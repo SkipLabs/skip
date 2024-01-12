@@ -16,9 +16,9 @@ SKDB_CLI_DIR=$(SRV_DIR)/node_modules/skdb
 SKDB_CLI_CMD=./dist/skdb-cli.mjs
 SKDB_CMD=$(REAL_DIR)/target/host/release/skdb
 SKDB_DATABASES=$(SRV_DIR)/dbs
-SKGW_DIR=$(SERVER_DIR)/skgw
+SKGW_DIR=$(SERVER_DIR)/dev
 SKDB_INIT=$(ROOT_DIR)/privacy/init.sql
-SKGW_JAR=$(SERVER_DIR)/skgw/build/libs/skgw.jar
+SKGW_JAR=$(SKGW_DIR)/build/libs/dev.jar
 SERVER_JAR=$(SRV_DIR)/server.jar
 
 default: build
