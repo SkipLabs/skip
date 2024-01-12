@@ -139,21 +139,11 @@ test-soak:
 
 # run targets
 
-.PHONY: run-server
-run-server: sql/target/host/dev/skdb build/init.sql
-	mkdir -p build
-	cp sql/target/host/dev/skdb build
-	./sql/server/deploy/start.sh --DANGEROUS-no-encryption --dev
-
 .PHONY: run-dev-server
 run-dev-server: sql/target/host/dev/skdb build/init.sql
 	mkdir -p build
 	cp sql/target/host/dev/skdb build
 	(cd sql/server/dev && gradle --console plain run)
-
-.PHONY: run-chaos
-run-chaos: build/skdb
-	./sql/server/deploy/chaos.sh
 
 # useful for testing in a browser
 build/index.html: sql/js/index.html
