@@ -29,7 +29,7 @@ type ProtoQuerySchema = {
 type ProtoRequestTail = {
   type: "tail";
   table: string;
-  schema: string;
+  expectedSchema: string;
   since: bigint;
   filterExpr: string;
   params: Params;
@@ -1520,7 +1520,7 @@ class SKDBServer implements RemoteSKDB {
         return {
           type: "tail",
           table: def.table,
-          schema: def.schema,
+          expectedSchema: def.schema,
           since: this.client.watermark(this.replicationUid, def.table),
           filterExpr: def.filterExpr || "",
           params: new Map(),
