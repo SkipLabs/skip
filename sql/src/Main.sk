@@ -30,15 +30,6 @@ fun getFieldNames(
   dirDescr.schema.map(x -> x.name.origName);
 }
 
-fun fixUpDirName(dirNameStr: String): SKStore.DirName {
-  chars = dirNameStr.chars();
-  SKStore.DirName::create(
-    (if (chars[0] != '/') "/" else "") +
-      dirNameStr +
-      (if (chars[chars.size() - 1] != '/') "/" else ""),
-  )
-}
-
 // Read a single line from stdin, decode it to a JSON Object, expected
 // to be a map from key strings (parameter names) to values.
 fun queryParams(options: SKDB.Options): Map<String, P.Value> {
