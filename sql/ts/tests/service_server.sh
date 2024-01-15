@@ -87,26 +87,3 @@ done
 if [ $i -ge 10 ]; then
   exit 2
 fi
-
-i=0
-while ! [ -f ~/.skdb/credentials ];
-do
-  sleep 2
-  i=$((i+1))
-  if [ $i -eq 30 ]; then
-    kill $pid1
-    exit 2
-  fi
-done
-
-sleep 2
-
-key=$(jq -r ".[\"ws://localhost:$skdb_port\"].skdb_service_mgmt.root" < ~/.skdb/credentials)
-
-echo "sknpm.env:SKDB_CREDENTIAL=$key"
-
-if [ "$key" = "null" ]; then
-    echo "Credential not found for $host." 1>&2
-    kill $pid1
-    exit 1
-fi
