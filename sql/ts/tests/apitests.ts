@@ -42,7 +42,6 @@ async function getCredsFromDevServer(host: string, port: number, database: strin
 }
 
 export async function setup(
-  credentials: string,
   port: number,
   crypto,
   asWorker: boolean,
