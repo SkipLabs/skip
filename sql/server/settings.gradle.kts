@@ -8,4 +8,4 @@
  */
 
 rootProject.name = "server"
-include("skgw", "core", "dev")
+include("core", "dev")

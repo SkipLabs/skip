@@ -12,13 +12,12 @@ git clean -xd --dry-run | sed 's|Would remove |/|g' >> .dockerignore
 echo ".git" >> .dockerignore
 
 dockerbuild () {
-    docker build . --no-cache --progress=plain --tag $1 --file $2/Dockerfile
+    docker build . --no-cache --progress=plain --tag "$1" --file "$2/Dockerfile" $3
 }
 
-dockerbuild skiplabs/skdb-base .
-dockerbuild skiplabs/skdb sql
-dockerbuild skiplabs/skdb-dev-server sql/server/dev
-[[ -f $USER/Dockerfile ]] && dockerbuild $USER-skdb $USER
+dockerbuild skiplabs/skdb-base . --platform=linux/amd64
+dockerbuild skiplabs/skdb sql --platform=linux/amd64
+dockerbuild skiplabs/server-core sql/server/core
 
 git restore .dockerignore
 
