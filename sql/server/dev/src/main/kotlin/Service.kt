@@ -23,6 +23,7 @@ import io.skiplabs.skdb.SchemaScope
 import io.skiplabs.skdb.Skdb
 import io.skiplabs.skdb.Stream
 import io.skiplabs.skdb.TailSpec
+import io.skiplabs.skdb.UserConfig
 import io.skiplabs.skdb.WebSocket
 import io.skiplabs.skdb.createSkdb
 import io.skiplabs.skdb.decodeProtoMsg
@@ -172,7 +173,7 @@ class RequestHandler(
         }
       }
       is ProtoCreateDb -> {
-        stream.error(2003u, "DB creation not supported. Use `--create-db <db>`.")
+        stream.error(2003u, "DB creation not supported or necessary in the dev server.")
       }
       is ProtoCreateUser -> {
         val privateKey = genPrivateKey()
@@ -253,7 +254,11 @@ fun connectionHandler(
                     throw RuntimeException("database not provided")
                   }
 
-                  val skdb = openSkdb(db)
+                  var skdb = openSkdb(db)
+                  if (skdb == null) {
+                    createDb(db)
+                    skdb = openSkdb(db)
+                  }
 
                   var replicationId: String? = null
                   var accessKey: String? = null
@@ -433,7 +438,16 @@ fun createHttpServer(
   return Undertow.builder().addHttpListener(ENV.port, "0.0.0.0").setHandler(pathHandler).build()
 }
 
-fun main() {
+fun main(args: Array<String>) {
+  val arglist = args.toList()
+  val configIdx = arglist.indexOf("--config")
+  if (configIdx >= 0 && arglist.size > configIdx + 1) {
+    val configFile = arglist.get(configIdx + 1)
+    if (File(configFile).exists()) {
+      ENV = UserConfig.fromFile(configFile)
+    }
+  }
+
   val taskPool = Executors.newSingleThreadScheduledExecutor()
   val workerPool = Executors.newSingleThreadExecutor()
   val connHandler = connectionHandler(workerPool, taskPool)

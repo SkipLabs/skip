@@ -22,8 +22,26 @@ function getErrorMessage(error: any) {
   }
 }
 
+async function getCredsFromDevServer(host: string, port: number, database: string) {
+  const creds = new Map();
+  try {
+    const resp = await fetch(`http://${host}:${port}/dbs/${database}/users`);
+    const data = await resp.text();
+    const users = data
+      .split("\n")
+      .filter((line) => line.trim() != "")
+      .map((line) => JSON.parse(line));
+    for (const user of users) {
+      creds.set(user.accessKey, user.privateKey);
+    }
+  } catch (ex: any) {
+    throw new Error("Could not fetch from the dev server, is it running?");
+  }
+
+  return creds;
+}
+
 export async function setup(
-  credentials: string,
   port: number,
   crypto,
   asWorker: boolean,
@@ -31,46 +49,22 @@ export async function setup(
 ) {
   const host = "ws://localhost:" + port;
   const dbName = "test" + suffix;
-  let skdb = await createSkdb({ asWorker: asWorker });
-  {
-    const b64key = credentials;
-    const keyData = Uint8Array.from(atob(b64key), (c) => c.charCodeAt(0));
-    const key = await crypto.subtle.importKey(
-      "raw",
-      keyData,
-      { name: "HMAC", hash: "SHA-256" },
-      false,
-      ["sign"],
-    );
-    await skdb.connect("skdb_service_mgmt", "root", key, host);
-  }
-  const remote = await skdb.connectedRemote();
-  const testRootCreds = await remote!.createDatabase(dbName);
-  // avoid flaky integration tests by bumping the request rate
-  // limiting. usually you interact mostly with your local db so the
-  // limit is a little low, but the integration tests - by nature -
-  // have a different profile
-  await remote!.exec(
-    "INSERT INTO server_config (key, db, dblVal) VALUES (@key, @dbName, @limit);",
-    {
-      key: "max_conn_qps",
-      dbName,
-      limit: 100,
-    },
-  );
-  skdb.closeConnection();
+
+  const testRootCreds = await getCredsFromDevServer("localhost", port, dbName);
 
   const rootSkdb = await createSkdb({ asWorker: asWorker });
   {
-    const keyData = testRootCreds.privateKey;
+    const keyBytes = Uint8Array.from(atob(testRootCreds.get("root")), (c) =>
+      c.charCodeAt(0),
+    );
     const key = await crypto.subtle.importKey(
       "raw",
-      keyData,
+      keyBytes,
       { name: "HMAC", hash: "SHA-256" },
       false,
       ["sign"],
     );
-    await rootSkdb.connect(dbName, testRootCreds.accessKey, key, host);
+    await rootSkdb.connect(dbName, "root", key, host);
   }
 
   const rootRemote = await rootSkdb.connectedRemote();

@@ -16,6 +16,9 @@ dependencies {
   // http/ws server
   implementation("io.undertow:undertow-core:2.3.9.Final")
 
+  // coroutines
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.1")
+
   implementation(project(":core"))
 }
 
@@ -25,6 +28,16 @@ application {
 
 tasks.named<Test>("test") {
   useJUnitPlatform()
+}
+
+task("runMuxTestServer", JavaExec::class) {
+  mainClass.set("io.skiplabs.skdb.test.MuxTestServerKt")
+  classpath = sourceSets["test"].runtimeClasspath
+}
+
+task("runMuxTestClient", JavaExec::class) {
+  mainClass.set("io.skiplabs.skdb.test.MuxTestClientKt")
+  classpath = sourceSets["test"].runtimeClasspath
 }
 
 tasks.jar {
