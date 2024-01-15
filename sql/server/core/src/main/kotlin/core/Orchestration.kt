@@ -64,7 +64,7 @@ fun decodeParams(data: ByteBuffer): Map<String, Any?> {
   val paramsBytes = ByteArray(paramsLength.toInt())
   data.get(paramsBytes)
   // TODO: decode json in to map
-  return HashMap<String, Object>()
+  return HashMap<String, Any>()
 }
 
 fun decodeProtoMsg(data: ByteBuffer): ProtoMessage {
