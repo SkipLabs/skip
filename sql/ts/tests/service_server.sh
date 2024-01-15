@@ -42,7 +42,7 @@ source $1/bin/sdkman-init.sh
 cd $2
 
 run_server () {
-    java -jar $4 --config $2   &> $3/server.log &
+    java -jar $4 --config $2 &> $3/server.log &
     pid1=$!
 
     host="http://localhost:$1"
@@ -50,7 +50,7 @@ run_server () {
     i=0
     while [[ $i -lt 10 ]];
     do
-        if wget -q -o /dev/null $host 2>&1; then
+        if curl --max-time 30 $host >/dev/null 2>&1; then
             echo "Server is running on port $1" 1>&2
             break;
         fi
@@ -59,6 +59,8 @@ run_server () {
     done
     if [[ $i -ge 10 ]]; then
         echo "Gave up waiting for server $pid1 to start at $host" 1>&2;
+        echo "Config:" 1>&2
+        cat "$2" 1>&2
     fi
 
     exists=$(kill -0 $pid1);

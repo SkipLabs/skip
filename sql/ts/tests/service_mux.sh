@@ -26,7 +26,7 @@ run_test_server () {
     i=0
     while [[ $i -lt 10 ]];
     do
-        if wget -q -o /dev/null $thost 2>&1; then
+        if curl --max-time 5 $thost >/dev/null 2>&1; then
             echo "Test server is running on port 8090" 1>&2
             break;
         fi
