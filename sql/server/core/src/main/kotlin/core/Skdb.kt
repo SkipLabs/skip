@@ -87,7 +87,7 @@ class Skdb(val name: String, private val dbPath: String) {
     val adapter: JsonAdapter<Map<String, Any?>> =
         moshi.adapter(
             Types.newParameterizedType(Map::class.java, String::class.java, Object::class.java))
-    buf.append(adapter.toJson(params))
+    buf.append(adapter.serializeNulls().toJson(params))
     buf.append("\n")
     buf.append(stmts)
     return blockingRun(
