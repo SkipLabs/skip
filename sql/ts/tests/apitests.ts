@@ -22,7 +22,11 @@ function getErrorMessage(error: any) {
   }
 }
 
-async function getCredsFromDevServer(host: string, port: number, database: string) {
+async function getCredsFromDevServer(
+  host: string,
+  port: number,
+  database: string,
+) {
   const creds = new Map();
   try {
     const resp = await fetch(`http://${host}:${port}/dbs/${database}/users`);
@@ -206,7 +210,15 @@ async function testSchemaQueries(skdb: SKDB) {
 }
 
 async function testMirroring(skdb: SKDB) {
-  await skdb.mirror("test_pk", "view_pk");
+  const test_pk = {
+    table: "test_pk",
+    expectedColumns: "(x INTEGER PRIMARY KEY, y INTEGER, skdb_access TEXT)",
+  };
+  const view_pk = {
+    table: "view_pk",
+    expectedColumns: "(x INTEGER, y INTEGER, skdb_access TEXT)",
+  };
+  await skdb.mirror(test_pk, view_pk);
 
   const testPkRows = await waitSynch(
     skdb,
@@ -223,7 +235,7 @@ async function testMirroring(skdb: SKDB) {
   expect(viewPkRows).toEqual([{ x: 42, y: 63 }]);
 
   // mirror already mirrored table is idempotent
-  await skdb.mirror("test_pk", "view_pk");
+  await skdb.mirror(test_pk, view_pk);
   const testPkRows2 = await skdb.exec("SELECT x,y FROM test_pk");
   expect(testPkRows2).toEqual([{ x: 42, y: 21 }]);
 }
@@ -336,7 +348,25 @@ async function testLargeMirror(root: SKDB, user: SKDB) {
   const rootRemote = await root.connectedRemote();
   rootRemote!.exec("CREATE TABLE large (t INTEGER, skdb_access TEXT);");
   rootRemote!.exec("CREATE TABLE large_copy (t INTEGER, skdb_access TEXT);");
-  await user.mirror("test_pk", "view_pk", "large");
+
+  const test_pk = {
+    table: "test_pk",
+    expectedColumns: "(x INTEGER PRIMARY KEY, y INTEGER, skdb_access TEXT)",
+  };
+  const view_pk = {
+    table: "view_pk",
+    expectedColumns: "(x INTEGER, y INTEGER, skdb_access TEXT)",
+  };
+  const large = {
+    table: "large",
+    expectedColumns: "(t INTEGER, skdb_access TEXT)",
+  };
+  const large_copy = {
+    table: "large_copy",
+    expectedColumns: "(t INTEGER, skdb_access TEXT)",
+  };
+
+  await user.mirror(test_pk, view_pk, large);
 
   const N = 10000;
 
@@ -361,7 +391,7 @@ async function testLargeMirror(root: SKDB, user: SKDB) {
   );
   expect(cnt).toEqual([{ n: N }]);
 
-  await user.mirror("test_pk", "view_pk", "large", "large_copy");
+  await user.mirror(test_pk, view_pk, large, large_copy);
 
   const localCnt = await user.exec("select count(*) as n from large", {});
   expect(localCnt).toEqual([{ n: N }]);
@@ -388,8 +418,16 @@ async function testReboot(root: SKDB, user: SKDB, user2: SKDB) {
 }
 
 async function testJSPrivacy(skdb: SKDB, skdb2: SKDB) {
-  await skdb.mirror("test_pk", "view_pk");
-  await skdb2.mirror("test_pk", "view_pk");
+  const test_pk = {
+    table: "test_pk",
+    expectedColumns: "(x INTEGER PRIMARY KEY, y INTEGER, skdb_access TEXT)",
+  };
+  const view_pk = {
+    table: "view_pk",
+    expectedColumns: "(x INTEGER, y INTEGER, skdb_access TEXT)",
+  };
+  await skdb.mirror(test_pk, view_pk);
+  await skdb2.mirror(test_pk, view_pk);
   await skdb.exec(
     "INSERT INTO skdb_groups VALUES ('my_group', @uid, @uid, 'read-write');",
     { uid: skdb.currentUser },
@@ -435,8 +473,16 @@ async function testJSPrivacy(skdb: SKDB, skdb2: SKDB) {
 }
 
 async function testJSGroups(skdb1: SKDB, skdb2: SKDB) {
-  await skdb1.mirror("test_pk", "view_pk");
-  await skdb2.mirror("test_pk", "view_pk");
+  const test_pk = {
+    table: "test_pk",
+    expectedColumns: "(x INTEGER PRIMARY KEY, y INTEGER, skdb_access TEXT)",
+  };
+  const view_pk = {
+    table: "view_pk",
+    expectedColumns: "(x INTEGER, y INTEGER, skdb_access TEXT)",
+  };
+  await skdb1.mirror(test_pk, view_pk);
+  await skdb2.mirror(test_pk, view_pk);
   const user1 = skdb1.currentUser!;
   const user2 = skdb2.currentUser!;
   const group = await skdb1.createGroup();
