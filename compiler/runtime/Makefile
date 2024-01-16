@@ -38,12 +38,6 @@ magic.c:
 	date | cksum | awk '{print "unsigned long version = " $$1 ";"}' > magic.c
 	echo "int SKIP_get_version() { return (int)version; }" >> magic.c
 
-magic.bc: magic.c
-	clang $(OLEVEL) $(CC32FLAGS) -o $@ -c $<
-
-magic.o: magic.c
-	clang $(CC64FLAGS) -o $@ -c $<
-
 libskip_runtime32.bc: $(BCFILES32)
 	llvm-link $(BCFILES32) -o $@
 
