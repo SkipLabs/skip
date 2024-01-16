@@ -266,7 +266,14 @@ mutable class Compiler{
     origFrom = this.compileFrom(context, joinFrom);
     (!cond, from) = this.compileJoin(context, origFrom, select.where);
     !select.where = cond;
-    params = this.compileParams(context, select.params, origFrom);
+    paramsWithAliases = this.compileParams(context, select.params, origFrom);
+    for ((param, alias) in paramsWithAliases) {
+      alias match {
+      | Some(name) -> this.subst![P.Identifier(name)] = param
+      | None _ -> void
+      }
+    };
+    params = paramsWithAliases.map(p -> p.i0);
     where = this.compileWhere(context, select.where);
     groupBy = this.compileGroupBy(context, select.groupBy, params);
     having = this.compileHaving(context, select.having);
@@ -467,7 +474,7 @@ mutable class Compiler{
     context: mutable SKStore.Context,
     selectParams: Array<P.SelectResult>,
     origFrom: Array<DirDescr>,
-  ): Array<CGExpr> {
+  ): Array<(CGExpr, ?P.Name)> {
     origFromMap = mutable Map[];
     for (table in origFrom) {
       if (!origFromMap.containsKey(table.name)) {
@@ -513,7 +520,7 @@ mutable class Compiler{
     };
 
     expandedSParams.toArray().map(param -> {
-      this.compileExpr(context, param.expr)
+      (this.compileExpr(context, param.expr), param.alias)
     })
   }
 
