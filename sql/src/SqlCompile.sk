@@ -2307,7 +2307,6 @@ mutable class Compiler{
 fun parsePattern(str: Vector<Char>): Pattern {
   text = mutable Vector[];
   subs = mutable Vector[];
-  hasUnderscore = false;
   for (c in str) {
     if (c == '%') {
       if (text.size() != 0) {
@@ -2315,9 +2314,6 @@ fun parsePattern(str: Vector<Char>): Pattern {
         text.clear();
       };
       continue;
-    };
-    if (c == '_') {
-      !hasUnderscore = true;
     };
     text.push(c);
   };
@@ -2327,7 +2323,7 @@ fun parsePattern(str: Vector<Char>): Pattern {
   };
   firstIsPercent = str.size() > 0 && str[0] == '%';
   lastIsPercent = str.size() > 0 && str[str.size() - 1] == '%';
-  Pattern{hasUnderscore, firstIsPercent, lastIsPercent, subs => subs.toArray()}
+  Pattern{firstIsPercent, lastIsPercent, subs => subs.toArray()}
 }
 
 // Translate `skdb_permission(arg)` to the corresponding permission mask integer
