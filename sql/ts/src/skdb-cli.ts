@@ -320,7 +320,9 @@ if (args.values["create-db"]) {
   const result = await remote!.createDatabase(db);
   // b64 encode
   const newDbCreds = {};
-  newDbCreds[result.accessKey] = Buffer.from(result.privateKey).toString('base64');
+  newDbCreds[result.accessKey] = Buffer.from(result.privateKey).toString(
+    "base64",
+  );
   console.log(`Successfully created database: ${db}.`);
   console.log(`Credentials for ${db}: `, newDbCreds);
 
@@ -336,7 +338,7 @@ if (args.values["create-user"]) {
   const result = await remote!.createUser();
   // b64 encode
   const newDbCreds = {};
-  const b64pk = Buffer.from(result.privateKey).toString('base64');
+  const b64pk = Buffer.from(result.privateKey).toString("base64");
   newDbCreds[result.accessKey] = b64pk;
   console.log("Successfully created user: ", newDbCreds);
 
@@ -487,9 +489,7 @@ const localRepl = async function () {
       console.log(".schema -- Output the schema.");
       console.log(".table-schema <table> -- Output the schema <table>.");
       console.log(".view-schema <view> -- Output the schema for <view>.");
-      console.log(
-        ".mirror <table1> <schema1> <table2> <schema2> ... -- Mirror the remote tables.",
-      );
+      console.log(".mirror <table1> <table2> ... -- Mirror the remote tables.");
       continue;
     }
 
@@ -542,32 +542,15 @@ const localRepl = async function () {
     }
 
     if (query.startsWith(".mirror")) {
-      let args = query.substring(7).trim();
-      let mirror_defns: Array<{ table: string; expectedColumns: string }> = [];
-      try {
-        while (args.length > 0) {
-          const tablename_length = args.indexOf(" ");
-          if (tablename_length == -1) throw new Error();
-          const table = args.slice(0, tablename_length);
-          args = args.slice(tablename_length).trim();
-
-          const cols_length = args.indexOf(")");
-          if (cols_length == -1) throw new Error();
-          const cols = args.slice(0, cols_length);
-          args = args.slice(cols_length).trim();
-          mirror_defns.push({ table: table, expectedColumns: cols });
-        }
-      } catch {
-        console.error(`Malformed mirror command "${query}"`);
-        console.error(
-          'Expected: ".mirror <table1> <schema1> <table2> <schema2> ..."',
-        );
-        continue;
-      }
+      const args = query.split(" ");
+      const tables = args.slice(1);
+      const mirror_defns = tables.map((table) => ({
+        table: table,
+        expectedColumns: "*",
+      }));
       try {
         await skdb.mirror(...mirror_defns);
       } catch (ex) {
-        const tables = mirror_defns.map((md) => md.table);
         console.error(`Could not mirror tables ${tables}.`);
         console.error(ex);
       }
