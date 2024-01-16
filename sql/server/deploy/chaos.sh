@@ -14,7 +14,7 @@ fi
 
 source "$SDKMAN/bin/sdkman-init.sh"
 
-cd $SCRIPT_DIR/../skgw
+cd $SCRIPT_DIR/../dev
 
 ################################################################################
 # start server in background
@@ -27,13 +27,13 @@ SERVER_LOG=/tmp/server.log
 
 if [ -f ~/.skdb/config.prop ];then
     file=$(realpath ~/.skdb/config.prop)
-    SERVER_ARGS="--config $file"
+    SERVER_ARGS="--args=\"--config $file\""
 else
     SERVER_ARGS=
 fi
 
 function start_server {
-    gradle --console plain run --args="--DANGEROUS-no-encryption --dev $SERVER_ARGS" > $SERVER_LOG 2>&1 &
+    gradle --console plain run $SERVER_ARGS > $SERVER_LOG 2>&1 &
     pid=$!
     echo $pid > $SERVER_PID_FILE
     echo "started server: $pid"
