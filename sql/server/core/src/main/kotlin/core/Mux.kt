@@ -1035,11 +1035,19 @@ class MuxedSocket(
   }
 
   private fun sendClose(code: Int, reason: String) {
-    channel.sendClose(code, reason)
+    try {
+      channel.sendClose(code, reason)
+    } catch (ex: Exception) {
+      onSocketError(0u, "IO failure while sending close")
+    }
   }
 
   private fun sendData(data: ByteBuffer) {
-    channel.sendData(data)
+    try {
+      channel.sendData(data)
+    } catch (ex: Exception) {
+      onSocketError(0u, "IO failure while sending data")
+    }
   }
 
   private fun scheduleSessionTimeout() {
