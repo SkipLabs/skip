@@ -29,7 +29,7 @@ type ProtoQuerySchema = {
 type ProtoRequestTail = {
   type: "tail";
   table: string;
-  expectedSchema: string;
+  expectedColumns: string;
   since: bigint;
   filterExpr: string;
   params: Params;
@@ -136,8 +136,9 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
       const serialisedParams = JSON.stringify(params);
 
       const buf = new ArrayBuffer(
-        18 +
+        20 +
           msg.table.length * 4 +
+          msg.expectedColumns.length * 4 +
           msg.filterExpr.length * 4 +
           serialisedParams.length * 4,
       );
@@ -152,7 +153,15 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
       dataView.setBigUint64(4, msg.since, false);
       dataView.setUint16(12, encodeResult.written || 0, false);
 
-      const filterExprOffset = 14 + (encodeResult.written || 0);
+      const expectedColsOffset = 14 + (encodeResult.written || 0);
+      encodeResult = textEncoder.encodeInto(
+        msg.expectedColumns,
+        uint8View.subarray(expectedColsOffset + 2),
+      );
+      dataView.setUint16(expectedColsOffset, encodeResult.written || 0, false);
+
+      const filterExprOffset =
+        expectedColsOffset + 2 + (encodeResult.written || 0);
       encodeResult = textEncoder.encodeInto(
         msg.filterExpr,
         uint8View.subarray(filterExprOffset + 2),
@@ -169,7 +178,11 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
       return buf.slice(0, paramsOffset + 2 + (encodeResult.written || 0));
     }
     case "tailBatch": {
-      const buffers = msg.requests.map((req) => encodeProtoMsg(req));
+      const buffers = msg.requests.map((req) => {
+        const td = new TextDecoder();
+        const buf = encodeProtoMsg(req);
+        return buf;
+      });
       const size = buffers.reduce((acc, b) => acc + b.byteLength, 0);
       const buf = new ArrayBuffer(4 + size);
       const uint8View = new Uint8Array(buf);
@@ -1520,9 +1533,9 @@ class SKDBServer implements RemoteSKDB {
         return {
           type: "tail",
           table: def.table,
-          expectedSchema: def.expectedColumns,
+          expectedColumns: def.expectedColumns,
           since: this.client.watermark(this.replicationUid, def.table),
-          filterExpr: def.filterExpr || "",
+          filterExpr: def.filterExpr ?? "",
           params: new Map(),
         };
       });
@@ -1531,7 +1544,6 @@ class SKDBServer implements RemoteSKDB {
         requests: reqs,
       });
     };
-
     return new Promise((resolve, _reject) => {
       stream.onData = (data) => {
         if (decoder.push(data)) {
@@ -1585,7 +1597,6 @@ class SKDBServer implements RemoteSKDB {
     const request: ProtoPushPromise = {
       type: "pushPromise",
     };
-
     stream.send(encodeProtoMsg(request));
 
     let fileName = tables.join("_") + "_" + this.creds.accessKey;
@@ -1661,8 +1672,7 @@ class SKDBServer implements RemoteSKDB {
     if (tables.length < 1) {
       throw new Error("Must specify at least one table to mirror");
     }
-
-    const setupTable = async (mirror_defn : MirrorDefn) => {
+    const setupTable = async (mirror_defn: MirrorDefn) => {
       const tableName: string = mirror_defn.table;
       const expectedSchema: string = mirror_defn.expectedColumns;
 
@@ -1688,7 +1698,6 @@ class SKDBServer implements RemoteSKDB {
         this.mirroredTables.add(tableName);
       }
     };
-
     // mirror has replace semantics. start by tearing down any current
     // mirror session. re-establishing is relatively cheap.
     if (this.localTailSession !== undefined) {
