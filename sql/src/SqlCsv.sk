@@ -195,23 +195,26 @@ fun reasonSchemaUnsupported(
         } column.`,
       )
     };
-    try {
-      Some(P.Parser::create(schema).parseCreateTableSchema().columns)
-    } catch {
-    | _exn -> None()
-    } match {
-    | None() ->
-      return Some(
-        "Malformed schema: expects parenthesized column-separated list of column definitions.",
-      )
-    | Some(requestSchema) ->
-      if (
-        requestSchema.size() != dirDescr.schema.size() ||
-        requestSchema.zip(dirDescr.schema).any(cols ~> cols.i0 != cols.i1)
-      ) {
+
+    if (schema != "*") {
+      try {
+        Some(P.Parser::create(schema).parseCreateTableSchema().columns)
+      } catch {
+      | _exn -> None()
+      } match {
+      | None() ->
         return Some(
-          "Cannot mirror table: provided schema does not match database.",
+          "Malformed schema: expects parenthesized column-separated list of column definitions.",
         )
+      | Some(requestSchema) ->
+        if (
+          requestSchema.size() != dirDescr.schema.size() ||
+          requestSchema.zip(dirDescr.schema).any(cols ~> cols.i0 != cols.i1)
+        ) {
+          return Some(
+            "Cannot mirror table: provided schema does not match database.",
+          )
+        }
       }
     };
     None()
