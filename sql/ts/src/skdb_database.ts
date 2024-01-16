@@ -313,7 +313,8 @@ export class SKDBSyncImpl implements SKDBSync {
           "(groupID TEXT NOT NULL, userID TEXT, permissions INTEGER NOT NULL, skdb_access TEXT NOT NULL)",
       },
     ]) {
-      if (!tables.some(is_mirror_def_of(metatable))) tables.push(metatable);
+      if (!tables.some(is_mirror_def_of(metatable.table)))
+        tables.push(metatable);
     }
     return this.connectedRemote!.mirror(...tables);
   }
@@ -425,5 +426,4 @@ export class SKDBImpl implements SKDB {
   async lookupGroup(groupID: string) {
     return SKDBGroupImpl.lookup(this, groupID);
   }
-
 }
