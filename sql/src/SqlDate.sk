@@ -14,7 +14,7 @@ module SKDB;
  *  localtime       | adjusts time value to its left to the local time
  *  utc             | adjusts time value to its left to the utc time
  *  tz <timezone>   | adjusts time value to its left to the specified timezone (<timezone>: ±D | ±DD | ±DDDD | ±DD:DD | ±DD:DD:DD)
- *  isutc           | force the time value to its left to be in utc time ingnoring current timezome
+ *  islocal         | force the time value to its left to be in local time
  */
 /*****************************************************************************/
 
@@ -61,8 +61,8 @@ mutable class DateTime(mutable date: SKDate.Calendar) {
         !ni = 7;
       };
       this.!date = this.date.toNextWeekDay(SKDate.Day::dayForCode(ni))
-    } else if (lex.isEq(pos, "isutc")) {
-      this.!date = this.date.withTimeZone(SKDate.utc)
+    } else if (lex.isEq(pos, "islocal")) {
+      this.!date = this.date.withTimeZone(SKDate.TZLocal())
     } else if (lex.isEq(pos, "utc")) {
       this.!date = this.date.deriveTimeZone(SKDate.utc)
     } else if (lex.isEq(pos, "localtime")) {
@@ -215,7 +215,7 @@ fun parseFullDate(
   | _ ->
     str.toFloatOption() match {
     | Some(julianDay) -> Some(SKDate.Calendar::fromJulianDay(julianDay, tz))
-    | _ -> SKDate.parseFullDate(str).map(e -> e.toCalendar())
+    | _ -> SKDate.Calendar::parse(str, tz)
     }
   }
 }
@@ -226,7 +226,7 @@ fun strftime(
   timeValue: String,
   modifiers: Array<String>,
 ): String {
-  optDateTime = parseFullDate(context, timeValue, SKDate.TZLocal());
+  optDateTime = parseFullDate(context, timeValue, SKDate.utc);
   optDateTime match {
   | Some(dateTime) ->
     dt = mutable DateTime(dateTime);
