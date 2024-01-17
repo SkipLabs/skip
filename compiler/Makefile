@@ -10,8 +10,8 @@ libdir   ?= $(exec_prefix)/lib
 .PHONY: default
 default: stage$(STAGE)
 
-.PHONY: runtime/libskip_runtime64.a
-runtime/libskip_runtime64.a:
+.PHONY: runtime/libskip_runtime64.bc
+runtime/libskip_runtime64.bc:
 	$(MAKE) -C runtime $(@F)
 
 .PHONY: runtime/libbacktrace/.libs/libbacktrace.a
@@ -27,9 +27,9 @@ bootstrap/%.ll: bootstrap/%.ll.gz
 
 stage%:
 	mkdir -p $@
-	$(MAKE) $@/bin/skc $@/bin/skfmt $@/bin/skargo $@/lib/libskip_runtime64.a $@/lib/libbacktrace.a $@/lib/libskip_runtime32.bc $@/lib/skip_preamble64.ll $@/lib/skip_preamble32.ll
+	$(MAKE) $@/bin/skc $@/bin/skfmt $@/bin/skargo $@/lib/libskip_runtime64.bc $@/lib/libbacktrace.a $@/lib/libskip_runtime32.bc $@/lib/skip_preamble64.ll $@/lib/skip_preamble32.ll
 
-stage%/lib/libskip_runtime64.a: runtime/libskip_runtime64.a
+stage%/lib/libskip_runtime64.bc: runtime/libskip_runtime64.bc
 	mkdir -p $(@D)
 	cp $< $@
 
@@ -49,15 +49,15 @@ stage%/lib/skip_preamble32.ll: preamble/preamble32.ll
 	mkdir -p $(@D)
 	cp $< $@
 
-stage0/bin/skargo: bootstrap/skargo_out64.ll stage0/lib/libskip_runtime64.a stage0/lib/libbacktrace.a
+stage0/bin/skargo: bootstrap/skargo_out64.ll stage0/lib/libskip_runtime64.bc stage0/lib/libbacktrace.a
 	mkdir -p $(@D)
 	clang++ -no-pie $(CXXFLAGS) -o $@ $^ -lpthread -g
 
-stage0/bin/skfmt: bootstrap/skfmt_out64.ll stage0/lib/libskip_runtime64.a stage0/lib/libbacktrace.a
+stage0/bin/skfmt: bootstrap/skfmt_out64.ll stage0/lib/libskip_runtime64.bc stage0/lib/libbacktrace.a
 	mkdir -p $(@D)
 	clang++ -no-pie $(CXXFLAGS) -o $@ $^ -lpthread -g
 
-stage0/bin/skc: bootstrap/skc_out64.ll stage0/lib/libskip_runtime64.a stage0/lib/libbacktrace.a
+stage0/bin/skc: bootstrap/skc_out64.ll stage0/lib/libskip_runtime64.bc stage0/lib/libbacktrace.a
 	mkdir -p $(@D)
 	clang++ -no-pie $(CXXFLAGS) -o $@ $^ -lpthread -g
 
@@ -77,7 +77,7 @@ stage3/bin/skc stage3/bin/skfmt stage3/bin/skargo: stage2
 .PHONY: install
 install: stage$(STAGE)
 	install -d $(libdir)
-	install -m 644 stage$(STAGE)/lib/libskip_runtime64.a $(libdir)
+	install -m 644 stage$(STAGE)/lib/libskip_runtime64.bc $(libdir)
 	install -m 644 stage$(STAGE)/lib/libbacktrace.a $(libdir)
 	install -m 644 stage$(STAGE)/lib/libskip_runtime32.bc $(libdir)
 	install -m 644 preamble/preamble64.ll $(libdir)/skip_preamble64.ll
