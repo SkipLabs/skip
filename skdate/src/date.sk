@@ -37,7 +37,7 @@ const daysInNonLeapYearMonth: Array<Int> = Array[
 class WeekDate(year: Int, week: Int, day: Day) uses Orderable {}
 
 base class Entity {
-  fun toCalendar(): Calendar;
+  fun toCalendar(tz: TZKind = TZLocal()): Calendar;
 }
 
 class Date private (
@@ -52,8 +52,8 @@ class Date private (
     date.addDays(day - 1);
   }
 
-  fun toCalendar(): Calendar {
-    Calendar::create(this)
+  fun toCalendar(tz: TZKind = TZLocal()): Calendar {
+    Calendar::create(this, Time::create(), tz)
   }
 
   fun toNextWeekDay(day: Day): Date {
@@ -438,8 +438,8 @@ class Time protected (
     time.addMilliseconds(milliseconds);
   }
 
-  fun toCalendar(): Calendar {
-    Calendar::current().setTime(this)
+  fun toCalendar(tz: TZKind = TZLocal()): Calendar {
+    Calendar::current().deriveTimeZone(tz).setTime(this)
   }
 
   static fun fromMilliseconds(milliseconds: Int): Time {
@@ -561,8 +561,12 @@ class Calendar private (
     Calendar::epoch(currentTimeMillis());
   }
 
-  fun toCalendar(): Calendar {
-    this
+  static fun parse(str: String, tz: TZKind = TZLocal()): ?Calendar {
+    parseFullDate(str, tz).map(e -> e.toCalendar(tz))
+  }
+
+  fun toCalendar(tz: TZKind = TZLocal()): Calendar {
+    this.deriveTimeZone(tz)
   }
 
   fun setTime(time: Time): Calendar {
