@@ -20,7 +20,7 @@ if [ -f ~/.skdb/config.prop ];then
 fi
 
 if [ -z "$skdb_port" ]; then
-    skdb_port=8080
+    skdb_port=3586
 fi
 
 if [ -z "$skdb_databases" ]; then

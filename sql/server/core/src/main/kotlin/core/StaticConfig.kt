@@ -18,7 +18,7 @@ class UserConfig(
     val addCredFormat: String,
 ) {
   companion object {
-    val SKDB_PORT = 8080
+    val SKDB_PORT = 3586
     val SKDB = "/skdb/build/skdb"
     val SKDB_INIT = "/skdb/build/init.sql"
     val SKDB_DATABASES = "/var/db"
