@@ -31,7 +31,7 @@ const setup = async function (client) {
     ["sign"],
   );
   const user = `test_user${client}`;
-  await skdb.connect("soak", user, key, "ws://localhost:" + (port ?? 8080));
+  await skdb.connect("soak", user, key, "ws://localhost:" + (port ?? 3586));
 
   const mirrorDefs = [
     ...tables,
