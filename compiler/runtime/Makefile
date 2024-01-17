@@ -23,8 +23,9 @@ CFILES=\
 	xoroshiro128plus.c
 
 NATIVE_FILES=\
-	palloc.c\
-	consts.c
+	consts.c \
+	palloc.c \
+	posix.c
 
 CFILES32=$(CFILES) runtime32_specific.c
 BCFILES32=magic.bc $(CFILES32:.c=.bc)
@@ -44,7 +45,7 @@ libskip_runtime32.bc: $(BCFILES32)
 %.bc: %.c
 	clang $(OLEVEL) $(CC32FLAGS) -o $@ -c $<
 
-libskip_runtime64.a: $(OFILES) posix.o runtime64_specific.o $(ONATIVE_FILES)
+libskip_runtime64.a: $(OFILES) runtime64_specific.o $(ONATIVE_FILES)
 	$(AR) rcs $@ $^
 
 .PHONY: libbacktrace
