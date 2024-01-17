@@ -102,14 +102,14 @@ run_test () {
   fi
 }
 
-run_date () {
-  echo "select strftime('$2', '$3');" | $SKDB >> "$1.out";
+run_l_date () {
+  echo "select strftime('$2', '$3', 'islocal');" | $SKDB >> "$1.out";
   date -d "$3"  +"$2" >> "$1.res";
 }
 
-run_u_date () {
-  echo "select strftime('$2', '$3', 'isutc');" | $SKDB >> "$1.out";
-  date -u -d "$3"  +"$2" >> "$1.res";
+run_date () {
+  echo "select strftime('$2', '$3');" | $SKDB >> "$1.out";
+  date -u -d "$3" +"$2" >> "$1.res";
 }
 
 run_date_test () {
@@ -148,8 +148,8 @@ run_date_test () {
   run_date $1 "w: %w" "$3"
   run_date $1 "Y: %Y" "$3"
   run_date $1 "y: %y" "$3"
-  run_date $1 "z: %z" "$3"
-  run_date $1 "Z: %Z" "$3"
+  run_l_date $1 "z: %z" "$3"
+  run_l_date $1 "Z: %Z" "$3"
   diff=$(diff -u "$1.out" "$1.res")
   if [ "$diff" == "" ]; then
       rm -f "$1.out"
@@ -225,24 +225,8 @@ run_modify_time () {
 ##############################################################################
 
 run_epoch_utc_test () {
-  while IFS="" read -r d || [ -n "$d" ]
-  do
-    run_u_date "$1" "%Y-%m-%d %H:%M:%S => %s" "$d"
-  done < "test/dates/valid_date_list2.txt"
-
-  diff=$(diff -u "$1.out" "$1.res")
-  if [ "$diff" == "" ]; then
-      rm -f "$1.out"
-      rm -f "$1.res"
-      pass "$2"
-  else
-      echo $diff > "$1.diff";
-      fail "$2"
-      exit 2
-  fi
-}
-
-run_epoch_locale_test () {
+  rm -f "$1.out"
+  rm -f "$1.res"
   while IFS="" read -r d || [ -n "$d" ]
   do
     run_date "$1" "%Y-%m-%d %H:%M:%S => %s" "$d"
@@ -260,8 +244,28 @@ run_epoch_locale_test () {
   fi
 }
 
+run_epoch_locale_test () {
+  rm -f "$1.out"
+  rm -f "$1.res"
+  while IFS="" read -r d || [ -n "$d" ]
+  do
+    run_l_date "$1" "%Y-%m-%d %H:%M:%S => %s" "$d"
+  done < "test/dates/valid_date_list2.txt"
+
+  diff=$(diff -u "$1.out" "$1.res")
+  if [ "$diff" == "" ]; then
+      rm -f "$1.out"
+      rm -f "$1.res"
+      pass "$2"
+  else
+      echo $diff > "$1.diff";
+      fail "$2"
+      exit 2
+  fi
+}
+
 # Make functions defined in this file visible to parallel's sub-shells
-export -f pass fail run_date run_u_date run_hour_test run_hour_test2 run_date_test run_test run_modify_time
+export -f pass fail run_date run_l_date run_hour_test run_hour_test2 run_date_test run_test run_modify_time
 
 run_hour_test2 "-365 day"
 run_hour_test2 "-366 day"
