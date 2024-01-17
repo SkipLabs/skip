@@ -1582,10 +1582,42 @@ class SKDBServer implements RemoteSKDB {
     stream.onData = (data) => {
       if (decoder.push(data)) {
         const msg = decoder.pop();
-        this.deliverDataTransferProtoMsg(msg, (payload) => {
-          // we only expect acks back in the form of checkpoints.
-          // let's store these as a watermark against the table.
+        this.deliverDataTransferProtoMsg(msg, (payload: string) => {
+          // the server responds with acks and any rejections
           client.writeCsv(payload, this.replicationUid);
+
+          // TODO:
+          const warningsEnabled = true;
+
+          if (!warningsEnabled) {
+            return
+          }
+
+          let count = 0;
+          let currentTable: string|undefined = undefined;
+
+          for (const line of payload.split("\n")) {
+            if (line.trim() === "") {
+              continue;
+            }
+
+            if (!currentTable) {
+              if (line.startsWith("^")) {
+                count = 0;
+                currentTable = line.split(" ")[0].substring(1);
+              }
+            } else {
+              if (line.startsWith("^") || line.startsWith(":")) {
+                if (count > 0) {
+                  console.warn("[skdb] %d row updates were rejected by the server. Query table %s to examine the rejected rows.", count, currentTable);
+                }
+                count = 0;
+                currentTable = line.startsWith("^") ? line.split(" ")[0].substring(1) : undefined;
+              } else {
+                count++;
+              }
+            }
+          }
         });
       }
     };
