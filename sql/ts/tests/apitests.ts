@@ -366,7 +366,7 @@ async function testLargeMirror(root: SKDB, user: SKDB) {
   };
   const large_copy = {
     table: "large_copy",
-    expectedColumns: "(t INTEGER, skdb_access TEXT)",
+    expectedColumns: "*", // just to test the *, would be better to be explicit
   };
 
   await user.mirror(test_pk, view_pk, large);
