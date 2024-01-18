@@ -1590,11 +1590,11 @@ class SKDBServer implements RemoteSKDB {
           const warningsEnabled = true;
 
           if (!warningsEnabled) {
-            return
+            return;
           }
 
           let count = 0;
-          let currentTable: string|undefined = undefined;
+          let currentTable: string | undefined = undefined;
 
           for (const line of payload.split("\n")) {
             if (line.trim() === "") {
@@ -1609,10 +1609,16 @@ class SKDBServer implements RemoteSKDB {
             } else {
               if (line.startsWith("^") || line.startsWith(":")) {
                 if (count > 0) {
-                  console.warn("[skdb] %d row updates were rejected by the server. Query table %s to examine the rejected rows.", count, currentTable);
+                  console.warn(
+                    "[skdb] %d row updates were rejected by the server. Query table %s to examine the rejected rows.",
+                    count,
+                    currentTable,
+                  );
                 }
                 count = 0;
-                currentTable = line.startsWith("^") ? line.split(" ")[0].substring(1) : undefined;
+                currentTable = line.startsWith("^")
+                  ? line.split(" ")[0].substring(1)
+                  : undefined;
               } else {
                 count++;
               }
