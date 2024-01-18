@@ -1610,8 +1610,16 @@ class SKDBServer implements RemoteSKDB {
               if (line.startsWith("^") || line.startsWith(":")) {
                 if (count > 0) {
                   console.warn(
-                    "[skdb] %d row updates were rejected by the server. Query table %s to examine the rejected rows.",
+                    "[skdb] %d row updates were rejected by the server. " +
+                      "Query table %s to examine the rejected rows.",
                     count,
+                    currentTable,
+                  );
+                  console.info(
+                    "[skdb] Rejected updates are caused by writes that violate " +
+                      "access rules. These rules are checked locally at write time so " +
+                      "must have changed concurrently. You can watchChanges on %s " +
+                      "if you wish to handle this with application logic.",
                     currentTable,
                   );
                 }
