@@ -18,17 +18,19 @@ export async function createSkdb(
     dbName?: string;
     asWorker?: boolean;
     getWasmSource?: () => Promise<Uint8Array>;
+    disableWarnings?: boolean;
   } = {},
 ): Promise<SKDB> {
   const asWorker =
     options.asWorker != undefined ? options.asWorker : !options.getWasmSource;
+  const disableWarnings = options.disableWarnings ?? false;
   if (!asWorker) {
-    return createOnMain(options.dbName, options.getWasmSource);
+    return createOnMain(disableWarnings, options.dbName, options.getWasmSource);
   } else {
     if (options.getWasmSource) {
       throw new Error("getWasmSource is not compatible with worker");
     }
-    return createWorker(options.dbName);
+    return createWorker(disableWarnings, options.dbName);
   }
 }
 
@@ -51,6 +53,7 @@ async function createSkdbSync(
 }
 
 async function createOnMain(
+  disableWarnings: boolean,
   dbName?: string,
   getWasmSource?: () => Promise<Uint8Array>,
 ) {
@@ -61,11 +64,13 @@ async function createOnMain(
     "SKDB_factory",
     getWasmSource,
   );
+  data.environment.disableWarnings = disableWarnings;
   return (data.environment.shared.get("SKDB") as SKDBShared).create(dbName);
 }
 
-async function createWorker(dbName?: string) {
+async function createWorker(disableWarnings: boolean, dbName?: string) {
   let env = await loadEnv(extensions);
+  env.disableWarnings = disableWarnings;
   let path: string;
   if (isNode()) {
     path = import.meta.url.replace("/skdb.mjs", "/skdb_nodeworker.mjs");
