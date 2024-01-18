@@ -1586,10 +1586,7 @@ class SKDBServer implements RemoteSKDB {
           // the server responds with acks and any rejections
           client.writeCsv(payload, this.replicationUid);
 
-          // TODO:
-          const warningsEnabled = true;
-
-          if (!warningsEnabled) {
+          if (this.env.disableWarnings) {
             return;
           }
 
@@ -1621,6 +1618,10 @@ class SKDBServer implements RemoteSKDB {
                       "must have changed concurrently. You can watchChanges on %s " +
                       "if you wish to handle this with application logic.",
                     currentTable,
+                  );
+                  console.info(
+                    "[skdb] To silence skdb warnings you can pass " +
+                      "`{ disableWarnings: true }` to createSkdb.",
                   );
                 }
                 count = 0;
