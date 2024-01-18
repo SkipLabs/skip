@@ -22,7 +22,11 @@ function getErrorMessage(error: any) {
   }
 }
 
-async function getCredsFromDevServer(host: string, port: number, database: string) {
+async function getCredsFromDevServer(
+  host: string,
+  port: number,
+  database: string,
+) {
   const creds = new Map();
   try {
     const resp = await fetch(`http://${host}:${port}/dbs/${database}/users`);
@@ -232,6 +236,7 @@ function waitSynch(
   skdb: SKDB,
   query: string,
   check: (v: any) => boolean,
+  query_params: Map<string, any> = new Map(),
   server: boolean = false,
   max: number = 6,
 ) {
@@ -248,11 +253,11 @@ function waitSynch(
     if (server) {
       skdb
         .connectedRemote()
-        .then((remote) => remote!.exec(query, new Map()))
+        .then((remote) => remote!.exec(query, query_params))
         .then(cb)
         .catch(reject);
     } else {
-      skdb.exec(query, new Map()).then(cb).catch(reject);
+      skdb.exec(query, query_params).then(cb).catch(reject);
     }
   };
   return new Promise(test);
@@ -320,6 +325,7 @@ async function testClientTail(root: SKDB, user: SKDB) {
     root,
     "select count(*) as cnt from test_pk where x = 97 and y = 98",
     (tail) => tail[0].cnt == 1,
+    new Map(),
     true,
   );
   expect(res).toEqual([{ cnt: 1 }]);
@@ -327,6 +333,7 @@ async function testClientTail(root: SKDB, user: SKDB) {
     root,
     "select count(*) as cnt from view_pk where x = 97 and y = 294",
     (tail) => tail[0].cnt == 1,
+    new Map(),
     true,
   );
   expect(resv).toEqual([{ cnt: 1 }]);
