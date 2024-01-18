@@ -213,7 +213,8 @@ async function testMirroring(skdb: SKDB) {
   const test_pk = {
     table: "test_pk",
     expectedColumns: "(x INTEGER PRIMARY KEY, y INTEGER, skdb_access TEXT)",
-    filterExpr: "x < 43",
+    filterExpr: "x < @thresh",
+    filterParams: { thresh: 43 },
   };
   const view_pk = {
     table: "view_pk",
