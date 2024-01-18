@@ -178,11 +178,7 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
       return buf.slice(0, paramsOffset + 2 + (encodeResult.written || 0));
     }
     case "tailBatch": {
-      const buffers = msg.requests.map((req) => {
-        const td = new TextDecoder();
-        const buf = encodeProtoMsg(req);
-        return buf;
-      });
+      const buffers = msg.requests.map(encodeProtoMsg);
       const size = buffers.reduce((acc, b) => acc + b.byteLength, 0);
       const buf = new ArrayBuffer(4 + size);
       const uint8View = new Uint8Array(buf);
