@@ -74,6 +74,26 @@ stage3/bin/skc stage3/bin/skfmt stage3/bin/skargo: stage2
 	(cd ../skargo && PATH=../compiler/stage2/bin:$(PATH) skargo build -r --target-dir ../compiler/stage3/bin)
 # 	TODO: Ensure stage2 == stage3.
 
+stageA/bin/skc:
+	mkdir -p stageA/bin
+	cp $(shell command -v skc) stageA/bin/skc
+
+stageA/bin/skargo:
+	mkdir -p stageA/bin
+	cp $(shell command -v skargo) stageA/bin/skargo
+
+stageA/bin/skfmt:
+	mkdir -p stageA/bin
+	cp $(shell command -v skfmt) stageA/bin/skfmt
+
+stageB/bin/skc stageB/bin/skfmt stageB/bin/skargo: stageA
+	PATH=stageA/bin/:$(PATH) skargo build -r --target-dir stageB/bin
+	(cd ../skargo && PATH=../compiler/stageA/bin:$(PATH) skargo build -r --target-dir ../compiler/stageB/bin)
+
+stageC/bin/skc stageC/bin/skfmt stageC/bin/skargo: stageB
+	PATH=stageB/bin/:$(PATH) skargo build -r --target-dir stageC/bin
+	(cd ../skargo && PATH=../compiler/stageB/bin:$(PATH) skargo build -r --target-dir ../compiler/stageC/bin)
+
 .PHONY: install
 install: stage$(STAGE)
 	install -d $(libdir)
