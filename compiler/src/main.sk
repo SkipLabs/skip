@@ -69,7 +69,13 @@ fun main(): void {
     _context ~> {
       SKStore.CStop(
         Some((context, _, _) ~> {
-          _result = compile(config, context, config.unknown);
+          try {
+            compile(config, context, config.unknown)
+          } catch {
+          | exn ->
+            print_error(exn.getMessage());
+            skipExit(2)
+          }
         }),
       )
     },
