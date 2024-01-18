@@ -1,5 +1,5 @@
 import { expect } from "@playwright/test";
-import { createSkdb, SKDB } from "skdb";
+import { createSkdb, SKDB, Params } from "skdb";
 
 type dbs = {
   root: SKDB;
@@ -244,7 +244,7 @@ function waitSynch(
   skdb: SKDB,
   query: string,
   check: (v: any) => boolean,
-  query_params: Map<string, any> = new Map(),
+  query_params: Params = new Map(),
   server: boolean = false,
   max: number = 6,
 ) {
