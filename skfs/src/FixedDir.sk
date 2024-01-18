@@ -107,15 +107,15 @@ class FixedDir<T: frozen> private {
     sorted = loop {
       !i = i + 1;
       if (i >= sz) break true;
-      keyComparison = data[i-1].key.compare(data[i].key);
+      keyComparison = data[i - 1].key.compare(data[i].key);
       keyComparison match {
-        | LT() -> continue;
-        | GT() -> break false;
-        | EQ() -> data[i-1].value.i0.compare(data[i].value.i0)
+      | LT() -> continue
+      | GT() -> break false
+      | EQ() -> data[i - 1].value.i0.compare(data[i].value.i0)
       } match {
-        | LT() -> continue;
-        | EQ() -> continue;
-        | GT() -> break false;
+      | LT() -> continue
+      | EQ() -> continue
+      | GT() -> break false
       };
     };
     if (!sorted) {

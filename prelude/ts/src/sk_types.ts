@@ -543,7 +543,7 @@ export class Utils {
       this.current_stdin++;
     }
     return lineBuffer;
-  }
+  };
 
   getStdInChar = () => {
     if (this.current_stdin >= this.stdin.length) {

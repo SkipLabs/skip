@@ -124,7 +124,7 @@ class LinksImpl implements Links {
       this.lineBuffer = utils.readStdInToEnd();
       return this.lineBuffer.length;
     };
-    this.SKIP_read_line_get = (i: int) =>  {
+    this.SKIP_read_line_get = (i: int) => {
       return this.lineBuffer[i];
     };
     this.SKIP_getchar = utils.getStdInChar;
