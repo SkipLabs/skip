@@ -463,10 +463,16 @@ async function testJSGroups(skdb1: SKDB, skdb2: SKDB) {
 
   // user1 can read, user2 can not
 
-  let user1_view = await skdb1.exec("SELECT * FROM test_pk WHERE x = 1001;");
-  let user2_view = await skdb2.exec("SELECT * FROM test_pk WHERE x = 1001;");
-  expect(user1_view).toHaveLength(1);
-  expect(user2_view).toHaveLength(0);
+  await waitSynch(
+    skdb1,
+    "SELECT * FROM test_pk WHERE x = 1001;",
+    (tail) => tail.length == 1,
+  );
+  await waitSynch(
+    skdb2,
+    "SELECT * FROM test_pk WHERE x = 1001;",
+    (tail) => tail.length == 0,
+  );
 
   // user1 can grant read+write permissions to user2,
   // after which user2 can insert & read
@@ -481,10 +487,16 @@ async function testJSGroups(skdb1: SKDB, skdb2: SKDB) {
     gid: group.groupID,
   });
   await new Promise((r) => setTimeout(r, 100));
-  user1_view = await skdb1.exec("SELECT * FROM test_pk WHERE x > 1000;");
-  user2_view = await skdb2.exec("SELECT * FROM test_pk WHERE x > 1000;");
-  expect(user1_view).toHaveLength(3);
-  expect(user2_view).toHaveLength(3);
+  await waitSynch(
+    skdb1,
+    "SELECT * FROM test_pk WHERE x > 1000;",
+    (tail) => tail.length == 3,
+  );
+  await waitSynch(
+    skdb2,
+    "SELECT * FROM test_pk WHERE x > 1000;",
+    (tail) => tail.length == 3,
+  );
 
   // user1 can grant admin permissions to user2, after which user2 can change member permissions
 
@@ -502,26 +514,30 @@ async function testJSGroups(skdb1: SKDB, skdb2: SKDB) {
   await group_as_user2.removeAdmin(user1);
   await new Promise((r) => setTimeout(r, 100));
 
-  let user1_view_owners = await skdb1.exec(
+  await waitSynch(
+    skdb1,
     "SELECT * FROM skdb_group_permissions WHERE groupID=@ownerGroupID;",
+    (owners) => owners.length == 0,
     { ownerGroupID: group.ownerGroupID },
   );
-  let user2_view_owners = await skdb2.exec(
+  await waitSynch(
+    skdb2,
     "SELECT * FROM skdb_group_permissions WHERE groupID=@ownerGroupID;",
+    (owners) => owners.length == 1,
     { ownerGroupID: group.ownerGroupID },
   );
-  let user1_view_admins = await skdb1.exec(
+  await waitSynch(
+    skdb1,
     "SELECT * FROM skdb_group_permissions WHERE groupID=@adminGroupID;",
+    (admins) => admins.length == 0,
     { adminGroupID: group.adminGroupID },
   );
-  let user2_view_admins = await skdb2.exec(
+  await waitSynch(
+    skdb2,
     "SELECT * FROM skdb_group_permissions WHERE groupID=@adminGroupID;",
+    (admins) => admins.length == 1,
     { adminGroupID: group.adminGroupID },
   );
-  expect(user1_view_owners).toHaveLength(0);
-  expect(user1_view_admins).toHaveLength(0);
-  expect(user2_view_owners).toHaveLength(1);
-  expect(user2_view_admins).toHaveLength(1);
 }
 
 export const apitests = (asWorker) => {
