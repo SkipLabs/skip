@@ -1,10 +1,5 @@
 package io.skiplabs.skdb
 
-import com.squareup.moshi.JsonAdapter
-import com.squareup.moshi.Moshi
-import com.squareup.moshi.Types
-import com.squareup.moshi.adapter
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.CharBuffer
@@ -83,11 +78,7 @@ class Skdb(val name: String, private val dbPath: String) {
 
   fun sql(stmts: String, params: Map<String, Any?>, format: OutputFormat): ProcessOutput {
     val buf = StringBuilder()
-    val moshi = Moshi.Builder().build()
-    val adapter: JsonAdapter<Map<String, Any?>> =
-        moshi.adapter(
-            Types.newParameterizedType(Map::class.java, String::class.java, Object::class.java))
-    buf.append(adapter.serializeNulls().toJson(params))
+    buf.append(jsonMapper.writeValueAsString(params))
     buf.append("\n")
     buf.append(stmts)
     return blockingRun(
@@ -196,9 +187,7 @@ class Skdb(val name: String, private val dbPath: String) {
             user,
             "--read-spec")
 
-    val moshi: Moshi = Moshi.Builder().addLast(KotlinJsonAdapterFactory()).build()
-    val jsonAdapter: JsonAdapter<Map<String, TailSpec>> = moshi.adapter<Map<String, TailSpec>>()
-    val serialisedSpec = jsonAdapter.serializeNulls().toJson(spec)
+    val serialisedSpec = jsonMapper.writeValueAsString(spec)
 
     // TODO: for hacky debug
     tailPb.redirectError(ProcessBuilder.Redirect.INHERIT)
@@ -330,8 +319,8 @@ class Skdb(val name: String, private val dbPath: String) {
   }
 
   fun canMirror(table: String, schema: String): Boolean {
-    val result = blockingRun(ProcessBuilder(ENV.skdbPath, "can-mirror", table, schema));
-    return result.decode() == "";
+    val result = blockingRun(ProcessBuilder(ENV.skdbPath, "can-mirror", table, schema))
+    return result.decode() == ""
   }
 }
 
