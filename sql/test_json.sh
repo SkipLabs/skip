@@ -63,21 +63,21 @@ else
 fi
 
 if echo "select json_check_schema('$schema', '{\"a\":22.0}')" | $SKDB 2>&1 | grep -q Error; then
-    pass "SCHEMA_CHECK2"
+    pass "SCHEMA_CHECK3"
 else
-    fail "SCHEMA_CHECK2"
+    fail "SCHEMA_CHECK3"
 fi
 
 if echo "select json_check_schema('$schema', '{\"a\":22.0}')" | $SKDB 2>&1 | grep -q Error; then
-    pass "SCHEMA_CHECK2"
+    pass "SCHEMA_CHECK4"
 else
-    fail "SCHEMA_CHECK2"
+    fail "SCHEMA_CHECK4"
 fi
 
 if echo "select json_check_schema(json_schema('$schema'), json('{\"b\":22.0}'))" | $SKDB 2>&1 | grep -q Error; then
-    pass "SCHEMA_CHECK2"
+    pass "SCHEMA_CHECK5"
 else
-    fail "SCHEMA_CHECK2"
+    fail "SCHEMA_CHECK5"
 fi
 
 echo "create virtual view paths as json_split(t1);" | $SKDB
@@ -104,3 +104,4 @@ if echo "insert into t1 values('$schema2', '{\"c\":3.3}');" | $SKDB 2>&1 | grep 
 else
     fail "ENFORCE_SCHEMA"
 fi
+

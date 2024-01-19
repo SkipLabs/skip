@@ -1310,6 +1310,7 @@ fun isPotentiallyEmpty(
     state[i] match {
     | Some(CInt(n)) -> if (n != 0) return false
     | Some(CFloat(f)) -> if (f < -0.01 || f > 0.01) return false
+    | Some(CSchema(_, ty)) -> if (ty.types.isEmpty()) return false
     | x ->
       debug(x);
       invariant_violation("Unexpected type")

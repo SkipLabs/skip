@@ -22,7 +22,7 @@ module SKJSON;
 
 class ParserError(msg: String) extends Exception {
   fun getMessage(): String {
-    this.msg
+    "Error: " + this.msg
   }
 }
 
@@ -178,7 +178,7 @@ mutable class Parser(lex: mutable Lexer) {
   }
 
   readonly fun error<T>(msg: String): T {
-    invariant_violation(msg)
+    throw ParserError(msg)
   }
 
   private mutable fun nextString(): String {

@@ -1425,6 +1425,10 @@ private mutable class SQLContext(
     (newContext, underLockF) = try {
       f(this.context with {globals => this.globals})
     } catch {
+    | err @ SKJSON.ParserError _
+    | err @ SKJSON.FieldError _
+    | err @ SKJSON.SuperTypeError _
+    | err @ SKJSON.ReconstructError _
     | err @ Error _ ->
       (SKStore.cloneContextWithError(this.context, err), None())
     | exn -> throw exn
