@@ -9,6 +9,7 @@ import java.util.Properties
 val USER_CONFIG_FILE = ".skdb.conf"
 var ENV = UserConfig.create()
 val SERVICE_MGMT_DB_NAME = "skdb_service_mgmt"
+val SKDB_PORT = 3586
 
 class UserConfig(
     val port: Int,
@@ -18,7 +19,6 @@ class UserConfig(
     val addCredFormat: String,
 ) {
   companion object {
-    val SKDB_PORT = 3586
     val SKDB = "/skdb/build/skdb"
     val SKDB_INIT = "/skdb/build/init.sql"
     val SKDB_DATABASES = "/var/db"
@@ -37,16 +37,6 @@ class UserConfig(
       return Optional.empty()
     }
 
-    fun default(): UserConfig {
-      return UserConfig(
-          SKDB_PORT,
-          SKDB,
-          SKDB_INIT,
-          SKDB_DATABASES,
-          SKDB_ADD_CRED,
-      )
-    }
-
     fun fromFile(file: String): UserConfig {
       FileInputStream(file).use {
         var prop = Properties()
@@ -62,12 +52,18 @@ class UserConfig(
       }
     }
 
-    fun create(): UserConfig {
+    fun create(port: Int = SKDB_PORT): UserConfig {
       var user_config_file = userConfigFile()
       if (user_config_file.isPresent()) {
         return fromFile(user_config_file.get())
       }
-      return default()
+      return UserConfig(
+          port,
+          SKDB,
+          SKDB_INIT,
+          SKDB_DATABASES,
+          SKDB_ADD_CRED,
+      )
     }
   }
 
