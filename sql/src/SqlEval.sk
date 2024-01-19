@@ -359,6 +359,21 @@ fun valueToCValue(
           ")",
       )
     }
+  | P.BLOB() -> error(pos, "Unsupported value: BLOB")
+  | P.JSON() ->
+    val match {
+    | P.VJSON(str) -> Some(CJSON(decodeJSON(context, str)))
+    | P.VString(str) -> Some(CJSON(decodeJSON(context, str)))
+    | v ->
+      error(
+        pos,
+        "Type mismatch on column " +
+          (idx + 1) +
+          " expected type TEXT (found " +
+          inspect(v).toString() +
+          ")",
+      )
+    }
   }
 }
 
@@ -572,11 +587,170 @@ class Evaluator{options: Options, user: ?UserFile} {
         this.makeIndex(context, index);
         context.update()
       })
+    | P.CreateView{
+      pos,
+      name => viewName,
+      ifNotExists,
+      query => P.SCall(funName, args),
+      virtual,
+    } ->
+      if (!virtual) {
+        error(pos, "table transforms can only be done in a virtual view");
+      };
+      funName.lower match {
+      | "json_split" ->
+        if (args.size() == 0) {
+          error(pos, "Missing argument for json_split");
+        };
+        if (args.size() > 1) {
+          error(pos, "Too many arguments for json_split");
+        };
+        args[0] match {
+        | P.Identifier(tableNameObj, _) ->
+          tableName = tableNameObj.lower;
+          views = getViewsDir(context);
+          viewsDir = context.unsafeGetEagerDir(views.dirName);
+          viewNameKey = SKStore.SID(viewName.lower);
+          if (viewsDir.getArrayRaw(viewNameKey).size() != 0) {
+            if (ifNotExists) return None();
+            error(pos, "VIEW " + viewName + " already exists");
+          } else {
+            tables = getTableDir(context);
+            tablesDir = context.unsafeGetEagerDir(tables.dirName);
+            if (tablesDir.getArrayRaw(viewNameKey).size() != 0) {
+              error(pos, "Table " + viewName + " exists");
+            };
+          };
+          Some((context, _, _) ~> {
+            tableDescr = getTable(context, pos, P.Name::create(tableName));
+            dir = SKStore.EHandle(
+              RowKey::keyType,
+              RowValues::type,
+              tableDescr.dirName,
+            );
+            if (tableDescr.schema.size() < 2) {
+              error(
+                pos,
+                "json_split can only be applied to a table with at least 2 columns",
+              );
+            };
+            if (
+              tableDescr.schema[0].primary is None() ||
+              tableDescr.schema[0].ty != P.TEXT()
+            ) {
+              error(
+                pos,
+                "json_split can only be applied to a table " +
+                  "where the first column is a TEXT primary key",
+              );
+            };
+            if (
+              tableDescr.schema[1].ty != P.TEXT() &&
+              tableDescr.schema[1].ty != P.JSON()
+            ) {
+              error(
+                pos,
+                "json_split can only be applied to a table " +
+                  "where the second column is TEXT or JSON",
+              );
+            };
+            dirName = SKStore.DirName::create("/" + viewName + "/");
+            viewDescr = DirDescr::create{
+              name => viewName,
+              dirName => dirName,
+              schema => Array[
+                P.ColumnDefinition{
+                  name => P.Name::create("id"),
+                  ty => P.TEXT(),
+                  primary => Some(
+                    P.CCPrimaryKey{
+                      order => P.IASC(),
+                      autoincrement => false,
+                      onConflict => None(),
+                    },
+                  ),
+                },
+                P.ColumnDefinition{
+                  name => P.Name::create("path"),
+                  ty => P.TEXT(),
+                },
+                P.ColumnDefinition{
+                  name => P.Name::create("type"),
+                  ty => P.TEXT(),
+                },
+                P.ColumnDefinition{
+                  name => P.Name::create("ivalue"),
+                  ty => P.INTEGER(),
+                },
+                P.ColumnDefinition{
+                  name => P.Name::create("fvalue"),
+                  ty => P.FLOAT(),
+                },
+                P.ColumnDefinition{
+                  name => P.Name::create("svalue"),
+                  ty => P.TEXT(),
+                },
+              ],
+              alias => Some(viewName),
+              isInput => false,
+            };
+            kinds = viewDescr.kinds;
+            _ = dir.map(
+              RowKey::keyType,
+              RowValues::type,
+              context,
+              dirName,
+              (context, writer, _key, valueIter) ~> {
+                for (value in valueIter) {
+                  value match {
+                  | row @ RowValues(_, repeat) ->
+                    if (repeat == 0) continue;
+                    invariant(repeat <= 1);
+                    pk = row.getString(0) match {
+                    | None() -> continue
+                    | Some(x) -> x
+                    };
+                    json = row.getValue(1) match {
+                    | None() -> continue
+                    | Some(CString(jsonStr)) -> decodeJSON(context, jsonStr)
+                    | Some(CJSON(json)) -> json
+                    | _ -> invariant_violation("Unexpected type")
+                    };
+                    pathIter = SKJSON.flatten("", Array[(pk, json)].iterator());
+                    for (elt in pathIter) {
+                      (id, path, ty, ivalue, fvalue, svalue) = elt;
+                      rowValues = RowValues::create(
+                        Array[
+                          Some(CString(id)),
+                          Some(CString(path)),
+                          ty.map(x -> CString(x.toString())),
+                          ivalue.map(x -> CInt(x)),
+                          fvalue.map(x -> CFloat(x)),
+                          svalue.map(s -> CString(s)),
+                        ],
+                        1,
+                      );
+                      rowKey = RowKey(rowValues, kinds);
+                      writer.set(rowKey, rowValues);
+                    }
+                  }
+                }
+              },
+            );
+            tableDir = getTableDir(context);
+            viewKey = SKStore.SID::create(viewName.lower);
+            tableDir.writeArray(context, viewKey, Array[viewDescr]);
+            _ = tableDir
+          })
+        | _ -> error(pos, "json_split expects a tableName as parameter")
+        }
+      | _ -> error(pos, "Unknown function: " + funName.origName)
+      }
     | view @ P.CreateView{
       pos,
       name => viewName,
       ifNotExists,
-      query => selectAst @ P.Select _,
+      query => P.SQuery(selectAst @ P.Select _),
       virtual,
     } ->
       if (selectAst.core is P.SelectCoreValues _) {
@@ -1998,7 +2172,9 @@ fun printTable(
         (
           val.toStringWithFormat(SKStore.OTable(fieldNames)),
           val match {
-          | CString _ -> TermColor.Blue()
+          | COpaque _
+          | CString _ ->
+            TermColor.Blue()
           | CInt _
           | CFloat _ ->
             TermColor.Green()

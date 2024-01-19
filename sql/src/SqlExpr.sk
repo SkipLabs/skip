@@ -264,12 +264,95 @@ class ExprEvaluator(
 
     | SKDB.CSFCast(e) -> this.evalCFExpr(context, e).map(f -> f.toString())
     | SKDB.CSICast(e) -> this.evalCIExpr(context, e).map(f -> f.toString())
+    | SKDB.COSCast(e) -> this.evalCOExpr(context, e).map(x -> x.toString())
 
     | CUp(x) ->
       this.up match {
       | None() -> invariant_violation("Could not find up environment")
       | Some(evaluator) -> evaluator.evalCSExpr(context, x)
       }
+
+    | CSJSchemaPp(e) ->
+      this.evalCOExpr(context, e).map(x ->
+        x match {
+        | CSchema(_, ty) -> SKJSON.prettyPrintType(false, ty)
+        | CJSON(json) -> SKJSON.prettyPrintType(false, json.toType())
+        }
+      )
+
+    | CSJSchemaCheck(e1, e2) ->
+      this.evalCOExpr(context, e1).flatMap(schema -> {
+        this.evalCOExpr(context, e2).map(value -> {
+          convert = x ->
+            x match {
+            | CSchema(_, ty) -> ty
+            | CJSON(j) -> j.toType()
+            };
+          convert(schema).isSuperType(convert(value));
+          "ok"
+        })
+      })
+    }
+  }
+
+  private fun evalCOExpr(
+    context: mutable SKStore.Context,
+    expr: SKDB.CExpr<COpaque>,
+  ): AValue<COpaque> {
+    expr match {
+    | COGetFrom(tableNbr, n) ->
+      if (tableNbr >= this.entries.size()) {
+        AUndef()
+      } else {
+        this.entries[tableNbr].getOpaque(n) match {
+        | None() -> ANull()
+        | Some(x) -> ADef(x)
+        }
+      }
+    | COJSchema(e) ->
+      this.evalCSExpr(context, e).map(s ->
+        CSchema::create(SKJSON.Parser::mcreate(s).type())
+      )
+    | COJSON(e) ->
+      this.evalCSExpr(context, e).map(s ->
+        CSchema::create(decodeJSON(context, s).toType())
+      )
+
+    | COJSONType(e) ->
+      this.evalCSExpr(context, e).map(s ->
+        CSchema::create(decodeJSON(context, s).toType())
+      )
+
+    | COParseSchema(e) ->
+      this.evalCSExpr(context, e).map(s ->
+        CSchema::create(SKJSON.Parser::mcreate(s).type())
+      )
+
+    | COQuery(select) ->
+      this.evalQuery(context, select) match {
+      | AUndef() -> AUndef()
+      | ANull() -> ANull()
+      | ADef(CSchema(_, x)) -> ADef(CSchema::create(x))
+      | ADef(CJSON(x)) -> ADef(CSchema::create(x.toType()))
+      | _ -> invariant_violation("Types have already been checked")
+      }
+
+    | CUp(x) ->
+      this.up match {
+      | None() -> invariant_violation("Could not find up environment")
+      | Some(evaluator) -> evaluator.evalCOExpr(context, x)
+      }
+
+    | CSub _
+    | CMul _
+    | CNull()
+    | CNullIf _
+    | CAdd _
+    | CCoalesce _
+    | CDiv _
+    | CIf _
+    | CMod _ ->
+      invariant_violation("Invalid operation on an opaque value")
     }
   }
 
@@ -543,6 +626,13 @@ class ExprEvaluator(
 
     | CSIsNull(e) ->
       this.evalCSExpr(context, e) match {
+      | AUndef() -> AUndef()
+      | ANull() -> ADef(1)
+      | ADef _ -> ADef(0)
+      }
+
+    | COIsNull(e) ->
+      this.evalCOExpr(context, e) match {
       | AUndef() -> AUndef()
       | ANull() -> ADef(1)
       | ADef _ -> ADef(0)
@@ -855,6 +945,7 @@ class ExprEvaluator(
     | CIExpr(ie) -> this.evalCIExpr(context, ie).map(x -> CInt(x))
     | CFExpr(fe) -> this.evalCFExpr(context, fe).map(x -> CFloat(x))
     | CSExpr(se) -> this.evalCSExpr(context, se).map(x -> CString(x))
+    | COExpr(se) -> this.evalCOExpr(context, se)
     };
     result
   }

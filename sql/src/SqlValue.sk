@@ -133,6 +133,7 @@ base class Row extends SKStore.File {
   fun getInt(n: Int): ?Int;
   fun getFloat(n: Int): ?Float;
   fun getString(n: Int): ?String;
+  fun getOpaque(n: Int): ?COpaque;
   fun getValue(n: Int): ?CValue;
   fun items(): mutable Iterator<(Int, ?CValue)>;
   static overridable fun type(f: SKStore.File): Row {
@@ -142,6 +143,7 @@ base class Row extends SKStore.File {
     | _ -> invariant_violation("Unexpected Row File")
     }
   }
+
   fun toString(): String {
     buffer = mutable Vector[];
     o = x -> buffer.push(x);
@@ -152,6 +154,7 @@ base class Row extends SKStore.File {
       | Some(CInt(n)) -> o(n.toString())
       | Some(CFloat(f)) -> o(f.toString())
       | Some(CString(s)) -> escapeString(o, s)
+      | Some(b @ COpaque _) -> escapeString(o, b.toString())
       };
       if (i != this.size() - 1) {
         o(",")
@@ -212,6 +215,7 @@ class RowValues private (
           }
         | Some(CFloat(f)) -> jsPushObjectFieldFloat(f.toString())
         | Some(CString(s)) -> jsPushObjectFieldString(s)
+        | Some(b @ COpaque _) -> jsPushObjectFieldString(b.toString())
         }
       };
       jsPushObject()
@@ -290,6 +294,14 @@ class RowValues private (
     }
   }
 
+  fun getOpaque(n: Int): ?COpaque {
+    this.values[n] match {
+    | None() -> None()
+    | Some(v @ COpaque _) -> Some(v)
+    | _ -> invariant_violation("Expected a blob")
+    }
+  }
+
   fun getValue(n: Int): ?CValue {
     this.values[n]
   }
@@ -318,6 +330,9 @@ class RowKind(order: Int, kind: QueryKind, row: Row) extends Row {
   }
   fun getString(n: Int): ?String {
     this.row.getString(n)
+  }
+  fun getOpaque(n: Int): ?COpaque {
+    this.row.getOpaque(n)
   }
   fun getValue(n: Int): ?CValue {
     this.row.getValue(n)

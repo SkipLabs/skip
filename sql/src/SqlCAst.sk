@@ -5,6 +5,86 @@ module alias P = SQLParser;
 
 module SKDB;
 
+/*****************************************************************************/
+/* Opaque types */
+/*****************************************************************************/
+
+base class COpaque extends CValue
+
+class CSchema(id: Int, ty: SKJSON.Type) extends COpaque {
+  static fun create(ty: SKJSON.Type): this {
+    static(SKStore.genSym(0), ty)
+  }
+
+  fun max(): COpaque {
+    invariant_violation("Max not implemented for Schemas")
+  }
+
+  fun min(): COpaque {
+    invariant_violation("Min not implemented for Schemas")
+  }
+}
+
+class CJSON(value: SKJSON.CJSON) extends SKDB.COpaque {
+  fun max(): SKDB.COpaque {
+    invariant_violation("Max not implemented for JSON")
+  }
+
+  fun min(): SKDB.COpaque {
+    invariant_violation("Min not implemented for JSON")
+  }
+}
+
+/*****************************************************************************/
+/* FieldNames interning for JSON. */
+/*****************************************************************************/
+
+class FieldNamesFile(value: Array<String>) extends SKStore.File
+
+const internedFieldsDirName: SKStore.DirName = SKStore.DirName::create(
+  "/json/interned/",
+);
+const internedFieldsDir: SKStore.EHandle<
+  SKStore.IID,
+  FieldNamesFile,
+> = SKStore.EHandle(
+  SKStore.IID::keyType,
+  FieldNamesFile::type,
+  internedFieldsDirName,
+);
+
+fun internFieldNames(
+  context: mutable SKStore.Context,
+  fieldNames: Array<String>,
+): Array<String> {
+  key = SKStore.IID(fieldNames.hash());
+  for (file in internedFieldsDir.unsafeGetArray(context, key)) {
+    if (file.value == fieldNames) {
+      return file.value;
+    }
+  };
+  internedFieldsDir.writeArray(context, key, Array[FieldNamesFile(fieldNames)]);
+  fieldNames
+}
+
+fun decodeJSON(context: mutable SKStore.Context, str: String): SKJSON.CJSON {
+  context.unsafeMaybeGetEagerDir(internedFieldsDirName) match {
+  | None() ->
+    _ = context.mkdir(
+      SKStore.IID::keyType,
+      FieldNamesFile::type,
+      internedFieldsDirName,
+      Array[],
+    )
+  | Some(_) -> void
+  };
+  SKJSON.decode(str, x -> internFieldNames(context, x))
+}
+
+/*****************************************************************************/
+/* Patterns */
+/*****************************************************************************/
+
 value class Pattern{
   firstIsPercent: Bool,
   lastIsPercent: Bool,
@@ -18,6 +98,7 @@ base class AggrKind uses Orderable {
   | Count(Bool)
   | Min()
   | Max()
+  | InferSchema()
 }
 
 base class CValue uses Orderable, Show {
@@ -59,6 +140,8 @@ base class CValue uses Orderable, Show {
     | CInt(n) -> n.toString()
     | CFloat(f) -> inspect(f).toString()
     | CString(str) -> str
+    | CSchema(_, ty) -> SKJSON.prettyPrintType(true, ty)
+    | CJSON(json) -> json.prettyPrint()
     }
   }
 
@@ -87,6 +170,7 @@ base class CValue uses Orderable, Show {
       result.push('"');
       String::fromChars(result.toArray())
     | CString(str) -> str
+    | b @ COpaque _ -> CString(b.toString()).toStringWithFormat(format)
     }
   }
 
@@ -159,6 +243,7 @@ base class CGExpr uses Orderable, Hashable {
   | CIExpr(CExpr<Int>)
   | CSExpr(CExpr<String>)
   | CFExpr(CExpr<Float>)
+  | COExpr(CExpr<COpaque>)
 
   fun up(): CGExpr {
     this match {
@@ -166,6 +251,7 @@ base class CGExpr uses Orderable, Hashable {
     | CIExpr(ce) -> CIExpr(CUp(ce))
     | CSExpr(ce) -> CSExpr(CUp(ce))
     | CFExpr(ce) -> CFExpr(CUp(ce))
+    | COExpr(ce) -> COExpr(CUp(ce))
     }
   }
 
@@ -176,6 +262,7 @@ base class CGExpr uses Orderable, Hashable {
       P.INTEGER()
     | CFExpr _ -> P.FLOAT()
     | CSExpr _ -> P.TEXT()
+    | COExpr _ -> P.BLOB()
     }
   }
 }
@@ -193,10 +280,12 @@ class CISCast(CExpr<String>) extends CExpr<Int>
 class CSICast(CExpr<Int>) extends CExpr<String>
 class CSFCast(CExpr<Float>) extends CExpr<String>
 class CFSCast(CExpr<String>) extends CExpr<Float>
+class COSCast(CExpr<COpaque>) extends CExpr<String>
 
 class CIGetFrom(Int, Int) extends CExpr<Int>
 class CSGetFrom(Int, Int) extends CExpr<String>
 class CFGetFrom(Int, Int) extends CExpr<Float>
+class COGetFrom(Int, Int) extends CExpr<COpaque>
 
 class CILiteral(Int) extends CExpr<Int>
 class CFLiteral(Float) extends CExpr<Float>
@@ -267,6 +356,11 @@ class CSQuery(cselect: CSelect) extends CExpr<String> {
     this.cselect.id.hash()
   }
 }
+class COQuery(cselect: CSelect) extends CExpr<COpaque> {
+  fun hash(): Int {
+    this.cselect.id.hash()
+  }
+}
 
 class CIAbs(CExpr<Int>) extends CExpr<Int>
 class CFAbs(CExpr<Float>) extends CExpr<Float>
@@ -278,6 +372,7 @@ class CCoalesce<T: frozen>(Array<CExpr<T>>) extends CExpr<T>
 class CIIsNull(CExpr<Int>) extends CExpr<Int>
 class CFIsNull(CExpr<Float>) extends CExpr<Int>
 class CSIsNull(CExpr<String>) extends CExpr<Int>
+class COIsNull(CExpr<COpaque>) extends CExpr<Int>
 class CSConcat(CExpr<String>, CExpr<String>) extends CExpr<String>
 class CSUpper(CExpr<String>) extends CExpr<String>
 class CSLower(CExpr<String>) extends CExpr<String>
@@ -290,5 +385,16 @@ class CStrftime(
 ) extends CExpr<String>
 
 class COn(P.JoinKind, CExpr<Int>) extends CExpr<Int>
+
+/*****************************************************************************/
+/* JSON primitives */
+/*****************************************************************************/
+
+class COJSON(CExpr<String>) extends CExpr<COpaque>
+class COJSchema(CExpr<String>) extends CExpr<COpaque>
+class CSJSchemaPp(CExpr<COpaque>) extends CExpr<String>
+class CSJSchemaCheck(CExpr<COpaque>, CExpr<COpaque>) extends CExpr<String>
+class COJSONType(CExpr<String>) extends CExpr<COpaque>
+class COParseSchema(CExpr<String>) extends CExpr<COpaque>
 
 module end;
