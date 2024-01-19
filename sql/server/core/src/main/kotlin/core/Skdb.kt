@@ -187,16 +187,13 @@ class Skdb(val name: String, private val dbPath: String) {
             user,
             "--read-spec")
 
-    val serialisedSpec = jsonMapper.writeValueAsString(spec)
 
     // TODO: for hacky debug
     tailPb.redirectError(ProcessBuilder.Redirect.INHERIT)
     val proc = tailPb.start()
 
-    val stdin = proc.outputStream
-    val writer = stdin.bufferedWriter()
-    writer.write(serialisedSpec)
-    writer.flush()
+    val stdin = proc.outputStream.buffered()
+    jsonMapper.writeValue(stdin, spec)
     stdin.close()
 
     // TODO: working with text currently to detect checkpoint flush
