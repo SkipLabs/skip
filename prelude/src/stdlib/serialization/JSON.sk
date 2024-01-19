@@ -384,9 +384,77 @@ private fun reportInvalidJSON(
   throw InvalidJSONError(iter.position, message);
 }
 
+mutable base class JSONBuilder<Value, Field, Fields> {
+  mutable fun emptyObject(): Value;
+  mutable fun makeField(.String, Value): Field;
+  mutable fun makeFields(.Array<Field>): Fields;
+  mutable fun makeObject(Fields): Value;
+  mutable fun makeArray(fields: Vector<Value>): Value;
+  mutable fun makeString(.String): Value;
+  mutable fun makeBool(.Bool): Value;
+  mutable fun makeNull(): Value;
+  mutable fun makeInt(Int): Value;
+  mutable fun makeFloat(Float): Value;
+}
+
+mutable class DefaultJSONBuilder{} extends
+  JSONBuilder<JSON.Value, (.String, JSON.Value), Map<.String, JSON.Value>>,
+{
+  mutable fun emptyObject(): JSON.Value {
+    JSON.Object(Map[])
+  }
+
+  mutable fun makeField(
+    fieldName: .String,
+    value: JSON.Value,
+  ): (.String, JSON.Value) {
+    (fieldName, value)
+  }
+  mutable fun makeFields(
+    fields: .Array<(.String, JSON.Value)>,
+  ): Map<.String, JSON.Value> {
+    map = mutable Map[];
+    for (x in fields) {
+      map![x.i0] = x.i1
+    };
+    map.chill()
+  }
+
+  mutable fun makeObject(fields: Map<.String, JSON.Value>): JSON.Value {
+    JSON.Object(fields)
+  }
+
+  mutable fun makeArray(fields: Vector<JSON.Value>): JSON.Value {
+    JSON.Array(fields)
+  }
+
+  mutable fun makeString(s: .String): JSON.Value {
+    JSON.String(s)
+  }
+  mutable fun makeBool(b: .Bool): Value {
+    JSON.Bool(b)
+  }
+  mutable fun makeNull(): Value {
+    JSON.Null()
+  }
+  mutable fun makeInt(n: Int): Value {
+    JSON.IntNumber(n)
+  }
+  mutable fun makeFloat(f: Float): Value {
+    JSON.FloatNumber(f)
+  }
+}
+
 fun decode(value: .String): JSON.Value {
+  genericDecode(value, mutable DefaultJSONBuilder{})
+}
+
+fun genericDecode<Value, Field, Fields>(
+  value: .String,
+  builder: mutable JSONBuilder<Value, Field, Fields>,
+): Value {
   iter = Lexer.LexingPosition::create(value);
-  result = decodeValue(iter);
+  result = decodeValue(iter, builder);
   eatWhitespace(iter);
   if (!iter.atEnd()) {
     reportInvalidJSON(iter, "Expected end of JSON string.");
@@ -394,24 +462,27 @@ fun decode(value: .String): JSON.Value {
   result
 }
 
-private fun decodeValue(iter: mutable Lexer.LexingPosition): JSON.Value {
+private fun decodeValue<Value, Field, Fields>(
+  iter: mutable Lexer.LexingPosition,
+  builder: mutable JSONBuilder<Value, Field, Fields>,
+): Value {
   eatWhitespace(iter);
   c = iter.peek();
   c match {
   | 'n' ->
     eatString(iter, "null");
-    JSON.Null()
+    builder.makeNull()
   | 't' ->
     eatString(iter, "true");
-    JSON.Bool(true)
+    builder.makeBool(true)
   | 'f' ->
     eatString(iter, "false");
-    JSON.Bool(false)
+    builder.makeBool(false)
   | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '-' ->
-    decodeNumber(iter)
-  | '"' -> JSON.String(decodeString(iter))
-  | '{' -> decodeObject(iter)
-  | '[' -> decodeArray(iter)
+    decodeNumber(iter, builder)
+  | '"' -> builder.makeString(decodeString(iter))
+  | '{' -> decodeObject(iter, builder)
+  | '[' -> builder.makeArray(decodeArray(iter, builder))
   | _ -> reportInvalidJSON(iter, `Invalid JSON start character '${c}'.`)
   }
 }
@@ -450,7 +521,10 @@ private fun skipExponentOpt(iter: mutable Lexer.LexingPosition): .Bool {
   }
 }
 
-private fun decodeNumber(iter: mutable Lexer.LexingPosition): JSON.Value {
+private fun decodeNumber<Value, Field, Fields>(
+  iter: mutable Lexer.LexingPosition,
+  builder: mutable JSONBuilder<Value, Field, Fields>,
+): Value {
   start = iter.clone();
   skipSignOpt(iter);
   skipDigits(iter);
@@ -459,11 +533,11 @@ private fun decodeNumber(iter: mutable Lexer.LexingPosition): JSON.Value {
   value = start.getText(iter);
   try {
     if (value == "-0") {
-      JSON.FloatNumber(-0.0);
+      builder.makeFloat(-0.0);
     } else if (!hadFraction && !hadExponent) {
-      JSON.IntNumber(value.toInt())
+      builder.makeInt(value.toInt())
     } else {
-      JSON.FloatNumber(value.toFloat())
+      builder.makeFloat(value.toFloat())
     }
   } catch {
   | ex -> reportInvalidJSON(start, "Bad number format: " + ex.getMessage())
@@ -547,38 +621,48 @@ private fun decodeString(iter: mutable Lexer.LexingPosition): .String {
   .String::fromChars(result.toArray());
 }
 
-private fun decodeObject(iter: mutable Lexer.LexingPosition): JSON.Object {
+private fun decodeObject<Value, Field, Fields>(
+  iter: mutable Lexer.LexingPosition,
+  builder: mutable JSONBuilder<Value, Field, Fields>,
+): Value {
   eat(iter, '{');
   eatWhitespace(iter);
   if (eatOpt(iter, '}')) {
-    JSON.Object(Map[]);
+    builder.emptyObject();
   } else {
-    map = mutable Map[];
-    decodeObjectFields(iter, map);
-    JSON.Object(map.chill());
+    fields = mutable Vector[];
+    decodeObjectFields(iter, fields, mutable Set[], builder);
+    builder.makeObject(
+      builder.makeFields(
+        fields.map(x -> builder.makeField(x.i0, x.i1)).toArray(),
+      ),
+    );
   }
 }
 
-private fun decodeObjectFields(
+private fun decodeObjectFields<Value, Field, Fields>(
   iter: mutable Lexer.LexingPosition,
-  map: mutable Map<.String, JSON.Value>,
+  items: mutable Vector<(.String, Value)>,
+  fieldSet: mutable Set<.String>,
+  builder: mutable JSONBuilder<Value, Field, Fields>,
 ): void {
   fieldStart = iter.clone();
   s = decodeString(iter);
   eatWhitespace(iter);
   eat(iter, ':');
-  v = decodeValue(iter);
-  if (map.containsKey(s)) {
+  v = decodeValue(iter, builder);
+  if (fieldSet.contains(s)) {
     reportInvalidJSON(fieldStart, `Duplicate object key '${s}'.`);
   };
-  map.add(s, v);
+  fieldSet.insert(s);
+  items.push((s, v));
   eatWhitespace(iter);
   iter.peek() match {
   | '}' -> iter.advance()
   | ',' ->
     iter.advance();
     eatWhitespace(iter);
-    decodeObjectFields(iter, map)
+    decodeObjectFields(iter, items, fieldSet, builder)
   | c ->
     reportInvalidJSON(
       iter,
@@ -589,23 +673,27 @@ private fun decodeObjectFields(
   }
 }
 
-private fun decodeArray(iter: mutable Lexer.LexingPosition): JSON.Array {
+private fun decodeArray<Value, Field, Fields>(
+  iter: mutable Lexer.LexingPosition,
+  builder: mutable JSONBuilder<Value, Field, Fields>,
+): Vector<Value> {
   eat(iter, '[');
   eatWhitespace(iter);
   if (eatOpt(iter, ']')) {
-    JSON.Array(Vector[]);
+    Vector[]
   } else {
     vector = mutable Vector[];
-    decodeArrayElements(iter, vector);
-    JSON.Array(vector.chill());
+    decodeArrayElements(iter, vector, builder);
+    vector.chill()
   }
 }
 
-private fun decodeArrayElements(
+private fun decodeArrayElements<Value, Field, Fields>(
   iter: mutable Lexer.LexingPosition,
-  vector: mutable Vector<JSON.Value>,
+  vector: mutable Vector<Value>,
+  builder: mutable JSONBuilder<Value, Field, Fields>,
 ): void {
-  v = decodeValue(iter);
+  v = decodeValue(iter, builder);
   vector.push(v);
   eatWhitespace(iter);
   iter.peek() match {
@@ -613,7 +701,7 @@ private fun decodeArrayElements(
   | ',' ->
     iter.advance();
     eatWhitespace(iter);
-    decodeArrayElements(iter, vector)
+    decodeArrayElements(iter, vector, builder)
   | c ->
     reportInvalidJSON(
       iter,
