@@ -158,7 +158,6 @@ class Skdb(val name: String, private val dbPath: String) {
     return proc
   }
 
-  @OptIn(kotlin.ExperimentalStdlibApi::class)
   fun tail(
       user: String,
       replicationId: String,
