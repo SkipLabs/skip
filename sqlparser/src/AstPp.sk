@@ -4,14 +4,18 @@ extension base class Stmt {
   fun toString(): String
   | BeginTransaction{kind} -> `BEGIN ${kind} TRANSACTION`
   | EndTransaction{} -> "END TRANSACTION"
-  | CreateView{virtual, name, ifNotExists, query} ->
+  | CreateView{virtual, name, ifNotExists, query => subQuery} ->
     "CREATE " +
       (if (virtual) "VIRTUAL " else "") +
       "VIEW " +
       (if (ifNotExists) "IF NOT EXISTS " else "") +
       name.toString() +
       " AS " +
-      query.toString()
+      subQuery match {
+      | SQuery(query) -> query.toString()
+      | SCall(funName, args) ->
+        funName.toString() + "(" + args.map(x -> x.toString()).join(",")
+      }
   | CreateIndex{ifNotExists, name, on, columns, unique, where} ->
     "CREATE " +
       (if (unique) "UNIQUE " else "") +
@@ -382,6 +386,7 @@ extension base class Value {
   | VCurrentTimestamp() -> "CURRENT_TIMESTAMP"
   | VParam(handle) -> "@" + handle
   | VPermission(s) -> "SKDB_PERMISSION(" + s + ")"
+  | VJSON(s) -> "json(" + s + ")"
 }
 
 extension base class Expr {
@@ -485,6 +490,8 @@ extension base class InValues {
 
 extension base class Type {
   fun toString(): String
+  | JSON() -> "JSON"
+  | BLOB() -> "BLOB"
   | FLOAT() -> "FLOAT"
   | INTEGER() -> "INTEGER"
   | TEXT() -> "TEXT"
