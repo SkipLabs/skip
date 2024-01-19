@@ -198,7 +198,7 @@ class Skdb(val name: String, private val dbPath: String) {
 
     val moshi: Moshi = Moshi.Builder().addLast(KotlinJsonAdapterFactory()).build()
     val jsonAdapter: JsonAdapter<Map<String, TailSpec>> = moshi.adapter<Map<String, TailSpec>>()
-    val serialisedSpec = jsonAdapter.toJson(spec)
+    val serialisedSpec = jsonAdapter.serializeNulls().toJson(spec)
 
     // TODO: for hacky debug
     tailPb.redirectError(ProcessBuilder.Redirect.INHERIT)
