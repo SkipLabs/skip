@@ -1,0 +1,202 @@
+/*****************************************************************************/
+/* Pretty-printer for types */
+/*****************************************************************************/
+
+module SKJSON;
+
+class MaxSizeReached() extends Exception {
+  fun getMessage(): String {
+    "Internal error: column max size reached"
+  }
+}
+
+value class Margin(size: Int = 0, str: String = "")
+
+mutable class TypePp{
+  compact: Bool,
+  mutable cols: Int = 0,
+  mutable buffer: List<String> = List[],
+} {
+  const MAX_COLS: Int = 80;
+
+  readonly fun chill(): this {
+    static{compact => this.compact, cols => this.cols, buffer => this.buffer}
+  }
+
+  static fun fromSaved(saved: TypePp): mutable this {
+    mutable static{
+      compact => saved.compact,
+      cols => saved.cols,
+      buffer => saved.buffer,
+    }
+  }
+
+  mutable fun replace(saved: readonly TypePp): void {
+    this.!cols = saved.cols;
+    this.!buffer = saved.buffer;
+  }
+
+  mutable fun out(level: Int, margin: Margin, str: String): void {
+    // The string does not contain special characters
+    for (c in str) {
+      invariant(c != '\n' && c != '\r' && c != '\t', "unexpected character");
+    };
+    if (this.cols < margin.size) {
+      // The string does not start with a space
+      for (c in str) {
+        invariant(c != ' ', "unexpected white space: " + str);
+        break void;
+      };
+      this.!cols = margin.size;
+      this.!buffer = List.Cons(margin.str, this.buffer);
+    };
+    this.!cols = this.cols + str.length();
+    if (level != 0 && this.cols > static::MAX_COLS) {
+      throw MaxSizeReached()
+    };
+    this.!buffer = List.Cons(str, this.buffer);
+  }
+
+  mutable fun newLine(): void {
+    this.!cols = 0;
+    this.!buffer = List.Cons("\n", this.buffer);
+  }
+
+  mutable fun branch(
+    level: Int,
+    margin: Margin,
+    f1: (mutable this, Int, Margin) ~> void,
+    f2: (mutable this, Int, Margin, Margin) -> void,
+  ): void {
+    if (this.compact || level > 0) {
+      f1(this, level, margin);
+      return void
+    };
+    saved = this.chill();
+    try {
+      f1(this, level + 1, margin)
+    } catch {
+    | MaxSizeReached() ->
+      this.replace(saved);
+      prevMargin = margin;
+      !margin.size = margin.size + 2;
+      !margin.str = margin.str + "  ";
+      f2(this, level, prevMargin, margin)
+    | exn -> throw (exn)
+    }
+  }
+
+  mutable fun stype(total: Int, level: Int, margin: Margin, sty: SType): void {
+    sty match {
+    | TNull() -> this.out(level, margin, "null")
+    | TBool() -> this.out(level, margin, "bool")
+    | TInt() -> this.out(level, margin, "int")
+    | TFloat() -> this.out(level, margin, "float")
+    | TString() -> this.out(level, margin, "string")
+    | TArray(ty) ->
+      this.out(level, margin, "[");
+      this.type(level, margin, ty);
+      this.out(level, margin, "]")
+    | TObject(fields) ->
+      this.out(level, margin, "{");
+      this.branch(
+        level,
+        margin,
+        (pp, level, margin) ~> {
+          pp.object(total, level, margin, fields, false);
+          pp.out(level, margin, "}");
+        },
+        (pp, level, prevMargin, margin) -> {
+          pp.newLine();
+          pp.object(total, level, margin, fields, true);
+          pp.newLine();
+          pp.out(level, prevMargin, "}");
+          pp.newLine();
+        },
+      )
+    }
+  }
+
+  mutable fun object(
+    total: Int,
+    level: Int,
+    margin: Margin,
+    fields: Fields,
+    multiLine: Bool,
+  ): void {
+    fieldArray = fields.toArray();
+    for (i => field in fieldArray) {
+      fieldName = field.name;
+      fieldCount = field.fieldCount;
+      fieldType = field.type;
+      if (fieldCount.missing(total) != 0) {
+        this.out(level, margin, "?")
+      };
+      this.out(level, margin, "\"");
+      this.out(level, margin, static::escapeName(fieldName));
+      this.out(level, margin, "\": ");
+      this.type(level, margin, fieldType);
+      if (i != fieldArray.size() - 1) {
+        this.out(level, margin, ",");
+        if (multiLine) this.newLine() else {
+          this.out(level, margin, " ")
+        };
+      }
+    }
+  }
+
+  static fun escapeName(name: String): String {
+    chars = mutable Vector[];
+    for (c in name) {
+      if (c == '"') chars.push('\\');
+      chars.push(c)
+    };
+    String::fromChars(chars.toArray())
+  }
+
+  mutable fun type(level: Int, margin: Margin, ty: Type): void {
+    this.branch(
+      level,
+      margin,
+      (pp, level, margin) ~> {
+        for (i => sty in ty.types) {
+          if (i != 0) {
+            pp.out(level, margin, " | ");
+          };
+          pp.stype(sty.i0, level, margin, sty.i1);
+        }
+      },
+      (pp, level, prevMargin, margin) ~> {
+        for (i => sty in ty.types) {
+          pp.buffer match {
+          | List.Nil()
+          | List.Cons("\n", _) ->
+            void
+          | _ -> pp.newLine()
+          };
+          if (i != 0) pp.out(level, prevMargin, "| ");
+          pp.stype(sty.i0, level, margin, sty.i1);
+          pp.newLine();
+        }
+      },
+    );
+  }
+}
+
+fun prettyPrintType(compact: Bool, ty: Type): String {
+  pp = mutable TypePp{compact};
+  pp.type(0, Margin(), ty);
+  strings = pp.buffer.reversed();
+  if (compact) {
+    !strings = strings.map(str ~> {
+      String::fromChars(
+        str
+          .getIter()
+          .filter(c ~> c != '\t' && c != '\n' && c != ' ')
+          .collect(Array),
+      )
+    })
+  };
+  result = "".join(strings);
+  result
+}

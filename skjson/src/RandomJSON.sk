@@ -1,0 +1,78 @@
+/*****************************************************************************/
+/* Random JSON object generator. */
+/*****************************************************************************/
+
+module SKJSON;
+
+mutable class RandomJSON{rand: mutable Random} {
+  const objectMinSize: Int = 0;
+  const objectMaxSize: Int = 5;
+
+  const arrayMinSize: Int = 0;
+  const arrayMaxSize: Int = 5;
+
+  const intMinSize: Int = 0;
+  const intMaxSize: Int = 10;
+
+  const probObject: Int = 20;
+  const probArray: Int = 20;
+  const probNull: Int = 20;
+  const probString: Int = 20;
+  const probInt: Int = 20;
+
+  static fun mcreate(i: Int = 23): mutable this {
+    if (i == 0) !i = -23;
+    mutable static{rand => Random::mcreate(i)}
+  }
+
+  mutable fun check(prob: Int): Bool {
+    this.rand.random(0, 100) <= prob
+  }
+
+  mutable fun genInt(): Int {
+    this.rand.random(static::intMinSize, static::intMaxSize)
+  }
+
+  mutable fun genValue(): CJSON {
+    if (this.check(static::probObject)) {
+      this.genObject()
+    } else {
+      if (this.check(static::probArray)) {
+        this.genArray()
+      } else {
+        if (this.check(static::probNull)) {
+          CJNull()
+        } else {
+          if (this.check(static::probString)) {
+            CJString("str" + this.genInt())
+          } else {
+            if (this.check(static::probInt)) {
+              CJInt(this.genInt())
+            } else {
+              CJFloat(this.genInt().toFloat())
+            }
+          }
+        }
+      }
+    }
+  }
+
+  mutable fun genObject(): CJObject {
+    size = this.rand.random(static::objectMinSize, static::objectMaxSize);
+    fields = mutable Vector[];
+    for (_ in Range(0, size)) {
+      fieldName = "field" + this.genInt();
+      fields.push((fieldName, this.genValue()));
+    };
+    CJObject(CJFields::create(fields.toArray().sortedBy(x ~> x.i0), x -> x))
+  }
+
+  mutable fun genArray(): CJArray {
+    size = this.rand.random(static::arrayMinSize, static::arrayMaxSize);
+    values = mutable Vector[];
+    for (_ in Range(0, size)) {
+      values.push(this.genValue());
+    };
+    CJArray(values.toArray())
+  }
+}

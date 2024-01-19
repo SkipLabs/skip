@@ -68,3 +68,17 @@ jobs:
             make test-wasm
       - store_test_results:
           path: ~/test-results/skdb-wasm.xml
+
+  skjson:
+    docker:
+      - image: skiplabs/skdb-base:latest
+    steps:
+      - checkout
+      - setup
+      - run:
+          name: Run skjson tests
+          command: |
+            mkdir -p ~/test-results
+            cd skjson && skargo test --junitxml ~/test-results/skjson.xml
+      - store_test_results:
+          path: ~/test-results/skjson.xml
