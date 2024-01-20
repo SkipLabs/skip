@@ -133,7 +133,8 @@ base class Row extends SKStore.File {
   fun getInt(n: Int): ?Int;
   fun getFloat(n: Int): ?Float;
   fun getString(n: Int): ?String;
-  fun getOpaque(n: Int): ?COpaque;
+  fun getJSON(n: Int): ?CJSON;
+  fun getType(n: Int): ?CType;
   fun getValue(n: Int): ?CValue;
   fun items(): mutable Iterator<(Int, ?CValue)>;
   static overridable fun type(f: SKStore.File): Row {
@@ -154,7 +155,8 @@ base class Row extends SKStore.File {
       | Some(CInt(n)) -> o(n.toString())
       | Some(CFloat(f)) -> o(f.toString())
       | Some(CString(s)) -> escapeString(o, s)
-      | Some(b @ COpaque _) -> escapeString(o, b.toString())
+      | Some(b @ CJSON _) -> escapeString(o, b.toString())
+      | Some(CType(ty)) -> escapeString(o, SKJSON.prettyPrintType(true, ty))
       };
       if (i != this.size() - 1) {
         o(",")
@@ -215,7 +217,8 @@ class RowValues private (
           }
         | Some(CFloat(f)) -> jsPushObjectFieldFloat(f.toString())
         | Some(CString(s)) -> jsPushObjectFieldString(s)
-        | Some(b @ COpaque _) -> jsPushObjectFieldString(b.toString())
+        | Some(b @ CJSON _) -> jsPushObjectFieldString(b.toString())
+        | Some(b @ CType _) -> jsPushObjectFieldString(b.toString())
         }
       };
       jsPushObject()
@@ -275,30 +278,41 @@ class RowValues private (
 
   fun getInt(n: Int): ?Int {
     this.values[n] match {
+    | None() -> None()
     | Some(CInt(v)) -> Some(v)
-    | _ -> None()
+    | _ -> invariant_violation("Expected an int")
     }
   }
 
   fun getFloat(n: Int): ?Float {
     this.values[n] match {
+    | None() -> None()
     | Some(CFloat(v)) -> Some(v)
-    | _ -> None()
+    | _ -> invariant_violation("Expected a float")
     }
   }
 
   fun getString(n: Int): ?String {
     this.values[n] match {
+    | None() -> None()
     | Some(CString(v)) -> Some(v)
-    | _ -> None()
+    | _ -> invariant_violation("Expected a string")
     }
   }
 
-  fun getOpaque(n: Int): ?COpaque {
+  fun getJSON(n: Int): ?CJSON {
     this.values[n] match {
     | None() -> None()
-    | Some(v @ COpaque _) -> Some(v)
-    | _ -> invariant_violation("Expected a blob")
+    | Some(v @ CJSON _) -> Some(v)
+    | _ -> invariant_violation("Expected a JSON")
+    }
+  }
+
+  fun getType(n: Int): ?CType {
+    this.values[n] match {
+    | None() -> None()
+    | Some(v @ CType _) -> Some(v)
+    | _ -> invariant_violation("Expected a SCHEMA")
     }
   }
 
@@ -331,8 +345,11 @@ class RowKind(order: Int, kind: QueryKind, row: Row) extends Row {
   fun getString(n: Int): ?String {
     this.row.getString(n)
   }
-  fun getOpaque(n: Int): ?COpaque {
-    this.row.getOpaque(n)
+  fun getJSON(n: Int): ?CJSON {
+    this.row.getJSON(n)
+  }
+  fun getType(n: Int): ?CType {
+    this.row.getType(n)
   }
   fun getValue(n: Int): ?CValue {
     this.row.getValue(n)

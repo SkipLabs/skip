@@ -84,8 +84,8 @@ fun adjustSerialisedValues(
       | Some(CInt(n)) -> n.toString()
       | Some(CFloat(f)) -> f.toString()
       | Some(CString(s)) -> escapeStringStr(s)
-      | Some(COpaque _) ->
-        invariant_violation("Opaques not implemented for migration")
+      | Some(json @ CJSON _) -> escapeStringStr(json.toString())
+      | Some(schema @ CType _) -> escapeStringStr(schema.toString())
       }
     | TcNewCol(_col) -> yield "NULL"
     | TcChange(_old, new) ->
@@ -107,11 +107,12 @@ fun adjustSerialisedValues(
       | (Some(CString(s)), P.INTEGER()) -> s
       | (Some(CString(s)), P.FLOAT()) -> s
       | (Some(CString(s)), P.TEXT()) -> escapeStringStr(s)
-      | (Some(COpaque _), _)
+      | (Some(CJSON _), _)
       | (_, P.JSON()) ->
         invariant_violation("JSON not supported in auto-migration")
-      | (_, P.BLOB()) ->
-        invariant_violation("Opaques not supported in auto-migration")
+      | (Some(CType _), _)
+      | (_, P.SCHEMA()) ->
+        invariant_violation("SCHEMA not supported in auto-migration")
       }
     }
   }

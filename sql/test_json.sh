@@ -28,8 +28,7 @@ echo "insert into t2 (object) values ('{\"a\": 34}');" | $SKDB
 echo "insert into t2 (object) values ('{\"a\": 34, \"b\": 3.4}');" | $SKDB
 echo "insert into t2 (object) values ('{\"a\": 34, \"b\": 3.4, \"c\":\"text2\"}');" | $SKDB
 
-
-if echo "select json_infer_schema(object) from t1" | $SKDB | grep -q '{"a":int,?"b":float,?"c":string}'; then
+if echo "select json_infer_schema(object) from t2" | $SKDB | grep -q '{"a":int,?"b":float,?"c":string}'; then
     pass "INFER_SCHEMA"
 else
     fail "INFER_SCHEMA"
@@ -95,6 +94,12 @@ schema2='{?"a":int,?"b":float,?"c":int|string}'
 
 # Let's enforce a schema on t1, see if it is successfully enforced
 
+echo "create virtual view t1_schema as select json_infer_schema(object) from t1;" | $SKDB
+echo "select * from t1_schema" | $SKDB
+echo "delete from t1 where id='id555';" | $SKDB
+echo "select * from t1_schema" | $SKDB
+
+
 echo "create virtual view enforce_type as select json_check_schema('$schema2', json_infer_schema(object)) from t1" | $SKDB
 
 # Now let's try to add something that does not respect the schema
@@ -104,4 +109,28 @@ if echo "insert into t1 values('$schema2', '{\"c\":3.3}');" | $SKDB 2>&1 | grep 
 else
     fail "ENFORCE_SCHEMA"
 fi
+
+echo "delete from t1" | $SKDB
+
+echo "create table users (id TEXT PRIMARY KEY, object JSON);" | $SKDB
+
+echo 'INSERT INTO users (object) values ('"'"'{
+  "name": "Greg",
+  "emails": [
+    {
+      "type": "work",
+      "address": "greg@skiplabs.io"
+    },
+    {
+      "type": "personal",
+      "address": "greg@gmail.com"
+    }
+  ],
+  "other_stuff": {}
+}'"'"');' | $SKDB
+
+echo "create virtual view user_paths as json_split(users);" | $SKDB
+echo "create virtual view emails as select id, svalue as email from user_paths where path like '.emails.[%].address';" | $SKDB 
+echo "create index email_idx on emails(email);" | $SKDB
+echo "select * from emails where email like 'greg%'" | $SKDB
 

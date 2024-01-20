@@ -9,29 +9,55 @@ module SKDB;
 /* Opaque types */
 /*****************************************************************************/
 
-base class COpaque extends CValue
+const minSchema: CType = CType(SKJSON.Type::any);
+const maxSchema: CType = CType(
+  SKJSON.Type[
+    (
+      Int::max,
+      SKJSON.TObject(
+        SKJSON.Fields::create(
+          Array[
+            SKJSON.Field(
+              largestString(),
+              SKJSON.FieldCount::create(),
+              SKJSON.Type::any,
+            ),
+          ],
+        ),
+      ),
+    ),
+  ],
+);
 
-class CSchema(id: Int, ty: SKJSON.Type) extends COpaque {
+class CType(ty: SKJSON.Type) extends CValue {
   static fun create(ty: SKJSON.Type): this {
-    static(SKStore.genSym(0), ty)
+    static(ty)
   }
 
-  fun max(): COpaque {
-    invariant_violation("Max not implemented for Schemas")
+  fun min(): CValue {
+    minSchema
   }
 
-  fun min(): COpaque {
-    invariant_violation("Min not implemented for Schemas")
+  fun max(): CValue {
+    maxSchema
   }
 }
 
-class CJSON(value: SKJSON.CJSON) extends SKDB.COpaque {
-  fun max(): SKDB.COpaque {
-    invariant_violation("Max not implemented for JSON")
+const minJSON: CJSON = CJSON(SKJSON.CJNull());
+
+const maxJSON: CJSON = CJSON(
+  SKJSON.CJObject(
+    SKJSON.CJFields::create(Array[(largestString(), SKJSON.CJNull())], x -> x),
+  ),
+);
+
+class CJSON(value: SKJSON.CJSON) extends SKDB.CValue {
+  fun max(): SKDB.CValue {
+    maxJSON
   }
 
-  fun min(): SKDB.COpaque {
-    invariant_violation("Min not implemented for JSON")
+  fun min(): SKDB.CValue {
+    minJSON
   }
 }
 
@@ -140,7 +166,7 @@ base class CValue uses Orderable, Show {
     | CInt(n) -> n.toString()
     | CFloat(f) -> inspect(f).toString()
     | CString(str) -> str
-    | CSchema(_, ty) -> SKJSON.prettyPrintType(true, ty)
+    | CType(ty) -> SKJSON.prettyPrintType(true, ty)
     | CJSON(json) -> json.prettyPrint()
     }
   }
@@ -170,7 +196,8 @@ base class CValue uses Orderable, Show {
       result.push('"');
       String::fromChars(result.toArray())
     | CString(str) -> str
-    | b @ COpaque _ -> CString(b.toString()).toStringWithFormat(format)
+    | b @ CType _ -> CString(b.toString()).toStringWithFormat(format)
+    | b @ CJSON _ -> CString(b.toString()).toStringWithFormat(format)
     }
   }
 
@@ -243,7 +270,8 @@ base class CGExpr uses Orderable, Hashable {
   | CIExpr(CExpr<Int>)
   | CSExpr(CExpr<String>)
   | CFExpr(CExpr<Float>)
-  | COExpr(CExpr<COpaque>)
+  | CJExpr(CExpr<CJSON>)
+  | CTExpr(CExpr<CType>)
 
   fun up(): CGExpr {
     this match {
@@ -251,7 +279,8 @@ base class CGExpr uses Orderable, Hashable {
     | CIExpr(ce) -> CIExpr(CUp(ce))
     | CSExpr(ce) -> CSExpr(CUp(ce))
     | CFExpr(ce) -> CFExpr(CUp(ce))
-    | COExpr(ce) -> COExpr(CUp(ce))
+    | CJExpr(ce) -> CJExpr(CUp(ce))
+    | CTExpr(ce) -> CTExpr(CUp(ce))
     }
   }
 
@@ -262,7 +291,8 @@ base class CGExpr uses Orderable, Hashable {
       P.INTEGER()
     | CFExpr _ -> P.FLOAT()
     | CSExpr _ -> P.TEXT()
-    | COExpr _ -> P.BLOB()
+    | CJExpr _ -> P.JSON()
+    | CTExpr _ -> P.SCHEMA()
     }
   }
 }
@@ -280,12 +310,14 @@ class CISCast(CExpr<String>) extends CExpr<Int>
 class CSICast(CExpr<Int>) extends CExpr<String>
 class CSFCast(CExpr<Float>) extends CExpr<String>
 class CFSCast(CExpr<String>) extends CExpr<Float>
-class COSCast(CExpr<COpaque>) extends CExpr<String>
+class CJSCast(CExpr<CJSON>) extends CExpr<String>
+class CTSCast(CExpr<CType>) extends CExpr<String>
 
 class CIGetFrom(Int, Int) extends CExpr<Int>
 class CSGetFrom(Int, Int) extends CExpr<String>
 class CFGetFrom(Int, Int) extends CExpr<Float>
-class COGetFrom(Int, Int) extends CExpr<COpaque>
+class CJGetFrom(Int, Int) extends CExpr<CJSON>
+class CTGetFrom(Int, Int) extends CExpr<CType>
 
 class CILiteral(Int) extends CExpr<Int>
 class CFLiteral(Float) extends CExpr<Float>
@@ -356,7 +388,12 @@ class CSQuery(cselect: CSelect) extends CExpr<String> {
     this.cselect.id.hash()
   }
 }
-class COQuery(cselect: CSelect) extends CExpr<COpaque> {
+class CJQuery(cselect: CSelect) extends CExpr<CJSON> {
+  fun hash(): Int {
+    this.cselect.id.hash()
+  }
+}
+class CTQuery(cselect: CSelect) extends CExpr<CType> {
   fun hash(): Int {
     this.cselect.id.hash()
   }
@@ -372,7 +409,8 @@ class CCoalesce<T: frozen>(Array<CExpr<T>>) extends CExpr<T>
 class CIIsNull(CExpr<Int>) extends CExpr<Int>
 class CFIsNull(CExpr<Float>) extends CExpr<Int>
 class CSIsNull(CExpr<String>) extends CExpr<Int>
-class COIsNull(CExpr<COpaque>) extends CExpr<Int>
+class CJIsNull(CExpr<CJSON>) extends CExpr<Int>
+class CTIsNull(CExpr<CType>) extends CExpr<Int>
 class CSConcat(CExpr<String>, CExpr<String>) extends CExpr<String>
 class CSUpper(CExpr<String>) extends CExpr<String>
 class CSLower(CExpr<String>) extends CExpr<String>
@@ -390,11 +428,11 @@ class COn(P.JoinKind, CExpr<Int>) extends CExpr<Int>
 /* JSON primitives */
 /*****************************************************************************/
 
-class COJSON(CExpr<String>) extends CExpr<COpaque>
-class COJSchema(CExpr<String>) extends CExpr<COpaque>
-class CSJSchemaPp(CExpr<COpaque>) extends CExpr<String>
-class CSJSchemaCheck(CExpr<COpaque>, CExpr<COpaque>) extends CExpr<String>
-class COJSONType(CExpr<String>) extends CExpr<COpaque>
-class COParseSchema(CExpr<String>) extends CExpr<COpaque>
+class CJJSON(CExpr<String>) extends CExpr<CJSON>
+class CTJSchema(CExpr<String>) extends CExpr<CType>
+class CSJSchemaPp(CExpr<CType>) extends CExpr<String>
+class CSJSchemaCheck(CExpr<CType>, CExpr<CType>) extends CExpr<String>
+class CTJSONType(CExpr<CJSON>) extends CExpr<CType>
+class CTParseSchema(CExpr<String>) extends CExpr<CType>
 
 module end;

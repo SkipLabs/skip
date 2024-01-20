@@ -359,7 +359,7 @@ fun valueToCValue(
           ")",
       )
     }
-  | P.BLOB() -> error(pos, "Unsupported value: BLOB")
+  | P.SCHEMA() -> error(pos, "Unsupported value: SCHEMA")
   | P.JSON() ->
     val match {
     | P.VJSON(str) -> Some(CJSON(decodeJSON(context, str)))
@@ -2176,7 +2176,8 @@ fun printTable(
         (
           val.toStringWithFormat(SKStore.OTable(fieldNames)),
           val match {
-          | COpaque _
+          | CJSON _
+          | CType _
           | CString _ ->
             TermColor.Blue()
           | CInt _

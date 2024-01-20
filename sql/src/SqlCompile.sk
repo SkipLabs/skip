@@ -659,9 +659,8 @@ mutable class Compiler{
       | P.FLOAT() -> CFExpr(CFGetFrom(tableNbr, colNbr))
       | P.INTEGER() -> CIExpr(CIGetFrom(tableNbr, colNbr))
       | P.TEXT() -> CSExpr(CSGetFrom(tableNbr, colNbr))
-      | P.JSON()
-      | P.BLOB() ->
-        COExpr(COGetFrom(tableNbr, colNbr))
+      | P.JSON() -> CJExpr(CJGetFrom(tableNbr, colNbr))
+      | P.SCHEMA() -> CTExpr(CTGetFrom(tableNbr, colNbr))
       }
     }
   }
@@ -847,7 +846,8 @@ mutable class Compiler{
         | CIExpr(x) -> Some(x)
         | CFExpr _ -> errorNbr(5, this.pos, "A where clause cannot be a FLOAT")
         | CSExpr _ -> errorNbr(5, this.pos, "A where clause cannot be TEXT")
-        | COExpr _ -> errorNbr(5, this.pos, "A where clause cannot be a BLOB")
+        | CJExpr _ -> errorNbr(5, this.pos, "A where clause cannot be a JSON")
+        | CTExpr _ -> errorNbr(5, this.pos, "A where clause cannot be a SCHEMA")
         }
       }
     })
@@ -984,7 +984,7 @@ mutable class Compiler{
     | P.VInt(i) -> CIExpr(CILiteral(i))
     | P.VFloat(f) -> CFExpr(CFLiteral(f))
     | P.VString(s) -> CSExpr(CSLiteral(s))
-    | P.VJSON(s) -> COExpr(COJSON(CSLiteral(s)))
+    | P.VJSON(s) -> CJExpr(CJJSON(CSLiteral(s)))
     | P.VSeqNum(_isPositive, Some(varName)) ->
       globals = context.getGlobal(GLOBALS) match {
       | None() ->
@@ -1047,9 +1047,8 @@ mutable class Compiler{
           | P.INTEGER() -> CIExpr(CIGetFrom(0, slot))
           | P.FLOAT() -> CFExpr(CFGetFrom(0, slot))
           | P.TEXT() -> CSExpr(CSGetFrom(0, slot))
-          | P.JSON()
-          | P.BLOB() ->
-            COExpr(COGetFrom(0, slot))
+          | P.JSON() -> CJExpr(CJGetFrom(0, slot))
+          | P.SCHEMA() -> CTExpr(CTGetFrom(0, slot))
           }
         } else {
           e
@@ -1071,7 +1070,8 @@ mutable class Compiler{
         | CIExpr(i) -> CIIsNull(i)
         | CFExpr(f) -> CFIsNull(f)
         | CSExpr(s) -> CSIsNull(s)
-        | COExpr(s) -> COIsNull(s)
+        | CJExpr(s) -> CJIsNull(s)
+        | CTExpr(s) -> CTIsNull(s)
         },
       )
 
@@ -1083,7 +1083,8 @@ mutable class Compiler{
           | CIExpr(i) -> CIIsNull(i)
           | CFExpr(f) -> CFIsNull(f)
           | CSExpr(s) -> CSIsNull(s)
-          | COExpr(b) -> COIsNull(b)
+          | CJExpr(b) -> CJIsNull(b)
+          | CTExpr(b) -> CTIsNull(b)
           },
         ),
       )
@@ -1205,9 +1206,8 @@ mutable class Compiler{
       | P.INTEGER() -> CIExpr(CIQuery(cselect))
       | P.FLOAT() -> CFExpr(CFQuery(cselect))
       | P.TEXT() -> CSExpr(CSQuery(cselect))
-      | P.JSON()
-      | P.BLOB() ->
-        COExpr(COQuery(cselect))
+      | P.JSON() -> CJExpr(CJQuery(cselect))
+      | P.SCHEMA() -> CTExpr(CTQuery(cselect))
       }
     | P.Exists(select, true) ->
       this.compileExpr(context, P.UnOp(P.UnaryNot(), P.Exists(select, false)))
@@ -1228,7 +1228,8 @@ mutable class Compiler{
     | P.In(e, P.InList(arr), false) ->
       this.compileExpr(context, e) match {
       | CGNull() -> CGNull()
-      | COExpr _ -> error(this.pos, "Cannot use 'IN' on a blob")
+      | CJExpr _ -> error(this.pos, "Cannot use 'IN' on a JSON")
+      | CTExpr _ -> error(this.pos, "Cannot use 'IN' on a SCHEMA")
       | CIExpr(i) ->
         set = arr.map(x ->
           this.compileExpr(context, x) match {
@@ -1273,7 +1274,8 @@ mutable class Compiler{
       | CIExpr(i) -> CIExpr(CSub(CILiteral(0), i))
       | CFExpr(f) -> CFExpr(CSub(CFLiteral(0.0), f))
       | CSExpr _ -> error(this.pos, "cannot apply - on a string")
-      | COExpr _ -> error(this.pos, "cannot apply - on a blob")
+      | CJExpr _ -> error(this.pos, "cannot apply - on a JSON")
+      | CTExpr _ -> error(this.pos, "cannot apply - on a SCHEMA")
       }
 
     | P.UnOp(P.UnaryPlus(), e) ->
@@ -1311,7 +1313,7 @@ mutable class Compiler{
         };
         this.compileExpr(context, args[0]) match {
         | CGNull _ -> CGNull()
-        | CSExpr(e) -> COExpr(COJSON(e))
+        | CSExpr(e) -> CJExpr(CJJSON(e))
         | _ -> error(this.pos, "json expects a string")
         }
       | "json_schema" ->
@@ -1320,7 +1322,7 @@ mutable class Compiler{
         };
         this.compileExpr(context, args[0]) match {
         | CGNull _ -> CGNull()
-        | CSExpr(e) -> COExpr(COJSchema(e))
+        | CSExpr(e) -> CTExpr(CTJSchema(e))
         | _ -> error(this.pos, "json_schema expects a string")
         }
       | "json_schema_pretty" ->
@@ -1329,8 +1331,8 @@ mutable class Compiler{
         };
         this.compileExpr(context, args[0]) match {
         | CGNull _ -> CGNull()
-        | CSExpr(e) -> CSExpr(CSJSchemaPp(COParseSchema(e)))
-        | COExpr(e) -> CSExpr(CSJSchemaPp(e))
+        | CSExpr(e) -> CSExpr(CSJSchemaPp(CTParseSchema(e)))
+        | CTExpr(e) -> CSExpr(CSJSchemaPp(e))
         | _ -> error(this.pos, "json_pretty_schema expects a json schema")
         }
       | "json_schema_compact" ->
@@ -1339,8 +1341,8 @@ mutable class Compiler{
         };
         this.compileExpr(context, args[0]) match {
         | CGNull _ -> CGNull()
-        | CSExpr(e) -> CSExpr(CSJSchemaPp(COParseSchema(e)))
-        | COExpr(e) -> CSExpr(CSJSchemaPp(e))
+        | CSExpr(e) -> CSExpr(CSJSchemaPp(CTParseSchema(e)))
+        | CTExpr(e) -> CSExpr(CSJSchemaPp(e))
         | _ -> error(this.pos, "json_pretty_schema expects a json schema")
         }
       | "json_check_schema" ->
@@ -1352,12 +1354,18 @@ mutable class Compiler{
           this.compileExpr(context, args[1]),
         ) match {
         | (CSExpr(schema), CSExpr(json)) ->
-          CSExpr(CSJSchemaCheck(COParseSchema(schema), COJSONType(json)))
-        | (COExpr(schema), CSExpr(json)) ->
-          CSExpr(CSJSchemaCheck(schema, COJSONType(json)))
-        | (CSExpr(schema), COExpr(json)) ->
-          CSExpr(CSJSchemaCheck(COParseSchema(schema), json))
-        | (COExpr(schema), COExpr(json)) -> CSExpr(CSJSchemaCheck(schema, json))
+          CSExpr(
+            CSJSchemaCheck(CTParseSchema(schema), CTJSONType(CJJSON(json))),
+          )
+        | (CTExpr(schema), CSExpr(json)) ->
+          CSExpr(CSJSchemaCheck(schema, CTJSONType(CJJSON(json))))
+        | (CSExpr(schema), CJExpr(json)) ->
+          CSExpr(CSJSchemaCheck(CTParseSchema(schema), CTJSONType(json)))
+        | (CTExpr(schema), CJExpr(json)) ->
+          CSExpr(CSJSchemaCheck(schema, CTJSONType(json)))
+        | (CSExpr(schema), CTExpr(json)) ->
+          CSExpr(CSJSchemaCheck(CTParseSchema(schema), json))
+        | (CTExpr(schema), CTExpr(json)) -> CSExpr(CSJSchemaCheck(schema, json))
         | _ ->
           error(
             this.pos,
@@ -1375,7 +1383,8 @@ mutable class Compiler{
           | CIExpr _ -> break Some(P.INTEGER())
           | CFExpr _ -> break Some(P.FLOAT())
           | CSExpr _ -> break Some(P.TEXT())
-          | COExpr _ -> break Some(P.BLOB())
+          | CJExpr _ -> break Some(P.JSON())
+          | CTExpr _ -> break Some(P.SCHEMA())
           }
         } else {
           None()
@@ -1418,7 +1427,7 @@ mutable class Compiler{
               ),
             ),
           )
-        | Some(P.BLOB()) -> error(this.pos, "Cannot call coalesce on a blob")
+        | Some(P.SCHEMA()) -> error(this.pos, "Cannot call coalesce on a blob")
         | Some(P.JSON()) -> error(this.pos, "Cannot call coalesce on JSON")
         }
 
@@ -1437,7 +1446,8 @@ mutable class Compiler{
             this.aggrVars.push((Sum(distinct), e));
             CFExpr(CFGetFrom(0, slot))
           | CSExpr _ -> error(this.pos, "Cannot call sum on a string")
-          | COExpr _ -> error(this.pos, "Cannot call sum on a blob")
+          | CJExpr _ -> error(this.pos, "Cannot call sum on a JSON")
+          | CTExpr _ -> error(this.pos, "Cannot call sum on a SCHEMA")
           | CGNull _ -> CGNull()
           }
         })
@@ -1460,7 +1470,8 @@ mutable class Compiler{
             slot = this.aggrVars.size();
             this.aggrVars.push((Min(), e));
             CSExpr(CSGetFrom(0, slot))
-          | COExpr _ -> error(this.pos, "Cannot call min on a blob")
+          | CJExpr _ -> error(this.pos, "Cannot call min on a JSON")
+          | CTExpr _ -> error(this.pos, "Cannot call min on a SCHEMA")
           | CGNull _ -> CGNull()
           }
         })
@@ -1483,7 +1494,8 @@ mutable class Compiler{
             slot = this.aggrVars.size();
             this.aggrVars.push((Max(), e));
             CSExpr(CSGetFrom(0, slot))
-          | COExpr _ -> error(this.pos, "Cannot call max on a blob")
+          | CJExpr _ -> error(this.pos, "Cannot call max on a JSON")
+          | CTExpr _ -> error(this.pos, "Cannot call max on a SCHEMA")
           | CGNull _ -> CGNull()
           }
         })
@@ -1508,10 +1520,14 @@ mutable class Compiler{
             slot = this.aggrVars.size();
             this.aggrVars.push((Count(distinct), e));
             CIExpr(CIGetFrom(0, slot))
-          | e @ COExpr(_) ->
+          | e @ CJExpr(_) ->
             slot = this.aggrVars.size();
             this.aggrVars.push((Count(distinct), e));
-            COExpr(COGetFrom(0, slot))
+            CJExpr(CJGetFrom(0, slot))
+          | e @ CTExpr(_) ->
+            slot = this.aggrVars.size();
+            this.aggrVars.push((Count(distinct), e));
+            CTExpr(CTGetFrom(0, slot))
           | CGNull _ -> CGNull()
           }
         })
@@ -1542,7 +1558,8 @@ mutable class Compiler{
               CDiv(CFGetFrom(0, sumSlot), CFICast(CIGetFrom(0, countSlot))),
             )
           | CSExpr _ -> error(this.pos, "Cannot call avg on a string")
-          | COExpr _ -> error(this.pos, "Cannot call avg on a blob")
+          | CJExpr _ -> error(this.pos, "Cannot call avg on a JSON")
+          | CTExpr _ -> error(this.pos, "Cannot call avg on a SCHEMA")
           | CGNull _ -> CGNull()
           }
         })
@@ -1557,14 +1574,16 @@ mutable class Compiler{
             error(this.pos, "Cannot call json_schema on an integer")
           | CFExpr(_) ->
             error(this.pos, "Cannot call json_infer_schema on a float")
-          | e @ COExpr _ ->
+          | CTExpr(_) ->
+            error(this.pos, "Cannot call json_infer_schema on a SCHEMA")
+          | e @ CJExpr _ ->
             slot = this.aggrVars.size();
             this.aggrVars.push((InferSchema(), e));
-            COExpr(COGetFrom(0, slot))
+            CTExpr(CTGetFrom(0, slot))
           | e @ CSExpr _ ->
             slot = this.aggrVars.size();
             this.aggrVars.push((InferSchema(), e));
-            COExpr(COGetFrom(0, slot))
+            CTExpr(CTGetFrom(0, slot))
           | CGNull _ -> CGNull()
           }
         })
@@ -1740,11 +1759,14 @@ mutable class Compiler{
       | (CIExpr(i), P.TEXT()) -> CSExpr(CSICast(i))
       | (CFExpr(f), P.TEXT()) -> CSExpr(CSFCast(f))
       | (CSExpr(s), P.FLOAT()) -> CFExpr(CFSCast(s))
-      | (COExpr(b), P.TEXT()) -> CSExpr(COSCast(b))
-      | (COExpr _, _)
-      | (_, P.BLOB()) ->
-        error(this.pos, "Cannot cast a blob")
-      | (_, P.JSON()) -> error(this.pos, "Cannot cast a JSON object")
+      | (CJExpr(b), P.TEXT()) -> CSExpr(CJSCast(b))
+      | (CTExpr(b), P.TEXT()) -> CSExpr(CTSCast(b))
+      | (CTExpr _, _)
+      | (_, P.SCHEMA()) ->
+        error(this.pos, "Cannot cast a schema")
+      | (CJExpr _, _)
+      | (_, P.JSON()) ->
+        error(this.pos, "Cannot cast a JSON object")
       | (ci @ CIExpr _, P.INTEGER()) -> ci
       | (cf @ CFExpr _, P.FLOAT()) -> cf
       | (cs @ CSExpr _, P.TEXT()) -> cs
@@ -1852,10 +1874,15 @@ mutable class Compiler{
         this.pos,
         "Unexpected if condition type, expected INTEGER, not TEXT",
       )
-    | COExpr(_) ->
+    | CJExpr(_) ->
       error(
         this.pos,
-        "Unexpected if condition type, expected INTEGER, not BLOB",
+        "Unexpected if condition type, expected INTEGER, not JSON",
+      )
+    | CTExpr(_) ->
+      error(
+        this.pos,
+        "Unexpected if condition type, expected INTEGER, not SCHEMA",
       )
     }
   }
@@ -2219,9 +2246,8 @@ mutable class Compiler{
                 | P.INTEGER() -> CInt(Int::max)
                 | P.FLOAT() -> CFloat(Float::inf)
                 | P.TEXT() -> CString(largestString())
-                | P.JSON()
-                | P.BLOB() ->
-                  error(this.pos, "Cannot use an index on blobs")
+                | P.JSON() -> maxJSON
+                | P.SCHEMA() -> maxSchema
                 },
               )
             }
