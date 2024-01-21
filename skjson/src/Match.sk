@@ -1,0 +1,48 @@
+/*****************************************************************************/
+// Path-matching.
+//
+// Some times, we will need to refer to path "patterns". Of course, we
+// could use the % operator (provided by SQL), but it's not always what
+// we want. For example, if I want to match all the entries in an array,
+// writing x[%] is not what I want because it will also match
+// x[3].otherField.[4]. So matching allows one to match against indexes
+// using the [] construction. More concretely, x[].field, will match all
+// the paths of the form x[myIndex].field (where myIndex is an integer).
+/*****************************************************************************/
+
+module SKJSON;
+
+base class PathPatternElement
+extension class PEField extends PathPatternElement
+extension class PEIndex extends PathPatternElement
+class PEEmptyIndex() extends PathPatternElement
+
+/*
+fun pathMatch(path: List<PathElement>, pat: List<PathPatternElement>): Bool {
+  (path, pat) match {
+  | (List.Nil(), List.Nil()) -> true
+  | (List.Nil(), _)
+  | (_, List.Nil()) ->
+    false
+  | (List.Cons(head1, tail1), List.Cons(head2, tail2)) ->
+    (head1, head2) match {
+    | (PEField(fieldName1), PEField(fieldName2)) -> fieldName1 == fieldName2
+    | (PEIndex(n1), PEIndex(n2)) -> n1 == n2
+    | (PEIndex(_), PEEmptyIndex()) -> true
+    | _ -> false
+    } && pathMatch(tail1, tail2)
+  }
+}
+*/
+
+/*****************************************************************************/
+/* SQL LIKE matching enriched with []. */
+/*****************************************************************************/
+
+value class PathPattern{
+  firstIsPercent: Bool,
+  lastIsPercent: Bool,
+  subs: Array<Array<Char>>,
+}
+
+module end;

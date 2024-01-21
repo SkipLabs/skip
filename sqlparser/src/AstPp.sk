@@ -14,7 +14,7 @@ extension base class Stmt {
       subQuery match {
       | SQuery(query) -> query.toString()
       | SCall(funName, args) ->
-        funName.toString() + "(" + args.map(x -> x.toString()).join(",")
+        funName.toString() + "(" + args.map(x -> x.toString()).join(",") + ")"
       }
   | CreateIndex{ifNotExists, name, on, columns, unique, where} ->
     "CREATE " +
@@ -386,7 +386,7 @@ extension base class Value {
   | VCurrentTimestamp() -> "CURRENT_TIMESTAMP"
   | VParam(handle) -> "@" + handle
   | VPermission(s) -> "SKDB_PERMISSION(" + s + ")"
-  | VJSON(s) -> "json(" + s + ")"
+  | VJSON(s) -> "json(" + `'${s.replace("'", "''")}'` + ")"
 }
 
 extension base class Expr {

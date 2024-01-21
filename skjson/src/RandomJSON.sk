@@ -59,12 +59,16 @@ mutable class RandomJSON{rand: mutable Random} {
 
   mutable fun genObject(): CJObject {
     size = this.rand.random(static::objectMinSize, static::objectMaxSize);
-    fields = mutable Vector[];
+    fields = mutable Map[];
     for (_ in Range(0, size)) {
       fieldName = "field" + this.genInt();
-      fields.push((fieldName, this.genValue()));
+      fields![fieldName] = this.genValue();
     };
-    CJObject(CJFields::create(fields.toArray().sortedBy(x ~> x.i0), x -> x))
+    CJObject(
+      CJFields::create(fields.items().collect(Array).sortedBy(x ~> x.i0), x ->
+        x
+      ),
+    )
   }
 
   mutable fun genArray(): CJArray {

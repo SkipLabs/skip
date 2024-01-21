@@ -43,6 +43,7 @@ extension class Parser {
 
     subQuery = this.peek_keyword() match {
     | TSelect() -> SQuery(this.parseSelect())
+    | TValues() -> this.errorNotImplemented()
     | _ ->
       this.parseExpr() match {
       | Call(funName, args, distinct) ->

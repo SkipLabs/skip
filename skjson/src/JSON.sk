@@ -61,10 +61,7 @@ base class CJSON uses Orderable {
     SKJSON.TObject(SKJSON.Fields::create(result.chill()))
 }
 
-value class CJFields private (
-  cols: Array<String>,
-  values: Array<CJSON>,
-) uses Orderable {
+value class CJFields(cols: Array<String>, values: Array<CJSON>) uses Orderable {
   fun isEmpty(): Bool {
     this.values.isEmpty()
   }
@@ -76,6 +73,9 @@ value class CJFields private (
     internFieldNames: Array<String> -> Array<String>,
   ): this {
     !fields = fields.sortedBy(x ~> x.i0);
+    for (i => elt in fields) {
+      if (i != 0) invariant(fields[i - 1].i0 < elt.i0);
+    };
     static(internFieldNames(fields.map(x -> x.i0)), fields.map(x -> x.i1))
   }
 

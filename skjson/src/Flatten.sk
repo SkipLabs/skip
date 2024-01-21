@@ -23,52 +23,53 @@ base class PrimType() uses Show {
 }
 
 fun flatten(
-  prefix: String,
   iter: mutable Iterator<(String, CJSON)>,
 ): mutable Iterator<(String, String, ?PrimType, ?Int, ?Float, ?String)> {
   for (row in iter) {
     (id, json) = row;
-    for (elt in flattenHelper(id, List[prefix], json)) {
+    for (elt in flattenHelper(id, List[], "", json)) {
       yield elt
     }
   }
 }
 
+fun mkPath(path: List<PathElement>): String {
+  pathToString(path.reversed())
+}
+
 fun flattenHelper(
   id: String,
-  path: List<String>,
+  path: List<PathElement>,
+  pathStr: String,
   json: CJSON,
 ): mutable Iterator<(String, String, ?PrimType, ?Int, ?Float, ?String)> {
-  mkPath = () -> "".join(path.reversed());
   json match {
-  | CJNull() -> yield (id, mkPath(), None(), None(), None(), None())
-  | CJBool(true) ->
-    yield (id, mkPath(), Some(PTBool()), Some(1), None(), None())
+  | CJNull() -> yield (id, pathStr, None(), None(), None(), None())
+  | CJBool(true) -> yield (id, pathStr, Some(PTBool()), Some(1), None(), None())
   | CJBool(false) ->
-    yield (id, mkPath(), Some(PTBool()), Some(0), None(), None())
-  | CJInt(i) -> yield (id, mkPath(), Some(PTInt()), Some(i), None(), None())
-  | CJFloat(f) -> yield (id, mkPath(), Some(PTFloat()), None(), Some(f), None())
+    yield (id, pathStr, Some(PTBool()), Some(0), None(), None())
+  | CJInt(i) -> yield (id, pathStr, Some(PTInt()), Some(i), None(), None())
+  | CJFloat(f) -> yield (id, pathStr, Some(PTFloat()), None(), Some(f), None())
   | CJString(s) ->
-    yield (id, mkPath(), Some(PTString()), None(), None(), Some(s))
+    yield (id, pathStr, Some(PTString()), None(), None(), Some(s))
   | CJArray(arr) if (arr.isEmpty()) ->
-    yield (id, mkPath(), Some(PTEmptyArray()), None(), None(), None())
+    yield (id, pathStr, Some(PTEmptyArray()), None(), None(), None())
   | CJArray(arr) ->
     for (i => v in arr) {
-      for (elt in flattenHelper(id, List.Cons(".[" + i + "]", path), v)) {
+      newPath = List.Cons(PEIndex(i), path);
+      newPathStr = mkPath(newPath);
+      for (elt in flattenHelper(id, newPath, newPathStr, v)) {
         yield elt
       }
     }
   | CJObject(fields) if (fields.isEmpty()) ->
-    yield (id, mkPath(), Some(PTEmptyObject()), None(), None(), None())
+    yield (id, pathStr, Some(PTEmptyObject()), None(), None(), None())
   | CJObject(fields) ->
     sortedFields = fields.items().collect(Array).sortedBy(x ~> x.i0);
     for (kv in sortedFields) {
       (fieldName, fieldValue) = kv;
-      for (elt in flattenHelper(
-        id,
-        List.Cons("." + fieldName, path),
-        fieldValue,
-      )) {
+      newPath = List.Cons(PEField(fieldName), path);
+      for (elt in flattenHelper(id, newPath, mkPath(newPath), fieldValue)) {
         yield elt
       }
     }
@@ -85,6 +86,17 @@ base class PathElement uses Orderable {
   | PEIndex(Int)
 }
 
+fun pathToString(path: List<PathElement>): String {
+  path match {
+  | List.Nil() -> ""
+  | List.Cons(head, tail) ->
+    head match {
+    | PEField(x) -> "." + x
+    | PEIndex(x) -> "[" + x + "]"
+    } + pathToString(tail)
+  }
+}
+
 class ReconstructError(msg: String) extends Exception {
   fun getMessage(): String {
     "Error: " + this.msg
@@ -99,10 +111,14 @@ fun buildPathValueIter(
   for (row in rows) {
     lastRow match {
     | Some(lrow) if (lrow.i0 > row.i0) ->
-      throw ReconstructError("Object id out of order: " + row.i0)
+      throw ReconstructError(
+        "Object id out of order: " + lrow.i0 + "/" + row.i0,
+      )
     | Some(lrow) if (lrow.i0 == row.i0) ->
       if (lrow.i1 > row.i1) {
-        throw ReconstructError("Object path out of order: " + row.i0 + row.i1)
+        throw ReconstructError(
+          "Object path out of order: " + lrow.i1 + "/" + row.i1,
+        )
       };
       if (lrow.i1 == row.i1) {
         throw ReconstructError(
@@ -116,26 +132,7 @@ fun buildPathValueIter(
     | _ -> void
     };
     !lastRow = Some(row);
-    path = row.i1
-      .split(".")
-      .filter(x -> x != "")
-      .map(fieldStr -> {
-        iter = fieldStr.getIter();
-        iter.next() match {
-        | None() ->
-          invariant_violation(
-            "Internal error: should have filtered empty strings",
-          )
-        | Some('[') ->
-          chars = mutable Vector[];
-          for (c in iter) {
-            if (c != ']') chars.push(c)
-          };
-          PEIndex(String::fromChars(chars.toArray()).toInt())
-        | _ -> PEField(fieldStr)
-        }
-      })
-      .toArray();
+    path = TypeParser::mcreate(row.i1).path().toArray();
     value = row.i2 match {
     | None() -> CJNull()
     | Some(PTInt()) -> CJInt(row.i3.fromSome())

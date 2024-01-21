@@ -87,8 +87,7 @@ value class Field(
 ) uses Orderable
 
 class Fields private (fields: Array<Field>) uses Orderable {
-  static fun create(fieldIter: Array<Field>): this {
-    fields = fieldIter.collect(Array);
+  static fun create(fields: Array<Field>): this {
     !fields = fields.sortedBy(x ~> x.name);
     for (i => elt in fields) {
       if (i != 0) invariant(fields[i - 1].name < elt.name);
@@ -189,7 +188,12 @@ class Fields private (fields: Array<Field>) uses Orderable {
  */
 /*****************************************************************************/
 
-base class SType uses Orderable {
+base class STypeWithNum {
+  children =
+  | TNum()
+}
+
+base class SType uses Orderable extends STypeWithNum {
   const TKNull: Int = 0;
   const TKBool: Int = 1;
   const TKInt: Int = 2;
@@ -294,12 +298,207 @@ class Type private (types: Array<(Int, SType)>) uses Orderable {
     Type(types)
   }
 
+  fun isInt(): Bool {
+    this match {
+    | Type(arr) ->
+      arr.size() == 1 &&
+        arr[0] match {
+        | (_, TInt()) -> true
+        | _ -> false
+        }
+    }
+  }
+
+  fun isIntOrNull(): Bool {
+    this match {
+    | Type(arr) ->
+      arr.size() == 2 &&
+        (arr[0], arr[1]) match {
+        | ((_, TNull()), (_, TInt())) -> true
+        | _ -> false
+        }
+    }
+  }
+
+  fun isBool(): Bool {
+    this match {
+    | Type(arr) ->
+      arr.size() == 1 &&
+        arr[0] match {
+        | (_, TBool()) -> true
+        | _ -> false
+        }
+    }
+  }
+
+  fun isBoolOrNull(): Bool {
+    this match {
+    | Type(arr) ->
+      arr.size() == 2 &&
+        (arr[0], arr[1]) match {
+        | ((_, TNull()), (_, TBool())) -> true
+        | _ -> false
+        }
+    }
+  }
+
+  // A num is either [int | float] or [null | int | float]
+  // Note that the type cannot contain anything else.
+  fun isNum(): Bool {
+    hasInt = false;
+    hasFloat = false;
+    for (ty in this.types) {
+      ty match {
+      | (_, TNull()) -> void
+      | (_, TBool())
+      | (_, TString()) ->
+        return false
+      | (_, TInt()) -> !hasInt = true
+      | (_, TFloat()) -> !hasFloat = true
+      | (_, TArray _)
+      | (_, TObject _) ->
+        return false
+      }
+    };
+    if (hasInt && hasFloat) return true;
+    false
+  }
+
+  fun containsNum(): Bool {
+    hasOtherType = false;
+    hasInt = false;
+    hasFloat = false;
+    todos = mutable Vector[];
+    for (ty in this.types) {
+      ty match {
+      | (_, TNull()) -> void
+      | (_, TBool())
+      | (_, TString()) ->
+        !hasOtherType = true
+      | (_, TInt()) -> !hasInt = true
+      | (_, TFloat()) -> !hasFloat = true
+      | (_, TArray(subTy)) ->
+        !hasOtherType = true;
+        todos.push(subTy)
+      | (_, TObject(fields)) ->
+        !hasOtherType = true;
+        for (field in fields.fields) {
+          todos.push(field.type);
+        }
+      }
+    };
+    if (hasInt && hasFloat && !hasOtherType) return true;
+    for (todo in todos) {
+      if (todo.containsNum()) return true;
+    };
+    false
+  }
+
+  fun convertNum(value: CJSON): CJSON {
+    if (this.isNum()) {
+      return value match {
+      | CJInt(n) -> CJFloat(n.toFloat())
+      | x -> x
+      }
+    };
+    for (sty in this.types) {
+      (sty.i1, value) match {
+      | (TNull(), v @ CJNull()) -> return v
+      | (TNull(), _) -> void
+      | (TBool(), v @ CJBool _) -> return v
+      | (TBool(), _) -> void
+      | (TInt(), v @ CJInt _) -> return v
+      | (TInt(), _) -> void
+      | (TFloat(), v @ CJFloat _) -> return v
+      | (TFloat(), _) -> void
+      | (TString(), v @ CJString _) -> return v
+      | (TString(), _) -> void
+      | (TArray(ty), CJArray(arr)) ->
+        return CJArray(arr.map(subValue -> ty.convertNum(subValue)))
+      | (TArray(_), _) -> void
+      | (TObject(objectFields), CJObject(fields)) ->
+        tyFields = objectFields.fields;
+        fieldNames = fields.cols;
+        fieldValues = fields.values;
+        i = 0;
+        j = 0;
+        newValues = mutable Vector[];
+        loop {
+          if (i >= tyFields.size() || j >= fieldNames.size()) {
+            return CJObject(CJFields(fieldNames, newValues.toArray()))
+          };
+          if (tyFields[i].name < fieldNames[j]) {
+            !i = i + 1;
+            continue
+          };
+          if (tyFields[i].name > fieldNames[j]) {
+            newValues.push(fieldValues[j]);
+            !j = j + 1;
+            continue
+          };
+          invariant(tyFields[i].name == fieldNames[j]);
+          newValues.push(tyFields[i].type.convertNum(fieldValues[j]));
+          !i = i + 1;
+          !j = j + 1;
+        }
+      | (TObject(_), _) -> void
+      }
+    };
+    invariant_violation(
+      "Internal error: the object should have matched one of the types",
+    )
+  }
+
+  fun isFloat(): Bool {
+    this match {
+    | Type(arr) ->
+      arr.size() == 1 &&
+        arr[0] match {
+        | (_, TFloat()) -> true
+        | _ -> false
+        }
+    }
+  }
+
+  fun isFloatOrNull(): Bool {
+    this match {
+    | Type(arr) ->
+      arr.size() == 2 &&
+        (arr[0], arr[1]) match {
+        | ((_, TNull()), (_, TFloat())) -> true
+        | _ -> false
+        }
+    }
+  }
+
+  fun isString(): Bool {
+    this match {
+    | Type(arr) ->
+      arr.size() == 1 &&
+        arr[0] match {
+        | (_, TString()) -> true
+        | _ -> false
+        }
+    }
+  }
+
+  fun isStringOrNull(): Bool {
+    this match {
+    | Type(arr) ->
+      arr.size() == 2 &&
+        (arr[0], arr[1]) match {
+        | ((_, TNull()), (_, TString())) -> true
+        | _ -> false
+        }
+    }
+  }
+
   static fun create(ty: SType): this {
     Type(Array[(1, ty)])
   }
 
   static fun fromString(value: String): Type {
-    Parser::mcreate(value).type()
+    TypeParser::mcreate(value).type()
   }
 
   fun union(other: Type): Type {

@@ -25,7 +25,12 @@ base class Stmt{pos: Int = 0} uses Equality, Show {
   children =
   | BeginTransaction{kind: TransactionKind}
   | EndTransaction{}
-  | CreateView{virtual: Bool, name: Name, ifNotExists: Bool, query: SubQuery}
+  | CreateView{
+    virtual: Bool,
+    name: Name,
+    ifNotExists: Bool,
+    query: ViewDefinition,
+  }
   | CreateIndex{
     ifNotExists: Bool,
     name: Name,
@@ -57,7 +62,7 @@ base class Stmt{pos: Int = 0} uses Equality, Show {
   | Pragma{name: Name, value: ?Value}
 }
 
-base class SubQuery uses Equality, Show {
+base class ViewDefinition uses Equality, Show {
   children =
   | SQuery(Select)
   | SCall(Name, Array<Expr>)

@@ -54,7 +54,6 @@ else
     fail "SCHEMA_CHECK1"
 fi
 
-
 if echo "select json_check_schema(json_schema('$schema'), json('{\"a\":22.0}'))" | $SKDB 2>&1 | grep -q Error; then
     pass "SCHEMA_CHECK2"
 else
@@ -95,10 +94,7 @@ schema2='{?"a":int,?"b":float,?"c":int|string}'
 # Let's enforce a schema on t1, see if it is successfully enforced
 
 echo "create virtual view t1_schema as select json_infer_schema(object) from t1;" | $SKDB
-echo "select * from t1_schema" | $SKDB
 echo "delete from t1 where id='id555';" | $SKDB
-echo "select * from t1_schema" | $SKDB
-
 
 echo "create virtual view enforce_type as select json_check_schema('$schema2', json_infer_schema(object)) from t1" | $SKDB
 
@@ -130,7 +126,45 @@ echo 'INSERT INTO users (object) values ('"'"'{
 }'"'"');' | $SKDB
 
 echo "create virtual view user_paths as json_split(users);" | $SKDB
-echo "create virtual view emails as select id, svalue as email from user_paths where path like '.emails.[%].address';" | $SKDB 
+echo "create virtual view emails as select id, svalue as email from user_paths where path like '.emails[%].address';" | $SKDB 
 echo "create index email_idx on emails(email);" | $SKDB
-echo "select * from emails where email like 'greg%'" | $SKDB
 
+if echo "select email from emails where email like 'greg%gmail%'" | $SKDB | grep -q 'greg@gmail.com'; then
+    pass "EMAIL_INDEX"
+else
+    fail "EMAIL_INDEX"
+fi
+
+# Tests for json_extract
+
+echo "create table t3 (v JSON);" | $SKDB
+
+echo 'insert into t3 values('"'"'{"userId": 1,"id": 1,"title": "delectus aut autem","completed": false}'"'"')' | $SKDB
+echo 'insert into t3 values('"'"'{"userId":1,"id":2,"title":"quisutamfacilisetofficiaqui","completed":false}'"'"')' | $SKDB
+echo 'insert into t3 values('"'"'{"userId":1,"id":3,"title":"fugiatveiammius","completed":false}'"'"')' | $SKDB
+echo 'insert into t3 values('"'"'{"userId":1,"id":4,"title":"etporrotempora","completed":true}'"'"')' | $SKDB
+echo 'insert into t3 values('"'"'{"userId":1,"id":5,"title":"laboriosammollitiaeteimquasiadipisciquiaprovidetillum","completed":false}'"'"')' | $SKDB
+
+echo "create virtual view t3_sql as json_extract(t3, v, '{id<int>, userId<int>, title<string>, completed<bool>}');" | $SKDB
+
+if echo "select * from t3_sql where id = 1" | $SKDB | grep -q delectus; then
+    pass "JSON_EXTRACT"
+else
+    fail "JSON_EXTRACT"
+fi
+
+echo "create table t4 (v JSON);" | $SKDB
+
+echo 'insert into t3 values('"'"'{"userIds":[1,2,3],"id": 1,"title": "delectus aut autem","completed": false}'"'"')' | $SKDB
+echo 'insert into t3 values('"'"'{"userIds":[2],"id":2,"title":"quisutamfacilisetofficiaqui","completed":false}'"'"')' | $SKDB
+echo 'insert into t3 values('"'"'{"userIds":[1,2],"id":3,"title":"fugiatveiammius","completed":false}'"'"')' | $SKDB
+echo 'insert into t3 values('"'"'{"userIds":[4,5],"id":4,"title":"etporrotempora","completed":true}'"'"')' | $SKDB
+echo 'insert into t3 values('"'"'{"userIds":[3,4],"id":5,"title":"laboriosammollitiaeteimquasiadipisciquiaprovidetillum","completed":false}'"'"')' | $SKDB
+
+echo "create virtual view t4_sql as json_extract(t3, v, '{id<int>, userIds[]: userId<int>, title<string>, completed<bool>}');" | $SKDB
+
+if echo "select count(*) from t4_sql where id = 1" | $SKDB | grep -q 3; then
+    pass "JSON_EXTRACT2"
+else
+    fail "JSON_EXTRACT2"
+fi
