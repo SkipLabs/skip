@@ -30,6 +30,7 @@ var encoder = new util.TextEncoder();
 class Env implements Environment {
   shared: Map<string, Shared>;
   fileSystem: MemFS;
+  disableWarnings: boolean = false;
   system: MemSys;
   timestamp: () => float;
   window: () => Window;

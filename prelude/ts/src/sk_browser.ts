@@ -19,6 +19,7 @@ class WrkImpl implements Wrk {
 
 class Env implements Environment {
   shared: Map<string, Shared>;
+  disableWarnings: boolean = false;
   fileSystem: MemFS;
   system: MemSys;
   timestamp: () => float;
