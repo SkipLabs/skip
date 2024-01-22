@@ -148,6 +148,7 @@ export interface Wrk {
 export interface Environment {
   shared: Map<string, Shared>;
   name: () => string;
+  disableWarnings: boolean;
   environment: Array<string>;
   createSocket: (uir: string) => WebSocket;
   createWorker: (filename: string | URL, options?: WorkerOptions) => Wrk;
@@ -543,7 +544,7 @@ export class Utils {
       this.current_stdin++;
     }
     return lineBuffer;
-  }
+  };
 
   getStdInChar = () => {
     if (this.current_stdin >= this.stdin.length) {
