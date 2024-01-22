@@ -21,6 +21,7 @@ export type MirrorDefn = {
   table: string;
   expectedColumns: string;
   filterExpr?: string;
+  filterParams?: Params;
 };
 
 export interface SKDBSync {

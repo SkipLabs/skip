@@ -1,5 +1,7 @@
 package io.skiplabs.skdb
 
+import com.fasterxml.jackson.core.type.TypeReference
+import com.fasterxml.jackson.databind.ObjectMapper
 import java.nio.ByteBuffer
 import java.nio.CharBuffer
 import java.nio.charset.StandardCharsets
@@ -8,6 +10,7 @@ import java.nio.charset.StandardCharsets
 
 // 10MiB ought to be enough for anybody
 val MAX_QUERY_LENGTH = 10 * 1024 * 1024
+val jsonMapper = ObjectMapper()
 
 sealed class ProtoMessage()
 
@@ -64,8 +67,11 @@ fun decodeParams(data: ByteBuffer): Map<String, Any?> {
   val paramsLength = data.getShort()
   val paramsBytes = ByteArray(paramsLength.toInt())
   data.get(paramsBytes)
-  // TODO: decode json in to map
-  return HashMap<String, Any>()
+
+  val typeRef = object : TypeReference<HashMap<String, Any>>() {}
+  val ret: Map<String, Any?> = jsonMapper.readValue(paramsBytes, typeRef)
+
+  return ret
 }
 
 fun decodeProtoMsg(data: ByteBuffer): ProtoMessage {

@@ -1,5 +1,5 @@
 import { expect } from "@playwright/test";
-import { createSkdb, SKDB } from "skdb";
+import { createSkdb, SKDB, Params } from "skdb";
 
 type dbs = {
   root: SKDB;
@@ -164,7 +164,7 @@ async function testQueriesAgainstTheServer(skdb: SKDB) {
     x: 42,
   });
   expect(rows).toEqual([{ x: 42, y: 21 }]);
-  await remote.exec("delete from test_pk where x in (43,44);", {});
+  await remote.exec("delete from test_pk where x in (44);", {});
   try {
     await remote.exec("bad query", {});
   } catch (error) {
@@ -213,6 +213,8 @@ async function testMirroring(skdb: SKDB) {
   const test_pk = {
     table: "test_pk",
     expectedColumns: "(x INTEGER PRIMARY KEY, y INTEGER, skdb_access TEXT)",
+    filterExpr: "x < @thresh",
+    filterParams: { thresh: 43 },
   };
   const view_pk = {
     table: "view_pk",
@@ -220,19 +222,14 @@ async function testMirroring(skdb: SKDB) {
   };
   await skdb.mirror(test_pk, view_pk);
 
-  const testPkRows = await waitSynch(
-    skdb,
-    "SELECT x,y FROM test_pk",
-    (tail) => tail[0] && tail[0].x == 42,
-  );
+  const testPkRows = await skdb.exec("SELECT x,y FROM test_pk");
   expect(testPkRows).toEqual([{ x: 42, y: 21 }]);
 
-  const viewPkRows = await waitSynch(
-    skdb,
-    "SELECT x,y FROM view_pk",
-    (tail) => tail[0] && tail[0].x == 42,
-  );
-  expect(viewPkRows).toEqual([{ x: 42, y: 63 }]);
+  const viewPkRows = await skdb.exec("SELECT x,y FROM view_pk");
+  expect(viewPkRows).toEqual([
+    { x: 42, y: 63 },
+    { x: 43, y: 66 },
+  ]);
 
   // mirror already mirrored table is idempotent
   await skdb.mirror(test_pk, view_pk);
@@ -244,7 +241,7 @@ function waitSynch(
   skdb: SKDB,
   query: string,
   check: (v: any) => boolean,
-  query_params: Map<string, any> = new Map(),
+  query_params: Params = new Map(),
   server: boolean = false,
   max: number = 6,
 ) {
@@ -366,7 +363,7 @@ async function testLargeMirror(root: SKDB, user: SKDB) {
   };
   const large_copy = {
     table: "large_copy",
-    expectedColumns: "(t INTEGER, skdb_access TEXT)",
+    expectedColumns: "*", // just to test the *, would be better to be explicit
   };
 
   await user.mirror(test_pk, view_pk, large);

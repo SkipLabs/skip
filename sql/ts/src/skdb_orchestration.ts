@@ -1532,7 +1532,7 @@ class SKDBServer implements RemoteSKDB {
           expectedColumns: def.expectedColumns,
           since: this.client.watermark(this.replicationUid, def.table),
           filterExpr: def.filterExpr ?? "",
-          params: new Map(),
+          params: def.filterParams ?? new Map(),
         };
       });
       return encodeProtoMsg({
