@@ -17,7 +17,7 @@ endif # ifeq ($(PRFDEF),DEBUG)
 endif # ifeq ($(PRFDEF),RELEASE)
 else
 DEFINITIONS=
-OLEVEL=-O2 -g
+OLEVEL=-O2 -g3
 endif # ifdef PROFILE
 
 LBT_EXISTS=$(shell [ -e $(LIB_DIR)/libbacktrace.a ] && echo 1 || echo 0 )
@@ -90,8 +90,8 @@ endif
 
 $(BUILD_DIR)runtime/runtime64_specific.o: $(COMP_DIR)/runtime/runtime64_specific.cpp
 	@[ -d $(dir $@) ] || mkdir -p $(dir $@)
-	@clang++ $(OLEVEL) -g -o $@ -c -I$(COMP_DIR)/runtime/libbacktrace/ $<
+	@clang++ $(OLEVEL) -g3 -o $@ -c -I$(COMP_DIR)/runtime/libbacktrace/ $<
 
 $(BUILD_DIR)%.o: $(COMP_DIR)/%.c
 	@[ -d $(dir $@) ] || mkdir -p $(dir $@)
-	@clang $(CC64FLAGS) -g -o $@ -c $<
+	@clang $(CC64FLAGS) -g3 -o $@ -c $<

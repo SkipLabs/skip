@@ -8,14 +8,14 @@ ifeq ($(PRFDEF),RELEASE)
 OLEVEL=-O3
 else
 ifeq ($(PRFDEF),DEBUG)
-OLEVEL=-O0 -g
+OLEVEL=-O0 -g3
 else
-OLEVEL=-O2 -g
+OLEVEL=-O2 -g3
 endif # ifeq ($(PRFDEF),DEBUG)
 endif # ifeq ($(PRFDEF),RELEASE)
 else
 DEFINITIONS=
-OLEVEL=-O2 -g
+OLEVEL=-O2 -g3
 endif # ifdef PROFILE
 
 CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm -nostdlibinc

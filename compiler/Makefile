@@ -51,15 +51,15 @@ stage%/lib/skip_preamble32.ll: preamble/preamble32.ll
 
 stage0/bin/skargo: bootstrap/skargo_out64.ll stage0/lib/libskip_runtime64.a stage0/lib/libbacktrace.a
 	mkdir -p $(@D)
-	clang++ -no-pie $(CXXFLAGS) -o $@ $^ -lpthread -g
+	clang++ -no-pie $(CXXFLAGS) -o $@ $^ -lpthread -g3
 
 stage0/bin/skfmt: bootstrap/skfmt_out64.ll stage0/lib/libskip_runtime64.a stage0/lib/libbacktrace.a
 	mkdir -p $(@D)
-	clang++ -no-pie $(CXXFLAGS) -o $@ $^ -lpthread -g
+	clang++ -no-pie $(CXXFLAGS) -o $@ $^ -lpthread -g3
 
 stage0/bin/skc: bootstrap/skc_out64.ll stage0/lib/libskip_runtime64.a stage0/lib/libbacktrace.a
 	mkdir -p $(@D)
-	clang++ -no-pie $(CXXFLAGS) -o $@ $^ -lpthread -g
+	clang++ -no-pie $(CXXFLAGS) -o $@ $^ -lpthread -g3
 
 stage1/bin/skc stage1/bin/skfmt stage1/bin/skargo: stage0
 	PATH=stage0/bin/:$(PATH) skargo build -r --target-dir stage1/bin
