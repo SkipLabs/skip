@@ -23,8 +23,9 @@ CFILES=\
 	xoroshiro128plus.c
 
 NATIVE_FILES=\
-	palloc.c\
-	consts.c
+	consts.c \
+	palloc.c \
+	posix.c
 
 CFILES32=$(CFILES) runtime32_specific.c
 BCFILES32=magic.bc $(CFILES32:.c=.bc)
@@ -38,19 +39,13 @@ magic.c:
 	date | cksum | awk '{print "unsigned long version = " $$1 ";"}' > magic.c
 	echo "int SKIP_get_version() { return (int)version; }" >> magic.c
 
-magic.bc: magic.c
-	clang $(OLEVEL) $(CC32FLAGS) -o $@ -c $<
-
-magic.o: magic.c
-	clang $(CC64FLAGS) -o $@ -c $<
-
 libskip_runtime32.bc: $(BCFILES32)
 	llvm-link $(BCFILES32) -o $@
 
 %.bc: %.c
 	clang $(OLEVEL) $(CC32FLAGS) -o $@ -c $<
 
-libskip_runtime64.a: $(OFILES) posix.o runtime64_specific.o $(ONATIVE_FILES)
+libskip_runtime64.a: $(OFILES) runtime64_specific.o $(ONATIVE_FILES)
 	$(AR) rcs $@ $^
 
 .PHONY: libbacktrace
@@ -62,10 +57,10 @@ libbacktrace: .libs/libbacktrace.a
 	$(MAKE) -C libbacktrace
 
 runtime64_specific.o: runtime64_specific.cpp .libs/libbacktrace.a
-	clang++ -std=c++11 $(OLEVEL) -g -o $@ -c -Ilibbacktrace/ $<
+	clang++ -std=c++11 $(OLEVEL) -g3 -o $@ -c -Ilibbacktrace/ $<
 
 %.o: %.c
-	clang $(CC64FLAGS) -g -o $@ -c $<
+	clang $(CC64FLAGS) -g3 -o $@ -c $<
 
 .PHONY: clean
 clean:
