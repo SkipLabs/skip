@@ -1004,6 +1004,11 @@ class Evaluator{options: Options, user: ?UserFile} {
   ): void {
     dirName = dirDescr.dirName;
     if (context.unsafeMaybeGetEagerDir(dirName) is Some _ && ifNotExists) {
+      currentSchema = getTable(context, pos, name).schema;
+      newSchema = dirDescr.schema;
+      if (currentSchema != newSchema) {
+        error(pos, "table exists with a different schema")
+      };
       return void;
     };
 
