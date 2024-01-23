@@ -202,12 +202,14 @@ base class MInfo {
   children =
   | MInfoEmpty()
   | MInfoSingle(Key)
+  | MInfoMultiple(Array<Key>)
   | MInfoFull(Array<Key>, Array<DirName>, Array<Path>)
 
   fun getKeys(): Array<Key> {
     this match {
     | MInfoEmpty() -> Array[]
     | MInfoSingle(x) -> Array[x]
+    | MInfoMultiple(keys) -> keys
     | MInfoFull(keys, _, _) -> keys
     }
   }
@@ -216,6 +218,7 @@ base class MInfo {
     this match {
     | MInfoEmpty() -> Array[]
     | MInfoSingle(_) -> Array[]
+    | MInfoMultiple(_) -> Array[]
     | MInfoFull(_, dirs, _) -> dirs
     }
   }
@@ -223,6 +226,7 @@ base class MInfo {
     this match {
     | MInfoEmpty() -> Array[]
     | MInfoSingle(_) -> Array[]
+    | MInfoMultiple(_) -> Array[]
     | MInfoFull(_, _, reads) -> reads
     }
   }
@@ -232,10 +236,11 @@ base class MInfo {
     newDirs: Array<DirName>,
     reads: Array<Path>,
   ): MInfo {
-    if (keys.isEmpty() && newDirs.isEmpty() && reads.isEmpty()) {
-      return MInfoEmpty()
+    if (newDirs.isEmpty() && reads.isEmpty()) {
+      if (keys.isEmpty()) return MInfoEmpty();
+      if (keys.size() == 1) return MInfoSingle(keys[0]);
+      return MInfoMultiple(keys);
     };
-    if (keys.size() == 1) return MInfoSingle(keys[0]);
     MInfoFull(keys, newDirs, reads)
   }
 
@@ -255,6 +260,9 @@ base class MInfo {
     | MInfoSingle(key) ->
       if (newDirs.isEmpty()) return this;
       MInfoFull(Array[key], newDirs, Array[])
+    | MInfoMultiple(keys) ->
+      if (newDirs.isEmpty()) return this;
+      MInfoFull(keys, newDirs, Array[])
     | MInfoFull(keys, _, reads) -> static::create(keys, newDirs, reads)
     }
   }
