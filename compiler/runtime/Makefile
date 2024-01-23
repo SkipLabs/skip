@@ -57,10 +57,10 @@ libbacktrace: .libs/libbacktrace.a
 	$(MAKE) -C libbacktrace
 
 runtime64_specific.o: runtime64_specific.cpp .libs/libbacktrace.a
-	clang++ -std=c++11 $(OLEVEL) -g -o $@ -c -Ilibbacktrace/ $<
+	clang++ -std=c++11 $(OLEVEL) -g3 -o $@ -c -Ilibbacktrace/ $<
 
 %.o: %.c
-	clang $(CC64FLAGS) -g -o $@ -c $<
+	clang $(CC64FLAGS) -g3 -o $@ -c $<
 
 .PHONY: clean
 clean:
