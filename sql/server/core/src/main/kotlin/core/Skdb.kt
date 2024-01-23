@@ -24,6 +24,7 @@ data class ProcessOutput(val output: ByteArray, val exitCode: Int) {
 
   fun getOrThrow(): ByteArray {
     if (exitCode != 0) {
+      System.err.println(decode())
       throw RuntimeException("Process exited unsuccessfully: ${exitCode}")
     }
     return output
