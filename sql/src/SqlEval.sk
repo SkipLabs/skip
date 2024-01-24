@@ -571,9 +571,24 @@ class Evaluator{options: Options, user: ?UserFile} {
       views = getViewsDir(context);
       viewsDir = context.unsafeGetEagerDir(views.dirName);
       key = SKStore.SID(viewName.lower);
-      if (viewsDir.getArrayRaw(key).size() != 0) {
-        if (ifNotExists) return None();
-        error(pos, "VIEW " + viewName + " already exists");
+      cselect1 = SKDB.Compiler::create(
+        false,
+        this.options with {virtual => true},
+        selectAst.pos,
+        params,
+      ).compileSelect(context, selectAst, viewName, true);
+      existingFiles = viewsDir.getArrayRaw(key);
+      if (existingFiles.size() > 0) {
+        existingFiles[0] match {
+        | _ if (!ifNotExists) ->
+          error(pos, "VIEW " + viewName + " already exists")
+        | SelectFile(_, _, _, _, _, cs) if (cselect1 != cs) ->
+          error(
+            pos,
+            "VIEW " + viewName + " already exists with a different query",
+          )
+        | _ -> return None()
+        }
       } else {
         tables = getTableDir(context);
         tablesDir = context.unsafeGetEagerDir(tables.dirName);
@@ -581,12 +596,6 @@ class Evaluator{options: Options, user: ?UserFile} {
           error(pos, "Table " + viewName + " exists");
         };
       };
-      cselect1 = SKDB.Compiler::create(
-        false,
-        this.options with {virtual => true},
-        selectAst.pos,
-        params,
-      ).compileSelect(context, selectAst, viewName, true);
       viewsDir.write(
         context,
         key,
