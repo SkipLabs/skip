@@ -1325,11 +1325,11 @@ class Evaluator{options: Options, user: ?UserFile} {
         };
         !row = RowValues::create(values.chill(), row.repeat);
         kinds = key match {
-        | RowKey(_, kinds) -> kinds
+        | rowKey @ RowKey _ -> rowKey.getKinds()
         | _ -> invariant_violation("Unexpected row kind")
         };
 
-        writer.set(RowKey(row, kinds), row);
+        writer.set(RowKey::create(row, kinds), row);
       },
     );
     sinkDir = context.unsafeGetEagerDir(sinkDirName);
@@ -1433,7 +1433,7 @@ class Evaluator{options: Options, user: ?UserFile} {
                     SKStore.IID(SKStore.genSym(0)),
                   );
 
-                  key: SKStore.Key = RowKey(row, kinds);
+                  key: SKStore.Key = RowKey::create(row, kinds);
                   for ((_, source, _) in dir.getDataIterWithoutTombs(
                     context,
                     key,
@@ -1473,7 +1473,7 @@ class Evaluator{options: Options, user: ?UserFile} {
     newDir = context.unsafeGetEagerDir(dir.dirName);
     kinds = table.kinds;
     for (row in rows) {
-      key = RowKey(row, kinds);
+      key = RowKey::create(row, kinds);
       source = SKStore.Path(dir.dirName, SKStore.IID(SKStore.genSym(0)));
       !newDir = newDir.writeEntry(context, source, source, key, Array[row]);
     };
@@ -2294,7 +2294,7 @@ fun printReactiveQueryChanges(
         values = edir.getArrayRaw(key);
         if (values.size() == 0) {
           switchTo(UInt32::truncate(2));
-          row = (key as RowKey _).row;
+          row = (key as RowKey _).getRowValues();
           for (_ in Range(0, row.repeat)) {
             RowValues::printItem(format, row);
           }
