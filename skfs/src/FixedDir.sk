@@ -98,45 +98,7 @@ fun binSearch<T: Orderable>(get: Int ~> T, key: T, i: Int, j: Int): Int {
 }
 
 class FixedDir<T: frozen> extends FixedDirImpl<T, FixedRow<T>> {
-  static fun compress(x: FixedRow<T>): FixedRow<T> {
-    x
-  }
-  static fun decompress(x: FixedRow<T>): FixedRow<T> {
-    x
-  }
-}
-
-class CompressedFixedDir extends FixedDirImpl<Array<File>, FixedRow<File>> {
-  static fun compress(row: FixedRow<Array<File>>): FixedRow<File> {
-    size = row.value.i1.size();
-    invariant(size == 1);
-    FixedRow(row.key, (row.value.i0, row.value.i1[0]), row.tag);
-  }
-  static fun decompress(row: FixedRow<File>): FixedRow<Array<File>> {
-    FixedRow(row.key, (row.value.i0, Array[row.value.i1]), row.tag)
-  }
-}
-
-base class FixedDirImpl<T: frozen, Compressed: frozen> private final {
-  data: Array<Compressed> = Array[],
-} extends FixedData<T> {
-  static fun compress(FixedRow<T>): Compressed;
-  static fun decompress(Compressed): FixedRow<T>;
-
-  fun iterator(): mutable Iterator<FixedRow<T>> {
-    for (elt in this.data.iterator()) {
-      yield static::decompress(elt)
-    }
-  }
-
-  static fun isCompressable(data: mutable Vector<FixedRow<Array<File>>>): Bool {
-    for (elt in data) {
-      if (elt.value.i1.size() != 1) return false;
-    };
-    true
-  }
-
-  static deferred fun create<C: FixedDirImpl<T, Compressed>>(
+  static fun create(
     data: mutable Vector<FixedRow<T>> = mutable Vector[],
   ): this {
     i = 0;
@@ -159,7 +121,207 @@ base class FixedDirImpl<T: frozen, Compressed: frozen> private final {
       data.sortBy(row ~> (row.key, row.value.i0));
     };
     _ = static::computeTags(data, 0, data.size() - 1);
-    static{data => data.map(static::compress).toArray()}
+    static{
+      state => None(),
+      data => data.map(x -> static::compress(None(), x)).toArray(),
+    }
+  }
+
+  static fun compress(?CompressState, x: FixedRow<T>): FixedRow<T> {
+    x
+  }
+  static fun decompress(?CompressState, x: FixedRow<T>): FixedRow<T> {
+    x
+  }
+}
+/*****************************************************************************/
+/* SQL. */
+/*****************************************************************************/
+
+
+module end;
+module SQLParser;
+
+base class Type uses Orderable {
+  children =
+  | FLOAT()
+  | INTEGER()
+  | TEXT()
+  | JSON()
+  | SCHEMA()
+}
+
+base class IKind uses Orderable {
+  children =
+  | INONE()
+  | IASC()
+  | IDESC()
+}
+
+module end;
+module SKDB;
+
+base class CValue uses Orderable {
+  children =
+  | CInt(value: Int)
+  | CFloat(value: Float)
+  | CString(value: String)
+}
+
+class RowKey(
+  row: RowValues,
+  kinds: Array<(Int, SQLParser.IKind, SQLParser.Type)>,
+) extends SKStore.Key
+
+class RowValues(
+  values: Array<?CValue>,
+  repeat: Int,
+) uses Orderable extends SKStore.File
+
+module end;
+module SKStore;
+
+/*****************************************************************************/
+value class CompressedRow(
+  sourceID: SKStore.Key,
+  values: Array<?SKDB.CValue>,
+  tag: TickRange,
+)
+
+class CompressState{
+  sourceDirs: SortedSet<DirName>,
+  keyIsSameAsValue: Bool,
+  isAlwaysSize1: Bool,
+  kinds: Array<(Int, SQLParser.IKind, SQLParser.Type)>,
+}
+
+class CompressedFixedDir extends FixedDirImpl<Array<File>, CompressedRow> {
+  static fun compress(
+    state: ?CompressState,
+    row: FixedRow<Array<File>>,
+  ): CompressedRow {
+    st = state match {
+    | None() -> invariant_violation("Expected a state")
+    | Some(x) -> x
+    };
+    invariant(st.sourceDirs.size() == 1);
+    invariant(row.value.i1.size() == 1);
+    // TODO check that source key == key
+    // TODO check that values in key == rowValues
+    // TODO check kinds are canonical
+    // TODO check repeat is 1
+    //    invariant(row.key.getRowValues() == row.value.i0.baseName);
+    result = CompressedRow(
+      row.value.i0.baseName,
+      row.value.i1[0] match {
+      | SKDB.RowValues(values, _kinds) -> values
+      | _ -> invariant_violation("Unexpected type")
+      },
+      row.tag,
+    );
+    //    debug(row);
+    //    debug(static::decompress(state, result));
+    invariant(inspect(static::decompress(state, result)) == inspect(row));
+    result
+  }
+  static fun decompress(
+    state: ?CompressState,
+    row: CompressedRow,
+  ): FixedRow<Array<File>> {
+    st = state match {
+    | None() -> invariant_violation("Expected a state")
+    | Some(x) -> x
+    };
+    rowValues = SKDB.RowValues(row.values, 1);
+    rowKey = SKDB.RowKey(rowValues, st.kinds);
+    FixedRow(
+      rowKey,
+      (
+        Source(st.sourceDirs.min().fromSome(), row.sourceID),
+        Array[(rowValues : File)],
+      ),
+      row.tag,
+    )
+  }
+
+  static fun create(
+    stateOption: ?CompressState,
+    data: mutable Vector<FixedRow<Array<File>>> = mutable Vector[],
+  ): this {
+    state = stateOption match {
+    | None() -> invariant_violation("Expected a state")
+    | Some(x) -> x
+    };
+    i = 0;
+    sz = data.size();
+    sorted = loop {
+      !i = i + 1;
+      if (i >= sz) break true;
+      keyComparison = data[i - 1].key.compare(data[i].key);
+      keyComparison match {
+      | LT() -> continue
+      | GT() -> break false
+      | EQ() -> data[i - 1].value.i0.compare(data[i].value.i0)
+      } match {
+      | LT() -> continue
+      | EQ() -> continue
+      | GT() -> break false
+      };
+    };
+    if (!sorted) {
+      data.sortBy(row ~> (row.key, row.value.i0));
+    };
+    _ = static::computeTags(data, 0, data.size() - 1);
+    invariant(state.keyIsSameAsValue);
+    static{
+      state => stateOption,
+      data => data.map(x -> static::compress(stateOption, x)).toArray(),
+    }
+  }
+}
+
+base class FixedDirImpl<T: frozen, Compressed: frozen> protected {
+  state: ?CompressState,
+  data: Array<Compressed> = Array[],
+} extends FixedData<T> {
+  static fun compress(?CompressState, FixedRow<T>): Compressed;
+  static fun decompress(?CompressState, Compressed): FixedRow<T>;
+
+  fun iterator(): mutable Iterator<FixedRow<T>> {
+    for (elt in this.data.iterator()) {
+      yield static::decompress(this.state, elt)
+    }
+  }
+
+  static fun isCompressable(
+    data: mutable Vector<FixedRow<Array<File>>>,
+  ): ?CompressState {
+    if (data.size() == 0) return None();
+    sourceDirs = SortedSet[];
+    kinds: ?Array<(Int, SQLParser.IKind, SQLParser.Type)> = None();
+
+    keyIsSameAsValue = true;
+    for (elt in data) {
+      if (elt.value.i1.size() != 1) return None();
+      (elt.key, elt.value.i1[0]) match {
+      | (SKDB.RowKey(row1, k), row2 @ SKDB.RowValues _) ->
+        kinds match {
+        | None() -> !kinds = Some(k)
+        | Some(k2) -> invariant(k == k2)
+        };
+        !sourceDirs = sourceDirs.set(elt.value.i0.dirName);
+        if (row1 != row2) return None()
+      | _ -> return None()
+      }
+    };
+    Some(
+      CompressState{
+        sourceDirs,
+        kinds => kinds.fromSome(),
+        keyIsSameAsValue,
+        isAlwaysSize1 => true,
+      },
+    )
   }
 
   fun size(): Int {
@@ -167,7 +329,7 @@ base class FixedDirImpl<T: frozen, Compressed: frozen> private final {
   }
 
   fun get(idx: Int): FixedRow<T> {
-    static::decompress(this.data.unsafe_get(idx))
+    static::decompress(this.state, this.data.unsafe_get(idx))
   }
 
   fun getPos(key: Key): Int {
@@ -235,7 +397,7 @@ base class FixedDirImpl<T: frozen, Compressed: frozen> private final {
       return void;
     };
     pivot = i + (j - i) / 2;
-    elt = static::decompress(this.data[pivot]);
+    elt = static::decompress(this.state, this.data[pivot]);
     tick = elt.tag;
     if (tick.max < after) return void;
     if (tick.current >= after) {
@@ -264,7 +426,7 @@ base class FixedDirImpl<T: frozen, Compressed: frozen> private final {
   ): void {
     if (i <= j) {
       pivot = i + (j - i) / 2;
-      elt = static::decompress(this.data[pivot]);
+      elt = static::decompress(this.state, this.data[pivot]);
       tick = elt.tag;
       if (tick.max >= after) {
         if (key <= elt.key) {
@@ -293,7 +455,7 @@ base class FixedDirImpl<T: frozen, Compressed: frozen> private final {
       None()
     } else {
       middle = (this.data.size() - 1) / 2;
-      tick = static::decompress(this.data[middle]).tag;
+      tick = static::decompress(this.state, this.data[middle]).tag;
       Some(tick.max)
     }
   }
