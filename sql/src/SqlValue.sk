@@ -67,15 +67,25 @@ fun compareRows(
   EQ()
 }
 
-class RowKey(
-  row: RowValues,
-  kinds: Array<(Int, P.IKind, P.Type)>,
-) extends SKStore.Key {
+class RowKey extends RowKeyImpl {
   static fun create(
     row: RowValues,
     kinds: Array<(Int, P.IKind, P.Type)>,
-  ): this {
+  ): RowKeyImpl {
     static(row, kinds)
+  }
+}
+
+base class RowKeyImpl protected (
+  private row: RowValues,
+  private kinds: Array<(Int, P.IKind, P.Type)>,
+) extends SKStore.Key {
+  fun getRowValues(): RowValues {
+    this.row
+  }
+
+  fun getKinds(): Array<(Int, P.IKind, P.Type)> {
+    this.kinds
   }
 
   fun compare(other: SKStore.Key): Order {

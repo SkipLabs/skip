@@ -351,7 +351,7 @@ class SelectEvaluator{
           };
           evaluator = ExprEvaluator(Array[entry], select.from, up);
           row = static::evalRow(context, evaluator, select.params, repeat);
-          writer.set(RowKey(row, kinds), row)
+          writer.set(RowKey::create(row, kinds), row)
         },
       );
       SelectDir(childName, this.types)
@@ -1425,7 +1425,7 @@ fun makeGroupByKey(
   evaluator: ExprEvaluator,
   row: Row,
   groupBy: Array<CGroupByElt>,
-): RowKey {
+): RowKeyImpl {
   rowKey = mutable Vector[];
   kinds = mutable Vector[];
   for (idx => elt in groupBy) {
@@ -1444,7 +1444,7 @@ fun makeGroupByKey(
       kinds.push((idx, P.IASC(), ty))
     }
   };
-  result = RowKey(RowValues::create(rowKey.toArray()), kinds.toArray());
+  result = RowKey::create(RowValues::create(rowKey.toArray()), kinds.toArray());
   result
 }
 
@@ -1518,7 +1518,7 @@ fun makeJoinReducer(
           left.values.concat(right);
         };
         row = RowValues::create(values, left.repeat);
-        writer.set(RowKey(row, kinds), row);
+        writer.set(RowKey::create(row, kinds), row);
       };
       for (rkv in rightRows) {
         (_, right) = rkv;
@@ -1526,7 +1526,7 @@ fun makeJoinReducer(
           left.values.concat(right.values)
         };
         row = RowValues::create(values, left.repeat * right.repeat);
-        writer.set(RowKey(row, kinds), row);
+        writer.set(RowKey::create(row, kinds), row);
       }
     };
     if (
@@ -1539,7 +1539,7 @@ fun makeJoinReducer(
         left = Array::fill(kinds.size() - right.size(), None<CValue>());
         values = left.concat(right.values);
         row = RowValues::create(values, right.repeat);
-        writer.set(RowKey(row, kinds), row);
+        writer.set(RowKey::create(row, kinds), row);
       }
     }
   }

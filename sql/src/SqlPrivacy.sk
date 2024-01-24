@@ -169,7 +169,8 @@ base class PredefinedTable private final {
     if (isReset) return true;
     for (change in changes) {
       change match {
-      | RowKey(row, _) ->
+      | rowKey @ RowKey _ ->
+        row = rowKey.getRowValues();
         row.getString(colNbr) match {
         | None() ->
           // The change affected every user
@@ -720,7 +721,8 @@ mutable class AccessSolver private {
     files: Array<SKStore.File>,
   ): void {
     key match {
-    | RowKey(rowValues, _) ->
+    | rowKey @ RowKey _ ->
+      rowValues = rowKey.getRowValues();
       if (files.size() == 0) {
         !rowValues = rowValues.setRepeat(0);
       };
