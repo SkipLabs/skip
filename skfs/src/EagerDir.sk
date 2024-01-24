@@ -525,12 +525,17 @@ class DataMap{
   }
 }
 
-class FixedDataMap{data: FixedDir<Array<File>>, tombs: FixedDir<Source>} {
+class FixedDataMap{data: FixedData<Array<File>>, tombs: FixedDir<Source>} {
   static fun create(
     vec: mutable Vector<FixedRow<Array<File>>> = mutable Vector[],
     tombs: mutable Vector<FixedRow<Source>> = mutable Vector[],
   ): this {
-    static{data => FixedDir::create(vec), tombs => FixedDir::create(tombs)}
+    data = if (FixedDirImpl::isCompressable(vec)) {
+      CompressedFixedDir::create(vec)
+    } else {
+      FixedDir::create(vec)
+    };
+    static{data, tombs => FixedDir::create(tombs)}
   }
 
   fun size(): Int {
@@ -554,7 +559,7 @@ class FixedDataMap{data: FixedDir<Array<File>>, tombs: FixedDir<Source>} {
   }
 
   fun getIterAll(): mutable Iterator<(Tick, Source, Source, Key, Array<File>)> {
-    iter1 = this.data.data.iterator();
+    iter1 = this.data.iterator();
     iter2 = this.tombs.data.iterator();
     left = iter1.next();
     right = iter2.next();
