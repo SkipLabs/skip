@@ -743,12 +743,20 @@ class Evaluator{options: Options, user: ?UserFile} {
   fun makeIndex(context: mutable SKStore.Context, index: P.CreateIndex): void {
     input = getIndexInputDir(context);
     key = SKStore.SID::create(index.name.lower);
-    size = (context.unsafeGetEagerDir(input.dirName)).getArrayRaw(key).size();
-    if (size != 0) {
-      if (index.ifNotExists) {
-        return void;
-      };
-      error(index.pos, "INDEX " + index.name.origName + " already exists");
+    current = (context.unsafeGetEagerDir(input.dirName)).getArrayRaw(key);
+    if (current.size() > 0) {
+      current[0] match {
+      | _ if (!index.ifNotExists) ->
+        error(index.pos, "INDEX " + index.name.origName + " already exists")
+      | ci @ P.CreateIndex _ if (ci != index) ->
+        error(
+          index.pos,
+          "INDEX " +
+            index.name.origName +
+            " already exists with different schema",
+        )
+      | _ -> return void
+      }
     };
     this.write(context, input.dirName, key, index);
     _ = getIndexOutputDir(context);
