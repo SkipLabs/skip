@@ -48,6 +48,7 @@ base class FixedData<T> {
   fun getIterSourceKey(source: Source, key: Key): mutable Iterator<T>;
   fun getChangesAfter(tick: Tick): SortedSet<Key>;
   fun getTick(): ?Tick;
+  fun iterator(): mutable Iterator<FixedRow<T>>;
 }
 
 // Assuming delta is monotone, that is, i <= j implies delta(i) <= delta(j),
@@ -96,10 +97,46 @@ fun binSearch<T: Orderable>(get: Int ~> T, key: T, i: Int, j: Int): Int {
   findFirstBy(idx ~> key.compare(get(idx)), i, j)
 }
 
-class FixedDir<T: frozen> private {
-  data: Array<FixedRow<T>> = Array[],
+class FixedDir<T: frozen> extends FixedDirImpl<T, FixedRow<T>> {
+  static fun compress(x: FixedRow<T>): FixedRow<T> {
+    x
+  }
+  static fun decompress(x: FixedRow<T>): FixedRow<T> {
+    x
+  }
+}
+
+class CompressedFixedDir extends FixedDirImpl<Array<File>, FixedRow<File>> {
+  static fun compress(row: FixedRow<Array<File>>): FixedRow<File> {
+    size = row.value.i1.size();
+    invariant(size == 1);
+    FixedRow(row.key, (row.value.i0, row.value.i1[0]), row.tag);
+  }
+  static fun decompress(row: FixedRow<File>): FixedRow<Array<File>> {
+    FixedRow(row.key, (row.value.i0, Array[row.value.i1]), row.tag)
+  }
+}
+
+base class FixedDirImpl<T: frozen, Compressed: frozen> private final {
+  data: Array<Compressed> = Array[],
 } extends FixedData<T> {
-  static fun create(
+  static fun compress(FixedRow<T>): Compressed;
+  static fun decompress(Compressed): FixedRow<T>;
+
+  fun iterator(): mutable Iterator<FixedRow<T>> {
+    for (elt in this.data.iterator()) {
+      yield static::decompress(elt)
+    }
+  }
+
+  static fun isCompressable(data: mutable Vector<FixedRow<Array<File>>>): Bool {
+    for (elt in data) {
+      if (elt.value.i1.size() != 1) return false;
+    };
+    true
+  }
+
+  static deferred fun create<C: FixedDirImpl<T, Compressed>>(
     data: mutable Vector<FixedRow<T>> = mutable Vector[],
   ): this {
     i = 0;
@@ -122,7 +159,7 @@ class FixedDir<T: frozen> private {
       data.sortBy(row ~> (row.key, row.value.i0));
     };
     _ = static::computeTags(data, 0, data.size() - 1);
-    FixedDir{data => data.toArray()}
+    static{data => data.map(static::compress).toArray()}
   }
 
   fun size(): Int {
@@ -130,7 +167,7 @@ class FixedDir<T: frozen> private {
   }
 
   fun get(idx: Int): FixedRow<T> {
-    this.data.unsafe_get(idx)
+    static::decompress(this.data.unsafe_get(idx))
   }
 
   fun getPos(key: Key): Int {
@@ -198,7 +235,7 @@ class FixedDir<T: frozen> private {
       return void;
     };
     pivot = i + (j - i) / 2;
-    elt = this.data[pivot];
+    elt = static::decompress(this.data[pivot]);
     tick = elt.tag;
     if (tick.max < after) return void;
     if (tick.current >= after) {
@@ -227,7 +264,7 @@ class FixedDir<T: frozen> private {
   ): void {
     if (i <= j) {
       pivot = i + (j - i) / 2;
-      elt = this.data[pivot];
+      elt = static::decompress(this.data[pivot]);
       tick = elt.tag;
       if (tick.max >= after) {
         if (key <= elt.key) {
@@ -256,7 +293,7 @@ class FixedDir<T: frozen> private {
       None()
     } else {
       middle = (this.data.size() - 1) / 2;
-      tick = this.data[middle].tag;
+      tick = static::decompress(this.data[middle]).tag;
       Some(tick.max)
     }
   }
