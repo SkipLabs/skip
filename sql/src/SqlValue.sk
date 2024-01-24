@@ -67,19 +67,14 @@ fun compareRows(
   EQ()
 }
 
-class RowKey extends RowKeyImpl {
+extension class RowKey {
   static fun create(
     row: RowValues,
     kinds: Array<(Int, P.IKind, P.Type)>,
-  ): RowKeyImpl {
+  ): RowKey {
     static(row, kinds)
   }
-}
 
-base class RowKeyImpl protected (
-  private row: RowValues,
-  private kinds: Array<(Int, P.IKind, P.Type)>,
-) extends SKStore.Key {
   fun getRowValues(): RowValues {
     this.row
   }
@@ -172,10 +167,7 @@ base class Row extends SKStore.File {
   }
 }
 
-class RowValues private (
-  values: Array<?CValue>,
-  repeat: Int,
-) extends Row uses Orderable {
+extension class RowValues extends Row {
   static fun create(values: Array<?CValue>, repeat: Int = 1): this {
     invariant(repeat >= 0);
     static(values, repeat)

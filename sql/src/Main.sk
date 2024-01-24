@@ -414,15 +414,6 @@ fun execSessions(args: Cli.ParseResults, options: SKDB.Options): void {
   })
 }
 
-/*** DEBUG ***/
-class MyData(
-  value: Array<
-    (SKStore.Key, (SKStore.Source, Array<SKStore.File>), SKStore.TickRange),
-  >,
-) extends SKStore.File
-const myKey: SKStore.IID = SKStore.IID(0);
-/*** END OF DEBUG ***/
-
 fun execCompact(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
   SKDB.runLockedSql(options, context ~> {
@@ -430,28 +421,6 @@ fun execCompact(args: Cli.ParseResults, options: SKDB.Options): void {
       dir match {
       | edir @ SKStore.EagerDir _ ->
         !edir = edir.purge(context, context.tick);
-        /*** DEBUG ***/
-        /*
-                debugSizeDirName = SKStore.DirName::create("/debugSize/");
-                debugSizeDir = context.maybeGetEagerDir(debugSizeDirName) match {
-                | None() -> context.mkdir(x ~> x, y ~> y, debugSizeDirName)
-                | Some(_) -> SKStore.EHandle(x ~> x, y ~> y, debugSizeDirName)
-                };
-                debugSizeDir.writeArray(
-                  context,
-                  SKStore.SID(edir.dirName.toString()),
-                  Array[
-                    MyData(
-                      edir.fixedData.data.data.map(frow -> {
-                        debug(frow.value.i1);
-                        (frow.key, (frow.value.i0, frow.value.i1), frow.tag)
-                      }),
-                    ),
-                  ],
-                );
-                !edir.fixedData = SKStore.FixedDataMap::create();
-        */
-        /*** END OF DEBUG ***/
         context.setDir(edir.dirName, edir)
       | _ -> void
       }
