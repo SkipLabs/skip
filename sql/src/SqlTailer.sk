@@ -33,7 +33,7 @@ fun buildTailFilter(
       conditionFilter = dirSub.filter(context, isReset);
       baseName -> {
         inputRow = baseName match {
-        | SKDB.RowKey(row, _) -> row
+        | rowKey @ SKDB.RowKey _ -> rowKey.getRowValues()
         | _ ->
           print_error("Unexpected table entry type");
           skipExit(2)
@@ -64,7 +64,8 @@ fun buildTailFilter(
       baseName -> {
         oldFilter(baseName) &&
           baseName match {
-          | SKDB.RowKey(row, _) ->
+          | rowKey @ SKDB.RowKey _ ->
+            row = rowKey.getRowValues();
             SKDB.checkUserCanReadRow(context, user, sqlTable, row) match {
             | SKDB.AROK() -> true
             | _ -> false

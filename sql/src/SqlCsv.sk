@@ -262,13 +262,13 @@ fun lwwEdits(
     | None() -> continue
     | _ -> void
     };
-    if (rowKey.row.getValue(0) != primaryKey) break void;
+    if (rowKey.getRowValues().getValue(0) != primaryKey) break void;
 
     for ((tick, source, _) in dir.getDataIterWithoutTombs(mcontext, key)) {
       if (
         tick.value < snapshot ||
         source.path() == writer ||
-        rowKey.row < row
+        rowKey.getRowValues() < row
       ) {
         entries.push((key, (source.path(), writer, Array<SKStore.File>[])));
       } else {
@@ -281,7 +281,7 @@ fun lwwEdits(
   if (!keepingCurrent) {
     for (entry in entries) yield entry;
     yield (
-      SKDB.RowKey(row, table.kinds),
+      SKDB.RowKey::create(row, table.kinds),
       (writer, writer, Array<SKStore.File>[row]),
     );
   }
@@ -351,7 +351,12 @@ fun applyDiffStrategy(
       (file: SKStore.Key) -> {
         file match {
         | k @ SKDB.RowKey _ ->
-          SKDB.checkUserCanReadRow(context, userFile, table, k.row) match {
+          SKDB.checkUserCanReadRow(
+            context,
+            userFile,
+            table,
+            k.getRowValues(),
+          ) match {
           | SKDB.AROK() -> true
           | SKDB.ARError(_err) -> false
           }
@@ -379,7 +384,7 @@ fun applyDiffStrategy(
       dir,
       (optContext, row, newDir) ~> {
         ctx = optContext.fromSome();
-        key: SKStore.Key = SKDB.RowKey(row.setRepeat(1), table.kinds);
+        key: SKStore.Key = SKDB.RowKey::create(row.setRepeat(1), table.kinds);
         for ((tick, source, _) in newDir.unsafeGetDataIterWithoutTombs(key)) {
           if (tick.value < snapshot.default(0) || source.path() == writer) {
             !newDir = newDir.writeEntry(
@@ -397,7 +402,7 @@ fun applyDiffStrategy(
             ctx,
             writer,
             writer,
-            SKDB.RowKey(row, table.kinds),
+            SKDB.RowKey::create(row, table.kinds),
             Array[row],
           );
         };
@@ -435,7 +440,7 @@ fun applyDiffStrategy(
       rows.iterator(),
       dir,
       (optContext, row, newDir) ~> {
-        key: SKStore.Key = SKDB.RowKey(row, table.kinds);
+        key: SKStore.Key = SKDB.RowKey::create(row, table.kinds);
         keyRepeat = row.repeat;
         for ((tick, source, files) in newDir.unsafeGetDataIterWithoutTombs(
           key,
@@ -480,7 +485,7 @@ fun applyDiffStrategy(
       rows
         .iterator()
         .filter(row -> row.repeat != 0)
-        .map(x -> SKDB.RowKey(x.setRepeat(1), table.kinds))
+        .map(x -> SKDB.RowKey::create(x.setRepeat(1), table.kinds))
         .collect(SortedSet),
       isVisibleToUser(newRoot),
       isEligibleForTomb,
@@ -508,7 +513,7 @@ fun applyDiffStrategy(
       (optContext, row, newDir) ~> {
         ctx = optContext.fromSome();
         if (row.repeat < 1) {
-          key: SKStore.Key = SKDB.RowKey(row.setRepeat(1), table.kinds);
+          key: SKStore.Key = SKDB.RowKey::create(row.setRepeat(1), table.kinds);
           for ((tick, source, _) in newDir.unsafeGetDataIterWithoutTombs(key)) {
             if (tick.value < snapshot.default(0) || source.path() == writer) {
               !newDir = newDir.writeEntry(
@@ -600,7 +605,7 @@ fun applyDiffStrategy(
       rows
         .iterator()
         .filter(row -> row.repeat != 0)
-        .map(x -> SKDB.RowKey(x.setRepeat(1), table.kinds))
+        .map(x -> SKDB.RowKey::create(x.setRepeat(1), table.kinds))
         .collect(SortedSet),
       isVisibleToUser(newRoot),
       (tick, source) ~>

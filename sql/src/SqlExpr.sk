@@ -684,7 +684,7 @@ class ExprEvaluator(
       invariant(query.params.size() == 1);
       row = RowValues::create(Array[Some(CInt(v))], 1);
       kinds = Array[(0, P.IASC(), P.TEXT())];
-      ADef(btoi(dir.getArray(context, RowKey(row, kinds)).size() != 0))
+      ADef(btoi(dir.getArray(context, RowKey::create(row, kinds)).size() != 0))
 
     | CIIn(vExpr, set) ->
       v = this.evalCIExpr(context, vExpr);
@@ -727,7 +727,7 @@ class ExprEvaluator(
       invariant(query.params.size() == 1);
       row = RowValues::create(Array[Some(CFloat(v))], 1);
       kinds = Array[(0, P.IASC(), P.TEXT())];
-      ADef(btoi(dir.getArray(context, RowKey(row, kinds)).size() != 0))
+      ADef(btoi(dir.getArray(context, RowKey::create(row, kinds)).size() != 0))
 
     | CFIn(vExpr, set) ->
       v = this.evalCFExpr(context, vExpr);
@@ -770,7 +770,7 @@ class ExprEvaluator(
       invariant(query.params.size() == 1);
       row = RowValues::create(Array[Some(CString(v))], 1);
       kinds = Array[(0, P.IASC(), P.TEXT())];
-      ADef(btoi(dir.getArray(context, RowKey(row, kinds)).size() != 0))
+      ADef(btoi(dir.getArray(context, RowKey::create(row, kinds)).size() != 0))
 
     | CSIn(vExpr, set) ->
       v = this.evalCSExpr(context, vExpr);
