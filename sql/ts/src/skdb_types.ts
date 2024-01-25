@@ -1,5 +1,5 @@
-import { Shared } from "#std/sk_types";
-import { SKDBTable } from "#skdb/skdb_util";
+import type { Shared } from "#std/sk_types.js";
+import { SKDBTable } from "./skdb_util.js";
 
 export interface SKDBHandle {
   runner: (fn: () => string) => SKDBTable;

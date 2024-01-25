@@ -1,14 +1,14 @@
-import { Wrk } from "#std/sk_types";
-import { PromiseWorker, Function, Caller } from "#std/sk_worker";
-import {
+import type { Wrk } from "#std/sk_types.js";
+import { PromiseWorker, Function, Caller } from "#std/sk_worker.js";
+import type {
   SKDB,
   ProtoResponseCreds,
   Params,
   RemoteSKDB,
   MirrorDefn,
-} from "#skdb/skdb_types";
-import { SKDBTable } from "#skdb/skdb_util";
-import { SKDBGroupImpl } from "#skdb/skdb_group";
+} from "./skdb_types.js";
+import { SKDBTable } from "./skdb_util.js";
+import { SKDBGroupImpl } from "./skdb_group.js";
 
 class WrappedRemote implements RemoteSKDB {
   private worker: PromiseWorker;

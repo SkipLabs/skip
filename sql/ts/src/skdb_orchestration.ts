@@ -1,11 +1,11 @@
-import { Environment } from "#std/sk_types";
-import {
+import type { Environment } from "#std/sk_types.js";
+import type {
   SKDBMechanism,
   RemoteSKDB,
   Params,
   MirrorDefn,
-} from "#skdb/skdb_types";
-import { SKDBTable } from "#skdb/skdb_util";
+} from "./skdb_types.js";
+import { SKDBTable } from "./skdb_util.js";
 
 const npmVersion = "";
 

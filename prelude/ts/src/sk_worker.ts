@@ -1,4 +1,4 @@
-import { int, Wrk } from "#std/sk_types";
+import type { int, Wrk } from "./sk_types.js";
 
 interface Payload {}
 

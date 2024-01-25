@@ -1,5 +1,5 @@
-import { float, int, Environment, Wrk, Shared } from "#std/sk_types";
-import { MemFS, MemSys } from "#std/sk_mem_utils";
+import type { float, int, Environment, Wrk, Shared } from "./sk_types.js";
+import { MemFS, MemSys } from "./sk_mem_utils.js";
 
 class WrkImpl implements Wrk {
   worker: Worker;

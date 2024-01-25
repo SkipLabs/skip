@@ -1,4 +1,4 @@
-import { onDbWorkerMessage } from "#skdb/skdb_wmessage";
+import { onDbWorkerMessage } from "./skdb_wmessage.js";
 
 var post = (message: any) => {
   postMessage(message);

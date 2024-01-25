@@ -1,4 +1,4 @@
-import { onDbWorkerMessage } from "#skdb/skdb_wmessage";
+import { onDbWorkerMessage } from "./skdb_wmessage.js";
 import { parentPort } from "worker_threads";
 
 var post = (message: any) => {
