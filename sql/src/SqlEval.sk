@@ -571,9 +571,24 @@ class Evaluator{options: Options, user: ?UserFile} {
       views = getViewsDir(context);
       viewsDir = context.unsafeGetEagerDir(views.dirName);
       key = SKStore.SID(viewName.lower);
-      if (viewsDir.getArrayRaw(key).size() != 0) {
-        if (ifNotExists) return None();
-        error(pos, "VIEW " + viewName + " already exists");
+      cselect1 = SKDB.Compiler::create(
+        false,
+        this.options with {virtual => true},
+        selectAst.pos,
+        params,
+      ).compileSelect(context, selectAst, viewName, true);
+      existingFiles = viewsDir.getArrayRaw(key);
+      if (existingFiles.size() > 0) {
+        existingFiles[0] match {
+        | _ if (!ifNotExists) ->
+          error(pos, "VIEW " + viewName + " already exists")
+        | SelectFile(_, _, _, _, _, cs) if (cselect1 != cs) ->
+          error(
+            pos,
+            "VIEW " + viewName + " already exists with a different query",
+          )
+        | _ -> return None()
+        }
       } else {
         tables = getTableDir(context);
         tablesDir = context.unsafeGetEagerDir(tables.dirName);
@@ -581,12 +596,6 @@ class Evaluator{options: Options, user: ?UserFile} {
           error(pos, "Table " + viewName + " exists");
         };
       };
-      cselect1 = SKDB.Compiler::create(
-        false,
-        this.options with {virtual => true},
-        selectAst.pos,
-        params,
-      ).compileSelect(context, selectAst, viewName, true);
       viewsDir.write(
         context,
         key,
@@ -734,12 +743,26 @@ class Evaluator{options: Options, user: ?UserFile} {
   fun makeIndex(context: mutable SKStore.Context, index: P.CreateIndex): void {
     input = getIndexInputDir(context);
     key = SKStore.SID::create(index.name.lower);
-    size = (context.unsafeGetEagerDir(input.dirName)).getArrayRaw(key).size();
-    if (size != 0) {
-      if (index.ifNotExists) {
-        return void;
-      };
-      error(index.pos, "INDEX " + index.name.origName + " already exists");
+    current = (context.unsafeGetEagerDir(input.dirName)).getArrayRaw(key);
+    if (current.size() > 0) {
+      current[0] match {
+      | _ if (!index.ifNotExists) ->
+        error(index.pos, "INDEX " + index.name.origName + " already exists")
+      | ci @ P.CreateIndex _ ->
+        old = ci with {ifNotExists => true, pos => 0};
+        new = index with {pos => 0};
+        if (old != new) {
+          error(
+            index.pos,
+            "INDEX " +
+              index.name.origName +
+              " already exists with different schema",
+          )
+        } else {
+          return void
+        }
+      | _ -> return void
+      }
     };
     this.write(context, input.dirName, key, index);
     _ = getIndexOutputDir(context);
@@ -1004,6 +1027,11 @@ class Evaluator{options: Options, user: ?UserFile} {
   ): void {
     dirName = dirDescr.dirName;
     if (context.unsafeMaybeGetEagerDir(dirName) is Some _ && ifNotExists) {
+      currentSchema = getTable(context, pos, name).schema;
+      newSchema = dirDescr.schema;
+      if (currentSchema != newSchema) {
+        error(pos, "table exists with a different schema")
+      };
       return void;
     };
 

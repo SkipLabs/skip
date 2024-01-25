@@ -22,8 +22,16 @@ data class ProcessOutput(val output: ByteArray, val exitCode: Int) {
     return exitCode == 0
   }
 
+  fun logOnError(): ProcessOutput {
+    if (!exitSuccessfully()) {
+      System.err.println(decode())
+    }
+    return this
+  }
+
   fun getOrThrow(): ByteArray {
-    if (exitCode != 0) {
+    if (!exitSuccessfully()) {
+      logOnError()
       throw RuntimeException("Process exited unsuccessfully: ${exitCode}")
     }
     return output
@@ -279,7 +287,7 @@ class Skdb(val name: String, private val dbPath: String) {
                 "SELECT privateKey FROM skdb_users WHERE userID = @user;",
                 mapOf("user" to user),
                 OutputFormat.RAW)
-            .decode()
+            .decodeOrThrow()
             .trim()
 
     if (key.isEmpty()) {
@@ -309,14 +317,15 @@ class Skdb(val name: String, private val dbPath: String) {
                 "BEGIN TRANSACTION; INSERT INTO skdb_users VALUES (id('userID'), @privateKey); SELECT id('userID'); COMMIT;",
                 mapOf("privateKey" to encryptedPrivateKey),
                 OutputFormat.RAW)
-            .decode()
+            .decodeOrThrow()
             .trim()
     return accessKey
   }
 
   fun canMirror(table: String, schema: String): Boolean {
     val result = blockingRun(ProcessBuilder(ENV.skdbPath, "can-mirror", table, schema))
-    return result.decode() == ""
+    result.logOnError()
+    return result.exitSuccessfully() && result.decode() == ""
   }
 }
 
