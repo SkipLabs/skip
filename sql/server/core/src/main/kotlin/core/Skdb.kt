@@ -23,14 +23,14 @@ data class ProcessOutput(val output: ByteArray, val exitCode: Int) {
   }
 
   fun logOnError(): ProcessOutput {
-    if (exitCode != 0) {
+    if (!exitSuccessfully()) {
       System.err.println(decode())
     }
     return this
   }
 
   fun getOrThrow(): ByteArray {
-    if (exitCode != 0) {
+    if (!exitSuccessfully()) {
       logOnError()
       throw RuntimeException("Process exited unsuccessfully: ${exitCode}")
     }
