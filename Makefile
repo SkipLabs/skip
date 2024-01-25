@@ -89,6 +89,7 @@ build/init.sql: sql/privacy/init.sql
 clean:
 	rm -Rf build
 	find . -name 'Skargo.toml' -print0 | sed 's|Skargo.toml|target|g' | xargs -0 rm -rf
+	cd compiler && ${MAKE} clean
 
 .PHONY: fmt
 fmt:
