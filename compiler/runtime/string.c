@@ -189,6 +189,10 @@ SkipInt SKIP_String_cmp(unsigned char* str1, unsigned char* str2) {
   }
 }
 
+uint8_t SKIP_String_eq(unsigned char* str1, unsigned char* str2) {
+  return SKIP_String_cmp(str1, str2) == 0;
+}
+
 /*****************************************************************************/
 /* Unsafe char access */
 /*****************************************************************************/

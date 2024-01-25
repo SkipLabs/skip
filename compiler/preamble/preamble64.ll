@@ -25,6 +25,7 @@ declare ptr @SKIP_Obstack_shallowClone(i64, ptr)
 declare i64 @SKIP_String_StringIterator__rawCurrent(ptr)
 declare void @SKIP_String_StringIterator__rawDrop(ptr, i64)
 declare i64 @SKIP_String_cmp(ptr, ptr)
+declare i8 @SKIP_String_eq(ptr, ptr)
 declare {i64, i64} @SKIP_String_toIntOptionHelper(ptr)
 declare ptr @SKIP_intern(ptr)
 declare void @SKIP_exit(i64)
@@ -127,20 +128,6 @@ define void @SKIP_debug_break() {
   tail call void @llvm.debugtrap()
   ret void
 }
-
-; Function Attrs: noinline nounwind optnone
-define i1 @SKIP_String_eq(ptr %0, ptr %1) #0 {
-  %3 = alloca ptr, align 4
-  %4 = alloca ptr, align 4
-  store ptr %0, ptr %3, align 4
-  store ptr %1, ptr %4, align 4
-  %5 = load ptr, ptr %3, align 4
-  %6 = load ptr, ptr %4, align 4
-  %7 = call i64 @SKIP_String_cmp(ptr %5, ptr %6)
-  %8 = icmp eq i64 %7, 0
-  ret i1 %8
-}
-
 
 %struct._FunctionSignature = type { ptr, ptr, i8, i8, ptr }
 

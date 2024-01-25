@@ -1231,8 +1231,7 @@ private fun peepholeBinOpSame(peep: BinOp, s: mutable Peephole): Instr {
   | BoolCmpLe _
   | IntCmpEq _
   | IntCmpLe _
-  | IntCmpUle _
-  | StringCmpEq _ ->
+  | IntCmpUle _ ->
     s.constantBool(true)
   | FloatCmpLt _
   | BoolCmpNe _
@@ -1245,7 +1244,8 @@ private fun peepholeBinOpSame(peep: BinOp, s: mutable Peephole): Instr {
   | IntRem _
   | IntSub _
   | IntXor _
-  | StringCmp _ ->
+  | StringCmp _
+  | StringCmpEq _ ->
     s.constantInt(0)
   | IntAnd _
   | IntOr _ ->
@@ -1725,7 +1725,7 @@ private fun peepholeStringBinOp(peep: StringBinOp, s: mutable Peephole): Instr {
           | GT() -> 1
           },
         )
-      | StringCmpEq _ -> s.constantBool(lhsValue == rhsValue)
+      | StringCmpEq _ -> s.constantInt(if (lhsValue == rhsValue) 0 else 1)
       }
     | _ -> peep
     }
