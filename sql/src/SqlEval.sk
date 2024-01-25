@@ -748,13 +748,19 @@ class Evaluator{options: Options, user: ?UserFile} {
       current[0] match {
       | _ if (!index.ifNotExists) ->
         error(index.pos, "INDEX " + index.name.origName + " already exists")
-      | ci @ P.CreateIndex _ if (ci != index) ->
-        error(
-          index.pos,
-          "INDEX " +
-            index.name.origName +
-            " already exists with different schema",
-        )
+      | ci @ P.CreateIndex _ ->
+        old = ci with {ifNotExists => true, pos => 0};
+        new = index with {pos => 0};
+        if (old != new) {
+          error(
+            index.pos,
+            "INDEX " +
+              index.name.origName +
+              " already exists with different schema",
+          )
+        } else {
+          return void
+        }
       | _ -> return void
       }
     };
