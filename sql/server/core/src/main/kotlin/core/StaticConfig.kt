@@ -8,7 +8,6 @@ import java.util.Properties
 
 val USER_CONFIG_FILE = ".skdb.conf"
 var ENV = UserConfig.create()
-val SERVICE_MGMT_DB_NAME = "skdb_service_mgmt"
 val SKDB_PORT = 3586
 
 class UserConfig(
