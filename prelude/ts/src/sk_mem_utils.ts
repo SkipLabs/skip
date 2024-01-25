@@ -1,4 +1,5 @@
-import { int, FileSystem, Options, System } from "#std/sk_types";
+import type { int, FileSystem, System } from "./sk_types.js";
+import { Options } from "./sk_types.js";
 
 class File {
   contents: string;

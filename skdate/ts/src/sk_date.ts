@@ -1,4 +1,4 @@
-import {
+import type {
   int,
   ptr,
   Environment,
@@ -7,7 +7,7 @@ import {
   Utils,
   FileSystem,
   Options,
-} from "#std/sk_types";
+} from "#std/sk_types.js";
 
 interface ToWasm {
   SKIP_localetimezone: (year: int, month: int, day: int) => int;

@@ -1,10 +1,10 @@
-import { run, loadEnv, isNode } from "#std/sk_types";
-import { SKDB, SKDBSync, SKDBShared } from "#skdb/skdb_types";
-import { SKDBWorker } from "#skdb/skdb_wdatabase";
-export { SKDB, RemoteSKDB } from "#skdb/skdb_types";
-export { SKDBTable as SKDBTable } from "#skdb/skdb_util";
-export { Creds, MuxedSocket } from "#skdb/skdb_orchestration";
-export { Environment } from "#std/sk_types";
+import { run, loadEnv, isNode } from "#std/sk_types.js";
+import type { SKDB, SKDBSync, SKDBShared } from "./skdb_types.js";
+import { SKDBWorker } from "./skdb_wdatabase.js";
+export { SKDBTable as SKDBTable } from "./skdb_util.js";
+export type { SKDB, RemoteSKDB } from "./skdb_types.js";
+export type { Creds, MuxedSocket } from "./skdb_orchestration.js";
+export type { Environment } from "#std/sk_types.js";
 
 var wasm64 = "skdb";
 // sknpm searches for the modules line verbatim
