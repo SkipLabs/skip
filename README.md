@@ -34,8 +34,8 @@ with `npm install --prefix=/path/to/install typescript`.
 
 ### Build steps
 
-These build steps can be simplified for your first build, but for simplicities
-sake we assume that you are doing multiple builds, and need to clean artefacts
+These build steps can be simplified for your first build, but for simplicity's
+sake we assume that you are doing multiple builds, and need to clean artifacts
 from previous builds: this is also safe, if unnecessary, for your first build.
 
 First build and install the bootstrap compiler:
