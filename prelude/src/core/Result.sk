@@ -28,6 +28,10 @@ base class Result<+T, +E> {
   | Failure(error: E)
   | Success(value: T)
 
+  fun liftFailure<U>(): Result<T, Failure<U, E>>
+  | Success(val) -> Success(val)
+  | Failure(err) -> Failure(Failure(err))
+
   // # Creating a Result
 
   // Execute the given function, returning as follows:

@@ -1,0 +1,38 @@
+fun foo(x: Bool): ?String {
+  if (x) {
+    Some("5")
+  } else {
+    None()
+  }
+}
+
+fun foo2(): ?Int {
+  Some(foo(true)?.toInt() + 1)
+}
+
+fun foo3(): ?Int {
+  Some(foo(false)?.toInt() + 1)
+}
+
+fun bar(x: Bool): Result<String, Exception> {
+  if (x) {
+    Success("5")
+  } else {
+    Failure(OutOfBounds())
+  }
+}
+
+fun bar2(): Result<Int, Exception> {
+  Success(bar(true)?.toInt() + 1)
+}
+
+fun bar3(): Result<Int, Exception> {
+  Success(bar(false)?.toInt() + 1)
+}
+
+fun main(): void {
+  print_string(inspect(foo2()).toString());
+  print_string(inspect(foo3()).toString());
+  print_string(inspect(bar2()).toString());
+  print_string(inspect(bar3()).toString());
+}

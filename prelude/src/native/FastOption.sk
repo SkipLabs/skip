@@ -71,6 +71,14 @@ private trait FastOptionTrait<+T>(protected valueIfSome: Unsafe.RawStorage<T>) {
 
 // Trait for always-available Option operations.
 private trait FastOptionCommonTrait<+T> extends FastOptionTrait<T> {
+  fun liftFailure<U>(): Result<T, None<U>> {
+    if (this.isSome()) {
+      Success(this.unsafeFromSome())
+    } else {
+      Failure(None())
+    }
+  }
+
   fun map<T2>(f: T -> T2): ?T2 {
     if (this.isSome()) {
       Some(f(this.unsafeFromSome()))
