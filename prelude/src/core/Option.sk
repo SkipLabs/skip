@@ -34,6 +34,10 @@ base class Option<+T> uses
   | Some(value: T)
   | None()
 
+  fun liftFailure<U>(): Result<T, None<U>>
+  | Some(val) -> Success(val)
+  | None() -> Failure(None())
+
   // For Some() values, returns a new Option with the result of applying the
   // mapping function to the contained value. Returns None() when this is None().
   fun map<T2>(f: T -> T2): ?T2

@@ -1659,6 +1659,8 @@ fun printTree(ctx: Context, t: ParseTree): Doc {
       printElseBranch(ctx, elseOpt, true),
     ];
     Doc.Group(res)
+  | ParseTree.EnsureExpressionTree{operand, operator} ->
+    Doc.Concat[print(ctx, operand), print(ctx, operator)]
   | ParseTree.UnaryExpressionTree{operator, operand} ->
     Doc.Concat[
       print(ctx, operator),
