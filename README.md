@@ -38,17 +38,17 @@ These build steps can be simplified for your first build, but for simplicity's
 sake we assume that you are doing multiple builds, and need to clean artifacts
 from previous builds: this is also safe, if unnecessary, for your first build.
 
-First build and install the bootstrap compiler:
+First build the bootstrap compiler:
 
 ```sh
-cd /path/to/skdbrepo/compiler && make clean && prefix=/path/to/install make install STAGE=0
+cd /path/to/skdbrepo/compiler && make clean && default STAGE=0
 ```
 
-Then build the rest of the system ensuring that `/path/to/install` from the
-previous step is in your `$PATH`:
+Then build the rest of the system ensuring that `$PATH` points to the compiler
+built in the previous stage:
 
 ```sh
-cd /path/to/skdbrepo && make clean && make
+cd /path/to/skdbrepo && make clean && PATH=/path/to/skdbrepo/compiler/stage0/bin:$PATH make
 ```
 
 To build the NPM packages locally:
