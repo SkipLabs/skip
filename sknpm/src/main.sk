@@ -698,7 +698,7 @@ fun manage(
   if (bc.env.verbose) {
     print_string(">> Copy types declaration files.");
   };
-  declFiles.each(f -> copyToDir(f, distDir, ".mjs"));
+  declFiles.each(f -> copyToDir(f, distDir));
   srcDir = Path.join(npmDir, "src");
   checkDir(srcDir);
   if (bc.env.verbose) {
@@ -708,7 +708,7 @@ fun manage(
     tsDir,
     f -> f.endsWith(".ts"),
     _f -> false,
-  ).each(f -> copyToDir(f, srcDir, ""));
+  ).each(f -> copyToDir(f, srcDir));
   if (bc.env.verbose) {
     print_string(">> Manage license and package files.");
   };
@@ -825,11 +825,15 @@ fun tsc(tsDir: String, link: ?(String, String), verbose: Bool): void {
   Skargo.run(Array["tsc", "--project", tsconfig], verbose);
 }
 
-fun copyToDir(tsFile: String, dir: String, ext: String = ".ts"): void {
+fun copyToDir(tsFile: String, dir: String): void {
   contents = FileSystem.readTextFile(tsFile);
   target = Path.join(dir, Path.basename(tsFile));
   lines = contents.split("\n").map(line -> {
-    if (line.startsWith("import ") || line.startsWith("export {")) {
+    if (
+      line.startsWith("import ") ||
+      line.startsWith("export {") ||
+      line.startsWith("export type {")
+    ) {
       elements = line.split(" from ");
       if (elements.size() == 2) {
         imported = elements[1].split("\"");
@@ -837,13 +841,7 @@ fun copyToDir(tsFile: String, dir: String, ext: String = ".ts"): void {
           elems = imported[1].split("/");
           size = elems.size();
           if (size > 1 && elems[0].startsWith("#")) {
-            !elems = elems.mapWithIndex((idx, v) ->
-              if (idx == 0) "." else if (idx == size - 1) {
-                `${v}${ext}`
-              } else {
-                v
-              }
-            );
+            !elems = elems.mapWithIndex((idx, v) -> if (idx == 0) "." else v);
             !line = `${elements[0]} from "${elems.join("/")}"`
           }
         }
