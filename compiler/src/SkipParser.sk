@@ -3874,6 +3874,15 @@ mutable class SkipParser{
       this.parsePostfixSuffix(this.parseMemberSelection(value))
     | TokenKind.COLON_COLON() ->
       this.parsePostfixSuffix(this.parseMemberSelection(value))
+    | TokenKind.QUESTION() ->
+      operator = this.tokenResult();
+      this.parsePostfixSuffix(
+        ParseTree.EnsureExpressionTree{
+          range => Parser.createRangeOfTrees(value, operator),
+          operator,
+          operand => value,
+        },
+      )
     | _ -> value
     }
   }
@@ -4925,6 +4934,7 @@ mutable class SkipParser{
     | ParseTree.TemplateLiteralExpressionTree _
     | ParseTree.ErrorTree _
     | ParseTree.EmptyTree _
+    | ParseTree.EnsureExpressionTree _
     | ParseTree.InfiniteLoopExpressionTree _
     | ParseTree.DoLoopExpressionTree _
     | ParseTree.WhileLoopExpressionTree _

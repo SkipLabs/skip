@@ -586,6 +586,8 @@ class Converter{filename: String} {
         operator,
         member,
       )
+    | ParseTree.EnsureExpressionTree{range, operand} ->
+      this.convertEnsureExpression(this.convertRange(range), operand)
     | ParseTree.UnaryExpressionTree{range, operator, operand} ->
       this.convertUnaryExpression(this.convertRange(range), operator, operand)
     | ParseTree.WithExpressionTree{range, value, arguments} ->
@@ -1345,6 +1347,53 @@ class Converter{filename: String} {
           "Unexpected unary operator: " + this.treeToString(tree),
         )
       },
+    )
+  }
+
+  fun convertEnsureExpression(
+    range: FileRange,
+    operand: ParseTree,
+  ): SkipAst.Expr_ {
+    match_expression = SkipAst.Call(
+      (
+        range,
+        SkipAst.Dot(this.convertExpression(operand), (range, "liftFailure")),
+      ),
+      Array[],
+      Positional(Array[]),
+    );
+    success_branch = (
+      List[
+        (
+          range,
+          SkipAst.Pat_type(
+            SkipAst.Tid_object(SkipAst.Tclass((range, "Success"))),
+            Some(Positional(Array[(range, SkipAst.Pat_var((range, "__x")))])),
+            SkipAst.Complete(),
+          ),
+        ),
+      ],
+      None(),
+      (range, SkipAst.Var((range, "__x"))),
+    );
+    early_return_branch = (
+      List[
+        (
+          range,
+          SkipAst.Pat_type(
+            SkipAst.Tid_object(SkipAst.Tclass((range, "Failure"))),
+            Some(Positional(Array[(range, SkipAst.Pat_var((range, "__x")))])),
+            SkipAst.Complete(),
+          ),
+        ),
+      ],
+      None(),
+      (range, SkipAst.Return((range, SkipAst.Var((range, "__x"))))),
+    );
+
+    SkipAst.Match(
+      (range, match_expression),
+      List[success_branch, early_return_branch],
     )
   }
 
