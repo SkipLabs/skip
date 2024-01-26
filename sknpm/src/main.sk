@@ -908,6 +908,7 @@ fun copyAndConvertImport(
     optCategory: ?String = None();
     lines = contents.split("\n").map(line -> {
       if (line.startsWith("import ") || line.startsWith("export {")) {
+        !line = line.replace(".js", ".mjs");
         elements = line.split(" from ");
         if (elements.size() == 2) {
           imported = elements[1].split("\"");
@@ -916,11 +917,7 @@ fun copyAndConvertImport(
             size = elems.size();
             if (size > 1 && elems[0].startsWith("#")) {
               !elems = elems.mapWithIndex((idx, v) ->
-                if (idx == 0) "." else if (idx == size - 1) {
-                  `${v}.mjs`
-                } else {
-                  v
-                }
+                if (idx == 0) "." else v
               );
               !line = `${elements[0]} from "${elems.join("/")}"`
             }
