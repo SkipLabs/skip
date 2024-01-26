@@ -21,12 +21,12 @@ available as normal NPM packages.
 It is recommended that you use the prepackaged version of SKBD in most
 situations.
 
-For those who need to build from source, you will need a number of
-dependencies installed: SKDB's
-[`Dockerfile`](https://github.com/SkipLabs/skdb/blob/main/Dockerfile) contains
-the definitive list for Ubuntu, and will give users of other operating systems
-a good idea of what is needed. Note that you will need LLVM 15, and that other
-tools relevant to LLVM need to be compatible with LLVM 15.
+For those who need to build from source, you will need a number of dependencies
+installed: SKDB's
+[`Dockerfile`](https://github.com/SkipLabs/skdb/blob/main/Dockerfile) serves as
+a good guide to those dependencies, though you may need to adapt them for your
+operating system. Note that you will need LLVM 15, and that other tools
+relevant to LLVM need to be compatible with LLVM 15.
 
 If your distribution/OS doesn't include typescript, you can install your own
 with `npm install --prefix=/path/to/install typescript`.
