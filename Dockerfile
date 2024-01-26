@@ -14,7 +14,7 @@ RUN apt-get update && \
     npx playwright install-deps
 
 RUN sh -c 'curl -s "https://get.sdkman.io?rcupdate=false" | bash'
-RUN bash -c "source /root/.sdkman/bin/sdkman-init.sh && \
+RUN bash -c "source $HOME/.sdkman/bin/sdkman-init.sh && \
     sdk install gradle && \
     sdk install java 20.0.2-tem"
 
