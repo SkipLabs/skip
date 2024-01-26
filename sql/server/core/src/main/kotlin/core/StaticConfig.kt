@@ -7,8 +7,8 @@ import java.util.Optional
 import java.util.Properties
 
 val USER_CONFIG_FILE = ".skdb.conf"
-var ENV = UserConfig.create()
 val SKDB_PORT = 3586
+var ENV = UserConfig.create()
 
 class UserConfig(
     val port: Int,
