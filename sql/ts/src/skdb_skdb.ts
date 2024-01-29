@@ -104,8 +104,8 @@ class SKDBMemory implements PagedMemory {
   nbrInitPages: number;
   pageSize: number;
   popDirtyPage: () => number;
-  private dirtyPagesMap: Array<number>;
-  private dirtyPages: Array<number>;
+  private dirtyPagesMap!: Array<number>;
+  private dirtyPages!: Array<number>;
 
   constructor(
     memory: ArrayBuffer,
@@ -223,25 +223,25 @@ class LinksImpl implements Links, ToWasm {
   private notifying: boolean;
   private freeQueryIDs: Array<number>;
 
-  SKIP_last_tick: (queryID: int) => int;
-  SKIP_switch_to: (stream: int) => void;
-  SKIP_call_external_fun: (funId: int, skParam: ptr) => ptr;
-  SKIP_clear_field_names: () => void;
-  SKIP_push_field_name: (skName: ptr) => void;
-  SKIP_clear_object: () => void;
-  SKIP_push_object_field_null: () => void;
-  SKIP_push_object_field_int32: (field: int) => void;
-  SKIP_push_object_field_int64: (field: ptr) => void;
-  SKIP_push_object_field_float: (field: ptr) => void;
-  SKIP_push_object_field_string: (field: ptr) => void;
-  SKIP_push_object: () => void;
-  SKIP_unix_unixepoch: (tm: ptr) => ptr;
-  SKIP_unix_strftime: (tm: ptr) => ptr;
-  SKIP_js_mark_query: (queryID: int) => void;
-  SKIP_js_delete_fun: (queryID: int) => void;
+  SKIP_last_tick!: (queryID: int) => int;
+  SKIP_switch_to!: (stream: int) => void;
+  SKIP_call_external_fun!: (funId: int, skParam: ptr) => ptr;
+  SKIP_clear_field_names!: () => void;
+  SKIP_push_field_name!: (skName: ptr) => void;
+  SKIP_clear_object!: () => void;
+  SKIP_push_object_field_null!: () => void;
+  SKIP_push_object_field_int32!: (field: int) => void;
+  SKIP_push_object_field_int64!: (field: ptr) => void;
+  SKIP_push_object_field_float!: (field: ptr) => void;
+  SKIP_push_object_field_string!: (field: ptr) => void;
+  SKIP_push_object!: () => void;
+  SKIP_unix_unixepoch!: (tm: ptr) => ptr;
+  SKIP_unix_strftime!: (tm: ptr) => ptr;
+  SKIP_js_mark_query!: (queryID: int) => void;
+  SKIP_js_delete_fun!: (queryID: int) => void;
   // Utils
-  notifyAllJS: () => void;
-  checkNotifications: () => void;
+  notifyAllJS!: () => void;
+  checkNotifications!: () => void;
 
   constructor(environment: Environment) {
     this.environment = environment;

@@ -16,35 +16,35 @@ interface Env extends Environment {
 
 class LinksImpl implements Links {
   env: Env | undefined;
-  lineBuffer: Array<int>;
-  lastTime: int;
+  lineBuffer!: Array<int>;
+  lastTime!: int;
 
   constructor(env?: Env) {
     this.env = env;
   }
 
-  SKIP_read_line_fill: () => int;
-  SKIP_read_to_end_fill: () => int;
-  SKIP_read_line_get: (index: int) => ptr;
-  SKIP_getchar: () => int;
+  SKIP_read_line_fill!: () => int;
+  SKIP_read_to_end_fill!: () => int;
+  SKIP_read_line_get!: (index: int) => ptr;
+  SKIP_getchar!: () => int;
 
-  SKIP_print_error: (strPtr: ptr) => void;
-  SKIP_print_error_raw: (strPtr: ptr) => void;
-  SKIP_print_debug: (strPtr: ptr) => void;
-  SKIP_print_debug_raw: (strPtr: ptr) => void;
-  SKIP_print_raw: (strPtr: ptr) => void;
-  SKIP_print_char: (code: int) => void;
-  SKIP_print_string: (strPtr: ptr) => void;
-  SKIP_etry: (f: ptr, exn_handler: ptr) => ptr;
-  js_throw: (strPtr: ptr, rethrow: int) => void;
-  SKIP_throw_cruntime: (code: int) => void;
-  SKIP_JS_timeStamp: () => float;
+  SKIP_print_error!: (strPtr: ptr) => void;
+  SKIP_print_error_raw!: (strPtr: ptr) => void;
+  SKIP_print_debug!: (strPtr: ptr) => void;
+  SKIP_print_debug_raw!: (strPtr: ptr) => void;
+  SKIP_print_raw!: (strPtr: ptr) => void;
+  SKIP_print_char!: (code: int) => void;
+  SKIP_print_string!: (strPtr: ptr) => void;
+  SKIP_etry!: (f: ptr, exn_handler: ptr) => ptr;
+  js_throw!: (strPtr: ptr, rethrow: int) => void;
+  SKIP_throw_cruntime!: (code: int) => void;
+  SKIP_JS_timeStamp!: () => float;
 
-  SKIP_delete_external_exception: (exc: int) => void;
-  SKIP_external_exception_message: (exc: int) => ptr;
-  SKIP_FileSystem_appendTextFile: (path: ptr, contents: ptr) => void;
-  SKIP_js_time_ms_lo: () => int;
-  SKIP_js_time_ms_hi: () => int;
+  SKIP_delete_external_exception!: (exc: int) => void;
+  SKIP_external_exception_message!: (exc: int) => ptr;
+  SKIP_FileSystem_appendTextFile!: (path: ptr, contents: ptr) => void;
+  SKIP_js_time_ms_lo!: () => int;
+  SKIP_js_time_ms_hi!: () => int;
 
   SKIP_js_get_entropy = () => {
     const buf = new Uint8Array(4);
@@ -53,13 +53,13 @@ class LinksImpl implements Links {
     return new Uint32Array(buf)[0];
   };
 
-  SKIP_js_get_argc: () => int;
-  SKIP_js_get_argn: (index: int) => ptr;
-  SKIP_js_get_envc: () => int;
-  SKIP_js_get_envn: (index: int) => ptr;
-  SKIP_setenv: (skName: ptr, skvalue: ptr) => void;
-  SKIP_getenv: (skName: ptr) => ptr | null;
-  SKIP_unsetenv: (skName: ptr) => void;
+  SKIP_js_get_argc!: () => int;
+  SKIP_js_get_argn!: (index: int) => ptr;
+  SKIP_js_get_envc!: () => int;
+  SKIP_js_get_envn!: (index: int) => ptr;
+  SKIP_setenv!: (skName: ptr, skvalue: ptr) => void;
+  SKIP_getenv!: (skName: ptr) => ptr | null;
+  SKIP_unsetenv!: (skName: ptr) => void;
 
   SKIP_glock() {}
   SKIP_gunlock() {}

@@ -2,8 +2,8 @@ import type { int, FileSystem, System } from "./sk_types.js";
 import { Options } from "./sk_types.js";
 
 class File {
-  contents: string;
-  changes: string;
+  contents?: string;
+  changes?: string;
   options?: Options;
   cursor: int;
   onChange?: (contents: string) => void;
@@ -28,7 +28,7 @@ class File {
 
   close() {
     if (this.withChange && this.onChange) {
-      this.onChange!(this.changes);
+      this.onChange!(this.changes ?? "");
     }
     this.options = undefined;
     this.changes = "";
@@ -58,7 +58,7 @@ class File {
       return null;
     }
     let end = Math.min(clen, this.cursor + len);
-    let res = this.contents.substring(this.cursor, end);
+    let res = this.contents?.substring(this.cursor, end);
     this.cursor = end;
     return res;
   }
@@ -80,11 +80,11 @@ export class MemFS implements FileSystem {
   }
 
   exists(filename: string): boolean {
-    return this.fileDescrs[filename] != undefined;
+    return this.fileDescrs.has(filename);
   }
 
   openFile(filename: string, options: Options, mode: int): number {
-    let existing = this.fileDescrs[filename];
+    let existing = this.fileDescrs.get(filename);
     if (existing != undefined) {
       if (options.create && options.create_new) {
         throw new Error("The file '" + filename + "' already exist");
@@ -94,7 +94,7 @@ export class MemFS implements FileSystem {
     }
     let fd = this.fileDescrNbr;
     this.files[fd] = new File(options);
-    this.fileDescrs[filename] = fd;
+    this.fileDescrs.set(filename, fd);
     this.fileDescrNbr++;
     return fd;
   }
@@ -102,7 +102,7 @@ export class MemFS implements FileSystem {
   watchFile(filename: string, f: (change: string) => void): void {
     let fd = this.fileDescrNbr;
     this.files[fd] = new File();
-    this.fileDescrs[filename] = fd;
+    this.fileDescrs.set(filename, fd);
     this.fileDescrNbr++;
     this.files[fd].watch(f);
   }
@@ -120,7 +120,7 @@ export class MemFS implements FileSystem {
       file = new File();
       let fd = this.fileDescrNbr;
       this.files[fd] = file;
-      this.fileDescrs[filename] = fd;
+      this.fileDescrs.set(filename, fd);
       this.fileDescrNbr++;
     }
     file.open(new Options(false, true, true));
@@ -136,8 +136,8 @@ export class MemFS implements FileSystem {
     return this.files[fd].write(content);
   }
 
-  read(fd: int, len: int) {
-    return this.files[fd].read(len);
+  read(fd: int, len: int): string | null {
+    return this.files[fd].read(len) ?? null;
   }
 }
 

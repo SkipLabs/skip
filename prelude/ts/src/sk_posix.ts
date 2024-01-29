@@ -32,12 +32,12 @@ interface ToWasm {
 
 class LinksImpl implements Links, ToWasm {
   private fs: FileSystem;
-  SKIP_check_if_file_exists: (skPath: ptr) => boolean;
-  SKIP_js_open: (skPath: ptr, flags: int, mode: int) => int;
-  SKIP_js_close: (fd: int) => void;
-  SKIP_js_write: (fd: int, skContents: ptr) => int;
-  SKIP_js_read: (fd: int, len: int) => ptr;
-  SKIP_js_open_flags: (
+  SKIP_check_if_file_exists!: (skPath: ptr) => boolean;
+  SKIP_js_open!: (skPath: ptr, flags: int, mode: int) => int;
+  SKIP_js_close!: (fd: int) => void;
+  SKIP_js_write!: (fd: int, skContents: ptr) => int;
+  SKIP_js_read!: (fd: int, len: int) => ptr;
+  SKIP_js_open_flags!: (
     read: boolean,
     write: boolean,
     append: boolean,
@@ -46,10 +46,10 @@ class LinksImpl implements Links, ToWasm {
     create_new: boolean,
   ) => int;
   //
-  SKIP_js_pipe: () => any;
-  SKIP_js_fork: () => any;
-  SKIP_js_dup2: () => any;
-  SKIP_js_execvp: (...args: any[]) => any;
+  SKIP_js_pipe!: () => any;
+  SKIP_js_fork!: () => any;
+  SKIP_js_dup2!: () => any;
+  SKIP_js_execvp!: (...args: any[]) => any;
   SKIP_js_invalid: (...args: any[]) => any = () => {
     throw new Error("Cannot be called within JS");
   };
