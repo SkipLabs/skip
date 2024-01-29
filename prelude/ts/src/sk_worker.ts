@@ -129,7 +129,7 @@ export class Wrapped {
   }
 }
 
-function asKey(messageId) {
+function asKey(messageId: MessageId) {
   return "" + messageId.source + ":" + messageId.id;
 }
 
@@ -319,6 +319,7 @@ export const onWorkerMessage = <T>(
           new Message(data.id, new Return(false, "Database must be created")),
         );
       } else {
+        //@ts-ignore
         let fn = runner[fun.fn];
         if (typeof fn !== "function") {
           post(
@@ -329,7 +330,7 @@ export const onWorkerMessage = <T>(
           );
         } else {
           fn.apply(runner, parameters)
-            .then((result) => {
+            .then((result: any) => {
               if (fun.wrap && fun.wrap) {
                 let wId = wrappedId++;
                 wrapped.set(wId, {
@@ -343,7 +344,9 @@ export const onWorkerMessage = <T>(
               }
               post(new Message(data!.id, new Return(true, result)));
             })
-            .catch((e) => post(new Message(data!.id, new Return(false, e))));
+            .catch((e: any) =>
+              post(new Message(data!.id, new Return(false, e))),
+            );
         }
       }
     }
@@ -374,8 +377,10 @@ export const onWorkerMessage = <T>(
     } else {
       fni.fn
         .apply(fni.obj, parameters)
-        .then((result) => post(new Message(data!.id, new Return(true, result))))
-        .catch((e) => post(new Message(data!.id, new Return(false, e))));
+        .then((result: any) =>
+          post(new Message(data!.id, new Return(true, result))),
+        )
+        .catch((e: any) => post(new Message(data!.id, new Return(false, e))));
     }
     if (obj?.autoremove || caller.remove) {
       wrapped.delete(caller.wrapped);

@@ -11,9 +11,9 @@ import * as process from "process";
 import * as repl from "repl";
 
 const createConnectedSkdb = async function (
-  endpoint,
-  database,
-  { accessKey, privateKey },
+  endpoint: string,
+  database: string,
+  { accessKey, privateKey }: { accessKey: string; privateKey: string },
 ) {
   const skdb = await createSkdb({ asWorker: false });
   const keyBytes = Buffer.from(privateKey, "base64");
@@ -187,20 +187,20 @@ if ((args.values as any).help || !haveMandatoryValues) {
   process.exit(1);
 }
 
-let values = args.values as any;
+const values = args.values as any;
 
 let creds: any;
 let hostCreds: any;
 let dbCreds: any;
 
-if (args.values["dev"]) {
-  if (args.values["add-cred"]) {
+if (values["dev"]) {
+  if (values["add-cred"]) {
     console.log(
       "Cannot add-cred when credentials are managed by the dev server (--dev was passed).",
     );
   }
 
-  let host: string = args.values["host"];
+  let host: string = values["host"];
   if (host === "wss://api.skiplabs.io") {
     host = "ws://localhost:3586";
     values.host = host;
@@ -237,13 +237,13 @@ if (args.values["dev"]) {
   dbCreds = hostCreds[values.db as string] ?? {};
   hostCreds[values.db as string] = dbCreds;
 
-  if (args.values["add-cred"]) {
-    if (!("access-key" in args.values)) {
+  if (values["add-cred"]) {
+    if (!("access-key" in values)) {
       console.log("Must pass --db --host and --access-key.");
       process.exit(1);
     }
 
-    const accessKey = (args.values["access-key"] as string).trim();
+    const accessKey = (values["access-key"] as string).trim();
     const privateKey = fs.readFileSync(process.stdin.fd, "utf-8").trim();
 
     dbCreds[accessKey] = privateKey;
@@ -266,7 +266,7 @@ if (!dbCreds || Object.entries(dbCreds).length < 1) {
 }
 
 const firstPair = Object.entries(dbCreds)[0];
-const accessKey = (args.values["access-key"] ?? firstPair[0]) as string;
+const accessKey = (values["access-key"] ?? firstPair[0]) as string;
 const privateKey = dbCreds[accessKey];
 
 if (!privateKey) {
@@ -280,14 +280,14 @@ const skdb = await createConnectedSkdb(values.host, values.db, {
 });
 
 const display = function (rows: Array<any>) {
-  if (args.values["json-output"]) {
+  if (values["json-output"]) {
     const acc: Array<string> = [];
     for (const row of rows) {
       acc.push(JSON.stringify(row));
     }
 
     console.log(acc.join("\n"));
-  } else if (args.values["pipe-separated-output"]) {
+  } else if (values["pipe-separated-output"]) {
     if (rows.length < 1) {
       return;
     }
@@ -314,58 +314,58 @@ const display = function (rows: Array<any>) {
   }
 };
 
-if (args.values["create-db"]) {
-  const db = args.values["create-db"] as string;
+if (values["create-db"]) {
+  const db = values["create-db"] as string;
   const remote = await skdb.connectedRemote();
   const result = await remote!.createDatabase(db);
   // b64 encode
   const newDbCreds = {};
+  //@ts-ignore
   newDbCreds[result.accessKey] = Buffer.from(result.privateKey).toString(
     "base64",
   );
   console.log(`Successfully created database: ${db}.`);
   console.log(`Credentials for ${db}: `, newDbCreds);
 
-  if (!args.values["dev"]) {
+  if (!values["dev"]) {
     hostCreds[db] = newDbCreds;
     fs.writeFileSync(credsFileName, JSON.stringify(creds));
     console.log(`Credentials were added to ${credsFileName}.`);
   }
 }
 
-if (args.values["create-user"]) {
+if (values["create-user"]) {
   const remote = await skdb.connectedRemote();
   const result = await remote!.createUser();
   // b64 encode
   const newDbCreds = {};
   const b64pk = Buffer.from(result.privateKey).toString("base64");
+  //@ts-ignore
   newDbCreds[result.accessKey] = b64pk;
   console.log("Successfully created user: ", newDbCreds);
 
-  if (!args.values["dev"]) {
+  if (!values["dev"]) {
     dbCreds[result.accessKey] = b64pk;
     fs.writeFileSync(credsFileName, JSON.stringify(creds));
     console.log(`Credentials were added to ${credsFileName}.`);
   }
 }
 
-if (args.values["schema"]) {
+if (values["schema"]) {
   const remote = await skdb.connectedRemote();
   const schema = await remote!.schema();
   console.log(schema.trim());
 }
 
-if (args.values["table-schema"]) {
+if (values["table-schema"]) {
   const remote = await skdb.connectedRemote();
-  const schema = await remote!.tableSchema(
-    args.values["table-schema"] as string,
-  );
+  const schema = await remote!.tableSchema(values["table-schema"] as string);
   console.log(schema.trim());
 }
 
-if (args.values["view-schema"]) {
+if (values["view-schema"]) {
   const remote = await skdb.connectedRemote();
-  const schema = await remote!.viewSchema(args.values["view-schema"] as string);
+  const schema = await remote!.viewSchema(values["view-schema"] as string);
   console.log(schema.trim());
 }
 
@@ -374,7 +374,7 @@ const remoteRepl = async function () {
     process.stdin,
     process.stdout,
     undefined,
-    !args.values["simple-output"],
+    !values["simple-output"],
   );
   while (true) {
     if (process.stdin.closed) {
@@ -465,7 +465,7 @@ const localRepl = async function () {
     process.stdin,
     process.stdout,
     undefined,
-    !args.values["simple-output"],
+    !values["simple-output"],
   );
   while (true) {
     const query = await rl.question(`local> `);
@@ -502,7 +502,7 @@ const localRepl = async function () {
     if (query.trim() === ".js") {
       rl.close();
       const replServer = repl.start({
-        terminal: !args.values["simple-output"],
+        terminal: !values["simple-output"],
       });
       replServer.context.skdb = skdb;
       return;
@@ -567,11 +567,11 @@ const localRepl = async function () {
   }
 };
 
-if (args.values["remote-repl"]) {
+if (values["remote-repl"]) {
   await remoteRepl();
 }
 
-if (args.values["local-repl"]) {
+if (values["local-repl"]) {
   await localRepl();
 }
 
@@ -596,6 +596,6 @@ if (query.trim() !== "") {
 // interactively, you can drop to the js console and the control flow
 // ends up calling this, which you don't want. the user is going to
 // send an interrupt anyway to get out of the shell.
-if (!(args.values["remote-repl"] || args.values["local-repl"])) {
+if (!(values["remote-repl"] || values["local-repl"])) {
   await skdb.closeConnection();
 }

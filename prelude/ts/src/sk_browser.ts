@@ -23,8 +23,6 @@ class Env implements Environment {
   fileSystem: MemFS;
   system: MemSys;
   timestamp: () => float;
-  canvas: () => HTMLCanvasElement;
-  clipboard: () => Clipboard;
   decodeUTF8: (utf8: ArrayBuffer) => string;
   encodeUTF8: (str: string) => Uint8Array;
   storage: () => Storage;

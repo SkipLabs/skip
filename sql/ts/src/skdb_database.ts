@@ -86,6 +86,7 @@ class SKDBMechanismImpl implements SKDBMechanism {
     this.diff = (session: string, watermarks: Map<string, bigint>) => {
       const acc = {};
       for (const [table, wm] of watermarks.entries()) {
+        // @ts-ignore
         acc[table] = { since: wm };
       }
       const diffSpec = JSON.stringify(acc, (_key, value) =>
@@ -107,24 +108,24 @@ export class SKDBSyncImpl implements SKDBSync {
   private environment: Environment;
   private subscriptionCount: number = 0;
   private clientUuid: string = "";
-  private accessKey: string;
+  private accessKey?: string;
   private fs: FileSystem;
 
-  save: () => Promise<boolean>;
-  runLocal: (new_args: Array<string>, new_stdin: string) => string;
-  watch: (
+  save!: () => Promise<boolean>;
+  runLocal!: (new_args: Array<string>, new_stdin: string) => string;
+  watch!: (
     query: string,
     params: Params,
     onChange: (rows: SKDBTable) => void,
   ) => { close: () => void };
-  watchChanges: (
+  watchChanges!: (
     query: string,
     params: Params,
     init: (rows: SKDBTable) => void,
     update: (added: SKDBTable, removed: SKDBTable) => void,
   ) => { close: () => void };
 
-  private runner: (fn: () => string) => SKDBTable;
+  private runner!: (fn: () => string) => SKDBTable;
 
   connectedRemote?: RemoteSKDB;
 
@@ -294,7 +295,7 @@ export class SKDBSyncImpl implements SKDBSync {
     throw new Error(error);
   }
   async mirror(...tables: MirrorDefn[]) {
-    const is_mirror_def_of = (table) => (mirror_def) =>
+    const is_mirror_def_of = (table: any) => (mirror_def: any) =>
       mirror_def.table === table;
     for (const metatable of [
       {
@@ -319,7 +320,7 @@ export class SKDBSyncImpl implements SKDBSync {
     return this.connectedRemote!.mirror(...tables);
   }
 
-  async serverExec(query: string, params: Params) {
+  async serverExec(query: string, params?: Params): Promise<SKDBTable> {
     return this.connectedRemote!.exec(query, params);
   }
 
@@ -420,9 +421,11 @@ export class SKDBImpl implements SKDB {
     return this.skdbSync.save();
   }
 
+  // @ts-ignore
   async createGroup() {
     return SKDBGroupImpl.create(this);
   }
+
   async lookupGroup(groupID: string) {
     return SKDBGroupImpl.lookup(this, groupID);
   }

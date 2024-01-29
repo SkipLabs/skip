@@ -19,7 +19,7 @@ export class Exception {
   id: int;
   err: Error;
 
-  constructor(err: Error, state) {
+  constructor(err: Error, state: State) {
     this.id = ++state.exceptionId;
     this.err = err;
     state.exceptions.set(this.id, this);
@@ -109,7 +109,7 @@ export class Options {
   }
 
   static fromFlags(flags: int) {
-    let is = (flags, value) => {
+    let is = (flags: int, value: int) => {
       return (flags & value) == value;
     };
     return new Options(
@@ -135,7 +135,7 @@ export interface FileSystem {
 }
 
 export interface System {
-  setenv(name: string, value: string);
+  setenv(name: string, value: string): void;
   getenv(name: string): string | null;
   unsetenv(name: string): void;
 }
@@ -156,7 +156,7 @@ export interface Environment {
   decodeUTF8: (utf8: ArrayBuffer) => string;
   encodeUTF8: (str: string) => Uint8Array;
   onException: () => void;
-  base64Decode: (base64: String) => Uint8Array;
+  base64Decode: (base64: string) => Uint8Array;
   fs: () => FileSystem;
   sys: () => System;
   crypto: () => Crypto;
@@ -218,6 +218,7 @@ export class Utils {
   };
 
   constructor(exports: WebAssembly.Exports, env: Environment, mainFn?: string) {
+    this.exceptions = [];
     this.states = new Map();
     this.args = new Array();
     this.current_stdin = 0;
@@ -292,6 +293,7 @@ export class Utils {
       if (!this.mainFn) {
         this.exports.skip_main();
       } else {
+        //@ts-ignore
         this.exports[this.mainFn]();
       }
     } catch (exn) {
@@ -465,7 +467,7 @@ export class Utils {
     try {
       return this.call(f);
     } catch (exn) {
-      this.exceptions.push(exn);
+      this.exceptions.push(exn as Error);
       let exception =
         exn instanceof SkException
           ? null

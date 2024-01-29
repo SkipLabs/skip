@@ -6,6 +6,7 @@ import * as util from "util";
 import * as perf_hooks from "perf_hooks";
 import * as crypto from "crypto";
 import { Worker } from "worker_threads";
+// @ts-ignore
 import { WebSocket } from "ws";
 
 class WrkImpl implements Wrk {
@@ -33,15 +34,9 @@ class Env implements Environment {
   disableWarnings: boolean = false;
   system: MemSys;
   timestamp: () => float;
-  window: () => Window;
-  canvas: () => HTMLCanvasElement;
-  clipboard: () => Clipboard;
   decodeUTF8: (utf8: ArrayBuffer) => string;
   encodeUTF8: (str: string) => Uint8Array;
-  storage: () => Storage;
-  onException: () => void;
   base64Decode: (base64: string) => Uint8Array;
-  update: () => void;
   environment: Array<string>;
   throwRuntime: (code: int) => void;
   createSocket: (uri: string) => WebSocket;
@@ -73,6 +68,7 @@ class Env implements Environment {
     }
     return processPath;
   }
+  onException() {}
 
   constructor(environment?: Array<string>) {
     this.shared = new Map<string, Shared>();
