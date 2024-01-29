@@ -1,4 +1,4 @@
-import {
+import type {
   int,
   ptr,
   Environment,
@@ -6,8 +6,8 @@ import {
   ToWasmManager,
   Utils,
   FileSystem,
-  Options,
-} from "#std/sk_types";
+} from "./sk_types.js";
+import { Options } from "./sk_types.js";
 
 interface ToWasm {
   SKIP_check_if_file_exists: (skPath: ptr) => boolean;

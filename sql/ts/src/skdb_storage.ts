@@ -1,4 +1,4 @@
-import { Storage, PagedMemory } from "#skdb/skdb_types";
+import type { Storage, PagedMemory } from "./skdb_types.js";
 
 function makeSKDBStore(
   dbName: string,

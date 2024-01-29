@@ -1,5 +1,7 @@
-import { Creator, onWorkerMessage } from "#std/sk_worker";
-import { createSkdb, SKDB } from "#skdb/skdb";
+import { onWorkerMessage } from "#std/sk_worker.js";
+import type { Creator } from "#std/sk_worker.js";
+import type { SKDB } from "./skdb.js";
+import { createSkdb } from "./skdb.js";
 
 class DbCreator implements Creator<SKDB> {
   getName() {

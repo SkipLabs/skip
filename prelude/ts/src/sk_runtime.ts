@@ -1,4 +1,4 @@
-import {
+import type {
   int,
   float,
   ptr,
@@ -6,9 +6,8 @@ import {
   Utils,
   ToWasmManager,
   Environment,
-  Stream,
-  Options,
-} from "#std/sk_types";
+} from "./sk_types.js";
+import { Stream } from "./sk_types.js";
 
 interface Env extends Environment {
   window: () => Window | null;

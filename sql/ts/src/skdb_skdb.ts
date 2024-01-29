@@ -1,4 +1,4 @@
-import {
+import type {
   int,
   ptr,
   Environment,
@@ -6,19 +6,18 @@ import {
   ToWasmManager,
   Utils,
   Shared,
-} from "#std/sk_types";
-import {
+} from "#std/sk_types.js";
+import type {
   PagedMemory,
   Page,
   Storage,
-  SKDB,
   SKDBHandle,
   Params,
   SKDBSync,
-} from "#skdb/skdb_types";
-import { ExternalFuns, SKDBTable } from "#skdb/skdb_util";
-import { IDBStorage } from "#skdb/skdb_storage";
-import { SKDBImpl, SKDBSyncImpl } from "#skdb/skdb_database";
+} from "./skdb_types.js";
+import { ExternalFuns, SKDBTable } from "./skdb_util.js";
+import { IDBStorage } from "./skdb_storage.js";
+import { SKDBImpl, SKDBSyncImpl } from "./skdb_database.js";
 
 interface Exported {
   sk_pop_dirty_page: () => number;

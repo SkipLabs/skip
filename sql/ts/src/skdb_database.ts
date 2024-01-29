@@ -1,5 +1,5 @@
-import { Environment, FileSystem } from "#std/sk_types";
-import {
+import type { Environment, FileSystem } from "#std/sk_types.js";
+import type {
   SKDBMechanism,
   SKDB,
   RemoteSKDB,
@@ -7,10 +7,10 @@ import {
   Params,
   SKDBSync,
   MirrorDefn,
-} from "#skdb/skdb_types";
-import { SKDBTable } from "#skdb/skdb_util";
-import { SKDBGroupImpl } from "#skdb/skdb_group";
-import { connect } from "#skdb/skdb_orchestration";
+} from "./skdb_types.js";
+import { SKDBTable } from "./skdb_util.js";
+import { SKDBGroupImpl } from "./skdb_group.js";
+import { connect } from "./skdb_orchestration.js";
 
 class SKDBMechanismImpl implements SKDBMechanism {
   writeCsv: (payload: string, source: string) => void;
