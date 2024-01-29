@@ -1,4 +1,4 @@
-import { SKDB, SKDBGroup } from "#skdb/skdb_types";
+import type { SKDB, SKDBGroup } from "./skdb_types.js";
 
 export class SKDBGroupImpl implements SKDBGroup {
   skdb: SKDB;
