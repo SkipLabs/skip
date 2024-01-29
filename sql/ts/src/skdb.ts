@@ -8,6 +8,7 @@ export type { Environment } from "#std/sk_types.js";
 
 var wasm64 = "skdb";
 // sknpm searches for the modules line verbatim
+// @ts-ignore
 // prettier-ignore
 var modules = [ /*--MODULES--*/];
 var extensions = new Map();
@@ -42,6 +43,7 @@ async function createSkdbSync(
 ): Promise<SKDBSync> {
   let data = await run(
     wasm64,
+    // @ts-ignore
     modules,
     extensions,
     "SKDB_factory",
@@ -59,6 +61,7 @@ async function createOnMain(
 ) {
   let data = await run(
     wasm64,
+    // @ts-ignore
     modules,
     extensions,
     "SKDB_factory",

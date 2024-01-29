@@ -230,10 +230,12 @@ export class SKDBWorker implements SKDB {
     return this.worker.post(new Function("getUser", [])).send();
   };
 
+  // @ts-ignore
   createGroup = async () => {
     return SKDBGroupImpl.create(this);
   };
-  lookupGroup = async (groupID) => {
+
+  lookupGroup = async (groupID: string) => {
     return SKDBGroupImpl.lookup(this, groupID);
   };
 }

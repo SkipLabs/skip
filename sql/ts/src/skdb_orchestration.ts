@@ -700,7 +700,7 @@ export class MuxedSocket {
 
   openStream(): Promise<Stream> {
     const openTimeoutMs = 10;
-    const fn = (resolve, reject) => {
+    const fn = (resolve: any, reject: any) => {
       switch (this.state) {
         case MuxedSocketState.AUTH_SENT: {
           const streamId = this.nextStream;
@@ -1460,7 +1460,7 @@ class SKDBServer implements RemoteSKDB {
 
   private deliverDataTransferProtoMsg(
     msg: ProtoMsg | null,
-    deliver: (string) => void,
+    deliver: (msg: string) => void,
   ) {
     const txtPayload = this.env.decodeUTF8(this.strictCastData(msg).payload);
     const rebootSignalled = txtPayload
@@ -1549,9 +1549,10 @@ class SKDBServer implements RemoteSKDB {
             if (!resolved) {
               // a non-zero checkpoint indicates that we have received a fully consistent
               // snapshot of the remote table, so should resolve the promise
-              resolveSignalled = payload
-                .split("\n")
-                .find((line: string) => line.match(/^:[1-9]/g));
+              resolveSignalled =
+                payload
+                  .split("\n")
+                  .find((line: string) => line.match(/^:[1-9]/g)) != undefined;
             }
             return client.writeCsv(payload, this.replicationUid);
           });

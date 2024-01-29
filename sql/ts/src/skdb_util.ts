@@ -14,7 +14,7 @@ export class SKDBCallable<T1, T2> {
 }
 
 export class ExternalFuns {
-  private externalFuns: Array<(any) => any>;
+  private externalFuns: Array<(obj: any) => any>;
 
   constructor() {
     this.externalFuns = [];
@@ -47,6 +47,7 @@ export class SKDBTable extends Array<Object> {
         `Can't extract scalar: query yielded ${cols.length} columns`,
       );
     }
+    // @ts-ignore
     return row[cols[0]];
   }
 
@@ -66,6 +67,7 @@ export class SKDBTable extends Array<Object> {
           `Can't extract only column: got ${cols.length} columns`,
         );
       }
+      // @ts-ignore
       result.push(row[cols[0]]);
     }
     return result;
@@ -73,9 +75,11 @@ export class SKDBTable extends Array<Object> {
 
   column(col: string): Array<any> {
     return this.map((row) => {
+      // @ts-ignore
       if (!row[col]) {
         throw new Error("Missing column: " + col);
       }
+      // @ts-ignore
       return row[col];
     });
   }
