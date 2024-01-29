@@ -1,4 +1,4 @@
-FROM skiplabs/skdb as skdb
+FROM skiplabs/skdb-base as skdb
 FROM eclipse-temurin:20 as skgw
 
 COPY . /skdb
@@ -14,7 +14,6 @@ FROM eclipse-temurin:20 as dev
 
 WORKDIR /skdb
 
-COPY --from=skdb /skdb/build ./build
 COPY --from=skgw /skdb/sql/server/dev/build/libs/dev.jar /skdb/build/server.jar
 COPY --from=skgw /skdb/sql/server/dev/start_dev.sh /skdb/build/start.sh
 
