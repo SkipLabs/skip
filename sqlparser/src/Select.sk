@@ -134,16 +134,22 @@ extension class Parser {
       | TSelect()
       | TValues() ->
         select = this.parseSelect();
+        this.expect_token(TRParen());
         asName = if (this.parse_keyword(TAs())) {
           Some(Name::create(this.expect_identifier()))
         } else {
-          None()
+          this.parse_identifier() match {
+          | Some(id) -> Some(Name::create(id))
+          | None() -> None()
+          }
         };
 
         FromQuery{select, asName}
-      | _ -> this.parseSelectFrom()
+      | _ ->
+        from = this.parseSelectFrom();
+        this.expect_token(TRParen());
+        from
       };
-      this.expect_token(TRParen());
 
       return res
     };
