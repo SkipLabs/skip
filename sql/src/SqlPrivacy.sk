@@ -78,6 +78,7 @@ base class PredefinedTable private final {
   private schema: Array<P.ColumnDefinition>,
   protected kinds: Array<(Int, P.IKind, P.Type)>,
   private indexDirName: SKStore.DirName,
+  protected dirDescr: DirDescr,
 } {
   const name: P.Name;
   const schemaText: String;
@@ -101,12 +102,22 @@ base class PredefinedTable private final {
       static::indexedFields.size(),
     );
     indexDirName = SKStore.DirName::create(indexName.lower + "unique/proj/");
+
+    dirDescr = DirDescr::create{
+      name => static::name,
+      schema => schema.columns,
+      dirName,
+      alias => None(),
+      isInput => true,
+    };
+
     static{
       columns => columns.chill(),
       dirName,
       schema => schema.columns,
       kinds,
       indexDirName,
+      dirDescr,
     }
   }
 
@@ -115,6 +126,10 @@ base class PredefinedTable private final {
     | None() -> error(0, "Privacy layer not initialized")
     | Some(index) -> PredefinedIndex(static::name, index, this.columns)
     }
+  }
+
+  fun getDirDescr(): DirDescr {
+    this.dirDescr
   }
 
   fun getColNbr(name: P.Name): Int {
@@ -430,6 +445,54 @@ fun checkUserCanReadRow(
   row: RowValues,
 ): AccessResult {
   access = AccessSolver::create(context, user.name);
+  if (table.name == SKDBGroupPermissions::name) {
+    groupID = row.getValue(
+      skdbGroupPermissions.getColNbr(groupIDColName),
+    ) match {
+    | Some(CString(groupID)) -> groupID
+    | _ ->
+      throw SqlError(
+        0,
+        "groupID is a non-null string in skdb_group_permissions",
+      )
+    };
+
+    groupRow = skdbGroups
+      .getIndex(context)
+      .get(skdbGroups.makeKey(groupID))
+      .fromSome();
+
+    checkUserCanReadRow(
+      context,
+      user,
+      skdbGroups.getDirDescr(),
+      groupRow.rowValues,
+    ) match {
+    | AROK() ->
+      // group is visible to this user.  they can see this permission iff
+      // (a) they are the specified user,
+      // (b) the permission is a default for all unspecifed users, OR
+      // (c) they are an admin of the group
+      row.getValue(skdbGroupPermissions.getColNbr(userIDColName)) match {
+      | None() -> return AROK()
+      | Some(CString(userID)) if (userID == user.name) -> return AROK()
+      | _ ->
+        groupIndex = skdbGroups.getIndex(context);
+        adminID = groupIndex.get(skdbGroups.makeKey(groupID)) match {
+        | Some(r) -> r.getString(adminIDColName)
+        | None() -> throw SqlError(0, "malformed predefined table skdb_groups")
+        };
+        if (access.canRead(context, adminID)) {
+          return AROK();
+        } else {
+          return ARError(ARENotAdmin{userID => user.name, groupID => groupID})
+        }
+      }
+    | reasonUserCantSeeGroup ->
+      // users should only see permissions for groups they can see
+      return reasonUserCantSeeGroup
+    };
+  };
   groupIdxOption = table.cols.maybeGet(skdbAccessColName);
   groupIdxOption match {
   | None() ->
@@ -479,29 +542,16 @@ fun checkUserCanWriteRow(
         "groupID is a non-null string in skdb_group_permissions",
       )
     };
-
-    groupIndex = skdbGroups.getIndex(context);
-    adminID = groupIndex.get(skdbGroups.makeKey(groupID)) match {
-    | Some(r) -> r.getString(adminIDColName)
-    | None() -> throw SqlError(0, "malformed predefined table skdb_groups")
-    };
-    hasAdminPrivileges =
-      adminID == access.userID ||
-      {
-        groupPermIndex = skdbGroupPermissions.getIndex(context);
-        adminRow = groupPermIndex.get(
-          skdbGroupPermissions.makeKey(adminID, Some(access.userID)),
-        ) match {
-        | r @ Some(_) -> r
-        | None() ->
-          groupPermIndex.get(skdbGroupPermissions.makeKey(adminID, None()))
-        };
-        adminPerm = adminRow match {
-        | None() -> Permission::none()
-        | Some(r) -> Permission(r.getInt(permissionsColName))
-        };
-        (row.repeat == 0 && adminPerm.canDelete()) || adminPerm.canInsert()
+    hasAdminPrivileges = {
+      groupIndex = skdbGroups.getIndex(context);
+      adminID = groupIndex.get(skdbGroups.makeKey(groupID)) match {
+      | Some(r) -> r.getString(adminIDColName)
+      | None() -> throw SqlError(0, "malformed predefined table skdb_groups")
       };
+
+      (row.repeat == 0 && access.canDelete(context, adminID)) ||
+        access.canInsert(context, adminID)
+    };
     if (!hasAdminPrivileges) {
       return ARError(ARENotAdmin{userID => access.userID, groupID => groupID})
     }
