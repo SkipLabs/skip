@@ -346,8 +346,10 @@ async function testClientTail(root: SKDB, user: SKDB) {
 
 async function testLargeMirror(root: SKDB, user: SKDB) {
   const rootRemote = await root.connectedRemote();
-  rootRemote!.exec("CREATE TABLE large (t INTEGER, skdb_access TEXT);");
-  rootRemote!.exec("CREATE TABLE large_copy (t INTEGER, skdb_access TEXT);");
+  await rootRemote!.exec("CREATE TABLE large (t INTEGER, skdb_access TEXT);");
+  await rootRemote!.exec(
+    "CREATE TABLE large_copy (t INTEGER, skdb_access TEXT);",
+  );
 
   const test_pk = {
     table: "test_pk",
@@ -401,6 +403,52 @@ async function testLargeMirror(root: SKDB, user: SKDB) {
     {},
   );
   expect(localCntCopy).toEqual([{ n: N }]);
+}
+
+async function testMirrorWithAuthor(root: SKDB, user1: SKDB, user2: SKDB) {
+  const rootRemote = await root.connectedRemote();
+  await rootRemote!.exec(
+    "CREATE TABLE sync (i INTEGER, skdb_access TEXT NOT NULL, skdb_author TEXT NOT NULL);",
+  );
+  await rootRemote!.exec(
+    "CREATE TABLE syncpk (i INTEGER PRIMARY KEY, skdb_access TEXT NOT NULL, skdb_author TEXT NOT NULL);",
+  );
+
+  const syncDef = {
+    table: "sync",
+    expectedColumns: "*",
+  };
+  const syncPkDef = {
+    table: "syncpk",
+    expectedColumns: "*",
+  };
+  const test_pk = {
+    table: "test_pk",
+    expectedColumns: "(x INTEGER PRIMARY KEY, y INTEGER, skdb_access TEXT)",
+  };
+  const view_pk = {
+    table: "view_pk",
+    expectedColumns: "(x INTEGER, y INTEGER, skdb_access TEXT)",
+  };
+
+  // important for the test that we really do have different users
+  expect(user1.currentUser).not.toEqual(user2.currentUser);
+
+  await user1.mirror(test_pk, view_pk, syncDef, syncPkDef);
+  const whoami = user1.currentUser;
+  await user1.exec("INSERT INTO sync VALUES (0, 'read-write', @whoami);", {
+    whoami,
+  });
+  await user1.exec("INSERT INTO syncpk VALUES (0, 'read-write', @whoami);", {
+    whoami,
+  });
+  await user2.mirror(test_pk, view_pk, syncDef, syncPkDef);
+  expect(await user2.exec("SELECT * FROM sync")).toEqual([
+    { i: 0, skdb_access: "read-write", skdb_author: whoami },
+  ]);
+  expect(await user2.exec("SELECT * FROM syncpk")).toEqual([
+    { i: 0, skdb_access: "read-write", skdb_author: whoami },
+  ]);
 }
 
 async function testReboot(root: SKDB, user: SKDB, user2: SKDB) {
@@ -599,6 +647,9 @@ export const apitests = (asWorker) => {
         await testClientTail(dbs.root, dbs.user);
 
         await testLargeMirror(dbs.root, dbs.user);
+
+        await testMirrorWithAuthor(dbs.root, dbs.user, dbs.user2);
+
         // must come last: puts replication in to a permanent state of failure
         await testReboot(dbs.root, dbs.user, dbs.user2);
 
