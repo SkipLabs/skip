@@ -535,6 +535,32 @@ async function testJSGroups(skdb1: SKDB, skdb2: SKDB) {
   const user2 = skdb2.currentUser!;
   const group = await skdb1.createGroup();
 
+  // user1 can see their own permissions on group, user2 is none the wiser
+
+  const user1_visible_permissions = await waitSynch(
+    skdb1,
+    "SELECT * FROM skdb_group_permissions WHERE groupID IN (@groupID, @adminID, @ownerID)",
+    (perms) => perms.length == 3,
+    {
+      groupID: group.groupID,
+      adminID: group.adminGroupID,
+      ownerID: group.ownerGroupID,
+    },
+  );
+  expect(user1_visible_permissions).toHaveLength(3);
+
+  const user2_visible_permissions = await waitSynch(
+    skdb2,
+    "SELECT * FROM skdb_group_permissions WHERE groupID IN (@groupID, @adminID, @ownerID)",
+    (perms) => perms.length == 0,
+    {
+      groupID: group.groupID,
+      adminID: group.adminGroupID,
+      ownerID: group.ownerGroupID,
+    },
+  );
+  expect(user2_visible_permissions).toHaveLength(0);
+
   // user1 can insert, user2 can not
 
   await skdb1.exec("INSERT INTO test_pk VALUES (1001, 1, @gid)", {
