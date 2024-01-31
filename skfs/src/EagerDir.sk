@@ -1722,6 +1722,7 @@ class EagerDir{
     writerPath: Path,
     k: Key,
     rvalues: Array<File>,
+    force: Bool = false,
   ): this {
     origSource = Source::create(origSourcePath);
     oldValues = this.getArraySourceKey(origSource, k);
@@ -1731,13 +1732,13 @@ class EagerDir{
     };
 
     context.writeChecker match {
-    | None() -> void
-    | Some(checker) ->
+    | Some(checker) if (!force) ->
       checker.tables.maybeGet(this.dirName) match {
       | None() -> void
       | Some(indexes) ->
         checker.checkWrite(context, this.dirName, indexes, k, rvalues)
       }
+    | _ -> void
     };
 
     if (this.data.nbrEntries >= this.fixedData.size()) {
