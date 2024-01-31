@@ -169,6 +169,10 @@ export interface SKDBShared extends Shared {
 }
 
 export interface SKDBGroup {
+  ownerGroupID: string;
+  adminGroupID: string;
+  groupID: string;
+
   setDefaultPermission: (perm: string) => Promise<void>;
   setMemberPermission: (userID: string, perm: string) => Promise<void>;
 
