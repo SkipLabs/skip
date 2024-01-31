@@ -81,7 +81,7 @@ export class SKDBGroupImpl implements SKDBGroup {
     // Now that Admin and Owner groups are set up, add userID to the Primary group
     // and set all of the admin/access fields of the groups properly.
     await skdb.exec(
-      "INSERT INTO skdb_group_permissions VALUES (@groupID, @userID, skdb_permission('rw'), 'read-write');",
+      "INSERT INTO skdb_group_permissions VALUES (@groupID, @userID, skdb_permission('rw'), @adminGroupID);",
       { groupID, userID, adminGroupID },
     );
 
