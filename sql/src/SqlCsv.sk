@@ -388,6 +388,7 @@ fun applyDiffStrategy(
               writer,
               key,
               Array<SKStore.File>[],
+              true,
             );
           }
         };
@@ -399,6 +400,7 @@ fun applyDiffStrategy(
             writer,
             SKDB.RowKey(row, table.kinds),
             Array[row],
+            true,
           );
         };
 
@@ -455,6 +457,7 @@ fun applyDiffStrategy(
               writer,
               key,
               Array[],
+              true,
             );
           } else {
             !keyRepeat = keyRepeat - srcRepeat;
@@ -468,6 +471,7 @@ fun applyDiffStrategy(
             writer,
             key,
             Array[row.setRepeat(keyRepeat)],
+            true,
           );
         };
         newDir
@@ -517,6 +521,7 @@ fun applyDiffStrategy(
                 writer,
                 key,
                 Array[],
+                true,
               );
             }
           };
@@ -537,6 +542,7 @@ fun applyDiffStrategy(
               editWriter,
               editKey,
               editFiles,
+              true,
             );
           };
         };
@@ -587,6 +593,7 @@ fun applyDiffStrategy(
               editWriter,
               editKey,
               editFiles,
+              true,
             );
           };
         };
@@ -785,6 +792,7 @@ fun replayDiff(
       | None() -> break SKStore.CStop(None())
       };
       !state = state match {
+      | None() if (line == "") -> None()
       | None() if (String.getByte(line, 0) != 94) -> // !startsWith("^")
         None()
 
