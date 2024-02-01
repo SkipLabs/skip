@@ -58,7 +58,8 @@ class WrappedRemote implements RemoteSKDB {
   exec(query: string, params?: Params) {
     return this.worker
       .post(new Caller(this.wrapped, "exec", [query, params]))
-      .send();
+      .send()
+      .then((rows) => new SKDBTable(...rows));
   }
 
   close() {
