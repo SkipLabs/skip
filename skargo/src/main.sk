@@ -138,6 +138,18 @@ fun execBuildContext(
 
 /********* Test **********/
 
+fun nproc(): Int {
+  p = System.subprocess(Array["nproc"]);
+  p.exitstatus match {
+  | Posix.WExited(0) ->
+    p.stdout.trim().toIntOption() match {
+    | Some(n) -> n
+    | None() -> 8
+    }
+  | _ -> 8
+  };
+}
+
 fun test(): (Cli.Command, Cli.ParseResults ~> void) {
   (
     Cli.Command("test")
@@ -152,7 +164,7 @@ fun test(): (Cli.Command, Cli.ParseResults ~> void) {
         Cli.IntArg("jobs")
           .long("jobs")
           .short("j")
-          .default(8)
+          .default(nproc())
           .about("Number of parallel jobs, defaults to # of CPUs"),
       )
       .arg(Cli.StringArg("target").about("Check for the target triple"))
