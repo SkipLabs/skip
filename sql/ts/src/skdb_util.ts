@@ -51,7 +51,7 @@ export class SKDBTable extends Array<Object> {
     return row[cols[0]];
   }
 
-  onlyRow(): Object {
+  onlyRow(): any {
     if (this.length != 1) {
       throw new Error(`Can't extract only row: got ${this.length} rows`);
     }
