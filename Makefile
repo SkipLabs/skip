@@ -100,7 +100,11 @@ fmt:
 
 .PHONY: test
 test:
-	$(MAKE) --keep-going SKARGO_PROFILE=dev SKDB_WASM=sql/target/wasm32/dev/skdb.wasm SKDB_BIN=sql/target/host/dev/skdb test-native test-wasm
+	$(MAKE) --keep-going SKARGO_PROFILE=dev SKDB_WASM=sql/target/wasm32/dev/skdb.wasm SKDB_BIN=sql/target/host/dev/skdb test-skfs test-native test-wasm
+
+.PHONY: test-skfs
+test-skfs:
+	cd skfs && SKARGO_PROFILE=$(SKARGO_PROFILE) skargo test
 
 .PHONY: test-native
 test-native: build/skdb
