@@ -125,7 +125,7 @@ fun updateDirtyReaders(
       (child.getTime(), parent.getTime())
     };
     arrow = Arrow(reader.parentName, reader.childName);
-    context.!toUpdate = context.toUpdate.set(time, arrow);
+    context.addToUpdate(time, arrow);
   };
 }
 
@@ -333,6 +333,10 @@ mutable class Context{
 } {
   mutable fun postpone(toWrite: ToWrite): void {
     this.!postWrites = List.Cons(toWrite, this.postWrites);
+  }
+
+  mutable fun addToUpdate(time: (Time, Time), arrow: Arrow): void {
+    this.!toUpdate = this.toUpdate.set(time, arrow);
   }
 
   mutable fun subscribe(
