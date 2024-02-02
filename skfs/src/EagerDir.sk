@@ -2080,15 +2080,38 @@ class EagerDir{
     source: Source,
     newDirs: SortedSet<DirName>,
   ): this {
-    removed = mutable Vector[];
     minfo = static::getOld(this, source);
-    if (minfo.getNewDirs().isEmpty() || !context.removeSubDirs) return this;
-
     lastRoundDirs = minfo.getNewDirs();
-    for (dirName in lastRoundDirs) {
-      if (newDirs.contains(dirName)) continue;
-      context.removeDir(dirName);
-      removed.push(dirName)
+    removed = mutable Vector[];
+    if (context.isWithSharedSubDirs(this.dirName)) {
+      toAdd = newDirs;
+      toRemove = mutable Vector[];
+      for (dirName in lastRoundDirs) {
+        if (toAdd.contains(dirName)) {
+          !toAdd = toAdd.remove(dirName)
+        } else {
+          toRemove.push(dirName);
+        }
+      };
+
+      for (newDir in toAdd) {
+        context.incrRefCount(newDir);
+      };
+
+      for (dirName in toRemove) {
+        if (context.decrRefCount(dirName) && context.removeSubDirs) {
+          context.removeDir(dirName);
+          removed.push(dirName)
+        }
+      };
+    } else {
+      if (minfo.getNewDirs().isEmpty() || !context.removeSubDirs) return this;
+
+      for (dirName in lastRoundDirs) {
+        if (newDirs.contains(dirName)) continue;
+        context.removeDir(dirName);
+        removed.push(dirName)
+      }
     };
     !minfo = minfo.setNewDirs(newDirs.toArray());
     !this.old[source] = minfo;
