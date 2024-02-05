@@ -1,4 +1,4 @@
-import { run } from "#std/sk_types";
+import { run } from "./sk_types.js";
 
 var wasm64 = "test";
 // sknpm searches for the modules line verbatim
