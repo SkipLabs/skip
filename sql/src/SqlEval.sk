@@ -685,7 +685,7 @@ class Evaluator{options: Options, user: ?UserFile} {
                     P.ColumnDefinition{name => patName, ty => P.INTEGER()},
                   )
 
-                | Some(patType) if (patType.isFloat()) ->
+                | Some(patType) if (patType.isNumAndNotNull()) ->
                   newSchemaAcc.push(
                     P.ColumnDefinition{
                       name => patName,
@@ -693,7 +693,7 @@ class Evaluator{options: Options, user: ?UserFile} {
                       notNull => Some(P.CCNotNull{}),
                     },
                   )
-                | Some(patType) if (patType.isFloatOrNull()) ->
+                | Some(patType) if (patType.isNum()) ->
                   newSchemaAcc.push(
                     P.ColumnDefinition{name => patName, ty => P.FLOAT()},
                   )

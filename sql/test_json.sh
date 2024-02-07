@@ -155,16 +155,43 @@ fi
 
 echo "create table t4 (v JSON);" | $SKDB
 
-echo 'insert into t3 values('"'"'{"userIds":[1,2,3],"id": 1,"title": "delectus aut autem","completed": false}'"'"')' | $SKDB
-echo 'insert into t3 values('"'"'{"userIds":[2],"id":2,"title":"quisutamfacilisetofficiaqui","completed":false}'"'"')' | $SKDB
-echo 'insert into t3 values('"'"'{"userIds":[1,2],"id":3,"title":"fugiatveiammius","completed":false}'"'"')' | $SKDB
-echo 'insert into t3 values('"'"'{"userIds":[4,5],"id":4,"title":"etporrotempora","completed":true}'"'"')' | $SKDB
-echo 'insert into t3 values('"'"'{"userIds":[3,4],"id":5,"title":"laboriosammollitiaeteimquasiadipisciquiaprovidetillum","completed":false}'"'"')' | $SKDB
+echo 'insert into t4 values('"'"'{"userIds":[1,2,3],"id": 1,"title": "delectus aut autem","completed": false}'"'"')' | $SKDB
+echo 'insert into t4 values('"'"'{"userIds":[2],"id":2,"title":"quisutamfacilisetofficiaqui","completed":false}'"'"')' | $SKDB
+echo 'insert into t4 values('"'"'{"userIds":[1,2],"id":3,"title":"fugiatveiammius","completed":false}'"'"')' | $SKDB
+echo 'insert into t4 values('"'"'{"userIds":[4,5],"id":4,"title":"etporrotempora","completed":true}'"'"')' | $SKDB
+echo 'insert into t4 values('"'"'{"userIds":[3,4],"id":5,"title":"laboriosammollitiaeteimquasiadipisciquiaprovidetillum","completed":false}'"'"')' | $SKDB
 
-echo "create virtual view t4_sql as json_extract(t3, v, '{id<int>, userIds[]: userId<int>, title<string>, completed<bool>}');" | $SKDB
+echo "create virtual view t4_sql as json_extract(t4, v, '{id<int>, userIds[]: userId<int>, title<string>, completed<bool>}');" | $SKDB
 
 if echo "select count(*) from t4_sql where id = 1" | $SKDB | grep -q 3; then
     pass "JSON_EXTRACT2"
 else
     fail "JSON_EXTRACT2"
 fi
+
+
+echo "create table t5 (v JSON);" | $SKDB
+
+echo 'insert into t5 values('"'"'{"ratings":[1,2.0,3],"id": 1,"title": "delectus aut autem","completed": false}'"'"')' | $SKDB
+echo 'insert into t5 values('"'"'{"ratings":[2.0],"id":2,"title":"quisutamfacilisetofficiaqui","completed":false}'"'"')' | $SKDB
+echo 'insert into t5 values('"'"'{"ratings":[1.0,2],"id":3,"title":"fugiatveiammius","completed":false}'"'"')' | $SKDB
+echo 'insert into t5 values('"'"'{"ratings":[4.0,null],"id":4,"title":"etporrotempora","completed":true}'"'"')' | $SKDB
+echo 'insert into t5 values('"'"'{"ratings":[3,4],"id":5,"title":"laboriosammollitiaeteimquasiadipisciquiaprovidetillum","completed":false}'"'"')' | $SKDB
+
+echo "create virtual view t5_sql as json_extract(t5, v, '{ratings[]: rating<num>}');" | $SKDB
+
+if echo "select count(rating) from t5_sql where rating > 1.0" | $SKDB | grep -q 7; then
+    pass "JSON_EXTRACT3"
+else
+    fail "JSON_EXTRACT3"
+fi
+
+echo "create virtual view t5_sql2 as json_extract(t5, v, '{ratings[]: rating<null | num>}');" | $SKDB
+
+if echo "select count(rating) from t5_sql2" | $SKDB | grep -q 9; then
+    pass "JSON_EXTRACT4"
+else
+    fail "JSON_EXTRACT4"
+fi
+
+

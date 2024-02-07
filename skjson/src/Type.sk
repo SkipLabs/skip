@@ -364,6 +364,13 @@ class Type private (types: Array<(Int, SType)>) uses Orderable {
     false
   }
 
+  fun isNumAndNotNull(): Bool {
+    for (ty in this.types) {
+      if (ty.i1 is TNull()) return true;
+    };
+    this.isNum()
+  }
+
   fun containsNum(): Bool {
     hasOtherType = false;
     hasInt = false;
