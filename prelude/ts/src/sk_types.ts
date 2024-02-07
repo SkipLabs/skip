@@ -196,6 +196,35 @@ export interface WasmSupplier {
   completeWasm: (wasm: object, utils: Utils) => void;
 }
 
+function utf8Encode(string) {
+  const utf8 = new Array();
+
+  for (let i = 0; i < string.length; i++) {
+    let charcode = string.charCodeAt(i);
+
+    if (charcode < 0x80) {
+      utf8.push(charcode);
+    } else if (charcode < 0x800) {
+      utf8.push((charcode >> 6) | 0xc0);
+      utf8.push((charcode & 0x3f) | 0x80);
+    } else if (charcode < 0xd800 || charcode >= 0xe000) {
+      utf8.push((charcode >> 12) | 0xe0);
+      utf8.push(((charcode >> 6) & 0x3f) | 0x80);
+      utf8.push((charcode & 0x3f) | 0x80);
+    } else {
+      // surrogate pair
+      i++;
+      charcode = 0x10000 + (((charcode & 0x3ff) << 10) | (string.charCodeAt(i) & 0x3ff));
+      utf8.push((charcode >> 18) | 0xf0);
+      utf8.push(((charcode >> 12) & 0x3f) | 0x80);
+      utf8.push(((charcode >> 6) & 0x3f) | 0x80);
+      utf8.push((charcode & 0x3f) | 0x80);
+    }
+  }
+
+  return utf8;
+}
+
 export class Utils {
   private exports: Exported;
   private env: Environment;
@@ -204,7 +233,7 @@ export class Utils {
 
   args: Array<string>;
   private current_stdin: number;
-  private stdin: string;
+  private stdin: Array<number>;
   private stdout: Array<string>;
   private stderr: Array<string>;
   private stddebug: Array<string>;
@@ -222,7 +251,7 @@ export class Utils {
     this.states = new Map();
     this.args = new Array();
     this.current_stdin = 0;
-    this.stdin = "";
+    this.stdin = utf8Encode("");
     this.stdout = new Array();
     this.stderr = new Array();
     this.stddebug = new Array();
@@ -254,7 +283,7 @@ export class Utils {
     this.args = [this.mainFn ?? "main"].concat(new_args);
     this.exceptions = [];
     this.current_stdin = 0;
-    this.stdin = new_stdin;
+    this.stdin = utf8Encode(new_stdin);
     this.stdout = new Array();
     this.stderr = new Array();
     this.stddebug = new Array();
@@ -524,7 +553,7 @@ export class Utils {
     if (this.current_stdin >= this.stdin.length) {
       this.exports.SKIP_throw_EndOfFile();
     }
-    while (this.stdin.charCodeAt(this.current_stdin) !== endOfLine) {
+    while (this.stdin[this.current_stdin] !== endOfLine) {
       if (this.current_stdin >= this.stdin.length) {
         if (lineBuffer.length == 0) {
           this.exports.SKIP_throw_EndOfFile();
@@ -532,7 +561,7 @@ export class Utils {
           return lineBuffer;
         }
       }
-      lineBuffer.push(this.stdin.charCodeAt(this.current_stdin));
+      lineBuffer.push(this.stdin[this.current_stdin]);
       this.current_stdin++;
     }
     this.current_stdin++;
@@ -542,7 +571,7 @@ export class Utils {
   readStdInToEnd = () => {
     let lineBuffer = new Array<int>();
     while (this.current_stdin < this.stdin.length) {
-      lineBuffer.push(this.stdin.charCodeAt(this.current_stdin));
+      lineBuffer.push(this.stdin[this.current_stdin]);
       this.current_stdin++;
     }
     return lineBuffer;
@@ -552,7 +581,7 @@ export class Utils {
     if (this.current_stdin >= this.stdin.length) {
       this.exports.SKIP_throw_EndOfFile();
     }
-    let result = this.stdin.charCodeAt(this.current_stdin);
+    let result = this.stdin[this.current_stdin];
     this.current_stdin++;
     return result;
   };
