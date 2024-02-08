@@ -1234,7 +1234,7 @@ fun lowerFunctions(env: GlobalEnv, config: Config.Config): GlobalEnv {
 
   runPass = (name: String, f: Function, pass: Function -> Function) -> {
     f2 = pass(f);
-    if (config.verbose) {
+    if (config.debug) {
       print_error(`Finished ${name} pass for ${f2}.\n`);
       f2.dump(env, config);
     };
@@ -1243,7 +1243,7 @@ fun lowerFunctions(env: GlobalEnv, config: Config.Config): GlobalEnv {
 
   for (f in env.sfuns) {
     if (f.hasImplementation()) {
-      if (config.verbose) {
+      if (config.debug) {
         print_error(`\nAbout to run lower passes for ${f}.\n`);
         f.dump(env, config);
       };
