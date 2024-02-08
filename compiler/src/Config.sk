@@ -15,6 +15,7 @@ private fun hostTarget(): String {
 private class Config{
   release: Bool,
   verbose: Bool,
+  debug: Bool,
   optConfig: Optimize.Config,
   unknown: Array<String>,
   exportedFunctions: UnorderedSet<String>,
@@ -58,7 +59,8 @@ private class Config{
     );
 
     release = results.getBool("release");
-    verbose = results.getBool("verbose");
+    debug = results.getBool("debug");
+    verbose = debug || results.getBool("verbose");
     // preserve legacy behavior of capturing all unmatched args in a single array
     unknown = results.getArray("files");
 
@@ -157,6 +159,7 @@ private class Config{
     static{
       release,
       verbose,
+      debug,
       optConfig,
       unknown,
       exportedFunctions,

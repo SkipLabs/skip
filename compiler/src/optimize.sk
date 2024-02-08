@@ -166,8 +166,6 @@ private fun optimizeOne(
   >,
   opts: Int,
 ): OptimizeOneResult {
-  verbose = config.verbose;
-
   // Grab a bit mask of which optimizations are already applied.
   donePasses = f.status match {
   | p @ OptPartial _ -> p.donePasses
@@ -204,7 +202,7 @@ private fun optimizeOne(
         } else {
           oldFunction = f;
 
-          if (verbose) {
+          if (config.debug) {
             print_error(
               "\nAbout to run " + passName + " pass for " + f + ".\n",
             );
@@ -233,7 +231,7 @@ private fun optimizeOne(
                 )
               };
 
-              if (verbose) {
+              if (config.debug) {
                 print_error(
                   "Finished " + passName + " iteration " + subIterations + "\n",
                 );
@@ -277,7 +275,7 @@ private fun optimizeOne(
 
           !donePasses = donePasses.or(mask);
 
-          if (verbose) {
+          if (config.debug) {
             if (thisChanged) {
               oldFunction.dump(env, config)
             };
@@ -460,7 +458,7 @@ private fun findUnfinishedDependencyCycleMember(
     b != a
   }) void;
 
-  if (config.verbose) {
+  if (config.debug) {
     bestFunction match {
     | Some(best) ->
       print_error_ln(
@@ -498,8 +496,6 @@ private fun optimizeAll(
   config: Config.Config,
   opts: Int,
 ): GlobalEnv {
-  verbose = config.verbose;
-
   passes = Array[
     ("ready", Config::kOptReady, checkReady),
     ("intrinsics", Config::kOptIntrinsics, IntrinsicsInliner::run),
@@ -595,7 +591,7 @@ private fun optimizeAll(
       }
     };
 
-    if (verbose) {
+    if (config.debug) {
       print_error(
         `Beginning round ${round} with ${unoptimized.size()} ` +
           `functions remaining. ${ready.size()} are ` +
@@ -674,7 +670,7 @@ private fun optimizeAll(
         }
       };
 
-      if (verbose) {
+      if (config.debug) {
         // First list the ones we failed to optimize.
         for (fid in unoptimized) {
           f = allFuns[fid];
