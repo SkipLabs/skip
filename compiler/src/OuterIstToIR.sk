@@ -426,7 +426,7 @@ class InspectLazyGFun extends ConcreteLazyGFun {
         Array[gtString, gtInspect],
       );
 
-      isLambda = cls.isLambda || cls.isMemoizeThunk;
+      isLambda = cls.isLambda;
 
       // Remove any confusing "!123" suffix for renamed captured variables.
       computeDisplayName = n ~> {
@@ -689,322 +689,6 @@ class CustomLazyGFun{
   }
 }
 
-class MemoizeThunkLazyGFun{
-  capturedParams: Array<ParameterInfo>,
-} extends BodyLazyGFun {
-  protected fun emitBody(
-    context: mutable SKStore.Context,
-    emitter: mutable OuterIstEmitter,
-  ): void {
-    // Create a separate async function for the body.
-    funInfo = this.funInfo;
-    pos = funInfo.pos;
-
-    thisObj = emitter.params[0];
-    fields = emitter.converter.getGClass(
-      context,
-      thisObj.getType().asGTapply(pos).generic,
-      pos,
-    ).fields;
-
-    bodyFunInfo = funInfo with {
-      gfunction => GFunctionName(funInfo.gfunction.id + "::.body"),
-      funType => funInfo.funType with {params => fields.map(f -> f.typ)},
-      isAsync => true,
-    };
-
-    bodyLazy = AsyncCoroutineLazyGFun{
-      funInfo => bodyFunInfo,
-      params => this.capturedParams,
-      useOptionalMask => this.useOptionalMask,
-      bodyProvider => this with {params => this.capturedParams},
-    };
-
-    call = emitter.emitCallFunction(
-      bodyLazy,
-      fields.map(f ->
-        emitter.emitInstr(
-          GGetField{typ => f.typ, pos, obj => thisObj, field => f.name},
-        )
-      ),
-      funInfo.tparams,
-      bodyFunInfo.funType.returnType,
-      pos,
-    );
-
-    _ = emitter.emitInstr(GReturn{pos, value => call})
-  }
-}
-
-// The underlying runtime memoizer function looks like this:
-//
-//    native fun SKIP_memoize<T>(
-//      callerAwaitable: mutable MemoReturnAwaitable<T>,
-//      func: () ~> mutable Awaitable<T>
-//    ): void;
-//
-// You'll notice there are two Awaitables here: one supplied by the caller,
-// and one returned by the lambda. They are different, because they may
-// end up in different "address spaces". Special runtime machinery hooks them
-// together as needed, so when the inner Awaitable gets fulfilled the
-// other one gets updated and "woken up".
-//
-// func is not literally a lambda, it's actually a MemoizeThunk object,
-// but it's basically the same thing.
-//
-// There are two cases for memoized functions, corresponding to whether
-// they are also async:
-//
-// 1)
-//
-//   memoized async fun foo(arg1: A, arg2: B): ^X { body }
-//
-// becomes:
-//
-//   fun foo(arg1: A, arg2: B): ^X {
-//     ret = mutable MemoReturnAwaitable<X>();
-//     SKIP_memoize(ret, () ~> async { body });
-//     ret
-//   }
-//
-//
-// 2)
-//
-//   memoized fun foo(arg1: A, arg2: B): X { body }
-//
-// becomes the same thing, but ending with an awaitSynchronously:
-//
-//   fun foo(arg1: A, arg2: B): X {
-//     ret = mutable MemoReturnAwaitable<X>();
-//     SKIP_memoize(ret, () ~> async { body });
-//     awaitSynchronously(ret)
-//   }
-//
-// There are two ways in which this transformation isn't quite as simple
-// as it appears.
-//
-// 1) If 'body' modifies any of the parameters, we would normally
-//    allocate them in LocalVariable cells because they are captured by a
-//    lambda. But we don't want that in this case, because they are ONLY
-//    accessed by the lambda, and we can't tolerate interning mutable
-//    LocalVariables holding locals. So instead, the lambda (really, a
-//    MemoizeThunk) captures them by value, loads them into locals on
-//    and can update those all it wants.
-//
-// 2) If any of the parameters are optional, we want to evaluate
-//    the default value inside the lambda, rather than in the outer function
-//    (foo in this example). We need to do this for correctness, because for
-//    an async function the default value could legally do an "await", which
-//    we can only do inside the transformed lambda. Additionally, the default
-//    value may require a great deal of work to compute, and we wanta to hide
-//    that inside the memoized code.
-//
-//    The downside is that explicitly passing a value equal to the
-//    default will yield a different memoization key.  We could reduce
-//    that risk by evaluating some fast, side-effect-free defaults in
-//    the outer function, e.g. literals like "false", but we don't yet.
-//
-class MemoizeLazyGFun{
-  bodyProvider: BodyProvidingLazyGFun,
-} extends ConcreteLazyGFun {
-  fun getParams(
-    context: mutable SKStore.Context,
-    converter: Converter,
-  ): Array<ParameterInfo> {
-    this.bodyProvider.getParams(context, converter)
-  }
-
-  protected fun emitBody(
-    context: mutable SKStore.Context,
-    emitter: mutable OuterIstEmitter,
-  ): void {
-    funInfo = this.funInfo;
-    tparams = funInfo.tparams;
-    converter = emitter.converter;
-    pos = funInfo.pos;
-
-    // Capture all the original used parameters, including any "supplied" flags.
-    // We capture even unused optional parameters, both to avoid messing
-    // up the numbering we use to assign them default values, and because
-    // those initial values could throw, so we always need to evaluate them.
-    //
-    // We could do a little better here, but it's not clear how important it is:
-    //
-    // 1) Supply any "trivial" default value, such as "false", in the caller,
-    //    so that implicitly or explicitly passing that default both produce
-    //    the same memoization key.
-    //
-    // 2) For an unused optional argument with a maybe-throwing default value,
-    //    pass in a flag saying whether the default needs to be evaluated,
-    //    but don't pass in a value.
-    capturedVec = mutable Vector[];
-    this.getParams(context, converter).eachWithIndex((i, p) -> {
-      updated = p.info.updated || p.value.isSome();
-
-      if (updated || p.info.read) {
-        capturedVec.push(
-          (
-            emitter.params[i],
-            p with {index => if (p.index >= 0) i else p.index},
-            GField{
-              name => (if (updated) "captured_memoref:" else "captured:") +
-                p.name,
-              typ => emitter.params[i].getType(),
-              isAssignable => false,
-              pos => p.pos,
-              index => i,
-            },
-          ),
-        )
-      }
-    });
-    captured = capturedVec.toArray();
-
-    fields = captured.map(x -> x.i2);
-
-    underlyingType = if (funInfo.isAsync) {
-      extractAwaitableType(funInfo.funType.returnType, pos)
-    } else {
-      funInfo.funType.returnType
-    };
-
-    thunkClassname = GClassName(funInfo.gfunction.id + "::MemoKey");
-
-    bodyProvider = this.bodyProvider;
-    useOptionalMask = this.useOptionalMask;
-
-    callMethod = GMethodDef{
-      function => Some((context, receiver) ~> {
-        callMethodFunInfo = GFunInfo{
-          gfunction => GFunctionName(thunkClassname.id + "::call"),
-          pos,
-          tparams,
-          funType => GFunType{
-            isMutable => false,
-            isTracked => funInfo.funType.isTracked,
-            params => Array[GTapply(receiver, DeepFrozen(), tparams)],
-            returnType => GTapply(
-              FrontEndLazyGClass("Awaitable"),
-              Mutable(),
-              Array[underlyingType],
-            ),
-          },
-          className => Some(thunkClassname),
-          // The C++ runtime calls this method using the vtable,
-          // so we need to ensure it's not devirtualized, because if we see
-          // no virtual calls to this method we won't put it in the vtable.
-          annotations => SSet["@cpp_virtual"],
-        };
-
-        MemoizeThunkLazyGFun{
-          funInfo => callMethodFunInfo,
-          params => Array[
-            ParameterInfo{
-              name => "this",
-              value => None(),
-              info => SkipOuterIstUtils.const_binding_info,
-              index => 0,
-              pos,
-            },
-          ],
-          capturedParams => captured.map(x -> x.i1),
-          body => bodyProvider.getBody(context, converter),
-          useOptionalMask,
-        }
-      }),
-      tparams => Array[],
-      pos,
-    };
-
-    thunkClass = converter.finishGClass(
-      context,
-      GClass{
-        name => thunkClassname,
-        tparams,
-        variances => Array::fill(tparams.size(), I.Vnone()),
-        isMutable => false,
-        isMemoizeThunk => true, // TODO: Delete?
-        fieldsFinal => true,
-        fields,
-        kind => KClass(),
-        extends_ => Array[
-          GTapply(
-            FrontEndLazyGClass("Awaitable.MemoizeThunkBase"),
-            DeepFrozen(),
-          ),
-        ],
-        methods => UnorderedMap["call" => callMethod],
-        pos,
-      },
-      false,
-    );
-
-    thunkType = GTapply(LiteralLazyGClass(thunkClass), DeepFrozen(), tparams);
-
-    // Allocate the thunk
-    thunk = emitter.emitInstr(
-      GObject{
-        typ => thunkType,
-        pos,
-        prettyName => "memo_thunk",
-        args => captured.map(x -> x.i0),
-      },
-    );
-
-    // Allocate an MemoReturnAwaitable<T> to hold the answer. All fields
-    // start out as zeroed bits.
-    memoReturnType = GTapply(
-      FrontEndLazyGClass("Awaitable.MemoReturnAwaitable"),
-      Mutable(),
-      Array[underlyingType],
-    );
-    memoReturnGClass = converter.getGClass(
-      context,
-      memoReturnType.generic,
-      pos,
-    );
-    tparamEnv = makeGTypeMap(
-      memoReturnGClass.tparams,
-      Array[underlyingType],
-      pos,
-    );
-    memoReturn = emitter.emitInstr(
-      GObject{
-        typ => memoReturnType,
-        pos,
-        prettyName => "memo_return",
-        args => memoReturnGClass.fields.map(field ->
-          emitter.constantZero(field.typ.applyTparams(tparamEnv))
-        ),
-      },
-    );
-
-    _ = emitter.emitCallFunction(
-      FrontEndLazyGFun{frontEndName => "Awaitable.memoizeCall"},
-      Array[memoReturn, thunk],
-      Array[],
-      gtVoid,
-      pos,
-    );
-
-    retVal = if (this.funInfo.isAsync) {
-      // We are no longer an async function per se (no await, coroutine etc.)
-      emitter.!funInfo = emitter.funInfo with {isAsync => false};
-      memoReturn
-    } else {
-      emitter.emitCallFunction(
-        FrontEndLazyGFun{frontEndName => "awaitSynchronously"},
-        Array[memoReturn],
-        Array[underlyingType],
-        underlyingType,
-        pos,
-      )
-    };
-
-    _ = emitter.emitReturn(retVal, pos)
-  }
-}
-
 // Extract the T from Awaitable<T>.
 private fun extractAwaitableType(gt: GType, pos: Pos): GType {
   gta = gt.asGTapply(pos);
@@ -1113,9 +797,7 @@ class DefLazyGFun{def: I.CallableDef} extends BodyProvidingLazyGFun {
     useOptionalMask: Bool,
   }: LazyGFun {
     d = DefLazyGFun{funInfo, def, params, useOptionalMask};
-    if (funInfo.isMemoized) {
-      MemoizeLazyGFun{funInfo, params, useOptionalMask, bodyProvider => d}
-    } else if (funInfo.isAsync) {
+    if (funInfo.isAsync) {
       AsyncCoroutineLazyGFun{
         funInfo,
         params,
@@ -1916,7 +1598,6 @@ class Converter private (
       visibility => (pos, I.VPublic()),
       annotations => SSet[],
       overridable_ => None(),
-      memoized_ => None(),
       async_ => None(),
       kind => SkipNamedAst.FKStatic(pos),
       native_ => None(),
@@ -2050,7 +1731,6 @@ class Converter private (
         from_ => constDef.from_.default(cd.name),
         implicit_param => staticThisBinding(constPos),
         overridable_ => None(),
-        memoized_ => None(),
         native_ => None(),
         params => Positional::create(),
         return_ => constDef.type,
@@ -2783,7 +2463,6 @@ class Converter private (
       pos,
       tparams,
       isNative,
-      isMemoized => in_.memoized_.isSome(),
       isAsync => in_.async_.isSome(),
       isGenerator => in_.yields.isSome(),
       annotations => in_.annotations,
@@ -2901,7 +2580,6 @@ class Converter private (
       gfunction => funID.gname(),
       pos,
       isNative,
-      isMemoized => in_.memoized_.isSome(),
       isGenerator => in_.yields.isSome(),
       className => Some(logicalClassName),
       isAsync => in_.async_.isSome(),

@@ -890,7 +890,6 @@ fun named_fun_def(
   next_id = sk_create_counter();
   acc = TUtils.empty_acc;
   native_ = fd.native_;
-  memoized_ = fd.memoized_;
   async_ = fd.async_;
   untracked_ = fd.untracked_;
   visibility = fd.visibility;
@@ -911,7 +910,6 @@ fun named_fun_def(
     acc,
     async_,
     untracked_,
-    memoized_,
     None(),
     params2,
     return_,
@@ -921,7 +919,6 @@ fun named_fun_def(
   res = SkipTypedAstRename.fun_def(
     TAst.Fun_def{
       native_,
-      memoized_,
       async_,
       untracked_,
       visibility,
@@ -936,45 +933,6 @@ fun named_fun_def(
   );
   reportLocalsErrors(fd.localsErrors);
   res
-}
-
-// Verify that 'ty' is a legal return type for an memoized function.
-//
-// We allow only frozen return types, or ^t (outer most only) if t is frozen
-private fun assert_legal_memo_return_type(
-  env: TUtils.Env,
-  acc: TUtils.Acc,
-  sk_async: ?FileRange,
-  case_fr: FileRange,
-  error_fr: FileRange,
-  ty: N.Type_,
-): void {
-  scrubbed = Types.unfold_type(acc.subst, ty) match {
-  | (afr, N.Tawaitable _) if (sk_async is None()) ->
-    SkipError.errorl(
-      List[
-        (error_fr, "Invalid return type to a memoized function"),
-        (
-          afr,
-          "To memoize this awaitable value, the function must be declared as 'async'",
-        ),
-        (case_fr, "Try declaring this function as 'async' here"),
-      ],
-    )
-
-  | (_, N.Tawaitable(_, inner)) -> inner
-  | _ -> ty
-  };
-  assert_frozen_type(
-    env,
-    acc,
-    case_fr,
-    "memoized",
-    error_fr,
-    "Invalid return type. The return type to a '",
-    scrubbed,
-    false,
-  )
 }
 
 // Record the return type and, if applicable, yield type, in env.
@@ -1030,7 +988,6 @@ fun method_body(
   acc: TUtils.Acc,
   sk_async: ?FileRange,
   sk_untracked: ?FileRange,
-  sk_memoized: ?FileRange,
   sk_deferred: ?FileRange,
   params: Parameters<TAst.Parameter>,
   return_ty: N.Type_,
@@ -1039,7 +996,7 @@ fun method_body(
 ): TAst.Expr_body {
   !env = setReturnType(context, next_id, env, acc, return_ty, yields);
 
-  /* Check for invalid async/memoized functions with mutable types */
+  /* Check for invalid async functions with mutable types */
   is_untracked = sk_untracked is Some _;
   is_deferred = sk_deferred is Some _;
   sk_async match {
@@ -1057,37 +1014,6 @@ fun method_body(
       )
     )
 
-  | _ -> void
-  };
-  (sk_memoized, sk_untracked) match {
-  | (Some(mfr), Some(ufr)) ->
-    SkipError.errorl(
-      List[
-        (ufr, "A function cannot be both 'memoized' and 'untracked'"),
-        (mfr, "Declared 'memoized' here"),
-      ],
-    )
-  | (Some(pos), None()) if (!is_deferred) ->
-    params.each(p -> {
-      assert_frozen_type(
-        env,
-        acc,
-        pos,
-        "memoized",
-        p.name.i0,
-        "Invalid parameter. All parameters to a '",
-        p.type,
-        false,
-      )
-    });
-    assert_legal_memo_return_type(
-      env,
-      acc,
-      sk_async,
-      pos,
-      return_ty.i0,
-      return_ty,
-    )
   | _ -> void
   };
   /* Handle the method body */
@@ -1258,7 +1184,6 @@ fun method_def_(
   visibility = met.visibility;
   annotations = met.annotations;
   overridable_ = met.overridable_;
-  memoized_ = met.memoized_;
   async_ = met.async_;
   untracked_ = met.untracked_;
   kind = met.kind;
@@ -1310,7 +1235,6 @@ fun method_def_(
     acc,
     async_,
     untracked_,
-    memoized_,
     deferred_,
     params2,
     return_,
@@ -1322,7 +1246,7 @@ fun method_def_(
   this_type match {
   | None() -> void
   | Some _ if (untracked_.isSome()) -> void
-  | Some(this_ty) -> check_async_memo_mut(acc, async_, memoized_, this_ty)
+  | Some(this_ty) -> check_async_memo_mut(acc, async_, this_ty)
   };
   implicit_param = {
     this_type match {
@@ -1349,7 +1273,6 @@ fun method_def_(
     visibility,
     annotations,
     overridable_,
-    memoized_,
     async_,
     native_,
     untracked_,
@@ -1380,15 +1303,11 @@ fun make_return_type(env: TUtils.Env, ty: TAst.Type_): N.Type_ {
 fun check_async_memo_mut(
   acc: TUtils.Acc,
   async_: ?FileRange,
-  memoized_: ?FileRange,
   this_ty: N.Type_,
 ): void {
-  if (async_.isNone() && memoized_.isNone()) return void;
-
-  (case_pos, case_type) = (async_, memoized_) match {
-  | (Some(pos), _) -> (pos, "async")
-  | (_, Some(pos)) -> (pos, "memoized")
-  | _ -> invariant_violation("ICE imposible match check_async_memo_mut")
+  case_pos = async_ match {
+  | None() -> return void
+  | Some(pos) -> pos
   };
 
   TUtils.is_mutable(acc, this_ty, async_.isSome()) match {
@@ -1398,8 +1317,7 @@ fun check_async_memo_mut(
       List[
         (
           case_pos,
-          case_type +
-            " methods cannot take mutable inputs. This method much be marked 'frozen' to make 'this' frozen",
+          "async methods cannot take mutable inputs. This method much be marked 'frozen' to make 'this' frozen",
         ),
         (fr, "this was not 'frozen' because of the type at this position"),
       ],
