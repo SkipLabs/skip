@@ -1608,7 +1608,9 @@ class EagerDir{
       })
     };
 
-    it = dirty.iterator();
+    // Do not remove .collect(Array).iterator();
+    // Look at issue #106
+    it = dirty.iterator().collect(Array).iterator();
     !childRef = withRegionFold(
       Some(context),
       it,
