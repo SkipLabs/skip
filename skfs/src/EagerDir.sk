@@ -530,9 +530,9 @@ class FixedDataMap{data: FixedData<Array<File>>, tombs: FixedDir<Source>} {
     vec: mutable Vector<FixedRow<Array<File>>> = mutable Vector[],
     tombs: mutable Vector<FixedRow<Source>> = mutable Vector[],
   ): this {
-    data = FixedDirImpl::isCompressable(vec) match {
+    data = FixedDirImpl::getDirInfo(vec) match {
     | None() -> FixedDir::create(vec)
-    | state @ Some(_) -> CompressedFixedDir::create(state, vec)
+    | Some(dirInfo) -> CompactFixedDir::create(vec, dirInfo)
     };
     static{data, tombs => FixedDir::create(tombs)}
   }
