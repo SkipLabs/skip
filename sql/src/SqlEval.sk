@@ -590,7 +590,7 @@ class Evaluator{options: Options, user: ?UserFile} {
           selectDir.dirName,
           sinkDirName,
           (context, _writer, key, valueIter) ~> {
-            src = SKStore.Path::create(selectDir.dirName, key);
+            src = SKStore.Path(selectDir.dirName, key);
             entries = Vector[(key, (src, src, valueIter.collect(Array)))];
             inputDir = context.unsafeGetEagerDir(dir.dirName);
             inputDir.writeArraySourceMany(context, entries.iterator());
@@ -1189,7 +1189,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         deleteDir,
         sinkDirName,
         (context, _writer, key, valueIter) ~> {
-          src = SKStore.Path::create(deleteDir, key);
+          src = SKStore.Path(deleteDir, key);
           entries = Vector[(key, (src, src, valueIter.collect(Array)))];
           inputDir = context.unsafeGetEagerDir(dir.dirName);
           inputDir.writeArraySourceMany(context, entries.iterator());
@@ -1285,9 +1285,7 @@ class Evaluator{options: Options, user: ?UserFile} {
           SKStore.IID(SKStore.genSym(0)),
         );
         for ((_, source, _) in dir.getDataIterWithoutTombs(context, key)) {
-          entries.push(
-            (key, (source.path(), writerPath, Array<SKStore.File>[])),
-          );
+          entries.push((key, (source, writerPath, Array<SKStore.File>[])));
         };
         dir.writeArraySourceMany(context, entries.iterator());
         if (select.sets.isEmpty()) return void;
@@ -1439,7 +1437,7 @@ class Evaluator{options: Options, user: ?UserFile} {
                     key,
                   )) {
                     entries.push(
-                      (key, (source.path(), writerPath, Array<SKStore.File>[])),
+                      (key, (source, writerPath, Array<SKStore.File>[])),
                     );
                   };
                 };
@@ -1952,7 +1950,7 @@ fun importNext(
         for (key in changedKeys) {
           for (srcValue in dir.unsafeGetAllDataIterAfter(tick, key)) {
             (_, source, writer, values) = srcValue;
-            entries.push((key, (source.path(), writer.path(), values)));
+            entries.push((key, (source, writer, values)));
           }
         };
         updates![targetDirName] = (isReset, changedKeys, dir, version, entries)

@@ -20,19 +20,9 @@
 /*****************************************************************************/
 module SKStore;
 
-value class Source(dirName: DirName, baseName: Key) uses Orderable {
-  static fun create(value: Path): this {
-    static(value.dirName, value.baseName)
-  }
-
-  fun path(): Path {
-    Path(this.dirName, this.baseName)
-  }
-}
-
-value class FixedRow<T>(key: Key, value: (Source, T), tag: TickRange) {
-  fun changeSource(source: Source): this {
-    !this.value.i0 = source;
+value class FixedRow<T>(key: Key, value: T, source: Path, tag: TickRange) {
+  fun changeSource(source: Path): this {
+    !this.source = source;
     this
   }
 }
@@ -41,11 +31,11 @@ base class FixedData<T> {
   fun size(): Int;
   fun get(idx: Int): FixedRow<T>;
   fun getPos(key: Key): Int;
-  fun getArray(key: Key): Array<(Source, T)>;
-  fun getIter(key: Key): mutable Iterator<(Tick, Source, T)>;
-  fun getIterAfter(tick: Tick, key: Key): mutable Iterator<(Tick, Source, T)>;
-  fun getArraySourceKey(source: Source, key: Key): Array<T>;
-  fun getIterSourceKey(source: Source, key: Key): mutable Iterator<T>;
+  fun getArray(key: Key): Array<T>;
+  fun getIter(key: Key): mutable Iterator<(Tick, Path, T)>;
+  fun getIterAfter(tick: Tick, key: Key): mutable Iterator<(Tick, Path, T)>;
+  fun getArraySourceKey(source: Path, key: Key): Array<T>;
+  fun getIterSourceKey(source: Path, key: Key): mutable Iterator<T>;
   fun getChangesAfter(tick: Tick): SortedSet<Key>;
   fun getTick(): ?Tick;
   fun iterator(): mutable Iterator<FixedRow<T>>;
@@ -110,7 +100,7 @@ class FixedDir<T: frozen> extends FixedDirImpl<T, FixedRow<T>> {
       keyComparison match {
       | LT() -> continue
       | GT() -> break false
-      | EQ() -> data[i - 1].value.i0.compare(data[i].value.i0)
+      | EQ() -> data[i - 1].source.compare(data[i].source)
       } match {
       | LT() -> continue
       | EQ() -> continue
@@ -118,7 +108,7 @@ class FixedDir<T: frozen> extends FixedDirImpl<T, FixedRow<T>> {
       };
     };
     if (!sorted) {
-      data.sortBy(row ~> (row.key, row.value.i0));
+      data.sortBy(row ~> (row.key, row.source));
     };
     _ = static::computeTags(data, 0, data.size() - 1);
     static{data => data.toArray()}
@@ -209,7 +199,7 @@ class CompactFixedDir{
       keyComparison match {
       | LT() -> continue
       | GT() -> break false
-      | EQ() -> data[i - 1].value.i0.compare(data[i].value.i0)
+      | EQ() -> data[i - 1].source.compare(data[i].source)
       } match {
       | LT() -> continue
       | EQ() -> continue
@@ -217,7 +207,7 @@ class CompactFixedDir{
       };
     };
     if (!sorted) {
-      data.sortBy(row ~> (row.key, row.value.i0));
+      data.sortBy(row ~> (row.key, row.source));
     };
     _ = static::computeTags(data, 0, data.size() - 1);
     invariant(dirInfo.keyIsSameAsValue);
@@ -230,9 +220,9 @@ class CompactFixedDir{
   protected static fun stripDirInfo(
     row: FixedRow<Array<File>>,
   ): CompactRow<?SKDB.CValue> {
-    invariant(row.value.i1.size() == 1);
-    sourceKey = if (row.value.i0.baseName != row.key) {
-      Some(row.value.i0.baseName)
+    invariant(row.value.size() == 1);
+    sourceKey = if (row.source.baseName != row.key) {
+      Some(row.source.baseName)
     } else {
       None()
     };
@@ -241,7 +231,7 @@ class CompactFixedDir{
     // TODO check that values in key == rowValues
     // TODO check kinds are canonical
     // TODO check repeat is 1
-    row.value.i1[0] match {
+    row.value[0] match {
     | SKDB.RowValues(values, repeat) ->
       CompactRow(values, repeat, row.tag, sourceKey)
     | _ -> invariant_violation("Unexpected type")
@@ -258,7 +248,8 @@ class CompactFixedDir{
     };
     FixedRow(
       rowKey,
-      (Source(this.dirInfo.sourceDir, sourceKey), Array[(rowValues : File)]),
+      Array[(rowValues : File)],
+      Path(this.dirInfo.sourceDir, sourceKey),
       compactRow.tag,
     )
   }
@@ -284,20 +275,17 @@ base class FixedDirImpl<T: frozen, RowRepresentation: frozen> protected {
 
     keyIsSameAsValue = true;
     for (elt in data) {
-      if (elt.value.i1.size() != 1) return None();
-      (elt.key, elt.value.i1[0]) match {
+      if (elt.value.size() != 1) return None();
+      (elt.key, elt.value[0]) match {
       | (SKDB.RowKey(row1, k), row2 @ SKDB.RowValues _) ->
         kinds match {
         | None() -> !kinds = Some(k)
         | Some(k2) ->
-          invariant(
-            k == k2,
-            "Mismatched kinds in table " + elt.value.i0.dirName,
-          )
+          invariant(k == k2, "Mismatched kinds in table " + elt.source.dirName)
         };
         !sourceDir = sourceDir match {
-        | None() -> Some(elt.source.path.dirName)
-        | sd @ Some(dir) if (dir == elt.source.path.dirName) -> sd
+        | None() -> Some(elt.source.dirName)
+        | sd @ Some(dir) if (dir == elt.source.dirName) -> sd
         | _ -> return None()
         };
         if (row1 != row2) return None()
@@ -330,32 +318,32 @@ base class FixedDirImpl<T: frozen, RowRepresentation: frozen> protected {
     findAll(i ~> this.get(i).key, key, 0, this.size() - 1)
   }
 
-  fun getAllSourceKey(source: Source, key: Key): mutable Iterator<Int> {
+  fun getAllSourceKey(source: Path, key: Key): mutable Iterator<Int> {
     delta = i ~> {
       entry = this.get(i);
       c = key.compare(entry.key);
       if (c != EQ()) return c;
-      source.compare(entry.value.i0)
+      source.compare(entry.source)
     };
     findAllBy(delta, 0, this.size() - 1)
   }
 
-  fun getArray(key: Key): Array<(Source, T)> {
+  fun getArray(key: Key): Array<T> {
     this.getAll(key).map(i ~> this.get(i).value).collect(Array)
   }
 
-  fun getIter(key: Key): mutable Iterator<(Tick, Source, T)> {
+  fun getIter(key: Key): mutable Iterator<(Tick, Path, T)> {
     this.getAll(key).map(i -> {
       elt = this.get(i);
-      (elt.tag.current, elt.value.i0, elt.value.i1)
+      (elt.tag.current, elt.source, elt.value)
     })
   }
 
-  fun getIterSourceKey(source: Source, key: Key): mutable Iterator<T> {
-    this.getAllSourceKey(source, key).map(i -> this.get(i).value.i1)
+  fun getIterSourceKey(source: Path, key: Key): mutable Iterator<T> {
+    this.getAllSourceKey(source, key).map(i -> this.get(i).value)
   }
 
-  fun getArraySourceKey(source: Source, key: Key): Array<T> {
+  fun getArraySourceKey(source: Path, key: Key): Array<T> {
     this.getIterSourceKey(source, key).collect(Array)
   }
 
@@ -412,7 +400,7 @@ base class FixedDirImpl<T: frozen, RowRepresentation: frozen> protected {
     key: Key,
     i: Int,
     j: Int,
-    acc: mutable Vector<(Tick, Source, T)>,
+    acc: mutable Vector<(Tick, Path, T)>,
   ): void {
     if (i <= j) {
       pivot = i + (j - i) / 2;
@@ -424,7 +412,7 @@ base class FixedDirImpl<T: frozen, RowRepresentation: frozen> protected {
         };
         if (tick.current >= after) {
           if (elt.key.compare(key) is EQ()) {
-            acc.push((tick.current, elt.value.i0, elt.value.i1));
+            acc.push((tick.current, elt.source, elt.value));
           }
         };
         if (key >= elt.key) {
@@ -434,7 +422,7 @@ base class FixedDirImpl<T: frozen, RowRepresentation: frozen> protected {
     }
   }
 
-  fun getIterAfter(limit: Tick, key: Key): mutable Iterator<(Tick, Source, T)> {
+  fun getIterAfter(limit: Tick, key: Key): mutable Iterator<(Tick, Path, T)> {
     acc = mutable Vector[];
     this.getKeyChangesAfter(limit, key, 0, this.data.size() - 1, acc);
     acc.iterator()

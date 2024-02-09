@@ -261,7 +261,7 @@ fun dirDescrCopy(
         dirName,
       )).unsafeGetAllDataIterAfter(limit, key)) {
         (_, source, writer, values) = srcValue;
-        entries.push((key, (source.path(), writer.path(), values)));
+        entries.push((key, (source, writer, values)));
       };
       inputDir = context.unsafeGetEagerDir(nextName);
       inputDir.writeArraySourceMany(context, entries.iterator());
@@ -417,9 +417,7 @@ fun getSubsDirs(
           (context, isReset) ~> {
             if (isReset) return alwaysTrue;
             tdir = context.unsafeGetEagerDir(dirDescr.dirName);
-            ignoredSrc = SKStore.Source::create(
-              SKStore.Path(dirDescr.dirName, SKStore.IID(inputSrc)),
-            );
+            ignoredSrc = SKStore.Path(dirDescr.dirName, SKStore.IID(inputSrc));
             (file: SKStore.Key) -> {
               rows = tdir.getAllDataIter(context.mclone(), file).collect(Array);
               !updateIsFromIgnoredSource(ignoredSrc, rows)
@@ -461,13 +459,11 @@ fun getSubsDirs(
 }
 
 fun updateIsFromIgnoredSource(
-  ignoredSrc: SKStore.Source,
-  rows: Array<
-    (SKStore.Tick, SKStore.Source, SKStore.Source, Array<SKStore.File>),
-  >,
+  ignoredSrc: SKStore.Path,
+  rows: Array<(SKStore.Tick, SKStore.Path, SKStore.Path, Array<SKStore.File>)>,
 ): Bool {
   maxTick = SKStore.Tick(0);
-  singleNonTomb: ?(SKStore.Tick, SKStore.Source) = None();
+  singleNonTomb: ?(SKStore.Tick, SKStore.Path) = None();
 
   for ((tick, _origSrc, src, files) in rows) {
     !maxTick = max(maxTick, tick);
