@@ -177,10 +177,10 @@ module SKStore;
 
 /*****************************************************************************/
 value class CompactRow<T>(
-  sourceID: SKStore.Key,
   values: Array<T>,
   repeat: Int,
   tag: TickRange,
+  sourceKey: ?SKStore.Key,
 )
 
 class DirInfo{
@@ -232,28 +232,35 @@ class CompactFixedDir{
     row: FixedRow<Array<File>>,
   ): CompactRow<?SKDB.CValue> {
     invariant(row.value.i1.size() == 1);
+    sourceKey = if (row.value.i0.baseName != row.key) {
+      Some(row.value.i0.baseName)
+    } else {
+      None()
+    };
+
     // TODO check that source key == key
     // TODO check that values in key == rowValues
     // TODO check kinds are canonical
     // TODO check repeat is 1
-    //    invariant(row.key.getRowValues() == row.value.i0.baseName);
-    result = row.value.i1[0] match {
+    row.value.i1[0] match {
     | SKDB.RowValues(values, repeat) ->
-      CompactRow(row.value.i0.baseName, values, repeat, row.tag)
+      CompactRow(values, repeat, row.tag, sourceKey)
     | _ -> invariant_violation("Unexpected type")
     };
-
-    result
   }
   protected fun decode(
     compactRow: CompactRow<?SKDB.CValue>,
   ): FixedRow<Array<File>> {
     rowValues = SKDB.RowValues(compactRow.values, compactRow.repeat);
     rowKey = SKDB.RowKey(rowValues, this.dirInfo.kinds);
+    sourceKey = compactRow.sourceKey match {
+    | None() -> rowKey
+    | Some(otherKey) -> otherKey
+    };
     FixedRow(
       rowKey,
       (
-        Source(this.dirInfo.sourceDirs.min().fromSome(), compactRow.sourceID),
+        Source(this.dirInfo.sourceDirs.min().fromSome(), sourceKey),
         Array[(rowValues : File)],
       ),
       compactRow.tag,
