@@ -121,17 +121,11 @@ class FixedDir<T: frozen> extends FixedDirImpl<T, FixedRow<T>> {
       data.sortBy(row ~> (row.key, row.value.i0));
     };
     _ = static::computeTags(data, 0, data.size() - 1);
-    static{
-      state => None(),
-      data => data.map(x -> static::compress(None(), x)).toArray(),
-    }
+    static{data => data.toArray()}
   }
 
-  static fun compress(?CompressState, x: FixedRow<T>): FixedRow<T> {
-    x
-  }
-  static fun decompress(?CompressState, x: FixedRow<T>): FixedRow<T> {
-    x
+  protected fun decode(row: FixedRow<T>): FixedRow<T> {
+    row
   }
 }
 /*****************************************************************************/
@@ -182,76 +176,31 @@ module end;
 module SKStore;
 
 /*****************************************************************************/
-value class CompressedRow(
+value class CompactRow<T>(
   sourceID: SKStore.Key,
-  values: Array<?SKDB.CValue>,
+  values: Array<T>,
+  repeat: Int,
   tag: TickRange,
 )
 
-class CompressState{
+class DirInfo{
   sourceDirs: SortedSet<DirName>,
   keyIsSameAsValue: Bool,
   isAlwaysSize1: Bool,
   kinds: Array<(Int, SQLParser.IKind, SQLParser.Type)>,
 }
 
-class CompressedFixedDir extends FixedDirImpl<Array<File>, CompressedRow> {
-  static fun compress(
-    state: ?CompressState,
-    row: FixedRow<Array<File>>,
-  ): CompressedRow {
-    st = state match {
-    | None() -> invariant_violation("Expected a state")
-    | Some(x) -> x
-    };
-    invariant(st.sourceDirs.size() == 1);
-    invariant(row.value.i1.size() == 1);
-    // TODO check that source key == key
-    // TODO check that values in key == rowValues
-    // TODO check kinds are canonical
-    // TODO check repeat is 1
-    //    invariant(row.key.getRowValues() == row.value.i0.baseName);
-    result = CompressedRow(
-      row.value.i0.baseName,
-      row.value.i1[0] match {
-      | SKDB.RowValues(values, _kinds) -> values
-      | _ -> invariant_violation("Unexpected type")
-      },
-      row.tag,
-    );
-    //    debug(row);
-    //    debug(static::decompress(state, result));
-    invariant(inspect(static::decompress(state, result)) == inspect(row));
-    result
-  }
-  static fun decompress(
-    state: ?CompressState,
-    row: CompressedRow,
-  ): FixedRow<Array<File>> {
-    st = state match {
-    | None() -> invariant_violation("Expected a state")
-    | Some(x) -> x
-    };
-    rowValues = SKDB.RowValues(row.values, 1);
-    rowKey = SKDB.RowKey(rowValues, st.kinds);
-    FixedRow(
-      rowKey,
-      (
-        Source(st.sourceDirs.min().fromSome(), row.sourceID),
-        Array[(rowValues : File)],
-      ),
-      row.tag,
-    )
-  }
-
+// This is a more compact representation of a FixedDir, keeping some shared
+// info about the directory (dirInfo) and stripping redundant repeated data
+// out of the rows themselves.
+class CompactFixedDir{
+  dirInfo: DirInfo,
+} extends FixedDirImpl<Array<File>, CompactRow<?SKDB.CValue>> {
   static fun create(
-    stateOption: ?CompressState,
-    data: mutable Vector<FixedRow<Array<File>>> = mutable Vector[],
+    data: mutable Vector<FixedRow<Array<File>>>,
+    dirInfo: DirInfo,
   ): this {
-    state = stateOption match {
-    | None() -> invariant_violation("Expected a state")
-    | Some(x) -> x
-    };
+    invariant(dirInfo.sourceDirs.size() == 1);
     i = 0;
     sz = data.size();
     sorted = loop {
@@ -272,30 +221,60 @@ class CompressedFixedDir extends FixedDirImpl<Array<File>, CompressedRow> {
       data.sortBy(row ~> (row.key, row.value.i0));
     };
     _ = static::computeTags(data, 0, data.size() - 1);
-    invariant(state.keyIsSameAsValue);
-    static{
-      state => stateOption,
-      data => data.map(x -> static::compress(stateOption, x)).toArray(),
-    }
+    invariant(dirInfo.keyIsSameAsValue);
+    res: CompactFixedDir = static{
+      data => data.map(static::stripDirInfo).toArray(),
+      dirInfo => dirInfo,
+    };
+    res
+  }
+  protected static fun stripDirInfo(
+    row: FixedRow<Array<File>>,
+  ): CompactRow<?SKDB.CValue> {
+    invariant(row.value.i1.size() == 1);
+    // TODO check that source key == key
+    // TODO check that values in key == rowValues
+    // TODO check kinds are canonical
+    // TODO check repeat is 1
+    //    invariant(row.key.getRowValues() == row.value.i0.baseName);
+    result = row.value.i1[0] match {
+    | SKDB.RowValues(values, repeat) ->
+      CompactRow(row.value.i0.baseName, values, repeat, row.tag)
+    | _ -> invariant_violation("Unexpected type")
+    };
+
+    result
+  }
+  protected fun decode(
+    compactRow: CompactRow<?SKDB.CValue>,
+  ): FixedRow<Array<File>> {
+    rowValues = SKDB.RowValues(compactRow.values, compactRow.repeat);
+    rowKey = SKDB.RowKey(rowValues, this.dirInfo.kinds);
+    FixedRow(
+      rowKey,
+      (
+        Source(this.dirInfo.sourceDirs.min().fromSome(), compactRow.sourceID),
+        Array[(rowValues : File)],
+      ),
+      compactRow.tag,
+    )
   }
 }
 
-base class FixedDirImpl<T: frozen, Compressed: frozen> protected {
-  state: ?CompressState,
-  data: Array<Compressed> = Array[],
+//Defines the public interface of a FixedDir, allowing for some alternative
+// internal RowRepresentation of conceptually-FixedRow<T> rows.
+base class FixedDirImpl<T: frozen, RowRepresentation: frozen> protected {
+  data: Array<RowRepresentation> = Array[],
 } extends FixedData<T> {
-  static fun compress(?CompressState, FixedRow<T>): Compressed;
-  static fun decompress(?CompressState, Compressed): FixedRow<T>;
+  protected fun decode(repr: RowRepresentation): FixedRow<T>;
 
   fun iterator(): mutable Iterator<FixedRow<T>> {
     for (elt in this.data.iterator()) {
-      yield static::decompress(this.state, elt)
+      yield this.decode(elt)
     }
   }
 
-  static fun isCompressable(
-    data: mutable Vector<FixedRow<Array<File>>>,
-  ): ?CompressState {
+  static fun getDirInfo(data: mutable Vector<FixedRow<Array<File>>>): ?DirInfo {
     if (data.size() == 0) return None();
     sourceDirs = SortedSet[];
     kinds: ?Array<(Int, SQLParser.IKind, SQLParser.Type)> = None();
@@ -307,7 +286,11 @@ base class FixedDirImpl<T: frozen, Compressed: frozen> protected {
       | (SKDB.RowKey(row1, k), row2 @ SKDB.RowValues _) ->
         kinds match {
         | None() -> !kinds = Some(k)
-        | Some(k2) -> invariant(k == k2)
+        | Some(k2) ->
+          invariant(
+            k == k2,
+            "Mismatched kinds in table " + elt.value.i0.dirName,
+          )
         };
         !sourceDirs = sourceDirs.set(elt.value.i0.dirName);
         if (row1 != row2) return None()
@@ -315,7 +298,7 @@ base class FixedDirImpl<T: frozen, Compressed: frozen> protected {
       }
     };
     Some(
-      CompressState{
+      DirInfo{
         sourceDirs,
         kinds => kinds.fromSome(),
         keyIsSameAsValue,
@@ -329,7 +312,7 @@ base class FixedDirImpl<T: frozen, Compressed: frozen> protected {
   }
 
   fun get(idx: Int): FixedRow<T> {
-    static::decompress(this.state, this.data.unsafe_get(idx))
+    this.decode(this.data.unsafe_get(idx))
   }
 
   fun getPos(key: Key): Int {
@@ -397,7 +380,7 @@ base class FixedDirImpl<T: frozen, Compressed: frozen> protected {
       return void;
     };
     pivot = i + (j - i) / 2;
-    elt = static::decompress(this.state, this.data[pivot]);
+    elt = this.decode(this.data[pivot]);
     tick = elt.tag;
     if (tick.max < after) return void;
     if (tick.current >= after) {
@@ -426,7 +409,7 @@ base class FixedDirImpl<T: frozen, Compressed: frozen> protected {
   ): void {
     if (i <= j) {
       pivot = i + (j - i) / 2;
-      elt = static::decompress(this.state, this.data[pivot]);
+      elt = this.decode(this.data[pivot]);
       tick = elt.tag;
       if (tick.max >= after) {
         if (key <= elt.key) {
@@ -455,8 +438,8 @@ base class FixedDirImpl<T: frozen, Compressed: frozen> protected {
       None()
     } else {
       middle = (this.data.size() - 1) / 2;
-      tick = static::decompress(this.state, this.data[middle]).tag;
-      Some(tick.max)
+      tickRange = this.decode(this.data[middle]).tag;
+      Some(tickRange.max)
     }
   }
 }
