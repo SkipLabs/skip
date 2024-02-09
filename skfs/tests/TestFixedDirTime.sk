@@ -15,8 +15,7 @@ fun testFixedDirTime(): void {
     for (i in Range(0, valueSize)) {
       baseName = SKStore.IID(i);
       path = SKStore.Path::create(dirName, baseName);
-      source = SKStore.Source::create(path);
-      !map[source] = Array[
+      !map[path] = Array[
         (SKStore.IntFile(rand.random(0, valueSize)) : SKStore.File),
       ];
     };
@@ -30,7 +29,7 @@ fun testFixedDirTime(): void {
   dmap.itemsWithTick().each(item -> {
     (key, valueMap, tick) = item;
     for (source => value in valueMap) {
-      acc.push(SKStore.FixedRow(key, (source, value), tick))
+      acc.push(SKStore.FixedRow(key, value, source, tick))
     }
   });
   farr = SKStore.FixedDir::create(acc);
