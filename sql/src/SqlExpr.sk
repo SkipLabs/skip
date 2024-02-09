@@ -264,12 +264,137 @@ class ExprEvaluator(
 
     | SKDB.CSFCast(e) -> this.evalCFExpr(context, e).map(f -> f.toString())
     | SKDB.CSICast(e) -> this.evalCIExpr(context, e).map(f -> f.toString())
+    | SKDB.CJSCast(e) -> this.evalCJExpr(context, e).map(x -> x.toString())
+    | SKDB.CTSCast(e) -> this.evalCTExpr(context, e).map(x -> x.toString())
 
     | CUp(x) ->
       this.up match {
       | None() -> invariant_violation("Could not find up environment")
       | Some(evaluator) -> evaluator.evalCSExpr(context, x)
       }
+
+    | CSJSchemaPp(e) ->
+      this.evalCTExpr(context, e).map(x ->
+        x match {
+        | CType(ty) -> SKJSON.prettyPrintType(false, ty)
+        }
+      )
+
+    | CSJSchemaCheck(e1, e2) ->
+      this.evalCTExpr(context, e1).flatMap(schema -> {
+        this.evalCTExpr(context, e2).map(value -> {
+          convert = x ->
+            x match {
+            | CType(ty) -> ty
+            };
+          convert(schema).isSuperType(convert(value));
+          "ok"
+        })
+      })
+    }
+  }
+
+  private fun evalCJExpr(
+    context: mutable SKStore.Context,
+    expr: SKDB.CExpr<CJSON>,
+  ): AValue<CJSON> {
+    expr match {
+    | CJGetFrom(tableNbr, n) ->
+      if (tableNbr >= this.entries.size()) {
+        AUndef()
+      } else {
+        this.entries[tableNbr].getValue(n) match {
+        | None() -> ANull()
+        | Some(x @ CJSON(_)) -> ADef(x)
+        | Some(CString(x)) -> ADef(CJSON(decodeJSON(context, x)))
+        | _ -> invariant_violation("Expected a JSON")
+        }
+      }
+    | CJJSON(e) ->
+      this.evalCSExpr(context, e).map(s -> CJSON(decodeJSON(context, s)))
+    | CJQuery(select) ->
+      this.evalQuery(context, select) match {
+      | AUndef() -> AUndef()
+      | ANull() -> ANull()
+      | ADef(x @ CJSON(_)) -> ADef(x)
+      | _ -> invariant_violation("Types have already been checked")
+      }
+
+    | CUp(x) ->
+      this.up match {
+      | None() -> invariant_violation("Could not find up environment")
+      | Some(evaluator) -> evaluator.evalCJExpr(context, x)
+      }
+
+    | CSub _
+    | CMul _
+    | CNull()
+    | CNullIf _
+    | CAdd _
+    | CCoalesce _
+    | CDiv _
+    | CIf _
+    | CMod _ ->
+      invariant_violation("Invalid operation on an opaque value")
+    }
+  }
+
+  private fun evalCTExpr(
+    context: mutable SKStore.Context,
+    expr: SKDB.CExpr<CType>,
+  ): AValue<CType> {
+    expr match {
+    | CTGetFrom(tableNbr, n) ->
+      if (tableNbr >= this.entries.size()) {
+        AUndef()
+      } else {
+        this.entries[tableNbr].getValue(n) match {
+        | None() -> ANull()
+        | Some(x @ CType(_)) -> ADef(x)
+        | Some(CJSON(x)) -> ADef(CType(x.toType()))
+        | Some(CString(x)) -> ADef(CType(decodeJSON(context, x).toType()))
+        | _ -> invariant_violation("Expected a type")
+        }
+      }
+    | CTJSchema(e) ->
+      this.evalCSExpr(context, e).map(s ->
+        CType::create(SKJSON.TypeParser::mcreate(s).type())
+      )
+    | CTJSONType(e) ->
+      this.evalCJExpr(context, e).map(j ->
+        j match {
+        | CJSON(x) -> CType::create(x.toType())
+        }
+      )
+    | CTParseSchema(e) ->
+      this.evalCSExpr(context, e).map(s ->
+        CType::create(SKJSON.TypeParser::mcreate(s).type())
+      )
+    | CTQuery(select) ->
+      this.evalQuery(context, select) match {
+      | AUndef() -> AUndef()
+      | ANull() -> ANull()
+      | ADef(CType(x)) -> ADef(CType::create(x))
+      | ADef(CJSON(x)) -> ADef(CType::create(x.toType()))
+      | _ -> invariant_violation("Types have already been checked")
+      }
+
+    | CUp(x) ->
+      this.up match {
+      | None() -> invariant_violation("Could not find up environment")
+      | Some(evaluator) -> evaluator.evalCTExpr(context, x)
+      }
+
+    | CSub _
+    | CMul _
+    | CNull()
+    | CNullIf _
+    | CAdd _
+    | CCoalesce _
+    | CDiv _
+    | CIf _
+    | CMod _ ->
+      invariant_violation("Invalid operation on an opaque value")
     }
   }
 
@@ -543,6 +668,20 @@ class ExprEvaluator(
 
     | CSIsNull(e) ->
       this.evalCSExpr(context, e) match {
+      | AUndef() -> AUndef()
+      | ANull() -> ADef(1)
+      | ADef _ -> ADef(0)
+      }
+
+    | CJIsNull(e) ->
+      this.evalCJExpr(context, e) match {
+      | AUndef() -> AUndef()
+      | ANull() -> ADef(1)
+      | ADef _ -> ADef(0)
+      }
+
+    | CTIsNull(e) ->
+      this.evalCTExpr(context, e) match {
       | AUndef() -> AUndef()
       | ANull() -> ADef(1)
       | ADef _ -> ADef(0)
@@ -855,6 +994,8 @@ class ExprEvaluator(
     | CIExpr(ie) -> this.evalCIExpr(context, ie).map(x -> CInt(x))
     | CFExpr(fe) -> this.evalCFExpr(context, fe).map(x -> CFloat(x))
     | CSExpr(se) -> this.evalCSExpr(context, se).map(x -> CString(x))
+    | CJExpr(se) -> this.evalCJExpr(context, se)
+    | CTExpr(se) -> this.evalCTExpr(context, se)
     };
     result
   }

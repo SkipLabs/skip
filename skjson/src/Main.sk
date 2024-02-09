@@ -1,0 +1,164 @@
+module SKJSON;
+
+fun main(): void {
+  saved = SKStore.newObstack();
+  cmd = Cli.Command("skjson")
+    .about("Skip JSON tooling")
+    .arg(
+      Cli.BoolArg("version")
+        .short("V")
+        .long("version")
+        .about("Print version info and exit"),
+    )
+    .arg(
+      Cli.BoolArg("verbose")
+        .short("v")
+        .long("verbose")
+        .about("Use verbose output")
+        .global(),
+    );
+  suppliers = Array[infer, gen, check, Skargo.help];
+  commands = mutable Map[];
+  for (supplier in suppliers) {
+    (subcommand, cmdFn) = supplier();
+    !cmd = cmd.subcommand(subcommand);
+    commands.set(subcommand.name, cmdFn);
+  };
+  !cmd = cmd.help();
+  args = cmd.parseArgs();
+  if (args.getBool("version")) {
+    print_string(
+      Environ.args().next().default("skjson") + " " + SkargoVersion.kVersion,
+    );
+    SKStore.destroyObstack(saved);
+    skipExit(0);
+  } else {
+    args.maybeGetSubcommand() match {
+    | Some(subcmd) ->
+      commands.maybeGet(subcmd) match {
+      | Some(handler) ->
+        skipExit(
+          try {
+            handler(args);
+            SKStore.destroyObstack(saved);
+            0
+          } catch {
+          | exn ->
+            e = SKStore.destroyObstackWithValue(saved, List[exn]).getHead();
+            throw e
+          },
+        )
+      | _ -> invariant_violation(`Unknown subcommand ${subcmd}`)
+      }
+    | None() ->
+      print_string(Cli.usage(args.cmd, true));
+      SKStore.destroyObstack(saved);
+      skipExit(0)
+    }
+  };
+}
+
+/*****************************************************************************/
+/* Command infering a schema (from a set of JSON objects). */
+/*****************************************************************************/
+
+fun infer(): (Cli.Command, Cli.ParseResults ~> void) {
+  (
+    Cli.Command("infer-schema")
+      .about("Infers the schema of a JSON entries passed on STDIN")
+      .arg(Cli.BoolArg("compact").about("Use compact representation")),
+    execInfer,
+  )
+}
+
+fun readLineOpt(): ?String {
+  try {
+    read_line()
+  } catch {
+  | EndOfFile _ -> None()
+  | exn -> throw exn
+  }
+}
+
+class SchemaFile(value: Type) extends SKStore.File
+const schemaGlobalName: String = "SCHEMA_GLOBAL";
+
+fun execInfer(args: Cli.ParseResults): void {
+  compact = args.getBool("compact");
+  SKStore.runWithGc(SKStore.Context{}, context ~> {
+    schema = context.getGlobal(schemaGlobalName) match {
+    | None() -> Type::any
+    | Some(schemaFile) -> SchemaFile::type(schemaFile).value
+    };
+    readLineOpt() match {
+    | None() ->
+      str = prettyPrintType(compact, schema);
+      print_string(str);
+      SKStore.CStop(None())
+    | Some(str) ->
+      iter = str.getIter();
+      (toRemove, !str) = if (iter.next() == Some('R')) {
+        (true, str.substring(iter))
+      } else {
+        (false, str)
+      };
+      ty = decode(str, x -> x).toType();
+      if (toRemove) !schema = schema.remove(ty) else !schema = schema.union(ty);
+      context.setGlobal(schemaGlobalName, SchemaFile(schema));
+      SKStore.CContinue(None())
+    }
+  });
+}
+
+/*****************************************************************************/
+/* Generates random JSON objects */
+/*****************************************************************************/
+fun gen(): (Cli.Command, Cli.ParseResults ~> void) {
+  (
+    Cli.Command("gen-json")
+      .about("generates a random JSON object")
+      .arg(Cli.IntArg("n").about("Number of objects to generate")),
+    execGen,
+  )
+}
+
+fun execGen(args: Cli.ParseResults): void {
+  for (i in Range(0, args.getInt("n"))) {
+    saved = SKStore.newObstack();
+    r = RandomJSON::mcreate(i);
+    print_string(r.genValue().prettyPrint());
+    SKStore.destroyObstack(saved);
+  }
+}
+
+/*****************************************************************************/
+/* Checks that JSON objects match a schema */
+/*****************************************************************************/
+fun check(): (Cli.Command, Cli.ParseResults ~> void) {
+  (
+    Cli.Command("check")
+      .about("Checks JSON objects against a schema")
+      .arg(
+        Cli.StringArg("schema").about("The schema used to check the objects"),
+      ),
+    execCheck,
+  )
+}
+
+fun execCheck(args: Cli.ParseResults): void {
+  schema = TypeParser::mcreate(args.getString("schema")).type();
+  loop {
+    readLineOpt() match {
+    | None() -> break void
+    | Some(str) ->
+      saved = SKStore.newObstack();
+      checkJSON(schema, decode(str, x -> x)) match {
+      | CROk() -> void
+      | CRError(msg) -> print_error(msg)
+      };
+      SKStore.destroyObstack(saved)
+    }
+  }
+}
+
+module end;

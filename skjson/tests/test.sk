@@ -1,0 +1,586 @@
+module alias T = SKTest;
+module alias J = SKJSON;
+
+module SKJSONTest;
+
+// Builds a schema out of a Vector of types.
+
+fun inferSchema(
+  types: readonly Vector<J.Type>,
+  sizeOpt: ?Int = None(),
+): J.Type {
+  size = sizeOpt match {
+  | None() -> types.size()
+  | Some(x) -> x
+  };
+  acc = J.Type::any;
+  for (i in Range(0, size)) {
+    ty = types[i];
+    !acc = acc.union(ty);
+  };
+  acc
+}
+
+// Creates a large union type from a set of types and then removes
+// them all one by one, checking that we do end up with the empty
+// type.
+
+@test
+fun testRemoveAll(): void {
+  r = J.RandomJSON::mcreate(23);
+  types = mutable Vector[];
+  for (_ in Range(0, 100)) {
+    types.push(r.genValue().toType())
+  };
+  acc = inferSchema(types);
+  for (ty in types) {
+    !acc = acc.remove(ty);
+  };
+  acc match {
+  | J.Type(arr) -> T.expectEq(arr.size(), 0)
+  }
+}
+
+// Creates a large union type from a set of types and then removes a
+// chunk of them at random in a loop, after each iteration, we check
+// that the resulting type is the same as when we start from scratch.
+// In other words we check that:
+// typeOf(allTypes)-typeOf(remTypes) = typeOf(allTypes-remTypes)
+
+@test
+fun testRemoveChunks(): void {
+  r = J.RandomJSON::mcreate(23);
+  types = mutable Vector[];
+  for (_ in Range(0, 100)) {
+    types.push(r.genValue().toType())
+  };
+  rand = Random::mcreate(11);
+  schema = inferSchema(types);
+  size = types.size();
+  // Remove types at random
+  for (_ in Range(0, 10)) {
+    for (_ in Range(0, 10)) {
+      idx = rand.random(0, size);
+      tmp = types[idx];
+      types![idx] = types[size - 1];
+      types![size - 1] = tmp;
+      !size = size - 1;
+      !schema = schema.remove(tmp);
+    };
+    T.expectEq(
+      J.prettyPrintType(false, schema),
+      J.prettyPrintType(false, inferSchema(types, Some(size))),
+    );
+  }
+}
+
+@test
+fun testUnit(): void {
+  tableReflexive = Array[
+    ("num", "num"),
+    ("int|float", "num"),
+    ("num", "int|float"),
+    ("float|int", "num"),
+    ("num", "float|int"),
+    ("bool|int", "int|bool"),
+    ("bool|int|float", "int|float|bool"),
+    ("bool|int|float", "float|int|bool"),
+    ("bool|int|float", "float|bool|int"),
+    ("bool|int|float|{}", "{}|float|bool|int"),
+    ("bool|int|float|{}", "float|{}|bool|int"),
+    ("bool|int|float|{}", "float|bool|{}|int"),
+    ("bool|int|float|{}", "float|bool|int|{}"),
+    ("[]", "[]"),
+    ("[bool|int]", "[int|bool]"),
+    ("[bool|int|float]", "[int|float|bool]"),
+    ("[bool|int|float]", "[float|int|bool]"),
+    ("[bool|int|float]", "[float|bool|int]"),
+    ("[bool|int|float|[]]", "[[]|float|bool|int]"),
+    ("[bool|int|float|[]]", "[float|[]|bool|int]"),
+    ("[bool|int|float|[]]", "[float|bool|[]|int]"),
+    ("[bool|int|float|{}]", "[{}|float|bool|int]"),
+    ("[bool|int|float|{}]", "[float|{}|bool|int]"),
+    ("[bool|int|float|{}]", "[float|bool|{}|int]"),
+    ("[bool|int|float|{}]", "[float|bool|int|{}]"),
+    ("[bool|int|float|{\"a\":int}]", "[{\"a\":int}|float|bool|int]"),
+    ("[bool|int|float|{\"a\":int}]", "[float|{\"a\":int}|bool|int]"),
+    ("[bool|int|float|{\"a\":int}]", "[float|bool|{\"a\":int}|int]"),
+    ("[bool|int|float|{\"a\":int}]", "[float|bool|int|{\"a\":int}]"),
+    ("[bool|int|float|{?\"a\":int}]", "[{?\"a\":int}|float|bool|int]"),
+    ("[bool|int|float|{?\"a\":int}]", "[float|{?\"a\":int}|bool|int]"),
+    ("[bool|int|float|{?\"a\":int}]", "[float|bool|{?\"a\":int}|int]"),
+    ("[bool|int|float|{?\"a\":int}]", "[float|bool|int|{?\"a\":int}]"),
+    ("{\"a\":[bool|int|float]}", "{\"a\":[int|float|bool]}"),
+    ("{\"a\":int,\"b\":int}", "{\"b\":int,\"a\":int}"),
+    ("{\"a\":int,?\"b\":int}", "{?\"b\":int,\"a\":int}"),
+    ("{?\"a\":int,\"b\":int}", "{\"b\":int,?\"a\":int}"),
+    ("{?\"a\":int,?\"b\":int}", "{?\"b\":int,?\"a\":int}"),
+  ];
+  for (elt in tableReflexive) {
+    (tyStr1, tyStr2) = elt;
+    ty1 = J.Type::fromString(tyStr1);
+    ty2 = J.Type::fromString(tyStr2);
+    T.expectEq(ty1.isSuperType(ty2), void);
+    T.expectEq(ty2.isSuperType(ty1), void);
+  };
+  tableSuperTypeButNotEqual = Array[
+    ("num", "int"),
+    ("num", "float"),
+    ("{?\"a\":int}", "{\"a\":int}"),
+    ("{\"a\":[bool|int]}", "{\"a\":[bool]}"),
+    ("{\"a\":[int|bool]}", "{\"a\":[bool]}"),
+    ("{\"a\":[bool]}", "{\"a\":[]}"),
+    ("{?\"a\":int}", "{}"),
+    ("{\"a\":int,?\"b\":int}", "{\"a\":int,\"b\":int}"),
+    ("{?\"a\":int,?\"b\":int}", "{\"a\":int,\"b\":int}"),
+  ];
+  for (elt in tableSuperTypeButNotEqual) {
+    (tyStr1, tyStr2) = elt;
+    ty1 = J.Type::fromString(tyStr1);
+    ty2 = J.Type::fromString(tyStr2);
+    T.expectEq(ty1.isSuperType(ty2), void);
+    T.expectThrow(() -> ty2.isSuperType(ty1));
+  };
+  tableUnrelated = Array[
+    ("num", "{}"),
+    ("num", "[]"),
+    ("{\"a\":bool}", "{\"a\":int}"),
+    ("{\"a\":[bool|float]}", "{\"a\":[bool|int]}"),
+    ("{\"a\":int,\"b\":int,\"z\":int}", "{\"a\":int,\"b\":int}"),
+    ("{\"a\":int,\"z\":int,\"b\":int}", "{\"a\":int,\"b\":int}"),
+  ];
+  for (elt in tableUnrelated) {
+    (tyStr1, tyStr2) = elt;
+    ty1 = J.Type::fromString(tyStr1);
+    ty2 = J.Type::fromString(tyStr2);
+    T.expectThrow(() -> ty1.isSuperType(ty2));
+    T.expectThrow(() -> ty2.isSuperType(ty1));
+  };
+}
+
+@test
+fun testJSON(): void {
+  tableSuperType = Array[
+    ("[]", "[]"),
+    ("[bool|int]", "[1, true]"),
+    ("[bool|int|float]", "[0,1.0,true]"),
+    ("[bool|int|float]", "[1.0,0,true]"),
+    ("[bool|int|float]", "[1.0,true,0]"),
+    ("[bool|int|float|[]]", "[[],1.0,true,0]"),
+    ("[bool|int|float|[]]", "[1.0,[],true,0]"),
+    ("[bool|int|float|[]]", "[1.0,true,[],0]"),
+    ("[bool|int|float|{}]", "[{},1.0,true,0]"),
+    ("[bool|int|float|{}]", "[1.0,{},true,0]"),
+    ("[bool|int|float|{}]", "[1.0,true,{},0]"),
+    ("[bool|int|float|{}]", "[1.0,true,0,{}]"),
+    ("[bool|int|float|{\"a\":int}]", "[{\"a\":0},1.0,true,0]"),
+    ("[bool|int|float|{\"a\":int}]", "[1.0,{\"a\":0},true,0]"),
+    ("[bool|int|float|{\"a\":int}]", "[1.0,true,{\"a\":0},0]"),
+    ("[bool|int|float|{\"a\":int}]", "[1.0,true,0,{\"a\":0}]"),
+    ("[bool|int|float|{?\"a\":int}]", "[{\"a\":0},1.0,true,0]"),
+    ("[bool|int|float|{?\"a\":int}]", "[1.0,{\"a\":0},true,0]"),
+    ("[bool|int|float|{?\"a\":int}]", "[1.0,true,{},0]"),
+    ("[bool|int|float|{?\"a\":int}]", "[1.0,true,0,{\"a\":0}]"),
+    ("{\"a\":[bool|int|float]}", "{\"a\":[0,1.0,true]}"),
+    ("{\"a\":int,\"b\":int}", "{\"b\":0,\"a\":0}"),
+    ("{\"a\":int,?\"b\":int}", "{\"b\":0,\"a\":0}"),
+    ("{?\"a\":int,\"b\":int}", "{\"b\":0,\"a\":0}"),
+    ("{?\"a\":int,?\"b\":int}", "{\"b\":0,\"a\":0}"),
+  ];
+  for (elt in tableSuperType) {
+    (tyStr1, tyStr2) = elt;
+    ty1 = J.Type::fromString(tyStr1);
+    ty2 = J.decode(tyStr2, x -> x).toType();
+    T.expectEq(ty1.isSuperType(ty2), void);
+  };
+  tableNotSuperType = Array[
+    ("{\"a\":int}", "{}"),
+    ("{\"a\":[bool]}", "{\"a\":[true,1]}"),
+    ("{\"a\":[bool]}", "{\"a\":[1,true]}"),
+    ("{\"a\":[]}", "{\"a\":[true]}"),
+    ("{}", "{\"a\":1}"),
+    ("{\"a\":int,\"b\":int}", "{\"a\":1}"),
+    ("{\"a\":int,\"b\":int}", "{\"b\":1}"),
+    ("{\"a\":int}", "{\"a\":true}"),
+    ("{\"a\":[bool|int]}", "{\"a\":[true,1.0]}"),
+    ("{\"a\":int,\"b\":int}", "{\"a\":1,\"b\":1,\"z\":1}"),
+    ("{\"a\":int,\"b\":int}", "{\"a\":1,\"z\":1,\"b\":1}"),
+  ];
+  for (elt in tableNotSuperType) {
+    (tyStr1, tyStr2) = elt;
+    ty1 = J.Type::fromString(tyStr1);
+    ty2 = J.decode(tyStr2, x -> x).toType();
+    T.expectThrow(() -> ty1.isSuperType(ty2));
+  };
+}
+
+@test
+fun testUnion(): void {
+  random = Random::mcreate(13);
+  r = J.RandomJSON::mcreate(23);
+  types = mutable Vector[];
+  for (_ in Range(0, 1000)) {
+    types.push(r.genValue().toType())
+  };
+  schema = inferSchema(types);
+  for (ty in types) {
+    T.expectEq(schema.isSuperType(ty), void);
+  };
+  for (ty in types) {
+    union = ty.union(types[random.random(0, types.size())]);
+    T.expectEq(union.isSuperType(ty), void);
+  };
+}
+
+/*****************************************************************************/
+// Testing decomposition into a normal form and reconstruction. We
+// just generate a lot of objects and make sure that they are
+// decomposed/rebuilt properly.
+/*****************************************************************************/
+
+fun genRows(n: Int): Array<(String, J.CJSON)> {
+  result = mutable Vector[];
+  r = J.RandomJSON::mcreate(23);
+  for (i in Range(0, n)) {
+    result.push((i.toString(), r.genValue()));
+  };
+  result.sortedBy(x ~> x.i0).toArray()
+}
+
+@test
+fun testReconstruct(): void {
+  rows = genRows(1000);
+  flattened = J.flatten(rows.iterator()).collect(Array);
+  reconstructed = J.reconstruct(flattened.iterator(), x -> x).collect(Array);
+  for (i => row in rows.map(x -> (x.i0, x.i1))) {
+    T.expectEq(row, reconstructed[i]);
+  }
+}
+
+/*****************************************************************************/
+/* Test pattern-matching. */
+/*****************************************************************************/
+
+@test
+fun testPathMatch(): void {
+  tests = Array[
+    ("a[]", "a[0]", true, true),
+    ("a[]", "a[0]", false, false),
+    ("a[]", "a[x]", true, false),
+    ("a[%]", "a[x]", false, true),
+    ("a[][]", "a[0][1]", true, true),
+    ("a[%]", "a[0][1]", false, true),
+    ("a[%]%", "a[0][1]", false, true),
+    ("%[%]%", "a[0][1]", false, true),
+    ("%[%]%", "a[0[1]", false, true),
+    ("a[%]", "a[0][1]", true, true),
+    ("a[%]%", "a[0][1]", true, true),
+    ("%[%]%", "a[0][1]", true, true),
+    ("%[%]%", "a[0[1]", true, true),
+    ("%abc", "xxxabc", false, true),
+    ("%abc", "xxxab", false, false),
+    ("%abc%", "xxxabcxxx", false, true),
+    ("abc%abc%abc", "abcabcabcabcabc", false, true),
+  ];
+  for (test in tests) {
+    T.expectEq(J.pathMatch(test.i0, test.i1, test.i2), test.i3);
+  }
+}
+
+@test
+fun testPatterns(): void {
+  patternMatches = Array[
+    (
+      (
+        "{x[]: var1, ?\"y[0]\": var2}",
+        "{\"x\":[1,2,3], \"y[0]\":[4,5,6,null]}",
+      ),
+      Array[
+        List[
+          (
+            "var2",
+            SKJSON.CJArray(
+              Array[
+                SKJSON.CJInt(4),
+                SKJSON.CJInt(5),
+                SKJSON.CJInt(6),
+                SKJSON.CJNull(),
+              ],
+            ),
+          ),
+          ("var1", SKJSON.CJInt(1)),
+        ],
+        List[
+          (
+            "var2",
+            SKJSON.CJArray(
+              Array[
+                SKJSON.CJInt(4),
+                SKJSON.CJInt(5),
+                SKJSON.CJInt(6),
+                SKJSON.CJNull(),
+              ],
+            ),
+          ),
+          ("var1", SKJSON.CJInt(2)),
+        ],
+        List[
+          (
+            "var2",
+            SKJSON.CJArray(
+              Array[
+                SKJSON.CJInt(4),
+                SKJSON.CJInt(5),
+                SKJSON.CJInt(6),
+                SKJSON.CJNull(),
+              ],
+            ),
+          ),
+          ("var1", SKJSON.CJInt(3)),
+        ],
+      ],
+    ),
+    (
+      ("{x[]: var1, ?y[0]: var2}", "{\"x\":[1,2,3], \"y\":[4,5,6,null]}"),
+      Array[
+        List[("var2", SKJSON.CJInt(4)), ("var1", SKJSON.CJInt(1))],
+        List[("var2", SKJSON.CJInt(4)), ("var1", SKJSON.CJInt(2))],
+        List[("var2", SKJSON.CJInt(4)), ("var1", SKJSON.CJInt(3))],
+      ],
+    ),
+    (
+      ("{%: var, x:var<int>}", "{\"x\":1, \"y\":2}"),
+      Array[List[("var", SKJSON.CJInt(1)), ("var", SKJSON.CJInt(2))]],
+    ),
+    (("{%: var, x:var<int>, y:y}", "{\"x\":1, \"y\":2}"), Array[]),
+    (
+      ("{%: var}", "{\"x\":1, \"y\":2}"),
+      Array[List[("var", SKJSON.CJInt(1))], List[("var", SKJSON.CJInt(2))]],
+    ),
+    (("{?%: var, x:var<int>, y:y}", "{\"x\":1, \"y\":2}"), Array[]),
+    (
+      ("{%.x: var, y:y}", "{\"x\":1, \"y\":2}"),
+      Array[List[("y", SKJSON.CJInt(2)), ("var", SKJSON.CJInt(1))]],
+    ),
+    (("{.%.x: var, y:y}", "{\"x\":1, \"y\":2}"), Array[]),
+    (
+      ("{.%x: var, y:y}", "{\"x\":1, \"y\":2}"),
+      Array[List[("y", SKJSON.CJInt(2)), ("var", SKJSON.CJInt(1))]],
+    ),
+    (
+      ("{.x%: var, y:y}", "{\"x\":1, \"y\":2}"),
+      Array[List[("y", SKJSON.CJInt(2)), ("var", SKJSON.CJInt(1))]],
+    ),
+    (
+      ("{x%: var, y:y}", "{\"x\":1, \"y\":2}"),
+      Array[List[("y", SKJSON.CJInt(2)), ("var", SKJSON.CJInt(1))]],
+    ),
+    (
+      ("{x%[]: var, y:y}", "{\"x\":[1], \"y\":2}"),
+      Array[List[("y", SKJSON.CJInt(2)), ("var", SKJSON.CJInt(1))]],
+    ),
+    (
+      ("{%.x: var, y:var2}", "{\"x\":1, \"y\":[{\"x\":5}]}"),
+      Array[
+        List[
+          (
+            "var2",
+            SKJSON.CJArray(
+              Array[
+                SKJSON.CJObject(
+                  SKJSON.CJFields::create(Array[("x", SKJSON.CJInt(5))], x ->
+                    x
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ("var", SKJSON.CJInt(1)),
+        ],
+      ],
+    ),
+    (
+      ("{%.x: var}", "{\"x\":1, \"y\":[{\"x\":5}]}"),
+      Array[List[("var", SKJSON.CJInt(1))], List[("var", SKJSON.CJInt(5))]],
+    ),
+    (("{%.x: var, z:foo}", "{\"x\":1, \"y\":[{\"x\":5}]}"), Array[]),
+    (
+      ("{%.x: var, ?z:foo}", "{\"x\":1, \"y\":[{\"x\":5}]}"),
+      Array[
+        List[("foo", SKJSON.CJNull()), ("var", SKJSON.CJInt(1))],
+        List[("foo", SKJSON.CJNull()), ("var", SKJSON.CJInt(5))],
+      ],
+    ),
+    (
+      ("{tags[]: tag<string>}", "{\"tags\":[\"#foo1\",\"#foo2\"]}"),
+      Array[
+        List[("tag", SKJSON.CJString("#foo1"))],
+        List[("tag", SKJSON.CJString("#foo2"))],
+      ],
+    ),
+    (
+      ("[tag<string>]", "[\"#foo1\",\"#foo2\"]"),
+      Array[
+        List[("tag", SKJSON.CJString("#foo1"))],
+        List[("tag", SKJSON.CJString("#foo2"))],
+      ],
+    ),
+    (
+      (
+        "{data[]: {id<int>, n<string>}}",
+        "{\"data\":[{\"id\":1,\"n\":\"n1\"},{\"id\":2,\"n\":\"n2\"}],\"s\":2}",
+      ),
+      Array[
+        List[("n", SKJSON.CJString("n1")), ("id", SKJSON.CJInt(1))],
+        List[("n", SKJSON.CJString("n2")), ("id", SKJSON.CJInt(2))],
+      ],
+    ),
+    (
+      (
+        "{%:{id<int>, n<string>}}",
+        "{\"data\":[{\"id\":1,\"n\":\"n1\"},{\"id\":2,\"n\":\"n2\"}],\"s\":2}",
+      ),
+      Array[
+        List[("n", SKJSON.CJString("n1")), ("id", SKJSON.CJInt(1))],
+        List[("n", SKJSON.CJString("n2")), ("id", SKJSON.CJInt(2))],
+      ],
+    ),
+    (
+      (
+        "{%data%:{id<int>, n<string>}}",
+        "{\"data\":[{\"id\":1,\"n\":\"n1\"},{\"id\":2,\"n\":\"n2\"}],\"s\":2}",
+      ),
+      Array[
+        List[("n", SKJSON.CJString("n1")), ("id", SKJSON.CJInt(1))],
+        List[("n", SKJSON.CJString("n2")), ("id", SKJSON.CJInt(2))],
+      ],
+    ),
+    (
+      (
+        "{%data[%]:{id<int>, n<string>}}",
+        "{\"data\":[{\"id\":1,\"n\":\"n1\"},{\"id\":2,\"n\":\"n2\"}],\"s\":2}",
+      ),
+      Array[
+        List[("n", SKJSON.CJString("n1")), ("id", SKJSON.CJInt(1))],
+        List[("n", SKJSON.CJString("n2")), ("id", SKJSON.CJInt(2))],
+      ],
+    ),
+    (
+      (
+        "{data[][]:{id<int>, n<string>}}",
+        "{\"data\":[[{\"id\":1,\"n\":\"n1\"},{\"id\":2,\"n\":\"n2\"}]],\"s\":2}",
+      ),
+      Array[
+        List[("n", SKJSON.CJString("n1")), ("id", SKJSON.CJInt(1))],
+        List[("n", SKJSON.CJString("n2")), ("id", SKJSON.CJInt(2))],
+      ],
+    ),
+    (
+      (
+        "{data[%]:{id<int>, n<string>}}",
+        "{\"data\":[[{\"id\":1,\"n\":\"n1\"},{\"id\":2,\"n\":\"n2\"}]],\"s\":2}",
+      ),
+      Array[
+        List[("n", SKJSON.CJString("n1")), ("id", SKJSON.CJInt(1))],
+        List[("n", SKJSON.CJString("n2")), ("id", SKJSON.CJInt(2))],
+      ],
+    ),
+    (
+      ("{x[]: v1, y[]: v2}", "{\"x\":[1,2,3], \"y\":[4,5,6]}"),
+      Array[
+        List[("v2", SKJSON.CJInt(4)), ("v1", SKJSON.CJInt(1))],
+        List[("v2", SKJSON.CJInt(5)), ("v1", SKJSON.CJInt(1))],
+        List[("v2", SKJSON.CJInt(6)), ("v1", SKJSON.CJInt(1))],
+        List[("v2", SKJSON.CJInt(4)), ("v1", SKJSON.CJInt(2))],
+        List[("v2", SKJSON.CJInt(5)), ("v1", SKJSON.CJInt(2))],
+        List[("v2", SKJSON.CJInt(6)), ("v1", SKJSON.CJInt(2))],
+        List[("v2", SKJSON.CJInt(4)), ("v1", SKJSON.CJInt(3))],
+        List[("v2", SKJSON.CJInt(5)), ("v1", SKJSON.CJInt(3))],
+        List[("v2", SKJSON.CJInt(6)), ("v1", SKJSON.CJInt(3))],
+      ],
+    ),
+
+    (("{x[0]: x}", "{\"x\":[]}"), Array[]),
+    (("{x[0]: x}", "{\"x\":[0]}"), Array[List[("x", SKJSON.CJInt(0))]]),
+    (("{x[]: x}", "{\"x\":[]}"), Array[List[("x", SKJSON.CJNull())]]),
+    (("{x[]: x}", "{\"x\":[0]}"), Array[List[("x", SKJSON.CJInt(0))]]),
+    (
+      ("{x[]: x}", "{\"x\":[0, 1]}"),
+      Array[List[("x", SKJSON.CJInt(0))], List[("x", SKJSON.CJInt(1))]],
+    ),
+    (
+      ("{x[].y: x}", "{\"x\":[{\"y\":0}]}"),
+      Array[List[("x", SKJSON.CJInt(0))]],
+    ),
+    (("{?c: x}", "{}"), Array[List[("x", SKJSON.CJNull())]]),
+    (("{?c: x}", "{\"c\":0}"), Array[List[("x", SKJSON.CJInt(0))]]),
+    (("{?c: x}", "{\"z\":0}"), Array[List[("x", SKJSON.CJNull())]]),
+    (("[x]", "[]"), Array[List[("x", SKJSON.CJNull())]]),
+    (("[x]", "[0.0]"), Array[List[("x", SKJSON.CJFloat(0.0))]]),
+    (("[{x:x}]", "[]"), Array[]),
+    (
+      ("[{x:x}]", "[{\"x\":\"foo\"}]"),
+      Array[List[("x", SKJSON.CJString("foo"))]],
+    ),
+    (("[]", "[]"), Array[]),
+    (("[]", "[0, 1, 2]"), Array[]),
+    (("[]", "{}"), Array[]),
+    (("{}", "[]"), Array[]),
+    (("{}", "[0, 1, 2]"), Array[]),
+    (("{}", "{}"), Array[]),
+    (("{x:[],y}", "{\"x\":[],\"y\":0}"), Array[List[("y", SKJSON.CJInt(0))]]),
+    (("{x:{},y}", "{\"x\":{},\"y\":0}"), Array[List[("y", SKJSON.CJInt(0))]]),
+    (("{\"a.b\":x}", "{\"a.b\":0}"), Array[List[("x", SKJSON.CJInt(0))]]),
+    (("{\"a.b\":x}", "{\"a\":{\"b\":0}}"), Array[]),
+    (("{a.b:x}", "{\"a\":{\"b\":0}}"), Array[List[("x", SKJSON.CJInt(0))]]),
+    (("{a.b:x}", "{\"a\":{\"c\":{\"b\":0}}}"), Array[]),
+    (("{a<num>}", "{\"a\":0}"), Array[List[("a", SKJSON.CJFloat(0.0))]]),
+    (("{a<num>}", "{\"a\":0.0}"), Array[List[("a", SKJSON.CJFloat(0.0))]]),
+    (("{a<float>}", "{\"a\":0.0}"), Array[List[("a", SKJSON.CJFloat(0.0))]]),
+
+    (
+      ("{obj<{c:{d:[num]}}>}", "{\"obj\":{\"c\":{\"d\":[0, 1, 2.3]}}}"),
+      Array[
+        List[
+          (
+            "obj",
+            SKJSON.CJObject(
+              SKJSON.CJFields(
+                Array["c"],
+                Array[
+                  SKJSON.CJObject(
+                    SKJSON.CJFields(
+                      Array["d"],
+                      Array[
+                        SKJSON.CJArray(
+                          Array[
+                            SKJSON.CJFloat(0.0),
+                            SKJSON.CJFloat(1.0),
+                            SKJSON.CJFloat(2.3),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ],
+    ),
+    (("%.a:a", "{\"a\":0}"), Array[List[("a", SKJSON.CJInt(0))]]),
+    (("%.a:a<num>", "[{\"a\":0}]"), Array[List[("a", SKJSON.CJFloat(0.0))]]),
+  ];
+  for (patternMatch in patternMatches) {
+    T.expectEq(
+      SKJSON.PatternParser::mcreate(patternMatch.i0.i0)
+        .toplevelPattern()
+        .pmatch(SKJSON.decode(patternMatch.i0.i1, x -> x))
+        .collect(Array),
+      patternMatch.i1,
+    )
+  };
+}
+
+module end;

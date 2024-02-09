@@ -674,6 +674,8 @@ fun printDirDescr(dirDescr: DirDescr, suffix: ?String): void {
       | P.INTEGER() -> "INTEGER"
       | P.FLOAT() -> "FLOAT"
       | P.TEXT() -> "TEXT"
+      | P.JSON() -> "JSON"
+      | P.SCHEMA() -> "SCHEMA"
       },
     );
     if (ty.unique is Some _) {
@@ -704,7 +706,8 @@ fun printDirDescr(dirDescr: DirDescr, suffix: ?String): void {
         | P.VSeqNum _
         | P.VId _
         | P.VParam _
-        | P.VPermission _ ->
+        | P.VPermission _
+        | P.VJSON _ ->
           invariant_violation("Invalid expression for default value")
         }
       | _ -> invariant_violation("Invalid expression for default value")

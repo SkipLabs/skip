@@ -1,0 +1,627 @@
+/*****************************************************************************/
+/* Types for JSON */
+/*****************************************************************************/
+
+module SKJSON;
+
+/*****************************************************************************/
+/* Operations */
+/*****************************************************************************/
+
+base class BinaryOp {
+  children =
+  | BOUnion()
+  | BOSuperType()
+  | BORemove()
+}
+
+/*****************************************************************************/
+/* Fields */
+/*****************************************************************************/
+
+value class FieldCount private (count: Int) uses Orderable {
+  const alwaysValue: Int = 2;
+
+  static fun create(): this {
+    FieldCount(1)
+  }
+
+  static fun always(): this {
+    FieldCount(2)
+  }
+
+  static fun optional(): this {
+    FieldCount(1)
+  }
+
+  fun +(other: FieldCount): FieldCount {
+    static(this.count + other.count)
+  }
+
+  fun -(other: FieldCount): FieldCount {
+    invariant(this.count >= other.count);
+    static(this.count - other.count)
+  }
+
+  fun missing(total: Int): Int {
+    invariant(total >= this.count);
+    total - this.count
+  }
+}
+
+const missing: FieldErrorKind = FEMissing();
+const unknown: FieldErrorKind = FEUnknown();
+
+base class FieldErrorKind {
+  children =
+  | FEMissing()
+  | FEUnknown()
+
+  fun toString(): String {
+    this match {
+    | FEMissing() -> "Missing"
+    | FEUnknown() -> "Unknown"
+    }
+  }
+}
+
+class FieldError(
+  kind: FieldErrorKind,
+  fieldName: String,
+  path: List<String>,
+) extends Exception {
+  fun getMessage(): String {
+    "Error: " +
+      this.kind.toString() +
+      " field (" +
+      this.fieldName +
+      ") at path: root" +
+      "".join(this.path.reversed())
+  }
+}
+
+value class Field(
+  name: String,
+  fieldCount: FieldCount,
+  type: Type,
+) uses Orderable
+
+class Fields private (fields: Array<Field>) uses Orderable {
+  static fun create(fields: Array<Field>): this {
+    !fields = fields.sortedBy(x ~> x.name);
+    for (i => elt in fields) {
+      if (i != 0) invariant(fields[i - 1].name < elt.name);
+    };
+    static(fields)
+  }
+
+  fun toArray(): Array<Field> {
+    this.fields
+  }
+
+  fun merge(
+    op: BinaryOp,
+    other: Fields,
+    f: (String, Type, Type) -> Type,
+  ): this {
+    left = this.fields.iterator();
+    right = other.fields.iterator();
+    result = mutable Vector[];
+    lhead = left.next();
+    rhead = right.next();
+    mergeField = (left: ?Field, right: ?Field) -> {
+      this.mergeField(result, left, right, op, f);
+    };
+    loop {
+      (lhead, rhead) match {
+      | (None(), None()) -> return static(result.toArray())
+      | (Some(_), None()) ->
+        mergeField(lhead, None());
+        !lhead = left.next()
+      | (None(), Some(_)) ->
+        mergeField(None(), rhead);
+        !rhead = right.next()
+      | (Some(x), Some(y)) ->
+        if (x.name < y.name) {
+          mergeField(lhead, None());
+          !lhead = left.next()
+        } else if (x.name > y.name) {
+          mergeField(None(), rhead);
+          !rhead = right.next()
+        } else {
+          mergeField(lhead, rhead);
+          !lhead = left.next();
+          !rhead = right.next();
+        }
+      }
+    }
+  }
+
+  fun mergeField(
+    result: mutable Vector<Field>,
+    lhead: ?Field,
+    rhead: ?Field,
+    op: BinaryOp,
+    f: (String, Type, Type) -> Type,
+  ): void {
+    (lhead, rhead) match {
+    | (None(), None()) -> void
+    | (Some(x), None()) -> result.push(x)
+    | (None(), Some(y)) ->
+      op match {
+      | BOUnion()
+      | BOSuperType() ->
+        void
+      | BORemove() ->
+        invariant_violation(
+          "Trying to a remove a field that was never seen before",
+        )
+      };
+      result.push(y)
+    | (Some(x), Some(y)) ->
+      fieldCount = op match {
+      | BOUnion() -> x.fieldCount + y.fieldCount
+      | BOSuperType() -> x.fieldCount
+      | BORemove() -> x.fieldCount - y.fieldCount
+      };
+      if (fieldCount.count != 0) {
+        result.push(Field(x.name, fieldCount, f(x.name, x.type, y.type)))
+      }
+    }
+  }
+
+  fun maybeGet(name: String): ?Field {
+    fields = this.fields;
+    idx = SKStore.binSearch(
+      i ~> fields[i].name,
+      name,
+      0,
+      this.fields.size() - 1,
+    );
+    if (idx < 0 || idx >= this.fields.size()) return None();
+    if (this.fields[idx].name == name) Some(this.fields[idx]) else None()
+  }
+}
+
+/*****************************************************************************/
+/* SType stands for "simple type". It's every possible type except for unions.
+ */
+/*****************************************************************************/
+
+base class STypeWithNum {
+  children =
+  | TNum()
+}
+
+base class SType uses Orderable extends STypeWithNum {
+  const TKNull: Int = 0;
+  const TKBool: Int = 1;
+  const TKInt: Int = 2;
+  const TKFloat: Int = 3;
+  const TKString: Int = 4;
+  const TKArray: Int = 5;
+  const TKObject: Int = 6;
+
+  children =
+  | TNull()
+  | TBool()
+  | TInt()
+  | TFloat()
+  | TString()
+  | TArray(Type)
+  | TObject(Fields)
+
+  fun kindString(): String
+  | TNull() -> "null"
+  | TBool() -> "a boolean"
+  | TInt() -> "an integer"
+  | TFloat() -> "a float"
+  | TString() -> "a string"
+  | TArray _ -> "an array"
+  | TObject _ -> "an object"
+
+  fun kind(): Int
+  | TNull() -> static::TKNull
+  | TBool() -> static::TKBool
+  | TInt() -> static::TKInt
+  | TFloat() -> static::TKFloat
+  | TString() -> static::TKString
+  | TArray _ -> static::TKArray
+  | TObject _ -> static::TKObject
+
+  static fun jsonKind(value: CJSON): Int {
+    value match {
+    | CJNull() -> static::TKNull
+    | CJBool _ -> static::TKBool
+    | CJInt _ -> static::TKInt
+    | CJFloat _ -> static::TKFloat
+    | CJString _ -> static::TKString
+    | CJArray(_) -> static::TKArray
+    | CJObject(_) -> static::TKObject
+    }
+  }
+
+  fun union(other: SType): SType {
+    this.binop(BOUnion(), List[], other)
+  }
+
+  fun remove(other: SType): SType {
+    this.binop(BORemove(), List[], other)
+  }
+
+  fun binop(op: BinaryOp, path: List<String>, other: SType): SType {
+    (this, other) match {
+    | (TNull(), TNull()) -> TNull()
+    | (TBool(), TBool()) -> TBool()
+    | (TInt(), TInt()) -> TInt()
+    | (TFloat(), TFloat()) -> TFloat()
+    | (TString(), TString()) -> TString()
+    | (TArray(u1), TArray(u2)) ->
+      TArray(u1.binop(op, List.Cons("[*]", path), u2))
+    | (TObject(m1), TObject(m2)) ->
+      TObject(
+        m1.merge(op, m2, (fieldName, x1, x2) ->
+          x1.binop(op, List.Cons("." + fieldName, path), x2)
+        ),
+      )
+    | _ -> invariant_violation("Internal error: should never happen")
+    }
+  }
+}
+
+class SuperTypeError(
+  path: List<String>,
+  expected: Type,
+  found: Type,
+) extends Exception {
+  fun getMessage(): String {
+    "Error, unexpected type at path: root" +
+      "".join(this.path.reversed()) +
+      "\n" +
+      "Expected: " +
+      prettyPrintType(false, this.expected) +
+      "\nFound: " +
+      prettyPrintType(false, this.found)
+  }
+}
+
+class Type private (types: Array<(Int, SType)>) uses Orderable {
+  const any: Type = Type(Array[]);
+
+  static fun createFromItems(types: Array<(Int, SType)>): this {
+    lastKind = -1;
+    for (ty in types) {
+      kind = ty.i1.kind();
+      invariant(kind > lastKind);
+      !lastKind = kind;
+    };
+    Type(types)
+  }
+
+  fun isInt(): Bool {
+    this match {
+    | Type(arr) ->
+      arr.size() == 1 &&
+        arr[0] match {
+        | (_, TInt()) -> true
+        | _ -> false
+        }
+    }
+  }
+
+  fun isIntOrNull(): Bool {
+    this match {
+    | Type(arr) ->
+      arr.size() == 2 &&
+        (arr[0], arr[1]) match {
+        | ((_, TNull()), (_, TInt())) -> true
+        | _ -> false
+        }
+    }
+  }
+
+  fun isBool(): Bool {
+    this match {
+    | Type(arr) ->
+      arr.size() == 1 &&
+        arr[0] match {
+        | (_, TBool()) -> true
+        | _ -> false
+        }
+    }
+  }
+
+  fun isBoolOrNull(): Bool {
+    this match {
+    | Type(arr) ->
+      arr.size() == 2 &&
+        (arr[0], arr[1]) match {
+        | ((_, TNull()), (_, TBool())) -> true
+        | _ -> false
+        }
+    }
+  }
+
+  // A num is either [int | float] or [null | int | float]
+  // Note that the type cannot contain anything else.
+  fun isNum(): Bool {
+    hasInt = false;
+    hasFloat = false;
+    for (ty in this.types) {
+      ty match {
+      | (_, TNull()) -> void
+      | (_, TBool())
+      | (_, TString()) ->
+        return false
+      | (_, TInt()) -> !hasInt = true
+      | (_, TFloat()) -> !hasFloat = true
+      | (_, TArray _)
+      | (_, TObject _) ->
+        return false
+      }
+    };
+    if (hasInt && hasFloat) return true;
+    false
+  }
+
+  fun isNumAndNotNull(): Bool {
+    for (ty in this.types) {
+      if (ty.i1 is TNull()) return true;
+    };
+    this.isNum()
+  }
+
+  fun containsNum(): Bool {
+    hasOtherType = false;
+    hasInt = false;
+    hasFloat = false;
+    todos = mutable Vector[];
+    for (ty in this.types) {
+      ty match {
+      | (_, TNull()) -> void
+      | (_, TBool())
+      | (_, TString()) ->
+        !hasOtherType = true
+      | (_, TInt()) -> !hasInt = true
+      | (_, TFloat()) -> !hasFloat = true
+      | (_, TArray(subTy)) ->
+        !hasOtherType = true;
+        todos.push(subTy)
+      | (_, TObject(fields)) ->
+        !hasOtherType = true;
+        for (field in fields.fields) {
+          todos.push(field.type);
+        }
+      }
+    };
+    if (hasInt && hasFloat && !hasOtherType) return true;
+    for (todo in todos) {
+      if (todo.containsNum()) return true;
+    };
+    false
+  }
+
+  fun convertNum(value: CJSON): CJSON {
+    if (this.isNum()) {
+      return value match {
+      | CJInt(n) -> CJFloat(n.toFloat())
+      | x -> x
+      }
+    };
+    for (sty in this.types) {
+      (sty.i1, value) match {
+      | (TNull(), v @ CJNull()) -> return v
+      | (TNull(), _) -> void
+      | (TBool(), v @ CJBool _) -> return v
+      | (TBool(), _) -> void
+      | (TInt(), v @ CJInt _) -> return v
+      | (TInt(), _) -> void
+      | (TFloat(), v @ CJFloat _) -> return v
+      | (TFloat(), _) -> void
+      | (TString(), v @ CJString _) -> return v
+      | (TString(), _) -> void
+      | (TArray(ty), CJArray(arr)) ->
+        return CJArray(arr.map(subValue -> ty.convertNum(subValue)))
+      | (TArray(_), _) -> void
+      | (TObject(objectFields), CJObject(fields)) ->
+        tyFields = objectFields.fields;
+        fieldNames = fields.cols;
+        fieldValues = fields.values;
+        i = 0;
+        j = 0;
+        newValues = mutable Vector[];
+        loop {
+          if (i >= tyFields.size() || j >= fieldNames.size()) {
+            return CJObject(CJFields(fieldNames, newValues.toArray()))
+          };
+          if (tyFields[i].name < fieldNames[j]) {
+            !i = i + 1;
+            continue
+          };
+          if (tyFields[i].name > fieldNames[j]) {
+            newValues.push(fieldValues[j]);
+            !j = j + 1;
+            continue
+          };
+          invariant(tyFields[i].name == fieldNames[j]);
+          newValues.push(tyFields[i].type.convertNum(fieldValues[j]));
+          !i = i + 1;
+          !j = j + 1;
+        }
+      | (TObject(_), _) -> void
+      }
+    };
+    invariant_violation(
+      "Internal error: the object should have matched one of the types",
+    )
+  }
+
+  fun isFloat(): Bool {
+    this match {
+    | Type(arr) ->
+      arr.size() == 1 &&
+        arr[0] match {
+        | (_, TFloat()) -> true
+        | _ -> false
+        }
+    }
+  }
+
+  fun isFloatOrNull(): Bool {
+    this match {
+    | Type(arr) ->
+      arr.size() == 2 &&
+        (arr[0], arr[1]) match {
+        | ((_, TNull()), (_, TFloat())) -> true
+        | _ -> false
+        }
+    }
+  }
+
+  fun isString(): Bool {
+    this match {
+    | Type(arr) ->
+      arr.size() == 1 &&
+        arr[0] match {
+        | (_, TString()) -> true
+        | _ -> false
+        }
+    }
+  }
+
+  fun isStringOrNull(): Bool {
+    this match {
+    | Type(arr) ->
+      arr.size() == 2 &&
+        (arr[0], arr[1]) match {
+        | ((_, TNull()), (_, TString())) -> true
+        | _ -> false
+        }
+    }
+  }
+
+  static fun create(ty: SType): this {
+    Type(Array[(1, ty)])
+  }
+
+  static fun fromString(value: String): Type {
+    TypeParser::mcreate(value).type()
+  }
+
+  fun union(other: Type): Type {
+    this.binop(BOUnion(), List[], other)
+  }
+
+  fun isSuperType(other: Type): void {
+    _ = this.binop(BOSuperType(), List[], other);
+    void
+  }
+
+  fun remove(other: Type): Type {
+    this.binop(BORemove(), List[], other)
+  }
+
+  fun binop(op: BinaryOp, path: List<String>, other: Type): Type {
+    iter1 = this.types.iterator();
+    iter2 = other.types.iterator();
+    acc = mutable Vector[];
+    head1 = iter1.next();
+    head2 = iter2.next();
+    loop {
+      (head1, head2) match {
+      | (None(), None()) ->
+        op match {
+        | BOUnion() -> void
+        | BOSuperType() ->
+          if (acc.size() != this.types.size()) {
+            throw (SuperTypeError(path, this, other))
+          }
+        | BORemove() -> void
+        };
+        return Type(acc.toArray())
+      | (Some(x), None()) ->
+        acc.push(x);
+        !head1 = iter1.next()
+      | (None(), Some(y)) ->
+        acc.push(y);
+        !head2 = iter2.next()
+      | (Some(x), Some(y)) if (x.i1.kind() < y.i1.kind()) ->
+        acc.push(x);
+        !head1 = iter1.next()
+      | (Some(x), Some(y)) if (x.i1.kind() > y.i1.kind()) ->
+        acc.push(y);
+        !head2 = iter2.next()
+      | (Some((c1, x)), Some((c2, y))) ->
+        invariant(x.kind() == y.kind());
+        count = op match {
+        | BOUnion() -> c1 + c2
+        | BOSuperType() -> c1
+        | BORemove() -> c1 - c2
+        };
+        result = x.binop(op, path, y);
+        if (count != 0) {
+          acc.push((count, result));
+        };
+        if (op is BOSuperType()) {
+          (x, y) match {
+          | (TObject(ox), TObject(oy)) ->
+            mandatoryFields = mutable Set[];
+            optionalFields = mutable Set[];
+            for (field in ox.fields) {
+              if (field.fieldCount.count == c1) {
+                mandatoryFields.insert(field.name)
+              } else {
+                optionalFields.insert(field.name)
+              }
+            };
+            for (field in oy.fields) {
+              if (mandatoryFields.contains(field.name)) {
+                if (field.fieldCount.count != c2) {
+                  throw FieldError(missing, field.name, path)
+                };
+                mandatoryFields.remove(field.name);
+                continue;
+              };
+              if (!optionalFields.contains(field.name)) {
+                throw FieldError(unknown, field.name, path)
+              };
+            };
+            if (!mandatoryFields.isEmpty()) {
+              for (fieldName in mandatoryFields) {
+                throw FieldError(missing, fieldName, path)
+              }
+            }
+          | _ -> void
+          }
+        };
+        !head1 = iter1.next();
+        !head2 = iter2.next()
+      }
+    }
+  }
+}
+
+/*****************************************************************************/
+/* Type-checking: verifies that a JSON correponds to a given schema. */
+/*****************************************************************************/
+
+base class CheckResult {
+  children =
+  | CROk()
+  | CRError(String)
+}
+
+fun checkJSON(ty: Type, json: CJSON): CheckResult {
+  objType = json.toType();
+  try {
+    _ = ty.binop(BOSuperType(), List[], objType);
+    CROk()
+  } catch {
+  | exn @ FieldError _
+  | exn @ SuperTypeError _ ->
+    CRError(exn.getMessage())
+  | exn -> throw exn
+  }
+}
+
+module end;

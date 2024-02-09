@@ -594,6 +594,7 @@ class SelectEvaluator{
               | Max() -> None()
               | Min() -> None()
               | Count(_) -> Some(CInt(0))
+              | InferSchema() -> Some(CType::create(SKJSON.Type::any))
               }
             ),
           );
@@ -642,7 +643,8 @@ class SelectEvaluator{
                 Array[
                   (
                     (_context, writer, key, values) ~> {
-                      writer.setArray(key, values.collect(Array))
+                      arr = values.collect(Array);
+                      writer.setArray(key, arr)
                     },
                     None(),
                     None(),
@@ -1188,6 +1190,33 @@ fun updateState(
       | _ -> invariant_violation("Expected a RowValue")
       };
       (kind, lastRow, vOpt) match {
+      | (InferSchema(), _, Some(CJSON(json))) ->
+        schema = state[i] match {
+        | None() -> SKJSON.Type::any
+        | Some(CType(ty)) -> ty
+        | _ -> invariant_violation("Unexpected schema type")
+        };
+        ty = json.toType();
+        if (adding) !ty = schema.union(ty) else !ty = schema.remove(ty);
+        state![i] = Some(CType::create(ty))
+      | (InferSchema(), _, Some(CString(s))) ->
+        schema = state[i] match {
+        | None() -> SKJSON.Type::any
+        | Some(CType(ty)) -> ty
+        | _ -> invariant_violation("Unexpected schema type")
+        };
+        ty = SKJSON.decode(s, x -> x).toType();
+        if (adding) !ty = schema.union(ty) else !ty = schema.remove(ty);
+        state![i] = Some(CType::create(ty))
+      | (InferSchema(), _, Some(CType(ty))) ->
+        schema = state[i] match {
+        | None() -> SKJSON.Type::any
+        | Some(CType(x)) -> x
+        | _ -> invariant_violation("Unexpected schema type")
+        };
+        if (adding) !ty = schema.union(ty) else !ty = schema.remove(ty);
+        state![i] = Some(CType::create(ty))
+      | (InferSchema(), _, _) -> continue
       | (Min(), _, None()) -> continue
       | (Min(), _, Some(_)) ->
         if (state[i] is None() && adding) state![i] = vOpt;
@@ -1234,6 +1263,8 @@ fun updateState(
       | (Noop(), _, x) -> state![i] = x
 
       | (_, _, Some(SKDB.CString _)) -> invariant_violation("Invalid aggregate")
+      | (_, _, Some(SKDB.CType _)) -> invariant_violation("Invalid aggregate")
+      | (_, _, Some(SKDB.CJSON _)) -> invariant_violation("Invalid aggregate")
       }
     };
     !lastRow = Some(row);
@@ -1254,6 +1285,7 @@ fun reducerInit(
       | Sum(_) ->
         None()
       | Count(_) -> Some(CInt(0))
+      | InferSchema() -> Some(CType::create(SKJSON.Type::any))
       }
     }),
   );
@@ -1278,6 +1310,7 @@ fun isPotentiallyEmpty(
     state[i] match {
     | Some(CInt(n)) -> if (n != 0) return false
     | Some(CFloat(f)) -> if (f < -0.01 || f > 0.01) return false
+    | Some(CType(ty)) -> if (ty.types.isEmpty()) return false
     | x ->
       debug(x);
       invariant_violation("Unexpected type")
