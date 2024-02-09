@@ -961,9 +961,9 @@ mutable class Context{
         !last = Some(key)
       | Some(oldKey) if (oldKey == key) -> valueAcc.extend(values)
       | Some(oldKey) ->
-        path = Source::create(Path::create(dirName, oldKey));
+        source = Path::create(dirName, oldKey);
         vector.push(
-          FixedRow(oldKey, (path, valueAcc.toArray()), TickRange::create(tick)),
+          FixedRow(oldKey, valueAcc.toArray(), source, TickRange::create(tick)),
         );
         !last = Some(key);
         valueAcc.clear();
@@ -973,9 +973,9 @@ mutable class Context{
     last match {
     | None() -> void
     | Some(key) ->
-      path = Source::create(Path::create(dirName, key));
+      source = Path::create(dirName, key);
       vector.push(
-        FixedRow(key, (path, valueAcc.toArray()), TickRange::create(tick)),
+        FixedRow(key, valueAcc.toArray(), source, TickRange::create(tick)),
       )
     };
     fixedData = FixedDataMap::create(vector);
@@ -1167,7 +1167,7 @@ fun import(
         for (key in changedKeys) {
           for (srcValue in dir.unsafeGetAllDataIterAfter(tick, key)) {
             (_, source, writer, values) = srcValue;
-            entries.push((key, (source.path(), writer.path(), values)));
+            entries.push((key, (source, writer, values)));
           }
         };
         targetCtx.unsafeMaybeGetEagerDir(dir.dirName) match {

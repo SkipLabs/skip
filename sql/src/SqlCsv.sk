@@ -250,10 +250,10 @@ fun lwwEdits(
     for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
       if (
         tick.value < snapshot ||
-        source.path() == writer ||
+        source == writer ||
         rowKey.getRowValues() < row
       ) {
-        entries.push((key, (source.path(), writer, Array<SKStore.File>[])));
+        entries.push((key, (source, writer, Array<SKStore.File>[])));
       } else {
         !keepingCurrent = true;
         break void;
@@ -370,10 +370,10 @@ fun applyDiffStrategy(
         ctx = optContext.fromSome();
         key: SKStore.Key = SKDB.RowKey::create(row.setRepeat(1), table.kinds);
         for ((tick, source, _) in newDir.unsafeGetDataIterWithoutTombs(key)) {
-          if (tick.value < snapshot.default(0) || source.path() == writer) {
+          if (tick.value < snapshot.default(0) || source == writer) {
             !newDir = newDir.writeEntry(
               ctx,
-              source.path(),
+              source,
               writer,
               key,
               Array<SKStore.File>[],
@@ -420,7 +420,7 @@ fun applyDiffStrategy(
 
     // we may only affect rows that have been seen
     isEligibleForTomb = (tick, source) ~>
-      tick.value < snapshot.default(0) || source.path() == writer;
+      tick.value < snapshot.default(0) || source == writer;
 
     !dir = SKStore.withRegionFold(
       Some(newRoot),
@@ -443,7 +443,7 @@ fun applyDiffStrategy(
           if (keyRepeat - srcRepeat < 0) {
             !newDir = newDir.writeEntry(
               optContext.fromSome(),
-              source.path(),
+              source,
               writer,
               key,
               Array[],
@@ -505,10 +505,10 @@ fun applyDiffStrategy(
         if (row.repeat < 1) {
           key: SKStore.Key = SKDB.RowKey::create(row.setRepeat(1), table.kinds);
           for ((tick, source, _) in newDir.unsafeGetDataIterWithoutTombs(key)) {
-            if (tick.value < snapshot.default(0) || source.path() == writer) {
+            if (tick.value < snapshot.default(0) || source == writer) {
               !newDir = newDir.writeEntry(
                 ctx,
-                source.path(),
+                source,
                 writer,
                 key,
                 Array[],
@@ -602,9 +602,7 @@ fun applyDiffStrategy(
         .map(x -> SKDB.RowKey::create(x.setRepeat(1), table.kinds))
         .collect(SortedSet),
       isVisibleToUser(newRoot),
-      (tick, source) ~>
-        tick.value < snapshot.default(0) || source.path() == writer
-      ,
+      (tick, source) ~> tick.value < snapshot.default(0) || source == writer,
     );
 
     newRoot.setDir(dir.dirName, dir);
