@@ -235,7 +235,9 @@ base class MInfo {
     if (keys.isEmpty() && newDirs.isEmpty() && reads.isEmpty()) {
       return MInfoEmpty()
     };
-    if (keys.size() == 1) return MInfoSingle(keys[0]);
+    if (keys.size() == 1 && newDirs.isEmpty() && reads.isEmpty()) {
+      return MInfoSingle(keys[0])
+    };
     MInfoFull(keys, newDirs, reads)
   }
 
@@ -1680,16 +1682,9 @@ class EagerDir{
           newDirs.toArray(),
           reads.toArray(),
         );
-        if (
-          !minfo.getKeys().isEmpty() ||
-          !minfo.getNewDirs().isEmpty() ||
-          !minfo.getReads().isEmpty()
-        ) {
-          !child.old[source] = minfo
-        } else if (child.old.containsKey(source)) {
-          !child.old = child.old.remove(source);
-        };
-
+        // The source cannot be removed from old here
+        // => prevent getting fixed data minfo on multiple call durring update
+        !child.old[source] = minfo;
         ctx.leave(ArrowKey(parentName, childName, key));
         child
       },
@@ -1823,7 +1818,7 @@ class EagerDir{
       | None() -> continue
       | Some(childDir) ->
         !childDirs = childDirs.set(childName);
-        context.!toUpdate = context.toUpdate.set(
+        context.addToUpdate(
           (childDir.time, parentTime),
           Arrow(this.dirName, childName),
         )
@@ -1839,7 +1834,7 @@ class EagerDir{
       context.unsafeMaybeGetEagerDir(childName) match {
       | None() -> continue
       | Some(childDir) ->
-        context.!toUpdate = context.toUpdate.set(
+        context.addToUpdate(
           (childDir.time, parentTime),
           Arrow(this.dirName, childName),
         )
@@ -2085,15 +2080,38 @@ class EagerDir{
     source: Source,
     newDirs: SortedSet<DirName>,
   ): this {
-    removed = mutable Vector[];
     minfo = static::getOld(this, source);
-    if (minfo.getNewDirs().isEmpty() || !context.removeSubDirs) return this;
-
     lastRoundDirs = minfo.getNewDirs();
-    for (dirName in lastRoundDirs) {
-      if (newDirs.contains(dirName)) continue;
-      context.removeDir(dirName);
-      removed.push(dirName)
+    removed = mutable Vector[];
+    if (context.isWithSharedSubDirs(this.dirName)) {
+      toAdd = newDirs;
+      toRemove = mutable Vector[];
+      for (dirName in lastRoundDirs) {
+        if (toAdd.contains(dirName)) {
+          !toAdd = toAdd.remove(dirName)
+        } else {
+          toRemove.push(dirName);
+        }
+      };
+
+      for (newDir in toAdd) {
+        context.incrRefCount(newDir);
+      };
+
+      for (dirName in toRemove) {
+        if (context.decrRefCount(dirName) && context.removeSubDirs) {
+          context.removeDir(dirName);
+          removed.push(dirName)
+        }
+      };
+    } else {
+      if (minfo.getNewDirs().isEmpty() || !context.removeSubDirs) return this;
+
+      for (dirName in lastRoundDirs) {
+        if (newDirs.contains(dirName)) continue;
+        context.removeDir(dirName);
+        removed.push(dirName)
+      }
     };
     !minfo = minfo.setNewDirs(newDirs.toArray());
     !this.old[source] = minfo;
