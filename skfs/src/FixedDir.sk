@@ -184,7 +184,7 @@ value class CompactRow<T>(
 )
 
 class DirInfo{
-  sourceDirs: SortedSet<DirName>,
+  sourceDir: DirName,
   keyIsSameAsValue: Bool,
   isAlwaysSize1: Bool,
   kinds: Array<(Int, SQLParser.IKind, SQLParser.Type)>,
@@ -200,7 +200,6 @@ class CompactFixedDir{
     data: mutable Vector<FixedRow<Array<File>>>,
     dirInfo: DirInfo,
   ): this {
-    invariant(dirInfo.sourceDirs.size() == 1);
     i = 0;
     sz = data.size();
     sorted = loop {
@@ -259,10 +258,7 @@ class CompactFixedDir{
     };
     FixedRow(
       rowKey,
-      (
-        Source(this.dirInfo.sourceDirs.min().fromSome(), sourceKey),
-        Array[(rowValues : File)],
-      ),
+      (Source(this.dirInfo.sourceDir, sourceKey), Array[(rowValues : File)]),
       compactRow.tag,
     )
   }
@@ -283,7 +279,7 @@ base class FixedDirImpl<T: frozen, RowRepresentation: frozen> protected {
 
   static fun getDirInfo(data: mutable Vector<FixedRow<Array<File>>>): ?DirInfo {
     if (data.size() == 0) return None();
-    sourceDirs = SortedSet[];
+    sourceDir: ?DirName = None();
     kinds: ?Array<(Int, SQLParser.IKind, SQLParser.Type)> = None();
 
     keyIsSameAsValue = true;
@@ -299,18 +295,22 @@ base class FixedDirImpl<T: frozen, RowRepresentation: frozen> protected {
             "Mismatched kinds in table " + elt.value.i0.dirName,
           )
         };
-        !sourceDirs = sourceDirs.set(elt.value.i0.dirName);
+        !sourceDir = sourceDir match {
+        | None() -> Some(elt.source.path.dirName)
+        | sd @ Some(dir) if (dir == elt.source.path.dirName) -> sd
+        | _ -> return None()
+        };
         if (row1 != row2) return None()
       | _ -> return None()
       }
     };
-    Some(
+    sourceDir.map(sourceDir ->
       DirInfo{
-        sourceDirs,
+        sourceDir,
         kinds => kinds.fromSome(),
         keyIsSameAsValue,
         isAlwaysSize1 => true,
-      },
+      }
     )
   }
 
