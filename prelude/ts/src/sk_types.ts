@@ -196,33 +196,15 @@ export interface WasmSupplier {
   completeWasm: (wasm: object, utils: Utils) => void;
 }
 
-function utf8Encode(string) {
-  const utf8 = new Array();
+function utf8Encode(str: string): Array<number> {
+  const codePoints = new Array();
 
-  for (let i = 0; i < string.length; i++) {
-    let charcode = string.charCodeAt(i);
-
-    if (charcode < 0x80) {
-      utf8.push(charcode);
-    } else if (charcode < 0x800) {
-      utf8.push((charcode >> 6) | 0xc0);
-      utf8.push((charcode & 0x3f) | 0x80);
-    } else if (charcode < 0xd800 || charcode >= 0xe000) {
-      utf8.push((charcode >> 12) | 0xe0);
-      utf8.push(((charcode >> 6) & 0x3f) | 0x80);
-      utf8.push((charcode & 0x3f) | 0x80);
-    } else {
-      // surrogate pair
-      i++;
-      charcode = 0x10000 + (((charcode & 0x3ff) << 10) | (string.charCodeAt(i) & 0x3ff));
-      utf8.push((charcode >> 18) | 0xf0);
-      utf8.push(((charcode >> 12) & 0x3f) | 0x80);
-      utf8.push(((charcode >> 6) & 0x3f) | 0x80);
-      utf8.push((charcode & 0x3f) | 0x80);
-    }
+  for (const char of str) {
+    const codePoint = char.codePointAt(0);
+    codePoints.push(codePoint);
   }
 
-  return utf8;
+  return codePoints;
 }
 
 export class Utils {
