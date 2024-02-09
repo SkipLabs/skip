@@ -1,0 +1,625 @@
+/*****************************************************************************/
+/* Parser for JSON schemas. */
+/*****************************************************************************/
+
+module SKJSON;
+
+// Example of schema
+
+//   null
+// | number<float>
+// | string
+// | [number<float> | [null | number<float>]]
+// | {
+//     ?"field0": string | [] | {"field1": string, "field9": {}},
+//     ?"field1": number<float> | string,
+//     ?"field3": number<float> | string,
+//     ?"field5": number<float>,
+//     ?"field7": string,
+//     ?"field8": number<float>,
+//     ?"field9": number<float>
+//   }
+
+class ParseError(msg: String) extends Exception {
+  fun getMessage(): String {
+    "Error: " + this.msg
+  }
+}
+
+mutable class Lexer(
+  iter: mutable String.StringIterator,
+  backBuf: mutable Vector<Char> = mutable Vector[],
+  mutable pos: Int = 0,
+) {
+  mutable fun next(): ?Char {
+    if (this.backBuf.isEmpty()) {
+      loop {
+        c = this.iter.next();
+        this.!pos = this.pos + 1;
+        c match {
+        | None() -> return None()
+        | Some(' ')
+        | Some('\t')
+        | Some('\n') ->
+          continue
+        | Some(_) -> return c
+        }
+      }
+    };
+    this.!pos = this.pos + 1;
+    Some(this.backBuf.pop())
+  }
+
+  mutable fun back(c: Char): void {
+    this.!pos = this.pos - 1;
+    this.backBuf.push(c)
+  }
+}
+
+mutable class TypeParser(lex: mutable Lexer) {
+  static fun mcreate(str: String): mutable this {
+    mutable static(mutable Lexer(str.getIter()))
+  }
+
+  static fun normalize(typesWithNum: mutable Vector<STypeWithNum>): Type {
+    types = mutable Vector<SType>[];
+    for (ty in typesWithNum) {
+      ty match {
+      | TNum() ->
+        types.push(TInt());
+        types.push(TFloat())
+      | sty @ TNull() -> types.push(sty)
+      | sty @ TBool() -> types.push(sty)
+      | sty @ TInt() -> types.push(sty)
+      | sty @ TFloat() -> types.push(sty)
+      | sty @ TString() -> types.push(sty)
+      | sty @ TArray _ -> types.push(sty)
+      | sty @ TObject _ -> types.push(sty)
+      }
+    };
+    types.sortBy(x ~> x.kind());
+    result = mutable Vector[];
+    for (ty in types) {
+      if (result.isEmpty()) {
+        result.push(ty);
+        continue;
+      };
+      last = result[result.size() - 1];
+      if (ty.kind() == last.kind()) {
+        !last = ty.union(last);
+        result![result.size() - 1] = last;
+      } else {
+        result.push(ty);
+        !last = ty;
+      }
+    };
+    Type::createFromItems(
+      result.map(x -> (FieldCount::alwaysValue, x)).toArray(),
+    )
+  }
+
+  mutable fun type(): Type {
+    types = mutable Vector[];
+    loop {
+      sty = this.stype();
+      types.push(sty);
+      this.lex.next() match {
+      | None() -> return static::normalize(types)
+      | Some('|') -> continue
+      | Some(c) ->
+        this.lex.back(c);
+        return static::normalize(types)
+      }
+    }
+  }
+
+  mutable fun path(): List<PathElement> {
+    this.lex.next() match {
+    | None() -> List.Nil()
+    | Some('.') ->
+      fieldName = this.lex.next() match {
+      | None() -> this.error("Expected a field name after .")
+      | Some('"') -> this.nextString()
+      | Some(c) ->
+        this.lex.back(c);
+        this.nextKeyword()
+      };
+      List.Cons(PEField(fieldName), this.path())
+    | Some('[') ->
+      chars = mutable Vector[];
+      loop {
+        this.lex.next() match {
+        | None() -> this.error("Unexpected end of path")
+        | Some(']') -> break void
+        | Some(c) ->
+          if (c < '0' || c > '9') {
+            this.error(
+              "Unexpected character for an index: " +
+                String::fromChars(Array[c]),
+            )
+          };
+          chars.push(c)
+        }
+      };
+      List.Cons(
+        PEIndex(String::fromChars(chars.toArray()).toInt()),
+        this.path(),
+      )
+    | Some(c) ->
+      this.error("Unexpected character: " + String::fromChars(Array[c]))
+    }
+  }
+
+  mutable fun expect(c: Char): void {
+    if (this.lex.next() == Some(c)) return void;
+    this.error("Was expecting: " + c)
+  }
+
+  mutable fun stype(): STypeWithNum {
+    this.lex.next() match {
+    | None() -> this.error("Expected a type")
+    | Some('[') ->
+      nc = this.lex.next();
+      nc match {
+      | None() -> this.error("Expected ']'")
+      | Some(c) if (c == ']') -> return TArray(Type::createFromItems(Array[]))
+      | Some(c) -> this.lex.back(c)
+      };
+      result = TArray(this.type());
+      this.expect(']');
+      result
+    | Some('{') ->
+      fields = mutable Vector[];
+      for (fieldName => field in this.fields()) {
+        (alwaysPresent, fieldType) = field;
+        fields.push(
+          if (alwaysPresent) {
+            Field(fieldName, FieldCount::always(), fieldType)
+          } else {
+            Field(fieldName, FieldCount::optional(), fieldType)
+          },
+        );
+      };
+      TObject(Fields::create(fields.toArray()))
+    | Some(c) ->
+      this.lex.back(c);
+      kwd = this.nextKeyword();
+      kwd match {
+      | "null" -> TNull()
+      | "bool" -> TBool()
+      | "int" -> TInt()
+      | "float" -> TFloat()
+      | "string" -> TString()
+      | "num" -> TNum()
+      | x -> this.error("Unknown type: '" + x + "'")
+      }
+    }
+  }
+
+  mutable fun fields(): Map<String, (Bool, Type)> {
+    fields = mutable Map[];
+    loop {
+      this.lex.next() match {
+      | None() -> this.error("Expected field")
+      | Some('}') -> return fields.chill()
+      | Some(c) -> this.lex.back(c)
+      };
+      (fieldName, (optional, ty)) = this.field();
+      fields![fieldName] = (!optional, ty);
+      this.lex.next() match {
+      | Some(',') -> continue
+      | Some('}') -> return fields.chill()
+      | _ -> this.error("Expected '}'")
+      }
+    }
+  }
+
+  mutable fun field(): (String, (Bool, Type)) {
+    optional = this.lex.next() match {
+    | Some('?') -> true
+    | None() -> this.error("Expected a field name")
+    | Some(c) ->
+      this.lex.back(c);
+      false
+    };
+    fieldName = this.lex.next() match {
+    | None() -> this.error("Expected field name")
+    | Some('"') -> this.nextString()
+    | Some(c) ->
+      this.lex.back(c);
+      this.nextKeyword()
+    };
+    ty = this.lex.next() match {
+    | Some(':') -> this.type()
+    | _ -> this.error("Expected ':'")
+    };
+    (fieldName, (optional, ty))
+  }
+
+  readonly fun error<T>(msg: String): T {
+    throw ParseError(msg)
+  }
+
+  private mutable fun nextString(): String {
+    buffer = mutable Vector[];
+    loop {
+      this.lex.iter.next() match {
+      | None()
+      | Some('"') ->
+        return String::fromChars(buffer.toArray())
+      | Some(c @ '\\') ->
+        buffer.push(c);
+        this.lex.next() match {
+        | None() -> invariant_violation("Unterminated string")
+        | Some(escaped) -> buffer.push(escaped)
+        }
+      | Some(c) -> buffer.push(c)
+      }
+    }
+  }
+
+  private mutable fun nextKeyword(): String {
+    buffer = mutable Vector[];
+    loop {
+      ch = this.lex.next();
+      ch match {
+      | None() -> return String::fromChars(buffer.toArray())
+      | Some(c @ '\t')
+      | Some(c @ '\n')
+      | Some(c @ ' ')
+      | Some(c @ '!')
+      | Some(c @ '"')
+      | Some(c @ '#')
+      | Some(c @ '$')
+      | Some(c @ '%')
+      | Some(c @ '&')
+      | Some(c @ '\'')
+      | Some(c @ '(')
+      | Some(c @ ')')
+      | Some(c @ '*')
+      | Some(c @ '+')
+      | Some(c @ ',')
+      | Some(c @ '-')
+      | Some(c @ '.')
+      | Some(c @ '/')
+      | Some(c @ ':')
+      | Some(c @ ';')
+      | Some(c @ '<')
+      | Some(c @ '=')
+      | Some(c @ '>')
+      | Some(c @ '?')
+      | Some(c @ '@')
+      | Some(c @ '[')
+      | Some(c @ '\\')
+      | Some(c @ ']')
+      | Some(c @ '^')
+      | Some(c @ '_')
+      | Some(c @ '`')
+      | Some(c @ '{')
+      | Some(c @ '|')
+      | Some(c @ '}')
+      | Some(c @ '~') ->
+        this.lex.back(c);
+        return String::fromChars(buffer.toArray())
+      | Some(c) -> buffer.push(c)
+      }
+    }
+  }
+}
+
+mutable class PatternParser(lex: mutable Lexer) {
+  static fun mcreate(str: String): mutable this {
+    mutable static(mutable Lexer(str.getIter()))
+  }
+
+  mutable fun expect(c: Char): void {
+    if (this.lex.next() == Some(c)) return void;
+    this.error("Was expecting: " + c)
+  }
+
+  mutable fun toplevelPattern(): ToplevelPattern {
+    result = this.lex.next() match {
+    | None() -> this.error("Expected a pattern")
+    | Some(c @ '%') ->
+      this.lex.back(c);
+      TLPercent(this.field().i1)
+    | Some(c) ->
+      this.lex.back(c);
+      TLPattern(this.pattern())
+    };
+    this.lex.next() match {
+    | None() -> return result
+    | Some(c) ->
+      this.error("Unexpected character: " + String::fromChars(Array[c]))
+    };
+    result
+  }
+
+  mutable fun pattern(): Pattern {
+    this.lex.next() match {
+    | None() -> this.error("Expected a pattern")
+    | Some('[') ->
+      nc = this.lex.next();
+      nc match {
+      | None() -> this.error("Expected ']'")
+      | Some(c) if (c == ']') ->
+        return PArray(
+          None(),
+          PVar(this.lex.pos, None(), "^" + SKStore.genSym(0)),
+        )
+      | Some(c) -> this.lex.back(c)
+      };
+      result = PArray(None(), this.pattern());
+      this.expect(']');
+      result
+    | Some('{') ->
+      fields = mutable Vector[];
+      for (field in this.fields()) {
+        fields.push(field);
+      };
+      PObject(PatFields::create(fields.toArray()))
+    | Some(c) ->
+      this.lex.back(c);
+      varName = this.nextFieldName();
+      if (!static::isValidColumnName(varName)) {
+        this.error("Unexpected var name: " + varName);
+      };
+      this.lex.next() match {
+      | None() -> PVar(this.lex.pos, None(), varName)
+      | Some('<') ->
+        typeParser = mutable TypeParser(this.lex);
+        ty = typeParser.type();
+        this.expect('>');
+        PVar(this.lex.pos, Some(ty), varName)
+      | Some(c2 @ ']')
+      | Some(c2 @ '}')
+      | Some(c2 @ ',') ->
+        this.lex.back(c2);
+        PVar(this.lex.pos, None(), varName)
+      | Some(c2) ->
+        this.error(
+          "Unexpected character after var name " +
+            varName +
+            " found: " +
+            String::fromChars(Array[c2]),
+        )
+      }
+    }
+  }
+
+  mutable fun fields(): Map<String, PatField> {
+    fields = mutable Map[];
+    loop {
+      this.lex.next() match {
+      | None() -> this.error("Expected field")
+      | Some('}') -> return fields.chill()
+      | Some(c) -> this.lex.back(c)
+      };
+      (fieldName, field) = this.field();
+      fields![fieldName] = field;
+      this.lex.next() match {
+      | Some(',') -> continue
+      | Some('}') -> return fields.chill()
+      | _ -> this.error("Expected '}'")
+      }
+    }
+  }
+
+  mutable fun field(): (String, PatField) {
+    optional = this.lex.next() match {
+    | Some('?') -> true
+    | None() -> this.error("Expected a field name")
+    | Some(c) ->
+      this.lex.back(c);
+      false
+    };
+    fieldName = this.lex.next() match {
+    | None() -> this.error("Expected field name")
+    | Some('"') -> this.nextString()
+    | Some(c) ->
+      this.lex.back(c);
+      this.nextFieldName()
+    };
+    for (first in fieldName) {
+      if (first == '[') {
+        this.error("Invalid field name2: " + fieldName)
+      };
+      break void;
+    };
+    pat = this.lex.next() match {
+    | Some(':') -> this.pattern()
+    | Some(c @ ',')
+    | Some(c @ '<')
+    | Some(c @ '}') ->
+      if (!static::isValidColumnName(fieldName)) {
+        this.error(
+          "The field name " +
+            fieldName +
+            " cannot be used as a column name in SQL." +
+            "Please add ': colName'",
+        )
+      };
+      ty = if (c == '<') {
+        typeParser = mutable TypeParser(this.lex);
+        ty = typeParser.type();
+        this.expect('>');
+        Some(ty)
+      } else {
+        this.lex.back(c);
+        None()
+      };
+      PVar(this.lex.pos, ty, fieldName)
+    | _ -> this.error("Expected ':'")
+    };
+    (fieldName, PatField(optional, fieldName, pat))
+  }
+
+  static fun isValidColumnName(fieldName: String): Bool {
+    isFirst = true;
+    for (c in fieldName) {
+      if (isFirst) {
+        !isFirst = false;
+        if (c == '_' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z') continue;
+        return false;
+      };
+      if (
+        c == '_' ||
+        c >= 'a' && c <= 'z' ||
+        c >= 'A' && c <= 'Z' ||
+        c >= '0' && c <= '9'
+      ) continue;
+      return false;
+    };
+    true
+  }
+
+  readonly fun error<T>(msg: String): T {
+    throw ParseError(msg)
+  }
+
+  private mutable fun nextString(): String {
+    buffer = mutable Vector[];
+    buffer.push('"');
+    loop {
+      this.lex.iter.next() match {
+      | None()
+      | Some('"') ->
+        return String::fromChars(buffer.toArray())
+      | Some(c @ '\\') ->
+        buffer.push(c);
+        this.lex.next() match {
+        | None() -> invariant_violation("Unterminated string")
+        | Some(escaped) -> buffer.push(escaped)
+        }
+      | Some(c) -> buffer.push(c)
+      }
+    }
+  }
+
+  private mutable fun nextKeyword(): String {
+    buffer = mutable Vector[];
+    loop {
+      ch = this.lex.next();
+      ch match {
+      | None() -> return String::fromChars(buffer.toArray())
+      | Some(c @ '\t')
+      | Some(c @ '\n')
+      | Some(c @ ' ')
+      | Some(c @ '!')
+      | Some(c @ '"')
+      | Some(c @ '#')
+      | Some(c @ '$')
+      | Some(c @ '%')
+      | Some(c @ '&')
+      | Some(c @ '\'')
+      | Some(c @ '(')
+      | Some(c @ ')')
+      | Some(c @ '*')
+      | Some(c @ '+')
+      | Some(c @ ',')
+      | Some(c @ '-')
+      | Some(c @ '.')
+      | Some(c @ '/')
+      | Some(c @ ':')
+      | Some(c @ ';')
+      | Some(c @ '<')
+      | Some(c @ '=')
+      | Some(c @ '>')
+      | Some(c @ '?')
+      | Some(c @ '@')
+      | Some(c @ '[')
+      | Some(c @ '\\')
+      | Some(c @ ']')
+      | Some(c @ '^')
+      | Some(c @ '_')
+      | Some(c @ '`')
+      | Some(c @ '{')
+      | Some(c @ '|')
+      | Some(c @ '}')
+      | Some(c @ '~') ->
+        this.lex.back(c);
+        return String::fromChars(buffer.toArray())
+      | Some(c) -> buffer.push(c)
+      }
+    }
+  }
+
+  private mutable fun nextFieldName(): String {
+    buffer = mutable Vector[];
+    loop {
+      ch = this.lex.next();
+      ch match {
+      | None() -> return String::fromChars(buffer.toArray())
+      | Some(c @ '[') ->
+        buffer.push(c);
+        loop {
+          this.lex.next() match {
+          | None() -> this.error("Expected ']'")
+          | Some(c2 @ '%') -> buffer.push(c2)
+          | Some(c2) if (c2 >= '0' && c2 <= '9') -> buffer.push(c2)
+          | Some(']') ->
+            buffer.push(']');
+            break void
+          | Some(x) ->
+            this.error("Unexpected index: " + String::fromChars(Array[x]))
+          }
+        }
+      | Some(c @ ':')
+      | Some(c @ ',')
+      | Some(c @ '"')
+      | Some(c @ '<')
+      | Some(c @ '>')
+      | Some(c @ '?')
+      | Some(c @ ']')
+      | Some(c @ '{')
+      | Some(c @ '}') ->
+        this.lex.back(c);
+        return String::fromChars(buffer.toArray())
+      | Some(c) -> buffer.push(c)
+      }
+    }
+  }
+
+  mutable fun path(): List<PathPatternElement> {
+    this.lex.next() match {
+    | None() -> List.Nil()
+    | Some('.') ->
+      fieldName = this.lex.next() match {
+      | None() -> this.error("Expected a field name after .")
+      | Some('"') -> this.nextString()
+      | Some(c) ->
+        this.lex.back(c);
+        this.nextKeyword()
+      };
+      List.Cons(PEField(fieldName), this.path())
+    | Some('[') ->
+      chars = mutable Vector[];
+      loop {
+        this.lex.next() match {
+        | None() -> this.error("Unexpected end of path")
+        | Some(']') -> break void
+        | Some(c) ->
+          if (c < '0' || c > '9') {
+            this.error(
+              "Unexpected character for an index: " +
+                String::fromChars(Array[c]),
+            )
+          };
+          chars.push(c)
+        }
+      };
+      List.Cons(
+        if (chars.isEmpty()) PEEmptyIndex() else {
+          PEIndex(String::fromChars(chars.toArray()).toInt())
+        },
+        this.path(),
+      )
+    | Some(c) ->
+      this.lex.back(c);
+      fieldName = this.nextKeyword();
+      List.Cons(PEField(fieldName), this.path())
+    }
+  }
+}
+
+module end;

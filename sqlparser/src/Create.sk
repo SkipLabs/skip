@@ -41,9 +41,21 @@ extension class Parser {
 
     this.expect_keyword(TAs());
 
-    query = this.parseSelect();
+    subQuery = this.peek_keyword() match {
+    | TSelect() -> SQuery(this.parseSelect())
+    | TValues() -> this.errorNotImplemented()
+    | _ ->
+      this.parseExpr() match {
+      | Call(funName, args, distinct) ->
+        if (distinct) {
+          this.errorUnexpectedToken("Distinct not supported")
+        };
+        SCall(funName, args)
+      | _ -> this.errorUnexpectedToken("Expected a function call")
+      }
+    };
 
-    CreateView{virtual, name, ifNotExists, query}
+    CreateView{virtual, name, ifNotExists, query => subQuery}
   }
 
   mutable fun parseCreateIndex(unique: Bool): CreateIndex {

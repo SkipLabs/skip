@@ -176,6 +176,15 @@ extension class Parser {
       };
       this.expect_token(TRParen());
       VPermission(arg)
+    | "JSON" ->
+      this.expect_token(TLParen());
+      error_pos = this.current_pos();
+      arg = this.parseExpr() match {
+      | VString(x) -> x
+      | e -> throw UnexpectedExpressionError(e, error_pos)
+      };
+      this.expect_token(TRParen());
+      VJSON(arg)
     | _ -> this.parseIdentifierOrFunctionCall(Name::create(value))
     }
   }

@@ -287,105 +287,104 @@ untracked fun main(): void {
     )
     .help();
 
-  try {
-    args = cmd.parseArgs();
-    options = SKDB.Options{
-      backtrace => args.getBool("backtrace"),
-      alwaysAllowJoins => args.getBool("always-allow-joins"),
-      sync => args.getBool("sync"),
-      showUsedIndexes => args.getBool("show-used-indexes"),
-      format => args.getString("format") match {
-      | "csv" -> SKDB.OFK_CSV()
-      | "json" -> SKDB.OFK_JSON()
-      | "sql" -> SKDB.OFK_SQL()
-      | "js" -> SKDB.OFK_JS()
-      | "table" -> SKDB.OFK_Table()
-      | f -> invariant_violation(`Unsupported format: ${f}`)
-      },
-      expectQueryParams => args.getBool("expect-query-params"),
-    };
-
-    subcmd_handler = args.subcommand
-      .map(subcmd ->
-        subcmd match {
-        | "sessions" -> execSessions
-        | "compact" -> execCompact
-        | "dump-table" -> execDumpTable
-        | "dump-tables" -> execDumpTables
-        | "dump-inserts" -> execDumpInserts
-        | "dump-view" -> execDumpView
-        | "dump-views" -> execDumpViews
-        | "dump" -> execDump
-        | "migrate" -> execMigrate
-        | "load-csv" -> execLoadCsv
-        | "csv-field" -> execCsvField
-        | "size" -> execSize
-        | "diff" -> execDiff
-        | "disconnect" -> execDisconnect
-        | "write" -> execWrite
-        | "tail" -> execTail
-        | "watermark" -> execWatermark
-        | "replication-id" -> execReplicationId
-        | "write-csv" -> execWriteCsv
-        | "subscribe" -> execSubscribe
-        | "can-mirror" -> execCanMirror
-        | "replay" -> execReplay
-        | "toggle-view" -> execToggleView
-        | "set-user" -> execSetUser
-        | _ -> invariant_violation(`Unknown subcommand ${subcmd}`)
-        }
-      )
-      .default((args, options) -> {
-        // NOTE: This should be a subcommand, but the `--init` flag is currently
-        // hardcoded in the runtime. It should be revisited once the runtime has
-        // a proper two-step init API for persistence.
-        if (args.maybeGetString("init") is Some _) {
-          _ = SKStore.gContextInit(SKDB.makeSqlContext().clone());
-          return void
-        } else if (args.maybeGetString("capacity") is Some _) {
-          print_error("cannot use capacity without init");
-          skipExit(2)
-        };
-        params = queryParams(options);
-        if (!IO.stdin().isatty()) {
-          input = read_to_end();
-          SKDB.eval(input, options, params) match {
-          | Failure(err) ->
-            SKDB.printError(input, err);
-            skipExit(1)
-          | Success _ -> void
-          }
-        } else {
-          loop {
-            SKStore.withRegionVoid(() ~> {
-              input = "";
-              print_raw("skdb> ");
-              loop {
-                read_line() match {
-                | Some(l) -> !input = input + l + " "
-                | None() -> skipExit(0)
-                };
-                SKDB.eval(input, options, params, true) match {
-                | Failure(UnfinishedTransactionError _)
-                | Failure(
-                  ParserError(P.UnexpectedTokenError(P.TEOF(), _, _)),
-                ) ->
-                  print_raw(" ...> ");
-                  continue
-                | Failure(err) ->
-                  printError(input, err);
-                  break void
-                | _ -> break void
-                }
-              }
-            })
-          }
-        };
-      });
-    subcmd_handler(args, options);
-  } catch {
-  | exn -> print_error("Internal error: " + exn.getMessage())
+  //  try {
+  args = cmd.parseArgs();
+  options = SKDB.Options{
+    backtrace => args.getBool("backtrace"),
+    alwaysAllowJoins => args.getBool("always-allow-joins"),
+    sync => args.getBool("sync"),
+    showUsedIndexes => args.getBool("show-used-indexes"),
+    format => args.getString("format") match {
+    | "csv" -> SKDB.OFK_CSV()
+    | "json" -> SKDB.OFK_JSON()
+    | "sql" -> SKDB.OFK_SQL()
+    | "js" -> SKDB.OFK_JS()
+    | "table" -> SKDB.OFK_Table()
+    | f -> invariant_violation(`Unsupported format: ${f}`)
+    },
+    expectQueryParams => args.getBool("expect-query-params"),
   };
+
+  subcmd_handler = args.subcommand
+    .map(subcmd ->
+      subcmd match {
+      | "sessions" -> execSessions
+      | "compact" -> execCompact
+      | "dump-table" -> execDumpTable
+      | "dump-tables" -> execDumpTables
+      | "dump-inserts" -> execDumpInserts
+      | "dump-view" -> execDumpView
+      | "dump-views" -> execDumpViews
+      | "dump" -> execDump
+      | "migrate" -> execMigrate
+      | "load-csv" -> execLoadCsv
+      | "csv-field" -> execCsvField
+      | "size" -> execSize
+      | "diff" -> execDiff
+      | "disconnect" -> execDisconnect
+      | "write" -> execWrite
+      | "tail" -> execTail
+      | "watermark" -> execWatermark
+      | "replication-id" -> execReplicationId
+      | "write-csv" -> execWriteCsv
+      | "subscribe" -> execSubscribe
+      | "can-mirror" -> execCanMirror
+      | "replay" -> execReplay
+      | "toggle-view" -> execToggleView
+      | "set-user" -> execSetUser
+      | _ -> invariant_violation(`Unknown subcommand ${subcmd}`)
+      }
+    )
+    .default((args, options) -> {
+      // NOTE: This should be a subcommand, but the `--init` flag is currently
+      // hardcoded in the runtime. It should be revisited once the runtime has
+      // a proper two-step init API for persistence.
+      if (args.maybeGetString("init") is Some _) {
+        _ = SKStore.gContextInit(SKDB.makeSqlContext().clone());
+        return void
+      } else if (args.maybeGetString("capacity") is Some _) {
+        print_error("cannot use capacity without init");
+        skipExit(2)
+      };
+      params = queryParams(options);
+      if (!IO.stdin().isatty()) {
+        input = read_to_end();
+        SKDB.eval(input, options, params) match {
+        | Failure(err) ->
+          SKDB.printError(input, err);
+          skipExit(1)
+        | Success _ -> void
+        }
+      } else {
+        loop {
+          SKStore.withRegionVoid(() ~> {
+            input = "";
+            print_raw("skdb> ");
+            loop {
+              read_line() match {
+              | Some(l) -> !input = input + l + " "
+              | None() -> skipExit(0)
+              };
+              SKDB.eval(input, options, params, true) match {
+              | Failure(UnfinishedTransactionError _)
+              | Failure(ParserError(P.UnexpectedTokenError(P.TEOF(), _, _))) ->
+                print_raw(" ...> ");
+                continue
+              | Failure(err) ->
+                printError(input, err);
+                break void
+              | _ -> break void
+              }
+            }
+          })
+        }
+      };
+    });
+  subcmd_handler(args, options);
+  /*  } catch {
+    | exn -> print_error("Internal error: " + exn.getMessage())
+    };
+  */
   SKStore.destroyObstack(saved);
 }
 

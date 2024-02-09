@@ -5,6 +5,158 @@ module alias P = SQLParser;
 
 module SKDB;
 
+/*****************************************************************************/
+/* Opaque types */
+/*****************************************************************************/
+
+const minSchema: CType = CType(SKJSON.Type::any);
+const maxSchema: CType = CType(
+  SKJSON.Type[
+    (
+      Int::max,
+      SKJSON.TObject(
+        SKJSON.Fields::create(
+          Array[
+            SKJSON.Field(
+              largestString(),
+              SKJSON.FieldCount::create(),
+              SKJSON.Type::any,
+            ),
+          ],
+        ),
+      ),
+    ),
+  ],
+);
+
+class CType(ty: SKJSON.Type) extends CValue {
+  static fun create(ty: SKJSON.Type): this {
+    static(ty)
+  }
+
+  fun min(): CValue {
+    minSchema
+  }
+
+  fun max(): CValue {
+    maxSchema
+  }
+}
+
+const minJSON: CJSON = CJSON(SKJSON.CJNull());
+
+const maxJSON: CJSON = CJSON(
+  SKJSON.CJObject(
+    SKJSON.CJFields::create(Array[(largestString(), SKJSON.CJNull())], x -> x),
+  ),
+);
+
+class CJSON(value: SKJSON.CJSON) extends SKDB.CValue {
+  fun max(): SKDB.CValue {
+    maxJSON
+  }
+
+  fun min(): SKDB.CValue {
+    minJSON
+  }
+}
+
+/*****************************************************************************/
+/* Path interning for JSON. */
+/*****************************************************************************/
+
+class CStringFile(value: ?CString) extends SKStore.Key, SKStore.File
+
+const internedCStringsDirName: SKStore.DirName = SKStore.DirName::create(
+  "/json/interned_paths/",
+);
+const internedCStringsDir: SKStore.EHandle<
+  SKStore.SID,
+  CStringFile,
+> = SKStore.EHandle(
+  SKStore.SID::keyType,
+  CStringFile::type,
+  internedCStringsDirName,
+);
+
+fun initInternCStrings(context: mutable SKStore.Context): void {
+  context.unsafeMaybeGetEagerDir(internedCStringsDirName) match {
+  | None() ->
+    _ = context.mkdir(
+      SKStore.IID::keyType,
+      CStringFile::type,
+      internedCStringsDirName,
+      Array[],
+    )
+  | Some(_) -> void
+  }
+}
+
+fun internCString(context: mutable SKStore.Context, string: String): ?CString {
+  initInternCStrings(context);
+  key = SKStore.SID(string);
+  cstring = Some(CString(string));
+  for (file in internedCStringsDir.unsafeGetArray(context, key)) {
+    return file.value;
+  };
+  internedCStringsDir.writeArray(context, key, Array[CStringFile(cstring)]);
+  cstring
+}
+
+/*****************************************************************************/
+/* FieldNames interning for JSON. */
+/*****************************************************************************/
+
+class FieldNamesFile(value: Array<String>) extends SKStore.File
+
+const internedFieldsDirName: SKStore.DirName = SKStore.DirName::create(
+  "/json/interned/",
+);
+const internedFieldsDir: SKStore.EHandle<
+  SKStore.IID,
+  FieldNamesFile,
+> = SKStore.EHandle(
+  SKStore.IID::keyType,
+  FieldNamesFile::type,
+  internedFieldsDirName,
+);
+
+fun initInternFieldNames(context: mutable SKStore.Context): void {
+  context.unsafeMaybeGetEagerDir(internedFieldsDirName) match {
+  | None() ->
+    _ = context.mkdir(
+      SKStore.IID::keyType,
+      FieldNamesFile::type,
+      internedFieldsDirName,
+      Array[],
+    )
+  | Some(_) -> void
+  }
+}
+
+fun internFieldNames(
+  context: mutable SKStore.Context,
+  fieldNames: Array<String>,
+): Array<String> {
+  key = SKStore.IID(fieldNames.hash());
+  for (file in internedFieldsDir.unsafeGetArray(context, key)) {
+    if (file.value == fieldNames) {
+      return file.value;
+    }
+  };
+  internedFieldsDir.writeArray(context, key, Array[FieldNamesFile(fieldNames)]);
+  fieldNames
+}
+
+fun decodeJSON(context: mutable SKStore.Context, str: String): SKJSON.CJSON {
+  initInternFieldNames(context);
+  SKJSON.decode(str, x -> internFieldNames(context, x))
+}
+
+/*****************************************************************************/
+/* Patterns */
+/*****************************************************************************/
+
 value class Pattern{
   firstIsPercent: Bool,
   lastIsPercent: Bool,
@@ -18,6 +170,7 @@ base class AggrKind uses Orderable {
   | Count(Bool)
   | Min()
   | Max()
+  | InferSchema()
 }
 
 base class CValue uses Orderable, Show {
@@ -59,6 +212,8 @@ base class CValue uses Orderable, Show {
     | CInt(n) -> n.toString()
     | CFloat(f) -> inspect(f).toString()
     | CString(str) -> str
+    | CType(ty) -> SKJSON.prettyPrintType(true, ty)
+    | CJSON(json) -> json.prettyPrint()
     }
   }
 
@@ -87,6 +242,8 @@ base class CValue uses Orderable, Show {
       result.push('"');
       String::fromChars(result.toArray())
     | CString(str) -> str
+    | b @ CType _ -> CString(b.toString()).toStringWithFormat(format)
+    | b @ CJSON _ -> CString(b.toString()).toStringWithFormat(format)
     }
   }
 
@@ -159,6 +316,8 @@ base class CGExpr uses Orderable, Hashable {
   | CIExpr(CExpr<Int>)
   | CSExpr(CExpr<String>)
   | CFExpr(CExpr<Float>)
+  | CJExpr(CExpr<CJSON>)
+  | CTExpr(CExpr<CType>)
 
   fun up(): CGExpr {
     this match {
@@ -166,6 +325,8 @@ base class CGExpr uses Orderable, Hashable {
     | CIExpr(ce) -> CIExpr(CUp(ce))
     | CSExpr(ce) -> CSExpr(CUp(ce))
     | CFExpr(ce) -> CFExpr(CUp(ce))
+    | CJExpr(ce) -> CJExpr(CUp(ce))
+    | CTExpr(ce) -> CTExpr(CUp(ce))
     }
   }
 
@@ -176,6 +337,8 @@ base class CGExpr uses Orderable, Hashable {
       P.INTEGER()
     | CFExpr _ -> P.FLOAT()
     | CSExpr _ -> P.TEXT()
+    | CJExpr _ -> P.JSON()
+    | CTExpr _ -> P.SCHEMA()
     }
   }
 }
@@ -193,10 +356,14 @@ class CISCast(CExpr<String>) extends CExpr<Int>
 class CSICast(CExpr<Int>) extends CExpr<String>
 class CSFCast(CExpr<Float>) extends CExpr<String>
 class CFSCast(CExpr<String>) extends CExpr<Float>
+class CJSCast(CExpr<CJSON>) extends CExpr<String>
+class CTSCast(CExpr<CType>) extends CExpr<String>
 
 class CIGetFrom(Int, Int) extends CExpr<Int>
 class CSGetFrom(Int, Int) extends CExpr<String>
 class CFGetFrom(Int, Int) extends CExpr<Float>
+class CJGetFrom(Int, Int) extends CExpr<CJSON>
+class CTGetFrom(Int, Int) extends CExpr<CType>
 
 class CILiteral(Int) extends CExpr<Int>
 class CFLiteral(Float) extends CExpr<Float>
@@ -267,6 +434,16 @@ class CSQuery(cselect: CSelect) extends CExpr<String> {
     this.cselect.id.hash()
   }
 }
+class CJQuery(cselect: CSelect) extends CExpr<CJSON> {
+  fun hash(): Int {
+    this.cselect.id.hash()
+  }
+}
+class CTQuery(cselect: CSelect) extends CExpr<CType> {
+  fun hash(): Int {
+    this.cselect.id.hash()
+  }
+}
 
 class CIAbs(CExpr<Int>) extends CExpr<Int>
 class CFAbs(CExpr<Float>) extends CExpr<Float>
@@ -278,6 +455,8 @@ class CCoalesce<T: frozen>(Array<CExpr<T>>) extends CExpr<T>
 class CIIsNull(CExpr<Int>) extends CExpr<Int>
 class CFIsNull(CExpr<Float>) extends CExpr<Int>
 class CSIsNull(CExpr<String>) extends CExpr<Int>
+class CJIsNull(CExpr<CJSON>) extends CExpr<Int>
+class CTIsNull(CExpr<CType>) extends CExpr<Int>
 class CSConcat(CExpr<String>, CExpr<String>) extends CExpr<String>
 class CSUpper(CExpr<String>) extends CExpr<String>
 class CSLower(CExpr<String>) extends CExpr<String>
@@ -290,5 +469,16 @@ class CStrftime(
 ) extends CExpr<String>
 
 class COn(P.JoinKind, CExpr<Int>) extends CExpr<Int>
+
+/*****************************************************************************/
+/* JSON primitives */
+/*****************************************************************************/
+
+class CJJSON(CExpr<String>) extends CExpr<CJSON>
+class CTJSchema(CExpr<String>) extends CExpr<CType>
+class CSJSchemaPp(CExpr<CType>) extends CExpr<String>
+class CSJSchemaCheck(CExpr<CType>, CExpr<CType>) extends CExpr<String>
+class CTJSONType(CExpr<CJSON>) extends CExpr<CType>
+class CTParseSchema(CExpr<String>) extends CExpr<CType>
 
 module end;

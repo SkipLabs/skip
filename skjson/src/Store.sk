@@ -1,0 +1,67 @@
+/*****************************************************************************/
+/* Code that stores json objects into SKStore. */
+/*****************************************************************************/
+
+module JSON;
+
+extension class IntNumber extends SKJSON.JSONRowValue
+extension class String extends SKJSON.JSONRowValue
+extension class FloatNumber extends SKJSON.JSONRowValue
+
+module end;
+
+module SKJSON;
+
+base class JSONRowValue
+
+base class JSONRowValueType uses Orderable, Hashable {
+  children =
+  | JTInt()
+  | JTFloat()
+  | JTString()
+}
+
+class JSONRowSchema(
+  fields: Array<(String, JSONRowValueType)>,
+  cols: Map<String, Int>,
+) uses Hashable {
+  fun hash(): Int {
+    this.fields.hash()
+  }
+}
+
+class Store{} {
+  static fun root(
+    _context: mutable SKStore.Context,
+    obj: JSON.Object,
+  ): (Array<JSONRowValue>, JSONRowSchema) {
+    values = mutable Vector[];
+    fields = mutable Vector[];
+    cols = mutable Map[];
+    i = 0;
+    addValue = (
+      fieldName: String,
+      value: JSONRowValue,
+      ty: JSONRowValueType,
+    ) -> {
+      values.push(value);
+      fields.push((fieldName, ty));
+      cols![fieldName] = i;
+      !i = i + 1;
+    };
+    for (fieldName => fieldValue in obj.value) {
+      fieldValue match {
+      | JSON.Bool(true) -> addValue(fieldName, JSON.IntNumber(1), JTInt())
+      | JSON.Bool(false) -> addValue(fieldName, JSON.IntNumber(0), JTInt())
+      | v @ JSON.IntNumber _ -> addValue(fieldName, v, JTInt())
+      | v @ JSON.FloatNumber _ -> addValue(fieldName, v, JTFloat())
+      | v @ JSON.String _ -> addValue(fieldName, v, JTString())
+      | _ -> continue
+      }
+    };
+
+    (values.toArray(), JSONRowSchema(fields.toArray(), cols.chill()))
+  }
+}
+
+module end;
