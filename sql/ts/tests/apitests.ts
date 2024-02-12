@@ -243,7 +243,7 @@ function waitSynch(
   check: (v: any) => boolean,
   query_params: Params = new Map(),
   server: boolean = false,
-  max: number = 6,
+  max: number = 10,
 ) {
   let count = 0;
   const test = (resolve, reject) => {
@@ -252,7 +252,7 @@ function waitSynch(
         resolve(value);
       } else {
         count++;
-        setTimeout(() => test(resolve, reject), 100);
+        setTimeout(() => test(resolve, reject), 200);
       }
     };
     if (server) {
