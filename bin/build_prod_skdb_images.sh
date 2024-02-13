@@ -6,13 +6,13 @@ REPO="$SCRIPT_DIR/.."
 set -e
 set -x
 
-cd $REPO
+cd "$REPO"
 
 git clean -xd --dry-run | sed 's|Would remove |/|g' >> .dockerignore
 echo ".git" >> .dockerignore
 
 dockerbuild () {
-    docker build . --no-cache --progress=plain --tag "$1" --file "$2/Dockerfile" $3
+    docker build . --no-cache --progress=plain --tag "$1" --file "$2/Dockerfile" "$3"
 }
 
 dockerbuild skiplabs/skdb-base . --platform=linux/amd64
