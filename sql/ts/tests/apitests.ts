@@ -115,7 +115,7 @@ async function testQueriesAgainstTheServer(skdb: SKDB) {
   expect(tableCreate).toEqual([]);
 
   const viewCreate = await remote.exec(
-    "CREATE VIRTUAL VIEW view_pk AS SELECT x, y * 3 AS y, 'read-write' as skdb_access FROM test_pk;",
+    "CREATE REACTIVE VIEW view_pk AS SELECT x, y * 3 AS y, 'read-write' as skdb_access FROM test_pk;",
     {},
   );
   expect(viewCreate).toEqual([]);
@@ -183,7 +183,7 @@ async function testSchemaQueries(skdb: SKDB) {
   expect(contains ? expected : schema).toEqual(expected);
 
   // valid views/tables
-  const viewExpected = "CREATE VIRTUAL VIEW skdb_groups_users";
+  const viewExpected = "CREATE REACTIVE VIEW skdb_groups_users";
   const viewSchema = await remote.viewSchema("skdb_groups_users");
   const viewContains = viewSchema.includes(viewExpected);
   expect(viewContains ? viewExpected : viewSchema).toEqual(viewExpected);

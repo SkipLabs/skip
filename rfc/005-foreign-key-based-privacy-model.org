@@ -195,7 +195,7 @@ must be the USER you're claiming is the author AND you must be a
 member of the group.
 
 We will need a way of encoding these boolean expressions for the FK
-relations in a table. Maybe this is done through a virtual view?
+relations in a table. Maybe this is done through a reactive view?
 
 With expressions per table like this we could make it so that only the
 author of a comment can delete the comment OR the post author.
@@ -250,7 +250,7 @@ specifying who can traverse an edge. And likewise with deletes.
   - Yes. But it's trivial to emulate our current non-pk conflict model
     using id() for yourself.
 
-* A worked example demonstrating virtual views and aggregation
+* A worked example demonstrating reactive views and aggregation
 
 Let's look at how an auction might work.
 
@@ -324,11 +324,11 @@ reference on the auctions table so there's no equation to specify.
 ** Aggregation
 
 Let's communicate who won an auction. We want to share derived data in
-the form of a virtual view with some users. We define the ~winners~
+the form of a reactive view with some users. We define the ~winners~
 vitual view on the server:
 
 #+BEGIN_SRC sql
-  CREATE VIRTUAL VIEW winners AS
+  CREATE REACTIVE VIEW winners AS
     SELECT
       id as auction,
       max_by(amount, bidder) as winner,
@@ -354,7 +354,7 @@ NOTE that:
   only be read.
 
 - These rows are written when the auctions row is written or the users
-  row is written. We don't need to worry about virtual views managing
+  row is written. We don't need to worry about reactive views managing
   privacy. In other words: the user that creates the data specifies
   the privacy of that data. Downstream tables that reference multiple
   pieces of data specify how that is combined at table/view creation
@@ -380,7 +380,7 @@ express complex privacy rules:
 First we need the total count:
 
 #+BEGIN_SRC sql
-  CREATE VIRTUAL VIEW auction_bid_counts AS
+  CREATE REACTIVE VIEW auction_bid_counts AS
     SELECT
       auction,
       bidder,

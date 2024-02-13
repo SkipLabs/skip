@@ -12,6 +12,8 @@ extension class Parser {
           TView() => this.errorNotImplemented,
         ],
       )
+    } else if (this.parse_keyword(TReactive())) {
+      this.parseCreateView(true)
     } else if (this.parse_keyword(TVirtual())) {
       this.parseCreateView(true)
     } else if (this.parse_keyword(TUnique())) {
@@ -27,7 +29,7 @@ extension class Parser {
     }
   }
 
-  mutable fun parseCreateView(virtual: Bool): CreateView {
+  mutable fun parseCreateView(reactive: Bool): CreateView {
     this.expect_keyword(TView());
 
     ifNotExists = this.parseIfNotExists();
@@ -55,7 +57,7 @@ extension class Parser {
       }
     };
 
-    CreateView{virtual, name, ifNotExists, query => subQuery}
+    CreateView{reactive, name, ifNotExists, query => subQuery}
   }
 
   mutable fun parseCreateIndex(unique: Bool): CreateIndex {

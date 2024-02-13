@@ -17,7 +17,7 @@ echo "create table t1 (a INTEGER);" | $SKDB --data /tmp/test.db
 
 rm -f /tmp/nn
 
-echo "create virtual view v1 as select * from t1;" | $SKDB --data /tmp/test.db
+echo "create reactive view v1 as select * from t1;" | $SKDB --data /tmp/test.db
 
 $SKDB subscribe v1 --connect --notify /tmp/nn --data /tmp/test.db > /dev/null
 

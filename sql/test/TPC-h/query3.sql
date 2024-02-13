@@ -1,4 +1,4 @@
-create virtual view query3 select
+create reactive view query3 select
 	p_brand,
 	p_type,
 	p_size,

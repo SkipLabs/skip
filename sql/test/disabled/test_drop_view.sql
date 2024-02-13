@@ -8,6 +8,6 @@ create view v1 as select * from t1;
 
 drop view v1;
 
-create virtual view v1 as select * from t1;
+create reactive view v1 as select * from t1;
 
 drop view v1;

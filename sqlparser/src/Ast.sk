@@ -26,7 +26,7 @@ base class Stmt{pos: Int = 0} uses Equality, Show {
   | BeginTransaction{kind: TransactionKind}
   | EndTransaction{}
   | CreateView{
-    virtual: Bool,
+    reactive: Bool,
     name: Name,
     ifNotExists: Bool,
     query: ViewDefinition,
@@ -117,7 +117,7 @@ base class ColumnConstraint{
   | CCDefault{expr: Expr}
   | CCCollate{name: String}
   | CCForeignKey{references: ForeignKeyClause}
-  | CCGenerated{expr: Expr, stored: Bool, virtual: Bool}
+  | CCGenerated{expr: Expr, stored: Bool, reactive: Bool}
 }
 
 base class TableConstraint{constraintName: ?String} uses Equality {

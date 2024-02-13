@@ -425,7 +425,7 @@ fun computeOrder(
 class SelectFile(
   tick: Int,
   name: P.Name,
-  virtual: Bool,
+  reactive: Bool,
   text: String,
   sparams: Array<P.SelectResult>,
   cselect: CSelect,
@@ -592,10 +592,10 @@ class Evaluator{options: Options, user: ?UserFile} {
       name => viewName,
       ifNotExists,
       query => P.SCall(funName, args),
-      virtual,
+      reactive,
     } ->
-      if (!virtual) {
-        error(pos, "table transforms can only be done in a virtual view");
+      if (!reactive) {
+        error(pos, "table transforms can only be done in a reactive view");
       };
       funName.lower match {
       | "json_extract" ->
@@ -957,7 +957,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       name => viewName,
       ifNotExists,
       query => P.SQuery(selectAst @ P.Select _),
-      virtual,
+      reactive,
     } ->
       if (selectAst.core is P.SelectCoreValues _) {
         error(selectAst.pos, "CREATE VIEW AS VALUES ... not implemented")
@@ -970,7 +970,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       key = SKStore.SID(viewName.lower);
       cselect1 = SKDB.Compiler::create(
         false,
-        this.options with {virtual => true},
+        this.options with {reactive => true},
         selectAst.pos,
         params,
       ).compileSelect(context, selectAst, viewName, true);
@@ -999,15 +999,15 @@ class Evaluator{options: Options, user: ?UserFile} {
         SelectFile(
           context.tick.value,
           viewName,
-          virtual,
+          reactive,
           view.toString(),
           (selectAst.core as P.SelectCoreQuery _).params,
           cselect1,
         ),
       );
-      if (virtual) {
+      if (reactive) {
         if (inTransaction) {
-          error(pos, "Cannot create a virtual view in a transaction");
+          error(pos, "Cannot create a reactive view in a transaction");
         };
         startTick = context.tick;
         // This phase just populates the data.
@@ -1029,7 +1029,7 @@ class Evaluator{options: Options, user: ?UserFile} {
           };
           compiler = SKDB.Compiler::create(
             false,
-            this.options with {virtual => true},
+            this.options with {reactive => true},
             selectAst.pos,
             params,
           );
@@ -1068,8 +1068,8 @@ class Evaluator{options: Options, user: ?UserFile} {
           error(pos, "VIEW " + viewName + " does not exist");
         };
         selectFile = SelectFile::type(files[0]);
-        if (selectFile.virtual) {
-          error(pos, "Cannot drop a virtual view");
+        if (selectFile.reactive) {
+          error(pos, "Cannot drop a reactive view");
         } else {
           viewsDir.writeArray(context, key, Array[]);
         }
@@ -1587,7 +1587,7 @@ class Options{
   alwaysAllowJoins: Bool,
   backtrace: Bool,
   sync: Bool,
-  virtual: Bool = false,
+  reactive: Bool = false,
   showUsedIndexes: Bool,
   format: OutputFormatKind = OFK_SQL(),
   expectQueryParams: Bool = false,
@@ -2134,7 +2134,7 @@ fun getReactiveQueryHandle(
             alwaysAllowJoins => false,
             backtrace => false,
             sync => false,
-            virtual => false,
+            reactive => false,
             showUsedIndexes => false,
           };
           params = decodeParams(queryInfo.params);

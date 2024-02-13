@@ -1,4 +1,4 @@
-create virtual view query1 as select
+create reactive view query1 as select
   c_custkey,
   c_name,
   sum(l_extendedprice * (1.0 - l_discount)) as revenue,
