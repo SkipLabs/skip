@@ -1607,6 +1607,56 @@ export const tests = (asWorker: boolean) => {
         expect(res).toMatch(/^CREATE VIRTUAL VIEW v1/);
       },
     },
+    {
+      name: n("UTF8", asWorker),
+      fun: async (skdb: SKDB) => {
+        await skdb.exec("create table t1 (a TEXT);");
+        let objects = [
+          {data:"x\u2019s re"},
+          {data:"y\u2013 1"},
+          {data:"z\u00ae b"},
+          {data:"\u00c3\u00a9al P"},
+          {data:" \u2022 T"}
+        ];
+        for(let i in objects) {
+          await skdb.exec("insert into t1 values(@data)", objects[i]);
+        }
+        return JSON.stringify(await skdb.exec("select * from t1"));
+      },
+      check: (res) => {
+        expect(res).toMatch(/x\u2019s re/);
+        expect(res).toMatch(/y\u2013 1/);
+        expect(res).toMatch(/z\u00ae b/);
+        expect(res).toMatch(/\u00c3\u00a9al P/);
+        expect(res).toMatch(/ \u2022 T/);
+      },
+    },
+    {
+      name: n("JSON UTF8", asWorker),
+      fun: async (skdb: SKDB) => {
+        await skdb.exec("create table t1 (a JSON);");
+        let objects = [
+          {data: {field1: "x\u2019s re"}},
+          {data: {field1: "y\u2013 1"}},
+          {data: {field1: "z\u00ae b"}},
+          {data: {field1: "\u00c3\u00a9al P"}},
+          {data: {field1: " \u2022 T"}}
+        ];
+        for(let i in objects) {
+          objects[i].data = JSON.stringify(objects[i].data);
+          await skdb.exec("insert into t1 values(@data)", objects[i]);
+        }
+        return await skdb.exec("select * from t1");
+      },
+      check: (res) => {
+        let all = res.map(x => JSON.parse(x.a).field1).join("");
+        expect(all).toMatch(/x\u2019s re/);
+        expect(all).toMatch(/y\u2013 1/);
+        expect(all).toMatch(/z\u00ae b/);
+        expect(all).toMatch(/\u00c3\u00a9al P/);
+        expect(all).toMatch(/ \u2022 T/);
+      },
+    }
   ];
   return tests
     .concat(watchTests(asWorker))
