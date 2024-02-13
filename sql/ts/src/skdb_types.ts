@@ -130,7 +130,9 @@ export type ProtoResponseCreds = {
   privateKey: Uint8Array;
 };
 
-export type Params = Map<string, string | number> | Object;
+export type Params =
+  | Map<string, string | number>
+  | Record<string, string | number>;
 
 export interface RemoteSKDB {
   connectedAs(): Promise<string>;
