@@ -38,7 +38,7 @@ export class ExternalFuns {
 /* Class for query results, extending Array<Object> with some common selectors
    and utility functions for ease of use. */
 /* ***************************************************************************/
-export class SKDBTable extends Array<Object> {
+export class SKDBTable extends Array<Record<string, any>> {
   scalarValue(): any {
     const row = this.onlyRow();
     const cols = Object.keys(row);
@@ -47,11 +47,10 @@ export class SKDBTable extends Array<Object> {
         `Can't extract scalar: query yielded ${cols.length} columns`,
       );
     }
-    // @ts-ignore
     return row[cols[0]];
   }
 
-  onlyRow(): any {
+  onlyRow(): Record<string, any> {
     if (this.length != 1) {
       throw new Error(`Can't extract only row: got ${this.length} rows`);
     }
@@ -67,7 +66,6 @@ export class SKDBTable extends Array<Object> {
           `Can't extract only column: got ${cols.length} columns`,
         );
       }
-      // @ts-ignore
       result.push(row[cols[0]]);
     }
     return result;
@@ -75,11 +73,9 @@ export class SKDBTable extends Array<Object> {
 
   column(col: string): Array<any> {
     return this.map((row) => {
-      // @ts-ignore
       if (!row[col]) {
         throw new Error("Missing column: " + col);
       }
-      // @ts-ignore
       return row[col];
     });
   }
