@@ -196,33 +196,8 @@ export interface WasmSupplier {
   completeWasm: (wasm: object, utils: Utils) => void;
 }
 
-function utf8Encode(str: string): Array<number> {
-  const utf8 = new Array();
-
-  for (let i = 0; i < str.length; i++) {
-    let charcode = str.charCodeAt(i);
-
-    if (charcode < 0x80) {
-      utf8.push(charcode);
-    } else if (charcode < 0x800) {
-      utf8.push((charcode >> 6) | 0xc0);
-      utf8.push((charcode & 0x3f) | 0x80);
-    } else if (charcode < 0xd800 || charcode >= 0xe000) {
-      utf8.push((charcode >> 12) | 0xe0);
-      utf8.push(((charcode >> 6) & 0x3f) | 0x80);
-      utf8.push((charcode & 0x3f) | 0x80);
-    } else {
-      // surrogate pair
-      i++;
-      charcode = 0x10000 + (((charcode & 0x3ff) << 10) | (str.charCodeAt(i) & 0x3ff));
-      utf8.push((charcode >> 18) | 0xf0);
-      utf8.push(((charcode >> 12) & 0x3f) | 0x80);
-      utf8.push(((charcode >> 6) & 0x3f) | 0x80);
-      utf8.push((charcode & 0x3f) | 0x80);
-    }
-  }
-
-  return utf8;
+function utf8Encode(str: string): Uint8Array {
+  return new TextEncoder().encode(str)
 }
 
 export class Utils {
@@ -233,7 +208,7 @@ export class Utils {
 
   args: Array<string>;
   private current_stdin: number;
-  private stdin: Array<number>;
+  private stdin: Uint8Array;
   private stdout: Array<string>;
   private stderr: Array<string>;
   private stddebug: Array<string>;
