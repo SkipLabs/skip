@@ -1,4 +1,4 @@
-create virtual view query2 as select
+create reactive view query2 as select
 	sum(l_extendedprice * l_discount) as revenue
 from
 	lineitem

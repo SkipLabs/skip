@@ -4,9 +4,9 @@ extension base class Stmt {
   fun toString(): String
   | BeginTransaction{kind} -> `BEGIN ${kind} TRANSACTION`
   | EndTransaction{} -> "END TRANSACTION"
-  | CreateView{virtual, name, ifNotExists, query => subQuery} ->
+  | CreateView{reactive, name, ifNotExists, query => subQuery} ->
     "CREATE " +
-      (if (virtual) "VIRTUAL " else "") +
+      (if (reactive) "REACTIVE " else "") +
       "VIEW " +
       (if (ifNotExists) "IF NOT EXISTS " else "") +
       name.toString() +

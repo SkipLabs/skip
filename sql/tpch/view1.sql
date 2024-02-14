@@ -1,4 +1,4 @@
-create virtual view view1 as select
+create reactive view view1 as select
 c_custkey,
 o_orderkey,
 c_name,
