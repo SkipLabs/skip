@@ -8,6 +8,9 @@
 module String;
 
 @cpp_extern
+native fun byteSize(String): UInt32;
+
+@cpp_extern
 native fun unsafeSlice(str: String, Int, Int): String;
 
 native class .String uses Hashable, Show, Orderable, AsBytes {
@@ -250,7 +253,7 @@ native class .String uses Hashable, Show, Orderable, AsBytes {
 
   fun utf8(): Array<UInt8> {
     result = mutable Vector[];
-    for (i in Range(0, Unsafe.string_utf8_size(this))) {
+    for (i in Range(0, String.byteSize(this).toInt())) {
       result.push(Unsafe.string_utf8_get(this, i));
     };
     result.toArray()
@@ -432,7 +435,7 @@ native class .String uses Hashable, Show, Orderable, AsBytes {
   }
 
   fun bytes(): readonly Bytes {
-    StringBytes(this, Range(0, Unsafe.string_utf8_size(this)))
+    StringBytes(this, Range(0, String.byteSize(this).toInt()))
   }
 
   @synonym("toUpperCase")
