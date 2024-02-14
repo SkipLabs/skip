@@ -575,20 +575,25 @@ class FixedSingle<K: Orderable, +V: frozen>(data: Array<(K, V)> = Array[]) {
     static::create(Vector::mcreateFromItems(items));
   }
 
-  static fun create(data: mutable Vector<(K, V)>, dedup: Bool = false): this {
+  static fun create(
+    data: mutable Vector<(K, V)>,
+    allowDuplicates: Bool = false,
+  ): FixedSingle<K, V> {
     data.sortBy(x ~> x.i0);
 
-    lastOpt: ?K = None();
-    for (kv in data) {
-      (k, _) = kv;
-      lastOpt match {
-      | None() -> !lastOpt = Some(k)
-      | Some(last) ->
-        if (last == k && !dedup) {
-          debug((last, k));
-          invariant_violation("Duplicate value in single")
-        } else {
-          !lastOpt = Some(k)
+    if (!allowDuplicates) {
+      lastOpt: ?K = None();
+      for (kv in data) {
+        (k, _) = kv;
+        lastOpt match {
+        | None() -> !lastOpt = Some(k)
+        | Some(last) ->
+          if (last == k) {
+            debug((last, k));
+            invariant_violation("Duplicate value in single")
+          } else {
+            !lastOpt = Some(k)
+          }
         }
       }
     };
