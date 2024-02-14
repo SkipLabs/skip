@@ -156,14 +156,7 @@ export class SKDBSyncImpl implements SKDBSync {
     endpoint?: string,
   ): Promise<void> {
     if (!endpoint) {
-      if (typeof window === "undefined") {
-        throw new Error(
-          "No endpoint passed to connect and no window object to infer from.",
-        );
-      }
-      const loc = window.location;
-      const scheme = loc.protocol === "https:" ? "wss://" : "ws://";
-      endpoint = `${scheme}${loc.host}`;
+      endpoint = "wss://api.skiplabs.io";
     }
 
     const creds = {
