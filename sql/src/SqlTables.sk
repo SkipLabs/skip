@@ -391,8 +391,8 @@ fun getSubsDirs(
             skipExit(3)
           };
           selectFile = SKDB.SelectFile::type(selectFiles[0]);
-          if (!selectFile.virtual) {
-            print_error("Error: can only connect to virtual views");
+          if (!selectFile.reactive) {
+            print_error("Error: can only connect to reactive views");
             skipExit(23);
           };
           cselect = selectFile.cselect;
@@ -633,7 +633,7 @@ fun getTable(
         cselect.id,
         dirName,
       );
-      if (!selectFile.virtual) {
+      if (!selectFile.reactive) {
         _ = evalSelect(context, cselect, None());
       };
       dirDescr

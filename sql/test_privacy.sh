@@ -30,7 +30,7 @@ echo "create table t1 (id INTEGER primary key, skdb_access TEXT);" | $SKDB_COPY
 subt1=`$SKDB subscribe t1`
 
 echo "create table t2 (id INTEGER primary key, skdb_access TEXT);" | $SKDB
-echo "create virtual view v1 as select id, id as skdb_access from t1 ;" | $SKDB
+echo "create reactive view v1 as select id, id as skdb_access from t1 ;" | $SKDB
 
 ###############################################################################
 # Creating the users

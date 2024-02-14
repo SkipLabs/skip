@@ -116,13 +116,13 @@ fi
 
 ./test_notify.sh
 
-cat test/join_outside_of_virtual.sql | $SKDB 2> /tmp/kk1
-diff /tmp/kk1 test/unit/join_outside_of_virtual.exp > /dev/null
+cat test/join_outside_of_reactive.sql | $SKDB 2> /tmp/kk1
+diff /tmp/kk1 test/unit/join_outside_of_reactive.exp > /dev/null
 
 if [ $? -eq 0 ]; then
-    pass "VIRTUAL JOIN"
+    pass "REACTIVE JOIN"
 else
-    fail "VIRTUAL JOIN"
+    fail "REACTIVE JOIN"
 fi
 
 if cat test/insert_autoid.sql | $SKDB | grep -q "3"

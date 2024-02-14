@@ -26,7 +26,7 @@ fi
 # NATION_COUNT VIEW
 ###############################################################################
 
-echo "create virtual view nation_count as select c_nationkey, count(*) from customer group by c_nationkey;" | $SKDB --data /tmp/test.db
+echo "create reactive view nation_count as select c_nationkey, count(*) from customer group by c_nationkey;" | $SKDB --data /tmp/test.db
 $SKDB subscribe nation_count --connect --data /tmp/test.db --updates /tmp/nation_count > /dev/null
 
 ###############################################################################
@@ -68,9 +68,9 @@ cat query1.sql | $SKDB --data /tmp/test.db
 TOTAL=$(($SECONDS - $START))
 if (( TOTAL > 3 ));
 then
-    echo -e "BUILD query1 VIRTUAL VIEW:\tFAILED ($TOTAL)"
+    echo -e "BUILD query1 REACTIVE VIEW:\tFAILED ($TOTAL)"
 else
-    echo -e "BUILD query1 VIRTUAL VIEW:\tOK ($TOTAL)"
+    echo -e "BUILD query1 REACTIVE VIEW:\tOK ($TOTAL)"
 fi
 
 $SKDB subscribe query1 --connect --data /tmp/test.db --updates /tmp/query1 > /dev/null
@@ -86,9 +86,9 @@ cat query2.sql | $SKDB --data /tmp/test.db
 TOTAL=$(($SECONDS - $START))
 if (( TOTAL > 20 ));
 then
-    echo -e "BUILD query2 VIRTUAL VIEW:\tFAILED ($TOTAL)"
+    echo -e "BUILD query2 REACTIVE VIEW:\tFAILED ($TOTAL)"
 else
-    echo -e "BUILD query2 VIRTUAL VIEW:\tOK ($TOTAL)"
+    echo -e "BUILD query2 REACTIVE VIEW:\tOK ($TOTAL)"
 fi
 
 $SKDB subscribe query2 --connect --data /tmp/test.db --updates /tmp/query2 > /dev/null
@@ -104,9 +104,9 @@ cat query3.sql | $SKDB --data /tmp/test.db
 TOTAL=$(($SECONDS - $START))
 if (( TOTAL > 30 ));
 then
-    echo -e "BUILD query3 VIRTUAL VIEW:\tFAILED ($TOTAL)"
+    echo -e "BUILD query3 REACTIVE VIEW:\tFAILED ($TOTAL)"
 else
-    echo -e "BUILD query3 VIRTUAL VIEW:\tOK ($TOTAL)"
+    echo -e "BUILD query3 REACTIVE VIEW:\tOK ($TOTAL)"
 fi
 
 $SKDB subscribe query3 --connect --data /tmp/test.db --updates /tmp/query3 > /dev/null

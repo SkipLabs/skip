@@ -15,7 +15,7 @@ fail() { printf "%-50s FAILED\n" "$1:"; }
 run_diff () {
     rm -f /tmp/kk1 /tmp/kk2 /tmp/kk3 $DB
 
-    nviews=`cat $2 | grep VIEW | sed 's/CREATE VIRTUAL VIEW V//' | sed 's/ .*//' | sort -n -r | head -n 1`
+    nviews=`cat $2 | grep VIEW | sed 's/CREATE REACTIVE VIEW V//' | sed 's/ .*//' | sort -n -r | head -n 1`
 
     $SKDB_CMD --init $DB
     cat $1 $2 | $SKDB
@@ -43,7 +43,7 @@ run_diff () {
 
     cat /tmp/selects.sql | $SKDB | sort -n > /tmp/kk1
 
-    cat $2 | sed 's/CREATE VIRTUAL VIEW V[0-9]* AS //' > /tmp/selects2.sql
+    cat $2 | sed 's/CREATE REACTIVE VIEW V[0-9]* AS //' > /tmp/selects2.sql
 
     cat $1 $3 $4 $5 /tmp/selects2.sql | sqlite3 | sort -n > /tmp/kk2
 
@@ -69,7 +69,7 @@ run_diff () {
 run_diff_no_sqlite () {
     rm -f /tmp/kk1 /tmp/kk2 /tmp/kk3 $DB
 
-    nviews=`cat $2 | grep VIEW | sed 's/CREATE VIRTUAL VIEW V//' | sed 's/ .*//' | sort -n -r | head -n 1`
+    nviews=`cat $2 | grep VIEW | sed 's/CREATE REACTIVE VIEW V//' | sed 's/ .*//' | sort -n -r | head -n 1`
 
     $SKDB_CMD --init $DB
     cat $1 $2 | $SKDB

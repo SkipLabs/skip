@@ -43,7 +43,7 @@ CREATE UNIQUE INDEX skdb_permissions_group_user ON
   skdb_group_permissions(groupID, userID)
 ;
 
-CREATE VIRTUAL VIEW skdb_groups_users AS
+CREATE REACTIVE VIEW skdb_groups_users AS
   SELECT userID AS groupID FROM skdb_users
   UNION ALL
   SELECT groupID FROM skdb_groups

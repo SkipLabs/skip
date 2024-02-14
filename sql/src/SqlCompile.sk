@@ -279,7 +279,7 @@ mutable class Compiler{
     cselect = CSelect{
       id => P.Name::create(
         selectId.lower +
-          (if (this.options.virtual) "" else params.hash().toString()) +
+          (if (this.options.reactive) "" else params.hash().toString()) +
           context.getGlobal("TableMap") match {
           | None() -> ""
           | Some(file) -> "_V" + TableMap::type(file).version.value.toString()
@@ -1983,10 +1983,10 @@ mutable class Compiler{
     where match {
     | None() ->
       if (origFrom.size() > 1) {
-        if (this.options.virtual) {
+        if (this.options.reactive) {
           error(
             this.pos,
-            "Cross joins not supported in virtual views (regardless of option --always-allow-joins)",
+            "Cross joins not supported in reactive views (regardless of option --always-allow-joins)",
           );
         };
         if (!this.options.alwaysAllowJoins) {
@@ -2081,19 +2081,19 @@ mutable class Compiler{
       viewName = P.Name::create(
         leftTable.name.origName + "_" + rightTable.name.origName,
       );
-      if (!this.options.virtual && !this.options.alwaysAllowJoins) {
+      if (!this.options.reactive && !this.options.alwaysAllowJoins) {
         leftSchema = tables[join.left.tableNbr].fromSome().schema;
         col1 = leftSchema[join.left.col.i0].name;
         rightSchema = tables[join.right.tableNbr].fromSome().schema;
         col2 = rightSchema[join.right.col.i0].name;
         msg =
-          "Joins outside of virtual views are considered bad practice in skdb.\n" +
-          "You should first create a virtual view joining " +
+          "Joins outside of reactive views are considered bad practice in skdb.\n" +
+          "You should first create a reactive view joining " +
           leftTable.name.origName +
           " and " +
           rightTable.name.origName +
           " with a query of the form:\n\n" +
-          "create virtual view " +
+          "create reactive view " +
           viewName +
           " as select * from " +
           leftTable.name.origName +
@@ -2110,7 +2110,7 @@ mutable class Compiler{
           "PS: You can ignore this error message with " +
           "--always-allow-joins (not recommended).\n" +
           if (tables.size() == 2) {
-            "PS2: don't forget you can add indexes to virtual views."
+            "PS2: don't forget you can add indexes to reactive views."
           } else {
             ""
           };

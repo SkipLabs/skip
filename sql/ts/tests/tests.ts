@@ -1452,12 +1452,12 @@ export const tests = (asWorker: boolean) => {
       },
     },
     {
-      name: n("Virtual view if not exists", asWorker),
+      name: n("Reactive view if not exists", asWorker),
       fun: async (skdb: SKDB) => {
         await skdb.exec("create table t1 (a BOOLEAN, b boolean);");
-        await skdb.exec("create virtual view v1 as select * from t1;");
+        await skdb.exec("create reactive view v1 as select * from t1;");
         await skdb.exec(
-          "create virtual view if not exists v1 as select * from t1;",
+          "create reactive view if not exists v1 as select * from t1;",
         );
         return await skdb.exec("select 1;");
       },
@@ -1600,11 +1600,11 @@ export const tests = (asWorker: boolean) => {
       name: n("Schema for view", asWorker),
       fun: async (skdb: SKDB) => {
         await skdb.exec("create table t1 (a BOOLEAN, b boolean);");
-        await skdb.exec("create virtual view v1 as select * from t1;");
+        await skdb.exec("create reactive view v1 as select * from t1;");
         return await skdb.schema("v1");
       },
       check: (res) => {
-        expect(res).toMatch(/^CREATE VIRTUAL VIEW v1/);
+        expect(res).toMatch(/^CREATE REACTIVE VIEW v1/);
       },
     },
     {
