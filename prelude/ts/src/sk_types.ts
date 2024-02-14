@@ -552,15 +552,6 @@ export class Utils {
     return lineBuffer;
   };
 
-  getStdInChar = () => {
-    if (this.current_stdin >= this.stdin.length) {
-      this.exports.SKIP_throw_EndOfFile();
-    }
-    let result = this.stdin[this.current_stdin];
-    this.current_stdin++;
-    return result;
-  };
-
   runWithGc = <T>(fn: () => T) => {
     let obsPos = this.exports.SKIP_new_Obstack();
     try {

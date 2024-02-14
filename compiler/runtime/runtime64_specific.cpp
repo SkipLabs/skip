@@ -218,56 +218,6 @@ uint32_t SKIP_read_line_get(uint32_t i) {
   return lineBuffer[i];
 }
 
-uint32_t SKIP_getchar(uint64_t) {
-  int c1 = (uint32_t)getc(stdin);
-
-  if (c1 == EOF) {
-    SKIP_throw_EndOfFile();
-  }
-
-  if ((c1 & 0x80) == 0) {
-    return c1;
-  }
-
-  int c2 = (uint32_t)getc(stdin);
-
-  if (c2 == EOF) {
-    fprintf(stderr, "Invalid utf8");
-    exit(ERROR_INVALID_STRING);
-  }
-
-  if ((c1 & 0x20) == 0) {
-    return (c1 - 192) * 64 + (c2 - 128);
-  }
-
-  int c3 = (uint32_t)getc(stdin);
-
-  if (c3 == EOF) {
-    fprintf(stderr, "Invalid utf8");
-    exit(ERROR_INVALID_STRING);
-  }
-
-  if ((c1 & 0x10) == 0) {
-    return (c1 - 224) * 4096 + (c2 - 128) * 64 + (c3 - 128);
-  }
-
-  int c4 = (uint32_t)getc(stdin);
-
-  if (c4 == EOF) {
-    fprintf(stderr, "Invalid utf8");
-    exit(ERROR_INVALID_STRING);
-  }
-
-  if ((c1 & 0x8) == 0) {
-    return (c1 - 240) * 262144 + (c2 - 128) * 4096 + (c3 - 128) * 64 +
-           (c4 - 128);
-  }
-
-  fprintf(stderr, "Invalid utf8");
-  exit(ERROR_INVALID_STRING);
-  return 0;
-}
-
 thread_local void* exn;
 
 void* SKIP_getExn() {

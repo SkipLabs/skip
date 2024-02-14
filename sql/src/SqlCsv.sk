@@ -105,33 +105,6 @@ fun lex(next: () -> Char): mutable Iterator<(Bool, String)> {
   }
 }
 
-fun parseCsv<T>(
-  line: mutable Ref<Int>,
-  f: ((Bool, String)) ~> T,
-): (Bool, Array<Array<T>>) {
-  array = mutable Vector[];
-  eof = false;
-  try {
-    for (_ in Range(0, 1000)) {
-      values = mutable Vector[];
-      for (value in lex(() -> getChar())) {
-        values.push(value);
-      };
-      cvalues = values.map(f);
-      array.push(cvalues.toArray());
-      line.set(line.get() + 1);
-    }
-  } catch {
-  | EndOfFile _ ->
-    !eof = true;
-    void
-  | exn ->
-    print_error("Error, line " + line.get() + ": " + exn.getMessage());
-    skipExit(23)
-  };
-  (eof, array.toArray())
-}
-
 fun parseCSVValue(kv: (Bool, String)): P.Value {
   (isStr, str) = kv;
   if (isStr) return P.VString(str);
@@ -144,34 +117,6 @@ fun parseCSVValue(kv: (Bool, String)): P.Value {
     }
   | Some(x) -> P.VInt(x)
   }
-}
-
-fun insert(
-  context: mutable SKStore.Context,
-  line: mutable Ref<Int>,
-  options: SKDB.Options,
-  table: SKDB.DirDescr,
-  user: ?SKDB.UserFile,
-): SKStore.ContextOp {
-  // empty params since no placeholders in input to skdb load-csv
-  params: Map<String, P.Value> = Map[];
-  eval = SKDB.Evaluator{options, user};
-  pos = 0;
-  inTransaction = false;
-  paramsOpt = None();
-  (eof, array) = parseCsv(line, parseCSVValue);
-  f = eval.insert(
-    context,
-    params,
-    pos,
-    None(),
-    inTransaction,
-    table,
-    paramsOpt,
-    array,
-  );
-  if (!eof) return SKStore.CContinue(f);
-  SKStore.CStop(f)
 }
 
 fun reasonSchemaUnsupported(

@@ -26,7 +26,6 @@ class LinksImpl implements Links {
   SKIP_read_line_fill!: () => int;
   SKIP_read_to_end_fill!: () => int;
   SKIP_read_line_get!: (index: int) => ptr;
-  SKIP_getchar!: () => int;
 
   SKIP_print_error!: (strPtr: ptr) => void;
   SKIP_print_error_raw!: (strPtr: ptr) => void;
@@ -126,7 +125,6 @@ class LinksImpl implements Links {
     this.SKIP_read_line_get = (i: int) => {
       return this.lineBuffer[i];
     };
-    this.SKIP_getchar = utils.getStdInChar;
     this.SKIP_FileSystem_appendTextFile = (path: ptr, contents: ptr) => {
       let strPath = utils.importString(path);
       let strContents = utils.importString(contents);
@@ -234,7 +232,6 @@ class Manager implements ToWasmManager {
     toWasm.SKIP_read_line_fill = () => links.SKIP_read_line_fill();
     toWasm.SKIP_read_to_end_fill = () => links.SKIP_read_to_end_fill();
     toWasm.SKIP_read_line_get = (index: int) => links.SKIP_read_line_get(index);
-    toWasm.SKIP_getchar = () => links.SKIP_getchar();
     toWasm.SKIP_setenv = (skName: ptr, skValue: ptr) =>
       links.SKIP_setenv(skName, skValue);
     toWasm.SKIP_getenv = (skName: ptr) => links.SKIP_getenv(skName);
@@ -289,7 +286,6 @@ interface ToWasm {
   SKIP_read_line_fill: () => int;
   SKIP_read_to_end_fill: () => int;
   SKIP_read_line_get: (index: int) => ptr;
-  SKIP_getchar: () => int;
   SKIP_setenv: (skName: ptr, skvalue: ptr) => void;
   SKIP_getenv: (skName: ptr) => ptr | null;
   SKIP_unsetenv: (skName: ptr) => void;
