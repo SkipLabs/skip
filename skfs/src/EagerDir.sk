@@ -825,26 +825,24 @@ class EagerDir{
       lastOpt: ?(Tick, Path, Path, Key, Array<File>) = None();
 
       addHelper = lastRow -> {
-        if (lastRow.i4.size() > 0 || lastRow.i0 > limit) {
-          if (lastRow.i4.size() > 0) {
-            data.push(
-              FixedRow(
-                lastRow.i3,
-                lastRow.i4,
-                lastRow.i1,
-                TickRange::create(lastRow.i0),
-              ),
-            );
-          } else {
-            tombs.push(
-              FixedRow(
-                lastRow.i3,
-                lastRow.i2,
-                lastRow.i1,
-                TickRange::create(lastRow.i0),
-              ),
-            );
-          }
+        if (lastRow.i4.size() > 0) {
+          data.push(
+            FixedRow(
+              lastRow.i3,
+              lastRow.i4,
+              lastRow.i1,
+              TickRange::create(lastRow.i0),
+            ),
+          );
+        } else if (lastRow.i0 > limit) {
+          tombs.push(
+            FixedRow(
+              lastRow.i3,
+              lastRow.i2,
+              lastRow.i1,
+              TickRange::create(lastRow.i0),
+            ),
+          );
         }
       };
 
