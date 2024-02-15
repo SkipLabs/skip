@@ -8,10 +8,7 @@ module SKDB;
 
 const systemIndexPrefix: String = "__skdb__";
 
-class IndexProjKey private (
-  row: RowValues,
-  kinds: Array<(Int, P.IKind, P.Type)>,
-) extends SKStore.Key {
+extension class IndexProjKey extends SKStore.Key {
   static fun create(values: Array<(Int, P.Type, ?CValue)>): this {
     row = RowValues::create(values.map(x -> x.i2));
     kinds = values.map(x -> (x.i0, P.IASC(), x.i1));
