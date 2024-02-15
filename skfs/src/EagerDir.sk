@@ -680,7 +680,7 @@ class EagerDir{
   fixedData: FixedDataMap,
   totalSize: Int,
   creator: ?ArrowKey,
-  fixedOld: FixedSingle<Path, MInfo> = FixedSingle::empty(),
+  fixedOld: FixedSourceMap = FixedSourceMap::empty(),
   data: DataMap = DataMap::empty(),
   old: SortedMap<Path, MInfo> = SortedMap[],
   parents: FixedSingle<
@@ -780,7 +780,7 @@ class EagerDir{
     changesWritten > 0
   }
 
-  fun purgeOld(): FixedSingle<Path, MInfo> {
+  fun purgeOld(): FixedSourceMap {
     current = 0;
     acc = mutable Vector[];
     add = minfo -> {
@@ -810,7 +810,10 @@ class EagerDir{
       add(this.fixedOld[current]);
       !current = current + 1;
     };
-    FixedSingle(acc.toArray());
+    FixedSourceMap::getMetadata(acc) match {
+    | Some(metadata) -> CompactFSMImpl::create(acc, metadata)
+    | None() -> FSMImpl::create(acc)
+    }
   }
 
   private fun flattenData(limit: Tick): FixedDataMap {
@@ -1371,6 +1374,11 @@ class EagerDir{
 
       data = DataMap::empty();
 
+      fixedOld = FixedSourceMap::getMetadata(oldVec) match {
+      | Some(metadata) -> CompactFSMImpl::create(oldVec, metadata, true)
+      | None() -> FSMImpl::create(oldVec, true)
+      };
+
       EagerDir{
         time,
         dirName => childName,
@@ -1380,7 +1388,7 @@ class EagerDir{
         data,
         totalSize,
         creator => context.currentArrow(),
-        fixedOld => FixedSingle::create(oldVec, true),
+        fixedOld,
         childDirs => SortedSet[],
         reducer,
       }
