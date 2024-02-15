@@ -87,6 +87,28 @@ fun binSearch<T: Orderable>(get: Int ~> T, key: T, i: Int, j: Int): Int {
   findFirstBy(idx ~> key.compare(get(idx)), i, j)
 }
 
+// Assuming that the elements of `sortedData` are in fact sorted by `f`,
+// checks that the elements are unique under `f` and throws otherwise
+fun assertUnique<T, U: Orderable>(
+  sortedData: mutable Vector<T>,
+  f: T ~> U,
+): void {
+  lastOpt: ?U = None();
+  for (t in sortedData) {
+    u = f(t);
+    lastOpt match {
+    | None() -> !lastOpt = Some(u)
+    | Some(last_u) ->
+      if (last_u == u) {
+        debug((last_u, u));
+        invariant_violation("Unexpected duplicate elements found")
+      } else {
+        !lastOpt = Some(u)
+      }
+    }
+  };
+}
+
 class FixedDir<T: frozen> extends IFixedDir<T, FixedRow<T>> {
   static fun create(
     data: mutable Vector<FixedRow<T>> = mutable Vector[],
@@ -161,6 +183,11 @@ class RowValues(
   values: Array<?CValue>,
   repeat: Int,
 ) uses Orderable extends SKStore.File
+
+class IndexProjKey(
+  row: RowValues,
+  kinds: Array<(Int, SQLParser.IKind, SQLParser.Type)>,
+) extends SKStore.Key
 
 module end;
 module SKStore;
@@ -578,22 +605,7 @@ class FixedSingle<K: Orderable, +V: frozen>(data: Array<(K, V)> = Array[]) {
   ): FixedSingle<K, V> {
     data.sortBy(x ~> x.i0);
 
-    if (!allowDuplicates) {
-      lastOpt: ?K = None();
-      for (kv in data) {
-        (k, _) = kv;
-        lastOpt match {
-        | None() -> !lastOpt = Some(k)
-        | Some(last) ->
-          if (last == k) {
-            debug((last, k));
-            invariant_violation("Duplicate value in single")
-          } else {
-            !lastOpt = Some(k)
-          }
-        }
-      }
-    };
+    if (!allowDuplicates) assertUnique(data, x ~> x.i0);
 
     FixedSingle(data.toArray())
   }
@@ -616,6 +628,150 @@ class FixedSingle<K: Orderable, +V: frozen>(data: Array<(K, V)> = Array[]) {
     elt = this.get(pos);
     if (elt.i0 != key) return None();
     Some(elt.i1);
+  }
+}
+
+// Mapping from source paths to MInfo
+base class FixedSourceMap {
+  fun maybeGet(key: Path): ?MInfo;
+  fun get(idx: Int): (Path, MInfo);
+  fun size(): Int;
+  fun items(): mutable Iterator<(Path, MInfo)>;
+  overridable static fun empty(): FixedSourceMap {
+    FSMImpl::empty()
+  }
+  static fun getMetadata(data: readonly Vector<(Path, MInfo)>): ?FSMMetadata {
+    seenDirOpt: ?DirName = None();
+    seenRowKindsOpt: ?Array<(Int, SQLParser.IKind, SQLParser.Type)> = None();
+    seenIndexKindsOpt: ?Array<(Int, SQLParser.IKind, SQLParser.Type)> = None();
+
+    for ((path, minfo) in data) {
+      !seenDirOpt = seenDirOpt match {
+      | None() -> Some(path.dirName)
+      | Some(seenDir) if (seenDir != path.dirName) -> return None()
+      | _ -> seenDirOpt
+      };
+      minfo match {
+      | MInfoSingle(SKDB.IndexProjKey(minfoRow, indexKinds)) ->
+        !seenIndexKindsOpt = seenIndexKindsOpt match {
+        | None() -> Some(indexKinds)
+        | Some(seenIndexKinds) if (indexKinds != seenIndexKinds) ->
+          return None()
+        | _ -> seenIndexKindsOpt
+        };
+        path.baseName match {
+        | SKDB.RowKey(pathRow, rowKinds) ->
+          if (minfoRow != pathRow) return None();
+          !seenRowKindsOpt = seenRowKindsOpt match {
+          | None() -> Some(rowKinds)
+          | Some(seenRowKinds) if (rowKinds != seenRowKinds) -> return None()
+          | _ -> seenRowKindsOpt
+          }
+        | _ -> return None()
+        }
+      | _ -> return None()
+      };
+    };
+    seenDirOpt.flatMap(dir ->
+      seenRowKindsOpt.flatMap(rowKinds ->
+        seenIndexKindsOpt.map(indexKinds ->
+          FSMMetadata{dir, rowKinds, indexKinds}
+        )
+      )
+    )
+  }
+}
+// Direct implementation of a FixedSourceMap as a (sorted) array of Path/MInfo pairs
+class FSMImpl(protected data: FixedSingle<Path, MInfo>) extends FixedSourceMap {
+  static fun create(
+    data: mutable Vector<(Path, MInfo)>,
+    allowDuplicates: Bool = false,
+  ): this {
+    static(FixedSingle::create(data, allowDuplicates))
+  }
+  fun maybeGet(key: Path): ?MInfo {
+    this.data.maybeGet(key)
+  }
+  fun get(idx: Int): (Path, MInfo) {
+    this.data.get(idx)
+  }
+  fun size(): Int {
+    this.data.size()
+  }
+  fun items(): mutable Iterator<(Path, MInfo)> {
+    this.data.items()
+  }
+  static fun empty(): this {
+    static::create(Vector::mcreate(0))
+  }
+}
+
+class FSMMetadata{
+  dir: DirName,
+  rowKinds: Array<(Int, SQLParser.IKind, SQLParser.Type)>,
+  indexKinds: Array<(Int, SQLParser.IKind, SQLParser.Type)>,
+}
+// More-compact representation of a FixedSourceMap, with shared information
+// extracted out of the individual key/val pairs and reconstructed on demand
+class CompactFSMImpl protected (
+  metadata: FSMMetadata,
+  data: Array<SKDB.RowValues>,
+) extends FixedSourceMap {
+  private fun reconstructPath(row: SKDB.RowValues): Path {
+    Path(this.metadata.dir, SKDB.RowKey(row, this.metadata.rowKinds))
+  }
+
+  private fun reconstructMInfo(row: SKDB.RowValues): MInfo {
+    MInfoSingle(SKDB.IndexProjKey(row, this.metadata.indexKinds))
+  }
+
+  fun maybeGet(key: Path): ?MInfo {
+    key.baseName match {
+    | SKDB.RowKey(row, _kinds) ->
+      idx = binSearch(this.data.get, row, 0, this.size() - 1);
+      if (idx >= this.data.size()) None() else Some(this.reconstructMInfo(row))
+    | _ -> None()
+    }
+  }
+
+  fun get(idx: Int): (Path, MInfo) {
+    row = this.data.get(idx);
+    path = this.reconstructPath(row);
+    minfo = this.reconstructMInfo(row);
+    (path, minfo)
+  }
+
+  fun size(): Int {
+    this.data.size()
+  }
+
+  fun items(): mutable Iterator<(Path, MInfo)> {
+    for (row in this.data.iterator()) {
+      path = this.reconstructPath(row);
+      minfo = this.reconstructMInfo(row);
+      yield (path, minfo)
+    }
+  }
+
+  static fun create(
+    data: mutable Vector<(Path, MInfo)>,
+    metadata: FSMMetadata,
+    allowDuplicates: Bool = false,
+  ): this {
+    baseNames = Vector::mcreateFromItems(
+      data.map(datum ->
+        datum.i0.baseName match {
+        | SKDB.RowKey(values, _kinds) -> values
+        | _ ->
+          invariant_violation(
+            "getMetadata ensures all path basenames are RowKeys",
+          )
+        }
+      ),
+    );
+    baseNames.sortBy(x ~> x);
+    if (!allowDuplicates) assertUnique(baseNames, x ~> x);
+    static(metadata, baseNames.toArray())
   }
 }
 
