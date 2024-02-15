@@ -87,7 +87,7 @@ fun binSearch<T: Orderable>(get: Int ~> T, key: T, i: Int, j: Int): Int {
   findFirstBy(idx ~> key.compare(get(idx)), i, j)
 }
 
-class FixedDir<T: frozen> extends FixedDirImpl<T, FixedRow<T>> {
+class FixedDir<T: frozen> extends IFixedDir<T, FixedRow<T>> {
   static fun create(
     data: mutable Vector<FixedRow<T>> = mutable Vector[],
   ): this {
@@ -173,7 +173,7 @@ value class CompactRow<T>(
   sourceKey: ?SKStore.Key,
 )
 
-class DirInfo{
+class FixedDirMetadata{
   sourceDir: DirName,
   keyIsSameAsValue: Bool,
   isAlwaysSize1: Bool,
@@ -181,14 +181,14 @@ class DirInfo{
 }
 
 // This is a more compact representation of a FixedDir, keeping some shared
-// info about the directory (dirInfo) and stripping redundant repeated data
+// metadata about the directory and stripping redundant repeated data
 // out of the rows themselves.
 class CompactFixedDir{
-  dirInfo: DirInfo,
-} extends FixedDirImpl<Array<File>, CompactRow<?SKDB.CValue>> {
+  metadata: FixedDirMetadata,
+} extends IFixedDir<Array<File>, CompactRow<?SKDB.CValue>> {
   static fun create(
     data: mutable Vector<FixedRow<Array<File>>>,
-    dirInfo: DirInfo,
+    metadata: FixedDirMetadata,
   ): this {
     i = 0;
     sz = data.size();
@@ -210,14 +210,13 @@ class CompactFixedDir{
       data.sortBy(row ~> (row.key, row.source));
     };
     _ = static::computeTags(data, 0, data.size() - 1);
-    invariant(dirInfo.keyIsSameAsValue);
-    res: CompactFixedDir = static{
-      data => data.map(static::stripDirInfo).toArray(),
-      dirInfo => dirInfo,
-    };
-    res
+    invariant(metadata.keyIsSameAsValue);
+    static{
+      data => data.map(static::stripMetadata).toArray(),
+      metadata => metadata,
+    }
   }
-  protected static fun stripDirInfo(
+  protected static fun stripMetadata(
     row: FixedRow<Array<File>>,
   ): CompactRow<?SKDB.CValue> {
     invariant(row.value.size() == 1);
@@ -227,10 +226,6 @@ class CompactFixedDir{
       None()
     };
 
-    // TODO check that source key == key
-    // TODO check that values in key == rowValues
-    // TODO check kinds are canonical
-    // TODO check repeat is 1
     row.value[0] match {
     | SKDB.RowValues(values, repeat) ->
       CompactRow(values, repeat, row.tag, sourceKey)
@@ -241,7 +236,7 @@ class CompactFixedDir{
     compactRow: CompactRow<?SKDB.CValue>,
   ): FixedRow<Array<File>> {
     rowValues = SKDB.RowValues(compactRow.values, compactRow.repeat);
-    rowKey = SKDB.RowKey(rowValues, this.dirInfo.kinds);
+    rowKey = SKDB.RowKey(rowValues, this.metadata.kinds);
     sourceKey = compactRow.sourceKey match {
     | None() -> rowKey
     | Some(otherKey) -> otherKey
@@ -249,7 +244,7 @@ class CompactFixedDir{
     FixedRow(
       rowKey,
       Array[(rowValues : File)],
-      Path(this.dirInfo.sourceDir, sourceKey),
+      Path(this.metadata.sourceDir, sourceKey),
       compactRow.tag,
     )
   }
@@ -257,7 +252,7 @@ class CompactFixedDir{
 
 //Defines the public interface of a FixedDir, allowing for some alternative
 // internal RowRepresentation of conceptually-FixedRow<T> rows.
-base class FixedDirImpl<T: frozen, RowRepresentation: frozen> protected {
+base class IFixedDir<T: frozen, RowRepresentation: frozen> protected {
   data: Array<RowRepresentation> = Array[],
 } extends FixedData<T> {
   protected fun decode(repr: RowRepresentation): FixedRow<T>;
@@ -268,7 +263,9 @@ base class FixedDirImpl<T: frozen, RowRepresentation: frozen> protected {
     }
   }
 
-  static fun getDirInfo(data: mutable Vector<FixedRow<Array<File>>>): ?DirInfo {
+  static fun getMetadata(
+    data: mutable Vector<FixedRow<Array<File>>>,
+  ): ?FixedDirMetadata {
     if (data.size() == 0) return None();
     sourceDir: ?DirName = None();
     kinds: ?Array<(Int, SQLParser.IKind, SQLParser.Type)> = None();
@@ -293,7 +290,7 @@ base class FixedDirImpl<T: frozen, RowRepresentation: frozen> protected {
       }
     };
     sourceDir.map(sourceDir ->
-      DirInfo{
+      FixedDirMetadata{
         sourceDir,
         kinds => kinds.fromSome(),
         keyIsSameAsValue,
