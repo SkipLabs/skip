@@ -131,8 +131,8 @@ export type ProtoResponseCreds = {
 };
 
 export type Params =
-  | Map<string, string | number | null>
-  | Record<string, string | number | null>;
+  | Map<string, string | number | boolean | null>
+  | Record<string, string | number | boolean | null>;
 
 export interface RemoteSKDB {
   connectedAs(): Promise<string>;
