@@ -197,7 +197,7 @@ export interface WasmSupplier {
 }
 
 function utf8Encode(str: string): Uint8Array {
-  return new TextEncoder().encode(str)
+  return new TextEncoder().encode(str);
 }
 
 export class Utils {
@@ -773,8 +773,11 @@ export async function loadEnv(
   envExtends: Map<string, Array<string>>,
   envVals?: Array<string>,
 ) {
-  const envModule = isNode() ? "./sk_node.mjs" : "./sk_browser.mjs";
-  const environment = await import(envModule);
+  const environment = await (isNode()
+    ? //@ts-ignore
+      import("./sk_node.mjs")
+    : //@ts-ignore
+      import("./sk_browser.mjs"));
   let env = environment.environment(envVals) as Environment;
   let extensions = envExtends.get(env.name());
   if (extensions) {
