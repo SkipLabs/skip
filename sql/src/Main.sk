@@ -150,13 +150,6 @@ untracked fun main(): void {
           Cli.StringArg("field").positional().required().about("Field number"),
         ),
     )
-    .subcommand(
-      Cli.Command("load-csv")
-        .about("Load CSV values into table")
-        .arg(Cli.StringArg("table").positional().required().about("Table name"))
-        // TODO: Why is `--user` only offered for CSV variants?
-        .arg(Cli.StringArg("user").about("Name of the user")),
-    )
     .subcommand(Cli.Command("size").about("Output the size of the db"))
     .subcommand(
       Cli.Command("diff")
@@ -317,12 +310,9 @@ untracked fun main(): void {
       | "dump-views" -> execDumpViews
       | "dump" -> execDump
       | "migrate" -> execMigrate
-      | "load-csv" -> execLoadCsv
-      | "csv-field" -> execCsvField
       | "size" -> execSize
       | "diff" -> execDiff
       | "disconnect" -> execDisconnect
-      | "write" -> execWrite
       | "tail" -> execTail
       | "watermark" -> execWatermark
       | "replication-id" -> execReplicationId
@@ -504,50 +494,6 @@ fun execMigrate(args: Cli.ParseResults, options: SKDB.Options): void {
   })
 }
 
-fun execLoadCsv(args: Cli.ParseResults, options: SKDB.Options): void {
-  name = P.Name::create(args.getString("table"));
-  SKDB.runSql(options, context ~> {
-    table = context.getGlobal("CSV_TABLE") match {
-    | None() ->
-      tableDescr = SKDB.getTable(context, 0, name);
-      context.setGlobal("CSV_TABLE", tableDescr);
-      tableDescr
-    | Some(x) -> SKDB.DirDescr::type(x)
-    };
-    line = context.getGlobal("Line") match {
-    | None() -> mutable Ref(1)
-    | Some(file) -> mutable Ref(SKStore.IntFile::type(file).value)
-    };
-    user = args.maybeGetString("user") match {
-    | None() -> None()
-    | Some(userID) -> Some(SKDB.UserFile::create(context, userID))
-    };
-    try {
-      contextOp = SKCSV.insert(context, line, options, table, user);
-      context.setGlobal("Line", SKStore.IntFile(line.get()));
-      contextOp
-    } catch {
-    | exn ->
-      print_error("Error, line " + line.get() + ": " + exn.getMessage());
-      skipExit(23)
-    };
-  })
-}
-
-fun execCsvField(args: Cli.ParseResults, _options: SKDB.Options): void {
-  fieldNbr = args.getString("field").toInt();
-  line = mutable Ref(1);
-  loop {
-    (eof, rows) = SKCSV.parseCsv(line, x ~> x);
-    for (row in rows) {
-      if (fieldNbr < 0 || fieldNbr >= row.size()) continue;
-      str = row[fieldNbr].i1;
-      print_string(str);
-    };
-    if (eof) return void;
-  }
-}
-
 fun execSize(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
   SKDB.runSql(options, _context ~> {
@@ -604,15 +550,6 @@ fun execDisconnect(args: Cli.ParseResults, options: SKDB.Options): void {
       skipExit(2)
     | Some(_) -> context.!sessions = context.sessions.remove(sessionID)
     };
-  })
-}
-
-fun execWrite(args: Cli.ParseResults, options: SKDB.Options): void {
-  ensureContext(args);
-  dirNameStr = args.getString("directory");
-  SKDB.runSql(options, context ~> {
-    SKStore.writeFromStdin(context, dirNameStr);
-    SKStore.CStop(None())
   })
 }
 
