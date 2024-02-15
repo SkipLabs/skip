@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { createContext, useContext } from "react";
 import type { SKDB } from "skdb";
+import { Params } from "skdb/dist/skdb_types.js";
 
 export const SKDBContext = createContext<SKDB | undefined>(undefined);
 
@@ -26,7 +27,7 @@ export function useSKDB(): SKDB {
 
 export function useQuery(
   query: string,
-  params: Object = {},
+  params: Params = {},
   defaultRows: Array<any> = [],
 ): any {
   const skdb = useSKDB();
