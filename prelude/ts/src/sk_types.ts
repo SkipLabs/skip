@@ -773,9 +773,11 @@ export async function loadEnv(
   envExtends: Map<string, Array<string>>,
   envVals?: Array<string>,
 ) {
+  // hack: this way of importing is deliberate so that web bundlers
+  // don't follow the node dynamic import
+  const nodeImport = "./sk_node.mjs";
   const environment = await (isNode()
-    ? //@ts-ignore
-      import("./sk_node.mjs")
+    ? import(nodeImport)
     : //@ts-ignore
       import("./sk_browser.mjs"));
   let env = environment.environment(envVals) as Environment;
