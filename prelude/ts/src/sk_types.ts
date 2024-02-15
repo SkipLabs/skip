@@ -197,7 +197,7 @@ export interface WasmSupplier {
 }
 
 function utf8Encode(str: string): Uint8Array {
-  return new TextEncoder().encode(str)
+  return new TextEncoder().encode(str);
 }
 
 export class Utils {
@@ -773,8 +773,13 @@ export async function loadEnv(
   envExtends: Map<string, Array<string>>,
   envVals?: Array<string>,
 ) {
-  const envModule = isNode() ? "./sk_node.mjs" : "./sk_browser.mjs";
-  const environment = await import(envModule);
+  // hack: this way of importing is deliberate so that web bundlers
+  // don't follow the node dynamic import
+  const nodeImport = "./sk_node.mjs";
+  const environment = await (isNode()
+    ? import(nodeImport)
+    : //@ts-ignore
+      import("./sk_browser.mjs"));
   let env = environment.environment(envVals) as Environment;
   let extensions = envExtends.get(env.name());
   if (extensions) {
