@@ -9,6 +9,10 @@
 /* String implementation */
 /*****************************************************************************/
 
+uint32_t SKIP_is_string(char* obj) {
+  return *(((uint32_t*)obj) - 1) & 0x80000000;
+}
+
 void sk_string_set_hash(char* obj) {
   sk_string_t* str = (sk_string_t*)(obj - sizeof(uint32_t) * 2);
   SkipInt acc = 0;
@@ -18,7 +22,7 @@ void sk_string_set_hash(char* obj) {
     acc = acc * 31 + str->data[i];
   }
 
-  // This tag is used by the interning to recognize strings.
+  // This tag is used by SKIP_is_string to recognize strings.
   acc |= 0x80000000;
   str->hash = (uint32_t)acc;
 }
