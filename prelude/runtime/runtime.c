@@ -8,6 +8,10 @@
 /* Operations on the runtime representation of skip values. */
 /*****************************************************************************/
 
+sk_string_t* get_sk_string(char* obj) {
+  return (sk_string_t*)(obj - sizeof(uint32_t) * 2);
+}
+
 SKIP_gc_type_t* get_gc_type(char* skip_object) {
   // a vtable pointer immediately precedes a pointer to each skip object
   SKIP_gc_type_t*** vtable = ((SKIP_gc_type_t***)skip_object) - 1;
