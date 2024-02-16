@@ -14,7 +14,7 @@ uint32_t SKIP_is_string(char* obj) {
 }
 
 void sk_string_set_hash(char* obj) {
-  sk_string_t* str = (sk_string_t*)(obj - sizeof(uint32_t) * 2);
+  sk_string_t* str = get_sk_string(obj);
   SkipInt acc = 0;
   uint32_t i;
 
@@ -28,7 +28,7 @@ void sk_string_set_hash(char* obj) {
 }
 
 uint32_t SKIP_String_byteSize(char* obj) {
-  sk_string_t* str = (sk_string_t*)(obj - sizeof(uint32_t) * 2);
+  sk_string_t* str = get_sk_string(obj);
   return str->size;
 }
 
