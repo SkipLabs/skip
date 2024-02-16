@@ -37,11 +37,7 @@ class SubTask(
 
 class KVFile(value: (SKStore.Key, Array<SKStore.File>)) extends SKStore.File
 
-class ProjKey(
-  value: ?CValue,
-  leftShard: Int,
-  rightShard: Int,
-) extends SKStore.Key {
+extension class ProjKey extends SKStore.Key {
   fun toString(): String {
     this.value.toString()
   }
@@ -433,7 +429,7 @@ class SelectEvaluator{
         leftShardID = SKStore.genSym(leftShard) % leftShard;
         shardedFile = LeftShardedFile{leftShardID, rightShard, value => row};
         for (i in Range(0, rightShard)) {
-          projKey = ProjKey(key, leftShardID, i);
+          projKey = ProjKey(key, leftColNbr, leftShardID, i);
           writer.set(projKey, LeftFile(fileKey, shardedFile.value))
         }
       };
@@ -449,7 +445,7 @@ class SelectEvaluator{
         rightShardID = SKStore.genSym(rightShard) % rightShard;
         shardedFile = RightShardedFile{leftShard, rightShardID, value => row};
         for (i in Range(0, leftShard)) {
-          projKey = ProjKey(key, i, rightShardID);
+          projKey = ProjKey(key, rightColNbr, i, rightShardID);
           writer.set(projKey, RightFile(fileKey, shardedFile.value))
         }
       };
