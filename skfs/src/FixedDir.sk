@@ -189,6 +189,13 @@ class IndexProjKey(
   kinds: Array<(Int, SQLParser.IKind, SQLParser.Type)>,
 ) extends SKStore.Key
 
+class ProjKey(
+  value: ?CValue,
+  colNbr: Int,
+  leftShard: Int,
+  rightShard: Int,
+) extends SKStore.Key
+
 module end;
 module SKStore;
 
@@ -643,7 +650,7 @@ base class FixedSourceMap {
   static fun getMetadata(data: readonly Vector<(Path, MInfo)>): ?FSMMetadata {
     seenDirOpt: ?DirName = None();
     seenRowKindsOpt: ?Array<(Int, SQLParser.IKind, SQLParser.Type)> = None();
-    seenIndexKindsOpt: ?Array<(Int, SQLParser.IKind, SQLParser.Type)> = None();
+    seenMInfoTypeOpt: ?FSMMInfoType = None();
 
     for ((path, minfo) in data) {
       !seenDirOpt = seenDirOpt match {
@@ -651,21 +658,38 @@ base class FixedSourceMap {
       | Some(seenDir) if (seenDir != path.dirName) -> return None()
       | _ -> seenDirOpt
       };
-      minfo match {
-      | MInfoSingle(SKDB.IndexProjKey(minfoRow, indexKinds)) ->
-        !seenIndexKindsOpt = seenIndexKindsOpt match {
-        | None() -> Some(indexKinds)
-        | Some(seenIndexKinds) if (indexKinds != seenIndexKinds) ->
-          return None()
-        | _ -> seenIndexKindsOpt
+      path.baseName match {
+      | rowKey @ SKDB.RowKey(pathRow, rowKinds) ->
+        !seenRowKindsOpt = seenRowKindsOpt match {
+        | None() -> Some(rowKinds)
+        | Some(seenRowKinds) if (rowKinds != seenRowKinds) -> return None()
+        | _ -> seenRowKindsOpt
         };
-        path.baseName match {
-        | SKDB.RowKey(pathRow, rowKinds) ->
+        minfo match {
+        | MInfoSingle(minfoKey @ SKDB.RowKey _) if (minfoKey == rowKey) ->
+          !seenMInfoTypeOpt = seenMInfoTypeOpt match {
+          | None() -> Some(FullRow())
+          | Some(FullRow()) -> seenMInfoTypeOpt
+          | _ -> return None()
+          }
+        | MInfoSingle(SKDB.IndexProjKey(minfoRow, indexKinds)) ->
           if (minfoRow != pathRow) return None();
-          !seenRowKindsOpt = seenRowKindsOpt match {
-          | None() -> Some(rowKinds)
-          | Some(seenRowKinds) if (rowKinds != seenRowKinds) -> return None()
-          | _ -> seenRowKindsOpt
+          !seenMInfoTypeOpt = seenMInfoTypeOpt match {
+          | None() -> Some(IndexProjection(indexKinds))
+          | Some(
+            IndexProjection(seenIndexKinds),
+          ) if (indexKinds == seenIndexKinds) ->
+            seenMInfoTypeOpt
+          | _ -> None()
+          }
+        | MInfoSingle(SKDB.ProjKey(_value, col, left, right)) ->
+          !seenMInfoTypeOpt = seenMInfoTypeOpt match {
+          | None() -> Some(Projection(col, left, right))
+          | Some(
+            Projection(pCol, pLeft, pRight),
+          ) if (col == pCol && left == pLeft && right == pRight) ->
+            seenMInfoTypeOpt
+          | _ -> None()
           }
         | _ -> return None()
         }
@@ -674,9 +698,7 @@ base class FixedSourceMap {
     };
     seenDirOpt.flatMap(dir ->
       seenRowKindsOpt.flatMap(rowKinds ->
-        seenIndexKindsOpt.map(indexKinds ->
-          FSMMetadata{dir, rowKinds, indexKinds}
-        )
+        seenMInfoTypeOpt.map(minfoType -> FSMMetadata{dir, rowKinds, minfoType})
       )
     )
   }
@@ -706,10 +728,21 @@ class FSMImpl(protected data: FixedSingle<Path, MInfo>) extends FixedSourceMap {
   }
 }
 
+base class FSMMInfoType
+class IndexProjection(
+  kinds: Array<(Int, SQLParser.IKind, SQLParser.Type)>,
+) extends FSMMInfoType
+class Projection(
+  col: Int,
+  leftShard: Int,
+  rightShard: Int,
+) extends FSMMInfoType
+class FullRow() extends FSMMInfoType
+
 class FSMMetadata{
   dir: DirName,
   rowKinds: Array<(Int, SQLParser.IKind, SQLParser.Type)>,
-  indexKinds: Array<(Int, SQLParser.IKind, SQLParser.Type)>,
+  minfoType: FSMMInfoType,
 }
 // More-compact representation of a FixedSourceMap, with shared information
 // extracted out of the individual key/val pairs and reconstructed on demand
@@ -717,28 +750,36 @@ class CompactFSMImpl protected (
   metadata: FSMMetadata,
   data: Array<SKDB.RowValues>,
 ) extends FixedSourceMap {
-  private fun reconstructPath(row: SKDB.RowValues): Path {
-    Path(this.metadata.dir, SKDB.RowKey(row, this.metadata.rowKinds))
+  private fun reconstructMInfo(rowKey: SKDB.RowKey): MInfo {
+    minfoKey = this.metadata.minfoType match {
+    | FullRow() -> rowKey
+    | IndexProjection(indexKinds) -> SKDB.IndexProjKey(rowKey.row, indexKinds)
+    | Projection(col, leftShard, rightShard) ->
+      SKDB.ProjKey(rowKey.row.values[col], col, leftShard, rightShard)
+    };
+    MInfoSingle(minfoKey)
   }
 
-  private fun reconstructMInfo(row: SKDB.RowValues): MInfo {
-    MInfoSingle(SKDB.IndexProjKey(row, this.metadata.indexKinds))
+  private fun reconstructKVPair(row: SKDB.RowValues): (Path, MInfo) {
+    rowKey = SKDB.RowKey(row, this.metadata.rowKinds);
+    path = Path(this.metadata.dir, rowKey);
+    minfo = this.reconstructMInfo(rowKey);
+    (path, minfo)
   }
 
   fun maybeGet(key: Path): ?MInfo {
     key.baseName match {
-    | SKDB.RowKey(row, _kinds) ->
+    | rowKey @ SKDB.RowKey(row, _kinds) ->
       idx = binSearch(this.data.get, row, 0, this.size() - 1);
-      if (idx >= this.data.size()) None() else Some(this.reconstructMInfo(row))
+      if (idx >= this.data.size()) None() else {
+        Some(this.reconstructMInfo(rowKey))
+      }
     | _ -> None()
     }
   }
 
   fun get(idx: Int): (Path, MInfo) {
-    row = this.data.get(idx);
-    path = this.reconstructPath(row);
-    minfo = this.reconstructMInfo(row);
-    (path, minfo)
+    this.reconstructKVPair(this.data.get(idx))
   }
 
   fun size(): Int {
@@ -747,9 +788,7 @@ class CompactFSMImpl protected (
 
   fun items(): mutable Iterator<(Path, MInfo)> {
     for (row in this.data.iterator()) {
-      path = this.reconstructPath(row);
-      minfo = this.reconstructMInfo(row);
-      yield (path, minfo)
+      yield this.reconstructKVPair(row)
     }
   }
 
