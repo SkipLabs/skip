@@ -9,7 +9,7 @@
 /*****************************************************************************/
 
 sk_string_t* get_sk_string(char* obj) {
-  return (sk_string_t*)(obj - sizeof(uint32_t) * 2);
+  return (sk_string_t*)(obj - sk_string_header_size);
 }
 
 SKIP_gc_type_t* get_gc_type(char* skip_object) {

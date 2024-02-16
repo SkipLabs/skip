@@ -62,7 +62,7 @@ static char* SKIP_copy_obj(sk_stack_t* st, char* obj, sk_cell_t* large_page) {
 
 static char* SKIP_copy_string(char* obj, sk_cell_t* large_page) {
   size_t len = get_sk_string(obj)->size;
-  char* result = shallow_copy(obj, len, 2 * sizeof(uint32_t), large_page);
+  char* result = shallow_copy(obj, len, sk_string_header_size, large_page);
   return result;
 }
 
