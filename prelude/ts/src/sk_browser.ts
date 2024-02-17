@@ -54,7 +54,7 @@ class Env implements Environment {
     return "browser";
   }
 
-  fetch(url: URL | string) {
+  fetch(url: URL) {
     return fetch(url)
       .then((res) => res.arrayBuffer())
       .then((ab) => new Uint8Array(ab));
