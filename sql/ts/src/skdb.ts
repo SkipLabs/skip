@@ -67,10 +67,8 @@ async function createWorker(disableWarnings: boolean, dbName?: string) {
   env.disableWarnings = disableWarnings;
   let worker: Wrk;
   if (isNode()) {
-    let path = import.meta.url.replace("/skdb.mjs", "/skdb_nodeworker.mjs");
-    //@ts-ignore
-    path = "./" + path.substring(process.cwd().length + 8);
-    worker = env.createWorker(path, { type: "module" });
+    let url = new URL('./skdb_nodeworker.mjs', import.meta.url);
+    worker = env.createWorker(url, { type: "module" });
   } else {
     // important that this line looks exactly like this for bundlers to discover the file
     const wrapped = new Worker(new URL("./skdb_worker.mjs", import.meta.url), {
