@@ -161,8 +161,7 @@ export interface Environment {
   fs: () => FileSystem;
   sys: () => System;
   crypto: () => Crypto;
-  fetch: (path: string) => Promise<Uint8Array>;
-  rootPath: () => string;
+  fetch: (url: URL | string) => Promise<Uint8Array>;
 }
 
 export interface Memory {
@@ -802,7 +801,7 @@ export async function loadEnv(
 
 
 export async function run(
-  wasm64: string,
+  wasm: URL,
   modules: ModuleInit[],
   envs: Map<string, Array<string>>,
   main?: string,
@@ -813,8 +812,7 @@ export async function run(
   if (getWasmSource) {
     buffer = await getWasmSource();
   } else {
-    let path = relativeto(resolve("./" + wasm64 + ".wasm"), env.rootPath());
-    buffer = await env.fetch(path);
+    buffer = await env.fetch(wasm);
   }
   return await start(modules, buffer, env, main);
 }

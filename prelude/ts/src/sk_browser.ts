@@ -54,13 +54,10 @@ class Env implements Environment {
     return "browser";
   }
 
-  fetch(path: string) {
-    return fetch(path)
+  fetch(url: URL | string) {
+    return fetch(url)
       .then((res) => res.arrayBuffer())
       .then((ab) => new Uint8Array(ab));
-  }
-  rootPath() {
-    return "";
   }
 
   constructor(environment?: Array<string>) {

@@ -62,22 +62,21 @@ class Env implements Environment {
   name() {
     return "node";
   }
-  fetch(path: string) {
-    if (path.startsWith("file://")) {
-      path = path.substring(7);
+  fetch(url: URL | string) {
+    var path : string;
+    if (url instanceof URL) {
+      path = "./" + url.href.substring(process.cwd().length + 8);
+      if (path.startsWith("file://")) {
+        path = path.substring(7);
+      }
+    } else {
+      path = url;
     }
     return new Promise<Uint8Array>(function (resolve, reject) {
       fs.readFile(path, {}, (err, data) => {
         err ? reject(err) : resolve(data);
       });
     });
-  }
-  rootPath() {
-    let processPath = process.cwd();
-    if (!processPath.startsWith("file://")) {
-      processPath = "file://" + processPath;
-    }
-    return processPath;
   }
   onException() {}
 
