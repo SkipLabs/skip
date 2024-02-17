@@ -1,10 +1,9 @@
-import { Options, run, type ToWasmManager, type Environment} from "#std/sk_types";
+import { Options, run, type ToWasmManager } from "#std/sk_types";
 
-var modules : (()=> Promise<ToWasmManager>)[];
+var modules: (() => Promise<ToWasmManager>)[];
 /*--MODULES--*/
 
-const wasmurl = new URL('./skmd.wasm', import.meta.url);
-
+const wasmurl = new URL("./skmd.wasm", import.meta.url);
 
 export type Conf = {
   title?: string;

@@ -9,7 +9,7 @@ class WrkImpl implements Wrk {
   }
 
   static fromPath(filename: string | URL, options?: WorkerOptions) {
-    return new this(new Worker(filename, options))
+    return new this(new Worker(filename, options));
   }
 
   postMessage = (message: any) => {
