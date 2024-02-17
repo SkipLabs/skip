@@ -1,12 +1,6 @@
-import type {
-  int,
-  ptr,
-  Environment,
-  Links,
-  ToWasmManager,
-  Utils,
-  Shared,
-} from "#std/sk_types.js";
+// sknpm: Cannot be multiline for package sources
+// prettier-ignore
+import type { int, ptr, Environment, Links, ToWasmManager, Utils, Shared } from "#std/sk_types.js";
 import type {
   PagedMemory,
   Page,

@@ -596,8 +596,8 @@ export interface ToWasmManager {
   prepare: (wasm: object) => Links | null;
 }
 
-export type ModuleInit = (e: Environment)=> Promise<ToWasmManager>;
-export type EnvInit = (e: Environment)=> void;
+export type ModuleInit = (e: Environment) => Promise<ToWasmManager>;
+export type EnvInit = (e: Environment) => void;
 
 enum I18N {
   RAW,
@@ -768,7 +768,7 @@ async function start(
   environment: Environment,
   main?: string,
 ) {
-  let promises = modules.map(fn => fn(environment));
+  let promises = modules.map((fn) => fn(environment));
   let cs = await Promise.all(promises);
   let ms = cs.filter((c) => c != null);
   return await loadWasm(buffer, ms, environment, main);
@@ -778,10 +778,7 @@ export function isNode() {
   return typeof process !== "undefined" && process.release.name == "node";
 }
 
-export async function loadEnv(
-  extensions: EnvInit[],
-  envVals?: Array<string>,
-) {
+export async function loadEnv(extensions: EnvInit[], envVals?: Array<string>) {
   // hack: this way of importing is deliberate so that web bundlers
   // don't follow the node dynamic import
   const nodeImport = "./sk_node.mjs";
@@ -791,12 +788,10 @@ export async function loadEnv(
       import("./sk_browser.mjs"));
   let env = environment.environment(envVals) as Environment;
   if (extensions) {
-    extensions.map(fn => fn(env));
+    extensions.map((fn) => fn(env));
   }
   return env;
 }
-
-
 
 export async function run(
   wasm: URL,

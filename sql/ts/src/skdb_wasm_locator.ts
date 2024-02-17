@@ -5,5 +5,5 @@ export async function getWasmUrl(): Promise<URL> {
     return await import("./skdb.wasm?url");
   }
 
-  return new URL('./skdb.wasm', import.meta.url);
+  return new URL("./skdb.wasm", import.meta.url);
 }

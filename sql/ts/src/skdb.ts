@@ -9,8 +9,7 @@ export type { Creds, MuxedSocket } from "./skdb_orchestration.js";
 export type { Environment } from "#std/sk_types.js";
 import { getWasmUrl } from "./skdb_wasm_locator.js";
 
-// sknpm searches for the modules line verbatim
-var modules : ModuleInit[];
+var modules: ModuleInit[];
 /*--MODULES--*/
 
 export async function createSkdb(
@@ -48,7 +47,6 @@ async function createSkdbSync(
 ): Promise<SKDBSync> {
   let data = await runUrl(
     getWasmUrl,
-    // @ts-ignore
     modules,
     [],
     "SKDB_factory",
@@ -64,7 +62,7 @@ async function createWorker(disableWarnings: boolean, dbName?: string) {
   env.disableWarnings = disableWarnings;
   let worker: Wrk;
   if (isNode()) {
-    let url = new URL('./skdb_nodeworker.mjs', import.meta.url);
+    let url = new URL("./skdb_nodeworker.mjs", import.meta.url);
     worker = env.createWorker(url, { type: "module" });
   } else {
     // important that this line looks exactly like this for bundlers to discover the file
