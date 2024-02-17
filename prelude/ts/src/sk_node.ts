@@ -20,6 +20,9 @@ class WrkImpl implements Wrk {
     filename: string | URL,
     options: WorkerOptions | undefined,
   ): Wrk {
+    if (filename instanceof URL) {
+      filename = "./" + filename.href.substring(process.cwd().length + 8);
+    }
     return new this(new Worker(filename, options));
   }
 
