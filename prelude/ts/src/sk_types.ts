@@ -161,7 +161,7 @@ export interface Environment {
   fs: () => FileSystem;
   sys: () => System;
   crypto: () => Crypto;
-  fetch: (url: URL | string) => Promise<Uint8Array>;
+  fetch: (url: URL) => Promise<Uint8Array>;
 }
 
 export interface Memory {
@@ -597,6 +597,7 @@ export interface ToWasmManager {
 }
 
 export type ModuleInit = (e: Environment)=> Promise<ToWasmManager>;
+export type EnvInit = (e: Environment)=> void;
 
 enum I18N {
   RAW,
@@ -778,7 +779,7 @@ export function isNode() {
 }
 
 export async function loadEnv(
-  envExtends: Map<string, Array<string>>,
+  extensions: EnvInit[],
   envVals?: Array<string>,
 ) {
   // hack: this way of importing is deliberate so that web bundlers
@@ -789,11 +790,8 @@ export async function loadEnv(
     : //@ts-ignore
       import("./sk_browser.mjs"));
   let env = environment.environment(envVals) as Environment;
-  let extensions = envExtends.get(env.name());
   if (extensions) {
-    (await Promise.all(extensions.map((ext) => import(ext)))).map((ext) =>
-      ext.complete(env),
-    );
+    extensions.map(fn => fn(env));
   }
   return env;
 }
@@ -803,11 +801,11 @@ export async function loadEnv(
 export async function run(
   wasm: URL,
   modules: ModuleInit[],
-  envs: Map<string, Array<string>>,
+  extensions: EnvInit[],
   main?: string,
   getWasmSource?: () => Promise<Uint8Array>,
 ) {
-  let env = await loadEnv(envs);
+  let env = await loadEnv(extensions);
   let buffer: Uint8Array;
   if (getWasmSource) {
     buffer = await getWasmSource();
@@ -818,18 +816,18 @@ export async function run(
 }
 
 export async function runUrl(
-  getUrl: (env: Environment) => Promise<string>,
+  getUrl: () => Promise<URL>,
   modules: ModuleInit[],
-  envs: Map<string, Array<string>>,
+  extensions: EnvInit[],
   main?: string,
   getWasmSource?: () => Promise<Uint8Array>,
 ) {
-  let env = await loadEnv(envs);
+  let env = await loadEnv(extensions);
   let buffer: Uint8Array;
   if (getWasmSource) {
     buffer = await getWasmSource();
   } else {
-    const url = await getUrl(env);
+    const url = await getUrl();
     buffer = await env.fetch(url);
   }
   return await start(modules, buffer, env, main);

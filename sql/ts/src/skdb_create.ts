@@ -5,7 +5,6 @@ import { getWasmUrl } from "./skdb_wasm_locator.js";
 export async function createOnThisThread(
   disableWarnings: boolean,
   modules: ModuleInit[],
-  envs: Map<string, Array<string>>,
   dbName?: string,
   getWasmSource?: () => Promise<Uint8Array>,
 ) {
@@ -13,7 +12,7 @@ export async function createOnThisThread(
     getWasmUrl,
     // @ts-ignore
     modules,
-    envs,
+    [],
     "SKDB_factory",
     getWasmSource,
   );

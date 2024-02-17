@@ -12,8 +12,6 @@ import { getWasmUrl } from "./skdb_wasm_locator.js";
 // sknpm searches for the modules line verbatim
 var modules : ModuleInit[];
 /*--MODULES--*/
-var extensions = new Map();
-/*--EXTENSIONS--*/
 
 export async function createSkdb(
   options: {
@@ -31,7 +29,6 @@ export async function createSkdb(
     return createOnThisThread(
       disableWarnings,
       modules,
-      extensions,
       options.dbName,
       options.getWasmSource,
     );
@@ -53,7 +50,7 @@ async function createSkdbSync(
     getWasmUrl,
     // @ts-ignore
     modules,
-    extensions,
+    [],
     "SKDB_factory",
     options.getWasmSource,
   );
@@ -63,7 +60,7 @@ async function createSkdbSync(
 }
 
 async function createWorker(disableWarnings: boolean, dbName?: string) {
-  let env = await loadEnv(extensions);
+  let env = await loadEnv([]);
   env.disableWarnings = disableWarnings;
   let worker: Wrk;
   if (isNode()) {
