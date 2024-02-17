@@ -888,7 +888,7 @@ fun copyAndConvertImport(
     print_string(">> Copy js files and convert to valid imports.");
   };
   nameLine = "var wasm64 = \"/*--NAME--*/\";";
-  modulesLines = "var modules = [ /*--MODULES--*/];";
+  modulesLines = "/*--MODULES--*/";
   base64Line = "export var base64 = \"\";";
   versionLine = "const npmVersion = \"\";";
   extensionsLine = "/*--EXTENSIONS--*/";
@@ -1013,11 +1013,17 @@ fun copyAndConvertImport(
   };
   invariant(!runtime.isEmpty(), "Runtime must be defined.");
   saved = SKStore.newObstack();
-  moduleName = (m) -> m.split(".", 2)[0];
-  import = (m) -> `import * as ${moduleName(m)} from "./${m}";`;
-  files = Vector[runtime].concat(loaderFiles).concat(moduleFiles);
-  imports = files.map(import).join("\n");
-  modulesList = files.map(moduleName).join(", ");
+  modules = mutable Vector[];
+  importLine = m -> {
+    mName = m.split(".", 2)[0];
+    modules.push(mName);
+    `import {init as ${mName}} from "./${m}";`
+  };
+  strModules = Vector[importLine(runtime)].concat(loaderFiles.map(importLine))
+    .concat(moduleFiles.map(importLine)).concat(Vector[
+      `modules = [${modules.join(", ")}];`
+    ])
+    .join("\n");
   strExtensions = "";
   extensionsFiles
     .map((_, v) -> "[" + v.map(c -> `"./${c}"`).join(", ") + "]")
@@ -1035,7 +1041,7 @@ fun copyAndConvertImport(
       if (cLine == nameLine) {
         `var wasm64 = "${binary()}";`
       } else if (cLine == modulesLines) {
-        `${imports}\nvar modules = [${modulesList}];`
+        strModules
       } else if (cLine == base64Line) {
         resources.maybeGet(sf) match {
         | Some(b64File) ->

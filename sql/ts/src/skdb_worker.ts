@@ -1,13 +1,11 @@
+import { type ModuleInit } from "#std/sk_types.js";
 import { createOnThisThread } from "./skdb_create.js";
 import { onWorkerMessage } from "#std/sk_worker.js";
 import type { Creator } from "#std/sk_worker.js";
 import type { SKDB } from "./skdb.js";
 
-// @ts-ignore
-// prettier-ignore
-var modules = [ /*--MODULES--*/];
-var extensions = new Map();
-/*--EXTENSIONS--*/
+var modules: ModuleInit[];
+/*--MODULES--*/
 
 class DbCreator implements Creator<SKDB> {
   getName() {
@@ -19,8 +17,7 @@ class DbCreator implements Creator<SKDB> {
   }
 
   async create(dbName?: string) {
-    // @ts-ignore
-    return createOnThisThread(false, modules, extensions, dbName);
+    return createOnThisThread(false, modules, dbName);
   }
 }
 

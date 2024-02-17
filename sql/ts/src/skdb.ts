@@ -1,18 +1,17 @@
 import { runUrl, loadEnv, isNode } from "#std/sk_types.js";
 import { createOnThisThread } from "./skdb_create.js";
-import type { Wrk } from "#std/sk_types.js";
+import type { Wrk, ModuleInit } from "#std/sk_types.js";
 import type { SKDB, SKDBSync, SKDBShared } from "./skdb_types.js";
 import { SKDBWorker } from "./skdb_wdatabase.js";
-export { SKDBTable as SKDBTable } from "./skdb_util.js";
+export { SKDBTable } from "./skdb_util.js";
 export type { SKDB, RemoteSKDB } from "./skdb_types.js";
 export type { Creds, MuxedSocket } from "./skdb_orchestration.js";
 export type { Environment } from "#std/sk_types.js";
 import { getWasmUrl } from "./skdb_wasm_locator.js";
 
 // sknpm searches for the modules line verbatim
-// @ts-ignore
-// prettier-ignore
-var modules = [ /*--MODULES--*/];
+var modules : ModuleInit[];
+/*--MODULES--*/
 var extensions = new Map();
 /*--EXTENSIONS--*/
 

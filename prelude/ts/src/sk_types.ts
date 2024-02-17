@@ -597,6 +597,8 @@ export interface ToWasmManager {
   prepare: (wasm: object) => Links | null;
 }
 
+export type ModuleInit = (e: Environment)=> Promise<ToWasmManager>;
+
 enum I18N {
   RAW,
   LOCALE,
@@ -761,18 +763,12 @@ export function loadWasm(
 }
 
 async function start(
-  modules: Array<any>,
+  modules: ModuleInit[],
   buffer: Uint8Array,
   environment: Environment,
   main?: string,
 ) {
-  let promises = modules.map((module) => {
-    if (module.init) {
-      return module.init(environment);
-    } else {
-      return null;
-    }
-  });
+  let promises = modules.map(fn => fn(environment));
   let cs = await Promise.all(promises);
   let ms = cs.filter((c) => c != null);
   return await loadWasm(buffer, ms, environment, main);
@@ -803,9 +799,11 @@ export async function loadEnv(
   return env;
 }
 
+
+
 export async function run(
   wasm64: string,
-  modules: Array<string>,
+  modules: ModuleInit[],
   envs: Map<string, Array<string>>,
   main?: string,
   getWasmSource?: () => Promise<Uint8Array>,
@@ -823,7 +821,7 @@ export async function run(
 
 export async function runUrl(
   getUrl: (env: Environment) => Promise<string>,
-  modules: Array<string>,
+  modules: ModuleInit[],
   envs: Map<string, Array<string>>,
   main?: string,
   getWasmSource?: () => Promise<Uint8Array>,

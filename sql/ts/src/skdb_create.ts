@@ -1,10 +1,10 @@
-import { runUrl } from "#std/sk_types.js";
+import { runUrl, type ModuleInit } from "#std/sk_types.js";
 import type { SKDBShared } from "./skdb_types.js";
 import { getWasmUrl } from "./skdb_wasm_locator.js";
 
 export async function createOnThisThread(
   disableWarnings: boolean,
-  modules: Array<string>,
+  modules: ModuleInit[],
   envs: Map<string, Array<string>>,
   dbName?: string,
   getWasmSource?: () => Promise<Uint8Array>,
