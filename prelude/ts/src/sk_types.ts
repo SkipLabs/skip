@@ -746,20 +746,18 @@ export function loadWasm(
 }
 
 async function start(
-  modules: Array<string>,
+  modules: Array<any>,
   buffer: Uint8Array,
   environment: Environment,
   main?: string,
 ) {
-  let promises = modules.map((name) =>
-    import(name).then((module) => {
-      if (module.init) {
-        return module.init(environment);
-      } else {
-        return null;
-      }
-    }),
-  );
+  let promises = modules.map((module) => {
+    if (module.init) {
+      return module.init(environment);
+    } else {
+      return null;
+    }
+  });
   let cs = await Promise.all(promises);
   let ms = cs.filter((c) => c != null);
   return await loadWasm(buffer, ms, environment, main);

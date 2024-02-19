@@ -916,9 +916,7 @@ fun copyAndConvertImport(
             elems = imported[1].split("/");
             size = elems.size();
             if (size > 1 && elems[0].startsWith("#")) {
-              !elems = elems.mapWithIndex((idx, v) ->
-                if (idx == 0) "." else v
-              );
+              !elems = elems.mapWithIndex((idx, v) -> if (idx == 0) "." else v);
               !line = `${elements[0]} from "${elems.join("/")}"`
             }
           }
@@ -1004,9 +1002,11 @@ fun copyAndConvertImport(
   };
   invariant(!runtime.isEmpty(), "Runtime must be defined.");
   saved = SKStore.newObstack();
-  strModules = Vector[`"./${runtime}"`].concat(loaderFiles.map(m -> `"./${m}"`))
-    .concat(moduleFiles.map(m -> `"./${m}"`))
-    .join(", ");
+  moduleName = (m) -> m.split(".", 2)[0];
+  import = (m) -> `import * as ${moduleName(m)} from "./${m}";`;
+  files = Vector[runtime].concat(loaderFiles).concat(moduleFiles);
+  imports = files.map(import).join("\n");
+  modulesList = files.map(moduleName).join(", ");
   strExtensions = "";
   extensionsFiles
     .map((_, v) -> "[" + v.map(c -> `"./${c}"`).join(", ") + "]")
@@ -1024,7 +1024,7 @@ fun copyAndConvertImport(
       if (cLine == nameLine) {
         `var wasm64 = "${binary()}";`
       } else if (cLine == modulesLines) {
-        `var modules = [${strModules}];`
+        `${imports}\nvar modules = [${modulesList}];`
       } else if (cLine == base64Line) {
         resources.maybeGet(sf) match {
         | Some(b64File) ->
