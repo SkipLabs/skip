@@ -39,7 +39,7 @@ export interface SKDBSync {
     update: (added: SKDBTable, removed: SKDBTable) => void,
   ) => { close: () => void };
   insert: (tableName: string, values: Array<any>) => boolean;
-  insertMany: (tableName: string, valuesArray: Array<Array<any>>) => boolean;
+  insertMany: (tableName: string, valuesArray: Array<Record<string, any>>) => number | Error;
 
   tableSchema: (tableName: string) => string;
   viewSchema: (viewName: string) => string;
@@ -83,7 +83,7 @@ export interface SKDB {
   insertMany: (
     tableName: string,
     valuesArray: Array<Array<any>>
-  ) => Promise<boolean>;
+  ) => Promise<number>;
 
   connect: (
     db: string,

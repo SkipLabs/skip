@@ -1662,7 +1662,7 @@ export const tests = (asWorker: boolean) => {
       fun: async (skdb: SKDB) => {
         await skdb.exec("create table t1 (a TEXT, b INTEGER);");
         await skdb.insertMany('t1', [{a:'foo', b:0}, {a:'bar', b: 1}]);
-        return skdb.exec("select * from t1");
+        return await skdb.exec("select * from t1");
       },
       check: (res) => {
         let str = JSON.stringify(res);
@@ -1679,7 +1679,7 @@ export const tests = (asWorker: boolean) => {
           values.push({a:'foo', b:i});
         }
         await skdb.insertMany('t1', values);
-        return skdb.exec("select count(*) as c from t1");
+        return await skdb.exec("select count(*) as c from t1");
       },
       check: (res) => {
         expect(res).toEqual([{c: 2100}]);
@@ -1696,7 +1696,7 @@ export const tests = (asWorker: boolean) => {
         }
       },
       check: (res) => {
-        expect(res).toMatch(/mismatch/);
+        expect(res).toMatch(/Missing/);
       },
     },
     {
