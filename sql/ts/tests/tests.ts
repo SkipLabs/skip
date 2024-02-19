@@ -1656,6 +1656,17 @@ export const tests = (asWorker: boolean) => {
         expect(all).toMatch(/\u00c3\u00a9al P/);
         expect(all).toMatch(/ \u2022 T/);
       },
+    },
+    {
+      name: n("insertMany", asWorker),
+      fun: async (skdb: SKDB) => {
+        await skdb.exec("create table t1 (a TEXT);");
+        await skdb.insertMany('t1', [['foo'], ['bar']]);
+        return skdb.exec("select count(*) from t1");
+      },
+      check: (res) => {
+        expect(res).toEqual([{"col<0>": 2}]);
+      },
     }
   ];
   return tests

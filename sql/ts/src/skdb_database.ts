@@ -280,6 +280,33 @@ export class SKDBSyncImpl implements SKDBSync {
     return this.runLocal(args1, stdin1) == "";
   };
 
+  insertMany = (tableName: string, valuesArray: Array<Array<any>>) => {
+    let params = new Map();
+    let valueIndex = 0;
+    while(valueIndex < valuesArray.length) {
+      let buffer = new Array();
+      buffer.push("insert into " + tableName + " values ");
+      for(let roundIdx = 0; roundIdx < 1000; roundIdx++) {
+        if(valueIndex >= valuesArray.length) break;
+        let values = valuesArray[valueIndex];
+        let keys = values.map((val, i) => {
+          let key = "@key" + i;
+          params.set(key, val);
+          return key;
+        });
+        if(roundIdx != 0) buffer.push(",");
+        buffer.push("(" + keys.join(", ") + ")");
+        valueIndex++;
+      }
+      buffer.push(";");
+      let [args1, stdin1] = this.addParams([], params, buffer.join(''));
+      if(this.runLocal(args1, stdin1) != "") {
+        return false;
+      }
+    };
+    return true;
+  }
+
   assertCanBeMirrored(tableName: string, schema: string): void {
     const error = this.runLocal(["can-mirror", tableName, schema], "");
     if (error === "") {
@@ -400,6 +427,10 @@ export class SKDBImpl implements SKDB {
 
   async insert(tableName: string, values: Array<any>) {
     return this.skdbSync.insert(tableName, values);
+  }
+
+  async insertMany(tableName: string, valuesArray: Array<Array<any>>) {
+    return this.skdbSync.insertMany(tableName, valuesArray);
   }
 
   async mirror(...tables: MirrorDefn[]) {

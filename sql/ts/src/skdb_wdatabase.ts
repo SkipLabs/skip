@@ -178,6 +178,12 @@ export class SKDBWorker implements SKDB {
       .send() as Promise<boolean>;
   };
 
+  insertMany = async (tableName: string, valuesArray: Array<Array<any>>) => {
+    return this.worker
+      .post(new Function("insertMany", [tableName, valuesArray]))
+      .send() as Promise<boolean>;
+  };
+
   save = async () => {
     return this.worker
       .post(new Function("save", []))
