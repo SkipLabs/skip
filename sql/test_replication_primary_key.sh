@@ -313,6 +313,26 @@ test_basic_replication_escaped_string_alt() {
     rm -f "$output"
 }
 
+test_basic_replication_string_with_unicode() {
+    setup_server
+    setup_local test_with_pk
+
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO test_with_pk VALUES(0,'foo','read-write');"
+    $SKDB_BIN --data $LOCAL_DB <<< "UPDATE test_with_pk SET note = 'what''s up?™' WHERE id = 0;"
+
+    replicate_to_server test_user
+
+    output=$(mktemp)
+
+    $SKDB_BIN --data $SERVER_DB <<< "SELECT COUNT(*) FROM test_with_pk WHERE note = 'what''s up?™';" > "$output"
+    assert_line_count "$output" 1 1
+
+    session=$($SKDB_BIN --data $SERVER_DB subscribe test_with_pk --connect)
+    $SKDB_BIN tail --user test_user --data $SERVER_DB --format=csv "$session" --since 0 > "$output"
+    assert_line_count "$output" "what's up?" 1
+    rm -f "$output"
+}
+
 test_basic_replication_with_deletes() {
     setup_server
     setup_local test_with_pk
@@ -1124,6 +1144,7 @@ run_test test_basic_replication_null_string
 run_test test_basic_replication_empty_string
 run_test test_basic_replication_escaped_string
 run_test test_basic_replication_escaped_string_alt
+run_test test_basic_replication_string_with_unicode
 
 run_test test_basic_replication_with_deletes
 run_test test_basic_replication_with_deletes_server_state_different
