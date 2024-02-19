@@ -80,6 +80,11 @@ export interface SKDB {
     update: (added: SKDBTable, removed: SKDBTable) => void,
   ) => Promise<{ close: () => Promise<void> }>;
 
+  insertMany: (
+    tableName: string,
+    valuesArray: Array<Array<any>>
+  ) => Promise<boolean>;
+
   connect: (
     db: string,
     accessKey: string,

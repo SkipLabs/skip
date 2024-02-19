@@ -280,17 +280,50 @@ export class SKDBSyncImpl implements SKDBSync {
     return this.runLocal(args1, stdin1) == "";
   };
 
-  insertMany = (tableName: string, valuesArray: Array<Array<any>>) => {
+  insertMany = (tableName: string, valuesArray: Array<any>) => {
     let params = new Map();
     let valueIndex = 0;
+    let keyNbr = 0;
+
+    let colTypes = this.tableSchema(tableName)
+        .replace(/.*\(/, "")
+        .replace(");", "")
+        .replace(/\n/g, "")
+        .replace(/[ ]+/g, " ")
+        .split(",");
+
+    let colNames = colTypes.map(col => col.split(" ")[1]);
+
+    let colIndex = new Map();
+    for(let i in colNames) {
+      colIndex.set(colNames[i], i);
+    }
+    
     while(valueIndex < valuesArray.length) {
       let buffer = new Array();
       buffer.push("insert into " + tableName + " values ");
       for(let roundIdx = 0; roundIdx < 1000; roundIdx++) {
         if(valueIndex >= valuesArray.length) break;
-        let values = valuesArray[valueIndex];
-        let keys = values.map((val, i) => {
-          let key = "@key" + i;
+        let values = new Array();
+        let valuesSize = 0;
+        let obj = valuesArray[valueIndex];
+        for(let fieldName in obj) {
+          if(!colIndex.has(fieldName)) {
+            throw new Error("Field not found: " + fieldName);
+          }
+          values[colIndex.get(fieldName)] = obj[fieldName];
+          valuesSize++;
+        }
+        if(valuesSize < colTypes.length) {
+          for(let fieldName in colIndex) {
+            if(!obj.hasOwnProperty(fieldName)) {
+              throw new Error("Missing field: " + fieldName);
+            }
+          }
+        }
+        let keys = values.map((val, _) => {
+          let key = "@key" + keyNbr;
+          keyNbr++;
           params.set(key, val);
           return key;
         });

@@ -1658,14 +1658,59 @@ export const tests = (asWorker: boolean) => {
       },
     },
     {
-      name: n("insertMany", asWorker),
+      name: n("insertMany unit", asWorker),
       fun: async (skdb: SKDB) => {
-        await skdb.exec("create table t1 (a TEXT);");
-        await skdb.insertMany('t1', [['foo'], ['bar']]);
-        return skdb.exec("select count(*) from t1");
+        await skdb.exec("create table t1 (a TEXT, b INTEGER);");
+        await skdb.insertMany('t1', [{a:'foo', b:0}, {a:'bar', b: 1}]);
+        return skdb.exec("select * from t1");
       },
       check: (res) => {
-        expect(res).toEqual([{"col<0>": 2}]);
+        let str = JSON.stringify(res);
+        expect(str).toMatch(/foo/);
+        expect(str).toMatch(/bar/);
+      },
+    },
+    {
+      name: n("insertMany bulk", asWorker),
+      fun: async (skdb: SKDB) => {
+        await skdb.exec("create table t1 (a TEXT, b INTEGER);");
+        let values = new Array();
+        for(let i = 0; i < 2100; i++) {
+          values.push({a:'foo', b:i});
+        }
+        await skdb.insertMany('t1', values);
+        return skdb.exec("select count(*) as c from t1");
+      },
+      check: (res) => {
+        expect(res).toEqual([{c: 2100}]);
+      },
+    },
+    {
+      name: n("insertMany missing field", asWorker),
+      fun: async (skdb: SKDB) => {
+        await skdb.exec("create table t1 (a TEXT, b INTEGER);");
+        try {
+          return await skdb.insertMany('t1', [{a:'foo'}, {a:'bar', b: 1}]);
+        } catch (e) {
+          return (e as Error).message;
+        }
+      },
+      check: (res) => {
+        expect(res).toMatch(/mismatch/);
+      },
+    },
+    {
+      name: n("insertMany too many fields", asWorker),
+      fun: async (skdb: SKDB) => {
+        await skdb.exec("create table t1 (a TEXT, b INTEGER);");
+        try {
+          return await skdb.insertMany('t1', [{a:'foo', b:1, c:2}, {a:'bar', b: 1}]);
+        } catch (e) {
+          return (e as Error).message;
+        }
+      },
+      check: (res) => {
+        expect(res).toMatch(/not found/);
       },
     }
   ];
