@@ -368,6 +368,11 @@ async function testClientTail(root: SKDB, user: SKDB) {
       true,
     );
     expect(res).toEqual([{ y: str }]);
+
+    // sanity check that the result we get back in to a json object is
+    // also correctly formed
+    const rows = await user.exec("SELECT y FROM test_pk_string WHERE x = 0");
+    expect(rows).toEqual([{ y: str }]);
   }
 
   // newlines don't break anything, adding...
@@ -385,6 +390,11 @@ async function testClientTail(root: SKDB, user: SKDB) {
       true,
     );
     expect(res).toEqual([{ cnt: 1 }]);
+
+    // sanity check that the result we get back in to a json object is
+    // also correctly formed
+    const rows = await user.exec("SELECT y FROM test_pk_string WHERE x = 1");
+    expect(rows).toEqual([{ y: str }]);
   }
 
   // ...or removing
@@ -415,6 +425,11 @@ async function testClientTail(root: SKDB, user: SKDB) {
       true,
     );
     expect(res).toEqual([{ cnt: 1 }]);
+
+    // sanity check that the result we get back in to a json object is
+    // also correctly formed
+    const rows = await user.exec("SELECT y FROM test_pk_string WHERE x = 1");
+    expect(rows).toEqual([{ y: str }]);
   }
 
   // ...or removing
