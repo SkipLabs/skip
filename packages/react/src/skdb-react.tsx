@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { createContext, useContext } from "react";
 import type { SKDB } from "skdb";
+import { SKDBTable } from "skdb";
 import { Params } from "skdb/dist/skdb_types.js";
 
 export const SKDBContext = createContext<SKDB | undefined>(undefined);
@@ -29,9 +30,9 @@ export function useQuery(
   query: string,
   params: Params = {},
   defaultRows: Array<any> = [],
-): any {
+): SKDBTable {
   const skdb = useSKDB();
-  const [state, setState] = useState(defaultRows);
+  const [state, setState] = useState<SKDBTable>(new SKDBTable(...defaultRows));
 
   const deps = Object.values(params);
   deps.push(skdb);
@@ -41,7 +42,7 @@ export function useQuery(
     let removeQuery = false;
     const closeable = { close: () => {} };
     skdb
-      .watch(query, params, (rows: Array<any>) => {
+      .watch(query, params, (rows) => {
         setState(rows);
       })
       .then((handle) => {
