@@ -221,6 +221,7 @@ base class CValue uses Orderable, Show {
     this match {
     | CInt(n) -> n.toString()
     | CFloat(f) -> floatToString(f)
+    | CString(str) if (format is SKStore.OCSV _) -> SKCSV.escapeString(str)
     | CString(str) if (format.usesDoubleQuotes()) ->
       result = mutable Vector['"'];
       for (c in str) {
@@ -228,9 +229,11 @@ base class CValue uses Orderable, Show {
           format match {
           | SKStore.OJSON _ -> result.push('\\')
           | SKStore.OSQL _ -> void
-          | SKStore.OTable _
+          | SKStore.OTable _ -> result.push(c)
           | SKStore.OCSV _ ->
-            result.push(c)
+            invariant_violation(
+              "CSV handled separately. This branch should not be reached.",
+            )
           | SKStore.OJS _ ->
             invariant_violation(
               "Internal error: JS direct mode should never be pretty-printed",
