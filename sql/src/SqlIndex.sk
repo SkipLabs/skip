@@ -32,7 +32,11 @@ extension class IndexProjKey extends SKStore.Key {
 
   fun compare(other: SKStore.Key): Order {
     other match {
-    | IndexProjKey(row2, _) -> compareRows(this.kinds, this.row, row2)
+    | IndexProjKey(row2, kinds2) ->
+      this.kinds.compare(kinds2) match {
+      | EQ() -> compareRows(this.kinds, this.row, row2)
+      | diseq -> diseq
+      }
     | _ -> this.getClassName().compare(other.getClassName())
     }
   }
