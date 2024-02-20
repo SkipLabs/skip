@@ -1,4 +1,6 @@
 import { run, loadEnv, isNode } from "#std/sk_types.js";
+import { createOnThisThread } from "./skdb_create.js";
+import type { Wrk } from "#std/sk_types.js";
 import type { SKDB, SKDBSync, SKDBShared } from "./skdb_types.js";
 import { SKDBWorker } from "./skdb_wdatabase.js";
 export { SKDBTable as SKDBTable } from "./skdb_util.js";
@@ -26,7 +28,8 @@ export async function createSkdb(
     options.asWorker != undefined ? options.asWorker : !options.getWasmSource;
   const disableWarnings = options.disableWarnings ?? false;
   if (!asWorker) {
-    return createOnMain(disableWarnings, options.dbName, options.getWasmSource);
+    // @ts-ignore
+    return createOnThisThread(disableWarnings, modules, extensions, options.dbName, options.getWasmSource);
   } else {
     if (options.getWasmSource) {
       throw new Error("getWasmSource is not compatible with worker");
@@ -54,35 +57,21 @@ async function createSkdbSync(
   );
 }
 
-async function createOnMain(
-  disableWarnings: boolean,
-  dbName?: string,
-  getWasmSource?: () => Promise<Uint8Array>,
-) {
-  let data = await run(
-    wasm64,
-    // @ts-ignore
-    modules,
-    extensions,
-    "SKDB_factory",
-    getWasmSource,
-  );
-  data.environment.disableWarnings = disableWarnings;
-  return (data.environment.shared.get("SKDB") as SKDBShared).create(dbName);
-}
-
 async function createWorker(disableWarnings: boolean, dbName?: string) {
   let env = await loadEnv(extensions);
   env.disableWarnings = disableWarnings;
-  let path: string;
+  let worker: Wrk;
   if (isNode()) {
-    path = import.meta.url.replace("/skdb.mjs", "/skdb_nodeworker.mjs");
-    // @ts-ignore
+    let path = import.meta.url.replace("/skdb.mjs", "/skdb_nodeworker.mjs");
+    //@ts-ignore
     path = "./" + path.substring(process.cwd().length + 8);
+    worker = env.createWorker(path, { type: "module" });
   } else {
-    path = import.meta.url.replace("/skdb.mjs", "/skdb_worker.mjs");
+    // important that this line looks exactly like this for bundlers to discover the file
+    const wrapped = new Worker(new URL("./skdb_worker.mjs", import.meta.url),
+      {type: 'module'});
+    worker = env.createWorkerWrapper(wrapped);
   }
-  let worker = env.createWorker(path, { type: "module" });
   let skdb = new SKDBWorker(worker);
   await skdb.create(dbName);
   return skdb;

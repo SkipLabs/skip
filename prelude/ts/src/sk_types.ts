@@ -152,6 +152,7 @@ export interface Environment {
   environment: Array<string>;
   createSocket: (uir: string) => WebSocket;
   createWorker: (filename: string | URL, options?: WorkerOptions) => Wrk;
+  createWorkerWrapper: (worker: Worker) => Wrk;
   timestamp: () => float;
   decodeUTF8: (utf8: ArrayBuffer) => string;
   encodeUTF8: (str: string) => Uint8Array;
@@ -775,7 +776,7 @@ export async function loadEnv(
   // don't follow the node dynamic import
   const nodeImport = "./sk_node.mjs";
   const environment = await (isNode()
-    ? import(nodeImport)
+    ? import(/* @vite-ignore */ nodeImport)
     : //@ts-ignore
       import("./sk_browser.mjs"));
   let env = environment.environment(envVals) as Environment;
