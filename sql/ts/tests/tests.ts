@@ -1712,6 +1712,19 @@ export const tests = (asWorker: boolean) => {
       check: (res) => {
         expect(res).toMatch(/not found/);
       },
+    },
+    {
+      name: n("Test error", asWorker),
+      fun: async (skdb: SKDB) => {
+        try {
+          return await skdb.exec("create table t1 (a TEXT, b BAD);");
+        } catch (e) {
+          return (e as Error).message;
+        }
+      },
+      check: (res) => {
+        expect(res).toMatch(/Construction not implemented/);
+      },
     }
   ];
   return tests

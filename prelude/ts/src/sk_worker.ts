@@ -265,6 +265,26 @@ export class PromiseWorker {
   }
 }
 
+function apply<R>(
+  post: (message: any) => void,
+  id: MessageId,
+  caller: any,
+  fn: (...args: any) => Promise<R>,
+  parameters: any[],
+  conv: (res: any) => any = (v) => v,
+): void {
+  fn.apply(caller, parameters)
+    .then((result: any) => {
+      post(new Message(id, new Return(true, conv(result))));
+    })
+    .catch((e: any) => {
+      // Firefox don't transmit Worker message if an object of type Error is in the message.
+      post(
+        new Message(id, new Return(false, e instanceof Error ? e.message : e)),
+      );
+    });
+}
+
 var runner: object;
 var wrappedId = 0;
 var wrapped = new Map<number, { value: any; autoremove: boolean }>();
@@ -306,13 +326,10 @@ export const onWorkerMessage = <T>(
             ),
           );
         } else {
-          creator.create
-            .apply(creator, parameters)
-            .then((created) => {
-              runner = created as object;
-              post(new Message(data!.id, new Return(true, null)));
-            })
-            .catch((e) => post(new Message(data!.id, new Return(false, e))));
+          apply(post, data!.id, creator, creator.create, parameters, created => {
+            runner = created as object;
+            return null;
+          });
         }
       } else if (!runner) {
         post(
@@ -329,24 +346,20 @@ export const onWorkerMessage = <T>(
             ),
           );
         } else {
-          fn.apply(runner, parameters)
-            .then((result: any) => {
-              if (fun.wrap && fun.wrap) {
-                let wId = wrappedId++;
-                wrapped.set(wId, {
-                  value: result,
-                  autoremove: fun.wrap.autoremove,
-                });
-                if (result instanceof Wrappable) {
-                  result.wrappedId = wId;
-                }
-                result = new Wrapped(wId);
+          apply(post, data!.id, runner, fn, parameters, (result: any) => {
+            if (fun.wrap && fun.wrap.wrap) {
+              let wId = wrappedId++;
+              wrapped.set(wId, {
+                value: result,
+                autoremove: fun.wrap.autoremove,
+              });
+              if (result instanceof Wrappable) {
+                result.wrappedId = wId;
               }
-              post(new Message(data!.id, new Return(true, result)));
-            })
-            .catch((e: any) =>
-              post(new Message(data!.id, new Return(false, e))),
-            );
+              result = new Wrapped(wId);
+            }
+            return result;
+          });
         }
       }
     }
@@ -375,12 +388,7 @@ export const onWorkerMessage = <T>(
         ),
       );
     } else {
-      fni.fn
-        .apply(fni.obj, parameters)
-        .then((result: any) =>
-          post(new Message(data!.id, new Return(true, result))),
-        )
-        .catch((e: any) => post(new Message(data!.id, new Return(false, e))));
+      apply(post, data!.id, fni.obj, fni.fn, parameters);
     }
     if (obj?.autoremove || caller.remove) {
       wrapped.delete(caller.wrapped);
