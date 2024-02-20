@@ -12,8 +12,15 @@ import { WebSocket } from "ws";
 class WrkImpl implements Wrk {
   worker: Worker;
 
-  constructor(filename: string | URL, options?: WorkerOptions) {
-    this.worker = new Worker(filename, options);
+  constructor(worker: Worker) {
+    this.worker = worker;
+  }
+
+  static fromPath(
+    filename: string | URL,
+    options: WorkerOptions | undefined,
+  ): Wrk {
+    return new this(new Worker(filename, options));
   }
 
   postMessage = (message: any) => {
@@ -41,6 +48,7 @@ class Env implements Environment {
   throwRuntime: (code: int) => void;
   createSocket: (uri: string) => WebSocket;
   createWorker: (filename: string | URL, options?: WorkerOptions) => Wrk;
+  createWorkerWrapper: (worker: any) => Wrk;
   crypto: () => Crypto;
   fs() {
     return this.fileSystem;
@@ -85,7 +93,10 @@ class Env implements Environment {
     };
     this.createSocket = (uri: string) => new WebSocket(uri);
     this.createWorker = (filename: string | URL, options?: WorkerOptions) =>
-      new WrkImpl(filename, options);
+      WrkImpl.fromPath(filename, options);
+    this.createWorkerWrapper = (worker: Worker) => {
+      throw new Error("Not implemented");
+    };
     this.crypto = () => crypto as Crypto;
   }
 }
