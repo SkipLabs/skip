@@ -29,7 +29,13 @@ export async function createSkdb(
   const disableWarnings = options.disableWarnings ?? false;
   if (!asWorker) {
     // @ts-ignore
-    return createOnThisThread(disableWarnings, modules, extensions, options.dbName, options.getWasmSource);
+    return createOnThisThread(
+      disableWarnings,
+      modules,
+      extensions,
+      options.dbName,
+      options.getWasmSource,
+    );
   } else {
     if (options.getWasmSource) {
       throw new Error("getWasmSource is not compatible with worker");
@@ -68,8 +74,9 @@ async function createWorker(disableWarnings: boolean, dbName?: string) {
     worker = env.createWorker(path, { type: "module" });
   } else {
     // important that this line looks exactly like this for bundlers to discover the file
-    const wrapped = new Worker(new URL("./skdb_worker.mjs", import.meta.url),
-      {type: 'module'});
+    const wrapped = new Worker(new URL("./skdb_worker.mjs", import.meta.url), {
+      type: "module",
+    });
     worker = env.createWorkerWrapper(wrapped);
   }
   let skdb = new SKDBWorker(worker);
