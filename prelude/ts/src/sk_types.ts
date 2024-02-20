@@ -693,7 +693,7 @@ export function trimEndChar(str: string, ch: string) {
   return end < str.length ? str.substring(0, end) : str;
 }
 
-function relativeto(path: string, ref: string) {
+export function relativeto(path: string, ref: string) {
   if (ref.length == 0) {
     return path;
   }
@@ -803,6 +803,24 @@ export async function run(
   } else {
     let path = relativeto(resolve("./" + wasm64 + ".wasm"), env.rootPath());
     buffer = await env.fetch(path);
+  }
+  return await start(modules, buffer, env, main);
+}
+
+export async function runUrl(
+  getUrl: (env: Environment) => Promise<string>,
+  modules: Array<string>,
+  envs: Map<string, Array<string>>,
+  main?: string,
+  getWasmSource?: () => Promise<Uint8Array>,
+) {
+  let env = await loadEnv(envs);
+  let buffer: Uint8Array;
+  if (getWasmSource) {
+    buffer = await getWasmSource();
+  } else {
+    const url = await getUrl(env);
+    buffer = await env.fetch(url);
   }
   return await start(modules, buffer, env, main);
 }

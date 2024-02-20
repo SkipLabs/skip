@@ -1,4 +1,4 @@
-import { run, loadEnv, isNode } from "#std/sk_types.js";
+import { runUrl, loadEnv, isNode } from "#std/sk_types.js";
 import { createOnThisThread } from "./skdb_create.js";
 import type { Wrk } from "#std/sk_types.js";
 import type { SKDB, SKDBSync, SKDBShared } from "./skdb_types.js";
@@ -7,8 +7,8 @@ export { SKDBTable as SKDBTable } from "./skdb_util.js";
 export type { SKDB, RemoteSKDB } from "./skdb_types.js";
 export type { Creds, MuxedSocket } from "./skdb_orchestration.js";
 export type { Environment } from "#std/sk_types.js";
+import { getWasmUrl } from "./skdb_wasm_locator.js";
 
-var wasm64 = "skdb";
 // sknpm searches for the modules line verbatim
 // @ts-ignore
 // prettier-ignore
@@ -44,8 +44,8 @@ async function createSkdbSync(
     getWasmSource?: () => Promise<Uint8Array>;
   } = {},
 ): Promise<SKDBSync> {
-  let data = await run(
-    wasm64,
+  let data = await runUrl(
+    getWasmUrl,
     // @ts-ignore
     modules,
     extensions,

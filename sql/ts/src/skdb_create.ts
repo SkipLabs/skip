@@ -1,7 +1,6 @@
-import { run } from "#std/sk_types.js";
+import { runUrl } from "#std/sk_types.js";
 import type { SKDBShared } from "./skdb_types.js";
-
-var wasm64 = "skdb";
+import { getWasmUrl } from "./skdb_wasm_locator.js";
 
 export async function createOnThisThread(
   disableWarnings: boolean,
@@ -10,8 +9,8 @@ export async function createOnThisThread(
   dbName?: string,
   getWasmSource?: () => Promise<Uint8Array>,
 ) {
-  let data = await run(
-    wasm64,
+  let data = await runUrl(
+    getWasmUrl,
     // @ts-ignore
     modules,
     envs,
