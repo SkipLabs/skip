@@ -85,7 +85,11 @@ extension class RowKey {
 
   fun compare(other: SKStore.Key): Order {
     other match {
-    | RowKey(row2, _) -> SKDB.compareRows(this.kinds, this.row, row2)
+    | RowKey(row2, kinds2) ->
+      this.kinds.compare(kinds2) match {
+      | EQ() -> SKDB.compareRows(this.kinds, this.row, row2)
+      | diseq -> diseq
+      }
     | _ -> this.getClassName().compare(other.getClassName())
     }
   }
