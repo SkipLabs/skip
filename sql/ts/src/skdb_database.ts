@@ -280,6 +280,70 @@ export class SKDBSyncImpl implements SKDBSync {
     return this.runLocal(args1, stdin1) == "";
   };
 
+  insertMany = (tableName: string, valuesArray: Array<Record<string, any>>) => {
+    let params = new Map();
+    let valueIndex = 0;
+    let keyNbr = 0;
+
+    let colTypes = this.tableSchema(tableName)
+        .replace(/.*\(/, "")
+        .replace(");", "")
+        .replace(/\n/g, "")
+        .replace(/[ ]+/g, " ")
+        .split(",");
+
+    let colNames = colTypes.map(col => col.split(" ")[1]);
+
+    let colIndex = new Map();
+    for(let i in colNames) {
+      colIndex.set(colNames[i], i);
+    }
+
+    
+    while(valueIndex < valuesArray.length) {
+      let buffer = new Array();
+      buffer.push("insert into " + tableName + " values ");
+      for(let roundIdx = 0; roundIdx < 1000; roundIdx++) {
+        if(valueIndex >= valuesArray.length) break;
+        let values = new Array();
+        let valuesSize = 0;
+        let obj = valuesArray[valueIndex];
+        for(let fieldName in obj) {
+          if(!colIndex.has(fieldName)) {
+            return new Error("Field not found: " + fieldName);
+          }
+          values[colIndex.get(fieldName)] = obj[fieldName];
+          valuesSize++;
+        }
+        if(valuesSize < colTypes.length) {
+          let error;
+          colIndex.forEach((_, fieldName) => {
+            if(!obj.hasOwnProperty(fieldName)) {
+              error = new Error("Missing field: " + fieldName);
+            }
+          });
+          throw error
+        }
+        let keys = values.map((val, _) => {
+          let key = "@key" + keyNbr;
+          keyNbr++;
+          params.set(key, val);
+          return key;
+        });
+        if(roundIdx != 0) buffer.push(",");
+        buffer.push("(" + keys.join(", ") + ")");
+        valueIndex++;
+      }
+      buffer.push(";");
+      let [args1, stdin1] = this.addParams([], params, buffer.join(''));
+      let stderr = this.runLocal(args1, stdin1);
+      if(stderr != "") {
+        throw Error(stderr);
+      }
+    };
+    return valueIndex;
+  }
+
   assertCanBeMirrored(tableName: string, schema: string): void {
     const error = this.runLocal(["can-mirror", tableName, schema], "");
     if (error === "") {
@@ -400,6 +464,14 @@ export class SKDBImpl implements SKDB {
 
   async insert(tableName: string, values: Array<any>) {
     return this.skdbSync.insert(tableName, values);
+  }
+
+  async insertMany(tableName: string, valuesArray: Array<Record<string, any>>) {
+    let result = this.skdbSync.insertMany(tableName, valuesArray);
+    if(result instanceof Error) {
+      throw result;
+    }
+    return result;
   }
 
   async mirror(...tables: MirrorDefn[]) {
