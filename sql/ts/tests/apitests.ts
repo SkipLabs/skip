@@ -114,6 +114,11 @@ async function testQueriesAgainstTheServer(skdb: SKDB) {
   );
   expect(tableCreate).toEqual([]);
 
+  await remote.exec(
+    "CREATE TABLE test_pk_string (x INTEGER PRIMARY KEY, y TEXT, skdb_access TEXT);",
+    new Map(),
+  );
+
   const viewCreate = await remote.exec(
     "CREATE REACTIVE VIEW view_pk AS SELECT x, y * 3 AS y, 'read-write' as skdb_access FROM test_pk;",
     {},
@@ -342,6 +347,103 @@ async function testClientTail(root: SKDB, user: SKDB) {
     true,
   );
   expect(resv).toEqual([{ cnt: 1 }]);
+
+  await user.mirror({
+    table: "test_pk_string",
+    expectedColumns: "(x INTEGER PRIMARY KEY, y TEXT, skdb_access TEXT)",
+  });
+
+  // chars outside of ascii replicate and can be queried
+  {
+    const str = "hello, world!\u2122";
+    await user.exec(
+      "insert into test_pk_string values (0,@str,'read-write');",
+      { str },
+    );
+    const res = await waitSynch(
+      root,
+      "select y from test_pk_string where x = 0 and y = @str",
+      (tail) => tail[0].y == str,
+      { str },
+      true,
+    );
+    expect(res).toEqual([{ y: str }]);
+
+    // sanity check that the result we get back in to a json object is
+    // also correctly formed
+    const rows = await user.exec("SELECT y FROM test_pk_string WHERE x = 0");
+    expect(rows).toEqual([{ y: str }]);
+  }
+
+  // newlines don't break anything, adding...
+  {
+    const str = "hello, world!\r\n";
+    await user.exec(
+      "insert into test_pk_string values (1,@str,'read-write');",
+      { str },
+    );
+    const res = await waitSynch(
+      root,
+      "select count(*) as cnt from test_pk_string where x = 1 and y = @str",
+      (tail) => tail[0].cnt == 1,
+      { str },
+      true,
+    );
+    expect(res).toEqual([{ cnt: 1 }]);
+
+    // sanity check that the result we get back in to a json object is
+    // also correctly formed
+    const rows = await user.exec("SELECT y FROM test_pk_string WHERE x = 1");
+    expect(rows).toEqual([{ y: str }]);
+  }
+
+  // ...or removing
+  {
+    await user.exec("delete from test_pk_string where x = 1;", {});
+    const res = await waitSynch(
+      root,
+      "select count(*) as cnt from test_pk_string where x = 1",
+      (tail) => tail[0].cnt == 0,
+      {},
+      true,
+    );
+    expect(res).toEqual([{ cnt: 0 }]);
+  }
+
+  // quotes don't break anything, adding...
+  {
+    const str = "he\"llo\", 'world'!";
+    await user.exec(
+      "insert into test_pk_string values (1,@str,'read-write');",
+      { str },
+    );
+    const res = await waitSynch(
+      root,
+      "select count(*) as cnt from test_pk_string where x = 1 and y = @str",
+      (tail) => tail[0].cnt == 1,
+      { str },
+      true,
+    );
+    expect(res).toEqual([{ cnt: 1 }]);
+
+    // sanity check that the result we get back in to a json object is
+    // also correctly formed
+    const rows = await user.exec("SELECT y FROM test_pk_string WHERE x = 1");
+    expect(rows).toEqual([{ y: str }]);
+  }
+
+  // ...or removing
+  {
+    await user.exec("delete from test_pk_string where x = 1;", {});
+    const res = await waitSynch(
+      root,
+      "select count(*) as cnt from test_pk_string where x = 1",
+      (tail) => tail[0].cnt == 0,
+      {},
+      true,
+    );
+    expect(res).toEqual([{ cnt: 0 }]);
+  }
 }
 
 async function testLargeMirror(root: SKDB, user: SKDB) {

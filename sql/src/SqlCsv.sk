@@ -2,50 +2,129 @@ module alias P = SQLParser;
 
 module SKCSV;
 
-base class Token {
-  children =
-  | NewLine()
-  | Comma()
-  | Chars(Array<Char>)
+fun requiresEscape(ch: Char): .Bool {
+  !Chars.isPrintableAscii(ch) || (ch == '"') || (ch == '\\');
 }
 
-fun lexRaw(next: () -> Char): mutable Iterator<Token> {
+// this deviates from 'standard' csv. it actually uses the json
+// escaping algorithm. this is for 2 reasons:
+// 1. this approach is very well battle tested and accounts for more
+//    things than csv usually considers.
+// 2. we have logic that assumes that a row is represented on a single
+//    line (e.g. looking for checkpoint markers). standard csv allows for
+//    line breaks in strings and this wreaks havoc. it'll also hurt
+//    line-based buffering.
+// this is all ok as the csv we produce is not meant to be public
+// facing. and ultimately we plan to replace this with a binary
+// format.
+fun charToString(ch: Char): String {
+  if (!requiresEscape(ch)) {
+    ch.toString()
+  } else {
+    addCode = (chars, code) -> {
+      chars.push('\\');
+      chars.push('u');
+      Chars.intToHexDigits(code, 4).each(chars.push);
+    };
+    ch match {
+    | '\\' -> "\\\\"
+    | '"' -> "\\\""
+    | '\b' -> "\\b"
+    | '\f' -> "\\f"
+    | '\n' -> "\\n"
+    | '\r' -> "\\r"
+    | '\t' -> "\\t"
+    | _ if (Chars.isBasicMultiLingualPlane(ch)) ->
+      chars = mutable Vector<Char>[];
+      addCode(chars, ch.code());
+      String::fromChars(chars.toArray())
+    | _ ->
+      chars = mutable Vector<Char>[];
+      (high, low) = Chars.toUTF16SurrogatePair(ch);
+      addCode(chars, high);
+      addCode(chars, low);
+      String::fromChars(chars.toArray())
+    };
+  }
+}
+
+fun escapeString(s: String): String {
+  s.search(requiresEscape) match {
+  | None() -> "\"" + s + "\""
+  | Some _ ->
+    strings = mutable Vector<String>[];
+    strings.push("\"");
+    s.each(ch -> {
+      strings.push(charToString(ch))
+    });
+    strings.push("\"");
+    strings.join("")
+  };
+}
+
+fun eatHexDigits(iter: () -> Char): Int {
+  result = mutable Vector[];
+  for (_ in Range(0, 4)) result.push(iter());
+  Chars.hexDigitsToInt(result.join(""));
+}
+
+fun decodeString(iter: () -> Char): String {
+  result = mutable Vector[];
+  loop {
+    iter() match {
+    | '"' -> break String::fromChars(result.toArray())
+    | '\\' ->
+      iter() match {
+      | '"' -> result.push('"')
+      | '\\' -> result.push('\\')
+      | '/' -> result.push('/')
+      | 'b' -> result.push('\b')
+      | 'f' -> result.push('\f')
+      | 'n' -> result.push('\n')
+      | 'r' -> result.push('\r')
+      | 't' -> result.push('\t')
+      | 'u' ->
+        leadingCode = eatHexDigits(iter);
+        if (!Chars.isSurrogate(leadingCode)) {
+          result.push(Char::fromCode(leadingCode));
+        } else if (Chars.isLowSurrogate(leadingCode)) {
+          invariant_violation("Trailing surrogate without leading surrogate");
+        } else {
+          trailingCode = eatHexDigits(iter);
+          if (!Chars.isLowSurrogate(trailingCode)) {
+            invariant_violation("Bad low surrogate");
+          };
+          result.push(Chars.fromSurrogatePair(leadingCode, trailingCode));
+        }
+      | _ -> invariant_violation("Invalid escape sequence in CSV string")
+      }
+    | ch if (Chars.isControlC0(ch)) ->
+      invariant_violation("Control C0 character in CSV string: " + ch.code())
+    | x -> result.push(x)
+    }
+  };
+}
+
+fun lex(next: () -> Char): mutable Iterator<(Bool, String)> {
   acc = mutable Vector[];
-  lastIsString = false;
+  processingString = false;
   loop {
     next() match {
     | '\n' ->
-      if (!lastIsString) {
-        str = acc.toArray();
-        acc.clear();
-        yield Chars(str);
+      if (!processingString) {
+        yield (false, String::fromChars(acc.toArray()))
       };
       break void
+    | '"' if (!processingString) ->
+      !processingString = true;
+      yield (true, decodeString(next))
     | ',' ->
-      if (!lastIsString) {
-        str = acc.toArray();
-        acc.clear();
-        yield Chars(str);
+      if (!processingString) {
+        yield (false, String::fromChars(acc.toArray()))
       };
-      !lastIsString = false;
-
-      yield Comma()
-    | '"' ->
-      !lastIsString = true;
-      acc.push('"');
-      loop {
-        c = next();
-        acc.push(c);
-        if (c == '"') {
-          break void;
-        }
-      };
-      str = acc.toArray();
       acc.clear();
-      yield Chars(str)
-    | x ->
-      !lastIsString = false;
-      acc.push(x)
+      !processingString = false
+    | x -> acc.push(x)
     }
   }
 }
@@ -63,46 +142,6 @@ fun trim(chars: Array<Char>): Array<Char> {
   j = chars.size();
   while (j - 1 >= 0 && chars[j - 1] == ' ') !j = j - 1;
   chars.slice(i, j)
-}
-
-fun lex(next: () -> Char): mutable Iterator<(Bool, String)> {
-  stringAcc: ?mutable Vector<Char> = None();
-  isString: Bool = false;
-  for (tok in lexRaw(next)) {
-    (tok, stringAcc) match {
-    | (Chars(chars), Some(acc)) if (chars.size() > 0 && chars[0] == '"') ->
-      !isString = true;
-      !chars = trim(chars);
-      acc.extend(chars.slice(0, chars.size() - 1))
-    | (
-      Chars(chars),
-      None(),
-    ) if (chars.size() > 0 && chars[chars.size() - 1] == '"') ->
-      !isString = true;
-      !chars = trim(chars);
-      !chars = chars.slice(1, chars.size() - 1);
-      !stringAcc = Some(Vector::mcreateFromItems(chars))
-    | _ ->
-      stringAcc match {
-      | None() -> void
-      | Some(acc) ->
-        !stringAcc = None();
-        yield (isString, String::fromChars(acc.toArray()))
-      };
-      !isString = false;
-      tok match {
-      | Chars(chars) -> yield (false, String::fromChars(trim(chars)))
-      | NewLine() -> break void
-      | Comma() -> void
-      }
-    }
-  };
-  stringAcc match {
-  | None() -> void
-  | Some(acc) ->
-    !stringAcc = None();
-    yield (isString, String::fromChars(acc.toArray()))
-  }
 }
 
 fun parseCSVValue(kv: (Bool, String)): P.Value {
