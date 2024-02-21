@@ -68,7 +68,7 @@ void sk_free_obj(sk_stack_t* st, char* obj) {
 #endif
       SKIP_throw_cruntime(ERROR_INVALID_EXTERNAL_POINTER);
     }
-    sk_call_external_pointer_descructor(destructor, value);
+    sk_call_external_pointer_destructor(destructor, value);
   } else if ((ty->m_refsHintMask & 1) != 0) {
     const size_t refMaskWordBitSize = sizeof(ty->m_refMask[0]) * 8;
     char* ohead = obj;
