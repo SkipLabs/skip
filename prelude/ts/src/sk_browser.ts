@@ -4,8 +4,12 @@ import { MemFS, MemSys } from "./sk_mem_utils.js";
 class WrkImpl implements Wrk {
   worker: Worker;
 
-  constructor(filename: string | URL, options?: WorkerOptions) {
-    this.worker = new Worker(filename, options);
+  constructor(worker: Worker) {
+    this.worker = worker;
+  }
+
+  static fromPath(filename: string | URL, options?: WorkerOptions) {
+    return new this(new Worker(filename, options))
   }
 
   postMessage = (message: any) => {
@@ -30,6 +34,7 @@ class Env implements Environment {
   base64Decode: (base64: string) => Uint8Array;
   createSocket: (uri: string) => WebSocket;
   createWorker: (filename: string | URL, options?: WorkerOptions) => Wrk;
+  createWorkerWrapper: (worker: Worker) => Wrk;
   crypto: () => Crypto;
   environment: Array<string>;
 
@@ -75,7 +80,8 @@ class Env implements Environment {
     this.onException = () => {};
     this.createSocket = (uri: string) => new WebSocket(uri);
     this.createWorker = (filename: string | URL, options?: WorkerOptions) =>
-      new WrkImpl(filename, options);
+      WrkImpl.fromPath(filename, options);
+    this.createWorkerWrapper = (worker: Worker) => new WrkImpl(worker);
     this.crypto = () => crypto;
   }
 }
