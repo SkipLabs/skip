@@ -21,10 +21,16 @@ LBT_EXISTS=$(shell [ -e $(LIB_DIR)/libbacktrace.a ] && echo 1 || echo 0 )
 SKIP_SRC=$(shell find src/ -name '*.sk')
 
 .PHONY: default
-default: $(OUT_DIR)/libbacktrace.a $(OUT_DIR)/libskip_runtime64.a
+default: $(OUT_DIR)/libbacktrace.a $(OUT_DIR)/libskip_runtime64.a preamble/preamble64.ll
+	@echo "skargo:skc-preamble=preamble/preamble64.ll"
+	@echo "skargo:skc-link-lib=$(OUT_DIR)/libskip_runtime64.a"
+	@echo "skargo:skc-link-lib=$(OUT_DIR)/libbacktrace.a"
+	@echo "skargo:skc-link-arg=-lpthread"
 
 .PHONY: wasm
-wasm: $(OUT_DIR)/libskip_runtime32.bc
+wasm: $(OUT_DIR)/libskip_runtime32.a preamble/preamble32.ll
+	@echo "skargo:skc-preamble=preamble/preamble32.ll"
+	@echo "skargo:skc-link-lib=$(OUT_DIR)/libskip_runtime32.a"
 
 .PHONY: bootstrap
 bootstrap: $(OUT_DIR)/libstd.sklib
@@ -58,6 +64,14 @@ $(OUT_DIR)/libskip_runtime32.bc:
 	@[ -d $(OUT_DIR) ] || mkdir -p $(OUT_DIR)
 	CFLAGS="$(CFLAGS)" $(MAKE) -C runtime/ libskip_runtime32.bc
 	cp runtime/libskip_runtime32.bc $@
+
+$(OUT_DIR)/libskip_runtime32.o: $(OUT_DIR)/libskip_runtime32.bc
+	@[ -d $(OUT_DIR) ] || mkdir -p $(OUT_DIR)
+	llc -mtriple=wasm32-unknown-unknown -O2 -filetype=obj $^ -o $@
+
+$(OUT_DIR)/libskip_runtime32.a: $(OUT_DIR)/libskip_runtime32.o
+	@[ -d $(OUT_DIR) ] || mkdir -p $(OUT_DIR)
+	llvm-ar crs $@ $^
 
 $(OUT_DIR)/libstd.sklib: $(OUT_DIR)/libskip_runtime64.a $(OUT_DIR)/libbacktrace.a $(SKIP_SRC)
 	SKC_PREAMBLE=./preamble/preamble64.ll skc -o $@ --sklib-name std --no-std -O2 --link-args '-lpthread' $^
