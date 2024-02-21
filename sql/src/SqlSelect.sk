@@ -41,6 +41,24 @@ extension class ProjKey extends SKStore.Key {
   fun toString(): String {
     this.value.toString()
   }
+
+  // Exclude colNbr from comparison, so that two ProjKeys compare as equal when
+  // their value and left/right shard indices match
+  fun compare(other: SKStore.Key): Order {
+    other match {
+    | otherPK @ ProjKey _ ->
+      this.leftShard.compare(otherPK.leftShard) match {
+      | EQ() ->
+        this.rightShard.compare(otherPK.rightShard) match {
+        | EQ() -> this.value.compare(otherPK.value)
+        | x -> x
+        }
+      | x -> x
+      }
+    | _ ->
+      LT() // not equal to non-ProjKey keys, choose LT over GT here arbitrarily
+    }
+  }
 }
 
 class LeftFile(SKStore.Key, RowValues) extends SKStore.File
