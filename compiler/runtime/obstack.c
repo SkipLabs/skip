@@ -69,8 +69,12 @@ typedef struct sk_obstack {
   sk_saved_obstack_t saved;
   char user_data[0];
 } sk_obstack_t;
-
+#ifdef SKIP32
 sk_saved_obstack_t init_saved = {NULL, NULL, NULL};
+#else
+__thread sk_saved_obstack_t init_saved = {NULL, NULL, NULL};
+#endif
+
 
 size_t sk_page_size(sk_obstack_t* page) {
   return page->size;
@@ -247,6 +251,34 @@ void* SKIP_destroy_Obstack_with_value(sk_saved_obstack_t* saved, void* toCopy) {
   sk_free_size(pages, sizeof(sk_cell_t) * nbr_pages);
 
   return result;
+}
+
+void SKIP_switch_to_parent(sk_saved_obstack_t* saved) {
+  sk_obstack_t* saved_page = page;
+  char* saved_head = head;
+  char* saved_end = end;
+
+  page = saved->page;
+  head = saved->head;
+  end = saved->end;
+
+  saved->head = saved_head;
+  saved->page = saved_page;
+  saved->end = saved_end;
+}
+
+void SKIP_restore_from_parent(sk_saved_obstack_t* saved) {
+  sk_obstack_t* saved_page = saved->page;
+  char* saved_head = saved->head;
+  char* saved_end = saved->end;
+
+  saved->page = page;
+  saved->head = head;
+  saved->end = end;
+
+  page = saved_page;
+  head = saved_head;
+  end = saved_end;
 }
 
 static int sk_gc_enabled = 1;
