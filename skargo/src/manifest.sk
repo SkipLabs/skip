@@ -1,43 +1,28 @@
 module Skargo;
 
-class Version(major: Int, minor: Int, patch: Int) uses Orderable {
-  static fun fromString(str: String): Version {
-    components = str.split(".");
-    if (components.size() != 3) {
-      invariant_violation("Invalid version string " + str)
-    };
-    Version(components[0].toInt(), components[1].toInt(), components[2].toInt())
-  }
-
-  fun toString(): String {
-    `${this.major}.${this.minor}.${this.patch}`
-  }
-}
-
-base class VersionConstraint uses Equality {
-  children =
-  | RangeConstraint(low: Version, high: ?Version)
-  | PathConstraint(path: String, version: ?Version)
-
-  static fun fromTOML(basePath: String, toml: TOML.Value): VersionConstraint {
+// TODO: Add support for `git` repositories as a package location.
+class ManifestDependency{
+  version: ?Semver.VersionReq = None(),
+  path: ?String = None(),
+} {
+  static fun fromTOML(basePath: String, toml: TOML.Value): ManifestDependency {
     toml match {
-    | TOML.String(v) -> static::fromString(v)
+    | TOML.String(v) ->
+      ManifestDependency{version => Some(Semver.VersionReq::fromString(v))}
     | t @ TOML.Table _ ->
       t.maybeGetString("path") match {
       | Some(path) ->
-        PathConstraint(
-          Path.join(basePath, path),
-          t.maybeGetString("version").map(Version::fromString),
-        )
+        ManifestDependency{
+          // FIXME: This breaks on absolute paths.
+          path => Some(Path.join(basePath, path)),
+          version => t
+            .maybeGetString("version")
+            .map(Semver.VersionReq::fromString),
+        }
       | _ -> invariant_violation("TODO")
       }
     | _ -> invariant_violation("Invalid dependency specification.")
-    };
-  }
-
-  static fun fromString(str: String): VersionConstraint {
-    lexer = VersionLexer::create(str);
-    lexer.lex();
+    }
   }
 }
 
@@ -95,12 +80,12 @@ class ManifestBinary(name: String, main: String) uses Equality {
 class Manifest{
   name: String,
   path: String,
-  version: Version,
+  version: Semver.Version,
   srcs: Array<String>,
   tests: Array<String>,
   testHarness: String,
-  dependencies: Map<String, VersionConstraint>,
-  buildDependencies: Map<String, VersionConstraint>,
+  dependencies: Map<String, ManifestDependency>,
+  buildDependencies: Map<String, ManifestDependency>,
   bin: Array<ManifestBinary>,
 } uses Equality {
   //
@@ -115,7 +100,7 @@ class Manifest{
     toml = TOML.decode(FileSystem.readTextFile(path));
     package = toml.getTable("package");
     name = package.getString("name");
-    version = Version::fromString(package.getString("version"));
+    version = Semver.Version::fromString(package.getString("version"));
 
     srcs = package.maybeGetArray("srcs") match {
     | Some(arr) -> arr.map(x -> x.expectString())
@@ -141,12 +126,12 @@ class Manifest{
     };
 
     dependencies = toml.getTable("dependencies").map.map((_, v) ->
-      VersionConstraint::fromTOML(basePath, v)
+      ManifestDependency::fromTOML(basePath, v)
     );
 
     buildDependencies = toml.maybeGetTable("build-dependencies") match {
     | Some(bDependencies) ->
-      bDependencies.map.map((_, v) -> VersionConstraint::fromTOML(basePath, v))
+      bDependencies.map.map((_, v) -> ManifestDependency::fromTOML(basePath, v))
     | _ -> Map[]
     };
 
