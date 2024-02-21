@@ -1,0 +1,12 @@
+module Skargo;
+
+fun withTimer<T>(f: () -> T, g: Float -> void): T {
+  t0 = Time.time_ms();
+  res = f();
+  t1 = Time.time_ms();
+  g((t1 - t0).toFloat() / 1000.0);
+
+  res
+}
+
+module end;

@@ -1,0 +1,78 @@
+module Skargo;
+
+base class ConsoleVerbosity uses Orderable {
+  children =
+  | VerbosityQuiet()
+  | VerbosityNormal()
+  | VerbosityVerbose()
+  | VerbosityProlix()
+
+  fun compare(other: ConsoleVerbosity): Order {
+    this.level().compare(other.level())
+  }
+
+  fun level(): Int
+  | VerbosityQuiet() -> 0
+  | VerbosityNormal() -> 1
+  | VerbosityVerbose() -> 2
+  | VerbosityProlix() -> 3
+}
+
+class Console(verbosity: ConsoleVerbosity) {
+  const kHeaderColor: TermColor.Color = TermColor.Green();
+  const kErrorColor: TermColor.Color = TermColor.Red();
+  const kWarningColor: TermColor.Color = TermColor.Yellow();
+  const kNoteColor: TermColor.Color = TermColor.Cyan();
+
+  fun status(status: String, message: String): void {
+    this.print(status, message, static::kHeaderColor, true)
+  }
+
+  fun status_verbose(status: String, message: String): void {
+    if (this.verbosity <= VerbosityVerbose()) return void;
+    this.status(status, message)
+  }
+
+  fun error(msg: String): void {
+    // NOTE: Not using print() since it must not be hidden by VerbosityQuiet.
+    print_error(this.fmt("error", msg, static::kErrorColor, false))
+  }
+
+  fun warn(msg: String): void {
+    this.print("warning", msg, static::kWarningColor, false)
+  }
+
+  fun note(msg: String): void {
+    this.print("warning", msg, static::kWarningColor, false)
+  }
+
+  private fun print(
+    status: String,
+    message: String,
+    color: TermColor.Color,
+    indented: Bool,
+  ): void {
+    if (this.verbosity is VerbosityQuiet _) return void;
+
+    print_error(this.fmt(status, message, color, indented))
+  }
+
+  private fun fmt(
+    status: String,
+    message: String,
+    color: TermColor.Color,
+    indented: Bool,
+  ): String {
+    margin = if (indented) "    " else "";
+    formatted_status = TermColor.colored(
+      status,
+      color,
+      TermColor.Default(),
+      Array[TermColor.Bold()],
+    );
+
+    `${margin}${formatted_status} ${message}`
+  }
+}
+
+module end;
