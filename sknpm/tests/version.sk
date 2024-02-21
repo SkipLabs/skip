@@ -5,7 +5,7 @@ module SknpmTests;
 @test
 fun parse1(): void {
   got = Sknpm.Version::fromString("1.2.3");
-  expected = Sknpm.Version(Skargo.Version(1, 2, 3), None());
+  expected = Sknpm.Version(Semver.Version(1, 2, 3), None());
   T.expectEq(got, expected)
 }
 
@@ -13,7 +13,7 @@ fun parse1(): void {
 fun parse2(): void {
   got = Sknpm.Version::fromString("1.2.3-beta");
   expected = Sknpm.Version(
-    Skargo.Version(1, 2, 3),
+    Semver.Version(1, 2, 3),
     Some(Sknpm.Tag("beta", None())),
   );
   T.expectEq(got, expected)
@@ -23,7 +23,7 @@ fun parse2(): void {
 fun parse3(): void {
   got = Sknpm.Version::fromString("1.2.3-beta.1");
   expected = Sknpm.Version(
-    Skargo.Version(1, 2, 3),
+    Semver.Version(1, 2, 3),
     Some(Sknpm.Tag("beta", Some(1))),
   );
   T.expectEq(got, expected)
