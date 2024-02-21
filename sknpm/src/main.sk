@@ -294,7 +294,7 @@ fun execCheck(args: Cli.ParseResults, env: Skargo.Env): void {
     (Path.join(env.rootDir, "ts/src"), None(), "source")
   };
   invariant(FileSystem.exists(tsDir), `No ${n} typescript to check`);
-  tsc(tsDir, info, env.verbose);
+  tsc(tsDir, info, env.console);
 }
 
 /********* Build **********/
@@ -346,7 +346,7 @@ fun execBuild(args: Cli.ParseResults, env: Skargo.Env): void {
   args.maybeGetString("html") match {
   | Some(launcher) ->
     writeIndex(bc.targetDir, launcher);
-    writeRun(bc.targetDir, env.verbose)
+    writeRun(bc.targetDir, env.console)
   | _ -> void
   }
 }
@@ -411,13 +411,18 @@ fun execTest(args: Cli.ParseResults, env: Skargo.Env): void {
   _ = buildIfNeeded(bc, !customTests);
   _ = manage(bc, Package::create(env.manifest), None());
   if (customTests) {
-    syncDirs(tests, targetDir, Set["node_modules"], bc.env.verbose);
+    syncDirs(
+      tests,
+      targetDir,
+      Set["node_modules"],
+      bc.env.console.verbosity >= Skargo.VerbosityVerbose(),
+    );
   } else {
     saveArchive(bc.targetDir);
   };
   Skargo.run(
     Array["npm", "i", "--prefix", targetDir, "--save-dev", "@types/node"],
-    bc.env.verbose,
+    bc.env.console,
   );
   tsDir = Path.join(bc.targetDir, "ts");
   optBinName: ?String = None();
@@ -461,7 +466,7 @@ fun execTest(args: Cli.ParseResults, env: Skargo.Env): void {
         bc.env.manifest.path,
         processes,
         environment,
-        bc.env.verbose,
+        bc.env.console.verbosity >= Skargo.VerbosityVerbose(),
       );
       done.insert(s);
     }
@@ -483,21 +488,18 @@ fun execTest(args: Cli.ParseResults, env: Skargo.Env): void {
     `--reporter=${reporter.default("line")}`,
   ].concat(filters).concat(targets);
   try {
-    Skargo.run(Array["npx", "playwright", "install"], bc.env.verbose);
-    if (bc.env.verbose) {
-      print_error(`>> ${cmd.join(" ")}`)
-    };
+    Skargo.run(Array["npx", "playwright", "install"], bc.env.console);
     p = System.subprocess(cmd, print_raw, print_error_raw);
     if (!p.success()) {
       throw Skargo.SystemCallException(p.exitcode());
     };
     processes.each(p ->
-      Skargo.run(Array["kill", p.toString()], bc.env.verbose)
+      Skargo.run(Array["kill", p.toString()], bc.env.console)
     );
   } catch {
   | exn ->
     processes.each(p ->
-      Skargo.run(Array["kill", p.toString()], bc.env.verbose)
+      Skargo.run(Array["kill", p.toString()], bc.env.console)
     );
     throw exn
   }
@@ -557,7 +559,11 @@ fun buildIfNeeded(bc: Skargo.BuildContext, test: Bool): Bool {
     false
   };
   if (buildNeeded) {
-    skargo(!test, bc.profile, bc.env.verbose)
+    skargo(
+      !test,
+      bc.profile,
+      bc.env.console.verbosity >= Skargo.VerbosityVerbose(),
+    )
   };
   buildNeeded
 }
@@ -571,7 +577,7 @@ fun manage(
 ): String {
   npmDir = optTarget.default(Path.join(bc.targetDir, "npm"));
   if (clean && FileSystem.exists(npmDir)) {
-    Skargo.run(Array["rm", "-rf", Path.join(npmDir, "*")], bc.env.verbose);
+    Skargo.run(Array["rm", "-rf", Path.join(npmDir, "*")], bc.env.console);
   };
   tsDir = Path.join(bc.targetDir, "ts");
   checkDir(tsDir);
@@ -626,7 +632,7 @@ fun manage(
 
   tsconfig = Path.join(tsDir, "tsconfig.json");
   FileSystem.writeTextFile(tsconfig, tsConfig(dependencies.map(d -> d.name)));
-  tsc(tsDir, None(), bc.env.verbose);
+  tsc(tsDir, None(), bc.env.console);
   jsDir = Path.join(tsDir, "js");
   invariant(FileSystem.exists(jsDir), "Invalid typescript build");
   // TODO: manage subdirectories
@@ -664,13 +670,13 @@ fun manage(
       invariant(bins.size() == 1, "Unable to get binary name");
       bins[0].name
     },
-    bc.env.verbose,
+    bc.env.console.verbosity >= Skargo.VerbosityVerbose(),
   );
   for (bin in bc.env.manifest.bin) {
     wasmFile = Path.join(bc.targetDir, bin.name + ".wasm");
     copy(wasmFile, distDir)
   };
-  if (bc.env.verbose) {
+  if (bc.env.console.verbosity >= Skargo.VerbosityVerbose()) {
     print_string(">> Copy mapping files associating '.mjs' instead of '.js'.");
   };
   mapFiles.each(mapFile -> {
@@ -697,13 +703,13 @@ fun manage(
     jsMapfile = Path.join(distDir, file);
     FileSystem.writeTextFile(jsMapfile, newJS.toString());
   });
-  if (bc.env.verbose) {
+  if (bc.env.console.verbosity >= Skargo.VerbosityVerbose()) {
     print_string(">> Copy types declaration files.");
   };
   declFiles.each(f -> copyToDir(f, distDir));
   srcDir = Path.join(npmDir, "src");
   checkDir(srcDir);
-  if (bc.env.verbose) {
+  if (bc.env.console.verbosity >= Skargo.VerbosityVerbose()) {
     print_string(">> Copy source files.");
   };
   FileSystem.readFilesRecursive(
@@ -711,7 +717,7 @@ fun manage(
     f -> f.endsWith(".ts"),
     _f -> false,
   ).each(f -> copyToDir(f, srcDir));
-  if (bc.env.verbose) {
+  if (bc.env.console.verbosity >= Skargo.VerbosityVerbose()) {
     print_string(">> Manage license and package files.");
   };
   licenseFile = Path.join(npmDir, "LICENSE");
@@ -807,11 +813,11 @@ fun tsConfig(deps: Vector<String>): String {
   stream.join("")
 }
 
-fun tsc(tsDir: String, link: ?(String, String), verbose: Bool): void {
+fun tsc(tsDir: String, link: ?(String, String), console: Skargo.Console): void {
   tsconfig = Path.join(tsDir, "tsconfig.json");
   Skargo.run(
     Array["npm", "i", "--prefix", tsDir, "--save-dev", "@types/node"],
-    verbose,
+    console,
   );
   link.each(l -> {
     node_modules = Path.join(tsDir, "node_modules");
@@ -819,12 +825,12 @@ fun tsc(tsDir: String, link: ?(String, String), verbose: Bool): void {
       (name, path) = l;
       symlink = Path.join(node_modules, name);
       if (FileSystem.exists(symlink)) {
-        Skargo.run(Array["rm", symlink], verbose);
+        Skargo.run(Array["rm", symlink], console);
       };
-      Skargo.run(Array["ln", "-s", path, symlink], verbose)
+      Skargo.run(Array["ln", "-s", path, symlink], console)
     }
   });
-  Skargo.run(Array["tsc", "--project", tsconfig], verbose);
+  Skargo.run(Array["tsc", "--project", tsconfig], console);
 }
 
 fun copyToDir(tsFile: String, dir: String): void {
@@ -1087,13 +1093,13 @@ fun writeIndex(target: String, name: String): void {
   )
 }
 
-fun writeRun(target: String, verbose: Bool): void {
+fun writeRun(target: String, console: Skargo.Console): void {
   runFile = Path.join(target, "run.sh");
   FileSystem.writeTextFile(
     runFile,
     "#!/bin/bash\npython3 -m http.server 8000\n",
   );
-  Skargo.run(Array["chmod", "+x", runFile], verbose);
+  Skargo.run(Array["chmod", "+x", runFile], console);
 }
 
 fun license(): String {
@@ -1180,8 +1186,18 @@ fun execRun(args: Cli.ParseResults): void {
       FileSystem.exists(manifestFile),
       `Invalid skargo directory ${path}`,
     );
-    Skargo.Env::fromFile(manifestFile, args.getBool("verbose"))
-  | _ -> Skargo.Env::create(args.getBool("verbose"))
+    Skargo.Env::fromFile(
+      manifestFile,
+      if (args.getBool("verbose")) Skargo.VerbosityVerbose() else {
+        Skargo.VerbosityNormal()
+      },
+    )
+  | _ ->
+    Skargo.Env::create(
+      if (args.getBool("verbose")) Skargo.VerbosityVerbose() else {
+        Skargo.VerbosityNormal()
+      },
+    )
   };
   bc = Skargo.BuildContext::create(
     env,
@@ -1202,7 +1218,7 @@ fun execRun(args: Cli.ParseResults): void {
     }
   };
   cmdArgs = Array["npm", "--prefix", npmDir, "run"].concat(args.extra);
-  if (env.verbose) {
+  if (env.console.verbosity >= Skargo.VerbosityVerbose()) {
     // TODO: colors
     print_error(`>> ${cmdArgs.join(" ")}`)
   };
@@ -1245,7 +1261,10 @@ fun publish(): (Cli.Command, Cli.ParseResults ~> void) {
 }
 
 fun execPublish(args: Cli.ParseResults, env: Skargo.Env): void {
-  gdiff = run(Array["git", "diff"], env.verbose);
+  gdiff = run(
+    Array["git", "diff"],
+    env.console.verbosity >= Skargo.VerbosityVerbose(),
+  );
   if (!gdiff.isEmpty()) {
     throw GitDiffException()
   };
@@ -1256,7 +1275,10 @@ fun execPublish(args: Cli.ParseResults, env: Skargo.Env): void {
     .map(Version::fromString)
     .default(package.version);
   if (!args.getBool("force")) {
-    view = run(Array["npm", "view", package.name, "--json"], env.verbose);
+    view = run(
+      Array["npm", "view", package.name, "--json"],
+      env.console.verbosity >= Skargo.VerbosityVerbose(),
+    );
     json = JSON.decode(view).expectObject();
     optVersion = json.maybeGetArray("versions").flatMap(versions -> {
       sorted = versions.value
@@ -1281,13 +1303,16 @@ fun execPublish(args: Cli.ParseResults, env: Skargo.Env): void {
   );
   Skargo.run(
     Array["skargo", "build", "--target", "wasm32", "--profile", bc.profile],
-    bc.env.verbose,
+    bc.env.console,
   );
   userNpmDir = args.maybeGetString("npm-out");
   npmDir = manage(bc, Package::create(env.manifest), userNpmDir, None(), true);
   Environ.set_current_dir(npmDir);
   if (userNpmDir.isSome()) {
-    udiff = run(Array["git", "diff"], env.verbose);
+    udiff = run(
+      Array["git", "diff"],
+      env.console.verbosity >= Skargo.VerbosityVerbose(),
+    );
     if (!udiff.isEmpty()) {
       throw GitDiffException()
     }
@@ -1296,7 +1321,7 @@ fun execPublish(args: Cli.ParseResults, env: Skargo.Env): void {
   | Some(tag) -> args.extra.concat(Array["--tag", tag.toString()])
   | _ -> args.extra
   };
-  Skargo.run(Array["npm", "publish"].concat(cmdArgs), bc.env.verbose);
+  Skargo.run(Array["npm", "publish"].concat(cmdArgs), bc.env.console);
 }
 
 fun run(args: Array<String>, verbose: Bool): String {
