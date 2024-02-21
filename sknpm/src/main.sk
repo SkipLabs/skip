@@ -67,7 +67,9 @@ class Tag(name: String, version: ?Int) uses Orderable {
   }
 }
 
-class Version(version: Skargo.Version, tag: ?Tag) uses Orderable {
+// TODO: This can probably be replaced with Semver.Version altogether, as it
+// already handles the prerelease tag.
+class Version(version: Semver.Version, tag: ?Tag) uses Orderable {
   //
   static fun fromString(str: String): Version {
     components = str.split("-");
@@ -75,7 +77,7 @@ class Version(version: Skargo.Version, tag: ?Tag) uses Orderable {
       invariant_violation("Invalid version-tag string " + str)
     };
     Version(
-      Skargo.Version::fromString(components[0]),
+      Semver.Version::fromString(components[0]),
       components.maybeGet(1).map(Tag::fromString),
     )
   }
