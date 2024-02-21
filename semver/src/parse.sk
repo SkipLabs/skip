@@ -1,0 +1,190 @@
+module Semver;
+
+private fun parse_version(pos: mutable Lexer.LexingPosition): Version {
+  major = numeric_identifier(pos);
+  if (!pos.peekChar('.')) invariant_violation("expected dot");
+  pos.advance();
+
+  minor = numeric_identifier(pos);
+  if (!pos.peekChar('.')) invariant_violation("expected dot");
+  pos.advance();
+
+  patch = numeric_identifier(pos);
+
+  pre = if (pos.peekChar('-')) {
+    pos.advance();
+    Prerelease(identifier(pos))
+  } else {
+    Prerelease::kEmpty
+  };
+
+  build = if (pos.peekChar('+')) {
+    pos.advance();
+    BuildMetadata(identifier(pos))
+  } else {
+    BuildMetadata::kEmpty
+  };
+
+  Version(major, minor, patch, pre, build)
+}
+
+private fun parse_comparator(pos: mutable Lexer.LexingPosition): Comparator {
+  default_op = false;
+  op = pos.peek() match {
+  | '=' ->
+    pos.advance();
+    Exact()
+  | '>' ->
+    pos.advance();
+    if (pos.peekChar('=')) {
+      pos.advance();
+      GreaterEq()
+    } else {
+      Greater()
+    }
+  | '<' ->
+    pos.advance();
+    if (pos.peekChar('=')) {
+      pos.advance();
+      LessEq()
+    } else {
+      Less()
+    }
+  | '~' ->
+    pos.advance();
+    Tilde()
+  | '^' ->
+    pos.advance();
+    Caret()
+  | _ ->
+    !default_op = true;
+    Caret()
+  };
+
+  while (!pos.atEnd() && Chars.isWhitespace(pos.peek())) {
+    pos.advance()
+  };
+
+  has_wildcard = false;
+
+  major = numeric_identifier(pos);
+
+  minor = if (pos.peekChar('.')) {
+    pos.advance();
+    if (parse_wildcard(pos)) {
+      !has_wildcard = true;
+      if (default_op) {
+        !op = Wildcard();
+      };
+      None()
+    } else {
+      Some(numeric_identifier(pos))
+    }
+  } else {
+    None()
+  };
+
+  patch = if (pos.peekChar('.')) {
+    pos.advance();
+    if (parse_wildcard(pos)) {
+      !has_wildcard = true;
+      if (default_op) {
+        !op = Wildcard();
+      };
+      None()
+    } else if (has_wildcard) {
+      invariant_violation("Unexpected segment after wildcard")
+    } else {
+      Some(numeric_identifier(pos))
+    }
+  } else {
+    None()
+  };
+
+  pre = if (patch is Some _ && pos.peekChar('-')) {
+    pos.advance();
+    Prerelease(identifier(pos))
+  } else {
+    Prerelease::kEmpty
+  };
+
+  // Discarding build metadata in comparators.
+  if (patch is Some _ && pos.peekChar('+')) {
+    pos.advance();
+    _ = identifier(pos)
+  };
+
+  Comparator(op, major, minor, patch, pre)
+}
+
+private fun numeric_identifier(pos: mutable Lexer.LexingPosition): Int {
+  value = 0;
+  len = 0;
+  loop {
+    pos.peek() match {
+    | d if (Chars.isDigit(d)) ->
+      if (value == 0 && len > 0) {
+        invariant_violation("leading zero")
+      };
+      !value = 10 * value + Chars.hexDigitToInt(d);
+      !len = len + 1;
+      pos.advance()
+    | _ -> break void
+    }
+  };
+
+  if (len == 0) {
+    invariant_violation("empty numeric identifier")
+  };
+
+  value
+}
+
+private fun parse_wildcard(pos: mutable Lexer.LexingPosition): Bool {
+  pos.peek() match {
+  | '*' | 'x' | 'X' ->
+    pos.advance();
+    true
+  | _ -> false
+  }
+}
+
+private fun identifier_segment(pos: mutable Lexer.LexingPosition): String {
+  res = mutable Vector[];
+  loop {
+    pos.peek() match {
+    | c if (Chars.isLetter(c) || Chars.isDigit(c) || c == '-') ->
+      pos.advance();
+      res.push(c)
+    | _ -> break void
+    }
+  };
+
+  // TODO: Fail on numeric identifier segments with leading zeros for prerelease.
+
+  if (res.isEmpty()) {
+    invariant_violation("empty identifier segment")
+  };
+
+  String::fromChars(res.collect(Array))
+}
+
+private fun identifier(pos: mutable Lexer.LexingPosition): String {
+  res = mutable Vector[identifier_segment(pos)];
+  loop {
+    pos.peek() match {
+    | '.' ->
+      pos.advance();
+      res.push(identifier_segment(pos))
+    | _ -> break void
+    }
+  };
+
+  if (res.isEmpty()) {
+    invariant_violation("empty identifier")
+  };
+
+  res.join(".")
+}
+
+module end;
