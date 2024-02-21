@@ -31,16 +31,16 @@ private class UserConfig{
 private class Env{
   rootDir: String,
   manifest: Manifest,
-  verbose: Bool,
+  console: Console,
   config: UserConfig,
 } {
-  static fun create(verbose: Bool): Env {
+  static fun create(verbosity: ConsoleVerbosity): Env {
     rootDir = findRootDir();
     config = findUserConfig();
     Env{
       rootDir,
       manifest => Manifest::read(Path.join(rootDir, kManifestFile)),
-      verbose,
+      console => Console(verbosity),
       config,
     }
   }
@@ -53,10 +53,15 @@ private class Env{
     };
   }
 
-  static fun fromFile(path: String, verbose: Bool): Env {
+  static fun fromFile(path: String, verbosity: ConsoleVerbosity): Env {
     rootDir = Path.dirname(path);
     config = findUserConfig(Some(rootDir));
-    Env{rootDir, manifest => Manifest::read(path), verbose, config}
+    Env{
+      rootDir,
+      manifest => Manifest::read(path),
+      console => Console(verbosity),
+      config,
+    }
   }
 }
 
@@ -112,17 +117,29 @@ private fun findUserConfig(optPath: ?String = None()): UserConfig {
   config
 }
 
-private fun run(args: Array<String>, verbose: Bool): void {
-  if (verbose) {
-    // TODO: colors
-    print_error(`>> ${args.join(" ")}`)
+private fun run(args: Array<String>, console: Console): void {
+  console.status_verbose("Running", args.join(" "));
+  (stdout_cb, stderr_cb) = if (console.verbosity >= VerbosityProlix()) {
+    (print_raw, print_error_raw)
+  } else {
+    ((_) -> void, (_) -> void)
   };
-  p = System.subprocess(args);
-  if (verbose || !p.success()) {
-    print_raw(p.stdout);
-    print_error_raw(p.stderr);
-  };
+
+  p = System.subprocess(args, stdout_cb, stderr_cb);
   if (!p.success()) {
+    console.error(
+      "command exited with non-zero status\n\n" +
+        "Caused by:\n" +
+        "  process did not exit successfully: \`" +
+        args[0] +
+        `\` (exit status: ${p.exitcode()})\n` +
+        "  --- stdout\n" +
+        p.stdout.split("\n").map(l -> "  " + l).join("\n") +
+        "\n" +
+        "  --- stderr\n" +
+        p.stderr.split("\n").map(l -> "  " + l).join("\n") +
+        "\n",
+    );
     throw SystemCallException(p.exitcode());
   }
 }
@@ -155,7 +172,7 @@ private fun invokeSkc(
       Array[bc.skc, "--init", bc.stateDb, "--check"].concat(
         Array[targetFlag].filterNone(),
       ).concat(bc.files),
-      bc.env.verbose,
+      bc.env.console,
     )
   };
   try {
@@ -163,7 +180,7 @@ private fun invokeSkc(
       Array[bc.skc, "--data", bc.stateDb].concat(Array[targetFlag].filterNone())
         .concat(args)
         .concat(bc.files),
-      bc.env.verbose,
+      bc.env.console,
     )
   } catch {
   | SystemCallException(
@@ -171,7 +188,7 @@ private fun invokeSkc(
     _,
   ) if (bc.env.config.autoRemoveState && retry && isMappingError(code)) ->
     // TODO check the 6 origin
-    run(Array["rm", bc.stateDb], bc.env.verbose);
+    run(Array["rm", bc.stateDb], bc.env.console);
     invokeSkc(bc, args, false)
   | exn -> throw exn
   }
@@ -336,7 +353,7 @@ fun checkBuildFile(
     env = Env{
       rootDir => targetDir,
       manifest => bManifest,
-      verbose => bc.env.verbose,
+      console => bc.env.console,
       config => bc.env.config,
     };
     deps = env.getDependencies();
@@ -359,7 +376,10 @@ fun checkBuildFile(
     Environ.set_var("PCK_DIR", dependency.path);
     Environ.set_var("NAME", dependency.name);
     Environ.set_var("PROFILE", bc.profile);
-    Environ.set_var("VERBOSE", bc.env.verbose.toString());
+    Environ.set_var(
+      "VERBOSE",
+      (bc.env.console.verbosity >= VerbosityVerbose()).toString(),
+    );
     Environ.set_var("TEST", test.toString());
     bc.target match {
     | Some(t) -> Environ.set_var("TARGET", t.toString())
@@ -371,9 +391,6 @@ fun checkBuildFile(
   };
   optCmd.each(cmd -> {
     _ = system("mkdir -p " + targetDir);
-    if (bc.env.verbose) {
-      print_error(`>> ${cmd.join(" ")}`)
-    };
     buffer = "";
     onLine = line -> {
       if (line.startsWith("skargo:")) {
@@ -387,6 +404,9 @@ fun checkBuildFile(
         }
       }
     };
+    if (bc.env.console.verbosity >= VerbosityVerbose()) {
+      print_error(`>> ${cmd.join(" ")}`)
+    };
     p = System.subprocess(
       cmd,
       str -> {
@@ -396,7 +416,7 @@ fun checkBuildFile(
         }
       },
       str ->
-        if (bc.env.verbose) {
+        if (bc.env.console.verbosity >= VerbosityVerbose()) {
           print_error_raw(str)
         }
       ,
@@ -405,7 +425,7 @@ fun checkBuildFile(
       onLine(buffer)
     };
     if (!p.success()) {
-      if (!bc.env.verbose) {
+      if (bc.env.console.verbosity < VerbosityVerbose()) {
         print_raw(p.stdout);
         print_error_raw(p.stderr);
       };

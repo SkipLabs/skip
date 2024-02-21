@@ -69,8 +69,18 @@ fun main(): void {
   };
 }
 
+fun getVerbosity(args: Cli.ParseResults): ConsoleVerbosity {
+  // TODO: Properly support -q/--quiet for VerbosityQuiet, -v for VerbosityVerbose,
+  // and -vv for VerbosityProlix.
+  if (args.getBool("verbose")) {
+    VerbosityProlix()
+  } else {
+    VerbosityNormal()
+  }
+}
+
 fun envCmd(args: Cli.ParseResults, fn: (Cli.ParseResults, Env) ~> void): void {
-  env = Env::create(args.getBool("verbose"));
+  env = Env::create(getVerbosity(args));
   fn(args, env)
 }
 
@@ -110,7 +120,11 @@ fun execBuild(args: Cli.ParseResults, env: Env): void {
     args.maybeGetString("target-dir"),
     getProfile(args),
   );
-  execBuildContext(bc, collectBinaries(args, env));
+
+  withTimer(
+    () -> execBuildContext(bc, collectBinaries(args, env)),
+    t -> bc.env.console.status("Finished", `${bc.profile} target(s) in ${t}s`),
+  );
 }
 
 fun collectBinaries(args: Cli.ParseResults, env: Env): Array<ManifestBinary> {
@@ -307,7 +321,7 @@ fun execClean(args: Cli.ParseResults, env: Env): void {
       Path.join(Path.join(dir, target), profile)
     }
   };
-  run(Array["rm", "-rf", targetDir], env.verbose)
+  run(Array["rm", "-rf", targetDir], env.console)
 }
 
 /********* Format **********/
@@ -325,7 +339,7 @@ fun execFmt(_args: Cli.ParseResults, env: Env): void {
   if (FileSystem.exists(buildSk)) {
     !files = files.concat(Array[buildSk]);
   };
-  run(Array["skfmt", "-i"].concat(files), env.verbose);
+  run(Array["skfmt", "-i"].concat(files), env.console);
   // format ./*.sk
 }
 
@@ -460,8 +474,8 @@ fun execRun(args: Cli.ParseResults): void {
       FileSystem.exists(manifestFile),
       `Invalid skargo directory ${path}`,
     );
-    Env::fromFile(manifestFile, args.getBool("verbose"))
-  | _ -> Env::create(args.getBool("verbose"))
+    Env::fromFile(manifestFile, getVerbosity(args))
+  | _ -> Env::create(getVerbosity(args))
   };
   bins = collectBinaries(args, env);
   invariant(!bins.isEmpty(), "No binary to run");
@@ -473,10 +487,7 @@ fun execRun(args: Cli.ParseResults): void {
   );
   invariant(FileSystem.exists(hostBinary), "No binary to run, build first");
   cmdArgs = Array[hostBinary].concat(args.extra);
-  if (env.verbose) {
-    // TODO: colors
-    print_error(`>> ${cmdArgs.join(" ")}`)
-  };
+  env.console.status_verbose("Running", cmdArgs.join(" "));
   Posix.execvp(cmdArgs)
 }
 
