@@ -1,0 +1,267 @@
+module Semver;
+
+class Version(
+  major: Int,
+  minor: Int,
+  patch: Int,
+  pre: Prerelease = Prerelease::kEmpty,
+  build: BuildMetadata = BuildMetadata::kEmpty,
+) uses Orderable {
+  static fun fromString(str: String): Version {
+    pos = Lexer.LexingPosition::create(str);
+
+    res = parse_version(pos);
+
+    if (!pos.atEnd()) {
+      invariant_violation("Unexpected character after version")
+    };
+
+    res
+  }
+
+  fun toString(): String {
+    res = `${this.major}.${this.minor}.${this.patch}`;
+    if (!this.pre.isEmpty()) {
+      !res = `${res}-${this.pre}`
+    };
+    if (!this.build.isEmpty()) {
+      !res = `${res}+${this.build}`
+    };
+
+    res
+  }
+
+  // Cf. https://semver.org/:
+  // > Build metadata MUST be ignored when determining version precedence.
+  fun compare_precedence(other: Version): Order {
+    (this.major, this.minor, this.patch, this.pre).compare(
+      (other.major, other.minor, other.patch, other.pre),
+    )
+  }
+}
+
+class VersionReq(comparators: Array<Comparator>) uses Show {
+  const kStar: VersionReq = VersionReq(Array[]);
+
+  fun matches(version: Version): Bool {
+    for (cmp in this.comparators) {
+      if (!cmp.matches(version)) {
+        return false
+      }
+    };
+
+    if (version.pre.isEmpty()) {
+      return true
+    };
+
+    for (cmp in this.comparators) {
+      if (pre_is_compatible(cmp, version)) {
+        return true
+      }
+    };
+
+    false
+  }
+
+  static fun fromString(str: String): VersionReq {
+    !str = str.trim();
+    if (str.startsWith("*") || str.startsWith("x") || str.startsWith("X")) {
+      if (str != "*" && str != "x" && str != "X") {
+        invariant_violation("Wildcard must be the only operator")
+      };
+      return static::kStar
+    };
+
+    comparators = str
+      .split(",")
+      .map(cmp -> Comparator::fromString(cmp))
+      .collect(Array);
+
+    VersionReq(comparators)
+  }
+
+  fun toString(): String {
+    if (this.comparators.isEmpty()) {
+      return "*"
+    };
+    this.comparators.map(cmp -> cmp.toString()).join(", ")
+  }
+}
+
+class Comparator(
+  op: Op,
+  major: Int,
+  minor: ?Int,
+  patch: ?Int,
+  pre: Prerelease,
+) uses Show {
+  fun matches(version: Version): Bool {
+    this.op match {
+    | Exact()
+    | Wildcard() ->
+      matches_exact(this, version)
+    | Greater() -> matches_greater(this, version)
+    | GreaterEq() ->
+      matches_exact(this, version) || matches_greater(this, version)
+    | Less() -> matches_less(this, version)
+    | LessEq() -> matches_exact(this, version) || matches_less(this, version)
+    | Tilde() -> matches_tilde(this, version)
+    | Caret() -> matches_caret(this, version)
+    }
+  }
+
+  static fun fromString(str: String): Comparator {
+    pos = Lexer.LexingPosition::create(str.trim());
+
+    res = parse_comparator(pos);
+
+    if (!pos.atEnd()) {
+      invariant_violation("Unexpected characters after comparator")
+    };
+
+    res
+  }
+
+  fun toString(): String {
+    prefix = this.op match {
+    | Exact() -> "="
+    | Greater() -> ">"
+    | GreaterEq() -> ">="
+    | Less() -> "<"
+    | LessEq() -> "<="
+    | Tilde() -> "~"
+    | Caret() -> "^"
+    | Wildcard() -> ""
+    };
+    `${prefix}${this.major}` +
+      this.minor match {
+      | Some(minor) ->
+        `.${minor}` +
+          this.patch match {
+          | Some(patch) ->
+            `.${patch}` +
+              if (!this.pre.isEmpty()) {
+                `-${this.pre}`
+              } else {
+                ""
+              }
+          | None() if (this.op is Wildcard _) -> ".*"
+          | None() -> ""
+          }
+      | None() if (this.op is Wildcard _) -> ".*"
+      | _ -> ""
+      }
+  }
+}
+
+base class Op {
+  children =
+  | Exact()
+  | Greater()
+  | GreaterEq()
+  | Less()
+  | LessEq()
+  | Tilde()
+  | Caret()
+  | Wildcard()
+}
+
+class Prerelease(identifier: String) uses Show, Orderable {
+  const kEmpty: Prerelease = Prerelease("");
+
+  fun isEmpty(): Bool {
+    this.identifier == ""
+  }
+
+  fun toString(): String {
+    this.identifier
+  }
+
+  fun compare(other: Prerelease): Order {
+    (this.isEmpty(), other.isEmpty()) match {
+    | (true, true) -> return EQ()
+    | (true, false) -> return GT()
+    | (false, true) -> return LT()
+    | _ -> void
+    };
+
+    lhs = this.identifier.split(".");
+    rhs = other.identifier.split(".");
+    for (i in Range(0, lhs.size())) {
+      if (i >= rhs.size()) {
+        return GT()
+      };
+      order = (
+        lhs[i].chars().all(Chars.isDigit),
+        rhs[i].chars().all(Chars.isDigit),
+      ) match {
+      | (true, true) -> lhs[i].toInt().compare(rhs[i].toInt())
+      | (true, false) -> LT()
+      | (false, true) -> GT()
+      | (false, false) -> lhs[i].compare(rhs[i])
+      };
+      if (order != EQ()) {
+        return order
+      }
+    };
+
+    if (lhs.size() < rhs.size()) {
+      LT()
+    } else {
+      EQ()
+    }
+  }
+}
+
+class BuildMetadata(identifier: String) uses Show, Orderable {
+  const kEmpty: BuildMetadata = BuildMetadata("");
+
+  fun isEmpty(): Bool {
+    this.identifier == ""
+  }
+
+  fun toString(): String {
+    this.identifier
+  }
+
+  fun compare(other: BuildMetadata): Order {
+    if (this.isEmpty() && other.isEmpty()) {
+      return EQ()
+    };
+
+    lhs = this.identifier.split(".");
+    rhs = other.identifier.split(".");
+    for (i in Range(0, lhs.size())) {
+      if (i >= rhs.size()) {
+        return GT()
+      };
+      order = (
+        lhs[i].chars().all(Chars.isDigit),
+        rhs[i].chars().all(Chars.isDigit),
+      ) match {
+      | (true, true) -> // 0 < 00 < 1 < 01 < 001 < 2 < 02 < 002 < 10
+        int_order = lhs[i].toInt().compare(rhs[i].toInt());
+        if (int_order != EQ()) {
+          int_order
+        } else {
+          lhs[i].length().compare(rhs[i].length())
+        }
+      | (true, false) -> LT()
+      | (false, true) -> GT()
+      | (false, false) -> lhs[i].compare(rhs[i])
+      };
+
+      if (order != EQ()) {
+        return order
+      }
+    };
+
+    if (lhs.size() < rhs.size()) {
+      LT()
+    } else {
+      EQ()
+    }
+  }
+}
+
+module end;
