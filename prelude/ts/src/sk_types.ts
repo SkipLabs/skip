@@ -152,6 +152,7 @@ export interface Environment {
   environment: Array<string>;
   createSocket: (uir: string) => WebSocket;
   createWorker: (filename: string | URL, options?: WorkerOptions) => Wrk;
+  createWorkerWrapper: (worker: Worker) => Wrk;
   timestamp: () => float;
   decodeUTF8: (utf8: ArrayBuffer) => string;
   encodeUTF8: (str: string) => Uint8Array;
@@ -692,7 +693,7 @@ export function trimEndChar(str: string, ch: string) {
   return end < str.length ? str.substring(0, end) : str;
 }
 
-function relativeto(path: string, ref: string) {
+export function relativeto(path: string, ref: string) {
   if (ref.length == 0) {
     return path;
   }
@@ -746,20 +747,18 @@ export function loadWasm(
 }
 
 async function start(
-  modules: Array<string>,
+  modules: Array<any>,
   buffer: Uint8Array,
   environment: Environment,
   main?: string,
 ) {
-  let promises = modules.map((name) =>
-    import(name).then((module) => {
-      if (module.init) {
-        return module.init(environment);
-      } else {
-        return null;
-      }
-    }),
-  );
+  let promises = modules.map((module) => {
+    if (module.init) {
+      return module.init(environment);
+    } else {
+      return null;
+    }
+  });
   let cs = await Promise.all(promises);
   let ms = cs.filter((c) => c != null);
   return await loadWasm(buffer, ms, environment, main);
@@ -777,7 +776,7 @@ export async function loadEnv(
   // don't follow the node dynamic import
   const nodeImport = "./sk_node.mjs";
   const environment = await (isNode()
-    ? import(nodeImport)
+    ? import(/* @vite-ignore */ nodeImport)
     : //@ts-ignore
       import("./sk_browser.mjs"));
   let env = environment.environment(envVals) as Environment;
@@ -804,6 +803,24 @@ export async function run(
   } else {
     let path = relativeto(resolve("./" + wasm64 + ".wasm"), env.rootPath());
     buffer = await env.fetch(path);
+  }
+  return await start(modules, buffer, env, main);
+}
+
+export async function runUrl(
+  getUrl: (env: Environment) => Promise<string>,
+  modules: Array<string>,
+  envs: Map<string, Array<string>>,
+  main?: string,
+  getWasmSource?: () => Promise<Uint8Array>,
+) {
+  let env = await loadEnv(envs);
+  let buffer: Uint8Array;
+  if (getWasmSource) {
+    buffer = await getWasmSource();
+  } else {
+    const url = await getUrl(env);
+    buffer = await env.fetch(url);
   }
   return await start(modules, buffer, env, main);
 }
