@@ -32,6 +32,20 @@ fun expectEq<T: frozen>(
   }
 }
 
+fun expectNe<T: frozen>(
+  actual: T,
+  expected: T,
+  msg: String = "expected difference",
+): void {
+  if (inspect(actual) == inspect(expected)) {
+    throw ExpectationError(
+      msg,
+      inspect(expected).toString(),
+      inspect(actual).toString(),
+    )
+  }
+}
+
 fun expectTrue(b: Bool, msg: String = "expected true"): void {
   if (!b) {
     throw ExpectationError(msg, "true", "false")
