@@ -210,23 +210,22 @@ fun lwwEdits(
   snapshot: Int,
   writer: SKStore.Path,
   primaryIdxOpt: ?Int,
-  context: readonly SKStore.Context,
+  context: mutable SKStore.Context,
   dir: SKStore.EagerDir,
   row: SKDB.RowValues,
 ): mutable Iterator<
   (SKStore.Key, (SKStore.Path, SKStore.Path, Array<SKStore.File>)),
 > {
-  mcontext = context.mclone();
   primaryIdx = primaryIdxOpt match {
   | None() -> invariant_violation("Using LWW without a primary key.")
   | Some(p) -> p
   };
   indexEntry = SKDB.makeIndexEntry(table.name, primaryIdx);
-  indexTable = SKDB.getIndexByColNbr(mcontext);
-  indexes = indexTable.unsafeGetArray(mcontext, indexEntry);
+  indexTable = SKDB.getIndexByColNbr(context);
+  indexes = indexTable.unsafeGetArray(context, indexEntry);
   invariant(indexes.size() > 0);
   index = indexes[0];
-  indexDir = mcontext.unsafeGetEagerDir(index.dirName);
+  indexDir = context.unsafeGetEagerDir(index.dirName);
   primaryKey = row.getValue(primaryIdx);
   startKey = SKDB.RowKey::create(
     SKDB.RowValues::create(Array[primaryKey], 1),
@@ -248,7 +247,7 @@ fun lwwEdits(
     };
     if (rowKey.row.getValue(0) != primaryKey) break void;
 
-    for ((tick, source, _) in dir.getDataIterWithoutTombs(mcontext, key)) {
+    for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
       if (
         tick.value < snapshot ||
         source.path() == writer ||
