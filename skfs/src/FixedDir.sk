@@ -771,7 +771,7 @@ class CompactFSMImpl protected (
     key.baseName match {
     | rowKey @ SKDB.RowKey(row, _kinds) ->
       idx = binSearch(this.data.get, row, 0, this.size() - 1);
-      if (idx >= this.data.size()) None() else {
+      if (idx >= this.data.size() || row != this.data.get(idx)) None() else {
         Some(this.reconstructMInfo(rowKey))
       }
     | _ -> None()
