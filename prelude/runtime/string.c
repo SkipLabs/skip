@@ -265,10 +265,6 @@ double SKIP_String__toFloat_raw(char* str) {
   return atof(cstr);
 }
 
-char SKIP_Unsafe_string_utf8_get(char* str, SkipInt n) {
-  return str[n];
-}
-
 void* SKIP_Unsafe_string_ptr(char* str, int64_t offset) {
   return str + offset;
 }
