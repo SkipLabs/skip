@@ -728,16 +728,26 @@ class FSMImpl(protected data: FixedSingle<Path, MInfo>) extends FixedSourceMap {
   }
 }
 
+// Each FSMMInfoType class encodes a relationship between Paths' baseNames and
+// corresponding MInfoSingles' keys in a CompactFSMImpl
 base class FSMMInfoType
+
+// Each RowKey maps to itself
+class FullRow() extends FSMMInfoType
+
+// Each RowKey maps to an IndexProjKey with the same rowValues but the specified
+// kinds array
 class IndexProjection(
   kinds: Array<(Int, SQLParser.IKind, SQLParser.Type)>,
 ) extends FSMMInfoType
+
+// Each RowKey maps to a ProjKey with the specified left/right shard and the
+// scalar value at position col in the rowKey.
 class Projection(
   col: Int,
   leftShard: Int,
   rightShard: Int,
 ) extends FSMMInfoType
-class FullRow() extends FSMMInfoType
 
 class FSMMetadata{
   dir: DirName,
