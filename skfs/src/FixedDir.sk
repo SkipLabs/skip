@@ -666,11 +666,42 @@ base class FixedSourceMap {
         | _ -> seenRowKindsOpt
         };
         minfo match {
-        | MInfoSingle(minfoKey @ SKDB.RowKey _) if (minfoKey == rowKey) ->
-          !seenMInfoTypeOpt = seenMInfoTypeOpt match {
-          | None() -> Some(FullRow())
-          | Some(FullRow()) -> seenMInfoTypeOpt
-          | _ -> return None()
+        | MInfoSingle(
+          minfoKey @ SKDB.RowKey(SKDB.RowValues(minfoRow, _), minfoKinds),
+        ) ->
+          if (minfoKey == rowKey) {
+            !seenMInfoTypeOpt = seenMInfoTypeOpt match {
+            | None() -> Some(FullRow())
+            | Some(FullRow()) -> seenMInfoTypeOpt
+            | _ -> return None()
+            }
+          } else if (pathRow.values.size() == 1) {
+            pathVal = pathRow.values[0];
+            !seenMInfoTypeOpt = seenMInfoTypeOpt match {
+            | None() ->
+              col: ?Int = None();
+              for (idx in Range(0, minfoRow.size())) {
+                if (pathVal == minfoRow[idx]) {
+                  !col = Some(idx);
+                  break void
+                }
+              };
+              col match {
+              | Some(x) -> Some(Extension(x, rowKinds))
+              | _ -> return None()
+              }
+            | Some(
+              Extension(col, extKinds),
+            ) if (
+              col < minfoRow.size() &&
+              pathVal == minfoRow[col] &&
+              extKinds == minfoKinds
+            ) ->
+              seenMInfoTypeOpt
+            | _ -> return None()
+            }
+          } else {
+            return None()
           }
         | MInfoSingle(SKDB.IndexProjKey(minfoRow, indexKinds)) ->
           if (minfoRow != pathRow) return None();
@@ -749,6 +780,13 @@ class Projection(
   rightShard: Int,
 ) extends FSMMInfoType
 
+// Each RowKey is a singleton and maps to some larger RowKey with that singleton
+// value at position col
+class Extension(
+  col: Int,
+  extKinds: Array<(Int, SQLParser.IKind, SQLParser.Type)>,
+) extends FSMMInfoType
+
 class FSMMetadata{
   dir: DirName,
   rowKinds: Array<(Int, SQLParser.IKind, SQLParser.Type)>,
@@ -766,23 +804,47 @@ class CompactFSMImpl protected (
     | IndexProjection(indexKinds) -> SKDB.IndexProjKey(rowKey.row, indexKinds)
     | Projection(col, leftShard, rightShard) ->
       SKDB.ProjKey(rowKey.row.values[col], col, leftShard, rightShard)
+    | Extension _ -> return this.extendKey(rowKey).fromSome()
     };
     MInfoSingle(minfoKey)
+  }
+
+  private fun extendKey(rowKey: SKDB.RowKey): ?MInfo {
+    this.metadata.minfoType match {
+    | Extension(col, extKinds) ->
+      idx = binSearch(
+        i ~> this.data.get(i).values[col],
+        rowKey.row.values[0],
+        0,
+        this.size() - 1,
+      );
+      if (idx >= this.data.size()) None() else {
+        Some(MInfoSingle(SKDB.RowKey(this.data.get(idx), extKinds)))
+      }
+    | _ -> invariant_violation("Can't extend a key without extension metadata")
+    }
   }
 
   private fun reconstructKVPair(row: SKDB.RowValues): (Path, MInfo) {
     rowKey = SKDB.RowKey(row, this.metadata.rowKinds);
     path = Path(this.metadata.dir, rowKey);
-    minfo = this.reconstructMInfo(rowKey);
+    minfo = this.metadata.minfoType match {
+    | Extension _ -> this.extendKey(rowKey).fromSome()
+    | _ -> this.reconstructMInfo(rowKey)
+    };
     (path, minfo)
   }
 
   fun maybeGet(key: Path): ?MInfo {
     key.baseName match {
     | rowKey @ SKDB.RowKey(row, _kinds) ->
-      idx = binSearch(this.data.get, row, 0, this.size() - 1);
-      if (idx >= this.data.size() || row != this.data.get(idx)) None() else {
-        Some(this.reconstructMInfo(rowKey))
+      this.metadata.minfoType match {
+      | Extension _ -> this.extendKey(rowKey)
+      | _ ->
+        idx = binSearch(this.data.get, row, 0, this.size() - 1);
+        if (idx >= this.data.size() || row != this.data.get(idx)) None() else {
+          Some(this.reconstructMInfo(rowKey))
+        }
       }
     | _ -> None()
     }
@@ -807,20 +869,27 @@ class CompactFSMImpl protected (
     metadata: FSMMetadata,
     allowDuplicates: Bool = false,
   ): this {
-    baseNames = Vector::mcreateFromItems(
+    strippedData = Vector::mcreateFromItems(
       data.map(datum ->
-        datum.i0.baseName match {
-        | SKDB.RowKey(values, _kinds) -> values
-        | _ ->
-          invariant_violation(
-            "getMetadata ensures all path basenames are RowKeys",
-          )
+        if (metadata.minfoType is Extension _) {
+          datum.i1 match {
+          | MInfoSingle(SKDB.RowKey(values, _kinds)) -> values
+          | _ -> invariant_violation("malformed data for Extension metadata")
+          }
+        } else {
+          datum.i0.baseName match {
+          | SKDB.RowKey(values, _kinds) -> values
+          | _ ->
+            invariant_violation(
+              "getMetadata ensures all path basenames are RowKeys",
+            )
+          }
         }
       ),
     );
-    baseNames.sortBy(x ~> x);
-    if (!allowDuplicates) assertUnique(baseNames, x ~> x);
-    static(metadata, baseNames.toArray())
+    strippedData.sortBy(x ~> x);
+    if (!allowDuplicates) assertUnique(strippedData, x ~> x);
+    static(metadata, strippedData.toArray())
   }
 }
 
