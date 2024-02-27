@@ -296,7 +296,7 @@ void SKIP_posix_execvp(char *args_obj) {
 int64_t SKIP_posix_isatty(int64_t fd) {
   int rv = isatty((int)fd);
   if (rv == 0 && errno != ENOTTY) {
-    return 0;     /* treat this call as best effort and assume not a tty */
+    return 0; /* treat this call as best effort and assume not a tty */
   }
   return (char)rv;
 }

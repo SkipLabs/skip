@@ -79,14 +79,15 @@ void sk_obstack_attach_page(char* lpage) {
 }
 
 char* sk_large_page(size_t size) {
-  size_t block_size = size + sizeof(char*) + sizeof(size_t) + sizeof(sk_saved_obstack_t);
+  size_t block_size =
+      size + sizeof(char*) + sizeof(size_t) + sizeof(sk_saved_obstack_t);
   block_size += 64;
   char* lpage = (char*)sk_malloc(block_size);
   sk_obstack_attach_page(lpage);
   lpage += sizeof(char*);
   *(size_t*)lpage = block_size;
   lpage += sizeof(size_t);
-  sk_saved_obstack_t * saved = (sk_saved_obstack_t*)lpage;
+  sk_saved_obstack_t* saved = (sk_saved_obstack_t*)lpage;
   saved->head = NULL;
   saved->end = NULL;
   saved->page = NULL;
@@ -110,7 +111,7 @@ void sk_new_page() {
   head += sizeof(char*);
   *(size_t*)head = block_size;
   head += sizeof(size_t);
-  sk_saved_obstack_t * saved = (sk_saved_obstack_t*)head;
+  sk_saved_obstack_t* saved = (sk_saved_obstack_t*)head;
   saved->head = NULL;
   saved->end = NULL;
   saved->page = NULL;
@@ -123,7 +124,8 @@ char* SKIP_Obstack_alloc(size_t size) {
   size = (size + 7) & ~7;
 
   if (head + size >= end) {
-    if (size + sizeof(char*) + sizeof(size_t) + sizeof(sk_saved_obstack_t) > PAGE_SIZE) {
+    if (size + sizeof(char*) + sizeof(size_t) + sizeof(sk_saved_obstack_t) >
+        PAGE_SIZE) {
       result = sk_large_page(size);
       result += 8;
       return result;
@@ -161,8 +163,7 @@ char* SKIP_Obstack_shallowClone(size_t _size, char* obj) {
 /* Obstack creation/destruction. */
 /*****************************************************************************/
 
-
-sk_saved_obstack_t * sk_saved_obstack(char* page) {
+sk_saved_obstack_t* sk_saved_obstack(char* page) {
   return (sk_saved_obstack_t*)(page + sizeof(char*) + sizeof(size_t));
 }
 

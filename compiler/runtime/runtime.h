@@ -66,7 +66,6 @@ void sk_print_ctx_table();
 #define ERROR_CONTEXT_CHECK 102
 #define ERROR_ARG_PARSE 103
 
-
 /*****************************************************************************/
 /* Types used for the Obstack pages info. */
 /*****************************************************************************/
@@ -198,9 +197,9 @@ typedef struct {
 /*****************************************************************************/
 
 #ifndef __cplusplus
-int (memcmp)(const void* ptr1, const void* ptr2, size_t num);
-void* (memcpy)(void *restrict dst, const void *restrict src, size_t n);
-void* (memset)(void* b, int c, size_t len);
+int(memcmp)(const void* ptr1, const void* ptr2, size_t num);
+void*(memcpy)(void* restrict dst, const void* restrict src, size_t n);
+void*(memset)(void* b, int c, size_t len);
 #endif
 
 char* SKIP_Obstack_alloc(size_t size);

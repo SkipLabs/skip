@@ -43,8 +43,6 @@ typedef struct {
   char* end;
 } sk_saved_obstack_t;
 
-
-
 extern "C" {
 char* sk2c_string(char* skStr);
 void* sk_get_exception_type(void* skExn);
@@ -87,7 +85,7 @@ static void error_callback(void* /* data */, const char* msg, int errnum) {
 }
 }  // namespace
 
-#endif // RELEASE
+#endif  // RELEASE
 
 namespace skip {
 struct SkipException : std::exception {
@@ -119,7 +117,7 @@ void printStackTrace() {
 }
 
 #endif
-}
+}  // namespace skip
 
 #ifndef RELEASE
 namespace {
@@ -139,7 +137,7 @@ void terminate() {
   std::cerr << "*** Stack trace:" << std::endl;
   skip::printStackTrace();
 }
-} // namespace
+}  // namespace
 #endif
 
 extern "C" {
@@ -463,9 +461,7 @@ int64_t SKIP_time() {
 uint64_t SKIP_time_ms() {
   using namespace std::chrono;
 
-  return
-    duration_cast<milliseconds>
-      (steady_clock::now().time_since_epoch())
+  return duration_cast<milliseconds>(steady_clock::now().time_since_epoch())
       .count();
 }
 
@@ -646,5 +642,4 @@ void SKIP_push_object() {
 void SKIP_js_delete_fun() {
   // Not implemented
 }
-
 }
