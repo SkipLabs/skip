@@ -554,8 +554,6 @@ void sk_load_mapping(char* fileName) {
     exit(ERROR_MAPPING_MEMORY);
   }
 
-  lseek(fd, 0L, SEEK_SET);
-
   int prot = PROT_READ | PROT_WRITE;
   lseek(fd, 0L, SEEK_END);
   size_t fsize = lseek(fd, 0, SEEK_CUR) - 1;
