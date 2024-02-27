@@ -241,8 +241,8 @@ size_t ctx_table_size = 0;
 
 int sk_find_ctx(char* context) {
   int i;
-  for(i = 0; i < ctx_table_size; i++) {
-    if(context == ctx_table[i]) {
+  for (i = 0; i < ctx_table_size; i++) {
+    if (context == ctx_table[i]) {
       return i;
     }
   }
@@ -252,16 +252,16 @@ int sk_find_ctx(char* context) {
 void sk_clean_ctx_table() {
   int i = 0;
   int j = 0;
-  for(; j < ctx_table_size; j++) {
+  for (; j < ctx_table_size; j++) {
     int rcount = sk_get_ref_count(ctx_table[j]);
-    if(rcount < 0) {
+    if (rcount < 0) {
       fprintf(stderr, "Error: CTX_TABLE found negative ref count");
       exit(ERROR_CONTEXT_CHECK);
     }
-    if(rcount == 0) {
+    if (rcount == 0) {
       continue;
     }
-    if(i != j) {
+    if (i != j) {
       ctx_table[i] = ctx_table[j];
     }
     i++;
@@ -272,16 +272,17 @@ void sk_clean_ctx_table() {
 void sk_print_ctx_table() {
   int i = 0;
   fprintf(stderr, "---- CTX TABLE BEGIN -----\n");
-  for(; i < ctx_table_size; i++) {
-    fprintf(stderr, "%p, REF_COUNT: %lu\n", ctx_table[i], sk_get_ref_count(ctx_table[i]));
+  for (; i < ctx_table_size; i++) {
+    fprintf(stderr, "%p, REF_COUNT: %lu\n", ctx_table[i],
+            sk_get_ref_count(ctx_table[i]));
   }
   fprintf(stderr, "---- CTX TABLE END -------\n");
 }
 
 void sk_add_ctx(char* context) {
   int i = sk_find_ctx(context);
-  if(i < 0) {
-    if(ctx_table_size >= CTX_TABLE_CAPACITY) {
+  if (i < 0) {
+    if (ctx_table_size >= CTX_TABLE_CAPACITY) {
       fprintf(stderr, "Error: CTX_TABLE reached maximum capacity");
       exit(ERROR_CONTEXT_CHECK);
     }
@@ -291,7 +292,6 @@ void sk_add_ctx(char* context) {
 }
 
 #endif
-
 
 /*****************************************************************************/
 /* Global context access primitives. */
@@ -353,7 +353,7 @@ void sk_context_set(char* obj) {
 
 static char* parse_args(int argc, char** argv, int* is_init) {
   // FIXME
-  if (argc > 0 && strcmp(argv[0], "skargo") == 0 ) {
+  if (argc > 0 && strcmp(argv[0], "skargo") == 0) {
     return NULL;
   }
 
