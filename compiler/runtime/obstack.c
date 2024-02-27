@@ -38,7 +38,7 @@
 // end: The end of the page.
 
 #ifdef SKIP32
-char* page = NULL;
+struct sk_obstack* page = NULL;
 char* head = NULL;
 char* end = NULL;
 #endif
@@ -48,7 +48,7 @@ char* end = NULL;
 // well).
 
 #ifdef SKIP64
-__thread char* page = NULL;
+__thread struct sk_obstack* page = NULL;
 __thread char* head = NULL;
 __thread char* end = NULL;
 #endif
@@ -59,63 +59,63 @@ __thread char* end = NULL;
 
 typedef struct {
   char* head;
-  char* page;
+  struct sk_obstack* page;
   char* end;
 } sk_saved_obstack_t;
 
+typedef struct sk_obstack {
+  struct sk_obstack* previous;
+  size_t size;
+  sk_saved_obstack_t saved;
+  char user_data[0];
+} sk_obstack_t;
+
 sk_saved_obstack_t init_saved = {NULL, NULL, NULL};
 
-size_t sk_page_size(char* page) {
-  return *(size_t*)(page + sizeof(char*));
+size_t sk_page_size(sk_obstack_t* page) {
+  return page->size;
 }
 
-int sk_is_large_page(char* page) {
+int sk_is_large_page(sk_obstack_t* page) {
   return sk_page_size(page) > PAGE_SIZE;
 }
 
-void sk_obstack_attach_page(char* lpage) {
-  *(char**)lpage = *(char**)page;
-  *(char**)page = lpage;
+void sk_obstack_attach_page(sk_obstack_t* lpage) {
+  lpage->previous = page->previous;
+  page->previous = lpage;
 }
 
 char* sk_large_page(size_t size) {
-  size_t block_size =
-      size + sizeof(char*) + sizeof(size_t) + sizeof(sk_saved_obstack_t);
+  size_t block_size = size + sizeof(sk_obstack_t);
+  // This space is needed in case the page gets interned (TO CHECK)
   block_size += 64;
-  char* lpage = (char*)sk_malloc(block_size);
+  sk_obstack_t* lpage = (sk_obstack_t*)sk_malloc(block_size);
   sk_obstack_attach_page(lpage);
-  lpage += sizeof(char*);
-  *(size_t*)lpage = block_size;
-  lpage += sizeof(size_t);
-  sk_saved_obstack_t* saved = (sk_saved_obstack_t*)lpage;
+  lpage->size = block_size;
+  sk_saved_obstack_t* saved = &lpage->saved;
   saved->head = NULL;
   saved->end = NULL;
   saved->page = NULL;
-  lpage += sizeof(sk_saved_obstack_t);
-  // This space is needed in case the page gets interned (TO CHECK)
-  lpage += 64;
-  return lpage;
+  return lpage->user_data + 64;
 }
 
 void sk_new_page() {
   size_t block_size = PAGE_SIZE;
+  sk_obstack_t* previous_page = page;
 #ifdef SKIP32
-  head = (char*)sk_malloc_end(block_size);
+  page = (sk_obstack_t*)sk_malloc_end(block_size);
 #endif
 #ifdef SKIP64
-  head = (char*)sk_malloc(block_size);
+  page = (sk_obstack_t*)sk_malloc(block_size);
 #endif
-  end = head + block_size;
-  *(char**)head = page;
-  page = head;
-  head += sizeof(char*);
-  *(size_t*)head = block_size;
-  head += sizeof(size_t);
-  sk_saved_obstack_t* saved = (sk_saved_obstack_t*)head;
+  page->previous = previous_page;
+  page->size = block_size;
+  sk_saved_obstack_t* saved = &page->saved;
   saved->head = NULL;
   saved->end = NULL;
   saved->page = NULL;
-  head += sizeof(sk_saved_obstack_t);
+  end = (char*)page + block_size;
+  head = page->user_data;
 }
 
 char* SKIP_Obstack_alloc(size_t size) {
@@ -124,8 +124,7 @@ char* SKIP_Obstack_alloc(size_t size) {
   size = (size + 7) & ~7;
 
   if (head + size >= end) {
-    if (size + sizeof(char*) + sizeof(size_t) + sizeof(sk_saved_obstack_t) >
-        PAGE_SIZE) {
+    if (size + sizeof(sk_obstack_t) > PAGE_SIZE) {
       result = sk_large_page(size);
       result += 8;
       return result;
@@ -163,8 +162,8 @@ char* SKIP_Obstack_shallowClone(size_t /* size */, char* obj) {
 /* Obstack creation/destruction. */
 /*****************************************************************************/
 
-sk_saved_obstack_t* sk_saved_obstack(char* page) {
-  return (sk_saved_obstack_t*)(page + sizeof(char*) + sizeof(size_t));
+sk_saved_obstack_t* sk_saved_obstack(sk_obstack_t* page) {
+  return &page->saved;
 }
 
 sk_saved_obstack_t* SKIP_new_Obstack() {
@@ -185,7 +184,7 @@ sk_saved_obstack_t* SKIP_new_Obstack() {
 }
 
 void SKIP_destroy_Obstack(sk_saved_obstack_t* saved) {
-  char* saved_page;
+  sk_obstack_t* saved_page;
   char* saved_head;
   char* saved_end;
   if (saved == NULL) {
@@ -197,10 +196,10 @@ void SKIP_destroy_Obstack(sk_saved_obstack_t* saved) {
     saved_head = saved->head;
     saved_end = saved->end;
   }
-  while (saved_head < page || saved_head > end) {
-    char* tofree = page;
+  while (saved_head < (char*)page || saved_head > end) {
+    sk_obstack_t* tofree = page;
     size_t tosk_free_size = sk_page_size(page);
-    page = *(char**)page;
+    page = page->previous;
     sk_free_size(tofree, tosk_free_size);
     if (page == NULL) {
       head = NULL;
@@ -208,8 +207,8 @@ void SKIP_destroy_Obstack(sk_saved_obstack_t* saved) {
       end = NULL;
       return;
     }
-    size_t size = *(size_t*)(page + sizeof(char*));
-    end = page + size;
+    size_t size = page->size;
+    end = (char*)page + size;
   }
   head = saved_head;
   page = saved_page;
@@ -239,9 +238,9 @@ void* SKIP_destroy_Obstack_with_value(sk_saved_obstack_t* saved, void* toCopy) {
   unsigned int i;
   for (i = 0; i < nbr_pages; i++) {
     if ((uint64_t)pages[i].key != pages[i].value) {
-      char* fpage = (char*)(pages[i].key);
-      size_t fnbr_pages = *(size_t*)(fpage + sizeof(char*));
-      sk_free_size(fpage, fnbr_pages);
+      sk_obstack_t* fpage = (sk_obstack_t*)(pages[i].key);
+      size_t fpage_size = fpage->size;
+      sk_free_size(fpage, fpage_size);
     }
   }
 
@@ -263,11 +262,12 @@ void SKIP_enable_GC() {
 uint32_t SKIP_should_GC(sk_saved_obstack_t* saved) {
   if (!sk_gc_enabled) return 0;
   size_t nbr_page = 0;
-  void* cursor = page;
+  sk_obstack_t* cursor = page;
   while (cursor != NULL && cursor != saved->page) {
-    cursor = *(char**)cursor;
+    cursor = cursor->previous;
     nbr_page++;
-    if (nbr_page > 3 || (nbr_page > 1 && (head - page > (2 * PAGE_SIZE / 3)))) {
+    if (nbr_page > 3 ||
+        (nbr_page > 1 && (head - (char*)page > (2 * PAGE_SIZE / 3)))) {
       return 1;
     }
   }
@@ -328,11 +328,11 @@ void sk_heap_sort(sk_cell_t* arr, size_t n) {
 /* Search. */
 /*****************************************************************************/
 
-size_t sk_get_nbr_pages(void* saved_page) {
+size_t sk_get_nbr_pages(sk_obstack_t* saved_page) {
   size_t nbr_page = 0;
-  void* cursor = page;
+  sk_obstack_t* cursor = page;
   while (cursor != NULL && cursor != saved_page) {
-    cursor = *(char**)cursor;
+    cursor = cursor->previous;
     nbr_page++;
   }
   return nbr_page;
@@ -341,11 +341,11 @@ size_t sk_get_nbr_pages(void* saved_page) {
 sk_cell_t* sk_get_pages(size_t nbr_pages) {
   sk_cell_t* result = (sk_cell_t*)sk_malloc(sizeof(sk_cell_t) * nbr_pages);
   unsigned int i = 0;
-  char* cursor = page;
+  sk_obstack_t* cursor = page;
   for (i = 0; i < nbr_pages; i++) {
     result[i].key = cursor;
-    result[i].value = (uint64_t)cursor + *(size_t*)(cursor + sizeof(char*));
-    cursor = *(char**)cursor;
+    result[i].value = (uint64_t)cursor + cursor->size;
+    cursor = cursor->previous;
   }
   sk_heap_sort(result, nbr_pages);
   return result;
