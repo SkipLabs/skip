@@ -70,16 +70,6 @@ void sk_print_ctx_table();
 /* Types used for the Obstack pages info. */
 /*****************************************************************************/
 
-typedef struct {
-  void* head;
-  size_t size;
-} sk_page_t;
-
-typedef struct {
-  sk_page_t* pages;
-  long pages_size;
-} sk_pinfo_t;
-
 /*****************************************************************************/
 /* Types used for the hashtable. */
 /*****************************************************************************/
