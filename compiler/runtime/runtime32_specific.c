@@ -1,5 +1,6 @@
-#include "runtime.h"
 #include <stdbool.h>
+
+#include "runtime.h"
 #include "xoroshiro128plus.h"
 
 void js_throw(void*, uint32_t);
@@ -208,16 +209,14 @@ int SKIP_stdin_has_data() {
 
 void SKIP_unix_die_on_EOF() {}
 
-int32_t SKIP_js_open_flags(
-  bool read, bool write, bool append,
-                              bool truncate, bool create,
-                              bool create_new
-);
+int32_t SKIP_js_open_flags(bool read, bool write, bool append, bool truncate,
+                           bool create, bool create_new);
 
 int64_t SKIP_posix_open_flags(int64_t read, int64_t write, int64_t append,
                               int64_t truncate, int64_t create,
                               int64_t create_new) {
-  return SKIP_js_open_flags((bool)read, (bool)write, (bool)append, (bool)truncate, (bool)create, (bool)create_new);
+  return SKIP_js_open_flags((bool)read, (bool)write, (bool)append,
+                            (bool)truncate, (bool)create, (bool)create_new);
 }
 
 int32_t SKIP_js_open(char* path, int32_t oflag, int32_t mode);
@@ -238,10 +237,9 @@ int64_t SKIP_posix_write(int64_t fd, char* buf) {
   return (int64_t)SKIP_js_write((uint32_t)fd, buf);
 }
 
+char* SKIP_js_read(uint32_t fd, uint32_t len);
 
-char *SKIP_js_read(uint32_t fd, uint32_t len);
-
-char *SKIP_posix_read(int64_t fd, int64_t len) {
+char* SKIP_posix_read(int64_t fd, int64_t len) {
   return SKIP_js_read((uint32_t)fd, (uint32_t)len);
 }
 
@@ -257,24 +255,21 @@ char* SKIP_getArgN(int64_t n) {
   return SKIP_js_get_argn((int32_t)n);
 }
 
-
 uint32_t SKIP_js_get_envc();
 
 int64_t SKIP_get_envc() {
   return (int64_t)SKIP_js_get_envc();
 }
 
+char* SKIP_js_get_envn(uint32_t n);
 
-char *SKIP_js_get_envn(uint32_t n);
-
-
-char *SKIP_get_envN(int64_t n) {
+char* SKIP_get_envN(int64_t n) {
   return SKIP_js_get_envn((uint32_t)n);
 }
 
-char *SKIP_js_pipe();
+char* SKIP_js_pipe();
 
-char *SKIP_posix_pipe() {
+char* SKIP_posix_pipe() {
   return SKIP_js_pipe();
 }
 
@@ -290,8 +285,8 @@ void SKIP_posix_dup2(int64_t oldfd, int64_t newfd) {
   SKIP_js_dup2((uint32_t)oldfd, (uint32_t)newfd);
 }
 
-void SKIP_js_execvp(char *args_obj);
+void SKIP_js_execvp(char* args_obj);
 
-void SKIP_posix_execvp(char *args_obj) {
+void SKIP_posix_execvp(char* args_obj) {
   SKIP_js_execvp(args_obj);
 }
