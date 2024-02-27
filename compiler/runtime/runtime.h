@@ -67,8 +67,10 @@ void sk_print_ctx_table();
 #define ERROR_ARG_PARSE 103
 
 /*****************************************************************************/
-/* Types used for the Obstack pages info. */
+/* Types used for the Obstack pages. */
 /*****************************************************************************/
+
+typedef struct sk_obstack sk_obstack_t;
 
 /*****************************************************************************/
 /* Types used for the hashtable. */
@@ -95,7 +97,7 @@ sk_cell_t* sk_htbl_find(sk_htbl_t* table, void* key);
 int sk_htbl_mem(sk_htbl_t* table, void* key);
 void sk_htbl_remove(sk_htbl_t* table, void* key);
 SkipInt SKIP_String_cmp(unsigned char* str1, unsigned char* str2);
-size_t sk_get_nbr_pages(void* saved_page);
+size_t sk_get_nbr_pages(sk_obstack_t* saved_page);
 sk_cell_t* sk_get_pages(size_t size);
 size_t sk_get_obstack_idx(char* ptr, sk_cell_t* pages, size_t size);
 
@@ -227,13 +229,13 @@ void sk_global_lock();
 void sk_global_unlock();
 void sk_incr_ref_count(void*);
 int sk_is_const(void*);
-int sk_is_large_page(char* page);
+int sk_is_large_page(sk_obstack_t* page);
 int sk_is_static(void*);
 void* sk_malloc(size_t size);
 void* sk_malloc_end(size_t);
 char* sk_new_const(char* cst);
-void sk_obstack_attach_page(char* lpage);
-size_t sk_page_size(char* page);
+void sk_obstack_attach_page(sk_obstack_t* lpage);
+size_t sk_page_size(sk_obstack_t* page);
 void* sk_palloc(size_t size);
 void sk_persist_consts();
 void sk_pfree_size(void*, size_t);
