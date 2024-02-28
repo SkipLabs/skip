@@ -219,7 +219,6 @@ void SKIP_cond_broadcast(void* c) {
 typedef struct ginfo {
   void* ftable[FTABLE_SIZE];
   void* context;
-  char* begin;
   char* head;
   char* end;
   char* fileName;
@@ -513,7 +512,6 @@ void sk_create_mapping(char* fileName, char* static_limit, size_t icapacity) {
   // The head must be aligned!
   head = (char*)(((uintptr_t)head + (uintptr_t)(15)) & ~((uintptr_t)(15)));
 
-  (*ginfo)->begin = (char*)mapping;
   (*ginfo)->head = head;
   (*ginfo)->end = end;
   (*ginfo)->fileName = persistent_fileName;
