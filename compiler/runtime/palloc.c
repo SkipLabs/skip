@@ -228,7 +228,6 @@ typedef struct {
   size_t total_palloc_size;
 } ginfo_t;
 
-ginfo_t** ginfo_root = NULL;
 ginfo_t** ginfo = NULL;
 
 /*****************************************************************************/
