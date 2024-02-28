@@ -510,6 +510,10 @@ class IndexDescr{
   fun compare(y: IndexDescr): Order {
     this.name.compare(y.name)
   }
+
+  fun isSystemIndex(): Bool {
+    this.name.lower.startsWith(systemIndexPrefix.lowercase())
+  }
 }
 
 fun getIndexInputDir(
@@ -752,6 +756,9 @@ fun dumpTables(origContext: readonly SKStore.Context, suffix: ?String): void {
         context,
         SKStore.SID(tableName),
       )) {
+        if (indexDescr.isSystemIndex()) {
+          continue;
+        };
         indexDescr.text match {
         | None() -> void
         | Some(text) -> print_string(text + ";")
