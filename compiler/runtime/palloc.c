@@ -446,7 +446,6 @@ struct file_mapping {
   pthread_mutexattr_t gmutex_attr;
   pthread_mutex_t gmutex;
   ginfo_t ginfo_data;
-  ginfo_t* ginfo;
   uint64_t gid;
   size_t capacity;
   void** pconsts;
@@ -480,7 +479,7 @@ void sk_create_mapping(char* fileName, char* static_limit, size_t icapacity) {
 
   gmutex_attr = &mapping->gmutex_attr;
   gmutex = &mapping->gmutex;
-  ginfo_t* ginfo_data = &mapping->ginfo_data;
+  ginfo = &mapping->ginfo_data;
   gid = &mapping->gid;
   capacity = &mapping->capacity;
   pconsts = &mapping->pconsts;
@@ -497,8 +496,6 @@ void sk_create_mapping(char* fileName, char* static_limit, size_t icapacity) {
   }
 
   memcpy(persistent_fileName, fileName, fileName_length);
-
-  mapping->ginfo = ginfo = ginfo_data;
 
   int i;
   for (i = 0; i < FTABLE_SIZE; i++) {
@@ -563,7 +560,7 @@ void sk_load_mapping(char* fileName) {
   }
 
   gmutex = &mapping->gmutex;
-  ginfo = mapping->ginfo;
+  ginfo = &mapping->ginfo_data;
   gid = &mapping->gid;
   capacity = &mapping->capacity;
   pconsts = &mapping->pconsts;
