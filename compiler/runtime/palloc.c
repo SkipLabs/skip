@@ -445,7 +445,7 @@ struct file_mapping {
   file_mapping_header_t header;
   pthread_mutexattr_t gmutex_attr;
   pthread_mutex_t gmutex;
-  ginfo_t ginfo_data[2];
+  ginfo_t ginfo_data;
   ginfo_t* ginfo;
   uint64_t gid;
   size_t capacity;
@@ -480,7 +480,7 @@ void sk_create_mapping(char* fileName, char* static_limit, size_t icapacity) {
 
   gmutex_attr = &mapping->gmutex_attr;
   gmutex = &mapping->gmutex;
-  ginfo_t* ginfo_data = mapping->ginfo_data;
+  ginfo_t* ginfo_data = &mapping->ginfo_data;
   ginfo = &mapping->ginfo;
   gid = &mapping->gid;
   capacity = &mapping->capacity;
