@@ -216,8 +216,7 @@ void SKIP_cond_broadcast(void* c) {
 /* The global information structure. */
 /*****************************************************************************/
 
-typedef struct {
-  void* ginfo_array;
+typedef struct ginfo {
   void* ftable[FTABLE_SIZE];
   void* context;
   char* begin;
@@ -502,7 +501,6 @@ void sk_create_mapping(char* fileName, char* static_limit, size_t icapacity) {
   memcpy(persistent_fileName, fileName, fileName_length);
 
   *ginfo = ginfo_data;
-  (*ginfo)->ginfo_array = ginfo_data;
 
   int i;
   for (i = 0; i < FTABLE_SIZE; i++) {
