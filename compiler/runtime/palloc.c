@@ -436,10 +436,24 @@ void sk_commit(char* new_root, uint32_t sync) {
 /* Disk-persisted state, a.k.a. file mapping. */
 /*****************************************************************************/
 
+typedef struct file_mapping file_mapping_t;
+
 typedef struct {
   int64_t version;
-  void* bottom_addr;
+  file_mapping_t* bottom_addr;
 } file_mapping_header_t;
+
+struct file_mapping {
+  file_mapping_header_t header;
+  pthread_mutexattr_t gmutex_attr;
+  pthread_mutex_t gmutex;
+  ginfo_t ginfo_data[2];
+  ginfo_t* ginfo;
+  uint64_t gid;
+  size_t capacity;
+  void** pconsts;
+  char persistent_fileName[1];
+};
 
 /*****************************************************************************/
 /* Creates a new file mapping. */
@@ -454,49 +468,31 @@ void sk_create_mapping(char* fileName, char* static_limit, size_t icapacity) {
   lseek(fd, icapacity, SEEK_SET);
   write(fd, "", 1);
   int prot = PROT_READ | PROT_WRITE;
-  char* begin =
+  file_mapping_t* mapping =
       mmap(BOTTOM_ADDR, icapacity, prot, MAP_SHARED | MAP_FIXED, fd, 0);
   close(fd);
 
-  if (begin == MAP_FAILED) {
+  if (mapping == MAP_FAILED) {
     perror("ERROR (MAP FAILED)");
     exit(ERROR_MAPPING_FAILED);
   }
 
-  char* head = begin;
+  mapping->header.version = SKIP_get_version();
+  mapping->header.bottom_addr = mapping;
 
-  *(int64_t*)head = SKIP_get_version();
-  head += sizeof(int64_t);
-
-  *(void**)head = begin;
-  head += sizeof(void*);
-
-  gmutex_attr = (pthread_mutexattr_t*)head;
-  head += sizeof(pthread_mutexattr_t);
-
-  gmutex = (pthread_mutex_t*)head;
-  head += sizeof(pthread_mutex_t);
-
-  ginfo_t* ginfo_data = (ginfo_t*)head;
-  head += 2 * sizeof(ginfo_t);
-
-  ginfo = (ginfo_t**)head;
-  head += sizeof(ginfo_t*);
-
-  gid = (uint64_t*)head;
-  head += sizeof(uint64_t);
-
-  capacity = (size_t*)head;
-  head += sizeof(size_t);
-
-  pconsts = (void***)head;
-  head += sizeof(void**);
+  gmutex_attr = &mapping->gmutex_attr;
+  gmutex = &mapping->gmutex;
+  ginfo_t* ginfo_data = mapping->ginfo_data;
+  ginfo = &mapping->ginfo;
+  gid = &mapping->gid;
+  capacity = &mapping->capacity;
+  pconsts = &mapping->pconsts;
 
   size_t fileName_length = strlen(fileName) + 1;
-  char* persistent_fileName = head;
-  head += fileName_length;
+  char* persistent_fileName = mapping->persistent_fileName;
 
-  char* end = begin + icapacity;
+  char* head = persistent_fileName + fileName_length;
+  char* end = (char*)mapping + icapacity;
 
   if (head >= end) {
     fprintf(stderr, "Could not initialize memory\n");
@@ -506,7 +502,6 @@ void sk_create_mapping(char* fileName, char* static_limit, size_t icapacity) {
   memcpy(persistent_fileName, fileName, fileName_length);
 
   *ginfo = ginfo_data;
-
   (*ginfo)->ginfo_array = ginfo_data;
 
   int i;
@@ -520,7 +515,7 @@ void sk_create_mapping(char* fileName, char* static_limit, size_t icapacity) {
   // The head must be aligned!
   head = (char*)(((uintptr_t)head + (uintptr_t)(15)) & ~((uintptr_t)(15)));
 
-  (*ginfo)->begin = begin;
+  (*ginfo)->begin = (char*)mapping;
   (*ginfo)->head = head;
   (*ginfo)->end = end;
   (*ginfo)->fileName = persistent_fileName;
@@ -561,32 +556,22 @@ void sk_load_mapping(char* fileName) {
     exit(ERROR_MAPPING_VERSION);
   }
 
-  int prot = PROT_READ | PROT_WRITE;
   size_t fsize = lseek(fd, 0, SEEK_END) - 1;
-  char* begin =
+  int prot = PROT_READ | PROT_WRITE;
+  file_mapping_t* mapping =
       mmap(header.bottom_addr, fsize, prot, MAP_SHARED | MAP_FIXED, fd, 0);
   close(fd);
 
-  if (begin == MAP_FAILED) {
+  if (mapping == MAP_FAILED) {
     perror("ERROR (MAP FAILED)");
     exit(ERROR_MAPPING_FAILED);
   }
 
-  char* head = begin;
-  head += sizeof(uint64_t);
-  head += sizeof(void*);
-  head += sizeof(pthread_mutexattr_t);
-  gmutex = (pthread_mutex_t*)head;
-  head += sizeof(pthread_mutex_t);
-  head += 2 * sizeof(ginfo_t);
-  ginfo = (ginfo_t**)head;
-  head += sizeof(ginfo_t*);
-  gid = (uint64_t*)head;
-  head += sizeof(uint64_t);
-  capacity = (size_t*)head;
-  head += sizeof(size_t);
-  pconsts = (void***)head;
-  head += sizeof(void**);
+  gmutex = &mapping->gmutex;
+  ginfo = &mapping->ginfo;
+  gid = &mapping->gid;
+  capacity = &mapping->capacity;
+  pconsts = &mapping->pconsts;
 }
 
 /*****************************************************************************/
