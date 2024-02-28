@@ -636,32 +636,29 @@ void* sk_get_ftable(size_t size) {
 /* No file initialization (the memory is not backed by a file). */
 /*****************************************************************************/
 
+// Handy structure to allocate all those things at once
+typedef struct {
+  ginfo_t* ginfo;
+  ginfo_t ginfo_data;
+  uint64_t gid;
+  void** pconsts;
+} no_file_t;
+
 static void sk_init_no_file(char* static_limit) {
-  ginfo = malloc(sizeof(ginfo_t*));
-  if (ginfo == NULL) {
+  no_file_t* no_file = malloc(sizeof(no_file_t));
+  if (no_file == NULL) {
     perror("malloc");
     exit(1);
   }
-  *ginfo = malloc(sizeof(ginfo_t));
-  if (*ginfo == NULL) {
-    perror("malloc");
-    exit(1);
-  }
+  ginfo = &no_file->ginfo;
+  *ginfo = &no_file->ginfo_data;
   (*ginfo)->break_ptr = static_limit;
   (*ginfo)->total_palloc_size = 0;
   (*ginfo)->fileName = NULL;
   (*ginfo)->context = NULL;
   gmutex = NULL;
-  gid = malloc(sizeof(uint64_t));
-  if (gid == NULL) {
-    perror("malloc");
-    exit(1);
-  }
-  pconsts = malloc(sizeof(void**));
-  if (pconsts == NULL) {
-    perror("malloc");
-    exit(1);
-  }
+  gid = &no_file->gid;
+  pconsts = &no_file->pconsts;
   *gid = 1;
   *pconsts = NULL;
 }
