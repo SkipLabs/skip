@@ -433,6 +433,15 @@ void sk_commit(char* new_root, uint32_t sync) {
 }
 
 /*****************************************************************************/
+/* Disk-persisted state, a.k.a. file mapping. */
+/*****************************************************************************/
+
+typedef struct {
+  int64_t version;
+  void* bottom_addr;
+} file_mapping_header_t;
+
+/*****************************************************************************/
 /* Creates a new file mapping. */
 /*****************************************************************************/
 
@@ -538,25 +547,24 @@ void sk_load_mapping(char* fileName) {
     exit(ERROR_FILE_IO);
   }
 
-  void* addr;
-  int64_t magic;
+  file_mapping_header_t header;
   lseek(fd, 0L, SEEK_SET);
-  int magic_size = read(fd, &magic, sizeof(int64_t));
+  int bytes = read(fd, &header, sizeof(file_mapping_header_t));
 
-  if (magic_size != sizeof(int64_t) || magic != SKIP_get_version()) {
+  if (bytes != sizeof(file_mapping_header_t)) {
+    fprintf(stderr, "Error: could not read header\n");
+    exit(ERROR_MAPPING_MEMORY);
+  }
+
+  if (header.version != SKIP_get_version()) {
     fprintf(stderr, "Error: wrong file format: %s\n", fileName);
     exit(ERROR_MAPPING_VERSION);
   }
 
-  int bytes = read(fd, &addr, sizeof(void*));
-  if (bytes != sizeof(void*)) {
-    fprintf(stderr, "Error: could not read heap address\n");
-    exit(ERROR_MAPPING_MEMORY);
-  }
-
   int prot = PROT_READ | PROT_WRITE;
   size_t fsize = lseek(fd, 0, SEEK_END) - 1;
-  char* begin = mmap(addr, fsize, prot, MAP_SHARED | MAP_FIXED, fd, 0);
+  char* begin =
+      mmap(header.bottom_addr, fsize, prot, MAP_SHARED | MAP_FIXED, fd, 0);
   close(fd);
 
   if (begin == MAP_FAILED) {
