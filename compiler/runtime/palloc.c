@@ -555,8 +555,7 @@ void sk_load_mapping(char* fileName) {
   }
 
   int prot = PROT_READ | PROT_WRITE;
-  lseek(fd, 0L, SEEK_END);
-  size_t fsize = lseek(fd, 0, SEEK_CUR) - 1;
+  size_t fsize = lseek(fd, 0, SEEK_END) - 1;
   char* begin = mmap(addr, fsize, prot, MAP_SHARED | MAP_FIXED, fd, 0);
   close(fd);
 
