@@ -488,6 +488,11 @@ void sk_create_mapping(char* fileName, char* static_limit, size_t icapacity) {
   char* persistent_fileName = head;
   head += fileName_length;
 
+  if (head >= end) {
+    fprintf(stderr, "Could not initialize memory\n");
+    exit(ERROR_MAPPING_MEMORY);
+  }
+
   memcpy(persistent_fileName, fileName, fileName_length);
 
   *ginfo = ginfo_data;
@@ -497,11 +502,6 @@ void sk_create_mapping(char* fileName, char* static_limit, size_t icapacity) {
   int i;
   for (i = 0; i < FTABLE_SIZE; i++) {
     (*ginfo)->ftable[i] = NULL;
-  }
-
-  if (head >= end) {
-    fprintf(stderr, "Could not initialize memory\n");
-    exit(ERROR_MAPPING_MEMORY);
   }
 
   (*ginfo)->break_ptr = static_limit;
