@@ -450,8 +450,8 @@ void sk_create_mapping(char* fileName, char* static_limit, size_t icapacity) {
       mmap(BOTTOM_ADDR, icapacity, prot, MAP_SHARED | MAP_FIXED, fd, 0);
   char* end = begin + icapacity;
 
-  if (begin == (void*)-1) {
-    perror("ERROR (MMAP FAILED)");
+  if (begin == MAP_FAILED) {
+    perror("ERROR (MAP FAILED)");
     exit(ERROR_MAPPING_FAILED);
   }
 
@@ -563,8 +563,8 @@ void sk_load_mapping(char* fileName) {
   char* begin = mmap(addr, fsize, prot, MAP_SHARED | MAP_FIXED, fd, 0);
   close(fd);
 
-  if (begin == (void*)-1) {
-    perror("ERROR (MMAP FAILED)");
+  if (begin == MAP_FAILED) {
+    perror("ERROR (MAP FAILED)");
     exit(ERROR_MAPPING_FAILED);
   }
 
