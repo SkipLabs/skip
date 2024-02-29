@@ -475,7 +475,7 @@ private fun createGCType(
 ): ConstantStruct {
   (
     userByteSize,
-    numMaskWords,
+    hasGCPointers,
     uninternedMetaSize,
     internedMetaSize,
     kind,
@@ -494,19 +494,13 @@ private fun createGCType(
       roundUp(last.bitOffset + last.typ.bitSize, 64) / 8
     };
 
-    // We need this many words for our bit mask.
-    words = if (layout.any(x -> x.typ.isGCPointer())) {
-      (userSize / config.ptrByteSize + (config.ptrBitSize - 1)) /
-        config.ptrBitSize
-    } else {
-      0
-    };
+    hasGCPointers = layout.any(x -> x.typ.isGCPointer());
 
     isAllDeepFrozen = sc.fields.all(x -> x.typ.isDeepFrozen());
 
     (
       userSize, // userByteSize
-      words, // numMaskWords
+      hasGCPointers,
       config.ptrByteSize, // sizeof(RObjMetadata)
       3 * config.ptrByteSize, // sizeof(IObjMetadata)
       0, // kSkipGcKindClass
@@ -521,13 +515,6 @@ private fun createGCType(
 
     userSize = slotInfo.bitSize / 8;
 
-    words = if (!hasGCPointers) {
-      0
-    } else {
-      (userSize / config.ptrByteSize + (config.ptrBitSize - 1)) /
-        config.ptrBitSize
-    };
-
     // Set the GC bits. All pointers are at the beginning of each slot,
     // but we tile it out as many times as will fit in a 64-bit word
     // so the inner loop of the GC can be tighter.
@@ -535,7 +522,7 @@ private fun createGCType(
 
     (
       userSize, // userByteSize
-      words, // numMaskWords
+      hasGCPointers,
       2 * config.ptrByteSize, // uninternedMetaSize
       3 * config.ptrByteSize, // internedMetaSize
       1, // kSkipGcKindArray
@@ -544,6 +531,14 @@ private fun createGCType(
   };
 
   // Create the string declaring a SkipGcType.
+
+  // We need this many words for our bit mask.
+  numMaskWords = if (hasGCPointers) {
+    (userByteSize / config.ptrByteSize + (config.ptrBitSize - 1)) /
+      config.ptrBitSize
+  } else {
+    0
+  };
 
   !numMaskWords =
     numMaskWords * 2 -
