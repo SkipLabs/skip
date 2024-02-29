@@ -510,6 +510,10 @@ class IndexDescr{
   fun compare(y: IndexDescr): Order {
     this.name.compare(y.name)
   }
+
+  fun isSystemIndex(): Bool {
+    this.name.lower.startsWith(systemIndexPrefix.lowercase())
+  }
 }
 
 fun getIndexInputDir(
@@ -747,10 +751,14 @@ fun dumpTables(origContext: readonly SKStore.Context, suffix: ?String): void {
       dirDescr = values.first;
       if (!dirDescr.isInput) return void;
       printDirDescr(dirDescr, suffix);
+      tableName = dirDescr.name.lower;
       for (indexDescr in getIndexByName(context).getArray(
         context,
-        SKStore.SID(dirDescr.dirName.toString()),
+        SKStore.SID(tableName),
       )) {
+        if (indexDescr.isSystemIndex()) {
+          continue;
+        };
         indexDescr.text match {
         | None() -> void
         | Some(text) -> print_string(text + ";")

@@ -25,7 +25,7 @@ extension base class Stmt {
       " ON " +
       on.toString() +
       "(" +
-      columns.map(c -> c.toString()).join(",") +
+      columns.map(c -> c.toString()).join(", ") +
       ")" +
       (if (where is Some _) " WHERE " + where.fromSome().toString() else "")
   | DropTable{name, ifExists} ->
@@ -253,7 +253,10 @@ extension class IndexedColumn {
       } else {
         ""
       }) +
-      this.order.toString()
+      this.order match {
+        | INONE() -> ""
+        | ord @ _ -> " " + ord.toString()
+      }
   }
 }
 
