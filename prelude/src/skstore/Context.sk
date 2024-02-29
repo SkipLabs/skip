@@ -495,41 +495,8 @@ mutable class Context{
     }
   }
 
-  static fun fromSaved(ctx: Context): mutable this {
-    mutable static{
-      toPurge => ctx.toPurge,
-      purgeLimit => ctx.purgeLimit,
-      pwd => ctx.pwd,
-      dirs => ctx.dirs,
-      reads => ctx.reads,
-      time => ctx.time,
-      tick => ctx.tick,
-      lazyCapacity => ctx.lazyCapacity,
-      toUpdate => ctx.toUpdate,
-      deps => ctx.deps,
-      debugMode => ctx.debugMode,
-      failOnExn => ctx.failOnExn,
-      hasPre => ctx.hasPre,
-      newDirs => ctx.newDirs,
-      toReset => ctx.toReset,
-      globals => ctx.globals,
-      dirty => ctx.dirty,
-      dirtyReaders => ctx.dirtyReaders,
-      canReuse => ctx.canReuse,
-      arrowStack => ctx.arrowStack,
-      lazyGets => ctx.lazyGets,
-      lazyGetsQueueIn => ctx.lazyGetsQueueIn,
-      lazyGetsQueueOut => ctx.lazyGetsQueueOut,
-      lazyGetsRefCount => ctx.lazyGetsRefCount,
-      sessions => ctx.sessions,
-      removeSubDirs => ctx.removeSubDirs,
-      postponables => ctx.postponables,
-      dirsWithSharedSubDirs => ctx.dirsWithSharedSubDirs,
-      sharedSubDirsRefCount => ctx.sharedSubDirsRefCount,
-      writeChecker => ctx.writeChecker.map(x -> x.mclone()),
-      purgeFrom => ctx.purgeFrom,
-      sourceOverride => ctx.sourceOverride,
-    }
+  static fun fromSaved(ctx: readonly Context): mutable this {
+    ctx.mclone()
   }
 
   mutable fun replaceFromSaved(ctx: readonly Context): void {
