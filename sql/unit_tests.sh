@@ -61,7 +61,7 @@ else
     fail "JOIN ORDER"
 fi
 
-if cat test/primary_index.sql | $SKDB --show-used-indexes | grep -q 'USING INDEX: t1_id'
+if cat test/primary_index.sql | $SKDB --show-used-indexes | grep -q 'USING INDEX: __skdb__t1_id'
 then
     pass "PRIMARY INDEX"
 else
@@ -274,13 +274,13 @@ else
     fail "LIMIT"
 fi
 
-if cat test/test_index_transaction.sql | $SKDB --show-used-indexes | tr ' ' 'S' | grep -q "USINGSINDEX:ST1_a"; then
+if cat test/test_index_transaction.sql | $SKDB --show-used-indexes | tr ' ' 'S' | grep -q "USINGSINDEX:S__skdb__T1_a"; then
     pass "TRANSACTION INDEX"
 else
     fail "TRANSACTION INDEX"
 fi
 
-if cat test/test_index_transaction2.sql | $SKDB --show-used-indexes | tr ' ' 'S' | grep -q "USINGSINDEX:ST1_a"; then
+if cat test/test_index_transaction2.sql | $SKDB --show-used-indexes | tr ' ' 'S' | grep -q "USINGSINDEX:S__skdb__T1_a"; then
     pass "TRANSACTION INDEX 2"
 else
     fail "TRANSACTION INDEX 2"
