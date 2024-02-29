@@ -579,9 +579,15 @@ class Evaluator{options: Options, user: ?UserFile} {
       context.setGlobal("Stdout", StdoutFile(select.format, stdout));
       None()
 
-    | index @ P.CreateIndex{pos, where} ->
+    | index @ P.CreateIndex{pos, where, name} ->
       if (where is Some _) {
         error(pos, "INDEX ... WHERE not implemented")
+      };
+      if (name.lower.startsWith(systemIndexPrefix.lowercase())) {
+        error(
+          pos,
+          "Indices cannot begin with reserved prefix: " + systemIndexPrefix,
+        );
       };
       Some((context, _, _) ~> {
         this.makeIndex(context, index);
@@ -1469,7 +1475,9 @@ class Evaluator{options: Options, user: ?UserFile} {
           P.CreateIndex{
             pos => pos,
             ifNotExists => false,
-            name => P.Name::create(name.origName + "_" + tyDescr.name.origName),
+            name => P.Name::create(
+              systemIndexPrefix + name.origName + "_" + tyDescr.name.origName,
+            ),
             on => name,
             columns => Array[
               P.IndexedColumn{
