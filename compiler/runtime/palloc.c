@@ -447,14 +447,13 @@ void sk_create_mapping(char* fileName, char* static_limit, size_t icapacity) {
   int prot = PROT_READ | PROT_WRITE;
   char* begin =
       mmap(BOTTOM_ADDR, icapacity, prot, MAP_SHARED | MAP_FIXED, fd, 0);
+  close(fd);
   char* end = begin + icapacity;
 
   if (begin == MAP_FAILED) {
     perror("ERROR (MAP FAILED)");
     exit(ERROR_MAPPING_FAILED);
   }
-
-  close(fd);
 
   char* head = begin;
 
