@@ -515,21 +515,13 @@ private fun createGCType(
   | Some(slotInfo) ->
     // This is a Vector type.
 
-    // Count how many pointers are in each array slot.
+    // Check whether there are pointers in array slots.
     // They go at the beginning of each slot (in the case of a tuple etc.)
-    numPointers = slotInfo.types.foldl(
-      (acc, t) ->
-        if (t.getScalarType(env).isGCPointer()) {
-          acc + 1
-        } else {
-          acc
-        },
-      0,
-    );
+    hasGCPointers = slotInfo.types.any(t -> t.getScalarType(env).isGCPointer());
 
     userSize = slotInfo.bitSize / 8;
 
-    words = if (numPointers == 0) {
+    words = if (!hasGCPointers) {
       0
     } else {
       (userSize / config.ptrByteSize + (config.ptrBitSize - 1)) /
