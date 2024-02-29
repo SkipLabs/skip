@@ -623,7 +623,7 @@ void* sk_get_ftable(size_t size) {
   if (ptr == NULL) {
     return ptr;
   }
-  (*ginfo)->ftable[slot] = *(void**)(*ginfo)->ftable[slot];
+  (*ginfo)->ftable[slot] = *ptr;
   return ptr;
 }
 
