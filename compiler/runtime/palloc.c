@@ -448,7 +448,6 @@ void sk_create_mapping(char* fileName, char* static_limit, size_t icapacity) {
   char* begin =
       mmap(BOTTOM_ADDR, icapacity, prot, MAP_SHARED | MAP_FIXED, fd, 0);
   close(fd);
-  char* end = begin + icapacity;
 
   if (begin == MAP_FAILED) {
     perror("ERROR (MAP FAILED)");
@@ -487,6 +486,8 @@ void sk_create_mapping(char* fileName, char* static_limit, size_t icapacity) {
   size_t fileName_length = strlen(fileName) + 1;
   char* persistent_fileName = head;
   head += fileName_length;
+
+  char* end = begin + icapacity;
 
   if (head >= end) {
     fprintf(stderr, "Could not initialize memory\n");
