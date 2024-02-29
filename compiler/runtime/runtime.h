@@ -161,6 +161,7 @@ typedef struct {
 #endif
   void* unused;
   size_t m_refMask[0];
+  // a 0-terminated name follows if m_hasName is true
 } SKIP_gc_type_t;
 
 SKIP_gc_type_t* get_gc_type(char* skip_object);
