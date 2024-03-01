@@ -101,7 +101,7 @@ const uint64_t crc64table[256] = {
 
 static uint64_t sk_crc64(uint64_t crc, const void* p, size_t len) {
   const unsigned char* _p = p;
-  const unsigned char* end = p + len;
+  const unsigned char* end = _p + len;
 
   while (_p < end) {
     unsigned int t = ((unsigned int)(crc >> 56) ^ (*_p++)) & 0xFF;

@@ -42,47 +42,48 @@ uint32_t SKIP_wait_for_proc(FILE* f) {
 
 #ifdef SKIP32
 
-void* memset(void* ptr, int value, size_t size) {
-  void* result = ptr;
+void* memset(void* orig_ptr, int value, size_t size) {
+  char* ptr = (char*)orig_ptr;
 
   if (value != 0) {
     // memset only implemented for zero
     SKIP_throw_cruntime(ERROR_NOT_IMPLEMENTED);
   }
 
-  const char* end = (char*)ptr + size;
-  const char* lend = (char*)ptr + (size / sizeof(long) * sizeof(long));
+  const char* end = ptr + size;
+  const char* lend = ptr + (size / sizeof(long) * sizeof(long));
 
-  while (ptr < (void*)lend) {
+  while (ptr < lend) {
     *(long*)ptr = 0;
     ptr += sizeof(long);
   }
 
-  while (ptr < (void*)end) {
-    *(char*)ptr = 0;
+  while (ptr < end) {
+    *ptr = 0;
     ptr++;
   }
 
-  return result;
+  return orig_ptr;
 }
 
-void* memcpy(void* dest, const void* src, size_t size) {
-  void* result = dest;
-  const char* end = (char*)src + size;
-  const char* lend = (char*)src + (size / sizeof(long) * sizeof(long));
+void* memcpy(void* orig_dest, const void* orig_src, size_t size) {
+  char* dest = (char*)orig_dest;
+  const char* src = (const char*)orig_src;
+  const char* end = src + size;
+  const char* lend = src + (size / sizeof(long) * sizeof(long));
 
-  while (src < (void*)lend) {
+  while (src < lend) {
     *(long*)dest = *(long*)src;
     dest += sizeof(long);
     src += sizeof(long);
   }
 
-  while (src < (void*)end) {
-    *(char*)dest = *(char*)src;
+  while (src < end) {
+    *dest = *src;
     dest++;
     src++;
   }
-  return result;
+  return orig_dest;
 }
 
 #endif
