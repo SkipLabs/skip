@@ -36,7 +36,7 @@ void sk_free_class(sk_stack_t* st, char* obj) {
   SKIP_gc_type_t* ty = get_gc_type(obj);
 
   size_t memsize = ty->m_userByteSize;
-  size_t leftsize = ty->m_uninternedMetadataByteSize;
+  size_t leftsize = uninterned_metadata_byte_size(ty);
 
   if (ty == epointer_ty) {
 #ifdef SKIP64
@@ -86,7 +86,7 @@ void sk_free_array(sk_stack_t* st, char* obj) {
 
   size_t len = *(uint32_t*)(obj - sizeof(char*) - sizeof(uint32_t));
   size_t memsize = ty->m_userByteSize * len;
-  size_t leftsize = ty->m_uninternedMetadataByteSize;
+  size_t leftsize = uninterned_metadata_byte_size(ty);
   size_t bitsize = sizeof(void*) * 8;
 
   if ((ty->m_refsHintMask & 1) != 0) {
