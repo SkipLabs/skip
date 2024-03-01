@@ -473,13 +473,7 @@ private fun createGCType(
   env: GlobalEnv,
   config: Config.Config,
 ): ConstantStruct {
-  (
-    userByteSize,
-    hasGCPointers,
-    uninternedMetaSize,
-    kind,
-    isAllDeepFrozen,
-  ) = sc.arraySlot match {
+  (userByteSize, hasGCPointers, uninternedMetaSize, kind) = sc.arraySlot match {
   | None() ->
     // This is a non-Vector type.
 
@@ -495,14 +489,11 @@ private fun createGCType(
 
     hasGCPointers = layout.any(x -> x.typ.isGCPointer());
 
-    isAllDeepFrozen = sc.fields.all(x -> x.typ.isDeepFrozen());
-
     (
       userSize, // userByteSize
       hasGCPointers,
       config.ptrByteSize, // sizeof(RObjMetadata)
       0, // kSkipGcKindClass
-      isAllDeepFrozen, // kSkipGcRefsHintFrozenRefs
     )
   | Some(slotInfo) ->
     // This is a Vector type.
@@ -513,17 +504,11 @@ private fun createGCType(
 
     userSize = slotInfo.bitSize / 8;
 
-    // Set the GC bits. All pointers are at the beginning of each slot,
-    // but we tile it out as many times as will fit in a 64-bit word
-    // so the inner loop of the GC can be tighter.
-    isAllDeepFrozen = slotInfo.types.all(x -> x.isDeepFrozen());
-
     (
       userSize, // userByteSize
       hasGCPointers,
       2 * config.ptrByteSize, // uninternedMetaSize
       1, // kSkipGcKindArray
-      isAllDeepFrozen,
     ) // kSkipGcRefsHintFrozenRefs
   };
 
@@ -536,10 +521,6 @@ private fun createGCType(
   } else {
     0
   };
-
-  !numMaskWords =
-    numMaskWords * 2 -
-    (if (isAllDeepFrozen && (numMaskWords > 0)) 1 else 0);
 
   refsHint = 0;
   if (numMaskWords != 0) {
@@ -601,14 +582,11 @@ private fun createGCType(
     // Create a memory image of the flag words array.
     flags = Array::mfill(numMaskWords, 0);
 
-    setBit = (bitOffset, isMutable) -> {
+    setBit = (bitOffset) -> {
       bitIndex = bitOffset / config.ptrBitSize;
-      wordIndex = 2 * (bitIndex / 64);
+      wordIndex = bitIndex / 64;
       bit = 1.shl(bitIndex % 64);
       flags.set(wordIndex, flags[wordIndex].or(bit));
-      if (isMutable) {
-        flags.set(wordIndex + 1, flags[wordIndex + 1].or(bit));
-      };
     };
 
     sc.arraySlot match {
@@ -616,7 +594,7 @@ private fun createGCType(
       for (x in sc.fields) {
         if (x.typ.getScalarType(env).isGCPointer()) {
           bitOffset = sc.getLayoutSlot(x.name, sc.pos).bitOffset;
-          setBit(bitOffset, !isAllDeepFrozen && !x.typ.isDeepFrozen())
+          setBit(bitOffset)
         }
       }
     | Some(slotInfo) ->
@@ -625,7 +603,7 @@ private fun createGCType(
         scalarType = x.getScalarType(env);
         if (scalarType.isGCPointer()) {
           bitOffset = slotInfo.bitOffsets[idx];
-          setBit(bitOffset, !isAllDeepFrozen && !x.isDeepFrozen())
+          setBit(bitOffset)
         }
       })
     };
