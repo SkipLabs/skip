@@ -32,7 +32,7 @@ static char* SKIP_copy_class(sk_stack_t* st, char* obj, char* large_page) {
     size_t size = ty->m_userByteSize / sizeof(void*);
     size_t bitsize = sizeof(void*) * 8;
     size_t mask_slot = 0;
-    int i;
+    unsigned int i;
     while (size > 0) {
       for (i = 0; i < bitsize && i < size; i++) {
         if (ty->m_refMask[mask_slot] & (1 << i)) {
@@ -72,7 +72,7 @@ static char* SKIP_copy_array(sk_stack_t* st, char* obj, char* large_page) {
       size_t size = ty->m_userByteSize;
       size_t mask_slot = 0;
       while (size > 0) {
-        int i;
+        unsigned int i;
         for (i = 0; i < bitsize && size > 0; i++) {
           if (ty->m_refMask[mask_slot] & (1 << i)) {
             void** ptr = (void**)ohead;
@@ -139,7 +139,7 @@ void* SKIP_copy_with_pages(void* obj, size_t nbr_pages, sk_cell_t* pages) {
     sk_value_t delayed = sk_stack_pop(st);
     void* toCopy = *delayed.value;
 
-    int obstack_idx = sk_get_obstack_idx(toCopy, pages, nbr_pages);
+    size_t obstack_idx = sk_get_obstack_idx(toCopy, pages, nbr_pages);
 
     if (obstack_idx >= nbr_pages) {
       continue;
@@ -156,7 +156,7 @@ void* SKIP_copy_with_pages(void* obj, size_t nbr_pages, sk_cell_t* pages) {
 
     if (SKIP_is_string(toCopy)) {
       sk_string_t* str = (sk_string_t*)((char*)toCopy - sizeof(uint32_t) * 2);
-      if (str->size != -1 && str->size < sizeof(void*)) {
+      if (str->size != (uint32_t)-1 && str->size < sizeof(void*)) {
         void* copied_ptr = SKIP_copy_string(toCopy, large_page);
         *delayed.slot = copied_ptr;
         continue;

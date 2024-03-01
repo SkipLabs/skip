@@ -43,7 +43,7 @@ SkipInt SKIP_native_eq_class(sk_stack_t* st, char* obj1, char* obj2) {
   size_t size = ty1->m_userByteSize / sizeof(void*);
   size_t bitsize = sizeof(void*) * 8;
   size_t mask_slot = 0;
-  int i;
+  unsigned int i;
   while (size > 0) {
     for (i = 0; i < bitsize && i < size; i++) {
       void* ptr1 = *(((void**)obj1) + (mask_slot * bitsize) + i);
@@ -98,7 +98,7 @@ SkipInt SKIP_native_eq_array(sk_stack_t* st, char* obj1, char* obj2) {
     size_t size = ty1->m_userByteSize;
     size_t mask_slot = 0;
     while (size > 0) {
-      int i;
+      unsigned int i;
       for (i = 0; i < bitsize && size > 0; i++) {
         void* ptr1 = *((void**)ohead1);
         void* ptr2 = *((void**)ohead2);

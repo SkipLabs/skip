@@ -127,7 +127,7 @@ char* SKIP_read_line() {
     return NULL;
   }
 
-  uint32_t i;
+  int32_t i;
   char* result = SKIP_Obstack_alloc(size);
 
   for (i = 0; i < size; i++) {
@@ -141,7 +141,7 @@ char* SKIP_read_line() {
 char* SKIP_read_to_end() {
   int32_t size = SKIP_read_to_end_fill();
 
-  uint32_t i;
+  int32_t i;
   char* result = SKIP_Obstack_alloc(size);
 
   for (i = 0; i < size; i++) {
