@@ -82,13 +82,14 @@ void sk_incr_ref_count(void* obj) {
     SKIP_gc_type_t* ty = get_gc_type(obj);
 
     switch (ty->m_kind) {
-      case 0:
+      case kSkipGcKindClass:
         count -= 2;
         break;
-      case 1:
+      case kSkipGcKindArray:
         count -= 3;
         break;
       default:
+        // IMPOSSIBLE
         SKIP_exit((SkipInt)-1);
     }
   }
@@ -108,13 +109,14 @@ static uintptr_t* sk_get_ref_count_addr(void* obj) {
     SKIP_gc_type_t* ty = get_gc_type(obj);
 
     switch (ty->m_kind) {
-      case 0:
+      case kSkipGcKindClass:
         count -= 2;
         break;
-      case 1:
+      case kSkipGcKindArray:
         count -= 3;
         break;
       default:
+        // IMPOSSIBLE
         SKIP_exit((SkipInt)-1);
     }
   }
@@ -224,14 +226,14 @@ static char* SKIP_intern_obj(sk_stack_t* st, char* obj) {
   SKIP_gc_type_t* ty = get_gc_type(obj);
 
   switch (ty->m_kind) {
-    case 0:
+    case kSkipGcKindClass:
       result = SKIP_intern_class(st, obj);
       break;
-    case 1:
+    case kSkipGcKindArray:
       result = SKIP_intern_array(st, obj);
       break;
     default:
-      // NOT SUPPORTED
+      // IMPOSSIBLE
       SKIP_exit((SkipInt)-1);
   }
 

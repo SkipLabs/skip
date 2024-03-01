@@ -108,14 +108,14 @@ static char* SKIP_copy_obj(sk_stack_t* st, char* obj,
   SKIP_gc_type_t* ty = get_gc_type(obj);
 
   switch (ty->m_kind) {
-    case 0:
+    case kSkipGcKindClass:
       result = SKIP_copy_class(st, obj, large_page);
       break;
-    case 1:
+    case kSkipGcKindArray:
       result = SKIP_copy_array(st, obj, large_page);
       break;
     default:
-      // NOT SUPPORTED
+      // IMPOSSIBLE
       SKIP_exit((SkipInt)-1);
   }
 

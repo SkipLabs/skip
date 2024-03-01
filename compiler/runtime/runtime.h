@@ -146,10 +146,13 @@ sk_value3_t sk_stack3_pop(sk_stack3_t* st);
 /* The type information exposed by the Skip compiler for each object. */
 /*****************************************************************************/
 
+#define kSkipGcKindClass 0
+#define kSkipGcKindArray 1
+
 // vtable entries created by createGCType in vtable.sk
 typedef struct {
   uint8_t m_refsHintMask;
-  uint8_t m_kind;
+  uint8_t m_kind;  // either kSkipGcKindClass or kSkipGcKindArray
   uint8_t m_unused_tilesPerMask;
   uint8_t m_hasName;
   uint16_t m_uninternedMetadataByteSize;
