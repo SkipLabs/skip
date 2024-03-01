@@ -222,7 +222,7 @@ char* SKIP_resolve_context(uint64_t, char* context, char* obj,
 void SKIP_call_after_unlock(char*, char*);
 
 void SKIP_throw(void*);
-void SKIP_throw_cruntime(int32_t);
+__attribute__((noreturn)) void SKIP_throw_cruntime(int32_t);
 
 void sk_add_ftable(void* ptr, size_t size);
 void sk_commit(char*, uint32_t);

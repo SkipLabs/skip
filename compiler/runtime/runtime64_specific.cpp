@@ -591,7 +591,7 @@ char* SKIP_realpath(char* path_obj) {
   return sk_string_create(res, strlen(res));
 }
 
-void SKIP_exit(uint64_t code) {
+__attribute__((noreturn)) void SKIP_exit(uint64_t code) {
   exit(code);
 }
 
