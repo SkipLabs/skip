@@ -340,10 +340,10 @@ size_t sk_get_nbr_pages(void* saved_page) {
 sk_cell_t* sk_get_pages(size_t size) {
   sk_cell_t* result = (sk_cell_t*)sk_malloc(sizeof(sk_cell_t) * size);
   int i = 0;
-  void* cursor = page;
+  char* cursor = page;
   for (i = 0; i < size; i++) {
     result[i].key = cursor;
-    result[i].value = (uint64_t)(cursor + *(size_t*)(cursor + sizeof(char*)));
+    result[i].value = (uint64_t)cursor + *(size_t*)(cursor + sizeof(char*));
     cursor = *(char**)cursor;
   }
   sk_heap_sort(result, size);
