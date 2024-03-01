@@ -147,7 +147,7 @@ static char* SKIP_intern_class(sk_stack_t* st, char* obj) {
     size_t size = ty->m_userByteSize / sizeof(void*);
     size_t bitsize = sizeof(void*) * 8;
     size_t mask_slot = 0;
-    int i;
+    unsigned int i;
     while (size > 0) {
       for (i = 0; i < bitsize && i < size; i++) {
         if (ty->m_refMask[mask_slot] & (1 << i)) {
@@ -187,7 +187,7 @@ static char* SKIP_intern_array(sk_stack_t* st, char* obj) {
       size_t size = ty->m_userByteSize;
       size_t mask_slot = 0;
       while (size > 0) {
-        int i;
+        unsigned int i;
         for (i = 0; i < bitsize && size > 0; i++) {
           if (ty->m_refMask[mask_slot] & (1 << i)) {
             void** ptr = (void**)ohead;
@@ -252,7 +252,7 @@ void* SKIP_intern_shared(void* obj) {
   int* large_pages = sk_malloc(sizeof(int) * nbr_pages);
 
   {
-    int i;
+    unsigned int i;
     for (i = 0; i < nbr_pages; i++) {
       large_pages[i] = 0;
     }
@@ -285,7 +285,7 @@ void* SKIP_intern_shared(void* obj) {
 
     if (SKIP_is_string(toCopy)) {
       sk_string_t* str = (sk_string_t*)((char*)toCopy - sizeof(uint32_t) * 2);
-      if (str->size != -1 && str->size < sizeof(void*)) {
+      if (str->size != (uint32_t)-1 && str->size < sizeof(void*)) {
         void* interned_ptr = SKIP_intern_string(toCopy);
         *delayed.slot = interned_ptr;
         continue;
@@ -330,7 +330,7 @@ void* SKIP_intern_shared(void* obj) {
   }
 
   {
-    int i;
+    unsigned int i;
     for (i = 0; i < nbr_pages; i++) {
       if (large_pages[i]) {
         pages[i].value = (uint64_t)pages[i].key;

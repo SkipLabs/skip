@@ -1,6 +1,6 @@
 MEMSIZE32=1073741824
 
-COMMONFLAGS=-Wall -Wno-sometimes-uninitialized -Wunused-parameter -Wno-c2x-extensions
+COMMONFLAGS=-Wall -Wno-sometimes-uninitialized -Wunused-parameter -Wno-c2x-extensions -Wsign-compare
 OLEVEL=-O2
 CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm -nostdlibinc $(COMMONFLAGS)
 CC64FLAGS=$(OLEVEL) -DSKIP64 $(COMMONFLAGS)
