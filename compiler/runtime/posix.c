@@ -79,7 +79,7 @@ char *SKIP_posix_read(int64_t fd, int64_t len) {
     perror("malloc");
     exit(EXIT_FAILURE);
   }
-  int rv = read((int)fd, buf, len);
+  ssize_t rv = read((int)fd, buf, len);
   if (rv == -1) {
     perror("read");
     exit(EXIT_FAILURE);
@@ -178,7 +178,8 @@ int64_t SKIP_posix_wstopsig(int64_t stat_loc) {
 }
 
 int64_t SKIP_posix_poll(char *pollfds) {
-  int nfds = *(uint32_t *)(pollfds - sizeof(char *) - sizeof(uint32_t));
+  unsigned int nfds =
+      *(uint32_t *)(pollfds - sizeof(char *) - sizeof(uint32_t));
 
   for (;;) {
     int rv = poll((struct pollfd *)pollfds, nfds, -1);
