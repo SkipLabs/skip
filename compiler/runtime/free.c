@@ -132,14 +132,14 @@ void sk_free_obj(sk_stack_t* st, char* obj) {
   SKIP_gc_type_t* ty = get_gc_type(obj);
 
   switch (ty->m_kind) {
-    case 0:
+    case kSkipGcKindClass:
       sk_free_class(st, obj);
       break;
-    case 1:
+    case kSkipGcKindArray:
       sk_free_array(st, obj);
       break;
     default:
-      // NOT SUPPORTED
+      // IMPOSSIBLE
       SKIP_exit((SkipInt)-1);
   }
 

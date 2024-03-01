@@ -228,14 +228,14 @@ static uint64_t sk_hash_obj(sk_stack_t* st, char* obj) {
   uint64_t crc;
 
   switch (ty->m_kind) {
-    case 0:
+    case kSkipGcKindClass:
       crc = sk_hash_class(st, obj);
       break;
-    case 1:
+    case kSkipGcKindArray:
       crc = sk_hash_array(st, obj);
       break;
     default:
-      // NOT SUPPORTED
+      // IMPOSSIBLE
       SKIP_exit((SkipInt)-1);
   }
 

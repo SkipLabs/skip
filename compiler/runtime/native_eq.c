@@ -150,14 +150,14 @@ SkipInt SKIP_native_eq_helper(sk_stack_t* st, char* obj1, char* obj2) {
   }
 
   switch (ty1->m_kind) {
-    case 0:
+    case kSkipGcKindClass:
       return SKIP_native_eq_class(st, obj1, obj2);
       break;
-    case 1:
+    case kSkipGcKindArray:
       return SKIP_native_eq_array(st, obj1, obj2);
       break;
     default:
-      // NOT SUPPORTED
+      // IMPOSSIBLE
       SKIP_exit((SkipInt)-1);
   }
 
