@@ -60,7 +60,7 @@ void sk_free_class(sk_stack_t* st, char* obj) {
     size_t size = ty->m_userByteSize / sizeof(void*);
     size_t bitsize = sizeof(void*) * 8;
     size_t mask_slot = 0;
-    int i;
+    unsigned int i;
     while (size > 0) {
       for (i = 0; i < bitsize && i < size; i++) {
         if (ty->m_refMask[mask_slot] & (1 << i)) {
@@ -97,7 +97,7 @@ void sk_free_array(sk_stack_t* st, char* obj) {
       size_t size = ty->m_userByteSize;
       size_t mask_slot = 0;
       while (size > 0) {
-        int i;
+        unsigned int i;
         for (i = 0; i < bitsize && size > 0; i++) {
           if (ty->m_refMask[mask_slot] & (1 << i)) {
             void* ptr = *((void**)ohead);

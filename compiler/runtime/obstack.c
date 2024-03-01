@@ -236,7 +236,7 @@ void* SKIP_destroy_Obstack_with_value(sk_saved_obstack_t* saved, void* toCopy) {
 
   void* result = SKIP_copy_with_pages(toCopy, nbr_pages, pages);
 
-  int i;
+  unsigned int i;
   for (i = 0; i < nbr_pages; i++) {
     if ((uint64_t)pages[i].key != pages[i].value) {
       char* fpage = (char*)(pages[i].key);
@@ -338,7 +338,7 @@ size_t sk_get_nbr_pages(void* saved_page) {
 
 sk_cell_t* sk_get_pages(size_t size) {
   sk_cell_t* result = (sk_cell_t*)sk_malloc(sizeof(sk_cell_t) * size);
-  int i = 0;
+  unsigned int i = 0;
   char* cursor = page;
   for (i = 0; i < size; i++) {
     result[i].key = cursor;

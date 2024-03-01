@@ -146,7 +146,7 @@ char* SKIP_String_concat2(char* str1, char* str2) {
 char* SKIP_String_concatN(char** arr) {
   uint32_t arr_size = SKIP_getArraySize((char*)arr);
   SkipInt byte_size = 0;
-  int i;
+  unsigned int i;
 
   for (i = 0; i < arr_size; i++) {
     byte_size += SKIP_String_byteSize(arr[i]);
@@ -359,7 +359,7 @@ static unsigned char
     string_utf8_buffer[sizeof(test_utf8_data) / sizeof(int) + 1];
 
 char* SKIP_utf8_test_string() {
-  int i;
+  unsigned int i;
   for (i = 0; i < sizeof(string_utf8_buffer); i++) {
     string_utf8_buffer[i] = (unsigned char)test_utf8_data[i];
   }

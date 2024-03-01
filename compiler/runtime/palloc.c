@@ -540,11 +540,11 @@ void sk_load_mapping(char* fileName) {
   }
 
   void* addr;
-  uint64_t magic;
+  int64_t magic;
   lseek(fd, 0L, SEEK_SET);
-  int magic_size = read(fd, &magic, sizeof(uint64_t));
+  int magic_size = read(fd, &magic, sizeof(int64_t));
 
-  if (magic_size != sizeof(uint64_t) || magic != SKIP_get_version()) {
+  if (magic_size != sizeof(int64_t) || magic != SKIP_get_version()) {
     fprintf(stderr, "Error: wrong file format: %s\n", fileName);
     exit(ERROR_MAPPING_VERSION);
   }
