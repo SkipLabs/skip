@@ -55,11 +55,11 @@ int sk_is_static(void* ptr) {
 
 void sk_staging() {}
 
-void sk_commit(char* new_root, uint32_t sync) {
+void sk_commit(char* new_root, uint32_t /* sync */) {
   sk_context_set_unsafe(new_root);
 }
 
-char* SKIP_read_file(char* filename_obj) {
+char* SKIP_read_file(char* /* filename_obj */) {
   SKIP_throw_cruntime(ERROR_NOT_IMPLEMENTED);
   return (void*)0;
 }
@@ -93,7 +93,7 @@ void sk_context_set_unsafe(char* obj) {
   context = obj;
 }
 
-SkipInt SKIP_genSym(SkipInt n) {
+SkipInt SKIP_genSym(SkipInt /* n */) {
   static SkipInt x = 1;
   x++;
   return x;
@@ -105,20 +105,20 @@ char* sk_new_const(char* cst) {
 
 void SKIP_throw_EndOfFile();
 
-int64_t SKIP_posix_isatty(int64_t fd) {
+int64_t SKIP_posix_isatty(int64_t /* fd */) {
   return 0;
 }
 
-void* SKIP_exec(char* cmd) {
+void* SKIP_exec(char* /* cmd */) {
   // Not implemented
   return NULL;
 }
 
-void SKIP_write_to_proc(void* proc, char* str) {
+void SKIP_write_to_proc(void* /* proc */, char* /* str */) {
   // Not implemented.
 }
 
-void SKIP_wait_for_proc(void* proc) {
+void SKIP_wait_for_proc(void* /* proc */) {
   // Not implemented
 }
 
@@ -151,7 +151,7 @@ void SKIP_flush_stdout() {
   // Not implemented
 }
 
-uint64_t SKIP_notify(char* filename_obj, uint64_t tick) {
+uint64_t SKIP_notify(char* /* filename_obj */, uint64_t /* tick */) {
   // Not implemented
   return 0;
 }
@@ -189,19 +189,19 @@ void* SKIP_unfreeze_cond(void* x) {
   return x;
 }
 
-void SKIP_mutex_init(void* lock) {}
+void SKIP_mutex_init(void* /* lock */) {}
 
-void SKIP_mutex_lock(void* lock) {}
+void SKIP_mutex_lock(void* /* lock */) {}
 
-void SKIP_mutex_unlock(void* lock) {}
+void SKIP_mutex_unlock(void* /* lock */) {}
 
-void SKIP_cond_init(void* cond) {}
+void SKIP_cond_init(void* /* cond */) {}
 
-void SKIP_cond_wait(void* x, void* y) {}
+void SKIP_cond_wait(void* /* x */, void* /* y */) {}
 
-void SKIP_cond_timedwait(void* x, void* y, uint32_t secs) {}
+void SKIP_cond_timedwait(void* /* x */, void* /* y */, uint32_t /* secs */) {}
 
-void SKIP_cond_broadcast(void* c) {}
+void SKIP_cond_broadcast(void* /* c */) {}
 
 int SKIP_stdin_has_data() {
   return 1;

@@ -147,7 +147,7 @@ void* SKIP_Obstack_calloc(size_t size) {
   return result;
 }
 
-char* SKIP_Obstack_shallowClone(size_t _size, char* obj) {
+char* SKIP_Obstack_shallowClone(size_t /* size */, char* obj) {
   SKIP_gc_type_t* ty = get_gc_type(obj);
 
   size_t memsize = ty->m_userByteSize;
@@ -280,7 +280,7 @@ uint32_t SKIP_should_GC(sk_saved_obstack_t* saved) {
 
 void SKIP_Obstack_auto_collect() {}
 
-void* SKIP_Obstack_collect1(void* note, void* obj) {
+void* SKIP_Obstack_collect1(void* /* note */, void* obj) {
   return obj;
 }
 
