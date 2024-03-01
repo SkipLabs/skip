@@ -115,23 +115,23 @@ static char* SKIP_intern_class(sk_stack_t* st, char* obj) {
   if (epointer_ty != NULL && ty != epointer_ty &&
       (ty->m_refsHintMask & 1) != 0) {
     size_t size = ty->m_userByteSize / sizeof(void*);
-    size_t bitsize = sizeof(void*) * 8;
+    const size_t refMaskWordBitSize = sizeof(ty->m_refMask[0]) * 8;
     size_t mask_slot = 0;
     unsigned int i;
     while (size > 0) {
-      for (i = 0; i < bitsize && i < size; i++) {
+      for (i = 0; i < refMaskWordBitSize && i < size; i++) {
         if (ty->m_refMask[mask_slot] & (1 << i)) {
-          void** ptr = ((void**)obj) + (mask_slot * bitsize) + i;
-          void** slot = result + (mask_slot * bitsize) + i;
+          void** ptr = ((void**)obj) + (mask_slot * refMaskWordBitSize) + i;
+          void** slot = result + (mask_slot * refMaskWordBitSize) + i;
           if (*ptr != NULL) {
             sk_stack_push(st, ptr, slot);
           }
         }
       }
-      if (size < bitsize) {
+      if (size < refMaskWordBitSize) {
         break;
       }
-      size -= bitsize;
+      size -= refMaskWordBitSize;
       mask_slot++;
     }
   }
@@ -146,9 +146,9 @@ static char* SKIP_intern_array(sk_stack_t* st, char* obj) {
   size_t memsize = ty->m_userByteSize * len;
   size_t leftsize = uninterned_metadata_byte_size(ty);
   void** result = (void**)shallow_intern(obj, memsize, leftsize);
-  size_t bitsize = sizeof(void*) * 8;
 
   if ((ty->m_refsHintMask & 1) != 0) {
+    const size_t refMaskWordBitSize = sizeof(ty->m_refMask[0]) * 8;
     char* rhead = (char*)result;
     char* ohead = obj;
     char* end = obj + memsize;
@@ -158,7 +158,7 @@ static char* SKIP_intern_array(sk_stack_t* st, char* obj) {
       size_t mask_slot = 0;
       while (size > 0) {
         unsigned int i;
-        for (i = 0; i < bitsize && size > 0; i++) {
+        for (i = 0; i < refMaskWordBitSize && size > 0; i++) {
           if (ty->m_refMask[mask_slot] & (1 << i)) {
             void** ptr = (void**)ohead;
             void** slot = (void**)rhead;

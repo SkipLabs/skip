@@ -143,13 +143,13 @@ static uint64_t sk_hash_class(sk_stack_t* st, char* obj) {
   uint64_t crc = CRC_INIT;
 
   size_t size = ty->m_userByteSize / sizeof(void*);
-  size_t bitsize = sizeof(void*) * 8;
+  const size_t refMaskWordBitSize = sizeof(ty->m_refMask[0]) * 8;
   size_t mask_slot = 0;
   unsigned int i;
 
   while (size > 0) {
-    for (i = 0; i < bitsize && i < size; i++) {
-      void** ptr = ((void**)obj) + (mask_slot * bitsize) + i;
+    for (i = 0; i < refMaskWordBitSize && i < size; i++) {
+      void** ptr = ((void**)obj) + (mask_slot * refMaskWordBitSize) + i;
       if (((ty->m_refsHintMask & 1) != 0) &&
           ty->m_refMask[mask_slot] & (1 << i)) {
         if (*ptr != NULL) {
@@ -159,10 +159,10 @@ static uint64_t sk_hash_class(sk_stack_t* st, char* obj) {
         crc = sk_crc64_combine(crc, *ptr);
       }
     }
-    if (size < bitsize) {
+    if (size < refMaskWordBitSize) {
       break;
     }
-    size -= bitsize;
+    size -= refMaskWordBitSize;
     mask_slot++;
   }
 
@@ -175,11 +175,11 @@ static uint64_t sk_hash_array(sk_stack_t* st, char* obj) {
 
   size_t len = *(uint32_t*)(obj - sizeof(char*) - sizeof(uint32_t));
   size_t memsize = ty->m_userByteSize * len;
-  size_t bitsize = sizeof(void*) * 8;
 
   if ((ty->m_refsHintMask & 1) == 0) {
     crc = sk_crc64(crc, obj, len * ty->m_userByteSize);
   } else {
+    const size_t refMaskWordBitSize = sizeof(ty->m_refMask[0]) * 8;
     char* ohead = obj;
     char* end = obj + memsize;
 
@@ -188,7 +188,7 @@ static uint64_t sk_hash_array(sk_stack_t* st, char* obj) {
       size_t mask_slot = 0;
       while (size > 0) {
         unsigned int i;
-        for (i = 0; i < bitsize && size > 0; i++) {
+        for (i = 0; i < refMaskWordBitSize && size > 0; i++) {
           if (ty->m_refMask[mask_slot] & (1 << i)) {
             void** ptr = (void**)ohead;
             if (*ptr != NULL) {

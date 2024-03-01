@@ -159,7 +159,7 @@ typedef struct {
   uint16_t m_unused_internedMetadataByteSize;
   SkipInt m_userByteSize;
   SkipInt m_unused_padding;
-  size_t m_refMask[0];
+  SkipInt m_refMask[0];
   // a 0-terminated name follows if m_hasName is true
 } SKIP_gc_type_t;
 

@@ -514,10 +514,9 @@ private fun createGCType(
 
   // Create the string declaring a SkipGcType.
 
-  // We need this many words for our bit mask.
+  // We need this many tInt words for our bit mask.
   numMaskWords = if (hasGCPointers) {
-    (userByteSize / config.ptrByteSize + (config.ptrBitSize - 1)) /
-      config.ptrBitSize
+    (userByteSize / config.ptrByteSize + 63) / 64
   } else {
     0
   };
