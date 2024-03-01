@@ -1,8 +1,9 @@
 MEMSIZE32=1073741824
 
+COMMONFLAGS=-Wpointer-arith
 OLEVEL=-O2
-CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm -nostdlibinc
-CC64FLAGS=$(OLEVEL) -DSKIP64
+CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm -nostdlibinc $(COMMONFLAGS)
+CC64FLAGS=$(OLEVEL) -DSKIP64 $(COMMONFLAGS)
 
 # NB: this MUST be kept in sync with CRELFILES in prelude/build.mk
 # and CRELFILES in prelude/build_wasm32.mk
