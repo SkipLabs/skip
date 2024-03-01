@@ -150,7 +150,7 @@ sk_value3_t sk_stack3_pop(sk_stack3_t* st);
 typedef struct {
   uint8_t m_refsHintMask;
   uint8_t m_kind;
-  uint8_t m_tilesPerMask;
+  uint8_t m_unused_tilesPerMask;
   uint8_t m_hasName;
   uint16_t m_uninternedMetadataByteSize;
   uint16_t m_internedMetadataByteSize;
