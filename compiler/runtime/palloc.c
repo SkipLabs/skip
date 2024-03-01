@@ -334,7 +334,6 @@ char* SKIP_context_get() {
 }
 
 void sk_context_set_unsafe(char* obj) {
-  void* vobj = (void*)obj;
   (*ginfo)->context = obj;
 #ifdef CTX_TABLE
   sk_add_ctx(obj);
@@ -386,7 +385,6 @@ static char* parse_args(int argc, char** argv, int* is_init) {
 
 size_t parse_capacity(int argc, char** argv) {
   int i;
-  int idx = -1;
 
   for (i = 1; i < argc; i++) {
     if (strcmp(argv[i], "--capacity") == 0) {

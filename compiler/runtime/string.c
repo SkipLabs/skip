@@ -198,7 +198,6 @@ uint32_t SKIP_String_unsafe_get(unsigned char* str, SkipInt n) {
 }
 
 void SKIP_String_unsafe_set(unsigned char* str, SkipInt n, SkipInt v) {
-  unsigned char c = (unsigned char)v;
   str[n] = v;
 }
 

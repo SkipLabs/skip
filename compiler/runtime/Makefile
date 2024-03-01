@@ -1,6 +1,6 @@
 MEMSIZE32=1073741824
 
-COMMONFLAGS=-Wpointer-arith
+COMMONFLAGS=-Wpointer-arith -Wunused-variable
 OLEVEL=-O2
 CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm -nostdlibinc $(COMMONFLAGS)
 CC64FLAGS=$(OLEVEL) -DSKIP64 $(COMMONFLAGS)
