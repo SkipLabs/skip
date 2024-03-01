@@ -14,7 +14,7 @@ extern sk_list_t* sk_external_pointers;
 
 static SkipInt test_counter = 0;
 
-void SKIP_test_free_external_pointer(SkipInt n) {
+void SKIP_test_free_external_pointer(SkipInt /* n */) {
   test_counter++;
 }
 

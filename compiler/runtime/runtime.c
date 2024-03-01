@@ -72,7 +72,7 @@ void SKIP_Obstack_vectorUnsafeSet(char** arr, char* x) {
   *arr = x;
 }
 
-void SKIP_Obstack_collect(char* dumb1, char** dumb2, SkipInt dumb3) {}
+void SKIP_Obstack_collect(char*, char**, SkipInt) {}
 
 void* SKIP_llvm_memcpy(char* dest, char* val, SkipInt len) {
   return memcpy(dest, val, (size_t)len);
