@@ -37,7 +37,7 @@ SkipInt SKIP_native_eq_class(sk_stack_t* st, char* obj1, char* obj2) {
   }
 
   if ((ty1->m_refsHintMask & 1) == 0) {
-    return memcmp(obj1, obj2, ty1->m_userByteSize);
+    return (SkipInt)memcmp(obj1, obj2, ty1->m_userByteSize);
   }
 
   size_t size = ty1->m_userByteSize / sizeof(void*);
@@ -87,7 +87,7 @@ SkipInt SKIP_native_eq_array(sk_stack_t* st, char* obj1, char* obj2) {
   size_t bitsize = sizeof(void*) * 8;
 
   if ((ty1->m_refsHintMask & 1) == 0) {
-    return memcmp(obj1, obj2, memsize);
+    return (SkipInt)memcmp(obj1, obj2, memsize);
   }
 
   char* ohead1 = obj1;
@@ -131,8 +131,8 @@ SkipInt SKIP_native_eq_helper(sk_stack_t* st, char* obj1, char* obj2) {
     return 1;
   }
 
-  int isString1 = SKIP_is_string(obj1);
-  int isString2 = SKIP_is_string(obj2);
+  uint32_t isString1 = SKIP_is_string(obj1);
+  uint32_t isString2 = SKIP_is_string(obj2);
 
   if (isString1 && isString2) {
     return SKIP_String_cmp((unsigned char*)obj1, (unsigned char*)obj2);
@@ -158,7 +158,7 @@ SkipInt SKIP_native_eq_helper(sk_stack_t* st, char* obj1, char* obj2) {
       break;
     default:
       // NOT SUPPORTED
-      SKIP_exit(-1);
+      SKIP_exit((SkipInt)-1);
   }
 
   return 0;

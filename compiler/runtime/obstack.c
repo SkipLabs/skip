@@ -288,10 +288,10 @@ void* SKIP_Obstack_collect1(void* /* note */, void* obj) {
 /* Sort used to sort the pages. */
 /*****************************************************************************/
 
-static void heapify(sk_cell_t* arr, int n, int i) {
-  int largest = i;
-  int l = 2 * i + 1;
-  int r = 2 * i + 2;
+static void heapify(sk_cell_t* arr, size_t n, size_t i) {
+  size_t largest = i;
+  size_t l = 2 * i + 1;
+  size_t r = 2 * i + 2;
 
   if (l < n && arr[l].key > arr[largest].key) {
     largest = l;
@@ -309,12 +309,14 @@ static void heapify(sk_cell_t* arr, int n, int i) {
   }
 }
 
-void sk_heap_sort(sk_cell_t* arr, int n) {
+void sk_heap_sort(sk_cell_t* arr, size_t n) {
+  if (n <= 1) return;
+
   for (int i = n / 2 - 1; i >= 0; i--) {
     heapify(arr, n, i);
   }
 
-  for (int i = n - 1; i > 0; i--) {
+  for (size_t i = n - 1; i > 0; i--) {
     sk_cell_t tmp = arr[0];
     arr[0] = arr[i];
     arr[i] = tmp;
@@ -349,19 +351,24 @@ sk_cell_t* sk_get_pages(size_t size) {
   return result;
 }
 
-size_t binarySearch(sk_cell_t* arr, int l, int r, char* x) {
+size_t binarySearch(sk_cell_t* arr, size_t l, size_t r, char* x) {
   if (l >= r) {
     if (((char*)arr[l].key <= x && x < (char*)(arr[l].value))) {
       return l;
     } else {
-      return -1;
+      return (size_t)-1;
     }
   }
 
-  int mid = l + (r - l) / 2;
+  size_t mid = l + (r - l) / 2;
 
   if (x < (char*)arr[mid].key) {
-    return binarySearch(arr, l, mid - 1, x);
+    if (mid <= l) {
+      // this happens when r = l + 1
+      return (size_t)-1;
+    } else {
+      return binarySearch(arr, l, mid - 1, x);
+    }
   } else if (x >= (char*)(arr[mid].value)) {
     return binarySearch(arr, mid + 1, r, x);
   } else {
@@ -371,8 +378,8 @@ size_t binarySearch(sk_cell_t* arr, int l, int r, char* x) {
 
 size_t sk_get_obstack_idx(char* ptr, sk_cell_t* pages, size_t size) {
   if (size == 0 || pages == NULL) {
-    return -1;
+    return (size_t)-1;
   }
-  int result = binarySearch(pages, 0, size - 1, ptr);
+  size_t result = binarySearch(pages, 0, size - 1, ptr);
   return result;
 }

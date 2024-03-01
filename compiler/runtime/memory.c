@@ -29,13 +29,13 @@ size_t sk_pow2_size(size_t size) {
 }
 
 void sk_add_ftable(void* ptr, size_t size) {
-  int slot = sk_bit_size(size);
+  size_t slot = sk_bit_size(size);
   *(void**)ptr = sk_ftable[slot];
   sk_ftable[slot] = ptr;
 }
 
 void* sk_get_ftable(size_t size) {
-  int slot = sk_bit_size(size);
+  size_t slot = sk_bit_size(size);
   void** ptr = sk_ftable[slot];
   if (ptr == NULL) {
     return ptr;
@@ -137,7 +137,7 @@ int memcmp(const void* ptr1, const void* ptr2, size_t num) {
     }
     char c1 = *str1;
     char c2 = *str2;
-    SkipInt diff = c1 - c2;
+    int diff = c1 - c2;
     if (diff != 0) return diff;
     str1++;
     str2++;

@@ -175,7 +175,7 @@ SkipInt SKIP_String_cmp(unsigned char* str1, unsigned char* str2) {
       return 0;
     }
     if (str1 == end1) {
-      return -1;
+      return (SkipInt)-1;
     }
     if (str2 == end2) {
       return 1;
