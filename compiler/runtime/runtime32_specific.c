@@ -169,7 +169,7 @@ uint64_t SKIP_random_next() {
   return xoroshiro128plus_next();
 }
 
-void SKIP_exit(uint64_t code) {
+__attribute__((noreturn)) void SKIP_exit(uint64_t code) {
   SKIP_throw_cruntime((int32_t)code);
 }
 
