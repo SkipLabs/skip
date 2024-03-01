@@ -154,10 +154,9 @@ typedef struct {
   uint8_t m_hasName;
   uint16_t m_uninternedMetadataByteSize;
   uint16_t m_unused_internedMetadataByteSize;
-  size_t m_userByteSize;
+  SkipInt m_userByteSize;
 #ifdef SKIP32
   void* unused1;
-  void* unused2;
 #endif
   void* unused;
   size_t m_refMask[0];
