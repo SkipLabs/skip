@@ -477,7 +477,6 @@ private fun createGCType(
     userByteSize,
     hasGCPointers,
     uninternedMetaSize,
-    internedMetaSize,
     kind,
     isAllDeepFrozen,
   ) = sc.arraySlot match {
@@ -502,7 +501,6 @@ private fun createGCType(
       userSize, // userByteSize
       hasGCPointers,
       config.ptrByteSize, // sizeof(RObjMetadata)
-      3 * config.ptrByteSize, // sizeof(IObjMetadata)
       0, // kSkipGcKindClass
       isAllDeepFrozen, // kSkipGcRefsHintFrozenRefs
     )
@@ -524,7 +522,6 @@ private fun createGCType(
       userSize, // userByteSize
       hasGCPointers,
       2 * config.ptrByteSize, // uninternedMetaSize
-      3 * config.ptrByteSize, // internedMetaSize
       1, // kSkipGcKindArray
       isAllDeepFrozen,
     ) // kSkipGcRefsHintFrozenRefs
@@ -584,10 +581,8 @@ private fun createGCType(
     },
   );
 
-  // m_internedMetadataByteSize
-  pushField(
-    ConstantInt{id => InstrID::none, typ => tInt16, value => internedMetaSize},
-  );
+  // m_unused_internedMetadataByteSize
+  pushField(ConstantInt{id => InstrID::none, typ => tInt16, value => 0});
 
   // m_userByteSize
   pushField(

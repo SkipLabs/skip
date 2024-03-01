@@ -153,7 +153,7 @@ typedef struct {
   uint8_t m_unused_tilesPerMask;
   uint8_t m_hasName;
   uint16_t m_uninternedMetadataByteSize;
-  uint16_t m_internedMetadataByteSize;
+  uint16_t m_unused_internedMetadataByteSize;
   size_t m_userByteSize;
 #ifdef SKIP32
   void* unused1;
