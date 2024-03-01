@@ -140,13 +140,10 @@ SkipInt SKIP_hash_combine(SkipInt crc1, SkipInt crc2) {
 static uint64_t sk_hash_class(sk_stack_t* st, char* obj) {
   SKIP_gc_type_t* ty = get_gc_type(obj);
 
-  size_t memsize = ty->m_userByteSize;
-  size_t leftsize = ty->m_uninternedMetadataByteSize;
   uint64_t crc = CRC_INIT;
 
   size_t size = ty->m_userByteSize / sizeof(void*);
   size_t bitsize = sizeof(void*) * 8;
-  size_t slot = 0;
   size_t mask_slot = 0;
   int i;
 
@@ -178,11 +175,7 @@ static uint64_t sk_hash_array(sk_stack_t* st, char* obj) {
 
   size_t len = *(uint32_t*)(obj - sizeof(char*) - sizeof(uint32_t));
   size_t memsize = ty->m_userByteSize * len;
-  size_t leftsize = ty->m_uninternedMetadataByteSize;
   size_t bitsize = sizeof(void*) * 8;
-
-  char* ohead = obj;
-  char* end = obj + memsize;
 
   if ((ty->m_refsHintMask & 1) == 0) {
     crc = sk_crc64(crc, obj, len * ty->m_userByteSize);
@@ -192,7 +185,6 @@ static uint64_t sk_hash_array(sk_stack_t* st, char* obj) {
 
     while (ohead < end) {
       size_t size = ty->m_userByteSize;
-      size_t slot = 0;
       size_t mask_slot = 0;
       while (size > 0) {
         int i;

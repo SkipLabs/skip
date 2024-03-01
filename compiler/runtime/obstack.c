@@ -263,7 +263,6 @@ void SKIP_enable_GC() {
 uint32_t SKIP_should_GC(sk_saved_obstack_t* saved) {
   if (!sk_gc_enabled) return 0;
   size_t nbr_page = 0;
-  size_t size = 0;
   void* cursor = page;
   while (cursor != NULL && cursor != saved->page) {
     cursor = *(char**)cursor;

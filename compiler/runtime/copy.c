@@ -31,7 +31,6 @@ static char* SKIP_copy_class(sk_stack_t* st, char* obj, char* large_page) {
   if ((ty->m_refsHintMask & 1) != 0) {
     size_t size = ty->m_userByteSize / sizeof(void*);
     size_t bitsize = sizeof(void*) * 8;
-    size_t slot = 0;
     size_t mask_slot = 0;
     int i;
     while (size > 0) {
@@ -71,7 +70,6 @@ static char* SKIP_copy_array(sk_stack_t* st, char* obj, char* large_page) {
 
     while (ohead < end) {
       size_t size = ty->m_userByteSize;
-      size_t slot = 0;
       size_t mask_slot = 0;
       while (size > 0) {
         int i;
