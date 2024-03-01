@@ -185,7 +185,7 @@ void* sk_malloc(size_t size) {
   return result;
 }
 
-void sk_free_size(void* ptr, size_t size) {
+void sk_free_size(void* ptr, size_t /* size */) {
 #ifdef MEMORY_CHECK
   sk_htbl_remove(sk_malloc_table, ptr);
 #endif
