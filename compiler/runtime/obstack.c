@@ -150,7 +150,7 @@ char* SKIP_Obstack_shallowClone(size_t /* size */, char* obj) {
   SKIP_gc_type_t* ty = get_gc_type(obj);
 
   size_t memsize = ty->m_userByteSize;
-  size_t leftsize = ty->m_uninternedMetadataByteSize;
+  size_t leftsize = uninterned_metadata_byte_size(ty);
   size_t size = memsize + leftsize;
 
   char* mem = SKIP_Obstack_alloc(size);

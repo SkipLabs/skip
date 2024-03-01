@@ -163,6 +163,16 @@ typedef struct {
   // a 0-terminated name follows if m_hasName is true
 } SKIP_gc_type_t;
 
+/* The uninterned_metadata_byte_size is the size preceding the pointer to a
+   non-string GC value. It is:
+   - 1 word for kSkipGcKindClass, its vtable pointer
+   - 2 words for kSkipGcKindArray, its vtable pointer preceded by its size on
+       32 bits, itself preceded by an unused padding of 32 bits on 64-bits arch.
+*/
+#define uninterned_metadata_word_size(ty) ((ty)->m_kind + 1)
+#define uninterned_metadata_byte_size(ty) \
+  (uninterned_metadata_word_size(ty) * sizeof(void*))
+
 SKIP_gc_type_t* get_gc_type(char* skip_object);
 
 /*****************************************************************************/
