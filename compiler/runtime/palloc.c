@@ -459,8 +459,8 @@ void sk_create_mapping(char* fileName, char* static_limit, size_t icapacity) {
 
   char* head = begin;
 
-  *(uint64_t*)head = SKIP_get_version();
-  head += sizeof(uint64_t);
+  *(int64_t*)head = SKIP_get_version();
+  head += sizeof(int64_t);
 
   *(void**)head = begin;
   head += sizeof(void*);

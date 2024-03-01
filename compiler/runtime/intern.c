@@ -89,7 +89,7 @@ void sk_incr_ref_count(void* obj) {
         count -= 3;
         break;
       default:
-        SKIP_exit(-1);
+        SKIP_exit((SkipInt)-1);
     }
   }
   *count = *count + 1;
@@ -115,7 +115,7 @@ static uintptr_t* sk_get_ref_count_addr(void* obj) {
         count -= 3;
         break;
       default:
-        SKIP_exit(-1);
+        SKIP_exit((SkipInt)-1);
     }
   }
   return count;
@@ -232,7 +232,7 @@ static char* SKIP_intern_obj(sk_stack_t* st, char* obj) {
       break;
     default:
       // NOT SUPPORTED
-      SKIP_exit(-1);
+      SKIP_exit((SkipInt)-1);
   }
 
   return (char*)result;

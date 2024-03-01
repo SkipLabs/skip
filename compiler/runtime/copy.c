@@ -113,7 +113,7 @@ static char* SKIP_copy_obj(sk_stack_t* st, char* obj, char* large_page) {
       break;
     default:
       // NOT SUPPORTED
-      SKIP_exit(-1);
+      SKIP_exit((SkipInt)-1);
   }
 
   return (char*)result;

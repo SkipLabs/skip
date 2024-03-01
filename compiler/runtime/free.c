@@ -140,7 +140,7 @@ void sk_free_obj(sk_stack_t* st, char* obj) {
       break;
     default:
       // NOT SUPPORTED
-      SKIP_exit(-1);
+      SKIP_exit((SkipInt)-1);
   }
 
   return;
