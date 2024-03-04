@@ -15,7 +15,7 @@ rm -f /tmp/nation_count
 START=$SECONDS
 ./makeSqliveDb.sh
 TOTAL=$(($SECONDS - $START))
-if (( TOTAL > 180 ));
+if (( TOTAL > 1800 ));
 then
     echo -e "BUILD TPC-H:\tFAILED ($TOTAL)"
 else

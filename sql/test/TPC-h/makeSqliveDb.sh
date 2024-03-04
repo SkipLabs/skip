@@ -119,13 +119,13 @@ CREATE TABLE SUPPLIER (
 );
 " | $SKDB --data /tmp/test.db
 
-echo "select * from customer;" | sqlite3 $TPCHDB -csv | $SKDB load-csv CUSTOMER --data /tmp/test.db
-echo "select * from lineitem;" | sqlite3 $TPCHDB -csv | head -n 500000 | $SKDB load-csv LINEITEM --data /tmp/test.db
-echo "select * from nation;" | sqlite3 $TPCHDB -csv | $SKDB load-csv NATION --data /tmp/test.db
-echo "select * from orders;" | sqlite3 $TPCHDB -csv | $SKDB load-csv ORDERS --data /tmp/test.db
-echo "select * from part;" | sqlite3 $TPCHDB -csv | $SKDB load-csv PART --data /tmp/test.db
-echo "select * from partsupp;" | sqlite3 $TPCHDB -csv | $SKDB load-csv PARTSUPP --data /tmp/test.db
-echo "select * from region;" | sqlite3 $TPCHDB -csv | $SKDB load-csv REGION --data /tmp/test.db
-echo "select * from supplier;" | sqlite3 $TPCHDB -csv | $SKDB load-csv SUPPLIER --data /tmp/test.db
+sqlite3 $TPCHDB ".mode insert customer" "select * from customer;" | $SKDB --data /tmp/test.db
+sqlite3 $TPCHDB ".mode insert lineitem" "select * from lineitem;" | head -n 500000 | $SKDB --data /tmp/test.db
+sqlite3 $TPCHDB ".mode insert nation" "select * from nation;" | $SKDB --data /tmp/test.db
+sqlite3 $TPCHDB ".mode insert orders" "select * from orders;" | $SKDB --data /tmp/test.db
+sqlite3 $TPCHDB ".mode insert part" "select * from part;" | $SKDB --data /tmp/test.db
+sqlite3 $TPCHDB ".mode insert partsupp" "select * from partsupp;" | $SKDB --data /tmp/test.db
+sqlite3 $TPCHDB ".mode insert region" "select * from region;" | $SKDB --data /tmp/test.db
+sqlite3 $TPCHDB ".mode insert supplier" "select * from supplier;" | $SKDB --data /tmp/test.db
 
 $SKDB compact --data /tmp/test.db
