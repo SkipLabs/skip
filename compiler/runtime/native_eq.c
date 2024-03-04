@@ -56,7 +56,7 @@ SkipInt SKIP_native_eq_class(sk_stack_t* st, char* obj1, char* obj2) {
           return 1;
         }
       }
-    };
+    }
     if (size < bitsize) {
       break;
     }
@@ -114,7 +114,7 @@ SkipInt SKIP_native_eq_array(sk_stack_t* st, char* obj1, char* obj2) {
         ohead1 += sizeof(void*);
         ohead2 += sizeof(void*);
         size -= sizeof(void*);
-      };
+      }
       mask_slot++;
     }
   }

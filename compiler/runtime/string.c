@@ -88,7 +88,7 @@ unsigned char* SKIP_String__fromChars(const unsigned char* /* dumb */,
     } else {
       SKIP_invalid_utf8();
     }
-  };
+  }
   uint32_t* iresult =
       (uint32_t*)SKIP_Obstack_alloc(result_size + 2 * sizeof(uint32_t));
   uint32_t* bsize = iresult;
@@ -127,7 +127,7 @@ unsigned char* SKIP_String__fromChars(const unsigned char* /* dumb */,
     } else {
       SKIP_invalid_utf8();
     }
-  };
+  }
   *bsize = (uint32_t)j;
   sk_string_set_hash((char*)result);
   return result;

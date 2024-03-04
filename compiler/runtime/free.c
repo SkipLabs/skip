@@ -67,7 +67,7 @@ void sk_free_class(sk_stack_t* st, char* obj) {
           void* ptr = *(((void**)obj) + (mask_slot * bitsize) + i);
           sk_stack_push(st, ptr, ptr);
         }
-      };
+      }
       if (size < bitsize) {
         break;
       }
@@ -105,7 +105,7 @@ void sk_free_array(sk_stack_t* st, char* obj) {
           }
           ohead += sizeof(void*);
           size -= sizeof(void*);
-        };
+        }
         mask_slot++;
       }
     }

@@ -129,7 +129,7 @@ int sk_test_table() {
     if ((uintptr_t)cell->value != i) {
       return 3;
     }
-  };
+  }
 
   return 0;
 }
