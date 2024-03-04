@@ -86,8 +86,8 @@ else
     fail "COUNT_PATHS"
 fi
 
-echo "\"id555\", \"{\"\"c\"\":33}\"" | $SKDB load-csv t1
-echo "\"id555\", \"{\"\"c\"\":33}\"" | $SKDB load-csv t2
+echo "insert into t1 values ('id555', '{\"c\": 33}');" | $SKDB
+echo "insert into t2 values ('id555', '{\"c\": 33}');" | $SKDB
 
 schema2='{?"a":int,?"b":float,?"c":int|string}'
 
