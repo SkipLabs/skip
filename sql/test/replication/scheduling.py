@@ -5,6 +5,7 @@ import random
 import copy
 import sys
 import asyncio
+import traceback
 
 task_id_counter = 0
 
@@ -19,8 +20,10 @@ async def runSchedules(schedules, log):
     try:
       await schedule.run()
     except AssertionError as err:
+      tb = traceback.format_exc()
       debugRun = schedule.clone()
       try:
+        log(f"> caught the following during a schedule run\n{tb}")
         log(f"> running debug test - schedule {hash(debugRun)}")
         await debugRun.run(log)
       finally:
