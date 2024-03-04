@@ -150,8 +150,6 @@ value class CompactRow<T>(
 
 class FixedDirMetadata{
   sourceDir: DirName,
-  keyIsSameAsValue: Bool,
-  isAlwaysSize1: Bool,
   kinds: Array<(Int, SQLParser.IKind, SQLParser.Type)>,
 }
 
@@ -185,7 +183,6 @@ class CompactFixedDir{
       data.sortBy(row ~> (row.key, row.source));
     };
     _ = static::computeTags(data, 0, data.size() - 1);
-    invariant(metadata.keyIsSameAsValue);
     static{
       data => data.map(static::stripMetadata).toArray(),
       metadata => metadata,
@@ -245,7 +242,6 @@ base class IFixedDir<T: frozen, RowRepresentation: frozen> protected {
     sourceDir: ?DirName = None();
     kinds: ?Array<(Int, SQLParser.IKind, SQLParser.Type)> = None();
 
-    keyIsSameAsValue = true;
     for (elt in data) {
       if (elt.value.size() != 1) return None();
       (elt.key, elt.value[0]) match {
@@ -265,12 +261,7 @@ base class IFixedDir<T: frozen, RowRepresentation: frozen> protected {
       }
     };
     sourceDir.map(sourceDir ->
-      FixedDirMetadata{
-        sourceDir,
-        kinds => kinds.fromSome(),
-        keyIsSameAsValue,
-        isAlwaysSize1 => true,
-      }
+      FixedDirMetadata{sourceDir, kinds => kinds.fromSome()}
     )
   }
 
