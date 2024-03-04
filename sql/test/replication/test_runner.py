@@ -21,7 +21,7 @@ def run_test(args):
     return f"{prefix}FAILED:\n{output}\n{exn}"
 
 
-def run_tests(module, nProcs=3):
+def run_tests(module, nProcs=20):
   fns = inspect.getmembers(module, inspect.isfunction)
   tests = list((name, f) for name, f in fns if name.startswith('test_'))
   with mp.Pool(nProcs) as p:

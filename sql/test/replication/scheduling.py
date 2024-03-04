@@ -15,40 +15,24 @@ def nop(*args, **kwargs):
   pass
 
 async def runSchedules(schedules, log):
-  failLock = asyncio.Lock()
   async def _run(schedule):
     try:
       await schedule.run()
     except AssertionError as err:
-      if failLock.locked():
-        return
-      await failLock.acquire() # just deal with first failure
       debugRun = schedule.clone()
       try:
-        print(f"> running debug test - schedule {hash(debugRun)}", file=sys.stderr)
+        log(f"> running debug test - schedule {hash(debugRun)}")
         await debugRun.run(log)
-      except AssertionError as err:
-        sys.exit(1)
       finally:
         await debugRun.finalise()
     finally:
       await schedule.finalise()
 
   n = 0
-  tasks = set()
-  # 8 is fairly arbitrary. a few experimental runs suggests it's
-  # quite good on an m1 macbook. this whole batch gather model
-  # isn't great, but it's easy to code and good enough to run
-  # hundreds of schedules in a few secs.
-  sem = asyncio.Semaphore(8)
   for i, schedule in enumerate(schedules):
-    n = i
-    await sem.acquire()
-    t = asyncio.create_task(_run(schedule))
-    tasks.add(t)
-    t.add_done_callback(lambda t: (tasks.discard(t), sem.release()))
-  await asyncio.gather(*tasks)
-  return f"Ran {n+1} schedules, all PASSED expectation checks"
+    await _run(schedule)
+    n = i + 1
+  return f"Ran {n} schedules, all PASSED expectation checks"
 
 class Task:
   def __init__(self, name, fn, final = anop):
@@ -144,7 +128,7 @@ class AllTopoSortsScheduler():
       for s in self._schedules(nodes, ourSchedule, ourCandidates, ourG):
         yield s
 
-  def schedules(self):
+  def schedules(self, _log):
     for nodes in self.taskLists:
       schedule = []
       g = {n: [x for x in self.graph[n] if x in nodes] for n in nodes}
@@ -176,12 +160,12 @@ class AllTopoSortsScheduler():
   async def run(self, log):
     if not self.runAll:
       i = 0
-      for _ in self.schedules():
+      for _ in self.schedules(log):
         i = i+1
         if i > self.limit:
           raise RuntimeError(f"There are more than {self.limit} schedules")
 
-    return await runSchedules(self.schedules(), log)
+    return await runSchedules(self.schedules(log), log)
 
 class Schedule:
   def __init__(self, tasks):
@@ -242,7 +226,7 @@ class FirstN():
     return await runSchedules(self.schedules(log), log)
 
   def schedules(self, log):
-    schedules = self.scheduler.schedules()
+    schedules = self.scheduler.schedules(log)
     return itertools.islice(schedules, self.N)
 
 class ReservoirSample():
@@ -267,7 +251,7 @@ class ReservoirSample():
 
   def schedules(self, log):
     # just simple reservoir sample
-    schedules = self.scheduler.schedules()
+    schedules = self.scheduler.schedules(log)
     reservoir = list(itertools.islice(schedules, self.N))
     N = len(reservoir)
     i = N - 1
