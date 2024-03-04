@@ -18,41 +18,6 @@ SKIP_gc_type_t* get_gc_type(char* skip_object) {
 }
 
 /*****************************************************************************/
-/* Saving/restoring context to thread locals.
- *
- * These primitives are very dangerous to use unless you really know what you
- * are doing. The GC does not keep track of the local context, so saving a
- * local context without a good understanding of how the memory model works
- * will probably lead to memory corruption.
- *
- * You have been warned ...
- */
-/*****************************************************************************/
-
-#ifdef SKIP32
-char* lcontext = NULL;
-#endif
-#ifdef SKIP64
-__thread char* lcontext = NULL;
-#endif
-
-int32_t SKIP_has_local_context() {
-  return (int32_t)(lcontext != NULL);
-}
-
-void SKIP_set_local_context(char* context) {
-  lcontext = context;
-}
-
-void SKIP_remove_local_context() {
-  lcontext = NULL;
-}
-
-char* SKIP_get_local_context() {
-  return lcontext;
-}
-
-/*****************************************************************************/
 /* Primitives that are not used in embedded mode. */
 /*****************************************************************************/
 
