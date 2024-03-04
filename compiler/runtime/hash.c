@@ -158,7 +158,7 @@ static uint64_t sk_hash_class(sk_stack_t* st, char* obj) {
       } else {
         crc = sk_crc64_combine(crc, *ptr);
       }
-    };
+    }
     if (size < bitsize) {
       break;
     }
@@ -199,7 +199,7 @@ static uint64_t sk_hash_array(sk_stack_t* st, char* obj) {
           }
           ohead += sizeof(void*);
           size -= sizeof(void*);
-        };
+        }
         mask_slot++;
       }
     }

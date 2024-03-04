@@ -51,7 +51,7 @@ uint64_t SKIP_genSym(uint64_t largerThan) {
 
   if (largerThan > gid_value) {
     n += largerThan - gid_value;
-  };
+  }
 
   return __atomic_fetch_add(gid, n, __ATOMIC_RELAXED);
 }
@@ -396,7 +396,7 @@ size_t parse_capacity(int argc, char** argv) {
             if (argv[i + 1][j] >= '0' && argv[i + 1][j] <= '9') {
               j++;
               continue;
-            };
+            }
             fprintf(stderr, "--capacity expects an integer\n");
             exit(2);
           }

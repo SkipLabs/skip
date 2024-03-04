@@ -157,7 +157,7 @@ static char* SKIP_intern_class(sk_stack_t* st, char* obj) {
             sk_stack_push(st, ptr, slot);
           }
         }
-      };
+      }
       if (size < bitsize) {
         break;
       }
@@ -199,7 +199,7 @@ static char* SKIP_intern_array(sk_stack_t* st, char* obj) {
           ohead += sizeof(void*);
           rhead += sizeof(void*);
           size -= sizeof(void*);
-        };
+        }
         mask_slot++;
       }
     }

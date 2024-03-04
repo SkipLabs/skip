@@ -42,7 +42,7 @@ static char* SKIP_copy_class(sk_stack_t* st, char* obj, char* large_page) {
             sk_stack_push(st, ptr, slot);
           }
         }
-      };
+      }
       if (size < bitsize) {
         break;
       }
@@ -84,7 +84,7 @@ static char* SKIP_copy_array(sk_stack_t* st, char* obj, char* large_page) {
           ohead += sizeof(void*);
           rhead += sizeof(void*);
           size -= sizeof(void*);
-        };
+        }
         mask_slot++;
       }
     }
