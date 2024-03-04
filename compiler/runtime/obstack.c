@@ -338,16 +338,16 @@ size_t sk_get_nbr_pages(void* saved_page) {
   return nbr_page;
 }
 
-sk_cell_t* sk_get_pages(size_t size) {
-  sk_cell_t* result = (sk_cell_t*)sk_malloc(sizeof(sk_cell_t) * size);
+sk_cell_t* sk_get_pages(size_t nbr_pages) {
+  sk_cell_t* result = (sk_cell_t*)sk_malloc(sizeof(sk_cell_t) * nbr_pages);
   unsigned int i = 0;
   char* cursor = page;
-  for (i = 0; i < size; i++) {
+  for (i = 0; i < nbr_pages; i++) {
     result[i].key = cursor;
     result[i].value = (uint64_t)cursor + *(size_t*)(cursor + sizeof(char*));
     cursor = *(char**)cursor;
   }
-  sk_heap_sort(result, size);
+  sk_heap_sort(result, nbr_pages);
   return result;
 }
 
@@ -376,10 +376,10 @@ size_t binarySearch(sk_cell_t* arr, size_t l, size_t r, char* x) {
   }
 }
 
-size_t sk_get_obstack_idx(char* ptr, sk_cell_t* pages, size_t size) {
-  if (size == 0 || pages == NULL) {
+size_t sk_get_obstack_idx(char* ptr, sk_cell_t* pages, size_t nbr_pages) {
+  if (nbr_pages == 0 || pages == NULL) {
     return (size_t)-1;
   }
-  size_t result = binarySearch(pages, 0, size - 1, ptr);
+  size_t result = binarySearch(pages, 0, nbr_pages - 1, ptr);
   return result;
 }
