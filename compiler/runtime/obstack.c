@@ -267,7 +267,7 @@ uint32_t SKIP_should_GC(sk_saved_obstack_t* saved) {
     cursor = cursor->previous;
     nbr_page++;
     if (nbr_page > 3 ||
-        (nbr_page > 1 && (head - (char*)page > (2 * PAGE_SIZE / 3)))) {
+        (nbr_page > 1 && (head - page->user_data > (2 * PAGE_SIZE / 3)))) {
       return 1;
     }
   }
