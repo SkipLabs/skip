@@ -8,8 +8,9 @@ pass() { printf "%-44s OK\n" "$1:"; }
 fail() { printf "%-44s FAILED\n" "$1:"; }
 
 SKDB="skargo run --profile $SKARGO_PROFILE -- "
+LC_TIME=C
 
-export SKDB
+export SKDB LC_TIME
 
 mkdir -p "test/dates"
 rm -f "test/dates/*.diff"
