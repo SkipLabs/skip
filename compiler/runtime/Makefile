@@ -1,6 +1,9 @@
 MEMSIZE32=1073741824
 
-COMMONFLAGS=-Wall -Wno-sometimes-uninitialized -Wunused-parameter -Wno-c2x-extensions -Wsign-compare -Wextra-semi-stmt
+COMMONFLAGS=-Wall -Wextra -Wno-sign-conversion -Wno-sometimes-uninitialized -Wno-c2x-extensions -Wsign-compare -Wextra-semi-stmt
+# To add: -Wcast-align -Wcast-qual -Wimplicit-int-conversion -Wmissing-noreturn -Wpadded -Wreserved-identifier -Wshorten-64-to-32 -Wtautological-unsigned-zero-compare
+# -Watomic-implicit-seq-cst ?
+# If using -Weverything, you may want to add -Wno-declaration-after-statement -Wno-missing-prototypes -Wno-missing-variable-declarations -Wno-shadow -Wno-strict-prototypes -Wno-zero-length-array -Wno-unreachable-code-break -Wno-unreachable-code-return
 OLEVEL=-O2
 CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm -nostdlibinc $(COMMONFLAGS)
 CC64FLAGS=$(OLEVEL) -DSKIP64 $(COMMONFLAGS)
