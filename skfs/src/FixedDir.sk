@@ -687,7 +687,7 @@ base class FixedSourceMap {
                 }
               };
               col match {
-              | Some(x) -> Some(Extension(x, rowKinds))
+              | Some(x) -> Some(Extension(x, minfoKinds))
               | _ -> return None()
               }
             | Some(
@@ -784,7 +784,7 @@ class Projection(
 // value at position col
 class Extension(
   col: Int,
-  extKinds: Array<(Int, SQLParser.IKind, SQLParser.Type)>,
+  kinds: Array<(Int, SQLParser.IKind, SQLParser.Type)>,
 ) extends FSMMInfoType
 
 class FSMMetadata{
@@ -804,24 +804,20 @@ class CompactFSMImpl protected (
     | IndexProjection(indexKinds) -> SKDB.IndexProjKey(rowKey.row, indexKinds)
     | Projection(col, leftShard, rightShard) ->
       SKDB.ProjKey(rowKey.row.values[col], col, leftShard, rightShard)
-    | Extension _ -> return this.extendKey(rowKey).fromSome()
+    | ext @ Extension _ -> return this.extendKey(rowKey, ext).fromSome()
     };
     MInfoSingle(minfoKey)
   }
 
-  private fun extendKey(rowKey: SKDB.RowKey): ?MInfo {
-    this.metadata.minfoType match {
-    | Extension(col, extKinds) ->
-      idx = binSearch(
-        i ~> this.data.get(i).values[col],
-        rowKey.row.values[0],
-        0,
-        this.size() - 1,
-      );
-      if (idx >= this.data.size()) None() else {
-        Some(MInfoSingle(SKDB.RowKey(this.data.get(idx), extKinds)))
-      }
-    | _ -> invariant_violation("Can't extend a key without extension metadata")
+  private fun extendKey(rowKey: SKDB.RowKey, extMetadata: Extension): ?MInfo {
+    idx = binSearch(
+      i ~> this.data.get(i).values[extMetadata.col],
+      rowKey.row.values[0],
+      0,
+      this.size() - 1,
+    );
+    if (idx >= this.data.size()) None() else {
+      Some(MInfoSingle(SKDB.RowKey(this.data.get(idx), extMetadata.kinds)))
     }
   }
 
@@ -829,7 +825,7 @@ class CompactFSMImpl protected (
     rowKey = SKDB.RowKey(row, this.metadata.rowKinds);
     path = Path(this.metadata.dir, rowKey);
     minfo = this.metadata.minfoType match {
-    | Extension _ -> this.extendKey(rowKey).fromSome()
+    | ext @ Extension _ -> this.extendKey(rowKey, ext).fromSome()
     | _ -> this.reconstructMInfo(rowKey)
     };
     (path, minfo)
@@ -839,7 +835,7 @@ class CompactFSMImpl protected (
     key.baseName match {
     | rowKey @ SKDB.RowKey(row, _kinds) ->
       this.metadata.minfoType match {
-      | Extension _ -> this.extendKey(rowKey)
+      | ext @ Extension _ -> this.extendKey(rowKey, ext)
       | _ ->
         idx = binSearch(this.data.get, row, 0, this.size() - 1);
         if (idx >= this.data.size() || row != this.data.get(idx)) None() else {
