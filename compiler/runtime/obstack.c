@@ -196,7 +196,7 @@ void SKIP_destroy_Obstack(sk_saved_obstack_t* saved) {
     saved_head = saved->head;
     saved_end = saved->end;
   }
-  while (saved_head < (char*)page || saved_head > end) {
+  while (!((char*)page <= saved_head && saved_head <= end)) {
     sk_obstack_t* tofree = page;
     size_t tosk_free_size = sk_page_size(page);
     page = page->previous;
