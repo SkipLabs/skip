@@ -3,6 +3,7 @@ import traceback
 import inspect
 import sys
 import multiprocessing as mp
+import scheduling as sched
 
 def run_test(args):
   name, f = args
@@ -12,7 +13,9 @@ def run_test(args):
   def collect(output):
     log.append(output)
   try:
-    info = loop.run_until_complete(f().run(collect))
+    scheduler = f()
+    # scheduler = sched.SpecificSchedule(scheduler, -1039740434997820987)
+    info = loop.run_until_complete(scheduler.run(collect))
     output = "" if log == [] else ("\n".join(log) + "\n")
     return f"{output}{prefix}{info}"
   except:
