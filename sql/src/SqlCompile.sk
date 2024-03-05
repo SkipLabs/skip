@@ -1665,7 +1665,11 @@ mutable class Compiler{
             Array[P.VString("%s")].concat(args),
             false,
           ),
-        )
+        ) match {
+        | CGNull() -> CGNull()
+        | CSExpr(s) -> CIExpr(CISCast(s))
+        | _ -> error(this.pos, "strftime must return a string")
+        }
 
       | "julianday" ->
         if (args.isEmpty()) {
@@ -1678,8 +1682,11 @@ mutable class Compiler{
             Array[P.VString("%J")].concat(args),
             false,
           ),
-        )
-
+        ) match {
+        | CGNull() -> CGNull()
+        | CSExpr(s) -> CFExpr(CFSCast(s))
+        | _ -> error(this.pos, "strftime must return a string")
+        }
       | "strftime" ->
         if (args.isEmpty()) {
           error(this.pos, "Missing arguments")

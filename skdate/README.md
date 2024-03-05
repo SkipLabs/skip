@@ -35,6 +35,7 @@ Managed specifiers:
 %r	  Time in AM/PM format of the locale. If not available in the locale time format, defaults to the POSIX time AM/PM format: %I:%M:%S %p.
 %R	  24-hour time format without seconds, same as %H:%M.
 %S	  Second [00-59].
+%s	  Number of seconds since 1970-01-01 00:00:00 UTC
 %t	  Tab character.
 %T	  24-hour time format with seconds, same as %H:%M:%S.
 %u	  Weekday [1,7]. Monday is 1 and Sunday is 7.
