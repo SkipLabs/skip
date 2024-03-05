@@ -21,45 +21,11 @@ static char* shallow_copy(char* obj, size_t memsize, size_t leftsize,
   return mem;
 }
 
-static char* SKIP_copy_class(sk_stack_t* st, char* obj,
-                             sk_obstack_t* large_page) {
+static char* SKIP_copy_obj(sk_stack_t* st, char* obj,
+                           sk_obstack_t* large_page) {
   SKIP_gc_type_t* ty = get_gc_type(obj);
 
-  size_t memsize = ty->m_userByteSize;
-  size_t leftsize = uninterned_metadata_byte_size(ty);
-  void** result = (void**)shallow_copy(obj, memsize, leftsize, large_page);
-
-  if ((ty->m_refsHintMask & 1) != 0) {
-    size_t size = ty->m_userByteSize / sizeof(void*);
-    const size_t refMaskWordBitSize = sizeof(ty->m_refMask[0]) * 8;
-    size_t mask_slot = 0;
-    unsigned int i;
-    while (size > 0) {
-      for (i = 0; i < refMaskWordBitSize && i < size; i++) {
-        if (ty->m_refMask[mask_slot] & (1 << i)) {
-          void** ptr = ((void**)obj) + (mask_slot * refMaskWordBitSize) + i;
-          void** slot = result + (mask_slot * refMaskWordBitSize) + i;
-          if (*ptr != NULL) {
-            sk_stack_push(st, ptr, slot);
-          }
-        }
-      }
-      if (size < refMaskWordBitSize) {
-        break;
-      }
-      size -= refMaskWordBitSize;
-      mask_slot++;
-    }
-  }
-
-  return (char*)result;
-}
-
-static char* SKIP_copy_array(sk_stack_t* st, char* obj,
-                             sk_obstack_t* large_page) {
-  SKIP_gc_type_t* ty = get_gc_type(obj);
-
-  size_t len = skip_array_len(obj);
+  size_t len = skip_object_len(ty, obj);
   size_t memsize = ty->m_userByteSize * len;
   size_t leftsize = uninterned_metadata_byte_size(ty);
   char* result = shallow_copy(obj, memsize, leftsize, large_page);
@@ -99,27 +65,6 @@ static char* SKIP_copy_string(char* obj, sk_obstack_t* large_page) {
   size_t len = *(uint32_t*)(obj - 2 * sizeof(uint32_t));
   char* result = shallow_copy(obj, len, 2 * sizeof(uint32_t), large_page);
   return result;
-}
-
-static char* SKIP_copy_obj(sk_stack_t* st, char* obj,
-                           sk_obstack_t* large_page) {
-  char* result;
-
-  SKIP_gc_type_t* ty = get_gc_type(obj);
-
-  switch (ty->m_kind) {
-    case kSkipGcKindClass:
-      result = SKIP_copy_class(st, obj, large_page);
-      break;
-    case kSkipGcKindArray:
-      result = SKIP_copy_array(st, obj, large_page);
-      break;
-    default:
-      // IMPOSSIBLE
-      SKIP_exit((SkipInt)-1);
-  }
-
-  return (char*)result;
 }
 
 void* SKIP_copy_with_pages(void* obj, size_t nbr_pages, sk_cell_t* pages) {
