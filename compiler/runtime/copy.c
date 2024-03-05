@@ -62,11 +62,11 @@ static char* SKIP_copy_array(sk_stack_t* st, char* obj,
   size_t len = skip_array_len(obj);
   size_t memsize = ty->m_userByteSize * len;
   size_t leftsize = uninterned_metadata_byte_size(ty);
-  void** result = (void**)shallow_copy(obj, memsize, leftsize, large_page);
+  char* result = shallow_copy(obj, memsize, leftsize, large_page);
 
   if ((ty->m_refsHintMask & 1) != 0) {
     const size_t refMaskWordBitSize = sizeof(ty->m_refMask[0]) * 8;
-    char* rhead = (char*)result;
+    char* rhead = result;
     char* ohead = obj;
     char* end = obj + memsize;
 
@@ -78,8 +78,8 @@ static char* SKIP_copy_array(sk_stack_t* st, char* obj,
         for (i = 0; i < refMaskWordBitSize && size > 0; i++) {
           if (ty->m_refMask[mask_slot] & (1 << i)) {
             void** ptr = (void**)ohead;
-            void** slot = (void**)rhead;
             if (*ptr != NULL) {
+              void** slot = (void**)rhead;
               sk_stack_push(st, ptr, slot);
             }
           }
@@ -92,7 +92,7 @@ static char* SKIP_copy_array(sk_stack_t* st, char* obj,
     }
   }
 
-  return (char*)result;
+  return result;
 }
 
 static char* SKIP_copy_string(char* obj, sk_obstack_t* large_page) {
