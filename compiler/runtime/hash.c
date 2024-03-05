@@ -173,7 +173,7 @@ static uint64_t sk_hash_array(sk_stack_t* st, char* obj) {
   uint64_t crc = CRC_INIT;
   SKIP_gc_type_t* ty = get_gc_type(obj);
 
-  size_t len = *(uint32_t*)(obj - sizeof(char*) - sizeof(uint32_t));
+  size_t len = skip_array_len(obj);
   size_t memsize = ty->m_userByteSize * len;
 
   if ((ty->m_refsHintMask & 1) == 0) {

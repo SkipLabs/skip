@@ -84,7 +84,7 @@ void sk_free_class(sk_stack_t* st, char* obj) {
 void sk_free_array(sk_stack_t* st, char* obj) {
   SKIP_gc_type_t* ty = get_gc_type(obj);
 
-  size_t len = *(uint32_t*)(obj - sizeof(char*) - sizeof(uint32_t));
+  size_t len = skip_array_len(obj);
   size_t memsize = ty->m_userByteSize * len;
   size_t leftsize = uninterned_metadata_byte_size(ty);
 
