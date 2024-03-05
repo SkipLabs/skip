@@ -92,8 +92,6 @@ interface ToWasm {
   SKIP_push_object_field_float: (field: ptr) => void;
   SKIP_push_object_field_string: (field: ptr) => void;
   SKIP_push_object: () => void;
-  SKIP_unix_unixepoch: (tm: ptr) => ptr;
-  SKIP_unix_strftime: (tm: ptr) => ptr;
   SKIP_js_mark_query: (queryID: int) => void;
   SKIP_js_delete_fun: (queryID: int) => void;
 }
@@ -235,8 +233,6 @@ class LinksImpl implements Links, ToWasm {
   SKIP_push_object_field_float!: (field: ptr) => void;
   SKIP_push_object_field_string!: (field: ptr) => void;
   SKIP_push_object!: () => void;
-  SKIP_unix_unixepoch!: (tm: ptr) => ptr;
-  SKIP_unix_strftime!: (tm: ptr) => ptr;
   SKIP_js_mark_query!: (queryID: int) => void;
   SKIP_js_delete_fun!: (queryID: int) => void;
   // Utils
@@ -343,12 +339,6 @@ class LinksImpl implements Links, ToWasm {
         this.stdout_objects[this.stream] = new Array();
       }
       this.stdout_objects[this.stream].push(this.object);
-    };
-    this.SKIP_unix_unixepoch = (tm: ptr) => {
-      return utils.exportString("TODO");
-    };
-    this.SKIP_unix_strftime = (tm: ptr) => {
-      return utils.exportString("TODO");
     };
     this.SKIP_js_mark_query = (queryID: int) => {
       this.queriesToNotify.add(queryID);
@@ -505,8 +495,6 @@ class Manager implements ToWasmManager {
     toWasm.SKIP_push_object_field_string = (field: ptr) =>
       links.SKIP_push_object_field_string(field);
     toWasm.SKIP_push_object = () => links.SKIP_push_object();
-    toWasm.SKIP_unix_unixepoch = (tm: ptr) => links.SKIP_unix_unixepoch(tm);
-    toWasm.SKIP_unix_strftime = (tm: ptr) => links.SKIP_unix_strftime(tm);
     toWasm.SKIP_js_mark_query = (id: int) => links.SKIP_js_mark_query(id);
     toWasm.SKIP_js_delete_fun = (id: int) => links.SKIP_js_delete_fun(id);
     return links;
