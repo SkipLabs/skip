@@ -476,7 +476,6 @@ private fun createGCType(
   (
     userByteSize,
     numMaskWords,
-    tilesPerMask,
     uninternedMetaSize,
     internedMetaSize,
     kind,
@@ -508,7 +507,6 @@ private fun createGCType(
     (
       userSize, // userByteSize
       words, // numMaskWords
-      1, // tilesPerMask
       config.ptrByteSize, // sizeof(RObjMetadata)
       3 * config.ptrByteSize, // sizeof(IObjMetadata)
       0, // kSkipGcKindClass
@@ -538,12 +536,6 @@ private fun createGCType(
         config.ptrBitSize
     };
 
-    tiles = if (words == 0) {
-      1
-    } else {
-      max(1, 64 / (userSize / config.ptrByteSize))
-    };
-
     // Set the GC bits. All pointers are at the beginning of each slot,
     // but we tile it out as many times as will fit in a 64-bit word
     // so the inner loop of the GC can be tighter.
@@ -552,7 +544,6 @@ private fun createGCType(
     (
       userSize, // userByteSize
       words, // numMaskWords
-      tiles, // tilesPerMask
       2 * config.ptrByteSize, // uninternedMetaSize
       3 * config.ptrByteSize, // internedMetaSize
       1, // kSkipGcKindArray
@@ -660,21 +651,14 @@ private fun createGCType(
         }
       }
     | Some(slotInfo) ->
-      // Set the GC bits. All pointers are at the beginning of each slot,
-      // but we tile it out as many times as will fit in a 64-bit word
-      // so the inner loop of the GC can be tighter.
-      for (i in Range(0, tilesPerMask)) {
-        slotInfo.types.eachWithIndex((idx, x) -> {
-          scalarType = x.getScalarType(env);
-          if (scalarType.isGCPointer()) {
-            bitOffset = slotInfo.bitOffsets[idx];
-            setBit(
-              (slotInfo.bitSize * i) + bitOffset,
-              !isAllDeepFrozen && !x.isDeepFrozen(),
-            )
-          }
-        });
-      }
+      // Possible optimization: tile the mask so the inner loop of the GC is tighter.
+      slotInfo.types.eachWithIndex((idx, x) -> {
+        scalarType = x.getScalarType(env);
+        if (scalarType.isGCPointer()) {
+          bitOffset = slotInfo.bitOffsets[idx];
+          setBit(bitOffset, !isAllDeepFrozen && !x.isDeepFrozen())
+        }
+      })
     };
 
     for (f in flags) {
