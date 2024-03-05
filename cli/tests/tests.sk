@@ -142,6 +142,13 @@ fun boolArgsNegatable(): void {
 }
 
 @test
+fun boolNegativeArgsRejected(): void {
+  cmd = Cli.Command("foo").arg(Cli.BoolArg("no-bar"));
+
+  T.expectThrow(() -> _ = Cli.parseArgsFrom(cmd, Array["--no-foo"]));
+}
+
+@test
 fun subcommand(): void {
   cmd = Cli.Command("foo")
     .subcommand(Cli.Command("bar"))
