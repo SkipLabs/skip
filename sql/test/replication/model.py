@@ -93,7 +93,7 @@ def compact(dbkey):
     (_, err) = await proc.communicate()
     schedule.debug(err.decode().rstrip())
     if proc.returncode is None or proc.returncode > 0:
-      raise RuntimeError(f"running '{query}' exited non-zero")
+      raise RuntimeError(f"running 'compact' exited non-zero")
     return []
   return f
 
