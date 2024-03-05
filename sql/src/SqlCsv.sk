@@ -351,6 +351,7 @@ fun applyDiffStrategy(
   // concurrent.
   assignRows = Some((newRoot, delta, root) ~> {
     if (shouldShortCircuitUpdate(root)) {
+      checkpointAndAck(newRoot, delta);
       return void;
     };
 
@@ -406,6 +407,7 @@ fun applyDiffStrategy(
   // state (a reset).
   resetRows = Some((newRoot, delta, root) ~> {
     if (shouldShortCircuitUpdate(root)) {
+      checkpointAndAck(newRoot, delta);
       return void;
     };
 
@@ -483,6 +485,7 @@ fun applyDiffStrategy(
   // using the vector clock. concurrent tiebreaks use the row data.
   lwwRows = Some((newRoot, delta, root) ~> {
     if (shouldShortCircuitUpdate(root)) {
+      checkpointAndAck(newRoot, delta);
       return void;
     };
 
@@ -549,6 +552,7 @@ fun applyDiffStrategy(
   // state (a reset) on a table where we use LWW.
   lwwReset = Some((newRoot, delta, root) ~> {
     if (shouldShortCircuitUpdate(root)) {
+      checkpointAndAck(newRoot, delta);
       return void;
     };
 
