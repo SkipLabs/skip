@@ -137,43 +137,26 @@ SkipInt SKIP_hash_combine(SkipInt crc1, SkipInt crc2) {
 /* Hashing of SKIP objects. */
 /*****************************************************************************/
 
-static uint64_t sk_hash_class(sk_stack_t* st, char* obj) {
-  SKIP_gc_type_t* ty = get_gc_type(obj);
-
+static uint64_t sk_hash_string(char* obj) {
   uint64_t crc = CRC_INIT;
-
-  size_t size = ty->m_userByteSize / sizeof(void*);
-  const size_t refMaskWordBitSize = sizeof(ty->m_refMask[0]) * 8;
-  size_t mask_slot = 0;
-  unsigned int i;
-
-  while (size > 0) {
-    for (i = 0; i < refMaskWordBitSize && i < size; i++) {
-      void** ptr = ((void**)obj) + (mask_slot * refMaskWordBitSize) + i;
-      if (((ty->m_refsHintMask & 1) != 0) &&
-          ty->m_refMask[mask_slot] & (1 << i)) {
-        if (*ptr != NULL) {
-          sk_stack_push(st, ptr, ptr);
-        }
-      } else {
-        crc = sk_crc64_combine(crc, *ptr);
-      }
-    }
-    if (size < refMaskWordBitSize) {
-      break;
-    }
-    size -= refMaskWordBitSize;
-    mask_slot++;
-  }
-
-  return crc;
+  size_t memsize = *(uint32_t*)(obj - 2 * sizeof(uint32_t));
+  return sk_crc64(crc, obj, memsize);
 }
 
-static uint64_t sk_hash_array(sk_stack_t* st, char* obj) {
+static uint64_t sk_hash_obj(sk_stack_t* st, char* obj) {
+  if (obj < (char*)64) {
+    return (uint64_t)obj;
+  }
+
+  // Check if we are dealing with a string
+  if (SKIP_is_string(obj)) {
+    return sk_hash_string(obj);
+  }
+
   uint64_t crc = CRC_INIT;
   SKIP_gc_type_t* ty = get_gc_type(obj);
 
-  size_t len = skip_array_len(obj);
+  size_t len = skip_object_len(ty, obj);
   size_t memsize = ty->m_userByteSize * len;
 
   if ((ty->m_refsHintMask & 1) == 0) {
@@ -203,40 +186,6 @@ static uint64_t sk_hash_array(sk_stack_t* st, char* obj) {
         mask_slot++;
       }
     }
-  }
-
-  return crc;
-}
-
-static uint64_t sk_hash_string(char* obj) {
-  uint64_t crc = CRC_INIT;
-  size_t memsize = *(uint32_t*)(obj - 2 * sizeof(uint32_t));
-  return sk_crc64(crc, obj, memsize);
-}
-
-static uint64_t sk_hash_obj(sk_stack_t* st, char* obj) {
-  if (obj < (char*)64) {
-    return (uint64_t)obj;
-  }
-
-  // Check if we are dealing with a string
-  if (SKIP_is_string(obj)) {
-    return sk_hash_string(obj);
-  }
-
-  SKIP_gc_type_t* ty = get_gc_type(obj);
-  uint64_t crc;
-
-  switch (ty->m_kind) {
-    case kSkipGcKindClass:
-      crc = sk_hash_class(st, obj);
-      break;
-    case kSkipGcKindArray:
-      crc = sk_hash_array(st, obj);
-      break;
-    default:
-      // IMPOSSIBLE
-      SKIP_exit((SkipInt)-1);
   }
 
   crc = sk_crc64_combine(crc, ty);
