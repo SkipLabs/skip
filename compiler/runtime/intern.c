@@ -112,8 +112,7 @@ static char* SKIP_intern_class(sk_stack_t* st, char* obj) {
   size_t leftsize = uninterned_metadata_byte_size(ty);
   void** result = (void**)shallow_intern(obj, memsize, leftsize);
 
-  if (epointer_ty != NULL && ty != epointer_ty &&
-      (ty->m_refsHintMask & 1) != 0) {
+  if (ty != epointer_ty && (ty->m_refsHintMask & 1) != 0) {
     size_t size = ty->m_userByteSize / sizeof(void*);
     const size_t refMaskWordBitSize = sizeof(ty->m_refMask[0]) * 8;
     size_t mask_slot = 0;
