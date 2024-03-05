@@ -178,8 +178,7 @@ int64_t SKIP_posix_wstopsig(int64_t stat_loc) {
 }
 
 int64_t SKIP_posix_poll(char *pollfds) {
-  unsigned int nfds =
-      *(uint32_t *)(pollfds - sizeof(char *) - sizeof(uint32_t));
+  unsigned int nfds = skip_array_len(pollfds);
 
   for (;;) {
     int rv = poll((struct pollfd *)pollfds, nfds, -1);
@@ -276,7 +275,7 @@ int64_t SKIP_posix_spawnp(char *skargv, char *skenvp, char *file_actionsp) {
 }
 
 void SKIP_posix_execvp(char *args_obj) {
-  size_t num_args = *(uint32_t *)(args_obj - sizeof(char *) - sizeof(uint32_t));
+  size_t num_args = skip_array_len(args_obj);
   char **args = (char **)malloc(sizeof(char *) * (num_args + 1));
   if (args == NULL) {
     perror("malloc");

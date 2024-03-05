@@ -177,7 +177,7 @@ char* sk2c_string(char* skstr) {
 }
 
 char** sk2c_string_array(char* skarr) {
-  size_t sz = *(uint32_t*)(skarr - sizeof(char*) - sizeof(uint32_t));
+  size_t sz = skip_array_len(skarr);
   char** arr = (char**)malloc(sizeof(char*) * (sz + 1));
   if (arr == NULL) {
     perror("malloc");

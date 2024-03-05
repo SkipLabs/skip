@@ -41,6 +41,16 @@ void sk_print_ctx_table();
 #endif
 
 /*****************************************************************************/
+/* Handy macros. */
+/*****************************************************************************/
+
+#define ptr_is_a_type_member_array(ptr, type, member) \
+  (1 ? (ptr) : &((type*)0)->member[0])
+#define container_of_type_member_array(ptr, type, member)         \
+  ((type*)((char*)ptr_is_a_type_member_array(ptr, type, member) - \
+           offsetof(type, member)))
+
+/*****************************************************************************/
 /* The error code thrown by the runtime. */
 /*****************************************************************************/
 
@@ -167,13 +177,30 @@ typedef struct {
    non-string GC value. It is:
    - 1 word for kSkipGcKindClass, its vtable pointer
    - 2 words for kSkipGcKindArray, its vtable pointer preceded by its size on
-       32 bits, itself preceded by an unused padding of 32 bits on 64-bits arch.
+       32 bits, itself preceded by an unused padding of 32 bits on 64-bits arch
+       (see sk_array_t).
 */
 #define uninterned_metadata_word_size(ty) ((ty)->m_kind + 1)
 #define uninterned_metadata_byte_size(ty) \
   (uninterned_metadata_word_size(ty) * sizeof(void*))
 
 SKIP_gc_type_t* get_gc_type(char* skip_object);
+
+/*****************************************************************************/
+/* SKIP Array representation: */
+/*****************************************************************************/
+
+typedef struct {
+#ifdef SKIP64
+  uint32_t unused_padding;
+#endif
+  uint32_t length;
+  void** vtable;
+  char data[0];
+} sk_array_t;
+
+#define skip_array_len(obj) \
+  (container_of_type_member_array(obj, sk_array_t, data)->length)
 
 /*****************************************************************************/
 /* SKIP String representation. */

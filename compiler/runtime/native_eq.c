@@ -75,8 +75,8 @@ SkipInt SKIP_native_eq_array(sk_stack_t* st, char* obj1, char* obj2) {
     return 1;
   }
 
-  size_t len1 = *(uint32_t*)(obj1 - sizeof(char*) - sizeof(uint32_t));
-  size_t len2 = *(uint32_t*)(obj2 - sizeof(char*) - sizeof(uint32_t));
+  size_t len1 = skip_array_len(obj1);
+  size_t len2 = skip_array_len(obj2);
 
   if (len1 != len2) {
     return 1;
