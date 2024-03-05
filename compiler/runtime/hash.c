@@ -177,7 +177,7 @@ static uint64_t sk_hash_array(sk_stack_t* st, char* obj) {
   size_t memsize = ty->m_userByteSize * len;
 
   if ((ty->m_refsHintMask & 1) == 0) {
-    crc = sk_crc64(crc, obj, len * ty->m_userByteSize);
+    crc = sk_crc64(crc, obj, memsize);
   } else {
     const size_t refMaskWordBitSize = sizeof(ty->m_refMask[0]) * 8;
     char* ohead = obj;
