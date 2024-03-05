@@ -105,48 +105,15 @@ uintptr_t sk_get_ref_count(void* obj) {
   return *count;
 }
 
-static char* SKIP_intern_class(sk_stack_t* st, char* obj) {
+static char* SKIP_intern_obj(sk_stack_t* st, char* obj) {
   SKIP_gc_type_t* ty = get_gc_type(obj);
 
-  size_t memsize = ty->m_userByteSize;
-  size_t leftsize = uninterned_metadata_byte_size(ty);
-  void** result = (void**)shallow_intern(obj, memsize, leftsize);
-
-  if (ty != epointer_ty && (ty->m_refsHintMask & 1) != 0) {
-    size_t size = ty->m_userByteSize / sizeof(void*);
-    const size_t refMaskWordBitSize = sizeof(ty->m_refMask[0]) * 8;
-    size_t mask_slot = 0;
-    unsigned int i;
-    while (size > 0) {
-      for (i = 0; i < refMaskWordBitSize && i < size; i++) {
-        if (ty->m_refMask[mask_slot] & (1 << i)) {
-          void** ptr = ((void**)obj) + (mask_slot * refMaskWordBitSize) + i;
-          void** slot = result + (mask_slot * refMaskWordBitSize) + i;
-          if (*ptr != NULL) {
-            sk_stack_push(st, ptr, slot);
-          }
-        }
-      }
-      if (size < refMaskWordBitSize) {
-        break;
-      }
-      size -= refMaskWordBitSize;
-      mask_slot++;
-    }
-  }
-
-  return (char*)result;
-}
-
-static char* SKIP_intern_array(sk_stack_t* st, char* obj) {
-  SKIP_gc_type_t* ty = get_gc_type(obj);
-
-  size_t len = skip_array_len(obj);
+  size_t len = skip_object_len(ty, obj);
   size_t memsize = ty->m_userByteSize * len;
   size_t leftsize = uninterned_metadata_byte_size(ty);
   char* result = shallow_intern(obj, memsize, leftsize);
 
-  if ((ty->m_refsHintMask & 1) != 0) {
+  if (ty != epointer_ty && (ty->m_refsHintMask & 1) != 0) {
     const size_t refMaskWordBitSize = sizeof(ty->m_refMask[0]) * 8;
     char* rhead = result;
     char* ohead = obj;
@@ -185,26 +152,6 @@ static char* SKIP_intern_string(char* obj) {
 
 uint32_t SKIP_is_string(char* obj) {
   return *(((uint32_t*)obj) - 1) & 0x80000000;
-}
-
-static char* SKIP_intern_obj(sk_stack_t* st, char* obj) {
-  char* result;
-
-  SKIP_gc_type_t* ty = get_gc_type(obj);
-
-  switch (ty->m_kind) {
-    case kSkipGcKindClass:
-      result = SKIP_intern_class(st, obj);
-      break;
-    case kSkipGcKindArray:
-      result = SKIP_intern_array(st, obj);
-      break;
-    default:
-      // IMPOSSIBLE
-      SKIP_exit((SkipInt)-1);
-  }
-
-  return (char*)result;
 }
 
 void* SKIP_intern_shared(void* obj) {

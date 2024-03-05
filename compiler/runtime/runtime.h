@@ -188,6 +188,8 @@ typedef struct {
 
 #define ty_is_array(ty) ((ty)->m_kind == kSkipGcKindArray)
 
+#define ty_is_array(ty) ((ty)->m_kind == kSkipGcKindArray)
+
 SKIP_gc_type_t* get_gc_type(char* skip_object);
 
 /*****************************************************************************/
@@ -214,6 +216,12 @@ typedef struct {
 
 #define skip_array_len(obj) \
   (container_of_type_member_array(obj, sk_array_t, data)->length)
+
+/*****************************************************************************/
+/* SKIP objects: arrays and class instances. */
+/*****************************************************************************/
+
+#define skip_object_len(ty, obj) (ty_is_array(ty) ? skip_array_len(obj) : 1)
 
 /*****************************************************************************/
 /* SKIP String representation. */
