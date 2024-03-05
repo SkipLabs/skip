@@ -4,6 +4,7 @@ import inspect
 import sys
 import multiprocessing as mp
 import scheduling as sched
+import os
 
 def run_test(args):
   name, f = args
@@ -24,7 +25,8 @@ def run_test(args):
     return f"{prefix}FAILED:\n{output}\n{exn}"
 
 
-def run_tests(module, nProcs=20):
+def run_tests(module, nProcs=None):
+  nProcs = nProcs if nProcs is not None else int(os.environ.get('NPROCS', '10'))
   fns = inspect.getmembers(module, inspect.isfunction)
   tests = list((name, f) for name, f in fns if name.startswith('test_'))
   with mp.Pool(nProcs) as p:
