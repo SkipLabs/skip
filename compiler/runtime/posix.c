@@ -15,13 +15,13 @@
 int64_t SKIP_posix_open(char *path_obj, int64_t oflag, int64_t mode) {
   char *path = sk2c_string(path_obj);
   int fd = open(path, oflag, mode);
-  if (path != path_obj) free(path);
 
   if (fd == -1) {
     perror("open");
     fprintf(stderr, "Could not open file: %s\n", path);
     exit(EXIT_FAILURE);
   }
+  if (path != path_obj) free(path);
 
   return (int64_t)fd;
 }
