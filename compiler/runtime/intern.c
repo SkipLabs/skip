@@ -144,11 +144,11 @@ static char* SKIP_intern_array(sk_stack_t* st, char* obj) {
   size_t len = skip_array_len(obj);
   size_t memsize = ty->m_userByteSize * len;
   size_t leftsize = uninterned_metadata_byte_size(ty);
-  void** result = (void**)shallow_intern(obj, memsize, leftsize);
+  char* result = shallow_intern(obj, memsize, leftsize);
 
   if ((ty->m_refsHintMask & 1) != 0) {
     const size_t refMaskWordBitSize = sizeof(ty->m_refMask[0]) * 8;
-    char* rhead = (char*)result;
+    char* rhead = result;
     char* ohead = obj;
     char* end = obj + memsize;
 
@@ -160,8 +160,8 @@ static char* SKIP_intern_array(sk_stack_t* st, char* obj) {
         for (i = 0; i < refMaskWordBitSize && size > 0; i++) {
           if (ty->m_refMask[mask_slot] & (1 << i)) {
             void** ptr = (void**)ohead;
-            void** slot = (void**)rhead;
             if (*ptr != NULL) {
+              void** slot = (void**)rhead;
               sk_stack_push(st, ptr, slot);
             }
           }
@@ -174,7 +174,7 @@ static char* SKIP_intern_array(sk_stack_t* st, char* obj) {
     }
   }
 
-  return (char*)result;
+  return result;
 }
 
 static char* SKIP_intern_string(char* obj) {
