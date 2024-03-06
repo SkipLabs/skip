@@ -74,6 +74,12 @@ base class ViewDefinition uses Equality, Show {
 
 class UpdateSet(columns: Array<(Int, Name)>, value: Expr) uses Equality, Show
 
+base class AlterTable{name: Name} extends Stmt {
+  children =
+  | AlterTableAddCol{colDef: ColumnDefinition}
+  | AlterTableDropCol{col: Name}
+}
+
 base class CreateTable{ifNotExists: Bool, name: Name} extends Stmt {
   children =
   | CreateTableSchema{schema: TableSchema}

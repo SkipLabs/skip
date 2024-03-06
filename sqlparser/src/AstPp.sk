@@ -111,6 +111,10 @@ extension base class Stmt {
       " (" +
       schema.columns.map(c -> c.toString()).join(", ") +
       ")"
+  | AlterTableAddCol{name, colDef} ->
+    "ALTER TABLE " + name.toString() + " ADD COLUMN " + colDef.toString()
+  | AlterTableDropCol{name, col} ->
+    "ALTER TABLE " + name.toString() + " DROP COLUMN " + col.toString()
 }
 
 extension class ColumnDefinition {
@@ -254,8 +258,8 @@ extension class IndexedColumn {
         ""
       }) +
       this.order match {
-        | INONE() -> ""
-        | ord @ _ -> " " + ord.toString()
+      | INONE() -> ""
+      | ord @ _ -> " " + ord.toString()
       }
   }
 }
