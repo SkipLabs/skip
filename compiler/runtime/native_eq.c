@@ -103,10 +103,10 @@ SkipInt SKIP_native_eq_array(sk_stack_t* st, char* obj1, char* obj2) {
         void* ptr1 = *((void**)ohead1);
         void* ptr2 = *((void**)ohead2);
 
-        if (ty1->m_refMask[mask_slot] & (1 << i) && ptr1 != ptr2) {
-          sk_stack_push(st, ptr1, ptr2);
-        } else {
-          if (ptr1 != ptr2) {
+        if (ptr1 != ptr2) {
+          if (ty1->m_refMask[mask_slot] & (1 << i)) {
+            sk_stack_push(st, ptr1, ptr2);
+          } else {
             return 1;
           }
         }
