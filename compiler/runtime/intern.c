@@ -66,36 +66,6 @@ static char* shallow_intern(char* obj, size_t memsize, size_t leftsize) {
   return mem;
 }
 
-void sk_incr_ref_count(void* obj) {
-#ifdef SKIP32
-  sk_persistent_write(obj, 0);
-#endif
-  uintptr_t* count = obj;
-  if (SKIP_is_string(obj)) {
-#ifdef SKIP64
-    count -= 2;
-#endif
-#ifdef SKIP32
-    count -= 3;
-#endif
-  } else {
-    SKIP_gc_type_t* ty = get_gc_type(obj);
-
-    switch (ty->m_kind) {
-      case kSkipGcKindClass:
-        count -= 2;
-        break;
-      case kSkipGcKindArray:
-        count -= 3;
-        break;
-      default:
-        // IMPOSSIBLE
-        SKIP_exit((SkipInt)-1);
-    }
-  }
-  *count = *count + 1;
-}
-
 static uintptr_t* sk_get_ref_count_addr(void* obj) {
   uintptr_t* count = obj;
   if (SKIP_is_string(obj)) {
@@ -121,6 +91,14 @@ static uintptr_t* sk_get_ref_count_addr(void* obj) {
     }
   }
   return count;
+}
+
+void sk_incr_ref_count(void* obj) {
+#ifdef SKIP32
+  sk_persistent_write(obj, 0);
+#endif
+  uintptr_t* count = sk_get_ref_count_addr(obj);
+  *count = *count + 1;
 }
 
 uintptr_t sk_decr_ref_count(void* obj) {
