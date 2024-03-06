@@ -6,13 +6,13 @@ import { webcrypto as crypto } from "node:crypto";
 import assert from "node:assert/strict";
 
 const tables = [
-  "no_pk_inserts",
-  "pk_inserts",
-  "no_pk_single_row",
-  "pk_single_row",
-  "pk_privacy_ro",
-  "pk_privacy_rw",
-  "checkpoints",
+  {table: "no_pk_inserts", expectedColumns: "*"},
+  {table: "pk_inserts", expectedColumns: "*"},
+  {table: "no_pk_single_row", expectedColumns: "*"},
+  {table: "pk_single_row", expectedColumns: "*"},
+  {table: "pk_privacy_ro", expectedColumns: "*"},
+  {table: "pk_privacy_rw", expectedColumns: "*"},
+  {table: "checkpoints", expectedColumns: "*"},
 ];
 
 const filtered_tables = ["no_pk_filtered", "pk_filtered"];
@@ -40,6 +40,7 @@ const setup = async function (client) {
     // about (3)
     ...filtered_tables.map((t) => ({
       table: t,
+      expectedColumns: "*",
       filterExpr: `value % 4 IN (${client}, 3)`,
     })),
   ];
