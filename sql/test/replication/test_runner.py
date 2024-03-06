@@ -3,6 +3,8 @@ import traceback
 import inspect
 import sys
 import multiprocessing as mp
+import scheduling as sched
+import os
 
 def run_test(args):
   name, f = args
@@ -12,7 +14,9 @@ def run_test(args):
   def collect(output):
     log.append(output)
   try:
-    info = loop.run_until_complete(f().run(collect))
+    scheduler = f()
+    # scheduler = sched.SpecificSchedule(scheduler, -1039740434997820987)
+    info = loop.run_until_complete(scheduler.run(collect))
     output = "" if log == [] else ("\n".join(log) + "\n")
     return f"{output}{prefix}{info}"
   except:
@@ -21,7 +25,8 @@ def run_test(args):
     return f"{prefix}FAILED:\n{output}\n{exn}"
 
 
-def run_tests(module, nProcs=3):
+def run_tests(module, nProcs=None):
+  nProcs = nProcs if nProcs is not None else int(os.environ.get('NPROCS', '20'))
   fns = inspect.getmembers(module, inspect.isfunction)
   tests = list((name, f) for name, f in fns if name.startswith('test_'))
   with mp.Pool(nProcs) as p:

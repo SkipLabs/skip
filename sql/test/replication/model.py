@@ -93,7 +93,7 @@ def compact(dbkey):
     (_, err) = await proc.communicate()
     schedule.debug(err.decode().rstrip())
     if proc.returncode is None or proc.returncode > 0:
-      raise RuntimeError(f"running '{query}' exited non-zero")
+      raise RuntimeError(f"running 'compact' exited non-zero")
     return []
   return f
 
@@ -137,7 +137,7 @@ def startStreamingWriteCsv(dbkey, writecsvKey, user, source, peerId, log):
                                                 "--source", source,
                                                 # "--peer-id", peerId,  # for multi-peer
                                                 stdin=asyncio.subprocess.PIPE,
-                                                stdout=asyncio.subprocess.DEVNULL,
+                                                stdout=asyncio.subprocess.PIPE,
                                                 stderr=asyncio.subprocess.PIPE)
     schedule.storeScheduleLocal(writecsvKey, proc)
     async def logStderr():
@@ -371,6 +371,13 @@ class SkdbPeer:
 
         payload = stream.recv(schedule)
         proc.stdin.write(payload)
+        await proc.stdin.drain()
+
+        expectAck = payload.decode().startswith("^")
+        while expectAck:
+          ack = await proc.stdout.readline()
+          if ack.decode().startswith(":"):
+            return
 
       if init:
         return Task(f"start write-csv for {self} {stream}", start, stop)
