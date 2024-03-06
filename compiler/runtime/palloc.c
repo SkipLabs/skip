@@ -216,11 +216,9 @@ void SKIP_cond_broadcast(void* c) {
 /* The global information structure. */
 /*****************************************************************************/
 
-typedef struct {
-  void* ginfo_array;
+typedef struct ginfo {
   void* ftable[FTABLE_SIZE];
   void* context;
-  char* begin;
   char* head;
   char* end;
   char* fileName;
@@ -228,8 +226,7 @@ typedef struct {
   size_t total_palloc_size;
 } ginfo_t;
 
-ginfo_t** ginfo_root = NULL;
-ginfo_t** ginfo = NULL;
+ginfo_t* ginfo = NULL;
 
 /*****************************************************************************/
 /* Debugging support for contexts. Set CTX_TABLE to 1 to use. */
@@ -298,7 +295,7 @@ void sk_add_ctx(char* context) {
 /*****************************************************************************/
 
 char* SKIP_context_get_unsafe() {
-  char* context = (*ginfo)->context;
+  char* context = ginfo->context;
 
   if (context != NULL) {
     sk_incr_ref_count(context);
@@ -309,14 +306,14 @@ char* SKIP_context_get_unsafe() {
 
 uint32_t SKIP_has_context() {
   sk_global_lock();
-  char* context = (*ginfo)->context;
+  char* context = ginfo->context;
   uint32_t result = context != NULL;
   sk_global_unlock();
   return result;
 }
 
 SkipInt SKIP_context_ref_count() {
-  char* context = (*ginfo)->context;
+  char* context = ginfo->context;
 
   if (context == NULL) {
     return (SkipInt)0;
@@ -334,7 +331,7 @@ char* SKIP_context_get() {
 }
 
 void sk_context_set_unsafe(char* obj) {
-  (*ginfo)->context = obj;
+  ginfo->context = obj;
 #ifdef CTX_TABLE
   sk_add_ctx(obj);
 #endif
@@ -342,7 +339,7 @@ void sk_context_set_unsafe(char* obj) {
 
 void sk_context_set(char* obj) {
   sk_global_lock();
-  (*ginfo)->context = obj;
+  ginfo->context = obj;
   sk_global_unlock();
 }
 
@@ -418,7 +415,7 @@ size_t parse_capacity(int argc, char** argv) {
 /*****************************************************************************/
 
 void sk_commit(char* new_root, uint32_t sync) {
-  if ((*ginfo)->fileName == NULL) {
+  if (ginfo->fileName == NULL) {
     sk_context_set_unsafe(new_root);
     return;
   }
@@ -434,6 +431,28 @@ void sk_commit(char* new_root, uint32_t sync) {
 }
 
 /*****************************************************************************/
+/* Disk-persisted state, a.k.a. file mapping. */
+/*****************************************************************************/
+
+typedef struct file_mapping file_mapping_t;
+
+typedef struct {
+  int64_t version;
+  file_mapping_t* bottom_addr;
+} file_mapping_header_t;
+
+struct file_mapping {
+  file_mapping_header_t header;
+  pthread_mutexattr_t gmutex_attr;
+  pthread_mutex_t gmutex;
+  ginfo_t ginfo_data;
+  uint64_t gid;
+  size_t capacity;
+  void** pconsts;
+  char persistent_fileName[1];
+};
+
+/*****************************************************************************/
 /* Creates a new file mapping. */
 /*****************************************************************************/
 
@@ -446,77 +465,53 @@ void sk_create_mapping(char* fileName, char* static_limit, size_t icapacity) {
   lseek(fd, icapacity, SEEK_SET);
   write(fd, "", 1);
   int prot = PROT_READ | PROT_WRITE;
-  char* begin =
+  file_mapping_t* mapping =
       mmap(BOTTOM_ADDR, icapacity, prot, MAP_SHARED | MAP_FIXED, fd, 0);
-  char* end = begin + icapacity;
+  close(fd);
 
-  if (begin == (void*)-1) {
-    perror("ERROR (MMAP FAILED)");
+  if (mapping == MAP_FAILED) {
+    perror("ERROR (MAP FAILED)");
     exit(ERROR_MAPPING_FAILED);
   }
 
-  close(fd);
+  mapping->header.version = SKIP_get_version();
+  mapping->header.bottom_addr = mapping;
 
-  char* head = begin;
-
-  *(int64_t*)head = SKIP_get_version();
-  head += sizeof(int64_t);
-
-  *(void**)head = begin;
-  head += sizeof(void*);
-
-  gmutex_attr = (pthread_mutexattr_t*)head;
-  head += sizeof(pthread_mutexattr_t);
-
-  gmutex = (pthread_mutex_t*)head;
-  head += sizeof(pthread_mutex_t);
-
-  ginfo_t* ginfo_data = (ginfo_t*)head;
-  head += 2 * sizeof(ginfo_t);
-
-  ginfo = (ginfo_t**)head;
-  head += sizeof(ginfo_t*);
-
-  gid = (uint64_t*)head;
-  head += sizeof(uint64_t);
-
-  capacity = (size_t*)head;
-  head += sizeof(size_t);
-
-  pconsts = (void***)head;
-  head += sizeof(void**);
+  gmutex_attr = &mapping->gmutex_attr;
+  gmutex = &mapping->gmutex;
+  ginfo = &mapping->ginfo_data;
+  gid = &mapping->gid;
+  capacity = &mapping->capacity;
+  pconsts = &mapping->pconsts;
 
   size_t fileName_length = strlen(fileName) + 1;
-  char* persistent_fileName = head;
-  head += fileName_length;
+  char* persistent_fileName = mapping->persistent_fileName;
 
-  memcpy(persistent_fileName, fileName, fileName_length);
-
-  *ginfo = ginfo_data;
-
-  (*ginfo)->ginfo_array = ginfo_data;
-
-  int i;
-  for (i = 0; i < FTABLE_SIZE; i++) {
-    (*ginfo)->ftable[i] = NULL;
-  }
+  char* head = persistent_fileName + fileName_length;
+  char* end = (char*)mapping + icapacity;
 
   if (head >= end) {
     fprintf(stderr, "Could not initialize memory\n");
     exit(ERROR_MAPPING_MEMORY);
   }
 
-  (*ginfo)->break_ptr = static_limit;
-  (*ginfo)->total_palloc_size = 0;
+  memcpy(persistent_fileName, fileName, fileName_length);
+
+  int i;
+  for (i = 0; i < FTABLE_SIZE; i++) {
+    ginfo->ftable[i] = NULL;
+  }
+
+  ginfo->break_ptr = static_limit;
+  ginfo->total_palloc_size = 0;
 
   // The head must be aligned!
   head = (char*)(((uintptr_t)head + (uintptr_t)(15)) & ~((uintptr_t)(15)));
 
-  (*ginfo)->begin = begin;
-  (*ginfo)->head = head;
-  (*ginfo)->end = end;
-  (*ginfo)->fileName = persistent_fileName;
-  (*ginfo)->context = NULL;
+  ginfo->head = head;
+  ginfo->end = end;
+  ginfo->fileName = persistent_fileName;
+  ginfo->context = NULL;
   *gid = 1;
   if (icapacity != DEFAULT_CAPACITY) {
     printf("CAPACITY SET TO: %ld\n", icapacity);
@@ -539,50 +534,36 @@ void sk_load_mapping(char* fileName) {
     exit(ERROR_FILE_IO);
   }
 
-  void* addr;
-  int64_t magic;
+  file_mapping_header_t header;
   lseek(fd, 0L, SEEK_SET);
-  int magic_size = read(fd, &magic, sizeof(int64_t));
+  int bytes = read(fd, &header, sizeof(file_mapping_header_t));
 
-  if (magic_size != sizeof(int64_t) || magic != SKIP_get_version()) {
+  if (bytes != sizeof(file_mapping_header_t)) {
+    fprintf(stderr, "Error: could not read header\n");
+    exit(ERROR_MAPPING_MEMORY);
+  }
+
+  if (header.version != SKIP_get_version()) {
     fprintf(stderr, "Error: wrong file format: %s\n", fileName);
     exit(ERROR_MAPPING_VERSION);
   }
 
-  int bytes = read(fd, &addr, sizeof(void*));
-  if (bytes != sizeof(void*)) {
-    fprintf(stderr, "Error: could not read heap address\n");
-    exit(ERROR_MAPPING_MEMORY);
-  }
-
-  lseek(fd, 0L, SEEK_SET);
-
+  size_t fsize = lseek(fd, 0, SEEK_END) - 1;
   int prot = PROT_READ | PROT_WRITE;
-  lseek(fd, 0L, SEEK_END);
-  size_t fsize = lseek(fd, 0, SEEK_CUR) - 1;
-  char* begin = mmap(addr, fsize, prot, MAP_SHARED | MAP_FIXED, fd, 0);
+  file_mapping_t* mapping =
+      mmap(header.bottom_addr, fsize, prot, MAP_SHARED | MAP_FIXED, fd, 0);
   close(fd);
 
-  if (begin == (void*)-1) {
-    perror("ERROR (MMAP FAILED)");
+  if (mapping == MAP_FAILED) {
+    perror("ERROR (MAP FAILED)");
     exit(ERROR_MAPPING_FAILED);
   }
 
-  char* head = begin;
-  head += sizeof(uint64_t);
-  head += sizeof(void*);
-  head += sizeof(pthread_mutexattr_t);
-  gmutex = (pthread_mutex_t*)head;
-  head += sizeof(pthread_mutex_t);
-  head += 2 * sizeof(ginfo_t);
-  ginfo = (ginfo_t**)head;
-  head += sizeof(ginfo_t*);
-  gid = (uint64_t*)head;
-  head += sizeof(uint64_t);
-  capacity = (size_t*)head;
-  head += sizeof(size_t);
-  pconsts = (void***)head;
-  head += sizeof(void**);
+  gmutex = &mapping->gmutex;
+  ginfo = &mapping->ginfo_data;
+  gid = &mapping->gid;
+  capacity = &mapping->capacity;
+  pconsts = &mapping->pconsts;
 }
 
 /*****************************************************************************/
@@ -590,12 +571,12 @@ void sk_load_mapping(char* fileName) {
 /*****************************************************************************/
 
 int sk_is_static(void* ptr) {
-  return (char*)ptr <= (*ginfo)->break_ptr;
+  return (char*)ptr <= ginfo->break_ptr;
 }
 
 void sk_lower_static(void* ptr) {
-  if ((char*)ptr < (*ginfo)->break_ptr) {
-    (*ginfo)->break_ptr = ptr;
+  if ((char*)ptr < ginfo->break_ptr) {
+    ginfo->break_ptr = ptr;
   }
 }
 
@@ -614,17 +595,17 @@ size_t sk_pow2_size(size_t size) {
 
 void sk_add_ftable(void* ptr, size_t size) {
   int slot = sk_bit_size(size);
-  *(void**)ptr = (*ginfo)->ftable[slot];
-  (*ginfo)->ftable[slot] = ptr;
+  *(void**)ptr = ginfo->ftable[slot];
+  ginfo->ftable[slot] = ptr;
 }
 
 void* sk_get_ftable(size_t size) {
   int slot = sk_bit_size(size);
-  void** ptr = (*ginfo)->ftable[slot];
+  void** ptr = ginfo->ftable[slot];
   if (ptr == NULL) {
     return ptr;
   }
-  (*ginfo)->ftable[slot] = *(void**)(*ginfo)->ftable[slot];
+  ginfo->ftable[slot] = *ptr;
   return ptr;
 }
 
@@ -632,38 +613,33 @@ void* sk_get_ftable(size_t size) {
 /* No file initialization (the memory is not backed by a file). */
 /*****************************************************************************/
 
+// Handy structure to allocate all those things at once
+typedef struct {
+  ginfo_t ginfo_data;
+  uint64_t gid;
+  void** pconsts;
+} no_file_t;
+
 static void sk_init_no_file(char* static_limit) {
-  ginfo = malloc(sizeof(ginfo_t*));
-  if (ginfo == NULL) {
+  no_file_t* no_file = malloc(sizeof(no_file_t));
+  if (no_file == NULL) {
     perror("malloc");
     exit(1);
   }
-  *ginfo = malloc(sizeof(ginfo_t));
-  if (*ginfo == NULL) {
-    perror("malloc");
-    exit(1);
-  }
-  (*ginfo)->break_ptr = static_limit;
-  (*ginfo)->total_palloc_size = 0;
-  (*ginfo)->fileName = NULL;
-  (*ginfo)->context = NULL;
+  ginfo = &no_file->ginfo_data;
+  ginfo->break_ptr = static_limit;
+  ginfo->total_palloc_size = 0;
+  ginfo->fileName = NULL;
+  ginfo->context = NULL;
   gmutex = NULL;
-  gid = malloc(sizeof(uint64_t));
-  if (gid == NULL) {
-    perror("malloc");
-    exit(1);
-  }
-  pconsts = malloc(sizeof(void**));
-  if (pconsts == NULL) {
-    perror("malloc");
-    exit(1);
-  }
+  gid = &no_file->gid;
+  pconsts = &no_file->pconsts;
   *gid = 1;
   *pconsts = NULL;
 }
 
 int sk_is_nofile_mode() {
-  return ((*ginfo)->fileName == NULL);
+  return (ginfo->fileName == NULL);
 }
 
 /*****************************************************************************/
@@ -709,11 +685,11 @@ void SKIP_memory_init(int argc, char** argv) {
 /*****************************************************************************/
 
 void SKIP_print_persistent_size() {
-  printf("%ld\n", (*ginfo)->total_palloc_size);
+  printf("%ld\n", ginfo->total_palloc_size);
 }
 
 void* sk_palloc(size_t size) {
-  if ((*ginfo)->fileName == NULL) {
+  if (ginfo->fileName == NULL) {
     void* result = malloc(size);
     if (result == NULL) {
       perror("malloc");
@@ -723,27 +699,27 @@ void* sk_palloc(size_t size) {
   }
   sk_check_has_lock();
   size = sk_pow2_size(size);
-  (*ginfo)->total_palloc_size += size;
+  ginfo->total_palloc_size += size;
   sk_cell_t* ptr = sk_get_ftable(size);
   if (ptr != NULL) {
     return ptr;
   }
-  if ((*ginfo)->head + size >= (*ginfo)->end) {
+  if (ginfo->head + size >= ginfo->end) {
     fprintf(stderr, "Error: out of persistent memory.\n");
     exit(ERROR_OUT_OF_MEMORY);
   }
-  void* result = (*ginfo)->head;
-  (*ginfo)->head += size;
+  void* result = ginfo->head;
+  ginfo->head += size;
   return result;
 }
 
 void sk_pfree_size(void* chunk, size_t size) {
-  if ((*ginfo)->fileName == NULL) {
+  if (ginfo->fileName == NULL) {
     free(chunk);
     return;
   }
   sk_check_has_lock();
   size = sk_pow2_size(size);
-  (*ginfo)->total_palloc_size -= size;
+  ginfo->total_palloc_size -= size;
   sk_add_ftable(chunk, size);
 }

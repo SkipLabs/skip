@@ -249,14 +249,6 @@ void* SKIP_intern_shared(void* obj) {
   sk_stack3_t* st3 = &st3_holder;
   size_t nbr_pages = sk_get_nbr_pages(NULL);
   sk_cell_t* pages = sk_get_pages(nbr_pages);
-  int* large_pages = sk_malloc(sizeof(int) * nbr_pages);
-
-  {
-    unsigned int i;
-    for (i = 0; i < nbr_pages; i++) {
-      large_pages[i] = 0;
-    }
-  }
 
   sk_stack_init(st, STACK_INIT_CAPACITY);
   sk_stack3_init(st3, STACK_INIT_CAPACITY);
@@ -275,10 +267,6 @@ void* SKIP_intern_shared(void* obj) {
       }
 
       continue;
-    }
-
-    if (sk_is_large_page(pages[obstack_idx].key)) {
-      large_pages[obstack_idx] = 1;
     }
 
     void* interned_ptr;
@@ -329,17 +317,7 @@ void* SKIP_intern_shared(void* obj) {
     }
   }
 
-  {
-    unsigned int i;
-    for (i = 0; i < nbr_pages; i++) {
-      if (large_pages[i]) {
-        pages[i].value = (uint64_t)pages[i].key;
-      }
-    }
-  }
-
   sk_free_size(pages, sizeof(sk_cell_t) * nbr_pages);
-  sk_free_size(large_pages, sizeof(int) * nbr_pages);
   sk_stack_free(st);
   sk_stack3_free(st3);
 
