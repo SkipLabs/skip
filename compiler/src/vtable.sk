@@ -589,14 +589,8 @@ private fun createGCType(
     ConstantInt{id => InstrID::none, typ => tInt, value => userByteSize},
   );
 
-  // unused padding
-  pushField(ConstantInt{id => InstrID::none, typ => tNonGCPointer, value => 0});
-
-  if (config.ptrBitSize == 32) {
-    // Emit alignment padding before the mask words.
-    // TODO: Maybe use 32-bit mask words in this case.
-    pushField(ConstantInt{id => InstrID::none, typ => tInt32, value => 0})
-  };
+  // m_unused_padding
+  pushField(ConstantInt{id => InstrID::none, typ => tInt, value => 0});
 
   if (fieldBitOffset % 64 != 0) {
     sc.die("bad vtable entry alignment")
