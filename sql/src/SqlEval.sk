@@ -1141,6 +1141,9 @@ class Evaluator{options: Options, user: ?UserFile} {
         },
       );
       None()
+    | P.AlterTableAddCol _
+    | P.AlterTableDropCol _ ->
+      invariant_violation("ALTER TABLE not yet implemented")
     };
   }
 
@@ -2081,7 +2084,8 @@ fun markIfRead(context: mutable SKStore.Context, stmt: P.Stmt): void {
   | P.DropView _
   | P.DropIndex _
   | P.Delete _
-  | P.Insert _ ->
+  | P.Insert _
+  | P.AlterTable _ ->
     void
   }
 }

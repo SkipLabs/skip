@@ -1,0 +1,26 @@
+module SQLParser;
+
+extension class Parser {
+  mutable fun parseAlter(): Stmt {
+    this.expect_keyword(TAlter());
+    this.expect_keyword(TTable());
+
+    name = Name::create(this.expect_identifier());
+
+    if (this.parse_keyword(TAdd())) {
+      _ = this.parse_keyword(TColumn());
+      colDef = this.parseColumnDefinition();
+      AlterTableAddCol{name, colDef}
+    } else if (this.parse_keyword(TDrop())) {
+      _ = this.parse_keyword(TColumn());
+      col = Name::create(this.expect_identifier());
+      AlterTableDropCol{name, col}
+    } else {
+      this.errorUnexpectedToken(
+        "Only add-column and drop-column ALTER statements are currently supported",
+      )
+    }
+  }
+}
+
+module end;
