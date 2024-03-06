@@ -26,7 +26,7 @@ def run_test(args):
 
 
 def run_tests(module, nProcs=None):
-  nProcs = nProcs if nProcs is not None else int(os.environ.get('NPROCS', '10'))
+  nProcs = nProcs if nProcs is not None else int(os.environ.get('NPROCS', '20'))
   fns = inspect.getmembers(module, inspect.isfunction)
   tests = list((name, f) for name, f in fns if name.startswith('test_'))
   with mp.Pool(nProcs) as p:
