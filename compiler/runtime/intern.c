@@ -78,17 +78,7 @@ static uintptr_t* sk_get_ref_count_addr(void* obj) {
   } else {
     SKIP_gc_type_t* ty = get_gc_type(obj);
 
-    switch (ty->m_kind) {
-      case kSkipGcKindClass:
-        count -= 2;
-        break;
-      case kSkipGcKindArray:
-        count -= 3;
-        break;
-      default:
-        // IMPOSSIBLE
-        SKIP_exit((SkipInt)-1);
-    }
+    count -= 1 + uninterned_metadata_word_size(ty);
   }
   return count;
 }
