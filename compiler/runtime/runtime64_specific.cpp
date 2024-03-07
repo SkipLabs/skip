@@ -349,7 +349,17 @@ char* SKIP_open_file(char* filename_obj) {
   char* filename = sk2c_string(filename_obj);
 
   int fd = open(filename, O_RDONLY);
+  if (fd == -1) {
+    perror("ERROR (open failed)");
+    fprintf(stderr, "Could not open file: %s\n", filename);
+    exit(ERROR_FILE_IO);
+  }
   int status = fstat(fd, &s);
+  if (status == -1) {
+    perror("ERROR (fstat failed)");
+    fprintf(stderr, "Could not open file: %s\n", filename);
+    exit(ERROR_FILE_IO);
+  }
   size_t size = s.st_size;
 
   char* result = nullptr;
@@ -361,7 +371,7 @@ char* SKIP_open_file(char* filename_obj) {
 
   char* f = (char*)mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
   if (f == (void*)MAP_FAILED) {
-    perror("ERROR (MMap FAILED)");
+    perror("ERROR (MAP FAILED)");
     fprintf(stderr, "Could not open file: %s\n", filename);
     exit(ERROR_FILE_IO);
   }
