@@ -362,9 +362,8 @@ char* SKIP_open_file(char* filename_obj) {
   }
   size_t size = s.st_size;
 
-  char* result = nullptr;
+  char* result = sk_string_alloc(size);
   if (size == 0) {
-    result = sk_string_alloc(0);
     sk_string_set_hash(result);
     return result;
   }
@@ -375,12 +374,11 @@ char* SKIP_open_file(char* filename_obj) {
     fprintf(stderr, "Could not open file: %s\n", filename);
     exit(ERROR_FILE_IO);
   }
-  result = sk_string_alloc(size);
   memcpy(result, f, size);
   sk_string_set_hash(result);
   if (filename != filename_obj) free(filename);
-  munmap(f, size);
   close(fd);
+  munmap(f, size);
   return result;
 }
 
