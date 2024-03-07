@@ -428,7 +428,7 @@ int64_t SKIP_notify(char* filename_obj, uint64_t tick) {
   size_t size = strlen(buf);
 
   while (size > 0) {
-    size_t written = write(fd, buf, size);
+    ssize_t written = write(fd, buf, size);
     if (written == -1) {
       return -1;
     }
