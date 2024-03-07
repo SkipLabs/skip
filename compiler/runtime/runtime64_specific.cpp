@@ -363,22 +363,19 @@ char* SKIP_open_file(char* filename_obj) {
   size_t size = s.st_size;
 
   char* result = sk_string_alloc(size);
-  if (size == 0) {
-    sk_string_set_hash(result);
-    return result;
+  if (size != 0) {
+    void* f = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
+    if (f == MAP_FAILED) {
+      perror("ERROR (MAP FAILED)");
+      fprintf(stderr, "Could not open file: %s\n", filename);
+      exit(ERROR_FILE_IO);
+    }
+    memcpy(result, f, size);
+    munmap(f, size);
   }
-
-  void* f = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
-  if (f == MAP_FAILED) {
-    perror("ERROR (MAP FAILED)");
-    fprintf(stderr, "Could not open file: %s\n", filename);
-    exit(ERROR_FILE_IO);
-  }
-  memcpy(result, f, size);
   sk_string_set_hash(result);
   if (filename != filename_obj) free(filename);
   close(fd);
-  munmap(f, size);
   return result;
 }
 
