@@ -1,3 +1,7 @@
+#ifndef SKIP64
+#error "This file requires -DSKIP64"
+#endif
+
 extern "C" {
 #include "runtime.h"
 }
