@@ -59,7 +59,7 @@ struct backtrace_data {
   bool before_throw;
 };
 
-static int print_callback(void* data, uintptr_t pc, const char* filename,
+static int print_callback(void* data, uintptr_t /* pc */, const char* filename,
                           int lineno, const char* function) {
   auto ctx = static_cast<backtrace_data*>(data);
 
