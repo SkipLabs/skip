@@ -7,6 +7,7 @@ COMMONFLAGS=-Wall -Wextra -Wno-sign-conversion -Wno-sometimes-uninitialized -Wno
 OLEVEL=-O2
 CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm -nostdlibinc $(COMMONFLAGS)
 CC64FLAGS=$(OLEVEL) -DSKIP64 $(COMMONFLAGS)
+CXX64FLAGS=$(OLEVEL) $(COMMONFLAGS)
 
 # NB: this MUST be kept in sync with CRELFILES in prelude/build.mk
 # and CRELFILES in prelude/build_wasm32.mk
@@ -61,7 +62,7 @@ libbacktrace: .libs/libbacktrace.a
 	$(MAKE) -C libbacktrace
 
 runtime64_specific.o: runtime64_specific.cpp .libs/libbacktrace.a
-	clang++ -std=c++11 $(OLEVEL) -g3 -o $@ -c -Ilibbacktrace/ $<
+	clang++ -std=c++11 $(CXX64FLAGS) -g3 -o $@ -c -Ilibbacktrace/ $<
 
 %.o: %.c
 	clang $(CC64FLAGS) -g3 -o $@ -c $<
