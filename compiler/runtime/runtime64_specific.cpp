@@ -369,8 +369,8 @@ char* SKIP_open_file(char* filename_obj) {
     return result;
   }
 
-  char* f = (char*)mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
-  if (f == (void*)MAP_FAILED) {
+  void* f = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
+  if (f == MAP_FAILED) {
     perror("ERROR (MAP FAILED)");
     fprintf(stderr, "Could not open file: %s\n", filename);
     exit(ERROR_FILE_IO);
