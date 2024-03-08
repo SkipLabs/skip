@@ -59,7 +59,7 @@ struct backtrace_data {
   bool before_throw;
 };
 
-static int print_callback(void* data, uintptr_t pc, const char* filename,
+static int print_callback(void* data, uintptr_t /* pc */, const char* filename,
                           int lineno, const char* function) {
   auto ctx = static_cast<backtrace_data*>(data);
 
@@ -349,27 +349,32 @@ char* SKIP_open_file(char* filename_obj) {
   char* filename = sk2c_string(filename_obj);
 
   int fd = open(filename, O_RDONLY);
-  int status = fstat(fd, &s);
-  size_t size = s.st_size;
-
-  char* result = nullptr;
-  if (size == 0) {
-    result = sk_string_alloc(0);
-    sk_string_set_hash(result);
-    return result;
-  }
-
-  char* f = (char*)mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
-  if (f == (void*)MAP_FAILED) {
-    perror("ERROR (MMap FAILED)");
+  if (fd == -1) {
+    perror("ERROR (open failed)");
     fprintf(stderr, "Could not open file: %s\n", filename);
     exit(ERROR_FILE_IO);
   }
-  result = sk_string_alloc(size);
-  memcpy(result, f, size);
+  int status = fstat(fd, &s);
+  if (status == -1) {
+    perror("ERROR (fstat failed)");
+    fprintf(stderr, "Could not open file: %s\n", filename);
+    exit(ERROR_FILE_IO);
+  }
+  size_t size = s.st_size;
+
+  char* result = sk_string_alloc(size);
+  if (size != 0) {
+    void* f = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
+    if (f == MAP_FAILED) {
+      perror("ERROR (MAP FAILED)");
+      fprintf(stderr, "Could not open file: %s\n", filename);
+      exit(ERROR_FILE_IO);
+    }
+    memcpy(result, f, size);
+    munmap(f, size);
+  }
   sk_string_set_hash(result);
   if (filename != filename_obj) free(filename);
-  munmap(f, size);
   close(fd);
   return result;
 }
@@ -423,8 +428,9 @@ int64_t SKIP_notify(char* filename_obj, uint64_t tick) {
   size_t size = strlen(buf);
 
   while (size > 0) {
-    size_t written = write(fd, buf, size);
+    ssize_t written = write(fd, buf, size);
     if (written == -1) {
+      close(fd);
       return -1;
     }
     buf += written;

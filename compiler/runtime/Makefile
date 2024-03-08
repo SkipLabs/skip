@@ -1,12 +1,13 @@
 MEMSIZE32=1073741824
 
-COMMONFLAGS=-Wall -Wextra -Wno-sign-conversion -Wno-sometimes-uninitialized -Wno-c2x-extensions -Wsign-compare -Wextra-semi-stmt
+COMMONFLAGS=-Werror -Wall -Wextra -Wno-sign-conversion -Wno-sometimes-uninitialized -Wno-c2x-extensions -Wsign-compare -Wextra-semi-stmt
 # To add: -Wcast-align -Wcast-qual -Wimplicit-int-conversion -Wmissing-noreturn -Wpadded -Wreserved-identifier -Wshorten-64-to-32 -Wtautological-unsigned-zero-compare
 # -Watomic-implicit-seq-cst ?
 # If using -Weverything, you may want to add -Wno-declaration-after-statement -Wno-missing-prototypes -Wno-missing-variable-declarations -Wno-shadow -Wno-strict-prototypes -Wno-zero-length-array -Wno-unreachable-code-break -Wno-unreachable-code-return
 OLEVEL=-O2
 CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm -nostdlibinc $(COMMONFLAGS)
 CC64FLAGS=$(OLEVEL) -DSKIP64 $(COMMONFLAGS)
+CXX64FLAGS=$(OLEVEL) $(COMMONFLAGS)
 
 # NB: this MUST be kept in sync with CRELFILES in prelude/build.mk
 # and CRELFILES in prelude/build_wasm32.mk
@@ -61,7 +62,7 @@ libbacktrace: .libs/libbacktrace.a
 	$(MAKE) -C libbacktrace
 
 runtime64_specific.o: runtime64_specific.cpp .libs/libbacktrace.a
-	clang++ -std=c++11 $(OLEVEL) -g3 -o $@ -c -Ilibbacktrace/ $<
+	clang++ -std=c++11 $(CXX64FLAGS) -g3 -o $@ -c -Ilibbacktrace/ $<
 
 %.o: %.c
 	clang $(CC64FLAGS) -g3 -o $@ -c $<
