@@ -69,9 +69,9 @@ static int print_callback(void* data, uintptr_t /* pc */, const char* filename,
             function == NULL ? "???" : function);
   }
 
-  if (0 == strcmp(function, "SKIP_throw")) {
+  if (function != NULL && 0 == strcmp(function, "SKIP_throw")) {
     ctx->before_throw = false;
-  } else if (0 == strcmp(function, "skip_main")) {
+  } else if (function != NULL && 0 == strcmp(function, "skip_main")) {
     ctx->before_main = false;
   }
 
