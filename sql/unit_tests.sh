@@ -299,3 +299,9 @@ then
 else
     fail "DATETIME"
 fi
+
+if cat test/unit/test_create_table_as_select.sql | $SKDB | grep -q '1|1|2|2|read-only' ; then
+    pass "CREATE TABLE AS SELECT"
+else
+    fail "CREATE TABLE AS SELECT"
+fi
