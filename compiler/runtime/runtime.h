@@ -175,16 +175,29 @@ typedef struct {
 
 /* The uninterned_metadata_byte_size is the size preceding the pointer to a
    non-string GC value. It is:
-   - 1 word for kSkipGcKindClass, its vtable pointer
+   - 1 word for kSkipGcKindClass, its vtable pointer (see sk_class_inst_t)
    - 2 words for kSkipGcKindArray, its vtable pointer preceded by its size on
        32 bits, itself preceded by an unused padding of 32 bits on 64-bits arch
        (see sk_array_t).
 */
-#define uninterned_metadata_word_size(ty) ((ty)->m_kind + 1)
-#define uninterned_metadata_byte_size(ty) \
-  (uninterned_metadata_word_size(ty) * sizeof(void*))
+#define uninterned_metadata_byte_size(ty)       \
+  (ty_is_array(ty) ? offsetof(sk_array_t, data) \
+                   : offsetof(sk_class_inst_t, data))
+#define uninterned_metadata_word_size(ty) \
+  (uninterned_metadata_byte_size(ty) / sizeof(void*))
+
+#define ty_is_array(ty) ((ty)->m_kind == kSkipGcKindArray)
 
 SKIP_gc_type_t* get_gc_type(char* skip_object);
+
+/*****************************************************************************/
+/* SKIP Class instance representation: */
+/*****************************************************************************/
+
+typedef struct {
+  void** vtable;
+  char data[0];
+} sk_class_inst_t;
 
 /*****************************************************************************/
 /* SKIP Array representation: */
