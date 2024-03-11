@@ -127,7 +127,8 @@ extension class Parser {
     name = Name::create(this.expect_identifier());
 
     if (this.parse_keyword(TAs())) {
-      this.errorNotImplemented()
+      select = this.parseSelect();
+      CreateTableAs{name, select, ifNotExists}
     } else {
       schema = this.parseCreateTableSchema();
       CreateTableSchema{name, schema, ifNotExists}
