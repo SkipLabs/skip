@@ -476,38 +476,26 @@ class Evaluator{options: Options, user: ?UserFile} {
         this.createTable(context, pos, name, dirDescr, ifNotExists);
       })
     | P.CreateTableAs{pos, name, select, ifNotExists} ->
-      core: P.SelectCoreQuery = select.core match {
-      | P.SelectCoreValues _ ->
-        error(
-          pos,
-          "CREATE TABLE AS requires a SELECT query, not a VALUES literal",
-        )
-      | core @ P.SelectCoreQuery _ -> core
+      compiler = SKDB.Compiler::create(false, this.options, select.pos, params);
+      selectAst = select with {
+        core => select.core match {
+        | vals @ P.SelectCoreValues _ -> compiler.expandValuesClause(vals)
+        | qry @ P.SelectCoreQuery _ -> qry
+        },
       };
 
-      compiler = SKDB.Compiler::create(false, this.options, select.pos, params);
       cselect = compiler.compileSelect(
         context,
-        select,
-        genSelectId(select),
+        selectAst,
+        genSelectId(selectAst),
         true,
       );
 
-      (_, cols) = SKDB.Compiler::getCols(core.params, cselect.from);
-
-      schema = cselect.params.mapWithIndex((idx, param) -> {
-        P.ColumnDefinition{
-          name => cols.maybeGet(idx) match {
-          | None() ->
-            error(
-              pos,
-              "Anonymous columns not allowed in CREATE TABLE AS SELECT",
-            )
-          | Some(x) -> x
-          },
-          ty => param.getType(),
-        }
-      });
+      schema = SKDB.Compiler::getSchema(
+        (selectAst.core as P.SelectCoreQuery _).params,
+        cselect.from,
+        cselect.params,
+      );
 
       dirDescr = computeTableDescr(name, schema);
       dirName = dirDescr.dirName;
