@@ -18,7 +18,7 @@ DEFINITIONS=
 OLEVEL=-O2 -g3
 endif # ifdef PROFILE
 
-CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm -nostdlibinc
+CC32FLAGS=$(OLEVEL) -DSKIP32 --target=wasm32 -emit-llvm -nostdlibinc
 
 # NB: this MUST be kept in sync with CFILES in compiler/runtime/Makefile
 # and CRELFILES in prelude/build.mk
@@ -60,7 +60,7 @@ $(BUILD_DIR)magic.c:
 
 $(BUILD_DIR)magic.bc: $(BUILD_DIR)magic.c
 	@[ -d $(dir $@) ] || mkdir -p $(dir $@)
-	@clang $(OLEVEL) $(CC32FLAGS) -o $@ -c $<
+	@clang $(CC32FLAGS) -o $@ -c $<
 
 $(BUILD_DIR)libskip_runtime32.bc: $(BCFILES32)
 	@[ -d $(dir $@) ] || mkdir -p $(dir $@)
@@ -68,5 +68,5 @@ $(BUILD_DIR)libskip_runtime32.bc: $(BCFILES32)
 
 $(BUILD_DIR)%.bc: $(COMP_DIR)/%.c
 	@[ -d $(dir $@) ] || mkdir -p $(dir $@)
-	@clang $(OLEVEL) $(CC32FLAGS) -o $@ -c $<
+	@clang $(CC32FLAGS) -o $@ -c $<
 
