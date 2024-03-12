@@ -137,77 +137,6 @@ SkipInt SKIP_hash_combine(SkipInt crc1, SkipInt crc2) {
 /* Hashing of SKIP objects. */
 /*****************************************************************************/
 
-static uint64_t sk_hash_class(sk_stack_t* st, char* obj) {
-  SKIP_gc_type_t* ty = get_gc_type(obj);
-
-  uint64_t crc = CRC_INIT;
-
-  size_t size = ty->m_userByteSize / sizeof(void*);
-  size_t bitsize = sizeof(void*) * 8;
-  size_t mask_slot = 0;
-  unsigned int i;
-
-  while (size > 0) {
-    for (i = 0; i < bitsize && i < size; i++) {
-      void** ptr = ((void**)obj) + (mask_slot * bitsize) + i;
-      if (((ty->m_refsHintMask & 1) != 0) &&
-          ty->m_refMask[mask_slot] & (1 << i)) {
-        if (*ptr != NULL) {
-          sk_stack_push(st, ptr, ptr);
-        }
-      } else {
-        crc = sk_crc64_combine(crc, *ptr);
-      }
-    }
-    if (size < bitsize) {
-      break;
-    }
-    size -= bitsize;
-    mask_slot++;
-  }
-
-  return crc;
-}
-
-static uint64_t sk_hash_array(sk_stack_t* st, char* obj) {
-  uint64_t crc = CRC_INIT;
-  SKIP_gc_type_t* ty = get_gc_type(obj);
-
-  size_t len = *(uint32_t*)(obj - sizeof(char*) - sizeof(uint32_t));
-  size_t memsize = ty->m_userByteSize * len;
-  size_t bitsize = sizeof(void*) * 8;
-
-  if ((ty->m_refsHintMask & 1) == 0) {
-    crc = sk_crc64(crc, obj, len * ty->m_userByteSize);
-  } else {
-    char* ohead = obj;
-    char* end = obj + memsize;
-
-    while (ohead < end) {
-      size_t size = ty->m_userByteSize;
-      size_t mask_slot = 0;
-      while (size > 0) {
-        unsigned int i;
-        for (i = 0; i < bitsize && size > 0; i++) {
-          if (ty->m_refMask[mask_slot] & (1 << i)) {
-            void** ptr = (void**)ohead;
-            if (*ptr != NULL) {
-              sk_stack_push(st, ptr, ptr);
-            }
-          } else {
-            crc = sk_crc64(crc, ohead, sizeof(void*));
-          }
-          ohead += sizeof(void*);
-          size -= sizeof(void*);
-        }
-        mask_slot++;
-      }
-    }
-  }
-
-  return crc;
-}
-
 static uint64_t sk_hash_string(char* obj) {
   uint64_t crc = CRC_INIT;
   size_t memsize = *(uint32_t*)(obj - 2 * sizeof(uint32_t));
@@ -224,19 +153,39 @@ static uint64_t sk_hash_obj(sk_stack_t* st, char* obj) {
     return sk_hash_string(obj);
   }
 
+  uint64_t crc = CRC_INIT;
   SKIP_gc_type_t* ty = get_gc_type(obj);
-  uint64_t crc;
 
-  switch (ty->m_kind) {
-    case 0:
-      crc = sk_hash_class(st, obj);
-      break;
-    case 1:
-      crc = sk_hash_array(st, obj);
-      break;
-    default:
-      // NOT SUPPORTED
-      SKIP_exit((SkipInt)-1);
+  size_t len = skip_object_len(ty, obj);
+  size_t memsize = ty->m_userByteSize * len;
+
+  if ((ty->m_refsHintMask & 1) == 0) {
+    crc = sk_crc64(crc, obj, memsize);
+  } else {
+    const size_t refMaskWordBitSize = sizeof(ty->m_refMask[0]) * 8;
+    char* ohead = obj;
+    char* end = obj + memsize;
+
+    while (ohead < end) {
+      size_t size = ty->m_userByteSize;
+      size_t mask_slot = 0;
+      while (size > 0) {
+        unsigned int i;
+        for (i = 0; i < refMaskWordBitSize && size > 0; i++) {
+          if (ty->m_refMask[mask_slot] & (1 << i)) {
+            void** ptr = (void**)ohead;
+            if (*ptr != NULL) {
+              sk_stack_push(st, ptr, ptr);
+            }
+          } else {
+            crc = sk_crc64(crc, ohead, sizeof(void*));
+          }
+          ohead += sizeof(void*);
+          size -= sizeof(void*);
+        }
+        mask_slot++;
+      }
+    }
   }
 
   crc = sk_crc64_combine(crc, ty);

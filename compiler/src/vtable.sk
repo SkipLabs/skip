@@ -473,15 +473,7 @@ private fun createGCType(
   env: GlobalEnv,
   config: Config.Config,
 ): ConstantStruct {
-  (
-    userByteSize,
-    numMaskWords,
-    tilesPerMask,
-    uninternedMetaSize,
-    internedMetaSize,
-    kind,
-    isAllDeepFrozen,
-  ) = sc.arraySlot match {
+  (userByteSize, hasGCPointers, uninternedMetaSize, kind) = sc.arraySlot match {
   | None() ->
     // This is a non-Vector type.
 
@@ -495,87 +487,43 @@ private fun createGCType(
       roundUp(last.bitOffset + last.typ.bitSize, 64) / 8
     };
 
-    // We need this many words for our bit mask.
-    words = if (layout.any(x -> x.typ.isGCPointer())) {
-      (userSize / config.ptrByteSize + (config.ptrBitSize - 1)) /
-        config.ptrBitSize
-    } else {
-      0
-    };
-
-    isAllDeepFrozen = sc.fields.all(x -> x.typ.isDeepFrozen());
+    hasGCPointers = layout.any(x -> x.typ.isGCPointer());
 
     (
       userSize, // userByteSize
-      words, // numMaskWords
-      1, // tilesPerMask
+      hasGCPointers,
       config.ptrByteSize, // sizeof(RObjMetadata)
-      3 * config.ptrByteSize, // sizeof(IObjMetadata)
       0, // kSkipGcKindClass
-      isAllDeepFrozen, // kSkipGcRefsHintFrozenRefs
     )
   | Some(slotInfo) ->
     // This is a Vector type.
 
-    // Count how many pointers are in each array slot.
+    // Check whether there are pointers in array slots.
     // They go at the beginning of each slot (in the case of a tuple etc.)
-    numPointers = slotInfo.types.foldl(
-      (acc, t) ->
-        if (t.getScalarType(env).isGCPointer()) {
-          acc + 1
-        } else {
-          acc
-        },
-      0,
-    );
+    hasGCPointers = slotInfo.types.any(t -> t.getScalarType(env).isGCPointer());
 
     userSize = slotInfo.bitSize / 8;
 
-    words = if (numPointers == 0) {
-      0
-    } else {
-      (userSize / config.ptrByteSize + (config.ptrBitSize - 1)) /
-        config.ptrBitSize
-    };
-
-    tiles = if (words == 0) {
-      1
-    } else {
-      max(1, 64 / (userSize / config.ptrByteSize))
-    };
-
-    // Set the GC bits. All pointers are at the beginning of each slot,
-    // but we tile it out as many times as will fit in a 64-bit word
-    // so the inner loop of the GC can be tighter.
-    isAllDeepFrozen = slotInfo.types.all(x -> x.isDeepFrozen());
-
     (
       userSize, // userByteSize
-      words, // numMaskWords
-      tiles, // tilesPerMask
+      hasGCPointers,
       2 * config.ptrByteSize, // uninternedMetaSize
-      3 * config.ptrByteSize, // internedMetaSize
       1, // kSkipGcKindArray
-      isAllDeepFrozen,
     ) // kSkipGcRefsHintFrozenRefs
   };
 
   // Create the string declaring a SkipGcType.
 
-  !numMaskWords =
-    numMaskWords * 2 -
-    (if (isAllDeepFrozen && (numMaskWords > 0)) 1 else 0);
+  // We need this many tInt words for our bit mask.
+  numMaskWords = if (hasGCPointers) {
+    (userByteSize / config.ptrByteSize + 63) / 64
+  } else {
+    0
+  };
 
   refsHint = 0;
   if (numMaskWords != 0) {
     !refsHint = refsHint.or(1) // kSkipGcRefsHintMixedRefs
-  };
-  if (isAllDeepFrozen) {
-    !refsHint = refsHint.or(2) // kSkipGcRefsHintAllFrozenRefs
-  };
-
-  if (!sc.canAliasMutableTypes) {
-    !refsHint = refsHint.or(4) // kSkipGcRefsHintNoDuplicateMutables
   };
 
   // Inserting names into GC info prevents SkipGcTypes from being shared
@@ -592,14 +540,14 @@ private fun createGCType(
     !fieldBitOffset = fieldBitOffset + f.typ.getScalarType(env).bitSize
   };
 
-  // m_refsHint
+  // m_refsHintMask
   pushField(kByteConstants[refsHint]);
 
   // m_kind
   pushField(kByteConstants[kind]);
 
-  // m_tilesPerMask
-  pushField(kByteConstants[tilesPerMask]);
+  // m_unused_tilesPerMask
+  pushField(kByteConstants[0]);
 
   // m_hasName
   pushField(kByteConstants[if (provideName) 1 else 0]);
@@ -613,24 +561,16 @@ private fun createGCType(
     },
   );
 
-  // m_internedMetadataByteSize
-  pushField(
-    ConstantInt{id => InstrID::none, typ => tInt16, value => internedMetaSize},
-  );
+  // m_unused_internedMetadataByteSize
+  pushField(ConstantInt{id => InstrID::none, typ => tInt16, value => 0});
 
   // m_userByteSize
   pushField(
     ConstantInt{id => InstrID::none, typ => tInt, value => userByteSize},
   );
 
-  // unused padding
-  pushField(ConstantInt{id => InstrID::none, typ => tNonGCPointer, value => 0});
-
-  if (config.ptrBitSize == 32) {
-    // Emit alignment padding before the mask words.
-    // TODO: Maybe use 32-bit mask words in this case.
-    pushField(ConstantInt{id => InstrID::none, typ => tInt32, value => 0})
-  };
+  // m_unused_padding
+  pushField(ConstantInt{id => InstrID::none, typ => tInt, value => 0});
 
   if (fieldBitOffset % 64 != 0) {
     sc.die("bad vtable entry alignment")
@@ -641,14 +581,11 @@ private fun createGCType(
     // Create a memory image of the flag words array.
     flags = Array::mfill(numMaskWords, 0);
 
-    setBit = (bitOffset, isMutable) -> {
+    setBit = (bitOffset) -> {
       bitIndex = bitOffset / config.ptrBitSize;
-      wordIndex = 2 * (bitIndex / 64);
+      wordIndex = bitIndex / 64;
       bit = 1.shl(bitIndex % 64);
       flags.set(wordIndex, flags[wordIndex].or(bit));
-      if (isMutable) {
-        flags.set(wordIndex + 1, flags[wordIndex + 1].or(bit));
-      };
     };
 
     sc.arraySlot match {
@@ -656,25 +593,18 @@ private fun createGCType(
       for (x in sc.fields) {
         if (x.typ.getScalarType(env).isGCPointer()) {
           bitOffset = sc.getLayoutSlot(x.name, sc.pos).bitOffset;
-          setBit(bitOffset, !isAllDeepFrozen && !x.typ.isDeepFrozen())
+          setBit(bitOffset)
         }
       }
     | Some(slotInfo) ->
-      // Set the GC bits. All pointers are at the beginning of each slot,
-      // but we tile it out as many times as will fit in a 64-bit word
-      // so the inner loop of the GC can be tighter.
-      for (i in Range(0, tilesPerMask)) {
-        slotInfo.types.eachWithIndex((idx, x) -> {
-          scalarType = x.getScalarType(env);
-          if (scalarType.isGCPointer()) {
-            bitOffset = slotInfo.bitOffsets[idx];
-            setBit(
-              (slotInfo.bitSize * i) + bitOffset,
-              !isAllDeepFrozen && !x.isDeepFrozen(),
-            )
-          }
-        });
-      }
+      // Possible optimization: tile the mask so the inner loop of the GC is tighter.
+      slotInfo.types.eachWithIndex((idx, x) -> {
+        scalarType = x.getScalarType(env);
+        if (scalarType.isGCPointer()) {
+          bitOffset = slotInfo.bitOffsets[idx];
+          setBit(bitOffset)
+        }
+      })
     };
 
     for (f in flags) {

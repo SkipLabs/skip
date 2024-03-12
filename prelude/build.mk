@@ -21,7 +21,8 @@ OLEVEL=-O2 -g3
 endif # ifdef PROFILE
 
 LBT_EXISTS=$(shell [ -e $(LIB_DIR)/libbacktrace.a ] && echo 1 || echo 0 )
-CC64FLAGS=$(OLEVEL) -DSKIP64
+COMMONFLAGS=$(OLEVEL) -Werror -Wall -Wextra -Wno-sign-conversion -Wno-sometimes-uninitialized -Wno-c2x-extensions -Wsign-compare -Wextra-semi-stmt
+CC64FLAGS=-DSKIP64 $(COMMONFLAGS)
 
 # NB: this MUST be kept in sync with CFILES in compiler/runtime/Makefile
 # and CRELFILES in prelude/build_wasm32.mk
@@ -90,7 +91,7 @@ endif
 
 $(BUILD_DIR)runtime/runtime64_specific.o: $(COMP_DIR)/runtime/runtime64_specific.cpp
 	@[ -d $(dir $@) ] || mkdir -p $(dir $@)
-	@clang++ $(OLEVEL) -g3 -o $@ -c -I$(COMP_DIR)/runtime/libbacktrace/ $<
+	@clang++ $(CC64FLAGS) -g3 -o $@ -c -I$(COMP_DIR)/runtime/libbacktrace/ $<
 
 $(BUILD_DIR)%.o: $(COMP_DIR)/%.c
 	@[ -d $(dir $@) ] || mkdir -p $(dir $@)

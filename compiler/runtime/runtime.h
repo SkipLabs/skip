@@ -41,6 +41,16 @@ void sk_print_ctx_table();
 #endif
 
 /*****************************************************************************/
+/* Handy macros. */
+/*****************************************************************************/
+
+#define ptr_is_a_type_member_array(ptr, type, member) \
+  (1 ? (ptr) : &((type*)0)->member[0])
+#define container_of_type_member_array(ptr, type, member)         \
+  ((type*)((char*)ptr_is_a_type_member_array(ptr, type, member) - \
+           offsetof(type, member)))
+
+/*****************************************************************************/
 /* The error code thrown by the runtime. */
 /*****************************************************************************/
 
@@ -146,24 +156,72 @@ sk_value3_t sk_stack3_pop(sk_stack3_t* st);
 /* The type information exposed by the Skip compiler for each object. */
 /*****************************************************************************/
 
+#define kSkipGcKindClass 0
+#define kSkipGcKindArray 1
+
 // vtable entries created by createGCType in vtable.sk
 typedef struct {
   uint8_t m_refsHintMask;
-  uint8_t m_kind;
-  uint8_t m_tilesPerMask;
+  uint8_t m_kind;  // either kSkipGcKindClass or kSkipGcKindArray
+  uint8_t m_unused_tilesPerMask;
   uint8_t m_hasName;
   uint16_t m_uninternedMetadataByteSize;
-  uint16_t m_internedMetadataByteSize;
-  size_t m_userByteSize;
-#ifdef SKIP32
-  void* unused1;
-  void* unused2;
-#endif
-  void* unused;
-  size_t m_refMask[0];
+  uint16_t m_unused_internedMetadataByteSize;
+  SkipInt m_userByteSize;
+  SkipInt m_unused_padding;
+  SkipInt m_refMask[0];
+  // a 0-terminated name follows if m_hasName is true
 } SKIP_gc_type_t;
 
+/* The uninterned_metadata_byte_size is the size preceding the pointer to a
+   non-string GC value. It is:
+   - 1 word for kSkipGcKindClass, its vtable pointer (see sk_class_inst_t)
+   - 2 words for kSkipGcKindArray, its vtable pointer preceded by its size on
+       32 bits, itself preceded by an unused padding of 32 bits on 64-bits arch
+       (see sk_array_t).
+*/
+#define uninterned_metadata_byte_size(ty)       \
+  (ty_is_array(ty) ? offsetof(sk_array_t, data) \
+                   : offsetof(sk_class_inst_t, data))
+#define uninterned_metadata_word_size(ty) \
+  (uninterned_metadata_byte_size(ty) / sizeof(void*))
+
+#define ty_is_array(ty) ((ty)->m_kind == kSkipGcKindArray)
+
+#define ty_is_array(ty) ((ty)->m_kind == kSkipGcKindArray)
+
 SKIP_gc_type_t* get_gc_type(char* skip_object);
+
+/*****************************************************************************/
+/* SKIP Class instance representation: */
+/*****************************************************************************/
+
+typedef struct {
+  void** vtable;
+  char data[0];
+} sk_class_inst_t;
+
+/*****************************************************************************/
+/* SKIP Array representation: */
+/*****************************************************************************/
+
+typedef struct {
+#ifdef SKIP64
+  uint32_t unused_padding;
+#endif
+  uint32_t length;
+  void** vtable;
+  char data[0];
+} sk_array_t;
+
+#define skip_array_len(obj) \
+  (container_of_type_member_array(obj, sk_array_t, data)->length)
+
+/*****************************************************************************/
+/* SKIP objects: arrays and class instances. */
+/*****************************************************************************/
+
+#define skip_object_len(ty, obj) (ty_is_array(ty) ? skip_array_len(obj) : 1)
 
 /*****************************************************************************/
 /* SKIP String representation. */
