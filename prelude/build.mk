@@ -90,7 +90,7 @@ endif
 
 $(BUILD_DIR)runtime/runtime64_specific.o: $(COMP_DIR)/runtime/runtime64_specific.cpp
 	@[ -d $(dir $@) ] || mkdir -p $(dir $@)
-	@clang++ $(OLEVEL) -g3 -o $@ -c -I$(COMP_DIR)/runtime/libbacktrace/ $<
+	@clang++ $(CC64FLAGS) -g3 -o $@ -c -I$(COMP_DIR)/runtime/libbacktrace/ $<
 
 $(BUILD_DIR)%.o: $(COMP_DIR)/%.c
 	@[ -d $(dir $@) ] || mkdir -p $(dir $@)
