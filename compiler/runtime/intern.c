@@ -66,35 +66,6 @@ static char* shallow_intern(char* obj, size_t memsize, size_t leftsize) {
   return mem;
 }
 
-void sk_incr_ref_count(void* obj) {
-#ifdef SKIP32
-  sk_persistent_write(obj, 0);
-#endif
-  uintptr_t* count = obj;
-  if (SKIP_is_string(obj)) {
-#ifdef SKIP64
-    count -= 2;
-#endif
-#ifdef SKIP32
-    count -= 3;
-#endif
-  } else {
-    SKIP_gc_type_t* ty = get_gc_type(obj);
-
-    switch (ty->m_kind) {
-      case 0:
-        count -= 2;
-        break;
-      case 1:
-        count -= 3;
-        break;
-      default:
-        SKIP_exit((SkipInt)-1);
-    }
-  }
-  *count = *count + 1;
-}
-
 static uintptr_t* sk_get_ref_count_addr(void* obj) {
   uintptr_t* count = obj;
   if (SKIP_is_string(obj)) {
@@ -107,18 +78,17 @@ static uintptr_t* sk_get_ref_count_addr(void* obj) {
   } else {
     SKIP_gc_type_t* ty = get_gc_type(obj);
 
-    switch (ty->m_kind) {
-      case 0:
-        count -= 2;
-        break;
-      case 1:
-        count -= 3;
-        break;
-      default:
-        SKIP_exit((SkipInt)-1);
-    }
+    count -= 1 + uninterned_metadata_word_size(ty);
   }
   return count;
+}
+
+void sk_incr_ref_count(void* obj) {
+#ifdef SKIP32
+  sk_persistent_write(obj, 0);
+#endif
+  uintptr_t* count = sk_get_ref_count_addr(obj);
+  *count = *count + 1;
 }
 
 uintptr_t sk_decr_ref_count(void* obj) {
@@ -135,51 +105,17 @@ uintptr_t sk_get_ref_count(void* obj) {
   return *count;
 }
 
-static char* SKIP_intern_class(sk_stack_t* st, char* obj) {
+static char* SKIP_intern_obj(sk_stack_t* st, char* obj) {
   SKIP_gc_type_t* ty = get_gc_type(obj);
 
-  size_t memsize = ty->m_userByteSize;
-  size_t leftsize = ty->m_uninternedMetadataByteSize;
-  void** result = (void**)shallow_intern(obj, memsize, leftsize);
-
-  if (epointer_ty != NULL && ty != epointer_ty &&
-      (ty->m_refsHintMask & 1) != 0) {
-    size_t size = ty->m_userByteSize / sizeof(void*);
-    size_t bitsize = sizeof(void*) * 8;
-    size_t mask_slot = 0;
-    unsigned int i;
-    while (size > 0) {
-      for (i = 0; i < bitsize && i < size; i++) {
-        if (ty->m_refMask[mask_slot] & (1 << i)) {
-          void** ptr = ((void**)obj) + (mask_slot * bitsize) + i;
-          void** slot = result + (mask_slot * bitsize) + i;
-          if (*ptr != NULL) {
-            sk_stack_push(st, ptr, slot);
-          }
-        }
-      }
-      if (size < bitsize) {
-        break;
-      }
-      size -= bitsize;
-      mask_slot++;
-    }
-  }
-
-  return (char*)result;
-}
-
-static char* SKIP_intern_array(sk_stack_t* st, char* obj) {
-  SKIP_gc_type_t* ty = get_gc_type(obj);
-
-  size_t len = *(uint32_t*)(obj - sizeof(char*) - sizeof(uint32_t));
+  size_t len = skip_object_len(ty, obj);
   size_t memsize = ty->m_userByteSize * len;
-  size_t leftsize = ty->m_uninternedMetadataByteSize;
-  void** result = (void**)shallow_intern(obj, memsize, leftsize);
-  size_t bitsize = sizeof(void*) * 8;
+  size_t leftsize = uninterned_metadata_byte_size(ty);
+  char* result = shallow_intern(obj, memsize, leftsize);
 
-  if ((ty->m_refsHintMask & 1) != 0) {
-    char* rhead = (char*)result;
+  if (ty != epointer_ty && (ty->m_refsHintMask & 1) != 0) {
+    const size_t refMaskWordBitSize = sizeof(ty->m_refMask[0]) * 8;
+    char* rhead = result;
     char* ohead = obj;
     char* end = obj + memsize;
 
@@ -188,11 +124,11 @@ static char* SKIP_intern_array(sk_stack_t* st, char* obj) {
       size_t mask_slot = 0;
       while (size > 0) {
         unsigned int i;
-        for (i = 0; i < bitsize && size > 0; i++) {
+        for (i = 0; i < refMaskWordBitSize && size > 0; i++) {
           if (ty->m_refMask[mask_slot] & (1 << i)) {
             void** ptr = (void**)ohead;
-            void** slot = (void**)rhead;
             if (*ptr != NULL) {
+              void** slot = (void**)rhead;
               sk_stack_push(st, ptr, slot);
             }
           }
@@ -205,7 +141,7 @@ static char* SKIP_intern_array(sk_stack_t* st, char* obj) {
     }
   }
 
-  return (char*)result;
+  return result;
 }
 
 static char* SKIP_intern_string(char* obj) {
@@ -216,26 +152,6 @@ static char* SKIP_intern_string(char* obj) {
 
 uint32_t SKIP_is_string(char* obj) {
   return *(((uint32_t*)obj) - 1) & 0x80000000;
-}
-
-static char* SKIP_intern_obj(sk_stack_t* st, char* obj) {
-  char* result;
-
-  SKIP_gc_type_t* ty = get_gc_type(obj);
-
-  switch (ty->m_kind) {
-    case 0:
-      result = SKIP_intern_class(st, obj);
-      break;
-    case 1:
-      result = SKIP_intern_array(st, obj);
-      break;
-    default:
-      // NOT SUPPORTED
-      SKIP_exit((SkipInt)-1);
-  }
-
-  return (char*)result;
 }
 
 void* SKIP_intern_shared(void* obj) {
