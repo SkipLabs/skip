@@ -18,7 +18,8 @@ DEFINITIONS=
 OLEVEL=-O2 -g3
 endif # ifdef PROFILE
 
-CC32FLAGS=$(OLEVEL) -DSKIP32 --target=wasm32 -emit-llvm -nostdlibinc
+COMMONFLAGS=$(OLEVEL) -Werror -Wall -Wextra -Wno-sign-conversion -Wno-sometimes-uninitialized -Wno-c2x-extensions -Wsign-compare -Wextra-semi-stmt
+CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm -nostdlibinc $(COMMONFLAGS)
 
 # NB: this MUST be kept in sync with CFILES in compiler/runtime/Makefile
 # and CRELFILES in prelude/build.mk
