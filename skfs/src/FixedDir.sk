@@ -579,7 +579,20 @@ base class FixedSourceMap {
   overridable static fun empty(): FixedSourceMap {
     FSMImpl::empty()
   }
-  static fun getMetadata(data: readonly Vector<(Path, MInfo)>): ?FSMMetadata {
+  overridable static fun create(
+    data: mutable Vector<(Path, MInfo)>,
+    allowDuplicates: Bool = false,
+  ): FixedSourceMap {
+    static::getMetadata(data) match {
+    | Some(metadata) ->
+      CompactFSMImpl::createWithMetadata(data, metadata, allowDuplicates)
+    | None() -> FSMImpl::create(data, allowDuplicates)
+    }
+  }
+
+  private static fun getMetadata(
+    data: readonly Vector<(Path, MInfo)>,
+  ): ?FSMMetadata {
     seenDirOpt: ?DirName = None();
     seenRowKindsOpt: ?Array<(Int, SQLParser.IKind, SQLParser.Type)> = None();
     seenMInfoTypeOpt: ?FSMMInfoType = None();
@@ -781,7 +794,7 @@ class CompactFSMImpl protected (
     }
   }
 
-  static fun create(
+  static fun createWithMetadata(
     data: mutable Vector<(Path, MInfo)>,
     metadata: FSMMetadata,
     allowDuplicates: Bool = false,
