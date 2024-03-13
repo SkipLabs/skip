@@ -104,12 +104,6 @@ void* SKIP_copy_with_pages(void* obj, size_t nbr_pages, sk_cell_t* pages) {
 
     if (SKIP_is_string(toCopy)) {
       sk_string_t* str = get_sk_string(toCopy);
-      if (str->size != (uint32_t)-1 && str->size < sizeof(void*)) {
-        void* copied_ptr = SKIP_copy_string(toCopy, large_page);
-        *delayed.slot = copied_ptr;
-        continue;
-      }
-
       if (str->size == (uint32_t)-1) {
         void* copied_ptr = *(void**)toCopy;
         *delayed.slot = copied_ptr;
