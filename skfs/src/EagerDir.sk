@@ -810,10 +810,7 @@ class EagerDir{
       add(this.fixedOld[current]);
       !current = current + 1;
     };
-    FixedSourceMap::getMetadata(acc) match {
-    | Some(metadata) -> CompactFSMImpl::create(acc, metadata)
-    | None() -> FSMImpl::create(acc)
-    }
+    FixedSourceMap::create(acc)
   }
 
   private fun flattenData(limit: Tick): FixedDataMap {
@@ -1373,11 +1370,7 @@ class EagerDir{
       };
 
       data = DataMap::empty();
-
-      fixedOld = FixedSourceMap::getMetadata(oldVec) match {
-      | Some(metadata) -> CompactFSMImpl::create(oldVec, metadata, true)
-      | None() -> FSMImpl::create(oldVec, true)
-      };
+      fixedOld = FixedSourceMap::create(oldVec, true);
 
       EagerDir{
         time,
