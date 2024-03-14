@@ -659,6 +659,13 @@ class ExprEvaluator(
       | ADef _ -> ADef(0)
       }
 
+    | CILength(e) ->
+      this.evalCSExpr(context, e) match {
+      | AUndef() -> AUndef()
+      | ANull() -> ANull()
+      | ADef(s) -> ADef(s.length())
+      }
+
     | CFIsNull(e) ->
       this.evalCFExpr(context, e) match {
       | AUndef() -> AUndef()
