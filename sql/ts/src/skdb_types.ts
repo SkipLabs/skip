@@ -193,3 +193,9 @@ export interface SKDBGroup {
 
   removeMember: (userID: string) => Promise<void>;
 }
+
+export interface SKDBTransaction {
+  addStatement: (stmt: string) => SKDBTransaction;
+  params: (params: Params) => SKDBTransaction;
+  flush: (params?: Params) => Promise<SKDBTable>;
+}

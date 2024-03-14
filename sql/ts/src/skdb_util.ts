@@ -1,3 +1,5 @@
+import type { SKDB, Params } from "./skdb_types.js";
+
 /* ***************************************************************************/
 /* The type used to represent callable external functions. */
 /* ***************************************************************************/
@@ -100,5 +102,44 @@ export class SKDBTable extends Array<Record<string, any>> {
       }
       return row[col];
     });
+  }
+}
+
+/* ***************************************************************************/
+/* Transaction API for programmatically constructing and executing
+   transactions against an SKDB instance */
+/* ***************************************************************************/
+
+export class SKDBTransaction {
+  private query_params: Params;
+  private stmts: Array<string>;
+  private db_handle: SKDB;
+
+  constructor(skdb: SKDB) {
+    this.query_params = {};
+    this.stmts = [];
+    this.db_handle = skdb;
+  }
+
+  addStatement(stmt: string): SKDBTransaction {
+    this.stmts.push(stmt.trim().replace(/;$/, ""));
+    return this;
+  }
+
+  params(params: Params): SKDBTransaction {
+    Object.assign(this.query_params, params);
+    return this;
+  }
+
+  flush(params: Params = {}): Promise<SKDBTable> {
+    this.params(params);
+
+    let txn = "BEGIN TRANSACTION;";
+    for (const stmt of this.stmts) {
+      txn = txn + "\n\t" + stmt + ";";
+    }
+    txn = txn + "\nCOMMIT;";
+
+    return this.db_handle.exec(txn, this.query_params);
   }
 }
