@@ -286,43 +286,42 @@ export class SKDBSyncImpl implements SKDBSync {
     let keyNbr = 0;
 
     let colTypes = this.tableSchema(tableName)
-        .replace(/.*\(/, "")
-        .replace(");", "")
-        .replace(/\n/g, "")
-        .replace(/[ ]+/g, " ")
-        .split(",");
+      .replace(/.*\(/, "")
+      .replace(");", "")
+      .replace(/\n/g, "")
+      .replace(/[ ]+/g, " ")
+      .split(",");
 
-    let colNames = colTypes.map(col => col.split(" ")[1]);
+    let colNames = colTypes.map((col) => col.split(" ")[1]);
 
     let colIndex = new Map();
-    for(let i in colNames) {
+    for (let i in colNames) {
       colIndex.set(colNames[i], i);
     }
 
-    
-    while(valueIndex < valuesArray.length) {
+    while (valueIndex < valuesArray.length) {
       let buffer = new Array();
       buffer.push("insert into " + tableName + " values ");
-      for(let roundIdx = 0; roundIdx < 1000; roundIdx++) {
-        if(valueIndex >= valuesArray.length) break;
+      for (let roundIdx = 0; roundIdx < 1000; roundIdx++) {
+        if (valueIndex >= valuesArray.length) break;
         let values = new Array();
         let valuesSize = 0;
         let obj = valuesArray[valueIndex];
-        for(let fieldName in obj) {
-          if(!colIndex.has(fieldName)) {
+        for (let fieldName in obj) {
+          if (!colIndex.has(fieldName)) {
             return new Error("Field not found: " + fieldName);
           }
           values[colIndex.get(fieldName)] = obj[fieldName];
           valuesSize++;
         }
-        if(valuesSize < colTypes.length) {
+        if (valuesSize < colTypes.length) {
           let error;
           colIndex.forEach((_, fieldName) => {
-            if(!obj.hasOwnProperty(fieldName)) {
+            if (!obj.hasOwnProperty(fieldName)) {
               error = new Error("Missing field: " + fieldName);
             }
           });
-          throw error
+          throw error;
         }
         let keys = values.map((val, _) => {
           let key = "@key" + keyNbr;
@@ -330,19 +329,19 @@ export class SKDBSyncImpl implements SKDBSync {
           params.set(key, val);
           return key;
         });
-        if(roundIdx != 0) buffer.push(",");
+        if (roundIdx != 0) buffer.push(",");
         buffer.push("(" + keys.join(", ") + ")");
         valueIndex++;
       }
       buffer.push(";");
-      let [args1, stdin1] = this.addParams([], params, buffer.join(''));
+      let [args1, stdin1] = this.addParams([], params, buffer.join(""));
       let stderr = this.runLocal(args1, stdin1);
-      if(stderr != "") {
+      if (stderr != "") {
         throw Error(stderr);
       }
-    };
+    }
     return valueIndex;
-  }
+  };
 
   assertCanBeMirrored(tableName: string, schema: string): void {
     const error = this.runLocal(["can-mirror", tableName, schema], "");
@@ -468,7 +467,7 @@ export class SKDBImpl implements SKDB {
 
   async insertMany(tableName: string, valuesArray: Array<Record<string, any>>) {
     let result = this.skdbSync.insertMany(tableName, valuesArray);
-    if(result instanceof Error) {
+    if (result instanceof Error) {
       throw result;
     }
     return result;
