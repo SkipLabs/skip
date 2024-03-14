@@ -1612,13 +1612,13 @@ export const tests = (asWorker: boolean) => {
       fun: async (skdb: SKDB) => {
         await skdb.exec("create table t1 (a TEXT);");
         let objects = [
-          {data:"x\u2019s re"},
-          {data:"y\u2013 1"},
-          {data:"z\u00ae b"},
-          {data:"\u00c3\u00a9al P"},
-          {data:" \u2022 T"}
+          { data: "x\u2019s re" },
+          { data: "y\u2013 1" },
+          { data: "z\u00ae b" },
+          { data: "\u00c3\u00a9al P" },
+          { data: " \u2022 T" },
         ];
-        for(let i in objects) {
+        for (let i in objects) {
           await skdb.exec("insert into t1 values(@data)", objects[i]);
         }
         return JSON.stringify(await skdb.exec("select * from t1"));
@@ -1636,20 +1636,20 @@ export const tests = (asWorker: boolean) => {
       fun: async (skdb: SKDB) => {
         await skdb.exec("create table t1 (a JSON);");
         let objects = [
-          {data: {field1: "x\u2019s re"}},
-          {data: {field1: "y\u2013 1"}},
-          {data: {field1: "z\u00ae b"}},
-          {data: {field1: "\u00c3\u00a9al P"}},
-          {data: {field1: " \u2022 T"}}
+          { data: { field1: "x\u2019s re" } },
+          { data: { field1: "y\u2013 1" } },
+          { data: { field1: "z\u00ae b" } },
+          { data: { field1: "\u00c3\u00a9al P" } },
+          { data: { field1: " \u2022 T" } },
         ];
-        for(let i in objects) {
+        for (let i in objects) {
           objects[i].data = JSON.stringify(objects[i].data);
           await skdb.exec("insert into t1 values(@data)", objects[i]);
         }
         return await skdb.exec("select * from t1");
       },
       check: (res) => {
-        let all = res.map(x => JSON.parse(x.a).field1).join("");
+        let all = res.map((x) => JSON.parse(x.a).field1).join("");
         expect(all).toMatch(/x\u2019s re/);
         expect(all).toMatch(/y\u2013 1/);
         expect(all).toMatch(/z\u00ae b/);
@@ -1661,7 +1661,10 @@ export const tests = (asWorker: boolean) => {
       name: n("insertMany unit", asWorker),
       fun: async (skdb: SKDB) => {
         await skdb.exec("create table t1 (a TEXT, b INTEGER);");
-        await skdb.insertMany('t1', [{a:'foo', b:0}, {a:'bar', b: 1}]);
+        await skdb.insertMany("t1", [
+          { a: "foo", b: 0 },
+          { a: "bar", b: 1 },
+        ]);
         return await skdb.exec("select * from t1");
       },
       check: (res) => {
@@ -1675,14 +1678,14 @@ export const tests = (asWorker: boolean) => {
       fun: async (skdb: SKDB) => {
         await skdb.exec("create table t1 (a TEXT, b INTEGER);");
         let values = new Array();
-        for(let i = 0; i < 2100; i++) {
-          values.push({a:'foo', b:i});
+        for (let i = 0; i < 2100; i++) {
+          values.push({ a: "foo", b: i });
         }
-        await skdb.insertMany('t1', values);
+        await skdb.insertMany("t1", values);
         return await skdb.exec("select count(*) as c from t1");
       },
       check: (res) => {
-        expect(res).toEqual([{c: 2100}]);
+        expect(res).toEqual([{ c: 2100 }]);
       },
     },
     {
@@ -1690,7 +1693,10 @@ export const tests = (asWorker: boolean) => {
       fun: async (skdb: SKDB) => {
         await skdb.exec("create table t1 (a TEXT, b INTEGER);");
         try {
-          return await skdb.insertMany('t1', [{a:'foo'}, {a:'bar', b: 1}]);
+          return await skdb.insertMany("t1", [
+            { a: "foo" },
+            { a: "bar", b: 1 },
+          ]);
         } catch (e) {
           return (e as Error).message;
         }
@@ -1704,7 +1710,10 @@ export const tests = (asWorker: boolean) => {
       fun: async (skdb: SKDB) => {
         await skdb.exec("create table t1 (a TEXT, b INTEGER);");
         try {
-          return await skdb.insertMany('t1', [{a:'foo', b:1, c:2}, {a:'bar', b: 1}]);
+          return await skdb.insertMany("t1", [
+            { a: "foo", b: 1, c: 2 },
+            { a: "bar", b: 1 },
+          ]);
         } catch (e) {
           return (e as Error).message;
         }
@@ -1725,7 +1734,7 @@ export const tests = (asWorker: boolean) => {
       check: (res) => {
         expect(res).toMatch(/Construction not implemented/);
       },
-    }
+    },
   ];
   return tests
     .concat(watchTests(asWorker))
