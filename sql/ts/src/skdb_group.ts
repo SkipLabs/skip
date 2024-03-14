@@ -1,4 +1,5 @@
 import type { SKDB, SKDBGroup } from "./skdb_types.js";
+import { SKDBTransaction } from "./skdb_util.js";
 
 export class SKDBGroupImpl implements SKDBGroup {
   skdb: SKDB;
@@ -50,13 +51,12 @@ export class SKDBGroupImpl implements SKDBGroup {
     // First, create the primary group and get its auto-generated groupID
     // (initially managed/accessed exclusively by userID, since we haven't created admin/owner groups yet)
     const groupID = (
-      await skdb.exec(
-        `BEGIN TRANSACTION;
-           INSERT INTO skdb_groups VALUES (id('groupID'), @userID, @userID, @userID);
-           SELECT id('groupID');
-         COMMIT;`,
-        { userID },
-      )
+      await new SKDBTransaction(skdb)
+        .addStatement(
+          "INSERT INTO skdb_groups VALUES (id('groupID'), @userID, @userID, @userID)",
+        )
+        .addStatement("SELECT id('groupID')")
+        .flush({ userID })
     ).scalarValue();
 
     const group = new SKDBGroupImpl(skdb, groupID);
@@ -154,12 +154,13 @@ export class SKDBGroupImpl implements SKDBGroup {
   }
 
   async transferOwnership(userID: string) {
-    await this.skdb.exec(
-      `BEGIN TRANSACTION;
-         DELETE FROM skdb_group_permissions WHERE groupID=@ownerGroupID;
-         INSERT INTO skdb_group_permissions VALUES (@ownerGroupID, @userID, skdb_permission('rw'), @ownerGroupID);
-       COMMIT;`,
-      { userID, ownerGroupID: this.ownerGroupID },
-    );
+    await new SKDBTransaction(this.skdb)
+      .addStatement(
+        "DELETE FROM skdb_group_permissions WHERE groupID=@ownerGroupID",
+      )
+      .addStatement(
+        "INSERT INTO skdb_group_permissions VALUES (@ownerGroupID, @userID, skdb_permission('rw'), @ownerGroupID)",
+      )
+      .flush({ userID, ownerGroupID: this.ownerGroupID });
   }
 }
