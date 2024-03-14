@@ -1739,6 +1739,16 @@ mutable class Compiler{
         | (x, _) -> x
         }
 
+      | "length" ->
+        if (args.size() != 1) {
+          error(this.pos, "LENGTH expects 1 argument");
+        };
+        this.compileExpr(context, args[0]) match {
+        | CGNull() -> CGNull()
+        | CSExpr(e1) -> CIExpr(CILength(e1))
+        | _ -> error(this.pos, "LENGTH expects a string argument")
+        }
+
       | _ -> error(this.pos, `Unknown function: ${fname}`)
       }
 
