@@ -199,17 +199,17 @@ void SKIP_cond_wait(pthread_cond_t* x, pthread_mutex_t* y) {
   pthread_cond_wait(x, y);
 }
 
-int SKIP_cond_timedwait(pthread_cond_t* x, pthread_mutex_t* y, uint32_t secs) {
+int32_t SKIP_cond_timedwait(pthread_cond_t* x, pthread_mutex_t* y, uint32_t secs) {
   struct timeval tv;
   struct timespec ts;
   gettimeofday(&tv, NULL);
   ts.tv_sec = tv.tv_sec + secs;
   ts.tv_nsec = 0;
-  return pthread_cond_timedwait(x, y, &ts);
+  return (int32_t)pthread_cond_timedwait(x, y, &ts);
 }
 
-void SKIP_cond_broadcast(void* c) {
-  pthread_cond_broadcast(c);
+int32_t SKIP_cond_broadcast(void* c) {
+  return (int32_t)pthread_cond_broadcast(c);
 }
 
 /*****************************************************************************/

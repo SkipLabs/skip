@@ -23,13 +23,13 @@ SKIP_gc_type_t* get_gc_type(char* skip_object) {
 
 void SKIP_Regex_initialize() {}
 
-void SKIP_print_last_exception_stack_trace_and_exit() {
+void SKIP_print_last_exception_stack_trace_and_exit(void*) {
   todo();
 }
-void SKIP_unreachableMethodCall() {
+void SKIP_unreachableMethodCall(void*, void*) {
   todo();
 }
-void SKIP_unreachableWithExplanation() {
+void SKIP_unreachableWithExplanation(void*) {
   todo();
 }
 
