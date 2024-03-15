@@ -198,7 +198,7 @@ export interface SKDBGroup {
 }
 
 export interface SKDBTransaction {
-  addStatement: (stmt: string) => SKDBTransaction;
-  params: (params: Params) => SKDBTransaction;
-  flush: (params?: Params) => Promise<SKDBTable>;
+  add: (stmt: string) => SKDBTransaction;
+  addParams: (params: Params) => SKDBTransaction;
+  commit: (additionalParams?: Params) => Promise<SKDBTable>;
 }
