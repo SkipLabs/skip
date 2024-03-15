@@ -302,4 +302,22 @@ mutable class BufferedReader<T: mutable Read>(
   }
 }
 
+// TODO: Properly optimized copy.
+fun copy<R: mutable Read, W: mutable Write>(
+  reader: R,
+  writer: W,
+): Result<Int, Error> {
+  buf = mutable Vector[];
+  reader.read_to_end(buf) match {
+  | Failure(err) -> return Failure(err)
+  | Success _ -> void
+  };
+  res = buf.size();
+  writer.write_all(buf.bytes()) match {
+  | Failure(err) -> return Failure(err)
+  | Success _ -> void
+  };
+  Success(res)
+}
+
 module end;
