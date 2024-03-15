@@ -72,4 +72,55 @@ private mutable class BytesIterator(
   }
 }
 
+mutable class Cursor(
+  buffer: readonly Bytes,
+  mutable pos: Int = 0,
+) uses IO.Read {
+  static fun create(buffer: readonly Bytes): mutable Cursor {
+    mutable Cursor(buffer)
+  }
+
+  mutable fun read(buf: mutable MutableBytes): Result<Int, IO.Error> {
+    readSz = min(buf.size(), this.buffer.size() - this.pos);
+    // TODO: Proper copy.
+    for (i in Range(0, readSz)) {
+      buf![i] = this.buffer[this.pos + i]
+    };
+    this.!pos = this.pos + readSz;
+
+    Success(readSz)
+  }
+}
+
+mutable class MutableCursor(
+  buffer: mutable MutableBytes,
+  mutable pos: Int = 0,
+) uses IO.Write, IO.Read {
+  static fun create(buffer: mutable MutableBytes): mutable MutableCursor {
+    mutable MutableCursor(buffer)
+  }
+
+  mutable fun read(buf: mutable MutableBytes): Result<Int, IO.Error> {
+    readSz = min(buf.size(), this.buffer.size() - this.pos);
+    // TODO: Proper copy.
+    for (i in Range(0, readSz)) {
+      buf![i] = this.buffer[this.pos + i]
+    };
+    this.!pos = this.pos + readSz;
+
+    Success(readSz)
+  }
+
+  mutable fun write(buf: readonly Bytes): Result<Int, IO.Error> {
+    writeSz = min(buf.size(), this.buffer.size() - this.pos);
+    // TODO: Proper copy.
+    for (i in Range(0, writeSz)) {
+      this.buffer![this.pos + i] = buf[i]
+    };
+    this.!pos = this.pos + writeSz;
+
+    Success(writeSz)
+  }
+}
+
 module end;

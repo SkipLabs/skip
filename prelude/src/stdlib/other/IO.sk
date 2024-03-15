@@ -194,31 +194,6 @@ mutable class File(
   }
 }
 
-mutable class StringIO(
-  private buffer: mutable Vector<UInt8> = mutable Vector[],
-  private mutable pos: Int = 0,
-) uses Read, Write, IsTerminal {
-  fun isatty(): Bool {
-    false
-  }
-
-  mutable fun read(buf: mutable MutableBytes): Result<Int, Error> {
-    readSz = min(buf.size(), this.buffer.size() - this.pos);
-    // TODO: Proper copy.
-    for (i in Range(0, readSz)) {
-      buf![i] = this.buffer[this.pos + i]
-    };
-    this.!pos = this.pos + readSz;
-
-    Success(readSz)
-  }
-
-  mutable fun write(buf: readonly Bytes): Result<Int, Error> {
-    this.buffer.extend(buf);
-    Success(buf.size())
-  }
-}
-
 trait BufRead extends Read {
   mutable fun fill_buf(): Result<readonly Bytes, Error>;
   mutable fun consume(nbytes: Int): void;
