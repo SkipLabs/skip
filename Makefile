@@ -157,3 +157,14 @@ run-dev-server: sql/target/host/dev/skdb build/init.sql
 build/index.html: sql/js/index.html
 	mkdir -p build
 	cp $^ $@
+
+.PHONY: check-vite
+check-vite: npm
+	rm -rf build/vitejs
+	git clone https://github.com/SkipLabs/skdb_vite_react_starter.git build/vitejs
+	cd build/vitejs && npm install;
+	rm -r build/vitejs/node_modules/skdb
+	cp -r build/package/skdb build/vitejs/node_modules/
+	cd build/vitejs && npm run build
+
+
