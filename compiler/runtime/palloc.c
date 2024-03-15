@@ -463,7 +463,7 @@ void sk_create_mapping(char* fileName, char* static_limit, size_t icapacity) {
   }
   int fd = open(fileName, O_RDWR | O_CREAT, 0600);
   lseek(fd, icapacity, SEEK_SET);
-  write(fd, "", 1);
+  (void)write(fd, "", 1);
   int prot = PROT_READ | PROT_WRITE;
   file_mapping_t* mapping =
       mmap(BOTTOM_ADDR, icapacity, prot, MAP_SHARED | MAP_FIXED, fd, 0);
