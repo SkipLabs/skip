@@ -151,7 +151,7 @@ export interface Environment {
   disableWarnings: boolean;
   environment: Array<string>;
   createSocket: (uir: string) => WebSocket;
-  createWorker: (filename: string | URL, options?: WorkerOptions) => Wrk;
+  createWorker: (url: URL, options?: WorkerOptions) => Wrk;
   createWorkerWrapper: (worker: Worker) => Wrk;
   timestamp: () => float;
   decodeUTF8: (utf8: ArrayBuffer) => string;
@@ -707,17 +707,6 @@ export function trimEndChar(str: string, ch: string) {
   var end = str.length;
   while (end > 0 && str[end - 1] === ch) --end;
   return end < str.length ? str.substring(0, end) : str;
-}
-
-export function relativeto(path: string, ref: string) {
-  if (ref.length == 0) {
-    return path;
-  }
-  if (path.startsWith(ref)) {
-    ref = trimEndChar(ref, "/");
-    return "." + path.substring(ref.length);
-  }
-  return path;
 }
 
 export function humanSize(bytes: int) {
