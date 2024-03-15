@@ -400,7 +400,7 @@ void SKIP_FileSystem_appendTextFile(char* filename_obj, char* str_obj) {
   char* filename = sk2c_string(filename_obj);
 
   int fd = open(filename, O_WRONLY | O_CREAT | O_APPEND, 0775);
-  write(fd, str_obj, SKIP_String_byteSize(str_obj));
+  (void)write(fd, str_obj, SKIP_String_byteSize(str_obj));
   close(fd);
 
   if (filename != filename_obj) free(filename);
