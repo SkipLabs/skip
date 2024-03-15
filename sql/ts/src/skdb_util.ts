@@ -111,28 +111,28 @@ export class SKDBTable extends Array<Record<string, any>> {
 /* ***************************************************************************/
 
 export class SKDBTransaction {
-  private query_params: Params;
+  private params: Params;
   private stmts: Array<string>;
   private db_handle: SKDB;
 
   constructor(skdb: SKDB) {
-    this.query_params = {};
+    this.params = {};
     this.stmts = [];
     this.db_handle = skdb;
   }
 
-  addStatement(stmt: string): SKDBTransaction {
+  add(stmt: string): SKDBTransaction {
     this.stmts.push(stmt.trim().replace(/;$/, ""));
     return this;
   }
 
-  params(params: Params): SKDBTransaction {
-    Object.assign(this.query_params, params);
+  addParams(params: Params): SKDBTransaction {
+    Object.assign(this.params, params);
     return this;
   }
 
-  flush(params: Params = {}): Promise<SKDBTable> {
-    this.params(params);
+  commit(additionalParams: Params = {}): Promise<SKDBTable> {
+    this.addParams(additionalParams);
 
     let txn = "BEGIN TRANSACTION;";
     for (const stmt of this.stmts) {
@@ -140,6 +140,6 @@ export class SKDBTransaction {
     }
     txn = txn + "\nCOMMIT;";
 
-    return this.db_handle.exec(txn, this.query_params);
+    return this.db_handle.exec(txn, this.params);
   }
 }
