@@ -306,7 +306,7 @@ else
     fail "CREATE TABLE AS SELECT"
 fi
 
-if cat test/unit/test_length.sql | $SKDB | grep -q '|0|||test|4' ; then
+if cat test/unit/test_length.sql | $SKDB | grep -q '|0|||test|4|literal|7' ; then
     pass "LENGTH"
 else
     fail "LENGTH"
