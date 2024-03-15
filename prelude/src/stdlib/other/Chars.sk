@@ -135,6 +135,19 @@ fun octDigitsToInt(digits: String): Int {
   digits.foldl((current, digit) -> current * 8 + hexDigitToInt(digit), 0)
 }
 
+fun intToOctDigits(n: Int): String {
+  digits = mutable Vector[];
+  while (n > 0) {
+    digits.push(hexDigitChars[n.and(0x7)]);
+    !n = n.ushr(3)
+  };
+  if (digits.isEmpty()) {
+    "0"
+  } else {
+    String::fromChars(digits.collect(Array))
+  }
+}
+
 const aLowerCode: Int = 'a'.code();
 const zLowerCode: Int = 'z'.code();
 const aUpperCode: Int = 'A'.code();
