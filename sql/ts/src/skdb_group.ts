@@ -52,11 +52,11 @@ export class SKDBGroupImpl implements SKDBGroup {
     // (initially managed/accessed exclusively by userID, since we haven't created admin/owner groups yet)
     const groupID = (
       await new SKDBTransaction(skdb)
-        .addStatement(
+        .add(
           "INSERT INTO skdb_groups VALUES (id('groupID'), @userID, @userID, @userID)",
         )
-        .addStatement("SELECT id('groupID')")
-        .flush({ userID })
+        .add("SELECT id('groupID')")
+        .commit({ userID })
     ).scalarValue();
 
     const group = new SKDBGroupImpl(skdb, groupID);
@@ -155,12 +155,10 @@ export class SKDBGroupImpl implements SKDBGroup {
 
   async transferOwnership(userID: string) {
     await new SKDBTransaction(this.skdb)
-      .addStatement(
-        "DELETE FROM skdb_group_permissions WHERE groupID=@ownerGroupID",
-      )
-      .addStatement(
+      .add("DELETE FROM skdb_group_permissions WHERE groupID=@ownerGroupID")
+      .add(
         "INSERT INTO skdb_group_permissions VALUES (@ownerGroupID, @userID, skdb_permission('rw'), @ownerGroupID)",
       )
-      .flush({ userID, ownerGroupID: this.ownerGroupID });
+      .commit({ userID, ownerGroupID: this.ownerGroupID });
   }
 }
