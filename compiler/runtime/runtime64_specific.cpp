@@ -415,7 +415,7 @@ bool SKIP_check_if_file_exists(char* filename_obj) {
   return res;
 }
 
-int64_t SKIP_notify(char* filename_obj, uint64_t tick) {
+int32_t SKIP_notify(char* filename_obj, int32_t tick) {
   char* filename = sk2c_string(filename_obj);
 
   int fd = open(filename, O_CREAT | O_WRONLY, 0644);
@@ -428,7 +428,7 @@ int64_t SKIP_notify(char* filename_obj, uint64_t tick) {
 
   char buf_data[256];
   char* buf = buf_data;
-  snprintf(buf, 256, "%" PRIu64 "\n", tick);
+  snprintf(buf, 256, "%d\n", tick);
   size_t size = strlen(buf);
 
   while (size > 0) {

@@ -151,7 +151,7 @@ void SKIP_flush_stdout() {
   // Not implemented
 }
 
-uint64_t SKIP_notify(char* /* filename_obj */, uint64_t /* tick */) {
+int32_t SKIP_notify(char* /* filename_obj */, int32_t /* tick */) {
   // Not implemented
   return 0;
 }
@@ -199,9 +199,9 @@ void SKIP_cond_init(void* /* cond */) {}
 
 void SKIP_cond_wait(void* /* x */, void* /* y */) {}
 
-void SKIP_cond_timedwait(void* /* x */, void* /* y */, uint32_t /* secs */) {}
+int32_t SKIP_cond_timedwait(void* /* x */, void* /* y */, uint32_t /* secs */) { return 0; }
 
-void SKIP_cond_broadcast(void* /* c */) {}
+int32_t SKIP_cond_broadcast(void* /* c */) { return 0; }
 
 int SKIP_stdin_has_data() {
   return 1;
