@@ -659,13 +659,6 @@ class ExprEvaluator(
       | ADef _ -> ADef(0)
       }
 
-    | CILength(e) ->
-      this.evalCSExpr(context, e) match {
-      | AUndef() -> AUndef()
-      | ANull() -> ANull()
-      | ADef(s) -> ADef(s.length())
-      }
-
     | CFIsNull(e) ->
       this.evalCFExpr(context, e) match {
       | AUndef() -> AUndef()
@@ -950,6 +943,13 @@ class ExprEvaluator(
       }
     | CIFCast(f) -> this.evalCFExpr(context, f).map(x -> x.toInt())
     | CISCast(s) -> this.evalCSExpr(context, s).map(x -> x.toInt())
+
+    | CSLength(e) ->
+      this.evalCSExpr(context, e) match {
+      | AUndef() -> AUndef()
+      | ANull() -> ANull()
+      | ADef(s) -> ADef(s.length())
+      }
     }
   }
 
