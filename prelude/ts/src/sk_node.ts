@@ -17,12 +17,10 @@ class WrkImpl implements Wrk {
   }
 
   static fromPath(
-    filename: string | URL,
+    url: URL,
     options: WorkerOptions | undefined,
   ): Wrk {
-    if (filename instanceof URL) {
-      filename = "./" + filename.href.substring(process.cwd().length + 8);
-    }
+    const filename = "." + url.pathname.substring(process.cwd().length);
     return new this(new Worker(filename, options));
   }
 
@@ -50,7 +48,7 @@ class Env implements Environment {
   environment: Array<string>;
   throwRuntime: (code: int) => void;
   createSocket: (uri: string) => WebSocket;
-  createWorker: (filename: string | URL, options?: WorkerOptions) => Wrk;
+  createWorker: (url: URL, options?: WorkerOptions) => Wrk;
   createWorkerWrapper: (worker: any) => Wrk;
   crypto: () => Crypto;
   fs() {
@@ -63,10 +61,7 @@ class Env implements Environment {
     return "node";
   }
   fetch(url: URL) {
-    var path = "./" + url.href.substring(process.cwd().length + 8);
-    if (path.startsWith("file://")) {
-      path = path.substring(7);
-    }
+    const path = "." + url.pathname.substring(process.cwd().length);
     return new Promise<Uint8Array>(function (resolve, reject) {
       fs.readFile(path, {}, (err, data) => {
         err ? reject(err) : resolve(data);
@@ -89,8 +84,8 @@ class Env implements Environment {
       process.exit(code);
     };
     this.createSocket = (uri: string) => new WebSocket(uri);
-    this.createWorker = (filename: string | URL, options?: WorkerOptions) =>
-      WrkImpl.fromPath(filename, options);
+    this.createWorker = (url: URL, options?: WorkerOptions) =>
+      WrkImpl.fromPath(url, options);
     this.createWorkerWrapper = (worker: Worker) => {
       throw new Error("Not implemented");
     };

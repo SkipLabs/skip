@@ -8,8 +8,8 @@ class WrkImpl implements Wrk {
     this.worker = worker;
   }
 
-  static fromPath(filename: string | URL, options?: WorkerOptions) {
-    return new this(new Worker(filename, options));
+  static fromPath(url: URL, options?: WorkerOptions) {
+    return new this(new Worker(url, options));
   }
 
   postMessage = (message: any) => {
@@ -33,7 +33,7 @@ class Env implements Environment {
   onException: () => void;
   base64Decode: (base64: string) => Uint8Array;
   createSocket: (uri: string) => WebSocket;
-  createWorker: (filename: string | URL, options?: WorkerOptions) => Wrk;
+  createWorker: (url: URL, options?: WorkerOptions) => Wrk;
   createWorkerWrapper: (worker: Worker) => Wrk;
   crypto: () => Crypto;
   environment: Array<string>;
@@ -76,8 +76,8 @@ class Env implements Environment {
     this.storage = () => localStorage;
     this.onException = () => {};
     this.createSocket = (uri: string) => new WebSocket(uri);
-    this.createWorker = (filename: string | URL, options?: WorkerOptions) =>
-      WrkImpl.fromPath(filename, options);
+    this.createWorker = (url: URL, options?: WorkerOptions) =>
+      WrkImpl.fromPath(url, options);
     this.createWorkerWrapper = (worker: Worker) => new WrkImpl(worker);
     this.crypto = () => crypto;
   }
