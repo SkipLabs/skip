@@ -92,7 +92,7 @@ char *SKIP_posix_read(int64_t fd, int64_t len) {
 int64_t SKIP_posix_lseek(int64_t fd, int64_t offset, int64_t whence) {
   int rv = lseek((int)fd, (int)offset, (int)whence);
   if (rv == -1) {
-    perror("read");
+    perror("lseek");
     exit(EXIT_FAILURE);
   }
   return rv;
