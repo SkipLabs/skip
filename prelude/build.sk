@@ -77,19 +77,17 @@ class Env(
 @debug
 fun main(): void {
   env = Env::create();
-  name = if (env.isWasm32()) {
-    "build_wasm32.mk"
+  target = if (env.isWasm32()) {
+    "wasm"
   } else {
-    "build.mk"
+    "default"
   };
-  mkbuildPath = env.resolve(name);
-  if (FileSystem.exists(mkbuildPath)) {
-    env.run(
-      Array["make", "-r", "-f", mkbuildPath].concat(
-        if (env.verbose) Array["-d"] else Array[],
-      ).concat(env.vars()),
-    )
-  }
+  _ = system("pwd");
+  env.run(
+    Array["make", "-r", "-C", env.refDir, target].concat(
+      if (env.verbose) Array["-d"] else Array[],
+    ).concat(env.vars()),
+  )
 }
 
 module end;
