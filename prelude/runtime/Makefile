@@ -1,15 +1,12 @@
 MEMSIZE32=1073741824
 
-OLEVEL=-O2
-COMMONFLAGS=$(OLEVEL) -Werror -Wall -Wextra -Wno-sign-conversion -Wno-sometimes-uninitialized -Wno-c2x-extensions -Wsign-compare -Wextra-semi-stmt
+CFLAGS += -Werror -Wall -Wextra -Wno-sign-conversion -Wno-sometimes-uninitialized -Wno-c2x-extensions -Wsign-compare -Wextra-semi-stmt
 # To add: -Wcast-align -Wcast-qual -Wimplicit-int-conversion -Wmissing-noreturn -Wpadded -Wreserved-identifier -Wshorten-64-to-32 -Wtautological-unsigned-zero-compare
 # -Watomic-implicit-seq-cst ?
 # If using -Weverything, you may want to add -Wno-declaration-after-statement -Wno-missing-prototypes -Wno-missing-variable-declarations -Wno-shadow -Wno-strict-prototypes -Wno-zero-length-array -Wno-unreachable-code-break -Wno-unreachable-code-return
-CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm -nostdlibinc $(COMMONFLAGS)
-CC64FLAGS=-DSKIP64 $(COMMONFLAGS)
+CC32FLAGS=-DSKIP32 --target=wasm32 -emit-llvm -nostdlibinc $(CFLAGS)
+CC64FLAGS=-DSKIP64 $(CFLAGS)
 
-# NB: this MUST be kept in sync with CRELFILES in prelude/build.mk
-# and CRELFILES in prelude/build_wasm32.mk
 CFILES=\
 	copy.c \
 	free.c \
@@ -52,16 +49,8 @@ libskip_runtime32.bc: $(BCFILES32)
 libskip_runtime64.a: $(OFILES) runtime64_specific.o $(ONATIVE_FILES)
 	$(AR) rcs $@ $^
 
-.PHONY: libbacktrace
-libbacktrace: .libs/libbacktrace.a
-
-.libs/libbacktrace.a:
-	test -f libbacktrace/configure || (echo "Warning: libbacktrace submodule not initialized" && false)
-	(cd libbacktrace && ./configure)
-	$(MAKE) -C libbacktrace
-
-runtime64_specific.o: runtime64_specific.cpp .libs/libbacktrace.a
-	clang++ -std=c++11 $(CC64FLAGS) -g3 -o $@ -c -Ilibbacktrace/ $<
+runtime64_specific.o: runtime64_specific.cpp
+	clang++ -std=c++11 $(CC64FLAGS) -g3 -o $@ -c $<
 
 %.o: %.c
 	clang $(CC64FLAGS) -g3 -o $@ -c $<
@@ -69,4 +58,3 @@ runtime64_specific.o: runtime64_specific.cpp .libs/libbacktrace.a
 .PHONY: clean
 clean:
 	rm -f *.o *.bc magic.c libskip_runtime64.a
-	(test ! -f libbacktrace/Makefile && echo "Warning: libbacktrace submodule not initialized") || $(MAKE) -C libbacktrace clean
