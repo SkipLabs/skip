@@ -49,20 +49,26 @@ fun errorFromSyntaxError(error: SyntaxError, filename: String): Error {
   }
 }
 
-fun errorsToString(errors: Vector<Error>): String {
+fun errorsToString(
+  errors: Vector<Error>,
+  get_file: (String) -> (String, String),
+): String {
   strErrors = mutable Vector[];
   for (error in errors) {
     strTraces = mutable Vector[];
     for (trace in error.traces) {
-      strTraces.push(traceToString(trace));
+      strTraces.push(traceToString(trace, get_file));
     };
     strErrors.push(strTraces.join("\n"));
   };
   strErrors.join("")
 }
 
-fun printErrors(errors: Vector<Error>): void {
-  print_error(errorsToString(errors));
+fun printErrors(
+  errors: Vector<Error>,
+  get_file: String -> (String, String),
+): void {
+  print_error(errorsToString(errors, get_file));
 }
 
 class SkipErrorException{
@@ -83,8 +89,15 @@ fun throwFlattenedErrors(errors: Vector<Vector<Error>>): void {
   throwErrors(errors.flatten());
 }
 
-fun printErrorsAndExit<T>(errors: Array<SkipErrorException>): T {
-  SkipError.printErrors(errors.map(x -> x.errors).flatten().collect(Vector));
+fun printErrorsAndExit<T>(
+  errors: Array<SkipErrorException>,
+  get_file: String -> (String, String) = filename ->
+    (filename, FileSystem.readTextFile(filename)),
+): T {
+  SkipError.printErrors(
+    errors.map(x -> x.errors).flatten().collect(Vector),
+    get_file,
+  );
   skipExit(2)
 }
 
@@ -184,18 +197,6 @@ fun do4WithError<T1, T2, T3, T4>(
   (r1.fromSuccess(), r2.fromSuccess(), r3.fromSuccess(), r4.fromSuccess());
 }
 
-// Reports errors to stderr and exits if any errors are produced by operation.
-fun doAndReportErrors<T>(
-  operation: () -> Result<T, Vector<SkipError.Error>>,
-): T {
-  operation() match {
-  | Success(result) -> result
-  | Failure(errors) ->
-    printErrors(errors.take(100));
-    skipExit(2)
-  }
-}
-
 fun renderTextRange(range: TextRange): String {
   // TODO: This is a poor format as it doesn't show the end line correctly.
   startColumn = range.start.column() + 1;
@@ -217,34 +218,23 @@ private fun render_pos(pos: FileRange): String {
   file + position + "\n";
 }
 
-private fun traceToString(trace: Trace): String {
-  render_pos(trace.i0) + trace.i1 + "\n" + get_context_of_pos(trace.i0);
+private fun traceToString(
+  trace: Trace,
+  get_file: (String) -> (String, String),
+): String {
+  (filename, contents) = get_file(trace.i0.filename);
+  render_pos(trace.i0 with {filename}) +
+    trace.i1 +
+    "\n" +
+    get_context_of_pos(trace.i0.range, contents);
 }
 
-private fun get_context_of_pos(
-  t: FileRange,
-  fileContents: ?String = None(),
-): String {
-  if (t.range.isNone()) {
+private fun get_context_of_pos(range: TextRange, contents: String): String {
+  if (range.isNone()) {
     return "";
   };
 
-  hasError = false;
-
-  contents = fileContents match {
-  | Some(contents) -> contents
-  | None() ->
-    try {
-      FileSystem.readTextFile(t.filename)
-    } catch {
-    | _ ->
-      !hasError = true;
-      ""
-    }
-  };
-  if (hasError) return "";
-
-  getContextOfRange(t.range, contents)
+  getContextOfRange(range, contents)
 }
 
 fun syntaxErrorToString(error: SyntaxError, fileContents: String): String {
