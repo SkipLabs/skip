@@ -75,7 +75,7 @@ private mutable class BytesIterator(
 mutable class Cursor(
   buffer: readonly Bytes,
   mutable pos: Int = 0,
-) uses IO.Read {
+) uses IO.Read, IO.Seek {
   static fun create(buffer: readonly Bytes): mutable Cursor {
     mutable Cursor(buffer)
   }
@@ -89,6 +89,21 @@ mutable class Cursor(
     this.!pos = this.pos + readSz;
 
     Success(readSz)
+  }
+
+  mutable fun seek(pos: IO.SeekFrom): Result<Int, IO.Error> {
+    new_pos = pos match {
+    | IO.SeekFromStart(offset) -> offset
+    | IO.SeekFromCurrent(offset) -> this.pos + offset
+    | IO.SeekFromEnd(offset) -> this.buffer.size() - offset
+    };
+    if (new_pos < 0) {
+      // NOTE: 0x16 corresponds to EINVAL, in accordance with `lseek()`.
+      // TODO: Properly expose `errno` constants in `IO`.
+      return Failure(IO.Error(0x16))
+    };
+    this.!pos = new_pos;
+    Success(this.pos)
   }
 }
 
