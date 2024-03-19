@@ -168,6 +168,12 @@ else
     fail "INSERT ID"
 fi
 
+if cat test/unit/insert_select_id.sql | $SKDB | sort -u | wc -l | grep -q "12"; then
+    pass "INSERT SELECT ID"
+else
+    fail "INSERT SELECT ID"
+fi
+
 
 if cat test/test_string_escaping_json.sql | $SKDB --format=json | grep -q '{"a":"\\"Hello world\\""}'; then
     pass "STRING ESCAPING JSON"
