@@ -47,11 +47,14 @@ data class Credentials(
     val deviceUuid: String? = null,
 ) {
   fun b64privateKey(): String = Base64.getEncoder().encodeToString(privateKey)
+
   fun b64encryptedKey(): String = Base64.getEncoder().encodeToString(encryptedPrivateKey)
+
   fun clear(): Unit {
     privateKey.fill(0)
     encryptedPrivateKey.fill(0)
   }
+
   override fun toString(): String {
     return "Credentials(accessKey=${accessKey}, privateKey=**redacted**, deviceId=${deviceUuid})"
   }
@@ -231,9 +234,13 @@ data class MuxStreamResetMsg(val stream: UInt, val errorCode: UInt, val msg: Str
 
 interface WebSocket {
   fun close()
+
   fun sendData(data: ByteBuffer)
+
   fun sendClose(code: Int, reason: String)
+
   fun suspendReceives()
+
   fun resumeReceives()
 }
 
@@ -318,6 +325,7 @@ class MuxedSocket(
         } finally {
           mutex.readLock().unlock()
         }
+
   private var state: State = State.IDLE
   private var nextStream: UInt = if (isClient) 1u else 2u
   private var otherStreamWatermark: UInt = 0u
@@ -325,6 +333,7 @@ class MuxedSocket(
   private var observers: MutableList<(State) -> Unit> = ArrayList()
 
   data class MuxedSocketEnd(val error: Boolean, val code: UInt?, val msg: String?)
+
   var endState: MuxedSocketEnd? = null
     get() =
         try {
@@ -336,6 +345,7 @@ class MuxedSocket(
 
   private val maxConnectionDuration: Duration = Duration.ofMinutes(10)
   private var timeout: ScheduledFuture<*>? = null
+
   init {
     scheduleSessionTimeout()
   }
@@ -1091,6 +1101,7 @@ class Stream(
   private var observers: Queue<(State) -> Unit> = ConcurrentLinkedQueue()
 
   data class StreamEnd(val error: Boolean, val code: UInt?, val msg: String?)
+
   var endState: AtomicReference<StreamEnd> = AtomicReference(null)
     get() = field
 

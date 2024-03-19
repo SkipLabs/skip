@@ -194,7 +194,6 @@ class Skdb(val name: String, private val dbPath: String) {
             user,
             "--read-spec")
 
-
     // TODO: for hacky debug
     tailPb.redirectError(ProcessBuilder.Redirect.INHERIT)
     val proc = tailPb.start()
