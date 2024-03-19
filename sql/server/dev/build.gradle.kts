@@ -1,6 +1,6 @@
 plugins {
   id("org.jetbrains.kotlin.jvm")
-
+  id("com.diffplug.spotless") version "6.12.1"
   application
   java
 }
@@ -50,3 +50,5 @@ tasks.jar {
     from(dependencies)
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
+
+spotless { kotlin { ktfmt("0.47") } }
