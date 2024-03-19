@@ -8,6 +8,7 @@
 
 plugins {
   id("org.jetbrains.kotlin.jvm")
+  id("com.diffplug.spotless") version "6.12.1"
 
   `java-library`
 }
@@ -32,3 +33,5 @@ tasks.named<Test>("test") {
   // Use JUnit Platform for unit tests.
   useJUnitPlatform()
 }
+
+spotless { kotlin { ktfmt("0.47") } }
