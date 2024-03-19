@@ -291,6 +291,8 @@ class ExprEvaluator(
           "ok"
         })
       })
+
+    | CSId() -> ADef(Ksuid::create().toString())
     }
   }
 
@@ -949,6 +951,13 @@ class ExprEvaluator(
       | AUndef() -> AUndef()
       | ANull() -> ANull()
       | ADef(s) -> ADef(s.length())
+      }
+
+    | CISeqNum(isPositive) ->
+      if (isPositive) {
+        ADef(SKStore.genSym(0))
+      } else {
+        ADef(-SKStore.genSym(0))
       }
     }
   }
