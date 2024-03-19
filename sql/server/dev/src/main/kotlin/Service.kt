@@ -89,6 +89,7 @@ fun createDb(dbName: String): Credentials {
 sealed interface StreamHandler {
 
   fun handleMessage(request: ProtoMessage, stream: Stream): StreamHandler
+
   fun handleMessage(message: ByteBuffer, stream: Stream) =
       handleMessage(decodeProtoMsg(message), stream)
 
@@ -196,8 +197,7 @@ class RequestHandler(
                 replicationId,
                 mapOf(
                     request.table to
-                        TailSpec(
-                            request.since.toInt(), request.filterExpr, request.filterParams)),
+                        TailSpec(request.since.toInt(), request.filterExpr, request.filterParams)),
                 { data, shouldFlush -> stream.send(encodeProtoMsg(ProtoData(data, shouldFlush))) },
                 { stream.error(2000u, "Unexpected EOF") },
             )
