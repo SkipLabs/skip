@@ -18,17 +18,17 @@ fun test(): (Cli.Command, (GlobalContext, Cli.ParseResults) ~> void) {
       .short("t")
       .about("Run the tests")
       .arg(
-        Cli.StringArg("manifest-path")
+        Cli.Arg::string("manifest-path")
           .value_name("PATH")
           .about("Path to Skargo.toml"),
       )
       .arg(
-        Cli.StringArg("filter")
+        Cli.Arg::string("filter")
           .positional()
           .about("If specified, only run tests with names matching the filter"),
       )
       .arg(
-        Cli.IntArg("jobs")
+        Cli.Arg::int("jobs")
           .long("jobs")
           .short("j")
           .default(nproc())
@@ -36,29 +36,29 @@ fun test(): (Cli.Command, (GlobalContext, Cli.ParseResults) ~> void) {
           .about("Number of parallel jobs, defaults to # of CPUs"),
       )
       .arg(
-        Cli.StringArg("target")
+        Cli.Arg::string("target")
           .value_name("TRIPLE")
           .about("Check for the target triple"),
       )
       .arg(
-        Cli.StringArg("target-dir")
+        Cli.Arg::string("target-dir")
           .value_name("PATH")
           .about("Directory for all generated artifacts"),
       )
       .arg(
-        Cli.StringArg("profile")
+        Cli.Arg::string("profile")
           .value_name("PROFILE-NAME")
           .about("Build artifacts with the specified profile"),
       )
       .arg(
-        Cli.BoolArg("release")
+        Cli.Arg::bool("release")
           .short("r")
           .long("release")
           .about("Build artifacts in release mode, with optimizations"),
       )
-      .arg(Cli.BoolArg("list").about("Display the list of available tests"))
+      .arg(Cli.Arg::bool("list").about("Display the list of available tests"))
       .arg(
-        Cli.StringArg("junitxml")
+        Cli.Arg::string("junitxml")
           .value_name("PATH")
           .about("Generate a JUnit XML report"),
       ),

@@ -4,24 +4,24 @@ fun clean(): (Cli.Command, (GlobalContext, Cli.ParseResults) ~> void) {
   (
     Cli.Command("clean")
       .about("Remove the target directory")
-      .arg(Cli.StringArg("manifest-path").about("Path to Skargo.toml"))
+      .arg(Cli.Arg::string("manifest-path").about("Path to Skargo.toml"))
       .arg(
-        Cli.StringArg("target")
+        Cli.Arg::string("target")
           .value_name("TRIPLE")
           .about("Target triple to clean output for"),
       )
       .arg(
-        Cli.StringArg("target-dir")
+        Cli.Arg::string("target-dir")
           .value_name("PATH")
           .about("Directory for all generated artifacts"),
       )
       .arg(
-        Cli.StringArg("profile")
+        Cli.Arg::string("profile")
           .value_name("PROFILE-NAME")
           .about("Clean artifacts of the specified profile"),
       )
       .arg(
-        Cli.BoolArg("release")
+        Cli.Arg::bool("release")
           .short("r")
           .long("release")
           .about("Build artifacts in release mode, with optimizations"),

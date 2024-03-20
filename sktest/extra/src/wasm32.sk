@@ -4,22 +4,24 @@ fun test_harness(tests: readonly Map<String, readonly Sequence<Test>>): void {
   args = Cli.Command("tests")
     .about("Run tests")
     .arg(
-      Cli.StringArg("filter")
+      Cli.Arg::string("filter")
         .positional()
         .about(
           "If specified, only run tests containing this string in their names",
         ),
     )
     .arg(
-      Cli.BoolArg("strict").about(
+      Cli.Arg::bool("strict").about(
         "If specified with filter, only run tests with listed names",
       ),
     )
-    .arg(Cli.BoolArg("json").about("If specified, print output in json format"))
-    .arg(Cli.BoolArg("list").about("Display the list of available tests"))
-    .arg(Cli.StringArg("junitxml").about("Generate a JUnit XML report"))
     .arg(
-      Cli.BoolArg("verbose")
+      Cli.Arg::bool("json").about("If specified, print output in json format"),
+    )
+    .arg(Cli.Arg::bool("list").about("Display the list of available tests"))
+    .arg(Cli.Arg::string("junitxml").about("Generate a JUnit XML report"))
+    .arg(
+      Cli.Arg::bool("verbose")
         .long("verbose")
         .short("v")
         .about("Use verbose output"),
