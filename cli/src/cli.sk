@@ -11,7 +11,6 @@ base class Arg{
   // NOTE: The following parameters cannot be placed in subclasses, since `name` is required.
   // Other than BoolArgs only
   _default: ?Value = None(),
-  _required: Bool = false,
   _positional: Bool = false,
   _value_name: String = "VALUE",
   // BoolArgs only
@@ -51,6 +50,8 @@ base class Arg{
     this with {_env => Some(name)}
   }
 
+  fun isRequired(): Bool;
+
   static fun string(name: String): StringArg {
     StringArg{name}
   }
@@ -64,9 +65,13 @@ base class Arg{
   }
 }
 
-base class ValuedArg extends Arg {
+base class ValuedArg{_required: Bool = false} extends Arg {
   fun required(value: Bool = true): this {
     this with {_required => value}
+  }
+
+  fun isRequired(): Bool {
+    this._required
   }
 
   fun value_name(value: String): this {
@@ -103,6 +108,10 @@ class IntArg extends ValuedArg {
 class BoolArg extends Arg {
   fun default(value: Bool): this {
     this with {_default => Some(BoolValue(value))}
+  }
+
+  fun isRequired(): Bool {
+    false
   }
 
   fun negatable(value: Bool = true): this {
