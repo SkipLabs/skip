@@ -54,7 +54,7 @@ fun test_harness(tests: readonly Map<String, readonly Sequence<Test>>): void {
   args = Cli.Command("tests")
     .about("Run tests")
     .arg(
-      Cli.StringArg("filter")
+      Cli.Arg::string("filter")
         .positional()
         .about(
           "If specified, only run tests containing this string in their names",
@@ -62,15 +62,15 @@ fun test_harness(tests: readonly Map<String, readonly Sequence<Test>>): void {
     )
     // TODO: Expose flag(s) to handle test report format(s) selection.
     .arg(
-      Cli.IntArg("jobs")
+      Cli.Arg::int("jobs")
         .long("jobs")
         .short("j")
         .about("Number of parallel jobs, defaults to # of CPUs")
         .default(8), // TODO: Properly determine available cores.
     )
-    .arg(Cli.StringArg("junitxml").about("Generate a JUnit XML report"))
+    .arg(Cli.Arg::string("junitxml").about("Generate a JUnit XML report"))
     .arg(
-      Cli.BoolArg("verbose")
+      Cli.Arg::bool("verbose")
         .long("verbose")
         .short("v")
         .about("Use verbose output"),

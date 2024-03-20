@@ -50,6 +50,18 @@ base class Arg(
   overridable fun env(name: String): this {
     this with {_env => Some(name)}
   }
+
+  static fun string(name: String): StringArg {
+    StringArg(name)
+  }
+
+  static fun int(name: String): IntArg {
+    IntArg(name)
+  }
+
+  static fun bool(name: String): BoolArg {
+    BoolArg(name)
+  }
 }
 
 base class ValuedArg extends Arg {
@@ -132,7 +144,7 @@ class Command(
 
   fun help(): this {
     this.arg(
-      Cli.BoolArg("help")
+      Cli.Arg::bool("help")
         .short("h")
         .long("help")
         .about("Print help information")
