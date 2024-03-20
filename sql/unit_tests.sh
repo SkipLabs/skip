@@ -174,6 +174,12 @@ else
     fail "INSERT SELECT ID"
 fi
 
+if cat test/unit/insert_select_partial.sql | $SKDB | sort -u | wc -l | grep -q "6"; then
+    pass "INSERT SELECT PARTIAL"
+else
+    fail "INSERT SELECT PARTIAL"
+fi
+
 
 if cat test/test_string_escaping_json.sql | $SKDB --format=json | grep -q '{"a":"\\"Hello world\\""}'; then
     pass "STRING ESCAPING JSON"
