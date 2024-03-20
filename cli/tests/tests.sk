@@ -323,4 +323,87 @@ fun intArgsFromEnv(): void {
   T.expectEq(args.getInt("baz"), 42);
 }
 
+@test
+fun undefinedArgs(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.BoolArg("bar").negatable())
+    .arg(Cli.StringArg("baz"))
+    .arg(Cli.IntArg("foobar"))
+    .arg(Cli.ArrayArg("foobar2"));
+  args = Cli.parseArgsFrom(
+    cmd,
+    Array[
+      "--no-bar",
+      "--baz",
+      "baz1",
+      "--foobar=1",
+      "--foobar2=abc",
+      "--foobar2",
+      "def",
+    ],
+  );
+
+  // Default is to throw.
+  T.expectThrow(() -> _ = args.maybeGetBool("unknown"));
+  T.expectThrow(() -> _ = args.maybeGetString("unknown"));
+  T.expectThrow(() -> _ = args.maybeGetInt("unknown"));
+  T.expectThrow(() -> _ = args.maybeGetArray("unknown"));
+
+  T.expectThrow(() -> _ = args.maybeGetBool("unknown", true));
+  T.expectThrow(() -> _ = args.maybeGetString("unknown", true));
+  T.expectThrow(() -> _ = args.maybeGetInt("unknown", true));
+  T.expectThrow(() -> _ = args.maybeGetArray("unknown", true));
+
+  T.expectEq(args.maybeGetBool("unknown", false), None());
+  T.expectEq(args.maybeGetString("unknown", false), None());
+  T.expectEq(args.maybeGetInt("unknown", false), None());
+  T.expectEq(args.maybeGetArray("unknown", false), None());
+
+  T.expectThrow(() -> _ = args.getBool("unknown"));
+  T.expectThrow(() -> _ = args.getString("unknown"));
+  T.expectThrow(() -> _ = args.getInt("unknown"));
+  T.expectThrow(() -> _ = args.getArray("unknown"));
+
+  T.expectThrow(() -> _ = args.getBool("unknown", None()));
+  T.expectThrow(() -> _ = args.getString("unknown", None()));
+  T.expectThrow(() -> _ = args.getInt("unknown", None()));
+  T.expectThrow(() -> _ = args.getArray("unknown", None()));
+
+  T.expectEq(args.getBool("unknown", Some(true)), true);
+  T.expectEq(args.getString("unknown", Some("foo")), "foo");
+  T.expectEq(args.getInt("unknown", Some(1337)), 1337);
+  T.expectEq(
+    args.getArray("unknown", Some(Array["1", "2", "3"])),
+    Array["1", "2", "3"],
+  );
+
+  // The default for undefined arg should not override the provided value.
+  T.expectEq(args.getBool("bar", Some(true)), false);
+  T.expectEq(args.getString("baz", Some("foo")), "baz1");
+  T.expectEq(args.getInt("foobar", Some(123)), 1);
+  T.expectEq(
+    args.getArray("foobar2", Some(Array["a", "b", "c"])),
+    Array["abc", "def"],
+  );
+}
+
+@test
+fun argDefaultWithUndefinedDefault(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.BoolArg("bar").default(true))
+    .arg(Cli.StringArg("baz").default("foo"))
+    .arg(Cli.IntArg("foobar").default(1337))
+    .arg(Cli.ArrayArg("foobar2").default(Array["a", "b", "c"]));
+  args = Cli.parseArgsFrom(cmd, Array[]);
+
+  // The default for undefined arg should not override the default value.
+  T.expectEq(args.getBool("bar", Some(false)), true);
+  T.expectEq(args.getString("baz", Some("bar")), "foo");
+  T.expectEq(args.getInt("foobar", Some(123)), 1337);
+  T.expectEq(
+    args.getArray("foobar2", Some(Array["d", "e", "f"])),
+    Array["a", "b", "c"],
+  );
+}
+
 module end;
