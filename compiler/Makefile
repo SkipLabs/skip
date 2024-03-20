@@ -81,6 +81,12 @@ stageC/bin/skc stageC/bin/skfmt stageC/bin/skargo: stageB
 	PATH=stageB/bin/:$(PATH) skargo build -r --bins --out-dir stageC/bin --target-dir stageC/bin
 	PATH=stageB/bin/:$(PATH) skargo build -r --bins --out-dir stageC/bin --target-dir stageC/target --manifest-path ../skargo/Skargo.toml
 
+.PHONY: promote
+promote: stage$(STAGE)
+	cp stage$(STAGE)/target/host/release/deps/skc-*.ll bootstrap/skc_out64.ll && gzip -f bootstrap/skc_out64.ll
+	cp stage$(STAGE)/target/host/release/deps/skargo-*.ll bootstrap/skargo_out64.ll && gzip -f bootstrap/skargo_out64.ll
+	cp stage$(STAGE)/target/host/release/deps/skfmt-*.ll bootstrap/skfmt_out64.ll && gzip -f bootstrap/skfmt_out64.ll
+
 .PHONY: install
 install: stage$(STAGE)
 	install -d $(libdir)
