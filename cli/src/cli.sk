@@ -13,8 +13,6 @@ base class Arg{
   _default: ?Value = None(),
   _positional: Bool = false,
   _value_name: String = "VALUE",
-  // BoolArgs only
-  _negatable: Bool = false,
 } {
   // Builder interface methods.
   fun short(flag: String): this {
@@ -52,6 +50,8 @@ base class Arg{
 
   fun isRequired(): Bool;
 
+  fun isNegatable(): Bool;
+
   static fun string(name: String): StringArg {
     StringArg{name}
   }
@@ -72,6 +72,10 @@ base class ValuedArg{_required: Bool = false} extends Arg {
 
   fun isRequired(): Bool {
     this._required
+  }
+
+  fun isNegatable(): Bool {
+    false
   }
 
   fun value_name(value: String): this {
@@ -105,7 +109,7 @@ class IntArg extends ValuedArg {
   }
 }
 
-class BoolArg extends Arg {
+class BoolArg{_negatable: Bool = false} extends Arg {
   fun default(value: Bool): this {
     this with {_default => Some(BoolValue(value))}
   }
@@ -116,6 +120,10 @@ class BoolArg extends Arg {
 
   fun negatable(value: Bool = true): this {
     this with {_negatable => value}
+  }
+
+  fun isNegatable(): Bool {
+    this._negatable
   }
 }
 
