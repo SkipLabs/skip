@@ -319,22 +319,12 @@ mutable class Parser(
         | Failure(err) ->
           !error = Some(err);
           break void
-        | Success((arg, value)) ->
-          arg match {
-          | BoolArg _ ->
-            if (!this.values.containsKey(arg.name)) {
-              this.values.set(arg.name, BoolValue(!str.startsWith("--no-")))
-            } else {
-              !error = Some(DuplicateValueError(arg.name));
-              break void
-            }
-          | _ ->
-            updateValue(this.values, arg, value) match {
-            | Failure(err) ->
-              !error = Some(err);
-              break void
-            | Success _ -> void
-            }
+        | Success(args) ->
+          this.updateValues(args) match {
+          | Failure(err) ->
+            !error = Some(err);
+            break void
+          | Success _ -> void
           }
         }
       }
@@ -371,10 +361,23 @@ mutable class Parser(
     }
   }
 
+  private mutable fun updateValues(
+    args: Array<(Arg, Value)>,
+  ): Result<void, ArgumentError> {
+    for ((arg, value) in args) {
+      updateValue(this.values, arg, value) match {
+      | Failure(err) -> return Failure(err)
+      | Success _ -> void
+      }
+    };
+
+    Success(void)
+  }
+
   private mutable fun parse_next_args(
     str: String,
     iterator: mutable Iterator<String>,
-  ): Result<(Arg, Value), ArgumentError> {
+  ): Result<Array<(Arg, Value)>, ArgumentError> {
     (argName, argValue) = if (str.contains("=")) {
       (k, v) = str.splitFirst("=");
       (k, Some(v))
@@ -391,24 +394,49 @@ mutable class Parser(
         | None() -> return Failure(MissingValueError(arg.name))
         }
       };
-      parse_value(arg, strValue).map(v -> (arg, v))
-    | Some(arg) -> Success((arg, BoolValue(!str.startsWith("--no-"))))
+      parse_value(arg, strValue).map(v -> Array[(arg, v)])
+    | Some(arg) -> Success(Array[(arg, BoolValue(!str.startsWith("--no-")))])
     | None() if (!str.startsWith("-") && this.posArgId < this.posArgs.size()) ->
       arg = this.posArgs[this.posArgId];
-      res = parse_value(arg, str).map(v -> (arg, v));
+      res = parse_value(arg, str).map(v -> Array[(arg, v)]);
       arg match {
       | ArrayArg _ -> void
       | _ -> this.!posArgId = this.posArgId + 1
       };
       res
-    | None() -> // Check for short forms that take values such as `-O2`.
+    | None() ->
       !argName = str.take(2);
-      strValue = str.substring(str.getIter().forward(2));
       this.options.maybeGet(argName) match {
-      | Some(arg @ StringArg _)
-      | Some(arg @ IntArg _) ->
-        parse_value(arg, strValue).map(v -> (arg, v))
-      | _ -> Failure(InvalidArgumentError(str))
+      // Check for short forms that take values such as `-O2`.
+      | Some(arg @ ValuedArg _) ->
+        strValue = str.substring(str.getIter().forward(2));
+        parse_value(arg, strValue).map(v -> Array[(arg, v)])
+      // Check for short boolean flags strung together such as `-abc`,
+      // possibly ending with a non-boolean flag such as `-kj2`.
+      | Some(BoolArg _) ->
+        res = mutable Vector<(Arg, Value)>[];
+        strFlags = str.stripPrefix("-");
+        iter = strFlags.getIter();
+        loop {
+          flag = iter.next() match {
+          | Some(c) -> c
+          | None() -> break void
+          };
+          this.options.maybeGet(`-${flag}`) match {
+          | Some(arg @ BoolArg _) -> res.push((arg, BoolValue(true)))
+          | Some(arg @ ValuedArg _) ->
+            strValue = strFlags.substring(iter);
+            value = parse_value(arg, strValue) match {
+            | Success(v) -> v
+            | Failure(err) -> return Failure(err)
+            };
+            res.push((arg, value));
+            break void
+          | None() -> return Failure(InvalidArgumentError(str))
+          }
+        };
+        Success(res.collect(Array))
+      | None() -> Failure(InvalidArgumentError(str))
       }
     }
   }
