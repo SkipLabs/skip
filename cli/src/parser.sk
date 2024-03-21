@@ -263,135 +263,156 @@ private fun arg_maps(args: Array<Arg>): (Array<Arg>, Map<String, Arg>) {
 private fun parse(
   cmd: Command,
   iterator: mutable Iterator<String>,
-  values: mutable Map<String, Value> = mutable Map<String, Value>[],
-  globals: Array<Arg> = Array[],
 ): ParseResults {
-  subcommands = subcommand_map(cmd._subcommands);
-  (posArgs, options) = arg_maps(cmd._args.concat(globals));
+  Parser::create(cmd).parse(iterator)
+}
 
-  posArgId = 0;
-  extra = mutable Vector[];
-  hasExtra = false;
-  error: ?ArgumentError = None();
-  subcommand: ?String = None();
+mutable class Parser(
+  cmd: Command,
+  subcommands: Map<String, Command>,
+  posArgs: Array<Arg>,
+  options: Map<String, Arg>,
+  values: mutable Map<String, Value> = mutable Map[],
+  mutable extra: mutable Vector<String> = mutable Vector[],
+  mutable posArgId: Int = 0,
+  mutable hasExtra: Bool = false,
+) {
+  static fun create(
+    cmd: Command,
+    globals: Array<Arg> = Array[],
+    values: mutable Map<String, Value> = mutable Map[],
+  ): mutable Parser {
+    subcommands = subcommand_map(cmd._subcommands);
+    (posArgs, options) = arg_maps(cmd._args.concat(globals));
 
-  loop {
-    iterator.next() match {
-    | None() -> break void
-    | Some(str) if (hasExtra) -> extra.push(str)
-    | Some(str) if (subcommands.containsKey(str)) ->
-      subcmd = subcommands.get(str);
-      !subcommand = Some(subcmd.name);
+    mutable Parser(cmd, subcommands, posArgs, options, values)
+  }
 
-      // TODO: This does not support nested subcommands (which probably
-      // shouldn't exist).
-      globalArgs = cmd._args.filter(a -> a._global);
-      res = parse(subcmd, iterator, values, globalArgs);
-      if (res.error.isSome()) {
-        !error = res.error;
+  mutable fun parse(iterator: mutable Iterator<String>): ParseResults {
+    error: ?ArgumentError = None();
+    subcommand: ?String = None();
+    loop {
+      iterator.next() match {
+      | None() -> break void
+      | Some(str) if (this.hasExtra) -> this.extra.push(str)
+      | Some(str) if (this.subcommands.containsKey(str)) ->
+        subcmd = this.subcommands.get(str);
+        !subcommand = Some(subcmd.name);
+
+        // TODO: This does not support nested subcommands (which probably
+        // shouldn't exist).
+        globalArgs = this.cmd._args.filter(a -> a._global);
+        subcmdParser = Parser::create(subcmd, globalArgs, this.values);
+        res = subcmdParser.parse(iterator);
+        if (res.error.isSome()) {
+          !error = res.error;
+          break void
+        };
+
+        // TODO: This is dirty.
+        this.!extra = Vector::mcreateFromItems(res.extra);
+
         break void
-      };
-
-      // TODO: This is dirty.
-      !extra = Vector::mcreateFromItems(res.extra);
-
-      break void
-    | Some("--") ->
-      if (!cmd._extra) {
-        !error = Some(InvalidArgumentError("--"));
-        break void
-      };
-      !hasExtra = true
-    | Some(str) ->
-      (argName, argValue) = if (str.contains("=")) {
-        (k, v) = str.splitFirst("=");
-        (k, Some(v))
-      } else {
-        (str, None())
-      };
-      options.maybeGet(argName) match {
-      | Some(arg @ ValuedArg _) ->
-        value = argValue match {
-        | Some(v) -> v
-        | None() ->
-          iterator.next() match {
+      | Some("--") ->
+        if (!this.cmd._extra) {
+          !error = Some(InvalidArgumentError("--"));
+          break void
+        };
+        this.!hasExtra = true
+      | Some(str) ->
+        (argName, argValue) = if (str.contains("=")) {
+          (k, v) = str.splitFirst("=");
+          (k, Some(v))
+        } else {
+          (str, None())
+        };
+        this.options.maybeGet(argName) match {
+        | Some(arg @ ValuedArg _) ->
+          value = argValue match {
           | Some(v) -> v
           | None() ->
-            !error = Some(MissingValueError(arg.name));
-            break void
-          }
-        };
-        updateValue(values, arg, value) match {
-        | err @ Some _ ->
-          !error = err;
-          break void
-        | None() -> void
-        }
-      | Some(arg) ->
-        if (!values.containsKey(arg.name)) {
-          values.set(arg.name, BoolValue(!str.startsWith("--no-")))
-        } else {
-          !error = Some(DuplicateValueError(arg.name));
-          break void
-        }
-      | None() if (!str.startsWith("-") && posArgId < posArgs.size()) ->
-        updateValue(values, posArgs[posArgId], str) match {
-        | err @ Some _ ->
-          !error = err;
-          break void
-        | _ -> void
-        };
-        posArgs[posArgId] match {
-        | ArrayArg _ -> void
-        | _ -> !posArgId = posArgId + 1
-        }
-      | None() -> // Check for short forms that take values such as `-O2`.
-        !argName = str.take(2);
-        value = str.substring(str.getIter().forward(2));
-        options.maybeGet(argName) match {
-        | Some(arg @ ValuedArg _) ->
-          updateValue(values, arg, value) match {
+            iterator.next() match {
+            | Some(v) -> v
+            | None() ->
+              !error = Some(MissingValueError(arg.name));
+              break void
+            }
+          };
+          updateValue(this.values, arg, value) match {
           | err @ Some _ ->
             !error = err;
             break void
           | None() -> void
           }
-        | _ ->
-          !error = Some(InvalidArgumentError(str));
-          break void
-        }
-      }
-    }
-  };
-
-  if (error.isNone()) {
-    for (arg in cmd._args) {
-      if (!values.containsKey(arg.name)) {
-        if (arg._required) {
-          !error = Some(MissingArgumentError(arg.name));
-          break void
-        } else {
-          env_var = arg._env.map(v -> Environ.var(v));
-          value = arg match {
-          | StringArg _ -> env_var.map(v -> StringValue(v))
-          | IntArg _ -> env_var.map(v -> IntValue(v.toInt()))
-          | BoolArg _ ->
-            env_var.map(b -> BoolValue(b != "no" && b != "false" && b != "0"))
-          | _ ->
-            env_var.map(_ -> invariant_violation("Unexpected argument type."))
+        | Some(arg) ->
+          if (!this.values.containsKey(arg.name)) {
+            this.values.set(arg.name, BoolValue(!str.startsWith("--no-")))
+          } else {
+            !error = Some(DuplicateValueError(arg.name));
+            break void
+          }
+        | None() if (
+          !str.startsWith("-") &&
+          this.posArgId < this.posArgs.size()
+        ) ->
+          updateValue(this.values, this.posArgs[this.posArgId], str) match {
+          | err @ Some _ ->
+            !error = err;
+            break void
+          | _ -> void
           };
-          values.set(arg.name, value.default(defaultValue(arg)))
+          this.posArgs[this.posArgId] match {
+          | ArrayArg _ -> void
+          | _ -> this.!posArgId = this.posArgId + 1
+          }
+        | None() -> // Check for short forms that take values such as `-O2`.
+          !argName = str.take(2);
+          value = str.substring(str.getIter().forward(2));
+          this.options.maybeGet(argName) match {
+          | Some(arg @ ValuedArg _) ->
+            updateValue(this.values, arg, value) match {
+            | err @ Some _ ->
+              !error = err;
+              break void
+            | None() -> void
+            }
+          | _ ->
+            !error = Some(InvalidArgumentError(str));
+            break void
+          }
         }
       }
-    }
-  };
+    };
 
-  ParseResults{
-    cmd => cmd,
-    subcommand,
-    values => values.chill(),
-    extra => Array::createFromItems(extra.chill()),
-    error => error,
+    if (error.isNone()) {
+      for (arg in this.cmd._args) {
+        if (!this.values.containsKey(arg.name)) {
+          if (arg._required) {
+            !error = Some(MissingArgumentError(arg.name));
+            break void
+          } else {
+            env_var = arg._env.map(v -> Environ.var(v));
+            value = arg match {
+            | StringArg _ -> env_var.map(v -> StringValue(v))
+            | IntArg _ -> env_var.map(v -> IntValue(v.toInt()))
+            | BoolArg _ ->
+              env_var.map(b -> BoolValue(b != "no" && b != "false" && b != "0"))
+            | _ ->
+              env_var.map(_ -> invariant_violation("Unexpected argument type."))
+            };
+            this.values.set(arg.name, value.default(defaultValue(arg)))
+          }
+        }
+      }
+    };
+
+    ParseResults{
+      cmd => this.cmd,
+      subcommand,
+      values => this.values.chill(),
+      extra => Array::createFromItems(this.extra.chill()),
+      error => error,
+    }
   }
 }
 
