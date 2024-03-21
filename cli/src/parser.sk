@@ -150,32 +150,27 @@ fun parseArgsFrom(cmd: Command, argv: Sequence<String>): ParseResults {
 private fun updateValue(
   values: mutable Map<String, Value>,
   arg: Arg,
-  value: String,
+  value: Value,
 ): ?ArgumentError {
   arg match {
   | ArrayArg _ ->
+    strValue = value match {
+    | StringValue(v) -> v
+    | _ -> invariant_violation(`Unexpected value type for ArrayArg`)
+    };
+
     values.maybeGet(arg.name) match {
     | Some(ArrayValue(arr)) ->
-      values.set(arg.name, ArrayValue(arr.concat(Array[value])))
-    | None() -> values.set(arg.name, ArrayValue(Array[value]))
+      values.set(arg.name, ArrayValue(arr.concat(Array[strValue])))
+    | None() -> values.set(arg.name, ArrayValue(Array[strValue]))
     | Some(v) -> invariant_violation(`Unexpected value type ${v} for ArrayArg`)
     }
-  | StringArg _ ->
+  | _ ->
     if (!values.containsKey(arg.name)) {
-      values.set(arg.name, StringValue(value))
+      values.set(arg.name, value)
     } else {
       return Some(DuplicateValueError(arg.name))
     }
-  | IntArg _ ->
-    if (!values.containsKey(arg.name)) {
-      value.toIntOption() match {
-      | Some(v) -> values.set(arg.name, IntValue(v))
-      | _ -> return Some(InvalidArgumentError(arg.name))
-      }
-    } else {
-      return Some(DuplicateValueError(arg.name))
-    }
-  | _ -> invariant_violation(`Unexpected argument type ${inspect(arg)}`)
   };
 
   None()
@@ -320,65 +315,26 @@ mutable class Parser(
         };
         this.!hasExtra = true
       | Some(str) ->
-        (argName, argValue) = if (str.contains("=")) {
-          (k, v) = str.splitFirst("=");
-          (k, Some(v))
-        } else {
-          (str, None())
-        };
-        this.options.maybeGet(argName) match {
-        | Some(arg @ ValuedArg _) ->
-          value = argValue match {
-          | Some(v) -> v
-          | None() ->
-            iterator.next() match {
-            | Some(v) -> v
-            | None() ->
-              !error = Some(MissingValueError(arg.name));
+        this.parse_next_args(str, iterator) match {
+        | Failure(err) ->
+          !error = Some(err);
+          break void
+        | Success((arg, value)) ->
+          arg match {
+          | BoolArg _ ->
+            if (!this.values.containsKey(arg.name)) {
+              this.values.set(arg.name, BoolValue(!str.startsWith("--no-")))
+            } else {
+              !error = Some(DuplicateValueError(arg.name));
               break void
             }
-          };
-          updateValue(this.values, arg, value) match {
-          | err @ Some _ ->
-            !error = err;
-            break void
-          | None() -> void
-          }
-        | Some(arg) ->
-          if (!this.values.containsKey(arg.name)) {
-            this.values.set(arg.name, BoolValue(!str.startsWith("--no-")))
-          } else {
-            !error = Some(DuplicateValueError(arg.name));
-            break void
-          }
-        | None() if (
-          !str.startsWith("-") &&
-          this.posArgId < this.posArgs.size()
-        ) ->
-          updateValue(this.values, this.posArgs[this.posArgId], str) match {
-          | err @ Some _ ->
-            !error = err;
-            break void
-          | _ -> void
-          };
-          this.posArgs[this.posArgId] match {
-          | ArrayArg _ -> void
-          | _ -> this.!posArgId = this.posArgId + 1
-          }
-        | None() -> // Check for short forms that take values such as `-O2`.
-          !argName = str.take(2);
-          value = str.substring(str.getIter().forward(2));
-          this.options.maybeGet(argName) match {
-          | Some(arg @ ValuedArg _) ->
+          | _ ->
             updateValue(this.values, arg, value) match {
             | err @ Some _ ->
               !error = err;
               break void
             | None() -> void
             }
-          | _ ->
-            !error = Some(InvalidArgumentError(str));
-            break void
           }
         }
       }
@@ -413,6 +369,65 @@ mutable class Parser(
       extra => Array::createFromItems(this.extra.chill()),
       error => error,
     }
+  }
+
+  private mutable fun parse_next_args(
+    str: String,
+    iterator: mutable Iterator<String>,
+  ): Result<(Arg, Value), ArgumentError> {
+    (argName, argValue) = if (str.contains("=")) {
+      (k, v) = str.splitFirst("=");
+      (k, Some(v))
+    } else {
+      (str, None())
+    };
+    this.options.maybeGet(argName) match {
+    | Some(arg @ ValuedArg _) ->
+      strValue = argValue match {
+      | Some(v) -> v
+      | None() ->
+        iterator.next() match {
+        | Some(v) -> v
+        | None() -> return Failure(MissingValueError(arg.name))
+        }
+      };
+      parse_value(arg, strValue).map(v -> (arg, v))
+    | Some(arg) -> Success((arg, BoolValue(!str.startsWith("--no-"))))
+    | None() if (!str.startsWith("-") && this.posArgId < this.posArgs.size()) ->
+      arg = this.posArgs[this.posArgId];
+      res = parse_value(arg, str).map(v -> (arg, v));
+      arg match {
+      | ArrayArg _ -> void
+      | _ -> this.!posArgId = this.posArgId + 1
+      };
+      res
+    | None() -> // Check for short forms that take values such as `-O2`.
+      !argName = str.take(2);
+      strValue = str.substring(str.getIter().forward(2));
+      this.options.maybeGet(argName) match {
+      | Some(arg @ StringArg _)
+      | Some(arg @ IntArg _) ->
+        parse_value(arg, strValue).map(v -> (arg, v))
+      | _ -> Failure(InvalidArgumentError(str))
+      }
+    }
+  }
+}
+
+private fun parse_value(
+  arg: Arg,
+  strValue: String,
+): Result<Value, ArgumentError> {
+  arg match {
+  | StringArg _
+  | ArrayArg _ ->
+    Success(StringValue(strValue))
+  | IntArg _ ->
+    strValue.toIntOption() match {
+    | Some(v) -> Success(IntValue(v))
+    | _ -> Failure(InvalidArgumentError(arg.name))
+    }
+  | BoolArg _ -> invariant_violation("Unexpected parse_value() for boolean arg")
   }
 }
 
