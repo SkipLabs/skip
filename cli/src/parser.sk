@@ -151,7 +151,7 @@ private fun updateValue(
   values: mutable Map<String, Value>,
   arg: Arg,
   value: Value,
-): ?ArgumentError {
+): Result<void, ArgumentError> {
   arg match {
   | ArrayArg _ ->
     strValue = value match {
@@ -169,11 +169,11 @@ private fun updateValue(
     if (!values.containsKey(arg.name)) {
       values.set(arg.name, value)
     } else {
-      return Some(DuplicateValueError(arg.name))
+      return Failure(DuplicateValueError(arg.name))
     }
   };
 
-  None()
+  Success(void)
 }
 
 private fun defaultValue(arg: Arg): Value {
@@ -330,10 +330,10 @@ mutable class Parser(
             }
           | _ ->
             updateValue(this.values, arg, value) match {
-            | err @ Some _ ->
-              !error = err;
+            | Failure(err) ->
+              !error = Some(err);
               break void
-            | None() -> void
+            | Success _ -> void
             }
           }
         }
