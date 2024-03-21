@@ -188,30 +188,30 @@ private fun defaultValue(arg: Arg): Value {
   }
 }
 
-private fun parse(
-  cmd: Command,
-  iterator: mutable Iterator<String>,
-  values: mutable Map<String, Value> = mutable Map<String, Value>[],
-  globals: Array<Arg> = Array[],
-): ParseResults {
-  subcommands = mutable Map[];
-  for (subcmd in cmd._subcommands) {
-    if (subcommands.containsKey(subcmd.name)) {
+private fun subcommand_map(subcommands: Array<Command>): Map<String, Command> {
+  res = mutable Map[];
+  for (subcmd in subcommands) {
+    if (res.containsKey(subcmd.name)) {
       invariant_violation(`Duplicate subcommand ${subcmd.name}`)
     };
-    subcommands.set(subcmd.name, subcmd);
+    res.set(subcmd.name, subcmd);
     subcmd._short.each(n -> {
-      if (subcommands.containsKey(n)) {
+      if (res.containsKey(n)) {
         invariant_violation(`Duplicate subcommand short alias ${n}`)
       };
-      subcommands.set(n, subcmd)
+      res.set(n, subcmd)
     })
   };
+
+  res.chill()
+}
+
+private fun arg_maps(args: Array<Arg>): (Array<Arg>, Map<String, Arg>) {
   argsNames = mutable Set[];
   posArgs = mutable Vector<Arg>[];
   // TODO: options is a bad name. Maybe flag_args?
   options = mutable Map[];
-  for (arg in cmd._args.concat(globals)) {
+  for (arg in args) {
     if (argsNames.contains(arg.name)) {
       invariant_violation(`Duplicate argument ${arg.name}`)
     };
@@ -256,6 +256,18 @@ private fun parse(
       };
     }
   };
+
+  (posArgs.collect(Array), options.chill())
+}
+
+private fun parse(
+  cmd: Command,
+  iterator: mutable Iterator<String>,
+  values: mutable Map<String, Value> = mutable Map<String, Value>[],
+  globals: Array<Arg> = Array[],
+): ParseResults {
+  subcommands = subcommand_map(cmd._subcommands);
+  (posArgs, options) = arg_maps(cmd._args.concat(globals));
 
   posArgId = 0;
   extra = mutable Vector[];
