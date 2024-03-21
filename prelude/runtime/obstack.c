@@ -95,16 +95,17 @@ void sk_obstack_attach_page(sk_obstack_t* lpage, sk_obstack_t* next) {
 
 char* sk_large_page(size_t size) {
   size_t block_size = size + sizeof(sk_obstack_t);
-  // This space is needed in case the page gets interned (TO CHECK)
-  block_size += 64;
+  // large pages are create directly on persistence side memory
+  // to prevent persistence copy
   sk_obstack_t* lpage = (sk_obstack_t*)sk_malloc(block_size);
   sk_obstack_attach_page(lpage, NULL);
+
   lpage->size = block_size;
   sk_saved_obstack_t* saved = &lpage->saved;
   saved->head = NULL;
   saved->end = NULL;
   saved->page = NULL;
-  return lpage->user_data + 64;
+  return lpage->user_data;
 }
 
 void sk_new_page() {
@@ -265,7 +266,7 @@ sk_obstack_t* SKIP_switch_to_parent(sk_saved_obstack_t* saved) {
   while (first != NULL && first->previous != saved->page) {
     first = first->previous;
   }
-  
+
   sk_obstack_t* saved_page = page;
   char* saved_head = head;
   char* saved_end = end;
@@ -283,7 +284,8 @@ sk_obstack_t* SKIP_switch_to_parent(sk_saved_obstack_t* saved) {
   return saved_page;
 }
 
-void SKIP_restore_from_parent(sk_saved_obstack_t* saved, sk_obstack_t* leading) {
+void SKIP_restore_from_parent(sk_saved_obstack_t* saved,
+                              sk_obstack_t* leading) {
   // Save the obstack restauration data
   sk_obstack_t* first_page = saved->page;
   char* saved_head = saved->head;
