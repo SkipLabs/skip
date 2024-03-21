@@ -324,6 +324,32 @@ fun intArgsFromEnv(): void {
 }
 
 @test
+fun multipleBoolArgsTogether(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.BoolArg("bar").short("b"))
+    .arg(Cli.BoolArg("baz").short("z"))
+    .arg(Cli.BoolArg("foobar").short("f"));
+  args = Cli.parseArgsFrom(cmd, Array["-bz"]);
+
+  T.expectTrue(args.getBool("bar"));
+  T.expectTrue(args.getBool("baz"));
+  T.expectFalse(args.getBool("foobar"));
+}
+
+@test
+fun nonBoolShortArgsTogether(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.BoolArg("keep-going").short("k"))
+    .arg(Cli.IntArg("jobs").short("j"))
+    .arg(Cli.BoolArg("foobar").short("f"));
+  args = Cli.parseArgsFrom(cmd, Array["-kj2"]);
+
+  T.expectTrue(args.getBool("keep-going"));
+  T.expectEq(args.getInt("jobs"), 2);
+  T.expectFalse(args.getBool("foobar"));
+}
+
+@test
 fun undefinedArgs(): void {
   cmd = Cli.Command("foo")
     .arg(Cli.BoolArg("bar").negatable())
