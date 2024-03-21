@@ -1360,6 +1360,9 @@ native fun unfreezeCond(cond: Condition): mutable Condition;
 @cpp_extern
 private native base class Obstack
 
+@cpp_extern
+private native base class Page
+
 @debug
 @cpp_extern("SKIP_new_Obstack")
 private native fun newObstack(): Obstack;
@@ -1374,11 +1377,11 @@ private native fun destroyObstackWithValue<T>(Obstack, List<T>): List<T>;
 
 @debug
 @cpp_extern("SKIP_switch_to_parent")
-private native fun switchToParent(Obstack): void;
+private native fun switchToParent(Obstack): Page;
 
 @debug
 @cpp_extern("SKIP_restore_from_parent")
-private native fun restoreFromParent(Obstack): void;
+private native fun restoreFromParent(Obstack, Page): void;
 
 @debug
 @cpp_extern("SKIP_context_sync")
@@ -1709,9 +1712,9 @@ fun withRegionValue<T>(f: () ~> T): T {
  */
 @debug
 private fun callOnParentObstack<T>(saved: Obstack, f: () -> T): T {
-  switchToParent(saved);
+  page = switchToParent(saved);
   res = f();
-  restoreFromParent(saved);
+  restoreFromParent(saved, page);
   res
 }
 
