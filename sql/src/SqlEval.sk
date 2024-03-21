@@ -149,75 +149,84 @@ fun computeInsert(
         val,
       )
     });
-    schema = table.schema;
-    schemaSize = schema.size();
-    valueSize = values.size();
-    cvalues = columnParamsOpt match {
-    | None() ->
-      if (valueSize != schemaSize) {
-        error(pos, "Value size mismatch with table schema");
-      };
-      values
-    | Some(columnParams) ->
-      missingCols = mutable Map[];
-      for (col in schema) {
-        missingCols![col.name] = col;
-      };
-      for (userDefinedCol in columnParams) {
-        if (!missingCols.containsKey(userDefinedCol)) {
-          error(pos, "Column not found: " + userDefinedCol);
-        };
-        missingCols.remove(userDefinedCol);
-      };
-
-      result = Array<?CValue>::mfill(schema.size(), None());
-
-      for (i => colName in columnParams) {
-        result![table.cols[colName]] = values[i];
-      };
-
-      for (tyDescr in missingCols) {
-        value = tyDescr.default match {
-        | None() ->
-          if (tyDescr.primary is Some _) {
-            if (tyDescr.ty is P.TEXT()) {
-              Some(CString(Ksuid::create().toString()))
-            } else {
-              Some(CInt(Random.next()))
-            };
-          } else if (!tyDescr.notNull.isSome() && !tyDescr.unique.isSome()) {
-            None()
-          } else {
-            error(pos, "Missing value for column: " + tyDescr.name);
-          }
-        | Some(P.CCDefault{expr}) ->
-          expr match {
-          | P.VNull() -> None()
-          | P.VInt(n) -> Some(CInt(n))
-          | P.VFloat(f) -> Some(CFloat(f))
-          | P.VString(x) -> Some(CString(x))
-          | P.VCurrentTime _ ->
-            Some(CString(strftime(context, "%H:%M:%S", "now", Array[])))
-          | P.VCurrentDate _ ->
-            Some(CString(strftime(context, "%Y-%m-%d", "now", Array[])))
-          | P.VCurrentTimestamp _ ->
-            Some(
-              CString(strftime(context, "%Y-%m-%d %H:%M:%S", "now", Array[])),
-            )
-          | _ -> error(pos, "Invalid expression for default value")
-          }
-        };
-        result![table.cols[tyDescr.name]] = value;
-      };
-
-      unsafe_chill_trust_me(result)
-    };
-    result = RowValues::create(cvalues);
-    if (repeat != 1) {
-      !result = result.setRepeat(repeat);
-    };
-    result
+    computeInsertRow(context, pos, columnParamsOpt, values, table, repeat)
   })
+}
+
+fun computeInsertRow(
+  context: mutable SKStore.Context,
+  pos: Int,
+  columnParamsOpt: ?Array<P.Name>,
+  values: Array<?CValue>,
+  table: DirDescr,
+  repeat: Int = 1,
+): RowValues {
+  schema = table.schema;
+  schemaSize = schema.size();
+  valueSize = values.size();
+  cvalues = columnParamsOpt match {
+  | None() ->
+    if (valueSize != schemaSize) {
+      error(pos, "Value size mismatch with table schema");
+    };
+    values
+  | Some(columnParams) ->
+    missingCols = mutable Map[];
+    for (col in schema) {
+      missingCols![col.name] = col;
+    };
+    for (userDefinedCol in columnParams) {
+      if (!missingCols.containsKey(userDefinedCol)) {
+        error(pos, "Column not found: " + userDefinedCol);
+      };
+      missingCols.remove(userDefinedCol);
+    };
+
+    result = Array<?CValue>::mfill(schema.size(), None());
+
+    for (i => colName in columnParams) {
+      result![table.cols[colName]] = values[i];
+    };
+
+    for (tyDescr in missingCols) {
+      value = tyDescr.default match {
+      | None() ->
+        if (tyDescr.primary is Some _) {
+          if (tyDescr.ty is P.TEXT()) {
+            Some(CString(Ksuid::create().toString()))
+          } else {
+            Some(CInt(Random.next()))
+          };
+        } else if (!tyDescr.notNull.isSome() && !tyDescr.unique.isSome()) {
+          None()
+        } else {
+          error(pos, "Missing value for column: " + tyDescr.name);
+        }
+      | Some(P.CCDefault{expr}) ->
+        expr match {
+        | P.VNull() -> None()
+        | P.VInt(n) -> Some(CInt(n))
+        | P.VFloat(f) -> Some(CFloat(f))
+        | P.VString(x) -> Some(CString(x))
+        | P.VCurrentTime _ ->
+          Some(CString(strftime(context, "%H:%M:%S", "now", Array[])))
+        | P.VCurrentDate _ ->
+          Some(CString(strftime(context, "%Y-%m-%d", "now", Array[])))
+        | P.VCurrentTimestamp _ ->
+          Some(CString(strftime(context, "%Y-%m-%d %H:%M:%S", "now", Array[])))
+        | _ -> error(pos, "Invalid expression for default value")
+        }
+      };
+      result![table.cols[tyDescr.name]] = value;
+    };
+
+    unsafe_chill_trust_me(result)
+  };
+  result = RowValues::create(cvalues);
+  if (repeat != 1) {
+    !result = result.setRepeat(repeat);
+  };
+  result
 }
 
 fun valueToCValue(
@@ -572,17 +581,48 @@ class Evaluator{options: Options, user: ?UserFile} {
         dir = getDir(table);
         sinkName = "/sinks/sink" + SKStore.genSym(0) + "/";
         sinkDirName = SKStore.DirName::create(sinkName);
-        kinds = table.schema.mapWithIndex((idx, x) -> (idx, P.IASC(), x.ty));
-        if (select.params.size() != kinds.size()) {
-          error(pos, "Incompatible select size")
-        };
-        for (i => param in select.params) {
-          (kinds[i].i2, param.getType()) match {
-          | (P.INTEGER(), P.INTEGER())
-          | (P.FLOAT(), P.FLOAT())
-          | (P.TEXT(), P.TEXT()) ->
-            void
-          | _ -> error(pos, "Incompatible select type")
+        paramsOpt match {
+        | None() ->
+          if (select.params.size() != table.schema.size()) {
+            error(
+              pos,
+              "Incompatible select size: expected " +
+                table.schema.size() +
+                " found " +
+                select.params.size(),
+            )
+          }
+        | Some(insertColumns) ->
+          if (select.params.size() != insertColumns.size()) {
+            error(
+              pos,
+              "Incompatible select size: expected " +
+                insertColumns.size() +
+                " found " +
+                select.params.size(),
+            )
+          };
+          for (idx => insertColName in insertColumns) {
+            schemaIdx = table.cols.maybeGet(insertColName) match {
+            | None() -> error(pos, "Column not found: " + insertColName)
+            | Some(colIdx) -> colIdx
+            };
+            schemaTy = table.schema[schemaIdx].ty;
+            selectTy = select.params[idx].getType();
+            if (schemaTy != selectTy) {
+              error(
+                pos,
+                "Type mismatch on column " +
+                  (idx + 1) +
+                  " (" +
+                  insertColName +
+                  ") expected type " +
+                  schemaTy.toString() +
+                  " (found " +
+                  selectTy.toString() +
+                  ")",
+              )
+            }
           }
         };
         _ = SKStore.EagerDir::apply(
@@ -591,7 +631,23 @@ class Evaluator{options: Options, user: ?UserFile} {
           sinkDirName,
           (context, _writer, key, valueIter) ~> {
             src = SKStore.Path(selectDir.dirName, key);
-            entries = Vector[(key, (src, src, valueIter.collect(Array)))];
+            rows: Array<SKStore.File> = valueIter
+              .map(row -> {
+                row match {
+                | RowValues(cvalues, repeat) ->
+                  computeInsertRow(
+                    context,
+                    pos,
+                    paramsOpt,
+                    cvalues,
+                    table,
+                    repeat,
+                  )
+                | _ -> invariant_violation("Invalid row kind")
+                }
+              })
+              .collect(Array);
+            entries = Vector[(key, (src, src, rows))];
             inputDir = context.unsafeGetEagerDir(dir.dirName);
             inputDir.writeArraySourceMany(context, entries.iterator());
           },
