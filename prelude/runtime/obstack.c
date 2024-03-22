@@ -49,6 +49,7 @@ char* end = NULL;
 struct sk_obstack* free_list = NULL;
 
 unsigned char* decr_heap_end(size_t size);
+void reset_heap_end();
 
 #else
 
@@ -124,6 +125,7 @@ void sk_obstack_attach_page(sk_obstack_t* lpage, sk_obstack_t* next) {
 
 char* sk_large_page(size_t size) {
   size_t block_size = size + sizeof(sk_obstack_t);
+  // SKIP32
   // large pages are create directly on persistence side memory
   // to prevent persistence copy
   sk_obstack_t* lpage = (sk_obstack_t*)sk_malloc(block_size);
@@ -246,6 +248,12 @@ void SKIP_destroy_Obstack(sk_saved_obstack_t* saved) {
     saved->head = NULL;
     saved->end = NULL;
   }
+#ifdef SKIP32
+  if (page == NULL && head == NULL && end == NULL) {
+    free_list = NULL;
+    reset_heap_end();
+  }
+#endif
 }
 
 void* SKIP_copy_value_to_Obstack(sk_obstack_t* from_page, void* toCopy) {
