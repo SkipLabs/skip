@@ -11,11 +11,11 @@ fun main(): void {
     .help()
     .arg(Cli.BoolArg("disasm-all"))
     .arg(Cli.BoolArg("disasm-annotated"))
-    .arg(Cli.ArrayArg("disasm-file").default(Array[]))
-    .arg(Cli.ArrayArg("disasm-function").default(Array[]))
-    .arg(Cli.ArrayArg("export-function").default(Array[]))
-    .arg(Cli.ArrayArg("export-function-as").default(Array[]))
-    .arg(Cli.ArrayArg("export-module").default(Array[]))
+    .arg(Cli.StringArg("disasm-file").repeatable())
+    .arg(Cli.StringArg("disasm-function").repeatable())
+    .arg(Cli.StringArg("export-function").repeatable())
+    .arg(Cli.StringArg("export-function-as").repeatable())
+    .arg(Cli.StringArg("export-module").repeatable())
     .arg(Cli.StringArg("output").long("output").short("o"))
     // .arg(Cli.StringArg("profile-path").default(""))
     .arg(Cli.StringArg("emit").default("link"))
@@ -47,7 +47,7 @@ fun main(): void {
     .arg(Cli.StringArg("data"))
     .arg(Cli.StringArg("init"))
     .arg(Cli.BoolArg("check"))
-    .arg(Cli.ArrayArg("files").positional().default(Array[]))
+    .arg(Cli.StringArg("files").positional().repeatable())
     .parseArgs();
 
   results.error match {
