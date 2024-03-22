@@ -251,16 +251,21 @@ int64_t SKIP_posix_spawnp(char *skargv, char *skenvp, char *file_actionsp) {
     exit(EXIT_FAILURE);
   }
 
-  for (int i = 0; *argv != NULL; ++argv, ++i) {
-    if (*argv != *(char **)skargv + i) {
-      free(*argv);
+  char **argv_cursor = argv;
+  for (int i = 0; *argv_cursor != NULL; ++argv_cursor, ++i) {
+    if (*argv_cursor != *(char **)skargv + i) {
+      free(*argv_cursor);
     }
   }
-  for (int i = 0; *envp != NULL; ++envp, ++i) {
-    if (*envp != *(char **)skenvp + i) {
-      free(*envp);
+  free(argv);
+
+  char **envp_cursor = envp;
+  for (int i = 0; *envp_cursor != NULL; ++envp_cursor, ++i) {
+    if (*envp_cursor != *(char **)skenvp + i) {
+      free(*envp_cursor);
     }
   }
+  free(envp);
 
   return (int64_t)pid;
 }
