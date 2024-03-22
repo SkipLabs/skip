@@ -152,34 +152,37 @@ private fun updateValue(
   arg: Arg,
   value: Value,
 ): Result<void, ArgumentError> {
-  arg match {
-  | ArrayArg _ ->
+  if (arg._repeatable) {
     strValue = value match {
     | StringValue(v) -> v
-    | _ -> invariant_violation(`Unexpected value type for ArrayArg`)
+    | BoolValue(true) -> "true"
+    | _ -> invariant_violation(`Unexpected value type for repeatable arg`)
     };
 
     values.maybeGet(arg.name) match {
     | Some(ArrayValue(arr)) ->
       values.set(arg.name, ArrayValue(arr.concat(Array[strValue])))
     | None() -> values.set(arg.name, ArrayValue(Array[strValue]))
-    | Some(v) -> invariant_violation(`Unexpected value type ${v} for ArrayArg`)
+    | Some(v) ->
+      invariant_violation(`Unexpected value type ${v} for repeatable arg`)
     }
-  | _ ->
-    if (!values.containsKey(arg.name)) {
-      values.set(arg.name, value)
-    } else {
-      return Failure(DuplicateValueError(arg.name))
-    }
+  } else if (!values.containsKey(arg.name)) {
+    values.set(arg.name, value)
+  } else {
+    return Failure(DuplicateValueError(arg.name))
   };
 
   Success(void)
 }
 
 private fun defaultValue(arg: Arg): Value {
-  arg match {
-  | ValuedArg _ -> arg._default.default(MissingValue())
-  | BoolArg _ -> arg._default.default(BoolValue(false))
+  if (arg._repeatable) {
+    arg._default.default(ArrayValue(Array[]))
+  } else {
+    arg match {
+    | ValuedArg _ -> arg._default.default(MissingValue())
+    | BoolArg _ -> arg._default.default(BoolValue(false))
+    }
   }
 }
 
@@ -215,11 +218,13 @@ private fun arg_maps(args: Array<Arg>): (Array<Arg>, Map<String, Arg>) {
     if (arg._positional) {
       if (posArgs.size() > 0) {
         prevArg = posArgs[posArgs.size() - 1];
-        if (prevArg is ArrayArg _) {
+        if (prevArg._repeatable) {
           invariant_violation(
             `Positional argument ${
               arg.name
-            } cannot appear after array positional argument ${prevArg.name}`,
+            } cannot appear after repeatable positional argument ${
+              prevArg.name
+            }`,
           )
         }
       };
@@ -338,14 +343,13 @@ mutable class Parser(
             break void
           } else {
             env_var = arg._env.map(v -> Environ.var(v));
-            value = arg match {
-            | StringArg _ -> env_var.map(v -> StringValue(v))
-            | IntArg _ -> env_var.map(v -> IntValue(v.toInt()))
-            | BoolArg _ ->
-              env_var.map(b -> BoolValue(b != "no" && b != "false" && b != "0"))
-            | _ ->
-              env_var.map(_ -> invariant_violation("Unexpected argument type."))
-            };
+            value = env_var.map(v ->
+              arg match {
+              | StringArg _ -> StringValue(v)
+              | IntArg _ -> IntValue(v.toInt())
+              | BoolArg _ -> BoolValue(v != "no" && v != "false" && v != "0")
+              }
+            );
             this.values.set(arg.name, value.default(defaultValue(arg)))
           }
         }
@@ -399,9 +403,8 @@ mutable class Parser(
     | None() if (!str.startsWith("-") && this.posArgId < this.posArgs.size()) ->
       arg = this.posArgs[this.posArgId];
       res = parse_value(arg, str).map(v -> Array[(arg, v)]);
-      arg match {
-      | ArrayArg _ -> void
-      | _ -> this.!posArgId = this.posArgId + 1
+      if (!arg._repeatable) {
+        this.!posArgId = this.posArgId + 1
       };
       res
     | None() ->
@@ -447,9 +450,7 @@ private fun parse_value(
   strValue: String,
 ): Result<Value, ArgumentError> {
   arg match {
-  | StringArg _
-  | ArrayArg _ ->
-    Success(StringValue(strValue))
+  | StringArg _ -> Success(StringValue(strValue))
   | IntArg _ ->
     strValue.toIntOption() match {
     | Some(v) -> Success(IntValue(v))
