@@ -888,25 +888,20 @@ fun copyAndConvertImport(
     print_string(">> Copy js files and convert to valid imports.");
   };
   nameLine = "var wasm64 = \"/*--NAME--*/\";";
-  modulesLines = "var modules = [ /*--MODULES--*/];";
+  modulesLines = "/*--MODULES--*/";
   base64Line = "export var base64 = \"\";";
   versionLine = "const npmVersion = \"\";";
-  extensionsLine = "/*--EXTENSIONS--*/";
-  envPrefix = "/** @sk env ";
-  envSuffix = " */";
 
   sourceMappingPrefix = "//# sourceMappingURL=";
   runtime = "";
   loaderFiles = mutable Vector<String>[];
   moduleFiles = mutable Vector<String>[];
-  extensionsFiles = mutable Map<String, mutable Vector<String>>[];
   tmplFiles = mutable Vector[];
   jsFiles.each(f -> {
     saved = SKStore.newObstack();
     optLoaderFile: ?String = None();
     optModuleFile: ?String = None();
     optRuntimeFile: ?String = None();
-    optExtensionFile: ?(String, String) = None();
     jsBasename = Path.basename(f);
     mjsBasename = jsBasename.replace(".js", ".mjs");
     jsSourceMapping = `${sourceMappingPrefix}${jsBasename}.map`;
@@ -938,8 +933,7 @@ fun copyAndConvertImport(
         cLine == nameLine ||
         cLine == modulesLines ||
         cLine == base64Line ||
-        cLine == versionLine ||
-        cLine == extensionsLine
+        cLine == versionLine
       ) {
         !withTmpl = true;
       } else if (cLine == "/** @sk init */") {
@@ -950,13 +944,6 @@ fun copyAndConvertImport(
         !withRuntime = true;
       } else if (cLine == jsSourceMapping) {
         !line = mjsSourceMapping;
-      } else if (cLine.startsWith(envPrefix) && cLine.endsWith(envSuffix)) {
-        len = cLine.length();
-        pSize = envPrefix.length();
-        sSize = envSuffix.length();
-        siter = cLine.getIter().drop(pSize);
-        inSize = len - pSize - sSize;
-        !optCategory = Some(cLine.sub(siter, inSize).trim());
       };
       line;
     });
@@ -977,22 +964,16 @@ fun copyAndConvertImport(
       invariant(runtime.isEmpty(), "Multiple runtime defined");
       !optRuntimeFile = Some(Path.basename(tf));
     };
-    !optExtensionFile = optCategory.map(cat -> (cat, Path.basename(tf)));
     copied = if (!withTmpl) {
       FileSystem.writeTextFile(tf, lines.join("\n"));
       SKStore.destroyObstackWithValue(
         saved,
-        List[(optModuleFile, optLoaderFile, optRuntimeFile, optExtensionFile)],
+        List[(optModuleFile, optLoaderFile, optRuntimeFile)],
       ).getHead();
     } else {
       copied = SKStore.destroyObstackWithValue(
         saved,
-        List[
-          (
-            (f, tf, lines),
-            (optModuleFile, optLoaderFile, optRuntimeFile, optExtensionFile),
-          ),
-        ],
+        List[((f, tf, lines), (optModuleFile, optLoaderFile, optRuntimeFile))],
       );
       head = copied.getHead();
       tmplFiles.push(head.i0);
@@ -1001,29 +982,22 @@ fun copyAndConvertImport(
     copied.i0.each(moduleFiles.push);
     copied.i1.each(loaderFiles.push);
     copied.i2.each(f -> !runtime = f);
-    copied.i3.each(f -> {
-      if (!extensionsFiles.containsKey(f.i0)) {
-        extensionsFiles.set(f.i0, mutable Vector[]);
-      };
-      extensionsFiles[f.i0].push(f.i1);
-    });
   });
   if (verbose) {
     print_string(">> Manage found templates.");
   };
   invariant(!runtime.isEmpty(), "Runtime must be defined.");
   saved = SKStore.newObstack();
-  moduleName = (m) -> m.split(".", 2)[0];
-  import = (m) -> `import * as ${moduleName(m)} from "./${m}";`;
-  files = Vector[runtime].concat(loaderFiles).concat(moduleFiles);
-  imports = files.map(import).join("\n");
-  modulesList = files.map(moduleName).join(", ");
-  strExtensions = "";
-  extensionsFiles
-    .map((_, v) -> "[" + v.map(c -> `"./${c}"`).join(", ") + "]")
-    .each((k, v) ->
-      !strExtensions = strExtensions + `extensions.set("${k}", ${v});\n`
-    );
+  modules = mutable Vector[];
+  importLine = m -> {
+    mName = m.split(".", 2)[0];
+    modules.push(mName);
+    `import {init as ${mName}} from "./${m}";`
+  };
+  strModules = Vector[importLine(runtime)].concat(loaderFiles.map(importLine))
+    .concat(moduleFiles.map(importLine))
+    .concat(Vector[`modules = [${modules.join(", ")}];`])
+    .join("\n");
   tmplFiles.each(fi -> {
     inner = SKStore.newObstack();
     (sf, tf, lines) = fi;
@@ -1035,7 +1009,7 @@ fun copyAndConvertImport(
       if (cLine == nameLine) {
         `var wasm64 = "${binary()}";`
       } else if (cLine == modulesLines) {
-        `${imports}\nvar modules = [${modulesList}];`
+        strModules
       } else if (cLine == base64Line) {
         resources.maybeGet(sf) match {
         | Some(b64File) ->
@@ -1044,8 +1018,6 @@ fun copyAndConvertImport(
         }
       } else if (cLine == versionLine) {
         `const npmVersion = "${version}";`
-      } else if (cLine == extensionsLine) {
-        strExtensions
       } else {
         line
       }
