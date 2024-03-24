@@ -1,20 +1,16 @@
 import { runUrl, loadEnv, isNode } from "#std/sk_types.js";
 import { createOnThisThread } from "./skdb_create.js";
-import type { Wrk } from "#std/sk_types.js";
+import type { Wrk, ModuleInit } from "#std/sk_types.js";
 import type { SKDB, SKDBSync, SKDBShared } from "./skdb_types.js";
 import { SKDBWorker } from "./skdb_wdatabase.js";
-export { SKDBTable as SKDBTable } from "./skdb_util.js";
+export { SKDBTable } from "./skdb_util.js";
 export type { SKDB, RemoteSKDB } from "./skdb_types.js";
 export type { Creds, MuxedSocket } from "./skdb_orchestration.js";
 export type { Environment } from "#std/sk_types.js";
 import { getWasmUrl } from "./skdb_wasm_locator.js";
 
-// sknpm searches for the modules line verbatim
-// @ts-ignore
-// prettier-ignore
-var modules = [ /*--MODULES--*/];
-var extensions = new Map();
-/*--EXTENSIONS--*/
+var modules: ModuleInit[];
+/*--MODULES--*/
 
 export async function createSkdb(
   options: {
@@ -32,7 +28,6 @@ export async function createSkdb(
     return createOnThisThread(
       disableWarnings,
       modules,
-      extensions,
       options.dbName,
       options.getWasmSource,
     );
@@ -52,9 +47,8 @@ async function createSkdbSync(
 ): Promise<SKDBSync> {
   let data = await runUrl(
     getWasmUrl,
-    // @ts-ignore
     modules,
-    extensions,
+    [],
     "SKDB_factory",
     options.getWasmSource,
   );
@@ -64,14 +58,12 @@ async function createSkdbSync(
 }
 
 async function createWorker(disableWarnings: boolean, dbName?: string) {
-  let env = await loadEnv(extensions);
+  let env = await loadEnv([]);
   env.disableWarnings = disableWarnings;
   let worker: Wrk;
   if (isNode()) {
-    let path = import.meta.url.replace("/skdb.mjs", "/skdb_nodeworker.mjs");
-    //@ts-ignore
-    path = "./" + path.substring(process.cwd().length + 8);
-    worker = env.createWorker(path, { type: "module" });
+    let url = new URL("./skdb_nodeworker.mjs", import.meta.url);
+    worker = env.createWorker(url, { type: "module" });
   } else {
     // important that this line looks exactly like this for bundlers to discover the file
     const wrapped = new Worker(new URL("./skdb_worker.mjs", import.meta.url), {

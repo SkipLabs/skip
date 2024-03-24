@@ -1,11 +1,9 @@
-import { Options, run } from "#std/sk_types";
+import { Options, run, type ToWasmManager } from "#std/sk_types";
 
-var wasm64 = "skmd";
-// sknpm searches for the modules line verbatim
-// prettier-ignore
-var modules = [ /*--MODULES--*/];
-var extensions = new Map();
-/*--EXTENSIONS--*/
+var modules: (() => Promise<ToWasmManager>)[];
+/*--MODULES--*/
+
+const wasmurl = new URL("./skmd.wasm", import.meta.url);
 
 export type Conf = {
   title?: string;
@@ -23,7 +21,7 @@ export type Conf = {
 };
 
 export async function createMDConverter() {
-  const data = await run(wasm64, modules, extensions);
+  const data = await run(wasmurl, modules, []);
   const fs = data.environment.fs();
   const write = (name: string, content: string) => {
     const fd = fs.openFile(name, Options.w(), 0);

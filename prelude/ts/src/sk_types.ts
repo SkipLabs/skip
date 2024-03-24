@@ -151,7 +151,7 @@ export interface Environment {
   disableWarnings: boolean;
   environment: Array<string>;
   createSocket: (uir: string) => WebSocket;
-  createWorker: (filename: string | URL, options?: WorkerOptions) => Wrk;
+  createWorker: (url: URL, options?: WorkerOptions) => Wrk;
   createWorkerWrapper: (worker: Worker) => Wrk;
   timestamp: () => float;
   decodeUTF8: (utf8: ArrayBuffer) => string;
@@ -161,8 +161,7 @@ export interface Environment {
   fs: () => FileSystem;
   sys: () => System;
   crypto: () => Crypto;
-  fetch: (path: string) => Promise<Uint8Array>;
-  rootPath: () => string;
+  fetch: (url: URL) => Promise<Uint8Array>;
 }
 
 export interface Memory {
@@ -597,6 +596,9 @@ export interface ToWasmManager {
   prepare: (wasm: object) => Links | null;
 }
 
+export type ModuleInit = (e: Environment) => Promise<ToWasmManager>;
+export type EnvInit = (e: Environment) => void;
+
 enum I18N {
   RAW,
   LOCALE,
@@ -707,17 +709,6 @@ export function trimEndChar(str: string, ch: string) {
   return end < str.length ? str.substring(0, end) : str;
 }
 
-export function relativeto(path: string, ref: string) {
-  if (ref.length == 0) {
-    return path;
-  }
-  if (path.startsWith(ref)) {
-    ref = trimEndChar(ref, "/");
-    return "." + path.substring(ref.length);
-  }
-  return path;
-}
-
 export function humanSize(bytes: int) {
   const thresh = 1024;
   if (Math.abs(bytes) < thresh) {
@@ -761,18 +752,12 @@ export function loadWasm(
 }
 
 async function start(
-  modules: Array<any>,
+  modules: ModuleInit[],
   buffer: Uint8Array,
   environment: Environment,
   main?: string,
 ) {
-  let promises = modules.map((module) => {
-    if (module.init) {
-      return module.init(environment);
-    } else {
-      return null;
-    }
-  });
+  let promises = modules.map((fn) => fn(environment));
   let cs = await Promise.all(promises);
   let ms = cs.filter((c) => c != null);
   return await loadWasm(buffer, ms, environment, main);
@@ -782,10 +767,7 @@ export function isNode() {
   return typeof process !== "undefined" && process.release.name == "node";
 }
 
-export async function loadEnv(
-  envExtends: Map<string, Array<string>>,
-  envVals?: Array<string>,
-) {
+export async function loadEnv(extensions: EnvInit[], envVals?: Array<string>) {
   // hack: this way of importing is deliberate so that web bundlers
   // don't follow the node dynamic import
   const nodeImport = "./sk_node.mjs";
@@ -794,46 +776,42 @@ export async function loadEnv(
     : //@ts-ignore
       import("./sk_browser.mjs"));
   let env = environment.environment(envVals) as Environment;
-  let extensions = envExtends.get(env.name());
   if (extensions) {
-    (await Promise.all(extensions.map((ext) => import(ext)))).map((ext) =>
-      ext.complete(env),
-    );
+    extensions.map((fn) => fn(env));
   }
   return env;
 }
 
 export async function run(
-  wasm64: string,
-  modules: Array<string>,
-  envs: Map<string, Array<string>>,
+  wasm: URL,
+  modules: ModuleInit[],
+  extensions: EnvInit[],
   main?: string,
   getWasmSource?: () => Promise<Uint8Array>,
 ) {
-  let env = await loadEnv(envs);
+  let env = await loadEnv(extensions);
   let buffer: Uint8Array;
   if (getWasmSource) {
     buffer = await getWasmSource();
   } else {
-    let path = relativeto(resolve("./" + wasm64 + ".wasm"), env.rootPath());
-    buffer = await env.fetch(path);
+    buffer = await env.fetch(wasm);
   }
   return await start(modules, buffer, env, main);
 }
 
 export async function runUrl(
-  getUrl: (env: Environment) => Promise<string>,
-  modules: Array<string>,
-  envs: Map<string, Array<string>>,
+  getUrl: () => Promise<URL>,
+  modules: ModuleInit[],
+  extensions: EnvInit[],
   main?: string,
   getWasmSource?: () => Promise<Uint8Array>,
 ) {
-  let env = await loadEnv(envs);
+  let env = await loadEnv(extensions);
   let buffer: Uint8Array;
   if (getWasmSource) {
     buffer = await getWasmSource();
   } else {
-    const url = await getUrl(env);
+    const url = await getUrl();
     buffer = await env.fetch(url);
   }
   return await start(modules, buffer, env, main);
