@@ -63,12 +63,18 @@ class Env(
     };
   }
 
-  fun run(args: Array<String>): void {
+  fun run(args: Array<String>, inDir: ?String = None()): void {
     if (this.verbose) {
       // TODO: colors
       print_error(`>> ${args.join(" ")}`)
     };
+    optCurrent = inDir.map(dir -> {
+      current = Environ.current_dir();
+      Environ.set_current_dir(dir);
+      current
+    });
     p = System.subprocess(args, this.printString, this.printError);
+    optCurrent.each(c -> Environ.set_current_dir(c));
     if (!p.success()) {
       if (!this.verbose) {
         print_raw(p.stdout);
@@ -150,7 +156,10 @@ fun build_harness(
       archive = env.targetPath(resPath, ".tar.gz");
       if (resChecker.isYoungerThan(archive)) {
         ensureDirectory(Path.dirname(archive), env.verbose);
-        env.run(Array["tar", "-zcvf", archive, name]);
+        env.run(
+          Array["tar", "-zcvf", archive, name],
+          Some(Path.dirname(resPath)),
+        );
       };
       if (!isWasm) {
         buildResource(env, archive, true) match {
@@ -264,13 +273,11 @@ fun buildResource(
     ensureDirectory(Path.dirname(object), env.verbose);
     workDir = if (relToOut) env.outDir else env.refDir;
     relative = relative(file, workDir).fromSome();
-    Environ.set_current_dir(workDir);
     name = relative.replace("/", "_").replace(".", "_");
     copyBinary(name, file, source) match {
     | Failure(err) -> return Failure(err)
     | _ -> void
     };
-    Environ.set_current_dir(env.refDir);
     _ = compileFile(env, false, source, TimeChecker(), Array[], Some(object))
   };
   Success(object)
