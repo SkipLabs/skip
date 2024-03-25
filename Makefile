@@ -165,11 +165,8 @@ check-vite: npm
 	cd build/vitejs && npm install;
 	rm -r build/vitejs/node_modules/skdb
 	cp -r build/package/skdb build/vitejs/node_modules/
-	cd build/vitejs && npm run dev
-	x-www-browser http://localhost:5173/ &> /dev/null
 	cd build/vitejs && npm run build
-	cd build/vitejs && node server.js &
-	x-www-browser http://localhost:5154/ &> /dev/null
-
+	cd build/vitejs && node server.js
+	cd build/vitejs && npm run dev
 
 
