@@ -207,6 +207,67 @@ fun reasonSchemaUnsupported(
   };
 }
 
+// How to produce a value for a given column in translateFromSourceSchema:
+// CTSourceIdx -> get it from position `idx` in input row
+// CTNull -> nullable column, leave null
+// CTDefault -> column with default, evaluate the default expr
+base class ColumnTranslation {
+  children =
+  | CTSourceIdx(idx: Int)
+  | CTNull()
+  | CTDefault(expr: P.Expr)
+}
+
+fun translateFromSourceSchema(
+  sourceSchema: Array<P.ColumnDefinition>,
+  actualSchema: Array<P.ColumnDefinition>,
+): (SKDB.RowValues, mutable SKStore.Context) -> SKDB.RowValues {
+  rowConstructor = actualSchema.map(colDef ->
+    sourceSchema.indexOf(colDef) match {
+    | Some(idx) -> CTSourceIdx(idx)
+    | None() ->
+      colDef.default match {
+      | Some(P.CCDefault{expr}) -> CTDefault(expr)
+      | None() ->
+        colDef.notNull match {
+        | None() -> CTNull()
+        | Some(_) ->
+          invariant_violation(
+            "Can't transform to schema with missing non-nullable fields",
+          )
+        }
+      }
+    }
+  );
+  (row, context) -> {
+    values: Array<?SKDB.CValue> = rowConstructor.map(cTranslation ->
+      cTranslation match {
+      | CTNull() -> None()
+      | CTSourceIdx(idx) -> row.values[idx]
+      | CTDefault(expr) ->
+        expr match {
+        | P.VNull() -> None()
+        | P.VInt(n) -> Some(SKDB.CInt(n))
+        | P.VFloat(f) -> Some(SKDB.CFloat(f))
+        | P.VString(x) -> Some(SKDB.CString(x))
+        | P.VCurrentTime _ ->
+          Some(SKDB.CString(SKDB.strftime(context, "%H:%M:%S", "now", Array[])))
+        | P.VCurrentDate _ ->
+          Some(SKDB.CString(SKDB.strftime(context, "%Y-%m-%d", "now", Array[])))
+        | P.VCurrentTimestamp _ ->
+          Some(
+            SKDB.CString(
+              SKDB.strftime(context, "%Y-%m-%d %H:%M:%S", "now", Array[]),
+            ),
+          )
+        | _ -> invariant_violation("Invalid expression for default value")
+        }
+      }
+    );
+    SKDB.RowValues::create(values, row.repeat)
+  }
+}
+
 fun lwwEdits(
   table: SKDB.DirDescr,
   snapshot: Int,
@@ -276,7 +337,8 @@ fun applyDiffStrategy(
   table: SKDB.DirDescr,
   identity: Int,
   rebuild: Bool,
-  rows: Array<SKDB.RowValues>,
+  sourceRows: Array<SKDB.RowValues>,
+  sourceSchema: ?Array<P.ColumnDefinition>,
   checkpoint: ?Int,
   snapshot: ?Int,
   userFileOpt: ?SKDB.UserFile,
@@ -389,12 +451,18 @@ fun applyDiffStrategy(
     if (!privacyIsOk(newRoot)) {
       throw PrivacyWriteViolation()
     };
+    rows = sourceSchema match {
+    | None() -> sourceRows.iterator()
+    | Some(schema) ->
+      translator = translateFromSourceSchema(schema, table.schema);
+      sourceRows.iterator().map(row -> translator(row, newRoot))
+    };
 
     dir = newRoot.unsafeGetEagerDir(table.dirName);
 
     !dir = SKStore.withRegionFoldRec(
       Some(newRoot),
-      rows.iterator(),
+      rows,
       dir,
       (optContext, row, newDir) ~> {
         ctx = optContext.fromSome();
@@ -450,12 +518,18 @@ fun applyDiffStrategy(
     if (!privacyIsOk(newRoot)) {
       throw PrivacyWriteViolation()
     };
+    rows = sourceSchema match {
+    | None() -> sourceRows.iterator()
+    | Some(schema) ->
+      translator = translateFromSourceSchema(schema, table.schema);
+      sourceRows.iterator().map(row -> translator(row, newRoot))
+    };
 
     dir = newRoot.unsafeGetEagerDir(table.dirName);
 
     !dir = SKStore.withRegionFoldRec(
       Some(newRoot),
-      rows.iterator(),
+      rows,
       dir,
       (optContext, row, newDir) ~> {
         ctx = optContext.fromSome();
@@ -630,18 +704,31 @@ class FinalTableDiff(
   snapshot: ?Int,
   rebuild: Bool,
   rows: Array<SKDB.RowValues>,
+  sourceSchema: ?Array<P.ColumnDefinition>,
   lines: Array<String>,
 ) {}
 
 mutable class TableDiff(
   table: SKDB.DirDescr,
+  sourceSchema: ?Array<P.ColumnDefinition>,
   snapshot: ?Int,
   mutable rebuild: Bool,
   rows: mutable Vector<SKDB.RowValues>,
   lines: mutable Vector<String>,
 ) {
-  static fun create(table: SKDB.DirDescr, snapshot: ?Int): mutable this {
-    mutable static(table, snapshot, false, mutable Vector[], mutable Vector[])
+  static fun create(
+    table: SKDB.DirDescr,
+    sourceSchema: ?Array<P.ColumnDefinition>,
+    snapshot: ?Int,
+  ): mutable this {
+    mutable static(
+      table,
+      sourceSchema,
+      snapshot,
+      false,
+      mutable Vector[],
+      mutable Vector[],
+    )
   }
 
   readonly fun freeze(): FinalTableDiff {
@@ -650,6 +737,7 @@ mutable class TableDiff(
       this.snapshot,
       this.rebuild,
       this.rows.toArray(),
+      this.sourceSchema,
       this.lines.toArray(),
     )
   }
@@ -671,6 +759,7 @@ fun buildDiffChain(
       identity,
       td.rebuild,
       td.rows,
+      td.sourceSchema,
       Some(checkpoint),
       td.snapshot,
       userFileOpt,
@@ -713,6 +802,7 @@ fun replayDiff(
   getLine: () -> ?String,
   user: ?String,
   identity: Int,
+  schemas: Map<String, Array<P.ColumnDefinition>>,
   rebuildsEnabled: Bool,
 ): SKStore.ContextOp {
   SKDB.getFinalState(context, Some(identity)) match {
@@ -738,10 +828,11 @@ fun replayDiff(
 
       | None() ->
         (table, snapshot) = parseHeader(context, line);
+        schema = schemas.maybeGet(table.name.toString());
         Some(
           mutable DiffParsingState(
             mutable Vector[],
-            TableDiff::create(table, snapshot),
+            TableDiff::create(table, schema, snapshot),
           ),
         )
 
@@ -749,11 +840,12 @@ fun replayDiff(
         DiffParsingState(tableDiffs, currentDiff),
       ) if (String.getByte(line, 0) == 94) -> // startsWith("^")
         (table, snapshot) = parseHeader(context, line);
+        schema = schemas.maybeGet(table.name.toString());
         tableDiffs.push(currentDiff);
         Some(
           mutable DiffParsingState(
             tableDiffs,
-            TableDiff::create(table, snapshot),
+            TableDiff::create(table, schema, snapshot),
           ),
         )
 
