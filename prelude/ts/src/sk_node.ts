@@ -61,7 +61,16 @@ class Env implements Environment {
     return "node";
   }
   fetch(url: URL) {
-    const path = "." + url.pathname.substring(process.cwd().length);
+    let path : string | URL;
+    if (url && url.pathname) {
+      path = "." + url.pathname.substring(process.cwd().length);
+    // @ts-ignore
+    } else if (url && url.default) {
+      // @ts-ignore
+      path = "." + url.default.substring(process.cwd().length);
+    } else {
+      path = url
+    }
     return new Promise<Uint8Array>(function (resolve, reject) {
       fs.readFile(path, {}, (err, data) => {
         err ? reject(err) : resolve(data);
