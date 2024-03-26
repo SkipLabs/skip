@@ -165,9 +165,16 @@ check-vite: npm
 	cd build/vitejs && npm install;
 	rm -r build/vitejs/node_modules/skdb
 	cp -r build/package/skdb build/vitejs/node_modules/
-	cd build/vitejs && bun bun.js
 	cd build/vitejs && npm run build
 	cd build/vitejs && node server.js
 	cd build/vitejs && npm run dev
 
 
+.PHONY: test-bun
+test-bun: npm
+	rm -rf build/bun
+	cp -r sql/ts/bun build/bun
+	cd build/bun && bun install;
+	rm -r build/bun/node_modules/skdb
+	cp -r build/package/skdb build/bun/node_modules/
+	cd build/bun && bun bun.js true && bun bun.js false
