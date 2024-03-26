@@ -57,5 +57,6 @@ export default defineConfig({
   plugins: [expressPlugin()],
   worker: {
     format: 'es'
-  }
+  },
+  optimizeDeps: {exclude:["skdb"]}
 })

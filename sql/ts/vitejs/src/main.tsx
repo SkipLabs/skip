@@ -1,6 +1,6 @@
 import { createSkdb } from 'skdb';
 
-createSkdb({ asWorker: false }).then(skdb => {
+createSkdb({ asWorker: true }).then(skdb => {
   skdb.schema(
     "CREATE TABLE example (id TEXT PRIMARY KEY, intCol INTEGER NOT NULL, floatCol FLOAT NOT NULL, skdb_access TEXT NOT NULL);",
   ).then(_r => {

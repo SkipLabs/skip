@@ -84,4 +84,5 @@ const server = http.createServer(requestHandler);
 server.listen(port, () => {
   console.timeEnd("server ready");
   console.log("➜  Local:   http://localhost:" + port + "/");
+  console.log(chalk.blue("Open the link in browser to continue the chek."));
 });
