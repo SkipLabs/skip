@@ -1,6 +1,7 @@
 import type { float, int, Environment, Wrk, Shared } from "./sk_types.js";
 import { MemFS, MemSys } from "./sk_mem_utils.js";
 
+import * as path from "path";
 import * as fs from "fs";
 import * as util from "util";
 import * as perf_hooks from "perf_hooks";
@@ -20,7 +21,7 @@ class WrkImpl implements Wrk {
     url: URL,
     options: WorkerOptions | undefined,
   ): Wrk {
-    const filename = "." + url.pathname.substring(process.cwd().length);
+    const filename = "./" + path.relative(process.cwd(), url.pathname);
     return new this(new Worker(filename, options));
   }
 
@@ -61,18 +62,19 @@ class Env implements Environment {
     return "node";
   }
   fetch(url: URL) {
-    let path : string | URL;
+    let filename : string | URL;
+    const cwd = process.cwd();
     if (url && url.pathname) {
-      path = "." + url.pathname.substring(process.cwd().length);
-    // @ts-ignore
+      filename = "./" + path.relative(cwd, url.pathname);
+      // @ts-ignore
     } else if (url && url.default) {
       // @ts-ignore
-      path = "." + url.default.substring(process.cwd().length);
+      filename = "./" + path.relative(cwd, url.default as string)
     } else {
-      path = url
+      filename = url
     }
     return new Promise<Uint8Array>(function (resolve, reject) {
-      fs.readFile(path, {}, (err, data) => {
+      fs.readFile(filename, {}, (err, data) => {
         err ? reject(err) : resolve(data);
       });
     });
