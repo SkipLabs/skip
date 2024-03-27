@@ -105,6 +105,10 @@ fmt-js:
 .PHONY: fmt
 fmt: fmt-sk fmt-c fmt-js
 
+.PHONY: check-fmt
+check-fmt: fmt
+	if ! git diff --quiet --exit-code; then echo "make fmt changed some files:"; git status --porcelain; exit 1; fi
+
 # install the repo pre-commit hook locally
 .git/hooks/pre-commit: bin/git_hooks/check_format.sh
 	ln -s $(PWD)/bin/git_hooks/check_format.sh .git/hooks/pre-commit
