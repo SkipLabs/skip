@@ -41,7 +41,12 @@ class WrappedRemote implements RemoteSKDB {
 
   notifyConnectedAs(userName: string, replicationId: string) {
     return this.worker
-      .post(new Caller(this.wrapped, "notifyConnectedAs", [userName, replicationId]))
+      .post(
+        new Caller(this.wrapped, "notifyConnectedAs", [
+          userName,
+          replicationId,
+        ]),
+      )
       .send();
   }
 

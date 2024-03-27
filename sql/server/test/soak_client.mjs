@@ -6,13 +6,13 @@ import { webcrypto as crypto } from "node:crypto";
 import assert from "node:assert/strict";
 
 const tables = [
-  {table: "no_pk_inserts", expectedColumns: "*"},
-  {table: "pk_inserts", expectedColumns: "*"},
-  {table: "no_pk_single_row", expectedColumns: "*"},
-  {table: "pk_single_row", expectedColumns: "*"},
-  {table: "pk_privacy_ro", expectedColumns: "*"},
-  {table: "pk_privacy_rw", expectedColumns: "*"},
-  {table: "checkpoints", expectedColumns: "*"},
+  { table: "no_pk_inserts", expectedColumns: "*" },
+  { table: "pk_inserts", expectedColumns: "*" },
+  { table: "no_pk_single_row", expectedColumns: "*" },
+  { table: "pk_single_row", expectedColumns: "*" },
+  { table: "pk_privacy_ro", expectedColumns: "*" },
+  { table: "pk_privacy_rw", expectedColumns: "*" },
+  { table: "checkpoints", expectedColumns: "*" },
 ];
 
 const filtered_tables = ["no_pk_filtered", "pk_filtered"];
@@ -151,7 +151,7 @@ const modify_rows = async function (client, skdb, i) {
   }
 };
 
-const table_is_rebuilding = function(skdb, table) {
+const table_is_rebuilding = function (skdb, table) {
   // we're about to do some serious encapsulation violation
   const replicationId = skdb.skdbSync.connectedRemote.replicationUid;
   const watermark = skdb.skdbSync.watermark(replicationId, table);
@@ -198,20 +198,24 @@ const check_expectation = async function (
 
 const expectation_check_watermarks = new Map();
 
-const check_expectations = async function (skdb, client, latest_id, this_client) {
+const check_expectations = async function (
+  skdb,
+  client,
+  latest_id,
+  this_client,
+) {
   pause_modifying = true;
   const prevCheckPointWatermark = expectation_check_watermarks.get(client) ?? 0;
   expectation_check_watermarks.set(
     client,
-    Math.max(latest_id, prevCheckPointWatermark)
+    Math.max(latest_id, prevCheckPointWatermark),
   );
 
   const params = { client, latest_id };
 
   await skdb.exec(`
 INSERT INTO pk_single_row_hist SELECT datetime(), client, value FROM pk_single_row;
-INSERT INTO no_pk_single_row_hist SELECT datetime(), client, value FROM no_pk_single_row;`,
-  );
+INSERT INTO no_pk_single_row_hist SELECT datetime(), client, value FROM no_pk_single_row;`);
 
   console.log("Running expectation checks for checkpoint", params);
 
@@ -404,7 +408,7 @@ CREATE TABLE pk_single_row_hist (
   t TEXT DEFAULT CURRENT_TIMESTAMP,
   client INTEGER,
   value INTEGER
-);` );
+);`);
 
     // check expectations on receiving a checkpoint
     await skdb.watch(

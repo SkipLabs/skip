@@ -170,7 +170,11 @@ export class SKDBSyncImpl implements SKDBSync {
 
     this.accessKey = accessKey;
 
-    const mechanism = new SKDBMechanismImpl(this, this.fs, this.environment.encodeUTF8);
+    const mechanism = new SKDBMechanismImpl(
+      this,
+      this.fs,
+      this.environment.encodeUTF8,
+    );
 
     this.connectedRemote = await connect(
       this.environment,
@@ -202,7 +206,10 @@ export class SKDBSyncImpl implements SKDBSync {
       "CREATE UNIQUE INDEX skdb_permissions_group_user ON skdb_group_permissions(groupID, userID);",
     );
 
-    this.notifyConnectedAs(accessKey, mechanism.getReplicationUid(this.clientUuid));
+    this.notifyConnectedAs(
+      accessKey,
+      mechanism.getReplicationUid(this.clientUuid),
+    );
   }
 
   getUser(): string | undefined {
@@ -251,11 +258,9 @@ export class SKDBSyncImpl implements SKDBSync {
 
   notifyConnectedAs = (userName: string, replicationId: string) => {
     return this.runLocal(
-      [
-        "connected-as",
-        "--userId", userName,
-        "--replicationId", replicationId
-      ], "");
+      ["connected-as", "--userId", userName, "--replicationId", replicationId],
+      "",
+    );
   };
 
   viewSchema = (viewName: string) => {
