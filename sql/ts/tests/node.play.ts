@@ -13,7 +13,6 @@ function run(t, asWorker: boolean) {
 tests(false).forEach((t) => run(t, false));
 tests(true).forEach((t) => run(t, true));
 
-
 const N = 765000; // we should be able to process this many rows without running out of address space
 
 // this is to detect memory regression in wasm, it's not a behaviour

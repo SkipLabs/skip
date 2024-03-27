@@ -1563,7 +1563,7 @@ class SKDBServer implements RemoteSKDB {
                   resolveSignalled = false;
                   break;
                 }
-                resolveSignalled ||= line.match(/^:[1-9]/g) != null
+                resolveSignalled ||= line.match(/^:[1-9]/g) != null;
               }
             }
             return client.writeCsv(payload, this.replicationUid);
