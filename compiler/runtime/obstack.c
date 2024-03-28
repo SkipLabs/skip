@@ -69,8 +69,12 @@ typedef struct sk_obstack {
   sk_saved_obstack_t saved;
   char user_data[0];
 } sk_obstack_t;
-
+#ifdef SKIP32
 sk_saved_obstack_t init_saved = {NULL, NULL, NULL};
+#else
+__thread sk_saved_obstack_t init_saved = {NULL, NULL, NULL};
+#endif
+
 
 size_t sk_page_size(sk_obstack_t* page) {
   return page->size;
@@ -247,6 +251,48 @@ void* SKIP_destroy_Obstack_with_value(sk_saved_obstack_t* saved, void* toCopy) {
   sk_free_size(pages, sizeof(sk_cell_t) * nbr_pages);
 
   return result;
+}
+
+sk_obstack_t* SKIP_switch_to_parent(sk_saved_obstack_t* saved) {
+  // Gather current obstack data
+  sk_obstack_t* first = page;
+  while (first != NULL && first->previous != saved->page) {
+    first = first->previous;
+  }
+  
+  sk_obstack_t* saved_page = page;
+  char* saved_head = head;
+  char* saved_end = end;
+
+  // Switch to parent obstack
+  page = saved->page;
+  head = saved->head;
+  end = saved->end;
+
+  // Store obstack dat for restauration
+  saved->head = saved_head;
+  saved->page = first;
+  saved->end = saved_end;
+
+  return saved_page;
+}
+
+void SKIP_restore_from_parent(sk_saved_obstack_t* saved, sk_obstack_t* leading) {
+  // Save the obstack restauration data
+  sk_obstack_t* first_page = saved->page;
+  char* saved_head = saved->head;
+  char* saved_end = saved->end;
+
+  // Update the sub obstack with new parent obstack positions
+  first_page->previous = page;
+  saved->page = page;
+  saved->head = head;
+  saved->end = end;
+
+  // Switch to sub obstack
+  page = leading;
+  head = saved_head;
+  end = saved_end;
 }
 
 static int sk_gc_enabled = 1;
