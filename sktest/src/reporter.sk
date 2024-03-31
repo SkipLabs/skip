@@ -132,6 +132,43 @@ mutable class TestSuiteStats(
   }
 }
 
+private fun requiresEscapeXmlText(c: Char): Bool {
+  c == '<' || c == '>'
+}
+
+private fun escapeXmlTextChar(c: Char): String {
+  c match {
+  | '<' -> "&lt;"
+  | '>' -> "&gt;"
+  | _ -> c.toString()
+  }
+}
+
+private fun requiresEscapeXmlAttr(c: Char): Bool {
+  c == '"' || c == '\'' || c == '&' || requiresEscapeXmlText(c)
+}
+
+private fun escapeXmlAttrChar(c: Char): String {
+  c match {
+  | '"' -> "&quote;"
+  | '\'' -> "&apos;"
+  | '&' -> "&amp;"
+  | _ -> escapeXmlTextChar(c)
+  }
+}
+
+private fun escape(
+  s: String,
+  requiresEscape: Char -> Bool,
+  escape: Char -> String,
+): String {
+  if (s.chars().any(requiresEscape)) {
+    s.chars().map(escape).join("")
+  } else {
+    s
+  }
+}
+
 mutable class XmlTestReporter{
   results: mutable Map<String, mutable Vector<TestResult>> = mutable Map[],
   stats: mutable Map<String, mutable TestSuiteStats> = mutable Map[],
@@ -146,6 +183,8 @@ mutable class XmlTestReporter{
   }
 
   mutable fun finish(): void {
+    escapeText = s -> escape(s, requiresEscapeXmlText, escapeXmlTextChar);
+    escapeAttr = s -> escape(s, requiresEscapeXmlAttr, escapeXmlAttrChar);
     this.writeLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
     totalTests = this.stats.values()
       .map(s -> s.tests)
@@ -168,23 +207,31 @@ mutable class XmlTestReporter{
       numErrors = this.stats[testSuiteName].errors;
       time = this.stats[testSuiteName].time;
       this.writeLine(
-        `  <testsuite name="${testSuiteName}" tests="${numTests}" failures="${numFailures}" errors="${numErrors}" time="${time}">`,
+        `  <testsuite name="${escapeAttr(
+          testSuiteName,
+        )}" tests="${numTests}" failures="${numFailures}" errors="${numErrors}" time="${time}">`,
       );
       for (res in results) {
         this.writeLine(
-          `    <testcase name="${res.name}" file="${res.file}" line="${
-            res.line
-          }" time="${res.time}" classname="${res.suite}">`,
+          `    <testcase name="${escapeAttr(res.name)}" file="${escapeAttr(
+            res.file,
+          )}" line="${res.line}" time="${res.time}" classname="${escapeAttr(
+            res.suite,
+          )}">`,
         );
         if (res.stdout != "") {
-          this.writeLine(`      <system-out>${res.stdout}</system-out>`);
-          this.writeLine(`      <system-err>${res.stderr}</system-err>`)
+          this.writeLine(
+            `      <system-out>${escapeText(res.stdout)}</system-out>`,
+          );
+          this.writeLine(
+            `      <system-err>${escapeText(res.stderr)}</system-err>`,
+          )
         };
         if (res.result != "success") {
           this.writeLine(
-            `      <failure message="${res.failure_message}" type="${
-              res.failure_type
-            }"></failure>`,
+            `      <failure message="${escapeAttr(
+              res.failure_message,
+            )}" type="${escapeAttr(res.failure_type)}"></failure>`,
           )
         };
         this.writeLine("    </testcase>")
