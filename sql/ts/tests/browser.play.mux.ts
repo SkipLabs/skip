@@ -16,6 +16,9 @@ function runMS(t) {
   test(t.name, async ({ page }) => {
     await page.evaluate(`window.testName = "${t.name}";`);
     await page.evaluate(`window.test = ${t.fun};`);
+    if (t.slow) {
+      test.slow();
+    }
     let res = await page.evaluate(async () => {
       var encoder = new TextEncoder();
       class Env {

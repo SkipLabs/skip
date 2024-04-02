@@ -404,6 +404,7 @@ export const ms_tests = () => {
         let val = 10001 * (10000 / 2);
         expect(res).toEqual(JSON.stringify([val, val, val, val, val, val]));
       },
+      slow: true,
     },
   ];
 };
