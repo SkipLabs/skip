@@ -417,6 +417,12 @@ fun applyDiffStrategy(
       tableName = table.name.origName;
       authorCol = SKDB.getAuthorIdx(table);
       accessCol = SKDB.getAccessIdx(table);
+      rows = sourceSchema match {
+      | None() -> sourceRows.iterator()
+      | Some(schema) ->
+        translator = translateFromSourceSchema(schema, table.schema);
+        sourceRows.iterator().map(row -> translator(row, context))
+      };
       for (row in rows) {
         SKDB.checkUserCanWriteRow(
           context,
