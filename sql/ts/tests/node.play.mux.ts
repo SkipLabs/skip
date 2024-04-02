@@ -15,6 +15,9 @@ class Env {
 
 function runMS(t) {
   test(t.name, async () => {
+    if (t.slow) {
+      test.slow();
+    }
     let res = await t.fun(new Env(), mu);
     t.check(res);
   });
