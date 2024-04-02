@@ -121,8 +121,18 @@ untracked fun main(): void {
     .subcommand(
       Cli.Command("connected-as")
         .about("Informs the database that it is a replicating peer")
-        .arg(Cli.StringArg("userId").required().about("user ID"))
-        .arg(Cli.StringArg("replicationId").required().about("replication id")),
+        .arg(
+          Cli.StringArg("userId")
+            .required()
+            .about("access key used for the connection"),
+        )
+        .arg(
+          Cli.StringArg("replicationId")
+            .required()
+            .about(
+              "the replication id the client is using locally for this server-connection",
+            ),
+        ),
     )
     .subcommand(
       Cli.Command("dump-tables")
@@ -207,7 +217,8 @@ untracked fun main(): void {
         .arg(Cli.StringArg("user").about("Name of the user"))
         .arg(
           Cli.BoolArg("enable-rebuilds").about(
-            "Allow write-csv to apply rebuilds. Used wrongly, can lead to data loss.",
+            "Allow write-csv to apply rebuilds. Should only be used by single-peer clients." +
+              " Used wrongly, can lead to data loss: if in doubt do not enable.",
           ),
         ),
     )
