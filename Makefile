@@ -90,11 +90,20 @@ clean:
 	rm -Rf build
 	find . -name 'Skargo.toml' -print0 | sed 's|Skargo.toml|target|g' | xargs -0 rm -rf
 
+.PHONY: fmt-sk
+fmt-sk:
+	find . -path ./compiler/tests -not -prune -or -name \*.sk | parallel skfmt -i :::
+
+.PHONY: fmt-c
+fmt-c:
+	find . -path ./compiler/runtime/libbacktrace -not -prune -or -path ./sql/test/TPC-h/tnt-tpch -not -prune -or -regex '.*\.[ch]\(pp\)*' | parallel clang-format -i :::
+
+.PHONY: fmt-js
+fmt-js:
+	npx prettier --log-level warn --write .
+
 .PHONY: fmt
-fmt:
-	find . -path ./compiler/tests -not -prune -or -name '*'.sk -exec sh -c 'echo {}; skfmt -i {}' \;
-	find . -path ./compiler/runtime/libbacktrace -not -prune -or -path ./sql/test/TPC-h/tnt-tpch -not -prune -or -regex '.*\.[ch]\(pp\)*' -exec sh -c 'echo {}; clang-format -i {}' \;
-	npx prettier . --write
+fmt: fmt-sk fmt-c fmt-js
 
 
 # test targets
