@@ -105,6 +105,13 @@ fmt-js:
 .PHONY: fmt
 fmt: fmt-sk fmt-c fmt-js
 
+# install the repo pre-commit hook locally
+.git/hooks/pre-commit: bin/git_hooks/check_format.sh
+	ln -s $(PWD)/bin/git_hooks/check_format.sh .git/hooks/pre-commit
+
+.PHONY: setup-git-hooks
+setup-git-hooks: .git/hooks/pre-commit
+
 
 # test targets
 
