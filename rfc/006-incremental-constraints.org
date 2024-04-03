@@ -1,0 +1,228 @@
+#+TITLE: Maintaining Data Invariants
+
+* The problem
+
+One of the responsibilities of a traditional backend application
+layer - something sitting in front of the database - is validating
+data updates and maintaining application invariants. SKDB can provide
+applications with shared state without needing to build a backend. But
+currently has limited ability to control data mutation. This proposal
+aims to address this.
+
+Imagine you were using skdb to build Reddit. The app only wants
+members of a subreddit to be able to post in that sub. And admins of
+that sub should have delete access to any post so that they can update
+a title, remove spam, etc.
+
+In this case we want to be able to constrain the skdb_access values a
+user can use when inserting a row. The value chosen should ensure
+subreddit admins can delete, all group members can read, and that the
+author is a member of the group and thus has write access.
+
+- Today a user can trivially bypass any of this by creating a new
+  group that shares the post with anyone they like (not just group
+  members or only some of them) and prevents anyone from deleting the
+  row.
+
+- We want to define a rule at schema creation time: if you're posting
+  to X group, you must use Y skdb access value. That would enforce
+  that only members can post, admins can delete, but other users
+  cannot.
+
+- Rules like this should be validated by the server to ensure bad
+  actors cannot propagate data that breaks invariants. They should
+  also be validated on the client to prevent mistakes, fail fast with
+  good feedback, and work offline.
+
+Today you can use reactive views on the server to partially solve the
+problem. But
+
+- they can't stop users from inserting rows nor can they enforce who
+  can and can't delete (and therefore update).
+
+- you can't instantly read your writes as they require server round
+  trips -- which means this doesn't work well offline.
+
+- it's a poor UX and wasteful to have to build and manage views for
+  every table and allow all writes.
+
+A mechanism that enforces data invariants can help with app-specific
+concerns, such as the example above, but can also help with cross
+cutting concerns. A few examples:
+
+- Limiting a bad actor - preventing spam, abuse, etc.
+
+- Preventing removal of immutable data i.e. no deletes (imagine
+  modelling an auction where users can take back their bids).
+
+- Providing backpressure to an event based data model. Applications
+  should be able to define rules such as, 'no more than N requests in
+  flight at any one time'.
+
+* Incremental constraints
+
+Here we describe the user facing interface of the proposed solution.
+
+We allow a user to define constraints, much like traditional DBMSs do,
+but on the ~SELECT~ query of a ~REACTIVE VIEW~, instead of in the table
+definition.
+
+Here is a trivial example:
+
+#+BEGIN_SRC sql
+  CREATE reactive VIEW account_balance_check AS
+  SELECT
+    CHECK(balance >= 0)
+  FROM
+    accounts
+#+END_SRC
+
+This mechanism is
+
+- considerably more expressive than table constraints. It allows the
+  user to make use of aggregations and joins to define any rule across
+  the entire database.
+
+- performant. Because reactive views are maintained incrementally we
+  can update the query and check the constraints very cheaply.
+  Traditional DBMSs do not allow you to set constraints across tables
+  because they're too expensive to check.
+
+- easy to perform client or server side. We just need to replicate the
+  schema.
+
+The constraint acts as a side effect that fails the query entirely if
+it does not hold on each and every row in the query. On an update to a
+table, SKDB propagates this in a cascade to all dependent reactive
+views. If a constraint no longer holds it will fail, cascading back up
+and causing the transaction as a whole to fail.
+
+This is exactly how unique indices currently work to prevent duplicate
+writes. It's a generalisation of this idea that has already been proven
+correct and efficient.
+
+To quickly build intuition of how this looks and what we can do with
+it, we'll walk through some examples:
+
+Let's enrich our previous example.
+
+#+BEGIN_SRC sql
+  CREATE reactive VIEW account_balance_check AS
+  SELECT
+    CONSTRAINT balance_is_not_below_overdraft CHECK(balance >= overdraft)
+  FROM
+    accounts
+  WHERE
+    account_type = 'checking'
+#+END_SRC
+
+We've added a filter to apply the constraint to only a subset of rows.
+We're now checking an expression made of multiple columns. And we've
+named the constraint to help understand the schema and improve errors.
+
+Returning to our Reddit example. This is how you would specify a named
+constraint for ensuring that we create posts with the correct group
+access.
+
+#+BEGIN_SRC sql
+  CREATE REACTIVE VIEW post_access_check AS
+  SELECT
+    CONSTRAINT group_posts_must_use_correct_access CHECK(p.skdb_access = g.post_access)
+  FROM
+    posts p
+    INNER JOIN groups g ON p.grp = g.group_id;
+#+END_SRC
+
+Notice that we are making use of a join to do this. This is impossible
+to express using traditional table ~CHECK~ expressions.
+
+We are only specifying constraints in this query, so it is ephemeral:
+there is nothing stored outside of what is necessary to make the view
+incremental, it exists purely for the side effect that will prevent
+writes from breaking the invariant.
+
+But if we want, we can also materialise data to make this reactive view
+usable for queries as well as checking writes:
+
+#+BEGIN_SRC sql
+  CREATE REACTIVE VIEW post_group_join AS
+  SELECT
+    p.id AS post_id,
+    g.name AS posted_to,
+    CONSTRAINT group_posts_must_use_group_access CHECK(p.skdb_access = g.post_access)
+  FROM
+    posts p
+    INNER JOIN groups g ON p.grp = g.group_id;
+#+END_SRC
+
+This saves us recomputing a join we already need.
+
+And here's how we could manually achieve a foreign key check if we wanted.
+
+#+BEGIN_SRC sql
+  CREATE REACTIVE VIEW post_group_join AS
+  SELECT
+    p.id AS post_id,
+    g.name AS posted_to,
+    CONSTRAINT group_posts_must_use_group_access CHECK(p.skdb_access = g.post_access),
+    CONSTRAINT fk_check CHECK(g.group_id IS NOT NULL)
+  FROM
+    posts p
+    LEFT OUTER JOIN groups g ON p.grp = g.group_id;
+#+END_SRC
+
+To demonstrate how aggregations are useful, here's how we can prevent
+a user spamming requests. After 5, further requests will be rejected.
+
+#+BEGIN_SRC sql
+  CREATE REACTIVE VIEW requests_backpressure AS
+  SELECT
+    CONSTRAINT limit_total_incomplete_reqs_per_user CHECK(count(*) <= 5)
+  FROM
+    requests r
+  WHERE
+    r.status != 'completed'
+  GROUP BY
+    skdb_author
+#+END_SRC
+
+This gives us declarative load shedding. We could craft any
+arbitrarily complex rules here that we want.
+
+Let's make it more interesting and create exceptions to demonstrate
+that more complex boolean expressions can be used inside ~CHECK~.
+We'll also refer to columns just defined in the view.
+
+#+BEGIN_SRC sql
+  CREATE REACTIVE VIEW requests_backpressure AS
+  SELECT
+    skdb_author AS author,
+    count(*) AS n,
+    CONSTRAINT limit_total_incomplete_reqs_per_user CHECK(
+      CASE
+        WHEN author == 'gds' THEN TRUE
+        ELSE n < 5
+      END
+    )
+  FROM
+    requests r
+  WHERE
+    r.status != 'completed'
+  GROUP BY
+    skdb_author
+#+END_SRC
+
+And with a join, we can easily enable employees to have different limits.
+
+#+BEGIN_SRC sql
+  CREATE REACTIVE VIEW requests_backpressure AS
+  SELECT
+    CONSTRAINT limit_total_incomplete_reqs_per_user CHECK(count(*) < coalesce(e.rate_limit, 5))
+  FROM
+    requests r
+    LEFT OUTER JOIN employees e ON r.skdb_author = e.id
+  WHERE
+    r.status != 'completed'
+  GROUP BY
+    skdb_author
+#+END_SRC
