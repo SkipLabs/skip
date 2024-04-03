@@ -234,8 +234,7 @@ extension class RowValues extends Row {
 
   fun toStringSingle(format: SKStore.OutputFormat): String {
     values = this.values;
-    size = values.size();
-    if (!(format is SKStore.OJSON _) && size == 1) {
+    if (!(format is SKStore.OJSON _) && values.size() == 1) {
       values[0] match {
       | None() -> return ""
       | Some(v) -> return v.toStringWithFormat(format)
@@ -250,8 +249,9 @@ extension class RowValues extends Row {
     // schemas which permute and/or elide columns
     indices = format match {
     | SKStore.OCSV(Some(permutation)) -> permutation
-    | _ -> Range(0, size).collect(Array)
+    | _ -> Range(0, values.size()).collect(Array)
     };
+    size = indices.size();
 
     for (index in Range(0, size - 1)) {
       i = indices[index];
