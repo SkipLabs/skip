@@ -192,14 +192,25 @@ fun reasonSchemaUnsupported(
         return Some(
           "Malformed schema: expects parenthesized column-separated list of column definitions.",
         )
-      | Some(requestSchema) ->
-        if (
-          requestSchema.size() != dirDescr.schema.size() ||
-          requestSchema.zip(dirDescr.schema).any(cols ~> cols.i0 != cols.i1)
-        ) {
-          return Some(
-            "Cannot mirror table: provided schema does not match database.",
-          )
+      | Some(requestedSchema) ->
+        actualSchema = dirDescr.schema;
+
+        for (col in requestedSchema) {
+          if (!actualSchema.contains(col)) {
+            return Some(`Incompatible schema: unknown column ${col.name}`)
+          }
+        };
+
+        for (col in actualSchema) {
+          if (
+            col.notNull is Some _ &&
+            col.default is None _ &&
+            !requestedSchema.contains(col)
+          ) {
+            return Some(
+              `Incompatible schema: missing required column ${col.name}`,
+            )
+          }
         }
       }
     };
