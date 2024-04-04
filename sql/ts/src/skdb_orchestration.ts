@@ -42,7 +42,7 @@ type ProtoRequestTailBatch = {
 
 type ProtoPushPromise = {
   type: "pushPromise";
-  schemas: Record<string,string>;
+  schemas: Record<string, string>;
 };
 
 type ProtoRequestCreateDb = {
@@ -194,12 +194,15 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
       return buf;
     }
     case "pushPromise": {
-      const serializedSchemas = JSON.stringify(msg.schemas)
+      const serializedSchemas = JSON.stringify(msg.schemas);
       const buf = new ArrayBuffer(4 + serializedSchemas.length * 4);
       const dataView = new DataView(buf);
       const uint8View = new Uint8Array(buf);
       const textEncoder = new TextEncoder();
-      const encodeResult = textEncoder.encodeInto(serializedSchemas, uint8View.subarray(6));
+      const encodeResult = textEncoder.encodeInto(
+        serializedSchemas,
+        uint8View.subarray(6),
+      );
       dataView.setUint8(0, 0x3); // type
       dataView.setUint16(4, encodeResult.written || 0, false);
       return buf.slice(0, 6 + (encodeResult.written || 0));
@@ -1580,7 +1583,9 @@ class SKDBServer implements RemoteSKDB {
     });
   }
 
-  private async establishLocalTail(schemas: Map<string, string>): Promise<string> {
+  private async establishLocalTail(
+    schemas: Map<string, string>,
+  ): Promise<string> {
     const tables = [...schemas.keys()];
     const stream = await this.connection.openResilientStream();
     this.mirrorStreams.add(stream);
@@ -1647,7 +1652,7 @@ class SKDBServer implements RemoteSKDB {
 
     const request: ProtoPushPromise = {
       type: "pushPromise",
-      schemas: Object.fromEntries(schemas)
+      schemas: Object.fromEntries(schemas),
     };
     stream.send(encodeProtoMsg(request));
 
@@ -1730,10 +1735,21 @@ class SKDBServer implements RemoteSKDB {
 
       let isViewOnRemote = (await this.viewSchema(tableName)) != "";
 
-      const [createTable, createResponseTable] = await Promise.all([
-        this.tableSchema(tableName),
-        this.tableSchema(tableName, server_response_suffix),
-      ]);
+      const [createTable, createResponseTable] =
+        expectedSchema == "*"
+          ? await Promise.all([
+              this.tableSchema(tableName),
+              this.tableSchema(tableName, server_response_suffix),
+            ])
+          : [
+              "CREATE TABLE " + tableName + " " + expectedSchema + ";",
+              "CREATE TABLE " +
+                serverResponseTable(tableName) +
+                " " +
+                expectedSchema +
+                ";",
+            ];
+
       if (!this.client.tableExists(tableName)) {
         this.client.exec(createTable);
         if (isViewOnRemote) {
@@ -1766,7 +1782,7 @@ class SKDBServer implements RemoteSKDB {
 
     if (this.mirroredTables.size > 0) {
       this.localTailSession = await this.establishLocalTail(
-        this.mirroredTables
+        this.mirroredTables,
       );
     }
 
