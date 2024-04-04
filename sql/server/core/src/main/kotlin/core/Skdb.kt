@@ -137,7 +137,7 @@ class Skdb(val name: String, private val dbPath: String) {
   fun writeCsv(
       user: String,
       replicationId: String,
-      schemas: String,
+      schemas: ByteArray,
       callback: (ByteBuffer, shouldFlush: Boolean) -> Unit,
       closed: () -> Unit,
   ): Process {
@@ -159,7 +159,7 @@ class Skdb(val name: String, private val dbPath: String) {
     val proc = pb.start()
 
     val stdin = proc.outputStream.buffered()
-    stdin.write(schemas.toByteArray(StandardCharsets.UTF_8))
+    stdin.write(schemas)
     stdin.write("\n".toByteArray(StandardCharsets.UTF_8))
 
     // Don't close yet, as we still need to write actual CSV data
