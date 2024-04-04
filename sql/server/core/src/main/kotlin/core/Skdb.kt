@@ -159,7 +159,8 @@ class Skdb(val name: String, private val dbPath: String) {
     val proc = pb.start()
 
     val stdin = proc.outputStream.buffered()
-    stdin.write((schemas + "\n").toByteArray(StandardCharsets.UTF_8))
+    stdin.write(schemas.toByteArray(StandardCharsets.UTF_8))
+    stdin.write("\n".toByteArray(StandardCharsets.UTF_8))
 
     // Don't close yet, as we still need to write actual CSV data
     stdin.flush()
