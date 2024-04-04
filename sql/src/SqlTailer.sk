@@ -171,7 +171,7 @@ fun tailSub(
       dirDescrs = getDirDescrs(gContext);
       sub with {
         dirSubs => sub.dirSubs.map(dirSub -> {
-          table = dirSub.dirName.toString().stripPrefix("/").stripSuffix("/");
+          table = getSqlTableName(dirSub.dirName);
           tableName = P.Name::create(table);
           dirDescr = dirDescrs.maybeGet(tableName) match {
           | Some(descr) -> descr
