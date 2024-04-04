@@ -122,7 +122,7 @@ fun tailShouldWake(
   sub: SKStore.Sub,
   tick: SKStore.Tick,
 ): Bool {
-  SKDB.getFinalState(context, sub.destinationSource) match {
+  SKDB.getReplicationState(context, sub.destinationSource) match {
   | Some(SKDB.RSError()) -> return true
   | _ -> void
   };
@@ -213,11 +213,15 @@ fun tailSub(
       | Some(_) -> void
       };
 
-      SKDB.getFinalState(context, sub.destinationSource) match {
-      | Some(SKDB.RSError()) ->
+      established = SKDB.getReplicationState(
+        context,
+        sub.destinationSource,
+      ) match {
+      | Some(RSError()) ->
         print_raw(":reboot\n");
         return None()
-      | _ -> void
+      | Some(RSEstablished()) -> true
+      | _ -> sub.destinationSource is None()
       };
 
       writer = mutable Debug.BufferedWriter(print_raw, 4096);
@@ -238,7 +242,15 @@ fun tailSub(
         | SKDB.OFK_Table() -> SKStore.OTable(getFieldNames(context, dirName))
         };
         since = tailFrom(spec, dirSub, tailWatermark);
-        (shouldRebuild, changes) = if (since.value > 0) {
+        (shouldRebuild, changes) = if (since.value > 0 && !established) {
+          // we have a client that we've never seen before asking to
+          // tail from a point in time that they cannot understand, as
+          // they have no reference for our clock. we assume that this
+          // indicates they've moved from a different server to us and
+          // so need to reset their concept of the server's time.
+          !chunkingDisabled = true;
+          (true, Array[].iterator())
+        } else if (since.value > 0) {
           // we can only chunk while tables are since 0 as we'll emit
           // zero checkpoints. once a nonzero request is handled, we must
           // make sure that it doesn't ultimately get sent back as part of a
@@ -299,6 +311,19 @@ fun tailSub(
       }
     });
 
+    // we are now considered established, even if we're about to fail.
+    if (init && sub.destinationSource is Some _) {
+      runSql(options, (ctx) ~> {
+        SKDB.setReplicationState(
+          ctx,
+          sub.destinationSource.fromSome(),
+          RSEstablished(),
+        );
+        SKStore.CStop(None())
+      })
+    };
+    !init = false;
+
     !tailWatermark = tick match {
     // if we cannot follow changes from here - regardless of whether
     // we want to - this is a failure to honour the request. i.e.
@@ -308,7 +333,7 @@ fun tailSub(
     | None() -> break false
     | Some(_) -> tick
     };
-    !init = false;
+
     !forceReset = false;
     lock = SKStore.unfreezeLock(sub.lock);
     cond = SKStore.unfreezeCond(sub.cond);

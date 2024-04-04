@@ -822,7 +822,7 @@ fun replayDiff(
   schemas: Map<String, Array<P.ColumnDefinition>>,
   rebuildsEnabled: Bool,
 ): SKStore.ContextOp {
-  SKDB.getFinalState(context, Some(identity)) match {
+  SKDB.getReplicationState(context, Some(identity)) match {
   | Some(SKDB.RSError()) ->
     print_raw(":reboot\n");
     return SKStore.CStop(None())
@@ -886,7 +886,7 @@ fun replayDiff(
         line == "!rebuild"
       ) ->
         if (!rebuildsEnabled) {
-          SKDB.setFinalState(context, identity, SKDB.RSError());
+          SKDB.setReplicationState(context, identity, SKDB.RSError());
           invariant_violation("Received rebuild when processing disabled.")
         };
         currentDiff.!rebuild = true;
