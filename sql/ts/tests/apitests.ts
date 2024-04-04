@@ -214,7 +214,7 @@ async function testSchemaQueries(skdb: SKDB) {
   expect(emptyTable).toEqual("");
 }
 
-async function testMirroring(skdb: SKDB) {
+async function testMirroring(skdb1: SKDB, skdb2: SKDB) {
   const test_pk = {
     table: "test_pk",
     expectedColumns: "(x INTEGER PRIMARY KEY, y INTEGER, skdb_access TEXT)",
@@ -225,21 +225,33 @@ async function testMirroring(skdb: SKDB) {
     table: "view_pk",
     expectedColumns: "(x INTEGER, y INTEGER, skdb_access TEXT)",
   };
-  await skdb.mirror(test_pk, view_pk);
+  await skdb1.mirror(test_pk, view_pk);
 
-  const testPkRows = await skdb.exec("SELECT x,y FROM test_pk");
+  const testPkRows = await skdb1.exec("SELECT x,y FROM test_pk");
   expect(testPkRows).toEqual([{ x: 42, y: 21 }]);
 
-  const viewPkRows = await skdb.exec("SELECT x,y FROM view_pk");
+  const viewPkRows = await skdb1.exec("SELECT x,y FROM view_pk");
   expect(viewPkRows).toEqual([
     { x: 42, y: 63 },
     { x: 43, y: 66 },
   ]);
 
   // mirror already mirrored table is idempotent
-  await skdb.mirror(test_pk, view_pk);
-  const testPkRows2 = await skdb.exec("SELECT x,y FROM test_pk");
+  await skdb1.mirror(test_pk, view_pk);
+  const testPkRows2 = await skdb1.exec("SELECT x,y FROM test_pk");
   expect(testPkRows2).toEqual([{ x: 42, y: 21 }]);
+
+  // mirroring clients can specify alternate schemas
+  const test_pk_subset_schema = {
+    table: "test_pk",
+    expectedColumns: "(skdb_access TEXT, x INTEGER PRIMARY KEY)",
+  };
+  await skdb2.mirror(test_pk_subset_schema);
+  const testPkRows_skdb2 = await skdb2.exec("SELECT * FROM test_pk");
+  expect(testPkRows_skdb2).toEqual([
+    { skdb_access: "read-write", x: 42 },
+    { skdb_access: "read-write", x: 43 },
+  ]);
 }
 
 function waitSynch(
@@ -528,6 +540,10 @@ async function testMirrorWithAuthor(root: SKDB, user1: SKDB, user2: SKDB) {
     table: "test_pk",
     expectedColumns: "(x INTEGER PRIMARY KEY, y INTEGER, skdb_access TEXT)",
   };
+  const test_pk_subset_schema = {
+    table: "test_pk",
+    expectedColumns: "(skdb_access TEXT, x INTEGER PRIMARY KEY)",
+  };
   const view_pk = {
     table: "view_pk",
     expectedColumns: "(x INTEGER, y INTEGER, skdb_access TEXT)",
@@ -544,7 +560,7 @@ async function testMirrorWithAuthor(root: SKDB, user1: SKDB, user2: SKDB) {
   await user1.exec("INSERT INTO syncpk VALUES (0, 'read-write', @whoami);", {
     whoami,
   });
-  await user2.mirror(test_pk, view_pk, syncDef, syncPkDef);
+  await user2.mirror(test_pk_subset_schema, view_pk, syncDef, syncPkDef);
   expect(await user2.exec("SELECT * FROM sync")).toEqual([
     { i: 0, skdb_access: "read-write", skdb_author: whoami },
   ]);
@@ -572,12 +588,16 @@ async function testJSPrivacy(skdb: SKDB, skdb2: SKDB) {
     table: "test_pk",
     expectedColumns: "(x INTEGER PRIMARY KEY, y INTEGER, skdb_access TEXT)",
   };
+  const test_pk_subset_schema = {
+    table: "test_pk",
+    expectedColumns: "(skdb_access TEXT, x INTEGER PRIMARY KEY)",
+  };
   const view_pk = {
     table: "view_pk",
     expectedColumns: "(x INTEGER, y INTEGER, skdb_access TEXT)",
   };
   await skdb.mirror(test_pk, view_pk);
-  await skdb2.mirror(test_pk, view_pk);
+  await skdb2.mirror(test_pk_subset_schema, view_pk);
   await skdb.exec(
     "INSERT INTO skdb_groups VALUES ('my_group', @uid, @uid, 'read-write');",
     { uid: skdb.currentUser },
@@ -607,7 +627,7 @@ async function testJSPrivacy(skdb: SKDB, skdb2: SKDB) {
 
   await expect(
     async () =>
-      await skdb2.exec("INSERT INTO test_pk VALUES (47, 52, 'my_group');"),
+      await skdb2.exec("INSERT INTO test_pk VALUES ('my_group', 47);"),
   ).rejects.toThrow();
 
   await skdb.exec(
@@ -622,7 +642,8 @@ async function testJSPrivacy(skdb: SKDB, skdb2: SKDB) {
       (rows) => rows.length == 1,
     ),
   ).toHaveLength(1);
-  await skdb2.exec("INSERT INTO test_pk VALUES (52, 0, 'my_group');");
+
+  await skdb2.exec("INSERT INTO test_pk VALUES ('my_group', 52);");
 
   expect(
     await waitSynch(
@@ -645,12 +666,16 @@ async function testJSGroups(skdb1: SKDB, skdb2: SKDB) {
     table: "test_pk",
     expectedColumns: "(x INTEGER PRIMARY KEY, y INTEGER, skdb_access TEXT)",
   };
+  const test_pk_subset_schema = {
+    table: "test_pk",
+    expectedColumns: "(skdb_access TEXT, x INTEGER PRIMARY KEY)",
+  };
   const view_pk = {
     table: "view_pk",
     expectedColumns: "(x INTEGER, y INTEGER, skdb_access TEXT)",
   };
   await skdb1.mirror(test_pk, view_pk);
-  await skdb2.mirror(test_pk, view_pk);
+  await skdb2.mirror(test_pk_subset_schema, view_pk);
   const user1 = skdb1.currentUser!;
   const user2 = skdb2.currentUser!;
   const group = await skdb1.createGroup();
@@ -689,7 +714,7 @@ async function testJSGroups(skdb1: SKDB, skdb2: SKDB) {
 
   await expect(
     async () =>
-      await skdb2.exec("INSERT INTO test_pk VALUES (1002, 2, @gid)", {
+      await skdb2.exec("INSERT INTO test_pk VALUES (@gid, 1002)", {
         gid: group.groupID,
       }),
   ).rejects.toThrow();
@@ -720,7 +745,7 @@ async function testJSGroups(skdb1: SKDB, skdb2: SKDB) {
     gid: group.groupID,
   });
   await new Promise((r) => setTimeout(r, 100));
-  await skdb2.exec("INSERT INTO test_pk VALUES (1004, 4, @gid)", {
+  await skdb2.exec("INSERT INTO test_pk VALUES (@gid, 1004)", {
     gid: group.groupID,
   });
   await new Promise((r) => setTimeout(r, 100));
@@ -798,7 +823,7 @@ export const apitests = (asWorker) => {
 
         await testSchemaQueries(dbs.user);
 
-        await testMirroring(dbs.user);
+        await testMirroring(dbs.user, dbs.user2);
 
         //Privacy
         await testJSPrivacy(dbs.user, dbs.user2);
