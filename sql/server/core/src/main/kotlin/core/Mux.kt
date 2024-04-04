@@ -510,7 +510,7 @@ class MuxedSocket(
                 signature = creds.sign(nonce, date),
                 deviceUuid = creds.deviceUuid ?: UUID.randomUUID().toString(),
                 date = date,
-                clientVersion = "kt-0.0.2", // TODO: this should be passed from above
+                clientVersion = "kt-0.0.3", // TODO: this should be passed from above
             )
         mutex.writeLock().lock()
         try {
