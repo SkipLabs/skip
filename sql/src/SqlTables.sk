@@ -13,6 +13,7 @@ const subsOutput: SKStore.DirName = SKStore.DirName::create("/subsOutput/");
 const indexInput: SKStore.DirName = SKStore.DirName::create("/indexInput/");
 const indexOutput: SKStore.DirName = SKStore.DirName::create("/indexOutput/");
 const indexByCol: SKStore.DirName = SKStore.DirName::create("/indexByCol/");
+const indexByName: SKStore.DirName = SKStore.DirName::create("/indexByName/");
 const watermarks: SKStore.DirName = SKStore.DirName::create("/watermarks/");
 const replication: SKStore.DirName = SKStore.DirName::create("/replication/");
 
@@ -598,12 +599,12 @@ fun getIndexByName(
   context: mutable SKStore.Context,
 ): SKStore.EHandle<SKStore.Key, IndexDescr> {
   indexes = getIndexOutputDir(context);
-  makeDir(IndexDescr::type, context, indexByCol, () -> {
+  makeDir(IndexDescr::type, context, indexByName, () -> {
     indexes.map(
       x ~> x,
       IndexDescr::type,
       context,
-      indexByCol,
+      indexByName,
       (_context, writer, _key, values) ~> {
         indexDescr = values.first;
         writer.set(SKStore.SID(indexDescr.tableName.lower), indexDescr)
