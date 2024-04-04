@@ -112,6 +112,41 @@ fun decodeTailSpec(input: String, defaultSince: Int): Map<P.Name, TailSpec> {
   }
 }
 
+// Decode input string as a JSON Object, expected to be a map from table names
+// to corresponding schemas (both strings).
+fun decodeSchemas(input: String): Map<String, Array<P.ColumnDefinition>> {
+  try {
+    JSON.decode(input)
+  } catch {
+  | exn ->
+    print_error(
+      "JSON decoding of schema expectations failed: \"" +
+        input +
+        "\"\n" +
+        exn.getMessage(),
+    );
+    skipExit(2)
+  } match {
+  | JSON.Object(obj) ->
+    obj
+      .map((_key, val) ->
+        val match {
+        | JSON.String("*") -> None()
+        | JSON.String(s) ->
+          schema = P.Parser::create(s).parseCreateTableSchema().columns;
+          Some(schema)
+        | _ ->
+          print_error("Malformed --expect-schemas JSON object\n");
+          skipExit(2)
+        }
+      )
+      .filterNone()
+  | _ ->
+    print_error("Non-object --expect-schemas JSON\n");
+    skipExit(2)
+  }
+}
+
 fun computeTableDescr(
   name: P.Name,
   schema: Array<P.ColumnDefinition>,
