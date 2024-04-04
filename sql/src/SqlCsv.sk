@@ -894,7 +894,11 @@ fun replayDiff(
 
       | current @ Some(DiffParsingState(_, currentDiff)) ->
         currentDiff.lines.push(line); // capture the raw input for if we end up rejecting the txn
-        newRows = parseTableChange(immContext, currentDiff.table, line);
+        table = currentDiff.sourceSchema match {
+        | Some(schema) -> currentDiff.table with {schema}
+        | None() -> currentDiff.table
+        };
+        newRows = parseTableChange(immContext, table, line);
         currentDiff.rows.extend(newRows);
         current
       };
