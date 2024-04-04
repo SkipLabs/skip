@@ -289,7 +289,7 @@ fun encodeProtoMsg(msg: ProtoMessage): ByteBuffer {
       buf.flip()
     }
     is ProtoPushPromise -> {
-      val buf = ByteBuffer.allocate(6 + msg.schemas.length * 4)
+      val buf = ByteBuffer.allocate(8 + msg.schemas.length * 4)
 
       buf.putInt(0x0)
       buf.put(0, 0x03.toByte())
