@@ -80,14 +80,16 @@ fun resetWatermark(
 }
 
 base class ReplicationState {
-  // gds: I envision an RSGarbageCollected to help with vector clock
-  // growth, thus the base class
   children =
   | RSError()
+  // once a downstream has fully caught up to a checkpoint and is now
+  // 'tailing since', they are considered established. this is useful
+  // to determine if this is a new-to-this-server client.
+  | RSEstablished()
 }
 class ReplicationStateFile(state: ReplicationState) extends SKStore.File
 
-fun getFinalState(
+fun getReplicationState(
   context: readonly SKStore.Context,
   replicationSource: ?Int,
 ): ?ReplicationState {
@@ -108,7 +110,7 @@ fun getFinalState(
   }
 }
 
-fun setFinalState(
+fun setReplicationState(
   context: mutable SKStore.Context,
   replicationSource: Int,
   state: ReplicationState,
@@ -120,9 +122,19 @@ fun setFinalState(
   };
   key = SKStore.IID(replicationSource);
   arr = replicationDir.unsafeGetArray(context, key);
-  // all states are final states, first writer wins
   if (arr.size() < 1) {
     replicationDir.writeArray(context, key, Array[ReplicationStateFile(state)])
+  } else {
+    arr[0] match {
+    | ReplicationStateFile(RSError()) ->
+      void // final state
+    | ReplicationStateFile(RSEstablished()) ->
+      replicationDir.writeArray(
+        context,
+        key,
+        Array[ReplicationStateFile(state)],
+      )
+    }
   }
 }
 
@@ -134,7 +146,11 @@ fun errorAllExistingSubs(
     if (sub.destinationSource is Some _) {
       for (dirSub in sub.dirSubs) {
         if (dirSub.dirName == dir) {
-          setFinalState(context, sub.destinationSource.fromSome(), RSError());
+          setReplicationState(
+            context,
+            sub.destinationSource.fromSome(),
+            RSError(),
+          );
           lock = SKStore.unfreezeLock(sub.lock);
           SKStore.mutexLock(lock);
           cond = SKStore.unfreezeCond(sub.cond);
