@@ -809,29 +809,28 @@ fun dumpInserts(origContext: readonly SKStore.Context): void {
     (context, _writer, _key, values) ~> {
       dirDescr = values.first;
       if (!dirDescr.isInput) return void;
-      o = print_raw;
       fileIter = context
         .unsafeGetEagerDir(dirDescr.dirName)
         .unsafeGetFileIter();
       count = 1;
-      o("BEGIN TRANSACTION;\n");
+      print_raw("BEGIN TRANSACTION;\n");
       for (kv in fileIter) {
         if (count % 1024 == 0) {
-          o("COMMIT;\n");
-          o("BEGIN TRANSACTION;\n");
+          print_raw("COMMIT;\n");
+          print_raw("BEGIN TRANSACTION;\n");
         };
         (_, files) = kv;
         for (file in files) {
           row = RowValues::type(file);
           for (_ in Range(0, row.repeat)) {
-            o("INSERT INTO " + dirDescr.name + " VALUES ");
-            o(row.toString());
-            o(";\n");
+            print_raw("INSERT INTO " + dirDescr.name + " VALUES ");
+            print_raw(row.toString());
+            print_raw(";\n");
             !count = count + 1;
           };
         };
       };
-      o("COMMIT;\n");
+      print_raw("COMMIT;\n");
       flushStdout();
     },
   );
