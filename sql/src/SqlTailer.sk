@@ -232,9 +232,34 @@ fun tailSub(
 
       writer = mutable Debug.BufferedWriter(print_raw, 4096);
 
+      requestToRebuildEverything = !sub.dirSubs.any(ds -> {
+        since = tailFrom(spec, ds, tailWatermark);
+        since.value > 0
+      });
+      oldestSubSince = sub.dirSubs.reduce(
+        (acc, ds) -> {
+          since = tailFrom(spec, ds, tailWatermark);
+          if (since < acc) {
+            since
+          } else {
+            acc
+          }
+        },
+        SKStore.Tick(Int::max),
+      );
+      forceCompleteRebuild =
+        !requestToRebuildEverything &&
+        SKDB.userPrivacyChanged(
+          context,
+          userIDOpt,
+          oldestSubSince,
+          sub.destinationSource,
+        );
+
       producedAnyOutput = false; // assume we won't
       couldFollowChanges = true; // assume we can
       chunkingDisabled = false;
+
       for (dirSub in sub.dirSubs) {
         dirName = dirSub.dirName;
         edir = context.unsafeGetEagerDir(dirName);
@@ -249,38 +274,33 @@ fun tailSub(
         };
         since = tailFrom(spec, dirSub, tailWatermark);
 
-        (shouldRebuild, changes) = if (since.value > 0 && !established) {
+        (shouldRebuild, changes) = if (forceCompleteRebuild) {
+          (true, Array[].iterator())
+        } else if (since.value <= 0) {
+          // if since is zero, the receiver is specifying that they
+          // have no data to tail since. to avoid a likely rebuild and
+          // allow chunking, we stream the current state of the table
+          // and begin tailing from here.
+          (false, edir.unsafeGetFileIterNoReducer(None()).map(pair -> pair.i0))
+        } else if (!established) {
           // we have a client that we've never seen before asking to
           // tail from a point in time that they cannot understand, as
           // they have no reference for our clock. we assume that this
           // indicates they've moved from a different server to us and
           // so need to reset their concept of the server's time.
-          !chunkingDisabled = true;
           (true, Array[].iterator())
-        } else if (since.value > 0) {
+        } else {
           // we can only chunk while tables are since 0 as we'll emit
           // zero checkpoints. once a nonzero request is handled, we must
           // make sure that it doesn't ultimately get sent back as part of a
           // zero-checkpoint chunk - otherwise it won't be applied
           // TODO: optimisation, request all 0 tables first
-
-          // TODO: memoize or something
-          forceRebuild = SKDB.userPrivacyChanged(
-            context,
-            userIDOpt,
-            since,
-            sub.destinationSource,
-          );
-
           !chunkingDisabled = true;
-          (shouldRebuild, changes) = edir.getChangesAfter(since, forceRebuild);
+          (shouldRebuild, changes) = edir.getChangesAfter(
+            since,
+            forceCompleteRebuild,
+          );
           (shouldRebuild, changes.iterator())
-        } else {
-          // if since is zero, the receiver is specifying that they
-          // have no data to tail since. to avoid a likely reset and
-          // allow chunking, we stream the current state of the table
-          // and begin tailing from here.
-          (false, edir.unsafeGetFileIterNoReducer(None()).map(pair -> pair.i0))
         };
 
         // Write checkpoints out at least every `checkpointInterval` rows during
