@@ -96,7 +96,8 @@ install: stage$(STAGE)
 
 .PHONY: clean
 clean:
-	rm -Rf stage* bootstrap/*.ll
+	OUT_DIR=$$(realpath ./bootstrap) $(MAKE) -C ../prelude clean
+	rm -Rf stage* bootstrap/*.ll bootstrap/libbacktrace.a
 
 .PHONY: test
 test: stage$(STAGE)
