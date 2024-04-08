@@ -32,6 +32,11 @@ uint32_t SKIP_String_byteSize(char* obj) {
   return str->size;
 }
 
+SkipInt SKIP_String_hash(char* obj) {
+  sk_string_t* str = get_sk_string(obj);
+  return (SkipInt)str->hash;
+}
+
 // Allocates a string (with no data nor hash).
 char* sk_string_alloc(uint32_t size) {
   uint32_t* iresult =
