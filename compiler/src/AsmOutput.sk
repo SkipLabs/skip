@@ -1968,7 +1968,7 @@ mutable class .AsmOutput{
                   ConstantInt{
                     id => InstrID::none,
                     typ => tInt32,
-                    value => str.hashToEmit(),
+                    value => str.hashToEmit().toInt(),
                   },
                   32,
                 )
@@ -3537,7 +3537,7 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
       buckets: SortedMap<Int, Array<(Int, UTF8String)>> = cases.foldl(
         (acc, case) -> {
           (_, str) = case;
-          hash = str.hashToEmit();
+          hash = str.hashToEmit().toInt();
           header = hash.shl(32).or(str.utf8.size());
           acc.setWith(header, Array[case], (old, v) -> {
             old.concat(v)
