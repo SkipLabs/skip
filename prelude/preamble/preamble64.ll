@@ -82,6 +82,7 @@ define void @SKIP_Obstack_store(ptr %obj, ptr %val) {
 
 declare ptr @SKIP_String_concat2(ptr, ptr)
 declare i64 @SKIP_String_cmp(ptr, ptr)
+declare i64 @SKIP_String_hash(ptr)
 declare ptr @SKIP_Float_toString(double)
 
 ; Function Attrs: noinline nounwind optnone
