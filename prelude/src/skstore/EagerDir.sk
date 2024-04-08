@@ -940,12 +940,8 @@ class EagerDir{
     result
   }
 
-  fun getChangesAfter(
-    tick: Tick,
-    forceReset: Bool = false,
-  ): (Bool, SortedSet<Key>) {
+  fun getChangesAfter(tick: Tick): (Bool, SortedSet<Key>) {
     this.tombLimit match {
-    | _ if (forceReset) -> return (true, this.getAllKeysWithValues())
     | Some(limit) if (tick.value <= limit.value) ->
       return (true, this.getAllKeysWithValues())
     | _ -> void
