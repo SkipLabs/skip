@@ -592,9 +592,9 @@ fun execTail(args: Cli.ParseResults, options: SKDB.Options): void {
   spec = if (args.getBool("read-spec")) {
     input = slurpStdin();
     lookup = decodeTailSpec(input, defaultSince);
-    name -> lookup.get(name)
+    name ~> lookup.get(name)
   } else {
-    _ -> {
+    _ ~> {
       TailSpec{
         since => defaultSince,
         filter => None(),
