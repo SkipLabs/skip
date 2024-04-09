@@ -311,14 +311,14 @@ async function testServerTail(root: SKDB, user: SKDB) {
   const res = await waitSynch(
     user,
     "select count(*) as cnt from test_pk where x = 87 and y = 88",
-    (tail) => tail[0].cnt == 1,
+    (tail) => tail.scalarValue() === 1,
   );
   expect(res).toEqual([{ cnt: 1 }]);
 
   const resv = await waitSynch(
     user,
     "select count(*) as cnt from view_pk where x = 87 and y = 264",
-    (tail) => tail[0].cnt == 1,
+    (tail) => tail.scalarValue() === 1,
   );
   expect(resv).toEqual([{ cnt: 1 }]);
 }
@@ -346,7 +346,7 @@ async function testClientTail(root: SKDB, user: SKDB) {
   const res = await waitSynch(
     root,
     "select count(*) as cnt from test_pk where x = 97 and y = 98",
-    (tail) => tail[0].cnt == 1,
+    (tail) => tail.scalarValue() === 1,
     new Map(),
     true,
   );
@@ -354,7 +354,7 @@ async function testClientTail(root: SKDB, user: SKDB) {
   const resv = await waitSynch(
     root,
     "select count(*) as cnt from view_pk where x = 97 and y = 294",
-    (tail) => tail[0].cnt == 1,
+    (tail) => tail.scalarValue() === 1,
     new Map(),
     true,
   );
@@ -375,7 +375,7 @@ async function testClientTail(root: SKDB, user: SKDB) {
     const res = await waitSynch(
       root,
       "select y from test_pk_string where x = 0 and y = @str",
-      (tail) => tail[0].y == str,
+      (tail) => tail.scalarValue() === str,
       { str },
       true,
     );
@@ -397,7 +397,7 @@ async function testClientTail(root: SKDB, user: SKDB) {
     const res = await waitSynch(
       root,
       "select count(*) as cnt from test_pk_string where x = 1 and y = @str",
-      (tail) => tail[0].cnt == 1,
+      (tail) => tail.scalarValue() === 1,
       { str },
       true,
     );
@@ -415,7 +415,7 @@ async function testClientTail(root: SKDB, user: SKDB) {
     const res = await waitSynch(
       root,
       "select count(*) as cnt from test_pk_string where x = 1",
-      (tail) => tail[0].cnt == 0,
+      (tail) => tail.scalarValue() === 0,
       {},
       true,
     );
@@ -432,7 +432,7 @@ async function testClientTail(root: SKDB, user: SKDB) {
     const res = await waitSynch(
       root,
       "select count(*) as cnt from test_pk_string where x = 1 and y = @str",
-      (tail) => tail[0].cnt == 1,
+      (tail) => tail.scalarValue() === 1,
       { str },
       true,
     );
@@ -450,7 +450,7 @@ async function testClientTail(root: SKDB, user: SKDB) {
     const res = await waitSynch(
       root,
       "select count(*) as cnt from test_pk_string where x = 1",
-      (tail) => tail[0].cnt == 0,
+      (tail) => tail.scalarValue() === 0,
       {},
       true,
     );
