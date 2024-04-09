@@ -39,12 +39,10 @@ SkipInt SKIP_String_hash(char* obj) {
 
 // Allocates a string (with no data nor hash).
 char* sk_string_alloc(uint32_t size) {
-  uint32_t* iresult =
-      (uint32_t*)SKIP_Obstack_alloc(size + sk_string_header_size);
-  *iresult = (uint32_t)size;
-  iresult++;
-  iresult++;
-  return (char*)iresult;
+  sk_string_t* obj =
+      (sk_string_t*)SKIP_Obstack_alloc(size + sk_string_header_size);
+  obj->size = size;
+  return (char*)&(obj->data);
 }
 
 char* sk_string_create(const char* buffer, uint32_t size) {
