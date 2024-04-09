@@ -1558,10 +1558,13 @@ class SKDBServer implements RemoteSKDB {
             if (!resolved) {
               // a non-zero checkpoint indicates that we have received a fully consistent
               // snapshot of the remote table, so should resolve the promise
-              resolveSignalled =
-                payload
-                  .split("\n")
-                  .find((line: string) => line.match(/^:[1-9]/g)) != undefined;
+              for (const line of payload.split("\n")) {
+                if (line.trim() === "!rebuild") {
+                  resolveSignalled = false;
+                  break;
+                }
+                resolveSignalled ||= line.match(/^:[1-9]/g) != null
+              }
             }
             return client.writeCsv(payload, this.replicationUid);
           });
