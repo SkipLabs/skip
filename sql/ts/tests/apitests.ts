@@ -642,6 +642,18 @@ async function testJSPrivacy(skdb: SKDB, skdb2: SKDB) {
       (rows) => rows.length == 1,
     ),
   ).toHaveLength(1);
+  expect(
+    await waitSynch(
+      skdb2,
+      "SELECT * FROM test_pk WHERE skdb_access='my_group';",
+      (rows) => rows.length == 1,
+    ),
+  ).toEqual([
+    {
+      skdb_access: "my_group",
+      x: 37,
+    },
+  ]);
 
   await skdb2.exec("INSERT INTO test_pk VALUES ('my_group', 52);");
 
