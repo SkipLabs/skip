@@ -89,6 +89,16 @@ value class AsmFormat<T: readonly AsmFormatTree>(
   }
 }
 
+// The order of size and hash in string headers is different in SKIP64
+// versus SKIP32 modes, see sk_string_t in runtime.h.
+fun sk_string_header(isWasm: Bool, size: UInt32, hash: UInt32): Int {
+  if (isWasm) {
+    hash.shl(32).or(size)
+  } else {
+    size.shl(32).or(hash)
+  }
+}
+
 extension class .String uses AsmFormattable {
   fun asmFormat(asm: mutable AsmDefBuilder, spec: Char): void {
     text = asm.text;
@@ -1945,36 +1955,31 @@ mutable class .AsmOutput{
   // Produces an LLVM expression for a pointer to the first utf8 byte of
   // a Skip LongString object.
   mutable fun stringToLLVM(str: UTF8String): AsmDefID {
+    isWasm = this.config.isWasm();
     this.strings.getOrAdd(str, () -> {
-      len = str.utf8.size();
+      len = UInt32::truncate(str.utf8.size());
       paddedLen = this.paddedStringSize(str);
 
       createStaticImage{
         getField => i ~> {
-          if (i >= paddedLen + 2) {
+          if (i >= paddedLen + 1) {
             None()
           } else {
             Some(
               i match {
               | 0 ->
                 StaticImageField(
-                  // length
-                  ConstantInt{id => InstrID::none, typ => tInt32, value => len},
-                  0,
-                )
-              | 1 ->
-                StaticImageField(
-                  // hash
+                  // header
                   ConstantInt{
                     id => InstrID::none,
-                    typ => tInt32,
-                    value => str.hashToEmit().toInt(),
+                    typ => tInt,
+                    value => sk_string_header(isWasm, len, str.hashToEmit()),
                   },
-                  32,
+                  0,
                 )
               | n ->
                 // padded character data
-                utf8Index = n - 2;
+                utf8Index = n - 1;
                 StaticImageField(
                   kByteConstants[
                     str.utf8.maybeGet(utf8Index).default(UInt8::zero).toInt(),
@@ -3534,11 +3539,13 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
     if (!cases.isEmpty()) {
       // Map each long string header word to an array of case indices
       // that have that value.
+      isWasm = common.config.isWasm();
       buckets: SortedMap<Int, Array<(Int, UTF8String)>> = cases.foldl(
         (acc, case) -> {
           (_, str) = case;
-          hash = str.hashToEmit().toInt();
-          header = hash.shl(32).or(str.utf8.size());
+          size = UInt32::truncate(str.utf8.size());
+          hash = str.hashToEmit();
+          header = sk_string_header(isWasm, size, hash);
           acc.setWith(header, Array[case], (old, v) -> {
             old.concat(v)
           })
