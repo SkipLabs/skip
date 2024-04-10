@@ -694,27 +694,31 @@ class SelectEvaluator{
   }
 
   fun evalEmptyFrom(context: mutable SKStore.Context): void {
-    dirName = this.selectName2;
-    if (context.unsafeMaybeGetEagerDir(dirName) is None()) {
-      evaluator = ExprEvaluator(Array[], this.select.from, this.up);
+    evaluator = ExprEvaluator(Array[], this.select.from, this.up);
+    whereVal = evaluator.evalWhere(context, this.select.where);
+    row = whereVal match {
+    | ANull()
+    | ADef(0) ->
+      static::evalRow(context, evaluator, Array[CGNull()], 1)
+    | AUndef()
+    | ADef(_) ->
+      static::evalRow(context, evaluator, this.select.params, 1)
+    };
 
-      whereVal = evaluator.evalWhere(context, this.select.where);
-      row = whereVal match {
-      | ANull()
-      | ADef(0) ->
-        static::evalRow(context, evaluator, Array[CGNull()], 1)
-      | AUndef()
-      | ADef(_) ->
-        static::evalRow(context, evaluator, this.select.params, 1)
-      };
+    dirName = this.selectName2;
+    context.unsafeMaybeGetEagerDir(dirName) match {
+    | None() ->
       _dir = context.mkdir(
         SKStore.IID::keyType,
         Row::type,
         dirName,
         Array[(SKStore.IID(0), row)],
-      );
-    } else {
-      context.!newDirs = context.newDirs.set(dirName);
+      )
+    | Some(dir) ->
+      context.setDir(
+        dirName,
+        dir.writeArrayReturnDir(context, SKStore.IID(0), Array[row]),
+      )
     }
   }
 
