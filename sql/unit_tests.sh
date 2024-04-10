@@ -323,3 +323,9 @@ if cat test/unit/test_length.sql | $SKDB | grep -q '|0|||test|4|literal|7' ; the
 else
     fail "LENGTH"
 fi
+
+if cat test/unit/test_select_multiple_id.sql | $SKDB | sort | uniq | wc -l | xargs test 4 -eq; then
+    pass "MULTIPLE ID"
+else
+    fail "MULTIPLE ID"
+fi
