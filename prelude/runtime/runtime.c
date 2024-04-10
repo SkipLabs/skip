@@ -9,15 +9,14 @@
 /*****************************************************************************/
 
 sk_string_t* get_sk_string(char* obj) {
-  return (sk_string_t*)(obj - sk_string_header_size);
+  return container_of(obj, sk_string_t, data);
 }
 
 SKIP_gc_type_t* get_gc_type(char* skip_object) {
-  // a vtable pointer immediately precedes a pointer to each skip object
-  SKIP_gc_type_t*** vtable = ((SKIP_gc_type_t***)skip_object) - 1;
+  void** vtable_ptr = container_of(skip_object, sk_class_inst_t, data)->vtable;
   // the gc_type of each object is stored in slot 1 of the vtable,
   // see createVTableBuilders in vtable.sk
-  SKIP_gc_type_t** slot1 = *(vtable) + 1;
+  SKIP_gc_type_t** slot1 = (SKIP_gc_type_t**)(vtable_ptr + 1);
   return *slot1;
 }
 
