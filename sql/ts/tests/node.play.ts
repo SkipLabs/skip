@@ -13,6 +13,9 @@ function run(t, asWorker: boolean) {
 tests(false).forEach((t) => run(t, false));
 tests(true).forEach((t) => run(t, true));
 
+
+const N = 765000; // we should be able to process this many rows without running out of address space
+
 // this is to detect memory regression in wasm, it's not a behaviour
 // test. running only in node as I saw timeout flakiness with firefox.
 run(
@@ -25,8 +28,6 @@ run(
         {},
       );
 
-      const N = 675000; // we should be able to process this many rows without running out of address space
-
       const rows = ["^no_pk_inserts"];
       for (let i = 0; i < N; i++) {
         rows.push(`1\t${i},1,${i},read-write`);
@@ -38,7 +39,7 @@ run(
       return await skdb.exec("select count(*) as n from no_pk_inserts");
     },
     check: (res) => {
-      expect(res).toEqual([{ n: 675000 }]);
+      expect(res).toEqual([{ n: N }]);
     },
   },
   false,
