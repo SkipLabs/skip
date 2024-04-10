@@ -89,7 +89,7 @@ fun buildCSVSchemaTransform(
 ): SKStore.OutputFormat {
   source = dirDescr.schema;
   target = tailSpec.columns match {
-  | None() -> return SKStore.OCSV(None())
+  | None() -> return SKStore.OCSV(Range(0, source.size()).collect(Array))
   | Some(targetSchema) -> targetSchema
   };
 
@@ -115,7 +115,7 @@ fun buildCSVSchemaTransform(
     }
   });
 
-  SKStore.OCSV(Some(schemaTransformation));
+  SKStore.OCSV(schemaTransformation);
 }
 
 fun tailShouldWake(

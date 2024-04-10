@@ -462,7 +462,8 @@ fun getSubsDirs(
         };
 
         format = request.format match {
-        | SKDB.OFK_CSV() -> SKStore.OCSV(None())
+        | SKDB.OFK_CSV() ->
+          SKStore.OCSV(Range(0, dirDescr.schema.size()).collect(Array))
         | SKDB.OFK_JSON() -> SKStore.OJSON(getFieldNames(context, edir.dirName))
         | SKDB.OFK_SQL() -> SKStore.OSQL()
         | SKDB.OFK_JS() -> SKStore.OJS(getFieldNames(context, edir.dirName))
