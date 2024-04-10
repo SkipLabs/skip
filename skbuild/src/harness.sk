@@ -250,11 +250,7 @@ fun buildLibrary(
           .toArray(),
       )
     );
-    cmd = if (isWasm) {
-      Array["llvm-link", "-o", target].concat(objects).concat(resources)
-    } else {
-      Array["llvm-ar", "rcs", target].concat(objects).concat(resources)
-    };
+    cmd = Array["llvm-ar", "rcs", target].concat(objects).concat(resources);
     run(cmd, env.verbose);
   };
   Some(target)
@@ -394,6 +390,17 @@ fun compileFile(
   ext = ".o";
   object = optObject.default(env.targetPath(source, ext));
   if (includesChecker.add(source).isYoungerThan(object)) {
+    flags = Array[
+      "-Werror",
+      "-Wall",
+      "-Wextra",
+      "-Wno-sign-conversion",
+      "-Wno-sometimes-uninitialized",
+      "-Wno-c2x-extensions",
+      "-Wsign-compare",
+      "-Wextra-semi-stmt",
+    ];
+
     ensureDirectory(Path.dirname(object), env.verbose);
     cmd = (if (source.endsWith(".c")) Array["clang"] else {
       Array["clang++"]
@@ -409,9 +416,13 @@ fun compileFile(
       )
       .concat(
         if (isWasm) {
-          Array["-DSKIP32", "--target=wasm32-unknown-unknown"]
+          Array[
+            "-DSKIP32",
+            "--target=wasm32",
+            "-nostdlibinc",
+          ].concat(flags)
         } else {
-          Array["-DSKIP64"]
+          Array["-DSKIP64"].concat(flags)
         },
       )
       .concat(includes)
