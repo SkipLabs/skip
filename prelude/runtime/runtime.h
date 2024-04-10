@@ -292,7 +292,7 @@ typedef struct {
   uint32_t size;
   uint32_t hash;
 #endif
-  unsigned char data[0];
+  char data[0];
 } sk_string_t;
 
 #define sk_string_header_size (offsetof(sk_string_t, data))
