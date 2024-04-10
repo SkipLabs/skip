@@ -184,6 +184,7 @@ void* SKIP_intern_shared(void* obj) {
 
     if (SKIP_is_string(toCopy)) {
       sk_string_t* str = get_sk_string(toCopy);
+      // mark already-copied strings by setting size to -1
       if (str->size != (uint32_t)-1 && str->size < sizeof(void*)) {
         void* interned_ptr = SKIP_intern_string(toCopy);
         *delayed.slot = interned_ptr;
@@ -205,12 +206,18 @@ void* SKIP_intern_shared(void* obj) {
       continue;
     }
 
-    if (((uintptr_t) * ((void**)toCopy - 1) & 1) == 0) {
+    void*** addr_vtable_ptr =
+        &(container_of(toCopy, sk_class_inst_t, data)->vtable);
+    void** vtable_ptr = *addr_vtable_ptr;
+    // mark already-copied objects by replacing their vtable pointer with a
+    // forwarding pointer to the copied object, with the lsb set to
+    // distinguish it from vtable pointers
+    if (((uintptr_t)vtable_ptr & 1) == 0) {
       interned_ptr = SKIP_intern_obj(st, toCopy);
-      sk_stack3_push(st3, ((void**)toCopy - 1), *((void**)toCopy - 1), NULL);
-      *((void**)toCopy - 1) = (void*)((uintptr_t)interned_ptr | 1);
+      sk_stack3_push(st3, addr_vtable_ptr, vtable_ptr, NULL);
+      *addr_vtable_ptr = (void*)((uintptr_t)interned_ptr | 1);
     } else {
-      interned_ptr = (void*)((uintptr_t) * ((void**)toCopy - 1) & ~1);
+      interned_ptr = (void*)((uintptr_t)vtable_ptr & ~1);
       sk_incr_ref_count(interned_ptr);
     }
 
