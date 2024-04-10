@@ -10,7 +10,8 @@
 /*****************************************************************************/
 
 uint32_t SKIP_is_string(char* obj) {
-  return *(((uint32_t*)obj) - 1) & 0x80000000;
+  void** vtable_ptr = container_of(obj, sk_class_inst_t, data)->vtable;
+  return (uintptr_t)vtable_ptr & 0x2;
 }
 
 void sk_string_set_hash(char* obj) {
@@ -23,7 +24,7 @@ void sk_string_set_hash(char* obj) {
   }
 
   // This tag is used by SKIP_is_string to recognize strings.
-  acc |= 0x80000000;
+  acc |= 0x2;
   str->hash = (uint32_t)acc;
 }
 
