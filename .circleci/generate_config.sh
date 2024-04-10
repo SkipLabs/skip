@@ -5,7 +5,7 @@ git diff --quiet HEAD $(git merge-base main HEAD) -- compiler/ prelude/ skfs/
 skc=$?
 git diff --quiet HEAD $(git merge-base main HEAD) -- skfs/ compiler/runtime/
 skfs=$?
-git diff --quiet HEAD $(git merge-base main HEAD) -- sql/ sqlparser/
+git diff --quiet HEAD $(git merge-base main HEAD) -- sql/ sqlparser/ skbuild/
 skdb=$?
 
 if (($skc == 0 && $skfs == 0 && $skdb == 0))
