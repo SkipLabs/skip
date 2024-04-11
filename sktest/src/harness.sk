@@ -14,12 +14,12 @@ fun run_test(test: Test, res: TestResult): TestResult {
     _ = test.func();
     res with {result => "success", time => time() - start}
   } catch {
-  | ExpectationError(msg, _, _) ->
+  | exn @ ExpectationError _ ->
     res with {
       result => "failure",
       time => time() - start,
       failure_type => "ExpectationError",
-      failure_message => msg,
+      failure_message => exn.getMessage(),
     }
   | exn ->
     res with {
