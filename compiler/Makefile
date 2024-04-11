@@ -84,9 +84,9 @@ stageC/bin/skc stageC/bin/skfmt stageC/bin/skargo: stageB
 
 .PHONY: promote
 promote: stage$(STAGE)
-	cp stage$(STAGE)/target/host/$(SKARGO_PROFILE)/deps/skc-*.ll bootstrap/skc_out64.ll && gzip -f bootstrap/skc_out64.ll
-	cp stage$(STAGE)/target/host/$(SKARGO_PROFILE)/deps/skargo-*.ll bootstrap/skargo_out64.ll && gzip -f bootstrap/skargo_out64.ll
-	cp stage$(STAGE)/target/host/$(SKARGO_PROFILE)/deps/skfmt-*.ll bootstrap/skfmt_out64.ll && gzip -f bootstrap/skfmt_out64.ll|
+	cp stage$(STAGE)/target/host/$(SKARGO_PROFILE)/deps/skc-*.ll bootstrap/skc_out64.ll && gzip --best --force bootstrap/skc_out64.ll
+	cp stage$(STAGE)/target/host/$(SKARGO_PROFILE)/deps/skargo-*.ll bootstrap/skargo_out64.ll && gzip --best --force bootstrap/skargo_out64.ll
+	cp stage$(STAGE)/target/host/$(SKARGO_PROFILE)/deps/skfmt-*.ll bootstrap/skfmt_out64.ll && gzip --best --force bootstrap/skfmt_out64.ll
 
 .PHONY: install
 install: stage$(STAGE)
