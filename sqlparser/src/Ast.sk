@@ -249,6 +249,7 @@ base class Expr uses Equality, Show {
   | Call(Name, Array<Expr>, distinct: Bool)
   | Cast(Expr, Type)
   | Collate(Expr, Name)
+  | Check(Expr)
 }
 
 class Identifier(
@@ -390,6 +391,7 @@ fun hasAggr(expr: Expr): Bool {
   | Cast(e, _) -> hasAggr(e)
   | Tuple(values) -> values.any(hasAggr)
   | Collate(e, _) -> hasAggr(e)
+  | Check(e) -> hasAggr(e)
   }
 }
 
