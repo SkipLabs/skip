@@ -10,6 +10,7 @@ SKDB_WASM=sql/target/wasm32-unknown-unknown/$(SKARGO_PROFILE)/skdb.wasm
 SKDB_BIN=sql/target/host/$(SKARGO_PROFILE)/skdb
 SDKMAN_DIR?=$(HOME)/.sdkman
 SKIPRUNTIME?=$(CURDIR)/build/skipruntime
+SKDB_METRICS?=$(shell realpath ./sql/monitoring/metrics.json)
 
 export SKIPRUNTIME
 
@@ -286,3 +287,25 @@ publish-metapackage:
 
 .PHONY: publish-all
 publish-all: clean publish-core publish-helpers publish-wasm publish-native publish-server publish-postgres-adapter publish-kafka-adapter publish-metapackage
+
+.PHONY: build-collector
+build-collector: $(SDKMAN_DIR)
+	bash -c 'source $(HOME)/.sdkman/bin/sdkman-init.sh && cd skmonitor/kotlin && gradle --console plain build'
+
+build/skmonitor.jar: build-collector skmonitor/kotlin/collector/build/libs/collector.jar
+	mkdir -p build
+	cp skmonitor/kotlin/collector/build/libs/collector.jar $@
+
+.PHONY: collect
+collect: build/skmonitor.jar $(eval MPROCESSES:=$(shell bash -c 'source $(HOME)/.sdkman/bin/sdkman-init.sh && jps' | grep skmonitor.jar | awk '{print $$1}'))
+ifeq ($(MPROCESSES),)
+	bash -c 'source $(HOME)/.sdkman/bin/sdkman-init.sh && java -jar $^ $(SKDB_METRICS) &'
+else
+	@echo "Already running."
+endif
+
+.PHONY: stop-collecting
+stop-collecting: $(eval MPROCESSES:=$(shell bash -c 'source $(HOME)/.sdkman/bin/sdkman-init.sh && jps' | grep skmonitor.jar | awk '{print $$1}'))
+ifneq ($(MPROCESSES),)
+	kill $(MPROCESSES)
+endif
