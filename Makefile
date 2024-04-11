@@ -90,10 +90,31 @@ clean:
 	rm -Rf build
 	find . -name 'Skargo.toml' -print0 | sed 's|Skargo.toml|target|g' | xargs -0 rm -rf
 
+.PHONY: fmt-sk
+fmt-sk:
+	find . -path ./compiler/tests -not -prune -or -name \*.sk | parallel skfmt -i :::
+
+.PHONY: fmt-c
+fmt-c:
+	find . -path ./compiler/runtime/libbacktrace -not -prune -or -path ./sql/test/TPC-h/tnt-tpch -not -prune -or -regex '.*\.[ch]\(pp\)*' | parallel clang-format -i :::
+
+.PHONY: fmt-js
+fmt-js:
+	npx prettier --log-level warn --write .
+
 .PHONY: fmt
-fmt:
-	find . -path ./compiler/tests -not -prune -or -name '*'.sk -exec sh -c 'echo {}; skfmt -i {}' \;
-	npx prettier . --write
+fmt: fmt-sk fmt-c fmt-js
+
+.PHONY: check-fmt
+check-fmt: fmt
+	if ! git diff --quiet --exit-code; then echo "make fmt changed some files:"; git status --porcelain; exit 1; fi
+
+# install the repo pre-commit hook locally
+.git/hooks/pre-commit: bin/git_hooks/check_format.sh
+	ln -s $(PWD)/bin/git_hooks/check_format.sh .git/hooks/pre-commit
+
+.PHONY: setup-git-hooks
+setup-git-hooks: .git/hooks/pre-commit
 
 
 # test targets
@@ -135,8 +156,6 @@ test-tpc: test
 	@echo ""
 	@cd sql/test/TPC-h/ && ./test_tpch.sh
 
-
-
 .PHONY: test-soak-priv
 test-soak-priv: $(SKNPM_BIN) build/skdb build/init.sql npm
 	./sql/server/test/test_soak.sh
@@ -168,7 +187,6 @@ check-vite: npm
 	cd build/vitejs && npm run build
 	cd build/vitejs && node server.js
 	cd build/vitejs && npm run dev
-
 
 .PHONY: test-bun
 test-bun: npm

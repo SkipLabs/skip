@@ -21,8 +21,7 @@ static char* shallow_copy(char* obj, size_t memsize, size_t leftsize,
   return mem;
 }
 
-static char* SKIP_copy_obj(sk_stack_t* st, char* obj,
-                           sk_cell_t* large_page) {
+static char* SKIP_copy_obj(sk_stack_t* st, char* obj, sk_cell_t* large_page) {
   SKIP_gc_type_t* ty = get_gc_type(obj);
 
   size_t len = skip_object_len(ty, obj);

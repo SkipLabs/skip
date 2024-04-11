@@ -9,8 +9,8 @@ RUN apt-get update && \
     echo "deb-src http://apt.llvm.org/jammy/ llvm-toolchain-jammy-15 main" >> /etc/apt/sources.list.d/llvm.list && \
     echo "deb https://deb.nodesource.com/node_20.x nodistro main" >> /etc/apt/sources.list.d/nodejs.list && \
     apt-get update && \
-    apt-get install -q -y git zip unzip curl make lld-15 sqlite3 gcc gawk clang-15 llvm-15 automake jq parallel nodejs file && \
-    npm install -g typescript@5.1 && \
+    apt-get install -q -y automake clang-15 clang-format-15 curl file gawk gcc git jq lld-15 llvm-15 make nodejs parallel sqlite3 unzip zip && \
+    npm install -g prettier typescript@5.1 && \
     npx playwright install-deps
 
 RUN sh -c 'curl -s "https://get.sdkman.io?rcupdate=false" | bash'
@@ -18,13 +18,14 @@ RUN bash -c "source $HOME/.sdkman/bin/sdkman-init.sh && \
     sdk install gradle && \
     sdk install java 20.0.2-tem"
 
-RUN update-alternatives --install /usr/bin/llvm-config llvm-config /usr/bin/llvm-config-15 100 && \
-    update-alternatives --install /usr/bin/wasm-ld wasm-ld /usr/bin/wasm-ld-15 100 && \
-    update-alternatives --install /usr/bin/clang clang /usr/bin/clang-15 100 && \
+RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-15 100 && \
     update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-15 100 && \
-    update-alternatives --install /usr/bin/llvm-link llvm-link /usr/bin/llvm-link-15 100 && \
+    update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-15 100 && \
     update-alternatives --install /usr/bin/llc llc /usr/bin/llc-15 100 && \
-    update-alternatives --install /usr/bin/llvm-ar llvm-ar /usr/bin/llvm-ar-15 100
+    update-alternatives --install /usr/bin/llvm-ar llvm-ar /usr/bin/llvm-ar-15 100 && \
+    update-alternatives --install /usr/bin/llvm-config llvm-config /usr/bin/llvm-config-15 100 && \
+    update-alternatives --install /usr/bin/llvm-link llvm-link /usr/bin/llvm-link-15 100 && \
+    update-alternatives --install /usr/bin/wasm-ld wasm-ld /usr/bin/wasm-ld-15 100
 
 ENV CC=clang
 ENV CXX=clang++
