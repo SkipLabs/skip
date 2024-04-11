@@ -959,6 +959,18 @@ class ExprEvaluator(
       } else {
         ADef(-SKStore.genSym(0))
       }
+
+    | CICheck(e) ->
+      this.evalCIExpr(context, e) match {
+      | AUndef() ->
+        AUndef() // TODO: what should this be?
+      | ANull() ->
+        ANull() // TODO: what should this be?
+      | ADef(n) if (n != 0) ->
+        ADef(n) // TODO: should not store this
+      | _ ->
+        errorEval("Constraint failed") // TODO: much better error
+      }
     }
   }
 
