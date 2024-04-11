@@ -12,7 +12,7 @@ default: stage$(STAGE)
 
 stage%:
 	mkdir -p $@
-	$(MAKE) $@/bin/skc $@/bin/skfmt $@/bin/skargo $@/lib/libstd.sklib
+	$(MAKE) $@/lib/libstd.sklib $@/bin/skc $@/bin/skfmt $@/bin/skargo
 
 bootstrap/%.ll: bootstrap/%.ll.gz
 	gunzip -c $< > $@
@@ -61,24 +61,26 @@ stage3/bin/skargo: stage2
 
 # 	TODO: Ensure stage2 == stage3.
 
-stageA/bin/skc:
-	mkdir -p stageA/bin
-	cp $(shell command -v skc) stageA/bin/skc
+stageA/lib/libstd.sklib:
+	mkdir -p $(@D)
+	cp $(shell dirname $(shell command -v skc))/../lib/libstd.sklib $@
 
-stageA/bin/skargo:
-	mkdir -p stageA/bin
-	cp $(shell command -v skargo) stageA/bin/skargo
+stageA/bin/skc stageA/bin/skfmt stageA/bin/skargo:
+	mkdir -p $(@D)
+	cp $(shell command -v $(@F)) $@
 
-stageA/bin/skfmt:
-	mkdir -p stageA/bin
-	cp $(shell command -v skfmt) stageA/bin/skfmt
-
-stageB/bin/skc stageB/bin/skfmt stageB/bin/skargo: stageA
+stageB/bin/skc stageB/bin/skfmt: stageA
 	PATH=stageA/bin/:$(PATH) skargo build -r --bins --out-dir stageB/bin --target-dir stageB/target
+stageB/lib/libstd.sklib: stageA
+	PATH=stageA/bin/:$(PATH) skargo build -r --lib --out-dir stageB/lib --target-dir stageB/target --manifest-path ../prelude/Skargo.toml
+stageB/bin/skargo: stageA
 	PATH=stageA/bin/:$(PATH) skargo build -r --bins --out-dir stageB/bin --target-dir stageB/target --manifest-path ../skargo/Skargo.toml
 
-stageC/bin/skc stageC/bin/skfmt stageC/bin/skargo: stageB
-	PATH=stageB/bin/:$(PATH) skargo build -r --bins --out-dir stageC/bin --target-dir stageC/bin
+stageC/bin/skc stageC/bin/skfmt: stageB
+	PATH=stageB/bin/:$(PATH) skargo build -r --bins --out-dir stageC/bin --target-dir stageC/target
+stageC/lib/libstd.sklib: stageB
+	PATH=stageB/bin/:$(PATH) skargo build -r --lib --out-dir stageC/lib --target-dir stageC/target --manifest-path ../prelude/Skargo.toml
+stageC/bin/skargo: stageB
 	PATH=stageB/bin/:$(PATH) skargo build -r --bins --out-dir stageC/bin --target-dir stageC/target --manifest-path ../skargo/Skargo.toml
 
 .PHONY: promote
