@@ -10,6 +10,7 @@ SKDB_WASM=sql/target/wasm32-unknown-unknown/$(SKARGO_PROFILE)/skdb.wasm
 SKDB_BIN=sql/target/host/$(SKARGO_PROFILE)/skdb
 SDKMAN_DIR?=$(HOME)/.sdkman
 DOCS_SITE_DIR?=/dev/null
+SKDB_METRICS?=$(shell realpath ./sql/monitoring/metrics.json)
 
 ################################################################################
 # skdb wasm + js client
@@ -274,3 +275,25 @@ publish-server:
 
 .PHONY: publish-all
 publish-all: clean publish-std publish-json publish-date publish-api publish-helpers publish-tests publish-wasm publish-server
+
+.PHONY: build-collector
+build-collector: $(SDKMAN_DIR)
+	bash -c 'source $(HOME)/.sdkman/bin/sdkman-init.sh && cd skmonitor/kotlin && gradle --console plain build'
+
+build/skmonitor.jar: build-collector skmonitor/kotlin/collector/build/libs/collector.jar
+	mkdir -p build
+	cp skmonitor/kotlin/collector/build/libs/collector.jar $@
+
+.PHONY: collect
+collect: build/skmonitor.jar $(eval MPROCESSES:=$(shell bash -c 'source $(HOME)/.sdkman/bin/sdkman-init.sh && jps' | grep skmonitor.jar | awk '{print $$1}'))
+ifeq ($(MPROCESSES),)
+	bash -c 'source $(HOME)/.sdkman/bin/sdkman-init.sh && java -jar $^ $(SKDB_METRICS) &'
+else
+	@echo "Already running."
+endif
+
+.PHONY: stop-collecting
+stop-collecting: $(eval MPROCESSES:=$(shell bash -c 'source $(HOME)/.sdkman/bin/sdkman-init.sh && jps' | grep skmonitor.jar | awk '{print $$1}'))
+ifneq ($(MPROCESSES),)
+	kill $(MPROCESSES)
+endif
