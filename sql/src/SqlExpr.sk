@@ -960,7 +960,7 @@ class ExprEvaluator(
         ADef(-SKStore.genSym(0))
       }
 
-    | CICheck(e) ->
+    | CICheck(pos, e) ->
       this.evalCIExpr(context, e) match {
       | AUndef() ->
         AUndef() // TODO: what should this be?
@@ -969,7 +969,7 @@ class ExprEvaluator(
       | ADef(n) if (n != 0) ->
         ADef(n) // TODO: should not store this
       | _ ->
-        errorEval("Constraint failed") // TODO: much better error
+        throw SqlError(pos, "Constraint failed") // TODO: much better error
       }
     }
   }
