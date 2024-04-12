@@ -1798,7 +1798,7 @@ mutable class Compiler{
     | P.Collate _ -> invariant_violation("not implemented")
     | P.Check(e) ->
       this.compileExpr(context, e) match {
-      | CIExpr(inner) -> CIExpr(CICheck(inner))
+      | CIExpr(inner) -> CIExpr(CICheck(this.pos, inner))
       | _ -> error(this.pos, "Expected a boolean expression inside CHECK")
       }
     }
