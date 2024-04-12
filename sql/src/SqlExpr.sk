@@ -962,14 +962,11 @@ class ExprEvaluator(
 
     | CICheck(pos, debugExpr, e) ->
       this.evalCIExpr(context, e) match {
-      | AUndef() ->
-        AUndef() // TODO: what should this be?
-      | ANull() ->
-        ANull() // TODO: what should this be?
-      | ADef(n) if (n != 0) ->
-        ADef(n) // TODO: should not store this
-      | _ ->
-        throw SqlError(pos, "Failed constraint: " + debugExpr)
+      | AUndef() -> AUndef()
+      | ANull() -> ANull()
+      | ret @ ADef(n) if (n != 0) ->
+        ret // TODO: should not store this
+      | _ -> throw SqlError(pos, "Failed constraint: " + debugExpr)
       }
     }
   }
