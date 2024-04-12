@@ -366,7 +366,11 @@ class SelectEvaluator{
             !entry = entry.setRepeat(repeat);
           };
           evaluator = ExprEvaluator(Array[entry], select.from, up);
-          row = static::evalRow(context, evaluator, select.params, repeat);
+          rowOpt = static::evalRow(context, evaluator, select.params, repeat);
+          row = rowOpt match {
+          | Some(row) -> row
+          | None() -> return void
+          };
           writer.set(RowKey::create(row, kinds), row)
         },
       );
@@ -533,15 +537,39 @@ class SelectEvaluator{
     if (this.select.from.size() == 0) {
       if (context.unsafeMaybeGetEagerDir(this.selectName1) is None()) {
         emptyEval = ExprEvaluator(Array[], this.select.from, this.up);
-        entry = static::evalRow(context, emptyEval, aggrs.map(y -> y.i1), 1);
+        entry = static::evalRow(
+          context,
+          emptyEval,
+          aggrs.map(y -> y.i1),
+          1,
+        ) match {
+        | Some(entry) -> entry
+        | None() ->
+          _dir = context.mkdir(
+            SKStore.IID::keyType,
+            Row::type,
+            this.selectName1,
+            Array[],
+          );
+          return this.selectName1
+        };
         evaluator = ExprEvaluator(Array[entry], this.select.from, this.up);
-        row = static::evalRow(context, evaluator, this.select.params, 1);
-        _dir = context.mkdir(
-          SKStore.IID::keyType,
-          Row::type,
-          this.selectName1,
-          Array[(SKStore.IID(0), row)],
-        );
+        static::evalRow(context, evaluator, this.select.params, 1) match {
+        | Some(row) ->
+          _dir = context.mkdir(
+            SKStore.IID::keyType,
+            Row::type,
+            this.selectName1,
+            Array[(SKStore.IID(0), row)],
+          )
+        | None() ->
+          _dir = context.mkdir(
+            SKStore.IID::keyType,
+            Row::type,
+            this.selectName1,
+            Array[],
+          )
+        };
       } else {
         context.!newDirs = context.newDirs.set(this.selectName1);
       };
@@ -579,8 +607,11 @@ class SelectEvaluator{
           evaluator = ExprEvaluator(Array[entry], this.select.from, this.up);
           this.select.having match {
           | None() ->
-            row = static::evalRow(context, evaluator, this.select.params, 1);
-            writer.set(key, row)
+            rowOpt = static::evalRow(context, evaluator, this.select.params, 1);
+            rowOpt match {
+            | Some(row) -> writer.set(key, row)
+            | None() -> void
+            }
           | Some(cond) ->
             evaluator.evalCIExpr(context, cond) match {
             | ADef(0)
@@ -590,8 +621,16 @@ class SelectEvaluator{
             | AUndef() ->
               invariant_violation("Having should never be undefined")
             | ADef(_) ->
-              row = static::evalRow(context, evaluator, this.select.params, 1);
-              writer.set(key, row)
+              rowOpt = static::evalRow(
+                context,
+                evaluator,
+                this.select.params,
+                1,
+              );
+              rowOpt match {
+              | Some(row) -> writer.set(key, row)
+              | None() -> void
+              }
             }
           }
         },
@@ -619,18 +658,27 @@ class SelectEvaluator{
             this.select.from,
             this.up,
           );
-          emptyRow = static::evalRow(
+          static::evalRow(
             context,
             emptyEvaluator,
             this.select.params,
             1,
-          );
-          _ = context.mkdir(
-            SKStore.IID::keyType,
-            Row::type,
-            selectName1Empty,
-            Array[(SKStore.IID(0), emptyRow)],
-          );
+          ) match {
+          | Some(emptyRow) ->
+            _ = context.mkdir(
+              SKStore.IID::keyType,
+              Row::type,
+              selectName1Empty,
+              Array[(SKStore.IID(0), emptyRow)],
+            )
+          | None() ->
+            _ = context.mkdir(
+              SKStore.IID::keyType,
+              Row::type,
+              selectName1Empty,
+              Array[],
+            )
+          };
         } else {
           context.!newDirs = context.newDirs.set(selectName1Empty);
         };
@@ -681,7 +729,7 @@ class SelectEvaluator{
     evaluator: ExprEvaluator,
     params: Array<CGExpr>,
     repeat: Int,
-  ): RowValues {
+  ): ?RowValues {
     acc = mutable Vector<?CValue>[];
     for (param in params) {
       evaluator.evalCGExpr(context, param) match {
@@ -693,13 +741,17 @@ class SelectEvaluator{
       | ADef(x) -> acc.push(Some(x))
       }
     };
-    RowValues::create(acc.toArray(), repeat)
+    if (acc.size() > 0) {
+      Some(RowValues::create(acc.toArray(), repeat))
+    } else {
+      None()
+    }
   }
 
   fun evalEmptyFrom(context: mutable SKStore.Context): void {
     evaluator = ExprEvaluator(Array[], this.select.from, this.up);
     whereVal = evaluator.evalWhere(context, this.select.where);
-    row = whereVal match {
+    rowOpt = whereVal match {
     | ASuccess() -> invariant_violation("Unexpected side effect")
     | ANull()
     | ADef(0) ->
@@ -716,12 +768,22 @@ class SelectEvaluator{
         SKStore.IID::keyType,
         Row::type,
         dirName,
-        Array[(SKStore.IID(0), row)],
+        rowOpt match {
+        | None() -> Array[]
+        | Some(row) -> Array[(SKStore.IID(0), row)]
+        },
       )
     | Some(dir) ->
       context.setDir(
         dirName,
-        dir.writeArrayReturnDir(context, SKStore.IID(0), Array[row]),
+        dir.writeArrayReturnDir(
+          context,
+          SKStore.IID(0),
+          rowOpt match {
+          | Some(row) -> Array[row]
+          | None() -> Array[]
+          },
+        ),
       )
     }
   }
@@ -865,12 +927,16 @@ class SelectEvaluator{
               continue
             | _ -> void
             };
-            row = static::evalRow(
+            rowOpt = static::evalRow(
               context,
               evaluator,
               this.params,
               input.repeat,
             );
+            row = rowOpt match {
+            | Some(row) -> row
+            | None() -> break void
+            };
             for (_ in Range(0, row.repeat)) {
               !i = i + 1;
               if (i >= limit) {
@@ -909,16 +975,20 @@ class SelectEvaluator{
               continue
             | _ -> void
             };
-            row = static::evalRow(
+            rowOpt = static::evalRow(
               context,
               evaluator,
               this.params,
               input.repeat,
             );
-            for (_ in Range(0, row.repeat)) {
-              RowValues::printItem(this.select.format, row);
-              !i = i + 1;
-              if (i >= limit) throw IgnoreAndContinue();
+            rowOpt match {
+            | Some(row) ->
+              for (_ in Range(0, row.repeat)) {
+                RowValues::printItem(this.select.format, row);
+                !i = i + 1;
+                if (i >= limit) throw IgnoreAndContinue();
+              }
+            | None() -> void
             }
           }
         }
@@ -1123,7 +1193,11 @@ class SelectEvaluator{
     writer: mutable MultiWriter,
     repeat: Int,
   ): void {
-    row = static::evalRow(context, evaluator, this.params, repeat);
+    rowOpt = static::evalRow(context, evaluator, this.params, repeat);
+    row = rowOpt match {
+    | Some(row) -> row
+    | None() -> return void
+    };
     if (this.select.aggr is Some _) {
       !evaluator = evaluator with {entries => Array[row]};
       key = this.select.groupBy match {
