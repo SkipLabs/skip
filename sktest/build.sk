@@ -1,0 +1,20 @@
+module SKTest;
+
+@skbuild_extra_sources
+fun extra_sources(env: Skbuild.Env): Array<String> {
+  if (env.isWasm32()) {
+    Array["extra/src/wasm32.sk"]
+  } else {
+    Array["extra/src/host.sk"]
+  }
+}
+
+module end;
+
+@debug
+fun main(): void {
+  Skbuild.build() match {
+  | Failure(err) -> skipExit(err.code)
+  | _ -> void
+  }
+}

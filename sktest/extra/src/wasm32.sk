@@ -1,0 +1,72 @@
+module SKTest;
+
+fun test_harness(tests: readonly Map<String, readonly Sequence<Test>>): void {
+  args = Cli.Command("tests")
+    .about("Run tests")
+    .arg(
+      Cli.StringArg("filter")
+        .positional()
+        .about(
+          "If specified, only run tests containing this string in their names",
+        ),
+    )
+    .arg(
+      Cli.BoolArg("strict").about(
+        "If specified with filter, only run tests with listed names",
+      ),
+    )
+    .arg(Cli.BoolArg("json").about("If specified, print output in json format"))
+    .arg(Cli.BoolArg("list").about("Display the list of available tests"))
+    .arg(Cli.StringArg("junitxml").about("Generate a JUnit XML report"))
+    .arg(
+      Cli.BoolArg("verbose")
+        .long("verbose")
+        .short("v")
+        .about("Use verbose output"),
+    )
+    .help()
+    .parseArgs();
+  if (args.getBool("list")) {
+    for (testSuite in tests.keys()) {
+      for (test in tests[testSuite]) {
+        print_string(testSuite + "." + test.name)
+      }
+    };
+    return void;
+  };
+  reporters = mutable Vector<mutable TestReporter>[mutable JSONTestReporter{}];
+  args.maybeGetString("junitxml").each(path ->
+    reporters.push(mutable XmlTestReporter{output => Some(path)})
+  );
+  filter = args.maybeGetString("filter").default("");
+  strict = args.getBool("strict");
+  valid = (name, filter) ->
+    if (strict) name == filter else name.contains(filter);
+  success = true;
+  for (testSuite in tests.keys()) {
+    for (test in tests[testSuite]) {
+      if (!valid(testSuite + "." + test.name, filter)) {
+        continue
+      };
+      res = run_test(
+        test,
+        TestResult{
+          name => test.name,
+          suite => testSuite,
+          file => test.file,
+          line => test.lineno,
+        },
+      );
+      if (res.result != "success") {
+        !success = false
+      };
+      reporters.each(r -> r.report(res));
+    }
+  };
+  reporters.each(r -> r.finish());
+  if (!success) {
+    skipExit(1)
+  }
+}
+
+module end;
