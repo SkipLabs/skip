@@ -1,0 +1,158 @@
+module SKTest;
+
+fun test_job(
+  tests: readonly Map<String, readonly Sequence<Test>>,
+  filter: String,
+  njobs: Int,
+  rank: Int,
+): void {
+  stdout = mutable IO.File(Posix.dup(IO.stdout().fileno));
+  i = 0;
+  for (testSuite in tests.keys()) {
+    for (test in tests[testSuite]) {
+      if (!(testSuite + "." + test.name).contains(filter)) {
+        continue
+      };
+      !i = i + 1;
+      if (i % njobs != rank) {
+        continue
+      };
+
+      stdout_file = Posix.mkstemp(Path.join(Environ.temp_dir(), "XXXXXX"));
+      Posix.dup2(stdout_file.fileno, IO.stdout().fileno);
+      stderr_file = Posix.mkstemp(Path.join(Environ.temp_dir(), "XXXXXX"));
+      Posix.dup2(stderr_file.fileno, IO.stderr().fileno);
+
+      res = run_test(
+        test,
+        TestResult{
+          name => test.name,
+          suite => testSuite,
+          file => test.file,
+          line => test.lineno,
+        },
+      );
+
+      flushStdout();
+      _ = Posix.lseek(stdout_file.fileno, 0, Posix.SeekSet());
+      _ = Posix.lseek(stderr_file.fileno, 0, Posix.SeekSet());
+      !res = res with {
+        stdout => stdout_file.read_to_string().fromSuccess(),
+        stderr => stderr_file.read_to_string().fromSuccess(),
+      };
+
+      stdout_file.close();
+      stderr_file.close();
+
+      stdout.write_all((res.toJSON() + "\n").bytes()).fromSuccess();
+    }
+  };
+  skipExit(0)
+}
+
+fun test_harness(tests: readonly Map<String, readonly Sequence<Test>>): void {
+  args = Cli.Command("tests")
+    .about("Run tests")
+    .arg(
+      Cli.StringArg("filter")
+        .positional()
+        .about(
+          "If specified, only run tests containing this string in their names",
+        ),
+    )
+    // TODO: Expose flag(s) to handle test report format(s) selection.
+    .arg(
+      Cli.IntArg("jobs")
+        .long("jobs")
+        .short("j")
+        .about("Number of parallel jobs, defaults to # of CPUs")
+        .default(8), // TODO: Properly determine available cores.
+    )
+    .arg(Cli.StringArg("junitxml").about("Generate a JUnit XML report"))
+    .arg(
+      Cli.BoolArg("verbose")
+        .long("verbose")
+        .short("v")
+        .about("Use verbose output"),
+    )
+    .help()
+    .parseArgs();
+
+  filter = args.maybeGetString("filter").default("");
+  Environ.varOpt("SKTEST_RANK") match {
+  | Some(rank) ->
+    test_job(
+      tests,
+      Environ.var("SKTEST_FILTER"),
+      Environ.var("SKTEST_JOBS").toInt(),
+      rank.toInt(),
+    )
+  | None() -> void
+  };
+
+  reporters = mutable Vector<mutable TestReporter>[
+    mutable BasicTestReporter{color => true},
+  ];
+  args.maybeGetString("junitxml").each(path ->
+    reporters.push(mutable XmlTestReporter{output => Some(path)})
+  );
+
+  njobs = args.getInt("jobs");
+  procs = Range(0, njobs).map(rank -> {
+    Posix.Popen::create{
+      args => Array[Environ.current_exe()],
+      env => Map[
+        "SKTEST_RANK" => rank.toString(),
+        "SKTEST_JOBS" => njobs.toString(),
+        "SKTEST_FILTER" => filter,
+      ],
+      stdout => true,
+      stderr => true,
+    }
+  });
+  readers = Array::createFromItems(
+    procs.map(p -> mutable IO.BufferedReader(p.stdout.fromSome())),
+  );
+  pollfds = Array::mcreateFromItems(
+    procs.map(p -> Posix.Pollfd::create(p.stdout.fromSome().fileno)),
+  );
+  open_fds = procs.size();
+  success = true;
+  while (open_fds > 0) {
+    _ = Posix.poll(pollfds);
+    for ((i, pfd) in pollfds.items()) {
+      if (pfd.fd == -1) continue;
+      if (pfd.pollin()) {
+        loop {
+          line = readers[i].read_line() match {
+          | Failure(err) -> throw err
+          | Success("") ->
+            pollfds.set(i, Posix.Pollfd::create(-1));
+            !open_fds = open_fds - 1;
+            break void
+          | Success(line) -> line
+          };
+          res = TestResult::fromJSON(line);
+          if (res.result != "success") {
+            !success = false
+          };
+          reporters.each(x -> x.report(res));
+          if (!readers[i].has_buffered_data()) {
+            break void
+          }
+        }
+      } else if (pfd.pollerr() || pfd.pollhup()) {
+        pollfds.set(i, Posix.Pollfd::create(-1));
+        !open_fds = open_fds - 1
+      }
+    }
+  };
+  procs.each(p -> _ = p.wait());
+  reporters.each(r -> r.finish());
+
+  if (!success) {
+    skipExit(1)
+  }
+}
+
+module end;
