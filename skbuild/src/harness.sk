@@ -111,6 +111,10 @@ fun build(): Result<Env, IO.Error> {
   #forEachFunction (@skbuild_resource_dirs, #function, #functionName) {
     !resourceDirs = resourceDirs.concat(#function(env));
   };
+  extraSources = Array[];
+  #forEachFunction (@skbuild_extra_sources, #function, #functionName) {
+    !extraSources = extraSources.concat(#function(env));
+  };
   build_harness(
     env,
     includeDirs,
@@ -119,6 +123,7 @@ fun build(): Result<Env, IO.Error> {
     links,
     resources,
     resourceDirs,
+    extraSources,
   );
 }
 
@@ -130,6 +135,7 @@ fun build_harness(
   links: Array<String>,
   resources: Array<String>,
   resourceDirs: Array<String>,
+  extraSources: Array<String>,
 ): Result<Env, IO.Error> {
   isWasm = env.isWasm32();
   resourceObjs = Array[];
@@ -212,6 +218,10 @@ fun build_harness(
     })
     .each(print_preamble);
   links.each(print_link);
+  for (source in extraSources) {
+    sourcePath = env.resolve(source);
+    print_string(`skargo:skc-extra-source=${sourcePath}`)
+  };
   Success(env)
 }
 
@@ -388,7 +398,10 @@ fun compileFile(
   optObject: ?String = None(),
 ): String {
   ext = ".o";
-  object = optObject.default(env.targetPath(source, ext));
+  object = optObject match {
+  | Some(o) -> o
+  | _ -> env.targetPath(source, ext)
+  };
   if (includesChecker.add(source).isYoungerThan(object)) {
     flags = Array[
       "-Werror",
@@ -437,7 +450,7 @@ fun print_preamble(preamble: String): void {
 }
 
 fun print_link(link: String): void {
-  print_string(`skargo:skc-link-search=${link}`);
+  print_string(`skargo:skc-link-arg=${link}`);
 }
 
 module end;
