@@ -90,7 +90,7 @@ fun execTest(gctx: GlobalContext, args: Cli.ParseResults): void {
   jobs = args.getInt("jobs");
   list = if (args.getBool("list")) Some("--list") else None();
 
-  binary = if (
+  optBinary = if (
     bctx.roots.size() != 1 ||
     !(bctx.roots[0].target.kind is TestTarget _)
   ) {
@@ -98,23 +98,31 @@ fun execTest(gctx: GlobalContext, args: Cli.ParseResults): void {
     skipExit(1)
   } else {
     unit = bctx.roots[0];
-    // TODO: Expose common API with BuildRunner.
-    path = Path.join(
-      ws.target_dir(),
-      "host",
-      opts.build_config.requested_profile,
+    unit.arch match {
+    | TargetArchTriple(t) if (t.isWasm32()) -> None()
+    | _ -> // TODO: Expose common API with BuildRunner.
+      path = Path.join(
+        ws.target_dir(),
+        "host",
+        opts.build_config.requested_profile,
+      );
+      Some(Path.join(path, unit.target.name))
+    }
+  };
+  optBinary match {
+  | Some(binary) ->
+    if (!FileSystem.exists(binary)) {
+      gctx.console.error(
+        `\`skargo test\` could not find test binary ${binary}.`,
+      );
+      skipExit(1)
+    };
+    cmd_args = Array[binary].concat(
+      Array[junitxml, filter, list, Some(`-j${jobs}`)].filterNone(),
     );
-    Path.join(path, unit.target.name)
-  };
-
-  if (!FileSystem.exists(binary)) {
-    gctx.console.error(`\`skargo test\` could not find test binary ${binary}.`);
-    skipExit(1)
-  };
-  cmd_args = Array[binary].concat(
-    Array[junitxml, filter, list, Some(`-j${jobs}`)].filterNone(),
-  );
-  Posix.execvp(cmd_args)
+    Posix.execvp(cmd_args)
+  | _ -> void
+  }
 }
 
 module end;
