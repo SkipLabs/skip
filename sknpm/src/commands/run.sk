@@ -1,0 +1,57 @@
+module Sknpm;
+
+fun run(): (
+  Cli.Command,
+  (Skargo.GlobalContext, Cli.ParseResults) ~> Result<void, void>,
+) {
+  (
+    Cli.Command("run")
+      .short("r")
+      .about("Call npm run on generated npm package")
+      .arg(
+        Cli.StringArg("manifest-path")
+          .value_name("PATH")
+          .about("Path to Skargo.toml"),
+      )
+      .arg(
+        Cli.StringArg("target-dir")
+          .value_name("PATH")
+          .about("Directory for all generated artifacts"),
+      )
+      .arg(
+        Cli.StringArg("out-dir")
+          .value_name("PATH")
+          .about("Copy final artifacts to this directory"),
+      )
+      .arg(
+        Cli.StringArg("profile")
+          .value_name("PROFILE-NAME")
+          .about("Build artifacts with the specified profile"),
+      )
+      .arg(
+        Cli.BoolArg("release")
+          .short("r")
+          .long("release")
+          .about("Build artifacts in release mode, with optimizations"),
+      )
+      .arg(
+        Cli.StringArg("bin")
+          .repeatable()
+          .value_name("NAME")
+          .about("Build only the specified binary"),
+      )
+      .extra(),
+    (gctx, args) ~> execCommand(gctx, args, execRun),
+  )
+}
+
+fun execRun(brunner: BuildRunner, args: Cli.ParseResults): Result<void, void> {
+  (npmDir, _) = doBuild(brunner, args)?;
+  npmInstall = Array["npm", "--prefix", npmDir, "install"];
+  _ = exec("[npm] ", npmInstall, brunner.bctx.gctx.console)?;
+  npmRun = Array["npm", "--prefix", npmDir, "run"].concat(args.extra);
+  _ = exec("", npmRun, brunner.bctx.gctx.console, Skargo.VerbosityQuiet())?;
+  Success(void)
+}
+
+module end;

@@ -1,0 +1,77 @@
+module Sknpm;
+
+fun check(): (
+  Cli.Command,
+  (Skargo.GlobalContext, Cli.ParseResults) ~> Result<void, void>,
+) {
+  (
+    Cli.Command("check")
+      .short("c")
+      .about("Run tsc on ts source files")
+      .arg(
+        Cli.StringArg("manifest-path")
+          .value_name("PATH")
+          .about("Path to Skargo.toml"),
+      )
+      .arg(
+        Cli.StringArg("target-dir")
+          .value_name("PATH")
+          .about("Directory for all generated artifacts"),
+      )
+      .arg(
+        Cli.StringArg("profile").about(
+          "Check artifacts with the specified profile",
+        ),
+      )
+      .arg(
+        Cli.BoolArg("release")
+          .short("r")
+          .long("release")
+          .about("Check artifacts in release mode, with optimizations"),
+      )
+      .arg(
+        Cli.StringArg("bin")
+          .repeatable()
+          .value_name("NAME")
+          .about("Build only the specified binary"),
+      )
+      .arg(
+        Cli.BoolArg("test")
+          .short("t")
+          .long("test")
+          .about("Run tsc on ts tests files, with built package"),
+      ),
+    (gctx, args) ~> execCommand(gctx, args, execCheck),
+  )
+}
+
+fun execCheck(
+  brunner: BuildRunner,
+  args: Cli.ParseResults,
+): Result<void, void> {
+  ws = brunner.bctx.ws;
+  gctx = brunner.bctx.gctx;
+  test = args.getBool("test");
+  root = ws.package.manifest.package_id.source_id.url;
+  tsDir = if (test) {
+    Path.join(root, "ts/tests")
+  } else {
+    Path.join(root, "ts/src")
+  };
+  if (!FileSystem.exists(tsDir)) {
+    gctx.console.error("`" + tsDir + "` not founds.");
+    return Failure(void);
+  };
+  info = if (test) {
+    skargo(args, false, gctx.console)?;
+    name = ws.package.manifest.package_id.name;
+    package = Package::create(root, name, gctx.console)?;
+    npmDir = manage(brunner, package, None())?;
+    Some((package.name, npmDir))
+  } else {
+    None()
+  };
+  tsc(tsDir, info, gctx.console)
+}
+
+module end;

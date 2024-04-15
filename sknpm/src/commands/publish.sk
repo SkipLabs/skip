@@ -1,0 +1,105 @@
+module Sknpm;
+
+fun publish(): (
+  Cli.Command,
+  (Skargo.GlobalContext, Cli.ParseResults) ~> Result<void, void>,
+) {
+  (
+    Cli.Command("publish")
+      .short("p")
+      .about("Call npm publish on generated npm package")
+      .arg(
+        Cli.StringArg("manifest-path")
+          .value_name("PATH")
+          .about("Path to Skargo.toml"),
+      )
+      .arg(
+        Cli.StringArg("target-dir")
+          .value_name("PATH")
+          .about("Directory for all generated artifacts"),
+      )
+      .arg(
+        Cli.StringArg("out-dir")
+          .value_name("PATH")
+          .about("Copy final artifacts to this directory"),
+      )
+      .arg(
+        Cli.StringArg("profile")
+          .value_name("PROFILE-NAME")
+          .about("Build artifacts with the specified profile"),
+      )
+      .arg(
+        Cli.BoolArg("release")
+          .short("r")
+          .long("release")
+          .about("Build artifacts in release mode, with optimizations"),
+      )
+      .arg(
+        Cli.StringArg("bin")
+          .repeatable()
+          .value_name("NAME")
+          .about("Build only the specified binary"),
+      )
+      .arg(Cli.StringArg("npmVersion").about("Publish with specified version"))
+      .arg(
+        Cli.StringArg("next").about(
+          "Publish with next (major | minor | patch) version of latest publish package",
+        ),
+      )
+      .extra(),
+    (gctx, args) ~> execCommand(gctx, args, execPublish),
+  )
+}
+
+fun execPublish(
+  brunner: BuildRunner,
+  args: Cli.ParseResults,
+): Result<void, void> {
+  console = brunner.bctx.gctx.console;
+  gitDiff(console)?;
+  ws = brunner.bctx.ws;
+  root = ws.package.manifest.package_id.source_id.url;
+  Package::check(root, console)?;
+  name = ws.package.manifest.package_id.name;
+  package = Package::create(root, name, console)?;
+  userNpmDir = args.maybeGetString("out-dir");
+  npmDir = manage(brunner, package, userNpmDir, None(), true)?;
+  console.status("Progress", `Npm package '${npmDir}' generated`);
+  Environ.set_current_dir(npmDir);
+  if (userNpmDir.isSome()) {
+    gitDiff(console)?;
+  };
+  (version, userVersion) = args
+    .maybeGetString("npmVersion")
+    .map(Version::fromString) match {
+  | Some(rVersion) ->
+    rVersion match {
+    | Success(version) -> (version, true)
+    | Failure(msg) ->
+      console.error(msg);
+      return Failure(void)
+    }
+  | _ -> (package.version, false)
+  };
+  if (!userVersion) {
+    latest = lastestDistributedVersion(package.name, console)?;
+    args.maybeGetString("next") match {
+    | Some("major") -> !version = latest.incrMajor()
+    | Some("minor") -> !version = latest.incrMinor()
+    | Some("patch") -> !version = latest.incrPatch()
+    | Some(kind) -> console.error(`Unmanaged version kind '${kind}'`)
+    | _ -> void
+    }
+  };
+  cmdArgs = version.tag match {
+  | Some(tag) -> args.extra.concat(Array["--tag", tag.toString()])
+  | _ -> args.extra
+  };
+  _ = exec("[npm] ", Array["npm", "publish"].concat(cmdArgs), console)?;
+  if (package.version != version) {
+    package.update(root, version)
+  };
+  Success(void)
+}
+
+module end;
