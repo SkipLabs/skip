@@ -139,50 +139,35 @@ fun build_harness(
 ): Result<Env, IO.Error> {
   isWasm = env.isWasm32();
   resourceObjs = Array[];
-  resourceInfos = mutable Map[];
-  for (res in resources) {
-    resPath = env.resolve(res);
-    if (FileSystem.exists(resPath)) {
-      if (!isWasm) {
+  if (!isWasm) {
+    for (res in resources) {
+      resPath = env.resolve(res);
+      if (FileSystem.exists(resPath)) {
         buildResource(env, resPath, false) match {
         | Failure(err) -> return Failure(err)
         | Success(object) -> !resourceObjs = resourceObjs.concat(Array[object])
         }
-      } else {
-        saved = saveResource(env, res, resPath);
-        resourceInfos.set(saved.i0, saved.i1)
       }
-    }
-  };
-  for (res in resourceDirs) {
-    resPath = env.resolve(res);
-    if (FileSystem.exists(resPath)) {
-      resChecker = TimeChecker().add(resPath);
-      name = Path.basename(resPath);
-      archive = env.targetPath(resPath, ".tar.gz");
-      if (resChecker.isYoungerThan(archive)) {
-        ensureDirectory(Path.dirname(archive), env.verbose);
-        env.run(
-          Array["tar", "-zcvf", archive, name],
-          Some(Path.dirname(resPath)),
-        );
-      };
-      if (!isWasm) {
+    };
+    for (res in resourceDirs) {
+      resPath = env.resolve(res);
+      if (FileSystem.exists(resPath)) {
+        resChecker = TimeChecker().add(resPath);
+        name = Path.basename(resPath);
+        archive = env.targetPath(resPath, ".tar.gz");
+        if (resChecker.isYoungerThan(archive)) {
+          ensureDirectory(Path.dirname(archive), env.verbose);
+          env.run(
+            Array["tar", "-zcvf", archive, name],
+            Some(Path.dirname(resPath)),
+          );
+        };
         buildResource(env, archive, true) match {
         | Failure(err) -> return Failure(err)
         | Success(object) -> !resourceObjs = resourceObjs.concat(Array[object])
         }
-      } else {
-        saved = saveResource(env, res, resPath);
-        resourceInfos.set(saved.i0, saved.i1)
-      };
+      }
     }
-  };
-  if (!resourceInfos.isEmpty()) {
-    rjson = JSON.Object(resourceInfos.map((_, v) -> JSON.String(v)));
-    stream = mutable Vector[];
-    rjson.writeToStream(stream.push, 2);
-    FileSystem.writeTextFile(env.outpath("resources.json"), stream.join(""));
   };
   includeChecker = TimeChecker();
   !includeDirs = includeDirs.map(id -> {

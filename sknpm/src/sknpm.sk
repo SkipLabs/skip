@@ -284,35 +284,20 @@ fun manage(
         }
     )
   };
+  distDir = Path.join(npmDir, "dist");
+  checkDir(distDir);
   dependencies = mutable Vector[];
-  resources = mutable Map[];
   for (u in libraries) {
     root = u.pkg.manifest.package_id.source_id.url;
     depsDir = Path.join(root, "ts/src");
     if (FileSystem.exists(depsDir)) {
       dependencies.push((u, depsDir))
     };
-    withBuild = units.filter(e ->
-      e.target.is_build_script() &&
-        u.pkg.manifest.package_id == e.pkg.manifest.package_id &&
-        e.arch match {
-        | Skargo.TargetArchHost() -> false
-        | Skargo.TargetArchTriple(t) -> t.isWasm32()
-        }
-    );
-    for (bu in withBuild) {
-      // TODO: This is dirty and britle.
-      path = brunner.build_dir_for(bu);
-      // TODO check test resources
-      depsResFile = Path.join(path, "out/resources.json");
-      if (FileSystem.exists(depsResFile)) {
-        contents = FileSystem.readTextFile(depsResFile);
-        json = jsonDecodeObject(contents, console)?;
-        json.value.each((f, v) -> {
-          copy(f, Path.join(tsDir, Path.basename(f)));
-          resources.add(f, v.expectString())
-        });
-      }
+    npmJson = Path.join(root, "npm.json");
+    if (FileSystem.exists(npmJson)) {
+      name = u.pkg.manifest.package_id.name;
+      pck = Package::create(root, name, console)?;
+      manageAssets(root, tsDir, distDir, name, pck.assets, console)?
     }
   };
   pckDependencies = mutable Map[];
@@ -380,19 +365,9 @@ fun manage(
     f ~> f.endsWith(".d.ts"),
     _f ~> false,
   );
-  distDir = Path.join(npmDir, "dist");
-  checkDir(distDir);
-  jsResources = mutable Map[];
-  resources.each((k, f) ->
-    jsResources.add(
-      Path.join(jsDir, Path.basename(k.take(k.length() - 3))) + ".js",
-      f,
-    )
-  );
   copyAndConvertImport(
     package.version,
     distDir,
-    jsResources.chill(),
     jsFiles,
     () -> {
       if (binaries.size() == 1) {
@@ -521,7 +496,6 @@ fun manage(
 fun copyAndConvertImport(
   version: Version,
   distDir: String,
-  resources: Map<String, String>,
   jsFiles: Vector<String>,
   binary: () -> Result<String, void>,
   console: Skargo.Console,
@@ -532,7 +506,6 @@ fun copyAndConvertImport(
   );
   nameLine = "var wasmName = \"/*--NAME--*/\";";
   modulesLines = "/*--MODULES--*/";
-  base64Line = "export var base64 = \"\";";
   versionLine = "const npmVersion = \"\";";
 
   sourceMappingPrefix = "//# sourceMappingURL=";
@@ -572,12 +545,7 @@ fun copyAndConvertImport(
         }
       };
       cLine = line.trim();
-      if (
-        cLine == nameLine ||
-        cLine == modulesLines ||
-        cLine == base64Line ||
-        cLine == versionLine
-      ) {
+      if (cLine == nameLine || cLine == modulesLines || cLine == versionLine) {
         !withTmpl = true;
       } else if (cLine == "/** @sk init */") {
         !withInit = true;
@@ -658,14 +626,6 @@ fun copyAndConvertImport(
         `var wasmName = "${binName}";`
       } else if (cLine == modulesLines) {
         strModules
-      } else if (cLine == base64Line) {
-        resources.maybeGet(sf) match {
-        | Some(b64File) ->
-          `export var base64 = "${FileSystem.readTextFile(b64File)}";`
-        | _ ->
-          console.error("Resource file not found.");
-          break false
-        }
       } else if (cLine == versionLine) {
         `const npmVersion = "${version}";`
       } else {
@@ -683,6 +643,27 @@ fun copyAndConvertImport(
   };
   SKStore.destroyObstack(saved);
   if (res) Success(void) else Failure(void)
+}
+
+fun manageAssets(
+  root: String,
+  tsTarget: String,
+  distTarget: String,
+  name: String,
+  assets: Array<Asset>,
+  console: Skargo.Console,
+): Result<void, void> {
+  if (assets.isEmpty()) return Success(void);
+  assetsDir = Path.join(distTarget, "assets");
+  checkDir(assetsDir);
+  tsContent = tsResource(assets);
+  tsFile = Path.join(tsTarget, name + "_assets.ts");
+  FileSystem.writeTextFile(tsFile, tsContent);
+  for (asset in assets) {
+    resource = Path.join(root, asset.path);
+    copy(resource, assetsDir, Some(console));
+  };
+  Success(void)
 }
 
 module end;
