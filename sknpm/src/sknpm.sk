@@ -491,16 +491,26 @@ fun manage(
   package.optNodeVersion.each(version ->
     npmPackage.add("engines", JSON.Object(Map["node" => JSON.String(version)]))
   );
-  package.optBinary.each(binary -> {
-    npmPackage.add(
-      "bin",
-      JSON.Object(Map[binary => JSON.String(`./dist/${binary}.mjs`)]),
+  if (!package.binaries.isEmpty()) {
+    pckBins = mutable Map[];
+    package.binaries.each(binary -> {
+      _ = exec(
+        "",
+        Array["chmod", "+x", Path.join(distDir, `${binary}.mjs`)],
+        console,
+      );
+      pckBins.add(binary, JSON.String(`./dist/${binary}.mjs`))
+    });
+    npmPackage.add("bin", JSON.Object(pckBins.chill()));
+    scripts = mutable Map[];
+    package.binaries.each(binary ->
+      scripts.add(
+        package.scriptName(binary),
+        JSON.String(`./dist/${binary}.mjs`),
+      )
     );
-    npmPackage.add(
-      "scripts",
-      JSON.Object(Map["cli" => JSON.String(`node ./dist/${binary}.mjs`)]),
-    );
-  });
+    npmPackage.add("scripts", JSON.Object(scripts.chill()));
+  };
   npmPackageContents = JSON.Object(npmPackage.chill());
   stream = mutable Vector[];
   npmPackageContents.writeToStream(stream.push, 2);
