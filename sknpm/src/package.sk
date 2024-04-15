@@ -2,12 +2,30 @@ module Sknpm;
 
 const kAuthor: String = "Skiplabs";
 
+class Asset(name: String, path: String) {
+  //
+  static fun fromJSON(jsonValue: JSON.Value): Asset {
+    json = jsonValue.expectObject();
+    static(json.getString("name"), json.getString("path"))
+  }
+
+  fun toJSON(): JSON.Value {
+    JSON.Object(
+      Map<String, JSON.Value>[
+        "name" => JSON.String(this.name),
+        "path" => JSON.String(this.path),
+      ],
+    );
+  }
+}
+
 class Package(
   name: String,
   author: ?String,
   version: Version,
   optNodeVersion: ?String = None(),
   binaries: Array<String> = Array[],
+  assets: Array<Asset> = Array[],
   sideEffects: Bool = false,
 ) {
   static fun check(root: String, console: Skargo.Console): Result<void, void> {
@@ -42,6 +60,10 @@ class Package(
               json
                 .maybeGetArray("binaries")
                 .map(jsa -> jsa.value.map(v -> v.expectString()).toArray())
+                .default(Array[]),
+              json
+                .maybeGetArray("assets")
+                .map(jsa -> jsa.value.map(Asset::fromJSON).toArray())
                 .default(Array[]),
               json.maybeGetBool("sideEffects").default(false),
             ),
@@ -97,6 +119,12 @@ class Package(
         JSON.Array(
           Vector::createFromItems(this.binaries.map(v -> JSON.String(v))),
         ),
+      )
+    };
+    if (!this.assets.isEmpty()) {
+      map.set(
+        "assets",
+        JSON.Array(Vector::createFromItems(this.assets.map(v -> v.toJSON()))),
       )
     };
     if (this.sideEffects) {
