@@ -263,24 +263,7 @@ fun translateFromSourceSchema(
       cTranslation match {
       | CTNull() -> None()
       | CTSourceIdx(idx) -> row.values[idx]
-      | CTDefault(expr) ->
-        expr match {
-        | P.VNull() -> None()
-        | P.VInt(n) -> Some(SKDB.CInt(n))
-        | P.VFloat(f) -> Some(SKDB.CFloat(f))
-        | P.VString(x) -> Some(SKDB.CString(x))
-        | P.VCurrentTime _ ->
-          Some(SKDB.CString(SKDB.strftime(context, "%H:%M:%S", "now", Array[])))
-        | P.VCurrentDate _ ->
-          Some(SKDB.CString(SKDB.strftime(context, "%Y-%m-%d", "now", Array[])))
-        | P.VCurrentTimestamp _ ->
-          Some(
-            SKDB.CString(
-              SKDB.strftime(context, "%Y-%m-%d %H:%M:%S", "now", Array[]),
-            ),
-          )
-        | _ -> invariant_violation("Invalid expression for default value")
-        }
+      | CTDefault(expr) -> SKDB.evaluateDefault(context, expr)
       }
     );
     SKDB.RowValues::create(values, row.repeat)
