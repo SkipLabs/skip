@@ -1307,9 +1307,10 @@ class Evaluator{options: Options, user: ?UserFile} {
         },
       );
       None()
-    | P.AlterTableAddCol _
+    | P.AlterTableAddCol{pos, name, colDef} ->
+      Some((context, _, _) ~> alterTableAddColumn(context, pos, name, colDef))
     | P.AlterTableDropCol _ ->
-      invariant_violation("ALTER TABLE not yet implemented")
+      invariant_violation("DROP COLUMN not yet implemented")
     };
   }
 
