@@ -750,6 +750,8 @@ mutable class Compiler{
           !slot = slot + 1;
         }
 
+      | P.SelectExpr(P.Check(_), _) -> continue
+
       | P.SelectExpr(_, Some(aliasColName)) ->
         if (cols.containsKey(aliasColName)) continue;
         !cols[aliasColName] = slot;
