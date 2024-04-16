@@ -251,20 +251,7 @@ fun computeInsertRow(
         } else {
           error(pos, "Missing value for column: " + tyDescr.name);
         }
-      | Some(P.CCDefault{expr}) ->
-        expr match {
-        | P.VNull() -> None()
-        | P.VInt(n) -> Some(CInt(n))
-        | P.VFloat(f) -> Some(CFloat(f))
-        | P.VString(x) -> Some(CString(x))
-        | P.VCurrentTime _ ->
-          Some(CString(strftime(context, "%H:%M:%S", "now", Array[])))
-        | P.VCurrentDate _ ->
-          Some(CString(strftime(context, "%Y-%m-%d", "now", Array[])))
-        | P.VCurrentTimestamp _ ->
-          Some(CString(strftime(context, "%Y-%m-%d %H:%M:%S", "now", Array[])))
-        | _ -> error(pos, "Invalid expression for default value")
-        }
+      | Some(P.CCDefault{expr}) -> evaluateDefault(context, expr)
       };
       result![table.cols[tyDescr.name]] = value;
     };
@@ -478,6 +465,25 @@ fun computeOrder(
     }
   };
   kinds.toArray()
+}
+
+fun evaluateDefault(
+  context: mutable SKStore.Context,
+  defaultExpr: P.Expr,
+): ?CValue {
+  defaultExpr match {
+  | P.VNull() -> None()
+  | P.VInt(n) -> Some(CInt(n))
+  | P.VFloat(f) -> Some(CFloat(f))
+  | P.VString(x) -> Some(CString(x))
+  | P.VCurrentTime _ ->
+    Some(CString(strftime(context, "%H:%M:%S", "now", Array[])))
+  | P.VCurrentDate _ ->
+    Some(CString(strftime(context, "%Y-%m-%d", "now", Array[])))
+  | P.VCurrentTimestamp _ ->
+    Some(CString(strftime(context, "%Y-%m-%d %H:%M:%S", "now", Array[])))
+  | _ -> invariant_violation("Invalid expression for default value")
+  }
 }
 
 class SelectFile(
