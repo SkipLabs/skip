@@ -547,7 +547,7 @@ class SelectEvaluator{
           context,
           emptyEval,
           aggrs.map(y -> y.i1),
-          this.select.effects,
+          Array[],
           1,
         ) match {
         | Some(entry) -> entry
@@ -682,7 +682,7 @@ class SelectEvaluator{
             context,
             emptyEvaluator,
             this.select.params,
-            this.select.effects,
+            Array[],
             1,
           ) match {
           | Some(emptyRow) ->
@@ -756,7 +756,8 @@ class SelectEvaluator{
       evaluator.evalCGExpr(context, effect) match {
       | ASuccess() -> void
       | ANull() -> void
-      | _ ->
+      | AUndef() -> void
+      | ADef(_) ->
         invariant_violation(
           "Expecting a side effect but expression evaluated to a result",
         )
@@ -1239,7 +1240,7 @@ class SelectEvaluator{
       context,
       evaluator,
       this.params,
-      this.select.effects,
+      Array[],
       repeat,
     );
     row = rowOpt match {
