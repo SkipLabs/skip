@@ -359,8 +359,7 @@ static unsigned int test_utf8_data[] = {
     157, 153, 137, 224, 167, 166, 206, 161, 240, 157, 151, 164, 201,
     140, 240, 157, 147, 162, 200, 154, 208, 166, 240, 157, 146, 177};
 
-static unsigned char
-    string_utf8_buffer[sizeof(test_utf8_data) / sizeof(int) + 1];
+static unsigned char string_utf8_buffer[sizeof(test_utf8_data) / sizeof(int)];
 
 char* SKIP_utf8_test_string() {
   unsigned int i;
