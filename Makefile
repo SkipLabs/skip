@@ -96,7 +96,7 @@ fmt-sk:
 
 .PHONY: fmt-c
 fmt-c:
-	find . -path ./compiler/runtime/libbacktrace -not -prune -or -path ./sql/test/TPC-h/tnt-tpch -not -prune -or -regex '.*\.[ch]\(pp\)*' | parallel clang-format -i :::
+	find . -path ./prelude/libbacktrace -not -prune -or -path ./sql/test/TPC-h/tnt-tpch -not -prune -or -regex '.*\.[ch]\(pp\)*' | parallel clang-format -i :::
 
 .PHONY: fmt-js
 fmt-js:
