@@ -363,6 +363,14 @@ fun alterTableAddColumn(
   name: P.Name,
   newCol: P.ColumnDefinition,
 ): void {
+  if (
+    name == SKDBUsersByName::name ||
+    name == SKDBUserPermissions::name ||
+    name == SKDBGroups::name ||
+    name == SKDBGroupPermissions::name
+  ) {
+    error(pos, "Can't add column to predefined table")
+  };
   if (newCol.notNull is Some _ && newCol.default is None _) {
     error(pos, "ADD COLUMN must either be nullable or provide a default value");
   };
