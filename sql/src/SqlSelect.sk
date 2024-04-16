@@ -366,7 +366,13 @@ class SelectEvaluator{
             !entry = entry.setRepeat(repeat);
           };
           evaluator = ExprEvaluator(Array[entry], select.from, up);
-          rowOpt = static::evalRow(context, evaluator, select.params, repeat);
+          rowOpt = static::evalRow(
+            context,
+            evaluator,
+            select.params,
+            select.effects,
+            repeat,
+          );
           row = rowOpt match {
           | Some(row) -> row
           | None() -> return void
@@ -541,6 +547,7 @@ class SelectEvaluator{
           context,
           emptyEval,
           aggrs.map(y -> y.i1),
+          this.select.effects,
           1,
         ) match {
         | Some(entry) -> entry
@@ -554,7 +561,13 @@ class SelectEvaluator{
           return this.selectName1
         };
         evaluator = ExprEvaluator(Array[entry], this.select.from, this.up);
-        static::evalRow(context, evaluator, this.select.params, 1) match {
+        static::evalRow(
+          context,
+          evaluator,
+          this.select.params,
+          this.select.effects,
+          1,
+        ) match {
         | Some(row) ->
           _dir = context.mkdir(
             SKStore.IID::keyType,
@@ -607,7 +620,13 @@ class SelectEvaluator{
           evaluator = ExprEvaluator(Array[entry], this.select.from, this.up);
           this.select.having match {
           | None() ->
-            rowOpt = static::evalRow(context, evaluator, this.select.params, 1);
+            rowOpt = static::evalRow(
+              context,
+              evaluator,
+              this.select.params,
+              this.select.effects,
+              1,
+            );
             rowOpt match {
             | Some(row) -> writer.set(key, row)
             | None() -> void
@@ -625,6 +644,7 @@ class SelectEvaluator{
                 context,
                 evaluator,
                 this.select.params,
+                this.select.effects,
                 1,
               );
               rowOpt match {
@@ -662,6 +682,7 @@ class SelectEvaluator{
             context,
             emptyEvaluator,
             this.select.params,
+            this.select.effects,
             1,
           ) match {
           | Some(emptyRow) ->
@@ -728,12 +749,24 @@ class SelectEvaluator{
     context: mutable SKStore.Context,
     evaluator: ExprEvaluator,
     params: Array<CGExpr>,
+    effects: Array<CGExpr>,
     repeat: Int,
   ): ?RowValues {
+    for (effect in effects) {
+      evaluator.evalCGExpr(context, effect) match {
+      | ASuccess() -> void
+      | ANull() -> void
+      | _ ->
+        invariant_violation(
+          "Expecting a side effect but expression evaluated to a result",
+        )
+      }
+    };
+
     acc = mutable Vector<?CValue>[];
     for (param in params) {
       evaluator.evalCGExpr(context, param) match {
-      | ASuccess() -> acc.push(None())
+      | ASuccess() -> void
       | AUndef() ->
         debug(param);
         invariant_violation("Unexpected undefined value")
@@ -741,6 +774,7 @@ class SelectEvaluator{
       | ADef(x) -> acc.push(Some(x))
       }
     };
+
     if (acc.size() > 0) {
       Some(RowValues::create(acc.toArray(), repeat))
     } else {
@@ -755,10 +789,16 @@ class SelectEvaluator{
     | ASuccess() -> invariant_violation("Unexpected side effect")
     | ANull()
     | ADef(0) ->
-      static::evalRow(context, evaluator, Array[CGNull()], 1)
+      static::evalRow(context, evaluator, Array[CGNull()], Array[], 1)
     | AUndef()
     | ADef(_) ->
-      static::evalRow(context, evaluator, this.select.params, 1)
+      static::evalRow(
+        context,
+        evaluator,
+        this.select.params,
+        this.select.effects,
+        1,
+      )
     };
 
     dirName = this.selectName2;
@@ -931,6 +971,7 @@ class SelectEvaluator{
               context,
               evaluator,
               this.params,
+              this.select.effects,
               input.repeat,
             );
             row = rowOpt match {
@@ -979,6 +1020,7 @@ class SelectEvaluator{
               context,
               evaluator,
               this.params,
+              this.select.effects,
               input.repeat,
             );
             rowOpt match {
@@ -1193,7 +1235,13 @@ class SelectEvaluator{
     writer: mutable MultiWriter,
     repeat: Int,
   ): void {
-    rowOpt = static::evalRow(context, evaluator, this.params, repeat);
+    rowOpt = static::evalRow(
+      context,
+      evaluator,
+      this.params,
+      this.select.effects,
+      repeat,
+    );
     row = rowOpt match {
     | Some(row) -> row
     | None() -> return void
