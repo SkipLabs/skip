@@ -56,12 +56,11 @@ stage2/bin/skargo: stage1
 
 stage3/bin/skc stage3/bin/skfmt: stage2
 	PATH=stage2/bin/:$(PATH) skargo build --profile $(SKARGO_PROFILE) --bins --out-dir stage3/bin --target-dir stage3/target
+	-diff -q stage2/bin/skc.ll stage3/bin/skc.ll
 stage3/lib/libstd.sklib: stage2
 	PATH=stage2/bin/:$(PATH) skargo build --profile $(SKARGO_PROFILE) --lib --out-dir stage3/lib --target-dir stage3/target --manifest-path ../prelude/Skargo.toml
 stage3/bin/skargo: stage2
 	PATH=stage2/bin/:$(PATH) skargo build --profile $(SKARGO_PROFILE) --bins --out-dir stage3/bin --target-dir stage3/target --manifest-path ../skargo/Skargo.toml
-
-# 	TODO: Ensure stage2 == stage3.
 
 stageA/bin/skc:
 	mkdir -p stageA/bin
