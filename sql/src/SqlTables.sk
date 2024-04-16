@@ -357,6 +357,85 @@ fun getLatestIndexDescr(
   }
 }
 
+fun alterTableAddColumn(
+  context: mutable SKStore.Context,
+  pos: Int,
+  name: P.Name,
+  newCol: P.ColumnDefinition,
+): void {
+  if (newCol.notNull is Some _ && newCol.default is None _) {
+    error(pos, "ADD COLUMN must either be nullable or provide a default value");
+  };
+  if (newCol.unique is Some _ || newCol.primary is Some _) {
+    error(pos, "ADD COLUMN must not impose a uniqueness or PK constraint")
+  };
+
+  tableDir = getTableDir(context);
+  sid = SKStore.SID::create(name.lower);
+  oldDescr = tableDir.maybeGet(context, sid) match {
+  | None() -> error(pos, "Table '" + name + "' does not exist")
+  | Some(descr) -> getLatestDirDescr(context, descr)
+  };
+
+  dirName = oldDescr.dirName;
+  oldDir = context.unsafeGetEagerDir(dirName);
+  oldNCols = oldDescr.schema.size();
+
+  newSchema = Array::fillBy(oldNCols + 1, i ->
+    if (i < oldNCols) oldDescr.schema[i] else newCol
+  );
+  newDescr = DirDescr::create{
+    name,
+    schema => newSchema,
+    dirName,
+    alias => oldDescr.alias,
+    isInput => true,
+  };
+
+  tag = SKStore.TickRange::create(context.tick);
+  newRows = Vector::mcreate(oldDir.totalSize);
+  for ((key, rowIter) in oldDir.unsafeGetFileIter()) {
+    oldRow = rowIter.next() match {
+    | None() -> return void
+    | Some(x @ RowValues _) -> x
+    | Some(_) -> invariant_violation("Invalid SKDB row")
+    };
+    repeat = oldRow.repeat;
+    rowIter.each(r ->
+      r match {
+      | RowValues(_, rr) -> !repeat = repeat + rr
+      | _ -> invariant_violation("Invalid SKDB row")
+      }
+    );
+
+    newVals = Array<SKStore.File>[
+      RowValues(
+        Array::fillBy(oldNCols + 1, i ->
+          if (i < oldNCols) oldRow.getValue(i) else {
+            newCol.default.flatMap(def -> evaluateDefault(context, def.expr))
+          }
+        ),
+        repeat,
+      ),
+    ];
+
+    src = SKStore.Path::create(newDescr.dirName, key);
+    newRows.push(SKStore.FixedRow(key, newVals, src, tag))
+  };
+
+  newDir = SKStore.EagerDir{
+    time => context.timeStamp(),
+    dirName,
+    input => true,
+    fixedData => SKStore.FixedDataMap::create(newRows),
+    creator => context.currentArrow(),
+    totalSize => oldDir.totalSize,
+  };
+
+  tableDir.writeArray(context, sid, Array[newDescr]);
+  context.setDir(dirName, newDir);
+}
+
 /*****************************************************************************/
 /* Sharding stats for joins. */
 /*****************************************************************************/
