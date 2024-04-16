@@ -334,9 +334,9 @@ for f in test/unit/checks/*.sql;
 do
     base=$(basename $f .sql)
     if diff -q <(cat "test/unit/checks/$base.sql" | $SKDB 2>&1) "test/unit/checks/$base.exp"; then
-        pass "CHECKS - $base"
+        pass "SELECT CHECK - $base"
     else
-        fail "CHECKS - $base"
+        fail "SELECT CHECK - $base"
         cat "test/unit/checks/$base.sql" | $SKDB
     fi
 done
