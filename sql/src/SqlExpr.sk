@@ -993,10 +993,11 @@ class ExprEvaluator(
 
     | CICheck(pos, debugExpr, e) ->
       this.evalCIExpr(context, e) match {
+      | ASuccess() -> ASuccess()
       | AUndef() -> AUndef()
       | ANull() -> ANull()
       | ADef(n) if (n != 0) -> ASuccess()
-      | _ -> throw SqlError(pos, "Failed constraint: " + debugExpr)
+      | ADef(_) -> throw SqlError(pos, "Failed constraint: " + debugExpr)
       }
     }
   }

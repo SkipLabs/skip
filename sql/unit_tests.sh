@@ -333,10 +333,15 @@ fi
 for f in test/unit/checks/*.sql;
 do
     base=$(basename $f .sql)
-    if diff -q <(cat "test/unit/checks/$base.sql" | $SKDB 2>&1) "test/unit/checks/$base.exp"; then
+    if diff -q <(cat "test/unit/checks/$base.sql" | $SKDB 2>&1) "test/unit/checks/$base.exp" > /dev/null 2>&1; then
         pass "SELECT CHECK - $base"
     else
         fail "SELECT CHECK - $base"
+        echo "Ran:"
+        cat "test/unit/checks/$base.sql"
+        echo "Got:"
         cat "test/unit/checks/$base.sql" | $SKDB
+        echo "Wanted:"
+        cat "test/unit/checks/$base.exp"
     fi
 done
