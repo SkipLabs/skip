@@ -281,8 +281,15 @@ untracked fun main(): void {
     )
     .subcommand(
       Cli.Command("can-mirror")
-        .about("Check that a table is eligible for mirroring")
-        .arg(Cli.StringArg("table").positional().required().about("Table name"))
+        .about(
+          "Check that a table is eligible for mirroring under a given schema",
+        )
+        .arg(
+          Cli.StringArg("table")
+            .positional()
+            .required()
+            .about("Table signature of remote to mirror"),
+        )
         .arg(
           Cli.StringArg("schema")
             .positional()
@@ -718,14 +725,10 @@ fun execSubscribe(args: Cli.ParseResults, options: SKDB.Options): void {
 
 fun execCanMirror(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
-  tableName = args.getString("table");
+  table = args.getString("table");
   schema = args.getString("schema");
   SKDB.runSql(options, context ~> {
-    SKCSV.reasonSchemaUnsupported(
-      context,
-      tableName.lowercase(),
-      schema.lowercase(),
-    ) match {
+    SKCSV.reasonSchemaUnsupported(context, table, schema.lowercase()) match {
     | None() -> void
     | Some(reason) -> print_string(reason)
     };
