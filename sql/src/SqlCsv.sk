@@ -162,60 +162,68 @@ fun parseCSVValue(kv: (Bool, String)): P.Value {
 
 fun reasonSchemaUnsupported(
   origContext: readonly SKStore.Context,
-  tableName: String,
-  schema: String,
+  table: String,
+  schemaStr: String,
 ): ?String {
   context = SKStore.Context::fromSaved(origContext.clone());
-  SKDB.getTableDir(context).maybeGet(context, SKStore.SID(tableName)) match {
-  | None() -> Some(`Table '${tableName}' does not exist.`)
-  | Some(dirDescr) ->
-    if (dirDescr.schema.any(x ~> x.unique is Some _)) {
-      return Some("Cannot mirror tables with unique constraints.")
-    };
-    dirDescr.cols.maybeGet(SKDB.skdbAccessColName) match {
-    | Some _ -> void
+
+  (tableName, actualSchema) = P.Parser::create(table).parseCreate() match {
+  | P.CreateTableSchema{name, schema} ->
+    (SKStore.SID(name.lower), schema.columns)
+  | _ -> return Some("Malformed create-table statement given.")
+  };
+
+  if (SKDB.getTableDir(context).maybeGet(context, tableName) is None()) {
+    return Some(`Table '${tableName}' does not exist.`)
+  };
+
+  if (actualSchema.any(x ~> x.unique is Some _)) {
+    return Some("Cannot mirror tables with unique constraints.")
+  };
+
+  if (actualSchema.all(x ~> x.name != SKDB.skdbAccessColName)) {
+    return Some(
+      `Cannot mirror tables without ${SKDB.skdbAccessColName.origName} column.`,
+    )
+  };
+
+  if (schemaStr != "*") {
+    try {
+      Some(P.Parser::create(schemaStr).parseCreateTableSchema().columns)
+    } catch {
+    | _exn -> None()
+    } match {
     | None() ->
       return Some(
-        `Cannot mirror tables without ${
-          SKDB.skdbAccessColName.origName
-        } column.`,
+        "Malformed schema: expects parenthesized column-separated list of column definitions.",
       )
-    };
+    | Some(requestedSchema) ->
+      for (col in requestedSchema) {
+        if (!actualSchema.contains(col)) {
+          return Some(
+            `Incompatible schema: unknown or incorrectly-defined column ${
+              col.name
+            }`,
+          )
+        }
+      };
 
-    if (schema != "*") {
-      try {
-        Some(P.Parser::create(schema).parseCreateTableSchema().columns)
-      } catch {
-      | _exn -> None()
-      } match {
-      | None() ->
-        return Some(
-          "Malformed schema: expects parenthesized column-separated list of column definitions.",
-        )
-      | Some(requestedSchema) ->
-        actualSchema = dirDescr.schema;
-
-        for (col in requestedSchema) {
-          if (!actualSchema.contains(col)) {
-            return Some(`Incompatible schema: unknown column ${col.name}`)
-          }
-        };
-
-        for (col in actualSchema) {
-          if (
-            col.notNull is Some _ &&
-            col.default is None _ &&
-            !requestedSchema.contains(col)
-          ) {
-            return Some(
-              `Incompatible schema: missing required column ${col.name}`,
-            )
-          }
+      for (col in actualSchema) {
+        if (
+          col.notNull is Some _ &&
+          col.default is None _ &&
+          !requestedSchema.contains(col)
+        ) {
+          return Some(
+            `Incompatible schema unsupported: missing required column ${
+              col.name
+            }`,
+          )
         }
       }
-    };
-    None()
+    }
   };
+  None()
 }
 
 // How to produce a value for a given column in translateFromSourceSchema:
