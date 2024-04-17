@@ -1738,12 +1738,14 @@ class SKDBServer implements RemoteSKDB {
 
       let isViewOnRemote = (await this.viewSchema(tableName)) != "";
 
+      const [remoteTable, remoteResponseTable] = await Promise.all([
+        this.tableSchema(tableName),
+        this.tableSchema(tableName, server_response_suffix),
+      ]);
+
       const [createTable, createResponseTable] =
         expectedSchema == "*"
-          ? await Promise.all([
-              this.tableSchema(tableName),
-              this.tableSchema(tableName, server_response_suffix),
-            ])
+          ? [remoteTable, remoteResponseTable]
           : [
               "CREATE TABLE " + tableName + " " + expectedSchema + ";",
               "CREATE TABLE " +
@@ -1765,7 +1767,7 @@ class SKDBServer implements RemoteSKDB {
         if (!this.client.tableExists(serverResponseTable(tableName))) {
           this.client.exec(createResponseTable);
         }
-        this.client.assertCanBeMirrored(tableName, expectedSchema);
+        this.client.assertCanBeMirrored(remoteTable, expectedSchema);
         this.mirroredTables.set(tableName, expectedSchema);
       }
     };

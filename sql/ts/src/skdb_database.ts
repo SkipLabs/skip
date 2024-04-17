@@ -27,7 +27,7 @@ class SKDBMechanismImpl implements SKDBMechanism {
     session: string,
     watermarks: Map<string, bigint>,
   ) => ArrayBuffer | null;
-  assertCanBeMirrored: (tableName: string, schema: string) => void;
+  assertCanBeMirrored: (table: string, schema: string) => void;
   tableExists: (tableName: string) => boolean;
   exec: (query: string) => SKDBTable;
   toggleView: (tableName: string) => void;
@@ -40,8 +40,8 @@ class SKDBMechanismImpl implements SKDBMechanism {
     this.tableExists = (tableName: string) =>
       client.tableSchema(tableName) != "";
     this.exec = (query: string) => client.exec(query);
-    this.assertCanBeMirrored = (tableName: string, schema: string) =>
-      client.assertCanBeMirrored(tableName, schema);
+    this.assertCanBeMirrored = (table: string, schema: string) =>
+      client.assertCanBeMirrored(table, schema);
     this.watermark = (replicationId: string, table: string) => {
       return BigInt(
         client.runLocal(["watermark", "--source", replicationId, table], ""),
@@ -358,8 +358,8 @@ export class SKDBSyncImpl implements SKDBSync {
     return valueIndex;
   };
 
-  assertCanBeMirrored(tableName: string, schema: string): void {
-    const error = this.runLocal(["can-mirror", tableName, schema], "");
+  assertCanBeMirrored(table: string, schema: string): void {
+    const error = this.runLocal(["can-mirror", table, schema], "");
     if (error === "") {
       return;
     }
