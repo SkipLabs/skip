@@ -256,7 +256,7 @@ class SelectEvaluator{
     emptyEval.evalCIExpr(context, expr) match {
     | ANull() -> 0
     | ADef(x) -> x
-    | ASuccess() -> invariant_violation("Unexpected side effect")
+    | ASuccess() -> unexpectedSideEffect()
     | AUndef() -> invariant_violation("Unexpected Undef")
     }
   }
@@ -336,7 +336,7 @@ class SelectEvaluator{
           evaluator = ExprEvaluator(Array[value], select.from, up);
           whereVal = evaluator.evalWhere(context, select.where);
           whereVal match {
-          | ASuccess() -> invariant_violation("Unexpected side effect")
+          | ASuccess() -> unexpectedSideEffect()
           | ANull()
           | ADef(0) ->
             false
@@ -639,7 +639,7 @@ class SelectEvaluator{
             | ADef(0)
             | ANull() ->
               void
-            | ASuccess() -> invariant_violation("Unexpected side effect")
+            | ASuccess() -> unexpectedSideEffect()
             | AUndef() ->
               invariant_violation("Having should never be undefined")
             | ADef(_) ->
@@ -790,7 +790,7 @@ class SelectEvaluator{
     evaluator = ExprEvaluator(Array[], this.select.from, this.up);
     whereVal = evaluator.evalWhere(context, this.select.where);
     rowOpt = whereVal match {
-    | ASuccess() -> invariant_violation("Unexpected side effect")
+    | ASuccess() -> unexpectedSideEffect()
     | ANull()
     | ADef(0) ->
       static::evalRow(context, evaluator, Array[CGNull()], Array[], 1)
@@ -1157,7 +1157,7 @@ class SelectEvaluator{
 
     whereVal = evaluator.evalWhere(context, this.select.where);
     whereVal match {
-    | ASuccess() -> invariant_violation("Unexpected side effect")
+    | ASuccess() -> unexpectedSideEffect()
     | ANull()
     | ADef(0) ->
       return void
