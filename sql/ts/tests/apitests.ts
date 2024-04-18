@@ -264,12 +264,12 @@ async function testMirroring(root: SKDB, skdb1: SKDB, skdb2: SKDB) {
   // with invalid schemas erroring
   const rootRemote = await root.connectedRemote();
   await rootRemote!.exec(
-    "CREATE TABLE has_constraint (i INTEGER, skdb_access TEXT NOT NULL);",
+    "CREATE TABLE invalid_expect_cols (i INTEGER, skdb_access TEXT NOT NULL);",
   );
   await expect(
     async () =>
       await user1.mirror({
-        table: "has_constraint",
+        table: "invalid_expect_cols",
         expectedColumns: "(i INTEGER, skdb_access TEXT)",
       }),
   ).rejects.toThrow();
