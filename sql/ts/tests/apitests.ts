@@ -214,7 +214,7 @@ async function testSchemaQueries(skdb: SKDB) {
   expect(emptyTable).toEqual("");
 }
 
-async function testMirroring(skdb1: SKDB, skdb2: SKDB) {
+async function testMirroring(root: SKDB, skdb1: SKDB, skdb2: SKDB) {
   const test_pk = {
     table: "test_pk",
     expectedColumns: "(x INTEGER PRIMARY KEY, y INTEGER, skdb_access TEXT)",
@@ -252,6 +252,18 @@ async function testMirroring(skdb1: SKDB, skdb2: SKDB) {
     { skdb_access: "read-write", x: 42 },
     { skdb_access: "read-write", x: 43 },
   ]);
+  // with invalid schemas erroring
+  const rootRemote = await root.connectedRemote();
+  await rootRemote!.exec(
+    "CREATE TABLE has_constraint (i INTEGER, skdb_access TEXT NOT NULL);",
+  );
+  await expect(
+    async () =>
+      await user1.mirror({
+        table: "has_constraint",
+        expectedColumns: "(i INTEGER, skdb_access TEXT)",
+      }),
+  ).rejects.toThrow();
 }
 
 function waitSynch(
@@ -835,7 +847,7 @@ export const apitests = (asWorker) => {
 
         await testSchemaQueries(dbs.user);
 
-        await testMirroring(dbs.user, dbs.user2);
+        await testMirroring(dbs.root, dbs.user, dbs.user2);
 
         //Privacy
         await testJSPrivacy(dbs.user, dbs.user2);
