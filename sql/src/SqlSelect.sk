@@ -228,6 +228,7 @@ fun makeSelectEvaluator(
     select,
     up,
     params => select.params,
+    effects => select.effects,
     selectName1,
     selectName2,
     kinds => select.kinds,
@@ -244,6 +245,7 @@ class SelectEvaluator{
   directMode: ?Int = None(),
   up: ?ExprEvaluator,
   params: Array<CGExpr>,
+  effects: Array<CGExpr>,
   selectName1: SKStore.DirName,
   selectName2: SKStore.DirName,
   kinds: Array<(Int, P.IKind, P.Type)>,
@@ -590,6 +592,7 @@ class SelectEvaluator{
     } else {
       resultDir = (this with {
         params => aggrs.map(x -> x.i1),
+        effects => Array[],
       }).evalSelectTableList(
         context,
         List::createFromItems(this.select.from),
@@ -1240,7 +1243,7 @@ class SelectEvaluator{
       context,
       evaluator,
       this.params,
-      Array[],
+      this.effects,
       repeat,
     );
     row = rowOpt match {
