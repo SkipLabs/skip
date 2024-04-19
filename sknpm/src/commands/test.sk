@@ -74,7 +74,7 @@ fun execCustomTests(
   name = ws.package.manifest.package_id.name;
   package = Package::create(root, name, console)?;
   syncDirs(tests_dir, target_dir, Set["node_modules"], console);
-  _ = exec("[npm] ", Array["npm", "i", "--prefix", target_dir], console)?;
+  _ = exec(Array["npm", "i", "--prefix", target_dir], console)?;
   packageDir = Path.join(Path.join(target_dir, "node_modules"), package.name);
   _ = manage(brunner, package, Some(packageDir))?;
   targetsFile = Path.join(target_dir, "targets.json");
@@ -155,7 +155,7 @@ fun execSkTests(
   target_dir = brunner.target_layout.dest;
   saveArchive(target_dir);
   tests_dir = Path.join(target_dir, "tests");
-  _ = exec("[npm] ", Array["npm", "i", "--prefix", tests_dir], console)?;
+  _ = exec(Array["npm", "i", "--prefix", tests_dir], console)?;
   tsDir = Path.join(target_dir, "ts");
   checkDir(tsDir);
   saveSkTestsTs(tsDir);
@@ -193,10 +193,10 @@ fun run_playwright(
   } else {
     Array[]
   };
-  exec("[npx] ", Array["npx", "playwright", "install"], console) match {
+  exec(Array["npx", "playwright", "install"], console) match {
   | Success _ -> void
   | Failure _ ->
-    processes.each(p -> _ = exec("", Array["kill", p.toString()], console));
+    processes.each(p -> _ = exec(Array["kill", p.toString()], console));
     return Failure(void)
   };
   cmd = Array[
@@ -205,10 +205,10 @@ fun run_playwright(
     "test",
     `--reporter=${reporter.default("line")}`,
   ].concat(filters).concat(targets);
-  exec("", cmd, console, Skargo.VerbosityQuiet()) match {
+  exec(cmd, console, Skargo.VerbosityQuiet()) match {
   | Success _ -> void
   | Failure _ ->
-    processes.each(p -> _ = exec("", Array["kill", p.toString()], console));
+    processes.each(p -> _ = exec(Array["kill", p.toString()], console));
     return Failure(void)
   };
   Success(void)

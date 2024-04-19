@@ -2,29 +2,54 @@ module Sknpm;
 
 mutable class Printer(
   prefix: String,
-  mutable out: String = "",
-  mutable err: String = "",
+  color: TermColor.Color = TermColor.Yellow(),
+  private mutable out: String = "",
+  private mutable err: String = "",
 ) {
   mutable fun printString(v: String): void {
-    this.!out = this.print(this.out + v, print_string)
+    this.!out = this.print(this.out + v)
   }
 
   mutable fun printError(v: String): void {
-    this.!err = this.print(this.err + v, print_debug)
+    this.!err = this.print(this.err + v)
   }
 
-  readonly fun print(v: String, fn: String -> void): String {
+  readonly private fun print(v: String): String {
     lines = v.split("\n");
-    for (i in Range(0, lines.size() - 1)) {
-      fn(this.prefix + lines[i])
+    if (!this.prefix.isEmpty()) {
+      formatted_prefix = this.formatted_prefix();
+      for (i in Range(0, lines.size() - 1)) {
+        print_debug(`${formatted_prefix} ${lines[i]}`)
+      };
+    } else {
+      for (i in Range(0, lines.size() - 1)) {
+        print_debug(lines[i])
+      }
     };
     lines.last()
   }
 
+  readonly private fun print_raw(v: String): void {
+    if (!this.prefix.isEmpty()) {
+      print_debug_raw(`${this.formatted_prefix()} ${v}`)
+    } else {
+      print_debug_raw(v)
+    }
+  }
+
+  readonly private fun formatted_prefix(): String {
+    TermColor.colored(
+      this.prefix,
+      this.color,
+      TermColor.Default(),
+      Array[TermColor.Bold()],
+    )
+  }
+
   mutable fun flush(): void {
-    if (!this.out.isEmpty()) print_raw(this.prefix + this.out);
+    if (!this.out.isEmpty()) this.print_raw(this.out);
     this.!out = "";
-    if (!this.err.isEmpty()) print_debug_raw(this.prefix + this.err);
+    if (!this.err.isEmpty()) this.print_raw(this.err);
     this.!err = "";
   }
 }
@@ -119,20 +144,20 @@ fun tsc(
   tsconfig = Path.join(tsDir, "tsconfig.json");
   console.status("Running", `npm install on '${tsDir}'`);
   npmcmd = Array["npm", "i", "--prefix", tsDir, "--save-dev", "@types/node"];
-  _ = exec("[npm] ", npmcmd, console)?;
+  _ = exec(npmcmd, console)?;
   link.each(l -> {
     node_modules = Path.join(tsDir, "node_modules");
     if (FileSystem.exists(node_modules)) {
       (name, path) = l;
       symlink = Path.join(node_modules, name);
       if (FileSystem.exists(symlink)) {
-        _ = exec("", Array["rm", symlink], console);
+        _ = exec(Array["rm", symlink], console);
       };
-      _ = exec("", Array["ln", "-s", path, symlink], console)
+      _ = exec(Array["ln", "-s", path, symlink], console)
     }
   });
   console.status("Running", `Typescript compiler on '${tsconfig}'`);
-  _ = exec("[tsc] ", Array["tsc", "--project", tsconfig], console)?;
+  _ = exec(Array["tsc", "--project", tsconfig], console)?;
   Success(void)
 }
 
@@ -155,22 +180,31 @@ fun execCommand(
           `${opts.build_config.requested_profile} target(s) in ${t}s`,
         )
       | _ ->
-        gctx.console.status(
-          "Finished with error",
-          `${opts.build_config.requested_profile} target(s) in ${t}s`,
-        )
+        if (gctx.console.verbosity >= Skargo.VerbosityNormal()) {
+          formatted_status = TermColor.colored(
+            "Finished with error(s)",
+            TermColor.Red(),
+            TermColor.Default(),
+            Array[TermColor.Bold()],
+          );
+          print_debug(
+            `    ${formatted_status} ${
+              opts.build_config.requested_profile
+            } target(s) in ${t}s`,
+          )
+        }
       }
     ,
   )
 }
 
 private fun exec(
-  prefix: String,
   args: Array<String>,
   console: Skargo.Console,
   verbosity: Skargo.ConsoleVerbosity = Skargo.VerbosityProlix(),
 ): Result<String, void> {
-  printer = mutable Printer(prefix);
+  if (args.isEmpty()) return Success("");
+  printer = mutable Printer(`[${args[0]}]`);
   console.status_verbose("Command", args.join(" "));
   (stdout_cb, stderr_cb) = if (console.verbosity >= verbosity) {
     (printer.printString, printer.printError)
@@ -258,7 +292,7 @@ fun manage(
   npmDir = optTarget.default(Path.join(target_dir, "npm"));
   console = brunner.bctx.gctx.console;
   if (clean && FileSystem.exists(npmDir)) {
-    _ = exec("", Array["rm", "-rf", Path.join(npmDir, "*")], console);
+    _ = exec(Array["rm", "-rf", Path.join(npmDir, "*")], console);
   };
   tsDir = Path.join(target_dir, "ts");
   checkDir(tsDir);
@@ -470,7 +504,6 @@ fun manage(
     pckBins = mutable Map[];
     package.binaries.each(binary -> {
       _ = exec(
-        "",
         Array["chmod", "+x", Path.join(distDir, `${binary}.mjs`)],
         console,
       );
