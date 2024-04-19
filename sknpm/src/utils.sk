@@ -1,0 +1,359 @@
+module Sknpm;
+
+fun syncDirs(
+  fromDir: String,
+  toDir: String,
+  exclude: Set<String>,
+  console: Skargo.Console,
+): void {
+  checkDir(toDir);
+  FileSystem.readFilesRecursive(
+    fromDir,
+    _f -> true,
+    src -> {
+      if (!exclude.contains(Path.basename(src))) {
+        relative(src, fromDir).each(rp -> {
+          dst = Path.join(toDir, rp);
+          checkDir(Path.basename(dst));
+        });
+        true
+      } else {
+        false
+      }
+    },
+  ).each(src ->
+    relative(src, fromDir).each(rp -> {
+      dst = Path.join(toDir, rp);
+      if (isYoungerThan(src, dst)) {
+        copy(src, dst, Some(console))
+      }
+    })
+  )
+}
+
+fun checkDir(dir: String): void {
+  _ = System.subprocess(Array["mkdir", "-p", dir]);
+}
+
+fun withTarget(args: Cli.ParseResults): Cli.ParseResults {
+  values = args.values.clone();
+  values.set("target", Cli.StringValue("wasm32"));
+  Cli.ParseResults{
+    cmd => args.cmd,
+    values => values.chill(),
+    extra => args.extra,
+    subcommand => args.subcommand,
+    error => args.error,
+  }
+}
+
+fun mtime(path: String): ?Int {
+  if (FileSystem.exists(path)) {
+    p = System.subprocess(Array["stat", "-c", "%Y", path]);
+    if (!p.success()) {
+      None()
+    } else {
+      p.stdout.trim().toIntOption()
+    }
+  } else {
+    None()
+  }
+}
+
+fun isYoungerThan(file1: String, file2: String): Bool {
+  optTime1 = mtime(file1);
+  optTime2 = mtime(file2);
+  optTime1.isNone() || optTime2.isNone() || optTime1 > optTime2
+}
+
+fun relative(path: String, to: String): ?String {
+  if (!to.endsWith("/")) {
+    !to = to + "/";
+  };
+  if (path.startsWith(to)) {
+    Some(path.sub(path.getIter().drop(to.chars().size()), path.chars().size()))
+  } else {
+    None()
+  }
+}
+
+fun tsConfig(deps: Vector<String>): String {
+  path = JSON.Array(Vector[JSON.String("./*")]);
+  paths = mutable Map<String, JSON.Value>[];
+  deps.each(v -> paths.set(`#${v}` + "/*", path));
+  config = JSON.Object(
+    Map[
+      "compilerOptions" => JSON.Object(
+        Map[
+          "target" => JSON.String("ES2021"),
+          "outDir" => JSON.String("js"),
+          "baseUrl" => JSON.String("."),
+          "paths" => JSON.Object(unsafe_chill_trust_me(paths)),
+          "strictNullChecks" => JSON.Bool(true),
+          "module" => JSON.String("node16"),
+          "sourceMap" => JSON.Bool(true),
+          "declaration" => JSON.Bool(true),
+          "declarationMap" => JSON.Bool(true),
+          "incremental" => JSON.Bool(true),
+          "verbatimModuleSyntax" => JSON.Bool(true),
+        ],
+      ),
+    ],
+  );
+  stream = mutable Vector[];
+  config.writeToStream(stream.push, 2);
+  stream.join("")
+}
+
+fun copyToDir(tsFile: String, dir: String): void {
+  contents = FileSystem.readTextFile(tsFile);
+  target = Path.join(dir, Path.basename(tsFile));
+  lines = contents.split("\n").map(line -> {
+    if (
+      line.startsWith("import ") ||
+      line.startsWith("export {") ||
+      line.startsWith("export type {")
+    ) {
+      elements = line.split(" from ");
+      if (elements.size() == 2) {
+        imported = elements[1].split("\"");
+        if (imported.size() == 3) {
+          elems = imported[1].split("/");
+          size = elems.size();
+          if (size > 1 && elems[0].startsWith("#")) {
+            !elems = elems.mapWithIndex((idx, v) -> if (idx == 0) "." else v);
+            !line = `${elements[0]} from "${elems.join("/")}"`
+          }
+        }
+      }
+    } else {
+      indexOf(line, "import(\"#") match {
+      | Some(index) ->
+        indexOf(line, "/", index) match {
+        | Some(end) ->
+          prefix = line.take(index);
+          siter = line.getIter().drop(end);
+          suffix = line.substring(siter);
+          !line = `${prefix}import(\".${suffix}`
+        | _ -> void
+        }
+      | _ -> void
+      }
+    };
+    line;
+  });
+  FileSystem.writeTextFile(target, lines.join("\n"));
+}
+
+fun i(v: Bool): Int {
+  if (v) 1 else 0;
+}
+
+fun copy(src: String, dst: String, optConsole: ?Skargo.Console = None()): void {
+  cmd = Array["cp", src, dst];
+  optConsole.each(console -> console.status_verbose("Command", cmd.join(" ")));
+  _ = System.subprocess(cmd);
+}
+
+fun targets(
+  file: String,
+  console: Skargo.Console,
+): Result<Map<String, Target>, void> {
+  try {
+    contents = FileSystem.readTextFile(file);
+    json = JSON.decode(contents).expectObject();
+    Success(json.value.map((_, v) -> Target::fromJSON(v)))
+  } catch {
+  | _ ->
+    console.error("Unable to load targets.");
+    Failure(void)
+  }
+}
+
+fun runService(
+  serviceFile: String,
+  root: String,
+  processes: mutable Vector<Int>,
+  environment: mutable Map<String, String>,
+  console: Skargo.Console,
+): Result<void, void> {
+  verbose = console.verbosity >= Skargo.VerbosityVerbose();
+  if (FileSystem.exists(serviceFile)) {
+    cmd = Array["make", "-f", serviceFile, `ROOT_DIR=${root}`];
+    console.status_verbose("Command", cmd.join(" "));
+    p = System.subprocess(cmd, s -> if (verbose) print_raw(s));
+    if (verbose || !p.success()) {
+      if (!verbose) print_raw(p.stdout);
+      print_error_raw(p.stderr);
+    };
+    if (!p.success()) {
+      return Failure(void)
+    };
+    p.stdout.split("\n").each(line -> {
+      indexOf(line, "sknpm") match {
+      | Some(index) ->
+        siter = line.getIter().drop(index);
+        cleaned = line.substring(siter);
+        elems = cleaned.split("=");
+        if (elems.size() >= 2) {
+          elems[0] match {
+          | "sknpm.process" -> processes.push(elems[1].toInt())
+          | s if (s.startsWith("sknpm.env:")) ->
+            envName = s.split(":")[1];
+            envValue = elems.drop(1).join("=");
+            environment.set(envName, envValue)
+          | _ -> console.error("Unmanaged command: " + line)
+          }
+        } else {
+          console.error("Unmanaged command: " + line)
+        }
+      | _ -> void
+      }
+    });
+  };
+  Success(void)
+}
+
+/*
+fun check(
+  several: String,
+  files: readonly Vector<String>,
+  optSingle: ?String,
+): void {
+  optSingle.each(single ->
+    invariant(!files.isEmpty(), `${single} must be defined.`)
+  );
+  if (files.size() > 1) {
+    invariant_violation(
+      `Several ${several} have been found (${files.map(f ->
+        f.split(".").take(files.size() - 1).join(".")
+      )}), please specify which one to use.`,
+    )
+  }
+}
+*/
+
+fun writeIndex(target: String, name: String): void {
+  FileSystem.writeTextFile(
+    Path.join(target, "index.html"),
+    Array[
+      "<!DOCTYPE html>",
+      "<html>",
+      "  <head lang=\"en\">",
+      "    <meta charset=\"utf-8\">",
+      "    <meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" />",
+      `    <script type="module" src=\"./npm/dist/${name}.mjs\"></script>`,
+      "    <link rel=\"icon\" href=\"data:,\">",
+      "  </head>",
+      "  <body>",
+      "  </body>",
+      "</html>",
+    ].join("\n"),
+  )
+}
+
+fun writeRun(target: String, console: Skargo.Console): void {
+  runFile = Path.join(target, "run.sh");
+  FileSystem.writeTextFile(
+    runFile,
+    "#!/bin/bash\npython3 -m http.server 8000\n",
+  );
+  _ = exec(Array["chmod", "+x", runFile], console);
+}
+
+fun license(): String {
+  `MIT License
+
+Copyright (c) 2023 SkipLabs
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.`
+}
+
+fun indexOf(inStr: String, s: String, start: Int = 0): ?Int {
+  chars1 = inStr.chars();
+  chars2 = s.chars();
+  for (i in Range(start, chars1.size())) {
+    if (chars2.size() > chars1.size() - i) {
+      return None();
+    };
+    j = 0;
+    while (j < chars2.size()) {
+      if (chars1[i + j] != chars2[j]) {
+        break void;
+      };
+      !j = j + 1;
+    };
+    if (j == chars2.size()) {
+      return Some(i);
+    }
+  };
+  None()
+}
+
+fun gitDiff(console: Skargo.Console): Result<void, void> {
+  gdiff = exec(Array["git", "diff"], console)?;
+  if (!gdiff.isEmpty()) {
+    console.error(
+      `'${Environ.current_dir()}'\nYou have git local changes.\nPlease, commit your changes or stash them before publishing.`,
+    );
+    return Failure(void)
+  };
+  Success(void)
+}
+
+fun jsonDecodeObject(
+  str: String,
+  console: Skargo.Console,
+): Result<JSON.Object, void> {
+  try {
+    Success(JSON.decode(str).expectObject());
+  } catch {
+  | ex ->
+    console.error(ex.getMessage());
+    Failure(void)
+  }
+}
+
+fun lastestDistributedVersion(
+  name: String,
+  console: Skargo.Console,
+): Result<Version, void> {
+  distTags = exec(Array["npm", "view", name, "dist-tags", "--json"], console)?;
+  jsonTags = jsonDecodeObject(distTags, console)?;
+  jsonTags.maybeGetString("latest") match {
+  | Some(latest) ->
+    Version::fromString(latest) match {
+    | Success(version) -> Success(version)
+    | Failure(msg) ->
+      console.error(msg);
+      Failure(void)
+    }
+  | _ ->
+    console.error("Unable to get latest distributed version");
+    Failure(void)
+  }
+}
+
+@cpp_extern("SKIP_sknpm_save_sk_tests_ts")
+native fun saveSkTestsTs(targetDir: String): void;
+
+@cpp_extern("SKIP_sknpm_save_archive")
+native fun saveArchive(targetDir: String): void;
+
+module end;

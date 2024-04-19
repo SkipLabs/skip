@@ -10,9 +10,9 @@ interface ToWasm {
 }
 
 class LinksImpl implements Links {
-  SKIP_localetimezone: (year: int, month: int, day: int) => int;
-  SKIP_localetimezonename: (year: int, month: int, day: int) => ptr;
-  SKIP_locale: (code: int, value: int) => ptr;
+  SKIP_localetimezone!: (year: int, month: int, day: int) => int;
+  SKIP_localetimezonename!: (year: int, month: int, day: int) => ptr;
+  SKIP_locale!: (code: int, value: int) => ptr;
 
   constructor() {}
 

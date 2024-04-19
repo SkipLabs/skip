@@ -346,7 +346,6 @@ fun epoch4(): void {
   );
   got = date.toEpoch();
   expect = 788914800000;
-  debug(("epoch4", date, got, expect, expect - got));
   T.expectEq(got, expect)
 }
 
@@ -359,7 +358,6 @@ fun epoch5(): void {
   );
   got = date.toEpoch();
   expect = 789001200000;
-  debug(("epoch4", date, got, expect, expect - got));
   T.expectEq(got, expect)
 }
 
@@ -381,15 +379,9 @@ fun days(): void {
       !p = day;
       !day = Some(d.addDays(1));
       yd = d.getDayOfYear();
-      if (yd != dn) {
-        debug(("DayOfYear", d, yd, dn));
-      };
       T.expectEq(yd, dn);
       utcDate = d.toCalendar().withTimeZone(SKDate.utc);
       dEpoch = utcDate.toEpoch();
-      if (dEpoch != epoch) {
-        debug(("Epoch", d, dEpoch, epoch));
-      };
       T.expectEq(dEpoch, epoch);
       !epoch = epoch + 3600000 * 24;
       !dn = dn + 1;
@@ -428,9 +420,6 @@ fun timezone(): void {
   date = SKDate.Date::create(2023, 9, 22);
   got = SKDate.TZLocal().toTimeZone(date);
   expect = SKDate.TimeZone::create(false, 2);
-  if (got != expect) {
-    debug(("Timezone", got, expect));
-  };
   T.expectEq(got, expect)
 }
 
@@ -439,9 +428,6 @@ fun timezone2(): void {
   date = SKDate.Date::create(1985, 1, 1);
   got = SKDate.TZLocal().toTimeZone(date);
   expect = SKDate.TimeZone::create(false, 1);
-  if (got != expect) {
-    debug(("Timezone", got, expect));
-  };
   T.expectEq(got, expect)
 }
 
@@ -450,9 +436,6 @@ fun timezone3(): void {
   date = SKDate.Date::create(2021, 1, 27);
   got = SKDate.TZLocal().toTimeZone(date);
   expect = SKDate.TimeZone::create(false, 1);
-  if (got != expect) {
-    debug(("Timezone", got, expect));
-  };
   T.expectEq(got, expect)
 }
 
@@ -461,9 +444,6 @@ fun timezone4(): void {
   date = SKDate.Date::create(1963, 12, 31);
   got = SKDate.TZLocal().toTimeZone(date);
   expect = SKDate.TimeZone::create(false, 1);
-  if (got != expect) {
-    debug(("Timezone", got, expect));
-  };
   T.expectEq(got, expect)
 }
 
@@ -472,9 +452,6 @@ fun timezone5(): void {
   date = SKDate.Date::create(1911, 3, 11);
   got = SKDate.TZLocal().toTimeZone(date);
   expect = SKDate.TimeZone::create(false, 0);
-  if (got != expect) {
-    debug(("Timezone", got, expect));
-  };
   T.expectEq(got, expect)
 }
 
@@ -483,9 +460,6 @@ fun timezone6(): void {
   date = SKDate.Date::create(1911, 3, 10);
   got = SKDate.TZLocal().toTimeZone(date);
   expect = SKDate.TimeZone::create(false, 0, 9, 21);
-  if (got != expect) {
-    debug(("Timezone", got, expect));
-  };
   T.expectEq(got, expect)
 }
 
@@ -494,9 +468,6 @@ fun timezone7(): void {
   date = SKDate.Date::create(1995, 1, 1);
   got = SKDate.TZLocal().toTimeZone(date);
   expect = SKDate.TimeZone::create(false, 1, 0, 0);
-  if (got != expect) {
-    debug(("Timezone", got, expect));
-  };
   T.expectEq(got, expect)
 }*/
 
@@ -505,9 +476,6 @@ fun add_seconds(): void {
   date = SKDate.Calendar::current();
   got = date.addSeconds(3600);
   expect = date.addHours(1);
-  if (got != expect) {
-    debug(("Add seconds", date, got, expect));
-  };
   T.expectEq(got, expect)
 }
 
@@ -516,9 +484,6 @@ fun minus_seconds(): void {
   date = SKDate.Calendar::current();
   got = date.addSeconds(-7200);
   expect = date.addHours(-2);
-  if (got != expect) {
-    debug(("Minus seconds", date, got, expect));
-  };
   T.expectEq(got, expect)
 }
 
@@ -527,9 +492,6 @@ fun minus_seconds2(): void {
   date = SKDate.Calendar::current();
   got = date.addSeconds(-86400);
   expect = date.addDays(-1);
-  if (got != expect) {
-    debug(("Minus seconds", date, got, expect));
-  };
   T.expectEq(got, expect)
 }
 
