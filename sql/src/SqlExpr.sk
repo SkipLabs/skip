@@ -995,13 +995,18 @@ class ExprEvaluator(
         ADef(-SKStore.genSym(0))
       }
 
-    | CICheck(pos, debugExpr, e) ->
+    | CICheck(pos, debugExpr, e, nameOpt) ->
       this.evalCIExpr(context, e) match {
       | ASuccess() -> ASuccess()
       | AUndef() -> AUndef()
       | ANull() -> ANull()
       | ADef(n) if (n != 0) -> ASuccess()
-      | ADef(_) -> throw SqlError(pos, "Failed constraint: " + debugExpr)
+      | ADef(_) ->
+        named = nameOpt match {
+        | None() -> ""
+        | Some(n) -> ` '${n}'`
+        };
+        throw SqlError(pos, `Failed constraint${named}: ${debugExpr}`)
       }
     }
   }
