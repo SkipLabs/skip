@@ -249,7 +249,9 @@ base class IFixedDir<T: frozen, RowRepresentation: frozen> protected {
         kinds match {
         | None() -> !kinds = Some(k)
         | Some(k2) ->
-          invariant(k == k2, "Mismatched kinds in table " + elt.source.dirName)
+          if (k != k2) {
+            return None()
+          }
         };
         !sourceDir = sourceDir match {
         | None() -> Some(elt.source.dirName)
