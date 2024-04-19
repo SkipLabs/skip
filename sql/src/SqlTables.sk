@@ -380,18 +380,64 @@ fun alterTableAddColumn(
 
   tableDir = getTableDir(context);
   sid = SKStore.SID::create(name.lower);
+
   oldDescr = tableDir.maybeGet(context, sid) match {
   | None() -> error(pos, "Table '" + name + "' does not exist")
   | Some(descr) -> getLatestDirDescr(context, descr)
   };
-
   dirName = oldDescr.dirName;
-  oldDir = context.unsafeGetEagerDir(dirName);
+  dir = context.unsafeGetEagerDir(dirName);
   oldNCols = oldDescr.schema.size();
 
   newSchema = Array::fillBy(oldNCols + 1, i ->
     if (i < oldNCols) oldDescr.schema[i] else newCol
   );
+  newKinds = newSchema.mapWithIndex((idx, col) -> (idx, P.IASC(), col.ty));
+
+  convertToNewSchema: (
+    (SKStore.Key, mutable Iterator<SKStore.File>),
+  ) -> mutable Iterator<
+    (SKStore.Key, (SKStore.Path, SKStore.Path, Array<SKStore.File>)),
+  > = (kv) -> {
+    (key, rowIter) = kv;
+    rowIter.next() match {
+    | Some(oldRow @ RowValues _) ->
+      repeat = oldRow.repeat;
+      rowIter.each(r ->
+        r match {
+        | RowValues(_, rr) -> !repeat = repeat + rr
+        | _ -> invariant_violation("Invalid SKDB row")
+        }
+      );
+
+      newVals = RowValues(
+        Array::fillBy(oldNCols + 1, i ->
+          if (i < oldNCols) oldRow.getValue(i) else {
+            newCol.default.flatMap(def -> evaluateDefault(context, def.expr))
+          }
+        ),
+        repeat,
+      );
+      newKey = RowKey(newVals, newKinds);
+      newSource = SKStore.Path::create(dirName, newKey);
+
+      // Since schema/kinds information is encoded in SKDB.RowKeys, we have to both null
+      // out the old row(s) and write the new row. (instead of just overwriting the old key)
+      for (x in dir.unsafeGetAllDataIter(key)) {
+        (_tick, source, writer, _row) = x;
+        yield (key, (source, writer, Array[]))
+      };
+      yield (newKey, (newSource, newSource, Array[newVals]))
+
+    | None() -> void
+    | Some(_) -> invariant_violation("Invalid SKDB row")
+    };
+  };
+
+  modifications = dir.unsafeGetFileIter().flatMap(convertToNewSchema);
+
+  dir.writeArraySourceMany(context, modifications);
+
   newDescr = DirDescr::create{
     name,
     schema => newSchema,
@@ -400,48 +446,7 @@ fun alterTableAddColumn(
     isInput => true,
   };
 
-  tag = SKStore.TickRange::create(context.tick);
-  newRows = Vector::mcreate(oldDir.totalSize);
-  for ((key, rowIter) in oldDir.unsafeGetFileIter()) {
-    oldRow = rowIter.next() match {
-    | None() -> return void
-    | Some(x @ RowValues _) -> x
-    | Some(_) -> invariant_violation("Invalid SKDB row")
-    };
-    repeat = oldRow.repeat;
-    rowIter.each(r ->
-      r match {
-      | RowValues(_, rr) -> !repeat = repeat + rr
-      | _ -> invariant_violation("Invalid SKDB row")
-      }
-    );
-
-    newVals = Array<SKStore.File>[
-      RowValues(
-        Array::fillBy(oldNCols + 1, i ->
-          if (i < oldNCols) oldRow.getValue(i) else {
-            newCol.default.flatMap(def -> evaluateDefault(context, def.expr))
-          }
-        ),
-        repeat,
-      ),
-    ];
-
-    src = SKStore.Path::create(newDescr.dirName, key);
-    newRows.push(SKStore.FixedRow(key, newVals, src, tag))
-  };
-
-  newDir = SKStore.EagerDir{
-    time => context.timeStamp(),
-    dirName,
-    input => true,
-    fixedData => SKStore.FixedDataMap::create(newRows),
-    creator => context.currentArrow(),
-    totalSize => oldDir.totalSize,
-  };
-
   tableDir.writeArray(context, sid, Array[newDescr]);
-  context.setDir(dirName, newDir);
 }
 
 /*****************************************************************************/
