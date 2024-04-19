@@ -258,7 +258,7 @@ fun writeRun(target: String, console: Skargo.Console): void {
     runFile,
     "#!/bin/bash\npython3 -m http.server 8000\n",
   );
-  _ = exec("[python3]", Array["chmod", "+x", runFile], console);
+  _ = exec(Array["chmod", "+x", runFile], console);
 }
 
 fun license(): String {
@@ -307,7 +307,7 @@ fun indexOf(inStr: String, s: String, start: Int = 0): ?Int {
 }
 
 fun gitDiff(console: Skargo.Console): Result<void, void> {
-  gdiff = exec("[git] ", Array["git", "diff"], console)?;
+  gdiff = exec(Array["git", "diff"], console)?;
   if (!gdiff.isEmpty()) {
     console.error(
       `'${Environ.current_dir()}'\nYou have git local changes.\nPlease, commit your changes or stash them before publishing.`,
@@ -334,11 +334,7 @@ fun lastestDistributedVersion(
   name: String,
   console: Skargo.Console,
 ): Result<Version, void> {
-  distTags = exec(
-    "[npm] ",
-    Array["npm", "view", name, "dist-tags", "--json"],
-    console,
-  )?;
+  distTags = exec(Array["npm", "view", name, "dist-tags", "--json"], console)?;
   jsonTags = jsonDecodeObject(distTags, console)?;
   jsonTags.maybeGetString("latest") match {
   | Some(latest) ->

@@ -48,9 +48,9 @@ fun run(): (
 fun execRun(brunner: BuildRunner, args: Cli.ParseResults): Result<void, void> {
   (npmDir, _) = doBuild(brunner, args)?;
   npmInstall = Array["npm", "--prefix", npmDir, "install"];
-  _ = exec("[npm] ", npmInstall, brunner.bctx.gctx.console)?;
+  _ = exec(npmInstall, brunner.bctx.gctx.console)?;
   npmRun = Array["npm", "--prefix", npmDir, "run"].concat(args.extra);
-  _ = exec("", npmRun, brunner.bctx.gctx.console, Skargo.VerbosityQuiet())?;
+  _ = exec(npmRun, brunner.bctx.gctx.console, Skargo.VerbosityQuiet())?;
   Success(void)
 }
 
