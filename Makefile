@@ -33,7 +33,7 @@ build/package/package.json:
 	@echo "}" >> build/package/package.json
 
 build/package/skdb: build/sknpm
-	cd sql && ../build/sknpm build --profile $(SKARGO_PROFILE) --npm-out ../build/package/skdb
+	cd sql && ../build/sknpm build --profile $(SKARGO_PROFILE)  --bin skdb --out-dir ../build/package/skdb
 
 sql/target/wasm32-unknown-unknown/dev/skdb.wasm: sql/src/*
 	cd sql && skargo build --target wasm32-unknown-unknown --bin skdb

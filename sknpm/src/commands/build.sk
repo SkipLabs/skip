@@ -1,0 +1,82 @@
+module Sknpm;
+
+fun build(): (
+  Cli.Command,
+  (Skargo.GlobalContext, Cli.ParseResults) ~> Result<void, void>,
+) {
+  (
+    Cli.Command("build")
+      .short("b")
+      .about("Build the npm package")
+      .arg(
+        Cli.StringArg("manifest-path")
+          .value_name("PATH")
+          .about("Path to Skargo.toml"),
+      )
+      .arg(
+        Cli.StringArg("target-dir")
+          .value_name("PATH")
+          .about("Directory for all generated artifacts"),
+      )
+      .arg(
+        Cli.StringArg("out-dir")
+          .value_name("PATH")
+          .about("Copy final artifacts to this directory"),
+      )
+      .arg(
+        Cli.StringArg("profile")
+          .value_name("PROFILE-NAME")
+          .about("Build artifacts with the specified profile"),
+      )
+      .arg(
+        Cli.BoolArg("release")
+          .short("r")
+          .long("release")
+          .about("Build artifacts in release mode, with optimizations"),
+      )
+      .arg(
+        Cli.StringArg("bin")
+          .repeatable()
+          .value_name("NAME")
+          .about("Build only the specified binary"),
+      )
+      .arg(
+        Cli.StringArg("html").about(
+          "Build minimal html support for specified launcher",
+        ),
+      ),
+    (gctx, args) ~> execCommand(gctx, args, execBuild),
+  )
+}
+
+fun doBuild(
+  brunner: BuildRunner,
+  args: Cli.ParseResults,
+  test: Bool = false,
+): Result<(String, Package), void> {
+  ws = brunner.bctx.ws;
+  gctx = brunner.bctx.gctx;
+  skargo(args, test, gctx.console)?;
+  root = ws.package.manifest.package_id.source_id.url;
+  name = ws.package.manifest.package_id.name;
+  package = Package::create(root, name, gctx.console)?;
+  npmDir = manage(brunner, package, args.maybeGetString("out-dir"))?;
+  gctx.console.status("Progress", `Npm package '${npmDir}' generated`);
+  Success((npmDir, package))
+}
+
+fun execBuild(
+  brunner: BuildRunner,
+  args: Cli.ParseResults,
+): Result<void, void> {
+  (npmDir, _) = doBuild(brunner, args)?;
+  args.maybeGetString("html") match {
+  | Some(launcher) ->
+    writeIndex(npmDir, launcher);
+    writeRun(npmDir, brunner.bctx.gctx.console)
+  | _ -> void
+  };
+  Success(void)
+}
+
+module end;
