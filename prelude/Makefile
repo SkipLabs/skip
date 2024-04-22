@@ -1,6 +1,8 @@
 OUT_DIR?=$(shell realpath ./build)
 LIB_DIR?=/usr/local/lib
 
+OLEVEL ?= -O2
+
 ifdef PROFILE
 PRFDEF=$(shell echo $(PROFILE) | tr  '[:lower:]' '[:upper:]')
 ifeq ($(PRFDEF),RELEASE)
@@ -72,7 +74,7 @@ $(OUT_DIR)/libskip_runtime32.a: $(OUT_DIR)/libskip_runtime32.o
 	llvm-ar crs $@ $^
 
 $(OUT_DIR)/libstd.sklib: $(OUT_DIR)/libskip_runtime64.a $(OUT_DIR)/libbacktrace.a $(SKIP_SRC)
-	SKC_PREAMBLE=./preamble/preamble64.ll skc -o $@ --sklib-name std --no-std -O2 --link-args '-lpthread' $^
+	SKC_PREAMBLE=./preamble/preamble64.ll skc -o $@ --sklib-name std --no-std $(OLEVEL) --link-args '-lpthread' $^
 
 .PHONY: clean
 clean:
