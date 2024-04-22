@@ -253,7 +253,7 @@ int64_t SKIP_posix_spawnp(char* skargv, char* skenvp, char* file_actionsp) {
 
   char** argv_cursor = argv;
   for (int i = 0; *argv_cursor != NULL; ++argv_cursor, ++i) {
-    if (*argv_cursor != *(char**)skargv + i) {
+    if (*argv_cursor != *((char**)skargv + i)) {
       free(*argv_cursor);
     }
   }
@@ -261,7 +261,7 @@ int64_t SKIP_posix_spawnp(char* skargv, char* skenvp, char* file_actionsp) {
 
   char** envp_cursor = envp;
   for (int i = 0; *envp_cursor != NULL; ++envp_cursor, ++i) {
-    if (*envp_cursor != *(char**)skenvp + i) {
+    if (*envp_cursor != *((char**)skenvp + i)) {
       free(*envp_cursor);
     }
   }
