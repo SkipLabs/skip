@@ -720,7 +720,7 @@ class EagerDir protected {
     filter: (Key -> Bool),
     destinationTime: ?Tick,
     checkpointInterval: Int = Int::max,
-  ): Bool {
+  ): Int {
     if (isReset) {
       theirTime = destinationTime match {
       | None() -> ""
@@ -728,7 +728,7 @@ class EagerDir protected {
       };
       writer.write(`^${entity}${theirTime}\n`);
       writer.write("!rebuild\n");
-      return true
+      return 1
     };
 
     changesWritten = 0;
@@ -757,7 +757,7 @@ class EagerDir protected {
       };
     };
 
-    changesWritten > 0
+    changesWritten
   }
 
   private fun purgeOld(): FixedSourceMap {

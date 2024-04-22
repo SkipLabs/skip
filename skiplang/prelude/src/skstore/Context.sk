@@ -765,15 +765,17 @@ mutable class Context private {
           } else {
             (false, dir.unsafeGetFileIterNoReducer(None()).map(pair -> pair.i0))
           };
-          producedOutput = dir.writeDiff(
-            shouldRebuild,
-            changes,
-            writer,
-            dirSub.entity,
-            dirSub.format,
-            dirSub.filter(this, false, dirName),
-            dirSub.getDestinationWatermark(this),
-          );
+          ctx = this.clone();
+          producedOutput =
+            dir.writeDiff(
+              shouldRebuild,
+              changes,
+              writer,
+              dirSub.entity,
+              dirSub.format,
+              dirSub.filter(ctx, false, dirName),
+              dirSub.getDestinationWatermark(ctx),
+            ) > 0;
           !producedAnyOutput = producedAnyOutput || producedOutput
         | _ -> void
         }
