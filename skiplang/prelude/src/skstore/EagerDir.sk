@@ -702,7 +702,7 @@ class EagerDir{
     filter: (SKStore.Key -> Bool),
     destinationTime: ?Tick,
     checkpointInterval: Int = Int::max,
-  ): Bool {
+  ): Int {
     if (isReset) {
       theirTime = destinationTime match {
       | None() -> ""
@@ -710,7 +710,7 @@ class EagerDir{
       };
       writer.write(`^${entity}${theirTime}\n`);
       writer.write("!rebuild\n");
-      return true
+      return 1
     };
 
     changesWritten = 0;
@@ -739,7 +739,7 @@ class EagerDir{
       };
     };
 
-    changesWritten > 0
+    changesWritten
   }
 
   fun purgeOld(): FixedSourceMap {
