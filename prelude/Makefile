@@ -4,17 +4,15 @@ LIB_DIR?=/usr/local/lib
 ifdef PROFILE
 PRFDEF=$(shell echo $(PROFILE) | tr  '[:lower:]' '[:upper:]')
 ifeq ($(PRFDEF),RELEASE)
-CFLAGS += -O3
+OLEVEL = -O3
 else
 ifeq ($(PRFDEF),DEBUG)
-CFLAGS += -O0
-else
-CFLAGS += -O2
+OLEVEL = -O0
 endif # ifeq ($(PRFDEF),DEBUG)
 endif # ifeq ($(PRFDEF),RELEASE)
-else
-CFLAGS += -O2 -g3
 endif # ifdef PROFILE
+OLEVEL ?= -O2
+CFLAGS += $(OLEVEL) -g3
 
 LBT_EXISTS=$(shell [ -e $(LIB_DIR)/libbacktrace.a ] && echo 1 || echo 0 )
 
