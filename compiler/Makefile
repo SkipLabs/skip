@@ -1,4 +1,5 @@
-CXXFLAGS ?= -O3 -mllvm -inline-threshold=0 # -enable-new-pm=false
+OLEVEL   ?= -O3
+CXXFLAGS ?= $(OLEVEL) -mllvm -inline-threshold=0 # -enable-new-pm=false
 STAGE    ?= 1
 
 prefix   ?= /usr/local
