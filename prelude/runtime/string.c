@@ -135,8 +135,8 @@ unsigned char* SKIP_String__fromChars(const unsigned char* /* dumb */,
 }
 
 char* SKIP_String_concat2(char* str1, char* str2) {
-  SkipInt size1 = SKIP_String_byteSize(str1);
-  SkipInt size2 = SKIP_String_byteSize(str2);
+  uint32_t size1 = SKIP_String_byteSize(str1);
+  uint32_t size2 = SKIP_String_byteSize(str2);
   char* result = sk_string_alloc(size1 + size2);
   memcpy(result, (const char*)str1, size1);
   memcpy(result + size1, (const char*)str2, size2);
