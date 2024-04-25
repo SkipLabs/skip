@@ -493,6 +493,8 @@ class SelectFile(
   text: String,
   sparams: Array<P.SelectResult>,
   cselect: CSelect,
+  select: P.Select,
+  queryParams: Map<String, P.Value>,
 ) extends SKStore.File
 
 class Evaluator{options: Options, user: ?UserFile} {
@@ -1151,7 +1153,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         existingFiles[0] match {
         | _ if (!ifNotExists) ->
           error(pos, "VIEW " + viewName + " already exists")
-        | SelectFile(_, _, _, _, _, cs) if (cselect1 != cs) ->
+        | SelectFile(_, _, _, _, _, cs, _, _) if (cselect1 != cs) ->
           error(
             pos,
             "VIEW " + viewName + " already exists with a different query",
@@ -1175,6 +1177,8 @@ class Evaluator{options: Options, user: ?UserFile} {
           view.toString(),
           (selectAst.core as P.SelectCoreQuery _).params,
           cselect1,
+          selectAst,
+          params,
         ),
       );
       if (reactive) {
@@ -1308,7 +1312,9 @@ class Evaluator{options: Options, user: ?UserFile} {
       );
       None()
     | P.AlterTableAddCol{pos, name, colDef} ->
-      Some((context, _, _) ~> alterTableAddColumn(context, pos, name, colDef))
+      Some((context, _, _) ~>
+        alterTableAddColumn(context, pos, name, colDef, this.options)
+      )
     | P.AlterTableDropCol _ ->
       invariant_violation("DROP COLUMN not yet implemented")
     };
@@ -1757,7 +1763,7 @@ fun sqlPurgeFrom(
 
 fun makeSqlContext(): SKStore.Context {
   SKStore.Context{
-    canReuse => SKStore.CRAlways(),
+    canReuse => SKStore.CRAlways(SortedSet::create()),
     failOnExn => true,
     removeSubDirs => true,
   }
