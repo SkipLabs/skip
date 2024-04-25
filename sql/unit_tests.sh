@@ -345,3 +345,9 @@ do
         cat "test/unit/checks/$base.exp"
     fi
 done
+
+if cat test/unit/test_alter_table_add_col.sql | $SKDB | tr '\n' 'S' | grep -q '1|1S3|3S1|1S3|3S1|1S3|3S3|5S1|1S3|3S3|5S' ; then
+    pass "ALTER TABLE ADD COLUMN"
+else
+    fail "ALTER TABLE ADD COLUMN"
+fi
