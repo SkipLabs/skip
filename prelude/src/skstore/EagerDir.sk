@@ -1222,7 +1222,7 @@ class EagerDir{
   }
 
   static fun isReusable(
-    context: readonly Context,
+    context: mutable Context,
     child: EagerDir,
     parents: FixedSingle<
       DirName,
@@ -1236,7 +1236,13 @@ class EagerDir{
     >,
   ): Bool {
     context.canReuse match {
-    | CRAlways() -> true
+    | CRAlways(except) ->
+      if (except.contains(child.dirName)) {
+        context.!canReuse = CRAlways(except.remove(child.dirName));
+        false
+      } else {
+        true
+      }
     | CRNever() -> false
     | CRIfMatch() ->
       same = (native_eq(parents, child.parents) == 0);
@@ -1294,9 +1300,11 @@ class EagerDir{
     unsafeSkipInit: Bool = false,
   ): void {
     context.unsafeMaybeGetEagerDir(childName) match {
-    | Some(child) if (static::isReusable(context, child, parents)) ->
-      static::reuseDir(context, childName);
-      return void
+    | Some(child) ->
+      if (static::isReusable(context, child, parents)) {
+        static::reuseDir(context, childName);
+        return void
+      }
     | _ -> void
     };
 
