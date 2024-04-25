@@ -21,7 +21,7 @@ value class Name private (
   }
 }
 
-base class Stmt{pos: Int = 0} uses Equality, Show {
+base class Stmt{pos: Int = 0} uses Orderable, Show {
   children =
   | BeginTransaction{kind: TransactionKind}
   | EndTransaction{}
@@ -62,7 +62,7 @@ base class Stmt{pos: Int = 0} uses Equality, Show {
   | Pragma{name: Name, value: ?Value}
 }
 
-base class ViewDefinition uses Equality, Show {
+base class ViewDefinition uses Orderable, Show {
   children =
   | SQuery(Select)
   | SCall(Name, Array<Expr>)
@@ -72,7 +72,7 @@ base class ViewDefinition uses Equality, Show {
   | SCall(f, args) -> Call(f, args, false).toString()
 }
 
-class UpdateSet(columns: Array<(Int, Name)>, value: Expr) uses Equality, Show
+class UpdateSet(columns: Array<(Int, Name)>, value: Expr) uses Orderable, Show
 
 base class AlterTable{name: Name} extends Stmt {
   children =
@@ -91,7 +91,7 @@ class TableSchema{
   constraints: Array<TableConstraint>,
   withoutRowid: Bool,
   strict: Bool,
-} uses Equality
+} uses Orderable
 
 class ColumnDefinition{
   name: Name,
@@ -105,12 +105,12 @@ class ColumnDefinition{
   collate: ?CCCollate = None(),
   foreignKey: ?CCForeignKey = None(),
   generated: ?CCGenerated = None(),
-} uses Equality, Show
+} uses Orderable, Show
 
 // TODO: Add `pos` for better error messages.
 base class ColumnConstraint{
   constraintName: ?Name = None(),
-} uses Equality, Show {
+} uses Orderable, Show {
   children =
   | CCPrimaryKey{
     order: IKind,
@@ -126,7 +126,7 @@ base class ColumnConstraint{
   | CCGenerated{expr: Expr, stored: Bool, reactive: Bool}
 }
 
-base class TableConstraint{constraintName: ?String} uses Equality {
+base class TableConstraint{constraintName: ?String} uses Orderable {
   children =
   | TCPrimaryKey{columns: Array<IndexedColumn>, onConflict: ?OnConflict}
   | TCUnique{columns: Array<IndexedColumn>, onConflict: ?OnConflict}
@@ -138,19 +138,19 @@ class IndexedColumn{
   expr: Expr,
   collate: ?Name,
   order: IKind,
-} uses Equality, Show
+} uses Orderable, Show
 
 // TODO
-class ForeignKeyClause{} uses Equality
+class ForeignKeyClause{} uses Orderable
 
-base class OnConflict uses Equality, Show {
+base class OnConflict uses Orderable, Show {
   children =
   | OCIgnore()
   | OCReplace()
   | OCUpdate(Update)
 }
 
-base class InsertValues uses Equality, Show {
+base class InsertValues uses Orderable, Show {
   children =
   | IValues(Array<Array<Expr>>)
   | IQuery(Select)
@@ -164,7 +164,7 @@ class Select{
   rest: Array<(CompoundOperator, SelectCore)>,
 } extends Stmt
 
-base class SelectCore uses Equality, Show {
+base class SelectCore uses Orderable, Show {
   children =
   | SelectCoreQuery{
     distinct: Bool,
@@ -177,13 +177,13 @@ base class SelectCore uses Equality, Show {
   | SelectCoreValues{values: Array<Array<Expr>>}
 }
 
-base class SelectResult uses Equality, Show {
+base class SelectResult uses Orderable, Show {
   children =
   | SelectStar(table: ?Name)
   | SelectExpr(expr: Expr, alias: ?Name)
 }
 
-base class SelectFrom uses Equality, Show
+base class SelectFrom uses Orderable, Show
 
 base class SelectSource{asName: ?Name} extends SelectFrom {
   children =
@@ -234,7 +234,7 @@ base class Value extends Expr {
   | VJSON(String)
 }
 
-base class Expr uses Equality, Show {
+base class Expr uses Orderable, Show {
   children =
   | In(Expr, InValues, negated: Bool)
   | Between(Expr, Expr, Expr, negated: Bool)
@@ -257,7 +257,7 @@ class Identifier(
   table: ?Name = None(),
 ) extends Expr uses Hashable, Show
 
-base class UnaryOperator uses Equality, Show {
+base class UnaryOperator uses Orderable, Show {
   children =
   | UnaryNot()
   | UnaryPlus()
@@ -266,7 +266,7 @@ base class UnaryOperator uses Equality, Show {
   | UnaryIsNull(negated: Bool)
 }
 
-base class BinaryOperator uses Equality, Show {
+base class BinaryOperator uses Orderable, Show {
   children =
   | OPlus()
   | OMinus()
@@ -328,13 +328,13 @@ base class BinaryOperator uses Equality, Show {
   }
 }
 
-base class InValues uses Equality, Show {
+base class InValues uses Orderable, Show {
   children =
   | InList(Array<Expr>)
   | InSelect(Select)
 }
 
-base class TransactionKind uses Equality, Show {
+base class TransactionKind uses Orderable, Show {
   children =
   | TransactionDeferred()
   | TransactionImmediate()
