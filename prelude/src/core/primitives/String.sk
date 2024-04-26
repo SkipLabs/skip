@@ -7,8 +7,17 @@
 
 module String;
 
+@cpp_extern
+native fun getByte(String, Int): UInt8;
+
+@cpp_extern
+native fun byteSize(String): UInt32;
+
+@cpp_extern
+native fun unsafeSlice(str: String, Int, Int): String;
+
 native class .String uses Hashable, Show, Orderable, AsBytes {
-  @cpp_runtime
+  @cpp_extern
   @may_alloc
   native static fun fromChars(chars: readonly Array<Char>): String;
   @cpp_extern
@@ -21,9 +30,9 @@ native class .String uses Hashable, Show, Orderable, AsBytes {
 
   @intrinsic
   private native fun concat(String): String;
-  @cpp_runtime
+  @cpp_extern
   native private fun toFloat_raw(): Float;
-  @cpp_runtime
+  @intrinsic
   native fun compare_raw(other: String): Int;
 
   fun take(len: Int): String {
@@ -245,6 +254,14 @@ native class .String uses Hashable, Show, Orderable, AsBytes {
     this.getIter().collect(Vector)
   }
 
+  fun utf8(): Array<UInt8> {
+    result = mutable Vector[];
+    for (i in Range(0, String.byteSize(this).toInt())) {
+      result.push(String.getByte(this, i));
+    };
+    result.toArray()
+  }
+
   fun splitLast(substring: String): (String, String) {
     i = this.getEndIter();
     if (!i.reverseSearch(substring)) {
@@ -421,7 +438,7 @@ native class .String uses Hashable, Show, Orderable, AsBytes {
   }
 
   fun bytes(): readonly Bytes {
-    StringBytes(this, Range(0, Unsafe.string_utf8_size(this)))
+    StringBytes(this, Range(0, String.byteSize(this).toInt()))
   }
 
   @synonym("toUpperCase")
@@ -535,28 +552,6 @@ private fun isWhitespace(c: Char): Bool {
   }
 }
 
-// --- Support for String::convert()
-
-base class Encoding {
-  children =
-  | Utf8()
-  | Ascii()
-  | Cp437()
-  | Utf16LE()
-  | Utf16BE()
-  | Iso8859_1()
-  | CustomEncoding(name: String)
-
-  fun code(): String
-  | Utf8() -> "utf8"
-  | Ascii() -> "ascii"
-  | Cp437() -> "cp437"
-  | Utf16LE() -> "utf16le"
-  | Utf16BE() -> "utf16be"
-  | Iso8859_1() -> "iso8859-1"
-  | CustomEncoding(name) -> name
-}
-
 private mutable class StringBytes(
   private str: String,
   private range: Range,
@@ -566,7 +561,7 @@ private mutable class StringBytes(
   }
 
   readonly fun get(index: Int): UInt8 {
-    Unsafe.string_utf8_get(this.str, this.range.start + index)
+    String.getByte(this.str, this.range.start + index)
   }
 
   readonly fun slice(start: Int, end: Int = Int::max): readonly Bytes {
@@ -576,6 +571,13 @@ private mutable class StringBytes(
   readonly fun size(): Int {
     this.range.size()
   }
+}
+
+class InvalidUtf8() extends Exception
+
+@export("SKIP_invalid_utf8")
+fun invalidUtf8(): void {
+  throw (InvalidUtf8())
 }
 
 module end;

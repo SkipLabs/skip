@@ -46,7 +46,7 @@ void sk_print_ctx_table();
 
 #define ptr_is_a_type_member_array(ptr, type, member) \
   (1 ? (ptr) : &((type*)0)->member[0])
-#define container_of_type_member_array(ptr, type, member)         \
+#define container_of(ptr, type, member)                           \
   ((type*)((char*)ptr_is_a_type_member_array(ptr, type, member) - \
            offsetof(type, member)))
 
@@ -218,8 +218,7 @@ typedef struct {
   char data[0];
 } sk_array_t;
 
-#define skip_array_len(obj) \
-  (container_of_type_member_array(obj, sk_array_t, data)->length)
+#define skip_array_len(obj) (container_of(obj, sk_array_t, data)->length)
 
 /*****************************************************************************/
 /* SKIP objects: arrays and class instances. */
@@ -231,11 +230,73 @@ typedef struct {
 /* SKIP String representation. */
 /*****************************************************************************/
 
+/*
+ * Each skip object is preceded in memory by either a string header, if the
+ * object is a string, or a vtable pointer otherwise. String headers are laid
+ * out so that the least significant byte of the hash of a string is at the
+ * same offset from the object pointer as the least significant byte of the
+ * vtable pointer of a non-string object.  Vtable entries are guaranteed to
+ * be 8-aligned, so their least significant 3 bits are clear. String hashes
+ * are tagged so that bit 1 is always set. Therefore, strings can be
+ * distinguished from other objects by reading what might be a vtable pointer
+ * and testing bit 1.
+ *
+ * In 64-bit mode, reading the vtable pointer of obj reads 8 bytes from
+ * obj-8, while in 32-bit mode it reads 4 bytes from obj-4. Labeling the
+ * bytes 0x01 through 0x08, suppose memory is laid out as follows:
+ *
+ *                   SKIP64                 SKIP32
+ * obj-8 -> ┌──────┐
+ *          │ 0x01 │ ⎫       ⎫              ⎫
+ * obj-7 -> ├──────┤ ⎪       ⎪              ⎪
+ *          │ 0x02 │ ⎪       ⎪              ⎪
+ * obj-6 -> ├──────┤ ⎬ hash  ⎪              ⎬ size
+ *          │ 0x03 │ ⎪       ⎪              ⎪
+ * obj-5 -> ├──────┤ ⎪       ⎪              ⎪
+ *          │ 0x04 │ ⎭       ⎪              ⎭
+ * obj-4 -> ├──────┤         ⎬ vtable ptr
+ *          │ 0x05 │ ⎫       ⎪              ⎫       ⎫
+ * obj-3 -> ├──────┤ ⎪       ⎪              ⎪       ⎪
+ *          │ 0x06 │ ⎪       ⎪              ⎪       ⎪
+ * obj-2 -> ├──────┤ ⎬ size  ⎪              ⎬ hash  ⎬ vtable ptr
+ *          │ 0x07 │ ⎪       ⎪              ⎪       ⎪
+ * obj-1 -> ├──────┤ ⎪       ⎪              ⎪       ⎪
+ *          │ 0x08 │ ⎭       ⎭              ⎭       ⎭
+ * obj   -> ├──────┤
+ *          │      │
+ *
+ * On little-endian machines, the vtable pointer in 64-bit mode will be
+ * 0x0807060504030201 and in 32-bit mode, 0x08070605. So the low byte in
+ * 64-bit mode is that labeled 0x01 while in 32-bit mode the low byte is
+ * 0x05. Therefore in 64-bit mode the string hash is stored in [obj-8,obj-5],
+ * with the size in [obj-4,obj-1], while in 32-bit mode the order is
+ * reversed: the hash in [obj-4,obj-1] and the size in [obj-8,obj-5].
+ *
+ * The compiler generates code that depends on this representation,
+ * see AsmOutput::sk_string_header.
+ *
+ * Resolving this reliance on a little-endian architecture would
+ * require treating the string header as a single 64-bit value in
+ * 64-bit mode, but not in 32 bit mode. Additionally, the code emitted
+ * by the compiler for pattern matching on string constants reads the
+ * 64-bit string header with a single load, which in 32-bit mode,
+ * would need to be changed to 2 32-bit loads, combining the results
+ * using sk_string_header.
+ */
+
 typedef struct {
+#ifdef SKIP64
+  uint32_t hash;
+  uint32_t size;
+#else
   uint32_t size;
   uint32_t hash;
-  unsigned char data[0];
+#endif
+  char data[0];
 } sk_string_t;
+
+#define sk_string_header_size (offsetof(sk_string_t, data))
+sk_string_t* get_sk_string(char* obj);
 
 /*****************************************************************************/
 /* SKIP linked list. */
@@ -317,7 +378,7 @@ char* sk_get_external_pointer();
 char* sk_get_external_pointer_destructor(char* obj);
 uint32_t sk_get_external_pointer_value(char* obj);
 uint32_t sk_get_magic_number(char* obj);
-void sk_call_external_pointer_descructor(char*, uint32_t);
+void sk_call_external_pointer_destructor(char*, uint32_t);
 int sk_is_nofile_mode();
 void sk_lower_static(void*);
 void sk_check_has_lock();

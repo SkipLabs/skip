@@ -333,19 +333,7 @@ void SKIP_restore_from_parent(sk_saved_obstack_t* saved,
   head = saved_head;
   end = saved_end;
 }
-
-static int sk_gc_enabled = 1;
-
-void SKIP_disable_GC() {
-  sk_gc_enabled = 0;
-}
-
-void SKIP_enable_GC() {
-  sk_gc_enabled = 1;
-}
-
 uint32_t SKIP_should_GC(sk_saved_obstack_t* saved) {
-  if (!sk_gc_enabled) return 0;
   size_t nbr_page = 0;
   sk_obstack_t* cursor = page;
   while (cursor != NULL && cursor != saved->page) {

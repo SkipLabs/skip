@@ -15,7 +15,7 @@ ifndef PLAYWRIGHT_JUNIT_OUTPUT_NAME
 SKNPM_FLAG=
 else
 SKNPM_FLAG=--junitxml $(PLAYWRIGHT_JUNIT_OUTPUT_NAME)
-endif # ifdef PROFILE
+endif # ifndef PLAYWRIGHT_JUNIT_OUTPUT_NAME
 
 ################################################################################
 # skdb wasm + js client
