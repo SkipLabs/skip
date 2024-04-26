@@ -1,6 +1,8 @@
 OUT_DIR?=$(shell realpath ./build)
 LIB_DIR?=/usr/local/lib
 
+OLEVEL ?= -O2
+
 ifdef PROFILE
 PRFDEF=$(shell echo $(PROFILE) | tr  '[:lower:]' '[:upper:]')
 ifeq ($(PRFDEF),RELEASE)
@@ -72,10 +74,11 @@ $(OUT_DIR)/libskip_runtime32.a: $(OUT_DIR)/libskip_runtime32.o
 	llvm-ar crs $@ $^
 
 $(OUT_DIR)/libstd.sklib: $(OUT_DIR)/libskip_runtime64.a $(OUT_DIR)/libbacktrace.a $(SKIP_SRC)
-	SKC_PREAMBLE=./preamble/preamble64.ll skc -o $@ --sklib-name std --no-std -O2 --link-args '-lpthread' $^
+	SKC_PREAMBLE=./preamble/preamble64.ll skc -o $@ --sklib-name std --no-std $(OLEVEL) --link-args '-lpthread' $^
 
 .PHONY: clean
 clean:
 	rm -f $(OUT_DIR)/libbacktrace.a $(OUT_DIR)/libskip_runtime64.a $(OUT_DIR)/libstd.sklib
 	$(MAKE) -C runtime clean
 	(test ! -f libbacktrace/Makefile && echo "Warning: libbacktrace submodule or Makefile not initialized") || $(MAKE) -C libbacktrace clean
+	find . -name 'Skargo.toml' -print0 | sed 's|Skargo.toml|target|g' | xargs -0 rm -rf

@@ -144,13 +144,9 @@ static char* SKIP_intern_obj(sk_stack_t* st, char* obj) {
 }
 
 static char* SKIP_intern_string(char* obj) {
-  size_t len = *(uint32_t*)(obj - 2 * sizeof(uint32_t));
-  char* result = shallow_intern(obj, len, 2 * sizeof(uint32_t));
+  size_t len = get_sk_string(obj)->size;
+  char* result = shallow_intern(obj, len, sk_string_header_size);
   return result;
-}
-
-uint32_t SKIP_is_string(char* obj) {
-  return *(((uint32_t*)obj) - 1) & 0x80000000;
 }
 
 void* SKIP_intern_shared(void* obj) {
@@ -187,7 +183,8 @@ void* SKIP_intern_shared(void* obj) {
     void* interned_ptr;
 
     if (SKIP_is_string(toCopy)) {
-      sk_string_t* str = (sk_string_t*)((char*)toCopy - sizeof(uint32_t) * 2);
+      sk_string_t* str = get_sk_string(toCopy);
+      // mark already-copied strings by setting size to -1
       if (str->size != (uint32_t)-1 && str->size < sizeof(void*)) {
         void* interned_ptr = SKIP_intern_string(toCopy);
         *delayed.slot = interned_ptr;
@@ -209,12 +206,18 @@ void* SKIP_intern_shared(void* obj) {
       continue;
     }
 
-    if (((uintptr_t) * ((void**)toCopy - 1) & 1) == 0) {
+    void*** addr_vtable_ptr =
+        &(container_of(toCopy, sk_class_inst_t, data)->vtable);
+    void** vtable_ptr = *addr_vtable_ptr;
+    // mark already-copied objects by replacing their vtable pointer with a
+    // forwarding pointer to the copied object, with the lsb set to
+    // distinguish it from vtable pointers
+    if (((uintptr_t)vtable_ptr & 1) == 0) {
       interned_ptr = SKIP_intern_obj(st, toCopy);
-      sk_stack3_push(st3, ((void**)toCopy - 1), *((void**)toCopy - 1), NULL);
-      *((void**)toCopy - 1) = (void*)((uintptr_t)interned_ptr | 1);
+      sk_stack3_push(st3, addr_vtable_ptr, vtable_ptr, NULL);
+      *addr_vtable_ptr = (void*)((uintptr_t)interned_ptr | 1);
     } else {
-      interned_ptr = (void*)((uintptr_t) * ((void**)toCopy - 1) & ~1);
+      interned_ptr = (void*)((uintptr_t)vtable_ptr & ~1);
       sk_incr_ref_count(interned_ptr);
     }
 
@@ -226,8 +229,7 @@ void* SKIP_intern_shared(void* obj) {
     void** toClean = cell.value1;
     *toClean = cell.value2;
     if (cell.value3 != NULL) {
-      sk_string_t* str =
-          (sk_string_t*)((char*)cell.value1 - sizeof(uint32_t) * 2);
+      sk_string_t* str = get_sk_string(cell.value1);
       str->size = (uint32_t)(uintptr_t)cell.value3;
     }
   }

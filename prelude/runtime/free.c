@@ -39,8 +39,8 @@ void sk_free_obj(sk_stack_t* st, char* obj) {
 
   // Check if we are dealing with a string
   if (SKIP_is_string(obj)) {
-    size_t memsize = *(uint32_t*)(obj - 2 * sizeof(uint32_t));
-    size_t leftsize = 2 * sizeof(uint32_t);
+    size_t memsize = get_sk_string(obj)->size;
+    size_t leftsize = sk_string_header_size;
     free_intern(obj, memsize, leftsize);
     return;
   }
@@ -68,7 +68,7 @@ void sk_free_obj(sk_stack_t* st, char* obj) {
 #endif
       SKIP_throw_cruntime(ERROR_INVALID_EXTERNAL_POINTER);
     }
-    sk_call_external_pointer_descructor(destructor, value);
+    sk_call_external_pointer_destructor(destructor, value);
   } else if ((ty->m_refsHintMask & 1) != 0) {
     const size_t refMaskWordBitSize = sizeof(ty->m_refMask[0]) * 8;
     char* ohead = obj;
