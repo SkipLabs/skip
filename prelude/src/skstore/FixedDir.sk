@@ -648,13 +648,13 @@ base class FixedSourceMap {
           } else {
             return None()
           }
-        | MInfoSingle(SKDB.IndexProjKey(minfoRow, indexKinds)) ->
+        | MInfoSingle(SKDB.IndexProjKey(minfoRow, columnIndices)) ->
           if (minfoRow != pathRow) return None();
           !seenMInfoTypeOpt = seenMInfoTypeOpt match {
-          | None() -> Some(IndexProjection(indexKinds))
+          | None() -> Some(IndexProjection(columnIndices))
           | Some(
-            IndexProjection(seenIndexKinds),
-          ) if (indexKinds == seenIndexKinds) ->
+            IndexProjection(seenColumnIndices),
+          ) if (columnIndices == seenColumnIndices) ->
             seenMInfoTypeOpt
           | _ -> None()
           }
@@ -713,8 +713,8 @@ base class FSMMInfoType {
   // Each RowKey maps to itself
   | FullRow()
   // Each RowKey maps to an IndexProjKey with the same rowValues but the specified
-  // kinds array
-  | IndexProjection(kinds: Array<(Int, SQLParser.IKind, SQLParser.Type)>)
+  // columnIndices array
+  | IndexProjection(columnIndices: Array<Int>)
   // Each RowKey maps to a ProjKey with the specified left/right shard and the
   // scalar value at position col in the rowKey.
   | Projection(col: Int, leftShard: Int, rightShard: Int)
@@ -737,7 +737,8 @@ private class CompactFSMImpl protected (
   private fun reconstructMInfo(rowKey: SKDB.RowKey): MInfo {
     minfoKey = this.metadata.minfoType match {
     | FullRow() -> rowKey
-    | IndexProjection(indexKinds) -> SKDB.IndexProjKey(rowKey.row, indexKinds)
+    | IndexProjection(columnIndices) ->
+      SKDB.IndexProjKey(rowKey.row, columnIndices)
     | Projection(col, leftShard, rightShard) ->
       SKDB.ProjKey(rowKey.row.values[col], col, leftShard, rightShard)
     | ext @ Extension _ -> return this.extendKey(rowKey, ext).fromSome()

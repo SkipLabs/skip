@@ -292,7 +292,7 @@ class SKDBUsersByName extends PredefinedTable {
 
   fun makeKey(userID: String): IndexProjKey {
     IndexProjKey::create(
-      Array[(this.getColNbr(userIDColName), P.TEXT(), Some(CString(userID)))],
+      Array[(this.getColNbr(userIDColName), Some(CString(userID)))],
     )
   }
 }
@@ -319,9 +319,7 @@ class SKDBUserPermissions extends PredefinedTable {
 
   fun makeKey(userID: ?String): IndexProjKey {
     IndexProjKey::create(
-      Array[
-        (this.getColNbr(userIDColName), P.TEXT(), userID.map(x -> CString(x))),
-      ],
+      Array[(this.getColNbr(userIDColName), userID.map(x -> CString(x)))],
     )
   }
 }
@@ -345,7 +343,7 @@ class SKDBGroups extends PredefinedTable {
   const indexedFields: Array<P.Name> = Array[groupIDColName];
   fun makeKey(groupID: String): IndexProjKey {
     IndexProjKey::create(
-      Array[(this.getColNbr(groupIDColName), P.TEXT(), Some(CString(groupID)))],
+      Array[(this.getColNbr(groupIDColName), Some(CString(groupID)))],
     )
   }
 }
@@ -373,8 +371,8 @@ class SKDBGroupPermissions extends PredefinedTable {
   fun makeKey(groupID: String, userID: ?String): IndexProjKey {
     IndexProjKey::create(
       Array[
-        (this.getColNbr(groupIDColName), P.TEXT(), Some(CString(groupID))),
-        (this.getColNbr(userIDColName), P.TEXT(), userID.map(x -> CString(x))),
+        (this.getColNbr(groupIDColName), Some(CString(groupID))),
+        (this.getColNbr(userIDColName), userID.map(x -> CString(x))),
       ],
     )
   }

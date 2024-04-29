@@ -9,32 +9,55 @@ module SKDB;
 const systemIndexPrefix: String = "__skdb__";
 
 extension class IndexProjKey extends SKStore.Key {
-  static fun create(values: Array<(Int, P.Type, ?CValue)>): this {
-    row = RowValues::create(values.map(x -> x.i2));
-    kinds = values.map(x -> (x.i0, P.IASC(), x.i1));
-    static(row, kinds)
+  static fun create(values: Array<(Int, ?CValue)>): this {
+    row = RowValues::create(values.map(x -> x.i1));
+    columnIndices = values.map(x -> (x.i0));
+    static(row, columnIndices)
   }
 
   static fun createFromRowValues(
     row: RowValues,
     kinds: Array<(Int, P.IKind, P.Type)>,
   ): IndexProjKey {
-    static(row, kinds)
+    static(row, kinds.map(x -> x.i0))
   }
 
   fun toArray(): Array<(Int, ?CValue)> {
     indexedValues = mutable Vector[];
-    for (i in Range(0, this.kinds.size())) {
-      indexedValues.push((this.kinds[i].i0, this.row.values[this.kinds[i].i0]));
+    for (i in Range(0, this.columnIndices.size())) {
+      columnIndex = this.columnIndices[i];
+      indexedValues.push((columnIndex, this.row.values[columnIndex]));
     };
     indexedValues.toArray()
   }
 
+  fun compareRows(x: RowValues, y: RowValues): Order {
+    xsize = x.size();
+    ysize = y.size();
+    for (i in Range(0, this.columnIndices.size())) {
+      idx = this.columnIndices[i];
+      if (idx >= xsize && idx >= ysize) return EQ();
+      if (idx >= xsize) return LT();
+      if (idx >= ysize) return GT();
+      value1 = x.getValue(idx);
+      value2 = y.getValue(idx);
+      (value1, value2) match {
+      | (None(), None()) -> continue
+      | (None(), _) -> return LT()
+      | (_, None()) -> return GT()
+      | (Some(v1), Some(v2)) ->
+        cmp = v1.compare(v2);
+        if (cmp != EQ()) return cmp
+      }
+    };
+    EQ()
+  }
+
   fun compare(other: SKStore.Key): Order {
     other match {
-    | IndexProjKey(row2, kinds2) ->
-      this.kinds.compare(kinds2) match {
-      | EQ() -> compareRows(this.kinds, this.row, row2)
+    | IndexProjKey(row2, columnIndices2) ->
+      this.columnIndices.compare(columnIndices2) match {
+      | EQ() -> this.compareRows(this.row, row2)
       | diseq -> diseq
       }
     | _ -> this.getClassName().compare(other.getClassName())
@@ -91,7 +114,7 @@ fun createIndex(
     )
   };
   if (unique) {
-    subKinds = kinds.slice(0, size);
+    columnIndices = kinds.slice(0, size);
     _ = index
       .map(
         x ~> x,
@@ -102,7 +125,7 @@ fun createIndex(
           result = SortedMap<IndexProjKey, mutable Vector<RowValues>>[];
           valuesArr = values.collect(Array);
           for (v in valuesArr) {
-            k = IndexProjKey::createFromRowValues(v, subKinds);
+            k = IndexProjKey::createFromRowValues(v, columnIndices);
             if (v.repeat != 1) {
               throw Conflict(
                 0,
