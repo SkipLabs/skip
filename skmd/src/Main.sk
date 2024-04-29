@@ -34,13 +34,14 @@ fun main(): void {
     SKStore.destroyObstack(saved);
     skipExit(0);
   } else {
+    gctx = Skargo.GlobalContext::create(args);
     args.maybeGetSubcommand() match {
     | Some(subcmd) ->
       commands.maybeGet(subcmd) match {
       | Some(handler) ->
         skipExit(
           try {
-            handler(args);
+            handler(gctx, args);
             SKStore.destroyObstack(saved);
             0
           } catch {
@@ -60,7 +61,7 @@ fun main(): void {
 }
 
 /********* Build **********/
-fun html(): (Cli.Command, Cli.ParseResults ~> void) {
+fun html(): (Cli.Command, (Skargo.GlobalContext, Cli.ParseResults) ~> void) {
   (
     Cli.Command("html")
       .about("Convert to html")
@@ -78,7 +79,7 @@ fun html(): (Cli.Command, Cli.ParseResults ~> void) {
   )
 }
 
-fun execHtml(args: Cli.ParseResults): void {
+fun execHtml(_: Skargo.GlobalContext, args: Cli.ParseResults): void {
   acc = mutable Vector[];
   rl = () -> {
     try {

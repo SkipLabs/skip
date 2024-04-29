@@ -1,24 +1,13 @@
 module SKMD;
 
-fun read_to_end(file: mutable IO.File): String {
-  res = mutable Vector[];
-  loop {
-    s = try {
-      Posix.read(file.fileno, IO.File::kDefaultBufferSize)
-    } catch {
-    | EndOfFile _ -> ""
-    | exn -> throw exn
-    };
-    if (s.length() == 0) {
-      break void
-    };
-    res.push(s)
-  };
-  res.join("")
-}
-
 fun readTextFile(filename: String): String {
-  read_to_end(IO.File::open(filename, IO.OpenOptions{read => true}))
+  buf = mutable Vector[];
+  IO.File::open(filename, IO.OpenOptions{read => true}).read_to_end(buf) match {
+  | Success _ -> String::fromUtf8(buf.collect(Array))
+  | Failure(err) ->
+    print_error(err.getMessage());
+    skipExit(1)
+  }
 }
 
 class Config{
