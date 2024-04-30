@@ -346,7 +346,7 @@ do
     fi
 done
 
-if cat test/unit/test_alter_table_add_col.sql | $SKDB | tr '\n' 'S' | grep -q '1|1S3|3S3S1|1S3|3S3|5S10S' ; then
+if cat test/unit/test_alter_table_add_col.sql | $SKDB | tr '\n' 'S' | grep -q '1|1S3|3S3S1|1S3|3S3|5S5S1|1S3|3S3|5S3|9S9S' ; then
     pass "ALTER TABLE ADD COLUMN"
 else
     fail "ALTER TABLE ADD COLUMN"
