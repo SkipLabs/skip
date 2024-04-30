@@ -6,8 +6,8 @@ fi
 
 SKDB="skargo run -q --profile $SKARGO_PROFILE -- "
 
-pass() { printf "%-36s OK\n" "TEST $1:"; }
-fail() { printf "%-36s FAILED\n" "TEST $1:"; }
+pass() { printf "%-76s OK\n" "TEST $1:"; }
+fail() { printf "%-76s FAILED\n" "TEST $1:"; }
 
 if cat test/unit/test_unique.sql | $SKDB 2>&1 | grep -q UNIQUE
 then
@@ -329,3 +329,19 @@ if cat test/unit/test_select_multiple_id.sql | $SKDB | sort | uniq | wc -l | xar
 else
     fail "MULTIPLE ID"
 fi
+
+for f in test/unit/checks/*.sql;
+do
+    base=$(basename $f .sql)
+    if diff -q <(cat "test/unit/checks/$base.sql" | $SKDB --always-allow-joins 2>&1) "test/unit/checks/$base.exp" > /dev/null 2>&1; then
+        pass "SELECT CHECK - $base"
+    else
+        fail "SELECT CHECK - $base"
+        echo "Ran:"
+        cat "test/unit/checks/$base.sql"
+        echo "Got:"
+        cat "test/unit/checks/$base.sql" | $SKDB --always-allow-joins
+        echo "Wanted:"
+        cat "test/unit/checks/$base.exp"
+    fi
+done

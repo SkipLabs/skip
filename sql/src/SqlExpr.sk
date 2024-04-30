@@ -11,16 +11,19 @@ base class AValue<+T> {
   | AUndef()
   | ANull()
   | ADef(T)
+  | ASuccess() // for representing a successful side effect
 
   fun flatMap<T2>(f: T -> AValue<T2>): AValue<T2>
   | AUndef() -> AUndef()
   | ANull() -> ANull()
   | ADef(x) -> f(x)
+  | ASuccess() -> ASuccess()
 
   fun map<T2>(f: T -> T2): AValue<T2>
   | AUndef() -> AUndef()
   | ANull() -> ANull()
   | ADef(x) -> ADef(f(x))
+  | ASuccess() -> ASuccess()
 }
 
 fun btoi(b: Bool): Int {
@@ -29,6 +32,10 @@ fun btoi(b: Bool): Int {
 
 fun errorEval<T>(msg: String): T {
   throw SqlError(0, msg);
+}
+
+fun unexpectedSideEffect<T>(): T {
+  invariant_violation("unexpected side effect within an expression")
 }
 
 base class ComparisonKind {
@@ -105,6 +112,7 @@ class ExprEvaluator(
 
     | CIf(conde, e1, e2) ->
       cond = this.evalCIExpr(context, conde) match {
+      | ASuccess() -> unexpectedSideEffect()
       | AUndef() -> return AUndef()
       | ANull() -> false
       | ADef(n) -> n != 0
@@ -121,6 +129,7 @@ class ExprEvaluator(
     | CCoalesce(el) ->
       for (e in el) {
         this.evalCFExpr(context, e) match {
+        | ASuccess() -> unexpectedSideEffect()
         | AUndef() -> return AUndef()
         | ANull() -> continue
         | v @ ADef(_) -> return v
@@ -130,6 +139,7 @@ class ExprEvaluator(
 
     | CFQuery(select) ->
       this.evalQuery(context, select) match {
+      | ASuccess() -> unexpectedSideEffect()
       | AUndef() -> AUndef()
       | ANull() -> ANull()
       | ADef(CFloat(f)) -> ADef(f)
@@ -138,6 +148,7 @@ class ExprEvaluator(
 
     | CNullIf(e1, e2) ->
       this.evalCFExpr(context, e1) match {
+      | ASuccess() -> unexpectedSideEffect()
       | AUndef() -> AUndef()
       | ANull() -> ANull()
       | ADef(x) ->
@@ -145,6 +156,7 @@ class ExprEvaluator(
         | AUndef() -> AUndef()
         | ANull() -> ADef(x)
         | ADef(y) -> if (x == y) ANull() else ADef(x)
+        | ASuccess() -> unexpectedSideEffect()
         }
       }
 
@@ -213,6 +225,7 @@ class ExprEvaluator(
 
     | CSQuery(select) ->
       this.evalQuery(context, select) match {
+      | ASuccess() -> unexpectedSideEffect()
       | AUndef() -> AUndef()
       | ANull() -> ANull()
       | ADef(CString(f)) -> ADef(f)
@@ -221,6 +234,7 @@ class ExprEvaluator(
 
     | CIf(conde, e1, e2) ->
       cond = this.evalCIExpr(context, conde) match {
+      | ASuccess() -> unexpectedSideEffect()
       | AUndef() -> return AUndef()
       | ANull() -> false
       | ADef(n) -> n != 0
@@ -241,6 +255,7 @@ class ExprEvaluator(
     | CCoalesce(el) ->
       for (e in el) {
         this.evalCSExpr(context, e) match {
+        | ASuccess() -> unexpectedSideEffect()
         | AUndef() -> return AUndef()
         | ANull() -> continue
         | v @ ADef(_) -> return v
@@ -252,10 +267,12 @@ class ExprEvaluator(
 
     | CNullIf(e1, e2) ->
       this.evalCSExpr(context, e1) match {
+      | ASuccess() -> unexpectedSideEffect()
       | AUndef() -> AUndef()
       | ANull() -> ANull()
       | ADef(x) ->
         this.evalCSExpr(context, e2) match {
+        | ASuccess() -> unexpectedSideEffect()
         | AUndef() -> AUndef()
         | ANull() -> ADef(x)
         | ADef(y) -> if (x == y) ANull() else ADef(x)
@@ -316,6 +333,7 @@ class ExprEvaluator(
       this.evalCSExpr(context, e).map(s -> CJSON(decodeJSON(context, s)))
     | CJQuery(select) ->
       this.evalQuery(context, select) match {
+      | ASuccess() -> unexpectedSideEffect()
       | AUndef() -> AUndef()
       | ANull() -> ANull()
       | ADef(x @ CJSON(_)) -> ADef(x)
@@ -374,6 +392,7 @@ class ExprEvaluator(
       )
     | CTQuery(select) ->
       this.evalQuery(context, select) match {
+      | ASuccess() -> unexpectedSideEffect()
       | AUndef() -> AUndef()
       | ANull() -> ANull()
       | ADef(CType(x)) -> ADef(CType::create(x))
@@ -437,6 +456,7 @@ class ExprEvaluator(
 
     | CNot(e) ->
       this.evalCIExpr(context, e) match {
+      | ASuccess() -> unexpectedSideEffect()
       | AUndef() -> AUndef()
       | ANull() -> ANull()
       | ADef(n) -> ADef(if (n == 0) 1 else 0)
@@ -589,6 +609,7 @@ class ExprEvaluator(
 
     | CIf(conde, e1, e2) ->
       cond = this.evalCIExpr(context, conde) match {
+      | ASuccess() -> unexpectedSideEffect()
       | AUndef() -> return AUndef()
       | ANull() -> false
       | ADef(n) -> n != 0
@@ -618,10 +639,12 @@ class ExprEvaluator(
 
     | CAnd(e1, e2) ->
       this.evalCIExpr(context, e1) match {
+      | ASuccess() -> unexpectedSideEffect()
       | ANull() -> ADef(0)
       | x @ ADef(0) -> x
       | AUndef() ->
         this.evalCIExpr(context, e2).flatMap(n2 -> ADef(btoi(n2 != 0))) match {
+        | ASuccess() -> unexpectedSideEffect()
         | ANull()
         | ADef(0) ->
           ADef(0)
@@ -647,6 +670,7 @@ class ExprEvaluator(
     | CCoalesce(el) ->
       for (e in el) {
         this.evalCIExpr(context, e) match {
+        | ASuccess() -> unexpectedSideEffect()
         | AUndef() -> return AUndef()
         | ANull() -> continue
         | v @ ADef(_) -> return v
@@ -656,6 +680,7 @@ class ExprEvaluator(
 
     | CIIsNull(e) ->
       this.evalCIExpr(context, e) match {
+      | ASuccess() -> unexpectedSideEffect()
       | AUndef() -> AUndef()
       | ANull() -> ADef(1)
       | ADef _ -> ADef(0)
@@ -663,6 +688,7 @@ class ExprEvaluator(
 
     | CFIsNull(e) ->
       this.evalCFExpr(context, e) match {
+      | ASuccess() -> unexpectedSideEffect()
       | AUndef() -> AUndef()
       | ANull() -> ADef(1)
       | ADef _ -> ADef(0)
@@ -670,6 +696,7 @@ class ExprEvaluator(
 
     | CSIsNull(e) ->
       this.evalCSExpr(context, e) match {
+      | ASuccess() -> unexpectedSideEffect()
       | AUndef() -> AUndef()
       | ANull() -> ADef(1)
       | ADef _ -> ADef(0)
@@ -677,6 +704,7 @@ class ExprEvaluator(
 
     | CJIsNull(e) ->
       this.evalCJExpr(context, e) match {
+      | ASuccess() -> unexpectedSideEffect()
       | AUndef() -> AUndef()
       | ANull() -> ADef(1)
       | ADef _ -> ADef(0)
@@ -684,6 +712,7 @@ class ExprEvaluator(
 
     | CTIsNull(e) ->
       this.evalCTExpr(context, e) match {
+      | ASuccess() -> unexpectedSideEffect()
       | AUndef() -> AUndef()
       | ANull() -> ADef(1)
       | ADef _ -> ADef(0)
@@ -810,6 +839,7 @@ class ExprEvaluator(
       | _ -> invariant_violation("Already checked in pattern")
       };
       v = this.evalCIExpr(context, vExpr) match {
+      | ASuccess() -> unexpectedSideEffect()
       | ANull() -> return ANull()
       | ADef(x) -> x
       | AUndef() -> return AUndef()
@@ -853,6 +883,7 @@ class ExprEvaluator(
       | _ -> invariant_violation("Already checked in pattern")
       };
       v = this.evalCFExpr(context, vExpr) match {
+      | ASuccess() -> unexpectedSideEffect()
       | ANull() -> return ANull()
       | ADef(x) -> x
       | AUndef() -> return AUndef()
@@ -896,6 +927,7 @@ class ExprEvaluator(
       | _ -> invariant_violation("Already checked in pattern")
       };
       v = this.evalCSExpr(context, vExpr) match {
+      | ASuccess() -> unexpectedSideEffect()
       | ANull() -> return ANull()
       | ADef(x) -> x
       | AUndef() -> return AUndef()
@@ -934,10 +966,12 @@ class ExprEvaluator(
 
     | CNullIf(e1, e2) ->
       this.evalCIExpr(context, e1) match {
+      | ASuccess() -> unexpectedSideEffect()
       | AUndef() -> AUndef()
       | ANull() -> ANull()
       | ADef(x) ->
         this.evalCIExpr(context, e2) match {
+        | ASuccess() -> unexpectedSideEffect()
         | AUndef() -> AUndef()
         | ANull() -> ADef(x)
         | ADef(y) -> if (x == y) ANull() else ADef(x)
@@ -948,6 +982,7 @@ class ExprEvaluator(
 
     | CSLength(e) ->
       this.evalCSExpr(context, e) match {
+      | ASuccess() -> unexpectedSideEffect()
       | AUndef() -> AUndef()
       | ANull() -> ANull()
       | ADef(s) -> ADef(s.length())
@@ -958,6 +993,20 @@ class ExprEvaluator(
         ADef(SKStore.genSym(0))
       } else {
         ADef(-SKStore.genSym(0))
+      }
+
+    | CICheck(pos, debugExpr, e, nameOpt) ->
+      this.evalCIExpr(context, e) match {
+      | ASuccess() -> ASuccess()
+      | AUndef() -> AUndef()
+      | ANull() -> ANull()
+      | ADef(n) if (n != 0) -> ASuccess()
+      | ADef(_) ->
+        named = nameOpt match {
+        | None() -> ""
+        | Some(n) -> ` '${n}'`
+        };
+        throw SqlError(pos, `Failed constraint${named}: ${debugExpr}`)
       }
     }
   }

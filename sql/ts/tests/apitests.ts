@@ -1,5 +1,5 @@
 import { expect } from "@playwright/test";
-import { createSkdb, SKDB, Params } from "skdb";
+import { createSkdb, SKDB, Params, SKDBTable } from "skdb";
 
 type dbs = {
   root: SKDB;
@@ -56,7 +56,10 @@ export async function setup(
 
   const testRootCreds = await getCredsFromDevServer("localhost", port, dbName);
 
-  const rootSkdb = await createSkdb({ asWorker: asWorker });
+  const rootSkdb = await createSkdb({
+    asWorker: asWorker,
+    disableWarnings: true,
+  });
   {
     const keyBytes = Uint8Array.from(atob(testRootCreds.get("root")), (c) =>
       c.charCodeAt(0),
@@ -74,7 +77,10 @@ export async function setup(
   const rootRemote = await rootSkdb.connectedRemote();
   const testUserCreds = await rootRemote!.createUser();
 
-  const userSkdb = await createSkdb({ asWorker: asWorker });
+  const userSkdb = await createSkdb({
+    asWorker: asWorker,
+    disableWarnings: true,
+  });
   {
     const keyData = testUserCreds.privateKey;
     const key = await crypto.subtle.importKey(
@@ -89,7 +95,10 @@ export async function setup(
 
   const testUserCreds2 = await rootRemote.createUser();
 
-  const userSkdb2 = await createSkdb({ asWorker: asWorker });
+  const userSkdb2 = await createSkdb({
+    asWorker: asWorker,
+    disableWarnings: true,
+  });
   {
     const keyData2 = testUserCreds2.privateKey;
     const key2 = await crypto.subtle.importKey(
@@ -255,12 +264,12 @@ async function testMirroring(root: SKDB, skdb1: SKDB, skdb2: SKDB) {
   // with invalid schemas erroring
   const rootRemote = await root.connectedRemote();
   await rootRemote!.exec(
-    "CREATE TABLE has_constraint (i INTEGER, skdb_access TEXT NOT NULL);",
+    "CREATE TABLE invalid_expect_cols (i INTEGER, skdb_access TEXT NOT NULL);",
   );
   await expect(
     async () =>
       await user1.mirror({
-        table: "has_constraint",
+        table: "invalid_expect_cols",
         expectedColumns: "(i INTEGER, skdb_access TEXT)",
       }),
   ).rejects.toThrow();
@@ -581,7 +590,89 @@ async function testMirrorWithAuthor(root: SKDB, user1: SKDB, user2: SKDB) {
   ]);
 }
 
+async function testConstraints(root: SKDB, user1: SKDB) {
+  const rootRemote = await root.connectedRemote();
+  await rootRemote!.exec(
+    "CREATE TABLE has_constraint (i INTEGER, skdb_access TEXT NOT NULL);",
+  );
+  await rootRemote!.exec(
+    "CREATE REACTIVE VIEW pos AS SELECT CHECK(i > 0) FROM has_constraint;",
+  );
+
+  const constraint = {
+    table: "has_constraint",
+    expectedColumns: "(i INTEGER, skdb_access TEXT NOT NULL)",
+  };
+
+  await user1.mirror(constraint);
+
+  // mirror works and is in good known state
+  await user1.exec("INSERT INTO has_constraint VALUES (1, 'read-write');");
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  const nRows = await user1.exec(
+    "select count(*) from has_constraint__skdb_mirror_feedback",
+  );
+  expect(nRows.scalarValue()).toEqual(0);
+
+  // mirror fails due to constraint violation
+  await user1.exec("INSERT INTO has_constraint VALUES (-1, 'read-write');");
+  const res = await waitSynch(
+    user1,
+    "select * from has_constraint__skdb_mirror_feedback",
+    (rows) => rows.length > 0,
+  );
+  expect(res).toEqual([{ i: -1, skdb_access: "read-write" }]);
+
+  // mirror fails whole txn due to constraint violation
+  await user1.exec(`BEGIN TRANSACTION;
+INSERT INTO
+  has_constraint
+VALUES
+  (55, 'read-write');
+INSERT INTO
+  has_constraint
+VALUES
+  (-1, 'read-write');
+INSERT INTO
+  has_constraint
+VALUES
+  (35, 'read-write');
+COMMIT;
+`);
+  {
+    const res: SKDBTable = await waitSynch(
+      user1,
+      "select i from has_constraint__skdb_mirror_feedback order by i",
+      (rows) => rows.length > 1,
+    );
+    expect(res).toEqual([{ i: -1 }, { i: -1 }, { i: 35 }, { i: 55 }]);
+  }
+
+  // mirror still works after failures
+  {
+    await user1.exec("INSERT INTO has_constraint VALUES (2, 'read-write');");
+    const res: SKDBTable = await waitSynch(
+      root,
+      "select count(*) from has_constraint where i = 2",
+      (rows) => rows.length > 0,
+      {},
+      true,
+    );
+    expect(res.scalarValue()).toEqual(1);
+  }
+}
+
 async function testReboot(root: SKDB, user: SKDB, user2: SKDB) {
+  const test_pk = {
+    table: "test_pk",
+    expectedColumns: "(x INTEGER PRIMARY KEY, y INTEGER, skdb_access TEXT)",
+  };
+  const test_pk_subset_schema = {
+    table: "test_pk",
+    expectedColumns: "(skdb_access TEXT, x INTEGER PRIMARY KEY)",
+  };
+  await user.mirror(test_pk);
+  await user2.mirror(test_pk_subset_schema);
   const remote = await user.connectedRemote();
   let user_rebooted = false;
   remote!.onReboot(() => (user_rebooted = true));
@@ -860,6 +951,8 @@ export const apitests = (asWorker) => {
         await testLargeMirror(dbs.root, dbs.user);
 
         await testMirrorWithAuthor(dbs.root, dbs.user, dbs.user2);
+
+        await testConstraints(dbs.root, dbs.user);
 
         // must come last: puts replication in to a permanent state of failure
         await testReboot(dbs.root, dbs.user, dbs.user2);

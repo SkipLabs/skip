@@ -111,6 +111,7 @@ extension class Parser {
       | TExists() -> this.parseExistsExpr(false)
       | TRaise() -> throw NotImplementedError(pos)
       // TODO: CURRENT?
+      | TCheck() -> this.parseCheckExpr()
       | TCurrentTime() -> VCurrentTime()
       | TCurrentDate() -> VCurrentDate()
       | TCurrentTimestamp() -> VCurrentTimestamp()
@@ -219,6 +220,13 @@ extension class Parser {
     } else {
       id
     }
+  }
+
+  mutable fun parseCheckExpr(): Expr {
+    this.expect_token(TLParen());
+    arg = this.parseExpr();
+    this.expect_token(TRParen());
+    Check(arg);
   }
 
   mutable fun parseCaseExpr(): Case {

@@ -798,13 +798,13 @@ fun buildDiffChain(
         }
       }
     } catch {
-    | PrivacyWriteViolation _ ->
+    | exn ->
       writer = mutable Debug.BufferedWriter(print_raw, 4096);
       for (tdiff in tableDiffs) {
         nack(writer, tdiff)
       };
-      writer.flush()
-    | exn -> throw exn
+      writer.flush();
+      throw exn
     }
   })
 }

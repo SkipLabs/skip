@@ -286,6 +286,7 @@ class CSelect{
   id: P.Name,
   distinct: Bool,
   params: Array<CGExpr>,
+  effects: Array<CGExpr>,
   sets: Array<(Int, CGExpr)>,
   aggr: ?Array<(AggrKind, CGExpr)>,
   kinds: Array<(Int, P.IKind, P.Type)>,
@@ -471,6 +472,8 @@ class COn(P.JoinKind, CExpr<Int>) extends CExpr<Int>
 
 class CISeqNum(Bool) extends CExpr<Int>
 class CSId() extends CExpr<String>
+
+class CICheck(Int, String, CExpr<Int>, ?P.Name) extends CExpr<Int>
 
 /*****************************************************************************/
 /* JSON primitives */
