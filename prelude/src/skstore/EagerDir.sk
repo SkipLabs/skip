@@ -1239,7 +1239,11 @@ class EagerDir{
     | CRAlways(except) ->
       if (except.contains(child.dirName)) {
         context.!canReuse = CRAlways(except.remove(child.dirName));
-        context.newDirs.contains(child.dirName)
+        if (context.newDirs.contains(child.dirName)) {
+          context.!newDirs = context.newDirs.remove(child.dirName);
+          context.removeDir(child.dirName)
+        };
+        false
       } else {
         true
       }
