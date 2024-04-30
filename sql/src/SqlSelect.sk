@@ -770,7 +770,11 @@ class SelectEvaluator{
     acc = mutable Vector<?CValue>[];
     for (param in params) {
       evaluator.evalCGExpr(context, param) match {
-      | ASuccess() -> void
+      | ASuccess() ->
+        throw SqlError(
+          0,
+          "SELECT error: parameter expression contains a side effect",
+        )
       | AUndef() ->
         debug(param);
         invariant_violation("Unexpected undefined value")
