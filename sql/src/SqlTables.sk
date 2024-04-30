@@ -366,13 +366,13 @@ private fun resetReactiveViews(
   viewsDir = context.unsafeGetEagerDir(getViewsDir(context).dirName);
   viewsToReset = viewsDir
     .unsafeGetFileIter()
-    .flatMap((x) -> {
+    .flatMap((x) ->
       x.i1.filter((file) ->
-        SelectFile::type(file).cselect.from.any((from) -> {
-          alteredDirs.contains(from.i0.name);
-        })
+        SelectFile::type(file).cselect.from.any((from) ->
+          alteredDirs.contains(from.i0.name)
+        )
       )
-    })
+    )
     .collect(Array);
 
   for (childView in viewsToReset) {
@@ -384,6 +384,7 @@ private fun resetReactiveViews(
       selectFile.queryParams,
     ).compileSelect(context, selectFile.select, selectFile.name, true);
     dirName = SKStore.DirName::create("/" + selectFile.name + "/");
+
     tableDir = context.unsafeGetEagerDir(getTableDir(context).dirName);
     fileName = SKStore.SID::create(selectFile.name.lower);
     tableDir.getArrayRaw(fileName).each((x) -> {
@@ -404,6 +405,9 @@ private fun resetReactiveViews(
         table.unsafeGetFileIter().flatMap(clearData),
       );
     });
+
+    _ = SKDB.evalSelect(context, newCSelect, None());
+
     dirDescr = SKDB.Compiler::getDirDescr(
       (selectFile.select.core as P.SelectCoreQuery _).params,
       newCSelect.from,
@@ -412,39 +416,10 @@ private fun resetReactiveViews(
       dirName,
       true,
     );
-
-    _selectDir = SKDB.evalSelect(context, newCSelect, None());
-
     tableDir.writeArray(context, fileName, Array[dirDescr]);
   };
-
-  //Recurse, resetting any views which depend upon a view we just reset.
-  if (viewsToReset.size() > 0) {
-    resetReactiveViews(
-      context,
-      viewsToReset
-        .map((file) -> SelectFile::type(file).name)
-        .collect(SortedSet),
-      options,
-    )
-  }
 }
 
-private fun transitiveDependencies(
-  context: mutable SKStore.Context,
-  dirName: SKStore.DirName,
-): SortedSet<SKStore.DirName> {
-  context.unsafeMaybeGetEagerDir(dirName) match {
-  | Some(dir @ SKStore.EagerDir _) ->
-    dir.childDirs.reduce(
-      (accDeps, childDirName) -> {
-        accDeps.union(transitiveDependencies(context, childDirName))
-      },
-      dir.childDirs,
-    )
-  | _ -> SortedSet::create()
-  }
-}
 fun alterTableAddColumn(
   context: mutable SKStore.Context,
   pos: Int,
@@ -537,17 +512,17 @@ fun alterTableAddColumn(
 
   tableDir.writeArray(context, sid, Array[newDescr]);
 
-  transitiveChildDirs = transitiveDependencies(context, dirName);
+  transitiveChildren = context.transitiveChildDirs(dirName);
 
   context.canReuse match {
   | SKStore.CRAlways(except) ->
-    context.!canReuse = SKStore.CRAlways(except.union(transitiveChildDirs))
+    context.!canReuse = SKStore.CRAlways(except.union(transitiveChildren))
   | _ -> void
   };
 
   resetReactiveViews(
     context,
-    transitiveChildDirs.map((x) -> P.Name::create(x.dirName)),
+    transitiveChildren.map((x) -> P.Name::create(x.dirName)),
     options,
   );
 }
