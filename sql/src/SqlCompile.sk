@@ -575,7 +575,7 @@ mutable class Compiler{
     };
 
     expandedSParams.toArray().map(param -> {
-      this.compileExpr(context, param.expr, param.alias)
+      this.compileExpr(context, param.expr)
     })
   }
 
@@ -586,8 +586,12 @@ mutable class Compiler{
     compiledExprs = mutable Vector[];
     for (_ => param in selectParams) {
       param match {
-      | P.SelectExpr(check @ P.Check(_), alias) ->
-        compiledExprs.push(this.compileExpr(context, check, alias))
+      | P.SelectExpr(P.Check(e), alias) ->
+        cexpr = this.compileExpr(context, e) match {
+        | CIExpr(inner) -> CIExpr(CICheck(this.pos, e.toString(), inner, alias))
+        | _ -> error(this.pos, "Expected a boolean expression inside CHECK")
+        };
+        compiledExprs.push(cexpr)
       | _ -> void
       }
     };
@@ -998,7 +1002,6 @@ mutable class Compiler{
   mutable fun compileExpr(
     context: mutable SKStore.Context,
     expr: P.Expr,
-    alias: ?P.Name = None(),
   ): CGExpr {
     expr match {
     | P.VNull() -> CGNull()
@@ -1817,11 +1820,9 @@ mutable class Compiler{
       }
 
     | P.Collate _ -> invariant_violation("not implemented")
-    | P.Check(e) ->
-      this.compileExpr(context, e) match {
-      | CIExpr(inner) -> CIExpr(CICheck(this.pos, e.toString(), inner, alias))
-      | _ -> error(this.pos, "Expected a boolean expression inside CHECK")
-      }
+    | P.Check(_) ->
+      // CHECK does not evaluate to ADef so should not be nested
+      error(this.pos, "CHECK expressions cannot be nested")
     }
   }
 
