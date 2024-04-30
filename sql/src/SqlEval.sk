@@ -1424,6 +1424,7 @@ class Evaluator{options: Options, user: ?UserFile} {
           | ADef(x) -> Some(x)
           | ANull() -> None()
           | AUndef _ -> invariant_violation("Undefined set value")
+          | ASuccess() -> unexpectedSideEffect()
           };
         };
         !row = RowValues::create(values.chill(), row.repeat);
@@ -1891,6 +1892,7 @@ private mutable class SQLContext(
           );
         } catch {
         | IgnoreAndContinue() -> void
+        | SqlError(_, msg) -> throw SqlError(stmt.pos, msg)
         | exn -> throw exn
         };
       };

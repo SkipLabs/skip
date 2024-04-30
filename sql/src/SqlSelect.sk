@@ -228,6 +228,7 @@ fun makeSelectEvaluator(
     select,
     up,
     params => select.params,
+    effects => select.effects,
     selectName1,
     selectName2,
     kinds => select.kinds,
@@ -244,6 +245,7 @@ class SelectEvaluator{
   directMode: ?Int = None(),
   up: ?ExprEvaluator,
   params: Array<CGExpr>,
+  effects: Array<CGExpr>,
   selectName1: SKStore.DirName,
   selectName2: SKStore.DirName,
   kinds: Array<(Int, P.IKind, P.Type)>,
@@ -254,6 +256,7 @@ class SelectEvaluator{
     emptyEval.evalCIExpr(context, expr) match {
     | ANull() -> 0
     | ADef(x) -> x
+    | ASuccess() -> unexpectedSideEffect()
     | AUndef() -> invariant_violation("Unexpected Undef")
     }
   }
@@ -333,6 +336,7 @@ class SelectEvaluator{
           evaluator = ExprEvaluator(Array[value], select.from, up);
           whereVal = evaluator.evalWhere(context, select.where);
           whereVal match {
+          | ASuccess() -> unexpectedSideEffect()
           | ANull()
           | ADef(0) ->
             false
@@ -364,7 +368,17 @@ class SelectEvaluator{
             !entry = entry.setRepeat(repeat);
           };
           evaluator = ExprEvaluator(Array[entry], select.from, up);
-          row = static::evalRow(context, evaluator, select.params, repeat);
+          rowOpt = static::evalRow(
+            context,
+            evaluator,
+            select.params,
+            select.effects,
+            repeat,
+          );
+          row = rowOpt match {
+          | Some(row) -> row
+          | None() -> return void
+          };
           writer.set(RowKey::create(row, kinds), row)
         },
       );
@@ -531,15 +545,46 @@ class SelectEvaluator{
     if (this.select.from.size() == 0) {
       if (context.unsafeMaybeGetEagerDir(this.selectName1) is None()) {
         emptyEval = ExprEvaluator(Array[], this.select.from, this.up);
-        entry = static::evalRow(context, emptyEval, aggrs.map(y -> y.i1), 1);
+        entry = static::evalRow(
+          context,
+          emptyEval,
+          aggrs.map(y -> y.i1),
+          Array[],
+          1,
+        ) match {
+        | Some(entry) -> entry
+        | None() ->
+          _dir = context.mkdir(
+            SKStore.IID::keyType,
+            Row::type,
+            this.selectName1,
+            Array[],
+          );
+          return this.selectName1
+        };
         evaluator = ExprEvaluator(Array[entry], this.select.from, this.up);
-        row = static::evalRow(context, evaluator, this.select.params, 1);
-        _dir = context.mkdir(
-          SKStore.IID::keyType,
-          Row::type,
-          this.selectName1,
-          Array[(SKStore.IID(0), row)],
-        );
+        static::evalRow(
+          context,
+          evaluator,
+          this.select.params,
+          this.select.effects,
+          1,
+        ) match {
+        | Some(row) ->
+          _dir = context.mkdir(
+            SKStore.IID::keyType,
+            Row::type,
+            this.selectName1,
+            Array[(SKStore.IID(0), row)],
+          )
+        | None() ->
+          _dir = context.mkdir(
+            SKStore.IID::keyType,
+            Row::type,
+            this.selectName1,
+            Array[],
+          )
+        };
       } else {
         context.!newDirs = context.newDirs.set(this.selectName1);
       };
@@ -547,6 +592,7 @@ class SelectEvaluator{
     } else {
       resultDir = (this with {
         params => aggrs.map(x -> x.i1),
+        effects => Array[],
       }).evalSelectTableList(
         context,
         List::createFromItems(this.select.from),
@@ -577,18 +623,37 @@ class SelectEvaluator{
           evaluator = ExprEvaluator(Array[entry], this.select.from, this.up);
           this.select.having match {
           | None() ->
-            row = static::evalRow(context, evaluator, this.select.params, 1);
-            writer.set(key, row)
+            rowOpt = static::evalRow(
+              context,
+              evaluator,
+              this.select.params,
+              this.select.effects,
+              1,
+            );
+            rowOpt match {
+            | Some(row) -> writer.set(key, row)
+            | None() -> void
+            }
           | Some(cond) ->
             evaluator.evalCIExpr(context, cond) match {
             | ADef(0)
             | ANull() ->
               void
+            | ASuccess() -> unexpectedSideEffect()
             | AUndef() ->
               invariant_violation("Having should never be undefined")
             | ADef(_) ->
-              row = static::evalRow(context, evaluator, this.select.params, 1);
-              writer.set(key, row)
+              rowOpt = static::evalRow(
+                context,
+                evaluator,
+                this.select.params,
+                this.select.effects,
+                1,
+              );
+              rowOpt match {
+              | Some(row) -> writer.set(key, row)
+              | None() -> void
+              }
             }
           }
         },
@@ -616,18 +681,28 @@ class SelectEvaluator{
             this.select.from,
             this.up,
           );
-          emptyRow = static::evalRow(
+          static::evalRow(
             context,
             emptyEvaluator,
             this.select.params,
+            Array[],
             1,
-          );
-          _ = context.mkdir(
-            SKStore.IID::keyType,
-            Row::type,
-            selectName1Empty,
-            Array[(SKStore.IID(0), emptyRow)],
-          );
+          ) match {
+          | Some(emptyRow) ->
+            _ = context.mkdir(
+              SKStore.IID::keyType,
+              Row::type,
+              selectName1Empty,
+              Array[(SKStore.IID(0), emptyRow)],
+            )
+          | None() ->
+            _ = context.mkdir(
+              SKStore.IID::keyType,
+              Row::type,
+              selectName1Empty,
+              Array[],
+            )
+          };
         } else {
           context.!newDirs = context.newDirs.set(selectName1Empty);
         };
@@ -677,32 +752,61 @@ class SelectEvaluator{
     context: mutable SKStore.Context,
     evaluator: ExprEvaluator,
     params: Array<CGExpr>,
+    effects: Array<CGExpr>,
     repeat: Int,
-  ): RowValues {
-    RowValues::create(
-      params.map(param ->
-        evaluator.evalCGExpr(context, param) match {
-        | AUndef() ->
-          debug(param);
-          invariant_violation("Unexpected undefined value")
-        | ANull() -> None()
-        | ADef(x) -> Some(x)
-        }
-      ),
-      repeat,
-    )
+  ): ?RowValues {
+    for (effect in effects) {
+      evaluator.evalCGExpr(context, effect) match {
+      | ASuccess() -> void
+      | ANull() -> void
+      | AUndef() -> void
+      | ADef(_) ->
+        invariant_violation(
+          "Expecting a side effect but expression evaluated to a result",
+        )
+      }
+    };
+
+    acc = mutable Vector<?CValue>[];
+    for (param in params) {
+      evaluator.evalCGExpr(context, param) match {
+      | ASuccess() ->
+        throw SqlError(
+          0,
+          "SELECT error: parameter expression contains a side effect",
+        )
+      | AUndef() ->
+        debug(param);
+        invariant_violation("Unexpected undefined value")
+      | ANull() -> acc.push(None())
+      | ADef(x) -> acc.push(Some(x))
+      }
+    };
+
+    if (acc.size() > 0) {
+      Some(RowValues::create(acc.toArray(), repeat))
+    } else {
+      None()
+    }
   }
 
   fun evalEmptyFrom(context: mutable SKStore.Context): void {
     evaluator = ExprEvaluator(Array[], this.select.from, this.up);
     whereVal = evaluator.evalWhere(context, this.select.where);
-    row = whereVal match {
+    rowOpt = whereVal match {
+    | ASuccess() -> unexpectedSideEffect()
     | ANull()
     | ADef(0) ->
-      static::evalRow(context, evaluator, Array[CGNull()], 1)
+      static::evalRow(context, evaluator, Array[CGNull()], Array[], 1)
     | AUndef()
     | ADef(_) ->
-      static::evalRow(context, evaluator, this.select.params, 1)
+      static::evalRow(
+        context,
+        evaluator,
+        this.select.params,
+        this.select.effects,
+        1,
+      )
     };
 
     dirName = this.selectName2;
@@ -712,12 +816,22 @@ class SelectEvaluator{
         SKStore.IID::keyType,
         Row::type,
         dirName,
-        Array[(SKStore.IID(0), row)],
+        rowOpt match {
+        | None() -> Array[]
+        | Some(row) -> Array[(SKStore.IID(0), row)]
+        },
       )
     | Some(dir) ->
       context.setDir(
         dirName,
-        dir.writeArrayReturnDir(context, SKStore.IID(0), Array[row]),
+        dir.writeArrayReturnDir(
+          context,
+          SKStore.IID(0),
+          rowOpt match {
+          | Some(row) -> Array[row]
+          | None() -> Array[]
+          },
+        ),
       )
     }
   }
@@ -861,12 +975,17 @@ class SelectEvaluator{
               continue
             | _ -> void
             };
-            row = static::evalRow(
+            rowOpt = static::evalRow(
               context,
               evaluator,
               this.params,
+              this.select.effects,
               input.repeat,
             );
+            row = rowOpt match {
+            | Some(row) -> row
+            | None() -> break void
+            };
             for (_ in Range(0, row.repeat)) {
               !i = i + 1;
               if (i >= limit) {
@@ -905,16 +1024,21 @@ class SelectEvaluator{
               continue
             | _ -> void
             };
-            row = static::evalRow(
+            rowOpt = static::evalRow(
               context,
               evaluator,
               this.params,
+              this.select.effects,
               input.repeat,
             );
-            for (_ in Range(0, row.repeat)) {
-              RowValues::printItem(this.select.format, row);
-              !i = i + 1;
-              if (i >= limit) throw IgnoreAndContinue();
+            rowOpt match {
+            | Some(row) ->
+              for (_ in Range(0, row.repeat)) {
+                RowValues::printItem(this.select.format, row);
+                !i = i + 1;
+                if (i >= limit) throw IgnoreAndContinue();
+              }
+            | None() -> void
             }
           }
         }
@@ -1037,6 +1161,7 @@ class SelectEvaluator{
 
     whereVal = evaluator.evalWhere(context, this.select.where);
     whereVal match {
+    | ASuccess() -> unexpectedSideEffect()
     | ANull()
     | ADef(0) ->
       return void
@@ -1118,7 +1243,17 @@ class SelectEvaluator{
     writer: mutable MultiWriter,
     repeat: Int,
   ): void {
-    row = static::evalRow(context, evaluator, this.params, repeat);
+    rowOpt = static::evalRow(
+      context,
+      evaluator,
+      this.params,
+      this.effects,
+      repeat,
+    );
+    row = rowOpt match {
+    | Some(row) -> row
+    | None() -> return void
+    };
     if (this.select.aggr is Some _) {
       !evaluator = evaluator with {entries => Array[row]};
       key = this.select.groupBy match {

@@ -62,10 +62,10 @@ build/sknpm: $(SKNPM_BIN)
 # skdb native binary
 ################################################################################
 
-sql/target/host/dev/skdb: sql/src/*
+sql/target/host/dev/skdb: sql/src/* prelude/src/**/*.sk skdate/src/* skjson/src/* sqlparser/src/*
 	cd sql && skargo build
 
-sql/target/host/release/skdb: sql/src/*
+sql/target/host/release/skdb: sql/src/* prelude/src/**/*.sk skdate/src/* skjson/src/* sqlparser/src/*
 	cd sql && skargo build --release --bin skdb
 
 # TODO: keeping this for now as nearly all test scripts refer to build/skdb
