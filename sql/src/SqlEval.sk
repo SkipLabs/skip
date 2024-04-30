@@ -1892,6 +1892,7 @@ private mutable class SQLContext(
           );
         } catch {
         | IgnoreAndContinue() -> void
+        | SqlError(_, msg) -> throw SqlError(stmt.pos, msg)
         | exn -> throw exn
         };
       };
