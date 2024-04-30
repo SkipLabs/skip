@@ -1104,6 +1104,19 @@ mutable class Context{
     this.setDir(dirName, DeletedDir{dirName, time => this.timeStamp()});
   }
 
+  mutable fun transitiveChildDirs(dirName: DirName): SortedSet<DirName> {
+    this.unsafeMaybeGetEagerDir(dirName) match {
+    | Some(dir @ SKStore.EagerDir _) ->
+      dir.childDirs.reduce(
+        (accDeps, child) -> {
+          accDeps.union(this.transitiveChildDirs(child))
+        },
+        dir.childDirs,
+      )
+    | _ -> SortedSet::create()
+    }
+  }
+
   mutable fun maybeGetDir<T: File>(dirName: DirName): ?Dir {
     this.addDep(Path::create(dirName.tag(), DirTag()));
     this.dirs.maybeGet(dirName);
