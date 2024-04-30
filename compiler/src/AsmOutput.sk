@@ -3510,18 +3510,10 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
   | x @ StringHash{value} ->
     llvmWriteIntrinsicCall(asm, x, "SKIP_String_hash", Array[value])
   | v @ StringSwitch{value, successors} ->
-    // Switching on strings is fast but fairly complicated.
-    //
-    // If any of the case statements are short strings, we do an integer
-    // switch on the String's raw bit pattern to see which case
-    // it matches. If it matches any, we are done.
-    //
-    // If it doesn't match any short string, then we check to see if it's
-    // a long string. If not, go to he default case, Otherwise, do an
-    // integer swtich on the 64-bit size+hash header to see which string
-    // might match. For each case we then do an actual string equality check
-    // to make sure it's the string we were looking for, handling collisions
-    // where multiple case statements have the same header.
+    // Do an integer switch on the 64-bit size+hash header to see which
+    // string might match. For each case we then do an actual string equality
+    // check to make sure it's the string we were looking for, handling
+    // collisions where multiple case statements have the same header.
 
     defaultBlock = optinfo.getBlock(successors[0].target);
 
@@ -3531,14 +3523,11 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
       cases.push((i, s))
     };
 
-    // Get raw bits from the string.
     valueInstr = optinfo.getInstr(value);
-    bits = asm.llvmIdentifier("%stringswitch.bits");
-    asm.print("  %s = ptrtoint %N to i64, %D\n" % bits % valueInstr % instr);
 
     if (!cases.isEmpty()) {
-      // Map each long string header word to an array of case indices
-      // that have that value.
+      // Map each string header word to an array of case indices that have
+      // that value.
       isWasm = common.config.isWasm();
       buckets: SortedMap<Int, Array<(Int, UTF8String)>> = cases.foldl(
         (acc, case) -> {
@@ -3553,7 +3542,7 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
         SortedMap::create(),
       );
 
-      // It's a long string, so load the long string header.
+      // Load the string header.
       rawHdrPtr = asm.llvmIdentifier("%stringswitch.rawhdrptr");
       asm.print(
         "  %s = getelementptr inbounds i8, %N, i64 -8, %D\n" %
@@ -3565,28 +3554,17 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
       asm.print(
         "  %s = bitcast i8* %s to i64*, %D\n" % hdrPtr % rawHdrPtr % instr,
       );
-      unmaskedHdr = asm.llvmIdentifier("%stringswitch.unmasked_hdr");
-      asm.print(
-        "  %s = load i64, i64* %s, align 8, %D\n" %
-          unmaskedHdr %
-          hdrPtr %
-          instr,
-      );
       hdr = asm.llvmIdentifier("%stringswitch.hdr");
       asm.print(
-        "  %s = shl i64 %s, %s, %D\n" %
-          hdr %
-          unmaskedHdr %
-          0 % // Does this 0 make it a noop?
-          instr,
+        "  %s = load i64, i64* %s, align 8, %D\n" % hdr % hdrPtr % instr,
       );
 
-      // Write out the long string switch statement.
+      // Write out the string switch statement.
       asm.print("  switch i64 %s, %N [" % hdr % defaultBlock);
 
       bucketLabels = buckets.map((hash, vals) -> {
         asm.llvmIdentifier(
-          "longstringcase_" +
+          "stringcase_" +
             (if (vals.size() == 1) {
               vals[0].i1.string
             } else {
@@ -3601,7 +3579,7 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
       });
       asm.print(" ]\n");
 
-      // Write out the long string switch cases.
+      // Write out the string switch cases.
       buckets.each((hash, cases) -> {
         label = bucketLabels[hash];
 
@@ -3610,7 +3588,7 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
           asm.writeQuotedIdentifier(label);
           asm.print(":\n");
 
-          cmpVar = asm.llvmIdentifier("%longstringcase_eq");
+          cmpVar = asm.llvmIdentifier("%stringcase_eq");
           asm.print(
             "  %s = call i1 @SKIP_String_eq(%N, %N), %D\n" %
               cmpVar %
@@ -3625,7 +3603,7 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
           // Here's where we go if it's not.
           if (i + 1 < cases.size()) {
             // We have a hash collision, jump to the next collider.
-            !label = asm.llvmIdentifier("longstringcase");
+            !label = asm.llvmIdentifier("stringcase");
             asm.print("label %%%s" % label)
           } else {
             // None else to try, jump to default case.
