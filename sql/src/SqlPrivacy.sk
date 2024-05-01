@@ -53,6 +53,7 @@ const skdbAccessColName: P.Name = P.Name::create("skdb_access");
 const groupIDColName: P.Name = P.Name::create("groupID");
 const userIDColName: P.Name = P.Name::create("userID");
 const adminIDColName: P.Name = P.Name::create("adminID");
+const ownerIDColName: P.Name = P.Name::create("ownerID");
 const permissionsColName: P.Name = P.Name::create("permissions");
 
 /*****************************************************************************/
@@ -460,6 +461,17 @@ fun checkUserCanReadRow(
   row: RowValues,
 ): AccessResult {
   access = AccessSolver::create(context, user.name);
+
+  // Owners can always see their own groups
+  if (table.name == SKDBGroups::name) {
+    ownerGroupID = row.getValue(skdbGroups.getColNbr(ownerIDColName)) match {
+    | Some(CString(id)) -> id
+    | _ -> throw SqlError(0, "ownerID is a non-null string in skdb_groups")
+    };
+    if (access.canRead(context, ownerGroupID)) return AROK()
+  };
+
+  // Users can always see permissions that affect them or they have admin rights over
   if (table.name == SKDBGroupPermissions::name) {
     groupID = row.getValue(
       skdbGroupPermissions.getColNbr(groupIDColName),
@@ -493,15 +505,18 @@ fun checkUserCanReadRow(
       | Some(CString(userID)) if (userID == user.name) -> return AROK()
       | _ ->
         groupIndex = skdbGroups.getIndex(context);
-        adminID = groupIndex.get(skdbGroups.makeKey(groupID)) match {
-        | Some(r) -> r.getString(adminIDColName)
+        (adminID, ownerID) = groupIndex.get(skdbGroups.makeKey(groupID)) match {
+        | Some(r) -> (r.getString(adminIDColName), r.getString(ownerIDColName))
         | None() ->
           throw SqlError(
             0,
             "malformed predefined table skdb_groups while checking read",
           )
         };
-        if (access.canRead(context, adminID)) {
+        if (
+          access.canRead(context, adminID) ||
+          access.canRead(context, ownerID)
+        ) {
           return AROK();
         } else {
           return ARError(ARENotAdmin{userID => user.name, groupID => groupID})
