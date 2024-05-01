@@ -43,7 +43,7 @@ done | $SKDB
 ###############################################################################
 
 # We need a group that doesn't restrict anyone.
-echo "insert into skdb_groups values('myGroup', NULL, 'root', 'root');" | $SKDB
+echo "insert into skdb_groups values('myGroup', NULL, 'root', 'root', 'root');" | $SKDB
 echo "insert into skdb_group_permissions values ('myGroup', NULL, skdb_permission('rid'), 'root');" | $SKDB
 
 # Let's check that user permissions are respected
@@ -81,7 +81,7 @@ fi
 
 # Let's create a group
 # user1 can write, all the others can only read
-echo "insert into skdb_groups values('ID22', NULL, 'root', 'root');" | $SKDB
+echo "insert into skdb_groups values('ID22', NULL, 'root', 'root', 'root');" | $SKDB
 echo "insert into skdb_group_permissions values ('ID22', 'ID1', skdb_permission('rw'), 'root');" | $SKDB
 echo "insert into skdb_group_permissions values ('ID22', 'ID2', skdb_permission('r'), 'root');" | $SKDB
 echo "insert into skdb_group_permissions values ('ID22', 'ID3', skdb_permission('r'), 'root');" | $SKDB
@@ -149,7 +149,7 @@ fi
 
 # Let's create a block list
 # Everybody can read/insert/delete, except for user1 who can only read
-echo "insert into skdb_groups values('ID23', NULL, 'root', 'root');" | $SKDB
+echo "insert into skdb_groups values('ID23', NULL, 'root', 'root', 'root');" | $SKDB
 echo "insert into skdb_group_permissions values ('ID23', 'ID1', skdb_permission('r'), 'root');" | $SKDB
 echo "insert into skdb_group_permissions values ('ID23', NULL, skdb_permission('rw'), 'root');" | $SKDB
 echo "insert into skdb_user_permissions values ('ID2', skdb_permission('ri'), 'root');" | $SKDB
@@ -209,7 +209,7 @@ echo "insert into skdb_users VALUES ('julienv', 'pass');" | $SKDB
 echo "insert into skdb_users VALUES ('daniell', 'pass');" | $SKDB
 
 # Prepare a group with only one member, julienv
-echo -e "^skdb_groups\n1\t\"myAdminGroup\", \"julienv\",\"julienv\", \"julienv\"\n:1" |
+echo -e "^skdb_groups\n1\t\"myAdminGroup\", \"julienv\", \"julienv\", \"julienv\", \"julienv\"\n:1" |
   $SKDB write-csv --user julienv --source 1234 > /dev/null
 echo -e "^skdb_group_permissions\n1\t\"myAdminGroup\", \"julienv\",7, \"julienv\"\n:2" |
   $SKDB write-csv --user julienv --source 1234 > /dev/null
@@ -231,7 +231,7 @@ echo -e "^skdb_group_permissions\n1\t\"myAdminGroup\", \"julienv\",7, \"julienv\
 # happen in the same transaction, otherwise we would lose access after
 # the delete.
 (echo -e "^skdb_groups";
- echo -e "0\t\"myAdminGroup\", \"julienv\",\"julienv\", \"julienv\"";
+ echo -e "0\t\"myAdminGroup\", \"julienv\", \"julienv\", \"julienv\", \"julienv\"";
  echo -e "1\t\"myAdminGroup\", \"julienv\",\"myAdminGroup\", \"myAdminGroup\"\n:4") |
   $SKDB write-csv --user julienv --source 1234 > /dev/null
 

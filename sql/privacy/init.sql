@@ -21,13 +21,15 @@ CREATE TABLE skdb_user_permissions(
 
 -- groupID: which group are we talking about?
 -- skdb_author: who is the creator of the group?
--- adminID: who should be able to be admin of the group?
--- skdb_access: who should be able to see/modify the administrators
+-- adminID: who should be able to change permissions for the group
+-- ownerID: who should be able to delete the group and override admins
+-- skdb_access: who should be able to see the group
 
 CREATE TABLE skdb_groups(
   groupID TEXT PRIMARY KEY,
   skdb_author TEXT,
   adminID TEXT NOT NULL,
+  ownerID TEXT NOT NULL,
   skdb_access TEXT NOT NULL
 );
 
@@ -57,9 +59,9 @@ CREATE UNIQUE INDEX skdb_groups_users_unique ON skdb_groups_users(groupID);
 -------------------------------------------------------------------------------
 
 INSERT INTO skdb_groups VALUES
-  ('read-only', NULL, 'root', 'read-only'),
-  ('read-write', NULL, 'root', 'read-only'),
-  ('write-only', NULL, 'root', 'read-only')
+  ('read-only', NULL, 'root', 'root', 'read-only'),
+  ('read-write', NULL, 'root', 'root', 'read-only'),
+  ('write-only', NULL, 'root', 'root', 'read-only')
 ;
 
 INSERT INTO skdb_group_permissions VALUES

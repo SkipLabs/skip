@@ -1085,7 +1085,7 @@ test_user_privacy_control() {
     replicate_to_local skdb_groups test_user
     replicate_to_local skdb_group_permissions test_user
 
-    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO skdb_groups VALUES('new_group', 'test_user', 'test_user','read-write');"
+    $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO skdb_groups VALUES('new_group', 'test_user', 'test_user', 'test_user', 'read-write');"
     $SKDB_BIN --data $LOCAL_DB <<< "INSERT INTO skdb_group_permissions VALUES('new_group', 'test_user', skdb_permission('rw'), 'read-write');"
     replicate_to_server test_user
 
