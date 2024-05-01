@@ -232,7 +232,7 @@ echo -e "^skdb_group_permissions\n1\t\"myAdminGroup\", \"julienv\",7, \"julienv\
 # the delete.
 (echo -e "^skdb_groups";
  echo -e "0\t\"myAdminGroup\", \"julienv\", \"julienv\", \"julienv\", \"julienv\"";
- echo -e "1\t\"myAdminGroup\", \"julienv\",\"myAdminGroup\", \"myAdminGroup\"\n:4") |
+ echo -e "1\t\"myAdminGroup\", \"julienv\",\"myAdminGroup\", \"myAdminGroup\", \"myAdminGroup\"\n:4") |
   $SKDB write-csv --user julienv --source 1234 > /dev/null
 
 # We have successfully create a group that is controlled by
