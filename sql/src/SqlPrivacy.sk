@@ -395,6 +395,7 @@ base class AccessResultError{userID: String} uses Show {
   | ARENullAuthor{}
   | AREWrongAuthor{foundUserName: String}
   | AREWrongAuthorType{}
+  | ARENotOwner{groupID: String}
   | ARENotAdmin{groupID: String}
   | ARECannotDelete{groupID: String}
   | ARECannotInsert{groupID: String}
@@ -428,6 +429,8 @@ base class AccessResultError{userID: String} uses Show {
       " (user " +
       this.userID +
       ")"
+  | ARENotOwner{groupID} ->
+    "not an owner of group " + groupID + " (user " + this.userID + ")"
   | ARECannotDelete{groupID} ->
     "cannot delete with skdb_access set to " +
       groupID +
@@ -564,6 +567,22 @@ fun checkUserCanWriteRow(
   groupIdxOption: ?Int,
   row: RowValues,
 ): AccessResult {
+  if (tableName.lowercase() == SKDBGroups::name.lower) {
+    ownerIDIdx = skdbGroups.getColNbr(ownerIDColName);
+    ownerID = row.getValue(ownerIDIdx) match {
+    | Some(CString(id)) -> id
+    | _ -> throw SqlError(0, "ownerID is a non-null string in skdb_groups")
+    };
+    if (row.repeat == 0 && !access.canDelete(context, ownerID)) {
+      groupIDIdx = skdbGroups.getColNbr(groupIDColName);
+      groupID = row.getValue(groupIDIdx) match {
+      | Some(CString(id)) -> id
+      | _ -> throw SqlError(0, "groupID is a non-null string in skdb_groups")
+      };
+      return ARError(ARENotOwner{userID => access.userID, groupID})
+    }
+  };
+
   if (tableName.lowercase() == SKDBGroupPermissions::name.lower) {
     // Check that only group admins can insert/delete rows
     // to SKDBGroupPermissions for that group
