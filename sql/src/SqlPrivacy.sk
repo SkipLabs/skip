@@ -600,8 +600,15 @@ fun checkUserCanWriteRow(
       groupIndex.get(skdbGroups.makeKey(groupID)) match {
       | Some(r) ->
         adminID = r.getString(adminIDColName);
-        (row.repeat == 0 && access.canDelete(context, adminID)) ||
-          access.canInsert(context, adminID)
+        ownerID = r.getString(ownerIDColName);
+        if (row.repeat == 0) {
+          access.canDelete(context, adminID) ||
+            access.canDelete(context, ownerID)
+        } else {
+          access.canInsert(context, adminID) ||
+            access.canInsert(context, ownerID)
+        }
+
       | None() -> return AROK()
       };
     };
