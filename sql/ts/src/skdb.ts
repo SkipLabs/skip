@@ -72,7 +72,8 @@ async function createWorker(disableWarnings: boolean, dbName?: string) {
     });
     worker = env.createWorkerWrapper(wrapped);
   }
+
   let skdb = new SKDBWorker(worker);
-  await skdb.create(dbName);
+  await skdb.create(dbName, disableWarnings);
   return skdb;
 }
