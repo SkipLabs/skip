@@ -888,45 +888,48 @@ async function testJSGroups(skdb1: SKDB, skdb2: SKDB) {
 
   await group_as_user2.setMemberPermission(user1, "rw");
 
-  // user1 can transfer ownership to user2, after which user2 can remove them as an admin
-  await group.transferOwnership(user2);
-  await new Promise((r) => setTimeout(r, 100));
+  // user1 can still take admin actions as owner after removing themself as an admin
 
-  await group_as_user2.removeAdmin(user1);
+  await group.removeAdmin(user1);
   await new Promise((r) => setTimeout(r, 100));
-
   expect(
     await waitSynch(
       skdb1,
-      "SELECT * FROM skdb_group_permissions WHERE groupID=@ownerGroupID;",
-      (owners) => owners.length == 0,
-      { ownerGroupID: group.ownerGroupID },
-    ),
-  ).toHaveLength(0);
-  expect(
-    await waitSynch(
-      skdb2,
-      "SELECT * FROM skdb_group_permissions WHERE groupID=@ownerGroupID;",
-      (owners) => owners.length == 1,
-      { ownerGroupID: group.ownerGroupID },
-    ),
-  ).toHaveLength(1);
-  expect(
-    await waitSynch(
-      skdb1,
-      "SELECT * FROM skdb_group_permissions WHERE groupID=@adminGroupID;",
-      (admins) => admins.length == 0,
-      { adminGroupID: group.adminGroupID },
-    ),
-  ).toHaveLength(0);
-  expect(
-    await waitSynch(
-      skdb2,
       "SELECT * FROM skdb_group_permissions WHERE groupID=@adminGroupID;",
       (admins) => admins.length == 1,
       { adminGroupID: group.adminGroupID },
     ),
   ).toHaveLength(1);
+
+  // user1 can transfer ownership to user2, after which user1 can't delete the group but user2 can
+  await group.transferOwnership(user2);
+
+  await skdb1.exec(
+    "DELETE FROM skdb_groups WHERE groupID=@groupID;", //rejected by server
+    {
+      groupID: group.groupID,
+    },
+  );
+
+  expect(
+    await waitSynch(
+      skdb2,
+      "SELECT * FROM skdb_groups WHERE groupID=@groupID",
+      (groups) => groups.length == 1,
+      { groupID: group.groupID },
+    ),
+  ).toHaveLength(1);
+  await skdb2.exec("DELETE FROM skdb_groups WHERE groupID=@groupID;", {
+    groupID: group.groupID,
+  });
+  expect(
+    await waitSynch(
+      skdb2,
+      "SELECT * FROM skdb_groups WHERE groupID=@groupID",
+      (groups) => groups.length == 0,
+      { groupID: group.groupID },
+    ),
+  ).toHaveLength(0);
 }
 
 export const apitests = (asWorker) => {
