@@ -12,9 +12,10 @@ class DbCreator implements Creator<SKDB> {
     return "Database";
   }
 
-  create(dnName: string) {
+  create(dbName: string, disableWarnings: boolean) {
     return createSkdb({
-      dbName: dnName,
+      dbName,
+      disableWarnings,
       asWorker: false,
     });
   }

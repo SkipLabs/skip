@@ -99,8 +99,13 @@ export class SKDBWorker implements SKDB {
     this.worker = new PromiseWorker(worker);
   }
 
-  create = async (dbName?: string): Promise<void> => {
-    return this.worker.post(new Function("create", [dbName])).send();
+  create = async (
+    dbName?: string,
+    disableWarnings: boolean = false,
+  ): Promise<void> => {
+    return this.worker
+      .post(new Function("create", [dbName, disableWarnings]))
+      .send();
   };
 
   exec = async (query: string, params: Params = new Map()) => {
