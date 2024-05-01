@@ -47,10 +47,8 @@ export class SKDBGroupImpl implements SKDBGroup {
 
   static async create(skdb: SKDB): Promise<SKDBGroup> {
     const userID = skdb.currentUser!;
-
-    // First, create the primary group and get its auto-generated groupID
-    // (initially managed/accessed exclusively by userID, since we haven't created admin/owner groups yet)
     const groupID = (await skdb.exec("SELECT id()")).scalarValue();
+
     const group = new SKDBGroupImpl(skdb, groupID);
     const adminGroupID = group.adminGroupID;
     const ownerGroupID = group.ownerGroupID;
