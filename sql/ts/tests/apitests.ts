@@ -702,7 +702,7 @@ async function testJSPrivacy(skdb: SKDB, skdb2: SKDB) {
   await skdb.mirror(test_pk, view_pk);
   await skdb2.mirror(test_pk_subset_schema, view_pk);
   await skdb.exec(
-    "INSERT INTO skdb_groups VALUES ('my_group', @uid, @uid, 'read-write');",
+    "INSERT INTO skdb_groups VALUES ('my_group', @uid, @uid, @uid, 'read-write');",
     { uid: skdb.currentUser },
   );
   await skdb.exec(

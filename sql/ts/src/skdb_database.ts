@@ -199,7 +199,7 @@ export class SKDBSyncImpl implements SKDBSync {
       {
         table: "skdb_groups",
         expectedColumns:
-          "(groupID TEXT PRIMARY KEY, skdb_author TEXT, adminID TEXT NOT NULL, skdb_access TEXT NOT NULL)",
+          "(groupID TEXT PRIMARY KEY, skdb_author TEXT, adminID TEXT NOT NULL, ownerID TEXT NOT NULL, skdb_access TEXT NOT NULL)",
       },
     );
     this.exec(
@@ -384,7 +384,7 @@ export class SKDBSyncImpl implements SKDBSync {
       {
         table: "skdb_groups",
         expectedColumns:
-          "(groupID TEXT PRIMARY KEY, skdb_author TEXT, adminID TEXT NOT NULL, skdb_access TEXT NOT NULL)",
+          "(groupID TEXT PRIMARY KEY, skdb_author TEXT, adminID TEXT NOT NULL, ownerID TEXT NOT NULL, skdb_access TEXT NOT NULL)",
       },
     ]) {
       if (!tables.some(is_mirror_def_of(metatable.table)))

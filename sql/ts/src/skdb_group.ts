@@ -64,13 +64,13 @@ export class SKDBGroupImpl implements SKDBGroup {
         "INSERT INTO skdb_group_permissions VALUES (@groupID, @userID, skdb_permission('rw'), @adminGroupID);",
       )
       .add(
-        "INSERT INTO skdb_groups VALUES (@adminGroupID, @userID, @ownerGroupID, @adminGroupID);",
+        "INSERT INTO skdb_groups VALUES (@adminGroupID, @userID, @adminGroupID, @ownerGroupID, @adminGroupID);",
       )
       .add(
-        "INSERT INTO skdb_groups VALUES (@groupID, @userID, @adminGroupID, 'read-write')",
+        "INSERT INTO skdb_groups VALUES (@groupID, @userID, @adminGroupID, @ownerGroupID, 'read-write')",
       )
       .add(
-        "INSERT INTO skdb_groups VALUES (@ownerGroupID, @userID, @ownerGroupID, @ownerGroupID);",
+        "INSERT INTO skdb_groups VALUES (@ownerGroupID, @userID, @ownerGroupID, @ownerGroupID, @ownerGroupID);",
       )
       .commit({ groupID, adminGroupID, ownerGroupID, userID });
 
