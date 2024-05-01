@@ -27,6 +27,7 @@ void sk_string_set_hash(char* obj) {
   str->hash = (uint32_t)acc;
 }
 
+// The size of the represented string, in bytes, excludes nul terminator.
 uint32_t SKIP_String_byteSize(char* obj) {
   sk_string_t* str = get_sk_string(obj);
   return str->size;
@@ -37,12 +38,14 @@ SkipInt SKIP_String_hash(char* obj) {
   return (SkipInt)str->hash;
 }
 
-// Allocates a string (with no data nor hash).
+// Allocates and nul-terminates a string (with no data nor hash).
 char* sk_string_alloc(uint32_t size) {
   sk_string_t* obj =
-      (sk_string_t*)SKIP_Obstack_alloc(size + sk_string_header_size);
+      (sk_string_t*)SKIP_Obstack_alloc(sk_string_header_size + size + 1);
   obj->size = size;
-  return (char*)&(obj->data);
+  char* str = &obj->data[0];
+  str[size] = '\0';
+  return str;
 }
 
 char* sk_string_create(const char* buffer, uint32_t size) {
