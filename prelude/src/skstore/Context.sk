@@ -1527,7 +1527,9 @@ fun runWithGcIntern(
       None()
     }) match {
     | Some(x) -> x
-    | None() -> return context
+    | None() ->
+      destroyObstack(pos);
+      return context
     };
     newContextOp match {
     | CContinue(underLockF) ->
