@@ -125,27 +125,23 @@ char* SKIP_read_line() {
     return NULL;
   }
 
-  int32_t i;
   char* result = SKIP_Obstack_alloc(size);
 
-  for (i = 0; i < size; i++) {
+  for (int32_t i = 0; i < size; i++) {
     result[i] = SKIP_read_line_get(i);
   }
 
-  result = sk_string_create(result, size);
-  return result;
+  return sk_string_create(result, size);
 }
 
 char* SKIP_read_to_end() {
   int32_t size = SKIP_read_to_end_fill();
 
-  int32_t i;
   char* result = SKIP_Obstack_alloc(size);
 
-  for (i = 0; i < size; i++) {
+  for (int32_t i = 0; i < size; i++) {
     result[i] = SKIP_read_line_get(i);
   }
 
-  result = sk_string_create(result, size);
-  return result;
+  return sk_string_create(result, size);
 }

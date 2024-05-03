@@ -69,6 +69,8 @@ uint8_t SKIP_String_getByte(unsigned char* bytes, SkipInt idx) {
 }
 
 char* SKIP_String_StringIterator__substring(char* argStart, char* argEnd) {
+  // get the index fields of argStart and argEnd, which are
+  // StringIterator objects
   SkipInt start = ((SkipInt*)argStart)[1];
   SkipInt end = ((SkipInt*)argEnd)[1];
   SkipInt size = end - start;

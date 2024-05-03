@@ -560,7 +560,7 @@ char* SKIP_realpath(char* path) {
   if (rv == NULL) {
     perror("realpath");
     // TODO: Ideally, this function would return a ?String instead.
-    return sk_string_create(res, 0);
+    return sk_string_create("", 0);
   }
 
   return sk_string_create(res, strlen(res));
