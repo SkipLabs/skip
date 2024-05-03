@@ -20,4 +20,12 @@ make build/sknpm
 
 make test-wasm
 
-(cd sql/ts && ../../build/sknpm publish --release)
+read -r -p "Enter 6-digit NPM 2FA code (or press enter to attempt publish without 2FA) " otp
+if [[ "$otp" =~ ^([0-9]{6})$ ]];
+then
+    echo "Publishing with OTP $otp"
+    (cd sql/ts && ../../build/sknpm publish --release -- --otp=$otp)
+else
+    echo "Publishing without OTP"
+    (cd sql/ts && ../../build/sknpm publish --release)
+fi
