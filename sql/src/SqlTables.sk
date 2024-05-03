@@ -427,12 +427,7 @@ fun alterTableAddColumn(
   newCol: P.ColumnDefinition,
   options: Options,
 ): void {
-  if (
-    name == SKDBUsersByName::name ||
-    name == SKDBUserPermissions::name ||
-    name == SKDBGroups::name ||
-    name == SKDBGroupPermissions::name
-  ) {
+  if (PredefinedTable::isReservedName(name)) {
     error(pos, "Can't add column to predefined table")
   };
   if (newCol.notNull is Some _ && newCol.default is None _) {

@@ -122,6 +122,13 @@ base class PredefinedTable private final {
     }
   }
 
+  static fun isReservedName(name: P.Name): Bool {
+    name == SKDBUsersByName::name ||
+      name == SKDBUserPermissions::name ||
+      name == SKDBGroups::name ||
+      name == SKDBGroupPermissions::name
+  }
+
   fun getIndex(context: readonly SKStore.Context): PredefinedIndex {
     context.unsafeMaybeGetEagerDir(this.indexDirName) match {
     | None() -> error(0, "Privacy layer not initialized")
