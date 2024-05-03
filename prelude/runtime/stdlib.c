@@ -11,16 +11,14 @@
 #include <unistd.h>
 
 void* SKIP_exec(char* cmd) {
-  char* cstr = sk2c_string(cmd);
+  sk_string_check_c_safe(cmd);
 
-  FILE* fstream = popen(cstr, "w");
+  FILE* fstream = popen(cmd, "w");
 
   if (fstream == NULL) {
     perror("Could not execute command");
     exit(ERROR_EXEC);
   }
-
-  free(cstr);
 
   return fstream;
 }
