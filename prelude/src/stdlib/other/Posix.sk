@@ -244,6 +244,7 @@ mutable class Popen(
     args: Array<String>,
     env: Map<String, String> = Map[],
     clear_env: Bool = false,
+    cwd: ?String = None(),
     stdin: Bool = false,
     stdout: Bool = false,
     stderr: Bool = false,
@@ -276,6 +277,13 @@ mutable class Popen(
       e.chill()
     };
     new_env = env.items().map(e -> `${e.i0}=${e.i1}`).collect(Array);
+
+    // NOTE: Since `posix_spawn()` does not provide a way for changing the
+    // working directory of the child process, we rely on GNU env.
+    cwd match {
+    | Some(path) -> !args = Array["env", "-C", path].concat(args)
+    | None() -> void
+    };
 
     p = spawnp(args, new_env, file_actions);
     file_actions.destroy();
