@@ -129,7 +129,7 @@ mutable class BuildRunner(
     if (!this.fingerprints.containsKey(unit)) {
       this.fingerprints![unit] = (
         unit.target.srcs
-          .map(f -> (f, getLastModificationTime(f)))
+          .map(f -> (f, getLastModificationTime(Path.join(unit.pkg.root(), f))))
           .collect(Array),
         this.bctx.unit_graph[unit].map(dep -> this.fingerprint_for(dep)),
         this.bctx.build_config,
@@ -143,7 +143,9 @@ mutable class BuildRunner(
             // files in the corresponding package.
             FileSystem.readTextFile(dep_file)
               .split("\n")
-              .map(f -> (f, getLastModificationTime(f)))
+              .map(f ->
+                (f, getLastModificationTime(Path.join(unit.pkg.root(), f)))
+              )
               .collect(Array)
           } else {
             Array[]
@@ -292,6 +294,8 @@ mutable class BuildRunner(
 
   private mutable fun skc(unit: Unit, check: Bool = false): void {
     skc = this.bctx.skc.process();
+
+    skc.cwd(unit.pkg.root());
 
     unit.arch match {
     | TargetArchHost() -> void
