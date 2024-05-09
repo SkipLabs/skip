@@ -228,8 +228,16 @@ fun popen{
   clear_env: Bool = false,
   stdout: (String) -> void = _ -> void,
   stderr: (String) -> void = _ -> void,
+  cwd: ?String = None(),
 }: CompletedProcess {
-  p = Posix.Popen::create{args, env, clear_env, stdout => true, stderr => true};
+  p = Posix.Popen::create{
+    args,
+    env,
+    clear_env,
+    cwd,
+    stdout => true,
+    stderr => true,
+  };
   streams = Array[p.stdout.fromSome(), p.stderr.fromSome()];
   captured = Array[mutable Vector[], mutable Vector[]];
   handlers = Array[stdout, stderr];
