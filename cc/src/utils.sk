@@ -1,0 +1,68 @@
+module Cc;
+
+// TODO: Move into stdlib.
+mutable class ProcessBuilder(
+  mutable process_cmd: String,
+  process_args: mutable Vector<String> = mutable Vector[],
+  process_env: mutable Map<String, String> = mutable Map[],
+  mutable process_cwd: ?String = None(),
+) {
+  mutable fun cmd(value: String): void {
+    this.!process_cmd = value
+  }
+
+  mutable fun arg(value: String): void {
+    this.process_args.push(value)
+  }
+
+  mutable fun args(values: Array<String>): void {
+    values.each(this.arg)
+  }
+
+  mutable fun env(key: String, value: String): void {
+    this.process_env![key] = value
+  }
+
+  mutable fun cwd(path: String): void {
+    this.!process_cwd = Some(path)
+  }
+
+  mutable fun clone(): mutable ProcessBuilder {
+    mutable ProcessBuilder(
+      this.process_cmd,
+      this.process_args.clone(),
+      this.process_env.clone(),
+      this.process_cwd,
+    )
+  }
+
+  readonly fun get_cmd(): String {
+    this.process_cmd
+  }
+
+  readonly fun get_argv(): Array<String> {
+    res = Array[this.process_cmd].concat(
+      this.process_args.collect(Array),
+    ).collect(Array);
+
+    // TODO: Move this logic into popen.
+    this.process_cwd match {
+    | Some(path) -> !res = Array["env", "-C", path].concat(res)
+    | _ -> void
+    };
+    res
+  }
+
+  readonly fun get_env(): Map<String, String> {
+    this.process_env.chill()
+  }
+
+  readonly fun run(
+    stdout: (String) -> void = _ -> void,
+    stderr: (String) -> void = _ -> void,
+  ): System.CompletedProcess {
+    System.popen{args => this.get_argv(), env => this.get_env(), stdout, stderr}
+  }
+}
+
+module end;
