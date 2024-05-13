@@ -8,4 +8,4 @@
  */
 
 rootProject.name = "server"
-include("core", "dev")
+include("core", "dev", "pg")
