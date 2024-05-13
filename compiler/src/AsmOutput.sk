@@ -1953,7 +1953,7 @@ mutable class .AsmOutput{
   }
 
   // Produces an LLVM expression for a pointer to the first utf8 byte of
-  // a Skip LongString object.
+  // a Skip string object.
   mutable fun stringToLLVM(str: UTF8String): AsmDefID {
     isWasm = this.config.isWasm();
     this.strings.getOrAdd(str, () -> {
@@ -2012,19 +2012,9 @@ mutable class .AsmOutput{
     asm.print("i8* bitcast (%N to i8*)" % id)
   }
 
-  // As in the runtime, strings always take a multiple of 8 bytes
-  // and strings >= cstr_buffer_size must have a trailing '\0'.
+  // Static strings always take a multiple of 8 bytes and have a trailing '\0'
   private readonly fun paddedStringSize(s: UTF8String): Int {
-    size = s.utf8.size();
-
-    // WARNING! This must equal CSTR_BUFFER_SIZE in the runtime!
-    cstr_buffer_size = (80 - 8 + 1);
-
-    // Guarantee zero-padding for long enough strings.
-    if (size >= cstr_buffer_size && s.utf8[size - 1] != 0) {
-      !size = size + 1
-    };
-
+    size = s.utf8.size() + 1;
     (size + 7).and(-8)
   }
 

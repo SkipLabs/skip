@@ -12,8 +12,8 @@
 
 #include "runtime.h"
 
-int64_t SKIP_posix_open(char* path_obj, int64_t oflag, int64_t mode) {
-  char* path = sk2c_string(path_obj);
+int64_t SKIP_posix_open(char* path, int64_t oflag, int64_t mode) {
+  sk_string_check_c_safe(path);
   int fd = open(path, oflag, mode);
 
   if (fd == -1) {
@@ -21,7 +21,6 @@ int64_t SKIP_posix_open(char* path_obj, int64_t oflag, int64_t mode) {
     fprintf(stderr, "Could not open file: %s\n", path);
     exit(EXIT_FAILURE);
   }
-  if (path != path_obj) free(path);
 
   return (int64_t)fd;
 }
@@ -235,9 +234,26 @@ void SKIP_posix_spawn_file_actions_destroy(void* file_actionsp) {
   free(file_actionsp);
 }
 
+// create a NULL-terminated array of pointers to C strings from Array<String>
+char** create_argv(char* skargv) {
+  size_t sz = skip_array_len(skargv);
+  char** argv = (char**)malloc(sizeof(char*) * (sz + 1));
+  if (argv == NULL) {
+    perror("malloc");
+    exit(EXIT_FAILURE);
+  }
+  for (size_t i = 0; i < sz; ++i) {
+    char* arg = ((char**)skargv)[i];
+    sk_string_check_c_safe(arg);
+    argv[i] = arg;
+  }
+  argv[sz] = NULL;
+  return argv;
+}
+
 int64_t SKIP_posix_spawnp(char* skargv, char* skenvp, char* file_actionsp) {
-  char** argv = sk2c_string_array(skargv);
-  char** envp = sk2c_string_array(skenvp);
+  char** argv = create_argv(skargv);
+  char** envp = create_argv(skenvp);
 
   pid_t pid = -1;
 
@@ -251,40 +267,18 @@ int64_t SKIP_posix_spawnp(char* skargv, char* skenvp, char* file_actionsp) {
     exit(EXIT_FAILURE);
   }
 
-  char** argv_cursor = argv;
-  for (int i = 0; *argv_cursor != NULL; ++argv_cursor, ++i) {
-    if (*argv_cursor != *((char**)skargv + i)) {
-      free(*argv_cursor);
-    }
-  }
   free(argv);
-
-  char** envp_cursor = envp;
-  for (int i = 0; *envp_cursor != NULL; ++envp_cursor, ++i) {
-    if (*envp_cursor != *((char**)skenvp + i)) {
-      free(*envp_cursor);
-    }
-  }
   free(envp);
-
   return (int64_t)pid;
 }
 
-void SKIP_posix_execvp(char* args_obj) {
-  size_t num_args = skip_array_len(args_obj);
-  char** args = (char**)malloc(sizeof(char*) * (num_args + 1));
-  if (args == NULL) {
-    perror("malloc");
-    exit(EXIT_FAILURE);
-  }
-  for (size_t i = 0; i < num_args; ++i) {
-    char* arg_obj = *((char**)args_obj + i);
-    args[i] = sk2c_string(arg_obj);
-  }
-  args[num_args] = 0;
+void SKIP_posix_execvp(char* skargv) {
+  char** argv = create_argv(skargv);
 
   // TODO: Optional envp with execvpe.
-  execvp(args[0], args);
+  execvp(argv[0], argv);
+
+  free(argv);
   perror("execvp");
   exit(EXIT_FAILURE);
 }
@@ -297,17 +291,22 @@ int64_t SKIP_posix_isatty(int64_t fd) {
   return (char)rv;
 }
 
-int64_t SKIP_posix_mkstemp(char* template_obj) {
-  char* template = sk2c_string(template_obj);
+int64_t SKIP_posix_mkstemp(char* template) {
+  sk_string_check_c_safe(template);
+  size_t memsize = SKIP_String_byteSize(template) + 1;
+  char* copy = (char*)malloc(memsize);
+  if (copy == NULL) {
+    perror("malloc");
+    exit(1);
+  }
+  memcpy(copy, template, memsize);
 
-  int rv = mkstemp(template);
+  int rv = mkstemp(copy);
   if (rv == -1) {
     perror("mkstemp");
     exit(EXIT_FAILURE);
   }
-  if (template != template_obj) {
-    free(template);
-  }
 
+  free(copy);
   return rv;
 }
