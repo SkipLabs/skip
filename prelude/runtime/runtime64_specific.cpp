@@ -48,7 +48,6 @@ typedef struct {
 } sk_saved_obstack_t;
 
 extern "C" {
-char* sk2c_string(char* skStr);
 void* sk_get_exception_type(void* skExn);
 void* sk_get_exception_message(void* skExn);
 sk_saved_obstack_t* SKIP_new_Obstack();
@@ -96,11 +95,15 @@ struct SkipException : std::exception {
   explicit SkipException(void* exc) : m_skipException(exc) {}
 
   virtual const char* what() const noexcept override {
-    return sk2c_string((char*)sk_get_exception_message(m_skipException));
+    char* str = (char*)sk_get_exception_message(m_skipException);
+    sk_string_check_c_safe(str);
+    return str;
   }
 
   const char* name() const noexcept {
-    return sk2c_string((char*)sk_get_exception_type(m_skipException));
+    char* str = (char*)sk_get_exception_type(m_skipException);
+    sk_string_check_c_safe(str);
+    return str;
   }
 
   void* m_skipException;
@@ -149,47 +152,27 @@ extern "C" {
 void SKIP_call0(void*);
 void SKIP_initializeSkip();
 void skip_main();
-uint32_t SKIP_String_byteSize(char*);
-char* sk_string_create(const char* buffer, uint32_t size);
 void SKIP_throw_EndOfFile();
 
-char* sk2c_string(char* skstr) {
-  char* cstr;
-  size_t size = SKIP_String_byteSize(skstr);
-  if (skstr[size - 1] == (char)0) {
-    cstr = skstr;
-  } else {
-    cstr = (char*)malloc(size + 1);
-    if (cstr == NULL) {
-      perror("malloc");
-      exit(1);
-    }
-    memcpy(cstr, skstr, size);
-    cstr[size] = (char)0;
-  }
-  if (strlen(cstr) != size) {
-    fprintf(stderr, "String contains embedded nul character: ");
-    fwrite(skstr, size, 1, stderr);
+void sk_string_check_c_safe(char* str) {
+  size_t size = SKIP_String_byteSize(str);
+  size_t len = strlen(str);
+  if (len < size) {
+    fprintf(stderr,
+            "String contains embedded nul character. addr: %p size: %zu "
+            "length: %zu bytes: ",
+            str, size, len);
+    fwrite(str, size, 1, stderr);
     fprintf(stderr, "\n");
-    exit(2);
+    abort();
+  } else if (len > size) {
+    fprintf(stderr,
+            "String not nul-terminated. addr: %p size: %zu length: %zu bytes: ",
+            str, size, len);
+    fwrite(str, size, 1, stderr);
+    fprintf(stderr, "\n");
+    abort();
   }
-  return cstr;
-}
-
-char** sk2c_string_array(char* skarr) {
-  size_t sz = skip_array_len(skarr);
-  char** arr = (char**)malloc(sizeof(char*) * (sz + 1));
-  if (arr == NULL) {
-    perror("malloc");
-    exit(EXIT_FAILURE);
-  }
-  for (size_t i = 0; i < sz; ++i) {
-    char* skstr = *((char**)skarr + i);
-    arr[i] = sk2c_string(skstr);
-  }
-  arr[sz] = 0;
-
-  return arr;
 }
 
 void SKIP_print_char(uint32_t x) {
@@ -256,36 +239,32 @@ char* SKIP_get_envN(int64_t n) {
 char* sk_create_none_string_option();
 char* sk_create_string_option(char* str);
 
-char* SKIP_getenv(char* skName) {
-  char* name = sk2c_string(skName);
+char* SKIP_getenv(char* name) {
+  sk_string_check_c_safe(name);
   char* value = getenv(name);
-  if (name != skName) free(name);
   if (value == nullptr) {
     return sk_create_none_string_option();
   }
   return sk_create_string_option(sk_string_create(value, strlen(value)));
 }
 
-void SKIP_setenv(char* skName, char* skValue) {
-  char* name = sk2c_string(skName);
-  char* value = sk2c_string(skValue);
+void SKIP_setenv(char* name, char* value) {
+  sk_string_check_c_safe(name);
+  sk_string_check_c_safe(value);
   int rv = setenv(name, value, 1);
   if (rv != 0) {
     perror("setenv");
     exit(EXIT_FAILURE);
   }
-  if (name != skName) free(name);
-  if (value != skValue) free(value);
 }
 
-void SKIP_unsetenv(char* skName) {
-  char* name = sk2c_string(skName);
+void SKIP_unsetenv(char* name) {
+  sk_string_check_c_safe(name);
   int rv = unsetenv(name);
   if (rv != 0) {
     perror("unsetenv");
     exit(EXIT_FAILURE);
   }
-  if (name != skName) free(name);
 }
 
 void SKIP_memory_init(int pargc, char** pargv);
@@ -345,9 +324,9 @@ void SKIP_print_debug(char* str) {
   SKIP_print_error(str);
 }
 
-char* SKIP_open_file(char* filename_obj) {
+char* SKIP_open_file(char* filename) {
   struct stat s;
-  char* filename = sk2c_string(filename_obj);
+  sk_string_check_c_safe(filename);
 
   int fd = open(filename, O_RDONLY);
   if (fd == -1) {
@@ -377,7 +356,6 @@ char* SKIP_open_file(char* filename_obj) {
     munmap(f, size);
   }
   close(fd);
-  if (filename != filename_obj) free(filename);
   return result;
 }
 
@@ -394,31 +372,26 @@ void SKIP_write_to_file(int64_t fd, char* str) {
   }
 }
 
-void SKIP_FileSystem_appendTextFile(char* filename_obj, char* str_obj) {
-  char* filename = sk2c_string(filename_obj);
+void SKIP_FileSystem_appendTextFile(char* filename, char* str_obj) {
+  sk_string_check_c_safe(filename);
 
   int fd = open(filename, O_WRONLY | O_CREAT | O_APPEND, 0775);
   (void)write(fd, str_obj, SKIP_String_byteSize(str_obj));
   close(fd);
-
-  if (filename != filename_obj) free(filename);
 }
 
-bool SKIP_check_if_file_exists(char* filename_obj) {
-  char* filename = sk2c_string(filename_obj);
+bool SKIP_check_if_file_exists(char* filename) {
+  sk_string_check_c_safe(filename);
 
   bool res = (access(filename, F_OK) == 0);
 
-  if (filename != filename_obj) free(filename);
   return res;
 }
 
-int32_t SKIP_notify(char* filename_obj, int32_t tick) {
-  char* filename = sk2c_string(filename_obj);
+int32_t SKIP_notify(char* filename, int32_t tick) {
+  sk_string_check_c_safe(filename);
 
   int fd = open(filename, O_CREAT | O_WRONLY, 0644);
-
-  if (filename != filename_obj) free(filename);
 
   if (fd == -1) {
     return -1;
@@ -504,22 +477,21 @@ char* SKIP_getcwd() {
   return sk_string_create(path, strlen(path));
 }
 
-void SKIP_chdir(char* path_obj) {
-  char* path = sk2c_string(path_obj);
+void SKIP_chdir(char* path) {
+  sk_string_check_c_safe(path);
   int rv = chdir(path);
   if (rv != 0) {
     perror("chdir");
     exit(EXIT_FAILURE);
   }
-  if (path != path_obj) free(path);
 }
 
 int64_t SKIP_numThreads() {
   return 1;
 }
 
-void SKIP_string_to_file(char* str, char* file_obj) {
-  char* file = sk2c_string(file_obj);
+void SKIP_string_to_file(char* str, char* file) {
+  sk_string_check_c_safe(file);
 
   FILE* out = fopen(file, "w");
   size_t size = SKIP_String_byteSize(str);
@@ -528,8 +500,6 @@ void SKIP_string_to_file(char* str, char* file_obj) {
     size -= written;
   }
   fclose(out);
-
-  if (file != file_obj) free(file);
 }
 
 int64_t SKIP_get_mtime(char* path) {
@@ -548,22 +518,20 @@ bool SKIP_is_directory(char* path) {
   return st.st_mode & S_IFDIR;
 }
 
-int64_t SKIP_system(char* cmd_obj) {
-  char* cmd = sk2c_string(cmd_obj);
+int64_t SKIP_system(char* cmd) {
+  sk_string_check_c_safe(cmd);
   int64_t res = system(cmd);
-  if (cmd != cmd_obj) free(cmd);
   return res;
 }
 
-int64_t SKIP_opendir(char* path_obj) {
-  char* path = sk2c_string(path_obj);
+int64_t SKIP_opendir(char* path) {
+  sk_string_check_c_safe(path);
 
   DIR* res = opendir(path);
   if (res == NULL) {
     perror("Error opening dir");
   }
 
-  if (path != path_obj) free(path);
   return (int64_t)res;
 }
 
@@ -584,16 +552,15 @@ void SKIP_closedir(int64_t dir_handle) {
   }
 }
 
-char* SKIP_realpath(char* path_obj) {
-  char* path = sk2c_string(path_obj);
+char* SKIP_realpath(char* path) {
+  sk_string_check_c_safe(path);
 
   char res[PATH_MAX];
   char* rv = realpath(path, res);
-  if (path != path_obj) free(path);
   if (rv == NULL) {
     perror("realpath");
     // TODO: Ideally, this function would return a ?String instead.
-    return sk_string_create(res, 0);
+    return sk_string_create("", 0);
   }
 
   return sk_string_create(res, strlen(res));
