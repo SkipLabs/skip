@@ -8,11 +8,8 @@ base class Arg{
   _global: Bool = false,
   _env: ?String = None(),
   _repeatable: Bool = false,
-  // NOTE: The following parameters cannot be placed in subclasses, since `name` is required.
-  // Other than BoolArgs only
   _default: ?Value = None(),
   _positional: Bool = false,
-  _value_name: String = "VALUE",
 } {
   // Builder interface methods.
   fun short(flag: String): this {
@@ -65,7 +62,10 @@ base class Arg{
   }
 }
 
-base class ValuedArg{_required: Bool = false} extends Arg {
+base class ValuedArg{
+  _required: Bool = false,
+  _value_name: String = "VALUE",
+} extends Arg {
   fun required(value: Bool = true): this {
     this with {_required => value}
   }
