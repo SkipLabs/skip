@@ -140,8 +140,12 @@ class Command(
   _about: ?String = None(),
   _short: ?String = None(),
 ) {
+  fun args(args: Array<Arg>): this {
+    this with {_args => this._args.concat(args)}
+  }
+
   fun arg(arg: Arg): this {
-    this with {_args => this._args.concat(Array[arg])}
+    this.args(Array[arg])
   }
 
   fun extra(name: String = ""): this {
