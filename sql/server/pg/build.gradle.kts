@@ -30,7 +30,7 @@ tasks.named<Test>("test") {
   useJUnitPlatform()
 }
 
-spotless { kotlin { ktfmt("0.47") } }
+spotless { kotlin { ktfmt("0.49") } }
 
 task("replication", JavaExec::class) {
   mainClass.set("io.skiplabs.skdb.pg.RepliTestKt")

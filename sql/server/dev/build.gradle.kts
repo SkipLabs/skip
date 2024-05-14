@@ -51,4 +51,4 @@ tasks.jar {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
-spotless { kotlin { ktfmt("0.47") } }
+spotless { kotlin { ktfmt("0.49") } }
