@@ -18,11 +18,21 @@ base class ConsoleVerbosity uses Orderable {
   | VerbosityProlix() -> 3
 }
 
-class Console(verbosity: ConsoleVerbosity) {
+class Console(verbosity: ConsoleVerbosity, color: Bool) {
   const kHeaderColor: TermColor.Color = TermColor.Green();
   const kErrorColor: TermColor.Color = TermColor.Red();
   const kWarningColor: TermColor.Color = TermColor.Yellow();
   const kNoteColor: TermColor.Color = TermColor.Cyan();
+
+  static fun create(verbosity: ConsoleVerbosity, color: String): Console {
+    use_colors = color match {
+    | "always" -> true
+    | "never" -> false
+    | "auto" | _ -> IO.stderr().isatty()
+    };
+
+    Console(verbosity, use_colors)
+  }
 
   fun status(status: String, message: String): void {
     this.print(status, message, static::kHeaderColor, true)
@@ -68,12 +78,16 @@ class Console(verbosity: ConsoleVerbosity) {
     indented: Bool,
   ): String {
     margin = if (indented) "    " else "";
-    formatted_status = TermColor.colored(
-      status,
-      color,
-      TermColor.Default(),
-      Array[TermColor.Bold()],
-    );
+    formatted_status = if (this.color) {
+      TermColor.colored(
+        status,
+        color,
+        TermColor.Default(),
+        Array[TermColor.Bold()],
+      )
+    } else {
+      status
+    };
 
     `${margin}${formatted_status}: ${message}`
   }

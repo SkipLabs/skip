@@ -13,28 +13,24 @@ class GlobalContext{
 } {
   static fun create(args: Cli.ParseResults): GlobalContext {
     verbosity = args.getArray("verbose").size() match {
-    | 0 -> VerbosityNormal()
+    | 0 ->
+      if (args.getBool("quiet")) {
+        VerbosityQuiet()
+      } else {
+        VerbosityNormal()
+      }
     | 1 -> VerbosityVerbose()
     | _ -> VerbosityProlix()
     };
-    // TODO: Handle flag incompatibility between -v and -q in `Cli`.
-    if (args.getBool("quiet")) {
-      if (verbosity != VerbosityNormal()) {
-        Console(VerbosityNormal()).error(
-          "cannot set both --verbose and --quiet",
-        )
-      };
-      !verbosity = VerbosityQuiet()
+    console = Console::create(verbosity, args.getString("color"));
+    if (args.getBool("quiet") && args.getArray("verbose").size() > 0) {
+      console.error("cannot set both --verbose and --quiet");
+      skipExit(3)
     };
     target_dir = args.maybeGetString("target-dir", false);
     config = findUserConfig();
 
-    GlobalContext{
-      config,
-      console => Console(verbosity),
-      cwd => getcwd(),
-      target_dir,
-    }
+    GlobalContext{config, console, cwd => getcwd(), target_dir}
   }
 }
 
