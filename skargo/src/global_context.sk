@@ -19,6 +19,11 @@ class GlobalContext{
     };
     // TODO: Handle flag incompatibility between -v and -q in `Cli`.
     if (args.getBool("quiet")) {
+      if (verbosity != VerbosityNormal()) {
+        Console(VerbosityNormal()).error(
+          "cannot set both --verbose and --quiet",
+        )
+      };
       !verbosity = VerbosityQuiet()
     };
     target_dir = args.maybeGetString("target-dir", false);
