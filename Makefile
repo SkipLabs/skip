@@ -100,11 +100,11 @@ clean:
 
 .PHONY: fmt-sk
 fmt-sk:
-	find . -path ./compiler/tests -not -prune -or -name \*.sk | parallel skfmt -i :::
+	find . -path ./compiler/tests -not -prune -or -name \*.sk | parallel skfmt -i {}
 
 .PHONY: fmt-c
 fmt-c:
-	find . -path ./prelude/libbacktrace -not -prune -or -path ./sql/test/TPC-h/tnt-tpch -not -prune -or -regex '.*\.[ch]\(pp\)*' | parallel clang-format -i :::
+	find . -path ./prelude/libbacktrace -not -prune -or -path ./sql/test/TPC-h/tnt-tpch -not -prune -or -regex '.*\.[ch]\(pp\)*' | parallel clang-format -i {}
 
 .PHONY: fmt-js
 fmt-js:
