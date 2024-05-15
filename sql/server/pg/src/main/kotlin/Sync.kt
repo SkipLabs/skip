@@ -27,6 +27,7 @@ class PgToSkdbSync(val skdb: Skdb) {
         currentWriter = null
         currentProc = null
       }
+      is PgRelation -> {} // handled for us
       is PgInsert -> {
         val relation = relations.get(msg.relationId)
         if (relation == null) {
@@ -43,40 +44,8 @@ class PgToSkdbSync(val skdb: Skdb) {
             val valueList =
                 cols
                     .mapIndexed { idx, colValue ->
-                      when (colValue) {
-                        is PgTupleNull -> "NULL"
-                        is PgTupleUnchangedToast ->
-                            throw RuntimeException("Unexpected data type unchanged in insert")
-                        is PgTupleText -> {
-                          val v = colValue.data
-                          val colType = relation.cols.get(idx).dataType
-                          when (colType) {
-                            PgGeneralisedDataType.BOOL -> {
-                              if (v in
-                                  arrayOf(
-                                      "TRUE",
-                                      "'t'",
-                                      "'true'",
-                                      "'y'",
-                                      "'yes'",
-                                      "'on'",
-                                      "'1'",
-                                  )) {
-                                "1"
-                              } else {
-                                "0"
-                              }
-                            }
-                            PgGeneralisedDataType.INT -> v
-                            PgGeneralisedDataType.FLOAT -> v
-                            PgGeneralisedDataType.TEXT -> "'${v}'"
-                            PgGeneralisedDataType.UNSUPPORTED -> {
-                              // TODO:
-                              throw RuntimeException("Could not insert unsupported data type")
-                            }
-                          }
-                        }
-                      }
+                      val colDef = relation.cols.get(idx)
+                      serialiseValue(colValue, colDef)
                     }
                     .joinToString(",", prefix = "(", postfix = ")")
 
@@ -89,9 +58,91 @@ class PgToSkdbSync(val skdb: Skdb) {
           else -> throw RuntimeException("Unexpected tuple type for insert: ${tuple}")
         }
       }
+      is PgDelete -> {
+        val relation = relations.get(msg.relationId)
+        if (relation == null) {
+          throw RuntimeException("Could not find relation for ${msg.relationId}")
+        }
+        val table = relation.relation
+        val tuple = msg.old
+        when (tuple) {
+          is PgTupleKey -> {
+            val cols = tuple.cols
+            val colDefs = relation.cols
+            val matchExpr =
+                cols
+                    .mapIndexedNotNull { idx, colValue ->
+                      if (!(colValue is PgTupleText)) {
+                        null
+                      } else {
+                        val colDef = colDefs.get(idx)
+                        "${colDef.name} = ${serialiseValue(colValue, colDef)}"
+                      }
+                    }
+                    .joinToString(" AND ")
+
+            val sqlDelete = "DELETE FROM ${table} WHERE ${matchExpr};\n"
+            currentWriter!!.write(sqlDelete)
+          }
+          is PgTupleFull -> {
+            val cols = tuple.cols
+            val matchExpr =
+                cols
+                    .mapIndexed { idx, colValue ->
+                      val colDef = relation.cols.get(idx)
+                      "${colDef.name} = ${serialiseValue(colValue, colDef)}"
+                    }
+                    .joinToString(" AND ")
+
+            val sqlDelete = "DELETE FROM ${table} WHERE ${matchExpr};\n"
+            currentWriter!!.write(sqlDelete)
+          }
+          else -> throw RuntimeException("Unexpected tuple type for delete: ${tuple}")
+        }
+      }
+      // TODO:
+      is PgUpdate -> {}
+      // TODO:
+      is PgTruncate -> {}
       else -> {
         // TODO:
-        System.err.println("WARNING: dropping ${msg}")
+        System.err.println("WARNING: skdb sync dropping ${msg}")
+      }
+    }
+  }
+}
+
+fun serialiseValue(colValue: PgTupleData, colDef: PgColumn): String {
+  return when (colValue) {
+    is PgTupleNull -> "NULL"
+    is PgTupleUnchangedToast -> throw RuntimeException("Unexpected data type unchanged in insert")
+    is PgTupleText -> {
+      val v = colValue.data
+      val colType = colDef.dataType
+      when (colType) {
+        PgGeneralisedDataType.BOOL -> {
+          if (v in
+              arrayOf(
+                  "TRUE",
+                  "'t'",
+                  "'true'",
+                  "'y'",
+                  "'yes'",
+                  "'on'",
+                  "'1'",
+              )) {
+            "1"
+          } else {
+            "0"
+          }
+        }
+        PgGeneralisedDataType.INT -> v
+        PgGeneralisedDataType.FLOAT -> v
+        PgGeneralisedDataType.TEXT -> "'${v}'"
+        PgGeneralisedDataType.UNSUPPORTED -> {
+          // TODO:
+          throw RuntimeException("Could not insert unsupported data type")
+        }
       }
     }
   }
