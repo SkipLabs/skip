@@ -19,6 +19,7 @@ repositories {
 }
 
 dependencies {
+  implementation(project(":core"))
   implementation("org.postgresql:postgresql:42.7.3") //pgjdbc
 }
 
