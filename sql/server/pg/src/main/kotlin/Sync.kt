@@ -100,8 +100,77 @@ class PgToSkdbSync(val skdb: Skdb) {
           else -> throw RuntimeException("Unexpected tuple type for delete: ${tuple}")
         }
       }
-      // TODO:
-      is PgUpdate -> {}
+      is PgUpdate -> {
+        val relation = relations.get(msg.relationId)
+        if (relation == null) {
+          throw RuntimeException("Could not find relation for ${msg.relationId}")
+        }
+        val table = relation.relation
+        val oldTuple = msg.old
+        val newTuple = msg.new
+
+        val matchExpr =
+            if (oldTuple == null) {
+              // the key did not change so we can extract it from the new tuple
+              val colDefs = relation.cols
+              if (!(newTuple is PgTupleNew)) {
+                throw RuntimeException("Unexpected type for new tuple in update: ${newTuple}")
+              }
+              val colValues = newTuple.cols
+              colDefs
+                  .mapIndexedNotNull { idx, def ->
+                    if (def.isKey) {
+                      val colValue = colValues.get(idx)
+                      "${def.name} = ${serialiseValue(colValue, def)}"
+                    } else {
+                      null
+                    }
+                  }
+                  .joinToString(" AND ")
+            } else {
+              when (oldTuple) {
+                is PgTupleKey -> {
+                  val colDefs = relation.cols
+                  oldTuple.cols
+                      .mapIndexedNotNull { idx, colValue ->
+                        if (!(colValue is PgTupleText)) {
+                          null
+                        } else {
+                          val colDef = colDefs.get(idx)
+                          "${colDef.name} = ${serialiseValue(colValue, colDef)}"
+                        }
+                      }
+                      .joinToString(" AND ")
+                }
+                is PgTupleFull -> {
+                  oldTuple.cols
+                      .mapIndexed { idx, colValue ->
+                        val colDef = relation.cols.get(idx)
+                        "${colDef.name} = ${serialiseValue(colValue, colDef)}"
+                      }
+                      .joinToString(" AND ")
+                }
+                else ->
+                    throw RuntimeException("Unexpected tuple type for update previous: ${oldTuple}")
+              }
+            }
+
+        val setExpr =
+            when (newTuple) {
+              is PgTupleNew -> {
+                newTuple.cols
+                    .mapIndexedNotNull { idx, colValue ->
+                      val colDef = relation.cols.get(idx)
+                      "${colDef.name} = ${serialiseValue(colValue, colDef)}"
+                    }
+                    .joinToString(",")
+              }
+              else -> throw RuntimeException("Unexpected tuple type for update new: ${newTuple}")
+            }
+
+        val sqlUpdate = "UPDATE ${table} SET ${setExpr} WHERE ${matchExpr};\n"
+        currentWriter!!.write(sqlUpdate)
+      }
       // TODO:
       is PgTruncate -> {}
       else -> {
