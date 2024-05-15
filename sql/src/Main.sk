@@ -80,35 +80,37 @@ untracked fun main(): void {
   saved = SKStore.newObstack();
   cmd = Cli.Command("skdb")
     .about("The SQL database that tells you when your query results changed")
-    .arg(Cli.StringArg("init").about("Initialize new SKStore runtime data"))
+    .arg(Cli.Arg::string("init").about("Initialize new SKStore runtime data"))
     .arg(
-      Cli.StringArg("data").about("Use existing SKStore runtime data").global(),
+      Cli.Arg::string("data")
+        .about("Use existing SKStore runtime data")
+        .global(),
     )
-    .arg(Cli.BoolArg("backtrace").about("Internal use").global())
-    .arg(Cli.BoolArg("sync").about("Sync to disk").global())
+    .arg(Cli.Arg::bool("backtrace").about("Internal use").global())
+    .arg(Cli.Arg::bool("sync").about("Sync to disk").global())
     .arg(
-      Cli.StringArg("format")
+      Cli.Arg::string("format")
         .default(if (IO.stdin().isatty()) "table" else "sql")
         .about("Output format (sql, csv, json, or table)")
         .global(),
     )
     .arg(
-      Cli.BoolArg("always-allow-joins")
+      Cli.Arg::bool("always-allow-joins")
         .about("Allow cross joins and joins outside of reactive views")
         .global(),
     )
     .arg(
-      Cli.BoolArg("show-used-indexes")
+      Cli.Arg::bool("show-used-indexes")
         .about("Print indexes used by a query to stdout")
         .global(),
     )
     .arg(
-      Cli.StringArg("capacity").about(
+      Cli.Arg::string("capacity").about(
         "Initialize SKStore runtime with given capacity",
       ),
     )
     .arg(
-      Cli.BoolArg("expect-query-params").about(
+      Cli.Arg::bool("expect-query-params").about(
         "Read values of named parameters which may appear in the statement. The parameter values must be provided via stdin, on a single line, as an encoded JSON Object where the keys are the parameter names and the values will be interpreted as SQL values.",
       ),
     )
@@ -117,19 +119,21 @@ untracked fun main(): void {
     .subcommand(
       Cli.Command("dump-table")
         .about("Print a specific table signature")
-        .arg(Cli.StringArg("table").positional().required().about("Table name"))
-        .arg(Cli.StringArg("table-suffix").about("Optional suffix")),
+        .arg(
+          Cli.Arg::string("table").positional().required().about("Table name"),
+        )
+        .arg(Cli.Arg::string("table-suffix").about("Optional suffix")),
     )
     .subcommand(
       Cli.Command("connected-as")
         .about("Informs the database that it is a replicating peer")
         .arg(
-          Cli.StringArg("userId")
+          Cli.Arg::string("userId")
             .required()
             .about("access key used for the connection"),
         )
         .arg(
-          Cli.StringArg("replicationId")
+          Cli.Arg::string("replicationId")
             .required()
             .about(
               "the replication id the client is using locally for this server-connection",
@@ -139,7 +143,7 @@ untracked fun main(): void {
     .subcommand(
       Cli.Command("dump-tables")
         .about("Dumps the tables in SQL format")
-        .arg(Cli.StringArg("table-suffix").about("Optional suffix")),
+        .arg(Cli.Arg::string("table-suffix").about("Optional suffix")),
     )
     .subcommand(
       Cli.Command("dump-inserts").about("Dump the inserts in SQL format"),
@@ -147,7 +151,9 @@ untracked fun main(): void {
     .subcommand(
       Cli.Command("dump-view")
         .about("Print a specific view in SQL format")
-        .arg(Cli.StringArg("view").positional().required().about("View name")),
+        .arg(
+          Cli.Arg::string("view").positional().required().about("View name"),
+        ),
     )
     .subcommand(Cli.Command("dump-views").about("Dump the views in SQL format"))
     .subcommand(
@@ -160,7 +166,10 @@ untracked fun main(): void {
       Cli.Command("csv-field")
         .about("Output a specific CSV field")
         .arg(
-          Cli.StringArg("field").positional().required().about("Field number"),
+          Cli.Arg::string("field")
+            .positional()
+            .required()
+            .about("Field number"),
         ),
     )
     .subcommand(Cli.Command("size").about("Output the size of the db"))
@@ -168,19 +177,19 @@ untracked fun main(): void {
       Cli.Command("diff")
         .about("Send the diff from session")
         .arg(
-          Cli.StringArg("session-id")
+          Cli.Arg::string("session-id")
             .positional()
             .required()
             .about("Session id"),
         )
         // if not specified, diff will read a multi-table spec from stdin.
-        .arg(Cli.StringArg("since").about("Starting time of the diff")),
+        .arg(Cli.Arg::string("since").about("Starting time of the diff")),
     )
     .subcommand(
       Cli.Command("disconnect")
         .about("Disconnect a session")
         .arg(
-          Cli.StringArg("session-id")
+          Cli.Arg::string("session-id")
             .positional()
             .required()
             .about("Session id"),
@@ -190,19 +199,19 @@ untracked fun main(): void {
       Cli.Command("watermark")
         .about("Get the watermark for table TABLE")
         .arg(
-          Cli.StringArg("source")
+          Cli.Arg::string("source")
             .required()
             .about("Globally unique identity of this write stream"),
         )
         .arg(
-          Cli.StringArg("table").positional().required().about("Table name"),
+          Cli.Arg::string("table").positional().required().about("Table name"),
         ),
     )
     .subcommand(
       Cli.Command("replication-id")
         .about("Get a unique id for CLIENT-UUID")
         .arg(
-          Cli.StringArg("client-uuid")
+          Cli.Arg::string("client-uuid")
             .positional()
             .required()
             .about("UUID of the client instance"),
@@ -212,19 +221,19 @@ untracked fun main(): void {
       Cli.Command("write-csv")
         .about("Write data from stdin into a directory in CSV format")
         .arg(
-          Cli.StringArg("source").about(
+          Cli.Arg::string("source").about(
             "Globally unique identity of this write stream",
           ),
         )
-        .arg(Cli.StringArg("user").about("Name of the user"))
+        .arg(Cli.Arg::string("user").about("Name of the user"))
         .arg(
-          Cli.BoolArg("enable-rebuilds").about(
+          Cli.Arg::bool("enable-rebuilds").about(
             "Allow write-csv to apply rebuilds. Should only be used by single-peer clients." +
               " Used wrongly, can lead to data loss: if in doubt do not enable.",
           ),
         )
         .arg(
-          Cli.BoolArg("expect-schemas").about(
+          Cli.Arg::bool("expect-schemas").about(
             "Read source-specified schemas from stdin.  They must be JSON-encoded in a map from table name to schema and written on one line before any CSV data.",
           ),
         ),
@@ -233,51 +242,51 @@ untracked fun main(): void {
       Cli.Command("tail")
         .about("Tail changes on a directory")
         .arg(
-          Cli.StringArg("session-id")
+          Cli.Arg::string("session-id")
             .positional()
             .required()
             .about("Session id"),
         )
         .arg(
-          Cli.BoolArg("follow")
+          Cli.Arg::bool("follow")
             .long("follow")
             .short("f")
             .about("Output appended data as the database grows"),
         )
         .arg(
-          Cli.BoolArg("read-spec").about(
+          Cli.Arg::bool("read-spec").about(
             "Read a tail spec for the subscription from stdin",
           ),
         )
         .arg(
-          Cli.StringArg("since")
+          Cli.Arg::string("since")
             .long("since")
             .about("Starting time of the tail"),
         )
-        .arg(Cli.StringArg("user").about("Name of the user")),
+        .arg(Cli.Arg::string("user").about("Name of the user")),
     )
     .subcommand(
       Cli.Command("subscribe")
         .about("Subscribe to a directory change")
         .arg(
-          Cli.StringArg("views")
+          Cli.Arg::string("views")
             .repeatable()
             .positional()
             .required()
             .about("Views"),
         )
-        .arg(Cli.BoolArg("connect").about("Send the initial state first"))
+        .arg(Cli.Arg::bool("connect").about("Send the initial state first"))
         .arg(
-          Cli.StringArg("updates").about(
+          Cli.Arg::string("updates").about(
             "Name of the file where the updates will be written",
           ),
         )
         .arg(
-          Cli.StringArg("notify").about(
+          Cli.Arg::string("notify").about(
             "Name of the file updates with time of the last change",
           ),
         )
-        .arg(Cli.StringArg("ignore-source").about("Write stream to ignore")),
+        .arg(Cli.Arg::string("ignore-source").about("Write stream to ignore")),
     )
     .subcommand(
       Cli.Command("can-mirror")
@@ -285,13 +294,13 @@ untracked fun main(): void {
           "Check that a table is eligible for mirroring under a given schema",
         )
         .arg(
-          Cli.StringArg("table")
+          Cli.Arg::string("table")
             .positional()
             .required()
             .about("Table signature of remote to mirror"),
         )
         .arg(
-          Cli.StringArg("schema")
+          Cli.Arg::string("schema")
             .positional()
             .required()
             .about("Expected table schema"),
@@ -302,7 +311,7 @@ untracked fun main(): void {
       Cli.Command("toggle-view")
         .about("Toggle view status of specified table")
         .arg(
-          Cli.StringArg("table").positional().required().about("Table name"),
+          Cli.Arg::string("table").positional().required().about("Table name"),
         ),
     )
     .help();

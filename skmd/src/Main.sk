@@ -5,13 +5,13 @@ fun main(): void {
   cmd = Cli.Command("skmd")
     .about("Skip's Markdown converter")
     .arg(
-      Cli.BoolArg("version")
+      Cli.Arg::bool("version")
         .short("V")
         .long("version")
         .about("Print version info and exit"),
     )
     .arg(
-      Cli.BoolArg("verbose")
+      Cli.Arg::bool("verbose")
         .short("v")
         .long("verbose")
         .about("Use verbose output")
@@ -66,12 +66,12 @@ fun html(): (Cli.Command, (Skargo.GlobalContext, Cli.ParseResults) ~> void) {
     Cli.Command("html")
       .about("Convert to html")
       .arg(
-        Cli.StringArg("target-dir").about(
+        Cli.Arg::string("target-dir").about(
           "Directory for all generated artifacts",
         ),
       )
       .arg(
-        Cli.StringArg("conf").about(
+        Cli.Arg::string("conf").about(
           "Build with the specified configuration file",
         ),
       ),

@@ -233,7 +233,7 @@ private fun arg_maps(args: Array<Arg>): (Array<Arg>, Map<String, Arg>) {
       if (arg._short.isSome()) {
         options.add(`-${arg._short.fromSome()}`, arg);
         if (arg._long.isNone()) {
-          if (arg._negatable) {
+          if (arg.isNegatable()) {
             invariant_violation(
               `Argument ${arg.name} cannot be negatable without a long name`,
             )
@@ -251,7 +251,7 @@ private fun arg_maps(args: Array<Arg>): (Array<Arg>, Map<String, Arg>) {
         )
       };
       options.add(`--${longFlag}`, arg);
-      if (arg._negatable) {
+      if (arg.isNegatable()) {
         options.add(`--no-${longFlag}`, arg);
       };
     }
@@ -338,7 +338,7 @@ mutable class Parser(
     if (error.isNone()) {
       for (arg in this.cmd._args) {
         if (!this.values.containsKey(arg.name)) {
-          if (arg._required) {
+          if (arg.isRequired()) {
             !error = Some(MissingArgumentError(arg.name));
             break void
           } else {

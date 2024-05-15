@@ -1,6 +1,6 @@
 module Cli;
 
-base class Arg(
+base class Arg{
   name: String,
   _short: ?String = None(),
   _long: ?String = None(),
@@ -8,15 +8,9 @@ base class Arg(
   _global: Bool = false,
   _env: ?String = None(),
   _repeatable: Bool = false,
-  // NOTE: The following parameters cannot be placed in subclasses, since `name` is required.
-  // Other than BoolArgs only
   _default: ?Value = None(),
-  _required: Bool = false,
   _positional: Bool = false,
-  _value_name: String = "VALUE",
-  // BoolArgs only
-  _negatable: Bool = false,
-) {
+} {
   // Builder interface methods.
   fun short(flag: String): this {
     this with {_short => Some(flag)}
@@ -50,15 +44,46 @@ base class Arg(
   overridable fun env(name: String): this {
     this with {_env => Some(name)}
   }
+
+  fun isRequired(): Bool;
+
+  fun isNegatable(): Bool;
+
+  static fun string(name: String): StringArg {
+    StringArg{name}
+  }
+
+  static fun int(name: String): IntArg {
+    IntArg{name}
+  }
+
+  static fun bool(name: String): BoolArg {
+    BoolArg{name}
+  }
 }
 
-base class ValuedArg extends Arg {
+base class ValuedArg{
+  _required: Bool = false,
+  _value_name: String = "VALUE",
+  _value_about: Array<(String, String)> = Array[],
+} extends Arg {
   fun required(value: Bool = true): this {
     this with {_required => value}
   }
 
-  fun value_name(value: String): this {
-    this with {_value_name => value}
+  fun isRequired(): Bool {
+    this._required
+  }
+
+  fun isNegatable(): Bool {
+    false
+  }
+
+  fun value_name(
+    value: String,
+    about: Array<(String, String)> = Array[],
+  ): this {
+    this with {_value_name => value, _value_about => about}
   }
 }
 
@@ -88,13 +113,21 @@ class IntArg extends ValuedArg {
   }
 }
 
-class BoolArg extends Arg {
+class BoolArg{_negatable: Bool = false} extends Arg {
   fun default(value: Bool): this {
     this with {_default => Some(BoolValue(value))}
   }
 
+  fun isRequired(): Bool {
+    false
+  }
+
   fun negatable(value: Bool = true): this {
     this with {_negatable => value}
+  }
+
+  fun isNegatable(): Bool {
+    this._negatable
   }
 }
 
@@ -107,8 +140,12 @@ class Command(
   _about: ?String = None(),
   _short: ?String = None(),
 ) {
+  fun args(args: Array<Arg>): this {
+    this with {_args => this._args.concat(args)}
+  }
+
   fun arg(arg: Arg): this {
-    this with {_args => this._args.concat(Array[arg])}
+    this.args(Array[arg])
   }
 
   fun extra(name: String = ""): this {
@@ -132,7 +169,7 @@ class Command(
 
   fun help(): this {
     this.arg(
-      Cli.BoolArg("help")
+      Cli.Arg::bool("help")
         .short("h")
         .long("help")
         .about("Print help information")

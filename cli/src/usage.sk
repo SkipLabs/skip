@@ -42,7 +42,7 @@ private fun usageUsage(
   } else {
     // Cannot have both positional args and subcommands.
     for (arg in positionalArgs) {
-      argString = if (arg._required) {
+      argString = if (arg.isRequired()) {
         `<${arg.name}>`
       } else {
         `[${arg.name}]`
@@ -78,20 +78,21 @@ private fun usageOptions(options: Sequence<Cli.Arg>): String {
   usageSection(
     "OPTIONS",
     options.map(arg -> {
-      optFlags = (arg._short, arg._long) match {
+      baseOptFlags = (arg._short, arg._long) match {
       | (Some(short), Some(long)) -> `-${short}, --${long}`
       | (Some(short), None()) -> `-${short}`
       | (None(), Some(long)) -> `    --${long}`
       | _ -> `    --${arg.name}`
       };
-      if (arg is Cli.ValuedArg _) {
-        !optFlags = if (arg._repeatable) {
-          `${optFlags} [<${arg._value_name}>]`
+      optFlags = arg match {
+      | Cli.ValuedArg{_value_name} ->
+        if (arg._repeatable) {
+          `${baseOptFlags} [<${_value_name}>]`
         } else {
-          `${optFlags} <${arg._value_name}>`
+          `${baseOptFlags} <${_value_name}>`
         }
-      } else if (arg._repeatable) {
-        !optFlags = `${optFlags}...`
+      | _ if (arg._repeatable) -> `${baseOptFlags}...`
+      | _ -> baseOptFlags
       };
       Array[Some(optFlags), arg._about]
     }),
@@ -109,6 +110,25 @@ private fun usageCommands(subcommands: Sequence<Command>): String {
   )
 }
 
+private fun usageValues(
+  values: Sequence<(String, Array<(String, String)>)>,
+): String {
+  nbLines = values.foldl(
+    (nb, name_abouts) -> nb + 1 + name_abouts.i1.size(),
+    0,
+  );
+  lines: mutable Vector<Array<?String>> = Vector::mcreate(nbLines);
+  for (name_abouts in values) {
+    (name, abouts) = name_abouts;
+    lines.push(Array[Some(name), None()]);
+    for (v_about in abouts) {
+      (v, about) = v_about;
+      lines.push(Array[Some("".padLeft(kTabSize, ' ') + v), Some(about)]);
+    }
+  };
+  usageSection("VALUES", lines.toArray())
+}
+
 fun usage(
   cmd: Command,
   header: Bool = true,
@@ -121,6 +141,14 @@ fun usage(
       parent.map(p -> p._args.filter(arg -> arg._global)).default(Array[]),
     );
   prefix = parent.map(x -> x.name + " ").default("");
+  values = cmd._args.filterMap(
+    (arg ->
+      (arg match {
+      | ValuedArg{_value_name, _value_about} if (_value_about.size() > 0) ->
+        Some((_value_name, _value_about))
+      | _ -> None()
+      })),
+  );
 
   Array[
     if (header) cmd._about else None(),
@@ -133,6 +161,11 @@ fun usage(
     if (options.size() > 0) Some(usageOptions(options)) else None(),
     if (cmd._subcommands.size() > 0) {
       Some(usageCommands(cmd._subcommands))
+    } else {
+      None()
+    },
+    if (values.size() > 0) {
+      Some(usageValues(values))
     } else {
       None()
     },
