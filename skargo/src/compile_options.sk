@@ -1,7 +1,10 @@
 module Skargo;
 
 const kDefaultProfile: String = "dev";
-const kAvailableProfiles: Array<String> = Array["dev", "release"];
+const kAvailableProfiles: Array<(String, String)> = Array[
+  ("dev", "Development profile: no optimizations, debug symbols"),
+  ("release", "Release profile: with optimizations"),
+];
 
 // TODO: Rename CompileKind to TargetArch.
 class BuildConfig{
@@ -36,10 +39,10 @@ fun build_config(
       invariant_violation(
         `Cannot specify both \`--release\` and \`--profile=${profile}\``,
       )
-    | (false, Some(profile)) if (kAvailableProfiles.contains(profile)) ->
-      profile
     | (false, Some(profile)) ->
-      invariant_violation(`Unrecognized profile ${profile}`)
+      if (kAvailableProfiles.any(p -> p.i0 == profile)) profile else {
+        invariant_violation(`Unrecognized profile ${profile}`)
+      }
     },
     export_dir => None(),
   };
@@ -62,5 +65,15 @@ fun compile_options(args: Cli.ParseResults): CompileOptions {
 
   CompileOptions{build_config, filter}
 }
+
+const kProfileArgs: Array<Cli.Arg> = Array[
+  Cli.Arg::string("profile")
+    .value_name("PROFILE-NAME", kAvailableProfiles)
+    .about("Use the specified profile"),
+  Cli.Arg::bool("release")
+    .short("r")
+    .long("release")
+    .about("Shorthand for --profile=release"),
+];
 
 module end;

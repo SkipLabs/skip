@@ -9,33 +9,23 @@ fun test(): (
       .short("t")
       .about("Run the tests")
       .arg(
-        Cli.StringArg("manifest-path")
+        Cli.Arg::string("manifest-path")
           .value_name("PATH")
           .about("Path to Skargo.toml"),
       )
       .arg(
-        Cli.StringArg("target-dir")
+        Cli.Arg::string("target-dir")
           .value_name("PATH")
           .about("Directory for all generated artifacts"),
       )
       .arg(
-        Cli.StringArg("out-dir")
+        Cli.Arg::string("out-dir")
           .value_name("PATH")
           .about("Copy final artifacts to this directory"),
       )
+      .args(Skargo.kProfileArgs)
       .arg(
-        Cli.StringArg("profile")
-          .value_name("PROFILE-NAME")
-          .about("Build artifacts with the specified profile"),
-      )
-      .arg(
-        Cli.BoolArg("release")
-          .short("r")
-          .long("release")
-          .about("Build artifacts in release mode, with optimizations"),
-      )
-      .arg(
-        Cli.StringArg("target")
+        Cli.Arg::string("target")
           .repeatable()
           .positional()
           .about(
@@ -43,13 +33,13 @@ fun test(): (
           ),
       )
       .arg(
-        Cli.StringArg("filter")
+        Cli.Arg::string("filter")
           .repeatable()
           .short("f")
           .long("filter")
           .about("If specified, only run tests with names matching the filter"),
       )
-      .arg(Cli.StringArg("junitxml").about("Generate a JUnit XML report")),
+      .arg(Cli.Arg::string("junitxml").about("Generate a JUnit XML report")),
     (gctx, args) ~> execCommand(gctx, args, execTest),
   )
 }

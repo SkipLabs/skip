@@ -6,28 +6,18 @@ fun runner(): (Cli.Command, (GlobalContext, Cli.ParseResults) ~> void) {
       .short("r")
       .about("Run the built host binary of the local package")
       .arg(
-        Cli.StringArg("manifest-path")
+        Cli.Arg::string("manifest-path")
           .value_name("PATH")
           .about("Path to Skargo.toml"),
       )
       .arg(
-        Cli.StringArg("target-dir")
+        Cli.Arg::string("target-dir")
           .value_name("PATH")
           .about("Directory for all generated artifacts"),
       )
+      .args(kProfileArgs)
       .arg(
-        Cli.StringArg("profile")
-          .value_name("PROFILE-NAME")
-          .about("Run the binary with the specified profile"),
-      )
-      .arg(
-        Cli.BoolArg("release")
-          .short("r")
-          .long("release")
-          .about("Run the binary in release mode"),
-      )
-      .arg(
-        Cli.StringArg("bin")
+        Cli.Arg::string("bin")
           .repeatable()
           .value_name("NAME")
           .about("Build only the specified binary"),

@@ -5,13 +5,13 @@ fun main(): void {
   cmd = Cli.Command("skjson")
     .about("Skip JSON tooling")
     .arg(
-      Cli.BoolArg("version")
+      Cli.Arg::bool("version")
         .short("V")
         .long("version")
         .about("Print version info and exit"),
     )
     .arg(
-      Cli.BoolArg("verbose")
+      Cli.Arg::bool("verbose")
         .short("v")
         .long("verbose")
         .about("Use verbose output")
@@ -67,7 +67,7 @@ fun infer(): (Cli.Command, Cli.ParseResults ~> void) {
   (
     Cli.Command("infer-schema")
       .about("Infers the schema of a JSON entries passed on STDIN")
-      .arg(Cli.BoolArg("compact").about("Use compact representation")),
+      .arg(Cli.Arg::bool("compact").about("Use compact representation")),
     execInfer,
   )
 }
@@ -118,7 +118,7 @@ fun gen(): (Cli.Command, Cli.ParseResults ~> void) {
   (
     Cli.Command("gen-json")
       .about("generates a random JSON object")
-      .arg(Cli.IntArg("n").about("Number of objects to generate")),
+      .arg(Cli.Arg::int("n").about("Number of objects to generate")),
     execGen,
   )
 }
@@ -140,7 +140,7 @@ fun check(): (Cli.Command, Cli.ParseResults ~> void) {
     Cli.Command("check")
       .about("Checks JSON objects against a schema")
       .arg(
-        Cli.StringArg("schema").about("The schema used to check the objects"),
+        Cli.Arg::string("schema").about("The schema used to check the objects"),
       ),
     execCheck,
   )
@@ -166,7 +166,7 @@ fun help(): (Cli.Command, Cli.ParseResults ~> void) {
   (
     Cli.Command("help")
       .arg(
-        Cli.StringArg("command")
+        Cli.Arg::string("command")
           .positional()
           .about(
             "If specified, the subcommand for which help is to be displayed",

@@ -9,40 +9,32 @@ fun publish(): (
       .short("p")
       .about("Call npm publish on generated npm package")
       .arg(
-        Cli.StringArg("manifest-path")
+        Cli.Arg::string("manifest-path")
           .value_name("PATH")
           .about("Path to Skargo.toml"),
       )
       .arg(
-        Cli.StringArg("target-dir")
+        Cli.Arg::string("target-dir")
           .value_name("PATH")
           .about("Directory for all generated artifacts"),
       )
       .arg(
-        Cli.StringArg("out-dir")
+        Cli.Arg::string("out-dir")
           .value_name("PATH")
           .about("Copy final artifacts to this directory"),
       )
+      .args(Skargo.kProfileArgs)
       .arg(
-        Cli.StringArg("profile")
-          .value_name("PROFILE-NAME")
-          .about("Build artifacts with the specified profile"),
-      )
-      .arg(
-        Cli.BoolArg("release")
-          .short("r")
-          .long("release")
-          .about("Build artifacts in release mode, with optimizations"),
-      )
-      .arg(
-        Cli.StringArg("bin")
+        Cli.Arg::string("bin")
           .repeatable()
           .value_name("NAME")
           .about("Build only the specified binary"),
       )
-      .arg(Cli.StringArg("npmVersion").about("Publish with specified version"))
       .arg(
-        Cli.StringArg("next").about(
+        Cli.Arg::string("npmVersion").about("Publish with specified version"),
+      )
+      .arg(
+        Cli.Arg::string("next").about(
           "Publish with next (major | minor | patch) version of latest publish package",
         ),
       )

@@ -4,7 +4,7 @@ module CliTests;
 
 @test
 fun unexpectedExtraArguments(): void {
-  cmd = Cli.Command("foo").arg(Cli.StringArg("bar").repeatable());
+  cmd = Cli.Command("foo").arg(Cli.Arg::string("bar").repeatable());
   args = Cli.parseArgsFrom(cmd, Array["--", "foo2", "--bar", "--foo2"]);
 
   T.expectTrue(args.error is Some(Cli.InvalidArgumentError _));
@@ -12,7 +12,7 @@ fun unexpectedExtraArguments(): void {
 
 @test
 fun extraArguments(): void {
-  cmd = Cli.Command("foo").arg(Cli.StringArg("bar").repeatable()).extra();
+  cmd = Cli.Command("foo").arg(Cli.Arg::string("bar").repeatable()).extra();
   args = Cli.parseArgsFrom(cmd, Array["--", "foo2", "--bar", "--foo2"]);
 
   T.expectEq(args.extra, Array["foo2", "--bar", "--foo2"]);
@@ -21,24 +21,24 @@ fun extraArguments(): void {
 @test
 fun duplicateArgument(): void {
   cmd = Cli.Command("foo")
-    .arg(Cli.BoolArg("bar").long("bar1"))
-    .arg(Cli.BoolArg("bar").long("bar2"));
+    .arg(Cli.Arg::bool("bar").long("bar1"))
+    .arg(Cli.Arg::bool("bar").long("bar2"));
   T.expectThrow(() -> _ = Cli.parseArgsFrom(cmd, Array[""]));
 }
 
 @test
 fun duplicateArgumentLongFlag(): void {
   cmd = Cli.Command("foo")
-    .arg(Cli.BoolArg("bar1").long("bar"))
-    .arg(Cli.BoolArg("bar2").long("bar"));
+    .arg(Cli.Arg::bool("bar1").long("bar"))
+    .arg(Cli.Arg::bool("bar2").long("bar"));
   T.expectThrow(() -> _ = Cli.parseArgsFrom(cmd, Array[""]));
 }
 
 @test
 fun duplicateArgumentShortFlag(): void {
   cmd = Cli.Command("foo")
-    .arg(Cli.BoolArg("bar1").short("bar"))
-    .arg(Cli.BoolArg("bar2").short("bar"));
+    .arg(Cli.Arg::bool("bar1").short("bar"))
+    .arg(Cli.Arg::bool("bar2").short("bar"));
   T.expectThrow(() -> _ = Cli.parseArgsFrom(cmd, Array[""]));
 }
 
@@ -61,11 +61,11 @@ fun duplicateSubcommandShort(): void {
 @test
 fun positionalArgs(): void {
   cmd = Cli.Command("foo")
-    .arg(Cli.StringArg("bar").positional())
-    .arg(Cli.StringArg("baz").positional())
-    .arg(Cli.BoolArg("foobar1"))
-    .arg(Cli.BoolArg("foobar2"))
-    .arg(Cli.BoolArg("foobar3"));
+    .arg(Cli.Arg::string("bar").positional())
+    .arg(Cli.Arg::string("baz").positional())
+    .arg(Cli.Arg::bool("foobar1"))
+    .arg(Cli.Arg::bool("foobar2"))
+    .arg(Cli.Arg::bool("foobar3"));
   args = Cli.parseArgsFrom(
     cmd,
     Array["--foobar1", "xxx", "--foobar2", "yyy", "--foobar3"],
@@ -77,7 +77,9 @@ fun positionalArgs(): void {
 
 @test
 fun stringArgsDefault(): void {
-  cmd = Cli.Command("foo").arg(Cli.StringArg("bar")).arg(Cli.StringArg("baz"));
+  cmd = Cli.Command("foo")
+    .arg(Cli.Arg::string("bar"))
+    .arg(Cli.Arg::string("baz"));
   args = Cli.parseArgsFrom(cmd, Array["--bar", "foo1", "--baz=foo2"]);
 
   T.expectEq(args.getString("bar"), "foo1");
@@ -87,8 +89,8 @@ fun stringArgsDefault(): void {
 @test
 fun stringArgsLong(): void {
   cmd = Cli.Command("foo")
-    .arg(Cli.StringArg("bar").long("foobar"))
-    .arg(Cli.StringArg("baz").long("foobaz"));
+    .arg(Cli.Arg::string("bar").long("foobar"))
+    .arg(Cli.Arg::string("baz").long("foobaz"));
   args = Cli.parseArgsFrom(cmd, Array["--foobar", "foo1", "--foobaz=foo2"]);
 
   T.expectEq(args.getString("bar"), "foo1");
@@ -100,8 +102,8 @@ fun stringArgsLong(): void {
 @test
 fun stringArgsShort(): void {
   cmd = Cli.Command("foo")
-    .arg(Cli.StringArg("bar").short("r"))
-    .arg(Cli.StringArg("baz").short("z"));
+    .arg(Cli.Arg::string("bar").short("r"))
+    .arg(Cli.Arg::string("baz").short("z"));
   args = Cli.parseArgsFrom(cmd, Array["-r", "foo1", "-z", "foo2"]);
 
   T.expectEq(args.getString("bar"), "foo1");
@@ -113,8 +115,8 @@ fun stringArgsShort(): void {
 @test
 fun stringArgsShortLong(): void {
   cmd = Cli.Command("foo")
-    .arg(Cli.StringArg("bar").long("foobar").short("r"))
-    .arg(Cli.StringArg("baz").long("foobaz").short("z"));
+    .arg(Cli.Arg::string("bar").long("foobar").short("r"))
+    .arg(Cli.Arg::string("baz").long("foobaz").short("z"));
   args = Cli.parseArgsFrom(cmd, Array["--foobar", "foo1", "-z", "foo2"]);
 
   T.expectEq(args.getString("bar"), "foo1");
@@ -123,7 +125,7 @@ fun stringArgsShortLong(): void {
 
 @test
 fun boolArgsDefault(): void {
-  cmd = Cli.Command("foo").arg(Cli.BoolArg("bar")).arg(Cli.BoolArg("baz"));
+  cmd = Cli.Command("foo").arg(Cli.Arg::bool("bar")).arg(Cli.Arg::bool("baz"));
   args = Cli.parseArgsFrom(cmd, Array["--bar"]);
 
   T.expectTrue(args.getBool("bar"));
@@ -133,8 +135,8 @@ fun boolArgsDefault(): void {
 @test
 fun boolArgsNegatable(): void {
   cmd = Cli.Command("foo")
-    .arg(Cli.BoolArg("bar").negatable().default(true))
-    .arg(Cli.BoolArg("baz").negatable().default(true));
+    .arg(Cli.Arg::bool("bar").negatable().default(true))
+    .arg(Cli.Arg::bool("baz").negatable().default(true));
   args = Cli.parseArgsFrom(cmd, Array["--no-bar"]);
 
   T.expectFalse(args.getBool("bar"));
@@ -143,7 +145,7 @@ fun boolArgsNegatable(): void {
 
 @test
 fun boolNegativeArgsRejected(): void {
-  cmd = Cli.Command("foo").arg(Cli.BoolArg("no-bar"));
+  cmd = Cli.Command("foo").arg(Cli.Arg::bool("no-bar"));
 
   T.expectThrow(() -> _ = Cli.parseArgsFrom(cmd, Array["--no-foo"]));
 }
@@ -160,8 +162,8 @@ fun subcommand(): void {
 @test
 fun subcommandOptions(): void {
   cmd = Cli.Command("foo")
-    .subcommand(Cli.Command("bar").arg(Cli.StringArg("foobar1")))
-    .subcommand(Cli.Command("baz").arg(Cli.StringArg("foobar2")));
+    .subcommand(Cli.Command("bar").arg(Cli.Arg::string("foobar1")))
+    .subcommand(Cli.Command("baz").arg(Cli.Arg::string("foobar2")));
   args1 = Cli.parseArgsFrom(cmd, Array["bar", "--foobar1=xxx"]);
   T.expectEq(args1.subcommand.fromSome(), "bar");
   T.expectEq(args1.getString("foobar1"), "xxx");
@@ -173,8 +175,8 @@ fun subcommandOptions(): void {
 @test
 fun subcommandGlobalOptions(): void {
   cmd = Cli.Command("foo")
-    .arg(Cli.StringArg("global-string").global())
-    .arg(Cli.BoolArg("global-bool").global())
+    .arg(Cli.Arg::string("global-string").global())
+    .arg(Cli.Arg::bool("global-bool").global())
     .subcommand(Cli.Command("bar"));
   args1 = Cli.parseArgsFrom(
     cmd,
@@ -194,7 +196,7 @@ fun subcommandGlobalOptions(): void {
 
 @test
 fun arrayArgs(): void {
-  cmd = Cli.Command("foo").arg(Cli.StringArg("bar").repeatable());
+  cmd = Cli.Command("foo").arg(Cli.Arg::string("bar").repeatable());
   args = Cli.parseArgsFrom(cmd, Array["--bar", "foo1", "--bar=foo2"]);
 
   T.expectEq(args.getArray("bar"), Array["foo1", "foo2"]);
@@ -203,7 +205,7 @@ fun arrayArgs(): void {
 @test
 fun arrayArgsDefault(): void {
   cmd = Cli.Command("foo").arg(
-    Cli.StringArg("bar").repeatable().default_values(Array["foo1", "foo2"]),
+    Cli.Arg::string("bar").repeatable().default_values(Array["foo1", "foo2"]),
   );
   args = Cli.parseArgsFrom(cmd, Array[]);
 
@@ -212,7 +214,9 @@ fun arrayArgsDefault(): void {
 
 @test
 fun arrayArgsPositional(): void {
-  cmd = Cli.Command("foo").arg(Cli.StringArg("bar").repeatable().positional());
+  cmd = Cli.Command("foo").arg(
+    Cli.Arg::string("bar").repeatable().positional(),
+  );
   args = Cli.parseArgsFrom(cmd, Array["foo1", "foo2"]);
 
   T.expectEq(args.getArray("bar"), Array["foo1", "foo2"]);
@@ -221,8 +225,8 @@ fun arrayArgsPositional(): void {
 @test
 fun arrayArgsPositionalIntertwined(): void {
   cmd = Cli.Command("foo")
-    .arg(Cli.StringArg("bar").repeatable().positional())
-    .arg(Cli.StringArg("baz"));
+    .arg(Cli.Arg::string("bar").repeatable().positional())
+    .arg(Cli.Arg::string("baz"));
   args = Cli.parseArgsFrom(cmd, Array["foo1", "--baz", "foo", "foo2"]);
 
   T.expectEq(args.getArray("bar"), Array["foo1", "foo2"]);
@@ -231,8 +235,8 @@ fun arrayArgsPositionalIntertwined(): void {
 @test
 fun arrayArgsPositionalAfterArray(): void {
   cmd = Cli.Command("foo")
-    .arg(Cli.StringArg("bar").repeatable().positional())
-    .arg(Cli.StringArg("baz").positional());
+    .arg(Cli.Arg::string("bar").repeatable().positional())
+    .arg(Cli.Arg::string("baz").positional());
 
   T.expectThrow(() -> {
     _ = Cli.parseArgsFrom(cmd, Array[]);
@@ -241,7 +245,9 @@ fun arrayArgsPositionalAfterArray(): void {
 
 @test
 fun arrayArgsPositionalWithExtra(): void {
-  cmd = Cli.Command("foo").arg(Cli.StringArg("bar").repeatable().positional());
+  cmd = Cli.Command("foo").arg(
+    Cli.Arg::string("bar").repeatable().positional(),
+  );
   args = Cli.parseArgsFrom(cmd, Array["foo1", "foo2", "--", "baz"]);
 
   T.expectEq(args.getArray("bar"), Array["foo1", "foo2"]);
@@ -250,9 +256,9 @@ fun arrayArgsPositionalWithExtra(): void {
 @test
 fun repeatableBoolArg(): void {
   cmd = Cli.Command("foo")
-    .arg(Cli.BoolArg("bar").repeatable())
-    .arg(Cli.BoolArg("baz").repeatable())
-    .arg(Cli.BoolArg("verbose").short("v").repeatable());
+    .arg(Cli.Arg::bool("bar").repeatable())
+    .arg(Cli.Arg::bool("baz").repeatable())
+    .arg(Cli.Arg::bool("verbose").short("v").repeatable());
 
   args = Cli.parseArgsFrom(cmd, Array["--bar", "--bar", "--bar", "-vv"]);
 
@@ -263,7 +269,7 @@ fun repeatableBoolArg(): void {
 
 @test
 fun shortOnlyWithValueNoSpace(): void {
-  cmd = Cli.Command("foo").arg(Cli.StringArg("bar").short("O"));
+  cmd = Cli.Command("foo").arg(Cli.Arg::string("bar").short("O"));
   args = Cli.parseArgsFrom(cmd, Array["-O2"]);
 
   T.expectEq(args.getString("bar"), "2");
@@ -271,7 +277,7 @@ fun shortOnlyWithValueNoSpace(): void {
 
 @test
 fun intArgs(): void {
-  cmd = Cli.Command("foo").arg(Cli.IntArg("bar")).arg(Cli.IntArg("baz"));
+  cmd = Cli.Command("foo").arg(Cli.Arg::int("bar")).arg(Cli.Arg::int("baz"));
   args = Cli.parseArgsFrom(cmd, Array["--bar", "1337", "--baz=-123"]);
 
   T.expectEq(args.getInt("bar"), 1337);
@@ -281,8 +287,8 @@ fun intArgs(): void {
 @test
 fun intArgsDefault(): void {
   cmd = Cli.Command("foo")
-    .arg(Cli.IntArg("bar").default(42))
-    .arg(Cli.IntArg("baz").default(101010));
+    .arg(Cli.Arg::int("bar").default(42))
+    .arg(Cli.Arg::int("baz").default(101010));
   args = Cli.parseArgsFrom(cmd, Array["--baz=1337"]);
 
   T.expectEq(args.getInt("bar"), 42);
@@ -292,8 +298,8 @@ fun intArgsDefault(): void {
 @test
 fun intArgsPositional(): void {
   cmd = Cli.Command("foo")
-    .arg(Cli.StringArg("bar"))
-    .arg(Cli.IntArg("baz").positional());
+    .arg(Cli.Arg::string("bar"))
+    .arg(Cli.Arg::int("baz").positional());
   args = Cli.parseArgsFrom(cmd, Array["--bar=foo", "1337"]);
 
   T.expectEq(args.getInt("baz"), 1337);
@@ -301,7 +307,7 @@ fun intArgsPositional(): void {
 
 @test
 fun intArgsInvalid(): void {
-  cmd = Cli.Command("foo").arg(Cli.IntArg("bar")).arg(Cli.IntArg("baz"));
+  cmd = Cli.Command("foo").arg(Cli.Arg::int("bar")).arg(Cli.Arg::int("baz"));
   args = Cli.parseArgsFrom(cmd, Array["--bar", "foo", "--baz=123"]);
 
   T.expectTrue(args.error is Some(Cli.InvalidArgumentError _));
@@ -310,8 +316,8 @@ fun intArgsInvalid(): void {
 @test
 fun boolArgsFromEnv(): void {
   cmd = Cli.Command("foo")
-    .arg(Cli.BoolArg("bar").negatable().env("BAR"))
-    .arg(Cli.BoolArg("baz").env("BAZ"));
+    .arg(Cli.Arg::bool("bar").negatable().env("BAR"))
+    .arg(Cli.Arg::bool("baz").env("BAZ"));
   Environ.vars().each(v -> Environ.remove_var(v.i0));
   Environ.set_var("BAR", "y");
   Environ.set_var("BAZ", "1");
@@ -324,9 +330,9 @@ fun boolArgsFromEnv(): void {
 @test
 fun intArgsFromEnv(): void {
   cmd = Cli.Command("foo")
-    .arg(Cli.IntArg("foo").env("FOO"))
-    .arg(Cli.IntArg("bar").default(123).env("BAR"))
-    .arg(Cli.IntArg("baz").env("BAZ"));
+    .arg(Cli.Arg::int("foo").env("FOO"))
+    .arg(Cli.Arg::int("bar").default(123).env("BAR"))
+    .arg(Cli.Arg::int("baz").env("BAZ"));
   Environ.vars().each(v -> Environ.remove_var(v.i0));
   Environ.set_var("BAR", "456");
   Environ.set_var("BAZ", "42");
@@ -340,9 +346,9 @@ fun intArgsFromEnv(): void {
 @test
 fun multipleBoolArgsTogether(): void {
   cmd = Cli.Command("foo")
-    .arg(Cli.BoolArg("bar").short("b"))
-    .arg(Cli.BoolArg("baz").short("z"))
-    .arg(Cli.BoolArg("foobar").short("f"));
+    .arg(Cli.Arg::bool("bar").short("b"))
+    .arg(Cli.Arg::bool("baz").short("z"))
+    .arg(Cli.Arg::bool("foobar").short("f"));
   args = Cli.parseArgsFrom(cmd, Array["-bz"]);
 
   T.expectTrue(args.getBool("bar"));
@@ -353,9 +359,9 @@ fun multipleBoolArgsTogether(): void {
 @test
 fun nonBoolShortArgsTogether(): void {
   cmd = Cli.Command("foo")
-    .arg(Cli.BoolArg("keep-going").short("k"))
-    .arg(Cli.IntArg("jobs").short("j"))
-    .arg(Cli.BoolArg("foobar").short("f"));
+    .arg(Cli.Arg::bool("keep-going").short("k"))
+    .arg(Cli.Arg::int("jobs").short("j"))
+    .arg(Cli.Arg::bool("foobar").short("f"));
   args = Cli.parseArgsFrom(cmd, Array["-kj2"]);
 
   T.expectTrue(args.getBool("keep-going"));
@@ -366,10 +372,10 @@ fun nonBoolShortArgsTogether(): void {
 @test
 fun undefinedArgs(): void {
   cmd = Cli.Command("foo")
-    .arg(Cli.BoolArg("bar").negatable())
-    .arg(Cli.StringArg("baz"))
-    .arg(Cli.IntArg("foobar"))
-    .arg(Cli.StringArg("foobar2").repeatable());
+    .arg(Cli.Arg::bool("bar").negatable())
+    .arg(Cli.Arg::string("baz"))
+    .arg(Cli.Arg::int("foobar"))
+    .arg(Cli.Arg::string("foobar2").repeatable());
   args = Cli.parseArgsFrom(
     cmd,
     Array[
@@ -430,11 +436,11 @@ fun undefinedArgs(): void {
 @test
 fun argDefaultWithUndefinedDefault(): void {
   cmd = Cli.Command("foo")
-    .arg(Cli.BoolArg("bar").default(true))
-    .arg(Cli.StringArg("baz").default("foo"))
-    .arg(Cli.IntArg("foobar").default(1337))
+    .arg(Cli.Arg::bool("bar").default(true))
+    .arg(Cli.Arg::string("baz").default("foo"))
+    .arg(Cli.Arg::int("foobar").default(1337))
     .arg(
-      Cli.StringArg("foobar2")
+      Cli.Arg::string("foobar2")
         .repeatable()
         .default_values(Array["a", "b", "c"]),
     );
