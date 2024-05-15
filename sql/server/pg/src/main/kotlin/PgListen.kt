@@ -16,7 +16,8 @@ class PgEventLoop(
     val user: String,
     val password: String,
     val slot: String,
-    val publication: String
+    val publication: String,
+    val delegate: (PgMsg, Map<UInt, PgRelation>) -> Unit,
 ) {
 
   // TODO: not thread safe
@@ -79,7 +80,24 @@ class PgEventLoop(
         .start()
   }
 
+  private var relations = HashMap<UInt, PgRelation>()
+  private var relationsInFlight = relations
+
   private fun process(msg: PgMsg) {
-    println(": [spznk] msg: ${msg}")
+    when (msg) {
+      is PgBegin -> {
+        relationsInFlight = relations
+      }
+      is PgCommit -> {
+        relations = relationsInFlight
+      }
+      is PgRelation -> {
+        relationsInFlight = HashMap<UInt, PgRelation>(relationsInFlight)
+        relationsInFlight.put(msg.id, msg)
+      }
+      else -> {}
+    }
+
+    delegate(msg, relationsInFlight)
   }
 }
