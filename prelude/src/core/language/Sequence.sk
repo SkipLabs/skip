@@ -230,6 +230,13 @@ mutable base class .Sequence<+T> uses IntoIterator<T> {
     }
   }
 
+  // Returns whether the items of this sequence are sorted
+  overridable readonly fun isSorted[T: readonly Orderable](
+    compare: (T, T) ~> Order = (x, y) ~> x.compare(y),
+  ): Bool {
+    this.isSortedBy(x ~> x, compare);
+  }
+
   // Returns a new sequence representing the items of this sequence in sorted
   // order, using their default ordering.
   // To sort a collection of non-Orderable items, use sortedBy().
