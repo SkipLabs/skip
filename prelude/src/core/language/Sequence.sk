@@ -204,6 +204,32 @@ mutable base class .Sequence<+T> uses IntoIterator<T> {
     Vector::reverseFromIterator(this.values())
   }
 
+  // Returns whether the items of this sequence are in sorted
+  // order using the given predicate to determine ordering.
+  overridable readonly fun isSortedBy<K: readonly Orderable>(
+    selector: T ~> K,
+    compare: (K, K) ~> Order = (x, y) ~> x.compare(y),
+  ): Bool {
+    it = this.iterator();
+    prevK = it.next() match {
+    | None() -> return true
+    | Some(first) -> selector(first)
+    };
+    loop {
+      it.next() match {
+      | None() -> return true
+      | Some(curT) ->
+        curK = selector(curT);
+        compare(prevK, curK) match {
+        | LT() -> void
+        | EQ() -> void
+        | GT() -> return false
+        };
+        !prevK = curK
+      }
+    }
+  }
+
   // Returns a new sequence representing the items of this sequence in sorted
   // order, using their default ordering.
   // To sort a collection of non-Orderable items, use sortedBy().
