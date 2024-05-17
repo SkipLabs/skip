@@ -20,10 +20,19 @@
 /*****************************************************************************/
 module SKStore;
 
-value class FixedRow<T>(key: Key, value: T, source: Path, tag: TickRange) {
+value class FixedRow<T>(
+  key: Key,
+  value: T,
+  source: Path,
+  tag: TickRange,
+) uses Orderable {
   fun changeSource(source: Path): this {
     !this.source = source;
     this
+  }
+
+  fun compare(other: FixedRow<T>): Order {
+    (this.key, this.source).compare((other.key, other.source))
   }
 }
 
