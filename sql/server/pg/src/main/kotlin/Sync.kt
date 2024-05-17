@@ -18,10 +18,10 @@ class PgToSkdbSync(val skdb: Skdb) {
         }
         currentProc = skdb.sqlStream(OutputFormat.RAW)
         currentWriter = currentProc!!.outputWriter()
-        // currentWriter!!.write("BEGIN TRANSACTION;\n")
+        currentWriter!!.write("BEGIN TRANSACTION;\n")
       }
       is PgCommit -> {
-        // currentWriter!!.write("COMMIT;")
+        currentWriter!!.write("COMMIT;")
         currentWriter!!.flush()
         currentWriter!!.close()
         currentWriter = null
