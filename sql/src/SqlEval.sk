@@ -1485,6 +1485,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       error(pos, "OR REPLACE not supported in transactions")
     } else if (inTransaction) {
       this.insertTable(context, table, rows);
+      context.update();
       None()
     } else if (onConflict is Some(P.OCUpdate(_))) {
       onConflict match {
