@@ -26,7 +26,7 @@ bootstrap/libskip_runtime64.a bootstrap/libbacktrace.a:
 .PHONY: stage0/lib/libstd.sklib
 stage0/lib/libstd.sklib:
 	mkdir -p $(@D)
-	PATH=$$(realpath stage0/bin/):$(PATH) OUT_DIR=$$(realpath ./stage0/lib/) $(MAKE) -C ../prelude bootstrap
+	PATH=$$(realpath stage0/bin):$(PATH) OUT_DIR=$$(realpath stage0/lib) $(MAKE) -C ../prelude bootstrap
 
 stage0/bin/skc: bootstrap/skc_out64.ll bootstrap/libskip_runtime64.a bootstrap/libbacktrace.a
 	mkdir -p $(@D)
@@ -41,26 +41,26 @@ stage0/bin/skfmt: bootstrap/skfmt_out64.ll stage0/lib/libstd.sklib
 	clang++ -no-pie $(CXXFLAGS) -o $@ $^ -lpthread -g3
 
 stage1/bin/skc stage1/bin/skfmt: stage0
-	PATH=stage0/bin/:$(PATH) skargo build --profile $(SKARGO_PROFILE) --bins --out-dir stage1/bin --target-dir stage1/target
+	PATH=$$(realpath stage0/bin):$(PATH) skargo build --profile $(SKARGO_PROFILE) --bins --out-dir stage1/bin --target-dir stage1/target
 stage1/lib/libstd.sklib: stage0
-	PATH=stage0/bin/:$(PATH) skargo build --profile $(SKARGO_PROFILE) --lib --out-dir stage1/lib --target-dir stage1/target --manifest-path ../prelude/Skargo.toml
+	PATH=$$(realpath stage0/bin):$(PATH) skargo build --profile $(SKARGO_PROFILE) --lib --out-dir stage1/lib --target-dir stage1/target --manifest-path ../prelude/Skargo.toml
 stage1/bin/skargo: stage0
-	PATH=stage0/bin/:$(PATH) skargo build --profile $(SKARGO_PROFILE) --bins --out-dir stage1/bin --target-dir stage1/target --manifest-path ../skargo/Skargo.toml
+	PATH=$$(realpath stage0/bin):$(PATH) skargo build --profile $(SKARGO_PROFILE) --bins --out-dir stage1/bin --target-dir stage1/target --manifest-path ../skargo/Skargo.toml
 
 stage2/bin/skc stage2/bin/skfmt: stage1
-	PATH=stage1/bin/:$(PATH) skargo build --profile $(SKARGO_PROFILE) --bins --out-dir stage2/bin --target-dir stage2/target
+	PATH=$$(realpath stage1/bin):$(PATH) skargo build --profile $(SKARGO_PROFILE) --bins --out-dir stage2/bin --target-dir stage2/target
 stage2/lib/libstd.sklib: stage1
-	PATH=stage1/bin/:$(PATH) skargo build --profile $(SKARGO_PROFILE) --lib --out-dir stage2/lib --target-dir stage2/target --manifest-path ../prelude/Skargo.toml
+	PATH=$$(realpath stage1/bin):$(PATH) skargo build --profile $(SKARGO_PROFILE) --lib --out-dir stage2/lib --target-dir stage2/target --manifest-path ../prelude/Skargo.toml
 stage2/bin/skargo: stage1
-	PATH=stage1/bin/:$(PATH) skargo build --profile $(SKARGO_PROFILE) --bins --out-dir stage2/bin --target-dir stage2/target --manifest-path ../skargo/Skargo.toml
+	PATH=$$(realpath stage1/bin):$(PATH) skargo build --profile $(SKARGO_PROFILE) --bins --out-dir stage2/bin --target-dir stage2/target --manifest-path ../skargo/Skargo.toml
 
 stage3/bin/skc stage3/bin/skfmt: stage2
-	PATH=stage2/bin/:$(PATH) skargo build --profile $(SKARGO_PROFILE) --bins --out-dir stage3/bin --target-dir stage3/target
+	PATH=$$(realpath stage2/bin):$(PATH) skargo build --profile $(SKARGO_PROFILE) --bins --out-dir stage3/bin --target-dir stage3/target
 	-diff -q stage2/bin/skc.ll stage3/bin/skc.ll
 stage3/lib/libstd.sklib: stage2
-	PATH=stage2/bin/:$(PATH) skargo build --profile $(SKARGO_PROFILE) --lib --out-dir stage3/lib --target-dir stage3/target --manifest-path ../prelude/Skargo.toml
+	PATH=$$(realpath stage2/bin):$(PATH) skargo build --profile $(SKARGO_PROFILE) --lib --out-dir stage3/lib --target-dir stage3/target --manifest-path ../prelude/Skargo.toml
 stage3/bin/skargo: stage2
-	PATH=stage2/bin/:$(PATH) skargo build --profile $(SKARGO_PROFILE) --bins --out-dir stage3/bin --target-dir stage3/target --manifest-path ../skargo/Skargo.toml
+	PATH=$$(realpath stage2/bin):$(PATH) skargo build --profile $(SKARGO_PROFILE) --bins --out-dir stage3/bin --target-dir stage3/target --manifest-path ../skargo/Skargo.toml
 
 # stageD is a "direct" build mode, where skc is built from current compiler
 # and runtime sources using the skc found in PATH, without using skargo or
@@ -70,19 +70,19 @@ stage3/bin/skargo: stage2
 
 stageD/bin/skc:
 	mkdir -p $(@D)
-	OUT_DIR=$$(realpath ./stageD/lib/) $(MAKE) -C ../prelude default
+	OUT_DIR=$$(realpath stageD/lib) $(MAKE) -C ../prelude default
 	SKC_PREAMBLE=../prelude/preamble/preamble64.ll SKC_LINK=stageD/lib/libskip_runtime64.a:stageD/lib/libbacktrace.a skc --link-args -lpthread --no-std --export-function-as main=skip_main -o stageD/bin/skc $(OLEVEL) $(shell find ../prelude/src ../arparser/src ../cli/src src -name '*.sk')
 	mkdir -p stage$(STAGE)/target/host/$(SKARGO_PROFILE)/deps/ && mv stage$(STAGE)/bin/skc.ll stage$(STAGE)/target/host/$(SKARGO_PROFILE)/deps/skc-d.ll
 
 stageD/lib/libstd.sklib: stageD/bin/skc
 	mkdir -p $(@D)
-	PATH=$$(realpath stageD/bin/):$(PATH) OUT_DIR=$$(realpath ./stageD/lib/) $(MAKE) -C ../prelude bootstrap
+	PATH=$$(realpath stageD/bin):$(PATH) OUT_DIR=$$(realpath stageD/lib) $(MAKE) -C ../prelude bootstrap
 
 stageD/bin/skargo: stageD/bin/skc stageD/lib/libstd.sklib
-	PATH=stageD/bin/:$(PATH) skargo build --profile $(SKARGO_PROFILE) --bin skargo --out-dir stageD/bin --target-dir stageD/target --manifest-path ../skargo/Skargo.toml
+	PATH=$$(realpath stageD/bin):$(PATH) skargo build --profile $(SKARGO_PROFILE) --bin skargo --out-dir stageD/bin --target-dir stageD/target --manifest-path ../skargo/Skargo.toml
 
 stageD/bin/skfmt: stageD/bin/skc stageD/lib/libstd.sklib
-	PATH=stageD/bin/:$(PATH) skargo build --profile $(SKARGO_PROFILE) --bin skfmt --out-dir stageD/bin --target-dir stageD/target
+	PATH=$$(realpath stageD/bin):$(PATH) skargo build --profile $(SKARGO_PROFILE) --bin skfmt --out-dir stageD/bin --target-dir stageD/target
 
 .PHONY: promote
 promote: stage$(STAGE)
