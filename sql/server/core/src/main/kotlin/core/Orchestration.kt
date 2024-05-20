@@ -152,7 +152,7 @@ fun decodeProtoMsg(data: ByteBuffer): ProtoMessage {
       val requests = ArrayList<ProtoRequestTail>()
       data.position(data.position() + 1) // skip over reserved
       val n = data.getShort()
-      for (i in 0 ..< n) {
+      for (i in 0..<n) {
         val req = decodeProtoMsg(data)
         if (req is ProtoRequestTail) {
           requests.add(req)
@@ -309,6 +309,7 @@ interface OrchestrationStream {
   fun close()
 
   fun error(errorCode: UInt, msg: String)
+
   // raises the abstraction of this to messages rather than bytes
   fun send(msg: ProtoMessage)
 }
