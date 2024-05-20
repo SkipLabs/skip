@@ -26,11 +26,6 @@ dependencies {
 // Apply a specific Java toolchain to ease working on different environments.
 java { toolchain { languageVersion.set(JavaLanguageVersion.of(20)) } }
 
-tasks.named<Test>("test") {
-  // Use JUnit Platform for unit tests.
-  useJUnitPlatform()
-}
-
 spotless { kotlin { ktfmt("0.49") } }
 
 task("replication", JavaExec::class) {
