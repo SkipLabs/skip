@@ -42,6 +42,7 @@ untracked fun main(): void {
   filenames = args.getArray("files");
   for (file in filenames) {
     contents = if (file == "-") {
+      invariant(!inplace, "Cannot use both - and -i");
       !file = "<stdin>";
       buf = mutable Vector[];
       IO.stdin().read_to_end(buf) match {
