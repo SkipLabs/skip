@@ -228,7 +228,11 @@ mutable class BuildRunner(
     cmd = mutable ProcessBuilder{
       process_cmd => Path.join(
         this.build_dir_for(
-          unit with {arch => TargetArchHost(), mode => CompileModeBuild()},
+          unit with {
+            arch => TargetArchHost(),
+            mode => CompileModeBuild(),
+            build_opts => unit.build_opts with {relocation_model => "static"},
+          },
         ),
         unit.target.name,
       ),
@@ -255,6 +259,7 @@ mutable class BuildRunner(
       "TARGET",
       this.bctx.target_data.target_triple_for_arch(unit.arch).toString(),
     );
+    cmd.env("RELOCATION_MODEL", unit.build_opts.relocation_model);
 
     p = this.run_cmd(cmd);
 
@@ -351,7 +356,12 @@ mutable class BuildRunner(
     if (!unit.target.is_build_script()) {
       // TODO: Once we have namespaced packages, we can share the state.db
       // across architectures.
-      state_db_path = Path.join(this.layout_for(unit).build, "state.db");
+      state_db_path = Path.join(
+        this.layout_for(unit).build,
+        // FIXME: This is a dirty hack that splits out the state.db between pic
+        // and static, which is required until `skc` namespaces packages.
+        `${unit.build_opts.relocation_model}_state.db`,
+      );
       skc.args(
         Array[
           if (FileSystem.exists(state_db_path)) {
@@ -568,6 +578,7 @@ private fun compute_hash(
     unit.mode,
     unit.target.name,
     unit.target.kind,
+    unit.build_opts,
   ).hash()
 }
 
