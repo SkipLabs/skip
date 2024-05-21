@@ -160,9 +160,21 @@ private fun generate_root_units(
     res.collect(Array)
   };
   targets
-    .map(target ->
-      Unit(package, target, build_config.requested_arch, CompileModeBuild())
-    )
+    .map(target -> {
+      Unit(
+        package,
+        target,
+        build_config.requested_arch,
+        CompileModeBuild(),
+        UnitBuildOptions{
+          relocation_model => if (
+            target.kind is LibTarget(LibraryTypeCdylib _)
+          ) "pic" else {
+            "static"
+          },
+        },
+      )
+    })
     .collect(Array)
 }
 
@@ -250,7 +262,11 @@ private fun compute_deps(
     unit.mode is CompileModeRunBuildScript _
   ) {
     return Array[
-      unit with {arch => TargetArchHost(), mode => CompileModeBuild()},
+      unit with {
+        arch => TargetArchHost(),
+        mode => CompileModeBuild(),
+        build_opts => unit.build_opts with {relocation_model => "static"},
+      },
     ]
   };
 
@@ -269,13 +285,20 @@ private fun compute_deps(
         unit.pkg.manifest.lib_target().fromSome(),
         unit.arch,
         CompileModeBuild(),
+        unit.build_opts,
       ),
     )
   | LibTarget(LibraryTypeSklib _) ->
     unit.pkg.manifest.build_script_target() match {
     | Some(target) ->
       unit_deps.push(
-        Unit(unit.pkg, target, unit.arch, CompileModeRunBuildScript()),
+        Unit(
+          unit.pkg,
+          target,
+          unit.arch,
+          CompileModeRunBuildScript(),
+          unit.build_opts,
+        ),
       )
     | None() -> void
     }
@@ -300,6 +323,7 @@ private fun compute_deps(
         dep_package.manifest.lib_target().fromSome(),
         unit.arch,
         CompileModeBuild(),
+        unit.build_opts,
       ),
     )
   };
