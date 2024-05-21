@@ -57,6 +57,22 @@ uint64_t SKIP_genSym(uint64_t largerThan) {
 }
 
 /*****************************************************************************/
+/* The global information structure. */
+/*****************************************************************************/
+
+typedef struct ginfo {
+  void* ftable[FTABLE_SIZE];
+  void* context;
+  char* head;
+  char* end;
+  char* fileName;
+  char* break_ptr;
+  size_t total_palloc_size;
+} ginfo_t;
+
+ginfo_t* ginfo = NULL;
+
+/*****************************************************************************/
 /* Global locking. */
 /*****************************************************************************/
 
@@ -67,7 +83,7 @@ pthread_mutex_t* gmutex = (void*)1234;
 int sk_is_locked = 0;
 
 void sk_check_has_lock() {
-  if ((gmutex != NULL) && !sk_is_locked) {
+  if ((ginfo->fileName != NULL) && !sk_is_locked) {
     fprintf(stderr, "INTERNAL ERROR: unsafe operation\n");
     SKIP_throw_cruntime(ERROR_INTERNAL_LOCK);
   }
@@ -83,7 +99,7 @@ void sk_global_lock_init() {
 }
 
 void sk_global_lock() {
-  if (gmutex == NULL) {
+  if (ginfo->fileName == NULL) {
     return;
   }
 
@@ -106,7 +122,7 @@ void sk_global_lock() {
 }
 
 void sk_global_unlock() {
-  if (gmutex == NULL) {
+  if (ginfo->fileName == NULL) {
     return;
   }
 
@@ -212,22 +228,6 @@ int32_t SKIP_cond_timedwait(pthread_cond_t* x, pthread_mutex_t* y,
 int32_t SKIP_cond_broadcast(void* c) {
   return (int32_t)pthread_cond_broadcast(c);
 }
-
-/*****************************************************************************/
-/* The global information structure. */
-/*****************************************************************************/
-
-typedef struct ginfo {
-  void* ftable[FTABLE_SIZE];
-  void* context;
-  char* head;
-  char* end;
-  char* fileName;
-  char* break_ptr;
-  size_t total_palloc_size;
-} ginfo_t;
-
-ginfo_t* ginfo = NULL;
 
 /*****************************************************************************/
 /* Debugging support for contexts. Set CTX_TABLE to 1 to use. */
