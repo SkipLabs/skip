@@ -50,7 +50,7 @@ fun main(): void {
     "runtime/xoroshiro128plus.c",
   ];
 
-  cfg = Cc.Build().flags(kCflags).files(srcs).file(magic_c);
+  cfg = Cc.Build().pic(true).flags(kCflags).files(srcs).file(magic_c);
   srcs.each(f -> print_string(`skargo:rerun-if-changed=${f}`));
 
   // TODO: `skargo:rerun-if-changed` on sources.
@@ -84,6 +84,7 @@ fun main(): void {
     native_cpp_srcs.each(f -> print_string(`skargo:rerun-if-changed=${f}`));
     Cc.Build()
       .cpp(true)
+      .pic(true)
       .files(native_cpp_srcs)
       .define("SKIP64")
       .include(libbacktrace_include)
@@ -106,7 +107,7 @@ fun build_libbacktrace(out_dir: String, try_pkgconfig: Bool): String {
 
   // Resort to building libbacktrace from source.
   p = System.popen{
-    args => Array["./configure", "--prefix", out_dir],
+    args => Array["./configure", "--prefix", out_dir, "--with-pic"],
     stdout => print_error_raw,
     stderr => print_error_raw,
     cwd => Some("./libbacktrace"),
