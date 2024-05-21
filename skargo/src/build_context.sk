@@ -90,7 +90,7 @@ private class BuildContext{
   roots: Array<Unit>,
   unit_graph: UnitGraph,
   target_dir: String,
-  skc: Skc,
+  target_data: SkcTargetData,
 }
 
 // TODO: Return Result<...>
@@ -102,8 +102,14 @@ fun create_bctx(
   resolved_packages = resolve(ws.package);
 
   roots = generate_root_units(gctx, ws.package, opts.filter, opts.build_config);
+  target_data = SkcTargetData::create(
+    gctx,
+    opts.build_config.requested_arch match {
+    | TargetArchHost _ -> Array[]
+    | TargetArchTriple(triple) -> Array[triple]
+    },
+  );
   unit_graph = build_unit_dependencies(roots, resolved_packages);
-  skc = Skc(Environ.varOpt("SKC").default("skc"));
   target_dir = ws.target_dir();
   BuildContext{
     ws,
@@ -112,7 +118,7 @@ fun create_bctx(
     roots,
     unit_graph,
     target_dir,
-    skc,
+    target_data,
   }
 }
 
