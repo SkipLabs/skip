@@ -57,7 +57,12 @@ untracked fun main(): void {
     | Failure(error) ->
       print_error_ln(
         SkipError.errorsToString(Vector[error], filename ->
-          (filename, FileSystem.readTextFile(filename))
+          (
+            filename,
+            if (filename == file) contents else {
+              FileSystem.readTextFile(filename)
+            },
+          )
         ),
       );
       skipExit(1)
