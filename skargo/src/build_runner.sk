@@ -247,11 +247,14 @@ mutable class BuildRunner(
       "VERBOSE",
       (this.bctx.gctx.console.verbosity >= VerbosityVerbose()).toString(),
     );
-    unit.arch match {
-    | TargetArchTriple(t) -> cmd.env("TARGET", t.toString())
-    | TargetArchHost() ->
-      void // TODO: Explicit host arch triple.
-    };
+    cmd.env(
+      "HOST",
+      this.bctx.target_data.target_triple_for_arch(TargetArchHost()).toString(),
+    );
+    cmd.env(
+      "TARGET",
+      this.bctx.target_data.target_triple_for_arch(unit.arch).toString(),
+    );
 
     p = this.run_cmd(cmd);
 
@@ -293,7 +296,7 @@ mutable class BuildRunner(
   }
 
   private mutable fun skc(unit: Unit, check: Bool = false): void {
-    skc = this.bctx.skc.process();
+    skc = this.bctx.target_data.skc.process();
 
     skc.cwd(unit.pkg.root());
 
