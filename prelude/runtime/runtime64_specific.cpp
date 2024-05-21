@@ -270,18 +270,36 @@ void SKIP_unsetenv(char* name) {
 void SKIP_memory_init(int pargc, char** pargv);
 void sk_persist_consts();
 
-int main(int pargc, char** pargv) {
+void sk_init(int pargc, char** pargv) {
   sk_saved_obstack_t* saved;
   argc = pargc;
   argv = pargv;
-  std::set_terminate(terminate);
   SKIP_memory_init(pargc, pargv);
   saved = SKIP_new_Obstack();
   SKIP_initializeSkip();
   sk_persist_consts();
   SKIP_destroy_Obstack(saved);
+}
+
+#ifdef SKIP_LIBRARY
+__attribute__((constructor)) static void lib_init() {
+  argc = 1;
+  char* argv0 = strdup("library");
+  argv = (char**)malloc(2 * sizeof(char*));
+  argv[0] = argv0;
+  argv[1] = NULL;
+  sk_init(argc, argv);
+}
+#else
+int main(int pargc, char** pargv) {
+  std::set_terminate(terminate);
+  // TODO: Make memory initialization read state.db path from the environment
+  // rather than command line arguments, and let the above constructor handle
+  // it.
+  sk_init(pargc, pargv);
   skip_main();
 }
+#endif  // SKIP_LIBRARY
 
 static void print(FILE* descr, char* str) {
   size_t size = SKIP_String_byteSize((char*)str);
