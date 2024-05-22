@@ -270,7 +270,7 @@ void SKIP_unsetenv(char* name) {
 void SKIP_memory_init(int pargc, char** pargv);
 void sk_persist_consts();
 
-void sk_init(int pargc, char **pargv) {
+void sk_init(int pargc, char** pargv) {
   sk_saved_obstack_t* saved;
   argc = pargc;
   argv = pargv;
@@ -282,11 +282,10 @@ void sk_init(int pargc, char **pargv) {
 }
 
 #ifdef SKIP_LIBRARY
-__attribute__((constructor))
-static void lib_init() {
+__attribute__((constructor)) static void lib_init() {
   argc = 1;
-  char *argv0 = strdup("library");
-  argv = (char **)malloc(2 * sizeof(char*));
+  char* argv0 = strdup("library");
+  argv = (char**)malloc(2 * sizeof(char*));
   argv[0] = argv0;
   argv[1] = NULL;
   sk_init(argc, argv);
@@ -601,33 +600,71 @@ void SKIP_last_tick(uint32_t) {
 void SKIP_switch_to(uint32_t) {
   // Not implemented
 }
+
+void (*SKIP_clear_field_names_ptr)();
 void SKIP_clear_field_names() {
-  // Not implemented
+  if (SKIP_clear_field_names_ptr) {
+    SKIP_clear_field_names_ptr();
+  }
 }
-void SKIP_push_field_name(char*) {
-  // Not implemented
+
+void (*SKIP_push_field_name_ptr)(char*);
+void SKIP_push_field_name(char* val) {
+  if (SKIP_push_field_name_ptr) {
+    SKIP_push_field_name_ptr(val);
+  }
 }
+
+void (*SKIP_clear_object_ptr)();
 void SKIP_clear_object() {
-  // Not implemented
+  if (SKIP_clear_object_ptr) {
+    SKIP_clear_object_ptr();
+  }
 }
+
+void (*SKIP_push_object_field_null_ptr)();
 void SKIP_push_object_field_null() {
+  if (SKIP_push_object_field_null_ptr) {
+    SKIP_push_object_field_null_ptr();
+  }
+}
+
+void (*SKIP_push_object_field_int32_ptr)(int32_t);
+void SKIP_push_object_field_int32(int32_t val) {
+  if (SKIP_push_object_field_int32_ptr) {
+    SKIP_push_object_field_int32_ptr(val);
+  }
   // Not implemented
 }
-void SKIP_push_object_field_int32(int32_t) {
-  // Not implemented
+
+void (*SKIP_push_object_field_int64_ptr)(char*);
+void SKIP_push_object_field_int64(char* val) {
+  if (SKIP_push_object_field_int64_ptr) {
+    SKIP_push_object_field_int64_ptr(val);
+  }
 }
-void SKIP_push_object_field_int64(char*) {
-  // Not implemented
+
+void (*SKIP_push_object_field_float_ptr)(char*);
+void SKIP_push_object_field_float(char* val) {
+  if (SKIP_push_object_field_float_ptr) {
+    SKIP_push_object_field_float_ptr(val);
+  }
 }
-void SKIP_push_object_field_float(char*) {
-  // Not implemented
+
+void (*SKIP_push_object_field_string_ptr)(char*);
+void SKIP_push_object_field_string(char* val) {
+  if (SKIP_push_object_field_string_ptr) {
+    SKIP_push_object_field_string_ptr(val);
+  }
 }
-void SKIP_push_object_field_string(char*) {
-  // Not implemented
-}
+
+void (*SKIP_push_object_ptr)();
 void SKIP_push_object() {
-  // Not implemented
+  if (SKIP_push_object_ptr) {
+    SKIP_push_object_ptr();
+  }
 }
+
 void SKIP_js_delete_fun() {
   // Not implemented
 }

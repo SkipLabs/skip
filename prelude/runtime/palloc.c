@@ -54,11 +54,9 @@ uint64_t SKIP_genSym(uint64_t largerThan) {
   return __atomic_fetch_add(gid, n, __ATOMIC_RELAXED);
 }
 
-
 /*****************************************************************************/
 /* The global information structure. */
 /*****************************************************************************/
-
 
 typedef struct ginfo {
   void* ftable[FTABLE_SIZE];
@@ -71,11 +69,9 @@ typedef struct ginfo {
 
 ginfo_t* ginfo = NULL;
 
-
 /*****************************************************************************/
 /* Global locking. */
 /*****************************************************************************/
-
 
 pthread_mutexattr_t* gmutex_attr;
 pthread_mutex_t* gmutex = (void*)1234;
