@@ -37,9 +37,9 @@
 // head: The current position in the page.
 // end: The end of the page.
 
-struct sk_obstack* page = NULL;
-char* head = NULL;
-char* end = NULL;
+static struct sk_obstack* page = NULL;
+static char* head = NULL;
+static char* end = NULL;
 
 #ifdef SKIP32
 
