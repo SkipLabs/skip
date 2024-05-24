@@ -35,13 +35,20 @@ untracked fun main(): void {
         .short("i")
         .about("Inplace edit file(s), if specified"),
     )
+    .arg(
+      Cli.Arg::string("assume-filename")
+        .value_name("FILENAME")
+        .about("File name used to report errors on stdin"),
+    )
     .help()
     .parseArgs();
 
   inplace = args.getBool("inplace");
   filenames = args.getArray("files");
+  assumeFilename = args.maybeGetString("assume-filename");
   for (file in filenames) {
     contents = if (file == "-") {
+      invariant(!inplace, "Cannot use both - and -i");
       !file = "<stdin>";
       buf = mutable Vector[];
       IO.stdin().read_to_end(buf) match {
@@ -51,13 +58,22 @@ untracked fun main(): void {
         skipExit(1)
       }
     } else {
+      invariant(
+        assumeFilename == None(),
+        "Cannot use --assume-filename with real file names",
+      );
       FileSystem.readTextFile(file)
     };
     prettyPrint(contents, file) match {
     | Failure(error) ->
       print_error_ln(
         SkipError.errorsToString(Vector[error], filename ->
-          (filename, FileSystem.readTextFile(filename))
+          (
+            assumeFilename.default(filename),
+            if (filename == file) contents else {
+              FileSystem.readTextFile(filename)
+            },
+          )
         ),
       );
       skipExit(1)
