@@ -634,4 +634,21 @@ void SKIP_push_object() {
 void SKIP_js_delete_fun() {
   // Not implemented
 }
+
+void SKIP_js_mark_query() {
+  // Not implemented
+}
+
+extern void SKIP_FFI_push_field_name(void* res, const char* name,
+                                     int64_t name_len);
+extern void SKIP_FFI_new_object(void* res);
+extern void SKIP_FFI_push_object_field_null(void* res);
+extern void SKIP_FFI_push_object_field_int(void* res, int64_t val);
+extern void SKIP_FFI_push_object_field_float(void* res, double val);
+extern void SKIP_FFI_push_object_field_string(void* res, const char* val,
+                                              int64_t val_len);
+
+extern void SKIP_FFI_print(void* res, const char* str, int64_t str_len);
+extern void SKIP_FFI_send_update(void* res, const char* str, int64_t str_len);
+extern void SKIP_FFI_send_watch_update(void* table_ptr, void* res);
 }
