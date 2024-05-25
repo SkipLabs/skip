@@ -559,7 +559,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         true,
       );
 
-      (_, cols) = SKDB.Compiler::getCols(core.params, cselect.from);
+      (_, cols) = SKDB.Compiler::getCols(context, core.params, cselect.from);
 
       schema = cselect.params.mapWithIndex((idx, param) -> {
         P.ColumnDefinition{
@@ -1213,6 +1213,7 @@ class Evaluator{options: Options, user: ?UserFile} {
           dirName = SKStore.DirName::create("/" + viewName + "/");
           context.setWithSharedSubDirs(dirName);
           dirDescr = SKDB.Compiler::getDirDescr(
+            context,
             (selectAst.core as P.SelectCoreQuery _).params,
             cselect.from,
             cselect.params,
@@ -2354,6 +2355,7 @@ fun getReactiveQueryHandle(
           );
           selectDir = SKDB.evalSelect(context, cselect, None());
           schema = SKDB.Compiler::getSchema(
+            context,
             (selectAst.core as P.SelectCoreQuery _).params,
             cselect.from,
             cselect.params,

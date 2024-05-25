@@ -409,6 +409,7 @@ private fun resetReactiveViews(
     _ = SKDB.evalSelect(context, newCSelect, None());
 
     dirDescr = SKDB.Compiler::getDirDescr(
+      context,
       (selectFile.select.core as P.SelectCoreQuery _).params,
       newCSelect.from,
       newCSelect.params,
@@ -600,6 +601,7 @@ fun getSubsDirs(
           selectDir = SKDB.evalSelect(context, cselect, None());
           edir = context.unsafeGetEagerDir(selectDir.dirName);
           dirDescr = Compiler::getDirDescr(
+            context,
             selectFile.sparams,
             cselect.from,
             cselect.params,
@@ -838,6 +840,7 @@ fun getTable(
       dirName = SKStore.DirName::create("/" + selectFile.cselect.id + "/");
       cselect = selectFile.cselect;
       dirDescr = SKDB.Compiler::getDirDescr(
+        context,
         selectFile.sparams,
         cselect.from,
         cselect.params,
