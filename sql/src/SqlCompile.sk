@@ -406,6 +406,7 @@ mutable class Compiler{
     );
 
     orderBy = this.compileOrderBy(
+      context,
       (select.core as P.SelectCoreQuery _).params,
       core.from,
       select.orderBy,
@@ -456,6 +457,7 @@ mutable class Compiler{
     | OFK_CSV() -> SKStore.OCSV(Range(0, core.params.size()).collect(Array))
     | OFK_Table() ->
       schema = static::getSchema(
+        context,
         (select.core as P.SelectCoreQuery _).params,
         core.from,
         core.params,
@@ -464,6 +466,7 @@ mutable class Compiler{
       SKStore.OTable(fieldNames)
     | OFK_JSON() ->
       schema = static::getSchema(
+        context,
         (select.core as P.SelectCoreQuery _).params,
         core.from,
         core.params,
@@ -473,6 +476,7 @@ mutable class Compiler{
     | OFK_SQL() -> SKStore.OSQL()
     | OFK_JS() ->
       schema = static::getSchema(
+        context,
         (select.core as P.SelectCoreQuery _).params,
         core.from,
         core.params,
@@ -701,6 +705,7 @@ mutable class Compiler{
       cselect = this.compileSelect(context, select, genSelectId(select), false);
       selectDir = evalSelect(context, cselect, None());
       static::getDirDescr(
+        context,
         (select.core as P.SelectCoreQuery _).params,
         cselect.from,
         cselect.params,
@@ -711,6 +716,7 @@ mutable class Compiler{
   }
 
   static fun getCols(
+    context: mutable SKStore.Context,
     params: Array<P.SelectResult>,
     from: Array<(DirDescr, ?Array<SKStore.KeyRange>)>,
   ): (SortedMap<P.Name, Int>, readonly Map<Int, P.Name>) {
@@ -745,7 +751,10 @@ mutable class Compiler{
         }
 
       | P.SelectStar(Some(tableName)) ->
-        dirDescr = origFromMap[tableName];
+        dirDescr = origFromMap.maybeGet(tableName) match {
+        | Some(x) -> x
+        | None() -> getTable(context, 0, tableName)
+        };
         for (tyName in dirDescr.colNames) {
           if (!cols.containsKey(tyName)) {
             !cols[tyName] = slot;
@@ -775,11 +784,12 @@ mutable class Compiler{
   }
 
   static fun getSchema(
+    context: mutable SKStore.Context,
     params: Array<P.SelectResult>,
     from: Array<(DirDescr, ?Array<SKStore.KeyRange>)>,
     cparams: Array<CGExpr>,
   ): Array<P.ColumnDefinition> {
-    (cols, invCols) = static::getCols(params, from);
+    (cols, invCols) = static::getCols(context, params, from);
     cparams.mapWithIndex((idx, param) -> {
       P.ColumnDefinition{
         name => invCols.maybeGet(idx) match {
@@ -796,6 +806,7 @@ mutable class Compiler{
   }
 
   static fun getDirDescr(
+    context: mutable SKStore.Context,
     params: Array<P.SelectResult>,
     from: Array<(DirDescr, ?Array<SKStore.KeyRange>)>,
     cparams: Array<CGExpr>,
@@ -803,7 +814,7 @@ mutable class Compiler{
     dirName: SKStore.DirName,
     view: Bool = false,
   ): DirDescr {
-    schema = static::getSchema(params, from, cparams);
+    schema = static::getSchema(context, params, from, cparams);
     DirDescr::create{
       name => selectId,
       schema,
@@ -952,6 +963,7 @@ mutable class Compiler{
   }
 
   mutable fun compileOrderBy(
+    context: mutable SKStore.Context,
     params: Array<P.SelectResult>,
     from: Array<(SKDB.DirDescr, ?Array<SKStore.KeyRange>)>,
     orderByOpt: ?Array<(P.Expr, P.IKind)>,
@@ -959,7 +971,7 @@ mutable class Compiler{
     orderByOpt match {
     | None() -> None()
     | Some(orderBy) ->
-      (cols, _) = static::getCols(params, from);
+      (cols, _) = static::getCols(context, params, from);
       Some(
         orderBy.map(kv -> {
           (order, kind) = kv;
