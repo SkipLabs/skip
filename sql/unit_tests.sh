@@ -351,3 +351,9 @@ if cat test/unit/test_alter_table_add_col.sql | $SKDB | tr '\n' 'S' | grep -q '1
 else
     fail "ALTER TABLE ADD COLUMN"
 fi
+
+if cat test/unit/test_qualified_select_star.sql| $SKDB --always-allow-joins | tr '\n' 'S' | grep -q '100|1S100|1S' ; then
+    pass "QUALIFIED SELECT-STAR"
+else
+    fail "QUALIFIED SELECT-STAR"
+fi
