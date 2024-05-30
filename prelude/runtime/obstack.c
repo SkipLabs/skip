@@ -43,12 +43,12 @@
 // page: The beginning of the current obstack page
 // head: The current position in the page.
 // end: The end of the page.
-__thread struct sk_obstack* page = NULL;
-__thread char* head = NULL;
-__thread char* end = NULL;
+static __thread struct sk_obstack* page = NULL;
+static __thread char* head = NULL;
+static __thread char* end = NULL;
 
 #ifdef SKIP32
-struct sk_obstack* free_list = NULL;
+static struct sk_obstack* free_list = NULL;
 
 unsigned char* decr_heap_end(size_t size);
 void reset_heap_end();
@@ -71,7 +71,7 @@ typedef struct sk_obstack {
   char user_data[0];
 } sk_obstack_t;
 
-__thread sk_saved_obstack_t init_saved = {NULL, NULL, NULL};
+static __thread sk_saved_obstack_t init_saved = {NULL, NULL, NULL};
 
 size_t sk_page_size(sk_obstack_t* page) {
   return page->size;
