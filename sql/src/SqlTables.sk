@@ -483,12 +483,11 @@ fun getSubsDirs(
       });
 
       context.subscribe(
-        context,
         request.sessionID,
-        request.init,
         request.cmd,
         request.destinationSource,
         dirSubs,
+        if (request.init) Some(Tick(0)) else None()
       );
       writer.set(key, SKStore.IntFile(request.sessionID))
     },
