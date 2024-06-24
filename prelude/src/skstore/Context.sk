@@ -53,6 +53,11 @@ base class CmdKind {
   | NUpdates(String)
   | NNotify(String)
   | NTail()
+  | NWatch(
+    start: Tick,
+    (DirName, Array<(Key, Array<File>)>, Tick, Bool)  ~> void,
+    changes: Bool,
+  )
 }
 
 value class Sub(
@@ -401,20 +406,19 @@ mutable class Context{
   }
 
   mutable fun subscribe(
-    context: mutable Context,
     sessionId: Int,
-    init: Bool,
     cmd: CmdKind,
     destinationSource: ?Int,
     dirSubs: Array<DirSub>,
+    init: ?Tick = None(),
   ): void {
     sub = Sub(mutexCreate(), condCreate(), cmd, destinationSource, dirSubs);
+    init.each(tick -> this.notifySub(sub, tick));
+    this.!sessions[sessionId] = sub;
+  }
 
-    if (init) {
-      this.notifySub(sub, Tick(0))
-    };
-
-    context.!sessions[sessionId] = sub;
+  mutable fun unsubscribe(sessionId: Int): void {
+    this.!sessions = this.sessions.remove(sessionId)
   }
 
   readonly fun clone(): this {
@@ -890,6 +894,34 @@ mutable class Context{
     | NTail() ->
       cond = unfreezeCond(sub.cond);
       _ = condBroadcast(cond)
+    | NWatch(initTick, fn, changes) ->
+      for (dirSub in sub.dirSubs) {
+        dirName = dirSub.dirName;
+        this.unsafeMaybeGetDir(dirName) match {
+        | Some(dir @ EagerDir _) ->
+          (init, changedKeys) = if (changes && start > initTick) {
+            dir.getChangesAfter(start)
+          } else {
+            (true, SortedSet[])
+          };
+          if (init) {
+            result = mutable Vector[];
+            dir.unsafeIterKeys((key, _time) -> {
+              values = dir.getArrayRaw(key);
+              result.push((key, values))
+            });
+            fn(dirName, result.toArray(), this.tick, false)
+          } else if (!changedKeys.isEmpty()) {
+            result = mutable Vector[];
+            for (key in changedKeys) {
+              values = dir.getArrayRaw(key);
+              result.push((key, values))
+            };
+            fn(dirName, result.toArray(), this.tick, true)
+          }
+        | _ -> void
+        }
+      }
     };
     mutexUnlock(lock)
   }
