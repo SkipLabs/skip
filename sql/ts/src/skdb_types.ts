@@ -177,6 +177,7 @@ export interface PagedMemory {
 export interface SKDBShared extends Shared {
   create: (dbName?: string, asWorker?: boolean) => Promise<SKDB>;
   createSync: (dbName?: string, asWorker?: boolean) => Promise<SKDBSync>;
+  notify: () => void;
 }
 
 export interface SKDBGroup {
