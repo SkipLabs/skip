@@ -8,6 +8,7 @@ import type {
   SKDBHandle,
   Params,
   SKDBSync,
+  SKDBShared,
 } from "./skdb_types.js";
 import { ExternalFuns, SKDBTable } from "./skdb_util.js";
 import { IDBStorage } from "./skdb_storage.js";
@@ -182,13 +183,16 @@ class SKDBMemory implements PagedMemory {
   }
 }
 
-class SKDBShared implements Shared {
+class SKDBSharedImpl implements SKDBShared {
   getName = () => "SKDB";
   createSync: (dbName?: string, asWorker?: boolean) => Promise<SKDBSync>;
+  notify: () => void;
   constructor(
     createSync: (dbName?: string, asWorker?: boolean) => Promise<SKDBSync>,
+    notify: () => void,
   ) {
     this.createSync = createSync;
+    this.notify = notify;
   }
 
   async create(dbName?: string, asWorker?: boolean) {
@@ -458,7 +462,10 @@ class LinksImpl implements Links, ToWasm {
       handle.init();
       return SKDBSyncImpl.create(handle, this.environment, save);
     };
-    this.environment.shared.set("SKDB", new SKDBShared(createSync));
+    this.environment.shared.set(
+      "SKDB",
+      new SKDBSharedImpl(createSync, this.notifyAllJS),
+    );
   };
 }
 
