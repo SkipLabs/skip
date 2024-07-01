@@ -4588,7 +4588,11 @@ fun expr_dot(
     ty_str = Types.to_string(env.this_class, acc.subst, obj_ty);
     field_map = field_map_for_error(context, env, acc, sk_static, obj_ty);
     didYouMeanTypos = SkipDidYouMean.findTypos(field_map, field_name.i1);
-    possibleValues = field_map.items().map(x -> "  ." + x.i0).collect(Array);
+    possibleValues = field_map
+      .items()
+      .map(x -> "  ." + x.i1)
+      .collect(SortedSet)
+      .collect(Array);
     msg1 =
       `The field ${field_name.i1} is undefined${SkipDidYouMean.formatTypos(
         didYouMeanTypos,
