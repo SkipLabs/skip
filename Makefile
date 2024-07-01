@@ -129,11 +129,7 @@ setup-git-hooks: .git/hooks/pre-commit
 
 .PHONY: test
 test:
-	$(MAKE) --keep-going SKARGO_PROFILE=dev SKDB_WASM=sql/target/wasm32-unknown-unknown/dev/skdb.wasm SKDB_BIN=sql/target/host/dev/skdb test-skfs test-native test-wasm
-
-.PHONY: test-skfs
-test-skfs:
-	cd prelude && SKARGO_PROFILE=$(SKARGO_PROFILE) skargo test
+	$(MAKE) --keep-going SKARGO_PROFILE=dev SKDB_WASM=sql/target/wasm32-unknown-unknown/dev/skdb.wasm SKDB_BIN=sql/target/host/dev/skdb test-skfs test-native tstest-sql
 
 .PHONY: test-native
 test-native: build/skdb
@@ -141,13 +137,8 @@ test-native: build/skdb
 	|tee /tmp/native-test.out ; \
 	! grep -v '\*\|^[[:blank:]]*$$\|OK\|PASS' /tmp/native-test.out
 
-.PHONY: test-wasm
-test-wasm: build/sknpm $(SKDB_WASM) $(SDKMAN_DIR)
-	bash -c 'source $(HOME)/.sdkman/bin/sdkman-init.sh && cd sql/server/ && gradle --console plain build'
-	cd sql && ../build/sknpm test --profile $(SKARGO_PROFILE) $(SKNPM_FLAG)
-
 .PHONY: test-client
-test-client: build/sknpm $(SKDB_WASM)
+test-client: build/sknpm
 	cd sql && ../build/sknpm test --profile $(SKARGO_PROFILE) $(SKNPM_FLAG) client
 
 .PHONY: test-replication
@@ -204,3 +195,40 @@ test-bun: npm
 	rm -r build/bun/node_modules/skdb
 	cp -r build/package/skdb build/bun/node_modules/
 	cd build/bun && bun bun.js true && bun bun.js false
+
+exbuild-%: build/sknpm
+	cd skstore/ts/examples && bun install
+	cd skstore && ../build/sknpm b -r --out-dir ts/examples/node_modules/skstore
+
+exrun-%: build/sknpm
+	cd skstore/ts/examples && bun install
+	cd skstore && ../build/sknpm b -r --out-dir ts/examples/node_modules/skstore
+	bun run skstore/ts/examples/$*.ts -m io
+
+explay-%: build/sknpm
+	cd skstore/ts/examples && bun install
+	cd skstore && ../build/sknpm b -r --out-dir ts/examples/node_modules/skstore
+	echo "play 1\nexit\n" | bun run skstore/ts/examples/$*.ts -m io
+
+skcheck-%:
+	cd $* && skargo c --profile $(SKARGO_PROFILE)
+
+skfmt-%:
+	cd $* && skargo fmt
+
+sktest-%:
+	cd $* && skargo test --profile $(SKARGO_PROFILE)
+
+skbuild-%:
+	cd $* && skargo b --profile $(SKARGO_PROFILE)
+
+tstest-%: build/sknpm
+	cd $* && ../build/sknpm test --profile $(SKARGO_PROFILE) $(SKNPM_FLAG)
+
+## Backward Compatibility
+
+.PHONY: test-wasm
+test-wasm: tstest-sql
+
+.PHONY: test-skfs
+test-skfs: sktest-prelude
