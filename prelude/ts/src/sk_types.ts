@@ -163,6 +163,7 @@ export interface Environment {
   encodeUTF8: (str: string) => Uint8Array;
   onException: () => void;
   base64Decode: (base64: string) => Uint8Array;
+  base64Encode: (toEncode: string, url?: boolean) => string;
   fs: () => FileSystem;
   sys: () => System;
   crypto: () => Crypto;
@@ -205,6 +206,13 @@ export interface WasmSupplier {
 function utf8Encode(str: string): Uint8Array {
   return new TextEncoder().encode(str);
 }
+
+export type Main = (new_args: Array<string>, new_stdin: string) => string;
+
+export type App = {
+  environment: Environment;
+  main: Main;
+};
 
 export class Utils {
   private exports: Exported;
@@ -638,14 +646,28 @@ export class Utils {
   };
 
   runWithGc = <T>(fn: () => T) => {
+    this.stddebug = new Array();
     let obsPos = this.exports.SKIP_new_Obstack();
     try {
       let res = fn();
       this.exports.SKIP_destroy_Obstack(obsPos);
-      return res;
+      if (
+        res !== null &&
+        typeof res === "object" &&
+        (("__isArrayProxy" in res && res.__isArrayProxy) ||
+          ("__isObjectProxy" in res && res.__isObjectProxy)) &&
+        "clone" in res
+      ) {
+        const clone = res.clone as () => T;
+        return clone();
+      } else return res;
     } catch (ex) {
       this.exports.SKIP_destroy_Obstack(obsPos);
       throw ex;
+    } finally {
+      if (this.stddebug.length > 0) {
+        console.log(this.stddebug.join(""));
+      }
     }
   };
 
