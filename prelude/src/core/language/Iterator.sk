@@ -117,6 +117,15 @@ mutable base class .Iterator<+T> {
     }
   }
 
+  overridable mutable fun filterMap<U>(f: T -> ?U): mutable Iterator<U> {
+    for (t in this) {
+      f(t) match {
+      | Some(u) -> yield u
+      | None() -> void
+      }
+    }
+  }
+
   overridable mutable fun unique[T: Hashable & Equality](): mutable Iterator<
     T,
   > {
@@ -202,6 +211,16 @@ mutable base class .Iterator<+T> {
       | Some(x) -> if (p(x)) break Some(x)
       | None() -> break None()
       }
+    }
+  }
+
+  // s.findMap(f) is Some(u) = f(t) for the first t in s where f is Some(_)
+  overridable mutable fun findMap<U>(f: T -> ?U): ?U {
+    for (t in this) {
+      u = f(t);
+      if (u.isSome()) break u
+    } else {
+      None()
     }
   }
 
