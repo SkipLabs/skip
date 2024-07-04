@@ -37,19 +37,19 @@ jobs:
       - store_test_results:
           path: ~/test-results/skc.xml
 
-  skfs:
+  skstore:
     docker:
       - image: skiplabs/skdb-base:latest
     steps:
       - checkout
       - setup
       - run:
-          name: Run skfs tests
+          name: Run skstore tests
           command: |
             mkdir -p ~/test-results
-            cd prelude && skargo test --jobs 8 --junitxml ~/test-results/skfs.xml
+            cd prelude && skargo test --jobs 8 --junitxml ~/test-results/skstore.xml
       - store_test_results:
-          path: ~/test-results/skfs.xml
+          path: ~/test-results/skstore.xml
 
   skdb:
     docker:
@@ -78,7 +78,6 @@ jobs:
             make test-wasm
       - store_test_results:
           path: ~/test-results/skdb-wasm.xml
-
   skjson:
     docker:
       - image: skiplabs/skdb-base:latest
@@ -92,3 +91,20 @@ jobs:
             cd skjson && skargo test --junitxml ~/test-results/skjson.xml
       - store_test_results:
           path: ~/test-results/skjson.xml
+  skstore-wasm:
+    docker:
+      - image: skiplabs/skdb-base:latest
+    steps:
+      - checkout
+      - setup
+      - run:
+          name: Run wasm skstore tests
+          no_output_timeout: 10m
+          environment:
+            PLAYWRIGHT_REPORTER: junit
+            PLAYWRIGHT_JUNIT_OUTPUT_NAME: ~/test-results/skstore-wasm.xml
+          command: |
+            mkdir -p ~/test-results
+            make tstest-skstore
+      - store_test_results:
+          path: ~/test-results/skstore-wasm.xml
