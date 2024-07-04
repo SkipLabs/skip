@@ -9,12 +9,23 @@ import type {
   ColumnSchema,
   MirrorSchema,
   TableHandle,
-  Table
+  Table,
+  TTableHandle,
+  TTable
 } from "./skstore_api.js";
 
 import type { TJSON, JSONObject } from "./skstore_skjson.js";
 
-export type { SKStore, TJSON, TableHandle, Table, MirrorSchema, JSONObject };
+export type {
+  SKStore,
+  TJSON,
+  TableHandle,
+  Table,
+  MirrorSchema,
+  JSONObject,
+  TTableHandle,
+  TTable,
+};
 
 export class Sum implements Accumulator<number, number> {
   default = 0;
