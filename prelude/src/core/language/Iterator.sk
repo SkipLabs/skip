@@ -69,6 +69,17 @@ mutable base class .Iterator<+T> {
     mutable MapIterator(this, f)
   }
 
+  // i.mapWhile(f) is similar to i.map(f).takeWhile(isSome).map(Option.get)
+  // but terminates as soon as f returns None()
+  overridable mutable fun mapWhile<U>(f: T -> ?U): mutable Iterator<U> {
+    for (t in this) {
+      f(t) match {
+      | None() -> break void
+      | Some(u) -> yield u
+      }
+    }
+  }
+
   // Returns a new iterator representing the results of calling the selection
   // function on each element to map each element to an iterator, and
   // (conceptually) flattening the resulting iterators.
