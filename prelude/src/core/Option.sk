@@ -25,6 +25,7 @@
 // NOTE: As a NBE optimization this implementation is customized in
 // native/FastOption.sk, and the APIs must be kept in sync.
 base class Option<+T> uses
+  IntoIterator<T>,
   Show[T: readonly Show],
   Hashable[T: Hashable],
   Orderable[T: Orderable],
@@ -146,4 +147,11 @@ base class Option<+T> uses
   async frozen fun genFilter(p: T ~> ^Bool): ^?T
   | None() -> None()
   | option @ Some(x) -> if (await p(x)) option else None()
+
+  fun iterator(): mutable Iterator<T> {
+    this match {
+    | None() -> void
+    | Some(v) -> yield v
+    }
+  }
 }
