@@ -413,45 +413,39 @@ fun alterTableExtractColumn(
   })
 }
 
+// Re-create indexes on changed table, in case they reference a column whose index has changed
 private fun resetIndexes(
   context: mutable SKStore.Context,
   table: P.Name,
 ): void {
   tableDirName = getTable(context, 0, table).dirName;
-  getIndexOutputDir(context).items(context).each(kv -> {
-    (key, outputs) = kv;
-
-    for (idxDescr in outputs.filter(x -> x.tableDirName == tableDirName)) {
-      input = getIndexInputDir(context).maybeGet(context, key) match {
-      | Some(x) -> x
-      | None() -> invariant_violation("Expected one index input per key")
-      };
-      context.removeDir(idxDescr.dirName);
-      idxDir = context.unsafeGetEagerDir(indexOutput);
-      idxDir.unsafeGetAllDataIter(key).each(datum ->
-        context.setDir(
-          indexOutput,
-          idxDir.writeEntry(
-            context,
-            datum.i1, //original source
-            datum.i2, //original writer
-            key,
-            Array[
-              createUserIndex(
-                context,
-                input.name,
-                input.pos,
-                input.on,
-                input.columns,
-                input.unique,
-                Some(input.toString()),
-              ),
-            ],
-          ),
-        )
-      );
+  indexInputDir = getIndexInputDir(context);
+  indexOutputDir = getIndexOutputDir(context);
+  indexOutputDir.items(context).each(kv -> {
+    idxDescr = kv.i1.next() match {
+    | Some(x) if (x.tableDirName == tableDirName) -> x
+    | _ -> return void
     };
-  });
+    context.removeDir(idxDescr.dirName);
+
+    key = kv.i0;
+    input = indexInputDir.maybeGet(context, key).fromSome();
+    indexOutputDir.writeArray(
+      context,
+      key,
+      Array[
+        createUserIndex(
+          context,
+          input.name,
+          input.pos,
+          input.on,
+          input.columns,
+          input.unique,
+          Some(input.toString()),
+        ),
+      ],
+    )
+  })
 }
 
 class LegacyViewFile{
