@@ -379,7 +379,9 @@ fun asyncResult(
     };
     context.update();
   }) match {
-  | Success _ -> 1.0
+  | Success _ ->
+    SKDB.jsNotifyAll();
+    1.0
   | Failure(err) -> -getErrorHdl(err)
   };
 }
