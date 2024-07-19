@@ -80,7 +80,7 @@ function getValue(hdl: WasmHandle): any {
       return hdl.access.SKIP_SKJSON_asInt(hdl.pointer);
     case Type.Float:
       return hdl.access.SKIP_SKJSON_asFloat(hdl.pointer);
-    case Type.Float:
+    case Type.Boolean:
       return hdl.access.SKIP_SKJSON_asBoolean(hdl.pointer);
     case Type.String:
       return hdl.utils.importString(
@@ -297,7 +297,16 @@ class Mapping {
   }
 }
 
-class SKJSONShared implements Shared {
+export interface SKJSON extends Shared {
+  importJSON: (value: ptr, copy?: boolean) => any;
+  exportJSON: <T>(v: T) => ptr;
+  importOptJSON: (value: Opt<ptr>, copy?: boolean) => any;
+  importString: (v: ptr) => string;
+  exportString: (v: string) => ptr;
+  runWithGC: <T>(fn: () => T) => T;
+}
+
+class SKJSONShared implements SKJSON {
   getName = () => "SKJSON";
 
   importJSON: (value: ptr, copy?: boolean) => any;

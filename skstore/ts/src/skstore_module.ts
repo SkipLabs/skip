@@ -1,20 +1,18 @@
 // prettier-ignore
-import type { int, ptr, Links, Utils, ToWasmManager, Environment, Opt } from "#std/sk_types.js";
-import type { TJSON } from "skstore_skjson.js";
+import type { int, ptr, Links, Utils, ToWasmManager, Environment, Opt, Metadata } from "#std/sk_types.js";
+import type { TJSON, SKJSON } from "skstore_skjson.js";
 import type {
   Accumulator,
   NonEmptyIterator,
   Handles,
   Context,
-  SKJSON,
   FromWasm,
-  Metadata,
   Mapper,
   EntryMapper,
   Mapping,
-  Lazy,
   Result,
   AValue,
+  LHandle,
 } from "./skstore_api.js";
 import { LSelfImpl, SKStoreFactoryImpl } from "./skstore_impl.js";
 // prettier-ignore
@@ -80,13 +78,13 @@ export class ContextImpl implements Context {
 
   lazy = <K extends TJSON, V extends TJSON>(
     metadata: Metadata,
-    lazy: Lazy<K, V>,
+    compute: (selfHdl: LHandle<K, V>, key: K) => Opt<V>,
   ) => {
     const name = this.handles.name(metadata);
     const lazyHdl = this.exports.SKIP_SKStore_lazy(
       this.pointer(),
       this.skjson.exportString(name),
-      this.handles.register(lazy),
+      this.handles.register(compute),
     );
     return this.skjson.importString(lazyHdl);
   };
@@ -117,8 +115,8 @@ export class ContextImpl implements Context {
   ) => {
     const name = this.handles.name(metadata);
     const skMappings = mappings.map((mapping) => [
-      mapping[0].getId(),
-      this.handles.register(mapping[1]),
+      mapping.handle.getId(),
+      this.handles.register(mapping.mapper),
     ]);
     const resHdlPtr = this.exports.SKIP_SKStore_multimap(
       this.pointer(),
@@ -141,8 +139,8 @@ export class ContextImpl implements Context {
   ) => {
     const name = this.handles.name(metadata);
     const skMappings = mappings.map((mapping) => [
-      mapping[0].getId(),
-      this.handles.register(mapping[1]),
+      mapping.handle.getId(),
+      this.handles.register(mapping.mapper),
     ]);
     const resHdlPtr = this.exports.SKIP_SKStore_multimapReduce(
       this.pointer(),
@@ -282,32 +280,6 @@ export class ContextImpl implements Context {
     );
   };
 
-  input<K, V>(name: string, value: [K, V][]) {
-    const inputHdl = this.exports.SKIP_SKStore_input(
-      this.pointer(),
-      this.skjson.exportString(name),
-      this.skjson.exportJSON(value),
-    );
-    return this.skjson.importString(inputHdl);
-  }
-
-  set = <K, V>(inputHdl: string, key: K, value: V) => {
-    this.exports.SKIP_SKStore_set(
-      this.pointer(),
-      this.skjson.exportString(inputHdl),
-      this.skjson.exportJSON(key),
-      this.skjson.exportJSON(value),
-    );
-  };
-
-  remove = <K, V>(inputHdl: string, key: K) => {
-    this.exports.SKIP_SKStore_remove(
-      this.pointer(),
-      this.skjson.exportString(inputHdl),
-      this.skjson.exportJSON(key),
-    );
-  };
-
   private pointer = () => {
     return this.ref.get()!;
   };
@@ -358,41 +330,18 @@ class WriterImpl<K, T> {
   private skjson: SKJSON;
   private exports: FromWasm;
   private pointer: ptr;
-  private updateGetter: (getter: (idx: int) => T) => void;
 
-  constructor(
-    skjson: SKJSON,
-    exports: FromWasm,
-    pointer: ptr,
-    updateGetter: (getter: (idx: int) => T) => void,
-  ) {
+  constructor(skjson: SKJSON, exports: FromWasm, pointer: ptr) {
     this.skjson = skjson;
     this.exports = exports;
     this.pointer = pointer;
-    this.updateGetter = updateGetter;
   }
-
-  setValues = (key: K, values: T[]) => {
-    this.updateGetter((idx) => values[idx]);
-    this.exports.SKIP_SKStore_writerSetValues(
-      this.pointer,
-      this.skjson.exportJSON(key),
-      values.length,
-    );
-  };
 
   set = (key: K, value: T) => {
     this.exports.SKIP_SKStore_writerSet(
       this.pointer,
       this.skjson.exportJSON(key),
       this.skjson.exportJSON(value),
-    );
-  };
-
-  remove = (key: K) => {
-    this.exports.SKIP_SKStore_writerRemove(
-      this.pointer,
-      this.skjson.exportJSON(key),
     );
   };
 }
@@ -430,7 +379,6 @@ interface ToWasm {
   SKIP_SKStore_applyAccumulate(fn: int, acc: ptr, value: ptr): ptr;
   SKIP_SKStore_applyDismiss(fn: int, acc: ptr, value: ptr): Opt<ptr>;
   // Utils
-  SKIP_SKStore_getArrayValue(idx: int): ptr;
   SKIP_SKStore_getErrorHdl(exn: ptr): number;
 }
 
@@ -478,11 +426,9 @@ class LinksImpl implements Links {
   init!: (builder: ptr) => void;
   applyAccumulate!: (fn: int, acc: ptr, value: ptr) => ptr;
   applyDismiss!: (fn: int, acc: ptr, value: ptr) => Opt<ptr>;
-  getArrayValue!: (idx: int) => ptr;
   getErrorHdl!: (exn: ptr) => number;
   applyConvertToRowFun!: (fn: int, key: ptr, it: ptr) => ptr;
 
-  private updateGetter!: (getter: (idx: int) => ptr) => void;
   private initFn!: () => void;
 
   constructor(env: Environment) {
@@ -500,15 +446,10 @@ class LinksImpl implements Links {
       return this.skjson;
     };
     const ref = new Ref();
-    this.updateGetter = (getter: (idx: int) => any) => {
-      this.getArrayValue = (idx: int) => {
-        return skjson().exportJSON(getter(idx));
-      };
-    };
     this.applyMapFun = (fn: int, ctx: ptr, writer: ptr, key: ptr, it: ptr) => {
       ref.push(ctx);
       const jsu = skjson();
-      const w = new WriterImpl(jsu, fromWasm, writer, this.updateGetter);
+      const w = new WriterImpl(jsu, fromWasm, writer);
       const result = this.handles.apply(fn, [
         jsu.importJSON(key),
         new NonEmptyIteratorImpl(jsu, fromWasm, it),
@@ -528,7 +469,7 @@ class LinksImpl implements Links {
     ) => {
       ref.push(ctx);
       const jsu = skjson();
-      const w = new WriterImpl(jsu, fromWasm, writer, this.updateGetter);
+      const w = new WriterImpl(jsu, fromWasm, writer);
       const result = this.handles.apply(fn, [jsu.importJSON(row), occ]);
       for (const v of result) {
         const t = v as any;
@@ -619,8 +560,8 @@ class LinksImpl implements Links {
             reason instanceof Error
               ? reason.message
               : typeof reason == "string"
-                ? reason
-                : JSON.stringify(reason);
+              ? reason
+              : JSON.stringify(reason);
           register({ status: "failure", error: msg });
         });
     };
@@ -743,7 +684,6 @@ class Manager implements ToWasmManager {
       links.applyAccumulate(fn, acc, value);
     toWasm.SKIP_SKStore_applyDismiss = (fn: int, acc: ptr, value: ptr) =>
       links.applyDismiss(fn, acc, value);
-    toWasm.SKIP_SKStore_getArrayValue = (idx: int) => links.getArrayValue(idx);
     toWasm.SKIP_SKStore_getErrorHdl = (exn: ptr) => links.getErrorHdl(exn);
     return links;
   };

@@ -2,6 +2,23 @@ module alias P = SQLParser;
 
 module SKStore;
 
+const kSessionDir: DirName = DirName::create("/sk_prv/sessions/");
+const kGraphDir: DirName = DirName::create("/sk_prv/graph/");
+
+native class Info
+
+const kJSONTypes: Types<JSONID, JSONFile> = Types(
+  JSONID::keyType,
+  JSONFile::type,
+);
+
+class JSONID(value: SKJSON.CJSON) extends Key {
+  //
+  fun toString(): String {
+    this.value.prettyPrint()
+  }
+}
+
 base class Accumulator<V1: frozen, V2: frozen>(default: V2) {
   fun getType(): File ~> V2;
   fun accumulate(acc: V2, value: V1): V2;
@@ -209,14 +226,6 @@ fun subDirName(context: mutable Context, name: String): DirName {
   DirName::create(path)
 }
 
-fun parentName(context: mutable Context): DirName {
-  path = context.currentArrow() match {
-  | Some(arrow) -> `${arrow.childName}${base64(arrow.key)}/`
-  | None() -> `/sk/`
-  };
-  DirName::create(path)
-}
-
 fun base64(toEncode: Key): String {
   encoded = `b64_${Base64.encodeString(toEncode.toString(), true)}`;
   encoded.searchRight(ch ~> ch != '=') match {
@@ -225,6 +234,44 @@ fun base64(toEncode: Key): String {
     encoded.getIter().substring(i)
   | None() -> ""
   }
+}
+
+class JSONFile(value: SKJSON.CJSON) extends File
+
+fun createFor(session: String): Float {
+  if (SKStore.gHasContext() == 0) {
+    SKStore.gContextInit(initCtx());
+  };
+  SKStore.runWithResult(context ~> {
+    if (context.unsafeMaybeGetEagerDir(kSessionDir) is None()) {
+      sessionHdl = context.mkdir(
+        IID::keyType,
+        StringFile::type,
+        kSessionDir,
+        Array[(IID(0), StringFile(session))],
+      );
+      _ = sessionHdl.map(
+        IID::keyType,
+        StringFile::type,
+        context,
+        kGraphDir,
+        (ctx, writer, key, it) ~> {
+          init(ctx);
+          writer.set(key, it.first)
+        },
+      )
+    } else {
+      EHandle(IID::keyType, StringFile::type, kSessionDir).writeArray(
+        context,
+        IID(0),
+        Array[StringFile(session)],
+      );
+    };
+    context.update();
+  }) match {
+  | Success _ -> 1.0
+  | Failure(err) -> -getErrorHdl(err)
+  };
 }
 
 module end; /* SKStore */
