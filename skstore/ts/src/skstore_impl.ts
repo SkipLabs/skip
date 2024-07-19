@@ -1,5 +1,5 @@
 // prettier-ignore
-import type { ptr, Opt, App } from "#std/sk_types.js";
+import { type ptr, type Opt, type App, metadata } from "#std/sk_types.js";
 import type { JSONObject, TJSON } from "skstore_skjson.js";
 import type {
   Accumulator,
@@ -9,7 +9,6 @@ import type {
   Mapper,
   OutputMapper,
   TableHandle,
-  Lazy,
   SKStore,
   SKStoreFactory,
   Mapping,
@@ -21,7 +20,6 @@ import type {
   AValue,
 } from "./skstore_api.js";
 
-import { metadata } from "./skstore_api.js";
 // prettier-ignore
 import type { MirrorDefn, Params, SKDBShared, SKDBSync } from "#skdb/skdb_types.js";
 
@@ -271,8 +269,10 @@ export class SKStoreImpl implements SKStore {
     return new EHandleImpl<K2, V3>(this.context, eagerHdl);
   }
 
-  lazy<K extends TJSON, V extends TJSON>(fn: Lazy<K, V>): LHandle<K, V> {
-    const lazyHdl = this.context.lazy(metadata(1), fn);
+  lazy<K extends TJSON, V extends TJSON>(
+    compute: (selfHdl: LHandle<K, V>, key: K) => Opt<V>,
+  ): LHandle<K, V> {
+    const lazyHdl = this.context.lazy(metadata(1), compute);
     return new LHandleImpl<K, V>(this.context, lazyHdl);
   }
 

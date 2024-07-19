@@ -1852,4 +1852,51 @@ fun copyValueToParentObstack<T>(saved: Obstack, value: List<T>): List<T> {
   res
 }
 
+fun runWithResult<T, F>(
+  f: mutable Context ~> T,
+  synchronizer: ?Synchronizer = None(),
+  isync: Bool = false,
+): Result<T, .Exception> {
+  sync = UInt32::truncate(if (isync) 1 else 0);
+  current = synchronizer match {
+  | None() ->
+    gGlobalLock();
+    gContextGetNoLock()
+  | Some _ -> gUnsafeContextGet()
+  };
+  try {
+    context = Context::fromSaved(current);
+    res = f(context);
+    startTick = current.tick;
+    synchronizer match {
+    | None() ->
+      !current = gContextSyncNoLock(
+        startTick,
+        current,
+        context.clone(),
+        synchronizer,
+        sync,
+        None(),
+      );
+      gGlobalUnlock()
+    | Some _ ->
+      !current = gContextSync(
+        startTick,
+        current,
+        context.clone(),
+        synchronizer,
+        sync,
+        None(),
+      )
+    };
+    current.notifyAll(startTick);
+    gUnsafeFree(current);
+    Success(res)
+  } catch {
+  | exn ->
+    if (synchronizer.isNone()) gGlobalUnlock();
+    Failure(exn)
+  }
+}
+
 module end;

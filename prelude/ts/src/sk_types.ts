@@ -562,19 +562,16 @@ export class Utils {
   };
 
   getErrorObject: (skExc: ptr) => ErrorObject = (skExc: ptr) => {
-    let skMessage =
-      skExc != null && skExc != 0
-        ? this.exports.SKIP_getExceptionMessage(skExc)
-        : null;
-    let message =
-      skMessage != null && skMessage != 0
-        ? this.importString(skMessage)
-        : "SKFS Internal error";
+    if (skExc == null || skExc == 0) {
+      return { message: "SKStore Internal error" };
+    }
+    let message = this.importString(
+      this.exports.SKIP_getExceptionMessage(skExc),
+    );
     let errStack = this.stacks.get(skExc);
     let lines = message.split("\n");
     if (lines[0].startsWith("external:")) {
       let external = lines.shift()!;
-      message = lines.join("\n");
       let id = parseInt(external.substring(9));
       if (this.state.exceptions.has(id)) {
         const exception = this.state.exceptions.get(id);
@@ -585,7 +582,7 @@ export class Utils {
           message = "Unknown error";
         }
       } else if (message.trim() == "") {
-        message = "SKFS Internal error";
+        message = "SKStore Internal error";
       }
     }
     const toObject: (error: Error) => ErrorObject = (error?: Error) => {
@@ -873,6 +870,30 @@ export async function loadEnv(extensions: EnvInit[], envVals?: Array<string>) {
     extensions.map((fn) => fn(env));
   }
   return env;
+}
+
+export type Metadata = {
+  filepath: string;
+  line: number;
+  column: number;
+};
+
+/**
+ * Collect function script metadata (name, line, colum)
+ * @param offset The offset of the function for the one to collect metadata
+ * @returns The script metadata of the offset function
+ */
+export function metadata(offset: number): Metadata {
+  const stack = new Error().stack!.split("\n");
+  // Skip "Error" and metadata call
+  const internalOffset = 2;
+  const info = /\((.*):(\d+):(\d+)\)$/.exec(stack[internalOffset + offset]);
+  const metadata = {
+    filepath: info![1],
+    line: parseInt(info![2]),
+    column: parseInt(info![3]),
+  };
+  return metadata;
 }
 
 export async function run(

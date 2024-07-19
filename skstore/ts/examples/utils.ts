@@ -13,7 +13,7 @@ import { createInterface } from "readline";
 import { Command } from "commander";
 
 export interface ReactiveStorage {
-  initReactiveFlow: (store: SKStore, ...TTableHandle: any[]) => void;
+  initReactiveFlow: (store: SKStore, ...table: TTableHandle[]) => void;
   schema: () => MirrorSchema[];
 }
 

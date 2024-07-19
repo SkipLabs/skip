@@ -5,7 +5,7 @@
  */
 
 // prettier-ignore
-import type {App, Opt, Shared, float, int, ptr} from "#std/sk_types.js";
+import type { App, Opt, Shared, float, int, ptr, Metadata } from "#std/sk_types.js";
 import type { JSONObject, TJSON } from "./skstore_skjson.js";
 
 export type { Opt, float, int, ptr };
@@ -28,12 +28,6 @@ export type MirrorSchema = {
   name: string;
   expected: ColumnSchema[];
   filter?: DBFilter;
-};
-
-export type Metadata = {
-  filepath: string;
-  line: number;
-  column: number;
 };
 
 /**
@@ -115,14 +109,6 @@ export type AValue<V extends TJSON, M extends TJSON> = {
   payload?: V;
   metadata?: M;
 };
-
-export interface Handles {
-  register(v: any): int;
-  get(id: int): any;
-  apply(id: int, parameters: any[]): any;
-  delete(id: int): any;
-  name(metadata: Metadata): string;
-}
 
 /**
  * Error thrown when an index is not found during table lookup
@@ -374,12 +360,7 @@ export type Mapping<
   V1 extends TJSON,
   K2 extends TJSON,
   V2 extends TJSON,
-> = [EHandle<K1, V1>, Mapper<K1, V1, K2, V2>];
-
-export type Lazy<K extends TJSON, V extends TJSON> = (
-  selfHdl: LHandle<K, V>,
-  key: K,
-) => Opt<V>;
+> = { handle: EHandle<K1, V1>; mapper: Mapper<K1, V1, K2, V2> };
 
 export interface SKStoreFactory extends Shared {
   runSKStore(
@@ -393,10 +374,12 @@ export interface SKStoreFactory extends Shared {
 export interface SKStore {
   /**
    * Creates a lazy reactive map
-   * @param {Lazy} compute - the lazy function to compute entries of the lazy map
+   * @param compute - the lazy function to compute entries of the lazy map
    * @returns {LHandle} The the resulting lazy reactive map handle
    */
-  lazy<K extends TJSON, V extends TJSON>(compute: Lazy<K, V>): LHandle<K, V>;
+  lazy<K extends TJSON, V extends TJSON>(
+    compute: (selfHdl: LHandle<K, V>, key: K) => Opt<V>,
+  ): LHandle<K, V>;
 
   /**
    * Map over each entry of each eager reative map and apply the corresponding mapper function
@@ -473,8 +456,6 @@ export interface FromWasm {
 
   SKIP_SKStore_getSelf(ctx: ptr, selfHdl: ptr, key: ptr): ptr;
 
-  SKIP_SKStore_set(ctx: ptr, inputHdl: ptr, key: ptr, value: ptr): void;
-  SKIP_SKStore_remove(ctx: ptr, inputHdl: ptr, key: ptr): void;
   SKIP_SKStore_size(ctx: ptr, eagerHdl: ptr): number;
 
   SKIP_SKStore_toSkdb(ctx: ptr, eagerHdl: ptr, table: ptr, fnPtr: int): void;
@@ -484,15 +465,12 @@ export interface FromWasm {
   SKIP_SKStore_iteratorUniqueValue(it: ptr): Opt<ptr>;
   SKIP_SKStore_iteratorFirst(it: ptr): ptr;
   // Writer
-  SKIP_SKStore_writerSetValues(writer: ptr, key: ptr, size: int): void;
   SKIP_SKStore_writerSet(writer: ptr, key: ptr, value: ptr): void;
-  SKIP_SKStore_writerRemove(writer: ptr, key: ptr): void;
 
   // Store
   SKIP_SKStore_createFor(session: ptr): float;
 
   // SKStore
-  SKIP_SKStore_input(ctx: ptr, name: ptr, values: ptr): ptr;
   SKIP_SKStore_asyncLazy(ctx: ptr, name: ptr, paramsFn: int, lazyFn: int): ptr;
   SKIP_SKStore_lazy(ctx: ptr, name: ptr, lazyFn: int): ptr;
   SKIP_SKStore_fromSkdb(ctx: ptr, table: ptr, name: ptr, fnPtr: int): ptr;
@@ -542,13 +520,9 @@ export interface Context {
     metadata: Metadata,
     compute: Mapper<K, V, K2, V2>,
   ) => string;
-  input: <K extends TJSON, V extends TJSON>(
-    name: string,
-    value: [K, V][],
-  ) => string;
   lazy: <K extends TJSON, V extends TJSON>(
     metadata: Metadata,
-    compute: Lazy<K, V>,
+    compute: (selfHdl: LHandle<K, V>, key: K) => Opt<V>,
   ) => string;
   asyncLazy: <
     K extends TJSON,
@@ -602,21 +576,4 @@ export interface Context {
 
   noref: () => Context;
   notify?: () => void;
-}
-
-/**
- * Collect function file line colum
- * @param offset
- * @returns
- */
-export function metadata(offset: number): Metadata {
-  const stack = new Error().stack!.split("\n");
-  // Skip "Error" and metadata call
-  const info = /\((.*):(\d+):(\d+)\)$/.exec(stack[2 + offset]);
-  const metadata = {
-    filepath: info![1],
-    line: parseInt(info![2]),
-    column: parseInt(info![3]),
-  };
-  return metadata;
 }

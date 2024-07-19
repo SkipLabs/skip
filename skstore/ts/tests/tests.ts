@@ -227,20 +227,20 @@ async function testMultiMap1Init(
     return Array([row[0], parseInt(row[1])]);
   });
   const eager3 = skstore.multimap([
-    [
-      eager1,
-      (key, it) => {
+    {
+      handle: eager1,
+      mapper: (key, it) => {
         const v = it.first();
         return Array([[0, key], v]);
       },
-    ],
-    [
-      eager2,
-      (key, it) => {
+    },
+    {
+      handle: eager2,
+      mapper: (key, it) => {
         const v = it.first();
         return Array([[1, key], v]);
       },
-    ],
+    },
   ]);
   eager3.mapTo(output, (key, it) => {
     return [key[0], key[1], it.first()];
@@ -290,20 +290,20 @@ function testMultiMapReduceInit(
   });
   const eager3 = skstore.multimapReduce(
     [
-      [
-        eager1,
-        (key, it) => {
+      {
+        handle: eager1,
+        mapper: (key, it) => {
           const v = it.first();
           return Array([key, v]);
         },
-      ],
-      [
-        eager2,
-        (key, it) => {
+      },
+      {
+        handle: eager2,
+        mapper: (key, it) => {
           const v = it.first();
           return Array([key, v]);
         },
-      ],
+      },
     ],
     new Sum(),
   );
