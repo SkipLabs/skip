@@ -34,6 +34,8 @@ extern "C" {
 #include <string>
 #include <vector>
 
+#include "runtime64_specific.h"
+
 extern "C" {
 #include "xoroshiro128plus.h"
 }
@@ -53,6 +55,19 @@ void* sk_get_exception_message(void* skExn);
 sk_saved_obstack_t* SKIP_new_Obstack();
 void SKIP_destroy_Obstack(sk_saved_obstack_t* saved);
 }
+
+namespace skruntime {
+Logger::~Logger() {}
+__attribute__((noreturn)) void BufferedLogger::exit(int code) {
+  std::cout << m_out.str();
+  m_out.clear();
+  std::cout.flush();
+  std::cerr.flush();
+  std::string message = m_err.str();
+  char* skmessage = sk_string_create(message.c_str(), message.size());
+  SKIP_throw_cruntime_with_message((int32_t)code, skmessage);
+}
+}  // namespace skruntime
 
 namespace {
 
@@ -221,6 +236,39 @@ static int argc = 0;
 static char** argv = NULL;
 extern char** environ;
 
+const char* endl = "\n";
+
+thread_local skruntime::Logger* logger;
+
+extern "C" {
+void SKIP_initBufferedLogger() {
+  if (logger != nullptr) {
+    logger->flush(true);
+    delete logger;
+  }
+  logger = new skruntime::BufferedLogger();
+}
+char* SKIP_endBufferedLogger() {
+  if (logger != nullptr) {
+    std::string sout = logger->out();
+    char* skout = sk_string_create(sout.c_str(), sout.size());
+    delete logger;
+    logger = nullptr;
+    return skout;
+  } else {
+    return sk_string_create("", 0);
+  }
+}
+}
+
+void SKIP_clearBufferedLogger() {
+  if (logger != nullptr) {
+    logger->flush(true);
+    delete logger;
+    logger = nullptr;
+  }
+}
+
 int64_t SKIP_getArgc() {
   return argc;
 }
@@ -311,11 +359,17 @@ static void print(FILE* descr, char* str) {
 }
 
 void SKIP_print_raw(char* str) {
-  print(stdout, str);
+  if (logger)
+    logger->print(str);
+  else
+    print(stdout, str);
 }
 
 void SKIP_print_error_raw(char* str) {
-  print(stderr, str);
+  if (logger)
+    logger->error(str);
+  else
+    print(stderr, str);
 }
 
 void SKIP_print_debug_raw(char* str) {
@@ -323,18 +377,32 @@ void SKIP_print_debug_raw(char* str) {
 }
 
 void SKIP_flush_stdout() {
-  fflush(stdout);
-  fflush(stderr);
+  if (logger)
+    logger->flush(false);
+  else {
+    fflush(stdout);
+    fflush(stderr);
+  }
 }
 
 void print_string(char* str) {
-  print(stdout, str);
-  printf("\n");
+  if (logger) {
+    logger->print(str);
+    logger->println();
+  } else {
+    print(stdout, str);
+    printf("\n");
+  }
 }
 
 void SKIP_print_error(char* str) {
-  print(stderr, str);
-  fprintf(stderr, "\n");
+  if (logger) {
+    logger->error(str);
+    logger->errorln();
+  } else {
+    print(stderr, str);
+    fprintf(stderr, "\n");
+  }
 }
 
 void SKIP_print_debug(char* str) {
@@ -584,7 +652,11 @@ char* SKIP_realpath(char* path) {
 }
 
 __attribute__((noreturn)) void SKIP_exit(uint64_t code) {
-  exit(code);
+  if (logger != nullptr) {
+    logger->exit(code);
+  } else {
+    exit(code);
+  }
 }
 
 char* SKIP_call_external_fun(int32_t, char*) {

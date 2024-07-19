@@ -338,6 +338,7 @@ void SKIP_call_after_unlock(char*, char*);
 
 void SKIP_throw(void*);
 __attribute__((noreturn)) void SKIP_throw_cruntime(int32_t);
+__attribute__((noreturn)) void SKIP_throw_cruntime_with_message(int32_t, char*);
 
 void sk_commit(char*, uint32_t);
 char* SKIP_context_get_unsafe();
