@@ -187,12 +187,16 @@ class SKDBSharedImpl implements SKDBShared {
   getName = () => "SKDB";
   createSync: (dbName?: string, asWorker?: boolean) => Promise<SKDBSync>;
   notify: () => void;
+  queryResult: () => Array<any>;
+
   constructor(
     createSync: (dbName?: string, asWorker?: boolean) => Promise<SKDBSync>,
     notify: () => void,
+    queryResult: () => Array<any>,
   ) {
     this.createSync = createSync;
     this.notify = notify;
+    this.queryResult = queryResult;
   }
 
   async create(dbName?: string, asWorker?: boolean) {
@@ -464,7 +468,11 @@ class LinksImpl implements Links, ToWasm {
     };
     this.environment.shared.set(
       "SKDB",
-      new SKDBSharedImpl(createSync, this.notifyAllJS),
+      new SKDBSharedImpl(createSync, this.notifyAllJS, () => {
+        const result = this.stdout_objects[0];
+        this.stdout_objects[0] = [];
+        return result;
+      }),
     );
   };
 }

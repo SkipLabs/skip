@@ -1,5 +1,7 @@
 // prettier-ignore
 import type { int, ptr, Links, Utils, ToWasmManager, Environment, Opt, Metadata } from "#std/sk_types.js";
+// prettier-ignore
+import type { SKDBShared } from "#skdb/skdb_types.js";
 import type { SKJSON } from "./skstore_skjson.js";
 import type {
   Accumulator,
@@ -8,6 +10,8 @@ import type {
   AValue,
   LHandle,
   TJSON,
+  JSONObject,
+  MirrorSchema,
 } from "../skstore_api.js";
 
 import type {
@@ -17,8 +21,6 @@ import type {
   CtxMapping,
 } from "./skstore_types.js";
 import { LSelfImpl, SKStoreFactoryImpl } from "./skstore_impl.js";
-// prettier-ignore
-import type { SKDBShared } from "#skdb/skdb_types.js";
 
 class HandlesImpl implements Handles {
   private nextID: number = 1;
@@ -66,16 +68,34 @@ export class ContextImpl implements Context {
   exports: FromWasm;
   handles: Handles;
   ref: Ref;
+  private queryResult: () => JSONObject[];
+  notify: () => void;
 
-  constructor(skjson: SKJSON, exports: FromWasm, handles: Handles, ref: Ref) {
+  constructor(
+    skjson: SKJSON,
+    exports: FromWasm,
+    handles: Handles,
+    queryResult: () => JSONObject[],
+    notify: () => void,
+    ref: Ref,
+  ) {
     this.skjson = skjson;
     this.exports = exports;
     this.handles = handles;
     this.ref = ref;
+    this.notify = notify;
+    this.queryResult = queryResult;
   }
 
   noref() {
-    return new ContextImpl(this.skjson, this.exports, this.handles, new Ref());
+    return new ContextImpl(
+      this.skjson,
+      this.exports,
+      this.handles,
+      this.queryResult,
+      this.notify,
+      new Ref(),
+    );
   }
 
   lazy = <K extends TJSON, V extends TJSON>(
@@ -273,6 +293,98 @@ export class ContextImpl implements Context {
       this.skjson.exportString(table),
       convertId,
     );
+  };
+
+  private execQuery = (fn: () => number) => {
+    if (this.ref.get() != null) {
+      throw new Error(
+        "insert cannot be called inside a SKStore function call.",
+      );
+    }
+    const result = this.skjson.runWithGC(fn);
+    if (result < 0) {
+      throw this.handles.delete(-result);
+    } else {
+      this.notify();
+    }
+  };
+
+  insert = <R extends TJSON[][]>(
+    name: string,
+    entries: R,
+    update: boolean = false,
+  ) => {
+    this.execQuery(() => {
+      return this.exports.SKIP_SKStore_insert(
+        this.skjson.exportString(name),
+        this.skjson.exportJSON(entries),
+        update,
+      );
+    });
+  };
+
+  update = <R extends TJSON[]>(
+    name: string,
+    columns: string[],
+    entry: R,
+    updates: JSONObject,
+  ) => {
+    this.execQuery(() => {
+      return this.exports.SKIP_SKStore_update(
+        this.skjson.exportString(name),
+        this.skjson.exportString(columns.join(",")),
+        this.skjson.exportJSON(entry),
+        this.skjson.exportJSON(updates),
+      );
+    });
+  };
+
+  createTables = (schemas: MirrorSchema[]) => {
+    this.execQuery(() => {
+      return this.exports.SKIP_SKStore_createTables(
+        this.skjson.exportJSON(schemas),
+      );
+    });
+  };
+
+  updateWhere = (name: string, where: JSONObject, updates: JSONObject) => {
+    this.execQuery(() => {
+      return this.exports.SKIP_SKStore_updateWhere(
+        this.skjson.exportString(name),
+        this.skjson.exportJSON(where),
+        this.skjson.exportJSON(updates),
+      );
+    });
+  };
+
+  select = (name: string, select: JSONObject, columns?: string[]) => {
+    this.execQuery(() => {
+      return this.exports.SKIP_SKStore_select(
+        this.skjson.exportString(name),
+        this.skjson.exportJSON(select),
+        this.skjson.exportJSON(columns ?? []),
+      );
+    });
+    return this.queryResult();
+  };
+
+  delete = <R extends TJSON[]>(name: string, columns: string[], entry: R) => {
+    this.execQuery(() => {
+      return this.exports.SKIP_SKStore_delete(
+        this.skjson.exportString(name),
+        this.skjson.exportString(columns.join(",")),
+        this.skjson.exportJSON(entry),
+      );
+    });
+  };
+
+  deleteWhere = (name: string, where: JSONObject) => {
+    this.execQuery(() => {
+      return this.exports.SKIP_SKStore_deleteWhere(
+        this.skjson.exportString(name),
+        this.skjson.exportJSON(where),
+      );
+    });
   };
 
   private pointer = () => {
@@ -575,11 +687,27 @@ class LinksImpl implements Links {
           register({ status: "failure", error: msg });
         });
     };
-
+    const queryResult = () => {
+      return (this.env.shared.get("SKDB") as SKDBShared).queryResult();
+    };
+    const checkAndNotify = () => {
+      if (!notify) {
+        const skdbApp = this.env.shared.get("SKDB") as SKDBShared;
+        notify = skdbApp?.notify;
+      }
+      notify();
+    };
     this.applyLazyFun = (fn: int, ctx: ptr, hdl: ptr, key: ptr) => {
       ref.push(ctx);
       const jsu = skjson();
-      const context = new ContextImpl(jsu, fromWasm, this.handles, ref);
+      const context = new ContextImpl(
+        jsu,
+        fromWasm,
+        this.handles,
+        queryResult,
+        checkAndNotify,
+        ref,
+      );
       const res = jsu.exportJSON(
         this.handles.apply(fn, [
           new LSelfImpl(context, hdl),
@@ -644,7 +772,15 @@ class LinksImpl implements Links {
     this.env.shared.set(
       "SKStore",
       new SKStoreFactoryImpl(
-        () => new ContextImpl(skjson(), fromWasm, this.handles, ref),
+        () =>
+          new ContextImpl(
+            skjson(),
+            fromWasm,
+            this.handles,
+            queryResult,
+            checkAndNotify,
+            ref,
+          ),
         create,
         (dbName, asWorker) =>
           (this.env.shared.get("SKDB") as SKDBShared).createSync(

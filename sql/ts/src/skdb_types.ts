@@ -178,6 +178,7 @@ export interface SKDBShared extends Shared {
   create: (dbName?: string, asWorker?: boolean) => Promise<SKDB>;
   createSync: (dbName?: string, asWorker?: boolean) => Promise<SKDBSync>;
   notify: () => void;
+  queryResult(): Array<any>;
 }
 
 export interface SKDBGroup {
