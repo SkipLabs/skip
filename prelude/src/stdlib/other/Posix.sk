@@ -248,7 +248,7 @@ mutable class Popen(
     stdin: Bool = false,
     stdout: Bool = false,
     stderr: Bool = false,
-  }: mutable Popen {
+  }: Result<mutable Popen, IO.Error> {
     file_actions = SpawnFileActions::init();
     stdin_pipe = if (stdin) Some(pipe()) else None();
     stdout_pipe = if (stdout) Some(pipe()) else None();
@@ -292,11 +292,13 @@ mutable class Popen(
     stdout_pipe.each(pipe -> close(pipe.input));
     stderr_pipe.each(pipe -> close(pipe.input));
 
-    mutable Popen(
-      p,
-      stdin_pipe.map(pipe -> mutable IO.File(pipe.input)),
-      stdout_pipe.map(pipe -> mutable IO.File(pipe.output)),
-      stderr_pipe.map(pipe -> mutable IO.File(pipe.output)),
+    p.map(p ->
+      mutable Popen(
+        p,
+        stdin_pipe.map(pipe -> mutable IO.File(pipe.input)),
+        stdout_pipe.map(pipe -> mutable IO.File(pipe.output)),
+        stderr_pipe.map(pipe -> mutable IO.File(pipe.output)),
+      )
     )
   }
 
@@ -388,9 +390,13 @@ fun spawnp(
   argv: Array<String>,
   env: Array<String>,
   file_actions: readonly SpawnFileActions,
-): mutable Process {
+): Result<mutable Process, IO.Error> {
   pid = internalSpawnp(argv, env, file_actions);
-  mutable Process(pid)
+  if (pid < 0) {
+    return Failure(IO.Error(-pid))
+  };
+
+  Success(mutable Process(pid))
 }
 
 module end;
