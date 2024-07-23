@@ -33,7 +33,7 @@ jobs:
           command: |
             mkdir -p ~/test-results
             cd compiler && make STAGE=1
-            PATH=./stage1/bin:$PATH skargo test --jobs 8 --junitxml ~/test-results/skc.xml
+            PATH=$(realpath ./stage1/bin):$PATH skargo test --jobs 8 --junitxml ~/test-results/skc.xml
       - store_test_results:
           path: ~/test-results/skc.xml
 
