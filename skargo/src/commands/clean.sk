@@ -23,7 +23,7 @@ fun clean(): (Cli.Command, (GlobalContext, Cli.ParseResults) ~> void) {
 fun execClean(gctx: GlobalContext, args: Cli.ParseResults): void {
   ws = workspace(args, gctx);
   // TODO: Clean only for a specific arch specified with `--target`?
-  p = System.subprocess(Array["rm", "-rf", ws.target_dir()]);
+  p = System.subprocess(Array["rm", "-rf", ws.target_dir()]).fromSuccess();
   if (!p.success()) {
     gctx.console.error(subprocess_error_message(p));
     skipExit(2);

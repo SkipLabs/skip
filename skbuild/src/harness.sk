@@ -73,7 +73,11 @@ class Env(
       Environ.set_current_dir(dir);
       current
     });
-    p = System.subprocess(args, this.printString, this.printError);
+    p = System.subprocess(
+      args,
+      this.printString,
+      this.printError,
+    ).fromSuccess();
     optCurrent.each(c -> Environ.set_current_dir(c));
     if (!p.success()) {
       if (!this.verbose) {
@@ -311,7 +315,7 @@ fun run(args: Array<String>, verbose: Bool): void {
     // TODO: colors
     print_error(`>> ${args.join(" ")}`)
   };
-  p = System.subprocess(args);
+  p = System.subprocess(args).fromSuccess();
   if (!p.success()) {
     print_raw(p.stdout);
     print_error_raw(p.stderr);

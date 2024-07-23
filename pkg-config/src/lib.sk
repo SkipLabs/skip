@@ -115,7 +115,10 @@ class Config(
 
   private fun run(name: String, args: Array<String>): Result<String, Error> {
     cmd = this.cmd().concat(Array[name]).concat(args);
-    p = System.subprocess(cmd);
+    p = System.subprocess(cmd) match {
+    | Success(p) -> p
+    | Failure _ -> return Failure(ErrorCommand(cmd.join(" ")))
+    };
 
     if (p.success()) {
       Success(p.stdout)
@@ -145,6 +148,7 @@ class Config(
 
 base class Error {
   children =
+  | ErrorCommand(cmd: String)
   | ErrorProbeFailure(name: String, command: String, output: String)
 }
 

@@ -127,7 +127,7 @@ private fun skargo(
     cmd_args.toArray(),
     printer.printString,
     printer.printError,
-  );
+  ).fromSuccess();
   printer.flush();
   if (!p.success()) {
     Failure(void)
@@ -211,7 +211,7 @@ private fun exec(
   } else {
     ((_) -> void, (_) -> void)
   };
-  p = System.subprocess(args, stdout_cb, stderr_cb);
+  p = System.subprocess(args, stdout_cb, stderr_cb).fromSuccess();
   printer.flush();
   if (!p.success()) {
     if (console.verbosity < verbosity) {

@@ -32,7 +32,7 @@ fun syncDirs(
 }
 
 fun checkDir(dir: String): void {
-  _ = System.subprocess(Array["mkdir", "-p", dir]);
+  _ = System.subprocess(Array["mkdir", "-p", dir]).fromSuccess();
 }
 
 fun withTarget(args: Cli.ParseResults): Cli.ParseResults {
@@ -49,7 +49,7 @@ fun withTarget(args: Cli.ParseResults): Cli.ParseResults {
 
 fun mtime(path: String): ?Int {
   if (FileSystem.exists(path)) {
-    p = System.subprocess(Array["stat", "-c", "%Y", path]);
+    p = System.subprocess(Array["stat", "-c", "%Y", path]).fromSuccess();
     if (!p.success()) {
       None()
     } else {
@@ -152,7 +152,7 @@ fun i(v: Bool): Int {
 fun copy(src: String, dst: String, optConsole: ?Skargo.Console = None()): void {
   cmd = Array["cp", src, dst];
   optConsole.each(console -> console.status_verbose("Command", cmd.join(" ")));
-  _ = System.subprocess(cmd);
+  _ = System.subprocess(cmd).fromSuccess();
 }
 
 fun targets(
@@ -181,7 +181,7 @@ fun runService(
   if (FileSystem.exists(serviceFile)) {
     cmd = Array["make", "-f", serviceFile, `ROOT_DIR=${root}`];
     console.status_verbose("Command", cmd.join(" "));
-    p = System.subprocess(cmd, s -> if (verbose) print_raw(s));
+    p = System.subprocess(cmd, s -> if (verbose) print_raw(s)).fromSuccess();
     if (verbose || !p.success()) {
       if (!verbose) print_raw(p.stdout);
       print_error_raw(p.stderr);

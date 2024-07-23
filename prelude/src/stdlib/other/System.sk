@@ -218,7 +218,7 @@ fun subprocess(
   args: Array<String>,
   stdout: (String) -> void = _ -> void,
   stderr: (String) -> void = _ -> void,
-): CompletedProcess {
+): Result<CompletedProcess, IO.Error> {
   popen{args, stdout, stderr}
 }
 
@@ -229,7 +229,7 @@ fun popen{
   stdout: (String) -> void = _ -> void,
   stderr: (String) -> void = _ -> void,
   cwd: ?String = None(),
-}: CompletedProcess {
+}: Result<CompletedProcess, IO.Error> {
   p = Posix.Popen::create{
     args,
     env,
@@ -237,7 +237,7 @@ fun popen{
     cwd,
     stdout => true,
     stderr => true,
-  };
+  }?;
   streams = Array[p.stdout.fromSome(), p.stderr.fromSome()];
   captured = Array[mutable Vector[], mutable Vector[]];
   handlers = Array[stdout, stderr];
@@ -273,11 +273,13 @@ fun popen{
     }
   };
   exitstatus = p.wait();
-  CompletedProcess(
-    args,
-    exitstatus,
-    String::fromUtf8(captured[0].toArray()),
-    String::fromUtf8(captured[1].toArray()),
+  Success(
+    CompletedProcess(
+      args,
+      exitstatus,
+      String::fromUtf8(captured[0].toArray()),
+      String::fromUtf8(captured[1].toArray()),
+    ),
   )
 }
 
