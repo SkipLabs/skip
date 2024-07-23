@@ -61,7 +61,12 @@ mutable class ProcessBuilder(
     stdout: (String) -> void = _ -> void,
     stderr: (String) -> void = _ -> void,
   ): System.CompletedProcess {
-    System.popen{args => this.get_argv(), env => this.get_env(), stdout, stderr}
+    System.popen{
+      args => this.get_argv(),
+      env => this.get_env(),
+      stdout,
+      stderr,
+    }.fromSuccess()
   }
 }
 

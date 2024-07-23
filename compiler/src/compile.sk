@@ -160,7 +160,7 @@ fun runShell(args: Array<String>, verbose: Bool = false): void {
         print_error_raw(s)
       }
     },
-  );
+  ).fromSuccess();
   if (!p.success()) {
     if (!verbose) {
       print_error_raw(p.stderr)
@@ -172,7 +172,7 @@ fun runShell(args: Array<String>, verbose: Bool = false): void {
 fun ensureCompatibleLLVMVersion(): void {
   kLLVMVersion = "15.";
 
-  p = System.subprocess(Array["llvm-config", "--version"]);
+  p = System.subprocess(Array["llvm-config", "--version"]).fromSuccess();
   if (!p.success()) {
     print_error_raw(p.stderr);
     skipExit(1)
@@ -429,7 +429,7 @@ fun compile_sklib(conf: Config.Config): void {
     };
     ar_file.close();
 
-    p = System.subprocess(Array["llvm-ar", "s", conf.output]);
+    p = System.subprocess(Array["llvm-ar", "s", conf.output]).fromSuccess();
     if (!p.success()) {
       print_error(`ranlib failed: ${p.stdout} ${p.stderr}`);
       skipExit(3)

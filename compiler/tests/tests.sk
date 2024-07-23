@@ -20,14 +20,14 @@ private fun compile_cmd(
 private fun genValidTest(basename: String): void {
   p = System.subprocess(
     compile_cmd(Array[basename + ".sk"], basename + ".bin"),
-  );
+  ).fromSuccess();
   if (!p.success()) {
     T.fail(
       `Unexpected compile error\nstdout: ${p.stdout}\nstderr:\n${p.stderr}`,
     );
   };
 
-  !p = System.subprocess(Array[basename + ".bin"]);
+  !p = System.subprocess(Array[basename + ".bin"]).fromSuccess();
 
   if (!p.success()) {
     T.fail(`Unexpected error\nstdout: ${p.stdout}\nstderr:\n${p.stderr}`);
@@ -42,7 +42,7 @@ private fun genValidTest(basename: String): void {
 private fun genInvalidTest(basename: String): void {
   p = System.subprocess(
     compile_cmd(Array[basename + ".sk"], basename + ".bin"),
-  );
+  ).fromSuccess();
 
   if (p.success()) {
     T.fail("Expected compile error")

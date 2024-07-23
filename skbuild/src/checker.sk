@@ -25,7 +25,7 @@ class TimeChecker(optTime: ?Int = None()) {
 
 fun mtime(path: String): ?Int {
   if (FileSystem.exists(path)) {
-    p = System.subprocess(Array["stat", "-c", "%Y", path]);
+    p = System.subprocess(Array["stat", "-c", "%Y", path]).fromSuccess();
     if (!p.success()) {
       None()
     } else {

@@ -260,15 +260,13 @@ int64_t SKIP_posix_spawnp(char* skargv, char* skenvp, char* file_actionsp) {
   int rv =
       posix_spawnp(&pid, argv[0], (posix_spawn_file_actions_t*)file_actionsp,
                    NULL, argv, envp);
-  if (rv != 0) {
-    errno = rv;
-    fprintf(stderr, "posix_spawnp (%s): ", argv[0]);
-    perror(NULL);
-    exit(EXIT_FAILURE);
-  }
-
   free(argv);
   free(envp);
+
+  if (rv != 0) {
+    return (int64_t)(-rv);
+  }
+
   return (int64_t)pid;
 }
 

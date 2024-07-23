@@ -20,7 +20,7 @@ fun execFmt(gctx: GlobalContext, args: Cli.ParseResults): void {
     f.endsWith(".sk")
   ).toArray();
 
-  p = System.subprocess(Array["skfmt", "-i"].concat(files));
+  p = System.subprocess(Array["skfmt", "-i"].concat(files)).fromSuccess();
   if (!p.success()) {
     gctx.console.error(subprocess_error_message(p));
     skipExit(2);
