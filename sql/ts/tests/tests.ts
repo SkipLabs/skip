@@ -1642,9 +1642,9 @@ export const tests = (asWorker: boolean) => {
           { data: { field1: "\u00c3\u00a9al P" } },
           { data: { field1: " \u2022 T" } },
         ];
-        for (let i in objects) {
-          objects[i].data = JSON.stringify(objects[i].data);
-          await skdb.exec("insert into t1 values(@data)", objects[i]);
+        for (let object of objects) {
+          const data = JSON.stringify(object.data);
+          await skdb.exec("insert into t1 values(@data)", { data });
         }
         return await skdb.exec("select * from t1");
       },
