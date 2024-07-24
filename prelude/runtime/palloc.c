@@ -577,8 +577,10 @@ void sk_load_mapping(char* fileName) {
 /* Detects pointers that come from the binary. */
 /*****************************************************************************/
 
+int obstack_intervals_contains(void*);
+
 int sk_is_static(void* ptr) {
-  return !(ginfo->head <= (char*)ptr && (char*)ptr <= ginfo->end);
+  return !((char*)ginfo <= (char*)ptr && (char*)ptr < ginfo->end);
 }
 
 /*****************************************************************************/
