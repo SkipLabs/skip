@@ -62,12 +62,15 @@ mutable class EmptyIterator<T>() extends FileIterator<T> {
 mutable class NonEmptyIterator<+T>(
   mutable first: T,
   iter: mutable Iterator<T>,
-  mutable isPassedFirstValue: Bool = false,
+  mutable isPastFirstValue: Bool = false,
 ) extends FileIterator<T> {
   mutable fun next(): ?T {
-    if (this.isPassedFirstValue) return this.iter.next();
-    this.!isPassedFirstValue = true;
-    Some(this.first)
+    if (this.isPastFirstValue) {
+      this.iter.next()
+    } else {
+      this.!isPastFirstValue = true;
+      Some(this.first)
+    }
   }
 
   readonly fun isEmpty(): Bool {
@@ -82,18 +85,14 @@ mutable class NonEmptyIterator<+T>(
     err: () -> void = () ->
       invariant_violation("Expected an iterator with only one element"),
   ): void {
-    if (this.isPassedFirstValue) {
+    if (this.isPastFirstValue) {
       invariant_violation(
         "Cannot use assertUnique on an iterator that has already been used",
       )
     };
-    this.next() match {
+    this.iter.next() match {
     | None() -> void
-    | Some _ ->
-      this.next() match {
-      | None() -> this.!isPassedFirstValue = false
-      | Some _ -> err()
-      }
+    | Some _ -> err()
     }
   }
 }
