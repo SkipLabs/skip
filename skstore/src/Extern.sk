@@ -151,6 +151,9 @@ fun writerRemove(
 
 @export("SKIP_SKStore_iteratorFirst")
 fun iteratorFirst(values: mutable NonEmptyIterator<JSONFile>): SKJSON.CJSON {
+  if (values.isPastFirstValue) {
+    throw Error("`first` can't be called after `next` on a NonEmptyIterator")
+  };
   values.first.value
 }
 

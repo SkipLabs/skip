@@ -1,3 +1,9 @@
+/**
+ * This file contains the SKStore public API: types, interfaces, and operations that can be
+ * used to specify and interact with reactive computations. See [todo: pointer to public
+ * overview page] for a detailed description and introduction to the SKStore system.
+ */
+
 // prettier-ignore
 import type {App, Opt, Shared, float, int, ptr} from "#std/sk_types.js";
 import type { JSONObject, TJSON } from "./skstore_skjson.js";
@@ -8,6 +14,8 @@ export type TTableHandle = any;
 export type TTable = any;
 
 export type DBType = "TEXT" | "JSON" | "INTEGER" | "FLOAT" | "SCHEMA";
+
+// `filter` is interpreted as a SQL "where" clause
 export type DBFilter = { filter: string; params?: JSONObject };
 export type ColumnSchema = {
   name: string;
@@ -29,10 +37,15 @@ export type Metadata = {
 };
 
 /**
- * Type return by an async function call
- * payload - The valuable data a the type
- * metadata - An optional data that can be added to specify further information about data
- *            such as freshness.
+ * SKStore async function calls return a `Result` value which is one of `Success`,
+ * `Failure`, or `Unchanged`
+ */
+
+/**
+ * A `Success` return value indicates successful function evaluation and contains:
+ * `payload`: the function return value
+ * `metadata`: optional data that can be added to specify further information
+               about data such as source location.
  */
 export type Success<V extends TJSON, M extends TJSON> = {
   status: "success";
@@ -41,8 +54,8 @@ export type Success<V extends TJSON, M extends TJSON> = {
 };
 
 /**
- * Type return by an async function call in case of error
- * error - The error message
+ * A `Failure` return value indicates a runtime error and contains:
+ * `error` - the error message associated with the error
  */
 export type Failure = {
   status: "failure";
@@ -50,9 +63,9 @@ export type Failure = {
 };
 
 /**
- * Type return by an async function call if a data is the same (for exemple '304 Not Modified' code for http)
- * payload - The valuable data a the type
- * metadata - An optional data that can be added to update metadata of current unmodified value.
+ * An `Unchanged` return value indicates that the data is the same as the last invocation,
+ * and is analogous to HTTP response code 304 'Not Modified'.  It contains:
+ * `metadata` - optional data that can be added to supersede metadata on the unchanged return value
  */
 export type Unchanged<M extends TJSON> = {
   status: "unchanged";
@@ -65,8 +78,16 @@ export type Result<V extends TJSON, M extends TJSON> =
   | Unchanged<M>;
 
 /**
- * Type return by an async lazy reactive handle when the a new call has been performed.
- * previous - The value of the previous call if exist.
+ * Lazy function calls carry additional structure in their `Loadable` return types, to
+ * indicate that computation is in progress or record information about previous values;
+ * the `Success` case is the same as for non-lazy calls, or the result can be `Loading`
+ * or `Error`.
+ */
+
+/**
+ * A `Loading` return value indicates that a new call has been performed, but its result
+ * is not yet available.  It contains:
+ * `previous` - the return value of the previous successful call, if available
  */
 export type Loading<V extends TJSON, M extends TJSON> = {
   status: "loading";
@@ -74,9 +95,10 @@ export type Loading<V extends TJSON, M extends TJSON> = {
 };
 
 /**
- * Type return by an async lazy reactive handle an error occurs.
- * error - The error message
- * previous - The value of the previous call if exist.
+ * An `Error` return value indicates that a runtime error occurred during a lazy function
+ * call.  It contains:
+ * `error` - the error message associated with the error
+ * `previous` - the return value of the previous successful call, if available
  */
 export type Error<V extends TJSON, M extends TJSON> = {
   status: "failure";
@@ -103,15 +125,15 @@ export interface Handles {
 }
 
 /**
- * An error thrown when an index is not found during table lookup
+ * Error thrown when an index is not found during table lookup
  */
 export class TableIndexError extends Error {}
 
 /**
- * The table entry mapper function
- * @param entry - the table entry to manage
- * @param occ - the occurence of entry in the table
- * @returns {Iterable} an iterable of Key, Value pair the depends on the entry
+ * The type of a reactive function mapping over a table.
+ * @param entry - the input table row
+ * @param occ - the number of repeat occurrences of `entry`
+ * @returns {Iterable} an iterable of key/value pairs to output for the given input(s)
  */
 export type EntryMapper<R extends TJSON, K extends TJSON, V extends TJSON> = (
   entry: R,
@@ -119,10 +141,12 @@ export type EntryMapper<R extends TJSON, K extends TJSON, V extends TJSON> = (
 ) => Iterable<[K, V]>;
 
 /**
- * The handle entry mapper function
- * @param key - the mapped handle entry key
- * @param {NonEmptyIterator} it - an iterator on values avalable for a key
- * @returns {Iterable} an iterable of Key, Value pair that depends on the entry
+ * The type of a reactive function mapping over an arbitrary collection.
+ * For each key & values in the input collection (of type K1/V1 respectively),
+ * produces some key/value pairs for the output collection (of type K2/V2 respectively)
+ * @param key - a key found in the input collection
+ * @param {NonEmptyIterator} it - the values mapped to by `key` in the input collection
+ * @returns {Iterable} an iterable of key/value pairs to output for the given input(s)
  */
 export type Mapper<
   K1 extends TJSON,
@@ -143,34 +167,34 @@ export type OutputMapper<R extends TJSON, K extends TJSON, V extends TJSON> = (
 ) => R;
 
 /**
- * The Accumulator
+ * The type of a reactive accumulator (a.k.a. reducer) function, which computes an output
+ * value over a collection as values are added/removed to the collection
  */
 export interface Accumulator<T extends TJSON, V extends TJSON> {
-  /** The default value of the accumulator */
   default: Opt<V>;
   /**
-   * The computation the perform when a value is added the a reactive map
+   * The computation to perform when an input value is added
    * @param acc - the current accumulated value
-   * @param value - the value to accumulale
-   * @return The resulting acculated value
+   * @param value - the added value
+   * @return the resulting accumulated value
    */
   accumulate(acc: Opt<V>, value: T): V;
   /**
-   * The computation the perform when a value is removed from a reactive map
+   * The computation to perform when an input value is removed
    * @param acc - the current accumulated value
-   * @param value - the value to dismiss
-   * @return The resulting acculated value
+   * @param value - the removed value
+   * @return the resulting accumulated value
    */
   dismiss(acc: V, value: T): Opt<V>;
 }
 
 /**
- * A Iterator that have at least one object
+ * A mutable iterator with at least one element
  */
 export interface NonEmptyIterator<T> {
   /**
-   * Returns the next element in the iteration.
-   *   first() cannot be call after this call
+   * Return the next element of the iteration.
+   *   `first` cannot be called after `next`
    */
   next: () => Opt<T>;
   /**
@@ -180,7 +204,7 @@ export interface NonEmptyIterator<T> {
   first: () => T;
 
   /**
-   * Returns the first element of the iteration if it's unique.
+   * Returns the first element of the iteration iff it contains exactly one element
    */
   uniqueValue: () => Opt<T>;
 
@@ -191,48 +215,47 @@ export interface NonEmptyIterator<T> {
 }
 
 /**
- * An handle to access to value of a lazy reactive map
+ * A _Lazy_ Handle on a reactive collection, whose values are computed only when queried
+ * using `get`
  */
 export interface LHandle<K, V> {
   /**
-   * Get/Compute a value of a lazy reactive map
-   * @param key - the key of the to get
+   * Get (and potentially compute) a value of a lazy reactive collection
+   * @throws {Error} when the key does not exist
    */
   get(key: K): V;
 }
 
 /**
- * An handle to act on an eager reactive map
+ * An _Eager_ handle on a reactive collection, whose values are computed eagerly as
+ * inputs grow/change
  */
 export interface EHandle<K extends TJSON, V extends TJSON> {
   /**
-   * Get a value of a eager reactive map
-   * @param key - the key of the to get
-   * @returns the value corresponding to the key
-   * @throws {Error} when key not exist
+   * Get a value of an eager reactive collection
+   * @throws {Error} when the key does not exist
    */
   get(key: K): V;
   /**
-   * Get a value of a eager reactive map if exist
-   * @param key - the key of the to get
-   * @returns the value corresponding to the key if exist else null
+   * Get a value of an eager reactive collection, if it exists
+   * @returns the value for this `key`, or null if no such value exists
    */
   maybeGet(key: K): Opt<V>;
 
   /**
-   * Map over each eager reative map entry and apply mapper function
-   * @param {Mapper} mapper - function to apply to the table entry
-   * @returns {EHandle} The the resulting eager reactive map handle
+   *  Create a new eager reactive collection by mapping some computation over this one
+   * @param {Mapper} mapper - function to apply to each element of this collection
+   * @returns {EHandle} An eager handle on the resulting output collection
    */
   map<K2 extends TJSON, V2 extends TJSON>(
     mapper: Mapper<K, V, K2, V2>,
   ): EHandle<K2, V2>;
   /**
-   * Map over each eager reative map entry and apply mapper function
-   *  then reduce the when the given accumulator
-   * @param {Mapper} mapper - function to apply to the eager map entry
-   * @param {Accumulator} accumulator - reduction manager
-   * @returns {EHandle} The the resulting eager reactive map handle
+   * Create a new eager reactive collection by mapping some computation `mapper` over this
+   * one and then reducing the results with `accumulator`
+   * @param {Mapper} mapper - function to apply to each element of this collection
+   * @param {Accumulator} accumulator - function to combine results of the `mapper`
+   * @returns {EHandle} An eager handle on the output of the `accumulator`
    */
   mapReduce<K2 extends TJSON, V2 extends TJSON, V3 extends TJSON>(
     mapper: Mapper<K, V, K2, V2>,
@@ -240,13 +263,14 @@ export interface EHandle<K extends TJSON, V extends TJSON> {
   ): EHandle<K2, V3>;
 
   /**
-   * Access the reactive size of the reactive eager map
+   * The current number of elements in the collection
    */
   size: () => number;
 
   /**
-   * Map over each eager reative map entry to write it into given table
-   * @param {Mapper} mapper - function to apply to the table entry
+   * Eagerly write/update `table` with the contents of this collection
+   * @param {Mapper} mapper - function to apply to each key/value pair in this collection
+   *                          to produce a table row
    */
   mapTo<R extends TJSON[]>(
     table: TableHandle<R>,
@@ -256,10 +280,8 @@ export interface EHandle<K extends TJSON, V extends TJSON> {
   getId(): string;
 }
 
+/** An eager handle on a Table */
 export interface TableHandle<R extends TJSON[]> {
-  /**
-   * @returns {string} The name of the table
-   */
   getName(): string;
   /**
    * Lookup in the table using specified index
@@ -272,33 +294,38 @@ export interface TableHandle<R extends TJSON[]> {
   // TODO get(key: TJSON, index?: string): R[];
 
   /**
-   * Map over each table entry and apply mapper function
-   * @param {EntryMapper} mapper - function to apply to the table entry
-   * @returns {EHandle} The the resulting eager reactive map handle
+   * Create a new eager reactive collection by mapping over each table entry
+   * @returns {EHandle} An eager handle on the resulting collection
    */
   map<K extends TJSON, V extends TJSON>(
     mapper: EntryMapper<R, K, V>,
   ): EHandle<K, V>;
 }
 
+/**
+ * This interface supports SQL-like operations accessing and/or mutating the data in a
+ * collection.  These operations are available only on collections which satisfy certain
+ * structural constraints, such as those produced by `mapTo`.
+ */
 export interface Table<R extends TJSON[]> {
   getName(): string;
   /**
-   * Insert an entry in the table
-   * @param entries - the entries to insert in the table
-   * @param update - indicate if the value need to be updated in case of index conflict
-   * @throws {Error} when not update and an index contraints is broken
+   * Insert an entry (or entries) into the table
+   * @param entries - The new data to insert
+   * @param update - If true, update the existing row in case of index conflict
+   * @throws {Error} in case of index conflict (when `update` is false) or constraint
+   *         violation
    */
   insert(entry: R[], update?: boolean): void;
   /**
    * Update an entry in the table
    * @param row - the table entry to update
    * @param updates - the column values updates
-   * @throws {Error} when an index contraints is broken
+   * @throws {Error} when the updates violate an index or other contraint
    */
   update(row: R, updates: JSONObject): void;
   /**
-   * Update an entry in the table
+   * Update entries in the table matching some `where` clause
    * @param where - the column values to filter entries
    * @param updates - the column values updates
    * @throws {Error} when an index contraints is broken
@@ -307,28 +334,31 @@ export interface Table<R extends TJSON[]> {
   /**
    * Select entries in the table
    * @param where - the column values to filter entries
+   * @param columns - the columns to include in the output; include all by default
    * @throws {Error} when an index contraints is broken
    */
   select(where: JSONObject, columns?: string[]): JSONObject[];
   /**
-   * Delete an entry in the table
-   * @param entry - the entry to delete from the table
+   * Delete an entry from the table
+   * @param entry - the entry to delete
    */
   delete(entry: R): void;
   /**
-   * Delete entries in the table
+   * Delete entries from the table matching some `where` clause.
    * @param where - the column values to filter entries
    */
   deleteWhere(where: JSONObject): void;
   /**
-   * Add a watch to the table
-   * @param update - the function to call on table update
+   * Register a callback to be invoked on the `rows` of this table whenever data changes
+   * @param update - the callback to invoke when data changes
+   * @returns a callback `close` to terminate and clean up the watch
    */
   watch: (update: (rows: JSONObject[]) => void) => { close: () => void };
   /**
-   * Add a watch changes to the table
-   * @param init - the function to call on table init/reset
-   * @param update - the function to call on table update
+   * Register a callback to be invoked on the `added` and `removed` rows of this table
+   * whenever data changes
+   * @param init - a callback to invoke on table initialization and reset
+   * @param update - the callback to invoke on changes
    */
   watchChanges: (
     init: (rows: JSONObject[]) => void,
@@ -336,6 +366,9 @@ export interface Table<R extends TJSON[]> {
   ) => { close: () => void };
 }
 
+/**
+ * A `Mapping` is an edge in the reactive computation graph, specified by an eager source handle together with a `Mapper` function
+ */
 export type Mapping<
   K1 extends TJSON,
   V1 extends TJSON,
@@ -360,13 +393,14 @@ export interface SKStoreFactory extends Shared {
 export interface SKStore {
   /**
    * Creates a lazy reactive map
-   * @param {Lazy} compute - the lazy function to compute lazy map entry
+   * @param {Lazy} compute - the lazy function to compute entries of the lazy map
    * @returns {LHandle} The the resulting lazy reactive map handle
    */
   lazy<K extends TJSON, V extends TJSON>(compute: Lazy<K, V>): LHandle<K, V>;
+
   /**
    * Map over each entry of each eager reative map and apply the corresponding mapper function
-   * @param {Mapping} mappings - the handles to combine
+   * @param {Mapping[]} mappings - the handles to combine
    * @returns {EHandle} The the resulting eager reactive map handle
    */
   multimap<
