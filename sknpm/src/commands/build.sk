@@ -34,7 +34,8 @@ fun build(): (
         Cli.Arg::string("html").about(
           "Build minimal html support for specified launcher",
         ),
-      ),
+      )
+      .arg(Cli.Arg::bool("nowasm").about("Do not build wasm file")),
     (gctx, args) ~> execCommand(gctx, args, execBuild),
   )
 }
@@ -43,10 +44,11 @@ fun doBuild(
   brunner: BuildRunner,
   args: Cli.ParseResults,
   test: Bool = false,
+  nowasm: Bool = false,
 ): Result<(String, Package), void> {
   ws = brunner.bctx.ws;
   gctx = brunner.bctx.gctx;
-  skargo(args, test, gctx.console)?;
+  if (!nowasm) skargo(args, test, gctx.console)?;
   root = ws.package.manifest.package_id.source_id.url;
   name = ws.package.manifest.package_id.name;
   package = Package::create(root, name, gctx.console)?;
@@ -59,7 +61,7 @@ fun execBuild(
   brunner: BuildRunner,
   args: Cli.ParseResults,
 ): Result<void, void> {
-  (npmDir, _) = doBuild(brunner, args)?;
+  (npmDir, _) = doBuild(brunner, args, false, args.getBool("nowasm"))?;
   args.maybeGetString("html") match {
   | Some(launcher) ->
     writeIndex(npmDir, launcher);
