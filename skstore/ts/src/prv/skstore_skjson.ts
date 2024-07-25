@@ -12,10 +12,6 @@ export enum Type {
   Object,
 }
 
-export type JSONObject = { [key: string]: TJSON };
-
-export type TJSON = number | JSONObject | boolean | TJSON[] | string;
-
 interface WasmAccess {
   SKIP_SKJSON_typeOf: (json: ptr) => int;
   SKIP_SKJSON_asInt: (json: ptr) => int;

@@ -1,11 +1,10 @@
 // prettier-ignore
-import { type ptr, type Opt, type App, metadata } from "#std/sk_types.js";
-import type { JSONObject, TJSON } from "skstore_skjson.js";
+import { type ptr, type Opt, metadata } from "#std/sk_types.js";
+import type { Context } from "./skstore_types.js";
 import type {
   Accumulator,
   EHandle,
   LHandle,
-  Context,
   Mapper,
   OutputMapper,
   TableHandle,
@@ -18,10 +17,12 @@ import type {
   Table,
   Loadable,
   AValue,
-} from "./skstore_api.js";
+  JSONObject,
+  TJSON,
+} from "../skstore_api.js";
 
 // prettier-ignore
-import type { MirrorDefn, Params, SKDBShared, SKDBSync } from "#skdb/skdb_types.js";
+import type { MirrorDefn, Params, SKDBSync } from "#skdb/skdb_types.js";
 
 type Query = { query: string; params?: JSONObject };
 
@@ -301,24 +302,30 @@ export class SKStoreImpl implements SKStore {
 export class SKStoreFactoryImpl implements SKStoreFactory {
   private context: () => Context;
   private create: (init: () => void) => void;
+  private createSync: (
+    dbName?: string,
+    asWorker?: boolean,
+  ) => Promise<SKDBSync>;
 
-  constructor(context: () => Context, create: (init: () => void) => void) {
+  constructor(
+    context: () => Context,
+    create: (init: () => void) => void,
+    createSync: (dbName?: string, asWorker?: boolean) => Promise<SKDBSync>,
+  ) {
     this.context = context;
     this.create = create;
+    this.createSync = createSync;
   }
 
   getName = () => "SKStore";
 
   runSKStore = async (
     init: (skstore: SKStore, ...tables: TableHandle<TJSON[]>[]) => void,
-    app: App,
     tablesSchema: MirrorSchema[],
     connect: boolean = true,
   ): Promise<Table<TJSON[]>[]> => {
     let context = this.context();
-    let skdb = await (
-      app.environment.shared.get("SKDB") as SKDBShared
-    ).createSync();
+    let skdb = await this.createSync();
     const tables = mirror(context, skdb, connect, ...tablesSchema);
     const skstore = new SKStoreImpl(context);
     this.create(() => init(skstore, ...tables));
