@@ -340,7 +340,7 @@ fun manage(
     FileSystem.readFilesRecursive(
       tsd,
       f -> f.endsWith(".ts"),
-      f -> Path.basename(f) != "node_modules",
+      f -> f != Path.join(tsd, "node_modules") && f != Path.join(tsd, "js"),
     ).each(f ->
       copy(f, Path.join(tsDir, relative(f, tsd).default(Path.basename(f))))
     );
@@ -387,22 +387,23 @@ fun manage(
   jsFiles = FileSystem.readFilesRecursive(
     jsDir,
     f ~> f.endsWith(".js"),
-    _f ~> false,
+    f ~> f != Path.join(jsDir, "node_modules") && f != Path.join(jsDir, "js"),
   );
   mapFiles = FileSystem.readFilesRecursive(
     jsDir,
     f ~> f.endsWith(".map"),
-    _f ~> false,
+    f ~> f != Path.join(jsDir, "node_modules") && f != Path.join(jsDir, "js"),
   );
   declFiles = FileSystem.readFilesRecursive(
     jsDir,
     f ~> f.endsWith(".d.ts"),
-    _f ~> false,
+    f ~> f != Path.join(jsDir, "node_modules") && f != Path.join(jsDir, "js"),
   );
   copyAndConvertImport(
     package.version,
     distDir,
     jsFiles,
+    jsDir,
     () -> {
       if (binaries.size() == 1) {
         return Success(binaries[0].target.name)
@@ -424,18 +425,22 @@ fun manage(
     contents = FileSystem.readTextFile(mapFile);
     res = try {
       json = JSON.decode(contents).expectObject();
-      file = Path.basename(mapFile);
+      file = relative(mapFile, jsDir).default(Path.basename(mapFile));
+      rpd = Path.dirname(file);
       newJS = JSON.Object(
         json.value.map((k, v) ->
           k match {
           | "file" ->
             f = v.expectString().replace(".js", ".mjs");
-            !file = f + ".map";
+            !file = Path.join(rpd, f) + ".map";
             JSON.String(f)
           | "sources" ->
+            start = if (rpd.isEmpty() || rpd == ".") "../src/" else {
+              rpd.split("/").map(_v -> "..").join("/") + "/../src/"
+            };
             JSON.Array(
               v.expectArray().value.map(src ->
-                JSON.String(src.expectString().replace("../", "../src/"))
+                JSON.String(start + src.expectString().replace("../", ""))
               ),
             )
           | _ -> v
@@ -443,6 +448,7 @@ fun manage(
         ),
       );
       jsMapfile = Path.join(distDir, file);
+      checkDir(Path.dirname(jsMapfile));
       FileSystem.writeTextFile(jsMapfile, newJS.toString());
       Success(void)
     } catch {
@@ -453,15 +459,15 @@ fun manage(
     res?
   };
   console.status_verbose("Progress", "Copy types declaration files");
-  declFiles.each(f -> copyToDir(f, distDir));
+  declFiles.each(f -> copyToDir(f, distDir, jsDir));
   srcDir = Path.join(npmDir, "src");
   checkDir(srcDir);
   console.status_verbose("Progress", "Copy source files");
   FileSystem.readFilesRecursive(
     tsDir,
     f -> f.endsWith(".ts"),
-    _f -> false,
-  ).each(f -> copyToDir(f, srcDir));
+    f -> f != Path.join(tsDir, "node_modules") && f != Path.join(tsDir, "js"),
+  ).each(f -> copyToDir(f, srcDir, tsDir));
   console.status_verbose("Progress", "Manage license and package files");
   licenseFile = Path.join(npmDir, "LICENSE");
   FileSystem.writeTextFile(licenseFile, license());
@@ -530,6 +536,7 @@ fun copyAndConvertImport(
   version: Version,
   distDir: String,
   jsFiles: Vector<String>,
+  fromDir: String,
   binary: () -> Result<String, void>,
   console: Skargo.Console,
 ): Result<void, void> {
@@ -548,13 +555,18 @@ fun copyAndConvertImport(
   tmplFiles = mutable Vector[];
   for (f in jsFiles) {
     saved = SKStore.newObstack();
+    rp = relative(f, fromDir).default(Path.basename(f));
+    rpd = Path.dirname(rp);
+    start = if (rpd.isEmpty() || rpd == ".") "." else {
+      rpd.split("/").map(_v -> "..").join("/")
+    };
     optLoaderFile: ?String = None();
     optModuleFile: ?String = None();
     optRuntimeFile: ?String = None();
     jsBasename = Path.basename(f);
     mjsBasename = jsBasename.replace(".js", ".mjs");
-    jsSourceMapping = `${sourceMappingPrefix}${jsBasename}.map`;
-    mjsSourceMapping = `${sourceMappingPrefix}${mjsBasename}.map`;
+    jsSourceMapping = `${sourceMappingPrefix}${rpd}${jsBasename}.map`;
+    mjsSourceMapping = `${sourceMappingPrefix}${rpd}${mjsBasename}.map`;
     contents = FileSystem.readTextFile(f);
     withInit = false;
     withLoader = false;
@@ -571,7 +583,9 @@ fun copyAndConvertImport(
             elems = imported[1].split("/");
             size = elems.size();
             if (size > 1 && elems[0].startsWith("#")) {
-              !elems = elems.mapWithIndex((idx, v) -> if (idx == 0) "." else v);
+              !elems = elems.mapWithIndex((idx, v) ->
+                if (idx == 0) start else v
+              );
               !line = `${elements[0]} from "${elems.join("/")}"`
             }
           }
@@ -591,27 +605,26 @@ fun copyAndConvertImport(
       };
       line;
     });
-    tf = Path.join(distDir, mjsBasename);
+    rtf = Path.join(rpd, mjsBasename);
+    tf = Path.join(distDir, rtf);
     if (
       i(withInit) + i(withLoader) + i(withRuntime) + i(optCategory.isSome()) >
       1
     ) {
       console.error(
-        `The file ${Path.basename(f).replace(
-          ".js",
-          ".ts",
-        )} cannot have multiple behaviors.`,
+        `The file ${rtf.replace(".js", ".ts")} cannot have multiple behaviors.`,
       );
       return Failure(void)
     };
     if (withInit) {
-      !optModuleFile = Some(Path.basename(tf));
+      !optModuleFile = Some(rtf);
     } else if (withLoader) {
-      !optLoaderFile = Some(Path.basename(tf));
+      !optLoaderFile = Some(rtf);
     } else if (withRuntime) {
       invariant(runtime.isEmpty(), "Multiple runtime defined");
-      !optRuntimeFile = Some(Path.basename(tf));
+      !optRuntimeFile = Some(rtf);
     };
+    checkDir(Path.dirname(tf));
     copied = if (!withTmpl) {
       FileSystem.writeTextFile(tf, lines.join("\n"));
       SKStore.destroyObstackWithValue(
@@ -636,7 +649,7 @@ fun copyAndConvertImport(
   saved = SKStore.newObstack();
   modules = mutable Vector[];
   importLine = m -> {
-    mName = m.split(".", 2)[0];
+    mName = Path.basename(m).split(".", 2)[0];
     modules.push(mName);
     `import {init as ${mName}} from "./${m}";`
   };
