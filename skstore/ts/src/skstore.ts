@@ -1,6 +1,5 @@
 // prettier-ignore
 import { runUrl, type ModuleInit } from "#std/sk_types.js";
-// prettier-ignore
 import type {
   SKStore,
   Accumulator,
@@ -11,10 +10,10 @@ import type {
   TableHandle,
   Table,
   TTableHandle,
-  TTable
+  TTable,
+  TJSON,
+  JSONObject,
 } from "./skstore_api.js";
-
-import type { TJSON, JSONObject } from "./skstore_skjson.js";
 
 export type {
   SKStore,
@@ -77,7 +76,7 @@ export async function createSKStore(
 ): Promise<Table<TJSON[]>[]> {
   let data = await runUrl(wasmUrl, modules, [], "SKDB_factory");
   const factory = data.environment.shared.get("SKStore") as SKStoreFactory;
-  return factory.runSKStore(init, data, tables, connect);
+  return factory.runSKStore(init, tables, connect);
 }
 
 export function integer(

@@ -1,19 +1,19 @@
 // prettier-ignore
 import type { int, ptr, Links, Utils, ToWasmManager, Environment, Opt, Metadata } from "#std/sk_types.js";
-import type { TJSON, SKJSON } from "skstore_skjson.js";
+import type { SKJSON } from "./skstore_skjson.js";
 import type {
   Accumulator,
   NonEmptyIterator,
-  Handles,
-  Context,
-  FromWasm,
   Mapper,
   EntryMapper,
   Mapping,
   Result,
   AValue,
   LHandle,
-} from "./skstore_api.js";
+  TJSON,
+} from "../skstore_api.js";
+
+import type { Handles, Context, FromWasm } from "./skstore_types.js";
 import { LSelfImpl, SKStoreFactoryImpl } from "./skstore_impl.js";
 // prettier-ignore
 import type { SKDBShared } from "#skdb/skdb_types.js";
@@ -364,7 +364,7 @@ interface ToWasm {
     occ: int,
   ): void;
   SKIP_SKStore_applyConvertToRowFun(fn: int, key: ptr, it: ptr): ptr;
-  SKIP_SKStore_init(builder: ptr): void;
+  SKIP_SKStore_init(context: ptr): void;
   SKIP_SKStore_applyLazyFun(fn: int, context: ptr, self: ptr, key: ptr): ptr;
   SKIP_SKStore_applyParamsFun(fn: int, context: ptr, key: ptr): ptr;
   SKIP_SKStore_applyLazyAsyncFun(
@@ -423,7 +423,7 @@ class LinksImpl implements Links {
     key: ptr,
     param: ptr,
   ) => void;
-  init!: (builder: ptr) => void;
+  init!: (context: ptr) => void;
   applyAccumulate!: (fn: int, acc: ptr, value: ptr) => ptr;
   applyDismiss!: (fn: int, acc: ptr, value: ptr) => Opt<ptr>;
   getErrorHdl!: (exn: ptr) => number;
@@ -560,8 +560,8 @@ class LinksImpl implements Links {
             reason instanceof Error
               ? reason.message
               : typeof reason == "string"
-              ? reason
-              : JSON.stringify(reason);
+                ? reason
+                : JSON.stringify(reason);
           register({ status: "failure", error: msg });
         });
     };
@@ -587,8 +587,8 @@ class LinksImpl implements Links {
       ref.pop();
       return res;
     };
-    this.init = (builder: ptr) => {
-      ref.push(builder);
+    this.init = (context: ptr) => {
+      ref.push(context);
       if (!this.initFn)
         throw new Error("SKStore init function must be defined");
       this.initFn();
@@ -636,6 +636,11 @@ class LinksImpl implements Links {
       new SKStoreFactoryImpl(
         () => new ContextImpl(skjson(), fromWasm, this.handles, ref),
         create,
+        (dbName, asWorker) =>
+          (this.env.shared.get("SKDB") as SKDBShared).createSync(
+            dbName,
+            asWorker,
+          ),
       ),
     );
   };
@@ -667,7 +672,7 @@ class Manager implements ToWasmManager {
     ) => links.applyMapTableFun(fn, context, writer, row, occ);
     toWasm.SKIP_SKStore_applyConvertToRowFun = (fn: int, key: ptr, it: ptr) =>
       links.applyConvertToRowFun(fn, key, it);
-    toWasm.SKIP_SKStore_init = (builder: ptr) => links.init(builder);
+    toWasm.SKIP_SKStore_init = (context: ptr) => links.init(context);
     toWasm.SKIP_SKStore_applyLazyFun = (fn, context, self, key) =>
       links.applyLazyFun(fn, context, self, key);
 
