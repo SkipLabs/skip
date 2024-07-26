@@ -7,6 +7,8 @@ git diff --quiet HEAD $(git merge-base main HEAD) -- skfs/ compiler/runtime/
 skfs=$?
 git diff --quiet HEAD $(git merge-base main HEAD) -- sql/ sqlparser/ skbuild/
 skdb=$?
+git diff --quiet HEAD $(git merge-base main HEAD) -- sknpm/
+sknpm=$?
 
 cat .circleci/base.yml
 
@@ -42,6 +44,14 @@ then
   skdb:
     jobs:
       - skdb
+EOF
+fi
+
+if (( $skdb != 0 || $skfs != 0 || $sknpm != 0))
+then
+    cat <<EOF
+  skdb-wasm:
+    jobs:
       - skdb-wasm
 EOF
 fi
