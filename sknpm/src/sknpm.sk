@@ -310,13 +310,18 @@ fun manage(
   binaries = optBinary match {
   | Some(v) -> Vector[v.i0]
   | _ ->
-    units.filter(u ->
-      (u.target.kind is Skargo.BinTarget _) &&
-        u.arch match {
-        | Skargo.TargetArchHost() -> false
-        | Skargo.TargetArchTriple(t) -> t.isWasm32()
-        }
-    )
+    units.filter(u -> {
+      u.arch match {
+      | Skargo.TargetArchTriple(t) if (t.isWasm32()) -> void
+      | _ -> return false
+      };
+      u.target.kind match {
+      | Skargo.BinTarget _
+      | Skargo.LibTarget(Skargo.LibraryTypeCdylib()) ->
+        true
+      | _ -> false
+      }
+    })
   };
   distDir = Path.join(npmDir, "dist");
   checkDir(distDir);
@@ -414,8 +419,16 @@ fun manage(
     console,
   )?;
   for (bin in binaries) {
-    wasmFile = Path.join(target_dir, bin.target.name + ".wasm");
-    copy(wasmFile, distDir)
+    bin.target.kind match {
+    | Skargo.LibTarget(Skargo.LibraryTypeCdylib()) ->
+      binName = bin.pkg.name();
+      wasmFile = Path.join(target_dir, `lib${binName}.so`);
+      distFile = Path.join(distDir, binName + ".wasm");
+      copy(wasmFile, distFile)
+    | _ ->
+      wasmFile = Path.join(target_dir, bin.target.name + ".wasm");
+      copy(wasmFile, distDir)
+    }
   };
   console.status_verbose(
     "Progress",
@@ -482,22 +495,24 @@ fun manage(
     "sideEffects" => JSON.Bool(package.sideEffects),
   ];
 
+  getName = (u) -> {
+    u.target.kind match {
+    | Skargo.LibTarget(Skargo.LibraryTypeCdylib()) -> u.pkg.name()
+    | _ -> u.target.name
+    }
+  };
+
   if (binaries.size() == 1) {
-    binName = optBinName.default(binaries[0].target.name);
+    binName = optBinName.default(getName(binaries[0]));
     npmPackage.add("main", JSON.String(`./dist/${binName}.mjs`));
     npmPackage.add("types", JSON.String(`./dist/${binName}.d.ts`));
   } else {
     exports = mutable Map[];
     typesVersions = mutable Map[];
     for (bin in binaries) {
-      exports.add(
-        `./${bin.target.name}`,
-        JSON.String(`./dist/${bin.target.name}.mjs`),
-      );
-      typesVersions.add(
-        `./${bin.target.name}`,
-        JSON.String(`./dist/${bin.target.name}.d.ts`),
-      );
+      binName = getName(bin);
+      exports.add(`./${binName}`, JSON.String(`./dist/${binName}.mjs`));
+      typesVersions.add(`./${binName}`, JSON.String(`./dist/${binName}.d.ts`));
     };
     npmPackage.add("exports", JSON.Object(exports.chill()));
     npmPackage.add("typesVersions", JSON.Object(typesVersions.chill()));
