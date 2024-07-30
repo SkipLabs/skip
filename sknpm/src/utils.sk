@@ -105,44 +105,60 @@ fun tsConfig(deps: Vector<String>): String {
   stream.join("")
 }
 
-fun copyToDir(tsFile: String, dir: String): void {
+fun copyToDir(
+  tsFile: String,
+  dir: String,
+  fromDir: String,
+  optConsole: ?Skargo.Console = None(),
+): void {
+  cmd = Array["copyToDir", tsFile, dir];
+  optConsole.each(console -> console.status_verbose("Command", cmd.join(" ")));
   contents = FileSystem.readTextFile(tsFile);
-  target = Path.join(dir, Path.basename(tsFile));
-  lines = contents.split("\n").map(line -> {
-    if (
-      line.startsWith("import ") ||
-      line.startsWith("export {") ||
-      line.startsWith("export type {")
-    ) {
-      elements = line.split(" from ");
-      if (elements.size() == 2) {
-        imported = elements[1].split("\"");
-        if (imported.size() == 3) {
-          elems = imported[1].split("/");
-          size = elems.size();
-          if (size > 1 && elems[0].startsWith("#")) {
-            !elems = elems.mapWithIndex((idx, v) -> if (idx == 0) "." else v);
-            !line = `${elements[0]} from "${elems.join("/")}"`
+  relative(tsFile, fromDir).each(rp -> {
+    rpd = Path.dirname(rp);
+    start = if (rpd.isEmpty() || rpd == ".") "." else {
+      rpd.split("/").map(_v -> "..").join("/")
+    };
+    target = Path.join(dir, rp);
+    lines = contents.split("\n").map(line -> {
+      if (
+        line.startsWith("import ") ||
+        line.startsWith("export {") ||
+        line.startsWith("export type {")
+      ) {
+        elements = line.split(" from ");
+        if (elements.size() == 2) {
+          imported = elements[1].split("\"");
+          if (imported.size() == 3) {
+            elems = imported[1].split("/");
+            size = elems.size();
+            if (size > 1 && elems[0].startsWith("#")) {
+              !elems = elems.mapWithIndex((idx, v) ->
+                if (idx == 0) start else v
+              );
+              !line = `${elements[0]} from "${elems.join("/")}"`
+            }
           }
         }
-      }
-    } else {
-      indexOf(line, "import(\"#") match {
-      | Some(index) ->
-        indexOf(line, "/", index) match {
-        | Some(end) ->
-          prefix = line.take(index);
-          siter = line.getIter().drop(end);
-          suffix = line.substring(siter);
-          !line = `${prefix}import(\".${suffix}`
+      } else {
+        indexOf(line, "import(\"#") match {
+        | Some(index) ->
+          indexOf(line, "/", index) match {
+          | Some(end) ->
+            prefix = line.take(index);
+            siter = line.getIter().drop(end);
+            suffix = line.substring(siter);
+            !line = `${prefix}import(\".${suffix}`
+          | _ -> void
+          }
         | _ -> void
         }
-      | _ -> void
-      }
-    };
-    line;
+      };
+      line;
+    });
+    checkDir(Path.dirname(target));
+    FileSystem.writeTextFile(target, lines.join("\n"));
   });
-  FileSystem.writeTextFile(target, lines.join("\n"));
 }
 
 fun i(v: Bool): Int {
@@ -150,6 +166,7 @@ fun i(v: Bool): Int {
 }
 
 fun copy(src: String, dst: String, optConsole: ?Skargo.Console = None()): void {
+  checkDir(Path.dirname(dst));
   cmd = Array["cp", src, dst];
   optConsole.each(console -> console.status_verbose("Command", cmd.join(" ")));
   _ = System.subprocess(cmd).fromSuccess();
