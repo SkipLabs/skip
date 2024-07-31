@@ -10,7 +10,7 @@ This allows to use the main features of SKStore (ie eager map, lazy compute)
 To run it run:
 
 ```
-cd .. && make exrun-sheet
+make bunrun-sheet
 ```
 
 A promp appears:

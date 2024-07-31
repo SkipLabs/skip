@@ -6,15 +6,18 @@ import type {
   JSONObject,
   TTableHandle,
   TTable,
+  createSKStore as CreateSKStore,
 } from "skstore";
-import { createSKStore } from "skstore";
 import { Server, type ServerOptions } from "socket.io";
 import { createInterface } from "readline";
 import { Command } from "commander";
+import fs from "fs";
+import { resolve } from "path";
 
 export interface ReactiveStorage {
-  initReactiveFlow: (store: SKStore, ...table: TTableHandle[]) => void;
-  schema: () => MirrorSchema[];
+  tablesSchema: () => MirrorSchema[];
+  initSKStore: (store: SKStore, ...table: TTableHandle[]) => void;
+  scenarios: () => Step[][];
 }
 
 type Step = string;
@@ -459,14 +462,15 @@ export class JSONLogger implements WatchListener {
 }
 
 export async function start(
+  createSKStore: typeof CreateSKStore,
   service: ReactiveService,
   storage: ReactiveStorage,
   connect: boolean = true,
 ) {
   try {
     const tables = await createSKStore(
-      storage.initReactiveFlow,
-      storage.schema(),
+      storage.initSKStore,
+      storage.tablesSchema(),
       connect,
     );
     service.run(...tables);
@@ -475,11 +479,7 @@ export async function start(
   }
 }
 
-export async function main(
-  storage: ReactiveStorage,
-  connect: boolean = true,
-  scenarios: Step[][] = [],
-) {
+export async function main(createSKStore: typeof CreateSKStore) {
   const program = new Command();
   program
     .version("0.0.1")
@@ -489,20 +489,48 @@ export async function main(
       "Launch mode (default: noop)",
       "noop",
     )
+    .option("-f,  --file <skstore_file>", "The SKStore example file")
     .option(
       "-p, --port <port>",
       "Port number in socket server mode (default: 3000)",
       "3000",
     )
+    .option("-c, --connect", "Specify if the tables are mirrored", false)
     .parse(process.argv);
+
   const options = program.opts();
+  const file = options.file;
+  if (!file) {
+    console.error("SKStore example file must be specified.");
+    console.log(program.usage());
+    return;
+  }
+  let connect = false;
+  if (typeof options.connect == "string") {
+    connect = options.connect == "true";
+  } else {
+    connect = options.connect ? true : false;
+  }
+
+  if (!fs.existsSync(file)) {
+    console.error("SKStore example file does not exists.");
+    return;
+  }
+  const path = resolve(file);
   try {
+    var storage = (await import(path)) as ReactiveStorage;
     switch (options.mode) {
       case "io":
-        await start(new IOInputService(scenarios), storage, connect);
+        await start(
+          createSKStore,
+          new IOInputService(storage.scenarios()),
+          storage,
+          connect,
+        );
         break;
       case "socket":
         await start(
+          createSKStore,
           new SocketServerService(parseInt(options.port)),
           storage,
           connect,
@@ -510,10 +538,11 @@ export async function main(
         break;
       case "noop":
       default:
-        await start(new NoopService(), storage, connect);
+        await start(createSKStore, new NoopService(), storage, connect);
         break;
     }
-  } catch (e) {
-    throw e;
+  } catch (e: any) {
+    console.error("Invalid SKStore example file.");
+    console.error("\t" + e.message);
   }
 }

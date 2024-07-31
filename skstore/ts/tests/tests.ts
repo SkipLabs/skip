@@ -7,7 +7,13 @@ import type {
   Table,
   JSONObject,
 } from "skstore";
-import { Sum, createSKStore, integer, schema, text } from "skstore";
+import {
+  Sum,
+  createSKStore,
+  cinteger as integer,
+  schema,
+  ctext as text,
+} from "skstore";
 
 function check(name: String, got: TJSON, expected: TJSON): void {
   expect([name, got]).toEqual([name, expected]);
@@ -166,7 +172,7 @@ async function testLazyRun(
 
 //// testMapReduce
 
-async function testMapReduceInit(
+function testMapReduceInit(
   _skstore: SKStore,
   input: TableHandle<[number, number]>,
   output: TableHandle<[number, number]>,
@@ -214,7 +220,7 @@ async function testMapReduceRun(
 
 //// testMultiMap1
 
-async function testMultiMap1Init(
+function testMultiMap1Init(
   skstore: SKStore,
   input1: TableHandle<[number, string]>,
   input2: TableHandle<[number, string]>,
