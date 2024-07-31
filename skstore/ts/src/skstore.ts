@@ -2,8 +2,6 @@
 import { runUrl, type ModuleInit } from "#std/sk_types.js";
 import type {
   SKStore,
-  Accumulator,
-  Opt,
   SKStoreFactory,
   ColumnSchema,
   MirrorSchema,
@@ -13,6 +11,7 @@ import type {
   TTable,
   TJSON,
   JSONObject,
+  Accumulator,
 } from "./skstore_api.js";
 
 export type {
@@ -24,37 +23,19 @@ export type {
   JSONObject,
   TTableHandle,
   TTable,
+  ColumnSchema,
+  Accumulator,
 };
 
-export class Sum implements Accumulator<number, number> {
-  default = 0;
-  accumulate(acc: number, value: number): number {
-    return acc + value;
-  }
-  dismiss(acc: number, value: number): Opt<number> {
-    return acc - value;
-  }
-}
-
-export class Min implements Accumulator<number, number> {
-  default = null;
-  accumulate(acc: Opt<number>, value: number): number {
-    return acc === null ? value : Math.min(acc, value);
-  }
-  dismiss(acc: number, value: number): Opt<number> {
-    return value > acc ? acc : null;
-  }
-}
-
-export class Max implements Accumulator<number, number> {
-  default = null;
-  accumulate(acc: Opt<number>, value: number): number {
-    return acc === null ? value : Math.max(acc, value);
-  }
-  dismiss(acc: number, value: number): Opt<number> {
-    return value < acc ? acc : null;
-  }
-}
+export {
+  Sum,
+  Min,
+  Max,
+  schema,
+  ctext,
+  cinteger,
+  cfloat,
+} from "./skstore_utils.js";
 
 var modules: ModuleInit[];
 /*--MODULES--*/
@@ -77,50 +58,4 @@ export async function createSKStore(
   let data = await runUrl(wasmUrl, modules, [], "SKDB_factory");
   const factory = data.environment.shared.get("SKStore") as SKStoreFactory;
   return factory.runSKStore(init, tables, connect);
-}
-
-export function integer(
-  name: string,
-  primary?: boolean,
-  notnull?: boolean,
-): ColumnSchema {
-  return {
-    name,
-    type: "INTEGER",
-    primary,
-    notnull,
-  };
-}
-
-export function schema(name: string, expected: ColumnSchema[]): MirrorSchema {
-  return {
-    name,
-    expected,
-  };
-}
-
-export function text(
-  name: string,
-  primary?: boolean,
-  notnull?: boolean,
-): ColumnSchema {
-  return {
-    name,
-    type: "TEXT",
-    primary,
-    notnull,
-  };
-}
-
-export function json(
-  name: string,
-  primary?: boolean,
-  notnull?: boolean,
-): ColumnSchema {
-  return {
-    name,
-    type: "JSON",
-    primary,
-    notnull,
-  };
 }

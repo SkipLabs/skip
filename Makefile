@@ -196,31 +196,23 @@ test-bun: npm
 	cp -r build/package/skdb build/bun/node_modules/
 	cd build/bun && bun bun.js true && bun bun.js false
 
-exbuild-%: build/sknpm
-	cd skstore/ts/examples && bun install
-	cd skstore && ../build/sknpm b -r --out-dir ts/examples/node_modules/skstore
+exbuild-%:
+	cd skstore && make build-$*
 
-exrun-%: build/sknpm
-	cd skstore/ts/examples && bun install
-	cd skstore && ../build/sknpm b -r --out-dir ts/examples/node_modules/skstore
-	bun run skstore/ts/examples/$*.ts -m io
+exrun-%:
+	cd skstore && make bunrun-$*
 
-nexrun-%: build/sknpm
-	cd skstore/ts/examples && npm install
-	cd skstore && ../build/sknpm b -r --out-dir ts/examples/node_modules/skstore
-	tsc --project skstore/ts/examples/tsconfig.json
-	cd skstore/ts/examples && node dist/$*.js -m io
+excheck-%:
+	cd skstore && make check-$*
 
-explay-%: build/sknpm
-	cd skstore/ts/examples && bun install
-	cd skstore && ../build/sknpm b -r --out-dir ts/examples/node_modules/skstore
-	echo "play 1\nexit\n" | bun run skstore/ts/examples/$*.ts -m io
+nexrun-%:
+	cd skstore && make noderun-$*
 
-nexplay-%: build/sknpm
-	cd skstore/ts/examples && bun install
-	cd skstore && ../build/sknpm b -r --out-dir ts/examples/node_modules/skstore
-	tsc --project skstore/ts/examples/tsconfig.json
-	cd skstore/ts/examples && echo "play 1\nexit\n" | node dist/$*.js -m io
+explay-%:
+	cd skstore && make bunplay-$*
+
+nexplay-%:
+	cd skstore && make nodeplay-$*
 
 skcheck-%:
 	cd $* && skargo c --profile $(SKARGO_PROFILE)
@@ -244,3 +236,4 @@ test-wasm: tstest-sql
 
 .PHONY: test-skfs
 test-skfs: sktest-prelude
+
