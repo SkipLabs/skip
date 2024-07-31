@@ -560,6 +560,14 @@ fun tsCreateFor(session: String): Float {
   createFor(session)
 }
 
+@export("SKIP_SKStore_create")
+fun tsCreate(): Float {
+  obstack = newObstack();
+  res = createFor(Ksuid::create().toString());
+  SKStore.destroyObstack(obstack);
+  res;
+}
+
 fun previous(value: SKJSON.CJObject): ?SKJSON.CJSON {
   if (SKJSON.getString(value, "status") == Some("success")) {
     Some(SKJSON.filter(value, f ~> f == "playload" || f == "metadata"))
