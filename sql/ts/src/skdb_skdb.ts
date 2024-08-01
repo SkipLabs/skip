@@ -8,6 +8,7 @@ import type {
   SKDBHandle,
   Params,
   SKDBSync,
+  SKDBShared,
 } from "./skdb_types.js";
 import { ExternalFuns, SKDBTable } from "./skdb_util.js";
 import { IDBStorage } from "./skdb_storage.js";
@@ -182,13 +183,16 @@ class SKDBMemory implements PagedMemory {
   }
 }
 
-class SKDBShared implements Shared {
+class SKDBSharedImpl implements SKDBShared {
   getName = () => "SKDB";
   createSync: (dbName?: string, asWorker?: boolean) => Promise<SKDBSync>;
+  notify: () => void;
   constructor(
     createSync: (dbName?: string, asWorker?: boolean) => Promise<SKDBSync>,
+    notify: () => void,
   ) {
     this.createSync = createSync;
+    this.notify = notify;
   }
 
   async create(dbName?: string, asWorker?: boolean) {
@@ -365,7 +369,7 @@ class LinksImpl implements Links, ToWasm {
         query: number,
         encoded_params: number,
       ) => void,
-      queryFun: (queryID: int) => void,
+      queryFun: (queryID: int, init: boolean) => void,
     ) => {
       if (params instanceof Map) {
         params = Object.fromEntries(params);
@@ -375,7 +379,7 @@ class LinksImpl implements Links, ToWasm {
       const freeQueryID = this.freeQueryIDs.pop();
       const queryID = freeQueryID === undefined ? this.queryID++ : freeQueryID;
       this.funLastTick.set(queryID, 0);
-      let userFun = () => queryFun(queryID);
+      let userFun = () => queryFun(queryID, false);
       this.userFuns[queryID] = userFun;
       utils.runWithGc(() => {
         utils.runCheckError(() => {
@@ -386,7 +390,7 @@ class LinksImpl implements Links, ToWasm {
           );
         });
       });
-      userFun();
+      queryFun(queryID, true);
       return {
         close: () => {
           this.userFuns[queryID] = () => {};
@@ -422,14 +426,14 @@ class LinksImpl implements Links, ToWasm {
         query,
         params,
         exported.SKIP_reactive_query_changes,
-        (queryID) => {
+        (queryID, first) => {
           const rows = new SKDBTable(...this.stdout_objects[0]);
           const added = new SKDBTable(...this.stdout_objects[1]);
           const removed = new SKDBTable(...this.stdout_objects[2]);
           const tick = this.stdout_objects[3][0].tick;
           if (added.length > 0 || removed.length > 0) {
             update(added, removed);
-          } else if (rows.length) {
+          } else if (rows.length || first) {
             init(rows);
           }
           this.funLastTick.set(queryID, tick);
@@ -458,7 +462,10 @@ class LinksImpl implements Links, ToWasm {
       handle.init();
       return SKDBSyncImpl.create(handle, this.environment, save);
     };
-    this.environment.shared.set("SKDB", new SKDBShared(createSync));
+    this.environment.shared.set(
+      "SKDB",
+      new SKDBSharedImpl(createSync, this.notifyAllJS),
+    );
   };
 }
 

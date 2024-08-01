@@ -1,6 +1,11 @@
 export type float = number;
 export type int = number;
 export type ptr = number;
+export type ErrorObject = {
+  message: string;
+  stack?: string[];
+  cause?: ErrorObject;
+};
 
 export type Opt<T> = T | null;
 
@@ -35,7 +40,7 @@ class SkRuntimeExit extends Error {
   }
 }
 
-class SkException extends Error {
+class SkError extends Error {
   constructor(msg: string) {
     super(msg);
   }
@@ -158,6 +163,7 @@ export interface Environment {
   encodeUTF8: (str: string) => Uint8Array;
   onException: () => void;
   base64Decode: (base64: string) => Uint8Array;
+  base64Encode: (toEncode: string, url?: boolean) => string;
   fs: () => FileSystem;
   sys: () => System;
   crypto: () => Crypto;
@@ -184,6 +190,7 @@ interface Exported {
   SKIP_initializeSkip: () => void;
   SKIP_skfs_end_of_init: () => void;
   SKIP_callWithException: (fnc: ptr, exc: int) => ptr;
+  SKIP_getExceptionId: (exn: ptr) => ptr;
   SKIP_getExceptionMessage: (skExc: ptr) => ptr;
   SKIP_get_persistent_size: () => int;
   SKIP_get_version: () => number;
@@ -200,6 +207,13 @@ function utf8Encode(str: string): Uint8Array {
   return new TextEncoder().encode(str);
 }
 
+export type Main = (new_args: Array<string>, new_stdin: string) => string;
+
+export type App = {
+  environment: Environment;
+  main: Main;
+};
+
 export class Utils {
   private exports: Exported;
   private env: Environment;
@@ -213,7 +227,8 @@ export class Utils {
   private stderr: Array<string>;
   private stddebug: Array<string>;
   private mainFn?: string;
-  private exceptions: Error[];
+  private exception?: Error;
+  private stacks: Map<ptr, string>;
 
   exit = (code: int) => {
     let message =
@@ -222,7 +237,7 @@ export class Utils {
   };
 
   constructor(exports: WebAssembly.Exports, env: Environment, mainFn?: string) {
-    this.exceptions = [];
+    this.stacks = new Map();
     this.states = new Map();
     this.args = new Array();
     this.current_stdin = 0;
@@ -256,24 +271,13 @@ export class Utils {
     new_stdin: string = "",
   ) => {
     this.args = [this.mainFn ?? "main"].concat(new_args);
-    this.exceptions = [];
+    this.exception = undefined;
+    this.stacks = new Map();
     this.current_stdin = 0;
     this.stdin = utf8Encode(new_stdin);
     this.stdout = new Array();
     this.stderr = new Array();
     this.stddebug = new Array();
-  };
-
-  exnCause = () => {
-    let cause: Error | undefined = undefined;
-    while (this.exceptions.length > 0) {
-      let exc = this.exceptions.pop();
-      if (cause) {
-        (exc as any).cause = cause;
-      }
-      cause = exc;
-    }
-    return cause;
   };
 
   runCheckError = <T>(fn: () => T) => {
@@ -284,7 +288,7 @@ export class Utils {
     }
     if (this.stderr.length > 0) {
       let error = new Error(this.stderr.join(""));
-      (error as any).cause = this.exnCause();
+      (error as any).cause = this.exception;
       throw error;
     }
     return res;
@@ -304,7 +308,8 @@ export class Utils {
       if (exn instanceof SkRuntimeExit) {
         exitCode = exn.code;
       } else {
-        (exn as any).cause = this.exnCause();
+        if (this.exception && this.exception != exn)
+          (exn as any).cause = this.exception;
         throw exn;
       }
     }
@@ -344,7 +349,7 @@ export class Utils {
       }
       message = lines.join("\n");
       let error = new SkRuntimeExit(exitCode, message?.trim());
-      (error as any).cause = this.exnCause();
+      (error as any).cause = this.exception;
       throw error;
     }
     return this.stdout.join("");
@@ -482,21 +487,28 @@ export class Utils {
     this.exports.SKIP_skfs_end_of_init();
   };
   etry = (f: ptr, exn_handler: ptr) => {
+    let err: Error | null = null;
     try {
       return this.call(f);
-    } catch (exn) {
-      this.exceptions.push(exn as Error);
-      let exception =
-        exn instanceof SkException
-          ? null
-          : new Exception(exn as Error, this.state);
+    } catch (exn: any) {
+      if (this.exception && this.exception != exn) exn.cause = this.exception;
+      err = exn as Error;
+      this.exception = err;
+      let exception: Exception | null = null;
+      if (!(err instanceof SkError)) {
+        exception = new Exception(err, this.state);
+      }
       return this.callWithException(exn_handler, exception);
+    } finally {
+      if (this.exception == err) {
+        this.exception = undefined;
+      }
     }
   };
   ethrow = (skExc: ptr, rethrow: boolean) => {
     if (this.env && this.env.onException) this.env.onException();
-    if (rethrow && this.exceptions.length > 0) {
-      throw this.exceptions.pop();
+    if (rethrow && this.exception) {
+      throw this.exception;
     } else {
       let skMessage =
         skExc != null && skExc != 0
@@ -517,9 +529,18 @@ export class Utils {
           message = "SKFS Internal error";
         }
       }
-      throw new SkException(message);
+      const err = new SkError(message);
+      if (err.stack) this.stacks.set(skExc, err.stack);
+      throw err;
     }
   };
+  replace_exn(oldex: ptr, newex: ptr) {
+    const stack = this.stacks.get(oldex);
+    if (stack) {
+      this.stacks.delete(oldex);
+      this.stacks.set(newex, stack);
+    }
+  }
   deleteException = (exc: int) => {
     this.state.exceptions.delete(exc);
   };
@@ -529,6 +550,61 @@ export class Utils {
       return this.state.exceptions.get(exc)!.err.message;
     } else {
       return "Unknown";
+    }
+  };
+
+  getExceptionStack = (exc: int) => {
+    if (this.state.exceptions.has(exc)) {
+      return this.state.exceptions.get(exc)!.err.stack ?? "";
+    } else {
+      return "";
+    }
+  };
+
+  getErrorObject: (skExc: ptr) => ErrorObject = (skExc: ptr) => {
+    if (skExc == null || skExc == 0) {
+      return { message: "SKStore Internal error" };
+    }
+    let message = this.importString(
+      this.exports.SKIP_getExceptionMessage(skExc),
+    );
+    let errStack = this.stacks.get(skExc);
+    let lines = message.split("\n");
+    if (lines[0].startsWith("external:")) {
+      let external = lines.shift()!;
+      let id = parseInt(external.substring(9));
+      if (this.state.exceptions.has(id)) {
+        const exception = this.state.exceptions.get(id);
+        if (exception) {
+          message = exception.err.message;
+          errStack = exception.err.stack;
+        } else {
+          message = "Unknown error";
+        }
+      } else if (message.trim() == "") {
+        message = "SKStore Internal error";
+      }
+    }
+    const toObject: (error: Error) => ErrorObject = (error?: Error) => {
+      const errcause = (error as any).cause;
+      const errstack = (error as any).stack?.split("\n") as string[];
+      if (errstack) {
+        return errcause
+          ? { message, cause: errcause, stack: errstack }
+          : { message, stack: errstack };
+      } else {
+        return errcause ? { message, cause: errcause } : { message };
+      }
+    };
+    if (errStack) {
+      const stack: string[] = errStack.split("\n") as string[];
+      return this.exception
+        ? { message, cause: toObject(this.exception), stack }
+        : { message, stack };
+    } else {
+      return this.exception
+        ? { message, cause: toObject(this.exception) }
+        : { message };
     }
   };
 
@@ -567,14 +643,28 @@ export class Utils {
   };
 
   runWithGc = <T>(fn: () => T) => {
+    this.stddebug = new Array();
     let obsPos = this.exports.SKIP_new_Obstack();
     try {
       let res = fn();
       this.exports.SKIP_destroy_Obstack(obsPos);
-      return res;
+      if (
+        res !== null &&
+        typeof res === "object" &&
+        (("__isArrayProxy" in res && res.__isArrayProxy) ||
+          ("__isObjectProxy" in res && res.__isObjectProxy)) &&
+        "clone" in res
+      ) {
+        const clone = res.clone as () => T;
+        return clone();
+      } else return res;
     } catch (ex) {
       this.exports.SKIP_destroy_Obstack(obsPos);
       throw ex;
+    } finally {
+      if (this.stddebug.length > 0) {
+        console.log(this.stddebug.join(""));
+      }
     }
   };
 
@@ -780,6 +870,30 @@ export async function loadEnv(extensions: EnvInit[], envVals?: Array<string>) {
     extensions.map((fn) => fn(env));
   }
   return env;
+}
+
+export type Metadata = {
+  filepath: string;
+  line: number;
+  column: number;
+};
+
+/**
+ * Collect function script metadata (name, line, colum)
+ * @param offset The offset of the function for the one to collect metadata
+ * @returns The script metadata of the offset function
+ */
+export function metadata(offset: number): Metadata {
+  const stack = new Error().stack!.split("\n");
+  // Skip "Error" and metadata call
+  const internalOffset = 2;
+  const info = /\((.*):(\d+):(\d+)\)$/.exec(stack[internalOffset + offset]);
+  const metadata = {
+    filepath: info![1],
+    line: parseInt(info![2]),
+    column: parseInt(info![3]),
+  };
+  return metadata;
 }
 
 export async function run(
