@@ -23,14 +23,14 @@ SERVER_JAR=$(SRV_DIR)/server.jar
 
 default: build
 
-$(SKGW_JAR):
+.PHONY: build_server
+build_server:
+	@source $(SDKMAN_INIT) && cd $(SERVER_DIR) && gradle --console plain build 1>&2 > $(SKDB_DATABASES)/build_server.log
 	@cd $(SKGW_DIR) && source $(SDKMAN_INIT) && ../gradlew jar --no-daemon --console plain 1>&2 > $(SKDB_DATABASES)/build_server.log
-
-$(SERVER_JAR): $(SKGW_JAR)
 	cp $(SKGW_JAR) $(SERVER_JAR)
 
 .PHONY: build
-build: $(SERVER_JAR) $(ROOT_DIR)/server $(SDKMAN_INIT) $(SKGW_DIR) $(SRV_DIR)/skdb.conf
+build: build_server $(SDKMAN_INIT) $(SKGW_DIR) $(SRV_DIR)/skdb.conf
 	$(SRV_DIR)/service_server.sh $(SDKMAN_DIR) $(SKGW_DIR) $(SRV_DIR)/skdb.conf $(SKDB_DATABASES) $(SERVER_JAR)
 	@echo sknpm.env:SKDB_CLI=$(SRV_DIR)/node_modules/skdb/dist/skdb-cli.mjs
 
