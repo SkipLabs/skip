@@ -27,6 +27,18 @@ export type {
   Accumulator,
 };
 
+export type {
+  Mapper,
+  EntryMapper as TableMapper,
+  OutputMapper,
+  EHandle,
+  NonEmptyIterator,
+  LHandle,
+  LazyCompute,
+  AsyncLazyCompute,
+  Loadable,
+} from "./skstore_api.js";
+
 export {
   Sum,
   Min,
@@ -35,6 +47,7 @@ export {
   ctext,
   cinteger,
   cfloat,
+  cjson,
 } from "./skstore_utils.js";
 
 var modules: ModuleInit[];

@@ -3,13 +3,21 @@ import type { Opt, Shared, ptr, int, float, Metadata } from "#std/sk_types.js";
 import type {
   Accumulator,
   AValue,
-  EntryMapper,
   LHandle,
-  Mapper,
-  Mapping,
-  OutputMapper,
   TJSON,
+  NonEmptyIterator,
+  EHandle,
 } from "../skstore_api.js";
+
+export type CtxMapping<
+  K1 extends TJSON,
+  V1 extends TJSON,
+  K2 extends TJSON,
+  V2 extends TJSON,
+> = {
+  handle: EHandle<K1, V1>;
+  mapper: (key: K1, it: NonEmptyIterator<V1>) => Iterable<[K2, V2]>;
+};
 
 export interface SKJSON extends Shared {
   importJSON: (value: ptr, copy?: boolean) => any;
@@ -29,30 +37,33 @@ export interface Context {
     V3 extends TJSON,
   >(
     eagerHdl: string,
-    metadata: Metadata,
-    mapper: Mapper<K, V, K2, V2>,
+    name: string,
+    mapper: (key: K, it: NonEmptyIterator<V>) => Iterable<[K2, V2]>,
     accumulator: Accumulator<V2, V3>,
   ) => string;
 
   map: <K extends TJSON, V extends TJSON, K2 extends TJSON, V2 extends TJSON>(
     eagerHdl: string,
-    metadata: Metadata,
-    compute: Mapper<K, V, K2, V2>,
+    name: string,
+    compute: (key: K, it: NonEmptyIterator<V>) => Iterable<[K2, V2]>,
   ) => string;
+
   lazy: <K extends TJSON, V extends TJSON>(
-    metadata: Metadata,
+    name: string,
     compute: (selfHdl: LHandle<K, V>, key: K) => Opt<V>,
   ) => string;
+
   asyncLazy: <
     K extends TJSON,
     V extends TJSON,
     P extends TJSON,
     M extends TJSON,
   >(
-    metadata: Metadata,
+    name: string,
     get: (key: K) => P,
     call: (key: K, params: P) => Promise<AValue<V, M>>,
   ) => string;
+
   get: <K, V>(eagerHdl: string, key: K) => V;
   getFromTable: <K, R>(table: string, key: K, index?: string) => R[];
   maybeGet: <K, V>(eagerHdl: string, key: K) => Opt<V>;
@@ -63,35 +74,37 @@ export interface Context {
 
   mapFromSkdb: <R extends TJSON, K extends TJSON, V extends TJSON>(
     table: string,
-    metadata: Metadata,
-    mapper: EntryMapper<R, K, V>,
+    name: string,
+    mapper: (entry: R, occ: number) => Iterable<[K, V]>,
   ) => string;
+
   mapToSkdb: <R extends TJSON, K extends TJSON, V extends TJSON>(
     eagerHdl: string,
     table: string,
-    mapper: OutputMapper<R, K, V>,
+    mapper: (key: K, it: NonEmptyIterator<V>) => R,
   ) => void;
 
-  multimap<
+  multimap: <
     K1 extends TJSON,
     V1 extends TJSON,
     K2 extends TJSON,
     V2 extends TJSON,
   >(
-    metadata: Metadata,
-    mappings: Mapping<K1, V1, K2, V2>[],
-  ): string;
-  multimapReduce<
+    name: string,
+    mappings: CtxMapping<K1, V1, K2, V2>[],
+  ) => string;
+
+  multimapReduce: <
     K1 extends TJSON,
     V1 extends TJSON,
     K2 extends TJSON,
     V2 extends TJSON,
     V3 extends TJSON,
   >(
-    metadata: Metadata,
-    mappings: Mapping<K1, V1, K2, V2>[],
+    name: string,
+    mappings: CtxMapping<K1, V1, K2, V2>[],
     accumulator: Accumulator<V2, V3>,
-  ): string;
+  ) => string;
 
   noref: () => Context;
   notify?: () => void;

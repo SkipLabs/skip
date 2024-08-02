@@ -4,16 +4,18 @@ import type { SKJSON } from "./skstore_skjson.js";
 import type {
   Accumulator,
   NonEmptyIterator,
-  Mapper,
-  EntryMapper,
-  Mapping,
   Result,
   AValue,
   LHandle,
   TJSON,
 } from "../skstore_api.js";
 
-import type { Handles, Context, FromWasm } from "./skstore_types.js";
+import type {
+  Handles,
+  Context,
+  FromWasm,
+  CtxMapping,
+} from "./skstore_types.js";
 import { LSelfImpl, SKStoreFactoryImpl } from "./skstore_impl.js";
 // prettier-ignore
 import type { SKDBShared } from "#skdb/skdb_types.js";
@@ -77,10 +79,9 @@ export class ContextImpl implements Context {
   }
 
   lazy = <K extends TJSON, V extends TJSON>(
-    metadata: Metadata,
+    name: string,
     compute: (selfHdl: LHandle<K, V>, key: K) => Opt<V>,
   ) => {
-    const name = this.handles.name(metadata);
     const lazyHdl = this.exports.SKIP_SKStore_lazy(
       this.pointer(),
       this.skjson.exportString(name),
@@ -90,11 +91,10 @@ export class ContextImpl implements Context {
   };
 
   asyncLazy = <K extends TJSON, V extends TJSON, P extends TJSON>(
-    metadata: Metadata,
+    name: string,
     get: (key: K) => P,
     call: (key: K, params: P) => Promise<V>,
   ) => {
-    const name = this.handles.name(metadata);
     const lazyHdl = this.exports.SKIP_SKStore_asyncLazy(
       this.pointer(),
       this.skjson.exportString(name),
@@ -110,10 +110,9 @@ export class ContextImpl implements Context {
     K2 extends TJSON,
     V2 extends TJSON,
   >(
-    metadata: Metadata,
-    mappings: Mapping<K1, V1, K2, V2>[],
+    name: string,
+    mappings: CtxMapping<K1, V1, K2, V2>[],
   ) => {
-    const name = this.handles.name(metadata);
     const skMappings = mappings.map((mapping) => [
       mapping.handle.getId(),
       this.handles.register(mapping.mapper),
@@ -133,11 +132,10 @@ export class ContextImpl implements Context {
     V2 extends TJSON,
     V3 extends TJSON,
   >(
-    metadata: Metadata,
-    mappings: Mapping<K1, V1, K2, V2>[],
+    name: string,
+    mappings: CtxMapping<K1, V1, K2, V2>[],
     accumulator: Accumulator<V2, V3>,
   ) => {
-    const name = this.handles.name(metadata);
     const skMappings = mappings.map((mapping) => [
       mapping.handle.getId(),
       this.handles.register(mapping.mapper),
@@ -217,11 +215,10 @@ export class ContextImpl implements Context {
     V3 extends TJSON,
   >(
     eagerHdl: string,
-    metadata: Metadata,
-    mapper: Mapper<K, V, K2, V2>,
+    name: string,
+    mapper: (key: K, it: NonEmptyIterator<V>) => Iterable<[K2, V2]>,
     accumulator: Accumulator<V2, V3>,
   ) => {
-    const name = this.handles.name(metadata);
     const resHdlPtr = this.exports.SKIP_SKStore_mapReduce(
       this.pointer(),
       this.skjson.exportString(eagerHdl),
@@ -235,10 +232,9 @@ export class ContextImpl implements Context {
 
   map = <K extends TJSON, V extends TJSON, K2 extends TJSON, V2 extends TJSON>(
     eagerHdl: string,
-    metadata: Metadata,
-    mapper: Mapper<K, V, K2, V2>,
+    name: string,
+    mapper: (key: K, it: NonEmptyIterator<V>) => Iterable<[K2, V2]>,
   ) => {
-    const name = this.handles.name(metadata);
     const computeFnId = this.handles.register(mapper);
     const pointer = this.pointer();
     const resHdlPtr = this.exports.SKIP_SKStore_map(
@@ -250,12 +246,11 @@ export class ContextImpl implements Context {
     return this.skjson.importString(resHdlPtr);
   };
 
-  mapFromSkdb = <R extends TJSON, K2 extends TJSON, V2 extends TJSON>(
+  mapFromSkdb = <R extends TJSON, K extends TJSON, V extends TJSON>(
     table: string,
-    metadata: Metadata,
-    mapper: EntryMapper<R, K2, V2>,
+    name: string,
+    mapper: (entry: R, occ: number) => Iterable<[K, V]>,
   ) => {
-    const name = this.handles.name(metadata);
     const computeFnId = this.handles.register(mapper);
     const eagerHdl = this.exports.SKIP_SKStore_fromSkdb(
       this.pointer(),
