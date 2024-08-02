@@ -1,4 +1,14 @@
-import type { SKStore, TableHandle } from "skstore";
+import type {
+  SKStore,
+  TableHandle,
+  TableMapper,
+  LazyCompute,
+  EHandle,
+  LHandle,
+  Mapper,
+  NonEmptyIterator,
+  OutputMapper,
+} from "skstore";
 import { schema, ctext as text } from "skstore";
 
 export function tablesSchema() {
@@ -13,18 +23,24 @@ export function tablesSchema() {
   ];
 }
 
-export function initSKStore(
-  store: SKStore,
-  cells: TableHandle<[string, string, string]>,
-  computed: TableHandle<[string, string, string]>,
-) {
-  // Build index to access all value reactivly
-  const skall = cells.map<[string, string], string>((row, _occ) => {
-    return Array([[row[0], row[1]], row[2]]);
-  });
-  // Use lazy dir to create eval dependency graph
-  // Its calls it self to get other computed cells
-  const evaluator = store.lazy<[string, string], string>((selfHdl, key) => {
+class ValueForCell
+  implements TableMapper<[string, string, string], [string, string], string>
+{
+  mapElement(
+    entry: [string, string, string],
+    _occ: number,
+  ): Iterable<[[string, string], string]> {
+    return Array([[entry[0], entry[1]], entry[2]]);
+  }
+}
+
+class ComputeExpression implements LazyCompute<[string, string], string> {
+  constructor(private skall: EHandle<[string, string], string>) {}
+
+  compute(
+    selfHdl: LHandle<[string, string], string>,
+    key: [string, string],
+  ): string | null {
     const getComputed = (key: [string, string]) => {
       const v = selfHdl.get(key);
       if (typeof v == "number") return v;
@@ -37,7 +53,7 @@ export function initSKStore(
       );
     };
     const sheet = key[0];
-    const v = skall.maybeGet(key);
+    const v = this.skall.maybeGet(key);
     if (v && v.charAt(0) == "=") {
       try {
         // Fake evaluator in this exemple
@@ -64,23 +80,66 @@ export function initSKStore(
     } else {
       return v;
     }
-  });
-  // Build a sub dependency graph for each sheet (For example purpose)
-  // A parsing phase can be added to prevent expression parsing each time:
-  // Parsing => Immutable ast
-  // Evaluation => Compute tree with context
-  const skcomputed = skall.map((key, it) => {
+  }
+}
+
+class CallCompute
+  implements Mapper<[string, string], string, [string, string], string>
+{
+  constructor(private evaluator: LHandle<[string, string], string>) {}
+
+  mapElement(
+    key: [string, string],
+    it: NonEmptyIterator<string>,
+  ): Iterable<[[string, string], string]> {
     const v = it.uniqueValue();
     if (typeof v == "string" && v.charAt(0) == "=") {
-      return Array([key, evaluator.get(key)]);
+      return Array([key, this.evaluator.get(key)]);
     }
     if (v == null) {
       throw new Error("(sheet, cell) pair must be unique.");
     }
     return Array([key, v]);
-  });
+  }
+}
+
+class ToOutput
+  implements OutputMapper<[string, string, string], [string, string], string>
+{
+  mapElement(
+    key: [string, string],
+    it: NonEmptyIterator<string>,
+  ): [string, string, string] {
+    return [key[0], key[1], it.first()];
+  }
+}
+
+export function initSKStore(
+  store: SKStore,
+  cells: TableHandle<[string, string, string]>,
+  computed: TableHandle<[string, string, string]>,
+) {
+  // Build index to access all value reactivly
+  const skall = cells.map<[string, string], string, typeof ValueForCell>(
+    ValueForCell,
+  );
+  // Use lazy dir to create eval dependency graph
+  // Its calls it self to get other computed cells
+  const evaluator = store.lazy<
+    [string, string],
+    string,
+    typeof ComputeExpression
+  >(ComputeExpression, skall);
+  // Build a sub dependency graph for each sheet (For example purpose)
+  // A parsing phase can be added to prevent expression parsing each time:
+  // Parsing => Immutable ast
+  // Evaluation => Compute tree with context
+  const skcomputed = skall.map<[string, string], string, typeof CallCompute>(
+    CallCompute,
+    evaluator,
+  );
   // Back to SKDB world
-  skcomputed.mapTo(computed, (key, it) => [key[0], key[1], it.first()]);
+  skcomputed.mapTo(computed, ToOutput);
 }
 
 export function scenarios() {

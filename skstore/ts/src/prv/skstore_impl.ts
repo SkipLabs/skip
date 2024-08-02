@@ -1,5 +1,5 @@
 // prettier-ignore
-import { type ptr, type Opt, metadata } from "#std/sk_types.js";
+import { type ptr, type Opt } from "#std/sk_types.js";
 import type { Context } from "./skstore_types.js";
 import type {
   Accumulator,
@@ -16,9 +16,17 @@ import type {
   EntryMapper,
   Table,
   Loadable,
-  AValue,
   JSONObject,
   TJSON,
+  Param,
+  EMParameters,
+  MParameters,
+  OMParameters,
+  LazyCompute,
+  LParameters,
+  AsyncLazyCompute,
+  ALParameters,
+  NonEmptyIterator,
 } from "../skstore_api.js";
 
 // prettier-ignore
@@ -57,30 +65,63 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     return this.context.size(this.eagerHdl);
   };
 
-  map<K2 extends TJSON, V2 extends TJSON>(mapper: Mapper<K, V, K2, V2>) {
-    const data = metadata(1);
-    const eagerHdl = this.context.map(this.eagerHdl, data, mapper);
+  map<
+    K2 extends TJSON,
+    V2 extends TJSON,
+    C extends new (...params: Param[]) => Mapper<K, V, K2, V2>,
+  >(mapper: C, ...params: MParameters<K, V, K2, V2, C>): EHandle<K2, V2> {
+    const mapperObj = new mapper(...params);
+    if (!mapperObj.constructor.name) {
+      throw new Error("The class must have a name.");
+    }
+    const eagerHdl = this.context.map(
+      this.eagerHdl,
+      mapperObj.constructor.name,
+      (key: K, it: NonEmptyIterator<V>) => mapperObj.mapElement(key, it),
+    );
     return this.derive<K2, V2>(eagerHdl);
   }
 
-  mapReduce<K2 extends TJSON, V2 extends TJSON, V3 extends TJSON>(
-    mapper: Mapper<K, V, K2, V2>,
+  mapReduce<
+    K2 extends TJSON,
+    V2 extends TJSON,
+    V3 extends TJSON,
+    C extends new (...params: Param[]) => Mapper<K, V, K2, V2>,
+  >(
+    mapper: C,
     accumulator: Accumulator<V2, V3>,
+    ...params: MParameters<K, V, K2, V2, C>
   ) {
+    const mapperObj = new mapper(...params);
+    if (!mapperObj.constructor.name) {
+      throw new Error("The class must have a name.");
+    }
     const eagerHdl = this.context.mapReduce(
       this.eagerHdl,
-      metadata(1),
-      mapper,
+      mapperObj.constructor.name,
+      (key: K, it: NonEmptyIterator<V>) => mapperObj.mapElement(key, it),
       accumulator,
     );
     return this.derive<K2, V3>(eagerHdl);
   }
 
-  mapTo<R extends TJSON[]>(
+  mapTo<
+    R extends TJSON[],
+    C extends new (...params: Param[]) => OutputMapper<R, K, V>,
+  >(
     table: TableHandle<R>,
-    mapper: OutputMapper<R, K, V>,
+    mapper: C,
+    ...params: OMParameters<R, K, V, C>
   ): void {
-    this.context.mapToSkdb(this.eagerHdl, table.getName(), mapper);
+    const mapperObj = new mapper(...params);
+    if (!mapperObj.constructor.name) {
+      throw new Error("The class must have a name.");
+    }
+    this.context.mapToSkdb(
+      this.eagerHdl,
+      table.getName(),
+      (key: K, it: NonEmptyIterator<V>) => mapperObj.mapElement(key, it),
+    );
   }
 }
 
@@ -133,12 +174,22 @@ export class TableHandleImpl<R extends TJSON[]> implements TableHandle<R> {
     return this.context.getFromTable(this.getName(), key, index);
   }
 
-  map<K extends TJSON, V extends TJSON>(
-    mapper: EntryMapper<R, K, V>,
-  ): EHandle<K, V> {
+  map<
+    K extends TJSON,
+    V extends TJSON,
+    C extends new (...params: Param[]) => EntryMapper<R, K, V>,
+  >(mapper: C, ...params: EMParameters<K, V, R, C>): EHandle<K, V> {
+    const mapperObj = new mapper(...params);
+    if (!mapperObj.constructor.name) {
+      throw new Error("The class must have a name.");
+    }
     const name = this.getName();
-    const data = metadata(1);
-    const eagerHdl = this.context.mapFromSkdb(name, data, mapper);
+    const skname = name + "_" + mapperObj.constructor.name;
+    const eagerHdl = this.context.mapFromSkdb(
+      name,
+      skname,
+      (entry: R, occ: number) => mapperObj.mapElement(entry, occ),
+    );
     return new EHandleImpl<K, V>(this.context, eagerHdl);
   }
 
@@ -248,7 +299,17 @@ export class SKStoreImpl implements SKStore {
     K2 extends TJSON,
     V2 extends TJSON,
   >(mappings: Mapping<K1, V1, K2, V2>[]): EHandle<K2, V2> {
-    const eagerHdl = this.context.multimap(metadata(1), mappings);
+    var name = "";
+    const ctxmapping = mappings.map((mapping) => {
+      const mapperObj = new mapping.mapper(...(mapping.params ?? []));
+      name += mapperObj.constructor.name;
+      return {
+        handle: mapping.handle,
+        mapper: (key: K1, it: NonEmptyIterator<V1>) =>
+          mapperObj.mapElement(key, it),
+      };
+    });
+    const eagerHdl = this.context.multimap(name, ctxmapping);
     return new EHandleImpl<K2, V2>(this.context, eagerHdl);
   }
 
@@ -262,26 +323,50 @@ export class SKStoreImpl implements SKStore {
     mappings: Mapping<K1, V1, K2, V2>[],
     accumulator: Accumulator<V2, V3>,
   ): EHandle<K2, V3> {
-    const eagerHdl = this.context.multimapReduce(
-      metadata(1),
-      mappings,
-      accumulator,
-    );
+    var name = "";
+    const ctxmapping = mappings.map((mapping) => {
+      const mapperObj = new mapping.mapper(...(mapping.params ?? []));
+      name += mapperObj.constructor.name;
+      return {
+        handle: mapping.handle,
+        mapper: (key: K1, it: NonEmptyIterator<V1>) =>
+          mapperObj.mapElement(key, it),
+      };
+    });
+    const eagerHdl = this.context.multimapReduce(name, ctxmapping, accumulator);
     return new EHandleImpl<K2, V3>(this.context, eagerHdl);
   }
 
-  lazy<K extends TJSON, V extends TJSON>(
-    compute: (selfHdl: LHandle<K, V>, key: K) => Opt<V>,
-  ): LHandle<K, V> {
-    const lazyHdl = this.context.lazy(metadata(1), compute);
+  lazy<
+    K extends TJSON,
+    V extends TJSON,
+    C extends new (...params: Param[]) => LazyCompute<K, V>,
+  >(compute: C, ...params: LParameters<K, V, C>): LHandle<K, V> {
+    const computeObj = new compute(...params);
+    const name = computeObj.constructor.name;
+    const lazyHdl = this.context.lazy(name, (selfHdl: LHandle<K, V>, key: K) =>
+      computeObj.compute(selfHdl, key),
+    );
     return new LHandleImpl<K, V>(this.context, lazyHdl);
   }
 
-  asyncLazy<K extends TJSON, V extends TJSON, P extends TJSON, M extends TJSON>(
-    get: (key: K) => P,
-    call: (key: K, params: P) => Promise<AValue<V, M>>,
+  asyncLazy<
+    K extends TJSON,
+    V extends TJSON,
+    P extends TJSON,
+    M extends TJSON,
+    C extends new (...params: Param[]) => AsyncLazyCompute<K, V, P, M>,
+  >(
+    compute: C,
+    ...params: ALParameters<K, V, P, M, C>
   ): LHandle<K, Loadable<V, M>> {
-    const lazyHdl = this.context.asyncLazy<K, V, P, M>(metadata(1), get, call);
+    const computeObj = new compute(...params);
+    const name = computeObj.constructor.name;
+    const lazyHdl = this.context.asyncLazy<K, V, P, M>(
+      name,
+      (key: K) => computeObj.params(key),
+      (key: K, params: P) => computeObj.call(key, params),
+    );
     return new LHandleImpl<K, Loadable<V, M>>(this.context, lazyHdl);
   }
 

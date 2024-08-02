@@ -1,4 +1,13 @@
-import type { SKStore, TableHandle } from "skstore";
+import type {
+  SKStore,
+  TableHandle,
+  TableMapper,
+  TJSON,
+  Mapper,
+  EHandle,
+  NonEmptyIterator,
+  OutputMapper,
+} from "skstore";
 import { cinteger as integer, schema } from "skstore";
 
 export function tablesSchema() {
@@ -15,29 +24,51 @@ export function tablesSchema() {
   ];
 }
 
+class T2SIdentify<K extends TJSON, V extends TJSON>
+  implements TableMapper<[K, V], K, V>
+{
+  mapElement(entry: [K, V], occ: number): Iterable<[K, V]> {
+    return Array([entry[0], entry[1]]);
+  }
+}
+
+class Add implements Mapper<number, number, number, number> {
+  constructor(private other: EHandle<number, number>) {}
+
+  mapElement(
+    key: number,
+    it: NonEmptyIterator<number>,
+  ): Iterable<[number, number]> {
+    const v = it.first();
+    const ev = this.other.maybeGet(key);
+    if (ev !== null) {
+      return Array([key, v + (ev ?? 0)]);
+    }
+    return Array();
+  }
+}
+
+class ToOutput<K extends TJSON, V extends TJSON>
+  implements OutputMapper<[K, V], K, V>
+{
+  mapElement(key: K, it: NonEmptyIterator<V>): [K, V] {
+    return [key, it.first()];
+  }
+}
+
 export function initSKStore(
   _store: SKStore,
   input1: TableHandle<[number, number]>,
   input2: TableHandle<[number, number]>,
   output: TableHandle<[number, number]>,
 ) {
-  const eager1 = input1.map((row, _occ) => {
-    return Array([row[0], row[1]]);
-  });
-  const eager2 = input2.map((row, _occ) => {
-    return Array([row[0], row[1]]);
-  });
-  const eager3 = eager1.map((key, it) => {
-    const v = it.first();
-    const ev = eager2.maybeGet(key);
-    if (ev !== null) {
-      return Array([key, v + (ev ?? 0)]);
-    }
-    return Array();
-  });
-  eager3.mapTo(output, (key, it) => {
-    return [key, it.first()];
-  });
+  const eager1 = input1.map<number, number, typeof T2SIdentify>(T2SIdentify);
+  const eager2 = input2.map<number, number, typeof T2SIdentify>(T2SIdentify);
+  const eager3 = eager1.map<number, number, typeof Add>(Add, eager2);
+  eager3.mapTo<[number, number], typeof ToOutput<number, number>>(
+    output,
+    ToOutput,
+  );
 }
 
 export function scenarios() {
