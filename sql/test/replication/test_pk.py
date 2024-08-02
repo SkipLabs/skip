@@ -20,7 +20,7 @@ def test_client_server_single_orthogonal_insert_each():
   server = cluster.add(Server("s1", scheduler))
   client1 = cluster.add(Client("c1", scheduler))
 
-  cluster.mirror("test_with_pk", client1, server)
+  cluster.mirror("test_with_pk", "(id INTEGER PRIMARY KEY, note TEXT)", client1, server)
 
   client1.insertInto("test_with_pk", [0, 'foo'])
   server.insertInto("test_with_pk", [1, 'bar'])
@@ -45,8 +45,8 @@ def test_two_clients_single_server_two_conflicting_inserts_each():
   client1 = cluster.add(Client("c1", scheduler))
   client2 = cluster.add(Client("c2", scheduler))
 
-  cluster.mirror("test_with_pk", client1, server)
-  cluster.mirror("test_with_pk", client2, server)
+  cluster.mirror("test_with_pk", "(id INTEGER PRIMARY KEY, note TEXT)", client1, server)
+  cluster.mirror("test_with_pk", "(id INTEGER PRIMARY KEY, note TEXT)", client2, server)
 
   clientInsert = client1.insertOrReplace("test_with_pk", [0, 'foo'])
   serverInsert = server.insertOrReplace("test_with_pk", [0, 'bar'])
@@ -77,8 +77,8 @@ def test_two_clients_single_server_two_conflicting_inserts_with_causality():
   client1 = cluster.add(Client("c1", scheduler))
   client2 = cluster.add(Client("c2", scheduler))
 
-  cluster.mirror("test_with_pk", client1, server)
-  cluster.mirror("test_with_pk", client2, server)
+  cluster.mirror("test_with_pk", "(id INTEGER PRIMARY KEY, note TEXT)", client1, server)
+  cluster.mirror("test_with_pk", "(id INTEGER PRIMARY KEY, note TEXT)", client2, server)
 
   client1.insertOrReplace("test_with_pk", [0, 'foo'])
   client1.insertOrReplace("test_with_pk", [0, 'bar'])
@@ -104,8 +104,8 @@ def test_two_clients_single_server_single_conflicting_insert_each():
   client1 = cluster.add(Client("c1", scheduler))
   client2 = cluster.add(Client("c2", scheduler))
 
-  cluster.mirror("test_with_pk", client1, server)
-  cluster.mirror("test_with_pk", client2, server)
+  cluster.mirror("test_with_pk", "(id INTEGER PRIMARY KEY, note TEXT)", client1, server)
+  cluster.mirror("test_with_pk", "(id INTEGER PRIMARY KEY, note TEXT)", client2, server)
 
   client1.insertOrReplace("test_with_pk", [0, 'foo'])
   client2.insertOrReplace("test_with_pk", [0, 'bar'])
@@ -131,8 +131,8 @@ def test_two_clients_single_server_multiple_inserts_on_client1_insert_on_client2
   client1 = cluster.add(Client("c1", scheduler))
   client2 = cluster.add(Client("c2", scheduler))
 
-  cluster.mirror("test_with_pk", client1, server)
-  cluster.mirror("test_with_pk", client2, server)
+  cluster.mirror("test_with_pk", "(id INTEGER PRIMARY KEY, note TEXT)", client1, server)
+  cluster.mirror("test_with_pk", "(id INTEGER PRIMARY KEY, note TEXT)", client2, server)
 
   client1.insertOrReplace("test_with_pk", [0, 'foo'])
   client1.insertOrReplace("test_with_pk", [0, 'bar'])
@@ -158,8 +158,8 @@ def test_two_clients_single_server_repeat_inserts_on_client1_purge_on_server():
   client1 = cluster.add(Client("c1", scheduler))
   client2 = cluster.add(Client("c2", scheduler))
 
-  cluster.mirror("test_with_pk", client1, server)
-  cluster.mirror("test_with_pk", client2, server)
+  cluster.mirror("test_with_pk", "(id INTEGER PRIMARY KEY, note TEXT)", client1, server)
+  cluster.mirror("test_with_pk", "(id INTEGER PRIMARY KEY, note TEXT)", client2, server)
 
   server.purgeAllAtSomePointFromNow()
 
@@ -203,8 +203,8 @@ def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2
   client1 = cluster.add(Client("c1", scheduler))
   client2 = cluster.add(Client("c2", scheduler))
 
-  cluster.mirror("test_with_pk", client1, server)
-  cluster.mirror("test_with_pk", client2, server)
+  cluster.mirror("test_with_pk", "(id INTEGER PRIMARY KEY, note TEXT)", client1, server)
+  cluster.mirror("test_with_pk", "(id INTEGER PRIMARY KEY, note TEXT)", client2, server)
 
   client1.insertOrReplace("test_with_pk", [0, 'foo'])
   client1.insertOrReplace("test_with_pk", [0, 'bar'])
@@ -230,8 +230,8 @@ def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2
   client1 = cluster.add(Client("c1", scheduler))
   client2 = cluster.add(Client("c2", scheduler))
 
-  cluster.mirror("test_with_pk", client1, server)
-  cluster.mirror("test_with_pk", client2, server)
+  cluster.mirror("test_with_pk", "(id INTEGER PRIMARY KEY, note TEXT)", client1, server)
+  cluster.mirror("test_with_pk", "(id INTEGER PRIMARY KEY, note TEXT)", client2, server)
 
   server.purgeAllAtSomePointFromNow()
 
@@ -260,8 +260,8 @@ def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2
   client1 = cluster.add(Client("c1", scheduler))
   client2 = cluster.add(Client("c2", scheduler))
 
-  cluster.mirror("test_with_pk", client1, server)
-  cluster.mirror("test_with_pk", client2, server)
+  cluster.mirror("test_with_pk", "(id INTEGER PRIMARY KEY, note TEXT)", client1, server)
+  cluster.mirror("test_with_pk", "(id INTEGER PRIMARY KEY, note TEXT)", client2, server)
 
   client1.insertOrReplace("test_with_pk", [0, 'foo'])
   client1.insertOrReplace("test_with_pk", [1, 'bar'])
@@ -287,8 +287,8 @@ def test_two_clients_single_server_multiple_inserts_on_client1_delete_on_client2
   client1 = cluster.add(Client("c1", scheduler))
   client2 = cluster.add(Client("c2", scheduler))
 
-  cluster.mirror("test_with_pk", client1, server)
-  cluster.mirror("test_with_pk", client2, server)
+  cluster.mirror("test_with_pk", "(id INTEGER PRIMARY KEY, note TEXT)", client1, server)
+  cluster.mirror("test_with_pk", "(id INTEGER PRIMARY KEY, note TEXT)", client2, server)
 
   server.purgeAllAtSomePointFromNow()
 
@@ -313,8 +313,8 @@ def test_two_clients_single_server_multiple_inserts_on_client1_update_on_client2
   client1 = cluster.add(Client("c1", scheduler))
   client2 = cluster.add(Client("c2", scheduler))
 
-  cluster.mirror("test_with_pk", client1, server)
-  cluster.mirror("test_with_pk", client2, server)
+  cluster.mirror("test_with_pk", "(id INTEGER PRIMARY KEY, note TEXT)", client1, server)
+  cluster.mirror("test_with_pk", "(id INTEGER PRIMARY KEY, note TEXT)", client2, server)
 
   client1.insertOrReplace("test_with_pk", [0, 'foo'])
   client1.insertOrReplace("test_with_pk", [0, 'bar'])
@@ -340,8 +340,8 @@ def test_two_clients_single_server_multiple_inserts_on_client1_update_on_client2
   client1 = cluster.add(Client("c1", scheduler))
   client2 = cluster.add(Client("c2", scheduler))
 
-  cluster.mirror("test_with_pk", client1, server)
-  cluster.mirror("test_with_pk", client2, server)
+  cluster.mirror("test_with_pk", "(id INTEGER PRIMARY KEY, note TEXT)", client1, server)
+  cluster.mirror("test_with_pk", "(id INTEGER PRIMARY KEY, note TEXT)", client2, server)
 
   server.purgeAllAtSomePointFromNow()
 
@@ -370,8 +370,8 @@ def test_two_clients_single_server_multiple_inserts_on_client1_update_on_client2
   client1 = cluster.add(Client("c1", scheduler))
   client2 = cluster.add(Client("c2", scheduler))
 
-  cluster.mirror("test_with_pk", client1, server)
-  cluster.mirror("test_with_pk", client2, server)
+  cluster.mirror("test_with_pk", "(id INTEGER PRIMARY KEY, note TEXT)", client1, server)
+  cluster.mirror("test_with_pk", "(id INTEGER PRIMARY KEY, note TEXT)", client2, server)
 
   client1.insertOrReplace("test_with_pk", [0, 'foo'])
   client1.insertOrReplace("test_with_pk", [1, 'bar'])
@@ -397,8 +397,8 @@ def test_two_clients_single_server_multiple_inserts_on_client1_update_on_client2
   client1 = cluster.add(Client("c1", scheduler))
   client2 = cluster.add(Client("c2", scheduler))
 
-  cluster.mirror("test_with_pk", client1, server)
-  cluster.mirror("test_with_pk", client2, server)
+  cluster.mirror("test_with_pk", "(id INTEGER PRIMARY KEY, note TEXT)", client1, server)
+  cluster.mirror("test_with_pk", "(id INTEGER PRIMARY KEY, note TEXT)", client2, server)
 
   server.purgeAllAtSomePointFromNow()
 
@@ -423,8 +423,8 @@ def test_two_clients_single_server_updates_purge_happens_on_server():
   client1 = cluster.add(Client("c1", scheduler))
   client2 = cluster.add(Client("c2", scheduler))
 
-  cluster.mirror("test_with_pk", client1, server)
-  cluster.mirror("test_with_pk", client2, server)
+  cluster.mirror("test_with_pk", "(id INTEGER PRIMARY KEY, note TEXT)", client1, server)
+  cluster.mirror("test_with_pk", "(id INTEGER PRIMARY KEY, note TEXT)", client2, server)
 
   server.purgeAllAtSomePointFromNow()
 
