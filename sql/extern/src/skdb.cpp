@@ -77,9 +77,16 @@ void SKIP_push_object_field_float(char* v) {
     skdb::watcher->pushObjectFieldFloat(v);
   }
 }
+
 void SKIP_push_object_field_string(char* v) {
   if (skdb::initialized) {
     skdb::watcher->pushObjectFieldString(v);
+  }
+}
+
+void SKIP_push_object_field_json(void* v) {
+  if (skdb::initialized) {
+    skdb::watcher->pushObjectFieldJSON(v);
   }
 }
 

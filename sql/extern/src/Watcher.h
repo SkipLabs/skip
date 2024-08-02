@@ -14,6 +14,7 @@ class Watcher {
   virtual void pushObjectFieldInt64(char*) = 0;
   virtual void pushObjectFieldFloat(char*) = 0;
   virtual void pushObjectFieldString(char*) = 0;
+  virtual void pushObjectFieldJSON(void*) = 0;
   virtual void pushObject(uint32_t) = 0;
   virtual void deleteFun(uint32_t) = 0;
   virtual void markQuery(uint32_t) = 0;

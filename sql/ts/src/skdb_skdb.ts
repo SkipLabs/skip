@@ -13,6 +13,8 @@ import type {
 import { SKDBTable } from "./skdb_util.js";
 import { IDBStorage } from "./skdb_storage.js";
 import { SKDBImpl, SKDBSyncImpl } from "./skdb_database.js";
+// prettier-ignore
+import type { SKJSON } from "#skjson/skjson.js";
 
 interface Exported {
   sk_pop_dirty_page: () => number;
@@ -85,6 +87,7 @@ interface ToWasm {
   SKIP_push_object_field_int64: (field: ptr) => void;
   SKIP_push_object_field_float: (field: ptr) => void;
   SKIP_push_object_field_string: (field: ptr) => void;
+  SKIP_push_object_field_json: (field: ptr) => void;
   SKIP_push_object: (channel: int) => void;
   SKIP_js_mark_query: (queryID: int) => void;
   SKIP_js_delete_fun: (queryID: int) => void;
@@ -217,6 +220,7 @@ class LinksImpl implements Links, ToWasm {
   private notifications: Array<Set<number>>;
   private notifying: boolean;
   private freeQueryIDs: Array<number>;
+  private skjson?: SKJSON;
 
   SKIP_last_tick!: (queryID: int) => int;
   SKIP_clear_field_names!: () => void;
@@ -227,6 +231,7 @@ class LinksImpl implements Links, ToWasm {
   SKIP_push_object_field_int64!: (field: ptr) => void;
   SKIP_push_object_field_float!: (field: ptr) => void;
   SKIP_push_object_field_string!: (field: ptr) => void;
+  SKIP_push_object_field_json!: (field: ptr) => void;
   SKIP_push_object!: (channel: int) => void;
   SKIP_js_mark_query!: (queryID: int) => void;
   SKIP_js_delete_fun!: (queryID: int) => void;
@@ -251,6 +256,12 @@ class LinksImpl implements Links, ToWasm {
 
   complete = (utils: Utils, exports: object) => {
     let exported = exports as Exported;
+    const skjson = () => {
+      if (this.skjson == undefined) {
+        this.skjson = this.environment.shared.get("SKJSON")! as SKJSON;
+      }
+      return this.skjson;
+    };
     this.SKIP_js_notify_all = () => {
       if (this.queriesToNotify.size > 0) {
         this.notifications.push(this.queriesToNotify);
@@ -317,6 +328,12 @@ class LinksImpl implements Links, ToWasm {
     this.SKIP_push_object_field_string = (skV: ptr) => {
       let field_name: string = this.field_names[this.objectIdx]!;
       this.object[field_name] = utils.importString(skV);
+      this.objectIdx++;
+    };
+    this.SKIP_push_object_field_json = (skV: ptr) => {
+      const jsu = skjson();
+      let field_name: string = this.field_names[this.objectIdx]!;
+      this.object[field_name] = jsu.importJSON(skV, true);
       this.objectIdx++;
     };
     this.SKIP_push_object = (channel: int) => {
@@ -482,6 +499,8 @@ class Manager implements ToWasmManager {
       links.SKIP_push_object_field_float(field);
     toWasm.SKIP_push_object_field_string = (field: ptr) =>
       links.SKIP_push_object_field_string(field);
+    toWasm.SKIP_push_object_field_json = (field: ptr) =>
+      links.SKIP_push_object_field_json(field);
     toWasm.SKIP_push_object = (channel: int) => links.SKIP_push_object(channel);
     toWasm.SKIP_js_mark_query = (id: int) => links.SKIP_js_mark_query(id);
     toWasm.SKIP_js_delete_fun = (id: int) => links.SKIP_js_delete_fun(id);

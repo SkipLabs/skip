@@ -22,6 +22,8 @@ native fun jsPushObjectFieldInt64(String): void;
 native fun jsPushObjectFieldFloat(String): void;
 @cpp_extern("SKIP_push_object_field_string")
 native fun jsPushObjectFieldString(String): void;
+@cpp_extern("SKIP_push_object_field_json")
+native fun jsPushObjectFieldJSON(SKJSON.CJSON): void;
 @cpp_extern("SKIP_push_object")
 native fun jsPushObject(UInt32): void;
 
@@ -224,7 +226,7 @@ extension class RowValues extends Row {
           }
         | Some(CFloat(f)) -> jsPushObjectFieldFloat(f.toString())
         | Some(CString(s)) -> jsPushObjectFieldString(s)
-        | Some(b @ CJSON _) -> jsPushObjectFieldString(b.toString())
+        | Some(b @ CJSON _) -> jsPushObjectFieldJSON(b.value)
         | Some(b @ CType _) -> jsPushObjectFieldString(b.toString())
         }
       };
