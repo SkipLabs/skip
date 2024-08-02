@@ -24,6 +24,7 @@ class SKWatcher : public skdb::Watcher {
   void pushObjectFieldInt64(char*);
   void pushObjectFieldFloat(char*);
   void pushObjectFieldString(char*);
+  void pushObjectFieldJSON(void*);
   void pushObject(uint32_t);
   void deleteFun(uint32_t);
   void markQuery(uint32_t);

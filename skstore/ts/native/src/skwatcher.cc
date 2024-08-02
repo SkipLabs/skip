@@ -112,6 +112,11 @@ void SKWatcher::pushObjectFieldString(char* v) {
   pushValue(isolate, FromUtf8(isolate, v));
 }
 
+void SKWatcher::pushObjectFieldJSON(void* v) {
+  Isolate* isolate = Isolate::GetCurrent();
+  pushValue(isolate, skjson::SKStoreToNode(isolate, v, true));
+}
+
 void SKWatcher::pushObjectTo(Isolate* isolate, Persistent<Array>& channel) {
   Local<Context> context = isolate->GetCurrentContext();
   if (channel.IsEmpty()) {

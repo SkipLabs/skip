@@ -102,7 +102,13 @@ void* NodeToSKStore(Isolate* isolate, Local<Value> value) {
   } else if (value->IsString()) {
     return SKIP_SKJSON_createCJString(ToSKString(isolate, value));
   } else if (value->IsNumber()) {
-    return SKIP_SKJSON_createCJFloat(value.As<Number>()->Value());
+    double v = value.As<Number>()->Value();
+    int64_t iv = (int64_t)v;
+    if (v == iv) {
+      return SKIP_SKJSON_createCJInt(iv);
+    } else {
+      return SKIP_SKJSON_createCJFloat(v);
+    }
   } else if (value->IsBoolean()) {
     return SKIP_SKJSON_createCJBool(value.As<Boolean>()->Value());
   } else if (value->IsBigInt()) {

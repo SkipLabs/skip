@@ -13,6 +13,7 @@
 
 #define CJSON void*
 #define CJArray void*
+#define CJObject void*
 #define SKCONTEXT void*
 #define SKHANDLE void*
 #define SKWRITER void*
@@ -48,6 +49,8 @@ double SKIP_SKStore_createTables(CJSON schemas);
 int SKIP_init_runtime(char* fileName, int is_create, int64_t capacity);
 void SKIP_collect_alloc_error(int code, char* fileName, int is_create,
                               std::ostringstream& error);
+
+CJArray SKIP_SKStore_jsonExtract(CJObject json, char* pattern);
 }
 
 namespace skstore {
@@ -97,6 +100,7 @@ void SKStore::Prototype(Local<FunctionTemplate> tpl) {
   NODE_SET_PROTOTYPE_METHOD(tpl, "asyncLazy", AsyncLazy);
   NODE_SET_PROTOTYPE_METHOD(tpl, "multimap", Multimap);
   NODE_SET_PROTOTYPE_METHOD(tpl, "multimapReduce", MultimapReduce);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "jsonExtract", JSONExtract);
 }
 
 void SKStore::Init(Local<Object> exports) {
@@ -335,6 +339,29 @@ void SKStore::MultimapReduce(const FunctionCallbackInfo<Value>& args) {
         args.GetReturnValue().Set(eHandle.ToLocalChecked());
     });
   }
+}
+
+void SKStore::JSONExtract(const FunctionCallbackInfo<Value>& args) {
+  Isolate* isolate = args.GetIsolate();
+  if (args.Length() != 2) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(
+        Exception::TypeError(FromUtf8(isolate, "Must have two parameters.")));
+    return;
+  };
+  if (!args[0]->IsObject() || !args[1]->IsString()) {
+    isolate->ThrowException(
+        Exception::TypeError(FromUtf8(isolate, "Invalid parameter type.")));
+    return;
+  }
+  NatTryCatch(isolate, [&args](Isolate* isolate) {
+    v8::String::Utf8Value pattern(isolate, args[1]);
+    const char* strPattern = *pattern;
+    CJArray skResult = SKIP_SKStore_jsonExtract(
+        skjson::NodeToSKStore(isolate, args[0]),
+        sk_string_create(strPattern, strlen(strPattern)));
+    args.GetReturnValue().Set(skjson::SKStoreToNode(isolate, skResult, false));
+  });
 }
 
 void Register(const FunctionCallbackInfo<Value>& args) {

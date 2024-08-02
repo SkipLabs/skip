@@ -5,6 +5,7 @@ import {
   cinteger as integer,
   ctext as text,
   schema,
+  cjson as json,
 } from "./skstore.mjs";
 
 import { fork } from "child_process";
@@ -332,6 +333,59 @@ async function testAsyncLazyRun(input1, input2, output) {
   return new Promise(waitandcheck);
 }
 
+// testJSONExtract
+
+function testJSONExtractInit(skstore, input, output) {
+  const eager = input.map((row, _occ) => {
+    const key = row[0];
+    const value = row[1];
+    const pattern = row[2];
+    const result = skstore.jsonExtract(value, pattern);
+    return Array([key, result]);
+  });
+  eager.mapTo(output, (key, it) => {
+    return [key, it.first()];
+  });
+}
+
+async function testJSONExtractRun(input, output) {
+  input.insert(
+    [
+      [
+        0,
+        { x: [1, 2, 3], "y[0]": [4, 5, 6, null] },
+        '{x[]: var1, ?"y[0]": var2}',
+      ],
+      [1, { x: [1, 2, 3], y: [4, 5, 6, null] }, "{x[]: var1, ?y[0]: var2}"],
+      [2, { x: 1, y: 2 }, "{%: var, x:var<int>}"],
+    ],
+    true,
+  );
+  const res = output.select({}, ["id", "v"]);
+  check("testJSONExtract", res, [
+    {
+      id: 0,
+      v: [
+        [{ var2: [4, 5, 6, null] }, { var1: 1 }],
+        [{ var2: [4, 5, 6, null] }, { var1: 2 }],
+        [{ var2: [4, 5, 6, null] }, { var1: 3 }],
+      ],
+    },
+    {
+      id: 1,
+      v: [
+        [{ var2: 4 }, { var1: 1 }],
+        [{ var2: 4 }, { var1: 2 }],
+        [{ var2: 4 }, { var1: 3 }],
+      ],
+    },
+    {
+      id: 2,
+      v: [[{ var: 1 }, { var: 2 }]],
+    },
+  ]);
+}
+
 //// Tests
 
 export const tests = [
@@ -411,6 +465,15 @@ export const tests = [
     ],
     init: testAsyncLazyInit,
     run: testAsyncLazyRun,
+  },
+  {
+    name: "testJSONExtract",
+    schema: [
+      schema("input", [integer("id", true), json("v"), text("p")]),
+      schema("output", [integer("id", true), json("v")]),
+    ],
+    init: testJSONExtractInit,
+    run: testJSONExtractRun,
   },
 ];
 

@@ -2,7 +2,7 @@
 import type { int, ptr, Links, Utils, ToWasmManager, Environment, Opt, Metadata } from "#std/sk_types.js";
 // prettier-ignore
 import type { SKDBShared } from "#skdb/skdb_types.js";
-import type { SKJSON } from "./skstore_skjson.js";
+import type { SKJSON } from "#skjson/skjson.js";
 import type {
   Accumulator,
   NonEmptyIterator,
@@ -290,6 +290,15 @@ export class ContextImpl implements Context {
       convertId,
     );
   };
+
+  jsonExtract(value: JSONObject, pattern: string): TJSON[] {
+    return this.skjson.importJSON(
+      this.exports.SKIP_SKStore_jsonExtract(
+        this.skjson.exportJSON(value),
+        this.skjson.exportString(pattern),
+      ),
+    );
+  }
 
   private execQuery = (fn: () => number) => {
     if (this.ref.get() != null) {

@@ -1485,17 +1485,26 @@ export class SKStoreImpl implements SKStore {
     );
   }
 
-  log(object: any): void {
-    if (
-      typeof object == "object" &&
-      (("__isArrayProxy" in object && object.__isArrayProxy) ||
-        ("__isObjectProxy" in object && object.__isObjectProxy)) &&
-      "clone" in object
-    ) {
-      console.log(object.clone());
-    } else {
-      console.log(object);
-    }
+  jsonExtract(value: JSONObject, pattern: string): TJSON[] {
+    return this.context.jsonExtract(value, pattern);
+  }
+
+  log(...objects: TJSON[]): void {
+    const toLog = objects.map((object) => {
+      if (object === null) {
+        return null;
+      } else if (
+        typeof object == "object" &&
+        (("__isArrayProxy" in object && object.__isArrayProxy) ||
+          ("__isObjectProxy" in object && object.__isObjectProxy)) &&
+        "clone" in object
+      ) {
+        return (object as any).clone();
+      } else {
+        return object;
+      }
+    });
+    console.log(...toLog);
   }
 }
 
@@ -1611,7 +1620,12 @@ function toParams(params: JSONObject): Params {
 
 export function check<T>(value: T): void {
   const type = typeof value;
-  if (type == "string" || type == "number" || type == "boolean") {
+  if (
+    value == null ||
+    type == "string" ||
+    type == "number" ||
+    type == "boolean"
+  ) {
     return;
   } else if (type == "object") {
     const jso = value as any;

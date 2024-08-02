@@ -75,7 +75,8 @@ export async function createSKStore(
   return factory.runSKStore(init, tables, connect);
 }
 
-export function freeze<T extends TJSON>(value: T): T {
+export function freeze<T extends TJSON | null>(value: T): T {
+  if (value == null) return value;
   const type = typeof value;
   if (type == "string" || type == "number" || type == "boolean") {
     return value;

@@ -139,6 +139,8 @@ export interface Context {
 
   deleteWhere: (name: string, where: JSONObject) => void;
 
+  jsonExtract(value: JSONObject, pattern: string): TJSON[];
+
   noref: () => Context;
   notify?: () => void;
 }
@@ -222,4 +224,7 @@ export interface FromWasm {
   SKIP_SKStore_select(name: ptr, select: ptr, columns: ptr): ptr;
   SKIP_SKStore_delete(name: ptr, columns: ptr, entry: ptr): number;
   SKIP_SKStore_deleteWhere(name: ptr, where: ptr): number;
+
+  // Utils
+  SKIP_SKStore_jsonExtract(json: ptr, pattern: ptr): ptr;
 }
