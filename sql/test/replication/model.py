@@ -336,7 +336,7 @@ class SkdbPeer:
   def initTask(self) -> Task:
     raise NotImplementedError()
 
-  def tailTask(self, table, dest, peerId):
+  def tailTask(self, table, schema, dest, peerId):
     def factory(stream, init):
       subkey = (self, stream, 'sub')
 
@@ -350,7 +350,7 @@ class SkdbPeer:
         db = schedule.getScheduleLocal(self)
         session = schedule.getScheduleLocal(subkey)
         since = schedule.getScheduleLocal(sinceKey) or 1
-        spec = { table: { "since": since } }
+        spec = { table: { "since": since, "expectedSchema": schema } }
         payload, log, exitcode = await tail(db, session, peerId, spec)
         schedule.debug(log.decode().rstrip())
         self.checkTailOutputExpectations(payload.decode(), since)
@@ -361,7 +361,7 @@ class SkdbPeer:
         # again with a since of 0.
         if exitcode > 0:
           schedule.debug(payload.decode().rstrip())
-          payload, log, exitcode = await tail(db, session, peerId, { table: { "since": 0 } })
+          payload, log, exitcode = await tail(db, session, peerId, { table: { "since": 0, "expectedSchema": schema } })
           schedule.debug(log.decode().rstrip())
           self.checkTailOutputExpectations(payload.decode(), since)
           stream.send(schedule, payload)
@@ -462,17 +462,17 @@ class Topology:
     self.replicationIdGen = self.replicationIdGen + 1
     return str(self.replicationIdGen)
 
-  def mirror(self, table, a, b):
+  def mirror(self, table, schema, a, b):
     # TODO: this should take a list of tables and only setup a single
     # w-csv and tail. but currently all tests just work with one
     # table.
     repIdForA = self._genReplicationId()
     repIdForB = self._genReplicationId()
     atob = HalfStream(a, b,
-                      a.tailTask(table, dest=repIdForB, peerId=a.name),
+                      a.tailTask(table, schema, dest=repIdForB, peerId=a.name),
                       b.writeTask(source=repIdForA, peerId=b.name))
     btoa = HalfStream(b, a,
-                      b.tailTask(table, dest=repIdForA, peerId=b.name),
+                      b.tailTask(table, schema, dest=repIdForA, peerId=b.name),
                       a.writeTask(source=repIdForB, peerId=a.name))
     atob.other = btoa
     btoa.other = atob
