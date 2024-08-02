@@ -20,7 +20,7 @@ def test_client_server_single_orthogonal_insert_each():
   server = cluster.add(Server("s1", scheduler))
   client1 = cluster.add(Client("c1", scheduler))
 
-  cluster.mirror("test_without_pk", client1, server)
+  cluster.mirror("test_without_pk", "(id INTEGER, note TEXT)", client1, server)
 
   client1.insertInto("test_without_pk", [0, 'foo'])
   server.insertInto("test_without_pk", [1, 'bar'])
@@ -45,8 +45,8 @@ def test_two_clients_single_server_two_conflicting_inserts_each():
   client1 = cluster.add(Client("c1", scheduler))
   client2 = cluster.add(Client("c2", scheduler))
 
-  cluster.mirror("test_without_pk", client1, server)
-  cluster.mirror("test_without_pk", client2, server)
+  cluster.mirror("test_without_pk", "(id INTEGER, note TEXT)", client1, server)
+  cluster.mirror("test_without_pk", "(id INTEGER, note TEXT)", client2, server)
 
   client1.insertInto("test_without_pk", [0, 'foo'])
   server.insertInto("test_without_pk", [0, 'foo'])
@@ -71,8 +71,8 @@ def test_two_clients_single_server_two_conflicting_inserts_with_causality():
   client1 = cluster.add(Client("c1", scheduler))
   client2 = cluster.add(Client("c2", scheduler))
 
-  cluster.mirror("test_without_pk", client1, server)
-  cluster.mirror("test_without_pk", client2, server)
+  cluster.mirror("test_without_pk", "(id INTEGER, note TEXT)", client1, server)
+  cluster.mirror("test_without_pk", "(id INTEGER, note TEXT)", client2, server)
 
   client1.insertInto("test_without_pk", [0, 'foo'])
   client1.insertInto("test_without_pk", [0, 'foo'])
@@ -98,8 +98,8 @@ def test_two_clients_single_server_single_conflicting_insert_each():
   client1 = cluster.add(Client("c1", scheduler))
   client2 = cluster.add(Client("c2", scheduler))
 
-  cluster.mirror("test_without_pk", client1, server)
-  cluster.mirror("test_without_pk", client2, server)
+  cluster.mirror("test_without_pk", "(id INTEGER, note TEXT)", client1, server)
+  cluster.mirror("test_without_pk", "(id INTEGER, note TEXT)", client2, server)
 
   client1.insertInto("test_without_pk", [0, 'foo'])
   client2.insertInto("test_without_pk", [0, 'foo'])
@@ -129,8 +129,8 @@ def test_two_clients_single_server_multiple_inserts_on_client1_insert_on_each():
   client1 = cluster.add(Client("c1", scheduler))
   client2 = cluster.add(Client("c2", scheduler))
 
-  cluster.mirror("test_without_pk", client1, server)
-  cluster.mirror("test_without_pk", client2, server)
+  cluster.mirror("test_without_pk", "(id INTEGER, note TEXT)", client1, server)
+  cluster.mirror("test_without_pk", "(id INTEGER, note TEXT)", client2, server)
 
   client1.insertInto("test_without_pk", [0, 'foo'])
   client1.insertInto("test_without_pk", [0, 'foo'])
@@ -160,8 +160,8 @@ def test_two_clients_insert_and_delete():
   client1 = cluster.add(Client("c1", scheduler))
   client2 = cluster.add(Client("c2", scheduler))
 
-  cluster.mirror("test_without_pk", client1, server)
-  cluster.mirror("test_without_pk", client2, server)
+  cluster.mirror("test_without_pk", "(id INTEGER, note TEXT)", client1, server)
+  cluster.mirror("test_without_pk", "(id INTEGER, note TEXT)", client2, server)
 
   insert = client1.insertInto("test_without_pk", [0, 'foo'])
   delete = server.deleteFromWhere("test_without_pk", "id = 0")
@@ -193,9 +193,9 @@ def ignore_test_full_mesh_two_conflicting_inserts():
   client1 = cluster.add(Client("c1", scheduler))
   client2 = cluster.add(Client("c2", scheduler))
 
-  cluster.mirror("test_without_pk", client1, server)
-  cluster.mirror("test_without_pk", client2, server)
-  cluster.mirror("test_without_pk", client1, client2)
+  cluster.mirror("test_without_pk", "(id INTEGER, note TEXT)", client1, server)
+  cluster.mirror("test_without_pk", "(id INTEGER, note TEXT)", client2, server)
+  cluster.mirror("test_without_pk", "(id INTEGER, note TEXT)", client1, client2)
 
   client1.insertInto("test_without_pk", [0, 'foo'])
   server.insertInto("test_without_pk", [0, 'foo'])
@@ -221,9 +221,9 @@ def ignore_test_full_mesh_with_insert_and_delete():
   client1 = cluster.add(Client("c1", scheduler))
   client2 = cluster.add(Client("c2", scheduler))
 
-  cluster.mirror("test_without_pk", client1, server)
-  cluster.mirror("test_without_pk", client2, server)
-  cluster.mirror("test_without_pk", client1, client2)
+  cluster.mirror("test_without_pk", "(id INTEGER, note TEXT)", client1, server)
+  cluster.mirror("test_without_pk", "(id INTEGER, note TEXT)", client2, server)
+  cluster.mirror("test_without_pk", "(id INTEGER, note TEXT)", client1, client2)
 
   insert = client1.insertInto("test_without_pk", [0, 'foo'])
   delete = server.deleteFromWhere("test_without_pk", "id = 0")
