@@ -18,7 +18,7 @@ check-%: ../build/sknpm
 	../build/sknpm b -r --nowasm --out-dir ts/examples/node_modules/skstore
 	tsc --project ts/examples/tsconfig.json
 
-noderun-%: build/sknpm
+noderun-%: ../build/sknpm
 	cd ts/examples && npm install
 	../build/sknpm b -r --out-dir ts/examples/node_modules/skstore
 	tsc --project ts/examples/tsconfig.json
