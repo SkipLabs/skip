@@ -51,8 +51,8 @@ class TestFromIntInt implements InputMapper<[number, number], number, number> {
 class TestToOutput<V extends TJSON>
   implements OutputMapper<[number, V], number, V>
 {
-  mapElement(key: number, it: NonEmptyIterator<V>): [number, V] {
-    return [key, it.first()];
+  mapElement(key: number, it: NonEmptyIterator<V>): Iterable<[number, V]> {
+    return Array([key, it.first()]);
   }
 }
 

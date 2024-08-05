@@ -183,7 +183,7 @@ export interface OutputMapper<
   K extends TJSON,
   V extends TJSON,
 > {
-  mapElement: (key: K, it: NonEmptyIterator<V>) => R;
+  mapElement: (key: K, it: NonEmptyIterator<V>) => Iterable<R>;
 }
 
 /**

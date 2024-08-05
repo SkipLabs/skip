@@ -18,7 +18,7 @@ native fun applyConvertToRowFun(
   fn: UInt32,
   key: SKJSON.CJSON,
   values: mutable NonEmptyIterator<JSONFile>,
-): SKJSON.CJSON;
+): SKJSON.CJArray;
 
 @cpp_extern
 @debug
@@ -192,7 +192,7 @@ class FnHandle private (eptr: SKStore.ExternalPointer) extends File {
   fun toRow(
     key: JSONID,
     values: mutable NonEmptyIterator<JSONFile>,
-  ): SKJSON.CJSON {
+  ): SKJSON.CJArray {
     applyConvertToRowFun(this.getId(), key.value, values)
   }
 }

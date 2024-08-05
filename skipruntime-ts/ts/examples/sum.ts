@@ -51,8 +51,8 @@ class Add implements Mapper<number, number, number, number> {
 class ToOutput<K extends TJSON, V extends TJSON>
   implements OutputMapper<[K, V], K, V>
 {
-  mapElement(key: K, it: NonEmptyIterator<V>): [K, V] {
-    return [key, it.first()];
+  mapElement(key: K, it: NonEmptyIterator<V>): Iterable<[K, V]> {
+    return Array([key, it.first()]);
   }
 }
 
