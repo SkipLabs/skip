@@ -64,7 +64,7 @@ fun toTable(
   conv: (
     SKStore.JSONID,
     mutable SKStore.NonEmptyIterator<SKStore.JSONFile>,
-  ) ~> SKJSON.CJSON,
+  ) ~> SKJSON.CJArray,
 ): void {
   dirDescr = SKDB.getTable(context, 0, P.Name::create(table));
   dirName = SKStore.subDirName(context, "outputs/" + table);
@@ -74,10 +74,14 @@ fun toTable(
     context,
     dirName,
     (context, writer, key, it) ~> {
-      computed = conv(key, it);
-      rowValues = toRowValues(context, dirDescr, computed);
-      rowKey = SKDB.RowKey(rowValues, dirDescr.kinds);
-      writer.set(rowKey, rowValues)
+      conv(key, it) match {
+      | SKJSON.CJArray(values) ->
+        values.each(computed -> {
+          rowValues = toRowValues(context, dirDescr, computed);
+          rowKey = SKDB.RowKey(rowValues, dirDescr.kinds);
+          writer.set(rowKey, rowValues)
+        })
+      }
     },
   );
   context.maybeGetEagerDir(converted.getDirName()).each(dir ->

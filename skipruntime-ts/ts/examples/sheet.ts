@@ -113,8 +113,8 @@ class ToOutput
   mapElement(
     key: [string, string],
     it: NonEmptyIterator<string>,
-  ): [string, string, string] {
-    return [key[0], key[1], it.first()];
+  ): Iterable<[string, string, string]> {
+    return Array([key[0], key[1], it.first()]);
   }
 }
 
