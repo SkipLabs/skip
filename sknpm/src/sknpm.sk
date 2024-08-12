@@ -216,17 +216,14 @@ private fun exec(
   if (!p.success()) {
     if (console.verbosity < verbosity) {
       console.error(
-        "command exited with non-zero status\n\n" +
-          "Caused by:\n" +
-          "  process did not exit successfully: \`" +
-          args[0] +
-          `\` (exit status: ${p.exitcode()})\n` +
-          "  --- stdout\n" +
-          p.stdout.split("\n").map(l -> "  " + l).join("\n") +
-          "\n" +
-          "  --- stderr\n" +
-          p.stderr.split("\n").map(l -> "  " + l).join("\n") +
-          "\n",
+        `command exited with non-zero status\n\n` +
+          `Caused by:\n` +
+          `  process did not exit successfully: \`${args[0]}\`` +
+          ` (exit status: ${p.exitcode()})\n` +
+          `  --- stdout\n` +
+          `${p.stdout}\n` +
+          `  --- stderr\n` +
+          `${p.stderr}\n`,
       );
     };
     Failure(void)
