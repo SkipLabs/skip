@@ -4,7 +4,7 @@ SKARGO_PROFILE?=release
 ../build/sknpm:
 	cd .. && make build/sknpm
 
-build-%: ../build/sknpm
+build: ../build/sknpm
 	cd ts/examples && bun install
 	../build/sknpm b -r --out-dir ts/examples/node_modules/skstore
 
@@ -13,7 +13,7 @@ bunrun-%: ../build/sknpm
 	../build/sknpm b -r --out-dir ts/examples/node_modules/skstore
 	bun run ts/examples/wmain.ts -f ts/examples/$*.ts -m io
 
-check-%: ../build/sknpm
+check: ../build/sknpm
 	cd ts/examples && npm install
 	../build/sknpm b -r --nowasm --out-dir ts/examples/node_modules/skstore
 	tsc --project ts/examples/tsconfig.json
