@@ -117,6 +117,13 @@ fun iteratorNext(values: mutable NonEmptyIterator<JSONFile>): ?SKJSON.CJSON {
   values.next().map(v -> v.value)
 }
 
+@export("SKIP_SKStore_cloneIterator")
+fun cloneIterator(
+  values: mutable NonEmptyIterator<JSONFile>,
+): mutable NonEmptyIterator<JSONFile> {
+  values.clone()
+}
+
 class FnHandle private (eptr: SKStore.ExternalPointer) extends File {
   static fun make(id: UInt32): this {
     static(SKStore.ExternalPointer::create(id, detachHandle))
