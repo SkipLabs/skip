@@ -60,9 +60,10 @@ mutable class EmptyIterator<T>() extends FileIterator<T> {
 }
 
 mutable class NonEmptyIterator<+T>(
-  mutable first: T,
-  iter: mutable Iterator<T>,
+  first: T,
+  mutable iter: mutable Iterator<T>,
   mutable isPastFirstValue: Bool = false,
+  mutable materializedIter: ?Array<T> = None(),
 ) extends FileIterator<T> {
   mutable fun next(): ?T {
     if (this.isPastFirstValue) {
@@ -94,6 +95,23 @@ mutable class NonEmptyIterator<+T>(
     | None() -> void
     | Some _ -> err()
     }
+  }
+  mutable fun clone(): mutable NonEmptyIterator<T> {
+    array: Array<T> = this.materializedIter match {
+    | None() ->
+      array = this.iter.collect(Array);
+      this.!materializedIter = Some(array);
+      this.!iter = (array.iterator() : mutable Iterator<T>);
+      array
+    | Some(array) -> array
+    };
+
+    mutable NonEmptyIterator(
+      this.first,
+      array.iterator(),
+      this.isPastFirstValue,
+      Some(array),
+    )
   }
 }
 

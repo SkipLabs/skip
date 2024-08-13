@@ -361,16 +361,19 @@ class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
     return Array.from(this);
   };
 
-  *iterator() {
-    let value = this.next();
-    while (value != null) {
-      yield value;
-      value = this.next();
-    }
-  }
+  [Symbol.iterator](): Iterator<T> {
+    const cloned_iter = new NonEmptyIteratorImpl<T>(
+      this.skjson,
+      this.exports,
+      this.exports.SKIP_SKStore_cloneIterator(this.pointer),
+    );
 
-  [Symbol.iterator]() {
-    return this.iterator();
+    return {
+      next() {
+        const value = cloned_iter.next();
+        return { value, done: value == null } as IteratorResult<T>;
+      },
+    };
   }
 }
 
