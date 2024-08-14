@@ -1,6 +1,7 @@
 
 SKARGO_PROFILE?=release
 
+.PHONY: ../build/sknpm
 ../build/sknpm:
 	cd .. && make build/sknpm
 
