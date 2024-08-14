@@ -291,24 +291,23 @@ class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
     this.pointer = pointer;
   }
 
-  next: () => Opt<T> = () => {
+  next(): Opt<T> {
     return this.skjson.importOptJSON(
       this.exports.SKIP_SKStore_iteratorNext(this.pointer),
     );
-  };
+  }
 
-  first: () => T = () => {
+  first(): T {
     return this.skjson.importJSON(
       this.exports.SKIP_SKStore_iteratorFirst(this.pointer),
-    ) as T;
-  };
+    );
+  }
 
-  uniqueValue: () => Opt<T> = () => {
-    const jsObj = this.skjson.importOptJSON(
+  uniqueValue(): Opt<T> {
+    return this.skjson.importOptJSON(
       this.exports.SKIP_SKStore_iteratorUniqueValue(this.pointer),
     );
-    return jsObj != null ? (jsObj as T) : null;
-  };
+  }
 
   toArray: () => T[] = () => {
     return Array.from(this);
