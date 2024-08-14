@@ -68,6 +68,7 @@ class WasmHandle {
 }
 
 function getValue(hdl: WasmHandle): any {
+  if (hdl.pointer == 0) return null;
   const type = hdl.access.SKIP_SKJSON_typeOf(hdl.pointer);
   switch (type) {
     case Type.Null:
