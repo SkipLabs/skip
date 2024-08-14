@@ -36,3 +36,6 @@ nodeplay-%: ../build/sknpm
 	tsc --project ts/examples/tsconfig.json
 	cd ts/examples && echo "play 1\nexit\n" | node dist/wmain.js -f  dist/$*.js -m io
 
+.PHONY: fmt
+fmt:
+	npx prettier --log-level warn --write .
