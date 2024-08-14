@@ -18,14 +18,8 @@ import type {
   Loadable,
   JSONObject,
   TJSON,
-  Param,
-  EMParameters,
-  MParameters,
-  OMParameters,
   LazyCompute,
-  LParameters,
   AsyncLazyCompute,
-  ALParameters,
   NonEmptyIterator,
 } from "../skstore_api.js";
 
@@ -65,12 +59,15 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     return this.context.size(this.eagerHdl);
   };
 
-  map<
-    K2 extends TJSON,
-    V2 extends TJSON,
-    C extends new (...params: Param[]) => Mapper<K, V, K2, V2>,
-  >(mapper: C, ...params: MParameters<K, V, K2, V2, C>): EHandle<K2, V2> {
-    const mapperObj = new mapper(...params);
+  map<K2 extends TJSON, V2 extends TJSON>(
+    mapper: new (
+      eparams: EHandle<any, any>[],
+      lparams: LHandle<any, any>[],
+    ) => Mapper<K, V, K2, V2>,
+    eparams: EHandle<any, any>[],
+    lparams: LHandle<any, any>[],
+  ): EHandle<K2, V2> {
+    const mapperObj = new mapper(eparams, lparams);
     if (!mapperObj.constructor.name) {
       throw new Error("The class must have a name.");
     }
@@ -82,17 +79,16 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     return this.derive<K2, V2>(eagerHdl);
   }
 
-  mapReduce<
-    K2 extends TJSON,
-    V2 extends TJSON,
-    V3 extends TJSON,
-    C extends new (...params: Param[]) => Mapper<K, V, K2, V2>,
-  >(
-    mapper: C,
+  mapReduce<K2 extends TJSON, V2 extends TJSON, V3 extends TJSON>(
+    mapper: new (
+      eparams: EHandle<any, any>[],
+      lparams: LHandle<any, any>[],
+    ) => Mapper<K, V, K2, V2>,
     accumulator: Accumulator<V2, V3>,
-    ...params: MParameters<K, V, K2, V2, C>
+    eparams: EHandle<any, any>[],
+    lparams: LHandle<any, any>[],
   ) {
-    const mapperObj = new mapper(...params);
+    const mapperObj = new mapper(eparams, lparams);
     if (!mapperObj.constructor.name) {
       throw new Error("The class must have a name.");
     }
@@ -105,15 +101,16 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     return this.derive<K2, V3>(eagerHdl);
   }
 
-  mapTo<
-    R extends TJSON[],
-    C extends new (...params: Param[]) => OutputMapper<R, K, V>,
-  >(
+  mapTo<R extends TJSON[]>(
     table: TableHandle<R>,
-    mapper: C,
-    ...params: OMParameters<R, K, V, C>
+    mapper: new (
+      eparams: EHandle<any, any>[],
+      lparams: LHandle<any, any>[],
+    ) => OutputMapper<R, K, V>,
+    eparams: EHandle<any, any>[],
+    lparams: LHandle<any, any>[],
   ): void {
-    const mapperObj = new mapper(...params);
+    const mapperObj = new mapper(eparams, lparams);
     if (!mapperObj.constructor.name) {
       throw new Error("The class must have a name.");
     }
@@ -174,12 +171,15 @@ export class TableHandleImpl<R extends TJSON[]> implements TableHandle<R> {
     return this.context.getFromTable(this.getName(), key, index);
   }
 
-  map<
-    K extends TJSON,
-    V extends TJSON,
-    C extends new (...params: Param[]) => EntryMapper<R, K, V>,
-  >(mapper: C, ...params: EMParameters<K, V, R, C>): EHandle<K, V> {
-    const mapperObj = new mapper(...params);
+  map<K extends TJSON, V extends TJSON>(
+    mapper: new (
+      eparams: EHandle<any, any>[],
+      lparams: LHandle<any, any>[],
+    ) => EntryMapper<R, K, V>,
+    eparams: EHandle<any, any>[],
+    lparams: LHandle<any, any>[],
+  ): EHandle<K, V> {
+    const mapperObj = new mapper(eparams, lparams);
     if (!mapperObj.constructor.name) {
       throw new Error("The class must have a name.");
     }
@@ -301,7 +301,7 @@ export class SKStoreImpl implements SKStore {
   >(mappings: Mapping<K1, V1, K2, V2>[]): EHandle<K2, V2> {
     var name = "";
     const ctxmapping = mappings.map((mapping) => {
-      const mapperObj = new mapping.mapper(...(mapping.params ?? []));
+      const mapperObj = new mapping.mapper(mapping.eparams, mapping.lparams);
       name += mapperObj.constructor.name;
       return {
         handle: mapping.handle,
@@ -325,7 +325,7 @@ export class SKStoreImpl implements SKStore {
   ): EHandle<K2, V3> {
     var name = "";
     const ctxmapping = mappings.map((mapping) => {
-      const mapperObj = new mapping.mapper(...(mapping.params ?? []));
+      const mapperObj = new mapping.mapper(mapping.eparams, mapping.lparams);
       name += mapperObj.constructor.name;
       return {
         handle: mapping.handle,
@@ -337,12 +337,15 @@ export class SKStoreImpl implements SKStore {
     return new EHandleImpl<K2, V3>(this.context, eagerHdl);
   }
 
-  lazy<
-    K extends TJSON,
-    V extends TJSON,
-    C extends new (...params: Param[]) => LazyCompute<K, V>,
-  >(compute: C, ...params: LParameters<K, V, C>): LHandle<K, V> {
-    const computeObj = new compute(...params);
+  lazy<K extends TJSON, V extends TJSON>(
+    compute: new (
+      eparams: EHandle<any, any>[],
+      lparams: LHandle<any, any>[],
+    ) => LazyCompute<K, V>,
+    eparams: EHandle<any, any>[],
+    lparams: LHandle<any, any>[],
+  ): LHandle<K, V> {
+    const computeObj = new compute(eparams, lparams);
     const name = computeObj.constructor.name;
     const lazyHdl = this.context.lazy(name, (selfHdl: LHandle<K, V>, key: K) =>
       computeObj.compute(selfHdl, key),
@@ -350,17 +353,15 @@ export class SKStoreImpl implements SKStore {
     return new LHandleImpl<K, V>(this.context, lazyHdl);
   }
 
-  asyncLazy<
-    K extends TJSON,
-    V extends TJSON,
-    P extends TJSON,
-    M extends TJSON,
-    C extends new (...params: Param[]) => AsyncLazyCompute<K, V, P, M>,
-  >(
-    compute: C,
-    ...params: ALParameters<K, V, P, M, C>
+  asyncLazy<K extends TJSON, V extends TJSON, P extends TJSON, M extends TJSON>(
+    compute: new (
+      eparams: EHandle<any, any>[],
+      lparams: LHandle<any, any>[],
+    ) => AsyncLazyCompute<K, V, P, M>,
+    eparams: EHandle<any, any>[],
+    lparams: LHandle<any, any>[],
   ): LHandle<K, Loadable<V, M>> {
-    const computeObj = new compute(...params);
+    const computeObj = new compute(eparams, lparams);
     const name = computeObj.constructor.name;
     const lazyHdl = this.context.asyncLazy<K, V, P, M>(
       name,

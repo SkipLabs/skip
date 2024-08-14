@@ -14,7 +14,6 @@ export type TJSON = number | JSONObject | boolean | TJSON[] | string;
 
 export type TTableHandle = any;
 export type TTable = any;
-export type Param = any;
 
 export type DBType = "TEXT" | "JSON" | "INTEGER" | "FLOAT" | "SCHEMA";
 
@@ -132,13 +131,6 @@ export interface EntryMapper<
   mapElement: (entry: R, occ: number) => Iterable<[K, V]>;
 }
 
-export type EMParameters<
-  K extends TJSON,
-  V extends TJSON,
-  R extends TJSON[],
-  C extends new (...params: Param[]) => EntryMapper<R, K, V>,
-> = C extends new (...params: infer P) => EntryMapper<R, K, V> ? P : never;
-
 /**
  * The type of a reactive function mapping over an arbitrary collection.
  * For each key & values in the input collection (of type K1/V1 respectively),
@@ -156,14 +148,6 @@ export interface Mapper<
   mapElement: (key: K1, it: NonEmptyIterator<V1>) => Iterable<[K2, V2]>;
 }
 
-export type MParameters<
-  K1 extends TJSON,
-  V1 extends TJSON,
-  K2 extends TJSON,
-  V2 extends TJSON,
-  C extends new (...params: Param[]) => Mapper<K1, V1, K2, V2>,
-> = C extends new (...params: infer P) => Mapper<K1, V1, K2, V2> ? P : never;
-
 /**
  * The handle entry mapper function to write data into table
  * @param key - the mapped handle entry key
@@ -177,13 +161,6 @@ export interface OutputMapper<
 > {
   mapElement: (key: K, it: NonEmptyIterator<V>) => R;
 }
-
-export type OMParameters<
-  R extends TJSON,
-  K extends TJSON,
-  V extends TJSON,
-  C extends new (...params: Param[]) => OutputMapper<R, K, V>,
-> = C extends new (...params: infer P) => OutputMapper<R, K, V> ? P : never;
 
 /**
  * The type of a reactive accumulator (a.k.a. reducer) function, which computes an output
@@ -266,13 +243,13 @@ export interface EHandle<K extends TJSON, V extends TJSON> {
    * @param {Mapper} mapper - function to apply to each element of this collection
    * @returns {EHandle} An eager handle on the resulting output collection
    */
-  map<
-    K2 extends TJSON,
-    V2 extends TJSON,
-    C extends new (...params: Param[]) => Mapper<K, V, K2, V2>,
-  >(
-    mapper: C,
-    ...params: MParameters<K, V, K2, V2, C>
+  map<K2 extends TJSON, V2 extends TJSON>(
+    mapper: new (
+      eparams: EHandle<any, any>[],
+      lparams: LHandle<any, any>[],
+    ) => Mapper<K, V, K2, V2>,
+    eparams: EHandle<any, any>[],
+    lparams: LHandle<any, any>[],
   ): EHandle<K2, V2>;
   /**
    * Create a new eager reactive collection by mapping some computation `mapper` over this
@@ -281,15 +258,14 @@ export interface EHandle<K extends TJSON, V extends TJSON> {
    * @param {Accumulator} accumulator - function to combine results of the `mapper`
    * @returns {EHandle} An eager handle on the output of the `accumulator`
    */
-  mapReduce<
-    K2 extends TJSON,
-    V2 extends TJSON,
-    V3 extends TJSON,
-    C extends new (...params: Param[]) => Mapper<K, V, K2, V2>,
-  >(
-    mapper: C,
+  mapReduce<K2 extends TJSON, V2 extends TJSON, V3 extends TJSON>(
+    mapper: new (
+      eparams: EHandle<any, any>[],
+      lparams: LHandle<any, any>[],
+    ) => Mapper<K, V, K2, V2>,
     accumulator: Accumulator<V2, V3>,
-    ...params: MParameters<K, V, K2, V2, C>
+    eparams: EHandle<any, any>[],
+    lparams: LHandle<any, any>[],
   ): EHandle<K2, V3>;
 
   /**
@@ -302,13 +278,14 @@ export interface EHandle<K extends TJSON, V extends TJSON> {
    * @param {Mapper} mapper - function to apply to each key/value pair in this collection
    *                          to produce a table row
    */
-  mapTo<
-    R extends TJSON[],
-    C extends new (...params: Param[]) => OutputMapper<R, K, V>,
-  >(
+  mapTo<R extends TJSON[]>(
     table: TableHandle<R>,
-    mapper: C,
-    ...params: OMParameters<R, K, V, C>
+    mapper: new (
+      eparams: EHandle<any, any>[],
+      lparams: LHandle<any, any>[],
+    ) => OutputMapper<R, K, V>,
+    eparams: EHandle<any, any>[],
+    lparams: LHandle<any, any>[],
   ): void;
 
   getId(): string;
@@ -331,13 +308,13 @@ export interface TableHandle<R extends TJSON[]> {
    * Create a new eager reactive collection by mapping over each table entry
    * @returns {EHandle} An eager handle on the resulting collection
    */
-  map<
-    K extends TJSON,
-    V extends TJSON,
-    C extends new (...params: Param[]) => EntryMapper<R, K, V>,
-  >(
-    mapper: C,
-    ...params: EMParameters<K, V, R, C>
+  map<K extends TJSON, V extends TJSON>(
+    mapper: new (
+      eparams: EHandle<any, any>[],
+      lparams: LHandle<any, any>[],
+    ) => EntryMapper<R, K, V>,
+    eparams: EHandle<any, any>[],
+    lparams: LHandle<any, any>[],
   ): EHandle<K, V>;
 }
 
@@ -415,8 +392,12 @@ export type Mapping<
   V2 extends TJSON,
 > = {
   handle: EHandle<K1, V1>;
-  mapper: new (...params: Param[]) => Mapper<K1, V1, K2, V2>;
-  params?: Param[];
+  mapper: new (
+    eparams: EHandle<any, any>[],
+    lparams: LHandle<any, any>[],
+  ) => Mapper<K1, V1, K2, V2>;
+  eparams: EHandle<any, any>[];
+  lparams: LHandle<any, any>[];
 };
 
 export interface SKStoreFactory extends Shared {
@@ -441,35 +422,19 @@ export interface AsyncLazyCompute<
   call: (key: K, params: P) => Promise<AValue<V, M>>;
 }
 
-export type LParameters<
-  K extends TJSON,
-  V extends TJSON,
-  C extends new (...params: Param[]) => LazyCompute<K, V>,
-> = C extends new (...params: infer P) => LazyCompute<K, V> ? P : never;
-
-export type ALParameters<
-  K extends TJSON,
-  V extends TJSON,
-  P extends TJSON,
-  M extends TJSON,
-  C extends new (...params: Param[]) => AsyncLazyCompute<K, V, P, M>,
-> = C extends new (...params: infer U) => AsyncLazyCompute<K, V, P, M>
-  ? U
-  : never;
-
 export interface SKStore {
   /**
    * Creates a lazy reactive map
    * @param compute - the lazy function to compute entries of the lazy map
    * @returns {LHandle} The the resulting lazy reactive map handle
    */
-  lazy<
-    K extends TJSON,
-    V extends TJSON,
-    C extends new (...params: Param[]) => LazyCompute<K, V>,
-  >(
-    compute: C,
-    ...params: LParameters<K, V, C>
+  lazy<K extends TJSON, V extends TJSON>(
+    compute: new (
+      eparams: EHandle<any, any>[],
+      lparams: LHandle<any, any>[],
+    ) => LazyCompute<K, V>,
+    eparams: EHandle<any, any>[],
+    lparams: LHandle<any, any>[],
   ): LHandle<K, V>;
 
   /**
@@ -509,15 +474,13 @@ export interface SKStore {
    * @param call - the async function to call with gathered values
    * @returns {LHandle} The the resulting lazy reactive map handle
    */
-  asyncLazy<
-    K extends TJSON,
-    V extends TJSON,
-    P extends TJSON,
-    M extends TJSON,
-    C extends new (...params: Param[]) => AsyncLazyCompute<K, V, P, M>,
-  >(
-    compute: C,
-    ...params: ALParameters<K, V, P, M, C>
+  asyncLazy<K extends TJSON, V extends TJSON, P extends TJSON, M extends TJSON>(
+    compute: new (
+      eparams: EHandle<any, any>[],
+      lparams: LHandle<any, any>[],
+    ) => AsyncLazyCompute<K, V, P, M>,
+    eparams: EHandle<any, any>[],
+    lparams: LHandle<any, any>[],
   ): LHandle<K, Loadable<V, M>>;
 
   log(object: TJSON): void;

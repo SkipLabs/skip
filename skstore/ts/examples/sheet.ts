@@ -35,7 +35,11 @@ class ValueForCell
 }
 
 class ComputeExpression implements LazyCompute<[string, string], string> {
-  constructor(private skall: EHandle<[string, string], string>) {}
+  private skall: EHandle<[string, string], string>;
+
+  constructor(eparams: EHandle<any, any>[], lparams: LHandle<any, any>[]) {
+    this.skall = eparams[0];
+  }
 
   compute(
     selfHdl: LHandle<[string, string], string>,
@@ -86,7 +90,11 @@ class ComputeExpression implements LazyCompute<[string, string], string> {
 class CallCompute
   implements Mapper<[string, string], string, [string, string], string>
 {
-  constructor(private evaluator: LHandle<[string, string], string>) {}
+  private evaluator: LHandle<[string, string], string>;
+
+  constructor(eparams: EHandle<any, any>[], lparams: LHandle<any, any>[]) {
+    this.evaluator = lparams[0];
+  }
 
   mapElement(
     key: [string, string],
@@ -120,26 +128,25 @@ export function initSKStore(
   computed: TableHandle<[string, string, string]>,
 ) {
   // Build index to access all value reactivly
-  const skall = cells.map<[string, string], string, typeof ValueForCell>(
-    ValueForCell,
-  );
+  const skall = cells.map<[string, string], string>(ValueForCell, [], []);
   // Use lazy dir to create eval dependency graph
   // Its calls it self to get other computed cells
-  const evaluator = store.lazy<
-    [string, string],
-    string,
-    typeof ComputeExpression
-  >(ComputeExpression, skall);
+  const evaluator = store.lazy<[string, string], string>(
+    ComputeExpression,
+    [skall],
+    [],
+  );
   // Build a sub dependency graph for each sheet (For example purpose)
   // A parsing phase can be added to prevent expression parsing each time:
   // Parsing => Immutable ast
   // Evaluation => Compute tree with context
-  const skcomputed = skall.map<[string, string], string, typeof CallCompute>(
+  const skcomputed = skall.map<[string, string], string>(
     CallCompute,
-    evaluator,
+    [],
+    [evaluator],
   );
   // Back to SKDB world
-  skcomputed.mapTo(computed, ToOutput);
+  skcomputed.mapTo(computed, ToOutput, [], []);
 }
 
 export function scenarios() {
