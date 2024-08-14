@@ -51,6 +51,7 @@ void SKIP_collect_alloc_error(int code, char* fileName, int is_create,
                               std::ostringstream& error);
 
 CJArray SKIP_SKStore_jsonExtract(CJObject json, char* pattern);
+char* SKIP_SKStore_ksuid();
 }
 
 namespace skstore {
@@ -142,24 +143,16 @@ void SKStore::Lazy(const FunctionCallbackInfo<Value>& args) {
         isolate, "Get cannot be called outside of a SKStore function.")));
     return;
   }
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
+  const char* fnnames[1] = {"compute"};
+  MaybeLocal<Object> mbMapperObj =
+      skbinding::CheckMapper(args, fnnames, 1, "SKStore.lazy", 0, false);
+  if (mbMapperObj.IsEmpty()) {
     return;
   };
-  if (!args[0]->IsFunction()) {
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "Parameter must be a function.")));
-    return;
-  }
-  std::string script;
-  int line = 0, column = 0;
-  Metadata(isolate, script, line, column);
-  Local<Function> cb = Local<Function>::Cast(args[0]);
-  char* skScript = sk_string_create(script.c_str(), script.size());
-  char* skName = SKIP_SKStore_nameForMeta(skScript, line, column);
-  uint32_t mapper = CreateHandle(isolate, cb);
+  Local<Object> mapperObj = mbMapperObj.ToLocalChecked();
+  // generate name for now
+  char* skName = SKIP_SKStore_ksuid();
+  uint32_t mapper = CreateHandle(isolate, mapperObj);
   char* skResult = SKIP_SKStore_lazy(ctx, skName, mapper);
   args.GetReturnValue().Set(
       LHandle::Create(isolate, FromUtf8(isolate, skResult)));
@@ -174,29 +167,45 @@ void SKStore::AsyncLazy(const FunctionCallbackInfo<Value>& args) {
         isolate, "Get cannot be called outside of a SKStore function.")));
     return;
   }
-  if (args.Length() != 2) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have two parameters.")));
+  const char* fnnames[2] = {"params", "call"};
+  MaybeLocal<Object> mbMapperObj =
+      skbinding::CheckMapper(args, fnnames, 2, "SKStore.asyncLazy", 0, false);
+  if (mbMapperObj.IsEmpty()) {
     return;
   };
-  if (!args[0]->IsFunction() || !args[1]->IsFunction()) {
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "Parameters must be functions.")));
-    return;
-  }
-  std::string script;
-  int line = 0, column = 0;
-  Metadata(isolate, script, line, column);
-  Local<Function> getCb = Local<Function>::Cast(args[0]);
-  Local<Function> computeCb = Local<Function>::Cast(args[1]);
-  char* skScript = sk_string_create(script.c_str(), script.size());
-  char* skName = SKIP_SKStore_nameForMeta(skScript, line, column);
-  uint32_t getHdl = CreateHandle(isolate, getCb);
-  uint32_t computeHdl = CreateHandle(isolate, computeCb);
-  char* skResult = SKIP_SKStore_asyncLazy(ctx, skName, getHdl, computeHdl);
+  char* skName = SKIP_SKStore_ksuid();
+  Local<Object> mapperObj = mbMapperObj.ToLocalChecked();
+  uint32_t handle = CreateHandle(isolate, mapperObj);
+  char* skResult = SKIP_SKStore_asyncLazy(ctx, skName, handle, handle);
   args.GetReturnValue().Set(
       LHandle::Create(isolate, FromUtf8(isolate, skResult)));
+}
+
+MaybeLocal<Object> CheckMMapper(Isolate* isolate, Local<Function> mapper,
+                                Local<Value> params) {
+  int size = 0;
+  if (params->IsArray()) {
+    size = params.As<Array>()->Length();
+  }
+  // TODO check parameter are frozen
+  Local<Context> context = isolate->GetCurrentContext();
+  const int argc = size;
+  Local<Value> argv[argc];
+  for (int i = 0; i < argc; i++) {
+    argv[i] = params.As<Array>()->Get(context, i).ToLocalChecked();
+  }
+  MaybeLocal<Object> result = mapper->NewInstance(context, argc, argv);
+  if (result.IsEmpty()) {
+    return MaybeLocal<Object>();
+  }
+  const char* fnname = "mapElement";
+  Local<Value> fn = result.ToLocalChecked()
+                        ->Get(context, FromUtf8(isolate, fnname))
+                        .ToLocalChecked();
+  if (!fn->IsFunction()) {
+    return MaybeLocal<Object>();
+  }
+  return result;
 }
 
 bool ConvertMappings(Isolate* isolate, Local<Array> mappings,
@@ -207,15 +216,19 @@ bool ConvertMappings(Isolate* isolate, Local<Array> mappings,
     Local<Value> mapping = mappings->Get(context, i).ToLocalChecked();
     Local<Value> handle;
     Local<Value> mapper;
+    Local<Value> params;
     if (mapping->IsArray()) {
       Local<Array> mappingArr = mapping.As<Array>();
       handle = mappingArr->Get(context, 0).ToLocalChecked();
       mapper = mappingArr->Get(context, 1).ToLocalChecked();
+      params = mappingArr->Get(context, 2).ToLocalChecked();
     } else if (mapping->IsObject()) {
       Local<Object> mappingObject = mapping.As<Object>();
       handle = mappingObject->Get(context, FromUtf8(isolate, "handle"))
                    .ToLocalChecked();
       mapper = mappingObject->Get(context, FromUtf8(isolate, "mapper"))
+                   .ToLocalChecked();
+      params = mappingObject->Get(context, FromUtf8(isolate, "params"))
                    .ToLocalChecked();
     } else {
       return false;
@@ -223,8 +236,13 @@ bool ConvertMappings(Isolate* isolate, Local<Array> mappings,
     if (!handle->IsObject() || !mapper->IsFunction()) {
       return false;
     }
+    MaybeLocal<Object> mbMapperObj =
+        CheckMMapper(isolate, mapper.As<Function>(), params);
+    if (mbMapperObj.IsEmpty()) {
+      return false;
+    }
+    Local<Object> mapperObj = mbMapperObj.ToLocalChecked();
     EHandle* eHandle = node::ObjectWrap::Unwrap<EHandle>(handle.As<Object>());
-    Local<Function> mapperFn = mapper.As<Function>();
     Local<Array> mapping_ = Array::New(isolate);
     mapping_
         ->Set(context, mapping_->Length(),
@@ -232,7 +250,7 @@ bool ConvertMappings(Isolate* isolate, Local<Array> mappings,
         .FromJust();
     mapping_
         ->Set(context, mapping_->Length(),
-              Number::New(isolate, CreateHandle(isolate, mapperFn)))
+              Number::New(isolate, CreateHandle(isolate, mapperObj)))
         .FromJust();
     mappings_->Set(context, mappings_->Length(), mapping_).FromJust();
   }
@@ -718,25 +736,35 @@ void SKIP_SKStore_init(SKCONTEXT ctx) {
 CJSON SKIP_SKStore_applyLazyFun(uint32_t fnId, SKCONTEXT ctx, SKHANDLE self,
                                 CJSON key) {
   Isolate* isolate = Isolate::GetCurrent();
-  Local<Value> fn_;
-  if (!GetHandle(isolate, fnId, fn_)) {
+  Local<Value> obj_;
+  if (!GetHandle(isolate, fnId, obj_)) {
     isolate->ThrowException(Exception::Error(
         FromUtf8(isolate, "Unable to retrieve lazy function.")));
     return nullptr;
   }
-  if (!fn_->IsFunction()) {
-    isolate->ThrowException(
-        Exception::Error(FromUtf8(isolate, "Invalid lazy function.")));
+  if (!obj_->IsObject()) {
+    isolate->ThrowException(Exception::Error(
+        FromUtf8(isolate, "Invalid SKStore.lazy compute object.")));
+    return nullptr;
+  }
+  Local<Context> context = isolate->GetCurrentContext();
+  Local<Object> obj = obj_.As<Object>();
+  Local<Value> compute_ =
+      obj->Get(context, FromUtf8(isolate, "compute")).ToLocalChecked();
+  if (!compute_->IsFunction()) {
+    isolate->ThrowException(Exception::TypeError(FromUtf8(
+        isolate,
+        "Invalid SKStore.lazy compute object. (compute method not defined)")));
     return nullptr;
   }
   SKCONTEXT current = SwitchContext(ctx);
-  Local<Function> fn = fn_.As<Function>();
+  Local<Function> compute = compute_.As<Function>();
   Local<Value> selfHdl = LSelf::Create(isolate, External::New(isolate, self));
   Local<Value> jsKey = skjson::SKStoreToNode(isolate, key, false);
   const unsigned argc = 2;
   Local<Value> argv[argc] = {selfHdl, jsKey};
   return SKTryCatch(
-      isolate, fn, Null(isolate), argc, argv,
+      isolate, compute, obj, argc, argv,
       [&current](Isolate* isolate, Local<Value> jsResult) {
         RestoreContext(current);
         return skjson::NodeToSKStore(isolate, jsResult);
@@ -746,24 +774,35 @@ CJSON SKIP_SKStore_applyLazyFun(uint32_t fnId, SKCONTEXT ctx, SKHANDLE self,
 
 CJSON SKIP_SKStore_applyParamsFun(uint32_t getId, SKCONTEXT ctx, CJSON key) {
   Isolate* isolate = Isolate::GetCurrent();
-  Local<Value> get_;
-  if (!GetHandle(isolate, getId, get_)) {
+  Local<Value> obj_;
+  if (!GetHandle(isolate, getId, obj_)) {
     isolate->ThrowException(Exception::Error(
-        FromUtf8(isolate, "Unable to retrieve async lazy get function.")));
+        FromUtf8(isolate, "Unable to retrieve SKStore.asyncLazy computer.")));
     return nullptr;
   }
-  if (!get_->IsFunction()) {
+  if (!obj_->IsObject()) {
     isolate->ThrowException(Exception::Error(
-        FromUtf8(isolate, "Invalid async lazy get function.")));
+        FromUtf8(isolate, "Invalid SKStore.asyncLazy compute object.")));
+    return nullptr;
+  }
+  Local<Context> context = isolate->GetCurrentContext();
+  Local<Object> obj = obj_.As<Object>();
+  Local<Value> params_ =
+      obj->Get(context, FromUtf8(isolate, "params")).ToLocalChecked();
+  if (!params_->IsFunction()) {
+    isolate->ThrowException(
+        Exception::TypeError(FromUtf8(isolate,
+                                      "Invalid SKStore.asyncLazy compute "
+                                      "object. (params method not defined)")));
     return nullptr;
   }
   SKCONTEXT current = SwitchContext(ctx);
-  Local<Function> get = get_.As<Function>();
+  Local<Function> params = params_.As<Function>();
   Local<Value> jsKey = skjson::SKStoreToNode(isolate, key, false);
   const unsigned argc = 1;
   Local<Value> argv[argc] = {jsKey};
   return SKTryCatch(
-      isolate, get, Null(isolate), argc, argv,
+      isolate, params, obj, argc, argv,
       [&current](Isolate* isolate, Local<Value> jsResult) {
         RestoreContext(current);
         return skjson::NodeToSKStore(isolate, jsResult);
@@ -774,19 +813,29 @@ CJSON SKIP_SKStore_applyParamsFun(uint32_t getId, SKCONTEXT ctx, CJSON key) {
 void SKIP_SKStore_applyLazyAsyncFun(uint32_t fnId, char* skcallid, char* skname,
                                     CJSON skkey, CJSON skparams) {
   Isolate* isolate = Isolate::GetCurrent();
-  Local<Value> fn_;
-  if (!GetHandle(isolate, fnId, fn_)) {
+  Local<Value> obj_;
+  if (!GetHandle(isolate, fnId, obj_)) {
     isolate->ThrowException(Exception::Error(
-        FromUtf8(isolate, "Unable to retrieve async lazy function.")));
+        FromUtf8(isolate, "Unable to retrieve SKStore.asyncLazy computer.")));
     return;
   }
-  if (!fn_->IsFunction()) {
-    isolate->ThrowException(
-        Exception::Error(FromUtf8(isolate, "Invalid async lazy function.")));
+  if (!obj_->IsObject()) {
+    isolate->ThrowException(Exception::Error(
+        FromUtf8(isolate, "Invalid SKStore.asyncLazy compute object.")));
     return;
   }
   Local<Context> context = isolate->GetCurrentContext();
-  Local<Function> fn = fn_.As<Function>();
+  Local<Object> obj = obj_.As<Object>();
+  Local<Value> call_ =
+      obj->Get(context, FromUtf8(isolate, "call")).ToLocalChecked();
+  if (!call_->IsFunction()) {
+    isolate->ThrowException(
+        Exception::TypeError(FromUtf8(isolate,
+                                      "Invalid SKStore.asyncLazy compute "
+                                      "object. (call method not defined)")));
+    return;
+  }
+  Local<Function> call = call_.As<Function>();
   Local<String> jscallid = FromUtf8(isolate, skcallid);
   Local<String> jsname = FromUtf8(isolate, skname);
   Local<Value> jskey = skjson::SKStoreToNode(isolate, skkey, true);
@@ -798,8 +847,7 @@ void SKIP_SKStore_applyLazyAsyncFun(uint32_t fnId, char* skcallid, char* skname,
   data->Set(context, 3, jsparams).FromJust();
   const unsigned argc = 2;
   Local<Value> argv[argc] = {jskey, jsparams};
-  Local<Value> jsResult =
-      fn->Call(context, Null(isolate), argc, argv).ToLocalChecked();
+  Local<Value> jsResult = call->Call(context, obj, argc, argv).ToLocalChecked();
   Local<FunctionTemplate> successTpl =
       FunctionTemplate::New(isolate, Success, data);
   Local<Function> successFn = successTpl->GetFunction(context).ToLocalChecked();

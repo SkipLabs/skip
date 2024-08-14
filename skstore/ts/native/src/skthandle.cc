@@ -25,6 +25,7 @@ char* SKIP_SKStore_fromSkdb(SKCONTEXT ctx, char* table, char* name,
 char* SKIP_SKStore_nameForMeta(char* script, int64_t line, int64_t column);
 // Writer
 void SKIP_SKStore_writerSet(SKWRITER writer, CJSON key, CJSON value);
+char* SKIP_SKStore_ksuid();
 }
 
 namespace skstore {
@@ -102,28 +103,19 @@ void THandle::Map(const v8::FunctionCallbackInfo<v8::Value>& args) {
         isolate, "Get cannot be called outside of a SKStore function.")));
     return;
   }
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
+  const char* fnnames[1] = {"mapElement"};
+  MaybeLocal<Object> mbMapperObj =
+      skbinding::CheckMapper(args, fnnames, 1, "THandle.map", 0, false);
+  if (mbMapperObj.IsEmpty()) {
     return;
   };
-  if (!args[0]->IsFunction()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a function.")));
-    return;
-  };
-  std::string script;
-  int line = 0, column = 0;
-  Metadata(isolate, script, line, column);
-  Local<Function> cb = Local<Function>::Cast(args[0]);
-  char* skScript = sk_string_create(script.c_str(), script.size());
-  char* skName = SKIP_SKStore_nameForMeta(skScript, line, column);
+  Local<Object> mapperObj = mbMapperObj.ToLocalChecked();
+  // generate name for now
+  char* skName = SKIP_SKStore_ksuid();
   THandle* tHandle = ObjectWrap::Unwrap<THandle>(args.Holder());
   char* skTable =
       sk_string_create(tHandle->m_table.c_str(), tHandle->m_table.size());
-  uint32_t mapper = CreateHandle(isolate, cb);
+  uint32_t mapper = CreateHandle(isolate, mapperObj);
   char* skResult = SKIP_SKStore_fromSkdb(ctx, skTable, skName, mapper);
   MaybeLocal<Object> eHandle =
       EHandle::Create(isolate, FromUtf8(isolate, skResult));
@@ -141,18 +133,29 @@ void SKIP_SKStore_applyMapTableFun(uint32_t mapperId, SKCONTEXT ctx,
         FromUtf8(isolate, "Unable to retrieve map function.")));
     return;
   }
-  if (!mapper_->IsFunction()) {
-    isolate->ThrowException(
-        Exception::Error(FromUtf8(isolate, "Invalid map function.")));
+  if (!mapper_->IsObject()) {
+    isolate->ThrowException(Exception::Error(
+        FromUtf8(isolate, "Invalid THandle.map mapper object.")));
     return;
   }
+  Local<Context> context = isolate->GetCurrentContext();
+  Local<Object> mapper = mapper_.As<Object>();
+  Local<Value> mapElement_ =
+      mapper->Get(context, FromUtf8(isolate, "mapElement")).ToLocalChecked();
+  if (!mapElement_->IsFunction()) {
+    isolate->ThrowException(Exception::TypeError(FromUtf8(
+        isolate,
+        "Invalid THandle.map mapper object. (mapElement method not defined)")));
+    return;
+  }
+
   SKCONTEXT current = SwitchContext(ctx);
-  Local<Function> mapper = mapper_.As<Function>();
+  Local<Function> mapElement = mapElement_.As<Function>();
   Local<Value> jsRow = skjson::SKStoreToNode(isolate, row, false);
   const unsigned argc = 2;
   Local<Value> argv[argc] = {jsRow, Number::New(isolate, occ)};
   SKTryCatch(
-      isolate, mapper, Null(isolate), argc, argv,
+      isolate, mapElement, mapper, argc, argv,
       [&current, &writer](Isolate* isolate, Local<Value> jsResult) {
         RestoreContext(current);
         Local<Context> context = isolate->GetCurrentContext();

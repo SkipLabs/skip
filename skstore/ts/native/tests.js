@@ -13,38 +13,56 @@ import path from "path";
 
 //// testMap1
 
-function testMap1Init(_skstore, input, output) {
-  const eager1 = input.map((entry, _occ) => {
-    return Array([entry[0], entry[1] + 2]);
-  });
-  eager1.mapTo(output, (key, it) => {
+class TestFromIntInt {
+  constructor(offset) {
+    this.offset = offset ?? 0;
+  }
+
+  mapElement(entry, _occ) {
+    return Array([entry[0], entry[1] + this.offset]);
+  }
+}
+
+class TestToOutput {
+  mapElement(key, it) {
     return [key, it.first()];
-  });
+  }
+}
+
+function testMap1Init(_skstore, input, output) {
+  const eager1 = input.map(TestFromIntInt, 2);
+  eager1.mapTo(output, TestToOutput);
 }
 
 async function testMap1Run(input, output) {
   input.insert([[1, 10]], true);
   check("testMap1", output.select({ id: 1 }, ["value"]), [{ value: 12 }]);
 }
-
 //// testMap2
 
-function testMap2Init(_skstore, input1, input2, output) {
-  const eager1 = input1.map((row, _occ) => {
-    return Array([row[0], parseInt(row[1])]);
-  });
-  const eager2 = input2.map((row, _occ) => {
-    return Array([row[0], parseInt(row[1])]);
-  });
-  const eager3 = eager1.map((key, it) => {
+class TestParseInt {
+  mapElement(entry, _occ) {
+    return Array([entry[0], parseInt(entry[1])]);
+  }
+}
+
+class TestAdd {
+  constructor(other) {
+    this.other = other;
+  }
+
+  mapElement(key, it) {
     const v = it.first();
-    const ev = eager2.maybeGet(key);
+    const ev = this.other.maybeGet(key);
     return Array([key, v + (ev ?? 0)]);
-  });
-  eager3.mapTo(output, (key, it) => {
-    let v = [key, it.first()];
-    return v;
-  });
+  }
+}
+
+function testMap2Init(_skstore, input1, input2, output) {
+  const eager1 = input1.map(TestParseInt);
+  const eager2 = input2.map(TestParseInt);
+  const eager3 = eager1.map(TestAdd, eager2);
+  eager3.mapTo(output, TestToOutput);
 }
 
 async function testMap2Run(input1, input2, output) {
@@ -61,17 +79,21 @@ async function testMap2Run(input1, input2, output) {
 
 //// testSize
 
-function testSizeInit(_skstore, input, size, output) {
-  const eager1 = input.map((row, _occ) => {
-    return Array([row[0], row[1]]);
-  });
-  const eager2 = size.map((row, _occ) => {
-    if (row[0] == 0) return Array([row[0], eager1.size()]);
+class TestSizeGetter {
+  constructor(other) {
+    this.other = other;
+  }
+
+  mapElement(entry, _occ) {
+    if (entry[0] == 0) return Array([entry[0], this.other.size()]);
     return Array();
-  });
-  eager2.mapTo(output, (key, it) => {
-    return [key, it.first()];
-  });
+  }
+}
+
+function testSizeInit(_skstore, input, size, output) {
+  const eager1 = input.map(TestFromIntInt);
+  const eager2 = size.map(TestSizeGetter, eager1);
+  eager2.mapTo(output, TestToOutput);
 }
 
 async function testSizeRun(input, size, output) {
@@ -88,20 +110,35 @@ async function testSizeRun(input, size, output) {
 
 //// testLazy
 
+class TestLazyAdd {
+  constructor(other) {
+    this.other = other;
+  }
+
+  compute(selfHdl, key) {
+    const v = this.other.maybeGet(key);
+    const res = (v ?? 0) + 2;
+    return res;
+  }
+}
+
+class TestSub {
+  constructor(other) {
+    this.other = other;
+  }
+
+  mapElement(key, it) {
+    const v1 = this.other.get(key);
+    const v2 = it.first();
+    return Array([key, v1 - v2]);
+  }
+}
+
 function testLazyInit(skstore, input, output) {
-  const eager1 = input.map((row, _occ) => {
-    return Array([row[0], row[1]]);
-  });
-  const lazy = skstore.lazy((_self, key) => {
-    const v = eager1.maybeGet(key);
-    return (v ?? 0) + 2;
-  });
-  const eager2 = eager1.map((key, it) => {
-    return Array([key, lazy.get(key) - it.first()]);
-  });
-  eager2.mapTo(output, (key, it) => {
-    return [key, it.first()];
-  });
+  const eager1 = input.map(TestFromIntInt);
+  const lazy = skstore.lazy(TestLazyAdd, eager1);
+  const eager2 = eager1.map(TestSub, lazy);
+  eager2.mapTo(output, TestToOutput);
 }
 
 async function testLazyRun(input, output) {
@@ -128,16 +165,16 @@ async function testLazyRun(input, output) {
 
 //// testMapReduce
 
-function testMapReduceInit(_skstore, input, output) {
-  const eager1 = input.map((row, _occ) => {
-    return Array([row[0], row[1]]);
-  });
-  const eager2 = eager1.mapReduce((key, it) => {
+class TestOddEven {
+  mapElement(key, it) {
     return Array([key % 2, it.first()]);
-  }, new Sum());
-  eager2.mapTo(output, (key, it) => {
-    return [key, it.first()];
-  });
+  }
+}
+
+function testMapReduceInit(_skstore, input, output) {
+  const eager1 = input.map(TestFromIntInt);
+  const eager2 = eager1.mapReduce(TestOddEven, new Sum());
+  eager2.mapTo(output, TestToOutput);
 }
 
 async function testMapReduceRun(input, output) {
@@ -168,33 +205,30 @@ async function testMapReduceRun(input, output) {
 }
 
 //// testMultiMap1
+class TestSplitter {
+  constructor(to) {
+    this.to = to;
+  }
+
+  mapElement(key, it) {
+    return Array([[this.to, key], it.first()]);
+  }
+}
+
+class TestToOutput2 {
+  mapElement(key, it) {
+    return [key[0], key[1], it.first()];
+  }
+}
 
 function testMultiMap1Init(skstore, input1, input2, output) {
-  const eager1 = input1.map((row, _occ) => {
-    return Array([row[0], parseInt(row[1])]);
-  });
-  const eager2 = input2.map((row, _occ) => {
-    return Array([row[0], parseInt(row[1])]);
-  });
+  const eager1 = input1.map(TestParseInt);
+  const eager2 = input2.map(TestParseInt);
   const eager3 = skstore.multimap([
-    {
-      handle: eager1,
-      mapper: (key, it) => {
-        const v = it.first();
-        return Array([[0, key], v]);
-      },
-    },
-    {
-      handle: eager2,
-      mapper: (key, it) => {
-        const v = it.first();
-        return Array([[1, key], v]);
-      },
-    },
+    { handle: eager1, mapper: TestSplitter, params: [0] },
+    { handle: eager2, mapper: TestSplitter, params: [1] },
   ]);
-  eager3.mapTo(output, (key, it) => {
-    return [key[0], key[1], it.first()];
-  });
+  eager3.mapTo(output, TestToOutput2);
 }
 
 async function testMultiMap1Run(input1, input2, output) {
@@ -222,35 +256,23 @@ async function testMultiMap1Run(input1, input2, output) {
 
 //// testMultiMapReduce
 
+class TestSet {
+  mapElement(key, it) {
+    return Array([key, it.first()]);
+  }
+}
+
 function testMultiMapReduceInit(skstore, input1, input2, output) {
-  const eager1 = input1.map((row, _occ) => {
-    return Array([row[0], parseInt(row[1])]);
-  });
-  const eager2 = input2.map((row, _occ) => {
-    return Array([row[0], parseInt(row[1])]);
-  });
+  const eager1 = input1.map(TestParseInt);
+  const eager2 = input2.map(TestParseInt);
   const eager3 = skstore.multimapReduce(
     [
-      {
-        handle: eager1,
-        mapper: (key, it) => {
-          const v = it.first();
-          return Array([key, v]);
-        },
-      },
-      {
-        handle: eager2,
-        mapper: (key, it) => {
-          const v = it.first();
-          return Array([key, v]);
-        },
-      },
+      { handle: eager1, mapper: TestSet },
+      { handle: eager2, mapper: TestSet },
     ],
     new Sum(),
   );
-  eager3.mapTo(output, (key, it) => {
-    return [key, it.first()];
-  });
+  eager3.mapTo(output, TestToOutput);
 }
 
 async function testMultiMapReduceRun(input1, input2, output) {
@@ -274,24 +296,28 @@ async function testMultiMapReduceRun(input1, input2, output) {
 
 //// testAsyncLazy
 
-function testAsyncLazyInit(skstore, input1, input2, output) {
-  const eager1 = input1.map((row, _occ) => {
-    return Array([row[0], row[1]]);
-  });
-  const eager2 = input2.map((row, _occ) => {
-    return Array([row[0], row[1]]);
-  });
-  const asyncLazy = skstore.asyncLazy(
-    (key) => {
-      const v2 = eager2.maybeGet(key[0]);
-      return v2 ?? 0;
-    },
-    async (key, param) => {
-      return { payload: key[1] + param };
-    },
-  );
-  const eager3 = eager1.map((key, it) => {
-    const result = asyncLazy.get([key, it.first()]);
+class TestLazyWithAsync {
+  constructor(other) {
+    this.other = other;
+  }
+
+  params(key) {
+    const v2 = this.other.maybeGet(key[0]);
+    return v2 ?? 0;
+  }
+
+  async call(key, param) {
+    return { payload: key[1] + param };
+  }
+}
+
+class TestCheckResult {
+  constructor(asyncLazy) {
+    this.asyncLazy = asyncLazy;
+  }
+
+  mapElement(key, it) {
+    const result = this.asyncLazy.get([key, it.first()]);
     let value;
     if (result.status == "loading") {
       value = [key, "loading"];
@@ -301,10 +327,15 @@ function testAsyncLazyInit(skstore, input1, input2, output) {
       value = [key, result.error];
     }
     return Array(value);
-  });
-  eager3.mapTo(output, (key, it) => {
-    return [key, it.first()];
-  });
+  }
+}
+
+function testAsyncLazyInit(skstore, input1, input2, output) {
+  const eager1 = input1.map(TestFromIntInt);
+  const eager2 = input2.map(TestFromIntInt);
+  const asyncLazy = skstore.asyncLazy(TestLazyWithAsync, eager2);
+  const eager3 = eager1.map(TestCheckResult, asyncLazy);
+  eager3.mapTo(output, TestToOutput);
 }
 
 async function testAsyncLazyRun(input1, input2, output) {
@@ -335,19 +366,24 @@ async function testAsyncLazyRun(input1, input2, output) {
 
 // testJSONExtract
 
-function testJSONExtractInit(skstore, input, output) {
-  const eager = input.map((row, _occ) => {
-    const key = row[0];
-    const value = row[1];
-    const pattern = row[2];
-    const result = skstore.jsonExtract(value, pattern);
+class TestFromJSTable {
+  constructor(skstore) {
+    this.skstore = skstore;
+  }
+
+  mapElement(entry, _occ) {
+    const key = entry[0];
+    const value = entry[1];
+    const pattern = entry[2];
+    const result = this.skstore.jsonExtract(value, pattern);
     return Array([key, result]);
-  });
-  eager.mapTo(output, (key, it) => {
-    return [key, it.first()];
-  });
+  }
 }
 
+function testJSONExtractInit(skstore, input, output) {
+  const eager = input.map(TestFromJSTable, skstore);
+  eager.mapTo(output, TestToOutput);
+}
 async function testJSONExtractRun(input, output) {
   input.insert(
     [

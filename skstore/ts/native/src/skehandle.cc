@@ -35,6 +35,7 @@ void SKIP_SKStore_toSkdb(SKCONTEXT ctx, char* eagerHdl, char* table,
 char* SKIP_SKStore_nameForMeta(char* script, int64_t line, int64_t column);
 // Writer
 void SKIP_SKStore_writerSet(SKWRITER writer, CJSON key, CJSON value);
+char* SKIP_SKStore_ksuid();
 }
 
 namespace skstore {
@@ -178,28 +179,19 @@ void EHandle::Map(const v8::FunctionCallbackInfo<v8::Value>& args) {
         isolate, "Get cannot be called outside of a SKStore function.")));
     return;
   }
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
+  const char* fnnames[1] = {"mapElement"};
+  MaybeLocal<Object> mbMapperObj =
+      skbinding::CheckMapper(args, fnnames, 1, "EHandle.map", 0, false);
+  if (mbMapperObj.IsEmpty()) {
     return;
   };
-  if (!args[0]->IsFunction()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a function.")));
-    return;
-  };
-  std::string script;
-  int line = 0, column = 0;
-  Metadata(isolate, script, line, column);
-  Local<Function> cb = Local<Function>::Cast(args[0]);
-  char* skScript = sk_string_create(script.c_str(), script.size());
-  char* skName = SKIP_SKStore_nameForMeta(skScript, line, column);
+  Local<Object> mapperObj = mbMapperObj.ToLocalChecked();
+  // generate name for now
+  char* skName = SKIP_SKStore_ksuid();
   EHandle* eHandle = ObjectWrap::Unwrap<EHandle>(args.Holder());
   char* skHandle =
       sk_string_create(eHandle->m_id.c_str(), eHandle->m_id.size());
-  uint32_t mapper = CreateHandle(isolate, cb);
+  uint32_t mapper = CreateHandle(isolate, mapperObj);
   char* skResult = SKIP_SKStore_map(ctx, skHandle, skName, mapper);
   MaybeLocal<Object> result =
       EHandle::Create(isolate, FromUtf8(isolate, skResult));
@@ -215,22 +207,20 @@ void EHandle::MapReduce(const v8::FunctionCallbackInfo<v8::Value>& args) {
         isolate, "Get cannot be called outside of a SKStore function.")));
     return;
   }
-  if (args.Length() != 2) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have two parameter.")));
+  const char* fnnames[1] = {"mapElement"};
+  MaybeLocal<Object> mbMapperObj =
+      skbinding::CheckMapper(args, fnnames, 1, "EHandle.mapReduce", 1, true);
+  if (mbMapperObj.IsEmpty()) {
     return;
   };
-  if (!args[0]->IsFunction()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a function.")));
-    return;
-  };
+  Local<Object> mapperObj = mbMapperObj.ToLocalChecked();
+  // generate name for now
+  char* skName = SKIP_SKStore_ksuid();
   if (!args[1]->IsObject()) {
     // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The second parameter must be an object.")));
+    isolate->ThrowException(Exception::TypeError(FromUtf8(
+        isolate,
+        "EHandle.mapReduce: The second parameter must be an object.")));
     return;
   };
   Local<Context> context = isolate->GetCurrentContext();
@@ -245,16 +235,10 @@ void EHandle::MapReduce(const v8::FunctionCallbackInfo<v8::Value>& args) {
         FromUtf8(isolate, "The second parameter must be an Accumulator.")));
     return;
   }
-  std::string script;
-  int line = 0, column = 0;
-  Metadata(isolate, script, line, column);
-  Local<Function> cb = Local<Function>::Cast(args[0]);
-  char* skScript = sk_string_create(script.c_str(), script.size());
-  char* skName = SKIP_SKStore_nameForMeta(skScript, line, column);
   EHandle* eHandle = ObjectWrap::Unwrap<EHandle>(args.Holder());
   char* skHandle =
       sk_string_create(eHandle->m_id.c_str(), eHandle->m_id.size());
-  uint32_t mapper = CreateHandle(isolate, cb);
+  uint32_t mapper = CreateHandle(isolate, mapperObj);
   uint32_t accMapper = CreateHandle(isolate, accumulator);
   void* skInitValue = skjson::NodeToSKStore(
       isolate,
@@ -276,22 +260,17 @@ void EHandle::MapTo(const FunctionCallbackInfo<Value>& args) {
         isolate, "Get cannot be called outside of a SKStore function.")));
     return;
   }
-  if (args.Length() != 2) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have two parameter.")));
+  const char* fnnames[1] = {"mapElement"};
+  MaybeLocal<Object> mbMapperObj =
+      skbinding::CheckMapper(args, fnnames, 1, "EHandle.mapTo", 1, false);
+  if (mbMapperObj.IsEmpty()) {
     return;
   };
+  Local<Object> mapperObj = mbMapperObj.ToLocalChecked();
   if (!args[0]->IsString() && !args[0]->IsObject()) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(Exception::TypeError(
         FromUtf8(isolate, "The parameter must be a string or an object.")));
-    return;
-  };
-  if (!args[1]->IsFunction()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a function.")));
     return;
   };
   Local<Context> context = isolate->GetCurrentContext();
@@ -304,12 +283,11 @@ void EHandle::MapTo(const FunctionCallbackInfo<Value>& args) {
     THandle* tHandle = ObjectWrap::Unwrap<THandle>(object);
     strTable = tHandle->m_table.c_str();
   }
-  Local<Function> cb = Local<Function>::Cast(args[1]);
   EHandle* eHandle = ObjectWrap::Unwrap<EHandle>(args.Holder());
   char* skHandle =
       sk_string_create(eHandle->m_id.c_str(), eHandle->m_id.size());
   char* skTable = sk_string_create(strTable, strlen(strTable));
-  uint32_t mapper = CreateHandle(isolate, cb);
+  uint32_t mapper = CreateHandle(isolate, mapperObj);
   SKIP_SKStore_toSkdb(ctx, skHandle, skTable, mapper);
 }
 
@@ -329,23 +307,34 @@ void SKIP_SKStore_applyMapFun(uint32_t mapperId, SKCONTEXT ctx, SKWRITER writer,
   Local<Value> mapper_;
   if (!GetHandle(isolate, mapperId, mapper_)) {
     isolate->ThrowException(Exception::Error(
-        FromUtf8(isolate, "Unable to retrieve map function.")));
+        FromUtf8(isolate, "Unable to retrieve EHandle.map function.")));
     return;
   }
-  if (!mapper_->IsFunction()) {
-    isolate->ThrowException(
-        Exception::Error(FromUtf8(isolate, "Invalid map function.")));
+  if (!mapper_->IsObject()) {
+    isolate->ThrowException(Exception::Error(
+        FromUtf8(isolate, "Invalid EHandle.map mapper object.")));
     return;
   }
+  Local<Context> context = isolate->GetCurrentContext();
+  Local<Object> mapper = mapper_.As<Object>();
+  Local<Value> mapElement_ =
+      mapper->Get(context, FromUtf8(isolate, "mapElement")).ToLocalChecked();
+  if (!mapElement_->IsFunction()) {
+    isolate->ThrowException(Exception::TypeError(FromUtf8(
+        isolate,
+        "Invalid EHandle.map mapper object. (mapElement method not defined)")));
+    return;
+  }
+
   SKCONTEXT current = SwitchContext(ctx);
-  Local<Function> mapper = mapper_.As<Function>();
+  Local<Function> mapElement = mapElement_.As<Function>();
   Local<Value> jsIt =
       NonEmptyIterator::Create(isolate, External::New(isolate, it));
   Local<Value> jsKey = skjson::SKStoreToNode(isolate, key, false);
   const unsigned argc = 2;
   Local<Value> argv[argc] = {jsKey, jsIt};
   SKTryCatch(
-      isolate, mapper, Null(isolate), argc, argv,
+      isolate, mapElement, mapper, argc, argv,
       [&current, &writer](Isolate* isolate, Local<Value> jsResult) {
         Local<Context> context = isolate->GetCurrentContext();
         RestoreContext(current);
@@ -447,25 +436,36 @@ CJSON SKIP_SKStore_applyDismiss(uint32_t dismissId, CJSON acc, CJSON value) {
 CJSON SKIP_SKStore_applyConvertToRowFun(uint32_t convId, CJSON key,
                                         SKITERATOR it) {
   Isolate* isolate = Isolate::GetCurrent();
-  Local<Value> conv_;
-  if (!GetHandle(isolate, convId, conv_)) {
+  Local<Value> mapper_;
+  if (!GetHandle(isolate, convId, mapper_)) {
     isolate->ThrowException(Exception::Error(
         FromUtf8(isolate, "Unable to retrieve convertion function.")));
     return nullptr;
   }
-  if (!conv_->IsFunction()) {
-    isolate->ThrowException(
-        Exception::Error(FromUtf8(isolate, "Invalid convertion function.")));
+  if (!mapper_->IsObject()) {
+    isolate->ThrowException(Exception::Error(
+        FromUtf8(isolate, "Invalid EHandle.map mapper object.")));
     return nullptr;
   }
-  Local<Function> conv = conv_.As<Function>();
+  Local<Context> context = isolate->GetCurrentContext();
+  Local<Object> mapper = mapper_.As<Object>();
+  Local<Value> mapElement_ =
+      mapper->Get(context, FromUtf8(isolate, "mapElement")).ToLocalChecked();
+  if (!mapElement_->IsFunction()) {
+    isolate->ThrowException(Exception::TypeError(FromUtf8(
+        isolate,
+        "Invalid EHandle.map mapper object. (mapElement method not defined)")));
+    return nullptr;
+  }
+
+  Local<Function> mapElement = mapElement_.As<Function>();
   Local<Value> jsIt =
       NonEmptyIterator::Create(isolate, External::New(isolate, it));
   Local<Value> jsKey = skjson::SKStoreToNode(isolate, key, false);
   const unsigned argc = 2;
   Local<Value> argv[argc] = {jsKey, jsIt};
   return SKTryCatch(
-      isolate, conv, Null(isolate), argc, argv,
+      isolate, mapElement, mapper, argc, argv,
       [](Isolate* isolate, Local<Value> jsResult) {
         return skjson::NodeToSKStore(isolate, jsResult);
       },

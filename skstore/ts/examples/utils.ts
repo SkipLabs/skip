@@ -543,6 +543,6 @@ export async function main(createSKStore: typeof CreateSKStore) {
     }
   } catch (e: any) {
     console.error("Invalid SKStore example file.");
-    console.error("\t" + e.message);
+    console.error(e);
   }
 }

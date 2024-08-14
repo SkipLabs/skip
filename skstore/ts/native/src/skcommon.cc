@@ -221,6 +221,63 @@ void Print(Isolate* isolate, const char* prefix, Local<Value> value) {
   std::cout << prefix << ": " << val << std::endl;
 }
 
+MaybeLocal<Object> CheckMapper(const FunctionCallbackInfo<Value>& args,
+                               const char** fnnames, int fncount,
+                               const char* name, u_int offset, bool after) {
+  Isolate* isolate = args.GetIsolate();
+  if ((uint)args.Length() < (1 + offset)) {
+    // Throw an Error that is passed back to JavaScript
+    std::ostringstream error;
+    error << name << " must have at least " << (1 + offset) << " parameter.";
+    isolate->ThrowException(
+        Exception::TypeError(FromUtf8(isolate, error.str().c_str())));
+    return MaybeLocal<Object>();
+  };
+  uint idx = after ? 0 : offset;
+  if (!args[idx]->IsFunction()) {
+    std::ostringstream error;
+    error << "Invalid " << name << " parameters.";
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(
+        Exception::TypeError(FromUtf8(isolate, error.str().c_str())));
+    return MaybeLocal<Object>();
+  };
+
+  Local<Function> cb = args[idx].As<Function>();
+  // TODO check parameter are frozen
+  uint shift = 1 + offset;
+  const int argc = args.Length() - shift;
+  Local<Value> argv[argc];
+  for (int i = 0; i < argc; i++) {
+    argv[i] = args[i + shift];
+  }
+  Local<Context> context = isolate->GetCurrentContext();
+  MaybeLocal<Object> result = cb->NewInstance(context, argc, argv);
+  if (result.IsEmpty()) {
+    std::ostringstream error;
+    error << "Invalid " << name
+          << " mapper (The mapper must be a constructor).";
+    isolate->ThrowException(
+        Exception::TypeError(FromUtf8(isolate, error.str().c_str())));
+    return MaybeLocal<Object>();
+  }
+  for (int i = 0; i < fncount; i++) {
+    const char* fnname = fnnames[i];
+    Local<Value> fn = result.ToLocalChecked()
+                          ->Get(context, FromUtf8(isolate, fnname))
+                          .ToLocalChecked();
+    if (!fn->IsFunction()) {
+      std::ostringstream error;
+      error << "Invalid " << name << " mapper (The << " << fnname
+            << " method must be defined).";
+      isolate->ThrowException(
+          Exception::TypeError(FromUtf8(isolate, error.str().c_str())));
+      return MaybeLocal<Object>();
+    }
+  }
+  return result;
+}
+
 Local<Value> JSONStringify(Isolate* isolate, Local<Value> value) {
   Local<Value> argv[1] = {value};
   return CallGlobalStaticMethod(isolate, "JSON", "stringify", 1, argv);
@@ -238,7 +295,7 @@ void* SKTryCatch(Isolate* isolate, Local<Function> fn, Local<Value> recv,
                  std::function<void(Isolate*)> failure) {
   Local<Context> context = isolate->GetCurrentContext();
   TryCatch tryCatch(isolate);
-  MaybeLocal<Value> optResult = fn->Call(context, Null(isolate), argc, argv);
+  MaybeLocal<Value> optResult = fn->Call(context, recv, argc, argv);
   if (!tryCatch.HasCaught()) {
     return success(isolate, optResult.ToLocalChecked());
   } else {
@@ -288,7 +345,7 @@ void SKTryCatchVoid(Isolate* isolate, Local<Function> fn, Local<Value> recv,
                     std::function<void(Isolate*)> failure) {
   Local<Context> context = isolate->GetCurrentContext();
   TryCatch tryCatch(isolate);
-  (void)fn->Call(context, Null(isolate), argc, argv);
+  (void)fn->Call(context, recv, argc, argv);
   if (!tryCatch.HasCaught()) {
     success(isolate);
   } else {

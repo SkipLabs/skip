@@ -477,21 +477,33 @@ async function testAsyncLazyRun(
 
 // testJSONExtract
 
+class TestFromJSTable
+  implements TableMapper<[number, JSONObject, string], number, TJSON[]>
+{
+  constructor(private skstore: SKStore) {}
+
+  mapElement(
+    entry: [number, JSONObject, string],
+    _occ: number,
+  ): Iterable<[number, TJSON[]]> {
+    const key = entry[0];
+    const value = entry[1];
+    const pattern = entry[2];
+    const result = this.skstore.jsonExtract(value, pattern);
+    return Array([key, result]);
+  }
+}
+
 function testJSONExtractInit(
   skstore: SKStore,
   input: TableHandle<[number, JSONObject, string]>,
   output: TableHandle<[number, TJSON[]]>,
 ) {
-  const eager = input.map((row, _occ) => {
-    const key = row[0];
-    const value = row[1];
-    const pattern = row[2];
-    const result = skstore.jsonExtract(value, pattern);
-    return Array([key, result]);
-  });
-  eager.mapTo(output, (key, it) => {
-    return [key, it.first()];
-  });
+  const eager = input.map<number, TJSON[], typeof TestFromJSTable>(
+    TestFromJSTable,
+    skstore,
+  );
+  eager.mapTo(output, TestToOutput);
 }
 
 async function testJSONExtractRun(
@@ -633,7 +645,7 @@ function run(t: Test) {
       tables = await createSKStore(t.init, t.schema, false);
     } catch (err: any) {
       if (t.error) t.error(err);
-      else console.error(err);
+      else throw err;
     }
 
     if (tables.length > 0) await t.run(...tables);
