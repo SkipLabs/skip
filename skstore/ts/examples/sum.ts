@@ -34,7 +34,11 @@ class T2SIdentify<K extends TJSON, V extends TJSON>
 }
 
 class Add implements Mapper<number, number, number, number> {
-  constructor(private other: EHandle<number, number>) {}
+  private other: EHandle<number, number>;
+
+  constructor(eparams: EHandle<any, any>[], lparams: LHandle<any, any>[]) {
+    this.other = eparams[0];
+  }
 
   mapElement(
     key: number,
