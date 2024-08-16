@@ -62,13 +62,10 @@ export function initSKStore(
   input2: TableHandle<[number, number]>,
   output: TableHandle<[number, number]>,
 ) {
-  const eager1 = input1.map<number, number, typeof T2SIdentify>(T2SIdentify);
-  const eager2 = input2.map<number, number, typeof T2SIdentify>(T2SIdentify);
-  const eager3 = eager1.map<number, number, typeof Add>(Add, eager2);
-  eager3.mapTo<[number, number], typeof ToOutput<number, number>>(
-    output,
-    ToOutput,
-  );
+  const eager1 = input1.map(T2SIdentify<number, number>);
+  const eager2 = input2.map(T2SIdentify<number, number>);
+  const eager3 = eager1.map1(Add, eager2);
+  eager3.mapTo(output, ToOutput);
 }
 
 export function scenarios() {
