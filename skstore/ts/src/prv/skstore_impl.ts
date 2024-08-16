@@ -27,6 +27,7 @@ import type {
   AsyncLazyCompute,
   ALParameters,
   NonEmptyIterator,
+  ALHandle,
 } from "../skstore_api.js";
 
 // prettier-ignore
@@ -65,7 +66,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     return this.context.size(this.eagerHdl);
   };
 
-  map<
+  mapN<
     K2 extends TJSON,
     V2 extends TJSON,
     C extends new (...params: Param[]) => Mapper<K, V, K2, V2>,
@@ -82,7 +83,152 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     return this.derive<K2, V2>(eagerHdl);
   }
 
-  mapReduce<
+  map<K2 extends TJSON, V2 extends TJSON>(
+    mapper: new () => Mapper<K, V, K2, V2>,
+  ): EHandle<K2, V2> {
+    return this.mapN(mapper);
+  }
+
+  map1<K2 extends TJSON, V2 extends TJSON, P1>(
+    mapper: new (p1: P1) => Mapper<K, V, K2, V2>,
+    p1: P1,
+  ): EHandle<K2, V2> {
+    return this.mapN(mapper, p1);
+  }
+
+  map2<K2 extends TJSON, V2 extends TJSON, P1, P2>(
+    mapper: new (p1: P1, p2: P2) => Mapper<K, V, K2, V2>,
+    p1: P1,
+    p2: P2,
+  ): EHandle<K2, V2> {
+    return this.mapN(mapper, p1, p2);
+  }
+
+  map3<K2 extends TJSON, V2 extends TJSON, P1, P2, P3>(
+    mapper: new (p1: P1, p2: P2, p3: P3) => Mapper<K, V, K2, V2>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+  ): EHandle<K2, V2> {
+    return this.mapN(mapper, p1, p2, p3);
+  }
+
+  map4<K2 extends TJSON, V2 extends TJSON, P1, P2, P3, P4>(
+    mapper: new (p1: P1, p2: P2, p3: P3, p4: P4) => Mapper<K, V, K2, V2>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+  ): EHandle<K2, V2> {
+    return this.mapN(mapper, p1, p2, p3, p4);
+  }
+
+  map5<K2 extends TJSON, V2 extends TJSON, P1, P2, P3, P4, P5>(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+    ) => Mapper<K, V, K2, V2>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+  ): EHandle<K2, V2> {
+    return this.mapN(mapper, p1, p2, p3, p4, p5);
+  }
+
+  map6<K2 extends TJSON, V2 extends TJSON, P1, P2, P3, P4, P5, P6>(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+    ) => Mapper<K, V, K2, V2>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+  ): EHandle<K2, V2> {
+    return this.mapN(mapper, p1, p2, p3, p4, p5, p6);
+  }
+
+  map7<K2 extends TJSON, V2 extends TJSON, P1, P2, P3, P4, P5, P6, P7>(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+    ) => Mapper<K, V, K2, V2>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+  ): EHandle<K2, V2> {
+    return this.mapN(mapper, p1, p2, p3, p4, p5, p6, p7);
+  }
+
+  map8<K2 extends TJSON, V2 extends TJSON, P1, P2, P3, P4, P5, P6, P7, P8>(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+      p8: P8,
+    ) => Mapper<K, V, K2, V2>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+    p8: P8,
+  ): EHandle<K2, V2> {
+    return this.mapN(mapper, p1, p2, p3, p4, p5, p6, p7, p8);
+  }
+
+  map9<K2 extends TJSON, V2 extends TJSON, P1, P2, P3, P4, P5, P6, P7, P8, P9>(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+      p8: P8,
+      p9: P9,
+    ) => Mapper<K, V, K2, V2>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+    p8: P8,
+    p9: P9,
+  ): EHandle<K2, V2> {
+    return this.mapN(mapper, p1, p2, p3, p4, p5, p6, p7, p8, p9);
+  }
+
+  mapReduceN<
     K2 extends TJSON,
     V2 extends TJSON,
     V3 extends TJSON,
@@ -105,7 +251,237 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     return this.derive<K2, V3>(eagerHdl);
   }
 
-  mapTo<
+  mapReduce<K2 extends TJSON, V2 extends TJSON, V3 extends TJSON>(
+    mapper: new () => Mapper<K, V, K2, V2>,
+    accumulator: Accumulator<V2, V3>,
+  ): EHandle<K2, V3> {
+    return this.mapReduceN(mapper, accumulator);
+  }
+
+  mapReduce1<K2 extends TJSON, V2 extends TJSON, V3 extends TJSON, P1>(
+    mapper: new (p1: P1) => Mapper<K, V, K2, V2>,
+    accumulator: Accumulator<V2, V3>,
+    p1: P1,
+  ): EHandle<K2, V3> {
+    return this.mapReduceN(mapper, accumulator, p1);
+  }
+
+  mapReduce2<K2 extends TJSON, V2 extends TJSON, V3 extends TJSON, P1, P2>(
+    mapper: new (p1: P1, p2: P2) => Mapper<K, V, K2, V2>,
+    accumulator: Accumulator<V2, V3>,
+    p1: P1,
+    p2: P2,
+  ): EHandle<K2, V3> {
+    return this.mapReduceN(mapper, accumulator, p1, p2);
+  }
+
+  mapReduce3<K2 extends TJSON, V2 extends TJSON, V3 extends TJSON, P1, P2, P3>(
+    mapper: new (p1: P1, p2: P2, p3: P3) => Mapper<K, V, K2, V2>,
+    accumulator: Accumulator<V2, V3>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+  ): EHandle<K2, V3> {
+    return this.mapReduceN(mapper, accumulator, p1, p2, p3);
+  }
+
+  mapReduce4<
+    K2 extends TJSON,
+    V2 extends TJSON,
+    V3 extends TJSON,
+    P1,
+    P2,
+    P3,
+    P4,
+  >(
+    mapper: new (p1: P1, p2: P2, p3: P3, p4: P4) => Mapper<K, V, K2, V2>,
+    accumulator: Accumulator<V2, V3>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+  ): EHandle<K2, V3> {
+    return this.mapReduceN(mapper, accumulator, p1, p2, p3, p4);
+  }
+
+  mapReduce5<
+    K2 extends TJSON,
+    V2 extends TJSON,
+    V3 extends TJSON,
+    P1,
+    P2,
+    P3,
+    P4,
+    P5,
+  >(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+    ) => Mapper<K, V, K2, V2>,
+    accumulator: Accumulator<V2, V3>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+  ): EHandle<K2, V3> {
+    return this.mapReduceN(mapper, accumulator, p1, p2, p3, p4, p5);
+  }
+
+  mapReduce6<
+    K2 extends TJSON,
+    V2 extends TJSON,
+    V3 extends TJSON,
+    P1,
+    P2,
+    P3,
+    P4,
+    P5,
+    P6,
+  >(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+    ) => Mapper<K, V, K2, V2>,
+    accumulator: Accumulator<V2, V3>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+  ): EHandle<K2, V3> {
+    return this.mapReduceN(mapper, accumulator, p1, p2, p3, p4, p5, p6);
+  }
+
+  mapReduce7<
+    K2 extends TJSON,
+    V2 extends TJSON,
+    V3 extends TJSON,
+    P1,
+    P2,
+    P3,
+    P4,
+    P5,
+    P6,
+    P7,
+  >(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+    ) => Mapper<K, V, K2, V2>,
+    accumulator: Accumulator<V2, V3>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+  ): EHandle<K2, V3> {
+    return this.mapReduceN(mapper, accumulator, p1, p2, p3, p4, p5, p6, p7);
+  }
+
+  mapReduce8<
+    K2 extends TJSON,
+    V2 extends TJSON,
+    V3 extends TJSON,
+    P1,
+    P2,
+    P3,
+    P4,
+    P5,
+    P6,
+    P7,
+    P8,
+  >(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+      p8: P8,
+    ) => Mapper<K, V, K2, V2>,
+    accumulator: Accumulator<V2, V3>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+    p8: P8,
+  ): EHandle<K2, V3> {
+    return this.mapReduceN(mapper, accumulator, p1, p2, p3, p4, p5, p6, p7, p8);
+  }
+
+  mapReduce9<
+    K2 extends TJSON,
+    V2 extends TJSON,
+    V3 extends TJSON,
+    P1,
+    P2,
+    P3,
+    P4,
+    P5,
+    P6,
+    P7,
+    P8,
+    P9,
+  >(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+      p8: P8,
+      p9: P9,
+    ) => Mapper<K, V, K2, V2>,
+    accumulator: Accumulator<V2, V3>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+    p8: P8,
+    p9: P9,
+  ): EHandle<K2, V3> {
+    return this.mapReduceN(
+      mapper,
+      accumulator,
+      p1,
+      p2,
+      p3,
+      p4,
+      p5,
+      p6,
+      p7,
+      p8,
+      p9,
+    );
+  }
+
+  mapToN<
     R extends TJSON[],
     C extends new (...params: Param[]) => OutputMapper<R, K, V>,
   >(
@@ -122,6 +498,161 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
       table.getName(),
       (key: K, it: NonEmptyIterator<V>) => mapperObj.mapElement(key, it),
     );
+  }
+
+  mapTo<R extends TJSON[]>(
+    table: TableHandle<R>,
+    mapper: new () => OutputMapper<R, K, V>,
+  ): void {
+    return this.mapToN(table, mapper);
+  }
+
+  mapTo1<R extends TJSON[], P1>(
+    table: TableHandle<R>,
+    mapper: new (p1: P1) => OutputMapper<R, K, V>,
+    p1: P1,
+  ): void {
+    return this.mapToN(table, mapper, p1);
+  }
+
+  mapTo2<R extends TJSON[], P1, P2>(
+    table: TableHandle<R>,
+    mapper: new (p1: P1, p2: P2) => OutputMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+  ): void {
+    return this.mapToN(table, mapper, p1, p2);
+  }
+
+  mapTo3<R extends TJSON[], P1, P2, P3>(
+    table: TableHandle<R>,
+    mapper: new (p1: P1, p2: P2, p3: P3) => OutputMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+  ): void {
+    return this.mapToN(table, mapper, p1, p2, p3);
+  }
+
+  mapTo4<R extends TJSON[], P1, P2, P3, P4>(
+    table: TableHandle<R>,
+    mapper: new (p1: P1, p2: P2, p3: P3, p4: P4) => OutputMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+  ): void {
+    return this.mapToN(table, mapper, p1, p2, p3, p4);
+  }
+
+  mapTo5<R extends TJSON[], P1, P2, P3, P4, P5>(
+    table: TableHandle<R>,
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+    ) => OutputMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+  ): void {
+    return this.mapToN(table, mapper, p1, p2, p3, p4, p5);
+  }
+
+  mapTo6<R extends TJSON[], P1, P2, P3, P4, P5, P6>(
+    table: TableHandle<R>,
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+    ) => OutputMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+  ): void {
+    return this.mapToN(table, mapper, p1, p2, p3, p4, p5, p6);
+  }
+
+  mapTo7<R extends TJSON[], P1, P2, P3, P4, P5, P6, P7>(
+    table: TableHandle<R>,
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+    ) => OutputMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+  ): void {
+    return this.mapToN(table, mapper, p1, p2, p3, p4, p5, p6, p7);
+  }
+
+  mapTo8<R extends TJSON[], P1, P2, P3, P4, P5, P6, P7, P8>(
+    table: TableHandle<R>,
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+      p8: P8,
+    ) => OutputMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+    p8: P8,
+  ): void {
+    return this.mapToN(table, mapper, p1, p2, p3, p4, p5, p6, p7, p8);
+  }
+
+  mapTo9<R extends TJSON[], P1, P2, P3, P4, P5, P6, P7, P8, P9>(
+    table: TableHandle<R>,
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+      p8: P8,
+      p9: P9,
+    ) => OutputMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+    p8: P8,
+    p9: P9,
+  ): void {
+    return this.mapToN(table, mapper, p1, p2, p3, p4, p5, p6, p7, p8, p9);
   }
 }
 
@@ -174,7 +705,7 @@ export class TableHandleImpl<R extends TJSON[]> implements TableHandle<R> {
     return this.context.getFromTable(this.getName(), key, index);
   }
 
-  map<
+  mapN<
     K extends TJSON,
     V extends TJSON,
     C extends new (...params: Param[]) => EntryMapper<R, K, V>,
@@ -191,6 +722,151 @@ export class TableHandleImpl<R extends TJSON[]> implements TableHandle<R> {
       (entry: R, occ: number) => mapperObj.mapElement(entry, occ),
     );
     return new EHandleImpl<K, V>(this.context, eagerHdl);
+  }
+
+  map<K extends TJSON, V extends TJSON>(
+    mapper: new () => EntryMapper<R, K, V>,
+  ): EHandle<K, V> {
+    return this.mapN(mapper);
+  }
+
+  map1<K extends TJSON, V extends TJSON, P1>(
+    mapper: new (p1: P1) => EntryMapper<R, K, V>,
+    p1: P1,
+  ): EHandle<K, V> {
+    return this.mapN(mapper, p1);
+  }
+
+  map2<K extends TJSON, V extends TJSON, P1, P2>(
+    mapper: new (p1: P1, p2: P2) => EntryMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+  ): EHandle<K, V> {
+    return this.mapN(mapper, p1, p2);
+  }
+
+  map3<K extends TJSON, V extends TJSON, P1, P2, P3>(
+    mapper: new (p1: P1, p2: P2, p3: P3) => EntryMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+  ): EHandle<K, V> {
+    return this.mapN(mapper, p1, p2, p3);
+  }
+
+  map4<K extends TJSON, V extends TJSON, P1, P2, P3, P4>(
+    mapper: new (p1: P1, p2: P2, p3: P3, p4: P4) => EntryMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+  ): EHandle<K, V> {
+    return this.mapN(mapper, p1, p2, p3, p4);
+  }
+
+  map5<K extends TJSON, V extends TJSON, P1, P2, P3, P4, P5>(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+    ) => EntryMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+  ): EHandle<K, V> {
+    return this.mapN(mapper, p1, p2, p3, p4, p5);
+  }
+
+  map6<K extends TJSON, V extends TJSON, P1, P2, P3, P4, P5, P6>(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+    ) => EntryMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+  ): EHandle<K, V> {
+    return this.mapN(mapper, p1, p2, p3, p4, p5, p6);
+  }
+
+  map7<K extends TJSON, V extends TJSON, P1, P2, P3, P4, P5, P6, P7>(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+    ) => EntryMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+  ): EHandle<K, V> {
+    return this.mapN(mapper, p1, p2, p3, p4, p5, p6, p7);
+  }
+
+  map8<K extends TJSON, V extends TJSON, P1, P2, P3, P4, P5, P6, P7, P8>(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+      p8: P8,
+    ) => EntryMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+    p8: P8,
+  ): EHandle<K, V> {
+    return this.mapN(mapper, p1, p2, p3, p4, p5, p6, p7, p8);
+  }
+
+  map9<K extends TJSON, V extends TJSON, P1, P2, P3, P4, P5, P6, P7, P8, P9>(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+      p8: P8,
+      p9: P9,
+    ) => EntryMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+    p8: P8,
+    p9: P9,
+  ): EHandle<K, V> {
+    return this.mapN(mapper, p1, p2, p3, p4, p5, p6, p7, p8, p9);
   }
 
   toTable() {
@@ -337,7 +1013,7 @@ export class SKStoreImpl implements SKStore {
     return new EHandleImpl<K2, V3>(this.context, eagerHdl);
   }
 
-  lazy<
+  lazyN<
     K extends TJSON,
     V extends TJSON,
     C extends new (...params: Param[]) => LazyCompute<K, V>,
@@ -350,16 +1026,152 @@ export class SKStoreImpl implements SKStore {
     return new LHandleImpl<K, V>(this.context, lazyHdl);
   }
 
-  asyncLazy<
+  lazy<K extends TJSON, V extends TJSON>(
+    compute: new () => LazyCompute<K, V>,
+  ): LHandle<K, V> {
+    return this.lazyN(compute);
+  }
+
+  lazy1<K extends TJSON, V extends TJSON, P1>(
+    compute: new (p1: P1) => LazyCompute<K, V>,
+    p1: P1,
+  ): LHandle<K, V> {
+    return this.lazyN(compute, p1);
+  }
+
+  lazy2<K extends TJSON, V extends TJSON, P1, P2>(
+    compute: new (p1: P1, p2: P2) => LazyCompute<K, V>,
+    p1: P1,
+    p2: P2,
+  ): LHandle<K, V> {
+    return this.lazyN(compute, p1, p2);
+  }
+
+  lazy3<K extends TJSON, V extends TJSON, P1, P2, P3>(
+    compute: new (p1: P1, p2: P2, p3: P3) => LazyCompute<K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+  ): LHandle<K, V> {
+    return this.lazyN(compute, p1, p2, p3);
+  }
+
+  lazy4<K extends TJSON, V extends TJSON, P1, P2, P3, P4>(
+    compute: new (p1: P1, p2: P2, p3: P3, p4: P4) => LazyCompute<K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+  ): LHandle<K, V> {
+    return this.lazyN(compute, p1, p2, p3, p4);
+  }
+
+  lazy5<K extends TJSON, V extends TJSON, P1, P2, P3, P4, P5>(
+    compute: new (p1: P1, p2: P2, p3: P3, p4: P4, p5: P5) => LazyCompute<K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+  ): LHandle<K, V> {
+    return this.lazyN(compute, p1, p2, p3, p4, p5);
+  }
+
+  lazy6<K extends TJSON, V extends TJSON, P1, P2, P3, P4, P5, P6>(
+    compute: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+    ) => LazyCompute<K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+  ): LHandle<K, V> {
+    return this.lazyN(compute, p1, p2, p3, p4, p5, p6);
+  }
+
+  lazy7<K extends TJSON, V extends TJSON, P1, P2, P3, P4, P5, P6, P7>(
+    compute: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+    ) => LazyCompute<K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+  ): LHandle<K, V> {
+    return this.lazyN(compute, p1, p2, p3, p4, p5, p6, p7);
+  }
+
+  lazy8<K extends TJSON, V extends TJSON, P1, P2, P3, P4, P5, P6, P7, P8>(
+    compute: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+      p8: P8,
+    ) => LazyCompute<K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+    p8: P8,
+  ): LHandle<K, V> {
+    return this.lazyN(compute, p1, p2, p3, p4, p5, p6, p7, p8);
+  }
+
+  lazy9<K extends TJSON, V extends TJSON, P1, P2, P3, P4, P5, P6, P7, P8, P9>(
+    compute: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+      p8: P8,
+      p9: P9,
+    ) => LazyCompute<K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+    p8: P8,
+    p9: P9,
+  ): LHandle<K, V> {
+    return this.lazyN(compute, p1, p2, p3, p4, p5, p6, p7, p8, p9);
+  }
+
+  asyncLazyN<
     K extends TJSON,
     V extends TJSON,
     P extends TJSON,
     M extends TJSON,
     C extends new (...params: Param[]) => AsyncLazyCompute<K, V, P, M>,
-  >(
-    compute: C,
-    ...params: ALParameters<K, V, P, M, C>
-  ): LHandle<K, Loadable<V, M>> {
+  >(compute: C, ...params: ALParameters<K, V, P, M, C>): ALHandle<K, V, M> {
     const computeObj = new compute(...params);
     const name = computeObj.constructor.name;
     const lazyHdl = this.context.asyncLazy<K, V, P, M>(
@@ -368,6 +1180,291 @@ export class SKStoreImpl implements SKStore {
       (key: K, params: P) => computeObj.call(key, params),
     );
     return new LHandleImpl<K, Loadable<V, M>>(this.context, lazyHdl);
+  }
+
+  asyncLazy<K extends TJSON, V extends TJSON, P extends TJSON, M extends TJSON>(
+    compute: new () => AsyncLazyCompute<K, V, P, M>,
+  ): ALHandle<K, V, M> {
+    return this.asyncLazyN<K, V, P, M, typeof compute>(compute);
+  }
+
+  asyncLazy1<
+    K extends TJSON,
+    V extends TJSON,
+    P extends TJSON,
+    M extends TJSON,
+    P1,
+  >(
+    compute: new (p1: P1) => AsyncLazyCompute<K, V, P, M>,
+    p1: P1,
+  ): ALHandle<K, V, M> {
+    return this.asyncLazyN<K, V, P, M, typeof compute>(compute, p1);
+  }
+
+  asyncLazy2<
+    K extends TJSON,
+    V extends TJSON,
+    P extends TJSON,
+    M extends TJSON,
+    P1,
+    P2,
+  >(
+    compute: new (p1: P1, p2: P2) => AsyncLazyCompute<K, V, P, M>,
+    p1: P1,
+    p2: P2,
+  ): ALHandle<K, V, M> {
+    return this.asyncLazyN<K, V, P, M, typeof compute>(compute, p1, p2);
+  }
+
+  asyncLazy3<
+    K extends TJSON,
+    V extends TJSON,
+    P extends TJSON,
+    M extends TJSON,
+    P1,
+    P2,
+    P3,
+  >(
+    compute: new (p1: P1, p2: P2, p3: P3) => AsyncLazyCompute<K, V, P, M>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+  ): ALHandle<K, V, M> {
+    return this.asyncLazyN<K, V, P, M, typeof compute>(compute, p1, p2, p3);
+  }
+
+  asyncLazy4<
+    K extends TJSON,
+    V extends TJSON,
+    P extends TJSON,
+    M extends TJSON,
+    P1,
+    P2,
+    P3,
+    P4,
+  >(
+    compute: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+    ) => AsyncLazyCompute<K, V, P, M>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+  ): ALHandle<K, V, M> {
+    return this.asyncLazyN<K, V, P, M, typeof compute>(compute, p1, p2, p3, p4);
+  }
+
+  asyncLazy5<
+    K extends TJSON,
+    V extends TJSON,
+    P extends TJSON,
+    M extends TJSON,
+    P1,
+    P2,
+    P3,
+    P4,
+    P5,
+  >(
+    compute: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+    ) => AsyncLazyCompute<K, V, P, M>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+  ): ALHandle<K, V, M> {
+    return this.asyncLazyN<K, V, P, M, typeof compute>(
+      compute,
+      p1,
+      p2,
+      p3,
+      p4,
+      p5,
+    );
+  }
+
+  asyncLazy6<
+    K extends TJSON,
+    V extends TJSON,
+    P extends TJSON,
+    M extends TJSON,
+    P1,
+    P2,
+    P3,
+    P4,
+    P5,
+    P6,
+  >(
+    compute: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+    ) => AsyncLazyCompute<K, V, P, M>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+  ): ALHandle<K, V, M> {
+    return this.asyncLazyN<K, V, P, M, typeof compute>(
+      compute,
+      p1,
+      p2,
+      p3,
+      p4,
+      p5,
+      p6,
+    );
+  }
+
+  asyncLazy7<
+    K extends TJSON,
+    V extends TJSON,
+    P extends TJSON,
+    M extends TJSON,
+    P1,
+    P2,
+    P3,
+    P5,
+    P4,
+    P6,
+    P7,
+  >(
+    compute: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+    ) => AsyncLazyCompute<K, V, P, M>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+  ): ALHandle<K, V, M> {
+    return this.asyncLazyN<K, V, P, M, typeof compute>(
+      compute,
+      p1,
+      p2,
+      p3,
+      p4,
+      p5,
+      p6,
+      p7,
+    );
+  }
+
+  asyncLazy8<
+    K extends TJSON,
+    V extends TJSON,
+    P extends TJSON,
+    M extends TJSON,
+    P1,
+    P2,
+    P3,
+    P4,
+    P5,
+    P6,
+    P7,
+    P8,
+  >(
+    compute: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+      p8: P8,
+    ) => AsyncLazyCompute<K, V, P, M>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+    p8: P8,
+  ): ALHandle<K, V, M> {
+    return this.asyncLazyN<K, V, P, M, typeof compute>(
+      compute,
+      p1,
+      p2,
+      p3,
+      p4,
+      p5,
+      p6,
+      p7,
+      p8,
+    );
+  }
+
+  asyncLazy9<
+    K extends TJSON,
+    V extends TJSON,
+    P extends TJSON,
+    M extends TJSON,
+    P1,
+    P2,
+    P3,
+    P4,
+    P5,
+    P6,
+    P7,
+    P8,
+    P9,
+  >(
+    compute: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+      p8: P8,
+      p9: P9,
+    ) => AsyncLazyCompute<K, V, P, M>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+    p8: P8,
+    p9: P9,
+  ): ALHandle<K, V, M> {
+    return this.asyncLazyN<K, V, P, M, typeof compute>(
+      compute,
+      p1,
+      p2,
+      p3,
+      p4,
+      p5,
+      p6,
+      p7,
+      p8,
+      p9,
+    );
   }
 
   log(object: any): void {

@@ -37,6 +37,7 @@ export type {
   LazyCompute,
   AsyncLazyCompute,
   Loadable,
+  ALHandle,
 } from "./skstore_api.js";
 
 export {

@@ -237,13 +237,16 @@ export interface NonEmptyIterator<T> {
  * A _Lazy_ Handle on a reactive collection, whose values are computed only when queried
  * using `get`
  */
-export interface LHandle<K, V> {
+export interface LHandle<K extends TJSON, V extends TJSON> {
   /**
    * Get (and potentially compute) a value of a lazy reactive collection
    * @throws {Error} when the key does not exist
    */
   get(key: K): V;
 }
+
+export interface ALHandle<K extends TJSON, V extends TJSON, M extends TJSON>
+  extends LHandle<K, Loadable<V, M>> {}
 
 /**
  * An _Eager_ handle on a reactive collection, whose values are computed eagerly as
@@ -266,7 +269,7 @@ export interface EHandle<K extends TJSON, V extends TJSON> {
    * @param {Mapper} mapper - function to apply to each element of this collection
    * @returns {EHandle} An eager handle on the resulting output collection
    */
-  map<
+  mapN<
     K2 extends TJSON,
     V2 extends TJSON,
     C extends new (...params: Param[]) => Mapper<K, V, K2, V2>,
@@ -274,6 +277,132 @@ export interface EHandle<K extends TJSON, V extends TJSON> {
     mapper: C,
     ...params: MParameters<K, V, K2, V2, C>
   ): EHandle<K2, V2>;
+
+  map<K2 extends TJSON, V2 extends TJSON>(
+    mapper: new () => Mapper<K, V, K2, V2>,
+  ): EHandle<K2, V2>;
+
+  map1<K2 extends TJSON, V2 extends TJSON, P1>(
+    mapper: new (p1: P1) => Mapper<K, V, K2, V2>,
+    p1: P1,
+  ): EHandle<K2, V2>;
+
+  map2<K2 extends TJSON, V2 extends TJSON, P1, P2>(
+    mapper: new (p1: P1, p2: P2) => Mapper<K, V, K2, V2>,
+    p1: P1,
+    p2: P2,
+  ): EHandle<K2, V2>;
+
+  map3<K2 extends TJSON, V2 extends TJSON, P1, P2, P3>(
+    mapper: new (p1: P1, p2: P2, p3: P3) => Mapper<K, V, K2, V2>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+  ): EHandle<K2, V2>;
+
+  map4<K2 extends TJSON, V2 extends TJSON, P1, P2, P3, P4>(
+    mapper: new (p1: P1, p2: P2, p3: P3, p4: P4) => Mapper<K, V, K2, V2>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+  ): EHandle<K2, V2>;
+
+  map5<K2 extends TJSON, V2 extends TJSON, P1, P2, P3, P4, P5>(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+    ) => Mapper<K, V, K2, V2>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+  ): EHandle<K2, V2>;
+
+  map6<K2 extends TJSON, V2 extends TJSON, P1, P2, P3, P4, P5, P6>(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+    ) => Mapper<K, V, K2, V2>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+  ): EHandle<K2, V2>;
+
+  map7<K2 extends TJSON, V2 extends TJSON, P1, P2, P3, P4, P5, P6, P7>(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+    ) => Mapper<K, V, K2, V2>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+  ): EHandle<K2, V2>;
+
+  map8<K2 extends TJSON, V2 extends TJSON, P1, P2, P3, P4, P5, P6, P7, P8>(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+      p8: P8,
+    ) => Mapper<K, V, K2, V2>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+    p8: P8,
+  ): EHandle<K2, V2>;
+
+  map9<K2 extends TJSON, V2 extends TJSON, P1, P2, P3, P4, P5, P6, P7, P8, P9>(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+      p8: P8,
+      p9: P9,
+    ) => Mapper<K, V, K2, V2>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+    p8: P8,
+    p9: P9,
+  ): EHandle<K2, V2>;
+
   /**
    * Create a new eager reactive collection by mapping some computation `mapper` over this
    * one and then reducing the results with `accumulator`
@@ -281,7 +410,7 @@ export interface EHandle<K extends TJSON, V extends TJSON> {
    * @param {Accumulator} accumulator - function to combine results of the `mapper`
    * @returns {EHandle} An eager handle on the output of the `accumulator`
    */
-  mapReduce<
+  mapReduceN<
     K2 extends TJSON,
     V2 extends TJSON,
     V3 extends TJSON,
@@ -290,6 +419,204 @@ export interface EHandle<K extends TJSON, V extends TJSON> {
     mapper: C,
     accumulator: Accumulator<V2, V3>,
     ...params: MParameters<K, V, K2, V2, C>
+  ): EHandle<K2, V3>;
+
+  mapReduce<K2 extends TJSON, V2 extends TJSON, V3 extends TJSON>(
+    mapper: new () => Mapper<K, V, K2, V2>,
+    accumulator: Accumulator<V2, V3>,
+  ): EHandle<K2, V3>;
+
+  mapReduce1<K2 extends TJSON, V2 extends TJSON, V3 extends TJSON, P1>(
+    mapper: new (p1: P1) => Mapper<K, V, K2, V2>,
+    accumulator: Accumulator<V2, V3>,
+    p1: P1,
+  ): EHandle<K2, V3>;
+
+  mapReduce2<K2 extends TJSON, V2 extends TJSON, V3 extends TJSON, P1, P2>(
+    mapper: new (p1: P1, p2: P2) => Mapper<K, V, K2, V2>,
+    accumulator: Accumulator<V2, V3>,
+    p1: P1,
+    p2: P2,
+  ): EHandle<K2, V3>;
+
+  mapReduce3<K2 extends TJSON, V2 extends TJSON, V3 extends TJSON, P1, P2, P3>(
+    mapper: new (p1: P1, p2: P2, p3: P3) => Mapper<K, V, K2, V2>,
+    accumulator: Accumulator<V2, V3>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+  ): EHandle<K2, V3>;
+
+  mapReduce4<
+    K2 extends TJSON,
+    V2 extends TJSON,
+    V3 extends TJSON,
+    P1,
+    P2,
+    P3,
+    P4,
+  >(
+    mapper: new (p1: P1, p2: P2, p3: P3, p4: P4) => Mapper<K, V, K2, V2>,
+    accumulator: Accumulator<V2, V3>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+  ): EHandle<K2, V3>;
+
+  mapReduce5<
+    K2 extends TJSON,
+    V2 extends TJSON,
+    V3 extends TJSON,
+    P1,
+    P2,
+    P3,
+    P4,
+    P5,
+  >(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+    ) => Mapper<K, V, K2, V2>,
+    accumulator: Accumulator<V2, V3>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+  ): EHandle<K2, V3>;
+
+  mapReduce6<
+    K2 extends TJSON,
+    V2 extends TJSON,
+    V3 extends TJSON,
+    P1,
+    P2,
+    P3,
+    P4,
+    P5,
+    P6,
+  >(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+    ) => Mapper<K, V, K2, V2>,
+    accumulator: Accumulator<V2, V3>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+  ): EHandle<K2, V3>;
+
+  mapReduce7<
+    K2 extends TJSON,
+    V2 extends TJSON,
+    V3 extends TJSON,
+    P1,
+    P2,
+    P3,
+    P4,
+    P5,
+    P6,
+    P7,
+  >(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+    ) => Mapper<K, V, K2, V2>,
+    accumulator: Accumulator<V2, V3>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+  ): EHandle<K2, V3>;
+
+  mapReduce8<
+    K2 extends TJSON,
+    V2 extends TJSON,
+    V3 extends TJSON,
+    P1,
+    P2,
+    P3,
+    P4,
+    P5,
+    P6,
+    P7,
+    P8,
+  >(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+      p8: P8,
+    ) => Mapper<K, V, K2, V2>,
+    accumulator: Accumulator<V2, V3>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+    p8: P8,
+  ): EHandle<K2, V3>;
+
+  mapReduce9<
+    K2 extends TJSON,
+    V2 extends TJSON,
+    V3 extends TJSON,
+    P1,
+    P2,
+    P3,
+    P4,
+    P5,
+    P6,
+    P7,
+    P8,
+    P9,
+  >(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+      p8: P8,
+      p9: P9,
+    ) => Mapper<K, V, K2, V2>,
+    accumulator: Accumulator<V2, V3>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+    p8: P8,
+    p9: P9,
   ): EHandle<K2, V3>;
 
   /**
@@ -302,13 +629,148 @@ export interface EHandle<K extends TJSON, V extends TJSON> {
    * @param {Mapper} mapper - function to apply to each key/value pair in this collection
    *                          to produce a table row
    */
-  mapTo<
+  mapToN<
     R extends TJSON[],
     C extends new (...params: Param[]) => OutputMapper<R, K, V>,
   >(
     table: TableHandle<R>,
     mapper: C,
     ...params: OMParameters<R, K, V, C>
+  ): void;
+
+  mapTo<R extends TJSON[]>(
+    table: TableHandle<R>,
+    mapper: new () => OutputMapper<R, K, V>,
+  ): void;
+
+  mapTo1<R extends TJSON[], P1>(
+    table: TableHandle<R>,
+    mapper: new (p1: P1) => OutputMapper<R, K, V>,
+    p1: P1,
+  ): void;
+
+  mapTo2<R extends TJSON[], P1, P2>(
+    table: TableHandle<R>,
+    mapper: new (p1: P1, p2: P2) => OutputMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+  ): void;
+
+  mapTo3<R extends TJSON[], P1, P2, P3>(
+    table: TableHandle<R>,
+    mapper: new (p1: P1, p2: P2, p3: P3) => OutputMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+  ): void;
+
+  mapTo4<R extends TJSON[], P1, P2, P3, P4>(
+    table: TableHandle<R>,
+    mapper: new (p1: P1, p2: P2, p3: P3, p4: P4) => OutputMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+  ): void;
+
+  mapTo5<R extends TJSON[], P1, P2, P3, P4, P5>(
+    table: TableHandle<R>,
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+    ) => OutputMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+  ): void;
+
+  mapTo6<R extends TJSON[], P1, P2, P3, P4, P5, P6>(
+    table: TableHandle<R>,
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+    ) => OutputMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+  ): void;
+
+  mapTo7<R extends TJSON[], P1, P2, P3, P4, P5, P6, P7>(
+    table: TableHandle<R>,
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+    ) => OutputMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+  ): void;
+
+  mapTo8<R extends TJSON[], P1, P2, P3, P4, P5, P6, P7, P8>(
+    table: TableHandle<R>,
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+      p8: P8,
+    ) => OutputMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+    p8: P8,
+  ): void;
+
+  mapTo9<R extends TJSON[], P1, P2, P3, P4, P5, P6, P7, P8, P9>(
+    table: TableHandle<R>,
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+      p8: P8,
+      p9: P9,
+    ) => OutputMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+    p8: P8,
+    p9: P9,
   ): void;
 
   getId(): string;
@@ -331,13 +793,138 @@ export interface TableHandle<R extends TJSON[]> {
    * Create a new eager reactive collection by mapping over each table entry
    * @returns {EHandle} An eager handle on the resulting collection
    */
-  map<
+  mapN<
     K extends TJSON,
     V extends TJSON,
     C extends new (...params: Param[]) => EntryMapper<R, K, V>,
   >(
     mapper: C,
     ...params: EMParameters<K, V, R, C>
+  ): EHandle<K, V>;
+
+  map<K extends TJSON, V extends TJSON>(
+    mapper: new () => EntryMapper<R, K, V>,
+  ): EHandle<K, V>;
+
+  map1<K extends TJSON, V extends TJSON, P1>(
+    mapper: new (p1: P1) => EntryMapper<R, K, V>,
+    p1: P1,
+  ): EHandle<K, V>;
+
+  map2<K extends TJSON, V extends TJSON, P1, P2>(
+    mapper: new (p1: P1, p2: P2) => EntryMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+  ): EHandle<K, V>;
+
+  map3<K extends TJSON, V extends TJSON, P1, P2, P3>(
+    mapper: new (p1: P1, p2: P2, p3: P3) => EntryMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+  ): EHandle<K, V>;
+
+  map4<K extends TJSON, V extends TJSON, P1, P2, P3, P4>(
+    mapper: new (p1: P1, p2: P2, p3: P3, p4: P4) => EntryMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+  ): EHandle<K, V>;
+
+  map5<K extends TJSON, V extends TJSON, P1, P2, P3, P4, P5>(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+    ) => EntryMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+  ): EHandle<K, V>;
+
+  map6<K extends TJSON, V extends TJSON, P1, P2, P3, P4, P5, P6>(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+    ) => EntryMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+  ): EHandle<K, V>;
+
+  map7<K extends TJSON, V extends TJSON, P1, P2, P3, P4, P5, P6, P7>(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+    ) => EntryMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+  ): EHandle<K, V>;
+
+  map8<K extends TJSON, V extends TJSON, P1, P2, P3, P4, P5, P6, P7, P8>(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+      p8: P8,
+    ) => EntryMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+    p8: P8,
+  ): EHandle<K, V>;
+
+  map9<K extends TJSON, V extends TJSON, P1, P2, P3, P4, P5, P6, P7, P8, P9>(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+      p8: P8,
+      p9: P9,
+    ) => EntryMapper<R, K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+    p8: P8,
+    p9: P9,
   ): EHandle<K, V>;
 }
 
@@ -463,13 +1050,132 @@ export interface SKStore {
    * @param compute - the lazy function to compute entries of the lazy map
    * @returns {LHandle} The the resulting lazy reactive map handle
    */
-  lazy<
+  lazyN<
     K extends TJSON,
     V extends TJSON,
     C extends new (...params: Param[]) => LazyCompute<K, V>,
   >(
     compute: C,
     ...params: LParameters<K, V, C>
+  ): LHandle<K, V>;
+
+  lazy<K extends TJSON, V extends TJSON>(
+    compute: new () => LazyCompute<K, V>,
+  ): LHandle<K, V>;
+
+  lazy1<K extends TJSON, V extends TJSON, P1>(
+    compute: new (p1: P1) => LazyCompute<K, V>,
+    p1: P1,
+  ): LHandle<K, V>;
+
+  lazy2<K extends TJSON, V extends TJSON, P1, P2>(
+    compute: new (p1: P1, p2: P2) => LazyCompute<K, V>,
+    p1: P1,
+    p2: P2,
+  ): LHandle<K, V>;
+
+  lazy3<K extends TJSON, V extends TJSON, P1, P2, P3>(
+    compute: new (p1: P1, p2: P2, p3: P3) => LazyCompute<K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+  ): LHandle<K, V>;
+
+  lazy4<K extends TJSON, V extends TJSON, P1, P2, P3, P4>(
+    compute: new (p1: P1, p2: P2, p3: P3, p4: P4) => LazyCompute<K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+  ): LHandle<K, V>;
+
+  lazy5<K extends TJSON, V extends TJSON, P1, P2, P3, P4, P5>(
+    compute: new (p1: P1, p2: P2, p3: P3, p4: P4, p5: P5) => LazyCompute<K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+  ): LHandle<K, V>;
+
+  lazy6<K extends TJSON, V extends TJSON, P1, P2, P3, P4, P5, P6>(
+    compute: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+    ) => LazyCompute<K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+  ): LHandle<K, V>;
+
+  lazy7<K extends TJSON, V extends TJSON, P1, P2, P3, P5, P4, P6, P7>(
+    compute: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+    ) => LazyCompute<K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+  ): LHandle<K, V>;
+
+  lazy8<K extends TJSON, V extends TJSON, P1, P2, P3, P4, P5, P6, P7, P8>(
+    compute: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+      p8: P8,
+    ) => LazyCompute<K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+    p8: P8,
+  ): LHandle<K, V>;
+
+  lazy9<K extends TJSON, V extends TJSON, P1, P2, P3, P4, P5, P6, P7, P8, P9>(
+    compute: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+      p8: P8,
+      p9: P9,
+    ) => LazyCompute<K, V>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+    p8: P8,
+    p9: P9,
   ): LHandle<K, V>;
 
   /**
@@ -509,7 +1215,7 @@ export interface SKStore {
    * @param call - the async function to call with gathered values
    * @returns {LHandle} The the resulting lazy reactive map handle
    */
-  asyncLazy<
+  asyncLazyN<
     K extends TJSON,
     V extends TJSON,
     P extends TJSON,
@@ -518,7 +1224,227 @@ export interface SKStore {
   >(
     compute: C,
     ...params: ALParameters<K, V, P, M, C>
-  ): LHandle<K, Loadable<V, M>>;
+  ): ALHandle<K, V, M>;
+
+  asyncLazy<K extends TJSON, V extends TJSON, P extends TJSON, M extends TJSON>(
+    compute: new () => AsyncLazyCompute<K, V, P, M>,
+  ): ALHandle<K, V, M>;
+
+  asyncLazy1<
+    K extends TJSON,
+    V extends TJSON,
+    P extends TJSON,
+    M extends TJSON,
+    P1,
+  >(
+    compute: new (p1: P1) => AsyncLazyCompute<K, V, P, M>,
+    p1: P1,
+  ): ALHandle<K, V, M>;
+
+  asyncLazy2<
+    K extends TJSON,
+    V extends TJSON,
+    P extends TJSON,
+    M extends TJSON,
+    P1,
+    P2,
+  >(
+    compute: new (p1: P1, p2: P2) => AsyncLazyCompute<K, V, P, M>,
+    p1: P1,
+    p2: P2,
+  ): ALHandle<K, V, M>;
+
+  asyncLazy3<
+    K extends TJSON,
+    V extends TJSON,
+    P extends TJSON,
+    M extends TJSON,
+    P1,
+    P2,
+    P3,
+  >(
+    compute: new (p1: P1, p2: P2, p3: P3) => AsyncLazyCompute<K, V, P, M>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+  ): ALHandle<K, V, M>;
+
+  asyncLazy4<
+    K extends TJSON,
+    V extends TJSON,
+    P extends TJSON,
+    M extends TJSON,
+    P1,
+    P2,
+    P3,
+    P4,
+  >(
+    compute: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+    ) => AsyncLazyCompute<K, V, P, M>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+  ): ALHandle<K, V, M>;
+
+  asyncLazy5<
+    K extends TJSON,
+    V extends TJSON,
+    P extends TJSON,
+    M extends TJSON,
+    P1,
+    P2,
+    P3,
+    P4,
+    P5,
+  >(
+    compute: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+    ) => AsyncLazyCompute<K, V, P, M>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+  ): ALHandle<K, V, M>;
+
+  asyncLazy6<
+    K extends TJSON,
+    V extends TJSON,
+    P extends TJSON,
+    M extends TJSON,
+    P1,
+    P2,
+    P3,
+    P4,
+    P5,
+    P6,
+  >(
+    compute: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+    ) => AsyncLazyCompute<K, V, P, M>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+  ): ALHandle<K, V, M>;
+
+  asyncLazy7<
+    K extends TJSON,
+    V extends TJSON,
+    P extends TJSON,
+    M extends TJSON,
+    P1,
+    P2,
+    P3,
+    P5,
+    P4,
+    P6,
+    P7,
+  >(
+    compute: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+    ) => AsyncLazyCompute<K, V, P, M>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+  ): ALHandle<K, V, M>;
+
+  asyncLazy8<
+    K extends TJSON,
+    V extends TJSON,
+    P extends TJSON,
+    M extends TJSON,
+    P1,
+    P2,
+    P3,
+    P4,
+    P5,
+    P6,
+    P7,
+    P8,
+  >(
+    compute: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+      p8: P8,
+    ) => AsyncLazyCompute<K, V, P, M>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+    p8: P8,
+  ): ALHandle<K, V, M>;
+
+  asyncLazy9<
+    K extends TJSON,
+    V extends TJSON,
+    P extends TJSON,
+    M extends TJSON,
+    P1,
+    P2,
+    P3,
+    P4,
+    P5,
+    P6,
+    P7,
+    P8,
+    P9,
+  >(
+    compute: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+      p8: P8,
+      p9: P9,
+    ) => AsyncLazyCompute<K, V, P, M>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+    p8: P8,
+    p9: P9,
+  ): ALHandle<K, V, M>;
 
   log(object: TJSON): void;
 }
