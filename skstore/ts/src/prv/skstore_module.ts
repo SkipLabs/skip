@@ -551,12 +551,14 @@ class LinksImpl implements Links {
           }
         })
         .catch((reason: any) => {
-          const msg =
-            reason instanceof Error
-              ? reason.message
-              : typeof reason == "string"
-                ? reason
-                : JSON.stringify(reason);
+          var msg: string;
+          if (reason instanceof Error) {
+            msg = reason.message;
+          } else if (typeof reason == "string") {
+            msg = reason;
+          } else {
+            msg = JSON.stringify(reason);
+          }
           register({ status: "failure", error: msg });
         });
     };

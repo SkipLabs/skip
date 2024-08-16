@@ -15,6 +15,7 @@ import type {
   LHandle,
   Loadable,
   NonEmptyIterator,
+  ALHandle,
 } from "skstore";
 import {
   Sum,
@@ -59,10 +60,7 @@ function testMap1Init(
   input: TableHandle<[number, number]>,
   output: TableHandle<[number, number]>,
 ) {
-  const eager1 = input.map<number, number, typeof TestFromIntInt>(
-    TestFromIntInt,
-    2,
-  );
+  const eager1 = input.map1(TestFromIntInt, 2);
   eager1.mapTo(output, TestToOutput);
 }
 
@@ -98,9 +96,9 @@ function testMap2Init(
   input2: TableHandle<[number, string]>,
   output: TableHandle<[number, number]>,
 ) {
-  const eager1 = input1.map<number, number, typeof TestParseInt>(TestParseInt);
-  const eager2 = input2.map<number, number, typeof TestParseInt>(TestParseInt);
-  const eager3 = eager1.map<number, number, typeof TestAdd>(TestAdd, eager2);
+  const eager1 = input1.map(TestParseInt);
+  const eager2 = input2.map(TestParseInt);
+  const eager3 = eager1.map1(TestAdd, eager2);
   eager3.mapTo(output, TestToOutput);
 }
 
@@ -137,13 +135,8 @@ function testSizeInit(
   size: TableHandle<[number]>,
   output: TableHandle<[number, number]>,
 ) {
-  const eager1 = input.map<number, number, typeof TestFromIntInt>(
-    TestFromIntInt,
-  );
-  const eager2 = size.map<number, number, typeof TestSizeGetter>(
-    TestSizeGetter,
-    eager1,
-  );
+  const eager1 = input.map(TestFromIntInt);
+  const eager2 = size.map1(TestSizeGetter, eager1);
   eager2.mapTo(output, TestToOutput);
 }
 
@@ -190,14 +183,9 @@ function testLazyInit(
   input: TableHandle<[number, number]>,
   output: TableHandle<[number, number]>,
 ) {
-  const eager1 = input.map<number, number, typeof TestFromIntInt>(
-    TestFromIntInt,
-  );
-  const lazy = skstore.lazy<number, number, typeof TestLazyAdd>(
-    TestLazyAdd,
-    eager1,
-  );
-  const eager2 = eager1.map<number, number, typeof TestSub>(TestSub, lazy);
+  const eager1 = input.map(TestFromIntInt);
+  const lazy = skstore.lazy1(TestLazyAdd, eager1);
+  const eager2 = eager1.map1(TestSub, lazy);
   eager2.mapTo(output, TestToOutput);
 }
 
@@ -242,13 +230,8 @@ function testMapReduceInit(
   input: TableHandle<[number, number]>,
   output: TableHandle<[number, number]>,
 ) {
-  const eager1 = input.map<number, number, typeof TestFromIntInt>(
-    TestFromIntInt,
-  );
-  const eager2 = eager1.mapReduce<number, number, number, typeof TestOddEven>(
-    TestOddEven,
-    new Sum(),
-  );
+  const eager1 = input.map(TestFromIntInt);
+  const eager2 = eager1.mapReduce(TestOddEven, new Sum());
   eager2.mapTo(output, TestToOutput);
 }
 
@@ -314,8 +297,8 @@ function testMultiMap1Init(
   input2: TableHandle<[number, string]>,
   output: TableHandle<[number, number, number]>,
 ) {
-  const eager1 = input1.map<number, number, typeof TestParseInt>(TestParseInt);
-  const eager2 = input2.map<number, number, typeof TestParseInt>(TestParseInt);
+  const eager1 = input1.map(TestParseInt);
+  const eager2 = input2.map(TestParseInt);
   const eager3 = skstore.multimap<number, number, [number, number], number>([
     { handle: eager1, mapper: TestSplitter, params: [0] },
     { handle: eager2, mapper: TestSplitter, params: [1] },
@@ -367,8 +350,8 @@ function testMultiMapReduceInit(
   input2: TableHandle<[number, string]>,
   output: TableHandle<[number, number]>,
 ) {
-  const eager1 = input1.map<number, number, typeof TestParseInt>(TestParseInt);
-  const eager2 = input2.map<number, number, typeof TestParseInt>(TestParseInt);
+  const eager1 = input1.map(TestParseInt);
+  const eager2 = input2.map(TestParseInt);
   const eager3 = skstore.multimapReduce(
     [
       { handle: eager1, mapper: TestSet },
@@ -447,23 +430,14 @@ function testAsyncLazyInit(
   input2: TableHandle<[number, number]>,
   output: TableHandle<[number, string]>,
 ) {
-  const eager1 = input1.map<number, number, typeof TestFromIntInt>(
-    TestFromIntInt,
-  );
-  const eager2 = input2.map<number, number, typeof TestFromIntInt>(
-    TestFromIntInt,
-  );
-  const asyncLazy = skstore.asyncLazy<
+  const eager1 = input1.map(TestFromIntInt);
+  const eager2 = input2.map(TestFromIntInt);
+  const asyncLazy = skstore.asyncLazy1(TestLazyWithAsync, eager2) as ALHandle<
     [number, number],
     number,
-    number,
-    number,
-    typeof TestLazyWithAsync
-  >(TestLazyWithAsync, eager2);
-  const eager3 = eager1.map<number, string, typeof TestCheckResult>(
-    TestCheckResult,
-    asyncLazy,
-  );
+    number
+  >;
+  const eager3 = eager1.map1(TestCheckResult, asyncLazy);
   eager3.mapTo(output, TestToOutput);
 }
 
@@ -586,7 +560,7 @@ function run(t: Test) {
   test(t.name, async ({ page }) => {
     let tables: Table<TJSON[]>[] = [];
     try {
-      tables = await createSKStore(t.init, t.schema, null);
+      tables = await createSKStore(t.init, t.schema, false);
     } catch (err: any) {
       if (t.error) t.error(err);
       else console.error(err);
