@@ -8,7 +8,7 @@ class Env(
   name: String,
   profile: String,
   optTarget: ?String,
-  // test: Bool,
+  optRelocationModel: ?String,
   verbose: Bool,
 ) {
   static fun create(): Env {
@@ -18,9 +18,13 @@ class Env(
       Environ.var("NAME"),
       Environ.var("PROFILE"),
       Environ.varOpt("TARGET"),
-      // Environ.var("TEST").lowercase() == "true",
+      Environ.varOpt("RELOCATION_MODEL"),
       Environ.var("VERBOSE").lowercase() == "true",
     )
+  }
+
+  fun isPic(): Bool {
+    this.optRelocationModel == Some("pic")
   }
 
   fun isWasm32(): Bool {
@@ -147,7 +151,7 @@ fun build_harness(
     for (res in resources) {
       resPath = env.resolve(res);
       if (FileSystem.exists(resPath)) {
-        buildResource(env, resPath, false) match {
+        buildResource(env, resPath, false, env.isPic()) match {
         | Failure(err) -> return Failure(err)
         | Success(object) -> !resourceObjs = resourceObjs.concat(Array[object])
         }
@@ -166,7 +170,7 @@ fun build_harness(
             Some(Path.dirname(resPath)),
           );
         };
-        buildResource(env, archive, true) match {
+        buildResource(env, archive, true, env.isPic()) match {
         | Failure(err) -> return Failure(err)
         | Success(object) -> !resourceObjs = resourceObjs.concat(Array[object])
         }
@@ -197,6 +201,7 @@ fun build_harness(
     resourceObjs,
     includeDirs,
     includeChecker,
+    env.isPic(),
   ).each(x -> print_library(x));
   preambles
     .map(p -> {
@@ -222,6 +227,7 @@ fun buildLibrary(
   resources: Array<String>,
   includeDirs: Array<String>,
   includeChecker: TimeChecker,
+  pic: Bool,
 ): ?String {
   sources = sourceDirs.map(sd -> {
     if (!Path.isAbsolute(sd)) {
@@ -245,7 +251,9 @@ fun buildLibrary(
     sources.each(tsd ->
       !objects = objects.concat(
         tsd
-          .map(f -> compileFile(env, isWasm, f, includeChecker, includeOptions))
+          .map(f ->
+            compileFile(env, isWasm, f, includeChecker, includeOptions, pic)
+          )
           .toArray(),
       )
     );
@@ -259,6 +267,7 @@ fun buildResource(
   env: Env,
   file: String,
   relToOut: Bool,
+  pic: Bool,
 ): Result<String, IO.Error> {
   checker = TimeChecker(mtime(file));
   object = if (relToOut) mvExt(file, ".o") else env.targetPath(file, ".o");
@@ -272,7 +281,15 @@ fun buildResource(
     | Failure(err) -> return Failure(err)
     | _ -> void
     };
-    _ = compileFile(env, false, source, TimeChecker(), Array[], Some(object))
+    _ = compileFile(
+      env,
+      false,
+      source,
+      TimeChecker(),
+      Array[],
+      pic,
+      Some(object),
+    )
   };
   Success(object)
 }
@@ -384,6 +401,7 @@ fun compileFile(
   source: String,
   includesChecker: TimeChecker,
   includes: Array<String>,
+  pic: Bool,
   optObject: ?String = None(),
 ): String {
   ext = ".o";
@@ -418,9 +436,17 @@ fun compileFile(
       )
       .concat(
         if (isWasm) {
-          Array["-DSKIP32", "--target=wasm32", "-nostdlibinc"].concat(flags)
+          Array["-DSKIP32", "--target=wasm32", "-nostdlibinc"]
         } else {
-          Array["-DSKIP64"].concat(flags)
+          Array["-DSKIP64"]
+        },
+      )
+      .concat(flags)
+      .concat(
+        if (pic) {
+          Array["-fPIC"]
+        } else {
+          Array[]
         },
       )
       .concat(includes)
