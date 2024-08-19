@@ -43,6 +43,11 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
   constructor(context: Context, eagerHdl: string) {
     this.context = context;
     this.eagerHdl = eagerHdl;
+    Object.defineProperty(this, "__sk_frozen", {
+      enumerable: false,
+      writable: false,
+      value: true,
+    });
   }
   getId(): string {
     return this.eagerHdl;
@@ -71,7 +76,9 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     V2 extends TJSON,
     C extends new (...params: Param[]) => Mapper<K, V, K2, V2>,
   >(mapper: C, ...params: MParameters<K, V, K2, V2, C>): EHandle<K2, V2> {
+    params.forEach(check);
     const mapperObj = new mapper(...params);
+    Object.freeze(mapperObj);
     if (!mapperObj.constructor.name) {
       throw new Error("The class must have a name.");
     }
@@ -238,7 +245,9 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     accumulator: Accumulator<V2, V3>,
     ...params: MParameters<K, V, K2, V2, C>
   ) {
+    params.forEach(check);
     const mapperObj = new mapper(...params);
+    Object.freeze(mapperObj);
     if (!mapperObj.constructor.name) {
       throw new Error("The class must have a name.");
     }
@@ -489,7 +498,9 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     mapper: C,
     ...params: OMParameters<R, K, V, C>
   ): void {
+    params.forEach(check);
     const mapperObj = new mapper(...params);
+    Object.freeze(mapperObj);
     if (!mapperObj.constructor.name) {
       throw new Error("The class must have a name.");
     }
@@ -663,6 +674,11 @@ class LHandleImpl<K extends TJSON, V extends TJSON> implements LHandle<K, V> {
   constructor(context: Context, lazyHdl: string) {
     this.context = context;
     this.lazyHdl = lazyHdl;
+    Object.defineProperty(this, "__sk_frozen", {
+      enumerable: false,
+      writable: false,
+      value: true,
+    });
   }
 
   get(key: K): V {
@@ -679,6 +695,11 @@ export class LSelfImpl<K extends TJSON, V extends TJSON>
   constructor(context: Context, lazyHdl: ptr) {
     this.context = context;
     this.lazyHdl = lazyHdl;
+    Object.defineProperty(this, "__sk_frozen", {
+      enumerable: false,
+      writable: false,
+      value: true,
+    });
   }
 
   get(key: K): V {
@@ -695,6 +716,11 @@ export class TableHandleImpl<R extends TJSON[]> implements TableHandle<R> {
     this.context = context;
     this.skdb = skdb;
     this.schema = schema;
+    Object.defineProperty(this, "__sk_frozen", {
+      enumerable: false,
+      writable: false,
+      value: true,
+    });
   }
 
   getName(): string {
@@ -710,7 +736,9 @@ export class TableHandleImpl<R extends TJSON[]> implements TableHandle<R> {
     V extends TJSON,
     C extends new (...params: Param[]) => EntryMapper<R, K, V>,
   >(mapper: C, ...params: EMParameters<K, V, R, C>): EHandle<K, V> {
+    params.forEach(check);
     const mapperObj = new mapper(...params);
+    Object.freeze(mapperObj);
     if (!mapperObj.constructor.name) {
       throw new Error("The class must have a name.");
     }
@@ -967,6 +995,11 @@ export class SKStoreImpl implements SKStore {
 
   constructor(context: Context) {
     this.context = context;
+    Object.defineProperty(this, "__sk_frozen", {
+      enumerable: false,
+      writable: false,
+      value: true,
+    });
   }
 
   multimap<
@@ -977,7 +1010,10 @@ export class SKStoreImpl implements SKStore {
   >(mappings: Mapping<K1, V1, K2, V2>[]): EHandle<K2, V2> {
     var name = "";
     const ctxmapping = mappings.map((mapping) => {
-      const mapperObj = new mapping.mapper(...(mapping.params ?? []));
+      const params = mapping.params ?? [];
+      params.forEach(check);
+      const mapperObj = new mapping.mapper(...params);
+      Object.freeze(mapperObj);
       name += mapperObj.constructor.name;
       return {
         handle: mapping.handle,
@@ -1001,7 +1037,10 @@ export class SKStoreImpl implements SKStore {
   ): EHandle<K2, V3> {
     var name = "";
     const ctxmapping = mappings.map((mapping) => {
-      const mapperObj = new mapping.mapper(...(mapping.params ?? []));
+      const params = mapping.params ?? [];
+      params.forEach(check);
+      const mapperObj = new mapping.mapper(...params);
+      Object.freeze(mapperObj);
       name += mapperObj.constructor.name;
       return {
         handle: mapping.handle,
@@ -1018,7 +1057,9 @@ export class SKStoreImpl implements SKStore {
     V extends TJSON,
     C extends new (...params: Param[]) => LazyCompute<K, V>,
   >(compute: C, ...params: LParameters<K, V, C>): LHandle<K, V> {
+    params.forEach(check);
     const computeObj = new compute(...params);
+    Object.freeze(computeObj);
     const name = computeObj.constructor.name;
     const lazyHdl = this.context.lazy(name, (selfHdl: LHandle<K, V>, key: K) =>
       computeObj.compute(selfHdl, key),
@@ -1171,9 +1212,14 @@ export class SKStoreImpl implements SKStore {
     P extends TJSON,
     M extends TJSON,
     C extends new (...params: Param[]) => AsyncLazyCompute<K, V, P, M>,
-  >(compute: C, ...params: ALParameters<K, V, P, M, C>): ALHandle<K, V, M> {
+  >(
+    compute: C,
+    ...params: ALParameters<K, V, P, M, C>
+  ): LHandle<K, Loadable<V, M>> {
+    params.forEach(check);
     const computeObj = new compute(...params);
     const name = computeObj.constructor.name;
+    Object.freeze(computeObj);
     const lazyHdl = this.context.asyncLazy<K, V, P, M>(
       name,
       (key: K) => computeObj.params(key),
@@ -1764,4 +1810,30 @@ function toUpdateWhereQuery(
   const sets = toSets(updates, "us_");
   const query = `UPDATE "${name}" SET ${sets.query} WHERE ${qWhere.query};`;
   return { query, params: { ...sets.params, ...qWhere.params } };
+}
+
+export function check<T>(value: T): void {
+  const type = typeof value;
+  if (type == "string" || type == "number" || type == "boolean") {
+    return;
+  } else if (type == "object") {
+    const jso = value as any;
+    if ((value as any).__sk_frozen) {
+      return;
+    } else if (Object.isFrozen(jso)) {
+      if (Array.isArray(jso)) {
+        for (let i = 0; i < length; i++) {
+          check(jso[i]);
+        }
+      } else {
+        for (const key of Object.keys(jso)) {
+          check(jso[key]);
+        }
+      }
+    } else {
+      throw new Error("Invalid object: must be frozen.");
+    }
+  } else {
+    throw new Error("'" + type + "' cannot be manage by skstore.");
+  }
 }
