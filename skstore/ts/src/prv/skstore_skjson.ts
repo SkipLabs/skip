@@ -125,6 +125,7 @@ function getValueAt(hdl: WasmHandle, idx: int, array: boolean = false): any {
 export const reactiveObject = {
   get(hdl: WasmHandle, prop: string, self: any): any {
     if (prop === "__isObjectProxy") return true;
+    if (prop === "__sk_frozen") return true;
     if (prop === "__pointer") return hdl.pointer;
     if (prop === "clone") return () => clone(self);
     const fields = hdl.objectFields();
@@ -141,8 +142,12 @@ export const reactiveObject = {
     if (idx === undefined) return undefined;
     return getValueAt(hdl, idx, false);
   },
+  set(_hdl: WasmHandle, _prop: string, _value: any) {
+    throw "Reactive object cannot be modified.";
+  },
   has(hdl: WasmHandle, prop: string): boolean {
     if (prop === "__isObjectProxy") return true;
+    if (prop === "__sk_frozen") return true;
     if (prop === "__pointer") return true;
     if (prop === "clone") return true;
     if (prop === "keys") return true;
@@ -173,6 +178,7 @@ export const reactiveArray = {
       return () => self.toJSON().values();
     } else {
       if (prop === "__isArrayProxy") return true;
+      if (prop === "__sk_frozen") return true;
       if (prop === "__pointer") return hdl.pointer;
       if (prop === "length")
         return hdl.access.SKIP_SKJSON_arraySize(hdl.pointer);
@@ -198,8 +204,12 @@ export const reactiveArray = {
       return undefined;
     }
   },
+  set(_hdl: WasmHandle, _prop: string, _value: any) {
+    throw "Reactive array cannot be modified.";
+  },
   has(hdl: WasmHandle, prop: string): boolean {
     if (prop === "__isArrayProxy") return true;
+    if (prop === "__sk_frozen") return true;
     if (prop === "__pointer") return true;
     if (prop === "length") return true;
     if (prop === "clone") return true;
@@ -383,8 +393,6 @@ class LinksImpl implements Links {
           return fromWasm.SKIP_SKJSON_endCJObject(obj);
         }
       } else {
-        console.error(value);
-        console.error(new Error());
         throw new Error("'" + type + "' cannot be exported to wasm.");
       }
     };
