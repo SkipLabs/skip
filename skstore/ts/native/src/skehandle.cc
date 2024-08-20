@@ -84,8 +84,38 @@ void EHandle::Prototype(Local<FunctionTemplate> tpl) {
   NODE_SET_PROTOTYPE_METHOD(tpl, "maybeGet", MaybeGet);
   NODE_SET_PROTOTYPE_METHOD(tpl, "size", Size);
   NODE_SET_PROTOTYPE_METHOD(tpl, "map", Map);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "map1", Map);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "map2", Map);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "map3", Map);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "map4", Map);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "map5", Map);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "map6", Map);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "map7", Map);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "map8", Map);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "map9", Map);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "mapN", Map);
   NODE_SET_PROTOTYPE_METHOD(tpl, "mapReduce", MapReduce);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "mapReduce1", MapReduce);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "mapReduce2", MapReduce);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "mapReduce3", MapReduce);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "mapReduce4", MapReduce);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "mapReduce5", MapReduce);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "mapReduce6", MapReduce);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "mapReduce7", MapReduce);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "mapReduce8", MapReduce);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "mapReduce9", MapReduce);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "mapReduceN", MapReduce);
   NODE_SET_PROTOTYPE_METHOD(tpl, "mapTo", MapTo);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "mapTo1", MapTo);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "mapTo2", MapTo);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "mapTo3", MapTo);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "mapTo4", MapTo);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "mapTo5", MapTo);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "mapTo6", MapTo);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "mapTo7", MapTo);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "mapTo8", MapTo);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "mapTo9", MapTo);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "mapToN", MapTo);
 }
 
 void EHandle::Init(Local<Object> exports) {

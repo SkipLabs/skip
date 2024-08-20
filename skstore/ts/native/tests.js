@@ -30,7 +30,7 @@ class TestToOutput {
 }
 
 function testMap1Init(_skstore, input, output) {
-  const eager1 = input.map(TestFromIntInt, 2);
+  const eager1 = input.map1(TestFromIntInt, 2);
   eager1.mapTo(output, TestToOutput);
 }
 
@@ -61,7 +61,7 @@ class TestAdd {
 function testMap2Init(_skstore, input1, input2, output) {
   const eager1 = input1.map(TestParseInt);
   const eager2 = input2.map(TestParseInt);
-  const eager3 = eager1.map(TestAdd, eager2);
+  const eager3 = eager1.map1(TestAdd, eager2);
   eager3.mapTo(output, TestToOutput);
 }
 
@@ -92,7 +92,7 @@ class TestSizeGetter {
 
 function testSizeInit(_skstore, input, size, output) {
   const eager1 = input.map(TestFromIntInt);
-  const eager2 = size.map(TestSizeGetter, eager1);
+  const eager2 = size.map1(TestSizeGetter, eager1);
   eager2.mapTo(output, TestToOutput);
 }
 
@@ -136,8 +136,8 @@ class TestSub {
 
 function testLazyInit(skstore, input, output) {
   const eager1 = input.map(TestFromIntInt);
-  const lazy = skstore.lazy(TestLazyAdd, eager1);
-  const eager2 = eager1.map(TestSub, lazy);
+  const lazy = skstore.lazy1(TestLazyAdd, eager1);
+  const eager2 = eager1.map1(TestSub, lazy);
   eager2.mapTo(output, TestToOutput);
 }
 
@@ -333,8 +333,8 @@ class TestCheckResult {
 function testAsyncLazyInit(skstore, input1, input2, output) {
   const eager1 = input1.map(TestFromIntInt);
   const eager2 = input2.map(TestFromIntInt);
-  const asyncLazy = skstore.asyncLazy(TestLazyWithAsync, eager2);
-  const eager3 = eager1.map(TestCheckResult, asyncLazy);
+  const asyncLazy = skstore.asyncLazy1(TestLazyWithAsync, eager2);
+  const eager3 = eager1.map1(TestCheckResult, asyncLazy);
   eager3.mapTo(output, TestToOutput);
 }
 
@@ -381,7 +381,7 @@ class TestFromJSTable {
 }
 
 function testJSONExtractInit(skstore, input, output) {
-  const eager = input.map(TestFromJSTable, skstore);
+  const eager = input.map1(TestFromJSTable, skstore);
   eager.mapTo(output, TestToOutput);
 }
 async function testJSONExtractRun(input, output) {

@@ -499,10 +499,7 @@ function testJSONExtractInit(
   input: TableHandle<[number, JSONObject, string]>,
   output: TableHandle<[number, TJSON[]]>,
 ) {
-  const eager = input.map<number, TJSON[], typeof TestFromJSTable>(
-    TestFromJSTable,
-    skstore,
-  );
+  const eager = input.map1(TestFromJSTable, skstore);
   eager.mapTo(output, TestToOutput);
 }
 

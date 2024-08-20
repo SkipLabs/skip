@@ -98,7 +98,27 @@ SKStore::~SKStore() {}
 
 void SKStore::Prototype(Local<FunctionTemplate> tpl) {
   NODE_SET_PROTOTYPE_METHOD(tpl, "lazy", Lazy);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "lazy1", Lazy);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "lazy2", Lazy);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "lazy3", Lazy);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "lazy4", Lazy);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "lazy5", Lazy);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "lazy6", Lazy);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "lazy7", Lazy);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "lazy8", Lazy);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "lazy9", Lazy);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "lazyN", Lazy);
   NODE_SET_PROTOTYPE_METHOD(tpl, "asyncLazy", AsyncLazy);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "asyncLazy1", AsyncLazy);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "asyncLazy2", AsyncLazy);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "asyncLazy3", AsyncLazy);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "asyncLazy4", AsyncLazy);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "asyncLazy5", AsyncLazy);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "asyncLazy6", AsyncLazy);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "asyncLazy7", AsyncLazy);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "asyncLazy8", AsyncLazy);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "asyncLazy9", AsyncLazy);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "asyncLazyN", AsyncLazy);
   NODE_SET_PROTOTYPE_METHOD(tpl, "multimap", Multimap);
   NODE_SET_PROTOTYPE_METHOD(tpl, "multimapReduce", MultimapReduce);
   NODE_SET_PROTOTYPE_METHOD(tpl, "jsonExtract", JSONExtract);

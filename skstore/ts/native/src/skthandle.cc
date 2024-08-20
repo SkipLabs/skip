@@ -66,6 +66,16 @@ THandle::~THandle() {}
 
 void THandle::Prototype(Local<FunctionTemplate> tpl) {
   NODE_SET_PROTOTYPE_METHOD(tpl, "map", Map);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "map1", Map);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "map2", Map);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "map3", Map);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "map4", Map);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "map5", Map);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "map6", Map);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "map7", Map);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "map8", Map);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "map9", Map);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "mapN", Map);
 }
 
 void THandle::Init(Local<Object> exports) {
