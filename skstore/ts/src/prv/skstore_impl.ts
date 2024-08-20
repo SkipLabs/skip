@@ -59,12 +59,16 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     return new EHandleImpl<K2, V2>(this.context, eagerHdl);
   }
 
-  get(key: K): V {
+  get(key: K): V[] {
     return this.context.get(this.eagerHdl, key);
   }
 
-  maybeGet(key: K): Opt<V> {
-    return this.context.maybeGet(this.eagerHdl, key);
+  getSingle(key: K): V {
+    return this.context.getSingle(this.eagerHdl, key);
+  }
+
+  maybeGetSingle(key: K): Opt<V> {
+    return this.context.maybeGetSingle(this.eagerHdl, key);
   }
 
   size = () => {
@@ -681,8 +685,16 @@ class LHandleImpl<K extends TJSON, V extends TJSON> implements LHandle<K, V> {
     });
   }
 
-  get(key: K): V {
+  get(key: K): V[] {
     return this.context.getLazy(this.lazyHdl, key);
+  }
+
+  getSingle(key: K): V {
+    return this.context.getSingleLazy(this.lazyHdl, key);
+  }
+
+  maybeGetSingle(key: K): Opt<V> {
+    return this.context.maybeGetSingleLazy(this.lazyHdl, key);
   }
 }
 
@@ -702,8 +714,14 @@ export class LSelfImpl<K extends TJSON, V extends TJSON>
     });
   }
 
-  get(key: K): V {
+  get(key: K): V[] {
     return this.context.getSelf(this.lazyHdl, key);
+  }
+  getSingle(key: K): V {
+    return this.context.getSingleSelf(this.lazyHdl, key);
+  }
+  maybeGetSingle(key: K): Opt<V> {
+    return this.context.maybeGetSingleSelf(this.lazyHdl, key);
   }
 }
 
