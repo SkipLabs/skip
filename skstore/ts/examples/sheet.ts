@@ -42,7 +42,7 @@ class ComputeExpression implements LazyCompute<[string, string], string> {
     key: [string, string],
   ): string | null {
     const getComputed = (key: [string, string]) => {
-      const v = selfHdl.get(key);
+      const v = selfHdl.getSingle(key);
       if (typeof v == "number") return v;
       if (typeof v == "string") {
         const nv = parseFloat(v);
@@ -53,7 +53,7 @@ class ComputeExpression implements LazyCompute<[string, string], string> {
       );
     };
     const sheet = key[0];
-    const v = this.skall.maybeGet(key);
+    const v = this.skall.maybeGetSingle(key);
     if (v && v.charAt(0) == "=") {
       try {
         // Fake evaluator in this exemple
@@ -94,7 +94,7 @@ class CallCompute
   ): Iterable<[[string, string], string]> {
     const v = it.uniqueValue();
     if (typeof v == "string" && v.charAt(0) == "=") {
-      return Array([key, this.evaluator.get(key)]);
+      return Array([key, this.evaluator.getSingle(key)]);
     }
     if (v == null) {
       throw new Error("(sheet, cell) pair must be unique.");
