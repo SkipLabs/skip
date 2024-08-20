@@ -150,16 +150,6 @@ export class ContextImpl implements Context {
     return this.skjson.importString(resHdlPtr);
   };
 
-  get = <K, V>(eagerHdl: string, key: K) => {
-    return this.skjson.importJSON(
-      this.exports.SKIP_SKStore_get(
-        this.pointer(),
-        this.skjson.exportString(eagerHdl),
-        this.skjson.exportJSON(key),
-      ),
-    ) as V;
-  };
-
   getFromTable = <K, R>(table: string, key: K, index?: string) => {
     return this.skjson.importJSON(
       this.exports.SKIP_SKStore_getFromTable(
@@ -171,7 +161,27 @@ export class ContextImpl implements Context {
     ) as R[];
   };
 
-  maybeGet = <K, V>(eagerHdl: string, key: K) => {
+  get = <K, V>(eagerHdl: string, key: K) => {
+    return this.skjson.importJSON(
+      this.exports.SKIP_SKStore_getArray(
+        this.pointer(),
+        this.skjson.exportString(eagerHdl),
+        this.skjson.exportJSON(key),
+      ),
+    ) as V[];
+  };
+
+  getSingle = <K, V>(eagerHdl: string, key: K) => {
+    return this.skjson.importJSON(
+      this.exports.SKIP_SKStore_get(
+        this.pointer(),
+        this.skjson.exportString(eagerHdl),
+        this.skjson.exportJSON(key),
+      ),
+    ) as V;
+  };
+
+  maybeGetSingle = <K, V>(eagerHdl: string, key: K) => {
     const res = this.exports.SKIP_SKStore_maybeGet(
       this.pointer(),
       this.skjson.exportString(eagerHdl),
@@ -182,6 +192,16 @@ export class ContextImpl implements Context {
 
   getLazy = <K, V>(lazyHdl: string, key: K) => {
     return this.skjson.importJSON(
+      this.exports.SKIP_SKStore_getArrayLazy(
+        this.pointer(),
+        this.skjson.exportString(lazyHdl),
+        this.skjson.exportJSON(key),
+      ),
+    ) as V[];
+  };
+
+  getSingleLazy = <K, V>(lazyHdl: string, key: K) => {
+    return this.skjson.importJSON(
       this.exports.SKIP_SKStore_getLazy(
         this.pointer(),
         this.skjson.exportString(lazyHdl),
@@ -190,7 +210,26 @@ export class ContextImpl implements Context {
     ) as V;
   };
 
+  maybeGetSingleLazy = <K, V>(lazyHdl: string, key: K) => {
+    return this.skjson.importJSON(
+      this.exports.SKIP_SKStore_maybeGetLazy(
+        this.pointer(),
+        this.skjson.exportString(lazyHdl),
+        this.skjson.exportJSON(key),
+      ),
+    ) as Opt<V>;
+  };
+
   getSelf = <K, V>(lazyHdl: ptr, key: K) => {
+    return this.skjson.importJSON(
+      this.exports.SKIP_SKStore_getArraySelf(
+        this.pointer(),
+        lazyHdl,
+        this.skjson.exportJSON(key),
+      ),
+    ) as V[];
+  };
+  getSingleSelf = <K, V>(lazyHdl: ptr, key: K) => {
     return this.skjson.importJSON(
       this.exports.SKIP_SKStore_getSelf(
         this.pointer(),
@@ -198,6 +237,15 @@ export class ContextImpl implements Context {
         this.skjson.exportJSON(key),
       ),
     ) as V;
+  };
+  maybeGetSingleSelf = <K, V>(lazyHdl: ptr, key: K) => {
+    return this.skjson.importJSON(
+      this.exports.SKIP_SKStore_maybeGetSelf(
+        this.pointer(),
+        lazyHdl,
+        this.skjson.exportJSON(key),
+      ),
+    ) as Opt<V>;
   };
 
   size = (eagerHdl: string) => {

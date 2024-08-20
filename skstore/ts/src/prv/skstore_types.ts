@@ -64,11 +64,19 @@ export interface Context {
     call: (key: K, params: P) => Promise<AValue<V, M>>,
   ) => string;
 
-  get: <K, V>(eagerHdl: string, key: K) => V;
   getFromTable: <K, R>(table: string, key: K, index?: string) => R[];
-  maybeGet: <K, V>(eagerHdl: string, key: K) => Opt<V>;
-  getLazy: <K, V>(lazyHdl: string, key: K) => V;
-  getSelf: <K, V>(lazyHdl: ptr, key: K) => V;
+
+  get: <K, V>(eagerHdl: string, key: K) => V[];
+  getSingle: <K, V>(eagerHdl: string, key: K) => V;
+  maybeGetSingle: <K, V>(eagerHdl: string, key: K) => Opt<V>;
+
+  getLazy: <K, V>(eagerHdl: string, key: K) => V[];
+  getSingleLazy: <K, V>(eagerHdl: string, key: K) => V;
+  maybeGetSingleLazy: <K, V>(eagerHdl: string, key: K) => Opt<V>;
+
+  getSelf: <K, V>(lazyHdl: ptr, key: K) => V[];
+  getSingleSelf: <K, V>(lazyHdl: ptr, key: K) => V;
+  maybeGetSingleSelf: <K, V>(lazyHdl: ptr, key: K) => Opt<V>;
 
   size: (eagerHdl: string) => number;
 
@@ -131,14 +139,19 @@ export interface FromWasm {
     accInit: ptr,
   ): ptr;
 
-  SKIP_SKStore_get(ctx: ptr, getterHdl: ptr, key: ptr): ptr;
   SKIP_SKStore_getFromTable(ctx: ptr, table: ptr, key: ptr, index: ptr): ptr;
 
+  SKIP_SKStore_getArray(ctx: ptr, getterHdl: ptr, key: ptr): ptr;
+  SKIP_SKStore_get(ctx: ptr, getterHdl: ptr, key: ptr): ptr;
   SKIP_SKStore_maybeGet(ctx: ptr, getterHdl: ptr, key: ptr): ptr;
 
+  SKIP_SKStore_getArrayLazy(ctx: ptr, lazyId: ptr, key: ptr): ptr;
   SKIP_SKStore_getLazy(ctx: ptr, lazyId: ptr, key: ptr): ptr;
+  SKIP_SKStore_maybeGetLazy(ctx: ptr, lazyId: ptr, key: ptr): ptr;
 
+  SKIP_SKStore_getArraySelf(ctx: ptr, selfHdl: ptr, key: ptr): ptr;
   SKIP_SKStore_getSelf(ctx: ptr, selfHdl: ptr, key: ptr): ptr;
+  SKIP_SKStore_maybeGetSelf(ctx: ptr, selfHdl: ptr, key: ptr): ptr;
 
   SKIP_SKStore_size(ctx: ptr, eagerHdl: ptr): number;
 
