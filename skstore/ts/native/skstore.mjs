@@ -8,6 +8,7 @@ export const cfloat = addon.cfloat;
 export const ctext = addon.ctext;
 export const cjson = addon.cjson;
 export const schema = addon.schema;
+export const freeze = addon.freeze;
 
 export { Sum, Min, Max, equals } from "./skstore_utils.mjs";
 

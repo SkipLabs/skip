@@ -40,9 +40,13 @@ void NatTryCatch(v8::Isolate*, std::function<void(v8::Isolate*)>);
 char* ToSKString(v8::Isolate*, v8::Local<v8::Value>);
 void Print(v8::Isolate*, const char*, v8::Local<v8::Value>);
 v8::Local<v8::Value> JSONStringify(v8::Isolate*, v8::Local<v8::Value>);
+v8::Local<v8::Object> JSFreeze(v8::Isolate* isolate,
+                               v8::Local<v8::Object> value);
 v8::MaybeLocal<v8::Object> CheckMapper(
     const v8::FunctionCallbackInfo<v8::Value>&, const char** fnnames,
     int fncount, const char*, u_int, bool);
+
+bool CheckParam(v8::Isolate*, v8::Local<v8::Value>);
 
 struct SkipException : std::exception {
   explicit SkipException(void* exc) : m_skipException(exc) {}

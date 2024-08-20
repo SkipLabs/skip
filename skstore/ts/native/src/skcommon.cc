@@ -9,6 +9,8 @@
 
 namespace skbinding {
 
+using v8::Array;
+using v8::Boolean;
 using v8::Context;
 using v8::Exception;
 using v8::Function;
@@ -22,6 +24,7 @@ using v8::Number;
 using v8::Object;
 using v8::ObjectTemplate;
 using v8::Persistent;
+using v8::PropertyDescriptor;
 using v8::String;
 using v8::TryCatch;
 using v8::Value;
@@ -89,6 +92,12 @@ void NewClass(
   if (args.IsConstructCall()) {
     // Invoked as constructor: `new Class(...)`
     create(isolate, args[0], args.This());
+    PropertyDescriptor pd =
+        PropertyDescriptor(Boolean::New(isolate, true), false);
+    pd.set_enumerable(false);
+    args.This()
+        ->DefineProperty(context, FromUtf8(isolate, "__sk_frozen"), pd)
+        .FromJust();
     args.GetReturnValue().Set(args.This());
   } else {
     // Invoked as plain function `Class(...)`, turn into construct call.
@@ -249,7 +258,9 @@ MaybeLocal<Object> CheckMapper(const FunctionCallbackInfo<Value>& args,
   const int argc = args.Length() - shift;
   Local<Value> argv[argc];
   for (int i = 0; i < argc; i++) {
-    argv[i] = args[i + shift];
+    Local<Value> param = args[i + shift];
+    if (!skbinding::CheckParam(isolate, param)) return MaybeLocal<Object>();
+    argv[i] = param;
   }
   Local<Context> context = isolate->GetCurrentContext();
   MaybeLocal<Object> result = cb->NewInstance(context, argc, argv);
@@ -261,11 +272,11 @@ MaybeLocal<Object> CheckMapper(const FunctionCallbackInfo<Value>& args,
         Exception::TypeError(FromUtf8(isolate, error.str().c_str())));
     return MaybeLocal<Object>();
   }
+  Local<Object> mapperObj = JSFreeze(isolate, result.ToLocalChecked());
   for (int i = 0; i < fncount; i++) {
     const char* fnname = fnnames[i];
-    Local<Value> fn = result.ToLocalChecked()
-                          ->Get(context, FromUtf8(isolate, fnname))
-                          .ToLocalChecked();
+    Local<Value> fn =
+        mapperObj->Get(context, FromUtf8(isolate, fnname)).ToLocalChecked();
     if (!fn->IsFunction()) {
       std::ostringstream error;
       error << "Invalid " << name << " mapper (The << " << fnname
@@ -275,12 +286,18 @@ MaybeLocal<Object> CheckMapper(const FunctionCallbackInfo<Value>& args,
       return MaybeLocal<Object>();
     }
   }
-  return result;
+  return MaybeLocal<Object>(mapperObj);
 }
 
 Local<Value> JSONStringify(Isolate* isolate, Local<Value> value) {
   Local<Value> argv[1] = {value};
   return CallGlobalStaticMethod(isolate, "JSON", "stringify", 1, argv);
+}
+
+Local<Object> JSFreeze(Isolate* isolate, Local<Object> value) {
+  Local<Value> argv[1] = {value};
+  return CallGlobalStaticMethod(isolate, "Object", "freeze", 1, argv)
+      .As<Object>();
 }
 
 extern "C" {
@@ -427,6 +444,56 @@ const char* SkipException::name() const noexcept {
   char* str = (char*)sk_get_exception_type(m_skipException);
   sk_string_check_c_safe(str);
   return str;
+}
+
+bool CheckParam(Isolate* isolate, Local<Value> value) {
+  if (value->IsNumber() || value->IsString() || value->IsBoolean() ||
+      value->IsNull()) {
+    return true;
+  } else if (value->IsObject()) {
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Object> obj = value.As<Object>();
+    Local<Value> frozen =
+        obj->Get(context, FromUtf8(isolate, "__sk_frozen")).ToLocalChecked();
+    if (frozen->IsBoolean() && frozen->BooleanValue(isolate)) {
+      return true;
+    }
+    Local<Value> argv[1] = {obj};
+    if (CallGlobalStaticMethod(isolate, "Object", "isFrozen", 1, argv)
+            ->BooleanValue(isolate)) {
+      if (obj->IsArray()) {
+        Local<Array> arr = obj.As<Array>();
+        uint32_t len = arr->Length();
+        for (uint32_t i = 0; i < len; i++) {
+          Local<Value> vi = arr->Get(context, i).ToLocalChecked();
+          if (!CheckParam(isolate, vi)) {
+            return false;
+          }
+        }
+      } else {
+        MaybeLocal<Array> mbKeys = obj->GetPropertyNames(context);
+        if (!mbKeys.IsEmpty()) {
+          Local<Array> keys = mbKeys.ToLocalChecked();
+          uint32_t len = keys->Length();
+          for (uint32_t i = 0; i < len; i++) {
+            Local<Value> key = keys->Get(context, i).ToLocalChecked();
+            Local<Value> vi = obj->Get(context, key).ToLocalChecked();
+            if (!CheckParam(isolate, vi)) {
+              return false;
+            }
+          }
+        }
+      }
+      return true;
+    }
+    isolate->ThrowException(Exception::TypeError(
+        FromUtf8(isolate, "SKStore: Invalid object must be frozen.")));
+    return false;
+  } else {
+    isolate->ThrowException(
+        Exception::TypeError(FromUtf8(isolate, "SKStore: Unmanaged value.")));
+    return false;
+  }
 }
 
 extern "C" {

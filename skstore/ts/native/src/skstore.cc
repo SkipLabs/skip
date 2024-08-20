@@ -86,6 +86,7 @@ using v8::Number;
 using v8::Object;
 using v8::Persistent;
 using v8::Promise;
+using v8::PropertyDescriptor;
 using v8::String;
 using v8::Value;
 
@@ -135,6 +136,12 @@ void SKStore::New(const FunctionCallbackInfo<Value>& args) {
     // Invoked as constructor: `new Class(...)`
     SKStore* obj = new SKStore();
     obj->Wrap(args.This());
+    PropertyDescriptor pd =
+        PropertyDescriptor(Boolean::New(isolate, true), false);
+    pd.set_enumerable(false);
+    args.This()
+        ->DefineProperty(context, FromUtf8(isolate, "__sk_frozen"), pd)
+        .FromJust();
     args.GetReturnValue().Set(args.This());
   } else {
     // Invoked as plain function `Class(...)`, turn into construct call.
@@ -207,25 +214,27 @@ MaybeLocal<Object> CheckMMapper(Isolate* isolate, Local<Function> mapper,
   if (params->IsArray()) {
     size = params.As<Array>()->Length();
   }
-  // TODO check parameter are frozen
   Local<Context> context = isolate->GetCurrentContext();
   const int argc = size;
   Local<Value> argv[argc];
   for (int i = 0; i < argc; i++) {
-    argv[i] = params.As<Array>()->Get(context, i).ToLocalChecked();
+    Local<Value> param = params.As<Array>()->Get(context, i).ToLocalChecked();
+    if (!skbinding::CheckParam(isolate, param)) return MaybeLocal<Object>();
+    argv[i] = param;
   }
   MaybeLocal<Object> result = mapper->NewInstance(context, argc, argv);
   if (result.IsEmpty()) {
     return MaybeLocal<Object>();
   }
+  Local<Object> mapperObj =
+      skbinding::JSFreeze(isolate, result.ToLocalChecked());
   const char* fnname = "mapElement";
-  Local<Value> fn = result.ToLocalChecked()
-                        ->Get(context, FromUtf8(isolate, fnname))
-                        .ToLocalChecked();
+  Local<Value> fn =
+      mapperObj->Get(context, FromUtf8(isolate, fnname)).ToLocalChecked();
   if (!fn->IsFunction()) {
     return MaybeLocal<Object>();
   }
-  return result;
+  return mapperObj;
 }
 
 bool ConvertMappings(Isolate* isolate, Local<Array> mappings,
@@ -703,6 +712,93 @@ void Schema(const FunctionCallbackInfo<Value>& args) {
   args.GetReturnValue().Set(obj);
 }
 
+MaybeLocal<Value> FreezeValue(Isolate* isolate, Local<Value> value) {
+  if (value->IsNumber() || value->IsString() || value->IsBoolean() ||
+      value->IsNull()) {
+    return MaybeLocal<Value>(value);
+  } else if (value->IsObject()) {
+    Local<Context> context = isolate->GetCurrentContext();
+    Local<Object> obj = value.As<Object>();
+    Local<Value> frozen =
+        obj->Get(context, FromUtf8(isolate, "__sk_frozen")).ToLocalChecked();
+    if (frozen->IsBoolean() && frozen->BooleanValue(isolate)) {
+      return MaybeLocal<Value>(value);
+    }
+    Local<Value> argv[1] = {obj};
+    if (CallGlobalStaticMethod(isolate, "Object", "isFrozen", 1, argv)
+            ->BooleanValue(isolate)) {
+      if (!skbinding::CheckParam(isolate, obj)) return MaybeLocal<Value>();
+      return MaybeLocal<Value>(value);
+    }
+    if (obj->IsArray()) {
+      Local<Array> arr = obj.As<Array>();
+      PropertyDescriptor pd =
+          PropertyDescriptor(Boolean::New(isolate, true), false);
+      pd.set_enumerable(false);
+      v8::Maybe<bool> done =
+          arr->DefineProperty(context, FromUtf8(isolate, "__sk_frozen"), pd);
+      if (!done.FromMaybe(false)) {
+        isolate->ThrowException(Exception::TypeError(
+            FromUtf8(isolate, "freeze: Unable to freeze value.")));
+        return MaybeLocal<Value>();
+      }
+      uint32_t len = arr->Length();
+      for (uint32_t i = 0; i < len; i++) {
+        Local<Value> vi = arr->Get(context, i).ToLocalChecked();
+        MaybeLocal<Value> fvi = FreezeValue(isolate, vi);
+        if (fvi.IsEmpty()) {
+          return fvi;
+        }
+        arr->Set(context, i, fvi.ToLocalChecked()).FromJust();
+      }
+      return MaybeLocal<Value>(skbinding::JSFreeze(isolate, arr));
+    }
+    PropertyDescriptor pd =
+        PropertyDescriptor(Boolean::New(isolate, true), false);
+    pd.set_enumerable(false);
+    v8::Maybe<bool> done =
+        obj->DefineProperty(context, FromUtf8(isolate, "__sk_frozen"), pd);
+    if (!done.FromMaybe(false)) {
+      isolate->ThrowException(Exception::TypeError(
+          FromUtf8(isolate, "freeze: Unable to freeze value.")));
+      return MaybeLocal<Value>();
+    }
+    MaybeLocal<Array> mbKeys = obj->GetPropertyNames(context);
+    if (!mbKeys.IsEmpty()) {
+      Local<Array> keys = mbKeys.ToLocalChecked();
+      uint32_t len = keys->Length();
+      for (uint32_t i = 0; i < len; i++) {
+        Local<Value> key = keys->Get(context, i).ToLocalChecked();
+        Local<Value> vi = obj->Get(context, key).ToLocalChecked();
+        MaybeLocal<Value> fvi = FreezeValue(isolate, vi);
+        if (fvi.IsEmpty()) {
+          return fvi;
+        }
+        obj->Set(context, key, fvi.ToLocalChecked()).FromJust();
+      }
+    }
+    return MaybeLocal<Value>(skbinding::JSFreeze(isolate, obj));
+  } else {
+    isolate->ThrowException(
+        Exception::TypeError(FromUtf8(isolate, "freeze: Invalid value.")));
+    return MaybeLocal<Value>();
+  }
+}
+
+void Freeze(const FunctionCallbackInfo<Value>& args) {
+  Isolate* isolate = args.GetIsolate();
+  if (args.Length() == 1) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(
+        Exception::TypeError(FromUtf8(isolate, "Must have at one parameter.")));
+    return;
+  };
+  MaybeLocal<Value> res = FreezeValue(isolate, args[0]);
+  if (!res.IsEmpty()) {
+    args.GetReturnValue().Set(res.ToLocalChecked());
+  }
+}
+
 void Init(Local<Object> exports) {
   NODE_SET_METHOD(exports, "createSKStore", CreateSKStore);
   NODE_SET_METHOD(exports, "cinteger", CInteger);
@@ -710,6 +806,7 @@ void Init(Local<Object> exports) {
   NODE_SET_METHOD(exports, "ctext", CText);
   NODE_SET_METHOD(exports, "cjson", CJson);
   NODE_SET_METHOD(exports, "schema", Schema);
+  NODE_SET_METHOD(exports, "freeze", Freeze);
   NonEmptyIterator::Init(exports);
   EHandle::Init(exports);
   LHandle::Init(exports);
