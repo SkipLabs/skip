@@ -407,16 +407,6 @@ fun toSkdb(
   DBUtils.toTable(eager, table, context, mapHandle.toRow)
 }
 
-@export("SKIP_SKStore_get")
-fun get(
-  context: mutable Context,
-  handleId: String,
-  key: SKJSON.CJSON,
-): SKJSON.CJSON {
-  eager = EHandle(JSONID::keyType, JSONFile::type, DirName::create(handleId));
-  eager.get(context, JSONID(key)).value
-}
-
 @export("SKIP_SKStore_getFromTable")
 fun getFromTable(
   _context: mutable Context,
@@ -427,6 +417,26 @@ fun getFromTable(
   invariant_violation("TODO")
 }
 
+@export("SKIP_SKStore_getArray")
+fun getArray(
+  context: mutable Context,
+  handleId: String,
+  key: SKJSON.CJSON,
+): SKJSON.CJSON {
+  eager = EHandle(JSONID::keyType, JSONFile::type, DirName::create(handleId));
+  SKJSON.CJArray(eager.getArray(context, JSONID(key)).map(v -> v.value))
+}
+
+@export("SKIP_SKStore_get")
+fun get(
+  context: mutable Context,
+  handleId: String,
+  key: SKJSON.CJSON,
+): SKJSON.CJSON {
+  eager = EHandle(JSONID::keyType, JSONFile::type, DirName::create(handleId));
+  eager.get(context, JSONID(key)).value
+}
+
 @export("SKIP_SKStore_maybeGet")
 fun maybeGet(
   context: mutable Context,
@@ -434,10 +444,20 @@ fun maybeGet(
   key: SKJSON.CJSON,
 ): SKJSON.CJSON {
   eager = EHandle(JSONID::keyType, JSONFile::type, DirName::create(handleId));
-  eager
-    .maybeGet(context, JSONID(key))
-    .map(v -> v.value)
-    .default(SKJSON.CJNull())
+  eager.maybeGet(context, JSONID(key)) match {
+  | Some(v) -> v.value
+  | None() -> SKJSON.CJNull()
+  }
+}
+
+@export("SKIP_SKStore_getArrayLazy")
+fun getArrayLazy(
+  context: mutable Context,
+  handleId: String,
+  key: SKJSON.CJSON,
+): SKJSON.CJSON {
+  lazy = LHandle(JSONID::keyType, JSONFile::type, DirName::create(handleId));
+  getArraySelf(context, lazy, key)
 }
 
 @export("SKIP_SKStore_getLazy")
@@ -449,7 +469,24 @@ fun getLazy(
   lazy = LHandle(JSONID::keyType, JSONFile::type, DirName::create(handleId));
   getSelf(context, lazy, key)
 }
+@export("SKIP_SKStore_maybeGetLazy")
+fun maybeGetLazy(
+  context: mutable Context,
+  handleId: String,
+  key: SKJSON.CJSON,
+): SKJSON.CJSON {
+  lazy = LHandle(JSONID::keyType, JSONFile::type, DirName::create(handleId));
+  maybeGetSelf(context, lazy, key)
+}
 
+@export("SKIP_SKStore_getArraySelf")
+fun getArraySelf(
+  context: mutable Context,
+  handle: LHandle<JSONID, JSONFile>,
+  key: SKJSON.CJSON,
+): SKJSON.CJSON {
+  SKJSON.CJArray(handle.getArray(context, JSONID(key)).map(v -> v.value))
+}
 @export("SKIP_SKStore_getSelf")
 fun getSelf(
   context: mutable Context,
@@ -458,7 +495,17 @@ fun getSelf(
 ): SKJSON.CJSON {
   handle.get(context, JSONID(key)).value
 }
-
+@export("SKIP_SKStore_maybeGetSelf")
+fun maybeGetSelf(
+  context: mutable Context,
+  handle: LHandle<JSONID, JSONFile>,
+  key: SKJSON.CJSON,
+): SKJSON.CJSON {
+  handle.maybeGet(context, JSONID(key)) match {
+  | Some(v) -> v.value
+  | None() -> SKJSON.CJNull()
+  }
+}
 @export("SKIP_SKStore_size")
 fun size(context: mutable Context, handleId: String): Float {
   eager = EHandle(JSONID::keyType, JSONFile::type, DirName::create(handleId));
