@@ -242,21 +242,21 @@ export interface LHandle<K extends TJSON, V extends TJSON> {
    * collection.
    * @throws {Error} when the key does not exist
    */
-  get(key: K): V[];
+  getArray(key: K): V[];
 
   /**
    * Get (and potentially compute) a value of a lazy reactive collection.
    * If multiple values are mapped to by the key, any of them can be returned
    * @throws {Error} when the key does not exist
    */
-  getSingle(key: K): V;
+  getFirst(key: K): V;
 
   /**
    * Get (and potentially compute) a value of a lazy reactive collection, if one exists.
    * If multiple values are mapped to by the key, any of them can be returned.
    * @throws {Error} when the key does not exist
    */
-  maybeGetSingle(key: K): Opt<V>;
+  maybeGetFirst(key: K): Opt<V>;
 }
 
 export interface ALHandle<K extends TJSON, V extends TJSON, M extends TJSON>
@@ -272,20 +272,20 @@ export interface EHandle<K extends TJSON, V extends TJSON> {
    * collection.
    * @throws {Error} when the key does not exist
    */
-  get(key: K): V[];
+  getArray(key: K): V[];
 
   /**
    * Get a value of an eager reactive collection.
    * If multiple values are mapped to by the key, any of them can be returned.
    * @throws {Error} when the key does not exist
    */
-  getSingle(key: K): V;
+  getFirst(key: K): V;
   /**
    * Get a value of an eager reactive collection, if one exists.
    * If multiple values are mapped to by the key, any of them can be returned.
    * @returns the value for this `key`, or null if no such value exists
    */
-  maybeGetSingle(key: K): Opt<V>;
+  maybeGetFirst(key: K): Opt<V>;
 
   /**
    *  Create a new eager reactive collection by mapping some computation over this one
