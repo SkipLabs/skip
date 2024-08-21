@@ -96,6 +96,18 @@ fun writerSet(
   writer.set(JSONID(key), JSONFile(value))
 }
 
+@export("SKIP_SKStore_writerSetArray")
+fun writerSetArray(
+  writer: mutable TWriter<JSONID, JSONFile>,
+  key: SKJSON.CJSON,
+  values: SKJSON.CJArray,
+): void {
+  files = values match {
+  | SKJSON.CJArray(xs) -> xs.map(x -> JSONFile(x))
+  };
+  writer.setArray(JSONID(key), files)
+}
+
 @export("SKIP_SKStore_iteratorFirst")
 fun iteratorFirst(values: mutable NonEmptyIterator<JSONFile>): SKJSON.CJSON {
   if (values.isPastFirstValue) {
