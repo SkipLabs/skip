@@ -150,6 +150,7 @@ export interface FromWasm {
   SKIP_SKStore_iteratorFirst(it: ptr): ptr;
   // Writer
   SKIP_SKStore_writerSet(writer: ptr, key: ptr, value: ptr): void;
+  SKIP_SKStore_writerSetArray(writer: ptr, key: ptr, values: ptr): void;
 
   // Store
   SKIP_SKStore_createFor(session: ptr): float;

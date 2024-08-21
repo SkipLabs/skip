@@ -339,6 +339,13 @@ class WriterImpl<K, T> {
       this.skjson.exportJSON(value),
     );
   };
+  setArray = (key: K, values: T[]) => {
+    this.exports.SKIP_SKStore_writerSetArray(
+      this.pointer,
+      this.skjson.exportJSON(key),
+      this.skjson.exportJSON(values),
+    );
+  };
 }
 
 interface ToWasm {
@@ -449,10 +456,17 @@ class LinksImpl implements Links {
         jsu.importJSON(key),
         new NonEmptyIteratorImpl(jsu, fromWasm, it),
       ]);
+
+      const bindings = {};
       for (const v of result) {
         const t = v as any;
-        w.set(t[0], t[1]);
+        bindings[t[0]] ??= [];
+        bindings[t[0]].push(t[1]);
       }
+      for (const k in bindings) {
+        w.setArray(k, bindings[k]);
+      }
+
       ref.pop();
     };
     this.applyMapTableFun = (
