@@ -162,7 +162,7 @@ class TestLazyAdd implements LazyCompute<number, number> {
   constructor(private other: EHandle<number, number>) {}
 
   compute(selfHdl: LHandle<number, number>, key: number): number | null {
-    const v = this.other.maybeGetSingle(key);
+    const v = this.other.maybeGetFirst(key);
     return (v ?? 0) + 2;
   }
 }
@@ -174,7 +174,7 @@ class TestSub implements Mapper<number, number, number, number> {
     key: number,
     it: NonEmptyIterator<number>,
   ): Iterable<[number, number]> {
-    return Array([key, this.other.getSingle(key) - it.first()]);
+    return Array([key, this.other.getFirst(key) - it.first()]);
   }
 }
 
@@ -393,7 +393,7 @@ class TestLazyWithAsync
   constructor(private other: EHandle<number, number>) {}
 
   params(key: [number, number]) {
-    const v2 = this.other.maybeGetSingle(key[0]);
+    const v2 = this.other.maybeGetFirst(key[0]);
     return v2 ?? 0;
   }
 
@@ -411,7 +411,7 @@ class TestCheckResult implements Mapper<number, number, number, string> {
     key: number,
     it: NonEmptyIterator<number>,
   ): Iterable<[number, string]> {
-    const result = this.asyncLazy.getSingle([key, it.first()]);
+    const result = this.asyncLazy.getFirst([key, it.first()]);
     let value: [number, string];
     if (result.status == "loading") {
       value = [key, "loading"];

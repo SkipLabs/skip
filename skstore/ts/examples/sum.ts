@@ -40,7 +40,7 @@ class Add implements Mapper<number, number, number, number> {
     it: NonEmptyIterator<number>,
   ): Iterable<[number, number]> {
     const v = it.first();
-    const ev = this.other.maybeGetSingle(key);
+    const ev = this.other.maybeGetFirst(key);
     if (ev !== null) {
       return Array([key, v + (ev ?? 0)]);
     }
