@@ -336,7 +336,7 @@ class SKJSONShared implements SKJSON {
   }
 
   importOptJSON(value: Opt<ptr>, copy?: boolean) {
-    if (value == null) {
+    if (value === null || value === 0) {
       return null;
     }
     return this.importJSON(value, copy);
