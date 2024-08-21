@@ -55,6 +55,15 @@ class TestToOutput<V extends TJSON>
   }
 }
 
+class TestSum implements Mapper<number, number, number, number> {
+  mapElement(
+    key: number,
+    it: NonEmptyIterator<number>,
+  ): Iterable<[number, number]> {
+    return [[key, it.toArray().reduce((x, y) => x + y, 0)]];
+  }
+}
+
 function testMap1Init(
   _skstore: SKStore,
   input: TableHandle<[number, number]>,
@@ -84,9 +93,15 @@ class TestAdd implements Mapper<number, number, number, number> {
     key: number,
     it: NonEmptyIterator<number>,
   ): Iterable<[number, number]> {
-    const v = it.first();
-    const ev = this.other.maybeGetSingle(key);
-    return Array([key, v + (ev ?? 0)]);
+    let result = [];
+    const values = it.toArray();
+    const other_values = this.other.getArray(key);
+    for (let v of values) {
+      for (let other_v of other_values) {
+        result.push([key, v + (other_v ?? 0)]);
+      }
+    }
+    return result;
   }
 }
 
@@ -115,6 +130,46 @@ async function testMap2Run(
   check("testMap2Insert", output.select({}, ["value"]), [
     { value: 10 },
     { value: 30 },
+  ]);
+}
+
+//// testMap3
+
+function testMap3Init(
+  _skstore: SKStore,
+  input_no_index: TableHandle<[number, string]>,
+  input_index: TableHandle<[number, string]>,
+  output: TableHandle<[number, number]>,
+) {
+  const eager1 = input_no_index.map<number, number, typeof TestParseInt>(
+    TestParseInt,
+  );
+  const eager2 = input_index.map<number, number, typeof TestParseInt>(
+    TestParseInt,
+  );
+  const eager3 = eager1
+    .map<number, number, typeof TestAdd>(TestAdd, eager2)
+    .map<number, number, typeof TestSum>(TestSum);
+  eager3.mapTo(output, TestToOutput);
+}
+
+async function testMap3Run(
+  input_no_index: Table<[number, string]>,
+  input_index: Table<[number, string]>,
+  output: Table<[number, number]>,
+) {
+  input_no_index.insert([
+    [1, "1"],
+    [1, "2"],
+    [1, "3"],
+  ]);
+  input_index.insert([[1, "10"]]);
+  check("testMap3Init", output.select({ id: 1 }, ["value"]), [{ value: 36 }]);
+  input_no_index.insert([[2, "3"]]);
+  input_index.insert([[2, "7"]]);
+  check("testMap3Insert", output.select({}, ["value"]), [
+    { value: 10 },
+    { value: 36 },
   ]);
 }
 
@@ -495,6 +550,16 @@ export const tests: Test[] = [
     ],
     init: testMap2Init,
     run: testMap2Run,
+  },
+  {
+    name: "testMap3",
+    schema: [
+      schema("input_no_index", [integer("id"), text("value")]),
+      schema("input_index", [integer("id", true), text("value")]),
+      schema("output", [integer("id"), integer("value")]),
+    ],
+    init: testMap3Init,
+    run: testMap3Run,
   },
   {
     name: "testSize",
