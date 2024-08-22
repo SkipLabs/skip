@@ -148,7 +148,7 @@ function testMap3Init(
     TestParseInt,
   );
   const eager3 = eager1
-    .map<number, number, typeof TestAdd>(TestAdd, eager2)
+    .map1<number, number, typeof TestAdd>(TestAdd, eager2)
     .map<number, number, typeof TestSum>(TestSum);
   eager3.mapTo(output, TestToOutput);
 }
