@@ -57,18 +57,16 @@ skdb-%: $(SKDB)
 	cd .. && make build/sknpm
 
 .PHONY: check-src
-check-src:
-	cd ts/src && npm install
-	cd ts/src && tsc
+check-src: ../build/sknpm
+	../build/sknpm check
 	cd ts/src && npm run lint
 
 .PHONY: check-tests
-check-tests:
-	cd ts/tests && npm install
-	cd ts/tests && tsc
+check-tests: ../build/sknpm
+	../build/sknpm check --test
 
 .PHONY: check-all
-check-all: check-src check check-tests
+check-all: check-src check-tests
 
 build: ../build/sknpm
 	cd ts/examples && bun install
@@ -86,10 +84,6 @@ bunclient-%:
 #	cd ts/examples && bun install
 #	../build/sknpm b -r --out-dir ts/examples/node_modules/skip-runtime
 #	bun run ts/examples/wmain.ts -f ts/examples/$*.ts -m io -c $*
-
-check: ../build/sknpm
-	../build/sknpm check
-	../build/sknpm check --test
 
 check-%: ../build/sknpm
 	cd ts/examples && npm install

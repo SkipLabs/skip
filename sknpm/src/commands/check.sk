@@ -52,15 +52,16 @@ fun execCheck(
     gctx.console.error("`" + tsDir + "` not founds.");
     return Failure(void);
   };
-  info = if (test) {
+  install(tsDir, gctx.console)?;
+  if (test) {
     name = ws.package.manifest.package_id.name;
-    package = Package::create(root, name, gctx.console)?;
-    npmDir = manage(brunner, package, None())?;
-    Some((package.name, npmDir))
-  } else {
-    None()
+    outdir = Path.join(Path.join(tsDir, "node_modules"), name);
+    doBuild(brunner, args, false, true, Some(outdir)) match {
+    | Success _ -> void
+    | _ -> return Failure(void)
+    }
   };
-  tsc(tsDir, info, gctx.console)
+  tsc(tsDir, gctx.console)
 }
 
 module end;

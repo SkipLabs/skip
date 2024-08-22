@@ -19,7 +19,7 @@ source $1/bin/sdkman-init.sh
 cd $2
 
 run_test_server () {
-    exec gradle --console plain -q runMuxTestServer "--args=8090 &> /dev/null" &> $1/test_server.log & 
+    exec gradle --console plain -q runMuxTestServer "--args=8090 &> /dev/null" &> $( dirname $1 )/test_server.log & 
     pid2=$!
 
     thost="http://localhost:8090"
@@ -34,16 +34,21 @@ run_test_server () {
         i=$((i+1))
     done
     if [[ $i -ge 10 ]]; then
-        echo "Gave up waiting for server $pid2 to start at $thost" 1>&2;
+        echo "Gave up waiting for server $pid2 to start at $thost" 1>&2
     fi
     exists=$(kill -0 $pid2);
     if [[ -z "$exists" ]]; then
+        if [[ $i -ge 10 ]]; then
+            kill $pid2
+            exit 2
+        fi
         echo "$pid2"
     else
         return 1
     fi
 }
 
+pid=""
 i=0
 while [[ $i -lt 10 ]];
 do
@@ -57,6 +62,8 @@ do
 done
 
 if [ $i -ge 10 ]; then
-  kill $pid1
+  if [[ ! -z "$pid" ]]; then
+    kill $pid
+  fi
   exit 2
 fi

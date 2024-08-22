@@ -136,26 +136,15 @@ private fun skargo(
   }
 }
 
-fun tsc(
-  tsDir: String,
-  link: ?(String, String),
-  console: Skargo.Console,
-): Result<void, void> {
-  tsconfig = Path.join(tsDir, "tsconfig.json");
+fun install(tsDir: String, console: Skargo.Console): Result<void, void> {
   console.status("Running", `npm install on '${tsDir}'`);
   npmcmd = Array["npm", "i", "--prefix", tsDir, "--save-dev", "@types/node"];
   _ = exec(npmcmd, console)?;
-  link.each(l -> {
-    node_modules = Path.join(tsDir, "node_modules");
-    if (FileSystem.exists(node_modules)) {
-      (name, path) = l;
-      symlink = Path.join(node_modules, name);
-      if (FileSystem.exists(symlink)) {
-        _ = exec(Array["rm", symlink], console);
-      };
-      _ = exec(Array["ln", "-s", path, symlink], console)
-    }
-  });
+  Success(void)
+}
+
+fun tsc(tsDir: String, console: Skargo.Console): Result<void, void> {
+  tsconfig = Path.join(tsDir, "tsconfig.json");
   console.status("Running", `Typescript compiler on '${tsconfig}'`);
   _ = exec(Array["tsc", "--project", tsconfig], console)?;
   Success(void)
@@ -284,7 +273,7 @@ fun manage(
   brunner: BuildRunner,
   package: Package,
   optTarget: ?String = None(),
-  optBinary: ?(Skargo.Unit, String) = None(),
+  optBinary: ?(Skargo.Unit, String, String, String) = None(),
   clean: Bool = false,
 ): Result<String, void> {
   optBinName = optBinary.map(v -> v.i1);
@@ -317,9 +306,7 @@ fun manage(
       | _ -> return false
       };
       u.target.kind match {
-      | Skargo.BinTarget _
-      | Skargo.LibTarget(Skargo.LibraryTypeCdylib()) ->
-        true
+      | Skargo.LibTarget(Skargo.LibraryTypeCdylib()) -> true
       | _ -> false
       }
     })
@@ -328,38 +315,40 @@ fun manage(
   checkDir(distDir);
   dependencies = mutable Vector[];
   for (u in libraries) {
-    root = u.pkg.manifest.package_id.source_id.url;
-    depsDir = Path.join(root, "ts/src");
+    uroot = u.pkg.manifest.package_id.source_id.url;
+    depsDir = Path.join(uroot, "ts/src");
     if (FileSystem.exists(depsDir)) {
-      dependencies.push((u, depsDir))
+      dependencies.push((u, depsDir, depsDir.stripPrefix(Path.dirname(uroot))));
     };
-    npmJson = Path.join(root, "npm.json");
+    npmJson = Path.join(uroot, "npm.json");
     if (FileSystem.exists(npmJson)) {
       name = u.pkg.manifest.package_id.name;
-      pck = Package::create(root, name, console)?;
-      manageAssets(root, tsDir, distDir, name, pck.assets, console)?
+      pck = Package::create(uroot, name, console)?;
+      manageAssets(uroot, tsDir, distDir, name, pck.assets, console)?
     }
   };
   pckDependencies = mutable Map[];
   for (dep in dependencies) {
     tsd = dep.i1;
-    FileSystem.readFilesRecursive(
-      tsd,
-      f -> f.endsWith(".ts"),
-      f -> f != Path.join(tsd, "node_modules") && f != Path.join(tsd, "js"),
-    ).each(f ->
-      copy(f, Path.join(tsDir, relative(f, tsd).default(Path.basename(f))))
-    );
-    // TODO manage same package usage
     packageFile = Path.join(tsd, "package.json");
     if (FileSystem.exists(packageFile)) {
       res = try {
-        // TODO: Manage multiple time same dependencies
         contents = FileSystem.readTextFile(packageFile);
         json = JSON.decode(contents).expectObject();
-        json.maybeGetObject("dependencies").each(dps ->
-          dps.value.each((k, v) -> pckDependencies.add(k, v.expectString()))
-        );
+        json.maybeGetObject("dependencies").each(dps -> {
+          dps.value.each((k, v) -> {
+            pv = v.expectString();
+            pckDependencies.maybeGet(k) match {
+            | Some(epv) ->
+              if (epv != pv) {
+                invariant_violation(
+                  `Same package '${k}' used with different versions '${epv} vs ${pv}'.`,
+                )
+              }
+            | _ -> pckDependencies.add(k, v.expectString())
+            }
+          })
+        });
         Success(void)
       } catch {
       | _ ->
@@ -380,37 +369,48 @@ fun manage(
   );
   FileSystem.writeTextFile(packageFile, packageContents.toString());
   tsconfig = Path.join(tsDir, "tsconfig.json");
-  FileSystem.writeTextFile(
-    tsconfig,
-    tsConfig(dependencies.map(d -> d.i0.pkg.manifest.package_id.name)),
+  sources = mutable Vector[];
+  dependencies.each(d ->
+    sources.push((d.i0.pkg.manifest.package_id.name, d.i1))
   );
-  tsc(tsDir, None(), console)?;
+  optBinary.each(b -> sources.push((b.i1, b.i2)));
+  FileSystem.writeTextFile(tsconfig, tsConfig(sources));
+  install(tsDir, console)?;
+  tsc(tsDir, console)?;
   jsDir = Path.join(tsDir, "js");
   if (!FileSystem.exists(jsDir)) {
     console.error("Invalid typescript build");
     return Failure(void)
   };
-  // TODO: manage subdirectories
-  jsFiles = FileSystem.readFilesRecursive(
-    jsDir,
-    f ~> f.endsWith(".js"),
-    f ~> f != Path.join(jsDir, "node_modules") && f != Path.join(jsDir, "js"),
-  );
-  mapFiles = FileSystem.readFilesRecursive(
-    jsDir,
-    f ~> f.endsWith(".map"),
-    f ~> f != Path.join(jsDir, "node_modules") && f != Path.join(jsDir, "js"),
-  );
-  declFiles = FileSystem.readFilesRecursive(
-    jsDir,
-    f ~> f.endsWith(".d.ts"),
-    f ~> f != Path.join(jsDir, "node_modules") && f != Path.join(jsDir, "js"),
-  );
+  jsFiles = mutable Vector<(String, String)>[];
+  mapFiles = mutable Vector<(String, String)>[];
+  declFiles = mutable Vector<(String, String)>[];
+  collect = (suffix) -> {
+    src = jsDir + suffix;
+    FileSystem.readFilesRecursive(
+      src,
+      f ~> f.endsWith(".js"),
+      f -> f != Path.join(src, "node_modules") && f != Path.join(src, "js"),
+    ).each(f -> jsFiles.push((f, src)));
+    FileSystem.readFilesRecursive(
+      src,
+      f ~> f.endsWith(".map"),
+      f -> f != Path.join(src, "node_modules") && f != Path.join(src, "js"),
+    ).each(f -> mapFiles.push((f, src)));
+    FileSystem.readFilesRecursive(
+      src,
+      f ~> f.endsWith(".d.ts"),
+      f -> f != Path.join(src, "node_modules") && f != Path.join(src, "js"),
+    ).each(f -> declFiles.push((f, src)));
+  };
+  for (dependency in dependencies) {
+    collect(dependency.i2)
+  };
+  optBinary.each(b -> collect(b.i3));
   copyAndConvertImport(
     package.version,
     distDir,
     jsFiles,
-    jsDir,
     () -> {
       if (binaries.size() == 1) {
         return Success(binaries[0].target.name)
@@ -420,27 +420,12 @@ fun manage(
     },
     console,
   )?;
-  for (bin in binaries) {
-    bin.target.kind match {
-    | Skargo.LibTarget(Skargo.LibraryTypeCdylib()) ->
-      binName = bin.pkg.name();
-      wasmFile = Path.join(target_dir, `lib${binName}.so`);
-      distFile = Path.join(distDir, binName + ".wasm");
-      copy(wasmFile, distFile)
-    | _ ->
-      wasmFile = Path.join(target_dir, bin.target.name + ".wasm");
-      copy(wasmFile, distDir)
-    }
-  };
-  console.status_verbose(
-    "Progress",
-    "Copy mapping files associating '.mjs' instead of '.js'",
-  );
-  for (mapFile in mapFiles) {
+  for (t in mapFiles) {
+    (mapFile, src) = t;
     contents = FileSystem.readTextFile(mapFile);
     res = try {
       json = JSON.decode(contents).expectObject();
-      file = relative(mapFile, jsDir).default(Path.basename(mapFile));
+      file = relative(mapFile, src).default(Path.basename(mapFile));
       rpd = Path.dirname(file);
       newJS = JSON.Object(
         json.value.map((k, v) ->
@@ -474,15 +459,35 @@ fun manage(
     res?
   };
   console.status_verbose("Progress", "Copy types declaration files");
-  declFiles.each(f -> copyToDir(f, distDir, jsDir));
+  declFiles.each(t -> copyToDir(t.i0, distDir, t.i1));
+
+  for (bin in binaries) {
+    bin.target.kind match {
+    | Skargo.LibTarget(Skargo.LibraryTypeCdylib()) ->
+      binName = bin.pkg.name();
+      wasmFile = Path.join(target_dir, `lib${binName}.so`);
+      distFile = Path.join(distDir, binName + ".wasm");
+      copy(wasmFile, distFile)
+    | _ ->
+      wasmFile = Path.join(target_dir, bin.target.name + ".wasm");
+      copy(wasmFile, distDir)
+    }
+  };
+  console.status_verbose(
+    "Progress",
+    "Copy mapping files associating '.mjs' instead of '.js'",
+  );
   srcDir = Path.join(npmDir, "src");
   checkDir(srcDir);
   console.status_verbose("Progress", "Copy source files");
-  FileSystem.readFilesRecursive(
-    tsDir,
-    f -> f.endsWith(".ts"),
-    f -> f != Path.join(tsDir, "node_modules") && f != Path.join(tsDir, "js"),
-  ).each(f -> copyToDir(f, srcDir, tsDir));
+  for (dep in dependencies) {
+    tsd = dep.i1;
+    FileSystem.readFilesRecursive(
+      tsd,
+      f -> f.endsWith(".ts"),
+      f -> f != Path.join(tsd, "node_modules") && f != Path.join(tsd, "js"),
+    ).each(f -> copyToDir(f, srcDir, tsd))
+  };
   console.status_verbose("Progress", "Manage license and package files");
   licenseFile = Path.join(npmDir, "LICENSE");
   FileSystem.writeTextFile(licenseFile, license());
@@ -503,7 +508,6 @@ fun manage(
     | _ -> u.target.name
     }
   };
-
   if (binaries.size() == 1) {
     binName = optBinName.default(getName(binaries[0]));
     npmPackage.add("main", JSON.String(`./dist/${binName}.mjs`));
@@ -549,11 +553,38 @@ fun manage(
   Success(npmDir)
 }
 
+fun getBinaries(units: readonly Vector<Skargo.Unit>): Array<Skargo.Unit> {
+  result = mutable Map<String, Skargo.Unit>[];
+  units.each(u -> {
+    check = () -> {
+      u.arch match {
+      | Skargo.TargetArchTriple(t) if (t.isWasm32()) -> void
+      | _ -> return false
+      };
+      u.target.kind match {
+      | Skargo.BinTarget _
+      | Skargo.LibTarget(Skargo.LibraryTypeCdylib()) ->
+        true
+      | _ -> false
+      }
+    };
+    if (check()) {
+      name = u.pkg.name();
+      result.maybeGet(name) match {
+      | None() -> result.set(name, u)
+      | Some(eu) if (eu.target.kind is Skargo.BinTarget _) ->
+        result.set(name, u)
+      | _ -> void
+      }
+    }
+  });
+  result.values().collect(Array)
+}
+
 fun copyAndConvertImport(
   version: Version,
   distDir: String,
-  jsFiles: Vector<String>,
-  fromDir: String,
+  jsFiles: readonly Vector<(String, String)>,
   binary: () -> Result<String, void>,
   console: Skargo.Console,
 ): Result<void, void> {
@@ -570,7 +601,8 @@ fun copyAndConvertImport(
   loaderFiles = mutable Vector<String>[];
   moduleFiles = mutable Vector<String>[];
   tmplFiles = mutable Vector[];
-  for (f in jsFiles) {
+  for (t in jsFiles) {
+    (f, fromDir) = t;
     saved = SKStore.newObstack();
     rp = relative(f, fromDir).default(Path.basename(f));
     rpd = Path.dirname(rp);

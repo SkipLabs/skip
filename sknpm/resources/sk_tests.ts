@@ -1,4 +1,4 @@
-import { run, type ModuleInit } from "./sk_types.js";
+import { run, type ModuleInit } from "#std/sk_types.js";
 
 const modules: ModuleInit[] = [];
 /*--MODULES--*/

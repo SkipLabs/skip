@@ -58,16 +58,19 @@ fun execCustomTests(
   root = ws.package.manifest.package_id.source_id.url;
   tests_dir = Path.join(root, "ts/tests");
   if (!FileSystem.exists(tests_dir)) return Success(void);
-  target_dir = brunner.target_layout.dest;
   console = brunner.bctx.gctx.console;
-  skargo(args, false, console)?;
+  _ = exec(Array["npm", "i", "--prefix", tests_dir], console)?;
   name = ws.package.manifest.package_id.name;
   package = Package::create(root, name, console)?;
-  syncDirs(tests_dir, target_dir, Set["node_modules"], console);
-  _ = exec(Array["npm", "i", "--prefix", target_dir], console)?;
-  packageDir = Path.join(Path.join(target_dir, "node_modules"), package.name);
-  _ = manage(brunner, package, Some(packageDir))?;
-  targetsFile = Path.join(target_dir, "targets.json");
+  outdir = Path.join(Path.join(tests_dir, "node_modules"), package.name);
+  if (FileSystem.exists(outdir)) {
+    _ = System.subprocess(Array["rm", "-rf", outdir]);
+  };
+  doBuild(brunner, args, false, false, Some(outdir)) match {
+  | Success _ -> void
+  | _ -> return Failure(void)
+  };
+  targetsFile = Path.join(tests_dir, "targets.json");
   availables = if (FileSystem.exists(targetsFile)) {
     targets(targetsFile, console)?;
   } else {
@@ -103,7 +106,7 @@ fun execCustomTests(
   for (s in services) {
     if (!done.contains(s)) {
       runService(
-        Path.join(target_dir, s),
+        Path.join(tests_dir, s),
         root,
         processes,
         environment,
@@ -112,7 +115,7 @@ fun execCustomTests(
       done.insert(s);
     }
   };
-  run_playwright(target_dir, args, console, targets, environment, processes)
+  run_playwright(tests_dir, args, console, targets, environment, processes)
 }
 
 fun execSkTests(
@@ -157,7 +160,7 @@ fun execSkTests(
     brunner,
     package,
     Some(packageDir),
-    Some((tests[0], "sk_tests")),
+    Some((tests[0], "sk_tests", tsDir, tsDir.stripPrefix(Path.dirname(root)))),
   )?;
   copy(wasm_file, Path.join(Path.join(npmDir, "dist"), "test.wasm"));
   run_playwright(tests_dir, args, console);

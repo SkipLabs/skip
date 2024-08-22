@@ -77,12 +77,16 @@ fun relative(path: String, to: String): ?String {
   }
 }
 
-fun tsConfig(deps: Vector<String>): String {
-  path = JSON.Array(Vector[JSON.String("./*")]);
+fun tsConfig(deps: readonly Vector<(String, String)>): String {
   paths = mutable Map<String, JSON.Value>[];
-  deps.each(v -> paths.set(`#${v}` + "/*", path));
+  deps.each(v ->
+    paths.set(
+      `#${v.i0}` + "/*",
+      JSON.Array(Vector[JSON.String(Path.join(v.i1, "*"))]),
+    )
+  );
   config = JSON.Object(
-    Map[
+    Map<String, JSON.Value>[
       "compilerOptions" => JSON.Object(
         Map[
           "target" => JSON.String("ES2021"),
@@ -97,6 +101,9 @@ fun tsConfig(deps: Vector<String>): String {
           "incremental" => JSON.Bool(true),
           "verbatimModuleSyntax" => JSON.Bool(true),
         ],
+      ),
+      "include" => JSON.Array(
+        Vector::createFromItems(deps.map(d -> JSON.String(d.i1))),
       ),
     ],
   );

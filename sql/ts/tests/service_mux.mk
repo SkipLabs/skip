@@ -11,7 +11,8 @@ MAKEFLAGS += --no-print-directory
 REAL_DIR=$(shell realpath $(ROOT_DIR))
 SERVER_DIR=$(ROOT_DIR)/server
 SKGW_DIR=$(SERVER_DIR)/dev
-SKDB_DATABASES=$(SRV_DIR)/dbs
+BUILD_DIR=$(SRV_DIR)/build
+SKDB_DATABASES=$(BUILD_DIR)/dbs
 
 default: run
 

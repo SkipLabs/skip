@@ -45,6 +45,7 @@ fun doBuild(
   args: Cli.ParseResults,
   test: Bool = false,
   nowasm: Bool = false,
+  optOutDir: ?String = None(),
 ): Result<(String, Package), void> {
   ws = brunner.bctx.ws;
   gctx = brunner.bctx.gctx;
@@ -52,7 +53,15 @@ fun doBuild(
   root = ws.package.manifest.package_id.source_id.url;
   name = ws.package.manifest.package_id.name;
   package = Package::create(root, name, gctx.console)?;
-  npmDir = manage(brunner, package, args.maybeGetString("out-dir"))?;
+  npmDir = manage(
+    brunner,
+    package,
+    if (optOutDir.isSome()) {
+      optOutDir
+    } else {
+      args.maybeGetString("out-dir")
+    },
+  )?;
   gctx.console.status("Progress", `Npm package '${npmDir}' generated`);
   Success((npmDir, package))
 }

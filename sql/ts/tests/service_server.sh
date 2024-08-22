@@ -42,7 +42,7 @@ source $1/bin/sdkman-init.sh
 cd $2
 
 run_server () {
-    java -jar $4 --config $2 &> $3/server.log &
+    java -jar $4 --config $2 &> $( dirname $3 )/server.log &
     pid1=$!
 
     host="http://localhost:$1"
@@ -65,25 +65,32 @@ run_server () {
 
     exists=$(kill -0 $pid1);
     if [[ -z "$exists" ]]; then
+        if [[ $i -ge 10 ]]; then
+            kill $pid1
+            exit 2
+        fi
         echo "$pid1"
     else
         return 1
     fi
 }
 
-pid1=""
+pid=""
 i=0
 while [[ $i -lt 10 ]];
 do
     echo "Running local server ($i)"
-    pid1=$(run_server $skdb_port $3 $4 $5)
-    if [[ -n "$pid1" ]]; then
-        echo "sknpm.process=$pid1"
+    pid=$(run_server $skdb_port $3 $4 $5)
+    if [[ -n "$pid" ]]; then
+        echo "sknpm.process=$pid"
         break;
     fi
     i=$((i+1))
 done
 
 if [ $i -ge 10 ]; then
+  if [[ ! -z "$pid" ]]; then
+    kill $pid
+  fi
   exit 2
 fi
