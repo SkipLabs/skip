@@ -652,6 +652,10 @@ extern void SKIP_FFI_push_object_field_string(void* res, const char* val,
 extern void SKIP_FFI_print(void* res, const char* str, int64_t str_len);
 extern void SKIP_FFI_send_update(void* res, const char* str, int64_t str_len);
 extern void SKIP_FFI_send_watch_update(void* table_ptr, void* res);
+extern void SKIP_FFI_send_watch_changes_update(void* init_table_ptr,
+                                               void* changes_table_ptr,
+                                               void* deletes_table_ptr,
+                                               void* res);
 #else
 void SKIP_FFI_push_field_name(void*, const char*, int64_t) {}
 void SKIP_FFI_new_object(void*) {}
@@ -663,5 +667,6 @@ void SKIP_FFI_push_object_field_string(void*, const char*, int64_t) {}
 void SKIP_FFI_print(void*, const char*, int64_t) {}
 void SKIP_FFI_send_update(void*, const char*, int64_t) {}
 void SKIP_FFI_send_watch_update(void*, void*) {}
+void SKIP_FFI_send_watch_changes_update(void*, void*, void*, void*) {}
 #endif
 }
