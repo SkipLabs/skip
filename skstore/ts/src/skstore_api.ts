@@ -240,7 +240,6 @@ export interface LHandle<K extends TJSON, V extends TJSON> {
   /**
    * Get (and potentially compute) all values mapped to by some key of a lazy reactive
    * collection.
-   * @throws {Error} when the key does not exist
    */
   getArray(key: K): V[];
 
@@ -254,7 +253,7 @@ export interface LHandle<K extends TJSON, V extends TJSON> {
   /**
    * Get (and potentially compute) a value of a lazy reactive collection, if one exists.
    * If multiple values are mapped to by the key, any of them can be returned.
-   * @throws {Error} when the key does not exist
+   * @returns the value for this `key`, or null if no such value exists
    */
   maybeGetFirst(key: K): Opt<V>;
 }
@@ -270,7 +269,6 @@ export interface EHandle<K extends TJSON, V extends TJSON> {
   /**
    * Get (and potentially compute) all values mapped to by some key of a lazy reactive
    * collection.
-   * @throws {Error} when the key does not exist
    */
   getArray(key: K): V[];
 
