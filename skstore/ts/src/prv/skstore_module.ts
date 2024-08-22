@@ -456,17 +456,16 @@ class LinksImpl implements Links {
         jsu.importJSON(key),
         new NonEmptyIteratorImpl(jsu, fromWasm, it),
       ]);
-
-      const bindings = {};
-      for (const v of result) {
-        const t = v as any;
-        bindings[t[0]] ??= [];
-        bindings[t[0]].push(t[1]);
+      const bindings = new Map();
+      for (const datum of result) {
+        const k = datum[0];
+        const v = datum[1];
+        if (bindings.has(k)) bindings.get(k).push(v);
+        else bindings.set(k, [v]);
       }
-      for (const k in bindings) {
-        w.setArray(k, bindings[k]);
+      for (const kv of bindings) {
+        w.setArray(kv[0], kv[1]);
       }
-
       ref.pop();
     };
     this.applyMapTableFun = (
