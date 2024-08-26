@@ -535,8 +535,8 @@ export const tests: Test[] = [
   {
     name: "testMap1",
     schema: [
-      schema("input", [integer("id", true), integer("value")]),
-      schema("output", [integer("id", true), integer("value")]),
+      schema("input", [integer("id", true, true), integer("value")]),
+      schema("output", [integer("id", true, true), integer("value")]),
     ],
     init: testMap1Init,
     run: testMap1Run,
@@ -544,9 +544,9 @@ export const tests: Test[] = [
   {
     name: "testMap2",
     schema: [
-      schema("input1", [integer("id", true), text("value")]),
-      schema("input2", [integer("id", true), text("value")]),
-      schema("output", [integer("id", true), integer("value")]),
+      schema("input1", [integer("id", true, true), text("value")]),
+      schema("input2", [integer("id", true, true), text("value")]),
+      schema("output", [integer("id", true, true), integer("value")]),
     ],
     init: testMap2Init,
     run: testMap2Run,
@@ -555,7 +555,7 @@ export const tests: Test[] = [
     name: "testMap3",
     schema: [
       schema("input_no_index", [integer("id"), text("value")]),
-      schema("input_index", [integer("id", true), text("value")]),
+      schema("input_index", [integer("id", true, true), text("value")]),
       schema("output", [integer("id"), integer("value")]),
     ],
     init: testMap3Init,
@@ -564,9 +564,9 @@ export const tests: Test[] = [
   {
     name: "testSize",
     schema: [
-      schema("input", [integer("id", true), integer("value")]),
-      schema("size", [integer("id", true)]),
-      schema("output", [integer("id", true), integer("value")]),
+      schema("input", [integer("id", true, true), integer("value")]),
+      schema("size", [integer("id", true, true)]),
+      schema("output", [integer("id", true, true), integer("value")]),
     ],
     init: testSizeInit,
     run: testSizeRun,
@@ -574,8 +574,8 @@ export const tests: Test[] = [
   {
     name: "testLazy",
     schema: [
-      schema("input", [integer("id", true), integer("value")]),
-      schema("output", [integer("id", true), integer("value")]),
+      schema("input", [integer("id", true, true), integer("value")]),
+      schema("output", [integer("id", true, true), integer("value")]),
     ],
     init: testLazyInit,
     run: testLazyRun,
@@ -583,8 +583,8 @@ export const tests: Test[] = [
   {
     name: "testMapReduce",
     schema: [
-      schema("input", [integer("id", true), integer("v")]),
-      schema("output", [integer("id", true), integer("v")]),
+      schema("input", [integer("id", true, true), integer("v")]),
+      schema("output", [integer("id", true, true), integer("v")]),
     ],
     init: testMapReduceInit,
     run: testMapReduceRun,
@@ -592,8 +592,8 @@ export const tests: Test[] = [
   {
     name: "testMultiMap1",
     schema: [
-      schema("input1", [integer("id", true), integer("value")]),
-      schema("input2", [integer("id", true), integer("value")]),
+      schema("input1", [integer("id", true, true), integer("value")]),
+      schema("input2", [integer("id", true, true), integer("value")]),
       schema("output", [integer("src"), integer("id"), integer("v")]),
     ],
     init: testMultiMap1Init,
@@ -602,9 +602,9 @@ export const tests: Test[] = [
   {
     name: "testMultiMapReduce",
     schema: [
-      schema("input1", [integer("id", true), integer("value")]),
-      schema("input2", [integer("id", true), integer("value")]),
-      schema("output", [integer("id", true), integer("v")]),
+      schema("input1", [integer("id", true, true), integer("value")]),
+      schema("input2", [integer("id", true, true), integer("value")]),
+      schema("output", [integer("id", true, true), integer("v")]),
     ],
     init: testMultiMapReduceInit,
     run: testMultiMapReduceRun,
@@ -612,9 +612,9 @@ export const tests: Test[] = [
   {
     name: "testAsyncLazy",
     schema: [
-      schema("input1", [integer("id", true), integer("value")]),
-      schema("input2", [integer("id", true), integer("value")]),
-      schema("output", [integer("id", true), text("v")]),
+      schema("input1", [integer("id", true, true), integer("value")]),
+      schema("input2", [integer("id", true, true), integer("value")]),
+      schema("output", [integer("id", true, true), text("v")]),
     ],
     init: testAsyncLazyInit,
     run: testAsyncLazyRun,

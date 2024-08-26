@@ -44,52 +44,52 @@ export function schema(name: string, expected: ColumnSchema[]): MirrorSchema {
 
 export function cinteger(
   name: string,
+  notnull: boolean = true,
   primary?: boolean,
-  notnull?: boolean,
 ): ColumnSchema {
   return {
     name,
     type: "INTEGER",
-    primary,
     notnull,
+    primary,
   };
 }
 
 export function ctext(
   name: string,
+  notnull: boolean = true,
   primary?: boolean,
-  notnull?: boolean,
 ): ColumnSchema {
   return {
     name,
     type: "TEXT",
-    primary,
     notnull,
+    primary,
   };
 }
 
 export function cjson(
   name: string,
+  notnull: boolean = true,
   primary?: boolean,
-  notnull?: boolean,
 ): ColumnSchema {
   return {
     name,
     type: "JSON",
-    primary,
     notnull,
+    primary,
   };
 }
 
 export function cfloat(
   name: string,
+  notnull: boolean = true,
   primary?: boolean,
-  notnull?: boolean,
 ): ColumnSchema {
   return {
     name,
     type: "JSON",
-    primary,
     notnull,
+    primary,
   };
 }

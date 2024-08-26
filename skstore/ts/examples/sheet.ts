@@ -13,9 +13,13 @@ import { schema, ctext as text } from "skstore";
 
 export function tablesSchema() {
   console.log("## INPUT");
-  console.log("  cells (sheet TEXT, cell TEXT, value TEXT)");
+  console.log(
+    "  cells (sheet TEXT NOT NULL, cell TEXT NOT NULL, value TEXT NOT NULL)",
+  );
   console.log("## OUTPUT");
-  console.log("  computed (sheet TEXT, cell TEXT, value TEXT)");
+  console.log(
+    "  computed (sheet TEXT NOT NULL, cell TEXT NOT NULL, value TEXT NOT NULL)",
+  );
   console.log("##");
   return [
     schema("cells", [text("sheet"), text("cell"), text("value")]),
