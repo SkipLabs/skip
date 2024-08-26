@@ -67,16 +67,16 @@ export interface Context {
   getFromTable: <K, R>(table: string, key: K, index?: string) => R[];
 
   getArray: <K, V>(eagerHdl: string, key: K) => V[];
-  getFirst: <K, V>(eagerHdl: string, key: K) => V;
-  maybeGetFirst: <K, V>(eagerHdl: string, key: K) => Opt<V>;
+  getOne: <K, V>(eagerHdl: string, key: K) => V;
+  maybeGetOne: <K, V>(eagerHdl: string, key: K) => Opt<V>;
 
   getArrayLazy: <K, V>(eagerHdl: string, key: K) => V[];
-  getFirstLazy: <K, V>(eagerHdl: string, key: K) => V;
-  maybeGetFirstLazy: <K, V>(eagerHdl: string, key: K) => Opt<V>;
+  getOneLazy: <K, V>(eagerHdl: string, key: K) => V;
+  maybeGetOneLazy: <K, V>(eagerHdl: string, key: K) => Opt<V>;
 
   getArraySelf: <K, V>(lazyHdl: ptr, key: K) => V[];
-  getFirstSelf: <K, V>(lazyHdl: ptr, key: K) => V;
-  maybeGetFirstSelf: <K, V>(lazyHdl: ptr, key: K) => Opt<V>;
+  getOneSelf: <K, V>(lazyHdl: ptr, key: K) => V;
+  maybeGetOneSelf: <K, V>(lazyHdl: ptr, key: K) => Opt<V>;
 
   size: (eagerHdl: string) => number;
 

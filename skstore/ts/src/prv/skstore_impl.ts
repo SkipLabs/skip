@@ -63,12 +63,12 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     return this.context.getArray(this.eagerHdl, key);
   }
 
-  getFirst(key: K): V {
-    return this.context.getFirst(this.eagerHdl, key);
+  getOne(key: K): V {
+    return this.context.getOne(this.eagerHdl, key);
   }
 
-  maybeGetFirst(key: K): Opt<V> {
-    return this.context.maybeGetFirst(this.eagerHdl, key);
+  maybeGetOne(key: K): Opt<V> {
+    return this.context.maybeGetOne(this.eagerHdl, key);
   }
 
   size = () => {
@@ -689,12 +689,12 @@ class LHandleImpl<K extends TJSON, V extends TJSON> implements LHandle<K, V> {
     return this.context.getArrayLazy(this.lazyHdl, key);
   }
 
-  getFirst(key: K): V {
-    return this.context.getFirstLazy(this.lazyHdl, key);
+  getOne(key: K): V {
+    return this.context.getOneLazy(this.lazyHdl, key);
   }
 
-  maybeGetFirst(key: K): Opt<V> {
-    return this.context.maybeGetFirstLazy(this.lazyHdl, key);
+  maybeGetOne(key: K): Opt<V> {
+    return this.context.maybeGetOneLazy(this.lazyHdl, key);
   }
 }
 
@@ -717,11 +717,11 @@ export class LSelfImpl<K extends TJSON, V extends TJSON>
   getArray(key: K): V[] {
     return this.context.getArraySelf(this.lazyHdl, key);
   }
-  getFirst(key: K): V {
-    return this.context.getFirstSelf(this.lazyHdl, key);
+  getOne(key: K): V {
+    return this.context.getOneSelf(this.lazyHdl, key);
   }
-  maybeGetFirst(key: K): Opt<V> {
-    return this.context.maybeGetFirstSelf(this.lazyHdl, key);
+  maybeGetOne(key: K): Opt<V> {
+    return this.context.maybeGetOneSelf(this.lazyHdl, key);
   }
 }
 

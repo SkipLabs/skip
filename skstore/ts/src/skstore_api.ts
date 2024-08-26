@@ -245,17 +245,16 @@ export interface LHandle<K extends TJSON, V extends TJSON> {
 
   /**
    * Get (and potentially compute) a value of a lazy reactive collection.
-   * If multiple values are mapped to by the key, any of them can be returned
-   * @throws {Error} when the key does not exist
+   * @throws {Error} when either zero or multiple such values exist
    */
-  getFirst(key: K): V;
+  getOne(key: K): V;
 
   /**
    * Get (and potentially compute) a value of a lazy reactive collection, if one exists.
    * If multiple values are mapped to by the key, any of them can be returned.
    * @returns the value for this `key`, or null if no such value exists
    */
-  maybeGetFirst(key: K): Opt<V>;
+  maybeGetOne(key: K): Opt<V>;
 }
 
 export interface ALHandle<K extends TJSON, V extends TJSON, M extends TJSON>
@@ -274,16 +273,15 @@ export interface EHandle<K extends TJSON, V extends TJSON> {
 
   /**
    * Get a value of an eager reactive collection.
-   * If multiple values are mapped to by the key, any of them can be returned.
-   * @throws {Error} when the key does not exist
+   * @throws {Error} when either zero or multiple such values exist
    */
-  getFirst(key: K): V;
+  getOne(key: K): V;
   /**
    * Get a value of an eager reactive collection, if one exists.
    * If multiple values are mapped to by the key, any of them can be returned.
    * @returns the value for this `key`, or null if no such value exists
    */
-  maybeGetFirst(key: K): Opt<V>;
+  maybeGetOne(key: K): Opt<V>;
 
   /**
    *  Create a new eager reactive collection by mapping some computation over this one
