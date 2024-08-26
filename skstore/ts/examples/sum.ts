@@ -12,15 +12,15 @@ import { cinteger as integer, schema } from "skstore";
 
 export function tablesSchema() {
   console.log("## INPUTS");
-  console.log("  input1 (id INTEGER, value INTEGER)");
-  console.log("  input2 (id INTEGER, value INTEGER)");
+  console.log("  input1 (id INTEGER PRIMARY KEY, value INTEGER NOT NULL)");
+  console.log("  input2 (id INTEGER PRIMARY KEY, value INTEGER NOT NULL)");
   console.log("## OUTPUT");
-  console.log("  output (id INTEGER, value INTEGER)");
+  console.log("  output (id INTEGER PRIMARY KEY, value INTEGER NOT NULL)");
   console.log("##");
   return [
-    schema("input1", [integer("id", true), integer("v")]),
-    schema("input2", [integer("id", true), integer("v")]),
-    schema("output", [integer("id", true), integer("v")]),
+    schema("input1", [integer("id", true, true), integer("v")]),
+    schema("input2", [integer("id", true, true), integer("v")]),
+    schema("output", [integer("id", true, true), integer("v")]),
   ];
 }
 
