@@ -84,7 +84,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     const mapperObj = new mapper(...params);
     Object.freeze(mapperObj);
     if (!mapperObj.constructor.name) {
-      throw new Error("The class must have a name.");
+      throw new Error("Mapper classes must be defined at top-level.");
     }
     const eagerHdl = this.context.map(
       this.eagerHdl,
@@ -253,7 +253,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     const mapperObj = new mapper(...params);
     Object.freeze(mapperObj);
     if (!mapperObj.constructor.name) {
-      throw new Error("The class must have a name.");
+      throw new Error("Mapper classes must be defined at top-level.");
     }
     const eagerHdl = this.context.mapReduce(
       this.eagerHdl,
@@ -506,7 +506,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     const mapperObj = new mapper(...params);
     Object.freeze(mapperObj);
     if (!mapperObj.constructor.name) {
-      throw new Error("The class must have a name.");
+      throw new Error("Mapper classes must be defined at top-level.");
     }
     this.context.mapToSkdb(
       this.eagerHdl,
@@ -758,7 +758,7 @@ export class TableHandleImpl<R extends TJSON[]> implements TableHandle<R> {
     const mapperObj = new mapper(...params);
     Object.freeze(mapperObj);
     if (!mapperObj.constructor.name) {
-      throw new Error("The class must have a name.");
+      throw new Error("Mapper classes must be defined at top-level.");
     }
     const name = this.getName();
     const skname = name + "_" + mapperObj.constructor.name;
