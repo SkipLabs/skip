@@ -23,6 +23,7 @@ import type {
   LazyCompute,
   AsyncLazyCompute,
   NonEmptyIterator,
+  Database,
 } from "../skipruntime_api.js";
 
 // prettier-ignore
@@ -143,7 +144,7 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
     }
     this.context.mapToSkdb(
       this.eagerHdl,
-      table.getName(),
+      table.getSchema(),
       (key: K, it: NonEmptyIterator<V>) => mapperObj.mapElement(key, it),
     );
   }
@@ -210,14 +211,11 @@ export class LSelfImpl<K extends TJSON, V extends TJSON>
 export class TableCollectionImpl<R extends TJSON[]>
   implements TableCollection<R>
 {
-  protected context: Context;
-  protected skdb: SKDBSync;
-  protected schema: MirrorSchema;
-
-  constructor(context: Context, skdb: SKDBSync, schema: MirrorSchema) {
-    this.context = context;
-    this.skdb = skdb;
-    this.schema = schema;
+  constructor(
+    protected context: Context,
+    protected skdb: SKDBSync,
+    protected schema: MirrorSchema,
+  ) {
     Object.defineProperty(this, "__sk_frozen", {
       enumerable: false,
       writable: false,
@@ -227,6 +225,10 @@ export class TableCollectionImpl<R extends TJSON[]>
 
   getName(): string {
     return this.schema.name;
+  }
+
+  getSchema(): MirrorSchema {
+    return this.schema;
   }
 
   get(key: TJSON, index?: string | undefined): R[] {
@@ -275,6 +277,14 @@ export class TableImpl<R extends TJSON[]> implements Table<R> {
   }
 
   insert(entries: R[], update?: boolean | undefined): void {
+    entries = entries.map((e) => {
+      if (this.schema.expected.length > e.length) {
+        if (this.schema.expected[e.length].name == "skdb_access") {
+          e.push("read-write");
+        }
+      }
+      return e;
+    });
     const query = toInsertQuery(this.getName(), entries, update);
     const params = query.params ? toParams(query.params) : undefined;
     this.skdb.exec(query.query, params);
@@ -471,15 +481,18 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
     dbName?: string,
     asWorker?: boolean,
   ) => Promise<SKDBSync>;
+  private createKey: (key: string) => Promise<CryptoKey>;
 
   constructor(
     context: () => Context,
     create: (init: () => void) => void,
     createSync: (dbName?: string, asWorker?: boolean) => Promise<SKDBSync>,
+    createKey: (key: string) => Promise<CryptoKey>,
   ) {
     this.context = context;
     this.create = create;
     this.createSync = createSync;
+    this.createKey = createKey;
   }
 
   getName = () => "SKStore";
@@ -487,11 +500,19 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
   runSKStore = async (
     init: (skstore: SKStore, ...tables: TableCollection<TJSON[]>[]) => void,
     tablesSchema: MirrorSchema[],
-    connect: boolean = true,
+    database: Database | null,
   ): Promise<Table<TJSON[]>[]> => {
     const context = this.context();
     const skdb = await this.createSync();
-    const tables = mirror(context, skdb, connect, ...tablesSchema);
+    const cdatabase = database
+      ? {
+          name: database.name,
+          access: database.access,
+          private: await this.createKey(database.private),
+          endpoint: database.endpoint,
+        }
+      : null;
+    const tables = await mirror(context, skdb, cdatabase, ...tablesSchema);
     const skstore = new SKStoreImpl(context);
     this.create(() => {
       init(skstore, ...tables);
@@ -508,23 +529,49 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
  * @param tables - tables to mirror, along with schemas and filters
  * @returns - the mirrored table collections
  */
-export function mirror(
+export async function mirror(
   context: Context,
   skdb: SKDBSync,
-  connect: boolean,
+  database: {
+    name: string;
+    access: string;
+    private: CryptoKey;
+    endpoint?: string;
+  } | null,
   ...tables: MirrorSchema[]
-): TableCollection<TJSON[]>[] {
-  if (connect) {
-    /* eslint-disable-next-line @typescript-eslint/no-floating-promises */
-    skdb.mirror(...toMirrorDefinitions(...tables));
-  } else {
-    /*
-    console.log("Warning:");
-    console.log("\tThe mirror tables filter are not applied.");
-    console.log(
-      "\tThe produced data will be lost as soon as the process shutdown.",
+): Promise<TableCollection<TJSON[]>[]> {
+  if (database) {
+    await skdb.connect(
+      database.name,
+      database.access,
+      database.private,
+      database.endpoint,
     );
-    */
+    if (!skdb.connectedRemote) {
+      throw new Error("Unable to connect to server.");
+    }
+    for (const table of tables) {
+      const with_access =
+        table.expected.filter((v) => v.name == "skdb_access").length > 0;
+      if (!with_access) {
+        table.expected.push({
+          name: "skdb_access",
+          type: "TEXT",
+        });
+      }
+      const query = create(table);
+      console.log("Create", query);
+      await skdb.connectedRemote!.exec(
+        query.query,
+        query.params ? toParams(query.params) : undefined,
+      );
+    }
+    /* eslint-disable-next-line @typescript-eslint/no-floating-promises */
+    const definitions = toMirrorDefinitions(...tables);
+
+    await skdb.mirror(...definitions);
+    context.toggleConnected();
+  } else {
     tables.forEach((table) => {
       const query = create(table);
       skdb.exec(query.query, query.params ? toParams(query.params) : undefined);
@@ -613,7 +660,7 @@ function toWhere(
       }
       exprs.push(`${column.name} IN (${inVal.join(", ")})`);
     } else {
-      const pName = prefix + column.name;
+      const pName = prefix + i + "_value";
       params[pName] = field;
       exprs.push(`${column.name} = @${pName}`);
     }
@@ -644,7 +691,7 @@ function toSelectWhere(select: JSONObject, prefix: string = ""): Query {
   if (keys.length <= 0) return { query: "true" };
   const exprs: string[] = [];
   const params: JSONObject = {};
-  keys.forEach((column: string & keyof JSONObject) => {
+  keys.forEach((column: keyof JSONObject, c: number) => {
     const field = select[column];
     if (Array.isArray(field)) {
       const inVal: string[] = [];
@@ -655,7 +702,7 @@ function toSelectWhere(select: JSONObject, prefix: string = ""): Query {
       }
       exprs.push(`${column} IN (${inVal.join(", ")})`);
     } else {
-      const pName = `${prefix}${column}`;
+      const pName = `${prefix}${c}${column}`;
       params[pName] = field;
       exprs.push(`${column} = @${pName}`);
     }

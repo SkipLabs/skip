@@ -672,7 +672,7 @@ function run(t: Test) {
   test(t.name, async ({ page }) => {
     let tables: Table<TJSON[]>[] = [];
     try {
-      tables = await createSKStore(t.init, t.schema, false);
+      tables = await createSKStore(t.init, t.schema, null);
     } catch (err: any) {
       if (t.error) t.error(err);
       else console.error(err);

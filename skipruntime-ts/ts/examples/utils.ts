@@ -250,7 +250,7 @@ export class SocketServerService implements ReactiveService {
           error(`Unable to find ${name} table.`);
           return;
         }
-        table.insert(JSON.parse(values));
+        table.insert(JSON.parse(values), true);
       });
       socket.on("delete", (name: string, where: string) => {
         const table = tablesByName.get(name);
@@ -365,7 +365,7 @@ export class IOInputService implements ReactiveService {
                   error(`Unable to find ${name} table.`);
                   return;
                 }
-                table.insert(JSON.parse(values));
+                table.insert(JSON.parse(values), true);
               },
             ],
             [
@@ -461,17 +461,53 @@ export class JSONLogger implements WatchListener {
   };
 }
 
+async function getCreds(
+  database: string,
+  port: number = 3586,
+  host: string = "localhost",
+) {
+  const creds = new Map();
+  try {
+    const resp = await fetch(`http://${host}:${port}/dbs/${database}/users`);
+    const data = await resp.text();
+    const users = data
+      .split("\n")
+      .filter((line) => line.trim() != "")
+      .map((line) => JSON.parse(line));
+    for (const user of users) {
+      creds.set(user.accessKey, user.privateKey);
+    }
+  } catch (ex: any) {
+    throw new Error("Could not fetch from the dev server, is it running?");
+  }
+
+  return creds;
+}
+
 export async function start(
   createSKStore: typeof CreateSKStore,
   service: ReactiveService,
   storage: ReactiveStorage,
-  connect: boolean = true,
+  database: string | null,
+  port: number = 3586,
 ) {
   try {
+    const creds = database ? await getCreds(database, port) : null;
+    const cdatabase = database
+      ? {
+          name: database,
+          access: "root",
+          private: creds?.get("root"),
+          endpoint: `ws://localhost:${port}`,
+        }
+      : null;
+    if (cdatabase && !cdatabase.private) {
+      throw new Error("Unable to retrieve root credential.");
+    }
     const tables = await createSKStore(
       storage.initSKStore,
       storage.tablesSchema(),
-      connect,
+      cdatabase,
     );
     service.run(...tables);
   } catch (e) {
@@ -495,7 +531,10 @@ export async function main(createSKStore: typeof CreateSKStore) {
       "Port number in socket server mode (default: 3000)",
       "3000",
     )
-    .option("-c, --connect", "Specify if the tables are mirrored", false)
+    .option(
+      "-c, --connect <database>",
+      "Specify the database to connect for table mirroring",
+    )
     .parse(process.argv);
 
   const options = program.opts();
@@ -505,13 +544,13 @@ export async function main(createSKStore: typeof CreateSKStore) {
     console.log(program.usage());
     return;
   }
-  let connect = false;
-  if (typeof options.connect == "string") {
-    connect = options.connect == "true";
-  } else {
-    connect = options.connect ? true : false;
+  let database: string | null = null;
+  if (typeof options.connect == "string" && options.connect != "") {
+    database = options.connect;
   }
-
+  if (database != null) {
+    console.log("Run for database:", database);
+  }
   if (!fs.existsSync(file)) {
     console.error("SKStore example file does not exists.");
     return;
@@ -525,7 +564,7 @@ export async function main(createSKStore: typeof CreateSKStore) {
           createSKStore,
           new IOInputService(storage.scenarios()),
           storage,
-          connect,
+          database,
         );
         break;
       case "socket":
@@ -533,16 +572,17 @@ export async function main(createSKStore: typeof CreateSKStore) {
           createSKStore,
           new SocketServerService(parseInt(options.port)),
           storage,
-          connect,
+          database,
         );
         break;
       case "noop":
       default:
-        await start(createSKStore, new NoopService(), storage, connect);
+        await start(createSKStore, new NoopService(), storage, database);
         break;
     }
   } catch (e: any) {
     console.error("Invalid SKStore example file.");
-    console.error("\t" + e.message);
+    console.error(e);
+    process.exit(2);
   }
 }
