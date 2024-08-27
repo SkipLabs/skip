@@ -173,6 +173,35 @@ async function testMap3Run(
   ]);
 }
 
+class SquareValues implements ValueMapper<number, number> {
+  mapValue(v) {
+    return v * v;
+  }
+}
+
+function testMapValuesInit(
+  _skstore: SKStore,
+  input: TableHandle<[number, number]>,
+  output: TableHandle<[number, number]>,
+) {
+  input.map(TestFromIntInt).mapValues(SquareValues).mapTo(output, TestToOutput);
+}
+
+async function testMapValuesRun(input: Table<TJSON[]>, output: Table<TJSON[]>) {
+  input.insert([
+    [1, 1],
+    [2, 2],
+    [5, 5],
+    [10, 10],
+  ]);
+  check("testMapValues", output.select({}, ["value"]), [
+    { value: 1 },
+    { value: 4 },
+    { value: 25 },
+    { value: 100 },
+  ]);
+}
+
 //// testSize
 
 class TestSizeGetter implements TableMapper<[number], number, number> {
@@ -560,6 +589,15 @@ export const tests: Test[] = [
     ],
     init: testMap3Init,
     run: testMap3Run,
+  },
+  {
+    name: "testMapValues",
+    schema: [
+      schema("input", [integer("id", true, true), integer("value")]),
+      schema("output", [integer("id", true, true), integer("value")]),
+    ],
+    init: testMapValuesInit,
+    run: testMapValuesRun,
   },
   {
     name: "testSize",
