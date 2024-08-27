@@ -165,10 +165,24 @@ export type MParameters<
 > = C extends new (...params: infer P) => Mapper<K1, V1, K2, V2> ? P : never;
 
 /**
- * The handle entry mapper function to write data into table
- * @param key - the mapped handle entry key
- * @param {NonEmptyIterator} it - an iterator on values avalable for a key
- * @returns {R} the table entry corresponding to eager map key value pair
+ * A specialized form of `Mapper` which re-uses the input collection's key structure
+ * in the output collection and thus doesn't need to consider keys.
+ */
+export interface ValueMapper<V1 extends TJSON, V2 extends TJSON> {
+  mapValue: (value: V1) => V2;
+}
+
+export type VMParameters<
+  V1 extends TJSON,
+  V2 extends TJSON,
+  C extends new (...params: Param[]) => ValueMapper<V1, V2>,
+> = C extends new (...params: infer P) => ValueMapper<V1, V2> ? P : never;
+
+/**
+ * The type of a reactive function mapping a collection into an output table
+ * @param key - a key of the input collection
+ * @param {NonEmptyIterator} it - an iterator on values avalable for said key
+ * @returns {R} a table row corresponding to the input key
  */
 export interface OutputMapper<
   R extends TJSON,
@@ -284,7 +298,7 @@ export interface EHandle<K extends TJSON, V extends TJSON> {
   maybeGetOne(key: K): Opt<V>;
 
   /**
-   *  Create a new eager reactive collection by mapping some computation over this one
+   * Create a new eager reactive collection by mapping some computation over this one
    * @param {Mapper} mapper - function to apply to each element of this collection
    * @returns {EHandle} An eager handle on the resulting output collection
    */
@@ -421,6 +435,139 @@ export interface EHandle<K extends TJSON, V extends TJSON> {
     p8: P8,
     p9: P9,
   ): EHandle<K2, V2>;
+
+  /**
+   * Create a new eager reactive collection by mapping over the _values_ of this one,
+   * keeping the same keys.
+   * @param {ValueMapper} mapper - function to apply to each _value_ of this collection
+   * @returns {EHandle} An eager handle on the resulting output collection
+   */
+  mapValuesN<
+    V2 extends TJSON,
+    C extends new (...params: Param[]) => ValueMapper<V, V2>,
+  >(
+    mapper: C,
+    ...params: VMParameters<V, V2, C>
+  ): EHandle<K, V2>;
+
+  mapValues<V2 extends TJSON>(
+    mapper: new () => ValueMapper<V, V2>,
+  ): EHandle<K, V2>;
+
+  mapValues1<V2 extends TJSON, P1>(
+    mapper: new (p1: P1) => ValueMapper<V, V2>,
+    p1: P1,
+  ): EHandle<K, V2>;
+
+  mapValues2<V2 extends TJSON, P1, P2>(
+    mapper: new (p1: P1, p2: P2) => ValueMapper<V, V2>,
+    p1: P1,
+    p2: P2,
+  ): EHandle<K, V2>;
+
+  mapValues3<V2 extends TJSON, P1, P2, P3>(
+    mapper: new (p1: P1, p2: P2, p3: P3) => ValueMapper<V, V2>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+  ): EHandle<K, V2>;
+
+  mapValues4<V2 extends TJSON, P1, P2, P3, P4>(
+    mapper: new (p1: P1, p2: P2, p3: P3, p4: P4) => ValueMapper<V, V2>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+  ): EHandle<K, V2>;
+
+  mapValues5<V2 extends TJSON, P1, P2, P3, P4, P5>(
+    mapper: new (p1: P1, p2: P2, p3: P3, p4: P4, p5: P5) => ValueMapper<V, V2>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+  ): EHandle<K, V2>;
+
+  mapValues6<V2 extends TJSON, P1, P2, P3, P4, P5, P6>(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+    ) => ValueMapper<V, V2>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+  ): EHandle<K, V2>;
+
+  mapValues7<V2 extends TJSON, P1, P2, P3, P4, P5, P6, P7>(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+    ) => ValueMapper<V, V2>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+  ): EHandle<K, V2>;
+
+  mapValues8<V2 extends TJSON, P1, P2, P3, P4, P5, P6, P7, P8>(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+      p8: P8,
+    ) => ValueMapper<V, V2>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+    p8: P8,
+  ): EHandle<K, V2>;
+
+  mapValues9<V2 extends TJSON, P1, P2, P3, P4, P5, P6, P7, P8, P9>(
+    mapper: new (
+      p1: P1,
+      p2: P2,
+      p3: P3,
+      p4: P4,
+      p5: P5,
+      p6: P6,
+      p7: P7,
+      p8: P8,
+      p9: P9,
+    ) => ValueMapper<V, V2>,
+    p1: P1,
+    p2: P2,
+    p3: P3,
+    p4: P4,
+    p5: P5,
+    p6: P6,
+    p7: P7,
+    p8: P8,
+    p9: P9,
+  ): EHandle<K, V2>;
 
   /**
    * Create a new eager reactive collection by mapping some computation `mapper` over this
@@ -1065,9 +1212,10 @@ export type ALParameters<
 
 export interface SKStore {
   /**
-   * Creates a lazy reactive map
-   * @param compute - the lazy function to compute entries of the lazy map
-   * @returns {LHandle} The the resulting lazy reactive map handle
+   * Creates a lazy reactive collection.
+   * @param compute - the function to compute entries of the lazy collection
+   * @param params - any additional parameters to the lazy computation
+   * @returns {LHandle} The resulting lazy reactive map handle
    */
   lazyN<
     K extends TJSON,
