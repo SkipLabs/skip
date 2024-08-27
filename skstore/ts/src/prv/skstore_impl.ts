@@ -242,9 +242,9 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
   }
 
   mapValuesN<
-    V2 extends TJSON,
-    C extends new (...params: Param[]) => ValueMapper<V, V2>,
-  >(mapper: C, ...params: VMParameters<V, V2, C>): EHandle<K, V2> {
+    W extends TJSON,
+    C extends new (...params: Param[]) => ValueMapper<V, W>,
+  >(mapper: C, ...params: VMParameters<V, W, C>): EHandle<K, W> {
     params.forEach(check);
     const mapperObj = new mapper(...params);
     Object.freeze(mapperObj);
@@ -257,61 +257,61 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
       (key: K, it: NonEmptyIterator<V>) =>
         it.toArray().map((v) => [key, mapperObj.mapValue(v)]),
     );
-    return this.derive<K, V2>(eagerHdl);
+    return this.derive<K, W>(eagerHdl);
   }
 
-  mapValues<V2 extends TJSON>(
-    mapper: new () => ValueMapper<V, V2>,
-  ): EHandle<K, V2> {
+  mapValues<W extends TJSON>(
+    mapper: new () => ValueMapper<V, W>,
+  ): EHandle<K, W> {
     return this.mapValuesN(mapper);
   }
 
-  mapValues1<V2 extends TJSON, P1>(
-    mapper: new (p1: P1) => ValueMapper<V, V2>,
+  mapValues1<W extends TJSON, P1>(
+    mapper: new (p1: P1) => ValueMapper<V, W>,
     p1: P1,
-  ): EHandle<K, V2> {
+  ): EHandle<K, W> {
     return this.mapValuesN(mapper, p1);
   }
 
-  mapValues2<V2 extends TJSON, P1, P2>(
-    mapper: new (p1: P1, p2: P2) => ValueMapper<V, V2>,
+  mapValues2<W extends TJSON, P1, P2>(
+    mapper: new (p1: P1, p2: P2) => ValueMapper<V, W>,
     p1: P1,
     p2: P2,
-  ): EHandle<K, V2> {
+  ): EHandle<K, W> {
     return this.mapValuesN(mapper, p1, p2);
   }
 
-  mapValues3<V2 extends TJSON, P1, P2, P3>(
-    mapper: new (p1: P1, p2: P2, p3: P3) => ValueMapper<V, V2>,
+  mapValues3<W extends TJSON, P1, P2, P3>(
+    mapper: new (p1: P1, p2: P2, p3: P3) => ValueMapper<V, W>,
     p1: P1,
     p2: P2,
     p3: P3,
-  ): EHandle<K, V2> {
+  ): EHandle<K, W> {
     return this.mapValuesN(mapper, p1, p2, p3);
   }
 
-  mapValues4<V2 extends TJSON, P1, P2, P3, P4>(
-    mapper: new (p1: P1, p2: P2, p3: P3, p4: P4) => ValueMapper<V, V2>,
+  mapValues4<W extends TJSON, P1, P2, P3, P4>(
+    mapper: new (p1: P1, p2: P2, p3: P3, p4: P4) => ValueMapper<V, W>,
     p1: P1,
     p2: P2,
     p3: P3,
     p4: P4,
-  ): EHandle<K, V2> {
+  ): EHandle<K, W> {
     return this.mapValuesN(mapper, p1, p2, p3, p4);
   }
 
-  mapValues5<V2 extends TJSON, P1, P2, P3, P4, P5>(
-    mapper: new (p1: P1, p2: P2, p3: P3, p4: P4, p5: P5) => ValueMapper<V, V2>,
+  mapValues5<W extends TJSON, P1, P2, P3, P4, P5>(
+    mapper: new (p1: P1, p2: P2, p3: P3, p4: P4, p5: P5) => ValueMapper<V, W>,
     p1: P1,
     p2: P2,
     p3: P3,
     p4: P4,
     p5: P5,
-  ): EHandle<K, V2> {
+  ): EHandle<K, W> {
     return this.mapValuesN(mapper, p1, p2, p3, p4, p5);
   }
 
-  mapValues6<V2 extends TJSON, P1, P2, P3, P4, P5, P6>(
+  mapValues6<W extends TJSON, P1, P2, P3, P4, P5, P6>(
     mapper: new (
       p1: P1,
       p2: P2,
@@ -319,18 +319,18 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
       p4: P4,
       p5: P5,
       p6: P6,
-    ) => ValueMapper<V, V2>,
+    ) => ValueMapper<V, W>,
     p1: P1,
     p2: P2,
     p3: P3,
     p4: P4,
     p5: P5,
     p6: P6,
-  ): EHandle<K, V2> {
+  ): EHandle<K, W> {
     return this.mapValuesN(mapper, p1, p2, p3, p4, p5, p6);
   }
 
-  mapValues7<V2 extends TJSON, P1, P2, P3, P4, P5, P6, P7>(
+  mapValues7<W extends TJSON, P1, P2, P3, P4, P5, P6, P7>(
     mapper: new (
       p1: P1,
       p2: P2,
@@ -339,7 +339,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
       p5: P5,
       p6: P6,
       p7: P7,
-    ) => ValueMapper<V, V2>,
+    ) => ValueMapper<V, W>,
     p1: P1,
     p2: P2,
     p3: P3,
@@ -347,11 +347,11 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p5: P5,
     p6: P6,
     p7: P7,
-  ): EHandle<K, V2> {
+  ): EHandle<K, W> {
     return this.mapValuesN(mapper, p1, p2, p3, p4, p5, p6, p7);
   }
 
-  mapValues8<V2 extends TJSON, P1, P2, P3, P4, P5, P6, P7, P8>(
+  mapValues8<W extends TJSON, P1, P2, P3, P4, P5, P6, P7, P8>(
     mapper: new (
       p1: P1,
       p2: P2,
@@ -361,7 +361,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
       p6: P6,
       p7: P7,
       p8: P8,
-    ) => ValueMapper<V, V2>,
+    ) => ValueMapper<V, W>,
     p1: P1,
     p2: P2,
     p3: P3,
@@ -370,11 +370,11 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p6: P6,
     p7: P7,
     p8: P8,
-  ): EHandle<K, V2> {
+  ): EHandle<K, W> {
     return this.mapValuesN(mapper, p1, p2, p3, p4, p5, p6, p7, p8);
   }
 
-  mapValues9<V2 extends TJSON, P1, P2, P3, P4, P5, P6, P7, P8, P9>(
+  mapValues9<W extends TJSON, P1, P2, P3, P4, P5, P6, P7, P8, P9>(
     mapper: new (
       p1: P1,
       p2: P2,
@@ -385,7 +385,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
       p7: P7,
       p8: P8,
       p9: P9,
-    ) => ValueMapper<V, V2>,
+    ) => ValueMapper<V, W>,
     p1: P1,
     p2: P2,
     p3: P3,
@@ -395,7 +395,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p7: P7,
     p8: P8,
     p9: P9,
-  ): EHandle<K, V2> {
+  ): EHandle<K, W> {
     return this.mapValuesN(mapper, p1, p2, p3, p4, p5, p6, p7, p8, p9);
   }
 
