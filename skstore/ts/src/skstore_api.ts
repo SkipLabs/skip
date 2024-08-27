@@ -167,16 +167,24 @@ export type MParameters<
 /**
  * A specialized form of `Mapper` which re-uses the input collection's key structure
  * in the output collection and thus doesn't need to consider keys.
+ *
+ * For cases where the mapper just maps values and preserves the key structure, this
+ * saves some boilerplate: instead of writing the fully general `mapElement` that
+ * considers both keys and values and potentially modifies, adds, or removes keys,
+ * just implement the simpler `mapValue` to transform values.
  */
-export interface ValueMapper<V1 extends TJSON, V2 extends TJSON> {
-  mapValue: (value: V1) => V2;
-}
-
-export type VMParameters<
+export abstract class ValueMapper<
+  K extends TJSON,
   V1 extends TJSON,
   V2 extends TJSON,
-  C extends new (...params: Param[]) => ValueMapper<V1, V2>,
-> = C extends new (...params: infer P) => ValueMapper<V1, V2> ? P : never;
+> implements Mapper<K, V1, K, V2>
+{
+  abstract mapValue(value: V1): V2;
+
+  mapElement(key: K, it: NonEmptyIterator<V1>): Iterable<[K, V2]> {
+    return it.toArray().map((v) => [key, this.mapValue(v)]);
+  }
+}
 
 /**
  * The type of a reactive function mapping a collection into an output table
@@ -435,139 +443,6 @@ export interface EHandle<K extends TJSON, V extends TJSON> {
     p8: P8,
     p9: P9,
   ): EHandle<K2, V2>;
-
-  /**
-   * Create a new eager reactive collection by mapping over the _values_ of this one,
-   * keeping the same keys.
-   * @param {ValueMapper} mapper - function to apply to each _value_ of this collection
-   * @returns {EHandle} An eager handle on the resulting output collection
-   */
-  mapValuesN<
-    W extends TJSON,
-    C extends new (...params: Param[]) => ValueMapper<V, W>,
-  >(
-    mapper: C,
-    ...params: VMParameters<V, W, C>
-  ): EHandle<K, W>;
-
-  mapValues<W extends TJSON>(
-    mapper: new () => ValueMapper<V, W>,
-  ): EHandle<K, W>;
-
-  mapValues1<W extends TJSON, P1>(
-    mapper: new (p1: P1) => ValueMapper<V, W>,
-    p1: P1,
-  ): EHandle<K, W>;
-
-  mapValues2<W extends TJSON, P1, P2>(
-    mapper: new (p1: P1, p2: P2) => ValueMapper<V, W>,
-    p1: P1,
-    p2: P2,
-  ): EHandle<K, W>;
-
-  mapValues3<W extends TJSON, P1, P2, P3>(
-    mapper: new (p1: P1, p2: P2, p3: P3) => ValueMapper<V, W>,
-    p1: P1,
-    p2: P2,
-    p3: P3,
-  ): EHandle<K, W>;
-
-  mapValues4<W extends TJSON, P1, P2, P3, P4>(
-    mapper: new (p1: P1, p2: P2, p3: P3, p4: P4) => ValueMapper<V, W>,
-    p1: P1,
-    p2: P2,
-    p3: P3,
-    p4: P4,
-  ): EHandle<K, W>;
-
-  mapValues5<W extends TJSON, P1, P2, P3, P4, P5>(
-    mapper: new (p1: P1, p2: P2, p3: P3, p4: P4, p5: P5) => ValueMapper<V, W>,
-    p1: P1,
-    p2: P2,
-    p3: P3,
-    p4: P4,
-    p5: P5,
-  ): EHandle<K, W>;
-
-  mapValues6<W extends TJSON, P1, P2, P3, P4, P5, P6>(
-    mapper: new (
-      p1: P1,
-      p2: P2,
-      p3: P3,
-      p4: P4,
-      p5: P5,
-      p6: P6,
-    ) => ValueMapper<V, W>,
-    p1: P1,
-    p2: P2,
-    p3: P3,
-    p4: P4,
-    p5: P5,
-    p6: P6,
-  ): EHandle<K, W>;
-
-  mapValues7<W extends TJSON, P1, P2, P3, P4, P5, P6, P7>(
-    mapper: new (
-      p1: P1,
-      p2: P2,
-      p3: P3,
-      p4: P4,
-      p5: P5,
-      p6: P6,
-      p7: P7,
-    ) => ValueMapper<V, W>,
-    p1: P1,
-    p2: P2,
-    p3: P3,
-    p4: P4,
-    p5: P5,
-    p6: P6,
-    p7: P7,
-  ): EHandle<K, W>;
-
-  mapValues8<W extends TJSON, P1, P2, P3, P4, P5, P6, P7, P8>(
-    mapper: new (
-      p1: P1,
-      p2: P2,
-      p3: P3,
-      p4: P4,
-      p5: P5,
-      p6: P6,
-      p7: P7,
-      p8: P8,
-    ) => ValueMapper<V, W>,
-    p1: P1,
-    p2: P2,
-    p3: P3,
-    p4: P4,
-    p5: P5,
-    p6: P6,
-    p7: P7,
-    p8: P8,
-  ): EHandle<K, W>;
-
-  mapValues9<W extends TJSON, P1, P2, P3, P4, P5, P6, P7, P8, P9>(
-    mapper: new (
-      p1: P1,
-      p2: P2,
-      p3: P3,
-      p4: P4,
-      p5: P5,
-      p6: P6,
-      p7: P7,
-      p8: P8,
-      p9: P9,
-    ) => ValueMapper<V, W>,
-    p1: P1,
-    p2: P2,
-    p3: P3,
-    p4: P4,
-    p5: P5,
-    p6: P6,
-    p7: P7,
-    p8: P8,
-    p9: P9,
-  ): EHandle<K, W>;
 
   /**
    * Create a new eager reactive collection by mapping some computation `mapper` over this
