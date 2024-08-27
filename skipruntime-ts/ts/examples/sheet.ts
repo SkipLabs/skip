@@ -22,8 +22,28 @@ export function tablesSchema() {
   );
   console.log("##");
   return [
-    schema("cells", [text("sheet"), text("cell"), text("value")]),
-    schema("computed", [text("sheet"), text("cell"), text("value")]),
+    schema(
+      "cells",
+      [text("sheet"), text("cell"), text("value")],
+      [
+        {
+          name: "cells_sheet_cell",
+          unique: true,
+          columns: ["sheet", "cell"],
+        },
+      ],
+    ),
+    schema(
+      "computed",
+      [text("sheet"), text("cell"), text("value")],
+      [
+        {
+          name: "computed_sheet_cell",
+          unique: true,
+          columns: ["sheet", "cell"],
+        },
+      ],
+    ),
   ];
 }
 
@@ -140,8 +160,6 @@ export function scenarios() {
   return [
     [
       "watch-changes computed",
-      // TODO see why no init emited
-      // Try with new skstore watch instead
       'insert cells [["first", "A1", "23"],["first", "A2", "2"]]',
       'insert cells [["first", "A3", "=A1 + A2"]]',
       'update cells {"where": {"sheet":"first", "cell":"A1"}, "update":{"value":"5"}}',

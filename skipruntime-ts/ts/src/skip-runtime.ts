@@ -5,7 +5,7 @@ import type {
   SKStore,
   SKStoreFactory,
   ColumnSchema,
-  MirrorSchema,
+  Schema,
   TableCollection,
   Table,
   TTableCollection,
@@ -21,7 +21,7 @@ export type {
   TJSON,
   TableCollection,
   Table,
-  MirrorSchema,
+  Schema,
   JSONObject,
   TTableCollection,
   TTable,
@@ -71,7 +71,7 @@ async function wasmUrl(): Promise<URL> {
 
 export async function createSKStore(
   init: (skstore: SKStore, ...tables: TableCollection<TJSON[]>[]) => void,
-  tables: MirrorSchema[],
+  tables: Schema[],
   database: Database | null,
 ): Promise<Table<TJSON[]>[]> {
   const data = await runUrl(wasmUrl, modules, [], "SKDB_factory");

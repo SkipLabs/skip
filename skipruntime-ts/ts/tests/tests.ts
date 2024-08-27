@@ -3,7 +3,7 @@ import type {
   SKStore,
   TJSON,
   TableCollection,
-  MirrorSchema,
+  Schema,
   Table,
   InputMapper,
   Mapper,
@@ -32,7 +32,7 @@ function check(name: String, got: TJSON, expected: TJSON): void {
 
 export type Test = {
   name: string;
-  schema: MirrorSchema[];
+  schema: Schema[];
   init: (skstore: SKStore, ...tables: any[]) => void;
   run: (...tables: any[]) => Promise<void>;
   error?: (err: any) => void;
@@ -102,7 +102,7 @@ class TestAdd implements Mapper<number, number, number, number> {
         result.push([key, v + (other_v ?? 0)]);
       }
     }
-    return result;
+    return result as Iterable<[number, number]>;
   }
 }
 
@@ -377,8 +377,8 @@ class TestToOutput2
   mapElement(
     key: [number, number],
     it: NonEmptyIterator<number>,
-  ): [number, number, number] {
-    return [key[0], key[1], it.first()];
+  ): Iterable<[number, number, number]> {
+    return Array([key[0], key[1], it.first()]);
   }
 }
 

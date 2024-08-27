@@ -8,7 +8,7 @@ import type {
   AValue,
   LazyCollection,
   TJSON,
-  MirrorSchema,
+  Schema,
 } from "../skipruntime_api.js";
 
 import type {
@@ -323,7 +323,7 @@ export class ContextImpl implements Context {
 
   mapToSkdb<R extends TJSON[], K extends TJSON, V extends TJSON>(
     eagerHdl: string,
-    schema: MirrorSchema,
+    schema: Schema,
     convert: (key: K, it: NonEmptyIterator<V>) => Iterable<R>,
   ) {
     const convertId = this.handles.register(convert);
