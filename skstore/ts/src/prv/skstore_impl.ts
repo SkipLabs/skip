@@ -37,6 +37,18 @@ import type { MirrorDefn, Params, SKDBSync } from "#skdb/skdb_types.js";
 
 type Query = { query: string; params?: JSONObject };
 
+function assertNoKeysNaN<K extends TJSON, V extends TJSON>(
+  kv_pairs: Iterable<[K, V]>,
+): Iterable<[K, V]> {
+  for (let [k, _v] of kv_pairs) {
+    if (Number.isNaN(k)) {
+      // NaN is forbidden since it breaks comparison reflexivity, ordering, etc.
+      throw new Error("NaN is forbidden as a Skip collection key");
+    }
+  }
+  return kv_pairs;
+}
+
 class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
   //
   protected context: Context;
@@ -91,7 +103,8 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     const eagerHdl = this.context.map(
       this.eagerHdl,
       mapperObj.constructor.name,
-      (key: K, it: NonEmptyIterator<V>) => mapperObj.mapElement(key, it),
+      (key: K, it: NonEmptyIterator<V>) =>
+        assertNoKeysNaN(mapperObj.mapElement(key, it)),
     );
     return this.derive<K2, V2>(eagerHdl);
   }
@@ -418,7 +431,8 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     const eagerHdl = this.context.mapReduce(
       this.eagerHdl,
       mapperObj.constructor.name,
-      (key: K, it: NonEmptyIterator<V>) => mapperObj.mapElement(key, it),
+      (key: K, it: NonEmptyIterator<V>) =>
+        assertNoKeysNaN(mapperObj.mapElement(key, it)),
       accumulator,
     );
     return this.derive<K2, V3>(eagerHdl);
@@ -925,7 +939,8 @@ export class TableHandleImpl<R extends TJSON[]> implements TableHandle<R> {
     const eagerHdl = this.context.mapFromSkdb(
       name,
       skname,
-      (entry: R, occ: number) => mapperObj.mapElement(entry, occ),
+      (entry: R, occ: number) =>
+        assertNoKeysNaN(mapperObj.mapElement(entry, occ)),
     );
     return new EHandleImpl<K, V>(this.context, eagerHdl);
   }
