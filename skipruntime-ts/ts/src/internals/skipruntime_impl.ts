@@ -472,6 +472,10 @@ export class SKStoreImpl implements SKStore {
     return new LazyCollectionImpl<K, Loadable<V, M>>(this.context, lazyHdl);
   }
 
+  getToken(key: string) {
+    return this.context.getToken(key);
+  }
+
   log(object: any): void {
     if (
       typeof object == "object" &&
@@ -489,7 +493,7 @@ export class SKStoreImpl implements SKStore {
 
 export class SKStoreFactoryImpl implements SKStoreFactory {
   private context: () => Context;
-  private create: (init: () => void) => void;
+  private create: (init: () => void, tokens: Record<string, number>) => void;
   private createSync: (
     dbName?: string,
     asWorker?: boolean,
@@ -498,7 +502,7 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
 
   constructor(
     context: () => Context,
-    create: (init: () => void) => void,
+    create: (init: () => void, tokens: Record<string, number>) => void,
     createSync: (dbName?: string, asWorker?: boolean) => Promise<SKDBSync>,
     createKey: (key: string) => Promise<CryptoKey>,
   ) {
@@ -517,6 +521,7 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
     ) => void,
     locale: Locale,
     remotes: Record<string, Remote> = {},
+    tokens: Record<string, number> = {},
   ): Promise<Record<string, Table<TJSON[]>>> => {
     let context = this.context();
     const tables = await mirror(
@@ -527,7 +532,7 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
       this.createKey,
     );
     const skstore = new SKStoreImpl(context);
-    this.create(() => init(skstore, tables));
+    this.create(() => init(skstore, tables), tokens);
     const result: Record<string, Table<TJSON[]>> = {};
     for (const [key, value] of Object.entries(tables)) {
       result[key] = (value as TableCollectionImpl<TJSON[]>).toTable();

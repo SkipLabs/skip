@@ -79,6 +79,7 @@ export interface Context {
   getArraySelf: <K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) => V[];
   getOneSelf: <K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) => V;
   maybeGetOneSelf: <K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) => Opt<V>;
+  getToken: (key: string) => number;
 
   size: (collection: string) => number;
 
@@ -167,6 +168,11 @@ export interface FromWasm {
     getterHdl: ptr<Internal.String>,
     key: ptr<Internal.CJSON>,
   ): ptr<Internal.CJSON>;
+  SkipRuntime_token(
+    ctx: ptr<Internal.Context>,
+    key: ptr<Internal.String>,
+  ): number;
+  SkipRuntime_updateTokens(tokens: ptr<Internal.CJArray>, time: number): number;
 
   SkipRuntime_getArrayLazy(
     ctx: ptr<Internal.Context>,
@@ -239,7 +245,11 @@ export interface FromWasm {
   ): void;
 
   // Store
-  SkipRuntime_createFor(session: ptr<Internal.String>): float;
+  SkipRuntime_createFor(
+    session: ptr<Internal.String>,
+    tokens: ptr<Internal.CJArray>,
+    time: float,
+  ): float;
 
   // SKStore
   SkipRuntime_asyncLazy(

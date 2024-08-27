@@ -94,7 +94,10 @@ function toWriters(
 }
 
 class SimpleToGenericSkipService implements GenericSkipService {
-  constructor(private simple: SimpleSkipService) {}
+  tokens?: Record<string, number>;
+  constructor(private simple: SimpleSkipService) {
+    if (simple.tokens) this.tokens = simple.tokens;
+  }
   localeInputs() {
     var inputs: Record<string, InputDefinition> = {};
     if (this.simple.inputTables) {
@@ -165,9 +168,11 @@ class SimpleToGenericSkipService implements GenericSkipService {
 }
 
 function isGenericSkipService(service: GenericSkipService | SimpleSkipService) {
-  if (!("inputs" in service)) return false;
+  if (!("localeInputs" in service)) return false;
+  if (!("remoteInputs" in service)) return false;
   if (!("outputs" in service)) return false;
-  if (typeof service.inputs != "function") return false;
+  if (typeof service.localeInputs != "function") return false;
+  if (typeof service.remoteInputs != "function") return false;
   if (typeof service.outputs != "function") return false;
   return true;
 }
@@ -275,6 +280,7 @@ export async function runService(
         }
       : { tables: schemas },
     remotes,
+    gService.tokens,
   );
   return [update!, iTables, oTables];
 }

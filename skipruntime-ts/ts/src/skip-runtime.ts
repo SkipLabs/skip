@@ -23,7 +23,7 @@ import type {
   Database,
 } from "./skipruntime_api.js";
 import { runWithServer_ } from "./internals/skipruntime_process.js";
-
+export { TimeQueue } from "./internals/skipruntime_module.js";
 export type {
   SKStore,
   TJSON,
@@ -88,16 +88,18 @@ export async function createSKStore(
   ) => void,
   locale: Locale,
   remotes: Record<string, Remote> = {},
+  tokens: Record<string, number> = {},
 ): Promise<Record<string, Table<TJSON[]>>> {
   let data = await runUrl(wasmUrl, modules, [], "SKDB_factory");
   const factory = data.environment.shared.get("SKStore") as SKStoreFactory;
-  return factory.runSKStore(init, locale, remotes);
+  return factory.runSKStore(init, locale, remotes, tokens);
 }
 
 export async function createInlineSKStore(
   init: (skstore: SKStore, ...tables: TableCollection<TJSON[]>[]) => void,
   locale: Locale,
   remotes: Record<string, Remote> = {},
+  tokens: Record<string, number> = {},
 ): Promise<Table<TJSON[]>[]> {
   let tables: Table<TJSON[]>[] = [];
   const result = await createSKStore(
@@ -117,6 +119,7 @@ export async function createInlineSKStore(
     },
     locale,
     remotes,
+    tokens,
   );
   for (const schema of locale.tables) {
     const name = schema.alias ? schema.alias : schema.name;
@@ -134,11 +137,14 @@ export async function createInlineSKStore(
 export async function createLocaleSKStore(
   init: (skstore: SKStore, ...tables: TableCollection<TJSON[]>[]) => void,
   schemas: Schema[],
+  tokens: Record<string, number> = {},
   database?: Database,
 ): Promise<Table<TJSON[]>[]> {
   return createInlineSKStore(
     init,
     database ? { tables: schemas, database } : { tables: schemas },
+    {},
+    tokens,
   );
 }
 

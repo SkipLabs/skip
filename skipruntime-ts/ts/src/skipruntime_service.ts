@@ -51,6 +51,8 @@ export type OutputDefinition = {
 };
 
 export interface GenericSkipService {
+  // name / duration in milliseconds
+  tokens?: Record<string, number>;
   localeInputs(): Record<string, InputDefinition>;
   remoteInputs(): Record<string, RemoteInputs>;
 
@@ -70,6 +72,8 @@ export type SimpleRemoteInputs = {
 export interface SimpleSkipService {
   inputTables?: string[];
   remoteTables?: Record<string, SimpleRemoteInputs>;
+  // name / duration in milliseconds
+  tokens?: Record<string, number>;
 
   reactiveCompute(
     store: SKStore,

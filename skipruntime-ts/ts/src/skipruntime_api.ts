@@ -515,6 +515,7 @@ export interface SKStoreFactory extends Shared {
     ) => void,
     locale: Locale,
     remotes?: Record<string, Remote>,
+    tokens?: Record<string, number>,
   ): Promise<Record<string, Table<TJSON[]>>>;
 }
 
@@ -593,5 +594,12 @@ export interface SKStore {
     ...params: Params
   ): AsyncLazyCollection<K, V, M>;
 
+  getToken: (key: string) => number;
+
   log(object: TJSON): void;
 }
+
+export type Token = {
+  duration: number;
+  value: string;
+};
