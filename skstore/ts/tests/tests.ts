@@ -173,6 +173,11 @@ class SquareValues extends ValueMapper<number, number, number> {
     return v * v;
   }
 }
+class AddKeyAndValue extends ValueMapper<number, number, number> {
+  mapValue(v: number, k: number) {
+    return k + v;
+  }
+}
 
 function testValueMapperInit(
   _skstore: SKStore,
@@ -182,7 +187,7 @@ function testValueMapperInit(
   input
     .map(TestFromIntInt)
     .map(SquareValues)
-    .map(SquareValues)
+    .map(AddKeyAndValue)
     .mapTo(output, TestToOutput);
 }
 
@@ -197,10 +202,10 @@ async function testValueMapperRun(
     [10, 10],
   ]);
   check("testValueMapper", output.select({}, ["value"]), [
-    { value: 1 },
-    { value: 16 },
-    { value: 625 },
-    { value: 10000 },
+    { value: 2 },
+    { value: 6 },
+    { value: 30 },
+    { value: 110 },
   ]);
 }
 

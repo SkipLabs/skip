@@ -166,12 +166,12 @@ export type MParameters<
 
 /**
  * A specialized form of `Mapper` which re-uses the input collection's key structure
- * in the output collection and thus doesn't need to consider keys.
+ * in the output collection.
  *
  * For cases where the mapper just maps values and preserves the key structure, this
  * saves some boilerplate: instead of writing the fully general `mapElement` that
- * considers both keys and values and potentially modifies, adds, or removes keys,
- * just implement the simpler `mapValue` to transform values.
+ * potentially modifies, adds, or removes keys, just implement the simpler `mapValue`
+ * to transform values.
  */
 export abstract class ValueMapper<
   K extends TJSON,
@@ -179,10 +179,10 @@ export abstract class ValueMapper<
   V2 extends TJSON,
 > implements Mapper<K, V1, K, V2>
 {
-  abstract mapValue(value: V1): V2;
+  abstract mapValue(value: V1, key: K): V2;
 
   mapElement(key: K, it: NonEmptyIterator<V1>): Iterable<[K, V2]> {
-    return it.toArray().map((v) => [key, this.mapValue(v)]);
+    return it.toArray().map((v) => [key, this.mapValue(v, key)]);
   }
 }
 
