@@ -41,6 +41,7 @@ export type {
   ALHandle,
 } from "./skstore_api.js";
 
+export { ValueMapper } from "./skstore_api.js";
 export {
   Sum,
   Min,

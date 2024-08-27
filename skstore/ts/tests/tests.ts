@@ -19,6 +19,7 @@ import type {
 } from "skstore";
 import {
   Sum,
+  ValueMapper,
   createSKStore,
   cinteger as integer,
   schema,
@@ -93,7 +94,7 @@ class TestAdd implements Mapper<number, number, number, number> {
     key: number,
     it: NonEmptyIterator<number>,
   ): Iterable<[number, number]> {
-    let result = [];
+    let result: Array<[number, number]> = [];
     const values = it.toArray();
     const other_values = this.other.getArray(key);
     for (let v of values) {
@@ -141,15 +142,9 @@ function testMap3Init(
   input_index: TableHandle<[number, string]>,
   output: TableHandle<[number, number]>,
 ) {
-  const eager1 = input_no_index.map<number, number, typeof TestParseInt>(
-    TestParseInt,
-  );
-  const eager2 = input_index.map<number, number, typeof TestParseInt>(
-    TestParseInt,
-  );
-  const eager3 = eager1
-    .map1<number, number, typeof TestAdd>(TestAdd, eager2)
-    .map<number, number, typeof TestSum>(TestSum);
+  const eager1 = input_no_index.map(TestParseInt);
+  const eager2 = input_index.map(TestParseInt);
+  const eager3 = eager1.map1(TestAdd, eager2).map(TestSum);
   eager3.mapTo(output, TestToOutput);
 }
 
@@ -173,32 +168,35 @@ async function testMap3Run(
   ]);
 }
 
-class SquareValues implements ValueMapper<number, number> {
-  mapValue(v) {
+class SquareValues extends ValueMapper<number, number, number> {
+  mapValue(v: number) {
     return v * v;
   }
 }
 
-function testMapValuesInit(
+function testValueMapperInit(
   _skstore: SKStore,
   input: TableHandle<[number, number]>,
   output: TableHandle<[number, number]>,
 ) {
   input
     .map(TestFromIntInt)
-    .mapValues(SquareValues)
-    .mapValues(SquareValues)
+    .map(SquareValues)
+    .map(SquareValues)
     .mapTo(output, TestToOutput);
 }
 
-async function testMapValuesRun(input: Table<TJSON[]>, output: Table<TJSON[]>) {
+async function testValueMapperRun(
+  input: Table<TJSON[]>,
+  output: Table<TJSON[]>,
+) {
   input.insert([
     [1, 1],
     [2, 2],
     [5, 5],
     [10, 10],
   ]);
-  check("testMapValues", output.select({}, ["value"]), [
+  check("testValueMapper", output.select({}, ["value"]), [
     { value: 1 },
     { value: 16 },
     { value: 625 },
@@ -595,13 +593,13 @@ export const tests: Test[] = [
     run: testMap3Run,
   },
   {
-    name: "testMapValues",
+    name: "testValueMapper",
     schema: [
       schema("input", [integer("id", true, true), integer("value")]),
       schema("output", [integer("id", true, true), integer("value")]),
     ],
-    init: testMapValuesInit,
-    run: testMapValuesRun,
+    init: testValueMapperInit,
+    run: testValueMapperRun,
   },
   {
     name: "testSize",
