@@ -408,10 +408,11 @@ fun toSkdb(
   handleId: String,
   table: String,
   convPtr: UInt32,
+  connected: Int32,
 ): void {
   eager = EHandle(JSONID::keyType, JSONFile::type, DirName::create(handleId));
   mapHandle = FnHandle::make(convPtr);
-  DBUtils.toTable(eager, table, context, mapHandle.toRow)
+  DBUtils.toTable(eager, table, context, mapHandle.toRow, connected != 0)
 }
 
 @export("SkipRuntime_getFromTable")

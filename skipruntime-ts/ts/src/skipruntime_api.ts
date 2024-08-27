@@ -345,6 +345,7 @@ export interface EagerCollection<K extends TJSON, V extends TJSON> {
  */
 export interface TableCollection<R extends TJSON[]> {
   getName(): string;
+  getSchema(): MirrorSchema;
   /**
    * Lookup in the table using specified index
    * @param key - the key to lookup in the table
@@ -452,11 +453,18 @@ export type Mapping<
   params?: Param[];
 };
 
+export type Database = {
+  name: string;
+  access: string;
+  private: string;
+  endpoint?: string;
+};
+
 export interface SKStoreFactory extends Shared {
   runSKStore(
     init: (skstore: SKStore, ...tables: TableCollection<TJSON[]>[]) => void,
     tables: MirrorSchema[],
-    connect?: boolean,
+    database: Database | null,
   ): Promise<Table<TJSON[]>[]>;
 }
 

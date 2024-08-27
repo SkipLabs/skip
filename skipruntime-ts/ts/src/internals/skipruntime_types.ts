@@ -8,6 +8,7 @@ import type {
   TJSON,
   NonEmptyIterator,
   EagerCollection,
+  MirrorSchema,
 } from "../skipruntime_api.js";
 
 export type CtxMapping<
@@ -81,16 +82,16 @@ export interface Context {
 
   size: (collection: string) => number;
 
-  mapFromSkdb: <R extends TJSON, K extends TJSON, V extends TJSON>(
+  mapFromSkdb: <R extends TJSON[], K extends TJSON, V extends TJSON>(
     table: string,
     mapperName: string,
     mapper: (entry: R, occ: number) => Iterable<[K, V]>,
   ) => string;
 
-  mapToSkdb: <R extends TJSON, K extends TJSON, V extends TJSON>(
-    collectionName: string,
-    table: string,
-    mapper: (key: K, it: NonEmptyIterator<V>) => R,
+  mapToSkdb: <R extends TJSON[], K extends TJSON, V extends TJSON>(
+    eagerHdl: string,
+    table: MirrorSchema,
+    mapper: (key: K, it: NonEmptyIterator<V>) => Iterable<R>,
   ) => void;
 
   multimap: <
@@ -116,7 +117,7 @@ export interface Context {
   ) => string;
 
   noref: () => Context;
-  notify?: () => void;
+  toggleConnected: () => void;
 }
 
 export interface Handles {
@@ -209,6 +210,7 @@ export interface FromWasm {
     eagerCollectionId: ptr<Internal.String>,
     table: ptr<Internal.String>,
     fnPtr: int,
+    connected: boolean,
   ): void;
 
   // NonEmptyIterator
