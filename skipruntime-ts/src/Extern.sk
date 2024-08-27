@@ -458,6 +458,30 @@ fun maybeGet(
   }
 }
 
+@export("SkipRuntime_token")
+fun token(context: mutable Context, key: String): Float {
+  eager = EHandle(SID::keyType, IntFile::type, kTokenDir);
+  eager.get(context, SID(key)).value.toFloat()
+}
+
+@export("SkipRuntime_updateTokens")
+fun updateTokens(tokens: SKJSON.CJArray, time: Float): Float {
+  SKStore.runWithResult(context ~> {
+    dir = context.unsafeGetEagerDir(kTokenDir);
+    tokens match {
+    | SKJSON.CJArray(values) ->
+      values.each(t -> {
+        token = SKJSON.asString(t);
+        dir.writeArray(context, SID(token), Array[IntFile(time.toInt())]);
+      })
+    };
+    context.update();
+  }) match {
+  | Success _ -> 1.0
+  | Failure(err) -> -getErrorHdl(err)
+  };
+}
+
 @export("SkipRuntime_getArrayLazy")
 fun getArrayLazy(
   context: mutable Context,
@@ -609,8 +633,8 @@ fun initCtx(): Context {
 }
 
 @export("SkipRuntime_createFor")
-fun tsCreateFor(session: String): Float {
-  createFor(session)
+fun tsCreateFor(session: String, tokens: SKJSON.CJArray, time: Float): Float {
+  createFor(session, tokens, time)
 }
 
 fun previous(value: SKJSON.CJObject): ?SKJSON.CJSON {

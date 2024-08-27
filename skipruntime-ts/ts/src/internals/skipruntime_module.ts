@@ -9,6 +9,7 @@ import type {
   LazyCollection,
   TJSON,
   Schema,
+  Token,
 } from "../skipruntime_api.js";
 
 import type {
@@ -150,7 +151,7 @@ export class ContextImpl implements Context {
     return this.skjson.importString(resHdlPtr);
   }
 
-  getFromTable = <K, R>(table: string, key: K, index?: string) => {
+  getFromTable<K, R>(table: string, key: K, index?: string) {
     return this.skjson.importJSON(
       this.exports.SkipRuntime_getFromTable(
         this.pointer(),
@@ -159,9 +160,9 @@ export class ContextImpl implements Context {
         this.skjson.exportJSON(index ?? null),
       ),
     ) as R[];
-  };
+  }
 
-  getArray = <K, V>(eagerHdl: string, key: K) => {
+  getArray<K, V>(eagerHdl: string, key: K) {
     return this.skjson.importJSON(
       this.exports.SkipRuntime_getArray(
         this.pointer(),
@@ -169,9 +170,9 @@ export class ContextImpl implements Context {
         this.skjson.exportJSON(key),
       ),
     ) as V[];
-  };
+  }
 
-  getOne = <K, V>(eagerHdl: string, key: K) => {
+  getOne<K, V>(eagerHdl: string, key: K) {
     return this.skjson.importJSON(
       this.exports.SkipRuntime_get(
         this.pointer(),
@@ -179,18 +180,18 @@ export class ContextImpl implements Context {
         this.skjson.exportJSON(key),
       ),
     ) as V;
-  };
+  }
 
-  maybeGetOne = <K, V>(eagerHdl: string, key: K) => {
+  maybeGetOne<K, V>(eagerHdl: string, key: K) {
     const res = this.exports.SkipRuntime_maybeGet(
       this.pointer(),
       this.skjson.exportString(eagerHdl),
       this.skjson.exportJSON(key),
     );
     return this.skjson.importJSON(res) as Opt<V>;
-  };
+  }
 
-  getArrayLazy = <K, V>(lazyHdl: string, key: K) => {
+  getArrayLazy<K, V>(lazyHdl: string, key: K) {
     return this.skjson.importJSON(
       this.exports.SkipRuntime_getArrayLazy(
         this.pointer(),
@@ -198,9 +199,9 @@ export class ContextImpl implements Context {
         this.skjson.exportJSON(key),
       ),
     ) as V[];
-  };
+  }
 
-  getOneLazy = <K, V>(lazyHdl: string, key: K) => {
+  getOneLazy<K, V>(lazyHdl: string, key: K) {
     return this.skjson.importJSON(
       this.exports.SkipRuntime_getLazy(
         this.pointer(),
@@ -208,9 +209,9 @@ export class ContextImpl implements Context {
         this.skjson.exportJSON(key),
       ),
     ) as V;
-  };
+  }
 
-  maybeGetOneLazy = <K, V>(lazyHdl: string, key: K) => {
+  maybeGetOneLazy<K, V>(lazyHdl: string, key: K) {
     return this.skjson.importJSON(
       this.exports.SkipRuntime_maybeGetLazy(
         this.pointer(),
@@ -218,9 +219,9 @@ export class ContextImpl implements Context {
         this.skjson.exportJSON(key),
       ),
     ) as Opt<V>;
-  };
+  }
 
-  getArraySelf = <K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) => {
+  getArraySelf<K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) {
     return this.skjson.importJSON(
       this.exports.SkipRuntime_getArraySelf(
         this.pointer(),
@@ -228,8 +229,8 @@ export class ContextImpl implements Context {
         this.skjson.exportJSON(key),
       ),
     ) as V[];
-  };
-  getOneSelf = <K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) => {
+  }
+  getOneSelf<K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) {
     return this.skjson.importJSON(
       this.exports.SkipRuntime_getSelf(
         this.pointer(),
@@ -237,8 +238,8 @@ export class ContextImpl implements Context {
         this.skjson.exportJSON(key),
       ),
     ) as V;
-  };
-  maybeGetOneSelf = <K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) => {
+  }
+  maybeGetOneSelf<K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) {
     return this.skjson.importJSON(
       this.exports.SkipRuntime_maybeGetSelf(
         this.pointer(),
@@ -246,7 +247,14 @@ export class ContextImpl implements Context {
         this.skjson.exportJSON(key),
       ),
     ) as Opt<V>;
-  };
+  }
+
+  getToken(key: string) {
+    return this.exports.SkipRuntime_token(
+      this.pointer(),
+      this.skjson.exportString(key),
+    );
+  }
 
   size = (eagerHdl: string) => {
     return this.exports.SkipRuntime_size(
@@ -526,6 +534,7 @@ class LinksImpl implements Links {
   env: Environment;
   handles: Handles;
   skjson?: SKJSON;
+  timedQueue?: TimeQueue;
 
   detachHandle!: (fn: int) => void;
   applyMapFun!: (
@@ -804,18 +813,42 @@ class LinksImpl implements Links {
     this.getErrorHdl = (exn: ptr<Internal.Exception>) => {
       return this.handles.register(utils.getErrorObject(exn));
     };
-    const create = (init: () => void) => {
+    const update = (time: number, tokens: string[]) => {
+      const jsu = skjson();
+      const result = utils.runWithGc(() =>
+        Math.trunc(
+          fromWasm.SkipRuntime_updateTokens(jsu.exportJSON(tokens), time),
+        ),
+      );
+      if (result < 0) {
+        throw this.handles.delete(-result);
+      }
+    };
+    const create = (init: () => void, tokens: Record<string, number>) => {
       // Register the init function to have  a named init function
       this.initFn = init;
       // Get a run uuid to build to allow function mapping reload in case of persistence
       const uuid = this.env.crypto().randomUUID();
       const jsu = skjson();
+      const time = new Date().getTime();
+      const tkeys = Object.keys(tokens);
       const result = utils.runWithGc(() =>
-        Math.trunc(fromWasm.SkipRuntime_createFor(jsu.exportString(uuid))),
+        Math.trunc(
+          fromWasm.SkipRuntime_createFor(
+            jsu.exportString(uuid),
+            jsu.exportJSON(tkeys),
+            time,
+          ),
+        ),
       );
       if (result < 0) {
         throw this.handles.delete(-result);
       }
+      const qTokens = Object.entries(tokens).map((entry) => {
+        return { duration: entry[1], value: entry[0] };
+      });
+      this.timedQueue = new TimeQueue(update);
+      this.timedQueue.start(qTokens, time);
     };
     this.env.shared.set(
       "SKStore",
@@ -911,6 +944,113 @@ class Manager implements ToWasmManager {
       links.getErrorHdl(exn);
     return links;
   };
+}
+
+type Tokens = {
+  endtime: number;
+  tokens: Token[];
+};
+
+export class TimeQueue {
+  constructor(
+    private update: (time: number, tokens: string[]) => void,
+    private queue: Tokens[] = [],
+    private timeout: any = null,
+  ) {}
+
+  start(tokens: Token[], time: number) {
+    var tostart: Map<number, Token[]> = new Map();
+    for (const token of tokens) {
+      if (token.duration <= 0) continue;
+      const endtime = time + token.duration;
+      const current = tostart.get(endtime);
+      if (current) {
+        current.push(token);
+      } else {
+        tostart.set(endtime, [token]);
+      }
+    }
+    this.queue = [];
+    const keys = Array.from(tostart.keys()).sort();
+    for (const key of keys) {
+      this.queue.push({ endtime: key, tokens: tostart.get(key)! });
+    }
+    if (this.queue.length > 0) {
+      const next = Math.max(this.queue[0].endtime - time, 0);
+      this.timeout = setTimeout(() => {
+        this.check();
+      }, next);
+      if (typeof this.timeout == "object" && "unref" in this.timeout) {
+        this.timeout.unref();
+      }
+    }
+  }
+
+  stop() {
+    if (this.timeout) {
+      clearTimeout(this.timeout);
+    }
+  }
+
+  check() {
+    const time = new Date().getTime();
+    var torenew: Map<number, Token[]> = new Map();
+    var i = 0;
+    for (i; i < this.queue.length; i++) {
+      const cendtime = this.queue[i].endtime;
+      if (time < this.queue[i].endtime) {
+        break;
+      }
+      this.update(
+        time,
+        this.queue[i].tokens.map((t) => t.value),
+      );
+      for (const token of this.queue[i].tokens) {
+        if (token.duration <= 0) continue;
+        var endtime = cendtime + token.duration;
+        while (endtime <= time) endtime += token.duration;
+        const current = torenew.get(endtime);
+        if (current) {
+          current.push(token);
+        } else {
+          torenew.set(endtime, [token]);
+        }
+      }
+    }
+    this.queue = this.queue.slice(i);
+    const keys = Array.from(torenew.keys()).sort().reverse();
+    for (const key of keys) {
+      this.insert(key, torenew.get(key)!);
+    }
+    if (this.queue.length > 0) {
+      const next = Math.max(this.queue[0].endtime - time, 0);
+      this.timeout = setTimeout(() => {
+        this.check();
+      }, next);
+      if (typeof this.timeout == "object" && "unref" in this.timeout) {
+        this.timeout.unref();
+      }
+    }
+  }
+
+  // TODO: Binary version
+  private insert(endtime: number, tokens: Token[]) {
+    var i = 0;
+    for (i; i < this.queue.length; i++) {
+      if (this.queue[i].endtime == endtime) {
+        this.queue[i].tokens.push(...tokens);
+        return;
+      }
+      if (this.queue[i].endtime > endtime) {
+        break;
+      }
+    }
+    const qtokens = { endtime, tokens };
+    if (i >= this.queue.length) this.queue.push(qtokens);
+    else {
+      this.queue = [...this.queue.slice(0, i), qtokens, ...this.queue.slice(i)];
+    }
+  }
 }
 
 /* @sk init */

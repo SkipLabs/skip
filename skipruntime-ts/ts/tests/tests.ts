@@ -21,6 +21,7 @@ import type {
 import {
   Sum,
   ValueMapper,
+  TimeQueue,
   createLocaleSKStore,
   cinteger as integer,
   schema,
@@ -36,6 +37,13 @@ export type Test = {
   schemas: Schema[];
   init: (skstore: SKStore, ...tables: TTableCollection[]) => void;
   run: (...tables: any[]) => Promise<void>;
+  error?: (err: any) => void;
+  tokens?: Record<string, number>;
+};
+
+export type UnitTest = {
+  name: string;
+  run: () => Promise<void>;
   error?: (err: any) => void;
 };
 
@@ -568,6 +576,69 @@ async function testAsyncLazyRun(
   return new Promise(waitandcheck) as Promise<void>;
 }
 
+//// testTokens
+
+class TestWithToken
+  implements Mapper<number, number, number, [number, number]>
+{
+  constructor(private skstore: SKStore) {}
+
+  mapElement(
+    key: number,
+    it: NonEmptyIterator<number>,
+  ): Iterable<[number, [number, number]]> {
+    const time = this.skstore.getToken("token_5s");
+    return [[key, [it.first(), time]]];
+  }
+}
+
+class TokensToOutput
+  implements OutputMapper<[number, number, number], number, [number, number]>
+{
+  mapElement(
+    key: number,
+    it: NonEmptyIterator<[number, number]>,
+  ): Iterable<[number, number, number]> {
+    const v = it.first();
+    return Array([key, ...v]);
+  }
+}
+
+function testTokensInit(
+  skstore: SKStore,
+  input: TableHandle<[number, number]>,
+  output: TableHandle<[number, number, number]>,
+) {
+  const eager1 = input.map(TestFromIntInt);
+  const eager2 = eager1.map(TestWithToken, skstore);
+  eager2.mapTo(output, TokensToOutput);
+}
+
+async function timeout(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function testTokensRun(
+  input: Table<[number, number]>,
+  output: Table<[number, number, number]>,
+) {
+  input.insert([[1, 0]], true);
+  const start = output.select({ id: 1 }, ["value", "time"])[0] as any;
+  await timeout(2000);
+  input.insert([[1, 2]], true);
+  check("testTokens[0]", output.select({ id: 1 }, ["value", "time"]), [
+    { value: 2, time: start.time },
+  ]);
+  await timeout(2000);
+  input.insert([[1, 4]], true);
+  check("testTokens[1]", output.select({ id: 1 }, ["value", "time"]), [
+    { value: 4, time: start.time },
+  ]);
+  await timeout(2000);
+  const last = output.select({ id: 1 }, ["value", "time"])[0] as any;
+  check("testTokens[2]", Math.trunc((last.time - start.time) / 1000), 5);
+}
+
 //// Tests
 
 export const tests: Test[] = [
@@ -667,22 +738,128 @@ export const tests: Test[] = [
     init: testAsyncLazyInit,
     run: testAsyncLazyRun,
   },
+  {
+    name: "testTokensInit",
+    schemas: [
+      schema("input", [integer("id", true, true), integer("value")]),
+      schema("output", [
+        integer("id", true, true),
+        integer("value"),
+        integer("time"),
+      ]),
+    ],
+    init: testTokensInit,
+    run: testTokensRun,
+    tokens: { token_5s: 5000 },
+  },
+];
+
+type Update = {
+  idx: number;
+  starttime: number;
+  time: number;
+  tokens: string[];
+};
+
+function token(duration: number, value: string) {
+  return { duration, value };
+}
+
+async function testTimedQueue() {
+  const updates: Update[] = [];
+  var starttime: number = 0;
+  const timedQueue = new TimeQueue((time: number, tokens: string[]) => {
+    updates.push({
+      idx: updates.length,
+      starttime,
+      time: Math.trunc(time / 100),
+      tokens: tokens.sort(),
+    });
+  });
+  const rstarttime = new Date().getTime();
+  timedQueue.start(
+    [
+      token(2000, "token_2s"),
+      token(5000, "token_5s"),
+      token(12000, "token_12s"),
+    ],
+    rstarttime,
+  );
+  starttime = Math.trunc(rstarttime / 100);
+  var waiting = true;
+  const waitandcheck = (
+    resolve: () => void,
+    reject: (reason?: any) => void,
+  ) => {
+    const ctime = (add: number) => Math.trunc((rstarttime + add * 100) / 100);
+    if (waiting) {
+      setTimeout(waitandcheck, 21000, resolve, reject);
+      waiting = false;
+    } else {
+      timedQueue.stop();
+      check("testTimedQueue", updates, [
+        { idx: 0, starttime, time: ctime(20), tokens: ["token_2s"] },
+        { idx: 1, starttime, time: ctime(40), tokens: ["token_2s"] },
+        { idx: 2, starttime, time: ctime(50), tokens: ["token_5s"] },
+        { idx: 3, starttime, time: ctime(60), tokens: ["token_2s"] },
+        { idx: 4, starttime, time: ctime(80), tokens: ["token_2s"] },
+        {
+          idx: 5,
+          starttime,
+          time: ctime(100),
+          tokens: ["token_2s", "token_5s"],
+        },
+        {
+          idx: 6,
+          starttime,
+          time: ctime(120),
+          tokens: ["token_12s", "token_2s"],
+        },
+        { idx: 7, starttime, time: ctime(140), tokens: ["token_2s"] },
+        { idx: 8, starttime, time: ctime(150), tokens: ["token_5s"] },
+        { idx: 9, starttime, time: ctime(160), tokens: ["token_2s"] },
+        { idx: 10, starttime, time: ctime(180), tokens: ["token_2s"] },
+        {
+          idx: 11,
+          starttime,
+          time: ctime(200),
+          tokens: ["token_2s", "token_5s"],
+        },
+      ]);
+      resolve();
+    }
+  };
+  return new Promise(waitandcheck) as Promise<void>;
+}
+
+export const units: UnitTest[] = [
+  { name: "testTimedQueue", run: testTimedQueue },
 ];
 
 function run(t: Test) {
   test(t.name, async ({ page }) => {
     let tables: Table<TJSON[]>[] = [];
     try {
-      tables = await createLocaleSKStore(t.init, t.schemas);
+      tables = await createLocaleSKStore(
+        t.init,
+        t.schemas,
+        t.tokens ? t.tokens : {},
+      );
     } catch (err: any) {
       if (t.error) t.error(err);
       else throw err;
     }
-
     if (tables.length > 0) await t.run(...tables);
+  });
+}
+
+function unit(t: UnitTest) {
+  test(t.name, async ({ page }) => {
+    await t.run();
   });
 }
 
 export function runAll() {
   tests.forEach(run);
+  units.forEach(unit);
 }
