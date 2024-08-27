@@ -57,7 +57,7 @@ class ComputeExpression implements LazyCompute<[string, string], string> {
       );
     };
     const sheet = key[0];
-    const v = this.skall.maybeGetFirst(key);
+    const v = this.skall.maybeGetOne(key);
     if (v && v.charAt(0) == "=") {
       try {
         // Fake evaluator in this exemple
