@@ -184,7 +184,11 @@ function testMapValuesInit(
   input: TableHandle<[number, number]>,
   output: TableHandle<[number, number]>,
 ) {
-  input.map(TestFromIntInt).mapValues(SquareValues).mapTo(output, TestToOutput);
+  input
+    .map(TestFromIntInt)
+    .mapValues(SquareValues)
+    .mapValues(SquareValues)
+    .mapTo(output, TestToOutput);
 }
 
 async function testMapValuesRun(input: Table<TJSON[]>, output: Table<TJSON[]>) {
@@ -196,9 +200,9 @@ async function testMapValuesRun(input: Table<TJSON[]>, output: Table<TJSON[]>) {
   ]);
   check("testMapValues", output.select({}, ["value"]), [
     { value: 1 },
-    { value: 4 },
-    { value: 25 },
-    { value: 100 },
+    { value: 16 },
+    { value: 625 },
+    { value: 10000 },
   ]);
 }
 
