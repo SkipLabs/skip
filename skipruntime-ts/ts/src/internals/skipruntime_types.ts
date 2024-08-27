@@ -8,7 +8,7 @@ import type {
   TJSON,
   NonEmptyIterator,
   EagerCollection,
-  MirrorSchema,
+  Schema,
 } from "../skipruntime_api.js";
 
 export type CtxMapping<
@@ -90,7 +90,7 @@ export interface Context {
 
   mapToSkdb: <R extends TJSON[], K extends TJSON, V extends TJSON>(
     eagerHdl: string,
-    table: MirrorSchema,
+    table: Schema,
     mapper: (key: K, it: NonEmptyIterator<V>) => Iterable<R>,
   ) => void;
 

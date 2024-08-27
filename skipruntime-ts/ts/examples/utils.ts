@@ -1,13 +1,14 @@
 import type {
   TJSON,
   SKStore,
-  MirrorSchema,
+  Schema,
   Table,
   JSONObject,
   TTableCollection,
   TTable,
   createSKStore as CreateSKStore,
 } from "skip-runtime";
+import { serverResponseSuffix } from "skip-runtime";
 import { Server, type ServerOptions } from "socket.io";
 import { createInterface } from "readline";
 import { Command } from "commander";
@@ -15,7 +16,7 @@ import fs from "fs";
 import { resolve } from "path";
 
 export interface ReactiveStorage {
-  tablesSchema: () => MirrorSchema[];
+  tablesSchema: () => Schema[];
   initSKStore: (store: SKStore, ...table: TTableCollection[]) => void;
   scenarios: () => Step[][];
 }
@@ -193,11 +194,19 @@ class SKDBWatcher {
     if (this.watches.has(name)) {
       this.watches.get(name)!();
     }
-    if (!this.tables.has(name)) {
-      this.error(`Unable to find ${name} table.`);
+    const feedback = name.endsWith(serverResponseSuffix);
+
+    const table_name = feedback
+      ? name.substring(0, name.length - serverResponseSuffix.length)
+      : name;
+    if (!this.tables.has(table_name)) {
+      this.error(`Unable to find ${table_name} table.`);
       return;
     }
-    this.watches.set(name, this.tables.get(name)!.watch(onChange).close);
+    this.watches.set(
+      name,
+      this.tables.get(table_name)!.watch(onChange, feedback).close,
+    );
   }
 
   watchChanges(
@@ -208,13 +217,18 @@ class SKDBWatcher {
     if (this.watches.has(name)) {
       this.watches.get(name)!();
     }
-    if (!this.tables.has(name)) {
+    const feedback = name.endsWith(serverResponseSuffix);
+
+    const table_name = feedback
+      ? name.substring(0, name.length - serverResponseSuffix.length)
+      : name;
+    if (!this.tables.has(table_name)) {
       this.error(`Unable to find ${name} table.`);
       return;
     }
     this.watches.set(
       name,
-      this.tables.get(name)!.watchChanges(init, update).close,
+      this.tables.get(table_name)!.watchChanges(init, update, feedback).close,
     );
   }
 
@@ -241,7 +255,7 @@ export class SocketServerService implements ReactiveService {
       tablesByName.set(table.getName(), table);
     });
     const io = new Server(this.options);
-    io.on("connection", (socket) => {
+    io.on("connection", (socket: any) => {
       const watcher = new SKDBWatcher(console.error, tablesByName);
       const error = (msg: string) => socket.emit("error", msg);
       socket.on("insert", (name: string, values: string) => {

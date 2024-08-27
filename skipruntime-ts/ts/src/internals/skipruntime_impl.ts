@@ -13,7 +13,7 @@ import type {
   SKStore,
   SKStoreFactory,
   Mapping,
-  MirrorSchema,
+  Schema,
   ColumnSchema,
   Table,
   Loadable,
@@ -24,6 +24,7 @@ import type {
   AsyncLazyCompute,
   NonEmptyIterator,
   Database,
+  Index,
 } from "../skipruntime_api.js";
 
 // prettier-ignore
@@ -42,6 +43,7 @@ function assertNoKeysNaN<K extends TJSON, V extends TJSON>(
   }
   return kv_pairs;
 }
+export const serverResponseSuffix = "__skdb_mirror_feedback";
 
 class EagerCollectionImpl<K extends TJSON, V extends TJSON>
   implements EagerCollection<K, V>
@@ -214,7 +216,7 @@ export class TableCollectionImpl<R extends TJSON[]>
   constructor(
     protected context: Context,
     protected skdb: SKDBSync,
-    protected schema: MirrorSchema,
+    protected schema: Schema,
   ) {
     Object.defineProperty(this, "__sk_frozen", {
       enumerable: false,
@@ -227,7 +229,7 @@ export class TableCollectionImpl<R extends TJSON[]>
     return this.schema.name;
   }
 
-  getSchema(): MirrorSchema {
+  getSchema(): Schema {
     return this.schema;
   }
 
@@ -264,9 +266,9 @@ export class TableCollectionImpl<R extends TJSON[]>
 export class TableImpl<R extends TJSON[]> implements Table<R> {
   protected context: Context;
   protected skdb: SKDBSync;
-  protected schema: MirrorSchema;
+  protected schema: Schema;
 
-  constructor(context: Context, skdb: SKDBSync, schema: MirrorSchema) {
+  constructor(context: Context, skdb: SKDBSync, schema: Schema) {
     this.context = context;
     this.skdb = skdb;
     this.schema = schema;
@@ -334,8 +336,11 @@ export class TableImpl<R extends TJSON[]> implements Table<R> {
       query.params ? toParams(query.params) : undefined,
     );
   }
-  watch = (update: (rows: JSONObject[]) => void) => {
-    const query = toSelectQuery(this.getName(), {});
+  watch = (update: (rows: JSONObject[]) => void, feedback: boolean = false) => {
+    const name = feedback
+      ? this.getName() + serverResponseSuffix
+      : this.getName();
+    const query = toSelectQuery(name, {});
     return this.skdb.watch(
       query.query,
       query.params ? toParams(query.params) : {},
@@ -346,8 +351,12 @@ export class TableImpl<R extends TJSON[]> implements Table<R> {
   watchChanges = (
     init: (rows: JSONObject[]) => void,
     update: (added: JSONObject[], removed: JSONObject[]) => void,
+    feedback: boolean = false,
   ) => {
-    const query = toSelectQuery(this.getName(), {});
+    const name = feedback
+      ? this.getName() + serverResponseSuffix
+      : this.getName();
+    const query = toSelectQuery(name, {});
     return this.skdb.watchChanges(
       query.query,
       query.params ? toParams(query.params) : {},
@@ -499,7 +508,7 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
 
   runSKStore = async (
     init: (skstore: SKStore, ...tables: TableCollection<TJSON[]>[]) => void,
-    tablesSchema: MirrorSchema[],
+    tablesSchema: Schema[],
     database: Database | null,
   ): Promise<Table<TJSON[]>[]> => {
     const context = this.context();
@@ -538,7 +547,7 @@ export async function mirror(
     private: CryptoKey;
     endpoint?: string;
   } | null,
-  ...tables: MirrorSchema[]
+  ...tables: Schema[]
 ): Promise<TableCollection<TJSON[]>[]> {
   if (database) {
     await skdb.connect(
@@ -560,7 +569,6 @@ export async function mirror(
         });
       }
       const query = create(table);
-      console.log("Create", query);
       await skdb.connectedRemote!.exec(
         query.query,
         query.params ? toParams(query.params) : undefined,
@@ -577,6 +585,12 @@ export async function mirror(
       skdb.exec(query.query, query.params ? toParams(query.params) : undefined);
     });
   }
+  tables.forEach((table) => {
+    if (table.indexes) {
+      const indexes = table.indexes.map((idx) => createIndex(table.name, idx));
+      skdb.exec(indexes.join("\n"));
+    }
+  });
   return tables.map((table) => new TableCollectionImpl(context, skdb, table));
 }
 
@@ -595,7 +609,7 @@ function toColumns(columns: ColumnSchema[]): string {
   return `(${columns.map(toColumn).join(",")})`;
 }
 
-function toMirrorDefinition(table: MirrorSchema): MirrorDefn {
+function toMirrorDefinition(table: Schema): MirrorDefn {
   return {
     table: table.name,
     expectedColumns: toColumns(table.expected),
@@ -606,11 +620,17 @@ function toMirrorDefinition(table: MirrorSchema): MirrorDefn {
   };
 }
 
-function toMirrorDefinitions(...tables: MirrorSchema[]): MirrorDefn[] {
+function toMirrorDefinitions(...tables: Schema[]): MirrorDefn[] {
   return tables.map(toMirrorDefinition);
 }
 
-function create(table: MirrorSchema): Query {
+function createIndex(table: string, index: Index): string {
+  return `CREATE ${index.unique ? "UNIQUE " : ""}INDEX IF NOT EXISTS ${
+    index.name
+  } ON ${table}(${index.columns.join(", ")});`;
+}
+
+function create(table: Schema): Query {
   const query = `CREATE TABLE IF NOT EXISTS "${table.name}" ${toColumns(
     table.expected,
   )};`;

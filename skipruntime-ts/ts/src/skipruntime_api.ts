@@ -26,11 +26,16 @@ export type ColumnSchema = {
   notnull?: boolean;
   primary?: boolean;
 };
-export type TableSchema = { name: string; columns: ColumnSchema[] };
-export type MirrorSchema = {
+export type Index = {
+  name: string;
+  columns: string[];
+  unique: boolean;
+};
+export type Schema = {
   name: string;
   expected: ColumnSchema[];
   filter?: DBFilter;
+  indexes?: Index[];
 };
 
 /**
@@ -345,7 +350,7 @@ export interface EagerCollection<K extends TJSON, V extends TJSON> {
  */
 export interface TableCollection<R extends TJSON[]> {
   getName(): string;
-  getSchema(): MirrorSchema;
+  getSchema(): Schema;
   /**
    * Lookup in the table using specified index
    * @param key - the key to lookup in the table
@@ -424,8 +429,10 @@ export interface Table<R extends TJSON[]> {
    * @param update - the callback to invoke when data changes
    * @returns a callback `close` to terminate and clean up the watch
    */
-  watch: (update: (rows: JSONObject[]) => void) => { close: () => void };
-
+  watch: (
+    update: (rows: JSONObject[]) => void,
+    feedback?: boolean,
+  ) => { close: () => void };
   /**
    * Register a callback to be invoked on the `added` and `removed` rows of this table
    * whenever data changes
@@ -435,6 +442,7 @@ export interface Table<R extends TJSON[]> {
   watchChanges: (
     init: (rows: JSONObject[]) => void,
     update: (added: JSONObject[], removed: JSONObject[]) => void,
+    feedback?: boolean,
   ) => { close: () => void };
 }
 
@@ -463,7 +471,7 @@ export type Database = {
 export interface SKStoreFactory extends Shared {
   runSKStore(
     init: (skstore: SKStore, ...tables: TableCollection<TJSON[]>[]) => void,
-    tables: MirrorSchema[],
+    tables: Schema[],
     database: Database | null,
   ): Promise<Table<TJSON[]>[]>;
 }

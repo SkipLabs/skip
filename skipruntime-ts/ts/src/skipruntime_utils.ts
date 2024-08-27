@@ -1,7 +1,8 @@
 import type {
   Accumulator,
   ColumnSchema,
-  MirrorSchema,
+  Index,
+  Schema,
   Opt,
 } from "./skipruntime_api.js";
 
@@ -41,10 +42,15 @@ export class Max implements Accumulator<number, number> {
   }
 }
 
-export function schema(name: string, expected: ColumnSchema[]): MirrorSchema {
+export function schema(
+  name: string,
+  expected: ColumnSchema[],
+  indexes?: Index[],
+): Schema {
   return {
     name,
     expected,
+    indexes,
   };
 }
 
