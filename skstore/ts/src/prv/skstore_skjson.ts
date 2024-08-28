@@ -227,7 +227,7 @@ export const reactiveArray = {
   },
   ownKeys(hdl: WasmHandle) {
     const l = hdl.access.SKIP_SKJSON_arraySize(hdl.pointer);
-    const res = Array.from(Array(l).keys()).map((v) => "" + v);
+    const res = Array.from(Array(l).keys()).map((v) => v.toString());
     return res;
   },
   getOwnPropertyDescriptor(hdl: WasmHandle, prop: string) {

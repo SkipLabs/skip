@@ -1677,16 +1677,17 @@ function toValues(entry: TJSON[], prefix: string = ""): Query {
   const params: JSONObject = {};
   for (let i = 0; i < entry.length; i++) {
     const field = entry[i];
+    const prefixedI = `${prefix}${i}`;
     if (
       typeof field == "string" ||
       typeof field == "number" ||
       typeof field == "boolean"
     ) {
-      params[prefix + i] = field;
+      params[prefixedI] = field;
     } else {
-      params[prefix + i] = JSON.stringify(field);
+      params[prefixedI] = JSON.stringify(field);
     }
-    exprs.push(`@${prefix + i}`);
+    exprs.push(`@${prefixedI}`);
   }
   return {
     query: exprs.join(" , "),
@@ -1708,7 +1709,7 @@ function toWhere(
     if (Array.isArray(field)) {
       const inVal: string[] = [];
       for (let idx = 0; idx < field.length; idx++) {
-        const pName = prefix + idx + "_" + column.name;
+        const pName = `${prefix}${idx}_${column.name}`;
         params[pName] = field[idx];
         inVal.push(`@${pName}`);
       }
@@ -1728,10 +1729,11 @@ function toWhere(
 function toSets(update: JSONObject, prefix: string = ""): Query {
   const exprs: string[] = [];
   const params: JSONObject = {};
-  Object.keys(update).forEach((column: keyof JSONObject) => {
+  Object.keys(update).forEach((column: string & keyof JSONObject) => {
     const field = update[column];
-    params[prefix + column] = field;
-    exprs.push(`${column} = @${prefix + column}`);
+    const prefixedColumn = `${prefix}${column}`;
+    params[prefixedColumn] = field;
+    exprs.push(`${column} = @${prefixedColumn}`);
   });
   return {
     query: exprs.join(" , "),
@@ -1744,18 +1746,18 @@ function toSelectWhere(select: JSONObject, prefix: string = ""): Query {
   if (keys.length <= 0) return { query: "true" };
   const exprs: string[] = [];
   const params: JSONObject = {};
-  keys.forEach((column: keyof JSONObject) => {
+  keys.forEach((column: string & keyof JSONObject) => {
     const field = select[column];
     if (Array.isArray(field)) {
       const inVal: string[] = [];
       for (let idx = 0; idx < field.length; idx++) {
-        const pName = prefix + idx + "_" + column;
+        const pName = `${prefix}${idx}_${column}`;
         params[pName] = field[idx];
         inVal.push(`@${pName}`);
       }
       exprs.push(`${column} IN (${inVal.join(", ")})`);
     } else {
-      const pName = prefix + column;
+      const pName = `${prefix}${column}`;
       params[pName] = field;
       exprs.push(`${column} = @${pName}`);
     }
@@ -1768,7 +1770,7 @@ function toSelectWhere(select: JSONObject, prefix: string = ""): Query {
 
 function toParams(params: JSONObject): Params {
   const res: Record<string, string | number | boolean> = {};
-  Object.keys(params).forEach((key: keyof JSONObject) => {
+  Object.keys(params).forEach((key: string & keyof JSONObject) => {
     const v = params[key];
     if (typeof v == "string") {
       res[key] = v;
@@ -1816,7 +1818,7 @@ function toInsertQuery(
 ): Query {
   let params: JSONObject = {};
   const values = entries.map((vs, idx) => {
-    const q = toValues(vs, "v" + idx + "_");
+    const q = toValues(vs, `v${idx}_`);
     params = { ...params, ...q.params };
     return q;
   });
