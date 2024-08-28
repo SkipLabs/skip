@@ -2,6 +2,7 @@
 import type { int, ptr, float, Links, Utils, ToWasmManager, Environment, Opt, Shared, } from "#std/sk_types.js";
 
 export enum Type {
+  /* eslint-disable no-unused-vars */
   Undefined,
   Null,
   Int,
@@ -10,6 +11,7 @@ export enum Type {
   String,
   Array,
   Object,
+  /* eslint-enable no-unused-vars */
 }
 
 interface WasmAccess {
@@ -83,12 +85,14 @@ function getValue(hdl: WasmHandle): any {
       return hdl.utils.importString(
         hdl.access.SKIP_SKJSON_asString(hdl.pointer),
       );
-    case Type.Array:
+    case Type.Array: {
       const aPtr = hdl.access.SKIP_SKJSON_asArray(hdl.pointer);
       return new Proxy(hdl.derive(aPtr), reactiveArray);
-    case Type.Object:
+    }
+    case Type.Object: {
       const oPtr = hdl.access.SKIP_SKJSON_asObject(hdl.pointer);
       return new Proxy(hdl.derive(oPtr), reactiveObject);
+    }
     case Type.Undefined:
     default:
       return undefined;
@@ -111,12 +115,14 @@ function getValueAt(hdl: WasmHandle, idx: int, array: boolean = false): any {
       return hdl.access.SKIP_SKJSON_asBoolean(skval) ? true : false;
     case Type.String:
       return hdl.utils.importString(hdl.access.SKIP_SKJSON_asString(skval));
-    case Type.Array:
+    case Type.Array: {
       const aPtr = hdl.access.SKIP_SKJSON_asArray(skval);
       return new Proxy(hdl.derive(aPtr), reactiveArray);
-    case Type.Object:
+    }
+    case Type.Object: {
       const oPtr = hdl.access.SKIP_SKJSON_asObject(skval);
       return new Proxy(hdl.derive(oPtr), reactiveObject);
+    }
     case Type.Undefined:
     default:
       return undefined;
@@ -364,7 +370,7 @@ class LinksImpl implements Links {
     };
 
     const exportJSON = (value: any) => {
-      let type = typeof value;
+      const type = typeof value;
       if (value === null || value === undefined) {
         return fromWasm.SKIP_SKJSON_createCJNull();
       } else if (type == "number") {
@@ -374,7 +380,7 @@ class LinksImpl implements Links {
       } else if (type == "string") {
         return fromWasm.SKIP_SKJSON_createCJString(utils.exportString(value));
       } else if (Array.isArray(value)) {
-        let arr = fromWasm.SKIP_SKJSON_startCJArray();
+        const arr = fromWasm.SKIP_SKJSON_startCJArray();
         value.forEach((v) =>
           fromWasm.SKIP_SKJSON_addToCJArray(arr, exportJSON(v)),
         );
@@ -383,8 +389,8 @@ class LinksImpl implements Links {
         if (value.__isObjectProxy || value.__isArrayProxy) {
           return value.__pointer as number;
         } else {
-          let obj = fromWasm.SKIP_SKJSON_startCJObject();
-          for (let key of Object.keys(value)) {
+          const obj = fromWasm.SKIP_SKJSON_startCJObject();
+          for (const key of Object.keys(value)) {
             fromWasm.SKIP_SKJSON_addToCJObject(
               obj,
               utils.exportString(key),
