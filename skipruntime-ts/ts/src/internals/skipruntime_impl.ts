@@ -1,7 +1,7 @@
 // prettier-ignore
 import { type ptr, type Opt } from "#std/sk_types.js";
 import type { Context } from "./skipruntime_types.js";
-import type * as Internal from "./skstore_internal_types.js";
+import type * as Internal from "./skipruntime_internal_types.js";
 import type {
   Accumulator,
   EagerCollection,
@@ -27,6 +27,7 @@ import type {
   Remote,
   Locale,
   EntryPoint,
+  Inputs,
 } from "../skipruntime_api.js";
 
 // prettier-ignore
@@ -285,16 +286,12 @@ export class TableImpl<R extends TJSON[]> implements Table<R> {
     return this.schema.name;
   }
 
-  insert(entries: R[], update?: boolean | undefined): void {
-    entries = entries.map((e) => {
-      if (this.schema.columns.length > e.length) {
-        if (this.schema.columns[e.length].name == "skdb_access") {
-          e.push("read-write");
-        }
-      }
-      return e;
-    });
-    const query = toInsertQuery(this.getName(), entries, update);
+  insert(entries: R[] | Inputs, update?: boolean | undefined): void {
+    let values = Array.isArray(entries) ? entries : entries.values;
+    const columns = !Array.isArray(entries)
+      ? entries.columns
+      : this.schema.columns.map((c) => c.name);
+    const query = toInsertQuery(this.getName(), values, update, columns);
     const params = query.params ? toParams(query.params) : undefined;
     this.skdb.exec(query.query, params);
   }
@@ -519,7 +516,7 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
       tables: Record<string, TableCollection<TJSON[]>>,
     ) => void,
     locale: Locale,
-    remotes: Remote[] = [],
+    remotes: Record<string, Remote> = {},
   ): Promise<Record<string, Table<TJSON[]>>> => {
     let context = this.context();
     const tables = await mirror(
@@ -556,15 +553,15 @@ export async function mirror(
   context: Context,
   createSkdb: () => Promise<SKDBSync>,
   locale: Locale,
-  remotes: Remote[],
+  remotes: Record<string, Remote>,
   createKey: (key: string) => Promise<CryptoKey>,
 ): Promise<Record<string, TableCollection<TJSON[]>>> {
   const tHandles: Record<string, TableCollection<TJSON[]>> = {};
   if (locale.database) {
-    remotes.push({
+    remotes["__sk_locale"] = {
       database: locale.database!,
       tables: locale.tables,
-    });
+    };
   } else {
     for (const table of locale.tables) {
       let skdb = await createSkdb();
@@ -579,7 +576,7 @@ export async function mirror(
       tHandles[table.name] = new TableCollectionImpl(context, skdb, table);
     }
   }
-  for (const remote of remotes) {
+  for (const remote of Object.values(remotes)) {
     let skdb = await createSkdb();
     const database = remote.database;
     const privateKey = await createKey(database.private);
@@ -736,7 +733,7 @@ function toSelectWhere(select: JSONObject, prefix: string = ""): Query {
   const params: JSONObject = {};
   keys.forEach((column: keyof JSONObject, c: number) => {
     const field = select[column];
-    if (Array.isArray(field)) {
+    if (Array.isArray(field) && field.length > 1) {
       const inVal: string[] = [];
       for (let idx = 0; idx < field.length; idx++) {
         const pName = `${prefix}${idx}_${column}`;
@@ -745,8 +742,9 @@ function toSelectWhere(select: JSONObject, prefix: string = ""): Query {
       }
       exprs.push(`${column} IN (${inVal.join(", ")})`);
     } else {
-      const pName = `${prefix}${c}${column}`;
-      params[pName] = field;
+      const value = Array.isArray(field) ? field[0] : field;
+      const pName = `${prefix}${c}_${column}`;
+      params[pName] = value;
       exprs.push(`${column} = @${pName}`);
     }
   });
@@ -803,6 +801,7 @@ function toInsertQuery(
   name: string,
   entries: TJSON[][],
   update?: boolean | undefined,
+  columns?: string[],
 ): Query {
   let params: JSONObject = {};
   const values = entries.map((vs, idx) => {
@@ -810,10 +809,12 @@ function toInsertQuery(
     params = { ...params, ...q.params };
     return q;
   });
+  const strColumns =
+    columns && columns.length > 0 ? `(${columns.join(",")}) ` : "";
   const strValue = values.map((v) => `(${v.query})`).join(",");
   const query = `INSERT ${
     update ? "OR REPLACE " : ""
-  }INTO "${name}" VALUES ${strValue};`;
+  }INTO "${name}" ${strColumns}VALUES ${strValue};`;
   return { query, params };
 }
 

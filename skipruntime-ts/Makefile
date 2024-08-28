@@ -72,12 +72,15 @@ build: ../build/sknpm
 bunrun-%: ../build/sknpm
 	cd ts/examples && bun install
 	../build/sknpm b -r --out-dir ts/examples/node_modules/skip-runtime
-	bun run ts/examples/wmain.ts -f ts/examples/$*.ts -m io
+	cd ts/examples && bun run $*.ts
 
-bunrun-%-m: ../build/sknpm $(SERVER_CONFIG) start 
-	cd ts/examples && bun install
-	../build/sknpm b -r --out-dir ts/examples/node_modules/skstore
-	bun run ts/examples/wmain.ts -f ts/examples/$*.ts -m io -c $*
+bunclient-%:
+	cd ts/examples && bun run $*-client.ts
+
+#bunrun-%-m: ../build/sknpm $(SERVER_CONFIG) start 
+#	cd ts/examples && bun install
+#	../build/sknpm b -r --out-dir ts/examples/node_modules/skip-runtime
+#	bun run ts/examples/wmain.ts -f ts/examples/$*.ts -m io -c $*
 
 check-%: ../build/sknpm
 	cd ts/examples && npm install
@@ -88,24 +91,16 @@ noderun-%: ../build/sknpm
 	cd ts/examples && npm install
 	../build/sknpm b -r --out-dir ts/examples/node_modules/skip-runtime
 	tsc --project ts/examples/tsconfig.json
-	cd ts/examples && node dist/wmain.js -f dist/$*.js -m io
+	cd ts/examples && node dist/$*.js
 
-noderun-%-m: ../build/sknpm  $(SERVER_CONFIG) start
-	cd ts/examples && npm install
-	../build/sknpm b -r --out-dir ts/examples/node_modules/skstore
-	tsc --project ts/examples/tsconfig.json
-	cd ts/examples && node dist/wmain.js -f dist/$*.js -m io -c $*
+nodeclient-%:
+	cd ts/examples && node dist/$*-client.js
 
-bunplay-%: ../build/sknpm
-	cd ts/examples && bun install
-	../build/sknpm b -r --out-dir ts/examples/node_modules/skip-runtime
-	echo "play 1\nexit\n" | bun run ts/examples/wmain.ts -f ts/examples/$*.ts -m io
-
-nodeplay-%: ../build/sknpm
-	cd ts/examples && npm install
-	../build/sknpm b -r --out-dir ts/examples/node_modules/skip-runtime
-	tsc --project ts/examples/tsconfig.json
-	cd ts/examples && echo "play 1\nexit\n" | node dist/wmain.js -f  dist/$*.js -m io
+#noderun-%-m: ../build/sknpm  $(SERVER_CONFIG) start
+#	cd ts/examples && npm install
+#	../build/sknpm b -r --out-dir ts/examples/node_modules/skip-runtime
+#	tsc --project ts/examples/tsconfig.json
+#	cd ts/examples && node dist/wmain.js -f dist/$*.js -m io -c $*
 
 .PHONY: start
 start: build_server $(eval SPROCESSES:=$(shell bash -c 'source $(SDKMAN_INIT) && jps' | grep dev.jar | awk '{print $$1}'))

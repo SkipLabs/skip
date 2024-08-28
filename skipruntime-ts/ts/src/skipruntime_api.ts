@@ -36,6 +36,7 @@ export type Schema = {
   columns: ColumnSchema[];
   indexes?: Index[];
   filter?: DBFilter;
+  alias?: string;
 };
 
 /**
@@ -390,6 +391,11 @@ export interface TableCollection<R extends TJSON[]> {
   ): EagerCollection<K, V>;
 }
 
+export type Inputs = {
+  columns: string[];
+  values: TJSON[][];
+};
+
 /**
  * This interface supports SQL-like operations accessing and/or mutating the data in a
  * collection.  These operations are available only on collections which satisfy certain
@@ -404,8 +410,7 @@ export interface Table<R extends TJSON[]> {
    * @throws {Error} in case of index conflict (when `update` is false) or constraint
    *         violation
    */
-  insert(entries: R[], update?: boolean): void;
-
+  insert(entry: R[] | Inputs, update?: boolean): void;
   /**
    * Update an entry in the table
    * @param row - the table entry to update
@@ -509,7 +514,7 @@ export interface SKStoreFactory extends Shared {
       tables: Record<string, TableCollection<TJSON[]>>,
     ) => void,
     locale: Locale,
-    remotes?: Remote[],
+    remotes?: Record<string, Remote>,
   ): Promise<Record<string, Table<TJSON[]>>>;
 }
 

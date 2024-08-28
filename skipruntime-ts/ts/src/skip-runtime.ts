@@ -1,5 +1,10 @@
 // prettier-ignore
 import { runUrl, type ModuleInit } from "#std/sk_types.js";
+import type {
+  SimpleSkipService,
+  SimpleServiceOutput,
+  Writer,
+} from "./skipruntime_service.js";
 import { check } from "./internals/skipruntime_impl.js";
 import type {
   SKStore,
@@ -17,6 +22,7 @@ import type {
   Remote,
   Database,
 } from "./skipruntime_api.js";
+import { runWithServer_ } from "./internals/skipruntime_process.js";
 
 export type {
   SKStore,
@@ -29,6 +35,9 @@ export type {
   TTable,
   ColumnSchema,
   Accumulator,
+  SimpleSkipService,
+  SimpleServiceOutput,
+  Writer,
 };
 
 export type {
@@ -78,7 +87,7 @@ export async function createSKStore(
     tables: Record<string, TableCollection<TJSON[]>>,
   ) => void,
   locale: Locale,
-  remotes: Remote[] = [],
+  remotes: Record<string, Remote> = {},
 ): Promise<Record<string, Table<TJSON[]>>> {
   let data = await runUrl(wasmUrl, modules, [], "SKDB_factory");
   const factory = data.environment.shared.get("SKStore") as SKStoreFactory;
@@ -88,18 +97,20 @@ export async function createSKStore(
 export async function createInlineSKStore(
   init: (skstore: SKStore, ...tables: TableCollection<TJSON[]>[]) => void,
   locale: Locale,
-  remotes: Remote[] = [],
+  remotes: Record<string, Remote> = {},
 ): Promise<Table<TJSON[]>[]> {
   let tables: Table<TJSON[]>[] = [];
   const result = await createSKStore(
     (skstore: SKStore, tables: Record<string, TableCollection<TJSON[]>>) => {
       const handles: TableCollection<TJSON[]>[] = [];
       for (const schema of locale.tables) {
-        handles.push(tables[schema.name]);
+        const name = schema.alias ? schema.alias : schema.name;
+        handles.push(tables[name]);
       }
-      for (const remote of remotes) {
+      for (const remote of Object.values(remotes)) {
         for (const schema of remote.tables) {
-          handles.push(tables[schema.name]);
+          const name = schema.alias ? schema.alias : schema.name;
+          handles.push(tables[name]);
         }
       }
       init(skstore, ...handles);
@@ -108,11 +119,13 @@ export async function createInlineSKStore(
     remotes,
   );
   for (const schema of locale.tables) {
-    tables.push(result[schema.name]);
+    const name = schema.alias ? schema.alias : schema.name;
+    tables.push(result[name]);
   }
-  for (const remote of remotes) {
+  for (const remote of Object.values(remotes)) {
     for (const schema of remote.tables) {
-      tables.push(result[schema.name]);
+      const name = schema.alias ? schema.alias : schema.name;
+      tables.push(result[name]);
     }
   }
   return tables;
@@ -129,7 +142,7 @@ export async function createLocaleSKStore(
   );
 }
 
-export function freeze<T extends TJSON>(value: T): T {
+export function freeze<T>(value: T): T {
   const type = typeof value;
   if (type == "string" || type == "number" || type == "boolean") {
     return value;
@@ -165,4 +178,12 @@ export function freeze<T extends TJSON>(value: T): T {
   } else {
     throw new Error("'" + type + "' cannot be frozen.");
   }
+}
+
+export async function runWithServer(
+  service: SimpleSkipService,
+  options: Record<string, any>,
+  database?: Database,
+) {
+  runWithServer_(service, createSKStore, options, database);
 }
