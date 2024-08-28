@@ -37,17 +37,18 @@ class HandlesImpl implements Handles {
     return id;
   }
 
-  get(id: int) {
+  get(id: int): any {
     return this.objects[id];
   }
 
-  apply = (id: int, parameters: any[]) => {
+  apply<T>(id: int, parameters: T[]): T {
     const fn = this.objects[id];
+    /* eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return */
     return fn.apply(null, parameters);
-  };
+  }
 
-  delete(id: int) {
-    const current = this.objects[id];
+  delete(id: int): any {
+    const current: unknown = this.objects[id];
     this.objects[id] = null;
     this.freeIDs.push(id);
     return current;
@@ -339,18 +340,21 @@ class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
   }
 
   next(): Opt<T> {
+    /* eslint-disable-next-line @typescript-eslint/no-unsafe-return */
     return this.skjson.importOptJSON(
       this.exports.SKIP_SKStore_iteratorNext(this.pointer),
     );
   }
 
   first(): T {
+    /* eslint-disable-next-line @typescript-eslint/no-unsafe-return */
     return this.skjson.importJSON(
       this.exports.SKIP_SKStore_iteratorFirst(this.pointer),
     );
   }
 
   uniqueValue(): Opt<T> {
+    /* eslint-disable-next-line @typescript-eslint/no-unsafe-return */
     return this.skjson.importOptJSON(
       this.exports.SKIP_SKStore_iteratorUniqueValue(this.pointer),
     );
@@ -515,10 +519,12 @@ class LinksImpl implements Links {
       for (const datum of result) {
         const k = datum[0];
         const v = datum[1];
+        /* eslint-disable-next-line @typescript-eslint/no-unsafe-call */
         if (bindings.has(k)) bindings.get(k).push(v);
         else bindings.set(k, [v]);
       }
       for (const kv of bindings) {
+        /* eslint-disable-next-line @typescript-eslint/no-unsafe-argument */
         w.setArray(kv[0], kv[1]);
       }
       ref.pop();
@@ -535,7 +541,7 @@ class LinksImpl implements Links {
       const w = new WriterImpl(jsu, fromWasm, writer);
       const result = this.handles.apply(fn, [jsu.importJSON(row), occ]);
       for (const v of result) {
-        const t = v as any;
+        const t = v as [any, any];
         w.set(t[0], t[1]);
       }
       ref.pop();
@@ -562,6 +568,7 @@ class LinksImpl implements Links {
       const name = jsu.importString(skname);
       const key = jsu.importJSON(skkey, true);
       const params = jsu.importJSON(skparams, true);
+      /* eslint-disable-next-line @typescript-eslint/no-unsafe-argument */
       const promise = this.handles.apply<Promise<AValue<TJSON, TJSON>>>(fn, [
         key,
         params,
