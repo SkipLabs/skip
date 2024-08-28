@@ -295,7 +295,7 @@ class Mapping {
 
   register(v: any) {
     const freeID = this.freeIDs.pop();
-    const id = freeID === undefined ? this.nextID++ : freeID;
+    const id = freeID ?? this.nextID++;
     this.objects[id] = v;
     return id;
   }

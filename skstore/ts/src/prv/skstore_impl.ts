@@ -1654,10 +1654,9 @@ function toMirrorDefinition(table: MirrorSchema): MirrorDefn {
     table: table.name,
     expectedColumns: toColumns(table.expected),
     filterExpr: table.filter ? table.filter.filter : undefined,
-    filterParams:
-      table.filter && table.filter.params
-        ? toParams(table.filter.params)
-        : undefined,
+    filterParams: table.filter?.params
+      ? toParams(table.filter.params)
+      : undefined,
   };
 }
 
