@@ -189,7 +189,7 @@ export abstract class ValueMapper<
 /**
  * The type of a reactive function mapping a collection into an output table
  * @param key - a key of the input collection
- * @param {NonEmptyIterator} it - an iterator on values avalable for said key
+ * @param {NonEmptyIterator} it - an iterator on values available for said key
  * @returns {R} a table row corresponding to the input key
  */
 export interface OutputMapper<
@@ -988,21 +988,21 @@ export interface Table<R extends TJSON[]> {
    * Update an entry in the table
    * @param row - the table entry to update
    * @param updates - the column values updates
-   * @throws {Error} when the updates violate an index or other contraint
+   * @throws {Error} when the updates violate an index or other constraint
    */
   update(row: R, updates: JSONObject): void;
   /**
    * Update entries in the table matching some `where` clause
    * @param where - the column values to filter entries
    * @param updates - the column values updates
-   * @throws {Error} when an index contraints is broken
+   * @throws {Error} when an index constraints is broken
    */
   updateWhere(where: JSONObject, updates: JSONObject): void;
   /**
    * Select entries in the table
    * @param where - the column values to filter entries
    * @param columns - the columns to include in the output; include all by default
-   * @throws {Error} when an index contraints is broken
+   * @throws {Error} when an index constraints is broken
    */
   select(where: JSONObject, columns?: string[]): JSONObject[];
   /**
@@ -1221,7 +1221,7 @@ export interface SKStore {
   ): LHandle<K, V>;
 
   /**
-   * Map over each entry of each eager reative map and apply the corresponding mapper function
+   * Map over each entry of each eager reactive map and apply the corresponding mapper function
    * @param {Mapping[]} mappings - the handles to combine
    * @returns {EHandle} The the resulting eager reactive map handle
    */
@@ -1234,7 +1234,7 @@ export interface SKStore {
     mappings: Mapping<K1, V1, K2, V2>[],
   ): EHandle<K2, V2>;
   /**
-   * Map over each entry of each eager reative map and apply the corresponding mapper function
+   * Map over each entry of each eager reactive map and apply the corresponding mapper function
    *  then reduce the when the given accumulator
    * @param {Mapping} mappings - the handles to combine
    * @param {Accumulator} accumulator - reduction manager
@@ -1252,7 +1252,7 @@ export interface SKStore {
   ): EHandle<K2, V3>;
 
   /**
-   * Creates a lazy reactive map attched to a asynch call
+   * Creates a lazy reactive map attached to a async call
    * @param get - the function the gather the values from others reactive maps
    * @param call - the async function to call with gathered values
    * @returns {LHandle} The the resulting lazy reactive map handle
