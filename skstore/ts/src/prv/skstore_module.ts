@@ -576,7 +576,7 @@ class LinksImpl implements Links {
       const register = (value: Result<TJSON, TJSON>) => {
         if (!notify) {
           const skdbApp = this.env.shared.get("SKDB") as SKDBShared;
-          notify = skdbApp?.notify;
+          notify = skdbApp.notify;
         }
         setTimeout(() => {
           const result = jsu.runWithGC(() => {
@@ -599,9 +599,9 @@ class LinksImpl implements Links {
       };
       promise
         .then((value) => {
-          if (value.payload !== null && value.payload !== undefined) {
+          if (value.payload !== undefined) {
             register(
-              value.metadata !== null && value.metadata !== undefined
+              value.metadata !== undefined
                 ? {
                     status: "success",
                     payload: value.payload,
@@ -614,7 +614,7 @@ class LinksImpl implements Links {
             );
           } else {
             register(
-              value.metadata !== null && value.metadata !== undefined
+              value.metadata !== undefined
                 ? {
                     status: "unchanged",
                     metadata: value.metadata,
@@ -661,8 +661,6 @@ class LinksImpl implements Links {
     };
     this.init = (context: ptr) => {
       ref.push(context);
-      if (!this.initFn)
-        throw new Error("SKStore init function must be defined");
       this.initFn();
       ref.pop();
     };
