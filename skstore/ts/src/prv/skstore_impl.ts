@@ -978,8 +978,8 @@ export class TableImpl<R extends TJSON[]> implements Table<R> {
     );
   }
 
-  select(select: JSONObject, colmuns?: string[]): JSONObject[] {
-    const query = toSelectQuery(this.getName(), select, colmuns);
+  select(select: JSONObject, columns?: string[]): JSONObject[] {
+    const query = toSelectQuery(this.getName(), select, columns);
     return this.skdb.exec(
       query.query,
       query.params ? toParams(query.params) : undefined,
