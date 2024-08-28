@@ -534,7 +534,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     table: TableHandle<R>,
     mapper: new () => OutputMapper<R, K, V>,
   ): void {
-    return this.mapToN(table, mapper);
+    this.mapToN(table, mapper);
   }
 
   mapTo1<R extends TJSON[], P1>(
@@ -542,7 +542,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     mapper: new (p1: P1) => OutputMapper<R, K, V>,
     p1: P1,
   ): void {
-    return this.mapToN(table, mapper, p1);
+    this.mapToN(table, mapper, p1);
   }
 
   mapTo2<R extends TJSON[], P1, P2>(
@@ -551,7 +551,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p1: P1,
     p2: P2,
   ): void {
-    return this.mapToN(table, mapper, p1, p2);
+    this.mapToN(table, mapper, p1, p2);
   }
 
   mapTo3<R extends TJSON[], P1, P2, P3>(
@@ -561,7 +561,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p2: P2,
     p3: P3,
   ): void {
-    return this.mapToN(table, mapper, p1, p2, p3);
+    this.mapToN(table, mapper, p1, p2, p3);
   }
 
   mapTo4<R extends TJSON[], P1, P2, P3, P4>(
@@ -572,7 +572,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p3: P3,
     p4: P4,
   ): void {
-    return this.mapToN(table, mapper, p1, p2, p3, p4);
+    this.mapToN(table, mapper, p1, p2, p3, p4);
   }
 
   mapTo5<R extends TJSON[], P1, P2, P3, P4, P5>(
@@ -590,7 +590,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p4: P4,
     p5: P5,
   ): void {
-    return this.mapToN(table, mapper, p1, p2, p3, p4, p5);
+    this.mapToN(table, mapper, p1, p2, p3, p4, p5);
   }
 
   mapTo6<R extends TJSON[], P1, P2, P3, P4, P5, P6>(
@@ -610,7 +610,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p5: P5,
     p6: P6,
   ): void {
-    return this.mapToN(table, mapper, p1, p2, p3, p4, p5, p6);
+    this.mapToN(table, mapper, p1, p2, p3, p4, p5, p6);
   }
 
   mapTo7<R extends TJSON[], P1, P2, P3, P4, P5, P6, P7>(
@@ -632,7 +632,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p6: P6,
     p7: P7,
   ): void {
-    return this.mapToN(table, mapper, p1, p2, p3, p4, p5, p6, p7);
+    this.mapToN(table, mapper, p1, p2, p3, p4, p5, p6, p7);
   }
 
   mapTo8<R extends TJSON[], P1, P2, P3, P4, P5, P6, P7, P8>(
@@ -656,7 +656,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p7: P7,
     p8: P8,
   ): void {
-    return this.mapToN(table, mapper, p1, p2, p3, p4, p5, p6, p7, p8);
+    this.mapToN(table, mapper, p1, p2, p3, p4, p5, p6, p7, p8);
   }
 
   mapTo9<R extends TJSON[], P1, P2, P3, P4, P5, P6, P7, P8, P9>(
@@ -682,7 +682,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p8: P8,
     p9: P9,
   ): void {
-    return this.mapToN(table, mapper, p1, p2, p3, p4, p5, p6, p7, p8, p9);
+    this.mapToN(table, mapper, p1, p2, p3, p4, p5, p6, p7, p8, p9);
   }
 }
 
@@ -1595,7 +1595,9 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
     const skdb = await this.createSync();
     const tables = mirror(context, skdb, connect, ...tablesSchema);
     const skstore = new SKStoreImpl(context);
-    this.create(() => init(skstore, ...tables));
+    this.create(() => {
+      init(skstore, ...tables);
+    });
     return tables.map((t) => (t as TableHandleImpl<TJSON[]>).toTable());
   };
 }

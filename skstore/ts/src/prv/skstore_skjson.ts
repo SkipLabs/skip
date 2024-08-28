@@ -382,9 +382,9 @@ class LinksImpl implements Links {
         return fromWasm.SKIP_SKJSON_createCJString(utils.exportString(value));
       } else if (Array.isArray(value)) {
         const arr = fromWasm.SKIP_SKJSON_startCJArray();
-        value.forEach((v) =>
-          fromWasm.SKIP_SKJSON_addToCJArray(arr, exportJSON(v)),
-        );
+        value.forEach((v) => {
+          fromWasm.SKIP_SKJSON_addToCJArray(arr, exportJSON(v));
+        });
         return fromWasm.SKIP_SKJSON_endCJArray(arr);
       } else if (typeof value == "object") {
         if (value.__isObjectProxy || value.__isArrayProxy) {
@@ -434,8 +434,12 @@ class Manager implements ToWasmManager {
   prepare = (wasm: object) => {
     const toWasm = wasm as ToWasm;
     const link = new LinksImpl(this.env);
-    toWasm.SKIP_SKJSON_console = (value: ptr) => link.SKJSON_console(value);
-    toWasm.SKIP_SKJSON_error = (value: ptr) => link.SKJSON_error(value);
+    toWasm.SKIP_SKJSON_console = (value: ptr) => {
+      link.SKJSON_console(value);
+    };
+    toWasm.SKIP_SKJSON_error = (value: ptr) => {
+      link.SKJSON_error(value);
+    };
     return link;
   };
 }
