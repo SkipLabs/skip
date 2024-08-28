@@ -399,6 +399,22 @@ class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
       },
     };
   }
+
+  forEach(callbackfn: (value: T, index: number) => void, thisArg?: any): void {
+    let value = this.next();
+    let index = 0;
+    while (value != null) {
+      callbackfn.apply(thisArg, [value, index]);
+      value = this.next();
+    }
+  }
+
+  map<U>(
+    callbackfn: (value: T, index: number) => U,
+    thisArg?: any,
+  ): Iterable<U> {
+    return this.toArray().map(callbackfn, thisArg);
+  }
 }
 
 class WriterImpl<K, T> {
