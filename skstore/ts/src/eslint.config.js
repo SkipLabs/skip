@@ -8,6 +8,7 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   {
     rules: {
+      "prefer-spread": "warn",
       "no-unused-vars": [
         "error",
         {
