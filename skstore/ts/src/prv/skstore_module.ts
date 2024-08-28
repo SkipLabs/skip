@@ -728,24 +728,32 @@ class Manager implements ToWasmManager {
   prepare = (wasm: object) => {
     const toWasm = wasm as ToWasm;
     const links = new LinksImpl(this.env);
-    toWasm.SKIP_SKStore_detachHandle = (fn: int) => links.detachHandle(fn);
+    toWasm.SKIP_SKStore_detachHandle = (fn: int) => {
+      links.detachHandle(fn);
+    };
     toWasm.SKIP_SKStore_applyMapFun = (
       fn: int,
       context: ptr,
       writer: ptr,
       key: ptr,
       it: ptr,
-    ) => links.applyMapFun(fn, context, writer, key, it);
+    ) => {
+      links.applyMapFun(fn, context, writer, key, it);
+    };
     toWasm.SKIP_SKStore_applyMapTableFun = (
       fn: int,
       context: ptr,
       writer: ptr,
       row: ptr,
       occ: int,
-    ) => links.applyMapTableFun(fn, context, writer, row, occ);
+    ) => {
+      links.applyMapTableFun(fn, context, writer, row, occ);
+    };
     toWasm.SKIP_SKStore_applyConvertToRowFun = (fn: int, key: ptr, it: ptr) =>
       links.applyConvertToRowFun(fn, key, it);
-    toWasm.SKIP_SKStore_init = (context: ptr) => links.init(context);
+    toWasm.SKIP_SKStore_init = (context: ptr) => {
+      links.init(context);
+    };
     toWasm.SKIP_SKStore_applyLazyFun = (fn, context, self, key) =>
       links.applyLazyFun(fn, context, self, key);
 
@@ -757,7 +765,9 @@ class Manager implements ToWasmManager {
       name: ptr,
       key: ptr,
       param: ptr,
-    ) => links.applyLazyAsyncFun(fn, call, name, key, param);
+    ) => {
+      links.applyLazyAsyncFun(fn, call, name, key, param);
+    };
     toWasm.SKIP_SKStore_applyAccumulate = (fn: int, acc: ptr, value: ptr) =>
       links.applyAccumulate(fn, acc, value);
     toWasm.SKIP_SKStore_applyDismiss = (fn: int, acc: ptr, value: ptr) =>
