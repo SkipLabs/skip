@@ -7,6 +7,7 @@ import stylisticJs from "@stylistic/eslint-plugin-js";
 export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
+  ...tseslint.configs.stylisticTypeChecked,
   {
     languageOptions: {
       parserOptions: {
@@ -59,6 +60,9 @@ export default tseslint.config(
         "error",
         { allowInterfaces: "with-single-extends" },
       ],
+      "@typescript-eslint/consistent-type-definitions": "warn",
+      "@typescript-eslint/consistent-indexed-object-style": "off",
+      "@typescript-eslint/no-inferrable-types": "off",
       "@stylistic/js/lines-between-class-members": [
         "error",
         { enforce: [{ prev: "*", next: "method", blankLine: "always" }] },
