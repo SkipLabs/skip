@@ -220,6 +220,7 @@ export interface Accumulator<T extends TJSON, V extends TJSON> {
    * @return the resulting accumulated value
    */
   accumulate(acc: Opt<V>, value: T): V;
+
   /**
    * The computation to perform when an input value is removed
    * @param acc - the current accumulated value
@@ -238,6 +239,7 @@ export interface NonEmptyIterator<T> extends Iterable<T> {
    *   `first` cannot be called after `next`
    */
   next: () => Opt<T>;
+
   /**
    * Returns the first element of the iteration.
    * @throws {Error} when next called before
@@ -984,6 +986,7 @@ export interface Table<R extends TJSON[]> {
    *         violation
    */
   insert(entry: R[], update?: boolean): void;
+
   /**
    * Update an entry in the table
    * @param row - the table entry to update
@@ -991,6 +994,7 @@ export interface Table<R extends TJSON[]> {
    * @throws {Error} when the updates violate an index or other constraint
    */
   update(row: R, updates: JSONObject): void;
+
   /**
    * Update entries in the table matching some `where` clause
    * @param where - the column values to filter entries
@@ -998,6 +1002,7 @@ export interface Table<R extends TJSON[]> {
    * @throws {Error} when an index constraints is broken
    */
   updateWhere(where: JSONObject, updates: JSONObject): void;
+
   /**
    * Select entries in the table
    * @param where - the column values to filter entries
@@ -1005,22 +1010,26 @@ export interface Table<R extends TJSON[]> {
    * @throws {Error} when an index constraints is broken
    */
   select(where: JSONObject, columns?: string[]): JSONObject[];
+
   /**
    * Delete an entry from the table
    * @param entry - the entry to delete
    */
   delete(entry: R): void;
+
   /**
    * Delete entries from the table matching some `where` clause.
    * @param where - the column values to filter entries
    */
   deleteWhere(where: JSONObject): void;
+
   /**
    * Register a callback to be invoked on the `rows` of this table whenever data changes
    * @param update - the callback to invoke when data changes
    * @returns a callback `close` to terminate and clean up the watch
    */
   watch: (update: (rows: JSONObject[]) => void) => { close: () => void };
+
   /**
    * Register a callback to be invoked on the `added` and `removed` rows of this table
    * whenever data changes
@@ -1233,6 +1242,7 @@ export interface SKStore {
   >(
     mappings: Mapping<K1, V1, K2, V2>[],
   ): EHandle<K2, V2>;
+
   /**
    * Map over each entry of each eager reactive map and apply the corresponding mapper function
    *  then reduce the when the given accumulator
