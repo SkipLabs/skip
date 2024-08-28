@@ -1,6 +1,6 @@
 // prettier-ignore
 import type { Opt, Shared, ptr, int, float, Metadata } from "#std/sk_types.js";
-import type * as Internal from "./skstore_internal_types.js";
+import type * as Internal from "./skipruntime_internal_types.js";
 import type {
   Accumulator,
   AValue,

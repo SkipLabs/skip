@@ -354,6 +354,7 @@ fun manage(
     packageFile = Path.join(tsd, "package.json");
     if (FileSystem.exists(packageFile)) {
       res = try {
+        // TODO: Manage multiple time same dependencies
         contents = FileSystem.readTextFile(packageFile);
         json = JSON.decode(contents).expectObject();
         json.maybeGetObject("dependencies").each(dps ->

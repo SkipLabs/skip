@@ -1,6 +1,6 @@
 // prettier-ignore
 import type { int, ptr, float, Links, Utils, ToWasmManager, Environment, Opt, Shared, } from "#std/sk_types.js";
-import type * as Internal from "./skstore_internal_types.js";
+import type * as Internal from "./skipruntime_internal_types.js";
 
 export enum Type {
   /* eslint-disable no-unused-vars */
