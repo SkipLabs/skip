@@ -6,8 +6,14 @@ import stylisticJs from "@stylistic/eslint-plugin-js";
 
 export default tseslint.config(
   eslint.configs.recommended,
-  ...tseslint.configs.recommended,
+  ...tseslint.configs.recommendedTypeChecked,
   {
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
     plugins: {
       "@stylistic/js": stylisticJs,
     },
@@ -40,6 +46,8 @@ export default tseslint.config(
         },
       ],
       "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-unsafe-assignment": "warn",
+      "@typescript-eslint/no-unsafe-member-access": "warn",
       "@typescript-eslint/no-empty-object-type": [
         "error",
         { allowInterfaces: "with-single-extends" },
@@ -50,4 +58,5 @@ export default tseslint.config(
       ],
     },
   },
+  { files: ["**/*.js"], ...tseslint.configs.disableTypeChecked },
 );

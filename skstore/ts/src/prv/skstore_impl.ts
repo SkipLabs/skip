@@ -1048,6 +1048,7 @@ export class SKStoreImpl implements SKStore {
     const ctxmapping = mappings.map((mapping) => {
       const params = mapping.params ?? [];
       params.forEach(check);
+      /* eslint-disable-next-line @typescript-eslint/no-unsafe-argument */
       const mapperObj = new mapping.mapper(...params);
       Object.freeze(mapperObj);
       name += mapperObj.constructor.name;
@@ -1075,6 +1076,7 @@ export class SKStoreImpl implements SKStore {
     const ctxmapping = mappings.map((mapping) => {
       const params = mapping.params ?? [];
       params.forEach(check);
+      /* eslint-disable-next-line @typescript-eslint/no-unsafe-argument */
       const mapperObj = new mapping.mapper(...params);
       Object.freeze(mapperObj);
       name += mapperObj.constructor.name;
@@ -1556,6 +1558,7 @@ export class SKStoreImpl implements SKStore {
         ("__isObjectProxy" in object && object.__isObjectProxy)) &&
       "clone" in object
     ) {
+      /* eslint-disable-next-line @typescript-eslint/no-unsafe-call */
       console.log(object.clone());
     } else {
       console.log(object);
@@ -1611,6 +1614,7 @@ export function mirror(
   ...tables: MirrorSchema[]
 ): TableHandle<TJSON[]>[] {
   if (connect) {
+    /* eslint-disable-next-line @typescript-eslint/no-floating-promises */
     skdb.mirror(...toMirrorDefinitions(...tables));
   } else {
     /*
@@ -1854,7 +1858,7 @@ export function check<T>(value: T): void {
     return;
   } else if (type == "object") {
     const jso = value as any;
-    if ((value as any).__sk_frozen) {
+    if (jso.__sk_frozen) {
       return;
     } else if (Object.isFrozen(jso)) {
       if (Array.isArray(jso)) {
@@ -1862,6 +1866,7 @@ export function check<T>(value: T): void {
           check(jso[i]);
         }
       } else {
+        /* eslint-disable-next-line @typescript-eslint/no-unsafe-argument */
         for (const key of Object.keys(jso)) {
           check(jso[key]);
         }
