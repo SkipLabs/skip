@@ -625,7 +625,7 @@ class LinksImpl implements Links {
             );
           }
         })
-        .catch((reason: any) => {
+        .catch((reason: unknown) => {
           let msg: string;
           if (reason instanceof Error) {
             msg = reason.message;
