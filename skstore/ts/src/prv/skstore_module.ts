@@ -42,7 +42,7 @@ class HandlesImpl implements Handles {
   }
 
   apply = (id: int, parameters: any[]) => {
-    let fn = this.objects[id];
+    const fn = this.objects[id];
     return fn.apply(null, parameters);
   };
 
@@ -619,7 +619,7 @@ class LinksImpl implements Links {
           }
         })
         .catch((reason: any) => {
-          var msg: string;
+          let msg: string;
           if (reason instanceof Error) {
             msg = reason.message;
           } else if (typeof reason == "string") {
@@ -683,7 +683,7 @@ class LinksImpl implements Links {
     this.getErrorHdl = (exn: ptr) => {
       return this.handles.register(utils.getErrorObject(exn));
     };
-    let create = (init: () => void) => {
+    const create = (init: () => void) => {
       // Register the init function to have  a named init function
       this.initFn = init;
       // Get a run uuid to build to allow function mapping reload in case of persistence
@@ -718,8 +718,8 @@ class Manager implements ToWasmManager {
   }
 
   prepare = (wasm: object) => {
-    let toWasm = wasm as ToWasm;
-    let links = new LinksImpl(this.env);
+    const toWasm = wasm as ToWasm;
+    const links = new LinksImpl(this.env);
     toWasm.SKIP_SKStore_detachHandle = (fn: int) => links.detachHandle(fn);
     toWasm.SKIP_SKStore_applyMapFun = (
       fn: int,
