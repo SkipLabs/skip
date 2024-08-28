@@ -6,7 +6,6 @@ import type {
   EHandle,
   LHandle,
   Mapper,
-  ValueMapper,
   EntryMapper,
   OutputMapper,
   TableHandle,
@@ -39,7 +38,7 @@ type Query = { query: string; params?: JSONObject };
 function assertNoKeysNaN<K extends TJSON, V extends TJSON>(
   kv_pairs: Iterable<[K, V]>,
 ): Iterable<[K, V]> {
-  for (let [k, _v] of kv_pairs) {
+  for (const [k, _v] of kv_pairs) {
     if (Number.isNaN(k)) {
       // NaN is forbidden since it breaks comparison reflexivity, ordering, etc.
       throw new Error("NaN is forbidden as a Skip collection key");
@@ -1042,7 +1041,7 @@ export class SKStoreImpl implements SKStore {
     K2 extends TJSON,
     V2 extends TJSON,
   >(mappings: Mapping<K1, V1, K2, V2>[]): EHandle<K2, V2> {
-    var name = "";
+    let name = "";
     const ctxmapping = mappings.map((mapping) => {
       const params = mapping.params ?? [];
       params.forEach(check);
@@ -1069,7 +1068,7 @@ export class SKStoreImpl implements SKStore {
     mappings: Mapping<K1, V1, K2, V2>[],
     accumulator: Accumulator<V2, V3>,
   ): EHandle<K2, V3> {
-    var name = "";
+    let name = "";
     const ctxmapping = mappings.map((mapping) => {
       const params = mapping.params ?? [];
       params.forEach(check);
@@ -1586,8 +1585,8 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
     tablesSchema: MirrorSchema[],
     connect: boolean = true,
   ): Promise<Table<TJSON[]>[]> => {
-    let context = this.context();
-    let skdb = await this.createSync();
+    const context = this.context();
+    const skdb = await this.createSync();
     const tables = mirror(context, skdb, connect, ...tablesSchema);
     const skstore = new SKStoreImpl(context);
     this.create(() => init(skstore, ...tables));
@@ -1665,8 +1664,8 @@ function create(table: MirrorSchema): Query {
 }
 
 function toValues(entry: TJSON[], prefix: string = ""): Query {
-  let exprs: string[] = [];
-  let params: JSONObject = {};
+  const exprs: string[] = [];
+  const params: JSONObject = {};
   for (let i = 0; i < entry.length; i++) {
     const field = entry[i];
     if (
@@ -1692,8 +1691,8 @@ function toWhere(
   prefix: string = "",
 ): Query {
   if (columns.length != entry.length) throw new Error("Invalid entry type.");
-  let exprs: string[] = [];
-  let params: JSONObject = {};
+  const exprs: string[] = [];
+  const params: JSONObject = {};
   for (let i = 0; i < columns.length; i++) {
     const column = columns[i];
     const field = entry[i];
@@ -1718,8 +1717,8 @@ function toWhere(
 }
 
 function toSets(update: JSONObject, prefix: string = ""): Query {
-  let exprs: string[] = [];
-  let params: JSONObject = {};
+  const exprs: string[] = [];
+  const params: JSONObject = {};
   Object.keys(update).forEach((column: keyof JSONObject) => {
     const field = update[column];
     params[prefix + column] = field;
@@ -1734,8 +1733,8 @@ function toSets(update: JSONObject, prefix: string = ""): Query {
 function toSelectWhere(select: JSONObject, prefix: string = ""): Query {
   const keys = Object.keys(select);
   if (keys.length <= 0) return { query: "true" };
-  let exprs: string[] = [];
-  let params: JSONObject = {};
+  const exprs: string[] = [];
+  const params: JSONObject = {};
   keys.forEach((column: keyof JSONObject) => {
     const field = select[column];
     if (Array.isArray(field)) {
@@ -1759,7 +1758,7 @@ function toSelectWhere(select: JSONObject, prefix: string = ""): Query {
 }
 
 function toParams(params: JSONObject): Params {
-  let res: Record<string, string | number | boolean> = {};
+  const res: Record<string, string | number | boolean> = {};
   Object.keys(params).forEach((key: keyof JSONObject) => {
     const v = params[key];
     if (typeof v == "string") {
