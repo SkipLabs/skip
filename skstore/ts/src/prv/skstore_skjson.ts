@@ -425,6 +425,7 @@ class LinksImpl implements Links {
 
 class Manager implements ToWasmManager {
   env: Environment;
+
   constructor(env: Environment) {
     this.env = env;
   }

@@ -61,6 +61,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
       value: true,
     });
   }
+
   getId(): string {
     return this.eagerHdl;
   }
@@ -731,9 +732,11 @@ export class LSelfImpl<K extends TJSON, V extends TJSON>
   getArray(key: K): V[] {
     return this.context.getArraySelf(this.lazyHdl, key);
   }
+
   getOne(key: K): V {
     return this.context.getOneSelf(this.lazyHdl, key);
   }
+
   maybeGetOne(key: K): Opt<V> {
     return this.context.maybeGetOneSelf(this.lazyHdl, key);
   }
