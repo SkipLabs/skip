@@ -57,9 +57,9 @@ const modules: ModuleInit[] = [];
 /*--MODULES--*/
 
 async function wasmUrl(): Promise<URL> {
-  //@ts-ignore
+  //@ts-expect-error  ImportMeta is incomplete
   if (import.meta.env || import.meta.webpack) {
-    //@ts-ignore
+    //@ts-expect-error  Cannot find module './skstore.wasm?url' or its corresponding type declarations.
     return await import("./skstore.wasm?url");
   }
 
@@ -71,7 +71,7 @@ export async function createSKStore(
   tables: MirrorSchema[],
   connect: boolean = true,
 ): Promise<Table<TJSON[]>[]> {
-  let data = await runUrl(wasmUrl, modules, [], "SKDB_factory");
+  const data = await runUrl(wasmUrl, modules, [], "SKDB_factory");
   const factory = data.environment.shared.get("SKStore") as SKStoreFactory;
   return factory.runSKStore(init, tables, connect);
 }
