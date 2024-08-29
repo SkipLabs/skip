@@ -196,9 +196,9 @@ interface Exported {
   SKIP_call0: <Ret>(
     fnc: ptr<Internal.Function<Internal.Void, Internal.T<Ret>>>,
   ) => ptr<Internal.T<Ret>>;
-  SKIP_skfs_init: (size: int) => void;
+  SKIP_skstore_init: (size: int) => void;
   SKIP_initializeSkip: () => void;
-  SKIP_skfs_end_of_init: () => void;
+  SKIP_skstore_end_of_init: () => void;
   SKIP_callWithException: <Ret>(
     fnc: ptr<Internal.Function<Internal.Void, Internal.T<Ret>>>,
     exc: int,
@@ -508,9 +508,9 @@ export class Utils {
   init = () => {
     let heapBase = this.exports.__heap_base.valueOf();
     let size = this.exports.memory.buffer.byteLength - heapBase;
-    this.exports.SKIP_skfs_init(size);
+    this.exports.SKIP_skstore_init(size);
     this.exports.SKIP_initializeSkip();
-    this.exports.SKIP_skfs_end_of_init();
+    this.exports.SKIP_skstore_end_of_init();
   };
   etry = <Ret>(
     f: ptr<Internal.Function<Internal.Void, Internal.T<Ret>>>,
@@ -546,7 +546,7 @@ export class Utils {
       let message =
         skMessage != null && skMessage != 0
           ? this.importString(skMessage)
-          : "SKFS Internal error";
+          : "SKStore Internal error";
       let lines = message.split("\n");
       if (lines[0].startsWith("external:")) {
         let external = lines.shift()!;
@@ -555,7 +555,7 @@ export class Utils {
         if (this.state.exceptions.has(id)) {
           throw this.state.exceptions.get(id)!.err;
         } else if (message.trim() == "") {
-          message = "SKFS Internal error";
+          message = "SKStore Internal error";
         }
       }
       const err = new SkError(message);
