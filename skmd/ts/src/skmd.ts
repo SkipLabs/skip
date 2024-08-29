@@ -1,6 +1,6 @@
 import { Options, run, type ToWasmManager } from "#std/sk_types";
 
-var modules: (() => Promise<ToWasmManager>)[];
+const modules: (() => Promise<ToWasmManager>)[] = [];
 /*--MODULES--*/
 
 const wasmurl = new URL("./skmd.wasm", import.meta.url);
