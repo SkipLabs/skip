@@ -23,8 +23,10 @@ import type {
   LazyCompute,
   AsyncLazyCompute,
   NonEmptyIterator,
-  Database,
   Index,
+  Remote,
+  Locale,
+  EntryPoint,
 } from "../skipruntime_api.js";
 
 // prettier-ignore
@@ -148,6 +150,7 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
       this.eagerHdl,
       table.getSchema(),
       (key: K, it: NonEmptyIterator<V>) => mapperObj.mapElement(key, it),
+      table.isConnected(),
     );
   }
 }
@@ -225,15 +228,19 @@ export class TableCollectionImpl<R extends TJSON[]>
     });
   }
 
-  getName(): string {
+  getName() {
     return this.schema.name;
   }
 
-  getSchema(): Schema {
+  getSchema() {
     return this.schema;
   }
 
-  get(key: TJSON, index?: string | undefined): R[] {
+  isConnected() {
+    return this.skdb.connectedRemote ? true : false;
+  }
+
+  get(key: TJSON, index?: string | undefined) {
     return this.context.getFromTable(this.getName(), key, index);
   }
 
@@ -280,8 +287,8 @@ export class TableImpl<R extends TJSON[]> implements Table<R> {
 
   insert(entries: R[], update?: boolean | undefined): void {
     entries = entries.map((e) => {
-      if (this.schema.expected.length > e.length) {
-        if (this.schema.expected[e.length].name == "skdb_access") {
+      if (this.schema.columns.length > e.length) {
+        if (this.schema.columns[e.length].name == "skdb_access") {
           e.push("read-write");
         }
       }
@@ -295,7 +302,7 @@ export class TableImpl<R extends TJSON[]> implements Table<R> {
   update(entry: R, updates: JSONObject): void {
     const query = toUpdateQuery(
       this.getName(),
-      this.schema.expected,
+      this.schema.columns,
       entry,
       updates,
     );
@@ -322,7 +329,7 @@ export class TableImpl<R extends TJSON[]> implements Table<R> {
   }
 
   delete(entry: R): void {
-    const query = toDeleteQuery(this.getName(), this.schema.expected, entry);
+    const query = toDeleteQuery(this.getName(), this.schema.columns, entry);
     this.skdb.exec(
       query.query,
       query.params ? toParams(query.params) : undefined,
@@ -507,27 +514,34 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
   getName = () => "SKStore";
 
   runSKStore = async (
-    init: (skstore: SKStore, ...tables: TableCollection<TJSON[]>[]) => void,
-    tablesSchema: Schema[],
-    database: Database | null,
-  ): Promise<Table<TJSON[]>[]> => {
-    const context = this.context();
-    const skdb = await this.createSync();
-    const cdatabase = database
-      ? {
-          name: database.name,
-          access: database.access,
-          private: await this.createKey(database.private),
-          endpoint: database.endpoint,
-        }
-      : null;
-    const tables = await mirror(context, skdb, cdatabase, ...tablesSchema);
+    init: (
+      skstore: SKStore,
+      tables: Record<string, TableCollection<TJSON[]>>,
+    ) => void,
+    locale: Locale,
+    remotes: Remote[] = [],
+  ): Promise<Record<string, Table<TJSON[]>>> => {
+    let context = this.context();
+    const tables = await mirror(
+      context,
+      this.createSync,
+      locale,
+      remotes,
+      this.createKey,
+    );
     const skstore = new SKStoreImpl(context);
-    this.create(() => {
-      init(skstore, ...tables);
-    });
-    return tables.map((t) => (t as TableCollectionImpl<TJSON[]>).toTable());
+    this.create(() => init(skstore, tables));
+    const result: Record<string, Table<TJSON[]>> = {};
+    for (const [key, value] of Object.entries(tables)) {
+      result[key] = (value as TableCollectionImpl<TJSON[]>).toTable();
+    }
+    return result;
   };
+}
+
+function toWs(entryPoint: EntryPoint) {
+  if (entryPoint.secured) return `wss://${entryPoint.host}:${entryPoint.port}`;
+  return `ws://${entryPoint.host}:${entryPoint.port}`;
 }
 
 /**
@@ -540,30 +554,49 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
  */
 export async function mirror(
   context: Context,
-  skdb: SKDBSync,
-  database: {
-    name: string;
-    access: string;
-    private: CryptoKey;
-    endpoint?: string;
-  } | null,
-  ...tables: Schema[]
-): Promise<TableCollection<TJSON[]>[]> {
-  if (database) {
+  createSkdb: () => Promise<SKDBSync>,
+  locale: Locale,
+  remotes: Remote[],
+  createKey: (key: string) => Promise<CryptoKey>,
+): Promise<Record<string, TableCollection<TJSON[]>>> {
+  const tHandles: Record<string, TableCollection<TJSON[]>> = {};
+  if (locale.database) {
+    remotes.push({
+      database: locale.database!,
+      tables: locale.tables,
+    });
+  } else {
+    for (const table of locale.tables) {
+      let skdb = await createSkdb();
+      const query = create(table);
+      skdb.exec(query.query, query.params ? toParams(query.params) : undefined);
+      if (table.indexes) {
+        const indexes = table.indexes.map((idx) =>
+          createIndex(table.name, idx),
+        );
+        skdb.exec(indexes.join("\n"));
+      }
+      tHandles[table.name] = new TableCollectionImpl(context, skdb, table);
+    }
+  }
+  for (const remote of remotes) {
+    let skdb = await createSkdb();
+    const database = remote.database;
+    const privateKey = await createKey(database.private);
     await skdb.connect(
       database.name,
       database.access,
-      database.private,
-      database.endpoint,
+      privateKey,
+      database.endpoint ? toWs(database.endpoint) : undefined,
     );
     if (!skdb.connectedRemote) {
       throw new Error("Unable to connect to server.");
     }
-    for (const table of tables) {
+    for (const table of remote.tables) {
       const with_access =
-        table.expected.filter((v) => v.name == "skdb_access").length > 0;
+        table.columns.filter((v) => v.name == "skdb_access").length > 0;
       if (!with_access) {
-        table.expected.push({
+        table.columns.push({
           name: "skdb_access",
           type: "TEXT",
         });
@@ -573,25 +606,14 @@ export async function mirror(
         query.query,
         query.params ? toParams(query.params) : undefined,
       );
+      tHandles[table.name] = new TableCollectionImpl(context, skdb, table);
     }
     /* eslint-disable-next-line @typescript-eslint/no-floating-promises */
-    const definitions = toMirrorDefinitions(...tables);
+    const definitions = toMirrorDefinitions(...remote.tables);
 
     await skdb.mirror(...definitions);
-    context.toggleConnected();
-  } else {
-    tables.forEach((table) => {
-      const query = create(table);
-      skdb.exec(query.query, query.params ? toParams(query.params) : undefined);
-    });
   }
-  tables.forEach((table) => {
-    if (table.indexes) {
-      const indexes = table.indexes.map((idx) => createIndex(table.name, idx));
-      skdb.exec(indexes.join("\n"));
-    }
-  });
-  return tables.map((table) => new TableCollectionImpl(context, skdb, table));
+  return tHandles;
 }
 
 function toColumn(column: ColumnSchema): string {
@@ -612,11 +634,12 @@ function toColumns(columns: ColumnSchema[]): string {
 function toMirrorDefinition(table: Schema): MirrorDefn {
   return {
     table: table.name,
-    expectedColumns: toColumns(table.expected),
-    filterExpr: table.filter?.filter,
-    filterParams: table.filter?.params
-      ? toParams(table.filter.params)
-      : undefined,
+    expectedColumns: toColumns(table.columns),
+    filterExpr: table.filter ? table.filter.filter : undefined,
+    filterParams:
+      table.filter && table.filter.params
+        ? toParams(table.filter.params)
+        : undefined,
   };
 }
 
@@ -632,7 +655,7 @@ function createIndex(table: string, index: Index): string {
 
 function create(table: Schema): Query {
   const query = `CREATE TABLE IF NOT EXISTS "${table.name}" ${toColumns(
-    table.expected,
+    table.columns,
   )};`;
   return { query };
 }

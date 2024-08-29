@@ -1,5 +1,5 @@
 import { main } from "./utils.js";
 
-import { createSKStore } from "skip-runtime";
+import { createLocaleSKStore } from "skip-runtime";
 
-await main(createSKStore);
+await main(createLocaleSKStore);

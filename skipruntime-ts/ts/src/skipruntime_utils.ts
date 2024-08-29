@@ -44,12 +44,12 @@ export class Max implements Accumulator<number, number> {
 
 export function schema(
   name: string,
-  expected: ColumnSchema[],
+  columns: ColumnSchema[],
   indexes?: Index[],
 ): Schema {
   return {
     name,
-    expected,
+    columns,
     indexes,
   };
 }

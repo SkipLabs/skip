@@ -33,9 +33,9 @@ export type Index = {
 };
 export type Schema = {
   name: string;
-  expected: ColumnSchema[];
-  filter?: DBFilter;
+  columns: ColumnSchema[];
   indexes?: Index[];
+  filter?: DBFilter;
 };
 
 /**
@@ -351,6 +351,7 @@ export interface EagerCollection<K extends TJSON, V extends TJSON> {
 export interface TableCollection<R extends TJSON[]> {
   getName(): string;
   getSchema(): Schema;
+  isConnected(): boolean;
   /**
    * Lookup in the table using specified index
    * @param key - the key to lookup in the table
@@ -461,19 +462,38 @@ export type Mapping<
   params?: Param[];
 };
 
+export type EntryPoint = {
+  host: string;
+  port: number;
+  secured?: boolean;
+};
+
 export type Database = {
   name: string;
   access: string;
   private: string;
-  endpoint?: string;
+  endpoint?: EntryPoint;
+};
+
+export type Locale = {
+  database?: Database;
+  tables: Schema[];
+};
+
+export type Remote = {
+  database: Database;
+  tables: Schema[];
 };
 
 export interface SKStoreFactory extends Shared {
   runSKStore(
-    init: (skstore: SKStore, ...tables: TableCollection<TJSON[]>[]) => void,
-    tables: Schema[],
-    database: Database | null,
-  ): Promise<Table<TJSON[]>[]>;
+    init: (
+      skstore: SKStore,
+      tables: Record<string, TableCollection<TJSON[]>>,
+    ) => void,
+    locale: Locale,
+    remotes?: Remote[],
+  ): Promise<Record<string, Table<TJSON[]>>>;
 }
 
 export interface LazyCompute<K extends TJSON, V extends TJSON> {

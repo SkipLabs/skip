@@ -69,29 +69,16 @@ export class ContextImpl implements Context {
   exports: FromWasm;
   handles: Handles;
   ref: Ref;
-  connected: boolean;
 
   constructor(skjson: SKJSON, exports: FromWasm, handles: Handles, ref: Ref) {
     this.skjson = skjson;
     this.exports = exports;
     this.handles = handles;
     this.ref = ref;
-    this.connected = false;
-  }
-
-  toggleConnected() {
-    this.connected = true;
   }
 
   noref() {
-    const nctx = new ContextImpl(
-      this.skjson,
-      this.exports,
-      this.handles,
-      new Ref(),
-    );
-    nctx.connected = this.connected;
-    return nctx;
+    return new ContextImpl(this.skjson, this.exports, this.handles, new Ref());
   }
 
   lazy<K extends TJSON, V extends TJSON>(
@@ -325,14 +312,31 @@ export class ContextImpl implements Context {
     eagerHdl: string,
     schema: Schema,
     convert: (key: K, it: NonEmptyIterator<V>) => Iterable<R>,
+    connected: boolean,
   ) {
-    const convertId = this.handles.register(convert);
+    const checked: (key: K, it: NonEmptyIterator<V>) => Iterable<R> = (
+      key: K,
+      it: NonEmptyIterator<V>,
+    ) => {
+      const rit = convert(key, it);
+      const verified: R[] = [];
+      for (const e of rit) {
+        if (schema.columns.length > e.length) {
+          if (schema.columns[e.length].name == "skdb_access") {
+            e.push("read-write");
+          }
+        }
+        verified.push(e);
+      }
+      return verified;
+    };
+    const convertId = this.handles.register(checked);
     this.exports.SkipRuntime_toSkdb(
       this.pointer(),
       this.skjson.exportString(eagerHdl),
       this.skjson.exportString(schema.name),
       convertId,
-      this.connected,
+      connected,
     );
   }
 

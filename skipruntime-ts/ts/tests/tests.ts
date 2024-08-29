@@ -16,11 +16,12 @@ import type {
   Loadable,
   NonEmptyIterator,
   AsyncLazyCollection,
+  TTableCollection,
 } from "skip-runtime";
 import {
   Sum,
   ValueMapper,
-  createSKStore,
+  createLocaleSKStore,
   cinteger as integer,
   schema,
   ctext as text,
@@ -32,8 +33,8 @@ function check(name: String, got: TJSON, expected: TJSON): void {
 
 export type Test = {
   name: string;
-  schema: Schema[];
-  init: (skstore: SKStore, ...tables: any[]) => void;
+  schemas: Schema[];
+  init: (skstore: SKStore, ...tables: TTableCollection[]) => void;
   run: (...tables: any[]) => Promise<void>;
   error?: (err: any) => void;
 };
@@ -572,7 +573,7 @@ async function testAsyncLazyRun(
 export const tests: Test[] = [
   {
     name: "testMap1",
-    schema: [
+    schemas: [
       schema("input", [integer("id", true, true), integer("value")]),
       schema("output", [integer("id", true, true), integer("value")]),
     ],
@@ -581,7 +582,7 @@ export const tests: Test[] = [
   },
   {
     name: "testMap2",
-    schema: [
+    schemas: [
       schema("input1", [integer("id", true, true), text("value")]),
       schema("input2", [integer("id", true, true), text("value")]),
       schema("output", [integer("id", true, true), integer("value")]),
@@ -591,7 +592,7 @@ export const tests: Test[] = [
   },
   {
     name: "testMap3",
-    schema: [
+    schemas: [
       schema("input_no_index", [integer("id"), text("value")]),
       schema("input_index", [integer("id", true, true), text("value")]),
       schema("output", [integer("id"), integer("value")]),
@@ -600,8 +601,8 @@ export const tests: Test[] = [
     run: testMap3Run,
   },
   {
-    name: "testValueMapper",
-    schema: [
+    name: "testMapValues",
+    schemas: [
       schema("input", [integer("id", true, true), integer("value")]),
       schema("output", [integer("id", true, true), integer("value")]),
     ],
@@ -610,7 +611,7 @@ export const tests: Test[] = [
   },
   {
     name: "testSize",
-    schema: [
+    schemas: [
       schema("input", [integer("id", true, true), integer("value")]),
       schema("size", [integer("id", true, true)]),
       schema("output", [integer("id", true, true), integer("value")]),
@@ -620,7 +621,7 @@ export const tests: Test[] = [
   },
   {
     name: "testLazy",
-    schema: [
+    schemas: [
       schema("input", [integer("id", true, true), integer("value")]),
       schema("output", [integer("id", true, true), integer("value")]),
     ],
@@ -629,7 +630,7 @@ export const tests: Test[] = [
   },
   {
     name: "testMapReduce",
-    schema: [
+    schemas: [
       schema("input", [integer("id", true, true), integer("v")]),
       schema("output", [integer("id", true, true), integer("v")]),
     ],
@@ -638,7 +639,7 @@ export const tests: Test[] = [
   },
   {
     name: "testMultiMap1",
-    schema: [
+    schemas: [
       schema("input1", [integer("id", true, true), integer("value")]),
       schema("input2", [integer("id", true, true), integer("value")]),
       schema("output", [integer("src"), integer("id"), integer("v")]),
@@ -648,7 +649,7 @@ export const tests: Test[] = [
   },
   {
     name: "testMultiMapReduce",
-    schema: [
+    schemas: [
       schema("input1", [integer("id", true, true), integer("value")]),
       schema("input2", [integer("id", true, true), integer("value")]),
       schema("output", [integer("id", true, true), integer("v")]),
@@ -658,7 +659,7 @@ export const tests: Test[] = [
   },
   {
     name: "testAsyncLazy",
-    schema: [
+    schemas: [
       schema("input1", [integer("id", true, true), integer("value")]),
       schema("input2", [integer("id", true, true), integer("value")]),
       schema("output", [integer("id", true, true), text("v")]),
@@ -672,10 +673,10 @@ function run(t: Test) {
   test(t.name, async ({ page }) => {
     let tables: Table<TJSON[]>[] = [];
     try {
-      tables = await createSKStore(t.init, t.schema, null);
+      tables = await createLocaleSKStore(t.init, t.schemas);
     } catch (err: any) {
       if (t.error) t.error(err);
-      else console.error(err);
+      else throw err;
     }
 
     if (tables.length > 0) await t.run(...tables);

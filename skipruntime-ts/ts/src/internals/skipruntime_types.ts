@@ -92,6 +92,7 @@ export interface Context {
     eagerHdl: string,
     table: Schema,
     mapper: (key: K, it: NonEmptyIterator<V>) => Iterable<R>,
+    connected: boolean,
   ) => void;
 
   multimap: <
@@ -117,7 +118,6 @@ export interface Context {
   ) => string;
 
   noref: () => Context;
-  toggleConnected: () => void;
 }
 
 export interface Handles {
