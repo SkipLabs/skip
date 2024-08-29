@@ -51,7 +51,7 @@ export function schema(name: string, expected: ColumnSchema[]): MirrorSchema {
 export function cinteger(
   name: string,
   notnull: boolean = true,
-  primary?: boolean,
+  primary: boolean = false,
 ): ColumnSchema {
   return {
     name,
@@ -64,7 +64,7 @@ export function cinteger(
 export function ctext(
   name: string,
   notnull: boolean = true,
-  primary?: boolean,
+  primary: boolean = false,
 ): ColumnSchema {
   return {
     name,
@@ -77,7 +77,7 @@ export function ctext(
 export function cjson(
   name: string,
   notnull: boolean = true,
-  primary?: boolean,
+  primary: boolean = false,
 ): ColumnSchema {
   return {
     name,
@@ -90,7 +90,7 @@ export function cjson(
 export function cfloat(
   name: string,
   notnull: boolean = true,
-  primary?: boolean,
+  primary: boolean = false,
 ): ColumnSchema {
   return {
     name,

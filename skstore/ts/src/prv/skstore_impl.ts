@@ -1653,7 +1653,7 @@ function toMirrorDefinition(table: MirrorSchema): MirrorDefn {
   return {
     table: table.name,
     expectedColumns: toColumns(table.expected),
-    filterExpr: table.filter ? table.filter.filter : undefined,
+    filterExpr: table.filter?.filter,
     filterParams: table.filter?.params
       ? toParams(table.filter.params)
       : undefined,
