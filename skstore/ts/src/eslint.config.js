@@ -73,8 +73,6 @@ export default tseslint.config(
       "jsdoc/require-jsdoc": ["warn", { publicOnly: true }],
       "jsdoc/require-description": "warn",
       "jsdoc/require-param-description": "warn",
-      "jsdoc/check-tag-names": "warn",
-      "jsdoc/require-returns": "warn",
       "jsdoc/no-types": "warn",
     },
   },

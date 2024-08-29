@@ -195,7 +195,7 @@ export interface Accumulator<T extends TJSON, V extends TJSON> {
    * The computation to perform when an input value is added
    * @param acc - the current accumulated value
    * @param value - the added value
-   * @return the resulting accumulated value
+   * @returns the resulting accumulated value
    */
   accumulate(acc: Opt<V>, value: T): V;
 
@@ -203,7 +203,7 @@ export interface Accumulator<T extends TJSON, V extends TJSON> {
    * The computation to perform when an input value is removed
    * @param acc - the current accumulated value
    * @param value - the removed value
-   * @return the resulting accumulated value
+   * @returns the resulting accumulated value
    */
   dismiss(acc: V, value: T): Opt<V>;
 }
