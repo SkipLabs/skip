@@ -1,10 +1,10 @@
 import type {
   SKStore,
-  TableHandle,
+  TableCollection,
   TableMapper,
   LazyCompute,
-  EHandle,
-  LHandle,
+  EagerCollection,
+  LazyCollection,
   Mapper,
   NonEmptyIterator,
   OutputMapper,
@@ -39,14 +39,14 @@ class ValueForCell
 }
 
 class ComputeExpression implements LazyCompute<[string, string], string> {
-  constructor(private skall: EHandle<[string, string], string>) {}
+  constructor(private skall: EagerCollection<[string, string], string>) {}
 
   compute(
-    selfHdl: LHandle<[string, string], string>,
+    self: LazyCollection<[string, string], string>,
     key: [string, string],
   ): string | null {
     const getComputed = (key: [string, string]) => {
-      const v = selfHdl.getOne(key);
+      const v = self.getOne(key);
       if (typeof v == "number") return v;
       if (typeof v == "string") {
         const nv = parseFloat(v);
@@ -90,7 +90,7 @@ class ComputeExpression implements LazyCompute<[string, string], string> {
 class CallCompute
   implements Mapper<[string, string], string, [string, string], string>
 {
-  constructor(private evaluator: LHandle<[string, string], string>) {}
+  constructor(private evaluator: LazyCollection<[string, string], string>) {}
 
   mapElement(
     key: [string, string],
@@ -120,8 +120,8 @@ class ToOutput
 
 export function initSKStore(
   store: SKStore,
-  cells: TableHandle<[string, string, string]>,
-  computed: TableHandle<[string, string, string]>,
+  cells: TableCollection<[string, string, string]>,
+  computed: TableCollection<[string, string, string]>,
 ) {
   // Build index to access all value reactivly
   const skall = cells.map(ValueForCell);

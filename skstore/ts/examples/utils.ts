@@ -4,7 +4,7 @@ import type {
   MirrorSchema,
   Table,
   JSONObject,
-  TTableHandle,
+  TTableCollection,
   TTable,
   createSKStore as CreateSKStore,
 } from "skstore";
@@ -16,7 +16,7 @@ import { resolve } from "path";
 
 export interface ReactiveStorage {
   tablesSchema: () => MirrorSchema[];
-  initSKStore: (store: SKStore, ...table: TTableHandle[]) => void;
+  initSKStore: (store: SKStore, ...table: TTableCollection[]) => void;
   scenarios: () => Step[][];
 }
 
