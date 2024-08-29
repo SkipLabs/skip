@@ -119,25 +119,26 @@ export type AValue<V extends TJSON, M extends TJSON> = {
 export class TableIndexError extends Error {}
 
 /**
- * The type of a reactive function mapping over a table.
+ * The type of a reactive function mapping from a `TableCollection` into an
+ * `EagerCollection`
  * @param entry - the input table row
- * @param occ - the number of repeat occurrences of `entry`
+ * @param count - the number of repeat occurrences of `entry`
  * @returns {Iterable} an iterable of key/value pairs to output for the given input(s)
  */
-export interface EntryMapper<
+export interface InputMapper<
   R extends TJSON,
   K extends TJSON,
   V extends TJSON,
 > {
-  mapElement: (entry: R, occ: number) => Iterable<[K, V]>;
+  mapElement: (entry: R, count: number) => Iterable<[K, V]>;
 }
 
-export type EMParameters<
+export type IMParameters<
   K extends TJSON,
   V extends TJSON,
   R extends TJSON[],
-  C extends new (...params: Param[]) => EntryMapper<R, K, V>,
-> = C extends new (...params: infer P) => EntryMapper<R, K, V> ? P : never;
+  C extends new (...params: Param[]) => InputMapper<R, K, V>,
+> = C extends new (...params: infer P) => InputMapper<R, K, V> ? P : never;
 
 /**
  * The type of a reactive function mapping over an arbitrary collection.
@@ -838,42 +839,43 @@ export interface TableCollection<R extends TJSON[]> {
   // TODO get(key: TJSON, index?: string): R[];
 
   /**
-   * Create a new eager reactive collection by mapping over each table entry
+   * Create a new eager reactive collection by mapping over each entry in
+   * a table collection
    * @returns {EagerCollection} The resulting (eager) output collection
    */
   mapN<
     K extends TJSON,
     V extends TJSON,
-    C extends new (...params: Param[]) => EntryMapper<R, K, V>,
+    C extends new (...params: Param[]) => InputMapper<R, K, V>,
   >(
     mapper: C,
-    ...params: EMParameters<K, V, R, C>
+    ...params: IMParameters<K, V, R, C>
   ): EagerCollection<K, V>;
 
   map<K extends TJSON, V extends TJSON>(
-    mapper: new () => EntryMapper<R, K, V>,
+    mapper: new () => InputMapper<R, K, V>,
   ): EagerCollection<K, V>;
 
   map1<K extends TJSON, V extends TJSON, P1>(
-    mapper: new (p1: P1) => EntryMapper<R, K, V>,
+    mapper: new (p1: P1) => InputMapper<R, K, V>,
     p1: P1,
   ): EagerCollection<K, V>;
 
   map2<K extends TJSON, V extends TJSON, P1, P2>(
-    mapper: new (p1: P1, p2: P2) => EntryMapper<R, K, V>,
+    mapper: new (p1: P1, p2: P2) => InputMapper<R, K, V>,
     p1: P1,
     p2: P2,
   ): EagerCollection<K, V>;
 
   map3<K extends TJSON, V extends TJSON, P1, P2, P3>(
-    mapper: new (p1: P1, p2: P2, p3: P3) => EntryMapper<R, K, V>,
+    mapper: new (p1: P1, p2: P2, p3: P3) => InputMapper<R, K, V>,
     p1: P1,
     p2: P2,
     p3: P3,
   ): EagerCollection<K, V>;
 
   map4<K extends TJSON, V extends TJSON, P1, P2, P3, P4>(
-    mapper: new (p1: P1, p2: P2, p3: P3, p4: P4) => EntryMapper<R, K, V>,
+    mapper: new (p1: P1, p2: P2, p3: P3, p4: P4) => InputMapper<R, K, V>,
     p1: P1,
     p2: P2,
     p3: P3,
@@ -887,7 +889,7 @@ export interface TableCollection<R extends TJSON[]> {
       p3: P3,
       p4: P4,
       p5: P5,
-    ) => EntryMapper<R, K, V>,
+    ) => InputMapper<R, K, V>,
     p1: P1,
     p2: P2,
     p3: P3,
@@ -903,7 +905,7 @@ export interface TableCollection<R extends TJSON[]> {
       p4: P4,
       p5: P5,
       p6: P6,
-    ) => EntryMapper<R, K, V>,
+    ) => InputMapper<R, K, V>,
     p1: P1,
     p2: P2,
     p3: P3,
@@ -921,7 +923,7 @@ export interface TableCollection<R extends TJSON[]> {
       p5: P5,
       p6: P6,
       p7: P7,
-    ) => EntryMapper<R, K, V>,
+    ) => InputMapper<R, K, V>,
     p1: P1,
     p2: P2,
     p3: P3,
@@ -941,7 +943,7 @@ export interface TableCollection<R extends TJSON[]> {
       p6: P6,
       p7: P7,
       p8: P8,
-    ) => EntryMapper<R, K, V>,
+    ) => InputMapper<R, K, V>,
     p1: P1,
     p2: P2,
     p3: P3,
@@ -963,7 +965,7 @@ export interface TableCollection<R extends TJSON[]> {
       p7: P7,
       p8: P8,
       p9: P9,
-    ) => EntryMapper<R, K, V>,
+    ) => InputMapper<R, K, V>,
     p1: P1,
     p2: P2,
     p3: P3,

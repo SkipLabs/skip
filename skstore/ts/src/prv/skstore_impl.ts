@@ -7,7 +7,7 @@ import type {
   LazyCollection,
   Mapper,
   ValueMapper,
-  EntryMapper,
+  InputMapper,
   OutputMapper,
   TableCollection,
   SKStore,
@@ -20,7 +20,7 @@ import type {
   JSONObject,
   TJSON,
   Param,
-  EMParameters,
+  IMParameters,
   MParameters,
   OMParameters,
   LazyCompute,
@@ -776,8 +776,8 @@ export class TableCollectionImpl<R extends TJSON[]>
   mapN<
     K extends TJSON,
     V extends TJSON,
-    C extends new (...params: Param[]) => EntryMapper<R, K, V>,
-  >(mapper: C, ...params: EMParameters<K, V, R, C>): EagerCollection<K, V> {
+    C extends new (...params: Param[]) => InputMapper<R, K, V>,
+  >(mapper: C, ...params: IMParameters<K, V, R, C>): EagerCollection<K, V> {
     params.forEach(check);
     const mapperObj = new mapper(...params);
     Object.freeze(mapperObj);
@@ -796,20 +796,20 @@ export class TableCollectionImpl<R extends TJSON[]>
   }
 
   map<K extends TJSON, V extends TJSON>(
-    mapper: new () => EntryMapper<R, K, V>,
+    mapper: new () => InputMapper<R, K, V>,
   ): EagerCollection<K, V> {
     return this.mapN(mapper);
   }
 
   map1<K extends TJSON, V extends TJSON, P1>(
-    mapper: new (p1: P1) => EntryMapper<R, K, V>,
+    mapper: new (p1: P1) => InputMapper<R, K, V>,
     p1: P1,
   ): EagerCollection<K, V> {
     return this.mapN(mapper, p1);
   }
 
   map2<K extends TJSON, V extends TJSON, P1, P2>(
-    mapper: new (p1: P1, p2: P2) => EntryMapper<R, K, V>,
+    mapper: new (p1: P1, p2: P2) => InputMapper<R, K, V>,
     p1: P1,
     p2: P2,
   ): EagerCollection<K, V> {
@@ -817,7 +817,7 @@ export class TableCollectionImpl<R extends TJSON[]>
   }
 
   map3<K extends TJSON, V extends TJSON, P1, P2, P3>(
-    mapper: new (p1: P1, p2: P2, p3: P3) => EntryMapper<R, K, V>,
+    mapper: new (p1: P1, p2: P2, p3: P3) => InputMapper<R, K, V>,
     p1: P1,
     p2: P2,
     p3: P3,
@@ -826,7 +826,7 @@ export class TableCollectionImpl<R extends TJSON[]>
   }
 
   map4<K extends TJSON, V extends TJSON, P1, P2, P3, P4>(
-    mapper: new (p1: P1, p2: P2, p3: P3, p4: P4) => EntryMapper<R, K, V>,
+    mapper: new (p1: P1, p2: P2, p3: P3, p4: P4) => InputMapper<R, K, V>,
     p1: P1,
     p2: P2,
     p3: P3,
@@ -842,7 +842,7 @@ export class TableCollectionImpl<R extends TJSON[]>
       p3: P3,
       p4: P4,
       p5: P5,
-    ) => EntryMapper<R, K, V>,
+    ) => InputMapper<R, K, V>,
     p1: P1,
     p2: P2,
     p3: P3,
@@ -860,7 +860,7 @@ export class TableCollectionImpl<R extends TJSON[]>
       p4: P4,
       p5: P5,
       p6: P6,
-    ) => EntryMapper<R, K, V>,
+    ) => InputMapper<R, K, V>,
     p1: P1,
     p2: P2,
     p3: P3,
@@ -880,7 +880,7 @@ export class TableCollectionImpl<R extends TJSON[]>
       p5: P5,
       p6: P6,
       p7: P7,
-    ) => EntryMapper<R, K, V>,
+    ) => InputMapper<R, K, V>,
     p1: P1,
     p2: P2,
     p3: P3,
@@ -902,7 +902,7 @@ export class TableCollectionImpl<R extends TJSON[]>
       p6: P6,
       p7: P7,
       p8: P8,
-    ) => EntryMapper<R, K, V>,
+    ) => InputMapper<R, K, V>,
     p1: P1,
     p2: P2,
     p3: P3,
@@ -926,7 +926,7 @@ export class TableCollectionImpl<R extends TJSON[]>
       p7: P7,
       p8: P8,
       p9: P9,
-    ) => EntryMapper<R, K, V>,
+    ) => InputMapper<R, K, V>,
     p1: P1,
     p2: P2,
     p3: P3,
