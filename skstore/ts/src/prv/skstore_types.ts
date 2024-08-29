@@ -4,10 +4,10 @@ import type * as Internal from "./skstore_internal_types.js";
 import type {
   Accumulator,
   AValue,
-  LHandle,
+  LazyCollection,
   TJSON,
   NonEmptyIterator,
-  EHandle,
+  EagerCollection,
 } from "../skstore_api.js";
 
 export type CtxMapping<
@@ -16,7 +16,7 @@ export type CtxMapping<
   K2 extends TJSON,
   V2 extends TJSON,
 > = {
-  handle: EHandle<K1, V1>;
+  source: EagerCollection<K1, V1>;
   mapper: (key: K1, it: NonEmptyIterator<V1>) => Iterable<[K2, V2]>;
 };
 
@@ -37,21 +37,21 @@ export interface Context {
     V2 extends TJSON,
     V3 extends TJSON,
   >(
-    eagerHdl: string,
-    name: string,
+    collectionName: string,
+    mapperName: string,
     mapper: (key: K, it: NonEmptyIterator<V>) => Iterable<[K2, V2]>,
     accumulator: Accumulator<V2, V3>,
   ) => string;
 
   map: <K extends TJSON, V extends TJSON, K2 extends TJSON, V2 extends TJSON>(
-    eagerHdl: string,
-    name: string,
+    collectionName: string,
+    mapperName: string,
     compute: (key: K, it: NonEmptyIterator<V>) => Iterable<[K2, V2]>,
   ) => string;
 
   lazy: <K extends TJSON, V extends TJSON>(
     name: string,
-    compute: (selfHdl: LHandle<K, V>, key: K) => Opt<V>,
+    compute: (self: LazyCollection<K, V>, key: K) => Opt<V>,
   ) => string;
 
   asyncLazy: <
@@ -67,28 +67,28 @@ export interface Context {
 
   getFromTable: <K, R>(table: string, key: K, index?: string) => R[];
 
-  getArray: <K, V>(eagerHdl: string, key: K) => V[];
-  getOne: <K, V>(eagerHdl: string, key: K) => V;
-  maybeGetOne: <K, V>(eagerHdl: string, key: K) => Opt<V>;
+  getArray: <K, V>(collection: string, key: K) => V[];
+  getOne: <K, V>(collection: string, key: K) => V;
+  maybeGetOne: <K, V>(collection: string, key: K) => Opt<V>;
 
-  getArrayLazy: <K, V>(eagerHdl: string, key: K) => V[];
-  getOneLazy: <K, V>(eagerHdl: string, key: K) => V;
-  maybeGetOneLazy: <K, V>(eagerHdl: string, key: K) => Opt<V>;
+  getArrayLazy: <K, V>(collection: string, key: K) => V[];
+  getOneLazy: <K, V>(collection: string, key: K) => V;
+  maybeGetOneLazy: <K, V>(collection: string, key: K) => Opt<V>;
 
   getArraySelf: <K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) => V[];
   getOneSelf: <K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) => V;
   maybeGetOneSelf: <K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) => Opt<V>;
 
-  size: (eagerHdl: string) => number;
+  size: (collection: string) => number;
 
   mapFromSkdb: <R extends TJSON, K extends TJSON, V extends TJSON>(
     table: string,
-    name: string,
+    mapperName: string,
     mapper: (entry: R, occ: number) => Iterable<[K, V]>,
   ) => string;
 
   mapToSkdb: <R extends TJSON, K extends TJSON, V extends TJSON>(
-    eagerHdl: string,
+    collectionName: string,
     table: string,
     mapper: (key: K, it: NonEmptyIterator<V>) => R,
   ) => void;
@@ -128,17 +128,16 @@ export interface Handles {
 }
 
 export interface FromWasm {
-  // Handle
   SKIP_SKStore_map(
     ctx: ptr<Internal.Context>,
-    eagerHdl: ptr<Internal.String>,
+    eagerCollectionId: ptr<Internal.String>,
     name: ptr<Internal.String>,
     fnPtr: int,
   ): ptr<Internal.String>;
 
   SKIP_SKStore_mapReduce(
     ctx: ptr<Internal.Context>,
-    eagerHdl: ptr<Internal.String>,
+    eagerCollectionId: ptr<Internal.String>,
     name: ptr<Internal.String>,
     fnPtr: int,
     accumulator: int,
@@ -202,12 +201,12 @@ export interface FromWasm {
 
   SKIP_SKStore_size(
     ctx: ptr<Internal.Context>,
-    eagerHdl: ptr<Internal.String>,
+    eagerCollectionId: ptr<Internal.String>,
   ): number;
 
   SKIP_SKStore_toSkdb(
     ctx: ptr<Internal.Context>,
-    eagerHdl: ptr<Internal.String>,
+    eagerCollectionId: ptr<Internal.String>,
     table: ptr<Internal.String>,
     fnPtr: int,
   ): void;

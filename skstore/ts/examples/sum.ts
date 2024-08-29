@@ -1,10 +1,10 @@
 import type {
   SKStore,
-  TableHandle,
+  TableCollection,
   TableMapper,
   TJSON,
   Mapper,
-  EHandle,
+  EagerCollection,
   NonEmptyIterator,
   OutputMapper,
 } from "skstore";
@@ -33,7 +33,7 @@ class T2SIdentify<K extends TJSON, V extends TJSON>
 }
 
 class Add implements Mapper<number, number, number, number> {
-  constructor(private other: EHandle<number, number>) {}
+  constructor(private other: EagerCollection<number, number>) {}
 
   mapElement(
     key: number,
@@ -58,9 +58,9 @@ class ToOutput<K extends TJSON, V extends TJSON>
 
 export function initSKStore(
   _store: SKStore,
-  input1: TableHandle<[number, number]>,
-  input2: TableHandle<[number, number]>,
-  output: TableHandle<[number, number]>,
+  input1: TableCollection<[number, number]>,
+  input2: TableCollection<[number, number]>,
+  output: TableCollection<[number, number]>,
 ) {
   const eager1 = input1.map(T2SIdentify<number, number>);
   const eager2 = input2.map(T2SIdentify<number, number>);
