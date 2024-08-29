@@ -129,7 +129,7 @@ setup-git-hooks: .git/hooks/pre-commit
 
 .PHONY: test
 test:
-	$(MAKE) --keep-going SKARGO_PROFILE=dev SKDB_WASM=sql/target/wasm32-unknown-unknown/dev/skdb.wasm SKDB_BIN=sql/target/host/dev/skdb test-skfs test-native tstest-sql
+	$(MAKE) --keep-going SKARGO_PROFILE=dev SKDB_WASM=sql/target/wasm32-unknown-unknown/dev/skdb.wasm SKDB_BIN=sql/target/host/dev/skdb sktest-prelude test-native tstest-sql tstest-skstore
 
 .PHONY: test-native
 test-native: build/skdb

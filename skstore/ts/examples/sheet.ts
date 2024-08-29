@@ -125,8 +125,7 @@ export function initSKStore(
 ) {
   // Build index to access all value reactivly
   const skall = cells.map(ValueForCell);
-  // Use lazy dir to create eval dependency graph
-  // Its calls it self to get other computed cells
+  // Create lazy evaluation dependency graph which calls itself to get other computed cells
   const evaluator = store.lazy1(ComputeExpression, skall);
   // Build a sub dependency graph for each sheet (For example purpose)
   // A parsing phase can be added to prevent expression parsing each time:

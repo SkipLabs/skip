@@ -43,7 +43,7 @@ unsigned char* decr_heap_end(size_t size) {
   return heap_end;
 }
 
-void SKIP_skfs_init(uint32_t size) {
+void SKIP_skstore_init(uint32_t size) {
   real_heap_end = bump_pointer + size;
   heap_end = real_heap_end;
   end_of_static = (char*)bump_pointer;
@@ -53,7 +53,7 @@ void SKIP_skfs_init(uint32_t size) {
 
 void SKIP_destroy_Obstack(void*);
 
-void SKIP_skfs_end_of_init() {
+void SKIP_skstore_end_of_init() {
   if ((char*)bump_pointer != (char*)0) {
     SKIP_destroy_Obstack((char*)0);
   }
