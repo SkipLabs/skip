@@ -1,7 +1,7 @@
 import type {
   SKStore,
   TableCollection,
-  TableMapper,
+  InputMapper,
   LazyCompute,
   EagerCollection,
   LazyCollection,
@@ -28,7 +28,7 @@ export function tablesSchema() {
 }
 
 class ValueForCell
-  implements TableMapper<[string, string, string], [string, string], string>
+  implements InputMapper<[string, string, string], [string, string], string>
 {
   mapElement(
     entry: [string, string, string],

@@ -7,7 +7,8 @@ import type {
   EagerCollection,
   LazyCollection,
   Mapper,
-  EntryMapper,
+  ValueMapper,
+  InputMapper,
   OutputMapper,
   TableCollection,
   SKStore,
@@ -234,7 +235,7 @@ export class TableCollectionImpl<R extends TJSON[]>
   }
 
   map<K extends TJSON, V extends TJSON, Params extends Param[]>(
-    mapper: new (...params: Params) => EntryMapper<R, K, V>,
+    mapper: new (...params: Params) => InputMapper<R, K, V>,
     ...params: Params
   ): EagerCollection<K, V> {
     params.forEach(check);

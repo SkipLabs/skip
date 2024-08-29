@@ -119,17 +119,18 @@ export type AValue<V extends TJSON, M extends TJSON> = {
 export class TableIndexError extends Error {}
 
 /**
- * The type of a reactive function mapping over a table.
+ * The type of a reactive function mapping from a `TableCollection` into an
+ * `EagerCollection`
  * @param entry - the input table row
- * @param occ - the number of repeat occurrences of `entry`
+ * @param count - the number of repeat occurrences of `entry`
  * @returns {Iterable} an iterable of key/value pairs to output for the given input(s)
  */
-export interface EntryMapper<
+export interface InputMapper<
   R extends TJSON,
   K extends TJSON,
   V extends TJSON,
 > {
-  mapElement: (entry: R, occ: number) => Iterable<[K, V]>;
+  mapElement: (entry: R, count: number) => Iterable<[K, V]>;
 }
 
 /**
@@ -355,11 +356,12 @@ export interface TableCollection<R extends TJSON[]> {
   // TODO get(key: TJSON, index?: string): R[];
 
   /**
-   * Create a new eager reactive collection by mapping over each table entry
+   * Create a new eager reactive collection by mapping over each entry in
+   * a table collection
    * @returns {EagerCollection} The resulting (eager) output collection
    */
   map<K extends TJSON, V extends TJSON, Params extends Param[]>(
-    mapper: new (...params: Params) => EntryMapper<R, K, V>,
+    mapper: new (...params: Params) => InputMapper<R, K, V>,
     ...params: Params
   ): EagerCollection<K, V>;
 }

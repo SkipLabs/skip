@@ -5,7 +5,7 @@ import type {
   TableCollection,
   MirrorSchema,
   Table,
-  TableMapper,
+  InputMapper,
   Mapper,
   OutputMapper,
   AsyncLazyCompute,
@@ -40,7 +40,7 @@ export type Test = {
 
 //// testMap1
 
-class TestFromIntInt implements TableMapper<[number, number], number, number> {
+class TestFromIntInt implements InputMapper<[number, number], number, number> {
   constructor(private offset: number = 0) {}
 
   mapElement(entry: [number, number], occ: number): Iterable<[number, number]> {
@@ -81,7 +81,7 @@ async function testMap1Run(input: Table<TJSON[]>, output: Table<TJSON[]>) {
 
 //// testMap2
 
-class TestParseInt implements TableMapper<[number, string], number, number> {
+class TestParseInt implements InputMapper<[number, string], number, number> {
   mapElement(entry: [number, string], occ: number): Iterable<[number, number]> {
     return Array([entry[0], parseInt(entry[1])]);
   }
@@ -211,7 +211,7 @@ async function testValueMapperRun(
 
 //// testSize
 
-class TestSizeGetter implements TableMapper<[number], number, number> {
+class TestSizeGetter implements InputMapper<[number], number, number> {
   constructor(private other: EagerCollection<number, number>) {}
 
   mapElement(entry: [number], occ: number): Iterable<[number, number]> {
