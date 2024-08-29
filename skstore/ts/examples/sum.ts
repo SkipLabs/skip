@@ -1,7 +1,7 @@
 import type {
   SKStore,
   TableCollection,
-  TableMapper,
+  InputMapper,
   TJSON,
   Mapper,
   EagerCollection,
@@ -25,7 +25,7 @@ export function tablesSchema() {
 }
 
 class T2SIdentify<K extends TJSON, V extends TJSON>
-  implements TableMapper<[K, V], K, V>
+  implements InputMapper<[K, V], K, V>
 {
   mapElement(entry: [K, V], occ: number): Iterable<[K, V]> {
     return Array([entry[0], entry[1]]);

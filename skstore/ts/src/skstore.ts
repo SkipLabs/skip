@@ -30,7 +30,7 @@ export type {
 
 export type {
   Mapper,
-  EntryMapper as TableMapper,
+  InputMapper,
   OutputMapper,
   EagerCollection,
   NonEmptyIterator,
