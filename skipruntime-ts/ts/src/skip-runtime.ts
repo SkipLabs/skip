@@ -13,6 +13,8 @@ import type {
   TJSON,
   JSONObject,
   Accumulator,
+  Locale,
+  Remote,
   Database,
 } from "./skipruntime_api.js";
 
@@ -40,6 +42,7 @@ export type {
   AsyncLazyCompute,
   Loadable,
   AsyncLazyCollection,
+  EntryPoint,
 } from "./skipruntime_api.js";
 
 export { ValueMapper } from "./skipruntime_api.js";
@@ -70,13 +73,60 @@ async function wasmUrl(): Promise<URL> {
 }
 
 export async function createSKStore(
-  init: (skstore: SKStore, ...tables: TableCollection<TJSON[]>[]) => void,
-  tables: Schema[],
-  database: Database | null,
-): Promise<Table<TJSON[]>[]> {
-  const data = await runUrl(wasmUrl, modules, [], "SKDB_factory");
+  init: (
+    skstore: SKStore,
+    tables: Record<string, TableCollection<TJSON[]>>,
+  ) => void,
+  locale: Locale,
+  remotes: Remote[] = [],
+): Promise<Record<string, Table<TJSON[]>>> {
+  let data = await runUrl(wasmUrl, modules, [], "SKDB_factory");
   const factory = data.environment.shared.get("SKStore") as SKStoreFactory;
-  return factory.runSKStore(init, tables, database);
+  return factory.runSKStore(init, locale, remotes);
+}
+
+export async function createInlineSKStore(
+  init: (skstore: SKStore, ...tables: TableCollection<TJSON[]>[]) => void,
+  locale: Locale,
+  remotes: Remote[] = [],
+): Promise<Table<TJSON[]>[]> {
+  let tables: Table<TJSON[]>[] = [];
+  const result = await createSKStore(
+    (skstore: SKStore, tables: Record<string, TableCollection<TJSON[]>>) => {
+      const handles: TableCollection<TJSON[]>[] = [];
+      for (const schema of locale.tables) {
+        handles.push(tables[schema.name]);
+      }
+      for (const remote of remotes) {
+        for (const schema of remote.tables) {
+          handles.push(tables[schema.name]);
+        }
+      }
+      init(skstore, ...handles);
+    },
+    locale,
+    remotes,
+  );
+  for (const schema of locale.tables) {
+    tables.push(result[schema.name]);
+  }
+  for (const remote of remotes) {
+    for (const schema of remote.tables) {
+      tables.push(result[schema.name]);
+    }
+  }
+  return tables;
+}
+
+export async function createLocaleSKStore(
+  init: (skstore: SKStore, ...tables: TableCollection<TJSON[]>[]) => void,
+  schemas: Schema[],
+  database?: Database,
+): Promise<Table<TJSON[]>[]> {
+  return createInlineSKStore(
+    init,
+    database ? { tables: schemas, database } : { tables: schemas },
+  );
 }
 
 export function freeze<T extends TJSON>(value: T): T {

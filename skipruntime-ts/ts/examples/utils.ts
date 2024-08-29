@@ -6,9 +6,11 @@ import type {
   JSONObject,
   TTableCollection,
   TTable,
-  createSKStore as CreateSKStore,
+  createLocaleSKStore as CreateSKStore,
+  EntryPoint,
 } from "skip-runtime";
 import { serverResponseSuffix } from "skip-runtime";
+
 import { Server, type ServerOptions } from "socket.io";
 import { createInterface } from "readline";
 import { Command } from "commander";
@@ -475,14 +477,14 @@ export class JSONLogger implements WatchListener {
   };
 }
 
-async function getCreds(
-  database: string,
-  port: number = 3586,
-  host: string = "localhost",
-) {
-  const creds = new Map();
+async function getCreds(database: string, entryPoint: EntryPoint) {
   try {
-    const resp = await fetch(`http://${host}:${port}/dbs/${database}/users`);
+    const creds = new Map();
+    const resp = await fetch(
+      `http${entryPoint.secured ? "s" : ""}://${entryPoint.host}:${
+        entryPoint.port
+      }/dbs/${database}/users`,
+    );
     const data = await resp.text();
     const users = data
       .split("\n")
@@ -491,11 +493,40 @@ async function getCreds(
     for (const user of users) {
       creds.set(user.accessKey, user.privateKey);
     }
+    return creds;
   } catch (ex: any) {
-    throw new Error("Could not fetch from the dev server, is it running?");
+    return null;
   }
+}
 
-  return creds;
+async function checkCreds(
+  database: string,
+  user: string,
+  entryPoint: EntryPoint,
+  retry = 5,
+) {
+  var count = 0;
+  const waitandcheck = (
+    resolve: (pk: string) => void,
+    reject: (reason?: any) => void,
+  ) => {
+    if (count == retry)
+      reject("Could not fetch from the dev server, is it running?");
+    count++;
+    getCreds(database, entryPoint).then((creds) => {
+      if (creds != null) {
+        const pk = creds.get(user);
+        if (pk != null) {
+          resolve(pk);
+        } else {
+          reject(`Unable to find ${user} credential`);
+        }
+      } else {
+        setTimeout(waitandcheck, 500, resolve, reject);
+      }
+    });
+  };
+  return new Promise(waitandcheck);
 }
 
 export async function start(
@@ -506,13 +537,15 @@ export async function start(
   port: number = 3586,
 ) {
   try {
-    const creds = database ? await getCreds(database, port) : null;
     const cdatabase = database
       ? {
           name: database,
           access: "root",
-          private: creds?.get("root"),
-          endpoint: `ws://localhost:${port}`,
+          private: await checkCreds(database, "root", {
+            host: "localhost",
+            port,
+          }),
+          endpoint: { host: "localhost", port },
         }
       : null;
     if (cdatabase && !cdatabase.private) {
@@ -521,7 +554,7 @@ export async function start(
     const tables = await createSKStore(
       storage.initSKStore,
       storage.tablesSchema(),
-      cdatabase,
+      cdatabase ? cdatabase : undefined,
     );
     service.run(...tables);
   } catch (e) {
