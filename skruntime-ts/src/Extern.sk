@@ -87,7 +87,7 @@ native fun getErrorHdl(exn: .Exception): Float;
 
 // Exports
 
-@export("SKIP_SKStore_writerSet")
+@export("SkipRuntime_writerSet")
 fun writerSet(
   writer: mutable TWriter<JSONID, JSONFile>,
   key: SKJSON.CJSON,
@@ -96,7 +96,7 @@ fun writerSet(
   writer.set(JSONID(key), JSONFile(value))
 }
 
-@export("SKIP_SKStore_writerSetArray")
+@export("SkipRuntime_writerSetArray")
 fun writerSetArray(
   writer: mutable TWriter<JSONID, JSONFile>,
   key: SKJSON.CJSON,
@@ -108,7 +108,7 @@ fun writerSetArray(
   writer.setArray(JSONID(key), files)
 }
 
-@export("SKIP_SKStore_iteratorFirst")
+@export("SkipRuntime_iteratorFirst")
 fun iteratorFirst(values: mutable NonEmptyIterator<JSONFile>): SKJSON.CJSON {
   if (values.isPastFirstValue) {
     throw Error("`first` can't be called after `next` on a NonEmptyIterator")
@@ -116,7 +116,7 @@ fun iteratorFirst(values: mutable NonEmptyIterator<JSONFile>): SKJSON.CJSON {
   values.first.value
 }
 
-@export("SKIP_SKStore_iteratorUniqueValue")
+@export("SkipRuntime_iteratorUniqueValue")
 fun iteratorUniqueValue(
   values: mutable NonEmptyIterator<JSONFile>,
 ): ?SKJSON.CJSON {
@@ -124,12 +124,12 @@ fun iteratorUniqueValue(
   if (values.next().isSome()) None() else value
 }
 
-@export("SKIP_SKStore_iteratorNext")
+@export("SkipRuntime_iteratorNext")
 fun iteratorNext(values: mutable NonEmptyIterator<JSONFile>): ?SKJSON.CJSON {
   values.next().map(v -> v.value)
 }
 
-@export("SKIP_SKStore_cloneIterator")
+@export("SkipRuntime_cloneIterator")
 fun cloneIterator(
   values: mutable NonEmptyIterator<JSONFile>,
 ): mutable NonEmptyIterator<JSONFile> {
@@ -216,7 +216,7 @@ class ExternAccumulator(
   }
 }
 
-@export("SKIP_SKStore_map")
+@export("SkipRuntime_map")
 fun map(
   context: mutable Context,
   handleId: String,
@@ -230,7 +230,7 @@ fun map(
     .toString()
 }
 
-@export("SKIP_SKStore_mapReduce")
+@export("SkipRuntime_mapReduce")
 fun mapReduce(
   context: mutable Context,
   handleId: String,
@@ -255,7 +255,7 @@ fun mapReduce(
     .toString()
 }
 
-@export("SKIP_SKStore_multimap")
+@export("SkipRuntime_multimap")
 fun multimap(
   context: mutable Context,
   name: String,
@@ -282,7 +282,7 @@ fun multimap(
     .toString()
 }
 
-@export("SKIP_SKStore_multimapReduce")
+@export("SkipRuntime_multimapReduce")
 fun multimapReduce(
   context: mutable Context,
   name: String,
@@ -331,7 +331,7 @@ class AsyncValueSaveError(
   }
 }
 
-@export("SKIP_SKStore_asyncResult")
+@export("SkipRuntime_asyncResult")
 fun asyncResult(
   callId: String,
   lazyName: String,
@@ -391,7 +391,7 @@ fun asyncResult(
   };
 }
 
-@export("SKIP_SKStore_fromSkdb")
+@export("SkipRuntime_fromSkdb")
 fun mapTable(
   context: mutable Context,
   table: String,
@@ -402,7 +402,7 @@ fun mapTable(
   DBUtils.mapTable(table, name, context, mapHandle.mapTable)
 }
 
-@export("SKIP_SKStore_toSkdb")
+@export("SkipRuntime_toSkdb")
 fun toSkdb(
   context: mutable Context,
   handleId: String,
@@ -414,7 +414,7 @@ fun toSkdb(
   DBUtils.toTable(eager, table, context, mapHandle.toRow)
 }
 
-@export("SKIP_SKStore_getFromTable")
+@export("SkipRuntime_getFromTable")
 fun getFromTable(
   _context: mutable Context,
   _table: String,
@@ -424,7 +424,7 @@ fun getFromTable(
   invariant_violation("TODO")
 }
 
-@export("SKIP_SKStore_getArray")
+@export("SkipRuntime_getArray")
 fun getArray(
   context: mutable Context,
   handleId: String,
@@ -434,7 +434,7 @@ fun getArray(
   SKJSON.CJArray(eager.getArray(context, JSONID(key)).map(v -> v.value))
 }
 
-@export("SKIP_SKStore_get")
+@export("SkipRuntime_get")
 fun get(
   context: mutable Context,
   handleId: String,
@@ -444,7 +444,7 @@ fun get(
   eager.get(context, JSONID(key)).value
 }
 
-@export("SKIP_SKStore_maybeGet")
+@export("SkipRuntime_maybeGet")
 fun maybeGet(
   context: mutable Context,
   handleId: String,
@@ -457,7 +457,7 @@ fun maybeGet(
   }
 }
 
-@export("SKIP_SKStore_getArrayLazy")
+@export("SkipRuntime_getArrayLazy")
 fun getArrayLazy(
   context: mutable Context,
   handleId: String,
@@ -467,7 +467,7 @@ fun getArrayLazy(
   getArraySelf(context, lazy, key)
 }
 
-@export("SKIP_SKStore_getLazy")
+@export("SkipRuntime_getLazy")
 fun getLazy(
   context: mutable Context,
   handleId: String,
@@ -476,7 +476,7 @@ fun getLazy(
   lazy = LHandle(JSONID::keyType, JSONFile::type, DirName::create(handleId));
   getSelf(context, lazy, key)
 }
-@export("SKIP_SKStore_maybeGetLazy")
+@export("SkipRuntime_maybeGetLazy")
 fun maybeGetLazy(
   context: mutable Context,
   handleId: String,
@@ -486,7 +486,7 @@ fun maybeGetLazy(
   maybeGetSelf(context, lazy, key)
 }
 
-@export("SKIP_SKStore_getArraySelf")
+@export("SkipRuntime_getArraySelf")
 fun getArraySelf(
   context: mutable Context,
   handle: LHandle<JSONID, JSONFile>,
@@ -494,7 +494,7 @@ fun getArraySelf(
 ): SKJSON.CJSON {
   SKJSON.CJArray(handle.getArray(context, JSONID(key)).map(v -> v.value))
 }
-@export("SKIP_SKStore_getSelf")
+@export("SkipRuntime_getSelf")
 fun getSelf(
   context: mutable Context,
   handle: LHandle<JSONID, JSONFile>,
@@ -502,7 +502,7 @@ fun getSelf(
 ): SKJSON.CJSON {
   handle.get(context, JSONID(key)).value
 }
-@export("SKIP_SKStore_maybeGetSelf")
+@export("SkipRuntime_maybeGetSelf")
 fun maybeGetSelf(
   context: mutable Context,
   handle: LHandle<JSONID, JSONFile>,
@@ -513,13 +513,13 @@ fun maybeGetSelf(
   | None() -> SKJSON.CJNull()
   }
 }
-@export("SKIP_SKStore_size")
+@export("SkipRuntime_size")
 fun size(context: mutable Context, handleId: String): Float {
   eager = EHandle(JSONID::keyType, JSONFile::type, DirName::create(handleId));
   eager.size(context).toFloat()
 }
 
-@export("SKIP_SKStore_input")
+@export("SkipRuntime_input")
 fun input(
   context: mutable Context,
   name: String,
@@ -537,13 +537,13 @@ fun input(
   )
 }
 
-@export("SKIP_SKStore_lazy")
+@export("SkipRuntime_lazy")
 fun lazy(context: mutable Context, name: String, lazyFunPtr: UInt32): String {
   lazyHandle = FnHandle::make(lazyFunPtr);
   makeLazy(JSONID::keyType, JSONFile::type, context, name, lazyHandle.lazy)
 }
 
-@export("SKIP_SKStore_asyncLazy")
+@export("SkipRuntime_asyncLazy")
 fun asyncLazy(
   context: mutable Context,
   name: String,
@@ -607,7 +607,7 @@ fun initCtx(): Context {
   Context{}
 }
 
-@export("SKIP_SKStore_createFor")
+@export("SkipRuntime_createFor")
 fun tsCreateFor(session: String): Float {
   createFor(session)
 }
