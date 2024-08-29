@@ -10,7 +10,7 @@ export type { Environment } from "#std/sk_types.js";
 export { SKDBTransaction } from "./skdb_util.js";
 import { getWasmUrl } from "./skdb_wasm_locator.js";
 
-var modules: ModuleInit[];
+const modules: ModuleInit[] = [];
 /*--MODULES--*/
 
 export async function createSkdb(

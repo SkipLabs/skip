@@ -53,7 +53,7 @@ export {
   cjson,
 } from "./skstore_utils.js";
 
-var modules: ModuleInit[];
+const modules: ModuleInit[] = [];
 /*--MODULES--*/
 
 async function wasmUrl(): Promise<URL> {
