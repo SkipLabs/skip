@@ -216,7 +216,7 @@ export const reactiveArray = {
   set(_hdl: WasmHandle, _prop: string, _value: any) {
     throw new Error("Reactive array cannot be modified.");
   },
-  has(hdl: WasmHandle, prop: string): boolean {
+  has(_hdl: WasmHandle, prop: string): boolean {
     if (prop === "__isArrayProxy") return true;
     if (prop === "__sk_frozen") return true;
     if (prop === "__pointer") return true;

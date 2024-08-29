@@ -3,7 +3,7 @@ import type { SKDB, Params } from "./skdb_types.js";
 /* ***************************************************************************/
 /* The type used to represent callable external functions. */
 /* ***************************************************************************/
-export class SKDBCallable<T1, T2> {
+export class SKDBCallable<_T1, _T2> {
   private id: number;
 
   constructor(id: number) {

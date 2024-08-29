@@ -702,7 +702,7 @@ export interface Text {
 export class Raw implements Text {
   text: string;
 
-  constructor(text: string, category?: string) {
+  constructor(text: string, _category?: string) {
     this.text = text;
   }
 
