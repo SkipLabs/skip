@@ -3,13 +3,13 @@ import { type ptr, type Opt } from "#std/sk_types.js";
 import type { Context } from "./skstore_types.js";
 import type {
   Accumulator,
-  EHandle,
-  LHandle,
+  EagerCollection,
+  LazyCollection,
   Mapper,
   ValueMapper,
   EntryMapper,
   OutputMapper,
-  TableHandle,
+  TableCollection,
   SKStore,
   SKStoreFactory,
   Mapping,
@@ -28,7 +28,7 @@ import type {
   AsyncLazyCompute,
   ALParameters,
   NonEmptyIterator,
-  ALHandle,
+  AsyncLazyCollection,
 } from "../skstore_api.js";
 
 // prettier-ignore
@@ -48,7 +48,9 @@ function assertNoKeysNaN<K extends TJSON, V extends TJSON>(
   return kv_pairs;
 }
 
-class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
+class EagerCollectionImpl<K extends TJSON, V extends TJSON>
+  implements EagerCollection<K, V>
+{
   //
   protected context: Context;
   eagerHdl: string;
@@ -68,8 +70,8 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
 
   protected derive<K2 extends TJSON, V2 extends TJSON>(
     eagerHdl: string,
-  ): EHandle<K2, V2> {
-    return new EHandleImpl<K2, V2>(this.context, eagerHdl);
+  ): EagerCollection<K2, V2> {
+    return new EagerCollectionImpl<K2, V2>(this.context, eagerHdl);
   }
 
   getArray(key: K): V[] {
@@ -92,7 +94,10 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     K2 extends TJSON,
     V2 extends TJSON,
     C extends new (...params: Param[]) => Mapper<K, V, K2, V2>,
-  >(mapper: C, ...params: MParameters<K, V, K2, V2, C>): EHandle<K2, V2> {
+  >(
+    mapper: C,
+    ...params: MParameters<K, V, K2, V2, C>
+  ): EagerCollection<K2, V2> {
     params.forEach(check);
     const mapperObj = new mapper(...params);
     Object.freeze(mapperObj);
@@ -110,14 +115,14 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
 
   map<K2 extends TJSON, V2 extends TJSON>(
     mapper: new () => Mapper<K, V, K2, V2>,
-  ): EHandle<K2, V2> {
+  ): EagerCollection<K2, V2> {
     return this.mapN(mapper);
   }
 
   map1<K2 extends TJSON, V2 extends TJSON, P1>(
     mapper: new (p1: P1) => Mapper<K, V, K2, V2>,
     p1: P1,
-  ): EHandle<K2, V2> {
+  ): EagerCollection<K2, V2> {
     return this.mapN(mapper, p1);
   }
 
@@ -125,7 +130,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     mapper: new (p1: P1, p2: P2) => Mapper<K, V, K2, V2>,
     p1: P1,
     p2: P2,
-  ): EHandle<K2, V2> {
+  ): EagerCollection<K2, V2> {
     return this.mapN(mapper, p1, p2);
   }
 
@@ -134,7 +139,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p1: P1,
     p2: P2,
     p3: P3,
-  ): EHandle<K2, V2> {
+  ): EagerCollection<K2, V2> {
     return this.mapN(mapper, p1, p2, p3);
   }
 
@@ -144,7 +149,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p2: P2,
     p3: P3,
     p4: P4,
-  ): EHandle<K2, V2> {
+  ): EagerCollection<K2, V2> {
     return this.mapN(mapper, p1, p2, p3, p4);
   }
 
@@ -161,7 +166,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p3: P3,
     p4: P4,
     p5: P5,
-  ): EHandle<K2, V2> {
+  ): EagerCollection<K2, V2> {
     return this.mapN(mapper, p1, p2, p3, p4, p5);
   }
 
@@ -180,7 +185,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p4: P4,
     p5: P5,
     p6: P6,
-  ): EHandle<K2, V2> {
+  ): EagerCollection<K2, V2> {
     return this.mapN(mapper, p1, p2, p3, p4, p5, p6);
   }
 
@@ -201,7 +206,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p5: P5,
     p6: P6,
     p7: P7,
-  ): EHandle<K2, V2> {
+  ): EagerCollection<K2, V2> {
     return this.mapN(mapper, p1, p2, p3, p4, p5, p6, p7);
   }
 
@@ -224,7 +229,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p6: P6,
     p7: P7,
     p8: P8,
-  ): EHandle<K2, V2> {
+  ): EagerCollection<K2, V2> {
     return this.mapN(mapper, p1, p2, p3, p4, p5, p6, p7, p8);
   }
 
@@ -249,7 +254,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p7: P7,
     p8: P8,
     p9: P9,
-  ): EHandle<K2, V2> {
+  ): EagerCollection<K2, V2> {
     return this.mapN(mapper, p1, p2, p3, p4, p5, p6, p7, p8, p9);
   }
 
@@ -282,7 +287,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
   mapReduce<K2 extends TJSON, V2 extends TJSON, V3 extends TJSON>(
     mapper: new () => Mapper<K, V, K2, V2>,
     accumulator: Accumulator<V2, V3>,
-  ): EHandle<K2, V3> {
+  ): EagerCollection<K2, V3> {
     return this.mapReduceN(mapper, accumulator);
   }
 
@@ -290,7 +295,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     mapper: new (p1: P1) => Mapper<K, V, K2, V2>,
     accumulator: Accumulator<V2, V3>,
     p1: P1,
-  ): EHandle<K2, V3> {
+  ): EagerCollection<K2, V3> {
     return this.mapReduceN(mapper, accumulator, p1);
   }
 
@@ -299,7 +304,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     accumulator: Accumulator<V2, V3>,
     p1: P1,
     p2: P2,
-  ): EHandle<K2, V3> {
+  ): EagerCollection<K2, V3> {
     return this.mapReduceN(mapper, accumulator, p1, p2);
   }
 
@@ -309,7 +314,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p1: P1,
     p2: P2,
     p3: P3,
-  ): EHandle<K2, V3> {
+  ): EagerCollection<K2, V3> {
     return this.mapReduceN(mapper, accumulator, p1, p2, p3);
   }
 
@@ -328,7 +333,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p2: P2,
     p3: P3,
     p4: P4,
-  ): EHandle<K2, V3> {
+  ): EagerCollection<K2, V3> {
     return this.mapReduceN(mapper, accumulator, p1, p2, p3, p4);
   }
 
@@ -355,7 +360,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p3: P3,
     p4: P4,
     p5: P5,
-  ): EHandle<K2, V3> {
+  ): EagerCollection<K2, V3> {
     return this.mapReduceN(mapper, accumulator, p1, p2, p3, p4, p5);
   }
 
@@ -385,7 +390,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p4: P4,
     p5: P5,
     p6: P6,
-  ): EHandle<K2, V3> {
+  ): EagerCollection<K2, V3> {
     return this.mapReduceN(mapper, accumulator, p1, p2, p3, p4, p5, p6);
   }
 
@@ -418,7 +423,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p5: P5,
     p6: P6,
     p7: P7,
-  ): EHandle<K2, V3> {
+  ): EagerCollection<K2, V3> {
     return this.mapReduceN(mapper, accumulator, p1, p2, p3, p4, p5, p6, p7);
   }
 
@@ -454,7 +459,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p6: P6,
     p7: P7,
     p8: P8,
-  ): EHandle<K2, V3> {
+  ): EagerCollection<K2, V3> {
     return this.mapReduceN(mapper, accumulator, p1, p2, p3, p4, p5, p6, p7, p8);
   }
 
@@ -493,7 +498,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p7: P7,
     p8: P8,
     p9: P9,
-  ): EHandle<K2, V3> {
+  ): EagerCollection<K2, V3> {
     return this.mapReduceN(
       mapper,
       accumulator,
@@ -513,7 +518,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     R extends TJSON[],
     C extends new (...params: Param[]) => OutputMapper<R, K, V>,
   >(
-    table: TableHandle<R>,
+    table: TableCollection<R>,
     mapper: C,
     ...params: OMParameters<R, K, V, C>
   ): void {
@@ -531,14 +536,14 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
   }
 
   mapTo<R extends TJSON[]>(
-    table: TableHandle<R>,
+    table: TableCollection<R>,
     mapper: new () => OutputMapper<R, K, V>,
   ): void {
     return this.mapToN(table, mapper);
   }
 
   mapTo1<R extends TJSON[], P1>(
-    table: TableHandle<R>,
+    table: TableCollection<R>,
     mapper: new (p1: P1) => OutputMapper<R, K, V>,
     p1: P1,
   ): void {
@@ -546,7 +551,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
   }
 
   mapTo2<R extends TJSON[], P1, P2>(
-    table: TableHandle<R>,
+    table: TableCollection<R>,
     mapper: new (p1: P1, p2: P2) => OutputMapper<R, K, V>,
     p1: P1,
     p2: P2,
@@ -555,7 +560,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
   }
 
   mapTo3<R extends TJSON[], P1, P2, P3>(
-    table: TableHandle<R>,
+    table: TableCollection<R>,
     mapper: new (p1: P1, p2: P2, p3: P3) => OutputMapper<R, K, V>,
     p1: P1,
     p2: P2,
@@ -565,7 +570,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
   }
 
   mapTo4<R extends TJSON[], P1, P2, P3, P4>(
-    table: TableHandle<R>,
+    table: TableCollection<R>,
     mapper: new (p1: P1, p2: P2, p3: P3, p4: P4) => OutputMapper<R, K, V>,
     p1: P1,
     p2: P2,
@@ -576,7 +581,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
   }
 
   mapTo5<R extends TJSON[], P1, P2, P3, P4, P5>(
-    table: TableHandle<R>,
+    table: TableCollection<R>,
     mapper: new (
       p1: P1,
       p2: P2,
@@ -594,7 +599,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
   }
 
   mapTo6<R extends TJSON[], P1, P2, P3, P4, P5, P6>(
-    table: TableHandle<R>,
+    table: TableCollection<R>,
     mapper: new (
       p1: P1,
       p2: P2,
@@ -614,7 +619,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
   }
 
   mapTo7<R extends TJSON[], P1, P2, P3, P4, P5, P6, P7>(
-    table: TableHandle<R>,
+    table: TableCollection<R>,
     mapper: new (
       p1: P1,
       p2: P2,
@@ -636,7 +641,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
   }
 
   mapTo8<R extends TJSON[], P1, P2, P3, P4, P5, P6, P7, P8>(
-    table: TableHandle<R>,
+    table: TableCollection<R>,
     mapper: new (
       p1: P1,
       p2: P2,
@@ -660,7 +665,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
   }
 
   mapTo9<R extends TJSON[], P1, P2, P3, P4, P5, P6, P7, P8, P9>(
-    table: TableHandle<R>,
+    table: TableCollection<R>,
     mapper: new (
       p1: P1,
       p2: P2,
@@ -686,7 +691,9 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
   }
 }
 
-class LHandleImpl<K extends TJSON, V extends TJSON> implements LHandle<K, V> {
+class LazyCollectionImpl<K extends TJSON, V extends TJSON>
+  implements LazyCollection<K, V>
+{
   protected context: Context;
   protected lazyHdl: string;
 
@@ -714,7 +721,7 @@ class LHandleImpl<K extends TJSON, V extends TJSON> implements LHandle<K, V> {
 }
 
 export class LSelfImpl<K extends TJSON, V extends TJSON>
-  implements LHandle<K, V>
+  implements LazyCollection<K, V>
 {
   protected context: Context;
   protected lazyHdl: ptr;
@@ -740,7 +747,9 @@ export class LSelfImpl<K extends TJSON, V extends TJSON>
   }
 }
 
-export class TableHandleImpl<R extends TJSON[]> implements TableHandle<R> {
+export class TableCollectionImpl<R extends TJSON[]>
+  implements TableCollection<R>
+{
   protected context: Context;
   protected skdb: SKDBSync;
   protected schema: MirrorSchema;
@@ -768,7 +777,7 @@ export class TableHandleImpl<R extends TJSON[]> implements TableHandle<R> {
     K extends TJSON,
     V extends TJSON,
     C extends new (...params: Param[]) => EntryMapper<R, K, V>,
-  >(mapper: C, ...params: EMParameters<K, V, R, C>): EHandle<K, V> {
+  >(mapper: C, ...params: EMParameters<K, V, R, C>): EagerCollection<K, V> {
     params.forEach(check);
     const mapperObj = new mapper(...params);
     Object.freeze(mapperObj);
@@ -783,19 +792,19 @@ export class TableHandleImpl<R extends TJSON[]> implements TableHandle<R> {
       (entry: R, occ: number) =>
         assertNoKeysNaN(mapperObj.mapElement(entry, occ)),
     );
-    return new EHandleImpl<K, V>(this.context, eagerHdl);
+    return new EagerCollectionImpl<K, V>(this.context, eagerHdl);
   }
 
   map<K extends TJSON, V extends TJSON>(
     mapper: new () => EntryMapper<R, K, V>,
-  ): EHandle<K, V> {
+  ): EagerCollection<K, V> {
     return this.mapN(mapper);
   }
 
   map1<K extends TJSON, V extends TJSON, P1>(
     mapper: new (p1: P1) => EntryMapper<R, K, V>,
     p1: P1,
-  ): EHandle<K, V> {
+  ): EagerCollection<K, V> {
     return this.mapN(mapper, p1);
   }
 
@@ -803,7 +812,7 @@ export class TableHandleImpl<R extends TJSON[]> implements TableHandle<R> {
     mapper: new (p1: P1, p2: P2) => EntryMapper<R, K, V>,
     p1: P1,
     p2: P2,
-  ): EHandle<K, V> {
+  ): EagerCollection<K, V> {
     return this.mapN(mapper, p1, p2);
   }
 
@@ -812,7 +821,7 @@ export class TableHandleImpl<R extends TJSON[]> implements TableHandle<R> {
     p1: P1,
     p2: P2,
     p3: P3,
-  ): EHandle<K, V> {
+  ): EagerCollection<K, V> {
     return this.mapN(mapper, p1, p2, p3);
   }
 
@@ -822,7 +831,7 @@ export class TableHandleImpl<R extends TJSON[]> implements TableHandle<R> {
     p2: P2,
     p3: P3,
     p4: P4,
-  ): EHandle<K, V> {
+  ): EagerCollection<K, V> {
     return this.mapN(mapper, p1, p2, p3, p4);
   }
 
@@ -839,7 +848,7 @@ export class TableHandleImpl<R extends TJSON[]> implements TableHandle<R> {
     p3: P3,
     p4: P4,
     p5: P5,
-  ): EHandle<K, V> {
+  ): EagerCollection<K, V> {
     return this.mapN(mapper, p1, p2, p3, p4, p5);
   }
 
@@ -858,7 +867,7 @@ export class TableHandleImpl<R extends TJSON[]> implements TableHandle<R> {
     p4: P4,
     p5: P5,
     p6: P6,
-  ): EHandle<K, V> {
+  ): EagerCollection<K, V> {
     return this.mapN(mapper, p1, p2, p3, p4, p5, p6);
   }
 
@@ -879,7 +888,7 @@ export class TableHandleImpl<R extends TJSON[]> implements TableHandle<R> {
     p5: P5,
     p6: P6,
     p7: P7,
-  ): EHandle<K, V> {
+  ): EagerCollection<K, V> {
     return this.mapN(mapper, p1, p2, p3, p4, p5, p6, p7);
   }
 
@@ -902,7 +911,7 @@ export class TableHandleImpl<R extends TJSON[]> implements TableHandle<R> {
     p6: P6,
     p7: P7,
     p8: P8,
-  ): EHandle<K, V> {
+  ): EagerCollection<K, V> {
     return this.mapN(mapper, p1, p2, p3, p4, p5, p6, p7, p8);
   }
 
@@ -927,7 +936,7 @@ export class TableHandleImpl<R extends TJSON[]> implements TableHandle<R> {
     p7: P7,
     p8: P8,
     p9: P9,
-  ): EHandle<K, V> {
+  ): EagerCollection<K, V> {
     return this.mapN(mapper, p1, p2, p3, p4, p5, p6, p7, p8, p9);
   }
 
@@ -1041,7 +1050,7 @@ export class SKStoreImpl implements SKStore {
     V1 extends TJSON,
     K2 extends TJSON,
     V2 extends TJSON,
-  >(mappings: Mapping<K1, V1, K2, V2>[]): EHandle<K2, V2> {
+  >(mappings: Mapping<K1, V1, K2, V2>[]): EagerCollection<K2, V2> {
     var name = "";
     const ctxmapping = mappings.map((mapping) => {
       const params = mapping.params ?? [];
@@ -1050,13 +1059,13 @@ export class SKStoreImpl implements SKStore {
       Object.freeze(mapperObj);
       name += mapperObj.constructor.name;
       return {
-        handle: mapping.handle,
+        source: mapping.source,
         mapper: (key: K1, it: NonEmptyIterator<V1>) =>
           mapperObj.mapElement(key, it),
       };
     });
     const eagerHdl = this.context.multimap(name, ctxmapping);
-    return new EHandleImpl<K2, V2>(this.context, eagerHdl);
+    return new EagerCollectionImpl<K2, V2>(this.context, eagerHdl);
   }
 
   multimapReduce<
@@ -1068,7 +1077,7 @@ export class SKStoreImpl implements SKStore {
   >(
     mappings: Mapping<K1, V1, K2, V2>[],
     accumulator: Accumulator<V2, V3>,
-  ): EHandle<K2, V3> {
+  ): EagerCollection<K2, V3> {
     var name = "";
     const ctxmapping = mappings.map((mapping) => {
       const params = mapping.params ?? [];
@@ -1077,40 +1086,42 @@ export class SKStoreImpl implements SKStore {
       Object.freeze(mapperObj);
       name += mapperObj.constructor.name;
       return {
-        handle: mapping.handle,
+        source: mapping.source,
         mapper: (key: K1, it: NonEmptyIterator<V1>) =>
           mapperObj.mapElement(key, it),
       };
     });
     const eagerHdl = this.context.multimapReduce(name, ctxmapping, accumulator);
-    return new EHandleImpl<K2, V3>(this.context, eagerHdl);
+    return new EagerCollectionImpl<K2, V3>(this.context, eagerHdl);
   }
 
   lazyN<
     K extends TJSON,
     V extends TJSON,
     C extends new (...params: Param[]) => LazyCompute<K, V>,
-  >(compute: C, ...params: LParameters<K, V, C>): LHandle<K, V> {
+  >(compute: C, ...params: LParameters<K, V, C>): LazyCollection<K, V> {
     params.forEach(check);
     const computeObj = new compute(...params);
     Object.freeze(computeObj);
     const name = computeObj.constructor.name;
-    const lazyHdl = this.context.lazy(name, (selfHdl: LHandle<K, V>, key: K) =>
-      computeObj.compute(selfHdl, key),
+    const lazyHdl = this.context.lazy(
+      name,
+      (selfHdl: LazyCollection<K, V>, key: K) =>
+        computeObj.compute(selfHdl, key),
     );
-    return new LHandleImpl<K, V>(this.context, lazyHdl);
+    return new LazyCollectionImpl<K, V>(this.context, lazyHdl);
   }
 
   lazy<K extends TJSON, V extends TJSON>(
     compute: new () => LazyCompute<K, V>,
-  ): LHandle<K, V> {
+  ): LazyCollection<K, V> {
     return this.lazyN(compute);
   }
 
   lazy1<K extends TJSON, V extends TJSON, P1>(
     compute: new (p1: P1) => LazyCompute<K, V>,
     p1: P1,
-  ): LHandle<K, V> {
+  ): LazyCollection<K, V> {
     return this.lazyN(compute, p1);
   }
 
@@ -1118,7 +1129,7 @@ export class SKStoreImpl implements SKStore {
     compute: new (p1: P1, p2: P2) => LazyCompute<K, V>,
     p1: P1,
     p2: P2,
-  ): LHandle<K, V> {
+  ): LazyCollection<K, V> {
     return this.lazyN(compute, p1, p2);
   }
 
@@ -1127,7 +1138,7 @@ export class SKStoreImpl implements SKStore {
     p1: P1,
     p2: P2,
     p3: P3,
-  ): LHandle<K, V> {
+  ): LazyCollection<K, V> {
     return this.lazyN(compute, p1, p2, p3);
   }
 
@@ -1137,7 +1148,7 @@ export class SKStoreImpl implements SKStore {
     p2: P2,
     p3: P3,
     p4: P4,
-  ): LHandle<K, V> {
+  ): LazyCollection<K, V> {
     return this.lazyN(compute, p1, p2, p3, p4);
   }
 
@@ -1148,7 +1159,7 @@ export class SKStoreImpl implements SKStore {
     p3: P3,
     p4: P4,
     p5: P5,
-  ): LHandle<K, V> {
+  ): LazyCollection<K, V> {
     return this.lazyN(compute, p1, p2, p3, p4, p5);
   }
 
@@ -1167,7 +1178,7 @@ export class SKStoreImpl implements SKStore {
     p4: P4,
     p5: P5,
     p6: P6,
-  ): LHandle<K, V> {
+  ): LazyCollection<K, V> {
     return this.lazyN(compute, p1, p2, p3, p4, p5, p6);
   }
 
@@ -1188,7 +1199,7 @@ export class SKStoreImpl implements SKStore {
     p5: P5,
     p6: P6,
     p7: P7,
-  ): LHandle<K, V> {
+  ): LazyCollection<K, V> {
     return this.lazyN(compute, p1, p2, p3, p4, p5, p6, p7);
   }
 
@@ -1211,7 +1222,7 @@ export class SKStoreImpl implements SKStore {
     p6: P6,
     p7: P7,
     p8: P8,
-  ): LHandle<K, V> {
+  ): LazyCollection<K, V> {
     return this.lazyN(compute, p1, p2, p3, p4, p5, p6, p7, p8);
   }
 
@@ -1236,7 +1247,7 @@ export class SKStoreImpl implements SKStore {
     p7: P7,
     p8: P8,
     p9: P9,
-  ): LHandle<K, V> {
+  ): LazyCollection<K, V> {
     return this.lazyN(compute, p1, p2, p3, p4, p5, p6, p7, p8, p9);
   }
 
@@ -1249,7 +1260,7 @@ export class SKStoreImpl implements SKStore {
   >(
     compute: C,
     ...params: ALParameters<K, V, P, M, C>
-  ): LHandle<K, Loadable<V, M>> {
+  ): LazyCollection<K, Loadable<V, M>> {
     params.forEach(check);
     const computeObj = new compute(...params);
     const name = computeObj.constructor.name;
@@ -1259,12 +1270,12 @@ export class SKStoreImpl implements SKStore {
       (key: K) => computeObj.params(key),
       (key: K, params: P) => computeObj.call(key, params),
     );
-    return new LHandleImpl<K, Loadable<V, M>>(this.context, lazyHdl);
+    return new LazyCollectionImpl<K, Loadable<V, M>>(this.context, lazyHdl);
   }
 
   asyncLazy<K extends TJSON, V extends TJSON, P extends TJSON, M extends TJSON>(
     compute: new () => AsyncLazyCompute<K, V, P, M>,
-  ): ALHandle<K, V, M> {
+  ): AsyncLazyCollection<K, V, M> {
     return this.asyncLazyN<K, V, P, M, typeof compute>(compute);
   }
 
@@ -1277,7 +1288,7 @@ export class SKStoreImpl implements SKStore {
   >(
     compute: new (p1: P1) => AsyncLazyCompute<K, V, P, M>,
     p1: P1,
-  ): ALHandle<K, V, M> {
+  ): AsyncLazyCollection<K, V, M> {
     return this.asyncLazyN<K, V, P, M, typeof compute>(compute, p1);
   }
 
@@ -1292,7 +1303,7 @@ export class SKStoreImpl implements SKStore {
     compute: new (p1: P1, p2: P2) => AsyncLazyCompute<K, V, P, M>,
     p1: P1,
     p2: P2,
-  ): ALHandle<K, V, M> {
+  ): AsyncLazyCollection<K, V, M> {
     return this.asyncLazyN<K, V, P, M, typeof compute>(compute, p1, p2);
   }
 
@@ -1309,7 +1320,7 @@ export class SKStoreImpl implements SKStore {
     p1: P1,
     p2: P2,
     p3: P3,
-  ): ALHandle<K, V, M> {
+  ): AsyncLazyCollection<K, V, M> {
     return this.asyncLazyN<K, V, P, M, typeof compute>(compute, p1, p2, p3);
   }
 
@@ -1333,7 +1344,7 @@ export class SKStoreImpl implements SKStore {
     p2: P2,
     p3: P3,
     p4: P4,
-  ): ALHandle<K, V, M> {
+  ): AsyncLazyCollection<K, V, M> {
     return this.asyncLazyN<K, V, P, M, typeof compute>(compute, p1, p2, p3, p4);
   }
 
@@ -1360,7 +1371,7 @@ export class SKStoreImpl implements SKStore {
     p3: P3,
     p4: P4,
     p5: P5,
-  ): ALHandle<K, V, M> {
+  ): AsyncLazyCollection<K, V, M> {
     return this.asyncLazyN<K, V, P, M, typeof compute>(
       compute,
       p1,
@@ -1397,7 +1408,7 @@ export class SKStoreImpl implements SKStore {
     p4: P4,
     p5: P5,
     p6: P6,
-  ): ALHandle<K, V, M> {
+  ): AsyncLazyCollection<K, V, M> {
     return this.asyncLazyN<K, V, P, M, typeof compute>(
       compute,
       p1,
@@ -1438,7 +1449,7 @@ export class SKStoreImpl implements SKStore {
     p5: P5,
     p6: P6,
     p7: P7,
-  ): ALHandle<K, V, M> {
+  ): AsyncLazyCollection<K, V, M> {
     return this.asyncLazyN<K, V, P, M, typeof compute>(
       compute,
       p1,
@@ -1483,7 +1494,7 @@ export class SKStoreImpl implements SKStore {
     p6: P6,
     p7: P7,
     p8: P8,
-  ): ALHandle<K, V, M> {
+  ): AsyncLazyCollection<K, V, M> {
     return this.asyncLazyN<K, V, P, M, typeof compute>(
       compute,
       p1,
@@ -1532,7 +1543,7 @@ export class SKStoreImpl implements SKStore {
     p7: P7,
     p8: P8,
     p9: P9,
-  ): ALHandle<K, V, M> {
+  ): AsyncLazyCollection<K, V, M> {
     return this.asyncLazyN<K, V, P, M, typeof compute>(
       compute,
       p1,
@@ -1582,7 +1593,7 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
   getName = () => "SKStore";
 
   runSKStore = async (
-    init: (skstore: SKStore, ...tables: TableHandle<TJSON[]>[]) => void,
+    init: (skstore: SKStore, ...tables: TableCollection<TJSON[]>[]) => void,
     tablesSchema: MirrorSchema[],
     connect: boolean = true,
   ): Promise<Table<TJSON[]>[]> => {
@@ -1591,23 +1602,23 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
     const tables = mirror(context, skdb, connect, ...tablesSchema);
     const skstore = new SKStoreImpl(context);
     this.create(() => init(skstore, ...tables));
-    return tables.map((t) => (t as TableHandleImpl<TJSON[]>).toTable());
+    return tables.map((t) => (t as TableCollectionImpl<TJSON[]>).toTable());
   };
 }
 
 /**
- * Mirror table from skdb with a specific filter
+ * Mirror Skip tables from SKDB, with support for custom schemas and SQL filters
  * @param context
  * @param skdb - the database to work with
- * @param tables - tables the mirroring info
- * @returns - the mirrors table handles
+ * @param tables - tables to mirror, along with schemas and filters
+ * @returns - the mirrored table collections
  */
 export function mirror(
   context: Context,
   skdb: SKDBSync,
   connect: boolean,
   ...tables: MirrorSchema[]
-): TableHandle<TJSON[]>[] {
+): TableCollection<TJSON[]>[] {
   if (connect) {
     skdb.mirror(...toMirrorDefinitions(...tables));
   } else {
@@ -1623,7 +1634,7 @@ export function mirror(
       skdb.exec(query.query, query.params ? toParams(query.params) : undefined);
     });
   }
-  return tables.map((table) => new TableHandleImpl(context, skdb, table));
+  return tables.map((table) => new TableCollectionImpl(context, skdb, table));
 }
 
 function toColumn(column: ColumnSchema): string {

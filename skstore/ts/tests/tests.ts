@@ -2,20 +2,20 @@ import { test, expect } from "@playwright/test";
 import type {
   SKStore,
   TJSON,
-  TableHandle,
+  TableCollection,
   MirrorSchema,
   Table,
   TableMapper,
   Mapper,
   OutputMapper,
   AsyncLazyCompute,
-  EHandle,
+  EagerCollection,
   JSONObject,
   LazyCompute,
-  LHandle,
+  LazyCollection,
   Loadable,
   NonEmptyIterator,
-  ALHandle,
+  AsyncLazyCollection,
 } from "skstore";
 import {
   Sum,
@@ -67,8 +67,8 @@ class TestSum implements Mapper<number, number, number, number> {
 
 function testMap1Init(
   _skstore: SKStore,
-  input: TableHandle<[number, number]>,
-  output: TableHandle<[number, number]>,
+  input: TableCollection<[number, number]>,
+  output: TableCollection<[number, number]>,
 ) {
   const eager1 = input.map1(TestFromIntInt, 2);
   eager1.mapTo(output, TestToOutput);
@@ -88,7 +88,7 @@ class TestParseInt implements TableMapper<[number, string], number, number> {
 }
 
 class TestAdd implements Mapper<number, number, number, number> {
-  constructor(private other: EHandle<number, number>) {}
+  constructor(private other: EagerCollection<number, number>) {}
 
   mapElement(
     key: number,
@@ -108,9 +108,9 @@ class TestAdd implements Mapper<number, number, number, number> {
 
 function testMap2Init(
   _skstore: SKStore,
-  input1: TableHandle<[number, string]>,
-  input2: TableHandle<[number, string]>,
-  output: TableHandle<[number, number]>,
+  input1: TableCollection<[number, string]>,
+  input2: TableCollection<[number, string]>,
+  output: TableCollection<[number, number]>,
 ) {
   const eager1 = input1.map(TestParseInt);
   const eager2 = input2.map(TestParseInt);
@@ -138,9 +138,9 @@ async function testMap2Run(
 
 function testMap3Init(
   _skstore: SKStore,
-  input_no_index: TableHandle<[number, string]>,
-  input_index: TableHandle<[number, string]>,
-  output: TableHandle<[number, number]>,
+  input_no_index: TableCollection<[number, string]>,
+  input_index: TableCollection<[number, string]>,
+  output: TableCollection<[number, number]>,
 ) {
   const eager1 = input_no_index.map(TestParseInt);
   const eager2 = input_index.map(TestParseInt);
@@ -181,8 +181,8 @@ class AddKeyAndValue extends ValueMapper<number, number, number> {
 
 function testValueMapperInit(
   _skstore: SKStore,
-  input: TableHandle<[number, number]>,
-  output: TableHandle<[number, number]>,
+  input: TableCollection<[number, number]>,
+  output: TableCollection<[number, number]>,
 ) {
   input
     .map(TestFromIntInt)
@@ -212,7 +212,7 @@ async function testValueMapperRun(
 //// testSize
 
 class TestSizeGetter implements TableMapper<[number], number, number> {
-  constructor(private other: EHandle<number, number>) {}
+  constructor(private other: EagerCollection<number, number>) {}
 
   mapElement(entry: [number], occ: number): Iterable<[number, number]> {
     if (entry[0] == 0) return Array([entry[0], this.other.size()]);
@@ -222,9 +222,9 @@ class TestSizeGetter implements TableMapper<[number], number, number> {
 
 function testSizeInit(
   _skstore: SKStore,
-  input: TableHandle<[number, number]>,
-  size: TableHandle<[number]>,
-  output: TableHandle<[number, number]>,
+  input: TableCollection<[number, number]>,
+  size: TableCollection<[number]>,
+  output: TableCollection<[number, number]>,
 ) {
   const eager1 = input.map(TestFromIntInt);
   const eager2 = size.map1(TestSizeGetter, eager1);
@@ -250,16 +250,16 @@ async function testSizeRun(
 //// testLazy
 
 class TestLazyAdd implements LazyCompute<number, number> {
-  constructor(private other: EHandle<number, number>) {}
+  constructor(private other: EagerCollection<number, number>) {}
 
-  compute(selfHdl: LHandle<number, number>, key: number): number | null {
+  compute(selfHdl: LazyCollection<number, number>, key: number): number | null {
     const v = this.other.maybeGetOne(key);
     return (v ?? 0) + 2;
   }
 }
 
 class TestSub implements Mapper<number, number, number, number> {
-  constructor(private other: LHandle<number, number>) {}
+  constructor(private other: LazyCollection<number, number>) {}
 
   mapElement(
     key: number,
@@ -271,8 +271,8 @@ class TestSub implements Mapper<number, number, number, number> {
 
 function testLazyInit(
   skstore: SKStore,
-  input: TableHandle<[number, number]>,
-  output: TableHandle<[number, number]>,
+  input: TableCollection<[number, number]>,
+  output: TableCollection<[number, number]>,
 ) {
   const eager1 = input.map(TestFromIntInt);
   const lazy = skstore.lazy1(TestLazyAdd, eager1);
@@ -318,8 +318,8 @@ class TestOddEven implements Mapper<number, number, number, number> {
 
 function testMapReduceInit(
   _skstore: SKStore,
-  input: TableHandle<[number, number]>,
-  output: TableHandle<[number, number]>,
+  input: TableCollection<[number, number]>,
+  output: TableCollection<[number, number]>,
 ) {
   const eager1 = input.map(TestFromIntInt);
   const eager2 = eager1.mapReduce(TestOddEven, new Sum());
@@ -384,15 +384,15 @@ class TestToOutput2
 
 function testMultiMap1Init(
   skstore: SKStore,
-  input1: TableHandle<[number, string]>,
-  input2: TableHandle<[number, string]>,
-  output: TableHandle<[number, number, number]>,
+  input1: TableCollection<[number, string]>,
+  input2: TableCollection<[number, string]>,
+  output: TableCollection<[number, number, number]>,
 ) {
   const eager1 = input1.map(TestParseInt);
   const eager2 = input2.map(TestParseInt);
-  const eager3 = skstore.multimap<number, number, [number, number], number>([
-    { handle: eager1, mapper: TestSplitter, params: [0] },
-    { handle: eager2, mapper: TestSplitter, params: [1] },
+  const eager3 = skstore.multimap([
+    { source: eager1, mapper: TestSplitter, params: [0] },
+    { source: eager2, mapper: TestSplitter, params: [1] },
   ]);
   eager3.mapTo(output, TestToOutput2);
 }
@@ -437,16 +437,16 @@ class TestSet implements Mapper<number, number, number, number> {
 
 function testMultiMapReduceInit(
   skstore: SKStore,
-  input1: TableHandle<[number, string]>,
-  input2: TableHandle<[number, string]>,
-  output: TableHandle<[number, number]>,
+  input1: TableCollection<[number, string]>,
+  input2: TableCollection<[number, string]>,
+  output: TableCollection<[number, number]>,
 ) {
   const eager1 = input1.map(TestParseInt);
   const eager2 = input2.map(TestParseInt);
   const eager3 = skstore.multimapReduce(
     [
-      { handle: eager1, mapper: TestSet },
-      { handle: eager2, mapper: TestSet },
+      { source: eager1, mapper: TestSet },
+      { source: eager2, mapper: TestSet },
     ],
     new Sum(),
   );
@@ -481,7 +481,7 @@ async function testMultiMapReduceRun(
 class TestLazyWithAsync
   implements AsyncLazyCompute<[number, number], number, number, number>
 {
-  constructor(private other: EHandle<number, number>) {}
+  constructor(private other: EagerCollection<number, number>) {}
 
   params(key: [number, number]) {
     const v2 = this.other.maybeGetOne(key[0]);
@@ -495,7 +495,10 @@ class TestLazyWithAsync
 
 class TestCheckResult implements Mapper<number, number, number, string> {
   constructor(
-    private asyncLazy: LHandle<[number, number], Loadable<number, number>>,
+    private asyncLazy: LazyCollection<
+      [number, number],
+      Loadable<number, number>
+    >,
   ) {}
 
   mapElement(
@@ -517,17 +520,16 @@ class TestCheckResult implements Mapper<number, number, number, string> {
 
 function testAsyncLazyInit(
   skstore: SKStore,
-  input1: TableHandle<[number, number]>,
-  input2: TableHandle<[number, number]>,
-  output: TableHandle<[number, string]>,
+  input1: TableCollection<[number, number]>,
+  input2: TableCollection<[number, number]>,
+  output: TableCollection<[number, string]>,
 ) {
   const eager1 = input1.map(TestFromIntInt);
   const eager2 = input2.map(TestFromIntInt);
-  const asyncLazy = skstore.asyncLazy1(TestLazyWithAsync, eager2) as ALHandle<
-    [number, number],
-    number,
-    number
-  >;
+  const asyncLazy = skstore.asyncLazy1(
+    TestLazyWithAsync,
+    eager2,
+  ) as AsyncLazyCollection<[number, number], number, number>;
   const eager3 = eager1.map1(TestCheckResult, asyncLazy);
   eager3.mapTo(output, TestToOutput);
 }

@@ -6,7 +6,7 @@ import type {
   NonEmptyIterator,
   Result,
   AValue,
-  LHandle,
+  LazyCollection,
   TJSON,
 } from "../skstore_api.js";
 
@@ -80,7 +80,7 @@ export class ContextImpl implements Context {
 
   lazy = <K extends TJSON, V extends TJSON>(
     name: string,
-    compute: (selfHdl: LHandle<K, V>, key: K) => Opt<V>,
+    compute: (self: LazyCollection<K, V>, key: K) => Opt<V>,
   ) => {
     const lazyHdl = this.exports.SKIP_SKStore_lazy(
       this.pointer(),
@@ -114,7 +114,7 @@ export class ContextImpl implements Context {
     mappings: CtxMapping<K1, V1, K2, V2>[],
   ) => {
     const skMappings = mappings.map((mapping) => [
-      mapping.handle.getId(),
+      mapping.source.getId(),
       this.handles.register(mapping.mapper),
     ]);
     const resHdlPtr = this.exports.SKIP_SKStore_multimap(
@@ -137,7 +137,7 @@ export class ContextImpl implements Context {
     accumulator: Accumulator<V2, V3>,
   ) => {
     const skMappings = mappings.map((mapping) => [
-      mapping.handle.getId(),
+      mapping.source.getId(),
       this.handles.register(mapping.mapper),
     ]);
     const resHdlPtr = this.exports.SKIP_SKStore_multimapReduce(

@@ -6,9 +6,9 @@ import type {
   SKStoreFactory,
   ColumnSchema,
   MirrorSchema,
-  TableHandle,
+  TableCollection,
   Table,
-  TTableHandle,
+  TTableCollection,
   TTable,
   TJSON,
   JSONObject,
@@ -18,11 +18,11 @@ import type {
 export type {
   SKStore,
   TJSON,
-  TableHandle,
+  TableCollection,
   Table,
   MirrorSchema,
   JSONObject,
-  TTableHandle,
+  TTableCollection,
   TTable,
   ColumnSchema,
   Accumulator,
@@ -32,13 +32,13 @@ export type {
   Mapper,
   EntryMapper as TableMapper,
   OutputMapper,
-  EHandle,
+  EagerCollection,
   NonEmptyIterator,
-  LHandle,
+  LazyCollection,
   LazyCompute,
   AsyncLazyCompute,
   Loadable,
-  ALHandle,
+  AsyncLazyCollection,
 } from "./skstore_api.js";
 
 export { ValueMapper } from "./skstore_api.js";
@@ -67,7 +67,7 @@ async function wasmUrl(): Promise<URL> {
 }
 
 export async function createSKStore(
-  init: (skstore: SKStore, ...tables: TableHandle<TJSON[]>[]) => void,
+  init: (skstore: SKStore, ...tables: TableCollection<TJSON[]>[]) => void,
   tables: MirrorSchema[],
   connect: boolean = true,
 ): Promise<Table<TJSON[]>[]> {
