@@ -70,7 +70,7 @@ function testMap1Init(
   input: TableHandle<[number, number]>,
   output: TableHandle<[number, number]>,
 ) {
-  const eager1 = input.map1(TestFromIntInt, 2);
+  const eager1 = input.map(TestFromIntInt, 2);
   eager1.mapTo(output, TestToOutput);
 }
 
@@ -114,7 +114,7 @@ function testMap2Init(
 ) {
   const eager1 = input1.map(TestParseInt);
   const eager2 = input2.map(TestParseInt);
-  const eager3 = eager1.map1(TestAdd, eager2);
+  const eager3 = eager1.map(TestAdd, eager2);
   eager3.mapTo(output, TestToOutput);
 }
 
@@ -144,7 +144,7 @@ function testMap3Init(
 ) {
   const eager1 = input_no_index.map(TestParseInt);
   const eager2 = input_index.map(TestParseInt);
-  const eager3 = eager1.map1(TestAdd, eager2).map(TestSum);
+  const eager3 = eager1.map(TestAdd, eager2).map(TestSum);
   eager3.mapTo(output, TestToOutput);
 }
 
@@ -227,7 +227,7 @@ function testSizeInit(
   output: TableHandle<[number, number]>,
 ) {
   const eager1 = input.map(TestFromIntInt);
-  const eager2 = size.map1(TestSizeGetter, eager1);
+  const eager2 = size.map(TestSizeGetter, eager1);
   eager2.mapTo(output, TestToOutput);
 }
 
@@ -275,8 +275,8 @@ function testLazyInit(
   output: TableHandle<[number, number]>,
 ) {
   const eager1 = input.map(TestFromIntInt);
-  const lazy = skstore.lazy1(TestLazyAdd, eager1);
-  const eager2 = eager1.map1(TestSub, lazy);
+  const lazy = skstore.lazy(TestLazyAdd, eager1);
+  const eager2 = eager1.map(TestSub, lazy);
   eager2.mapTo(output, TestToOutput);
 }
 
@@ -523,12 +523,12 @@ function testAsyncLazyInit(
 ) {
   const eager1 = input1.map(TestFromIntInt);
   const eager2 = input2.map(TestFromIntInt);
-  const asyncLazy = skstore.asyncLazy1(TestLazyWithAsync, eager2) as ALHandle<
+  const asyncLazy = skstore.asyncLazy(TestLazyWithAsync, eager2) as ALHandle<
     [number, number],
     number,
     number
   >;
-  const eager3 = eager1.map1(TestCheckResult, asyncLazy);
+  const eager3 = eager1.map(TestCheckResult, asyncLazy);
   eager3.mapTo(output, TestToOutput);
 }
 
