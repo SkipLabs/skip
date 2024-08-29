@@ -19,13 +19,8 @@ import type {
   JSONObject,
   TJSON,
   Param,
-  EMParameters,
-  MParameters,
-  OMParameters,
   LazyCompute,
-  LParameters,
   AsyncLazyCompute,
-  ALParameters,
   NonEmptyIterator,
   ALHandle,
 } from "../skstore_api.js";
@@ -88,11 +83,10 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     return this.context.size(this.eagerHdl);
   };
 
-  mapN<
-    K2 extends TJSON,
-    V2 extends TJSON,
-    C extends new (...params: Param[]) => Mapper<K, V, K2, V2>,
-  >(mapper: C, ...params: MParameters<K, V, K2, V2, C>): EHandle<K2, V2> {
+  mapN<K2 extends TJSON, V2 extends TJSON, Params extends Param[]>(
+    mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
+    ...params: Params
+  ): EHandle<K2, V2> {
     params.forEach(check);
     const mapperObj = new mapper(...params);
     Object.freeze(mapperObj);
@@ -257,11 +251,11 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     K2 extends TJSON,
     V2 extends TJSON,
     V3 extends TJSON,
-    C extends new (...params: Param[]) => Mapper<K, V, K2, V2>,
+    Params extends Param[],
   >(
-    mapper: C,
+    mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
     accumulator: Accumulator<V2, V3>,
-    ...params: MParameters<K, V, K2, V2, C>
+    ...params: Params
   ) {
     params.forEach(check);
     const mapperObj = new mapper(...params);
@@ -509,13 +503,10 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     );
   }
 
-  mapToN<
-    R extends TJSON[],
-    C extends new (...params: Param[]) => OutputMapper<R, K, V>,
-  >(
+  mapToN<R extends TJSON[], Params extends Param[]>(
     table: TableHandle<R>,
-    mapper: C,
-    ...params: OMParameters<R, K, V, C>
+    mapper: new (...params: Params) => OutputMapper<R, K, V>,
+    ...params: Params
   ): void {
     params.forEach(check);
     const mapperObj = new mapper(...params);
@@ -766,11 +757,10 @@ export class TableHandleImpl<R extends TJSON[]> implements TableHandle<R> {
     return this.context.getFromTable(this.getName(), key, index);
   }
 
-  mapN<
-    K extends TJSON,
-    V extends TJSON,
-    C extends new (...params: Param[]) => EntryMapper<R, K, V>,
-  >(mapper: C, ...params: EMParameters<K, V, R, C>): EHandle<K, V> {
+  mapN<K extends TJSON, V extends TJSON, Params extends Param[]>(
+    mapper: new (...params: Params) => EntryMapper<R, K, V>,
+    ...params: Params
+  ): EHandle<K, V> {
     params.forEach(check);
     const mapperObj = new mapper(...params);
     Object.freeze(mapperObj);
@@ -1090,11 +1080,10 @@ export class SKStoreImpl implements SKStore {
     return new EHandleImpl<K2, V3>(this.context, eagerHdl);
   }
 
-  lazyN<
-    K extends TJSON,
-    V extends TJSON,
-    C extends new (...params: Param[]) => LazyCompute<K, V>,
-  >(compute: C, ...params: LParameters<K, V, C>): LHandle<K, V> {
+  lazyN<K extends TJSON, V extends TJSON, Params extends Param[]>(
+    compute: new (...params: Params) => LazyCompute<K, V>,
+    ...params: Params
+  ): LHandle<K, V> {
     params.forEach(check);
     const computeObj = new compute(...params);
     Object.freeze(computeObj);
@@ -1249,10 +1238,10 @@ export class SKStoreImpl implements SKStore {
     V extends TJSON,
     P extends TJSON,
     M extends TJSON,
-    C extends new (...params: Param[]) => AsyncLazyCompute<K, V, P, M>,
+    Params extends Param[],
   >(
-    compute: C,
-    ...params: ALParameters<K, V, P, M, C>
+    compute: new (...params: Params) => AsyncLazyCompute<K, V, P, M>,
+    ...params: Params
   ): LHandle<K, Loadable<V, M>> {
     params.forEach(check);
     const computeObj = new compute(...params);
@@ -1269,7 +1258,9 @@ export class SKStoreImpl implements SKStore {
   asyncLazy<K extends TJSON, V extends TJSON, P extends TJSON, M extends TJSON>(
     compute: new () => AsyncLazyCompute<K, V, P, M>,
   ): ALHandle<K, V, M> {
-    return this.asyncLazyN<K, V, P, M, typeof compute>(compute);
+    return this.asyncLazyN<K, V, P, M, ConstructorParameters<typeof compute>>(
+      compute,
+    );
   }
 
   asyncLazy1<
@@ -1282,7 +1273,10 @@ export class SKStoreImpl implements SKStore {
     compute: new (p1: P1) => AsyncLazyCompute<K, V, P, M>,
     p1: P1,
   ): ALHandle<K, V, M> {
-    return this.asyncLazyN<K, V, P, M, typeof compute>(compute, p1);
+    return this.asyncLazyN<K, V, P, M, ConstructorParameters<typeof compute>>(
+      compute,
+      p1,
+    );
   }
 
   asyncLazy2<
@@ -1297,7 +1291,11 @@ export class SKStoreImpl implements SKStore {
     p1: P1,
     p2: P2,
   ): ALHandle<K, V, M> {
-    return this.asyncLazyN<K, V, P, M, typeof compute>(compute, p1, p2);
+    return this.asyncLazyN<K, V, P, M, ConstructorParameters<typeof compute>>(
+      compute,
+      p1,
+      p2,
+    );
   }
 
   asyncLazy3<
@@ -1314,7 +1312,12 @@ export class SKStoreImpl implements SKStore {
     p2: P2,
     p3: P3,
   ): ALHandle<K, V, M> {
-    return this.asyncLazyN<K, V, P, M, typeof compute>(compute, p1, p2, p3);
+    return this.asyncLazyN<K, V, P, M, ConstructorParameters<typeof compute>>(
+      compute,
+      p1,
+      p2,
+      p3,
+    );
   }
 
   asyncLazy4<
@@ -1338,7 +1341,13 @@ export class SKStoreImpl implements SKStore {
     p3: P3,
     p4: P4,
   ): ALHandle<K, V, M> {
-    return this.asyncLazyN<K, V, P, M, typeof compute>(compute, p1, p2, p3, p4);
+    return this.asyncLazyN<K, V, P, M, ConstructorParameters<typeof compute>>(
+      compute,
+      p1,
+      p2,
+      p3,
+      p4,
+    );
   }
 
   asyncLazy5<
@@ -1365,7 +1374,7 @@ export class SKStoreImpl implements SKStore {
     p4: P4,
     p5: P5,
   ): ALHandle<K, V, M> {
-    return this.asyncLazyN<K, V, P, M, typeof compute>(
+    return this.asyncLazyN<K, V, P, M, ConstructorParameters<typeof compute>>(
       compute,
       p1,
       p2,
@@ -1402,7 +1411,7 @@ export class SKStoreImpl implements SKStore {
     p5: P5,
     p6: P6,
   ): ALHandle<K, V, M> {
-    return this.asyncLazyN<K, V, P, M, typeof compute>(
+    return this.asyncLazyN<K, V, P, M, ConstructorParameters<typeof compute>>(
       compute,
       p1,
       p2,
@@ -1443,7 +1452,7 @@ export class SKStoreImpl implements SKStore {
     p6: P6,
     p7: P7,
   ): ALHandle<K, V, M> {
-    return this.asyncLazyN<K, V, P, M, typeof compute>(
+    return this.asyncLazyN<K, V, P, M, ConstructorParameters<typeof compute>>(
       compute,
       p1,
       p2,
@@ -1488,7 +1497,7 @@ export class SKStoreImpl implements SKStore {
     p7: P7,
     p8: P8,
   ): ALHandle<K, V, M> {
-    return this.asyncLazyN<K, V, P, M, typeof compute>(
+    return this.asyncLazyN<K, V, P, M, ConstructorParameters<typeof compute>>(
       compute,
       p1,
       p2,
@@ -1537,7 +1546,7 @@ export class SKStoreImpl implements SKStore {
     p8: P8,
     p9: P9,
   ): ALHandle<K, V, M> {
-    return this.asyncLazyN<K, V, P, M, typeof compute>(
+    return this.asyncLazyN<K, V, P, M, ConstructorParameters<typeof compute>>(
       compute,
       p1,
       p2,
