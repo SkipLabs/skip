@@ -1,18 +1,27 @@
 // sknpm: Cannot be multiline for package sources
 // prettier-ignore
 import type { int, ptr, Environment, Links, ToWasmManager, Utils } from "#std/sk_types.js";
+import type * as Internal from "#std/sk_internal_types.js";
 
 interface ToWasm {
   SKIP_localetimezone: (year: int, month: int, day: int) => int;
-  SKIP_localetimezonename: (year: int, month: int, day: int) => ptr;
-  SKIP_locale: (code: int, value: int) => ptr;
+  SKIP_localetimezonename: (
+    year: int,
+    month: int,
+    day: int,
+  ) => ptr<Internal.String>;
+  SKIP_locale: (code: int, value: int) => ptr<Internal.String>;
   SKIP_JS_currenttimemillis: () => number;
 }
 
 class LinksImpl implements Links {
   SKIP_localetimezone!: (year: int, month: int, day: int) => int;
-  SKIP_localetimezonename!: (year: int, month: int, day: int) => ptr;
-  SKIP_locale!: (code: int, value: int) => ptr;
+  SKIP_localetimezonename!: (
+    year: int,
+    month: int,
+    day: int,
+  ) => ptr<Internal.String>;
+  SKIP_locale!: (code: int, value: int) => ptr<Internal.String>;
 
   constructor() {}
 
