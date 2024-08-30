@@ -1,6 +1,7 @@
 // sknpm: Cannot be multiline for package sources
 // prettier-ignore
 import type { int, ptr, Environment, Links, ToWasmManager, Utils, Shared } from "#std/sk_types.js";
+import type * as Internal from "#std/sk_internal_types.js";
 import type {
   PagedMemory,
   Page,
@@ -79,13 +80,13 @@ interface ToWasm {
   SKIP_last_tick: (queryID: int) => int;
   SKIP_switch_to: (stream: int) => void;
   SKIP_clear_field_names: () => void;
-  SKIP_push_field_name: (skName: ptr) => void;
+  SKIP_push_field_name: (skName: ptr<Internal.String>) => void;
   SKIP_clear_object: () => void;
   SKIP_push_object_field_null: () => void;
   SKIP_push_object_field_int32: (field: int) => void;
-  SKIP_push_object_field_int64: (field: ptr) => void;
-  SKIP_push_object_field_float: (field: ptr) => void;
-  SKIP_push_object_field_string: (field: ptr) => void;
+  SKIP_push_object_field_int64: (field: ptr<Internal.String>) => void;
+  SKIP_push_object_field_float: (field: ptr<Internal.String>) => void;
+  SKIP_push_object_field_string: (field: ptr<Internal.String>) => void;
   SKIP_push_object: () => void;
   SKIP_js_mark_query: (queryID: int) => void;
   SKIP_js_delete_fun: (queryID: int) => void;
@@ -221,15 +222,18 @@ class LinksImpl implements Links, ToWasm {
 
   SKIP_last_tick!: (queryID: int) => int;
   SKIP_switch_to!: (stream: int) => void;
-  SKIP_call_external_fun!: (funId: int, skParam: ptr) => ptr;
+  SKIP_call_external_fun!: (
+    funId: int,
+    skParam: ptr<Internal.String>,
+  ) => ptr<Internal.String>;
   SKIP_clear_field_names!: () => void;
-  SKIP_push_field_name!: (skName: ptr) => void;
+  SKIP_push_field_name!: (skName: ptr<Internal.String>) => void;
   SKIP_clear_object!: () => void;
   SKIP_push_object_field_null!: () => void;
   SKIP_push_object_field_int32!: (field: int) => void;
-  SKIP_push_object_field_int64!: (field: ptr) => void;
-  SKIP_push_object_field_float!: (field: ptr) => void;
-  SKIP_push_object_field_string!: (field: ptr) => void;
+  SKIP_push_object_field_int64!: (field: ptr<Internal.String>) => void;
+  SKIP_push_object_field_float!: (field: ptr<Internal.String>) => void;
+  SKIP_push_object_field_string!: (field: ptr<Internal.String>) => void;
   SKIP_push_object!: () => void;
   SKIP_js_mark_query!: (queryID: int) => void;
   SKIP_js_delete_fun!: (queryID: int) => void;
@@ -285,7 +289,10 @@ class LinksImpl implements Links, ToWasm {
         }
       }
     };
-    this.SKIP_call_external_fun = (funId: int, skParam: ptr) => {
+    this.SKIP_call_external_fun = (
+      funId: int,
+      skParam: ptr<Internal.String>,
+    ) => {
       let res = this.state.call(funId, JSON.parse(utils.importString(skParam)));
       let strRes = JSON.stringify(res === undefined ? null : res);
       return utils.exportString(strRes);
@@ -299,7 +306,7 @@ class LinksImpl implements Links, ToWasm {
     this.SKIP_clear_field_names = () => {
       this.field_names = new Array();
     };
-    this.SKIP_push_field_name = (skName: ptr) => {
+    this.SKIP_push_field_name = (skName: ptr<Internal.String>) => {
       this.field_names.push(utils.importString(skName));
     };
     this.SKIP_clear_object = () => {
@@ -316,17 +323,17 @@ class LinksImpl implements Links, ToWasm {
       this.object[field_name] = n;
       this.objectIdx++;
     };
-    this.SKIP_push_object_field_int64 = (skV: ptr) => {
+    this.SKIP_push_object_field_int64 = (skV: ptr<Internal.String>) => {
       let field_name: string = this.field_names[this.objectIdx]!;
       this.object[field_name] = parseInt(utils.importString(skV), 10);
       this.objectIdx++;
     };
-    this.SKIP_push_object_field_float = (skV: ptr) => {
+    this.SKIP_push_object_field_float = (skV: ptr<Internal.String>) => {
       let field_name: string = this.field_names[this.objectIdx]!;
       this.object[field_name] = parseFloat(utils.importString(skV));
       this.objectIdx++;
     };
-    this.SKIP_push_object_field_string = (skV: ptr) => {
+    this.SKIP_push_object_field_string = (skV: ptr<Internal.String>) => {
       let field_name: string = this.field_names[this.objectIdx]!;
       this.object[field_name] = utils.importString(skV);
       this.objectIdx++;
@@ -480,7 +487,7 @@ class Manager implements ToWasmManager {
     let toWasm = wasm as ToWasm;
     let links = new LinksImpl(this.environment);
     toWasm.SKIP_clear_field_names = () => links.SKIP_clear_field_names();
-    toWasm.SKIP_push_field_name = (skName: ptr) =>
+    toWasm.SKIP_push_field_name = (skName: ptr<Internal.String>) =>
       links.SKIP_push_field_name(skName);
     toWasm.SKIP_clear_object = () => links.SKIP_clear_object();
     toWasm.SKIP_last_tick = (queryID: int) => links.SKIP_last_tick(queryID);
@@ -489,11 +496,11 @@ class Manager implements ToWasmManager {
       links.SKIP_push_object_field_null();
     toWasm.SKIP_push_object_field_int32 = (field: int) =>
       links.SKIP_push_object_field_int32(field);
-    toWasm.SKIP_push_object_field_int64 = (field: ptr) =>
+    toWasm.SKIP_push_object_field_int64 = (field: ptr<Internal.String>) =>
       links.SKIP_push_object_field_int64(field);
-    toWasm.SKIP_push_object_field_float = (field: ptr) =>
+    toWasm.SKIP_push_object_field_float = (field: ptr<Internal.String>) =>
       links.SKIP_push_object_field_float(field);
-    toWasm.SKIP_push_object_field_string = (field: ptr) =>
+    toWasm.SKIP_push_object_field_string = (field: ptr<Internal.String>) =>
       links.SKIP_push_object_field_string(field);
     toWasm.SKIP_push_object = () => links.SKIP_push_object();
     toWasm.SKIP_js_mark_query = (id: int) => links.SKIP_js_mark_query(id);
