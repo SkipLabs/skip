@@ -34,7 +34,7 @@ export type MirrorSchema = {
 };
 
 /**
- * SKStore async function calls return a `Result` value which is one of `Success`,
+ * Skip Runtime async function calls return a `Result` value which is one of `Success`,
  * `Failure`, or `Unchanged`
  */
 

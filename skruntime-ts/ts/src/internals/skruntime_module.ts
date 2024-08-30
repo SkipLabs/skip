@@ -1,6 +1,6 @@
 // prettier-ignore
 import type { int, ptr, Links, Utils, ToWasmManager, Environment, Opt, Metadata } from "#std/sk_types.js";
-import type { SKJSON } from "./skstore_skjson.js";
+import type { SKJSON } from "./skjson.js";
 import type {
   Accumulator,
   NonEmptyIterator,
@@ -8,16 +8,16 @@ import type {
   AValue,
   LazyCollection,
   TJSON,
-} from "../skstore_api.js";
+} from "../skip_runtime_api.js";
 
 import type {
   Handles,
   Context,
   FromWasm,
   CtxMapping,
-} from "./skstore_types.js";
+} from "./skruntime_types.js";
 import type * as Internal from "./skstore_internal_types.js";
-import { LSelfImpl, SKStoreFactoryImpl } from "./skstore_impl.js";
+import { LSelfImpl, SKStoreFactoryImpl } from "./skruntime_impl.js";
 // prettier-ignore
 import type { SKDBShared } from "#skdb/skdb_types.js";
 
