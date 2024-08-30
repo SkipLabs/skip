@@ -190,7 +190,6 @@ interface Exported {
   SKIP_initializeSkip: () => void;
   SKIP_skfs_end_of_init: () => void;
   SKIP_callWithException: (fnc: ptr, exc: int) => ptr;
-  SKIP_getExceptionId: (exn: ptr) => ptr;
   SKIP_getExceptionMessage: (skExc: ptr) => ptr;
   SKIP_get_persistent_size: () => int;
   SKIP_get_version: () => number;
