@@ -31,7 +31,10 @@ class LinksImpl implements Links {
   SKIP_print_raw!: (strPtr: ptr<Internal.String>) => void;
   SKIP_print_char!: (code: int) => void;
   SKIP_print_string!: (strPtr: ptr<Internal.String>) => void;
-  SKIP_etry!: (f: ptr, exn_handler: ptr) => ptr;
+  SKIP_etry!: <Ret>(
+    f: ptr<Internal.Function<Internal.Void, Internal.T<Ret>>>,
+    exn_handler: ptr<Internal.Function<Internal.Void, Internal.T<Ret>>>,
+  ) => ptr<Internal.T<Ret>>;
   js_throw!: (excPtr: ptr<Internal.Exception>, rethrow: int) => void;
   js_replace_exn!: (
     oldex: ptr<Internal.Exception>,
@@ -241,8 +244,10 @@ class Manager implements ToWasmManager {
       links.SKIP_print_char(strPtr);
     toWasm.SKIP_print_string = (strPtr: ptr<Internal.String>) =>
       links.SKIP_print_string(strPtr);
-    toWasm.SKIP_etry = (f: ptr, exn_handler: ptr) =>
-      links.SKIP_etry(f, exn_handler);
+    toWasm.SKIP_etry = <Ret>(
+      f: ptr<Internal.Function<Internal.Void, Internal.T<Ret>>>,
+      exn_handler: ptr<Internal.Function<Internal.Void, Internal.T<Ret>>>,
+    ): ptr<Internal.T<Ret>> => links.SKIP_etry(f, exn_handler);
     toWasm.SKIP_delete_external_exception = (actor: int) =>
       links.SKIP_delete_external_exception(actor);
     toWasm.SKIP_external_exception_message = (actor: int) =>
@@ -309,7 +314,10 @@ interface ToWasm {
   SKIP_print_raw: (strPtr: ptr<Internal.String>) => void;
   SKIP_print_char: (strPtr: ptr<Internal.String>) => void;
   SKIP_print_string: (strPtr: ptr<Internal.String>) => void;
-  SKIP_etry: (f: ptr, exn_handler: ptr) => ptr;
+  SKIP_etry: <Ret>(
+    f: ptr<Internal.Function<Internal.Void, Internal.T<Ret>>>,
+    exn_handler: ptr<Internal.Function<Internal.Void, Internal.T<Ret>>>,
+  ) => ptr<Internal.T<Ret>>;
   SKIP_delete_external_exception: (exc: int) => void;
   SKIP_external_exception_message: (exc: int) => ptr<Internal.String>;
   SKIP_js_time_ms_lo: () => int;

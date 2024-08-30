@@ -188,11 +188,16 @@ interface Exported {
   SKIP_createFloatArray: (size: int) => ptr<Internal.Array<Internal.Float>>;
   SKIP_createUInt32Array: (size: int) => ptr<Internal.Array<Internal.UInt32>>;
   SKIP_getArraySize: <Ty>(skArray: ptr<Internal.Array<Internal.T<Ty>>>) => int;
-  SKIP_call0: (fnc: ptr) => ptr;
+  SKIP_call0: <Ret>(
+    fnc: ptr<Internal.Function<Internal.Void, Internal.T<Ret>>>,
+  ) => ptr<Internal.T<Ret>>;
   SKIP_skfs_init: (size: int) => void;
   SKIP_initializeSkip: () => void;
   SKIP_skfs_end_of_init: () => void;
-  SKIP_callWithException: (fnc: ptr, exc: int) => ptr;
+  SKIP_callWithException: <Ret>(
+    fnc: ptr<Internal.Function<Internal.Void, Internal.T<Ret>>>,
+    exc: int,
+  ) => ptr<Internal.T<Ret>>;
   SKIP_getExceptionMessage: (
     skExc: ptr<Internal.Exception>,
   ) => ptr<Internal.String>;
@@ -478,10 +483,15 @@ export class Utils {
     skData.set(array);
     return skArray;
   }
-  call = (fnId: ptr) => {
+  call = <Ret>(
+    fnId: ptr<Internal.Function<Internal.Void, Internal.T<Ret>>>,
+  ): ptr<Internal.T<Ret>> => {
     return this.exports.SKIP_call0(fnId);
   };
-  callWithException = (fnId: ptr, exception: Exception | null) => {
+  callWithException = <Ret>(
+    fnId: ptr<Internal.Function<Internal.Void, Internal.T<Ret>>>,
+    exception: Exception | null,
+  ): ptr<Internal.T<Ret>> => {
     return this.exports.SKIP_callWithException(
       fnId,
       exception ? exception.id : 0,
@@ -497,7 +507,10 @@ export class Utils {
     this.exports.SKIP_initializeSkip();
     this.exports.SKIP_skfs_end_of_init();
   };
-  etry = (f: ptr, exn_handler: ptr) => {
+  etry = <Ret>(
+    f: ptr<Internal.Function<Internal.Void, Internal.T<Ret>>>,
+    exn_handler: ptr<Internal.Function<Internal.Void, Internal.T<Ret>>>,
+  ): ptr<Internal.T<Ret>> => {
     let err: Error | null = null;
     try {
       return this.call(f);
