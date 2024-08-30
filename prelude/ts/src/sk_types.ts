@@ -180,10 +180,13 @@ export interface Memory {
 interface Exported {
   SKIP_throw_EndOfFile: () => void;
   SKIP_String_byteSize: (strPtr: ptr<Internal.String>) => int;
-  SKIP_Obstack_alloc: (size: int) => ptr;
+  SKIP_Obstack_alloc: (size: int) => ptr<Internal.Raw>;
   SKIP_new_Obstack: () => ptr<Internal.Obstack>;
   SKIP_destroy_Obstack: (pos: ptr<Internal.Obstack>) => void;
-  sk_string_create: (addr: ptr, size: int) => ptr<Internal.String>;
+  sk_string_create: (
+    addr: ptr<Internal.Raw>,
+    size: int,
+  ) => ptr<Internal.String>;
   SKIP_createByteArray: (size: int) => ptr<Internal.Array<Internal.Byte>>;
   SKIP_createFloatArray: (size: int) => ptr<Internal.Array<Internal.Float>>;
   SKIP_createUInt32Array: (size: int) => ptr<Internal.Array<Internal.UInt32>>;
