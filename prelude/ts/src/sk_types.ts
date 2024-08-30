@@ -1,6 +1,8 @@
+import type * as Internal from "./sk_internal_types.js";
+
 export type float = number;
 export type int = number;
-export type ptr = number;
+export type ptr = Internal.Opaque<number, Internal.Ptr>;
 export type ErrorObject = {
   message: string;
   stack?: string[];
