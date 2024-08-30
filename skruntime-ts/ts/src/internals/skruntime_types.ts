@@ -8,7 +8,7 @@ import type {
   TJSON,
   NonEmptyIterator,
   EagerCollection,
-} from "../skstore_api.js";
+} from "../skip_runtime_api.js";
 
 export type CtxMapping<
   K1 extends TJSON,
