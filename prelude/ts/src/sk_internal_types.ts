@@ -6,6 +6,9 @@ export type T<V = any> = { [t]: V };
 
 export type Any = T;
 
+declare const raw: unique symbol;
+export type Raw = T<typeof raw>;
+
 declare const void_: unique symbol;
 export type Void = T<typeof void_>;
 
