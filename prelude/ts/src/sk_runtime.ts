@@ -197,16 +197,20 @@ class Manager implements ToWasmManager {
     toWasm._ZdlPv = () => {
       throw new Error("_ZdlPv");
     };
-    toWasm.abort = (err: ptr) => {
+    toWasm.abort = (err: ptr<Internal.T<unknown>>) => {
       throw new Error("Abort " + err);
     };
-    toWasm.abortOnCannotGrowMemory = (err: ptr) => {
+    toWasm.abortOnCannotGrowMemory = (err: ptr<Internal.T<unknown>>) => {
       throw new Error("Abort on cannot grow memory " + err);
     };
-    toWasm.__setErrNo = (err: ptr) => {
+    toWasm.__setErrNo = (err: ptr<Internal.T<unknown>>) => {
       throw new Error("ErrNo " + err);
     };
-    toWasm.__cxa_throw = (exn: ptr, infi: ptr, dest: ptr) => {
+    toWasm.__cxa_throw = (
+      exn: ptr<Internal.T<unknown>>,
+      infi: ptr<Internal.T<unknown>>,
+      dest: ptr<Internal.T<unknown>>,
+    ) => {
       throw new Error("Not managed exception");
     };
     toWasm.js_throw = (excPtr: ptr<Internal.Exception>, rethrow: int) =>
@@ -283,10 +287,14 @@ interface ToWasm {
   _ZNSt9exceptionD2Ev: () => void;
   _ZNKSt9exception4whatEv: () => void;
   _ZdlPv: () => void;
-  abort: (err: ptr) => void;
-  abortOnCannotGrowMemory: (err: ptr) => void;
-  __setErrNo: (err: ptr) => void;
-  __cxa_throw: (exn: ptr, infi: ptr, dest: ptr) => void;
+  abort: (err: ptr<Internal.T<unknown>>) => void;
+  abortOnCannotGrowMemory: (err: ptr<Internal.T<unknown>>) => void;
+  __setErrNo: (err: ptr<Internal.T<unknown>>) => void;
+  __cxa_throw: (
+    exn: ptr<Internal.T<unknown>>,
+    infi: ptr<Internal.T<unknown>>,
+    dest: ptr<Internal.T<unknown>>,
+  ) => void;
   js_throw: (excPtr: ptr<Internal.Exception>, rethrow: int) => void;
   js_replace_exn: (
     oldex: ptr<Internal.Exception>,

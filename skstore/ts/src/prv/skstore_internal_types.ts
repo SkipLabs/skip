@@ -39,17 +39,17 @@ export type JSONID = T<typeof jsonid>;
 declare const p: unique symbol;
 
 declare const lhandle: unique symbol;
-export type LHandle<K extends T = JSONID, V extends T = JSONFile> = T<
+export type LHandle<K extends T<any> = JSONID, V extends T<any> = JSONFile> = T<
   typeof lhandle
 > & { [p]: (_: V) => K };
 
 declare const nonemptyiterator: unique symbol;
-export type NonEmptyIterator<Ty extends T = JSONFile> = T<
+export type NonEmptyIterator<Ty extends T<any> = JSONFile> = T<
   typeof nonemptyiterator
 > & { [p]: Ty };
 
 declare const twriter: unique symbol;
-export type TWriter<K extends T = JSONID, V extends T = JSONFile> = T<
+export type TWriter<K extends T<any> = JSONID, V extends T<any> = JSONFile> = T<
   typeof twriter
 > & { [p]: [K, V] };
 
