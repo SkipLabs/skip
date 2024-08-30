@@ -2,8 +2,10 @@ import type * as Internal from "./sk_internal_types.js";
 
 export type float = number;
 export type int = number;
-export type ptr<InternalType extends Internal.T = Internal.Any> =
-  Internal.Opaque<number, InternalType>;
+export type ptr<InternalType extends Internal.T<any>> = Internal.Opaque<
+  number,
+  InternalType
+>;
 export type ErrorObject = {
   message: string;
   stack?: string[];
@@ -428,7 +430,7 @@ export class Utils {
     copy.set(skData);
     return copy;
   };
-  importBytes2 = (skBytes: ptr, size: int = 1) => {
+  importBytes2 = (skBytes: ptr<Internal.T<any>>, size: int = 1) => {
     let skData = new Uint8Array(this.exports.memory.buffer, skBytes, size);
     let copy = new Uint8Array(size);
     copy.set(skData);
@@ -444,7 +446,7 @@ export class Utils {
     data.set(view);
     return skArray;
   };
-  exportBytes2 = (view: Uint8Array, skBytes: ptr) => {
+  exportBytes2 = (view: Uint8Array, skBytes: ptr<Internal.T<any>>) => {
     let data = new Uint8Array(
       this.exports.memory.buffer,
       skBytes,
@@ -500,7 +502,7 @@ export class Utils {
       exception ? exception.id : 0,
     );
   };
-  getBytesFromBuffer = (dataPtr: ptr, length: int) => {
+  getBytesFromBuffer = (dataPtr: ptr<Internal.T<any>>, length: int) => {
     return new Uint8ClampedArray(this.exports.memory.buffer, dataPtr, length);
   };
   init = () => {
