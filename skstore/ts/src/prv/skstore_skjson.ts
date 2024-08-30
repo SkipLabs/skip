@@ -1,5 +1,6 @@
 // prettier-ignore
 import type { int, ptr, float, Links, Utils, ToWasmManager, Environment, Opt, Shared, } from "#std/sk_types.js";
+import type * as Internal from "./skstore_internal_types.js";
 
 export enum Type {
   /* eslint-disable no-unused-vars */
@@ -15,34 +16,43 @@ export enum Type {
 }
 
 interface WasmAccess {
-  SKIP_SKJSON_typeOf: (json: ptr) => int;
-  SKIP_SKJSON_asInt: (json: ptr) => int;
-  SKIP_SKJSON_asFloat: (json: ptr) => float;
-  SKIP_SKJSON_asBoolean: (json: ptr) => boolean;
-  SKIP_SKJSON_asString: (json: ptr) => ptr;
-  SKIP_SKJSON_asArray: (json: ptr) => ptr;
-  SKIP_SKJSON_asObject: (json: ptr) => ptr;
+  SKIP_SKJSON_typeOf: (json: ptr<Internal.CJSON>) => int;
+  SKIP_SKJSON_asInt: (json: ptr<Internal.CJSON>) => int;
+  SKIP_SKJSON_asFloat: (json: ptr<Internal.CJSON>) => float;
+  SKIP_SKJSON_asBoolean: (json: ptr<Internal.CJSON>) => boolean;
+  SKIP_SKJSON_asString: (json: ptr<Internal.CJSON>) => ptr<Internal.String>;
+  SKIP_SKJSON_asArray: (json: ptr<Internal.CJSON>) => ptr<Internal.CJArray>;
+  SKIP_SKJSON_asObject: (json: ptr<Internal.CJSON>) => ptr<Internal.CJObject>;
 
-  SKIP_SKJSON_fieldAt: (json: ptr, idx: int) => ptr;
-  SKIP_SKJSON_get: (json: ptr, idx: int) => ptr;
-  SKIP_SKJSON_at: (json: ptr, idx: int) => ptr;
+  SKIP_SKJSON_fieldAt: (
+    json: ptr<Internal.CJObject>,
+    idx: int,
+  ) => ptr<Internal.String>; // Should be Opt<...>
+  SKIP_SKJSON_get: (
+    json: ptr<Internal.CJObject>,
+    idx: int,
+  ) => ptr<Internal.CJSON>; // Should be Opt<...>
+  SKIP_SKJSON_at: (
+    json: ptr<Internal.CJArray>,
+    idx: int,
+  ) => ptr<Internal.CJSON>; // Should be Opt<...>
 
-  SKIP_SKJSON_objectSize: (json: ptr) => int;
-  SKIP_SKJSON_arraySize: (json: ptr) => int;
+  SKIP_SKJSON_objectSize: (json: ptr<Internal.CJObject>) => int;
+  SKIP_SKJSON_arraySize: (json: ptr<Internal.CJArray>) => int;
 }
 
 interface ToWasm {
-  SKIP_SKJSON_console: (json: ptr) => void;
-  SKIP_SKJSON_error: (json: ptr) => void;
+  SKIP_SKJSON_console: (json: ptr<Internal.CJSON>) => void;
+  SKIP_SKJSON_error: (json: ptr<Internal.CJSON>) => void;
 }
 
 class WasmHandle {
   utils: Utils;
-  pointer: ptr;
+  pointer: ptr<Internal.CJSON>;
   access: WasmAccess;
   fields?: Map<string, int>;
 
-  constructor(utils: Utils, pointer: ptr, access: WasmAccess) {
+  constructor(utils: Utils, pointer: ptr<Internal.CJSON>, access: WasmAccess) {
     this.utils = utils;
     this.pointer = pointer;
     this.access = access;
@@ -64,7 +74,7 @@ class WasmHandle {
     return this.fields;
   }
 
-  derive(pointer: ptr) {
+  derive(pointer: ptr<Internal.CJSON>) {
     return new WasmHandle(this.utils, pointer, this.access);
   }
 }
@@ -275,17 +285,30 @@ function clone<T>(value: T): T {
 }
 
 interface FromWasm extends WasmAccess {
-  SKIP_SKJSON_startCJObject: () => ptr;
-  SKIP_SKJSON_addToCJObject: (obj: ptr, name: ptr, value: ptr) => void;
-  SKIP_SKJSON_endCJObject: (obj: ptr) => ptr;
-  SKIP_SKJSON_startCJArray: () => ptr;
-  SKIP_SKJSON_addToCJArray: (arr: ptr, value: ptr) => void;
-  SKIP_SKJSON_endCJArray: (arr: ptr) => ptr;
-  SKIP_SKJSON_createCJNull: () => ptr;
-  SKIP_SKJSON_createCJInt: (v: int) => ptr;
-  SKIP_SKJSON_createCJFloat: (v: float) => ptr;
-  SKIP_SKJSON_createCJString: (str: ptr) => ptr;
-  SKIP_SKJSON_createCJBool: (v: boolean) => ptr;
+  SKIP_SKJSON_startCJObject: () => ptr<Internal.VectorPairStringCJSON>;
+  SKIP_SKJSON_addToCJObject: (
+    obj: ptr<Internal.VectorPairStringCJSON>,
+    name: ptr<Internal.String>,
+    value: ptr<Internal.CJSON>,
+  ) => void;
+  SKIP_SKJSON_endCJObject: (
+    obj: ptr<Internal.VectorPairStringCJSON>,
+  ) => ptr<Internal.CJObject>;
+  SKIP_SKJSON_startCJArray: () => ptr<Internal.VectorCJSON>;
+  SKIP_SKJSON_addToCJArray: (
+    arr: ptr<Internal.VectorCJSON>,
+    value: ptr<Internal.CJSON>,
+  ) => void;
+  SKIP_SKJSON_endCJArray: (
+    arr: ptr<Internal.VectorCJSON>,
+  ) => ptr<Internal.CJArray>;
+  SKIP_SKJSON_createCJNull: () => ptr<Internal.CJNull>;
+  SKIP_SKJSON_createCJInt: (v: int) => ptr<Internal.CJInt>;
+  SKIP_SKJSON_createCJFloat: (v: float) => ptr<Internal.CJFloat>;
+  SKIP_SKJSON_createCJString: (
+    str: ptr<Internal.String>,
+  ) => ptr<Internal.CJString>;
+  SKIP_SKJSON_createCJBool: (v: boolean) => ptr<Internal.CJBool>;
 }
 
 class Mapping {
@@ -313,28 +336,28 @@ class Mapping {
 }
 
 export interface SKJSON extends Shared {
-  importJSON: (value: ptr, copy?: boolean) => any;
-  exportJSON: <T>(v: T) => ptr;
-  importOptJSON: (value: Opt<ptr>, copy?: boolean) => any;
-  importString: (v: ptr) => string;
-  exportString: (v: string) => ptr;
+  importJSON: (value: ptr<Internal.CJSON>, copy?: boolean) => any;
+  exportJSON: <T>(v: T) => ptr<Internal.CJSON>;
+  importOptJSON: (value: Opt<ptr<Internal.CJSON>>, copy?: boolean) => any;
+  importString: (v: ptr<Internal.String>) => string;
+  exportString: (v: string) => ptr<Internal.String>;
   runWithGC: <T>(fn: () => T) => T;
 }
 
 class SKJSONShared implements SKJSON {
   getName = () => "SKJSON";
 
-  importJSON: (value: ptr, copy?: boolean) => any;
-  exportJSON: <T>(v: T) => ptr;
-  importString: (v: ptr) => string;
-  exportString: (v: string) => ptr;
+  importJSON: (value: ptr<Internal.CJSON>, copy?: boolean) => any;
+  exportJSON: <T>(v: T) => ptr<Internal.CJSON>;
+  importString: (v: ptr<Internal.String>) => string;
+  exportString: (v: string) => ptr<Internal.String>;
   runWithGC: <T>(fn: () => T) => T;
 
   constructor(
-    importJSON: (value: ptr, copy?: boolean) => any,
-    exportJSON: <T>(v: T) => ptr,
-    importString: (v: ptr) => string,
-    exportString: (v: string) => ptr,
+    importJSON: (value: ptr<Internal.CJSON>, copy?: boolean) => any,
+    exportJSON: <T>(v: T) => ptr<Internal.CJSON>,
+    importString: (v: ptr<Internal.String>) => string,
+    exportString: (v: string) => ptr<Internal.String>,
     runWithGC: <T>(fn: () => T) => T,
   ) {
     this.importJSON = importJSON;
@@ -344,7 +367,7 @@ class SKJSONShared implements SKJSON {
     this.runWithGC = runWithGC;
   }
 
-  importOptJSON(value: Opt<ptr>, copy?: boolean): any {
+  importOptJSON(value: Opt<ptr<Internal.CJSON>>, copy?: boolean): any {
     if (value === null || value === 0) {
       return null;
     }
@@ -356,8 +379,8 @@ class LinksImpl implements Links {
   env: Environment;
   mapping: Mapping;
 
-  SKJSON_console!: (json: ptr) => void;
-  SKJSON_error!: (json: ptr) => void;
+  SKJSON_console!: (json: ptr<Internal.CJSON>) => void;
+  SKJSON_error!: (json: ptr<Internal.CJSON>) => void;
 
   constructor(env: Environment) {
     this.env = env;
@@ -366,12 +389,12 @@ class LinksImpl implements Links {
 
   complete = (utils: Utils, exports: object) => {
     const fromWasm = exports as FromWasm;
-    const importJSON = (valuePtr: ptr, copy?: boolean): any => {
+    const importJSON = (valuePtr: ptr<Internal.CJSON>, copy?: boolean): any => {
       const value = getValue(new WasmHandle(utils, valuePtr, fromWasm));
       return copy ? (value !== null ? clone(value) : value) : value;
     };
 
-    const exportJSON = (value: any) => {
+    const exportJSON = (value: any): ptr<Internal.CJSON> => {
       if (value === null || value === undefined) {
         return fromWasm.SKIP_SKJSON_createCJNull();
       } else if (typeof value == "number") {
@@ -388,7 +411,7 @@ class LinksImpl implements Links {
         return fromWasm.SKIP_SKJSON_endCJArray(arr);
       } else if (typeof value == "object") {
         if (value.__isObjectProxy || value.__isArrayProxy) {
-          return value.__pointer as ptr;
+          return value.__pointer as ptr<Internal.CJSON>;
         } else {
           const obj = fromWasm.SKIP_SKJSON_startCJObject();
           for (const key of Object.keys(value as object)) {
@@ -404,10 +427,10 @@ class LinksImpl implements Links {
         throw new Error(`'${typeof value}' cannot be exported to wasm.`);
       }
     };
-    this.SKJSON_console = (json: ptr) => {
+    this.SKJSON_console = (json: ptr<Internal.CJSON>) => {
       console.log(clone(importJSON(json)));
     };
-    this.SKJSON_error = (json: ptr) => {
+    this.SKJSON_error = (json: ptr<Internal.CJSON>) => {
       console.error(clone(importJSON(json)));
     };
 
@@ -434,10 +457,10 @@ class Manager implements ToWasmManager {
   prepare = (wasm: object) => {
     const toWasm = wasm as ToWasm;
     const link = new LinksImpl(this.env);
-    toWasm.SKIP_SKJSON_console = (value: ptr) => {
+    toWasm.SKIP_SKJSON_console = (value: ptr<Internal.CJSON>) => {
       link.SKJSON_console(value);
     };
-    toWasm.SKIP_SKJSON_error = (value: ptr) => {
+    toWasm.SKIP_SKJSON_error = (value: ptr<Internal.CJSON>) => {
       link.SKJSON_error(value);
     };
     return link;

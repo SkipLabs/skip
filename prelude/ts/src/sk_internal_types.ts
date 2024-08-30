@@ -37,6 +37,14 @@ export type Array<Ty extends T> = T<typeof array> & {
   [p]: (_: Ty) => Ty;
 };
 
+declare const vector: unique symbol;
+export type Vector<Ty extends T> = T<typeof vector> & { [p]: (_: Ty) => Ty };
+
+declare const pair: unique symbol;
+export type Pair<Ty1 extends T, Ty2 extends T> = T<typeof pair> & {
+  [p]: [Ty1, Ty2];
+};
+
 declare const function_: unique symbol;
 export type Function<Ty1 extends T, Ty2 extends T> = T<typeof function_> & {
   [p]: (_: Ty1) => Ty2;
