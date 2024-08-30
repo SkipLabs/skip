@@ -20,7 +20,7 @@ class LinksImpl implements Links {
 
   SKIP_read_line_fill!: () => int;
   SKIP_read_to_end_fill!: () => int;
-  SKIP_read_line_get!: (index: int) => ptr;
+  SKIP_read_line_get!: (index: int) => int;
 
   SKIP_print_error!: (strPtr: ptr) => void;
   SKIP_print_error_raw!: (strPtr: ptr) => void;
@@ -31,7 +31,7 @@ class LinksImpl implements Links {
   SKIP_print_string!: (strPtr: ptr) => void;
   SKIP_etry!: (f: ptr, exn_handler: ptr) => ptr;
   js_throw!: (strPtr: ptr, rethrow: int) => void;
-  js_replace_exn!: (oldex: ptr, newex: int) => void;
+  js_replace_exn!: (oldex: ptr, newex: ptr) => void;
   SKIP_throw_cruntime!: (code: int) => void;
   SKIP_JS_timeStamp!: () => float;
 
@@ -188,7 +188,7 @@ class Manager implements ToWasmManager {
     };
     toWasm.js_throw = (strPtr: ptr, rethrow: int) =>
       links.js_throw(strPtr, rethrow);
-    toWasm.js_replace_exn = (oldex: ptr, newex: int) =>
+    toWasm.js_replace_exn = (oldex: ptr, newex: ptr) =>
       links.js_replace_exn(oldex, newex);
     toWasm.SKIP_throw_cruntime = (code: int) => links.SKIP_throw_cruntime(code);
     toWasm.cos = Math.cos;
@@ -250,7 +250,7 @@ interface ToWasm {
   __setErrNo: (err: ptr) => void;
   __cxa_throw: (exn: ptr, infi: ptr, dest: ptr) => void;
   js_throw: (strPtr: ptr, rethrow: int) => void;
-  js_replace_exn: (oldex: ptr, newex: int) => void;
+  js_replace_exn: (oldex: ptr, newex: ptr) => void;
   SKIP_throw_cruntime: (code: int) => void;
   SKIP_JS_timeStamp: () => float;
   cos: (v: float) => float;
@@ -286,7 +286,7 @@ interface ToWasm {
   SKIP_FileSystem_appendTextFile: (path: ptr, contents: ptr) => void;
   SKIP_read_line_fill: () => int;
   SKIP_read_to_end_fill: () => int;
-  SKIP_read_line_get: (index: int) => ptr;
+  SKIP_read_line_get: (index: int) => int;
   SKIP_setenv: (skName: ptr, skvalue: ptr) => void;
   SKIP_getenv: (skName: ptr) => ptr | null;
   SKIP_unsetenv: (skName: ptr) => void;

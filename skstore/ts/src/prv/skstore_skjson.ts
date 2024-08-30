@@ -388,7 +388,7 @@ class LinksImpl implements Links {
         return fromWasm.SKIP_SKJSON_endCJArray(arr);
       } else if (typeof value == "object") {
         if (value.__isObjectProxy || value.__isArrayProxy) {
-          return value.__pointer as number;
+          return value.__pointer as ptr;
         } else {
           const obj = fromWasm.SKIP_SKJSON_startCJObject();
           for (const key of Object.keys(value as object)) {
