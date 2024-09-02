@@ -24,7 +24,7 @@ import type {
   LazyCompute,
   AsyncLazyCompute,
   NonEmptyIterator,
-} from "../skip_runtime_api.js";
+} from "../skruntime_api.js";
 
 // prettier-ignore
 import type { MirrorDefn, Params, SKDBSync } from "#skdb/skdb_types.js";

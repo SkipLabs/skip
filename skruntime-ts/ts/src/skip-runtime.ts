@@ -13,7 +13,7 @@ import type {
   TJSON,
   JSONObject,
   Accumulator,
-} from "./skip_runtime_api.js";
+} from "./skruntime_api.js";
 
 export type {
   SKStore,
@@ -39,9 +39,9 @@ export type {
   AsyncLazyCompute,
   Loadable,
   AsyncLazyCollection,
-} from "./skip_runtime_api.js";
+} from "./skruntime_api.js";
 
-export { ValueMapper } from "./skip_runtime_api.js";
+export { ValueMapper } from "./skruntime_api.js";
 export {
   Sum,
   Min,
@@ -51,7 +51,7 @@ export {
   cinteger,
   cfloat,
   cjson,
-} from "./skip_runtime_utils.js";
+} from "./skruntime_utils.js";
 
 const modules: ModuleInit[] = [];
 /*--MODULES--*/
@@ -61,11 +61,11 @@ async function wasmUrl(): Promise<URL> {
   if (import.meta.env || import.meta.webpack) {
     /* eslint-disable @typescript-eslint/no-unsafe-return */
     //@ts-expect-error  Cannot find module './skstore.wasm?url' or its corresponding type declarations.
-    return await import("./skip_runtime.wasm?url");
+    return await import("./skip-runtime.wasm?url");
     /* eslint-enable @typescript-eslint/no-unsafe-return */
   }
 
-  return new URL("./skip_runtime.wasm", import.meta.url);
+  return new URL("./skip-runtime.wasm", import.meta.url);
 }
 
 export async function createSKStore(

@@ -16,7 +16,7 @@ import type {
   Loadable,
   NonEmptyIterator,
   AsyncLazyCollection,
-} from "skip_runtime";
+} from "skip-runtime";
 import {
   Sum,
   ValueMapper,
@@ -24,7 +24,7 @@ import {
   cinteger as integer,
   schema,
   ctext as text,
-} from "skip_runtime";
+} from "skip-runtime";
 
 function check(name: String, got: TJSON, expected: TJSON): void {
   expect([name, got]).toEqual([name, expected]);
