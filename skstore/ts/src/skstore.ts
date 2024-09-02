@@ -57,10 +57,12 @@ const modules: ModuleInit[] = [];
 /*--MODULES--*/
 
 async function wasmUrl(): Promise<URL> {
-  //@ts-ignore
+  //@ts-expect-error  ImportMeta is incomplete
   if (import.meta.env || import.meta.webpack) {
-    //@ts-ignore
+    /* eslint-disable @typescript-eslint/no-unsafe-return */
+    //@ts-expect-error  Cannot find module './skstore.wasm?url' or its corresponding type declarations.
     return await import("./skstore.wasm?url");
+    /* eslint-enable @typescript-eslint/no-unsafe-return */
   }
 
   return new URL("./skstore.wasm", import.meta.url);
@@ -71,7 +73,7 @@ export async function createSKStore(
   tables: MirrorSchema[],
   connect: boolean = true,
 ): Promise<Table<TJSON[]>[]> {
-  let data = await runUrl(wasmUrl, modules, [], "SKDB_factory");
+  const data = await runUrl(wasmUrl, modules, [], "SKDB_factory");
   const factory = data.environment.shared.get("SKStore") as SKStoreFactory;
   return factory.runSKStore(init, tables, connect);
 }
@@ -98,7 +100,7 @@ export function freeze<T extends TJSON>(value: T): T {
       }
       return Object.freeze(value) as T;
     } else {
-      const jso = value as any;
+      const jso = value as Record<string, any>;
       Object.defineProperty(value, "__sk_frozen", {
         enumerable: false,
         writable: false,

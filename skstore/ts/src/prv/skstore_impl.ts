@@ -6,7 +6,6 @@ import type {
   EHandle,
   LHandle,
   Mapper,
-  ValueMapper,
   EntryMapper,
   OutputMapper,
   TableHandle,
@@ -39,7 +38,7 @@ type Query = { query: string; params?: JSONObject };
 function assertNoKeysNaN<K extends TJSON, V extends TJSON>(
   kv_pairs: Iterable<[K, V]>,
 ): Iterable<[K, V]> {
-  for (let [k, _v] of kv_pairs) {
+  for (const [k, _v] of kv_pairs) {
     if (Number.isNaN(k)) {
       // NaN is forbidden since it breaks comparison reflexivity, ordering, etc.
       throw new Error("NaN is forbidden as a Skip collection key");
@@ -62,6 +61,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
       value: true,
     });
   }
+
   getId(): string {
     return this.eagerHdl;
   }
@@ -534,7 +534,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     table: TableHandle<R>,
     mapper: new () => OutputMapper<R, K, V>,
   ): void {
-    return this.mapToN(table, mapper);
+    this.mapToN(table, mapper);
   }
 
   mapTo1<R extends TJSON[], P1>(
@@ -542,7 +542,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     mapper: new (p1: P1) => OutputMapper<R, K, V>,
     p1: P1,
   ): void {
-    return this.mapToN(table, mapper, p1);
+    this.mapToN(table, mapper, p1);
   }
 
   mapTo2<R extends TJSON[], P1, P2>(
@@ -551,7 +551,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p1: P1,
     p2: P2,
   ): void {
-    return this.mapToN(table, mapper, p1, p2);
+    this.mapToN(table, mapper, p1, p2);
   }
 
   mapTo3<R extends TJSON[], P1, P2, P3>(
@@ -561,7 +561,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p2: P2,
     p3: P3,
   ): void {
-    return this.mapToN(table, mapper, p1, p2, p3);
+    this.mapToN(table, mapper, p1, p2, p3);
   }
 
   mapTo4<R extends TJSON[], P1, P2, P3, P4>(
@@ -572,7 +572,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p3: P3,
     p4: P4,
   ): void {
-    return this.mapToN(table, mapper, p1, p2, p3, p4);
+    this.mapToN(table, mapper, p1, p2, p3, p4);
   }
 
   mapTo5<R extends TJSON[], P1, P2, P3, P4, P5>(
@@ -590,7 +590,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p4: P4,
     p5: P5,
   ): void {
-    return this.mapToN(table, mapper, p1, p2, p3, p4, p5);
+    this.mapToN(table, mapper, p1, p2, p3, p4, p5);
   }
 
   mapTo6<R extends TJSON[], P1, P2, P3, P4, P5, P6>(
@@ -610,7 +610,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p5: P5,
     p6: P6,
   ): void {
-    return this.mapToN(table, mapper, p1, p2, p3, p4, p5, p6);
+    this.mapToN(table, mapper, p1, p2, p3, p4, p5, p6);
   }
 
   mapTo7<R extends TJSON[], P1, P2, P3, P4, P5, P6, P7>(
@@ -632,7 +632,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p6: P6,
     p7: P7,
   ): void {
-    return this.mapToN(table, mapper, p1, p2, p3, p4, p5, p6, p7);
+    this.mapToN(table, mapper, p1, p2, p3, p4, p5, p6, p7);
   }
 
   mapTo8<R extends TJSON[], P1, P2, P3, P4, P5, P6, P7, P8>(
@@ -656,7 +656,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p7: P7,
     p8: P8,
   ): void {
-    return this.mapToN(table, mapper, p1, p2, p3, p4, p5, p6, p7, p8);
+    this.mapToN(table, mapper, p1, p2, p3, p4, p5, p6, p7, p8);
   }
 
   mapTo9<R extends TJSON[], P1, P2, P3, P4, P5, P6, P7, P8, P9>(
@@ -682,7 +682,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
     p8: P8,
     p9: P9,
   ): void {
-    return this.mapToN(table, mapper, p1, p2, p3, p4, p5, p6, p7, p8, p9);
+    this.mapToN(table, mapper, p1, p2, p3, p4, p5, p6, p7, p8, p9);
   }
 }
 
@@ -732,9 +732,11 @@ export class LSelfImpl<K extends TJSON, V extends TJSON>
   getArray(key: K): V[] {
     return this.context.getArraySelf(this.lazyHdl, key);
   }
+
   getOne(key: K): V {
     return this.context.getOneSelf(this.lazyHdl, key);
   }
+
   maybeGetOne(key: K): Opt<V> {
     return this.context.maybeGetOneSelf(this.lazyHdl, key);
   }
@@ -978,8 +980,8 @@ export class TableImpl<R extends TJSON[]> implements Table<R> {
     );
   }
 
-  select(select: JSONObject, colmuns?: string[]): JSONObject[] {
-    const query = toSelectQuery(this.getName(), select, colmuns);
+  select(select: JSONObject, columns?: string[]): JSONObject[] {
+    const query = toSelectQuery(this.getName(), select, columns);
     return this.skdb.exec(
       query.query,
       query.params ? toParams(query.params) : undefined,
@@ -1042,10 +1044,11 @@ export class SKStoreImpl implements SKStore {
     K2 extends TJSON,
     V2 extends TJSON,
   >(mappings: Mapping<K1, V1, K2, V2>[]): EHandle<K2, V2> {
-    var name = "";
+    let name = "";
     const ctxmapping = mappings.map((mapping) => {
       const params = mapping.params ?? [];
       params.forEach(check);
+      /* eslint-disable-next-line @typescript-eslint/no-unsafe-argument */
       const mapperObj = new mapping.mapper(...params);
       Object.freeze(mapperObj);
       name += mapperObj.constructor.name;
@@ -1069,10 +1072,11 @@ export class SKStoreImpl implements SKStore {
     mappings: Mapping<K1, V1, K2, V2>[],
     accumulator: Accumulator<V2, V3>,
   ): EHandle<K2, V3> {
-    var name = "";
+    let name = "";
     const ctxmapping = mappings.map((mapping) => {
       const params = mapping.params ?? [];
       params.forEach(check);
+      /* eslint-disable-next-line @typescript-eslint/no-unsafe-argument */
       const mapperObj = new mapping.mapper(...params);
       Object.freeze(mapperObj);
       name += mapperObj.constructor.name;
@@ -1554,6 +1558,7 @@ export class SKStoreImpl implements SKStore {
         ("__isObjectProxy" in object && object.__isObjectProxy)) &&
       "clone" in object
     ) {
+      /* eslint-disable-next-line @typescript-eslint/no-unsafe-call */
       console.log(object.clone());
     } else {
       console.log(object);
@@ -1586,11 +1591,13 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
     tablesSchema: MirrorSchema[],
     connect: boolean = true,
   ): Promise<Table<TJSON[]>[]> => {
-    let context = this.context();
-    let skdb = await this.createSync();
+    const context = this.context();
+    const skdb = await this.createSync();
     const tables = mirror(context, skdb, connect, ...tablesSchema);
     const skstore = new SKStoreImpl(context);
-    this.create(() => init(skstore, ...tables));
+    this.create(() => {
+      init(skstore, ...tables);
+    });
     return tables.map((t) => (t as TableHandleImpl<TJSON[]>).toTable());
   };
 }
@@ -1609,6 +1616,7 @@ export function mirror(
   ...tables: MirrorSchema[]
 ): TableHandle<TJSON[]>[] {
   if (connect) {
+    /* eslint-disable-next-line @typescript-eslint/no-floating-promises */
     skdb.mirror(...toMirrorDefinitions(...tables));
   } else {
     /*
@@ -1645,11 +1653,10 @@ function toMirrorDefinition(table: MirrorSchema): MirrorDefn {
   return {
     table: table.name,
     expectedColumns: toColumns(table.expected),
-    filterExpr: table.filter ? table.filter.filter : undefined,
-    filterParams:
-      table.filter && table.filter.params
-        ? toParams(table.filter.params)
-        : undefined,
+    filterExpr: table.filter?.filter,
+    filterParams: table.filter?.params
+      ? toParams(table.filter.params)
+      : undefined,
   };
 }
 
@@ -1665,20 +1672,21 @@ function create(table: MirrorSchema): Query {
 }
 
 function toValues(entry: TJSON[], prefix: string = ""): Query {
-  let exprs: string[] = [];
-  let params: JSONObject = {};
+  const exprs: string[] = [];
+  const params: JSONObject = {};
   for (let i = 0; i < entry.length; i++) {
     const field = entry[i];
+    const prefixedI = `${prefix}${i}`;
     if (
       typeof field == "string" ||
       typeof field == "number" ||
       typeof field == "boolean"
     ) {
-      params[prefix + i] = field;
+      params[prefixedI] = field;
     } else {
-      params[prefix + i] = JSON.stringify(field);
+      params[prefixedI] = JSON.stringify(field);
     }
-    exprs.push(`@${prefix + i}`);
+    exprs.push(`@${prefixedI}`);
   }
   return {
     query: exprs.join(" , "),
@@ -1692,15 +1700,15 @@ function toWhere(
   prefix: string = "",
 ): Query {
   if (columns.length != entry.length) throw new Error("Invalid entry type.");
-  let exprs: string[] = [];
-  let params: JSONObject = {};
+  const exprs: string[] = [];
+  const params: JSONObject = {};
   for (let i = 0; i < columns.length; i++) {
     const column = columns[i];
     const field = entry[i];
     if (Array.isArray(field)) {
       const inVal: string[] = [];
       for (let idx = 0; idx < field.length; idx++) {
-        const pName = prefix + idx + "_" + column.name;
+        const pName = `${prefix}${idx}_${column.name}`;
         params[pName] = field[idx];
         inVal.push(`@${pName}`);
       }
@@ -1718,12 +1726,13 @@ function toWhere(
 }
 
 function toSets(update: JSONObject, prefix: string = ""): Query {
-  let exprs: string[] = [];
-  let params: JSONObject = {};
-  Object.keys(update).forEach((column: keyof JSONObject) => {
+  const exprs: string[] = [];
+  const params: JSONObject = {};
+  Object.keys(update).forEach((column: string & keyof JSONObject) => {
     const field = update[column];
-    params[prefix + column] = field;
-    exprs.push(`${column} = @${prefix + column}`);
+    const prefixedColumn = `${prefix}${column}`;
+    params[prefixedColumn] = field;
+    exprs.push(`${column} = @${prefixedColumn}`);
   });
   return {
     query: exprs.join(" , "),
@@ -1734,20 +1743,20 @@ function toSets(update: JSONObject, prefix: string = ""): Query {
 function toSelectWhere(select: JSONObject, prefix: string = ""): Query {
   const keys = Object.keys(select);
   if (keys.length <= 0) return { query: "true" };
-  let exprs: string[] = [];
-  let params: JSONObject = {};
-  keys.forEach((column: keyof JSONObject) => {
+  const exprs: string[] = [];
+  const params: JSONObject = {};
+  keys.forEach((column: string & keyof JSONObject) => {
     const field = select[column];
     if (Array.isArray(field)) {
       const inVal: string[] = [];
       for (let idx = 0; idx < field.length; idx++) {
-        const pName = prefix + idx + "_" + column;
+        const pName = `${prefix}${idx}_${column}`;
         params[pName] = field[idx];
         inVal.push(`@${pName}`);
       }
       exprs.push(`${column} IN (${inVal.join(", ")})`);
     } else {
-      const pName = prefix + column;
+      const pName = `${prefix}${column}`;
       params[pName] = field;
       exprs.push(`${column} = @${pName}`);
     }
@@ -1759,8 +1768,8 @@ function toSelectWhere(select: JSONObject, prefix: string = ""): Query {
 }
 
 function toParams(params: JSONObject): Params {
-  let res: Record<string, string | number | boolean> = {};
-  Object.keys(params).forEach((key: keyof JSONObject) => {
+  const res: Record<string, string | number | boolean> = {};
+  Object.keys(params).forEach((key: string & keyof JSONObject) => {
     const v = params[key];
     if (typeof v == "string") {
       res[key] = v;
@@ -1808,7 +1817,7 @@ function toInsertQuery(
 ): Query {
   let params: JSONObject = {};
   const values = entries.map((vs, idx) => {
-    const q = toValues(vs, "v" + idx + "_");
+    const q = toValues(vs, `v${idx}_`);
     params = { ...params, ...q.params };
     return q;
   });
@@ -1852,7 +1861,7 @@ export function check<T>(value: T): void {
     return;
   } else if (type == "object") {
     const jso = value as any;
-    if ((value as any).__sk_frozen) {
+    if (jso.__sk_frozen) {
       return;
     } else if (Object.isFrozen(jso)) {
       if (Array.isArray(jso)) {
@@ -1860,6 +1869,7 @@ export function check<T>(value: T): void {
           check(jso[i]);
         }
       } else {
+        /* eslint-disable-next-line @typescript-eslint/no-unsafe-argument */
         for (const key of Object.keys(jso)) {
           check(jso[key]);
         }
