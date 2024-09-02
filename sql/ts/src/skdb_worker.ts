@@ -4,7 +4,7 @@ import { onWorkerMessage } from "#std/sk_worker.js";
 import type { Creator } from "#std/sk_worker.js";
 import type { SKDB } from "./skdb.js";
 
-var modules: ModuleInit[];
+const modules: ModuleInit[] = [];
 /*--MODULES--*/
 
 class DbCreator implements Creator<SKDB> {
