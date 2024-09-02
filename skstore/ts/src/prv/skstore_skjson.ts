@@ -2,6 +2,7 @@
 import type { int, ptr, float, Links, Utils, ToWasmManager, Environment, Opt, Shared, } from "#std/sk_types.js";
 
 export enum Type {
+  /* eslint-disable no-unused-vars */
   Undefined,
   Null,
   Int,
@@ -10,6 +11,7 @@ export enum Type {
   String,
   Array,
   Object,
+  /* eslint-enable no-unused-vars */
 }
 
 interface WasmAccess {
@@ -69,7 +71,7 @@ class WasmHandle {
 
 function getValue(hdl: WasmHandle): any {
   if (hdl.pointer == 0) return null;
-  const type = hdl.access.SKIP_SKJSON_typeOf(hdl.pointer);
+  const type = hdl.access.SKIP_SKJSON_typeOf(hdl.pointer) as Type;
   switch (type) {
     case Type.Null:
       return null;
@@ -83,12 +85,14 @@ function getValue(hdl: WasmHandle): any {
       return hdl.utils.importString(
         hdl.access.SKIP_SKJSON_asString(hdl.pointer),
       );
-    case Type.Array:
+    case Type.Array: {
       const aPtr = hdl.access.SKIP_SKJSON_asArray(hdl.pointer);
       return new Proxy(hdl.derive(aPtr), reactiveArray);
-    case Type.Object:
+    }
+    case Type.Object: {
       const oPtr = hdl.access.SKIP_SKJSON_asObject(hdl.pointer);
       return new Proxy(hdl.derive(oPtr), reactiveObject);
+    }
     case Type.Undefined:
     default:
       return undefined;
@@ -99,7 +103,7 @@ function getValueAt(hdl: WasmHandle, idx: int, array: boolean = false): any {
   const skval = array
     ? hdl.access.SKIP_SKJSON_at(hdl.pointer, idx)
     : hdl.access.SKIP_SKJSON_get(hdl.pointer, idx);
-  const type = hdl.access.SKIP_SKJSON_typeOf(skval);
+  const type = hdl.access.SKIP_SKJSON_typeOf(skval) as Type;
   switch (type) {
     case Type.Null:
       return null;
@@ -111,12 +115,14 @@ function getValueAt(hdl: WasmHandle, idx: int, array: boolean = false): any {
       return hdl.access.SKIP_SKJSON_asBoolean(skval) ? true : false;
     case Type.String:
       return hdl.utils.importString(hdl.access.SKIP_SKJSON_asString(skval));
-    case Type.Array:
+    case Type.Array: {
       const aPtr = hdl.access.SKIP_SKJSON_asArray(skval);
       return new Proxy(hdl.derive(aPtr), reactiveArray);
-    case Type.Object:
+    }
+    case Type.Object: {
       const oPtr = hdl.access.SKIP_SKJSON_asObject(skval);
       return new Proxy(hdl.derive(oPtr), reactiveObject);
+    }
     case Type.Undefined:
     default:
       return undefined;
@@ -128,10 +134,10 @@ export const reactiveObject = {
     if (prop === "__isObjectProxy") return true;
     if (prop === "__sk_frozen") return true;
     if (prop === "__pointer") return hdl.pointer;
-    if (prop === "clone") return () => clone(self);
+    if (prop === "clone") return (): any => clone(self);
     const fields = hdl.objectFields();
     if (prop === "toJSON")
-      return () => {
+      return (): any => {
         const res: any = {};
         for (const key of fields) {
           res[key[0]] = getValueAt(hdl, key[1], false);
@@ -144,7 +150,7 @@ export const reactiveObject = {
     return getValueAt(hdl, idx, false);
   },
   set(_hdl: WasmHandle, _prop: string, _value: any) {
-    throw "Reactive object cannot be modified.";
+    throw new Error("Reactive object cannot be modified.");
   },
   has(hdl: WasmHandle, prop: string): boolean {
     if (prop === "__isObjectProxy") return true;
@@ -176,16 +182,17 @@ export const reactiveObject = {
 export const reactiveArray = {
   get(hdl: WasmHandle, prop: string, self: any): any {
     if (typeof prop === "symbol") {
-      return () => self.toJSON().values();
+      /* eslint-disable-next-line @typescript-eslint/no-unsafe-call */
+      return (): any => self.toJSON().values();
     } else {
       if (prop === "__isArrayProxy") return true;
       if (prop === "__sk_frozen") return true;
       if (prop === "__pointer") return hdl.pointer;
       if (prop === "length")
         return hdl.access.SKIP_SKJSON_arraySize(hdl.pointer);
-      if (prop === "clone") return () => clone(self);
+      if (prop === "clone") return (): any => clone(self);
       if (prop === "toJSON")
-        return () => {
+        return (): any[] => {
           const res: any[] = [];
           const length: number = self.length;
           for (let i = 0; i < length; i++) {
@@ -197,7 +204,8 @@ export const reactiveArray = {
         return <T>(
           callbackfn: (value: T, index: number, array: T[]) => void,
           thisArg?: any,
-        ) => {
+        ): void => {
+          /* eslint-disable-next-line @typescript-eslint/no-unsafe-call */
           self.toJSON().forEach(callbackfn, thisArg);
         };
       const v = parseInt(prop);
@@ -206,9 +214,9 @@ export const reactiveArray = {
     }
   },
   set(_hdl: WasmHandle, _prop: string, _value: any) {
-    throw "Reactive array cannot be modified.";
+    throw new Error("Reactive array cannot be modified.");
   },
-  has(hdl: WasmHandle, prop: string): boolean {
+  has(_hdl: WasmHandle, prop: string): boolean {
     if (prop === "__isArrayProxy") return true;
     if (prop === "__sk_frozen") return true;
     if (prop === "__pointer") return true;
@@ -219,7 +227,7 @@ export const reactiveArray = {
   },
   ownKeys(hdl: WasmHandle) {
     const l = hdl.access.SKIP_SKJSON_arraySize(hdl.pointer);
-    const res = Array.from(Array(l).keys()).map((v) => "" + v);
+    const res = Array.from(Array(l).keys()).map((v) => v.toString());
     return res;
   },
   getOwnPropertyDescriptor(hdl: WasmHandle, prop: string) {
@@ -255,7 +263,7 @@ function clone<T>(value: T): T {
       return res as T;
     } else {
       const res: any = {};
-      const keys = Object.keys(aValue);
+      const keys = Object.keys(aValue as object);
       for (const key of keys) {
         res[key] = clone(aValue[key]);
       }
@@ -287,17 +295,17 @@ class Mapping {
 
   register(v: any) {
     const freeID = this.freeIDs.pop();
-    const id = freeID === undefined ? this.nextID++ : freeID;
+    const id = freeID ?? this.nextID++;
     this.objects[id] = v;
     return id;
   }
 
-  get(id: int) {
+  get(id: int): any {
     return this.objects[id];
   }
 
-  delete(id: int) {
-    const current = this.objects[id];
+  delete(id: int): any {
+    const current: unknown = this.objects[id];
     this.objects[id] = null;
     this.freeIDs.push(id);
     return current;
@@ -336,7 +344,7 @@ class SKJSONShared implements SKJSON {
     this.runWithGC = runWithGC;
   }
 
-  importOptJSON(value: Opt<ptr>, copy?: boolean) {
+  importOptJSON(value: Opt<ptr>, copy?: boolean): any {
     if (value === null || value === 0) {
       return null;
     }
@@ -358,33 +366,32 @@ class LinksImpl implements Links {
 
   complete = (utils: Utils, exports: object) => {
     const fromWasm = exports as FromWasm;
-    const importJSON = (valuePtr: ptr, copy?: boolean) => {
+    const importJSON = (valuePtr: ptr, copy?: boolean): any => {
       const value = getValue(new WasmHandle(utils, valuePtr, fromWasm));
       return copy ? (value !== null ? clone(value) : value) : value;
     };
 
     const exportJSON = (value: any) => {
-      let type = typeof value;
       if (value === null || value === undefined) {
         return fromWasm.SKIP_SKJSON_createCJNull();
-      } else if (type == "number") {
+      } else if (typeof value == "number") {
         return fromWasm.SKIP_SKJSON_createCJFloat(value);
-      } else if (type == "boolean") {
+      } else if (typeof value == "boolean") {
         return fromWasm.SKIP_SKJSON_createCJBool(value);
-      } else if (type == "string") {
+      } else if (typeof value == "string") {
         return fromWasm.SKIP_SKJSON_createCJString(utils.exportString(value));
       } else if (Array.isArray(value)) {
-        let arr = fromWasm.SKIP_SKJSON_startCJArray();
-        value.forEach((v) =>
-          fromWasm.SKIP_SKJSON_addToCJArray(arr, exportJSON(v)),
-        );
+        const arr = fromWasm.SKIP_SKJSON_startCJArray();
+        value.forEach((v) => {
+          fromWasm.SKIP_SKJSON_addToCJArray(arr, exportJSON(v));
+        });
         return fromWasm.SKIP_SKJSON_endCJArray(arr);
-      } else if (type == "object") {
+      } else if (typeof value == "object") {
         if (value.__isObjectProxy || value.__isArrayProxy) {
           return value.__pointer as number;
         } else {
-          let obj = fromWasm.SKIP_SKJSON_startCJObject();
-          for (let key of Object.keys(value)) {
+          const obj = fromWasm.SKIP_SKJSON_startCJObject();
+          for (const key of Object.keys(value as object)) {
             fromWasm.SKIP_SKJSON_addToCJObject(
               obj,
               utils.exportString(key),
@@ -394,7 +401,7 @@ class LinksImpl implements Links {
           return fromWasm.SKIP_SKJSON_endCJObject(obj);
         }
       } else {
-        throw new Error("'" + type + "' cannot be exported to wasm.");
+        throw new Error(`'${typeof value}' cannot be exported to wasm.`);
       }
     };
     this.SKJSON_console = (json: ptr) => {
@@ -419,6 +426,7 @@ class LinksImpl implements Links {
 
 class Manager implements ToWasmManager {
   env: Environment;
+
   constructor(env: Environment) {
     this.env = env;
   }
@@ -426,8 +434,12 @@ class Manager implements ToWasmManager {
   prepare = (wasm: object) => {
     const toWasm = wasm as ToWasm;
     const link = new LinksImpl(this.env);
-    toWasm.SKIP_SKJSON_console = (value: ptr) => link.SKJSON_console(value);
-    toWasm.SKIP_SKJSON_error = (value: ptr) => link.SKJSON_error(value);
+    toWasm.SKIP_SKJSON_console = (value: ptr) => {
+      link.SKJSON_console(value);
+    };
+    toWasm.SKIP_SKJSON_error = (value: ptr) => {
+      link.SKJSON_error(value);
+    };
     return link;
   };
 }

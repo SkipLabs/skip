@@ -32,22 +32,23 @@ class HandlesImpl implements Handles {
 
   register(v: JSON) {
     const freeID = this.freeIDs.pop();
-    const id = freeID === undefined ? this.nextID++ : freeID;
+    const id = freeID ?? this.nextID++;
     this.objects[id] = v;
     return id;
   }
 
-  get(id: int) {
+  get(id: int): any {
     return this.objects[id];
   }
 
-  apply = (id: int, parameters: any[]) => {
-    let fn = this.objects[id];
+  apply<T>(id: int, parameters: T[]): T {
+    const fn = this.objects[id];
+    /* eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return */
     return fn.apply(null, parameters);
-  };
+  }
 
-  delete(id: int) {
-    const current = this.objects[id];
+  delete(id: int): any {
+    const current: unknown = this.objects[id];
     this.objects[id] = null;
     this.freeIDs.push(id);
     return current;
@@ -339,18 +340,21 @@ class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
   }
 
   next(): Opt<T> {
+    /* eslint-disable-next-line @typescript-eslint/no-unsafe-return */
     return this.skjson.importOptJSON(
       this.exports.SKIP_SKStore_iteratorNext(this.pointer),
     );
   }
 
   first(): T {
+    /* eslint-disable-next-line @typescript-eslint/no-unsafe-return */
     return this.skjson.importJSON(
       this.exports.SKIP_SKStore_iteratorFirst(this.pointer),
     );
   }
 
   uniqueValue(): Opt<T> {
+    /* eslint-disable-next-line @typescript-eslint/no-unsafe-return */
     return this.skjson.importOptJSON(
       this.exports.SKIP_SKStore_iteratorUniqueValue(this.pointer),
     );
@@ -515,10 +519,12 @@ class LinksImpl implements Links {
       for (const datum of result) {
         const k = datum[0];
         const v = datum[1];
+        /* eslint-disable-next-line @typescript-eslint/no-unsafe-call */
         if (bindings.has(k)) bindings.get(k).push(v);
         else bindings.set(k, [v]);
       }
       for (const kv of bindings) {
+        /* eslint-disable-next-line @typescript-eslint/no-unsafe-argument */
         w.setArray(kv[0], kv[1]);
       }
       ref.pop();
@@ -535,7 +541,7 @@ class LinksImpl implements Links {
       const w = new WriterImpl(jsu, fromWasm, writer);
       const result = this.handles.apply(fn, [jsu.importJSON(row), occ]);
       for (const v of result) {
-        const t = v as any;
+        const t = v as [any, any];
         w.set(t[0], t[1]);
       }
       ref.pop();
@@ -562,6 +568,7 @@ class LinksImpl implements Links {
       const name = jsu.importString(skname);
       const key = jsu.importJSON(skkey, true);
       const params = jsu.importJSON(skparams, true);
+      /* eslint-disable-next-line @typescript-eslint/no-unsafe-argument */
       const promise = this.handles.apply<Promise<AValue<TJSON, TJSON>>>(fn, [
         key,
         params,
@@ -569,7 +576,7 @@ class LinksImpl implements Links {
       const register = (value: Result<TJSON, TJSON>) => {
         if (!notify) {
           const skdbApp = this.env.shared.get("SKDB") as SKDBShared;
-          notify = skdbApp?.notify;
+          notify = skdbApp.notify;
         }
         setTimeout(() => {
           const result = jsu.runWithGC(() => {
@@ -592,9 +599,9 @@ class LinksImpl implements Links {
       };
       promise
         .then((value) => {
-          if (value.payload !== null && value.payload !== undefined) {
+          if (value.payload !== undefined) {
             register(
-              value.metadata !== null && value.metadata !== undefined
+              value.metadata !== undefined
                 ? {
                     status: "success",
                     payload: value.payload,
@@ -607,7 +614,7 @@ class LinksImpl implements Links {
             );
           } else {
             register(
-              value.metadata !== null && value.metadata !== undefined
+              value.metadata !== undefined
                 ? {
                     status: "unchanged",
                     metadata: value.metadata,
@@ -618,8 +625,8 @@ class LinksImpl implements Links {
             );
           }
         })
-        .catch((reason: any) => {
-          var msg: string;
+        .catch((reason: unknown) => {
+          let msg: string;
           if (reason instanceof Error) {
             msg = reason.message;
           } else if (typeof reason == "string") {
@@ -654,8 +661,6 @@ class LinksImpl implements Links {
     };
     this.init = (context: ptr) => {
       ref.push(context);
-      if (!this.initFn)
-        throw new Error("SKStore init function must be defined");
       this.initFn();
       ref.pop();
     };
@@ -683,7 +688,7 @@ class LinksImpl implements Links {
     this.getErrorHdl = (exn: ptr) => {
       return this.handles.register(utils.getErrorObject(exn));
     };
-    let create = (init: () => void) => {
+    const create = (init: () => void) => {
       // Register the init function to have  a named init function
       this.initFn = init;
       // Get a run uuid to build to allow function mapping reload in case of persistence
@@ -713,31 +718,40 @@ class LinksImpl implements Links {
 
 class Manager implements ToWasmManager {
   env: Environment;
+
   constructor(env: Environment) {
     this.env = env;
   }
 
   prepare = (wasm: object) => {
-    let toWasm = wasm as ToWasm;
-    let links = new LinksImpl(this.env);
-    toWasm.SKIP_SKStore_detachHandle = (fn: int) => links.detachHandle(fn);
+    const toWasm = wasm as ToWasm;
+    const links = new LinksImpl(this.env);
+    toWasm.SKIP_SKStore_detachHandle = (fn: int) => {
+      links.detachHandle(fn);
+    };
     toWasm.SKIP_SKStore_applyMapFun = (
       fn: int,
       context: ptr,
       writer: ptr,
       key: ptr,
       it: ptr,
-    ) => links.applyMapFun(fn, context, writer, key, it);
+    ) => {
+      links.applyMapFun(fn, context, writer, key, it);
+    };
     toWasm.SKIP_SKStore_applyMapTableFun = (
       fn: int,
       context: ptr,
       writer: ptr,
       row: ptr,
       occ: int,
-    ) => links.applyMapTableFun(fn, context, writer, row, occ);
+    ) => {
+      links.applyMapTableFun(fn, context, writer, row, occ);
+    };
     toWasm.SKIP_SKStore_applyConvertToRowFun = (fn: int, key: ptr, it: ptr) =>
       links.applyConvertToRowFun(fn, key, it);
-    toWasm.SKIP_SKStore_init = (context: ptr) => links.init(context);
+    toWasm.SKIP_SKStore_init = (context: ptr) => {
+      links.init(context);
+    };
     toWasm.SKIP_SKStore_applyLazyFun = (fn, context, self, key) =>
       links.applyLazyFun(fn, context, self, key);
 
@@ -749,7 +763,9 @@ class Manager implements ToWasmManager {
       name: ptr,
       key: ptr,
       param: ptr,
-    ) => links.applyLazyAsyncFun(fn, call, name, key, param);
+    ) => {
+      links.applyLazyAsyncFun(fn, call, name, key, param);
+    };
     toWasm.SKIP_SKStore_applyAccumulate = (fn: int, acc: ptr, value: ptr) =>
       links.applyAccumulate(fn, acc, value);
     toWasm.SKIP_SKStore_applyDismiss = (fn: int, acc: ptr, value: ptr) =>
