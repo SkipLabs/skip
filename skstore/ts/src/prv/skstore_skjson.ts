@@ -284,24 +284,25 @@ function clone<T>(value: T): T {
   }
 }
 
+type PartialCJObj = Internal.Vector<
+  Internal.Pair<Internal.String, Internal.CJSON>
+>;
+type PartialCJArray = Internal.Vector<Internal.CJSON>;
+
 interface FromWasm extends WasmAccess {
-  SKIP_SKJSON_startCJObject: () => ptr<Internal.VectorPairStringCJSON>;
+  SKIP_SKJSON_startCJObject: () => ptr<PartialCJObj>;
   SKIP_SKJSON_addToCJObject: (
-    obj: ptr<Internal.VectorPairStringCJSON>,
+    obj: ptr<PartialCJObj>,
     name: ptr<Internal.String>,
     value: ptr<Internal.CJSON>,
   ) => void;
-  SKIP_SKJSON_endCJObject: (
-    obj: ptr<Internal.VectorPairStringCJSON>,
-  ) => ptr<Internal.CJObject>;
-  SKIP_SKJSON_startCJArray: () => ptr<Internal.VectorCJSON>;
+  SKIP_SKJSON_endCJObject: (obj: ptr<PartialCJObj>) => ptr<Internal.CJObject>;
+  SKIP_SKJSON_startCJArray: () => ptr<PartialCJArray>;
   SKIP_SKJSON_addToCJArray: (
-    arr: ptr<Internal.VectorCJSON>,
+    arr: ptr<PartialCJArray>,
     value: ptr<Internal.CJSON>,
   ) => void;
-  SKIP_SKJSON_endCJArray: (
-    arr: ptr<Internal.VectorCJSON>,
-  ) => ptr<Internal.CJArray>;
+  SKIP_SKJSON_endCJArray: (arr: ptr<PartialCJArray>) => ptr<Internal.CJArray>;
   SKIP_SKJSON_createCJNull: () => ptr<Internal.CJNull>;
   SKIP_SKJSON_createCJInt: (v: int) => ptr<Internal.CJInt>;
   SKIP_SKJSON_createCJFloat: (v: float) => ptr<Internal.CJFloat>;

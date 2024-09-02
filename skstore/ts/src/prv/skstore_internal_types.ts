@@ -1,4 +1,4 @@
-import type { T, Pair, String, Vector } from "#std/sk_internal_types.js";
+import type { T } from "#std/sk_internal_types.js";
 export type * from "#std/sk_internal_types.js";
 
 /* eslint-disable @typescript-eslint/no-unused-vars */
@@ -52,6 +52,3 @@ declare const twriter: unique symbol;
 export type TWriter<K extends T<any> = JSONID, V extends T<any> = JSONFile> = T<
   typeof twriter
 > & { [p]: [K, V] };
-
-export type VectorCJSON = Vector<CJSON>;
-export type VectorPairStringCJSON = Vector<Pair<String, CJSON>>;
