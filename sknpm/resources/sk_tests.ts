@@ -1,6 +1,6 @@
 import { run, type ModuleInit } from "./sk_types.js";
 
-var modules: ModuleInit[];
+const modules: ModuleInit[] = [];
 /*--MODULES--*/
 
 const wasmurl = new URL("./test.wasm", import.meta.url);
