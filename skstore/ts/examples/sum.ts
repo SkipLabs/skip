@@ -64,7 +64,7 @@ export function initSKStore(
 ) {
   const eager1 = input1.map(T2SIdentify<number, number>);
   const eager2 = input2.map(T2SIdentify<number, number>);
-  const eager3 = eager1.map1(Add, eager2);
+  const eager3 = eager1.map(Add, eager2);
   eager3.mapTo(output, ToOutput);
 }
 

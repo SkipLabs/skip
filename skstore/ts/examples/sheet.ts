@@ -127,12 +127,12 @@ export function initSKStore(
   const skall = cells.map(ValueForCell);
   // Use lazy dir to create eval dependency graph
   // Its calls it self to get other computed cells
-  const evaluator = store.lazy1(ComputeExpression, skall);
+  const evaluator = store.lazy(ComputeExpression, skall);
   // Build a sub dependency graph for each sheet (For example purpose)
   // A parsing phase can be added to prevent expression parsing each time:
   // Parsing => Immutable ast
   // Evaluation => Compute tree with context
-  const skcomputed = skall.map1(CallCompute, evaluator);
+  const skcomputed = skall.map(CallCompute, evaluator);
   // Back to SKDB world
   skcomputed.mapTo(computed, ToOutput);
 }
