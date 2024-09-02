@@ -8,7 +8,7 @@ import type {
   AValue,
   LazyCollection,
   TJSON,
-} from "../skip_runtime_api.js";
+} from "../skruntime_api.js";
 
 import type {
   Handles,

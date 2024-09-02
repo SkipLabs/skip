@@ -8,7 +8,7 @@ import type {
   TJSON,
   NonEmptyIterator,
   EagerCollection,
-} from "../skip_runtime_api.js";
+} from "../skruntime_api.js";
 
 export type CtxMapping<
   K1 extends TJSON,
