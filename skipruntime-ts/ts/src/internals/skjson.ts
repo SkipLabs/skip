@@ -139,12 +139,25 @@ function getValueAt(hdl: WasmHandle, idx: int, array: boolean = false): any {
   }
 }
 
+type ObjectProxy<Base extends Record<string, any>> = {
+  __isObjectProxy: true;
+  __sk_frozen: true;
+  __pointer: ptr<Internal.CJSON>;
+  clone: () => ObjectProxy<Base>;
+  toJSON: () => Base;
+  keys: (keyof Base)[];
+} & Base;
+
 export const reactiveObject = {
-  get(hdl: WasmHandle, prop: string | symbol, self: any): any {
+  get<Base extends object>(
+    hdl: WasmHandle,
+    prop: string | symbol,
+    self: ObjectProxy<Base>,
+  ): any {
     if (prop === "__isObjectProxy") return true;
     if (prop === "__sk_frozen") return true;
     if (prop === "__pointer") return hdl.pointer;
-    if (prop === "clone") return (): any => clone(self);
+    if (prop === "clone") return (): ObjectProxy<Base> => clone(self);
     const fields = hdl.objectFields();
     if (prop === "toJSON")
       return (): any => {
@@ -192,13 +205,28 @@ export const reactiveObject = {
   },
 };
 
+type ArrayProxy<T> = {
+  __isArrayProxy: true;
+  __sk_frozen: true;
+  __pointer: ptr<Internal.CJSON>;
+  length: number;
+  clone: () => ArrayProxy<T>;
+  toJSON: () => T[];
+  forEach: (
+    callbackfn: (value: T, index: number, array: T[]) => void,
+    thisArg?: any,
+  ) => void;
+  [Symbol.iterator]: T[][typeof Symbol.iterator];
+  [idx: number]: T;
+};
+
 export const reactiveArray = {
-  get(hdl: WasmHandle, prop: string | symbol, self: any): any {
+  get<T>(hdl: WasmHandle, prop: string | symbol, self: ArrayProxy<T>): any {
     if (prop === "__isArrayProxy") return true;
     if (prop === "__sk_frozen") return true;
     if (prop === "__pointer") return hdl.pointer;
     if (prop === "length") return hdl.access.SKIP_SKJSON_arraySize(hdl.pointer);
-    if (prop === "clone") return (): any => clone(self);
+    if (prop === "clone") return (): ArrayProxy<T> => clone(self);
     if (prop === "toJSON")
       return (): any[] => {
         const res: any[] = [];
@@ -209,19 +237,18 @@ export const reactiveArray = {
         return res;
       };
     if (prop === "forEach")
-      return <T>(
+      return (
         callbackfn: (value: T, index: number, array: T[]) => void,
         thisArg?: any,
       ): void => {
-        /* eslint-disable-next-line @typescript-eslint/no-unsafe-call */
         self.toJSON().forEach(callbackfn, thisArg);
       };
     if (typeof prop === "symbol") {
-      /* eslint-disable-next-line @typescript-eslint/no-unsafe-call */
-      return self.toJSON()[prop];
+      if (prop === Symbol.iterator) return self.toJSON()[Symbol.iterator];
+    } else {
+      const v = parseInt(prop);
+      if (!isNaN(v)) return getValueAt(hdl, v, true);
     }
-    const v = parseInt(prop);
-    if (!isNaN(v)) return getValueAt(hdl, v, true);
     return undefined;
   },
   set(_hdl: WasmHandle, _prop: string | symbol, _value: any) {
