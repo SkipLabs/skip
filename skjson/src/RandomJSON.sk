@@ -38,7 +38,7 @@ mutable class RandomJSON{rand: mutable Random} {
       this.genObject()
     } else {
       if (this.check(static::probArray)) {
-        this.genArray()
+        this.genArray(this.genValue)
       } else {
         if (this.check(static::probNull)) {
           CJNull()
@@ -71,11 +71,11 @@ mutable class RandomJSON{rand: mutable Random} {
     )
   }
 
-  mutable fun genArray(): CJArray {
+  mutable fun genArray<T: CJSON>(genValue: () -> T): CJArray<T> {
     size = this.rand.random(static::arrayMinSize, static::arrayMaxSize);
     values = mutable Vector[];
     for (_ in Range(0, size)) {
-      values.push(this.genValue());
+      values.push(genValue());
     };
     CJArray(values.toArray())
   }

@@ -26,7 +26,7 @@ native fun applyMapTableFun(
   fn: UInt32,
   context: mutable Context,
   writer: mutable TWriter<JSONID, JSONFile>,
-  key: SKJSON.CJArray,
+  key: SKJSON.CJArray<SKJSON.CJSON>,
   occ: Float,
 ): void;
 
@@ -100,7 +100,7 @@ fun writerSet(
 fun writerSetArray(
   writer: mutable TWriter<JSONID, JSONFile>,
   key: SKJSON.CJSON,
-  values: SKJSON.CJArray,
+  values: SKJSON.CJArray<SKJSON.CJSON>,
 ): void {
   files = values match {
   | SKJSON.CJArray(xs) -> xs.map(x -> JSONFile(x))
@@ -259,7 +259,7 @@ fun mapReduce(
 fun multimap(
   context: mutable Context,
   name: String,
-  mappings: SKJSON.CJArray,
+  mappings: SKJSON.CJArray<SKJSON.CJSON>,
 ): String {
   skmappings = mappings match {
   | SKJSON.CJArray(v) ->
@@ -286,7 +286,7 @@ fun multimap(
 fun multimapReduce(
   context: mutable Context,
   name: String,
-  mappings: SKJSON.CJArray,
+  mappings: SKJSON.CJArray<SKJSON.CJSON>,
   accumulator: UInt32,
   default: SKJSON.CJSON,
 ): String {
@@ -523,7 +523,7 @@ fun size(context: mutable Context, handleId: String): Float {
 fun input(
   context: mutable Context,
   name: String,
-  values: SKJSON.CJArray,
+  values: SKJSON.CJArray<SKJSON.CJSON>,
 ): String {
   makeInput(
     JSONID::keyType,

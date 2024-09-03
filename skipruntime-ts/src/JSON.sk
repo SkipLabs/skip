@@ -55,7 +55,7 @@ fun asString(json: CJSON): String {
 }
 
 @export("SKIP_SKJSON_asArray")
-fun asArray(json: CJSON): CJArray {
+fun asArray(json: CJSON): CJArray<CJSON> {
   json match {
   | v @ CJArray _ -> v
   | _ -> invariant_violation("Must be a Array value.")
@@ -109,14 +109,14 @@ fun objectSize(object: CJObject): Float {
 }
 
 @export("SKIP_SKJSON_at")
-fun at(array: CJArray, idx: Float): ?CJSON {
+fun at(array: CJArray<CJSON>, idx: Float): ?CJSON {
   array match {
   | CJArray(values) -> values.maybeGet(idx.toInt())
   }
 }
 
 @export("SKIP_SKJSON_arraySize")
-fun arraySize(array: CJArray): Float {
+fun arraySize(array: CJArray<CJSON>): Float {
   array match {
   | CJArray(values) -> values.size().toFloat()
   }
@@ -153,7 +153,7 @@ fun addToCJArray(array: mutable Vector<CJSON>, value: CJSON): void {
 }
 
 @export("SKIP_SKJSON_endCJArray")
-fun endCJArray(array: mutable Vector<CJSON>): CJArray {
+fun endCJArray(array: mutable Vector<CJSON>): CJArray<CJSON> {
   CJArray(array.toArray())
 }
 
