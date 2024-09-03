@@ -495,6 +495,7 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
  * Mirror table from skdb with a specific filter
  * @param context
  * @param skdb - the database to work with
+ * @param connect
  * @param tables - tables the mirroring info
  * @returns - the mirrors table handles
  */
