@@ -12,7 +12,6 @@ base class CJSON uses Orderable {
   | CJInt(Int)
   | CJFloat(Float)
   | CJString(String)
-  | CJArray(Array<CJSON>)
   | CJObject(CJFields)
 
   fun toJSON(): JSON.Value
@@ -60,6 +59,8 @@ base class CJSON uses Orderable {
     };
     SKJSON.TObject(SKJSON.Fields::create(result.chill()))
 }
+
+class CJArray(Array<CJSON>) extends CJSON
 
 value class CJFields(cols: Array<String>, values: Array<CJSON>) uses Orderable {
   fun isEmpty(): Bool {
