@@ -140,7 +140,7 @@ function getValueAt(hdl: WasmHandle, idx: int, array: boolean = false): any {
 }
 
 export const reactiveObject = {
-  get(hdl: WasmHandle, prop: string, self: any): any {
+  get(hdl: WasmHandle, prop: string | symbol, self: any): any {
     if (prop === "__isObjectProxy") return true;
     if (prop === "__sk_frozen") return true;
     if (prop === "__pointer") return hdl.pointer;
@@ -155,27 +155,30 @@ export const reactiveObject = {
         return res;
       };
     if (prop === "keys") return fields.keys();
+    if (typeof prop === "symbol") return undefined;
     const idx = fields.get(prop);
     if (idx === undefined) return undefined;
     return getValueAt(hdl, idx, false);
   },
-  set(_hdl: WasmHandle, _prop: string, _value: any) {
+  set(_hdl: WasmHandle, _prop: string | symbol, _value: any) {
     throw new Error("Reactive object cannot be modified.");
   },
-  has(hdl: WasmHandle, prop: string): boolean {
+  has(hdl: WasmHandle, prop: string | symbol): boolean {
     if (prop === "__isObjectProxy") return true;
     if (prop === "__sk_frozen") return true;
     if (prop === "__pointer") return true;
     if (prop === "clone") return true;
     if (prop === "keys") return true;
     if (prop === "toJSON") return true;
+    if (typeof prop === "symbol") return false;
     const fields = hdl.objectFields();
     return fields.has(prop);
   },
   ownKeys(hdl: WasmHandle) {
     return Array.from(hdl.objectFields().keys());
   },
-  getOwnPropertyDescriptor(hdl: WasmHandle, prop: string) {
+  getOwnPropertyDescriptor(hdl: WasmHandle, prop: string | symbol) {
+    if (typeof prop === "symbol") return undefined;
     const fields = hdl.objectFields();
     const idx = fields.get(prop);
     if (idx === undefined) return undefined;
@@ -190,49 +193,48 @@ export const reactiveObject = {
 };
 
 export const reactiveArray = {
-  get(hdl: WasmHandle, prop: string, self: any): any {
+  get(hdl: WasmHandle, prop: string | symbol, self: any): any {
+    if (prop === "__isArrayProxy") return true;
+    if (prop === "__sk_frozen") return true;
+    if (prop === "__pointer") return hdl.pointer;
+    if (prop === "length") return hdl.access.SKIP_SKJSON_arraySize(hdl.pointer);
+    if (prop === "clone") return (): any => clone(self);
+    if (prop === "toJSON")
+      return (): any[] => {
+        const res: any[] = [];
+        const length: number = self.length;
+        for (let i = 0; i < length; i++) {
+          res.push(getValueAt(hdl, i, true));
+        }
+        return res;
+      };
+    if (prop === "forEach")
+      return <T>(
+        callbackfn: (value: T, index: number, array: T[]) => void,
+        thisArg?: any,
+      ): void => {
+        /* eslint-disable-next-line @typescript-eslint/no-unsafe-call */
+        self.toJSON().forEach(callbackfn, thisArg);
+      };
     if (typeof prop === "symbol") {
       /* eslint-disable-next-line @typescript-eslint/no-unsafe-call */
-      return (): any => self.toJSON().values();
-    } else {
-      if (prop === "__isArrayProxy") return true;
-      if (prop === "__sk_frozen") return true;
-      if (prop === "__pointer") return hdl.pointer;
-      if (prop === "length")
-        return hdl.access.SKIP_SKJSON_arraySize(hdl.pointer);
-      if (prop === "clone") return (): any => clone(self);
-      if (prop === "toJSON")
-        return (): any[] => {
-          const res: any[] = [];
-          const length: number = self.length;
-          for (let i = 0; i < length; i++) {
-            res.push(getValueAt(hdl, i, true));
-          }
-          return res;
-        };
-      if (prop === "forEach")
-        return <T>(
-          callbackfn: (value: T, index: number, array: T[]) => void,
-          thisArg?: any,
-        ): void => {
-          /* eslint-disable-next-line @typescript-eslint/no-unsafe-call */
-          self.toJSON().forEach(callbackfn, thisArg);
-        };
-      const v = parseInt(prop);
-      if (!isNaN(v)) return getValueAt(hdl, v, true);
-      return undefined;
+      return self.toJSON()[prop];
     }
+    const v = parseInt(prop);
+    if (!isNaN(v)) return getValueAt(hdl, v, true);
+    return undefined;
   },
-  set(_hdl: WasmHandle, _prop: string, _value: any) {
+  set(_hdl: WasmHandle, _prop: string | symbol, _value: any) {
     throw new Error("Reactive array cannot be modified.");
   },
-  has(_hdl: WasmHandle, prop: string): boolean {
+  has(_hdl: WasmHandle, prop: string | symbol): boolean {
     if (prop === "__isArrayProxy") return true;
     if (prop === "__sk_frozen") return true;
     if (prop === "__pointer") return true;
     if (prop === "length") return true;
     if (prop === "clone") return true;
     if (prop === "toJSON") return true;
+    if (prop === Symbol.iterator) return true;
     return false;
   },
   ownKeys(hdl: WasmHandle) {
@@ -240,7 +242,8 @@ export const reactiveArray = {
     const res = Array.from(Array(l).keys()).map((v) => v.toString());
     return res;
   },
-  getOwnPropertyDescriptor(hdl: WasmHandle, prop: string) {
+  getOwnPropertyDescriptor(hdl: WasmHandle, prop: string | symbol) {
+    if (typeof prop === "symbol") return undefined;
     const v = parseInt(prop);
     if (isNaN(v)) return undefined;
     const value = getValueAt(hdl, v, true);
