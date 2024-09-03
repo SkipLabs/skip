@@ -590,7 +590,13 @@ fun copyAndConvertImport(
     withTmpl = false;
     optCategory: ?String = None();
     lines = contents.split("\n").map(line -> {
-      if (line.startsWith("import ") || line.startsWith("export {")) {
+      if (
+        line.startsWith("import ") ||
+        line.startsWith("export {") ||
+        line.startsWith("export type {") ||
+        line.startsWith("export *") ||
+        line.startsWith("export type *")
+      ) {
         !line = line.replace(".js", ".mjs");
         elements = line.split(" from ");
         if (elements.size() == 2) {

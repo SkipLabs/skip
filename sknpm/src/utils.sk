@@ -124,7 +124,9 @@ fun copyToDir(
       if (
         line.startsWith("import ") ||
         line.startsWith("export {") ||
-        line.startsWith("export type {")
+        line.startsWith("export type {") ||
+        line.startsWith("export *") ||
+        line.startsWith("export type *")
       ) {
         elements = line.split(" from ");
         if (elements.size() == 2) {
@@ -230,25 +232,6 @@ fun runService(
   };
   Success(void)
 }
-
-/*
-fun check(
-  several: String,
-  files: readonly Vector<String>,
-  optSingle: ?String,
-): void {
-  optSingle.each(single ->
-    invariant(!files.isEmpty(), `${single} must be defined.`)
-  );
-  if (files.size() > 1) {
-    invariant_violation(
-      `Several ${several} have been found (${files.map(f ->
-        f.split(".").take(files.size() - 1).join(".")
-      )}), please specify which one to use.`,
-    )
-  }
-}
-*/
 
 fun writeIndex(target: String, name: String): void {
   FileSystem.writeTextFile(
