@@ -195,7 +195,7 @@ export interface Accumulator<T extends TJSON, V extends TJSON> {
    * The computation to perform when an input value is added
    * @param acc - the current accumulated value
    * @param value - the added value
-   * @return the resulting accumulated value
+   * @returns the resulting accumulated value
    */
   accumulate(acc: Opt<V>, value: T): V;
 
@@ -203,7 +203,7 @@ export interface Accumulator<T extends TJSON, V extends TJSON> {
    * The computation to perform when an input value is removed
    * @param acc - the current accumulated value
    * @param value - the removed value
-   * @return the resulting accumulated value
+   * @returns the resulting accumulated value
    */
   dismiss(acc: V, value: T): Opt<V>;
 }
@@ -320,8 +320,10 @@ export interface EHandle<K extends TJSON, V extends TJSON> {
 
   /**
    * Eagerly write/update `table` with the contents of this collection
+   * @param {TableHandle} table - the table to update
    * @param {Mapper} mapper - function to apply to each key/value pair in this collection
    *                          to produce a table row
+   * @param params - any additional parameters to the mapper
    */
   mapTo<R extends TJSON[], Params extends Param[]>(
     table: TableHandle<R>,
@@ -369,7 +371,7 @@ export interface Table<R extends TJSON[]> {
    * @throws {Error} in case of index conflict (when `update` is false) or constraint
    *         violation
    */
-  insert(entry: R[], update?: boolean): void;
+  insert(entries: R[], update?: boolean): void;
 
   /**
    * Update an entry in the table
@@ -508,8 +510,8 @@ export interface SKStore {
 
   /**
    * Creates a lazy reactive map attached to a async call
-   * @param get - the function the gather the values from others reactive maps
-   * @param call - the async function to call with gathered values
+   * @param compute - the function to compute entries of the lazy collection
+   * @param params - any additional parameters to the lazy computation
    * @returns {LHandle} The the resulting lazy reactive map handle
    */
   asyncLazy<

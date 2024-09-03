@@ -3,9 +3,11 @@
 import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
 import stylisticJs from "@stylistic/eslint-plugin-js";
+import jsdoc from "eslint-plugin-jsdoc";
 
 export default tseslint.config(
   eslint.configs.recommended,
+  jsdoc.configs["flat/recommended-typescript-error"],
   ...tseslint.configs.strictTypeChecked,
   ...tseslint.configs.stylisticTypeChecked,
   {
@@ -17,6 +19,7 @@ export default tseslint.config(
     },
     plugins: {
       "@stylistic/js": stylisticJs,
+      jsdoc,
     },
     rules: {
       "prefer-spread": "warn",
@@ -67,6 +70,10 @@ export default tseslint.config(
         "error",
         { enforce: [{ prev: "*", next: "method", blankLine: "always" }] },
       ],
+      "jsdoc/require-jsdoc": ["warn", { publicOnly: true }],
+      "jsdoc/require-description": "warn",
+      "jsdoc/require-param-description": "warn",
+      "jsdoc/no-types": "warn",
     },
   },
   { files: ["**/*.js"], ...tseslint.configs.disableTypeChecked },
