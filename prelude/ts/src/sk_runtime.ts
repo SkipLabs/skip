@@ -292,7 +292,7 @@ interface ToWasm {
   SKIP_unsetenv: (skName: ptr) => void;
 }
 
-/** @sk runtime */
+/* @sk runtime */
 export function init(env?: Environment) {
   return Promise.resolve(new Manager(env));
 }

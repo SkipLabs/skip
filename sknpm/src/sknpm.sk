@@ -610,11 +610,14 @@ fun copyAndConvertImport(
       cLine = line.trim();
       if (cLine == nameLine || cLine == modulesLines || cLine == versionLine) {
         !withTmpl = true;
-      } else if (cLine == "/** @sk init */") {
+      } else if (cLine == "/* @sk init */" || cLine == "/** @sk init */") {
         !withInit = true;
-      } else if (cLine == "/** @sk loader */") {
+      } else if (cLine == "/* @sk loader */" || cLine == "/** @sk loader */") {
         !withLoader = true;
-      } else if (cLine == "/** @sk runtime */") {
+      } else if (
+        cLine == "/* @sk runtime */" ||
+        cLine == "/** @sk runtime */"
+      ) {
         !withRuntime = true;
       } else if (cLine == jsSourceMapping) {
         !line = mjsSourceMapping;
