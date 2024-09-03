@@ -1,6 +1,7 @@
 // prettier-ignore
 import { type ptr, type Opt } from "#std/sk_types.js";
 import type { Context } from "./skstore_types.js";
+import type * as Internal from "./skstore_internal_types.js";
 import type {
   Accumulator,
   EHandle,
@@ -177,9 +178,9 @@ export class LSelfImpl<K extends TJSON, V extends TJSON>
   implements LHandle<K, V>
 {
   protected context: Context;
-  protected lazyHdl: ptr;
+  protected lazyHdl: ptr<Internal.LHandle>;
 
-  constructor(context: Context, lazyHdl: ptr) {
+  constructor(context: Context, lazyHdl: ptr<Internal.LHandle>) {
     this.context = context;
     this.lazyHdl = lazyHdl;
     Object.defineProperty(this, "__sk_frozen", {
