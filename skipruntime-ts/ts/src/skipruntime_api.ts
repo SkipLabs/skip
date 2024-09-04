@@ -246,7 +246,7 @@ export interface NonEmptyIterator<T> extends Iterable<T> {
    * @param callbackfn  A function that accepts up to thow arguments. forEach calls the callbackfn function one time for each element.
    * @param thisArg An object to which the this keyword can refer in the callbackfn function. If thisArg is omitted, undefined is used as the this value.
    */
-  forEach(callbackfn: (value: T, index: number) => void): void;
+  forEach(callbackfn: (value: T, index: number) => void, thisArg?: any): void;
 
   /**
    * Calls a defined callback function on each element of an array, and returns an array that contains the results.
@@ -410,7 +410,7 @@ export interface Table<R extends TJSON[]> {
    * @throws {Error} in case of index conflict (when `update` is false) or constraint
    *         violation
    */
-  insert(entry: R[] | Inputs, update?: boolean): void;
+  insert(entries: R[] | Inputs, update?: boolean): void;
   /**
    * Update an entry in the table
    * @param row - the table entry to update

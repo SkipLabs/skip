@@ -78,6 +78,7 @@ class WriterImpl<V extends TJSON> implements Writer<V> {
   set(key: string, value: V): void {
     this.table.insert([[key, JSON.stringify(value), "", "read-write"]], true);
   }
+
   delete(keys: string[]): void {
     this.table.deleteWhere({ key: keys });
   }
@@ -95,11 +96,13 @@ function toWriters(
 
 class SimpleToGenericSkipService implements GenericSkipService {
   tokens?: Record<string, number>;
+
   constructor(private simple: SimpleSkipService) {
     if (simple.tokens) this.tokens = simple.tokens;
   }
+
   localeInputs() {
-    var inputs: Record<string, InputDefinition> = {};
+    const inputs: Record<string, InputDefinition> = {};
     if (this.simple.inputTables) {
       this.simple.inputTables.map((table) => {
         inputs[table] = {
@@ -120,10 +123,10 @@ class SimpleToGenericSkipService implements GenericSkipService {
   }
 
   remoteInputs(): Record<string, RemoteInputs> {
-    var inputs: Record<string, RemoteInputs> = {};
+    const inputs: Record<string, RemoteInputs> = {};
     if (this.simple.remoteTables) {
       for (const [key, sri] of Object.entries(this.simple.remoteTables)) {
-        var rInputs: Record<string, InputDefinition> = {};
+        const rInputs: Record<string, InputDefinition> = {};
         sri.inputs.map((table) => {
           rInputs[table] = {
             schema: inputSchema(table),
@@ -149,6 +152,7 @@ class SimpleToGenericSkipService implements GenericSkipService {
       },
     };
   }
+
   reactiveCompute(
     store: SKStore,
     inputs: Record<string, EagerCollection<TJSON, TJSON>>,
@@ -230,8 +234,8 @@ export async function runService(
         remote: Record<string, (event: TJSON) => Promise<void>>,
       ) => Promise<void>)
     | null = null;
-  let iTables: Record<string, Table<TJSON[]>> = {};
-  let oTables: Record<string, Table<TJSON[]>> = {};
+  const iTables: Record<string, Table<TJSON[]>> = {};
+  const oTables: Record<string, Table<TJSON[]>> = {};
   const initSKStore = (
     store: SKStore,
     tables: Record<string, TableCollection<TJSON[]>>,
@@ -239,12 +243,14 @@ export async function runService(
     const iHandles: Record<string, EagerCollection<TJSON, TJSON>> = {};
     for (const [key, value] of Object.entries(localeInputs)) {
       const table = tables[key];
+      // eslint-disable-next-line  @typescript-eslint/no-unsafe-argument
       iHandles[key] = table.map(value.fromTableRow, ...value.params);
       iTables[key] = (table as TableCollectionImpl<TJSON[]>).toTable();
     }
     for (const remove of Object.values(remoteInputs)) {
       for (const [key, value] of Object.entries(remove.inputs)) {
         const table = tables[key];
+        // eslint-disable-next-line  @typescript-eslint/no-unsafe-argument
         iHandles[key] = table.map(value.fromTableRow, ...value.params);
       }
     }
@@ -259,14 +265,17 @@ export async function runService(
     }
     for (const [key, output] of Object.entries(outputs)) {
       const ehandle = result.outputs[key];
+      // eslint-disable-next-line  @typescript-eslint/no-unnecessary-condition
       if (!ehandle) {
         throw new Error(`The ${key} must be return by reactiveCompute.`);
       }
       const table = tables[key];
+      // eslint-disable-next-line  @typescript-eslint/no-unnecessary-condition
       if (!table) {
         throw new Error(`Unable to retrieve ${key} table.`);
       }
       oTables[key] = (table as TableCollectionImpl<TJSON[]>).toTable();
+      // eslint-disable-next-line  @typescript-eslint/no-unsafe-argument
       ehandle.mapTo(tables[key], output.toTableRow, ...output.params);
     }
     update = (event, remotes) => result.update(event, iTables, remotes);
