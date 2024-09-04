@@ -476,6 +476,10 @@ export class SKStoreImpl implements SKStore {
     return this.context.getToken(key);
   }
 
+  jsonExtract(value: JSONObject, pattern: string): TJSON[] {
+    return this.context.jsonExtract(value, pattern);
+  }
+
   log(object: any): void {
     if (
       typeof object == "object" &&

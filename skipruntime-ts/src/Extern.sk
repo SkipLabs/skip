@@ -645,4 +645,21 @@ fun previous(value: SKJSON.CJObject): ?SKJSON.CJSON {
   }
 }
 
+@export("SKIP_SKStore_jsonExtract")
+fun jsonExtract(from: SKJSON.CJSON, pattern: String): SKJSON.CJArray {
+  fieldsList = SKJSON.PatternParser::mcreate(pattern)
+    .toplevelPattern()
+    .pmatch(from)
+    .collect(Array);
+  values = mutable Vector[];
+  fieldsList.each(fields -> {
+    array = fields.collect(Array).map(field -> {
+      cjfields = SKJSON.CJFields::create(Array[field], x -> x);
+      SKJSON.CJObject(cjfields)
+    });
+    values.push(SKJSON.CJArray(array));
+  });
+  SKJSON.CJArray(values.toArray())
+}
+
 module end; /* SKStore */

@@ -8,9 +8,9 @@
 import type { Opt, Shared, float, int, ptr } from "#std/sk_types.js";
 export type { Opt, float, int, ptr };
 
-export type JSONObject = { [key: string]: TJSON };
+export type JSONObject = { [key: string]: TJSON | null };
 
-export type TJSON = number | JSONObject | boolean | TJSON[] | string;
+export type TJSON = number | JSONObject | boolean | (TJSON | null)[] | string;
 
 export type TTableCollection = any;
 export type TTable = any;
@@ -595,6 +595,8 @@ export interface SKStore {
   ): AsyncLazyCollection<K, V, M>;
 
   getToken: (key: string) => number;
+
+  jsonExtract(value: JSONObject, pattern: string): TJSON[];
 
   log(object: TJSON): void;
 }

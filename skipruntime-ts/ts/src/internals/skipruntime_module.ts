@@ -1,6 +1,6 @@
 // prettier-ignore
 import type { int, ptr, Links, Utils, ToWasmManager, Environment, Opt, Metadata } from "#std/sk_types.js";
-import type { SKJSON } from "./skjson.js";
+import type { SKJSON } from "#skjson/skjson.js";
 import type {
   Accumulator,
   NonEmptyIterator,
@@ -10,6 +10,7 @@ import type {
   TJSON,
   Schema,
   Token,
+  JSONObject,
 } from "../skipruntime_api.js";
 
 import type {
@@ -345,6 +346,15 @@ export class ContextImpl implements Context {
       this.skjson.exportString(schema.name),
       convertId,
       connected,
+    );
+  }
+
+  jsonExtract(value: JSONObject, pattern: string): TJSON[] {
+    return this.skjson.importJSON(
+      this.exports.SKIP_SKStore_jsonExtract(
+        this.skjson.exportJSON(value),
+        this.skjson.exportString(pattern),
+      ),
     );
   }
 

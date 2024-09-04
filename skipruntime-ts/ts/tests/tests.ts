@@ -26,6 +26,7 @@ import {
   cinteger as integer,
   schema,
   ctext as text,
+  cjson as json,
 } from "skip-runtime";
 
 function check(name: String, got: TJSON, expected: TJSON): void {
@@ -606,8 +607,8 @@ class TokensToOutput
 
 function testTokensInit(
   skstore: SKStore,
-  input: TableHandle<[number, number]>,
-  output: TableHandle<[number, number, number]>,
+  input: TableCollection<[number, number]>,
+  output: TableCollection<[number, number, number]>,
 ) {
   const eager1 = input.map(TestFromIntInt);
   const eager2 = eager1.map(TestWithToken, skstore);
@@ -637,6 +638,75 @@ async function testTokensRun(
   await timeout(2000);
   const last = output.select({ id: 1 }, ["value", "time"])[0] as any;
   check("testTokens[2]", Math.trunc((last.time - start.time) / 1000), 5);
+}
+
+// testJSONExtract
+
+class TestFromJSTable
+  implements InputMapper<[number, JSONObject, string], number, TJSON[]>
+{
+  constructor(private skstore: SKStore) {}
+
+  mapElement(
+    entry: [number, JSONObject, string],
+    _occ: number,
+  ): Iterable<[number, TJSON[]]> {
+    const key = entry[0];
+    const value = entry[1];
+    const pattern = entry[2];
+    const result = this.skstore.jsonExtract(value, pattern);
+    return Array([key, result]);
+  }
+}
+
+function testJSONExtractInit(
+  skstore: SKStore,
+  input: TableCollection<[number, JSONObject, string]>,
+  output: TableCollection<[number, TJSON[]]>,
+) {
+  const eager = input.map(TestFromJSTable, skstore);
+  eager.mapTo(output, TestToOutput);
+}
+
+async function testJSONExtractRun(
+  input: Table<[number, JSONObject, string]>,
+  output: Table<[number, TJSON[]]>,
+) {
+  input.insert(
+    [
+      [
+        0,
+        { x: [1, 2, 3], "y[0]": [4, 5, 6, null] },
+        '{x[]: var1, ?"y[0]": var2}',
+      ],
+      [1, { x: [1, 2, 3], y: [4, 5, 6, null] }, "{x[]: var1, ?y[0]: var2}"],
+      [2, { x: 1, y: 2 }, "{%: var, x:var<int>}"],
+    ],
+    true,
+  );
+  const res = output.select({}, ["id", "v"]);
+  check("testJSONExtract", res, [
+    {
+      id: 0,
+      v: [
+        [{ var2: [4, 5, 6, null] }, { var1: 1 }],
+        [{ var2: [4, 5, 6, null] }, { var1: 2 }],
+        [{ var2: [4, 5, 6, null] }, { var1: 3 }],
+      ],
+    },
+    {
+      id: 1,
+      v: [
+        [{ var2: 4 }, { var1: 1 }],
+        [{ var2: 4 }, { var1: 2 }],
+        [{ var2: 4 }, { var1: 3 }],
+      ],
+    },
+    {
+      id: 2,
+      v: [[{ var: 1 }, { var: 2 }]],
+    },
+  ]);
 }
 
 //// Tests
@@ -751,6 +821,15 @@ export const tests: Test[] = [
     init: testTokensInit,
     run: testTokensRun,
     tokens: { token_5s: 5000 },
+  },
+  {
+    name: "testJSONExtract",
+    schemas: [
+      schema("input", [integer("id", true), json("v"), text("p")]),
+      schema("output", [integer("id", true), json("v")]),
+    ],
+    init: testJSONExtractInit,
+    run: testJSONExtractRun,
   },
 ];
 
