@@ -149,6 +149,11 @@ type ObjectProxy<Base extends Record<string, any>> = {
   keys: (keyof Base)[];
 } & Base;
 
+function isObjectProxy(x: any): x is ObjectProxy<Record<string, any>> {
+  /* eslint-disable-next-line @typescript-eslint/no-unsafe-return */
+  return sk_isObjectProxy in x && x[sk_isObjectProxy];
+}
+
 export const reactiveObject = {
   get<Base extends object>(
     hdl: WasmHandle,
@@ -221,6 +226,11 @@ type ArrayProxy<T> = {
   [idx: number]: T;
 };
 
+function isArrayProxy(x: any): x is ArrayProxy<any> {
+  /* eslint-disable-next-line @typescript-eslint/no-unsafe-return */
+  return sk_isArrayProxy in x && x[sk_isArrayProxy];
+}
+
 export const reactiveArray = {
   get<T>(hdl: WasmHandle, prop: string | symbol, self: ArrayProxy<T>): any {
     if (prop === sk_isArrayProxy) return true;
@@ -285,24 +295,24 @@ export const reactiveArray = {
 };
 
 function clone<T>(value: T): T {
-  const aValue = value as any;
-  if (typeof value === "object") {
+  if (typeof value === "object" && value !== null) {
     if (Array.isArray(value)) {
       return value.map(clone) as T;
-    } else if (aValue[sk_isArrayProxy]) {
+    } else if (isArrayProxy(value)) {
       const res: any[] = [];
-      const length: number = aValue.length;
+      const length: number = value.length;
       for (let i = 0; i < length; i++) {
-        res.push(clone(aValue[i]));
+        res.push(clone(value[i]));
       }
       return res as T;
-    } else if (aValue[sk_isObjectProxy]) {
+    } else if (isObjectProxy(value)) {
       const res: any = {};
-      for (const key of aValue.keys) {
-        res[key] = clone(aValue[key]);
+      for (const key of value.keys) {
+        res[key] = clone(value[key]);
       }
       return res as T;
     } else {
+      const aValue = value as any;
       const res: any = {};
       const keys = Object.keys(aValue as object);
       for (const key of keys) {
@@ -442,8 +452,8 @@ class LinksImpl implements Links {
         });
         return fromWasm.SKIP_SKJSON_endCJArray(arr);
       } else if (typeof value == "object") {
-        if (value[sk_isObjectProxy] || value[sk_isArrayProxy]) {
-          return value.__pointer as ptr<Internal.CJSON>;
+        if (isObjectProxy(value) || isArrayProxy(value)) {
+          return value.__pointer;
         } else {
           const obj = fromWasm.SKIP_SKJSON_startCJObject();
           for (const key of Object.keys(value as object)) {
