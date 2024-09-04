@@ -1,5 +1,5 @@
 // prettier-ignore
-import { type ptr, type Opt } from "#std/sk_types.js";
+import { type ptr, type Opt, cloneIfProxy } from "#std/sk_types.js";
 import type { Context } from "./skipruntime_types.js";
 import type * as Internal from "./skstore_internal_types.js";
 import type {
@@ -450,17 +450,7 @@ export class SKStoreImpl implements SKStore {
   }
 
   log(object: any): void {
-    if (
-      typeof object == "object" &&
-      (("__isArrayProxy" in object && object.__isArrayProxy) ||
-        ("__isObjectProxy" in object && object.__isObjectProxy)) &&
-      "clone" in object
-    ) {
-      /* eslint-disable-next-line @typescript-eslint/no-unsafe-call */
-      console.log(object.clone());
-    } else {
-      console.log(object);
-    }
+    console.log(cloneIfProxy(object));
   }
 }
 
