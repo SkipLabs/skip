@@ -1,5 +1,5 @@
 // prettier-ignore
-import type { int, ptr, Links, Utils, ToWasmManager, Environment, Opt, Metadata } from "#std/sk_types.js";
+import type { int, ptr, Links, Utils, ToWasmManager, Environment, Opt, Metadata, ErrorObject } from "#std/sk_types.js";
 import type { SKJSON } from "#skjson/skjson.js";
 import type {
   Accumulator,
@@ -14,6 +14,7 @@ import type {
 } from "../skipruntime_api.js";
 
 import type {
+  Handle,
   Handles,
   Context,
   FromWasm,
@@ -34,25 +35,24 @@ class HandlesImpl implements Handles {
     this.env = env;
   }
 
-  register(v: any) {
+  register<T>(v: T): Handle<T> {
     const freeID = this.freeIDs.pop();
     const id = freeID ?? this.nextID++;
     this.objects[id] = v;
-    return id;
+    return id as Handle<T>;
   }
 
-  get(id: int): any {
-    return this.objects[id];
+  get<T>(id: Handle<T>): T {
+    return this.objects[id] as T;
   }
 
-  apply<R, P extends any[] = any[]>(id: int, parameters: P): R {
-    const fn = this.objects[id];
-    /* eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return */
+  apply<R, P extends any[]>(id: Handle<(..._: P) => R>, parameters: P): R {
+    const fn = this.get(id);
     return fn.apply(null, parameters);
   }
 
-  delete(id: int): any {
-    const current: unknown = this.objects[id];
+  delete<T>(id: Handle<T>): T {
+    const current = this.get(id);
     this.objects[id] = null;
     this.freeIDs.push(id);
     return current;
@@ -470,41 +470,59 @@ class WriterImpl<K, T> {
 }
 
 interface ToWasm {
-  SKIP_SKStore_detachHandle(fn: int): void;
+  SKIP_SKStore_detachHandle<T>(fn: Handle<T>): void;
   // Context
-  SKIP_SKStore_applyMapFun(
-    fn: int,
+  SKIP_SKStore_applyMapFun<
+    K extends TJSON,
+    V extends TJSON,
+    K2 extends TJSON,
+    V2 extends TJSON,
+  >(
+    fn: Handle<(key: K, it: NonEmptyIterator<V>) => Iterable<[K2, V2]>>,
     context: ptr<Internal.Context>,
     writer: ptr<Internal.TWriter>,
     key: ptr<Internal.CJSON>,
     it: ptr<Internal.NonEmptyIterator>,
   ): void;
-  SKIP_SKStore_applyMapTableFun(
-    fn: int,
+  SKIP_SKStore_applyMapTableFun<
+    R extends TJSON,
+    K extends TJSON,
+    V extends TJSON,
+  >(
+    fn: Handle<(row: R, occ: number) => Iterable<[K, V]>>,
     context: ptr<Internal.Context>,
     writer: ptr<Internal.TWriter>,
     row: ptr<Internal.CJArray>,
     occ: int,
   ): void;
-  SKIP_SKStore_applyConvertToRowFun(
-    fn: int,
+  SKIP_SKStore_applyConvertToRowFun<
+    R extends Iterable<TJSON[]>,
+    K extends TJSON,
+    V extends TJSON,
+  >(
+    fn: Handle<(key: K, it: NonEmptyIterator<V>) => R>,
     key: ptr<Internal.CJSON>,
     it: ptr<Internal.NonEmptyIterator>,
   ): ptr<Internal.CJSON>;
   SKIP_SKStore_init(context: ptr<Internal.Context>): void;
-  SKIP_SKStore_applyLazyFun(
-    fn: int,
+  SKIP_SKStore_applyLazyFun<K extends TJSON, V extends TJSON>(
+    fn: Handle<(selfHdl: LazyCollection<K, V>, key: K) => Opt<V>>,
     context: ptr<Internal.Context>,
     self: ptr<Internal.LHandle>,
     key: ptr<Internal.CJSON>,
   ): ptr<Internal.CJSON>;
-  SKIP_SKStore_applyParamsFun(
-    fn: int,
+  SKIP_SKStore_applyParamsFun<K extends TJSON, P extends TJSON>(
+    fn: Handle<(key: K) => P>,
     context: ptr<Internal.Context>,
     key: ptr<Internal.CJSON>,
   ): ptr<Internal.CJSON>;
-  SKIP_SKStore_applyLazyAsyncFun(
-    fn: int,
+  SKIP_SKStore_applyLazyAsyncFun<
+    K extends TJSON,
+    V extends TJSON,
+    P extends TJSON,
+    M extends TJSON,
+  >(
+    fn: Handle<(key: K, params: P) => Promise<AValue<V, M>>>,
     callId: ptr<Internal.String>,
     name: ptr<Internal.String>,
     key: ptr<Internal.CJSON>,
@@ -512,18 +530,18 @@ interface ToWasm {
   ): void;
 
   // Accumulator
-  SKIP_SKStore_applyAccumulate(
-    fn: int,
+  SKIP_SKStore_applyAccumulate<T extends TJSON, V extends TJSON>(
+    fn: Handle<Accumulator<T, V>>,
     acc: ptr<Internal.CJSON>,
     value: ptr<Internal.CJSON>,
   ): ptr<Internal.CJSON>;
-  SKIP_SKStore_applyDismiss(
-    fn: int,
+  SKIP_SKStore_applyDismiss<T extends TJSON, V extends TJSON>(
+    fn: Handle<Accumulator<T, V>>,
     acc: ptr<Internal.CJSON>,
     value: ptr<Internal.CJSON>,
   ): Opt<ptr<Internal.CJSON>>;
   // Utils
-  SKIP_SKStore_getErrorHdl(exn: ptr<Internal.Exception>): number;
+  SKIP_SKStore_getErrorHdl(exn: ptr<Internal.Exception>): Handle<ErrorObject>;
 }
 
 class Ref {
@@ -549,54 +567,68 @@ class LinksImpl implements Links {
   skjson?: SKJSON;
   timedQueue?: TimeQueue;
 
-  detachHandle!: (fn: int) => void;
-  applyMapFun!: (
-    fn: int,
+  detachHandle!: <T>(fn: Handle<T>) => void;
+  applyMapFun!: <
+    K extends TJSON,
+    V extends TJSON,
+    K2 extends TJSON,
+    V2 extends TJSON,
+  >(
+    fn: Handle<(key: K, it: NonEmptyIterator<V>) => Iterable<[K2, V2]>>,
     context: ptr<Internal.Context>,
     writer: ptr<Internal.TWriter>,
     key: ptr<Internal.CJSON>,
     it: ptr<Internal.NonEmptyIterator>,
   ) => void;
-  applyMapTableFun!: (
-    fn: int,
+  applyMapTableFun!: <R extends TJSON, K extends TJSON, V extends TJSON>(
+    fn: Handle<(row: R, occ: number) => Iterable<[K, V]>>,
     context: ptr<Internal.Context>,
     writer: ptr<Internal.TWriter>,
     row: ptr<Internal.CJArray>,
     occ: int,
   ) => void;
 
-  applyLazyFun!: (
-    fn: int,
+  applyLazyFun!: <K extends TJSON, V extends TJSON>(
+    fn: Handle<(selfHdl: LazyCollection<K, V>, key: K) => Opt<V>>,
     context: ptr<Internal.Context>,
     self: ptr<Internal.LHandle>,
     key: ptr<Internal.CJSON>,
   ) => ptr<Internal.CJSON>;
-  applyParamsFun!: (
-    fn: int,
+  applyParamsFun!: <K extends TJSON, P extends TJSON>(
+    fn: Handle<(key: K) => P>,
     context: ptr<Internal.Context>,
     key: ptr<Internal.CJSON>,
   ) => ptr<Internal.CJSON>;
-  applyLazyAsyncFun!: (
-    fn: int,
+  applyLazyAsyncFun!: <
+    K extends TJSON,
+    V extends TJSON,
+    P extends TJSON,
+    M extends TJSON,
+  >(
+    fn: Handle<(key: K, params: P) => Promise<AValue<V, M>>>,
     callId: ptr<Internal.String>,
     name: ptr<Internal.String>,
     key: ptr<Internal.CJSON>,
     param: ptr<Internal.CJSON>,
   ) => void;
   init!: (context: ptr<Internal.Context>) => void;
-  applyAccumulate!: (
-    fn: int,
+  applyAccumulate!: <T extends TJSON, V extends TJSON>(
+    fn: Handle<Accumulator<T, V>>,
     acc: ptr<Internal.CJSON>,
     value: ptr<Internal.CJSON>,
   ) => ptr<Internal.CJSON>;
-  applyDismiss!: (
-    fn: int,
+  applyDismiss!: <T extends TJSON, V extends TJSON>(
+    fn: Handle<Accumulator<T, V>>,
     acc: ptr<Internal.CJSON>,
     value: ptr<Internal.CJSON>,
   ) => Opt<ptr<Internal.CJSON>>;
-  getErrorHdl!: (exn: ptr<Internal.Exception>) => number;
-  applyConvertToRowFun!: (
-    fn: int,
+  getErrorHdl!: (exn: ptr<Internal.Exception>) => Handle<ErrorObject>;
+  applyConvertToRowFun!: <
+    R extends Iterable<TJSON[]>,
+    K extends TJSON,
+    V extends TJSON,
+  >(
+    fn: Handle<(key: K, it: NonEmptyIterator<V>) => R>,
     key: ptr<Internal.CJSON>,
     it: ptr<Internal.NonEmptyIterator>,
   ) => ptr<Internal.CJSON>;
@@ -618,8 +650,13 @@ class LinksImpl implements Links {
       return this.skjson;
     };
     const ref = new Ref();
-    this.applyMapFun = (
-      fn: int,
+    this.applyMapFun = <
+      K1 extends TJSON,
+      V1 extends TJSON,
+      K2 extends TJSON,
+      V2 extends TJSON,
+    >(
+      fn: Handle<(key: K1, it: NonEmptyIterator<V1>) => Iterable<[K2, V2]>>,
       ctx: ptr<Internal.Context>,
       writer: ptr<Internal.TWriter>,
       key: ptr<Internal.CJSON>,
@@ -628,26 +665,28 @@ class LinksImpl implements Links {
       ref.push(ctx);
       const jsu = skjson();
       const w = new WriterImpl(jsu, fromWasm, writer);
-      const result = this.handles.apply<any>(fn, [
+      const result = this.handles.apply(fn, [
         jsu.importJSON(key),
-        new NonEmptyIteratorImpl(jsu, fromWasm, it),
+        new NonEmptyIteratorImpl<V1>(jsu, fromWasm, it),
       ]);
-      const bindings = new Map();
+      const bindings = new Map<K2, V2[]>();
       for (const datum of result) {
         const k = datum[0];
         const v = datum[1];
-        /* eslint-disable-next-line @typescript-eslint/no-unsafe-call */
-        if (bindings.has(k)) bindings.get(k).push(v);
-        else bindings.set(k, [v]);
+        const at_k = bindings.get(k);
+        if (at_k !== undefined) {
+          at_k.push(v);
+        } else {
+          bindings.set(k, [v]);
+        }
       }
       for (const kv of bindings) {
-        /* eslint-disable-next-line @typescript-eslint/no-unsafe-argument */
         w.setArray(kv[0], kv[1]);
       }
       ref.pop();
     };
-    this.applyMapTableFun = (
-      fn: int,
+    this.applyMapTableFun = <R extends TJSON, K extends TJSON, V extends TJSON>(
+      fn: Handle<(row: R, occ: number) => Iterable<[K, V]>>,
       ctx: ptr<Internal.Context>,
       writer: ptr<Internal.TWriter>,
       row: ptr<Internal.CJArray>,
@@ -656,31 +695,37 @@ class LinksImpl implements Links {
       ref.push(ctx);
       const jsu = skjson();
       const w = new WriterImpl(jsu, fromWasm, writer);
-      const result = this.handles.apply<Iterable<[TJSON, TJSON]>>(fn, [
-        jsu.importJSON(row),
-        occ,
-      ]);
+      const result = this.handles.apply(fn, [jsu.importJSON(row), occ]);
       for (const v of result) {
         w.set(v[0], v[1]);
       }
       ref.pop();
     };
 
-    this.applyConvertToRowFun = (
-      fn: int,
+    this.applyConvertToRowFun = <
+      R extends Iterable<TJSON[]>,
+      K extends TJSON,
+      V extends TJSON,
+    >(
+      fn: Handle<(key: K, it: NonEmptyIterator<V>) => R>,
       key: ptr<Internal.CJSON>,
       it: ptr<Internal.NonEmptyIterator>,
     ) => {
       const jsu = skjson();
-      const res = this.handles.apply<Iterable<TJSON[]>>(fn, [
+      const res = this.handles.apply(fn, [
         jsu.importJSON(key),
-        new NonEmptyIteratorImpl(jsu, fromWasm, it),
+        new NonEmptyIteratorImpl<V>(jsu, fromWasm, it),
       ]);
       return jsu.exportJSON(Array.from(res));
     };
 
-    this.applyLazyAsyncFun = (
-      fn: int,
+    this.applyLazyAsyncFun = <
+      K extends TJSON,
+      V extends TJSON,
+      P extends TJSON,
+      M extends TJSON,
+    >(
+      fn: Handle<(key: K, params: P) => Promise<AValue<V, M>>>,
       skcall: ptr<Internal.String>,
       skname: ptr<Internal.String>,
       skkey: ptr<Internal.CJSON>,
@@ -691,10 +736,7 @@ class LinksImpl implements Links {
       const name = jsu.importString(skname);
       const key = jsu.importJSON(skkey, true);
       const params = jsu.importJSON(skparams, true);
-      const promise = this.handles.apply<Promise<AValue<TJSON, TJSON>>>(fn, [
-        key,
-        params,
-      ]);
+      const promise = this.handles.apply(fn, [key, params]);
       const register = (value: Result<TJSON, TJSON>) => {
         if (!notify) {
           const skdbApp = this.env.shared.get("SKDB") as SKDBShared;
@@ -713,7 +755,7 @@ class LinksImpl implements Links {
             );
           });
           if (result < 0) {
-            throw this.handles.delete(-result);
+            throw this.handles.delete(-result as Handle<unknown>);
           } else if (notify) {
             notify();
           }
@@ -760,8 +802,8 @@ class LinksImpl implements Links {
         });
     };
 
-    this.applyLazyFun = (
-      fn: int,
+    this.applyLazyFun = <K extends TJSON, V extends TJSON>(
+      fn: Handle<(selfHdl: LazyCollection<K, V>, key: K) => Opt<V>>,
       ctx: ptr<Internal.Context>,
       hdl: ptr<Internal.LHandle>,
       key: ptr<Internal.CJSON>,
@@ -771,7 +813,7 @@ class LinksImpl implements Links {
       const context = new ContextImpl(jsu, fromWasm, this.handles, ref);
       const res = jsu.exportJSON(
         this.handles.apply(fn, [
-          new LSelfImpl(context, hdl),
+          new LSelfImpl(context, hdl) as LazyCollection<K, V>,
           jsu.importJSON(key),
         ]),
       );
@@ -779,8 +821,8 @@ class LinksImpl implements Links {
       return res;
     };
 
-    this.applyParamsFun = (
-      fn: int,
+    this.applyParamsFun = <K extends TJSON, P extends TJSON>(
+      fn: Handle<(key: K) => P>,
       ctx: ptr<Internal.Context>,
       key: ptr<Internal.CJSON>,
     ) => {
@@ -795,33 +837,33 @@ class LinksImpl implements Links {
       this.initFn();
       ref.pop();
     };
-    this.applyAccumulate = (
-      fn: int,
+    this.applyAccumulate = <T extends TJSON, V extends TJSON>(
+      fn: Handle<Accumulator<T, V>>,
       acc: ptr<Internal.CJSON>,
       value: ptr<Internal.CJSON>,
     ) => {
       const jsu = skjson();
-      const accumulator = this.handles.get(fn) as Accumulator<any, any>;
+      const accumulator = this.handles.get(fn);
       const result = accumulator.accumulate(
-        jsu.importJSON(acc),
-        jsu.importJSON(value),
+        jsu.importJSON(acc) as Opt<V>,
+        jsu.importJSON(value) as T,
       );
       return jsu.exportJSON(result);
     };
-    this.applyDismiss = (
-      fn: int,
+    this.applyDismiss = <T extends TJSON, V extends TJSON>(
+      fn: Handle<Accumulator<T, V>>,
       acc: ptr<Internal.CJSON>,
       value: ptr<Internal.CJSON>,
     ) => {
       const jsu = skjson();
-      const accumulator = this.handles.get(fn) as Accumulator<any, any>;
+      const accumulator = this.handles.get(fn);
       const result = accumulator.dismiss(
-        jsu.importJSON(acc),
-        jsu.importJSON(value),
+        jsu.importJSON(acc) as V,
+        jsu.importJSON(value) as T,
       );
       return result != null ? jsu.exportJSON(result) : null;
     };
-    this.detachHandle = (idx: int) => {
+    this.detachHandle = <T>(idx: Handle<T>) => {
       this.handles.delete(idx);
     };
     this.getErrorHdl = (exn: ptr<Internal.Exception>) => {
@@ -835,7 +877,7 @@ class LinksImpl implements Links {
         ),
       );
       if (result < 0) {
-        throw this.handles.delete(-result);
+        throw this.handles.delete(-result as Handle<unknown>);
       }
     };
     const create = (init: () => void, tokens: Record<string, number>) => {
@@ -856,7 +898,7 @@ class LinksImpl implements Links {
         ),
       );
       if (result < 0) {
-        throw this.handles.delete(-result);
+        throw this.handles.delete(-result as Handle<unknown>);
       }
       const qTokens = Object.entries(tokens).map((entry) => {
         return { duration: entry[1], value: entry[0] };
@@ -901,11 +943,16 @@ class Manager implements ToWasmManager {
   prepare = (wasm: object) => {
     const toWasm = wasm as ToWasm;
     const links = new LinksImpl(this.env);
-    toWasm.SKIP_SKStore_detachHandle = (fn: int) => {
+    toWasm.SKIP_SKStore_detachHandle = <T>(fn: Handle<T>) => {
       links.detachHandle(fn);
     };
-    toWasm.SKIP_SKStore_applyMapFun = (
-      fn: int,
+    toWasm.SKIP_SKStore_applyMapFun = <
+      K extends TJSON,
+      V extends TJSON,
+      K2 extends TJSON,
+      V2 extends TJSON,
+    >(
+      fn: Handle<(key: K, it: NonEmptyIterator<V>) => Iterable<[K2, V2]>>,
       context: ptr<Internal.Context>,
       writer: ptr<Internal.TWriter>,
       key: ptr<Internal.CJSON>,
@@ -913,8 +960,12 @@ class Manager implements ToWasmManager {
     ) => {
       links.applyMapFun(fn, context, writer, key, it);
     };
-    toWasm.SKIP_SKStore_applyMapTableFun = (
-      fn: int,
+    toWasm.SKIP_SKStore_applyMapTableFun = <
+      R extends TJSON,
+      K extends TJSON,
+      V extends TJSON,
+    >(
+      fn: Handle<(row: R, occ: number) => Iterable<[K, V]>>,
       context: ptr<Internal.Context>,
       writer: ptr<Internal.TWriter>,
       row: ptr<Internal.CJArray>,
@@ -922,21 +973,37 @@ class Manager implements ToWasmManager {
     ) => {
       links.applyMapTableFun(fn, context, writer, row, occ);
     };
-    toWasm.SKIP_SKStore_applyConvertToRowFun = (
-      fn: int,
+    toWasm.SKIP_SKStore_applyConvertToRowFun = <
+      R extends Iterable<TJSON[]>,
+      K extends TJSON,
+      V extends TJSON,
+    >(
+      fn: Handle<(key: K, it: NonEmptyIterator<V>) => R>,
       key: ptr<Internal.CJSON>,
       it: ptr<Internal.NonEmptyIterator>,
     ) => links.applyConvertToRowFun(fn, key, it);
     toWasm.SKIP_SKStore_init = (context: ptr<Internal.Context>) => {
       links.init(context);
     };
-    toWasm.SKIP_SKStore_applyLazyFun = (fn, context, self, key) =>
-      links.applyLazyFun(fn, context, self, key);
+    toWasm.SKIP_SKStore_applyLazyFun = <K extends TJSON, V extends TJSON>(
+      fn: Handle<(selfHdl: LazyCollection<K, V>, key: K) => Opt<V>>,
+      context: ptr<Internal.Context>,
+      self: ptr<Internal.LHandle>,
+      key: ptr<Internal.CJSON>,
+    ) => links.applyLazyFun(fn, context, self, key);
 
-    toWasm.SKIP_SKStore_applyParamsFun = (fn, context, key) =>
-      links.applyParamsFun(fn, context, key);
-    toWasm.SKIP_SKStore_applyLazyAsyncFun = (
-      fn: int,
+    toWasm.SKIP_SKStore_applyParamsFun = <K extends TJSON, P extends TJSON>(
+      fn: Handle<(key: K) => P>,
+      context: ptr<Internal.Context>,
+      key: ptr<Internal.CJSON>,
+    ) => links.applyParamsFun(fn, context, key);
+    toWasm.SKIP_SKStore_applyLazyAsyncFun = <
+      K extends TJSON,
+      V extends TJSON,
+      P extends TJSON,
+      M extends TJSON,
+    >(
+      fn: Handle<(key: K, params: P) => Promise<AValue<V, M>>>,
       call: ptr<Internal.String>,
       name: ptr<Internal.String>,
       key: ptr<Internal.CJSON>,
@@ -944,13 +1011,13 @@ class Manager implements ToWasmManager {
     ) => {
       links.applyLazyAsyncFun(fn, call, name, key, param);
     };
-    toWasm.SKIP_SKStore_applyAccumulate = (
-      fn: int,
+    toWasm.SKIP_SKStore_applyAccumulate = <T extends TJSON, V extends TJSON>(
+      fn: Handle<Accumulator<T, V>>,
       acc: ptr<Internal.CJSON>,
       value: ptr<Internal.CJSON>,
     ) => links.applyAccumulate(fn, acc, value);
-    toWasm.SKIP_SKStore_applyDismiss = (
-      fn: int,
+    toWasm.SKIP_SKStore_applyDismiss = <T extends TJSON, V extends TJSON>(
+      fn: Handle<Accumulator<T, V>>,
       acc: ptr<Internal.CJSON>,
       value: ptr<Internal.CJSON>,
     ) => links.applyDismiss(fn, acc, value);
