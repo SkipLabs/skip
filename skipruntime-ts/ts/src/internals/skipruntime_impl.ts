@@ -1,15 +1,15 @@
 // prettier-ignore
 import { type ptr, type Opt } from "#std/sk_types.js";
-import type { Context } from "./skstore_types.js";
+import type { Context } from "./skipruntime_types.js";
 import type * as Internal from "./skstore_internal_types.js";
 import type {
   Accumulator,
-  EHandle,
-  LHandle,
+  EagerCollection,
+  LazyCollection,
   Mapper,
-  EntryMapper,
+  InputMapper,
   OutputMapper,
-  TableHandle,
+  TableCollection,
   SKStore,
   SKStoreFactory,
   Mapping,
@@ -23,7 +23,7 @@ import type {
   LazyCompute,
   AsyncLazyCompute,
   NonEmptyIterator,
-} from "../skstore_api.js";
+} from "../skipruntime_api.js";
 
 // prettier-ignore
 import type { MirrorDefn, Params, SKDBSync } from "#skdb/skdb_types.js";
@@ -42,7 +42,9 @@ function assertNoKeysNaN<K extends TJSON, V extends TJSON>(
   return kv_pairs;
 }
 
-class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
+class EagerCollectionImpl<K extends TJSON, V extends TJSON>
+  implements EagerCollection<K, V>
+{
   //
   protected context: Context;
   eagerHdl: string;
@@ -63,8 +65,8 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
 
   protected derive<K2 extends TJSON, V2 extends TJSON>(
     eagerHdl: string,
-  ): EHandle<K2, V2> {
-    return new EHandleImpl<K2, V2>(this.context, eagerHdl);
+  ): EagerCollection<K2, V2> {
+    return new EagerCollectionImpl<K2, V2>(this.context, eagerHdl);
   }
 
   getArray(key: K): V[] {
@@ -86,7 +88,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
   map<K2 extends TJSON, V2 extends TJSON, Params extends Param[]>(
     mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
     ...params: Params
-  ): EHandle<K2, V2> {
+  ): EagerCollection<K2, V2> {
     params.forEach(check);
     const mapperObj = new mapper(...params);
     Object.freeze(mapperObj);
@@ -129,7 +131,7 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
   }
 
   mapTo<R extends TJSON[], Params extends Param[]>(
-    table: TableHandle<R>,
+    table: TableCollection<R>,
     mapper: new (...params: Params) => OutputMapper<R, K, V>,
     ...params: Params
   ): void {
@@ -147,7 +149,9 @@ class EHandleImpl<K extends TJSON, V extends TJSON> implements EHandle<K, V> {
   }
 }
 
-class LHandleImpl<K extends TJSON, V extends TJSON> implements LHandle<K, V> {
+class LazyCollectionImpl<K extends TJSON, V extends TJSON>
+  implements LazyCollection<K, V>
+{
   protected context: Context;
   protected lazyHdl: string;
 
@@ -175,7 +179,7 @@ class LHandleImpl<K extends TJSON, V extends TJSON> implements LHandle<K, V> {
 }
 
 export class LSelfImpl<K extends TJSON, V extends TJSON>
-  implements LHandle<K, V>
+  implements LazyCollection<K, V>
 {
   protected context: Context;
   protected lazyHdl: ptr<Internal.LHandle>;
@@ -203,7 +207,9 @@ export class LSelfImpl<K extends TJSON, V extends TJSON>
   }
 }
 
-export class TableHandleImpl<R extends TJSON[]> implements TableHandle<R> {
+export class TableCollectionImpl<R extends TJSON[]>
+  implements TableCollection<R>
+{
   protected context: Context;
   protected skdb: SKDBSync;
   protected schema: MirrorSchema;
@@ -228,9 +234,9 @@ export class TableHandleImpl<R extends TJSON[]> implements TableHandle<R> {
   }
 
   map<K extends TJSON, V extends TJSON, Params extends Param[]>(
-    mapper: new (...params: Params) => EntryMapper<R, K, V>,
+    mapper: new (...params: Params) => InputMapper<R, K, V>,
     ...params: Params
-  ): EHandle<K, V> {
+  ): EagerCollection<K, V> {
     params.forEach(check);
     const mapperObj = new mapper(...params);
     Object.freeze(mapperObj);
@@ -245,7 +251,7 @@ export class TableHandleImpl<R extends TJSON[]> implements TableHandle<R> {
       (entry: R, occ: number) =>
         assertNoKeysNaN(mapperObj.mapElement(entry, occ)),
     );
-    return new EHandleImpl<K, V>(this.context, eagerHdl);
+    return new EagerCollectionImpl<K, V>(this.context, eagerHdl);
   }
 
   toTable() {
@@ -358,7 +364,7 @@ export class SKStoreImpl implements SKStore {
     V1 extends TJSON,
     K2 extends TJSON,
     V2 extends TJSON,
-  >(mappings: Mapping<K1, V1, K2, V2>[]): EHandle<K2, V2> {
+  >(mappings: Mapping<K1, V1, K2, V2>[]): EagerCollection<K2, V2> {
     let name = "";
     const ctxmapping = mappings.map((mapping) => {
       const params = mapping.params ?? [];
@@ -368,13 +374,13 @@ export class SKStoreImpl implements SKStore {
       Object.freeze(mapperObj);
       name += mapperObj.constructor.name;
       return {
-        handle: mapping.handle,
+        source: mapping.source,
         mapper: (key: K1, it: NonEmptyIterator<V1>) =>
           mapperObj.mapElement(key, it),
       };
     });
     const eagerHdl = this.context.multimap(name, ctxmapping);
-    return new EHandleImpl<K2, V2>(this.context, eagerHdl);
+    return new EagerCollectionImpl<K2, V2>(this.context, eagerHdl);
   }
 
   multimapReduce<
@@ -386,7 +392,7 @@ export class SKStoreImpl implements SKStore {
   >(
     mappings: Mapping<K1, V1, K2, V2>[],
     accumulator: Accumulator<V2, V3>,
-  ): EHandle<K2, V3> {
+  ): EagerCollection<K2, V3> {
     let name = "";
     const ctxmapping = mappings.map((mapping) => {
       const params = mapping.params ?? [];
@@ -396,27 +402,29 @@ export class SKStoreImpl implements SKStore {
       Object.freeze(mapperObj);
       name += mapperObj.constructor.name;
       return {
-        handle: mapping.handle,
+        source: mapping.source,
         mapper: (key: K1, it: NonEmptyIterator<V1>) =>
           mapperObj.mapElement(key, it),
       };
     });
     const eagerHdl = this.context.multimapReduce(name, ctxmapping, accumulator);
-    return new EHandleImpl<K2, V3>(this.context, eagerHdl);
+    return new EagerCollectionImpl<K2, V3>(this.context, eagerHdl);
   }
 
   lazy<K extends TJSON, V extends TJSON, Params extends Param[]>(
     compute: new (...params: Params) => LazyCompute<K, V>,
     ...params: Params
-  ): LHandle<K, V> {
+  ): LazyCollection<K, V> {
     params.forEach(check);
     const computeObj = new compute(...params);
     Object.freeze(computeObj);
     const name = computeObj.constructor.name;
-    const lazyHdl = this.context.lazy(name, (selfHdl: LHandle<K, V>, key: K) =>
-      computeObj.compute(selfHdl, key),
+    const lazyHdl = this.context.lazy(
+      name,
+      (selfHdl: LazyCollection<K, V>, key: K) =>
+        computeObj.compute(selfHdl, key),
     );
-    return new LHandleImpl<K, V>(this.context, lazyHdl);
+    return new LazyCollectionImpl<K, V>(this.context, lazyHdl);
   }
 
   asyncLazy<
@@ -428,7 +436,7 @@ export class SKStoreImpl implements SKStore {
   >(
     compute: new (...params: Params) => AsyncLazyCompute<K, V, P, M>,
     ...params: Params
-  ): LHandle<K, Loadable<V, M>> {
+  ): LazyCollection<K, Loadable<V, M>> {
     params.forEach(check);
     const computeObj = new compute(...params);
     const name = computeObj.constructor.name;
@@ -438,7 +446,7 @@ export class SKStoreImpl implements SKStore {
       (key: K) => computeObj.params(key),
       (key: K, params: P) => computeObj.call(key, params),
     );
-    return new LHandleImpl<K, Loadable<V, M>>(this.context, lazyHdl);
+    return new LazyCollectionImpl<K, Loadable<V, M>>(this.context, lazyHdl);
   }
 
   log(object: any): void {
@@ -477,7 +485,7 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
   getName = () => "SKStore";
 
   runSKStore = async (
-    init: (skstore: SKStore, ...tables: TableHandle<TJSON[]>[]) => void,
+    init: (skstore: SKStore, ...tables: TableCollection<TJSON[]>[]) => void,
     tablesSchema: MirrorSchema[],
     connect: boolean = true,
   ): Promise<Table<TJSON[]>[]> => {
@@ -488,24 +496,24 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
     this.create(() => {
       init(skstore, ...tables);
     });
-    return tables.map((t) => (t as TableHandleImpl<TJSON[]>).toTable());
+    return tables.map((t) => (t as TableCollectionImpl<TJSON[]>).toTable());
   };
 }
 
 /**
- * Mirror table from skdb with a specific filter
+ * Mirror Skip tables from SKDB, with support for custom schemas and SQL filters
  * @param context
  * @param skdb - the database to work with
  * @param connect
- * @param tables - tables the mirroring info
- * @returns - the mirrors table handles
+ * @param tables - tables to mirror, along with schemas and filters
+ * @returns - the mirrored table collections
  */
 export function mirror(
   context: Context,
   skdb: SKDBSync,
   connect: boolean,
   ...tables: MirrorSchema[]
-): TableHandle<TJSON[]>[] {
+): TableCollection<TJSON[]>[] {
   if (connect) {
     /* eslint-disable-next-line @typescript-eslint/no-floating-promises */
     skdb.mirror(...toMirrorDefinitions(...tables));
@@ -522,7 +530,7 @@ export function mirror(
       skdb.exec(query.query, query.params ? toParams(query.params) : undefined);
     });
   }
-  return tables.map((table) => new TableHandleImpl(context, skdb, table));
+  return tables.map((table) => new TableCollectionImpl(context, skdb, table));
 }
 
 function toColumn(column: ColumnSchema): string {

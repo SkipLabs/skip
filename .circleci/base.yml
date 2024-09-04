@@ -91,23 +91,23 @@ jobs:
             cd skjson && skargo test --junitxml ~/test-results/skjson.xml
       - store_test_results:
           path: ~/test-results/skjson.xml
-  skstore-wasm:
+  skipruntime-wasm:
     docker:
       - image: skiplabs/skdb-base:latest
     steps:
       - checkout
       - setup
       - run:
-          name: Typecheck and lint skstore
-          command: cd skstore && make check-all
+          name: Typecheck and lint skip runtime
+          command: cd skipruntime-ts && make check-all
       - run:
-          name: Run wasm skstore tests
+          name: Run wasm skip runtime tests
           no_output_timeout: 10m
           environment:
             PLAYWRIGHT_REPORTER: junit
-            PLAYWRIGHT_JUNIT_OUTPUT_NAME: ~/test-results/skstore-wasm.xml
+            PLAYWRIGHT_JUNIT_OUTPUT_NAME: ~/test-results/skipruntime-wasm.xml
           command: |
             mkdir -p ~/test-results
-            make tstest-skstore
+            make tstest-skipruntime-ts
       - store_test_results:
-          path: ~/test-results/skstore-wasm.xml
+          path: ~/test-results/skipruntime-wasm.xml

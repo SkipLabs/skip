@@ -1,14 +1,14 @@
 import type {
   SKStore,
-  TableHandle,
-  TableMapper,
+  TableCollection,
+  InputMapper,
   TJSON,
   Mapper,
-  EHandle,
+  EagerCollection,
   NonEmptyIterator,
   OutputMapper,
-} from "skstore";
-import { cinteger as integer, schema } from "skstore";
+} from "skip-runtime";
+import { cinteger as integer, schema } from "skip-runtime";
 
 export function tablesSchema() {
   console.log("## INPUTS");
@@ -25,7 +25,7 @@ export function tablesSchema() {
 }
 
 class T2SIdentify<K extends TJSON, V extends TJSON>
-  implements TableMapper<[K, V], K, V>
+  implements InputMapper<[K, V], K, V>
 {
   mapElement(entry: [K, V], occ: number): Iterable<[K, V]> {
     return Array([entry[0], entry[1]]);
@@ -33,7 +33,7 @@ class T2SIdentify<K extends TJSON, V extends TJSON>
 }
 
 class Add implements Mapper<number, number, number, number> {
-  constructor(private other: EHandle<number, number>) {}
+  constructor(private other: EagerCollection<number, number>) {}
 
   mapElement(
     key: number,
@@ -58,9 +58,9 @@ class ToOutput<K extends TJSON, V extends TJSON>
 
 export function initSKStore(
   _store: SKStore,
-  input1: TableHandle<[number, number]>,
-  input2: TableHandle<[number, number]>,
-  output: TableHandle<[number, number]>,
+  input1: TableCollection<[number, number]>,
+  input2: TableCollection<[number, number]>,
+  output: TableCollection<[number, number]>,
 ) {
   const eager1 = input1.map(T2SIdentify<number, number>);
   const eager2 = input2.map(T2SIdentify<number, number>);

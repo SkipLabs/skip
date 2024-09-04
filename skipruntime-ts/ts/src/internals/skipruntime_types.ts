@@ -4,11 +4,11 @@ import type * as Internal from "./skstore_internal_types.js";
 import type {
   Accumulator,
   AValue,
-  LHandle,
+  LazyCollection,
   TJSON,
   NonEmptyIterator,
-  EHandle,
-} from "../skstore_api.js";
+  EagerCollection,
+} from "../skipruntime_api.js";
 
 export type CtxMapping<
   K1 extends TJSON,
@@ -16,7 +16,7 @@ export type CtxMapping<
   K2 extends TJSON,
   V2 extends TJSON,
 > = {
-  handle: EHandle<K1, V1>;
+  source: EagerCollection<K1, V1>;
   mapper: (key: K1, it: NonEmptyIterator<V1>) => Iterable<[K2, V2]>;
 };
 
@@ -37,21 +37,21 @@ export interface Context {
     V2 extends TJSON,
     V3 extends TJSON,
   >(
-    eagerHdl: string,
-    name: string,
+    collectionName: string,
+    mapperName: string,
     mapper: (key: K, it: NonEmptyIterator<V>) => Iterable<[K2, V2]>,
     accumulator: Accumulator<V2, V3>,
   ) => string;
 
   map: <K extends TJSON, V extends TJSON, K2 extends TJSON, V2 extends TJSON>(
-    eagerHdl: string,
-    name: string,
+    collectionName: string,
+    mapperName: string,
     compute: (key: K, it: NonEmptyIterator<V>) => Iterable<[K2, V2]>,
   ) => string;
 
   lazy: <K extends TJSON, V extends TJSON>(
     name: string,
-    compute: (selfHdl: LHandle<K, V>, key: K) => Opt<V>,
+    compute: (self: LazyCollection<K, V>, key: K) => Opt<V>,
   ) => string;
 
   asyncLazy: <
@@ -67,28 +67,28 @@ export interface Context {
 
   getFromTable: <K, R>(table: string, key: K, index?: string) => R[];
 
-  getArray: <K, V>(eagerHdl: string, key: K) => V[];
-  getOne: <K, V>(eagerHdl: string, key: K) => V;
-  maybeGetOne: <K, V>(eagerHdl: string, key: K) => Opt<V>;
+  getArray: <K, V>(collection: string, key: K) => V[];
+  getOne: <K, V>(collection: string, key: K) => V;
+  maybeGetOne: <K, V>(collection: string, key: K) => Opt<V>;
 
-  getArrayLazy: <K, V>(eagerHdl: string, key: K) => V[];
-  getOneLazy: <K, V>(eagerHdl: string, key: K) => V;
-  maybeGetOneLazy: <K, V>(eagerHdl: string, key: K) => Opt<V>;
+  getArrayLazy: <K, V>(collection: string, key: K) => V[];
+  getOneLazy: <K, V>(collection: string, key: K) => V;
+  maybeGetOneLazy: <K, V>(collection: string, key: K) => Opt<V>;
 
   getArraySelf: <K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) => V[];
   getOneSelf: <K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) => V;
   maybeGetOneSelf: <K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) => Opt<V>;
 
-  size: (eagerHdl: string) => number;
+  size: (collection: string) => number;
 
   mapFromSkdb: <R extends TJSON, K extends TJSON, V extends TJSON>(
     table: string,
-    name: string,
+    mapperName: string,
     mapper: (entry: R, occ: number) => Iterable<[K, V]>,
   ) => string;
 
   mapToSkdb: <R extends TJSON, K extends TJSON, V extends TJSON>(
-    eagerHdl: string,
+    collectionName: string,
     table: string,
     mapper: (key: K, it: NonEmptyIterator<V>) => R,
   ) => void;
@@ -128,142 +128,141 @@ export interface Handles {
 }
 
 export interface FromWasm {
-  // Handle
-  SKIP_SKStore_map(
+  SkipRuntime_map(
     ctx: ptr<Internal.Context>,
-    eagerHdl: ptr<Internal.String>,
+    eagerCollectionId: ptr<Internal.String>,
     name: ptr<Internal.String>,
     fnPtr: int,
   ): ptr<Internal.String>;
 
-  SKIP_SKStore_mapReduce(
+  SkipRuntime_mapReduce(
     ctx: ptr<Internal.Context>,
-    eagerHdl: ptr<Internal.String>,
+    eagerCollectionId: ptr<Internal.String>,
     name: ptr<Internal.String>,
     fnPtr: int,
     accumulator: int,
     accInit: ptr<Internal.CJSON>,
   ): ptr<Internal.String>;
 
-  SKIP_SKStore_getFromTable(
+  SkipRuntime_getFromTable(
     ctx: ptr<Internal.Context>,
     table: ptr<Internal.String>,
     key: ptr<Internal.CJSON>,
     index: ptr<Internal.CJSON>,
   ): ptr<Internal.CJSON>;
 
-  SKIP_SKStore_getArray(
+  SkipRuntime_getArray(
     ctx: ptr<Internal.Context>,
     getterHdl: ptr<Internal.String>,
     key: ptr<Internal.CJSON>,
   ): ptr<Internal.CJSON>;
-  SKIP_SKStore_get(
+  SkipRuntime_get(
     ctx: ptr<Internal.Context>,
     getterHdl: ptr<Internal.String>,
     key: ptr<Internal.CJSON>,
   ): ptr<Internal.CJSON>;
-  SKIP_SKStore_maybeGet(
+  SkipRuntime_maybeGet(
     ctx: ptr<Internal.Context>,
     getterHdl: ptr<Internal.String>,
     key: ptr<Internal.CJSON>,
   ): ptr<Internal.CJSON>;
 
-  SKIP_SKStore_getArrayLazy(
+  SkipRuntime_getArrayLazy(
     ctx: ptr<Internal.Context>,
     lazyId: ptr<Internal.String>,
     key: ptr<Internal.CJSON>,
   ): ptr<Internal.CJSON>;
-  SKIP_SKStore_getLazy(
+  SkipRuntime_getLazy(
     ctx: ptr<Internal.Context>,
     lazyId: ptr<Internal.String>,
     key: ptr<Internal.CJSON>,
   ): ptr<Internal.CJSON>;
-  SKIP_SKStore_maybeGetLazy(
+  SkipRuntime_maybeGetLazy(
     ctx: ptr<Internal.Context>,
     lazyId: ptr<Internal.String>,
     key: ptr<Internal.CJSON>,
   ): ptr<Internal.CJSON>;
 
-  SKIP_SKStore_getArraySelf(
+  SkipRuntime_getArraySelf(
     ctx: ptr<Internal.Context>,
     selfHdl: ptr<Internal.LHandle>,
     key: ptr<Internal.CJSON>,
   ): ptr<Internal.CJSON>;
-  SKIP_SKStore_getSelf(
+  SkipRuntime_getSelf(
     ctx: ptr<Internal.Context>,
     selfHdl: ptr<Internal.LHandle>,
     key: ptr<Internal.CJSON>,
   ): ptr<Internal.CJSON>;
-  SKIP_SKStore_maybeGetSelf(
+  SkipRuntime_maybeGetSelf(
     ctx: ptr<Internal.Context>,
     selfHdl: ptr<Internal.LHandle>,
     key: ptr<Internal.CJSON>,
   ): ptr<Internal.CJSON>;
 
-  SKIP_SKStore_size(
+  SkipRuntime_size(
     ctx: ptr<Internal.Context>,
-    eagerHdl: ptr<Internal.String>,
+    eagerCollectionId: ptr<Internal.String>,
   ): number;
 
-  SKIP_SKStore_toSkdb(
+  SkipRuntime_toSkdb(
     ctx: ptr<Internal.Context>,
-    eagerHdl: ptr<Internal.String>,
+    eagerCollectionId: ptr<Internal.String>,
     table: ptr<Internal.String>,
     fnPtr: int,
   ): void;
 
   // NonEmptyIterator
-  SKIP_SKStore_iteratorNext(
+  SkipRuntime_iteratorNext(
     it: ptr<Internal.NonEmptyIterator>,
   ): Opt<ptr<Internal.CJSON>>;
-  SKIP_SKStore_iteratorUniqueValue(
+  SkipRuntime_iteratorUniqueValue(
     it: ptr<Internal.NonEmptyIterator>,
   ): Opt<ptr<Internal.CJSON>>;
-  SKIP_SKStore_iteratorFirst(
+  SkipRuntime_iteratorFirst(
     it: ptr<Internal.NonEmptyIterator>,
   ): ptr<Internal.CJSON>;
-  SKIP_SKStore_cloneIterator(
+  SkipRuntime_cloneIterator(
     it: ptr<Internal.NonEmptyIterator>,
   ): ptr<Internal.NonEmptyIterator>;
   // Writer
-  SKIP_SKStore_writerSet(
+  SkipRuntime_writerSet(
     writer: ptr<Internal.TWriter>,
     key: ptr<Internal.CJSON>,
     value: ptr<Internal.CJSON>,
   ): void;
-  SKIP_SKStore_writerSetArray(
+  SkipRuntime_writerSetArray(
     writer: ptr<Internal.TWriter>,
     key: ptr<Internal.CJSON>,
     values: ptr<Internal.CJArray>,
   ): void;
 
   // Store
-  SKIP_SKStore_createFor(session: ptr<Internal.String>): float;
+  SkipRuntime_createFor(session: ptr<Internal.String>): float;
 
   // SKStore
-  SKIP_SKStore_asyncLazy(
+  SkipRuntime_asyncLazy(
     ctx: ptr<Internal.Context>,
     name: ptr<Internal.String>,
     paramsFn: int,
     lazyFn: int,
   ): ptr<Internal.String>;
-  SKIP_SKStore_lazy(
+  SkipRuntime_lazy(
     ctx: ptr<Internal.Context>,
     name: ptr<Internal.String>,
     lazyFn: int,
   ): ptr<Internal.String>;
-  SKIP_SKStore_fromSkdb(
+  SkipRuntime_fromSkdb(
     ctx: ptr<Internal.Context>,
     table: ptr<Internal.String>,
     name: ptr<Internal.String>,
     fnPtr: int,
   ): ptr<Internal.String>;
-  SKIP_SKStore_multimap(
+  SkipRuntime_multimap(
     ctx: ptr<Internal.Context>,
     name: ptr<Internal.String>,
     mappings: ptr<Internal.CJArray>,
   ): ptr<Internal.String>;
-  SKIP_SKStore_asyncResult(
+  SkipRuntime_asyncResult(
     callId: ptr<Internal.String>,
     name: ptr<Internal.String>,
     key: ptr<Internal.CJSON>,
@@ -271,7 +270,7 @@ export interface FromWasm {
     value: ptr<Internal.CJObject>,
   ): number;
 
-  SKIP_SKStore_multimapReduce(
+  SkipRuntime_multimapReduce(
     ctx: ptr<Internal.Context>,
     name: ptr<Internal.String>,
     mappings: ptr<Internal.CJArray>,
