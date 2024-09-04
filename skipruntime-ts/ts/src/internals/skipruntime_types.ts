@@ -127,7 +127,7 @@ export interface Context {
 export interface Handles {
   register(v: any): int;
   get(id: int): any;
-  apply<T>(id: int, parameters: T[]): T;
+  apply<R, P extends any[] = any[]>(id: int, parameters: P): R;
   delete(id: int): any;
   name(metadata: Metadata): string;
 }

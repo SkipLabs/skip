@@ -45,7 +45,7 @@ class HandlesImpl implements Handles {
     return this.objects[id];
   }
 
-  apply<T>(id: int, parameters: T[]): T {
+  apply<R, P extends any[] = any[]>(id: int, parameters: P): R {
     const fn = this.objects[id];
     /* eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return */
     return fn.apply(null, parameters);
@@ -628,7 +628,7 @@ class LinksImpl implements Links {
       ref.push(ctx);
       const jsu = skjson();
       const w = new WriterImpl(jsu, fromWasm, writer);
-      const result = this.handles.apply(fn, [
+      const result = this.handles.apply<any>(fn, [
         jsu.importJSON(key),
         new NonEmptyIteratorImpl(jsu, fromWasm, it),
       ]);
@@ -656,10 +656,10 @@ class LinksImpl implements Links {
       ref.push(ctx);
       const jsu = skjson();
       const w = new WriterImpl(jsu, fromWasm, writer);
-      const result = this.handles.apply(fn, [
+      const result = this.handles.apply<Iterable<[TJSON, TJSON]>>(fn, [
         jsu.importJSON(row),
         occ,
-      ]) as Iterable<[TJSON, TJSON]>;
+      ]);
       for (const v of result) {
         w.set(v[0], v[1]);
       }
@@ -672,10 +672,10 @@ class LinksImpl implements Links {
       it: ptr<Internal.NonEmptyIterator>,
     ) => {
       const jsu = skjson();
-      const res = this.handles.apply(fn, [
+      const res = this.handles.apply<Iterable<TJSON[]>>(fn, [
         jsu.importJSON(key),
         new NonEmptyIteratorImpl(jsu, fromWasm, it),
-      ]) as Iterable<TJSON[]>;
+      ]);
       return jsu.exportJSON(Array.from(res));
     };
 
@@ -691,7 +691,6 @@ class LinksImpl implements Links {
       const name = jsu.importString(skname);
       const key = jsu.importJSON(skkey, true);
       const params = jsu.importJSON(skparams, true);
-      /* eslint-disable-next-line @typescript-eslint/no-unsafe-argument */
       const promise = this.handles.apply<Promise<AValue<TJSON, TJSON>>>(fn, [
         key,
         params,
