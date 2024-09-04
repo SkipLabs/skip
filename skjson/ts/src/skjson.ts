@@ -402,7 +402,7 @@ export type Exportable =
 
 export interface SKJSON extends Shared {
   importJSON: (value: ptr<Internal.CJSON>, copy?: boolean) => Exportable;
-  exportJSON: <T>(v: T) => ptr<Internal.CJSON>;
+  exportJSON: (v: Exportable) => ptr<Internal.CJSON>;
   importOptJSON: (
     value: Opt<ptr<Internal.CJSON>>,
     copy?: boolean,
@@ -416,14 +416,14 @@ class SKJSONShared implements SKJSON {
   getName = () => "SKJSON";
 
   importJSON: (value: ptr<Internal.CJSON>, copy?: boolean) => Exportable;
-  exportJSON: <T>(v: T) => ptr<Internal.CJSON>;
+  exportJSON: (v: Exportable) => ptr<Internal.CJSON>;
   importString: (v: ptr<Internal.String>) => string;
   exportString: (v: string) => ptr<Internal.String>;
   runWithGC: <T>(fn: () => T) => T;
 
   constructor(
     importJSON: (value: ptr<Internal.CJSON>, copy?: boolean) => Exportable,
-    exportJSON: <T>(v: T) => ptr<Internal.CJSON>,
+    exportJSON: (v: Exportable) => ptr<Internal.CJSON>,
     importString: (v: ptr<Internal.String>) => string,
     exportString: (v: string) => ptr<Internal.String>,
     runWithGC: <T>(fn: () => T) => T,
@@ -465,7 +465,7 @@ class LinksImpl implements Links {
       return copy && value !== null ? clone(value) : value;
     };
 
-    const exportJSON = (value: any): ptr<Internal.CJSON> => {
+    const exportJSON = (value: Exportable): ptr<Internal.CJSON> => {
       if (value === null || value === undefined) {
         return fromWasm.SKIP_SKJSON_createCJNull();
       } else if (typeof value == "number") {
@@ -489,13 +489,13 @@ class LinksImpl implements Links {
           return value.__pointer;
         } else {
           const obj = fromWasm.SKIP_SKJSON_startCJObject();
-          for (const key of Object.keys(value as object)) {
+          Object.entries(value).forEach(([key, val]) => {
             fromWasm.SKIP_SKJSON_addToCJObject(
               obj,
               utils.exportString(key),
-              exportJSON(value[key]),
+              exportJSON(val),
             );
-          }
+          });
           return fromWasm.SKIP_SKJSON_endCJObject(obj);
         }
       } else {
