@@ -67,19 +67,29 @@ export interface Context {
     call: (key: K, params: P) => Promise<AValue<V, M>>,
   ) => string;
 
-  getFromTable: <K, R>(table: string, key: K, index?: string) => R[];
+  getFromTable: <K extends TJSON, R>(
+    table: string,
+    key: K,
+    index?: string,
+  ) => R[];
 
-  getArray: <K, V>(collection: string, key: K) => V[];
-  getOne: <K, V>(collection: string, key: K) => V;
-  maybeGetOne: <K, V>(collection: string, key: K) => Opt<V>;
+  getArray: <K extends TJSON, V>(collection: string, key: K) => V[];
+  getOne: <K extends TJSON, V>(collection: string, key: K) => V;
+  maybeGetOne: <K extends TJSON, V>(collection: string, key: K) => Opt<V>;
 
-  getArrayLazy: <K, V>(collection: string, key: K) => V[];
-  getOneLazy: <K, V>(collection: string, key: K) => V;
-  maybeGetOneLazy: <K, V>(collection: string, key: K) => Opt<V>;
+  getArrayLazy: <K extends TJSON, V>(collection: string, key: K) => V[];
+  getOneLazy: <K extends TJSON, V>(collection: string, key: K) => V;
+  maybeGetOneLazy: <K extends TJSON, V>(collection: string, key: K) => Opt<V>;
 
-  getArraySelf: <K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) => V[];
-  getOneSelf: <K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) => V;
-  maybeGetOneSelf: <K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) => Opt<V>;
+  getArraySelf: <K extends TJSON, V>(
+    lazyHdl: ptr<Internal.LHandle>,
+    key: K,
+  ) => V[];
+  getOneSelf: <K extends TJSON, V>(lazyHdl: ptr<Internal.LHandle>, key: K) => V;
+  maybeGetOneSelf: <K extends TJSON, V>(
+    lazyHdl: ptr<Internal.LHandle>,
+    key: K,
+  ) => Opt<V>;
   getToken: (key: string) => number;
 
   size: (collection: string) => number;

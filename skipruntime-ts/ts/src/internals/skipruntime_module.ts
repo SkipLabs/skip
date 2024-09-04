@@ -152,7 +152,7 @@ export class ContextImpl implements Context {
     return this.skjson.importString(resHdlPtr);
   }
 
-  getFromTable<K, R>(table: string, key: K, index?: string) {
+  getFromTable<K extends TJSON, R>(table: string, key: K, index?: string) {
     return this.skjson.importJSON(
       this.exports.SkipRuntime_getFromTable(
         this.pointer(),
@@ -163,7 +163,7 @@ export class ContextImpl implements Context {
     ) as R[];
   }
 
-  getArray<K, V>(eagerHdl: string, key: K) {
+  getArray<K extends TJSON, V>(eagerHdl: string, key: K) {
     return this.skjson.importJSON(
       this.exports.SkipRuntime_getArray(
         this.pointer(),
@@ -173,7 +173,7 @@ export class ContextImpl implements Context {
     ) as V[];
   }
 
-  getOne<K, V>(eagerHdl: string, key: K) {
+  getOne<K extends TJSON, V>(eagerHdl: string, key: K) {
     return this.skjson.importJSON(
       this.exports.SkipRuntime_get(
         this.pointer(),
@@ -183,7 +183,7 @@ export class ContextImpl implements Context {
     ) as V;
   }
 
-  maybeGetOne<K, V>(eagerHdl: string, key: K) {
+  maybeGetOne<K extends TJSON, V>(eagerHdl: string, key: K) {
     const res = this.exports.SkipRuntime_maybeGet(
       this.pointer(),
       this.skjson.exportString(eagerHdl),
@@ -192,7 +192,7 @@ export class ContextImpl implements Context {
     return this.skjson.importJSON(res) as Opt<V>;
   }
 
-  getArrayLazy<K, V>(lazyHdl: string, key: K) {
+  getArrayLazy<K extends TJSON, V>(lazyHdl: string, key: K) {
     return this.skjson.importJSON(
       this.exports.SkipRuntime_getArrayLazy(
         this.pointer(),
@@ -202,7 +202,7 @@ export class ContextImpl implements Context {
     ) as V[];
   }
 
-  getOneLazy<K, V>(lazyHdl: string, key: K) {
+  getOneLazy<K extends TJSON, V>(lazyHdl: string, key: K) {
     return this.skjson.importJSON(
       this.exports.SkipRuntime_getLazy(
         this.pointer(),
@@ -212,7 +212,7 @@ export class ContextImpl implements Context {
     ) as V;
   }
 
-  maybeGetOneLazy<K, V>(lazyHdl: string, key: K) {
+  maybeGetOneLazy<K extends TJSON, V>(lazyHdl: string, key: K) {
     return this.skjson.importJSON(
       this.exports.SkipRuntime_maybeGetLazy(
         this.pointer(),
@@ -222,7 +222,7 @@ export class ContextImpl implements Context {
     ) as Opt<V>;
   }
 
-  getArraySelf<K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) {
+  getArraySelf<K extends TJSON, V>(lazyHdl: ptr<Internal.LHandle>, key: K) {
     return this.skjson.importJSON(
       this.exports.SkipRuntime_getArraySelf(
         this.pointer(),
@@ -232,7 +232,7 @@ export class ContextImpl implements Context {
     ) as V[];
   }
 
-  getOneSelf<K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) {
+  getOneSelf<K extends TJSON, V>(lazyHdl: ptr<Internal.LHandle>, key: K) {
     return this.skjson.importJSON(
       this.exports.SkipRuntime_getSelf(
         this.pointer(),
@@ -242,7 +242,7 @@ export class ContextImpl implements Context {
     ) as V;
   }
 
-  maybeGetOneSelf<K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) {
+  maybeGetOneSelf<K extends TJSON, V>(lazyHdl: ptr<Internal.LHandle>, key: K) {
     return this.skjson.importJSON(
       this.exports.SkipRuntime_maybeGetSelf(
         this.pointer(),
@@ -435,7 +435,7 @@ class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
   }
 }
 
-class WriterImpl<K, T> {
+class WriterImpl<K extends TJSON, T extends TJSON> {
   private skjson: SKJSON;
   private exports: FromWasm;
   private pointer: ptr<Internal.TWriter>;
