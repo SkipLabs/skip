@@ -74,6 +74,7 @@ const config: Config = {
           position: "left",
           label: "Docs",
         },
+        { to: "/docs/api", label: "API", position: "left" },
         // { to: "/blog", label: "Blog", position: "left" },
         {
           href: "https://github.com/SkipLabs/skdb",
@@ -91,6 +92,10 @@ const config: Config = {
             {
               label: "Overview",
               to: "/docs/overview",
+            },
+            {
+              label: "API",
+              to: "/docs/api",
             },
           ],
         },
@@ -136,6 +141,28 @@ const config: Config = {
       darkTheme: prismThemes.dracula,
     },
   } satisfies Preset.ThemeConfig,
+
+  plugins: [
+    [
+      "docusaurus-plugin-typedoc",
+      {
+        entryPoints: ["../skipruntime-ts/ts/src/skip-runtime.ts"],
+        tsconfig: "../skipruntime-ts/ts/src/tsconfig.json",
+        readme: "none",
+        indexFormat: "table",
+        disableSources: true,
+        groupOrder: ["Classes", "Interfaces", "Type Aliases", "functions"],
+        sidebar: { pretty: true },
+        textContentMappings: {
+          "title.indexPage": "Skip API",
+          "title.memberPage": "{name}",
+        },
+        parametersFormat: "table",
+        enumMembersFormat: "table",
+        useCodeBlocks: true,
+      },
+    ],
+  ],
 };
 
 export default config;
