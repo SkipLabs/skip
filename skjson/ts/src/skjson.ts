@@ -402,7 +402,16 @@ export type Exportable =
 
 export interface SKJSON extends Shared {
   importJSON: (value: ptr<Internal.CJSON>, copy?: boolean) => Exportable;
-  exportJSON: (v: Exportable) => ptr<Internal.CJSON>;
+  exportJSON(v: null | undefined): ptr<Internal.CJNull>;
+  exportJSON(v: number): ptr<Internal.CJFloat>;
+  exportJSON(v: boolean): ptr<Internal.CJBool>;
+  exportJSON(v: string): ptr<Internal.CJString>;
+  exportJSON(v: any[]): ptr<Internal.CJArray>;
+  exportJSON(v: JSONObject): ptr<Internal.CJObject>;
+  exportJSON<T extends Internal.CJSON>(
+    v: (ObjectProxy<object> | ArrayProxy<any>) & { __pointer: ptr<T> },
+  ): ptr<T>;
+  exportJSON(v: TJSON | null): ptr<Internal.CJSON>;
   importOptJSON: (
     value: Opt<ptr<Internal.CJSON>>,
     copy?: boolean,
