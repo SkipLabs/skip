@@ -1,6 +1,6 @@
 // prettier-ignore
 import { type ptr, type Opt } from "#std/sk_types.js";
-import type { Context } from "./skruntime_types.js";
+import type { Context } from "./skipruntime_types.js";
 import type * as Internal from "./skstore_internal_types.js";
 import type {
   Accumulator,
@@ -24,7 +24,7 @@ import type {
   LazyCompute,
   AsyncLazyCompute,
   NonEmptyIterator,
-} from "../skruntime_api.js";
+} from "../skipruntime_api.js";
 
 // prettier-ignore
 import type { MirrorDefn, Params, SKDBSync } from "#skdb/skdb_types.js";

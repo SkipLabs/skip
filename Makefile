@@ -129,7 +129,7 @@ setup-git-hooks: .git/hooks/pre-commit
 
 .PHONY: test
 test:
-	$(MAKE) --keep-going SKARGO_PROFILE=dev SKDB_WASM=sql/target/wasm32-unknown-unknown/dev/skdb.wasm SKDB_BIN=sql/target/host/dev/skdb sktest-prelude test-native tstest-sql tstest-skruntime-ts
+	$(MAKE) --keep-going SKARGO_PROFILE=dev SKDB_WASM=sql/target/wasm32-unknown-unknown/dev/skdb.wasm SKDB_BIN=sql/target/host/dev/skdb sktest-prelude test-native tstest-sql tstest-skipruntime-ts
 
 .PHONY: test-native
 test-native: build/skdb
@@ -197,22 +197,22 @@ test-bun: npm
 	cd build/bun && bun bun.js true && bun bun.js false
 
 exbuild-%:
-	cd skruntime-ts && make build-$*
+	cd skipruntime-ts && make build-$*
 
 exrun-%:
-	cd skruntime-ts && make bunrun-$*
+	cd skipruntime-ts && make bunrun-$*
 
 excheck-%:
-	cd skruntime-ts && make check-$*
+	cd skipruntime-ts && make check-$*
 
 nexrun-%:
-	cd skruntime-ts && make noderun-$*
+	cd skipruntime-ts && make noderun-$*
 
 explay-%:
-	cd skruntime-ts && make bunplay-$*
+	cd skipruntime-ts && make bunplay-$*
 
 nexplay-%:
-	cd skruntime-ts && make nodeplay-$*
+	cd skipruntime-ts && make nodeplay-$*
 
 skcheck-%:
 	cd $* && skargo c --profile $(SKARGO_PROFILE)

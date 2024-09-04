@@ -91,7 +91,7 @@ jobs:
             cd skjson && skargo test --junitxml ~/test-results/skjson.xml
       - store_test_results:
           path: ~/test-results/skjson.xml
-  skruntime-wasm:
+  skipruntime-wasm:
     docker:
       - image: skiplabs/skdb-base:latest
     steps:
@@ -105,9 +105,9 @@ jobs:
           no_output_timeout: 10m
           environment:
             PLAYWRIGHT_REPORTER: junit
-            PLAYWRIGHT_JUNIT_OUTPUT_NAME: ~/test-results/skruntime-wasm.xml
+            PLAYWRIGHT_JUNIT_OUTPUT_NAME: ~/test-results/skipruntime-wasm.xml
           command: |
             mkdir -p ~/test-results
-            make tstest-skruntime-ts
+            make tstest-skipruntime-ts
       - store_test_results:
-          path: ~/test-results/skruntime-wasm.xml
+          path: ~/test-results/skipruntime-wasm.xml

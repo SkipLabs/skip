@@ -8,16 +8,16 @@ import type {
   AValue,
   LazyCollection,
   TJSON,
-} from "../skruntime_api.js";
+} from "../skipruntime_api.js";
 
 import type {
   Handles,
   Context,
   FromWasm,
   CtxMapping,
-} from "./skruntime_types.js";
+} from "./skipruntime_types.js";
 import type * as Internal from "./skstore_internal_types.js";
-import { LSelfImpl, SKStoreFactoryImpl } from "./skruntime_impl.js";
+import { LSelfImpl, SKStoreFactoryImpl } from "./skipruntime_impl.js";
 // prettier-ignore
 import type { SKDBShared } from "#skdb/skdb_types.js";
 
