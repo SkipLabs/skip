@@ -8,8 +8,8 @@ import type {
   Mapper,
   NonEmptyIterator,
   OutputMapper,
-} from "skstore";
-import { schema, ctext as text } from "skstore";
+} from "skip-runtime";
+import { schema, ctext as text } from "skip-runtime";
 
 export function tablesSchema() {
   console.log("## INPUT");

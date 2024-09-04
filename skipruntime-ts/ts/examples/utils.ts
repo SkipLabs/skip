@@ -7,7 +7,7 @@ import type {
   TTableCollection,
   TTable,
   createSKStore as CreateSKStore,
-} from "skstore";
+} from "skip-runtime";
 import { Server, type ServerOptions } from "socket.io";
 import { createInterface } from "readline";
 import { Command } from "commander";

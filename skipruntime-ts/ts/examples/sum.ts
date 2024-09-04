@@ -7,8 +7,8 @@ import type {
   EagerCollection,
   NonEmptyIterator,
   OutputMapper,
-} from "skstore";
-import { cinteger as integer, schema } from "skstore";
+} from "skip-runtime";
+import { cinteger as integer, schema } from "skip-runtime";
 
 export function tablesSchema() {
   console.log("## INPUTS");
