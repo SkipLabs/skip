@@ -47,19 +47,19 @@ interface ToWasm {
   SKIP_SKJSON_error: (json: ptr<Internal.CJSON>) => void;
 }
 
-class WasmHandle {
+class WasmHandle<T extends Internal.CJSON> {
   utils: Utils;
-  pointer: ptr<Internal.CJSON>;
+  pointer: ptr<T>;
   access: WasmAccess;
   fields?: Map<string, int>;
 
-  constructor(utils: Utils, pointer: ptr<Internal.CJSON>, access: WasmAccess) {
+  constructor(utils: Utils, pointer: ptr<T>, access: WasmAccess) {
     this.utils = utils;
     this.pointer = pointer;
     this.access = access;
   }
 
-  objectFields() {
+  objectFields(this: WasmHandle<Internal.CJObject>) {
     if (!this.fields) {
       this.fields = new Map();
       const size = this.access.SKIP_SKJSON_objectSize(this.pointer);
@@ -75,12 +75,12 @@ class WasmHandle {
     return this.fields;
   }
 
-  derive(pointer: ptr<Internal.CJSON>) {
+  derive<U extends Internal.CJSON>(pointer: ptr<U>) {
     return new WasmHandle(this.utils, pointer, this.access);
   }
 }
 
-function getValue(hdl: WasmHandle): any {
+function getValue<T extends Internal.CJSON>(hdl: WasmHandle<T>): any {
   if (hdl.pointer == 0) return null;
   const type = hdl.access.SKIP_SKJSON_typeOf(hdl.pointer) as Type;
   switch (type) {
@@ -110,7 +110,11 @@ function getValue(hdl: WasmHandle): any {
   }
 }
 
-function getValueAt(hdl: WasmHandle, idx: int, array: boolean = false): any {
+function getValueAt<T extends Internal.CJSON>(
+  hdl: WasmHandle<T>,
+  idx: int,
+  array: boolean = false,
+): any {
   const skval = array
     ? hdl.access.SKIP_SKJSON_at(hdl.pointer, idx)
     : hdl.access.SKIP_SKJSON_get(hdl.pointer, idx);
@@ -156,7 +160,7 @@ function isObjectProxy(x: any): x is ObjectProxy<Record<string, any>> {
 
 export const reactiveObject = {
   get<Base extends object>(
-    hdl: WasmHandle,
+    hdl: WasmHandle<Internal.CJObject>,
     prop: string | symbol,
     self: ObjectProxy<Base>,
   ): any {
@@ -179,10 +183,14 @@ export const reactiveObject = {
     if (idx === undefined) return undefined;
     return getValueAt(hdl, idx, false);
   },
-  set(_hdl: WasmHandle, _prop: string | symbol, _value: any) {
+  set(
+    _hdl: WasmHandle<Internal.CJObject>,
+    _prop: string | symbol,
+    _value: any,
+  ) {
     throw new Error("Reactive object cannot be modified.");
   },
-  has(hdl: WasmHandle, prop: string | symbol): boolean {
+  has(hdl: WasmHandle<Internal.CJObject>, prop: string | symbol): boolean {
     if (prop === sk_isObjectProxy) return true;
     if (prop === "__sk_frozen") return true;
     if (prop === "__pointer") return true;
@@ -193,10 +201,13 @@ export const reactiveObject = {
     const fields = hdl.objectFields();
     return fields.has(prop);
   },
-  ownKeys(hdl: WasmHandle) {
+  ownKeys(hdl: WasmHandle<Internal.CJObject>) {
     return Array.from(hdl.objectFields().keys());
   },
-  getOwnPropertyDescriptor(hdl: WasmHandle, prop: string | symbol) {
+  getOwnPropertyDescriptor(
+    hdl: WasmHandle<Internal.CJObject>,
+    prop: string | symbol,
+  ) {
     if (typeof prop === "symbol") return undefined;
     const fields = hdl.objectFields();
     const idx = fields.get(prop);
@@ -232,7 +243,11 @@ function isArrayProxy(x: any): x is ArrayProxy<any> {
 }
 
 export const reactiveArray = {
-  get<T>(hdl: WasmHandle, prop: string | symbol, self: ArrayProxy<T>): any {
+  get<T>(
+    hdl: WasmHandle<Internal.CJArray>,
+    prop: string | symbol,
+    self: ArrayProxy<T>,
+  ): any {
     if (prop === sk_isArrayProxy) return true;
     if (prop === "__sk_frozen") return true;
     if (prop === "__pointer") return hdl.pointer;
@@ -262,10 +277,10 @@ export const reactiveArray = {
     }
     return undefined;
   },
-  set(_hdl: WasmHandle, _prop: string | symbol, _value: any) {
+  set(_hdl: WasmHandle<Internal.CJArray>, _prop: string | symbol, _value: any) {
     throw new Error("Reactive array cannot be modified.");
   },
-  has(_hdl: WasmHandle, prop: string | symbol): boolean {
+  has(_hdl: WasmHandle<Internal.CJArray>, prop: string | symbol): boolean {
     if (prop === sk_isArrayProxy) return true;
     if (prop === "__sk_frozen") return true;
     if (prop === "__pointer") return true;
@@ -275,12 +290,15 @@ export const reactiveArray = {
     if (prop === Symbol.iterator) return true;
     return false;
   },
-  ownKeys(hdl: WasmHandle) {
+  ownKeys(hdl: WasmHandle<Internal.CJArray>) {
     const l = hdl.access.SKIP_SKJSON_arraySize(hdl.pointer);
     const res = Array.from(Array(l).keys()).map((v) => v.toString());
     return res;
   },
-  getOwnPropertyDescriptor(hdl: WasmHandle, prop: string | symbol) {
+  getOwnPropertyDescriptor(
+    hdl: WasmHandle<Internal.CJArray>,
+    prop: string | symbol,
+  ) {
     if (typeof prop === "symbol") return undefined;
     const v = parseInt(prop);
     if (isNaN(v)) return undefined;
@@ -423,7 +441,10 @@ class LinksImpl implements Links {
 
   complete = (utils: Utils, exports: object) => {
     const fromWasm = exports as FromWasm;
-    const importJSON = (valuePtr: ptr<Internal.CJSON>, copy?: boolean): any => {
+    const importJSON = <T extends Internal.CJSON>(
+      valuePtr: ptr<T>,
+      copy?: boolean,
+    ): any => {
       const value = getValue(new WasmHandle(utils, valuePtr, fromWasm));
       return copy && value !== null ? clone(value) : value;
     };
