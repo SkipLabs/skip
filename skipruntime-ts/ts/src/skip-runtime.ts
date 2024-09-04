@@ -1,6 +1,6 @@
 // prettier-ignore
 import { runUrl, type ModuleInit } from "#std/sk_types.js";
-import { check } from "./internals/skruntime_impl.js";
+import { check } from "./internals/skipruntime_impl.js";
 import type {
   SKStore,
   SKStoreFactory,
@@ -13,7 +13,7 @@ import type {
   TJSON,
   JSONObject,
   Accumulator,
-} from "./skruntime_api.js";
+} from "./skipruntime_api.js";
 
 export type {
   SKStore,
@@ -39,9 +39,9 @@ export type {
   AsyncLazyCompute,
   Loadable,
   AsyncLazyCollection,
-} from "./skruntime_api.js";
+} from "./skipruntime_api.js";
 
-export { ValueMapper } from "./skruntime_api.js";
+export { ValueMapper } from "./skipruntime_api.js";
 export {
   Sum,
   Min,
@@ -51,7 +51,7 @@ export {
   cinteger,
   cfloat,
   cjson,
-} from "./skruntime_utils.js";
+} from "./skipruntime_utils.js";
 
 const modules: ModuleInit[] = [];
 /*--MODULES--*/
