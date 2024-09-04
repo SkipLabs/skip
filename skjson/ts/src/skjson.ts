@@ -296,26 +296,17 @@ function clone<T>(value: T): T {
     if (Array.isArray(value)) {
       return value.map(clone) as T;
     } else if (isArrayProxy(value)) {
-      const res: any[] = [];
-      const length: number = value.length;
-      for (let i = 0; i < length; i++) {
-        res.push(clone(value[i]));
-      }
-      return res as T;
+      return Array.from({ length: value.length }, (_, i) =>
+        clone(value[i]),
+      ) as T;
     } else if (isObjectProxy(value)) {
-      const res: any = {};
-      for (const key of value.keys) {
-        res[key] = clone(value[key]);
-      }
-      return res as T;
+      return Object.fromEntries(
+        Array.from(value.keys).map((k) => [k, clone(value[k])]),
+      ) as T;
     } else {
-      const aValue = value as any;
-      const res: any = {};
-      const keys = Object.keys(aValue as object);
-      for (const key of keys) {
-        res[key] = clone(aValue[key]);
-      }
-      return res as T;
+      return Object.fromEntries(
+        Object.entries(value).map(([k, v]): [string, any] => [k, clone(v)]),
+      ) as T;
     }
   } else {
     return value;
@@ -430,7 +421,7 @@ class LinksImpl implements Links {
     const fromWasm = exports as FromWasm;
     const importJSON = (valuePtr: ptr<Internal.CJSON>, copy?: boolean): any => {
       const value = getValue(new WasmHandle(utils, valuePtr, fromWasm));
-      return copy ? (value !== null ? clone(value) : value) : value;
+      return copy && value !== null ? clone(value) : value;
     };
 
     const exportJSON = (value: any): ptr<Internal.CJSON> => {
