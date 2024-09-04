@@ -9,6 +9,7 @@ import type {
   NonEmptyIterator,
   EagerCollection,
   Schema,
+  JSONObject,
 } from "../skipruntime_api.js";
 
 export type CtxMapping<
@@ -117,6 +118,8 @@ export interface Context {
     mappings: CtxMapping<K1, V1, K2, V2>[],
     accumulator: Accumulator<V2, V3>,
   ) => string;
+
+  jsonExtract(value: JSONObject, pattern: string): TJSON[];
 
   noref: () => Context;
 }
@@ -289,4 +292,10 @@ export interface FromWasm {
     accumulator: int,
     accInit: ptr<Internal.CJSON>,
   ): ptr<Internal.String>;
+
+  // Utils
+  SKIP_SKStore_jsonExtract(
+    json: ptr<Internal.CJSON>,
+    pattern: ptr<Internal.String>,
+  ): ptr<Internal.CJArray>;
 }
