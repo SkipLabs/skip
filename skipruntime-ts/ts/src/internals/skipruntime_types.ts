@@ -119,27 +119,39 @@ export interface Context {
   notify?: () => void;
 }
 
+export type Handle<T> = Internal.Opaque<int, { handle_for: T }>;
+
 export interface Handles {
-  register(v: any): int;
-  get(id: int): any;
-  apply<R, P extends any[] = any[]>(id: int, parameters: P): R;
-  delete(id: int): any;
+  register<T>(v: T): Handle<T>;
+  get<T>(id: Handle<T>): T;
+  apply<R, P extends any[]>(id: Handle<(..._: P) => R>, parameters: P): R;
+  delete<T>(id: Handle<T>): T;
   name(metadata: Metadata): string;
 }
 
 export interface FromWasm {
-  SkipRuntime_map(
+  SkipRuntime_map<
+    K extends TJSON,
+    V extends TJSON,
+    K2 extends TJSON,
+    V2 extends TJSON,
+  >(
     ctx: ptr<Internal.Context>,
     eagerCollectionId: ptr<Internal.String>,
     name: ptr<Internal.String>,
-    fnPtr: int,
+    fnPtr: Handle<(key: K, it: NonEmptyIterator<V>) => Iterable<[K2, V2]>>,
   ): ptr<Internal.String>;
 
-  SkipRuntime_mapReduce(
+  SkipRuntime_mapReduce<
+    K extends TJSON,
+    V extends TJSON,
+    K2 extends TJSON,
+    V2 extends TJSON,
+  >(
     ctx: ptr<Internal.Context>,
     eagerCollectionId: ptr<Internal.String>,
     name: ptr<Internal.String>,
-    fnPtr: int,
+    fnPtr: Handle<(key: K, it: NonEmptyIterator<V>) => Iterable<[K2, V2]>>,
     accumulator: int,
     accInit: ptr<Internal.CJSON>,
   ): ptr<Internal.String>;
@@ -204,11 +216,11 @@ export interface FromWasm {
     eagerCollectionId: ptr<Internal.String>,
   ): number;
 
-  SkipRuntime_toSkdb(
+  SkipRuntime_toSkdb<R, K, V>(
     ctx: ptr<Internal.Context>,
     eagerCollectionId: ptr<Internal.String>,
     table: ptr<Internal.String>,
-    fnPtr: int,
+    fnPtr: Handle<(key: K, it: NonEmptyIterator<V>) => R>,
   ): void;
 
   // NonEmptyIterator
@@ -240,22 +252,22 @@ export interface FromWasm {
   SkipRuntime_createFor(session: ptr<Internal.String>): float;
 
   // SKStore
-  SkipRuntime_asyncLazy(
+  SkipRuntime_asyncLazy<K extends TJSON, V extends TJSON, P extends TJSON>(
     ctx: ptr<Internal.Context>,
     name: ptr<Internal.String>,
-    paramsFn: int,
-    lazyFn: int,
+    paramsFn: Handle<(key: K) => P>,
+    lazyFn: Handle<(key: K, params: P) => Promise<V>>,
   ): ptr<Internal.String>;
-  SkipRuntime_lazy(
+  SkipRuntime_lazy<K extends TJSON, V extends TJSON>(
     ctx: ptr<Internal.Context>,
     name: ptr<Internal.String>,
-    lazyFn: int,
+    lazyFn: Handle<(selfHdl: LazyCollection<K, V>, key: K) => Opt<V>>,
   ): ptr<Internal.String>;
-  SkipRuntime_fromSkdb(
+  SkipRuntime_fromSkdb<R extends TJSON, K extends TJSON, V extends TJSON>(
     ctx: ptr<Internal.Context>,
     table: ptr<Internal.String>,
     name: ptr<Internal.String>,
-    fnPtr: int,
+    fnPtr: Handle<(entry: R, occ: number) => Iterable<[K, V]>>,
   ): ptr<Internal.String>;
   SkipRuntime_multimap(
     ctx: ptr<Internal.Context>,
@@ -270,11 +282,11 @@ export interface FromWasm {
     value: ptr<Internal.CJObject>,
   ): number;
 
-  SkipRuntime_multimapReduce(
+  SkipRuntime_multimapReduce<V2 extends TJSON, V3 extends TJSON>(
     ctx: ptr<Internal.Context>,
     name: ptr<Internal.String>,
     mappings: ptr<Internal.CJArray>,
-    accumulator: int,
+    accumulator: Handle<Accumulator<V2, V3>>,
     accInit: ptr<Internal.CJSON>,
   ): ptr<Internal.String>;
 }
