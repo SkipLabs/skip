@@ -951,12 +951,15 @@ export async function runUrl(
   return await start(modules, buffer, env, main);
 }
 
+export const sk_isArrayProxy: unique symbol = Symbol();
+export const sk_isObjectProxy: unique symbol = Symbol();
+
 export function cloneIfProxy<T>(v: T): T {
   if (
     v !== null &&
     typeof v === "object" &&
-    (("__isArrayProxy" in v && v.__isArrayProxy) ||
-      ("__isObjectProxy" in v && v.__isObjectProxy)) &&
+    ((sk_isArrayProxy in v && v[sk_isArrayProxy]) ||
+      (sk_isObjectProxy in v && v[sk_isObjectProxy])) &&
     "clone" in v
   ) {
     return (v.clone as () => T)();
