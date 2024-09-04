@@ -1,5 +1,7 @@
 // prettier-ignore
 import type { int, ptr, float, Links, Utils, ToWasmManager, Environment, Opt, Shared, } from "#std/sk_types.js";
+// prettier-ignore
+import { sk_isArrayProxy, sk_isObjectProxy } from "#std/sk_types.js";
 import type * as Internal from "./skjson_internal_types.js";
 
 export enum Type {
@@ -138,7 +140,7 @@ function getValueAt(hdl: WasmHandle, idx: int, array: boolean = false): any {
 }
 
 type ObjectProxy<Base extends Record<string, any>> = {
-  __isObjectProxy: true;
+  [sk_isObjectProxy]: true;
   __sk_frozen: true;
   __pointer: ptr<Internal.CJSON>;
   clone: () => ObjectProxy<Base>;
@@ -152,7 +154,7 @@ export const reactiveObject = {
     prop: string | symbol,
     self: ObjectProxy<Base>,
   ): any {
-    if (prop === "__isObjectProxy") return true;
+    if (prop === sk_isObjectProxy) return true;
     if (prop === "__sk_frozen") return true;
     if (prop === "__pointer") return hdl.pointer;
     if (prop === "clone") return (): ObjectProxy<Base> => clone(self);
@@ -175,7 +177,7 @@ export const reactiveObject = {
     throw new Error("Reactive object cannot be modified.");
   },
   has(hdl: WasmHandle, prop: string | symbol): boolean {
-    if (prop === "__isObjectProxy") return true;
+    if (prop === sk_isObjectProxy) return true;
     if (prop === "__sk_frozen") return true;
     if (prop === "__pointer") return true;
     if (prop === "clone") return true;
@@ -204,7 +206,7 @@ export const reactiveObject = {
 };
 
 type ArrayProxy<T> = {
-  __isArrayProxy: true;
+  [sk_isArrayProxy]: true;
   __sk_frozen: true;
   __pointer: ptr<Internal.CJSON>;
   length: number;
@@ -220,7 +222,7 @@ type ArrayProxy<T> = {
 
 export const reactiveArray = {
   get<T>(hdl: WasmHandle, prop: string | symbol, self: ArrayProxy<T>): any {
-    if (prop === "__isArrayProxy") return true;
+    if (prop === sk_isArrayProxy) return true;
     if (prop === "__sk_frozen") return true;
     if (prop === "__pointer") return hdl.pointer;
     if (prop === "length") return hdl.access.SKIP_SKJSON_arraySize(hdl.pointer);
@@ -253,7 +255,7 @@ export const reactiveArray = {
     throw new Error("Reactive array cannot be modified.");
   },
   has(_hdl: WasmHandle, prop: string | symbol): boolean {
-    if (prop === "__isArrayProxy") return true;
+    if (prop === sk_isArrayProxy) return true;
     if (prop === "__sk_frozen") return true;
     if (prop === "__pointer") return true;
     if (prop === "length") return true;
@@ -286,14 +288,14 @@ function clone<T>(value: T): T {
   if (value !== null && typeof value === "object") {
     if (Array.isArray(value)) {
       return value.map(clone) as T;
-    } else if (aValue.__isArrayProxy) {
+    } else if (aValue[sk_isArrayProxy]) {
       const res: any[] = [];
       const length: number = aValue.length;
       for (let i = 0; i < length; i++) {
         res.push(clone(aValue[i]));
       }
       return res as T;
-    } else if (aValue.__isObjectProxy) {
+    } else if (aValue[sk_isObjectProxy]) {
       const res: any = {};
       for (const key of aValue.keys) {
         res[key] = clone(aValue[key]);
@@ -443,7 +445,7 @@ class LinksImpl implements Links {
         });
         return fromWasm.SKIP_SKJSON_endCJArray(arr);
       } else if (typeof value == "object") {
-        if (value.__isObjectProxy || value.__isArrayProxy) {
+        if (value[sk_isObjectProxy] || value[sk_isArrayProxy]) {
           return value.__pointer as ptr<Internal.CJSON>;
         } else {
           const obj = fromWasm.SKIP_SKJSON_startCJObject();
