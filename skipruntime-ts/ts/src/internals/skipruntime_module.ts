@@ -42,7 +42,7 @@ class HandlesImpl implements Handles {
     return this.objects[id];
   }
 
-  apply<T>(id: int, parameters: T[]): T {
+  apply<R, P extends any[] = any[]>(id: int, parameters: P): R {
     const fn = this.objects[id];
     /* eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return */
     return fn.apply(null, parameters);
@@ -574,7 +574,7 @@ class LinksImpl implements Links {
       ref.push(ctx);
       const jsu = skjson();
       const w = new WriterImpl(jsu, fromWasm, writer);
-      const result = this.handles.apply(fn, [
+      const result = this.handles.apply<any>(fn, [
         jsu.importJSON(key),
         new NonEmptyIteratorImpl(jsu, fromWasm, it),
       ]);
@@ -602,7 +602,7 @@ class LinksImpl implements Links {
       ref.push(ctx);
       const jsu = skjson();
       const w = new WriterImpl(jsu, fromWasm, writer);
-      const result = this.handles.apply(fn, [jsu.importJSON(row), occ]);
+      const result = this.handles.apply<any>(fn, [jsu.importJSON(row), occ]);
       for (const v of result) {
         const t = v as [any, any];
         w.set(t[0], t[1]);
@@ -635,7 +635,6 @@ class LinksImpl implements Links {
       const name = jsu.importString(skname);
       const key = jsu.importJSON(skkey, true);
       const params = jsu.importJSON(skparams, true);
-      /* eslint-disable-next-line @typescript-eslint/no-unsafe-argument */
       const promise = this.handles.apply<Promise<AValue<TJSON, TJSON>>>(fn, [
         key,
         params,
