@@ -381,24 +381,21 @@ class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
   }
 
   next(): Opt<T> {
-    /* eslint-disable-next-line @typescript-eslint/no-unsafe-return */
     return this.skjson.importOptJSON(
       this.exports.SkipRuntime_iteratorNext(this.pointer),
-    );
+    ) as Opt<T>;
   }
 
   first(): T {
-    /* eslint-disable-next-line @typescript-eslint/no-unsafe-return */
     return this.skjson.importJSON(
       this.exports.SkipRuntime_iteratorFirst(this.pointer),
-    );
+    ) as T;
   }
 
   uniqueValue(): Opt<T> {
-    /* eslint-disable-next-line @typescript-eslint/no-unsafe-return */
     return this.skjson.importOptJSON(
       this.exports.SkipRuntime_iteratorUniqueValue(this.pointer),
-    );
+    ) as Opt<T>;
   }
 
   toArray: () => T[] = () => {
@@ -666,7 +663,7 @@ class LinksImpl implements Links {
       const jsu = skjson();
       const w = new WriterImpl(jsu, fromWasm, writer);
       const result = this.handles.apply(fn, [
-        jsu.importJSON(key),
+        jsu.importJSON(key) as K1,
         new NonEmptyIteratorImpl<V1>(jsu, fromWasm, it),
       ]);
       const bindings = new Map<K2, V2[]>();
@@ -695,7 +692,7 @@ class LinksImpl implements Links {
       ref.push(ctx);
       const jsu = skjson();
       const w = new WriterImpl(jsu, fromWasm, writer);
-      const result = this.handles.apply(fn, [jsu.importJSON(row), occ]);
+      const result = this.handles.apply(fn, [jsu.importJSON(row) as R, occ]);
       for (const v of result) {
         w.set(v[0], v[1]);
       }
@@ -713,7 +710,7 @@ class LinksImpl implements Links {
     ) => {
       const jsu = skjson();
       const res = this.handles.apply(fn, [
-        jsu.importJSON(key),
+        jsu.importJSON(key) as K,
         new NonEmptyIteratorImpl<V>(jsu, fromWasm, it),
       ]);
       return jsu.exportJSON(Array.from(res));
@@ -734,8 +731,8 @@ class LinksImpl implements Links {
       const jsu = skjson();
       const callId = jsu.importString(skcall);
       const name = jsu.importString(skname);
-      const key = jsu.importJSON(skkey, true);
-      const params = jsu.importJSON(skparams, true);
+      const key = jsu.importJSON(skkey, true) as K;
+      const params = jsu.importJSON(skparams, true) as P;
       const promise = this.handles.apply(fn, [key, params]);
       const register = (value: Result<TJSON, TJSON>) => {
         if (!notify) {
@@ -814,7 +811,7 @@ class LinksImpl implements Links {
       const res = jsu.exportJSON(
         this.handles.apply(fn, [
           new LSelfImpl(context, hdl) as LazyCollection<K, V>,
-          jsu.importJSON(key),
+          jsu.importJSON(key) as K,
         ]),
       );
       ref.pop();
@@ -828,7 +825,9 @@ class LinksImpl implements Links {
     ) => {
       ref.push(ctx);
       const jsu = skjson();
-      const res = jsu.exportJSON(this.handles.apply(fn, [jsu.importJSON(key)]));
+      const res = jsu.exportJSON(
+        this.handles.apply(fn, [jsu.importJSON(key) as K]),
+      );
       ref.pop();
       return res;
     };
