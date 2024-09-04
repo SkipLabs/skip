@@ -1,6 +1,6 @@
 // prettier-ignore
 import type { int, ptr, Links, Utils, ToWasmManager, Environment, Opt, Metadata, ErrorObject } from "#std/sk_types.js";
-import type { SKJSON, Exportable } from "./skjson.js";
+import type { SKJSON } from "./skjson.js";
 import type {
   Accumulator,
   NonEmptyIterator,
@@ -665,7 +665,7 @@ class LinksImpl implements Links {
         jsu.importJSON(key) as K,
         new NonEmptyIteratorImpl<V>(jsu, fromWasm, it),
       ]);
-      return jsu.exportJSON(res as Exportable);
+      return jsu.exportJSON(res);
     };
 
     this.applyLazyAsyncFun = <
