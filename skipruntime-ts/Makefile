@@ -82,6 +82,10 @@ bunclient-%:
 #	../build/sknpm b -r --out-dir ts/examples/node_modules/skip-runtime
 #	bun run ts/examples/wmain.ts -f ts/examples/$*.ts -m io -c $*
 
+check: ../build/sknpm
+	../build/sknpm check
+	../build/sknpm check --test
+
 check-%: ../build/sknpm
 	cd ts/examples && npm install
 	../build/sknpm b -r --nowasm --out-dir ts/examples/node_modules/skip-runtime

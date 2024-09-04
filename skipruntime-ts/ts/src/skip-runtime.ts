@@ -90,7 +90,7 @@ export async function createSKStore(
   remotes: Record<string, Remote> = {},
   tokens: Record<string, number> = {},
 ): Promise<Record<string, Table<TJSON[]>>> {
-  let data = await runUrl(wasmUrl, modules, [], "SKDB_factory");
+  const data = await runUrl(wasmUrl, modules, [], "SKDB_factory");
   const factory = data.environment.shared.get("SKStore") as SKStoreFactory;
   return factory.runSKStore(init, locale, remotes, tokens);
 }
@@ -101,7 +101,7 @@ export async function createInlineSKStore(
   remotes: Record<string, Remote> = {},
   tokens: Record<string, number> = {},
 ): Promise<Table<TJSON[]>[]> {
-  let tables: Table<TJSON[]>[] = [];
+  const tables: Table<TJSON[]>[] = [];
   const result = await createSKStore(
     (skstore: SKStore, tables: Record<string, TableCollection<TJSON[]>>) => {
       const handles: TableCollection<TJSON[]>[] = [];
@@ -191,5 +191,5 @@ export async function runWithServer(
   options: Record<string, any>,
   database?: Database,
 ) {
-  runWithServer_(service, createSKStore, options, database);
+  await runWithServer_(service, createSKStore, options, database);
 }

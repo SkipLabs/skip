@@ -287,7 +287,7 @@ export class TableImpl<R extends TJSON[]> implements Table<R> {
   }
 
   insert(entries: R[] | Inputs, update?: boolean | undefined): void {
-    let values = Array.isArray(entries) ? entries : entries.values;
+    const values = Array.isArray(entries) ? entries : entries.values;
     const columns = !Array.isArray(entries)
       ? entries.columns
       : this.schema.columns.map((c) => c.name);
@@ -527,7 +527,7 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
     remotes: Record<string, Remote> = {},
     tokens: Record<string, number> = {},
   ): Promise<Record<string, Table<TJSON[]>>> => {
-    let context = this.context();
+    const context = this.context();
     const tables = await mirror(
       context,
       this.createSync,
@@ -536,7 +536,9 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
       this.createKey,
     );
     const skstore = new SKStoreImpl(context);
-    this.create(() => init(skstore, tables), tokens);
+    this.create(() => {
+      init(skstore, tables);
+    }, tokens);
     const result: Record<string, Table<TJSON[]>> = {};
     for (const [key, value] of Object.entries(tables)) {
       result[key] = (value as TableCollectionImpl<TJSON[]>).toTable();
@@ -553,10 +555,11 @@ function toWs(entryPoint: EntryPoint) {
 /**
  * Mirror Skip tables from SKDB, with support for custom schemas and SQL filters
  * @param context
- * @param skdb - the database to work with
- * @param connect
- * @param tables - tables to mirror, along with schemas and filters
- * @returns - the mirrored table collections
+ * @param createSkdb
+ * @param locale
+ * @param remotes
+ * @param createKey
+ * @returns - the mirrors table handles
  */
 export async function mirror(
   context: Context,
@@ -568,12 +571,12 @@ export async function mirror(
   const tHandles: Record<string, TableCollection<TJSON[]>> = {};
   if (locale.database) {
     remotes["__sk_locale"] = {
-      database: locale.database!,
+      database: locale.database,
       tables: locale.tables,
     };
   } else {
     for (const table of locale.tables) {
-      let skdb = await createSkdb();
+      const skdb = await createSkdb();
       const query = create(table);
       skdb.exec(query.query, query.params ? toParams(query.params) : undefined);
       if (table.indexes) {
@@ -586,7 +589,7 @@ export async function mirror(
     }
   }
   for (const remote of Object.values(remotes)) {
-    let skdb = await createSkdb();
+    const skdb = await createSkdb();
     const database = remote.database;
     const privateKey = await createKey(database.private);
     await skdb.connect(
@@ -608,7 +611,7 @@ export async function mirror(
         });
       }
       const query = create(table);
-      await skdb.connectedRemote!.exec(
+      await skdb.connectedRemote.exec(
         query.query,
         query.params ? toParams(query.params) : undefined,
       );
@@ -642,10 +645,9 @@ function toMirrorDefinition(table: Schema): MirrorDefn {
     table: table.name,
     expectedColumns: toColumns(table.columns),
     filterExpr: table.filter ? table.filter.filter : undefined,
-    filterParams:
-      table.filter && table.filter.params
-        ? toParams(table.filter.params)
-        : undefined,
+    filterParams: table.filter?.params
+      ? toParams(table.filter.params)
+      : undefined,
   };
 }
 
@@ -709,7 +711,7 @@ function toWhere(
       }
       exprs.push(`${column.name} IN (${inVal.join(", ")})`);
     } else {
-      const pName = prefix + i + "_value";
+      const pName = `${prefix}${i}_value`;
       params[pName] = field;
       exprs.push(`${column.name} = @${pName}`);
     }

@@ -1,5 +1,6 @@
 import type { SimpleSkipService } from "../skipruntime_service.js";
 import type { createSKStore as CreateSKStore } from "../skip-runtime.js";
+// eslint-disable-next-line  @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import { WebSocketServer } from "ws";
 import type { Database, JSONObject, TJSON } from "../skipruntime_api.js";
@@ -10,12 +11,18 @@ type HTTPCommand = {
   [key: string]: TJSON;
 };
 
+interface WS {
+  send(message: string): void;
+  on(chanel: string, callback: (bytes: Buffer) => void): void;
+}
+
 export async function runWithServer_(
   service: SimpleSkipService,
   createSKStore: typeof CreateSKStore,
   options: Record<string, any>,
   database?: Database,
 ) {
+  // eslint-disable-next-line  @typescript-eslint/no-unsafe-call
   const wss = new WebSocketServer(options);
   const [update, inputs, outputs] = await runService(
     service,
@@ -24,7 +31,8 @@ export async function runWithServer_(
   );
   const responses = outputs["__sk_responses"];
   const requests = inputs["__sk_requests"];
-  wss.on("connection", function connection(ws: any) {
+  // eslint-disable-next-line  @typescript-eslint/no-unsafe-call
+  wss.on("connection", function connection(ws: WS) {
     responses.watchChanges(
       (rows: JSONObject[]) => {
         const message = JSON.stringify({ type: "init", payload: rows });
@@ -47,7 +55,9 @@ export async function runWithServer_(
           values: [[http, "", "read-write"]],
         });
       } else if (http.type == "post") {
-        update(http, {});
+        update(http, {}).catch((e: unknown) => {
+          throw e;
+        });
       } else {
         throw new TypeError("Unknown message type");
       }

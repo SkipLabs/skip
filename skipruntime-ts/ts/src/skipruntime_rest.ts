@@ -49,7 +49,7 @@ function resolve(path: string, requestPath: string[]): string[] | null {
     return null;
   }
   const variables: string[] = [];
-  for (let [idx, part] of requestPath.entries()) {
+  for (const [idx, part] of requestPath.entries()) {
     if (part.match(/^{[a-z0-1A-Z]+}$/g)) {
       // variable
       variables.push(elements[idx]);
@@ -79,7 +79,6 @@ export class RequestMapper
   ) {}
 
   mapElement(key: number, it: NonEmptyIterator<TJSON>) {
-    let response = BadRequest;
     const path = it.first() as string;
     for (const request of this.requests) {
       const payload = resolve(path, request.path);
@@ -87,7 +86,7 @@ export class RequestMapper
       request.runner.execRequest(this.sktore, payload, this.inputCollections);
       break;
     }
-    return Array([key, response] as [number, HTTPResponse]);
+    return Array([key, BadRequest] as [number, HTTPResponse]);
   }
 }
 
@@ -108,6 +107,7 @@ export type Write = (
 
 export class RESTWriter {
   private managers: HTTPRESTWriteRequest[];
+
   constructor() {
     this.managers = [];
   }

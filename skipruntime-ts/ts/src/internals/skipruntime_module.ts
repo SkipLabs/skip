@@ -231,6 +231,7 @@ export class ContextImpl implements Context {
       ),
     ) as V[];
   }
+
   getOneSelf<K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) {
     return this.skjson.importJSON(
       this.exports.SkipRuntime_getSelf(
@@ -240,6 +241,7 @@ export class ContextImpl implements Context {
       ),
     ) as V;
   }
+
   maybeGetOneSelf<K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) {
     return this.skjson.importJSON(
       this.exports.SkipRuntime_maybeGetSelf(
@@ -355,7 +357,7 @@ export class ContextImpl implements Context {
         this.skjson.exportJSON(value),
         this.skjson.exportString(pattern),
       ),
-    );
+    ) as TJSON[];
   }
 
   private pointer() {
@@ -424,6 +426,7 @@ class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
     while (value != null) {
       callbackfn.apply(thisArg, [value, index]);
       value = this.next();
+      index++;
     }
   }
 
@@ -653,10 +656,12 @@ class LinksImpl implements Links {
       ref.push(ctx);
       const jsu = skjson();
       const w = new WriterImpl(jsu, fromWasm, writer);
-      const result = this.handles.apply(fn, [jsu.importJSON(row), occ]);
+      const result = this.handles.apply(fn, [
+        jsu.importJSON(row),
+        occ,
+      ]) as Iterable<[TJSON, TJSON]>;
       for (const v of result) {
-        const t = v as [any, any];
-        w.set(t[0], t[1]);
+        w.set(v[0], v[1]);
       }
       ref.pop();
     };
@@ -670,7 +675,7 @@ class LinksImpl implements Links {
       const res = this.handles.apply(fn, [
         jsu.importJSON(key),
         new NonEmptyIteratorImpl(jsu, fromWasm, it),
-      ]);
+      ]) as Iterable<TJSON[]>;
       return jsu.exportJSON(Array.from(res));
     };
 
@@ -961,15 +966,19 @@ type Tokens = {
   tokens: Token[];
 };
 
+interface Timeout {
+  unref: () => void;
+}
+
 export class TimeQueue {
   constructor(
     private update: (time: number, tokens: string[]) => void,
     private queue: Tokens[] = [],
-    private timeout: any = null,
+    private timeout: string | number | Timeout | null = null,
   ) {}
 
   start(tokens: Token[], time: number) {
-    var tostart: Map<number, Token[]> = new Map();
+    const tostart: Map<number, Token[]> = new Map<number, Token[]>();
     for (const token of tokens) {
       if (token.duration <= 0) continue;
       const endtime = time + token.duration;
@@ -998,14 +1007,14 @@ export class TimeQueue {
 
   stop() {
     if (this.timeout) {
-      clearTimeout(this.timeout);
+      clearTimeout(this.timeout as number);
     }
   }
 
   check() {
     const time = new Date().getTime();
-    var torenew: Map<number, Token[]> = new Map();
-    var i = 0;
+    const torenew: Map<number, Token[]> = new Map<number, Token[]>();
+    let i = 0;
     for (i; i < this.queue.length; i++) {
       const cendtime = this.queue[i].endtime;
       if (time < this.queue[i].endtime) {
@@ -1017,7 +1026,7 @@ export class TimeQueue {
       );
       for (const token of this.queue[i].tokens) {
         if (token.duration <= 0) continue;
-        var endtime = cendtime + token.duration;
+        let endtime = cendtime + token.duration;
         while (endtime <= time) endtime += token.duration;
         const current = torenew.get(endtime);
         if (current) {
@@ -1045,7 +1054,7 @@ export class TimeQueue {
 
   // TODO: Binary version
   private insert(endtime: number, tokens: Token[]) {
-    var i = 0;
+    let i = 0;
     for (i; i < this.queue.length; i++) {
       if (this.queue[i].endtime == endtime) {
         this.queue[i].tokens.push(...tokens);
