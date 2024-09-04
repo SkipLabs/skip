@@ -1,6 +1,7 @@
 // prettier-ignore
 import type { int, ptr, float, Links, Utils,  ToWasmManager, Environment, Opt, Shared, } from "#std/sk_types.js";
 import { sk_isArrayProxy, sk_isObjectProxy } from "#std/sk_types.js";
+import type { TJSON } from "skipruntime_api.js";
 import type * as Internal from "./skstore_internal_types.js";
 
 export enum Type {
@@ -80,7 +81,7 @@ class WasmHandle<T extends Internal.CJSON> {
   }
 }
 
-function getValue<T extends Internal.CJSON>(hdl: WasmHandle<T>): any {
+function getValue<T extends Internal.CJSON>(hdl: WasmHandle<T>): Exportable {
   if (hdl.pointer == 0) return null;
   const type = hdl.access.SKIP_SKJSON_typeOf(hdl.pointer) as Type;
   switch (type) {
@@ -98,11 +99,17 @@ function getValue<T extends Internal.CJSON>(hdl: WasmHandle<T>): any {
       );
     case Type.Array: {
       const aPtr = hdl.access.SKIP_SKJSON_asArray(hdl.pointer);
-      return new Proxy(hdl.derive(aPtr), reactiveArray);
+      return new Proxy(
+        hdl.derive(aPtr),
+        reactiveArray,
+      ) as unknown as ArrayProxy<any>;
     }
     case Type.Object: {
       const oPtr = hdl.access.SKIP_SKJSON_asObject(hdl.pointer);
-      return new Proxy(hdl.derive(oPtr), reactiveObject);
+      return new Proxy(
+        hdl.derive(oPtr),
+        reactiveObject,
+      ) as unknown as ObjectProxy<object>;
     }
     case Type.Undefined:
     default:
@@ -387,10 +394,20 @@ class Mapping {
   }
 }
 
+export type Exportable =
+  | TJSON
+  | null
+  | undefined
+  | ObjectProxy<object>
+  | ArrayProxy<any>;
+
 export interface SKJSON extends Shared {
-  importJSON: (value: ptr<Internal.CJSON>, copy?: boolean) => any;
+  importJSON: (value: ptr<Internal.CJSON>, copy?: boolean) => Exportable;
   exportJSON: <T>(v: T) => ptr<Internal.CJSON>;
-  importOptJSON: (value: Opt<ptr<Internal.CJSON>>, copy?: boolean) => any;
+  importOptJSON: (
+    value: Opt<ptr<Internal.CJSON>>,
+    copy?: boolean,
+  ) => Exportable;
   importString: (v: ptr<Internal.String>) => string;
   exportString: (v: string) => ptr<Internal.String>;
   runWithGC: <T>(fn: () => T) => T;
@@ -399,14 +416,14 @@ export interface SKJSON extends Shared {
 class SKJSONShared implements SKJSON {
   getName = () => "SKJSON";
 
-  importJSON: (value: ptr<Internal.CJSON>, copy?: boolean) => any;
+  importJSON: (value: ptr<Internal.CJSON>, copy?: boolean) => Exportable;
   exportJSON: <T>(v: T) => ptr<Internal.CJSON>;
   importString: (v: ptr<Internal.String>) => string;
   exportString: (v: string) => ptr<Internal.String>;
   runWithGC: <T>(fn: () => T) => T;
 
   constructor(
-    importJSON: (value: ptr<Internal.CJSON>, copy?: boolean) => any,
+    importJSON: (value: ptr<Internal.CJSON>, copy?: boolean) => Exportable,
     exportJSON: <T>(v: T) => ptr<Internal.CJSON>,
     importString: (v: ptr<Internal.String>) => string,
     exportString: (v: string) => ptr<Internal.String>,
@@ -419,7 +436,7 @@ class SKJSONShared implements SKJSON {
     this.runWithGC = runWithGC;
   }
 
-  importOptJSON(value: Opt<ptr<Internal.CJSON>>, copy?: boolean): any {
+  importOptJSON(value: Opt<ptr<Internal.CJSON>>, copy?: boolean): Exportable {
     if (value === null || value === 0) {
       return null;
     }
@@ -444,7 +461,7 @@ class LinksImpl implements Links {
     const importJSON = <T extends Internal.CJSON>(
       valuePtr: ptr<T>,
       copy?: boolean,
-    ): any => {
+    ): Exportable => {
       const value = getValue(new WasmHandle(utils, valuePtr, fromWasm));
       return copy && value !== null ? clone(value) : value;
     };
