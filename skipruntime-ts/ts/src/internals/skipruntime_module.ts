@@ -34,7 +34,7 @@ class HandlesImpl implements Handles {
     this.env = env;
   }
 
-  register(v: JSON) {
+  register(v: any) {
     const freeID = this.freeIDs.pop();
     const id = freeID ?? this.nextID++;
     this.objects[id] = v;
