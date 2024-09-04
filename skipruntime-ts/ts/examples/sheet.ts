@@ -1,15 +1,15 @@
 import type {
   SKStore,
-  TableHandle,
-  TableMapper,
+  TableCollection,
+  InputMapper,
   LazyCompute,
-  EHandle,
-  LHandle,
+  EagerCollection,
+  LazyCollection,
   Mapper,
   NonEmptyIterator,
   OutputMapper,
-} from "skstore";
-import { schema, ctext as text } from "skstore";
+} from "skip-runtime";
+import { schema, ctext as text } from "skip-runtime";
 
 export function tablesSchema() {
   console.log("## INPUT");
@@ -28,7 +28,7 @@ export function tablesSchema() {
 }
 
 class ValueForCell
-  implements TableMapper<[string, string, string], [string, string], string>
+  implements InputMapper<[string, string, string], [string, string], string>
 {
   mapElement(
     entry: [string, string, string],
@@ -39,14 +39,14 @@ class ValueForCell
 }
 
 class ComputeExpression implements LazyCompute<[string, string], string> {
-  constructor(private skall: EHandle<[string, string], string>) {}
+  constructor(private skall: EagerCollection<[string, string], string>) {}
 
   compute(
-    selfHdl: LHandle<[string, string], string>,
+    self: LazyCollection<[string, string], string>,
     key: [string, string],
   ): string | null {
     const getComputed = (key: [string, string]) => {
-      const v = selfHdl.getOne(key);
+      const v = self.getOne(key);
       if (typeof v == "number") return v;
       if (typeof v == "string") {
         const nv = parseFloat(v);
@@ -90,7 +90,7 @@ class ComputeExpression implements LazyCompute<[string, string], string> {
 class CallCompute
   implements Mapper<[string, string], string, [string, string], string>
 {
-  constructor(private evaluator: LHandle<[string, string], string>) {}
+  constructor(private evaluator: LazyCollection<[string, string], string>) {}
 
   mapElement(
     key: [string, string],
@@ -120,13 +120,12 @@ class ToOutput
 
 export function initSKStore(
   store: SKStore,
-  cells: TableHandle<[string, string, string]>,
-  computed: TableHandle<[string, string, string]>,
+  cells: TableCollection<[string, string, string]>,
+  computed: TableCollection<[string, string, string]>,
 ) {
   // Build index to access all value reactivly
   const skall = cells.map(ValueForCell);
-  // Use lazy dir to create eval dependency graph
-  // Its calls it self to get other computed cells
+  // Create lazy evaluation dependency graph which calls itself to get other computed cells
   const evaluator = store.lazy(ComputeExpression, skall);
   // Build a sub dependency graph for each sheet (For example purpose)
   // A parsing phase can be added to prevent expression parsing each time:

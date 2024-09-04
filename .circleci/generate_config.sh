@@ -9,8 +9,8 @@ git diff --quiet HEAD $(git merge-base main HEAD) -- sql/ sqlparser/ skbuild/
 skdb=$?
 git diff --quiet HEAD $(git merge-base main HEAD) -- sknpm/
 sknpm=$?
-git diff --quiet HEAD $(git merge-base main HEAD) -- skstore/
-skstore_wasm=$?
+git diff --quiet HEAD $(git merge-base main HEAD) -- skipruntime-ts/
+skipruntime_wasm=$?
 
 cat .circleci/base.yml
 
@@ -58,11 +58,11 @@ then
 EOF
 fi
 
-if (( $skdb != 0 || $skstore != 0 || $skstore_wasm != 0 || $sknpm != 0))
+if (( $skdb != 0 || $skstore != 0 || $skipruntime_wasm != 0 || $sknpm != 0))
 then
     cat <<EOF
-  skstore-wasm:
+  skipruntime-wasm:
     jobs:
-      - skstore-wasm
+      - skipruntime-wasm
 EOF
 fi

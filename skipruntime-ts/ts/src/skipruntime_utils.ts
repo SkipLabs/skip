@@ -3,7 +3,7 @@ import type {
   ColumnSchema,
   MirrorSchema,
   Opt,
-} from "./skstore_api.js";
+} from "./skipruntime_api.js";
 
 export class Sum implements Accumulator<number, number> {
   default = 0;

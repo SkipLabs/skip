@@ -1,23 +1,23 @@
 // prettier-ignore
 import type { int, ptr, Links, Utils, ToWasmManager, Environment, Opt, Metadata } from "#std/sk_types.js";
-import type { SKJSON } from "./skstore_skjson.js";
+import type { SKJSON } from "./skjson.js";
 import type {
   Accumulator,
   NonEmptyIterator,
   Result,
   AValue,
-  LHandle,
+  LazyCollection,
   TJSON,
-} from "../skstore_api.js";
+} from "../skipruntime_api.js";
 
 import type {
   Handles,
   Context,
   FromWasm,
   CtxMapping,
-} from "./skstore_types.js";
+} from "./skipruntime_types.js";
 import type * as Internal from "./skstore_internal_types.js";
-import { LSelfImpl, SKStoreFactoryImpl } from "./skstore_impl.js";
+import { LSelfImpl, SKStoreFactoryImpl } from "./skipruntime_impl.js";
 // prettier-ignore
 import type { SKDBShared } from "#skdb/skdb_types.js";
 
@@ -82,9 +82,9 @@ export class ContextImpl implements Context {
 
   lazy = <K extends TJSON, V extends TJSON>(
     name: string,
-    compute: (selfHdl: LHandle<K, V>, key: K) => Opt<V>,
+    compute: (self: LazyCollection<K, V>, key: K) => Opt<V>,
   ) => {
-    const lazyHdl = this.exports.SKIP_SKStore_lazy(
+    const lazyHdl = this.exports.SkipRuntime_lazy(
       this.pointer(),
       this.skjson.exportString(name),
       this.handles.register(compute),
@@ -97,7 +97,7 @@ export class ContextImpl implements Context {
     get: (key: K) => P,
     call: (key: K, params: P) => Promise<V>,
   ) => {
-    const lazyHdl = this.exports.SKIP_SKStore_asyncLazy(
+    const lazyHdl = this.exports.SkipRuntime_asyncLazy(
       this.pointer(),
       this.skjson.exportString(name),
       this.handles.register(get),
@@ -116,10 +116,10 @@ export class ContextImpl implements Context {
     mappings: CtxMapping<K1, V1, K2, V2>[],
   ) => {
     const skMappings = mappings.map((mapping) => [
-      mapping.handle.getId(),
+      mapping.source.getId(),
       this.handles.register(mapping.mapper),
     ]);
-    const resHdlPtr = this.exports.SKIP_SKStore_multimap(
+    const resHdlPtr = this.exports.SkipRuntime_multimap(
       this.pointer(),
       this.skjson.exportString(name),
       this.skjson.exportJSON(skMappings),
@@ -139,10 +139,10 @@ export class ContextImpl implements Context {
     accumulator: Accumulator<V2, V3>,
   ) => {
     const skMappings = mappings.map((mapping) => [
-      mapping.handle.getId(),
+      mapping.source.getId(),
       this.handles.register(mapping.mapper),
     ]);
-    const resHdlPtr = this.exports.SKIP_SKStore_multimapReduce(
+    const resHdlPtr = this.exports.SkipRuntime_multimapReduce(
       this.pointer(),
       this.skjson.exportString(name),
       this.skjson.exportJSON(skMappings),
@@ -154,7 +154,7 @@ export class ContextImpl implements Context {
 
   getFromTable = <K, R>(table: string, key: K, index?: string) => {
     return this.skjson.importJSON(
-      this.exports.SKIP_SKStore_getFromTable(
+      this.exports.SkipRuntime_getFromTable(
         this.pointer(),
         this.skjson.exportString(table),
         this.skjson.exportJSON(key),
@@ -165,7 +165,7 @@ export class ContextImpl implements Context {
 
   getArray = <K, V>(eagerHdl: string, key: K) => {
     return this.skjson.importJSON(
-      this.exports.SKIP_SKStore_getArray(
+      this.exports.SkipRuntime_getArray(
         this.pointer(),
         this.skjson.exportString(eagerHdl),
         this.skjson.exportJSON(key),
@@ -175,7 +175,7 @@ export class ContextImpl implements Context {
 
   getOne = <K, V>(eagerHdl: string, key: K) => {
     return this.skjson.importJSON(
-      this.exports.SKIP_SKStore_get(
+      this.exports.SkipRuntime_get(
         this.pointer(),
         this.skjson.exportString(eagerHdl),
         this.skjson.exportJSON(key),
@@ -184,7 +184,7 @@ export class ContextImpl implements Context {
   };
 
   maybeGetOne = <K, V>(eagerHdl: string, key: K) => {
-    const res = this.exports.SKIP_SKStore_maybeGet(
+    const res = this.exports.SkipRuntime_maybeGet(
       this.pointer(),
       this.skjson.exportString(eagerHdl),
       this.skjson.exportJSON(key),
@@ -194,7 +194,7 @@ export class ContextImpl implements Context {
 
   getArrayLazy = <K, V>(lazyHdl: string, key: K) => {
     return this.skjson.importJSON(
-      this.exports.SKIP_SKStore_getArrayLazy(
+      this.exports.SkipRuntime_getArrayLazy(
         this.pointer(),
         this.skjson.exportString(lazyHdl),
         this.skjson.exportJSON(key),
@@ -204,7 +204,7 @@ export class ContextImpl implements Context {
 
   getOneLazy = <K, V>(lazyHdl: string, key: K) => {
     return this.skjson.importJSON(
-      this.exports.SKIP_SKStore_getLazy(
+      this.exports.SkipRuntime_getLazy(
         this.pointer(),
         this.skjson.exportString(lazyHdl),
         this.skjson.exportJSON(key),
@@ -214,7 +214,7 @@ export class ContextImpl implements Context {
 
   maybeGetOneLazy = <K, V>(lazyHdl: string, key: K) => {
     return this.skjson.importJSON(
-      this.exports.SKIP_SKStore_maybeGetLazy(
+      this.exports.SkipRuntime_maybeGetLazy(
         this.pointer(),
         this.skjson.exportString(lazyHdl),
         this.skjson.exportJSON(key),
@@ -224,7 +224,7 @@ export class ContextImpl implements Context {
 
   getArraySelf = <K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) => {
     return this.skjson.importJSON(
-      this.exports.SKIP_SKStore_getArraySelf(
+      this.exports.SkipRuntime_getArraySelf(
         this.pointer(),
         lazyHdl,
         this.skjson.exportJSON(key),
@@ -233,7 +233,7 @@ export class ContextImpl implements Context {
   };
   getOneSelf = <K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) => {
     return this.skjson.importJSON(
-      this.exports.SKIP_SKStore_getSelf(
+      this.exports.SkipRuntime_getSelf(
         this.pointer(),
         lazyHdl,
         this.skjson.exportJSON(key),
@@ -242,7 +242,7 @@ export class ContextImpl implements Context {
   };
   maybeGetOneSelf = <K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) => {
     return this.skjson.importJSON(
-      this.exports.SKIP_SKStore_maybeGetSelf(
+      this.exports.SkipRuntime_maybeGetSelf(
         this.pointer(),
         lazyHdl,
         this.skjson.exportJSON(key),
@@ -251,7 +251,7 @@ export class ContextImpl implements Context {
   };
 
   size = (eagerHdl: string) => {
-    return this.exports.SKIP_SKStore_size(
+    return this.exports.SkipRuntime_size(
       this.pointer(),
       this.skjson.exportString(eagerHdl),
     );
@@ -269,7 +269,7 @@ export class ContextImpl implements Context {
     mapper: (key: K, it: NonEmptyIterator<V>) => Iterable<[K2, V2]>,
     accumulator: Accumulator<V2, V3>,
   ) => {
-    const resHdlPtr = this.exports.SKIP_SKStore_mapReduce(
+    const resHdlPtr = this.exports.SkipRuntime_mapReduce(
       this.pointer(),
       this.skjson.exportString(eagerHdl),
       this.skjson.exportString(name),
@@ -286,7 +286,7 @@ export class ContextImpl implements Context {
     mapper: (key: K, it: NonEmptyIterator<V>) => Iterable<[K2, V2]>,
   ) => {
     const computeFnId = this.handles.register(mapper);
-    const resHdlPtr = this.exports.SKIP_SKStore_map(
+    const resHdlPtr = this.exports.SkipRuntime_map(
       this.pointer(),
       this.skjson.exportString(eagerHdl),
       this.skjson.exportString(name),
@@ -301,7 +301,7 @@ export class ContextImpl implements Context {
     mapper: (entry: R, occ: number) => Iterable<[K, V]>,
   ) => {
     const computeFnId = this.handles.register(mapper);
-    const eagerHdl = this.exports.SKIP_SKStore_fromSkdb(
+    const eagerHdl = this.exports.SkipRuntime_fromSkdb(
       this.pointer(),
       this.skjson.exportString(table),
       this.skjson.exportString(name),
@@ -316,7 +316,7 @@ export class ContextImpl implements Context {
     convert: (key: K, it: NonEmptyIterator<V>) => R,
   ) => {
     const convertId = this.handles.register(convert);
-    this.exports.SKIP_SKStore_toSkdb(
+    this.exports.SkipRuntime_toSkdb(
       this.pointer(),
       this.skjson.exportString(eagerHdl),
       this.skjson.exportString(table),
@@ -347,21 +347,21 @@ class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
   next(): Opt<T> {
     /* eslint-disable-next-line @typescript-eslint/no-unsafe-return */
     return this.skjson.importOptJSON(
-      this.exports.SKIP_SKStore_iteratorNext(this.pointer),
+      this.exports.SkipRuntime_iteratorNext(this.pointer),
     );
   }
 
   first(): T {
     /* eslint-disable-next-line @typescript-eslint/no-unsafe-return */
     return this.skjson.importJSON(
-      this.exports.SKIP_SKStore_iteratorFirst(this.pointer),
+      this.exports.SkipRuntime_iteratorFirst(this.pointer),
     );
   }
 
   uniqueValue(): Opt<T> {
     /* eslint-disable-next-line @typescript-eslint/no-unsafe-return */
     return this.skjson.importOptJSON(
-      this.exports.SKIP_SKStore_iteratorUniqueValue(this.pointer),
+      this.exports.SkipRuntime_iteratorUniqueValue(this.pointer),
     );
   }
 
@@ -373,7 +373,7 @@ class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
     const cloned_iter = new NonEmptyIteratorImpl<T>(
       this.skjson,
       this.exports,
-      this.exports.SKIP_SKStore_cloneIterator(this.pointer),
+      this.exports.SkipRuntime_cloneIterator(this.pointer),
     );
 
     return {
@@ -401,14 +401,14 @@ class WriterImpl<K, T> {
   }
 
   set = (key: K, value: T) => {
-    this.exports.SKIP_SKStore_writerSet(
+    this.exports.SkipRuntime_writerSet(
       this.pointer,
       this.skjson.exportJSON(key),
       this.skjson.exportJSON(value),
     );
   };
   setArray = (key: K, values: T[]) => {
-    this.exports.SKIP_SKStore_writerSetArray(
+    this.exports.SkipRuntime_writerSetArray(
       this.pointer,
       this.skjson.exportJSON(key),
       this.skjson.exportJSON(values),
@@ -648,7 +648,7 @@ class LinksImpl implements Links {
         setTimeout(() => {
           const result = jsu.runWithGC(() => {
             return Math.trunc(
-              fromWasm.SKIP_SKStore_asyncResult(
+              fromWasm.SkipRuntime_asyncResult(
                 jsu.exportString(callId),
                 jsu.exportString(name),
                 jsu.exportJSON(key),
@@ -779,7 +779,7 @@ class LinksImpl implements Links {
       const uuid = this.env.crypto().randomUUID();
       const jsu = skjson();
       const result = utils.runWithGc(() =>
-        Math.trunc(fromWasm.SKIP_SKStore_createFor(jsu.exportString(uuid))),
+        Math.trunc(fromWasm.SkipRuntime_createFor(jsu.exportString(uuid))),
       );
       if (result < 0) {
         throw this.handles.delete(-result);

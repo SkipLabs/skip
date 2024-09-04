@@ -1,28 +1,28 @@
 // prettier-ignore
 import { runUrl, type ModuleInit } from "#std/sk_types.js";
-import { check } from "./prv/skstore_impl.js";
+import { check } from "./internals/skipruntime_impl.js";
 import type {
   SKStore,
   SKStoreFactory,
   ColumnSchema,
   MirrorSchema,
-  TableHandle,
+  TableCollection,
   Table,
-  TTableHandle,
+  TTableCollection,
   TTable,
   TJSON,
   JSONObject,
   Accumulator,
-} from "./skstore_api.js";
+} from "./skipruntime_api.js";
 
 export type {
   SKStore,
   TJSON,
-  TableHandle,
+  TableCollection,
   Table,
   MirrorSchema,
   JSONObject,
-  TTableHandle,
+  TTableCollection,
   TTable,
   ColumnSchema,
   Accumulator,
@@ -30,18 +30,18 @@ export type {
 
 export type {
   Mapper,
-  EntryMapper as TableMapper,
+  InputMapper,
   OutputMapper,
-  EHandle,
+  EagerCollection,
   NonEmptyIterator,
-  LHandle,
+  LazyCollection,
   LazyCompute,
   AsyncLazyCompute,
   Loadable,
-  ALHandle,
-} from "./skstore_api.js";
+  AsyncLazyCollection,
+} from "./skipruntime_api.js";
 
-export { ValueMapper } from "./skstore_api.js";
+export { ValueMapper } from "./skipruntime_api.js";
 export {
   Sum,
   Min,
@@ -51,7 +51,7 @@ export {
   cinteger,
   cfloat,
   cjson,
-} from "./skstore_utils.js";
+} from "./skipruntime_utils.js";
 
 const modules: ModuleInit[] = [];
 /*--MODULES--*/
@@ -61,15 +61,15 @@ async function wasmUrl(): Promise<URL> {
   if (import.meta.env || import.meta.webpack) {
     /* eslint-disable @typescript-eslint/no-unsafe-return */
     //@ts-expect-error  Cannot find module './skstore.wasm?url' or its corresponding type declarations.
-    return await import("./skstore.wasm?url");
+    return await import("./skip-runtime.wasm?url");
     /* eslint-enable @typescript-eslint/no-unsafe-return */
   }
 
-  return new URL("./skstore.wasm", import.meta.url);
+  return new URL("./skip-runtime.wasm", import.meta.url);
 }
 
 export async function createSKStore(
-  init: (skstore: SKStore, ...tables: TableHandle<TJSON[]>[]) => void,
+  init: (skstore: SKStore, ...tables: TableCollection<TJSON[]>[]) => void,
   tables: MirrorSchema[],
   connect: boolean = true,
 ): Promise<Table<TJSON[]>[]> {
