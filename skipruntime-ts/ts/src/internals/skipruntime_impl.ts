@@ -7,7 +7,6 @@ import type {
   EagerCollection,
   LazyCollection,
   Mapper,
-  ValueMapper,
   InputMapper,
   OutputMapper,
   TableCollection,
