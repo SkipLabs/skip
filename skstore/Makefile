@@ -4,6 +4,15 @@ SKARGO_PROFILE?=release
 ../build/sknpm:
 	cd .. && make build/sknpm
 
+.PHONY: check-src
+check-src:
+	cd ts/src && npm install
+	cd ts/src && tsc
+	cd ts/src && npm run lint
+
+.PHONY: check-all
+check-all: check-src check
+
 build: ../build/sknpm
 	cd ts/examples && bun install
 	../build/sknpm b -r --out-dir ts/examples/node_modules/skstore
