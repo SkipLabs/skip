@@ -297,7 +297,9 @@ export interface FromWasm {
   SkipRuntime_multimap(
     ctx: ptr<Internal.Context>,
     name: ptr<Internal.String>,
-    mappings: ptr<Internal.CJArray>,
+    mappings: ptr<
+      Internal.CJArray<Internal.CJArray<Internal.CJString | Internal.CJInt>>
+    >,
   ): ptr<Internal.String>;
   SkipRuntime_asyncResult(
     callId: ptr<Internal.String>,
@@ -310,7 +312,9 @@ export interface FromWasm {
   SkipRuntime_multimapReduce<V2 extends TJSON, V3 extends TJSON>(
     ctx: ptr<Internal.Context>,
     name: ptr<Internal.String>,
-    mappings: ptr<Internal.CJArray>,
+    mappings: ptr<
+      Internal.CJArray<Internal.CJArray<Internal.CJString | Internal.CJInt>>
+    >,
     accumulator: Handle<Accumulator<V2, V3>>,
     accInit: ptr<Internal.CJSON>,
   ): ptr<Internal.String>;
