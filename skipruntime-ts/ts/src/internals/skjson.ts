@@ -122,15 +122,18 @@ function getValue<T extends Internal.CJSON>(hdl: WasmHandle<T>): Exportable {
   return interpretPointer(hdl, hdl.pointer);
 }
 
-function getValueAt<T extends Internal.CJSON>(
+function getFieldAt<T extends Internal.CJObject>(
   hdl: WasmHandle<T>,
   idx: int,
-  array: boolean = false,
-): any {
-  const skval = array
-    ? hdl.access.SKIP_SKJSON_at(hdl.pointer, idx)
-    : hdl.access.SKIP_SKJSON_get(hdl.pointer, idx);
-  return interpretPointer(hdl, skval);
+): Exportable {
+  return interpretPointer(hdl, hdl.access.SKIP_SKJSON_get(hdl.pointer, idx));
+}
+
+function getItemAt<T extends Internal.CJArray>(
+  hdl: WasmHandle<T>,
+  idx: int,
+): Exportable {
+  return interpretPointer(hdl, hdl.access.SKIP_SKJSON_at(hdl.pointer, idx));
 }
 
 type ObjectProxy<Base extends Record<string, any>> = {
@@ -162,7 +165,7 @@ export const reactiveObject = {
       return (): any => {
         const res: any = {};
         for (const key of fields) {
-          res[key[0]] = getValueAt(hdl, key[1], false);
+          res[key[0]] = getFieldAt(hdl, key[1]);
         }
         return res;
       };
@@ -170,7 +173,7 @@ export const reactiveObject = {
     if (typeof prop === "symbol") return undefined;
     const idx = fields.get(prop);
     if (idx === undefined) return undefined;
-    return getValueAt(hdl, idx, false);
+    return getFieldAt(hdl, idx);
   },
   set(
     _hdl: WasmHandle<Internal.CJObject>,
@@ -201,7 +204,7 @@ export const reactiveObject = {
     const fields = hdl.objectFields();
     const idx = fields.get(prop);
     if (idx === undefined) return undefined;
-    const value = getValueAt(hdl, idx, false);
+    const value = getFieldAt(hdl, idx);
     return {
       configurable: true,
       enumerable: true,
@@ -247,7 +250,7 @@ export const reactiveArray = {
         const res: any[] = [];
         const length: number = self.length;
         for (let i = 0; i < length; i++) {
-          res.push(getValueAt(hdl, i, true));
+          res.push(getItemAt(hdl, i));
         }
         return res;
       };
@@ -262,7 +265,7 @@ export const reactiveArray = {
       if (prop === Symbol.iterator) return self.toJSON()[Symbol.iterator];
     } else {
       const v = parseInt(prop);
-      if (!isNaN(v)) return getValueAt(hdl, v, true);
+      if (!isNaN(v)) return getItemAt(hdl, v);
     }
     return undefined;
   },
@@ -291,7 +294,7 @@ export const reactiveArray = {
     if (typeof prop === "symbol") return undefined;
     const v = parseInt(prop);
     if (isNaN(v)) return undefined;
-    const value = getValueAt(hdl, v, true);
+    const value = getItemAt(hdl, v);
     return {
       configurable: true,
       enumerable: true,
