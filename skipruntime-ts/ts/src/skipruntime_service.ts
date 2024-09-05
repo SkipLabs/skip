@@ -53,7 +53,7 @@ export type OutputDefinition = {
 export interface GenericSkipService {
   // name / duration in milliseconds
   tokens?: Record<string, number>;
-  localeInputs(): Record<string, InputDefinition>;
+  localInputs(): Record<string, InputDefinition>;
   remoteInputs(): Record<string, RemoteInputs>;
 
   outputs(): Record<string, OutputDefinition>;

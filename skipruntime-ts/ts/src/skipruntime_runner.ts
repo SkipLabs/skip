@@ -101,7 +101,7 @@ class SimpleToGenericSkipService implements GenericSkipService {
     if (simple.tokens) this.tokens = simple.tokens;
   }
 
-  localeInputs() {
+  localInputs() {
     const inputs: Record<string, InputDefinition> = {};
     if (this.simple.inputTables) {
       this.simple.inputTables.map((table) => {
@@ -172,10 +172,10 @@ class SimpleToGenericSkipService implements GenericSkipService {
 }
 
 function isGenericSkipService(service: GenericSkipService | SimpleSkipService) {
-  if (!("localeInputs" in service)) return false;
+  if (!("localInputs" in service)) return false;
   if (!("remoteInputs" in service)) return false;
   if (!("outputs" in service)) return false;
-  if (typeof service.localeInputs != "function") return false;
+  if (typeof service.localInputs != "function") return false;
   if (typeof service.remoteInputs != "function") return false;
   if (typeof service.outputs != "function") return false;
   return true;
@@ -198,11 +198,11 @@ export async function runService(
   const gService: GenericSkipService = isGenericSkipService(service)
     ? (service as GenericSkipService)
     : new SimpleToGenericSkipService(service as SimpleSkipService);
-  const localeInputs = gService.localeInputs();
+  const localInputs = gService.localInputs();
   const remoteInputs = gService.remoteInputs();
   const outputs = gService.outputs();
   const schemas: Schema[] = [];
-  for (const [key, value] of Object.entries(localeInputs)) {
+  for (const [key, value] of Object.entries(localInputs)) {
     const schema = value.schema;
     if (schema.name != key) {
       schema.alias = key;
@@ -241,7 +241,7 @@ export async function runService(
     tables: Record<string, TableCollection<TJSON[]>>,
   ) => {
     const iHandles: Record<string, EagerCollection<TJSON, TJSON>> = {};
-    for (const [key, value] of Object.entries(localeInputs)) {
+    for (const [key, value] of Object.entries(localInputs)) {
       const table = tables[key];
       // eslint-disable-next-line  @typescript-eslint/no-unsafe-argument
       iHandles[key] = table.map(value.fromTableRow, ...value.params);

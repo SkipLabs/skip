@@ -18,7 +18,7 @@ import type {
   TJSON,
   JSONObject,
   Accumulator,
-  Locale,
+  Local,
   Remote,
   Database,
 } from "./skipruntime_api.js";
@@ -86,18 +86,18 @@ export async function createSKStore(
     skstore: SKStore,
     tables: Record<string, TableCollection<TJSON[]>>,
   ) => void,
-  locale: Locale,
+  local: Local,
   remotes: Record<string, Remote> = {},
   tokens: Record<string, number> = {},
 ): Promise<Record<string, Table<TJSON[]>>> {
   const data = await runUrl(wasmUrl, modules, [], "SKDB_factory");
   const factory = data.environment.shared.get("SKStore") as SKStoreFactory;
-  return factory.runSKStore(init, locale, remotes, tokens);
+  return factory.runSKStore(init, local, remotes, tokens);
 }
 
 export async function createInlineSKStore(
   init: (skstore: SKStore, ...tables: TableCollection<TJSON[]>[]) => void,
-  locale: Locale,
+  local: Local,
   remotes: Record<string, Remote> = {},
   tokens: Record<string, number> = {},
 ): Promise<Table<TJSON[]>[]> {
@@ -105,7 +105,7 @@ export async function createInlineSKStore(
   const result = await createSKStore(
     (skstore: SKStore, tables: Record<string, TableCollection<TJSON[]>>) => {
       const handles: TableCollection<TJSON[]>[] = [];
-      for (const schema of locale.tables) {
+      for (const schema of local.tables) {
         const name = schema.alias ? schema.alias : schema.name;
         handles.push(tables[name]);
       }
@@ -117,11 +117,11 @@ export async function createInlineSKStore(
       }
       init(skstore, ...handles);
     },
-    locale,
+    local,
     remotes,
     tokens,
   );
-  for (const schema of locale.tables) {
+  for (const schema of local.tables) {
     const name = schema.alias ? schema.alias : schema.name;
     tables.push(result[name]);
   }
@@ -134,7 +134,7 @@ export async function createInlineSKStore(
   return tables;
 }
 
-export async function createLocaleSKStore(
+export async function createLocalSKStore(
   init: (skstore: SKStore, ...tables: TableCollection<TJSON[]>[]) => void,
   schemas: Schema[],
   tokens: Record<string, number> = {},

@@ -25,7 +25,7 @@ import type {
   NonEmptyIterator,
   Index,
   Remote,
-  Locale,
+  Local,
   EntryPoint,
   Inputs,
 } from "../skipruntime_api.js";
@@ -523,7 +523,7 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
       skstore: SKStore,
       tables: Record<string, TableCollection<TJSON[]>>,
     ) => void,
-    locale: Locale,
+    local: Local,
     remotes: Record<string, Remote> = {},
     tokens: Record<string, number> = {},
   ): Promise<Record<string, Table<TJSON[]>>> => {
@@ -531,7 +531,7 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
     const tables = await mirror(
       context,
       this.createSync,
-      locale,
+      local,
       remotes,
       this.createKey,
     );
@@ -556,7 +556,7 @@ function toWs(entryPoint: EntryPoint) {
  * Mirror Skip tables from SKDB, with support for custom schemas and SQL filters
  * @param context
  * @param createSkdb
- * @param locale
+ * @param local
  * @param remotes
  * @param createKey
  * @returns - the mirrors table handles
@@ -564,18 +564,18 @@ function toWs(entryPoint: EntryPoint) {
 export async function mirror(
   context: Context,
   createSkdb: () => Promise<SKDBSync>,
-  locale: Locale,
+  local: Local,
   remotes: Record<string, Remote>,
   createKey: (key: string) => Promise<CryptoKey>,
 ): Promise<Record<string, TableCollection<TJSON[]>>> {
   const tHandles: Record<string, TableCollection<TJSON[]>> = {};
-  if (locale.database) {
-    remotes["__sk_locale"] = {
-      database: locale.database,
-      tables: locale.tables,
+  if (local.database) {
+    remotes["__sk_local"] = {
+      database: local.database,
+      tables: local.tables,
     };
   } else {
-    for (const table of locale.tables) {
+    for (const table of local.tables) {
       const skdb = await createSkdb();
       const query = create(table);
       skdb.exec(query.query, query.params ? toParams(query.params) : undefined);
