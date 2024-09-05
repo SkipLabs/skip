@@ -182,7 +182,7 @@ export interface FromWasm {
     ctx: ptr<Internal.Context>,
     getterHdl: ptr<Internal.String>,
     key: ptr<Internal.CJSON>,
-  ): ptr<Internal.CJSON>;
+  ): ptr<Internal.CJArray>;
   SkipRuntime_get(
     ctx: ptr<Internal.Context>,
     getterHdl: ptr<Internal.String>,
@@ -203,7 +203,7 @@ export interface FromWasm {
     ctx: ptr<Internal.Context>,
     lazyId: ptr<Internal.String>,
     key: ptr<Internal.CJSON>,
-  ): ptr<Internal.CJSON>;
+  ): ptr<Internal.CJArray>;
   SkipRuntime_getLazy(
     ctx: ptr<Internal.Context>,
     lazyId: ptr<Internal.String>,
@@ -219,7 +219,7 @@ export interface FromWasm {
     ctx: ptr<Internal.Context>,
     selfHdl: ptr<Internal.LHandle>,
     key: ptr<Internal.CJSON>,
-  ): ptr<Internal.CJSON>;
+  ): ptr<Internal.CJArray>;
   SkipRuntime_getSelf(
     ctx: ptr<Internal.Context>,
     selfHdl: ptr<Internal.LHandle>,
