@@ -497,7 +497,7 @@ export type Database = {
   endpoint?: EntryPoint;
 };
 
-export type Locale = {
+export type Local = {
   database?: Database;
   tables: Schema[];
 };
@@ -513,7 +513,7 @@ export interface SKStoreFactory extends Shared {
       skstore: SKStore,
       tables: Record<string, TableCollection<TJSON[]>>,
     ) => void,
-    locale: Locale,
+    local: Local,
     remotes?: Record<string, Remote>,
     tokens?: Record<string, number>,
   ): Promise<Record<string, Table<TJSON[]>>>;

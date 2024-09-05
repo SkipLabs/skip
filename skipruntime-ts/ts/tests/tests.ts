@@ -22,7 +22,7 @@ import {
   Sum,
   ValueMapper,
   TimeQueue,
-  createLocaleSKStore,
+  createLocalSKStore,
   cinteger as integer,
   schema,
   ctext as text,
@@ -919,7 +919,7 @@ function run(t: Test) {
   test(t.name, async ({ page }) => {
     let tables: Table<TJSON[]>[] = [];
     try {
-      tables = await createLocaleSKStore(
+      tables = await createLocalSKStore(
         t.init,
         t.schemas,
         t.tokens ? t.tokens : {},
