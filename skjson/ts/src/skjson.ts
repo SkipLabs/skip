@@ -31,11 +31,11 @@ interface WasmAccess {
   SKIP_SKJSON_get: (
     json: ptr<Internal.CJObject>,
     idx: int,
-  ) => ptr<Internal.CJSON>; // Should be Opt<...>
+  ) => Opt<ptr<Internal.CJSON>>;
   SKIP_SKJSON_at: (
     json: ptr<Internal.CJArray>,
     idx: int,
-  ) => ptr<Internal.CJSON>; // Should be Opt<...>
+  ) => Opt<ptr<Internal.CJSON>>;
 
   SKIP_SKJSON_objectSize: (json: ptr<Internal.CJObject>) => int;
   SKIP_SKJSON_arraySize: (json: ptr<Internal.CJArray>) => int;
@@ -81,9 +81,9 @@ class WasmHandle<T extends Internal.CJSON> {
 
 function interpretPointer<T extends Internal.CJSON>(
   hdl: WasmHandle<any>,
-  ptr: ptr<T>,
+  ptr: null | ptr<T>,
 ): Exportable {
-  if (ptr == 0) return null;
+  if (ptr === null || ptr == 0) return null;
   const type = hdl.access.SKIP_SKJSON_typeOf(ptr) as Type;
   switch (type) {
     case Type.Null:
