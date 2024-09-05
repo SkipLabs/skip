@@ -34,10 +34,10 @@ interface WasmAccess {
     json: ptr<Internal.CJObject>,
     idx: int,
   ) => Opt<ptr<Internal.CJSON>>;
-  SKIP_SKJSON_at: (
-    json: ptr<Internal.CJArray>,
+  SKIP_SKJSON_at: <T extends Internal.CJSON>(
+    json: ptr<Internal.CJArray<T>>,
     idx: int,
-  ) => Opt<ptr<Internal.CJSON>>;
+  ) => Opt<ptr<T>>;
 
   SKIP_SKJSON_objectSize: (json: ptr<Internal.CJObject>) => int;
   SKIP_SKJSON_arraySize: (json: ptr<Internal.CJArray>) => int;
@@ -129,8 +129,8 @@ function getFieldAt<T extends Internal.CJObject>(
   return interpretPointer(hdl, hdl.access.SKIP_SKJSON_get(hdl.pointer, idx));
 }
 
-function getItemAt<T extends Internal.CJArray>(
-  hdl: WasmHandle<T>,
+function getItemAt<T extends Internal.CJSON>(
+  hdl: WasmHandle<Internal.CJArray<T>>,
   idx: int,
 ): Exportable {
   return interpretPointer(hdl, hdl.access.SKIP_SKJSON_at(hdl.pointer, idx));
@@ -328,7 +328,7 @@ function clone<T>(value: T): T {
 type PartialCJObj = Internal.Vector<
   Internal.Pair<Internal.String, Internal.CJSON>
 >;
-type PartialCJArray = Internal.Vector<Internal.CJSON>;
+type PartialCJArray<T extends Internal.CJSON> = Internal.Vector<T>;
 
 interface FromWasm extends WasmAccess {
   SKIP_SKJSON_startCJObject: () => ptr<PartialCJObj>;
@@ -338,12 +338,16 @@ interface FromWasm extends WasmAccess {
     value: ptr<Internal.CJSON>,
   ) => void;
   SKIP_SKJSON_endCJObject: (obj: ptr<PartialCJObj>) => ptr<Internal.CJObject>;
-  SKIP_SKJSON_startCJArray: () => ptr<PartialCJArray>;
-  SKIP_SKJSON_addToCJArray: (
-    arr: ptr<PartialCJArray>,
-    value: ptr<Internal.CJSON>,
+  SKIP_SKJSON_startCJArray: <T extends Internal.CJSON>() => ptr<
+    PartialCJArray<T>
+  >;
+  SKIP_SKJSON_addToCJArray: <T extends Internal.CJSON>(
+    arr: ptr<PartialCJArray<T>>,
+    value: ptr<T>,
   ) => void;
-  SKIP_SKJSON_endCJArray: (arr: ptr<PartialCJArray>) => ptr<Internal.CJArray>;
+  SKIP_SKJSON_endCJArray: <T extends Internal.CJSON>(
+    arr: ptr<PartialCJArray<T>>,
+  ) => ptr<Internal.CJArray<T>>;
   SKIP_SKJSON_createCJNull: () => ptr<Internal.CJNull>;
   SKIP_SKJSON_createCJInt: (v: int) => ptr<Internal.CJInt>;
   SKIP_SKJSON_createCJFloat: (v: float) => ptr<Internal.CJFloat>;
