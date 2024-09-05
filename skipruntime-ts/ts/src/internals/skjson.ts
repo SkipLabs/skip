@@ -110,7 +110,7 @@ function interpretPointer<T extends Internal.CJSON>(
       return new Proxy(
         hdl.derive(oPtr),
         reactiveObject,
-      ) as unknown as ObjectProxy<object>;
+      ) as unknown as ObjectProxy<{ [k: string]: Exportable }>;
     }
     case Type.Undefined:
     default:
@@ -136,7 +136,7 @@ function getItemAt<T extends Internal.CJArray>(
   return interpretPointer(hdl, hdl.access.SKIP_SKJSON_at(hdl.pointer, idx));
 }
 
-type ObjectProxy<Base extends Record<string, any>> = {
+type ObjectProxy<Base extends { [k: string]: Exportable }> = {
   [sk_isObjectProxy]: true;
   __sk_frozen: true;
   __pointer: ptr<Internal.CJSON>;
@@ -145,13 +145,13 @@ type ObjectProxy<Base extends Record<string, any>> = {
   keys: (keyof Base)[];
 } & Base;
 
-function isObjectProxy(x: any): x is ObjectProxy<Record<string, any>> {
+function isObjectProxy(x: any): x is ObjectProxy<{ [k: string]: Exportable }> {
   /* eslint-disable-next-line @typescript-eslint/no-unsafe-return */
   return sk_isObjectProxy in x && x[sk_isObjectProxy];
 }
 
 export const reactiveObject = {
-  get<Base extends object>(
+  get<Base extends { [k: string]: Exportable }>(
     hdl: WasmHandle<Internal.CJObject>,
     prop: string | symbol,
     self: ObjectProxy<Base>,
@@ -160,17 +160,15 @@ export const reactiveObject = {
     if (prop === "__sk_frozen") return true;
     if (prop === "__pointer") return hdl.pointer;
     if (prop === "clone") return (): ObjectProxy<Base> => clone(self);
+    if (typeof prop === "symbol") return undefined;
     const fields = hdl.objectFields();
     if (prop === "toJSON")
-      return (): any => {
-        const res: any = {};
-        for (const key of fields) {
-          res[key[0]] = getFieldAt(hdl, key[1]);
-        }
-        return res;
+      return (): Base => {
+        return Object.fromEntries(
+          Array.from(fields).map(([k, ptr]) => [k, getFieldAt(hdl, ptr)]),
+        ) as Base;
       };
     if (prop === "keys") return fields.keys();
-    if (typeof prop === "symbol") return undefined;
     const idx = fields.get(prop);
     if (idx === undefined) return undefined;
     return getFieldAt(hdl, idx);
@@ -383,7 +381,7 @@ export type Exportable =
   | TJSON
   | null
   | undefined
-  | ObjectProxy<object>
+  | ObjectProxy<{ [k: string]: Exportable }>
   | ArrayProxy<any>;
 
 export interface SKJSON extends Shared {
@@ -395,7 +393,9 @@ export interface SKJSON extends Shared {
   exportJSON(v: any[]): ptr<Internal.CJArray>;
   exportJSON(v: JSONObject): ptr<Internal.CJObject>;
   exportJSON<T extends Internal.CJSON>(
-    v: (ObjectProxy<object> | ArrayProxy<any>) & { __pointer: ptr<T> },
+    v: (ObjectProxy<{ [k: string]: Exportable }> | ArrayProxy<any>) & {
+      __pointer: ptr<T>;
+    },
   ): ptr<T>;
   exportJSON(v: TJSON | null): ptr<Internal.CJSON>;
   importOptJSON: (
