@@ -17,10 +17,13 @@ declare const cjstring: unique symbol;
 export type CJString = CJSON<typeof cjstring>;
 
 declare const cjarray: unique symbol;
-export type CJArray = CJSON<typeof cjarray>;
+export type CJArray<Sub extends CJSON = CJSON> = CJSON<typeof cjarray, Sub>;
 
 declare const cjobject: unique symbol;
 export type CJObject = CJSON<typeof cjobject>;
 
 declare const cjson: unique symbol;
-export type CJSON<Sub = any> = T<typeof cjson> & { sub: Sub };
+export type CJSON<Sub = any, Sub2 = any> = T<typeof cjson> & {
+  sub: Sub;
+  sub2: Sub2;
+};
