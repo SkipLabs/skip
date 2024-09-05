@@ -259,22 +259,24 @@ fun mapReduce(
 fun multimap(
   context: mutable Context,
   name: String,
-  mappings: SKJSON.CJArray<SKJSON.CJSON>,
+  mappings: SKJSON.CJArray<SKJSON.CJArray<SKJSON.CJSON>>,
 ): String {
   skmappings = mappings match {
   | SKJSON.CJArray(v) ->
     v.map(e -> {
-      mapping = SKJSON.expectArray(e);
-      handleId = SKJSON.asString(mapping[0]);
-      eager = EHandle(
-        JSONID::keyType,
-        JSONFile::type,
-        DirName::create(handleId),
-      );
-      mapHandle = FnHandle::make(
-        UInt32::truncate(SKJSON.asFloat(mapping[1]).toInt()),
-      );
-      return (eager, mapHandle.map)
+      e match {
+      | SKJSON.CJArray(mapping) ->
+        handleId = SKJSON.asString(mapping[0]);
+        eager = EHandle(
+          JSONID::keyType,
+          JSONFile::type,
+          DirName::create(handleId),
+        );
+        mapHandle = FnHandle::make(
+          UInt32::truncate(SKJSON.asFloat(mapping[1]).toInt()),
+        );
+        return (eager, mapHandle.map)
+      }
     })
   };
   eagerMultiMap(JSONID::keyType, JSONFile::type, name, context, skmappings)
@@ -286,7 +288,7 @@ fun multimap(
 fun multimapReduce(
   context: mutable Context,
   name: String,
-  mappings: SKJSON.CJArray<SKJSON.CJSON>,
+  mappings: SKJSON.CJArray<SKJSON.CJArray<SKJSON.CJSON>>,
   accumulator: UInt32,
   default: SKJSON.CJSON,
 ): String {
@@ -294,17 +296,19 @@ fun multimapReduce(
   skmappings = mappings match {
   | SKJSON.CJArray(v) ->
     v.map(e -> {
-      mapping = SKJSON.expectArray(e);
-      handleId = SKJSON.asString(mapping[0]);
-      eager = EHandle(
-        JSONID::keyType,
-        JSONFile::type,
-        DirName::create(handleId),
-      );
-      mapHandle = FnHandle::make(
-        UInt32::truncate(SKJSON.asFloat(mapping[1]).toInt()),
-      );
-      return (eager, mapHandle.map)
+      e match {
+      | SKJSON.CJArray(mapping) ->
+        handleId = SKJSON.asString(mapping[0]);
+        eager = EHandle(
+          JSONID::keyType,
+          JSONFile::type,
+          DirName::create(handleId),
+        );
+        mapHandle = FnHandle::make(
+          UInt32::truncate(SKJSON.asFloat(mapping[1]).toInt()),
+        );
+        return (eager, mapHandle.map)
+      }
     })
   };
   eagerMultiMapReduce(
