@@ -48,6 +48,9 @@ export type UnitTest = {
   error?: (err: any) => void;
 };
 
+export const tests: Test[] = [];
+export const units: UnitTest[] = [];
+
 //// testMap1
 
 class TestFromIntInt implements InputMapper<[number, number], number, number> {
@@ -79,6 +82,16 @@ async function testMap1Run(input: Table<TJSON[]>, output: Table<TJSON[]>) {
   input.insert([[1, 10]], true);
   check("testMap1", output.select({ id: 1 }, ["value"]), [{ value: 12 }]);
 }
+
+tests.push({
+  name: "testMap1",
+  schemas: [
+    schema("input", [integer("id", true, true), integer("value")]),
+    schema("output", [integer("id", true, true), integer("value")]),
+  ],
+  init: testMap1Init,
+  run: testMap1Run,
+});
 
 //// testMap2
 
@@ -135,6 +148,17 @@ async function testMap2Run(
   ]);
 }
 
+tests.push({
+  name: "testMap2",
+  schemas: [
+    schema("input1", [integer("id", true, true), text("value")]),
+    schema("input2", [integer("id", true, true), text("value")]),
+    schema("output", [integer("id", true, true), integer("value")]),
+  ],
+  init: testMap2Init,
+  run: testMap2Run,
+});
+
 //// testMap3
 
 class TestSum implements Mapper<number, number, number, number> {
@@ -178,6 +202,19 @@ async function testMap3Run(
   ]);
 }
 
+tests.push({
+  name: "testMap3",
+  schemas: [
+    schema("input_no_index", [integer("id"), text("value")]),
+    schema("input_index", [integer("id", true, true), text("value")]),
+    schema("output", [integer("id"), integer("value")]),
+  ],
+  init: testMap3Init,
+  run: testMap3Run,
+});
+
+//// testValueMapper
+
 class SquareValues extends ValueMapper<number, number, number> {
   mapValue(v: number) {
     return v * v;
@@ -219,6 +256,16 @@ async function testValueMapperRun(
   ]);
 }
 
+tests.push({
+  name: "testValueMapper",
+  schemas: [
+    schema("input", [integer("id", true, true), integer("value")]),
+    schema("output", [integer("id", true, true), integer("value")]),
+  ],
+  init: testValueMapperInit,
+  run: testValueMapperRun,
+});
+
 //// testSize
 
 class TestSizeGetter implements InputMapper<[number], number, number> {
@@ -256,6 +303,17 @@ async function testSizeRun(
   input.deleteWhere({ id: 1 });
   check("testSizeRemove", output.select({ id: 0 }, ["value"]), [{ value: 1 }]);
 }
+
+tests.push({
+  name: "testSize",
+  schemas: [
+    schema("input", [integer("id", true, true), integer("value")]),
+    schema("size", [integer("id", true, true)]),
+    schema("output", [integer("id", true, true), integer("value")]),
+  ],
+  init: testSizeInit,
+  run: testSizeRun,
+});
 
 //// testLazy
 
@@ -315,6 +373,16 @@ async function testLazyRun(
   ]);
 }
 
+tests.push({
+  name: "testLazy",
+  schemas: [
+    schema("input", [integer("id", true, true), integer("value")]),
+    schema("output", [integer("id", true, true), integer("value")]),
+  ],
+  init: testLazyInit,
+  run: testLazyRun,
+});
+
 //// testMapReduce
 
 class TestOddEven implements Mapper<number, number, number, number> {
@@ -365,6 +433,16 @@ async function testMapReduceRun(
     { id: 1, v: 1 },
   ]);
 }
+
+tests.push({
+  name: "testMapReduce",
+  schemas: [
+    schema("input", [integer("id", true, true), integer("v")]),
+    schema("output", [integer("id", true, true), integer("v")]),
+  ],
+  init: testMapReduceInit,
+  run: testMapReduceRun,
+});
 
 //// testMultiMap1
 
@@ -434,6 +512,17 @@ async function testMultiMap1Run(
   ]);
 }
 
+tests.push({
+  name: "testMultiMap1",
+  schemas: [
+    schema("input1", [integer("id", true, true), integer("value")]),
+    schema("input2", [integer("id", true, true), integer("value")]),
+    schema("output", [integer("src"), integer("id"), integer("v")]),
+  ],
+  init: testMultiMap1Init,
+  run: testMultiMap1Run,
+});
+
 //// testMultiMapReduce
 
 class TestSet implements Mapper<number, number, number, number> {
@@ -485,6 +574,17 @@ async function testMultiMapReduceRun(
     { id: 2, v: 10 },
   ]);
 }
+
+tests.push({
+  name: "testMultiMapReduce",
+  schemas: [
+    schema("input1", [integer("id", true, true), integer("value")]),
+    schema("input2", [integer("id", true, true), integer("value")]),
+    schema("output", [integer("id", true, true), integer("v")]),
+  ],
+  init: testMultiMapReduceInit,
+  run: testMultiMapReduceRun,
+});
 
 //// testAsyncLazy
 
@@ -577,6 +677,17 @@ async function testAsyncLazyRun(
   return new Promise(waitandcheck) as Promise<void>;
 }
 
+tests.push({
+  name: "testAsyncLazy",
+  schemas: [
+    schema("input1", [integer("id", true, true), integer("value")]),
+    schema("input2", [integer("id", true, true), integer("value")]),
+    schema("output", [integer("id", true, true), text("v")]),
+  ],
+  init: testAsyncLazyInit,
+  run: testAsyncLazyRun,
+});
+
 //// testTokens
 
 class TestWithToken
@@ -639,6 +750,21 @@ async function testTokensRun(
   const last = output.select({ id: 1 }, ["value", "time"])[0] as any;
   check("testTokens[2]", Math.trunc((last.time - start.time) / 1000), 5);
 }
+
+tests.push({
+  name: "testTokensInit",
+  schemas: [
+    schema("input", [integer("id", true, true), integer("value")]),
+    schema("output", [
+      integer("id", true, true),
+      integer("value"),
+      integer("time"),
+    ]),
+  ],
+  init: testTokensInit,
+  run: testTokensRun,
+  tokens: { token_5s: 5000 },
+});
 
 // testJSONExtract
 
@@ -709,129 +835,17 @@ async function testJSONExtractRun(
   ]);
 }
 
-//// Tests
+tests.push({
+  name: "testJSONExtract",
+  schemas: [
+    schema("input", [integer("id", true), json("v"), text("p")]),
+    schema("output", [integer("id", true), json("v")]),
+  ],
+  init: testJSONExtractInit,
+  run: testJSONExtractRun,
+});
 
-export const tests: Test[] = [
-  {
-    name: "testMap1",
-    schemas: [
-      schema("input", [integer("id", true, true), integer("value")]),
-      schema("output", [integer("id", true, true), integer("value")]),
-    ],
-    init: testMap1Init,
-    run: testMap1Run,
-  },
-  {
-    name: "testMap2",
-    schemas: [
-      schema("input1", [integer("id", true, true), text("value")]),
-      schema("input2", [integer("id", true, true), text("value")]),
-      schema("output", [integer("id", true, true), integer("value")]),
-    ],
-    init: testMap2Init,
-    run: testMap2Run,
-  },
-  {
-    name: "testMap3",
-    schemas: [
-      schema("input_no_index", [integer("id"), text("value")]),
-      schema("input_index", [integer("id", true, true), text("value")]),
-      schema("output", [integer("id"), integer("value")]),
-    ],
-    init: testMap3Init,
-    run: testMap3Run,
-  },
-  {
-    name: "testMapValues",
-    schemas: [
-      schema("input", [integer("id", true, true), integer("value")]),
-      schema("output", [integer("id", true, true), integer("value")]),
-    ],
-    init: testValueMapperInit,
-    run: testValueMapperRun,
-  },
-  {
-    name: "testSize",
-    schemas: [
-      schema("input", [integer("id", true, true), integer("value")]),
-      schema("size", [integer("id", true, true)]),
-      schema("output", [integer("id", true, true), integer("value")]),
-    ],
-    init: testSizeInit,
-    run: testSizeRun,
-  },
-  {
-    name: "testLazy",
-    schemas: [
-      schema("input", [integer("id", true, true), integer("value")]),
-      schema("output", [integer("id", true, true), integer("value")]),
-    ],
-    init: testLazyInit,
-    run: testLazyRun,
-  },
-  {
-    name: "testMapReduce",
-    schemas: [
-      schema("input", [integer("id", true, true), integer("v")]),
-      schema("output", [integer("id", true, true), integer("v")]),
-    ],
-    init: testMapReduceInit,
-    run: testMapReduceRun,
-  },
-  {
-    name: "testMultiMap1",
-    schemas: [
-      schema("input1", [integer("id", true, true), integer("value")]),
-      schema("input2", [integer("id", true, true), integer("value")]),
-      schema("output", [integer("src"), integer("id"), integer("v")]),
-    ],
-    init: testMultiMap1Init,
-    run: testMultiMap1Run,
-  },
-  {
-    name: "testMultiMapReduce",
-    schemas: [
-      schema("input1", [integer("id", true, true), integer("value")]),
-      schema("input2", [integer("id", true, true), integer("value")]),
-      schema("output", [integer("id", true, true), integer("v")]),
-    ],
-    init: testMultiMapReduceInit,
-    run: testMultiMapReduceRun,
-  },
-  {
-    name: "testAsyncLazy",
-    schemas: [
-      schema("input1", [integer("id", true, true), integer("value")]),
-      schema("input2", [integer("id", true, true), integer("value")]),
-      schema("output", [integer("id", true, true), text("v")]),
-    ],
-    init: testAsyncLazyInit,
-    run: testAsyncLazyRun,
-  },
-  {
-    name: "testTokensInit",
-    schemas: [
-      schema("input", [integer("id", true, true), integer("value")]),
-      schema("output", [
-        integer("id", true, true),
-        integer("value"),
-        integer("time"),
-      ]),
-    ],
-    init: testTokensInit,
-    run: testTokensRun,
-    tokens: { token_5s: 5000 },
-  },
-  {
-    name: "testJSONExtract",
-    schemas: [
-      schema("input", [integer("id", true), json("v"), text("p")]),
-      schema("output", [integer("id", true), json("v")]),
-    ],
-    init: testJSONExtractInit,
-    run: testJSONExtractRun,
-  },
-];
+/// Unit tests
 
 type Update = {
   idx: number;
@@ -911,9 +925,9 @@ async function testTimedQueue() {
   return new Promise(waitandcheck) as Promise<void>;
 }
 
-export const units: UnitTest[] = [
-  { name: "testTimedQueue", run: testTimedQueue },
-];
+units.push({ name: "testTimedQueue", run: testTimedQueue });
+
+//// Run
 
 function run(t: Test) {
   test(t.name, async ({ page }) => {
