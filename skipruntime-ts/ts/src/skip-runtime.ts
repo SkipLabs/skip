@@ -54,7 +54,7 @@ export type {
   EntryPoint,
 } from "./skipruntime_api.js";
 
-export { ValueMapper } from "./skipruntime_api.js";
+export { ValueMapper, MapOptions } from "./skipruntime_api.js";
 export {
   Sum,
   Min,
