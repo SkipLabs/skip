@@ -81,31 +81,32 @@ class WasmHandle<T extends Internal.CJSON> {
   }
 }
 
-function getValue<T extends Internal.CJSON>(hdl: WasmHandle<T>): Exportable {
-  if (hdl.pointer == 0) return null;
-  const type = hdl.access.SKIP_SKJSON_typeOf(hdl.pointer) as Type;
+function interpretPointer<T extends Internal.CJSON>(
+  hdl: WasmHandle<any>,
+  ptr: ptr<T>,
+): Exportable {
+  if (ptr == 0) return null;
+  const type = hdl.access.SKIP_SKJSON_typeOf(ptr) as Type;
   switch (type) {
     case Type.Null:
       return null;
     case Type.Int:
-      return hdl.access.SKIP_SKJSON_asInt(hdl.pointer);
+      return hdl.access.SKIP_SKJSON_asInt(ptr);
     case Type.Float:
-      return hdl.access.SKIP_SKJSON_asFloat(hdl.pointer);
+      return hdl.access.SKIP_SKJSON_asFloat(ptr);
     case Type.Boolean:
-      return hdl.access.SKIP_SKJSON_asBoolean(hdl.pointer);
+      return hdl.access.SKIP_SKJSON_asBoolean(ptr);
     case Type.String:
-      return hdl.utils.importString(
-        hdl.access.SKIP_SKJSON_asString(hdl.pointer),
-      );
+      return hdl.utils.importString(hdl.access.SKIP_SKJSON_asString(ptr));
     case Type.Array: {
-      const aPtr = hdl.access.SKIP_SKJSON_asArray(hdl.pointer);
+      const aPtr = hdl.access.SKIP_SKJSON_asArray(ptr);
       return new Proxy(
         hdl.derive(aPtr),
         reactiveArray,
       ) as unknown as ArrayProxy<any>;
     }
     case Type.Object: {
-      const oPtr = hdl.access.SKIP_SKJSON_asObject(hdl.pointer);
+      const oPtr = hdl.access.SKIP_SKJSON_asObject(ptr);
       return new Proxy(
         hdl.derive(oPtr),
         reactiveObject,
@@ -117,6 +118,10 @@ function getValue<T extends Internal.CJSON>(hdl: WasmHandle<T>): Exportable {
   }
 }
 
+function getValue<T extends Internal.CJSON>(hdl: WasmHandle<T>): Exportable {
+  return interpretPointer(hdl, hdl.pointer);
+}
+
 function getValueAt<T extends Internal.CJSON>(
   hdl: WasmHandle<T>,
   idx: int,
@@ -125,30 +130,7 @@ function getValueAt<T extends Internal.CJSON>(
   const skval = array
     ? hdl.access.SKIP_SKJSON_at(hdl.pointer, idx)
     : hdl.access.SKIP_SKJSON_get(hdl.pointer, idx);
-  const type = hdl.access.SKIP_SKJSON_typeOf(skval) as Type;
-  switch (type) {
-    case Type.Null:
-      return null;
-    case Type.Int:
-      return hdl.access.SKIP_SKJSON_asInt(skval);
-    case Type.Float:
-      return hdl.access.SKIP_SKJSON_asFloat(skval);
-    case Type.Boolean:
-      return hdl.access.SKIP_SKJSON_asBoolean(skval) ? true : false;
-    case Type.String:
-      return hdl.utils.importString(hdl.access.SKIP_SKJSON_asString(skval));
-    case Type.Array: {
-      const aPtr = hdl.access.SKIP_SKJSON_asArray(skval);
-      return new Proxy(hdl.derive(aPtr), reactiveArray);
-    }
-    case Type.Object: {
-      const oPtr = hdl.access.SKIP_SKJSON_asObject(skval);
-      return new Proxy(hdl.derive(oPtr), reactiveObject);
-    }
-    case Type.Undefined:
-    default:
-      return undefined;
-  }
+  return interpretPointer(hdl, skval);
 }
 
 type ObjectProxy<Base extends Record<string, any>> = {
