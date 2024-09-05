@@ -33,23 +33,23 @@ function check(name: String, got: TJSON, expected: TJSON): void {
   expect([name, got]).toEqual([name, expected]);
 }
 
-export type Test = {
+type Test = {
   name: string;
   schemas: Schema[];
   init: (skstore: SKStore, ...tables: TTableCollection[]) => void;
-  run: (...tables: any[]) => Promise<void>;
+  run: (...tables: Table<TJSON[]>[]) => Promise<void>;
   error?: (err: any) => void;
   tokens?: Record<string, number>;
 };
 
-export type UnitTest = {
+type UnitTest = {
   name: string;
   run: () => Promise<void>;
   error?: (err: any) => void;
 };
 
-export const tests: Test[] = [];
-export const units: UnitTest[] = [];
+const tests: Test[] = [];
+const units: UnitTest[] = [];
 
 //// testMap1
 
