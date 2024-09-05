@@ -527,18 +527,22 @@ fun size(context: mutable Context, handleId: String): Float {
 fun input(
   context: mutable Context,
   name: String,
-  values: SKJSON.CJArray<SKJSON.CJSON>,
+  cjvalues: SKJSON.CJArray<SKJSON.CJArray<SKJSON.CJSON>>,
 ): String {
-  makeInput(
-    JSONID::keyType,
-    JSONFile::type,
-    context,
-    name,
-    SKJSON.expectArray(values).map(v -> {
-      a = SKJSON.expectArray(v);
-      (JSONID(a[0]), JSONFile(a[1]))
-    }),
-  )
+  cjvalues match {
+  | SKJSON.CJArray(values) ->
+    makeInput(
+      JSONID::keyType,
+      JSONFile::type,
+      context,
+      name,
+      values.map(v -> {
+        v match {
+        | SKJSON.CJArray(a) -> (JSONID(a[0]), JSONFile(a[1]))
+        }
+      }),
+    )
+  }
 }
 
 @export("SkipRuntime_lazy")
