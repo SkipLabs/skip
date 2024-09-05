@@ -433,7 +433,7 @@ fun getArray(
   context: mutable Context,
   handleId: String,
   key: SKJSON.CJSON,
-): SKJSON.CJSON {
+): SKJSON.CJArray<SKJSON.CJSON> {
   eager = EHandle(JSONID::keyType, JSONFile::type, DirName::create(handleId));
   SKJSON.CJArray(eager.getArray(context, JSONID(key)).map(v -> v.value))
 }
@@ -466,7 +466,7 @@ fun getArrayLazy(
   context: mutable Context,
   handleId: String,
   key: SKJSON.CJSON,
-): SKJSON.CJSON {
+): SKJSON.CJArray<SKJSON.CJSON> {
   lazy = LHandle(JSONID::keyType, JSONFile::type, DirName::create(handleId));
   getArraySelf(context, lazy, key)
 }
@@ -495,7 +495,7 @@ fun getArraySelf(
   context: mutable Context,
   handle: LHandle<JSONID, JSONFile>,
   key: SKJSON.CJSON,
-): SKJSON.CJSON {
+): SKJSON.CJArray<SKJSON.CJSON> {
   SKJSON.CJArray(handle.getArray(context, JSONID(key)).map(v -> v.value))
 }
 @export("SkipRuntime_getSelf")
