@@ -2,6 +2,7 @@
 import { type ptr, type Opt, cloneIfProxy } from "#std/sk_types.js";
 import type { Context } from "./skipruntime_types.js";
 import type * as Internal from "./skipruntime_internal_types.js";
+import { MapOptions } from "../skipruntime_api.js";
 import type {
   Accumulator,
   EagerCollection,
@@ -28,6 +29,7 @@ import type {
   Local,
   EntryPoint,
   Inputs,
+  WithOptions,
 } from "../skipruntime_api.js";
 
 // prettier-ignore
@@ -47,6 +49,19 @@ function assertNoKeysNaN<K extends TJSON, V extends TJSON>(
   return kv_pairs;
 }
 export const serverResponseSuffix = "__skdb_mirror_feedback";
+
+function splitMapParams<Params extends Param[], K extends TJSON>(
+  paramsAndOptions: WithOptions<Params, K>,
+): [Params, MapOptions<K>] {
+  if (paramsAndOptions.length > 0) {
+    const last = paramsAndOptions[paramsAndOptions.length - 1];
+    if (last instanceof MapOptions) {
+      paramsAndOptions.pop();
+      return [paramsAndOptions as unknown as Params, last as MapOptions<K>];
+    }
+  }
+  return [paramsAndOptions as unknown as Params, new MapOptions()];
+}
 
 class EagerCollectionImpl<K extends TJSON, V extends TJSON>
   implements EagerCollection<K, V>
@@ -93,8 +108,9 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
 
   map<K2 extends TJSON, V2 extends TJSON, Params extends Param[]>(
     mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
-    ...params: Params
+    ...paramsAndOptions: WithOptions<Params, K>
   ): EagerCollection<K2, V2> {
+    const [params, options] = splitMapParams(paramsAndOptions);
     params.forEach(check);
     const mapperObj = new mapper(...params);
     Object.freeze(mapperObj);
@@ -106,6 +122,7 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
       mapperObj.constructor.name,
       (key: K, it: NonEmptyIterator<V>) =>
         assertNoKeysNaN(mapperObj.mapElement(key, it)),
+      options.ranges,
     );
     return this.derive<K2, V2>(eagerHdl);
   }
@@ -118,8 +135,9 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
   >(
     mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
     accumulator: Accumulator<V2, V3>,
-    ...params: Params
+    ...paramsAndOptions: WithOptions<Params, K>
   ) {
+    const [params, options] = splitMapParams(paramsAndOptions);
     params.forEach(check);
     const mapperObj = new mapper(...params);
     Object.freeze(mapperObj);
@@ -132,6 +150,7 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
       (key: K, it: NonEmptyIterator<V>) =>
         assertNoKeysNaN(mapperObj.mapElement(key, it)),
       accumulator,
+      options.ranges,
     );
     return this.derive<K2, V3>(eagerHdl);
   }
