@@ -216,16 +216,36 @@ class ExternAccumulator(
   }
 }
 
+fun asKeyRanges(jsonRanges: SKJSON.CJSON): ?Array<KeyRange> {
+  if (jsonRanges is SKJSON.CJNull()) return None();
+  ranges = SKJSON.expectArray(jsonRanges);
+  Some(
+    ranges.map((jsonRange) -> {
+      range = SKJSON.expectArray(jsonRange);
+      KeyRange(JSONID(range[0]), JSONID(range[1]))
+    }),
+  )
+}
+
 @export("SkipRuntime_map")
 fun map(
   context: mutable Context,
   handleId: String,
   name: String,
   fnPtr: UInt32,
+  rangeOpt: SKJSON.CJSON,
 ): String {
   eager = EHandle(JSONID::keyType, JSONFile::type, DirName::create(handleId));
   mapHandle = FnHandle::make(fnPtr);
-  eagerMap(eager, JSONID::keyType, JSONFile::type, name, context, mapHandle.map)
+  eagerMap(
+    eager,
+    JSONID::keyType,
+    JSONFile::type,
+    name,
+    context,
+    mapHandle.map,
+    asKeyRanges(rangeOpt),
+  )
     .getDirName()
     .toString()
 }
@@ -238,6 +258,7 @@ fun mapReduce(
   fnPtr: UInt32,
   accumulator: UInt32,
   default: SKJSON.CJSON,
+  rangeOpt: SKJSON.CJSON,
 ): String {
   eager = EHandle(JSONID::keyType, JSONFile::type, DirName::create(handleId));
   mapHandle = FnHandle::make(fnPtr);
@@ -250,6 +271,7 @@ fun mapReduce(
     context,
     mapHandle.map,
     ExternAccumulator(accumulatorHandle, JSONFile(default)),
+    asKeyRanges(rangeOpt),
   )
     .getDirName()
     .toString()

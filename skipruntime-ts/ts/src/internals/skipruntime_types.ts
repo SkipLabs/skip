@@ -44,12 +44,14 @@ export interface Context {
     mapperName: string,
     mapper: (key: K, it: NonEmptyIterator<V>) => Iterable<[K2, V2]>,
     accumulator: Accumulator<V2, V3>,
+    rangeOpt?: [K, K][] | null,
   ) => string;
 
   map: <K extends TJSON, V extends TJSON, K2 extends TJSON, V2 extends TJSON>(
     collectionName: string,
     mapperName: string,
     compute: (key: K, it: NonEmptyIterator<V>) => Iterable<[K2, V2]>,
+    rangeOpt?: [K, K][] | null,
   ) => string;
 
   lazy: <K extends TJSON, V extends TJSON>(
@@ -156,6 +158,9 @@ export interface FromWasm {
     eagerCollectionId: ptr<Internal.String>,
     name: ptr<Internal.String>,
     fnPtr: Handle<(key: K, it: NonEmptyIterator<V>) => Iterable<[K2, V2]>>,
+    rangeOpt: ptr<
+      Internal.CJArray<Internal.CJArray<Internal.CJSON>> | Internal.CJNull
+    >,
   ): ptr<Internal.String>;
 
   SkipRuntime_mapReduce<
@@ -170,6 +175,9 @@ export interface FromWasm {
     fnPtr: Handle<(key: K, it: NonEmptyIterator<V>) => Iterable<[K2, V2]>>,
     accumulator: int,
     accInit: ptr<Internal.CJSON>,
+    rangeOpt: ptr<
+      Internal.CJArray<Internal.CJArray<Internal.CJSON>> | Internal.CJNull
+    >,
   ): ptr<Internal.String>;
 
   SkipRuntime_getFromTable(
