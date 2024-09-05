@@ -66,15 +66,6 @@ class TestToOutput<V extends TJSON>
   }
 }
 
-class TestSum implements Mapper<number, number, number, number> {
-  mapElement(
-    key: number,
-    it: NonEmptyIterator<number>,
-  ): Iterable<[number, number]> {
-    return [[key, it.toArray().reduce((x, y) => x + y, 0)]];
-  }
-}
-
 function testMap1Init(
   _skstore: SKStore,
   input: TableCollection<[number, number]>,
@@ -145,6 +136,15 @@ async function testMap2Run(
 }
 
 //// testMap3
+
+class TestSum implements Mapper<number, number, number, number> {
+  mapElement(
+    key: number,
+    it: NonEmptyIterator<number>,
+  ): Iterable<[number, number]> {
+    return [[key, it.toArray().reduce((x, y) => x + y, 0)]];
+  }
+}
 
 function testMap3Init(
   _skstore: SKStore,
