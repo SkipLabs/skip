@@ -127,7 +127,7 @@ class SimpleToGenericSkipService implements GenericSkipService {
     if (this.simple.remoteTables) {
       for (const [key, sri] of Object.entries(this.simple.remoteTables)) {
         const rInputs: Record<string, InputDefinition> = {};
-        sri.inputs.map((table) => {
+        sri.tables.map((table) => {
           rInputs[table] = {
             schema: inputSchema(table),
             fromTableRow: FromInput,

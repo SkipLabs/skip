@@ -66,7 +66,7 @@ export interface GenericSkipService {
 
 export type SimpleRemoteInputs = {
   database: Database;
-  inputs: string[];
+  tables: string[];
 };
 
 export interface SimpleSkipService {
