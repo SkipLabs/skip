@@ -158,8 +158,9 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
   mapTo<R extends TJSON[], Params extends Param[]>(
     table: TableCollection<R>,
     mapper: new (...params: Params) => OutputMapper<R, K, V>,
-    ...params: Params
+    ...paramsAndOptions: WithOptions<Params, K>
   ): void {
+    const [params, options] = splitMapParams(paramsAndOptions);
     params.forEach(check);
     const mapperObj = new mapper(...params);
     Object.freeze(mapperObj);
@@ -171,6 +172,7 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
       table.getSchema(),
       (key: K, it: NonEmptyIterator<V>) => mapperObj.mapElement(key, it),
       table.isConnected(),
+      options.ranges,
     );
   }
 }
@@ -266,8 +268,9 @@ export class TableCollectionImpl<R extends TJSON[]>
 
   map<K extends TJSON, V extends TJSON, Params extends Param[]>(
     mapper: new (...params: Params) => InputMapper<R, K, V>,
-    ...params: Params
+    ...paramsAndOptions: WithOptions<Params, R>
   ): EagerCollection<K, V> {
+    const [params, options] = splitMapParams(paramsAndOptions);
     params.forEach(check);
     const mapperObj = new mapper(...params);
     Object.freeze(mapperObj);
@@ -281,6 +284,7 @@ export class TableCollectionImpl<R extends TJSON[]>
       skname,
       (entry: R, occ: number) =>
         assertNoKeysNaN(mapperObj.mapElement(entry, occ)),
+      options.ranges,
     );
     return new EagerCollectionImpl<K, V>(this.context, eagerHdl);
   }
