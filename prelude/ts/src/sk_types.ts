@@ -677,16 +677,7 @@ export class Utils {
     try {
       let res = fn();
       this.exports.SKIP_destroy_Obstack(obsPos);
-      if (
-        res !== null &&
-        typeof res === "object" &&
-        (("__isArrayProxy" in res && res.__isArrayProxy) ||
-          ("__isObjectProxy" in res && res.__isObjectProxy)) &&
-        "clone" in res
-      ) {
-        const clone = res.clone as () => T;
-        return clone();
-      } else return res;
+      return cloneIfProxy(res);
     } catch (ex) {
       this.exports.SKIP_destroy_Obstack(obsPos);
       throw ex;
@@ -958,4 +949,20 @@ export async function runUrl(
     buffer = await env.fetch(url);
   }
   return await start(modules, buffer, env, main);
+}
+
+export const sk_isArrayProxy: unique symbol = Symbol();
+export const sk_isObjectProxy: unique symbol = Symbol();
+
+export function cloneIfProxy<T>(v: T): T {
+  if (
+    v !== null &&
+    typeof v === "object" &&
+    ((sk_isArrayProxy in v && v[sk_isArrayProxy]) ||
+      (sk_isObjectProxy in v && v[sk_isObjectProxy])) &&
+    "clone" in v
+  ) {
+    return (v.clone as () => T)();
+  }
+  return v;
 }
