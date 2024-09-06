@@ -617,7 +617,6 @@ export async function mirror(
       );
       tHandles[table.name] = new TableCollectionImpl(context, skdb, table);
     }
-    /* eslint-disable-next-line @typescript-eslint/no-floating-promises */
     const definitions = toMirrorDefinitions(...remote.tables);
 
     await skdb.mirror(...definitions);
