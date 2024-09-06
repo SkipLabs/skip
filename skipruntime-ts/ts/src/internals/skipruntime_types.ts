@@ -67,19 +67,29 @@ export interface Context {
     call: (key: K, params: P) => Promise<AValue<V, M>>,
   ) => string;
 
-  getFromTable: <K, R>(table: string, key: K, index?: string) => R[];
+  getFromTable: <K extends TJSON, R>(
+    table: string,
+    key: K,
+    index?: string,
+  ) => R[];
 
-  getArray: <K, V>(collection: string, key: K) => V[];
-  getOne: <K, V>(collection: string, key: K) => V;
-  maybeGetOne: <K, V>(collection: string, key: K) => Opt<V>;
+  getArray: <K extends TJSON, V>(collection: string, key: K) => V[];
+  getOne: <K extends TJSON, V>(collection: string, key: K) => V;
+  maybeGetOne: <K extends TJSON, V>(collection: string, key: K) => Opt<V>;
 
-  getArrayLazy: <K, V>(collection: string, key: K) => V[];
-  getOneLazy: <K, V>(collection: string, key: K) => V;
-  maybeGetOneLazy: <K, V>(collection: string, key: K) => Opt<V>;
+  getArrayLazy: <K extends TJSON, V>(collection: string, key: K) => V[];
+  getOneLazy: <K extends TJSON, V>(collection: string, key: K) => V;
+  maybeGetOneLazy: <K extends TJSON, V>(collection: string, key: K) => Opt<V>;
 
-  getArraySelf: <K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) => V[];
-  getOneSelf: <K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) => V;
-  maybeGetOneSelf: <K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) => Opt<V>;
+  getArraySelf: <K extends TJSON, V>(
+    lazyHdl: ptr<Internal.LHandle>,
+    key: K,
+  ) => V[];
+  getOneSelf: <K extends TJSON, V>(lazyHdl: ptr<Internal.LHandle>, key: K) => V;
+  maybeGetOneSelf: <K extends TJSON, V>(
+    lazyHdl: ptr<Internal.LHandle>,
+    key: K,
+  ) => Opt<V>;
   getToken: (key: string) => number;
 
   size: (collection: string) => number;
@@ -124,27 +134,39 @@ export interface Context {
   noref: () => Context;
 }
 
+export type Handle<T> = Internal.Opaque<int, { handle_for: T }>;
+
 export interface Handles {
-  register(v: any): int;
-  get(id: int): any;
-  apply<T>(id: int, parameters: T[]): T;
-  delete(id: int): any;
+  register<T>(v: T): Handle<T>;
+  get<T>(id: Handle<T>): T;
+  apply<R, P extends any[]>(id: Handle<(..._: P) => R>, parameters: P): R;
+  delete<T>(id: Handle<T>): T;
   name(metadata: Metadata): string;
 }
 
 export interface FromWasm {
-  SkipRuntime_map(
+  SkipRuntime_map<
+    K extends TJSON,
+    V extends TJSON,
+    K2 extends TJSON,
+    V2 extends TJSON,
+  >(
     ctx: ptr<Internal.Context>,
     eagerCollectionId: ptr<Internal.String>,
     name: ptr<Internal.String>,
-    fnPtr: int,
+    fnPtr: Handle<(key: K, it: NonEmptyIterator<V>) => Iterable<[K2, V2]>>,
   ): ptr<Internal.String>;
 
-  SkipRuntime_mapReduce(
+  SkipRuntime_mapReduce<
+    K extends TJSON,
+    V extends TJSON,
+    K2 extends TJSON,
+    V2 extends TJSON,
+  >(
     ctx: ptr<Internal.Context>,
     eagerCollectionId: ptr<Internal.String>,
     name: ptr<Internal.String>,
-    fnPtr: int,
+    fnPtr: Handle<(key: K, it: NonEmptyIterator<V>) => Iterable<[K2, V2]>>,
     accumulator: int,
     accInit: ptr<Internal.CJSON>,
   ): ptr<Internal.String>;
@@ -160,7 +182,7 @@ export interface FromWasm {
     ctx: ptr<Internal.Context>,
     getterHdl: ptr<Internal.String>,
     key: ptr<Internal.CJSON>,
-  ): ptr<Internal.CJSON>;
+  ): ptr<Internal.CJArray>;
   SkipRuntime_get(
     ctx: ptr<Internal.Context>,
     getterHdl: ptr<Internal.String>,
@@ -181,7 +203,7 @@ export interface FromWasm {
     ctx: ptr<Internal.Context>,
     lazyId: ptr<Internal.String>,
     key: ptr<Internal.CJSON>,
-  ): ptr<Internal.CJSON>;
+  ): ptr<Internal.CJArray>;
   SkipRuntime_getLazy(
     ctx: ptr<Internal.Context>,
     lazyId: ptr<Internal.String>,
@@ -197,7 +219,7 @@ export interface FromWasm {
     ctx: ptr<Internal.Context>,
     selfHdl: ptr<Internal.LHandle>,
     key: ptr<Internal.CJSON>,
-  ): ptr<Internal.CJSON>;
+  ): ptr<Internal.CJArray>;
   SkipRuntime_getSelf(
     ctx: ptr<Internal.Context>,
     selfHdl: ptr<Internal.LHandle>,
@@ -214,11 +236,11 @@ export interface FromWasm {
     eagerCollectionId: ptr<Internal.String>,
   ): number;
 
-  SkipRuntime_toSkdb(
+  SkipRuntime_toSkdb<R, K, V>(
     ctx: ptr<Internal.Context>,
     eagerCollectionId: ptr<Internal.String>,
     table: ptr<Internal.String>,
-    fnPtr: int,
+    fnPtr: Handle<(key: K, it: NonEmptyIterator<V>) => R>,
     connected: boolean,
   ): void;
 
@@ -255,27 +277,29 @@ export interface FromWasm {
   ): float;
 
   // SKStore
-  SkipRuntime_asyncLazy(
+  SkipRuntime_asyncLazy<K extends TJSON, V extends TJSON, P extends TJSON>(
     ctx: ptr<Internal.Context>,
     name: ptr<Internal.String>,
-    paramsFn: int,
-    lazyFn: int,
+    paramsFn: Handle<(key: K) => P>,
+    lazyFn: Handle<(key: K, params: P) => Promise<V>>,
   ): ptr<Internal.String>;
-  SkipRuntime_lazy(
+  SkipRuntime_lazy<K extends TJSON, V extends TJSON>(
     ctx: ptr<Internal.Context>,
     name: ptr<Internal.String>,
-    lazyFn: int,
+    lazyFn: Handle<(selfHdl: LazyCollection<K, V>, key: K) => Opt<V>>,
   ): ptr<Internal.String>;
-  SkipRuntime_fromSkdb(
+  SkipRuntime_fromSkdb<R extends TJSON, K extends TJSON, V extends TJSON>(
     ctx: ptr<Internal.Context>,
     table: ptr<Internal.String>,
     name: ptr<Internal.String>,
-    fnPtr: int,
+    fnPtr: Handle<(entry: R, occ: number) => Iterable<[K, V]>>,
   ): ptr<Internal.String>;
   SkipRuntime_multimap(
     ctx: ptr<Internal.Context>,
     name: ptr<Internal.String>,
-    mappings: ptr<Internal.CJArray>,
+    mappings: ptr<
+      Internal.CJArray<Internal.CJArray<Internal.CJString | Internal.CJInt>>
+    >,
   ): ptr<Internal.String>;
   SkipRuntime_asyncResult(
     callId: ptr<Internal.String>,
@@ -285,11 +309,13 @@ export interface FromWasm {
     value: ptr<Internal.CJObject>,
   ): number;
 
-  SkipRuntime_multimapReduce(
+  SkipRuntime_multimapReduce<V2 extends TJSON, V3 extends TJSON>(
     ctx: ptr<Internal.Context>,
     name: ptr<Internal.String>,
-    mappings: ptr<Internal.CJArray>,
-    accumulator: int,
+    mappings: ptr<
+      Internal.CJArray<Internal.CJArray<Internal.CJString | Internal.CJInt>>
+    >,
+    accumulator: Handle<Accumulator<V2, V3>>,
     accInit: ptr<Internal.CJSON>,
   ): ptr<Internal.String>;
 
