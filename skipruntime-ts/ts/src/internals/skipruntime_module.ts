@@ -1,6 +1,6 @@
 // prettier-ignore
 import type { int, ptr, Links, Utils, ToWasmManager, Environment, Opt, Metadata } from "#std/sk_types.js";
-import type { SKJSON } from "./skjson.js";
+import type { SKJSON } from "#skjson/skjson.js";
 import type {
   Accumulator,
   NonEmptyIterator,
@@ -8,6 +8,9 @@ import type {
   AValue,
   LazyCollection,
   TJSON,
+  Schema,
+  Token,
+  JSONObject,
 } from "../skipruntime_api.js";
 
 import type {
@@ -16,7 +19,7 @@ import type {
   FromWasm,
   CtxMapping,
 } from "./skipruntime_types.js";
-import type * as Internal from "./skstore_internal_types.js";
+import type * as Internal from "./skipruntime_internal_types.js";
 import { LSelfImpl, SKStoreFactoryImpl } from "./skipruntime_impl.js";
 // prettier-ignore
 import type { SKDBShared } from "#skdb/skdb_types.js";
@@ -80,23 +83,23 @@ export class ContextImpl implements Context {
     return new ContextImpl(this.skjson, this.exports, this.handles, new Ref());
   }
 
-  lazy = <K extends TJSON, V extends TJSON>(
+  lazy<K extends TJSON, V extends TJSON>(
     name: string,
     compute: (self: LazyCollection<K, V>, key: K) => Opt<V>,
-  ) => {
+  ) {
     const lazyHdl = this.exports.SkipRuntime_lazy(
       this.pointer(),
       this.skjson.exportString(name),
       this.handles.register(compute),
     );
     return this.skjson.importString(lazyHdl);
-  };
+  }
 
-  asyncLazy = <K extends TJSON, V extends TJSON, P extends TJSON>(
+  asyncLazy<K extends TJSON, V extends TJSON, P extends TJSON>(
     name: string,
     get: (key: K) => P,
     call: (key: K, params: P) => Promise<V>,
-  ) => {
+  ) {
     const lazyHdl = this.exports.SkipRuntime_asyncLazy(
       this.pointer(),
       this.skjson.exportString(name),
@@ -104,17 +107,14 @@ export class ContextImpl implements Context {
       this.handles.register(call),
     );
     return this.skjson.importString(lazyHdl);
-  };
+  }
 
-  multimap = <
+  multimap<
     K1 extends TJSON,
     V1 extends TJSON,
     K2 extends TJSON,
     V2 extends TJSON,
-  >(
-    name: string,
-    mappings: CtxMapping<K1, V1, K2, V2>[],
-  ) => {
+  >(name: string, mappings: CtxMapping<K1, V1, K2, V2>[]) {
     const skMappings = mappings.map((mapping) => [
       mapping.source.getId(),
       this.handles.register(mapping.mapper),
@@ -125,9 +125,9 @@ export class ContextImpl implements Context {
       this.skjson.exportJSON(skMappings),
     );
     return this.skjson.importString(resHdlPtr);
-  };
+  }
 
-  multimapReduce = <
+  multimapReduce<
     K1 extends TJSON,
     V1 extends TJSON,
     K2 extends TJSON,
@@ -137,7 +137,7 @@ export class ContextImpl implements Context {
     name: string,
     mappings: CtxMapping<K1, V1, K2, V2>[],
     accumulator: Accumulator<V2, V3>,
-  ) => {
+  ) {
     const skMappings = mappings.map((mapping) => [
       mapping.source.getId(),
       this.handles.register(mapping.mapper),
@@ -150,9 +150,9 @@ export class ContextImpl implements Context {
       this.skjson.exportJSON(accumulator.default),
     );
     return this.skjson.importString(resHdlPtr);
-  };
+  }
 
-  getFromTable = <K, R>(table: string, key: K, index?: string) => {
+  getFromTable<K, R>(table: string, key: K, index?: string) {
     return this.skjson.importJSON(
       this.exports.SkipRuntime_getFromTable(
         this.pointer(),
@@ -161,9 +161,9 @@ export class ContextImpl implements Context {
         this.skjson.exportJSON(index ?? null),
       ),
     ) as R[];
-  };
+  }
 
-  getArray = <K, V>(eagerHdl: string, key: K) => {
+  getArray<K, V>(eagerHdl: string, key: K) {
     return this.skjson.importJSON(
       this.exports.SkipRuntime_getArray(
         this.pointer(),
@@ -171,9 +171,9 @@ export class ContextImpl implements Context {
         this.skjson.exportJSON(key),
       ),
     ) as V[];
-  };
+  }
 
-  getOne = <K, V>(eagerHdl: string, key: K) => {
+  getOne<K, V>(eagerHdl: string, key: K) {
     return this.skjson.importJSON(
       this.exports.SkipRuntime_get(
         this.pointer(),
@@ -181,18 +181,18 @@ export class ContextImpl implements Context {
         this.skjson.exportJSON(key),
       ),
     ) as V;
-  };
+  }
 
-  maybeGetOne = <K, V>(eagerHdl: string, key: K) => {
+  maybeGetOne<K, V>(eagerHdl: string, key: K) {
     const res = this.exports.SkipRuntime_maybeGet(
       this.pointer(),
       this.skjson.exportString(eagerHdl),
       this.skjson.exportJSON(key),
     );
     return this.skjson.importJSON(res) as Opt<V>;
-  };
+  }
 
-  getArrayLazy = <K, V>(lazyHdl: string, key: K) => {
+  getArrayLazy<K, V>(lazyHdl: string, key: K) {
     return this.skjson.importJSON(
       this.exports.SkipRuntime_getArrayLazy(
         this.pointer(),
@@ -200,9 +200,9 @@ export class ContextImpl implements Context {
         this.skjson.exportJSON(key),
       ),
     ) as V[];
-  };
+  }
 
-  getOneLazy = <K, V>(lazyHdl: string, key: K) => {
+  getOneLazy<K, V>(lazyHdl: string, key: K) {
     return this.skjson.importJSON(
       this.exports.SkipRuntime_getLazy(
         this.pointer(),
@@ -210,9 +210,9 @@ export class ContextImpl implements Context {
         this.skjson.exportJSON(key),
       ),
     ) as V;
-  };
+  }
 
-  maybeGetOneLazy = <K, V>(lazyHdl: string, key: K) => {
+  maybeGetOneLazy<K, V>(lazyHdl: string, key: K) {
     return this.skjson.importJSON(
       this.exports.SkipRuntime_maybeGetLazy(
         this.pointer(),
@@ -220,9 +220,9 @@ export class ContextImpl implements Context {
         this.skjson.exportJSON(key),
       ),
     ) as Opt<V>;
-  };
+  }
 
-  getArraySelf = <K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) => {
+  getArraySelf<K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) {
     return this.skjson.importJSON(
       this.exports.SkipRuntime_getArraySelf(
         this.pointer(),
@@ -230,8 +230,9 @@ export class ContextImpl implements Context {
         this.skjson.exportJSON(key),
       ),
     ) as V[];
-  };
-  getOneSelf = <K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) => {
+  }
+
+  getOneSelf<K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) {
     return this.skjson.importJSON(
       this.exports.SkipRuntime_getSelf(
         this.pointer(),
@@ -239,8 +240,9 @@ export class ContextImpl implements Context {
         this.skjson.exportJSON(key),
       ),
     ) as V;
-  };
-  maybeGetOneSelf = <K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) => {
+  }
+
+  maybeGetOneSelf<K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) {
     return this.skjson.importJSON(
       this.exports.SkipRuntime_maybeGetSelf(
         this.pointer(),
@@ -248,7 +250,14 @@ export class ContextImpl implements Context {
         this.skjson.exportJSON(key),
       ),
     ) as Opt<V>;
-  };
+  }
+
+  getToken(key: string) {
+    return this.exports.SkipRuntime_token(
+      this.pointer(),
+      this.skjson.exportString(key),
+    );
+  }
 
   size = (eagerHdl: string) => {
     return this.exports.SkipRuntime_size(
@@ -257,7 +266,7 @@ export class ContextImpl implements Context {
     );
   };
 
-  mapReduce = <
+  mapReduce<
     K extends TJSON,
     V extends TJSON,
     K2 extends TJSON,
@@ -268,7 +277,7 @@ export class ContextImpl implements Context {
     name: string,
     mapper: (key: K, it: NonEmptyIterator<V>) => Iterable<[K2, V2]>,
     accumulator: Accumulator<V2, V3>,
-  ) => {
+  ) {
     const resHdlPtr = this.exports.SkipRuntime_mapReduce(
       this.pointer(),
       this.skjson.exportString(eagerHdl),
@@ -278,13 +287,13 @@ export class ContextImpl implements Context {
       this.skjson.exportJSON(accumulator.default),
     );
     return this.skjson.importString(resHdlPtr);
-  };
+  }
 
-  map = <K extends TJSON, V extends TJSON, K2 extends TJSON, V2 extends TJSON>(
+  map<K extends TJSON, V extends TJSON, K2 extends TJSON, V2 extends TJSON>(
     eagerHdl: string,
     name: string,
     mapper: (key: K, it: NonEmptyIterator<V>) => Iterable<[K2, V2]>,
-  ) => {
+  ) {
     const computeFnId = this.handles.register(mapper);
     const resHdlPtr = this.exports.SkipRuntime_map(
       this.pointer(),
@@ -293,13 +302,13 @@ export class ContextImpl implements Context {
       computeFnId,
     );
     return this.skjson.importString(resHdlPtr);
-  };
+  }
 
-  mapFromSkdb = <R extends TJSON, K extends TJSON, V extends TJSON>(
+  mapFromSkdb<R extends TJSON, K extends TJSON, V extends TJSON>(
     table: string,
     name: string,
     mapper: (entry: R, occ: number) => Iterable<[K, V]>,
-  ) => {
+  ) {
     const computeFnId = this.handles.register(mapper);
     const eagerHdl = this.exports.SkipRuntime_fromSkdb(
       this.pointer(),
@@ -308,25 +317,52 @@ export class ContextImpl implements Context {
       computeFnId,
     );
     return this.skjson.importString(eagerHdl);
-  };
+  }
 
-  mapToSkdb = <R, K, V>(
+  mapToSkdb<R extends TJSON[], K extends TJSON, V extends TJSON>(
     eagerHdl: string,
-    table: string,
-    convert: (key: K, it: NonEmptyIterator<V>) => R,
-  ) => {
-    const convertId = this.handles.register(convert);
+    schema: Schema,
+    convert: (key: K, it: NonEmptyIterator<V>) => Iterable<R>,
+    connected: boolean,
+  ) {
+    const checked: (key: K, it: NonEmptyIterator<V>) => Iterable<R> = (
+      key: K,
+      it: NonEmptyIterator<V>,
+    ) => {
+      const rit = convert(key, it);
+      const verified: R[] = [];
+      for (const e of rit) {
+        if (schema.columns.length > e.length) {
+          if (schema.columns[e.length].name == "skdb_access") {
+            e.push("read-write");
+          }
+        }
+        verified.push(e);
+      }
+      return verified;
+    };
+    const convertId = this.handles.register(checked);
     this.exports.SkipRuntime_toSkdb(
       this.pointer(),
       this.skjson.exportString(eagerHdl),
-      this.skjson.exportString(table),
+      this.skjson.exportString(schema.name),
       convertId,
+      connected,
     );
-  };
+  }
 
-  private pointer = () => {
+  jsonExtract(value: JSONObject, pattern: string): TJSON[] {
+    return this.skjson.importJSON(
+      this.exports.SKIP_SKStore_jsonExtract(
+        this.skjson.exportJSON(value),
+        this.skjson.exportString(pattern),
+      ),
+    ) as TJSON[];
+  }
+
+  private pointer() {
     return this.ref.get()!;
-  };
+  }
 }
 
 class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
@@ -382,6 +418,23 @@ class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
         return { value, done: value == null } as IteratorResult<T>;
       },
     };
+  }
+
+  forEach(callbackfn: (value: T, index: number) => void, thisArg?: any): void {
+    let value = this.next();
+    let index = 0;
+    while (value != null) {
+      callbackfn.apply(thisArg, [value, index]);
+      value = this.next();
+      index++;
+    }
+  }
+
+  map<U>(
+    callbackfn: (value: T, index: number) => U,
+    thisArg?: any,
+  ): Iterable<U> {
+    return this.toArray().map(callbackfn, thisArg);
   }
 }
 
@@ -494,6 +547,7 @@ class LinksImpl implements Links {
   env: Environment;
   handles: Handles;
   skjson?: SKJSON;
+  timedQueue?: TimeQueue;
 
   detachHandle!: (fn: int) => void;
   applyMapFun!: (
@@ -602,10 +656,12 @@ class LinksImpl implements Links {
       ref.push(ctx);
       const jsu = skjson();
       const w = new WriterImpl(jsu, fromWasm, writer);
-      const result = this.handles.apply(fn, [jsu.importJSON(row), occ]);
+      const result = this.handles.apply(fn, [
+        jsu.importJSON(row),
+        occ,
+      ]) as Iterable<[TJSON, TJSON]>;
       for (const v of result) {
-        const t = v as [any, any];
-        w.set(t[0], t[1]);
+        w.set(v[0], v[1]);
       }
       ref.pop();
     };
@@ -619,8 +675,8 @@ class LinksImpl implements Links {
       const res = this.handles.apply(fn, [
         jsu.importJSON(key),
         new NonEmptyIteratorImpl(jsu, fromWasm, it),
-      ]);
-      return jsu.exportJSON(res);
+      ]) as Iterable<TJSON[]>;
+      return jsu.exportJSON(Array.from(res));
     };
 
     this.applyLazyAsyncFun = (
@@ -772,18 +828,42 @@ class LinksImpl implements Links {
     this.getErrorHdl = (exn: ptr<Internal.Exception>) => {
       return this.handles.register(utils.getErrorObject(exn));
     };
-    const create = (init: () => void) => {
+    const update = (time: number, tokens: string[]) => {
+      const jsu = skjson();
+      const result = utils.runWithGc(() =>
+        Math.trunc(
+          fromWasm.SkipRuntime_updateTokens(jsu.exportJSON(tokens), time),
+        ),
+      );
+      if (result < 0) {
+        throw this.handles.delete(-result);
+      }
+    };
+    const create = (init: () => void, tokens: Record<string, number>) => {
       // Register the init function to have  a named init function
       this.initFn = init;
       // Get a run uuid to build to allow function mapping reload in case of persistence
       const uuid = this.env.crypto().randomUUID();
       const jsu = skjson();
+      const time = new Date().getTime();
+      const tkeys = Object.keys(tokens);
       const result = utils.runWithGc(() =>
-        Math.trunc(fromWasm.SkipRuntime_createFor(jsu.exportString(uuid))),
+        Math.trunc(
+          fromWasm.SkipRuntime_createFor(
+            jsu.exportString(uuid),
+            jsu.exportJSON(tkeys),
+            time,
+          ),
+        ),
       );
       if (result < 0) {
         throw this.handles.delete(-result);
       }
+      const qTokens = Object.entries(tokens).map((entry) => {
+        return { duration: entry[1], value: entry[0] };
+      });
+      this.timedQueue = new TimeQueue(update);
+      this.timedQueue.start(qTokens, time);
     };
     this.env.shared.set(
       "SKStore",
@@ -795,6 +875,18 @@ class LinksImpl implements Links {
             dbName,
             asWorker,
           ),
+        (key: string) => {
+          const keyBytes = this.env.base64Decode(key);
+          return this.env
+            .crypto()
+            .subtle.importKey(
+              "raw",
+              keyBytes,
+              { name: "HMAC", hash: "SHA-256" },
+              false,
+              ["sign"],
+            );
+        },
       ),
     );
   };
@@ -867,6 +959,117 @@ class Manager implements ToWasmManager {
       links.getErrorHdl(exn);
     return links;
   };
+}
+
+type Tokens = {
+  endtime: number;
+  tokens: Token[];
+};
+
+interface Timeout {
+  unref: () => void;
+}
+
+export class TimeQueue {
+  constructor(
+    private update: (time: number, tokens: string[]) => void,
+    private queue: Tokens[] = [],
+    private timeout: string | number | Timeout | null = null,
+  ) {}
+
+  start(tokens: Token[], time: number) {
+    const tostart: Map<number, Token[]> = new Map<number, Token[]>();
+    for (const token of tokens) {
+      if (token.duration <= 0) continue;
+      const endtime = time + token.duration;
+      const current = tostart.get(endtime);
+      if (current) {
+        current.push(token);
+      } else {
+        tostart.set(endtime, [token]);
+      }
+    }
+    this.queue = [];
+    const keys = Array.from(tostart.keys()).sort();
+    for (const key of keys) {
+      this.queue.push({ endtime: key, tokens: tostart.get(key)! });
+    }
+    if (this.queue.length > 0) {
+      const next = Math.max(this.queue[0].endtime - time, 0);
+      this.timeout = setTimeout(() => {
+        this.check();
+      }, next);
+      if (typeof this.timeout == "object" && "unref" in this.timeout) {
+        this.timeout.unref();
+      }
+    }
+  }
+
+  stop() {
+    if (this.timeout) {
+      clearTimeout(this.timeout as number);
+    }
+  }
+
+  check() {
+    const time = new Date().getTime();
+    const torenew: Map<number, Token[]> = new Map<number, Token[]>();
+    let i = 0;
+    for (i; i < this.queue.length; i++) {
+      const cendtime = this.queue[i].endtime;
+      if (time < this.queue[i].endtime) {
+        break;
+      }
+      this.update(
+        time,
+        this.queue[i].tokens.map((t) => t.value),
+      );
+      for (const token of this.queue[i].tokens) {
+        if (token.duration <= 0) continue;
+        let endtime = cendtime + token.duration;
+        while (endtime <= time) endtime += token.duration;
+        const current = torenew.get(endtime);
+        if (current) {
+          current.push(token);
+        } else {
+          torenew.set(endtime, [token]);
+        }
+      }
+    }
+    this.queue = this.queue.slice(i);
+    const keys = Array.from(torenew.keys()).sort().reverse();
+    for (const key of keys) {
+      this.insert(key, torenew.get(key)!);
+    }
+    if (this.queue.length > 0) {
+      const next = Math.max(this.queue[0].endtime - time, 0);
+      this.timeout = setTimeout(() => {
+        this.check();
+      }, next);
+      if (typeof this.timeout == "object" && "unref" in this.timeout) {
+        this.timeout.unref();
+      }
+    }
+  }
+
+  // TODO: Binary version
+  private insert(endtime: number, tokens: Token[]) {
+    let i = 0;
+    for (i; i < this.queue.length; i++) {
+      if (this.queue[i].endtime == endtime) {
+        this.queue[i].tokens.push(...tokens);
+        return;
+      }
+      if (this.queue[i].endtime > endtime) {
+        break;
+      }
+    }
+    const qtokens = { endtime, tokens };
+    if (i >= this.queue.length) this.queue.push(qtokens);
+    else {
+      this.queue = [...this.queue.slice(0, i), qtokens, ...this.queue.slice(i)];
+    }
+  }
 }
 
 /* @sk init */

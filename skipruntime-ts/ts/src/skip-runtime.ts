@@ -1,11 +1,16 @@
 // prettier-ignore
 import { runUrl, type ModuleInit } from "#std/sk_types.js";
+import type {
+  SimpleSkipService,
+  SimpleServiceOutput,
+  Writer,
+} from "./skipruntime_service.js";
 import { check } from "./internals/skipruntime_impl.js";
 import type {
   SKStore,
   SKStoreFactory,
   ColumnSchema,
-  MirrorSchema,
+  Schema,
   TableCollection,
   Table,
   TTableCollection,
@@ -13,19 +18,26 @@ import type {
   TJSON,
   JSONObject,
   Accumulator,
+  Local,
+  Remote,
+  Database,
 } from "./skipruntime_api.js";
-
+import { runWithServer_ } from "./internals/skipruntime_process.js";
+export { TimeQueue } from "./internals/skipruntime_module.js";
 export type {
   SKStore,
   TJSON,
   TableCollection,
   Table,
-  MirrorSchema,
+  Schema,
   JSONObject,
   TTableCollection,
   TTable,
   ColumnSchema,
   Accumulator,
+  SimpleSkipService,
+  SimpleServiceOutput,
+  Writer,
 };
 
 export type {
@@ -39,6 +51,7 @@ export type {
   AsyncLazyCompute,
   Loadable,
   AsyncLazyCollection,
+  EntryPoint,
 } from "./skipruntime_api.js";
 
 export { ValueMapper } from "./skipruntime_api.js";
@@ -69,16 +82,73 @@ async function wasmUrl(): Promise<URL> {
 }
 
 export async function createSKStore(
-  init: (skstore: SKStore, ...tables: TableCollection<TJSON[]>[]) => void,
-  tables: MirrorSchema[],
-  connect: boolean = true,
-): Promise<Table<TJSON[]>[]> {
+  init: (
+    skstore: SKStore,
+    tables: Record<string, TableCollection<TJSON[]>>,
+  ) => void,
+  local: Local,
+  remotes: Record<string, Remote> = {},
+  tokens: Record<string, number> = {},
+): Promise<Record<string, Table<TJSON[]>>> {
   const data = await runUrl(wasmUrl, modules, [], "SKDB_factory");
   const factory = data.environment.shared.get("SKStore") as SKStoreFactory;
-  return factory.runSKStore(init, tables, connect);
+  return factory.runSKStore(init, local, remotes, tokens);
 }
 
-export function freeze<T extends TJSON>(value: T): T {
+export async function createInlineSKStore(
+  init: (skstore: SKStore, ...tables: TableCollection<TJSON[]>[]) => void,
+  local: Local,
+  remotes: Record<string, Remote> = {},
+  tokens: Record<string, number> = {},
+): Promise<Table<TJSON[]>[]> {
+  const tables: Table<TJSON[]>[] = [];
+  const result = await createSKStore(
+    (skstore: SKStore, tables: Record<string, TableCollection<TJSON[]>>) => {
+      const handles: TableCollection<TJSON[]>[] = [];
+      for (const schema of local.tables) {
+        const name = schema.alias ? schema.alias : schema.name;
+        handles.push(tables[name]);
+      }
+      for (const remote of Object.values(remotes)) {
+        for (const schema of remote.tables) {
+          const name = schema.alias ? schema.alias : schema.name;
+          handles.push(tables[name]);
+        }
+      }
+      init(skstore, ...handles);
+    },
+    local,
+    remotes,
+    tokens,
+  );
+  for (const schema of local.tables) {
+    const name = schema.alias ? schema.alias : schema.name;
+    tables.push(result[name]);
+  }
+  for (const remote of Object.values(remotes)) {
+    for (const schema of remote.tables) {
+      const name = schema.alias ? schema.alias : schema.name;
+      tables.push(result[name]);
+    }
+  }
+  return tables;
+}
+
+export async function createLocalSKStore(
+  init: (skstore: SKStore, ...tables: TableCollection<TJSON[]>[]) => void,
+  schemas: Schema[],
+  tokens: Record<string, number> = {},
+  database?: Database,
+): Promise<Table<TJSON[]>[]> {
+  return createInlineSKStore(
+    init,
+    database ? { tables: schemas, database } : { tables: schemas },
+    {},
+    tokens,
+  );
+}
+
+export function freeze<T>(value: T): T {
   const type = typeof value;
   if (type == "string" || type == "number" || type == "boolean") {
     return value;
@@ -114,4 +184,12 @@ export function freeze<T extends TJSON>(value: T): T {
   } else {
     throw new Error("'" + type + "' cannot be frozen.");
   }
+}
+
+export async function runWithServer(
+  service: SimpleSkipService,
+  options: Record<string, any>,
+  database?: Database,
+) {
+  await runWithServer_(service, createSKStore, options, database);
 }

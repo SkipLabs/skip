@@ -1,6 +1,6 @@
 // prettier-ignore
 import type { Opt, Shared, ptr, int, float, Metadata } from "#std/sk_types.js";
-import type * as Internal from "./skstore_internal_types.js";
+import type * as Internal from "./skipruntime_internal_types.js";
 import type {
   Accumulator,
   AValue,
@@ -8,6 +8,8 @@ import type {
   TJSON,
   NonEmptyIterator,
   EagerCollection,
+  Schema,
+  JSONObject,
 } from "../skipruntime_api.js";
 
 export type CtxMapping<
@@ -78,19 +80,21 @@ export interface Context {
   getArraySelf: <K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) => V[];
   getOneSelf: <K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) => V;
   maybeGetOneSelf: <K, V>(lazyHdl: ptr<Internal.LHandle>, key: K) => Opt<V>;
+  getToken: (key: string) => number;
 
   size: (collection: string) => number;
 
-  mapFromSkdb: <R extends TJSON, K extends TJSON, V extends TJSON>(
+  mapFromSkdb: <R extends TJSON[], K extends TJSON, V extends TJSON>(
     table: string,
     mapperName: string,
     mapper: (entry: R, occ: number) => Iterable<[K, V]>,
   ) => string;
 
-  mapToSkdb: <R extends TJSON, K extends TJSON, V extends TJSON>(
-    collectionName: string,
-    table: string,
-    mapper: (key: K, it: NonEmptyIterator<V>) => R,
+  mapToSkdb: <R extends TJSON[], K extends TJSON, V extends TJSON>(
+    eagerHdl: string,
+    table: Schema,
+    mapper: (key: K, it: NonEmptyIterator<V>) => Iterable<R>,
+    connected: boolean,
   ) => void;
 
   multimap: <
@@ -115,8 +119,9 @@ export interface Context {
     accumulator: Accumulator<V2, V3>,
   ) => string;
 
+  jsonExtract(value: JSONObject, pattern: string): TJSON[];
+
   noref: () => Context;
-  notify?: () => void;
 }
 
 export interface Handles {
@@ -166,6 +171,11 @@ export interface FromWasm {
     getterHdl: ptr<Internal.String>,
     key: ptr<Internal.CJSON>,
   ): ptr<Internal.CJSON>;
+  SkipRuntime_token(
+    ctx: ptr<Internal.Context>,
+    key: ptr<Internal.String>,
+  ): number;
+  SkipRuntime_updateTokens(tokens: ptr<Internal.CJArray>, time: number): number;
 
   SkipRuntime_getArrayLazy(
     ctx: ptr<Internal.Context>,
@@ -209,6 +219,7 @@ export interface FromWasm {
     eagerCollectionId: ptr<Internal.String>,
     table: ptr<Internal.String>,
     fnPtr: int,
+    connected: boolean,
   ): void;
 
   // NonEmptyIterator
@@ -237,7 +248,11 @@ export interface FromWasm {
   ): void;
 
   // Store
-  SkipRuntime_createFor(session: ptr<Internal.String>): float;
+  SkipRuntime_createFor(
+    session: ptr<Internal.String>,
+    tokens: ptr<Internal.CJArray>,
+    time: float,
+  ): float;
 
   // SKStore
   SkipRuntime_asyncLazy(
@@ -277,4 +292,10 @@ export interface FromWasm {
     accumulator: int,
     accInit: ptr<Internal.CJSON>,
   ): ptr<Internal.String>;
+
+  // Utils
+  SKIP_SKStore_jsonExtract(
+    json: ptr<Internal.CJSON>,
+    pattern: ptr<Internal.String>,
+  ): ptr<Internal.CJArray>;
 }

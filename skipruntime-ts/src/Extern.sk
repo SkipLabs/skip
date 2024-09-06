@@ -18,7 +18,7 @@ native fun applyConvertToRowFun(
   fn: UInt32,
   key: SKJSON.CJSON,
   values: mutable NonEmptyIterator<JSONFile>,
-): SKJSON.CJSON;
+): SKJSON.CJArray;
 
 @cpp_extern
 @debug
@@ -192,7 +192,7 @@ class FnHandle private (eptr: SKStore.ExternalPointer) extends File {
   fun toRow(
     key: JSONID,
     values: mutable NonEmptyIterator<JSONFile>,
-  ): SKJSON.CJSON {
+  ): SKJSON.CJArray {
     applyConvertToRowFun(this.getId(), key.value, values)
   }
 }
@@ -408,10 +408,11 @@ fun toSkdb(
   handleId: String,
   table: String,
   convPtr: UInt32,
+  connected: Int32,
 ): void {
   eager = EHandle(JSONID::keyType, JSONFile::type, DirName::create(handleId));
   mapHandle = FnHandle::make(convPtr);
-  DBUtils.toTable(eager, table, context, mapHandle.toRow)
+  DBUtils.toTable(eager, table, context, mapHandle.toRow, connected != 0)
 }
 
 @export("SkipRuntime_getFromTable")
@@ -455,6 +456,30 @@ fun maybeGet(
   | Some(v) -> v.value
   | None() -> SKJSON.CJNull()
   }
+}
+
+@export("SkipRuntime_token")
+fun token(context: mutable Context, key: String): Float {
+  eager = EHandle(SID::keyType, IntFile::type, kTokenDir);
+  eager.get(context, SID(key)).value.toFloat()
+}
+
+@export("SkipRuntime_updateTokens")
+fun updateTokens(tokens: SKJSON.CJArray, time: Float): Float {
+  SKStore.runWithResult(context ~> {
+    dir = context.unsafeGetEagerDir(kTokenDir);
+    tokens match {
+    | SKJSON.CJArray(values) ->
+      values.each(t -> {
+        token = SKJSON.asString(t);
+        dir.writeArray(context, SID(token), Array[IntFile(time.toInt())]);
+      })
+    };
+    context.update();
+  }) match {
+  | Success _ -> 1.0
+  | Failure(err) -> -getErrorHdl(err)
+  };
 }
 
 @export("SkipRuntime_getArrayLazy")
@@ -608,8 +633,8 @@ fun initCtx(): Context {
 }
 
 @export("SkipRuntime_createFor")
-fun tsCreateFor(session: String): Float {
-  createFor(session)
+fun tsCreateFor(session: String, tokens: SKJSON.CJArray, time: Float): Float {
+  createFor(session, tokens, time)
 }
 
 fun previous(value: SKJSON.CJObject): ?SKJSON.CJSON {
@@ -618,6 +643,23 @@ fun previous(value: SKJSON.CJObject): ?SKJSON.CJSON {
   } else {
     SKJSON.getValue(value, "previous")
   }
+}
+
+@export("SKIP_SKStore_jsonExtract")
+fun jsonExtract(from: SKJSON.CJSON, pattern: String): SKJSON.CJArray {
+  fieldsList = SKJSON.PatternParser::mcreate(pattern)
+    .toplevelPattern()
+    .pmatch(from)
+    .collect(Array);
+  values = mutable Vector[];
+  fieldsList.each(fields -> {
+    array = fields.collect(Array).map(field -> {
+      cjfields = SKJSON.CJFields::create(Array[field], x -> x);
+      SKJSON.CJObject(cjfields)
+    });
+    values.push(SKJSON.CJArray(array));
+  });
+  SKJSON.CJArray(values.toArray())
 }
 
 module end; /* SKStore */

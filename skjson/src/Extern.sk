@@ -26,6 +26,7 @@ fun typeOf(json: CJSON): Float {
 fun asInt(json: CJSON): Float {
   json match {
   | CJInt(v) -> v.toFloat()
+  | CJFloat(v) -> v
   | _ -> invariant_violation("Must be an Int value.")
   }
 }
@@ -34,6 +35,7 @@ fun asInt(json: CJSON): Float {
 fun asFloat(json: CJSON): Float {
   json match {
   | CJFloat(v) -> v
+  | CJInt(v) -> v.toFloat()
   | _ -> invariant_violation("Must be a Float value.")
   }
 }

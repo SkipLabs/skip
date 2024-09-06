@@ -1,7 +1,7 @@
 // prettier-ignore
 import { type ptr, type Opt } from "#std/sk_types.js";
 import type { Context } from "./skipruntime_types.js";
-import type * as Internal from "./skstore_internal_types.js";
+import type * as Internal from "./skipruntime_internal_types.js";
 import type {
   Accumulator,
   EagerCollection,
@@ -13,7 +13,7 @@ import type {
   SKStore,
   SKStoreFactory,
   Mapping,
-  MirrorSchema,
+  Schema,
   ColumnSchema,
   Table,
   Loadable,
@@ -23,6 +23,11 @@ import type {
   LazyCompute,
   AsyncLazyCompute,
   NonEmptyIterator,
+  Index,
+  Remote,
+  Local,
+  EntryPoint,
+  Inputs,
 } from "../skipruntime_api.js";
 
 // prettier-ignore
@@ -41,6 +46,7 @@ function assertNoKeysNaN<K extends TJSON, V extends TJSON>(
   }
   return kv_pairs;
 }
+export const serverResponseSuffix = "__skdb_mirror_feedback";
 
 class EagerCollectionImpl<K extends TJSON, V extends TJSON>
   implements EagerCollection<K, V>
@@ -143,8 +149,9 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
     }
     this.context.mapToSkdb(
       this.eagerHdl,
-      table.getName(),
+      table.getSchema(),
       (key: K, it: NonEmptyIterator<V>) => mapperObj.mapElement(key, it),
+      table.isConnected(),
     );
   }
 }
@@ -210,14 +217,11 @@ export class LSelfImpl<K extends TJSON, V extends TJSON>
 export class TableCollectionImpl<R extends TJSON[]>
   implements TableCollection<R>
 {
-  protected context: Context;
-  protected skdb: SKDBSync;
-  protected schema: MirrorSchema;
-
-  constructor(context: Context, skdb: SKDBSync, schema: MirrorSchema) {
-    this.context = context;
-    this.skdb = skdb;
-    this.schema = schema;
+  constructor(
+    protected context: Context,
+    protected skdb: SKDBSync,
+    protected schema: Schema,
+  ) {
     Object.defineProperty(this, "__sk_frozen", {
       enumerable: false,
       writable: false,
@@ -225,11 +229,19 @@ export class TableCollectionImpl<R extends TJSON[]>
     });
   }
 
-  getName(): string {
+  getName() {
     return this.schema.name;
   }
 
-  get(key: TJSON, index?: string | undefined): R[] {
+  getSchema() {
+    return this.schema;
+  }
+
+  isConnected() {
+    return this.skdb.connectedRemote ? true : false;
+  }
+
+  get(key: TJSON, index?: string | undefined) {
     return this.context.getFromTable(this.getName(), key, index);
   }
 
@@ -262,9 +274,9 @@ export class TableCollectionImpl<R extends TJSON[]>
 export class TableImpl<R extends TJSON[]> implements Table<R> {
   protected context: Context;
   protected skdb: SKDBSync;
-  protected schema: MirrorSchema;
+  protected schema: Schema;
 
-  constructor(context: Context, skdb: SKDBSync, schema: MirrorSchema) {
+  constructor(context: Context, skdb: SKDBSync, schema: Schema) {
     this.context = context;
     this.skdb = skdb;
     this.schema = schema;
@@ -274,8 +286,12 @@ export class TableImpl<R extends TJSON[]> implements Table<R> {
     return this.schema.name;
   }
 
-  insert(entries: R[], update?: boolean | undefined): void {
-    const query = toInsertQuery(this.getName(), entries, update);
+  insert(entries: R[] | Inputs, update?: boolean | undefined): void {
+    const values = Array.isArray(entries) ? entries : entries.values;
+    const columns = !Array.isArray(entries)
+      ? entries.columns
+      : this.schema.columns.map((c) => c.name);
+    const query = toInsertQuery(this.getName(), values, update, columns);
     const params = query.params ? toParams(query.params) : undefined;
     this.skdb.exec(query.query, params);
   }
@@ -283,7 +299,7 @@ export class TableImpl<R extends TJSON[]> implements Table<R> {
   update(entry: R, updates: JSONObject): void {
     const query = toUpdateQuery(
       this.getName(),
-      this.schema.expected,
+      this.schema.columns,
       entry,
       updates,
     );
@@ -310,7 +326,7 @@ export class TableImpl<R extends TJSON[]> implements Table<R> {
   }
 
   delete(entry: R): void {
-    const query = toDeleteQuery(this.getName(), this.schema.expected, entry);
+    const query = toDeleteQuery(this.getName(), this.schema.columns, entry);
     this.skdb.exec(
       query.query,
       query.params ? toParams(query.params) : undefined,
@@ -324,8 +340,11 @@ export class TableImpl<R extends TJSON[]> implements Table<R> {
       query.params ? toParams(query.params) : undefined,
     );
   }
-  watch = (update: (rows: JSONObject[]) => void) => {
-    const query = toSelectQuery(this.getName(), {});
+  watch = (update: (rows: JSONObject[]) => void, feedback: boolean = false) => {
+    const name = feedback
+      ? this.getName() + serverResponseSuffix
+      : this.getName();
+    const query = toSelectQuery(name, {});
     return this.skdb.watch(
       query.query,
       query.params ? toParams(query.params) : {},
@@ -336,8 +355,12 @@ export class TableImpl<R extends TJSON[]> implements Table<R> {
   watchChanges = (
     init: (rows: JSONObject[]) => void,
     update: (added: JSONObject[], removed: JSONObject[]) => void,
+    feedback: boolean = false,
   ) => {
-    const query = toSelectQuery(this.getName(), {});
+    const name = feedback
+      ? this.getName() + serverResponseSuffix
+      : this.getName();
+    const query = toSelectQuery(name, {});
     return this.skdb.watchChanges(
       query.query,
       query.params ? toParams(query.params) : {},
@@ -449,6 +472,14 @@ export class SKStoreImpl implements SKStore {
     return new LazyCollectionImpl<K, Loadable<V, M>>(this.context, lazyHdl);
   }
 
+  getToken(key: string) {
+    return this.context.getToken(key);
+  }
+
+  jsonExtract(value: JSONObject, pattern: string): TJSON[] {
+    return this.context.jsonExtract(value, pattern);
+  }
+
   log(object: any): void {
     if (
       typeof object == "object" &&
@@ -466,71 +497,132 @@ export class SKStoreImpl implements SKStore {
 
 export class SKStoreFactoryImpl implements SKStoreFactory {
   private context: () => Context;
-  private create: (init: () => void) => void;
+  private create: (init: () => void, tokens: Record<string, number>) => void;
   private createSync: (
     dbName?: string,
     asWorker?: boolean,
   ) => Promise<SKDBSync>;
+  private createKey: (key: string) => Promise<CryptoKey>;
 
   constructor(
     context: () => Context,
-    create: (init: () => void) => void,
+    create: (init: () => void, tokens: Record<string, number>) => void,
     createSync: (dbName?: string, asWorker?: boolean) => Promise<SKDBSync>,
+    createKey: (key: string) => Promise<CryptoKey>,
   ) {
     this.context = context;
     this.create = create;
     this.createSync = createSync;
+    this.createKey = createKey;
   }
 
   getName = () => "SKStore";
 
   runSKStore = async (
-    init: (skstore: SKStore, ...tables: TableCollection<TJSON[]>[]) => void,
-    tablesSchema: MirrorSchema[],
-    connect: boolean = true,
-  ): Promise<Table<TJSON[]>[]> => {
+    init: (
+      skstore: SKStore,
+      tables: Record<string, TableCollection<TJSON[]>>,
+    ) => void,
+    local: Local,
+    remotes: Record<string, Remote> = {},
+    tokens: Record<string, number> = {},
+  ): Promise<Record<string, Table<TJSON[]>>> => {
     const context = this.context();
-    const skdb = await this.createSync();
-    const tables = mirror(context, skdb, connect, ...tablesSchema);
+    const tables = await mirror(
+      context,
+      this.createSync,
+      local,
+      remotes,
+      this.createKey,
+    );
     const skstore = new SKStoreImpl(context);
     this.create(() => {
-      init(skstore, ...tables);
-    });
-    return tables.map((t) => (t as TableCollectionImpl<TJSON[]>).toTable());
+      init(skstore, tables);
+    }, tokens);
+    const result: Record<string, Table<TJSON[]>> = {};
+    for (const [key, value] of Object.entries(tables)) {
+      result[key] = (value as TableCollectionImpl<TJSON[]>).toTable();
+    }
+    return result;
   };
+}
+
+function toWs(entryPoint: EntryPoint) {
+  if (entryPoint.secured) return `wss://${entryPoint.host}:${entryPoint.port}`;
+  return `ws://${entryPoint.host}:${entryPoint.port}`;
 }
 
 /**
  * Mirror Skip tables from SKDB, with support for custom schemas and SQL filters
  * @param context
- * @param skdb - the database to work with
- * @param connect
- * @param tables - tables to mirror, along with schemas and filters
- * @returns - the mirrored table collections
+ * @param createSkdb
+ * @param local
+ * @param remotes
+ * @param createKey
+ * @returns - the mirrors table handles
  */
-export function mirror(
+export async function mirror(
   context: Context,
-  skdb: SKDBSync,
-  connect: boolean,
-  ...tables: MirrorSchema[]
-): TableCollection<TJSON[]>[] {
-  if (connect) {
-    /* eslint-disable-next-line @typescript-eslint/no-floating-promises */
-    skdb.mirror(...toMirrorDefinitions(...tables));
+  createSkdb: () => Promise<SKDBSync>,
+  local: Local,
+  remotes: Record<string, Remote>,
+  createKey: (key: string) => Promise<CryptoKey>,
+): Promise<Record<string, TableCollection<TJSON[]>>> {
+  const tHandles: Record<string, TableCollection<TJSON[]>> = {};
+  if (local.database) {
+    remotes["__sk_local"] = {
+      database: local.database,
+      tables: local.tables,
+    };
   } else {
-    /*
-    console.log("Warning:");
-    console.log("\tThe mirror tables filter are not applied.");
-    console.log(
-      "\tThe produced data will be lost as soon as the process shutdown.",
-    );
-    */
-    tables.forEach((table) => {
+    for (const table of local.tables) {
+      const skdb = await createSkdb();
       const query = create(table);
       skdb.exec(query.query, query.params ? toParams(query.params) : undefined);
-    });
+      if (table.indexes) {
+        const indexes = table.indexes.map((idx) =>
+          createIndex(table.name, idx),
+        );
+        skdb.exec(indexes.join("\n"));
+      }
+      tHandles[table.name] = new TableCollectionImpl(context, skdb, table);
+    }
   }
-  return tables.map((table) => new TableCollectionImpl(context, skdb, table));
+  for (const remote of Object.values(remotes)) {
+    const skdb = await createSkdb();
+    const database = remote.database;
+    const privateKey = await createKey(database.private);
+    await skdb.connect(
+      database.name,
+      database.access,
+      privateKey,
+      database.endpoint ? toWs(database.endpoint) : undefined,
+    );
+    if (!skdb.connectedRemote) {
+      throw new Error("Unable to connect to server.");
+    }
+    for (const table of remote.tables) {
+      const with_access =
+        table.columns.filter((v) => v.name == "skdb_access").length > 0;
+      if (!with_access) {
+        table.columns.push({
+          name: "skdb_access",
+          type: "TEXT",
+        });
+      }
+      const query = create(table);
+      await skdb.connectedRemote.exec(
+        query.query,
+        query.params ? toParams(query.params) : undefined,
+      );
+      tHandles[table.name] = new TableCollectionImpl(context, skdb, table);
+    }
+    /* eslint-disable-next-line @typescript-eslint/no-floating-promises */
+    const definitions = toMirrorDefinitions(...remote.tables);
+
+    await skdb.mirror(...definitions);
+  }
+  return tHandles;
 }
 
 function toColumn(column: ColumnSchema): string {
@@ -548,24 +640,30 @@ function toColumns(columns: ColumnSchema[]): string {
   return `(${columns.map(toColumn).join(",")})`;
 }
 
-function toMirrorDefinition(table: MirrorSchema): MirrorDefn {
+function toMirrorDefinition(table: Schema): MirrorDefn {
   return {
     table: table.name,
-    expectedColumns: toColumns(table.expected),
-    filterExpr: table.filter?.filter,
+    expectedColumns: toColumns(table.columns),
+    filterExpr: table.filter ? table.filter.filter : undefined,
     filterParams: table.filter?.params
       ? toParams(table.filter.params)
       : undefined,
   };
 }
 
-function toMirrorDefinitions(...tables: MirrorSchema[]): MirrorDefn[] {
+function toMirrorDefinitions(...tables: Schema[]): MirrorDefn[] {
   return tables.map(toMirrorDefinition);
 }
 
-function create(table: MirrorSchema): Query {
+function createIndex(table: string, index: Index): string {
+  return `CREATE ${index.unique ? "UNIQUE " : ""}INDEX IF NOT EXISTS ${
+    index.name
+  } ON ${table}(${index.columns.join(", ")});`;
+}
+
+function create(table: Schema): Query {
   const query = `CREATE TABLE IF NOT EXISTS "${table.name}" ${toColumns(
-    table.expected,
+    table.columns,
   )};`;
   return { query };
 }
@@ -613,7 +711,7 @@ function toWhere(
       }
       exprs.push(`${column.name} IN (${inVal.join(", ")})`);
     } else {
-      const pName = prefix + column.name;
+      const pName = `${prefix}${i}_value`;
       params[pName] = field;
       exprs.push(`${column.name} = @${pName}`);
     }
@@ -644,9 +742,9 @@ function toSelectWhere(select: JSONObject, prefix: string = ""): Query {
   if (keys.length <= 0) return { query: "true" };
   const exprs: string[] = [];
   const params: JSONObject = {};
-  keys.forEach((column: string & keyof JSONObject) => {
+  keys.forEach((column: keyof JSONObject, c: number) => {
     const field = select[column];
-    if (Array.isArray(field)) {
+    if (Array.isArray(field) && field.length > 1) {
       const inVal: string[] = [];
       for (let idx = 0; idx < field.length; idx++) {
         const pName = `${prefix}${idx}_${column}`;
@@ -655,8 +753,9 @@ function toSelectWhere(select: JSONObject, prefix: string = ""): Query {
       }
       exprs.push(`${column} IN (${inVal.join(", ")})`);
     } else {
-      const pName = `${prefix}${column}`;
-      params[pName] = field;
+      const value = Array.isArray(field) ? field[0] : field;
+      const pName = `${prefix}${c}_${column}`;
+      params[pName] = value;
       exprs.push(`${column} = @${pName}`);
     }
   });
@@ -713,6 +812,7 @@ function toInsertQuery(
   name: string,
   entries: TJSON[][],
   update?: boolean | undefined,
+  columns?: string[],
 ): Query {
   let params: JSONObject = {};
   const values = entries.map((vs, idx) => {
@@ -720,10 +820,12 @@ function toInsertQuery(
     params = { ...params, ...q.params };
     return q;
   });
+  const strColumns =
+    columns && columns.length > 0 ? `(${columns.join(",")}) ` : "";
   const strValue = values.map((v) => `(${v.query})`).join(",");
   const query = `INSERT ${
     update ? "OR REPLACE " : ""
-  }INTO "${name}" VALUES ${strValue};`;
+  }INTO "${name}" ${strColumns}VALUES ${strValue};`;
   return { query, params };
 }
 

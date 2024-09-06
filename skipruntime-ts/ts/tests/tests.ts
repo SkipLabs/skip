@@ -3,7 +3,7 @@ import type {
   SKStore,
   TJSON,
   TableCollection,
-  MirrorSchema,
+  Schema,
   Table,
   InputMapper,
   Mapper,
@@ -16,14 +16,17 @@ import type {
   Loadable,
   NonEmptyIterator,
   AsyncLazyCollection,
+  TTableCollection,
 } from "skip-runtime";
 import {
   Sum,
   ValueMapper,
-  createSKStore,
+  TimeQueue,
+  createLocalSKStore,
   cinteger as integer,
   schema,
   ctext as text,
+  cjson as json,
 } from "skip-runtime";
 
 function check(name: String, got: TJSON, expected: TJSON): void {
@@ -32,9 +35,16 @@ function check(name: String, got: TJSON, expected: TJSON): void {
 
 export type Test = {
   name: string;
-  schema: MirrorSchema[];
-  init: (skstore: SKStore, ...tables: any[]) => void;
+  schemas: Schema[];
+  init: (skstore: SKStore, ...tables: TTableCollection[]) => void;
   run: (...tables: any[]) => Promise<void>;
+  error?: (err: any) => void;
+  tokens?: Record<string, number>;
+};
+
+export type UnitTest = {
+  name: string;
+  run: () => Promise<void>;
   error?: (err: any) => void;
 };
 
@@ -51,8 +61,8 @@ class TestFromIntInt implements InputMapper<[number, number], number, number> {
 class TestToOutput<V extends TJSON>
   implements OutputMapper<[number, V], number, V>
 {
-  mapElement(key: number, it: NonEmptyIterator<V>): [number, V] {
-    return [key, it.first()];
+  mapElement(key: number, it: NonEmptyIterator<V>): Iterable<[number, V]> {
+    return Array([key, it.first()]);
   }
 }
 
@@ -102,7 +112,7 @@ class TestAdd implements Mapper<number, number, number, number> {
         result.push([key, v + (other_v ?? 0)]);
       }
     }
-    return result;
+    return result as Iterable<[number, number]>;
   }
 }
 
@@ -377,8 +387,8 @@ class TestToOutput2
   mapElement(
     key: [number, number],
     it: NonEmptyIterator<number>,
-  ): [number, number, number] {
-    return [key[0], key[1], it.first()];
+  ): Iterable<[number, number, number]> {
+    return Array([key[0], key[1], it.first()]);
   }
 }
 
@@ -567,12 +577,144 @@ async function testAsyncLazyRun(
   return new Promise(waitandcheck) as Promise<void>;
 }
 
+//// testTokens
+
+class TestWithToken
+  implements Mapper<number, number, number, [number, number]>
+{
+  constructor(private skstore: SKStore) {}
+
+  mapElement(
+    key: number,
+    it: NonEmptyIterator<number>,
+  ): Iterable<[number, [number, number]]> {
+    const time = this.skstore.getToken("token_5s");
+    return [[key, [it.first(), time]]];
+  }
+}
+
+class TokensToOutput
+  implements OutputMapper<[number, number, number], number, [number, number]>
+{
+  mapElement(
+    key: number,
+    it: NonEmptyIterator<[number, number]>,
+  ): Iterable<[number, number, number]> {
+    const v = it.first();
+    return Array([key, ...v]);
+  }
+}
+
+function testTokensInit(
+  skstore: SKStore,
+  input: TableCollection<[number, number]>,
+  output: TableCollection<[number, number, number]>,
+) {
+  const eager1 = input.map(TestFromIntInt);
+  const eager2 = eager1.map(TestWithToken, skstore);
+  eager2.mapTo(output, TokensToOutput);
+}
+
+async function timeout(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function testTokensRun(
+  input: Table<[number, number]>,
+  output: Table<[number, number, number]>,
+) {
+  input.insert([[1, 0]], true);
+  const start = output.select({ id: 1 }, ["value", "time"])[0] as any;
+  await timeout(2000);
+  input.insert([[1, 2]], true);
+  check("testTokens[0]", output.select({ id: 1 }, ["value", "time"]), [
+    { value: 2, time: start.time },
+  ]);
+  await timeout(2000);
+  input.insert([[1, 4]], true);
+  check("testTokens[1]", output.select({ id: 1 }, ["value", "time"]), [
+    { value: 4, time: start.time },
+  ]);
+  await timeout(2000);
+  const last = output.select({ id: 1 }, ["value", "time"])[0] as any;
+  check("testTokens[2]", Math.trunc((last.time - start.time) / 1000), 5);
+}
+
+// testJSONExtract
+
+class TestFromJSTable
+  implements InputMapper<[number, JSONObject, string], number, TJSON[]>
+{
+  constructor(private skstore: SKStore) {}
+
+  mapElement(
+    entry: [number, JSONObject, string],
+    _occ: number,
+  ): Iterable<[number, TJSON[]]> {
+    const key = entry[0];
+    const value = entry[1];
+    const pattern = entry[2];
+    const result = this.skstore.jsonExtract(value, pattern);
+    return Array([key, result]);
+  }
+}
+
+function testJSONExtractInit(
+  skstore: SKStore,
+  input: TableCollection<[number, JSONObject, string]>,
+  output: TableCollection<[number, TJSON[]]>,
+) {
+  const eager = input.map(TestFromJSTable, skstore);
+  eager.mapTo(output, TestToOutput);
+}
+
+async function testJSONExtractRun(
+  input: Table<[number, JSONObject, string]>,
+  output: Table<[number, TJSON[]]>,
+) {
+  input.insert(
+    [
+      [
+        0,
+        { x: [1, 2, 3], "y[0]": [4, 5, 6, null] },
+        '{x[]: var1, ?"y[0]": var2}',
+      ],
+      [1, { x: [1, 2, 3], y: [4, 5, 6, null] }, "{x[]: var1, ?y[0]: var2}"],
+      [2, { x: 1, y: 2 }, "{%: var, x:var<int>}"],
+    ],
+    true,
+  );
+  const res = output.select({}, ["id", "v"]);
+  check("testJSONExtract", res, [
+    {
+      id: 0,
+      v: [
+        [{ var2: [4, 5, 6, null] }, { var1: 1 }],
+        [{ var2: [4, 5, 6, null] }, { var1: 2 }],
+        [{ var2: [4, 5, 6, null] }, { var1: 3 }],
+      ],
+    },
+    {
+      id: 1,
+      v: [
+        [{ var2: 4 }, { var1: 1 }],
+        [{ var2: 4 }, { var1: 2 }],
+        [{ var2: 4 }, { var1: 3 }],
+      ],
+    },
+    {
+      id: 2,
+      v: [[{ var: 1 }, { var: 2 }]],
+    },
+  ]);
+}
+
 //// Tests
 
 export const tests: Test[] = [
   {
     name: "testMap1",
-    schema: [
+    schemas: [
       schema("input", [integer("id", true, true), integer("value")]),
       schema("output", [integer("id", true, true), integer("value")]),
     ],
@@ -581,7 +723,7 @@ export const tests: Test[] = [
   },
   {
     name: "testMap2",
-    schema: [
+    schemas: [
       schema("input1", [integer("id", true, true), text("value")]),
       schema("input2", [integer("id", true, true), text("value")]),
       schema("output", [integer("id", true, true), integer("value")]),
@@ -591,7 +733,7 @@ export const tests: Test[] = [
   },
   {
     name: "testMap3",
-    schema: [
+    schemas: [
       schema("input_no_index", [integer("id"), text("value")]),
       schema("input_index", [integer("id", true, true), text("value")]),
       schema("output", [integer("id"), integer("value")]),
@@ -600,8 +742,8 @@ export const tests: Test[] = [
     run: testMap3Run,
   },
   {
-    name: "testValueMapper",
-    schema: [
+    name: "testMapValues",
+    schemas: [
       schema("input", [integer("id", true, true), integer("value")]),
       schema("output", [integer("id", true, true), integer("value")]),
     ],
@@ -610,7 +752,7 @@ export const tests: Test[] = [
   },
   {
     name: "testSize",
-    schema: [
+    schemas: [
       schema("input", [integer("id", true, true), integer("value")]),
       schema("size", [integer("id", true, true)]),
       schema("output", [integer("id", true, true), integer("value")]),
@@ -620,7 +762,7 @@ export const tests: Test[] = [
   },
   {
     name: "testLazy",
-    schema: [
+    schemas: [
       schema("input", [integer("id", true, true), integer("value")]),
       schema("output", [integer("id", true, true), integer("value")]),
     ],
@@ -629,7 +771,7 @@ export const tests: Test[] = [
   },
   {
     name: "testMapReduce",
-    schema: [
+    schemas: [
       schema("input", [integer("id", true, true), integer("v")]),
       schema("output", [integer("id", true, true), integer("v")]),
     ],
@@ -638,7 +780,7 @@ export const tests: Test[] = [
   },
   {
     name: "testMultiMap1",
-    schema: [
+    schemas: [
       schema("input1", [integer("id", true, true), integer("value")]),
       schema("input2", [integer("id", true, true), integer("value")]),
       schema("output", [integer("src"), integer("id"), integer("v")]),
@@ -648,7 +790,7 @@ export const tests: Test[] = [
   },
   {
     name: "testMultiMapReduce",
-    schema: [
+    schemas: [
       schema("input1", [integer("id", true, true), integer("value")]),
       schema("input2", [integer("id", true, true), integer("value")]),
       schema("output", [integer("id", true, true), integer("v")]),
@@ -658,7 +800,7 @@ export const tests: Test[] = [
   },
   {
     name: "testAsyncLazy",
-    schema: [
+    schemas: [
       schema("input1", [integer("id", true, true), integer("value")]),
       schema("input2", [integer("id", true, true), integer("value")]),
       schema("output", [integer("id", true, true), text("v")]),
@@ -666,22 +808,137 @@ export const tests: Test[] = [
     init: testAsyncLazyInit,
     run: testAsyncLazyRun,
   },
+  {
+    name: "testTokensInit",
+    schemas: [
+      schema("input", [integer("id", true, true), integer("value")]),
+      schema("output", [
+        integer("id", true, true),
+        integer("value"),
+        integer("time"),
+      ]),
+    ],
+    init: testTokensInit,
+    run: testTokensRun,
+    tokens: { token_5s: 5000 },
+  },
+  {
+    name: "testJSONExtract",
+    schemas: [
+      schema("input", [integer("id", true), json("v"), text("p")]),
+      schema("output", [integer("id", true), json("v")]),
+    ],
+    init: testJSONExtractInit,
+    run: testJSONExtractRun,
+  },
+];
+
+type Update = {
+  idx: number;
+  starttime: number;
+  time: number;
+  tokens: string[];
+};
+
+function token(duration: number, value: string) {
+  return { duration, value };
+}
+
+async function testTimedQueue() {
+  const updates: Update[] = [];
+  var starttime: number = 0;
+  const timedQueue = new TimeQueue((time: number, tokens: string[]) => {
+    updates.push({
+      idx: updates.length,
+      starttime,
+      time: Math.trunc(time / 100),
+      tokens: tokens.sort(),
+    });
+  });
+  const rstarttime = new Date().getTime();
+  timedQueue.start(
+    [
+      token(2000, "token_2s"),
+      token(5000, "token_5s"),
+      token(12000, "token_12s"),
+    ],
+    rstarttime,
+  );
+  starttime = Math.trunc(rstarttime / 100);
+  var waiting = true;
+  const waitandcheck = (
+    resolve: () => void,
+    reject: (reason?: any) => void,
+  ) => {
+    const ctime = (add: number) => Math.trunc((rstarttime + add * 100) / 100);
+    if (waiting) {
+      setTimeout(waitandcheck, 21000, resolve, reject);
+      waiting = false;
+    } else {
+      timedQueue.stop();
+      check("testTimedQueue", updates, [
+        { idx: 0, starttime, time: ctime(20), tokens: ["token_2s"] },
+        { idx: 1, starttime, time: ctime(40), tokens: ["token_2s"] },
+        { idx: 2, starttime, time: ctime(50), tokens: ["token_5s"] },
+        { idx: 3, starttime, time: ctime(60), tokens: ["token_2s"] },
+        { idx: 4, starttime, time: ctime(80), tokens: ["token_2s"] },
+        {
+          idx: 5,
+          starttime,
+          time: ctime(100),
+          tokens: ["token_2s", "token_5s"],
+        },
+        {
+          idx: 6,
+          starttime,
+          time: ctime(120),
+          tokens: ["token_12s", "token_2s"],
+        },
+        { idx: 7, starttime, time: ctime(140), tokens: ["token_2s"] },
+        { idx: 8, starttime, time: ctime(150), tokens: ["token_5s"] },
+        { idx: 9, starttime, time: ctime(160), tokens: ["token_2s"] },
+        { idx: 10, starttime, time: ctime(180), tokens: ["token_2s"] },
+        {
+          idx: 11,
+          starttime,
+          time: ctime(200),
+          tokens: ["token_2s", "token_5s"],
+        },
+      ]);
+      resolve();
+    }
+  };
+  return new Promise(waitandcheck) as Promise<void>;
+}
+
+export const units: UnitTest[] = [
+  { name: "testTimedQueue", run: testTimedQueue },
 ];
 
 function run(t: Test) {
   test(t.name, async ({ page }) => {
     let tables: Table<TJSON[]>[] = [];
     try {
-      tables = await createSKStore(t.init, t.schema, false);
+      tables = await createLocalSKStore(
+        t.init,
+        t.schemas,
+        t.tokens ? t.tokens : {},
+      );
     } catch (err: any) {
       if (t.error) t.error(err);
-      else console.error(err);
+      else throw err;
     }
-
     if (tables.length > 0) await t.run(...tables);
+  });
+}
+
+function unit(t: UnitTest) {
+  test(t.name, async ({ page }) => {
+    await t.run();
   });
 }
 
 export function runAll() {
   tests.forEach(run);
+  units.forEach(unit);
 }

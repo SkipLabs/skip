@@ -292,7 +292,6 @@ class DataMapValue{
     writer: Path, // different to origSource when explicitly tombstoning
     files: Array<File>,
   ): this {
-    invariant(files.isEmpty() || origSource == writer);
     if (files.isEmpty()) {
       if (isMasking) {
         // mask out fixed data, for when you're iterating without tombs.
@@ -315,7 +314,7 @@ class DataMapValue{
       !this.map = this.map.set(
         TickRange::create(tick),
         origSource,
-        (writer, files),
+        (origSource, files),
       );
     };
     this
@@ -694,7 +693,10 @@ class EagerDir{
   reducer: ?Reducer = None(),
   purgeCount: Int = 0,
   tombLimit: ?Tick = None(),
-  optCopy: ?DirName = None(),
+  optCopy: ?(
+    DirName,
+    ?(DirName, Key, readonly Context ~> Array<File>) ~> Postponable,
+  ) = None(),
 } extends Dir {
   fun reset(
     context: mutable SKStore.Context,
@@ -1858,25 +1860,36 @@ class EagerDir{
       !purgeCount = 0;
     };
 
-    this.optCopy.each(target ->
-      context.unsafeMaybeGetEagerDir(target).each(targetDir -> {
-        tCopy = targetDir.writeEntry(
-          context,
-          origSource,
-          writer,
-          k,
-          rvalues,
-          force,
-        );
-        context.setDir(target, tCopy);
-      })
-    );
+    this.optCopy.each(info -> {
+      (target, copier) = info;
+      context.postpone(
+        copier match {
+        | Some(w) -> w(target, k, _ctx ~> rvalues)
+        | _ -> ToWrite(target, k, _ctx ~> rvalues)
+        },
+      )
+    });
 
     this with {childDirs, slices, purgeCount}
   }
 
-  fun copyTo(context: mutable Context, target: DirName): void {
-    context.setDir(this.dirName, this with {optCopy => Some(target)});
+  fun copyTo(
+    context: mutable Context,
+    target: DirName,
+    copy: ?Postponable = None(),
+    writer: ?(
+      DirName,
+      Key,
+      readonly Context ~> Array<File>,
+    ) ~> Postponable = None(),
+  ): void {
+    context.postpone(
+      copy match {
+      | Some(c) -> c
+      | _ -> CopyTo(this.getDirName(), target)
+      },
+    );
+    context.setDir(this.dirName, this with {optCopy => Some((target, writer))});
   }
 
   fun purgeSlices(

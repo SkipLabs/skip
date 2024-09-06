@@ -3,6 +3,7 @@ module alias P = SQLParser;
 module SKStore;
 
 const kSessionDir: DirName = DirName::create("/sk_prv/sessions/");
+const kTokenDir: DirName = DirName::create("/sk_prv/tokens/");
 const kGraphDir: DirName = DirName::create("/sk_prv/graph/");
 
 native class Info
@@ -238,7 +239,7 @@ fun base64(toEncode: Key): String {
 
 class JSONFile(value: SKJSON.CJSON) extends File
 
-fun createFor(session: String): Float {
+fun createFor(session: String, tokens: SKJSON.CJArray, time: Float): Float {
   if (SKStore.gHasContext() == 0) {
     SKStore.gContextInit(initCtx());
   };
@@ -250,6 +251,11 @@ fun createFor(session: String): Float {
         kSessionDir,
         Array[(IID(0), StringFile(session))],
       );
+      initTokens = tokens match {
+      | SKJSON.CJArray(values) ->
+        values.map(t -> (SID(SKJSON.asString(t)), IntFile(time.toInt())))
+      };
+      _ = context.mkdir(SID::keyType, IntFile::type, kTokenDir, initTokens);
       _ = sessionHdl.map(
         IID::keyType,
         StringFile::type,
