@@ -117,6 +117,18 @@ fmt: fmt-sk fmt-c fmt-js
 check-fmt: fmt
 	if ! git diff --quiet --exit-code; then echo "make fmt changed some files:"; git status --porcelain; exit 1; fi
 
+# run the docs site locally at http://localhost:3000
+.PHONY: run-docs
+run-docs:
+	cd skipruntime-ts/ts/src && bun install
+	cd www && npm run start
+
+# regenerate api docs served by run-docs from ts sources
+.PHONY: docs
+docs:
+	cd skipruntime-ts/ts/src && bun install
+	cd www && npx docusaurus generate-typedoc
+
 # install the repo pre-commit hook locally
 .git/hooks/pre-commit: bin/git_hooks/check_format.sh
 	ln -s $(PWD)/bin/git_hooks/check_format.sh .git/hooks/pre-commit
