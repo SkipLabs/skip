@@ -287,11 +287,16 @@ export class TableImpl<R extends TJSON[]> implements Table<R> {
   }
 
   insert(entries: R[] | Inputs, update?: boolean | undefined): void {
-    const values = Array.isArray(entries) ? entries : entries.values;
-    const columns = !Array.isArray(entries)
-      ? entries.columns
-      : this.schema.columns.map((c) => c.name);
-    const query = toInsertQuery(this.getName(), values, update, columns);
+    const input = Array.isArray(entries)
+      ? { values: entries, columns: this.schema.columns.map((c) => c.name) }
+      : entries;
+
+    const query = toInsertQuery(
+      this.getName(),
+      input.values,
+      update,
+      input.columns,
+    );
     const params = query.params ? toParams(query.params) : undefined;
     this.skdb.exec(query.query, params);
   }
