@@ -193,7 +193,7 @@ export interface FromWasm {
     getterHdl: ptr<Internal.String>,
     key: ptr<Internal.CJSON>,
   ): ptr<Internal.CJSON>;
-  SkipRuntime_token(
+  SkipRuntime_getToken(
     ctx: ptr<Internal.Context>,
     key: ptr<Internal.String>,
   ): number;
