@@ -328,15 +328,23 @@ function testRangedMap1Init(
         [1, 1],
         [3, 4],
         [7, 9],
+        [20, 50],
         [42, 1337],
       ]),
     )
-    .mapTo(output, TestToOutput);
+    .mapTo(
+      output,
+      TestToOutput,
+      new MapOptions([
+        [0, 7],
+        [8, 15],
+      ]),
+    );
 }
 
 async function testRangeMap1Run(input: Table<TJSON[]>, output: Table<TJSON[]>) {
-  // Inserts [[0, "0"], ..., [10, "10"]]
-  input.insert(Array.from({ length: 11 }, (_, i) => [i, i.toString()]));
+  // Inserts [[0, "0"], ..., [30, "30"]]
+  input.insert(Array.from({ length: 31 }, (_, i) => [i, i.toString()]));
   check("testRangeMap1", output.select({}, ["value"]), [
     { value: 1 },
     { value: 9 },
