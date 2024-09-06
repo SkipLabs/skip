@@ -3,7 +3,6 @@ import type { int, ptr, float, Links, Utils, ToWasmManager, Environment, Opt, Sh
 import type * as Internal from "./skjson_internal_types.js";
 
 export enum Type {
-  /* eslint-disable no-unused-vars */
   Undefined,
   Null,
   Int,
@@ -12,7 +11,6 @@ export enum Type {
   String,
   Array,
   Object,
-  /* eslint-enable no-unused-vars */
 }
 
 interface WasmAccess {
@@ -192,7 +190,6 @@ export const reactiveObject = {
 export const reactiveArray = {
   get(hdl: WasmHandle, prop: string, self: any): any {
     if (typeof prop === "symbol") {
-      /* eslint-disable-next-line @typescript-eslint/no-unsafe-call */
       return (): any => self.toJSON().values();
     } else {
       if (prop === "__isArrayProxy") return true;
@@ -215,7 +212,6 @@ export const reactiveArray = {
           callbackfn: (value: T, index: number, array: T[]) => void,
           thisArg?: any,
         ): void => {
-          /* eslint-disable-next-line @typescript-eslint/no-unsafe-call */
           self.toJSON().forEach(callbackfn, thisArg);
         };
       const v = parseInt(prop);
