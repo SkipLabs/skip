@@ -78,7 +78,7 @@ function testMap1Init(
   eager1.mapTo(output, TestToOutput);
 }
 
-async function testMap1Run(input: Table<TJSON[]>, output: Table<TJSON[]>) {
+function testMap1Run(input: Table<TJSON[]>, output: Table<TJSON[]>) {
   input.insert([[1, 10]], true);
   check("testMap1", output.select({ id: 1 }, ["value"]), [{ value: 12 }]);
 }
@@ -132,7 +132,7 @@ function testMap2Init(
   eager3.mapTo(output, TestToOutput);
 }
 
-async function testMap2Run(
+function testMap2Run(
   input1: Table<[number, string]>,
   input2: Table<[number, string]>,
   output: Table<[number, number]>,
@@ -182,7 +182,7 @@ function testMap3Init(
   eager3.mapTo(output, TestToOutput);
 }
 
-async function testMap3Run(
+function testMap3Run(
   input_no_index: Table<[number, string]>,
   input_index: Table<[number, string]>,
   output: Table<[number, number]>,
@@ -238,10 +238,7 @@ function testValueMapperInit(
     .mapTo(output, TestToOutput);
 }
 
-async function testValueMapperRun(
-  input: Table<TJSON[]>,
-  output: Table<TJSON[]>,
-) {
+function testValueMapperRun(input: Table<TJSON[]>, output: Table<TJSON[]>) {
   input.insert([
     [1, 1],
     [2, 2],
@@ -288,7 +285,7 @@ function testSizeInit(
   eager2.mapTo(output, TestToOutput);
 }
 
-async function testSizeRun(
+function testSizeRun(
   input: Table<[number, number]>,
   size: Table<[number]>,
   output: Table<[number, number]>,
@@ -348,7 +345,7 @@ function testLazyInit(
   eager2.mapTo(output, TestToOutput);
 }
 
-async function testLazyRun(
+function testLazyRun(
   input: Table<[number, number]>,
   output: Table<[number, number]>,
 ) {
@@ -404,7 +401,7 @@ function testMapReduceInit(
   eager2.mapTo(output, TestToOutput);
 }
 
-async function testMapReduceRun(
+function testMapReduceRun(
   input: Table<[number, number]>,
   output: Table<[number, number]>,
 ) {
@@ -485,7 +482,7 @@ function testMultiMap1Init(
   eager3.mapTo(output, TestToOutput2);
 }
 
-async function testMultiMap1Run(
+function testMultiMap1Run(
   input1: Table<[number, number]>,
   input2: Table<[number, number]>,
   output: Table<[number, number, number]>,
@@ -552,7 +549,7 @@ function testMultiMapReduceInit(
   eager3.mapTo(output, TestToOutput);
 }
 
-async function testMultiMapReduceRun(
+function testMultiMapReduceRun(
   input1: Table<[number, number]>,
   input2: Table<[number, number]>,
   output: Table<[number, number]>,
@@ -657,7 +654,7 @@ async function testAsyncLazyRun(
   input2.insert([[0, 5]]);
   let count = 0;
   const waitandcheck = (
-    resolve: (v?: unknown) => void,
+    resolve: (v?: void) => void,
     reject: (reason?: any) => void,
   ) => {
     if (count == 50) reject("Async response not received");
@@ -674,7 +671,7 @@ async function testAsyncLazyRun(
       resolve();
     }
   };
-  return new Promise(waitandcheck) as Promise<void>;
+  return new Promise(waitandcheck);
 }
 
 tests.push({
