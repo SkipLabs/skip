@@ -253,7 +253,7 @@ export class ContextImpl implements Context {
   }
 
   getToken(key: string) {
-    return this.exports.SkipRuntime_token(
+    return this.exports.SkipRuntime_getToken(
       this.pointer(),
       this.skjson.exportString(key),
     );
