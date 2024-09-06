@@ -886,12 +886,11 @@ class LinksImpl implements Links {
       const uuid = this.env.crypto().randomUUID();
       const jsu = skjson();
       const time = new Date().getTime();
-      const tkeys = Object.keys(tokens);
       const result = utils.runWithGc(() =>
         Math.trunc(
           fromWasm.SkipRuntime_createFor(
             jsu.exportString(uuid),
-            jsu.exportJSON(tkeys),
+            jsu.exportJSON(Object.keys(tokens)),
             time,
           ),
         ),
