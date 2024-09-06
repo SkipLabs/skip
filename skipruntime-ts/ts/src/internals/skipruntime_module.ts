@@ -9,7 +9,7 @@ import type {
   LazyCollection,
   TJSON,
   Schema,
-  Token,
+  RefreshToken,
   JSONObject,
 } from "../skipruntime_api.js";
 
@@ -256,7 +256,7 @@ export class ContextImpl implements Context {
     return this.exports.SkipRuntime_getToken(
       this.pointer(),
       this.skjson.exportString(key),
-    );
+    ) as RefreshToken;
   }
 
   size = (eagerHdl: string) => {

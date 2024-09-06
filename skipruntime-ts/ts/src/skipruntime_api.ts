@@ -16,6 +16,8 @@ export type TTableCollection = any;
 export type TTable = any;
 export type Param = any;
 
+export type RefreshToken = number & { __type_brand: "SkipRefreshToken" };
+
 export type DBType = "TEXT" | "JSON" | "INTEGER" | "FLOAT" | "SCHEMA";
 
 // `filter` is interpreted as a SQL "where" clause
@@ -594,7 +596,7 @@ export interface SKStore {
     ...params: Params
   ): AsyncLazyCollection<K, V, M>;
 
-  getToken: (key: string) => number;
+  getRefreshToken: (key: string) => RefreshToken;
 
   jsonExtract(value: JSONObject, pattern: string): TJSON[];
 

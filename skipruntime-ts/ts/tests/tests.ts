@@ -696,7 +696,7 @@ class TestWithToken
     key: number,
     it: NonEmptyIterator<number>,
   ): Iterable<[number, [number, number]]> {
-    const time = this.skstore.getToken("token_5s");
+    const time = this.skstore.getRefreshToken("token_5s");
     return [[key, [it.first(), time]]];
   }
 }

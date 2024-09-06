@@ -8,6 +8,7 @@ import type {
   Table,
   TJSON,
   Database,
+  RefreshToken,
 } from "./skipruntime_api.js";
 
 export interface Writer<V extends TJSON> {
@@ -51,12 +52,13 @@ export type OutputDefinition = {
 };
 
 export interface GenericSkipService {
-  // name / duration in milliseconds
-  tokens?: Record<string, number>;
   localInputs(): Record<string, InputDefinition>;
   remoteInputs(): Record<string, RemoteInputs>;
 
   outputs(): Record<string, OutputDefinition>;
+
+  // name / duration in milliseconds
+  refreshTokens?: Record<string, RefreshToken>;
 
   reactiveCompute(
     store: SKStore,
@@ -72,8 +74,9 @@ export type SimpleRemoteInputs = {
 export interface SimpleSkipService {
   inputTables?: string[];
   remoteTables?: Record<string, SimpleRemoteInputs>;
+
   // name / duration in milliseconds
-  tokens?: Record<string, number>;
+  refreshTokens?: Record<string, RefreshToken>;
 
   reactiveCompute(
     store: SKStore,
