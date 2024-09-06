@@ -37,14 +37,14 @@ type Test = {
   name: string;
   schemas: Schema[];
   init: (skstore: SKStore, ...tables: TTableCollection[]) => void;
-  run: (...tables: Table<TJSON[]>[]) => Promise<void>;
+  run: (...tables: Table<TJSON[]>[]) => void | Promise<void>;
   error?: (err: any) => void;
   tokens?: Record<string, number>;
 };
 
 type UnitTest = {
   name: string;
-  run: () => Promise<void>;
+  run: () => void | Promise<void>;
   error?: (err: any) => void;
 };
 
