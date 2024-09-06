@@ -3,6 +3,7 @@ import type {
   EagerCollection,
   NonEmptyIterator,
   OutputMapper,
+  RefreshToken,
   Remote,
   Schema,
   SKStore,
@@ -95,10 +96,10 @@ function toWriters(
 }
 
 class SimpleToGenericSkipService implements GenericSkipService {
-  tokens?: Record<string, number>;
+  refreshTokens?: Record<string, RefreshToken>;
 
   constructor(private simple: SimpleSkipService) {
-    if (simple.tokens) this.tokens = simple.tokens;
+    if (simple.refreshTokens) this.refreshTokens = simple.refreshTokens;
   }
 
   localInputs() {
@@ -289,7 +290,7 @@ export async function runService(
         }
       : { tables: schemas },
     remotes,
-    gService.tokens,
+    gService.refreshTokens,
   );
   return [update!, iTables, oTables];
 }

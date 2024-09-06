@@ -477,7 +477,7 @@ export class SKStoreImpl implements SKStore {
     return new LazyCollectionImpl<K, Loadable<V, M>>(this.context, lazyHdl);
   }
 
-  getToken(key: string) {
+  getRefreshToken(key: string) {
     return this.context.getToken(key);
   }
 
