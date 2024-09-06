@@ -359,12 +359,12 @@ export interface EagerCollection<K extends TJSON, V extends TJSON> {
    * @param {TableHandle} table - the table to update
    * @param {Mapper} mapper - function to apply to each key/value pair in this collection
    *                          to produce a table row
-   * @param params - any additional parameters to the mapper
+   * @param paramsAndOptions - any additional parameters to the mapper followed by possible options
    */
   mapTo<R extends TJSON[], Params extends Param[]>(
     table: TableCollection<R>,
     mapper: new (...params: Params) => OutputMapper<R, K, V>,
-    ...params: Params
+    ...paramsAndOptions: WithOptions<Params, K>
   ): void;
 
   getId(): string;
@@ -396,7 +396,7 @@ export interface TableCollection<R extends TJSON[]> {
    */
   map<K extends TJSON, V extends TJSON, Params extends Param[]>(
     mapper: new (...params: Params) => InputMapper<R, K, V>,
-    ...params: Params
+    ...paramsAndOptions: WithOptions<Params, R>
   ): EagerCollection<K, V>;
 }
 
