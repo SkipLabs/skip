@@ -11,7 +11,38 @@
 
 module SKStore;
 
-class ToWrite(DirName, Key, readonly Context ~> Array<File>)
+base class Postponable {
+  fun perform(context: mutable Context): void;
+}
+
+class ToWrite(
+  dirName: DirName,
+  key: Key,
+  values: readonly Context ~> Array<File>,
+) extends Postponable {
+  //
+  fun perform(context: mutable Context): void {
+    context.unsafeMaybeGetEagerDir(this.dirName) match {
+    | Some(dir) -> dir.writeArray(context, this.key, this.values(context))
+    | _ -> void
+    }
+  }
+}
+
+class CopyTo(from: DirName, to: DirName) extends Postponable {
+  //
+  fun perform(context: mutable Context): void {
+    context.maybeGetEagerDir(this.from).each(fdir ->
+      context.unsafeMaybeGetEagerDir(this.to).each(tdir -> {
+        for (kv in fdir.unsafeGetFileIter()) {
+          (key, files) = kv;
+          rvalues = files.collect(Array);
+          tdir.writeArray(context, key, rvalues)
+        };
+      })
+    )
+  }
+}
 
 /*****************************************************************************/
 /* Sessions. */
@@ -328,7 +359,7 @@ mutable class Context{
   mutable lazyGetsRefCount: SortedMap<Path, Int> = SortedMap[],
   mutable sessions: SortedMap<Int, Sub> = SortedMap[],
   mutable removeSubDirs: Bool = true,
-  mutable postWrites: List<ToWrite> = List[],
+  mutable postponables: List<Postponable> = List[],
   mutable dirsWithSharedSubDirs: SortedSet<DirName> = SortedSet[],
   mutable sharedSubDirsRefCount: SortedMap<DirName, Int> = SortedMap[],
   mutable writeChecker: ?(mutable WriteChecker) = None(),
@@ -361,8 +392,8 @@ mutable class Context{
     ref == 0
   }
 
-  mutable fun postpone(toWrite: ToWrite): void {
-    this.!postWrites = List.Cons(toWrite, this.postWrites);
+  mutable fun postpone(postponable: Postponable): void {
+    this.!postponables = List.Cons(postponable, this.postponables);
   }
 
   mutable fun addToUpdate(time: (Time, Time), arrow: Arrow): void {
@@ -414,7 +445,7 @@ mutable class Context{
       lazyGetsRefCount => this.lazyGetsRefCount,
       sessions => this.sessions,
       removeSubDirs => this.removeSubDirs,
-      postWrites => this.postWrites,
+      postponables => this.postponables,
       dirsWithSharedSubDirs => this.dirsWithSharedSubDirs,
       sharedSubDirsRefCount => this.sharedSubDirsRefCount,
       writeChecker => this.writeChecker.map(x -> x.clone()),
@@ -451,7 +482,7 @@ mutable class Context{
       lazyGetsRefCount => this.lazyGetsRefCount,
       sessions => this.sessions,
       removeSubDirs => this.removeSubDirs,
-      postWrites => this.postWrites,
+      postponables => this.postponables,
       dirsWithSharedSubDirs => this.dirsWithSharedSubDirs,
       sharedSubDirsRefCount => this.sharedSubDirsRefCount,
       writeChecker => this.writeChecker.map(x -> x.mclone()),
@@ -488,7 +519,7 @@ mutable class Context{
       lazyGetsRefCount => ctx.lazyGetsRefCount,
       sessions => ctx.sessions,
       removeSubDirs => ctx.removeSubDirs,
-      postWrites => ctx.postWrites,
+      postponables => ctx.postponables,
       dirsWithSharedSubDirs => ctx.dirsWithSharedSubDirs,
       sharedSubDirsRefCount => ctx.sharedSubDirsRefCount,
       writeChecker => ctx.writeChecker.map(x -> x.mclone()),
@@ -524,7 +555,7 @@ mutable class Context{
     this.!lazyGetsRefCount = ctx.lazyGetsRefCount;
     this.!sessions = ctx.sessions;
     this.!removeSubDirs = ctx.removeSubDirs;
-    this.!postWrites = ctx.postWrites;
+    this.!postponables = ctx.postponables;
     this.!dirsWithSharedSubDirs = ctx.dirsWithSharedSubDirs;
     this.!sharedSubDirsRefCount = ctx.sharedSubDirsRefCount;
     this.!writeChecker = ctx.writeChecker.map(x -> x.mclone());
@@ -565,7 +596,7 @@ mutable class Context{
 
   readonly fun debug(path: Path): void {
     this.dirs.maybeGet(path.dirName) match {
-    | None() -> print_string("Directory does not exist")
+    | None() -> print_debug("Directory does not exist")
     | Some(dir) ->
       values = dir.getArrayRaw(path.baseName);
       debug(values)
@@ -594,7 +625,7 @@ mutable class Context{
 
   mutable fun updatePre(): Bool {
     if (this.debugMode) {
-      print_string(`------------ UPDATE PRE ------------`);
+      print_debug(`------------ UPDATE PRE ------------`);
     };
     withChange = false;
     this.hasPre.each(dirName -> {
@@ -640,12 +671,12 @@ mutable class Context{
     withChange
   }
 
-  mutable fun checkPostWrites(): Bool {
-    withChange = !this.postWrites.isEmpty();
+  mutable fun checkPostponables(): Bool {
+    withChange = !this.postponables.isEmpty();
     if (withChange) {
-      toWrite = this.postWrites.reversed();
-      this.!postWrites = List[];
-      this.postWrite(toWrite);
+      postponables = this.postponables.reversed();
+      this.!postponables = List[];
+      this.perform(postponables);
     };
     withChange;
   }
@@ -723,7 +754,7 @@ mutable class Context{
       "updateWithStatus cannot be called during update.",
     );
     if (this.debugMode) {
-      print_string(`------------ UPDATE (TICK: ${this.tick}) ------------`);
+      print_debug(`------------ UPDATE (TICK: ${this.tick}) ------------`);
     };
 
     _ = this.timeStamp();
@@ -761,9 +792,9 @@ mutable class Context{
       | None() ->
         invariant(this.dirty.isEmpty());
         invariant(this.dirtyReaders.isEmpty());
-        withPostWrites = this.checkPostWrites();
+        withPostponables = this.checkPostponables();
         withPre = this.updatePre();
-        withChanges = withPostWrites || withPre;
+        withChanges = withPostponables || withPre;
         this.!toReset = SortedSet[];
         this.!tick = this.tick.next();
         break withChanges
@@ -795,16 +826,12 @@ mutable class Context{
     }
   }
 
-  mutable fun postWrite(list: List<ToWrite>): void {
+  mutable fun perform(list: List<Postponable>): void {
     list match {
     | List.Nil() -> void
-    | List.Cons(ToWrite(dirName, key, values), rl) ->
-      this.unsafeMaybeGetEagerDir(dirName) match {
-      | Some(dir) ->
-        dir.writeArray(this, key, values(this));
-        this.postWrite(rl)
-      | _ -> void
-      }
+    | List.Cons(p, rl) ->
+      p.perform(this);
+      this.perform(rl)
     }
   }
 
@@ -1041,7 +1068,7 @@ mutable class Context{
 
   mutable fun removeDir(dirName: DirName): void {
     if (this.debugMode) {
-      print_string("REMOVED: " + dirName);
+      print_debug("REMOVED: " + dirName);
     };
     if (this.hasPre.contains(dirName)) {
       this.!hasPre = this.hasPre.remove(dirName);

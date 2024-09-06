@@ -1642,14 +1642,14 @@ export const tests = (asWorker: boolean) => {
           { data: { field1: "\u00c3\u00a9al P" } },
           { data: { field1: " \u2022 T" } },
         ];
-        for (let i in objects) {
-          objects[i].data = JSON.stringify(objects[i].data);
-          await skdb.exec("insert into t1 values(@data)", objects[i]);
+        for (let object of objects) {
+          const data = JSON.stringify(object.data);
+          await skdb.exec("insert into t1 values(@data)", { data });
         }
         return await skdb.exec("select * from t1");
       },
       check: (res) => {
-        let all = res.map((x) => JSON.parse(x.a).field1).join("");
+        let all = res.map((x) => x.a.field1).join("");
         expect(all).toMatch(/x\u2019s re/);
         expect(all).toMatch(/y\u2013 1/);
         expect(all).toMatch(/z\u00ae b/);

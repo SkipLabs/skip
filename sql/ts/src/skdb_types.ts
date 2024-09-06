@@ -85,8 +85,10 @@ export interface SKDB {
 
   insertMany: (
     tableName: string,
-    valuesArray: Array<Array<any>>,
+    valuesArray: Array<Record<string, any>>,
   ) => Promise<number>;
+
+  insert: (tableName: string, valuesArray: Array<any>) => Promise<boolean>;
 
   connect: (
     db: string,

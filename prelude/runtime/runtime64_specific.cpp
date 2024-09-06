@@ -628,6 +628,9 @@ void SKIP_push_object_field_float(char*) {
 void SKIP_push_object_field_string(char*) {
   // Not implemented
 }
+void SKIP_push_object_field_json(void*) {
+  // Not implemented
+}
 void SKIP_push_object() {
   // Not implemented
 }

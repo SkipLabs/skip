@@ -64,24 +64,39 @@ fun toTable(
   conv: (
     SKStore.JSONID,
     mutable SKStore.NonEmptyIterator<SKStore.JSONFile>,
-  ) ~> SKJSON.CJSON,
+  ) ~> SKJSON.CJArray,
+  connected: Bool,
 ): void {
   dirDescr = SKDB.getTable(context, 0, P.Name::create(table));
   dirName = SKStore.subDirName(context, "outputs/" + table);
-  converted = handle.map(
+  _ = handle.map(
     SKDB.RowKey::keyType,
     SKDB.RowValues::type,
     context,
     dirName,
     (context, writer, key, it) ~> {
-      computed = conv(key, it);
-      rowValues = toRowValues(context, dirDescr, computed);
-      rowKey = SKDB.RowKey(rowValues, dirDescr.kinds);
-      writer.set(rowKey, rowValues)
+      conv(key, it) match {
+      | SKJSON.CJArray(values) ->
+        values.each(computed -> {
+          rowValues = toRowValues(context, dirDescr, computed);
+          rowKey = SKDB.RowKey(rowValues, dirDescr.kinds);
+          writer.set(rowKey, rowValues)
+        })
+      }
     },
   );
-  context.maybeGetEagerDir(converted.getDirName()).each(dir ->
-    dir.copyTo(context, dirDescr.dirName)
+  // Quick version to allow replication to work as we go throw table
+  context.maybeGetEagerDir(dirName).each(dir ->
+    if (connected) {
+      dir.copyTo(
+        context,
+        dirDescr.dirName,
+        Some(Noop()),
+        Some((_to, key, getter) ~> CopyKey(dirDescr, key, getter)),
+      )
+    } else {
+      dir.copyTo(context, dirDescr.dirName)
+    }
   )
 }
 
@@ -177,6 +192,51 @@ fun toCJArray(row: SKDB.RowValues): SKJSON.CJArray {
       }
     ),
   )
+}
+
+fun copyToTable(
+  context: mutable SKStore.Context,
+  tableDir: SKStore.EagerDir,
+  key: SKStore.Key,
+  values: Array<SKStore.File>,
+): void {
+  source = SKStore.Path::create(
+    tableDir.dirName,
+    SKStore.IID(SKStore.genSym(0)),
+  );
+  writer = source;
+  withSource = false;
+  for (srcValue in tableDir.unsafeGetAllDataIter(key)) {
+    if (withSource) {
+      invariant_violation("Table data cannot have multiple sources")
+    };
+    (_, !source, _, _) = srcValue;
+  };
+  !tableDir = tableDir.writeEntry(context, source, writer, key, values);
+  context.!toReset = context.toReset.set(tableDir.dirName);
+  context.setDir(tableDir.dirName, tableDir);
+}
+
+class Noop() extends SKStore.Postponable {
+  //
+  fun perform(_context: mutable SKStore.Context): void {
+    // Nothing to be done the values are replicated
+    void
+  }
+}
+
+class CopyKey(
+  to: SKDB.DirDescr,
+  key: SKStore.Key,
+  values: readonly SKStore.Context ~> Array<SKStore.File>,
+) extends SKStore.Postponable {
+  //
+  fun perform(context: mutable SKStore.Context): void {
+    context.unsafeMaybeGetEagerDir(this.to.dirName) match {
+    | Some(dir) -> copyToTable(context, dir, this.key, this.values(context))
+    | _ -> void
+    }
+  }
 }
 
 module end;

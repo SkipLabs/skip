@@ -8,9 +8,9 @@
 import type { Opt, Shared, float, int, ptr } from "#std/sk_types.js";
 export type { Opt, float, int, ptr };
 
-export type JSONObject = { [key: string]: TJSON };
+export type JSONObject = { [key: string]: TJSON | null };
 
-export type TJSON = number | JSONObject | boolean | TJSON[] | string;
+export type TJSON = number | JSONObject | boolean | (TJSON | null)[] | string;
 
 export type TTableCollection = any;
 export type TTable = any;
@@ -26,11 +26,17 @@ export type ColumnSchema = {
   notnull?: boolean;
   primary?: boolean;
 };
-export type TableSchema = { name: string; columns: ColumnSchema[] };
-export type MirrorSchema = {
+export type Index = {
   name: string;
-  expected: ColumnSchema[];
+  columns: string[];
+  unique: boolean;
+};
+export type Schema = {
+  name: string;
+  columns: ColumnSchema[];
+  indexes?: Index[];
   filter?: DBFilter;
+  alias?: string;
 };
 
 /**
@@ -183,7 +189,7 @@ export interface OutputMapper<
   K extends TJSON,
   V extends TJSON,
 > {
-  mapElement: (key: K, it: NonEmptyIterator<V>) => R;
+  mapElement: (key: K, it: NonEmptyIterator<V>) => Iterable<R>;
 }
 
 /**
@@ -234,6 +240,23 @@ export interface NonEmptyIterator<T> extends Iterable<T> {
    * Returns an array containing the remaining values of the iterator
    */
   toArray: () => T[];
+
+  /**
+   * Performs the specified action for each element in the iterator.
+   * @param callbackfn  A function that accepts up to thow arguments. forEach calls the callbackfn function one time for each element.
+   * @param thisArg An object to which the this keyword can refer in the callbackfn function. If thisArg is omitted, undefined is used as the this value.
+   */
+  forEach(callbackfn: (value: T, index: number) => void, thisArg?: any): void;
+
+  /**
+   * Calls a defined callback function on each element of an array, and returns an array that contains the results.
+   * @param callbackfn A function that accepts up to three arguments. The map method calls the callbackfn function one time for each element in the array.
+   * @param thisArg An object to which the this keyword can refer in the callbackfn function. If thisArg is omitted, undefined is used as the this value.
+   */
+  map<U>(
+    callbackfn: (value: T, index: number) => U,
+    thisArg?: any,
+  ): Iterable<U>;
 }
 
 /**
@@ -345,6 +368,8 @@ export interface EagerCollection<K extends TJSON, V extends TJSON> {
  */
 export interface TableCollection<R extends TJSON[]> {
   getName(): string;
+  getSchema(): Schema;
+  isConnected(): boolean;
   /**
    * Lookup in the table using specified index
    * @param key - the key to lookup in the table
@@ -366,6 +391,11 @@ export interface TableCollection<R extends TJSON[]> {
   ): EagerCollection<K, V>;
 }
 
+export type Inputs = {
+  columns: string[];
+  values: TJSON[][];
+};
+
 /**
  * This interface supports SQL-like operations accessing and/or mutating the data in a
  * collection.  These operations are available only on collections which satisfy certain
@@ -380,8 +410,7 @@ export interface Table<R extends TJSON[]> {
    * @throws {Error} in case of index conflict (when `update` is false) or constraint
    *         violation
    */
-  insert(entries: R[], update?: boolean): void;
-
+  insert(entries: R[] | Inputs, update?: boolean): void;
   /**
    * Update an entry in the table
    * @param row - the table entry to update
@@ -423,8 +452,10 @@ export interface Table<R extends TJSON[]> {
    * @param update - the callback to invoke when data changes
    * @returns a callback `close` to terminate and clean up the watch
    */
-  watch: (update: (rows: JSONObject[]) => void) => { close: () => void };
-
+  watch: (
+    update: (rows: JSONObject[]) => void,
+    feedback?: boolean,
+  ) => { close: () => void };
   /**
    * Register a callback to be invoked on the `added` and `removed` rows of this table
    * whenever data changes
@@ -434,6 +465,7 @@ export interface Table<R extends TJSON[]> {
   watchChanges: (
     init: (rows: JSONObject[]) => void,
     update: (added: JSONObject[], removed: JSONObject[]) => void,
+    feedback?: boolean,
   ) => { close: () => void };
 }
 
@@ -452,12 +484,39 @@ export type Mapping<
   params?: Param[];
 };
 
+export type EntryPoint = {
+  host: string;
+  port: number;
+  secured?: boolean;
+};
+
+export type Database = {
+  name: string;
+  access: string;
+  private: string;
+  endpoint?: EntryPoint;
+};
+
+export type Local = {
+  database?: Database;
+  tables: Schema[];
+};
+
+export type Remote = {
+  database: Database;
+  tables: Schema[];
+};
+
 export interface SKStoreFactory extends Shared {
   runSKStore(
-    init: (skstore: SKStore, ...tables: TableCollection<TJSON[]>[]) => void,
-    tables: MirrorSchema[],
-    connect?: boolean,
-  ): Promise<Table<TJSON[]>[]>;
+    init: (
+      skstore: SKStore,
+      tables: Record<string, TableCollection<TJSON[]>>,
+    ) => void,
+    local: Local,
+    remotes?: Record<string, Remote>,
+    tokens?: Record<string, number>,
+  ): Promise<Record<string, Table<TJSON[]>>>;
 }
 
 export interface LazyCompute<K extends TJSON, V extends TJSON> {
@@ -535,5 +594,14 @@ export interface SKStore {
     ...params: Params
   ): AsyncLazyCollection<K, V, M>;
 
+  getToken: (key: string) => number;
+
+  jsonExtract(value: JSONObject, pattern: string): TJSON[];
+
   log(object: TJSON): void;
 }
+
+export type Token = {
+  duration: number;
+  value: string;
+};
