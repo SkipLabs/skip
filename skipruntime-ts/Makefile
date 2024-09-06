@@ -62,8 +62,13 @@ check-src:
 	cd ts/src && tsc
 	cd ts/src && npm run lint
 
+.PHONY: check-tests
+check-tests:
+	cd ts/tests && npm install
+	cd ts/tests && tsc
+
 .PHONY: check-all
-check-all: check-src check
+check-all: check-src check check-tests
 
 build: ../build/sknpm
 	cd ts/examples && bun install
