@@ -419,9 +419,16 @@ fun mapTable(
   table: String,
   name: String,
   fnPtr: UInt32,
+  rangeOpt: SKJSON.CJSON,
 ): String {
   mapHandle = FnHandle::make(fnPtr);
-  DBUtils.mapTable(table, name, context, mapHandle.mapTable)
+  DBUtils.mapTable(
+    table,
+    name,
+    context,
+    mapHandle.mapTable,
+    asKeyRanges(rangeOpt),
+  )
 }
 
 @export("SkipRuntime_toSkdb")
@@ -431,10 +438,18 @@ fun toSkdb(
   table: String,
   convPtr: UInt32,
   connected: Int32,
+  rangeOpt: SKJSON.CJSON,
 ): void {
   eager = EHandle(JSONID::keyType, JSONFile::type, DirName::create(handleId));
   mapHandle = FnHandle::make(convPtr);
-  DBUtils.toTable(eager, table, context, mapHandle.toRow, connected != 0)
+  DBUtils.toTable(
+    eager,
+    table,
+    context,
+    mapHandle.toRow,
+    connected != 0,
+    asKeyRanges(rangeOpt),
+  )
 }
 
 @export("SkipRuntime_getFromTable")
