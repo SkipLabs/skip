@@ -851,8 +851,8 @@ type Update = {
   tokens: string[];
 };
 
-function token(duration: number, value: string) {
-  return { duration, value };
+function token(duration: number, ident: string): Token {
+  return { duration, ident };
 }
 
 async function testTimedQueue() {

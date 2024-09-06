@@ -900,7 +900,7 @@ class LinksImpl implements Links {
         throw this.handles.delete(-result as Handle<unknown>);
       }
       const qTokens = Object.entries(tokens).map((entry) => {
-        return { duration: entry[1], value: entry[0] };
+        return { duration: entry[1], ident: entry[0] };
       });
       this.timedQueue = new TimeQueue(update);
       this.timedQueue.start(qTokens, time);
@@ -1026,6 +1026,7 @@ class Manager implements ToWasmManager {
   };
 }
 
+type Token = { duration: number; ident: string };
 type Tokens = {
   endtime: number;
   tokens: Token[];
@@ -1087,7 +1088,7 @@ export class TimeQueue {
       }
       this.update(
         time,
-        this.queue[i].tokens.map((t) => t.value),
+        this.queue[i].tokens.map((t) => t.ident),
       );
       for (const token of this.queue[i].tokens) {
         if (token.duration <= 0) continue;

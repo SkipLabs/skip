@@ -600,8 +600,3 @@ export interface SKStore {
 
   log(object: TJSON): void;
 }
-
-export type Token = {
-  duration: number;
-  value: string;
-};
