@@ -312,6 +312,7 @@ export class ContextImpl implements Context {
     table: string,
     name: string,
     mapper: (entry: R, occ: number) => Iterable<[K, V]>,
+    rangeOpt: [R, R][] | null = null,
   ) {
     const computeFnId = this.handles.register(mapper);
     const eagerHdl = this.exports.SkipRuntime_fromSkdb(
@@ -319,6 +320,7 @@ export class ContextImpl implements Context {
       this.skjson.exportString(table),
       this.skjson.exportString(name),
       computeFnId,
+      this.skjson.exportJSON(rangeOpt),
     );
     return this.skjson.importString(eagerHdl);
   }
@@ -328,6 +330,7 @@ export class ContextImpl implements Context {
     schema: Schema,
     convert: (key: K, it: NonEmptyIterator<V>) => Iterable<R>,
     connected: boolean,
+    rangeOpt: [K, K][] | null = null,
   ) {
     const checked: (key: K, it: NonEmptyIterator<V>) => Iterable<R> = (
       key: K,
@@ -352,6 +355,7 @@ export class ContextImpl implements Context {
       this.skjson.exportString(schema.name),
       convertId,
       connected,
+      this.skjson.exportJSON(rangeOpt),
     );
   }
 

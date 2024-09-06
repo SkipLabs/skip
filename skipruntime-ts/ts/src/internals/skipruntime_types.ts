@@ -101,6 +101,7 @@ export interface Context {
     table: string,
     mapperName: string,
     mapper: (entry: R, occ: number) => Iterable<[K, V]>,
+    rangeOpt?: [R, R][] | null,
   ) => string;
 
   mapToSkdb: <R extends TJSON[], K extends TJSON, V extends TJSON>(
@@ -108,6 +109,7 @@ export interface Context {
     table: Schema,
     mapper: (key: K, it: NonEmptyIterator<V>) => Iterable<R>,
     connected: boolean,
+    rangeOpt?: [K, K][] | null,
   ) => void;
 
   multimap: <
@@ -251,6 +253,9 @@ export interface FromWasm {
     table: ptr<Internal.String>,
     fnPtr: Handle<(key: K, it: NonEmptyIterator<V>) => R>,
     connected: boolean,
+    rangeOpt: ptr<
+      Internal.CJArray<Internal.CJArray<Internal.CJSON>> | Internal.CJNull
+    >,
   ): void;
 
   // NonEmptyIterator
@@ -302,6 +307,9 @@ export interface FromWasm {
     table: ptr<Internal.String>,
     name: ptr<Internal.String>,
     fnPtr: Handle<(entry: R, occ: number) => Iterable<[K, V]>>,
+    rangeOpt: ptr<
+      Internal.CJArray<Internal.CJArray<Internal.CJSON>> | Internal.CJNull
+    >,
   ): ptr<Internal.String>;
   SkipRuntime_multimap(
     ctx: ptr<Internal.Context>,
