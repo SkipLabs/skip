@@ -1,8 +1,6 @@
 import type { T } from "#std/sk_internal_types.js";
 export type * from "#std/sk_internal_types.js";
 
-/* eslint-disable @typescript-eslint/no-unused-vars */
-
 declare const cjnull: unique symbol;
 export type CJNull = CJSON<typeof cjnull>;
 
