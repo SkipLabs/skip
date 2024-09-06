@@ -29,13 +29,17 @@ import type {
   Local,
   EntryPoint,
   Inputs,
-  WithOptions,
 } from "../skipruntime_api.js";
 
 // prettier-ignore
 import type { MirrorDefn, Params, SKDBSync } from "#skdb/skdb_types.js";
 
 type Query = { query: string; params?: JSONObject };
+
+type WithOptions<Params extends Param[], K extends TJSON> = [
+  ...Params,
+  MapOptions<K>?,
+];
 
 function assertNoKeysNaN<K extends TJSON, V extends TJSON>(
   kv_pairs: Iterable<[K, V]>,
