@@ -9,7 +9,7 @@ import type {
   LazyCollection,
   TJSON,
   Schema,
-  Token,
+  RefreshToken,
   JSONObject,
 } from "../skipruntime_api.js";
 
@@ -253,10 +253,10 @@ export class ContextImpl implements Context {
   }
 
   getToken(key: string) {
-    return this.exports.SkipRuntime_token(
+    return this.exports.SkipRuntime_getToken(
       this.pointer(),
       this.skjson.exportString(key),
-    );
+    ) as RefreshToken;
   }
 
   size = (eagerHdl: string) => {
@@ -562,7 +562,7 @@ class LinksImpl implements Links {
   env: Environment;
   handles: Handles;
   skjson?: SKJSON;
-  timedQueue?: TimeQueue;
+  timedQueue?: TimedQueue;
 
   detachHandle!: <T>(fn: Handle<T>) => void;
   applyMapFun!: <
@@ -886,12 +886,11 @@ class LinksImpl implements Links {
       const uuid = this.env.crypto().randomUUID();
       const jsu = skjson();
       const time = new Date().getTime();
-      const tkeys = Object.keys(tokens);
       const result = utils.runWithGc(() =>
         Math.trunc(
           fromWasm.SkipRuntime_createFor(
             jsu.exportString(uuid),
-            jsu.exportJSON(tkeys),
+            jsu.exportJSON(Object.keys(tokens)),
             time,
           ),
         ),
@@ -900,9 +899,9 @@ class LinksImpl implements Links {
         throw this.handles.delete(-result as Handle<unknown>);
       }
       const qTokens = Object.entries(tokens).map((entry) => {
-        return { duration: entry[1], value: entry[0] };
+        return { duration: entry[1], ident: entry[0] };
       });
-      this.timedQueue = new TimeQueue(update);
+      this.timedQueue = new TimedQueue(update);
       this.timedQueue.start(qTokens, time);
     };
     this.env.shared.set(
@@ -1026,24 +1025,25 @@ class Manager implements ToWasmManager {
   };
 }
 
-type Tokens = {
-  endtime: number;
-  tokens: Token[];
-};
-
 interface Timeout {
   unref: () => void;
 }
 
-export class TimeQueue {
+type TQ_Token = { duration: number; ident: string };
+type TQ_Elt = {
+  endtime: number;
+  tokens: TQ_Token[];
+};
+
+export class TimedQueue {
   constructor(
     private update: (time: number, tokens: string[]) => void,
-    private queue: Tokens[] = [],
+    private queue: TQ_Elt[] = [],
     private timeout: string | number | Timeout | null = null,
   ) {}
 
-  start(tokens: Token[], time: number) {
-    const tostart: Map<number, Token[]> = new Map<number, Token[]>();
+  start(tokens: TQ_Token[], time: number) {
+    const tostart: Map<number, TQ_Token[]> = new Map<number, TQ_Token[]>();
     for (const token of tokens) {
       if (token.duration <= 0) continue;
       const endtime = time + token.duration;
@@ -1078,7 +1078,7 @@ export class TimeQueue {
 
   check() {
     const time = new Date().getTime();
-    const torenew: Map<number, Token[]> = new Map<number, Token[]>();
+    const torenew: Map<number, TQ_Token[]> = new Map<number, TQ_Token[]>();
     let i = 0;
     for (i; i < this.queue.length; i++) {
       const cendtime = this.queue[i].endtime;
@@ -1087,7 +1087,7 @@ export class TimeQueue {
       }
       this.update(
         time,
-        this.queue[i].tokens.map((t) => t.value),
+        this.queue[i].tokens.map((t) => t.ident),
       );
       for (const token of this.queue[i].tokens) {
         if (token.duration <= 0) continue;
@@ -1104,7 +1104,7 @@ export class TimeQueue {
     this.queue = this.queue.slice(i);
     const keys = Array.from(torenew.keys()).sort().reverse();
     for (const key of keys) {
-      this.insert(key, torenew.get(key)!);
+      this.insert({ endtime: key, tokens: torenew.get(key)! });
     }
     if (this.queue.length > 0) {
       const next = Math.max(this.queue[0].endtime - time, 0);
@@ -1118,22 +1118,18 @@ export class TimeQueue {
   }
 
   // TODO: Binary version
-  private insert(endtime: number, tokens: Token[]) {
-    let i = 0;
-    for (i; i < this.queue.length; i++) {
-      if (this.queue[i].endtime == endtime) {
-        this.queue[i].tokens.push(...tokens);
+  private insert(elt: TQ_Elt) {
+    for (let i = 0; i < this.queue.length; i++) {
+      if (this.queue[i].endtime == elt.endtime) {
+        this.queue[i].tokens.push(...elt.tokens);
         return;
       }
-      if (this.queue[i].endtime > endtime) {
-        break;
+      if (this.queue[i].endtime > elt.endtime) {
+        this.queue = [...this.queue.slice(0, i), elt, ...this.queue.slice(i)];
+        return;
       }
     }
-    const qtokens = { endtime, tokens };
-    if (i >= this.queue.length) this.queue.push(qtokens);
-    else {
-      this.queue = [...this.queue.slice(0, i), qtokens, ...this.queue.slice(i)];
-    }
+    this.queue.push(elt);
   }
 }
 

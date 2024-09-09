@@ -10,6 +10,7 @@ import type {
   EagerCollection,
   Schema,
   JSONObject,
+  RefreshToken,
 } from "../skipruntime_api.js";
 
 export type CtxMapping<
@@ -90,7 +91,7 @@ export interface Context {
     lazyHdl: ptr<Internal.LHandle>,
     key: K,
   ) => Opt<V>;
-  getToken: (key: string) => number;
+  getToken: (key: string) => RefreshToken;
 
   size: (collection: string) => number;
 
@@ -193,7 +194,7 @@ export interface FromWasm {
     getterHdl: ptr<Internal.String>,
     key: ptr<Internal.CJSON>,
   ): ptr<Internal.CJSON>;
-  SkipRuntime_token(
+  SkipRuntime_getToken(
     ctx: ptr<Internal.Context>,
     key: ptr<Internal.String>,
   ): number;
