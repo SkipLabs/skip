@@ -21,7 +21,7 @@ import type {
 import {
   Sum,
   ValueMapper,
-  TimeQueue,
+  TimedQueue,
   createLocalSKStore,
   cinteger as integer,
   schema,
@@ -851,14 +851,10 @@ type Update = {
   tokens: string[];
 };
 
-function token(duration: number, ident: string): Token {
-  return { duration, ident };
-}
-
 async function testTimedQueue() {
   const updates: Update[] = [];
   var starttime: number = 0;
-  const timedQueue = new TimeQueue((time: number, tokens: string[]) => {
+  const timedQueue = new TimedQueue((time: number, tokens: string[]) => {
     updates.push({
       idx: updates.length,
       starttime,
@@ -869,9 +865,9 @@ async function testTimedQueue() {
   const rstarttime = new Date().getTime();
   timedQueue.start(
     [
-      token(2000, "token_2s"),
-      token(5000, "token_5s"),
-      token(12000, "token_12s"),
+      { ident: "token_2s", duration: 2000 },
+      { ident: "token_5s", duration: 5000 },
+      { ident: "token_12s", duration: 12000 },
     ],
     rstarttime,
   );

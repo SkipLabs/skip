@@ -23,7 +23,7 @@ import type {
   Database,
 } from "./skipruntime_api.js";
 import { runWithServer_ } from "./internals/skipruntime_process.js";
-export { TimeQueue } from "./internals/skipruntime_module.js";
+export { TimedQueue } from "./internals/skipruntime_module.js";
 export type {
   SKStore,
   TJSON,
