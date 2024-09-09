@@ -37,6 +37,7 @@ fun mapTable(
     mutable SKStore.TWriter<SKStore.JSONID, SKStore.JSONFile>,
     SKDB.RowValues,
   ) ~> void,
+  rangesOpt: ?Array<SKStore.KeyRange> = None(),
 ): String {
   dirDescr = SKDB.getTable(context, 0, P.Name::create(table));
   handle = SKStore.EHandle(
@@ -53,6 +54,7 @@ fun mapTable(
     (context, writer, _, rit) ~> {
       compute(context, writer, rit.first)
     },
+    rangesOpt,
   );
   dirName.toString();
 }
@@ -66,6 +68,7 @@ fun toTable(
     mutable SKStore.NonEmptyIterator<SKStore.JSONFile>,
   ) ~> SKJSON.CJArray,
   connected: Bool,
+  rangesOpt: ?Array<SKStore.KeyRange> = None(),
 ): void {
   dirDescr = SKDB.getTable(context, 0, P.Name::create(table));
   dirName = SKStore.subDirName(context, "outputs/" + table);
@@ -84,6 +87,7 @@ fun toTable(
         })
       }
     },
+    rangesOpt,
   );
   // Quick version to allow replication to work as we go throw table
   context.maybeGetEagerDir(dirName).each(dir ->

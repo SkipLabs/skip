@@ -40,9 +40,10 @@ fun eagerMap<K: Key, V: File, K2: Key, V2: File>(
     K,
     mutable NonEmptyIterator<V>,
   ) ~> void,
+  rangeOpt: ?Array<KeyRange> = None(),
 ): EHandle<K2, V2> {
   dirName = handle.dirName.sub(name);
-  handle.map(keyConv, fileConv, context, dirName, compute);
+  handle.map(keyConv, fileConv, context, dirName, compute, rangeOpt);
 }
 
 fun eagerMultiMap<K: Key, V: File, K2: Key, V2: File>(
@@ -85,6 +86,7 @@ fun eagerMapReduce<K: Key, V: File, K2: Key, V2: File, V3: File>(
     mutable NonEmptyIterator<V>,
   ) ~> void,
   accumulator: Accumulator<V2, V3>,
+  rangeOpt: ?Array<KeyRange> = None(),
 ): EHandle<K2, V3> {
   dirName = handle.dirName.sub(name);
   handle.mapReduce(
@@ -94,6 +96,7 @@ fun eagerMapReduce<K: Key, V: File, K2: Key, V2: File, V3: File>(
     dirName,
     compute,
     accReducer(accumulator),
+    rangeOpt,
   )
 }
 
