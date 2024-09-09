@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # TODO: This is flaky as it relies on coarse directory-level diffs.
-git diff --quiet HEAD $(git merge-base main HEAD) -- compiler/ prelude/
+git diff --quiet HEAD $(git merge-base main HEAD) -- compiler/ prelude/ :^prelude/ts
 skc=$?
 git diff --quiet HEAD $(git merge-base main HEAD) -- prelude/src/skstore/ compiler/runtime/
 skstore=$?
