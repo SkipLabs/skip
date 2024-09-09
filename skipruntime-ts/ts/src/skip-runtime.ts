@@ -89,10 +89,11 @@ export async function createSKStore(
   local: Local,
   remotes: Record<string, Remote> = {},
   tokens: Record<string, number> = {},
+  initLocals?: (tables: Record<string, Table<TJSON[]>>) => Promise<void>,
 ): Promise<Record<string, Table<TJSON[]>>> {
   const data = await runUrl(wasmUrl, modules, [], "SKDB_factory");
   const factory = data.environment.shared.get("SKStore") as SKStoreFactory;
-  return factory.runSKStore(init, local, remotes, tokens);
+  return factory.runSKStore(init, local, remotes, tokens, initLocals);
 }
 
 export async function createInlineSKStore(
@@ -105,7 +106,7 @@ export async function createInlineSKStore(
   const result = await createSKStore(
     (skstore: SKStore, tables: Record<string, TableCollection<TJSON[]>>) => {
       const handles: TableCollection<TJSON[]>[] = [];
-      for (const schema of local.tables) {
+      for (const schema of local.inputs) {
         const name = schema.alias ? schema.alias : schema.name;
         handles.push(tables[name]);
       }
@@ -115,13 +116,17 @@ export async function createInlineSKStore(
           handles.push(tables[name]);
         }
       }
+      for (const schema of local.outputs) {
+        const name = schema.alias ? schema.alias : schema.name;
+        handles.push(tables[name]);
+      }
       init(skstore, ...handles);
     },
     local,
     remotes,
     tokens,
   );
-  for (const schema of local.tables) {
+  for (const schema of local.inputs) {
     const name = schema.alias ? schema.alias : schema.name;
     tables.push(result[name]);
   }
@@ -131,18 +136,23 @@ export async function createInlineSKStore(
       tables.push(result[name]);
     }
   }
+  for (const schema of local.outputs) {
+    const name = schema.alias ? schema.alias : schema.name;
+    tables.push(result[name]);
+  }
   return tables;
 }
 
 export async function createLocalSKStore(
   init: (skstore: SKStore, ...tables: TableCollection<TJSON[]>[]) => void,
-  schemas: Schema[],
+  inputs: Schema[],
+  outputs: Schema[],
   tokens: Record<string, number> = {},
   database?: Database,
 ): Promise<Table<TJSON[]>[]> {
   return createInlineSKStore(
     init,
-    database ? { tables: schemas, database } : { tables: schemas },
+    database ? { inputs, outputs, database } : { inputs, outputs },
     {},
     tokens,
   );
