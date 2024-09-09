@@ -112,6 +112,11 @@ export interface Context {
     rangeOpt?: [K, K][] | null,
   ) => void;
 
+  union: <K extends TJSON, V extends TJSON>(
+    name: string,
+    ...collections: EagerCollection<K, V>[]
+  ) => string;
+
   multimap: <
     K1 extends TJSON,
     V1 extends TJSON,
@@ -326,13 +331,6 @@ export interface FromWasm {
       Internal.CJArray<Internal.CJArray<Internal.CJSON>> | Internal.CJNull
     >,
   ): ptr<Internal.String>;
-  SkipRuntime_multimap(
-    ctx: ptr<Internal.Context>,
-    name: ptr<Internal.String>,
-    mappings: ptr<
-      Internal.CJArray<Internal.CJArray<Internal.CJString | Internal.CJInt>>
-    >,
-  ): ptr<Internal.String>;
   SkipRuntime_asyncResult(
     callId: ptr<Internal.String>,
     name: ptr<Internal.String>,
@@ -341,6 +339,18 @@ export interface FromWasm {
     value: ptr<Internal.CJObject>,
   ): number;
 
+  SkipRuntime_union(
+    ctx: ptr<Internal.Context>,
+    name: ptr<Internal.String>,
+    collections: ptr<Internal.CJArray>,
+  ): ptr<Internal.String>;
+  SkipRuntime_multimap(
+    ctx: ptr<Internal.Context>,
+    name: ptr<Internal.String>,
+    mappings: ptr<
+      Internal.CJArray<Internal.CJArray<Internal.CJString | Internal.CJInt>>
+    >,
+  ): ptr<Internal.String>;
   SkipRuntime_multimapReduce<V2 extends TJSON, V3 extends TJSON>(
     ctx: ptr<Internal.Context>,
     name: ptr<Internal.String>,

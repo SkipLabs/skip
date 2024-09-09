@@ -279,6 +279,32 @@ fun mapReduce(
     .toString()
 }
 
+@export("SkipRuntime_union")
+fun union(
+  context: mutable Context,
+  name: String,
+  collections: SKJSON.CJArray,
+): String {
+  mappings = collections match {
+  | SKJSON.CJArray(v) ->
+    v.map(handleID -> {
+      ehandle = EHandle(
+        JSONID::keyType,
+        JSONFile::type,
+        DirName::create(SKJSON.asString(handleID)),
+      );
+      id_mapper = (_ctx, writer, key, vals) ~> {
+        //identity mapper function: write values straight through
+        writer.setArray(key, vals.collect(Array))
+      };
+      (ehandle, id_mapper)
+    })
+  };
+  eagerMultiMap(JSONID::keyType, JSONFile::type, name, context, mappings)
+    .getDirName()
+    .toString()
+}
+
 @export("SkipRuntime_multimap")
 fun multimap(
   context: mutable Context,
