@@ -114,7 +114,7 @@ export class ContextImpl implements Context {
 
   union<K extends TJSON, V extends TJSON>(
     name: string,
-    ...collections: EagerCollection<K, V>[]
+    collections: EagerCollection<K, V>[],
   ) {
     const collectionIDs = collections.map((c) => c.getId());
     const unionPtr = this.exports.SkipRuntime_union(
