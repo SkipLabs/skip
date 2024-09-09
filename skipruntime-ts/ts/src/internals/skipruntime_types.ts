@@ -44,12 +44,14 @@ export interface Context {
     mapperName: string,
     mapper: (key: K, it: NonEmptyIterator<V>) => Iterable<[K2, V2]>,
     accumulator: Accumulator<V2, V3>,
+    rangeOpt?: [K, K][] | null,
   ) => string;
 
   map: <K extends TJSON, V extends TJSON, K2 extends TJSON, V2 extends TJSON>(
     collectionName: string,
     mapperName: string,
     compute: (key: K, it: NonEmptyIterator<V>) => Iterable<[K2, V2]>,
+    rangeOpt?: [K, K][] | null,
   ) => string;
 
   lazy: <K extends TJSON, V extends TJSON>(
@@ -99,6 +101,7 @@ export interface Context {
     table: string,
     mapperName: string,
     mapper: (entry: R, occ: number) => Iterable<[K, V]>,
+    rangeOpt?: [R, R][] | null,
   ) => string;
 
   mapToSkdb: <R extends TJSON[], K extends TJSON, V extends TJSON>(
@@ -106,6 +109,7 @@ export interface Context {
     table: Schema,
     mapper: (key: K, it: NonEmptyIterator<V>) => Iterable<R>,
     connected: boolean,
+    rangeOpt?: [K, K][] | null,
   ) => void;
 
   multimap: <
@@ -156,6 +160,9 @@ export interface FromWasm {
     eagerCollectionId: ptr<Internal.String>,
     name: ptr<Internal.String>,
     fnPtr: Handle<(key: K, it: NonEmptyIterator<V>) => Iterable<[K2, V2]>>,
+    rangeOpt: ptr<
+      Internal.CJArray<Internal.CJArray<Internal.CJSON>> | Internal.CJNull
+    >,
   ): ptr<Internal.String>;
 
   SkipRuntime_mapReduce<
@@ -170,6 +177,9 @@ export interface FromWasm {
     fnPtr: Handle<(key: K, it: NonEmptyIterator<V>) => Iterable<[K2, V2]>>,
     accumulator: int,
     accInit: ptr<Internal.CJSON>,
+    rangeOpt: ptr<
+      Internal.CJArray<Internal.CJArray<Internal.CJSON>> | Internal.CJNull
+    >,
   ): ptr<Internal.String>;
 
   SkipRuntime_getFromTable(
@@ -243,6 +253,9 @@ export interface FromWasm {
     table: ptr<Internal.String>,
     fnPtr: Handle<(key: K, it: NonEmptyIterator<V>) => R>,
     connected: boolean,
+    rangeOpt: ptr<
+      Internal.CJArray<Internal.CJArray<Internal.CJSON>> | Internal.CJNull
+    >,
   ): void;
 
   // NonEmptyIterator
@@ -294,6 +307,9 @@ export interface FromWasm {
     table: ptr<Internal.String>,
     name: ptr<Internal.String>,
     fnPtr: Handle<(entry: R, occ: number) => Iterable<[K, V]>>,
+    rangeOpt: ptr<
+      Internal.CJArray<Internal.CJArray<Internal.CJSON>> | Internal.CJNull
+    >,
   ): ptr<Internal.String>;
   SkipRuntime_multimap(
     ctx: ptr<Internal.Context>,
