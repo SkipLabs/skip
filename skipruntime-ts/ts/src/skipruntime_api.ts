@@ -566,39 +566,6 @@ export interface SKStore {
   ): EagerCollection<K, V>;
 
   /**
-   * Map over each entry of each eager reactive map and apply the corresponding mapper function
-   * @param {Mapping[]} mappings - the input collections and corresponding mappers
-   * @returns {EagerCollection} An eager collection containing the combined outputs of the `mappings`
-   */
-  multimap<
-    K1 extends TJSON,
-    V1 extends TJSON,
-    K2 extends TJSON,
-    V2 extends TJSON,
-  >(
-    mappings: Mapping<K1, V1, K2, V2>[],
-  ): EagerCollection<K2, V2>;
-
-  /**
-   * Create a new eager reactive collection by applying a `multimap` and then reducing the results
-   * with a given `accumulator`
-   * @param {Mapping} mappings - the input collections and corresponding mappers
-   * @param {Accumulator} accumulator - function to combine results of the multimap
-   * @returns {EagerCollection} An eager collection containing the output of the accumulator over
-   * the combined outputs of the `mappings`
-   */
-  multimapReduce<
-    K1 extends TJSON,
-    V1 extends TJSON,
-    K2 extends TJSON,
-    V2 extends TJSON,
-    V3 extends TJSON,
-  >(
-    mappings: Mapping<K1, V1, K2, V2>[],
-    accumulator: Accumulator<V2, V3>,
-  ): EagerCollection<K2, V3>;
-
-  /**
    * Creates a lazy reactive collection with an asynchronous computation
    * @param compute - the async function to call with returned values
    * @returns {LazyCollection} The resulting async lazy collection
