@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # TODO: This is flaky as it relies on coarse directory-level diffs.
-git diff --quiet HEAD $(git merge-base main HEAD) -- compiler/ prelude/
+git diff --quiet HEAD $(git merge-base main HEAD) -- compiler/ prelude/ :^prelude/ts
 skc=$?
 git diff --quiet HEAD $(git merge-base main HEAD) -- prelude/src/skstore/ compiler/runtime/
 skstore=$?
@@ -11,6 +11,8 @@ git diff --quiet HEAD $(git merge-base main HEAD) -- sknpm/
 sknpm=$?
 git diff --quiet HEAD $(git merge-base main HEAD) -- skipruntime-ts/
 skipruntime_wasm=$?
+git diff --quiet HEAD $(git merge-base main HEAD) -- prelude/ts/
+ts_prelude=$?
 
 cat .circleci/base.yml
 
@@ -49,7 +51,7 @@ then
 EOF
 fi
 
-if (( $skdb != 0 || $skstore != 0 || $sknpm != 0))
+if (( $skdb != 0 || $skstore != 0 || $sknpm != 0 || $ts_prelude != 0 ))
 then
     cat <<EOF
   skdb-wasm:
@@ -58,7 +60,7 @@ then
 EOF
 fi
 
-if (( $skdb != 0 || $skstore != 0 || $skipruntime_wasm != 0 || $sknpm != 0))
+if (( $skdb != 0 || $skstore != 0 || $skipruntime_wasm != 0 || $sknpm != 0 || $ts_prelude != 0 ))
 then
     cat <<EOF
   skipruntime-wasm:
