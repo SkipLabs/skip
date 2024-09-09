@@ -400,6 +400,16 @@ export class SKStoreImpl implements SKStore {
     });
   }
 
+  union<K extends TJSON, V extends TJSON>(
+    ...collections: EagerCollection<K, V>[]
+  ) {
+    if (collections.length < 2)
+      throw new Error("Union requires at least two input collections.");
+    const name = collections.reduce((acc, curr) => acc + curr.getId(), "union_");
+    const eagerHdl = this.context.union(name, collections);
+    return new EagerCollectionImpl<K, V>(this.context, eagerHdl);
+  }
+
   multimap<
     K1 extends TJSON,
     V1 extends TJSON,

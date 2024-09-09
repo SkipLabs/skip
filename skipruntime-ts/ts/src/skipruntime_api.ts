@@ -556,6 +556,16 @@ export interface SKStore {
   ): LazyCollection<K, V>;
 
   /**
+   * Combine some eager collections into one, associating with each key _all_ values
+   * associated with that key in any of the input collections.
+   * @param collections - the input collections to union together
+   * @returns {EagerCollection} The resulting combination of all input key/value pairs
+   */
+  union<K extends TJSON, V extends TJSON>(
+    ...collections: EagerCollection<K, V>[]
+  ): EagerCollection<K, V>;
+
+  /**
    * Map over each entry of each eager reactive map and apply the corresponding mapper function
    * @param {Mapping[]} mappings - the input collections and corresponding mappers
    * @returns {EagerCollection} An eager collection containing the combined outputs of the `mappings`

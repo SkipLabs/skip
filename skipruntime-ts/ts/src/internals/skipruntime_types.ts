@@ -114,7 +114,7 @@ export interface Context {
 
   union: <K extends TJSON, V extends TJSON>(
     name: string,
-    ...collections: EagerCollection<K, V>[]
+    collections: EagerCollection<K, V>[],
   ) => string;
 
   multimap: <
