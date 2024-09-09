@@ -98,8 +98,21 @@ function toWriters(
 class SimpleToGenericSkipService implements GenericSkipService {
   refreshTokens?: Record<string, RefreshToken>;
 
+  init?: (tables: Record<string, Table<TJSON[]>>) => Promise<void>;
+
   constructor(private simple: SimpleSkipService) {
     if (simple.refreshTokens) this.refreshTokens = simple.refreshTokens;
+    const sInit = simple.init;
+    if (sInit) {
+      this.init = async (tables: Record<string, Table<TJSON[]>>) => {
+        const writers: Record<string, Writer<TJSON>> = {};
+        for (const key of Object.keys(tables)) {
+          if (key == "__sk_requests") continue;
+          writers[key] = new WriterImpl(tables[key]);
+        }
+        return sInit(writers);
+      };
+    }
   }
 
   localInputs() {
@@ -202,20 +215,21 @@ export async function runService(
   const localInputs = gService.localInputs();
   const remoteInputs = gService.remoteInputs();
   const outputs = gService.outputs();
-  const schemas: Schema[] = [];
+  const inputSchemas: Schema[] = [];
+  const outputSchemas: Schema[] = [];
   for (const [key, value] of Object.entries(localInputs)) {
     const schema = value.schema;
     if (schema.name != key) {
       schema.alias = key;
     }
-    schemas.push(schema);
+    inputSchemas.push(schema);
   }
   for (const [key, value] of Object.entries(outputs)) {
     const schema = value.schema;
     if (schema.name != key) {
       schema.alias = key;
     }
-    schemas.push(schema);
+    outputSchemas.push(schema);
   }
   const remotes: Record<string, Remote> = {};
   for (const [key, ri] of Object.entries(remoteInputs)) {
@@ -285,12 +299,17 @@ export async function runService(
     initSKStore,
     database
       ? {
-          tables: schemas,
+          inputs: inputSchemas,
+          outputs: outputSchemas,
           database,
         }
-      : { tables: schemas },
+      : {
+          inputs: inputSchemas,
+          outputs: outputSchemas,
+        },
     remotes,
     gService.refreshTokens,
+    gService.init,
   );
   return [update!, iTables, oTables];
 }

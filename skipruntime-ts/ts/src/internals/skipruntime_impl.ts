@@ -548,6 +548,7 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
     local: Local,
     remotes: Record<string, Remote> = {},
     tokens: Record<string, number> = {},
+    initLocals?: (tables: Record<string, Table<TJSON[]>>) => Promise<void>,
   ): Promise<Record<string, Table<TJSON[]>>> => {
     const context = this.context();
     const tables = await mirror(
@@ -557,6 +558,15 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
       remotes,
       this.createKey,
     );
+    if (initLocals) {
+      const localTables: Record<string, Table<TJSON[]>> = {};
+      for (const table of local.inputs) {
+        localTables[table.name] = (
+          tables[table.name] as TableCollectionImpl<TJSON[]>
+        ).toTable();
+      }
+      await initLocals(localTables);
+    }
     const skstore = new SKStoreImpl(context);
     this.create(() => {
       init(skstore, tables);
@@ -591,13 +601,14 @@ export async function mirror(
   createKey: (key: string) => Promise<CryptoKey>,
 ): Promise<Record<string, TableCollection<TJSON[]>>> {
   const tHandles: Record<string, TableCollection<TJSON[]>> = {};
+  const tables = [...local.inputs, ...local.outputs];
   if (local.database) {
     remotes["__sk_local"] = {
       database: local.database,
-      tables: local.tables,
+      tables,
     };
   } else {
-    for (const table of local.tables) {
+    for (const table of tables) {
       const skdb = await createSkdb();
       const query = create(table);
       skdb.exec(query.query, query.params ? toParams(query.params) : undefined);
