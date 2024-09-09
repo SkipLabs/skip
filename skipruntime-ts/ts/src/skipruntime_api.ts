@@ -555,7 +555,8 @@ export type Database = {
 
 export type Local = {
   database?: Database;
-  tables: Schema[];
+  inputs: Schema[];
+  outputs: Schema[];
 };
 
 export type Remote = {
@@ -572,6 +573,7 @@ export interface SKStoreFactory extends Shared {
     local: Local,
     remotes?: Record<string, Remote>,
     tokens?: Record<string, number>,
+    initLocals?: (tables: Record<string, Table<TJSON[]>>) => Promise<void>,
   ): Promise<Record<string, Table<TJSON[]>>>;
 }
 
