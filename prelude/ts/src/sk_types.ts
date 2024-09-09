@@ -1,4 +1,5 @@
 import type * as Internal from "./sk_internal_types.js";
+export type { Opaque } from "./sk_internal_types.js";
 
 export type float = number;
 export type int = number;

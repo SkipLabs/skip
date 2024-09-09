@@ -5,7 +5,7 @@
  */
 
 // prettier-ignore
-import type { Opt, Shared, float, int, ptr } from "#std/sk_types.js";
+import type { Opaque, Opt, Shared, float, int, ptr } from "#std/sk_types.js";
 export type { Opt, float, int, ptr };
 
 export type JSONObject = { [key: string]: TJSON | null };
@@ -16,7 +16,7 @@ export type TTableCollection = any;
 export type TTable = any;
 export type Param = any;
 
-export type RefreshToken = number & { __type_brand: "SkipRefreshToken" };
+export type RefreshToken = Opaque<number, "SkipRefreshToken">;
 
 export type DBType = "TEXT" | "JSON" | "INTEGER" | "FLOAT" | "SCHEMA";
 
