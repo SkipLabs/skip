@@ -354,10 +354,8 @@ async function testRangeMap1Run(input: Table<TJSON[]>, output: Table<TJSON[]>) {
 
 tests.push({
   name: "testRangedMap1",
-  schemas: [
-    schema("input", [integer("id", true, true), text("value")]),
-    schema("output", [integer("id", true, true), integer("value")]),
-  ],
+  inputs: [schema("input", [integer("id", true, true), text("value")])],
+  outputs: [schema("output", [integer("id", true, true), integer("value")])],
   init: testRangedMap1Init,
   run: testRangeMap1Run,
 });
