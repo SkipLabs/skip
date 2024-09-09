@@ -6,6 +6,7 @@ import type {
   NonEmptyIterator,
   Result,
   AValue,
+  EagerCollection,
   LazyCollection,
   TJSON,
   Schema,
@@ -109,6 +110,19 @@ export class ContextImpl implements Context {
       this.handles.register(call),
     );
     return this.skjson.importString(lazyHdl);
+  }
+
+  union<K extends TJSON, V extends TJSON>(
+    name: string,
+    ...collections: EagerCollection<K, V>[]
+  ) {
+    const collectionIDs = collections.map((c) => c.getId());
+    const unionPtr = this.exports.SkipRuntime_union(
+      this.pointer(),
+      this.skjson.exportString(name),
+      this.skjson.exportJSON(collectionIDs),
+    );
+    return this.skjson.importString(unionPtr);
   }
 
   multimap<
