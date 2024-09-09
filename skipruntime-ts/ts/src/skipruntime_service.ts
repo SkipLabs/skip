@@ -60,6 +60,8 @@ export interface GenericSkipService {
   // name / duration in milliseconds
   refreshTokens?: Record<string, RefreshToken>;
 
+  init?: (tables: Record<string, Table<TJSON[]>>) => Promise<void>;
+
   reactiveCompute(
     store: SKStore,
     inputs: Record<string, EagerCollection<TJSON, TJSON>>,
@@ -77,6 +79,8 @@ export interface SimpleSkipService {
 
   // name / duration in milliseconds
   refreshTokens?: Record<string, RefreshToken>;
+
+  init?: (table: Record<string, Writer<TJSON[]>>) => Promise<void>;
 
   reactiveCompute(
     store: SKStore,

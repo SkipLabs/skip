@@ -36,7 +36,8 @@ function check(name: String, got: TJSON, expected: TJSON): void {
 
 type Test = {
   name: string;
-  schemas: Schema[];
+  inputs: Schema[];
+  outputs: Schema[];
   init: (skstore: SKStore, ...tables: TTableCollection[]) => void;
   run: (...tables: Table<TJSON[]>[]) => void | Promise<void>;
   error?: (err: any) => void;
@@ -86,10 +87,8 @@ function testMap1Run(input: Table<TJSON[]>, output: Table<TJSON[]>) {
 
 tests.push({
   name: "testMap1",
-  schemas: [
-    schema("input", [integer("id", true, true), integer("value")]),
-    schema("output", [integer("id", true, true), integer("value")]),
-  ],
+  inputs: [schema("input", [integer("id", true, true), integer("value")])],
+  outputs: [schema("output", [integer("id", true, true), integer("value")])],
   init: testMap1Init,
   run: testMap1Run,
 });
@@ -151,11 +150,11 @@ function testMap2Run(
 
 tests.push({
   name: "testMap2",
-  schemas: [
+  inputs: [
     schema("input1", [integer("id", true, true), text("value")]),
     schema("input2", [integer("id", true, true), text("value")]),
-    schema("output", [integer("id", true, true), integer("value")]),
   ],
+  outputs: [schema("output", [integer("id", true, true), integer("value")])],
   init: testMap2Init,
   run: testMap2Run,
 });
@@ -205,11 +204,11 @@ function testMap3Run(
 
 tests.push({
   name: "testMap3",
-  schemas: [
+  inputs: [
     schema("input_no_index", [integer("id"), text("value")]),
     schema("input_index", [integer("id", true, true), text("value")]),
-    schema("output", [integer("id"), integer("value")]),
   ],
+  outputs: [schema("output", [integer("id"), integer("value")])],
   init: testMap3Init,
   run: testMap3Run,
 });
@@ -256,10 +255,8 @@ function testValueMapperRun(input: Table<TJSON[]>, output: Table<TJSON[]>) {
 
 tests.push({
   name: "testValueMapper",
-  schemas: [
-    schema("input", [integer("id", true, true), integer("value")]),
-    schema("output", [integer("id", true, true), integer("value")]),
-  ],
+  inputs: [schema("input", [integer("id", true, true), integer("value")])],
+  outputs: [schema("output", [integer("id", true, true), integer("value")])],
   init: testValueMapperInit,
   run: testValueMapperRun,
 });
@@ -304,11 +301,11 @@ function testSizeRun(
 
 tests.push({
   name: "testSize",
-  schemas: [
+  inputs: [
     schema("input", [integer("id", true, true), integer("value")]),
     schema("size", [integer("id", true, true)]),
-    schema("output", [integer("id", true, true), integer("value")]),
   ],
+  outputs: [schema("output", [integer("id", true, true), integer("value")])],
   init: testSizeInit,
   run: testSizeRun,
 });
@@ -357,10 +354,8 @@ async function testRangeMap1Run(input: Table<TJSON[]>, output: Table<TJSON[]>) {
 
 tests.push({
   name: "testRangedMap1",
-  schemas: [
-    schema("input", [integer("id", true, true), text("value")]),
-    schema("output", [integer("id", true, true), integer("value")]),
-  ],
+  inputs: [schema("input", [integer("id", true, true), text("value")])],
+  outputs: [schema("output", [integer("id", true, true), integer("value")])],
   init: testRangedMap1Init,
   run: testRangeMap1Run,
 });
@@ -425,10 +420,8 @@ function testLazyRun(
 
 tests.push({
   name: "testLazy",
-  schemas: [
-    schema("input", [integer("id", true, true), integer("value")]),
-    schema("output", [integer("id", true, true), integer("value")]),
-  ],
+  inputs: [schema("input", [integer("id", true, true), integer("value")])],
+  outputs: [schema("output", [integer("id", true, true), integer("value")])],
   init: testLazyInit,
   run: testLazyRun,
 });
@@ -486,10 +479,8 @@ function testMapReduceRun(
 
 tests.push({
   name: "testMapReduce",
-  schemas: [
-    schema("input", [integer("id", true, true), integer("v")]),
-    schema("output", [integer("id", true, true), integer("v")]),
-  ],
+  inputs: [schema("input", [integer("id", true, true), integer("v")])],
+  outputs: [schema("output", [integer("id", true, true), integer("v")])],
   init: testMapReduceInit,
   run: testMapReduceRun,
 });
@@ -564,11 +555,11 @@ function testMultiMap1Run(
 
 tests.push({
   name: "testMultiMap1",
-  schemas: [
+  inputs: [
     schema("input1", [integer("id", true, true), integer("value")]),
     schema("input2", [integer("id", true, true), integer("value")]),
-    schema("output", [integer("src"), integer("id"), integer("v")]),
   ],
+  outputs: [schema("output", [integer("src"), integer("id"), integer("v")])],
   init: testMultiMap1Init,
   run: testMultiMap1Run,
 });
@@ -627,11 +618,11 @@ function testMultiMapReduceRun(
 
 tests.push({
   name: "testMultiMapReduce",
-  schemas: [
+  inputs: [
     schema("input1", [integer("id", true, true), integer("value")]),
     schema("input2", [integer("id", true, true), integer("value")]),
-    schema("output", [integer("id", true, true), integer("v")]),
   ],
+  outputs: [schema("output", [integer("id", true, true), integer("v")])],
   init: testMultiMapReduceInit,
   run: testMultiMapReduceRun,
 });
@@ -729,11 +720,11 @@ async function testAsyncLazyRun(
 
 tests.push({
   name: "testAsyncLazy",
-  schemas: [
+  inputs: [
     schema("input1", [integer("id", true, true), integer("value")]),
     schema("input2", [integer("id", true, true), integer("value")]),
-    schema("output", [integer("id", true, true), text("v")]),
   ],
+  outputs: [schema("output", [integer("id", true, true), text("v")])],
   init: testAsyncLazyInit,
   run: testAsyncLazyRun,
 });
@@ -803,8 +794,8 @@ async function testTokensRun(
 
 tests.push({
   name: "testTokensInit",
-  schemas: [
-    schema("input", [integer("id", true, true), integer("value")]),
+  inputs: [schema("input", [integer("id", true, true), integer("value")])],
+  outputs: [
     schema("output", [
       integer("id", true, true),
       integer("value"),
@@ -887,10 +878,8 @@ async function testJSONExtractRun(
 
 tests.push({
   name: "testJSONExtract",
-  schemas: [
-    schema("input", [integer("id", true), json("v"), text("p")]),
-    schema("output", [integer("id", true), json("v")]),
-  ],
+  inputs: [schema("input", [integer("id", true), json("v"), text("p")])],
+  outputs: [schema("output", [integer("id", true), json("v")])],
   init: testJSONExtractInit,
   run: testJSONExtractRun,
 });
@@ -981,7 +970,8 @@ function run(t: Test) {
     try {
       tables = await createLocalSKStore(
         t.init,
-        t.schemas,
+        t.inputs,
+        t.outputs,
         t.tokens ? t.tokens : {},
       );
     } catch (err: any) {

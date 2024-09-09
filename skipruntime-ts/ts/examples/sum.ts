@@ -57,6 +57,10 @@ class Service implements SimpleSkipService {
   name: string = "sum";
   inputTables = ["input1", "input2"];
 
+  async init(tables: Record<string, Writer<TJSON[]>>) {
+    console.log("Init called with tables", Object.keys(tables));
+  }
+
   reactiveCompute(
     _store: SKStore,
     requests: EagerCollection<string, TJSON>,
