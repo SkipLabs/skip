@@ -266,7 +266,7 @@ export class TableCollectionImpl<R extends TJSON[]>
     return this.skdb.connectedRemote ? true : false;
   }
 
-  get(key: TJSON, index?: string | undefined) {
+  get(key: TJSON, index?: string) {
     return this.context.getFromTable(this.getName(), key, index);
   }
 
@@ -313,7 +313,7 @@ export class TableImpl<R extends TJSON[]> implements Table<R> {
     return this.schema.name;
   }
 
-  insert(entries: R[] | Inputs, update?: boolean | undefined): void {
+  insert(entries: R[] | Inputs, update?: boolean): void {
     const input = Array.isArray(entries)
       ? { values: entries, columns: this.schema.columns.map((c) => c.name) }
       : entries;
@@ -832,7 +832,7 @@ function toSelectQuery(
 function toInsertQuery(
   name: string,
   entries: TJSON[][],
-  update?: boolean | undefined,
+  update?: boolean,
   columns?: string[],
 ): Query {
   let params: JSONObject = {};
