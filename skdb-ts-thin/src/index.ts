@@ -1,4 +1,4 @@
-import { WebSocket, MessageEvent, CloseEvent } from "ws";
+import { WebSocket, MessageEvent, CloseEvent, ErrorEvent } from "ws";
 import * as util from "util";
 import { webcrypto } from "node:crypto";
 
@@ -8,7 +8,7 @@ function decodeUTF8(v: ArrayBuffer): string {
   return decoder.decode(v)
 }
 
-function csv2array(v: string): (string|number|null)[] {
+function csv2array(v: string): Value[] {
   const res = [];
   let pos = 0;
   while (pos < v.length) {
@@ -53,19 +53,29 @@ export interface MirrorDefn {
   filterParams?: Params;
 }
 
-export type SKDBValue = string | number | boolean | null;
+export interface JSONObject { [key: string]: TJSON | null }
+export type TJSON = number | JSONObject | boolean | (TJSON | null)[] | string;
+export type Value = TJSON | null;
+
+export type Row = Record<string, Value>;
+
+const zip = (a: string[], b: Value[]): [string, Value][] => a.map((k, i) => [k, b[i]]);
 
 /* ***************************************************************************/
 /* Class for query results, extending Array<Record<>> with some common
    selectors and utility functions for ease of use. */
 /* ***************************************************************************/
-export class SKDBTable extends Array<Record<string, SKDBValue>> {
-  static ofRows(data: [number, Record<string, SKDBValue>][]): SKDBTable {
-    const rows = data.flatMap(r => new Array<Record<string, SKDBValue>>(r[0]).fill(r[1]));
-    return rows as SKDBTable;
+export class Table extends Array<Row> {
+  static ofRows(data: [number, Value[]][], colNames: string[]): Table {
+    const rows = data.flatMap(r => new Array<Record<string, Value>>(r[0]).fill(
+      Object.fromEntries(
+        new Map(zip(colNames, r[1]))
+      ) as Record<string, Value>
+    ));
+    return rows as Table;
   }
 
-  scalarValue(): SKDBValue | undefined {
+  scalarValue(): Value | undefined {
     const row = this.firstRow();
     if (row === undefined) {
       return undefined;
@@ -82,28 +92,28 @@ export class SKDBTable extends Array<Record<string, SKDBValue>> {
     return row[cols[0]];
   }
 
-  onlyRow(): Record<string, SKDBValue> {
+  onlyRow(): Record<string, Value> {
     if (this.length != 1) {
       throw new Error(`Can't extract only row: got ${this.length} rows`);
     }
     return this[0];
   }
 
-  firstRow(): Record<string, SKDBValue> | undefined {
+  firstRow(): Record<string, Value> | undefined {
     if (this.length < 1) {
       return undefined;
     }
     return this[0];
   }
 
-  lastRow(): Record<string, SKDBValue> | undefined {
+  lastRow(): Record<string, Value> | undefined {
     if (this.length < 1) {
       return undefined;
     }
     return this[this.length - 1];
   }
 
-  onlyColumn(): SKDBValue[] {
+  onlyColumn(): Value[] {
     const row = this.firstRow();
     if (row === undefined) {
       return [];
@@ -119,7 +129,7 @@ export class SKDBTable extends Array<Record<string, SKDBValue>> {
     return this.column(col);
   }
 
-  column(col: string): SKDBValue[] {
+  column(col: string): Value[] {
     return this.map((row) => {
       if (!row[col]) {
         throw new Error("Missing column: " + col);
@@ -226,8 +236,8 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
       return buf.slice(0, 6 + (encodeResult.written || 0));
     }
     case "schema": {
-      const name = msg.name || "";
-      const suffix = msg.suffix || "";
+      const name = msg.name ?? "";
+      const suffix = msg.suffix ?? "";
       const buf = new ArrayBuffer(6 + name.length * 4 + suffix.length * 4);
       const uint8View = new Uint8Array(buf);
       const dataView = new DataView(buf);
@@ -480,7 +490,7 @@ class ResilientMuxedSocket {
   private creds: Creds;
   private policy: ResiliencyPolicy;
   private socket?: MuxedSocket;
-  private socketQueue: any[] = [];
+  private socketQueue: { resolve: (socket: MuxedSocket) => void, reject: (error: Error) => void}[] = [];
   private permanentFailureReason?: string;
 
   // streams from the server are not resilient
@@ -575,7 +585,7 @@ class ResilientMuxedSocket {
       }
     };
     socket.onClose = () => {
-      this.replaceFailedSocket();
+      void this.replaceFailedSocket();
     };
     socket.onError = (errorCode, msg) => {
       if (!this.isSocketErrorRetryable(errorCode)) {
@@ -586,7 +596,7 @@ class ResilientMuxedSocket {
         this.socket = undefined;
         return;
       }
-      this.replaceFailedSocket();
+      void this.replaceFailedSocket();
     };
     this.socket = socket;
     for (const promise of this.socketQueue) {
@@ -613,7 +623,7 @@ class ResilientMuxedSocket {
     const backoffMs = 500 + Math.random() * 1000;
     await new Promise((resolve) => setTimeout(resolve, backoffMs));
 
-    while (true) {
+    for (;;) {
       try {
         const socket = await MuxedSocket.connect(
           this.uri,
@@ -633,13 +643,13 @@ class ResilientMuxedSocket {
   async replaceFailedStream(): Promise<Stream> {
     this.policy.notifyFailedStream();
     if (await this.policy.shouldReconnect(this)) {
-      this.replaceFailedSocket();
+      await this.replaceFailedSocket();
     }
 
     const socket = await this.getSocket();
 
     try {
-      return socket.openStream();
+      return await socket.openStream();
     } catch {
       await this.replaceFailedSocket();
       return this.replaceFailedStream();
@@ -695,7 +705,7 @@ class ResilientStream {
 
     const failureThresholdMs = 60000;
     const timeout = setTimeout(() => {
-      this.replaceFailedStream();
+      void this.replaceFailedStream();
     }, failureThresholdMs);
     // @ts-expect-error TODO: Fix the following error.
     this.setFailureDetectionTimeout(timeout);
@@ -710,13 +720,13 @@ class ResilientStream {
       }
     };
     stream.onClose = () => {
-      this.replaceFailedStream();
+      void this.replaceFailedStream();
     };
     stream.onError = (_errorCode, _msg) => {
       // we ignore the error code and attempt to re-establish the
       // stream from scratch, which should resolve the issue even if
       // it wasn't in a retryable state.
-      this.replaceFailedStream();
+      void this.replaceFailedStream();
     };
     this.stream = stream;
   }
@@ -803,7 +813,7 @@ export class MuxedSocket {
 
   // state
   private state: MuxedSocketState = MuxedSocketState.IDLE;
-  private reauthTimer?: any;
+  private reauthTimer?: ReturnType<typeof setTimeout>;
   // streams in the open or closing state
   private activeStreams = new Map<number, Stream>();
   private serverStreamWatermark = 0;
@@ -825,7 +835,7 @@ export class MuxedSocket {
 
   openStream(): Promise<Stream> {
     const openTimeoutMs = 10;
-    const fn = (resolve: any, reject: any) => {
+    const fn = (resolve: (stream: Stream) => void, reject: (error: Error) => void) => {
       switch (this.state) {
         case MuxedSocketState.AUTH_SENT: {
           const streamId = this.nextStream;
@@ -836,7 +846,7 @@ export class MuxedSocket {
           return;
         }
         case MuxedSocketState.IDLE:
-          setTimeout(() => fn(resolve, reject), openTimeoutMs);
+          setTimeout(() => { fn(resolve, reject); }, openTimeoutMs);
           return;
         case MuxedSocketState.CLOSING:
         case MuxedSocketState.CLOSEWAIT:
@@ -924,7 +934,7 @@ export class MuxedSocket {
         return new Promise((resolve, _reject) => {
           this.socket.send(this.encodePingMsg());
           const pingTimeoutMs = 10000;
-          const timeout = setTimeout(() => resolve(false), pingTimeoutMs);
+          const timeout = setTimeout(() => { resolve(false); }, pingTimeoutMs);
           this.healthChecks.push((isOk) => {
             clearTimeout(timeout);
             resolve(isOk);
@@ -947,10 +957,10 @@ export class MuxedSocket {
       const socket = new WebSocket(uri);
       socket.binaryType = "arraybuffer";
       socket.onclose = (_event) =>
-        reject(new Error("Socket closed before open"));
-      socket.onerror = (event) => reject(event);
+        { reject(new Error("Socket closed before open")); };
+      socket.onerror = (event: ErrorEvent) => { reject(new Error(event.message)); };
       socket.onmessage = (_event) =>
-        reject(new Error("Socket messaged before open"));
+        { reject(new Error("Socket messaged before open")); };
       socket.onopen = (_event) => {
         clearTimeout(timeout);
         if (failed) {
@@ -958,13 +968,16 @@ export class MuxedSocket {
           return;
         }
         const muxSocket = new MuxedSocket(socket, creds);
-        socket.onclose = (event) => muxSocket.onSocketClose(event);
-        socket.onerror = (_event) => muxSocket.onSocketError(0, "socket error");
-        socket.onmessage = (event) => muxSocket.onSocketMessage(event);
+        socket.onclose = (event) => { muxSocket.onSocketClose(event); };
+        socket.onerror = (_event) => { muxSocket.onSocketError(0, "socket error"); };
+        socket.onmessage = (event) => { muxSocket.onSocketMessage(event); };
         muxSocket
           .sendAuth()
-          .then(() => resolve(muxSocket))
-          .catch((reason) => reject(reason));
+          .then(() => { resolve(muxSocket); })
+          .catch((reason: unknown) => {
+            // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
+            reject(reason);
+          });
       };
     });
   }
@@ -1146,7 +1159,7 @@ export class MuxedSocket {
         this.state = MuxedSocketState.AUTH_SENT;
         clearTimeout(this.reauthTimer);
         this.reauthTimer = setTimeout(() => {
-          this.sendAuth();
+          void this.sendAuth();
         }, this.reauthTimeoutMs);
         break;
       }
@@ -1518,12 +1531,12 @@ export async function connect(
 class SKDB {
   private connection: ResilientMuxedSocket;
   private creds: Creds;
-  private replicationUid: string = "";
   private mirrorStreams = new Set<ResilientStream>();
   private onRebootFn?: () => void;
   private watermark: bigint = BigInt(0);
-  private data = new Map<string, Map<string, [number, Record<string, any>]>>();
-  private callbacks = new Map<string, (added: SKDBTable, removed: SKDBTable) => void>();
+  private data = new Map<string, Map<string, [number, Value[]]>>();
+  private colNames = new Map<string, string[]>;
+  private callbacks = new Map<string, (added: Table, removed: Table) => void>();
 
   private constructor(
     connection: ResilientMuxedSocket,
@@ -1547,26 +1560,24 @@ class SKDB {
       },
       async shouldReconnect(socket: ResilientMuxedSocket): Promise<boolean> {
         // perform an active check
-        return !socket.isSocketResponsive();
+        return !await socket.isSocketResponsive();
       },
     };
     const conn = await ResilientMuxedSocket.connect(policy, uri, creds);
 
     const server = new SKDB(conn, creds);
-    // FIXME
-    server.replicationUid = creds.deviceUuid;//client.getReplicationUid(creds.deviceUuid);
 
     await server.mirror(schemas);
 
     return server;
   }
 
-  async connectedAs(): Promise<string> {
+  connectedAs(): string {
     return this.creds.accessKey;
   }
 
-  async close() {
-    this.connection.closeSocket();
+  close() {
+     void this.connection.closeSocket();
   }
 
   private static getDbSocketUri(endpoint: string, db: string) {
@@ -1580,7 +1591,7 @@ class SKDB {
     if (response.type === "data") {
       return response;
     }
-    throw new Error(`Unexpected response: ${response}`);
+    throw new Error(`Unexpected response: ${response.type}`);
   }
 
   private deliverDataTransferProtoMsg(
@@ -1629,7 +1640,7 @@ class SKDB {
         }
         resolve(msg);
       };
-      stream.onError = (_code, msg) => reject(msg);
+      stream.onError = (_code, msg) => { reject(new Error(msg)); };
       stream.send(encodeProtoMsg(request));
       stream.close();
     });
@@ -1681,13 +1692,12 @@ class SKDB {
                 resolveSignalled ||= (line.match(/^:[1-9]/g) != null);
               }
             }
-
             this.mergeUpdates(payload);
+            if (!resolved && resolveSignalled) {
+              resolved = true;
+              resolve();
+            }
           });
-          if (!resolved && resolveSignalled) {
-            resolved = true;
-            resolve();
-          }
         }
         stream.expectingData();
       };
@@ -1703,11 +1713,11 @@ class SKDB {
   }
 
   private mergeUpdates(payload: string) {
-    let curTable = null;
-    let curData = null;
+    let curTable;
+    let curData: Map<string, [number, Value[]]>;
     let changedTables = [];
-    let added = new Map();
-    let removed = new Map();
+    let added = new Map<string, [number, Value[]][]>();
+    let removed = new Map<string, [number, Value[]][]>();
 
     for (const line of payload.split("\n")) {
       if (line == "") {
@@ -1719,18 +1729,18 @@ class SKDB {
           const cb = this.callbacks.get(curTable);
           if (cb !== undefined) {
             cb(
-              SKDBTable.ofRows(added.get(curTable)),
-              SKDBTable.ofRows(removed.get(curTable))
+              Table.ofRows(added.get(curTable)!, this.colNames.get(curTable)!),
+              Table.ofRows(removed.get(curTable)!, this.colNames.get(curTable)!)
             );
           }
         }
 
         changedTables = [];
-        added = new Map();
-        removed = new Map();
+        added = new Map<string, [number, Value[]][]>();
+        removed = new Map<string, [number, Value[]][]>();
       } else if (line.startsWith("^")) {
         curTable = line.substring(1);
-        curData = this.data.get(curTable);
+        curData = this.data.get(curTable)!;
         changedTables.push(curTable);
         added.set(curTable, []);
         removed.set(curTable, []);
@@ -1743,9 +1753,11 @@ class SKDB {
 
         const values = csv2array(row);
         if (prev_cnt < cnt) {
-          added.get(curTable).push([cnt - prev_cnt, values]);
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+          added.get(curTable!)!.push([cnt - prev_cnt, values]);
         } else {
-          removed.get(curTable).push([prev_cnt - cnt, values]);
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+          removed.get(curTable!)!.push([prev_cnt - cnt, values]);
         }
         if (cnt == 0) {
           curData!.delete(row);
@@ -1758,8 +1770,8 @@ class SKDB {
 
   subscribe(
     table: string,
-    init_cb: (rows: SKDBTable) => void,
-    update_cb: (added: SKDBTable, removed: SKDBTable) => void
+    init_cb: (rows: Table) => void,
+    update_cb: (added: Table, removed: Table) => void
   ): (() => void) {
     // TODO: Fail if attempting to subscribe to non-mirrored table.
     // TODO: Allow multiple callbacks?
@@ -1770,8 +1782,8 @@ class SKDB {
     return () => { this.callbacks.delete(table); }
   }
 
-  getTable(name: string): SKDBTable {
-    return SKDBTable.ofRows(Array.from(this.data.get(name)!.values()));
+  getTable(name: string): Table {
+    return Table.ofRows(Array.from(this.data.get(name)!.values()), this.colNames.get(name)!);
   }
 
   // async write(payload: JSON) {
@@ -1784,7 +1796,7 @@ class SKDB {
   //   })
   // }
 
-  async isConnectionHealthy() {
+  isConnectionHealthy() {
     return this.connection.isSocketConsideredHealthy();
   }
 
@@ -1801,6 +1813,12 @@ class SKDB {
       }
 
       this.data.set(tableName, new Map());
+
+      // TODO: This is dirty. Properly parse or change returned data format.
+      const colDefs = remoteTable.split("\n");
+      this.colNames.set(tableName, colDefs.slice(1, colDefs.length - 2).map(
+        (x) => x.trim().split(" ")[0]
+      ));
     };
 
     // mirror has replace semantics. start by tearing down any current
@@ -1815,7 +1833,7 @@ class SKDB {
     await this.establishServerTail(tables);
   }
 
-  async exec(stdin: string, params: Params = new Map()): Promise<SKDBTable> {
+  async exec(stdin: string, params: Params = new Map()): Promise<Table> {
     if (params instanceof Map) {
       params = Object.fromEntries(params);
     }
@@ -1828,8 +1846,8 @@ class SKDB {
       const rows = result
         .split("\n")
         .filter((x) => x != "")
-        .map((x) => JSON.parse(x));
-      return SKDBTable.ofRows(rows);
+        .map((x) => JSON.parse(x) as Row);
+      return new Table(...rows);
     });
   }
 
@@ -1885,7 +1903,7 @@ class SKDB {
     });
   }
 
-  async onReboot(fn: () => void) {
+  onReboot(fn: () => void) {
     this.onRebootFn = fn;
   }
 }

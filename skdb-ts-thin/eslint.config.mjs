@@ -44,12 +44,12 @@ export default [
       "@typescript-eslint/no-unsafe-member-access": "warn",
       "@typescript-eslint/no-confusing-void-expression": "error",
       "@typescript-eslint/restrict-plus-operands": "error",
-      "@typescript-eslint/restrict-template-expressions": "warn",
+      "@typescript-eslint/restrict-template-expressions": "off",
       "@typescript-eslint/use-unknown-in-catch-callback-variable": "error",
       "@typescript-eslint/no-unnecessary-condition": "error",
       "@typescript-eslint/no-unnecessary-type-arguments": "warn",
       "@typescript-eslint/no-unnecessary-type-parameters": "warn",
-      "@typescript-eslint/no-non-null-assertion": "warn",
+      "@typescript-eslint/no-non-null-assertion": "off",
       "@typescript-eslint/no-empty-object-type": [
         "error",
         { allowInterfaces: "with-single-extends" },
@@ -68,5 +68,5 @@ export default [
       "jsdoc/no-types": "warn",
     },
   },
-  { files: ["**/*.{mjs,ts}"], ...tseslint.configs.disableTypeChecked },
+  { files: ["**/*.{mjs,js}"], ...tseslint.configs.disableTypeChecked },
 ];

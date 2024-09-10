@@ -1,5 +1,4 @@
 import 'mocha';
-import { assert } from 'chai';
 import SKDB from "../src/index"
 import { webcrypto } from 'node:crypto';
 
@@ -18,17 +17,19 @@ async function getKey() {
 
 describe('connect', () => {
   it('works', async () => {
-    const skdb = await SKDB.connect("ws://localhost:3586", "foo", {
-      accessKey: "root", privateKey: await getKey(), deviceUuid: webcrypto.randomUUID(),
-    }, [{
-      table: 'bar',
-      expectedColumns: '*',
-    }]);
+    const skdb = await SKDB.connect(
+      "ws://localhost:3586",
+      "foo",
+      {
+        accessKey: "root",
+        privateKey: await getKey(),
+        deviceUuid: webcrypto.randomUUID(),
+      },
+      [{
+        table: 'bar',
+        expectedColumns: '*',
+      }]);
     console.log(await skdb.exec("CREATE TABLE IF NOT EXISTS bar(a INTEGER, b TEXT)"));
-    // await skdb.mirror({
-    //   table: 'bar',
-    //   expectedColumns: '*',
-    // });
 
     skdb.subscribe('bar',
       (rows) => {
@@ -41,10 +42,6 @@ describe('connect', () => {
 
     console.log(await skdb.exec("INSERT INTO bar VALUES(1337, 'hello')"));
 
-    await new Promise((resolve) => {
-      setTimeout(resolve, 5000);
-    });
-
-    // await skdb.close();
+    skdb.close();
   })
 })
