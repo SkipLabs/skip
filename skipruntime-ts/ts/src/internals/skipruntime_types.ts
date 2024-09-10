@@ -134,6 +134,12 @@ export interface Context {
     accumulator: Accumulator<V2, V3>,
   ) => string;
 
+  sliced<K extends TJSON>(
+    collectionName: string,
+    sliceName: string,
+    ranges: readonly [K, K][],
+  ): string;
+
   jsonExtract(value: JSONObject, pattern: string): TJSON[];
 
   noref: () => Context;
