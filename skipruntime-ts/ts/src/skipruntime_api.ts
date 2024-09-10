@@ -12,8 +12,6 @@ export type JSONObject = { [key: string]: TJSON | null };
 
 export type TJSON = number | JSONObject | boolean | (TJSON | null)[] | string;
 
-export type TTableCollection = any;
-export type TTable = any;
 export type Param = any;
 
 export type RefreshToken = Opaque<number, "SkipRefreshToken">;
