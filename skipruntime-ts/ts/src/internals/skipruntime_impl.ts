@@ -47,12 +47,14 @@ function assertNoKeysNaN<K extends TJSON, V extends TJSON>(
 }
 export const serverResponseSuffix = "__skdb_mirror_feedback";
 
+const sk_frozen: unique symbol = Symbol();
+
 export interface Constant {
-  __sk_frozen: true;
+  [sk_frozen]: true;
 }
 
 function sk_freeze<T extends object>(x: T): T & Constant {
-  return Object.defineProperty(x, "__sk_frozen", {
+  return Object.defineProperty(x, sk_frozen, {
     enumerable: false,
     writable: false,
     value: true,
@@ -60,12 +62,12 @@ function sk_freeze<T extends object>(x: T): T & Constant {
 }
 
 function isSkFrozen(x: any): x is Constant {
-  return "__sk_frozen" in x && x.__sk_frozen === true;
+  return sk_frozen in x && x[sk_frozen] === true;
 }
 
 abstract class SkFrozen implements Constant {
   // tsc misses that Object.defineProperty in the constructor inits this
-  __sk_frozen!: true;
+  [sk_frozen]!: true;
 
   constructor() {
     sk_freeze(this);
