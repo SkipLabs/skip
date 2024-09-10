@@ -71,11 +71,18 @@ export class ContextImpl implements Context {
     private skjson: SKJSON,
     private exports: FromWasm,
     private handles: Handles,
+    private env: Environment,
     private ref: Ref,
   ) {}
 
   noref() {
-    return new ContextImpl(this.skjson, this.exports, this.handles, new Ref());
+    return new ContextImpl(
+      this.skjson,
+      this.exports,
+      this.handles,
+      this.env,
+      new Ref(),
+    );
   }
 
   lazy<K extends TJSON, V extends TJSON>(
@@ -824,7 +831,13 @@ class LinksImpl implements Links {
     ) => {
       ref.push(ctx);
       const jsu = skjson();
-      const context = new ContextImpl(jsu, fromWasm, this.handles, ref);
+      const context = new ContextImpl(
+        jsu,
+        fromWasm,
+        this.handles,
+        this.env,
+        ref,
+      );
       const res = jsu.exportJSON(
         this.handles.apply(fn, [
           new LSelfImpl(context, hdl) as LazyCollection<K, V>,
@@ -924,7 +937,7 @@ class LinksImpl implements Links {
     this.env.shared.set(
       "SKStore",
       new SKStoreFactoryImpl(
-        () => new ContextImpl(skjson(), fromWasm, this.handles, ref),
+        () => new ContextImpl(skjson(), fromWasm, this.handles, this.env, ref),
         create,
         (dbName, asWorker) =>
           (this.env.shared.get("SKDB") as SKDBShared).createSync(
