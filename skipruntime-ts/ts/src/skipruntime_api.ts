@@ -40,9 +40,6 @@ export type Schema = {
   filter?: DBFilter;
   alias?: string;
 };
-export class MapOptions<K extends TJSON> {
-  constructor(public ranges: [K, K][] | null = null) {}
-}
 
 /**
  * Skip Runtime async function calls return a `Result` value which is one of `Success`,
@@ -399,16 +396,6 @@ export interface TableCollection<R extends TJSON[]> {
   map<K extends TJSON, V extends TJSON, Params extends Param[]>(
     mapper: new (...params: Params) => InputMapper<R, K, V>,
     ...params: Params
-  ): EagerCollection<K, V>;
-
-  /**
-   * Create a new eager reactive collection by mapping over each entry in
-   * a table collection (with options)
-   * @returns {EagerCollection} The resulting (eager) output collection
-   */
-  map<K extends TJSON, V extends TJSON, Params extends Param[]>(
-    mapper: new (...params: Params) => InputMapper<R, K, V>,
-    ...paramsAndOptions: [...Params, MapOptions<R>]
   ): EagerCollection<K, V>;
 }
 
