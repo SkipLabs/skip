@@ -454,6 +454,39 @@ fun toSkdb(
   )
 }
 
+fun identityMap<K: Key, V: File>(
+  _context: mutable Context,
+  writer: mutable TWriter<K, V>,
+  key: K,
+  it: mutable NonEmptyIterator<V>,
+): void {
+  writer.setArray(key, it.collect(Array));
+}
+
+@export("SkipRuntime_sliced")
+fun sliced(
+  context: mutable Context,
+  handleId: String,
+  name: String,
+  jsonRanges: SKJSON.CJArray,
+): String {
+  ranges = jsonRanges match {
+  | SKJSON.CJArray(ranges) -> asKeyRanges(ranges)
+  };
+  eager = EHandle(JSONID::keyType, JSONFile::type, DirName::create(handleId));
+  eagerMap(
+    eager,
+    JSONID::keyType,
+    JSONFile::type,
+    name,
+    context,
+    identityMap,
+    Some(ranges),
+  )
+    .getDirName()
+    .toString()
+}
+
 @export("SkipRuntime_getFromTable")
 fun getFromTable(
   _context: mutable Context,
