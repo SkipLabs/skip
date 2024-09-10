@@ -860,3 +860,60 @@ export function check<T>(value: T): void {
     throw new Error("'" + type + "' cannot be manage by skstore.");
   }
 }
+
+/**
+ * _Deep-freeze_ an object, returning the same object that was passed in.
+ *
+ * This function is similar to
+ * {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/freeze | `Object.freeze()`}
+ * but freezes the object and deep-freezes all its properties,
+ * recursively. The object is then not only _immutable_ but also
+ * _constant_. Note that as a result all objects reachable from the
+ * parameter will be frozen and no longer mutable or extensible, even from
+ * other references.
+ *
+ * The primary use for this function is to satisfy the requirement that all
+ * parameters to Skip `Mapper` constructors must be deep-frozen: objects
+ * that have not been constructed by Skip can be passed to `freeze()` before
+ * passing them to a `Mapper` constructor.
+ *
+ * @param value - The object to deep-freeze.
+ * @returns The same object that was passed in.
+ */
+export function freeze<T>(value: T): T {
+  const type = typeof value;
+  if (type == "string" || type == "number" || type == "boolean") {
+    return value;
+  } else if (type == "object") {
+    if ((value as any).__sk_frozen) {
+      return value;
+    } else if (Object.isFrozen(value)) {
+      check(value);
+      return value;
+    } else if (Array.isArray(value)) {
+      Object.defineProperty(value, "__sk_frozen", {
+        enumerable: false,
+        writable: false,
+        value: true,
+      });
+      const length: number = value.length;
+      for (let i = 0; i < length; i++) {
+        value[i] = freeze(value[i]);
+      }
+      return Object.freeze(value) as T;
+    } else {
+      const jso = value as Record<string, any>;
+      Object.defineProperty(value, "__sk_frozen", {
+        enumerable: false,
+        writable: false,
+        value: true,
+      });
+      for (const key of Object.keys(jso)) {
+        jso[key] = freeze(jso[key]);
+      }
+      return Object.freeze(jso) as T;
+    }
+  } else {
+    throw new Error("'" + type + "' cannot be frozen.");
+  }
+}
