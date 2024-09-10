@@ -47,7 +47,29 @@ function assertNoKeysNaN<K extends TJSON, V extends TJSON>(
 }
 export const serverResponseSuffix = "__skdb_mirror_feedback";
 
+export interface Constant {
+  __sk_frozen: true;
+}
+
+function sk_freeze<T extends object>(x: T): T & Constant {
+  return Object.defineProperty(x, "__sk_frozen", {
+    enumerable: false,
+    writable: false,
+    value: true,
+  }) as T & Constant;
+}
+
+abstract class SkFrozen implements Constant {
+  // tsc misses that Object.defineProperty in the constructor inits this
+  __sk_frozen!: true;
+
+  constructor() {
+    sk_freeze(this);
+  }
+}
+
 class EagerCollectionImpl<K extends TJSON, V extends TJSON>
+  extends SkFrozen
   implements EagerCollection<K, V>
 {
   //
@@ -55,13 +77,9 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
   eagerHdl: string;
 
   constructor(context: Context, eagerHdl: string) {
+    super();
     this.context = context;
     this.eagerHdl = eagerHdl;
-    Object.defineProperty(this, "__sk_frozen", {
-      enumerable: false,
-      writable: false,
-      value: true,
-    });
   }
 
   getId(): string {
@@ -182,19 +200,16 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
 }
 
 class LazyCollectionImpl<K extends TJSON, V extends TJSON>
+  extends SkFrozen
   implements LazyCollection<K, V>
 {
   protected context: Context;
   protected lazyHdl: string;
 
   constructor(context: Context, lazyHdl: string) {
+    super();
     this.context = context;
     this.lazyHdl = lazyHdl;
-    Object.defineProperty(this, "__sk_frozen", {
-      enumerable: false,
-      writable: false,
-      value: true,
-    });
   }
 
   getArray(key: K): V[] {
@@ -211,19 +226,16 @@ class LazyCollectionImpl<K extends TJSON, V extends TJSON>
 }
 
 export class LSelfImpl<K extends TJSON, V extends TJSON>
+  extends SkFrozen
   implements LazyCollection<K, V>
 {
   protected context: Context;
   protected lazyHdl: ptr<Internal.LHandle>;
 
   constructor(context: Context, lazyHdl: ptr<Internal.LHandle>) {
+    super();
     this.context = context;
     this.lazyHdl = lazyHdl;
-    Object.defineProperty(this, "__sk_frozen", {
-      enumerable: false,
-      writable: false,
-      value: true,
-    });
   }
 
   getArray(key: K): V[] {
@@ -240,6 +252,7 @@ export class LSelfImpl<K extends TJSON, V extends TJSON>
 }
 
 export class TableCollectionImpl<R extends TJSON[]>
+  extends SkFrozen
   implements TableCollection<R>
 {
   constructor(
@@ -247,11 +260,7 @@ export class TableCollectionImpl<R extends TJSON[]>
     protected skdb: SKDBSync,
     protected schema: Schema,
   ) {
-    Object.defineProperty(this, "__sk_frozen", {
-      enumerable: false,
-      writable: false,
-      value: true,
-    });
+    super();
   }
 
   getName() {
@@ -400,16 +409,12 @@ export class TableImpl<R extends TJSON[]> implements Table<R> {
   };
 }
 
-export class SKStoreImpl implements SKStore {
+export class SKStoreImpl extends SkFrozen implements SKStore {
   private context: Context;
 
   constructor(context: Context) {
+    super();
     this.context = context;
-    Object.defineProperty(this, "__sk_frozen", {
-      enumerable: false,
-      writable: false,
-      value: true,
-    });
   }
 
   lazy<K extends TJSON, V extends TJSON, Params extends Param[]>(
@@ -898,27 +903,17 @@ export function freeze<T>(value: T): T {
       check(value);
       return value;
     } else if (Array.isArray(value)) {
-      Object.defineProperty(value, "__sk_frozen", {
-        enumerable: false,
-        writable: false,
-        value: true,
-      });
       const length: number = value.length;
       for (let i = 0; i < length; i++) {
         value[i] = freeze(value[i]);
       }
-      return Object.freeze(value) as T;
+      return Object.freeze(sk_freeze(value));
     } else {
       const jso = value as Record<string, any>;
-      Object.defineProperty(value, "__sk_frozen", {
-        enumerable: false,
-        writable: false,
-        value: true,
-      });
       for (const key of Object.keys(jso)) {
         jso[key] = freeze(jso[key]);
       }
-      return Object.freeze(jso) as T;
+      return Object.freeze(sk_freeze(jso)) as T;
     }
   } else {
     throw new Error(`'${typeof value}' cannot be frozen.`);
