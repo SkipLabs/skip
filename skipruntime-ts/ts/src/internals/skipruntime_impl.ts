@@ -835,10 +835,13 @@ function toUpdateWhereQuery(
 }
 
 export function check<T>(value: T): void {
-  const type = typeof value;
-  if (type == "string" || type == "number" || type == "boolean") {
+  if (
+    typeof value == "string" ||
+    typeof value == "number" ||
+    typeof value == "boolean"
+  ) {
     return;
-  } else if (type == "object") {
+  } else if (typeof value == "object") {
     const jso = value as any;
     if (jso.__sk_frozen) {
       return;
@@ -857,7 +860,7 @@ export function check<T>(value: T): void {
       throw new Error("Invalid object: must be frozen.");
     }
   } else {
-    throw new Error("'" + type + "' cannot be manage by skstore.");
+    throw new Error(`'${typeof value}' cannot be managed by skstore.`);
   }
 }
 
@@ -881,10 +884,13 @@ export function check<T>(value: T): void {
  * @returns The same object that was passed in.
  */
 export function freeze<T>(value: T): T {
-  const type = typeof value;
-  if (type == "string" || type == "number" || type == "boolean") {
+  if (
+    typeof value == "string" ||
+    typeof value == "number" ||
+    typeof value == "boolean"
+  ) {
     return value;
-  } else if (type == "object") {
+  } else if (typeof value == "object") {
     if ((value as any).__sk_frozen) {
       return value;
     } else if (Object.isFrozen(value)) {
@@ -914,6 +920,6 @@ export function freeze<T>(value: T): T {
       return Object.freeze(jso) as T;
     }
   } else {
-    throw new Error("'" + type + "' cannot be frozen.");
+    throw new Error(`'${typeof value}' cannot be frozen.`);
   }
 }
