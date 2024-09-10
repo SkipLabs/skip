@@ -125,9 +125,8 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
 
   map<K2 extends TJSON, V2 extends TJSON, Params extends Param[]>(
     mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
-    ...paramsAndOptions: WithOptions<Params, K>
+    ...params: Params
   ): EagerCollection<K2, V2> {
-    const [params, options] = splitMapParams(paramsAndOptions);
     params.forEach(check);
     const mapperObj = new mapper(...params);
     Object.freeze(mapperObj);
@@ -139,7 +138,6 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
       mapperObj.constructor.name,
       (key: K, it: NonEmptyIterator<V>) =>
         assertNoKeysNaN(mapperObj.mapElement(key, it)),
-      options.ranges,
     );
     return this.derive<K2, V2>(eagerHdl);
   }
@@ -152,9 +150,8 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
   >(
     mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
     accumulator: Accumulator<V2, V3>,
-    ...paramsAndOptions: WithOptions<Params, K>
+    ...params: Params
   ) {
-    const [params, options] = splitMapParams(paramsAndOptions);
     params.forEach(check);
     const mapperObj = new mapper(...params);
     Object.freeze(mapperObj);
@@ -167,7 +164,6 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
       (key: K, it: NonEmptyIterator<V>) =>
         assertNoKeysNaN(mapperObj.mapElement(key, it)),
       accumulator,
-      options.ranges,
     );
     return this.derive<K2, V3>(eagerHdl);
   }
@@ -175,9 +171,8 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
   mapTo<R extends TJSON[], Params extends Param[]>(
     table: TableCollection<R>,
     mapper: new (...params: Params) => OutputMapper<R, K, V>,
-    ...paramsAndOptions: WithOptions<Params, K>
+    ...params: Params
   ): void {
-    const [params, options] = splitMapParams(paramsAndOptions);
     params.forEach(check);
     const mapperObj = new mapper(...params);
     Object.freeze(mapperObj);
@@ -189,7 +184,6 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
       table.getSchema(),
       (key: K, it: NonEmptyIterator<V>) => mapperObj.mapElement(key, it),
       table.isConnected(),
-      options.ranges,
     );
   }
 }
