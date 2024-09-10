@@ -61,23 +61,57 @@ jobs:
           name: Run native skdb tests
           command: |
             make test-native
-  skdb-wasm:
+  skdb-wasm-client:
     docker:
       - image: skiplabs/skdb-base:latest
     steps:
       - checkout
       - setup
       - run:
-          name: Run wasm skdb tests
+          name: Run wasm skdb client tests
           no_output_timeout: 15m
           environment:
             PLAYWRIGHT_REPORTER: junit
-            PLAYWRIGHT_JUNIT_OUTPUT_NAME: ~/test-results/skdb-wasm.xml
+            PLAYWRIGHT_JUNIT_OUTPUT_NAME: ~/test-results/skdb-wasm-client.xml
           command: |
             mkdir -p ~/test-results
-            make test-wasm
+            make tstest-sql TEST_TARGET=client
       - store_test_results:
-          path: ~/test-results/skdb-wasm.xml
+          path: ~/test-results/skdb-wasm-client.xml
+  skdb-wasm-api:
+    docker:
+      - image: skiplabs/skdb-base:latest
+    steps:
+      - checkout
+      - setup
+      - run:
+          name: Run wasm skdb api tests
+          no_output_timeout: 15m
+          environment:
+            PLAYWRIGHT_REPORTER: junit
+            PLAYWRIGHT_JUNIT_OUTPUT_NAME: ~/test-results/skdb-wasm-api.xml
+          command: |
+            mkdir -p ~/test-results
+            make tstest-sql TEST_TARGET=server
+      - store_test_results:
+          path: ~/test-results/skdb-wasm-api.xml
+  skdb-wasm-mux:
+    docker:
+      - image: skiplabs/skdb-base:latest
+    steps:
+      - checkout
+      - setup
+      - run:
+          name: Run wasm skdb mux tests
+          no_output_timeout: 15m
+          environment:
+            PLAYWRIGHT_REPORTER: junit
+            PLAYWRIGHT_JUNIT_OUTPUT_NAME: ~/test-results/skdb-wasm-mux.xml
+          command: |
+            mkdir -p ~/test-results
+            make tstest-sql TEST_TARGET=mux
+      - store_test_results:
+          path: ~/test-results/skdb-wasm-mux.xml
   skjson:
     docker:
       - image: skiplabs/skdb-base:latest

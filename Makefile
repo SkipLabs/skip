@@ -239,7 +239,7 @@ skbuild-%:
 	cd $* && skargo b --profile $(SKARGO_PROFILE)
 
 tstest-%: build/sknpm
-	cd $* && ../build/sknpm test --profile $(SKARGO_PROFILE) $(SKNPM_FLAG)
+	cd $* && ../build/sknpm test --profile $(SKARGO_PROFILE) $(SKNPM_FLAG) $(TEST_TARGET)
 
 ## Backward Compatibility
 

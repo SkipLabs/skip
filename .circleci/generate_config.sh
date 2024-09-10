@@ -56,7 +56,9 @@ then
     cat <<EOF
   skdb-wasm:
     jobs:
-      - skdb-wasm
+      - skdb-wasm-client
+      - skdb-wasm-api
+      - skdb-wasm-mux
 EOF
 fi
 
