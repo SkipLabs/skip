@@ -12,29 +12,25 @@ function csv2array(v: string): Value[] {
   const res = [];
   let pos = 0;
   while (pos < v.length) {
+    let str = "";
     if (v[pos] == '"') {
       let end_pos = pos + 1;
-      let str = "";
       while (v[end_pos] != '"') {
         if (v[end_pos] == "\\") end_pos++;
-        str += v[end_pos];
         end_pos++;
       }
-      res.push(str);
+      str = v.substring(pos, end_pos + 1);
       pos = end_pos + 1;
     } else {
-      let haystack = v.substring(pos);
-      const end_pos = haystack.indexOf(",");
+      str = v.substring(pos);
+      const end_pos = str.indexOf(",");
       if (end_pos != -1) {
-        haystack = haystack.substring(0, end_pos);
+        str = str.substring(0, end_pos);
       }
-      if (v[pos] == "." || ("0" <= v[pos] && v[pos] <= "9")) {
-        res.push(parseFloat(haystack));
-      } else {
-        res.push(null);
-      }
-      pos += haystack.length;
+      pos += str.length;
     }
+
+    res.push(JSON.parse(str) as Value);
 
     pos += 1;
   }
