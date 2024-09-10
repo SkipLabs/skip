@@ -384,6 +384,14 @@ export class ContextImpl implements Context {
     ) as TJSON[];
   }
 
+  /* Must produce a valid SKStore key ideally with no collision */
+  keyOfJSON(value: TJSON): string {
+    return (
+      "b64_" +
+      this.env.base64Encode(JSON.stringify(value), true).replaceAll("=", "")
+    );
+  }
+
   private pointer() {
     return this.ref.get()!;
   }
