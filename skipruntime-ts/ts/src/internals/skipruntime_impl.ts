@@ -59,6 +59,10 @@ function sk_freeze<T extends object>(x: T): T & Constant {
   }) as T & Constant;
 }
 
+function isSkFrozen(x: any): x is Constant {
+  return "__sk_frozen" in x && x.__sk_frozen === true;
+}
+
 abstract class SkFrozen implements Constant {
   // tsc misses that Object.defineProperty in the constructor inits this
   __sk_frozen!: true;
@@ -847,18 +851,14 @@ export function check<T>(value: T): void {
   ) {
     return;
   } else if (typeof value == "object") {
-    if (value === null) {
+    if (value === null || isSkFrozen(value)) {
       return;
     }
-    const jso = value as any;
-    if (jso.__sk_frozen) {
-      return;
-    } else if (Object.isFrozen(jso)) {
-      if (Array.isArray(jso)) {
-        jso.forEach(check);
+    if (Object.isFrozen(value)) {
+      if (Array.isArray(value)) {
+        value.forEach(check);
       } else {
-        /* eslint-disable-next-line @typescript-eslint/no-unsafe-argument */
-        Object.values(jso).forEach(check);
+        Object.values(value).forEach(check);
       }
     } else {
       throw new Error("Invalid object: must be frozen.");
@@ -897,7 +897,7 @@ export function freeze<T>(value: T): T {
   } else if (typeof value == "object") {
     if (value === null) {
       return value;
-    } else if ((value as any).__sk_frozen) {
+    } else if (isSkFrozen(value)) {
       return value;
     } else if (Object.isFrozen(value)) {
       check(value);
