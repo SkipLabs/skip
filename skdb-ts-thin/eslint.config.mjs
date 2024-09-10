@@ -3,7 +3,6 @@ import eslint from "@eslint/js";
 import stylisticJs from "@stylistic/eslint-plugin-js";
 import jsdoc from "eslint-plugin-jsdoc";
 
-
 export default [
   eslint.configs.recommended,
   jsdoc.configs["flat/recommended-typescript-error"],

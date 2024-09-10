@@ -5,7 +5,7 @@ import { webcrypto } from "node:crypto";
 const decoder = new util.TextDecoder("utf8");
 
 function decodeUTF8(v: ArrayBuffer): string {
-  return decoder.decode(v)
+  return decoder.decode(v);
 }
 
 function csv2array(v: string): Value[] {
@@ -16,7 +16,7 @@ function csv2array(v: string): Value[] {
       let end_pos = pos + 1;
       let str = "";
       while (v[end_pos] != '"') {
-        if (v[end_pos] == '\\') end_pos++;
+        if (v[end_pos] == "\\") end_pos++;
         str += v[end_pos];
         end_pos++;
       }
@@ -24,14 +24,14 @@ function csv2array(v: string): Value[] {
       pos = end_pos + 1;
     } else {
       let haystack = v.substring(pos);
-      const end_pos = haystack.indexOf(',');
+      const end_pos = haystack.indexOf(",");
       if (end_pos != -1) {
         haystack = haystack.substring(0, end_pos);
       }
-      if (v[pos] == '.' || ('0' <= v[pos] && v[pos] <= '9')) {
+      if (v[pos] == "." || ("0" <= v[pos] && v[pos] <= "9")) {
         res.push(parseFloat(haystack));
       } else {
-        res.push(null)
+        res.push(null);
       }
       pos += haystack.length;
     }
@@ -53,13 +53,16 @@ export interface MirrorDefn {
   filterParams?: Params;
 }
 
-export interface JSONObject { [key: string]: TJSON | null }
+export interface JSONObject {
+  [key: string]: TJSON | null;
+}
 export type TJSON = number | JSONObject | boolean | (TJSON | null)[] | string;
 export type Value = TJSON | null;
 
 export type Row = Record<string, Value>;
 
-const zip = (a: string[], b: Value[]): [string, Value][] => a.map((k, i) => [k, b[i]]);
+const zip = (a: string[], b: Value[]): [string, Value][] =>
+  a.map((k, i) => [k, b[i]]);
 
 /* ***************************************************************************/
 /* Class for query results, extending Array<Record<>> with some common
@@ -67,11 +70,14 @@ const zip = (a: string[], b: Value[]): [string, Value][] => a.map((k, i) => [k, 
 /* ***************************************************************************/
 export class Table extends Array<Row> {
   static ofRows(data: [number, Value[]][], colNames: string[]): Table {
-    const rows = data.flatMap(r => new Array<Record<string, Value>>(r[0]).fill(
-      Object.fromEntries(
-        new Map(zip(colNames, r[1]))
-      ) as Record<string, Value>
-    ));
+    const rows = data.flatMap((r) =>
+      new Array<Record<string, Value>>(r[0]).fill(
+        Object.fromEntries(new Map(zip(colNames, r[1]))) as Record<
+          string,
+          Value
+        >,
+      ),
+    );
     return rows as Table;
   }
 
@@ -490,7 +496,10 @@ class ResilientMuxedSocket {
   private creds: Creds;
   private policy: ResiliencyPolicy;
   private socket?: MuxedSocket;
-  private socketQueue: { resolve: (socket: MuxedSocket) => void, reject: (error: Error) => void}[] = [];
+  private socketQueue: {
+    resolve: (socket: MuxedSocket) => void;
+    reject: (error: Error) => void;
+  }[] = [];
   private permanentFailureReason?: string;
 
   // streams from the server are not resilient
@@ -625,10 +634,7 @@ class ResilientMuxedSocket {
 
     for (;;) {
       try {
-        const socket = await MuxedSocket.connect(
-          this.uri,
-          this.creds,
-        );
+        const socket = await MuxedSocket.connect(this.uri, this.creds);
         this.attachSocket(socket);
         return;
       } catch (_error) {
@@ -835,7 +841,10 @@ export class MuxedSocket {
 
   openStream(): Promise<Stream> {
     const openTimeoutMs = 10;
-    const fn = (resolve: (stream: Stream) => void, reject: (error: Error) => void) => {
+    const fn = (
+      resolve: (stream: Stream) => void,
+      reject: (error: Error) => void,
+    ) => {
       switch (this.state) {
         case MuxedSocketState.AUTH_SENT: {
           const streamId = this.nextStream;
@@ -846,7 +855,9 @@ export class MuxedSocket {
           return;
         }
         case MuxedSocketState.IDLE:
-          setTimeout(() => { fn(resolve, reject); }, openTimeoutMs);
+          setTimeout(() => {
+            fn(resolve, reject);
+          }, openTimeoutMs);
           return;
         case MuxedSocketState.CLOSING:
         case MuxedSocketState.CLOSEWAIT:
@@ -934,7 +945,9 @@ export class MuxedSocket {
         return new Promise((resolve, _reject) => {
           this.socket.send(this.encodePingMsg());
           const pingTimeoutMs = 10000;
-          const timeout = setTimeout(() => { resolve(false); }, pingTimeoutMs);
+          const timeout = setTimeout(() => {
+            resolve(false);
+          }, pingTimeoutMs);
           this.healthChecks.push((isOk) => {
             clearTimeout(timeout);
             resolve(isOk);
@@ -956,11 +969,15 @@ export class MuxedSocket {
       }, timeoutMs);
       const socket = new WebSocket(uri);
       socket.binaryType = "arraybuffer";
-      socket.onclose = (_event) =>
-        { reject(new Error("Socket closed before open")); };
-      socket.onerror = (event: ErrorEvent) => { reject(new Error(event.message)); };
-      socket.onmessage = (_event) =>
-        { reject(new Error("Socket messaged before open")); };
+      socket.onclose = (_event) => {
+        reject(new Error("Socket closed before open"));
+      };
+      socket.onerror = (event: ErrorEvent) => {
+        reject(new Error(event.message));
+      };
+      socket.onmessage = (_event) => {
+        reject(new Error("Socket messaged before open"));
+      };
       socket.onopen = (_event) => {
         clearTimeout(timeout);
         if (failed) {
@@ -968,12 +985,20 @@ export class MuxedSocket {
           return;
         }
         const muxSocket = new MuxedSocket(socket, creds);
-        socket.onclose = (event) => { muxSocket.onSocketClose(event); };
-        socket.onerror = (_event) => { muxSocket.onSocketError(0, "socket error"); };
-        socket.onmessage = (event) => { muxSocket.onSocketMessage(event); };
+        socket.onclose = (event) => {
+          muxSocket.onSocketClose(event);
+        };
+        socket.onerror = (_event) => {
+          muxSocket.onSocketError(0, "socket error");
+        };
+        socket.onmessage = (event) => {
+          muxSocket.onSocketMessage(event);
+        };
         muxSocket
           .sendAuth()
-          .then(() => { resolve(muxSocket); })
+          .then(() => {
+            resolve(muxSocket);
+          })
           .catch((reason: unknown) => {
             // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
             reject(reason);
@@ -1170,9 +1195,7 @@ export class MuxedSocket {
     }
   }
 
-  private static async encodeAuthMsg(
-    creds: Creds,
-  ): Promise<ArrayBuffer> {
+  private static async encodeAuthMsg(creds: Creds): Promise<ArrayBuffer> {
     const clientVersion = "js-" + npmVersion;
     const enc = new TextEncoder();
     const buf = new ArrayBuffer(140 + clientVersion.length);
@@ -1535,13 +1558,10 @@ class SKDB {
   private onRebootFn?: () => void;
   private watermark: bigint = BigInt(0);
   private data = new Map<string, Map<string, [number, Value[]]>>();
-  private colNames = new Map<string, string[]>;
+  private colNames = new Map<string, string[]>();
   private callbacks = new Map<string, (added: Table, removed: Table) => void>();
 
-  private constructor(
-    connection: ResilientMuxedSocket,
-    creds: Creds,
-  ) {
+  private constructor(connection: ResilientMuxedSocket, creds: Creds) {
     this.connection = connection;
     this.creds = creds;
   }
@@ -1560,7 +1580,7 @@ class SKDB {
       },
       async shouldReconnect(socket: ResilientMuxedSocket): Promise<boolean> {
         // perform an active check
-        return !await socket.isSocketResponsive();
+        return !(await socket.isSocketResponsive());
       },
     };
     const conn = await ResilientMuxedSocket.connect(policy, uri, creds);
@@ -1577,7 +1597,7 @@ class SKDB {
   }
 
   close() {
-     void this.connection.closeSocket();
+    void this.connection.closeSocket();
   }
 
   private static getDbSocketUri(endpoint: string, db: string) {
@@ -1640,7 +1660,9 @@ class SKDB {
         }
         resolve(msg);
       };
-      stream.onError = (_code, msg) => { reject(new Error(msg)); };
+      stream.onError = (_code, msg) => {
+        reject(new Error(msg));
+      };
       stream.send(encodeProtoMsg(request));
       stream.close();
     });
@@ -1689,7 +1711,7 @@ class SKDB {
                   resolveSignalled = false;
                   break;
                 }
-                resolveSignalled ||= (line.match(/^:[1-9]/g) != null);
+                resolveSignalled ||= line.match(/^:[1-9]/g) != null;
               }
             }
             this.mergeUpdates(payload);
@@ -1730,7 +1752,10 @@ class SKDB {
           if (cb !== undefined) {
             cb(
               Table.ofRows(added.get(curTable)!, this.colNames.get(curTable)!),
-              Table.ofRows(removed.get(curTable)!, this.colNames.get(curTable)!)
+              Table.ofRows(
+                removed.get(curTable)!,
+                this.colNames.get(curTable)!,
+              ),
             );
           }
         }
@@ -1749,7 +1774,7 @@ class SKDB {
         const row = parts[1];
         const cnt = parseInt(parts[0]);
         const prev_record = curData!.get(row);
-        const prev_cnt = (prev_record === undefined) ? 0 : prev_record[0];
+        const prev_cnt = prev_record === undefined ? 0 : prev_record[0];
 
         const values = csv2array(row);
         if (prev_cnt < cnt) {
@@ -1771,19 +1796,24 @@ class SKDB {
   subscribe(
     table: string,
     init_cb: (rows: Table) => void,
-    update_cb: (added: Table, removed: Table) => void
-  ): (() => void) {
+    update_cb: (added: Table, removed: Table) => void,
+  ): () => void {
     // TODO: Fail if attempting to subscribe to non-mirrored table.
     // TODO: Allow multiple callbacks?
     this.callbacks.set(table, update_cb);
 
     init_cb(this.getTable(table));
 
-    return () => { this.callbacks.delete(table); }
+    return () => {
+      this.callbacks.delete(table);
+    };
   }
 
   getTable(name: string): Table {
-    return Table.ofRows(Array.from(this.data.get(name)!.values()), this.colNames.get(name)!);
+    return Table.ofRows(
+      Array.from(this.data.get(name)!.values()),
+      this.colNames.get(name)!,
+    );
   }
 
   // async write(payload: JSON) {
@@ -1816,9 +1846,10 @@ class SKDB {
 
       // TODO: This is dirty. Properly parse or change returned data format.
       const colDefs = remoteTable.split("\n");
-      this.colNames.set(tableName, colDefs.slice(1, colDefs.length - 2).map(
-        (x) => x.trim().split(" ")[0]
-      ));
+      this.colNames.set(
+        tableName,
+        colDefs.slice(1, colDefs.length - 2).map((x) => x.trim().split(" ")[0]),
+      );
     };
 
     // mirror has replace semantics. start by tearing down any current
