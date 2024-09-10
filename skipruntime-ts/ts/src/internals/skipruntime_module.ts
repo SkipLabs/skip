@@ -359,6 +359,20 @@ export class ContextImpl implements Context {
     );
   }
 
+  sliced<K extends TJSON>(
+    collectionName: string,
+    sliceName: string,
+    ranges: [K, K][],
+  ): string {
+    const resHdlPtr = this.exports.SkipRuntime_sliced(
+      this.pointer(),
+      this.skjson.exportString(collectionName),
+      this.skjson.exportString(sliceName),
+      this.skjson.exportJSON(ranges),
+    );
+    return this.skjson.importString(resHdlPtr);
+  }
+
   jsonExtract(value: JSONObject, pattern: string): TJSON[] {
     return this.skjson.importJSON(
       this.exports.SKIP_SKStore_jsonExtract(
