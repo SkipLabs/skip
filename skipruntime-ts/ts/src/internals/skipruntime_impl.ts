@@ -842,6 +842,9 @@ export function check<T>(value: T): void {
   ) {
     return;
   } else if (typeof value == "object") {
+    if (value === null) {
+      return;
+    }
     const jso = value as any;
     if (jso.__sk_frozen) {
       return;
@@ -891,7 +894,9 @@ export function freeze<T>(value: T): T {
   ) {
     return value;
   } else if (typeof value == "object") {
-    if ((value as any).__sk_frozen) {
+    if (value === null) {
+      return value;
+    } else if ((value as any).__sk_frozen) {
       return value;
     } else if (Object.isFrozen(value)) {
       check(value);
