@@ -110,6 +110,19 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
     return this.context.size(this.eagerHdl);
   };
 
+  sliced(ranges: readonly [K, K][]): EagerCollection<K, V> {
+    const sliceName =
+      "range_" +
+      ranges
+        .map(
+          ([k1, k2]) =>
+            `${this.context.keyOfJSON(k1)}--${this.context.keyOfJSON(k2)}`,
+        )
+        .join("_");
+    const eagerHdl = this.context.sliced(this.eagerHdl, sliceName, ranges);
+    return this.derive<K, V>(eagerHdl);
+  }
+
   map<K2 extends TJSON, V2 extends TJSON, Params extends Param[]>(
     mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
     ...paramsAndOptions: WithOptions<Params, K>
