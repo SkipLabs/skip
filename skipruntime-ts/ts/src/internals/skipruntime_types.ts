@@ -142,6 +142,8 @@ export interface Context {
 
   jsonExtract(value: JSONObject, pattern: string): TJSON[];
 
+  keyOfJSON(value: TJSON): string;
+
   noref: () => Context;
 }
 
