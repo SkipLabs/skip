@@ -171,11 +171,7 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
   union(...others: EagerCollection<K, V>[]): EagerCollection<K, V> {
     if (others.length == 0) return this;
     const collections = [this, ...others];
-    const name = collections.reduce(
-      (acc, curr) => acc + curr.getId(),
-      "union_",
-    );
-    const eagerHdl = this.context.union(name, collections);
+    const eagerHdl = this.context.union(collections);
     return new EagerCollectionImpl<K, V>(this.context, eagerHdl);
   }
 }

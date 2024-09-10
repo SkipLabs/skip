@@ -113,7 +113,6 @@ export interface Context {
   ) => void;
 
   union: <K extends TJSON, V extends TJSON>(
-    name: string,
     collections: EagerCollection<K, V>[],
   ) => string;
 
@@ -341,7 +340,6 @@ export interface FromWasm {
 
   SkipRuntime_union(
     ctx: ptr<Internal.Context>,
-    name: ptr<Internal.String>,
     collections: ptr<Internal.CJArray>,
   ): ptr<Internal.String>;
   SkipRuntime_multimap(
