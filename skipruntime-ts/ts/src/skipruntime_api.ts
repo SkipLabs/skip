@@ -5,8 +5,8 @@
  */
 
 // prettier-ignore
-import type { Opaque, Opt, Shared, float, int, ptr } from "#std/sk_types.js";
-export type { Opt, float, int, ptr };
+import type { Opaque, Opt, Shared, int } from "#std/sk_types.js";
+export type { Opt, int };
 
 export type JSONObject = { [key: string]: TJSON | null };
 
