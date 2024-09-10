@@ -216,15 +216,17 @@ class ExternAccumulator(
   }
 }
 
+fun asKeyRanges(ranges: Array<SKJSON.CJSON>): Array<KeyRange> {
+  ranges.map((jsonRange) -> {
+    range = SKJSON.expectArray(jsonRange);
+    KeyRange(JSONID(range[0]), JSONID(range[1]))
+  })
+}
+
 fun asKeyRangesOpt(jsonRanges: SKJSON.CJSON): ?Array<KeyRange> {
   if (jsonRanges is SKJSON.CJNull()) return None();
   ranges = SKJSON.expectArray(jsonRanges);
-  Some(
-    ranges.map((jsonRange) -> {
-      range = SKJSON.expectArray(jsonRange);
-      KeyRange(JSONID(range[0]), JSONID(range[1]))
-    }),
-  )
+  Some(asKeyRanges(ranges))
 }
 
 @export("SkipRuntime_map")
