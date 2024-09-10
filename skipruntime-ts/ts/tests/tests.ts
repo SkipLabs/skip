@@ -560,12 +560,9 @@ tests.push({
 
 //// testMultiMapReduce
 
-class TestSet implements Mapper<number, number, number, number> {
-  mapElement(
-    key: number,
-    it: NonEmptyIterator<number>,
-  ): Iterable<[number, number]> {
-    return Array([key, it.first()]);
+class IdentityMapper extends ValueMapper<number, number, number> {
+  mapValue(v: number) {
+    return v;
   }
 }
 
@@ -578,7 +575,7 @@ function testMultiMapReduceInit(
   input1
     .map(TestParseInt)
     .union(input2.map(TestParseInt))
-    .mapReduce(Identity, new Sum())
+    .mapReduce(IdentityMapper, new Sum())
     .mapTo(output, TestToOutput);
 }
 
