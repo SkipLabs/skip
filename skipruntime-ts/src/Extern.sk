@@ -216,7 +216,7 @@ class ExternAccumulator(
   }
 }
 
-fun asKeyRanges(jsonRanges: SKJSON.CJSON): ?Array<KeyRange> {
+fun asKeyRangesOpt(jsonRanges: SKJSON.CJSON): ?Array<KeyRange> {
   if (jsonRanges is SKJSON.CJNull()) return None();
   ranges = SKJSON.expectArray(jsonRanges);
   Some(
@@ -244,7 +244,7 @@ fun map(
     name,
     context,
     mapHandle.map,
-    asKeyRanges(rangeOpt),
+    asKeyRangesOpt(rangeOpt),
   )
     .getDirName()
     .toString()
@@ -271,7 +271,7 @@ fun mapReduce(
     context,
     mapHandle.map,
     ExternAccumulator(accumulatorHandle, JSONFile(default)),
-    asKeyRanges(rangeOpt),
+    asKeyRangesOpt(rangeOpt),
   )
     .getDirName()
     .toString()
@@ -427,7 +427,7 @@ fun mapTable(
     name,
     context,
     mapHandle.mapTable,
-    asKeyRanges(rangeOpt),
+    asKeyRangesOpt(rangeOpt),
   )
 }
 
@@ -448,7 +448,7 @@ fun toSkdb(
     context,
     mapHandle.toRow,
     connected != 0,
-    asKeyRanges(rangeOpt),
+    asKeyRangesOpt(rangeOpt),
   )
 }
 
