@@ -404,6 +404,12 @@ export interface EagerCollection<K extends TJSON, V extends TJSON> {
     ...paramsAndOptions: [...Params, MapOptions<K>]
   ): void;
 
+  /**
+   * Create a new eager collection by keeping only the elements whose keys are in
+   * the given ranges.
+   */
+  sliced(ranges: [K, K][]): EagerCollection<K, V>;
+
   getId(): string;
 }
 
