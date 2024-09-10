@@ -850,14 +850,10 @@ export function check<T>(value: T): void {
       return;
     } else if (Object.isFrozen(jso)) {
       if (Array.isArray(jso)) {
-        for (let i = 0; i < length; i++) {
-          check(jso[i]);
-        }
+        jso.forEach(check);
       } else {
         /* eslint-disable-next-line @typescript-eslint/no-unsafe-argument */
-        for (const key of Object.keys(jso)) {
-          check(jso[key]);
-        }
+        Object.values(jso).forEach(check);
       }
     } else {
       throw new Error("Invalid object: must be frozen.");
