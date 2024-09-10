@@ -67,17 +67,12 @@ class HandlesImpl implements Handles {
 }
 
 export class ContextImpl implements Context {
-  skjson: SKJSON;
-  exports: FromWasm;
-  handles: Handles;
-  ref: Ref;
-
-  constructor(skjson: SKJSON, exports: FromWasm, handles: Handles, ref: Ref) {
-    this.skjson = skjson;
-    this.exports = exports;
-    this.handles = handles;
-    this.ref = ref;
-  }
+  constructor(
+    private skjson: SKJSON,
+    private exports: FromWasm,
+    private handles: Handles,
+    private ref: Ref,
+  ) {}
 
   noref() {
     return new ContextImpl(this.skjson, this.exports, this.handles, new Ref());
