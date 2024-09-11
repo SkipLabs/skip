@@ -27,7 +27,6 @@ import {
   schema,
   ctext as text,
   cjson as json,
-  MapOptions,
 } from "skip-runtime";
 
 function check(name: String, got: TJSON, expected: TJSON): void {
@@ -310,39 +309,37 @@ tests.push({
   run: testSizeRun,
 });
 
-//// testRangedMap1
+//// testSlicedMap1
 
-function testRangedMap1Init(
+function testSlicedMap1Init(
   _skstore: SKStore,
   input: TableCollection<[number, string]>,
   output: TableCollection<[number, number]>,
 ) {
   input
     .map(TestParseInt)
-    .map(
-      SquareValues,
-      new MapOptions([
-        [1, 1],
-        [3, 4],
-        [7, 9],
-        [20, 50],
-        [42, 1337],
-      ]),
-    )
-    .mapTo(
-      output,
-      TestToOutput,
-      new MapOptions([
-        [0, 7],
-        [8, 15],
-      ]),
-    );
+    .sliced([
+      [1, 1],
+      [3, 4],
+      [7, 9],
+      [20, 50],
+      [42, 1337],
+    ])
+    .map(SquareValues)
+    .sliced([
+      [0, 7],
+      [8, 15],
+    ])
+    .mapTo(output, TestToOutput);
 }
 
-async function testRangeMap1Run(input: Table<TJSON[]>, output: Table<TJSON[]>) {
+async function testSlicedMap1Run(
+  input: Table<TJSON[]>,
+  output: Table<TJSON[]>,
+) {
   // Inserts [[0, "0"], ..., [30, "30"]]
   input.insert(Array.from({ length: 31 }, (_, i) => [i, i.toString()]));
-  check("testRangeMap1", output.select({}, ["value"]), [
+  check("testSlicedMap1", output.select({}, ["value"]), [
     { value: 1 },
     { value: 9 },
     { value: 16 },
@@ -353,11 +350,11 @@ async function testRangeMap1Run(input: Table<TJSON[]>, output: Table<TJSON[]>) {
 }
 
 tests.push({
-  name: "testRangedMap1",
+  name: "testSlicedMap1",
   inputs: [schema("input", [integer("id", true, true), text("value")])],
   outputs: [schema("output", [integer("id", true, true), integer("value")])],
-  init: testRangedMap1Init,
-  run: testRangeMap1Run,
+  init: testSlicedMap1Init,
+  run: testSlicedMap1Run,
 });
 
 //// testLazy
