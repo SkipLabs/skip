@@ -343,11 +343,6 @@ export interface EagerCollection<K extends TJSON, V extends TJSON> {
   ): EagerCollection<K2, V3>;
 
   /**
-   * The current number of elements in the collection
-   */
-  size: () => number;
-
-  /**
    * Eagerly write/update `table` with the contents of this collection
    * @param {TableHandle} table - the table to update
    * @param {Mapper} mapper - function to apply to each key/value pair in this collection
@@ -365,6 +360,19 @@ export interface EagerCollection<K extends TJSON, V extends TJSON> {
    * the given ranges.
    */
   sliced(ranges: [K, K][]): EagerCollection<K, V>;
+
+  /**
+   * Combine some eager collections into one, associating with each key _all_ values
+   * associated with that key in any of the input collections.
+   * @param others - some other eager collections of compatible type
+   * @returns {EagerCollection} The resulting combination of all input key/value pairs
+   */
+  union(...others: EagerCollection<K, V>[]): EagerCollection<K, V>;
+
+  /**
+   * The current number of elements in the collection
+   */
+  size: () => number;
 
   getId(): string;
 }
@@ -554,16 +562,6 @@ export interface SKStore {
     compute: new (...params: Params) => LazyCompute<K, V>,
     ...params: Params
   ): LazyCollection<K, V>;
-
-  /**
-   * Combine some eager collections into one, associating with each key _all_ values
-   * associated with that key in any of the input collections.
-   * @param collections - the input collections to union together
-   * @returns {EagerCollection} The resulting combination of all input key/value pairs
-   */
-  union<K extends TJSON, V extends TJSON>(
-    ...collections: EagerCollection<K, V>[]
-  ): EagerCollection<K, V>;
 
   /**
    * Creates a lazy reactive collection with an asynchronous computation
