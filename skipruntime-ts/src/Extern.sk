@@ -281,18 +281,20 @@ fun mapReduce(
 
 @export("SkipRuntime_union")
 fun union(context: mutable Context, collections: SKJSON.CJArray): String {
-  name = "union";
+  name = "union"; // to be concatenated with the names of inputs within the loop
   mappings = collections match {
   | SKJSON.CJArray(v) ->
     v.map(handleID_json -> {
       handleID = SKJSON.asString(handleID_json);
+
+      invariant(handleID.endsWith("/"));
+      !name = name + handleID.splitLast("/").i0;
+
       ehandle = EHandle(
         JSONID::keyType,
         JSONFile::type,
         DirName::create(handleID),
       );
-      invariant(handleID.endsWith("/"));
-      !name = name + handleID.splitLast("/").i0;
       id_mapper = (_ctx, writer, key, vals) ~> {
         //identity mapper function: write values straight through
         writer.setArray(key, vals.collect(Array))

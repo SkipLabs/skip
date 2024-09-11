@@ -340,7 +340,7 @@ export interface FromWasm {
 
   SkipRuntime_union(
     ctx: ptr<Internal.Context>,
-    collections: ptr<Internal.CJArray>,
+    collections: ptr<Internal.CJArray<Internal.CJString>>,
   ): ptr<Internal.String>;
   SkipRuntime_multimap(
     ctx: ptr<Internal.Context>,
