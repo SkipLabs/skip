@@ -47,7 +47,7 @@ function assertNoKeysNaN<K extends TJSON, V extends TJSON>(
 }
 export const serverResponseSuffix = "__skdb_mirror_feedback";
 
-const sk_frozen: unique symbol = Symbol();
+export const sk_frozen: unique symbol = Symbol();
 
 export interface Constant {
   [sk_frozen]: true;
