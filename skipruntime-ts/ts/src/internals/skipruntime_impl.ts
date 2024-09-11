@@ -167,6 +167,17 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
       table.isConnected(),
     );
   }
+
+  union(...others: EagerCollection<K, V>[]): EagerCollection<K, V> {
+    if (others.length == 0) return this;
+    const collections = [this, ...others];
+    const name = collections.reduce(
+      (acc, curr) => acc + curr.getId(),
+      "union_",
+    );
+    const eagerHdl = this.context.union(name, collections);
+    return new EagerCollectionImpl<K, V>(this.context, eagerHdl);
+  }
 }
 
 class LazyCollectionImpl<K extends TJSON, V extends TJSON>
@@ -398,16 +409,6 @@ export class SKStoreImpl implements SKStore {
       writable: false,
       value: true,
     });
-  }
-
-  union<K extends TJSON, V extends TJSON>(
-    ...collections: EagerCollection<K, V>[]
-  ) {
-    if (collections.length < 2)
-      throw new Error("Union requires at least two input collections.");
-    const name = collections.reduce((acc, curr) => acc + curr.getId(), "union_");
-    const eagerHdl = this.context.union(name, collections);
-    return new EagerCollectionImpl<K, V>(this.context, eagerHdl);
   }
 
   multimap<
