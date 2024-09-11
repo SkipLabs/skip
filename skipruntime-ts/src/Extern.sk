@@ -295,11 +295,7 @@ fun merge(context: mutable Context, collections: SKJSON.CJArray): String {
         JSONFile::type,
         DirName::create(handleID),
       );
-      id_mapper = (_ctx, writer, key, vals) ~> {
-        //identity mapper function: write values straight through
-        writer.setArray(key, vals.collect(Array))
-      };
-      (ehandle, id_mapper)
+      (ehandle, identityMap)
     })
   };
   eagerMultiMap(JSONID::keyType, JSONFile::type, name, context, mappings)
