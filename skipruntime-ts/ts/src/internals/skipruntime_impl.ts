@@ -167,10 +167,10 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
     );
   }
 
-  union(...others: EagerCollection<K, V>[]): EagerCollection<K, V> {
+  merge(...others: EagerCollection<K, V>[]): EagerCollection<K, V> {
     if (others.length == 0) return this;
     const collections = [this, ...others];
-    const eagerHdl = this.context.union(collections);
+    const eagerHdl = this.context.merge(collections);
     return new EagerCollectionImpl<K, V>(this.context, eagerHdl);
   }
 }

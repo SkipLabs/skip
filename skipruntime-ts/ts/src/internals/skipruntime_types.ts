@@ -112,7 +112,7 @@ export interface Context {
     rangeOpt?: [K, K][] | null,
   ) => void;
 
-  union: <K extends TJSON, V extends TJSON>(
+  merge: <K extends TJSON, V extends TJSON>(
     collections: EagerCollection<K, V>[],
   ) => string;
 
@@ -338,7 +338,7 @@ export interface FromWasm {
     value: ptr<Internal.CJObject>,
   ): number;
 
-  SkipRuntime_union(
+  SkipRuntime_merge(
     ctx: ptr<Internal.Context>,
     collections: ptr<Internal.CJArray<Internal.CJString>>,
   ): ptr<Internal.String>;
