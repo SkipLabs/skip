@@ -40,8 +40,8 @@ export type Schema = {
 };
 
 /**
- * Skip Runtime async function calls return a `Result` value which is one of `Success`,
- * `Failure`, or `Unchanged`
+ * Skip Runtime async function calls return a `Loadable` value which is one of `Success`,
+ * `Loading`, or `Error`
  */
 
 /**
@@ -55,30 +55,6 @@ export type Success<V extends TJSON, M extends TJSON> = {
   payload: V;
   metadata?: M;
 };
-
-/**
- * A `Failure` return value indicates a runtime error and contains:
- * `error` - the error message associated with the error
- */
-export type Failure = {
-  status: "failure";
-  error: string;
-};
-
-/**
- * An `Unchanged` return value indicates that the data is the same as the last invocation,
- * and is analogous to HTTP response code 304 'Not Modified'.  It contains:
- * `metadata` - optional data that can be added to supersede metadata on the unchanged return value
- */
-export type Unchanged<M extends TJSON> = {
-  status: "unchanged";
-  metadata?: M;
-};
-
-export type Result<V extends TJSON, M extends TJSON> =
-  | Success<V, M>
-  | Failure
-  | Unchanged<M>;
 
 /**
  * Lazy function calls carry additional structure in their `Loadable` return types, to
