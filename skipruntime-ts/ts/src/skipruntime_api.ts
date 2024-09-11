@@ -485,21 +485,6 @@ export interface Table<R extends TJSON[]> {
   ) => { close: () => void };
 }
 
-/**
- * A `Mapping` is an edge in the reactive computation graph, specified by a source
- * collection and a mapper function (along with parameters to that mapper, if needed)
- */
-export type Mapping<
-  K1 extends TJSON,
-  V1 extends TJSON,
-  K2 extends TJSON,
-  V2 extends TJSON,
-> = {
-  source: EagerCollection<K1, V1>;
-  mapper: new (...params: Param[]) => Mapper<K1, V1, K2, V2>;
-  params?: Param[];
-};
-
 export type EntryPoint = {
   host: string;
   port: number;
