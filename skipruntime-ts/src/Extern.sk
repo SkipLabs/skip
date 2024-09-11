@@ -216,15 +216,17 @@ class ExternAccumulator(
   }
 }
 
-fun asKeyRanges(jsonRanges: SKJSON.CJSON): ?Array<KeyRange> {
+fun asKeyRanges(ranges: Array<SKJSON.CJSON>): Array<KeyRange> {
+  ranges.map((jsonRange) -> {
+    range = SKJSON.expectArray(jsonRange);
+    KeyRange(JSONID(range[0]), JSONID(range[1]))
+  })
+}
+
+fun asKeyRangesOpt(jsonRanges: SKJSON.CJSON): ?Array<KeyRange> {
   if (jsonRanges is SKJSON.CJNull()) return None();
   ranges = SKJSON.expectArray(jsonRanges);
-  Some(
-    ranges.map((jsonRange) -> {
-      range = SKJSON.expectArray(jsonRange);
-      KeyRange(JSONID(range[0]), JSONID(range[1]))
-    }),
-  )
+  Some(asKeyRanges(ranges))
 }
 
 @export("SkipRuntime_map")
@@ -244,7 +246,7 @@ fun map(
     name,
     context,
     mapHandle.map,
-    asKeyRanges(rangeOpt),
+    asKeyRangesOpt(rangeOpt),
   )
     .getDirName()
     .toString()
@@ -271,7 +273,7 @@ fun mapReduce(
     context,
     mapHandle.map,
     ExternAccumulator(accumulatorHandle, JSONFile(default)),
-    asKeyRanges(rangeOpt),
+    asKeyRangesOpt(rangeOpt),
   )
     .getDirName()
     .toString()
@@ -427,7 +429,7 @@ fun mapTable(
     name,
     context,
     mapHandle.mapTable,
-    asKeyRanges(rangeOpt),
+    asKeyRangesOpt(rangeOpt),
   )
 }
 
@@ -448,8 +450,41 @@ fun toSkdb(
     context,
     mapHandle.toRow,
     connected != 0,
-    asKeyRanges(rangeOpt),
+    asKeyRangesOpt(rangeOpt),
   )
+}
+
+fun identityMap<K: Key, V: File>(
+  _context: mutable Context,
+  writer: mutable TWriter<K, V>,
+  key: K,
+  it: mutable NonEmptyIterator<V>,
+): void {
+  writer.setArray(key, it.collect(Array));
+}
+
+@export("SkipRuntime_sliced")
+fun sliced(
+  context: mutable Context,
+  handleId: String,
+  name: String,
+  jsonRanges: SKJSON.CJArray,
+): String {
+  ranges = jsonRanges match {
+  | SKJSON.CJArray(ranges) -> asKeyRanges(ranges)
+  };
+  eager = EHandle(JSONID::keyType, JSONFile::type, DirName::create(handleId));
+  eagerMap(
+    eager,
+    JSONID::keyType,
+    JSONFile::type,
+    name,
+    context,
+    identityMap,
+    Some(ranges),
+  )
+    .getDirName()
+    .toString()
 }
 
 @export("SkipRuntime_getFromTable")

@@ -40,9 +40,6 @@ export type Schema = {
   filter?: DBFilter;
   alias?: string;
 };
-export class MapOptions<K extends TJSON> {
-  constructor(public ranges: [K, K][] | null = null) {}
-}
 
 /**
  * Skip Runtime async function calls return a `Result` value which is one of `Success`,
@@ -328,16 +325,6 @@ export interface EagerCollection<K extends TJSON, V extends TJSON> {
   ): EagerCollection<K2, V2>;
 
   /**
-   * Create a new eager collection by mapping some computation over this one (with options)
-   * @param {Mapper} mapper - function to apply to each element of this collection
-   * @returns {EagerCollection} The resulting (eager) output collection
-   */
-  map<K2 extends TJSON, V2 extends TJSON, Params extends Param[]>(
-    mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
-    ...paramsAndOptions: [...Params, MapOptions<K>]
-  ): EagerCollection<K2, V2>;
-
-  /**
    * Create a new eager reactive collection by mapping some computation `mapper` over this
    * one and then reducing the results with `accumulator`
    * @param {Mapper} mapper - function to apply to each element of this collection
@@ -353,24 +340,6 @@ export interface EagerCollection<K extends TJSON, V extends TJSON> {
     mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
     accumulator: Accumulator<V2, V3>,
     ...params: Params
-  ): EagerCollection<K2, V3>;
-
-  /**
-   * Create a new eager reactive collection by mapping some computation `mapper` over this
-   * one and then reducing the results with `accumulator` (with options)
-   * @param {Mapper} mapper - function to apply to each element of this collection
-   * @param {Accumulator} accumulator - function to combine results of the `mapper`
-   * @returns {EagerCollection} An eager collection containing the output of the accumulator
-   */
-  mapReduce<
-    K2 extends TJSON,
-    V2 extends TJSON,
-    V3 extends TJSON,
-    Params extends Param[],
-  >(
-    mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
-    accumulator: Accumulator<V2, V3>,
-    ...paramsAndOptions: [...Params, MapOptions<K>]
   ): EagerCollection<K2, V3>;
 
   /**
@@ -392,17 +361,10 @@ export interface EagerCollection<K extends TJSON, V extends TJSON> {
   ): void;
 
   /**
-   * Eagerly write/update `table` with the contents of this collection (with options)
-   * @param {TableHandle} table - the table to update
-   * @param {Mapper} mapper - function to apply to each key/value pair in this collection
-   *                          to produce a table row
-   * @param paramsAndOptions - any additional parameters to the mapper followed by options
+   * Create a new eager collection by keeping only the elements whose keys are in
+   * the given ranges.
    */
-  mapTo<R extends TJSON[], Params extends Param[]>(
-    table: TableCollection<R>,
-    mapper: new (...params: Params) => OutputMapper<R, K, V>,
-    ...paramsAndOptions: [...Params, MapOptions<K>]
-  ): void;
+  sliced(ranges: [K, K][]): EagerCollection<K, V>;
 
   getId(): string;
 }
@@ -434,16 +396,6 @@ export interface TableCollection<R extends TJSON[]> {
   map<K extends TJSON, V extends TJSON, Params extends Param[]>(
     mapper: new (...params: Params) => InputMapper<R, K, V>,
     ...params: Params
-  ): EagerCollection<K, V>;
-
-  /**
-   * Create a new eager reactive collection by mapping over each entry in
-   * a table collection (with options)
-   * @returns {EagerCollection} The resulting (eager) output collection
-   */
-  map<K extends TJSON, V extends TJSON, Params extends Param[]>(
-    mapper: new (...params: Params) => InputMapper<R, K, V>,
-    ...paramsAndOptions: [...Params, MapOptions<R>]
   ): EagerCollection<K, V>;
 }
 

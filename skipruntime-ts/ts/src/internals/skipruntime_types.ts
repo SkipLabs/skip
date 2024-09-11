@@ -134,7 +134,15 @@ export interface Context {
     accumulator: Accumulator<V2, V3>,
   ) => string;
 
+  sliced<K extends TJSON>(
+    collectionName: string,
+    sliceName: string,
+    ranges: readonly [K, K][],
+  ): string;
+
   jsonExtract(value: JSONObject, pattern: string): TJSON[];
+
+  keyOfJSON(value: TJSON): string;
 
   noref: () => Context;
 }
@@ -180,6 +188,13 @@ export interface FromWasm {
     rangeOpt: ptr<
       Internal.CJArray<Internal.CJArray<Internal.CJSON>> | Internal.CJNull
     >,
+  ): ptr<Internal.String>;
+
+  SkipRuntime_sliced(
+    ctx: ptr<Internal.Context>,
+    eagerCollectionId: ptr<Internal.String>,
+    name: ptr<Internal.String>,
+    ranges: ptr<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
   ): ptr<Internal.String>;
 
   SkipRuntime_getFromTable(

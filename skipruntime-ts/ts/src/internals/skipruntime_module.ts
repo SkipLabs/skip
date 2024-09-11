@@ -67,20 +67,22 @@ class HandlesImpl implements Handles {
 }
 
 export class ContextImpl implements Context {
-  skjson: SKJSON;
-  exports: FromWasm;
-  handles: Handles;
-  ref: Ref;
-
-  constructor(skjson: SKJSON, exports: FromWasm, handles: Handles, ref: Ref) {
-    this.skjson = skjson;
-    this.exports = exports;
-    this.handles = handles;
-    this.ref = ref;
-  }
+  constructor(
+    private skjson: SKJSON,
+    private exports: FromWasm,
+    private handles: Handles,
+    private env: Environment,
+    private ref: Ref,
+  ) {}
 
   noref() {
-    return new ContextImpl(this.skjson, this.exports, this.handles, new Ref());
+    return new ContextImpl(
+      this.skjson,
+      this.exports,
+      this.handles,
+      this.env,
+      new Ref(),
+    );
   }
 
   lazy<K extends TJSON, V extends TJSON>(
@@ -359,6 +361,20 @@ export class ContextImpl implements Context {
     );
   }
 
+  sliced<K extends TJSON>(
+    collectionName: string,
+    sliceName: string,
+    ranges: [K, K][],
+  ): string {
+    const resHdlPtr = this.exports.SkipRuntime_sliced(
+      this.pointer(),
+      this.skjson.exportString(collectionName),
+      this.skjson.exportString(sliceName),
+      this.skjson.exportJSON(ranges),
+    );
+    return this.skjson.importString(resHdlPtr);
+  }
+
   jsonExtract(value: JSONObject, pattern: string): TJSON[] {
     return this.skjson.importJSON(
       this.exports.SKIP_SKStore_jsonExtract(
@@ -366,6 +382,14 @@ export class ContextImpl implements Context {
         this.skjson.exportString(pattern),
       ),
     ) as TJSON[];
+  }
+
+  /* Must produce a valid SKStore key ideally with no collision */
+  keyOfJSON(value: TJSON): string {
+    return (
+      "b64_" +
+      this.env.base64Encode(JSON.stringify(value), true).replaceAll("=", "")
+    );
   }
 
   private pointer() {
@@ -815,7 +839,13 @@ class LinksImpl implements Links {
     ) => {
       ref.push(ctx);
       const jsu = skjson();
-      const context = new ContextImpl(jsu, fromWasm, this.handles, ref);
+      const context = new ContextImpl(
+        jsu,
+        fromWasm,
+        this.handles,
+        this.env,
+        ref,
+      );
       const res = jsu.exportJSON(
         this.handles.apply(fn, [
           new LSelfImpl(context, hdl) as LazyCollection<K, V>,
@@ -915,7 +945,7 @@ class LinksImpl implements Links {
     this.env.shared.set(
       "SKStore",
       new SKStoreFactoryImpl(
-        () => new ContextImpl(skjson(), fromWasm, this.handles, ref),
+        () => new ContextImpl(skjson(), fromWasm, this.handles, this.env, ref),
         create,
         (dbName, asWorker) =>
           (this.env.shared.get("SKDB") as SKDBShared).createSync(
