@@ -184,12 +184,13 @@ export interface FromWasm {
     V extends TJSON,
     K2 extends TJSON,
     V2 extends TJSON,
+    V3 extends TJSON,
   >(
     ctx: ptr<Internal.Context>,
     eagerCollectionId: ptr<Internal.String>,
     name: ptr<Internal.String>,
     fnPtr: Handle<(key: K, it: NonEmptyIterator<V>) => Iterable<[K2, V2]>>,
-    accumulator: int,
+    accumulator: Handle<Accumulator<V2, V3>>,
     accInit: ptr<Internal.CJSON>,
     rangeOpt: ptr<
       Internal.CJArray<Internal.CJArray<Internal.CJSON>> | Internal.CJNull
