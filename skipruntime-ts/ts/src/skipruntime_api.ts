@@ -13,7 +13,14 @@ export type JSONObject = { [key: string]: TJSON | null };
 
 export type TJSON = number | JSONObject | boolean | (TJSON | null)[] | string;
 
-export type Param = any;
+export type Param =
+  | null
+  | boolean
+  | number
+  | string
+  | Constant
+  | readonly Param[]
+  | { readonly [k: string]: Param };
 
 export type RefreshToken = Opaque<number, "SkipRefreshToken">;
 
