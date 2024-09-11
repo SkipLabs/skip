@@ -360,6 +360,11 @@ export interface EagerCollection<K extends TJSON, V extends TJSON> {
   sliced(ranges: [K, K][]): EagerCollection<K, V>;
 
   /**
+   * Create a new eager collection by keeping the given number of the first elements.
+   */
+  take(limit: int): EagerCollection<K, V>;
+
+  /**
    * Combine some eager collections into one, associating with each key _all_ values
    * associated with that key in any of the input collections.
    * @param others - some other eager collections of compatible type

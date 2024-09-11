@@ -1,5 +1,5 @@
 // prettier-ignore
-import { type ptr, type Opt, cloneIfProxy } from "#std/sk_types.js";
+import { type int, type ptr, type Opt, cloneIfProxy } from "#std/sk_types.js";
 import type { Context } from "./skipruntime_types.js";
 import type * as Internal from "./skipruntime_internal_types.js";
 import type {
@@ -100,6 +100,12 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
         )
         .join("_");
     const eagerHdl = this.context.sliced(this.eagerHdl, sliceName, ranges);
+    return this.derive<K, V>(eagerHdl);
+  }
+
+  take(limit: int): EagerCollection<K, V> {
+    const limitName = `limit_${limit}`;
+    const eagerHdl = this.context.take(this.eagerHdl, limitName, limit);
     return this.derive<K, V>(eagerHdl);
   }
 
