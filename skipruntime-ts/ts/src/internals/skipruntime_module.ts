@@ -388,6 +388,16 @@ export class ContextImpl implements Context {
     return this.skjson.importString(resHdlPtr);
   }
 
+  take(collectionName: string, name: string, limit: int): string {
+    const resHdlPtr = this.exports.SkipRuntime_take(
+      this.pointer(),
+      this.skjson.exportString(collectionName),
+      this.skjson.exportString(name),
+      limit,
+    );
+    return this.skjson.importString(resHdlPtr);
+  }
+
   jsonExtract(value: JSONObject, pattern: string): TJSON[] {
     return this.skjson.importJSON(
       this.exports.SKIP_SKStore_jsonExtract(

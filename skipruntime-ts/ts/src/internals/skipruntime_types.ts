@@ -144,6 +144,8 @@ export interface Context {
     ranges: readonly [K, K][],
   ): string;
 
+  take(collectionName: string, name: string, limit: int): string;
+
   jsonExtract(value: JSONObject, pattern: string): TJSON[];
 
   keyOfJSON(value: TJSON): string;
