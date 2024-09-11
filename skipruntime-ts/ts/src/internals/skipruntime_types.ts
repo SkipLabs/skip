@@ -201,6 +201,13 @@ export interface FromWasm {
     ranges: ptr<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
   ): ptr<Internal.String>;
 
+  SkipRuntime_take(
+    ctx: ptr<Internal.Context>,
+    eagerCollectionId: ptr<Internal.String>,
+    name: ptr<Internal.String>,
+    limit: int,
+  ): ptr<Internal.String>;
+
   SkipRuntime_getFromTable(
     ctx: ptr<Internal.Context>,
     table: ptr<Internal.String>,
