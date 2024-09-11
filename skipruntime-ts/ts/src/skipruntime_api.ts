@@ -6,6 +6,7 @@
 
 // prettier-ignore
 import type { Opaque, Opt, Shared, int } from "#std/sk_types.js";
+import type { Constant } from "./internals/skipruntime_impl.js";
 export type { Opt, int };
 
 export type JSONObject = { [key: string]: TJSON | null };
@@ -238,7 +239,8 @@ export interface NonEmptyIterator<T> extends Iterable<T> {
 /**
  * A _Lazy_ reactive collection, whose values are computed only when queried
  */
-export interface LazyCollection<K extends TJSON, V extends TJSON> {
+export interface LazyCollection<K extends TJSON, V extends TJSON>
+  extends Constant {
   /**
    * Get (and potentially compute) all values mapped to by some key of a lazy reactive
    * collection.
@@ -269,7 +271,8 @@ export interface AsyncLazyCollection<
  * An _Eager_ reactive collection, whose values are computed eagerly and kept up
  * to date whenever inputs are changed
  */
-export interface EagerCollection<K extends TJSON, V extends TJSON> {
+export interface EagerCollection<K extends TJSON, V extends TJSON>
+  extends Constant {
   /**
    * Get (and potentially compute) all values mapped to by some key of a lazy reactive
    * collection.
@@ -361,7 +364,7 @@ export interface EagerCollection<K extends TJSON, V extends TJSON> {
  * allows it to be serialized and replicated over the wire.  `TableCollection`s
  * serve as inputs and outputs of reactive services.
  */
-export interface TableCollection<R extends TJSON[]> {
+export interface TableCollection<R extends TJSON[]> extends Constant {
   getName(): string;
   getSchema(): Schema;
   isConnected(): boolean;
@@ -516,7 +519,7 @@ export interface AsyncLazyCompute<
   call: (key: K, params: P) => Promise<AValue<V, M>>;
 }
 
-export interface SKStore {
+export interface SKStore extends Constant {
   /**
    * Creates a lazy reactive collection.
    * @param compute - the function to compute entries of the lazy collection
