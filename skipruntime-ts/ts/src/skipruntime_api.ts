@@ -367,7 +367,7 @@ export interface EagerCollection<K extends TJSON, V extends TJSON> {
    * @param others - some other eager collections of compatible type
    * @returns {EagerCollection} The resulting combination of all input key/value pairs
    */
-  union(...others: EagerCollection<K, V>[]): EagerCollection<K, V>;
+  merge(...others: EagerCollection<K, V>[]): EagerCollection<K, V>;
 
   /**
    * The current number of elements in the collection

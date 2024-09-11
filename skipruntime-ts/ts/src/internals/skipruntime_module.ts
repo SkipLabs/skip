@@ -112,15 +112,15 @@ export class ContextImpl implements Context {
     return this.skjson.importString(lazyHdl);
   }
 
-  union<K extends TJSON, V extends TJSON>(
+  merge<K extends TJSON, V extends TJSON>(
     collections: EagerCollection<K, V>[],
   ) {
     const collectionIDs = collections.map((c) => c.getId());
-    const unionPtr = this.exports.SkipRuntime_union(
+    const mergePtr = this.exports.SkipRuntime_merge(
       this.pointer(),
       this.skjson.exportJSON(collectionIDs),
     );
-    return this.skjson.importString(unionPtr);
+    return this.skjson.importString(mergePtr);
   }
 
   multimap<

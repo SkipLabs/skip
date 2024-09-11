@@ -517,7 +517,7 @@ function testMultiMap1Init(
   const eager1 = input1.map(TestParseInt).map(TestSplitter, 0);
   const eager2 = input2.map(TestParseInt).map(TestSplitter, 1);
 
-  eager1.union(eager2).mapTo(output, TestToOutput2);
+  eager1.merge(eager2).mapTo(output, TestToOutput2);
 }
 
 function testMultiMap1Run(
@@ -574,7 +574,7 @@ function testMultiMapReduceInit(
 ) {
   input1
     .map(TestParseInt)
-    .union(input2.map(TestParseInt))
+    .merge(input2.map(TestParseInt))
     .mapReduce(IdentityMapper, new Sum())
     .mapTo(output, TestToOutput);
 }
