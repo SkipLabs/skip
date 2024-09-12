@@ -21,6 +21,7 @@ import type {
   FromWasm,
   CtxMapping,
 } from "./skipruntime_types.js";
+export type { Opaque } from "./skipruntime_internal_types.js";
 import type * as Internal from "./skipruntime_internal_types.js";
 import { LSelfImpl, SKStoreFactoryImpl } from "./skipruntime_impl.js";
 // prettier-ignore
