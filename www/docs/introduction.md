@@ -2,7 +2,9 @@
 sidebar_position: 1
 ---
 
-# Skip Overview
+# Introduction
+
+## Overview
 
 *Skip* is an open-source framework that enables software developers to build and run reactive services and systems.
 
@@ -19,3 +21,9 @@ Mappers form the *edges* of the Skip reactive computation graph, specifying tran
 Crucially, mappers must be deterministic and side-effect free, so that the reactive runtime can re-execute them as needed to maintain results that are both up-to-date and guaranteed from-scratch consistent (that is, exactly the same as the result that would be computed if the equivalent non-reactive computation were executed from scratch on the current input).
 
 *Table*s are a special form of *collection* with the proper metadata and structure that allows them to be (a) serialized and replicated over the wire with access controls and writer/author information, and (b) queried and manipulated using SQL, evaluated reactively by the Skip runtime.
+
+
+## Background
+
+
+## Core concepts
