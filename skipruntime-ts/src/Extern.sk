@@ -279,6 +279,30 @@ fun mapReduce(
     .toString()
 }
 
+@export("SkipRuntime_merge")
+fun merge(context: mutable Context, collections: SKJSON.CJArray): String {
+  name = "merge"; // to be concatenated with the names of inputs within the loop
+  mappings = collections match {
+  | SKJSON.CJArray(v) ->
+    v.map(handleID_json -> {
+      handleID = SKJSON.asString(handleID_json);
+
+      invariant(handleID.endsWith("/"));
+      !name = name + handleID.splitLast("/").i0;
+
+      ehandle = EHandle(
+        JSONID::keyType,
+        JSONFile::type,
+        DirName::create(handleID),
+      );
+      (ehandle, identityMap)
+    })
+  };
+  eagerMultiMap(JSONID::keyType, JSONFile::type, name, context, mappings)
+    .getDirName()
+    .toString()
+}
+
 @export("SkipRuntime_multimap")
 fun multimap(
   context: mutable Context,

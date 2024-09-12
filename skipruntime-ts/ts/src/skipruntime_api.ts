@@ -343,11 +343,6 @@ export interface EagerCollection<K extends TJSON, V extends TJSON> {
   ): EagerCollection<K2, V3>;
 
   /**
-   * The current number of elements in the collection
-   */
-  size: () => number;
-
-  /**
    * Eagerly write/update `table` with the contents of this collection
    * @param {TableHandle} table - the table to update
    * @param {Mapper} mapper - function to apply to each key/value pair in this collection
@@ -365,6 +360,19 @@ export interface EagerCollection<K extends TJSON, V extends TJSON> {
    * the given ranges.
    */
   sliced(ranges: [K, K][]): EagerCollection<K, V>;
+
+  /**
+   * Combine some eager collections into one, associating with each key _all_ values
+   * associated with that key in any of the input collections.
+   * @param others - some other eager collections of compatible type
+   * @returns {EagerCollection} The resulting combination of all input key/value pairs
+   */
+  merge(...others: EagerCollection<K, V>[]): EagerCollection<K, V>;
+
+  /**
+   * The current number of elements in the collection
+   */
+  size: () => number;
 
   getId(): string;
 }
@@ -477,21 +485,6 @@ export interface Table<R extends TJSON[]> {
   ) => { close: () => void };
 }
 
-/**
- * A `Mapping` is an edge in the reactive computation graph, specified by a source
- * collection and a mapper function (along with parameters to that mapper, if needed)
- */
-export type Mapping<
-  K1 extends TJSON,
-  V1 extends TJSON,
-  K2 extends TJSON,
-  V2 extends TJSON,
-> = {
-  source: EagerCollection<K1, V1>;
-  mapper: new (...params: Param[]) => Mapper<K1, V1, K2, V2>;
-  params?: Param[];
-};
-
 export type EntryPoint = {
   host: string;
   port: number;
@@ -554,39 +547,6 @@ export interface SKStore {
     compute: new (...params: Params) => LazyCompute<K, V>,
     ...params: Params
   ): LazyCollection<K, V>;
-
-  /**
-   * Map over each entry of each eager reactive map and apply the corresponding mapper function
-   * @param {Mapping[]} mappings - the input collections and corresponding mappers
-   * @returns {EagerCollection} An eager collection containing the combined outputs of the `mappings`
-   */
-  multimap<
-    K1 extends TJSON,
-    V1 extends TJSON,
-    K2 extends TJSON,
-    V2 extends TJSON,
-  >(
-    mappings: Mapping<K1, V1, K2, V2>[],
-  ): EagerCollection<K2, V2>;
-
-  /**
-   * Create a new eager reactive collection by applying a `multimap` and then reducing the results
-   * with a given `accumulator`
-   * @param {Mapping} mappings - the input collections and corresponding mappers
-   * @param {Accumulator} accumulator - function to combine results of the multimap
-   * @returns {EagerCollection} An eager collection containing the output of the accumulator over
-   * the combined outputs of the `mappings`
-   */
-  multimapReduce<
-    K1 extends TJSON,
-    V1 extends TJSON,
-    K2 extends TJSON,
-    V2 extends TJSON,
-    V3 extends TJSON,
-  >(
-    mappings: Mapping<K1, V1, K2, V2>[],
-    accumulator: Accumulator<V2, V3>,
-  ): EagerCollection<K2, V3>;
 
   /**
    * Creates a lazy reactive collection with an asynchronous computation

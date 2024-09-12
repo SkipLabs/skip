@@ -514,13 +514,10 @@ function testMultiMap1Init(
   input2: TableCollection<[number, string]>,
   output: TableCollection<[number, number, number]>,
 ) {
-  const eager1 = input1.map(TestParseInt);
-  const eager2 = input2.map(TestParseInt);
-  const eager3 = skstore.multimap([
-    { source: eager1, mapper: TestSplitter, params: [0] },
-    { source: eager2, mapper: TestSplitter, params: [1] },
-  ]);
-  eager3.mapTo(output, TestToOutput2);
+  const eager1 = input1.map(TestParseInt).map(TestSplitter, 0);
+  const eager2 = input2.map(TestParseInt).map(TestSplitter, 1);
+
+  eager1.merge(eager2).mapTo(output, TestToOutput2);
 }
 
 function testMultiMap1Run(
@@ -563,12 +560,9 @@ tests.push({
 
 //// testMultiMapReduce
 
-class TestSet implements Mapper<number, number, number, number> {
-  mapElement(
-    key: number,
-    it: NonEmptyIterator<number>,
-  ): Iterable<[number, number]> {
-    return Array([key, it.first()]);
+class IdentityMapper extends ValueMapper<number, number, number> {
+  mapValue(v: number) {
+    return v;
   }
 }
 
@@ -578,16 +572,11 @@ function testMultiMapReduceInit(
   input2: TableCollection<[number, string]>,
   output: TableCollection<[number, number]>,
 ) {
-  const eager1 = input1.map(TestParseInt);
-  const eager2 = input2.map(TestParseInt);
-  const eager3 = skstore.multimapReduce(
-    [
-      { source: eager1, mapper: TestSet },
-      { source: eager2, mapper: TestSet },
-    ],
-    new Sum(),
-  );
-  eager3.mapTo(output, TestToOutput);
+  input1
+    .map(TestParseInt)
+    .merge(input2.map(TestParseInt))
+    .mapReduce(IdentityMapper, new Sum())
+    .mapTo(output, TestToOutput);
 }
 
 function testMultiMapReduceRun(
