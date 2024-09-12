@@ -20,6 +20,15 @@ const sidebars: SidebarsConfig = {
     "mirroring",
     "deploying",
     "debugging",
+    {
+      type: "category",
+      label: "Skip API",
+      link: {
+        type: "doc",
+        id: "api/index",
+      },
+      items: require("./docs/api/typedoc-sidebar.cjs"),
+    },
     "resources",
     "encyclopedia",
     "glossary",
