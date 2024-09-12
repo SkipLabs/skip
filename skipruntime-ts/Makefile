@@ -58,9 +58,9 @@ skdb-%: $(SKDB)
 
 .PHONY: check-src
 check-src:
-	cd ts/src && npm install
-	cd ts/src && tsc
-	cd ts/src && npm run lint
+	echo "make: Entering directory '${SCRIPT_DIR}/ts/src'"
+	cd ts/src && npm install && tsc && npm run lint
+	echo "make: Leaving directory '${SCRIPT_DIR}/ts/src'"
 
 .PHONY: check-tests
 check-tests:
