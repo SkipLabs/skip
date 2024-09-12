@@ -8,11 +8,25 @@ type FeatureItem = {
   description: JSX.Element;
 };
 
-const FeatureList: FeatureItem[] = [];
+const FeatureList: FeatureItem[] = [
+  {
+    title: "Why Skip",
+    Svg: require("@site/static/img/hero.svg").default,
+    description: (
+      <>
+        Paragraph explainer lorem ipsum. Paragraph explainer lorem ipsum.
+        Paragraph explainer lorem ipsum. Paragraph explainer lorem ipsum.
+        Paragraph explainer lorem ipsum. Paragraph explainer lorem ipsum.
+        Paragraph explainer lorem ipsum. Paragraph explainer lorem ipsum.
+        Paragraph explainer lorem ipsum.
+      </>
+    ),
+  },
+];
 
 function Feature({ title, Svg, description }: FeatureItem) {
   return (
-    <div className={clsx("col col--4")}>
+    <div className={clsx("col col")}>
       <div className="text--center">
         <Svg className={styles.featureSvg} role="img" />
       </div>
