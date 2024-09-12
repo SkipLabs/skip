@@ -1,12 +1,16 @@
 // prettier-ignore
-import { runUrl, type ModuleInit } from "#std/sk_types.js";
+import { runUrl, type ModuleInit, type Opt } from "#std/sk_types.js";
 import type {
+  SimpleRemoteInputs,
   SimpleSkipService,
   SimpleServiceOutput,
   Writer,
 } from "./skipruntime_service.js";
 import { check } from "./internals/skipruntime_impl.js";
 import type {
+  DBFilter,
+  DBType,
+  Index,
   SKStore,
   SKStoreFactory,
   ColumnSchema,
@@ -21,8 +25,12 @@ import type {
   Database,
 } from "./skipruntime_api.js";
 import { runWithServer_ } from "./internals/skipruntime_process.js";
+export type { Opaque } from "./internals/skipruntime_module.js";
 export { TimedQueue } from "./internals/skipruntime_module.js";
 export type {
+  DBFilter,
+  DBType,
+  Index,
   SKStore,
   TJSON,
   TableCollection,
@@ -31,13 +39,19 @@ export type {
   JSONObject,
   ColumnSchema,
   Accumulator,
+  SimpleRemoteInputs,
   SimpleSkipService,
   SimpleServiceOutput,
   Writer,
+  Opt,
 };
 
 export type {
+  AValue,
+  Database,
   Mapper,
+  Param,
+  RefreshToken,
   InputMapper,
   OutputMapper,
   EagerCollection,
