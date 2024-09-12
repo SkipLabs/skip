@@ -12,7 +12,6 @@ import type {
   TableCollection,
   SKStore,
   SKStoreFactory,
-  Mapping,
   Schema,
   ColumnSchema,
   Table,
@@ -166,6 +165,13 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
       (key: K, it: NonEmptyIterator<V>) => mapperObj.mapElement(key, it),
       table.isConnected(),
     );
+  }
+
+  merge(...others: EagerCollection<K, V>[]): EagerCollection<K, V> {
+    if (others.length == 0) return this;
+    const collections = [this, ...others];
+    const eagerHdl = this.context.merge(collections);
+    return new EagerCollectionImpl<K, V>(this.context, eagerHdl);
   }
 }
 
@@ -398,58 +404,6 @@ export class SKStoreImpl implements SKStore {
       writable: false,
       value: true,
     });
-  }
-
-  multimap<
-    K1 extends TJSON,
-    V1 extends TJSON,
-    K2 extends TJSON,
-    V2 extends TJSON,
-  >(mappings: Mapping<K1, V1, K2, V2>[]): EagerCollection<K2, V2> {
-    let name = "";
-    const ctxmapping = mappings.map((mapping) => {
-      const params = mapping.params ?? [];
-      params.forEach(check);
-      /* eslint-disable-next-line @typescript-eslint/no-unsafe-argument */
-      const mapperObj = new mapping.mapper(...params);
-      Object.freeze(mapperObj);
-      name += mapperObj.constructor.name;
-      return {
-        source: mapping.source,
-        mapper: (key: K1, it: NonEmptyIterator<V1>) =>
-          mapperObj.mapElement(key, it),
-      };
-    });
-    const eagerHdl = this.context.multimap(name, ctxmapping);
-    return new EagerCollectionImpl<K2, V2>(this.context, eagerHdl);
-  }
-
-  multimapReduce<
-    K1 extends TJSON,
-    V1 extends TJSON,
-    K2 extends TJSON,
-    V2 extends TJSON,
-    V3 extends TJSON,
-  >(
-    mappings: Mapping<K1, V1, K2, V2>[],
-    accumulator: Accumulator<V2, V3>,
-  ): EagerCollection<K2, V3> {
-    let name = "";
-    const ctxmapping = mappings.map((mapping) => {
-      const params = mapping.params ?? [];
-      params.forEach(check);
-      /* eslint-disable-next-line @typescript-eslint/no-unsafe-argument */
-      const mapperObj = new mapping.mapper(...params);
-      Object.freeze(mapperObj);
-      name += mapperObj.constructor.name;
-      return {
-        source: mapping.source,
-        mapper: (key: K1, it: NonEmptyIterator<V1>) =>
-          mapperObj.mapElement(key, it),
-      };
-    });
-    const eagerHdl = this.context.multimapReduce(name, ctxmapping, accumulator);
-    return new EagerCollectionImpl<K2, V3>(this.context, eagerHdl);
   }
 
   lazy<K extends TJSON, V extends TJSON, Params extends Param[]>(
