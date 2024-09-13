@@ -129,7 +129,7 @@ export class TableIndexError extends Error {}
  * `EagerCollection`
  * @param entry - the input table row
  * @param count - the number of repeat occurrences of `entry`
- * @returns {Iterable} an iterable of key/value pairs to output for the given input(s)
+ * @returns an iterable of key/value pairs to output for the given input(s)
  */
 export interface InputMapper<
   R extends TJSON,
@@ -144,8 +144,8 @@ export interface InputMapper<
  * For each key & values in the input collection (of type K1/V1 respectively),
  * produces some key/value pairs for the output collection (of type K2/V2 respectively)
  * @param key - a key found in the input collection
- * @param {NonEmptyIterator} it - the values mapped to by `key` in the input collection
- * @returns {Iterable} an iterable of key/value pairs to output for the given input(s)
+ * @param it - the values mapped to by `key` in the input collection
+ * @returns an iterable of key/value pairs to output for the given input(s)
  */
 export interface Mapper<
   K1 extends TJSON,
@@ -181,8 +181,8 @@ export abstract class ValueMapper<
 /**
  * The type of a reactive function mapping a collection into an output table
  * @param key - a key of the input collection
- * @param {NonEmptyIterator} it - an iterator on values available for said key
- * @returns {R} a table row corresponding to the input key
+ * @param it - an iterator on values available for said key
+ * @returns a table row corresponding to the input key
  */
 export interface OutputMapper<
   R extends TJSON,
@@ -243,15 +243,15 @@ export interface NonEmptyIterator<T> extends Iterable<T> {
 
   /**
    * Performs the specified action for each element in the iterator.
-   * @param callbackfn  A function that accepts up to thow arguments. forEach calls the callbackfn function one time for each element.
-   * @param thisArg An object to which the this keyword can refer in the callbackfn function. If thisArg is omitted, undefined is used as the this value.
+   * @param callbackfn - A function that accepts up to thow arguments. forEach calls the callbackfn function one time for each element.
+   * @param thisArg - An object to which the this keyword can refer in the callbackfn function. If thisArg is omitted, undefined is used as the this value.
    */
   forEach(callbackfn: (value: T, index: number) => void, thisArg?: any): void;
 
   /**
    * Calls a defined callback function on each element of an array, and returns an array that contains the results.
-   * @param callbackfn A function that accepts up to three arguments. The map method calls the callbackfn function one time for each element in the array.
-   * @param thisArg An object to which the this keyword can refer in the callbackfn function. If thisArg is omitted, undefined is used as the this value.
+   * @param callbackfn - A function that accepts up to three arguments. The map method calls the callbackfn function one time for each element in the array.
+   * @param thisArg - An object to which the this keyword can refer in the callbackfn function. If thisArg is omitted, undefined is used as the this value.
    */
   map<U>(
     callbackfn: (value: T, index: number) => U,
@@ -314,8 +314,8 @@ export interface EagerCollection<K extends TJSON, V extends TJSON> {
 
   /**
    * Create a new eager collection by mapping some computation over this one
-   * @param {Mapper} mapper - function to apply to each element of this collection
-   * @returns {EagerCollection} The resulting (eager) output collection
+   * @param mapper - function to apply to each element of this collection
+   * @returns The resulting (eager) output collection
    */
   map<K2 extends TJSON, V2 extends TJSON, Params extends Param[]>(
     mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
@@ -325,9 +325,9 @@ export interface EagerCollection<K extends TJSON, V extends TJSON> {
   /**
    * Create a new eager reactive collection by mapping some computation `mapper` over this
    * one and then reducing the results with `accumulator`
-   * @param {Mapper} mapper - function to apply to each element of this collection
-   * @param {Accumulator} accumulator - function to combine results of the `mapper`
-   * @returns {EagerCollection} An eager collection containing the output of the accumulator
+   * @param mapper - function to apply to each element of this collection
+   * @param accumulator - function to combine results of the `mapper`
+   * @returns An eager collection containing the output of the accumulator
    */
   mapReduce<
     K2 extends TJSON,
@@ -342,8 +342,8 @@ export interface EagerCollection<K extends TJSON, V extends TJSON> {
 
   /**
    * Eagerly write/update `table` with the contents of this collection
-   * @param {TableHandle} table - the table to update
-   * @param {Mapper} mapper - function to apply to each key/value pair in this collection
+   * @param table - the table to update
+   * @param mapper - function to apply to each key/value pair in this collection
    *                          to produce a table row
    * @param params - any additional parameters to the mapper
    */
@@ -363,7 +363,7 @@ export interface EagerCollection<K extends TJSON, V extends TJSON> {
    * Combine some eager collections into one, associating with each key _all_ values
    * associated with that key in any of the input collections.
    * @param others - some other eager collections of compatible type
-   * @returns {EagerCollection} The resulting combination of all input key/value pairs
+   * @returns The resulting combination of all input key/value pairs
    */
   merge(...others: EagerCollection<K, V>[]): EagerCollection<K, V>;
 
@@ -384,20 +384,21 @@ export interface TableCollection<R extends TJSON[]> {
   getName(): string;
   getSchema(): Schema;
   isConnected(): boolean;
-  /**
-   * Lookup in the table using specified index
-   * @param key - the key to lookup in the table
-   * @param index - the index which you want lookup the table
-   * @returns The results of the lookup
-   * @throws {TableIndexError} when an index is not found
-   *          or the index type is not valid
-   */
+
+  // /**
+  //  * Lookup in the table using specified index
+  //  * @param key - the key to lookup in the table
+  //  * @param index - the index which you want lookup the table
+  //  * @returns The results of the lookup
+  //  * @throws {TableIndexError} when an index is not found
+  //  *          or the index type is not valid
+  //  */
   // TODO get(key: TJSON, index?: string): R[];
 
   /**
    * Create a new eager reactive collection by mapping over each entry in
    * a table collection
-   * @returns {EagerCollection} The resulting (eager) output collection
+   * @returns The resulting (eager) output collection
    */
   map<K extends TJSON, V extends TJSON, Params extends Param[]>(
     mapper: new (...params: Params) => InputMapper<R, K, V>,
@@ -539,7 +540,7 @@ export interface SKStore {
    * Creates a lazy reactive collection.
    * @param compute - the function to compute entries of the lazy collection
    * @param params - any additional parameters to the computation
-   * @returns {LazyCollection} The resulting lazy collection
+   * @returns The resulting lazy collection
    */
   lazy<K extends TJSON, V extends TJSON, Params extends Param[]>(
     compute: new (...params: Params) => LazyCompute<K, V>,
@@ -549,7 +550,7 @@ export interface SKStore {
   /**
    * Creates a lazy reactive collection with an asynchronous computation
    * @param compute - the async function to call with returned values
-   * @returns {LazyCollection} The resulting async lazy collection
+   * @returns The resulting async lazy collection
    */
   asyncLazy<
     K extends TJSON,
