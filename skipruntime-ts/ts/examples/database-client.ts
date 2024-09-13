@@ -11,8 +11,8 @@ function scenarios() {
       {
         type: "post",
         command: "set",
-        payload: [{ key: "123", value: {name: "daniel", country: "UK" }}],
-      }
+        payload: [{ key: "123", value: { name: "daniel", country: "UK" } }],
+      },
     ],
   ];
 }
