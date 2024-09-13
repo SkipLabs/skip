@@ -115,9 +115,15 @@ class SimpleToGenericSkipService implements GenericSkipService {
   }
 
   localInputs() {
-    const inputs: Record<string, InputDefinition> = {};
+    const inputs: Record<string, InputDefinition> = {
+      __sk_requests: {
+        schema: requestSchema,
+        fromTableRow: FromInput,
+        params: [],
+      },
+    };
     if (this.simple.inputTables) {
-      this.simple.inputTables.map((table) => {
+      this.simple.inputTables.forEach((table) => {
         inputs[table] = {
           schema: inputSchema(table),
           fromTableRow: FromInput,
@@ -125,14 +131,7 @@ class SimpleToGenericSkipService implements GenericSkipService {
         };
       });
     }
-    return {
-      __sk_requests: {
-        schema: requestSchema,
-        fromTableRow: FromInput,
-        params: [],
-      },
-      ...inputs,
-    };
+    return inputs;
   }
 
   remoteInputs(): Record<string, RemoteInputs> {
