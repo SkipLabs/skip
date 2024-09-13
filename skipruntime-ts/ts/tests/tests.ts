@@ -325,9 +325,11 @@ function testSlicedMap1Init(
       [42, 1337],
     ])
     .map(SquareValues)
+    .take(7)
     .sliced([
       [0, 7],
       [8, 15],
+      [19, 2000],
     ])
     .mapTo(output, TestToOutput);
 }
@@ -345,6 +347,7 @@ async function testSlicedMap1Run(
     { value: 49 },
     { value: 64 },
     { value: 81 },
+    { value: 400 },
   ]);
 }
 

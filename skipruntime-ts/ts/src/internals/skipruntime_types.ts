@@ -144,6 +144,8 @@ export interface Context {
     ranges: readonly [K, K][],
   ): string;
 
+  take(collectionName: string, name: string, limit: int): string;
+
   jsonExtract(value: JSONObject, pattern: string): TJSON[];
 
   keyOfJSON(value: TJSON): string;
@@ -199,6 +201,13 @@ export interface FromWasm {
     eagerCollectionId: ptr<Internal.String>,
     name: ptr<Internal.String>,
     ranges: ptr<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
+  ): ptr<Internal.String>;
+
+  SkipRuntime_take(
+    ctx: ptr<Internal.Context>,
+    eagerCollectionId: ptr<Internal.String>,
+    name: ptr<Internal.String>,
+    limit: int,
   ): ptr<Internal.String>;
 
   SkipRuntime_getFromTable(
