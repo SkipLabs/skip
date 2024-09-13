@@ -180,6 +180,7 @@ const config: Config = {
         parametersFormat: "table",
         enumMembersFormat: "table",
         useCodeBlocks: true,
+        useHTMLEncodedBrackets: true,
       },
     ],
   ],

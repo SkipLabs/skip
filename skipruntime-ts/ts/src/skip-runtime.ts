@@ -1,12 +1,16 @@
 // prettier-ignore
-import { runUrl, type ModuleInit } from "#std/sk_types.js";
+import { runUrl, type ModuleInit, type Opt } from "#std/sk_types.js";
 import type {
+  SimpleRemoteInputs,
   SimpleSkipService,
   SimpleServiceOutput,
   Writer,
 } from "./skipruntime_service.js";
 import { check } from "./internals/skipruntime_impl.js";
 import type {
+  DBFilter,
+  DBType,
+  Index,
   SKStore,
   SKStoreFactory,
   ColumnSchema,
@@ -21,8 +25,12 @@ import type {
   Database,
 } from "./skipruntime_api.js";
 import { runWithServer_ } from "./internals/skipruntime_process.js";
+export type { Opaque } from "./internals/skipruntime_module.js";
 export { TimedQueue } from "./internals/skipruntime_module.js";
 export type {
+  DBFilter,
+  DBType,
+  Index,
   SKStore,
   TJSON,
   TableCollection,
@@ -31,13 +39,19 @@ export type {
   JSONObject,
   ColumnSchema,
   Accumulator,
+  SimpleRemoteInputs,
   SimpleSkipService,
   SimpleServiceOutput,
   Writer,
+  Opt,
 };
 
 export type {
+  AValue,
+  Database,
   Mapper,
+  Param,
+  RefreshToken,
   InputMapper,
   OutputMapper,
   EagerCollection,
@@ -154,6 +168,25 @@ export async function createLocalSKStore(
   );
 }
 
+/**
+ * _Deep-freeze_ an object, returning the same object that was passed in.
+ *
+ * This function is similar to
+ * {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/freeze | `Object.freeze()`}
+ * but freezes the object and deep-freezes all its properties,
+ * recursively. The object is then not only _immutable_ but also
+ * _constant_. Note that as a result all objects reachable from the
+ * parameter will be frozen and no longer mutable or extensible, even from
+ * other references.
+ *
+ * The primary use for this function is to satisfy the requirement that all
+ * parameters to Skip `Mapper` constructors must be deep-frozen: objects
+ * that have not been constructed by Skip can be passed to `freeze()` before
+ * passing them to a `Mapper` constructor.
+ *
+ * @param value - The object to deep-freeze.
+ * @returns The same object that was passed in.
+ */
 export function freeze<T>(value: T): T {
   const type = typeof value;
   if (type == "string" || type == "number" || type == "boolean") {
