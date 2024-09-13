@@ -184,7 +184,9 @@ class SimpleToGenericSkipService implements GenericSkipService {
   }
 }
 
-function isGenericSkipService(service: GenericSkipService | SimpleSkipService) {
+function isGenericSkipService(
+  service: GenericSkipService | SimpleSkipService,
+): service is GenericSkipService {
   if (!("localInputs" in service)) return false;
   if (!("remoteInputs" in service)) return false;
   if (!("outputs" in service)) return false;
@@ -209,8 +211,8 @@ export async function runService(
   ]
 > {
   const gService: GenericSkipService = isGenericSkipService(service)
-    ? (service as GenericSkipService)
-    : new SimpleToGenericSkipService(service as SimpleSkipService);
+    ? service
+    : new SimpleToGenericSkipService(service);
   const localInputs = gService.localInputs();
   const remoteInputs = gService.remoteInputs();
   const outputs = gService.outputs();
