@@ -1,0 +1,410 @@
+#+title: Reactive Services -- Architecture
+
+* Overview
+
+This RFC aims to define an architecture for *reactive services*, along
+with their APIs.
+
+#+begin_src plantuml :file architecture.png
+  skinparam componentStyle rectangle
+  skinparam linetype ortho
+  !theme superhero-outline
+
+  component "Back end" as s1 {
+          database "PostgreSQL" as db
+          component "Reactive Service" as srs {
+                  [Reactive Resource #1] as srs.1
+                  [Reactive Resource #2] as srs.2
+          }
+          component "REST Service" as rest
+          note left of rest
+                  Vanilla REST service,
+                  implemented using any
+                  existing web framework
+                  (Flask, Ruby on Rails,
+                  node.js, etc.).
+          end note
+
+          [Reactive Replication Service] as replication
+          note right of replication
+                  This corresponds to the
+                  current skdb server, in
+                  charge of mirroring
+                  through WebSockets.
+          end note
+
+          db -[hidden]right- srs
+
+          rest -[hidden]right- replication
+
+          db <---> rest
+          srs <---> rest
+          srs ---> replication
+
+          cloud "Remote Reactive Services" as remote_srs
+          srs <-[norank]- remote_srs
+  }
+
+
+
+  component "Front end" #line.dotted {
+          [HTTP Client\n\n.get(...)\n.post(...)\n...] as restclient
+          note left
+                  Vanilla HTTP client,
+                  such as JS's fetch()
+          end note
+          [Skip Reactive Client\n\n.mirror(...)\n\n] as srsclient
+          note right
+                  Thin client that deals
+                  only with mirroring.
+          end note
+
+          restclient -[hidden]right-> srsclient
+          replication ---> srsclient : WebSocket
+          rest <---> restclient : HTTP
+
+  }
+#+end_src
+
+A *reactive service* defines a compute graph made of skip runtime
+reactive collections, along with one or more *reactive resources*
+(analogous to REST resources), which are parameterized, dynamically
+generated, read-only, skip runtime reactive collections exposed to the
+outside world.
+
+A *reactive service* is a back end component offering a low level API
+intended to be used by other back end components (such as regular REST
+services), rather than being directly exposed to the front end.
+
+A *reactive resources* can be mirrored (through WebSocket) from by
+services as well as directly from clients.
+
+Example:
+
+A Twitter *reactive service* may expose the following *reactive
+resources*:
+- ~tweets~ (params: ~author_id~),
+- ~likes_per_tweet~ (params: ~tweet_id~),
+- ~likes_per_author~ (params: ~author_id~).
+
+In practice, it is implemented as follows:
+#+begin_src
+TODO
+#+end_src
+
+A *reactive service* offers a [[*Low Level API][minimal API]] to interact with *reactive
+resources*. This API is intended to be used by other back end
+components, such as a regular web frameworks[fn:1].
+
+[fn:1] In other words, a *reactive service* does not deal with the
+HTTP request/response cycle, but is instead invoked by a REST service
+(for instance implemented using Flask, node.js, or Ruby on
+Rails). This differs from the previous design where the *reactive
+service* owned the HTTP request/response cycle, delegating to user
+code by invoking the ~update()~ callback. That design had the downside
+of making it difficult to leverage existing web frameworks for the
+REST part.
+
+* Mirroring Reactive Resources
+
+In practice, a *reactive resource* is implemented by a TypeScript
+class responsible for dynamically generating a skip runtime reactive
+collection (using the provided parameters).
+
+It is usually exposed through a separate REST service (implemented
+using any web framework), which orchestrates the instantiation of
+*reactive resources*.
+
+Example[fn:2]:
+#+BEGIN_SRC plantuml :file mirroring.png
+  !theme superhero-outline
+  Client -> "REST service" : GET /users/123/likes\nX-Reactive-Auth: {pubkey}
+  "REST service" -> "Reactive service" : create_reactive_request(\n  "likes_per_author",\n  { author_id: 123 },\n  pubkey\n)
+  "REST service" <-- "Reactive service" : reactive_request_id
+  "REST service" -> "Reactive service" : diff(reactive_request_id, 0)
+  "REST service" <-- "Reactive service" : (current_values, init_tick)
+  Client <-- "REST service" : 200 OK\nX-Reactive-Request-Id: {reactive_request_id}:{init_tick}\nbody: {current_values}
+  Client -> "Reactive service" : WebSocket: mirror(reactive_request_id, initial_tick)
+  Client <-- "Reactive service" : WebSocket: updates
+#+END_SRC
+
+- A client sends a regular HTTP ~GET /users/123/likes~ to the REST
+  service.
+- The REST service handles the request:
+  - it invokes the *reactive service*'s
+    ~create_reactive_request("likes_per_author", { author_id: 123 })~,
+    which returns a reactive request token (in practice, this is the
+    name of a dynamically generated skip runtime collection),
+  - it invokes the *reactive service*'s ~diff(reactive_request_id,
+    0)~, returning the current value along with the current tick,
+  - it returns an HTTP 200 OK response, with the current value in the
+    response body, along with a special HTTP header:
+    ~X-Reactive-Request-Id: {reactive_request_id}:{init_tick}~.
+- The client uses the received data, and invokes the *skip reactive
+  client*'s ~mirror(reactive_request_id, init_tick, update_cb)~ to
+  subscribe to subsequent updates[fn:3].
+
+[fn:2] This is just one possible way to use a *reactive
+service*. Developers may instead decide to create a reactive request
+only when explicitly requested. They may also choose not to respond
+with initial data, relying on mirroring for the entire sync.
+
+[fn:3] The exact API of mirror regarding init data is still TBD.
+
+
+This means that an *existing REST API can be kept as is*, and made
+reactive without hindering non-reactive clients (which would simply
+ignore the ~X-Reactive-Request-Id~ HTTP response header), thus
+*permitting gradual introduction of reactivity in existing services*.
+
+* The Write Path
+
+Some of the skip runtime reactive collections defined by the *reactive
+service* may be read-write *input collections*.  On the write path,
+the web framework simply invokes the *reactive service*'s ~write() /
+write_all()~ functions [fn:4].
+
+[fn:4] Writing to a *reactive service* input collection isn't a
+substitute for writing into a regular database (such as
+PostgreSQL). In most cases, the write into the *reactive service* will
+happen after an actual write to a regular database.
+
+* Low Level API
+
+*Reactive Services* expose the following low level primitives (through
+a local server-side HTTP API, except for ~subscribe()~ which is
+handled through a WebSocket):
+
+** Reactive Resources
+
+- [WebSocket] ~subscribe(replication_token: string, cb: (values: Object,
+  isInit: boolean): void)~
+
+  Subscribes to further updates from the reactive collection
+  identified by ~replication_token~.
+
+** Reading
+
+- ~GET /{resource}~
+  Headers:
+    - (optional) ~X-Reactive-Auth~: Reactive service authentication
+      token.
+
+  Parameters: Query parameters are passed down to the reactive
+  resource.
+
+  Returns the whole collection at current tick in the response body.
+
+  If an ~X-Reactive-Auth~ header is set by the client, the server
+  creates a long-lived response collection, the identifier of which is
+  returned in the ~X-Reactive-Response~ header. This identifier can
+  then be used to stream further updates through the WebSocket API.
+  Updates are restricted to the session identified by the
+  ~X-Reactive-Auth~ token.
+
+- ~HEAD /{resource}~
+  Headers:
+    - (optional) ~X-Reactive-Auth~: Reactive service authentication
+      token.
+  Parameters: Query parameters are passed down to the reactive
+  resource.
+
+  Identical to ~GET /{resource}~, except that no data is returned in
+  the body.
+
+  This is only useful when setting the ~X-Reactive~Auth~ header, in
+  order to get a replication token. This can be used to handle initial
+  data through the replication client.
+
+- ~GET /{resource}/{key}~
+  Parameters: Query parameters are passed down to the reactive
+  resource.
+
+  Read a single key from the collection.
+
+** Writing
+
+- ~PUT /{collection}/{key}~
+
+  Update the value in the input collection ~collection~ with the value
+  provided in the request body (JSON array).
+
+  Example: ~["foo", "bar"]~
+
+- ~PATCH /{collection}~
+
+  Update the values in the input collection ~collection~ with the
+  values provided in the request body.
+
+  Example: ~[[1, ["foo", "bar"]], [1337, ["foobar"]]]~
+
+- ~DELETE /{collection}/{key}~
+
+  Remove the given ~key~ from the input collection ~collection~.
+
+* Client
+
+A downstream consumer of a *reactive service* will usually be using a
+thin client in their host language. That client deals only with
+mirroring *reactive resources* (cf. [[*Mirroring Reactive Resources][Mirroring Reactive Resources]]), and
+subscribing to updates.
+
+* Authentication
+
+A pair of public/private keys is generated client-side in order to
+authenticate a session. The private key never leaves the client[fn:5].
+
+[fn:5] This differs from the previous design where a shared private
+key was generated server-side and communicated to the client through a
+side-channel.
+
+
+The public key is sent to the replication server in the ~Auth~
+message, along with a signature of the ~Auth~ message, in order to
+authenticate the mirroring session.
+
+The ~Auth~ message contains a (client generated) nonce to prevent
+replay attacks, and a timestamp to make tracking previously used
+nonces more practical.
+
+The replication server accepts any public key (as long as it matches
+the signature). By default, no data is mirrorable, except for the
+response tables generated for requests using that public key.
+
+The ~create_reactive_request()~ function of the [[*Low Level API][Low Level API]] takes a
+public key as its last parameter. The generated response table can be
+mirrored only by authenticating using the same public/private key
+pair.
+
+* Full Example: HackerNews
+
+** Non-reactive initial project
+
+SQL Schema:
+#+include: "../examples/hackernews/back-end/schema.sql" src sql -n
+Back end:
+#+include: "../examples/hackernews/back-end/app.py" src python -n
+Front end:
+#+include: "../examples/hackernews/front-end/src/App.tsx" src tsx -n
+
+** Making it reactive
+
+Reactive Service:
+#+include: "../examples/hackernews/back-end/reactive_service/src/hackernews.service.ts" src ts -n
+
+Modifications to the back end:
+#+NAME: diff
+#+begin_src shell :var a="foo.txt" b="bar.txt" :results verbatim :wrap src diff
+diff -u $a $b
+#+end_src
+
+#+CALL: diff(a="../examples/hackernews/back-end/app.py", b="../examples/hackernews/back-end/app_reactive.py")
+
+#+RESULTS:
+#+begin_src diff
+--- ../examples/hackernews/back-end/app.py	2024-09-22 18:27:57.402641870 +0200
++++ ../examples/hackernews/back-end/app_reactive.py	2024-09-22 18:27:57.402641870 +0200
+@@ -1,5 +1,8 @@
+ from flask import Flask, g, json, request
+ import sqlite3
++import requests
++
++REACTIVE_SERVICE_URL = 'http://localhost:3587/v1'
+ 
+ DATABASE = 'database.db'
+ 
+@@ -42,18 +45,35 @@
+ 
+ @app.get("/")
+ def posts_index():
+-    db = get_db()
+-    cur = db.execute(
+-        """SELECT id, title, url, body,
+-        (SELECT name FROM users WHERE id=posts.author_id LIMIT 1) as author,
+-        (SELECT COUNT(id) FROM upvotes WHERE post_id=posts.id) as upvotes
+-        FROM posts ORDER BY upvotes DESC"""
+-    )
+-    res = [
+-        format_post(post)
+-        for post in cur.fetchall()
+-    ]
+-    cur.close()
++    public_key = request.headers['X-Reactive-Auth']
++
++    if public_key:
++        # Create reactive request for the reactive resource `posts`,
++        # limited to 10 results.
++        reactive_request_id = requests.post(
++            REACTIVE_SERVICE_URL + f'/reactive/posts',
++            params = {
++                'limit': 10
++            },
++            headers = {
++                'X-Reactive-Auth': public_key,
++            }
++        ).content
++
++        # Get the initial data, which will be returned to the client
++        # along with a reactive request token for subscribing to
++        # further updates.
++        diff = requests.get(REACTIVE_SERVICE_URL +
++                            f'/collections/{reactive_request_id}/diff/0').json()
++
++        tick = diff['tick']
++        return diff['data'], { 'X-Reactive-Request-Id': f'{reactive_request_id}:{tick}' }
++
++    else:
++        # If the client didn't set the `X-Reactive-Auth` header, they
++        # are not interested in reactive updates for this query, so we
++        # just respond with the current values.
++        posts = requests.get(f'/collections/{reactive_request_id}').json()
+ 
+     return json.jsonify(res)
+ 
+@@ -65,9 +85,17 @@
+     body = params['body']
+ 
+     db = get_db()
+-    db.execute(f"INSERT INTO posts(title, url, body) VALUES('{title}', '{url}', '{body}')")
++    cur = db.cursor()
++    cur.execute(f"INSERT INTO posts(title, url, body) VALUES('{title}', '{url}', '{body}')")
++    post_id = cur.lastrowid
+     db.commit()
+ 
++    # Write into the reactive input collection.
++    requests.post(
++        REACTIVE_SERVICE_URL + f'/posts',
++        params = { **params, 'id': post_id }
++    )
++
+     return "ok", 200
+ 
+ @app.get("/posts/<int:post_id>")
+@@ -85,8 +113,22 @@
+ 
+ @app.post("/posts/<int:post_id>/upvotes")
+ def upvote_post(post_id):
++    user_id = get_current_user().id
++
+     db = get_db()
+-    db.execute(f"INSERT INTO upvotes(post_id) VALUES({post_id})")
++    cur = db.cursor()
++    cur.execute(f"INSERT INTO upvotes(post_id, user_id) VALUES({post_id}, {user_id})")
++    upvote_id = cur.lastrowid
+     db.commit()
+ 
++    # Write into the reactive input collection.
++    requests.post(
++        REACTIVE_SERVICE_URL + f'/upvotes',
++        params = {
++            'id': upvote_id,
++            'post_id': post_id,
++            'user_id': user_id,
++        }
++    )
++
+     return "ok", 200
+#+end_src
+
+Modified back end:
+#+include: "../examples/hackernews/back-end/app_reactive.py" src python -n
