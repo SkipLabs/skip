@@ -12,41 +12,41 @@ import type {
 
 import { runWithServer } from "skip-runtime";
 
-import sqlite3 from 'sqlite3';
-const db = new sqlite3.Database('./db.sqlite');
+import sqlite3 from "sqlite3";
+const db = new sqlite3.Database("./db.sqlite");
 
 /*****************************************************************************/
 // Populating the database with made-up values (if it's not already there)
 /*****************************************************************************/
 
 async function initDB(): Promise<void> {
-    // Create the table if it doesn't exist
-    await db.exec(`CREATE TABLE IF NOT EXISTS data (
+  // Create the table if it doesn't exist
+  await db.exec(`CREATE TABLE IF NOT EXISTS data (
     id TEXT PRIMARY KEY,
     object JSON
     )`);
 
-    await db.run('INSERT OR REPLACE INTO data (id, object) VALUES (?, ?)', [
-      '123',
-      JSON.stringify({
-        name: 'daniel',
-        country: 'FR',
-      })
-    ]);
-    await db.run('INSERT OR REPLACE INTO data (id, object) VALUES (?, ?)', [
-      '124',
-      JSON.stringify({
-        name: 'josh',
-        country: 'UK',
-      })
-    ]);
-    await db.run('INSERT OR REPLACE INTO data (id, object) VALUES (?, ?)', [
-      '125',
-      JSON.stringify({
-        name: 'julien',
-        country: 'ES',
-      })
-    ]);
+  await db.run("INSERT OR REPLACE INTO data (id, object) VALUES (?, ?)", [
+    "123",
+    JSON.stringify({
+      name: "daniel",
+      country: "FR",
+    }),
+  ]);
+  await db.run("INSERT OR REPLACE INTO data (id, object) VALUES (?, ?)", [
+    "124",
+    JSON.stringify({
+      name: "josh",
+      country: "UK",
+    }),
+  ]);
+  await db.run("INSERT OR REPLACE INTO data (id, object) VALUES (?, ?)", [
+    "125",
+    JSON.stringify({
+      name: "julien",
+      country: "ES",
+    }),
+  ]);
 }
 
 /*****************************************************************************/
@@ -54,17 +54,14 @@ async function initDB(): Promise<void> {
 /*****************************************************************************/
 
 type User = {
-  name: string,
-  country: string,
+  name: string;
+  country: string;
 };
 
-type Response =
-| { status: 'error', msg: string }
-| { status: 'ok', user: User }
+type Response = { status: "error"; msg: string } | { status: "ok"; user: User };
 
 class Request implements Mapper<string, TJSON, string, TJSON> {
-  constructor(
-    private users: EagerCollection<string, TJSON>) {}
+  constructor(private users: EagerCollection<string, TJSON>) {}
 
   mapElement(
     key: string,
@@ -73,11 +70,11 @@ class Request implements Mapper<string, TJSON, string, TJSON> {
     const v = it.first() as JSONObject;
     let computed: Response;
     const value = this.users.maybeGetOne(v.payload as string);
-    const user =  value as User;
+    const user = value as User;
     if (v.command == "getUser") {
-      computed = { status: 'ok', user };
+      computed = { status: "ok", user };
     } else {
-      computed = { status: 'error', msg: 'Unknown command'}
+      computed = { status: "error", msg: "Unknown command" };
     }
     return Array([key, computed]);
   }
@@ -97,26 +94,24 @@ type Delete = { keys: string[] };
 
 async function update(
   event: TJSON,
-  writers: Record<string, Writer<TJSON>>
+  writers: Record<string, Writer<TJSON>>,
 ): Promise<void> {
-  const writer = writers['users'];
+  const writer = writers["users"];
   const cmd = event as Command;
   if (cmd.command == "set") {
     const payload = cmd.payload as Set[];
     for (const e of payload) {
-      await db.run(
-        'INSERT OR REPLACE INTO data (id, object) VALUES (?, ?)',
-        [e.key, JSON.stringify(e.value)]
-      );
+      await db.run("INSERT OR REPLACE INTO data (id, object) VALUES (?, ?)", [
+        e.key,
+        JSON.stringify(e.value),
+      ]);
       writer.set(e.key, e.value);
     }
   } else if (cmd.command == "delete") {
     const payload = cmd.payload as Delete[];
     for (const e of payload) {
-      for(const key of e.keys) {
-        await db.run(
-          'DELETE FROM data WHERE id=?', [key]
-        );
+      for (const key of e.keys) {
+        await db.run("DELETE FROM data WHERE id=?", [key]);
       }
       writer.delete(e.keys);
     }
@@ -133,13 +128,14 @@ class Service implements SimpleSkipService {
 
   async init(tables: Record<string, Writer<TJSON[]>>) {
     await initDB();
-    db.all('SELECT id, object FROM data',
-      (err, data: Array<{id: string, object: string}>) => {
-        const userWriter = tables['users'];
-        for(const user of data) {
+    db.all(
+      "SELECT id, object FROM data",
+      (err, data: Array<{ id: string; object: string }>) => {
+        const userWriter = tables["users"];
+        for (const user of data) {
           userWriter.set(user.id, JSON.parse(user.object));
         }
-      }
+      },
     );
     console.log("Initializing done.");
     console.log("Service is ready!");
@@ -150,7 +146,7 @@ class Service implements SimpleSkipService {
     requests: EagerCollection<string, TJSON>,
     inputCollections: Record<string, EagerCollection<string, TJSON>>,
   ): SimpleServiceOutput {
-    const output = requests.map(Request, inputCollections['users']);
+    const output = requests.map(Request, inputCollections["users"]);
     return { output, update };
   }
 }
