@@ -367,6 +367,32 @@ fun usersHandler(): HttpHandler {
       })
 }
 
+fun dbHandler(): HttpHandler {
+  return BlockingHandler(
+      object : HttpHandler {
+        override fun handleRequest(exchange: HttpServerExchange) {
+          val db = UUID.randomUUID().toString();
+
+          if (exchange.requestMethod == Methods.POST) {
+            var skdb = openSkdb(db)
+            if (skdb == null) {
+              createDb(db)
+              skdb = openSkdb(db)
+            }
+            exchange.responseHeaders.put(Headers.CONTENT_TYPE, "application/json")
+            exchange.responseHeaders.put(HttpString("Access-Control-Allow-Origin"), "*")
+            exchange.responseSender.send(
+                skdb!!
+                    .sql(
+                        "SELECT userID as accessKey, privateKey, '" + db + "' AS db FROM skdb_users", OutputFormat.JSON)
+                    .decodeOrThrow())
+          } else {
+            exchange.statusCode = StatusCodes.METHOD_NOT_ALLOWED
+          }
+        }
+      })
+}
+
 fun schemaHandler(): HttpHandler {
   val schemas = ConcurrentHashMap<String, String>()
   return BlockingHandler(
@@ -442,12 +468,14 @@ fun schemaHandler(): HttpHandler {
 fun createHttpServer(
     connectionHandler: HttpHandler,
     usersHandler: HttpHandler,
+    dbHandler: HttpHandler,
     schemaHandler: HttpHandler
 ): Undertow {
   var pathHandler =
       PathTemplateHandler()
           .add("/dbs/{database}/connection", connectionHandler)
           .add("/dbs/{database}/users", usersHandler)
+          .add("/dbs", dbHandler)
           .add("/dbs/{database}/schema", schemaHandler)
   return Undertow.builder().addHttpListener(ENV.port, "0.0.0.0").setHandler(pathHandler).build()
 }
@@ -466,14 +494,16 @@ fun main(args: Array<String>) {
   val workerPool = Executors.newSingleThreadExecutor()
   val connHandler = connectionHandler(workerPool, taskPool)
   val usersHandler = usersHandler()
+  val dbHandler = dbHandler()
   val schemaHandler = schemaHandler()
-  val server = createHttpServer(connHandler, usersHandler, schemaHandler)
+  val server = createHttpServer(connHandler, usersHandler, dbHandler, schemaHandler)
   server.start()
 
   println("SKDB dev server has started")
   println("------------------------------------------------------")
   println("The following dev resources are available:")
   println("GET /dbs/{database}/users")
+  println("POST /dbs")
   println("PUT /dbs/{database}/schema")
   println("------------------------------------------------------")
 }
