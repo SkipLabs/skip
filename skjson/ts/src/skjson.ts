@@ -390,7 +390,7 @@ export type Exportable =
 export interface SKJSON extends Shared {
   importJSON: (value: ptr<Internal.CJSON>, copy?: boolean) => Exportable;
   exportJSON(v: null | undefined): ptr<Internal.CJNull>;
-  exportJSON(v: number): ptr<Internal.CJFloat>;
+  exportJSON(v: number): ptr<Internal.CJFloat | Internal.CJInt>;
   exportJSON(v: boolean): ptr<Internal.CJBool>;
   exportJSON(v: string): ptr<Internal.CJString>;
   exportJSON(v: any[]): ptr<Internal.CJArray>;

@@ -511,6 +511,46 @@ fun sliced(
     .toString()
 }
 
+fun noFilter<K: Key, V: File>(
+  _context: readonly Context,
+  _key: K,
+  _value: File,
+): Bool {
+  true
+}
+
+fun countElementAsOne<V: File>(_value: File): Int {
+  1
+}
+
+fun removeElementAsOne<V: File>(_value: V, _toRemove: Int): File {
+  invariant_violation("removeElementAsOne called on singleton value");
+}
+
+@export("SkipRuntime_take")
+fun take(
+  context: mutable Context,
+  handleId: String,
+  name: String,
+  limit: UInt32,
+): String {
+  sourceDirName = DirName::create(handleId);
+  eager = EHandle(JSONID::keyType, JSONFile::type, sourceDirName);
+  dirName = sourceDirName.sub(name);
+  eager
+    .filter(
+      context,
+      dirName,
+      limit.toInt(),
+      noFilter,
+      countElementAsOne,
+      removeElementAsOne,
+      None(),
+    )
+    .getDirName()
+    .toString()
+}
+
 @export("SkipRuntime_getFromTable")
 fun getFromTable(
   _context: mutable Context,
