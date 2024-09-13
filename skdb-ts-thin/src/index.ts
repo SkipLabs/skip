@@ -1,8 +1,4 @@
-import { WebSocket, MessageEvent, CloseEvent, ErrorEvent } from "ws";
-import * as util from "util";
-import { webcrypto } from "node:crypto";
-
-const decoder = new util.TextDecoder("utf8");
+const decoder = new TextDecoder("utf8");
 
 function decodeUTF8(v: ArrayBuffer): string {
   return decoder.decode(v);
@@ -44,7 +40,7 @@ export type Params =
 
 export interface MirrorDefn {
   table: string;
-  expectedColumns: string;
+  expectedColumns?: string;
   filterExpr?: string;
   filterParams?: Params;
 }
@@ -803,7 +799,7 @@ type MuxMessage =
 
 export interface Creds {
   accessKey: string;
-  privateKey: webcrypto.CryptoKey;
+  privateKey: CryptoKey;
   deviceUuid: string;
 }
 
@@ -968,8 +964,8 @@ export class MuxedSocket {
       socket.onclose = (_event) => {
         reject(new Error("Socket closed before open"));
       };
-      socket.onerror = (event: ErrorEvent) => {
-        reject(new Error(event.message));
+      socket.onerror = (_event) => {
+        reject(new Error("Socket error"));
       };
       socket.onmessage = (_event) => {
         reject(new Error("Socket messaged before open"));
@@ -1682,7 +1678,7 @@ class SKDB {
         return {
           type: "tail",
           table: def.table,
-          expectedColumns: def.expectedColumns,
+          expectedColumns: def.expectedColumns ?? "*",
           since: tick,
           filterExpr: def.filterExpr ?? "",
           params: def.filterParams ?? new Map(),
@@ -1793,15 +1789,17 @@ class SKDB {
     table: string,
     init_cb: (rows: Table) => void,
     update_cb: (added: Table, removed: Table) => void,
-  ): () => void {
+  ): {close: () => void} {
     // TODO: Fail if attempting to subscribe to non-mirrored table.
     // TODO: Allow multiple callbacks?
     this.callbacks.set(table, update_cb);
 
     init_cb(this.getTable(table));
 
-    return () => {
-      this.callbacks.delete(table);
+    return {
+      close: () => {
+        this.callbacks.delete(table);
+      }
     };
   }
 
@@ -1828,7 +1826,7 @@ class SKDB {
 
   private async mirror(tables: MirrorDefn[]): Promise<void> {
     if (tables.length < 1) {
-      throw new Error("Must specify at least one table to mirror");
+      return; // throw new Error("Must specify at least one table to mirror");
     }
     const setupTable = async (mirror_defn: MirrorDefn) => {
       const tableName: string = mirror_defn.table;
