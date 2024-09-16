@@ -960,7 +960,7 @@ class LinksImpl implements Links {
         throw this.handles.delete(-result as Handle<unknown>);
       }
       const qTokens = Object.entries(tokens).map((entry) => {
-        return { duration: entry[1], ident: entry[0] };
+        return { ident: entry[0], interval: entry[1] };
       });
       this.timedQueue = new TimedQueue(update);
       this.timedQueue.start(qTokens, time);
@@ -1090,7 +1090,7 @@ interface Timeout {
   unref: () => void;
 }
 
-type TQ_Token = { duration: number; ident: string };
+type TQ_Token = { ident: string; interval: number };
 type TQ_Elt = {
   endtime: number;
   tokens: TQ_Token[];
@@ -1106,8 +1106,8 @@ export class TimedQueue {
   start(tokens: TQ_Token[], time: number) {
     const tostart: Map<number, TQ_Token[]> = new Map<number, TQ_Token[]>();
     for (const token of tokens) {
-      if (token.duration <= 0) continue;
-      const endtime = time + token.duration;
+      if (token.interval <= 0) continue;
+      const endtime = time + token.interval;
       const current = tostart.get(endtime);
       if (current) {
         current.push(token);
@@ -1151,9 +1151,9 @@ export class TimedQueue {
         this.queue[i].tokens.map((t) => t.ident),
       );
       for (const token of this.queue[i].tokens) {
-        if (token.duration <= 0) continue;
-        let endtime = cendtime + token.duration;
-        while (endtime <= time) endtime += token.duration;
+        if (token.interval <= 0) continue;
+        let endtime = cendtime + token.interval;
+        while (endtime <= time) endtime += token.interval;
         const current = torenew.get(endtime);
         if (current) {
           current.push(token);

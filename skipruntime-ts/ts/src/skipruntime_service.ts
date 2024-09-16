@@ -56,7 +56,7 @@ export interface GenericSkipService {
 
   outputs(): Record<string, OutputDefinition>;
 
-  // Each token associates a string identifier with a refresh frequency (in milliseconds)
+  // Each token associates a string identifier with a refresh interval (in milliseconds)
   refreshTokens?: Record<string, number>;
 
   init?: (tables: Record<string, Table<TJSON[]>>) => Promise<void>;
@@ -76,7 +76,7 @@ export interface SimpleSkipService {
   inputTables?: string[];
   remoteTables?: Record<string, SimpleRemoteInputs>;
 
-  // Each token associates a string identifier with a refresh frequency (in milliseconds)
+  // Each token associates a string identifier with a refresh interval (in milliseconds)
   refreshTokens?: Record<string, number>;
 
   init?: (table: Record<string, Writer<TJSON[]>>) => Promise<void>;

@@ -14,7 +14,7 @@ are kept as fresh as your application requires.
 ## Overview
 
 A reactive service can define any number of refresh tokens, each of which
-associates a string identifier with a refresh frequency, given in milliseconds.
+associates a string identifier with a refresh interval, given in milliseconds.
 Skip then maintains an internal data structure with a timestamp for each token
 that is refreshed at the specified frequency.
 
