@@ -82,13 +82,13 @@ type User = {
 
 type Response = { status: "error"; msg: string } | { status: "ok"; user: User };
 
-class Request implements Mapper<string, TJSON, string, TJSON> {
+class Request implements Mapper<string, TJSON, string, Response> {
   constructor(private users: EagerCollection<string, TJSON>) {}
 
   mapElement(
     key: string,
     it: NonEmptyIterator<TJSON>,
-  ): Iterable<[string, TJSON]> {
+  ): Iterable<[string, Response]> {
     const v = it.first() as JSONObject;
     let computed: Response;
     const value = this.users.maybeGetOne(v.payload as GetUser);
