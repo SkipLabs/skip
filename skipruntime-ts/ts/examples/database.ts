@@ -85,14 +85,14 @@ type User = {
 
 type Response = { status: "error"; msg: string } | { status: "ok"; user: User };
 
-class Request implements Mapper<string, TJSON, string, Response> {
+class Request implements Mapper<string, Command, string, Response> {
   constructor(private users: EagerCollection<string, TJSON>) {}
 
   mapElement(
     key: string,
-    it: NonEmptyIterator<TJSON>,
+    it: NonEmptyIterator<Command>,
   ): Iterable<[string, Response]> {
-    const cmd = it.first() as Command;
+    const cmd = it.first();
     const value = this.users.maybeGetOne(cmd.payload as GetUser);
     const user = value as User;
     const computed: Response =
@@ -160,7 +160,7 @@ class Service implements SimpleSkipService {
 
   reactiveCompute(
     _store: SKStore,
-    requests: EagerCollection<string, TJSON>,
+    requests: EagerCollection<string, Command>,
     inputCollections: Record<string, EagerCollection<string, TJSON>>,
   ): SimpleServiceOutput {
     const output = requests.map(Request, inputCollections["users"]);
