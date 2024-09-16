@@ -1,4 +1,4 @@
-FROM ubuntu:22.04 as stage0
+FROM ubuntu:22.04 AS stage0
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
@@ -31,14 +31,14 @@ RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-15 100 && 
 ENV CC=clang
 ENV CXX=clang++
 
-FROM stage0 as bootstrap
+FROM stage0 AS bootstrap
 
 COPY . /work
 
 WORKDIR /work/compiler
 RUN make clean && make STAGE=0
 
-FROM stage0 as base
+FROM stage0 AS base
 
 COPY --from=bootstrap /work/compiler/stage0/bin/ /usr/bin/
 COPY --from=bootstrap /work/compiler/stage0/lib/ /usr/lib/
