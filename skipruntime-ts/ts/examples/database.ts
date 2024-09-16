@@ -26,27 +26,36 @@ async function initDB(): Promise<void> {
     object JSON
     )`);
 
-  await db.run("INSERT OR REPLACE INTO data (id, object) VALUES (?, ?)", [
-    "123",
-    JSON.stringify({
-      name: "daniel",
-      country: "FR",
-    }),
-  ]);
-  await db.run("INSERT OR REPLACE INTO data (id, object) VALUES (?, ?)", [
-    "124",
-    JSON.stringify({
-      name: "josh",
-      country: "UK",
-    }),
-  ]);
-  await db.run("INSERT OR REPLACE INTO data (id, object) VALUES (?, ?)", [
-    "125",
-    JSON.stringify({
-      name: "julien",
-      country: "ES",
-    }),
-  ]);
+  await db.run(
+    "INSERT OR REPLACE INTO data (id, object) VALUES ($id, $object)",
+    {
+      $id: "123",
+      $object: JSON.stringify({
+        name: "daniel",
+        country: "FR",
+      }),
+    },
+  );
+  await db.run(
+    "INSERT OR REPLACE INTO data (id, object) VALUES ($id, $object)",
+    {
+      $id: "124",
+      $object: JSON.stringify({
+        name: "josh",
+        country: "UK",
+      }),
+    },
+  );
+  await db.run(
+    "INSERT OR REPLACE INTO data (id, object) VALUES ($id, $object)",
+    {
+      $id: "125",
+      $object: JSON.stringify({
+        name: "julien",
+        country: "ES",
+      }),
+    },
+  );
 }
 
 /*****************************************************************************/
@@ -101,17 +110,20 @@ async function update(
   if (cmd.command == "set") {
     const payload = cmd.payload as Set[];
     for (const e of payload) {
-      await db.run("INSERT OR REPLACE INTO data (id, object) VALUES (?, ?)", [
-        e.key,
-        JSON.stringify(e.value),
-      ]);
+      await db.run(
+        "INSERT OR REPLACE INTO data (id, object) VALUES ($id, $object)",
+        {
+          $id: e.key,
+          $object: JSON.stringify(e.value),
+        },
+      );
       writer.set(e.key, e.value);
     }
   } else if (cmd.command == "delete") {
     const payload = cmd.payload as Delete[];
     for (const e of payload) {
       for (const key of e.keys) {
-        await db.run("DELETE FROM data WHERE id=?", [key]);
+        await db.run("DELETE FROM data WHERE id = $id", { $id: key });
       }
       writer.delete(e.keys);
     }
