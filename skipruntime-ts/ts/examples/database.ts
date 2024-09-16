@@ -89,11 +89,11 @@ class Request implements Mapper<string, TJSON, string, Response> {
     key: string,
     it: NonEmptyIterator<TJSON>,
   ): Iterable<[string, Response]> {
-    const v = it.first() as JSONObject;
-    const value = this.users.maybeGetOne(v.payload as GetUser);
+    const cmd = it.first() as Command;
+    const value = this.users.maybeGetOne(cmd.payload as GetUser);
     const user = value as User;
     const computed: Response =
-      v.command == "getUser"
+      cmd.command == "getUser"
         ? { status: "ok", user }
         : { status: "error", msg: "Unknown command" };
     return Array([key, computed]);
