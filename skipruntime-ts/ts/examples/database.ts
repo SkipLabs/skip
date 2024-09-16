@@ -68,8 +68,8 @@ type Command = {
 };
 
 type GetUser = string;
-type Set = { key: string; value: string };
-type Delete = { keys: string[] };
+type Set = { key: string; value: string }[];
+type Delete = { keys: string[] }[];
 
 /*****************************************************************************/
 // The read path, we want to find a user
@@ -113,7 +113,7 @@ async function update(
   const writer = writers["users"];
   const cmd = event as Command;
   if (cmd.command == "set") {
-    const payload = cmd.payload as Set[];
+    const payload = cmd.payload as Set;
     for (const e of payload) {
       await db.run(
         "INSERT OR REPLACE INTO data (id, object) VALUES ($id, $object)",
@@ -125,7 +125,7 @@ async function update(
       writer.set(e.key, e.value);
     }
   } else if (cmd.command == "delete") {
-    const payload = cmd.payload as Delete[];
+    const payload = cmd.payload as Delete;
     for (const e of payload) {
       for (const key of e.keys) {
         await db.run("DELETE FROM data WHERE id = $id", { $id: key });
