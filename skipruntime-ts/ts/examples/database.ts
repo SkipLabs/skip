@@ -90,14 +90,12 @@ class Request implements Mapper<string, TJSON, string, Response> {
     it: NonEmptyIterator<TJSON>,
   ): Iterable<[string, Response]> {
     const v = it.first() as JSONObject;
-    let computed: Response;
     const value = this.users.maybeGetOne(v.payload as GetUser);
     const user = value as User;
-    if (v.command == "getUser") {
-      computed = { status: "ok", user };
-    } else {
-      computed = { status: "error", msg: "Unknown command" };
-    }
+    const computed: Response =
+      v.command == "getUser"
+        ? { status: "ok", user }
+        : { status: "error", msg: "Unknown command" };
     return Array([key, computed]);
   }
 }
