@@ -8,7 +8,6 @@ import type {
   Table,
   TJSON,
   Database,
-  RefreshToken,
 } from "./skipruntime_api.js";
 
 export interface Writer<V extends TJSON> {
@@ -57,8 +56,8 @@ export interface GenericSkipService {
 
   outputs(): Record<string, OutputDefinition>;
 
-  // name / duration in milliseconds
-  refreshTokens?: Record<string, RefreshToken>;
+  // Each token associates a string identifier with a refresh frequency (in milliseconds)
+  refreshTokens?: Record<string, number>;
 
   init?: (tables: Record<string, Table<TJSON[]>>) => Promise<void>;
 
@@ -77,8 +76,8 @@ export interface SimpleSkipService {
   inputTables?: string[];
   remoteTables?: Record<string, SimpleRemoteInputs>;
 
-  // name / duration in milliseconds
-  refreshTokens?: Record<string, RefreshToken>;
+  // Each token associates a string identifier with a refresh frequency (in milliseconds)
+  refreshTokens?: Record<string, number>;
 
   init?: (table: Record<string, Writer<TJSON[]>>) => Promise<void>;
 
