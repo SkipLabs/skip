@@ -13,13 +13,13 @@ import type {
 import { runWithServer } from "skip-runtime";
 
 import sqlite3 from "sqlite3";
-const db = new sqlite3.Database("./db.sqlite");
 
 /*****************************************************************************/
-// Populating the database with made-up values (if it's not already there)
+// Populate the database with made-up values (if it's not already there)
 /*****************************************************************************/
 
-async function initDB(): Promise<void> {
+async function initDB(): Promise<sqlite3.Database> {
+  const db = new sqlite3.Database("./db.sqlite");
   // Create the table if it doesn't exist
   await db.exec(`CREATE TABLE IF NOT EXISTS data (
     id TEXT PRIMARY KEY,
@@ -56,7 +56,10 @@ async function initDB(): Promise<void> {
       }),
     },
   );
+  return db;
 }
+
+const db = await initDB();
 
 /*****************************************************************************/
 // The protocol
@@ -142,7 +145,6 @@ class Service implements SimpleSkipService {
   inputTables = ["users"];
 
   async init(tables: Record<string, Writer<TJSON[]>>) {
-    await initDB();
     db.all(
       "SELECT id, object FROM data",
       (err, data: Array<{ id: string; object: string }>) => {
