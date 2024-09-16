@@ -63,7 +63,7 @@ async function initDB(): Promise<void> {
 /*****************************************************************************/
 
 type Command = {
-  command: string;
+  command: "getUser" | "set" | "delete";
   payload: TJSON;
 };
 
