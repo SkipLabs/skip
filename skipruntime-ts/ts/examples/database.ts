@@ -67,6 +67,7 @@ type Command = {
   payload: TJSON;
 };
 
+type GetUser = string;
 type Set = { key: string; value: string };
 type Delete = { keys: string[] };
 
@@ -90,7 +91,7 @@ class Request implements Mapper<string, TJSON, string, TJSON> {
   ): Iterable<[string, TJSON]> {
     const v = it.first() as JSONObject;
     let computed: Response;
-    const value = this.users.maybeGetOne(v.payload as string);
+    const value = this.users.maybeGetOne(v.payload as GetUser);
     const user = value as User;
     if (v.command == "getUser") {
       computed = { status: "ok", user };
