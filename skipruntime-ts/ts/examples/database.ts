@@ -59,6 +59,18 @@ async function initDB(): Promise<void> {
 }
 
 /*****************************************************************************/
+// The protocol
+/*****************************************************************************/
+
+type Command = {
+  command: string;
+  payload: TJSON;
+};
+
+type Set = { key: string; value: string };
+type Delete = { keys: string[] };
+
+/*****************************************************************************/
 // The read path, we want to find a user
 /*****************************************************************************/
 
@@ -92,14 +104,6 @@ class Request implements Mapper<string, TJSON, string, TJSON> {
 /*****************************************************************************/
 // The write path
 /*****************************************************************************/
-
-type Command = {
-  command: string;
-  payload: TJSON;
-};
-
-type Set = { key: string; value: string };
-type Delete = { keys: string[] };
 
 async function update(
   event: TJSON,
