@@ -3,7 +3,6 @@ import type {
   EagerCollection,
   NonEmptyIterator,
   OutputMapper,
-  RefreshToken,
   Remote,
   Schema,
   SKStore,
@@ -96,7 +95,7 @@ function toWriters(
 }
 
 class SimpleToGenericSkipService implements GenericSkipService {
-  refreshTokens?: Record<string, RefreshToken>;
+  refreshTokens?: Record<string, number>;
 
   init?: (tables: Record<string, Table<TJSON[]>>) => Promise<void>;
 

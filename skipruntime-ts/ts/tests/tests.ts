@@ -895,9 +895,9 @@ async function testTimedQueue() {
   const rstarttime = new Date().getTime();
   timedQueue.start(
     [
-      { ident: "token_2s", duration: 2000 },
-      { ident: "token_5s", duration: 5000 },
-      { ident: "token_12s", duration: 12000 },
+      { ident: "token_2s", interval: 2000 },
+      { ident: "token_5s", interval: 5000 },
+      { ident: "token_12s", interval: 12000 },
     ],
     rstarttime,
   );
