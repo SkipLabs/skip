@@ -98,7 +98,7 @@ class Request extends ValueMapper<string, Command, Response> {
 
 async function update(
   event: TJSON,
-  writers: Record<string, Writer<TJSON>>,
+  writers: Record<string, Writer<string>>,
 ): Promise<void> {
   const writer = writers["users"];
   const cmd = event as Command;
