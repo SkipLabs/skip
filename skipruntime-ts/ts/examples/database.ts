@@ -62,23 +62,16 @@ const db = await initDB();
 // The protocol
 /*****************************************************************************/
 
-type Command = {
-  command: "getUser" | "set" | "delete";
-  payload: TJSON;
-};
-
-type GetUser = string;
-type Set = { key: string; value: string }[];
-type Delete = { keys: string[] }[];
+type Command =
+  | { command: "getUser"; payload: string }
+  | { command: "set"; payload: { key: string; value: string }[] }
+  | { command: "delete"; payload: { keys: string[] }[] };
 
 /*****************************************************************************/
 // The read path, we want to find a user
 /*****************************************************************************/
 
-type User = {
-  name: string;
-  country: string;
-};
+type User = { name: string; country: string };
 
 type Response = { status: "error"; msg: string } | { status: "ok"; user: User };
 
@@ -88,11 +81,14 @@ class Request extends ValueMapper<string, Command, Response> {
   }
 
   mapValue(cmd: Command): Response {
-    const value = this.users.maybeGetOne(cmd.payload as GetUser);
-    const user = value as User;
-    return cmd.command == "getUser"
-      ? { status: "ok", user }
-      : { status: "error", msg: "Unknown command" };
+    switch (cmd.command) {
+      case "getUser": {
+        const user = this.users.maybeGetOne(cmd.payload) as User;
+        return { status: "ok", user };
+      }
+      default:
+        return { status: "error", msg: "Unknown command" };
+    }
   }
 }
 
@@ -106,25 +102,28 @@ async function update(
 ): Promise<void> {
   const writer = writers["users"];
   const cmd = event as Command;
-  if (cmd.command == "set") {
-    const payload = cmd.payload as Set;
-    for (const e of payload) {
-      await db.run(
-        "INSERT OR REPLACE INTO data (id, object) VALUES ($id, $object)",
-        {
-          $id: e.key,
-          $object: JSON.stringify(e.value),
-        },
-      );
-      writer.set(e.key, e.value);
-    }
-  } else if (cmd.command == "delete") {
-    const payload = cmd.payload as Delete;
-    for (const e of payload) {
-      for (const key of e.keys) {
-        await db.run("DELETE FROM data WHERE id = $id", { $id: key });
+  switch (cmd.command) {
+    case "set": {
+      for (const entry of cmd.payload) {
+        await db.run(
+          "INSERT OR REPLACE INTO data (id, object) VALUES ($id, $object)",
+          {
+            $id: entry.key,
+            $object: JSON.stringify(entry.value),
+          },
+        );
+        writer.set(entry.key, entry.value);
       }
-      writer.delete(e.keys);
+      break;
+    }
+    case "delete": {
+      for (const entry of cmd.payload) {
+        for (const key of entry.keys) {
+          await db.run("DELETE FROM data WHERE id = $id", { $id: key });
+        }
+        writer.delete(entry.keys);
+      }
+      break;
     }
   }
 }
