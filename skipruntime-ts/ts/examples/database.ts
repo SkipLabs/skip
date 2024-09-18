@@ -1,16 +1,13 @@
 import type {
   SKStore,
   TJSON,
-  Mapper,
   EagerCollection,
-  NonEmptyIterator,
   SimpleSkipService,
   SimpleServiceOutput,
-  JSONObject,
   Writer,
 } from "skip-runtime";
 
-import { runWithServer } from "skip-runtime";
+import { runWithServer, ValueMapper } from "skip-runtime";
 
 import sqlite3 from "sqlite3";
 
@@ -85,21 +82,17 @@ type User = {
 
 type Response = { status: "error"; msg: string } | { status: "ok"; user: User };
 
-class Request implements Mapper<string, Command, string, Response> {
-  constructor(private users: EagerCollection<string, TJSON>) {}
+class Request extends ValueMapper<string, Command, Response> {
+  constructor(private users: EagerCollection<string, TJSON>) {
+    super();
+  }
 
-  mapElement(
-    key: string,
-    it: NonEmptyIterator<Command>,
-  ): Iterable<[string, Response]> {
-    const cmd = it.first();
+  mapValue(cmd: Command): Response {
     const value = this.users.maybeGetOne(cmd.payload as GetUser);
     const user = value as User;
-    const computed: Response =
-      cmd.command == "getUser"
-        ? { status: "ok", user }
-        : { status: "error", msg: "Unknown command" };
-    return Array([key, computed]);
+    return cmd.command == "getUser"
+      ? { status: "ok", user }
+      : { status: "error", msg: "Unknown command" };
   }
 }
 
