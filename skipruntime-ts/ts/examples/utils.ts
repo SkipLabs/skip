@@ -142,7 +142,7 @@ class Player {
   }
 }
 
-export async function run(scenarios: Step[][], port: number) {
+export function run(scenarios: Step[][], port: number) {
   const ws = new WebSocket(`ws://localhost:${port}`);
   ws.on("error", console.error);
   ws.on("close", () => process.exit(2));
