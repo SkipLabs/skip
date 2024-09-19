@@ -8,6 +8,7 @@ import type {
   SimpleServiceOutput,
   JSONObject,
   Writer,
+  Opt,
 } from "skip-runtime";
 
 import { runWithServer } from "skip-runtime";
@@ -37,11 +38,12 @@ class Add implements Mapper<string, TJSON, string, TJSON> {
     it: NonEmptyIterator<TJSON>,
   ): Iterable<[string, TJSON]> {
     const v = it.first() as number;
-    const ev = this.other.maybeGetOne(key) as number;
+    const ev = this.other.maybeGetOne(key) as Opt<number>;
     if (ev !== null) {
-      return Array([key, v + (ev ?? 0)]);
+      return Array([key, v + ev]);
+    } else {
+      return [];
     }
-    return [];
   }
 }
 
