@@ -41,7 +41,7 @@ class Add implements Mapper<string, TJSON, string, TJSON> {
     if (ev !== null) {
       return Array([key, v + (ev ?? 0)]);
     }
-    return Array();
+    return [];
   }
 }
 
