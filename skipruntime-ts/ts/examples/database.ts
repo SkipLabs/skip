@@ -15,48 +15,30 @@ import sqlite3 from "sqlite3";
 // Populate the database with made-up values (if it's not already there)
 /*****************************************************************************/
 
-async function initDB(): Promise<sqlite3.Database> {
+function initDB(): sqlite3.Database {
   const db = new sqlite3.Database("./db.sqlite");
   // Create the table if it doesn't exist
-  await db.exec(`CREATE TABLE IF NOT EXISTS data (
+  db.exec(`CREATE TABLE IF NOT EXISTS data (
     id TEXT PRIMARY KEY,
     object JSON
     )`);
 
-  await db.run(
-    "INSERT OR REPLACE INTO data (id, object) VALUES ($id, $object)",
-    {
-      $id: "123",
-      $object: JSON.stringify({
-        name: "daniel",
-        country: "FR",
-      }),
-    },
-  );
-  await db.run(
-    "INSERT OR REPLACE INTO data (id, object) VALUES ($id, $object)",
-    {
-      $id: "124",
-      $object: JSON.stringify({
-        name: "josh",
-        country: "UK",
-      }),
-    },
-  );
-  await db.run(
-    "INSERT OR REPLACE INTO data (id, object) VALUES ($id, $object)",
-    {
-      $id: "125",
-      $object: JSON.stringify({
-        name: "julien",
-        country: "ES",
-      }),
-    },
-  );
+  db.run("INSERT OR REPLACE INTO data (id, object) VALUES ($id, $object)", {
+    $id: "123",
+    $object: JSON.stringify({ name: "daniel", country: "FR" }),
+  });
+  db.run("INSERT OR REPLACE INTO data (id, object) VALUES ($id, $object)", {
+    $id: "124",
+    $object: JSON.stringify({ name: "josh", country: "UK" }),
+  });
+  db.run("INSERT OR REPLACE INTO data (id, object) VALUES ($id, $object)", {
+    $id: "125",
+    $object: JSON.stringify({ name: "julien", country: "ES" }),
+  });
   return db;
 }
 
-const db = await initDB();
+const db = initDB();
 
 /*****************************************************************************/
 // The protocol
@@ -96,16 +78,13 @@ class Request extends ValueMapper<string, Command, Response> {
 // The write path
 /*****************************************************************************/
 
-async function update(
-  event: TJSON,
-  writers: Record<string, Writer<string>>,
-): Promise<void> {
+function update(event: TJSON, writers: Record<string, Writer<string>>): void {
   const writer = writers["users"];
   const cmd = event as Command;
   switch (cmd.command) {
     case "set": {
       for (const entry of cmd.payload) {
-        await db.run(
+        db.run(
           "INSERT OR REPLACE INTO data (id, object) VALUES ($id, $object)",
           {
             $id: entry.key,
@@ -119,7 +98,7 @@ async function update(
     case "delete": {
       for (const entry of cmd.payload) {
         for (const key of entry.keys) {
-          await db.run("DELETE FROM data WHERE id = $id", { $id: key });
+          db.run("DELETE FROM data WHERE id = $id", { $id: key });
         }
         writer.delete(entry.keys);
       }
@@ -136,7 +115,7 @@ class Service implements SimpleSkipService {
   name: string = "database-example";
   inputTables = ["users"];
 
-  async init(tables: Record<string, Writer<TJSON[]>>) {
+  init(tables: Record<string, Writer<TJSON[]>>) {
     db.all(
       "SELECT id, object FROM data",
       (err, data: Array<{ id: string; object: string }>) => {
@@ -162,4 +141,4 @@ class Service implements SimpleSkipService {
 
 // Command that starts the service
 
-runWithServer(new Service(), { port: 8081 });
+await runWithServer(new Service(), { port: 8081 });

@@ -96,7 +96,7 @@ class Service implements SimpleSkipService {
     const output = cells.map(CallCompute, evaluator);
     return {
       output,
-      update: async (event: TJSON, writers: Record<string, Writer<TJSON>>) => {
+      update: (event: TJSON, writers: Record<string, Writer<TJSON>>) => {
         const cmd = event as Command;
         if (cmd.command == "set") {
           const payload = cmd.payload as Set[];
@@ -116,4 +116,4 @@ class Service implements SimpleSkipService {
   }
 }
 
-runWithServer(new Service(), { port: 8082 });
+await runWithServer(new Service(), { port: 8082 });
