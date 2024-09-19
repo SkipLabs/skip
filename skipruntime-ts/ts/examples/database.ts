@@ -121,7 +121,8 @@ class Service implements SimpleSkipService {
       (err, data: { id: string; object: string }[]) => {
         const userWriter = tables["users"];
         for (const user of data) {
-          userWriter.set(user.id, JSON.parse(user.object));
+          const json: User = JSON.parse(user.object);
+          userWriter.set(user.id, [json]);
         }
       },
     );
