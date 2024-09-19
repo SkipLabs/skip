@@ -75,10 +75,10 @@ class Player {
     }
   }
 
-  play(idx?: number) {
+  play(idx = 0) {
     let run = true;
-    if (idx ?? 0 > 0) {
-      run = this.start(idx!);
+    if (idx > 0) {
+      run = this.start(idx);
     }
     if (run) {
       if (this.running) {
