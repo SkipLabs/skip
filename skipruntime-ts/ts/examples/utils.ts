@@ -1,4 +1,4 @@
-import type { JSONObject } from "skip-runtime";
+import type { TJSON } from "skip-runtime";
 import { createInterface } from "readline";
 import { WebSocket } from "ws";
 
@@ -7,7 +7,7 @@ export interface ClientDefinition {
   scenarios: () => Step[][];
 }
 
-type Step = JSONObject;
+type Step = { type: string; command: string; payload: TJSON };
 
 class Session {
   scenario: Step[];
@@ -156,17 +156,17 @@ export function run(scenarios: Step[][], port: number) {
           [
             /^get (.*)$/g,
             (query: string) => {
-              const jsquery = JSON.parse(query);
+              const jsquery: Step = JSON.parse(query);
               jsquery["type"] = "get";
-              ws.send(jsquery);
+              ws.send(JSON.stringify(jsquery));
             },
           ],
           [
             /^post (.*)$/g,
             (query: string) => {
-              const jsquery = JSON.parse(query);
+              const jsquery: Step = JSON.parse(query);
               jsquery["type"] = "post";
-              ws.send(jsquery);
+              ws.send(JSON.stringify(jsquery));
             },
           ],
         ];
