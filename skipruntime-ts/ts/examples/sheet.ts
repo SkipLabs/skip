@@ -31,10 +31,11 @@ class ComputeExpression implements LazyCompute<string, string> {
       try {
         // Fake evaluator in this exemple
         switch (v.substring(1)) {
-          case "A1 + A2":
+          case "A1 + A2": {
             const v1 = getComputed("A1");
             const v2 = getComputed("A2");
             return (v1 + v2).toString();
+          }
           case "A3 * A2":
             return (getComputed("A3") * getComputed("A2")).toString();
           default:
@@ -45,7 +46,7 @@ class ComputeExpression implements LazyCompute<string, string> {
         return "# " + msg;
       }
     } else {
-      return v as string;
+      return v;
     }
   }
 }

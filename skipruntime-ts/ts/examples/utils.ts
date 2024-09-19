@@ -128,8 +128,7 @@ class Player {
       [/^stop$/g, () => this.stop()],
     ];
     let done = false;
-    for (let i = 0; i < patterns.length; i++) {
-      const pattern = patterns[i];
+    for (const pattern of patterns) {
       const matches = [...line.matchAll(pattern[0])];
       if (matches.length > 0) {
         done = true;
@@ -172,8 +171,7 @@ export function run(scenarios: Step[][], port: number) {
           ],
         ];
         let done = false;
-        for (let i = 0; i < patterns.length; i++) {
-          const pattern = patterns[i];
+        for (const pattern of patterns) {
           const matches = [...line.matchAll(pattern[0])];
           if (matches.length > 0) {
             done = true;
