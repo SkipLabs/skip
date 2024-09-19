@@ -71,6 +71,10 @@ export default tseslint.config(
           reportUsedIgnorePattern: true,
         },
       ],
+      "@typescript-eslint/prefer-string-starts-ends-with": [
+        "error",
+        { allowSingleElementEquality: "always" },
+      ],
       "@typescript-eslint/restrict-plus-operands": "error",
       "@typescript-eslint/restrict-template-expressions": "off",
       "@typescript-eslint/use-unknown-in-catch-callback-variable": "error",
