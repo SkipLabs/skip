@@ -1,6 +1,5 @@
 import type { JSONObject } from "skip-runtime";
 import { createInterface } from "readline";
-// @ts-ignore
 import { WebSocket } from "ws";
 
 export interface ClientDefinition {
