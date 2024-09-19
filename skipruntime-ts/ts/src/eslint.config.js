@@ -45,7 +45,7 @@ export default tseslint.config(
       ],
       "@typescript-eslint/consistent-indexed-object-style": "off",
       "@typescript-eslint/consistent-type-definitions": "off",
-      "@typescript-eslint/no-confusing-void-expression": "error",
+      "@typescript-eslint/no-confusing-void-expression": "off",
       "@typescript-eslint/no-empty-object-type": [
         "error",
         { allowInterfaces: "with-single-extends" },
