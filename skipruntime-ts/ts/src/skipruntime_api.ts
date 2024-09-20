@@ -528,6 +528,14 @@ export interface AsyncLazyCompute<
   call: (key: K, params: P) => Promise<AValue<V, M>>;
 }
 
+export interface ExternalCall<
+  K extends TJSON,
+  V extends TJSON,
+  Metadata extends TJSON,
+> {
+  call(key: K, timestamp: number): Promise<AValue<V, Metadata>>;
+}
+
 export interface SKStore extends Constant {
   /**
    * Creates a lazy reactive collection.
@@ -555,6 +563,17 @@ export interface SKStore extends Constant {
     compute: new (...params: Params) => AsyncLazyCompute<K, V, P, M>,
     ...params: Params
   ): AsyncLazyCollection<K, V, M>;
+
+  external<
+    K extends TJSON,
+    V extends TJSON,
+    Metadata extends TJSON,
+    Params extends Param[],
+  >(
+    refreshToken: string,
+    compute: new (...params: Params) => ExternalCall<K, V, Metadata>,
+    ...params: Params
+  ): AsyncLazyCollection<K, V, Metadata>;
 
   getRefreshToken: (key: string) => RefreshToken;
 
