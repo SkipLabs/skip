@@ -203,7 +203,7 @@ export async function runService(
     (
       event: TJSON,
       remote: Record<string, (event: TJSON) => Promise<void>>,
-    ) => Promise<void>,
+    ) => void | Promise<void>,
     Record<string, Table<TJSON[]>>,
     Record<string, Table<TJSON[]>>,
   ]
@@ -246,7 +246,7 @@ export async function runService(
     | ((
         event: TJSON,
         remote: Record<string, (event: TJSON) => Promise<void>>,
-      ) => Promise<void>)
+      ) => void | Promise<void>)
     | null = null;
   const iTables: Record<string, Table<TJSON[]>> = {};
   const oTables: Record<string, Table<TJSON[]>> = {};
