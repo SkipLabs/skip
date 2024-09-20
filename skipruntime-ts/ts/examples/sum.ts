@@ -8,7 +8,6 @@ import type {
   SimpleServiceOutput,
   JSONObject,
   Writer,
-  Opt,
 } from "skip-runtime";
 
 import { runWithServer } from "skip-runtime";
@@ -30,15 +29,15 @@ class Request implements Mapper<string, TJSON, string, TJSON> {
   }
 }
 
-class Add implements Mapper<string, TJSON, string, TJSON> {
-  constructor(private other: EagerCollection<string, TJSON>) {}
+class Add implements Mapper<string, number, string, number> {
+  constructor(private other: EagerCollection<string, number>) {}
 
   mapElement(
     key: string,
-    it: NonEmptyIterator<TJSON>,
-  ): Iterable<[string, TJSON]> {
-    const v = it.first() as number;
-    const ev = this.other.maybeGetOne(key) as Opt<number>;
+    it: NonEmptyIterator<number>,
+  ): Iterable<[string, number]> {
+    const v = it.first();
+    const ev = this.other.maybeGetOne(key);
     if (ev !== null) {
       return Array([key, v + ev]);
     } else {
@@ -66,7 +65,7 @@ class Service implements SimpleSkipService {
   reactiveCompute(
     _store: SKStore,
     requests: EagerCollection<string, TJSON>,
-    inputCollections: Record<string, EagerCollection<string, TJSON>>,
+    inputCollections: Record<string, EagerCollection<string, number>>,
   ): SimpleServiceOutput {
     const addResult = inputCollections.input1.map(Add, inputCollections.input2);
     const output = requests.map(Request, addResult);
