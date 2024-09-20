@@ -85,6 +85,10 @@ build/init.sql: sql/privacy/init.sql
 # dev workflow orchestration
 ################################################################################
 
+.PHONY: update-js-deps
+update-js-deps:
+	find . -name node_modules -not -prune -or -name target -not -prune -or -name package.json -exec sh -c 'cd $$(dirname "$$0"); bun update --latest' {} \;
+
 CHECK_TARGETS=$(patsubst %/Skargo.toml,check-%,$(shell ls -1 */Skargo.toml))
 
 check-%:
