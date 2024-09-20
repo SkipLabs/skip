@@ -47,21 +47,45 @@ function assertNoKeysNaN<K extends TJSON, V extends TJSON>(
 }
 export const serverResponseSuffix = "__skdb_mirror_feedback";
 
+export const sk_frozen: unique symbol = Symbol();
+
+export interface Constant {
+  [sk_frozen]: true;
+}
+
+function sk_freeze<T extends object>(x: T): T & Constant {
+  return Object.defineProperty(x, sk_frozen, {
+    enumerable: false,
+    writable: false,
+    value: true,
+  }) as T & Constant;
+}
+
+function isSkFrozen(x: any): x is Constant {
+  return sk_frozen in x && x[sk_frozen] === true;
+}
+
+abstract class SkFrozen implements Constant {
+  // tsc misses that Object.defineProperty in the constructor inits this
+  [sk_frozen]!: true;
+
+  constructor() {
+    sk_freeze(this);
+    // Inheriting classes should call Object.freeze at the end of their
+    // constructor
+  }
+}
+
 class EagerCollectionImpl<K extends TJSON, V extends TJSON>
+  extends SkFrozen
   implements EagerCollection<K, V>
 {
-  //
-  protected context: Context;
-  eagerHdl: string;
-
-  constructor(context: Context, eagerHdl: string) {
-    this.context = context;
-    this.eagerHdl = eagerHdl;
-    Object.defineProperty(this, "__sk_frozen", {
-      enumerable: false,
-      writable: false,
-      value: true,
-    });
+  constructor(
+    protected context: Context,
+    protected eagerHdl: string,
+  ) {
+    super();
+    Object.freeze(this);
   }
 
   getId(): string {
@@ -86,9 +110,9 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
     return this.context.maybeGetOne(this.eagerHdl, key);
   }
 
-  size = () => {
+  size(): int {
     return this.context.size(this.eagerHdl);
-  };
+  }
 
   sliced(ranges: readonly [K, K][]): EagerCollection<K, V> {
     const sliceName =
@@ -182,19 +206,15 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
 }
 
 class LazyCollectionImpl<K extends TJSON, V extends TJSON>
+  extends SkFrozen
   implements LazyCollection<K, V>
 {
-  protected context: Context;
-  protected lazyHdl: string;
-
-  constructor(context: Context, lazyHdl: string) {
-    this.context = context;
-    this.lazyHdl = lazyHdl;
-    Object.defineProperty(this, "__sk_frozen", {
-      enumerable: false,
-      writable: false,
-      value: true,
-    });
+  constructor(
+    protected context: Context,
+    protected lazyHdl: string,
+  ) {
+    super();
+    Object.freeze(this);
   }
 
   getArray(key: K): V[] {
@@ -211,19 +231,15 @@ class LazyCollectionImpl<K extends TJSON, V extends TJSON>
 }
 
 export class LSelfImpl<K extends TJSON, V extends TJSON>
+  extends SkFrozen
   implements LazyCollection<K, V>
 {
-  protected context: Context;
-  protected lazyHdl: ptr<Internal.LHandle>;
-
-  constructor(context: Context, lazyHdl: ptr<Internal.LHandle>) {
-    this.context = context;
-    this.lazyHdl = lazyHdl;
-    Object.defineProperty(this, "__sk_frozen", {
-      enumerable: false,
-      writable: false,
-      value: true,
-    });
+  constructor(
+    protected context: Context,
+    protected lazyHdl: ptr<Internal.LHandle>,
+  ) {
+    super();
+    Object.freeze(this);
   }
 
   getArray(key: K): V[] {
@@ -240,6 +256,7 @@ export class LSelfImpl<K extends TJSON, V extends TJSON>
 }
 
 export class TableCollectionImpl<R extends TJSON[]>
+  extends SkFrozen
   implements TableCollection<R>
 {
   constructor(
@@ -247,11 +264,8 @@ export class TableCollectionImpl<R extends TJSON[]>
     protected skdb: SKDBSync,
     protected schema: Schema,
   ) {
-    Object.defineProperty(this, "__sk_frozen", {
-      enumerable: false,
-      writable: false,
-      value: true,
-    });
+    super();
+    Object.freeze(this);
   }
 
   getName() {
@@ -297,15 +311,12 @@ export class TableCollectionImpl<R extends TJSON[]>
 }
 
 export class TableImpl<R extends TJSON[]> implements Table<R> {
-  protected context: Context;
-  protected skdb: SKDBSync;
-  protected schema: Schema;
-
-  constructor(context: Context, skdb: SKDBSync, schema: Schema) {
-    this.context = context;
-    this.skdb = skdb;
-    this.schema = schema;
-  }
+  //
+  constructor(
+    protected context: Context,
+    protected skdb: SKDBSync,
+    protected schema: Schema,
+  ) {}
 
   getName(): string {
     return this.schema.name;
@@ -370,7 +381,8 @@ export class TableImpl<R extends TJSON[]> implements Table<R> {
       query.params ? toParams(query.params) : undefined,
     );
   }
-  watch = (update: (rows: JSONObject[]) => void, feedback: boolean = false) => {
+
+  watch(update: (rows: JSONObject[]) => void, feedback: boolean = false) {
     const name = feedback
       ? this.getName() + serverResponseSuffix
       : this.getName();
@@ -380,13 +392,13 @@ export class TableImpl<R extends TJSON[]> implements Table<R> {
       query.params ? toParams(query.params) : {},
       update,
     );
-  };
+  }
 
-  watchChanges = (
+  watchChanges(
     init: (rows: JSONObject[]) => void,
     update: (added: JSONObject[], removed: JSONObject[]) => void,
     feedback: boolean = false,
-  ) => {
+  ) {
     const name = feedback
       ? this.getName() + serverResponseSuffix
       : this.getName();
@@ -397,19 +409,14 @@ export class TableImpl<R extends TJSON[]> implements Table<R> {
       init,
       update,
     );
-  };
+  }
 }
 
-export class SKStoreImpl implements SKStore {
-  private context: Context;
-
-  constructor(context: Context) {
-    this.context = context;
-    Object.defineProperty(this, "__sk_frozen", {
-      enumerable: false,
-      writable: false,
-      value: true,
-    });
+export class SKStoreImpl extends SkFrozen implements SKStore {
+  //
+  constructor(private context: Context) {
+    super();
+    Object.freeze(this);
   }
 
   lazy<K extends TJSON, V extends TJSON, Params extends Param[]>(
@@ -464,29 +471,22 @@ export class SKStoreImpl implements SKStore {
 }
 
 export class SKStoreFactoryImpl implements SKStoreFactory {
-  private context: () => Context;
-  private create: (init: () => void, tokens: Record<string, number>) => void;
-  private createSync: (
-    dbName?: string,
-    asWorker?: boolean,
-  ) => Promise<SKDBSync>;
-  private createKey: (key: string) => Promise<CryptoKey>;
-
+  //
   constructor(
-    context: () => Context,
-    create: (init: () => void, tokens: Record<string, number>) => void,
-    createSync: (dbName?: string, asWorker?: boolean) => Promise<SKDBSync>,
-    createKey: (key: string) => Promise<CryptoKey>,
-  ) {
-    this.context = context;
-    this.create = create;
-    this.createSync = createSync;
-    this.createKey = createKey;
+    private context: () => Context,
+    private create: (init: () => void, tokens: Record<string, number>) => void,
+    private createSync: (
+      dbName?: string,
+      asWorker?: boolean,
+    ) => Promise<SKDBSync>,
+    private createKey: (key: string) => Promise<CryptoKey>,
+  ) {}
+
+  getName() {
+    return "SKStore";
   }
 
-  getName = () => "SKStore";
-
-  runSKStore = async (
+  async runSKStore(
     init: (
       skstore: SKStore,
       tables: Record<string, TableCollection<TJSON[]>>,
@@ -495,7 +495,7 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
     remotes: Record<string, Remote> = {},
     tokens: Record<string, number> = {},
     initLocals?: (tables: Record<string, Table<TJSON[]>>) => Promise<void>,
-  ): Promise<Record<string, Table<TJSON[]>>> => {
+  ): Promise<Record<string, Table<TJSON[]>>> {
     const context = this.context();
     const tables = await mirror(
       context,
@@ -522,7 +522,7 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
       result[key] = (value as TableCollectionImpl<TJSON[]>).toTable();
     }
     return result;
-  };
+  }
 }
 
 function toWs(entryPoint: EntryPoint) {
@@ -835,28 +835,78 @@ function toUpdateWhereQuery(
 }
 
 export function check<T>(value: T): void {
-  const type = typeof value;
-  if (type == "string" || type == "number" || type == "boolean") {
+  if (
+    typeof value == "string" ||
+    typeof value == "number" ||
+    typeof value == "boolean"
+  ) {
     return;
-  } else if (type == "object") {
-    const jso = value as any;
-    if (jso.__sk_frozen) {
+  } else if (typeof value == "object") {
+    if (value === null || isSkFrozen(value)) {
       return;
-    } else if (Object.isFrozen(jso)) {
-      if (Array.isArray(jso)) {
-        for (let i = 0; i < length; i++) {
-          check(jso[i]);
-        }
+    }
+    if (Object.isFrozen(value)) {
+      if (Array.isArray(value)) {
+        value.forEach(check);
       } else {
-        /* eslint-disable-next-line @typescript-eslint/no-unsafe-argument */
-        for (const key of Object.keys(jso)) {
-          check(jso[key]);
-        }
+        Object.values(value).forEach(check);
       }
     } else {
       throw new Error("Invalid object: must be frozen.");
     }
   } else {
-    throw new Error("'" + type + "' cannot be manage by skstore.");
+    throw new Error(`'${typeof value}' cannot be managed by skstore.`);
+  }
+}
+
+/**
+ * _Deep-freeze_ an object, returning the same object that was passed in.
+ *
+ * This function is similar to
+ * {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/freeze | `Object.freeze()`}
+ * but freezes the object and deep-freezes all its properties,
+ * recursively. The object is then not only _immutable_ but also
+ * _constant_. Note that as a result all objects reachable from the
+ * parameter will be frozen and no longer mutable or extensible, even from
+ * other references.
+ *
+ * The primary use for this function is to satisfy the requirement that all
+ * parameters to Skip `Mapper` constructors must be deep-frozen: objects
+ * that have not been constructed by Skip can be passed to `freeze()` before
+ * passing them to a `Mapper` constructor.
+ *
+ * @param value - The object to deep-freeze.
+ * @returns The same object that was passed in.
+ */
+export function freeze<T>(value: T): T {
+  if (
+    typeof value == "string" ||
+    typeof value == "number" ||
+    typeof value == "boolean"
+  ) {
+    return value;
+  } else if (typeof value == "object") {
+    if (value === null) {
+      return value;
+    } else if (isSkFrozen(value)) {
+      return value;
+    } else if (Object.isFrozen(value)) {
+      check(value);
+      return value;
+    } else if (Array.isArray(value)) {
+      const length: number = value.length;
+      for (let i = 0; i < length; i++) {
+        value[i] = freeze(value[i]);
+      }
+      return Object.freeze(sk_freeze(value));
+    } else {
+      const jso = value as Record<string, any>;
+      for (const key of Object.keys(jso)) {
+        jso[key] = freeze(jso[key]);
+      }
+      return Object.freeze(sk_freeze(jso)) as T;
+    }
+  } else {
+    throw new Error(`'${typeof value}' cannot be frozen.`);
   }
 }
