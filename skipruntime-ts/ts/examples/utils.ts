@@ -157,7 +157,7 @@ export function run(scenarios: Step[][], port: number) {
             /^get (.*)$/g,
             (query: string) => {
               const jsquery: Step = JSON.parse(query);
-              jsquery["type"] = "get";
+              jsquery.type = "get";
               ws.send(JSON.stringify(jsquery));
             },
           ],
@@ -165,7 +165,7 @@ export function run(scenarios: Step[][], port: number) {
             /^post (.*)$/g,
             (query: string) => {
               const jsquery: Step = JSON.parse(query);
-              jsquery["type"] = "post";
+              jsquery.type = "post";
               ws.send(JSON.stringify(jsquery));
             },
           ],
