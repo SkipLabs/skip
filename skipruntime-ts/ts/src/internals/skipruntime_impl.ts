@@ -446,7 +446,7 @@ export class SKStoreImpl extends SkFrozen implements SKStore {
   >(
     compute: new (...params: Params) => AsyncLazyCompute<K, V, P, M>,
     ...params: Params
-  ): LazyCollection<K, Loadable<V, M>> {
+  ): AsyncLazyCollection<K, V, M> {
     params.forEach(check);
     const computeObj = new compute(...params);
     const name = computeObj.constructor.name;
