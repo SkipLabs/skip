@@ -9,11 +9,6 @@ type HTTPCommand = {
   [key: string]: TJSON;
 };
 
-interface WS {
-  send(message: string): void;
-  on(chanel: string, callback: (bytes: Buffer) => void): void;
-}
-
 export async function runWithServer_(
   service: SimpleSkipService,
   createSKStore: typeof CreateSKStore,
@@ -28,7 +23,7 @@ export async function runWithServer_(
   );
   const responses = outputs["__sk_responses"];
   const requests = inputs["__sk_requests"];
-  wss.on("connection", (ws: WS) => {
+  wss.on("connection", (ws) => {
     responses.watchChanges(
       (rows: JSONObject[]) => {
         const message = JSON.stringify({ type: "init", payload: rows });
