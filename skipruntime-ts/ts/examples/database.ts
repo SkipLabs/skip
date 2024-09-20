@@ -118,7 +118,7 @@ class Service implements SimpleSkipService {
   init(tables: Record<string, Writer<TJSON[]>>) {
     db.all(
       "SELECT id, object FROM data",
-      (err, data: { id: string; object: string }[]) => {
+      (_err, data: { id: string; object: string }[]) => {
         const userWriter = tables["users"];
         for (const user of data) {
           const json: User = JSON.parse(user.object);
