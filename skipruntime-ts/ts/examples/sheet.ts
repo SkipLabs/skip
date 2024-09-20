@@ -86,7 +86,7 @@ class Service implements SimpleSkipService {
     _requests: EagerCollection<string, TJSON>,
     inputCollections: Record<string, EagerCollection<string, TJSON>>,
   ): SimpleServiceOutput {
-    const cells = inputCollections.cells;
+    const cells = inputCollections["cells"];
     // Use lazy dir to create eval dependency graph
     // Its calls it self to get other computed cells
     const evaluator = store.lazy(ComputeExpression, cells);

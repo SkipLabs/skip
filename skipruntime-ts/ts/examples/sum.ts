@@ -62,7 +62,10 @@ class Service implements SimpleSkipService {
     requests: EagerCollection<string, Command>,
     inputCollections: Record<string, EagerCollection<string, number>>,
   ): SimpleServiceOutput {
-    const addResult = inputCollections.input1.map(Add, inputCollections.input2);
+    const addResult = inputCollections["input1"].map(
+      Add,
+      inputCollections["input2"],
+    );
     const output = requests.map(Request, addResult);
     return {
       output,
