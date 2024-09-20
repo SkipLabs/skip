@@ -36,7 +36,7 @@ type Test = {
   name: string;
   inputs: Schema[];
   outputs: Schema[];
-  init: (skstore: SKStore, ...tables: any[]) => void;
+  init: (skstore: SKStore, ...tables: TableCollection<TJSON[]>[]) => void;
   run: (...tables: Table<TJSON[]>[]) => void | Promise<void>;
   error?: (err: any) => void;
   tokens?: Record<string, number>;

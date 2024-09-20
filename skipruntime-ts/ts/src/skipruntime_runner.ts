@@ -257,14 +257,12 @@ export async function runService(
     const iHandles: Record<string, EagerCollection<TJSON, TJSON>> = {};
     for (const [key, value] of Object.entries(localInputs)) {
       const table = tables[key];
-      // eslint-disable-next-line  @typescript-eslint/no-unsafe-argument
       iHandles[key] = table.map(value.fromTableRow, ...value.params);
       iTables[key] = (table as TableCollectionImpl<TJSON[]>).toTable();
     }
     for (const remove of Object.values(remoteInputs)) {
       for (const [key, value] of Object.entries(remove.inputs)) {
         const table = tables[key];
-        // eslint-disable-next-line  @typescript-eslint/no-unsafe-argument
         iHandles[key] = table.map(value.fromTableRow, ...value.params);
       }
     }
@@ -289,7 +287,6 @@ export async function runService(
         throw new Error(`Unable to retrieve ${key} table.`);
       }
       oTables[key] = (table as TableCollectionImpl<TJSON[]>).toTable();
-      // eslint-disable-next-line  @typescript-eslint/no-unsafe-argument
       ehandle.mapTo(tables[key], output.toTableRow, ...output.params);
     }
     update = (event, remotes) => result.update(event, iTables, remotes);
