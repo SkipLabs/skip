@@ -78,14 +78,11 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
   extends SkFrozen
   implements EagerCollection<K, V>
 {
-  //
-  protected context: Context;
-  eagerHdl: string;
-
-  constructor(context: Context, eagerHdl: string) {
+  constructor(
+    protected context: Context,
+    protected eagerHdl: string,
+  ) {
     super();
-    this.context = context;
-    this.eagerHdl = eagerHdl;
   }
 
   getId(): string {
@@ -209,13 +206,11 @@ class LazyCollectionImpl<K extends TJSON, V extends TJSON>
   extends SkFrozen
   implements LazyCollection<K, V>
 {
-  protected context: Context;
-  protected lazyHdl: string;
-
-  constructor(context: Context, lazyHdl: string) {
+  constructor(
+    protected context: Context,
+    protected lazyHdl: string,
+  ) {
     super();
-    this.context = context;
-    this.lazyHdl = lazyHdl;
   }
 
   getArray(key: K): V[] {
@@ -235,13 +230,11 @@ export class LSelfImpl<K extends TJSON, V extends TJSON>
   extends SkFrozen
   implements LazyCollection<K, V>
 {
-  protected context: Context;
-  protected lazyHdl: ptr<Internal.LHandle>;
-
-  constructor(context: Context, lazyHdl: ptr<Internal.LHandle>) {
+  constructor(
+    protected context: Context,
+    protected lazyHdl: ptr<Internal.LHandle>,
+  ) {
     super();
-    this.context = context;
-    this.lazyHdl = lazyHdl;
   }
 
   getArray(key: K): V[] {
@@ -312,15 +305,12 @@ export class TableCollectionImpl<R extends TJSON[]>
 }
 
 export class TableImpl<R extends TJSON[]> implements Table<R> {
-  protected context: Context;
-  protected skdb: SKDBSync;
-  protected schema: Schema;
-
-  constructor(context: Context, skdb: SKDBSync, schema: Schema) {
-    this.context = context;
-    this.skdb = skdb;
-    this.schema = schema;
-  }
+  //
+  constructor(
+    protected context: Context,
+    protected skdb: SKDBSync,
+    protected schema: Schema,
+  ) {}
 
   getName(): string {
     return this.schema.name;
@@ -416,11 +406,9 @@ export class TableImpl<R extends TJSON[]> implements Table<R> {
 }
 
 export class SKStoreImpl extends SkFrozen implements SKStore {
-  private context: Context;
-
-  constructor(context: Context) {
+  //
+  constructor(private context: Context) {
     super();
-    this.context = context;
   }
 
   lazy<K extends TJSON, V extends TJSON, Params extends Param[]>(
@@ -475,25 +463,16 @@ export class SKStoreImpl extends SkFrozen implements SKStore {
 }
 
 export class SKStoreFactoryImpl implements SKStoreFactory {
-  private context: () => Context;
-  private create: (init: () => void, tokens: Record<string, number>) => void;
-  private createSync: (
-    dbName?: string,
-    asWorker?: boolean,
-  ) => Promise<SKDBSync>;
-  private createKey: (key: string) => Promise<CryptoKey>;
-
+  //
   constructor(
-    context: () => Context,
-    create: (init: () => void, tokens: Record<string, number>) => void,
-    createSync: (dbName?: string, asWorker?: boolean) => Promise<SKDBSync>,
-    createKey: (key: string) => Promise<CryptoKey>,
-  ) {
-    this.context = context;
-    this.create = create;
-    this.createSync = createSync;
-    this.createKey = createKey;
-  }
+    private context: () => Context,
+    private create: (init: () => void, tokens: Record<string, number>) => void,
+    private createSync: (
+      dbName?: string,
+      asWorker?: boolean,
+    ) => Promise<SKDBSync>,
+    private createKey: (key: string) => Promise<CryptoKey>,
+  ) {}
 
   getName = () => "SKStore";
 
