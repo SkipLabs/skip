@@ -28,7 +28,7 @@ export async function runWithServer_(
   );
   const responses = outputs["__sk_responses"];
   const requests = inputs["__sk_requests"];
-  wss.on("connection", function connection(ws: WS) {
+  wss.on("connection", (ws: WS) => {
     responses.watchChanges(
       (rows: JSONObject[]) => {
         const message = JSON.stringify({ type: "init", payload: rows });
@@ -42,7 +42,7 @@ export async function runWithServer_(
         ws.send(message);
       },
     );
-    ws.on("message", function message(bytes: Buffer) {
+    ws.on("message", (bytes: Buffer) => {
       const strData = bytes.toString();
       const http = JSON.parse(strData) as HTTPCommand;
       if (http.type == "get") {
