@@ -494,7 +494,9 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
     local: Local,
     remotes: Record<string, Remote> = {},
     tokens: Record<string, number> = {},
-    initLocals?: (tables: Record<string, Table<TJSON[]>>) => Promise<void>,
+    initLocals?: (
+      tables: Record<string, Table<TJSON[]>>,
+    ) => void | Promise<void>,
   ): Promise<Record<string, Table<TJSON[]>>> {
     const context = this.context();
     const tables = await mirror(
