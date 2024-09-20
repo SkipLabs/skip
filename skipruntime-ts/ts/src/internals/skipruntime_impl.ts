@@ -6,6 +6,7 @@ import type {
   Accumulator,
   EagerCollection,
   LazyCollection,
+  AsyncLazyCollection,
   Mapper,
   InputMapper,
   OutputMapper,
@@ -27,6 +28,7 @@ import type {
   Local,
   EntryPoint,
   Inputs,
+  ExternalCall,
 } from "../skipruntime_api.js";
 
 // prettier-ignore
@@ -455,6 +457,31 @@ export class SKStoreImpl extends SkFrozen implements SKStore {
       (key: K, params: P) => computeObj.call(key, params),
     );
     return new LazyCollectionImpl<K, Loadable<V, M>>(this.context, lazyHdl);
+  }
+
+  external<
+    K extends TJSON,
+    V extends TJSON,
+    Metadata extends TJSON,
+    Params extends Param[],
+  >(
+    refreshToken: string,
+    compute: new (...params: Params) => ExternalCall<K, V, Metadata>,
+    ...params: Params
+  ): AsyncLazyCollection<K, V, Metadata> {
+    params.forEach(check);
+    const computeObj = new compute(...params);
+    const name = computeObj.constructor.name;
+    Object.freeze(computeObj);
+    const lazyHdl = this.context.asyncLazy<K, V, number, TJSON>(
+      name,
+      (_key: K) => this.getRefreshToken(refreshToken),
+      (key: K, timestamp: number) => computeObj.call(key, timestamp),
+    );
+    return new LazyCollectionImpl<K, Loadable<V, Metadata>>(
+      this.context,
+      lazyHdl,
+    );
   }
 
   getRefreshToken(key: string) {
