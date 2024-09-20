@@ -115,9 +115,15 @@ class SimpleToGenericSkipService implements GenericSkipService {
   }
 
   localInputs() {
-    const inputs: Record<string, InputDefinition> = {};
+    const inputs: Record<string, InputDefinition> = {
+      __sk_requests: {
+        schema: requestSchema,
+        fromTableRow: FromInput,
+        params: [],
+      },
+    };
     if (this.simple.inputTables) {
-      this.simple.inputTables.map((table) => {
+      this.simple.inputTables.forEach((table) => {
         inputs[table] = {
           schema: inputSchema(table),
           fromTableRow: FromInput,
@@ -125,14 +131,7 @@ class SimpleToGenericSkipService implements GenericSkipService {
         };
       });
     }
-    return {
-      __sk_requests: {
-        schema: requestSchema,
-        fromTableRow: FromInput,
-        params: [],
-      },
-      ...inputs,
-    };
+    return inputs;
   }
 
   remoteInputs(): Record<string, RemoteInputs> {
@@ -184,7 +183,9 @@ class SimpleToGenericSkipService implements GenericSkipService {
   }
 }
 
-function isGenericSkipService(service: GenericSkipService | SimpleSkipService) {
+function isGenericSkipService(
+  service: GenericSkipService | SimpleSkipService,
+): service is GenericSkipService {
   if (!("localInputs" in service)) return false;
   if (!("remoteInputs" in service)) return false;
   if (!("outputs" in service)) return false;
@@ -209,8 +210,8 @@ export async function runService(
   ]
 > {
   const gService: GenericSkipService = isGenericSkipService(service)
-    ? (service as GenericSkipService)
-    : new SimpleToGenericSkipService(service as SimpleSkipService);
+    ? service
+    : new SimpleToGenericSkipService(service);
   const localInputs = gService.localInputs();
   const remoteInputs = gService.remoteInputs();
   const outputs = gService.outputs();
