@@ -71,6 +71,8 @@ abstract class SkFrozen implements Constant {
 
   constructor() {
     sk_freeze(this);
+    // Inheriting classes should call Object.freeze at the end of their
+    // constructor
   }
 }
 
@@ -83,6 +85,7 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
     protected eagerHdl: string,
   ) {
     super();
+    Object.freeze(this);
   }
 
   getId(): string {
@@ -211,6 +214,7 @@ class LazyCollectionImpl<K extends TJSON, V extends TJSON>
     protected lazyHdl: string,
   ) {
     super();
+    Object.freeze(this);
   }
 
   getArray(key: K): V[] {
@@ -235,6 +239,7 @@ export class LSelfImpl<K extends TJSON, V extends TJSON>
     protected lazyHdl: ptr<Internal.LHandle>,
   ) {
     super();
+    Object.freeze(this);
   }
 
   getArray(key: K): V[] {
@@ -260,6 +265,7 @@ export class TableCollectionImpl<R extends TJSON[]>
     protected schema: Schema,
   ) {
     super();
+    Object.freeze(this);
   }
 
   getName() {
@@ -409,6 +415,7 @@ export class SKStoreImpl extends SkFrozen implements SKStore {
   //
   constructor(private context: Context) {
     super();
+    Object.freeze(this);
   }
 
   lazy<K extends TJSON, V extends TJSON, Params extends Param[]>(
