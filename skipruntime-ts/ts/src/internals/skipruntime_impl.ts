@@ -110,9 +110,9 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
     return this.context.maybeGetOne(this.eagerHdl, key);
   }
 
-  size = () => {
+  size(): int {
     return this.context.size(this.eagerHdl);
-  };
+  }
 
   sliced(ranges: readonly [K, K][]): EagerCollection<K, V> {
     const sliceName =
@@ -381,7 +381,8 @@ export class TableImpl<R extends TJSON[]> implements Table<R> {
       query.params ? toParams(query.params) : undefined,
     );
   }
-  watch = (update: (rows: JSONObject[]) => void, feedback: boolean = false) => {
+
+  watch(update: (rows: JSONObject[]) => void, feedback: boolean = false) {
     const name = feedback
       ? this.getName() + serverResponseSuffix
       : this.getName();
@@ -391,13 +392,13 @@ export class TableImpl<R extends TJSON[]> implements Table<R> {
       query.params ? toParams(query.params) : {},
       update,
     );
-  };
+  }
 
-  watchChanges = (
+  watchChanges(
     init: (rows: JSONObject[]) => void,
     update: (added: JSONObject[], removed: JSONObject[]) => void,
     feedback: boolean = false,
-  ) => {
+  ) {
     const name = feedback
       ? this.getName() + serverResponseSuffix
       : this.getName();
@@ -408,7 +409,7 @@ export class TableImpl<R extends TJSON[]> implements Table<R> {
       init,
       update,
     );
-  };
+  }
 }
 
 export class SKStoreImpl extends SkFrozen implements SKStore {
@@ -481,9 +482,11 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
     private createKey: (key: string) => Promise<CryptoKey>,
   ) {}
 
-  getName = () => "SKStore";
+  getName() {
+    return "SKStore";
+  }
 
-  runSKStore = async (
+  async runSKStore(
     init: (
       skstore: SKStore,
       tables: Record<string, TableCollection<TJSON[]>>,
@@ -492,7 +495,7 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
     remotes: Record<string, Remote> = {},
     tokens: Record<string, number> = {},
     initLocals?: (tables: Record<string, Table<TJSON[]>>) => Promise<void>,
-  ): Promise<Record<string, Table<TJSON[]>>> => {
+  ): Promise<Record<string, Table<TJSON[]>>> {
     const context = this.context();
     const tables = await mirror(
       context,
@@ -519,7 +522,7 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
       result[key] = (value as TableCollectionImpl<TJSON[]>).toTable();
     }
     return result;
-  };
+  }
 }
 
 function toWs(entryPoint: EntryPoint) {
