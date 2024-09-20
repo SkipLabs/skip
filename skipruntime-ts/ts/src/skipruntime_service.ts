@@ -21,7 +21,7 @@ export type ServiceOutput = {
     event: TJSON,
     table: Record<string, Table<TJSON[]>>,
     remote: Record<string, (event: TJSON) => Promise<void>>,
-  ) => Promise<void>;
+  ) => void | Promise<void>;
 };
 
 export type SimpleServiceOutput = {
@@ -30,7 +30,7 @@ export type SimpleServiceOutput = {
     event: TJSON,
     writers: Record<string, Writer<TJSON>>,
     remote: Record<string, (event: TJSON) => Promise<void>>,
-  ) => Promise<void>;
+  ) => void | Promise<void>;
 };
 
 export type InputDefinition = {
@@ -59,7 +59,7 @@ export interface GenericSkipService {
   // Each token associates a string identifier with a refresh interval (in milliseconds)
   refreshTokens?: Record<string, number>;
 
-  init?: (tables: Record<string, Table<TJSON[]>>) => Promise<void>;
+  init?: (tables: Record<string, Table<TJSON[]>>) => void | Promise<void>;
 
   reactiveCompute(
     store: SKStore,
@@ -79,7 +79,7 @@ export interface SimpleSkipService {
   // Each token associates a string identifier with a refresh interval (in milliseconds)
   refreshTokens?: Record<string, number>;
 
-  init?: (table: Record<string, Writer<TJSON[]>>) => Promise<void>;
+  init?: (table: Record<string, Writer<TJSON[]>>) => void | Promise<void>;
 
   reactiveCompute(
     store: SKStore,

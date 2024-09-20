@@ -55,9 +55,12 @@ export async function runWithServer_(
           values: [[http, "", "read-write"]],
         });
       } else if (http.type == "post") {
-        update(http, {}).catch((e: unknown) => {
-          throw e;
-        });
+        const maybePromise = update(http, {});
+        if (typeof maybePromise === "object") {
+          maybePromise.catch((e: unknown) => {
+            throw e;
+          });
+        }
       } else {
         throw new TypeError("Unknown message type");
       }

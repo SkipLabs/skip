@@ -99,7 +99,7 @@ export async function createSKStore(
   local: Local,
   remotes: Record<string, Remote> = {},
   tokens: Record<string, number> = {},
-  initLocals?: (tables: Record<string, Table<TJSON[]>>) => Promise<void>,
+  initLocals?: (tables: Record<string, Table<TJSON[]>>) => void | Promise<void>,
 ): Promise<Record<string, Table<TJSON[]>>> {
   const data = await runUrl(wasmUrl, modules, [], "SKDB_factory");
   const factory = data.environment.shared.get("SKStore") as SKStoreFactory;
