@@ -1397,11 +1397,10 @@ type TQ_Elt = {
 };
 
 export class TimedQueue {
-  constructor(
-    private update: (time: number, tokens: string[]) => void,
-    private queue: TQ_Elt[] = [],
-    private timeout: string | number | Timeout | null = null,
-  ) {}
+  private queue: TQ_Elt[] = [];
+  private timeout: string | number | Timeout | null = null;
+
+  constructor(private update: (time: number, tokens: string[]) => void) {}
 
   start(tokens: TQ_Token[], time: number) {
     const tostart = new Map<number, TQ_Token[]>();
