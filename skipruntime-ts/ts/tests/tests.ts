@@ -727,11 +727,9 @@ class TestCheckExternalResult extends ValueMapper<number, number, string> {
   }
   mapValue(value: number, key: number): string {
     const asyncRes = this.asyncLazy.getOne(key);
-    return asyncRes.status == "success"
-      ? "success: " + asyncRes.payload
-      : asyncRes.status == "failure"
-        ? "error: " + asyncRes.error
-        : "loading...";
+    if (asyncRes.status == "success") return `success: ${asyncRes.payload}`;
+    if (asyncRes.status == "failure") return `error: ${asyncRes.error}`;
+    return `loading... (previous: ${asyncRes.previous ? asyncRes.previous.payload : "NONE"})`;
   }
 }
 tests.push({
@@ -758,8 +756,9 @@ tests.push({
     const success = (id: number) => {
       return { id, value: `success: mock_result(${id})` };
     };
-    const loading = (id: number) => {
-      return { id, value: "loading..." };
+    const loading = (id: number, hasPrevious: boolean = false) => {
+      const previous = hasPrevious ? `mock_result(${id})` : "NONE";
+      return { id, value: `loading... (previous: ${previous})` };
     };
 
     input.insert([
@@ -797,11 +796,11 @@ tests.push({
       success(3),
     ]);
     await timeout(1000);
-    //all loading at t = 4.5s (because refresh triggered at t = 4s)
+    //all loading at t = 4.5s, but with previous values available for use if need be
     check("testExternalCall", output.select({}), [
-      loading(1),
-      loading(2),
-      loading(3),
+      loading(1, true),
+      loading(2, true),
+      loading(3, true),
     ]);
   },
 });
