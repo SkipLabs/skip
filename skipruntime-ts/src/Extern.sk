@@ -1,5 +1,3 @@
-module alias DBUtils = SKDBToFromSKStore;
-
 module SKStore;
 
 @cpp_extern
@@ -32,7 +30,7 @@ native fun applyMapTableFun(
 
 @cpp_extern
 @debug
-native fun init(context: mutable Context): void;
+native fun init(context: mutable Context, handles: SKJSON.CJObject): void;
 
 @cpp_extern
 @debug
@@ -61,6 +59,14 @@ native fun applyLazyAsyncFun(
   param: SKJSON.CJSON,
 ): void;
 
+@cpp_extern("SkipRuntime_callResourceCompute")
+@debug
+native fun callResourceCompute(
+  context: mutable Context,
+  name: String,
+  params: SKJSON.CJObject,
+): String;
+
 @cpp_extern
 @debug
 native fun detachHandle(fn: UInt32): void;
@@ -84,6 +90,15 @@ native fun applyDismiss(
 @cpp_extern
 @debug
 native fun getErrorHdl(exn: .Exception): Float;
+
+@cpp_extern("SkipRuntime_applyNotify")
+@debug
+native fun applyNotify(
+  fn: UInt32,
+  values: SKJSON.CJArray,
+  watermark: Int,
+  update: Int32,
+): void;
 
 // Exports
 
@@ -175,25 +190,19 @@ class FnHandle private (eptr: SKStore.ExternalPointer) extends File {
     applyLazyAsyncFun(this.getId(), call, name, key.value, params)
   }
 
-  fun mapTable(
-    context: mutable Context,
-    writer: mutable TWriter<JSONID, JSONFile>,
-    row: SKDB.RowValues,
+  fun notify(
+    _dirname: DirName,
+    values: Array<(Key, Array<File>)>,
+    tick: Tick,
+    update: Bool,
   ): void {
-    applyMapTableFun(
+    jsValues = values.map(v -> toEntry(v.i0, v.i1));
+    applyNotify(
       this.getId(),
-      context,
-      writer,
-      DBUtils.toCJArray(row),
-      row.repeat.toFloat(),
+      SKJSON.CJArray(jsValues),
+      tick.value,
+      Int32::truncate(if (update) 1 else 0),
     )
-  }
-
-  fun toRow(
-    key: JSONID,
-    values: mutable NonEmptyIterator<JSONFile>,
-  ): SKJSON.CJArray {
-    applyConvertToRowFun(this.getId(), key.value, values)
   }
 }
 
@@ -439,45 +448,6 @@ fun asyncResult(
   };
 }
 
-@export("SkipRuntime_fromSkdb")
-fun mapTable(
-  context: mutable Context,
-  table: String,
-  name: String,
-  fnPtr: UInt32,
-  rangeOpt: SKJSON.CJSON,
-): String {
-  mapHandle = FnHandle::make(fnPtr);
-  DBUtils.mapTable(
-    table,
-    name,
-    context,
-    mapHandle.mapTable,
-    asKeyRangesOpt(rangeOpt),
-  )
-}
-
-@export("SkipRuntime_toSkdb")
-fun toSkdb(
-  context: mutable Context,
-  handleId: String,
-  table: String,
-  convPtr: UInt32,
-  connected: Int32,
-  rangeOpt: SKJSON.CJSON,
-): void {
-  eager = EHandle(JSONID::keyType, JSONFile::type, DirName::create(handleId));
-  mapHandle = FnHandle::make(convPtr);
-  DBUtils.toTable(
-    eager,
-    table,
-    context,
-    mapHandle.toRow,
-    connected != 0,
-    asKeyRangesOpt(rangeOpt),
-  )
-}
-
 fun identityMap<K: Key, V: File>(
   _context: mutable Context,
   writer: mutable TWriter<K, V>,
@@ -551,28 +521,32 @@ fun take(
     .toString()
 }
 
-@export("SkipRuntime_getFromTable")
-fun getFromTable(
-  _context: mutable Context,
-  _table: String,
-  _key: SKJSON.CJSON,
-  _index: SKJSON.CJSON,
-): SKJSON.CJSON {
-  invariant_violation("TODO")
-}
-
-@export("SkipRuntime_getArray")
-fun getArray(
+fun getArray_(
   context: mutable Context,
   handleId: String,
   key: SKJSON.CJSON,
 ): SKJSON.CJArray {
   eager = EHandle(JSONID::keyType, JSONFile::type, DirName::create(handleId));
-  SKJSON.CJArray(eager.getArray(context, JSONID(key)).map(v -> v.value))
+  SKJSON.CJArray(eager.getArray(context, JSONID(key)).map(v -> v.value));
 }
 
-@export("SkipRuntime_get")
-fun get(
+@export("SkipRuntime_getArray")
+fun getArray(
+  optContext: ?mutable Context,
+  handleId: String,
+  key: SKJSON.CJSON,
+): SKJSON.CJArray {
+  optContext match {
+  | Some(context) -> getArray_(context, handleId, key)
+  | _ ->
+    SKStore.runWithResult(context ~> getArray_(context, handleId, key)) match {
+    | Success(v) -> v
+    | Failure(err) -> throw err
+    }
+  }
+}
+
+fun get_(
   context: mutable Context,
   handleId: String,
   key: SKJSON.CJSON,
@@ -581,8 +555,23 @@ fun get(
   eager.get(context, JSONID(key)).value
 }
 
-@export("SkipRuntime_maybeGet")
-fun maybeGet(
+@export("SkipRuntime_get")
+fun get(
+  optContext: ?mutable Context,
+  handleId: String,
+  key: SKJSON.CJSON,
+): SKJSON.CJSON {
+  optContext match {
+  | Some(context) -> get_(context, handleId, key)
+  | _ ->
+    SKStore.runWithResult(context ~> get_(context, handleId, key)) match {
+    | Success(v) -> v
+    | Failure(err) -> throw err
+    }
+  }
+}
+
+fun maybeGet_(
   context: mutable Context,
   handleId: String,
   key: SKJSON.CJSON,
@@ -591,6 +580,22 @@ fun maybeGet(
   eager.maybeGet(context, JSONID(key)) match {
   | Some(v) -> v.value
   | None() -> SKJSON.CJNull()
+  }
+}
+
+@export("SkipRuntime_maybeGet")
+fun maybeGet(
+  optContext: ?mutable Context,
+  handleId: String,
+  key: SKJSON.CJSON,
+): SKJSON.CJSON {
+  optContext match {
+  | Some(context) -> maybeGet_(context, handleId, key)
+  | _ ->
+    SKStore.runWithResult(context ~> maybeGet_(context, handleId, key)) match {
+    | Success(v) -> v
+    | Failure(err) -> throw err
+    }
   }
 }
 
@@ -769,8 +774,14 @@ fun initCtx(): Context {
 }
 
 @export("SkipRuntime_createFor")
-fun tsCreateFor(session: String, tokens: SKJSON.CJArray, time: Float): Float {
-  createFor(session, tokens, time)
+fun tsCreateFor(
+  session: String,
+  inputs: SKJSON.CJArray,
+  initValues: SKJSON.CJObject,
+  tokens: SKJSON.CJArray,
+  time: Float,
+): Float {
+  createFor(session, inputs, initValues, tokens, time)
 }
 
 fun previous(value: SKJSON.CJObject): ?SKJSON.CJSON {
@@ -781,7 +792,7 @@ fun previous(value: SKJSON.CJObject): ?SKJSON.CJSON {
   }
 }
 
-@export("SKIP_SKStore_jsonExtract")
+@export("SkipRuntime_jsonExtract")
 fun jsonExtract(from: SKJSON.CJSON, pattern: String): SKJSON.CJArray {
   fieldsList = SKJSON.PatternParser::mcreate(pattern)
     .toplevelPattern()
@@ -796,6 +807,256 @@ fun jsonExtract(from: SKJSON.CJSON, pattern: String): SKJSON.CJArray {
     values.push(SKJSON.CJArray(array));
   });
   SKJSON.CJArray(values.toArray())
+}
+
+@export("SkipRuntime_createReactiveRequest")
+fun createReactiveRequest(
+  resource: String,
+  params: SKJSON.CJObject,
+  reactiveAuth: Array<UInt8>,
+): SKJSON.CJSON {
+  SKStore.runWithResult(context ~> {
+    session = toSessionName(reactiveAuth);
+    rsessions = EHandle(SID::keyType, IntFile::type, kResourceSessionDir);
+    rsessions.writeArray(context, SID(session), Array[IntFile(0)]);
+    context.update();
+    rDirName = DirName::create(`/sk_prv/resources/session/${session}/`);
+    rObject = Resource(resource, params);
+    resourceHdl = EHandle(Resource::keyType, IntFile::type, rDirName);
+    resourceHdl.writeArray(context, rObject, Array[IntFile(0)]);
+    context.update();
+    gDirName = DirName::create(`/sk_prv/resources/session/${session}/graph/`);
+    graphHdl = EHandle(Resource::keyType, ResourceNames::type, gDirName);
+    names = graphHdl.get(context, rObject);
+    SKJSON.CJArray(
+      Array[
+        SKJSON.CJString(names.name),
+        SKJSON.CJString(names.handle.getDirName().toString()),
+      ],
+    );
+  }) match {
+  | Success(info) -> info
+  | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
+  };
+}
+
+@export("SkipRuntime_closeReactiveRequest")
+fun closeReactiveRequest(
+  resource: String,
+  params: SKJSON.CJObject,
+  reactiveAuth: Array<UInt8>,
+): Float {
+  SKStore.runWithResult(context ~> {
+    session = toSessionName(reactiveAuth);
+    rDirName = DirName::create(`/sk_prv/resources/session/${session}/`);
+    context.maybeGetEagerDir(rDirName).each(_ -> {
+      rObject = Resource(resource, params);
+      resourceHdl = EHandle(Resource::keyType, IntFile::type, rDirName);
+      resourceHdl.writeArray(context, rObject, Array[]);
+      context.update();
+    });
+  }) match {
+  | Success _ -> 0.0
+  | Failure(err) -> getErrorHdl(err)
+  };
+}
+
+@export("SkipRuntime_closeSession")
+fun closeSession(reactiveAuth: Array<UInt8>): Float {
+  SKStore.runWithResult(context ~> {
+    session = toSessionName(reactiveAuth);
+    rsessions = EHandle(SID::keyType, IntFile::type, kResourceSessionDir);
+    rsessions.writeArray(context, SID(session), Array[]);
+    context.update();
+  }) match {
+  | Success _ -> 0.0
+  | Failure(err) -> getErrorHdl(err)
+  };
+}
+
+@export("SkipRuntime_write")
+fun write(collection: String, key: SKJSON.CJSON, value: SKJSON.CJArray): Float {
+  SKStore.runWithResult(context ~> {
+    chdl = EHandle(
+      JSONID::keyType,
+      JSONFile::type,
+      DirName::create(collection),
+    );
+    value match {
+    | SKJSON.CJArray(values) ->
+      chdl.writeArray(context, JSONID(key), values.map(v -> JSONFile(v)))
+    };
+    context.update();
+  }) match {
+  | Success _ -> 0.0
+  | Failure(err) -> getErrorHdl(err)
+  };
+}
+
+@export("SkipRuntime_writeAll")
+fun writeAll(collection: String, values: SKJSON.CJArray): Float {
+  SKStore.runWithResult(context ~> {
+    chdl = EHandle(
+      JSONID::keyType,
+      JSONFile::type,
+      DirName::create(collection),
+    );
+    values match {
+    | SKJSON.CJArray(vs) ->
+      vs.each(e ->
+        e match {
+        | SKJSON.CJArray(av) ->
+          optKey = av.maybeGet(0);
+          optVal = av.maybeGet(1);
+          (optKey, optVal) match {
+          | (Some(key), Some(SKJSON.CJArray(aval))) ->
+            chdl.writeArray(context, JSONID(key), aval.map(v -> JSONFile(v)))
+          | (Some(key), None()) ->
+            chdl.writeArray(context, JSONID(key), Array[])
+          | _ -> invariant_violation("Invalid entry.")
+          }
+        | _ -> invariant_violation("Invalid entry.")
+        }
+      )
+    };
+    context.update();
+  }) match {
+  | Success _ -> 0.0
+  | Failure(err) -> getErrorHdl(err)
+  };
+}
+
+@export("SkipRuntime_delete")
+fun delete(collection: String, value: SKJSON.CJArray): Float {
+  SKStore.runWithResult(context ~> {
+    chdl = EHandle(
+      JSONID::keyType,
+      JSONFile::type,
+      DirName::create(collection),
+    );
+    value match {
+    | SKJSON.CJArray(values) ->
+      values.each(key -> chdl.writeArray(context, JSONID(key), Array[]))
+    };
+    context.update();
+  }) match {
+  | Success _ -> 0.0
+  | Failure(err) -> getErrorHdl(err)
+  };
+}
+
+fun toEntry(key: Key, files: Array<File>): SKJSON.CJArray {
+  SKJSON.CJArray(
+    Array[
+      JSONID::keyType(key).value,
+      SKJSON.CJArray(files.map(JSONFile::type).map(v -> v.value)),
+    ],
+  )
+}
+
+fun getAll_(dir: EagerDir): SKJSON.CJArray {
+  values = mutable Vector<SKJSON.CJArray>[];
+  for (kv in dir.unsafeGetFileIter()) {
+    (key, files) = kv;
+    values.push(toEntry(key, files.collect(Array)));
+  };
+  SKJSON.CJArray(values.toArray());
+}
+
+@export("SkipRuntime_getAll")
+fun getAll(collection: String): SKJSON.CJSON {
+  SKStore.runWithResult(context ~> {
+    getAll_(context.unsafeGetEagerDir(DirName::create(collection)))
+  }) match {
+  | Success(info) -> info
+  | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
+  };
+}
+
+@export("SkipRuntime_getDiff")
+fun getDiff(collection: String, from: Int): SKJSON.CJSON {
+  SKStore.runWithResult(context ~> {
+    tick = Tick(from);
+    edir = context.unsafeGetEagerDir(DirName::create(collection));
+    (isReset, changes) = if (tick.value > 0) {
+      edir.getChangesAfter(tick)
+    } else {
+      (true, SortedSet[])
+    };
+    if (isReset) {
+      SKJSON.CJObject(
+        SKJSON.CJFields::create(
+          Array[
+            (
+              "values",
+              getAll_(context.unsafeGetEagerDir(DirName::create(collection))),
+            ),
+            ("tick", SKJSON.CJInt(context.tick.value)),
+            ("update", SKJSON.CJBool(false)),
+          ],
+          x -> x,
+        ),
+      )
+    } else {
+      values = mutable Vector<SKJSON.CJArray>[];
+      if (!changes.isEmpty()) {
+        for (key in changes) {
+          files = edir.getArrayRaw(key);
+          values.push(toEntry(key, files))
+        }
+      };
+      SKJSON.CJObject(
+        SKJSON.CJFields::create(
+          Array[
+            ("values", SKJSON.CJArray(values.toArray())),
+            ("tick", SKJSON.CJInt(context.tick.value)),
+            ("update", SKJSON.CJBool(true)),
+          ],
+          x -> x,
+        ),
+      )
+    }
+  }) match {
+  | Success(info) -> info
+  | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
+  };
+}
+
+@export("SkipRuntime_subscribe")
+fun subscribe(
+  resource: String,
+  start: Int,
+  notifyPtr: UInt32,
+  changes: Int32,
+): Int {
+  notifyHandle = FnHandle::make(notifyPtr);
+  runWithResult(context ~> {
+    session = SKStore.genSym(0);
+    tick = Tick(start);
+    context.subscribe(
+      session,
+      NWatch(tick, notifyHandle.notify, if (changes != 0) true else false),
+      None(),
+      Array[
+        DirSub(DirName::create(resource), "", OJSON(Array[]), (__) ~> None()),
+      ],
+      Some(tick),
+    );
+    return session;
+  }) match {
+  | Success(session) -> session
+  | Failure(err) -> -getErrorHdl(err).toInt()
+  };
+}
+
+@export("SkipRuntime_unsubscribe")
+fun unsubscribe(session: Int): Float {
+  SKStore.runWithResult(context ~> {
+    context.unsubscribe(session.toInt())
+  }) match {
+  | Success _ -> 0.0
+  | Failure(err) -> getErrorHdl(err)
+  };
 }
 
 module end; /* SKStore */

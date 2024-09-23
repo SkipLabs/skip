@@ -1,38 +1,70 @@
-import { run } from "./utils.js";
+import { run, type Step } from "./utils.js";
 
 function scenarios() {
   return [
     [
       {
-        type: "post",
-        command: "set",
+        type: "request",
+        payload: { resource: "computed" },
+      },
+      {
+        type: "write",
         payload: [
-          { key: "A1", value: "23" },
-          { key: "A2", value: "2" },
+          {
+            collection: "cells",
+            entries: [
+              ["A1", ["23"]],
+              ["A2", ["2"]],
+            ],
+          },
         ],
       },
       {
-        type: "post",
-        command: "set",
-        payload: [{ key: "A3", value: "=A1 + A2" }],
+        type: "write",
+        payload: [
+          {
+            collection: "cells",
+            entries: [["A3", ["=A1 + A2"]]],
+          },
+        ],
       },
       {
-        type: "post",
-        command: "set",
-        payload: [{ key: "A1", value: "5" }],
+        type: "write",
+        payload: [
+          {
+            collection: "cells",
+            entries: [["A1", ["5"]]],
+          },
+        ],
       },
       {
-        type: "post",
-        command: "set",
-        payload: [{ key: "A4", value: "=A3 * A2" }],
+        type: "write",
+        payload: [
+          {
+            collection: "cells",
+            entries: [["A4", ["=A3 * A2"]]],
+          },
+        ],
       },
       {
-        type: "post",
-        command: "delete",
-        payload: [{ keys: ["A3"] }],
+        type: "request",
+        payload: { resource: "computed" },
       },
-    ],
+      {
+        type: "delete",
+        payload: [
+          {
+            collection: "cells",
+            keys: ["A3"],
+          },
+        ],
+      },
+      {
+        type: "request",
+        payload: { resource: "computed" },
+      },
+    ] as Step[],
   ];
 }
 
-run(scenarios(), 8082);
+run(scenarios());

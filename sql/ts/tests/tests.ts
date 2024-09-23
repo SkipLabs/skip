@@ -1427,6 +1427,21 @@ export const tests = (asWorker: boolean) => {
       },
     },
     {
+      name: n("Select Primary Key", asWorker),
+      fun: async (skdb: SKDB) => {
+        await skdb.exec("create table t1 (id TEXT PRIMARY KEY, b INTEGER);");
+        try {
+          await skdb.exec("insert into t1 (id, b) values ('key', 22);");
+          return await skdb.exec("select b from t1 where id='key';");
+        } catch (e) {
+          return (e as Error).message;
+        }
+      },
+      check: (res) => {
+        expect(res).toEqual([{ b: 22 }]);
+      },
+    },
+    {
       name: n("Multiple field updates", asWorker),
       fun: async (skdb: SKDB) => {
         await skdb.exec("create table widgets (id text unique, name text);");

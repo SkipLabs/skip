@@ -161,7 +161,7 @@ export interface Environment {
   name: () => string;
   disableWarnings: boolean;
   environment: Array<string>;
-  createSocket: (uir: string) => WebSocket;
+  createSocket: (uri: string) => WebSocket;
   createWorker: (url: URL, options?: WorkerOptions) => Wrk;
   createWorkerWrapper: (worker: Worker) => Wrk;
   timestamp: () => float;

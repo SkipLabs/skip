@@ -1,48 +1,50 @@
-import { run } from "./utils.js";
+import { run, type Step } from "./utils.js";
 
 function scenarios() {
   return [
     [
       {
-        type: "get",
-        command: "add",
-        payload: "v1",
+        type: "write",
+        payload: [{ collection: "input1", entries: [["v1", [2]]] }],
       },
       {
-        type: "post",
-        command: "set",
-        payload: [{ name: "input1", key: "v1", value: 2 }],
+        type: "write",
+        payload: [{ collection: "input2", entries: [["v1", [3]]] }],
       },
       {
-        type: "post",
-        command: "set",
-        payload: [{ name: "input2", key: "v1", value: 3 }],
+        type: "request",
+        payload: { resource: "add" },
       },
       {
-        type: "post",
-        command: "delete",
-        payload: [{ name: "input1", keys: ["v1"] }],
+        type: "delete",
+        payload: [{ collection: "input1", keys: ["v1"] }],
       },
       {
-        type: "post",
-        command: "set",
+        type: "write",
         payload: [
-          { name: "input1", key: "v1", value: 2 },
-          { name: "input1", key: "v2", value: 6 },
+          {
+            collection: "input1",
+            entries: [
+              ["v1", [2]],
+              ["v2", [6]],
+            ],
+          },
         ],
       },
       {
-        type: "post",
-        command: "set",
-        payload: [{ name: "input2", key: "v2", value: 0 }],
+        type: "write",
+        payload: [{ collection: "input2", entries: [["v2", [0]]] }],
       },
       {
-        type: "post",
-        command: "set",
-        payload: [{ name: "input1", key: "v1", value: 8 }],
+        type: "write",
+        payload: [{ collection: "input1", entries: [["v1", [8]]] }],
       },
-    ],
+      {
+        type: "request",
+        payload: { resource: "add" },
+      },
+    ] as Step[],
   ];
 }
 
-run(scenarios(), 8081);
+run(scenarios());
