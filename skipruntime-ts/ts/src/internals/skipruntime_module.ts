@@ -628,9 +628,9 @@ class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
     );
 
     return {
-      next() {
+      next(): IteratorResult<T> {
         const value = cloned_iter.next();
-        return { value, done: value == null } as IteratorResult<T>;
+        return value === null ? { value, done: true } : { value };
       },
     };
   }
@@ -1137,7 +1137,7 @@ class LinksImpl implements Links {
       );
       const res = jsu.exportJSON(
         this.handles.apply(fn, [
-          new LSelfImpl(context, hdl) as LazyCollection<K, V>,
+          new LSelfImpl<K, V>(context, hdl),
           jsu.importJSON(key) as K,
         ]),
       );
