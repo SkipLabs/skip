@@ -1386,10 +1386,6 @@ class Manager implements ToWasmManager {
   };
 }
 
-interface Timeout {
-  unref: () => void;
-}
-
 type TQ_Token = { ident: string; interval: number };
 type TQ_Elt = {
   endtime: number;
@@ -1398,7 +1394,7 @@ type TQ_Elt = {
 
 export class TimedQueue {
   private queue: TQ_Elt[] = [];
-  private timeout: string | number | Timeout | null = null;
+  private timeout?: NodeJS.Timeout;
 
   constructor(private update: (time: number, tokens: string[]) => void) {}
 
@@ -1424,15 +1420,14 @@ export class TimedQueue {
       this.timeout = setTimeout(() => {
         this.check();
       }, next);
-      if (typeof this.timeout == "object" && "unref" in this.timeout) {
-        this.timeout.unref();
-      }
+      this.timeout.unref();
     }
   }
 
   stop() {
     if (this.timeout) {
-      clearTimeout(this.timeout as number);
+      clearTimeout(this.timeout);
+      delete this.timeout;
     }
   }
 
@@ -1471,9 +1466,7 @@ export class TimedQueue {
       this.timeout = setTimeout(() => {
         this.check();
       }, next);
-      if (typeof this.timeout == "object" && "unref" in this.timeout) {
-        this.timeout.unref();
-      }
+      this.timeout.unref();
     }
   }
 
