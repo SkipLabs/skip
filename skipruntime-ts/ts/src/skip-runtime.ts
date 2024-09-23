@@ -66,7 +66,18 @@ async function wasmUrl(): Promise<URL> {
   return new URL("./libskip-runtime.wasm", import.meta.url);
 }
 
-export async function createSKStore(
+export type CreateSKStore<K extends TJSON, V extends TJSON> = (
+  init: (
+    skstore: SKStore,
+    inputs: Record<string, EagerCollection<TJSON, TJSON>>,
+  ) => CallResourceCompute,
+  inputs: string[],
+  remotes?: Record<string, EntryPoint>,
+  tokens?: Record<string, number>,
+  initLocals?: () => Promise<Record<string, [TJSON, TJSON][]>>,
+) => Promise<SkipBuilder<K, V>>;
+
+export async function createSKStore<K extends TJSON, V extends TJSON>(
   init: (
     skstore: SKStore,
     inputs: Record<string, EagerCollection<TJSON, TJSON>>,
@@ -75,10 +86,10 @@ export async function createSKStore(
   remotes: Record<string, EntryPoint> = {},
   tokens: Record<string, number> = {},
   initLocals?: () => Promise<Record<string, [TJSON, TJSON][]>>,
-): Promise<SkipBuilder> {
+): Promise<SkipBuilder<K, V>> {
   const data = await runUrl(wasmUrl, modules, [], "SKDB_factory");
   const factory = data.environment.shared.get("SKStore") as SKStoreFactory;
-  return factory.runSKStore(init, inputs, remotes, tokens, initLocals);
+  return factory.runSKStore<K, V>(init, inputs, remotes, tokens, initLocals);
 }
 
 export function freeze<T>(value: T): T {
@@ -137,7 +148,7 @@ async function send(
 ) {
   try {
     const body = data ? JSON.stringify(data) : undefined;
-    console.log("fetch", url, method, body);
+    //console.log("fetch", url, method, body);
     const response = await fetch(url, {
       method,
       body,
@@ -148,7 +159,7 @@ async function send(
       },
       signal: AbortSignal.timeout(1000),
     });
-    const responseJSON = await response.json();
+    const responseJSON = method != "HEAD" ? await response.json() : null;
     if (!response.ok) {
       throw new Error(JSON.stringify(responseJSON));
     }
@@ -185,7 +196,7 @@ export class SkipRESTRuntime implements SkipRuntime {
       "GET",
       header,
     );
-    const strReactiveResponse = headers["X-Reactive-Response"];
+    const strReactiveResponse = headers.get("x-reactive-response");
     const reactive = strReactiveResponse
       ? JSON.parse(strReactiveResponse)
       : undefined;
@@ -208,7 +219,8 @@ export class SkipRESTRuntime implements SkipRuntime {
       "HEAD",
       header,
     );
-    return JSON.parse(headers["X-Reactive-Response"]);
+    const reactiveResponse = headers.get("x-reactive-response");
+    return JSON.parse(reactiveResponse);
   }
   async getOne<V extends TJSON>(
     resource: string,

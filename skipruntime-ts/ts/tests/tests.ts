@@ -22,7 +22,7 @@ import {
   ValueMapper,
   TimedQueue,
   createSKStore,
-  runService,
+  initService,
 } from "skip-runtime";
 
 function check(name: String, got: TJSON, expected: TJSON): void {
@@ -34,7 +34,7 @@ type Test = {
   service: SkipService;
   run: (
     runtime: SkipRuntime,
-    replication?: SkipReplication,
+    replication?: SkipReplication<TJSON, TJSON>,
   ) => void | Promise<void>;
   tokens?: Record<string, number>;
 };
@@ -278,8 +278,6 @@ tests.push({
   run: testValueMapperRun,
 });
 
-/*
-
 //// testSize
 
 class SizeMapper implements Mapper<number, number, number, number> {
@@ -321,28 +319,27 @@ class SizeService implements SkipService {
 }
 
 async function testSizeRun(runtime: SkipRuntime) {
-  const session = `s_${crypto.randomUUID()}`;
-  const resource = await runtime.createReactiveRequest("size", {}, session);
-  await runtime.writeAll("input1", [
-    { key: 1, value: [0] },
-    { key: 2, value: [2] },
+  await runtime.getAll("size", {});
+  await runtime.patch("input1", [
+    [1, [0]],
+    [2, [2]],
   ]);
-  check("testSize[0]", await runtime.readAll(resource), [
-    { key: 1, value: [0] },
-    { key: 2, value: [2] },
+  check("testSize[0]", (await runtime.getAll("size", {})).values, [
+    [1, [0]],
+    [2, [2]],
   ]);
-  await runtime.writeAll("input2", [
-    { key: 1, value: [10] },
-    { key: 2, value: [5] },
+  await runtime.patch("input2", [
+    [1, [10]],
+    [2, [5]],
   ]);
-  check("testSize[1]", await runtime.readAll(resource), [
-    { key: 1, value: [2] },
-    { key: 2, value: [4] },
+  check("testSize[1]", (await runtime.getAll("size", {})).values, [
+    [1, [2]],
+    [2, [4]],
   ]);
-  await runtime.delete("input2", [1]);
-  check("testSize[2]", await runtime.readAll(resource), [
-    { key: 1, value: [1] },
-    { key: 2, value: [3] },
+  await runtime.delete("input2", 1);
+  check("testSize[2]", (await runtime.getAll("size", {})).values, [
+    [1, [1]],
+    [2, [3]],
   ]);
 }
 
@@ -394,21 +391,20 @@ class SlicedMap1Service implements SkipService {
 }
 
 async function testSlicedMap1Run(runtime: SkipRuntime) {
-  const session = `s_${crypto.randomUUID()}`;
-  const resource = await runtime.createReactiveRequest("slice", {}, session);
+  await runtime.getAll("slice", {});
   // Inserts [[0, 0], ..., [30, 30]
   const values = Array.from({ length: 31 }, (_, i) => {
-    return { key: i, value: [i] };
+    return [i, [i]] as Entry<number, number>;
   });
-  await runtime.writeAll("input", values);
-  check("testSlicedMap1[2]", await runtime.readAll(resource), [
-    { key: 1, value: [1] },
-    { key: 3, value: [9] },
-    { key: 4, value: [16] },
-    { key: 7, value: [49] },
-    { key: 8, value: [64] },
-    { key: 9, value: [81] },
-    { key: 20, value: [400] },
+  await runtime.patch("input", values);
+  check("testSlicedMap1[2]", (await runtime.getAll("size", {})).values, [
+    [1, [1]],
+    [3, [9]],
+    [4, [16]],
+    [7, [49]],
+    [8, [64]],
+    [9, [81]],
+    [20, [400]],
   ]);
 }
 
@@ -418,6 +414,7 @@ tests.push({
   run: testSlicedMap1Run,
 });
 
+/*
 //// testLazy
 
 class TestLazyAdd implements LazyCompute<number, number> {
@@ -778,7 +775,7 @@ class AsyncLazyService implements SkipService {
 
 async function testAsyncLazyRun(
   runtime: SkipRuntime,
-  replication?: SkipReplication,
+  replication?: SkipReplication<TJSON, TJSON>,
 ) {
   const data = await runtime.head("asyncLazy", {}, new Uint8Array([]));
 
@@ -1190,7 +1187,7 @@ units.push({ name: "testTimedQueue", run: testTimedQueue });
 
 function run(t: Test) {
   test(t.name, async ({ page }) => {
-    const [runtime, replication] = await runService(t.service, createSKStore);
+    const [runtime, replication] = await initService(t.service, createSKStore);
     await t.run(runtime, replication);
   });
 }

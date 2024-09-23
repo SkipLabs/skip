@@ -14,7 +14,6 @@ import type {
   Entry,
   CollectionAccess,
   CallResourceCompute,
-  Watermaked,
   Notifier,
 } from "../skipruntime_api.js";
 
@@ -34,6 +33,12 @@ import {
   SKStoreFactoryImpl,
   UnknownCollectionError,
 } from "./skipruntime_impl.js";
+
+type Watermaked_<K extends TJSON, V extends TJSON> = {
+  values: Entry<K, V>[];
+  watermark: bigint;
+  update?: boolean;
+};
 
 class HandlesImpl implements Handles {
   private nextID: number = 1;
@@ -194,7 +199,7 @@ export class ContextImpl implements Context {
     return result as Entry<K, V>[];
   }
 
-  getDiff<K extends TJSON, V extends TJSON>(collection: string, from: bigint) {
+  getDiff<K extends TJSON, V extends TJSON>(collection: string, from: string) {
     const ctx = this.ref.get();
     if (ctx != null)
       throw new Error("getDiff: Cannot be called durring update.");
@@ -203,7 +208,7 @@ export class ContextImpl implements Context {
         this.skjson.importJSON(
           this.exports.SkipRuntime_getDiff(
             this.skjson.exportString(collection),
-            from,
+            BigInt(from),
           ),
         ),
       );
@@ -211,7 +216,12 @@ export class ContextImpl implements Context {
     if (typeof result == "number") {
       throw this.handles.delete(result as Handle<unknown>);
     }
-    return result as Watermaked<K, V>;
+    const tmp = result as Watermaked_<K, V>;
+    return {
+      values: tmp.values,
+      watermark: tmp.watermark.toString(),
+      update: tmp.update,
+    };
   }
 
   getArray<K extends TJSON, V>(eagerHdl: string, key: K) {
@@ -538,7 +548,7 @@ export class ContextImpl implements Context {
 
   subscribe<K extends TJSON, V extends TJSON>(
     collectionName: string,
-    from: bigint,
+    from: string,
     nofify: Notifier<K, V>,
     changes: boolean,
   ): bigint {
@@ -551,7 +561,7 @@ export class ContextImpl implements Context {
     const result = this.skjson.runWithGC(() => {
       return this.exports.SkipRuntime_subscribe(
         this.skjson.exportString(collection),
-        from,
+        BigInt(from),
         this.handles.register(nofify as Notifier<TJSON, TJSON>),
         changes,
       );

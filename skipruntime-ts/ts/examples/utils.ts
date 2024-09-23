@@ -6,6 +6,7 @@ import type {
 } from "skip-runtime";
 import { SkipRESTRuntime } from "skip-runtime";
 import { createInterface } from "readline";
+import { connect, Protocol, type Client } from "skipruntime-replication-client";
 
 export interface ClientDefinition {
   port: number;
@@ -22,13 +23,20 @@ type Delete = {
   keys: string[];
 };
 
+function toWs(entrypoint: EntryPoint) {
+  if (entrypoint.secured) return `wss://${entrypoint.host}:${entrypoint.port}`;
+  return `ws://${entrypoint.host}:${entrypoint.port}`;
+}
+
 class SkipHttpAccessV1 {
   private runtime: SkipRESTRuntime;
+  private client?: Client;
   constructor(
-    entrypoint: EntryPoint = {
+    private entrypoint: EntryPoint = {
       host: "localhost",
       port: 3587,
     },
+    private creds: Protocol.Creds,
   ) {
     this.runtime = new SkipRESTRuntime(entrypoint);
   }
@@ -51,8 +59,21 @@ class SkipHttpAccessV1 {
   }
 
   async request(resource: string, params: Record<string, string>) {
-    const result = await this.runtime.getAll(resource, params);
-    return result.values;
+    const publicKey = new Uint8Array(
+      await Protocol.exportKey(this.creds.publicKey),
+    );
+    const reactive = await this.runtime.head(resource, params, publicKey);
+    console.log(JSON.stringify(reactive));
+    if (!this.client) {
+      this.client = await connect(toWs(this.entrypoint), this.creds);
+    }
+    await this.client.subscribe(
+      reactive.collection,
+      BigInt(reactive.watermark),
+      (updates: Map<string, TJSON[]>, isInit: boolean) => {
+        console.log("Update", Object.fromEntries(updates), isInit);
+      },
+    );
   }
 }
 
@@ -194,11 +215,15 @@ class Player {
   }
 }
 
-export function run(scenarios: Step[][], port: number = 3587) {
-  const access = new SkipHttpAccessV1({
-    host: "localhost",
-    port,
-  });
+export async function run(scenarios: Step[][], port: number = 3587) {
+  const creds = await Protocol.generateCredentials();
+  const access = new SkipHttpAccessV1(
+    {
+      host: "localhost",
+      port,
+    },
+    creds,
+  );
   const online = async (line: string) => {
     const error = console.error;
     try {

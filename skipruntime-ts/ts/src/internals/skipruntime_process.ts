@@ -40,8 +40,10 @@ class TailingSession {
     // FIXME: Pass pubkey down to replication.
     const subsession = this.replication.subscribe(
       collection,
-      since,
-      (v, w, u) => callback(v, !u, w),
+      since.toString(),
+      (v, w, u) => {
+        callback(v, !u, BigInt(w));
+      },
     );
     this.subsessions.set(collection, subsession);
   }
@@ -257,6 +259,26 @@ async function runRESTServer(runtime: SkipRuntime): Promise<express.Express> {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
   // READS
+  app.head("/v1/:resource", async (req, res) => {
+    const resourceName = req.params.resource;
+    try {
+      const strReactiveAuth = req.headers["x-reactive-auth"] as string;
+      if (!strReactiveAuth)
+        throw new Error("X-Reactive-Auth must be specified.");
+      const reactiveAuth = new Uint8Array(
+        Buffer.from(strReactiveAuth, "base64"),
+      );
+      const data = await runtime.head(
+        resourceName,
+        req.query as JSONObject,
+        reactiveAuth,
+      );
+      res.set("X-Reactive-Response", JSON.stringify(data));
+      res.status(200).json({});
+    } catch (e: any) {
+      res.status(500).json(e.message);
+    }
+  });
   app.get("/v1/:resource/:key", async (req, res) => {
     const key = req.params.key;
     const resourceName = req.params.resource;
@@ -284,29 +306,10 @@ async function runRESTServer(runtime: SkipRuntime): Promise<express.Express> {
         req.query as JSONObject,
         reactiveAuth,
       );
-      const header = data.reactive
-        ? { "X-Reactive-Responce": JSON.stringify(data.reactive) }
-        : {};
-      res.header(header).status(200).json(data.values);
-    } catch (e: any) {
-      res.status(500).json(e.message);
-    }
-  });
-  app.head("/v1/:resource", async (req, res) => {
-    const resourceName = req.params.resource;
-    const strReactiveAuth = req.headers["x-reactive-auth"] as string;
-    if (!strReactiveAuth) throw new Error("X-Reactive-Auth must be specified.");
-    const reactiveAuth = new Uint8Array(Buffer.from(strReactiveAuth, "base64"));
-    try {
-      const data = await runtime.head(
-        resourceName,
-        req.query as JSONObject,
-        reactiveAuth,
-      );
-      const header = reactiveAuth
-        ? { "X-Reactive-Responce": JSON.stringify(data) }
-        : {};
-      res.header(header).status(200).json({});
+      if (data.reactive) {
+        res.set("X-Reactive-Response", JSON.stringify(data.reactive));
+      }
+      res.status(200).json(data.values);
     } catch (e: any) {
       res.status(500).json(e.message);
     }

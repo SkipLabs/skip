@@ -47,10 +47,6 @@ function scenarios() {
         ],
       },
       {
-        type: "request",
-        payload: { resource: "computed" },
-      },
-      {
         type: "delete",
         payload: [
           {
@@ -59,12 +55,8 @@ function scenarios() {
           },
         ],
       },
-      {
-        type: "request",
-        payload: { resource: "computed" },
-      },
     ] as Step[],
   ];
 }
 
-run(scenarios());
+run(scenarios(), 9998);

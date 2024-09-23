@@ -76,7 +76,7 @@ export interface Context {
 
   getDiff<K extends TJSON, V extends TJSON>(
     collection: string,
-    watermark: bigint,
+    watermark: string,
   ): Watermaked<K, V>;
 
   getArrayLazy<K extends TJSON, V>(collection: string, key: K): V[];
@@ -153,7 +153,7 @@ export interface Context {
 
   subscribe<K extends TJSON, V extends TJSON>(
     collection: string,
-    from: bigint,
+    from: string,
     notify: Notifier<K, V>,
     changes: boolean,
   ): bigint;
