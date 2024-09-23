@@ -255,8 +255,7 @@ export class SKStoreImpl extends SkFrozen implements SKStore {
     const name = computeObj.constructor.name;
     const lazyHdl = this.context.lazy(
       name,
-      (selfHdl: LazyCollection<K, V>, key: K) =>
-        computeObj.compute(selfHdl, key),
+      computeObj.compute.bind(computeObj),
     );
     return new LazyCollectionImpl<K, V>(this.context, lazyHdl);
   }
