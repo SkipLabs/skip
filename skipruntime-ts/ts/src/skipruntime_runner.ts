@@ -278,12 +278,10 @@ export async function runService(
     }
     for (const [key, output] of Object.entries(outputs)) {
       const ehandle = result.outputs[key];
-      // eslint-disable-next-line  @typescript-eslint/no-unnecessary-condition
       if (!ehandle) {
         throw new Error(`The ${key} must be return by reactiveCompute.`);
       }
       const table = tables[key];
-      // eslint-disable-next-line  @typescript-eslint/no-unnecessary-condition
       if (!table) {
         throw new Error(`Unable to retrieve ${key} table.`);
       }

@@ -31,10 +31,11 @@ class ComputeExpression implements LazyCompute<string, string> {
       try {
         // Fake evaluator in this exemple
         switch (v.substring(1)) {
-          case "A1 + A2":
+          case "A1 + A2": {
             const v1 = getComputed("A1");
             const v2 = getComputed("A2");
             return (v1 + v2).toString();
+          }
           case "A3 * A2":
             return (getComputed("A3") * getComputed("A2")).toString();
           default:
@@ -45,7 +46,7 @@ class ComputeExpression implements LazyCompute<string, string> {
         return "# " + msg;
       }
     } else {
-      return v as string;
+      return v;
     }
   }
 }
@@ -85,7 +86,7 @@ class Service implements SimpleSkipService {
     _requests: EagerCollection<string, TJSON>,
     inputCollections: Record<string, EagerCollection<string, TJSON>>,
   ): SimpleServiceOutput {
-    const cells = inputCollections.cells;
+    const cells = inputCollections["cells"];
     // Use lazy dir to create eval dependency graph
     // Its calls it self to get other computed cells
     const evaluator = store.lazy(ComputeExpression, cells);
@@ -96,7 +97,7 @@ class Service implements SimpleSkipService {
     const output = cells.map(CallCompute, evaluator);
     return {
       output,
-      update: async (event: TJSON, writers: Record<string, Writer<TJSON>>) => {
+      update: (event: TJSON, writers: Record<string, Writer<TJSON>>) => {
         const cmd = event as Command;
         if (cmd.command == "set") {
           const payload = cmd.payload as Set[];
@@ -116,4 +117,4 @@ class Service implements SimpleSkipService {
   }
 }
 
-runWithServer(new Service(), { port: 8082 });
+await runWithServer(new Service(), { port: 8082 });

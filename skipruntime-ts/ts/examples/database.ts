@@ -1,16 +1,13 @@
 import type {
   SKStore,
   TJSON,
-  Mapper,
   EagerCollection,
-  NonEmptyIterator,
   SimpleSkipService,
   SimpleServiceOutput,
-  JSONObject,
   Writer,
 } from "skip-runtime";
 
-import { runWithServer } from "skip-runtime";
+import { runWithServer, ValueMapper } from "skip-runtime";
 
 import sqlite3 from "sqlite3";
 
@@ -18,88 +15,62 @@ import sqlite3 from "sqlite3";
 // Populate the database with made-up values (if it's not already there)
 /*****************************************************************************/
 
-async function initDB(): Promise<sqlite3.Database> {
+function initDB(): sqlite3.Database {
   const db = new sqlite3.Database("./db.sqlite");
   // Create the table if it doesn't exist
-  await db.exec(`CREATE TABLE IF NOT EXISTS data (
+  db.exec(`CREATE TABLE IF NOT EXISTS data (
     id TEXT PRIMARY KEY,
     object JSON
     )`);
 
-  await db.run(
-    "INSERT OR REPLACE INTO data (id, object) VALUES ($id, $object)",
-    {
-      $id: "123",
-      $object: JSON.stringify({
-        name: "daniel",
-        country: "FR",
-      }),
-    },
-  );
-  await db.run(
-    "INSERT OR REPLACE INTO data (id, object) VALUES ($id, $object)",
-    {
-      $id: "124",
-      $object: JSON.stringify({
-        name: "josh",
-        country: "UK",
-      }),
-    },
-  );
-  await db.run(
-    "INSERT OR REPLACE INTO data (id, object) VALUES ($id, $object)",
-    {
-      $id: "125",
-      $object: JSON.stringify({
-        name: "julien",
-        country: "ES",
-      }),
-    },
-  );
+  db.run("INSERT OR REPLACE INTO data (id, object) VALUES ($id, $object)", {
+    $id: "123",
+    $object: JSON.stringify({ name: "daniel", country: "FR" }),
+  });
+  db.run("INSERT OR REPLACE INTO data (id, object) VALUES ($id, $object)", {
+    $id: "124",
+    $object: JSON.stringify({ name: "josh", country: "UK" }),
+  });
+  db.run("INSERT OR REPLACE INTO data (id, object) VALUES ($id, $object)", {
+    $id: "125",
+    $object: JSON.stringify({ name: "julien", country: "ES" }),
+  });
   return db;
 }
 
-const db = await initDB();
+const db = initDB();
 
 /*****************************************************************************/
 // The protocol
 /*****************************************************************************/
 
-type Command = {
-  command: "getUser" | "set" | "delete";
-  payload: TJSON;
-};
-
-type GetUser = string;
-type Set = { key: string; value: string }[];
-type Delete = { keys: string[] }[];
+type Command =
+  | { command: "getUser"; payload: string }
+  | { command: "set"; payload: { key: string; value: string }[] }
+  | { command: "delete"; payload: { keys: string[] }[] };
 
 /*****************************************************************************/
 // The read path, we want to find a user
 /*****************************************************************************/
 
-type User = {
-  name: string;
-  country: string;
-};
+type User = { name: string; country: string };
 
 type Response = { status: "error"; msg: string } | { status: "ok"; user: User };
 
-class Request implements Mapper<string, Command, string, Response> {
-  constructor(private users: EagerCollection<string, TJSON>) {}
+class Request extends ValueMapper<string, Command, Response> {
+  constructor(private users: EagerCollection<string, TJSON>) {
+    super();
+  }
 
-  mapElement(
-    key: string,
-    it: NonEmptyIterator<Command>,
-  ): Iterable<[string, Response]> {
-    const cmd = it.first();
-    const value = this.users.maybeGetOne(cmd.payload as GetUser);
-    const user = value as User;
-    const computed: Response =
-      cmd.command == "getUser"
-        ? { status: "ok", user }
-        : { status: "error", msg: "Unknown command" };
-    return Array([key, computed]);
+  mapValue(cmd: Command): Response {
+    switch (cmd.command) {
+      case "getUser": {
+        const user = this.users.maybeGetOne(cmd.payload) as User;
+        return { status: "ok", user };
+      }
+      default:
+        return { status: "error", msg: "Unknown command" };
+    }
   }
 }
 
@@ -107,31 +78,31 @@ class Request implements Mapper<string, Command, string, Response> {
 // The write path
 /*****************************************************************************/
 
-async function update(
-  event: TJSON,
-  writers: Record<string, Writer<TJSON>>,
-): Promise<void> {
+function update(event: TJSON, writers: Record<string, Writer<string>>): void {
   const writer = writers["users"];
   const cmd = event as Command;
-  if (cmd.command == "set") {
-    const payload = cmd.payload as Set;
-    for (const e of payload) {
-      await db.run(
-        "INSERT OR REPLACE INTO data (id, object) VALUES ($id, $object)",
-        {
-          $id: e.key,
-          $object: JSON.stringify(e.value),
-        },
-      );
-      writer.set(e.key, e.value);
-    }
-  } else if (cmd.command == "delete") {
-    const payload = cmd.payload as Delete;
-    for (const e of payload) {
-      for (const key of e.keys) {
-        await db.run("DELETE FROM data WHERE id = $id", { $id: key });
+  switch (cmd.command) {
+    case "set": {
+      for (const entry of cmd.payload) {
+        db.run(
+          "INSERT OR REPLACE INTO data (id, object) VALUES ($id, $object)",
+          {
+            $id: entry.key,
+            $object: JSON.stringify(entry.value),
+          },
+        );
+        writer.set(entry.key, entry.value);
       }
-      writer.delete(e.keys);
+      break;
+    }
+    case "delete": {
+      for (const entry of cmd.payload) {
+        for (const key of entry.keys) {
+          db.run("DELETE FROM data WHERE id = $id", { $id: key });
+        }
+        writer.delete(entry.keys);
+      }
+      break;
     }
   }
 }
@@ -144,13 +115,14 @@ class Service implements SimpleSkipService {
   name: string = "database-example";
   inputTables = ["users"];
 
-  async init(tables: Record<string, Writer<TJSON[]>>) {
+  init(tables: Record<string, Writer<TJSON[]>>) {
     db.all(
       "SELECT id, object FROM data",
-      (err, data: Array<{ id: string; object: string }>) => {
+      (_err, data: { id: string; object: string }[]) => {
         const userWriter = tables["users"];
         for (const user of data) {
-          userWriter.set(user.id, JSON.parse(user.object));
+          const json: User = JSON.parse(user.object);
+          userWriter.set(user.id, [json]);
         }
       },
     );
@@ -170,4 +142,4 @@ class Service implements SimpleSkipService {
 
 // Command that starts the service
 
-runWithServer(new Service(), { port: 8081 });
+await runWithServer(new Service(), { port: 8081 });
