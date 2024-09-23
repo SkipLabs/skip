@@ -6,12 +6,11 @@ import type {
   Mapper,
   NonEmptyIterator,
   TJSON,
-  SimpleSkipService,
-  SimpleServiceOutput,
-  Writer,
+  SkipService,
 } from "skip-runtime";
 
-import { runWithServer } from "skip-runtime";
+import { runWithRESTServer } from "skip-runtime";
+import type { Resource } from "skip-runtime/dist/skipruntime_service.js";
 
 class ComputeExpression implements LazyCompute<string, string> {
   constructor(private skall: EagerCollection<string, TJSON>) {}
@@ -69,23 +68,23 @@ class CallCompute implements Mapper<string, TJSON, string, TJSON> {
   }
 }
 
-type Command = {
-  command: string;
-  payload: TJSON;
-};
+class ComputedCells implements Resource {
+  reactiveCompute(
+    _store: SKStore,
+    collections: { output: EagerCollection<string, TJSON> },
+  ): EagerCollection<string, TJSON> {
+    return collections.output;
+  }
+}
 
-type Set = { key: string; value: number };
-type Delete = { keys: string[] };
-
-class Service implements SimpleSkipService {
-  name: string = "sheet";
-  inputTables = ["cells"];
+class Service implements SkipService {
+  inputCollections = ["cells"];
+  resources = { computed: ComputedCells };
 
   reactiveCompute(
     store: SKStore,
-    _requests: EagerCollection<string, TJSON>,
     inputCollections: Record<string, EagerCollection<string, TJSON>>,
-  ): SimpleServiceOutput {
+  ): Record<string, EagerCollection<TJSON, TJSON>> {
     const cells = inputCollections["cells"];
     // Use lazy dir to create eval dependency graph
     // Its calls it self to get other computed cells
@@ -95,26 +94,8 @@ class Service implements SimpleSkipService {
     // Parsing => Immutable ast
     // Evaluation => Compute tree with context
     const output = cells.map(CallCompute, evaluator);
-    return {
-      output,
-      update: (event: TJSON, writers: Record<string, Writer<TJSON>>) => {
-        const cmd = event as Command;
-        if (cmd.command == "set") {
-          const payload = cmd.payload as Set[];
-          for (const e of payload) {
-            const writer = writers["cells"];
-            writer.set(e.key, e.value);
-          }
-        } else if (cmd.command == "delete") {
-          const payload = cmd.payload as Delete[];
-          for (const e of payload) {
-            const writer = writers["cells"];
-            writer.delete(e.keys);
-          }
-        }
-      },
-    };
+    return { output };
   }
 }
 
-await runWithServer(new Service(), { port: 8082 });
+runWithRESTServer(new Service());

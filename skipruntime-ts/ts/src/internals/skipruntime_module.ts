@@ -8,10 +8,14 @@ import type {
   EagerCollection,
   LazyCollection,
   TJSON,
-  Schema,
   RefreshToken,
   JSONObject,
   Success,
+  Entry,
+  CollectionAccess,
+  CallResourceCompute,
+  Watermaked,
+  Notifier,
 } from "../skipruntime_api.js";
 
 import type {
@@ -23,9 +27,13 @@ import type {
 } from "./skipruntime_types.js";
 export type { Opaque } from "./skipruntime_internal_types.js";
 import type * as Internal from "./skipruntime_internal_types.js";
-import { LSelfImpl, SKStoreFactoryImpl } from "./skipruntime_impl.js";
-// prettier-ignore
-import type { SKDBShared } from "#skdb/skdb_types.js";
+import {
+  EagerCollectionImpl,
+  EagerCollectionReader,
+  LSelfImpl,
+  SKStoreFactoryImpl,
+  UnknownCollectionError,
+} from "./skipruntime_impl.js";
 
 class HandlesImpl implements Handles {
   private nextID: number = 1;
@@ -69,6 +77,8 @@ class HandlesImpl implements Handles {
 }
 
 export class ContextImpl implements Context {
+  private resources: Record<string, string> = {};
+
   constructor(
     private skjson: SKJSON,
     private exports: FromWasm,
@@ -167,44 +177,98 @@ export class ContextImpl implements Context {
     return this.skjson.importString(resHdlPtr);
   }
 
-  getFromTable<K extends TJSON, R>(table: string, key: K, index?: string) {
-    return this.skjson.importJSON(
-      this.exports.SkipRuntime_getFromTable(
-        this.pointer(),
-        this.skjson.exportString(table),
-        this.skjson.exportJSON(key),
-        this.skjson.exportJSON(index ?? null),
-      ),
-    ) as R[];
+  getAll<K extends TJSON, V extends TJSON>(collection: string) {
+    const ctx = this.ref.get();
+    if (ctx != null)
+      throw new Error("getAll: Cannot be called durring update.");
+    const result = this.skjson.runWithGC(() => {
+      return this.skjson.clone(
+        this.skjson.importJSON(
+          this.exports.SkipRuntime_getAll(this.skjson.exportString(collection)),
+        ),
+      );
+    });
+    if (typeof result == "number") {
+      throw this.handles.delete(result as Handle<unknown>);
+    }
+    return result as Entry<K, V>[];
+  }
+
+  getDiff<K extends TJSON, V extends TJSON>(collection: string, from: bigint) {
+    const ctx = this.ref.get();
+    if (ctx != null)
+      throw new Error("getDiff: Cannot be called durring update.");
+    const result = this.skjson.runWithGC(() => {
+      return this.skjson.clone(
+        this.skjson.importJSON(
+          this.exports.SkipRuntime_getDiff(
+            this.skjson.exportString(collection),
+            from,
+          ),
+        ),
+      );
+    });
+    if (typeof result == "number") {
+      throw this.handles.delete(result as Handle<unknown>);
+    }
+    return result as Watermaked<K, V>;
   }
 
   getArray<K extends TJSON, V>(eagerHdl: string, key: K) {
-    return this.skjson.importJSON(
-      this.exports.SkipRuntime_getArray(
-        this.pointer(),
-        this.skjson.exportString(eagerHdl),
-        this.skjson.exportJSON(key),
-      ),
-    ) as V[];
+    const ctx = this.ref.get();
+    const call = () =>
+      this.skjson.importJSON(
+        this.exports.SkipRuntime_getArray(
+          ctx,
+          this.skjson.exportString(eagerHdl),
+          this.skjson.exportJSON(key),
+        ),
+      ) as V[];
+    if (ctx != null) {
+      return call();
+    }
+    return this.skjson.runWithGC(() => {
+      const result = call();
+      return this.skjson.clone(result);
+    });
   }
 
   getOne<K extends TJSON, V>(eagerHdl: string, key: K) {
-    return this.skjson.importJSON(
-      this.exports.SkipRuntime_get(
-        this.pointer(),
-        this.skjson.exportString(eagerHdl),
-        this.skjson.exportJSON(key),
-      ),
-    ) as V;
+    const ctx = this.ref.get();
+    const call = () =>
+      this.skjson.importJSON(
+        this.exports.SkipRuntime_get(
+          ctx,
+          this.skjson.exportString(eagerHdl),
+          this.skjson.exportJSON(key),
+        ),
+      ) as V;
+    if (ctx != null) {
+      return call();
+    }
+    return this.skjson.runWithGC(() => {
+      const result = call();
+      return this.skjson.clone(result);
+    });
   }
 
   maybeGetOne<K extends TJSON, V>(eagerHdl: string, key: K) {
-    const res = this.exports.SkipRuntime_maybeGet(
-      this.pointer(),
-      this.skjson.exportString(eagerHdl),
-      this.skjson.exportJSON(key),
-    );
-    return this.skjson.importJSON(res) as Opt<V>;
+    const ctx = this.ref.get();
+    const call = () =>
+      this.skjson.importJSON(
+        this.exports.SkipRuntime_maybeGet(
+          this.pointer(),
+          this.skjson.exportString(eagerHdl),
+          this.skjson.exportJSON(key),
+        ),
+      ) as Opt<V>;
+    if (ctx != null) {
+      return call();
+    }
+    return this.skjson.runWithGC(() => {
+      const result = call();
+      return this.skjson.clone(result);
+    });
   }
 
   getArrayLazy<K extends TJSON, V>(lazyHdl: string, key: K) {
@@ -323,57 +387,6 @@ export class ContextImpl implements Context {
     return this.skjson.importString(resHdlPtr);
   }
 
-  mapFromSkdb<R extends TJSON, K extends TJSON, V extends TJSON>(
-    table: string,
-    name: string,
-    mapper: (entry: R, occ: number) => Iterable<[K, V]>,
-    rangeOpt: [R, R][] | null = null,
-  ) {
-    const computeFnId = this.handles.register(mapper);
-    const eagerHdl = this.exports.SkipRuntime_fromSkdb(
-      this.pointer(),
-      this.skjson.exportString(table),
-      this.skjson.exportString(name),
-      computeFnId,
-      this.skjson.exportJSON(rangeOpt),
-    );
-    return this.skjson.importString(eagerHdl);
-  }
-
-  mapToSkdb<R extends TJSON[], K extends TJSON, V extends TJSON>(
-    eagerHdl: string,
-    schema: Schema,
-    convert: (key: K, it: NonEmptyIterator<V>) => Iterable<R>,
-    connected: boolean,
-    rangeOpt: [K, K][] | null = null,
-  ) {
-    const checked: (key: K, it: NonEmptyIterator<V>) => Iterable<R> = (
-      key: K,
-      it: NonEmptyIterator<V>,
-    ) => {
-      const rit = convert(key, it);
-      const verified: R[] = [];
-      for (const e of rit) {
-        if (schema.columns.length > e.length) {
-          if (schema.columns[e.length].name == "skdb_access") {
-            e.push("read-write");
-          }
-        }
-        verified.push(e);
-      }
-      return verified;
-    };
-    const convertId = this.handles.register(checked);
-    this.exports.SkipRuntime_toSkdb(
-      this.pointer(),
-      this.skjson.exportString(eagerHdl),
-      this.skjson.exportString(schema.name),
-      convertId,
-      connected,
-      this.skjson.exportJSON(rangeOpt),
-    );
-  }
-
   sliced<K extends TJSON>(
     collectionName: string,
     sliceName: string,
@@ -400,7 +413,7 @@ export class ContextImpl implements Context {
 
   jsonExtract(value: JSONObject, pattern: string): TJSON[] {
     return this.skjson.importJSON(
-      this.exports.SKIP_SKStore_jsonExtract(
+      this.exports.SkipRuntime_jsonExtract(
         this.skjson.exportJSON(value),
         this.skjson.exportString(pattern),
       ),
@@ -413,6 +426,149 @@ export class ContextImpl implements Context {
       "b64_" +
       this.env.base64Encode(JSON.stringify(value), true).replaceAll("=", "")
     );
+  }
+
+  createReactiveRequest<K extends TJSON, V extends TJSON>(
+    resourceName: string,
+    params: JSONObject,
+    reactiveAuth: Uint8Array,
+  ): [string, CollectionAccess<K, V>] {
+    const ctx = this.ref.get();
+    if (ctx != null)
+      throw new Error(
+        "createReactiveRequest: Cannot be called durring update.",
+      );
+    const result = this.skjson.runWithGC(() => {
+      const result = this.skjson.importJSON(
+        this.exports.SkipRuntime_createReactiveRequest(
+          this.skjson.exportString(resourceName),
+          this.skjson.exportJSON(params),
+          this.skjson.exportBytes(reactiveAuth),
+        ),
+      );
+      return this.skjson.clone(result);
+    });
+    if (typeof result == "number") {
+      throw this.handles.delete(result as Handle<unknown>);
+    }
+    if (
+      !Array.isArray(result) ||
+      result.length != 2 ||
+      typeof result[0] != "string" ||
+      typeof result[1] != "string"
+    ) {
+      throw new TypeError("Invalid result type.");
+    }
+    const [name, handle] = result as [string, string];
+    const collection = new EagerCollectionReader<K, V>(this, handle);
+    this.resources[name] = handle;
+    return [name, collection];
+  }
+
+  closeReactiveRequest(
+    resourceName: string,
+    params: JSONObject,
+    reactiveAuth: Uint8Array,
+  ) {
+    const ctx = this.ref.get();
+    if (ctx != null)
+      throw new Error("closeReactiveRequest: Cannot be called durring update.");
+    const result = this.skjson.runWithGC(() => {
+      return this.exports.SkipRuntime_closeReactiveRequest(
+        this.skjson.exportString(resourceName),
+        this.skjson.exportJSON(params),
+        this.skjson.exportBytes(reactiveAuth),
+      );
+    });
+    if (result > 0) {
+      throw this.handles.delete(result as Handle<unknown>);
+    }
+  }
+
+  closeSession(reactiveAuth: Uint8Array) {
+    const ctx = this.ref.get();
+    if (ctx != null)
+      throw new Error("closeSession: Cannot be called durring update.");
+    const result = this.skjson.runWithGC(() => {
+      return this.exports.SkipRuntime_closeSession(
+        this.skjson.exportBytes(reactiveAuth),
+      );
+    });
+    if (result > 0) {
+      throw this.handles.delete(result as Handle<unknown>);
+    }
+  }
+
+  write(collection: string, key: TJSON, value: TJSON[]): void {
+    const result = this.skjson.runWithGC(() => {
+      return this.exports.SkipRuntime_write(
+        this.skjson.exportString(collection),
+        this.skjson.exportJSON(key),
+        this.skjson.exportJSON(value),
+      );
+    });
+    if (result > 0) {
+      throw this.handles.delete(result as Handle<unknown>);
+    }
+  }
+
+  writeAll(collection: string, values: Entry<TJSON, TJSON>[]): void {
+    const result = this.skjson.runWithGC(() => {
+      return this.exports.SkipRuntime_writeAll(
+        this.skjson.exportString(collection),
+        this.skjson.exportJSON(values),
+      );
+    });
+    if (result > 0) {
+      throw this.handles.delete(result as Handle<unknown>);
+    }
+  }
+
+  delete(collection: string, keys: TJSON[]): void {
+    const result = this.skjson.runWithGC(() => {
+      return this.exports.SkipRuntime_delete(
+        this.skjson.exportString(collection),
+        this.skjson.exportJSON(keys),
+      );
+    });
+    if (result > 0) {
+      throw this.handles.delete(result as Handle<unknown>);
+    }
+  }
+
+  subscribe<K extends TJSON, V extends TJSON>(
+    collectionName: string,
+    from: bigint,
+    nofify: Notifier<K, V>,
+    changes: boolean,
+  ): bigint {
+    const collection = this.resources[collectionName];
+    if (!collection) {
+      throw new UnknownCollectionError(
+        `Collection ${collectionName} not found`,
+      );
+    }
+    const result = this.skjson.runWithGC(() => {
+      return this.exports.SkipRuntime_subscribe(
+        this.skjson.exportString(collection),
+        from,
+        this.handles.register(nofify as Notifier<TJSON, TJSON>),
+        changes,
+      );
+    });
+    if (result < 0) {
+      throw this.handles.delete(Number(-result) as Handle<unknown>);
+    }
+    return result;
+  }
+
+  unsubscribe(session: bigint): void {
+    const result = this.skjson.runWithGC(() => {
+      return this.exports.SkipRuntime_unsubscribe(session);
+    });
+    if (result > 0) {
+      throw this.handles.delete(result as Handle<unknown>);
+    }
   }
 
   private pointer() {
@@ -556,7 +712,10 @@ interface ToWasm {
     key: ptr<Internal.CJSON>,
     it: ptr<Internal.NonEmptyIterator>,
   ): ptr<Internal.CJSON>;
-  SKIP_SKStore_init(context: ptr<Internal.Context>): void;
+  SKIP_SKStore_init(
+    context: ptr<Internal.Context>,
+    inputs: ptr<Internal.CJObject>,
+  ): void;
   SKIP_SKStore_applyLazyFun<K extends TJSON, V extends TJSON>(
     fn: Handle<(selfHdl: LazyCollection<K, V>, key: K) => Opt<V>>,
     context: ptr<Internal.Context>,
@@ -594,6 +753,25 @@ interface ToWasm {
   ): Opt<ptr<Internal.CJSON>>;
   // Utils
   SKIP_SKStore_getErrorHdl(exn: ptr<Internal.Exception>): Handle<ErrorObject>;
+
+  SkipRuntime_callResourceCompute(
+    context: ptr<Internal.Context>,
+    name: ptr<Internal.String>,
+    params: ptr<Internal.CJObject>,
+  ): ptr<Internal.String>;
+
+  SkipRuntime_applyNotify(
+    fn: Handle<
+      (
+        values: Entry<TJSON, TJSON>[],
+        watermark: bigint,
+        update: boolean,
+      ) => void
+    >,
+    values: ptr<Internal.CJArray>,
+    watermark: bigint,
+    update: boolean,
+  ): void;
 }
 
 class Ref {
@@ -692,7 +870,10 @@ class LinksImpl implements Links {
     key: ptr<Internal.CJSON>,
     param: ptr<Internal.CJSON>,
   ) => void;
-  init!: (context: ptr<Internal.Context>) => void;
+  init!: (
+    context: ptr<Internal.Context>,
+    inputs: ptr<Internal.CJObject>,
+  ) => void;
   applyAccumulate!: <T extends TJSON, V extends TJSON>(
     fn: Handle<Accumulator<T, V>>,
     acc: ptr<Internal.CJSON>,
@@ -714,7 +895,29 @@ class LinksImpl implements Links {
     it: ptr<Internal.NonEmptyIterator>,
   ) => ptr<Internal.CJSON>;
 
-  private initFn!: () => void;
+  callResourceCompute!: (
+    context: ptr<Internal.Context>,
+    name: ptr<Internal.String>,
+    params: ptr<Internal.CJObject>,
+  ) => ptr<Internal.String>;
+
+  applyNotify!: (
+    fn: Handle<
+      (
+        values: Entry<TJSON, TJSON>[],
+        watermark: bigint,
+        update: boolean,
+      ) => void
+    >,
+    values: ptr<Internal.CJArray>,
+    watermark: bigint,
+    update: boolean,
+  ) => void;
+
+  private initFn!: (
+    collections: Record<string, EagerCollection<TJSON, TJSON>>,
+  ) => CallResourceCompute;
+  private callResourceCompute_!: CallResourceCompute;
 
   constructor(env: Environment) {
     this.env = env;
@@ -722,7 +925,6 @@ class LinksImpl implements Links {
   }
 
   complete = (utils: Utils, exports: object) => {
-    let notify: (() => void) | null = null;
     const fromWasm = exports as FromWasm;
     const skjson = () => {
       if (this.skjson == undefined) {
@@ -731,6 +933,40 @@ class LinksImpl implements Links {
       return this.skjson;
     };
     const ref = new Ref();
+    this.callResourceCompute = (
+      ctx: ptr<Internal.Context>,
+      skname: ptr<Internal.String>,
+      skparams: ptr<Internal.CJObject>,
+    ) => {
+      ref.push(ctx);
+      const jsu = skjson();
+      const name = jsu.importString(skname);
+      const params = jsu.importJSON(skparams) as JSONObject;
+      const res = jsu.exportString(this.callResourceCompute_(name, params));
+      ref.pop();
+      return res;
+    };
+
+    this.applyNotify = (
+      fn: Handle<
+        (
+          values: Entry<TJSON, TJSON>[],
+          watermark: bigint,
+          update: boolean,
+        ) => void
+      >,
+      skvalues: ptr<Internal.CJArray>,
+      watermark: bigint,
+      update: boolean,
+    ) => {
+      const jsu = skjson();
+      const values = jsu.clone(jsu.importJSON(skvalues)) as Entry<
+        TJSON,
+        TJSON
+      >[];
+      this.handles.apply(fn, [values, watermark, update]);
+    };
+
     this.applyMapFun = <
       K1 extends TJSON,
       V1 extends TJSON,
@@ -819,10 +1055,6 @@ class LinksImpl implements Links {
       const params = jsu.importJSON(skparams, true) as P;
       const promise = this.handles.apply(fn, [key, params]);
       const register = (value: Result<TJSON, TJSON>) => {
-        if (!notify) {
-          const skdbApp = this.env.shared.get("SKDB") as SKDBShared;
-          notify = skdbApp.notify;
-        }
         setTimeout(() => {
           const result = jsu.runWithGC(() => {
             return Math.trunc(
@@ -837,8 +1069,6 @@ class LinksImpl implements Links {
           });
           if (result < 0) {
             throw this.handles.delete(-result as Handle<unknown>);
-          } else if (notify) {
-            notify();
           }
         }, 0);
       };
@@ -921,9 +1151,28 @@ class LinksImpl implements Links {
       ref.pop();
       return res;
     };
-    this.init = (context: ptr<Internal.Context>) => {
-      ref.push(context);
-      this.initFn();
+    this.init = (
+      ctx: ptr<Internal.Context>,
+      skInputs: ptr<Internal.CJObject>,
+    ) => {
+      ref.push(ctx);
+      const context = new ContextImpl(
+        skjson(),
+        fromWasm,
+        this.handles,
+        this.env,
+        ref,
+      );
+      const jsu = skjson();
+      const inputs = jsu.importJSON(skInputs) as Record<string, string>;
+      const collections: Record<string, EagerCollection<TJSON, TJSON>> = {};
+      for (const [name, handle] of Object.entries(inputs)) {
+        collections[name] = new EagerCollectionImpl<TJSON, TJSON>(
+          context,
+          handle,
+        );
+      }
+      this.callResourceCompute_ = this.initFn(collections);
       ref.pop();
     };
     this.applyAccumulate = <T extends TJSON, V extends TJSON>(
@@ -969,7 +1218,14 @@ class LinksImpl implements Links {
         throw this.handles.delete(-result as Handle<unknown>);
       }
     };
-    const create = (init: () => void, tokens: Record<string, number>) => {
+    const create = (
+      init: (
+        collections: Record<string, EagerCollection<TJSON, TJSON>>,
+      ) => CallResourceCompute,
+      inputs: string[],
+      tokens: Record<string, number>,
+      initValues: Record<string, [TJSON, TJSON][]>,
+    ) => {
       // Register the init function to have  a named init function
       this.initFn = init;
       // Get a run uuid to build to allow function mapping reload in case of persistence
@@ -980,6 +1236,8 @@ class LinksImpl implements Links {
         Math.trunc(
           fromWasm.SkipRuntime_createFor(
             jsu.exportString(uuid),
+            jsu.exportJSON(inputs),
+            jsu.exportJSON(initValues),
             jsu.exportJSON(Object.keys(tokens)),
             time,
           ),
@@ -999,23 +1257,6 @@ class LinksImpl implements Links {
       new SKStoreFactoryImpl(
         () => new ContextImpl(skjson(), fromWasm, this.handles, this.env, ref),
         create,
-        (dbName, asWorker) =>
-          (this.env.shared.get("SKDB") as SKDBShared).createSync(
-            dbName,
-            asWorker,
-          ),
-        (key: string) => {
-          const keyBytes = this.env.base64Decode(key);
-          return this.env
-            .crypto()
-            .subtle.importKey(
-              "raw",
-              keyBytes,
-              { name: "HMAC", hash: "SHA-256" },
-              false,
-              ["sign"],
-            );
-        },
       ),
     );
   };
@@ -1070,8 +1311,11 @@ class Manager implements ToWasmManager {
       key: ptr<Internal.CJSON>,
       it: ptr<Internal.NonEmptyIterator>,
     ) => links.applyConvertToRowFun(fn, key, it);
-    toWasm.SKIP_SKStore_init = (context: ptr<Internal.Context>) => {
-      links.init(context);
+    toWasm.SKIP_SKStore_init = (
+      context: ptr<Internal.Context>,
+      inputs: ptr<Internal.CJObject>,
+    ) => {
+      links.init(context, inputs);
     };
     toWasm.SKIP_SKStore_applyLazyFun = <K extends TJSON, V extends TJSON>(
       fn: Handle<(selfHdl: LazyCollection<K, V>, key: K) => Opt<V>>,
@@ -1111,6 +1355,23 @@ class Manager implements ToWasmManager {
     ) => links.applyDismiss(fn, acc, value);
     toWasm.SKIP_SKStore_getErrorHdl = (exn: ptr<Internal.Exception>) =>
       links.getErrorHdl(exn);
+    toWasm.SkipRuntime_callResourceCompute = (
+      context: ptr<Internal.Context>,
+      name: ptr<Internal.String>,
+      params: ptr<Internal.CJObject>,
+    ) => links.callResourceCompute(context, name, params);
+    toWasm.SkipRuntime_applyNotify = (
+      fn: Handle<
+        (
+          values: Entry<TJSON, TJSON>[],
+          watermark: bigint,
+          update: boolean,
+        ) => void
+      >,
+      values: ptr<Internal.CJArray>,
+      watermark: bigint,
+      update: boolean,
+    ) => links.applyNotify(fn, values, watermark, update);
     return links;
   };
 }

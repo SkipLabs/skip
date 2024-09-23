@@ -378,7 +378,7 @@ class Mapping {
 
 export type JSONObject = { [key: string]: TJSON | null };
 
-export type TJSON = number | JSONObject | boolean | (TJSON | null)[] | string;
+export type TJSON = number | JSONObject | boolean | (TJSON | null)[] | string | bigint;
 
 export type Exportable =
   | TJSON
@@ -388,7 +388,7 @@ export type Exportable =
   | ArrayProxy<any>;
 
 export interface SKJSON extends Shared {
-  importJSON: (value: ptr<Internal.CJSON>, copy?: boolean) => Exportable;
+  importJSON(value: ptr<Internal.CJSON>, copy?: boolean): Exportable;
   exportJSON(v: null | undefined): ptr<Internal.CJNull>;
   exportJSON(v: number): ptr<Internal.CJFloat | Internal.CJInt>;
   exportJSON(v: boolean): ptr<Internal.CJBool>;
@@ -401,37 +401,29 @@ export interface SKJSON extends Shared {
     },
   ): ptr<T>;
   exportJSON(v: TJSON | null): ptr<Internal.CJSON>;
-  importOptJSON: (
+  importOptJSON(
     value: Opt<ptr<Internal.CJSON>>,
     copy?: boolean,
-  ) => Exportable;
-  importString: (v: ptr<Internal.String>) => string;
-  exportString: (v: string) => ptr<Internal.String>;
+  ): Exportable;
+  importString(v: ptr<Internal.String>): string;
+  exportString(v: string): ptr<Internal.String>;
+  exportBytes(v: Uint8Array): ptr<Internal.Array<Internal.Byte>>;
   runWithGC: <T>(fn: () => T) => T;
+  clone: <T>(v: T) => T;
 }
 
 class SKJSONShared implements SKJSON {
   getName = () => "SKJSON";
 
-  importJSON: (value: ptr<Internal.CJSON>, copy?: boolean) => Exportable;
-  exportJSON: (v: Exportable) => ptr<Internal.CJSON>;
-  importString: (v: ptr<Internal.String>) => string;
-  exportString: (v: string) => ptr<Internal.String>;
-  runWithGC: <T>(fn: () => T) => T;
-
   constructor(
-    importJSON: (value: ptr<Internal.CJSON>, copy?: boolean) => Exportable,
-    exportJSON: (v: Exportable) => ptr<Internal.CJSON>,
-    importString: (v: ptr<Internal.String>) => string,
-    exportString: (v: string) => ptr<Internal.String>,
-    runWithGC: <T>(fn: () => T) => T,
-  ) {
-    this.importJSON = importJSON;
-    this.exportJSON = exportJSON;
-    this.importString = importString;
-    this.exportString = exportString;
-    this.runWithGC = runWithGC;
-  }
+    public importJSON: (value: ptr<Internal.CJSON>, copy?: boolean) => Exportable,
+    public exportJSON: (v: Exportable) => ptr<Internal.CJSON>,
+    public importString: (v: ptr<Internal.String>) => string,
+    public exportString: (v: string) => ptr<Internal.String>,
+    public exportBytes: (v: Uint8Array) => ptr<Internal.Array<Internal.Byte>>,
+    public runWithGC: <T>(fn: () => T) => T,
+    public clone: <T>(v: T) => T,
+  ) {}
 
   importOptJSON(value: Opt<ptr<Internal.CJSON>>, copy?: boolean): Exportable {
     if (value === null || value === 0) {
@@ -514,7 +506,9 @@ class LinksImpl implements Links {
         exportJSON,
         utils.importString,
         utils.exportString,
+        utils.exportBytes,
         utils.runWithGc,
+        clone,
       ),
     );
   };

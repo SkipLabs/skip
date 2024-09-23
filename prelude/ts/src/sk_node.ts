@@ -7,7 +7,6 @@ import * as util from "util";
 import * as perf_hooks from "perf_hooks";
 import * as crypto from "crypto";
 import { Worker } from "worker_threads";
-// @ts-ignore
 import { WebSocket } from "ws";
 
 class WrkImpl implements Wrk {
@@ -46,6 +45,7 @@ class Env implements Environment {
   base64Encode: (toEncode: string, url?: boolean) => string;
   environment: Array<string>;
   throwRuntime: (code: int) => void;
+  // @ts-ignore
   createSocket: (uri: string) => WebSocket;
   createWorker: (url: URL, options?: WorkerOptions) => Wrk;
   createWorkerWrapper: (worker: any) => Wrk;

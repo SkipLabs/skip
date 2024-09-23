@@ -8,9 +8,12 @@ import type {
   TJSON,
   NonEmptyIterator,
   EagerCollection,
-  Schema,
   JSONObject,
   RefreshToken,
+  Entry,
+  CollectionAccess,
+  Watermaked,
+  Notifier,
 } from "../skipruntime_api.js";
 
 export type CtxMapping<
@@ -33,7 +36,7 @@ export interface SKJSON extends Shared {
 }
 
 export interface Context {
-  mapReduce: <
+  mapReduce<
     K extends TJSON,
     V extends TJSON,
     K2 extends TJSON,
@@ -45,78 +48,56 @@ export interface Context {
     mapper: (key: K, it: NonEmptyIterator<V>) => Iterable<[K2, V2]>,
     accumulator: Accumulator<V2, V3>,
     rangeOpt?: [K, K][] | null,
-  ) => string;
+  ): string;
 
-  map: <K extends TJSON, V extends TJSON, K2 extends TJSON, V2 extends TJSON>(
+  map<K extends TJSON, V extends TJSON, K2 extends TJSON, V2 extends TJSON>(
     collectionName: string,
     mapperName: string,
     compute: (key: K, it: NonEmptyIterator<V>) => Iterable<[K2, V2]>,
     rangeOpt?: [K, K][] | null,
-  ) => string;
+  ): string;
 
-  lazy: <K extends TJSON, V extends TJSON>(
+  lazy<K extends TJSON, V extends TJSON>(
     name: string,
     compute: (self: LazyCollection<K, V>, key: K) => Opt<V>,
-  ) => string;
+  ): string;
 
-  asyncLazy: <
-    K extends TJSON,
-    V extends TJSON,
-    P extends TJSON,
-    M extends TJSON,
-  >(
+  asyncLazy<K extends TJSON, V extends TJSON, P extends TJSON, M extends TJSON>(
     name: string,
     get: (key: K) => P,
     call: (key: K, params: P) => Promise<AValue<V, M>>,
-  ) => string;
+  ): string;
 
-  getFromTable: <K extends TJSON, R>(
-    table: string,
-    key: K,
-    index?: string,
-  ) => R[];
+  getArray<K extends TJSON, V>(collection: string, key: K): V[];
+  getOne<K extends TJSON, V>(collection: string, key: K): V;
+  maybeGetOne<K extends TJSON, V>(collection: string, key: K): Opt<V>;
 
-  getArray: <K extends TJSON, V>(collection: string, key: K) => V[];
-  getOne: <K extends TJSON, V>(collection: string, key: K) => V;
-  maybeGetOne: <K extends TJSON, V>(collection: string, key: K) => Opt<V>;
+  getAll<K extends TJSON, V extends TJSON>(collection: string): Entry<K, V>[];
 
-  getArrayLazy: <K extends TJSON, V>(collection: string, key: K) => V[];
-  getOneLazy: <K extends TJSON, V>(collection: string, key: K) => V;
-  maybeGetOneLazy: <K extends TJSON, V>(collection: string, key: K) => Opt<V>;
+  getDiff<K extends TJSON, V extends TJSON>(
+    collection: string,
+    watermark: bigint,
+  ): Watermaked<K, V>;
 
-  getArraySelf: <K extends TJSON, V>(
+  getArrayLazy<K extends TJSON, V>(collection: string, key: K): V[];
+  getOneLazy<K extends TJSON, V>(collection: string, key: K): V;
+  maybeGetOneLazy<K extends TJSON, V>(collection: string, key: K): Opt<V>;
+
+  getArraySelf<K extends TJSON, V>(lazyHdl: ptr<Internal.LHandle>, key: K): V[];
+  getOneSelf<K extends TJSON, V>(lazyHdl: ptr<Internal.LHandle>, key: K): V;
+  maybeGetOneSelf<K extends TJSON, V>(
     lazyHdl: ptr<Internal.LHandle>,
     key: K,
-  ) => V[];
-  getOneSelf: <K extends TJSON, V>(lazyHdl: ptr<Internal.LHandle>, key: K) => V;
-  maybeGetOneSelf: <K extends TJSON, V>(
-    lazyHdl: ptr<Internal.LHandle>,
-    key: K,
-  ) => Opt<V>;
-  getToken: (key: string) => RefreshToken;
+  ): Opt<V>;
+  getToken(key: string): RefreshToken;
 
-  size: (collection: string) => number;
+  size(collection: string): number;
 
-  mapFromSkdb: <R extends TJSON[], K extends TJSON, V extends TJSON>(
-    table: string,
-    mapperName: string,
-    mapper: (entry: R, occ: number) => Iterable<[K, V]>,
-    rangeOpt?: [R, R][] | null,
-  ) => string;
-
-  mapToSkdb: <R extends TJSON[], K extends TJSON, V extends TJSON>(
-    eagerHdl: string,
-    table: Schema,
-    mapper: (key: K, it: NonEmptyIterator<V>) => Iterable<R>,
-    connected: boolean,
-    rangeOpt?: [K, K][] | null,
-  ) => void;
-
-  merge: <K extends TJSON, V extends TJSON>(
+  merge<K extends TJSON, V extends TJSON>(
     collections: EagerCollection<K, V>[],
-  ) => string;
+  ): string;
 
-  multimap: <
+  multimap<
     K1 extends TJSON,
     V1 extends TJSON,
     K2 extends TJSON,
@@ -124,9 +105,9 @@ export interface Context {
   >(
     name: string,
     mappings: CtxMapping<K1, V1, K2, V2>[],
-  ) => string;
+  ): string;
 
-  multimapReduce: <
+  multimapReduce<
     K1 extends TJSON,
     V1 extends TJSON,
     K2 extends TJSON,
@@ -136,7 +117,7 @@ export interface Context {
     name: string,
     mappings: CtxMapping<K1, V1, K2, V2>[],
     accumulator: Accumulator<V2, V3>,
-  ) => string;
+  ): string;
 
   sliced<K extends TJSON>(
     collectionName: string,
@@ -150,7 +131,36 @@ export interface Context {
 
   keyOfJSON(value: TJSON): string;
 
-  noref: () => Context;
+  createReactiveRequest<K extends TJSON, V extends TJSON>(
+    resourceName: string,
+    params: JSONObject,
+    reactiveAuth: Uint8Array,
+  ): [string, CollectionAccess<K, V>];
+
+  closeReactiveRequest(
+    resourceName: string,
+    params: JSONObject,
+    reactiveAuth: Uint8Array,
+  ): void;
+
+  closeSession(reactiveAuth: Uint8Array): void;
+
+  write(collection: string, key: TJSON, value: TJSON[]): void;
+
+  writeAll(collection: string, values: Entry<TJSON, TJSON>[]): void;
+
+  delete(collection: string, keys: TJSON[]): void;
+
+  subscribe<K extends TJSON, V extends TJSON>(
+    collection: string,
+    from: bigint,
+    notify: Notifier<K, V>,
+    changes: boolean,
+  ): bigint;
+
+  unsubscribe(session: bigint): void;
+
+  noref(): Context;
 }
 
 export type Handle<T> = Internal.Opaque<int, { handle_for: T }>;
@@ -211,28 +221,27 @@ export interface FromWasm {
     limit: int,
   ): ptr<Internal.String>;
 
-  SkipRuntime_getFromTable(
-    ctx: ptr<Internal.Context>,
-    table: ptr<Internal.String>,
-    key: ptr<Internal.CJSON>,
-    index: ptr<Internal.CJSON>,
-  ): ptr<Internal.CJSON>;
-
   SkipRuntime_getArray(
-    ctx: ptr<Internal.Context>,
+    ctx: ptr<Internal.Context> | null,
     getterHdl: ptr<Internal.String>,
     key: ptr<Internal.CJSON>,
   ): ptr<Internal.CJArray>;
   SkipRuntime_get(
-    ctx: ptr<Internal.Context>,
+    ctx: ptr<Internal.Context> | null,
     getterHdl: ptr<Internal.String>,
     key: ptr<Internal.CJSON>,
   ): ptr<Internal.CJSON>;
   SkipRuntime_maybeGet(
-    ctx: ptr<Internal.Context>,
+    ctx: ptr<Internal.Context> | null,
     getterHdl: ptr<Internal.String>,
     key: ptr<Internal.CJSON>,
   ): ptr<Internal.CJSON>;
+  SkipRuntime_getAll(getterHdl: ptr<Internal.String>): ptr<Internal.CJSON>;
+  SkipRuntime_getDiff(
+    getterHdl: ptr<Internal.String>,
+    from: bigint,
+  ): ptr<Internal.CJSON>;
+
   SkipRuntime_getToken(
     ctx: ptr<Internal.Context>,
     key: ptr<Internal.String>,
@@ -276,17 +285,6 @@ export interface FromWasm {
     eagerCollectionId: ptr<Internal.String>,
   ): number;
 
-  SkipRuntime_toSkdb<R, K, V>(
-    ctx: ptr<Internal.Context>,
-    eagerCollectionId: ptr<Internal.String>,
-    table: ptr<Internal.String>,
-    fnPtr: Handle<(key: K, it: NonEmptyIterator<V>) => R>,
-    connected: boolean,
-    rangeOpt: ptr<
-      Internal.CJArray<Internal.CJArray<Internal.CJSON>> | Internal.CJNull
-    >,
-  ): void;
-
   // NonEmptyIterator
   SkipRuntime_iteratorNext(
     it: ptr<Internal.NonEmptyIterator>,
@@ -315,11 +313,12 @@ export interface FromWasm {
   // Store
   SkipRuntime_createFor(
     session: ptr<Internal.String>,
+    inputs: ptr<Internal.CJArray>,
+    values: ptr<Internal.CJObject>,
     tokens: ptr<Internal.CJArray>,
     time: float,
   ): float;
 
-  // SKStore
   SkipRuntime_asyncLazy<K extends TJSON, V extends TJSON, P extends TJSON>(
     ctx: ptr<Internal.Context>,
     name: ptr<Internal.String>,
@@ -330,15 +329,6 @@ export interface FromWasm {
     ctx: ptr<Internal.Context>,
     name: ptr<Internal.String>,
     lazyFn: Handle<(selfHdl: LazyCollection<K, V>, key: K) => Opt<V>>,
-  ): ptr<Internal.String>;
-  SkipRuntime_fromSkdb<R extends TJSON, K extends TJSON, V extends TJSON>(
-    ctx: ptr<Internal.Context>,
-    table: ptr<Internal.String>,
-    name: ptr<Internal.String>,
-    fnPtr: Handle<(entry: R, occ: number) => Iterable<[K, V]>>,
-    rangeOpt: ptr<
-      Internal.CJArray<Internal.CJArray<Internal.CJSON>> | Internal.CJNull
-    >,
   ): ptr<Internal.String>;
   SkipRuntime_asyncResult(
     callId: ptr<Internal.String>,
@@ -369,9 +359,49 @@ export interface FromWasm {
     accInit: ptr<Internal.CJSON>,
   ): ptr<Internal.String>;
 
-  // Utils
-  SKIP_SKStore_jsonExtract(
+  SkipRuntime_jsonExtract(
     json: ptr<Internal.CJSON>,
     pattern: ptr<Internal.String>,
   ): ptr<Internal.CJArray>;
+
+  SkipRuntime_createReactiveRequest(
+    collection: ptr<Internal.String>,
+    params: ptr<Internal.CJObject>,
+    reactiveAuth: ptr<Internal.Array<Internal.Byte>>,
+  ): ptr<Internal.CJSON>;
+
+  SkipRuntime_closeReactiveRequest(
+    collection: ptr<Internal.String>,
+    params: ptr<Internal.CJObject>,
+    reactiveAuth: ptr<Internal.Array<Internal.Byte>>,
+  ): number;
+
+  SkipRuntime_closeSession(
+    reactiveAuth: ptr<Internal.Array<Internal.Byte>>,
+  ): number;
+
+  SkipRuntime_write(
+    collection: ptr<Internal.String>,
+    key: ptr<Internal.CJSON>,
+    value: ptr<Internal.CJArray>,
+  ): number;
+
+  SkipRuntime_writeAll(
+    collection: ptr<Internal.String>,
+    values: ptr<Internal.CJArray>,
+  ): number;
+
+  SkipRuntime_delete(
+    collection: ptr<Internal.String>,
+    keys: ptr<Internal.CJArray>,
+  ): number;
+
+  SkipRuntime_subscribe(
+    resource: ptr<Internal.String>,
+    from: bigint,
+    notifyFn: Handle<Notifier<TJSON, TJSON>>,
+    changes: boolean,
+  ): bigint;
+
+  SkipRuntime_unsubscribe(session: bigint): number;
 }
