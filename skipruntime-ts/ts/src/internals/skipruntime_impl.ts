@@ -109,7 +109,7 @@ export class EagerCollectionImpl<K extends TJSON, V extends TJSON>
     return this.context.size(this.eagerHdl);
   };
 
-  sliced(ranges: readonly [K, K][]): EagerCollection<K, V> {
+  slice(ranges: readonly [K, K][]): EagerCollection<K, V> {
     const sliceName =
       "range_" +
       ranges
@@ -118,7 +118,7 @@ export class EagerCollectionImpl<K extends TJSON, V extends TJSON>
             `${this.context.keyOfJSON(k1)}--${this.context.keyOfJSON(k2)}`,
         )
         .join("_");
-    const eagerHdl = this.context.sliced(this.eagerHdl, sliceName, ranges);
+    const eagerHdl = this.context.slice(this.eagerHdl, sliceName, ranges);
     return this.derive<K, V>(eagerHdl);
   }
 

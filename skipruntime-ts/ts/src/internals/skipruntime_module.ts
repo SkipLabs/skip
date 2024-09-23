@@ -396,12 +396,12 @@ export class ContextImpl implements Context {
     return this.skjson.importString(resHdlPtr);
   }
 
-  sliced<K extends TJSON>(
+  slice<K extends TJSON>(
     collectionName: string,
     sliceName: string,
     ranges: [K, K][],
   ): string {
-    const resHdlPtr = this.exports.SkipRuntime_sliced(
+    const resHdlPtr = this.exports.SkipRuntime_slice(
       this.pointer(),
       this.skjson.exportString(collectionName),
       this.skjson.exportString(sliceName),
