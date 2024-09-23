@@ -1,4 +1,4 @@
-import { runUrl, type ModuleInit } from "std";
+import { run, type ModuleInit } from "std";
 import type { SKDBShared } from "./skdb_types.js";
 import { getWasmUrl } from "./skdb_wasm_locator.js";
 
@@ -8,7 +8,7 @@ export async function createOnThisThread(
   dbName?: string,
   getWasmSource?: () => Promise<Uint8Array>,
 ) {
-  const data = await runUrl(
+  const data = await run(
     getWasmUrl,
     // @ts-ignore
     modules,
