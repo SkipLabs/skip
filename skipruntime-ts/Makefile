@@ -62,13 +62,21 @@ check-src:
 	cd ts/src && npm install && tsc && npm run lint
 	echo "make: Leaving directory '${SCRIPT_DIR}/ts/src'"
 
+.PHONY: check-examples
+check-examples: ../build/sknpm
+	cd ts/examples && npm install
+	../build/sknpm b -r --nowasm --out-dir ts/examples/node_modules/skip-runtime
+	echo "make: Entering directory '${SCRIPT_DIR}/ts/examples'"
+	cd ts/examples && tsc && npm run lint
+	echo "make: Leaving directory '${SCRIPT_DIR}/ts/examples'"
+
 .PHONY: check-tests
 check-tests:
 	cd ts/tests && npm install
 	cd ts/tests && tsc
 
 .PHONY: check-all
-check-all: check-src check check-tests
+check-all: check-src check-examples check check-tests
 
 build: ../build/sknpm
 	cd ts/examples && bun install

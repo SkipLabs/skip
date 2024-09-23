@@ -1,6 +1,5 @@
-import type { JSONObject } from "skip-runtime";
+import type { TJSON } from "skip-runtime";
 import { createInterface } from "readline";
-// @ts-ignore
 import { WebSocket } from "ws";
 
 export interface ClientDefinition {
@@ -8,7 +7,7 @@ export interface ClientDefinition {
   scenarios: () => Step[][];
 }
 
-type Step = JSONObject;
+type Step = { type: string; command: string; payload: TJSON };
 
 class Session {
   scenario: Step[];
@@ -76,10 +75,10 @@ class Player {
     }
   }
 
-  play(idx?: number) {
+  play(idx = 0) {
     let run = true;
-    if (idx ?? 0 > 0) {
-      run = this.start(idx!);
+    if (idx > 0) {
+      run = this.start(idx);
     }
     if (run) {
       if (this.running) {
@@ -129,8 +128,7 @@ class Player {
       [/^stop$/g, () => this.stop()],
     ];
     let done = false;
-    for (let i = 0; i < patterns.length; i++) {
-      const pattern = patterns[i];
+    for (const pattern of patterns) {
       const matches = [...line.matchAll(pattern[0])];
       if (matches.length > 0) {
         done = true;
@@ -143,7 +141,7 @@ class Player {
   }
 }
 
-export async function run(scenarios: Step[][], port: number) {
+export function run(scenarios: Step[][], port: number) {
   const ws = new WebSocket(`ws://localhost:${port}`);
   ws.on("error", console.error);
   ws.on("close", () => process.exit(2));
@@ -158,23 +156,22 @@ export async function run(scenarios: Step[][], port: number) {
           [
             /^get (.*)$/g,
             (query: string) => {
-              const jsquery = JSON.parse(query);
-              jsquery["type"] = "get";
-              ws.send(jsquery);
+              const jsquery: Step = JSON.parse(query);
+              jsquery.type = "get";
+              ws.send(JSON.stringify(jsquery));
             },
           ],
           [
             /^post (.*)$/g,
             (query: string) => {
-              const jsquery = JSON.parse(query);
-              jsquery["type"] = "post";
-              ws.send(jsquery);
+              const jsquery: Step = JSON.parse(query);
+              jsquery.type = "post";
+              ws.send(JSON.stringify(jsquery));
             },
           ],
         ];
         let done = false;
-        for (let i = 0; i < patterns.length; i++) {
-          const pattern = patterns[i];
+        for (const pattern of patterns) {
           const matches = [...line.matchAll(pattern[0])];
           if (matches.length > 0) {
             done = true;
