@@ -15,7 +15,6 @@ import type {
   SkipService,
   Resource,
   Entry,
-  Loadable,
 } from "../src/skip-runtime.js";
 import {
   Sum,
@@ -350,8 +349,8 @@ it("testSlicedMap1", async () => {
   const runtime = await initService(new SlicedMap1Service(), createSKStore);
   const resource = "slice";
   // Inserts [[0, 0], ..., [30, 30]
-  const values = Array.from({ length: 31 }, (_, i) => {
-    return [i, [i]] as Entry<number, number>;
+  const values = Array.from({ length: 31 }, (_, i): Entry<number, number> => {
+    return [i, [i]];
   });
   runtime.patch("input", values);
   check("testSlicedMap1[0]", runtime.getAll(resource, {}).values, [
@@ -641,7 +640,7 @@ class TestLazyWithAsync
 
 class TestCheckResult implements Mapper<number, number, number, string> {
   constructor(
-    private asyncLazy: AsyncLazyCollection<[number, number], number, number>,
+    private asyncLazy: AsyncLazyCollection<[number, number], number, TJSON>,
   ) {}
 
   mapElement(
@@ -669,11 +668,7 @@ class AsyncLazyResource implements Resource {
       input2: EagerCollection<number, number>;
     },
   ): EagerCollection<number, string> {
-    /* eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion */
-    const asyncLazy = skstore.asyncLazy(
-      TestLazyWithAsync,
-      cs.input2,
-    ) as LazyCollection<[number, number], Loadable<number, number>>;
+    const asyncLazy = skstore.asyncLazy(TestLazyWithAsync, cs.input2);
     return cs.input1.map(TestCheckResult, asyncLazy);
   }
 }
