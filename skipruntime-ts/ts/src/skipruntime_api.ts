@@ -316,7 +316,7 @@ export interface EagerCollection<K extends TJSON, V extends TJSON>
    * Create a new eager collection by keeping only the elements whose keys are in
    * the given ranges.
    */
-  sliced(ranges: [K, K][]): EagerCollection<K, V>;
+  slice(ranges: [K, K][]): EagerCollection<K, V>;
 
   /**
    * Create a new eager collection by keeping the given number of the first elements.

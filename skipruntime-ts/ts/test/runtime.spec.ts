@@ -314,7 +314,7 @@ class SlicedMap1Resource implements Resource {
     },
   ): EagerCollection<number, number> {
     return cs.input
-      .sliced([
+      .slice([
         [1, 1],
         [3, 4],
         [7, 9],
@@ -323,7 +323,7 @@ class SlicedMap1Resource implements Resource {
       ])
       .map(SquareValues)
       .take(7)
-      .sliced([
+      .slice([
         [0, 7],
         [8, 15],
         [19, 2000],
