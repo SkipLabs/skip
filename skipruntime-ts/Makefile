@@ -8,6 +8,11 @@ SCRIPT_DIR=$(shell dirname $(shell realpath $(firstword $(MAKEFILE_LIST))))
 ../build/sknpm:
 	cd .. && make build/sknpm
 
+
+.PHONY: replication
+replication:
+	cd ../replication && npm i && tsc
+
 .PHONY: check-src
 check-src:
 	echo "make: Entering directory '${SCRIPT_DIR}/ts/src'"
@@ -51,7 +56,7 @@ check-%: ../build/sknpm
 	../build/sknpm b -r --nowasm --out-dir ts/examples/node_modules/skip-runtime
 	tsc --project ts/examples/tsconfig.json
 
-noderun-%: ../build/sknpm
+noderun-%: ../build/sknpm replication
 	cd ts/examples && npm install
 	../build/sknpm b -r --out-dir ts/examples/node_modules/skip-runtime
 	tsc --project ts/examples/tsconfig.json

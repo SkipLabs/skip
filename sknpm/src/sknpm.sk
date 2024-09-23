@@ -362,6 +362,10 @@ fun manage(
         json.maybeGetObject("dependencies").each(dps -> {
           dps.value.each((k, v) -> {
             pv = v.expectString();
+            if (pv.startsWith("file:")) {
+              deppath = pv.substring(pv.getIter().forward(5));
+              !pv = `file:${Path.resolve(tsd, deppath)}`;
+            };
             pckDependencies.maybeGet(k) match {
             | Some(epv) ->
               if (epv != pv) {
@@ -369,13 +373,17 @@ fun manage(
                   `Same package '${k}' used with different versions '${epv} vs ${pv}'.`,
                 )
               }
-            | _ -> pckDependencies.add(k, v.expectString())
+            | _ -> pckDependencies.add(k, pv)
             }
           })
         });
         json.maybeGetObject("devDependencies").each(dps -> {
           dps.value.each((k, v) -> {
             pv = v.expectString();
+            if (pv.startsWith("file:")) {
+              deppath = pv.substring(pv.getIter().forward(5));
+              !pv = `file:${Path.resolve(tsd, deppath)}`;
+            };
             pckDevDependencies.maybeGet(k) match {
             | Some(epv) ->
               if (epv != pv) {
@@ -383,7 +391,7 @@ fun manage(
                   `Same package '${k}' used with different versions '${epv} vs ${pv}'.`,
                 )
               }
-            | _ -> pckDevDependencies.add(k, v.expectString())
+            | _ -> pckDevDependencies.add(k, pv)
             }
           })
         });
@@ -408,7 +416,9 @@ fun manage(
       "type" => JSON.String("module"),
     ],
   );
-  FileSystem.writeTextFile(packageFile, packageContents.toString());
+  pckstream = mutable Vector[];
+  packageContents.writeToStream(pckstream.push, 2);
+  FileSystem.writeTextFile(packageFile, pckstream.join(""));
   tsconfig = Path.join(tsDir, "tsconfig.json");
   FileSystem.writeTextFile(
     tsconfig,

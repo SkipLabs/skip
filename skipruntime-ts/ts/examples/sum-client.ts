@@ -4,16 +4,16 @@ function scenarios() {
   return [
     [
       {
+        type: "request",
+        payload: { resource: "add" },
+      },
+      {
         type: "write",
         payload: [{ collection: "input1", entries: [["v1", [2]]] }],
       },
       {
         type: "write",
         payload: [{ collection: "input2", entries: [["v1", [3]]] }],
-      },
-      {
-        type: "request",
-        payload: { resource: "add" },
       },
       {
         type: "delete",
@@ -38,10 +38,6 @@ function scenarios() {
       {
         type: "write",
         payload: [{ collection: "input1", entries: [["v1", [8]]] }],
-      },
-      {
-        type: "request",
-        payload: { resource: "add" },
       },
     ] as Step[],
   ];

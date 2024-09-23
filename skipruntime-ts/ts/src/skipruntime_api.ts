@@ -245,8 +245,8 @@ export interface CollectionAccess<K extends TJSON, V extends TJSON>
    * @returns the values for this `key`, or null if no such value exists
    */
   getAll(): Entry<K, V>[];
-  getDiff(from: bigint): Watermaked<K, V>;
-  subscribe(from: bigint, notify: Notifier<K, V>, changes: boolean): bigint;
+  getDiff(from: string): Watermaked<K, V>;
+  subscribe(from: string, notify: Notifier<K, V>, changes: boolean): bigint;
 }
 
 /**
@@ -320,7 +320,7 @@ export type EntryPoint = {
 export type CallResourceCompute = (name: string, params: JSONObject) => string;
 
 export interface SKStoreFactory extends Shared {
-  runSKStore(
+  runSKStore<K extends TJSON, V extends TJSON>(
     init: (
       skstore: SKStore,
       collections: Record<string, EagerCollection<TJSON, TJSON>>,
@@ -329,7 +329,7 @@ export interface SKStoreFactory extends Shared {
     remotes?: Record<string, EntryPoint>,
     tokens?: Record<string, number>,
     initLocals?: () => Promise<Record<string, [TJSON, TJSON][]>>,
-  ): Promise<SkipBuilder>;
+  ): Promise<SkipBuilder<K, V>>;
 }
 
 export interface LazyCompute<K extends TJSON, V extends TJSON> {
@@ -409,24 +409,24 @@ export type Entry<K extends TJSON, V extends TJSON> = [K, V[]];
 
 export type ReactiveResponse = {
   collection: string;
-  watermark: bigint;
+  watermark: string;
 };
 
 export type Watermaked<K extends TJSON, V extends TJSON> = {
   values: Entry<K, V>[];
-  watermark: bigint;
+  watermark: string;
   update?: boolean;
 };
 
 export type Notifier<K extends TJSON, V extends TJSON> = (
   values: Entry<K, V>[],
-  watermark: bigint,
+  watermark: string,
   update: boolean,
 ) => void;
 
-export type SkipBuilder = (
+export type SkipBuilder<K extends TJSON, V extends TJSON> = (
   iCollection: Record<string, CollectionWriter<TJSON, TJSON>>,
-) => [SkipRuntime, SkipReplication<string, TJSON>];
+) => [SkipRuntime, SkipReplication<K, V>];
 
 export interface CollectionWriter<K extends TJSON, V extends TJSON> {
   write(key: K, value: V[]): void;
@@ -467,7 +467,7 @@ export interface SkipRuntime {
 }
 
 export interface SkipReplication<K extends TJSON, V extends TJSON> {
-  subscribe(collection: string, from: bigint, notify: Notifier<K, V>): bigint;
+  subscribe(collection: string, from: string, notify: Notifier<K, V>): bigint;
 
   unsubscribe(id: bigint): void;
 }
