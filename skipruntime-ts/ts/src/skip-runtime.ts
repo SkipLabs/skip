@@ -62,6 +62,7 @@ export type {
   Loadable,
   AsyncLazyCollection,
   EntryPoint,
+  ExternalCall,
 } from "./skipruntime_api.js";
 
 export { ValueMapper } from "./skipruntime_api.js";

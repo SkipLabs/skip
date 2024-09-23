@@ -13,9 +13,9 @@ import type {
   JSONObject,
   LazyCompute,
   LazyCollection,
-  Loadable,
   NonEmptyIterator,
   AsyncLazyCollection,
+  ExternalCall,
 } from "skip-runtime";
 import {
   Sum,
@@ -634,10 +634,7 @@ class TestLazyWithAsync
 
 class TestCheckResult implements Mapper<number, number, number, string> {
   constructor(
-    private asyncLazy: LazyCollection<
-      [number, number],
-      Loadable<number, number>
-    >,
+    private asyncLazy: AsyncLazyCollection<[number, number], number, number>,
   ) {}
 
   mapElement(
@@ -717,6 +714,96 @@ tests.push({
   run: testAsyncLazyRun,
 });
 
+class MockExternal implements ExternalCall<number, string, TJSON> {
+  async call(key: number, timestamp: number) {
+    await timeout(1000 * key); // wait for `key` seconds before returning
+    return { payload: "mock_result(" + key + ")" };
+  }
+}
+
+class TestCheckExternalResult extends ValueMapper<number, number, string> {
+  constructor(private asyncLazy: AsyncLazyCollection<number, string, TJSON>) {
+    super();
+  }
+  mapValue(value: number, key: number): string {
+    const asyncRes = this.asyncLazy.getOne(key);
+    if (asyncRes.status == "success") return `success: ${asyncRes.payload}`;
+    if (asyncRes.status == "failure") return `error: ${asyncRes.error}`;
+    return `loading... (previous: ${asyncRes.previous ? asyncRes.previous.payload : "NONE"})`;
+  }
+}
+tests.push({
+  name: "testExternalCall",
+  inputs: [schema("input", [integer("id", true, true), integer("value")])],
+  outputs: [schema("output", [integer("id", true, true), text("value")])],
+  tokens: { token_4s: 4000 },
+  init: (
+    skstore: SKStore,
+    input: TableCollection<[number, number]>,
+    output: TableCollection<[number, string]>,
+  ) => {
+    const external = skstore.external("token_4s", MockExternal);
+    input
+      .map(TestFromIntInt)
+      .map(TestCheckExternalResult, external)
+      .mapTo(output, TestToOutput);
+  },
+
+  run: async (
+    input: Table<[number, number]>,
+    output: Table<[number, string]>,
+  ) => {
+    const success = (id: number) => {
+      return { id, value: `success: mock_result(${id})` };
+    };
+    const loading = (id: number, hasPrevious: boolean = false) => {
+      const previous = hasPrevious ? `mock_result(${id})` : "NONE";
+      return { id, value: `loading... (previous: ${previous})` };
+    };
+
+    input.insert([
+      [1, 10],
+      [2, 20],
+      [3, 30],
+    ]);
+
+    await timeout(500);
+    // all loading at t = 0.5s
+    check("testExternalCall", output.select({}), [
+      loading(1),
+      loading(2),
+      loading(3),
+    ]);
+    await timeout(1000);
+    //id=1 succeeded at t = 1.5s
+    check("testExternalCall", output.select({}), [
+      success(1),
+      loading(2),
+      loading(3),
+    ]);
+    await timeout(1000);
+    //id=1,id=2 succeeded at t = 2.5s
+    check("testExternalCall", output.select({}), [
+      success(1),
+      success(2),
+      loading(3),
+    ]);
+    await timeout(1000);
+    //id=1,id=2,id=3 succeeded at t = 3.5s
+    check("testExternalCall", output.select({}), [
+      success(1),
+      success(2),
+      success(3),
+    ]);
+    await timeout(1000);
+    //all loading at t = 4.5s, but with previous values available for use if need be
+    check("testExternalCall", output.select({}), [
+      loading(1, true),
+      loading(2, true),
+      loading(3, true),
+    ]);
+  },
+});
 //// testTokens
 
 class TestWithToken
