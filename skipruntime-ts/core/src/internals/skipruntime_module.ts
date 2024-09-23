@@ -1415,11 +1415,11 @@ export class TimedQueue {
         tostart.set(endtime, [token]);
       }
     }
-    this.queue = [];
-    const keys = Array.from(tostart.keys()).sort();
-    for (const key of keys) {
-      this.queue.push({ endtime: key, tokens: tostart.get(key)! });
-    }
+    this.queue = Array.from(tostart, ([endtime, tokens]) => ({
+      endtime,
+      tokens,
+    }));
+    this.queue.sort((a, b) => a.endtime - b.endtime);
     if (this.queue.length > 0) {
       const next = Math.max(this.queue[0].endtime - time, 0);
       this.timeout = setTimeout(() => {
