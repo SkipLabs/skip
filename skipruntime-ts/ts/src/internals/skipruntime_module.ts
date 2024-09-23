@@ -1404,7 +1404,7 @@ export class TimedQueue {
   ) {}
 
   start(tokens: TQ_Token[], time: number) {
-    const tostart: Map<number, TQ_Token[]> = new Map<number, TQ_Token[]>();
+    const tostart = new Map<number, TQ_Token[]>();
     for (const token of tokens) {
       if (token.interval <= 0) continue;
       const endtime = time + token.interval;
@@ -1439,7 +1439,7 @@ export class TimedQueue {
 
   check() {
     const time = new Date().getTime();
-    const torenew: Map<number, TQ_Token[]> = new Map<number, TQ_Token[]>();
+    const torenew = new Map<number, TQ_Token[]>();
     let i = 0;
     for (i; i < this.queue.length; i++) {
       const cendtime = this.queue[i].endtime;
