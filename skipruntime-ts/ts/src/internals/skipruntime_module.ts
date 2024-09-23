@@ -1253,9 +1253,10 @@ class LinksImpl implements Links {
       if (result < 0) {
         throw this.handles.delete(-result as Handle<unknown>);
       }
-      const qTokens = Object.entries(tokens).map((entry) => {
-        return { ident: entry[0], interval: entry[1] };
-      });
+      const qTokens = Object.entries(tokens).map(([ident, interval]) => ({
+        ident,
+        interval,
+      }));
       this.timedQueue = new TimedQueue(update);
       this.timedQueue.start(qTokens, time);
     };
