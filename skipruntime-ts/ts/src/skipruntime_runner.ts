@@ -2,7 +2,6 @@ import type {
   CollectionAccess,
   CollectionWriter,
   EagerCollection,
-  JSONObject,
   SkipReplication,
   SkipRuntime,
   SKStore,
@@ -47,7 +46,7 @@ export async function runService(
       ).toCollectionAccess();
     }
     const collections = { ...inputs, ...result };
-    return (name: string, params: JSONObject) => {
+    return (name: string, params: Record<string, string>) => {
       const resourceConst = service.resources
         ? service.resources[name]
         : undefined;

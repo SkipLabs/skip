@@ -1,7 +1,6 @@
 import type {
   EagerCollection,
   EntryPoint,
-  Param,
   SKStore,
   TJSON,
 } from "./skipruntime_api.js";
@@ -23,7 +22,7 @@ export interface SkipService {
   remoteCollections?: Record<string, EntryPoint>;
   // name / duration in milliseconds
   refreshTokens?: Record<string, number>;
-  resources?: Record<string, new (...params: Param[]) => Resource>;
+  resources?: Record<string, new (params: Record<string, string>) => Resource>;
   init?: () => Promise<Record<string, [TJSON, TJSON][]>>;
 
   reactiveCompute(

@@ -101,6 +101,7 @@ check: $(CHECK_TARGETS)
 clean:
 	rm -Rf build
 	find . -name 'Skargo.toml' -print0 | sed 's|Skargo.toml|target|g' | xargs -0 rm -rf
+	find . -type d -name 'node_modules' -prune -print0 | xargs -0 rm -rf
 
 .PHONY: fmt-sk
 fmt-sk:

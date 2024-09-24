@@ -148,7 +148,7 @@ function toHttp(entrypoint: EntryPoint) {
   return `http://${entrypoint.host}:${entrypoint.port}`;
 }
 
-async function send(
+export async function fetchJSON(
   url: string,
   method: "POST" | "GET" | "PUT" | "PATCH" | "HEAD" | "DELETE" = "GET",
   headers: Record<string, string>,
@@ -156,7 +156,6 @@ async function send(
 ) {
   try {
     const body = data ? JSON.stringify(data) : undefined;
-    //console.log("fetch", url, method, body);
     const response = await fetch(url, {
       method,
       body,
@@ -199,7 +198,7 @@ export class SkipRESTRuntime implements SkipRuntime {
         "X-Reactive-Auth": Buffer.from(reactiveAuth.buffer).toString("base64"),
       };
     }
-    const [values, headers] = await send(
+    const [values, headers] = await fetchJSON(
       `${this.entrypoint}/v1/${resource}?${qParams}`,
       "GET",
       header,
@@ -222,7 +221,7 @@ export class SkipRESTRuntime implements SkipRuntime {
         "X-Reactive-Auth": Buffer.from(reactiveAuth.buffer).toString("base64"),
       };
     }
-    const [_data, headers] = await send(
+    const [_data, headers] = await fetchJSON(
       `${this.entrypoint}/v1/${resource}?${qParams}`,
       "HEAD",
       header,
@@ -237,7 +236,7 @@ export class SkipRESTRuntime implements SkipRuntime {
   ): Promise<V[]> {
     const qParams = new URLSearchParams(params).toString();
     let header = {};
-    const [data, _headers] = await send(
+    const [data, _headers] = await fetchJSON(
       `${this.entrypoint}/v1/${resource}/${key}?${qParams}`,
       "GET",
       header,
@@ -249,15 +248,20 @@ export class SkipRESTRuntime implements SkipRuntime {
     key: string,
     value: V[],
   ): Promise<void> {
-    await send(`${this.entrypoint}/v1/${collection}/${key}`, "PUT", {}, value);
+    await fetchJSON(
+      `${this.entrypoint}/v1/${collection}/${key}`,
+      "PUT",
+      {},
+      value,
+    );
   }
   async patch<K extends TJSON, V extends TJSON>(
     collection: string,
     values: Entry<K, V>[],
   ): Promise<void> {
-    await send(`${this.entrypoint}/v1/${collection}`, "PATCH", {}, values);
+    await fetchJSON(`${this.entrypoint}/v1/${collection}`, "PATCH", {}, values);
   }
   async delete(collection: string, key: string): Promise<void> {
-    await send(`${this.entrypoint}/v1/${collection}/${key}`, "DELETE", {});
+    await fetchJSON(`${this.entrypoint}/v1/${collection}/${key}`, "DELETE", {});
   }
 }
