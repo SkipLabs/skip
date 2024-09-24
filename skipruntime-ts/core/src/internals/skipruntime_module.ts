@@ -1466,6 +1466,9 @@ export class TimedQueue {
   }
 
   start(tokens: TQ_Token[], time: number): void {
+    if (this.timeout) {
+      throw new Error(`TimedQueue already started!`);
+    }
     this.add(tokens, time);
     this.schedule();
   }
