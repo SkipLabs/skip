@@ -1463,6 +1463,17 @@ export class TimedQueue {
       const endtime = time + token.interval;
       this.queue.insert(endtime, token);
     }
+    this.schedule();
+  }
+
+  stop(): void {
+    if (this.timeout) {
+      clearTimeout(this.timeout);
+      delete this.timeout;
+    }
+  }
+
+  private schedule(): void {
     const first = this.queue.peekPriority();
     if (first !== undefined) {
       const next = Math.max(first - Date.now(), 1);
@@ -1470,13 +1481,6 @@ export class TimedQueue {
         this.check();
       }, next);
       this.timeout.unref();
-    }
-  }
-
-  stop(): void {
-    if (this.timeout) {
-      clearTimeout(this.timeout);
-      delete this.timeout;
     }
   }
 
@@ -1496,14 +1500,7 @@ export class TimedQueue {
         this.queue.insert(endtime, token);
       }
     }
-    const first = this.queue.peekPriority();
-    if (first !== undefined) {
-      const next = Math.max(first - Date.now(), 1);
-      this.timeout = setTimeout(() => {
-        this.check();
-      }, next);
-      this.timeout.unref();
-    }
+    this.schedule();
   }
 }
 
