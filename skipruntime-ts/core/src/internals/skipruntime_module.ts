@@ -1449,7 +1449,6 @@ export class TimedQueue {
         this.queue[i].tokens.map((t) => t.ident),
       );
       for (const token of this.queue[i].tokens) {
-        if (token.interval <= 0) continue;
         let endtime = cendtime + token.interval;
         while (endtime <= time) endtime += token.interval;
         const current = torenew.get(endtime);
