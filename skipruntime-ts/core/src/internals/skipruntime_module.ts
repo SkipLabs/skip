@@ -1386,20 +1386,74 @@ class Manager implements ToWasmManager {
   };
 }
 
+/** Min heap-based priority queue whose keys are numbers and values are arrays. */
+class MinArrayPriorityQueue<T> {
+  private heap: [priority: number, values: T[]][] = [];
+  private priorityIndex = new Map<number, number>();
+
+  insert(priority: number, value: T): void {
+    const currentIndex = this.priorityIndex.get(priority);
+    if (currentIndex !== undefined) {
+      this.heap[currentIndex][1].push(value);
+    } else {
+      let i = this.heap.length;
+      this.heap.push([priority, [value]]);
+      this.priorityIndex.set(priority, i);
+      while (i > 0) {
+        const parent = (i - 1) >> 1;
+        if (this.heap[i][0] >= this.heap[parent][0]) break;
+        this.swap(i, parent);
+        i = parent;
+      }
+    }
+  }
+
+  peekPriority(): number | undefined {
+    return this.heap[0]?.[0];
+  }
+
+  popValues(): T[] | undefined {
+    const top = this.heap[0];
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (top === undefined) return undefined;
+    this.priorityIndex.delete(top[0]);
+    const last = this.heap.pop();
+    if (last === undefined || this.heap.length === 0) return top[1];
+    this.heap[0] = last;
+    this.priorityIndex.set(last[0], 0);
+    for (let i = 0; ; ) {
+      const left = (i << 1) + 1;
+      if (left >= this.heap.length) break;
+      let smallest = this.heap[left][0] < this.heap[i][0] ? left : i;
+      const right = left + 1;
+      if (
+        right < this.heap.length &&
+        this.heap[right][0] < this.heap[smallest][0]
+      )
+        smallest = right;
+      if (smallest === i) break;
+      this.swap(i, smallest);
+      i = smallest;
+    }
+    return top[1];
+  }
+
+  private swap(i: number, j: number): void {
+    [this.heap[i], this.heap[j]] = [this.heap[j], this.heap[i]];
+    this.priorityIndex.set(this.heap[i][0], i);
+    this.priorityIndex.set(this.heap[j][0], j);
+  }
+}
+
 type TQ_Token = { ident: string; interval: number };
-type TQ_Elt = {
-  endtime: number;
-  tokens: TQ_Token[];
-};
 
 export class TimedQueue {
-  private queue: TQ_Elt[] = [];
+  private queue = new MinArrayPriorityQueue<TQ_Token>();
   private timeout?: NodeJS.Timeout;
 
   constructor(private update: (time: number, tokens: string[]) => void) {}
 
   start(tokens: TQ_Token[], time: number): void {
-    const tostart = new Map<number, TQ_Token[]>();
     for (const token of tokens) {
       if (token.interval < 1 || token.interval > 2147483647) {
         throw new Error(
@@ -1407,20 +1461,11 @@ export class TimedQueue {
         );
       }
       const endtime = time + token.interval;
-      const current = tostart.get(endtime);
-      if (current) {
-        current.push(token);
-      } else {
-        tostart.set(endtime, [token]);
-      }
+      this.queue.insert(endtime, token);
     }
-    this.queue = Array.from(tostart, ([endtime, tokens]) => ({
-      endtime,
-      tokens,
-    }));
-    this.queue.sort((a, b) => a.endtime - b.endtime);
-    if (this.queue.length > 0) {
-      const next = Math.max(this.queue[0].endtime - Date.now(), 1);
+    const first = this.queue.peekPriority();
+    if (first !== undefined) {
+      const next = Math.max(first - Date.now(), 1);
       this.timeout = setTimeout(() => {
         this.check();
       }, next);
@@ -1437,55 +1482,28 @@ export class TimedQueue {
 
   private check(): void {
     const time = Date.now();
-    const torenew = new Map<number, TQ_Token[]>();
-    let i = 0;
-    for (i; i < this.queue.length; i++) {
-      const cendtime = this.queue[i].endtime;
-      if (time < this.queue[i].endtime) {
-        break;
-      }
+    for (;;) {
+      const cendtime = this.queue.peekPriority();
+      if (cendtime === undefined || cendtime > time) break;
+      const tokens = this.queue.popValues()!;
       this.update(
         time,
-        this.queue[i].tokens.map((t) => t.ident),
+        tokens.map((t) => t.ident),
       );
-      for (const token of this.queue[i].tokens) {
+      for (const token of tokens) {
         let endtime = cendtime + token.interval;
         if (endtime <= time) endtime = time + 1; // re-update was missed => reschedule ASAP
-        const current = torenew.get(endtime);
-        if (current) {
-          current.push(token);
-        } else {
-          torenew.set(endtime, [token]);
-        }
+        this.queue.insert(endtime, token);
       }
     }
-    this.queue = this.queue.slice(i);
-    const keys = Array.from(torenew.keys()).sort().reverse();
-    for (const key of keys) {
-      this.insert({ endtime: key, tokens: torenew.get(key)! });
-    }
-    if (this.queue.length > 0) {
-      const next = Math.max(this.queue[0].endtime - Date.now(), 1);
+    const first = this.queue.peekPriority();
+    if (first !== undefined) {
+      const next = Math.max(first - Date.now(), 1);
       this.timeout = setTimeout(() => {
         this.check();
       }, next);
       this.timeout.unref();
     }
-  }
-
-  // TODO: Binary version
-  private insert(elt: TQ_Elt): void {
-    for (let i = 0; i < this.queue.length; i++) {
-      if (this.queue[i].endtime == elt.endtime) {
-        this.queue[i].tokens.push(...elt.tokens);
-        return;
-      }
-      if (this.queue[i].endtime > elt.endtime) {
-        this.queue = [...this.queue.slice(0, i), elt, ...this.queue.slice(i)];
-        return;
-      }
-    }
-    this.queue.push(elt);
   }
 }
 
