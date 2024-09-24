@@ -1238,7 +1238,7 @@ class LinksImpl implements Links {
       // Get a run uuid to build to allow function mapping reload in case of persistence
       const uuid = this.env.crypto().randomUUID();
       const jsu = skjson();
-      const time = new Date().getTime();
+      const time = Date.now();
       const result = utils.runWithGc(() =>
         Math.trunc(
           fromWasm.SkipRuntime_createFor(
@@ -1432,7 +1432,7 @@ export class TimedQueue {
   }
 
   check() {
-    const time = new Date().getTime();
+    const time = Date.now();
     const torenew = new Map<number, TQ_Token[]>();
     let i = 0;
     for (i; i < this.queue.length; i++) {
