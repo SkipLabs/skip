@@ -11,17 +11,17 @@ replication:
 
 .PHONY: skjson
 skjson:
-	cd ../skjson/ts/src && npm i && tsc
+	cd ../skjson/ts && npm i && tsc
 
 .PHONY: prelude
 prelude:
-	cd ../prelude/ts/src && npm i && tsc
+	cd ../prelude/ts && npm i && tsc
 
 .PHONY: check-src
 check-src:
-	echo "make: Entering directory '${SCRIPT_DIR}/ts/src'"
-	cd ts/src && npm install && tsc && npm run lint
-	echo "make: Leaving directory '${SCRIPT_DIR}/ts/src'"
+	echo "make: Entering directory '${SCRIPT_DIR}/ts'"
+	cd ts && npm install && tsc && npm run lint
+	echo "make: Leaving directory '${SCRIPT_DIR}/ts'"
 
 .PHONY: check-examples
 check-examples:
@@ -40,8 +40,8 @@ check-all: check-src check-examples check-tests
 
 .PHONY: build
 build: prelude skjson replication
-	cd ts/src && npm i && tsc
-	skargo build -r --target wasm32-unknown-unknown --lib --out-dir=./ts/dist/src/
+	cd ts && npm i && tsc
+	skargo build -r --target wasm32-unknown-unknown --lib --out-dir=./ts/dist/
 
 bunrun-%: build
 	cd ts/examples && bun install && bun run $*.ts
