@@ -1450,7 +1450,7 @@ export class TimedQueue {
       );
       for (const token of this.queue[i].tokens) {
         let endtime = cendtime + token.interval;
-        while (endtime <= time) endtime += token.interval;
+        if (endtime <= time) endtime = time + 1; // re-update was missed => reschedule ASAP
         const current = torenew.get(endtime);
         if (current) {
           current.push(token);
