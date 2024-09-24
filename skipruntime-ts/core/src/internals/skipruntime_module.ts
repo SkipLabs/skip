@@ -1420,7 +1420,7 @@ export class TimedQueue {
     }));
     this.queue.sort((a, b) => a.endtime - b.endtime);
     if (this.queue.length > 0) {
-      const next = Math.max(this.queue[0].endtime - time, 0);
+      const next = Math.max(this.queue[0].endtime - Date.now(), 1);
       this.timeout = setTimeout(() => {
         this.check();
       }, next);
@@ -1466,7 +1466,7 @@ export class TimedQueue {
       this.insert({ endtime: key, tokens: torenew.get(key)! });
     }
     if (this.queue.length > 0) {
-      const next = Math.max(this.queue[0].endtime - time, 0);
+      const next = Math.max(this.queue[0].endtime - Date.now(), 1);
       this.timeout = setTimeout(() => {
         this.check();
       }, next);
