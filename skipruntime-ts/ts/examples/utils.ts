@@ -58,14 +58,13 @@ class SkipHttpAccessV1 {
       await Protocol.exportKey(this.creds.publicKey),
     );
     const reactive = await this.runtime.head(resource, params, publicKey);
-    console.log(JSON.stringify(reactive));
     if (!this.client) {
       this.client = await connect(toWs(this.entrypoint), this.creds);
     }
     await this.client.subscribe(
       reactive.collection,
       BigInt(reactive.watermark),
-      (updates: Map<string, TJSON[]>, isInit: boolean) => {
+      (updates: [string, TJSON[]][], isInit: boolean) => {
         console.log("Update", Object.fromEntries(updates), isInit);
       },
     );

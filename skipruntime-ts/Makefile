@@ -60,3 +60,12 @@ noderun-%: build
 
 nodeclient-%:
 	cd ts/examples && node dist/$*-client.js
+
+.PHONY: clean
+clean:
+	cd .. && make clean
+
+.PHONY: test
+test: build
+	cd ts && npx playwright install
+	cd ts && npx playwright test -c tests/playwright.config.ts --reporter=line

@@ -316,7 +316,10 @@ export type EntryPoint = {
   secured?: boolean;
 };
 
-export type CallResourceCompute = (name: string, params: JSONObject) => string;
+export type CallResourceCompute = (
+  name: string,
+  params: Record<string, string>,
+) => string;
 
 export interface SKStoreFactory extends Shared {
   runSKStore<K extends TJSON, V extends TJSON>(

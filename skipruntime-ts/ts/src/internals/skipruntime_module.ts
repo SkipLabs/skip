@@ -24,6 +24,7 @@ import type {
   CollectionAccess,
   CallResourceCompute,
   Notifier,
+  Watermaked,
 } from "../skipruntime_api.js";
 
 import type {
@@ -42,12 +43,6 @@ import {
   SKStoreFactoryImpl,
   UnknownCollectionError,
 } from "./skipruntime_impl.js";
-
-type Watermaked_<K extends TJSON, V extends TJSON> = {
-  values: Entry<K, V>[];
-  watermark: bigint;
-  update?: boolean;
-};
 
 class HandlesImpl implements Handles {
   private nextID: number = 1;
@@ -225,12 +220,7 @@ export class ContextImpl implements Context {
     if (typeof result == "number") {
       throw this.handles.delete(result as Handle<unknown>);
     }
-    const tmp = result as Watermaked_<K, V>;
-    return {
-      values: tmp.values,
-      watermark: tmp.watermark.toString(),
-      update: tmp.update,
-    };
+    return result as Watermaked<K, V>;
   }
 
   getArray<K extends TJSON, V>(eagerHdl: string, key: K) {
@@ -960,7 +950,7 @@ class LinksImpl implements Links {
       ref.push(ctx);
       const jsu = skjson();
       const name = jsu.importString(skname);
-      const params = jsu.importJSON(skparams) as JSONObject;
+      const params = jsu.importJSON(skparams) as Record<string, string>;
       const res = jsu.exportString(this.callResourceCompute_(name, params));
       ref.pop();
       return res;
