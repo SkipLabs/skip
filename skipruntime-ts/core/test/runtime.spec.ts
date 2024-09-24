@@ -1024,7 +1024,7 @@ it("testTimedQueue", () => {
       tokens: tokens.sort(),
     });
   });
-  const rstarttime = new Date().getTime();
+  const rstarttime = Date.now();
   timedQueue.start(
     [
       { ident: "token_2s", interval: 2000 },
