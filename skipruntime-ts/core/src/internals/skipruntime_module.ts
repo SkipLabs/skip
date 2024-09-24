@@ -1453,7 +1453,7 @@ export class TimedQueue {
 
   constructor(private update: (time: number, tokens: string[]) => void) {}
 
-  start(tokens: TQ_Token[], time: number): void {
+  private add(tokens: TQ_Token[], time: number): void {
     for (const token of tokens) {
       if (token.interval < 1 || token.interval > 2147483647) {
         throw new Error(
@@ -1463,6 +1463,10 @@ export class TimedQueue {
       const endtime = time + token.interval;
       this.queue.insert(endtime, token);
     }
+  }
+
+  start(tokens: TQ_Token[], time: number): void {
+    this.add(tokens, time);
     this.schedule();
   }
 
