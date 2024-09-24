@@ -1401,7 +1401,11 @@ export class TimedQueue {
   start(tokens: TQ_Token[], time: number): void {
     const tostart = new Map<number, TQ_Token[]>();
     for (const token of tokens) {
-      if (token.interval <= 0) continue;
+      if (token.interval < 1 || token.interval > 2147483647) {
+        throw new Error(
+          `Invalid interval ${token.interval} for token '${token.ident}'. The interval must be between 1 and 2147483647.`,
+        );
+      }
       const endtime = time + token.interval;
       const current = tostart.get(endtime);
       if (current) {
