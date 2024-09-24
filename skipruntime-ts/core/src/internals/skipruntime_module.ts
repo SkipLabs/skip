@@ -1398,7 +1398,7 @@ export class TimedQueue {
 
   constructor(private update: (time: number, tokens: string[]) => void) {}
 
-  start(tokens: TQ_Token[], time: number) {
+  start(tokens: TQ_Token[], time: number): void {
     const tostart = new Map<number, TQ_Token[]>();
     for (const token of tokens) {
       if (token.interval <= 0) continue;
@@ -1424,14 +1424,14 @@ export class TimedQueue {
     }
   }
 
-  stop() {
+  stop(): void {
     if (this.timeout) {
       clearTimeout(this.timeout);
       delete this.timeout;
     }
   }
 
-  check() {
+  check(): void {
     const time = Date.now();
     const torenew = new Map<number, TQ_Token[]>();
     let i = 0;
@@ -1471,7 +1471,7 @@ export class TimedQueue {
   }
 
   // TODO: Binary version
-  private insert(elt: TQ_Elt) {
+  private insert(elt: TQ_Elt): void {
     for (let i = 0; i < this.queue.length; i++) {
       if (this.queue[i].endtime == elt.endtime) {
         this.queue[i].tokens.push(...elt.tokens);
