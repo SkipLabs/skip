@@ -1435,7 +1435,7 @@ export class TimedQueue {
     }
   }
 
-  check(): void {
+  private check(): void {
     const time = Date.now();
     const torenew = new Map<number, TQ_Token[]>();
     let i = 0;
