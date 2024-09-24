@@ -32,7 +32,7 @@ class TailingSession {
     collection: string,
     since: bigint,
     callback: (
-      updates: Array<Entry<string, TJSON>>,
+      updates: Entry<string, TJSON>[],
       isInit: boolean,
       tick: bigint,
     ) => void,
@@ -55,24 +55,26 @@ class TailingSession {
   }
 
   close() {
-    for (let collection in this.subsessions) {
+    for (const collection in this.subsessions) {
       this.unsubscribe(collection);
     }
   }
 }
 
-class ReplicationServerError {
+class ReplicationServerError extends Error {
   constructor(
     public code: number,
     public msg: string,
-  ) {}
+  ) {
+    super(`${code}: ${msg}`);
+  }
 }
 
-async function handleMessage(
-  data: any,
+function handleMessage(
+  data: unknown,
   session: TailingSession,
   ws: WebSocket,
-): Promise<void> {
+): void {
   if (!(data instanceof ArrayBuffer)) {
     // Required by Bun.
     if (data instanceof Uint8Array) {
@@ -82,7 +84,7 @@ async function handleMessage(
     }
   }
 
-  const msg = Protocol.decodeMsg(data);
+  const msg = Protocol.decodeMsg(data as ArrayBuffer);
   switch (msg.type) {
     case "auth":
       throw new ReplicationServerError(1001, "Unexpected auth");
@@ -129,7 +131,7 @@ async function handleAuthMessage(data: any): Promise<boolean> {
     }
   }
 
-  const msg = Protocol.decodeMsg(data);
+  const msg = Protocol.decodeMsg(data as ArrayBuffer);
   if (msg.type != "auth") {
     throw new ReplicationServerError(
       1002,
@@ -157,13 +159,15 @@ export class ReplicationServer {
     private wss: WebSocketServer,
     private replication: SkipReplication<string, TJSON>,
   ) {
-    wss.on("connection", (ws) => this.onconnection(ws));
+    wss.on("connection", (ws) => {
+      this.onconnection(ws);
+    });
   }
 
   close() {
     for (const [ws, session] of this.sessions) {
       session.close();
-      void ws.send(
+      ws.send(
         Protocol.encodeMsg({
           type: "goaway",
           code: 1000,
@@ -176,8 +180,12 @@ export class ReplicationServer {
 
   private onconnection(ws: WebSocket) {
     ws.binaryType = "arraybuffer";
-    ws.onmessage = (event) => this.onmessage(ws, event);
-    ws.onclose = (_event) => this.onclose(ws);
+    ws.onmessage = (event) => {
+      this.onmessage(ws, event);
+    };
+    ws.onclose = (_event) => {
+      this.onclose(ws);
+    };
   }
 
   private onmessage(ws: WebSocket, event: MessageEvent) {
@@ -196,15 +204,19 @@ export class ReplicationServer {
             );
           }
         })
-        .catch((error) => {
+        .catch((error: unknown) => {
           this.errorHandler(ws, error);
           return false;
         });
       this.auth.set(ws, authPromise);
     } else {
       void authRequest
-        .then((_) => handleMessage(event.data, this.sessions.get(ws)!, ws))
-        .catch((error) => this.errorHandler(ws, error));
+        .then((_) => {
+          handleMessage(event.data, this.sessions.get(ws)!, ws);
+        })
+        .catch((error: unknown) => {
+          this.errorHandler(ws, error);
+        });
     }
   }
 
@@ -236,7 +248,7 @@ export async function runService(
   port: number = 443,
 ): Promise<{ close: () => void }> {
   const [runtime, replication] = await initService(service, createSKStore);
-  const app = await runRESTServer(runtime);
+  const app = runRESTServer(runtime);
   const httpServer = http.createServer();
   httpServer.on("request", app);
   const wss = new WebSocketServer({ server: httpServer });
@@ -253,114 +265,101 @@ export async function runService(
   };
 }
 
-async function runRESTServer(runtime: SkipRuntime): Promise<express.Express> {
-  // eslint-disable-next-line  @typescript-eslint/no-unsafe-call
+function runRESTServer(runtime: SkipRuntime): express.Express {
   const app = express();
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
   // READS
-  app.head("/v1/:resource", async (req, res) => {
+  app.head("/v1/:resource", (req, res) => {
     const resourceName = req.params.resource;
-    try {
-      const strReactiveAuth = req.headers["x-reactive-auth"] as string;
-      if (!strReactiveAuth)
-        throw new Error("X-Reactive-Auth must be specified.");
-      const reactiveAuth = new Uint8Array(
-        Buffer.from(strReactiveAuth, "base64"),
+    const strReactiveAuth = req.headers["x-reactive-auth"] as string;
+    if (!strReactiveAuth) throw new Error("X-Reactive-Auth must be specified.");
+    const reactiveAuth = new Uint8Array(Buffer.from(strReactiveAuth, "base64"));
+    runtime
+      .head(resourceName, req.query as JSONObject, reactiveAuth)
+      .then((data) => {
+        res.set("X-Reactive-Response", JSON.stringify(data));
+        res.status(200).json({});
+      })
+      .catch((e: unknown) =>
+        res.status(500).json(e instanceof Error ? e.message : e),
       );
-      const data = await runtime.head(
-        resourceName,
-        req.query as JSONObject,
-        reactiveAuth,
-      );
-      res.set("X-Reactive-Response", JSON.stringify(data));
-      res.status(200).json({});
-    } catch (e: any) {
-      res.status(500).json(e.message);
-    }
   });
-  app.get("/v1/:resource/:key", async (req, res) => {
+  app.get("/v1/:resource/:key", (req, res) => {
     const key = req.params.key;
     const resourceName = req.params.resource;
-    //const params = res.
-    try {
-      const data = await runtime.getOne(
-        resourceName,
-        req.query as JSONObject,
-        key,
+    runtime
+      .getOne(resourceName, req.query as JSONObject, key)
+      .then((data) => res.status(200).json(data))
+      .catch((e: unknown) =>
+        res.status(500).json(e instanceof Error ? e.message : e),
       );
-      res.status(200).json(data);
-    } catch (e: any) {
-      res.status(500).json(e.message);
-    }
   });
-  app.get("/v1/:resource", async (req, res) => {
+  app.get("/v1/:resource", (req, res) => {
     const resourceName = req.params.resource;
     const strReactiveAuth = req.headers["x-reactive-auth"] as string;
     const reactiveAuth = strReactiveAuth
       ? new Uint8Array(Buffer.from(strReactiveAuth, "base64"))
       : undefined;
-    try {
-      const data = await runtime.getAll(
-        resourceName,
-        req.query as JSONObject,
-        reactiveAuth,
+    runtime
+      .getAll(resourceName, req.query as Record<string, string>, reactiveAuth)
+      .then((data) => {
+        if (data.reactive) {
+          res.set("X-Reactive-Response", JSON.stringify(data.reactive));
+        }
+        res.status(200).json(data.values);
+      })
+      .catch((e: unknown) =>
+        res.status(500).json(e instanceof Error ? e.message : e),
       );
-      if (data.reactive) {
-        res.set("X-Reactive-Response", JSON.stringify(data.reactive));
-      }
-      res.status(200).json(data.values);
-    } catch (e: any) {
-      res.status(500).json(e.message);
-    }
   });
   // WRITES
-  app.put("/v1/:collection/:id", async (req, res) => {
+  app.put("/v1/:collection/:id", (req, res) => {
     const key = req.params.id;
     const data: TJSON[] = req.body;
     const collectionName = req.params.collection;
-    try {
-      await runtime.put(collectionName, key, data);
-      res.status(200).json({});
-    } catch (e: any) {
-      if (e instanceof UnknownCollectionError) {
-        res.status(400).json("Bad request");
-      } else {
-        res.status(500).json(e.message);
-      }
-    }
+    runtime
+      .put(collectionName, key, data)
+      .then(() => res.status(200).json({}))
+      .catch((e: unknown) => {
+        if (e instanceof UnknownCollectionError) {
+          res.status(400).json("Bad request");
+        } else {
+          res.status(500).json(e instanceof Error ? e.message : e);
+        }
+      });
   });
-  app.patch("/v1/:collection", async (req, res) => {
+  app.patch("/v1/:collection", (req, res) => {
     const data: TJSON = req.body;
     if (!Array.isArray(data)) {
       res.status(400).json("Bad request");
       return;
     }
     const collectionName = req.params.collection;
-    try {
-      await runtime.patch(collectionName, data as Entry<TJSON, TJSON>[]);
-      res.status(200).json({});
-    } catch (e: any) {
-      if (e instanceof UnknownCollectionError) {
-        res.status(400).json("Bad request");
-      } else {
-        res.status(500).json(e.message);
-      }
-    }
+    runtime
+      .patch(collectionName, data as Entry<TJSON, TJSON>[])
+      .then(() => res.status(200).json({}))
+      .catch((e: unknown) => {
+        if (e instanceof UnknownCollectionError) {
+          res.status(400).json("Bad request");
+        } else {
+          res.status(500).json(e instanceof Error ? e.message : e);
+        }
+      });
   });
-  app.delete("/v1/:collection/:id", async (req, res) => {
+  app.delete("/v1/:collection/:id", (req, res) => {
     const key = req.params.id;
     const collectionName = req.params.collection;
-    try {
-      await runtime.delete(collectionName, key);
-      res.status(200).json({});
-    } catch (e: any) {
-      if (e instanceof UnknownCollectionError) {
-        res.status(400).json("Bad request");
-      } else {
-        res.status(500).json(e.message);
-      }
-    }
+    runtime
+      .delete(collectionName, key)
+      .then(() => res.status(200).json({}))
+      .catch((e: unknown) => {
+        if (e instanceof UnknownCollectionError) {
+          res.status(400).json("Bad request");
+        } else {
+          res.status(500).json(e instanceof Error ? e.message : e);
+        }
+      });
   });
 
   return app;

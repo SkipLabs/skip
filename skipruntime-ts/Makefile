@@ -32,8 +32,7 @@ check-examples:
 
 .PHONY: check-tests
 check-tests:
-	cd ts/tests && npm install
-	cd ts/tests && tsc
+	cd ts/tests && npm install && tsc && npm run lint
 
 .PHONY: check-all
 check-all: check-src check-examples check-tests
@@ -63,9 +62,11 @@ nodeclient-%:
 
 .PHONY: clean
 clean:
+	rm -rf ./ts/dist ./ts/playwright-report ./ts/test-results
 	cd .. && make clean
 
 .PHONY: test
 test: build
-	cd ts && npx playwright install
-	cd ts && npx playwright test -c tests/playwright.config.ts --reporter=line
+	cd ts/tests && npm i && tsc
+	cd ts/tests && npx playwright install
+	cd ts/tests && npx playwright test --reporter=line

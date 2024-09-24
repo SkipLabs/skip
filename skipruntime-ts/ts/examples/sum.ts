@@ -71,9 +71,9 @@ class Service implements SkipService {
   inputCollections = ["input1", "input2"];
   resources = { add: Add, sub: Sub };
 
-  async init() {
+  init() {
     console.log("Init called returns no values");
-    return {};
+    return Promise.resolve({});
   }
 
   reactiveCompute(
@@ -84,4 +84,4 @@ class Service implements SkipService {
   }
 }
 
-runService(new Service(), 3587);
+await runService(new Service(), 3587);

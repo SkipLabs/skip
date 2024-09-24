@@ -16,6 +16,7 @@ import type {
   Resource,
   Entry,
   SkipReplication,
+  Loadable,
 } from "skip-runtime";
 import {
   Sum,
@@ -25,11 +26,11 @@ import {
   initService,
 } from "skip-runtime";
 
-function check(name: String, got: TJSON, expected: TJSON): void {
+function check(name: string, got: TJSON, expected: TJSON): void {
   expect([name, got]).toEqual([name, expected]);
 }
 
-type Test = {
+interface Test {
   name: string;
   service: SkipService;
   run: (
@@ -37,12 +38,12 @@ type Test = {
     replication?: SkipReplication<TJSON, TJSON>,
   ) => void | Promise<void>;
   tokens?: Record<string, number>;
-};
+}
 
-type UnitTest = {
+interface UnitTest {
   name: string;
   run: () => void | Promise<void>;
-};
+}
 
 const tests: Test[] = [];
 const units: UnitTest[] = [];
@@ -101,11 +102,11 @@ class Map2 implements Mapper<string, number, string, number> {
     key: string,
     it: NonEmptyIterator<number>,
   ): Iterable<[string, number]> {
-    let result: Array<[string, number]> = [];
+    const result: [string, number][] = [];
     const values = it.toArray();
     const other_values = this.other.getArray(key);
-    for (let v of values) {
-      for (let other_v of other_values) {
+    for (const v of values) {
+      for (const other_v of other_values) {
         result.push([key, v + other_v]);
       }
     }
@@ -712,8 +713,8 @@ class TestLazyWithAsync
     return v2 ?? 0;
   }
 
-  async call(key: [number, number], param: number) {
-    return { payload: key[1] + param };
+  call(key: [number, number], param: number) {
+    return Promise.resolve({ payload: key[1] + param });
   }
 }
 
@@ -747,10 +748,11 @@ class AsyncLazyResource implements Resource {
       input2: EagerCollection<number, number>;
     },
   ): EagerCollection<number, string> {
+    /* eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion */
     const asyncLazy = skstore.asyncLazy(
       TestLazyWithAsync,
       cs.input2,
-    ) as AsyncLazyCollection<[number, number], number, number>;
+    ) as LazyCollection<[number, number], Loadable<number, number>>;
     return cs.input1.map(TestCheckResult, asyncLazy);
   }
 }
@@ -774,10 +776,11 @@ async function testAsyncLazyRun(
   runtime: SkipRuntime,
   replication?: SkipReplication<TJSON, TJSON>,
 ) {
+  if (!replication) throw new Error("Replication must be specified.");
   const data = await runtime.head("asyncLazy", {}, new Uint8Array([]));
 
   const updates: Entry<TJSON, TJSON>[][] = [];
-  replication!.subscribe(
+  replication.subscribe(
     data.collection,
     data.watermark,
     (values, _watermark, _update) => {
@@ -788,8 +791,8 @@ async function testAsyncLazyRun(
   await runtime.patch("input2", [[0, [5]]]);
   let count = 0;
   const waitandcheck = (
-    resolve: (v?: void) => void,
-    reject: (reason?: any) => void,
+    resolve: () => void,
+    reject: (reason?: unknown) => void,
   ) => {
     if (count == 50) reject("Async response not received");
     count++;
@@ -811,9 +814,11 @@ async function testAsyncLazyRun(
           resolve();
         }
       })
-      .catch(reject);
+      .catch((e: unknown) => {
+        reject(e);
+      });
   };
-  return new Promise(waitandcheck);
+  return new Promise<void>(waitandcheck);
 }
 
 tests.push({
@@ -1100,7 +1105,7 @@ type Update = {
 
 async function testTimedQueue() {
   const updates: Update[] = [];
-  var starttime: number = 0;
+  let starttime: number = 0;
   const timedQueue = new TimedQueue((time: number, tokens: string[]) => {
     updates.push({
       idx: updates.length,
@@ -1119,10 +1124,10 @@ async function testTimedQueue() {
     rstarttime,
   );
   starttime = Math.trunc(rstarttime / 100);
-  var waiting = true;
+  let waiting = true;
   const waitandcheck = (
     resolve: () => void,
-    reject: (reason?: any) => void,
+    reject: (reason?: unknown) => void,
   ) => {
     const ctime = (add: number) => Math.trunc((rstarttime + add * 100) / 100);
     if (waiting) {
@@ -1162,7 +1167,7 @@ async function testTimedQueue() {
       resolve();
     }
   };
-  return new Promise(waitandcheck) as Promise<void>;
+  return new Promise<void>(waitandcheck);
 }
 
 units.push({ name: "testTimedQueue", run: testTimedQueue });
@@ -1182,6 +1187,9 @@ function unit(t: UnitTest) {
   });
 }
 
+/**
+ * Run all tests
+ */
 export function runAll() {
   tests.forEach(run);
   units.forEach(unit);

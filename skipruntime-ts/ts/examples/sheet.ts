@@ -24,8 +24,8 @@ class ComputeExpression implements LazyCompute<string, string> {
       }
       throw new Error(`Invalid value for cell '${key}'`);
     };
-    const v = this.skall.maybeGetOne(key) as string;
-    if (v && v.charAt(0) == "=") {
+    const v = this.skall.maybeGetOne(key) as string | null;
+    if (v?.startsWith("=")) {
       try {
         // Fake evaluator in this exemple
         switch (v.substring(1)) {
@@ -39,7 +39,7 @@ class ComputeExpression implements LazyCompute<string, string> {
           default:
             return "# Not managed expression.";
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : JSON.stringify(e);
         return "# " + msg;
       }
@@ -57,7 +57,7 @@ class CallCompute implements Mapper<string, TJSON, string, TJSON> {
     it: NonEmptyIterator<TJSON>,
   ): Iterable<[string, TJSON]> {
     const v = it.uniqueValue();
-    if (typeof v == "string" && v.charAt(0) == "=") {
+    if (typeof v == "string" && v.startsWith("=")) {
       return Array([key, this.evaluator.getOne(key)]);
     }
     if (v == null) {
@@ -97,4 +97,4 @@ class Service implements SkipService {
   }
 }
 
-runService(new Service(), 9998);
+await runService(new Service(), 9998);
