@@ -8,24 +8,26 @@ export interface ClientDefinition {
   scenarios: () => Step[][];
 }
 
-type Write = {
+interface Write {
   collection: string;
   entries: Entry<TJSON, TJSON>[];
-};
+}
 
-type Delete = {
+interface Delete {
   collection: string;
   keys: string[];
-};
+}
 
 function toWs(entrypoint: EntryPoint) {
-  if (entrypoint.secured) return `wss://${entrypoint.host}:${entrypoint.port}`;
-  return `ws://${entrypoint.host}:${entrypoint.port}`;
+  if (entrypoint.secured)
+    return `wss://${entrypoint.host}:${entrypoint.port.toString()}`;
+  return `ws://${entrypoint.host}:${entrypoint.port.toString()}`;
 }
 
 class SkipHttpAccessV1 {
   private runtime: SkipRESTRuntime;
   private client?: Client;
+
   constructor(
     private entrypoint: EntryPoint = {
       host: "localhost",
@@ -61,7 +63,7 @@ class SkipHttpAccessV1 {
     if (!this.client) {
       this.client = await connect(toWs(this.entrypoint), this.creds);
     }
-    await this.client.subscribe(
+    this.client.subscribe(
       reactive.collection,
       BigInt(reactive.watermark),
       (updates: [string, TJSON[]][], isInit: boolean) => {
@@ -71,9 +73,18 @@ class SkipHttpAccessV1 {
   }
 }
 
-type RequestQuery = { type: "request"; payload: JSONObject };
-type WriteQuery = { type: "write"; payload: Write[] };
-type DeleteQuery = { type: "delete"; payload: Delete[] };
+interface RequestQuery {
+  type: "request";
+  payload: JSONObject;
+}
+interface WriteQuery {
+  type: "write";
+  payload: Write[];
+}
+interface DeleteQuery {
+  type: "delete";
+  payload: Delete[];
+}
 
 export type Step = RequestQuery | WriteQuery | DeleteQuery;
 
@@ -133,19 +144,20 @@ class Player {
   ) {}
 
   start(idx: number) {
-    const scenario = this.scenarios[idx - 1];
-    if (!scenario) {
-      this.error(`The scenario ${idx} does not exist`);
+    const aidx = idx - 1;
+    if (aidx < 0 || aidx >= this.scenarios.length) {
+      this.error(`The scenario ${idx.toString()} does not exist`);
       return false;
     } else {
+      const scenario = this.scenarios[idx - 1];
       this.running = new Session(scenario, this.send, this.error);
       return true;
     }
   }
 
-  play(idx = 0) {
+  play(idx?: number) {
     let run = true;
-    if (idx > 0) {
+    if (idx !== undefined) {
       run = this.start(idx);
     }
     if (run) {
@@ -186,14 +198,49 @@ class Player {
       this.step();
       return;
     }
-    const patterns: [RegExp, (...args: string[]) => any][] = [
-      [/^start ([a-z_0-9]+)$/g, (str: string) => this.start(parseInt(str))],
-      [/^reset$/g, () => this.reset()],
-      [/^step ([a-z_0-9]+)$/g, (str: string) => this.step(parseInt(str))],
-      [/^step$/g, () => this.step()],
-      [/^play ([a-z_0-9]+)$/g, (str: string) => this.play(parseInt(str))],
-      [/^play$/g, () => this.play()],
-      [/^stop$/g, () => this.stop()],
+    const patterns: [RegExp, (...args: string[]) => unknown][] = [
+      [
+        /^start ([a-z_0-9]+)$/g,
+        (str: string) => {
+          this.start(parseInt(str));
+        },
+      ],
+      [
+        /^reset$/g,
+        () => {
+          this.reset();
+        },
+      ],
+      [
+        /^step ([a-z_0-9]+)$/g,
+        (str: string) => {
+          this.step(parseInt(str));
+        },
+      ],
+      [
+        /^step$/g,
+        () => {
+          this.step();
+        },
+      ],
+      [
+        /^play ([a-z_0-9]+)$/g,
+        (str: string) => {
+          this.play(parseInt(str));
+        },
+      ],
+      [
+        /^play$/g,
+        () => {
+          this.play();
+        },
+      ],
+      [
+        /^stop$/g,
+        () => {
+          this.stop();
+        },
+      ],
     ];
     let done = false;
     for (const pattern of patterns) {
@@ -208,7 +255,11 @@ class Player {
     if (!done) this.perform(line);
   }
 }
-
+/**
+ * Run the client with specified scenarios
+ * @param scenarios The scenarios
+ * @param port  The port
+ */
 export async function run(scenarios: Step[][], port: number = 3587) {
   const creds = await Protocol.generateCredentials();
   const access = new SkipHttpAccessV1(
@@ -218,8 +269,7 @@ export async function run(scenarios: Step[][], port: number = 3587) {
     },
     creds,
   );
-  const online = async (line: string) => {
-    const error = console.error;
+  const online = (line: string) => {
     try {
       const patterns: [RegExp, (...args: string[]) => void][] = [
         [
@@ -232,21 +282,33 @@ export async function run(scenarios: Step[][], port: number = 3587) {
             access
               .request(jsquery.resource, jsquery.params ?? {})
               .then(console.log)
-              .catch(console.error);
+              .catch((e: unknown) => {
+                console.error(e);
+              });
           },
         ],
         [
           /^write (.*)$/g,
-          async (query: string) => {
-            const jsquery = JSON.parse(query);
-            access.writeMany(jsquery).then(console.log).catch(console.error);
+          (query: string) => {
+            const jsquery = JSON.parse(query) as Write[];
+            access
+              .writeMany(jsquery)
+              .then(console.log)
+              .catch((e: unknown) => {
+                console.error(e);
+              });
           },
         ],
         [
           /^delete (.*)$/g,
-          async (query: string) => {
-            const jsquery = JSON.parse(query);
-            access.deteleMany(jsquery).then(console.log).catch(console.error);
+          (query: string) => {
+            const jsquery = JSON.parse(query) as Delete[];
+            access
+              .deteleMany(jsquery)
+              .then(console.log)
+              .catch((e: unknown) => {
+                console.error(e);
+              });
           },
         ],
       ];
@@ -261,11 +323,11 @@ export async function run(scenarios: Step[][], port: number = 3587) {
         }
       }
       if (!done) {
-        error(`Unknow command line '${line}'`);
+        console.error(`Unknow command line '${line}'`);
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       const message = e instanceof Error ? e.message : JSON.stringify(e);
-      error(message);
+      console.error(message);
     }
   };
   const player = new Player(
@@ -280,11 +342,23 @@ export async function run(scenarios: Step[][], port: number = 3587) {
         access
           .request(jsquery.resource, jsquery.params ?? {})
           .then(console.log)
-          .catch(console.error);
+          .catch((e: unknown) => {
+            console.error(e);
+          });
       } else if (step.type == "write") {
-        access.writeMany(step.payload).then(console.log).catch(console.error);
+        access
+          .writeMany(step.payload)
+          .then(console.log)
+          .catch((e: unknown) => {
+            console.error(e);
+          });
       } else {
-        access.deteleMany(step.payload).then(console.log).catch(console.error);
+        access
+          .deteleMany(step.payload)
+          .then(console.log)
+          .catch((e: unknown) => {
+            console.error(e);
+          });
       }
     },
     console.error,

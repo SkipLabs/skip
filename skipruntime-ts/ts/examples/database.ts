@@ -92,6 +92,7 @@ class GetUserResource implements Resource {
   private params: {
     userId: string;
   };
+
   constructor(params: Record<string, string>) {
     this.params = params as {
       userId: string;
@@ -146,4 +147,4 @@ class Service implements SkipService {
 
 // Command that starts the service
 
-runService(new Service(), 8081);
+await runService(new Service(), 8081);

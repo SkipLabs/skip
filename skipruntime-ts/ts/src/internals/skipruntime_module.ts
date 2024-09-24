@@ -1380,7 +1380,9 @@ class Manager implements ToWasmManager {
       values: ptr<Internal.CJArray>,
       watermark: bigint,
       update: boolean,
-    ) => links.applyNotify(fn, values, watermark, update);
+    ) => {
+      links.applyNotify(fn, values, watermark, update);
+    };
     return links;
   };
 }

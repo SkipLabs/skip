@@ -1,35 +1,36 @@
-import { fetchJSON } from "skip-runtime";
-import { connect, Protocol, type Client } from "skipruntime-replication-client";
+import { fetchJSON, type ReactiveResponse } from "skip-runtime";
+import { connect, Protocol } from "skipruntime-replication-client";
+import type { TJSON } from "skipruntime-replication-client/protocol.js";
 
 async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 const replication = 8081;
 const port = 8082;
-const url = `http://localhost:${port}`;
+const url = `http://localhost:${port.toString()}`;
 const creds = await Protocol.generateCredentials();
 
 const publicKey = new Uint8Array(await Protocol.exportKey(creds.publicKey));
 
 console.log("Connect to replication server for resource /user/123");
 
-let header = {
+const header = {
   "X-Reactive-Auth": Buffer.from(publicKey.buffer).toString("base64"),
 };
-const [reactive, headers] = await fetchJSON(
+const [reactive, _headers] = await fetchJSON<ReactiveResponse>(
   `${url}/auth/user/123`,
   "GET",
   header,
 );
 
-const client = await connect(`ws://localhost:${replication}`, creds);
+const client = await connect(`ws://localhost:${replication.toString()}`, creds);
 
-await client.subscribe(
+client.subscribe(
   reactive.collection,
+  BigInt(reactive.watermark),
   (updates: [string, TJSON[]][], isInit: boolean) => {
     console.log("Update", Object.fromEntries(updates), isInit);
   },
-  BigInt(reactive.watermark),
 );
 
 await sleep(1000);

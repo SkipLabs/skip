@@ -31,53 +31,54 @@ const run = function (
     });
   });
 };
-app.get("/auth/user/:id", async (req, res) => {
-  try {
-    const key = req.params.id;
-    const strReactiveAuth = req.headers["x-reactive-auth"] as string;
-    if (!strReactiveAuth) throw new Error("X-Reactive-Auth must be specified.");
-    const reactiveAuth = new Uint8Array(Buffer.from(strReactiveAuth, "base64"));
-    const reactiveResponse = await runtime.head(
-      "user",
-      { userId: key },
-      reactiveAuth,
-    );
-    res.status(200).json(reactiveResponse);
-  } catch (_e: any) {
+app.get("/auth/user/:id", (req, res) => {
+  const key = req.params.id;
+  const strReactiveAuth = req.headers["x-reactive-auth"] as string;
+  if (!strReactiveAuth) {
+    console.error("X-Reactive-Auth must be specified.");
     res.status(500).json("Internal error");
+    return;
   }
+  const reactiveAuth = new Uint8Array(Buffer.from(strReactiveAuth, "base64"));
+  runtime
+    .head("user", { userId: key }, reactiveAuth)
+    .then((reactiveResponse) => {
+      res.status(200).json(reactiveResponse);
+    })
+    .catch(() => {
+      res.status(500).json("Internal error");
+    });
 });
 
-app.put("/user/:id", async (req, res) => {
+app.put("/user/:id", (req, res) => {
   const key = req.params.id;
-  const data: User = req.body;
-  try {
-    await run(
-      "INSERT OR REPLACE INTO data (id, object) VALUES ($id, $object)",
-      {
-        $id: key,
-        $object: JSON.stringify(data),
-      },
-    );
-    await runtime.put("users", key, [data]);
-    res.status(200).json({});
-  } catch (_e: any) {
-    res.status(500).json("Internal error");
-  }
+  const data = req.body as User;
+  run("INSERT OR REPLACE INTO data (id, object) VALUES ($id, $object)", {
+    $id: key,
+    $object: JSON.stringify(data),
+  })
+    .then(() => runtime.put("users", key, [data]))
+    .then(() => {
+      res.status(200).json({});
+    })
+    .catch(() => {
+      res.status(500).json("Internal error");
+    });
 });
-app.delete("/user/:id", async (req, res) => {
-  try {
-    const key = req.params.id;
-    await run("DELETE FROM data WHERE id = $id", { $id: key });
-    await runtime.delete("users", key);
-    res.status(200).json({});
-  } catch (_e: any) {
-    res.status(500).json("Internal error");
-  }
+app.delete("/user/:id", (req, res) => {
+  const key = req.params.id;
+  run("DELETE FROM data WHERE id = $id", { $id: key })
+    .then(() => runtime.delete("users", key))
+    .then(() => {
+      res.status(200).json({});
+    })
+    .catch(() => {
+      res.status(500).json("Internal error");
+    });
 });
 
 const port = 8082;
 
 app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`);
+  console.log(`Example app listening on port ${port.toString()}`);
 });

@@ -382,7 +382,7 @@ export interface SKStore extends Constant {
   >(
     compute: new (...params: Params) => AsyncLazyCompute<K, V, P, M>,
     ...params: Params
-  ): AsyncLazyCollection<K, V, M>;
+  ): LazyCollection<K, Loadable<V, M>>;
 
   external<
     K extends TJSON,
@@ -441,12 +441,12 @@ export interface SkipRuntime {
   getAll<K extends TJSON, V extends TJSON>(
     resource: string,
     params: JSONObject,
-    reactiveAuth?: Uint8Array,
+    reactiveAuth?: Uint8Array | string,
   ): Promise<{ values: Entry<K, V>[]; reactive?: ReactiveResponse }>;
   head(
     resource: string,
     params: JSONObject,
-    reactiveAuth: Uint8Array,
+    reactiveAuth: Uint8Array | string,
   ): Promise<ReactiveResponse>;
   getOne<V extends TJSON>(
     resource: string,
