@@ -590,14 +590,12 @@ export class SkipRuntimeImpl implements SkipRuntime {
   }
 }
 
-export class SkipReplicationImpl implements SkipReplication {
+export class SkipReplicationImpl<K extends TJSON, V extends TJSON>
+  implements SkipReplication<K, V>
+{
   constructor(private context: Context) {}
 
-  subscribe(
-    collectionName: string,
-    from: bigint,
-    notify: Notifier<TJSON, TJSON>,
-  ) {
+  subscribe(collectionName: string, from: bigint, notify: Notifier<K, V>) {
     return this.context.subscribe(collectionName, from, notify, true);
   }
 

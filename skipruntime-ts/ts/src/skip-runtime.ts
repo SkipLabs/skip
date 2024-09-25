@@ -16,10 +16,10 @@ import type {
   SkipBuilder,
   ReactiveResponse,
 } from "./skipruntime_api.js";
-import { runWithRESTServer_ } from "./internals/skipruntime_process.js";
+import { runService as runService_ } from "./internals/skipruntime_process.js";
 export type { Opaque } from "./internals/skipruntime_module.js";
 export { TimedQueue } from "./internals/skipruntime_module.js";
-export { runService } from "./skipruntime_runner.js";
+export { runService as initService } from "./skipruntime_runner.js";
 
 export type {
   SKStore,
@@ -119,11 +119,8 @@ export function freeze<T>(value: T): T {
   }
 }
 
-export async function runWithRESTServer(
-  service: SkipService,
-  options: Record<string, any> = { port: 3587 },
-) {
-  return runWithRESTServer_(service, createSKStore, options);
+export async function runService(service: SkipService, port: number = 443) {
+  return runService_(service, createSKStore, port);
 }
 
 function toHttp(entrypoint: EntryPoint) {

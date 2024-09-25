@@ -420,13 +420,13 @@ export type Watermaked<K extends TJSON, V extends TJSON> = {
 
 export type Notifier<K extends TJSON, V extends TJSON> = (
   values: Entry<K, V>[],
-  watermark: number,
+  watermark: bigint,
   update: boolean,
 ) => void;
 
 export type SkipBuilder = (
   iCollection: Record<string, CollectionWriter<TJSON, TJSON>>,
-) => [SkipRuntime, SkipReplication];
+) => [SkipRuntime, SkipReplication<string, TJSON>];
 
 export interface CollectionWriter<K extends TJSON, V extends TJSON> {
   write(key: K, value: V[]): void;
@@ -466,12 +466,8 @@ export interface SkipRuntime {
   delete(collection: string, key: string | number): Promise<void>;
 }
 
-export interface SkipReplication {
-  subscribe(
-    collection: string,
-    from: bigint,
-    notify: Notifier<TJSON, TJSON>,
-  ): bigint;
+export interface SkipReplication<K extends TJSON, V extends TJSON> {
+  subscribe(collection: string, from: bigint, notify: Notifier<K, V>): bigint;
 
   unsubscribe(id: bigint): void;
 }

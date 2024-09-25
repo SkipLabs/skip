@@ -7,7 +7,7 @@ import type {
   Resource,
 } from "skip-runtime";
 
-import { runWithRESTServer } from "skip-runtime";
+import { runService } from "skip-runtime";
 
 class Plus implements Mapper<string, number, string, number> {
   constructor(private other: EagerCollection<string, number>) {}
@@ -84,4 +84,4 @@ class Service implements SkipService {
   }
 }
 
-runWithRESTServer(new Service());
+runService(new Service(), 3587);
