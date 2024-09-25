@@ -2,7 +2,6 @@ import type {
   CollectionAccess,
   CollectionWriter,
   EagerCollection,
-  SkipReplication,
   SkipRuntime,
   SKStore,
   TJSON,
@@ -15,8 +14,8 @@ import type { EagerCollectionImpl } from "./internals/skipruntime_impl.js";
 
 export async function runService(
   service: SkipService,
-  createSKStore: CreateSKStore<string, TJSON>,
-): Promise<[SkipRuntime, SkipReplication<string, TJSON>]> {
+  createSKStore: CreateSKStore,
+): Promise<SkipRuntime> {
   const iCollections: Record<string, CollectionWriter<TJSON, TJSON>> = {};
   const rCollections: Record<string, CollectionAccess<TJSON, TJSON>> = {};
   const initSKStore = (

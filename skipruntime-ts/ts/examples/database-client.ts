@@ -22,6 +22,9 @@ const [reactive, _headers] = await fetchJSON<ReactiveResponse>(
   "GET",
   header,
 );
+if (reactive == null) {
+  throw new Error("Reactive response must be supplied.");
+}
 
 const client = await connect(`ws://localhost:${replication.toString()}`, creds);
 
