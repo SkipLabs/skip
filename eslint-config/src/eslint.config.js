@@ -1,5 +1,3 @@
-// @ts-check
-
 import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
 import stylisticJs from "@stylistic/eslint-plugin-js";
@@ -19,7 +17,7 @@ export default tseslint.config(
     },
     languageOptions: {
       parserOptions: {
-        project: "./tsconfig-eslint.json",
+        projectService: true,
         tsconfigRootDir: import.meta.dirname,
       },
     },
