@@ -454,10 +454,11 @@ mutable class BuildRunner(
     export_dir = this.bctx.build_config.export_dir;
     unit.target.kind match {
     | LibTarget(type) ->
-      short_name = type match {
-      | LibraryTypeSklib _ -> `lib${unit.pkg.name()}.sklib`
-      | LibraryTypeCdylib _ -> `lib${unit.pkg.name()}.so`
+      suffix = type match {
+      | LibraryTypeSklib _ -> "sklib"
+      | LibraryTypeCdylib _ -> this.suffix_for_lib(unit.arch)
       };
+      short_name = `lib${unit.pkg.name()}.${suffix}`;
       file = OutputFile(this.lib_file_for(unit), None(), None());
       if (is_root) {
         !file = file with {
@@ -518,9 +519,16 @@ mutable class BuildRunner(
 
   private readonly fun suffix_for_binary(unit: Unit): String {
     unit.arch match {
-    | TargetArchTriple(t) if (t.isWasm32()) -> ".wasm"
+    | TargetArchTriple(t) if (t.isWasm32() && unit.target.is_test()) -> ".wasm"
     | _ -> ""
-    };
+    }
+  }
+
+  private readonly fun suffix_for_lib(arch: TargetArch): String {
+    arch match {
+    | TargetArchTriple(TargetTriple("wasm32", None(), None(), None())) -> "wasm"
+    | _ -> "so"
+    }
   }
 
   private readonly fun build_dir_for(unit: Unit): String {
