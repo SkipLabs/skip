@@ -39,8 +39,7 @@ check-all: check-src check-examples check-tests
 
 .PHONY: build
 build: prelude skjson replication
-	cd ts && npm i && tsc
-	skargo build -r --target wasm32-unknown-unknown --lib --out-dir=./ts/dist/
+	cd ts && npm i && npm run build
 
 bunrun-%: build
 	cd ts/examples && bun install && bun run $*.ts
