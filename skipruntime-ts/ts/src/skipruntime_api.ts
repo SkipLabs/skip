@@ -322,7 +322,7 @@ export type CallResourceCompute = (
 ) => string;
 
 export interface SKStoreFactory extends Shared {
-  runSKStore<K extends TJSON, V extends TJSON>(
+  runSKStore(
     init: (
       skstore: SKStore,
       collections: Record<string, EagerCollection<TJSON, TJSON>>,
@@ -331,7 +331,7 @@ export interface SKStoreFactory extends Shared {
     remotes?: Record<string, EntryPoint>,
     tokens?: Record<string, number>,
     initLocals?: () => Promise<Record<string, [TJSON, TJSON][]>>,
-  ): Promise<SkipBuilder<K, V>>;
+  ): Promise<SkipBuilder>;
 }
 
 export interface LazyCompute<K extends TJSON, V extends TJSON> {
@@ -426,9 +426,9 @@ export type Notifier<K extends TJSON, V extends TJSON> = (
   update: boolean,
 ) => void;
 
-export type SkipBuilder<K extends TJSON, V extends TJSON> = (
+export type SkipBuilder = (
   iCollection: Record<string, CollectionWriter<TJSON, TJSON>>,
-) => [SkipRuntime, SkipReplication<K, V>];
+) => SkipRuntime;
 
 export interface CollectionWriter<K extends TJSON, V extends TJSON> {
   write(key: K, value: V[]): void;
@@ -442,34 +442,35 @@ export interface SkipRuntime {
     resource: string,
     params: JSONObject,
     reactiveAuth?: Uint8Array | string,
-  ): Promise<{ values: Entry<K, V>[]; reactive?: ReactiveResponse }>;
+  ): { values: Entry<K, V>[]; reactive?: ReactiveResponse };
   head(
     resource: string,
     params: JSONObject,
     reactiveAuth: Uint8Array | string,
-  ): Promise<ReactiveResponse>;
+  ): ReactiveResponse;
   getOne<V extends TJSON>(
     resource: string,
     params: JSONObject,
     key: string | number,
-  ): Promise<V[]>;
+  ): V[];
   // WRITE
   put<V extends TJSON>(
     collection: string,
     key: string | number,
     value: V[],
-  ): Promise<void>;
+  ): void;
 
   patch<K extends TJSON, V extends TJSON>(
     collection: string,
     values: Entry<K, V>[],
-  ): Promise<void>;
+  ): void;
 
-  delete(collection: string, key: string | number): Promise<void>;
-}
-
-export interface SkipReplication<K extends TJSON, V extends TJSON> {
-  subscribe(collection: string, from: string, notify: Notifier<K, V>): bigint;
+  delete(collection: string, key: string | number): void;
+  subscribe<K extends TJSON, V extends TJSON>(
+    collection: string,
+    from: string,
+    notify: Notifier<K, V>,
+  ): bigint;
 
   unsubscribe(id: bigint): void;
 }

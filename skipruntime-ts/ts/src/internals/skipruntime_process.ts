@@ -5,7 +5,6 @@ import type {
   JSONObject,
   TJSON,
   SkipRuntime,
-  SkipReplication,
 } from "../skipruntime_api.js";
 import express from "express";
 
@@ -22,10 +21,7 @@ class TailingSession {
   private subsessions = new Map<string, bigint>();
 
   constructor(
-    private replication: SkipReplication<
-      string,
-      TJSON
-    > /*, private pubkey: ArrayBuffer*/,
+    private replication: SkipRuntime /*, private pubkey: ArrayBuffer*/,
   ) {}
 
   subscribe(
@@ -38,7 +34,7 @@ class TailingSession {
     ) => void,
   ) {
     // FIXME: Pass pubkey down to replication.
-    const subsession = this.replication.subscribe(
+    const subsession = this.replication.subscribe<string, TJSON>(
       collection,
       since.toString(),
       (v, w, u) => {
@@ -66,7 +62,7 @@ class ReplicationServerError extends Error {
     public code: number,
     public msg: string,
   ) {
-    super(`${code}: ${msg}`);
+    super(`${code.toString()}: ${msg}`);
   }
 }
 
@@ -121,7 +117,7 @@ function handleMessage(
   }
 }
 
-async function handleAuthMessage(data: any): Promise<boolean> {
+async function handleAuthMessage(data: unknown): Promise<boolean> {
   if (!(data instanceof ArrayBuffer)) {
     // Required by Bun.
     if (data instanceof Uint8Array) {
@@ -157,7 +153,7 @@ export class ReplicationServer {
 
   constructor(
     private wss: WebSocketServer,
-    private replication: SkipReplication<string, TJSON>,
+    private replication: SkipRuntime,
   ) {
     wss.on("connection", (ws) => {
       this.onconnection(ws);
@@ -247,14 +243,14 @@ export async function runService(
   createSKStore: typeof CreateSKStore,
   port: number = 443,
 ): Promise<{ close: () => void }> {
-  const [runtime, replication] = await initService(service, createSKStore);
+  const runtime = await initService(service, createSKStore);
   const app = runRESTServer(runtime);
   const httpServer = http.createServer();
   httpServer.on("request", app);
   const wss = new WebSocketServer({ server: httpServer });
-  const replicationServer = new ReplicationServer(wss, replication);
+  const replicationServer = new ReplicationServer(wss, runtime);
   httpServer.listen(port, () => {
-    console.log(`Reactive service listening on port ${port}`);
+    console.log(`Reactive service listening on port ${port.toString()}`);
   });
 
   return {
@@ -275,25 +271,27 @@ function runRESTServer(runtime: SkipRuntime): express.Express {
     const strReactiveAuth = req.headers["x-reactive-auth"] as string;
     if (!strReactiveAuth) throw new Error("X-Reactive-Auth must be specified.");
     const reactiveAuth = new Uint8Array(Buffer.from(strReactiveAuth, "base64"));
-    runtime
-      .head(resourceName, req.query as JSONObject, reactiveAuth)
-      .then((data) => {
-        res.set("X-Reactive-Response", JSON.stringify(data));
-        res.status(200).json({});
-      })
-      .catch((e: unknown) =>
-        res.status(500).json(e instanceof Error ? e.message : e),
+    try {
+      const data = runtime.head(
+        resourceName,
+        req.query as JSONObject,
+        reactiveAuth,
       );
+      res.set("X-Reactive-Response", JSON.stringify(data));
+      res.status(200).json({});
+    } catch (e: unknown) {
+      res.status(500).json(e instanceof Error ? e.message : e);
+    }
   });
   app.get("/v1/:resource/:key", (req, res) => {
     const key = req.params.key;
     const resourceName = req.params.resource;
-    runtime
-      .getOne(resourceName, req.query as JSONObject, key)
-      .then((data) => res.status(200).json(data))
-      .catch((e: unknown) =>
-        res.status(500).json(e instanceof Error ? e.message : e),
-      );
+    try {
+      const data = runtime.getOne(resourceName, req.query as JSONObject, key);
+      res.status(200).json(data);
+    } catch (e: unknown) {
+      res.status(500).json(e instanceof Error ? e.message : e);
+    }
   });
   app.get("/v1/:resource", (req, res) => {
     const resourceName = req.params.resource;
@@ -301,65 +299,75 @@ function runRESTServer(runtime: SkipRuntime): express.Express {
     const reactiveAuth = strReactiveAuth
       ? new Uint8Array(Buffer.from(strReactiveAuth, "base64"))
       : undefined;
-    runtime
-      .getAll(resourceName, req.query as Record<string, string>, reactiveAuth)
-      .then((data) => {
-        if (data.reactive) {
-          res.set("X-Reactive-Response", JSON.stringify(data.reactive));
-        }
-        res.status(200).json(data.values);
-      })
-      .catch((e: unknown) =>
-        res.status(500).json(e instanceof Error ? e.message : e),
+    try {
+      const data = runtime.getAll(
+        resourceName,
+        req.query as Record<string, string>,
+        reactiveAuth,
       );
+      if (data.reactive) {
+        res.set("X-Reactive-Response", JSON.stringify(data.reactive));
+      }
+      res.status(200).json(data.values);
+    } catch (e: unknown) {
+      res.status(500).json(e instanceof Error ? e.message : e);
+    }
   });
   // WRITES
   app.put("/v1/:collection/:id", (req, res) => {
+    if (!Array.isArray(req.body)) {
+      res.status(400).json(`Bad request body ${JSON.stringify(req.body)}`);
+      return;
+    }
     const key = req.params.id;
-    const data: TJSON[] = req.body;
+    const data = req.body as TJSON[];
     const collectionName = req.params.collection;
-    runtime
-      .put(collectionName, key, data)
-      .then(() => res.status(200).json({}))
-      .catch((e: unknown) => {
-        if (e instanceof UnknownCollectionError) {
-          res.status(400).json("Bad request");
-        } else {
-          res.status(500).json(e instanceof Error ? e.message : e);
-        }
-      });
+    try {
+      runtime.put(collectionName, key, data);
+      res.status(200).json({});
+    } catch (e: unknown) {
+      if (e instanceof UnknownCollectionError) {
+        res.status(400).json("Bad request");
+      } else {
+        res.status(500).json(e instanceof Error ? e.message : e);
+      }
+    }
   });
   app.patch("/v1/:collection", (req, res) => {
-    const data: TJSON = req.body;
+    if (!Array.isArray(req.body)) {
+      res.status(400).json(`Bad request body ${JSON.stringify(req.body)}`);
+      return;
+    }
+    const data = req.body as TJSON[];
     if (!Array.isArray(data)) {
       res.status(400).json("Bad request");
       return;
     }
     const collectionName = req.params.collection;
-    runtime
-      .patch(collectionName, data as Entry<TJSON, TJSON>[])
-      .then(() => res.status(200).json({}))
-      .catch((e: unknown) => {
-        if (e instanceof UnknownCollectionError) {
-          res.status(400).json("Bad request");
-        } else {
-          res.status(500).json(e instanceof Error ? e.message : e);
-        }
-      });
+    try {
+      runtime.patch(collectionName, data as Entry<TJSON, TJSON>[]);
+      res.status(200).json({});
+    } catch (e: unknown) {
+      if (e instanceof UnknownCollectionError) {
+        res.status(400).json("Bad request");
+      } else {
+        res.status(500).json(e instanceof Error ? e.message : e);
+      }
+    }
   });
   app.delete("/v1/:collection/:id", (req, res) => {
     const key = req.params.id;
     const collectionName = req.params.collection;
-    runtime
-      .delete(collectionName, key)
-      .then(() => res.status(200).json({}))
-      .catch((e: unknown) => {
-        if (e instanceof UnknownCollectionError) {
-          res.status(400).json("Bad request");
-        } else {
-          res.status(500).json(e instanceof Error ? e.message : e);
-        }
-      });
+    try {
+      runtime.delete(collectionName, key);
+      res.status(200).json({});
+    } catch (e: unknown) {
+      if (e instanceof UnknownCollectionError) {
+        res.status(400).json("Bad request");
+      } else {
+        res.status(500).json(e instanceof Error ? e.message : e);
+      }
+    }
   });
 
   return app;

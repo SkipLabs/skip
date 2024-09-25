@@ -15,7 +15,6 @@ import type {
   SkipRuntime,
   Resource,
   Entry,
-  SkipReplication,
   Loadable,
 } from "skip-runtime";
 import {
@@ -33,10 +32,7 @@ function check(name: string, got: TJSON, expected: TJSON): void {
 interface Test {
   name: string;
   service: SkipService;
-  run: (
-    runtime: SkipRuntime,
-    replication?: SkipReplication<TJSON, TJSON>,
-  ) => void | Promise<void>;
+  run: (runtime: SkipRuntime) => void | Promise<void>;
   tokens?: Record<string, number>;
 }
 
@@ -82,9 +78,9 @@ class Map1Service implements SkipService {
   }
 }
 
-async function testMap1Run(runtime: SkipRuntime) {
-  await runtime.put("input", "1", [10]);
-  check("testMap1", await runtime.getOne("map1", {}, "1"), [12]);
+function testMap1Run(runtime: SkipRuntime) {
+  runtime.put("input", "1", [10]);
+  check("testMap1", runtime.getOne("map1", {}, "1"), [12]);
 }
 
 tests.push({
@@ -141,14 +137,14 @@ class Map2Service implements SkipService {
   }
 }
 
-async function testMap2Run(runtime: SkipRuntime) {
+function testMap2Run(runtime: SkipRuntime) {
   const resource = "map2";
-  await runtime.put("input1", "1", [10]);
-  await runtime.put("input2", "1", [20]);
-  check("testMap2[0]", await runtime.getOne(resource, {}, "1"), [30]);
-  await runtime.put("input1", "2", [3]);
-  await runtime.put("input2", "2", [7]);
-  check("testMap2[1]", (await runtime.getAll(resource, {})).values, [
+  runtime.put("input1", "1", [10]);
+  runtime.put("input2", "1", [20]);
+  check("testMap2[0]", runtime.getOne(resource, {}, "1"), [30]);
+  runtime.put("input1", "2", [3]);
+  runtime.put("input2", "2", [7]);
+  check("testMap2[1]", runtime.getAll(resource, {}).values, [
     ["1", [30]],
     ["2", [10]],
   ]);
@@ -198,14 +194,14 @@ class Map3Service implements SkipService {
   }
 }
 
-async function testMap3Run(runtime: SkipRuntime) {
+function testMap3Run(runtime: SkipRuntime) {
   const resource = "map3";
-  await runtime.put("input1", "1", [1, 2, 3]);
-  await runtime.put("input2", "1", [10]);
-  check("testMap3[0]", await runtime.getOne(resource, {}, "1"), [36]);
-  await runtime.put("input1", "2", [3]);
-  await runtime.put("input2", "2", [7]);
-  check("testMap2[1]", (await runtime.getAll(resource, {})).values, [
+  runtime.put("input1", "1", [1, 2, 3]);
+  runtime.put("input2", "1", [10]);
+  check("testMap3[0]", runtime.getOne(resource, {}, "1"), [36]);
+  runtime.put("input1", "2", [3]);
+  runtime.put("input2", "2", [7]);
+  check("testMap2[1]", runtime.getAll(resource, {}).values, [
     ["1", [36]],
     ["2", [10]],
   ]);
@@ -256,15 +252,15 @@ class ValueMapperService implements SkipService {
   }
 }
 
-async function testValueMapperRun(runtime: SkipRuntime) {
+function testValueMapperRun(runtime: SkipRuntime) {
   const resource = "valueMapper";
-  await runtime.patch("input", [
+  runtime.patch("input", [
     [1, [1]],
     [2, [2]],
     [5, [5]],
     [10, [10]],
   ]);
-  check("testValueMapper", (await runtime.getAll(resource, {})).values, [
+  check("testValueMapper", runtime.getAll(resource, {}).values, [
     [1, [2]],
     [2, [6]],
     [5, [30]],
@@ -318,26 +314,26 @@ class SizeService implements SkipService {
   }
 }
 
-async function testSizeRun(runtime: SkipRuntime) {
+function testSizeRun(runtime: SkipRuntime) {
   const resource = "size";
-  await runtime.patch("input1", [
+  runtime.patch("input1", [
     [1, [0]],
     [2, [2]],
   ]);
-  check("testSize[0]", (await runtime.getAll(resource, {})).values, [
+  check("testSize[0]", runtime.getAll(resource, {}).values, [
     [1, [0]],
     [2, [2]],
   ]);
-  await runtime.patch("input2", [
+  runtime.patch("input2", [
     [1, [10]],
     [2, [5]],
   ]);
-  check("testSize[1]", (await runtime.getAll(resource, {})).values, [
+  check("testSize[1]", runtime.getAll(resource, {}).values, [
     [1, [2]],
     [2, [4]],
   ]);
-  await runtime.delete("input2", 1);
-  check("testSize[2]", (await runtime.getAll(resource, {})).values, [
+  runtime.delete("input2", 1);
+  check("testSize[2]", runtime.getAll(resource, {}).values, [
     [1, [1]],
     [2, [3]],
   ]);
@@ -390,14 +386,14 @@ class SlicedMap1Service implements SkipService {
   }
 }
 
-async function testSlicedMap1Run(runtime: SkipRuntime) {
+function testSlicedMap1Run(runtime: SkipRuntime) {
   const resource = "slice";
   // Inserts [[0, 0], ..., [30, 30]
   const values = Array.from({ length: 31 }, (_, i) => {
     return [i, [i]] as Entry<number, number>;
   });
-  await runtime.patch("input", values);
-  check("testSlicedMap1[0]", (await runtime.getAll(resource, {})).values, [
+  runtime.patch("input", values);
+  check("testSlicedMap1[0]", runtime.getAll(resource, {}).values, [
     [1, [1]],
     [3, [9]],
     [4, [16]],
@@ -465,24 +461,24 @@ class LazyService implements SkipService {
   }
 }
 
-async function testLazyRun(runtime: SkipRuntime) {
+function testLazyRun(runtime: SkipRuntime) {
   const resource = "lazy";
-  await runtime.patch("input", [
+  runtime.patch("input", [
     [0, [10]],
     [1, [20]],
   ]);
-  check("testLazyRun[0]", (await runtime.getAll(resource, {})).values, [
+  check("testLazyRun[0]", runtime.getAll(resource, {}).values, [
     [0, [2]],
     [1, [2]],
   ]);
-  await runtime.put("input", 2, [4]);
-  check("testLazyRun[1]", (await runtime.getAll(resource, {})).values, [
+  runtime.put("input", 2, [4]);
+  check("testLazyRun[1]", runtime.getAll(resource, {}).values, [
     [0, [2]],
     [1, [2]],
     [2, [2]],
   ]);
-  await runtime.delete("input", 2);
-  check("testLazyRun[2]", (await runtime.getAll(resource, {})).values, [
+  runtime.delete("input", 2);
+  check("testLazyRun[2]", runtime.getAll(resource, {}).values, [
     [0, [2]],
     [1, [2]],
   ]);
@@ -530,33 +526,33 @@ class MapReduceService implements SkipService {
   }
 }
 
-async function testMapReduceRun(runtime: SkipRuntime) {
+function testMapReduceRun(runtime: SkipRuntime) {
   const resource = "mapReduce";
-  await runtime.patch("input", [
+  runtime.patch("input", [
     [0, [1]],
     [1, [1]],
     [2, [1]],
   ]);
-  check("testMapReduceRun[0]", (await runtime.getAll(resource, {})).values, [
+  check("testMapReduceRun[0]", runtime.getAll(resource, {}).values, [
     [0, [2]],
     [1, [1]],
   ]);
-  await runtime.put("input", 3, [2]);
-  check("testMapReduceRun[1]", (await runtime.getAll(resource, {})).values, [
+  runtime.put("input", 3, [2]);
+  check("testMapReduceRun[1]", runtime.getAll(resource, {}).values, [
     [0, [2]],
     [1, [3]],
   ]);
-  await runtime.patch("input", [
+  runtime.patch("input", [
     [0, [2]],
     [1, [2]],
   ]);
-  check("testMapReduceRun[2]", (await runtime.getAll(resource, {})).values, [
+  check("testMapReduceRun[2]", runtime.getAll(resource, {}).values, [
     [0, [3]],
     [1, [4]],
   ]);
 
-  await runtime.delete("input", 3);
-  check("testMapReduceRun[3]", (await runtime.getAll(resource, {})).values, [
+  runtime.delete("input", 3);
+  check("testMapReduceRun[3]", runtime.getAll(resource, {}).values, [
     [0, [3]],
     [1, [2]],
   ]);
@@ -604,34 +600,24 @@ function sorted(entries: Entry<TJSON, TJSON>[]): Entry<TJSON, TJSON>[] {
   return entries;
 }
 
-async function testMerge1Run(runtime: SkipRuntime) {
+function testMerge1Run(runtime: SkipRuntime) {
   const resource = "merge1";
-  await runtime.put("input1", 1, [10]);
-  await runtime.put("input2", 1, [20]);
-  check(
-    "testMerge1Run[0]",
-    sorted((await runtime.getAll(resource, {})).values),
-    [[1, [10, 20]]],
-  );
-  await runtime.put("input1", 2, [3]);
-  await runtime.put("input2", 2, [7]);
-  check(
-    "testMerge1Run[1]",
-    sorted((await runtime.getAll(resource, {})).values),
-    [
-      [1, [10, 20]],
-      [2, [3, 7]],
-    ],
-  );
-  await runtime.delete("input1", 1);
-  check(
-    "testMerge1Run[2]",
-    sorted((await runtime.getAll(resource, {})).values),
-    [
-      [1, [20]],
-      [2, [3, 7]],
-    ],
-  );
+  runtime.put("input1", 1, [10]);
+  runtime.put("input2", 1, [20]);
+  check("testMerge1Run[0]", sorted(runtime.getAll(resource, {}).values), [
+    [1, [10, 20]],
+  ]);
+  runtime.put("input1", 2, [3]);
+  runtime.put("input2", 2, [7]);
+  check("testMerge1Run[1]", sorted(runtime.getAll(resource, {}).values), [
+    [1, [10, 20]],
+    [2, [3, 7]],
+  ]);
+  runtime.delete("input1", 1);
+  check("testMerge1Run[2]", sorted(runtime.getAll(resource, {}).values), [
+    [1, [20]],
+    [2, [3, 7]],
+  ]);
 }
 
 tests.push({
@@ -675,21 +661,21 @@ class MergeReduceService implements SkipService {
   }
 }
 
-async function testMergeReduceRun(runtime: SkipRuntime) {
+function testMergeReduceRun(runtime: SkipRuntime) {
   const resource = "mergeReduce";
-  await runtime.put("input1", 1, [10]);
-  await runtime.put("input2", 1, [20]);
-  check("testMergeReduceRun[0]", (await runtime.getAll(resource, {})).values, [
+  runtime.put("input1", 1, [10]);
+  runtime.put("input2", 1, [20]);
+  check("testMergeReduceRun[0]", runtime.getAll(resource, {}).values, [
     [1, [30]],
   ]);
-  await runtime.put("input1", 2, [3]);
-  await runtime.put("input2", 2, [7]);
-  check("testMergeReduceRun[1]", (await runtime.getAll(resource, {})).values, [
+  runtime.put("input1", 2, [3]);
+  runtime.put("input2", 2, [7]);
+  check("testMergeReduceRun[1]", runtime.getAll(resource, {}).values, [
     [1, [30]],
     [2, [10]],
   ]);
-  await runtime.delete("input1", 1);
-  check("testMergeReduceRun[2]", (await runtime.getAll(resource, {})).values, [
+  runtime.delete("input1", 1);
+  check("testMergeReduceRun[2]", runtime.getAll(resource, {}).values, [
     [1, [20]],
     [2, [10]],
   ]);
@@ -772,23 +758,19 @@ class AsyncLazyService implements SkipService {
   }
 }
 
-async function testAsyncLazyRun(
-  runtime: SkipRuntime,
-  replication?: SkipReplication<TJSON, TJSON>,
-) {
-  if (!replication) throw new Error("Replication must be specified.");
-  const data = await runtime.head("asyncLazy", {}, new Uint8Array([]));
+async function testAsyncLazyRun(runtime: SkipRuntime) {
+  const data = runtime.head("asyncLazy", {}, new Uint8Array([]));
 
   const updates: Entry<TJSON, TJSON>[][] = [];
-  replication.subscribe(
+  runtime.subscribe<string, TJSON>(
     data.collection,
     data.watermark,
     (values, _watermark, _update) => {
       updates.push(values);
     },
   );
-  await runtime.patch("input1", [[0, [10]]]);
-  await runtime.patch("input2", [[0, [5]]]);
+  runtime.patch("input1", [[0, [10]]]);
+  runtime.patch("input2", [[0, [5]]]);
   let count = 0;
   const waitandcheck = (
     resolve: () => void,
@@ -796,27 +778,25 @@ async function testAsyncLazyRun(
   ) => {
     if (count == 50) reject("Async response not received");
     count++;
-    runtime
-      .getOne("asyncLazy", {}, 0)
-      .then((value) => {
-        if (value[0] == "loading") {
-          setTimeout(waitandcheck, 10, resolve, reject);
-        } else {
-          try {
-            check("testAsyncLazy", updates, [
-              [],
-              [[0, ["loading"]]],
-              [[0, ["15"]]],
-            ]);
-          } catch (e) {
-            reject(e);
-          }
-          resolve();
+    try {
+      const value = runtime.getOne("asyncLazy", {}, 0);
+      if (value[0] == "loading") {
+        setTimeout(waitandcheck, 10, resolve, reject);
+      } else {
+        try {
+          check("testAsyncLazy", updates, [
+            [],
+            [[0, ["loading"]]],
+            [[0, ["15"]]],
+          ]);
+        } catch (e) {
+          reject(e);
         }
-      })
-      .catch((e: unknown) => {
-        reject(e);
-      });
+        resolve();
+      }
+    } catch (e: unknown) {
+      reject(e);
+    }
   };
   return new Promise<void>(waitandcheck);
 }
@@ -980,18 +960,18 @@ async function timeout(ms: number) {
 
 async function testTokensRun(runtime: SkipRuntime) {
   const resource = "tokens";
-  await runtime.put("input", 1, [0]);
-  const start = (await runtime.getOne(resource, {}, 1))[0] as [number, number];
+  runtime.put("input", 1, [0]);
+  const start = runtime.getOne(resource, {}, 1)[0] as [number, number];
   await timeout(2000);
-  await runtime.put("input", 1, [2]);
-  let current = (await runtime.getOne(resource, {}, 1))[0] as [number, number];
+  runtime.put("input", 1, [2]);
+  let current = runtime.getOne(resource, {}, 1)[0] as [number, number];
   check("testTokens[0]", current, [2, start[1]]);
   await timeout(2000);
-  await runtime.put("input", 1, [4]);
-  current = (await runtime.getOne(resource, {}, 1))[0] as [number, number];
+  runtime.put("input", 1, [4]);
+  current = runtime.getOne(resource, {}, 1)[0] as [number, number];
   check("testTokens[1]", current, [4, start[1]]);
   await timeout(2000);
-  current = (await runtime.getOne(resource, {}, 1))[0] as [number, number];
+  current = runtime.getOne(resource, {}, 1)[0] as [number, number];
   check("testTokens[2]", Math.trunc((current[1] - start[1]) / 1000), 5);
 }
 
@@ -1044,9 +1024,9 @@ class JSONExtractService implements SkipService {
   }
 }
 
-async function testJSONExtractRun(runtime: SkipRuntime) {
+function testJSONExtractRun(runtime: SkipRuntime) {
   const resource = "jsonExtract";
-  await runtime.patch("input", [
+  runtime.patch("input", [
     [
       0,
       [
@@ -1076,7 +1056,7 @@ async function testJSONExtractRun(runtime: SkipRuntime) {
     ],
   ]);
   //
-  const res = (await runtime.getAll(resource, {})).values;
+  const res = runtime.getAll(resource, {}).values;
   check("testJSONExtract", res, [
     [
       0,
@@ -1190,8 +1170,8 @@ units.push({ name: "testTimedQueue", run: testTimedQueue });
 
 function run(t: Test) {
   test(t.name, async () => {
-    const [runtime, replication] = await initService(t.service, createSKStore);
-    await t.run(runtime, replication);
+    const runtime = await initService(t.service, createSKStore);
+    await t.run(runtime);
   });
 }
 
