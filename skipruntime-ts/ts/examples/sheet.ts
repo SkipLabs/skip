@@ -9,7 +9,7 @@ import type {
   SkipService,
 } from "skip-runtime";
 
-import { runWithRESTServer } from "skip-runtime";
+import { runService } from "skip-runtime";
 import type { Resource } from "skip-runtime/dist/skipruntime_service.js";
 
 class ComputeExpression implements LazyCompute<string, string> {
@@ -98,4 +98,4 @@ class Service implements SkipService {
   }
 }
 
-runWithRESTServer(new Service());
+runService(new Service());

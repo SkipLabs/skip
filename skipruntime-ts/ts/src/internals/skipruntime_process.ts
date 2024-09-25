@@ -1,21 +1,261 @@
 import type { SkipService } from "../skipruntime_service.js";
-import type { createSKStore as CreateSKStore } from "../skip-runtime.js";
-import type { Entry, JSONObject, TJSON } from "../skipruntime_api.js";
+import { createSKStore as CreateSKStore } from "../skip-runtime.js";
+import type {
+  Entry,
+  JSONObject,
+  TJSON,
+  SkipRuntime,
+  SkipReplication,
+} from "../skipruntime_api.js";
 import express from "express";
 
-import { runService } from "../skipruntime_runner.js";
+import { runService as initService } from "../skipruntime_runner.js";
 import { UnknownCollectionError } from "./skipruntime_impl.js";
 
-export async function runWithRESTServer_(
+import { WebSocket, WebSocketServer, type MessageEvent } from "ws";
+
+import { Protocol } from "skipruntime-replication-client";
+
+import * as http from "http";
+
+class TailingSession {
+  private subsessions = new Map<string, bigint>();
+
+  constructor(
+    private replication: SkipReplication<
+      string,
+      TJSON
+    > /*, private pubkey: ArrayBuffer*/,
+  ) {}
+
+  subscribe(
+    collection: string,
+    since: bigint,
+    callback: (
+      updates: Array<Entry<string, TJSON>>,
+      isInit: boolean,
+      tick: bigint,
+    ) => void,
+  ) {
+    // FIXME: Pass pubkey down to replication.
+    const subsession = this.replication.subscribe(
+      collection,
+      since,
+      (v, w, u) => callback(v, !u, w),
+    );
+    this.subsessions.set(collection, subsession);
+  }
+
+  unsubscribe(collection: string) {
+    // TODO: Throw if not found.
+    this.replication.unsubscribe(this.subsessions.get(collection)!);
+    this.subsessions.delete(collection);
+  }
+
+  close() {
+    for (let collection in this.subsessions) {
+      this.unsubscribe(collection);
+    }
+  }
+}
+
+class ReplicationServerError {
+  constructor(
+    public code: number,
+    public msg: string,
+  ) {}
+}
+
+async function handleMessage(
+  data: any,
+  session: TailingSession,
+  ws: WebSocket,
+): Promise<void> {
+  if (!(data instanceof ArrayBuffer)) {
+    // Required by Bun.
+    if (data instanceof Uint8Array) {
+      data = data.buffer;
+    } else {
+      throw new ReplicationServerError(1001, "Received string WebSocket msg.");
+    }
+  }
+
+  const msg = Protocol.decodeMsg(data);
+  switch (msg.type) {
+    case "auth":
+      throw new ReplicationServerError(1001, "Unexpected auth");
+    case "ping": {
+      ws.send(
+        Protocol.encodeMsg({
+          type: "pong",
+        }),
+      );
+      return;
+    }
+    case "tail": {
+      // FIXME: Respond with error 1004 if collection does not exist
+      // (for current user).
+      session.subscribe(msg.collection, msg.since, (updates, isInit, tick) => {
+        ws.send(
+          Protocol.encodeMsg({
+            type: "data",
+            collection: msg.collection,
+            isInit,
+            tick,
+            payload: JSON.stringify(updates),
+          }),
+        );
+      });
+      return;
+    }
+    case "aborttail": {
+      session.unsubscribe(msg.collection);
+      return;
+    }
+    case "tailbatch":
+      throw new Error("TODO");
+  }
+}
+
+async function handleAuthMessage(data: any): Promise<boolean> {
+  if (!(data instanceof ArrayBuffer)) {
+    // Required by Bun.
+    if (data instanceof Uint8Array) {
+      data = data.buffer;
+    } else {
+      throw new ReplicationServerError(1001, "Received string WebSocket msg.");
+    }
+  }
+
+  const msg = Protocol.decodeMsg(data);
+  if (msg.type != "auth") {
+    throw new ReplicationServerError(
+      1002,
+      "Authentication failed: Invalid message",
+    );
+  }
+  // FIXME: Check nonce uniqueness to avoid replay attack.
+  // Timestamp allowed 60 seconds of drift.
+  if (Math.abs(Date.now() - Number(msg.timestamp) * 1000) > 60 * 1000) {
+    throw new ReplicationServerError(
+      1002,
+      "Authentication failed: Invalid timestamp",
+    );
+  }
+
+  const pubkey = await Protocol.importKey(msg.pubkey);
+  return await Protocol.verify(pubkey, msg.nonce, msg.timestamp, msg.signature);
+}
+
+export class ReplicationServer {
+  private auth = new Map<WebSocket, Promise<boolean>>();
+  private sessions = new Map<WebSocket, TailingSession>();
+
+  constructor(
+    private wss: WebSocketServer,
+    private replication: SkipReplication<string, TJSON>,
+  ) {
+    wss.on("connection", (ws) => this.onconnection(ws));
+  }
+
+  close() {
+    for (const [ws, session] of this.sessions) {
+      session.close();
+      void ws.send(
+        Protocol.encodeMsg({
+          type: "goaway",
+          code: 1000,
+          msg: "Server shutting down",
+        }),
+      );
+    }
+    this.wss.close();
+  }
+
+  private onconnection(ws: WebSocket) {
+    ws.binaryType = "arraybuffer";
+    ws.onmessage = (event) => this.onmessage(ws, event);
+    ws.onclose = (_event) => this.onclose(ws);
+  }
+
+  private onmessage(ws: WebSocket, event: MessageEvent) {
+    // First message must be auth.
+    const authRequest = this.auth.get(ws);
+    if (!authRequest) {
+      const authPromise = handleAuthMessage(event.data)
+        .then((authOk) => {
+          if (authOk) {
+            this.sessions.set(ws, new TailingSession(this.replication));
+            return true;
+          } else {
+            throw new ReplicationServerError(
+              1002,
+              "Authentication failed: Invalid credentials",
+            );
+          }
+        })
+        .catch((error) => {
+          this.errorHandler(ws, error);
+          return false;
+        });
+      this.auth.set(ws, authPromise);
+    } else {
+      void authRequest
+        .then((_) => handleMessage(event.data, this.sessions.get(ws)!, ws))
+        .catch((error) => this.errorHandler(ws, error));
+    }
+  }
+
+  private onclose(ws: WebSocket) {
+    this.sessions.get(ws)?.close();
+    this.auth.delete(ws);
+    this.sessions.delete(ws);
+  }
+
+  private errorHandler(ws: WebSocket, error: any) {
+    if (error instanceof ReplicationServerError) {
+      ws.send(
+        Protocol.encodeMsg({
+          type: "goaway",
+          code: error.code,
+          msg: error.msg,
+        }),
+      );
+      ws.close();
+    } else {
+      throw error;
+    }
+  }
+}
+
+export async function runService(
   service: SkipService,
   createSKStore: typeof CreateSKStore,
-  options: Record<string, any>,
-) {
+  port: number = 443,
+): Promise<{ close: () => void }> {
+  const [runtime, replication] = await initService(service, createSKStore);
+  const app = await runRESTServer(runtime);
+  const httpServer = http.createServer();
+  httpServer.on("request", app);
+  const wss = new WebSocketServer({ server: httpServer });
+  const replicationServer = new ReplicationServer(wss, replication);
+  httpServer.listen(port, () => {
+    console.log(`Reactive service listening on port ${port}`);
+  });
+
+  return {
+    close: () => {
+      replicationServer.close();
+      httpServer.close();
+    },
+  };
+}
+
+async function runRESTServer(runtime: SkipRuntime): Promise<express.Express> {
   // eslint-disable-next-line  @typescript-eslint/no-unsafe-call
   const app = express();
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
-  const [runtime, _replication] = await runService(service, createSKStore);
   // READS
   app.get("/v1/:resource/:key", async (req, res) => {
     const key = req.params.key;
@@ -119,8 +359,6 @@ export async function runWithRESTServer_(
       }
     }
   });
-  const httpPort = "port" in options ? options["port"] : 3587;
-  app.listen(httpPort, () => {
-    console.log(`Serve at http://localhost:${httpPort}`);
-  });
+
+  return app;
 }
