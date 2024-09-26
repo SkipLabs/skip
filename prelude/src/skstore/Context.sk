@@ -978,35 +978,24 @@ mutable class Context{
     );
     !content = content.sortedBy(x ~> x.i0);
     vector: mutable Vector<FixedRow<Array<File>>> = mutable Vector[];
-    valueAcc = mutable Vector[];
-    last: ?Key = None();
     time = this.timeStamp();
     tick = this.tick;
 
-    for (kv in content) {
-      (key, values) = kv;
-      last match {
-      | None() ->
-        valueAcc.extend(values);
-        !last = Some(key)
-      | Some(oldKey) if (oldKey == key) -> valueAcc.extend(values)
-      | Some(oldKey) ->
-        source = Path::create(dirName, oldKey);
-        vector.push(
-          FixedRow(oldKey, valueAcc.toArray(), source, TickRange::create(tick)),
-        );
-        !last = Some(key);
-        valueAcc.clear();
-        valueAcc.extend(values)
+    n = content.size();
+    i = 0;
+    while (i < n) {
+      (key, values) = content[i];
+      !i = i + 1;
+      if (i < n && content[i].i0 == key) {
+        valueAcc = Vector::mcreateFromItems(values);
+        do {
+          valueAcc.extend(content[i].i1);
+          !i = i + 1;
+        } while (i < n && content[i].i0 == key);
+        !values = valueAcc.toArray();
       };
-    };
-    last match {
-    | None() -> void
-    | Some(key) ->
       source = Path::create(dirName, key);
-      vector.push(
-        FixedRow(key, valueAcc.toArray(), source, TickRange::create(tick)),
-      )
+      vector.push(FixedRow(key, values, source, TickRange::create(tick)));
     };
     fixedData = FixedDataMap::create(vector);
 
