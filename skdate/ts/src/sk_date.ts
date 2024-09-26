@@ -1,7 +1,5 @@
-// sknpm: Cannot be multiline for package sources
-// prettier-ignore
-import type { int, ptr, Environment, Links, ToWasmManager, Utils } from "#std/sk_types.js";
-import type * as Internal from "#std/sk_internal_types.js";
+import type { int, ptr, Environment, Links, ToWasmManager, Utils } from "std";
+import type * as Internal from "std/internal.js";
 
 interface ToWasm {
   SKIP_localetimezone: (year: int, month: int, day: int) => int;

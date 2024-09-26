@@ -1,7 +1,5 @@
-// prettier-ignore
-import type { int, ptr, float, Links, Utils, ToWasmManager, Environment, Opt, Shared, } from "#std/sk_types.js";
-// prettier-ignore
-import { sk_isArrayProxy, sk_isObjectProxy } from "#std/sk_types.js";
+import type { int, ptr, float, Links, Utils, ToWasmManager, Environment, Opt, Shared, } from "std";
+import { sk_isArrayProxy, sk_isObjectProxy } from "std";
 import type * as Internal from "./skjson_internal_types.js";
 
 export enum Type {

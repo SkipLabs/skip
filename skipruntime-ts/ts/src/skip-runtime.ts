@@ -1,5 +1,4 @@
-// prettier-ignore
-import { runUrl, type ModuleInit } from "#std/sk_types.js";
+import { runUrl, type ModuleInit } from "std";
 import type { SkipService, Resource } from "./skipruntime_service.js";
 import { check } from "./internals/skipruntime_impl.js";
 import type {
@@ -51,8 +50,12 @@ export type {
 export { ValueMapper } from "./skipruntime_api.js";
 export { Sum, Min, Max } from "./skipruntime_utils.js";
 
-const modules: ModuleInit[] = [];
-/*--MODULES--*/
+import { init as runtimeInit } from "std/runtime.js";
+import { init as posixInit } from "std/posix.js";
+import { init as skjsonInit } from "skjson";
+import { init as skruntimeInit } from "./internals/skipruntime_module.js";
+
+const modules: ModuleInit[] = [runtimeInit, posixInit, skjsonInit, skruntimeInit];
 
 async function wasmUrl(): Promise<URL> {
   //@ts-expect-error  ImportMeta is incomplete

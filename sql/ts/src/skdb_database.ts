@@ -1,4 +1,4 @@
-import type { Environment, FileSystem } from "#std/sk_types.js";
+import type { Environment, FileSystem } from "std";
 import type {
   SKDBMechanism,
   SKDB,

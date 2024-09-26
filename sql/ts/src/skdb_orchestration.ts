@@ -1,4 +1,4 @@
-import type { Environment } from "#std/sk_types.js";
+import type { Environment } from "std";
 import type {
   SKDBMechanism,
   RemoteSKDB,

@@ -18,7 +18,7 @@ function run(t, asWorker: boolean) {
     await page.evaluate(`window.test = ${t.fun};`);
     let res = await page.evaluate(async () => {
       // @ts-ignore
-      let m = await import("./node_modules/skdb/dist/skdb.mjs");
+      let m = await import("skdb");
       // @ts-ignore
       let skdb = await m.createSkdb({ asWorker: window.asWorker });
       // @ts-ignore

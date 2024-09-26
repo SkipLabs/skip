@@ -1,5 +1,4 @@
-// prettier-ignore
-import { type int, type ptr, type Opt, cloneIfProxy } from "#std/sk_types.js";
+import { type int, type ptr, type Opt, cloneIfProxy } from "std";
 import type { Context } from "./skipruntime_types.js";
 import type * as Internal from "./skipruntime_internal_types.js";
 import type {

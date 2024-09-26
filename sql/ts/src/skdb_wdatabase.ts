@@ -1,5 +1,5 @@
-import type { Wrk } from "#std/sk_types.js";
-import { PromiseWorker, Function, Caller } from "#std/sk_worker.js";
+import type { Wrk } from "std";
+import { PromiseWorker, Function, Caller } from "std/worker.js";
 import type {
   SKDB,
   ProtoResponseCreds,

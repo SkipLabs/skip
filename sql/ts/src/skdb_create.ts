@@ -1,4 +1,4 @@
-import { runUrl, type ModuleInit } from "#std/sk_types.js";
+import { runUrl, type ModuleInit } from "std";
 import type { SKDBShared } from "./skdb_types.js";
 import { getWasmUrl } from "./skdb_wasm_locator.js";
 
