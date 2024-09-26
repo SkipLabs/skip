@@ -413,8 +413,7 @@ class SelectEvaluator{
         childName.toString() + "proj/shards/",
       );
       shards = context.unsafeMaybeGetEagerDir(shardsDirName) match {
-      | None() ->
-        context.mkdir(x ~> x, ShardStats::type, shardsDirName, Array[])
+      | None() -> context.mkdir(x ~> x, ShardStats::type, shardsDirName)
       | Some(x) -> SKStore.EHandle(x ~> x, ShardStats::type, x.dirName)
       };
 
@@ -558,7 +557,6 @@ class SelectEvaluator{
             SKStore.IID::keyType,
             Row::type,
             this.selectName1,
-            Array[],
           );
           return this.selectName1
         };
@@ -582,7 +580,6 @@ class SelectEvaluator{
             SKStore.IID::keyType,
             Row::type,
             this.selectName1,
-            Array[],
           )
         };
       } else {
@@ -696,12 +693,7 @@ class SelectEvaluator{
               Array[(SKStore.IID(0), emptyRow)],
             )
           | None() ->
-            _ = context.mkdir(
-              SKStore.IID::keyType,
-              Row::type,
-              selectName1Empty,
-              Array[],
-            )
+            _ = context.mkdir(SKStore.IID::keyType, Row::type, selectName1Empty)
           };
         } else {
           context.!newDirs = context.newDirs.set(selectName1Empty);
