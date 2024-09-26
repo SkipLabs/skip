@@ -1,7 +1,5 @@
-// sknpm: Cannot be multiline for package sources
-// prettier-ignore
-import type { int, ptr, Environment, Links, ToWasmManager, Utils, Shared } from "#std/sk_types.js";
-import type * as Internal from "#std/sk_internal_types.js";
+import type { int, ptr, Environment, Links, ToWasmManager, Utils, Shared } from "std";
+import type * as Internal from "std/internal.js";
 import type {
   PagedMemory,
   Page,
@@ -14,8 +12,8 @@ import type {
 import { ExternalFuns, SKDBTable } from "./skdb_util.js";
 import { IDBStorage } from "./skdb_storage.js";
 import { SKDBImpl, SKDBSyncImpl } from "./skdb_database.js";
-import type { SKJSON } from "#skjson/skjson.js";
-import type * as InternalJ from "#skjson/skjson_internal_types.js";
+import type { SKJSON } from "skjson";
+import type * as InternalJ from "skjson/internal.js";
 
 interface Exported {
   sk_pop_dirty_page: () => number;

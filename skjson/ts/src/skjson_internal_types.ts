@@ -1,5 +1,5 @@
-import type { T } from "#std/sk_internal_types.js";
-export type * from "#std/sk_internal_types.js";
+import type { T } from "std/internal.js";
+export type * from "std/internal.js";
 
 declare const cjnull: unique symbol;
 export type CJNull = CJSON<typeof cjnull>;

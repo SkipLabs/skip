@@ -1,6 +1,6 @@
-import { runUrl, loadEnv, isNode } from "#std/sk_types.js";
+import { runUrl, loadEnv, isNode } from "std";
 import { createOnThisThread } from "./skdb_create.js";
-import type { Wrk, ModuleInit } from "#std/sk_types.js";
+import type { Wrk, ModuleInit } from "std";
 import type { SKDB, SKDBSync, SKDBShared } from "./skdb_types.js";
 import { SKDBWorker } from "./skdb_wdatabase.js";
 export { SKDBTable } from "./skdb_util.js";
@@ -12,12 +12,23 @@ export type {
   Params,
 } from "./skdb_types.js";
 export type { Creds, MuxedSocket } from "./skdb_orchestration.js";
-export type { Environment } from "#std/sk_types.js";
+export type { Environment } from "std";
 export { SKDBTransaction } from "./skdb_util.js";
 import { getWasmUrl } from "./skdb_wasm_locator.js";
 
-const modules: ModuleInit[] = [];
-/*--MODULES--*/
+import { init as runtimeInit } from "std/runtime.js";
+import { init as posixInit } from "std/posix.js";
+import { init as skjsonInit } from "skjson";
+import { init as skdateInit } from "skdate";
+import { init as skdbInit } from "./skdb_skdb.js";
+
+const modules: ModuleInit[] = [
+  runtimeInit,
+  posixInit,
+  skjsonInit,
+  skdateInit,
+  skdbInit,
+];
 
 export async function createSkdb(
   options: {

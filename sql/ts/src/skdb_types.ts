@@ -1,4 +1,4 @@
-import type { Shared } from "#std/sk_types.js";
+import type { Shared } from "std";
 import { SKDBTable } from "./skdb_util.js";
 
 export interface SKDBHandle {
