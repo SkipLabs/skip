@@ -125,7 +125,7 @@ class FixedDir<T: frozen> extends IFixedDir<T, FixedRow<T>> {
     if (!data.isSorted()) {
       data.sort();
     };
-    _ = static::computeTags(data, 0, data.size() - 1);
+    static::computeTags(data);
     static{data => data.toArray()}
   }
 
@@ -159,7 +159,7 @@ class CompactFixedDir protected {
     if (!data.isSorted()) {
       data.sort();
     };
-    _ = static::computeTags(data, 0, data.size() - 1);
+    static::computeTags(data);
     static{
       data => data.map(static::stripMetadata).toArray(),
       metadata => metadata,
@@ -289,7 +289,11 @@ base class IFixedDir<T: frozen, RowRepresentation: frozen> protected {
     this.getIterSourceKey(source, key).collect(Array)
   }
 
-  static fun computeTags(
+  protected static fun computeTags(array: mutable Vector<FixedRow<T>>): void {
+    _: TickRange = static::computeTags_(array, 0, array.size() - 1);
+  }
+
+  private static fun computeTags_(
     array: mutable Vector<FixedRow<T>>,
     i: Int,
     j: Int,
@@ -300,8 +304,8 @@ base class IFixedDir<T: frozen, RowRepresentation: frozen> protected {
     pivot = i + (j - i) / 2;
     elt = array[pivot];
     tag = elt.tag;
-    right = static::computeTags(array, pivot + 1, j);
-    left = static::computeTags(array, i, pivot - 1);
+    right = static::computeTags_(array, pivot + 1, j);
+    left = static::computeTags_(array, i, pivot - 1);
     !tag.max = max(tag.max, max(left.max, right.max));
     array![pivot] = elt with {tag};
     tag
