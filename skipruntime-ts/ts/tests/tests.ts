@@ -808,9 +808,9 @@ tests.push({
 });
 
 class MockExternal implements ExternalCall<number, string, TJSON> {
-  async call(key: number, timestamp: number) {
-    await timeout(1000 * key); // wait for `key` seconds before returning
-    return { payload: "mock_result(" + key + ")" };
+  async call(key: number, _timestamp: number) {
+    await timeout(2000 * key); // wait for `key` seconds before returning
+    return { payload: `mock_result(${key.toString()})` };
   }
 }
 
@@ -818,7 +818,8 @@ class TestCheckExternalResult extends ValueMapper<number, number, string> {
   constructor(private asyncLazy: AsyncLazyCollection<number, string, TJSON>) {
     super();
   }
-  mapValue(value: number, key: number): string {
+
+  mapValue(_value: number, key: number): string {
     const asyncRes = this.asyncLazy.getOne(key);
     if (asyncRes.status == "success") return `success: ${asyncRes.payload}`;
     if (asyncRes.status == "failure") return `error: ${asyncRes.error}`;
