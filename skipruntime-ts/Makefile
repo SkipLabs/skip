@@ -22,20 +22,22 @@ eslint-config:
 	cd ../eslint-config && npm i
 
 .PHONY: check-src
-check-src: eslint-config
+check-src: eslint-config prelude skjson replication
 	echo "make: Entering directory '${SCRIPT_DIR}/ts'"
 	cd ts && npm install && tsc && npm run lint
 	echo "make: Leaving directory '${SCRIPT_DIR}/ts'"
 
 .PHONY: check-examples
-check-examples: eslint-config
+check-examples: eslint-config prelude skjson replication
+	cd ts && npm i && tsc
 	cd ts/examples && npm install
 	echo "make: Entering directory '${SCRIPT_DIR}/ts/examples'"
 	cd ts/examples && tsc && npm run lint
 	echo "make: Leaving directory '${SCRIPT_DIR}/ts/examples'"
 
 .PHONY: check-tests
-check-tests: eslint-config
+check-tests: eslint-config prelude skjson replication
+	cd ts && npm i && tsc
 	cd ts/tests && npm install && tsc && npm run lint
 
 .PHONY: check-all
