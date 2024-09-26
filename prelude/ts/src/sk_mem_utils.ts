@@ -83,7 +83,7 @@ export class MemFS implements FileSystem {
     return this.fileDescrs.has(filename);
   }
 
-  openFile(filename: string, options: Options, mode: int): number {
+  openFile(filename: string, options: Options, _mode: int): number {
     let existing = this.fileDescrs.get(filename);
     if (existing != undefined) {
       if (options.create && options.create_new) {

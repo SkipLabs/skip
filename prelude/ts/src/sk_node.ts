@@ -7,7 +7,6 @@ import * as util from "util";
 import * as perf_hooks from "perf_hooks";
 import * as crypto from "crypto";
 import { Worker } from "worker_threads";
-import { WebSocket } from "ws";
 
 class WrkImpl implements Wrk {
   worker: Worker;
@@ -97,7 +96,7 @@ class Env implements Environment {
     this.createSocket = (uri: string) => new WebSocket(uri);
     this.createWorker = (url: URL, options?: WorkerOptions) =>
       WrkImpl.fromPath(url, options);
-    this.createWorkerWrapper = (worker: Worker) => {
+    this.createWorkerWrapper = (_worker: Worker) => {
       throw new Error("Not implemented");
     };
     this.crypto = () => crypto as Crypto;

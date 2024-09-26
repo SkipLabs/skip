@@ -1,4 +1,3 @@
-
 SHELL := /bin/bash
 
 SKARGO_PROFILE?=release

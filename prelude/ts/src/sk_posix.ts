@@ -59,7 +59,7 @@ class LinksImpl implements Links, ToWasm {
     this.fs = environment.fs();
   }
 
-  complete = (utils: Utils, exports: object) => {
+  complete = (utils: Utils, _exports: object) => {
     this.SKIP_check_if_file_exists = (skPath) => {
       return this.fs.exists(utils.importString(skPath));
     };

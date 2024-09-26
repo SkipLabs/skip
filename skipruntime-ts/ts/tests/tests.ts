@@ -1186,14 +1186,14 @@ units.push({ name: "testTimedQueue", run: testTimedQueue });
 //// Run
 
 function run(t: Test) {
-  test(t.name, async ({ page }) => {
+  test(t.name, async () => {
     const [runtime, replication] = await initService(t.service, createSKStore);
     await t.run(runtime, replication);
   });
 }
 
 function unit(t: UnitTest) {
-  test(t.name, async ({ page }) => {
+  test(t.name, async () => {
     await t.run();
   });
 }
