@@ -976,26 +976,28 @@ mutable class Context{
         throw DirAlreadyExists(dirName);
       }
     );
-    !content = content.sortedBy(x ~> x.i0);
     vector: mutable Vector<FixedRow<Array<File>>> = mutable Vector[];
     time = this.timeStamp();
-    tick = this.tick;
 
     n = content.size();
-    i = 0;
-    while (i < n) {
-      (key, values) = content[i];
-      !i = i + 1;
-      if (i < n && content[i].i0 == key) {
-        valueAcc = Vector::mcreateFromItems(values);
-        do {
-          valueAcc.extend(content[i].i1);
-          !i = i + 1;
-        } while (i < n && content[i].i0 == key);
-        !values = valueAcc.toArray();
+    if (n > 0) {
+      tickRange = TickRange::create(this.tick);
+      !content = content.sortedBy(x ~> x.i0);
+      i = 0;
+      while (i < n) {
+        (key, values) = content[i];
+        !i = i + 1;
+        if (i < n && content[i].i0 == key) {
+          valueAcc = Vector::mcreateFromItems(values);
+          do {
+            valueAcc.extend(content[i].i1);
+            !i = i + 1;
+          } while (i < n && content[i].i0 == key);
+          !values = valueAcc.toArray();
+        };
+        source = Path::create(dirName, key);
+        vector.push(FixedRow(key, values, source, tickRange));
       };
-      source = Path::create(dirName, key);
-      vector.push(FixedRow(key, values, source, TickRange::create(tick)));
     };
     fixedData = FixedDataMap::create(vector);
 
