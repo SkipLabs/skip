@@ -585,10 +585,7 @@ mutable class Context{
   }
 
   readonly fun currentArrow(): ?ArrowKey {
-    this.arrowStack match {
-    | List.Nil() -> None()
-    | List.Cons(x, _) -> Some(x)
-    }
+    this.arrowStack.maybeHead()
   }
 
   readonly fun getDeps(path: Path): SortedSet<ArrowKey> {
