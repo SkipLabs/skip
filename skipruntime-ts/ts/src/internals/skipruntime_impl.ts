@@ -558,6 +558,7 @@ export class SkipRuntimeImpl implements SkipRuntime {
     value: V[],
   ): Promise<void> {
     const collection = this.writables[collectionName];
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (!collection) {
       throw new UnknownCollectionError(
         `Collection ${collectionName} not found`,
@@ -571,6 +572,7 @@ export class SkipRuntimeImpl implements SkipRuntime {
     values: Entry<K, V>[],
   ): Promise<void> {
     const collection = this.writables[collectionName];
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (!collection) {
       throw new UnknownCollectionError(
         `Collection ${collectionName} not found`,
@@ -581,6 +583,7 @@ export class SkipRuntimeImpl implements SkipRuntime {
 
   async delete(collectionName: string, key: string): Promise<void> {
     const collection = this.writables[collectionName];
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (!collection) {
       throw new UnknownCollectionError(
         `Collection ${collectionName} not found`,

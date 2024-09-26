@@ -6,7 +6,7 @@ import type {
 } from "skip-runtime";
 import { SkipRESTRuntime } from "skip-runtime";
 import { createInterface } from "readline";
-import { connect, Protocol, type Client } from "skipruntime-replication-client";
+import { connect, Protocol, Client } from "skipruntime-replication-client";
 
 export interface ClientDefinition {
   port: number;
