@@ -39,6 +39,9 @@ check-all: check-src check-tests
 
 .PHONY: build
 build: tsconfig prelude skjson skdate
+	cd ../prelude/ts && npm i && tsc
+	cd ../skjson/ts && npm i && tsc
+	cd ../skdate/ts && npm i && tsc
 	cd ts && npm i && npm run build
 
 .PHONY: clean
