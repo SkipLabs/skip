@@ -395,7 +395,8 @@ class DataMap{
     DataMap{}
   }
 
-  fun set(tickRange: TickRange, key: Key, value: DataMapValue): this {
+  fun set(tick: Tick, key: Key, value: DataMapValue): this {
+    tickRange = TickRange::create(tick);
     if (value.map.isEmpty()) {
       if (this.data.containsKey(key)) {
         !this.data = this.data.remove(key)
@@ -1769,8 +1770,7 @@ class EagerDir{
     ).next() is Some _;
     !map = map.set(context.tick, isMasking, origSource, writer, rvalues);
 
-    tag = TickRange::create(context.tick);
-    !this.data = this.data.set(tag, k, map);
+    !this.data = this.data.set(context.tick, k, map);
 
     reducer = this.reducer match {
     | None() -> None()
