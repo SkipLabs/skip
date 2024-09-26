@@ -46,7 +46,6 @@ base class FixedData<T> {
   fun getArraySourceKey(source: Path, key: Key): Array<T>;
   fun getIterSourceKey(source: Path, key: Key): mutable Iterator<T>;
   fun getChangesAfter(tick: Tick): SortedSet<Key>;
-  fun getTick(): ?Tick;
   fun iterator(): mutable Iterator<FixedRow<T>>;
 }
 
@@ -372,16 +371,6 @@ base class IFixedDir<T: frozen, RowRepresentation: frozen> protected {
     acc = mutable Vector[];
     this.getKeyChangesAfter(limit, key, 0, this.data.size() - 1, acc);
     acc.iterator()
-  }
-
-  fun getTick(): ?Tick {
-    if (this.data.isEmpty()) {
-      None()
-    } else {
-      middle = (this.data.size() - 1) / 2;
-      tickRange = this.decode(this.data[middle]).tag;
-      Some(tickRange.max)
-    }
   }
 }
 
