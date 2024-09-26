@@ -3,7 +3,7 @@ import type { Storage, PagedMemory } from "./skdb_types.js";
 function makeSKDBStore(
   dbName: string,
   storeName: string,
-  version: number,
+  _version: number,
   memory: PagedMemory,
 ): Promise<IDBDatabase> {
   if (typeof indexedDB === "undefined") {
@@ -81,14 +81,14 @@ export class IDBStorage implements Storage {
       return new Promise((resolve, _) => resolve(true));
     }
     let storeName = this.storeName;
-    return new Promise((resolve, reject) =>
+    return new Promise((resolve, _reject) =>
       (async () => {
         if (this.db == null) {
           resolve(true);
         }
         let db = this.db!;
         let tx = db.transaction(storeName, "readwrite");
-        tx.onabort = (err) => {
+        tx.onabort = (_err) => {
           resolve(false);
         };
         tx.onerror = (err) => {
@@ -127,7 +127,7 @@ export function clear(dbName: string, storeName: string): Promise<void> {
 
     open.onupgradeneeded = function () {
       let db = open.result;
-      let store = db.createObjectStore(storeName, { keyPath: "pageid" });
+      db.createObjectStore(storeName, { keyPath: "pageid" });
     };
 
     open.onsuccess = function () {

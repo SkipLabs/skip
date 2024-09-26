@@ -5,7 +5,6 @@ import type {
   Links,
   ToWasmManager,
   Utils,
-  Shared,
 } from "std";
 import type * as Internal from "std/internal.js";
 import type {
@@ -205,7 +204,7 @@ class SKDBSharedImpl implements SKDBShared {
     this.notify = notify;
   }
 
-  async create(dbName?: string, asWorker?: boolean) {
+  async create(dbName?: string, _asWorker?: boolean) {
     let skdbSync = await this.createSync(dbName);
     return new SKDBImpl(skdbSync);
   }
