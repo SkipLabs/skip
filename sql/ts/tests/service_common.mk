@@ -11,7 +11,7 @@ MAKEFLAGS += --no-print-directory
 REAL_DIR=$(shell realpath $(ROOT_DIR))
 SDKMAN_INIT=$(SDKMAN_DIR)/bin/sdkman-init.sh
 SKDB_CMD=$(REAL_DIR)/target/host/release/skdb
-SKDB_DATABASES=$(SRV_DIR)/dbs
+SKDB_DATABASES=$(SRV_DIR)/build/dbs
 
 default: install
 

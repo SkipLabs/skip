@@ -1,7 +1,6 @@
 import { type ModuleInit } from "std";
 import { createOnThisThread } from "./skdb_create.js";
-import { onWorkerMessage } from "std/worker.js";
-import type { Creator } from "std/worker.js";
+import { onWorkerMessage, type Creator } from "std/worker.js";
 import type { SKDB } from "./skdb.js";
 
 import { init as runtimeInit } from "std/runtime.js";
