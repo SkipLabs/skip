@@ -58,10 +58,10 @@ class Env implements Environment {
   name() {
     return "node";
   }
-  fetch(url: URL) {
+  fetch(url: URL | string) {
     let filename: string | URL;
     const cwd = process.cwd();
-    if (url && url.pathname) {
+    if (url && url instanceof URL && url.pathname) {
       filename = "./" + path.relative(cwd, url.pathname);
       // @ts-ignore
     } else if (url && url.default) {

@@ -1,17 +1,21 @@
 import { test, expect } from "@playwright/test";
-import { tests } from "./tests";
+import { tests, type Test } from "./tests";
 import { createSkdb, SKDB } from "skdb";
 
-function run(t, asWorker: boolean) {
+function run(t: Test, asWorker: boolean) {
   test(t.name, async () => {
-    let skdb = await createSkdb({ asWorker: asWorker });
-    let res = await t.fun(skdb);
+    const skdb = await createSkdb({ asWorker: asWorker });
+    const res = await t.fun(skdb);
     t.check(res);
   });
 }
 
-tests(false).forEach((t) => run(t, false));
-tests(true).forEach((t) => run(t, true));
+tests(false).forEach((t) => {
+  run(t, false);
+});
+tests(true).forEach((t) => {
+  run(t, true);
+});
 
 const N = 765000; // we should be able to process this many rows without running out of address space
 
@@ -32,7 +36,7 @@ run(
         rows.push(`1\t${i},1,${i},read-write`);
       }
       rows.push(":10");
-
+      /* eslint-disable-next-line @typescript-eslint/no-unsafe-call */
       (skdb as any).skdbSync.runLocal(["write-csv"], rows.join("\n") + "\n");
 
       return await skdb.exec("select count(*) as n from no_pk_inserts");

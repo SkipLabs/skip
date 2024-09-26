@@ -1,19 +1,26 @@
 import { expect } from "@playwright/test";
 import { SKDB, SKDBTable } from "skdb";
 
-type Test = {
+export type Test = {
   name: string;
   fun: (skdb: SKDB) => Promise<any>;
   check: (res: any) => void;
 };
+
+type WType =
+  | { init: SKDBTable }
+  | {
+      added: SKDBTable;
+      deleted: SKDBTable;
+    };
 
 function n(name: string, asWorker: boolean) {
   if (asWorker) return name + " in Worker";
   return name;
 }
 
-const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
-  let wn = (name: string, asWorker: boolean) => {
+function watchTests(asWorker: boolean): Test[] {
+  const wn = (name: string, asWorker: boolean) => {
     return n("Watch: " + name, asWorker);
   };
   return [
@@ -21,17 +28,17 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
       name: wn("Test on empty table", asWorker),
       fun: async (skdb: SKDB) => {
         await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
-        let result: Array<any> = [];
-        let handle = await skdb.watch(
+        const result: SKDBTable[] = [];
+        const handle = await skdb.watch(
           "SELECT * FROM t1;",
           {},
-          (changes: Array<any>) => result.push(changes),
+          (changes: SKDBTable) => result.push(changes),
         );
         await handle.close();
         return result;
       },
       check: (res) => {
-        let expected = [[]];
+        const expected = [[]];
         expect(res).toEqual(expected);
       },
     },
@@ -43,11 +50,11 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
       fun: async (skdb: SKDB) => {
         await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
-        let result: Array<any> = [];
-        let handle = await skdb.watch(
+        const result: SKDBTable[] = [];
+        const handle = await skdb.watch(
           "SELECT * FROM t1;",
           {},
-          (changes: Array<any>) => result.push(changes),
+          (changes: SKDBTable) => result.push(changes),
         );
         await skdb.insert("t1", [14, "bar", 44.5]);
         await handle.close();
@@ -55,7 +62,7 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
         return result;
       },
       check: (res) => {
-        let expected = [
+        const expected = [
           [{ a: 13, b: "9", c: 42.1 }],
           [
             { a: 13, b: "9", c: 42.1 },
@@ -73,11 +80,11 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
       fun: async (skdb: SKDB) => {
         await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
-        let result: Array<any> = [];
-        let handle = await skdb.watch(
+        const result: SKDBTable[] = [];
+        const handle = await skdb.watch(
           "SELECT * FROM t1;",
           {},
-          (changes: Array<any>) => result.push(changes),
+          (changes: SKDBTable) => result.push(changes),
         );
         await skdb.exec("update t1 set b = 'foo' where a = 13");
         await handle.close();
@@ -100,11 +107,11 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
         await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
         await skdb.insert("t1", [14, "9", 42.1]);
-        let result: Array<any> = [];
-        let handle = await skdb.watch(
+        const result: SKDBTable[] = [];
+        const handle = await skdb.watch(
           "SELECT * FROM t1;",
           {},
-          (changes: Array<any>) => result.push(changes),
+          (changes: SKDBTable) => result.push(changes),
         );
         await skdb.exec("delete from t1 where a = 13");
         await handle.close();
@@ -129,11 +136,11 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
         await skdb.insert("t1", [14, "9", 42.1]);
         await skdb.insert("t1", [15, "9", 42.1]);
         await skdb.insert("t1", [16, "9", 42.1]);
-        let result: Array<any> = [];
-        let handle = await skdb.watch(
+        const result: SKDBTable[] = [];
+        const handle = await skdb.watch(
           "SELECT * FROM t1 WHERE a > 13;",
           {},
-          (changes: Array<any>) => result.push(changes),
+          (changes: SKDBTable) => result.push(changes),
         );
         // update all 4 rows. we're checking this doesn't result in 16
         // objects built in js.
@@ -165,8 +172,8 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
       fun: async (skdb: SKDB) => {
         await skdb.exec("CREATE TABLE t1 (a INTEGER, b INTEGER, c INTEGER);");
         await skdb.insert("t1", [13, 9, 42]);
-        let result: Array<any> = [];
-        let handle = await skdb.watch(
+        const result: SKDBTable[] = [];
+        const handle = await skdb.watch(
           "SELECT * FROM t1 where a = 13 or a = 14;",
           {},
           (changes) => {
@@ -195,8 +202,8 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
       fun: async (skdb: SKDB) => {
         await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
-        let result: Array<any> = [];
-        let handle = await skdb.watch(
+        const result: SKDBTable[] = [];
+        const handle = await skdb.watch(
           "SELECT * FROM t1 where a = 13 or a = 14;",
           {},
           (changes) => {
@@ -224,8 +231,8 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
         await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
         await skdb.insert("t1", [14, "9", 42.1]);
-        let result: Array<any> = [];
-        let handle = await skdb.watch(
+        const result: SKDBTable[] = [];
+        const handle = await skdb.watch(
           "SELECT * FROM t1 where a = 13 or a = 14;",
           {},
           (changes) => {
@@ -264,8 +271,8 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
             "insert into todos values (3, 'foo', 0);",
           ].join("\n"),
         );
-        let result: Array<any> = [];
-        let handle = await skdb.watch(
+        const result: SKDBTable[] = [];
+        const handle = await skdb.watch(
           "select completed, count(*) as n from (select * from todos where id > 0) group by completed",
           {},
           (changes) => {
@@ -301,8 +308,8 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
             "insert into test values (0, 'foo', 1.2, 42);",
           ].join("\n"),
         );
-        let result: Array<any> = [];
-        let handle = await skdb.watch(
+        const result: SKDBTable[] = [];
+        const handle = await skdb.watch(
           "select w from test where x = @x and y = @y and z = @zed",
           new Map<string, string | number>([
             ["x", 0],
@@ -330,8 +337,8 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
             "insert into test values (0, 'foo', 1.2, 42);",
           ].join("\n"),
         );
-        let result: Array<any> = [];
-        let handle = await skdb.watch(
+        const result: SKDBTable[] = [];
+        const handle = await skdb.watch(
           "select w from test where x = @x and y = @y and z = @zed",
           { x: 0, y: "foo", zed: 1.2 },
           (changes) => {
@@ -354,7 +361,7 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
       fun: async (skdb: SKDB) => {
         await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
-        let result: Array<any> = [];
+        const result: SKDBTable[] = [];
         let handle = await skdb.watch(
           "SELECT * FROM t1 where a = 13;",
           {},
@@ -387,11 +394,11 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
       fun: async (skdb: SKDB) => {
         await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
-        let result: Array<any> = [];
+        const result: SKDBTable[] = [];
         let handle = await skdb.watch(
           "SELECT * FROM t1 where a = @a;",
           { a: 13 },
-          (changes) => {
+          (changes: SKDBTable) => {
             result.push(changes);
           },
         );
@@ -400,7 +407,7 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
         handle = await skdb.watch(
           "SELECT * FROM t1 where a = @a;",
           { a: 14 },
-          (changes) => {
+          (changes: SKDBTable) => {
             result.push(changes);
           },
         );
@@ -430,17 +437,17 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
         await skdb.insert("t1", [13, "9", 42.1]);
         await skdb.insert("t2", [13, "9", 42.1]);
 
-        let result1: Array<any> = [];
-        let result2: Array<any> = [];
+        const result1: SKDBTable[] = [];
+        const result2: SKDBTable[] = [];
 
-        let handle1 = await skdb.watch(
+        const handle1 = await skdb.watch(
           "SELECT * FROM t1 where a = @a;",
           { a: 13 },
           (changes) => {
             result1.push(changes);
           },
         );
-        let handle2 = await skdb.watch(
+        const handle2 = await skdb.watch(
           "SELECT * FROM t2 where a = @a;",
           { a: 13 },
           (changes) => {
@@ -473,17 +480,17 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
         await skdb.insert("t1", [13, "9", 42.1]);
         await skdb.insert("t1", [15, "9", 42.1]);
 
-        let result1: Array<any> = [];
-        let result2: Array<any> = [];
+        const result1: SKDBTable[] = [];
+        const result2: SKDBTable[] = [];
 
-        let handle1 = await skdb.watch(
+        const handle1 = await skdb.watch(
           "SELECT * FROM t1 where a < @a;",
           { a: 15 },
           (changes) => {
             result1.push(changes);
           },
         );
-        let handle2 = await skdb.watch(
+        const handle2 = await skdb.watch(
           "SELECT * FROM t1 where a > @a;",
           { a: 13 },
           (changes) => {
@@ -516,17 +523,17 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
         await skdb.insert("t1", [14, "9", 42.1]);
         await skdb.insert("t1", [15, "9", 42.1]);
 
-        let result1: Array<any> = [];
-        let result2: Array<any> = [];
+        const result1: SKDBTable[] = [];
+        const result2: SKDBTable[] = [];
 
-        let handle1 = await skdb.watch(
+        const handle1 = await skdb.watch(
           "SELECT * FROM t1 where a < @a;",
           { a: 15 },
           (changes) => {
             result1.push(changes);
           },
         );
-        let handle2 = await skdb.watch(
+        const handle2 = await skdb.watch(
           "SELECT * FROM t1 where a > @a;",
           { a: 13 },
           (changes) => {
@@ -567,12 +574,10 @@ const watchTests: (asWorker: boolean) => Test[] = (asWorker: boolean) => {
       },
     },
   ];
-};
+}
 
-const watchChangesTests: (asWorker: boolean) => Test[] = (
-  asWorker: boolean,
-) => {
-  let wn = (name: string, asWorker: boolean) => {
+function watchChangesTests(asWorker: boolean): Test[] {
+  const wn = (name: string, asWorker: boolean) => {
     return n("WatchChanges: " + name, asWorker);
   };
   return [
@@ -580,22 +585,22 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
       name: wn("Test on empty table", asWorker),
       fun: async (skdb: SKDB) => {
         await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
-        let result: Array<any> = [];
-        let handle = await skdb.watchChanges(
+        const result: WType[] = [];
+        const handle = await skdb.watchChanges(
           "SELECT * FROM t1;",
           {},
-          (rows: Array<any>) => {
-            result.push({ init: rows });
+          (init: SKDBTable) => {
+            result.push({ init });
           },
-          (added: Array<any>, deleted: Array<any>) => {
-            result.push({ added: added, deleted: deleted });
+          (added: SKDBTable, deleted: SKDBTable) => {
+            result.push({ added, deleted });
           },
         );
         await handle.close();
         return result;
       },
       check: (res) => {
-        let expected = [{ init: [] }];
+        const expected = [{ init: [] }];
         expect(res).toEqual(expected);
       },
     },
@@ -607,15 +612,15 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
       fun: async (skdb: SKDB) => {
         await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
-        let result: Array<any> = [];
-        let handle = await skdb.watchChanges(
+        const result: WType[] = [];
+        const handle = await skdb.watchChanges(
           "SELECT * FROM t1;",
           {},
-          (rows: Array<any>) => {
-            result.push({ init: rows });
+          (init: SKDBTable) => {
+            result.push({ init });
           },
-          (added: Array<any>, deleted: Array<any>) => {
-            result.push({ added: added, deleted: deleted });
+          (added: SKDBTable, deleted: SKDBTable) => {
+            result.push({ added, deleted });
           },
         );
         await skdb.insert("t1", [14, "bar", 44.5]);
@@ -624,7 +629,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
         return result;
       },
       check: (res) => {
-        let expected = [
+        const expected = [
           {
             init: [{ a: 13, b: "9", c: 42.1 }],
           },
@@ -644,15 +649,15 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
       fun: async (skdb: SKDB) => {
         await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
-        let result: Array<any> = [];
-        let handle = await skdb.watchChanges(
+        const result: WType[] = [];
+        const handle = await skdb.watchChanges(
           "SELECT * FROM t1;",
           {},
-          (rows: Array<any>) => {
-            result.push({ init: rows });
+          (init: SKDBTable) => {
+            result.push({ init });
           },
-          (added: Array<any>, deleted: Array<any>) => {
-            result.push({ added: added, deleted: deleted });
+          (added: SKDBTable, deleted: SKDBTable) => {
+            result.push({ added, deleted });
           },
         );
         await skdb.exec("update t1 set b = 'foo' where a = 13");
@@ -661,7 +666,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
         return result;
       },
       check: (res) => {
-        let expected = [
+        const expected = [
           {
             init: [{ a: 13, b: "9", c: 42.1 }],
           },
@@ -682,15 +687,15 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
         await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
         await skdb.insert("t1", [14, "9", 42.1]);
-        let result: Array<any> = [];
-        let handle = await skdb.watchChanges(
+        const result: WType[] = [];
+        const handle = await skdb.watchChanges(
           "SELECT * FROM t1;",
           {},
-          (rows: Array<any>) => {
-            result.push({ init: rows });
+          (init) => {
+            result.push({ init });
           },
-          (added: Array<any>, deleted: Array<any>) => {
-            result.push({ added: added, deleted: deleted });
+          (added, deleted) => {
+            result.push({ added, deleted });
           },
         );
         await skdb.exec("delete from t1 where a = 13");
@@ -699,7 +704,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
         return result;
       },
       check: (res) => {
-        let expected = [
+        const expected = [
           {
             init: [
               { a: 13, b: "9", c: 42.1 },
@@ -722,15 +727,15 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
         await skdb.insert("t1", [14, "9", 42.1]);
         await skdb.insert("t1", [15, "9", 42.1]);
         await skdb.insert("t1", [16, "9", 42.1]);
-        let result: Array<any> = [];
-        let handle = await skdb.watchChanges(
+        const result: WType[] = [];
+        const handle = await skdb.watchChanges(
           "SELECT * FROM t1 WHERE a > 13;",
           {},
-          (rows: Array<any>) => {
-            result.push({ init: rows });
+          (init) => {
+            result.push({ init });
           },
-          (added: Array<any>, deleted: Array<any>) => {
-            result.push({ added: added, deleted: deleted });
+          (added, deleted) => {
+            result.push({ added, deleted });
           },
         );
         // update all 4 rows. we're checking this doesn't result in 16
@@ -741,7 +746,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
         return result;
       },
       check: (res) => {
-        let expected = [
+        const expected = [
           {
             init: [
               { a: 14, b: "9", c: 42.1 },
@@ -773,15 +778,15 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
       fun: async (skdb: SKDB) => {
         await skdb.exec("CREATE TABLE t1 (a INTEGER, b INTEGER, c INTEGER);");
         await skdb.insert("t1", [13, 9, 42]);
-        let result: Array<any> = [];
-        let handle = await skdb.watchChanges(
+        const result: WType[] = [];
+        const handle = await skdb.watchChanges(
           "SELECT * FROM t1 where a = 13 or a = 14;",
           {},
-          (rows: Array<any>) => {
-            result.push({ init: rows });
+          (init) => {
+            result.push({ init });
           },
-          (added: Array<any>, deleted: Array<any>) => {
-            result.push({ added: added, deleted: deleted });
+          (added, deleted) => {
+            result.push({ added, deleted });
           },
         );
         await skdb.insert("t1", [14, 9, 44]);
@@ -790,7 +795,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
         return result;
       },
       check: (res) => {
-        let expected = [
+        const expected = [
           {
             init: [{ a: 13, b: 9, c: 42 }],
           },
@@ -810,15 +815,15 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
       fun: async (skdb: SKDB) => {
         await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
-        let result: Array<any> = [];
-        let handle = await skdb.watchChanges(
+        const result: WType[] = [];
+        const handle = await skdb.watchChanges(
           "SELECT * FROM t1 where a = 13 or a = 14;",
           {},
-          (rows: Array<any>) => {
-            result.push({ init: rows });
+          (init: SKDBTable) => {
+            result.push({ init });
           },
-          (added: Array<any>, deleted: Array<any>) => {
-            result.push({ added: added, deleted: deleted });
+          (added: SKDBTable, deleted: SKDBTable) => {
+            result.push({ added, deleted });
           },
         );
         await skdb.exec("update t1 set b = 'foo' where a = 13");
@@ -827,7 +832,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
         return result;
       },
       check: (res) => {
-        let expected = [
+        const expected = [
           {
             init: [{ a: 13, b: "9", c: 42.1 }],
           },
@@ -848,14 +853,14 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
         await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
         await skdb.insert("t1", [14, "9", 42.1]);
-        let result: Array<any> = [];
-        let handle = await skdb.watchChanges(
+        const result: WType[] = [];
+        const handle = await skdb.watchChanges(
           "SELECT * FROM t1 where a = 13 or a = 14;",
           {},
-          (rows: Array<any>) => {
+          (rows: SKDBTable) => {
             result.push({ init: rows });
           },
-          (added: Array<any>, deleted: Array<any>) => {
+          (added: SKDBTable, deleted: SKDBTable) => {
             result.push({ added: added, deleted: deleted });
           },
         );
@@ -865,7 +870,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
         return result;
       },
       check: (res) => {
-        let expected = [
+        const expected = [
           {
             init: [
               { a: 13, b: "9", c: 42.1 },
@@ -897,15 +902,15 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
             "insert into todos values (3, 'foo', 0);",
           ].join("\n"),
         );
-        let result: Array<any> = [];
-        let handle = await skdb.watchChanges(
+        const result: WType[] = [];
+        const handle = await skdb.watchChanges(
           "select completed, count(*) as n from (select * from todos where id > 0) group by completed",
           {},
-          (rows: Array<any>) => {
-            result.push({ init: rows });
+          (init: SKDBTable) => {
+            result.push({ init });
           },
-          (added: Array<any>, deleted: Array<any>) => {
-            result.push({ added: added, deleted: deleted });
+          (added: SKDBTable, deleted: SKDBTable) => {
+            result.push({ added, deleted });
           },
         );
         await skdb.exec("insert into todos values (4, 'foo', 1);");
@@ -915,7 +920,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
         return result;
       },
       check: (res) => {
-        let expected = [
+        const expected = [
           {
             init: [
               { completed: 0, n: 2 },
@@ -939,19 +944,19 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
             "insert into test values (0, 'foo', 1.2, 42);",
           ].join("\n"),
         );
-        let result: Array<any> = [];
-        let handle = await skdb.watchChanges(
+        const result: WType[] = [];
+        const handle = await skdb.watchChanges(
           "select w from test where x = @x and y = @y and z = @zed",
           new Map<string, string | number>([
             ["x", 0],
             ["y", "foo"],
             ["zed", 1.2],
           ]),
-          (rows: Array<any>) => {
-            result.push({ init: rows });
+          (init: SKDBTable) => {
+            result.push({ init });
           },
-          (added: Array<any>, deleted: Array<any>) => {
-            result.push({ added: added, deleted: deleted });
+          (added: SKDBTable, deleted: SKDBTable) => {
+            result.push({ added, deleted });
           },
         );
         await skdb.exec("update test set w = 21 where y = 'foo';");
@@ -959,7 +964,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
         return result;
       },
       check: (res) => {
-        let expected = [
+        const expected = [
           {
             init: [{ w: 42 }],
           },
@@ -980,16 +985,16 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
             "insert into test values (0, 'foo', 1.2, 42);",
           ].join("\n"),
         );
-        let result: Array<any> = [];
+        const result: WType[] = [];
 
-        let handle = await skdb.watchChanges(
+        const handle = await skdb.watchChanges(
           "select w from test where x = @x and y = @y and z = @zed",
           { x: 0, y: "foo", zed: 1.2 },
-          (rows: Array<any>) => {
-            result.push({ init: rows });
+          (init: SKDBTable) => {
+            result.push({ init });
           },
-          (added: Array<any>, deleted: Array<any>) => {
-            result.push({ added: added, deleted: deleted });
+          (added: SKDBTable, deleted: SKDBTable) => {
+            result.push({ added, deleted });
           },
         );
         await skdb.exec("update test set w = 21 where y = 'foo';");
@@ -997,7 +1002,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
         return result;
       },
       check: (res) => {
-        let expected = [
+        const expected = [
           {
             init: [{ w: 42 }],
           },
@@ -1017,15 +1022,15 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
       fun: async (skdb: SKDB) => {
         await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
-        let result: Array<any> = [];
+        const result: WType[] = [];
         let handle = await skdb.watchChanges(
           "SELECT * FROM t1 where a = 13;",
           {},
-          (rows: Array<any>) => {
-            result.push({ init: rows });
+          (init: SKDBTable) => {
+            result.push({ init });
           },
-          (added: Array<any>, deleted: Array<any>) => {
-            result.push({ added: added, deleted: deleted });
+          (added: SKDBTable, deleted: SKDBTable) => {
+            result.push({ added, deleted });
           },
         );
         await skdb.insert("t1", [14, "bar", 44.5]);
@@ -1033,10 +1038,10 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
         handle = await skdb.watchChanges(
           "SELECT * FROM t1 where a = 14;",
           {},
-          (rows: Array<any>) => {
+          (rows: SKDBTable) => {
             result.push({ init: rows });
           },
-          (added: Array<any>, deleted: Array<any>) => {
+          (added: SKDBTable, deleted: SKDBTable) => {
             result.push({ added: added, deleted: deleted });
           },
         );
@@ -1045,7 +1050,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
         return result;
       },
       check: (res) => {
-        let expected = [
+        const expected = [
           {
             init: [{ a: 13, b: "9", c: 42.1 }],
           },
@@ -1061,14 +1066,14 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
       fun: async (skdb: SKDB) => {
         await skdb.exec("CREATE TABLE t1 (a INTEGER, b TEXT, c FLOAT);");
         await skdb.insert("t1", [13, "9", 42.1]);
-        let result: Array<any> = [];
+        const result: WType[] = [];
         let handle = await skdb.watchChanges(
           "SELECT * FROM t1 where a = @a;",
           { a: 13 },
-          (rows: Array<any>) => {
+          (rows: SKDBTable) => {
             result.push({ init: rows });
           },
-          (added: Array<any>, deleted: Array<any>) => {
+          (added: SKDBTable, deleted: SKDBTable) => {
             result.push({ added: added, deleted: deleted });
           },
         );
@@ -1077,10 +1082,10 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
         handle = await skdb.watchChanges(
           "SELECT * FROM t1 where a = @a;",
           { a: 14 },
-          (rows: Array<any>) => {
+          (rows: SKDBTable) => {
             result.push({ init: rows });
           },
-          (added: Array<any>, deleted: Array<any>) => {
+          (added: SKDBTable, deleted: SKDBTable) => {
             result.push({ added: added, deleted: deleted });
           },
         );
@@ -1089,7 +1094,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
         return result;
       },
       check: (res) => {
-        let expected = [
+        const expected = [
           {
             init: [{ a: 13, b: "9", c: 42.1 }],
           },
@@ -1115,26 +1120,26 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
         await skdb.insert("t1", [13, "9", 42.1]);
         await skdb.insert("t2", [13, "9", 42.1]);
 
-        let result1: Array<any> = [];
-        let result2: Array<any> = [];
-        let handle1 = await skdb.watchChanges(
+        const result1: WType[] = [];
+        const result2: WType[] = [];
+        const handle1 = await skdb.watchChanges(
           "SELECT * FROM t1 where a = @a;",
           { a: 13 },
-          (rows: Array<any>) => {
-            result1.push({ init: rows });
+          (init) => {
+            result1.push({ init });
           },
-          (added: Array<any>, deleted: Array<any>) => {
-            result1.push({ added: added, deleted: deleted });
+          (added, deleted) => {
+            result1.push({ added, deleted });
           },
         );
-        let handle2 = await skdb.watchChanges(
+        const handle2 = await skdb.watchChanges(
           "SELECT * FROM t2 where a = @a;",
           { a: 13 },
-          (rows: Array<any>) => {
-            result2.push({ init: rows });
+          (init) => {
+            result2.push({ init });
           },
-          (added: Array<any>, deleted: Array<any>) => {
-            result2.push({ added: added, deleted: deleted });
+          (added, deleted) => {
+            result2.push({ added, deleted });
           },
         );
         await skdb.exec("update t1 set b = 'foo';");
@@ -1146,7 +1151,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
         return [result1, result2];
       },
       check: (res) => {
-        let expected = [
+        const expected = [
           [
             {
               init: [{ a: 13, b: "9", c: 42.1 }],
@@ -1179,26 +1184,26 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
         await skdb.insert("t1", [13, "9", 42.1]);
         await skdb.insert("t1", [15, "9", 42.1]);
 
-        let result1: Array<any> = [];
-        let result2: Array<any> = [];
-        let handle1 = await skdb.watchChanges(
+        const result1: WType[] = [];
+        const result2: WType[] = [];
+        const handle1 = await skdb.watchChanges(
           "SELECT * FROM t1 where a < @a;",
           { a: 15 },
-          (rows: Array<any>) => {
-            result1.push({ init: rows });
+          (init) => {
+            result1.push({ init });
           },
-          (added: Array<any>, deleted: Array<any>) => {
-            result1.push({ added: added, deleted: deleted });
+          (added, deleted) => {
+            result1.push({ added, deleted });
           },
         );
-        let handle2 = await skdb.watchChanges(
+        const handle2 = await skdb.watchChanges(
           "SELECT * FROM t1 where a > @a;",
           { a: 13 },
-          (rows: Array<any>) => {
-            result2.push({ init: rows });
+          (init) => {
+            result2.push({ init });
           },
-          (added: Array<any>, deleted: Array<any>) => {
-            result2.push({ added: added, deleted: deleted });
+          (added, deleted) => {
+            result2.push({ added, deleted });
           },
         );
 
@@ -1210,7 +1215,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
         return [result1, result2];
       },
       check: (res) => {
-        let expected = [
+        const expected = [
           [
             {
               init: [{ a: 13, b: "9", c: 42.1 }],
@@ -1244,27 +1249,27 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
         await skdb.insert("t1", [14, "9", 42.1]);
         await skdb.insert("t1", [15, "9", 42.1]);
 
-        let result1: Array<any> = [];
-        let result2: Array<any> = [];
+        const result1: WType[] = [];
+        const result2: WType[] = [];
 
-        let handle1 = await skdb.watchChanges(
+        const handle1 = await skdb.watchChanges(
           "SELECT * FROM t1 where a < @a;",
           { a: 15 },
-          (rows: Array<any>) => {
-            result1.push({ init: rows });
+          (init) => {
+            result1.push({ init });
           },
-          (added: Array<any>, deleted: Array<any>) => {
-            result1.push({ added: added, deleted: deleted });
+          (added, deleted) => {
+            result1.push({ added, deleted });
           },
         );
-        let handle2 = await skdb.watchChanges(
+        const handle2 = await skdb.watchChanges(
           "SELECT * FROM t1 where a > @a;",
           { a: 13 },
-          (rows: Array<any>) => {
-            result2.push({ init: rows });
+          (init) => {
+            result2.push({ init });
           },
-          (added: Array<any>, deleted: Array<any>) => {
-            result2.push({ added: added, deleted: deleted });
+          (added, deleted) => {
+            result2.push({ added, deleted });
           },
         );
 
@@ -1276,7 +1281,7 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
         return [result1, result2];
       },
       check: (res) => {
-        let expected = [
+        const expected = [
           [
             {
               init: [
@@ -1318,10 +1323,10 @@ const watchChangesTests: (asWorker: boolean) => Test[] = (
       },
     },
   ];
-};
+}
 
-const dateTests = (asWorker: boolean) => {
-  let dn = (name: string, asWorker: boolean) => {
+function dateTests(asWorker: boolean): Test[] {
+  const dn = (name: string, asWorker: boolean) => {
     return n("Date: " + name, asWorker);
   };
   return [
@@ -1331,9 +1336,9 @@ const dateTests = (asWorker: boolean) => {
         const res = await skdb.exec(
           "select strftime('%Y-%m-%d', '2023-01-01', '+2 day');",
         );
-        return res.scalarValue();
+        return res.scalarValue() as string;
       },
-      check: (res) => {
+      check: (res: string) => {
         expect(res).toEqual("2023-01-03");
       },
     },
@@ -1343,9 +1348,9 @@ const dateTests = (asWorker: boolean) => {
         const res = await skdb.exec(
           "select strftime('%Y-%m-%d', '2023-01-01', '+2 month');",
         );
-        return res.scalarValue();
+        return res.scalarValue() as string;
       },
-      check: (res) => {
+      check: (res: string) => {
         expect(res).toEqual("2023-03-01");
       },
     },
@@ -1355,9 +1360,9 @@ const dateTests = (asWorker: boolean) => {
         const res = await skdb.exec(
           "select strftime('%s', '1995-01-01 00:00:00+00');",
         );
-        return res.scalarValue();
+        return res.scalarValue() as string;
       },
-      check: (res) => {
+      check: (res: string) => {
         expect(res).toEqual("788918400");
       },
     },
@@ -1367,17 +1372,17 @@ const dateTests = (asWorker: boolean) => {
         const res = await skdb.exec(
           "select strftime('%r', '2023-01-01 10:30:00');",
         );
-        return res.scalarValue();
+        return res.scalarValue() as string;
       },
-      check: (res) => {
+      check: (res: string) => {
         expect(res).toEqual("10:30:00 AM");
       },
     },
   ];
-};
+}
 
 export const tests = (asWorker: boolean) => {
-  let tests = [
+  const tests = [
     {
       name: n("Boolean", asWorker),
       fun: async (skdb: SKDB) => {
@@ -1579,7 +1584,7 @@ export const tests = (asWorker: boolean) => {
         await skdb.insert("t", [1, 2, 3]);
         return skdb.exec("SELECT a + b + c AS my_sum FROM t;");
       },
-      check: (res) => {
+      check: (res: Record<string, unknown>[]) => {
         // browser client tests clobber the prototype of the table returned by
         // skdb.exec in fun, so re-wrap if need be.
         const resTable = res instanceof SKDBTable ? res : new SKDBTable(...res);
@@ -1626,19 +1631,19 @@ export const tests = (asWorker: boolean) => {
       name: n("UTF8", asWorker),
       fun: async (skdb: SKDB) => {
         await skdb.exec("create table t1 (a TEXT);");
-        let objects = [
+        const objects = [
           { data: "x\u2019s re" },
           { data: "y\u2013 1" },
           { data: "z\u00ae b" },
           { data: "\u00c3\u00a9al P" },
           { data: " \u2022 T" },
         ];
-        for (let i in objects) {
-          await skdb.exec("insert into t1 values(@data)", objects[i]);
+        for (const object of objects) {
+          await skdb.exec("insert into t1 values(@data)", object);
         }
         return JSON.stringify(await skdb.exec("select * from t1"));
       },
-      check: (res) => {
+      check: (res: string) => {
         expect(res).toMatch(/x\u2019s re/);
         expect(res).toMatch(/y\u2013 1/);
         expect(res).toMatch(/z\u00ae b/);
@@ -1650,21 +1655,21 @@ export const tests = (asWorker: boolean) => {
       name: n("JSON UTF8", asWorker),
       fun: async (skdb: SKDB) => {
         await skdb.exec("create table t1 (a JSON);");
-        let objects = [
+        const objects = [
           { data: { field1: "x\u2019s re" } },
           { data: { field1: "y\u2013 1" } },
           { data: { field1: "z\u00ae b" } },
           { data: { field1: "\u00c3\u00a9al P" } },
           { data: { field1: " \u2022 T" } },
         ];
-        for (let object of objects) {
+        for (const object of objects) {
           const data = JSON.stringify(object.data);
           await skdb.exec("insert into t1 values(@data)", { data });
         }
         return await skdb.exec("select * from t1");
       },
-      check: (res) => {
-        let all = res.map((x) => x.a.field1).join("");
+      check: (res: { a: { field1: string } }[]) => {
+        const all = res.map((x) => x.a.field1).join("");
         expect(all).toMatch(/x\u2019s re/);
         expect(all).toMatch(/y\u2013 1/);
         expect(all).toMatch(/z\u00ae b/);
@@ -1683,7 +1688,7 @@ export const tests = (asWorker: boolean) => {
         return await skdb.exec("select * from t1");
       },
       check: (res) => {
-        let str = JSON.stringify(res);
+        const str = JSON.stringify(res);
         expect(str).toMatch(/foo/);
         expect(str).toMatch(/bar/);
       },
@@ -1692,7 +1697,7 @@ export const tests = (asWorker: boolean) => {
       name: n("insertMany bulk", asWorker),
       fun: async (skdb: SKDB) => {
         await skdb.exec("create table t1 (a TEXT, b INTEGER);");
-        let values = new Array();
+        const values: { a: string; b: number }[] = [];
         for (let i = 0; i < 2100; i++) {
           values.push({ a: "foo", b: i });
         }

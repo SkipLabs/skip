@@ -55,12 +55,12 @@ class Env implements Environment {
     return "browser";
   }
 
-  fetch(url: URL) {
+  async fetch(url: URL | string) {
     let fUrl;
     if (url instanceof URL) {
       fUrl = url;
     } else {
-      fUrl = new URL((url as any).default, import.meta.url);
+      fUrl = new URL(url, import.meta.url);
     }
     return fetch(fUrl)
       .then((res) => res.arrayBuffer())

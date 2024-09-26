@@ -116,6 +116,7 @@ class Service implements SkipService {
   resources = {
     user: GetUserResource,
   };
+
   async init() {
     const db = await initDB();
     const data = await new Promise<[string, TJSON][]>(function (
