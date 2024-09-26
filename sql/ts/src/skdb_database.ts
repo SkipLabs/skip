@@ -7,6 +7,7 @@ import type {
   Params,
   SKDBSync,
   MirrorDefn,
+  SKDBGroup,
 } from "./skdb_types.js";
 import { SKDBTable } from "./skdb_util.js";
 import { SKDBGroupImpl } from "./skdb_group.js";
@@ -233,21 +234,21 @@ export class SKDBSyncImpl implements SKDBSync {
   };
 
   addParams = (
-    args: Array<string>,
+    args: string[],
     params: Params,
     stdin: string,
-  ): [Array<string>, string] => {
+  ): [string[], string] => {
     if (params instanceof Map) {
       params = Object.fromEntries(params);
     }
-    let args1 = ["--expect-query-params"].concat(args);
-    let stdin1 = JSON.stringify(params) + "\n" + stdin;
+    const args1 = ["--expect-query-params"].concat(args);
+    const stdin1 = JSON.stringify(params) + "\n" + stdin;
     return [args1, stdin1];
   };
 
   exec = (stdin: string, params: Params = new Map()) => {
     return this.runner(() => {
-      let [args1, stdin1] = this.addParams(["--format=js"], params, stdin);
+      const [args1, stdin1] = this.addParams(["--format=js"], params, stdin);
       return this.runLocal(args1, stdin1);
     });
   };
@@ -282,75 +283,71 @@ export class SKDBSyncImpl implements SKDBSync {
     return this.tableSchema(tableName);
   };
 
-  insert = (tableName: string, values: Array<any>) => {
-    let params = new Map();
-    let keys = values.map((val, i) => {
-      let key = "@key" + i;
+  insert = (tableName: string, values: any[]) => {
+    const params = new Map();
+    const keys = values.map((val, i) => {
+      const key = `@key${i.toString()}`;
       params.set(key, val);
       return key;
     });
-    let stdin =
-      "insert into " + tableName + " values (" + keys.join(", ") + ");";
-    let [args1, stdin1] = this.addParams([], params, stdin);
+    const stdin = `insert into ${tableName} values (${keys.join(", ")});`;
+    const [args1, stdin1] = this.addParams([], params, stdin);
     return this.runLocal(args1, stdin1) == "";
   };
 
-  insertMany = (tableName: string, valuesArray: Array<Record<string, any>>) => {
-    let params = new Map();
+  insertMany = (tableName: string, valuesArray: Record<string, object>[]) => {
+    const params = new Map();
     let valueIndex = 0;
     let keyNbr = 0;
 
-    let colTypes = this.tableSchema(tableName)
+    const colTypes = this.tableSchema(tableName)
       .replace(/.*\(/, "")
       .replace(");", "")
       .replace(/\n/g, "")
       .replace(/[ ]+/g, " ")
       .split(",");
 
-    let colNames = colTypes.map((col) => col.split(" ")[1]);
+    const colNames = colTypes.map((col) => col.split(" ")[1]);
 
-    let colIndex = new Map();
-    for (let i in colNames) {
-      colIndex.set(colNames[i], i);
-    }
-
+    const colIndex = new Map<string, number>();
+    colNames.forEach((v, i) => {
+      colIndex.set(v, i);
+    });
     while (valueIndex < valuesArray.length) {
-      let buffer = new Array();
+      const buffer = [];
       buffer.push("insert into " + tableName + " values ");
       for (let roundIdx = 0; roundIdx < 1000; roundIdx++) {
         if (valueIndex >= valuesArray.length) break;
-        let values = new Array();
+        const values: unknown[] = [];
         let valuesSize = 0;
-        let obj = valuesArray[valueIndex];
-        for (let fieldName in obj) {
+        const obj = valuesArray[valueIndex];
+        for (const fieldName in obj) {
           if (!colIndex.has(fieldName)) {
-            return new Error("Field not found: " + fieldName);
+            throw new Error("Field not found: " + fieldName);
           }
-          values[colIndex.get(fieldName)] = obj[fieldName];
+          values[colIndex.get(fieldName)!] = obj[fieldName];
           valuesSize++;
         }
         if (valuesSize < colTypes.length) {
-          let error;
-          colIndex.forEach((_, fieldName) => {
-            if (!obj.hasOwnProperty(fieldName)) {
-              error = new Error("Missing field: " + fieldName);
+          for (const fieldName of Object.values(Object.fromEntries(colIndex))) {
+            if (!obj[fieldName]) {
+              throw new Error(`Missing field: ${fieldName}`);
             }
-          });
-          throw error;
+          }
         }
-        let keys = values.map((val, _) => {
-          let key = "@key" + keyNbr;
+        const keys = values.map((val, _) => {
+          const key = `@key${keyNbr.toString()}`;
           keyNbr++;
           params.set(key, val);
           return key;
         });
         if (roundIdx != 0) buffer.push(",");
-        buffer.push("(" + keys.join(", ") + ")");
+        buffer.push(`(${keys.join(", ")})`);
         valueIndex++;
       }
       buffer.push(";");
-      let [args1, stdin1] = this.addParams([], params, buffer.join(""));
-      let stderr = this.runLocal(args1, stdin1);
+      const [args1, stdin1] = this.addParams([], params, buffer.join(""));
+      const stderr = this.runLocal(args1, stdin1);
       if (stderr != "") {
         throw Error(stderr);
       }
@@ -365,6 +362,7 @@ export class SKDBSyncImpl implements SKDBSync {
     }
     throw new Error(error);
   }
+
   async mirror(...tables: MirrorDefn[]) {
     const is_mirror_def_of = (table: any) => (mirror_def: any) =>
       mirror_def.table === table;
@@ -411,8 +409,14 @@ export class SKDBSyncImpl implements SKDBSync {
 
   createServerDatabase = (dbName: string) =>
     this.connectedRemote!.createDatabase(dbName);
-  createServerUser = () => this.connectedRemote!.createUser();
-  serverClose = () => this.connectedRemote!.close();
+
+  createServerUser() {
+    return this.connectedRemote!.createUser();
+  }
+
+  async serverClose() {
+    await this.connectedRemote!.close();
+  }
 }
 
 export class SKDBImpl implements SKDB {
@@ -424,90 +428,98 @@ export class SKDBImpl implements SKDB {
 
   currentUser?: string;
 
-  async connect(
+  connect(
     db: string,
     accessKey: string,
     privateKey: CryptoKey,
     endpoint?: string,
   ): Promise<void> {
     this.currentUser = accessKey;
-    return this.skdbSync.connect(db, accessKey, privateKey, endpoint);
+    return Promise.resolve(
+      this.skdbSync.connect(db, accessKey, privateKey, endpoint),
+    );
   }
 
-  connectedRemote = async () => {
-    return this.skdbSync.connectedRemote;
-  };
-
-  subscribe = async (viewName: string, f: (change: string) => void) => {
-    return this.skdbSync.subscribe(viewName, f);
-  };
-
-  exec = async (stdin: string, params: Params = new Map()) => {
-    const rows = await this.skdbSync.exec(stdin, params);
-    return new SKDBTable(...rows);
-  };
-
-  async watch(
-    query: string,
-    params: Params,
-    onChange: (rows: SKDBTable) => void,
-  ) {
-    let closable = this.skdbSync.watch(query, params, onChange);
-    return Promise.resolve({ close: () => Promise.resolve(closable.close()) });
+  connectedRemote() {
+    return Promise.resolve(this.skdbSync.connectedRemote);
   }
 
-  async watchChanges(
+  subscribe(viewName: string, f: (change: string) => void) {
+    this.skdbSync.subscribe(viewName, f);
+    return Promise.resolve();
+  }
+
+  exec(stdin: string, params: Params = new Map()) {
+    const rows = this.skdbSync.exec(stdin, params);
+    return Promise.resolve(new SKDBTable(...rows));
+  }
+
+  watch(query: string, params: Params, onChange: (rows: SKDBTable) => void) {
+    const closable = this.skdbSync.watch(query, params, onChange);
+    return Promise.resolve({
+      close: () => {
+        closable.close();
+        return Promise.resolve();
+      },
+    });
+  }
+
+  watchChanges(
     query: string,
     params: Params,
     init: (rows: SKDBTable) => void,
     update: (added: SKDBTable, removed: SKDBTable) => void,
   ) {
-    let closable = this.skdbSync.watchChanges(query, params, init, update);
-    return Promise.resolve({ close: () => Promise.resolve(closable.close()) });
+    const closable = this.skdbSync.watchChanges(query, params, init, update);
+    return Promise.resolve({
+      close: () => {
+        closable.close();
+        return Promise.resolve();
+      },
+    });
   }
 
-  tableSchema = async (tableName: string) => {
-    return this.skdbSync.tableSchema(tableName);
-  };
-
-  viewSchema = async (viewName: string) => {
-    return this.skdbSync.viewSchema(viewName);
-  };
-
-  schema = async (tableName?: string) => {
-    return this.skdbSync.schema(tableName);
-  };
-
-  async insert(tableName: string, values: Array<any>) {
-    return this.skdbSync.insert(tableName, values);
+  tableSchema(tableName: string) {
+    return Promise.resolve(this.skdbSync.tableSchema(tableName));
   }
 
-  async insertMany(tableName: string, valuesArray: Array<Record<string, any>>) {
-    let result = this.skdbSync.insertMany(tableName, valuesArray);
+  viewSchema(viewName: string) {
+    return Promise.resolve(this.skdbSync.viewSchema(viewName));
+  }
+
+  schema(tableName?: string) {
+    return Promise.resolve(this.skdbSync.schema(tableName));
+  }
+
+  insert(tableName: string, values: any[]) {
+    return Promise.resolve(this.skdbSync.insert(tableName, values));
+  }
+
+  insertMany(tableName: string, valuesArray: Record<string, any>[]) {
+    const result = this.skdbSync.insertMany(tableName, valuesArray);
     if (result instanceof Error) {
       throw result;
     }
-    return result;
+    return Promise.resolve(result);
   }
 
-  async mirror(...tables: MirrorDefn[]) {
+  mirror(...tables: MirrorDefn[]) {
     return this.skdbSync.mirror(...tables);
   }
 
-  async closeConnection() {
+  closeConnection() {
     return this.skdbSync.serverClose();
   }
 
-  async save() {
+  save() {
     return this.skdbSync.save();
   }
 
-  // @ts-ignore
-  async createGroup() {
+  createGroup(): Promise<SKDBGroup> {
     return SKDBGroupImpl.create(this);
   }
 
-  async lookupGroup(groupID: string) {
+  lookupGroup(groupID: string): Promise<SKDBGroup | undefined> {
     return SKDBGroupImpl.lookup(this, groupID);
   }
 }

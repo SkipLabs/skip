@@ -173,7 +173,7 @@ export interface Environment {
   fs: () => FileSystem;
   sys: () => System;
   crypto: () => Crypto;
-  fetch: (url: URL) => Promise<Uint8Array>;
+  fetch: (url: URL | string) => Promise<Uint8Array>;
 }
 
 export interface Memory {
@@ -935,7 +935,7 @@ export async function run(
 }
 
 export async function runUrl(
-  getUrl: () => Promise<URL>,
+  getUrl: () => Promise<URL | string>,
   modules: ModuleInit[],
   extensions: EnvInit[],
   main?: string,

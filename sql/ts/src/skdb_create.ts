@@ -8,7 +8,7 @@ export async function createOnThisThread(
   dbName?: string,
   getWasmSource?: () => Promise<Uint8Array>,
 ) {
-  let data = await runUrl(
+  const data = await runUrl(
     getWasmUrl,
     // @ts-ignore
     modules,

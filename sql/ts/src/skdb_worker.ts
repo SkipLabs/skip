@@ -33,11 +33,13 @@ class DbCreator implements Creator<SKDB> {
 
 const creator = new DbCreator();
 
-var post = (message: any) => {
+const post = (message: any) => {
   postMessage(message);
 };
 
-var onMessage = (message: MessageEvent) =>
+const onMessage = (message: MessageEvent) => {
+  /* eslint-disable-next-line @typescript-eslint/no-unsafe-argument */
   onWorkerMessage(message.data, post, creator);
+};
 
 addEventListener("message", onMessage);

@@ -37,8 +37,7 @@ export async function createSkdb(
     disableWarnings?: boolean;
   } = {},
 ): Promise<SKDB> {
-  const asWorker =
-    options.asWorker != undefined ? options.asWorker : !options.getWasmSource;
+  const asWorker = options.asWorker ?? !options.getWasmSource;
   const disableWarnings = options.disableWarnings ?? false;
   if (!asWorker) {
     // @ts-ignore
@@ -57,11 +56,11 @@ export async function createSkdb(
 }
 
 async function createWorker(disableWarnings: boolean, dbName?: string) {
-  let env = await loadEnv([]);
+  const env = await loadEnv([]);
   env.disableWarnings = disableWarnings;
   let worker: Wrk;
   if (isNode()) {
-    let url = new URL("./skdb_nodeworker.js", import.meta.url);
+    const url = new URL("./skdb_nodeworker.js", import.meta.url);
     worker = env.createWorker(url, { type: "module" });
   } else {
     // important that this line looks exactly like this for bundlers to discover the file
@@ -71,7 +70,7 @@ async function createWorker(disableWarnings: boolean, dbName?: string) {
     worker = env.createWorkerWrapper(wrapped);
   }
 
-  let skdb = new SKDBWorker(worker);
+  const skdb = new SKDBWorker(worker);
   await skdb.create(dbName, disableWarnings);
   return skdb;
 }

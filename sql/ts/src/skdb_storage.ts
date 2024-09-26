@@ -10,31 +10,31 @@ function makeSKDBStore(
     throw new Error("No indexedDB in this environment.");
   }
   return new Promise((resolve, reject) => {
-    let open = indexedDB.open(dbName, 1);
+    const open = indexedDB.open(dbName, 1);
 
     open.onupgradeneeded = function () {
-      let db = open.result;
+      const db = open.result;
       db.createObjectStore(storeName, { keyPath: "pageid" });
     };
 
     open.onsuccess = function () {
-      let db = open.result;
-      let tx = db.transaction(storeName, "readwrite");
-      let store = tx.objectStore(storeName);
+      const db = open.result;
+      const tx = db.transaction(storeName, "readwrite");
+      const store = tx.objectStore(storeName);
 
       store.getAll().onsuccess = (event) => {
-        let target = event.target;
+        const target = event.target;
         if (target == null) {
           reject(new Error("Unexpected null target"));
           return;
         }
-        let pages = (
+        const pages = (
           target as unknown as {
-            result: Array<{ pageid: number; content: ArrayBuffer }>;
+            result: { pageid: number; content: ArrayBuffer }[];
           }
         ).result;
         if (pages.length == 0) {
-          memory.init(store.put);
+          memory.init((page) => store.put(page));
         } else {
           memory.restore(pages);
         }
@@ -44,13 +44,13 @@ function makeSKDBStore(
         resolve(db);
       };
 
-      tx.onerror = function (err) {
-        reject(err);
+      tx.onerror = function () {
+        reject(new Error("indexedDB Transaction error"));
       };
     };
 
-    open.onerror = function (err) {
-      reject(err);
+    open.onerror = function () {
+      reject(new Error("indexedDB Open error"));
     };
   });
 }
@@ -72,40 +72,46 @@ export class IDBStorage implements Storage {
     version: number,
     memory: PagedMemory,
   ): Promise<Storage> {
-    let db = await makeSKDBStore(dbName, storeName, version, memory);
+    const db = await makeSKDBStore(dbName, storeName, version, memory);
     return new IDBStorage(storeName, db, memory);
   }
 
   private async storePages(): Promise<boolean> {
     if (this.storeName == null) {
-      return new Promise((resolve, _) => resolve(true));
+      return new Promise((resolve, _) => {
+        resolve(true);
+      });
     }
-    let storeName = this.storeName;
-    return new Promise((resolve, _reject) =>
-      (async () => {
-        if (this.db == null) {
-          resolve(true);
-        }
-        let db = this.db!;
-        let tx = db.transaction(storeName, "readwrite");
-        tx.onabort = (_err) => {
+    const storeName = this.storeName;
+    return new Promise((resolve, _reject) => {
+      if (this.db == null) {
+        resolve(true);
+      }
+      const db = this.db;
+      const tx = db.transaction(storeName, "readwrite");
+      tx.onabort = () => {
+        resolve(false);
+      };
+      tx.onerror = (err) => {
+        console.log("Error sync db: " + JSON.stringify(err));
+        resolve(false);
+      };
+      tx.oncomplete = () => {
+        this.memory.clear();
+        resolve(true);
+      };
+      this.memory
+        .getPages()
+        .then((copiedPages) => {
+          const store = tx.objectStore(storeName);
+          for (const copiedPage of copiedPages) {
+            store.put(copiedPage);
+          }
+        })
+        .catch(() => {
           resolve(false);
-        };
-        tx.onerror = (err) => {
-          console.log("Error sync db: " + err);
-          resolve(false);
-        };
-        tx.oncomplete = () => {
-          this.memory.clear();
-          resolve(true);
-        };
-        let copiedPages = await this.memory.getPages();
-        let store = tx.objectStore(storeName);
-        for (let j = 0; j < copiedPages.length; j++) {
-          store.put(copiedPages[j]!);
-        }
-      })(),
-    );
+        });
+    });
   }
 
   async save() {
@@ -123,17 +129,17 @@ export function clear(dbName: string, storeName: string): Promise<void> {
     throw new Error("No indexedDB in this environment.");
   }
   return new Promise((resolve, reject) => {
-    let open = indexedDB.open(dbName, 1);
+    const open = indexedDB.open(dbName, 1);
 
     open.onupgradeneeded = function () {
-      let db = open.result;
+      const db = open.result;
       db.createObjectStore(storeName, { keyPath: "pageid" });
     };
 
     open.onsuccess = function () {
-      let db = open.result;
-      let tx = db.transaction(storeName, "readwrite");
-      let store = tx.objectStore(storeName);
+      const db = open.result;
+      const tx = db.transaction(storeName, "readwrite");
+      const store = tx.objectStore(storeName);
 
       store.clear();
 
@@ -141,13 +147,13 @@ export function clear(dbName: string, storeName: string): Promise<void> {
         resolve();
       };
 
-      tx.onerror = function (err) {
-        reject(err);
+      tx.onerror = function () {
+        reject(new Error("indexedDB Transaction error"));
       };
     };
 
-    open.onerror = function (err) {
-      reject(err);
+    open.onerror = function () {
+      reject(new Error("indexedDB Open error"));
     };
   });
 }
