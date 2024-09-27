@@ -809,7 +809,7 @@ tests.push({
 
 class MockExternal implements ExternalCall<number, string, TJSON> {
   async call(key: number, _timestamp: number) {
-    await timeout(2000 * key); // wait for `key` seconds before returning
+    await timeout(1000 * key); // wait for `key` seconds before returning
     return { payload: `mock_result(${key.toString()})` };
   }
 }
@@ -869,38 +869,43 @@ async function testExternalCallRun(runtime: SkipRuntime) {
     [2, [20]],
     [3, [30]],
   ]);
-
+  // Int resource all loading at t = 0.0s
+  check("testExternalCall[0]", runtime.getAll(resource, {}).values, [
+    loading(1),
+    loading(2),
+    loading(3),
+  ]);
   await timeout(500);
   // all loading at t = 0.5s
-  check("testExternalCall[0]", runtime.getAll(resource, {}).values, [
+  check("testExternalCall[1]", runtime.getAll(resource, {}).values, [
     loading(1),
     loading(2),
     loading(3),
   ]);
   await timeout(1000);
   //id=1 succeeded at t = 1.5s
-  check("testExternalCall[1]", runtime.getAll(resource, {}).values, [
+  check("testExternalCall[2]", runtime.getAll(resource, {}).values, [
     success(1),
     loading(2),
     loading(3),
   ]);
   await timeout(1000);
   //id=1,id=2 succeeded at t = 2.5s
-  check("testExternalCall[2]", runtime.getAll(resource, {}).values, [
+  check("testExternalCall[3]", runtime.getAll(resource, {}).values, [
     success(1),
     success(2),
     loading(3),
   ]);
   await timeout(1000);
   //id=1,id=2,id=3 succeeded at t = 3.5s
-  check("testExternalCall[3]", runtime.getAll(resource, {}).values, [
+  check("testExternalCall[4]", runtime.getAll(resource, {}).values, [
     success(1),
     success(2),
     success(3),
   ]);
   await timeout(1000);
   //all loading at t = 4.5s, but with previous values available for use if need be
-  check("testExternalCall[4]", runtime.getAll(resource, {}).values, [
+  check("testExternalCall[5]", runtime.getAll(resource, {}).values, [
     loading(1, true),
     loading(2, true),
     loading(3, true),
