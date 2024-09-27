@@ -1,4 +1,14 @@
-import type { int, ptr, Links, Utils, ToWasmManager, Environment, Opt, Metadata, ErrorObject } from "std";
+import type {
+  int,
+  ptr,
+  Links,
+  Utils,
+  ToWasmManager,
+  Environment,
+  Opt,
+  Metadata,
+  ErrorObject,
+} from "std";
 import type { SKJSON } from "skjson";
 import type {
   Accumulator,

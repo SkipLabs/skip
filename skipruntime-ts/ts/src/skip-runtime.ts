@@ -55,7 +55,12 @@ import { init as posixInit } from "std/posix.js";
 import { init as skjsonInit } from "skjson";
 import { init as skruntimeInit } from "./internals/skipruntime_module.js";
 
-const modules: ModuleInit[] = [runtimeInit, posixInit, skjsonInit, skruntimeInit];
+const modules: ModuleInit[] = [
+  runtimeInit,
+  posixInit,
+  skjsonInit,
+  skruntimeInit,
+];
 
 async function wasmUrl(): Promise<URL> {
   //@ts-expect-error  ImportMeta is incomplete

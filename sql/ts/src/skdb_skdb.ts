@@ -1,4 +1,12 @@
-import type { int, ptr, Environment, Links, ToWasmManager, Utils, Shared } from "std";
+import type {
+  int,
+  ptr,
+  Environment,
+  Links,
+  ToWasmManager,
+  Utils,
+  Shared,
+} from "std";
 import type * as Internal from "std/internal.js";
 import type {
   PagedMemory,

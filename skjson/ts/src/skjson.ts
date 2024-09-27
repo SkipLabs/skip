@@ -1,4 +1,14 @@
-import type { int, ptr, float, Links, Utils, ToWasmManager, Environment, Opt, Shared, } from "std";
+import type {
+  int,
+  ptr,
+  float,
+  Links,
+  Utils,
+  ToWasmManager,
+  Environment,
+  Opt,
+  Shared,
+} from "std";
 import { sk_isArrayProxy, sk_isObjectProxy } from "std";
 import type * as Internal from "./skjson_internal_types.js";
 
@@ -376,7 +386,13 @@ class Mapping {
 
 export type JSONObject = { [key: string]: TJSON | null };
 
-export type TJSON = number | JSONObject | boolean | (TJSON | null)[] | string | bigint;
+export type TJSON =
+  | number
+  | JSONObject
+  | boolean
+  | (TJSON | null)[]
+  | string
+  | bigint;
 
 export type Exportable =
   | TJSON
@@ -399,10 +415,7 @@ export interface SKJSON extends Shared {
     },
   ): ptr<T>;
   exportJSON(v: TJSON | null): ptr<Internal.CJSON>;
-  importOptJSON(
-    value: Opt<ptr<Internal.CJSON>>,
-    copy?: boolean,
-  ): Exportable;
+  importOptJSON(value: Opt<ptr<Internal.CJSON>>, copy?: boolean): Exportable;
   importString(v: ptr<Internal.String>): string;
   exportString(v: string): ptr<Internal.String>;
   exportBytes(v: Uint8Array): ptr<Internal.Array<Internal.Byte>>;
@@ -414,7 +427,10 @@ class SKJSONShared implements SKJSON {
   getName = () => "SKJSON";
 
   constructor(
-    public importJSON: (value: ptr<Internal.CJSON>, copy?: boolean) => Exportable,
+    public importJSON: (
+      value: ptr<Internal.CJSON>,
+      copy?: boolean,
+    ) => Exportable,
     public exportJSON: (v: Exportable) => ptr<Internal.CJSON>,
     public importString: (v: ptr<Internal.String>) => string,
     public exportString: (v: string) => ptr<Internal.String>,
