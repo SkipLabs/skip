@@ -14,34 +14,34 @@ tsconfig:
 
 .PHONY: skdate
 skdate:
-	cd ../skdate/ts && npm i && tsc
+	cd ../skdate/ts && npm i && npm run build
 
 .PHONY: skjson
 skjson:
-	cd ../skjson/ts && npm i && tsc
+	cd ../skjson/ts && npm i && npm run build
 
 .PHONY: prelude
 prelude:
-	cd ../prelude/ts && npm i && tsc
+	cd ../prelude/ts && npm i && npm run build
 
 .PHONY: check-src
 check-src: eslint
 	echo "make: Entering directory '${SCRIPT_DIR}/ts'"
-	cd ts/ && npm install && tsc && npm run lint
+	cd ts/ && npm install && npm run build && npm run lint
 	echo "make: Leaving directory '${SCRIPT_DIR}/ts'"
 
 .PHONY: check-tests
 check-tests: eslint
-	cd ts/tests && npm install && tsc && npm run lint
+	cd ts/tests && npm install && npm run build && npm run lint
 
 .PHONY: check-all
 check-all: check-src check-tests
 
 .PHONY: build
 build: tsconfig prelude skjson skdate
-	cd ../prelude/ts && npm i && tsc
-	cd ../skjson/ts && npm i && tsc
-	cd ../skdate/ts && npm i && tsc
+	cd ../prelude/ts && npm i && npm run build
+	cd ../skjson/ts && npm i && npm run build
+	cd ../skdate/ts && npm i && npm run build
 	cd ts && npm i && npm run build
 
 .PHONY: clean
@@ -51,7 +51,7 @@ clean:
 
 .PHONY: install-test
 install-test: build
-	cd ts/tests && npm i && tsc
+	cd ts/tests && npm i && npm run build
 	cd ts/tests && npx playwright install
 
 .PHONY: test
