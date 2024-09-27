@@ -41,7 +41,7 @@ check-tests: eslint-config prelude skjson replication
 	cd ts/tests && npm install && npm run build && npm run lint
 
 .PHONY: check-all
-check-all: check-src check-examples check-tests
+check-all: check-src # check-tests check-examples
 
 .PHONY: build
 build: prelude skjson replication

@@ -5,7 +5,7 @@ import jsdoc from "eslint-plugin-jsdoc";
 
 export default tseslint.config(
   {
-    ignores: ["**/dev/*", "**/dist/*", "**/tests/*", "tsconfig.json"],
+    ignores: ["**/dist/*"],
   },
   eslint.configs.recommended,
   jsdoc.configs["flat/recommended-typescript-error"],
