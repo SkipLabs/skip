@@ -1,9 +1,4 @@
-import type {
-  TJSON,
-  EntryPoint,
-  Entry,
-  JSONObject,
-} from "skip-runtime";
+import type { TJSON, EntryPoint, Entry, JSONObject } from "skip-runtime";
 import { SkipRESTRuntime } from "skip-runtime";
 import { createInterface } from "readline";
 import { connect, Protocol, Client } from "skipruntime-replication-client";
