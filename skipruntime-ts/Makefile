@@ -7,15 +7,15 @@ SCRIPT_DIR=$(shell dirname $(shell realpath $(firstword $(MAKEFILE_LIST))))
 
 .PHONY: replication
 replication:
-	cd ../replication && npm i && tsc
+	cd ../replication && npm i && npm run build
 
 .PHONY: skjson
 skjson:
-	cd ../skjson/ts && npm i && tsc
+	cd ../skjson/ts && npm i && npm run build
 
 .PHONY: prelude
 prelude:
-	cd ../prelude/ts && npm i && tsc
+	cd ../prelude/ts && npm i && npm run build
 
 .PHONY: eslint-config
 eslint-config:
@@ -24,21 +24,21 @@ eslint-config:
 .PHONY: check-src
 check-src: eslint-config prelude skjson replication
 	echo "make: Entering directory '${SCRIPT_DIR}/ts'"
-	cd ts && npm install && tsc && npm run lint
+	cd ts && npm install && npm run build && npm run lint
 	echo "make: Leaving directory '${SCRIPT_DIR}/ts'"
 
 .PHONY: check-examples
 check-examples: eslint-config prelude skjson replication
-	cd ts && npm i && tsc
+	cd ts && npm i && npm run build
 	cd ts/examples && npm install
 	echo "make: Entering directory '${SCRIPT_DIR}/ts/examples'"
-	cd ts/examples && tsc && npm run lint
+	cd ts/examples && npm run build && npm run lint
 	echo "make: Leaving directory '${SCRIPT_DIR}/ts/examples'"
 
 .PHONY: check-tests
 check-tests: eslint-config prelude skjson replication
-	cd ts && npm i && tsc
-	cd ts/tests && npm install && tsc && npm run lint
+	cd ts && npm i && npm run build
+	cd ts/tests && npm install && npm run build && npm run lint
 
 .PHONY: check-all
 check-all: check-src check-examples check-tests
@@ -55,11 +55,11 @@ bunclient-%:
 
 check-%:
 	cd ts/examples && npm install
-	tsc --project ts/examples/tsconfig.json
+	npx tsc -- --project ts/examples/tsconfig.json
 
 noderun-%: build
 	cd ts/examples && npm install
-	tsc --project ts/examples/tsconfig.json
+	npx tsc -- --project ts/examples/tsconfig.json
 	cd ts/examples && node dist/$*.js
 
 nodeclient-%:
@@ -72,6 +72,6 @@ clean:
 
 .PHONY: test
 test: build
-	cd ts/tests && npm i && tsc
+	cd ts/tests && npm i && npm run build
 	cd ts/tests && npx playwright install
 	cd ts/tests && npx playwright test --reporter=line
