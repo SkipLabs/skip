@@ -28,6 +28,7 @@ import type {
   ReactiveResponse,
   SkipBuilder,
 } from "../skipruntime_api.js";
+import { UnknownCollectionError } from "../skipruntime_errors.js";
 
 function assertNoKeysNaN<K extends TJSON, V extends TJSON>(
   kv_pairs: Iterable<[K, V]>,
@@ -491,8 +492,6 @@ export class EagerCollectionWriter<K extends TJSON, V extends TJSON>
     this.context.delete(this.eagerHdl, keys);
   }
 }
-
-export class UnknownCollectionError extends Error {}
 
 export class SkipRuntimeImpl implements SkipRuntime {
   constructor(
