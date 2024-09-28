@@ -166,8 +166,8 @@ const config: Config = {
     [
       "docusaurus-plugin-typedoc",
       {
-        entryPoints: ["../skipruntime-ts/ts/src/skip-runtime.ts"],
-        tsconfig: "../skipruntime-ts/ts/src/tsconfig.json",
+        entryPoints: ["../skipruntime-ts/core/src/skip-runtime.ts"],
+        tsconfig: "../skipruntime-ts/core/tsconfig.json",
         readme: "none",
         indexFormat: "table",
         disableSources: true,

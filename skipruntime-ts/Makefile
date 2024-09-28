@@ -7,15 +7,15 @@ SCRIPT_DIR=$(shell dirname $(shell realpath $(firstword $(MAKEFILE_LIST))))
 
 .PHONY: check-src
 check-src: build
-	echo "make: Entering directory '${SCRIPT_DIR}/ts'"
-	cd ts && npm run lint
-	echo "make: Leaving directory '${SCRIPT_DIR}/ts'"
+	echo "make: Entering directory '${SCRIPT_DIR}/core'"
+	cd core && npm run lint
+	echo "make: Leaving directory '${SCRIPT_DIR}/core'"
 
 .PHONY: check-examples
 check-examples: build
-	echo "make: Entering directory '${SCRIPT_DIR}/ts/examples'"
-	cd ts/examples && npm run lint
-	echo "make: Leaving directory '${SCRIPT_DIR}/ts/examples'"
+	echo "make: Entering directory '${SCRIPT_DIR}/examples'"
+	cd examples && npm run lint
+	echo "make: Leaving directory '${SCRIPT_DIR}/examples'"
 
 .PHONY: check-all
 check-all: build check-src check-examples
@@ -29,22 +29,22 @@ bunbuild:
 	cd .. && bum install && bun run build
 
 bunrun-%: bunbuild
-	bun run ts/examples/$*.ts
+	bun run examples/$*.ts
 
 bunclient-%: bunbuild
-	bun run ts/examples/$*-client.ts
+	bun run examples/$*-client.ts
 
 bunserver-%: bunbuild
-	bun run ts/examples/$*-server.ts
+	bun run examples/$*-server.ts
 
 noderun-%: build
-	node ts/examples/dist/$*.js
+	node examples/dist/$*.js
 
 nodeclient-%: build
-	node ts/examples/dist/$*-client.js
+	node examples/dist/$*-client.js
 
 nodeserver-%: build
-	node ts/examples/dist/&*-server.js
+	node examples/dist/&*-server.js
 
 .PHONY: clean
 clean:
@@ -52,4 +52,4 @@ clean:
 
 .PHONY: test
 test: build
-	cd ts && npm run test
+	cd core && npm run test

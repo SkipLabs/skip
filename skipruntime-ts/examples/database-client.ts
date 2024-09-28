@@ -1,6 +1,6 @@
 import { fetchJSON, type ReactiveResponse } from "skip-runtime";
-import { connect, Protocol } from "skipruntime-replication-client";
-import type { TJSON } from "skipruntime-replication-client/protocol.js";
+import { connect, Protocol } from "skipruntime-client";
+import type { TJSON } from "skipruntime-client/protocol.js";
 
 /*
   This is the client simulator of database example
