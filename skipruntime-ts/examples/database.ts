@@ -6,7 +6,7 @@ import type {
   Resource,
 } from "@skipruntime/core";
 
-import { runService } from "@skipruntime/core";
+import { runService } from "@skipruntime/server";
 
 import sqlite3 from "sqlite3";
 

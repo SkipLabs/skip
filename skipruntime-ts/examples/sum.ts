@@ -7,7 +7,7 @@ import type {
   Resource,
 } from "@skipruntime/core";
 
-import { runService } from "@skipruntime/core";
+import { runService } from "@skipruntime/server";
 
 class Plus implements Mapper<string, number, string, number> {
   constructor(private other: EagerCollection<string, number>) {}

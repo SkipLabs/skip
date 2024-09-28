@@ -7,9 +7,10 @@ import type {
   NonEmptyIterator,
   TJSON,
   SkipService,
+  Resource,
 } from "@skipruntime/core";
 
-import { runService, type Resource } from "@skipruntime/core";
+import { runService } from "@skipruntime/server";
 
 class ComputeExpression implements LazyCompute<string, string> {
   constructor(private skall: EagerCollection<string, TJSON>) {}

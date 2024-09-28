@@ -15,7 +15,8 @@ import type {
   SkipBuilder,
   ReactiveResponse,
 } from "./skipruntime_api.js";
-import { runService as runService_ } from "./internals/skipruntime_process.js";
+
+export { UnknownCollectionError } from "./skipruntime_errors.js";
 export type { Opaque } from "./internals/skipruntime_module.js";
 export { TimedQueue } from "./internals/skipruntime_module.js";
 export { runService as initService } from "./skipruntime_runner.js";
@@ -135,10 +136,6 @@ export function freeze<T>(value: T): T {
   } else {
     throw new Error("'" + type + "' cannot be frozen.");
   }
-}
-
-export async function runService(service: SkipService, port: number = 443) {
-  return runService_(service, createSKStore, port);
 }
 
 function toHttp(entrypoint: EntryPoint) {
