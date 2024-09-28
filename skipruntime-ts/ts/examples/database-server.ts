@@ -2,6 +2,10 @@ import { SkipRESTRuntime } from "skip-runtime";
 
 import express from "express";
 
+/*
+  This is the user facing server of the database example
+*/
+
 const runtime = new SkipRESTRuntime({
   host: "localhost",
   port: 8081,
@@ -31,8 +35,8 @@ const run = function (
     });
   });
 };
-app.get("/auth/user/:id", (req, res) => {
-  const key = req.params.id;
+
+app.head("/auth/users", (req, res) => {
   const strReactiveAuth = req.headers["x-reactive-auth"] as string;
   if (!strReactiveAuth) {
     console.error("X-Reactive-Auth must be specified.");
@@ -41,9 +45,26 @@ app.get("/auth/user/:id", (req, res) => {
   }
   const reactiveAuth = new Uint8Array(Buffer.from(strReactiveAuth, "base64"));
   runtime
-    .head("user", { userId: key }, reactiveAuth)
+    .head("users", {}, reactiveAuth)
     .then((reactiveResponse) => {
-      res.status(200).json(reactiveResponse);
+      res.set("X-Reactive-Response", JSON.stringify(reactiveResponse));
+      res.status(200).json({});
+    })
+    .catch(() => {
+      res.status(500).json("Internal error");
+    });
+});
+app.get("/user/:id", (req, res) => {
+  const strReactiveAuth = req.headers["x-reactive-auth"] as string;
+  if (!strReactiveAuth) {
+    console.error("X-Reactive-Auth must be specified.");
+    res.status(500).json("Internal error");
+    return;
+  }
+  runtime
+    .getOne("users", {}, "123", strReactiveAuth)
+    .then((user) => {
+      res.status(200).json(user);
     })
     .catch(() => {
       res.status(500).json("Internal error");
