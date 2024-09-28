@@ -86,6 +86,7 @@ check: $(CHECK_TARGETS)
 clean:
 	rm -Rf build
 	find . -name 'Skargo.toml' -print0 | sed 's|Skargo.toml|target|g' | xargs -0 rm -rf
+	npm run clean
 
 .PHONY: clean-all
 clean-all: clean
