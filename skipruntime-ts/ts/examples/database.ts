@@ -1,9 +1,7 @@
 import type {
   SKStore,
   TJSON,
-  Mapper,
   EagerCollection,
-  NonEmptyIterator,
   SkipService,
   Resource,
 } from "skip-runtime";
@@ -11,6 +9,10 @@ import type {
 import { runService } from "skip-runtime";
 
 import sqlite3 from "sqlite3";
+
+/*
+  This is the skip runtime service of the database example  
+*/
 
 /*****************************************************************************/
 // Populate the database with made-up values (if it's not already there)
@@ -73,37 +75,12 @@ async function initDB(): Promise<sqlite3.Database> {
 
 type User = { name: string; country: string };
 
-class GetUserMapper implements Mapper<string, User, string, User> {
-  constructor(private userId: string) {}
-
-  mapElement(
-    key: string,
-    it: NonEmptyIterator<User>,
-  ): Iterable<[string, User]> {
-    const user = it.first();
-    if (key == this.userId) {
-      return [[key, user]];
-    }
-    return [];
-  }
-}
-
-class GetUserResource implements Resource {
-  private params: {
-    userId: string;
-  };
-
-  constructor(params: Record<string, string>) {
-    this.params = params as {
-      userId: string;
-    };
-  }
-
+class UsersResource implements Resource {
   reactiveCompute(
     _store: SKStore,
     cs: { users: EagerCollection<string, User> },
   ): EagerCollection<string, User> {
-    return cs.users.map(GetUserMapper, this.params.userId);
+    return cs.users;
   }
 }
 
@@ -114,7 +91,7 @@ class GetUserResource implements Resource {
 class Service implements SkipService {
   inputCollections = ["users"];
   resources = {
-    user: GetUserResource,
+    users: UsersResource,
   };
 
   async init() {

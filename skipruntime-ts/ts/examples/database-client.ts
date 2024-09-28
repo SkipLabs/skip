@@ -2,6 +2,10 @@ import { fetchJSON, type ReactiveResponse } from "skip-runtime";
 import { connect, Protocol } from "skipruntime-replication-client";
 import type { TJSON } from "skipruntime-replication-client/protocol.js";
 
+/*
+  This is the client simulator of database example
+*/
+
 async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -12,16 +16,22 @@ const creds = await Protocol.generateCredentials();
 
 const publicKey = new Uint8Array(await Protocol.exportKey(creds.publicKey));
 
-console.log("Connect to replication server for resource /user/123");
+console.log("Connect to replication server for resource /users");
 
 const header = {
   "X-Reactive-Auth": Buffer.from(publicKey.buffer).toString("base64"),
 };
-const [reactive, _headers] = await fetchJSON<ReactiveResponse>(
-  `${url}/auth/user/123`,
-  "GET",
+const [_e, headers] = await fetchJSON<ReactiveResponse>(
+  `${url}/auth/users`,
+  "HEAD",
   header,
 );
+
+const strReactiveResponse = headers.get("x-reactive-response");
+const reactive = strReactiveResponse
+  ? (JSON.parse(strReactiveResponse) as ReactiveResponse)
+  : undefined;
+
 if (reactive == null) {
   throw new Error("Reactive response must be supplied.");
 }
@@ -47,7 +57,20 @@ await fetchJSON(
   { name: "daniel", country: "UK" },
 );
 
+console.log(
+  "Get /user/123",
+  (await fetchJSON(`${url}/user/123`, "GET", header))[0],
+);
+
 await sleep(1000);
 console.log("Delete /user/123");
 
 await fetchJSON(`${url}/user/123`, "DELETE", {});
+
+console.log(
+  "Get /user/123",
+  (await fetchJSON(`${url}/user/123`, "GET", header))[0],
+);
+
+await sleep(1000);
+client.close();

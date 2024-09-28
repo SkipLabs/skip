@@ -50,8 +50,11 @@ build: prelude skjson replication
 bunrun-%: build
 	cd ts/examples && bun install && bun run $*.ts
 
-bunclient-%:
+bunclient-%: build
 	cd ts/examples && bun install && bun run $*-client.ts
+
+bunserver-%: build
+	cd ts/examples && bun install && bun run $*-server.ts
 
 check-%:
 	cd ts/examples && npm install
@@ -62,8 +65,15 @@ noderun-%: build
 	npx tsc -- --project ts/examples/tsconfig.json
 	cd ts/examples && node dist/$*.js
 
-nodeclient-%:
+nodeclient-%: build
+	cd ts/examples && npm install
+	npx tsc -- --project ts/examples/tsconfig.json
 	cd ts/examples && node dist/$*-client.js
+
+nodeserver-%: build
+	cd ts/examples && npm install
+	npx tsc -- --project ts/examples/tsconfig.json
+	cd ts/examples && node dist/$*-server.js
 
 .PHONY: clean
 clean:
