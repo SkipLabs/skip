@@ -224,16 +224,7 @@ export class SkipRESTRuntime {
     reactiveAuth: Uint8Array | string,
   ): Promise<ReactiveResponse> {
     const qParams = new URLSearchParams(params).toString();
-    let header = {};
-    if (typeof reactiveAuth == "string") {
-      header = {
-        "X-Reactive-Auth": reactiveAuth,
-      };
-    } else {
-      header = {
-        "X-Reactive-Auth": Buffer.from(reactiveAuth.buffer).toString("base64"),
-      };
-    }
+    const header = this.header(reactiveAuth);
     const [_data, headers] = await fetchJSON(
       `${this.entrypoint}/v1/${resource}?${qParams}`,
       "HEAD",
@@ -249,9 +240,10 @@ export class SkipRESTRuntime {
     resource: string,
     params: Record<string, string>,
     key: string,
+    reactiveAuth?: Uint8Array | string,
   ): Promise<V[]> {
     const qParams = new URLSearchParams(params).toString();
-    const header = {};
+    const header = this.header(reactiveAuth);
     const [data, _headers] = await fetchJSON<V[]>(
       `${this.entrypoint}/v1/${resource}/${key}?${qParams}`,
       "GET",
@@ -282,5 +274,22 @@ export class SkipRESTRuntime {
 
   async delete(collection: string, key: string): Promise<void> {
     await fetchJSON(`${this.entrypoint}/v1/${collection}/${key}`, "DELETE", {});
+  }
+
+  private header(reactiveAuth?: Uint8Array | string): Record<string, string> {
+    if (reactiveAuth) {
+      if (typeof reactiveAuth == "string") {
+        return {
+          "X-Reactive-Auth": reactiveAuth,
+        };
+      } else {
+        return {
+          "X-Reactive-Auth": Buffer.from(reactiveAuth.buffer).toString(
+            "base64",
+          ),
+        };
+      }
+    }
+    return {};
   }
 }

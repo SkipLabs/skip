@@ -540,11 +540,15 @@ export class SkipRuntimeImpl implements SkipRuntime {
     resource: string,
     params: JSONObject,
     key: string,
+    reactiveAuth?: Uint8Array,
   ): V[] {
+    if (!reactiveAuth) {
+      reactiveAuth = new Uint8Array([]);
+    }
     const [_, reader] = this.context.createReactiveRequest<string, V>(
       resource,
       params,
-      new Uint8Array([]),
+      reactiveAuth,
     );
     return reader.getArray(key);
   }

@@ -481,6 +481,7 @@ export interface SkipRuntime {
     resource: string,
     params: JSONObject,
     key: string | number,
+    reactiveAuth?: Uint8Array | string,
   ): V[];
   // WRITE
   put<V extends TJSON>(
