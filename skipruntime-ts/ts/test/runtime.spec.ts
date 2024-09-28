@@ -1,4 +1,5 @@
-import { test, expect } from "@playwright/test";
+import { expect } from "earl";
+
 import type {
   SKStore,
   TJSON,
@@ -16,14 +17,14 @@ import type {
   Resource,
   Entry,
   Loadable,
-} from "skip-runtime";
+} from "../src/skip-runtime.js";
 import {
   Sum,
   ValueMapper,
   TimedQueue,
   createSKStore,
   initService,
-} from "skip-runtime";
+} from "../src/skip-runtime.js";
 
 function check(name: string, got: TJSON, expected: TJSON): void {
   expect([name, got]).toEqual([name, expected]);
@@ -1175,14 +1176,14 @@ units.push({ name: "testTimedQueue", run: testTimedQueue });
 //// Run
 
 function run(t: Test) {
-  test(t.name, async () => {
+  it(t.name, async () => {
     const runtime = await initService(t.service, createSKStore);
     await t.run(runtime);
   });
 }
 
 function unit(t: UnitTest) {
-  test(t.name, async () => {
+  it(t.name, async () => {
     await t.run();
   });
 }
@@ -1190,7 +1191,7 @@ function unit(t: UnitTest) {
 /**
  * Run all tests
  */
-export function runAll() {
+describe('SkipService', () => {
   tests.forEach(run);
   units.forEach(unit);
-}
+});
