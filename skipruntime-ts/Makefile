@@ -5,83 +5,59 @@ SKARGO_PROFILE?=release
 SCRIPT_DIR=$(shell dirname $(shell realpath $(firstword $(MAKEFILE_LIST))))
 
 
-.PHONY: replication
-replication:
-	cd ../replication && npm i && npm run build
-
-.PHONY: skjson
-skjson:
-	cd ../skjson/ts && npm i && npm run build
-
-.PHONY: prelude
-prelude:
-	cd ../prelude/ts && npm i && npm run build
-
-.PHONY: eslint-config
-eslint-config:
-	cd ../eslint-config && npm i
-
 .PHONY: check-src
-check-src: eslint-config prelude skjson replication
+check-src: build
 	echo "make: Entering directory '${SCRIPT_DIR}/ts'"
-	cd ts && npm install && npm run build && npm run lint
+	cd ts && npm run lint
 	echo "make: Leaving directory '${SCRIPT_DIR}/ts'"
 
 .PHONY: check-examples
-check-examples: eslint-config prelude skjson replication
-	cd ts && npm i && npm run build
-	cd ts/examples && npm install
+check-examples: build
 	echo "make: Entering directory '${SCRIPT_DIR}/ts/examples'"
-	cd ts/examples && npm run build && npm run lint
+	cd ts/examples && npm run lint
 	echo "make: Leaving directory '${SCRIPT_DIR}/ts/examples'"
 
 .PHONY: check-tests
-check-tests: eslint-config prelude skjson replication
-	cd ts && npm i && npm run build
-	cd ts/tests && npm install && npm run build && npm run lint
+check-tests: build
+	echo "make: Entering directory '${SCRIPT_DIR}/ts/tests'"
+	cd ts/tests && npm run lint
+	echo "make: Leaving directory '${SCRIPT_DIR}/ts/tests'"
 
 .PHONY: check-all
-check-all: check-src # check-tests check-examples
+check-all: build check-src # check-tests check-examples
 
 .PHONY: build
-build: prelude skjson replication
-	cd ts && npm i && npm run build
+build:
+	cd .. && npm install && npm run build
 
-bunrun-%: build
-	cd ts/examples && bun install && bun run $*.ts
+.PHONY: bunbuild
+bunbuild:
+	cd .. && bum install && bun run build
 
-bunclient-%: build
-	cd ts/examples && bun install && bun run $*-client.ts
+bunrun-%: bunbuild
+	bun run ts/examples/$*.ts
 
-bunserver-%: build
-	cd ts/examples && bun install && bun run $*-server.ts
+bunclient-%: bunbuild
+	bun run ts/examples/$*-client.ts
 
-check-%:
-	cd ts/examples && npm install
-	npx tsc -- --project ts/examples/tsconfig.json
+bunserver-%: bunbuild
+	bun run ts/examples/$*-server.ts
 
 noderun-%: build
-	cd ts/examples && npm install
-	npx tsc -- --project ts/examples/tsconfig.json
-	cd ts/examples && node dist/$*.js
+	node ts/examples/dist/$*.js
 
 nodeclient-%: build
-	cd ts/examples && npm install
-	npx tsc -- --project ts/examples/tsconfig.json
-	cd ts/examples && node dist/$*-client.js
+	node ts/examples/dist/$*-client.js
 
 nodeserver-%: build
-	cd ts/examples && npm install
-	npx tsc -- --project ts/examples/tsconfig.json
-	cd ts/examples && node dist/$*-server.js
+	node ts/examples/dist/&*-server.js
 
 .PHONY: clean
 clean:
-	rm -rf ./ts/dist ./ts/playwright-report ./ts/test-results
+	rm -rf ./ts/playwright-report ./ts/test-results
 	cd .. && make clean
 
 .PHONY: test
 test: build
-	cd ts/tests && npm i && npm run build
 	cd ts/tests && npx playwright install
 	cd ts/tests && npx playwright test --reporter=line
