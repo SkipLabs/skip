@@ -4,9 +4,9 @@ import type {
   EagerCollection,
   SkipService,
   Resource,
-} from "skip-runtime";
+} from "@skipruntime/core";
 
-import { runService } from "skip-runtime";
+import { runService } from "@skipruntime/core";
 
 import sqlite3 from "sqlite3";
 

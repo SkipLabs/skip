@@ -5,9 +5,9 @@ import type {
   NonEmptyIterator,
   SkipService,
   Resource,
-} from "skip-runtime";
+} from "@skipruntime/core";
 
-import { runService } from "skip-runtime";
+import { runService } from "@skipruntime/core";
 
 class Plus implements Mapper<string, number, string, number> {
   constructor(private other: EagerCollection<string, number>) {}

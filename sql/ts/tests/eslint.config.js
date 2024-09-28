@@ -1,3 +1,3 @@
-import config from "eslint-config-skiplabs";
+import config from "@skiplabs/eslint-config";
 
 export default [...config];
