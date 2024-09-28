@@ -114,13 +114,13 @@ check-fmt: fmt
 # run the docs site locally at http://localhost:3000
 .PHONY: run-docs
 run-docs:
-	cd skipruntime-ts/ts/src && bun install
+	bun install
 	cd www && npm run start
 
 # regenerate api docs served by run-docs from ts sources
 .PHONY: docs
 docs:
-	cd skipruntime-ts/ts/src && bun install
+	bun install
 	cd www && npx docusaurus generate-typedoc
 
 # install the repo pre-commit hook locally
