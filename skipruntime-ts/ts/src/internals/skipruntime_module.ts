@@ -21,7 +21,7 @@ import type {
   JSONObject,
   Success,
   Entry,
-  CollectionAccess,
+  CollectionReader,
   CallResourceCompute,
   Notifier,
   Watermaked,
@@ -441,7 +441,7 @@ export class ContextImpl implements Context {
     resourceName: string,
     params: JSONObject,
     reactiveAuth: Uint8Array,
-  ): [string, CollectionAccess<K, V>] {
+  ): [string, CollectionReader<K, V>] {
     const ctx = this.ref.get();
     if (ctx != null)
       throw new Error(
@@ -549,7 +549,6 @@ export class ContextImpl implements Context {
     collectionName: string,
     from: string,
     nofify: Notifier<K, V>,
-    changes: boolean,
   ): bigint {
     const collection = this.resources[collectionName];
     if (!collection) {
@@ -562,7 +561,6 @@ export class ContextImpl implements Context {
         this.skjson.exportString(collection),
         BigInt(from),
         this.handles.register(nofify as Notifier<TJSON, TJSON>),
-        changes,
       );
     });
     if (result < 0) {

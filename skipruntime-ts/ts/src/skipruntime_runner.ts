@@ -1,5 +1,5 @@
 import type {
-  CollectionAccess,
+  CollectionReader,
   CollectionWriter,
   EagerCollection,
   SkipRuntime,
@@ -17,7 +17,7 @@ export async function runService(
   createSKStore: CreateSKStore,
 ): Promise<SkipRuntime> {
   const iCollections: Record<string, CollectionWriter<TJSON, TJSON>> = {};
-  const rCollections: Record<string, CollectionAccess<TJSON, TJSON>> = {};
+  const rCollections: Record<string, CollectionReader<TJSON, TJSON>> = {};
   const initSKStore = (
     store: SKStore,
     inputs: Record<string, EagerCollection<TJSON, TJSON>>,
@@ -42,7 +42,7 @@ export async function runService(
     for (const [key, col] of Object.entries(result)) {
       rCollections[key] = (
         col as EagerCollectionImpl<TJSON, TJSON>
-      ).toCollectionAccess();
+      ).toCollectionReader();
     }
     const collections = { ...inputs, ...result };
     return (name: string, params: Record<string, string>) => {

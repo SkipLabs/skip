@@ -1023,19 +1023,14 @@ fun getDiff(collection: String, from: Int): SKJSON.CJSON {
 }
 
 @export("SkipRuntime_subscribe")
-fun subscribe(
-  resource: String,
-  start: Int,
-  notifyPtr: UInt32,
-  changes: Int32,
-): Int {
+fun subscribe(resource: String, start: Int, notifyPtr: UInt32): Int {
   notifyHandle = FnHandle::make(notifyPtr);
   runWithResult(context ~> {
     session = SKStore.genSym(0);
     tick = Tick(start);
     context.subscribe(
       session,
-      NWatch(tick, notifyHandle.notify, if (changes != 0) true else false),
+      NWatch(tick, notifyHandle.notify, true),
       None(),
       Array[
         DirSub(DirName::create(resource), "", OJSON(Array[]), (__) ~> None()),
