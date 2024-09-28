@@ -18,12 +18,11 @@ export interface Resource {
 }
 
 export interface SkipService {
-  inputCollections?: string[];
+  inputCollections?: Record<string, [TJSON, TJSON][]>;
   remoteCollections?: Record<string, EntryPoint>;
   // name / duration in milliseconds
   refreshTokens?: Record<string, number>;
   resources?: Record<string, new (params: Record<string, string>) => Resource>;
-  init?: () => Promise<Record<string, [TJSON, TJSON][]>>;
 
   reactiveCompute(
     store: SKStore,

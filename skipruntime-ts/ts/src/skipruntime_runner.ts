@@ -23,7 +23,7 @@ export async function runService(
     inputs: Record<string, EagerCollection<TJSON, TJSON>>,
   ) => {
     if (service.inputCollections) {
-      for (const name of service.inputCollections) {
+      for (const name of Object.keys(service.inputCollections)) {
         const input = inputs[name];
         iCollections[name] = (
           input as EagerCollectionImpl<TJSON, TJSON>
@@ -58,10 +58,9 @@ export async function runService(
   };
   const builder = await createSKStore(
     initSKStore,
-    service.inputCollections ?? [],
+    service.inputCollections ?? {},
     service.remoteCollections ?? {},
     service.refreshTokens ?? {},
-    service.init,
   );
   return builder(iCollections);
 }

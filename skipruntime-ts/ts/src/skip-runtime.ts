@@ -80,10 +80,9 @@ export type CreateSKStore = (
     skstore: SKStore,
     inputs: Record<string, EagerCollection<TJSON, TJSON>>,
   ) => CallResourceCompute,
-  inputs: string[],
+  inputs: Record<string, [TJSON, TJSON][]>,
   remotes?: Record<string, EntryPoint>,
   tokens?: Record<string, number>,
-  initLocals?: () => Promise<Record<string, [TJSON, TJSON][]>>,
 ) => Promise<SkipBuilder>;
 
 export async function createSKStore(
@@ -91,14 +90,13 @@ export async function createSKStore(
     skstore: SKStore,
     inputs: Record<string, EagerCollection<TJSON, TJSON>>,
   ) => CallResourceCompute,
-  inputs: string[],
+  inputs: Record<string, [TJSON, TJSON][]>,
   remotes: Record<string, EntryPoint> = {},
   tokens: Record<string, number> = {},
-  initLocals?: () => Promise<Record<string, [TJSON, TJSON][]>>,
 ): Promise<SkipBuilder> {
   const data = await runUrl(wasmUrl, modules, [], "SKDB_factory");
   const factory = data.environment.shared.get("SKStore") as SKStoreFactory;
-  return factory.runSKStore(init, inputs, remotes, tokens, initLocals);
+  return factory.runSKStore(init, inputs, remotes, tokens);
 }
 
 export function freeze<T>(value: T): T {
