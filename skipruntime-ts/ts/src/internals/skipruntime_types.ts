@@ -10,7 +10,7 @@ import type {
   JSONObject,
   RefreshToken,
   Entry,
-  CollectionAccess,
+  CollectionReader,
   Watermaked,
   Notifier,
 } from "../skipruntime_api.js";
@@ -134,7 +134,7 @@ export interface Context {
     resourceName: string,
     params: JSONObject,
     reactiveAuth: Uint8Array,
-  ): [string, CollectionAccess<K, V>];
+  ): [string, CollectionReader<K, V>];
 
   closeReactiveRequest(
     resourceName: string,
@@ -154,7 +154,6 @@ export interface Context {
     collection: string,
     from: string,
     notify: Notifier<K, V>,
-    changes: boolean,
   ): bigint;
 
   unsubscribe(session: bigint): void;
@@ -399,7 +398,6 @@ export interface FromWasm {
     resource: ptr<Internal.String>,
     from: bigint,
     notifyFn: Handle<Notifier<TJSON, TJSON>>,
-    changes: boolean,
   ): bigint;
 
   SkipRuntime_unsubscribe(session: bigint): number;

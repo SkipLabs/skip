@@ -216,6 +216,9 @@ export interface AsyncLazyCollection<
   M extends TJSON,
 > extends LazyCollection<K, Loadable<V, M>> {}
 
+/**
+ * This interface allow accessing the data in a collection outside in a non reactive way.
+ */
 export interface CollectionReader<K extends TJSON, V extends TJSON> {
   /**
    * Get (and potentially compute) all values mapped to by some key of a lazy reactive
@@ -234,18 +237,28 @@ export interface CollectionReader<K extends TJSON, V extends TJSON> {
    * @returns the value for this `key`, or null if no such value exists
    */
   maybeGetOne(key: K): Opt<V>;
-}
 
-export interface CollectionAccess<K extends TJSON, V extends TJSON>
-  extends CollectionReader<K, V> {
   /**
    * Get all values of an eager reactive collection, if one exists.
    * Exist only in .
-   * @returns the values for this `key`, or null if no such value exists
+   * @returns an array en key, values pair.
    */
   getAll(): Entry<K, V>[];
+
+  /**
+   * Get a diff of a collection according a from watermark, if one exists.
+   * @param from The from watermark to retrieve diff from
+   * @returns {Watermaked} an array en key, values pair with the corresponding watermark.
+   */
   getDiff(from: string): Watermaked<K, V>;
-  subscribe(from: string, notify: Notifier<K, V>, changes: boolean): bigint;
+
+  /**
+   * Allow to subsribe the updates of the collection
+   * @param from The watermark where to start the update
+   * @param notify The function to call on collection update
+   * @returns {Watermaked} an array en key, values pair with the corresponding watermark.
+   */
+  subscribe(from: string, notify: Notifier<K, V>): bigint;
 }
 
 /**
@@ -253,8 +266,24 @@ export interface CollectionAccess<K extends TJSON, V extends TJSON>
  * to date whenever inputs are changed
  */
 export interface EagerCollection<K extends TJSON, V extends TJSON>
-  extends Constant,
-    CollectionReader<K, V> {
+  extends Constant {
+  /**
+   * Get (and potentially compute) all values mapped to by some key of a lazy reactive
+   * collection.
+   */
+  getArray(key: K): V[];
+
+  /**
+   * Get a value of an eager reactive collection.
+   * @throws {Error} when either zero or multiple such values exist
+   */
+  getOne(key: K): V;
+  /**
+   * Get a value of an eager reactive collection, if one exists.
+   * If multiple values are mapped to by the key, any of them can be returned.
+   * @returns the value for this `key`, or null if no such value exists
+   */
+  maybeGetOne(key: K): Opt<V>;
   /**
    * Create a new eager collection by mapping some computation over this one
    * @param mapper - function to apply to each element of this collection

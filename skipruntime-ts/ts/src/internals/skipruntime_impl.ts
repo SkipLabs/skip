@@ -21,7 +21,6 @@ import type {
   CollectionReader,
   SkipRuntime,
   Entry,
-  CollectionAccess,
   CollectionWriter,
   CallResourceCompute,
   Watermaked,
@@ -72,15 +71,20 @@ abstract class SkFrozen implements Constant {
   }
 }
 
-export class EagerReader<K extends TJSON, V extends TJSON>
+export class EagerCollectionImpl<K extends TJSON, V extends TJSON>
   extends SkFrozen
-  implements CollectionReader<K, V>
+  implements EagerCollection<K, V>
 {
   constructor(
-    protected context: Context,
-    protected eagerHdl: string,
+    private context: Context,
+    private eagerHdl: string,
   ) {
     super();
+    Object.freeze(this);
+  }
+
+  getId(): string {
+    return this.eagerHdl;
   }
 
   getArray(key: K): V[] {
@@ -93,20 +97,6 @@ export class EagerReader<K extends TJSON, V extends TJSON>
 
   maybeGetOne(key: K): Opt<V> {
     return this.context.maybeGetOne(this.eagerHdl, key);
-  }
-}
-
-export class EagerCollectionImpl<K extends TJSON, V extends TJSON>
-  extends EagerReader<K, V>
-  implements EagerCollection<K, V>
-{
-  constructor(context: Context, eagerHdl: string) {
-    super(context, eagerHdl);
-    Object.freeze(this);
-  }
-
-  getId(): string {
-    return this.eagerHdl;
   }
 
   protected derive<K2 extends TJSON, V2 extends TJSON>(
@@ -190,7 +180,7 @@ export class EagerCollectionImpl<K extends TJSON, V extends TJSON>
     return new EagerCollectionImpl<K, V>(this.context, eagerHdl);
   }
 
-  toCollectionAccess(): CollectionAccess<K, V> {
+  toCollectionReader(): CollectionReader<K, V> {
     return new EagerCollectionReader<K, V>(this.context, this.eagerHdl);
   }
 
@@ -452,9 +442,25 @@ export function freeze<T>(value: T): T {
 }
 
 export class EagerCollectionReader<K extends TJSON, V extends TJSON>
-  extends EagerReader<K, V>
-  implements CollectionAccess<K, V>
+  implements CollectionReader<K, V>
 {
+  constructor(
+    private context: Context,
+    private eagerHdl: string,
+  ) {}
+
+  getArray(key: K): V[] {
+    return this.context.getArray(this.eagerHdl, key);
+  }
+
+  getOne(key: K): V {
+    return this.context.getOne(this.eagerHdl, key);
+  }
+
+  maybeGetOne(key: K): Opt<V> {
+    return this.context.maybeGetOne(this.eagerHdl, key);
+  }
+
   getAll(): Entry<K, V>[] {
     return this.context.getAll<K, V>(this.eagerHdl);
   }
@@ -463,8 +469,8 @@ export class EagerCollectionReader<K extends TJSON, V extends TJSON>
     return this.context.getDiff(this.eagerHdl, from);
   }
 
-  subscribe(from: string, notify: Notifier<K, V>, changes: boolean): bigint {
-    return this.context.subscribe(this.eagerHdl, from, notify, changes);
+  subscribe(from: string, notify: Notifier<K, V>): bigint {
+    return this.context.subscribe(this.eagerHdl, from, notify);
   }
 }
 
@@ -584,7 +590,7 @@ export class SkipRuntimeImpl implements SkipRuntime {
     from: string,
     notify: Notifier<K, V>,
   ) {
-    return this.context.subscribe(collectionName, from, notify, true);
+    return this.context.subscribe(collectionName, from, notify);
   }
 
   unsubscribe(id: bigint): void {
