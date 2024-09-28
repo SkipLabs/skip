@@ -1,13 +1,92 @@
-import type { TJSON } from "skip-runtime";
+import type { TJSON, EntryPoint, Entry, JSONObject } from "skip-runtime";
+import { SkipRESTRuntime } from "skip-runtime";
 import { createInterface } from "readline";
-import { WebSocket } from "ws";
+import { connect, Protocol, Client } from "skipruntime-replication-client";
 
 export interface ClientDefinition {
   port: number;
   scenarios: () => Step[][];
 }
 
-type Step = { type: string; command: string; payload: TJSON };
+interface Write {
+  collection: string;
+  entries: Entry<TJSON, TJSON>[];
+}
+
+interface Delete {
+  collection: string;
+  keys: string[];
+}
+
+function toWs(entrypoint: EntryPoint) {
+  if (entrypoint.secured)
+    return `wss://${entrypoint.host}:${entrypoint.port.toString()}`;
+  return `ws://${entrypoint.host}:${entrypoint.port.toString()}`;
+}
+
+class SkipHttpAccessV1 {
+  private runtime: SkipRESTRuntime;
+  private client?: Client;
+
+  constructor(
+    private entrypoint: EntryPoint = {
+      host: "localhost",
+      port: 3587,
+    },
+    private creds: Protocol.Creds,
+  ) {
+    this.runtime = new SkipRESTRuntime(entrypoint);
+  }
+
+  async writeMany(data: Write[]) {
+    const promises = data.map((w) =>
+      this.runtime.patch(w.collection, w.entries),
+    );
+    return Promise.allSettled(promises);
+  }
+
+  async deteleMany(data: Delete[]) {
+    const promises: Promise<void>[] = [];
+    for (const x of data) {
+      for (const key of x.keys) {
+        promises.push(this.runtime.delete(x.collection, key));
+      }
+    }
+    return Promise.allSettled(promises);
+  }
+
+  async request(resource: string, params: Record<string, string>) {
+    const publicKey = new Uint8Array(
+      await Protocol.exportKey(this.creds.publicKey),
+    );
+    const reactive = await this.runtime.head(resource, params, publicKey);
+    if (!this.client) {
+      this.client = await connect(toWs(this.entrypoint), this.creds);
+    }
+    this.client.subscribe(
+      reactive.collection,
+      BigInt(reactive.watermark),
+      (updates: [string, TJSON[]][], isInit: boolean) => {
+        console.log("Update", Object.fromEntries(updates), isInit);
+      },
+    );
+  }
+}
+
+interface RequestQuery {
+  type: "request";
+  payload: JSONObject;
+}
+interface WriteQuery {
+  type: "write";
+  payload: Write[];
+}
+interface DeleteQuery {
+  type: "delete";
+  payload: Delete[];
+}
+
+export type Step = RequestQuery | WriteQuery | DeleteQuery;
 
 class Session {
   scenario: Step[];
@@ -31,9 +110,9 @@ class Session {
       this.error("The scenario as no more entries.");
       return false;
     }
-    const line = this.scenario[this.current++];
-    console.log(">>", JSON.stringify(line));
-    this.perform(line);
+    const step = this.scenario[this.current++];
+    console.log(">>", step.type, JSON.stringify(step.payload));
+    this.perform(step);
     return this.current < this.scenario.length;
   }
 
@@ -65,19 +144,20 @@ class Player {
   ) {}
 
   start(idx: number) {
-    const scenario = this.scenarios[idx - 1];
-    if (!scenario) {
-      this.error(`The scenario ${idx} does not exist`);
+    const aidx = idx - 1;
+    if (aidx < 0 || aidx >= this.scenarios.length) {
+      this.error(`The scenario ${idx.toString()} does not exist`);
       return false;
     } else {
+      const scenario = this.scenarios[idx - 1];
       this.running = new Session(scenario, this.send, this.error);
       return true;
     }
   }
 
-  play(idx = 0) {
+  play(idx?: number) {
     let run = true;
-    if (idx > 0) {
+    if (idx !== undefined) {
       run = this.start(idx);
     }
     if (run) {
@@ -118,14 +198,49 @@ class Player {
       this.step();
       return;
     }
-    const patterns: [RegExp, (...args: string[]) => any][] = [
-      [/^start ([a-z_0-9]+)$/g, (str: string) => this.start(parseInt(str))],
-      [/^reset$/g, () => this.reset()],
-      [/^step ([a-z_0-9]+)$/g, (str: string) => this.step(parseInt(str))],
-      [/^step$/g, () => this.step()],
-      [/^play ([a-z_0-9]+)$/g, (str: string) => this.play(parseInt(str))],
-      [/^play$/g, () => this.play()],
-      [/^stop$/g, () => this.stop()],
+    const patterns: [RegExp, (...args: string[]) => unknown][] = [
+      [
+        /^start ([a-z_0-9]+)$/g,
+        (str: string) => {
+          this.start(parseInt(str));
+        },
+      ],
+      [
+        /^reset$/g,
+        () => {
+          this.reset();
+        },
+      ],
+      [
+        /^step ([a-z_0-9]+)$/g,
+        (str: string) => {
+          this.step(parseInt(str));
+        },
+      ],
+      [
+        /^step$/g,
+        () => {
+          this.step();
+        },
+      ],
+      [
+        /^play ([a-z_0-9]+)$/g,
+        (str: string) => {
+          this.play(parseInt(str));
+        },
+      ],
+      [
+        /^play$/g,
+        () => {
+          this.play();
+        },
+      ],
+      [
+        /^stop$/g,
+        () => {
+          this.stop();
+        },
+      ],
     ];
     let done = false;
     for (const pattern of patterns) {
@@ -140,73 +255,126 @@ class Player {
     if (!done) this.perform(line);
   }
 }
-
-export function run(scenarios: Step[][], port: number) {
-  const ws = new WebSocket(`ws://localhost:${port}`);
-  ws.on("error", console.error);
-  ws.on("close", () => process.exit(2));
-  ws.on("message", (data: Buffer) => {
-    console.log(data.toString());
-  });
-  ws.on("open", function open() {
-    const online = (line: string) => {
-      const error = console.error;
-      try {
-        const patterns: [RegExp, (...args: string[]) => any][] = [
-          [
-            /^get (.*)$/g,
-            (query: string) => {
-              const jsquery: Step = JSON.parse(query);
-              jsquery.type = "get";
-              ws.send(JSON.stringify(jsquery));
-            },
-          ],
-          [
-            /^post (.*)$/g,
-            (query: string) => {
-              const jsquery: Step = JSON.parse(query);
-              jsquery.type = "post";
-              ws.send(JSON.stringify(jsquery));
-            },
-          ],
-        ];
-        let done = false;
-        for (const pattern of patterns) {
-          const matches = [...line.matchAll(pattern[0])];
-          if (matches.length > 0) {
-            done = true;
-            const args = matches[0].map((v) => v.toString());
-            args.shift();
-            pattern[1].apply(null, args);
-          }
+/**
+ * Run the client with specified scenarios
+ * @param scenarios The scenarios
+ * @param port  The port
+ */
+export async function run(scenarios: Step[][], port: number = 3587) {
+  const creds = await Protocol.generateCredentials();
+  const access = new SkipHttpAccessV1(
+    {
+      host: "localhost",
+      port,
+    },
+    creds,
+  );
+  const online = (line: string) => {
+    try {
+      const patterns: [RegExp, (...args: string[]) => void][] = [
+        [
+          /^request (.*)$/g,
+          (query: string) => {
+            const jsquery = JSON.parse(query) as {
+              resource: string;
+              params?: Record<string, string>;
+            };
+            access
+              .request(jsquery.resource, jsquery.params ?? {})
+              .then(console.log)
+              .catch((e: unknown) => {
+                console.error(e);
+              });
+          },
+        ],
+        [
+          /^write (.*)$/g,
+          (query: string) => {
+            const jsquery = JSON.parse(query) as Write[];
+            access
+              .writeMany(jsquery)
+              .then(console.log)
+              .catch((e: unknown) => {
+                console.error(e);
+              });
+          },
+        ],
+        [
+          /^delete (.*)$/g,
+          (query: string) => {
+            const jsquery = JSON.parse(query) as Delete[];
+            access
+              .deteleMany(jsquery)
+              .then(console.log)
+              .catch((e: unknown) => {
+                console.error(e);
+              });
+          },
+        ],
+      ];
+      let done = false;
+      for (const pattern of patterns) {
+        const matches = [...line.matchAll(pattern[0])];
+        if (matches.length > 0) {
+          done = true;
+          const args = matches[0].map((v) => v.toString());
+          args.shift();
+          pattern[1].apply(null, args);
         }
-        if (!done) {
-          error(`Unknow command line '${line}'`);
-        }
-      } catch (e: any) {
-        const message = e instanceof Error ? e.message : JSON.stringify(e);
-        error(message);
       }
-    };
-    const player = new Player(
-      scenarios,
-      online,
-      (event) => ws.send(JSON.stringify(event)),
-      console.error,
-    );
-    const rl = createInterface({
-      input: process.stdin,
-      output: process.stdout,
-      prompt: "> ",
-    });
-    rl.prompt();
-    rl.on("line", (line: string) => {
-      if (line == "exit") {
-        process.exit(0);
+      if (!done) {
+        console.error(`Unknow command line '${line}'`);
+      }
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : JSON.stringify(e);
+      console.error(message);
+    }
+  };
+  const player = new Player(
+    scenarios,
+    online,
+    (step) => {
+      if (step.type == "request") {
+        const jsquery = step.payload as {
+          resource: string;
+          params?: Record<string, string>;
+        };
+        access
+          .request(jsquery.resource, jsquery.params ?? {})
+          .then(console.log)
+          .catch((e: unknown) => {
+            console.error(e);
+          });
+      } else if (step.type == "write") {
+        access
+          .writeMany(step.payload)
+          .then(console.log)
+          .catch((e: unknown) => {
+            console.error(e);
+          });
       } else {
-        player.online(line);
-        rl.prompt();
+        access
+          .deteleMany(step.payload)
+          .then(console.log)
+          .catch((e: unknown) => {
+            console.error(e);
+          });
       }
-    });
+    },
+    console.error,
+  );
+  const rl = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    prompt: "> ",
+  });
+  rl.prompt();
+  rl.on("line", (line: string) => {
+    if (line == "exit") {
+      process.exit(0);
+    } else {
+      player.online(line);
+      rl.prompt();
+    }
   });
 }

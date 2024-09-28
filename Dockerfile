@@ -7,11 +7,11 @@ RUN apt-get update && \
     wget -O - https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | apt-key add - && \
     echo "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-15 main" >> /etc/apt/sources.list.d/llvm.list && \
     echo "deb-src http://apt.llvm.org/jammy/ llvm-toolchain-jammy-15 main" >> /etc/apt/sources.list.d/llvm.list && \
-    echo "deb https://deb.nodesource.com/node_20.x nodistro main" >> /etc/apt/sources.list.d/nodejs.list && \
+    echo "deb https://deb.nodesource.com/node_22.x nodistro main" >> /etc/apt/sources.list.d/nodejs.list && \
     apt-get update && \
     apt-get install -q -y automake clang-15 clang-format-15 curl file gawk gcc git jq lld-15 llvm-15 make nodejs parallel sqlite3 unzip zip && \
     npm install -g bun && \
-    npm install -g prettier typescript@5.1 && \
+    npm install -g prettier && \
     npx playwright install-deps
 
 RUN sh -c 'curl -s "https://get.sdkman.io?rcupdate=false" | bash'

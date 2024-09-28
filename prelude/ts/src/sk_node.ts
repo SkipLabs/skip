@@ -7,8 +7,6 @@ import * as util from "util";
 import * as perf_hooks from "perf_hooks";
 import * as crypto from "crypto";
 import { Worker } from "worker_threads";
-// @ts-ignore
-import { WebSocket } from "ws";
 
 class WrkImpl implements Wrk {
   worker: Worker;
@@ -46,6 +44,7 @@ class Env implements Environment {
   base64Encode: (toEncode: string, url?: boolean) => string;
   environment: Array<string>;
   throwRuntime: (code: int) => void;
+  // @ts-ignore
   createSocket: (uri: string) => WebSocket;
   createWorker: (url: URL, options?: WorkerOptions) => Wrk;
   createWorkerWrapper: (worker: any) => Wrk;
@@ -59,10 +58,10 @@ class Env implements Environment {
   name() {
     return "node";
   }
-  fetch(url: URL) {
+  fetch(url: URL | string) {
     let filename: string | URL;
     const cwd = process.cwd();
-    if (url && url.pathname) {
+    if (url && url instanceof URL && url.pathname) {
       filename = "./" + path.relative(cwd, url.pathname);
       // @ts-ignore
     } else if (url && url.default) {
@@ -97,7 +96,7 @@ class Env implements Environment {
     this.createSocket = (uri: string) => new WebSocket(uri);
     this.createWorker = (url: URL, options?: WorkerOptions) =>
       WrkImpl.fromPath(url, options);
-    this.createWorkerWrapper = (worker: Worker) => {
+    this.createWorkerWrapper = (_worker: Worker) => {
       throw new Error("Not implemented");
     };
     this.crypto = () => crypto as Crypto;

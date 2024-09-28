@@ -4,8 +4,7 @@
  * overview page] for a detailed description and introduction to the SKStore system.
  */
 
-// prettier-ignore
-import type { Opaque, Opt, Shared, int } from "#std/sk_types.js";
+import type { Opaque, Opt, Shared, int } from "std";
 import type { Constant } from "./internals/skipruntime_impl.js";
 export type { Opt, int };
 
@@ -23,29 +22,6 @@ export type Param =
   | { readonly [k: string]: Param };
 
 export type RefreshToken = Opaque<number, "SkipRefreshToken">;
-
-export type DBType = "TEXT" | "JSON" | "INTEGER" | "FLOAT" | "SCHEMA";
-
-// `filter` is interpreted as a SQL "where" clause
-export type DBFilter = { filter: string; params?: JSONObject };
-export type ColumnSchema = {
-  name: string;
-  type: DBType;
-  notnull?: boolean;
-  primary?: boolean;
-};
-export type Index = {
-  name: string;
-  columns: string[];
-  unique: boolean;
-};
-export type Schema = {
-  name: string;
-  columns: ColumnSchema[];
-  indexes?: Index[];
-  filter?: DBFilter;
-  alias?: string;
-};
 
 /**
  * Skip Runtime async function calls return a `Loadable` value which is one of `Success`,
@@ -104,26 +80,6 @@ export type AValue<V extends TJSON, M extends TJSON> = {
 };
 
 /**
- * Error thrown when an index is not found during table lookup
- */
-export class TableIndexError extends Error {}
-
-/**
- * The type of a reactive function mapping from a `TableCollection` into an
- * `EagerCollection`
- * @param entry - the input table row
- * @param count - the number of repeat occurrences of `entry`
- * @returns an iterable of key/value pairs to output for the given input(s)
- */
-export interface InputMapper<
-  R extends TJSON,
-  K extends TJSON,
-  V extends TJSON,
-> {
-  mapElement: (entry: R, count: number) => Iterable<[K, V]>;
-}
-
-/**
  * The type of a reactive function mapping over an arbitrary collection.
  * For each key & values in the input collection (of type K1/V1 respectively),
  * produces some key/value pairs for the output collection (of type K2/V2 respectively)
@@ -160,20 +116,6 @@ export abstract class ValueMapper<
   mapElement(key: K, it: NonEmptyIterator<V1>): Iterable<[K, V2]> {
     return it.toArray().map((v) => [key, this.mapValue(v, key)]);
   }
-}
-
-/**
- * The type of a reactive function mapping a collection into an output table
- * @param key - a key of the input collection
- * @param it - an iterator on values available for said key
- * @returns a table row corresponding to the input key
- */
-export interface OutputMapper<
-  R extends TJSON,
-  K extends TJSON,
-  V extends TJSON,
-> {
-  mapElement: (key: K, it: NonEmptyIterator<V>) => Iterable<R>;
 }
 
 /**
@@ -275,6 +217,51 @@ export interface AsyncLazyCollection<
 > extends LazyCollection<K, Loadable<V, M>> {}
 
 /**
+ * This interface allow accessing the data in a collection outside in a non reactive way.
+ */
+export interface CollectionReader<K extends TJSON, V extends TJSON> {
+  /**
+   * Get (and potentially compute) all values mapped to by some key of a lazy reactive
+   * collection.
+   */
+  getArray(key: K): V[];
+
+  /**
+   * Get a value of an eager reactive collection.
+   * @throws {Error} when either zero or multiple such values exist
+   */
+  getOne(key: K): V;
+  /**
+   * Get a value of an eager reactive collection, if one exists.
+   * If multiple values are mapped to by the key, any of them can be returned.
+   * @returns the value for this `key`, or null if no such value exists
+   */
+  maybeGetOne(key: K): Opt<V>;
+
+  /**
+   * Get all values of an eager reactive collection, if one exists.
+   * Exist only in .
+   * @returns an array en key, values pair.
+   */
+  getAll(): Entry<K, V>[];
+
+  /**
+   * Get a diff of a collection according a from watermark, if one exists.
+   * @param from The from watermark to retrieve diff from
+   * @returns {Watermaked} an array en key, values pair with the corresponding watermark.
+   */
+  getDiff(from: string): Watermaked<K, V>;
+
+  /**
+   * Allow to subsribe the updates of the collection
+   * @param from The watermark where to start the update
+   * @param notify The function to call on collection update
+   * @returns {Watermaked} an array en key, values pair with the corresponding watermark.
+   */
+  subscribe(from: string, notify: Notifier<K, V>): bigint;
+}
+
+/**
  * An _Eager_ reactive collection, whose values are computed eagerly and kept up
  * to date whenever inputs are changed
  */
@@ -297,7 +284,6 @@ export interface EagerCollection<K extends TJSON, V extends TJSON>
    * @returns the value for this `key`, or null if no such value exists
    */
   maybeGetOne(key: K): Opt<V>;
-
   /**
    * Create a new eager collection by mapping some computation over this one
    * @param mapper - function to apply to each element of this collection
@@ -327,19 +313,6 @@ export interface EagerCollection<K extends TJSON, V extends TJSON>
   ): EagerCollection<K2, V3>;
 
   /**
-   * Eagerly write/update `table` with the contents of this collection
-   * @param table - the table to update
-   * @param mapper - function to apply to each key/value pair in this collection
-   *                          to produce a table row
-   * @param params - any additional parameters to the mapper
-   */
-  mapTo<R extends TJSON[], Params extends Param[]>(
-    table: TableCollection<R>,
-    mapper: new (...params: Params) => OutputMapper<R, K, V>,
-    ...params: Params
-  ): void;
-
-  /**
    * Create a new eager collection by keeping only the elements whose keys are in
    * the given ranges.
    */
@@ -366,152 +339,27 @@ export interface EagerCollection<K extends TJSON, V extends TJSON>
   getId(): string;
 }
 
-/**
- * A `TableCollection` is a restricted form of eager collection, whose structure
- * allows it to be serialized and replicated over the wire.  `TableCollection`s
- * serve as inputs and outputs of reactive services.
- */
-export interface TableCollection<R extends TJSON[]> extends Constant {
-  getName(): string;
-  getSchema(): Schema;
-  isConnected(): boolean;
-
-  // /**
-  //  * Lookup in the table using specified index
-  //  * @param key - the key to lookup in the table
-  //  * @param index - the index which you want lookup the table
-  //  * @returns The results of the lookup
-  //  * @throws {TableIndexError} when an index is not found
-  //  *          or the index type is not valid
-  //  */
-  // TODO get(key: TJSON, index?: string): R[];
-
-  /**
-   * Create a new eager reactive collection by mapping over each entry in
-   * a table collection
-   * @returns The resulting (eager) output collection
-   */
-  map<K extends TJSON, V extends TJSON, Params extends Param[]>(
-    mapper: new (...params: Params) => InputMapper<R, K, V>,
-    ...params: Params
-  ): EagerCollection<K, V>;
-}
-
-export type Inputs = {
-  columns: string[];
-  values: TJSON[][];
-};
-
-/**
- * This interface supports SQL-like operations accessing and/or mutating the data in a
- * collection.  These operations are available only on collections which satisfy certain
- * structural constraints, such as those produced by `mapTo`.
- */
-export interface Table<R extends TJSON[]> {
-  getName(): string;
-  /**
-   * Insert an entry (or entries) into the table
-   * @param entries - The new data to insert
-   * @param update - If true, update the existing row in case of index conflict
-   * @throws {Error} in case of index conflict (when `update` is false) or constraint
-   *         violation
-   */
-  insert(entries: R[] | Inputs, update?: boolean): void;
-  /**
-   * Update an entry in the table
-   * @param row - the table entry to update
-   * @param updates - the column values updates
-   * @throws {Error} when the updates violate an index or other constraint
-   */
-  update(row: R, updates: JSONObject): void;
-
-  /**
-   * Update entries in the table matching some `where` clause
-   * @param where - the column values to filter entries
-   * @param updates - the column values updates
-   * @throws {Error} when an index constraints is broken
-   */
-  updateWhere(where: JSONObject, updates: JSONObject): void;
-
-  /**
-   * Select entries in the table
-   * @param where - the column values to filter entries
-   * @param columns - the columns to include in the output; include all by default
-   * @throws {Error} when an index constraints is broken
-   */
-  select(where: JSONObject, columns?: string[]): JSONObject[];
-
-  /**
-   * Delete an entry from the table
-   * @param entry - the entry to delete
-   */
-  delete(entry: R): void;
-
-  /**
-   * Delete entries from the table matching some `where` clause.
-   * @param where - the column values to filter entries
-   */
-  deleteWhere(where: JSONObject): void;
-
-  /**
-   * Register a callback to be invoked on the `rows` of this table whenever data changes
-   * @param update - the callback to invoke when data changes
-   * @returns a callback `close` to terminate and clean up the watch
-   */
-  watch: (
-    update: (rows: JSONObject[]) => void,
-    feedback?: boolean,
-  ) => { close: () => void };
-  /**
-   * Register a callback to be invoked on the `added` and `removed` rows of this table
-   * whenever data changes
-   * @param init - a callback to invoke on table initialization and reset
-   * @param update - the callback to invoke on changes
-   */
-  watchChanges: (
-    init: (rows: JSONObject[]) => void,
-    update: (added: JSONObject[], removed: JSONObject[]) => void,
-    feedback?: boolean,
-  ) => { close: () => void };
-}
-
 export type EntryPoint = {
   host: string;
   port: number;
   secured?: boolean;
 };
 
-export type Database = {
-  name: string;
-  access: string;
-  private: string;
-  endpoint?: EntryPoint;
-};
-
-export type Local = {
-  database?: Database;
-  inputs: Schema[];
-  outputs: Schema[];
-};
-
-export type Remote = {
-  database: Database;
-  tables: Schema[];
-};
+export type CallResourceCompute = (
+  name: string,
+  params: Record<string, string>,
+) => string;
 
 export interface SKStoreFactory extends Shared {
   runSKStore(
     init: (
       skstore: SKStore,
-      tables: Record<string, TableCollection<TJSON[]>>,
-    ) => void,
-    local: Local,
-    remotes?: Record<string, Remote>,
+      collections: Record<string, EagerCollection<TJSON, TJSON>>,
+    ) => CallResourceCompute,
+    inputs: Record<string, [TJSON, TJSON][]>,
+    remotes?: Record<string, EntryPoint>,
     tokens?: Record<string, number>,
-    initLocals?: (
-      tables: Record<string, Table<TJSON[]>>,
-    ) => void | Promise<void>,
-  ): Promise<Record<string, Table<TJSON[]>>>;
+  ): SkipBuilder;
 }
 
 export interface LazyCompute<K extends TJSON, V extends TJSON> {
@@ -562,7 +410,7 @@ export interface SKStore extends Constant {
   >(
     compute: new (...params: Params) => AsyncLazyCompute<K, V, P, M>,
     ...params: Params
-  ): AsyncLazyCollection<K, V, M>;
+  ): LazyCollection<K, Loadable<V, M>>;
 
   external<
     K extends TJSON,
@@ -580,4 +428,78 @@ export interface SKStore extends Constant {
   jsonExtract(value: JSONObject, pattern: string): TJSON[];
 
   log(object: TJSON): void;
+}
+
+export type Token = {
+  duration: number;
+  value: string;
+};
+
+export type Entry<K extends TJSON, V extends TJSON> = [K, V[]];
+
+export type ReactiveResponse = {
+  collection: string;
+  watermark: string;
+};
+
+export type Watermaked<K extends TJSON, V extends TJSON> = {
+  values: Entry<K, V>[];
+  watermark: string;
+  update?: boolean;
+};
+
+export type Notifier<K extends TJSON, V extends TJSON> = (
+  values: Entry<K, V>[],
+  watermark: string,
+  update: boolean,
+) => void;
+
+export type SkipBuilder = (
+  iCollection: Record<string, CollectionWriter<TJSON, TJSON>>,
+) => SkipRuntime;
+
+export interface CollectionWriter<K extends TJSON, V extends TJSON> {
+  write(key: K, value: V[]): void;
+  writeAll(values: Entry<K, V>[]): void;
+  delete(keys: K[]): void;
+}
+
+export interface SkipRuntime {
+  // READ
+  getAll<K extends TJSON, V extends TJSON>(
+    resource: string,
+    params: JSONObject,
+    reactiveAuth?: Uint8Array | string,
+  ): { values: Entry<K, V>[]; reactive?: ReactiveResponse };
+  head(
+    resource: string,
+    params: JSONObject,
+    reactiveAuth: Uint8Array | string,
+  ): ReactiveResponse;
+  getOne<V extends TJSON>(
+    resource: string,
+    params: JSONObject,
+    key: string | number,
+    reactiveAuth?: Uint8Array | string,
+  ): V[];
+  // WRITE
+  put<V extends TJSON>(
+    collection: string,
+    key: string | number,
+    value: V[],
+  ): void;
+
+  patch<K extends TJSON, V extends TJSON>(
+    collection: string,
+    values: Entry<K, V>[],
+  ): void;
+
+  delete(collection: string, key: string | number): void;
+  subscribe<K extends TJSON, V extends TJSON>(
+    collection: string,
+    from: string,
+    notify: Notifier<K, V>,
+  ): bigint;
+
+  unsubscribe(id: bigint): void;
 }

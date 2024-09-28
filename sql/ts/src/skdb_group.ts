@@ -31,7 +31,7 @@ export class SKDBGroupImpl implements SKDBGroup {
             groupID,
           },
         )
-      ).scalarValue();
+      ).scalarValue() as string;
       const ownerID = (
         await skdb.exec(
           "SELECT adminID FROM skdb_groups WHERE groupID=@adminID",
@@ -39,15 +39,16 @@ export class SKDBGroupImpl implements SKDBGroup {
             adminID,
           },
         )
-      ).scalarValue();
+      ).scalarValue() as string;
       return new SKDBGroupImpl(skdb, groupID, adminID, ownerID);
-    } catch {}
-    return undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   static async create(skdb: SKDB): Promise<SKDBGroup> {
     const userID = skdb.currentUser!;
-    const groupID = (await skdb.exec("SELECT id()")).scalarValue();
+    const groupID = (await skdb.exec("SELECT id()")).scalarValue() as string;
 
     const group = new SKDBGroupImpl(skdb, groupID);
     const adminGroupID = group.adminGroupID;
@@ -83,6 +84,7 @@ export class SKDBGroupImpl implements SKDBGroup {
       { groupID: this.groupID, perm, adminGroupID: this.adminGroupID },
     );
   }
+
   async setMemberPermission(userID: string, perm: string) {
     await this.skdb.exec(
       "INSERT OR REPLACE INTO skdb_group_permissions VALUES (@groupID, @userID, skdb_permission(@perm), 'read-write');",
@@ -121,6 +123,7 @@ export class SKDBGroupImpl implements SKDBGroup {
       { userID, ownerGroupID: this.ownerGroupID },
     );
   }
+
   async removeOwner(userID: string) {
     await this.skdb.exec(
       "DELETE FROM skdb_group_permissions WHERE groupID=@ownerGroupID AND userID=@userID;",

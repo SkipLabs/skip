@@ -1,7 +1,7 @@
-import { runUrl, loadEnv, isNode } from "#std/sk_types.js";
+import { loadEnv, isNode } from "std";
 import { createOnThisThread } from "./skdb_create.js";
-import type { Wrk, ModuleInit } from "#std/sk_types.js";
-import type { SKDB, SKDBSync, SKDBShared } from "./skdb_types.js";
+import type { Wrk, ModuleInit } from "std";
+import type { SKDB } from "./skdb_types.js";
 import { SKDBWorker } from "./skdb_wdatabase.js";
 export { SKDBTable } from "./skdb_util.js";
 export type {
@@ -12,12 +12,22 @@ export type {
   Params,
 } from "./skdb_types.js";
 export type { Creds, MuxedSocket } from "./skdb_orchestration.js";
-export type { Environment } from "#std/sk_types.js";
+export type { Environment } from "std";
 export { SKDBTransaction } from "./skdb_util.js";
-import { getWasmUrl } from "./skdb_wasm_locator.js";
 
-const modules: ModuleInit[] = [];
-/*--MODULES--*/
+import { init as runtimeInit } from "std/runtime.js";
+import { init as posixInit } from "std/posix.js";
+import { init as skjsonInit } from "skjson";
+import { init as skdateInit } from "skdate";
+import { init as skdbInit } from "./skdb_skdb.js";
+
+const modules: ModuleInit[] = [
+  runtimeInit,
+  posixInit,
+  skjsonInit,
+  skdateInit,
+  skdbInit,
+];
 
 export async function createSkdb(
   options: {
@@ -27,8 +37,7 @@ export async function createSkdb(
     disableWarnings?: boolean;
   } = {},
 ): Promise<SKDB> {
-  const asWorker =
-    options.asWorker != undefined ? options.asWorker : !options.getWasmSource;
+  const asWorker = options.asWorker ?? !options.getWasmSource;
   const disableWarnings = options.disableWarnings ?? false;
   if (!asWorker) {
     // @ts-ignore
@@ -46,40 +55,22 @@ export async function createSkdb(
   }
 }
 
-async function createSkdbSync(
-  options: {
-    dbName?: string;
-    getWasmSource?: () => Promise<Uint8Array>;
-  } = {},
-): Promise<SKDBSync> {
-  let data = await runUrl(
-    getWasmUrl,
-    modules,
-    [],
-    "SKDB_factory",
-    options.getWasmSource,
-  );
-  return (data.environment.shared.get("SKDB") as SKDBShared).createSync(
-    options.dbName,
-  );
-}
-
 async function createWorker(disableWarnings: boolean, dbName?: string) {
-  let env = await loadEnv([]);
+  const env = await loadEnv([]);
   env.disableWarnings = disableWarnings;
   let worker: Wrk;
   if (isNode()) {
-    let url = new URL("./skdb_nodeworker.mjs", import.meta.url);
+    const url = new URL("./skdb_nodeworker.js", import.meta.url);
     worker = env.createWorker(url, { type: "module" });
   } else {
     // important that this line looks exactly like this for bundlers to discover the file
-    const wrapped = new Worker(new URL("./skdb_worker.mjs", import.meta.url), {
+    const wrapped = new Worker(new URL("./skdb_worker.js", import.meta.url), {
       type: "module",
     });
     worker = env.createWorkerWrapper(wrapped);
   }
 
-  let skdb = new SKDBWorker(worker);
+  const skdb = new SKDBWorker(worker);
   await skdb.create(dbName, disableWarnings);
   return skdb;
 }

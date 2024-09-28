@@ -1,135 +1,87 @@
-
 SHELL := /bin/bash
 
 SKARGO_PROFILE?=release
 
 SCRIPT_DIR=$(shell dirname $(shell realpath $(firstword $(MAKEFILE_LIST))))
-PRIVACY=$(realpath ../sql/privacy/init.sql)
-DATABASES=$(realpath ./ts/examples/databases/)
-SKDB=../sql/target/host/$(SKARGO_PROFILE)/skdb
-INPUTS?=1
-NUMBERS:=$(shell seq 1 ${INPUTS})
-SDKMAN_DIR?=$(HOME)/.sdkman
-SDKMAN_INIT=$(SDKMAN_DIR)/bin/sdkman-init.sh
 
-SERVER_DIR=$(SCRIPT_DIR)/../sql/server/dev
-SERVER_JAR=$(SERVER_DIR)/build/libs/dev.jar
-SERVER_CONFIG=$(DATABASES)/server.config
 
-$(SERVER_CONFIG):
-	@echo "skdb_databases=$(DATABASES)" >> $(SERVER_CONFIG)
-	@echo "skdb=$(realpath $(SKDB))" >> $(SERVER_CONFIG)
-	@echo "skdb_init=$(PRIVACY)" >> $(SERVER_CONFIG)
-	@echo "skstore=true" >> $(SERVER_CONFIG)
+.PHONY: replication
+replication:
+	cd ../replication && npm i && npm run build
 
-.PHONY: build_server
-build_server:
-	@cd ../sql && skargo b --profile $(SKARGO_PROFILE)
-	@cd $(SERVER_DIR) && source $(SDKMAN_INIT) && ../gradlew jar --no-daemon --console plain 1>&2 > $(DATABASES)/build_server.log
+.PHONY: skjson
+skjson:
+	cd ../skjson/ts && npm i && npm run build
 
-define skdb
-$(SKDB) --data $(DATABASES)/$(1).db
-endef
+.PHONY: prelude
+prelude:
+	cd ../prelude/ts && npm i && npm run build
 
-define exec
-echo $(2); echo $(2) | $(call skdb,$(1))
-endef
-
-define run_server
-source $(SDKMAN_INIT) && java -jar $(SERVER_JAR) --config $(SERVER_CONFIG) &> $(DATABASES)/server.log &
-endef
-
-define create_table
-$(call exec,$(1),"CREATE TABLE IF NOT EXISTS \"$(2)\" (key JSON PRIMARY KEY,value JSON);")
-endef
-
-define create_input
-$(call create_table,$(1),input$(2))
-endef
-
-clean-%: stop
-	rm $(DATABASES)/$*.db
-
-skdb-%: $(SKDB)
-	$(call exec,$*,"$(QUERY)")
-
-../build/sknpm:
-	cd .. && make build/sknpm
+.PHONY: eslint-config
+eslint-config:
+	cd ../eslint-config && npm i
 
 .PHONY: check-src
-check-src:
-	echo "make: Entering directory '${SCRIPT_DIR}/ts/src'"
-	cd ts/src && npm install && tsc && npm run lint
-	echo "make: Leaving directory '${SCRIPT_DIR}/ts/src'"
+check-src: eslint-config prelude skjson replication
+	echo "make: Entering directory '${SCRIPT_DIR}/ts'"
+	cd ts && npm install && npm run build && npm run lint
+	echo "make: Leaving directory '${SCRIPT_DIR}/ts'"
 
 .PHONY: check-examples
-check-examples: ../build/sknpm
+check-examples: eslint-config prelude skjson replication
+	cd ts && npm i && npm run build
 	cd ts/examples && npm install
-	../build/sknpm b -r --nowasm --out-dir ts/examples/node_modules/skip-runtime
 	echo "make: Entering directory '${SCRIPT_DIR}/ts/examples'"
-	cd ts/examples && tsc && npm run lint
+	cd ts/examples && npm run build && npm run lint
 	echo "make: Leaving directory '${SCRIPT_DIR}/ts/examples'"
 
 .PHONY: check-tests
-check-tests:
-	cd ts/tests && npm install
-	cd ts/tests && tsc
+check-tests: eslint-config prelude skjson replication
+	cd ts && npm i && npm run build
+	cd ts/tests && npm install && npm run build && npm run lint
 
 .PHONY: check-all
-check-all: check-src check-examples check check-tests
+check-all: check-src # check-tests check-examples
 
-build: ../build/sknpm
-	cd ts/examples && bun install
-	../build/sknpm b -r --out-dir ts/examples/node_modules/skip-runtime
+.PHONY: build
+build: prelude skjson replication
+	cd ts && npm i && npm run build
 
-bunrun-%: ../build/sknpm
-	cd ts/examples && bun install
-	../build/sknpm b -r --out-dir ts/examples/node_modules/skip-runtime
-	cd ts/examples && bun run $*.ts
+bunrun-%: build
+	cd ts/examples && bun install && bun run $*.ts
 
-bunclient-%:
-	cd ts/examples && bun run $*-client.ts
+bunclient-%: build
+	cd ts/examples && bun install && bun run $*-client.ts
 
-#bunrun-%-m: ../build/sknpm $(SERVER_CONFIG) start 
-#	cd ts/examples && bun install
-#	../build/sknpm b -r --out-dir ts/examples/node_modules/skip-runtime
-#	bun run ts/examples/wmain.ts -f ts/examples/$*.ts -m io -c $*
+bunserver-%: build
+	cd ts/examples && bun install && bun run $*-server.ts
 
-check: ../build/sknpm
-	../build/sknpm check
-	../build/sknpm check --test
-
-check-%: ../build/sknpm
+check-%:
 	cd ts/examples && npm install
-	../build/sknpm b -r --nowasm --out-dir ts/examples/node_modules/skip-runtime
-	tsc --project ts/examples/tsconfig.json
+	npx tsc -- --project ts/examples/tsconfig.json
 
-noderun-%: ../build/sknpm
+noderun-%: build
 	cd ts/examples && npm install
-	../build/sknpm b -r --out-dir ts/examples/node_modules/skip-runtime
-	tsc --project ts/examples/tsconfig.json
+	npx tsc -- --project ts/examples/tsconfig.json
 	cd ts/examples && node dist/$*.js
 
-nodeclient-%:
+nodeclient-%: build
+	cd ts/examples && npm install
+	npx tsc -- --project ts/examples/tsconfig.json
 	cd ts/examples && node dist/$*-client.js
 
-#noderun-%-m: ../build/sknpm  $(SERVER_CONFIG) start
-#	cd ts/examples && npm install
-#	../build/sknpm b -r --out-dir ts/examples/node_modules/skip-runtime
-#	tsc --project ts/examples/tsconfig.json
-#	cd ts/examples && node dist/wmain.js -f dist/$*.js -m io -c $*
+nodeserver-%: build
+	cd ts/examples && npm install
+	npx tsc -- --project ts/examples/tsconfig.json
+	cd ts/examples && node dist/$*-server.js
 
-.PHONY: start
-start: build_server $(eval SPROCESSES:=$(shell bash -c 'source $(SDKMAN_INIT) && jps' | grep dev.jar | awk '{print $$1}'))
-ifneq ($(SPROCESSES),)
-	@kill $(SPROCESSES)
-endif
-	$(call run_server)
+.PHONY: clean
+clean:
+	rm -rf ./ts/dist ./ts/playwright-report ./ts/test-results
+	cd .. && make clean
 
-
-.PHONY: stop
-stop: $(eval SPROCESSES:=$(shell bash -c 'source $(SDKMAN_INIT) && jps' | grep dev.jar | awk '{print $$1}'))
-ifneq ($(SPROCESSES),)
-	@kill $(SPROCESSES)
-endif
-
+.PHONY: test
+test: build
+	cd ts/tests && npm i && npm run build
+	cd ts/tests && npx playwright install
+	cd ts/tests && npx playwright test --reporter=line

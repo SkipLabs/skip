@@ -220,6 +220,15 @@ fun getObject(obj: CJObject, field: String): ?CJObject {
   )
 }
 
+fun getArray(obj: CJObject, field: String): ?CJArray {
+  getValue(obj, field).flatMap(v ->
+    v match {
+    | farr @ CJArray _ -> Some(farr)
+    | _ -> None()
+    }
+  )
+}
+
 fun remove(obj: SKJSON.CJObject, field: String): SKJSON.CJObject {
   filter(obj, f ~> f != field)
 }

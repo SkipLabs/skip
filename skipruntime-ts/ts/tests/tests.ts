@@ -2,12 +2,7 @@ import { test, expect } from "@playwright/test";
 import type {
   SKStore,
   TJSON,
-  TableCollection,
-  Schema,
-  Table,
-  InputMapper,
   Mapper,
-  OutputMapper,
   AsyncLazyCompute,
   EagerCollection,
   JSONObject,
@@ -16,198 +11,205 @@ import type {
   NonEmptyIterator,
   AsyncLazyCollection,
   ExternalCall,
+  SkipService,
+  SkipRuntime,
+  Resource,
+  Entry,
+  Loadable,
 } from "skip-runtime";
 import {
   Sum,
   ValueMapper,
   TimedQueue,
-  createLocalSKStore,
-  cinteger as integer,
-  schema,
-  ctext as text,
-  cjson as json,
+  createSKStore,
+  initService,
 } from "skip-runtime";
 
-function check(name: String, got: TJSON, expected: TJSON): void {
+function check(name: string, got: TJSON, expected: TJSON): void {
   expect([name, got]).toEqual([name, expected]);
 }
 
-type Test = {
+interface Test {
   name: string;
-  inputs: Schema[];
-  outputs: Schema[];
-  init: (skstore: SKStore, ...tables: TableCollection<TJSON[]>[]) => void;
-  run: (...tables: Table<TJSON[]>[]) => void | Promise<void>;
-  error?: (err: any) => void;
+  service: SkipService;
+  run: (runtime: SkipRuntime) => void | Promise<void>;
   tokens?: Record<string, number>;
-};
+}
 
-type UnitTest = {
+interface UnitTest {
   name: string;
   run: () => void | Promise<void>;
-  error?: (err: any) => void;
-};
+}
 
 const tests: Test[] = [];
 const units: UnitTest[] = [];
 
 //// testMap1
 
-class TestFromIntInt implements InputMapper<[number, number], number, number> {
-  constructor(private offset: number = 0) {}
-
-  mapElement(entry: [number, number], occ: number): Iterable<[number, number]> {
-    return Array([entry[0], entry[1] + this.offset]);
+class Map1 implements Mapper<string, number, string, number> {
+  mapElement(
+    key: string,
+    it: NonEmptyIterator<number>,
+  ): Iterable<[string, number]> {
+    return Array([key, it.first() + 2]);
   }
 }
 
-class TestToOutput<V extends TJSON>
-  implements OutputMapper<[number, V], number, V>
-{
-  mapElement(key: number, it: NonEmptyIterator<V>): Iterable<[number, V]> {
-    return Array([key, it.first()]);
+class Map1Resource implements Resource {
+  reactiveCompute(
+    _store: SKStore,
+    collections: {
+      input: EagerCollection<string, number>;
+    },
+  ): EagerCollection<string, number> {
+    return collections.input.map(Map1);
   }
 }
 
-function testMap1Init(
-  _skstore: SKStore,
-  input: TableCollection<[number, number]>,
-  output: TableCollection<[number, number]>,
-) {
-  const eager1 = input.map(TestFromIntInt, 2);
-  eager1.mapTo(output, TestToOutput);
+class Map1Service implements SkipService {
+  inputCollections = { input: [] };
+  resources = { map1: Map1Resource };
+
+  reactiveCompute(
+    _store: SKStore,
+    inputCollections: { input: EagerCollection<number, number> },
+  ) {
+    return inputCollections;
+  }
 }
 
-function testMap1Run(input: Table<TJSON[]>, output: Table<TJSON[]>) {
-  input.insert([[1, 10]], true);
-  check("testMap1", output.select({ id: 1 }, ["value"]), [{ value: 12 }]);
+function testMap1Run(runtime: SkipRuntime) {
+  runtime.put("input", "1", [10]);
+  check("testMap1", runtime.getOne("map1", {}, "1"), [12]);
 }
 
 tests.push({
   name: "testMap1",
-  inputs: [schema("input", [integer("id", true, true), integer("value")])],
-  outputs: [schema("output", [integer("id", true, true), integer("value")])],
-  init: testMap1Init,
+  service: new Map1Service(),
   run: testMap1Run,
 });
 
 //// testMap2
 
-class TestParseInt implements InputMapper<[number, string], number, number> {
-  mapElement(entry: [number, string], occ: number): Iterable<[number, number]> {
-    return Array([entry[0], parseInt(entry[1])]);
-  }
-}
-
-class TestAdd implements Mapper<number, number, number, number> {
-  constructor(private other: EagerCollection<number, number>) {}
+class Map2 implements Mapper<string, number, string, number> {
+  constructor(private other: EagerCollection<string, number>) {}
 
   mapElement(
-    key: number,
+    key: string,
     it: NonEmptyIterator<number>,
-  ): Iterable<[number, number]> {
-    let result: Array<[number, number]> = [];
+  ): Iterable<[string, number]> {
+    const result: [string, number][] = [];
     const values = it.toArray();
     const other_values = this.other.getArray(key);
-    for (let v of values) {
-      for (let other_v of other_values) {
-        result.push([key, v + (other_v ?? 0)]);
+    for (const v of values) {
+      for (const other_v of other_values) {
+        result.push([key, v + other_v]);
       }
     }
-    return result as Iterable<[number, number]>;
+    return result;
   }
 }
 
-function testMap2Init(
-  _skstore: SKStore,
-  input1: TableCollection<[number, string]>,
-  input2: TableCollection<[number, string]>,
-  output: TableCollection<[number, number]>,
-) {
-  const eager1 = input1.map(TestParseInt);
-  const eager2 = input2.map(TestParseInt);
-  const eager3 = eager1.map(TestAdd, eager2);
-  eager3.mapTo(output, TestToOutput);
+class Map2Resource implements Resource {
+  reactiveCompute(
+    _store: SKStore,
+    collections: {
+      input1: EagerCollection<string, number>;
+      input2: EagerCollection<string, number>;
+    },
+  ): EagerCollection<string, number> {
+    return collections.input1.map(Map2, collections.input2);
+  }
 }
 
-function testMap2Run(
-  input1: Table<[number, string]>,
-  input2: Table<[number, string]>,
-  output: Table<[number, number]>,
-) {
-  input1.insert([[1, "10"]], true);
-  input2.insert([[1, "20"]], true);
-  check("testMap2Init", output.select({ id: 1 }, ["value"]), [{ value: 30 }]);
-  input1.insert([[2, "3"]], true);
-  input2.insert([[2, "7"]], true);
-  check("testMap2Insert", output.select({}, ["value"]), [
-    { value: 10 },
-    { value: 30 },
+class Map2Service implements SkipService {
+  inputCollections = { input1: [], input2: [] };
+  resources = { map2: Map2Resource };
+
+  reactiveCompute(
+    _store: SKStore,
+    inputCollections: {
+      input1: EagerCollection<string, number>;
+      input2: EagerCollection<string, number>;
+    },
+  ) {
+    return inputCollections;
+  }
+}
+
+function testMap2Run(runtime: SkipRuntime) {
+  const resource = "map2";
+  runtime.put("input1", "1", [10]);
+  runtime.put("input2", "1", [20]);
+  check("testMap2[0]", runtime.getOne(resource, {}, "1"), [30]);
+  runtime.put("input1", "2", [3]);
+  runtime.put("input2", "2", [7]);
+  check("testMap2[1]", runtime.getAll(resource, {}).values, [
+    ["1", [30]],
+    ["2", [10]],
   ]);
 }
 
 tests.push({
   name: "testMap2",
-  inputs: [
-    schema("input1", [integer("id", true, true), text("value")]),
-    schema("input2", [integer("id", true, true), text("value")]),
-  ],
-  outputs: [schema("output", [integer("id", true, true), integer("value")])],
-  init: testMap2Init,
+  service: new Map2Service(),
   run: testMap2Run,
 });
 
 //// testMap3
 
-class TestSum implements Mapper<number, number, number, number> {
+class Map3 implements Mapper<string, number, string, number> {
   mapElement(
-    key: number,
+    key: string,
     it: NonEmptyIterator<number>,
-  ): Iterable<[number, number]> {
+  ): Iterable<[string, number]> {
     return [[key, it.toArray().reduce((x, y) => x + y, 0)]];
   }
 }
 
-function testMap3Init(
-  _skstore: SKStore,
-  input_no_index: TableCollection<[number, string]>,
-  input_index: TableCollection<[number, string]>,
-  output: TableCollection<[number, number]>,
-) {
-  const eager1 = input_no_index.map(TestParseInt);
-  const eager2 = input_index.map(TestParseInt);
-  const eager3 = eager1.map(TestAdd, eager2).map(TestSum);
-  eager3.mapTo(output, TestToOutput);
+class Map3Resource implements Resource {
+  reactiveCompute(
+    _store: SKStore,
+    cs: {
+      input1: EagerCollection<string, number>;
+      input2: EagerCollection<string, number>;
+    },
+  ): EagerCollection<string, number> {
+    return cs.input1.map(Map2, cs.input2).map(Map3);
+  }
 }
 
-function testMap3Run(
-  input_no_index: Table<[number, string]>,
-  input_index: Table<[number, string]>,
-  output: Table<[number, number]>,
-) {
-  input_no_index.insert([
-    [1, "1"],
-    [1, "2"],
-    [1, "3"],
-  ]);
-  input_index.insert([[1, "10"]]);
-  check("testMap3Init", output.select({ id: 1 }, ["value"]), [{ value: 36 }]);
-  input_no_index.insert([[2, "3"]]);
-  input_index.insert([[2, "7"]]);
-  check("testMap3Insert", output.select({}, ["value"]), [
-    { value: 10 },
-    { value: 36 },
+class Map3Service implements SkipService {
+  inputCollections = { input1: [], input2: [] };
+  resources = { map3: Map3Resource };
+
+  reactiveCompute(
+    _store: SKStore,
+    inputCollections: {
+      input1: EagerCollection<number, number>;
+      input2: EagerCollection<number, number>;
+    },
+  ) {
+    return inputCollections;
+  }
+}
+
+function testMap3Run(runtime: SkipRuntime) {
+  const resource = "map3";
+  runtime.put("input1", "1", [1, 2, 3]);
+  runtime.put("input2", "1", [10]);
+  check("testMap3[0]", runtime.getOne(resource, {}, "1"), [36]);
+  runtime.put("input1", "2", [3]);
+  runtime.put("input2", "2", [7]);
+  check("testMap2[1]", runtime.getAll(resource, {}).values, [
+    ["1", [36]],
+    ["2", [10]],
   ]);
 }
 
 tests.push({
   name: "testMap3",
-  inputs: [
-    schema("input_no_index", [integer("id"), text("value")]),
-    schema("input_index", [integer("id", true, true), text("value")]),
-  ],
-  outputs: [schema("output", [integer("id"), integer("value")])],
-  init: testMap3Init,
+  service: new Map3Service(),
   run: testMap3Run,
 });
 
@@ -218,144 +220,193 @@ class SquareValues extends ValueMapper<number, number, number> {
     return v * v;
   }
 }
+
 class AddKeyAndValue extends ValueMapper<number, number, number> {
   mapValue(v: number, k: number) {
     return k + v;
   }
 }
 
-function testValueMapperInit(
-  _skstore: SKStore,
-  input: TableCollection<[number, number]>,
-  output: TableCollection<[number, number]>,
-) {
-  input
-    .map(TestFromIntInt)
-    .map(SquareValues)
-    .map(AddKeyAndValue)
-    .mapTo(output, TestToOutput);
+class ValueMapperResource implements Resource {
+  reactiveCompute(
+    _store: SKStore,
+    cs: {
+      input: EagerCollection<number, number>;
+    },
+  ): EagerCollection<number, number> {
+    return cs.input.map(SquareValues).map(AddKeyAndValue);
+  }
 }
 
-function testValueMapperRun(input: Table<TJSON[]>, output: Table<TJSON[]>) {
-  input.insert([
-    [1, 1],
-    [2, 2],
-    [5, 5],
-    [10, 10],
+class ValueMapperService implements SkipService {
+  inputCollections = { input: [] };
+  resources = { valueMapper: ValueMapperResource };
+
+  reactiveCompute(
+    _store: SKStore,
+    inputCollections: {
+      input: EagerCollection<number, number>;
+    },
+  ) {
+    return inputCollections;
+  }
+}
+
+function testValueMapperRun(runtime: SkipRuntime) {
+  const resource = "valueMapper";
+  runtime.patch("input", [
+    [1, [1]],
+    [2, [2]],
+    [5, [5]],
+    [10, [10]],
   ]);
-  check("testValueMapper", output.select({}, ["value"]), [
-    { value: 2 },
-    { value: 6 },
-    { value: 30 },
-    { value: 110 },
+  check("testValueMapper", runtime.getAll(resource, {}).values, [
+    [1, [2]],
+    [2, [6]],
+    [5, [30]],
+    [10, [110]],
   ]);
 }
 
 tests.push({
   name: "testValueMapper",
-  inputs: [schema("input", [integer("id", true, true), integer("value")])],
-  outputs: [schema("output", [integer("id", true, true), integer("value")])],
-  init: testValueMapperInit,
+  service: new ValueMapperService(),
   run: testValueMapperRun,
 });
 
 //// testSize
 
-class TestSizeGetter implements InputMapper<[number], number, number> {
+class SizeMapper implements Mapper<number, number, number, number> {
   constructor(private other: EagerCollection<number, number>) {}
 
-  mapElement(entry: [number], occ: number): Iterable<[number, number]> {
-    if (entry[0] == 0) return Array([entry[0], this.other.size()]);
-    return Array();
+  mapElement(
+    key: number,
+    it: NonEmptyIterator<number>,
+  ): Iterable<[number, number]> {
+    return [[key, it.first() + this.other.size()]];
   }
 }
 
-function testSizeInit(
-  _skstore: SKStore,
-  input: TableCollection<[number, number]>,
-  size: TableCollection<[number]>,
-  output: TableCollection<[number, number]>,
-) {
-  const eager1 = input.map(TestFromIntInt);
-  const eager2 = size.map(TestSizeGetter, eager1);
-  eager2.mapTo(output, TestToOutput);
+class SizeResource implements Resource {
+  reactiveCompute(
+    _store: SKStore,
+    cs: {
+      input1: EagerCollection<number, number>;
+      input2: EagerCollection<number, number>;
+    },
+  ): EagerCollection<number, number> {
+    return cs.input1.map(SizeMapper, cs.input2);
+  }
 }
 
-function testSizeRun(
-  input: Table<[number, number]>,
-  size: Table<[number]>,
-  output: Table<[number, number]>,
-) {
-  size.insert([[0]]);
-  check("testSizeInit", output.select({ id: 0 }, ["value"]), [{ value: 0 }]);
-  input.insert([
-    [1, 10],
-    [2, 5],
+class SizeService implements SkipService {
+  inputCollections = { input1: [], input2: [] };
+  resources = { size: SizeResource };
+
+  reactiveCompute(
+    _store: SKStore,
+    inputCollections: {
+      input1: EagerCollection<number, number>;
+      input2: EagerCollection<number, number>;
+    },
+  ) {
+    return inputCollections;
+  }
+}
+
+function testSizeRun(runtime: SkipRuntime) {
+  const resource = "size";
+  runtime.patch("input1", [
+    [1, [0]],
+    [2, [2]],
   ]);
-  check("testSizeInsert", output.select({ id: 0 }, ["value"]), [{ value: 2 }]);
-  input.deleteWhere({ id: 1 });
-  check("testSizeRemove", output.select({ id: 0 }, ["value"]), [{ value: 1 }]);
+  check("testSize[0]", runtime.getAll(resource, {}).values, [
+    [1, [0]],
+    [2, [2]],
+  ]);
+  runtime.patch("input2", [
+    [1, [10]],
+    [2, [5]],
+  ]);
+  check("testSize[1]", runtime.getAll(resource, {}).values, [
+    [1, [2]],
+    [2, [4]],
+  ]);
+  runtime.delete("input2", 1);
+  check("testSize[2]", runtime.getAll(resource, {}).values, [
+    [1, [1]],
+    [2, [3]],
+  ]);
 }
 
 tests.push({
   name: "testSize",
-  inputs: [
-    schema("input", [integer("id", true, true), integer("value")]),
-    schema("size", [integer("id", true, true)]),
-  ],
-  outputs: [schema("output", [integer("id", true, true), integer("value")])],
-  init: testSizeInit,
+  service: new SizeService(),
   run: testSizeRun,
 });
 
 //// testSlicedMap1
 
-function testSlicedMap1Init(
-  _skstore: SKStore,
-  input: TableCollection<[number, string]>,
-  output: TableCollection<[number, number]>,
-) {
-  input
-    .map(TestParseInt)
-    .sliced([
-      [1, 1],
-      [3, 4],
-      [7, 9],
-      [20, 50],
-      [42, 1337],
-    ])
-    .map(SquareValues)
-    .take(7)
-    .sliced([
-      [0, 7],
-      [8, 15],
-      [19, 2000],
-    ])
-    .mapTo(output, TestToOutput);
+class SlicedMap1Resource implements Resource {
+  reactiveCompute(
+    _store: SKStore,
+    cs: {
+      input: EagerCollection<number, number>;
+    },
+  ): EagerCollection<number, number> {
+    return cs.input
+      .sliced([
+        [1, 1],
+        [3, 4],
+        [7, 9],
+        [20, 50],
+        [42, 1337],
+      ])
+      .map(SquareValues)
+      .take(7)
+      .sliced([
+        [0, 7],
+        [8, 15],
+        [19, 2000],
+      ]);
+  }
 }
 
-async function testSlicedMap1Run(
-  input: Table<TJSON[]>,
-  output: Table<TJSON[]>,
-) {
-  // Inserts [[0, "0"], ..., [30, "30"]]
-  input.insert(Array.from({ length: 31 }, (_, i) => [i, i.toString()]));
-  check("testSlicedMap1", output.select({}, ["value"]), [
-    { value: 1 },
-    { value: 9 },
-    { value: 16 },
-    { value: 49 },
-    { value: 64 },
-    { value: 81 },
-    { value: 400 },
+class SlicedMap1Service implements SkipService {
+  inputCollections = { input: [] };
+  resources = { slice: SlicedMap1Resource };
+
+  reactiveCompute(
+    _store: SKStore,
+    inputCollections: {
+      input: EagerCollection<number, number>;
+    },
+  ) {
+    return inputCollections;
+  }
+}
+
+function testSlicedMap1Run(runtime: SkipRuntime) {
+  const resource = "slice";
+  // Inserts [[0, 0], ..., [30, 30]
+  const values = Array.from({ length: 31 }, (_, i) => {
+    return [i, [i]] as Entry<number, number>;
+  });
+  runtime.patch("input", values);
+  check("testSlicedMap1[0]", runtime.getAll(resource, {}).values, [
+    [1, [1]],
+    [3, [9]],
+    [4, [16]],
+    [7, [49]],
+    [8, [64]],
+    [9, [81]],
+    [20, [400]],
   ]);
 }
 
 tests.push({
   name: "testSlicedMap1",
-  inputs: [schema("input", [integer("id", true, true), text("value")])],
-  outputs: [schema("output", [integer("id", true, true), integer("value")])],
-  init: testSlicedMap1Init,
+  service: new SlicedMap1Service(),
   run: testSlicedMap1Run,
 });
 
@@ -364,13 +415,16 @@ tests.push({
 class TestLazyAdd implements LazyCompute<number, number> {
   constructor(private other: EagerCollection<number, number>) {}
 
-  compute(selfHdl: LazyCollection<number, number>, key: number): number | null {
+  compute(
+    _selfHdl: LazyCollection<number, number>,
+    key: number,
+  ): number | null {
     const v = this.other.maybeGetOne(key);
     return (v ?? 0) + 2;
   }
 }
 
-class TestSub implements Mapper<number, number, number, number> {
+class MapLazy implements Mapper<number, number, number, number> {
   constructor(private other: LazyCollection<number, number>) {}
 
   mapElement(
@@ -381,47 +435,58 @@ class TestSub implements Mapper<number, number, number, number> {
   }
 }
 
-function testLazyInit(
-  skstore: SKStore,
-  input: TableCollection<[number, number]>,
-  output: TableCollection<[number, number]>,
-) {
-  const eager1 = input.map(TestFromIntInt);
-  const lazy = skstore.lazy(TestLazyAdd, eager1);
-  const eager2 = eager1.map(TestSub, lazy);
-  eager2.mapTo(output, TestToOutput);
+class LazyResource implements Resource {
+  reactiveCompute(
+    skstore: SKStore,
+    cs: {
+      input: EagerCollection<number, number>;
+    },
+  ): EagerCollection<number, number> {
+    const lazy = skstore.lazy(TestLazyAdd, cs.input);
+    return cs.input.map(MapLazy, lazy);
+  }
 }
 
-function testLazyRun(
-  input: Table<[number, number]>,
-  output: Table<[number, number]>,
-) {
-  input.insert([
-    [0, 10],
-    [1, 20],
+class LazyService implements SkipService {
+  inputCollections = { input: [] };
+  resources = { lazy: LazyResource };
+
+  reactiveCompute(
+    _store: SKStore,
+    inputCollections: {
+      input: EagerCollection<number, number>;
+    },
+  ) {
+    return inputCollections;
+  }
+}
+
+function testLazyRun(runtime: SkipRuntime) {
+  const resource = "lazy";
+  runtime.patch("input", [
+    [0, [10]],
+    [1, [20]],
   ]);
-  check("testLazyInit", output.select({ id: [0, 1] }, ["value"]), [
-    { value: 2 },
-    { value: 2 },
+  check("testLazyRun[0]", runtime.getAll(resource, {}).values, [
+    [0, [2]],
+    [1, [2]],
   ]);
-  input.insert([[2, 4]]);
-  check("testLazyInit", output.select({ id: [0, 1, 2] }, ["value"]), [
-    { value: 2 },
-    { value: 2 },
-    { value: 2 },
+  runtime.put("input", 2, [4]);
+  check("testLazyRun[1]", runtime.getAll(resource, {}).values, [
+    [0, [2]],
+    [1, [2]],
+    [2, [2]],
   ]);
-  input.deleteWhere({ id: 2 });
-  check("testLazyInit", output.select({ id: [0, 1, 2] }, ["id", "value"]), [
-    { id: 0, value: 2 },
-    { id: 1, value: 2 },
+  runtime.delete("input", 2);
+  check("testLazyRun[2]", runtime.getAll(resource, {}).values, [
+    [0, [2]],
+    [1, [2]],
   ]);
 }
 
 tests.push({
   name: "testLazy",
-  inputs: [schema("input", [integer("id", true, true), integer("value")])],
-  outputs: [schema("output", [integer("id", true, true), integer("value")])],
-  init: testLazyInit,
+  service: new LazyService(),
   run: testLazyRun,
 });
 
@@ -436,131 +501,132 @@ class TestOddEven implements Mapper<number, number, number, number> {
   }
 }
 
-function testMapReduceInit(
-  _skstore: SKStore,
-  input: TableCollection<[number, number]>,
-  output: TableCollection<[number, number]>,
-) {
-  const eager1 = input.map(TestFromIntInt);
-  const eager2 = eager1.mapReduce(TestOddEven, new Sum());
-  eager2.mapTo(output, TestToOutput);
+class MapReduceResource implements Resource {
+  reactiveCompute(
+    _skstore: SKStore,
+    cs: {
+      input: EagerCollection<number, number>;
+    },
+  ): EagerCollection<number, number> {
+    return cs.input.mapReduce(TestOddEven, new Sum());
+  }
 }
 
-function testMapReduceRun(
-  input: Table<[number, number]>,
-  output: Table<[number, number]>,
-) {
-  input.insert([
-    [0, 1],
-    [1, 1],
-    [2, 1],
+class MapReduceService implements SkipService {
+  inputCollections = { input: [] };
+  resources = { mapReduce: MapReduceResource };
+
+  reactiveCompute(
+    _store: SKStore,
+    inputCollections: {
+      input: EagerCollection<number, number>;
+    },
+  ) {
+    return inputCollections;
+  }
+}
+
+function testMapReduceRun(runtime: SkipRuntime) {
+  const resource = "mapReduce";
+  runtime.patch("input", [
+    [0, [1]],
+    [1, [1]],
+    [2, [1]],
   ]);
-  check("testMapReduceInit", output.select({}, ["id", "v"]), [
-    { id: 0, v: 2 },
-    { id: 1, v: 1 },
+  check("testMapReduceRun[0]", runtime.getAll(resource, {}).values, [
+    [0, [2]],
+    [1, [1]],
   ]);
-  input.insert([[3, 2]]);
-  check("testMapReduceInsert", output.select({}, ["id", "v"]), [
-    { id: 0, v: 2 },
-    { id: 1, v: 3 },
+  runtime.put("input", 3, [2]);
+  check("testMapReduceRun[1]", runtime.getAll(resource, {}).values, [
+    [0, [2]],
+    [1, [3]],
   ]);
-  input.update([0, 1], { v: 2 });
-  check("testMapReduceUpdate", output.select({}, ["id", "v"]), [
-    { id: 0, v: 3 },
-    { id: 1, v: 3 },
+  runtime.patch("input", [
+    [0, [2]],
+    [1, [2]],
   ]);
-  input.deleteWhere({ id: 3 });
-  check("testMapReduceRemove", output.select({}, ["id", "v"]), [
-    { id: 0, v: 3 },
-    { id: 1, v: 1 },
+  check("testMapReduceRun[2]", runtime.getAll(resource, {}).values, [
+    [0, [3]],
+    [1, [4]],
+  ]);
+
+  runtime.delete("input", 3);
+  check("testMapReduceRun[3]", runtime.getAll(resource, {}).values, [
+    [0, [3]],
+    [1, [2]],
   ]);
 }
 
 tests.push({
   name: "testMapReduce",
-  inputs: [schema("input", [integer("id", true, true), integer("v")])],
-  outputs: [schema("output", [integer("id", true, true), integer("v")])],
-  init: testMapReduceInit,
+  service: new MapReduceService(),
   run: testMapReduceRun,
 });
 
-//// testMultiMap1
+//// testMerge1
 
-class TestSplitter implements Mapper<number, number, [number, number], number> {
-  constructor(private to: number) {
-    this.to = to;
-  }
-
-  mapElement(
-    key: number,
-    it: NonEmptyIterator<number>,
-  ): Iterable<[[number, number], number]> {
-    return Array([[this.to, key], it.first()]);
-  }
-}
-
-class TestToOutput2
-  implements OutputMapper<[number, number, number], [number, number], number>
-{
-  mapElement(
-    key: [number, number],
-    it: NonEmptyIterator<number>,
-  ): Iterable<[number, number, number]> {
-    return Array([key[0], key[1], it.first()]);
+class Merge1Resource implements Resource {
+  reactiveCompute(
+    _skstore: SKStore,
+    cs: {
+      input1: EagerCollection<number, number>;
+      input2: EagerCollection<number, number>;
+    },
+  ): EagerCollection<number, number> {
+    return cs.input1.merge(cs.input2);
   }
 }
 
-function testMultiMap1Init(
-  skstore: SKStore,
-  input1: TableCollection<[number, string]>,
-  input2: TableCollection<[number, string]>,
-  output: TableCollection<[number, number, number]>,
-) {
-  const eager1 = input1.map(TestParseInt).map(TestSplitter, 0);
-  const eager2 = input2.map(TestParseInt).map(TestSplitter, 1);
+class Merge1Service implements SkipService {
+  inputCollections = { input1: [], input2: [] };
+  resources = { merge1: Merge1Resource };
 
-  eager1.merge(eager2).mapTo(output, TestToOutput2);
+  reactiveCompute(
+    _store: SKStore,
+    inputCollections: {
+      input1: EagerCollection<number, number>;
+      input2: EagerCollection<number, number>;
+    },
+  ) {
+    return inputCollections;
+  }
 }
 
-function testMultiMap1Run(
-  input1: Table<[number, number]>,
-  input2: Table<[number, number]>,
-  output: Table<[number, number, number]>,
-) {
-  input1.insert([[1, 10]], true);
-  input2.insert([[1, 20]], true);
-  check("testMultiMapInit", output.select({}, ["src", "id", "v"]), [
-    { src: 0, id: 1, v: 10 },
-    { src: 1, id: 1, v: 20 },
+function sorted(entries: Entry<TJSON, TJSON>[]): Entry<TJSON, TJSON>[] {
+  for (const entry of entries) {
+    entry[1].sort();
+  }
+  return entries;
+}
+
+function testMerge1Run(runtime: SkipRuntime) {
+  const resource = "merge1";
+  runtime.put("input1", 1, [10]);
+  runtime.put("input2", 1, [20]);
+  check("testMerge1Run[0]", sorted(runtime.getAll(resource, {}).values), [
+    [1, [10, 20]],
   ]);
-  input1.insert([[2, 3]], true);
-  input2.insert([[2, 7]], true);
-  check("testMultiMapInsert", output.select({}, ["src", "id", "v"]), [
-    { src: 0, id: 1, v: 10 },
-    { src: 0, id: 2, v: 3 },
-    { src: 1, id: 1, v: 20 },
-    { src: 1, id: 2, v: 7 },
+  runtime.put("input1", 2, [3]);
+  runtime.put("input2", 2, [7]);
+  check("testMerge1Run[1]", sorted(runtime.getAll(resource, {}).values), [
+    [1, [10, 20]],
+    [2, [3, 7]],
   ]);
-  input1.deleteWhere({ id: 1 });
-  check("testMultiMapDelete", output.select({}, ["src", "id", "v"]), [
-    { src: 0, id: 2, v: 3 },
-    { src: 1, id: 1, v: 20 },
-    { src: 1, id: 2, v: 7 },
+  runtime.delete("input1", 1);
+  check("testMerge1Run[2]", sorted(runtime.getAll(resource, {}).values), [
+    [1, [20]],
+    [2, [3, 7]],
   ]);
 }
 
 tests.push({
-  name: "testMultiMap1",
-  inputs: [
-    schema("input1", [integer("id", true, true), integer("value")]),
-    schema("input2", [integer("id", true, true), integer("value")]),
-  ],
-  outputs: [schema("output", [integer("src"), integer("id"), integer("v")])],
-  init: testMultiMap1Init,
-  run: testMultiMap1Run,
+  name: "testMerge1",
+  service: new Merge1Service(),
+  run: testMerge1Run,
 });
 
-//// testMultiMapReduce
+//// testMergeReduce
 
 class IdentityMapper extends ValueMapper<number, number, number> {
   mapValue(v: number) {
@@ -568,51 +634,57 @@ class IdentityMapper extends ValueMapper<number, number, number> {
   }
 }
 
-function testMultiMapReduceInit(
-  skstore: SKStore,
-  input1: TableCollection<[number, string]>,
-  input2: TableCollection<[number, string]>,
-  output: TableCollection<[number, number]>,
-) {
-  input1
-    .map(TestParseInt)
-    .merge(input2.map(TestParseInt))
-    .mapReduce(IdentityMapper, new Sum())
-    .mapTo(output, TestToOutput);
+class MergeReduceResource implements Resource {
+  reactiveCompute(
+    _skstore: SKStore,
+    cs: {
+      input1: EagerCollection<number, number>;
+      input2: EagerCollection<number, number>;
+    },
+  ): EagerCollection<number, number> {
+    return cs.input1.merge(cs.input2).mapReduce(IdentityMapper, new Sum());
+  }
 }
 
-function testMultiMapReduceRun(
-  input1: Table<[number, number]>,
-  input2: Table<[number, number]>,
-  output: Table<[number, number]>,
-) {
-  input1.insert([[1, 10]], true);
-  input2.insert([[1, 20]], true);
-  check("testMultiMapReduceInit", output.select({}, ["id", "v"]), [
-    { id: 1, v: 30 },
+class MergeReduceService implements SkipService {
+  inputCollections = { input1: [], input2: [] };
+  resources = { mergeReduce: MergeReduceResource };
+
+  reactiveCompute(
+    _store: SKStore,
+    inputCollections: {
+      input1: EagerCollection<number, number>;
+      input2: EagerCollection<number, number>;
+    },
+  ) {
+    return inputCollections;
+  }
+}
+
+function testMergeReduceRun(runtime: SkipRuntime) {
+  const resource = "mergeReduce";
+  runtime.put("input1", 1, [10]);
+  runtime.put("input2", 1, [20]);
+  check("testMergeReduceRun[0]", runtime.getAll(resource, {}).values, [
+    [1, [30]],
   ]);
-  input1.insert([[2, 3]], true);
-  input2.insert([[2, 7]], true);
-  check("testMultiMapReduceInsert", output.select({}, ["id", "v"]), [
-    { id: 1, v: 30 },
-    { id: 2, v: 10 },
+  runtime.put("input1", 2, [3]);
+  runtime.put("input2", 2, [7]);
+  check("testMergeReduceRun[1]", runtime.getAll(resource, {}).values, [
+    [1, [30]],
+    [2, [10]],
   ]);
-  input1.deleteWhere({ id: 1 });
-  check("testMultiMapReduceDelete", output.select({}, ["id", "v"]), [
-    { id: 1, v: 20 },
-    { id: 2, v: 10 },
+  runtime.delete("input1", 1);
+  check("testMergeReduceRun[2]", runtime.getAll(resource, {}).values, [
+    [1, [20]],
+    [2, [10]],
   ]);
 }
 
 tests.push({
-  name: "testMultiMapReduce",
-  inputs: [
-    schema("input1", [integer("id", true, true), integer("value")]),
-    schema("input2", [integer("id", true, true), integer("value")]),
-  ],
-  outputs: [schema("output", [integer("id", true, true), integer("v")])],
-  init: testMultiMapReduceInit,
-  run: testMultiMapReduceRun,
+  name: "testMergeReduce",
+  service: new MergeReduceService(),
+  run: testMergeReduceRun,
 });
 
 //// testAsyncLazy
@@ -627,8 +699,8 @@ class TestLazyWithAsync
     return v2 ?? 0;
   }
 
-  async call(key: [number, number], param: number) {
-    return { payload: key[1] + param };
+  call(key: [number, number], param: number) {
+    return Promise.resolve({ payload: key[1] + param });
   }
 }
 
@@ -654,70 +726,91 @@ class TestCheckResult implements Mapper<number, number, number, string> {
   }
 }
 
-function testAsyncLazyInit(
-  skstore: SKStore,
-  input1: TableCollection<[number, number]>,
-  input2: TableCollection<[number, number]>,
-  output: TableCollection<[number, string]>,
-) {
-  const eager1 = input1.map(TestFromIntInt);
-  const eager2 = input2.map(TestFromIntInt);
-  const asyncLazy = skstore.asyncLazy(
-    TestLazyWithAsync,
-    eager2,
-  ) as AsyncLazyCollection<[number, number], number, number>;
-  const eager3 = eager1.map(TestCheckResult, asyncLazy);
-  eager3.mapTo(output, TestToOutput);
+class AsyncLazyResource implements Resource {
+  reactiveCompute(
+    skstore: SKStore,
+    cs: {
+      input1: EagerCollection<number, number>;
+      input2: EagerCollection<number, number>;
+    },
+  ): EagerCollection<number, string> {
+    /* eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion */
+    const asyncLazy = skstore.asyncLazy(
+      TestLazyWithAsync,
+      cs.input2,
+    ) as LazyCollection<[number, number], Loadable<number, number>>;
+    return cs.input1.map(TestCheckResult, asyncLazy);
+  }
 }
 
-async function testAsyncLazyRun(
-  input1: Table<[number, number]>,
-  input2: Table<[number, number]>,
-  output: Table<[number, string]>,
-) {
-  const updates: JSONObject[][] = [];
-  output.watch((rows) => {
-    updates.push(rows);
-  });
-  input1.insert([[0, 10]]);
-  input2.insert([[0, 5]]);
+class AsyncLazyService implements SkipService {
+  inputCollections = { input1: [], input2: [] };
+  resources = { asyncLazy: AsyncLazyResource };
+
+  reactiveCompute(
+    _store: SKStore,
+    inputCollections: {
+      input1: EagerCollection<number, number>;
+      input2: EagerCollection<number, number>;
+    },
+  ) {
+    return inputCollections;
+  }
+}
+
+async function testAsyncLazyRun(runtime: SkipRuntime) {
+  const data = runtime.head("asyncLazy", {}, new Uint8Array([]));
+
+  const updates: Entry<TJSON, TJSON>[][] = [];
+  runtime.subscribe<string, TJSON>(
+    data.collection,
+    data.watermark,
+    (values, _watermark, _update) => {
+      updates.push(values);
+    },
+  );
+  runtime.patch("input1", [[0, [10]]]);
+  runtime.patch("input2", [[0, [5]]]);
   let count = 0;
   const waitandcheck = (
-    resolve: (v?: void) => void,
-    reject: (reason?: any) => void,
+    resolve: () => void,
+    reject: (reason?: unknown) => void,
   ) => {
     if (count == 50) reject("Async response not received");
     count++;
-    const value = output.select({ id: 0 });
-    if (value[0]?.v == "loading") {
-      setTimeout(waitandcheck, 10, resolve, reject);
-    } else {
-      check("testAsyncLazy", updates, [
-        [],
-        [{ id: 0, v: "loading" }],
-        [{ id: 0, v: "15" }],
-      ]);
-      resolve();
+    try {
+      const value = runtime.getOne("asyncLazy", {}, 0);
+      if (value[0] == "loading") {
+        setTimeout(waitandcheck, 10, resolve, reject);
+      } else {
+        try {
+          check("testAsyncLazy", updates, [
+            [],
+            [[0, ["loading"]]],
+            [[0, ["15"]]],
+          ]);
+        } catch (e) {
+          reject(e);
+        }
+        resolve();
+      }
+    } catch (e: unknown) {
+      reject(e);
     }
   };
-  return new Promise(waitandcheck);
+  return new Promise<void>(waitandcheck);
 }
 
 tests.push({
   name: "testAsyncLazy",
-  inputs: [
-    schema("input1", [integer("id", true, true), integer("value")]),
-    schema("input2", [integer("id", true, true), integer("value")]),
-  ],
-  outputs: [schema("output", [integer("id", true, true), text("v")])],
-  init: testAsyncLazyInit,
+  service: new AsyncLazyService(),
   run: testAsyncLazyRun,
 });
 
 class MockExternal implements ExternalCall<number, string, TJSON> {
-  async call(key: number, timestamp: number) {
+  async call(key: number, _timestamp: number) {
     await timeout(1000 * key); // wait for `key` seconds before returning
-    return { payload: "mock_result(" + key + ")" };
+    return { payload: `mock_result(${key.toString()})` };
   }
 }
 
@@ -725,85 +818,106 @@ class TestCheckExternalResult extends ValueMapper<number, number, string> {
   constructor(private asyncLazy: AsyncLazyCollection<number, string, TJSON>) {
     super();
   }
-  mapValue(value: number, key: number): string {
+
+  mapValue(_value: number, key: number): string {
     const asyncRes = this.asyncLazy.getOne(key);
     if (asyncRes.status == "success") return `success: ${asyncRes.payload}`;
     if (asyncRes.status == "failure") return `error: ${asyncRes.error}`;
     return `loading... (previous: ${asyncRes.previous ? asyncRes.previous.payload : "NONE"})`;
   }
 }
+
+class ExternalResource implements Resource {
+  reactiveCompute(
+    skstore: SKStore,
+    cs: {
+      input: EagerCollection<number, number>;
+    },
+  ): EagerCollection<number, string> {
+    const external = skstore.external("token_4s", MockExternal);
+    return cs.input.map(TestCheckExternalResult, external);
+  }
+}
+
+class ExternalService implements SkipService {
+  inputCollections = { input: [] };
+  resources = { external: ExternalResource };
+  refreshTokens = { token_4s: 4000 };
+
+  reactiveCompute(
+    _store: SKStore,
+    inputCollections: {
+      input: EagerCollection<number, number>;
+    },
+  ) {
+    return inputCollections;
+  }
+}
+
+async function testExternalCallRun(runtime: SkipRuntime) {
+  const resource = "external";
+  const success = (id: number) => {
+    return [id, [`success: mock_result(${id.toString()})`]];
+  };
+  const loading = (id: number, hasPrevious: boolean = false) => {
+    const previous = hasPrevious ? `mock_result(${id.toString()})` : "NONE";
+    return [id, [`loading... (previous: ${previous})`]];
+  };
+
+  runtime.patch("input", [
+    [1, [10]],
+    [2, [20]],
+    [3, [30]],
+  ]);
+  // Int resource all loading at t = 0.0s
+  check("testExternalCall[0]", runtime.getAll(resource, {}).values, [
+    loading(1),
+    loading(2),
+    loading(3),
+  ]);
+  await timeout(500);
+  // all loading at t = 0.5s
+  check("testExternalCall[1]", runtime.getAll(resource, {}).values, [
+    loading(1),
+    loading(2),
+    loading(3),
+  ]);
+  await timeout(1000);
+  //id=1 succeeded at t = 1.5s
+  check("testExternalCall[2]", runtime.getAll(resource, {}).values, [
+    success(1),
+    loading(2),
+    loading(3),
+  ]);
+  await timeout(1000);
+  //id=1,id=2 succeeded at t = 2.5s
+  check("testExternalCall[3]", runtime.getAll(resource, {}).values, [
+    success(1),
+    success(2),
+    loading(3),
+  ]);
+  await timeout(1000);
+  //id=1,id=2,id=3 succeeded at t = 3.5s
+  check("testExternalCall[4]", runtime.getAll(resource, {}).values, [
+    success(1),
+    success(2),
+    success(3),
+  ]);
+  await timeout(1000);
+  //all loading at t = 4.5s, but with previous values available for use if need be
+  check("testExternalCall[5]", runtime.getAll(resource, {}).values, [
+    loading(1, true),
+    loading(2, true),
+    loading(3, true),
+  ]);
+}
+
 tests.push({
   name: "testExternalCall",
-  inputs: [schema("input", [integer("id", true, true), integer("value")])],
-  outputs: [schema("output", [integer("id", true, true), text("value")])],
-  tokens: { token_4s: 4000 },
-  init: (
-    skstore: SKStore,
-    input: TableCollection<[number, number]>,
-    output: TableCollection<[number, string]>,
-  ) => {
-    const external = skstore.external("token_4s", MockExternal);
-    input
-      .map(TestFromIntInt)
-      .map(TestCheckExternalResult, external)
-      .mapTo(output, TestToOutput);
-  },
-
-  run: async (
-    input: Table<[number, number]>,
-    output: Table<[number, string]>,
-  ) => {
-    const success = (id: number) => {
-      return { id, value: `success: mock_result(${id})` };
-    };
-    const loading = (id: number, hasPrevious: boolean = false) => {
-      const previous = hasPrevious ? `mock_result(${id})` : "NONE";
-      return { id, value: `loading... (previous: ${previous})` };
-    };
-
-    input.insert([
-      [1, 10],
-      [2, 20],
-      [3, 30],
-    ]);
-
-    await timeout(500);
-    // all loading at t = 0.5s
-    check("testExternalCall", output.select({}), [
-      loading(1),
-      loading(2),
-      loading(3),
-    ]);
-    await timeout(1000);
-    //id=1 succeeded at t = 1.5s
-    check("testExternalCall", output.select({}), [
-      success(1),
-      loading(2),
-      loading(3),
-    ]);
-    await timeout(1000);
-    //id=1,id=2 succeeded at t = 2.5s
-    check("testExternalCall", output.select({}), [
-      success(1),
-      success(2),
-      loading(3),
-    ]);
-    await timeout(1000);
-    //id=1,id=2,id=3 succeeded at t = 3.5s
-    check("testExternalCall", output.select({}), [
-      success(1),
-      success(2),
-      success(3),
-    ]);
-    await timeout(1000);
-    //all loading at t = 4.5s, but with previous values available for use if need be
-    check("testExternalCall", output.select({}), [
-      loading(1, true),
-      loading(2, true),
-      loading(3, true),
-    ]);
-  },
+  service: new ExternalService(),
+  run: testExternalCallRun,
 });
+
 //// testTokens
 
 class TestWithToken
@@ -820,142 +934,163 @@ class TestWithToken
   }
 }
 
-class TokensToOutput
-  implements OutputMapper<[number, number, number], number, [number, number]>
-{
-  mapElement(
-    key: number,
-    it: NonEmptyIterator<[number, number]>,
-  ): Iterable<[number, number, number]> {
-    const v = it.first();
-    return Array([key, ...v]);
+class TokensResource implements Resource {
+  reactiveCompute(
+    skstore: SKStore,
+    cs: {
+      input: EagerCollection<number, number>;
+    },
+  ): EagerCollection<number, [number, number]> {
+    return cs.input.map(TestWithToken, skstore);
   }
 }
 
-function testTokensInit(
-  skstore: SKStore,
-  input: TableCollection<[number, number]>,
-  output: TableCollection<[number, number, number]>,
-) {
-  const eager1 = input.map(TestFromIntInt);
-  const eager2 = eager1.map(TestWithToken, skstore);
-  eager2.mapTo(output, TokensToOutput);
+class TokensService implements SkipService {
+  inputCollections = { input: [] };
+  resources = { tokens: TokensResource };
+  refreshTokens = { token_5s: 5000 };
+
+  reactiveCompute(
+    _store: SKStore,
+    inputCollections: {
+      input: EagerCollection<number, number>;
+    },
+  ) {
+    return inputCollections;
+  }
 }
 
 async function timeout(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function testTokensRun(
-  input: Table<[number, number]>,
-  output: Table<[number, number, number]>,
-) {
-  input.insert([[1, 0]], true);
-  const start = output.select({ id: 1 }, ["value", "time"])[0] as any;
+async function testTokensRun(runtime: SkipRuntime) {
+  const resource = "tokens";
+  runtime.put("input", 1, [0]);
+  const start = runtime.getOne(resource, {}, 1)[0] as [number, number];
   await timeout(2000);
-  input.insert([[1, 2]], true);
-  check("testTokens[0]", output.select({ id: 1 }, ["value", "time"]), [
-    { value: 2, time: start.time },
-  ]);
+  runtime.put("input", 1, [2]);
+  let current = runtime.getOne(resource, {}, 1)[0] as [number, number];
+  check("testTokens[0]", current, [2, start[1]]);
   await timeout(2000);
-  input.insert([[1, 4]], true);
-  check("testTokens[1]", output.select({ id: 1 }, ["value", "time"]), [
-    { value: 4, time: start.time },
-  ]);
+  runtime.put("input", 1, [4]);
+  current = runtime.getOne(resource, {}, 1)[0] as [number, number];
+  check("testTokens[1]", current, [4, start[1]]);
   await timeout(2000);
-  const last = output.select({ id: 1 }, ["value", "time"])[0] as any;
-  check("testTokens[2]", Math.trunc((last.time - start.time) / 1000), 5);
+  current = runtime.getOne(resource, {}, 1)[0] as [number, number];
+  check("testTokens[2]", Math.trunc((current[1] - start[1]) / 1000), 5);
 }
 
 tests.push({
-  name: "testTokensInit",
-  inputs: [schema("input", [integer("id", true, true), integer("value")])],
-  outputs: [
-    schema("output", [
-      integer("id", true, true),
-      integer("value"),
-      integer("time"),
-    ]),
-  ],
-  init: testTokensInit,
+  name: "testTokens",
+  service: new TokensService(),
   run: testTokensRun,
-  tokens: { token_5s: 5000 },
 });
 
 // testJSONExtract
 
-class TestFromJSTable
-  implements InputMapper<[number, JSONObject, string], number, TJSON[]>
+class JSONExtract
+  implements
+    Mapper<number, { value: JSONObject; pattern: string }, number, TJSON[]>
 {
   constructor(private skstore: SKStore) {}
 
   mapElement(
-    entry: [number, JSONObject, string],
-    _occ: number,
+    key: number,
+    it: NonEmptyIterator<{ value: JSONObject; pattern: string }>,
   ): Iterable<[number, TJSON[]]> {
-    const key = entry[0];
-    const value = entry[1];
-    const pattern = entry[2];
-    const result = this.skstore.jsonExtract(value, pattern);
+    const value = it.first();
+    const result = this.skstore.jsonExtract(value.value, value.pattern);
     return Array([key, result]);
   }
 }
 
-function testJSONExtractInit(
-  skstore: SKStore,
-  input: TableCollection<[number, JSONObject, string]>,
-  output: TableCollection<[number, TJSON[]]>,
-) {
-  const eager = input.map(TestFromJSTable, skstore);
-  eager.mapTo(output, TestToOutput);
+class JSONExtractResource implements Resource {
+  reactiveCompute(
+    skstore: SKStore,
+    cs: {
+      input: EagerCollection<number, { value: JSONObject; pattern: string }>;
+    },
+  ): EagerCollection<number, TJSON[]> {
+    return cs.input.map(JSONExtract, skstore);
+  }
 }
 
-async function testJSONExtractRun(
-  input: Table<[number, JSONObject, string]>,
-  output: Table<[number, TJSON[]]>,
-) {
-  input.insert(
+class JSONExtractService implements SkipService {
+  inputCollections = { input: [] };
+  resources = { jsonExtract: JSONExtractResource };
+
+  reactiveCompute(
+    _store: SKStore,
+    inputCollections: {
+      input: EagerCollection<number, { value: JSONObject; pattern: string }>;
+    },
+  ) {
+    return inputCollections;
+  }
+}
+
+function testJSONExtractRun(runtime: SkipRuntime) {
+  const resource = "jsonExtract";
+  runtime.patch("input", [
     [
+      0,
       [
-        0,
-        { x: [1, 2, 3], "y[0]": [4, 5, 6, null] },
-        '{x[]: var1, ?"y[0]": var2}',
+        {
+          value: { x: [1, 2, 3], "y[0]": [4, 5, 6, null] },
+          pattern: '{x[]: var1, ?"y[0]": var2}',
+        },
       ],
-      [1, { x: [1, 2, 3], y: [4, 5, 6, null] }, "{x[]: var1, ?y[0]: var2}"],
-      [2, { x: 1, y: 2 }, "{%: var, x:var<int>}"],
     ],
-    true,
-  );
-  const res = output.select({}, ["id", "v"]);
+    [
+      1,
+      [
+        {
+          value: { x: [1, 2, 3], y: [4, 5, 6, null] },
+          pattern: "{x[]: var1, ?y[0]: var2}",
+        },
+      ],
+    ],
+    [
+      2,
+      [
+        {
+          value: { x: 1, y: 2 },
+          pattern: "{%: var, x:var<int>}",
+        },
+      ],
+    ],
+  ]);
+  //
+  const res = runtime.getAll(resource, {}).values;
   check("testJSONExtract", res, [
-    {
-      id: 0,
-      v: [
-        [{ var2: [4, 5, 6, null] }, { var1: 1 }],
-        [{ var2: [4, 5, 6, null] }, { var1: 2 }],
-        [{ var2: [4, 5, 6, null] }, { var1: 3 }],
+    [
+      0,
+      [
+        [
+          [{ var2: [4, 5, 6, null] }, { var1: 1 }],
+          [{ var2: [4, 5, 6, null] }, { var1: 2 }],
+          [{ var2: [4, 5, 6, null] }, { var1: 3 }],
+        ],
       ],
-    },
-    {
-      id: 1,
-      v: [
-        [{ var2: 4 }, { var1: 1 }],
-        [{ var2: 4 }, { var1: 2 }],
-        [{ var2: 4 }, { var1: 3 }],
+    ],
+    [
+      1,
+      [
+        [
+          [{ var2: 4 }, { var1: 1 }],
+          [{ var2: 4 }, { var1: 2 }],
+          [{ var2: 4 }, { var1: 3 }],
+        ],
       ],
-    },
-    {
-      id: 2,
-      v: [[{ var: 1 }, { var: 2 }]],
-    },
+    ],
+    [2, [[[{ var: 1 }, { var: 2 }]]]],
   ]);
 }
 
 tests.push({
   name: "testJSONExtract",
-  inputs: [schema("input", [integer("id", true), json("v"), text("p")])],
-  outputs: [schema("output", [integer("id", true), json("v")])],
-  init: testJSONExtractInit,
+  service: new JSONExtractService(),
   run: testJSONExtractRun,
 });
 
@@ -970,7 +1105,7 @@ type Update = {
 
 async function testTimedQueue() {
   const updates: Update[] = [];
-  var starttime: number = 0;
+  let starttime: number = 0;
   const timedQueue = new TimedQueue((time: number, tokens: string[]) => {
     updates.push({
       idx: updates.length,
@@ -989,10 +1124,10 @@ async function testTimedQueue() {
     rstarttime,
   );
   starttime = Math.trunc(rstarttime / 100);
-  var waiting = true;
+  let waiting = true;
   const waitandcheck = (
     resolve: () => void,
-    reject: (reason?: any) => void,
+    reject: (reason?: unknown) => void,
   ) => {
     const ctime = (add: number) => Math.trunc((rstarttime + add * 100) / 100);
     if (waiting) {
@@ -1032,7 +1167,7 @@ async function testTimedQueue() {
       resolve();
     }
   };
-  return new Promise(waitandcheck) as Promise<void>;
+  return new Promise<void>(waitandcheck);
 }
 
 units.push({ name: "testTimedQueue", run: testTimedQueue });
@@ -1040,29 +1175,21 @@ units.push({ name: "testTimedQueue", run: testTimedQueue });
 //// Run
 
 function run(t: Test) {
-  test(t.name, async ({ page }) => {
-    let tables: Table<TJSON[]>[] = [];
-    try {
-      tables = await createLocalSKStore(
-        t.init,
-        t.inputs,
-        t.outputs,
-        t.tokens ? t.tokens : {},
-      );
-    } catch (err: any) {
-      if (t.error) t.error(err);
-      else throw err;
-    }
-    if (tables.length > 0) await t.run(...tables);
+  test(t.name, async () => {
+    const runtime = await initService(t.service, createSKStore);
+    await t.run(runtime);
   });
 }
 
 function unit(t: UnitTest) {
-  test(t.name, async ({ page }) => {
+  test(t.name, async () => {
     await t.run();
   });
 }
 
+/**
+ * Run all tests
+ */
 export function runAll() {
   tests.forEach(run);
   units.forEach(unit);

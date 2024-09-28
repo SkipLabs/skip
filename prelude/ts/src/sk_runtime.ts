@@ -73,7 +73,7 @@ class LinksImpl implements Links {
   SKIP_glock() {}
   SKIP_gunlock() {}
 
-  complete = (utils: Utils, exports: object) => {
+  complete = (utils: Utils, _exports: object) => {
     this.SKIP_etry = utils.etry;
     this.SKIP_print_error = (msg: ptr<Internal.String>) => {
       utils.sklog(msg, Stream.ERR, true);
@@ -207,9 +207,9 @@ class Manager implements ToWasmManager {
       throw new Error("ErrNo " + err);
     };
     toWasm.__cxa_throw = (
-      exn: ptr<Internal.T<unknown>>,
-      infi: ptr<Internal.T<unknown>>,
-      dest: ptr<Internal.T<unknown>>,
+      _exn: ptr<Internal.T<unknown>>,
+      _infi: ptr<Internal.T<unknown>>,
+      _dest: ptr<Internal.T<unknown>>,
     ) => {
       throw new Error("Not managed exception");
     };

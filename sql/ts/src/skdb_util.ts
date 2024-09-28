@@ -16,7 +16,7 @@ export class SKDBCallable<_T1, _T2> {
 }
 
 export class ExternalFuns {
-  private externalFuns: Array<(obj: any) => any>;
+  private externalFuns: ((obj: any) => any)[];
 
   constructor() {
     this.externalFuns = [];
@@ -26,13 +26,13 @@ export class ExternalFuns {
     if (typeof f != "function") {
       throw new Error("Only function can be registered");
     }
-    let funId = this.externalFuns.length;
+    const funId = this.externalFuns.length;
     this.externalFuns.push(f);
     return new SKDBCallable(funId);
   }
 
-  call(funId: number, jso: object) {
-    return this.externalFuns[funId]!(jso);
+  call<V>(funId: number, jso: object) {
+    return this.externalFuns[funId](jso) as V;
   }
 }
 
@@ -40,8 +40,8 @@ export class ExternalFuns {
 /* Class for query results, extending Array<Record<>> with some common
    selectors and utility functions for ease of use. */
 /* ***************************************************************************/
-export class SKDBTable extends Array<Record<string, any>> {
-  scalarValue(): any | undefined {
+export class SKDBTable extends Array<Record<string, unknown>> {
+  scalarValue(): unknown {
     const row = this.firstRow();
     if (row === undefined) {
       return undefined;
@@ -58,28 +58,28 @@ export class SKDBTable extends Array<Record<string, any>> {
     return row[cols[0]];
   }
 
-  onlyRow(): Record<string, any> {
+  onlyRow(): Record<string, unknown> {
     if (this.length != 1) {
       throw new Error(`Can't extract only row: got ${this.length} rows`);
     }
     return this[0];
   }
 
-  firstRow(): Record<string, any> | undefined {
+  firstRow(): Record<string, unknown> | undefined {
     if (this.length < 1) {
       return undefined;
     }
     return this[0];
   }
 
-  lastRow(): Record<string, any> | undefined {
+  lastRow(): Record<string, unknown> | undefined {
     if (this.length < 1) {
       return undefined;
     }
     return this[this.length - 1];
   }
 
-  onlyColumn(): any[] {
+  onlyColumn(): unknown[] {
     const row = this.firstRow();
     if (row === undefined) {
       return [];
@@ -95,7 +95,7 @@ export class SKDBTable extends Array<Record<string, any>> {
     return this.column(col);
   }
 
-  column(col: string): any[] {
+  column(col: string): unknown[] {
     return this.map((row) => {
       if (!row[col]) {
         throw new Error("Missing column: " + col);
@@ -112,7 +112,7 @@ export class SKDBTable extends Array<Record<string, any>> {
 
 export class SKDBTransaction {
   private params: Params;
-  private stmts: Array<string>;
+  private stmts: string[];
   private db_handle: SKDB;
 
   constructor(skdb: SKDB) {
@@ -121,12 +121,12 @@ export class SKDBTransaction {
     this.db_handle = skdb;
   }
 
-  add(stmt: string): SKDBTransaction {
+  add(stmt: string): this {
     this.stmts.push(stmt.trim().replace(/;$/, ""));
     return this;
   }
 
-  addParams(params: Params): SKDBTransaction {
+  addParams(params: Params): this {
     Object.assign(this.params, params);
     return this;
   }
