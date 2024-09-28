@@ -1,7 +1,7 @@
-import type { TJSON, EntryPoint, Entry, JSONObject } from "skip-runtime";
-import { SkipRESTRuntime } from "skip-runtime";
+import type { TJSON, EntryPoint, Entry, JSONObject } from "@skipruntime/core";
+import { SkipRESTRuntime } from "@skipruntime/core";
 import { createInterface } from "readline";
-import { connect, Protocol, Client } from "skipruntime-client";
+import { connect, Protocol, Client } from "@skipruntime/client";
 
 export interface ClientDefinition {
   port: number;

@@ -13,7 +13,7 @@ import { UnknownCollectionError } from "./skipruntime_impl.js";
 
 import { WebSocket, WebSocketServer, type MessageEvent } from "ws";
 
-import { Protocol } from "skipruntime-client";
+import { Protocol } from "@skipruntime/client";
 
 import * as http from "http";
 
