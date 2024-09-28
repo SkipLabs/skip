@@ -13,7 +13,6 @@ import type {
   AsyncLazyCollection,
   ExternalCall,
   SkipService,
-  SkipRuntime,
   Resource,
   Entry,
   Loadable,
@@ -29,21 +28,6 @@ import {
 function check(name: string, got: TJSON, expected: TJSON): void {
   expect([name, got]).toEqual([name, expected]);
 }
-
-interface Test {
-  name: string;
-  service: SkipService;
-  run: (runtime: SkipRuntime) => void | Promise<void>;
-  tokens?: Record<string, number>;
-}
-
-interface UnitTest {
-  name: string;
-  run: () => void | Promise<void>;
-}
-
-const tests: Test[] = [];
-const units: UnitTest[] = [];
 
 //// testMap1
 
@@ -79,15 +63,10 @@ class Map1Service implements SkipService {
   }
 }
 
-function testMap1Run(runtime: SkipRuntime) {
+it("testMap1", async () => {
+  const runtime = await initService(new Map1Service(), createSKStore);
   runtime.put("input", "1", [10]);
   check("testMap1", runtime.getOne("map1", {}, "1"), [12]);
-}
-
-tests.push({
-  name: "testMap1",
-  service: new Map1Service(),
-  run: testMap1Run,
 });
 
 //// testMap2
@@ -138,7 +117,8 @@ class Map2Service implements SkipService {
   }
 }
 
-function testMap2Run(runtime: SkipRuntime) {
+it("testMap2", async () => {
+  const runtime = await initService(new Map2Service(), createSKStore);
   const resource = "map2";
   runtime.put("input1", "1", [10]);
   runtime.put("input2", "1", [20]);
@@ -149,12 +129,6 @@ function testMap2Run(runtime: SkipRuntime) {
     ["1", [30]],
     ["2", [10]],
   ]);
-}
-
-tests.push({
-  name: "testMap2",
-  service: new Map2Service(),
-  run: testMap2Run,
 });
 
 //// testMap3
@@ -195,7 +169,8 @@ class Map3Service implements SkipService {
   }
 }
 
-function testMap3Run(runtime: SkipRuntime) {
+it("testMap2", async () => {
+  const runtime = await initService(new Map3Service(), createSKStore);
   const resource = "map3";
   runtime.put("input1", "1", [1, 2, 3]);
   runtime.put("input2", "1", [10]);
@@ -206,12 +181,6 @@ function testMap3Run(runtime: SkipRuntime) {
     ["1", [36]],
     ["2", [10]],
   ]);
-}
-
-tests.push({
-  name: "testMap3",
-  service: new Map3Service(),
-  run: testMap3Run,
 });
 
 //// testValueMapper
@@ -253,7 +222,8 @@ class ValueMapperService implements SkipService {
   }
 }
 
-function testValueMapperRun(runtime: SkipRuntime) {
+it("valueMapper", async () => {
+  const runtime = await initService(new ValueMapperService(), createSKStore);
   const resource = "valueMapper";
   runtime.patch("input", [
     [1, [1]],
@@ -267,12 +237,6 @@ function testValueMapperRun(runtime: SkipRuntime) {
     [5, [30]],
     [10, [110]],
   ]);
-}
-
-tests.push({
-  name: "testValueMapper",
-  service: new ValueMapperService(),
-  run: testValueMapperRun,
 });
 
 //// testSize
@@ -315,7 +279,8 @@ class SizeService implements SkipService {
   }
 }
 
-function testSizeRun(runtime: SkipRuntime) {
+it("testSize", async () => {
+  const runtime = await initService(new SizeService(), createSKStore);
   const resource = "size";
   runtime.patch("input1", [
     [1, [0]],
@@ -338,12 +303,6 @@ function testSizeRun(runtime: SkipRuntime) {
     [1, [1]],
     [2, [3]],
   ]);
-}
-
-tests.push({
-  name: "testSize",
-  service: new SizeService(),
-  run: testSizeRun,
 });
 
 //// testSlicedMap1
@@ -387,7 +346,8 @@ class SlicedMap1Service implements SkipService {
   }
 }
 
-function testSlicedMap1Run(runtime: SkipRuntime) {
+it("testSlicedMap1", async () => {
+  const runtime = await initService(new SlicedMap1Service(), createSKStore);
   const resource = "slice";
   // Inserts [[0, 0], ..., [30, 30]
   const values = Array.from({ length: 31 }, (_, i) => {
@@ -403,12 +363,6 @@ function testSlicedMap1Run(runtime: SkipRuntime) {
     [9, [81]],
     [20, [400]],
   ]);
-}
-
-tests.push({
-  name: "testSlicedMap1",
-  service: new SlicedMap1Service(),
-  run: testSlicedMap1Run,
 });
 
 //// testLazy
@@ -462,7 +416,8 @@ class LazyService implements SkipService {
   }
 }
 
-function testLazyRun(runtime: SkipRuntime) {
+it("testLazy", async () => {
+  const runtime = await initService(new LazyService(), createSKStore);
   const resource = "lazy";
   runtime.patch("input", [
     [0, [10]],
@@ -483,12 +438,6 @@ function testLazyRun(runtime: SkipRuntime) {
     [0, [2]],
     [1, [2]],
   ]);
-}
-
-tests.push({
-  name: "testLazy",
-  service: new LazyService(),
-  run: testLazyRun,
 });
 
 //// testMapReduce
@@ -527,7 +476,8 @@ class MapReduceService implements SkipService {
   }
 }
 
-function testMapReduceRun(runtime: SkipRuntime) {
+it("testMapReduce", async () => {
+  const runtime = await initService(new MapReduceService(), createSKStore);
   const resource = "mapReduce";
   runtime.patch("input", [
     [0, [1]],
@@ -557,12 +507,6 @@ function testMapReduceRun(runtime: SkipRuntime) {
     [0, [3]],
     [1, [2]],
   ]);
-}
-
-tests.push({
-  name: "testMapReduce",
-  service: new MapReduceService(),
-  run: testMapReduceRun,
 });
 
 //// testMerge1
@@ -601,7 +545,8 @@ function sorted(entries: Entry<TJSON, TJSON>[]): Entry<TJSON, TJSON>[] {
   return entries;
 }
 
-function testMerge1Run(runtime: SkipRuntime) {
+it("testMerge1", async () => {
+  const runtime = await initService(new Merge1Service(), createSKStore);
   const resource = "merge1";
   runtime.put("input1", 1, [10]);
   runtime.put("input2", 1, [20]);
@@ -619,12 +564,6 @@ function testMerge1Run(runtime: SkipRuntime) {
     [1, [20]],
     [2, [3, 7]],
   ]);
-}
-
-tests.push({
-  name: "testMerge1",
-  service: new Merge1Service(),
-  run: testMerge1Run,
 });
 
 //// testMergeReduce
@@ -662,7 +601,8 @@ class MergeReduceService implements SkipService {
   }
 }
 
-function testMergeReduceRun(runtime: SkipRuntime) {
+it("testMergeReduce", async () => {
+  const runtime = await initService(new MergeReduceService(), createSKStore);
   const resource = "mergeReduce";
   runtime.put("input1", 1, [10]);
   runtime.put("input2", 1, [20]);
@@ -680,12 +620,6 @@ function testMergeReduceRun(runtime: SkipRuntime) {
     [1, [20]],
     [2, [10]],
   ]);
-}
-
-tests.push({
-  name: "testMergeReduce",
-  service: new MergeReduceService(),
-  run: testMergeReduceRun,
 });
 
 //// testAsyncLazy
@@ -759,7 +693,8 @@ class AsyncLazyService implements SkipService {
   }
 }
 
-async function testAsyncLazyRun(runtime: SkipRuntime) {
+it("testAsyncLazy", async () => {
+  const runtime = await initService(new AsyncLazyService(), createSKStore);
   const data = runtime.head("asyncLazy", {}, new Uint8Array([]));
 
   const updates: Entry<TJSON, TJSON>[][] = [];
@@ -800,12 +735,6 @@ async function testAsyncLazyRun(runtime: SkipRuntime) {
     }
   };
   return new Promise<void>(waitandcheck);
-}
-
-tests.push({
-  name: "testAsyncLazy",
-  service: new AsyncLazyService(),
-  run: testAsyncLazyRun,
 });
 
 class MockExternal implements ExternalCall<number, string, TJSON> {
@@ -855,7 +784,8 @@ class ExternalService implements SkipService {
   }
 }
 
-async function testExternalCallRun(runtime: SkipRuntime) {
+it("testExternalCall", async () => {
+  const runtime = await initService(new ExternalService(), createSKStore);
   const resource = "external";
   const success = (id: number) => {
     return [id, [`success: mock_result(${id.toString()})`]];
@@ -911,12 +841,6 @@ async function testExternalCallRun(runtime: SkipRuntime) {
     loading(2, true),
     loading(3, true),
   ]);
-}
-
-tests.push({
-  name: "testExternalCall",
-  service: new ExternalService(),
-  run: testExternalCallRun,
 });
 
 //// testTokens
@@ -965,7 +889,8 @@ async function timeout(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function testTokensRun(runtime: SkipRuntime) {
+it("testTokens", async () => {
+  const runtime = await initService(new TokensService(), createSKStore);
   const resource = "tokens";
   runtime.put("input", 1, [0]);
   const start = runtime.getOne(resource, {}, 1)[0] as [number, number];
@@ -980,12 +905,6 @@ async function testTokensRun(runtime: SkipRuntime) {
   await timeout(2000);
   current = runtime.getOne(resource, {}, 1)[0] as [number, number];
   check("testTokens[2]", Math.trunc((current[1] - start[1]) / 1000), 5);
-}
-
-tests.push({
-  name: "testTokens",
-  service: new TokensService(),
-  run: testTokensRun,
 });
 
 // testJSONExtract
@@ -1031,7 +950,8 @@ class JSONExtractService implements SkipService {
   }
 }
 
-function testJSONExtractRun(runtime: SkipRuntime) {
+it("testJSONExtract", async () => {
+  const runtime = await initService(new JSONExtractService(), createSKStore);
   const resource = "jsonExtract";
   runtime.patch("input", [
     [
@@ -1087,12 +1007,6 @@ function testJSONExtractRun(runtime: SkipRuntime) {
     ],
     [2, [[[{ var: 1 }, { var: 2 }]]]],
   ]);
-}
-
-tests.push({
-  name: "testJSONExtract",
-  service: new JSONExtractService(),
-  run: testJSONExtractRun,
 });
 
 /// Unit tests
@@ -1104,7 +1018,7 @@ type Update = {
   tokens: string[];
 };
 
-async function testTimedQueue() {
+it("testTimedQueue", () => {
   const updates: Update[] = [];
   let starttime: number = 0;
   const timedQueue = new TimedQueue((time: number, tokens: string[]) => {
@@ -1169,29 +1083,4 @@ async function testTimedQueue() {
     }
   };
   return new Promise<void>(waitandcheck);
-}
-
-units.push({ name: "testTimedQueue", run: testTimedQueue });
-
-//// Run
-
-function run(t: Test) {
-  it(t.name, async () => {
-    const runtime = await initService(t.service, createSKStore);
-    await t.run(runtime);
-  });
-}
-
-function unit(t: UnitTest) {
-  it(t.name, async () => {
-    await t.run();
-  });
-}
-
-/**
- * Run all tests
- */
-describe('SkipService', () => {
-  tests.forEach(run);
-  units.forEach(unit);
 });
