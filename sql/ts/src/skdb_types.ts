@@ -1,9 +1,9 @@
-import type { Shared } from "#std/sk_types.js";
+import type { Shared } from "std";
 import { SKDBTable } from "./skdb_util.js";
 
 export interface SKDBHandle {
   runner: (fn: () => string) => SKDBTable;
-  main: (new_args: Array<string>, new_stdin: string) => string;
+  main: (new_args: string[], new_stdin: string) => string;
   watch: (
     query: string,
     params: Params,
@@ -38,10 +38,10 @@ export interface SKDBSync {
     init: (rows: SKDBTable) => void,
     update: (added: SKDBTable, removed: SKDBTable) => void,
   ) => { close: () => void };
-  insert: (tableName: string, values: Array<any>) => boolean;
+  insert: (tableName: string, values: any[]) => boolean;
   insertMany: (
     tableName: string,
-    valuesArray: Array<Record<string, any>>,
+    valuesArray: Record<string, any>[],
   ) => number | Error;
 
   tableSchema: (tableName: string) => string;
@@ -66,7 +66,7 @@ export interface SKDBSync {
   serverTableSchema: (tableName: string) => Promise<string>;
   serverViewSchema: (tableName: string) => Promise<string>;
   serverSchema: () => Promise<string>;
-  serverClose: () => void;
+  serverClose: () => Promise<void>;
 }
 
 export interface SKDB {
@@ -85,10 +85,10 @@ export interface SKDB {
 
   insertMany: (
     tableName: string,
-    valuesArray: Array<Record<string, any>>,
+    valuesArray: Record<string, any>[],
   ) => Promise<number>;
 
-  insert: (tableName: string, valuesArray: Array<any>) => Promise<boolean>;
+  insert: (tableName: string, valuesArray: any[]) => Promise<boolean>;
 
   connect: (
     db: string,
@@ -170,10 +170,10 @@ export type Page = { pageid: number; content: any };
 
 export interface PagedMemory {
   init(fn: (page: Page) => void): void;
-  restore(pages: Array<Page>): void;
+  restore(pages: Page[]): void;
   clear(): void;
   update(): void;
-  getPages(): Promise<Array<Page>>;
+  getPages(): Promise<Page[]>;
 }
 
 export interface SKDBShared extends Shared {

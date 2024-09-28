@@ -1,10 +1,4 @@
-import type {
-  Accumulator,
-  ColumnSchema,
-  Index,
-  Schema,
-  Opt,
-} from "./skipruntime_api.js";
+import type { Accumulator, Opt } from "./skipruntime_api.js";
 
 export class Sum implements Accumulator<number, number> {
   default = 0;
@@ -40,68 +34,4 @@ export class Max implements Accumulator<number, number> {
   dismiss(acc: number, value: number): Opt<number> {
     return value < acc ? acc : null;
   }
-}
-
-export function schema(
-  name: string,
-  columns: ColumnSchema[],
-  indexes?: Index[],
-): Schema {
-  return {
-    name,
-    columns,
-    indexes,
-  };
-}
-
-export function cinteger(
-  name: string,
-  notnull: boolean = true,
-  primary: boolean = false,
-): ColumnSchema {
-  return {
-    name,
-    type: "INTEGER",
-    notnull,
-    primary,
-  };
-}
-
-export function ctext(
-  name: string,
-  notnull: boolean = true,
-  primary: boolean = false,
-): ColumnSchema {
-  return {
-    name,
-    type: "TEXT",
-    notnull,
-    primary,
-  };
-}
-
-export function cjson(
-  name: string,
-  notnull: boolean = true,
-  primary: boolean = false,
-): ColumnSchema {
-  return {
-    name,
-    type: "JSON",
-    notnull,
-    primary,
-  };
-}
-
-export function cfloat(
-  name: string,
-  notnull: boolean = true,
-  primary: boolean = false,
-): ColumnSchema {
-  return {
-    name,
-    type: "JSON",
-    notnull,
-    primary,
-  };
 }

@@ -8,7 +8,6 @@ PLAYWRIGHT_REPORTER?="line"
 SKARGO_PROFILE?=release
 SKDB_WASM=sql/target/wasm32-unknown-unknown/$(SKARGO_PROFILE)/skdb.wasm
 SKDB_BIN=sql/target/host/$(SKARGO_PROFILE)/skdb
-SKNPM_BIN=sknpm/target/host/$(SKARGO_PROFILE)/sknpm
 SDKMAN_DIR?=$(HOME)/.sdkman
 
 ifndef PLAYWRIGHT_JUNIT_OUTPUT_NAME
@@ -43,20 +42,6 @@ sql/target/wasm32-unknown-unknown/release/skdb.wasm: sql/src/*
 
 $(SDKMAN_DIR):
 	cd $(dirname $(SDKMAN_DIR)) && sh -c 'wget -q -O- "https://get.sdkman.io?rcupdate=false" | bash'
-
-################################################################################
-# sknpm native binary
-################################################################################
-
-sknpm/target/host/dev/sknpm: sknpm/src/* skargo/src/* prelude/src/*
-	cd sknpm && skargo build
-
-sknpm/target/host/release/sknpm: sknpm/src/* skargo/src/* prelude/src/*
-	cd sknpm && skargo build --release --bin sknpm
-
-build/sknpm: $(SKNPM_BIN)
-	mkdir -p build
-	cp $^ $@
 
 ################################################################################
 # skdb native binary
@@ -101,6 +86,10 @@ check: $(CHECK_TARGETS)
 clean:
 	rm -Rf build
 	find . -name 'Skargo.toml' -print0 | sed 's|Skargo.toml|target|g' | xargs -0 rm -rf
+
+.PHONY: clean-all
+clean-all: clean
+	find . -type d -name 'node_modules' -prune -print0 | xargs -0 rm -rf
 
 .PHONY: fmt-sk
 fmt-sk:
@@ -154,8 +143,8 @@ test-native: build/skdb
 	! grep -v '\*\|^[[:blank:]]*$$\|OK\|PASS' /tmp/native-test.out
 
 .PHONY: test-client
-test-client: build/sknpm
-	cd sql && ../build/sknpm test --profile $(SKARGO_PROFILE) $(SKNPM_FLAG) client
+test-client:
+	cd sql && make test-client
 
 .PHONY: test-replication
 test-replication: build/skdb
@@ -242,13 +231,13 @@ sktest-%:
 skbuild-%:
 	cd $* && skargo b --profile $(SKARGO_PROFILE)
 
-tstest-%: build/sknpm
-	cd $* && ../build/sknpm test --profile $(SKARGO_PROFILE) $(SKNPM_FLAG)
 
-## Backward Compatibility
 
 .PHONY: test-wasm
-test-wasm: tstest-sql
+test-wasm:
+	cd sql && make test
+
+## Backward Compatibility
 
 .PHONY: test-skfs
 test-skfs: sktest-prelude

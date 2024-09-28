@@ -11,7 +11,7 @@ You will need at least the following installed:
  * LLVM 15.
  * wasm-ld 15 (this is part of LLVM, but your distribution might split it into
    a separate package: your wasm-ld version must match your LLVM version).
- * typescript 5.2 or later.
+ * typescript 5.5 or later.
 
 
 ## License

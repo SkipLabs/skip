@@ -1,6 +1,6 @@
-import type { T } from "#std/sk_internal_types.js";
-export type * from "#std/sk_internal_types.js";
-export type * from "#skjson/skjson_internal_types.js";
+import type { T } from "std/internal.js";
+export type * from "std/internal.js";
+export type * from "skjson/internal.js";
 
 /* eslint-disable @typescript-eslint/no-unused-vars */
 

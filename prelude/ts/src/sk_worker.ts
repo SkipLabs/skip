@@ -135,9 +135,9 @@ function asKey(messageId: MessageId) {
 
 export class Sender {
   close: () => void;
-  send: () => Promise<any>;
+  send: <T>() => Promise<T>;
 
-  constructor(close: () => void, send: () => Promise<any>) {
+  constructor(close: () => void, send: <T>() => Promise<T>) {
     this.close = close;
     this.send = send;
   }
@@ -273,16 +273,26 @@ function apply<R>(
   parameters: any[],
   conv: (res: any) => any = (v) => v,
 ): void {
-  fn.apply(caller, parameters)
-    .then((result: any) => {
-      post(new Message(id, new Return(true, conv(result))));
-    })
-    .catch((e: any) => {
-      // Firefox don't transmit Worker message if an object of type Error is in the message.
-      post(
-        new Message(id, new Return(false, e instanceof Error ? e.message : e)),
-      );
-    });
+  try {
+    const promise = fn.apply(caller, parameters);
+    promise
+      .then((result: any) => {
+        post(new Message(id, new Return(true, conv(result))));
+      })
+      .catch((e: any) => {
+        // Firefox don't transmit Worker message if an object of type Error is in the message.
+        post(
+          new Message(
+            id,
+            new Return(false, e instanceof Error ? e.message : e),
+          ),
+        );
+      });
+  } catch (e: unknown) {
+    post(
+      new Message(id, new Return(false, e instanceof Error ? e.message : e)),
+    );
+  }
 }
 
 var runner: object;

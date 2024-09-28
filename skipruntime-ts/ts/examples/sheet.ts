@@ -6,12 +6,10 @@ import type {
   Mapper,
   NonEmptyIterator,
   TJSON,
-  SimpleSkipService,
-  SimpleServiceOutput,
-  Writer,
+  SkipService,
 } from "skip-runtime";
 
-import { runWithServer } from "skip-runtime";
+import { runService, type Resource } from "skip-runtime";
 
 class ComputeExpression implements LazyCompute<string, string> {
   constructor(private skall: EagerCollection<string, TJSON>) {}
@@ -26,8 +24,8 @@ class ComputeExpression implements LazyCompute<string, string> {
       }
       throw new Error(`Invalid value for cell '${key}'`);
     };
-    const v = this.skall.maybeGetOne(key) as string;
-    if (v && v.charAt(0) == "=") {
+    const v = this.skall.maybeGetOne(key) as string | null;
+    if (v?.startsWith("=")) {
       try {
         // Fake evaluator in this exemple
         switch (v.substring(1)) {
@@ -41,7 +39,7 @@ class ComputeExpression implements LazyCompute<string, string> {
           default:
             return "# Not managed expression.";
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : JSON.stringify(e);
         return "# " + msg;
       }
@@ -59,7 +57,7 @@ class CallCompute implements Mapper<string, TJSON, string, TJSON> {
     it: NonEmptyIterator<TJSON>,
   ): Iterable<[string, TJSON]> {
     const v = it.uniqueValue();
-    if (typeof v == "string" && v.charAt(0) == "=") {
+    if (typeof v == "string" && v.startsWith("=")) {
       return Array([key, this.evaluator.getOne(key)]);
     }
     if (v == null) {
@@ -69,23 +67,23 @@ class CallCompute implements Mapper<string, TJSON, string, TJSON> {
   }
 }
 
-type Command = {
-  command: string;
-  payload: TJSON;
-};
+class ComputedCells implements Resource {
+  reactiveCompute(
+    _store: SKStore,
+    collections: { output: EagerCollection<string, TJSON> },
+  ): EagerCollection<string, TJSON> {
+    return collections.output;
+  }
+}
 
-type Set = { key: string; value: number };
-type Delete = { keys: string[] };
-
-class Service implements SimpleSkipService {
-  name: string = "sheet";
-  inputTables = ["cells"];
+class Service implements SkipService {
+  inputCollections = { cells: [] };
+  resources = { computed: ComputedCells };
 
   reactiveCompute(
     store: SKStore,
-    _requests: EagerCollection<string, TJSON>,
     inputCollections: Record<string, EagerCollection<string, TJSON>>,
-  ): SimpleServiceOutput {
+  ): Record<string, EagerCollection<TJSON, TJSON>> {
     const cells = inputCollections["cells"];
     // Use lazy dir to create eval dependency graph
     // Its calls it self to get other computed cells
@@ -95,26 +93,8 @@ class Service implements SimpleSkipService {
     // Parsing => Immutable ast
     // Evaluation => Compute tree with context
     const output = cells.map(CallCompute, evaluator);
-    return {
-      output,
-      update: (event: TJSON, writers: Record<string, Writer<TJSON>>) => {
-        const cmd = event as Command;
-        if (cmd.command == "set") {
-          const payload = cmd.payload as Set[];
-          for (const e of payload) {
-            const writer = writers["cells"];
-            writer.set(e.key, e.value);
-          }
-        } else if (cmd.command == "delete") {
-          const payload = cmd.payload as Delete[];
-          for (const e of payload) {
-            const writer = writers["cells"];
-            writer.delete(e.keys);
-          }
-        }
-      },
-    };
+    return { output };
   }
 }
 
-await runWithServer(new Service(), { port: 8082 });
+await runService(new Service(), 9998);

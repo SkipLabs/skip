@@ -161,7 +161,7 @@ export interface Environment {
   name: () => string;
   disableWarnings: boolean;
   environment: Array<string>;
-  createSocket: (uir: string) => WebSocket;
+  createSocket: (uri: string) => WebSocket;
   createWorker: (url: URL, options?: WorkerOptions) => Wrk;
   createWorkerWrapper: (worker: Worker) => Wrk;
   timestamp: () => float;
@@ -173,7 +173,7 @@ export interface Environment {
   fs: () => FileSystem;
   sys: () => System;
   crypto: () => Crypto;
-  fetch: (url: URL) => Promise<Uint8Array>;
+  fetch: (url: URL | string) => Promise<Uint8Array>;
 }
 
 export interface Memory {
@@ -881,11 +881,11 @@ export function isNode() {
 export async function loadEnv(extensions: EnvInit[], envVals?: Array<string>) {
   // hack: this way of importing is deliberate so that web bundlers
   // don't follow the node dynamic import
-  const nodeImport = "./sk_node.mjs";
+  const nodeImport = "./sk_node.js";
   const environment = await (isNode()
     ? import(/* @vite-ignore */ nodeImport)
     : //@ts-ignore
-      import("./sk_browser.mjs"));
+      import("./sk_browser.js"));
   let env = environment.environment(envVals) as Environment;
   if (extensions) {
     extensions.map((fn) => fn(env));
@@ -935,7 +935,7 @@ export async function run(
 }
 
 export async function runUrl(
-  getUrl: () => Promise<URL>,
+  getUrl: () => Promise<URL | string>,
   modules: ModuleInit[],
   extensions: EnvInit[],
   main?: string,

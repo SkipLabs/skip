@@ -1,4 +1,4 @@
-import type { Environment } from "#std/sk_types.js";
+import type { Environment } from "std";
 import type {
   SKDBMechanism,
   RemoteSKDB,
@@ -104,14 +104,14 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
       return buf.slice(0, 6 + (encodeResult.written || 0));
     }
     case "schema": {
-      const name = msg.name || "";
-      const suffix = msg.suffix || "";
+      const name = msg.name ?? "";
+      const suffix = msg.suffix ?? "";
       const buf = new ArrayBuffer(6 + name.length * 4 + suffix.length * 4);
       const uint8View = new Uint8Array(buf);
       const dataView = new DataView(buf);
       const textEncoder = new TextEncoder();
       let encodeResult = textEncoder.encodeInto(name, uint8View.subarray(4));
-      const suffixIdx = 4 + (encodeResult.written || 0);
+      const suffixIdx = 4 + (encodeResult.written ?? 0);
       dataView.setUint8(0, 0x4); // type
       const scopeLookup = new Map([
         ["all", 0x0],
@@ -244,8 +244,8 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
 }
 
 class ProtoMsgDecoder {
-  private bufs: Array<Uint8Array> = [];
-  private msgs: Array<ProtoMsg | null> = [];
+  private bufs: Uint8Array[] = [];
+  private msgs: (ProtoMsg | null)[] = [];
 
   private popBufs(): ArrayBuffer {
     if (this.bufs.length == 1) {
@@ -354,12 +354,11 @@ interface ResiliencyPolicy {
 }
 
 class ResilientMuxedSocket {
-  private env: Environment;
-  private uri: string;
-  private creds: Creds;
-  private policy: ResiliencyPolicy;
   private socket?: MuxedSocket;
-  private socketQueue: Array<any> = new Array();
+  private socketQueue: {
+    resolve: (value: MuxedSocket | PromiseLike<MuxedSocket>) => void;
+    reject: (error?: Error) => void;
+  }[] = [];
   private permanentFailureReason?: string;
 
   // streams from the server are not resilient
@@ -379,14 +378,14 @@ class ResilientMuxedSocket {
   async closeSocket(): Promise<void> {
     const socket = this.socket ?? (await this.getSocket());
     this.socket = undefined;
-    this.socketQueue = new Array();
+    this.socketQueue = [];
     socket.closeSocket();
   }
 
   async errorSocket(errorCode: number, msg: string): Promise<void> {
     const socket = this.socket ?? (await this.getSocket());
     this.socket = undefined;
-    this.socketQueue = new Array();
+    this.socketQueue = [];
     socket.errorSocket(errorCode, msg);
   }
 
@@ -412,17 +411,13 @@ class ResilientMuxedSocket {
   }
 
   private constructor(
-    env: Environment,
-    policy: ResiliencyPolicy,
-    uri: string,
-    creds: Creds,
+    private env: Environment,
+    private policy: ResiliencyPolicy,
+    private uri: string,
+    private creds: Creds,
     initialSocket: MuxedSocket,
   ) {
-    this.env = env;
     this.attachSocket(initialSocket);
-    this.policy = policy;
-    this.uri = uri;
-    this.creds = creds;
   }
 
   private async getSocket(): Promise<MuxedSocket> {
@@ -457,7 +452,9 @@ class ResilientMuxedSocket {
       }
     };
     socket.onClose = () => {
-      this.replaceFailedSocket();
+      this.replaceFailedSocket().catch((e: unknown) => {
+        console.error(e);
+      });
     };
     socket.onError = (errorCode, msg) => {
       if (!this.isSocketErrorRetryable(errorCode)) {
@@ -468,13 +465,15 @@ class ResilientMuxedSocket {
         this.socket = undefined;
         return;
       }
-      this.replaceFailedSocket();
+      this.replaceFailedSocket().catch((e: unknown) => {
+        console.error(e);
+      });
     };
     this.socket = socket;
     for (const promise of this.socketQueue) {
       promise.resolve(socket);
     }
-    this.socketQueue = new Array();
+    this.socketQueue = [];
   }
 
   private async replaceFailedSocket(): Promise<void> {
@@ -504,7 +503,7 @@ class ResilientMuxedSocket {
         );
         this.attachSocket(socket);
         return;
-      } catch (error) {
+      } catch {
         const backoffMs = 500 + Math.random() * 1000;
         await new Promise((resolve) => setTimeout(resolve, backoffMs));
       }
@@ -516,13 +515,15 @@ class ResilientMuxedSocket {
   async replaceFailedStream(): Promise<Stream> {
     this.policy.notifyFailedStream();
     if (await this.policy.shouldReconnect(this)) {
-      this.replaceFailedSocket();
+      this.replaceFailedSocket().catch((e: unknown) => {
+        console.error(e);
+      });
     }
 
     const socket = await this.getSocket();
 
     try {
-      return socket.openStream();
+      return await socket.openStream();
     } catch {
       await this.replaceFailedSocket();
       return this.replaceFailedStream();
@@ -535,6 +536,7 @@ class ResilientStream {
   private stream?: Stream;
 
   private failureDetectionTimeout?: number;
+
   private setFailureDetectionTimeout(timeout?: number): void {
     clearTimeout(this.failureDetectionTimeout);
     this.failureDetectionTimeout = timeout;
@@ -577,7 +579,9 @@ class ResilientStream {
 
     const failureThresholdMs = 60000;
     const timeout = setTimeout(() => {
-      this.replaceFailedStream();
+      this.replaceFailedStream().catch((e: unknown) => {
+        console.error(e);
+      });
     }, failureThresholdMs);
     // TODO: Fix the following error.
     // @ts-ignore
@@ -593,13 +597,17 @@ class ResilientStream {
       }
     };
     stream.onClose = () => {
-      this.replaceFailedStream();
+      this.replaceFailedStream().catch((e: unknown) => {
+        console.error(e);
+      });
     };
     stream.onError = (_errorCode, _msg) => {
       // we ignore the error code and attempt to re-establish the
       // stream from scratch, which should resolve the issue even if
       // it wasn't in a retryable state.
-      this.replaceFailedStream();
+      this.replaceFailedStream().catch((e: unknown) => {
+        console.error(e);
+      });
     };
     this.stream = stream;
   }
@@ -633,6 +641,8 @@ class ResilientStream {
 /* Stream MUX protocol */
 /* ***************************************************************************/
 
+/* eslint-disable no-unused-vars */
+
 enum MuxedSocketState {
   IDLE,
   AUTH_SENT,
@@ -640,6 +650,8 @@ enum MuxedSocketState {
   CLOSEWAIT, // can send data
   CLOSED,
 }
+
+/* eslint-enable no-unused-vars */
 
 type MuxAuth = {
   type: "auth";
@@ -680,20 +692,17 @@ export interface Creds {
 
 export class MuxedSocket {
   // constants
-  private socket: WebSocket;
-  private creds: Creds;
   private reauthTimeoutMs = 5 * 60 * 1000; // 5 mins - half of the 10 min window
-  private env: Environment;
 
   // state
   private state: MuxedSocketState = MuxedSocketState.IDLE;
-  private reauthTimer?: any;
+  private reauthTimer?: string | number | undefined;
   // streams in the open or closing state
-  private activeStreams: Map<number, Stream> = new Map();
+  private activeStreams: Map<number, Stream> = new Map<number, Stream>();
   private serverStreamWatermark = 0;
   private nextStream = 1;
 
-  private healthChecks: Array<(isOk: boolean) => void> = new Array();
+  private healthChecks: ((isOk: boolean) => void)[] = [];
 
   // user facing interface /////////////////////////////////////////////////////
 
@@ -701,16 +710,17 @@ export class MuxedSocket {
   onClose?: () => void;
   onError?: (errorCode: number, msg: string) => void;
 
-  private constructor(socket: WebSocket, creds: Creds, env: Environment) {
+  private constructor(
+    private socket: WebSocket,
+    private creds: Creds,
+    private env: Environment,
+  ) {
     // pre-condition: socket is open
-    this.socket = socket;
-    this.creds = creds;
-    this.env = env;
   }
 
   openStream(): Promise<Stream> {
     const openTimeoutMs = 10;
-    const fn = (resolve: any, reject: any) => {
+    const fn = (resolve: (v: Stream) => void, reject: (e: Error) => void) => {
       switch (this.state) {
         case MuxedSocketState.AUTH_SENT: {
           const streamId = this.nextStream;
@@ -721,7 +731,9 @@ export class MuxedSocket {
           return;
         }
         case MuxedSocketState.IDLE:
-          setTimeout(() => fn(resolve, reject), openTimeoutMs);
+          setTimeout(() => {
+            fn(resolve, reject);
+          }, openTimeoutMs);
           return;
         case MuxedSocketState.CLOSING:
         case MuxedSocketState.CLOSEWAIT:
@@ -732,7 +744,7 @@ export class MuxedSocket {
           return;
       }
     };
-    return new Promise(fn);
+    return new Promise<Stream>(fn);
   }
 
   closeSocket(): void {
@@ -809,7 +821,9 @@ export class MuxedSocket {
         return new Promise((resolve, _reject) => {
           this.socket.send(this.encodePingMsg());
           const pingTimeoutMs = 10000;
-          const timeout = setTimeout(() => resolve(false), pingTimeoutMs);
+          const timeout = setTimeout(() => {
+            resolve(false);
+          }, pingTimeoutMs);
           this.healthChecks.push((isOk) => {
             clearTimeout(timeout);
             resolve(isOk);
@@ -832,25 +846,39 @@ export class MuxedSocket {
       }, timeoutMs);
       const socket = env.createSocket(uri);
       socket.binaryType = "arraybuffer";
-      socket.onclose = (_event) =>
+      socket.onclose = () => {
         reject(new Error("Socket closed before open"));
-      socket.onerror = (event) => reject(event);
-      socket.onmessage = (_event) =>
+      };
+      socket.onerror = (event: unknown) => {
+        reject(new Error(JSON.stringify(event)));
+      };
+      socket.onmessage = () => {
         reject(new Error("Socket messaged before open"));
-      socket.onopen = (_event) => {
+      };
+      socket.onopen = () => {
         clearTimeout(timeout);
         if (failed) {
           socket.close();
           return;
         }
         const muxSocket = new MuxedSocket(socket, creds, env);
-        socket.onclose = (event) => muxSocket.onSocketClose(event);
-        socket.onerror = (_event) => muxSocket.onSocketError(0, "socket error");
-        socket.onmessage = (event) => muxSocket.onSocketMessage(event);
+        socket.onclose = (event: CloseEvent) => {
+          muxSocket.onSocketClose(event);
+        };
+        socket.onerror = (_event: Event) => {
+          muxSocket.onSocketError(0, "socket error");
+        };
+        socket.onmessage = (event: MessageEvent<unknown>) => {
+          muxSocket.onSocketMessage(event);
+        };
         muxSocket
           .sendAuth()
-          .then(() => resolve(muxSocket))
-          .catch((reason) => reject(reason));
+          .then(() => {
+            resolve(muxSocket);
+          })
+          .catch((reason: unknown) => {
+            reject(reason as Error);
+          });
       };
     });
   }
@@ -954,7 +982,7 @@ export class MuxedSocket {
   private onSocketMessage(event: MessageEvent<any>): void {
     switch (this.state) {
       case MuxedSocketState.AUTH_SENT:
-      case MuxedSocketState.CLOSING:
+      case MuxedSocketState.CLOSING: {
         if (!(event.data instanceof ArrayBuffer)) {
           throw new Error("Received unexpected text data");
         }
@@ -998,12 +1026,13 @@ export class MuxedSocket {
             stream?.onStreamData(msg.payload);
             break;
           }
-          case "close":
+          case "close": {
             const closed = this.activeStreams.get(msg.stream)?.onStreamClose();
             if (closed) {
               this.activeStreams.delete(msg.stream);
             }
             break;
+          }
           case "reset":
             this.activeStreams
               .get(msg.stream)
@@ -1014,6 +1043,7 @@ export class MuxedSocket {
             throw new Error("Unexpected message type");
         }
         break;
+      }
       case MuxedSocketState.IDLE:
       case MuxedSocketState.CLOSEWAIT:
       case MuxedSocketState.CLOSED:
@@ -1024,15 +1054,18 @@ export class MuxedSocket {
   private async sendAuth(): Promise<void> {
     switch (this.state) {
       case MuxedSocketState.IDLE:
-      case MuxedSocketState.AUTH_SENT:
+      case MuxedSocketState.AUTH_SENT: {
         const auth = await MuxedSocket.encodeAuthMsg(this.creds, this.env);
         this.socket.send(auth);
         this.state = MuxedSocketState.AUTH_SENT;
         clearTimeout(this.reauthTimer);
         this.reauthTimer = setTimeout(() => {
-          this.sendAuth();
-        }, this.reauthTimeoutMs);
+          this.sendAuth().catch((e: unknown) => {
+            console.error(e);
+          });
+        }, this.reauthTimeoutMs) as any;
         break;
+      }
       case MuxedSocketState.CLOSING:
       case MuxedSocketState.CLOSEWAIT:
       case MuxedSocketState.CLOSED:
@@ -1261,12 +1294,16 @@ export class MuxedSocket {
   }
 }
 
+/* eslint-disable no-unused-vars */
+
 enum StreamState {
   OPEN,
   CLOSING,
   CLOSEWAIT,
   CLOSED,
 }
+
+/* eslint-enable no-unused-vars */
 
 class Stream {
   // constants
@@ -1401,27 +1438,18 @@ const serverResponseTable = (tableName: string) => {
 };
 
 class SKDBServer implements RemoteSKDB {
-  private env: Environment;
-  private client: SKDBMechanism;
-  private connection: ResilientMuxedSocket;
-  private creds: Creds;
   private replicationUid: string = "";
   private localTailSession: string | undefined = undefined;
-  private mirroredTables: Map<string, string> = new Map();
-  private mirrorStreams: Set<ResilientStream> = new Set();
+  private mirroredTables: Map<string, string> = new Map<string, string>();
+  private mirrorStreams: Set<ResilientStream> = new Set<ResilientStream>();
   private onRebootFn?: () => void;
 
   private constructor(
-    env: Environment,
-    client: SKDBMechanism,
-    connection: ResilientMuxedSocket,
-    creds: Creds,
-  ) {
-    this.env = env;
-    this.client = client;
-    this.connection = connection;
-    this.creds = creds;
-  }
+    private env: Environment,
+    private client: SKDBMechanism,
+    private connection: ResilientMuxedSocket,
+    private creds: Creds,
+  ) {}
 
   static async connect(
     env: Environment,
@@ -1433,10 +1461,12 @@ class SKDBServer implements RemoteSKDB {
     const uri = SKDBServer.getDbSocketUri(endpoint, db);
 
     const policy: ResiliencyPolicy = {
-      notifyFailedStream() {},
+      notifyFailedStream() {
+        return;
+      },
       async shouldReconnect(socket: ResilientMuxedSocket): Promise<boolean> {
         // perform an active check
-        return !socket.isSocketResponsive();
+        return !(await socket.isSocketResponsive());
       },
     };
     const conn = await ResilientMuxedSocket.connect(env, policy, uri, creds);
@@ -1446,12 +1476,12 @@ class SKDBServer implements RemoteSKDB {
     return server;
   }
 
-  async connectedAs(): Promise<string> {
-    return this.creds.accessKey;
+  connectedAs(): Promise<string> {
+    return Promise.resolve(this.creds.accessKey);
   }
 
-  async close() {
-    this.connection.closeSocket();
+  close() {
+    return this.connection.closeSocket();
   }
 
   private static getDbSocketUri(endpoint: string, db: string) {
@@ -1460,12 +1490,12 @@ class SKDBServer implements RemoteSKDB {
 
   private strictCastData(response: ProtoMsg | null): ProtoData {
     if (response === null) {
-      throw new Error(`Unexpected response: ${response}`);
+      throw new Error(`Unexpected response: ${JSON.stringify(response)}`);
     }
     if (response.type === "data") {
       return response;
     }
-    throw new Error(`Unexpected response: ${response}`);
+    throw new Error(`Unexpected response: ${JSON.stringify(response)}`);
   }
 
   private deliverDataTransferProtoMsg(
@@ -1475,9 +1505,9 @@ class SKDBServer implements RemoteSKDB {
     const txtPayload = this.env.decodeUTF8(this.strictCastData(msg).payload);
     const rebootSignalled = txtPayload
       .split("\n")
-      .find((line) => line.trim() == ":reboot");
+      .find((line: string) => line.trim() == ":reboot");
     if (rebootSignalled) {
-      this.close();
+      void this.close();
       this.callOnReboot();
       return;
     }
@@ -1514,7 +1544,9 @@ class SKDBServer implements RemoteSKDB {
         }
         resolve(msg);
       };
-      stream.onError = (_code, msg) => reject(msg);
+      stream.onError = (_code, msg) => {
+        reject(new Error(msg));
+      };
       stream.send(encodeProtoMsg(request));
       stream.close();
     });
@@ -1567,7 +1599,7 @@ class SKDBServer implements RemoteSKDB {
                 resolveSignalled ||= line.match(/^:[1-9]/g) != null;
               }
             }
-            return client.writeCsv(payload, this.replicationUid);
+            client.writeCsv(payload, this.replicationUid);
           });
           if (!resolved && resolveSignalled) {
             resolved = true;
@@ -1660,7 +1692,7 @@ class SKDBServer implements RemoteSKDB {
     };
     stream.send(encodeProtoMsg(request));
 
-    let fileName = tables.join("_") + "_" + this.creds.accessKey;
+    const fileName = tables.join("_") + "_" + this.creds.accessKey;
 
     client.watchFile(fileName, (payload) => {
       stream.send(
@@ -1700,11 +1732,11 @@ class SKDBServer implements RemoteSKDB {
     return session;
   }
 
-  async isConnectionHealthy() {
-    return this.connection.isSocketConsideredHealthy();
+  isConnectionHealthy() {
+    return Promise.resolve(this.connection.isSocketConsideredHealthy());
   }
 
-  async tablesAwaitingSync() {
+  tablesAwaitingSync() {
     const acc = new Set<string>();
     for (const [table, _schema] of this.mirroredTables) {
       // TODO: if we parse the diff output we can provide an object
@@ -1726,7 +1758,7 @@ class SKDBServer implements RemoteSKDB {
         acc.add(table);
       }
     }
-    return acc;
+    return Promise.resolve(acc);
   }
 
   async mirror(...tables: MirrorDefn[]): Promise<void> {
@@ -1737,7 +1769,7 @@ class SKDBServer implements RemoteSKDB {
       const tableName: string = mirror_defn.table;
       const expectedSchema: string = mirror_defn.expectedColumns;
 
-      let isViewOnRemote = (await this.viewSchema(tableName)) != "";
+      const isViewOnRemote = (await this.viewSchema(tableName)) != "";
 
       const [remoteTable, remoteResponseTable] = await Promise.all([
         this.tableSchema(tableName),
@@ -1821,7 +1853,7 @@ class SKDBServer implements RemoteSKDB {
       const rows = result
         .split("\n")
         .filter((x) => x != "")
-        .map((x) => JSON.parse(x));
+        .map((x) => JSON.parse(x) as Record<string, unknown>);
       return new SKDBTable(...rows);
     });
   }
@@ -1878,7 +1910,8 @@ class SKDBServer implements RemoteSKDB {
     });
   }
 
-  async onReboot(fn: () => void) {
+  onReboot(fn: () => void) {
     this.onRebootFn = fn;
+    return Promise.resolve();
   }
 }

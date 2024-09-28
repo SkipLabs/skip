@@ -1,12 +1,29 @@
 module alias P = SQLParser;
+module alias DBUtils = SKDBToFromSKStore;
 
 module SKStore;
 
 const kSessionDir: DirName = DirName::create("/sk_prv/sessions/");
 const kTokenDir: DirName = DirName::create("/sk_prv/tokens/");
 const kGraphDir: DirName = DirName::create("/sk_prv/graph/");
+const kResourceSessionDir: DirName = DirName::create(
+  "/sk_prv/resources/sessions/",
+);
+const kResourceGraphDir: DirName = DirName::create("/sk_prv/resources/graph/");
 
 native class Info
+
+class Resource(name: String, params: SKJSON.CJObject) extends Key {
+  //
+  fun toString(): String {
+    `${this.name}:${this.params.prettyPrint()}`
+  }
+}
+
+class ResourceNames(
+  name: String,
+  handle: SKStore.EHandle<JSONID, JSONFile>,
+) extends File
 
 const kJSONTypes: Types<JSONID, JSONFile> = Types(
   JSONID::keyType,
@@ -240,13 +257,32 @@ fun base64(toEncode: Key): String {
   }
 }
 
+fun toSessionName(reactiveAuth: Array<UInt8>): String {
+  encoded = `b64_${Base64.encodeBytes(reactiveAuth, true)}`;
+  encoded.searchRight(ch ~> ch != '=') match {
+  | Some(i) ->
+    _ = i.next();
+    encoded.getIter().substring(i)
+  | None() -> ""
+  }
+}
+
 class JSONFile(value: SKJSON.CJSON) extends File
 
-fun createFor(session: String, tokens: SKJSON.CJArray, time: Float): Float {
+fun createFor(
+  session: String,
+  inputs: SKJSON.CJArray,
+  initValues: SKJSON.CJObject,
+  tokens: SKJSON.CJArray,
+  time: Float,
+): Float {
   if (SKStore.gHasContext() == 0) {
     SKStore.gContextInit(initCtx());
   };
   SKStore.runWithResult(context ~> {
+    inputsNames = inputs match {
+    | SKJSON.CJArray(values) -> values.map(v -> SKJSON.asString(v))
+    };
     if (context.unsafeMaybeGetEagerDir(kSessionDir) is None()) {
       sessionHdl = context.mkdir(
         IID::keyType,
@@ -259,14 +295,74 @@ fun createFor(session: String, tokens: SKJSON.CJArray, time: Float): Float {
         values.map(t -> (SID(SKJSON.asString(t)), IntFile(time.toInt())))
       };
       _ = context.mkdir(SID::keyType, IntFile::type, kTokenDir, initTokens);
+      fields = inputsNames.map(name -> {
+        values = SKJSON.getArray(initValues, name) match {
+        | Some(arr) ->
+          arr match {
+          | SKJSON.CJArray(avs) ->
+            avs.map(v -> {
+              e = SKJSON.expectArray(v);
+              (JSONID(e[0]), JSONFile(e[1]))
+            })
+          }
+
+        | _ -> Array[]
+        };
+        iHdl = context.mkdir(
+          JSONID::keyType,
+          JSONFile::type,
+          DirName::create(`/${name}/`),
+          values,
+        );
+        (name, SKJSON.CJString(iHdl.getDirName().toString()))
+      });
+      handles = SKJSON.CJObject(SKJSON.CJFields::create(fields, x -> x));
       _ = sessionHdl.map(
         IID::keyType,
         StringFile::type,
         context,
         kGraphDir,
         (ctx, writer, key, it) ~> {
-          init(ctx);
+          init(ctx, handles);
           writer.set(key, it.first)
+        },
+      );
+      rSessionHdl = context.mkdir(
+        SID::keyType,
+        IntFile::type,
+        kResourceSessionDir,
+        Array[],
+      );
+      _ = rSessionHdl.map(
+        SID::keyType,
+        IntFile::type,
+        context,
+        kResourceGraphDir,
+        (context, writer, key, it) ~> {
+          rsession = key.value;
+          dirname = DirName::create(`/sk_prv/resources/session/${rsession}/`);
+          gDirname = DirName::create(
+            `/sk_prv/resources/session/${rsession}/graph/`,
+          );
+          _ = context
+            .mkdir(Resource::keyType, IntFile::type, dirname, Array[])
+            .map(
+              Resource::keyType,
+              ResourceNames::type,
+              context,
+              gDirname,
+              (context, writer, key, _it) ~> {
+                collection = `response_${SKStore.genSym(0)}`;
+                handleId = callResourceCompute(context, key.name, key.params);
+                handle = EHandle(
+                  JSONID::keyType,
+                  JSONFile::type,
+                  DirName::create(handleId),
+                );
+                writer.set(key, ResourceNames(collection, handle))
+              },
+            );
+          writer.set(key, it.first);
         },
       )
     } else {

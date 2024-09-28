@@ -18,9 +18,11 @@ function runMS(t) {
     if (t.slow) {
       test.slow();
     }
-    let res = await t.fun(new Env(), mu);
+    const res = await t.fun(new Env(), mu);
     t.check(res);
   });
 }
 
-ms_tests().forEach((t) => runMS(t));
+ms_tests().forEach((t) => {
+  runMS(t);
+});

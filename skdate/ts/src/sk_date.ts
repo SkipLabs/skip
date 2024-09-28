@@ -1,7 +1,5 @@
-// sknpm: Cannot be multiline for package sources
-// prettier-ignore
-import type { int, ptr, Environment, Links, ToWasmManager, Utils } from "#std/sk_types.js";
-import type * as Internal from "#std/sk_internal_types.js";
+import type { int, ptr, Links, ToWasmManager, Utils } from "std";
+import type * as Internal from "std/internal.js";
 
 interface ToWasm {
   SKIP_localetimezone: (year: int, month: int, day: int) => int;
@@ -23,22 +21,20 @@ class LinksImpl implements Links {
   ) => ptr<Internal.String>;
   SKIP_locale!: (code: int, value: int) => ptr<Internal.String>;
 
-  constructor() {}
-
-  complete = (utils: Utils, exports: object) => {
+  complete = (utils: Utils, _exports: object) => {
     this.SKIP_localetimezone = (year: int, month: int, day: int) => {
-      let date = new Date(year, month - 1, day);
-      let offset = -(date.getTimezoneOffset() * 60);
-      return offset;
+      const date = new Date(year, month - 1, day);
+      return -(date.getTimezoneOffset() * 60);
     };
     this.SKIP_localetimezonename = (year: int, month: int, day: int) => {
-      let date = new Date(year, month - 1, day);
+      const date = new Date(year, month - 1, day);
       const timeZone = date.toLocaleDateString(undefined, {
         timeZoneName: "short",
       });
       return utils.exportString(timeZone);
     };
-    /**
+
+    /*
      * Retrieves the local version of variables required for formatting using format specifier.
      * A => Full weekday name.
      * a => Abbreviated weekday name.
@@ -51,17 +47,17 @@ class LinksImpl implements Links {
      * p => AM or PM locale string.
      */
     this.SKIP_locale = (code: int, value: int) => {
-      let str = String.fromCharCode(code);
+      const str = String.fromCharCode(code);
       if (str == "B" || str == "b") {
-        let date = new Date(Date.UTC(2023, 0 + (value - 1), 1)); // January
-        let name = date.toLocaleDateString(undefined, {
+        const date = new Date(Date.UTC(2023, 0 + (value - 1), 1)); // January
+        const name = date.toLocaleDateString(undefined, {
           month: str == "b" ? "short" : "long",
         });
         return utils.exportString(name);
       }
       if (str == "A" || str == "a") {
-        let date = new Date(Date.UTC(2023, 8, 18 + (value - 1))); // A monday
-        let name = date.toLocaleDateString(undefined, {
+        const date = new Date(Date.UTC(2023, 8, 18 + (value - 1))); // A monday
+        const name = date.toLocaleDateString(undefined, {
           weekday: str == "a" ? "short" : "long",
         });
         return utils.exportString(name);
@@ -71,8 +67,8 @@ class LinksImpl implements Links {
         if (value == 1) {
           hour = 15;
         }
-        let date = new Date(2023, 8, 18, hour);
-        let m = date
+        const date = new Date(2023, 8, 18, hour);
+        const m = date
           .toLocaleDateString(undefined, { hour12: true, hour: "numeric" })
           .split(" ");
         return utils.exportString(m[m.length - 1]);
@@ -87,11 +83,9 @@ class LinksImpl implements Links {
 }
 
 class Manager implements ToWasmManager {
-  constructor() {}
-
   prepare = (wasm: object) => {
-    let toWasm = wasm as ToWasm;
-    let links = new LinksImpl();
+    const toWasm = wasm as ToWasm;
+    const links = new LinksImpl();
     toWasm.SKIP_localetimezone = (year: int, month: int, day: int) =>
       links.SKIP_localetimezone(year, month, day);
     toWasm.SKIP_localetimezonename = (year: int, month: int, day: int) =>
@@ -104,6 +98,10 @@ class Manager implements ToWasmManager {
 }
 
 /* @sk init */
-export function init(env?: Environment) {
+/**
+ * Init the wasm module
+ * @returns The module manager
+ */
+export function init() {
   return Promise.resolve(new Manager());
 }

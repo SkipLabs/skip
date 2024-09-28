@@ -1,14 +1,17 @@
-import type { Wrk } from "#std/sk_types.js";
-import { PromiseWorker, Function, Caller } from "#std/sk_worker.js";
+import type { Wrk } from "std";
+import { PromiseWorker, Function, Caller, Wrapped } from "std/worker.js";
 import type {
   SKDB,
   ProtoResponseCreds,
   Params,
   RemoteSKDB,
   MirrorDefn,
+  SKDBGroup,
 } from "./skdb_types.js";
 import { SKDBTable } from "./skdb_util.js";
 import { SKDBGroupImpl } from "./skdb_group.js";
+
+/* eslint-disable @typescript-eslint/no-invalid-void-type */
 
 class WrappedRemote implements RemoteSKDB {
   private worker: PromiseWorker;
@@ -22,21 +25,25 @@ class WrappedRemote implements RemoteSKDB {
   createDatabase(dbName: string) {
     return this.worker
       .post(new Caller(this.wrapped, "createDatabase", [dbName]))
-      .send();
+      .send<ProtoResponseCreds>();
   }
 
   createUser() {
-    return this.worker.post(new Caller(this.wrapped, "createUser", [])).send();
+    return this.worker
+      .post(new Caller(this.wrapped, "createUser", []))
+      .send<ProtoResponseCreds>();
   }
 
   schema() {
-    return this.worker.post(new Caller(this.wrapped, "schema", [])).send();
+    return this.worker
+      .post(new Caller(this.wrapped, "schema", []))
+      .send<string>();
   }
 
   tableSchema(tableName: string) {
     return this.worker
       .post(new Caller(this.wrapped, "tableSchema", [tableName]))
-      .send();
+      .send<string>();
   }
 
   notifyConnectedAs(userName: string, replicationId: string) {
@@ -53,34 +60,38 @@ class WrappedRemote implements RemoteSKDB {
   viewSchema(viewName: string) {
     return this.worker
       .post(new Caller(this.wrapped, "viewSchema", [viewName]))
-      .send();
+      .send<string>();
   }
 
   mirror(...tables: MirrorDefn[]) {
-    return this.worker.post(new Caller(this.wrapped, "mirror", tables)).send();
+    return this.worker
+      .post(new Caller(this.wrapped, "mirror", tables))
+      .send<void>();
   }
 
   exec(query: string, params?: Params) {
     return this.worker
       .post(new Caller(this.wrapped, "exec", [query, params]))
-      .send()
+      .send<Record<string, any>[]>()
       .then((rows) => new SKDBTable(...rows));
   }
 
   close() {
-    return this.worker.post(new Caller(this.wrapped, "close", [], true)).send();
+    return this.worker
+      .post(new Caller(this.wrapped, "close", [], true))
+      .send<void>();
   }
 
   isConnectionHealthy() {
     return this.worker
       .post(new Caller(this.wrapped, "isConnectionHealthy", []))
-      .send();
+      .send<boolean>();
   }
 
   tablesAwaitingSync() {
     return this.worker
       .post(new Caller(this.wrapped, "tablesAwaitingSync", []))
-      .send();
+      .send<Set<string>>();
   }
 
   onReboot(fn: () => void): Promise<void> {
@@ -111,7 +122,7 @@ export class SKDBWorker implements SKDB {
   exec = async (query: string, params: Params = new Map()) => {
     const rows = await this.worker
       .post(new Function("exec", [query, params]))
-      .send();
+      .send<Record<string, any>[]>();
     return new SKDBTable(...rows);
   };
 
@@ -120,14 +131,14 @@ export class SKDBWorker implements SKDB {
     params: Params,
     onChange: (rows: SKDBTable) => void,
   ) => {
-    let provider = this.worker.post(
+    const provider = this.worker.post(
       new Function("watch", [query, params, onChange], {
         wrap: true,
         autoremove: true,
       }),
     );
-    return provider.send().then((wrapped) => {
-      let close = () =>
+    return provider.send<Wrapped>().then((wrapped) => {
+      const close = () =>
         this.worker
           .post(new Caller(wrapped.wrapped, "close", []))
           .send()
@@ -142,14 +153,14 @@ export class SKDBWorker implements SKDB {
     init: (rows: SKDBTable) => void,
     update: (added: SKDBTable, removed: SKDBTable) => void,
   ) => {
-    let provider = this.worker.post(
+    const provider = this.worker.post(
       new Function("watchChanges", [query, params, init, update], {
         wrap: true,
         autoremove: true,
       }),
     );
-    return provider.send().then((wrapped) => {
-      let close = () =>
+    return provider.send<Wrapped>().then((wrapped) => {
+      const close = () =>
         this.worker
           .post(new Caller(wrapped.wrapped, "close", []))
           .send()
@@ -161,70 +172,66 @@ export class SKDBWorker implements SKDB {
   tableSchema = async (tableName: string) => {
     return this.worker
       .post(new Function("tableSchema", [tableName]))
-      .send() as Promise<string>;
+      .send<string>();
   };
 
   notifyConnectedAs = async (userName: string, replicationId: string) => {
     return this.worker
       .post(new Function("notifyConnectedAs", [userName, replicationId]))
-      .send() as Promise<void>;
+      .send<void>();
   };
 
   viewSchema = async (viewName: string) => {
     return this.worker
       .post(new Function("viewSchema", [viewName]))
-      .send() as Promise<string>;
+      .send<string>();
   };
 
   schema = async (tableName?: string) => {
-    return this.worker
-      .post(new Function("schema", [tableName]))
-      .send() as Promise<string>;
+    return this.worker.post(new Function("schema", [tableName])).send<string>();
   };
 
-  insert = async (tableName: string, values: Array<any>) => {
+  insert = async (tableName: string, values: unknown[]) => {
     return this.worker
       .post(new Function("insert", [tableName, values]))
-      .send() as Promise<boolean>;
+      .send<boolean>();
   };
 
   insertMany = async (
     tableName: string,
-    valuesArray: Array<Record<string, any>>,
+    valuesArray: Record<string, unknown>[],
   ) => {
-    let result = await this.worker
+    const result = await this.worker
       .post(new Function("insertMany", [tableName, valuesArray]))
       .send();
     if (result instanceof Error) {
       throw result;
     }
-    return result as Promise<number>;
+    return result as number;
   };
 
   save = async () => {
-    return this.worker
-      .post(new Function("save", []))
-      .send() as Promise<boolean>;
+    return this.worker.post(new Function("save", [])).send<boolean>();
   };
 
   createServerDatabase = async (dbName: string) => {
     return this.worker
       .post(new Function("createServerDatabase", [dbName]))
-      .send() as Promise<ProtoResponseCreds>;
+      .send<ProtoResponseCreds>();
   };
 
   createServerUser = async () => {
     return this.worker
       .post(new Function("createServerUser", []))
-      .send() as Promise<ProtoResponseCreds>;
+      .send<ProtoResponseCreds>();
   };
 
   mirror = async (...tables: MirrorDefn[]) => {
-    return this.worker.post(new Function("mirror", tables)).send();
+    return this.worker.post(new Function("mirror", tables)).send<void>();
   };
 
   closeConnection = async () => {
-    return this.worker.post(new Function("closeConnection", [])).send();
+    return this.worker.post(new Function("closeConnection", [])).send<void>();
   };
 
   currentUser?: string;
@@ -238,7 +245,7 @@ export class SKDBWorker implements SKDB {
     this.currentUser = accessKey;
     return this.worker
       .post(new Function("connect", [db, accessKey, privateKey, endpoint]))
-      .send();
+      .send<void>();
   };
 
   connectedRemote = async () => {
@@ -246,20 +253,25 @@ export class SKDBWorker implements SKDB {
       .post(
         new Function("connectedRemote", [], { wrap: true, autoremove: false }),
       )
-      .send()
+      .send<Wrapped>()
       .then((wrapped) => new WrappedRemote(this.worker, wrapped.wrapped));
   };
 
   getUser = async () => {
-    return this.worker.post(new Function("getUser", [])).send();
+    return this.worker
+      .post(new Function("getUser", []))
+      .send<string | undefined>();
   };
 
-  // @ts-ignore
-  createGroup = async () => {
+  createGroup: () => Promise<SKDBGroup> = async () => {
     return SKDBGroupImpl.create(this);
   };
 
-  lookupGroup = async (groupID: string) => {
+  lookupGroup: (groupID: string) => Promise<SKDBGroup | undefined> = async (
+    groupID: string,
+  ) => {
     return SKDBGroupImpl.lookup(this, groupID);
   };
 }
+
+/* eslint-enable @typescript-eslint/no-invalid-void-type */
