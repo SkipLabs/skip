@@ -356,11 +356,10 @@ export interface SKStoreFactory extends Shared {
       skstore: SKStore,
       collections: Record<string, EagerCollection<TJSON, TJSON>>,
     ) => CallResourceCompute,
-    inputs: string[],
+    inputs: Record<string, [TJSON, TJSON][]>,
     remotes?: Record<string, EntryPoint>,
     tokens?: Record<string, number>,
-    initLocals?: () => Promise<Record<string, [TJSON, TJSON][]>>,
-  ): Promise<SkipBuilder>;
+  ): SkipBuilder;
 }
 
 export interface LazyCompute<K extends TJSON, V extends TJSON> {

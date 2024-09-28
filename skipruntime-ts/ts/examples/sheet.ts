@@ -77,7 +77,7 @@ class ComputedCells implements Resource {
 }
 
 class Service implements SkipService {
-  inputCollections = ["cells"];
+  inputCollections = { cells: [] };
   resources = { computed: ComputedCells };
 
   reactiveCompute(

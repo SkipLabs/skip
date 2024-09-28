@@ -339,26 +339,24 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
     return "SKStore";
   }
 
-  async runSKStore(
+  runSKStore(
     init: (
       skstore: SKStore,
       collections: Record<string, EagerCollection<TJSON, TJSON>>,
     ) => CallResourceCompute,
-    inputs: string[],
+    inputs: Record<string, [TJSON, TJSON][]> = {},
     remotes: Record<string, EntryPoint> = {},
     tokens: Record<string, number> = {},
-    initLocals?: () => Promise<Record<string, [TJSON, TJSON][]>>,
-  ): Promise<SkipBuilder> {
+  ): SkipBuilder {
     const context = this.context();
     const skstore = new SKStoreImpl(context);
-    const initValues = initLocals ? await initLocals() : {};
     this.create(
       (collections) => init(skstore, collections),
-      [...inputs, ...Object.keys(remotes)],
+      [...Object.keys(inputs), ...Object.keys(remotes)],
       tokens,
-      initValues,
+      inputs,
     );
-    return (iCollections) => {
+    return (iCollections: Record<string, CollectionWriter<TJSON, TJSON>>) => {
       return new SkipRuntimeImpl(context, iCollections);
     };
   }

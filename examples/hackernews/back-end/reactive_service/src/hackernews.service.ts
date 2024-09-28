@@ -28,7 +28,7 @@ type Upvote = {
 };
 
 class HackerNewsService implements SkipService {
-  inputCollections = ["posts", "users", "upvotes"];
+  inputCollections = { posts: [], users: [], upvotes: [] };
   resources = { posts: PostsResource };
 
   reactiveCompute(

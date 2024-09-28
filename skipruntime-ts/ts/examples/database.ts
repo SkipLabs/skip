@@ -89,31 +89,15 @@ class UsersResource implements Resource {
 /*****************************************************************************/
 
 class Service implements SkipService {
-  inputCollections = ["users"];
+  inputCollections: { users: [TJSON, TJSON][] };
+
+  constructor(users: [TJSON, TJSON][]) {
+    this.inputCollections = { users };
+  }
+
   resources = {
     users: UsersResource,
   };
-
-  async init() {
-    const db = await initDB();
-    const data = await new Promise<[string, TJSON][]>(function (
-      resolve,
-      reject,
-    ) {
-      db.all(
-        "SELECT id, object FROM data",
-        (err, data: { id: string; object: string }[]) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(data.map((v) => [v.id, JSON.parse(v.object)]));
-          }
-        },
-      );
-    });
-    db.close();
-    return { users: data };
-  }
 
   reactiveCompute(
     _store: SKStore,
@@ -125,4 +109,19 @@ class Service implements SkipService {
 
 // Command that starts the service
 
-await runService(new Service(), 8081);
+const db = await initDB();
+const data = await new Promise<[string, User][]>(function (resolve, reject) {
+  db.all(
+    "SELECT id, object FROM data",
+    (err, data: { id: string; object: string }[]) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(data.map((v) => [v.id, JSON.parse(v.object)]));
+      }
+    },
+  );
+});
+db.close();
+
+await runService(new Service(data), 8081);
