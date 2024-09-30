@@ -297,7 +297,7 @@ it("testSize", async () => {
     [1, [2]],
     [2, [4]],
   ]);
-  runtime.delete("input2", 1);
+  runtime.deleteKey("input2", 1);
   check("testSize[2]", runtime.getAll(resource, {}).values, [
     [1, [1]],
     [2, [3]],
@@ -432,7 +432,7 @@ it("testLazy", async () => {
     [1, [2]],
     [2, [2]],
   ]);
-  runtime.delete("input", 2);
+  runtime.deleteKey("input", 2);
   check("testLazyRun[2]", runtime.getAll(resource, {}).values, [
     [0, [2]],
     [1, [2]],
@@ -501,7 +501,7 @@ it("testMapReduce", async () => {
     [1, [4]],
   ]);
 
-  runtime.delete("input", 3);
+  runtime.deleteKey("input", 3);
   check("testMapReduceRun[3]", runtime.getAll(resource, {}).values, [
     [0, [3]],
     [1, [2]],
@@ -558,7 +558,7 @@ it("testMerge1", async () => {
     [1, [10, 20]],
     [2, [3, 7]],
   ]);
-  runtime.delete("input1", 1);
+  runtime.deleteKey("input1", 1);
   check("testMerge1Run[2]", sorted(runtime.getAll(resource, {}).values), [
     [1, [20]],
     [2, [3, 7]],
@@ -614,7 +614,7 @@ it("testMergeReduce", async () => {
     [1, [30]],
     [2, [10]],
   ]);
-  runtime.delete("input1", 1);
+  runtime.deleteKey("input1", 1);
   check("testMergeReduceRun[2]", runtime.getAll(resource, {}).values, [
     [1, [20]],
     [2, [10]],

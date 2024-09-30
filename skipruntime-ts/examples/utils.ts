@@ -49,7 +49,7 @@ class SkipHttpAccessV1 {
     const promises: Promise<void>[] = [];
     for (const x of data) {
       for (const key of x.keys) {
-        promises.push(this.runtime.delete(x.collection, key));
+        promises.push(this.runtime.deleteKey(x.collection, key));
       }
     }
     return Promise.allSettled(promises);

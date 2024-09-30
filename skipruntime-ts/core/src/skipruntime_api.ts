@@ -494,7 +494,7 @@ export interface SkipRuntime {
     values: Entry<K, V>[],
   ): void;
 
-  delete(collection: string, key: string | number): void;
+  deleteKey(collection: string, key: string | number): void;
   subscribe<K extends TJSON, V extends TJSON>(
     collection: string,
     from: string,
