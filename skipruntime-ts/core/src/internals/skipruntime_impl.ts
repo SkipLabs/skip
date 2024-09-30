@@ -488,8 +488,8 @@ export class EagerCollectionWriter<K extends TJSON, V extends TJSON>
     this.context.writeAll(this.eagerHdl, values);
   }
 
-  delete(keys: K[]): void {
-    this.context.delete(this.eagerHdl, keys);
+  deleteKeys(keys: K[]): void {
+    this.context.deleteKeys(this.eagerHdl, keys);
   }
 }
 
@@ -582,7 +582,7 @@ export class SkipRuntimeImpl implements SkipRuntime {
         `Collection ${collectionName} not found`,
       );
     }
-    collection.delete([key]);
+    collection.deleteKeys([key]);
   }
 
   subscribe<K extends TJSON, V extends TJSON>(
