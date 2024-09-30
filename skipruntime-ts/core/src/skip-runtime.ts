@@ -267,7 +267,7 @@ export class SkipRESTRuntime {
     await fetchJSON(`${this.entrypoint}/v1/${collection}`, "PATCH", {}, values);
   }
 
-  async delete(collection: string, key: string): Promise<void> {
+  async deleteKey(collection: string, key: string): Promise<void> {
     await fetchJSON(`${this.entrypoint}/v1/${collection}/${key}`, "DELETE", {});
   }
 

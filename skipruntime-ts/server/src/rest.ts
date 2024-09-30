@@ -100,7 +100,7 @@ export function createRESTServer(runtime: SkipRuntime): express.Express {
     const key = req.params.id;
     const collectionName = req.params.collection;
     try {
-      runtime.delete(collectionName, key);
+      runtime.deleteKey(collectionName, key);
       res.status(200).json({});
     } catch (e: unknown) {
       if (e instanceof UnknownCollectionError) {

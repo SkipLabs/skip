@@ -574,7 +574,7 @@ export class SkipRuntimeImpl implements SkipRuntime {
     collection.writeAll(values);
   }
 
-  delete(collectionName: string, key: string): void {
+  deleteKey(collectionName: string, key: string): void {
     const collection = this.writables[collectionName];
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (!collection) {
