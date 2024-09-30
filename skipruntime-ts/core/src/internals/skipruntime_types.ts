@@ -167,7 +167,7 @@ export interface Handles {
   register<T>(v: T): Handle<T>;
   get<T>(id: Handle<T>): T;
   apply<R, P extends any[]>(id: Handle<(..._: P) => R>, parameters: P): R;
-  delete<T>(id: Handle<T>): T;
+  deleteHandle<T>(id: Handle<T>): T;
   name(metadata: Metadata): string;
 }
 
