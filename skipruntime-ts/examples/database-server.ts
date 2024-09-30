@@ -1,4 +1,4 @@
-import { SkipRESTRuntime } from "skip-runtime";
+import { SkipRESTRuntime } from "@skipruntime/core";
 
 import express from "express";
 
