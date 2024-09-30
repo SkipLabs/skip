@@ -918,7 +918,7 @@ export function metadata(offset: number): Metadata {
 }
 
 export async function run(
-  wasm: URL,
+  wasmUrl: URL | (() => URL | string | Promise<URL | string>),
   modules: ModuleInit[],
   extensions: EnvInit[],
   main?: string,
@@ -929,24 +929,7 @@ export async function run(
   if (getWasmSource) {
     buffer = await getWasmSource();
   } else {
-    buffer = await env.fetch(wasm);
-  }
-  return await start(modules, buffer, env, main);
-}
-
-export async function runUrl(
-  getUrl: () => Promise<URL | string>,
-  modules: ModuleInit[],
-  extensions: EnvInit[],
-  main?: string,
-  getWasmSource?: () => Promise<Uint8Array>,
-) {
-  let env = await loadEnv(extensions);
-  let buffer: Uint8Array;
-  if (getWasmSource) {
-    buffer = await getWasmSource();
-  } else {
-    const url = await getUrl();
+    const url = typeof wasmUrl === "function" ? await wasmUrl() : wasmUrl;
     buffer = await env.fetch(url);
   }
   return await start(modules, buffer, env, main);

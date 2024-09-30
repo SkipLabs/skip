@@ -1,4 +1,4 @@
-import { runUrl, type ModuleInit } from "std";
+import { run, type ModuleInit } from "std";
 import type { SkipService, Resource } from "./skipruntime_service.js";
 import { check } from "./internals/skipruntime_impl.js";
 import type {
@@ -94,7 +94,7 @@ export async function createSKStore(
   remotes: Record<string, EntryPoint> = {},
   tokens: Record<string, number> = {},
 ): Promise<SkipBuilder> {
-  const data = await runUrl(wasmUrl, modules, [], "SKDB_factory");
+  const data = await run(wasmUrl, modules, [], "SKDB_factory");
   const factory = data.environment.shared.get("SKStore") as SKStoreFactory;
   return factory.runSKStore(init, inputs, remotes, tokens);
 }

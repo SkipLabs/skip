@@ -396,12 +396,12 @@ export class ContextImpl implements Context {
     return this.skjson.importString(resHdlPtr);
   }
 
-  sliced<K extends TJSON>(
+  slice<K extends TJSON>(
     collectionName: string,
     sliceName: string,
     ranges: [K, K][],
   ): string {
-    const resHdlPtr = this.exports.SkipRuntime_sliced(
+    const resHdlPtr = this.exports.SkipRuntime_slice(
       this.pointer(),
       this.skjson.exportString(collectionName),
       this.skjson.exportString(sliceName),
@@ -628,9 +628,9 @@ class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
     );
 
     return {
-      next() {
+      next(): IteratorResult<T> {
         const value = cloned_iter.next();
-        return { value, done: value == null } as IteratorResult<T>;
+        return value === null ? { value, done: true } : { value };
       },
     };
   }
@@ -1137,7 +1137,7 @@ class LinksImpl implements Links {
       );
       const res = jsu.exportJSON(
         this.handles.apply(fn, [
-          new LSelfImpl(context, hdl) as LazyCollection<K, V>,
+          new LSelfImpl<K, V>(context, hdl),
           jsu.importJSON(key) as K,
         ]),
       );
@@ -1253,9 +1253,10 @@ class LinksImpl implements Links {
       if (result < 0) {
         throw this.handles.delete(-result as Handle<unknown>);
       }
-      const qTokens = Object.entries(tokens).map((entry) => {
-        return { ident: entry[0], interval: entry[1] };
-      });
+      const qTokens = Object.entries(tokens).map(([ident, interval]) => ({
+        ident,
+        interval,
+      }));
       this.timedQueue = new TimedQueue(update);
       this.timedQueue.start(qTokens, time);
     };
@@ -1403,7 +1404,7 @@ export class TimedQueue {
   ) {}
 
   start(tokens: TQ_Token[], time: number) {
-    const tostart: Map<number, TQ_Token[]> = new Map<number, TQ_Token[]>();
+    const tostart = new Map<number, TQ_Token[]>();
     for (const token of tokens) {
       if (token.interval <= 0) continue;
       const endtime = time + token.interval;
@@ -1438,7 +1439,7 @@ export class TimedQueue {
 
   check() {
     const time = new Date().getTime();
-    const torenew: Map<number, TQ_Token[]> = new Map<number, TQ_Token[]>();
+    const torenew = new Map<number, TQ_Token[]>();
     let i = 0;
     for (i; i < this.queue.length; i++) {
       const cendtime = this.queue[i].endtime;
