@@ -118,7 +118,7 @@ export interface Context {
     accumulator: Accumulator<V2, V3>,
   ): string;
 
-  sliced<K extends TJSON>(
+  slice<K extends TJSON>(
     collectionName: string,
     sliceName: string,
     ranges: readonly [K, K][],
@@ -205,7 +205,7 @@ export interface FromWasm {
     >,
   ): ptr<Internal.String>;
 
-  SkipRuntime_sliced(
+  SkipRuntime_slice(
     ctx: ptr<Internal.Context>,
     eagerCollectionId: ptr<Internal.String>,
     name: ptr<Internal.String>,
