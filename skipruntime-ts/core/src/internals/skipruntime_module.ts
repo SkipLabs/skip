@@ -41,8 +41,8 @@ import {
   EagerCollectionReader,
   LSelfImpl,
   SKStoreFactoryImpl,
-  UnknownCollectionError,
 } from "./skipruntime_impl.js";
+import { UnknownCollectionError } from "../skipruntime_errors.js";
 
 class HandlesImpl implements Handles {
   private nextID: number = 1;

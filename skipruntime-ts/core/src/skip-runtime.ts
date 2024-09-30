@@ -15,7 +15,8 @@ import type {
   SkipBuilder,
   ReactiveResponse,
 } from "./skipruntime_api.js";
-import { runService as runService_ } from "./internals/skipruntime_process.js";
+
+export { UnknownCollectionError } from "./skipruntime_errors.js";
 export type { Opaque } from "./internals/skipruntime_module.js";
 export { TimedQueue } from "./internals/skipruntime_module.js";
 export { runService as initService } from "./skipruntime_runner.js";
@@ -68,11 +69,11 @@ async function wasmUrl(): Promise<URL> {
   if (import.meta.env || import.meta.webpack) {
     /* eslint-disable @typescript-eslint/no-unsafe-return */
     //@ts-expect-error  Cannot find module './skstore.wasm?url' or its corresponding type declarations.
-    return await import("./libskip-runtime.wasm?url");
+    return await import("./libskip-runtime-ts.wasm?url");
     /* eslint-enable @typescript-eslint/no-unsafe-return */
   }
 
-  return new URL("./libskip-runtime.wasm", import.meta.url);
+  return new URL("./libskip-runtime-ts.wasm", import.meta.url);
 }
 
 export type CreateSKStore = (
@@ -135,10 +136,6 @@ export function freeze<T>(value: T): T {
   } else {
     throw new Error("'" + type + "' cannot be frozen.");
   }
-}
-
-export async function runService(service: SkipService, port: number = 443) {
-  return runService_(service, createSKStore, port);
 }
 
 function toHttp(entrypoint: EntryPoint) {
