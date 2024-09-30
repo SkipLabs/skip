@@ -17,14 +17,8 @@ check-examples: build
 	cd ts/examples && npm run lint
 	echo "make: Leaving directory '${SCRIPT_DIR}/ts/examples'"
 
-.PHONY: check-tests
-check-tests: build
-	echo "make: Entering directory '${SCRIPT_DIR}/ts/tests'"
-	cd ts/tests && npm run lint
-	echo "make: Leaving directory '${SCRIPT_DIR}/ts/tests'"
-
 .PHONY: check-all
-check-all: build check-src # check-tests check-examples
+check-all: build check-src check-examples
 
 .PHONY: build
 build:
@@ -54,10 +48,8 @@ nodeserver-%: build
 
 .PHONY: clean
 clean:
-	rm -rf ./ts/playwright-report ./ts/test-results
 	cd .. && make clean
 
 .PHONY: test
 test: build
-	cd ts/tests && npx playwright install
-	cd ts/tests && npx playwright test --reporter=line
+	cd ts && npm run test
