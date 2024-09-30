@@ -70,7 +70,7 @@ class HandlesImpl implements Handles {
     return fn.apply(null, parameters);
   }
 
-  delete<T>(id: Handle<T>): T {
+  deleteHandle<T>(id: Handle<T>): T {
     const current = this.get(id);
     this.objects[id] = null;
     this.freeIDs.push(id);
@@ -198,7 +198,7 @@ export class ContextImpl implements Context {
       );
     });
     if (typeof result == "number") {
-      throw this.handles.delete(result as Handle<unknown>);
+      throw this.handles.deleteHandle(result as Handle<unknown>);
     }
     return result as Entry<K, V>[];
   }
@@ -218,7 +218,7 @@ export class ContextImpl implements Context {
       );
     });
     if (typeof result == "number") {
-      throw this.handles.delete(result as Handle<unknown>);
+      throw this.handles.deleteHandle(result as Handle<unknown>);
     }
     return result as Watermaked<K, V>;
   }
@@ -458,7 +458,7 @@ export class ContextImpl implements Context {
       return this.skjson.clone(result);
     });
     if (typeof result == "number") {
-      throw this.handles.delete(result as Handle<unknown>);
+      throw this.handles.deleteHandle(result as Handle<unknown>);
     }
     if (
       !Array.isArray(result) ||
@@ -490,7 +490,7 @@ export class ContextImpl implements Context {
       );
     });
     if (result > 0) {
-      throw this.handles.delete(result as Handle<unknown>);
+      throw this.handles.deleteHandle(result as Handle<unknown>);
     }
   }
 
@@ -504,7 +504,7 @@ export class ContextImpl implements Context {
       );
     });
     if (result > 0) {
-      throw this.handles.delete(result as Handle<unknown>);
+      throw this.handles.deleteHandle(result as Handle<unknown>);
     }
   }
 
@@ -517,7 +517,7 @@ export class ContextImpl implements Context {
       );
     });
     if (result > 0) {
-      throw this.handles.delete(result as Handle<unknown>);
+      throw this.handles.deleteHandle(result as Handle<unknown>);
     }
   }
 
@@ -529,19 +529,19 @@ export class ContextImpl implements Context {
       );
     });
     if (result > 0) {
-      throw this.handles.delete(result as Handle<unknown>);
+      throw this.handles.deleteHandle(result as Handle<unknown>);
     }
   }
 
-  delete(collection: string, keys: TJSON[]): void {
+  deleteKeys(collection: string, keys: TJSON[]): void {
     const result = this.skjson.runWithGC(() => {
-      return this.exports.SkipRuntime_delete(
+      return this.exports.SkipRuntime_deleteKeys(
         this.skjson.exportString(collection),
         this.skjson.exportJSON(keys),
       );
     });
     if (result > 0) {
-      throw this.handles.delete(result as Handle<unknown>);
+      throw this.handles.deleteHandle(result as Handle<unknown>);
     }
   }
 
@@ -564,7 +564,7 @@ export class ContextImpl implements Context {
       );
     });
     if (result < 0) {
-      throw this.handles.delete(Number(-result) as Handle<unknown>);
+      throw this.handles.deleteHandle(Number(-result) as Handle<unknown>);
     }
     return result;
   }
@@ -574,7 +574,7 @@ export class ContextImpl implements Context {
       return this.exports.SkipRuntime_unsubscribe(session);
     });
     if (result > 0) {
-      throw this.handles.delete(result as Handle<unknown>);
+      throw this.handles.deleteHandle(result as Handle<unknown>);
     }
   }
 
@@ -1075,7 +1075,7 @@ class LinksImpl implements Links {
             );
           });
           if (result < 0) {
-            throw this.handles.delete(-result as Handle<unknown>);
+            throw this.handles.deleteHandle(-result as Handle<unknown>);
           }
         }, 0);
       };
@@ -1209,7 +1209,7 @@ class LinksImpl implements Links {
       return result != null ? jsu.exportJSON(result) : null;
     };
     this.detachHandle = <T>(idx: Handle<T>) => {
-      this.handles.delete(idx);
+      this.handles.deleteHandle(idx);
     };
     this.getErrorHdl = (exn: ptr<Internal.Exception>) => {
       return this.handles.register(utils.getErrorObject(exn));
@@ -1222,7 +1222,7 @@ class LinksImpl implements Links {
         ),
       );
       if (result < 0) {
-        throw this.handles.delete(-result as Handle<unknown>);
+        throw this.handles.deleteHandle(-result as Handle<unknown>);
       }
     };
     const create = (
@@ -1251,7 +1251,7 @@ class LinksImpl implements Links {
         ),
       );
       if (result < 0) {
-        throw this.handles.delete(-result as Handle<unknown>);
+        throw this.handles.deleteHandle(-result as Handle<unknown>);
       }
       const qTokens = Object.entries(tokens).map(([ident, interval]) => ({
         ident,

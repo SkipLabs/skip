@@ -461,7 +461,7 @@ export type SkipBuilder = (
 export interface CollectionWriter<K extends TJSON, V extends TJSON> {
   write(key: K, value: V[]): void;
   writeAll(values: Entry<K, V>[]): void;
-  delete(keys: K[]): void;
+  deleteKeys(keys: K[]): void;
 }
 
 export interface SkipRuntime {
@@ -494,7 +494,7 @@ export interface SkipRuntime {
     values: Entry<K, V>[],
   ): void;
 
-  delete(collection: string, key: string | number): void;
+  deleteKey(collection: string, key: string | number): void;
   subscribe<K extends TJSON, V extends TJSON>(
     collection: string,
     from: string,

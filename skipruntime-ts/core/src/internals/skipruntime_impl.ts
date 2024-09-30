@@ -488,8 +488,8 @@ export class EagerCollectionWriter<K extends TJSON, V extends TJSON>
     this.context.writeAll(this.eagerHdl, values);
   }
 
-  delete(keys: K[]): void {
-    this.context.delete(this.eagerHdl, keys);
+  deleteKeys(keys: K[]): void {
+    this.context.deleteKeys(this.eagerHdl, keys);
   }
 }
 
@@ -574,7 +574,7 @@ export class SkipRuntimeImpl implements SkipRuntime {
     collection.writeAll(values);
   }
 
-  delete(collectionName: string, key: string): void {
+  deleteKey(collectionName: string, key: string): void {
     const collection = this.writables[collectionName];
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (!collection) {
@@ -582,7 +582,7 @@ export class SkipRuntimeImpl implements SkipRuntime {
         `Collection ${collectionName} not found`,
       );
     }
-    collection.delete([key]);
+    collection.deleteKeys([key]);
   }
 
   subscribe<K extends TJSON, V extends TJSON>(

@@ -89,7 +89,7 @@ app.put("/user/:id", (req, res) => {
 app.delete("/user/:id", (req, res) => {
   const key = req.params.id;
   run("DELETE FROM data WHERE id = $id", { $id: key })
-    .then(() => runtime.delete("users", key))
+    .then(() => runtime.deleteKey("users", key))
     .then(() => {
       res.status(200).json({});
     })
