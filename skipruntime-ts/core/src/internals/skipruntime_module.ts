@@ -533,9 +533,9 @@ export class ContextImpl implements Context {
     }
   }
 
-  delete(collection: string, keys: TJSON[]): void {
+  deleteKeys(collection: string, keys: TJSON[]): void {
     const result = this.skjson.runWithGC(() => {
-      return this.exports.SkipRuntime_delete(
+      return this.exports.SkipRuntime_deleteKeys(
         this.skjson.exportString(collection),
         this.skjson.exportJSON(keys),
       );

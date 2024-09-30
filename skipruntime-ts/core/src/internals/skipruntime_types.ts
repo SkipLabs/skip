@@ -148,7 +148,7 @@ export interface Context {
 
   writeAll(collection: string, values: Entry<TJSON, TJSON>[]): void;
 
-  delete(collection: string, keys: TJSON[]): void;
+  deleteKeys(collection: string, keys: TJSON[]): void;
 
   subscribe<K extends TJSON, V extends TJSON>(
     collection: string,
@@ -389,7 +389,7 @@ export interface FromWasm {
     values: ptr<Internal.CJArray>,
   ): number;
 
-  SkipRuntime_delete(
+  SkipRuntime_deleteKeys(
     collection: ptr<Internal.String>,
     keys: ptr<Internal.CJArray>,
   ): number;
