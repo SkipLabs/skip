@@ -4,30 +4,10 @@ SKARGO_PROFILE?=release
 
 SCRIPT_DIR=$(shell dirname $(shell realpath $(firstword $(MAKEFILE_LIST))))
 
-.PHONY: eslint
-eslint:
-	cd ../eslint-config && npm i
-
-.PHONY: tsconfig
-tsconfig:
-	cd ../tsconfig && npm i
-
-.PHONY: skdate
-skdate:
-	cd ../skdate/ts && npm i && npm run build
-
-.PHONY: skjson
-skjson:
-	cd ../skjson/ts && npm i && npm run build
-
-.PHONY: prelude
-prelude:
-	cd ../prelude/ts && npm i && npm run build
-
 .PHONY: check-src
-check-src: eslint
+check-src: build
 	echo "make: Entering directory '${SCRIPT_DIR}/ts'"
-	cd ts/ && npm install && npm run build && npm run lint
+	cd ts/ && npm run lint
 	echo "make: Leaving directory '${SCRIPT_DIR}/ts'"
 
 .PHONY: check-tests
@@ -38,11 +18,8 @@ check-tests: eslint
 check-all: check-src check-tests
 
 .PHONY: build
-build: tsconfig prelude skjson skdate
-	cd ../prelude/ts && npm i && npm run build
-	cd ../skjson/ts && npm i && npm run build
-	cd ../skdate/ts && npm i && npm run build
-	cd ts && npm i && npm run build
+build:
+	cd .. && npm i && npm run build
 
 .PHONY: clean
 clean:
@@ -51,7 +28,6 @@ clean:
 
 .PHONY: install-test
 install-test: build
-	cd ts/tests && npm i && npm run build
 	cd ts/tests && npx playwright install
 
 .PHONY: test
