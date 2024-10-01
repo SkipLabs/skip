@@ -99,7 +99,7 @@ const debugMode: Bool = false;
 /*****************************************************************************/
 
 // An Arrow represent an operation from a parent to a child.
-// Typically, a map is a tranformation that associates a value from a parent
+// Typically, a map is a transformation that associates a value from a parent
 // to a child. The association between the two is called an Arrow.
 
 value class Arrow(parentName: DirName, childName: DirName) uses Orderable
@@ -109,8 +109,8 @@ value class Arrow(parentName: DirName, childName: DirName) uses Orderable
 // Let's say we have a directory A mapped to B. So B is the result of a map
 // applied to A with a given function.
 
-// If during the transformation from A to B, a key is read in third directory,
-// we will need to remember that the read occured while processing a map
+// If during the transformation from A to B, a key K is read in a third directory,
+// we will need to remember that the read occurred while processing a map
 // from A to B on the key K. Hence the type: ArrowKey(A, B, K).
 
 value class ArrowKey(
@@ -495,41 +495,8 @@ mutable class Context{
     }
   }
 
-  static fun fromSaved(ctx: Context): mutable this {
-    mutable static{
-      toPurge => ctx.toPurge,
-      purgeLimit => ctx.purgeLimit,
-      pwd => ctx.pwd,
-      dirs => ctx.dirs,
-      reads => ctx.reads,
-      time => ctx.time,
-      tick => ctx.tick,
-      lazyCapacity => ctx.lazyCapacity,
-      toUpdate => ctx.toUpdate,
-      deps => ctx.deps,
-      debugMode => ctx.debugMode,
-      failOnExn => ctx.failOnExn,
-      hasPre => ctx.hasPre,
-      newDirs => ctx.newDirs,
-      toReset => ctx.toReset,
-      globals => ctx.globals,
-      dirty => ctx.dirty,
-      dirtyReaders => ctx.dirtyReaders,
-      canReuse => ctx.canReuse,
-      arrowStack => ctx.arrowStack,
-      lazyGets => ctx.lazyGets,
-      lazyGetsQueueIn => ctx.lazyGetsQueueIn,
-      lazyGetsQueueOut => ctx.lazyGetsQueueOut,
-      lazyGetsRefCount => ctx.lazyGetsRefCount,
-      sessions => ctx.sessions,
-      removeSubDirs => ctx.removeSubDirs,
-      postponables => ctx.postponables,
-      dirsWithSharedSubDirs => ctx.dirsWithSharedSubDirs,
-      sharedSubDirsRefCount => ctx.sharedSubDirsRefCount,
-      writeChecker => ctx.writeChecker.map(x -> x.mclone()),
-      purgeFrom => ctx.purgeFrom,
-      sourceOverride => ctx.sourceOverride,
-    }
+  static fun fromSaved(ctx: readonly Context): mutable this {
+    ctx.mclone()
   }
 
   mutable fun replaceFromSaved(ctx: readonly Context): void {
@@ -585,10 +552,7 @@ mutable class Context{
   }
 
   readonly fun currentArrow(): ?ArrowKey {
-    this.arrowStack match {
-    | List.Nil() -> None()
-    | List.Cons(x, _) -> Some(x)
-    }
+    this.arrowStack.maybeHead()
   }
 
   readonly fun getDeps(path: Path): SortedSet<ArrowKey> {
@@ -976,37 +940,28 @@ mutable class Context{
         throw DirAlreadyExists(dirName);
       }
     );
-    !content = content.sortedBy(x ~> x.i0);
     vector: mutable Vector<FixedRow<Array<File>>> = mutable Vector[];
-    valueAcc = mutable Vector[];
-    last: ?Key = None();
     time = this.timeStamp();
-    tick = this.tick;
 
-    for (kv in content) {
-      (key, values) = kv;
-      last match {
-      | None() ->
-        valueAcc.extend(values);
-        !last = Some(key)
-      | Some(oldKey) if (oldKey == key) -> valueAcc.extend(values)
-      | Some(oldKey) ->
-        source = Path::create(dirName, oldKey);
-        vector.push(
-          FixedRow(oldKey, valueAcc.toArray(), source, TickRange::create(tick)),
-        );
-        !last = Some(key);
-        valueAcc.clear();
-        valueAcc.extend(values)
+    n = content.size();
+    if (n > 0) {
+      tickRange = TickRange::create(this.tick);
+      !content = content.sortedBy(x ~> x.i0);
+      i = 0;
+      while (i < n) {
+        (key, values) = content[i];
+        !i = i + 1;
+        if (i < n && content[i].i0 == key) {
+          valueAcc = Vector::mcreateFromItems(values);
+          do {
+            valueAcc.extend(content[i].i1);
+            !i = i + 1;
+          } while (i < n && content[i].i0 == key);
+          !values = valueAcc.toArray();
+        };
+        source = Path::create(dirName, key);
+        vector.push(FixedRow(key, values, source, tickRange));
       };
-    };
-    last match {
-    | None() -> void
-    | Some(key) ->
-      source = Path::create(dirName, key);
-      vector.push(
-        FixedRow(key, valueAcc.toArray(), source, TickRange::create(tick)),
-      )
     };
     fixedData = FixedDataMap::create(vector);
 
@@ -1167,7 +1122,7 @@ mutable class Context{
 
 class Dirs{state: DMap<DirName, Dir> = DMap::empty()} {
   fun set<T: File>(tick: Tick, key: DirName, value: Dir): this {
-    !this.state = this.state.set(TickRange::create(tick), key, value);
+    !this.state = this.state.set(tick, key, value);
     this
   }
   fun maybeGet(key: DirName): ?Dir {

@@ -227,7 +227,7 @@ fun getTableDir(
   context: mutable SKStore.Context,
 ): SKStore.EHandle<SKStore.Key, DirDescr> {
   makeDir(DirDescr::type, context, tableInfo, () -> {
-    context.mkdir(x ~> x, DirDescr::type, tableInfo, Array[])
+    context.mkdir(x ~> x, DirDescr::type, tableInfo)
   })
 }
 
@@ -375,7 +375,7 @@ fun getViewsDir(
   context: mutable SKStore.Context,
 ): SKStore.EHandle<SKStore.Key, SelectFile> {
   makeDir(SelectFile::type, context, views, () ->
-    context.mkdir(x ~> x, SelectFile::type, views, Array[])
+    context.mkdir(x ~> x, SelectFile::type, views)
   )
 }
 
@@ -403,7 +403,7 @@ fun getSubsDirs(
     output = SKStore.EHandle(x ~> x, SKStore.IntFile::type, subsOutput);
     return (input, output)
   };
-  input = context.mkdir(x ~> x, SubRequestFile::type, subsInput, Array[]);
+  input = context.mkdir(x ~> x, SubRequestFile::type, subsInput);
   output = input.map(
     x ~> x,
     SKStore.IntFile::type,
@@ -553,7 +553,7 @@ fun getIndexInputDir(
   context: mutable SKStore.Context,
 ): SKStore.EHandle<SKStore.Key, P.CreateIndex> {
   makeDir(P.CreateIndex::type, context, indexInput, () ->
-    context.mkdir(x ~> x, P.CreateIndex::type, indexInput, Array[])
+    context.mkdir(x ~> x, P.CreateIndex::type, indexInput)
   )
 }
 
