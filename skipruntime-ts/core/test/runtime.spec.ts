@@ -23,10 +23,6 @@ import {
   initService,
 } from "../src/skip-runtime.js";
 
-function check(name: string, got: TJSON, expected: TJSON): void {
-  expect([name, got]).toEqual([name, expected]);
-}
-
 //// testMap1
 
 class Map1 implements Mapper<string, number, string, number> {
@@ -64,7 +60,7 @@ class Map1Service implements SkipService {
 it("testMap1", async () => {
   const runtime = await initService(new Map1Service(), createSKStore);
   runtime.put("input", "1", [10]);
-  check("testMap1", runtime.getOne("map1", {}, "1"), [12]);
+  expect(runtime.getOne("map1", {}, "1")).toEqual([12]);
 });
 
 //// testMap2
@@ -120,10 +116,10 @@ it("testMap2", async () => {
   const resource = "map2";
   runtime.put("input1", "1", [10]);
   runtime.put("input2", "1", [20]);
-  check("testMap2[0]", runtime.getOne(resource, {}, "1"), [30]);
+  expect(runtime.getOne(resource, {}, "1")).toEqual([30]);
   runtime.put("input1", "2", [3]);
   runtime.put("input2", "2", [7]);
-  check("testMap2[1]", runtime.getAll(resource, {}).values, [
+  expect(runtime.getAll(resource, {}).values).toEqual([
     ["1", [30]],
     ["2", [10]],
   ]);
@@ -172,10 +168,10 @@ it("testMap2", async () => {
   const resource = "map3";
   runtime.put("input1", "1", [1, 2, 3]);
   runtime.put("input2", "1", [10]);
-  check("testMap3[0]", runtime.getOne(resource, {}, "1"), [36]);
+  expect(runtime.getOne(resource, {}, "1")).toEqual([36]);
   runtime.put("input1", "2", [3]);
   runtime.put("input2", "2", [7]);
-  check("testMap2[1]", runtime.getAll(resource, {}).values, [
+  expect(runtime.getAll(resource, {}).values).toEqual([
     ["1", [36]],
     ["2", [10]],
   ]);
@@ -229,7 +225,7 @@ it("valueMapper", async () => {
     [5, [5]],
     [10, [10]],
   ]);
-  check("testValueMapper", runtime.getAll(resource, {}).values, [
+  expect(runtime.getAll(resource, {}).values).toEqual([
     [1, [2]],
     [2, [6]],
     [5, [30]],
@@ -284,7 +280,7 @@ it("testSize", async () => {
     [1, [0]],
     [2, [2]],
   ]);
-  check("testSize[0]", runtime.getAll(resource, {}).values, [
+  expect(runtime.getAll(resource, {}).values).toEqual([
     [1, [0]],
     [2, [2]],
   ]);
@@ -292,12 +288,12 @@ it("testSize", async () => {
     [1, [10]],
     [2, [5]],
   ]);
-  check("testSize[1]", runtime.getAll(resource, {}).values, [
+  expect(runtime.getAll(resource, {}).values).toEqual([
     [1, [2]],
     [2, [4]],
   ]);
   runtime.deleteKey("input2", 1);
-  check("testSize[2]", runtime.getAll(resource, {}).values, [
+  expect(runtime.getAll(resource, {}).values).toEqual([
     [1, [1]],
     [2, [3]],
   ]);
@@ -352,7 +348,7 @@ it("testSlicedMap1", async () => {
     return [i, [i]];
   });
   runtime.patch("input", values);
-  check("testSlicedMap1[0]", runtime.getAll(resource, {}).values, [
+  expect(runtime.getAll(resource, {}).values).toEqual([
     [1, [1]],
     [3, [9]],
     [4, [16]],
@@ -421,18 +417,18 @@ it("testLazy", async () => {
     [0, [10]],
     [1, [20]],
   ]);
-  check("testLazyRun[0]", runtime.getAll(resource, {}).values, [
+  expect(runtime.getAll(resource, {}).values).toEqual([
     [0, [2]],
     [1, [2]],
   ]);
   runtime.put("input", 2, [4]);
-  check("testLazyRun[1]", runtime.getAll(resource, {}).values, [
+  expect(runtime.getAll(resource, {}).values).toEqual([
     [0, [2]],
     [1, [2]],
     [2, [2]],
   ]);
   runtime.deleteKey("input", 2);
-  check("testLazyRun[2]", runtime.getAll(resource, {}).values, [
+  expect(runtime.getAll(resource, {}).values).toEqual([
     [0, [2]],
     [1, [2]],
   ]);
@@ -482,12 +478,12 @@ it("testMapReduce", async () => {
     [1, [1]],
     [2, [1]],
   ]);
-  check("testMapReduceRun[0]", runtime.getAll(resource, {}).values, [
+  expect(runtime.getAll(resource, {}).values).toEqual([
     [0, [2]],
     [1, [1]],
   ]);
   runtime.put("input", 3, [2]);
-  check("testMapReduceRun[1]", runtime.getAll(resource, {}).values, [
+  expect(runtime.getAll(resource, {}).values).toEqual([
     [0, [2]],
     [1, [3]],
   ]);
@@ -495,13 +491,13 @@ it("testMapReduce", async () => {
     [0, [2]],
     [1, [2]],
   ]);
-  check("testMapReduceRun[2]", runtime.getAll(resource, {}).values, [
+  expect(runtime.getAll(resource, {}).values).toEqual([
     [0, [3]],
     [1, [4]],
   ]);
 
   runtime.deleteKey("input", 3);
-  check("testMapReduceRun[3]", runtime.getAll(resource, {}).values, [
+  expect(runtime.getAll(resource, {}).values).toEqual([
     [0, [3]],
     [1, [2]],
   ]);
@@ -548,17 +544,17 @@ it("testMerge1", async () => {
   const resource = "merge1";
   runtime.put("input1", 1, [10]);
   runtime.put("input2", 1, [20]);
-  check("testMerge1Run[0]", sorted(runtime.getAll(resource, {}).values), [
+  expect(sorted(runtime.getAll(resource, {}).values)).toEqual([
     [1, [10, 20]],
   ]);
   runtime.put("input1", 2, [3]);
   runtime.put("input2", 2, [7]);
-  check("testMerge1Run[1]", sorted(runtime.getAll(resource, {}).values), [
+  expect(sorted(runtime.getAll(resource, {}).values)).toEqual([
     [1, [10, 20]],
     [2, [3, 7]],
   ]);
   runtime.deleteKey("input1", 1);
-  check("testMerge1Run[2]", sorted(runtime.getAll(resource, {}).values), [
+  expect(sorted(runtime.getAll(resource, {}).values)).toEqual([
     [1, [20]],
     [2, [3, 7]],
   ]);
@@ -604,17 +600,17 @@ it("testMergeReduce", async () => {
   const resource = "mergeReduce";
   runtime.put("input1", 1, [10]);
   runtime.put("input2", 1, [20]);
-  check("testMergeReduceRun[0]", runtime.getAll(resource, {}).values, [
+  expect(runtime.getAll(resource, {}).values).toEqual([
     [1, [30]],
   ]);
   runtime.put("input1", 2, [3]);
   runtime.put("input2", 2, [7]);
-  check("testMergeReduceRun[1]", runtime.getAll(resource, {}).values, [
+  expect(runtime.getAll(resource, {}).values).toEqual([
     [1, [30]],
     [2, [10]],
   ]);
   runtime.deleteKey("input1", 1);
-  check("testMergeReduceRun[2]", runtime.getAll(resource, {}).values, [
+  expect(runtime.getAll(resource, {}).values).toEqual([
     [1, [20]],
     [2, [10]],
   ]);
@@ -714,7 +710,7 @@ it("testAsyncLazy", async () => {
         setTimeout(waitandcheck, 10, resolve, reject);
       } else {
         try {
-          check("testAsyncLazy", updates, [
+          expect(updates).toEqual([
             [],
             [[0, ["loading"]]],
             [[0, ["15"]]],
@@ -781,10 +777,10 @@ class ExternalService implements SkipService {
 it("testExternalCall", async () => {
   const runtime = await initService(new ExternalService(), createSKStore);
   const resource = "external";
-  const success = (id: number) => {
+  const success = (id: number): Entry<TJSON, TJSON> => {
     return [id, [`success: mock_result(${id.toString()})`]];
   };
-  const loading = (id: number, hasPrevious: boolean = false) => {
+  const loading = (id: number, hasPrevious: boolean = false): Entry<TJSON, TJSON> => {
     const previous = hasPrevious ? `mock_result(${id.toString()})` : "NONE";
     return [id, [`loading... (previous: ${previous})`]];
   };
@@ -795,42 +791,42 @@ it("testExternalCall", async () => {
     [3, [30]],
   ]);
   // Int resource all loading at t = 0.0s
-  check("testExternalCall[0]", runtime.getAll(resource, {}).values, [
+  expect(runtime.getAll(resource, {}).values).toEqual([
     loading(1),
     loading(2),
     loading(3),
   ]);
   await timeout(500);
   // all loading at t = 0.5s
-  check("testExternalCall[1]", runtime.getAll(resource, {}).values, [
+  expect(runtime.getAll(resource, {}).values).toEqual([
     loading(1),
     loading(2),
     loading(3),
   ]);
   await timeout(1000);
   //id=1 succeeded at t = 1.5s
-  check("testExternalCall[2]", runtime.getAll(resource, {}).values, [
+  expect(runtime.getAll(resource, {}).values).toEqual([
     success(1),
     loading(2),
     loading(3),
   ]);
   await timeout(1000);
   //id=1,id=2 succeeded at t = 2.5s
-  check("testExternalCall[3]", runtime.getAll(resource, {}).values, [
+  expect(runtime.getAll(resource, {}).values).toEqual([
     success(1),
     success(2),
     loading(3),
   ]);
   await timeout(1000);
   //id=1,id=2,id=3 succeeded at t = 3.5s
-  check("testExternalCall[4]", runtime.getAll(resource, {}).values, [
+  expect(runtime.getAll(resource, {}).values).toEqual([
     success(1),
     success(2),
     success(3),
   ]);
   await timeout(1000);
   //all loading at t = 4.5s, but with previous values available for use if need be
-  check("testExternalCall[5]", runtime.getAll(resource, {}).values, [
+  expect(runtime.getAll(resource, {}).values).toEqual([
     loading(1, true),
     loading(2, true),
     loading(3, true),
@@ -891,14 +887,14 @@ it("testTokens", async () => {
   await timeout(2000);
   runtime.put("input", 1, [2]);
   let current = runtime.getOne(resource, {}, 1)[0] as [number, number];
-  check("testTokens[0]", current, [2, start[1]]);
+  expect(current).toEqual([2, start[1]]);
   await timeout(2000);
   runtime.put("input", 1, [4]);
   current = runtime.getOne(resource, {}, 1)[0] as [number, number];
-  check("testTokens[1]", current, [4, start[1]]);
+  expect(current).toEqual([4, start[1]]);
   await timeout(2000);
   current = runtime.getOne(resource, {}, 1)[0] as [number, number];
-  check("testTokens[2]", Math.trunc((current[1] - start[1]) / 1000), 5);
+  expect(Math.trunc((current[1] - start[1]) / 1000)).toEqual(5);
 });
 
 // testJSONExtract
@@ -976,9 +972,8 @@ it("testJSONExtract", async () => {
       ],
     ],
   ]);
-  //
-  const res = runtime.getAll(resource, {}).values;
-  check("testJSONExtract", res, [
+
+  expect(runtime.getAll(resource, {}).values).toEqual([
     [
       0,
       [
