@@ -24,7 +24,7 @@ choose to release either or both of the `latest` and `quickstart` tags.
    skdb-dev@a.b.c, skdb-react@1.2.3`, but don't push yet.
 
 4. Run `release_npm_skdb.sh` to release the base `skdb` package.  Note that this
-   script requires `skargo` and `sknpm`, so may need to run inside of a docker
+   script requires `skargo`, so may need to run inside of a docker
    environment.  If so, make sure to run `npm login` first so that the CLI can
    authenticate.
 
