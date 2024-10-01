@@ -831,7 +831,7 @@ class LinksImpl implements Links {
   env: Environment;
   handles: Handles;
   skjson?: SKJSON;
-  timedQueue?: TimedQueue;
+  timedQueue?: ReturnType<typeof setInterval>[];
 
   detachHandle!: <T>(fn: Handle<T>) => void;
   applyMapFun!: <
@@ -1214,11 +1214,12 @@ class LinksImpl implements Links {
     this.getErrorHdl = (exn: ptr<Internal.Exception>) => {
       return this.handles.register(utils.getErrorObject(exn));
     };
-    const update = (time: number, tokens: string[]) => {
+    const update = (token: string) => {
+      const time = Date.now();
       const jsu = skjson();
       const result = utils.runWithGc(() =>
         Math.trunc(
-          fromWasm.SkipRuntime_updateTokens(jsu.exportJSON(tokens), time),
+          fromWasm.SkipRuntime_updateTokens(jsu.exportJSON([token]), time),
         ),
       );
       if (result < 0) {
@@ -1253,12 +1254,12 @@ class LinksImpl implements Links {
       if (result < 0) {
         throw this.handles.deleteHandle(-result as Handle<unknown>);
       }
-      const qTokens = Object.entries(tokens).map(([ident, interval]) => ({
-        ident,
-        interval,
-      }));
-      this.timedQueue = new TimedQueue(update);
-      this.timedQueue.start(qTokens, time);
+      this.timedQueue = Object.entries(tokens).map(([ident, interval]) =>
+        // TODO: Replace the call to `.unref()` with a proper call to
+        // `clearInterval()` once graceful shutdown is implemented.
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        setInterval(update, interval, ident).unref?.(),
+      );
     };
     this.env.shared.set(
       "SKStore",
@@ -1384,131 +1385,6 @@ class Manager implements ToWasmManager {
     };
     return links;
   };
-}
-
-/** Min heap-based priority queue whose keys are numbers and values are arrays. */
-class MinArrayPriorityQueue<T> {
-  private heap: [priority: number, values: T[]][] = [];
-  private priorityIndex = new Map<number, number>();
-
-  insert(priority: number, value: T): void {
-    const currentIndex = this.priorityIndex.get(priority);
-    if (currentIndex !== undefined) {
-      this.heap[currentIndex][1].push(value);
-    } else {
-      let i = this.heap.length;
-      this.heap.push([priority, [value]]);
-      this.priorityIndex.set(priority, i);
-      while (i > 0) {
-        const parent = (i - 1) >> 1;
-        if (this.heap[i][0] >= this.heap[parent][0]) break;
-        this.swap(i, parent);
-        i = parent;
-      }
-    }
-  }
-
-  peekPriority(): number | undefined {
-    return this.heap[0]?.[0];
-  }
-
-  popValues(): T[] | undefined {
-    const top = this.heap[0];
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (top === undefined) return undefined;
-    this.priorityIndex.delete(top[0]);
-    const last = this.heap.pop();
-    if (last === undefined || this.heap.length === 0) return top[1];
-    this.heap[0] = last;
-    this.priorityIndex.set(last[0], 0);
-    for (let i = 0; ; ) {
-      const left = (i << 1) + 1;
-      if (left >= this.heap.length) break;
-      let smallest = this.heap[left][0] < this.heap[i][0] ? left : i;
-      const right = left + 1;
-      if (
-        right < this.heap.length &&
-        this.heap[right][0] < this.heap[smallest][0]
-      )
-        smallest = right;
-      if (smallest === i) break;
-      this.swap(i, smallest);
-      i = smallest;
-    }
-    return top[1];
-  }
-
-  private swap(i: number, j: number): void {
-    [this.heap[i], this.heap[j]] = [this.heap[j], this.heap[i]];
-    this.priorityIndex.set(this.heap[i][0], i);
-    this.priorityIndex.set(this.heap[j][0], j);
-  }
-}
-
-type TQ_Token = { ident: string; interval: number };
-
-export class TimedQueue {
-  private queue = new MinArrayPriorityQueue<TQ_Token>();
-  private timeout?: NodeJS.Timeout;
-
-  constructor(private update: (time: number, tokens: string[]) => void) {}
-
-  private add(tokens: TQ_Token[], time: number): void {
-    for (const token of tokens) {
-      if (token.interval < 1 || token.interval > 2147483647) {
-        throw new Error(
-          `Invalid interval ${token.interval} for token '${token.ident}'. The interval must be between 1 and 2147483647.`,
-        );
-      }
-      const endtime = time + token.interval;
-      this.queue.insert(endtime, token);
-    }
-  }
-
-  start(tokens: TQ_Token[], time: number): void {
-    if (this.timeout) {
-      throw new Error(`TimedQueue already started!`);
-    }
-    this.add(tokens, time);
-    this.schedule();
-  }
-
-  stop(): void {
-    if (this.timeout) {
-      clearTimeout(this.timeout);
-      delete this.timeout;
-    }
-  }
-
-  private schedule(): void {
-    const first = this.queue.peekPriority();
-    if (first !== undefined) {
-      const next = Math.max(first - Date.now(), 1);
-      this.timeout = setTimeout(() => {
-        this.check();
-      }, next);
-      this.timeout.unref();
-    }
-  }
-
-  private check(): void {
-    const time = Date.now();
-    for (;;) {
-      const cendtime = this.queue.peekPriority();
-      if (cendtime === undefined || cendtime > time) break;
-      const tokens = this.queue.popValues()!;
-      this.update(
-        time,
-        tokens.map((t) => t.ident),
-      );
-      for (const token of tokens) {
-        let endtime = cendtime + token.interval;
-        if (endtime <= time) endtime = time + 1; // re-update was missed => reschedule ASAP
-        this.queue.insert(endtime, token);
-      }
-    }
-    this.schedule();
-  }
 }
 
 /* @sk init */
