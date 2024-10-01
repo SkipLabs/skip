@@ -50,7 +50,7 @@ do
     echo "Running mux server ($i)"
     pid=$(run_test_server $3)
     if [[ -n "$pid" ]]; then
-        echo -e "sknpm.process=$pid"
+        echo -e "$pid"
         break;
     fi
     i=$((i+1))
