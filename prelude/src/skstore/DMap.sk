@@ -9,9 +9,9 @@
 
 module SKStore;
 
-value class TickRange(max: Tick, current: Tick) {
+value class TickRange{max: Tick, current: Tick} {
   static fun create(tick: Tick): this {
-    TickRange(tick, tick)
+    static{max => tick, current => tick}
   }
 }
 
@@ -69,7 +69,7 @@ base class DMap<Key: Orderable, Value> {
       value2 = f(key, value);
       right2 = right.map(tick, f);
       Node{
-        tick => TickRange(tick, tick),
+        tick => TickRange::create(tick),
         key,
         value => value2,
         left => left2,
@@ -180,10 +180,6 @@ base class DMap<Key: Orderable, Value> {
     }
   }
 
-  fun getLastTick(): ?Tick
-  | Nil() -> None()
-  | Node{tick} -> Some(tick.max)
-
   fun getChangesRangeAcc(
     tickStart: Tick,
     tickEnd: Tick,
@@ -216,15 +212,19 @@ base class DMap<Key: Orderable, Value> {
     Node{tick, height, key, value, left, right}
   }
 
-  fun set(tick: TickRange, key: Key, value: Value): DMap<Key, Value>
+  fun set(tick: Tick, key: Key, value: Value): DMap<Key, Value> {
+    this.set_(TickRange::create(tick), key, value)
+  }
+
+  protected fun set_(tick: TickRange, key: Key, value: Value): DMap<Key, Value>
   | Nil() -> static::node(tick, key, value, Nil(), Nil())
   | Node{tick => t, left => l, right => r, key => k, value => v} ->
     !t.max = max(tick.max, t.max);
     !tick.max = t.max;
     compare(key, this.key) match {
-    | LT() -> static::balance(t, k, v, l.set(tick, key, value), r)
+    | LT() -> static::balance(t, k, v, l.set_(tick, key, value), r)
     | EQ() -> static::node(tick, k, value, l, r)
-    | GT() -> static::balance(t, k, v, l, r.set(tick, key, value))
+    | GT() -> static::balance(t, k, v, l, r.set_(tick, key, value))
     }
 
   fun containsKey(k: Key): Bool

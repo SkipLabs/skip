@@ -20,10 +20,19 @@
 /*****************************************************************************/
 module SKStore;
 
-value class FixedRow<T>(key: Key, value: T, source: Path, tag: TickRange) {
+value class FixedRow<T>(
+  key: Key,
+  value: T,
+  source: Path,
+  tag: TickRange,
+) uses Orderable {
   fun changeSource(source: Path): this {
     !this.source = source;
     this
+  }
+
+  fun compare(other: FixedRow<T>): Order {
+    (this.key, this.source).compare((other.key, other.source))
   }
 }
 
@@ -37,7 +46,6 @@ base class FixedData<T> {
   fun getArraySourceKey(source: Path, key: Key): Array<T>;
   fun getIterSourceKey(source: Path, key: Key): mutable Iterator<T>;
   fun getChangesAfter(tick: Tick): SortedSet<Key>;
-  fun getTick(): ?Tick;
   fun iterator(): mutable Iterator<FixedRow<T>>;
 }
 
@@ -113,26 +121,10 @@ class FixedDir<T: frozen> extends IFixedDir<T, FixedRow<T>> {
   static fun create(
     data: mutable Vector<FixedRow<T>> = mutable Vector[],
   ): this {
-    i = 0;
-    sz = data.size();
-    sorted = loop {
-      !i = i + 1;
-      if (i >= sz) break true;
-      keyComparison = data[i - 1].key.compare(data[i].key);
-      keyComparison match {
-      | LT() -> continue
-      | GT() -> break false
-      | EQ() -> data[i - 1].source.compare(data[i].source)
-      } match {
-      | LT() -> continue
-      | EQ() -> continue
-      | GT() -> break false
-      };
+    if (!data.isSorted()) {
+      data.sort();
     };
-    if (!sorted) {
-      data.sortBy(row ~> (row.key, row.source));
-    };
-    _ = static::computeTags(data, 0, data.size() - 1);
+    static::computeTags(data);
     static{data => data.toArray()}
   }
 
@@ -156,33 +148,17 @@ class FixedDirMetadata{
 // This is a more compact representation of a FixedDir, keeping some shared
 // metadata about the directory and stripping redundant repeated data
 // out of the rows themselves.
-class CompactFixedDir{
+class CompactFixedDir protected {
   metadata: FixedDirMetadata,
 } extends IFixedDir<Array<File>, CompactRow<?SKDB.CValue>> {
   static fun create(
     data: mutable Vector<FixedRow<Array<File>>>,
     metadata: FixedDirMetadata,
   ): this {
-    i = 0;
-    sz = data.size();
-    sorted = loop {
-      !i = i + 1;
-      if (i >= sz) break true;
-      keyComparison = data[i - 1].key.compare(data[i].key);
-      keyComparison match {
-      | LT() -> continue
-      | GT() -> break false
-      | EQ() -> data[i - 1].source.compare(data[i].source)
-      } match {
-      | LT() -> continue
-      | EQ() -> continue
-      | GT() -> break false
-      };
+    if (!data.isSorted()) {
+      data.sort();
     };
-    if (!sorted) {
-      data.sortBy(row ~> (row.key, row.source));
-    };
-    _ = static::computeTags(data, 0, data.size() - 1);
+    static::computeTags(data);
     static{
       data => data.map(static::stripMetadata).toArray(),
       metadata => metadata,
@@ -236,9 +212,9 @@ base class IFixedDir<T: frozen, RowRepresentation: frozen> protected {
   }
 
   static fun getMetadata(
-    data: mutable Vector<FixedRow<Array<File>>>,
+    data: readonly Vector<FixedRow<Array<File>>>,
   ): ?FixedDirMetadata {
-    if (data.size() == 0) return None();
+    if (data.isEmpty()) return None();
     sourceDir: ?DirName = None();
     kinds: ?Array<(Int, SQLParser.IKind, SQLParser.Type)> = None();
 
@@ -312,7 +288,11 @@ base class IFixedDir<T: frozen, RowRepresentation: frozen> protected {
     this.getIterSourceKey(source, key).collect(Array)
   }
 
-  static fun computeTags(
+  protected static fun computeTags(array: mutable Vector<FixedRow<T>>): void {
+    _: TickRange = static::computeTags_(array, 0, array.size() - 1);
+  }
+
+  private static fun computeTags_(
     array: mutable Vector<FixedRow<T>>,
     i: Int,
     j: Int,
@@ -323,14 +303,14 @@ base class IFixedDir<T: frozen, RowRepresentation: frozen> protected {
     pivot = i + (j - i) / 2;
     elt = array[pivot];
     tag = elt.tag;
-    right = static::computeTags(array, pivot + 1, j);
-    left = static::computeTags(array, i, pivot - 1);
+    right = static::computeTags_(array, pivot + 1, j);
+    left = static::computeTags_(array, i, pivot - 1);
     !tag.max = max(tag.max, max(left.max, right.max));
     array![pivot] = elt with {tag};
     tag
   }
 
-  fun getChangesAcc(
+  private fun getChangesAcc(
     after: Tick,
     acc: mutable Vector<Key>,
     i: Int,
@@ -360,7 +340,7 @@ base class IFixedDir<T: frozen, RowRepresentation: frozen> protected {
     result
   }
 
-  fun getKeyChangesAfter(
+  private fun getKeyChangesAfter(
     after: Tick,
     key: Key,
     i: Int,
@@ -391,16 +371,6 @@ base class IFixedDir<T: frozen, RowRepresentation: frozen> protected {
     acc = mutable Vector[];
     this.getKeyChangesAfter(limit, key, 0, this.data.size() - 1, acc);
     acc.iterator()
-  }
-
-  fun getTick(): ?Tick {
-    if (this.data.isEmpty()) {
-      None()
-    } else {
-      middle = (this.data.size() - 1) / 2;
-      tickRange = this.decode(this.data[middle]).tag;
-      Some(tickRange.max)
-    }
   }
 }
 
@@ -445,7 +415,7 @@ class FixedSet private {data: Array<FixedKey> = Array[]} {
     this.data.size()
   }
 
-  static fun computeTags(
+  protected static fun computeTags(
     cache: mutable Array<Bool>,
     array: mutable Array<FixedKey>,
     i: Int,
@@ -462,11 +432,11 @@ class FixedSet private {data: Array<FixedKey> = Array[]} {
           loop {
             !i = i + 1;
             if (i >= array.size() || array[i].key != key) {
-              return TickRange(maxVal, maxVal)
+              return TickRange::create(maxVal)
             };
             !maxVal = max(maxVal, array[i].tag.max);
             if (cache[i]) {
-              return TickRange(maxVal, maxVal)
+              return TickRange::create(maxVal)
             };
           }
         }
@@ -483,7 +453,7 @@ class FixedSet private {data: Array<FixedKey> = Array[]} {
     tag
   }
 
-  fun getChangesAcc(
+  private fun getChangesAcc(
     after: Tick,
     acc: mutable Vector<Key>,
     i: Int,

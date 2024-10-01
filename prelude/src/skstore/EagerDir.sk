@@ -295,27 +295,19 @@ class DataMapValue{
     if (files.isEmpty()) {
       if (isMasking) {
         // mask out fixed data, for when you're iterating without tombs.
-        !this.map = this.map.set(
-          TickRange::create(tick),
-          origSource,
-          (writer, files),
-        )
+        !this.map = this.map.set(tick, origSource, (writer, files))
       } else {
         this.map.maybeGet(origSource) match {
         | None() -> void
         | Some _ -> !this.map = this.map.remove(origSource)
         };
       };
-      !this.tombs = this.tombs.set(TickRange::create(tick), origSource, writer);
+      !this.tombs = this.tombs.set(tick, origSource, writer);
     } else {
       if (this.tombs.containsKey(origSource)) {
         !this.tombs = this.tombs.remove(origSource)
       };
-      !this.map = this.map.set(
-        TickRange::create(tick),
-        origSource,
-        (origSource, files),
-      );
+      !this.map = this.map.set(tick, origSource, (origSource, files));
     };
     this
   }
@@ -395,7 +387,7 @@ class DataMap{
     DataMap{}
   }
 
-  fun set(tickRange: TickRange, key: Key, value: DataMapValue): this {
+  fun set(tick: Tick, key: Key, value: DataMapValue): this {
     if (value.map.isEmpty()) {
       if (this.data.containsKey(key)) {
         !this.data = this.data.remove(key)
@@ -404,7 +396,7 @@ class DataMap{
       if (!this.data.containsKey(key)) {
         !this.nbrEntries = this.nbrEntries + 1;
       };
-      !this.data = this.data.set(tickRange, key, value.map)
+      !this.data = this.data.set(tick, key, value.map)
     };
     if (value.tombs.isEmpty()) {
       if (this.tombs.containsKey(key)) {
@@ -414,7 +406,7 @@ class DataMap{
       if (!this.tombs.containsKey(key)) {
         !this.nbrEntries = this.nbrEntries + 1;
       };
-      !this.tombs = this.tombs.set(tickRange, key, value.tombs);
+      !this.tombs = this.tombs.set(tick, key, value.tombs);
     };
     this
   }
@@ -425,18 +417,6 @@ class DataMap{
     | (Some(map), None()) -> Some(DataMapValue{map, tombs => DMap::empty()})
     | (None(), Some(tombs)) -> Some(DataMapValue{map => DMap::empty(), tombs})
     | (Some(map), Some(tombs)) -> Some(DataMapValue{map, tombs})
-    }
-  }
-
-  fun getTick(): ?Tick {
-    optFTick = this.tombs.getLastTick();
-    optDTick = this.data.getLastTick();
-    (optFTick, optDTick) match {
-    | (None(), None()) -> None()
-    | (Some(t), None())
-    | (None(), Some(t)) ->
-      Some(t)
-    | (Some(ft), Some(dt)) -> Some(max(ft, dt))
     }
   }
 
@@ -538,18 +518,6 @@ class FixedDataMap{data: FixedData<Array<File>>, tombs: FixedDir<Path>} {
 
   fun size(): Int {
     this.data.size() + this.tombs.size()
-  }
-
-  fun getTick(): ?Tick {
-    optFTick = this.tombs.getTick();
-    optDTick = this.data.getTick();
-    (optFTick, optDTick) match {
-    | (None(), None()) -> None()
-    | (Some(t), None())
-    | (None(), Some(t)) ->
-      Some(t)
-    | (Some(ft), Some(dt)) -> Some(max(ft, dt))
-    }
   }
 
   fun getChangesAfter(tick: Tick): SortedSet<Key> {
@@ -949,18 +917,6 @@ class EagerDir{
     old = this.fixedData.getChangesAfter(tick);
     result = new.union(old);
     (false, result)
-  }
-
-  fun getLastTick(): ?Tick {
-    optFTick = this.fixedData.getTick();
-    optDTick = this.data.getTick();
-    (optFTick, optDTick) match {
-    | (None(), None()) -> None()
-    | (Some(t), None())
-    | (None(), Some(t)) ->
-      Some(t)
-    | (Some(ft), Some(dt)) -> Some(max(ft, dt))
-    }
   }
 
   private static fun fixedMapData(
@@ -1769,8 +1725,7 @@ class EagerDir{
     ).next() is Some _;
     !map = map.set(context.tick, isMasking, origSource, writer, rvalues);
 
-    tag = TickRange::create(context.tick);
-    !this.data = this.data.set(tag, k, map);
+    !this.data = this.data.set(context.tick, k, map);
 
     reducer = this.reducer match {
     | None() -> None()

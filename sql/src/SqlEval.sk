@@ -1607,7 +1607,7 @@ class Evaluator{options: Options, user: ?UserFile} {
     ifNotExists: Bool,
   ): void {
     dirName = dirDescr.dirName;
-    if (context.unsafeMaybeGetEagerDir(dirName) is Some _ && ifNotExists) {
+    if (ifNotExists && context.unsafeMaybeGetEagerDir(dirName) is Some _) {
       currentSchema = getTable(context, pos, name).schema;
       newSchema = dirDescr.schema;
       if (currentSchema != newSchema) {
@@ -2324,7 +2324,6 @@ fun getReactiveQueryHandle(
       SKStore.IID::keyType,
       QueryInfoFile::type,
       reactiveQueriesDirName,
-      Array[],
     );
     selectDirs = handle.map(
       SKStore.IID::keyType,
