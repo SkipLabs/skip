@@ -33,7 +33,6 @@ build_server:
 build: build_server $(SDKMAN_INIT) $(SKGW_DIR) $(SRV_DIR)/build/skdb.conf
 	@mkdir -p $(SRV_DIR)/build
 	$(SRV_DIR)/service_server.sh $(SDKMAN_DIR) $(SKGW_DIR) $(SRV_DIR)/build/skdb.conf $(SKDB_DATABASES) $(SERVER_JAR)
-	@echo sknpm.env:SKDB_CLI=$(SRV_DIR)/node_modules/skdb/dist/skdb-cli.mjs
 
 .PHONY: $(SRV_DIR)/build/skdb.conf
 $(SRV_DIR)/build/skdb.conf: $(SKDB_CLI) $(SKDB_DATABASES) $(SKDB_INIT)
