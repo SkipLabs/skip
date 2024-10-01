@@ -6,7 +6,6 @@
 
 import type { Opaque, Opt, Shared, int } from "std";
 import type { Constant } from "./internals/skipruntime_impl.js";
-export type { Opt, int };
 
 export type JSONObject = { [key: string]: TJSON | null };
 
@@ -248,15 +247,15 @@ export interface CollectionReader<K extends TJSON, V extends TJSON> {
   /**
    * Get a diff of a collection according a from watermark, if one exists.
    * @param from The from watermark to retrieve diff from
-   * @returns {Watermaked} an array en key, values pair with the corresponding watermark.
+   * @returns {Watermarked} an array en key, values pair with the corresponding watermark.
    */
-  getDiff(from: string): Watermaked<K, V>;
+  getDiff(from: string): Watermarked<K, V>;
 
   /**
    * Allow to subsribe the updates of the collection
    * @param from The watermark where to start the update
    * @param notify The function to call on collection update
-   * @returns {Watermaked} an array en key, values pair with the corresponding watermark.
+   * @returns {Watermarked} an array en key, values pair with the corresponding watermark.
    */
   subscribe(from: string, notify: Notifier<K, V>): bigint;
 }
@@ -442,7 +441,7 @@ export type ReactiveResponse = {
   watermark: string;
 };
 
-export type Watermaked<K extends TJSON, V extends TJSON> = {
+export type Watermarked<K extends TJSON, V extends TJSON> = {
   values: Entry<K, V>[];
   watermark: string;
   update?: boolean;

@@ -11,7 +11,7 @@ import type {
   RefreshToken,
   Entry,
   CollectionReader,
-  Watermaked,
+  Watermarked,
   Notifier,
 } from "../skipruntime_api.js";
 
@@ -76,7 +76,7 @@ export interface Context {
   getDiff<K extends TJSON, V extends TJSON>(
     collection: string,
     watermark: string,
-  ): Watermaked<K, V>;
+  ): Watermarked<K, V>;
 
   getArrayLazy<K extends TJSON, V>(collection: string, key: K): V[];
   getOneLazy<K extends TJSON, V>(collection: string, key: K): V;

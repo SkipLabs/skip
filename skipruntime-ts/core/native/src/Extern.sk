@@ -521,6 +521,20 @@ fun take(
     .toString()
 }
 
+fun withOptContext<T>(
+  optContext: ?mutable Context,
+  f: (mutable Context) ~> T,
+): T {
+  optContext match {
+  | Some(context) -> f(context)
+  | None() ->
+    SKStore.runWithResult(f) match {
+    | Success(v) -> v
+    | Failure(err) -> throw err
+    }
+  }
+}
+
 fun getArray_(
   context: mutable Context,
   handleId: String,
@@ -536,14 +550,7 @@ fun getArray(
   handleId: String,
   key: SKJSON.CJSON,
 ): SKJSON.CJArray {
-  optContext match {
-  | Some(context) -> getArray_(context, handleId, key)
-  | _ ->
-    SKStore.runWithResult(context ~> getArray_(context, handleId, key)) match {
-    | Success(v) -> v
-    | Failure(err) -> throw err
-    }
-  }
+  withOptContext(optContext, context ~> getArray_(context, handleId, key))
 }
 
 fun get_(
@@ -561,14 +568,7 @@ fun get(
   handleId: String,
   key: SKJSON.CJSON,
 ): SKJSON.CJSON {
-  optContext match {
-  | Some(context) -> get_(context, handleId, key)
-  | _ ->
-    SKStore.runWithResult(context ~> get_(context, handleId, key)) match {
-    | Success(v) -> v
-    | Failure(err) -> throw err
-    }
-  }
+  withOptContext(optContext, context ~> get_(context, handleId, key))
 }
 
 fun maybeGet_(
@@ -589,14 +589,7 @@ fun maybeGet(
   handleId: String,
   key: SKJSON.CJSON,
 ): SKJSON.CJSON {
-  optContext match {
-  | Some(context) -> maybeGet_(context, handleId, key)
-  | _ ->
-    SKStore.runWithResult(context ~> maybeGet_(context, handleId, key)) match {
-    | Success(v) -> v
-    | Failure(err) -> throw err
-    }
-  }
+  withOptContext(optContext, context ~> maybeGet_(context, handleId, key))
 }
 
 @export("SkipRuntime_getToken")

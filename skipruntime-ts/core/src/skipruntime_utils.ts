@@ -1,4 +1,5 @@
-import type { Accumulator, Opt } from "./skipruntime_api.js";
+import type { Opt } from "std";
+import type { Accumulator } from "./skipruntime_api.js";
 
 export class Sum implements Accumulator<number, number> {
   default = 0;
