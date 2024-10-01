@@ -22,11 +22,6 @@ class ResourceNames(
   handle: SKStore.EHandle<JSONID, JSONFile>,
 ) extends File
 
-const kJSONTypes: Types<JSONID, JSONFile> = Types(
-  JSONID::keyType,
-  JSONFile::type,
-);
-
 class JSONID(value: SKJSON.CJSON) extends Key {
   //
   fun toString(): String {
@@ -39,8 +34,6 @@ base class Accumulator<V1: frozen, V2: frozen>(default: V2) {
   fun accumulate(acc: V2, value: V1): V2;
   fun dismiss(cumul: V2, value: V1): ?V2;
 }
-
-class Types<K: Key, V: File>(key: Key ~> K, file: File ~> V)
 
 fun eagerMap<K: Key, V: File, K2: Key, V2: File>(
   handle: EHandle<K, V>,
