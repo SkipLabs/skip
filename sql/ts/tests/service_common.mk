@@ -27,7 +27,6 @@ $(SDKMAN_DIR)/candidates/gradle: $(SDKMAN_DIR)/candidates/java/20.0.2-tem
 
 .PHONY: install
 install: $(SDKMAN_DIR)/candidates/gradle $(SKDB_CMD) $(SKDB_DATABASES)
-	@echo sknpm.env:SKDB_BIN=$(REAL_DIR)/target/host/release/skdb
 
 $(SKDB_DATABASES):
 	@mkdir -p $(SKDB_DATABASES)

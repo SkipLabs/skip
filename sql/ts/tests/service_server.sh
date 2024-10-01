@@ -78,7 +78,7 @@ do
     echo "Running local server ($i)"
     pid1=$(run_server $skdb_port $3 $4 $5)
     if [[ -n "$pid1" ]]; then
-        echo "sknpm.process=$pid1"
+        echo "$pid1"
         break;
     fi
     i=$((i+1))

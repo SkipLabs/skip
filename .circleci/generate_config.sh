@@ -7,8 +7,6 @@ git diff --quiet HEAD $(git merge-base main HEAD) -- prelude/src/skstore/ compil
 skstore=$?
 git diff --quiet HEAD $(git merge-base main HEAD) -- sql/ sqlparser/ skbuild/
 skdb=$?
-git diff --quiet HEAD $(git merge-base main HEAD) -- sknpm/
-sknpm=$?
 git diff --quiet HEAD $(git merge-base main HEAD) -- skipruntime-ts/
 skipruntime_wasm=$?
 git diff --quiet HEAD $(git merge-base main HEAD) -- prelude/ts/
@@ -51,7 +49,7 @@ then
 EOF
 fi
 
-if (( $skdb != 0 || $skstore != 0 || $sknpm != 0 || $ts_prelude != 0 ))
+if (( $skdb != 0 || $skstore != 0 || $ts_prelude != 0 ))
 then
     cat <<EOF
   skdb-wasm:
@@ -60,7 +58,7 @@ then
 EOF
 fi
 
-if (( $skdb != 0 || $skstore != 0 || $skipruntime_wasm != 0 || $sknpm != 0 || $ts_prelude != 0 ))
+if (( $skdb != 0 || $skstore != 0 || $skipruntime_wasm != 0 || $ts_prelude != 0 ))
 then
     cat <<EOF
   skipruntime-wasm:
