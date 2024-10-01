@@ -19,7 +19,6 @@ import type {
 import {
   Sum,
   ValueMapper,
-  TimedQueue,
   createSKStore,
   initService,
 } from "../src/skip-runtime.js";
@@ -1002,80 +1001,4 @@ it("testJSONExtract", async () => {
     ],
     [2, [[[{ var: 1 }, { var: 2 }]]]],
   ]);
-});
-
-/// Unit tests
-
-type Update = {
-  idx: number;
-  starttime: number;
-  time: number;
-  tokens: string[];
-};
-
-it("testTimedQueue", () => {
-  const updates: Update[] = [];
-  let starttime: number = 0;
-  const timedQueue = new TimedQueue((time: number, tokens: string[]) => {
-    updates.push({
-      idx: updates.length,
-      starttime,
-      time: Math.trunc(time / 100),
-      tokens: tokens.sort(),
-    });
-  });
-  const rstarttime = Date.now();
-  timedQueue.start(
-    [
-      { ident: "token_2s", interval: 2000 },
-      { ident: "token_5s", interval: 5000 },
-      { ident: "token_12s", interval: 12000 },
-    ],
-    rstarttime,
-  );
-  starttime = Math.trunc(rstarttime / 100);
-  let waiting = true;
-  const waitandcheck = (
-    resolve: () => void,
-    reject: (reason?: unknown) => void,
-  ) => {
-    const ctime = (add: number) => Math.trunc((rstarttime + add * 100) / 100);
-    if (waiting) {
-      setTimeout(waitandcheck, 21000, resolve, reject);
-      waiting = false;
-    } else {
-      timedQueue.stop();
-      check("testTimedQueue", updates, [
-        { idx: 0, starttime, time: ctime(20), tokens: ["token_2s"] },
-        { idx: 1, starttime, time: ctime(40), tokens: ["token_2s"] },
-        { idx: 2, starttime, time: ctime(50), tokens: ["token_5s"] },
-        { idx: 3, starttime, time: ctime(60), tokens: ["token_2s"] },
-        { idx: 4, starttime, time: ctime(80), tokens: ["token_2s"] },
-        {
-          idx: 5,
-          starttime,
-          time: ctime(100),
-          tokens: ["token_2s", "token_5s"],
-        },
-        {
-          idx: 6,
-          starttime,
-          time: ctime(120),
-          tokens: ["token_12s", "token_2s"],
-        },
-        { idx: 7, starttime, time: ctime(140), tokens: ["token_2s"] },
-        { idx: 8, starttime, time: ctime(150), tokens: ["token_5s"] },
-        { idx: 9, starttime, time: ctime(160), tokens: ["token_2s"] },
-        { idx: 10, starttime, time: ctime(180), tokens: ["token_2s"] },
-        {
-          idx: 11,
-          starttime,
-          time: ctime(200),
-          tokens: ["token_2s", "token_5s"],
-        },
-      ]);
-      resolve();
-    }
-  };
-  return new Promise<void>(waitandcheck);
 });
