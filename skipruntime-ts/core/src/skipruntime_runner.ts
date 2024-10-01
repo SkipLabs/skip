@@ -9,7 +9,7 @@ import type {
 
 import type { SkipService } from "./skipruntime_service.js";
 
-import { type CreateSKStore } from "./skip-runtime.js";
+import type { CreateSKStore } from "./skipruntime_init.js";
 import type { EagerCollectionImpl } from "./internals/skipruntime_impl.js";
 
 export async function runService(
