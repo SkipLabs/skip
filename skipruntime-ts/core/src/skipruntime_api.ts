@@ -6,7 +6,6 @@
 
 import type { Opaque, Opt, Shared, int } from "std";
 import type { Constant } from "./internals/skipruntime_impl.js";
-export type { Opt, int };
 
 export type JSONObject = { [key: string]: TJSON | null };
 
