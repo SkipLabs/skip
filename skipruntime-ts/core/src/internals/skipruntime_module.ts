@@ -24,7 +24,7 @@ import type {
   CollectionReader,
   CallResourceCompute,
   Notifier,
-  Watermaked,
+  Watermarked,
 } from "../skipruntime_api.js";
 
 import type {
@@ -220,7 +220,7 @@ export class ContextImpl implements Context {
     if (typeof result == "number") {
       throw this.handles.deleteHandle(result as Handle<unknown>);
     }
-    return result as Watermaked<K, V>;
+    return result as Watermarked<K, V>;
   }
 
   getArray<K extends TJSON, V>(eagerHdl: string, key: K) {
