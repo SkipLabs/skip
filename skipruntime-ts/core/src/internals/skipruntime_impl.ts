@@ -23,7 +23,7 @@ import type {
   Entry,
   CollectionWriter,
   CallResourceCompute,
-  Watermaked,
+  Watermarked,
   Notifier,
   ReactiveResponse,
   SkipBuilder,
@@ -463,7 +463,7 @@ export class EagerCollectionReader<K extends TJSON, V extends TJSON>
     return this.context.getAll<K, V>(this.eagerHdl);
   }
 
-  getDiff(from: string): Watermaked<K, V> {
+  getDiff(from: string): Watermarked<K, V> {
     return this.context.getDiff(this.eagerHdl, from);
   }
 
