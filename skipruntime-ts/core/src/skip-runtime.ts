@@ -76,15 +76,7 @@ async function wasmUrl(): Promise<URL> {
   return new URL("./libskip-runtime-ts.wasm", import.meta.url);
 }
 
-export type CreateSKStore = (
-  init: (
-    skstore: SKStore,
-    inputs: Record<string, EagerCollection<TJSON, TJSON>>,
-  ) => CallResourceCompute,
-  inputs: Record<string, [TJSON, TJSON][]>,
-  remotes?: Record<string, EntryPoint>,
-  tokens?: Record<string, number>,
-) => Promise<SkipBuilder>;
+export type CreateSKStore = typeof createSKStore;
 
 export async function createSKStore(
   init: (
