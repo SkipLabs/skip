@@ -65,7 +65,7 @@ export interface Context {
     K extends TJSON,
     V extends TJSON,
     P extends TJSON,
-    Metadata extends TJSON,
+    Metadata extends TJSON = never,
   >(
     name: string,
     get: (key: K) => P,
@@ -325,7 +325,7 @@ export interface FromWasm {
     K extends TJSON,
     V extends TJSON,
     P extends TJSON,
-    Metadata extends TJSON,
+    Metadata extends TJSON = never,
   >(
     ctx: ptr<Internal.Context>,
     name: ptr<Internal.String>,
