@@ -61,10 +61,15 @@ export interface Context {
     compute: (self: LazyCollection<K, V>, key: K) => Opt<V>,
   ): string;
 
-  asyncLazy<K extends TJSON, V extends TJSON, P extends TJSON, M extends TJSON>(
+  asyncLazy<
+    K extends TJSON,
+    V extends TJSON,
+    P extends TJSON,
+    Metadata extends TJSON,
+  >(
     name: string,
     get: (key: K) => P,
-    call: (key: K, params: P) => Promise<AValue<V, M>>,
+    call: (key: K, params: P) => Promise<AValue<V, Metadata>>,
   ): string;
 
   getArray<K extends TJSON, V>(collection: string, key: K): V[];

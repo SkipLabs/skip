@@ -265,22 +265,25 @@ export class SKStoreImpl extends SkFrozen implements SKStore {
     K extends TJSON,
     V extends TJSON,
     P extends TJSON,
-    M extends TJSON,
+    Metadata extends TJSON,
     Params extends Param[],
   >(
-    compute: new (...params: Params) => AsyncLazyCompute<K, V, P, M>,
+    compute: new (...params: Params) => AsyncLazyCompute<K, V, P, Metadata>,
     ...params: Params
-  ): AsyncLazyCollection<K, V, M> {
+  ): AsyncLazyCollection<K, V, Metadata> {
     params.forEach(check);
     const computeObj = new compute(...params);
     const name = computeObj.constructor.name;
     Object.freeze(computeObj);
-    const lazyHdl = this.context.asyncLazy<K, V, P, M>(
+    const lazyHdl = this.context.asyncLazy<K, V, P, Metadata>(
       name,
       (key: K) => computeObj.params(key),
       (key: K, params: P) => computeObj.call(key, params),
     );
-    return new LazyCollectionImpl<K, Loadable<V, M>>(this.context, lazyHdl);
+    return new LazyCollectionImpl<K, Loadable<V, Metadata>>(
+      this.context,
+      lazyHdl,
+    );
   }
 
   external<
