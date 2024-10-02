@@ -1061,12 +1061,12 @@ mutable class Context{
     if (this.debugMode) {
       print_debug("REMOVED: " + dirName);
     };
-    if (this.hasPre.contains(dirName)) {
-      this.!hasPre = this.hasPre.remove(dirName);
-    };
     this.unsafeMaybeGetEagerDir(dirName) match {
     | None() -> return void
     | Some(dir) ->
+      if (this.hasPre.contains(dirName)) {
+        this.!hasPre = this.hasPre.remove(dirName);
+      };
       for (parentName => _ in dir.parents) {
         this.unsafeMaybeGetEagerDir(parentName) match {
         | None() -> continue
@@ -1075,7 +1075,8 @@ mutable class Context{
           this.setDir(parent.dirName, parent)
         }
       };
-      dir.removeSubDirs(this)
+      dir.removeSubDirs(this);
+      dir.optOnDelete.each(this.postpone)
     };
     this.!deps = this.deps.removeDir(dirName);
     this.!dirsWithSharedSubDirs = this.dirsWithSharedSubDirs.remove(dirName);
