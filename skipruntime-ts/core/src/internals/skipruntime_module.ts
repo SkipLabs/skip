@@ -105,10 +105,15 @@ export class ContextImpl implements Context {
     return this.skjson.importString(lazyHdl);
   }
 
-  asyncLazy<K extends TJSON, V extends TJSON, P extends TJSON>(
+  asyncLazy<
+    K extends TJSON,
+    V extends TJSON,
+    P extends TJSON,
+    Metadata extends TJSON,
+  >(
     name: string,
     get: (key: K) => P,
-    call: (key: K, params: P) => Promise<V>,
+    call: (key: K, params: P) => Promise<AValue<V, Metadata>>,
   ) {
     const lazyHdl = this.exports.SkipRuntime_asyncLazy(
       this.pointer(),

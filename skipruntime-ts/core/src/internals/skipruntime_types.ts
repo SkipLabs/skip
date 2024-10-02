@@ -321,11 +321,16 @@ export interface FromWasm {
     time: float,
   ): float;
 
-  SkipRuntime_asyncLazy<K extends TJSON, V extends TJSON, P extends TJSON>(
+  SkipRuntime_asyncLazy<
+    K extends TJSON,
+    V extends TJSON,
+    P extends TJSON,
+    Metadata extends TJSON,
+  >(
     ctx: ptr<Internal.Context>,
     name: ptr<Internal.String>,
     paramsFn: Handle<(key: K) => P>,
-    lazyFn: Handle<(key: K, params: P) => Promise<V>>,
+    lazyFn: Handle<(key: K, params: P) => Promise<AValue<V, Metadata>>>,
   ): ptr<Internal.String>;
   SkipRuntime_lazy<K extends TJSON, V extends TJSON>(
     ctx: ptr<Internal.Context>,
