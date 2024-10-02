@@ -1081,31 +1081,19 @@ class LinksImpl implements Links {
       };
       promise
         .then((value) => {
-          if (value.payload !== undefined) {
-            register(
-              value.metadata !== undefined
-                ? {
-                    status: "success",
-                    payload: value.payload,
-                    metadata: value.metadata,
-                  }
-                : {
-                    status: "success",
-                    payload: value.payload,
-                  },
-            );
-          } else {
-            register(
-              value.metadata !== undefined
-                ? {
-                    status: "unchanged",
-                    metadata: value.metadata,
-                  }
-                : {
-                    status: "unchanged",
-                  },
-            );
+          const result: Result<V, M> =
+            value.payload !== undefined
+              ? {
+                  status: "success",
+                  payload: value.payload,
+                }
+              : {
+                  status: "unchanged",
+                };
+          if ("metadata" in value) {
+            result.metadata = value.metadata;
           }
+          register(result);
         })
         .catch((reason: unknown) => {
           let msg: string;
