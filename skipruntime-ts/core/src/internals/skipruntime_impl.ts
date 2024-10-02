@@ -266,7 +266,7 @@ export class SKStoreImpl extends SkFrozen implements SKStore {
     V extends TJSON,
     P extends TJSON,
     Params extends Param[],
-    Metadata extends TJSON,
+    Metadata extends TJSON = never,
   >(
     compute: new (...params: Params) => AsyncLazyCompute<K, V, P, Metadata>,
     ...params: Params
@@ -290,7 +290,7 @@ export class SKStoreImpl extends SkFrozen implements SKStore {
     K extends TJSON,
     V extends TJSON,
     Params extends Param[],
-    Metadata extends TJSON,
+    Metadata extends TJSON = never,
   >(
     refreshToken: string,
     compute: new (...params: Params) => ExternalCall<K, V, Metadata>,

@@ -109,7 +109,7 @@ export class ContextImpl implements Context {
     K extends TJSON,
     V extends TJSON,
     P extends TJSON,
-    Metadata extends TJSON,
+    Metadata extends TJSON = never,
   >(
     name: string,
     get: (key: K) => P,
@@ -730,7 +730,7 @@ interface ToWasm {
     K extends TJSON,
     V extends TJSON,
     P extends TJSON,
-    Metadata extends TJSON,
+    Metadata extends TJSON = never,
   >(
     fn: Handle<(key: K, params: P) => Promise<AValue<V, Metadata>>>,
     callId: ptr<Internal.String>,
@@ -809,12 +809,12 @@ type Failure = {
  * and is analogous to HTTP response code 304 'Not Modified'.  It contains:
  * `metadata` - optional data that can be added to supersede metadata on the unchanged return value
  */
-type Unchanged<Metadata extends TJSON> = {
+type Unchanged<Metadata extends TJSON = never> = {
   status: "unchanged";
   metadata?: Metadata;
 };
 
-type Result<V extends TJSON, Metadata extends TJSON> =
+type Result<V extends TJSON, Metadata extends TJSON = never> =
   | Success<V, Metadata>
   | Failure
   | Unchanged<Metadata>;
@@ -861,7 +861,7 @@ class LinksImpl implements Links {
     K extends TJSON,
     V extends TJSON,
     P extends TJSON,
-    Metadata extends TJSON,
+    Metadata extends TJSON = never,
   >(
     fn: Handle<(key: K, params: P) => Promise<AValue<V, Metadata>>>,
     callId: ptr<Internal.String>,
@@ -1039,7 +1039,7 @@ class LinksImpl implements Links {
       K extends TJSON,
       V extends TJSON,
       P extends TJSON,
-      Metadata extends TJSON,
+      Metadata extends TJSON = never,
     >(
       fn: Handle<(key: K, params: P) => Promise<AValue<V, Metadata>>>,
       skcall: ptr<Internal.String>,
@@ -1322,7 +1322,7 @@ class Manager implements ToWasmManager {
       K extends TJSON,
       V extends TJSON,
       P extends TJSON,
-      Metadata extends TJSON,
+      Metadata extends TJSON = never,
     >(
       fn: Handle<(key: K, params: P) => Promise<AValue<V, Metadata>>>,
       call: ptr<Internal.String>,
