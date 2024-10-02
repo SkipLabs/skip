@@ -1,4 +1,4 @@
-import type { Opt, Shared, ptr, int, float, Metadata } from "std";
+import type { Opt, Shared, ptr, int, float } from "std";
 import type * as Internal from "./skipruntime_internal_types.js";
 import type {
   Accumulator,
@@ -168,7 +168,6 @@ export interface Handles {
   get<T>(id: Handle<T>): T;
   apply<R, P extends any[]>(id: Handle<(..._: P) => R>, parameters: P): R;
   deleteHandle<T>(id: Handle<T>): T;
-  name(metadata: Metadata): string;
 }
 
 export interface FromWasm {
