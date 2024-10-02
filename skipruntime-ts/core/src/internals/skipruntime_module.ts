@@ -6,7 +6,6 @@ import type {
   ToWasmManager,
   Environment,
   Opt,
-  Metadata,
   ErrorObject,
 } from "std";
 import type { SKJSON } from "skjson";
@@ -48,11 +47,6 @@ class HandlesImpl implements Handles {
   private nextID: number = 1;
   private objects: any[] = [];
   private freeIDs: int[] = [];
-  private env: Environment;
-
-  constructor(env: Environment) {
-    this.env = env;
-  }
 
   register<T>(v: T): Handle<T> {
     const freeID = this.freeIDs.pop();
@@ -76,13 +70,6 @@ class HandlesImpl implements Handles {
     this.freeIDs.push(id);
     return current;
   }
-
-  name = (metadata: Metadata) => {
-    return (
-      "b64_" +
-      this.env.base64Encode(JSON.stringify(metadata)).replaceAll("=", "")
-    );
-  };
 }
 
 export class ContextImpl implements Context {
@@ -928,7 +915,7 @@ class LinksImpl implements Links {
 
   constructor(env: Environment) {
     this.env = env;
-    this.handles = new HandlesImpl(env);
+    this.handles = new HandlesImpl();
   }
 
   complete = (utils: Utils, exports: object) => {
