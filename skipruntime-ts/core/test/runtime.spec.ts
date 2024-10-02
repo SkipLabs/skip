@@ -544,9 +544,7 @@ it("testMerge1", async () => {
   const resource = "merge1";
   runtime.put("input1", 1, [10]);
   runtime.put("input2", 1, [20]);
-  expect(sorted(runtime.getAll(resource, {}).values)).toEqual([
-    [1, [10, 20]],
-  ]);
+  expect(sorted(runtime.getAll(resource, {}).values)).toEqual([[1, [10, 20]]]);
   runtime.put("input1", 2, [3]);
   runtime.put("input2", 2, [7]);
   expect(sorted(runtime.getAll(resource, {}).values)).toEqual([
@@ -600,9 +598,7 @@ it("testMergeReduce", async () => {
   const resource = "mergeReduce";
   runtime.put("input1", 1, [10]);
   runtime.put("input2", 1, [20]);
-  expect(runtime.getAll(resource, {}).values).toEqual([
-    [1, [30]],
-  ]);
+  expect(runtime.getAll(resource, {}).values).toEqual([[1, [30]]]);
   runtime.put("input1", 2, [3]);
   runtime.put("input2", 2, [7]);
   expect(runtime.getAll(resource, {}).values).toEqual([
@@ -710,11 +706,7 @@ it("testAsyncLazy", async () => {
         setTimeout(waitandcheck, 10, resolve, reject);
       } else {
         try {
-          expect(updates).toEqual([
-            [],
-            [[0, ["loading"]]],
-            [[0, ["15"]]],
-          ]);
+          expect(updates).toEqual([[], [[0, ["loading"]]], [[0, ["15"]]]]);
         } catch (e) {
           reject(e);
         }
@@ -780,7 +772,10 @@ it("testExternalCall", async () => {
   const success = (id: number): Entry<TJSON, TJSON> => {
     return [id, [`success: mock_result(${id.toString()})`]];
   };
-  const loading = (id: number, hasPrevious: boolean = false): Entry<TJSON, TJSON> => {
+  const loading = (
+    id: number,
+    hasPrevious: boolean = false,
+  ): Entry<TJSON, TJSON> => {
     const previous = hasPrevious ? `mock_result(${id.toString()})` : "NONE";
     return [id, [`loading... (previous: ${previous})`]];
   };
