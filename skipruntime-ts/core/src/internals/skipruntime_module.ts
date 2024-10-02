@@ -16,7 +16,6 @@ import type {
   EagerCollection,
   LazyCollection,
   TJSON,
-  RefreshToken,
   JSONObject,
   Success,
   Entry,
@@ -336,7 +335,7 @@ export class ContextImpl implements Context {
     return this.exports.SkipRuntime_getToken(
       this.pointer(),
       this.skjson.exportString(key),
-    ) as RefreshToken;
+    );
   }
 
   size = (eagerHdl: string) => {
