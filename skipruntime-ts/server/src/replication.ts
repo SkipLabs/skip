@@ -6,7 +6,8 @@ class TailingSession {
   private subsessions = new Map<string, bigint>();
 
   constructor(
-    private replication: SkipRuntime /*, private pubkey: ArrayBuffer*/,
+    private replication: SkipRuntime,
+    private pubkey: ArrayBuffer,
   ) {}
 
   subscribe(
@@ -25,6 +26,7 @@ class TailingSession {
       (v, w, u) => {
         callback(v, !u, BigInt(w));
       },
+      new Uint8Array(this.pubkey),
     );
     this.subsessions.set(collection, subsession);
   }
@@ -102,7 +104,7 @@ function handleMessage(
   }
 }
 
-async function handleAuthMessage(data: unknown): Promise<boolean> {
+async function handleAuthMessage(data: unknown): Promise<ArrayBuffer | null> {
   if (!(data instanceof ArrayBuffer)) {
     // Required by Bun.
     if (data instanceof Uint8Array) {
@@ -129,7 +131,9 @@ async function handleAuthMessage(data: unknown): Promise<boolean> {
   }
 
   const pubkey = await Protocol.importKey(msg.pubkey);
-  return await Protocol.verify(pubkey, msg.nonce, msg.timestamp, msg.signature);
+  if (await Protocol.verify(pubkey, msg.nonce, msg.timestamp, msg.signature))
+    return msg.pubkey;
+  return null;
 }
 
 export class ReplicationServer {
@@ -174,9 +178,9 @@ export class ReplicationServer {
     const authRequest = this.auth.get(ws);
     if (!authRequest) {
       const authPromise = handleAuthMessage(event.data)
-        .then((authOk) => {
-          if (authOk) {
-            this.sessions.set(ws, new TailingSession(this.replication));
+        .then((pubkey) => {
+          if (pubkey) {
+            this.sessions.set(ws, new TailingSession(this.replication, pubkey));
             return true;
           } else {
             throw new ReplicationServerError(

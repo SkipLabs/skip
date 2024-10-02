@@ -1,9 +1,10 @@
-import type {
-  TJSON,
-  Entry,
-  Entrypoint,
-  ReactiveResponse,
-} from "./skipruntime_api.js";
+import type { TJSON, Entry, ReactiveResponse } from "./skipruntime_api.js";
+
+export type Entrypoint = {
+  host: string;
+  port: number;
+  secured?: boolean;
+};
 
 function toHttp(entrypoint: Entrypoint) {
   if (entrypoint.secured)
@@ -14,7 +15,7 @@ function toHttp(entrypoint: Entrypoint) {
 export async function fetchJSON<V>(
   url: string,
   method: "POST" | "GET" | "PUT" | "PATCH" | "HEAD" | "DELETE" = "GET",
-  headers: Record<string, string>,
+  headers: Record<string, string> = {},
   data?: TJSON,
 ): Promise<[V | null, Headers]> {
   const body = data ? JSON.stringify(data) : undefined;

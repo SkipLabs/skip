@@ -1,10 +1,6 @@
 import { WebSocketServer } from "ws";
 import * as http from "http";
-import {
-  initService,
-  createRuntime,
-  type SkipService,
-} from "@skipruntime/core";
+import { initService, type SkipService } from "@skipruntime/core";
 import { createRESTServer } from "./rest.js";
 import { ReplicationServer } from "./replication.js";
 
@@ -12,7 +8,7 @@ export async function runService(
   service: SkipService,
   port: number = 443,
 ): Promise<{ close: () => void }> {
-  const runtime = await initService(service, createRuntime);
+  const runtime = await initService(service);
   const httpServer = http.createServer();
   const app = createRESTServer(runtime);
   httpServer.on("request", app);

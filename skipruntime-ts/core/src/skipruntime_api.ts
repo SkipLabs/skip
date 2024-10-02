@@ -1,11 +1,11 @@
 /**
- * This file contains the Skip Runtime's public API: types, interfaces, and operations that
- * can be used to specify and interact with reactive computations. See [todo: pointer to
- * public overview page] for a detailed description and introduction to Skip.
+ * This file contains the SkipRuntime public API: types, interfaces, and operations that can be
+ * used to specify and interact with reactive computations. See [todo: pointer to public
+ * overview page] for a detailed description and introduction to the SkipRuntime system.
  */
 
-import type { Opt, Shared, int } from "std";
-import type { Constant } from "./internals/skipruntime_impl.js";
+import type { Opt, int } from "std";
+import type { Constant } from "./internals/skipruntime_module.js";
 
 /**
  * The `TJSON` type describes JSON-serializable values and serves as an upper bound on keys
@@ -31,50 +31,6 @@ export type Param =
   | { readonly [k: string]: Param };
 
 /**
- * Skip Runtime async function calls return a `Loadable` value which is one of `Success`,
- * `Loading`, or `Error`
- */
-
-export type Loadable<V extends TJSON, M extends TJSON> =
-  | Success<V, M>
-  | Loading<V, M>
-  | Error<V, M>;
-
-/**
- * A `Success` return value indicates successful function evaluation and contains:
- * `payload`: the function return value
- * `metadata`: optional data that can be added to specify further information
-               about data such as source location.
- */
-export type Success<V extends TJSON, Metadata extends TJSON = never> = {
-  status: "success";
-  payload: V;
-  metadata?: Metadata;
-};
-
-/**
- * A `Loading` return value indicates that a new call has been performed, but its result
- * is not yet available.  It contains:
- * `previous` - the return value of the previous successful call, if available
- */
-export type Loading<V extends TJSON, Metadata extends TJSON = never> = {
-  status: "loading";
-  previous?: { payload: V; metadata?: Metadata };
-};
-
-/**
- * An `Error` return value indicates that a runtime error occurred during a lazy function
- * call.  It contains:
- * `error` - the error message associated with the error
- * `previous` - the return value of the previous successful call, if available
- */
-export type Error<V extends TJSON, Metadata extends TJSON = never> = {
-  status: "failure";
-  error: string;
-  previous?: { payload: V; metadata?: Metadata };
-};
-
-/**
  * The type of a reactive function mapping over an arbitrary collection.
  * For each key & values in the input collection (of type K1/V1 respectively),
  * produces some key/value pairs for the output collection (of type K2/V2 respectively)
@@ -88,7 +44,7 @@ export interface Mapper<
   K2 extends TJSON,
   V2 extends TJSON,
 > {
-  mapElement: (key: K1, it: NonEmptyIterator<V1>) => Iterable<[K2, V2]>;
+  mapElement(key: K1, it: NonEmptyIterator<V1>): Iterable<[K2, V2]>;
 }
 
 /**
@@ -144,23 +100,23 @@ export interface NonEmptyIterator<T> extends Iterable<T> {
    * Return the next element of the iteration.
    *   `first` cannot be called after `next`
    */
-  next: () => Opt<T>;
+  next(): Opt<T>;
 
   /**
    * Returns the first element of the iteration.
    * @throws {Error} when called after `next`
    */
-  first: () => T;
+  first(): T;
 
   /**
    * Returns the first element of the iteration iff it contains exactly one element
    */
-  uniqueValue: () => Opt<T>;
+  uniqueValue(): Opt<T>;
 
   /**
    * Returns an array containing all values of the iterator
    */
-  toArray: () => T[];
+  toArray(): T[];
 
   /**
    * Performs the specified action for each element in the iterator.
@@ -204,62 +160,6 @@ export interface LazyCollection<K extends TJSON, V extends TJSON>
 }
 
 /**
- * A shorthand for the type of lazy collections produced by asynchronous computations, whose
- * values contain some `Loadable` metadata about the asynchronous computation.
- */
-export interface AsyncLazyCollection<
-  K extends TJSON,
-  V extends TJSON,
-  Metadata extends TJSON = never,
-> extends LazyCollection<K, Loadable<V, Metadata>> {}
-
-/**
- * This interface allow accessing the data in a collection outside in a non reactive way.
- */
-export interface CollectionReader<K extends TJSON, V extends TJSON> {
-  /**
-   * Get (and potentially compute) all values mapped to by some key.
-   */
-  getArray(key: K): V[];
-
-  /**
-   * Get a value of an eager reactive collection.
-   * @throws {Error} when either zero or multiple such values exist
-   */
-  getOne(key: K): V;
-
-  /**
-   * Get a value of an eager reactive collection, if one exists.
-   * If multiple values are mapped to by the key, any of them can be returned.
-   * @returns the value for this `key`, or null if no such value exists
-   */
-  maybeGetOne(key: K): Opt<V>;
-
-  /**
-   * Get all key/values entries of a reactive collection as a non-reactive array.
-   */
-  getAll(): Entry<K, V>[];
-
-  /**
-   * Get a diff of added/updated entries in a collection since some watermark.
-   * @param since A watermark from which to compute the diff
-   * @returns {UpdatedValues} An object containing updated entries and a new watermark string.
-   */
-  getDiff(since: string): UpdatedValues<K, V>;
-
-  /**
-   * Subscribe to updates of the collection since some initial watermark
-   * @param since The watermark from which to receive updates
-   * @param f The function to call on collection update
-   * @returns A subscription identifier, which can be passed to `unsubscribe` to cancel this subscription
-   */
-  subscribe(
-    since: string,
-    f: (values: Entry<K, V>[], watermark: string, update: boolean) => void,
-  ): bigint;
-}
-
-/**
  * An _Eager_ reactive collection, whose values are computed eagerly and kept up
  * to date whenever inputs are changed
  */
@@ -271,11 +171,6 @@ export interface EagerCollection<K extends TJSON, V extends TJSON>
    */
   getArray(key: K): V[];
 
-  /**
-   * Get a value of an eager reactive collection.
-   * @throws {Error} when either zero or multiple such values exist
-   */
-  getOne(key: K): V;
   /**
    * Get a value of an eager reactive collection, if one exists.
    * If multiple values are mapped to by the key, any of them can be returned.
@@ -332,69 +227,14 @@ export interface EagerCollection<K extends TJSON, V extends TJSON>
   /**
    * The current number of elements in the collection
    */
-  size: () => number;
-
-  /**
-   * A unique identifier for this collection
-   */
-  getId(): string;
-}
-
-export type Entrypoint = {
-  host: string;
-  port: number;
-  secured?: boolean;
-};
-
-export type CallResourceCompute = (
-  name: string,
-  params: Record<string, string>,
-) => string;
-
-export interface RuntimeFactory extends Shared {
-  createRuntime(
-    init: (
-      context: Context,
-      collections: Record<string, EagerCollection<TJSON, TJSON>>,
-    ) => CallResourceCompute,
-    inputs: Record<string, [TJSON, TJSON][]>,
-    remotes?: Record<string, Entrypoint>,
-    tokens?: Record<string, number>,
-    writers?: Record<string, CollectionWriter<TJSON, TJSON>>,
-  ): SkipRuntime;
+  size(): number;
 }
 
 /**
  * The type of a _lazy_ reactive function which produces a value for some `key`, possibly using a `self` reference to get/produce other lazily-computed results.
  */
 export interface LazyCompute<K extends TJSON, V extends TJSON> {
-  compute: (self: LazyCollection<K, V>, key: K) => Opt<V>;
-}
-
-/**
- * The expected return type for an asynchronous lazy computation, containing the `payload` and some optional `metadata`
- */
-export type AValue<V extends TJSON, M extends TJSON> = {
-  payload?: V;
-  metadata?: M;
-};
-
-export interface AsyncLazyCompute<
-  K extends TJSON,
-  V extends TJSON,
-  P extends TJSON,
-  Metadata extends TJSON = never,
-> {
-  params: (key: K) => P;
-  call: (key: K, params: P) => Promise<AValue<V, Metadata>>;
-}
-
-export interface ExternalCall<
-  K extends TJSON,
-  V extends TJSON,
-  Metadata extends TJSON = never,
-> {
-  call(key: K, timestamp: number): Promise<AValue<V, Metadata>>;
+  compute(selfHdl: LazyCollection<K, V>, key: K): Opt<V>;
 }
 
 export interface Context extends Constant {
@@ -409,109 +249,105 @@ export interface Context extends Constant {
     ...params: Params
   ): LazyCollection<K, V>;
 
-  /**
-   * Creates a lazy reactive collection with an asynchronous computation
-   * @param compute - the async function to call with returned values
-   * @returns The resulting async lazy collection
-   */
-  asyncLazy<
-    K extends TJSON,
-    V extends TJSON,
-    AsyncParams extends TJSON,
-    Params extends Param[],
-    Metadata extends TJSON = never,
-  >(
-    compute: new (
-      ...params: Params
-    ) => AsyncLazyCompute<K, V, AsyncParams, Metadata>,
-    ...params: Params
-  ): AsyncLazyCollection<K, V, Metadata>;
-
-  external<
-    K extends TJSON,
-    V extends TJSON,
-    Params extends Param[],
-    Metadata extends TJSON = never,
-  >(
-    refreshToken: string,
-    compute: new (...params: Params) => ExternalCall<K, V, Metadata>,
-    ...params: Params
-  ): AsyncLazyCollection<K, V, Metadata>;
-
-  getRefreshToken: (key: string) => number;
+  manageResource<K extends TJSON, V extends TJSON>(
+    supplier: string,
+    resource: string,
+    params: Record<string, string | number>,
+    reactiveAuth?: Uint8Array,
+  ): EagerCollection<K, V>;
 
   jsonExtract(value: JSONObject, pattern: string): TJSON[];
-
-  log(object: TJSON): void;
 }
-
-export type Token = {
-  duration: number;
-  value: string;
-};
 
 export type Entry<K extends TJSON, V extends TJSON> = [K, V[]];
 
-export type ReactiveResponse = {
-  collection: string;
-  watermark: string;
-};
-
-/**
- * Represents some update(s) to a collection, containing: an array of all updated keys and
- * their new `values`, where an empty value array indicates deletion; a new `watermark` for
- * the point after these updates; and, a flag `isInitial` which is set when this update is
- * the initial chunk of data rather than an update to the preceding state.
- */
-export type UpdatedValues<K extends TJSON, V extends TJSON> = {
-  values: Entry<K, V>[];
-  watermark: string;
-  isInitial?: boolean;
-};
-
-export interface CollectionWriter<K extends TJSON, V extends TJSON> {
-  write(key: K, value: V[]): void;
-  writeAll(values: Entry<K, V>[]): void;
-  deleteKeys(keys: K[]): void;
-}
+export type Notifier<K extends TJSON, V extends TJSON> = (
+  values: Entry<K, V>[],
+  watermark: number,
+  update: boolean,
+) => void;
 
 export interface SkipRuntime {
   // READ
   getAll<K extends TJSON, V extends TJSON>(
     resource: string,
-    params: JSONObject,
-    reactiveAuth?: Uint8Array | string,
+    params: Record<string, string>,
+    reactiveAuth?: Uint8Array,
   ): { values: Entry<K, V>[]; reactive?: ReactiveResponse };
-  head(
+
+  createResource(
     resource: string,
-    params: JSONObject,
-    reactiveAuth: Uint8Array | string,
+    params: Record<string, string>,
+    reactiveAuth?: Uint8Array,
   ): ReactiveResponse;
+
   getOne<V extends TJSON>(
     resource: string,
-    params: JSONObject,
+    params: Record<string, string>,
     key: string | number,
-    reactiveAuth?: Uint8Array | string,
+    reactiveAuth?: Uint8Array,
   ): V[];
-  // WRITE
-  put<V extends TJSON>(
-    collection: string,
-    key: string | number,
-    value: V[],
+
+  closeResource(
+    resource: string,
+    params: Record<string, string>,
+    reactiveAuth?: Uint8Array,
   ): void;
 
-  patch<K extends TJSON, V extends TJSON>(
-    collection: string,
-    values: Entry<K, V>[],
-  ): void;
-
-  deleteKey(collection: string, key: string | number): void;
+  closeSession(reactiveAuth?: Uint8Array): void;
 
   subscribe<K extends TJSON, V extends TJSON>(
-    collection: string,
-    since: string,
-    f: (values: Entry<K, V>[], watermark: string, update: boolean) => void,
+    reactiveId: string,
+    from: string,
+    notify: Notifier<K, V>,
+    reactiveAuth?: Uint8Array,
   ): bigint;
 
   unsubscribe(id: bigint): void;
+
+  // WRITE
+
+  update<K extends TJSON, V extends TJSON>(
+    collection: string,
+    values: Entry<K, V>[],
+  ): void;
 }
+
+export interface ExternalSupplier {
+  link(
+    resource: string,
+    params: Record<string, string | number>,
+    cb: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void,
+    reactiveAuth?: Uint8Array,
+  ): void;
+
+  close(
+    resource: string,
+    params: Record<string, string | number>,
+    reactiveAuth?: Uint8Array,
+  ): void;
+}
+
+export interface Resource {
+  reactiveCompute(
+    conetxt: Context,
+    collections: Record<string, EagerCollection<TJSON, TJSON>>,
+    publicToken?: Uint8Array,
+  ): EagerCollection<TJSON, TJSON>;
+}
+
+export interface SkipService {
+  inputCollections?: Record<string, [TJSON, TJSON][]>;
+  remoteCollections?: Record<string, ExternalSupplier>;
+  resources?: Record<string, new (params: Record<string, string>) => Resource>;
+
+  reactiveCompute(
+    context: Context,
+    inputCollections: Record<string, EagerCollection<TJSON, TJSON>>,
+  ): Record<string, EagerCollection<TJSON, TJSON>>;
+}
+
+export type ReactiveResponse = {
+  collection: string;
+  watermark: number;
+};

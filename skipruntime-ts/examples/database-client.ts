@@ -32,7 +32,7 @@ const reactive = strReactiveResponse
   ? (JSON.parse(strReactiveResponse) as ReactiveResponse)
   : undefined;
 
-if (reactive == null) {
+if (!reactive) {
   throw new Error("Reactive response must be supplied.");
 }
 
