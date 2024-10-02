@@ -950,3 +950,16 @@ export function cloneIfProxy<T>(v: T): T {
   }
   return v;
 }
+
+export function errorObjectAsError(e: ErrorObject): Error {
+  const error = new Error(e.message);
+  error.stack = e.stack?.join("\n");
+  if (e.cause) {
+    Object.defineProperty(error, "cause", {
+      enumerable: true,
+      writable: true,
+      value: errorObjectAsError(e.cause),
+    });
+  }
+  return error;
+}
