@@ -404,8 +404,8 @@ export interface SKStore extends Constant {
     K extends TJSON,
     V extends TJSON,
     P extends TJSON,
-    Metadata extends TJSON,
     Params extends Param[],
+    Metadata extends TJSON,
   >(
     compute: new (...params: Params) => AsyncLazyCompute<K, V, P, Metadata>,
     ...params: Params
@@ -414,8 +414,8 @@ export interface SKStore extends Constant {
   external<
     K extends TJSON,
     V extends TJSON,
-    Metadata extends TJSON,
     Params extends Param[],
+    Metadata extends TJSON,
   >(
     refreshToken: string,
     compute: new (...params: Params) => ExternalCall<K, V, Metadata>,
