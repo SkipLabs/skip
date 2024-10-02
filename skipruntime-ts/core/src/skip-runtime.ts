@@ -8,7 +8,6 @@ export type {
   AValue,
   Mapper,
   Param,
-  RefreshToken,
   EagerCollection,
   NonEmptyIterator,
   LazyCollection,

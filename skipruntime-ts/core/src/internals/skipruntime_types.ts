@@ -8,7 +8,6 @@ import type {
   NonEmptyIterator,
   EagerCollection,
   JSONObject,
-  RefreshToken,
   Entry,
   CollectionReader,
   Watermarked,
@@ -93,7 +92,7 @@ export interface Context {
     lazyHdl: ptr<Internal.LHandle>,
     key: K,
   ): Opt<V>;
-  getToken(key: string): RefreshToken;
+  getToken(key: string): number;
 
   size(collection: string): number;
 

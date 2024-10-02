@@ -4,7 +4,7 @@
  * overview page] for a detailed description and introduction to the SKStore system.
  */
 
-import type { Opaque, Opt, Shared, int } from "std";
+import type { Opt, Shared, int } from "std";
 import type { Constant } from "./internals/skipruntime_impl.js";
 
 export type JSONObject = { [key: string]: TJSON | null };
@@ -19,8 +19,6 @@ export type Param =
   | Constant
   | readonly Param[]
   | { readonly [k: string]: Param };
-
-export type RefreshToken = Opaque<number, "SkipRefreshToken">;
 
 /**
  * Skip Runtime async function calls return a `Loadable` value which is one of `Success`,
@@ -422,7 +420,7 @@ export interface SKStore extends Constant {
     ...params: Params
   ): AsyncLazyCollection<K, V, Metadata>;
 
-  getRefreshToken: (key: string) => RefreshToken;
+  getRefreshToken: (key: string) => number;
 
   jsonExtract(value: JSONObject, pattern: string): TJSON[];
 
