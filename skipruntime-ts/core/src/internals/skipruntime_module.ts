@@ -1062,7 +1062,7 @@ class LinksImpl implements Links {
       const params = jsu.importJSON(skparams, true) as P;
       const promise = this.handles.apply(fn, [key, params]);
       const register = (value: Result<TJSON, TJSON>) => {
-        setTimeout(() => {
+        setImmediate(() => {
           const result = jsu.runWithGC(() => {
             return Math.trunc(
               fromWasm.SkipRuntime_asyncResult(
@@ -1077,7 +1077,7 @@ class LinksImpl implements Links {
           if (result < 0) {
             throw this.handles.deleteHandle(-result as Handle<unknown>);
           }
-        }, 0);
+        });
       };
       promise
         .then((value) => {
