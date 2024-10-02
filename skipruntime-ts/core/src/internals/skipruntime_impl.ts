@@ -300,15 +300,12 @@ export class SKStoreImpl extends SkFrozen implements SKStore {
     const computeObj = new compute(...params);
     const name = computeObj.constructor.name;
     Object.freeze(computeObj);
-    const lazyHdl = this.context.asyncLazy<K, V, number, TJSON>(
+    const lazyHdl = this.context.asyncLazy<K, V, number, Metadata>(
       name,
       (_key: K) => this.getRefreshToken(refreshToken),
       (key: K, timestamp: number) => computeObj.call(key, timestamp),
     );
-    return new LazyCollectionImpl<K, Loadable<V, Metadata>>(
-      this.context,
-      lazyHdl,
-    );
+    return new LazyCollectionImpl(this.context, lazyHdl);
   }
 
   getRefreshToken(key: string) {
