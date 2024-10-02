@@ -1061,7 +1061,7 @@ class LinksImpl implements Links {
       const key = jsu.importJSON(skkey, true) as K;
       const params = jsu.importJSON(skparams, true) as P;
       const promise = this.handles.apply(fn, [key, params]);
-      const register = (value: Result<TJSON, TJSON>) => {
+      const register = (value: Result<V, M>) => {
         setImmediate(() => {
           const result = jsu.runWithGC(() => {
             return Math.trunc(
