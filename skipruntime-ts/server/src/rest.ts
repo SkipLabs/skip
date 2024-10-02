@@ -1,5 +1,5 @@
 import express from "express";
-import type { Entry, JSONObject, TJSON, SkipRuntime } from "@skipruntime/core";
+import type { Entry, TJSON, SkipRuntime } from "@skipruntime/core";
 import { UnknownCollectionError } from "@skipruntime/core";
 
 export function createRESTServer(runtime: SkipRuntime): express.Express {
@@ -13,9 +13,9 @@ export function createRESTServer(runtime: SkipRuntime): express.Express {
     if (!strReactiveAuth) throw new Error("X-Reactive-Auth must be specified.");
     const reactiveAuth = new Uint8Array(Buffer.from(strReactiveAuth, "base64"));
     try {
-      const data = runtime.head(
+      const data = runtime.createResource(
         resourceName,
-        req.query as JSONObject,
+        req.query as Record<string, string>,
         reactiveAuth,
       );
       res.set("X-Reactive-Response", JSON.stringify(data));
@@ -28,7 +28,11 @@ export function createRESTServer(runtime: SkipRuntime): express.Express {
     const key = req.params.key;
     const resourceName = req.params.resource;
     try {
-      const data = runtime.getOne(resourceName, req.query as JSONObject, key);
+      const data = runtime.getOne(
+        resourceName,
+        req.query as Record<string, string>,
+        key,
+      );
       res.status(200).json(data);
     } catch (e: unknown) {
       res.status(500).json(e instanceof Error ? e.message : e);
@@ -64,7 +68,7 @@ export function createRESTServer(runtime: SkipRuntime): express.Express {
     const data = req.body as TJSON[];
     const collectionName = req.params.collection;
     try {
-      runtime.put(collectionName, key, data);
+      runtime.update(collectionName, [[key, [data]]]);
       res.status(200).json({});
     } catch (e: unknown) {
       if (e instanceof UnknownCollectionError) {
@@ -79,14 +83,10 @@ export function createRESTServer(runtime: SkipRuntime): express.Express {
       res.status(400).json(`Bad request body ${JSON.stringify(req.body)}`);
       return;
     }
-    const data = req.body as TJSON[];
-    if (!Array.isArray(data)) {
-      res.status(400).json("Bad request");
-      return;
-    }
+    const data = req.body as Entry<TJSON, TJSON>[];
     const collectionName = req.params.collection;
     try {
-      runtime.patch(collectionName, data as Entry<TJSON, TJSON>[]);
+      runtime.update(collectionName, data);
       res.status(200).json({});
     } catch (e: unknown) {
       if (e instanceof UnknownCollectionError) {
@@ -100,7 +100,7 @@ export function createRESTServer(runtime: SkipRuntime): express.Express {
     const key = req.params.id;
     const collectionName = req.params.collection;
     try {
-      runtime.deleteKey(collectionName, key);
+      runtime.update(collectionName, [[key, []]]);
       res.status(200).json({});
     } catch (e: unknown) {
       if (e instanceof UnknownCollectionError) {

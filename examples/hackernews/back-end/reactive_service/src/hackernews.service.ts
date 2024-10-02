@@ -1,5 +1,5 @@
 import type {
-  SKStore,
+  Context,
   TJSON,
   Mapper,
   EagerCollection,
@@ -32,7 +32,7 @@ class HackerNewsService implements SkipService {
   resources = { posts: PostsResource };
 
   reactiveCompute(
-    _store: SKStore,
+    _context: Context,
     inputCollections: {
       posts: EagerCollection<number, Post>;
       users: EagerCollection<number, User>;
@@ -98,7 +98,7 @@ class PostsResource implements Resource {
   }
 
   reactiveCompute(
-    _store: SKStore,
+    _context: Context,
     collections: {
       postsWithUpvotes: EagerCollection<
         [number, number],
