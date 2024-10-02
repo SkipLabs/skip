@@ -1,207 +1,55 @@
-module SKStore;
+module SkipRuntime;
 
-const kSessionDir: DirName = DirName::create("/sk_prv/sessions/");
-const kTokenDir: DirName = DirName::create("/sk_prv/tokens/");
-const kGraphDir: DirName = DirName::create("/sk_prv/graph/");
-const kResourceSessionDir: DirName = DirName::create(
+const kSessionDir: SKStore.DirName = SKStore.DirName::create(
+  "/sk_prv/sessions/",
+);
+const kTokenDir: SKStore.DirName = SKStore.DirName::create("/sk_prv/tokens/");
+const kGraphDir: SKStore.DirName = SKStore.DirName::create("/sk_prv/graph/");
+const kResourceSessionDir: SKStore.DirName = SKStore.DirName::create(
   "/sk_prv/resources/sessions/",
 );
-const kResourceGraphDir: DirName = DirName::create("/sk_prv/resources/graph/");
+const kResourceGraphDir: SKStore.DirName = SKStore.DirName::create(
+  "/sk_prv/resources/graph/",
+);
+const kResourceCollectionsDir: SKStore.DirName = SKStore.DirName::create(
+  "/sk_prv/resources/collections/",
+);
 
-class Resource(name: String, params: SKJSON.CJObject) extends Key {
-  //
-  fun toString(): String {
-    `${this.name}:${this.params.prettyPrint()}`
+const kRemoteSpecifiers: String = "SkipRuntime.RemoteSpecifiers";
+
+class JSONKeyConverter() extends KeyConverter {
+  fun toJSON(value: SKStore.Key): SKJSON.CJSON {
+    JSONID::keyType(value).value
+  }
+
+  fun fromJSON(json: SKJSON.CJSON): SKStore.Key {
+    JSONID(json)
   }
 }
 
-class ResourceNames(
-  name: String,
-  handle: SKStore.EHandle<JSONID, JSONFile>,
-) extends File
+class JSONFileConverter() extends FileConverter {
+  fun toJSON(value: SKStore.File): SKJSON.CJSON {
+    JSONFile::type(value).value
+  }
 
-class JSONID(value: SKJSON.CJSON) extends Key {
+  fun fromJSON(json: SKJSON.CJSON): SKStore.File {
+    JSONFile(json)
+  }
+}
+
+class JSONID(value: SKJSON.CJSON) extends SKStore.Key {
   //
   fun toString(): String {
     this.value.prettyPrint()
   }
 }
 
-class JSONFile(value: SKJSON.CJSON) extends File
+class JSONFile(value: SKJSON.CJSON) extends SKStore.File
 
-base class Accumulator<V1: frozen, V2: frozen>(default: V2) {
-  fun getType(): File ~> V2;
-  fun accumulate(acc: V2, value: V1): V2;
-  fun dismiss(cumul: V2, value: V1): ?V2;
-}
-
-fun eagerMap<K: Key, V: File, K2: Key, V2: File>(
-  handle: EHandle<K, V>,
-  keyConv: Key ~> K2,
-  fileConv: File ~> V2,
-  name: String,
-  context: mutable Context,
-  compute: (
-    mutable Context,
-    mutable TWriter<K2, V2>,
-    K,
-    mutable NonEmptyIterator<V>,
-  ) ~> void,
-  rangeOpt: ?Array<KeyRange> = None(),
-): EHandle<K2, V2> {
-  dirName = handle.dirName.sub(name);
-  handle.map(keyConv, fileConv, context, dirName, compute, rangeOpt);
-}
-
-fun eagerMultiMap<K: Key, V: File, K2: Key, V2: File>(
-  keyConv: Key ~> K2,
-  fileConv: File ~> V2,
-  name: String,
-  context: mutable Context,
-  mappings: Array<
-    (
-      EHandle<K, V>,
-      (
-        mutable Context,
-        mutable TWriter<K2, V2>,
-        K,
-        mutable NonEmptyIterator<V>,
-      ) ~> void,
-    ),
-  >,
-): EHandle<K2, V2> {
-  dirName = subDirName(context, name);
-  EHandle::multiMap(
-    keyConv,
-    fileConv,
-    context,
-    mappings.map(m -> (m.i0, (m.i1, None()))),
-    dirName,
-  )
-}
-
-fun eagerMapReduce<K: Key, V: File, K2: Key, V2: File, V3: File>(
-  handle: EHandle<K, V>,
-  keyConv: Key ~> K2,
-  fileConv: File ~> V2,
-  name: String,
-  context: mutable Context,
-  compute: (
-    mutable Context,
-    mutable TWriter<K2, V2>,
-    K,
-    mutable NonEmptyIterator<V>,
-  ) ~> void,
-  accumulator: Accumulator<V2, V3>,
-  rangeOpt: ?Array<KeyRange> = None(),
-): EHandle<K2, V3> {
-  dirName = handle.dirName.sub(name);
-  handle.mapReduce(
-    keyConv,
-    fileConv,
-    context,
-    dirName,
-    compute,
-    accReducer(accumulator),
-    rangeOpt,
-  )
-}
-
-fun eagerMultiMapReduce<K: Key, V: File, K2: Key, V2: File, V3: File>(
-  keyConv: Key ~> K2,
-  fileConv: File ~> V2,
-  name: String,
-  context: mutable Context,
-  mappings: Array<
-    (
-      EHandle<K, V>,
-      (
-        mutable Context,
-        mutable TWriter<K2, V2>,
-        K,
-        mutable NonEmptyIterator<V>,
-      ) ~> void,
-    ),
-  >,
-  accumulator: Accumulator<V2, V3>,
-): EHandle<K2, V3> {
-  dirName = subDirName(context, name);
-  EHandle::multiMapReduce(
-    keyConv,
-    fileConv,
-    context,
-    mappings.map(m -> (m.i0, (m.i1, None()))),
-    dirName,
-    accReducer(accumulator),
-  )
-}
-
-fun makeInput<K: Key, V: File>(
-  convKey: Key ~> K,
-  convValue: File ~> V,
-  context: mutable Context,
-  name: String,
-  content: Array<(K, V)> = Array[],
-): String {
-  dirName = subDirName(context, name);
-  _ = context.mkdir(convKey, convValue, dirName, content);
-  dirName.toString()
-}
-
-fun makeLazy<K: Key, V: File>(
-  convKey: Key ~> K,
-  convValue: File ~> V,
-  context: mutable Context,
-  name: String,
-  f: (mutable Context, LHandle<K, V>, K) ~> Array<V>,
-  collect: Bool = true,
-): String {
-  dirName = subDirName(context, name);
-  _ = LHandle::create(convKey, convValue, context, dirName, f, collect);
-  dirName.toString()
-}
-
-class Check<V: File>(valid: Bool, optPrevious: ?V)
-class Loading<V: File>(internal: V, result: V)
-
-fun makeAsyncLazy<K: Key, V: File, C: frozen>(
-  convKey: Key ~> K,
-  convValue: File ~> V,
-  context: mutable Context,
-  name: String,
-  params: (mutable Context, K) ~> C,
-  call: (String, String, K, C) ~> void,
-  check: (V, C) ~> Check<V>,
-  loading: (String, C, ?V) ~> Loading<V>,
-): String {
-  dirName = subDirName(context, name);
-  resultsDirs = DirName::create(dirName.toString() + "sk_prv/results/");
-  results = context.mkdir(convKey, convValue, resultsDirs);
-  _ = LHandle::create(convKey, convValue, context, dirName, (ctx, self, key) ~> {
-    ps = params(ctx, key);
-    // FastOption error: Signature must be specified
-    perform: (?V) -> Array<V> = optPrevious -> {
-      ksuid = Ksuid::create().toString();
-      call(self.getDirName().toString(), ksuid, key, ps);
-      loadingValue = loading(ksuid, ps, optPrevious);
-      ctx.postpone(
-        ToWrite(resultsDirs, key, _ctx ~> Array[loadingValue.internal]),
-      );
-      Array[loadingValue.result]
-    };
-    results.maybeGet(ctx, key).map(r -> check(r, ps)) match {
-    | Some(Check(true, Some(v))) -> Array[v]
-    | Some(Check(_, optPrevious)) -> perform(optPrevious)
-    | _ -> perform(None())
-    }
-  });
-  dirName.toString()
-}
-
-fun accReducer<V1: File, V2: File>(
+fun accReducer<V1: SKStore.File, V2: SKStore.File>(
   accumulator: Accumulator<V1, V2>,
-): EReducer<V1, V2> {
-  EReducer{
+): SKStore.EReducer<V1, V2> {
+  SKStore.EReducer{
     type => accumulator.getType(),
     canReset => true,
     init => iter ~> {
@@ -227,17 +75,69 @@ fun accReducer<V1: File, V2: File>(
   }
 }
 
-fun subDirName(context: mutable Context, name: String): DirName {
+fun identityMap<K: SKStore.Key, V: SKStore.File>(
+  _context: mutable SKStore.Context,
+  writer: mutable SKStore.TWriter<K, V>,
+  key: K,
+  it: mutable SKStore.NonEmptyIterator<V>,
+): void {
+  writer.setArray(key, it.collect(Array));
+}
+
+class IdentityMapper(
+  private keyConverter: KeyConverter,
+  private fileConverter: FileConverter,
+) extends Mapper {
+  //
+  fun getKeyConverter(): KeyConverter {
+    this.keyConverter
+  }
+
+  fun getFileConverter(): FileConverter {
+    this.fileConverter
+  }
+
+  fun mapElement(
+    key: SKJSON.CJSON,
+    it: mutable SKStore.NonEmptyIterator<SKJSON.CJSON>,
+  ): mutable Iterator<(SKJSON.CJSON, SKJSON.CJSON)> {
+    it.collect(Array).map(v -> (key, v)).iterator()
+  }
+}
+
+fun noFilter<K: SKStore.Key, V: SKStore.File>(
+  _context: readonly SKStore.Context,
+  _key: K,
+  _value: V,
+): Bool {
+  true
+}
+
+fun countElementAsOne<V: SKStore.File>(_value: SKStore.File): Int {
+  1
+}
+
+fun removeElementAsOne<V: SKStore.File>(
+  _value: V,
+  _toRemove: Int,
+): SKStore.File {
+  invariant_violation("removeElementAsOne called on singleton value");
+}
+
+fun subDirName(
+  context: mutable SKStore.Context,
+  name: String,
+): SKStore.DirName {
   path = context.currentArrow() match {
   | Some(arrow) ->
     b64 = base64(arrow.key);
     `${arrow.childName}${b64}/${name}/`
   | None() -> `/sk/${name}/`
   };
-  DirName::create(path)
+  SKStore.DirName::create(path)
 }
 
-fun base64(toEncode: Key): String {
+fun base64<T: Show>(toEncode: T): String {
   encoded = `b64_${Base64.encodeString(toEncode.toString(), true)}`;
   encoded.searchRight(ch ~> ch != '=') match {
   | Some(i) ->
@@ -257,114 +157,51 @@ fun toSessionName(reactiveAuth: Array<UInt8>): String {
   }
 }
 
-fun createFor(
-  session: String,
-  inputs: SKJSON.CJArray,
-  initValues: SKJSON.CJObject,
-  tokens: SKJSON.CJArray,
-  time: Float,
-): Float {
-  if (SKStore.gHasContext() == 0) {
-    SKStore.gContextInit(initCtx());
-  };
-  SKStore.runWithResult(context ~> {
-    inputsNames = inputs match {
-    | SKJSON.CJArray(values) -> values.map(v -> SKJSON.asString(v))
-    };
-    if (context.unsafeMaybeGetEagerDir(kSessionDir) is None()) {
-      sessionHdl = context.mkdir(
-        IID::keyType,
-        StringFile::type,
-        kSessionDir,
-        Array[(IID(0), StringFile(session))],
-      );
-      initTokens = tokens match {
-      | SKJSON.CJArray(values) ->
-        values.map(t -> (SID(SKJSON.asString(t)), IntFile(time.toInt())))
-      };
-      _ = context.mkdir(SID::keyType, IntFile::type, kTokenDir, initTokens);
-      fields = inputsNames.map(name -> {
-        values = SKJSON.getArray(initValues, name) match {
-        | Some(arr) ->
-          arr match {
-          | SKJSON.CJArray(avs) ->
-            avs.map(v -> {
-              e = SKJSON.expectArray(v);
-              (JSONID(e[0]), JSONFile(e[1]))
-            })
-          }
-
-        | _ -> Array[]
-        };
-        iHdl = context.mkdir(
-          JSONID::keyType,
-          JSONFile::type,
-          DirName::create(`/${name}/`),
-          values,
-        );
-        (name, SKJSON.CJString(iHdl.getDirName().toString()))
-      });
-      handles = SKJSON.CJObject(SKJSON.CJFields::create(fields, x -> x));
-      _ = sessionHdl.map(
-        IID::keyType,
-        StringFile::type,
-        context,
-        kGraphDir,
-        (ctx, writer, key, it) ~> {
-          init(ctx, handles);
-          writer.set(key, it.first)
-        },
-      );
-      rSessionHdl = context.mkdir(
-        SID::keyType,
-        IntFile::type,
-        kResourceSessionDir,
-        Array[],
-      );
-      _ = rSessionHdl.map(
-        SID::keyType,
-        IntFile::type,
-        context,
-        kResourceGraphDir,
-        (context, writer, key, it) ~> {
-          rsession = key.value;
-          dirname = DirName::create(`/sk_prv/resources/session/${rsession}/`);
-          gDirname = DirName::create(
-            `/sk_prv/resources/session/${rsession}/graph/`,
-          );
-          _ = context
-            .mkdir(Resource::keyType, IntFile::type, dirname, Array[])
-            .map(
-              Resource::keyType,
-              ResourceNames::type,
-              context,
-              gDirname,
-              (context, writer, key, _it) ~> {
-                collection = `response_${SKStore.genSym(0)}`;
-                handleId = callResourceCompute(context, key.name, key.params);
-                handle = EHandle(
-                  JSONID::keyType,
-                  JSONFile::type,
-                  DirName::create(handleId),
-                );
-                writer.set(key, ResourceNames(collection, handle))
-              },
-            );
-          writer.set(key, it.first);
-        },
-      )
-    } else {
-      EHandle(IID::keyType, StringFile::type, kSessionDir).writeArray(
-        context,
-        IID(0),
-        Array[StringFile(session)],
-      );
-    };
-    context.update();
-  }) match {
-  | Success _ -> 1.0
-  | Failure(err) -> -getErrorHdl(err)
-  };
+fun collectionForName(name: String): Collection {
+  Collection::forName(name, JSONKeyConverter(), JSONFileConverter())
 }
 
-module end; /* SKStore */
+fun lazyForName(name: String): LazyCollection {
+  LazyCollection::forName(name, JSONKeyConverter(), JSONFileConverter())
+}
+
+fun collectionsByName(collections: Map<String, Collection>): SKJSON.CJObject {
+  fields = mutable Vector[];
+  collections.each((k, c) -> fields.push((k, SKJSON.CJString(c.getId()))));
+  SKJSON.CJObject(SKJSON.CJFields::create(fields.toArray(), x -> x));
+}
+
+fun params(params: SKJSON.CJObject): Map<String, PValue> {
+  map = mutable Map[];
+  params match {
+  | SKJSON.CJObject(fields) ->
+    for (fieldName => field in fields) {
+      map![fieldName] = field match {
+      | SKJSON.CJString(v) -> PString(v)
+      | SKJSON.CJInt(v) -> PInt(v)
+      | SKJSON.CJFloat(v) -> PFloat(v)
+      | _ -> invariant_violation("Invalid parameter value.")
+      }
+    }
+  };
+  map.chill()
+}
+
+fun jsonParams(params: Map<String, PValue>): SKJSON.CJObject {
+  fields = mutable Vector[];
+  params.each((k, v) ->
+    fields.push(
+      (
+        k,
+        v match {
+        | PString(sv) -> SKJSON.CJString(sv)
+        | PInt(iv) -> SKJSON.CJInt(iv)
+        | PFloat(fv) -> SKJSON.CJFloat(fv)
+        },
+      ),
+    )
+  );
+  SKJSON.CJObject(SKJSON.CJFields::create(fields.toArray(), x -> x))
+}
+
+module end;

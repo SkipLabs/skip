@@ -1,0 +1,92 @@
+module SkipRuntime;
+
+base class FileConverter {
+  fun toJSON(value: SKStore.File): SKJSON.CJSON;
+  fun fromJSON(json: SKJSON.CJSON): SKStore.File;
+}
+
+base class KeyConverter {
+  fun toJSON(value: SKStore.Key): SKJSON.CJSON;
+  fun fromJSON(json: SKJSON.CJSON): SKStore.Key;
+}
+
+base class Accumulator<V1: frozen, V2: frozen>(default: V2) {
+  fun getType(): SKStore.File ~> V2;
+  fun accumulate(acc: V2, value: V1): V2;
+  fun dismiss(cumul: V2, value: V1): ?V2;
+}
+
+/**
+ * The type of a reactive function mapping over an arbitrary collection.
+ * For each key & values in the input collection (of type K1/V1 respectively),
+ * produces some key/value pairs for the output collection (of type K2/V2 respectively)
+ * @param key - a key found in the input collection
+ * @param it - the values mapped to by `key` in the input collection
+ * @returns an iterable of key/value pairs to output for the given input(s)
+ */
+base class Mapper {
+  fun getKeyConverter(): KeyConverter;
+  fun getFileConverter(): FileConverter;
+
+  fun mapElement(
+    key: SKJSON.CJSON,
+    it: mutable SKStore.NonEmptyIterator<SKJSON.CJSON>,
+  ): mutable Iterator<(SKJSON.CJSON, SKJSON.CJSON)>;
+}
+
+base class LazyCompute {
+  fun getKeyConverter(): KeyConverter;
+  fun getFileConverter(): FileConverter;
+
+  fun compute(self: LazyCollection, key: SKJSON.CJSON): Array<SKJSON.CJSON>;
+}
+
+base class PValue uses Show {
+  children =
+  | PInt(Int)
+  | PFloat(Float)
+  | PString(String)
+
+  fun toString(): String
+  | PInt(v) -> v.toString()
+  | PFloat(v) -> v.toString()
+  | PString(v) -> v
+}
+
+base class ExternalSupplier {
+  fun link(
+    collection: CollectionWriter,
+    resource: String,
+    params: Map<String, PValue>,
+    reactiveAuth: ?Array<UInt8>,
+  ): void;
+
+  fun close(
+    resource: String,
+    params: Map<String, PValue>,
+    reactiveAuth: ?Array<UInt8>,
+  ): void;
+}
+
+base class Resource {
+  fun reactiveCompute(
+    collections: Map<String, Collection>,
+    reactiveAuth: ?Array<UInt8>,
+  ): Collection;
+}
+
+base class ResourceBuilder {
+  fun build(parameters: Map<String, PValue>): Resource;
+}
+
+base class Service(
+  inputCollections: Array<Input>,
+  resources: Map<String, ResourceBuilder>,
+  remoteCollections: Map<String, ExternalSupplier> = Map[],
+) {
+  fun reactiveCompute(
+    inputCollections: Map<String, Collection>,
+  ): Map<String, Collection>;
+}
+
+module end;
