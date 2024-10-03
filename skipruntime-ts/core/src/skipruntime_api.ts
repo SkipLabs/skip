@@ -33,10 +33,10 @@ export type RefreshToken = Opaque<number, "SkipRefreshToken">;
  * `metadata`: optional data that can be added to specify further information
                about data such as source location.
  */
-export type Success<V extends TJSON, M extends TJSON> = {
+export type Success<V extends TJSON, Metadata extends TJSON = never> = {
   status: "success";
   payload: V;
-  metadata?: M;
+  metadata?: Metadata;
 };
 
 /**
@@ -51,9 +51,9 @@ export type Success<V extends TJSON, M extends TJSON> = {
  * is not yet available.  It contains:
  * `previous` - the return value of the previous successful call, if available
  */
-export type Loading<V extends TJSON, M extends TJSON> = {
+export type Loading<V extends TJSON, Metadata extends TJSON = never> = {
   status: "loading";
-  previous?: { payload: V; metadata?: M };
+  previous?: { payload: V; metadata?: Metadata };
 };
 
 /**
@@ -62,20 +62,20 @@ export type Loading<V extends TJSON, M extends TJSON> = {
  * `error` - the error message associated with the error
  * `previous` - the return value of the previous successful call, if available
  */
-export type Error<V extends TJSON, M extends TJSON> = {
+export type Error<V extends TJSON, Metadata extends TJSON = never> = {
   status: "failure";
   error: string;
-  previous?: { payload: V; metadata?: M };
+  previous?: { payload: V; metadata?: Metadata };
 };
 
-export type Loadable<V extends TJSON, M extends TJSON> =
-  | Success<V, M>
-  | Loading<V, M>
-  | Error<V, M>;
+export type Loadable<V extends TJSON, Metadata extends TJSON = never> =
+  | Success<V, Metadata>
+  | Loading<V, Metadata>
+  | Error<V, Metadata>;
 
-export type AValue<V extends TJSON, M extends TJSON> = {
+export type AValue<V extends TJSON, Metadata extends TJSON = never> = {
   payload?: V;
-  metadata?: M;
+  metadata?: Metadata;
 };
 
 /**
@@ -212,8 +212,8 @@ export interface LazyCollection<K extends TJSON, V extends TJSON>
 export interface AsyncLazyCollection<
   K extends TJSON,
   V extends TJSON,
-  M extends TJSON,
-> extends LazyCollection<K, Loadable<V, M>> {}
+  Metadata extends TJSON = never,
+> extends LazyCollection<K, Loadable<V, Metadata>> {}
 
 /**
  * This interface allow accessing the data in a collection outside in a non reactive way.
@@ -369,16 +369,16 @@ export interface AsyncLazyCompute<
   K extends TJSON,
   V extends TJSON,
   P extends TJSON,
-  M extends TJSON,
+  Metadata extends TJSON = never,
 > {
   params: (key: K) => P;
-  call: (key: K, params: P) => Promise<AValue<V, M>>;
+  call: (key: K, params: P) => Promise<AValue<V, Metadata>>;
 }
 
 export interface ExternalCall<
   K extends TJSON,
   V extends TJSON,
-  Metadata extends TJSON,
+  Metadata extends TJSON = never,
 > {
   call(key: K, timestamp: number): Promise<AValue<V, Metadata>>;
 }
@@ -404,18 +404,18 @@ export interface SKStore extends Constant {
     K extends TJSON,
     V extends TJSON,
     P extends TJSON,
-    M extends TJSON,
     Params extends Param[],
+    Metadata extends TJSON = never,
   >(
-    compute: new (...params: Params) => AsyncLazyCompute<K, V, P, M>,
+    compute: new (...params: Params) => AsyncLazyCompute<K, V, P, Metadata>,
     ...params: Params
-  ): LazyCollection<K, Loadable<V, M>>;
+  ): LazyCollection<K, Loadable<V, Metadata>>;
 
   external<
     K extends TJSON,
     V extends TJSON,
-    Metadata extends TJSON,
     Params extends Param[],
+    Metadata extends TJSON = never,
   >(
     refreshToken: string,
     compute: new (...params: Params) => ExternalCall<K, V, Metadata>,

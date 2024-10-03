@@ -615,7 +615,7 @@ it("testMergeReduce", async () => {
 //// testAsyncLazy
 
 class TestLazyWithAsync
-  implements AsyncLazyCompute<[number, number], number, number, number>
+  implements AsyncLazyCompute<[number, number], number, number>
 {
   constructor(private other: EagerCollection<number, number>) {}
 
@@ -631,7 +631,7 @@ class TestLazyWithAsync
 
 class TestCheckResult implements Mapper<number, number, number, string> {
   constructor(
-    private asyncLazy: AsyncLazyCollection<[number, number], number, TJSON>,
+    private asyncLazy: AsyncLazyCollection<[number, number], number>,
   ) {}
 
   mapElement(
@@ -727,7 +727,7 @@ class MockExternal implements ExternalCall<number, string, TJSON> {
 }
 
 class TestCheckExternalResult extends ValueMapper<number, number, string> {
-  constructor(private asyncLazy: AsyncLazyCollection<number, string, TJSON>) {
+  constructor(private asyncLazy: AsyncLazyCollection<number, string>) {
     super();
   }
 
