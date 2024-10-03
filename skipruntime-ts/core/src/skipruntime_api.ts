@@ -1,16 +1,26 @@
 /**
- * This file contains the SKStore public API: types, interfaces, and operations that can be
- * used to specify and interact with reactive computations. See [todo: pointer to public
- * overview page] for a detailed description and introduction to the SKStore system.
+ * This file contains the Skip Runtime's public API: types, interfaces, and operations that
+ * can be used to specify and interact with reactive computations. See [todo: pointer to
+ * public overview page] for a detailed description and introduction to Skip.
  */
 
 import type { Opt, Shared, int } from "std";
 import type { Constant } from "./internals/skipruntime_impl.js";
 
+/**
+ * The `TJSON` type describes JSON-serializable values and serves as an upper bound on keys
+ * and values in the Skip Runtime, ensuring that they can be serialized and managed by the
+ * reactive computation engine.
+ */
+export type TJSON = number | boolean | string | JSONObject | (TJSON | null)[];
 export type JSONObject = { [key: string]: TJSON | null };
 
-export type TJSON = number | JSONObject | boolean | (TJSON | null)[] | string;
-
+/**
+ * A `Param` is a valid parameter to a Skip runtime mapper function: either a constant JS
+ * value or a Skip-runtime-managed value.  In either case, restricting mapper parameters to
+ * this type ensures that reactive computations can be re-evaluated as needed with consistent
+ * semantics.
+ */
 export type Param =
   | null
   | boolean
@@ -25,6 +35,11 @@ export type Param =
  * `Loading`, or `Error`
  */
 
+export type Loadable<V extends TJSON, M extends TJSON> =
+  | Success<V, M>
+  | Loading<V, M>
+  | Error<V, M>;
+
 /**
  * A `Success` return value indicates successful function evaluation and contains:
  * `payload`: the function return value
@@ -36,13 +51,6 @@ export type Success<V extends TJSON, Metadata extends TJSON = never> = {
   payload: V;
   metadata?: Metadata;
 };
-
-/**
- * Lazy function calls carry additional structure in their `Loadable` return types, to
- * indicate that computation is in progress or record information about previous values;
- * the `Success` case is the same as for non-lazy calls, or the result can be `Loading`
- * or `Error`.
- */
 
 /**
  * A `Loading` return value indicates that a new call has been performed, but its result
@@ -64,16 +72,6 @@ export type Error<V extends TJSON, Metadata extends TJSON = never> = {
   status: "failure";
   error: string;
   previous?: { payload: V; metadata?: Metadata };
-};
-
-export type Loadable<V extends TJSON, Metadata extends TJSON = never> =
-  | Success<V, Metadata>
-  | Loading<V, Metadata>
-  | Error<V, Metadata>;
-
-export type AValue<V extends TJSON, Metadata extends TJSON = never> = {
-  payload?: V;
-  metadata?: Metadata;
 };
 
 /**
@@ -150,7 +148,7 @@ export interface NonEmptyIterator<T> extends Iterable<T> {
 
   /**
    * Returns the first element of the iteration.
-   * @throws {Error} when next called before
+   * @throws {Error} when called after `next`
    */
   first: () => T;
 
@@ -160,26 +158,24 @@ export interface NonEmptyIterator<T> extends Iterable<T> {
   uniqueValue: () => Opt<T>;
 
   /**
-   * Returns an array containing the remaining values of the iterator
+   * Returns an array containing all values of the iterator
    */
   toArray: () => T[];
 
   /**
    * Performs the specified action for each element in the iterator.
-   * @param callbackfn - A function that accepts up to thow arguments. forEach calls the callbackfn function one time for each element.
-   * @param thisArg - An object to which the this keyword can refer in the callbackfn function. If thisArg is omitted, undefined is used as the this value.
+   * @param f - A callback to invoke on each element
+   * @param thisObj - An object to bind as `this` within the `f` invocations
    */
-  forEach(callbackfn: (value: T, index: number) => void, thisArg?: any): void;
+  forEach(f: (value: T, index: number) => void, thisObj?: any): void;
 
   /**
-   * Calls a defined callback function on each element of an array, and returns an array that contains the results.
-   * @param callbackfn - A function that accepts up to three arguments. The map method calls the callbackfn function one time for each element in the array.
-   * @param thisArg - An object to which the this keyword can refer in the callbackfn function. If thisArg is omitted, undefined is used as the this value.
+   * Calls a defined callback function on each element of an array, and returns an array
+   * containing the results.
+   * @param f - A function to apply to each element
+   * @param thisObj - An object to bind as `this` within the `f` invocations
    */
-  map<U>(
-    callbackfn: (value: T, index: number) => U,
-    thisArg?: any,
-  ): Iterable<U>;
+  map<U>(f: (value: T, index: number) => U, thisObj?: any): U[];
 }
 
 /**
@@ -207,6 +203,10 @@ export interface LazyCollection<K extends TJSON, V extends TJSON>
   maybeGetOne(key: K): Opt<V>;
 }
 
+/**
+ * A shorthand for the type of lazy collections produced by asynchronous computations, whose
+ * values contain some `Loadable` metadata about the asynchronous computation.
+ */
 export interface AsyncLazyCollection<
   K extends TJSON,
   V extends TJSON,
@@ -218,8 +218,7 @@ export interface AsyncLazyCollection<
  */
 export interface CollectionReader<K extends TJSON, V extends TJSON> {
   /**
-   * Get (and potentially compute) all values mapped to by some key of a lazy reactive
-   * collection.
+   * Get (and potentially compute) all values mapped to by some key.
    */
   getArray(key: K): V[];
 
@@ -228,6 +227,7 @@ export interface CollectionReader<K extends TJSON, V extends TJSON> {
    * @throws {Error} when either zero or multiple such values exist
    */
   getOne(key: K): V;
+
   /**
    * Get a value of an eager reactive collection, if one exists.
    * If multiple values are mapped to by the key, any of them can be returned.
@@ -236,9 +236,7 @@ export interface CollectionReader<K extends TJSON, V extends TJSON> {
   maybeGetOne(key: K): Opt<V>;
 
   /**
-   * Get all values of an eager reactive collection, if one exists.
-   * Exist only in .
-   * @returns an array en key, values pair.
+   * Get all key/values entries of a reactive collection as a non-reactive array.
    */
   getAll(): Entry<K, V>[];
 
@@ -251,7 +249,7 @@ export interface CollectionReader<K extends TJSON, V extends TJSON> {
 
   /**
    * Subscribe to updates of the collection since some initial watermark
-   * @param since The watermark from which to start watching for updates
+   * @param since The watermark from which to receive updates
    * @param f The function to call on collection update
    * @returns A subscription identifier, which can be passed to `unsubscribe` to cancel this subscription
    */
@@ -336,6 +334,9 @@ export interface EagerCollection<K extends TJSON, V extends TJSON>
    */
   size: () => number;
 
+  /**
+   * A unique identifier for this collection
+   */
   getId(): string;
 }
 
@@ -362,9 +363,20 @@ export interface SKStoreFactory extends Shared {
   ): SkipBuilder;
 }
 
+/**
+ * The type of a _lazy_ reactive function which produces a value for some `key`, possibly using a `self` reference to get/produce other lazily-computed results.
+ */
 export interface LazyCompute<K extends TJSON, V extends TJSON> {
-  compute: (selfHdl: LazyCollection<K, V>, key: K) => Opt<V>;
+  compute: (self: LazyCollection<K, V>, key: K) => Opt<V>;
 }
+
+/**
+ * The expected return type for an asynchronous lazy computation, containing the `payload` and some optional `metadata`
+ */
+export type AValue<V extends TJSON, M extends TJSON> = {
+  payload?: V;
+  metadata?: M;
+};
 
 export interface AsyncLazyCompute<
   K extends TJSON,
@@ -404,13 +416,15 @@ export interface SKStore extends Constant {
   asyncLazy<
     K extends TJSON,
     V extends TJSON,
-    P extends TJSON,
+    AsyncParams extends TJSON,
     Params extends Param[],
     Metadata extends TJSON = never,
   >(
-    compute: new (...params: Params) => AsyncLazyCompute<K, V, P, Metadata>,
+    compute: new (
+      ...params: Params
+    ) => AsyncLazyCompute<K, V, AsyncParams, Metadata>,
     ...params: Params
-  ): LazyCollection<K, Loadable<V, Metadata>>;
+  ): AsyncLazyCollection<K, V, Metadata>;
 
   external<
     K extends TJSON,
