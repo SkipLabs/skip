@@ -6,7 +6,6 @@ import type {
   ToWasmManager,
   Environment,
   Opt,
-  Metadata,
   ErrorObject,
 } from "std";
 import type { SKJSON } from "skjson";
@@ -48,11 +47,6 @@ class HandlesImpl implements Handles {
   private nextID: number = 1;
   private objects: any[] = [];
   private freeIDs: int[] = [];
-  private env: Environment;
-
-  constructor(env: Environment) {
-    this.env = env;
-  }
 
   register<T>(v: T): Handle<T> {
     const freeID = this.freeIDs.pop();
@@ -76,13 +70,6 @@ class HandlesImpl implements Handles {
     this.freeIDs.push(id);
     return current;
   }
-
-  name = (metadata: Metadata) => {
-    return (
-      "b64_" +
-      this.env.base64Encode(JSON.stringify(metadata)).replaceAll("=", "")
-    );
-  };
 }
 
 export class ContextImpl implements Context {
@@ -118,10 +105,15 @@ export class ContextImpl implements Context {
     return this.skjson.importString(lazyHdl);
   }
 
-  asyncLazy<K extends TJSON, V extends TJSON, P extends TJSON>(
+  asyncLazy<
+    K extends TJSON,
+    V extends TJSON,
+    P extends TJSON,
+    Metadata extends TJSON = never,
+  >(
     name: string,
     get: (key: K) => P,
-    call: (key: K, params: P) => Promise<V>,
+    call: (key: K, params: P) => Promise<AValue<V, Metadata>>,
   ) {
     const lazyHdl = this.exports.SkipRuntime_asyncLazy(
       this.pointer(),
@@ -738,9 +730,9 @@ interface ToWasm {
     K extends TJSON,
     V extends TJSON,
     P extends TJSON,
-    M extends TJSON,
+    Metadata extends TJSON = never,
   >(
-    fn: Handle<(key: K, params: P) => Promise<AValue<V, M>>>,
+    fn: Handle<(key: K, params: P) => Promise<AValue<V, Metadata>>>,
     callId: ptr<Internal.String>,
     name: ptr<Internal.String>,
     key: ptr<Internal.CJSON>,
@@ -817,15 +809,15 @@ type Failure = {
  * and is analogous to HTTP response code 304 'Not Modified'.  It contains:
  * `metadata` - optional data that can be added to supersede metadata on the unchanged return value
  */
-type Unchanged<M extends TJSON> = {
+type Unchanged<Metadata extends TJSON = never> = {
   status: "unchanged";
-  metadata?: M;
+  metadata?: Metadata;
 };
 
-type Result<V extends TJSON, M extends TJSON> =
-  | Success<V, M>
+type Result<V extends TJSON, Metadata extends TJSON = never> =
+  | Success<V, Metadata>
   | Failure
-  | Unchanged<M>;
+  | Unchanged<Metadata>;
 
 class LinksImpl implements Links {
   env: Environment;
@@ -869,9 +861,9 @@ class LinksImpl implements Links {
     K extends TJSON,
     V extends TJSON,
     P extends TJSON,
-    M extends TJSON,
+    Metadata extends TJSON = never,
   >(
-    fn: Handle<(key: K, params: P) => Promise<AValue<V, M>>>,
+    fn: Handle<(key: K, params: P) => Promise<AValue<V, Metadata>>>,
     callId: ptr<Internal.String>,
     name: ptr<Internal.String>,
     key: ptr<Internal.CJSON>,
@@ -928,7 +920,7 @@ class LinksImpl implements Links {
 
   constructor(env: Environment) {
     this.env = env;
-    this.handles = new HandlesImpl(env);
+    this.handles = new HandlesImpl();
   }
 
   complete = (utils: Utils, exports: object) => {
@@ -1047,9 +1039,9 @@ class LinksImpl implements Links {
       K extends TJSON,
       V extends TJSON,
       P extends TJSON,
-      M extends TJSON,
+      Metadata extends TJSON = never,
     >(
-      fn: Handle<(key: K, params: P) => Promise<AValue<V, M>>>,
+      fn: Handle<(key: K, params: P) => Promise<AValue<V, Metadata>>>,
       skcall: ptr<Internal.String>,
       skname: ptr<Internal.String>,
       skkey: ptr<Internal.CJSON>,
@@ -1061,8 +1053,8 @@ class LinksImpl implements Links {
       const key = jsu.importJSON(skkey, true) as K;
       const params = jsu.importJSON(skparams, true) as P;
       const promise = this.handles.apply(fn, [key, params]);
-      const register = (value: Result<TJSON, TJSON>) => {
-        setTimeout(() => {
+      const register = (value: Result<V, Metadata>) => {
+        setImmediate(() => {
           const result = jsu.runWithGC(() => {
             return Math.trunc(
               fromWasm.SkipRuntime_asyncResult(
@@ -1077,35 +1069,23 @@ class LinksImpl implements Links {
           if (result < 0) {
             throw this.handles.deleteHandle(-result as Handle<unknown>);
           }
-        }, 0);
+        });
       };
       promise
         .then((value) => {
-          if (value.payload !== undefined) {
-            register(
-              value.metadata !== undefined
-                ? {
-                    status: "success",
-                    payload: value.payload,
-                    metadata: value.metadata,
-                  }
-                : {
-                    status: "success",
-                    payload: value.payload,
-                  },
-            );
-          } else {
-            register(
-              value.metadata !== undefined
-                ? {
-                    status: "unchanged",
-                    metadata: value.metadata,
-                  }
-                : {
-                    status: "unchanged",
-                  },
-            );
+          const result: Result<V, Metadata> =
+            value.payload !== undefined
+              ? {
+                  status: "success",
+                  payload: value.payload,
+                }
+              : {
+                  status: "unchanged",
+                };
+          if ("metadata" in value) {
+            result.metadata = value.metadata;
           }
+          register(result);
         })
         .catch((reason: unknown) => {
           let msg: string;
@@ -1342,9 +1322,9 @@ class Manager implements ToWasmManager {
       K extends TJSON,
       V extends TJSON,
       P extends TJSON,
-      M extends TJSON,
+      Metadata extends TJSON = never,
     >(
-      fn: Handle<(key: K, params: P) => Promise<AValue<V, M>>>,
+      fn: Handle<(key: K, params: P) => Promise<AValue<V, Metadata>>>,
       call: ptr<Internal.String>,
       name: ptr<Internal.String>,
       key: ptr<Internal.CJSON>,

@@ -1,4 +1,4 @@
-import type { Opt, Shared, ptr, int, float, Metadata } from "std";
+import type { Opt, Shared, ptr, int, float } from "std";
 import type * as Internal from "./skipruntime_internal_types.js";
 import type {
   Accumulator,
@@ -61,10 +61,15 @@ export interface Context {
     compute: (self: LazyCollection<K, V>, key: K) => Opt<V>,
   ): string;
 
-  asyncLazy<K extends TJSON, V extends TJSON, P extends TJSON, M extends TJSON>(
+  asyncLazy<
+    K extends TJSON,
+    V extends TJSON,
+    P extends TJSON,
+    Metadata extends TJSON = never,
+  >(
     name: string,
     get: (key: K) => P,
-    call: (key: K, params: P) => Promise<AValue<V, M>>,
+    call: (key: K, params: P) => Promise<AValue<V, Metadata>>,
   ): string;
 
   getArray<K extends TJSON, V>(collection: string, key: K): V[];
@@ -168,7 +173,6 @@ export interface Handles {
   get<T>(id: Handle<T>): T;
   apply<R, P extends any[]>(id: Handle<(..._: P) => R>, parameters: P): R;
   deleteHandle<T>(id: Handle<T>): T;
-  name(metadata: Metadata): string;
 }
 
 export interface FromWasm {
@@ -317,11 +321,16 @@ export interface FromWasm {
     time: float,
   ): float;
 
-  SkipRuntime_asyncLazy<K extends TJSON, V extends TJSON, P extends TJSON>(
+  SkipRuntime_asyncLazy<
+    K extends TJSON,
+    V extends TJSON,
+    P extends TJSON,
+    Metadata extends TJSON = never,
+  >(
     ctx: ptr<Internal.Context>,
     name: ptr<Internal.String>,
     paramsFn: Handle<(key: K) => P>,
-    lazyFn: Handle<(key: K, params: P) => Promise<V>>,
+    lazyFn: Handle<(key: K, params: P) => Promise<AValue<V, Metadata>>>,
   ): ptr<Internal.String>;
   SkipRuntime_lazy<K extends TJSON, V extends TJSON>(
     ctx: ptr<Internal.Context>,
