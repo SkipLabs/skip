@@ -339,7 +339,7 @@ export interface EagerCollection<K extends TJSON, V extends TJSON>
   getId(): string;
 }
 
-export type EntryPoint = {
+export type Entrypoint = {
   host: string;
   port: number;
   secured?: boolean;
@@ -357,7 +357,7 @@ export interface SKStoreFactory extends Shared {
       collections: Record<string, EagerCollection<TJSON, TJSON>>,
     ) => CallResourceCompute,
     inputs: Record<string, [TJSON, TJSON][]>,
-    remotes?: Record<string, EntryPoint>,
+    remotes?: Record<string, Entrypoint>,
     tokens?: Record<string, number>,
   ): SkipBuilder;
 }
