@@ -24,7 +24,6 @@ import type {
   CollectionWriter,
   CallResourceCompute,
   Watermarked,
-  Notifier,
   ReactiveResponse,
   SkipBuilder,
 } from "../skipruntime_api.js";
@@ -467,8 +466,11 @@ export class EagerCollectionReader<K extends TJSON, V extends TJSON>
     return this.context.getDiff(this.eagerHdl, from);
   }
 
-  subscribe(from: string, notify: Notifier<K, V>): bigint {
-    return this.context.subscribe(this.eagerHdl, from, notify);
+  subscribe(
+    since: string,
+    f: (values: Entry<K, V>[], watermark: string, update: boolean) => void,
+  ): bigint {
+    return this.context.subscribe(this.eagerHdl, since, f);
   }
 }
 
@@ -587,10 +589,10 @@ export class SkipRuntimeImpl implements SkipRuntime {
 
   subscribe<K extends TJSON, V extends TJSON>(
     collectionName: string,
-    from: string,
-    notify: Notifier<K, V>,
+    since: string,
+    f: (values: Entry<K, V>[], watermark: string, update: boolean) => void,
   ) {
-    return this.context.subscribe(collectionName, from, notify);
+    return this.context.subscribe(collectionName, since, f);
   }
 
   unsubscribe(id: bigint): void {
