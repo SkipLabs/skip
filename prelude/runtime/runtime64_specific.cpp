@@ -459,7 +459,7 @@ int64_t SKIP_time() {
 uint64_t SKIP_time_ms() {
   using namespace std::chrono;
 
-  return duration_cast<milliseconds>(steady_clock::now().time_since_epoch())
+  return duration_cast<milliseconds>(system_clock::now().time_since_epoch())
       .count();
 }
 
