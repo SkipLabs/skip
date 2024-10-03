@@ -51,5 +51,5 @@ clean:
 	cd .. && make clean
 
 .PHONY: test
-test: build
-	cd core && npm run test
+test: bunbuild
+	cd core && bun run test
