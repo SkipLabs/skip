@@ -61,6 +61,22 @@ export * from "./errors.js";
 export type JSONMapper = Mapper<Json, Json, Json, Json>;
 export type JSONLazyCompute = LazyCompute<Json, Json>;
 
+function instantiateUserObject<Params extends DepSafe[], Result extends object>(
+  what: string,
+  ctor: new (...params: Params) => Result,
+  params: Params,
+): Result {
+  const checkedParams = params.map(checkOrCloneParam) as Params;
+  const obj = new ctor(...checkedParams);
+  Object.freeze(obj);
+  if (!obj.constructor.name) {
+    throw new SkipClassNameError(
+      `${what} classes must be defined at top-level.`,
+    );
+  }
+  return obj;
+}
+
 class Handles {
   private nextID: number = 1;
   private readonly objects: any[] = [];
@@ -212,14 +228,7 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
     ...params: Params
   ): EagerCollection<K2, V2> {
-    const mapperParams = params.map(checkOrCloneParam) as Params;
-    const mapperObj = new mapper(...mapperParams);
-    Object.freeze(mapperObj);
-    if (!mapperObj.constructor.name) {
-      throw new SkipClassNameError(
-        "Mapper classes must be defined at top-level.",
-      );
-    }
+    const mapperObj = instantiateUserObject("Mapper", mapper, params);
     const skmapper = this.refs.binding.SkipRuntime_createMapper(
       this.refs.handles.register(mapperObj),
     );
@@ -238,25 +247,12 @@ class EagerCollectionImpl<K extends Json, V extends Json>
       reducer: new (...params: ReducerParams) => Reducer<V2, Accum>,
       ...reducerParams: ReducerParams
     ) => {
-      const mParams = mapperParams.map(checkOrCloneParam) as MapperParams;
-      const rParams = reducerParams.map(checkOrCloneParam) as ReducerParams;
-
-      const mapperObj = new mapper(...mParams);
-      const reducerObj = new reducer(...rParams);
-
-      Object.freeze(mapperObj);
-      Object.freeze(reducerObj);
-
-      if (!mapperObj.constructor.name) {
-        throw new SkipClassNameError(
-          "Mapper classes must be defined at top-level.",
-        );
-      }
-      if (!reducerObj.constructor.name) {
-        throw new SkipClassNameError(
-          "Reducer classes must be defined at top-level.",
-        );
-      }
+      const mapperObj = instantiateUserObject("Mapper", mapper, mapperParams);
+      const reducerObj = instantiateUserObject(
+        "Reducer",
+        reducer,
+        reducerParams,
+      );
 
       const skmapper = this.refs.binding.SkipRuntime_createMapper(
         this.refs.handles.register(mapperObj),
@@ -290,14 +286,7 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     reducer: new (...params: Params) => Reducer<V, Accum>,
     ...params: Params
   ): EagerCollection<K, Accum> {
-    const reducerParams = params.map(checkOrCloneParam) as Params;
-    const reducerObj = new reducer(...reducerParams);
-    Object.freeze(reducerObj);
-    if (!reducerObj.constructor.name) {
-      throw new SkipClassNameError(
-        "Reducer classes must be defined at top-level.",
-      );
-    }
+    const reducerObj = instantiateUserObject("Reducer", reducer, params);
     if (sknative in reducerObj && typeof reducerObj[sknative] == "string") {
       return this.derive<K, Accum>(
         this.refs.binding.SkipRuntime_Collection__nativeReduce(
@@ -398,14 +387,7 @@ class ContextImpl extends SkManaged implements Context {
     compute: new (...params: Params) => LazyCompute<K, V>,
     ...params: Params
   ): LazyCollection<K, V> {
-    const mapperParams = params.map(checkOrCloneParam) as Params;
-    const computeObj = new compute(...mapperParams);
-    Object.freeze(computeObj);
-    if (!computeObj.constructor.name) {
-      throw new SkipClassNameError(
-        "LazyCompute classes must be defined at top-level.",
-      );
-    }
+    const computeObj = instantiateUserObject("LazyCompute", compute, params);
     const skcompute = this.refs.binding.SkipRuntime_createLazyCompute(
       this.refs.handles.register(computeObj),
     );
