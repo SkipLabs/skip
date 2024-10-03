@@ -21,7 +21,6 @@ import type {
   Entry,
   CollectionReader,
   CallResourceCompute,
-  Notifier,
   Watermarked,
 } from "../skipruntime_api.js";
 
@@ -538,8 +537,8 @@ export class ContextImpl implements Context {
 
   subscribe<K extends TJSON, V extends TJSON>(
     collectionName: string,
-    from: string,
-    nofify: Notifier<K, V>,
+    since: string,
+    f: (values: Entry<K, V>[], watermark: string, update: boolean) => void,
   ): bigint {
     const collection = this.resources[collectionName];
     if (!collection) {
@@ -550,8 +549,14 @@ export class ContextImpl implements Context {
     const result = this.skjson.runWithGC(() => {
       return this.exports.SkipRuntime_subscribe(
         this.skjson.exportString(collection),
-        BigInt(from),
-        this.handles.register(nofify as Notifier<TJSON, TJSON>),
+        BigInt(since),
+        this.handles.register(
+          f as (
+            values: Entry<TJSON, TJSON>[],
+            watermark: string,
+            update: boolean,
+          ) => void,
+        ),
       );
     });
     if (result < 0) {

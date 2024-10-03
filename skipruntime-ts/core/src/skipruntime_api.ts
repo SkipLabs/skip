@@ -243,19 +243,22 @@ export interface CollectionReader<K extends TJSON, V extends TJSON> {
   getAll(): Entry<K, V>[];
 
   /**
-   * Get a diff of a collection according a from watermark, if one exists.
-   * @param from The from watermark to retrieve diff from
-   * @returns {Watermarked} an array en key, values pair with the corresponding watermark.
+   * Get a diff of added/updated entries in a collection since some watermark.
+   * @param since A watermark from which to compute the diff
+   * @returns {Watermarked} An object containing updated entries and a new watermark string.
    */
-  getDiff(from: string): Watermarked<K, V>;
+  getDiff(since: string): Watermarked<K, V>;
 
   /**
-   * Allow to subsribe the updates of the collection
-   * @param from The watermark where to start the update
-   * @param notify The function to call on collection update
-   * @returns {Watermarked} an array en key, values pair with the corresponding watermark.
+   * Subscribe to updates of the collection since some initial watermark
+   * @param since The watermark from which to start watching for updates
+   * @param f The function to call on collection update
+   * @returns A subscription identifier, which can be passed to `unsubscribe` to cancel this subscription
    */
-  subscribe(from: string, notify: Notifier<K, V>): bigint;
+  subscribe(
+    since: string,
+    f: (values: Entry<K, V>[], watermark: string, update: boolean) => void,
+  ): bigint;
 }
 
 /**
@@ -445,12 +448,6 @@ export type Watermarked<K extends TJSON, V extends TJSON> = {
   update?: boolean;
 };
 
-export type Notifier<K extends TJSON, V extends TJSON> = (
-  values: Entry<K, V>[],
-  watermark: string,
-  update: boolean,
-) => void;
-
 export type SkipBuilder = (
   iCollection: Record<string, CollectionWriter<TJSON, TJSON>>,
 ) => SkipRuntime;
@@ -492,10 +489,11 @@ export interface SkipRuntime {
   ): void;
 
   deleteKey(collection: string, key: string | number): void;
+
   subscribe<K extends TJSON, V extends TJSON>(
     collection: string,
-    from: string,
-    notify: Notifier<K, V>,
+    since: string,
+    f: (values: Entry<K, V>[], watermark: string, update: boolean) => void,
   ): bigint;
 
   unsubscribe(id: bigint): void;
