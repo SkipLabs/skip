@@ -15,7 +15,7 @@ export type {
   AsyncLazyCompute,
   Loadable,
   AsyncLazyCollection,
-  EntryPoint,
+  Entrypoint,
   ExternalCall,
   SKStore,
   TJSON,

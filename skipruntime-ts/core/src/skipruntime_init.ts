@@ -4,7 +4,7 @@ import type {
   SKStoreFactory,
   TJSON,
   CallResourceCompute,
-  EntryPoint,
+  Entrypoint,
   EagerCollection,
   SkipBuilder,
 } from "./skipruntime_api.js";
@@ -41,7 +41,7 @@ export async function createSKStore(
     inputs: Record<string, EagerCollection<TJSON, TJSON>>,
   ) => CallResourceCompute,
   inputs: Record<string, [TJSON, TJSON][]>,
-  remotes: Record<string, EntryPoint> = {},
+  remotes: Record<string, Entrypoint> = {},
   tokens: Record<string, number> = {},
 ): Promise<SkipBuilder> {
   const data = await run(wasmUrl, modules, [], "SKDB_factory");

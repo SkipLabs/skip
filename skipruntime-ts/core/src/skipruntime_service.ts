@@ -1,6 +1,6 @@
 import type {
   EagerCollection,
-  EntryPoint,
+  Entrypoint,
   SKStore,
   TJSON,
 } from "./skipruntime_api.js";
@@ -19,7 +19,7 @@ export interface Resource {
 
 export interface SkipService {
   inputCollections?: Record<string, [TJSON, TJSON][]>;
-  remoteCollections?: Record<string, EntryPoint>;
+  remoteCollections?: Record<string, Entrypoint>;
   // name / duration in milliseconds
   refreshTokens?: Record<string, number>;
   resources?: Record<string, new (params: Record<string, string>) => Resource>;

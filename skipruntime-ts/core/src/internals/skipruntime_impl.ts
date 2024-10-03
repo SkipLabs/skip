@@ -16,7 +16,7 @@ import type {
   LazyCompute,
   AsyncLazyCompute,
   NonEmptyIterator,
-  EntryPoint,
+  Entrypoint,
   ExternalCall,
   CollectionReader,
   SkipRuntime,
@@ -344,7 +344,7 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
       collections: Record<string, EagerCollection<TJSON, TJSON>>,
     ) => CallResourceCompute,
     inputs: Record<string, [TJSON, TJSON][]> = {},
-    remotes: Record<string, EntryPoint> = {},
+    remotes: Record<string, Entrypoint> = {},
     tokens: Record<string, number> = {},
   ): SkipBuilder {
     const context = this.context();
