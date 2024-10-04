@@ -625,25 +625,6 @@ typedef struct {
   void** pconsts;
 } no_file_t;
 
-#ifdef __APPLE__
-static void sk_init_no_file() {
-  no_file_t* no_file = malloc(sizeof(no_file_t));
-  if (no_file == NULL) {
-    perror("malloc");
-    exit(1);
-  }
-  ginfo = &no_file->ginfo_data;
-  ginfo->total_palloc_size = 0;
-  ginfo->fileName = NULL;
-  ginfo->context = NULL;
-  gmutex = NULL;
-  gid = &no_file->gid;
-  pconsts = &no_file->pconsts;
-  *gid = 1;
-  *pconsts = NULL;
-}
-#endif
-
 int sk_is_nofile_mode() {
   return (ginfo->fileName == NULL);
 }
@@ -664,13 +645,14 @@ void SKIP_memory_init(int argc, char** argv, char use_lock) {
             "Persistent allocation not supported on this platform. "
             "Disregarding %s.\n",
             fileName);
+    fileName = NULL;
   }
+
   if (is_create) {
     exit(EXIT_SUCCESS);
   }
-  sk_init_no_file();
+#endif  // __APPLE__
 
-#else   // __APPLE__
   if (is_create || fileName == NULL) {
     size_t capacity = DEFAULT_CAPACITY;
     capacity = parse_capacity(argc, argv);
@@ -678,7 +660,6 @@ void SKIP_memory_init(int argc, char** argv, char use_lock) {
   } else {
     sk_load_mapping(fileName);
   }
-#endif  // __APPLE__
 
   char* obj = sk_get_external_pointer();
   epointer_ty = get_gc_type(obj);
