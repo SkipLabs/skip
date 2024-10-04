@@ -2057,6 +2057,11 @@ class EagerDir{
     this.dirName
   }
 
+  fun removeSubDirs(context: mutable Context): void {
+    this.old.each((_, v) -> v.getNewDirs().each(context.removeDir));
+    this.fixedOld.items().each(e -> e.i1.getNewDirs().each(context.removeDir))
+  }
+
   static fun getOld(child: EagerDir, key: Path): MInfo {
     if (child.old.containsKey(key)) {
       child.old[key]
