@@ -32,7 +32,7 @@ jobs:
           no_output_timeout: 30m
           command: |
             mkdir -p ~/test-results
-            cd compiler && make STAGE=1
+            cd skiplang/compiler && make STAGE=1
             PATH=$(realpath ./stage1/bin):$PATH skargo test --jobs 8 --junitxml ~/test-results/skc.xml
       - store_test_results:
           path: ~/test-results/skc.xml
@@ -47,7 +47,7 @@ jobs:
           name: Run skstore tests
           command: |
             mkdir -p ~/test-results
-            cd prelude && skargo test --jobs 8 --junitxml ~/test-results/skstore.xml
+            cd skiplang/prelude && skargo test --jobs 8 --junitxml ~/test-results/skstore.xml
       - store_test_results:
           path: ~/test-results/skstore.xml
 
@@ -85,7 +85,7 @@ jobs:
           name: Run skjson tests
           command: |
             mkdir -p ~/test-results
-            cd skjson && skargo test --junitxml ~/test-results/skjson.xml
+            cd skiplang/skjson && skargo test --junitxml ~/test-results/skjson.xml
       - store_test_results:
           path: ~/test-results/skjson.xml
   skipruntime-wasm:
