@@ -59,4 +59,4 @@ function scenarios() {
   ];
 }
 
-await run(scenarios(), 9998);
+await run(scenarios(), [9998]);
