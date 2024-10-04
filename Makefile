@@ -10,12 +10,6 @@ SKDB_WASM=sql/target/wasm32-unknown-unknown/$(SKARGO_PROFILE)/skdb.wasm
 SKDB_BIN=sql/target/host/$(SKARGO_PROFILE)/skdb
 SDKMAN_DIR?=$(HOME)/.sdkman
 
-ifndef PLAYWRIGHT_JUNIT_OUTPUT_NAME
-SKNPM_FLAG=
-else
-SKNPM_FLAG=--junitxml $(PLAYWRIGHT_JUNIT_OUTPUT_NAME)
-endif # ifndef PLAYWRIGHT_JUNIT_OUTPUT_NAME
-
 ################################################################################
 # skdb wasm + js client
 ################################################################################
@@ -159,7 +153,7 @@ test-tpc: test
 	@cd sql/test/TPC-h/ && ./test_tpch.sh
 
 .PHONY: test-soak-priv
-test-soak-priv: $(SKNPM_BIN) build/skdb build/init.sql npm
+test-soak-priv: build/skdb build/init.sql npm
 	./sql/server/test/test_soak.sh
 
 .PHONY: test-soak

@@ -5,5 +5,4 @@ in):
 
 TO REWRITE
 
-1. Build `sknpm` with `make -C ../.. npm`
-2. Run the CLI: `cd ../../build/packages/skdb && npm run cli -- <args>`
+1. Run the CLI: `cd ../../build/packages/skdb && npm run cli -- <args>`
