@@ -33,7 +33,7 @@ ENV CXX=clang++
 
 FROM stage0 AS bootstrap
 
-COPY . /work
+COPY ./skiplang /work
 
 WORKDIR /work/compiler
 RUN make clean && make STAGE=0
