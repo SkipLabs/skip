@@ -38,10 +38,10 @@ $(SDKMAN_DIR):
 # skdb native binary
 ################################################################################
 
-sql/target/host/dev/skdb: sql/src/* prelude/src/**/*.sk skdate/src/* skjson/src/* sqlparser/src/*
+sql/target/host/dev/skdb: sql/src/* skiplang/prelude/src/**/*.sk skiplang/skdate/src/* skiplang/skjson/src/* skiplang/sqlparser/src/*
 	cd sql && skargo build
 
-sql/target/host/release/skdb: sql/src/* prelude/src/**/*.sk skdate/src/* skjson/src/* sqlparser/src/*
+sql/target/host/release/skdb: sql/src/* skiplang/prelude/src/**/*.sk skiplang/skdate/src/* skiplang/skjson/src/* skiplang/sqlparser/src/*
 	cd sql && skargo build --release --bin skdb
 
 # TODO: keeping this for now as nearly all test scripts refer to build/skdb
@@ -85,11 +85,11 @@ clean-all: clean
 
 .PHONY: fmt-sk
 fmt-sk:
-	find . -path ./compiler/tests -not -prune -or -name \*.sk | parallel skfmt -i {}
+	find . -path ./skiplang/compiler/tests -not -prune -or -name \*.sk | parallel skfmt -i {}
 
 .PHONY: fmt-c
 fmt-c:
-	find . -path ./prelude/libbacktrace -not -prune -or -path ./sql/test/TPC-h/tnt-tpch -not -prune -or -regex '.*\.[ch]\(pp\)*' | parallel clang-format -i {}
+	find . -path ./skiplang/prelude/libbacktrace -not -prune -or -path ./sql/test/TPC-h/tnt-tpch -not -prune -or -regex '.*\.[ch]\(pp\)*' | parallel clang-format -i {}
 
 .PHONY: fmt-js
 fmt-js:
