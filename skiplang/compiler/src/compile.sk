@@ -210,6 +210,12 @@ fun compile(
     _ = context.mkdir(x ~> x, x ~> x, FileCache.fileDirName);
     _ = context.mkdir(x ~> x, x ~> x, FileCache.fileTimeDirName);
     _ = context.mkdir(x ~> x, x ~> x, FileCache.allFilesDirName);
+    backendDir = context.mkdir(
+      SKStore.IID::keyType,
+      TickConfigFile::type,
+      backendDirName,
+      Array[(SKStore.IID(0), TickConfigFile((-128, config)))],
+    );
 
     outerIst = OuterIstToIR.makeOuterIst(context);
 
@@ -221,13 +227,6 @@ fun compile(
       config,
       SKStore.DirName::create("/converter/"),
       outerIst,
-    );
-
-    backendDir = context.mkdir(
-      SKStore.IID::keyType,
-      TickConfigFile::type,
-      backendDirName,
-      Array[(SKStore.IID(0), TickConfigFile((-128, config)))],
     );
 
     backendSinkDirName = SKStore.DirName::create("/backendSink/");
