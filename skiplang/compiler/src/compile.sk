@@ -214,7 +214,6 @@ fun compile(
       SKStore.IID::keyType,
       TickConfigFile::type,
       backendDirName,
-      Array[(SKStore.IID(0), TickConfigFile((-128, config)))],
     );
 
     outerIst = OuterIstToIR.makeOuterIst(context);
@@ -371,17 +370,14 @@ fun compile(
     config.lib_name,
   );
 
-  if (context.unsafeMaybeGetEagerDir(backendDirName) is None()) {
-    void
-  } else {
-    context
-      .unsafeGetEagerDir(backendDirName)
-      .writeArray(
-        context,
-        SKStore.IID(0),
-        Array[TickConfigFile((context.tick.value, config))],
-      );
-  };
+  context
+    .unsafeGetEagerDir(backendDirName)
+    .writeArray(
+      context,
+      SKStore.IID(0),
+      Array[TickConfigFile((context.tick.value, config))],
+    );
+
   context.update()
 }
 
