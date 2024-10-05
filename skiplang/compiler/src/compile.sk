@@ -229,12 +229,11 @@ fun compile(
       outerIst,
     );
 
-    backendSinkDirName = SKStore.DirName::create("/backendSink/");
     _ = backendDir.map(
       SKStore.SID::keyType,
       TickConfigFile::type,
       context,
-      backendSinkDirName,
+      SKStore.DirName::create("/backendSink/"),
       (context, _writer, _key, values) ~> {
         (_, conf) = TickConfigFile::type(values.first).value;
 
