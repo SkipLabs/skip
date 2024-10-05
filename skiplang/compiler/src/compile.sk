@@ -210,16 +210,7 @@ fun compile(
     _ = context.mkdir(x ~> x, x ~> x, FileCache.fileDirName);
     _ = context.mkdir(x ~> x, x ~> x, FileCache.fileTimeDirName);
     _ = context.mkdir(x ~> x, x ~> x, FileCache.allFilesDirName);
-  };
 
-  FileCache.writeFiles(
-    context,
-    fileNames,
-    config.dependencies,
-    config.lib_name,
-  );
-
-  if (context.unsafeMaybeGetEagerDir(backendDirName) is None()) {
     outerIst = OuterIstToIR.makeOuterIst(context);
 
     defsProj = outerIst.getFunsProj(context);
@@ -373,6 +364,17 @@ fun compile(
         }
       },
     );
+  };
+
+  FileCache.writeFiles(
+    context,
+    fileNames,
+    config.dependencies,
+    config.lib_name,
+  );
+
+  if (context.unsafeMaybeGetEagerDir(backendDirName) is None()) {
+    void
   } else {
     context
       .unsafeGetEagerDir(backendDirName)
