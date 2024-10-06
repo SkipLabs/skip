@@ -987,7 +987,7 @@ export class ToBinding {
     skreducer: Handle<Reducer<Json, Json>>,
     skacc: Pointer<Internal.CJSON>,
     skvalue: Pointer<Internal.CJSON>,
-  ): Pointer<Internal.CJSON> {
+  ): Nullable<Pointer<Internal.CJSON>> {
     const skjson = this.getJsonConverter();
     const reducer = this.handles.get(skreducer);
     return skjson.exportJSON(
