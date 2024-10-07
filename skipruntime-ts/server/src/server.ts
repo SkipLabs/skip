@@ -2,7 +2,7 @@ import { WebSocketServer } from "ws";
 import * as http from "http";
 import {
   initService,
-  createSKStore,
+  createRuntime,
   type SkipService,
 } from "@skipruntime/core";
 import { createRESTServer } from "./rest.js";
@@ -12,7 +12,7 @@ export async function runService(
   service: SkipService,
   port: number = 443,
 ): Promise<{ close: () => void }> {
-  const runtime = await initService(service, createSKStore);
+  const runtime = await initService(service, createRuntime);
   const httpServer = http.createServer();
   const app = createRESTServer(runtime);
   httpServer.on("request", app);

@@ -37,7 +37,7 @@ import {
   EagerCollectionImpl,
   EagerCollectionReader,
   LSelfImpl,
-  SKStoreFactoryImpl,
+  RuntimeFactoryImpl,
 } from "./skipruntime_impl.js";
 import { UnknownCollectionError } from "../skipruntime_errors.js";
 
@@ -196,7 +196,7 @@ export class ContextImpl implements Context {
   getDiff<K extends TJSON, V extends TJSON>(collection: string, from: string) {
     const ctx = this.ref.get();
     if (ctx != null)
-      throw new Error("getDiff: Cannot be called durring update.");
+      throw new Error("getDiff: Cannot be called during update.");
     const result = this.skjson.runWithGC(() => {
       return this.skjson.clone(
         this.skjson.importJSON(
@@ -419,7 +419,7 @@ export class ContextImpl implements Context {
     ) as TJSON[];
   }
 
-  /* Must produce a valid SKStore key ideally with no collision */
+  /* Must produce a valid Skip key ideally with no collision */
   keyOfJSON(value: TJSON): string {
     return (
       "b64_" +
@@ -1243,8 +1243,8 @@ class LinksImpl implements Links {
       );
     };
     this.env.shared.set(
-      "SKStore",
-      new SKStoreFactoryImpl(
+      "SkipRuntimeFactory",
+      new RuntimeFactoryImpl(
         () => new ContextImpl(skjson(), fromWasm, this.handles, this.env, ref),
         create,
       ),
