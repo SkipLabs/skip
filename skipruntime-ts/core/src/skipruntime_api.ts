@@ -234,7 +234,7 @@ export interface EagerCollection<K extends TJSON, V extends TJSON>
  * The type of a _lazy_ reactive function which produces a value for some `key`, possibly using a `self` reference to get/produce other lazily-computed results.
  */
 export interface LazyCompute<K extends TJSON, V extends TJSON> {
-  compute(selfHdl: LazyCollection<K, V>, key: K): Opt<V>;
+  compute(self: LazyCollection<K, V>, key: K): Opt<V>;
 }
 
 export interface Context extends Constant {
