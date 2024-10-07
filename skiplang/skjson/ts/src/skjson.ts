@@ -427,6 +427,7 @@ export interface SKJSON extends Shared {
   importString(v: ptr<Internal.String>): string;
   exportString(v: string): ptr<Internal.String>;
   exportBytes(v: Uint8Array): ptr<Internal.Array<Internal.Byte>>;
+  importBytes(v: ptr<Internal.Array<Internal.Byte>>): Uint8Array;
   runWithGC: <T>(fn: () => T) => T;
   clone: <T>(v: T) => T;
 }
@@ -443,6 +444,7 @@ class SKJSONShared implements SKJSON {
     public importString: (v: ptr<Internal.String>) => string,
     public exportString: (v: string) => ptr<Internal.String>,
     public exportBytes: (v: Uint8Array) => ptr<Internal.Array<Internal.Byte>>,
+    public importBytes: (v: ptr<Internal.Array<Internal.Byte>>) => Uint8Array,
     public runWithGC: <T>(fn: () => T) => T,
     public clone: <T>(v: T) => T,
   ) {}
@@ -526,10 +528,11 @@ class LinksImpl implements Links {
       new SKJSONShared(
         importJSON,
         exportJSON,
-        utils.importString,
-        utils.exportString,
-        utils.exportBytes,
-        utils.runWithGc,
+        utils.importString.bind(utils),
+        utils.exportString.bind(utils),
+        utils.exportBytes.bind(utils),
+        utils.importBytes.bind(utils),
+        utils.runWithGc.bind(utils),
         clone,
       ),
     );

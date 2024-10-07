@@ -25,43 +25,65 @@ function toWs(entrypoint: Entrypoint) {
 }
 
 class SkipHttpAccessV1 {
-  private runtime: SkipRESTRuntime;
+  private runtimes: Record<number, SkipRESTRuntime>;
   private client?: Client;
+  private defaultPort: number;
 
   constructor(
-    private entrypoint: Entrypoint = {
-      host: "localhost",
-      port: 3587,
-    },
+    ports: number[] = [3587],
     private creds: Protocol.Creds,
   ) {
-    this.runtime = new SkipRESTRuntime(entrypoint);
+    this.defaultPort = ports[0];
+    this.runtimes = {};
+    for (const port of ports) {
+      this.runtimes[port] = new SkipRESTRuntime({ host: "localhost", port });
+    }
   }
 
-  async writeMany(data: Write[]) {
+  close() {
+    if (this.client) this.client.close();
+  }
+
+  async writeMany(data: Write[], port?: number) {
     const promises = data.map((w) =>
-      this.runtime.patch(w.collection, w.entries),
+      this.runtimes[port ?? this.defaultPort].patch(w.collection, w.entries),
     );
-    return Promise.allSettled(promises);
-  }
-
-  async deteleMany(data: Delete[]) {
-    const promises: Promise<void>[] = [];
-    for (const x of data) {
-      for (const key of x.keys) {
-        promises.push(this.runtime.deleteKey(x.collection, key));
-      }
+    if (promises.length == 1) {
+      return promises[0];
     }
     return Promise.allSettled(promises);
   }
 
-  async request(resource: string, params: Record<string, string>) {
+  async deteleMany(data: Delete[], port?: number) {
+    const promises: Promise<void>[] = [];
+    for (const x of data) {
+      for (const key of x.keys) {
+        promises.push(
+          this.runtimes[port ?? this.defaultPort].deleteKey(x.collection, key),
+        );
+      }
+    }
+    if (promises.length == 1) {
+      return promises[0];
+    }
+    return Promise.allSettled(promises);
+  }
+
+  async request(
+    resource: string,
+    params: Record<string, string>,
+    port?: number,
+  ) {
     const publicKey = new Uint8Array(
       await Protocol.exportKey(this.creds.publicKey),
     );
-    const reactive = await this.runtime.head(resource, params, publicKey);
+    const runtime = this.runtimes[port ?? this.defaultPort];
+    const reactive = await runtime.head(resource, params, publicKey);
     if (!this.client) {
-      this.client = await connect(toWs(this.entrypoint), this.creds);
+      this.client = await connect(
+        toWs({ host: "localhost", port: port ?? this.defaultPort }),
+        this.creds,
+      );
     }
     this.client.subscribe(
       reactive.collection,
@@ -258,18 +280,16 @@ class Player {
 /**
  * Run the client with specified scenarios
  * @param scenarios The scenarios
- * @param port  The port
+ * @param ports  The ports
  */
-export async function run(scenarios: Step[][], port: number = 3587) {
+export async function run(scenarios: Step[][], ports: number[] = [3587]) {
   const creds = await Protocol.generateCredentials();
-  const access = new SkipHttpAccessV1(
-    {
-      host: "localhost",
-      port,
-    },
-    creds,
-  );
+  const access = new SkipHttpAccessV1(ports, creds);
   const online = (line: string) => {
+    if (line == "exit") {
+      access.close();
+      return;
+    }
     try {
       const patterns: [RegExp, (...args: string[]) => void][] = [
         [
@@ -278,9 +298,10 @@ export async function run(scenarios: Step[][], port: number = 3587) {
             const jsquery = JSON.parse(query) as {
               resource: string;
               params?: Record<string, string>;
+              port: number;
             };
             access
-              .request(jsquery.resource, jsquery.params ?? {})
+              .request(jsquery.resource, jsquery.params ?? {}, jsquery.port)
               .then(console.log)
               .catch((e: unknown) => {
                 console.error(e);
@@ -338,9 +359,10 @@ export async function run(scenarios: Step[][], port: number = 3587) {
         const jsquery = step.payload as {
           resource: string;
           params?: Record<string, string>;
+          port?: number;
         };
         access
-          .request(jsquery.resource, jsquery.params ?? {})
+          .request(jsquery.resource, jsquery.params ?? {}, jsquery.port)
           .then(console.log)
           .catch((e: unknown) => {
             console.error(e);
@@ -371,6 +393,7 @@ export async function run(scenarios: Step[][], port: number = 3587) {
   rl.prompt();
   rl.on("line", (line: string) => {
     if (line == "exit") {
+      player.online(line);
       process.exit(0);
     } else {
       player.online(line);

@@ -1,1050 +1,742 @@
-module SKStore;
+module SkipRuntime;
 
-@cpp_extern
-@debug
-native fun applyMapFun(
-  fn: UInt32,
-  context: mutable Context,
-  writer: mutable TWriter<JSONID, JSONFile>,
-  key: SKJSON.CJSON,
-  values: mutable NonEmptyIterator<JSONFile>,
-): void;
-
-@cpp_extern
-@debug
-native fun applyConvertToRowFun(
-  fn: UInt32,
-  key: SKJSON.CJSON,
-  values: mutable NonEmptyIterator<JSONFile>,
-): SKJSON.CJArray;
-
-@cpp_extern
-@debug
-native fun applyMapTableFun(
-  fn: UInt32,
-  context: mutable Context,
-  writer: mutable TWriter<JSONID, JSONFile>,
-  key: SKJSON.CJArray,
-  occ: Float,
-): void;
-
-@cpp_extern
-@debug
-native fun init(context: mutable Context, handles: SKJSON.CJObject): void;
-
-@cpp_extern
-@debug
-native fun applyLazyFun(
-  fn: UInt32,
-  context: mutable Context,
-  self: LHandle<JSONID, JSONFile>,
-  key: SKJSON.CJSON,
-): SKJSON.CJSON;
-
-@cpp_extern
-@debug
-native fun applyParamsFun(
-  fn: UInt32,
-  context: mutable Context,
-  key: SKJSON.CJSON,
-): SKJSON.CJSON;
-
-@cpp_extern
-@debug
-native fun applyLazyAsyncFun(
-  fn: UInt32,
-  callId: String,
-  name: String,
-  key: SKJSON.CJSON,
-  param: SKJSON.CJSON,
-): void;
-
-@cpp_extern("SkipRuntime_callResourceCompute")
-@debug
-native fun callResourceCompute(
-  context: mutable Context,
-  name: String,
-  params: SKJSON.CJObject,
-): String;
-
-@cpp_extern
-@debug
-native fun detachHandle(fn: UInt32): void;
-
-@cpp_extern
-@debug
-native fun applyAccumulate(
-  fn: UInt32,
-  acc: SKJSON.CJSON,
-  value: SKJSON.CJSON,
-): SKJSON.CJSON;
-
-@cpp_extern
-@debug
-native fun applyDismiss(
-  fn: UInt32,
-  acc: SKJSON.CJSON,
-  value: SKJSON.CJSON,
-): ?SKJSON.CJSON;
-
-@cpp_extern
+@cpp_extern("SkipRuntime_getErrorHdl")
 @debug
 native fun getErrorHdl(exn: .Exception): Float;
 
-@cpp_extern("SkipRuntime_applyNotify")
-@debug
-native fun applyNotify(
-  fn: UInt32,
-  values: SKJSON.CJArray,
-  watermark: Int,
-  update: Int32,
-): void;
+@cpp_extern("SkipRuntime_pushContext")
+native fun pushContext(context: mutable SKStore.Context): void;
 
-// Exports
+@cpp_extern("SkipRuntime_popContext")
+native fun popContext(): void;
 
-@export("SkipRuntime_writerSet")
-fun writerSet(
-  writer: mutable TWriter<JSONID, JSONFile>,
-  key: SKJSON.CJSON,
-  value: SKJSON.CJSON,
-): void {
-  writer.set(JSONID(key), JSONFile(value))
-}
+@cpp_extern("SkipRuntime_getContext")
+native fun getContext(): ?mutable SKStore.Context;
 
-@export("SkipRuntime_writerSetArray")
-fun writerSetArray(
-  writer: mutable TWriter<JSONID, JSONFile>,
-  key: SKJSON.CJSON,
-  values: SKJSON.CJArray,
-): void {
-  files = values match {
-  | SKJSON.CJArray(xs) -> xs.map(x -> JSONFile(x))
-  };
-  writer.setArray(JSONID(key), files)
-}
+/************  NonEmptyIterator ****************/
 
-@export("SkipRuntime_iteratorFirst")
-fun iteratorFirst(values: mutable NonEmptyIterator<JSONFile>): SKJSON.CJSON {
+@export("SkipRuntime_NonEmptyIterator__first")
+fun firstOfNonEmptyIterator(
+  values: mutable SKStore.NonEmptyIterator<SKJSON.CJSON>,
+): SKJSON.CJSON {
   if (values.isPastFirstValue) {
-    throw Error("`first` can't be called after `next` on a NonEmptyIterator")
+    throw SKStore.Error(
+      "`first` can't be called after `next` on a NonEmptyIterator",
+    )
   };
-  values.first.value
+  values.first
 }
 
-@export("SkipRuntime_iteratorUniqueValue")
-fun iteratorUniqueValue(
-  values: mutable NonEmptyIterator<JSONFile>,
+@export("SkipRuntime_NonEmptyIterator__uniqueValue")
+fun uniqueValueOfNonEmptyIterator(
+  values: mutable SKStore.NonEmptyIterator<SKJSON.CJSON>,
 ): ?SKJSON.CJSON {
-  value = values.next().map(v -> v.value);
+  value = values.next();
   if (values.next().isSome()) None() else value
 }
 
-@export("SkipRuntime_iteratorNext")
-fun iteratorNext(values: mutable NonEmptyIterator<JSONFile>): ?SKJSON.CJSON {
-  values.next().map(v -> v.value)
+@export("SkipRuntime_NonEmptyIterator__next")
+fun nextOfNonEmptyIterator(
+  values: mutable SKStore.NonEmptyIterator<SKJSON.CJSON>,
+): ?SKJSON.CJSON {
+  values.next()
 }
 
-@export("SkipRuntime_cloneIterator")
-fun cloneIterator(
-  values: mutable NonEmptyIterator<JSONFile>,
-): mutable NonEmptyIterator<JSONFile> {
+@export("SkipRuntime_NonEmptyIterator__clone")
+fun cloneOfNonEmptyIterator(
+  values: mutable SKStore.NonEmptyIterator<SKJSON.CJSON>,
+): mutable SKStore.NonEmptyIterator<SKJSON.CJSON> {
   values.clone()
 }
 
-class FnHandle private (eptr: SKStore.ExternalPointer) extends File {
-  static fun make(id: UInt32): this {
-    static(SKStore.ExternalPointer::create(id, detachHandle))
-  }
+/************  Mapper ****************/
 
-  fun getId(): UInt32 {
-    this.eptr.value
-  }
-
-  fun map(
-    context: mutable Context,
-    writer: mutable TWriter<JSONID, JSONFile>,
-    key: JSONID,
-    values: mutable NonEmptyIterator<JSONFile>,
-  ): void {
-    applyMapFun(this.getId(), context, writer, key.value, values)
-  }
-
-  fun lazy(
-    context: mutable Context,
-    self: LHandle<JSONID, JSONFile>,
-    key: JSONID,
-  ): Array<JSONFile> {
-    Array[JSONFile(applyLazyFun(this.getId(), context, self, key.value))]
-  }
-
-  fun params(context: mutable Context, key: JSONID): SKJSON.CJSON {
-    applyParamsFun(this.getId(), context, key.value)
-  }
-
-  fun callAsync(
-    name: String,
-    call: String,
-    key: JSONID,
-    params: SKJSON.CJSON,
-  ): void {
-    applyLazyAsyncFun(this.getId(), call, name, key.value, params)
-  }
-
-  fun notify(
-    _dirname: DirName,
-    values: Array<(Key, Array<File>)>,
-    tick: Tick,
-    update: Bool,
-  ): void {
-    jsValues = values.map(v -> toEntry(v.i0, v.i1));
-    applyNotify(
-      this.getId(),
-      SKJSON.CJArray(jsValues),
-      tick.value,
-      Int32::truncate(if (update) 1 else 0),
-    )
-  }
-}
-
-class ExternAccumulator(
-  accumulator: FnHandle,
-) extends Accumulator<JSONFile, JSONFile> {
-  //
-  fun getType(): File ~> JSONFile {
-    JSONFile::type
-  }
-
-  fun accumulate(acc: JSONFile, value: JSONFile): JSONFile {
-    JSONFile(applyAccumulate(this.accumulator.getId(), acc.value, value.value))
-  }
-
-  fun dismiss(cumul: JSONFile, value: JSONFile): ?JSONFile {
-    applyDismiss(this.accumulator.getId(), cumul.value, value.value).map(v ->
-      JSONFile(v)
-    )
-  }
-}
-
-fun asKeyRanges(ranges: Array<SKJSON.CJSON>): Array<KeyRange> {
-  ranges.map((jsonRange) -> {
-    range = SKJSON.expectArray(jsonRange);
-    KeyRange(JSONID(range[0]), JSONID(range[1]))
-  })
-}
-
-fun asKeyRangesOpt(jsonRanges: SKJSON.CJSON): ?Array<KeyRange> {
-  if (jsonRanges is SKJSON.CJNull()) return None();
-  ranges = SKJSON.expectArray(jsonRanges);
-  Some(asKeyRanges(ranges))
-}
-
-@export("SkipRuntime_map")
-fun map(
-  context: mutable Context,
-  handleId: String,
-  name: String,
-  fnPtr: UInt32,
-  rangeOpt: SKJSON.CJSON,
-): String {
-  eager = EHandle(JSONID::keyType, JSONFile::type, DirName::create(handleId));
-  mapHandle = FnHandle::make(fnPtr);
-  eagerMap(
-    eager,
-    JSONID::keyType,
-    JSONFile::type,
-    name,
-    context,
-    mapHandle.map,
-    asKeyRangesOpt(rangeOpt),
-  )
-    .getDirName()
-    .toString()
-}
-
-@export("SkipRuntime_mapReduce")
-fun mapReduce(
-  context: mutable Context,
-  handleId: String,
-  name: String,
-  fnPtr: UInt32,
-  accumulator: UInt32,
-  default: SKJSON.CJSON,
-  rangeOpt: SKJSON.CJSON,
-): String {
-  eager = EHandle(JSONID::keyType, JSONFile::type, DirName::create(handleId));
-  mapHandle = FnHandle::make(fnPtr);
-  accumulatorHandle = FnHandle::make(accumulator);
-  eagerMapReduce(
-    eager,
-    JSONID::keyType,
-    JSONFile::type,
-    name,
-    context,
-    mapHandle.map,
-    ExternAccumulator(accumulatorHandle, JSONFile(default)),
-    asKeyRangesOpt(rangeOpt),
-  )
-    .getDirName()
-    .toString()
-}
-
-@export("SkipRuntime_merge")
-fun merge(context: mutable Context, collections: SKJSON.CJArray): String {
-  name = "merge"; // to be concatenated with the names of inputs within the loop
-  mappings = collections match {
-  | SKJSON.CJArray(v) ->
-    v.map(handleID_json -> {
-      handleID = SKJSON.asString(handleID_json);
-
-      invariant(handleID.endsWith("/"));
-      !name = name + handleID.splitLast("/").i0;
-
-      ehandle = EHandle(
-        JSONID::keyType,
-        JSONFile::type,
-        DirName::create(handleID),
-      );
-      (ehandle, identityMap)
-    })
-  };
-  eagerMultiMap(JSONID::keyType, JSONFile::type, name, context, mappings)
-    .getDirName()
-    .toString()
-}
-
-@export("SkipRuntime_multimap")
-fun multimap(
-  context: mutable Context,
-  name: String,
-  mappings: SKJSON.CJArray,
-): String {
-  skmappings = mappings match {
-  | SKJSON.CJArray(v) ->
-    v.map(e -> {
-      mapping = SKJSON.expectArray(e);
-      handleId = SKJSON.asString(mapping[0]);
-      eager = EHandle(
-        JSONID::keyType,
-        JSONFile::type,
-        DirName::create(handleId),
-      );
-      mapHandle = FnHandle::make(
-        UInt32::truncate(SKJSON.asFloat(mapping[1]).toInt()),
-      );
-      return (eager, mapHandle.map)
-    })
-  };
-  eagerMultiMap(JSONID::keyType, JSONFile::type, name, context, skmappings)
-    .getDirName()
-    .toString()
-}
-
-@export("SkipRuntime_multimapReduce")
-fun multimapReduce(
-  context: mutable Context,
-  name: String,
-  mappings: SKJSON.CJArray,
-  accumulator: UInt32,
-  default: SKJSON.CJSON,
-): String {
-  accumulatorHandle = FnHandle::make(accumulator);
-  skmappings = mappings match {
-  | SKJSON.CJArray(v) ->
-    v.map(e -> {
-      mapping = SKJSON.expectArray(e);
-      handleId = SKJSON.asString(mapping[0]);
-      eager = EHandle(
-        JSONID::keyType,
-        JSONFile::type,
-        DirName::create(handleId),
-      );
-      mapHandle = FnHandle::make(
-        UInt32::truncate(SKJSON.asFloat(mapping[1]).toInt()),
-      );
-      return (eager, mapHandle.map)
-    })
-  };
-  eagerMultiMapReduce(
-    JSONID::keyType,
-    JSONFile::type,
-    name,
-    context,
-    skmappings,
-    ExternAccumulator(accumulatorHandle, JSONFile(default)),
-  )
-    .getDirName()
-    .toString()
-}
-
-class AsyncValueSaveError(
+@cpp_extern("SkipRuntime_Mapper__mapElement")
+@debug
+native fun mapElementOfMapper(
+  mapper: UInt32,
   key: SKJSON.CJSON,
-  params: SKJSON.CJSON,
-  reason: String,
-) extends .Exception {
-  fun getMessage(): String {
-    `Unable to save async result for key '${this.key.toJSON()}' and params '${this.params.toJSON()}: ${
-      this.reason
-    }'.`
+  values: mutable SKStore.NonEmptyIterator<SKJSON.CJSON>,
+): SKJSON.CJArray;
+
+@cpp_extern("SkipRuntime_deleteMapper")
+@debug
+native fun deleteMapper(mapper: UInt32): void;
+
+@export("SkipRuntime_createMapper")
+fun createMapper(mapper: UInt32): ExternMapper {
+  ExternMapper(SKStore.ExternalPointer::create(mapper, deleteMapper))
+}
+
+class ExternMapper(eptr: SKStore.ExternalPointer) extends Mapper {
+  fun getKeyConverter(): KeyConverter {
+    JSONKeyConverter()
   }
-}
 
-@export("SkipRuntime_asyncResult")
-fun asyncResult(
-  callId: String,
-  lazyName: String,
-  key: SKJSON.CJSON,
-  params: SKJSON.CJSON,
-  value: SKJSON.CJObject,
-): Float {
-  SKStore.runWithResult(context ~> {
-    resultsDirs = DirName::create(lazyName + "sk_prv/results/");
-    context.unsafeMaybeGetEagerDir(resultsDirs) match {
-    | Some(dir) ->
-      if (!dir.isInput()) {
-        throw AsyncValueSaveError(key, params, "Invalid async handle")
-      };
-      keyId = JSONID(key);
-      current = dir.getArray(context, keyId).map(JSONFile::type);
-      if (current.isEmpty()) {
-        throw AsyncValueSaveError(key, params, "Query info not found")
-      };
-      cvalue = current[0].value match {
-      | x @ SKJSON.CJObject _ -> x
-      | _ -> throw AsyncValueSaveError(key, params, "Invalid query info")
-      };
-      ksuid = SKJSON.getString(cvalue, "ksuid");
-      if (!ksuid.map(v -> callId == v).default(false)) {
-        // The received response is deprecated
-        return void;
-      };
-      status = SKJSON.getString(value, "status") match {
-      | Some(s) -> s
-      | _ -> throw AsyncValueSaveError(key, params, "Invalid async result")
-      };
-      toAdd = status match {
-      | "success" -> Array[("params", params)]
-      | "failure" ->
-        previous(cvalue) match {
-        | Some(p) -> Array[("params", params), ("previous", p)]
-        | _ -> Array[("params", params)]
-        }
-      | "unchanged" ->
-        previous(cvalue) match {
-        | Some(p) -> Array[("params", params), ("previous", p)]
-        | _ -> Array[("params", params)]
-        }
-      | _ ->
-        throw AsyncValueSaveError(key, params, `Unknown status '${status}'`)
-      };
-      toRegister = SKJSON.add(value, toAdd);
-      dir.writeArray(context, keyId, Array[JSONFile(toRegister)])
-    | None() ->
-      throw AsyncValueSaveError(key, params, "Async handle not exist.")
-    };
-    context.update();
-  }) match {
-  | Success _ -> 1.0
-  | Failure(err) -> -getErrorHdl(err)
-  };
-}
-
-fun identityMap<K: Key, V: File>(
-  _context: mutable Context,
-  writer: mutable TWriter<K, V>,
-  key: K,
-  it: mutable NonEmptyIterator<V>,
-): void {
-  writer.setArray(key, it.collect(Array));
-}
-
-@export("SkipRuntime_slice")
-fun slice(
-  context: mutable Context,
-  handleId: String,
-  name: String,
-  jsonRanges: SKJSON.CJArray,
-): String {
-  ranges = jsonRanges match {
-  | SKJSON.CJArray(ranges) -> asKeyRanges(ranges)
-  };
-  eager = EHandle(JSONID::keyType, JSONFile::type, DirName::create(handleId));
-  eagerMap(
-    eager,
-    JSONID::keyType,
-    JSONFile::type,
-    name,
-    context,
-    identityMap,
-    Some(ranges),
-  )
-    .getDirName()
-    .toString()
-}
-
-fun noFilter<K: Key, V: File>(
-  _context: readonly Context,
-  _key: K,
-  _value: File,
-): Bool {
-  true
-}
-
-fun countElementAsOne<V: File>(_value: File): Int {
-  1
-}
-
-fun removeElementAsOne<V: File>(_value: V, _toRemove: Int): File {
-  invariant_violation("removeElementAsOne called on singleton value");
-}
-
-@export("SkipRuntime_take")
-fun take(
-  context: mutable Context,
-  handleId: String,
-  name: String,
-  limit: UInt32,
-): String {
-  sourceDirName = DirName::create(handleId);
-  eager = EHandle(JSONID::keyType, JSONFile::type, sourceDirName);
-  dirName = sourceDirName.sub(name);
-  eager
-    .filter(
-      context,
-      dirName,
-      limit.toInt(),
-      noFilter,
-      countElementAsOne,
-      removeElementAsOne,
-      None(),
-    )
-    .getDirName()
-    .toString()
-}
-
-fun withOptContext<T>(
-  optContext: ?mutable Context,
-  f: (mutable Context) ~> T,
-): T {
-  optContext match {
-  | Some(context) -> f(context)
-  | None() ->
-    SKStore.runWithResult(f) match {
-    | Success(v) -> v
-    | Failure(err) -> throw err
-    }
+  fun getFileConverter(): FileConverter {
+    JSONFileConverter()
   }
-}
 
-fun getArray_(
-  context: mutable Context,
-  handleId: String,
-  key: SKJSON.CJSON,
-): SKJSON.CJArray {
-  eager = EHandle(JSONID::keyType, JSONFile::type, DirName::create(handleId));
-  SKJSON.CJArray(eager.getArray(context, JSONID(key)).map(v -> v.value));
-}
-
-@export("SkipRuntime_getArray")
-fun getArray(
-  optContext: ?mutable Context,
-  handleId: String,
-  key: SKJSON.CJSON,
-): SKJSON.CJArray {
-  withOptContext(optContext, context ~> getArray_(context, handleId, key))
-}
-
-fun get_(
-  context: mutable Context,
-  handleId: String,
-  key: SKJSON.CJSON,
-): SKJSON.CJSON {
-  eager = EHandle(JSONID::keyType, JSONFile::type, DirName::create(handleId));
-  eager.get(context, JSONID(key)).value
-}
-
-@export("SkipRuntime_get")
-fun get(
-  optContext: ?mutable Context,
-  handleId: String,
-  key: SKJSON.CJSON,
-): SKJSON.CJSON {
-  withOptContext(optContext, context ~> get_(context, handleId, key))
-}
-
-fun maybeGet_(
-  context: mutable Context,
-  handleId: String,
-  key: SKJSON.CJSON,
-): SKJSON.CJSON {
-  eager = EHandle(JSONID::keyType, JSONFile::type, DirName::create(handleId));
-  eager.maybeGet(context, JSONID(key)) match {
-  | Some(v) -> v.value
-  | None() -> SKJSON.CJNull()
-  }
-}
-
-@export("SkipRuntime_maybeGet")
-fun maybeGet(
-  optContext: ?mutable Context,
-  handleId: String,
-  key: SKJSON.CJSON,
-): SKJSON.CJSON {
-  withOptContext(optContext, context ~> maybeGet_(context, handleId, key))
-}
-
-@export("SkipRuntime_getToken")
-fun getToken(context: mutable Context, key: String): Float {
-  eager = EHandle(SID::keyType, IntFile::type, kTokenDir);
-  eager.get(context, SID(key)).value.toFloat()
-}
-
-@export("SkipRuntime_updateTokens")
-fun updateTokens(tokens: SKJSON.CJArray, time: Float): Float {
-  SKStore.runWithResult(context ~> {
-    dir = context.unsafeGetEagerDir(kTokenDir);
-    tokens match {
+  fun mapElement(
+    key: SKJSON.CJSON,
+    it: mutable SKStore.NonEmptyIterator<SKJSON.CJSON>,
+  ): mutable Iterator<(SKJSON.CJSON, SKJSON.CJSON)> {
+    mapElementOfMapper(this.eptr.value, key, it) match {
     | SKJSON.CJArray(values) ->
-      values.each(t -> {
-        token = SKJSON.asString(t);
-        dir.writeArray(context, SID(token), Array[IntFile(time.toInt())]);
-      })
-    };
-    context.update();
-  }) match {
-  | Success _ -> 1.0
-  | Failure(err) -> -getErrorHdl(err)
-  };
-}
-
-@export("SkipRuntime_getArrayLazy")
-fun getArrayLazy(
-  context: mutable Context,
-  handleId: String,
-  key: SKJSON.CJSON,
-): SKJSON.CJArray {
-  lazy = LHandle(JSONID::keyType, JSONFile::type, DirName::create(handleId));
-  getArraySelf(context, lazy, key)
-}
-
-@export("SkipRuntime_getLazy")
-fun getLazy(
-  context: mutable Context,
-  handleId: String,
-  key: SKJSON.CJSON,
-): SKJSON.CJSON {
-  lazy = LHandle(JSONID::keyType, JSONFile::type, DirName::create(handleId));
-  getSelf(context, lazy, key)
-}
-@export("SkipRuntime_maybeGetLazy")
-fun maybeGetLazy(
-  context: mutable Context,
-  handleId: String,
-  key: SKJSON.CJSON,
-): SKJSON.CJSON {
-  lazy = LHandle(JSONID::keyType, JSONFile::type, DirName::create(handleId));
-  maybeGetSelf(context, lazy, key)
-}
-
-@export("SkipRuntime_getArraySelf")
-fun getArraySelf(
-  context: mutable Context,
-  handle: LHandle<JSONID, JSONFile>,
-  key: SKJSON.CJSON,
-): SKJSON.CJArray {
-  SKJSON.CJArray(handle.getArray(context, JSONID(key)).map(v -> v.value))
-}
-@export("SkipRuntime_getSelf")
-fun getSelf(
-  context: mutable Context,
-  handle: LHandle<JSONID, JSONFile>,
-  key: SKJSON.CJSON,
-): SKJSON.CJSON {
-  handle.get(context, JSONID(key)).value
-}
-@export("SkipRuntime_maybeGetSelf")
-fun maybeGetSelf(
-  context: mutable Context,
-  handle: LHandle<JSONID, JSONFile>,
-  key: SKJSON.CJSON,
-): SKJSON.CJSON {
-  handle.maybeGet(context, JSONID(key)) match {
-  | Some(v) -> v.value
-  | None() -> SKJSON.CJNull()
-  }
-}
-@export("SkipRuntime_size")
-fun size(context: mutable Context, handleId: String): Float {
-  eager = EHandle(JSONID::keyType, JSONFile::type, DirName::create(handleId));
-  eager.size(context).toFloat()
-}
-
-@export("SkipRuntime_input")
-fun input(
-  context: mutable Context,
-  name: String,
-  values: SKJSON.CJArray,
-): String {
-  makeInput(
-    JSONID::keyType,
-    JSONFile::type,
-    context,
-    name,
-    SKJSON.expectArray(values).map(v -> {
-      a = SKJSON.expectArray(v);
-      (JSONID(a[0]), JSONFile(a[1]))
-    }),
-  )
-}
-
-@export("SkipRuntime_lazy")
-fun lazy(context: mutable Context, name: String, lazyFunPtr: UInt32): String {
-  lazyHandle = FnHandle::make(lazyFunPtr);
-  makeLazy(JSONID::keyType, JSONFile::type, context, name, lazyHandle.lazy)
-}
-
-@export("SkipRuntime_asyncLazy")
-fun asyncLazy(
-  context: mutable Context,
-  name: String,
-  getFunPtr: UInt32,
-  lazyFunPtr: UInt32,
-): String {
-  getHandle = FnHandle::make(getFunPtr);
-  lazyHandle = FnHandle::make(lazyFunPtr);
-  fieldFilter = f ~> f != "params" && f != "ksuid";
-  check: (JSONFile, SKJSON.CJSON) ~> Check<JSONFile> = (v, params) ~> {
-    v.value match {
-    | obj @ SKJSON.CJObject _ ->
-      if (
-        SKJSON.getValue(obj, "params").map(ps -> ps == params).default(false)
-      ) {
-        Check(true, Some(JSONFile(SKJSON.filter(obj, fieldFilter))))
-      } else {
-        Check(false, previous(obj).map(e -> JSONFile(e)))
-      }
-    | _ -> Check(false, None())
-    }
-  };
-  loading: (String, SKJSON.CJSON, ?JSONFile) ~> Loading<JSONFile> = (
-    ksuid,
-    params,
-    optPrevious,
-  ) ~> {
-    fields: Array<(String, SKJSON.CJSON)> = optPrevious.map(v ->
-      v.value
-    ) match {
-    | Some(p) ->
-      Array[
-        ("ksuid", SKJSON.CJString(ksuid)),
-        ("params", params),
-        ("previous", p),
-        ("status", SKJSON.CJString("loading")),
-      ]
-    | _ ->
-      Array[
-        ("ksuid", SKJSON.CJString(ksuid)),
-        ("params", params),
-        ("status", SKJSON.CJString("loading")),
-      ]
-    };
-    internal = SKJSON.CJObject(SKJSON.CJFields::create(fields, x -> x));
-    Loading(JSONFile(internal), JSONFile(SKJSON.filter(internal, fieldFilter)))
-  };
-  makeAsyncLazy<JSONID, JSONFile, SKJSON.CJSON>(
-    JSONID::keyType,
-    JSONFile::type,
-    context,
-    name,
-    getHandle.params,
-    lazyHandle.callAsync,
-    check,
-    loading,
-  )
-}
-
-fun initCtx(): Context {
-  Context{}
-}
-
-@export("SkipRuntime_createFor")
-fun tsCreateFor(
-  session: String,
-  inputs: SKJSON.CJArray,
-  initValues: SKJSON.CJObject,
-  tokens: SKJSON.CJArray,
-  time: Float,
-): Float {
-  createFor(session, inputs, initValues, tokens, time)
-}
-
-fun previous(value: SKJSON.CJObject): ?SKJSON.CJSON {
-  if (SKJSON.getString(value, "status") == Some("success")) {
-    Some(SKJSON.filter(value, f ~> f == "payload" || f == "metadata"))
-  } else {
-    SKJSON.getValue(value, "previous")
-  }
-}
-
-@export("SkipRuntime_jsonExtract")
-fun jsonExtract(from: SKJSON.CJSON, pattern: String): SKJSON.CJArray {
-  fieldsList = SKJSON.PatternParser::mcreate(pattern)
-    .toplevelPattern()
-    .pmatch(from)
-    .collect(Array);
-  values = mutable Vector[];
-  fieldsList.each(fields -> {
-    array = fields.collect(Array).map(field -> {
-      cjfields = SKJSON.CJFields::create(Array[field], x -> x);
-      SKJSON.CJObject(cjfields)
-    });
-    values.push(SKJSON.CJArray(array));
-  });
-  SKJSON.CJArray(values.toArray())
-}
-
-@export("SkipRuntime_createReactiveRequest")
-fun createReactiveRequest(
-  resource: String,
-  params: SKJSON.CJObject,
-  reactiveAuth: Array<UInt8>,
-): SKJSON.CJSON {
-  SKStore.runWithResult(context ~> {
-    session = toSessionName(reactiveAuth);
-    rsessions = EHandle(SID::keyType, IntFile::type, kResourceSessionDir);
-    rsessions.writeArray(context, SID(session), Array[IntFile(0)]);
-    context.update();
-    rDirName = DirName::create(`/sk_prv/resources/session/${session}/`);
-    rObject = Resource(resource, params);
-    resourceHdl = EHandle(Resource::keyType, IntFile::type, rDirName);
-    resourceHdl.writeArray(context, rObject, Array[IntFile(0)]);
-    context.update();
-    gDirName = DirName::create(`/sk_prv/resources/session/${session}/graph/`);
-    graphHdl = EHandle(Resource::keyType, ResourceNames::type, gDirName);
-    names = graphHdl.get(context, rObject);
-    SKJSON.CJArray(
-      Array[
-        SKJSON.CJString(names.name),
-        SKJSON.CJString(names.handle.getDirName().toString()),
-      ],
-    );
-  }) match {
-  | Success(info) -> info
-  | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
-  };
-}
-
-@export("SkipRuntime_closeReactiveRequest")
-fun closeReactiveRequest(
-  resource: String,
-  params: SKJSON.CJObject,
-  reactiveAuth: Array<UInt8>,
-): Float {
-  SKStore.runWithResult(context ~> {
-    session = toSessionName(reactiveAuth);
-    rDirName = DirName::create(`/sk_prv/resources/session/${session}/`);
-    context.maybeGetEagerDir(rDirName).each(_ -> {
-      rObject = Resource(resource, params);
-      resourceHdl = EHandle(Resource::keyType, IntFile::type, rDirName);
-      resourceHdl.writeArray(context, rObject, Array[]);
-      context.update();
-    });
-  }) match {
-  | Success _ -> 0.0
-  | Failure(err) -> getErrorHdl(err)
-  };
-}
-
-@export("SkipRuntime_closeSession")
-fun closeSession(reactiveAuth: Array<UInt8>): Float {
-  SKStore.runWithResult(context ~> {
-    session = toSessionName(reactiveAuth);
-    rsessions = EHandle(SID::keyType, IntFile::type, kResourceSessionDir);
-    rsessions.writeArray(context, SID(session), Array[]);
-    context.update();
-  }) match {
-  | Success _ -> 0.0
-  | Failure(err) -> getErrorHdl(err)
-  };
-}
-
-@export("SkipRuntime_write")
-fun write(collection: String, key: SKJSON.CJSON, value: SKJSON.CJArray): Float {
-  SKStore.runWithResult(context ~> {
-    chdl = EHandle(
-      JSONID::keyType,
-      JSONFile::type,
-      DirName::create(collection),
-    );
-    value match {
-    | SKJSON.CJArray(values) ->
-      chdl.writeArray(context, JSONID(key), values.map(v -> JSONFile(v)))
-    };
-    context.update();
-  }) match {
-  | Success _ -> 0.0
-  | Failure(err) -> getErrorHdl(err)
-  };
-}
-
-@export("SkipRuntime_writeAll")
-fun writeAll(collection: String, values: SKJSON.CJArray): Float {
-  SKStore.runWithResult(context ~> {
-    chdl = EHandle(
-      JSONID::keyType,
-      JSONFile::type,
-      DirName::create(collection),
-    );
-    values match {
-    | SKJSON.CJArray(vs) ->
-      vs.each(e ->
-        e match {
-        | SKJSON.CJArray(av) ->
-          optKey = av.maybeGet(0);
-          optVal = av.maybeGet(1);
-          (optKey, optVal) match {
-          | (Some(key), Some(SKJSON.CJArray(aval))) ->
-            chdl.writeArray(context, JSONID(key), aval.map(v -> JSONFile(v)))
-          | (Some(key), None()) ->
-            chdl.writeArray(context, JSONID(key), Array[])
+      values
+        .map(e ->
+          e match {
+          | SKJSON.CJArray(av) ->
+            optKey = av.maybeGet(0);
+            optVal = av.maybeGet(1);
+            (optKey, optVal) match {
+            | (Some(rkey), Some(rval)) -> (rkey, rval)
+            | _ -> invariant_violation("Invalid entry.")
+            }
           | _ -> invariant_violation("Invalid entry.")
           }
-        | _ -> invariant_violation("Invalid entry.")
-        }
-      )
-    };
-    context.update();
-  }) match {
-  | Success _ -> 0.0
-  | Failure(err) -> getErrorHdl(err)
-  };
+        )
+        .iterator()
+    }
+  }
 }
 
-@export("SkipRuntime_deleteKeys")
-fun deleteKeys(collection: String, value: SKJSON.CJArray): Float {
-  SKStore.runWithResult(context ~> {
-    chdl = EHandle(
-      JSONID::keyType,
-      JSONFile::type,
-      DirName::create(collection),
-    );
-    value match {
-    | SKJSON.CJArray(values) ->
-      values.each(key -> chdl.writeArray(context, JSONID(key), Array[]))
-    };
-    context.update();
-  }) match {
-  | Success _ -> 0.0
-  | Failure(err) -> getErrorHdl(err)
-  };
-}
+/************  LazyCompute ****************/
 
-fun toEntry(key: Key, files: Array<File>): SKJSON.CJArray {
-  SKJSON.CJArray(
-    Array[
-      JSONID::keyType(key).value,
-      SKJSON.CJArray(files.map(JSONFile::type).map(v -> v.value)),
-    ],
+@cpp_extern("SkipRuntime_LazyCompute__compute")
+@debug
+native fun computeOfLazyCompute(
+  lazyCompute: UInt32,
+  self: String,
+  key: SKJSON.CJSON,
+): SKJSON.CJSON;
+
+@cpp_extern("SkipRuntime_deleteLazyCompute")
+@debug
+native fun deleteLazyCompute(lazyCompute: UInt32): void;
+
+@export("SkipRuntime_createLazyCompute")
+fun createLazyCompute(lazyCompute: UInt32): ExternLazyCompute {
+  ExternLazyCompute(
+    SKStore.ExternalPointer::create(lazyCompute, deleteLazyCompute),
   )
 }
 
-fun getAll_(dir: EagerDir): SKJSON.CJArray {
-  values = mutable Vector<SKJSON.CJArray>[];
-  for (kv in dir.unsafeGetFileIter()) {
-    (key, files) = kv;
-    values.push(toEntry(key, files.collect(Array)));
-  };
-  SKJSON.CJArray(values.toArray());
+class ExternLazyCompute(eptr: SKStore.ExternalPointer) extends LazyCompute {
+  fun getKeyConverter(): KeyConverter {
+    JSONKeyConverter()
+  }
+  fun getFileConverter(): FileConverter {
+    JSONFileConverter()
+  }
+
+  fun compute(self: LazyCollection, key: SKJSON.CJSON): Array<SKJSON.CJSON> {
+    computeOfLazyCompute(this.eptr.value, self.getId(), key) match {
+    | SKJSON.CJArray(value) -> value
+    | _ -> invariant_violation("Invalid computed value.")
+    }
+  }
 }
 
-@export("SkipRuntime_getAll")
-fun getAll(collection: String): SKJSON.CJSON {
-  SKStore.runWithResult(context ~> {
-    getAll_(context.unsafeGetEagerDir(DirName::create(collection)))
-  }) match {
-  | Success(info) -> info
-  | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
+/************  ExternalSupplier ****************/
+
+@cpp_extern("SkipRuntime_ExternalSupplier__link")
+@debug
+native fun linkOfExternalSupplier(
+  externalSupplier: UInt32,
+  collection: String,
+  resource: String,
+  params: SKJSON.CJObject,
+  reactiveAuth: ?Array<UInt8>,
+): void;
+
+@cpp_extern("SkipRuntime_ExternalSupplier__close")
+@debug
+native fun closeOfExternalSupplier(
+  externalSupplier: UInt32,
+  resource: String,
+  params: SKJSON.CJObject,
+  reactiveAuth: ?Array<UInt8>,
+): void;
+
+@cpp_extern("SkipRuntime_deleteExternalSupplier")
+@debug
+native fun deleteExternalSupplier(externalSupplier: UInt32): void;
+
+@export("SkipRuntime_createExternalSupplier")
+fun createExternalSupplier(externalSupplier: UInt32): ExternExternalSupplier {
+  ExternExternalSupplier(
+    SKStore.ExternalPointer::create(externalSupplier, deleteExternalSupplier),
+  )
+}
+
+class ExternExternalSupplier(
+  eptr: SKStore.ExternalPointer,
+) extends ExternalSupplier {
+  fun link(
+    collection: CollectionWriter,
+    resource: String,
+    params: Map<String, PValue>,
+    reactiveAuth: ?Array<UInt8>,
+  ): void {
+    linkOfExternalSupplier(
+      this.eptr.value,
+      collection.dirName.toString(),
+      resource,
+      jsonParams(params),
+      reactiveAuth,
+    )
+  }
+
+  fun close(
+    resource: String,
+    params: Map<String, PValue>,
+    reactiveAuth: ?Array<UInt8>,
+  ): void {
+    closeOfExternalSupplier(
+      this.eptr.value,
+      resource,
+      jsonParams(params),
+      reactiveAuth,
+    )
+  }
+}
+
+/************  CollectionWriter ****************/
+
+@export("SkipRuntime_CollectionWriter__update")
+fun updateOfCollectionWriter(
+  collection: String,
+  values: SKJSON.CJArray,
+  isInit: Int32,
+): Float {
+  writer = CollectionWriter(SKStore.DirName::create(collection));
+  writer.update(
+    values match {
+    | SKJSON.CJArray(vs) ->
+      vs.map(v -> {
+        e = SKJSON.expectArray(v);
+        (e[0], SKJSON.expectArray(e[1]))
+      })
+    },
+    isInit != 0,
+  ) match {
+  | Success _ -> 0.0
+  | Failure(err) -> getErrorHdl(err)
   };
 }
 
-@export("SkipRuntime_getDiff")
-fun getDiff(collection: String, from: Int): SKJSON.CJSON {
-  SKStore.runWithResult(context ~> {
-    tick = Tick(from);
-    edir = context.unsafeGetEagerDir(DirName::create(collection));
-    (isReset, changes) = if (tick.value > 0) {
-      edir.getChangesAfter(tick)
-    } else {
-      (true, SortedSet[])
-    };
-    if (isReset) {
-      SKJSON.CJObject(
-        SKJSON.CJFields::create(
-          Array[
-            (
-              "values",
-              getAll_(context.unsafeGetEagerDir(DirName::create(collection))),
-            ),
-            ("watermark", SKJSON.CJInt(context.tick.value)),
-            ("isInitial", SKJSON.CJBool(true)),
-          ],
-          x -> x,
-        ),
-      )
-    } else {
-      values = mutable Vector<SKJSON.CJArray>[];
-      if (!changes.isEmpty()) {
-        for (key in changes) {
-          files = edir.getArrayRaw(key);
-          values.push(toEntry(key, files))
-        }
-      };
-      SKJSON.CJObject(
-        SKJSON.CJFields::create(
-          Array[
-            ("values", SKJSON.CJArray(values.toArray())),
-            ("watermark", SKJSON.CJInt(context.tick.value)),
-            ("isInitial", SKJSON.CJBool(false)),
-          ],
-          x -> x,
+/************  Resource ****************/
+
+@cpp_extern("SkipRuntime_Resource__reactiveCompute")
+@debug
+native fun reactiveComputeOfResource(
+  resource: UInt32,
+  collections: SKJSON.CJObject,
+  reactiveAuth: ?Array<UInt8>,
+): String;
+
+@cpp_extern("SkipRuntime_deleteResource")
+@debug
+native fun deleteResource(resource: UInt32): void;
+
+@export("SkipRuntime_createResource")
+fun createResource(resource: UInt32): ExternResource {
+  ExternResource(SKStore.ExternalPointer::create(resource, deleteResource))
+}
+
+class ExternResource(eptr: SKStore.ExternalPointer) extends Resource {
+  fun reactiveCompute(
+    collections: Map<String, Collection>,
+    reactiveAuth: ?Array<UInt8>,
+  ): Collection {
+    collectionName = reactiveComputeOfResource(
+      this.eptr.value,
+      collectionsByName(collections),
+      reactiveAuth,
+    );
+    collectionForName(collectionName)
+  }
+}
+
+/************  ResourceBuilder ****************/
+
+@cpp_extern("SkipRuntime_ResourceBuilder__build")
+@debug
+native fun buildOfResourceBuilder(
+  builder: UInt32,
+  params: SKJSON.CJObject,
+): Resource;
+
+@cpp_extern("SkipRuntime_deleteResourceBuilder")
+@debug
+native fun deleteResourceBuilder(resourceBuilder: UInt32): void;
+
+@export("SkipRuntime_createResourceBuilder")
+fun createResourceBuilder(resourceBuilder: UInt32): ExternResourceBuilder {
+  ExternResourceBuilder(
+    SKStore.ExternalPointer::create(resourceBuilder, deleteResourceBuilder),
+  )
+}
+
+class ExternResourceBuilder(
+  eptr: SKStore.ExternalPointer,
+) extends ResourceBuilder {
+  fun build(params: Map<String, PValue>): Resource {
+    buildOfResourceBuilder(this.eptr.value, jsonParams(params))
+  }
+}
+
+/************  Service ****************/
+
+@export("SkipRuntime_createService")
+fun createService(
+  service: UInt32,
+  jsInputs: SKJSON.CJObject,
+  resources: mutable Map<String, ResourceBuilder>,
+  remotes: mutable Map<String, ExternalSupplier>,
+): ExternService {
+  keyConverter = JSONKeyConverter();
+  fileConverter = JSONFileConverter();
+  inputs = mutable Vector[];
+  jsInputs match {
+  | SKJSON.CJObject(fields) ->
+    for (fieldName => field in fields) {
+      inputs.push(
+        Input(
+          fieldName,
+          SKJSON.expectArray(field).map(v -> {
+            e = SKJSON.expectArray(v);
+            (e[0], e[1])
+          }),
+          keyConverter,
+          fileConverter,
         ),
       )
     }
+  };
+  ExternService(
+    SKStore.ExternalPointer::create(service, deleteService),
+    inputs.toArray(),
+    resources.chill(),
+    remotes.chill(),
+  )
+}
+
+@cpp_extern("SkipRuntime_deleteService")
+@debug
+native fun deleteService(service: UInt32): void;
+
+@cpp_extern("SkipRuntime_Service__reactiveCompute")
+@debug
+native fun reactiveComputeOfService(
+  resource: UInt32,
+  collections: SKJSON.CJObject,
+): SKJSON.CJObject;
+
+class ExternService(eptr: SKStore.ExternalPointer) extends Service {
+  //
+  fun reactiveCompute(
+    inputs: Map<String, Collection>,
+  ): Map<String, Collection> {
+    names = reactiveComputeOfService(
+      this.eptr.value,
+      collectionsByName(inputs),
+    );
+    map = mutable Map[];
+    names match {
+    | SKJSON.CJObject(nfields) ->
+      for (fieldName => field in nfields) {
+        map![fieldName] = collectionForName(SKJSON.asString(field));
+      }
+    };
+    map.chill()
+  }
+}
+
+/************  ResourceBuilderMap ****************/
+
+@export("SkipRuntime_ResourceBuilderMap__create")
+fun createOfResourceBuilderMap(): mutable Map<String, ResourceBuilder> {
+  mutable Map[]
+}
+
+@export("SkipRuntime_ResourceBuilderMap__add")
+fun addOfResourceBuilderMap(
+  builders: mutable Map<String, ResourceBuilder>,
+  name: String,
+  builder: ResourceBuilder,
+): void {
+  builders.add(name, builder)
+}
+
+/************  ExternalSupplierMap ****************/
+
+@export("SkipRuntime_ExternalSupplierMap__create")
+fun createOfExternalSupplierMap(): mutable Map<String, ExternalSupplier> {
+  mutable Map[]
+}
+
+@export("SkipRuntime_ExternalSupplierMap__add")
+fun addOfExternalSupplierMap(
+  suppliers: mutable Map<String, ExternalSupplier>,
+  name: String,
+  supplier: ExternalSupplier,
+): void {
+  suppliers.add(name, supplier)
+}
+
+/************  Collection ****************/
+
+@export("SkipRuntime_Collection__getArray")
+fun getArrayOfCollection(
+  collection: String,
+  key: SKJSON.CJSON,
+): SKJSON.CJArray {
+  SKJSON.CJArray(collectionForName(collection).getArray(key))
+}
+
+@export("SkipRuntime_Collection__maybeGetOne")
+fun maybeGetOneOfCollection(
+  collection: String,
+  key: SKJSON.CJSON,
+): ?SKJSON.CJSON {
+  collectionForName(collection).maybeGetOne(key)
+}
+
+@export("SkipRuntime_Collection__map")
+fun mapOfCollection(collection: String, mapper: Mapper): String {
+  collectionForName(collection).map(mapper).getId()
+}
+
+@export("SkipRuntime_Collection__mapReduce")
+fun mapReduceOfCollection(
+  collection: String,
+  mapper: Mapper,
+  accumulator: JSONAccumulator,
+): String {
+  collectionForName(collection)
+    .mapReduce(mapper, accumulator, JSONFileConverter())
+    .getId()
+}
+
+@export("SkipRuntime_Collection__slice")
+fun sliceOfCollection(collection: String, ranges: SKJSON.CJArray): String {
+  collectionForName(collection)
+    .sliced(
+      ranges match {
+      | SKJSON.CJArray(values) ->
+        values.map(v -> {
+          e = SKJSON.expectArray(v);
+          (e[0], e[1])
+        })
+      },
+    )
+    .getId()
+}
+
+@export("SkipRuntime_Collection__take")
+fun takeOfCollection(collection: String, limit: Int): String {
+  collectionForName(collection).take(limit).getId()
+}
+
+@export("SkipRuntime_Collection__merge")
+fun mergeOfCollection(collection: String, others: SKJSON.CJArray): String {
+  collectionForName(collection)
+    .merge(
+      others match {
+      | SKJSON.CJArray(values) ->
+        values.map(c -> collectionForName(SKJSON.asString(c)))
+      },
+    )
+    .getId()
+}
+
+@export("SkipRuntime_Collection__size")
+fun sizeOfCollection(collection: String): Int {
+  collectionForName(collection).size()
+}
+
+/************  LazyCollection ****************/
+
+@export("SkipRuntime_LazyCollection__getArray")
+fun getArrayOfLazyCollection(lazy: String, key: SKJSON.CJSON): SKJSON.CJArray {
+  SKJSON.CJArray(lazyForName(lazy).getArray(key))
+}
+
+@export("SkipRuntime_LazyCollection__maybeGetOne")
+fun maybeGetOneOfLazyCollection(
+  lazy: String,
+  key: SKJSON.CJSON,
+): ?SKJSON.CJSON {
+  lazyForName(lazy).maybeGetOne(key)
+}
+
+@export("SkipRuntime_LazyCollection__getOne")
+fun getOneOfLazyCollection(lazy: String, key: SKJSON.CJSON): SKJSON.CJSON {
+  lazyForName(lazy).getOne(key)
+}
+
+/************  Notifier ****************/
+
+@cpp_extern("SkipRuntime_Notifier__notify")
+@debug
+native fun notifyOfNotifier(
+  notifier: UInt32,
+  values: SKJSON.CJArray,
+  tick: Int,
+  updates: Int32,
+): void;
+
+@cpp_extern("SkipRuntime_deleteNotifier")
+@debug
+native fun deleteNotifier(notifier: UInt32): void;
+
+@export("SkipRuntime_createNotifier")
+fun createNotifier(notifier: UInt32): Notifier {
+  Notifier(SKStore.ExternalPointer::create(notifier, deleteNotifier))
+}
+
+class Notifier(eptr: SKStore.ExternalPointer) {
+  fun notify(
+    values: Array<(SKJSON.CJSON, Array<SKJSON.CJSON>)>,
+    tick: SKStore.Tick,
+    updates: Bool,
+  ): void {
+    notifyOfNotifier(
+      this.eptr.value,
+      SKJSON.CJArray(
+        values.map(v -> SKJSON.CJArray(Array[v.i0, SKJSON.CJArray(v.i1)])),
+      ),
+      tick.value,
+      Int32::truncate(if (updates) 1 else 0),
+    )
+  }
+}
+
+/************  Accumulator ****************/
+
+@cpp_extern("SkipRuntime_Accumulator__accumulate")
+@debug
+native fun accumulateOfAccumulator(
+  accumulator: UInt32,
+  acc: SKJSON.CJSON,
+  value: SKJSON.CJSON,
+): SKJSON.CJSON;
+
+@cpp_extern("SkipRuntime_Accumulator__dismiss")
+@debug
+native fun dismissOfAccumulator(
+  accumulator: UInt32,
+  cumul: SKJSON.CJSON,
+  value: SKJSON.CJSON,
+): ?SKJSON.CJSON;
+
+@cpp_extern("SkipRuntime_deleteAccumulator")
+@debug
+native fun deleteAccumulator(accumulator: UInt32): void;
+
+@export("SkipRuntime_createAccumulator")
+fun createAccumulator(
+  accumulator: UInt32,
+  default: SKJSON.CJSON,
+): JSONAccumulator {
+  JSONAccumulator(
+    SKStore.ExternalPointer::create(accumulator, deleteAccumulator),
+    default,
+  )
+}
+
+class JSONAccumulator(
+  eptr: SKStore.ExternalPointer,
+) extends Accumulator<SKJSON.CJSON, SKJSON.CJSON> {
+  fun getType(): SKStore.File ~> SKJSON.CJSON {
+    f ~> JSONFile::type(f).value
+  }
+
+  fun accumulate(acc: SKJSON.CJSON, value: SKJSON.CJSON): SKJSON.CJSON {
+    accumulateOfAccumulator(this.eptr.value, acc, value)
+  }
+
+  fun dismiss(cumul: SKJSON.CJSON, value: SKJSON.CJSON): ?SKJSON.CJSON {
+    dismissOfAccumulator(this.eptr.value, cumul, value)
+  }
+}
+
+/************  Runtime ****************/
+
+@export("SkipRuntime_Runtime__createResource")
+fun createResourceOfRuntime(
+  resource: String,
+  jsonParams: SKJSON.CJObject,
+  reactiveAuth: ?Array<UInt8>,
+): SKJSON.CJSON {
+  SKStore.runWithResult(context ~> {
+    createReactiveResource(context, resource, params(jsonParams), reactiveAuth)
   }) match {
-  | Success(info) -> info
+  | Success(reactive) ->
+    SKJSON.CJArray(
+      Array[
+        SKJSON.CJString(reactive.id),
+        SKJSON.CJString(reactive.watermark.value.toString()),
+      ],
+    )
   | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
   };
 }
 
-@export("SkipRuntime_subscribe")
-fun subscribe(resource: String, start: Int, notifyPtr: UInt32): Int {
-  notifyHandle = FnHandle::make(notifyPtr);
-  runWithResult(context ~> {
-    session = SKStore.genSym(0);
-    tick = Tick(start);
-    context.subscribe(
-      session,
-      NWatch(tick, notifyHandle.notify, true),
-      None(),
-      Array[
-        DirSub(DirName::create(resource), "", OJSON(Array[]), (__) ~> None()),
-      ],
-      Some(tick),
-    );
-    return session;
+@export("SkipRuntime_Runtime__getAll")
+fun getAllOfRuntime(
+  resource: String,
+  jsonParams: SKJSON.CJObject,
+  reactiveAuth: ?Array<UInt8>,
+): SKJSON.CJSON {
+  SKStore.runWithResult(context ~> {
+    getAll(context, resource, params(jsonParams), reactiveAuth)
   }) match {
-  | Success(session) -> session
-  | Failure(err) -> -getErrorHdl(err).toInt()
+  | Success(values) ->
+    SKJSON.CJArray(
+      Array[
+        SKJSON.CJArray(
+          values.values.map(v ->
+            SKJSON.CJArray(Array[v.i0, SKJSON.CJArray(v.i1)])
+          ),
+        ),
+        SKJSON.CJArray(
+          Array[
+            SKJSON.CJString(values.reactive.id),
+            SKJSON.CJString(values.reactive.watermark.value.toString()),
+          ],
+        ),
+      ],
+    )
+  | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
   };
 }
 
-@export("SkipRuntime_unsubscribe")
-fun unsubscribe(session: Int): Float {
+@export("SkipRuntime_Runtime__getForKey")
+fun getForKeyOfRuntime(
+  resource: String,
+  jsonParams: SKJSON.CJObject,
+  key: SKJSON.CJSON,
+  reactiveAuth: ?Array<UInt8>,
+): SKJSON.CJSON {
   SKStore.runWithResult(context ~> {
-    context.unsubscribe(session.toInt())
+    getForKey(context, resource, params(jsonParams), key, reactiveAuth)
+  }) match {
+  | Success(value) -> SKJSON.CJArray(value)
+  | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
+  };
+}
+
+@export("SkipRuntime_Runtime__closeResource")
+fun closeResourceOfRuntime(
+  resource: String,
+  jsonParams: SKJSON.CJObject,
+  reactiveAuth: ?Array<UInt8>,
+): Float {
+  SKStore.runWithResult(context ~> {
+    closeReactiveResource(context, resource, params(jsonParams), reactiveAuth)
   }) match {
   | Success _ -> 0.0
   | Failure(err) -> getErrorHdl(err)
   };
 }
 
-module end; /* SKStore */
+@export("SkipRuntime_Runtime__closeSession")
+fun closeSessionOfRuntime(reactiveAuth: ?Array<UInt8>): Float {
+  SKStore.runWithResult(context ~> {
+    closeSession(context, reactiveAuth)
+  }) match {
+  | Success _ -> 0.0
+  | Failure(err) -> getErrorHdl(err)
+  };
+}
+
+@export("SkipRuntime_Runtime__subscribe")
+fun subscribeOfRuntime(
+  reactiveId: String,
+  from: Int,
+  notifier: Notifier,
+  reactiveAuth: ?Array<UInt8>,
+): SKJSON.CJSON {
+  SKStore.runWithResult(context ~> {
+    subscribe(
+      context,
+      reactiveId,
+      SKStore.Tick(from),
+      notifier.notify,
+      reactiveAuth,
+    )
+  }) match {
+  | Success(id) -> SKJSON.CJString(id.toString())
+  | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
+  };
+}
+
+@export("SkipRuntime_Runtime__unsubscribe")
+fun unsubscribeOfRuntime(session: Int): Float {
+  SKStore.runWithResult(context ~> {
+    unsubscribe(context, session)
+  }) match {
+  | Success _ -> 0.0
+  | Failure(err) -> getErrorHdl(err)
+  };
+}
+
+@export("SkipRuntime_Runtime__update")
+fun updateOfRuntime(input: String, values: SKJSON.CJArray): Float {
+  SKStore.runWithResult(context ~> {
+    update(
+      context,
+      input,
+      values match {
+      | SKJSON.CJArray(vs) ->
+        vs.map(v -> {
+          e = SKJSON.expectArray(v);
+          (e[0], SKJSON.expectArray(e[1]))
+        })
+      },
+    )
+  }) match {
+  | Success _ -> 0.0
+  | Failure(err) -> getErrorHdl(err)
+  };
+}
+
+/************ Context ****************/
+
+@export("SkipRuntime_Context__lazy")
+fun lazyOfContext(compute: LazyCompute): String {
+  lazy(compute).getId()
+}
+
+@export("SkipRuntime_Context__jsonExtract")
+fun jsonExtractOfContext(
+  from: SKJSON.CJObject,
+  pattern: String,
+): SKJSON.CJArray {
+  SKJSON.CJArray(jsonExtract(from, pattern))
+}
+
+@export("SkipRuntime_Context__manageResource")
+fun manageResourceOfSKStore(
+  supplier: String,
+  resource: String,
+  jsonparams: SKJSON.CJObject,
+  reactiveAuth: ?Array<UInt8>,
+): String {
+  manageResource(supplier, resource, params(jsonparams), reactiveAuth).getId()
+}
+
+/************ initService ****************/
+
+@export("SkipRuntime_initService")
+fun initSkipRuntimeService(service: Service): Float {
+  initService(service) match {
+  | Success _ -> 0.0
+  | Failure(err) -> getErrorHdl(err)
+  };
+}
+
+module end;
