@@ -935,7 +935,7 @@ class GClassFile(value: GClass) extends SKStore.File
 // Manages the overall conversion from OuterIst to IR.
 class Converter private (
   program: I.Program,
-  config: Config.Config,
+  ptrBitSize: Int,
   funs: SKStore.LHandle<SKStore.Key, GFunctionFile>,
   classes: SKStore.LHandle<SKStore.Key, GClassFile>,
   lower: SKStore.LHandle<SKStore.Key, I.CallableDefFile>,
@@ -962,7 +962,7 @@ class Converter private (
 
   static fun create(
     context: mutable SKStore.Context,
-    config: Config.Config,
+    ptrBitSize: Int,
     name: SKStore.DirName,
     program: I.Program,
   ): this {
@@ -984,7 +984,7 @@ class Converter private (
       I.CallableDefFile::type,
       lowerDirName,
     );
-    converter = static(program, config, funs, classes, lower);
+    converter = static(program, ptrBitSize, funs, classes, lower);
     _ = SKStore.LHandle::create(
       SKStore.Key::unTyped,
       GFunctionFile::type,
@@ -2267,10 +2267,9 @@ class Converter private (
     | "Int16" -> Some(ScalarType(16, 16, "i16", IntegerScalarKind()))
     | "Int32" -> Some(ScalarType(32, 32, "i32", IntegerScalarKind()))
     | "Float" -> Some(ScalarType(64, 64, "double", FloatScalarKind()))
-    | "Runtime.GCPointer" -> Some(ScalarType::gcPointer(this.config.ptrBitSize))
-    | "Runtime.NonGCPointer" ->
-      Some(ScalarType::nonGCPointer(this.config.ptrBitSize))
-    | "String" -> Some(ScalarType::gcPointer(this.config.ptrBitSize))
+    | "Runtime.GCPointer" -> Some(ScalarType::gcPointer(this.ptrBitSize))
+    | "Runtime.NonGCPointer" -> Some(ScalarType::nonGCPointer(this.ptrBitSize))
+    | "String" -> Some(ScalarType::gcPointer(this.ptrBitSize))
     | _ -> None()
     };
 

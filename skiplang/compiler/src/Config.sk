@@ -52,7 +52,6 @@ private class Config{
   // info, but inhibits sharing, which increases compilation time and
   // binary sizes.
   useSpecializedNames: Bool,
-  version: Bool,
   check: Bool,
   stackAlign: Int,
   stackAlignStr: String,
@@ -166,13 +165,7 @@ private class Config{
     autogc = results.getBool("autogc");
     sampleRate = results.getString("sample-rate").toInt();
     useSpecializedNames = results.getBool("use-specialized-names");
-    version = results.getBool("version");
     check = results.getBool("check");
-
-    if (version) {
-      print_string(getBuildVersion());
-      skipExit(0);
-    };
 
     exportAs = mutable UnorderedMap[];
     for (f in exportedAsFunctions) {
@@ -244,7 +237,6 @@ private class Config{
       autogc,
       sampleRate,
       useSpecializedNames,
-      version,
       check,
       stackAlign,
       stackAlignStr,
