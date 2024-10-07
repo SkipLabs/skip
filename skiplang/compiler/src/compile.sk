@@ -193,6 +193,173 @@ fun ensureCompatibleLLVMVersion(): void {
 
 class TickConfigFile(value: (Int, Config.Config)) extends SKStore.File
 
+fun getOrInitializeBackend(
+  context: mutable SKStore.Context,
+  ptrBitSize: Int,
+): SKStore.EagerDir {
+  backendDirName = SKStore.DirName::create("/backend/");
+  context.unsafeMaybeGetEagerDir(backendDirName) match {
+  | Some(dir) -> return dir
+  | None() -> void
+  };
+
+  _ = context.mkdir(x ~> x, x ~> x, FileCache.fileDirName);
+  _ = context.mkdir(x ~> x, x ~> x, FileCache.fileTimeDirName);
+  _ = context.mkdir(x ~> x, x ~> x, FileCache.allFilesDirName);
+  backendDir = context.mkdir(
+    SKStore.IID::keyType,
+    TickConfigFile::type,
+    backendDirName,
+  );
+
+  outerIst = OuterIstToIR.makeOuterIst(context);
+
+  defsProj = outerIst.getFunsProj(context);
+  constsProj = outerIst.getConstsProj(context);
+
+  converter = OuterIstToIR.Converter::create(
+    context,
+    ptrBitSize,
+    SKStore.DirName::create("/converter/"),
+    outerIst,
+  );
+
+  _ = backendDir.map(
+    SKStore.SID::keyType,
+    TickConfigFile::type,
+    context,
+    SKStore.DirName::create("/backendSink/"),
+    (context, _writer, _key, values) ~> {
+      (_, conf) = TickConfigFile::type(values.first).value;
+
+      context.getGlobal("ERRORS") match {
+      | None() -> void
+      | Some(errors) ->
+        SkipError.printErrorsAndExit(
+          SkipError.ErrorsFile::type(errors).value.reversed().toArray(),
+          filename -> {
+            contents = FileCache.fileDir.unsafeGetArray(
+              context,
+              SKStore.SID(filename),
+            )[0].value;
+
+            if (filename.contains(":")) {
+              !filename = filename.splitFirst(":") match {
+              // Display bare paths for errors pertaining to the sklib
+              // currently being built if any.
+              | (l, f) if (Some(l) == conf.lib_name) -> f
+
+              // Errors in dependencies are displayed as:
+              //  /path/to/foo.sklib:src/bar.sk
+              | (l, f) -> conf.dependencies[l].i0 + ":" + f
+              }
+            };
+
+            (filename, contents)
+          },
+        )
+      };
+
+      if (conf.check) {
+        return void;
+      };
+
+      if (conf.emit == "sklib") {
+        compile_sklib(conf);
+        return void
+      };
+
+      // Create a filter for what functions to compile.
+      shouldRuntimeExport = (
+        funDef ~>
+          AsmOutput.cppIsExported(
+            funDef.origName,
+            funDef.annotations,
+            funDef.getPos(),
+            conf.exportedAsFunctions,
+            conf.isWasm(),
+          )
+      );
+
+      // Are we in "disassemble" mode?
+      disasm = (
+        conf.disasmAll ||
+        conf.disasmAnnotated ||
+        !conf.disasmFiles.isEmpty() ||
+        !conf.disasmFunctions.isEmpty()
+      );
+
+      // Create a filter for what functions to disassemble.
+      //
+      // Note that for "disasmAll" we do not return true, since we only want
+      // to disassemble code which is actually used, and returning true would
+      // force everything to be compiled just so it could be disassembled.
+      shouldDisasm = (
+        funDef ~>
+          disasm &&
+            (conf.disasmFunctions.contains(funDef.origName) ||
+              (conf.disasmAnnotated &&
+                annotationsContain(
+                  funDef.annotations,
+                  "@disasm",
+                  funDef.getPos(),
+                )))
+      );
+
+      env = OuterIstToIR.createIR(
+        context,
+        conf,
+        shouldDisasm,
+        shouldRuntimeExport,
+        outerIst,
+        converter,
+        constsProj,
+        defsProj,
+      );
+
+      !env = createOptimizedFunctions(context, env, conf);
+      defs = runCompilerPhase("native/create_asm_graph", () -> {
+        AsmOutput.createAsmDefGraph(env, conf)
+      });
+
+      runCompilerPhase("native/merge_asm_graph", () -> {
+        AsmOutput.mergeIdenticalAsmDefs(defs, conf.debug)
+      });
+
+      runCompilerPhase("native/create_asm_symbols", () -> {
+        AsmOutput.assignFinalSymbols(defs)
+      });
+
+      conf.emit match {
+      | "llvm-ir" -> compile_llvm_ir(defs, conf)
+      | "link" | "cdylib" ->
+        // TODO: Remove exports stuff once --emit=cdylib is supported.
+        wasm_exports = outerIst
+          .getFuns(context, defsProj)
+          .filter(f ->
+            annotationsContainParam(
+              f.annotations,
+              "@wasm_export",
+              f.getPos(),
+            ).isSome() ||
+              annotationsContainParam(
+                f.annotations,
+                "@export",
+                f.getPos(),
+              ).isSome()
+          )
+          .map(exportName);
+        compile_binary(defs, conf, wasm_exports)
+      | "sklib" ->
+        invariant_violation("--emit=sklib should have been handled earlier")
+      | _ -> invariant_violation("Unsupported value for `--emit`: " + conf.emit)
+      }
+    },
+  );
+
+  context.unsafeGetEagerDir(backendDirName)
+}
+
 fun compile(
   config: Config.Config,
   context: mutable SKStore.Context,
@@ -205,11 +372,13 @@ fun compile(
 
   ensureCompatibleLLVMVersion();
 
-  if (context.unsafeMaybeGetDir(FileCache.fileDirName) is None()) {
-    _ = context.mkdir(x ~> x, x ~> x, FileCache.fileDirName);
-    _ = context.mkdir(x ~> x, x ~> x, FileCache.fileTimeDirName);
-    _ = context.mkdir(x ~> x, x ~> x, FileCache.allFilesDirName);
-  };
+  // FIXME: Backend initialization should _not_ peek into the config
+  // as it is likely to change across invocations.
+  getOrInitializeBackend(context, config.ptrBitSize).writeArray(
+    context,
+    SKStore.IID(0),
+    Array[TickConfigFile((context.tick.value, config))],
+  );
 
   FileCache.writeFiles(
     context,
@@ -218,171 +387,6 @@ fun compile(
     config.lib_name,
   );
 
-  backendDirName = SKStore.DirName::create("/backend/");
-  backendSinkDirName = SKStore.DirName::create("/backendSink/");
-
-  if (context.unsafeMaybeGetEagerDir(backendDirName) is None()) {
-    outerIst = OuterIstToIR.makeOuterIst(context);
-
-    defsProj = outerIst.getFunsProj(context);
-    constsProj = outerIst.getConstsProj(context);
-
-    converter = OuterIstToIR.Converter::create(
-      context,
-      config,
-      SKStore.DirName::create("/converter/"),
-      outerIst,
-    );
-
-    backendDir = context.mkdir(
-      SKStore.IID::keyType,
-      TickConfigFile::type,
-      backendDirName,
-      Array[(SKStore.IID(0), TickConfigFile((-128, config)))],
-    );
-
-    _ = backendDir.map(
-      SKStore.SID::keyType,
-      TickConfigFile::type,
-      context,
-      backendSinkDirName,
-      (context, _writer, _key, values) ~> {
-        (_, conf) = TickConfigFile::type(values.first).value;
-
-        context.getGlobal("ERRORS") match {
-        | None() -> void
-        | Some(errors) ->
-          SkipError.printErrorsAndExit(
-            SkipError.ErrorsFile::type(errors).value.reversed().toArray(),
-            filename -> {
-              contents = FileCache.fileDir.unsafeGetArray(
-                context,
-                SKStore.SID(filename),
-              )[0].value;
-
-              if (filename.contains(":")) {
-                !filename = filename.splitFirst(":") match {
-                // Display bare paths for errors pertaining to the sklib
-                // currently being built if any.
-                | (l, f) if (Some(l) == conf.lib_name) -> f
-
-                // Errors in dependencies are displayed as:
-                //  /path/to/foo.sklib:src/bar.sk
-                | (l, f) -> conf.dependencies[l].i0 + ":" + f
-                }
-              };
-
-              (filename, contents)
-            },
-          )
-        };
-
-        if (conf.check) {
-          return void;
-        };
-
-        if (conf.emit == "sklib") {
-          compile_sklib(conf);
-          return void
-        };
-
-        // Create a filter for what functions to compile.
-        shouldRuntimeExport = (
-          funDef ~>
-            AsmOutput.cppIsExported(
-              funDef.origName,
-              funDef.annotations,
-              funDef.getPos(),
-              conf.exportedAsFunctions,
-              conf.isWasm(),
-            )
-        );
-
-        // Are we in "disassemble" mode?
-        disasm = (
-          conf.disasmAll ||
-          conf.disasmAnnotated ||
-          !conf.disasmFiles.isEmpty() ||
-          !conf.disasmFunctions.isEmpty()
-        );
-
-        // Create a filter for what functions to disassemble.
-        //
-        // Note that for "disasmAll" we do not return true, since we only want
-        // to disassemble code which is actually used, and returning true would
-        // force everything to be compiled just so it could be disassembled.
-        shouldDisasm = (
-          funDef ~>
-            disasm &&
-              (conf.disasmFunctions.contains(funDef.origName) ||
-                (conf.disasmAnnotated &&
-                  annotationsContain(
-                    funDef.annotations,
-                    "@disasm",
-                    funDef.getPos(),
-                  )))
-        );
-
-        env = OuterIstToIR.createIR(
-          context,
-          conf,
-          shouldDisasm,
-          shouldRuntimeExport,
-          outerIst,
-          converter,
-          constsProj,
-          defsProj,
-        );
-
-        !env = createOptimizedFunctions(context, env, conf);
-        defs = runCompilerPhase("native/create_asm_graph", () -> {
-          AsmOutput.createAsmDefGraph(env, conf)
-        });
-
-        runCompilerPhase("native/merge_asm_graph", () -> {
-          AsmOutput.mergeIdenticalAsmDefs(defs, conf.debug)
-        });
-
-        runCompilerPhase("native/create_asm_symbols", () -> {
-          AsmOutput.assignFinalSymbols(defs)
-        });
-
-        conf.emit match {
-        | "llvm-ir" -> compile_llvm_ir(defs, conf)
-        | "link" | "cdylib" ->
-          // TODO: Remove exports stuff once --emit=cdylib is supported.
-          wasm_exports = outerIst
-            .getFuns(context, defsProj)
-            .filter(f ->
-              annotationsContainParam(
-                f.annotations,
-                "@wasm_export",
-                f.getPos(),
-              ).isSome() ||
-                annotationsContainParam(
-                  f.annotations,
-                  "@export",
-                  f.getPos(),
-                ).isSome()
-            )
-            .map(exportName);
-          compile_binary(defs, conf, wasm_exports)
-        | "sklib" ->
-          invariant_violation("--emit=sklib should have been handled earlier")
-        | _ ->
-          invariant_violation("Unsupported value for `--emit`: " + conf.emit)
-        }
-      },
-    );
-  } else {
-    context
-      .unsafeGetEagerDir(backendDirName)
-      .writeArray(
-        context,
-        SKStore.IID(0),
-        Array[TickConfigFile((context.tick.value, config))],
-      );
-  };
   context.update()
 }
 
