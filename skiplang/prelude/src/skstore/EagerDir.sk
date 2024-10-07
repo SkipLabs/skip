@@ -665,6 +665,7 @@ class EagerDir{
     DirName,
     ?(DirName, Key, readonly Context ~> Array<File>) ~> Postponable,
   ) = None(),
+  optOnDelete: ?Postponable = None(),
 } extends Dir {
   fun reset(
     context: mutable SKStore.Context,
@@ -1847,6 +1848,13 @@ class EagerDir{
     context.setDir(this.dirName, this with {optCopy => Some((target, writer))});
   }
 
+  fun onDelete(
+    context: mutable Context,
+    optOnDelete: ?Postponable = None(),
+  ): void {
+    context.setDir(this.dirName, this with {optOnDelete});
+  }
+
   fun purgeSlices(
     context: mutable Context,
   ): RangeMapList<SKStore.Key, SKStore.DirName> {
@@ -2055,6 +2063,11 @@ class EagerDir{
 
   fun getDirName(): DirName {
     this.dirName
+  }
+
+  fun removeSubDirs(context: mutable Context): void {
+    this.old.each((_, v) -> v.getNewDirs().each(context.removeDir));
+    this.fixedOld.items().each(e -> e.i1.getNewDirs().each(context.removeDir))
   }
 
   static fun getOld(child: EagerDir, key: Path): MInfo {
