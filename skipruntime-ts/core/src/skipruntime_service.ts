@@ -1,7 +1,7 @@
 import type {
   EagerCollection,
   Entrypoint,
-  SKStore,
+  Context,
   TJSON,
 } from "./skipruntime_api.js";
 
@@ -12,7 +12,7 @@ export type ServiceOutput = {
 
 export interface Resource {
   reactiveCompute(
-    store: SKStore,
+    context: Context,
     collections: Record<string, EagerCollection<TJSON, TJSON>>,
   ): EagerCollection<TJSON, TJSON>;
 }
@@ -25,7 +25,7 @@ export interface SkipService {
   resources?: Record<string, new (params: Record<string, string>) => Resource>;
 
   reactiveCompute(
-    store: SKStore,
+    context: Context,
     inputCollections: Record<string, EagerCollection<TJSON, TJSON>>,
   ): Record<string, EagerCollection<TJSON, TJSON>>;
 }

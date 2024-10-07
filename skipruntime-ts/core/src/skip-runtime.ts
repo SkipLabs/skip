@@ -17,7 +17,7 @@ export type {
   AsyncLazyCollection,
   Entrypoint,
   ExternalCall,
-  SKStore,
+  Context,
   TJSON,
   JSONObject,
   Accumulator,

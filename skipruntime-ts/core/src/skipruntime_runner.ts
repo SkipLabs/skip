@@ -3,7 +3,7 @@ import type {
   CollectionWriter,
   EagerCollection,
   SkipRuntime,
-  SKStore,
+  Context,
   TJSON,
 } from "./skipruntime_api.js";
 
@@ -18,8 +18,8 @@ export async function runService(
 ): Promise<SkipRuntime> {
   const iCollections: Record<string, CollectionWriter<TJSON, TJSON>> = {};
   const rCollections: Record<string, CollectionReader<TJSON, TJSON>> = {};
-  const initSKStore = (
-    store: SKStore,
+  const init = (
+    context: Context,
     inputs: Record<string, EagerCollection<TJSON, TJSON>>,
   ) => {
     if (service.inputCollections) {
@@ -38,7 +38,7 @@ export async function runService(
         ).toCollectionWriter();
       }
     }
-    const result = service.reactiveCompute(store, inputs);
+    const result = service.reactiveCompute(context, inputs);
     for (const [key, col] of Object.entries(result)) {
       rCollections[key] = (
         col as EagerCollectionImpl<TJSON, TJSON>
@@ -53,7 +53,7 @@ export async function runService(
         throw new Error(`Unknown resource ${name}`);
       }
       const resource = new resourceConst(params);
-      return resource.reactiveCompute(store, collections).getId();
+      return resource.reactiveCompute(context, collections).getId();
     };
   };
   return await createRuntime(

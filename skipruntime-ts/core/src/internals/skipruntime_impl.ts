@@ -1,5 +1,5 @@
 import { type int, type ptr, type Opt, cloneIfProxy } from "std";
-import type { Context } from "./skipruntime_types.js";
+import type { Context as InternalContext } from "./skipruntime_types.js";
 import type * as Internal from "./skipruntime_internal_types.js";
 import type {
   Accumulator,
@@ -7,7 +7,7 @@ import type {
   LazyCollection,
   AsyncLazyCollection,
   Mapper,
-  SKStore,
+  Context,
   RuntimeFactory,
   Loadable,
   JSONObject,
@@ -75,7 +75,7 @@ export class EagerCollectionImpl<K extends TJSON, V extends TJSON>
   implements EagerCollection<K, V>
 {
   constructor(
-    private context: Context,
+    private context: InternalContext,
     private eagerHdl: string,
   ) {
     super();
@@ -193,7 +193,7 @@ class LazyCollectionImpl<K extends TJSON, V extends TJSON>
   implements LazyCollection<K, V>
 {
   constructor(
-    protected context: Context,
+    protected context: InternalContext,
     protected lazyHdl: string,
   ) {
     super();
@@ -218,7 +218,7 @@ export class LSelfImpl<K extends TJSON, V extends TJSON>
   implements LazyCollection<K, V>
 {
   constructor(
-    protected context: Context,
+    protected context: InternalContext,
     protected lazyHdl: ptr<Internal.LHandle>,
   ) {
     super();
@@ -238,8 +238,8 @@ export class LSelfImpl<K extends TJSON, V extends TJSON>
   }
 }
 
-export class SKStoreImpl extends SkFrozen implements SKStore {
-  constructor(private context: Context) {
+export class ContextImpl extends SkFrozen implements Context {
+  constructor(private context: InternalContext) {
     super();
     Object.freeze(this);
   }
@@ -322,7 +322,7 @@ export class SKStoreImpl extends SkFrozen implements SKStore {
 export class RuntimeFactoryImpl implements RuntimeFactory {
   //
   constructor(
-    private context: () => Context,
+    private internalContext: () => InternalContext,
     private create: (
       init: (
         collections: Record<string, EagerCollection<TJSON, TJSON>>,
@@ -439,7 +439,7 @@ export class EagerCollectionReader<K extends TJSON, V extends TJSON>
   implements CollectionReader<K, V>
 {
   constructor(
-    private context: Context,
+    private context: InternalContext,
     private eagerHdl: string,
   ) {}
 
@@ -475,7 +475,7 @@ export class EagerCollectionWriter<K extends TJSON, V extends TJSON>
   implements CollectionWriter<K, V>
 {
   constructor(
-    private context: Context,
+    private context: InternalContext,
     private eagerHdl: string,
   ) {}
 
@@ -494,7 +494,7 @@ export class EagerCollectionWriter<K extends TJSON, V extends TJSON>
 
 export class SkipRuntimeImpl implements SkipRuntime {
   constructor(
-    private context: Context,
+    private context: InternalContext,
     private writables: Record<string, CollectionWriter<TJSON, TJSON>>,
   ) {}
 
