@@ -17,6 +17,7 @@ export type {
   SkipService,
   Resource,
   ExternalSupplier,
+  CollectionUpdate,
 } from "./skipruntime_api.js";
 
 export { UnknownCollectionError } from "./skipruntime_errors.js";

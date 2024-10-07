@@ -261,11 +261,17 @@ export interface Context extends Constant {
 
 export type Entry<K extends TJSON, V extends TJSON> = [K, V[]];
 
-export type Notifier<K extends TJSON, V extends TJSON> = (
-  values: Entry<K, V>[],
-  watermark: number,
-  update: boolean,
-) => void;
+/**
+ * Represents some update(s) to a collection, containing: an array of all updated keys and
+ * their new `values`, where an empty value array indicates deletion; a new `watermark` for
+ * the point after these updates; and, a flag `isInitial` which is set when this update is
+ * the initial chunk of data rather than an update to the preceding state.
+ */
+export type CollectionUpdate<K extends TJSON, V extends TJSON> = {
+  values: Entry<K, V>[];
+  watermark: bigint;
+  isInitial?: boolean;
+};
 
 export interface SkipRuntime {
   // READ
@@ -298,8 +304,8 @@ export interface SkipRuntime {
 
   subscribe<K extends TJSON, V extends TJSON>(
     reactiveId: string,
-    from: string,
-    notify: Notifier<K, V>,
+    since: bigint,
+    f: (update: CollectionUpdate<K, V>) => void,
     reactiveAuth?: Uint8Array,
   ): bigint;
 
@@ -349,5 +355,5 @@ export interface SkipService {
 
 export type ReactiveResponse = {
   collection: string;
-  watermark: number;
+  watermark: bigint;
 };

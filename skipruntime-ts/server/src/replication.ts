@@ -1,5 +1,5 @@
 import { WebSocket, type WebSocketServer, type MessageEvent } from "ws";
-import type { Entry, TJSON, SkipRuntime } from "@skipruntime/core";
+import type { TJSON, SkipRuntime, CollectionUpdate } from "@skipruntime/core";
 import { Protocol } from "@skipruntime/client";
 
 class TailingSession {
@@ -13,19 +13,12 @@ class TailingSession {
   subscribe(
     collection: string,
     since: bigint,
-    callback: (
-      updates: Entry<string, TJSON>[],
-      isInit: boolean,
-      tick: bigint,
-    ) => void,
+    callback: (update: CollectionUpdate<string, TJSON>) => void,
   ) {
-    // FIXME: Pass pubkey down to replication.
     const subsession = this.replication.subscribe<string, TJSON>(
       collection,
-      since.toString(),
-      (v, w, u) => {
-        callback(v, !u, BigInt(w));
-      },
+      since,
+      callback,
       new Uint8Array(this.pubkey),
     );
     this.subsessions.set(collection, subsession);
@@ -82,14 +75,14 @@ function handleMessage(
     case "tail": {
       // FIXME: Respond with error 1004 if collection does not exist
       // (for current user).
-      session.subscribe(msg.collection, msg.since, (updates, isInit, tick) => {
+      session.subscribe(msg.collection, msg.since, (update) => {
         ws.send(
           Protocol.encodeMsg({
             type: "data",
             collection: msg.collection,
-            isInit,
-            tick,
-            payload: JSON.stringify(updates),
+            isInit: update.isInitial ?? false,
+            tick: update.watermark,
+            payload: JSON.stringify(update.values),
           }),
         );
       });
