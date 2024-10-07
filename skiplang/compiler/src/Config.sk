@@ -94,13 +94,6 @@ private class Config{
     };
     input_files = input_files_vec.collect(Array);
     static_libraries = static_libs_vec.collect(Array);
-    // TODO: Remove once Skargo properly forwards static libaries as input
-    // files.
-    !static_libraries = static_libraries.concat(
-      Environ.varOpt("SKC_LIBRARIES")
-        .map(s -> s.split(Path.listSeparator).collect(Array))
-        .default(Array[]),
-    );
 
     output = results.maybeGetString("output").default("-");
     emit = results.getString("emit");
@@ -153,14 +146,6 @@ private class Config{
       .default("")
       .split(" ")
       .collect(Array);
-
-    // TODO: Deprecate `SKC_LINK`/`SKC_LIBRARIES` once Skargo properly forwards
-    // `--link-args`.
-    !link_args = link_args.concat(
-      Environ.varOpt("SKC_LINK")
-        .map(s -> s.split(Path.listSeparator).collect(Array))
-        .default(Array[]),
-    );
 
     disasmAll = results.getBool("disasm-all");
     disasmAnnotated = results.getBool("disasm-annotated");
