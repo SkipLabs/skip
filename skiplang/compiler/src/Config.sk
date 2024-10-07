@@ -147,14 +147,6 @@ private class Config{
       .split(" ")
       .collect(Array);
 
-    // TODO: Deprecate `SKC_LINK` once Skargo properly forwards
-    // `--link-args`.
-    !link_args = link_args.concat(
-      Environ.varOpt("SKC_LINK")
-        .map(s -> s.split(Path.listSeparator).collect(Array))
-        .default(Array[]),
-    );
-
     disasmAll = results.getBool("disasm-all");
     disasmAnnotated = results.getBool("disasm-annotated");
     disasmFiles = UnorderedSet::createFromItems(
