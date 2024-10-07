@@ -29,6 +29,7 @@ import type {
   SkipRuntime,
   ReactiveResponse,
   CollectionUpdate,
+  Watermark,
 } from "../skipruntime_api.js";
 
 import type { SKJSON } from "skjson";
@@ -649,7 +650,7 @@ class LinksImpl implements Links {
   notifyOfNotifier<K extends TJSON, V extends TJSON>(
     sknotifier: Handle<(update: CollectionUpdate<K, V>) => void>,
     skvalues: ptr<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
-    watermark: bigint,
+    watermark: Watermark,
     isInitial: boolean,
   ) {
     const skjson = this.getSkjson();
@@ -1092,7 +1093,7 @@ class SkipRuntimeImpl implements SkipRuntime {
       throw this.refs.handles.deleteAsError(result as Handle<ErrorObject>);
     }
     const [collection, watermark] = result as [string, string];
-    return { collection, watermark: BigInt(watermark) };
+    return { collection, watermark: BigInt(watermark) as Watermark };
   }
 
   getAll<K extends TJSON, V extends TJSON>(
@@ -1115,7 +1116,7 @@ class SkipRuntimeImpl implements SkipRuntime {
     }
     const [values, reactive] = result as [Entry<K, V>[], [string, string]];
     const [collection, watermark] = reactive;
-    return { values, reactive: { collection, watermark: BigInt(watermark) } };
+    return { values, reactive: { collection, watermark: BigInt(watermark) as Watermark } };
   }
 
   getOne<V extends TJSON>(
@@ -1171,7 +1172,7 @@ class SkipRuntimeImpl implements SkipRuntime {
 
   subscribe<K extends TJSON, V extends TJSON>(
     reactiveId: string,
-    since: bigint,
+    since: Watermark,
     f: (update: CollectionUpdate<K, V>) => void,
     reactiveAuth?: Uint8Array,
   ): bigint {
