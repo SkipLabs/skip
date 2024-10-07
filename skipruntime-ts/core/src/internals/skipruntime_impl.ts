@@ -1,5 +1,5 @@
 import { type int, type ptr, type Opt, cloneIfProxy } from "std";
-import type { Context } from "./skipruntime_types.js";
+import type { Context as InternalContext } from "./skipruntime_types.js";
 import type * as Internal from "./skipruntime_internal_types.js";
 import type {
   Accumulator,
@@ -7,8 +7,8 @@ import type {
   LazyCollection,
   AsyncLazyCollection,
   Mapper,
-  SKStore,
-  SKStoreFactory,
+  Context,
+  RuntimeFactory,
   Loadable,
   JSONObject,
   TJSON,
@@ -16,17 +16,15 @@ import type {
   LazyCompute,
   AsyncLazyCompute,
   NonEmptyIterator,
-  EntryPoint,
+  Entrypoint,
   ExternalCall,
   CollectionReader,
   SkipRuntime,
   Entry,
   CollectionWriter,
   CallResourceCompute,
-  Watermarked,
-  Notifier,
+  UpdatedValues,
   ReactiveResponse,
-  SkipBuilder,
 } from "../skipruntime_api.js";
 import { UnknownCollectionError } from "../skipruntime_errors.js";
 
@@ -77,7 +75,7 @@ export class EagerCollectionImpl<K extends TJSON, V extends TJSON>
   implements EagerCollection<K, V>
 {
   constructor(
-    private context: Context,
+    private context: InternalContext,
     private eagerHdl: string,
   ) {
     super();
@@ -195,7 +193,7 @@ class LazyCollectionImpl<K extends TJSON, V extends TJSON>
   implements LazyCollection<K, V>
 {
   constructor(
-    protected context: Context,
+    protected context: InternalContext,
     protected lazyHdl: string,
   ) {
     super();
@@ -220,7 +218,7 @@ export class LSelfImpl<K extends TJSON, V extends TJSON>
   implements LazyCollection<K, V>
 {
   constructor(
-    protected context: Context,
+    protected context: InternalContext,
     protected lazyHdl: ptr<Internal.LHandle>,
   ) {
     super();
@@ -240,8 +238,8 @@ export class LSelfImpl<K extends TJSON, V extends TJSON>
   }
 }
 
-export class SKStoreImpl extends SkFrozen implements SKStore {
-  constructor(private context: Context) {
+export class ContextImpl extends SkFrozen implements Context {
+  constructor(private context: InternalContext) {
     super();
     Object.freeze(this);
   }
@@ -321,10 +319,10 @@ export class SKStoreImpl extends SkFrozen implements SKStore {
   }
 }
 
-export class SKStoreFactoryImpl implements SKStoreFactory {
+export class RuntimeFactoryImpl implements RuntimeFactory {
   //
   constructor(
-    private context: () => Context,
+    private internalContext: () => InternalContext,
     private create: (
       init: (
         collections: Record<string, EagerCollection<TJSON, TJSON>>,
@@ -336,29 +334,27 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
   ) {}
 
   getName() {
-    return "SKStore";
+    return "SkipRuntimeFactory";
   }
 
-  runSKStore(
+  createRuntime(
     init: (
-      skstore: SKStore,
+      context: Context,
       collections: Record<string, EagerCollection<TJSON, TJSON>>,
     ) => CallResourceCompute,
     inputs: Record<string, [TJSON, TJSON][]> = {},
-    remotes: Record<string, EntryPoint> = {},
+    remotes: Record<string, Entrypoint> = {},
     tokens: Record<string, number> = {},
-  ): SkipBuilder {
-    const context = this.context();
-    const skstore = new SKStoreImpl(context);
+    writers: Record<string, CollectionWriter<TJSON, TJSON>> = {},
+  ): SkipRuntime {
+    const internalContext = this.internalContext();
     this.create(
-      (collections) => init(skstore, collections),
+      (collections) => init(new ContextImpl(internalContext), collections),
       [...Object.keys(inputs), ...Object.keys(remotes)],
       tokens,
       inputs,
     );
-    return (iCollections: Record<string, CollectionWriter<TJSON, TJSON>>) => {
-      return new SkipRuntimeImpl(context, iCollections);
-    };
+    return new SkipRuntimeImpl(internalContext, writers);
   }
 }
 
@@ -443,7 +439,7 @@ export class EagerCollectionReader<K extends TJSON, V extends TJSON>
   implements CollectionReader<K, V>
 {
   constructor(
-    private context: Context,
+    private context: InternalContext,
     private eagerHdl: string,
   ) {}
 
@@ -463,12 +459,15 @@ export class EagerCollectionReader<K extends TJSON, V extends TJSON>
     return this.context.getAll<K, V>(this.eagerHdl);
   }
 
-  getDiff(from: string): Watermarked<K, V> {
+  getDiff(from: string): UpdatedValues<K, V> {
     return this.context.getDiff(this.eagerHdl, from);
   }
 
-  subscribe(from: string, notify: Notifier<K, V>): bigint {
-    return this.context.subscribe(this.eagerHdl, from, notify);
+  subscribe(
+    since: string,
+    f: (values: Entry<K, V>[], watermark: string, update: boolean) => void,
+  ): bigint {
+    return this.context.subscribe(this.eagerHdl, since, f);
   }
 }
 
@@ -476,7 +475,7 @@ export class EagerCollectionWriter<K extends TJSON, V extends TJSON>
   implements CollectionWriter<K, V>
 {
   constructor(
-    private context: Context,
+    private context: InternalContext,
     private eagerHdl: string,
   ) {}
 
@@ -495,7 +494,7 @@ export class EagerCollectionWriter<K extends TJSON, V extends TJSON>
 
 export class SkipRuntimeImpl implements SkipRuntime {
   constructor(
-    private context: Context,
+    private context: InternalContext,
     private writables: Record<string, CollectionWriter<TJSON, TJSON>>,
   ) {}
 
@@ -587,10 +586,10 @@ export class SkipRuntimeImpl implements SkipRuntime {
 
   subscribe<K extends TJSON, V extends TJSON>(
     collectionName: string,
-    from: string,
-    notify: Notifier<K, V>,
+    since: string,
+    f: (values: Entry<K, V>[], watermark: string, update: boolean) => void,
   ) {
-    return this.context.subscribe(collectionName, from, notify);
+    return this.context.subscribe(collectionName, since, f);
   }
 
   unsubscribe(id: bigint): void {

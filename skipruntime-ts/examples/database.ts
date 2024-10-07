@@ -1,5 +1,5 @@
 import type {
-  SKStore,
+  Context,
   TJSON,
   EagerCollection,
   SkipService,
@@ -77,7 +77,7 @@ type User = { name: string; country: string };
 
 class UsersResource implements Resource {
   reactiveCompute(
-    _store: SKStore,
+    _context: Context,
     cs: { users: EagerCollection<string, User> },
   ): EagerCollection<string, User> {
     return cs.users;
@@ -100,7 +100,7 @@ class Service implements SkipService {
   };
 
   reactiveCompute(
-    _store: SKStore,
+    _context: Context,
     inputCollections: { users: EagerCollection<string, TJSON> },
   ): Record<string, EagerCollection<string, TJSON>> {
     return inputCollections;
