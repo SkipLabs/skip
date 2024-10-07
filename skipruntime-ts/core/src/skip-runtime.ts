@@ -18,6 +18,7 @@ export type {
   Resource,
   ExternalSupplier,
   CollectionUpdate,
+  Watermark,
 } from "./skipruntime_api.js";
 
 export { UnknownCollectionError } from "./skipruntime_errors.js";

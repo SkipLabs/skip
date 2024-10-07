@@ -4,7 +4,7 @@
  * overview page] for a detailed description and introduction to the SkipRuntime system.
  */
 
-import type { Opt, int } from "std";
+import type { Opaque, Opt, int } from "std";
 import type { Constant } from "./internals/skipruntime_module.js";
 
 /**
@@ -261,6 +261,8 @@ export interface Context extends Constant {
 
 export type Entry<K extends TJSON, V extends TJSON> = [K, V[]];
 
+export type Watermark = Opaque<bigint, "watermark">;
+
 /**
  * Represents some update(s) to a collection, containing: an array of all updated keys and
  * their new `values`, where an empty value array indicates deletion; a new `watermark` for
@@ -269,7 +271,7 @@ export type Entry<K extends TJSON, V extends TJSON> = [K, V[]];
  */
 export type CollectionUpdate<K extends TJSON, V extends TJSON> = {
   values: Entry<K, V>[];
-  watermark: bigint;
+  watermark: Watermark;
   isInitial?: boolean;
 };
 
@@ -304,7 +306,7 @@ export interface SkipRuntime {
 
   subscribe<K extends TJSON, V extends TJSON>(
     reactiveId: string,
-    since: bigint,
+    since: Watermark,
     f: (update: CollectionUpdate<K, V>) => void,
     reactiveAuth?: Uint8Array,
   ): bigint;
@@ -355,5 +357,5 @@ export interface SkipService {
 
 export type ReactiveResponse = {
   collection: string;
-  watermark: bigint;
+  watermark: Watermark;
 };
