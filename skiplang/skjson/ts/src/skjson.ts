@@ -174,6 +174,7 @@ export const reactiveObject = {
         ) as Base;
       };
     if (prop === "keys") return fields.keys();
+    if (prop === "toString") return () => JSON.stringify(self);
     const idx = fields.get(prop);
     if (idx === undefined) return undefined;
     return getFieldAt(hdl, idx);
@@ -192,6 +193,7 @@ export const reactiveObject = {
     if (prop === "clone") return true;
     if (prop === "keys") return true;
     if (prop === "toJSON") return true;
+    if (prop === "toString") return true;
     if (typeof prop === "symbol") return false;
     const fields = hdl.objectFields();
     return fields.has(prop);
@@ -224,6 +226,8 @@ type ArrayProxy<T> = {
   length: number;
   clone: () => ArrayProxy<T>;
   toJSON: () => T[];
+  toString: () => string;
+  join(sep?: string): string;
   forEach: (
     callbackfn: (value: T, index: number, array: T[]) => void,
     thisArg?: any,
@@ -263,6 +267,8 @@ export const reactiveArray = {
       ): void => {
         self.toJSON().forEach(callbackfn, thisArg);
       };
+    if (prop === "toString") return () => JSON.stringify(self);
+    if (prop === "join") return (sep?: string) => clone(self).join(sep);
     if (typeof prop === "symbol") {
       if (prop === Symbol.iterator) return self.toJSON()[Symbol.iterator];
     } else {
@@ -281,6 +287,8 @@ export const reactiveArray = {
     if (prop === "length") return true;
     if (prop === "clone") return true;
     if (prop === "toJSON") return true;
+    if (prop === "toString") return true;
+    if (prop === "join") return true;
     if (prop === Symbol.iterator) return true;
     return false;
   },
