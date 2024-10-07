@@ -262,6 +262,7 @@ export interface Context extends Constant {
 export type Entry<K extends TJSON, V extends TJSON> = [K, V[]];
 
 export type Watermark = Opaque<bigint, "watermark">;
+export type SubscriptionID = Opaque<bigint, "subscription">;
 
 /**
  * Represents some update(s) to a collection, containing: an array of all updated keys and
@@ -309,9 +310,9 @@ export interface SkipRuntime {
     since: Watermark,
     f: (update: CollectionUpdate<K, V>) => void,
     reactiveAuth?: Uint8Array,
-  ): bigint;
+  ): SubscriptionID;
 
-  unsubscribe(id: bigint): void;
+  unsubscribe(id: SubscriptionID): void;
 
   // WRITE
 

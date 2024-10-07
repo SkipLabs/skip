@@ -19,6 +19,7 @@ export type {
   ExternalSupplier,
   CollectionUpdate,
   Watermark,
+  SubscriptionID,
 } from "./skipruntime_api.js";
 
 export { UnknownCollectionError } from "./skipruntime_errors.js";

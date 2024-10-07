@@ -4,11 +4,12 @@ import type {
   SkipRuntime,
   CollectionUpdate,
   Watermark,
+  SubscriptionID,
 } from "@skipruntime/core";
 import { Protocol } from "@skipruntime/client";
 
 class TailingSession {
-  private subsessions = new Map<string, bigint>();
+  private subsessions = new Map<string, SubscriptionID>();
 
   constructor(
     private replication: SkipRuntime,

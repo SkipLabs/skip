@@ -30,6 +30,7 @@ import type {
   ReactiveResponse,
   CollectionUpdate,
   Watermark,
+  SubscriptionID,
 } from "../skipruntime_api.js";
 
 import type { SKJSON } from "skjson";
@@ -1116,7 +1117,10 @@ class SkipRuntimeImpl implements SkipRuntime {
     }
     const [values, reactive] = result as [Entry<K, V>[], [string, string]];
     const [collection, watermark] = reactive;
-    return { values, reactive: { collection, watermark: BigInt(watermark) as Watermark } };
+    return {
+      values,
+      reactive: { collection, watermark: BigInt(watermark) as Watermark },
+    };
   }
 
   getOne<V extends TJSON>(
@@ -1175,7 +1179,7 @@ class SkipRuntimeImpl implements SkipRuntime {
     since: Watermark,
     f: (update: CollectionUpdate<K, V>) => void,
     reactiveAuth?: Uint8Array,
-  ): bigint {
+  ): SubscriptionID {
     const session = this.refs.skjson.runWithGC(() => {
       const sknotifier = this.refs.fromWasm.SkipRuntime_createNotifier(
         this.refs.handles.register(f),
@@ -1196,10 +1200,10 @@ class SkipRuntimeImpl implements SkipRuntime {
     } else if (session < 0n) {
       throw new Error("Unknown error");
     }
-    return session;
+    return session as SubscriptionID;
   }
 
-  unsubscribe(id: bigint): void {
+  unsubscribe(id: SubscriptionID): void {
     const result = this.refs.skjson.runWithGC(() => {
       return this.refs.fromWasm.SkipRuntime_Runtime__unsubscribe(id);
     });
