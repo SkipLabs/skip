@@ -457,6 +457,12 @@ export type ReactiveResponse = {
   watermark: string;
 };
 
+/**
+ * Represents some update(s) to a collection, containing: an array of all updated keys and
+ * their new `values`, where an empty value array indicates deletion; a new `watermark` for
+ * the point after these updates; and, a flag `isInitial` which is set when this update is
+ * the initial chunk of data rather than an update to the preceding state.
+ */
 export type UpdatedValues<K extends TJSON, V extends TJSON> = {
   values: Entry<K, V>[];
   watermark: string;
