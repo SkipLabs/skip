@@ -40,6 +40,10 @@ class SkipHttpAccessV1 {
     }
   }
 
+  close() {
+    if (this.client) this.client.close();
+  }
+
   async writeMany(data: Write[], port?: number) {
     const promises = data.map((w) =>
       this.runtimes[port ?? this.defaultPort].patch(w.collection, w.entries),
@@ -282,6 +286,10 @@ export async function run(scenarios: Step[][], ports: number[] = [3587]) {
   const creds = await Protocol.generateCredentials();
   const access = new SkipHttpAccessV1(ports, creds);
   const online = (line: string) => {
+    if (line == "exit") {
+      access.close();
+      return;
+    }
     try {
       const patterns: [RegExp, (...args: string[]) => void][] = [
         [
@@ -385,6 +393,7 @@ export async function run(scenarios: Step[][], ports: number[] = [3587]) {
   rl.prompt();
   rl.on("line", (line: string) => {
     if (line == "exit") {
+      player.online(line);
       process.exit(0);
     } else {
       player.online(line);
