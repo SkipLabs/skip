@@ -46,9 +46,6 @@ const fileTimeDir: SKStore.EHandle<
   fileTimeDirName,
 );
 
-@cpp_extern("SKIP_get_mtime")
-native fun getLastModificationTime(fileName: String): Int;
-
 fun get_old_files_per_package(
   context: mutable SKStore.Context,
 ): Map<String, SortedSet<String>> {
@@ -127,7 +124,7 @@ fun writeFiles(
     | Some(lib_name) -> `${lib_name}:${file_name}`
     | None() -> file_name
     };
-    lastModifTime = getLastModificationTime(file_name);
+    lastModifTime = FileSystem.getLastModificationTime(file_name);
     timeArr = fileTimeDir.unsafeGetArray(context, SKStore.SID(key));
     if (timeArr.size() > 0 && timeArr[0].value == lastModifTime) continue;
     contents = FileSystem.readTextFile(file_name);
