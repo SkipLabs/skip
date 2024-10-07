@@ -1,20 +1,11 @@
-module SKTest;
-
-@skbuild_extra_sources
-fun extra_sources(env: Skbuild.Env): Array<String> {
-  if (env.isWasm32()) {
-    Array["extra/src/wasm32.sk"]
-  } else {
-    Array["extra/src/host.sk"]
-  }
-}
-
-module end;
-
-@debug
 fun main(): void {
-  Skbuild.build() match {
-  | Failure(err) -> skipExit(err.code)
-  | _ -> void
-  }
+  target = Environ.var("TARGET");
+
+  extra_srcs = target match {
+  | "wasm32-unknown-unknown" -> wasm_srcs = Array["extra/src/wasm32.sk"]
+  | _ -> Array["extra/src/host.sk"]
+  };
+
+  extra_srcs.each(src -> print_string(`skargo:skc-extra-source=${src}`));
+  extra_srcs.each(src -> print_string(`skargo:rerun-if-changed=${src}`))
 }
