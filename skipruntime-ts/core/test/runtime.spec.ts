@@ -4,24 +4,21 @@ import type {
   Context,
   TJSON,
   Mapper,
-  AsyncLazyCompute,
   EagerCollection,
   JSONObject,
   LazyCompute,
   LazyCollection,
   NonEmptyIterator,
-  AsyncLazyCollection,
-  ExternalCall,
   SkipService,
   Resource,
   Entry,
+  ExternalSupplier,
 } from "../src/skip-runtime.js";
+import { Sum, ValueMapper, initService } from "../src/skip-runtime.js";
 import {
-  Sum,
-  ValueMapper,
-  createRuntime,
-  initService,
-} from "../src/skip-runtime.js";
+  TimeCollection,
+  ExternalResources,
+} from "../src/skipruntime_helpers.js";
 
 //// testMap1
 
@@ -58,8 +55,8 @@ class Map1Service implements SkipService {
 }
 
 it("testMap1", async () => {
-  const runtime = await initService(new Map1Service(), createRuntime);
-  runtime.put("input", "1", [10]);
+  const runtime = await initService(new Map1Service());
+  runtime.update("input", [["1", [10]]]);
   expect(runtime.getOne("map1", {}, "1")).toEqual([12]);
 });
 
@@ -112,13 +109,13 @@ class Map2Service implements SkipService {
 }
 
 it("testMap2", async () => {
-  const runtime = await initService(new Map2Service(), createRuntime);
+  const runtime = await initService(new Map2Service());
   const resource = "map2";
-  runtime.put("input1", "1", [10]);
-  runtime.put("input2", "1", [20]);
+  runtime.update("input1", [["1", [10]]]);
+  runtime.update("input2", [["1", [20]]]);
   expect(runtime.getOne(resource, {}, "1")).toEqual([30]);
-  runtime.put("input1", "2", [3]);
-  runtime.put("input2", "2", [7]);
+  runtime.update("input1", [["2", [3]]]);
+  runtime.update("input2", [["2", [7]]]);
   expect(runtime.getAll(resource, {}).values).toEqual([
     ["1", [30]],
     ["2", [10]],
@@ -163,14 +160,14 @@ class Map3Service implements SkipService {
   }
 }
 
-it("testMap2", async () => {
-  const runtime = await initService(new Map3Service(), createRuntime);
+it("testMap3", async () => {
+  const runtime = await initService(new Map3Service());
   const resource = "map3";
-  runtime.put("input1", "1", [1, 2, 3]);
-  runtime.put("input2", "1", [10]);
+  runtime.update("input1", [["1", [1, 2, 3]]]);
+  runtime.update("input2", [["1", [10]]]);
   expect(runtime.getOne(resource, {}, "1")).toEqual([36]);
-  runtime.put("input1", "2", [3]);
-  runtime.put("input2", "2", [7]);
+  runtime.update("input1", [["2", [3]]]);
+  runtime.update("input2", [["2", [7]]]);
   expect(runtime.getAll(resource, {}).values).toEqual([
     ["1", [36]],
     ["2", [10]],
@@ -217,9 +214,9 @@ class ValueMapperService implements SkipService {
 }
 
 it("valueMapper", async () => {
-  const runtime = await initService(new ValueMapperService(), createRuntime);
+  const runtime = await initService(new ValueMapperService());
   const resource = "valueMapper";
-  runtime.patch("input", [
+  runtime.update("input", [
     [1, [1]],
     [2, [2]],
     [5, [5]],
@@ -274,9 +271,9 @@ class SizeService implements SkipService {
 }
 
 it("testSize", async () => {
-  const runtime = await initService(new SizeService(), createRuntime);
+  const runtime = await initService(new SizeService());
   const resource = "size";
-  runtime.patch("input1", [
+  runtime.update("input1", [
     [1, [0]],
     [2, [2]],
   ]);
@@ -284,7 +281,7 @@ it("testSize", async () => {
     [1, [0]],
     [2, [2]],
   ]);
-  runtime.patch("input2", [
+  runtime.update("input2", [
     [1, [10]],
     [2, [5]],
   ]);
@@ -292,7 +289,7 @@ it("testSize", async () => {
     [1, [2]],
     [2, [4]],
   ]);
-  runtime.deleteKey("input2", 1);
+  runtime.update("input2", [[1, []]]);
   expect(runtime.getAll(resource, {}).values).toEqual([
     [1, [1]],
     [2, [3]],
@@ -341,13 +338,13 @@ class SlicedMap1Service implements SkipService {
 }
 
 it("testSlicedMap1", async () => {
-  const runtime = await initService(new SlicedMap1Service(), createRuntime);
+  const runtime = await initService(new SlicedMap1Service());
   const resource = "slice";
   // Inserts [[0, 0], ..., [30, 30]
   const values = Array.from({ length: 31 }, (_, i): Entry<number, number> => {
     return [i, [i]];
   });
-  runtime.patch("input", values);
+  runtime.update("input", values);
   expect(runtime.getAll(resource, {}).values).toEqual([
     [1, [1]],
     [3, [9]],
@@ -411,9 +408,9 @@ class LazyService implements SkipService {
 }
 
 it("testLazy", async () => {
-  const runtime = await initService(new LazyService(), createRuntime);
+  const runtime = await initService(new LazyService());
   const resource = "lazy";
-  runtime.patch("input", [
+  runtime.update("input", [
     [0, [10]],
     [1, [20]],
   ]);
@@ -421,13 +418,13 @@ it("testLazy", async () => {
     [0, [2]],
     [1, [2]],
   ]);
-  runtime.put("input", 2, [4]);
+  runtime.update("input", [[2, [4]]]);
   expect(runtime.getAll(resource, {}).values).toEqual([
     [0, [2]],
     [1, [2]],
     [2, [2]],
   ]);
-  runtime.deleteKey("input", 2);
+  runtime.update("input", [[2, []]]);
   expect(runtime.getAll(resource, {}).values).toEqual([
     [0, [2]],
     [1, [2]],
@@ -471,9 +468,9 @@ class MapReduceService implements SkipService {
 }
 
 it("testMapReduce", async () => {
-  const runtime = await initService(new MapReduceService(), createRuntime);
+  const runtime = await initService(new MapReduceService());
   const resource = "mapReduce";
-  runtime.patch("input", [
+  runtime.update("input", [
     [0, [1]],
     [1, [1]],
     [2, [1]],
@@ -482,12 +479,12 @@ it("testMapReduce", async () => {
     [0, [2]],
     [1, [1]],
   ]);
-  runtime.put("input", 3, [2]);
+  runtime.update("input", [[3, [2]]]);
   expect(runtime.getAll(resource, {}).values).toEqual([
     [0, [2]],
     [1, [3]],
   ]);
-  runtime.patch("input", [
+  runtime.update("input", [
     [0, [2]],
     [1, [2]],
   ]);
@@ -496,7 +493,7 @@ it("testMapReduce", async () => {
     [1, [4]],
   ]);
 
-  runtime.deleteKey("input", 3);
+  runtime.update("input", [[3, []]]);
   expect(runtime.getAll(resource, {}).values).toEqual([
     [0, [3]],
     [1, [2]],
@@ -540,18 +537,18 @@ function sorted(entries: Entry<TJSON, TJSON>[]): Entry<TJSON, TJSON>[] {
 }
 
 it("testMerge1", async () => {
-  const runtime = await initService(new Merge1Service(), createRuntime);
+  const runtime = await initService(new Merge1Service());
   const resource = "merge1";
-  runtime.put("input1", 1, [10]);
-  runtime.put("input2", 1, [20]);
+  runtime.update("input1", [[1, [10]]]);
+  runtime.update("input2", [[1, [20]]]);
   expect(sorted(runtime.getAll(resource, {}).values)).toEqual([[1, [10, 20]]]);
-  runtime.put("input1", 2, [3]);
-  runtime.put("input2", 2, [7]);
+  runtime.update("input1", [[2, [3]]]);
+  runtime.update("input2", [[2, [7]]]);
   expect(sorted(runtime.getAll(resource, {}).values)).toEqual([
     [1, [10, 20]],
     [2, [3, 7]],
   ]);
-  runtime.deleteKey("input1", 1);
+  runtime.update("input1", [[1, []]]);
   expect(sorted(runtime.getAll(resource, {}).values)).toEqual([
     [1, [20]],
     [2, [3, 7]],
@@ -594,302 +591,22 @@ class MergeReduceService implements SkipService {
 }
 
 it("testMergeReduce", async () => {
-  const runtime = await initService(new MergeReduceService(), createRuntime);
+  const runtime = await initService(new MergeReduceService());
   const resource = "mergeReduce";
-  runtime.put("input1", 1, [10]);
-  runtime.put("input2", 1, [20]);
+  runtime.update("input1", [[1, [10]]]);
+  runtime.update("input2", [[1, [20]]]);
   expect(runtime.getAll(resource, {}).values).toEqual([[1, [30]]]);
-  runtime.put("input1", 2, [3]);
-  runtime.put("input2", 2, [7]);
+  runtime.update("input1", [[2, [3]]]);
+  runtime.update("input2", [[2, [7]]]);
   expect(runtime.getAll(resource, {}).values).toEqual([
     [1, [30]],
     [2, [10]],
   ]);
-  runtime.deleteKey("input1", 1);
+  runtime.update("input1", [[1, []]]);
   expect(runtime.getAll(resource, {}).values).toEqual([
     [1, [20]],
     [2, [10]],
   ]);
-});
-
-//// testAsyncLazy
-
-class TestLazyWithAsync
-  implements AsyncLazyCompute<[number, number], number, number>
-{
-  constructor(private other: EagerCollection<number, number>) {}
-
-  params(key: [number, number]) {
-    const v2 = this.other.maybeGetOne(key[0]);
-    return v2 ?? 0;
-  }
-
-  call(key: [number, number], param: number) {
-    return Promise.resolve({ payload: key[1] + param });
-  }
-}
-
-class TestCheckResult implements Mapper<number, number, number, string> {
-  constructor(
-    private asyncLazy: AsyncLazyCollection<[number, number], number>,
-  ) {}
-
-  mapElement(
-    key: number,
-    it: NonEmptyIterator<number>,
-  ): Iterable<[number, string]> {
-    const result = this.asyncLazy.getOne([key, it.first()]);
-    let value: [number, string];
-    if (result.status == "loading") {
-      value = [key, "loading"];
-    } else if (result.status == "success") {
-      value = [key, JSON.stringify(result.payload)];
-    } else {
-      value = [key, result.error];
-    }
-    return Array(value);
-  }
-}
-
-class AsyncLazyResource implements Resource {
-  reactiveCompute(
-    context: Context,
-    cs: {
-      input1: EagerCollection<number, number>;
-      input2: EagerCollection<number, number>;
-    },
-  ): EagerCollection<number, string> {
-    const asyncLazy = context.asyncLazy(TestLazyWithAsync, cs.input2);
-    return cs.input1.map(TestCheckResult, asyncLazy);
-  }
-}
-
-class AsyncLazyService implements SkipService {
-  inputCollections = { input1: [], input2: [] };
-  resources = { asyncLazy: AsyncLazyResource };
-
-  reactiveCompute(
-    _context: Context,
-    inputCollections: {
-      input1: EagerCollection<number, number>;
-      input2: EagerCollection<number, number>;
-    },
-  ) {
-    return inputCollections;
-  }
-}
-
-it("testAsyncLazy", async () => {
-  const runtime = await initService(new AsyncLazyService(), createRuntime);
-  const data = runtime.head("asyncLazy", {}, new Uint8Array([]));
-
-  const updates: Entry<TJSON, TJSON>[][] = [];
-  runtime.subscribe<string, TJSON>(
-    data.collection,
-    data.watermark,
-    (values, _watermark, _update) => {
-      updates.push(values);
-    },
-  );
-  runtime.patch("input1", [[0, [10]]]);
-  runtime.patch("input2", [[0, [5]]]);
-  let count = 0;
-  const waitandcheck = (
-    resolve: () => void,
-    reject: (reason?: unknown) => void,
-  ) => {
-    if (count == 50) reject("Async response not received");
-    count++;
-    try {
-      const value = runtime.getOne("asyncLazy", {}, 0);
-      if (value[0] == "loading") {
-        setTimeout(waitandcheck, 10, resolve, reject);
-      } else {
-        try {
-          expect(updates).toEqual([[], [[0, ["loading"]]], [[0, ["15"]]]]);
-        } catch (e) {
-          reject(e);
-        }
-        resolve();
-      }
-    } catch (e: unknown) {
-      reject(e);
-    }
-  };
-  return new Promise<void>(waitandcheck);
-});
-
-class MockExternal implements ExternalCall<number, string> {
-  async call(key: number, _timestamp: number) {
-    await timeout(1000 * key); // wait for `key` seconds before returning
-    return { payload: `mock_result(${key.toString()})` };
-  }
-}
-
-class TestCheckExternalResult extends ValueMapper<number, number, string> {
-  constructor(private asyncLazy: AsyncLazyCollection<number, string>) {
-    super();
-  }
-
-  mapValue(_value: number, key: number): string {
-    const asyncRes = this.asyncLazy.getOne(key);
-    if (asyncRes.status == "success") return `success: ${asyncRes.payload}`;
-    if (asyncRes.status == "failure") return `error: ${asyncRes.error}`;
-    return `loading... (previous: ${asyncRes.previous ? asyncRes.previous.payload : "NONE"})`;
-  }
-}
-
-class ExternalResource implements Resource {
-  reactiveCompute(
-    context: Context,
-    cs: {
-      input: EagerCollection<number, number>;
-    },
-  ): EagerCollection<number, string> {
-    const external = context.external("token_4s", MockExternal);
-    return cs.input.map(TestCheckExternalResult, external);
-  }
-}
-
-class ExternalService implements SkipService {
-  inputCollections = { input: [] };
-  resources = { external: ExternalResource };
-  refreshTokens = { token_4s: 4000 };
-
-  reactiveCompute(
-    _context: Context,
-    inputCollections: {
-      input: EagerCollection<number, number>;
-    },
-  ) {
-    return inputCollections;
-  }
-}
-
-it("testExternalCall", async () => {
-  const runtime = await initService(new ExternalService(), createRuntime);
-  const resource = "external";
-  const success = (id: number): Entry<TJSON, TJSON> => {
-    return [id, [`success: mock_result(${id.toString()})`]];
-  };
-  const loading = (
-    id: number,
-    hasPrevious: boolean = false,
-  ): Entry<TJSON, TJSON> => {
-    const previous = hasPrevious ? `mock_result(${id.toString()})` : "NONE";
-    return [id, [`loading... (previous: ${previous})`]];
-  };
-
-  runtime.patch("input", [
-    [1, [10]],
-    [2, [20]],
-    [3, [30]],
-  ]);
-  // Int resource all loading at t = 0.0s
-  expect(runtime.getAll(resource, {}).values).toEqual([
-    loading(1),
-    loading(2),
-    loading(3),
-  ]);
-  await timeout(500);
-  // all loading at t = 0.5s
-  expect(runtime.getAll(resource, {}).values).toEqual([
-    loading(1),
-    loading(2),
-    loading(3),
-  ]);
-  await timeout(1000);
-  //id=1 succeeded at t = 1.5s
-  expect(runtime.getAll(resource, {}).values).toEqual([
-    success(1),
-    loading(2),
-    loading(3),
-  ]);
-  await timeout(1000);
-  //id=1,id=2 succeeded at t = 2.5s
-  expect(runtime.getAll(resource, {}).values).toEqual([
-    success(1),
-    success(2),
-    loading(3),
-  ]);
-  await timeout(1000);
-  //id=1,id=2,id=3 succeeded at t = 3.5s
-  expect(runtime.getAll(resource, {}).values).toEqual([
-    success(1),
-    success(2),
-    success(3),
-  ]);
-  await timeout(1000);
-  //all loading at t = 4.5s, but with previous values available for use if need be
-  expect(runtime.getAll(resource, {}).values).toEqual([
-    loading(1, true),
-    loading(2, true),
-    loading(3, true),
-  ]);
-});
-
-//// testTokens
-
-class TestWithToken
-  implements Mapper<number, number, number, [number, number]>
-{
-  constructor(private context: Context) {}
-
-  mapElement(
-    key: number,
-    it: NonEmptyIterator<number>,
-  ): Iterable<[number, [number, number]]> {
-    const time = this.context.getRefreshToken("token_5s");
-    return [[key, [it.first(), time]]];
-  }
-}
-
-class TokensResource implements Resource {
-  reactiveCompute(
-    context: Context,
-    cs: {
-      input: EagerCollection<number, number>;
-    },
-  ): EagerCollection<number, [number, number]> {
-    return cs.input.map(TestWithToken, context);
-  }
-}
-
-class TokensService implements SkipService {
-  inputCollections = { input: [] };
-  resources = { tokens: TokensResource };
-  refreshTokens = { token_5s: 5000 };
-
-  reactiveCompute(
-    _context: Context,
-    inputCollections: {
-      input: EagerCollection<number, number>;
-    },
-  ) {
-    return inputCollections;
-  }
-}
-
-async function timeout(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-it("testTokens", async () => {
-  const runtime = await initService(new TokensService(), createRuntime);
-  const resource = "tokens";
-  runtime.put("input", 1, [0]);
-  const start = runtime.getOne(resource, {}, 1)[0] as [number, number];
-  await timeout(2000);
-  runtime.put("input", 1, [2]);
-  let current = runtime.getOne(resource, {}, 1)[0] as [number, number];
-  expect(current).toEqual([2, start[1]]);
-  await timeout(2000);
-  runtime.put("input", 1, [4]);
-  current = runtime.getOne(resource, {}, 1)[0] as [number, number];
-  expect(current).toEqual([4, start[1]]);
-  await timeout(2000);
-  current = runtime.getOne(resource, {}, 1)[0] as [number, number];
-  expect(Math.trunc((current[1] - start[1]) / 1000)).toEqual(5);
 });
 
 // testJSONExtract
@@ -936,9 +653,9 @@ class JSONExtractService implements SkipService {
 }
 
 it("testJSONExtract", async () => {
-  const runtime = await initService(new JSONExtractService(), createRuntime);
+  const runtime = await initService(new JSONExtractService());
   const resource = "jsonExtract";
-  runtime.patch("input", [
+  runtime.update("input", [
     [
       0,
       [
@@ -967,8 +684,9 @@ it("testJSONExtract", async () => {
       ],
     ],
   ]);
-
-  expect(runtime.getAll(resource, {}).values).toEqual([
+  //
+  const res = runtime.getAll(resource, {}).values;
+  expect(res).toEqual([
     [
       0,
       [
@@ -991,4 +709,189 @@ it("testJSONExtract", async () => {
     ],
     [2, [[[{ var: 1 }, { var: 2 }]]]],
   ]);
+});
+
+//// testExternalSupplier
+
+async function timeout(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+class External implements ExternalSupplier {
+  link(
+    resource: string,
+    params: { v1: string; v2: string },
+    cb: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void,
+    _reactiveAuth?: Uint8Array,
+  ) {
+    if (resource == "mock") {
+      this.mock(params, cb).catch((e: unknown) => console.error(e));
+    }
+    return;
+  }
+
+  close(
+    _resource: string,
+    _params: { v1: string; v2: string },
+    _reactiveAuth?: Uint8Array,
+  ) {
+    return;
+  }
+
+  private async mock(
+    params: { v1: string; v2: string },
+    cb: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void,
+  ) {
+    await timeout(0);
+    cb(
+      [
+        [0, [10 + Number(params.v1)]],
+        [1, [20 + Number(params.v2)]],
+      ],
+      false,
+    );
+  }
+}
+
+class ExternalCheck implements Mapper<number, number, number, number[]> {
+  constructor(private external: EagerCollection<number, number>) {}
+
+  mapElement(
+    key: number,
+    it: NonEmptyIterator<number>,
+  ): Iterable<[number, number[]]> {
+    const result = this.external.maybeGetOne(key);
+    const value = it.toArray();
+    if (result != null) {
+      value.push(result);
+    }
+    return [[key, value]];
+  }
+}
+
+class ExternalResource implements Resource {
+  reactiveCompute(
+    context: Context,
+    cs: {
+      input1: EagerCollection<number, number>;
+      input2: EagerCollection<number, number>;
+    },
+    reactiveAuth?: Uint8Array,
+  ): EagerCollection<number, number[]> {
+    const v1 = cs.input2.maybeGetOne(0);
+    const v2 = cs.input2.maybeGetOne(1);
+    const external = context.manageResource(
+      "external",
+      "mock",
+      {
+        v1: (v1 ?? 0).toString(),
+        v2: (v2 ?? 0).toString(),
+      },
+      reactiveAuth,
+    );
+    return cs.input1.map(
+      ExternalCheck,
+      external as EagerCollection<number, number>,
+    );
+  }
+}
+
+class ExternalService implements SkipService {
+  inputCollections = { input1: [], input2: [] };
+  resources = { external: ExternalResource };
+  remoteCollections = { external: new External() };
+
+  reactiveCompute(
+    _context: Context,
+    inputCollections: {
+      input1: EagerCollection<number, number>;
+      input2: EagerCollection<number, number>;
+    },
+  ) {
+    return inputCollections;
+  }
+}
+
+it("testExtenal", async () => {
+  const resource = "external";
+  const runtime = await initService(new ExternalService());
+  runtime.update("input1", [
+    [0, [10]],
+    [1, [20]],
+  ]);
+  runtime.update("input2", [
+    [0, [5]],
+    [1, [10]],
+  ]);
+  // No value registered in external mock resource
+  expect(runtime.getAll(resource, {}).values).toEqual([
+    [0, [[10]]],
+    [1, [[20]]],
+  ]);
+  await timeout(1);
+  // After 1ms values are added to external mock resource
+  expect(runtime.getAll(resource, {}).values).toEqual([
+    [0, [[10, 15]]],
+    [1, [[20, 30]]],
+  ]);
+  runtime.update("input2", [
+    [0, [6]],
+    [1, [11]],
+  ]);
+  // New params => No value registered in external mock resource
+  expect(runtime.getAll(resource, {}).values).toEqual([
+    [0, [[10]]],
+    [1, [[20]]],
+  ]);
+  await timeout(6);
+  // After 5ms values are added to external mock resource
+  expect(runtime.getAll(resource, {}).values).toEqual([
+    [0, [[10, 16]]],
+    [1, [[20, 31]]],
+  ]);
+});
+
+//// testCloseSession
+
+class TokensResource implements Resource {
+  reactiveCompute(
+    context: Context,
+    _cs: Record<string, EagerCollection<TJSON, TJSON>>,
+    reactiveAuth?: Uint8Array,
+  ): EagerCollection<string, number> {
+    return context.manageResource(
+      "system",
+      "timer",
+      { "5ms": 5 },
+      reactiveAuth,
+    );
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-call
+const system = new ExternalResources({ timer: new TimeCollection() });
+
+class TokensService implements SkipService {
+  inputCollections = { input: [] };
+  resources = { tokens: TokensResource };
+  remoteCollections = { system };
+
+  reactiveCompute(
+    _context: Context,
+    _ic: Record<string, EagerCollection<TJSON, TJSON>>,
+  ) {
+    return {};
+  }
+}
+
+it("testCloseSession", async () => {
+  const runtime = await initService(new TokensService());
+  const resource = "tokens";
+  const start = runtime.getOne(resource, {}, "5ms");
+  await timeout(2);
+  expect(runtime.getOne(resource, {}, "5ms")).toEqual(start);
+  await timeout(4);
+  const current = runtime.getOne(resource, {}, "5ms");
+  expect(current == start).toEqual(false);
+  runtime.closeResource(resource, {});
 });
