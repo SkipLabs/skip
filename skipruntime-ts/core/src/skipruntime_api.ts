@@ -18,8 +18,8 @@ export type JSONObject = { [key: string]: TJSON | null };
 /**
  * A `Param` is a valid parameter to a Skip runtime mapper function: either a constant JS
  * value or a Skip-runtime-managed value.  In either case, restricting mapper parameters to
- * this type ensures that reactive computations can be re-evaluated as needed with consistent
- * semantics.
+ * this type helps developers to ensure that reactive computations can be re-evaluated as
+ * needed with consistent semantics.
  */
 export type Param =
   | null
