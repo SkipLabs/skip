@@ -104,4 +104,4 @@ clean:
 
 .PHONY: test
 test: stage$(STAGE)
-	PATH=stage$(STAGE)/bin:$(PATH) skargo test
+	PATH=$$(realpath stage$(STAGE)/bin):$(PATH) skargo test
