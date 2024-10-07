@@ -1,5 +1,5 @@
 import type {
-  SKStore,
+  Context,
   Mapper,
   EagerCollection,
   NonEmptyIterator,
@@ -45,7 +45,7 @@ class Minus implements Mapper<string, number, string, number> {
 
 class Add implements Resource {
   reactiveCompute(
-    _store: SKStore,
+    _context: Context,
     collections: {
       input1: EagerCollection<string, number>;
       input2: EagerCollection<string, number>;
@@ -57,7 +57,7 @@ class Add implements Resource {
 
 class Sub implements Resource {
   reactiveCompute(
-    _store: SKStore,
+    _context: Context,
     collections: {
       input1: EagerCollection<string, number>;
       input2: EagerCollection<string, number>;
@@ -77,7 +77,7 @@ class Service implements SkipService {
   }
 
   reactiveCompute(
-    _store: SKStore,
+    _context: Context,
     inputCollections: Record<string, EagerCollection<string, number>>,
   ) {
     return inputCollections;

@@ -8,11 +8,9 @@ import type {
   NonEmptyIterator,
   EagerCollection,
   JSONObject,
-  RefreshToken,
   Entry,
   CollectionReader,
-  Watermarked,
-  Notifier,
+  UpdatedValues,
 } from "../skipruntime_api.js";
 
 export type CtxMapping<
@@ -81,7 +79,7 @@ export interface Context {
   getDiff<K extends TJSON, V extends TJSON>(
     collection: string,
     watermark: string,
-  ): Watermarked<K, V>;
+  ): UpdatedValues<K, V>;
 
   getArrayLazy<K extends TJSON, V>(collection: string, key: K): V[];
   getOneLazy<K extends TJSON, V>(collection: string, key: K): V;
@@ -93,7 +91,7 @@ export interface Context {
     lazyHdl: ptr<Internal.LHandle>,
     key: K,
   ): Opt<V>;
-  getToken(key: string): RefreshToken;
+  getToken(key: string): number;
 
   size(collection: string): number;
 
@@ -157,8 +155,8 @@ export interface Context {
 
   subscribe<K extends TJSON, V extends TJSON>(
     collection: string,
-    from: string,
-    notify: Notifier<K, V>,
+    since: string,
+    f: (values: Entry<K, V>[], watermark: string, update: boolean) => void,
   ): bigint;
 
   unsubscribe(session: bigint): void;
@@ -241,7 +239,7 @@ export interface FromWasm {
   SkipRuntime_getAll(getterHdl: ptr<Internal.String>): ptr<Internal.CJSON>;
   SkipRuntime_getDiff(
     getterHdl: ptr<Internal.String>,
-    from: bigint,
+    since: bigint,
   ): ptr<Internal.CJSON>;
 
   SkipRuntime_getToken(
@@ -405,8 +403,14 @@ export interface FromWasm {
 
   SkipRuntime_subscribe(
     resource: ptr<Internal.String>,
-    from: bigint,
-    notifyFn: Handle<Notifier<TJSON, TJSON>>,
+    since: bigint,
+    f: Handle<
+      (
+        values: Entry<TJSON, TJSON>[],
+        watermark: string,
+        update: boolean,
+      ) => void
+    >,
   ): bigint;
 
   SkipRuntime_unsubscribe(session: bigint): number;

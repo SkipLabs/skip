@@ -1,7 +1,7 @@
 import { expect } from "earl";
 
 import type {
-  SKStore,
+  Context,
   TJSON,
   Mapper,
   AsyncLazyCompute,
@@ -19,7 +19,7 @@ import type {
 import {
   Sum,
   ValueMapper,
-  createSKStore,
+  createRuntime,
   initService,
 } from "../src/skip-runtime.js";
 
@@ -36,7 +36,7 @@ class Map1 implements Mapper<string, number, string, number> {
 
 class Map1Resource implements Resource {
   reactiveCompute(
-    _store: SKStore,
+    _context: Context,
     collections: {
       input: EagerCollection<string, number>;
     },
@@ -50,7 +50,7 @@ class Map1Service implements SkipService {
   resources = { map1: Map1Resource };
 
   reactiveCompute(
-    _store: SKStore,
+    _context: Context,
     inputCollections: { input: EagerCollection<number, number> },
   ) {
     return inputCollections;
@@ -58,7 +58,7 @@ class Map1Service implements SkipService {
 }
 
 it("testMap1", async () => {
-  const runtime = await initService(new Map1Service(), createSKStore);
+  const runtime = await initService(new Map1Service(), createRuntime);
   runtime.put("input", "1", [10]);
   expect(runtime.getOne("map1", {}, "1")).toEqual([12]);
 });
@@ -86,7 +86,7 @@ class Map2 implements Mapper<string, number, string, number> {
 
 class Map2Resource implements Resource {
   reactiveCompute(
-    _store: SKStore,
+    _context: Context,
     collections: {
       input1: EagerCollection<string, number>;
       input2: EagerCollection<string, number>;
@@ -101,7 +101,7 @@ class Map2Service implements SkipService {
   resources = { map2: Map2Resource };
 
   reactiveCompute(
-    _store: SKStore,
+    _context: Context,
     inputCollections: {
       input1: EagerCollection<string, number>;
       input2: EagerCollection<string, number>;
@@ -112,7 +112,7 @@ class Map2Service implements SkipService {
 }
 
 it("testMap2", async () => {
-  const runtime = await initService(new Map2Service(), createSKStore);
+  const runtime = await initService(new Map2Service(), createRuntime);
   const resource = "map2";
   runtime.put("input1", "1", [10]);
   runtime.put("input2", "1", [20]);
@@ -138,7 +138,7 @@ class Map3 implements Mapper<string, number, string, number> {
 
 class Map3Resource implements Resource {
   reactiveCompute(
-    _store: SKStore,
+    _context: Context,
     cs: {
       input1: EagerCollection<string, number>;
       input2: EagerCollection<string, number>;
@@ -153,7 +153,7 @@ class Map3Service implements SkipService {
   resources = { map3: Map3Resource };
 
   reactiveCompute(
-    _store: SKStore,
+    _context: Context,
     inputCollections: {
       input1: EagerCollection<number, number>;
       input2: EagerCollection<number, number>;
@@ -164,7 +164,7 @@ class Map3Service implements SkipService {
 }
 
 it("testMap2", async () => {
-  const runtime = await initService(new Map3Service(), createSKStore);
+  const runtime = await initService(new Map3Service(), createRuntime);
   const resource = "map3";
   runtime.put("input1", "1", [1, 2, 3]);
   runtime.put("input2", "1", [10]);
@@ -193,7 +193,7 @@ class AddKeyAndValue extends ValueMapper<number, number, number> {
 
 class ValueMapperResource implements Resource {
   reactiveCompute(
-    _store: SKStore,
+    _context: Context,
     cs: {
       input: EagerCollection<number, number>;
     },
@@ -207,7 +207,7 @@ class ValueMapperService implements SkipService {
   resources = { valueMapper: ValueMapperResource };
 
   reactiveCompute(
-    _store: SKStore,
+    _context: Context,
     inputCollections: {
       input: EagerCollection<number, number>;
     },
@@ -217,7 +217,7 @@ class ValueMapperService implements SkipService {
 }
 
 it("valueMapper", async () => {
-  const runtime = await initService(new ValueMapperService(), createSKStore);
+  const runtime = await initService(new ValueMapperService(), createRuntime);
   const resource = "valueMapper";
   runtime.patch("input", [
     [1, [1]],
@@ -248,7 +248,7 @@ class SizeMapper implements Mapper<number, number, number, number> {
 
 class SizeResource implements Resource {
   reactiveCompute(
-    _store: SKStore,
+    _context: Context,
     cs: {
       input1: EagerCollection<number, number>;
       input2: EagerCollection<number, number>;
@@ -263,7 +263,7 @@ class SizeService implements SkipService {
   resources = { size: SizeResource };
 
   reactiveCompute(
-    _store: SKStore,
+    _context: Context,
     inputCollections: {
       input1: EagerCollection<number, number>;
       input2: EagerCollection<number, number>;
@@ -274,7 +274,7 @@ class SizeService implements SkipService {
 }
 
 it("testSize", async () => {
-  const runtime = await initService(new SizeService(), createSKStore);
+  const runtime = await initService(new SizeService(), createRuntime);
   const resource = "size";
   runtime.patch("input1", [
     [1, [0]],
@@ -303,7 +303,7 @@ it("testSize", async () => {
 
 class SlicedMap1Resource implements Resource {
   reactiveCompute(
-    _store: SKStore,
+    _context: Context,
     cs: {
       input: EagerCollection<number, number>;
     },
@@ -331,7 +331,7 @@ class SlicedMap1Service implements SkipService {
   resources = { slice: SlicedMap1Resource };
 
   reactiveCompute(
-    _store: SKStore,
+    _context: Context,
     inputCollections: {
       input: EagerCollection<number, number>;
     },
@@ -341,7 +341,7 @@ class SlicedMap1Service implements SkipService {
 }
 
 it("testSlicedMap1", async () => {
-  const runtime = await initService(new SlicedMap1Service(), createSKStore);
+  const runtime = await initService(new SlicedMap1Service(), createRuntime);
   const resource = "slice";
   // Inserts [[0, 0], ..., [30, 30]
   const values = Array.from({ length: 31 }, (_, i): Entry<number, number> => {
@@ -386,12 +386,12 @@ class MapLazy implements Mapper<number, number, number, number> {
 
 class LazyResource implements Resource {
   reactiveCompute(
-    skstore: SKStore,
+    context: Context,
     cs: {
       input: EagerCollection<number, number>;
     },
   ): EagerCollection<number, number> {
-    const lazy = skstore.lazy(TestLazyAdd, cs.input);
+    const lazy = context.lazy(TestLazyAdd, cs.input);
     return cs.input.map(MapLazy, lazy);
   }
 }
@@ -401,7 +401,7 @@ class LazyService implements SkipService {
   resources = { lazy: LazyResource };
 
   reactiveCompute(
-    _store: SKStore,
+    _context: Context,
     inputCollections: {
       input: EagerCollection<number, number>;
     },
@@ -411,7 +411,7 @@ class LazyService implements SkipService {
 }
 
 it("testLazy", async () => {
-  const runtime = await initService(new LazyService(), createSKStore);
+  const runtime = await initService(new LazyService(), createRuntime);
   const resource = "lazy";
   runtime.patch("input", [
     [0, [10]],
@@ -447,7 +447,7 @@ class TestOddEven implements Mapper<number, number, number, number> {
 
 class MapReduceResource implements Resource {
   reactiveCompute(
-    _skstore: SKStore,
+    _context: Context,
     cs: {
       input: EagerCollection<number, number>;
     },
@@ -461,7 +461,7 @@ class MapReduceService implements SkipService {
   resources = { mapReduce: MapReduceResource };
 
   reactiveCompute(
-    _store: SKStore,
+    _context: Context,
     inputCollections: {
       input: EagerCollection<number, number>;
     },
@@ -471,7 +471,7 @@ class MapReduceService implements SkipService {
 }
 
 it("testMapReduce", async () => {
-  const runtime = await initService(new MapReduceService(), createSKStore);
+  const runtime = await initService(new MapReduceService(), createRuntime);
   const resource = "mapReduce";
   runtime.patch("input", [
     [0, [1]],
@@ -507,7 +507,7 @@ it("testMapReduce", async () => {
 
 class Merge1Resource implements Resource {
   reactiveCompute(
-    _skstore: SKStore,
+    _context: Context,
     cs: {
       input1: EagerCollection<number, number>;
       input2: EagerCollection<number, number>;
@@ -522,7 +522,7 @@ class Merge1Service implements SkipService {
   resources = { merge1: Merge1Resource };
 
   reactiveCompute(
-    _store: SKStore,
+    _context: Context,
     inputCollections: {
       input1: EagerCollection<number, number>;
       input2: EagerCollection<number, number>;
@@ -540,7 +540,7 @@ function sorted(entries: Entry<TJSON, TJSON>[]): Entry<TJSON, TJSON>[] {
 }
 
 it("testMerge1", async () => {
-  const runtime = await initService(new Merge1Service(), createSKStore);
+  const runtime = await initService(new Merge1Service(), createRuntime);
   const resource = "merge1";
   runtime.put("input1", 1, [10]);
   runtime.put("input2", 1, [20]);
@@ -568,7 +568,7 @@ class IdentityMapper extends ValueMapper<number, number, number> {
 
 class MergeReduceResource implements Resource {
   reactiveCompute(
-    _skstore: SKStore,
+    _context: Context,
     cs: {
       input1: EagerCollection<number, number>;
       input2: EagerCollection<number, number>;
@@ -583,7 +583,7 @@ class MergeReduceService implements SkipService {
   resources = { mergeReduce: MergeReduceResource };
 
   reactiveCompute(
-    _store: SKStore,
+    _context: Context,
     inputCollections: {
       input1: EagerCollection<number, number>;
       input2: EagerCollection<number, number>;
@@ -594,7 +594,7 @@ class MergeReduceService implements SkipService {
 }
 
 it("testMergeReduce", async () => {
-  const runtime = await initService(new MergeReduceService(), createSKStore);
+  const runtime = await initService(new MergeReduceService(), createRuntime);
   const resource = "mergeReduce";
   runtime.put("input1", 1, [10]);
   runtime.put("input2", 1, [20]);
@@ -653,13 +653,13 @@ class TestCheckResult implements Mapper<number, number, number, string> {
 
 class AsyncLazyResource implements Resource {
   reactiveCompute(
-    skstore: SKStore,
+    context: Context,
     cs: {
       input1: EagerCollection<number, number>;
       input2: EagerCollection<number, number>;
     },
   ): EagerCollection<number, string> {
-    const asyncLazy = skstore.asyncLazy(TestLazyWithAsync, cs.input2);
+    const asyncLazy = context.asyncLazy(TestLazyWithAsync, cs.input2);
     return cs.input1.map(TestCheckResult, asyncLazy);
   }
 }
@@ -669,7 +669,7 @@ class AsyncLazyService implements SkipService {
   resources = { asyncLazy: AsyncLazyResource };
 
   reactiveCompute(
-    _store: SKStore,
+    _context: Context,
     inputCollections: {
       input1: EagerCollection<number, number>;
       input2: EagerCollection<number, number>;
@@ -680,7 +680,7 @@ class AsyncLazyService implements SkipService {
 }
 
 it("testAsyncLazy", async () => {
-  const runtime = await initService(new AsyncLazyService(), createSKStore);
+  const runtime = await initService(new AsyncLazyService(), createRuntime);
   const data = runtime.head("asyncLazy", {}, new Uint8Array([]));
 
   const updates: Entry<TJSON, TJSON>[][] = [];
@@ -719,7 +719,7 @@ it("testAsyncLazy", async () => {
   return new Promise<void>(waitandcheck);
 });
 
-class MockExternal implements ExternalCall<number, string, TJSON> {
+class MockExternal implements ExternalCall<number, string> {
   async call(key: number, _timestamp: number) {
     await timeout(1000 * key); // wait for `key` seconds before returning
     return { payload: `mock_result(${key.toString()})` };
@@ -741,12 +741,12 @@ class TestCheckExternalResult extends ValueMapper<number, number, string> {
 
 class ExternalResource implements Resource {
   reactiveCompute(
-    skstore: SKStore,
+    context: Context,
     cs: {
       input: EagerCollection<number, number>;
     },
   ): EagerCollection<number, string> {
-    const external = skstore.external("token_4s", MockExternal);
+    const external = context.external("token_4s", MockExternal);
     return cs.input.map(TestCheckExternalResult, external);
   }
 }
@@ -757,7 +757,7 @@ class ExternalService implements SkipService {
   refreshTokens = { token_4s: 4000 };
 
   reactiveCompute(
-    _store: SKStore,
+    _context: Context,
     inputCollections: {
       input: EagerCollection<number, number>;
     },
@@ -767,7 +767,7 @@ class ExternalService implements SkipService {
 }
 
 it("testExternalCall", async () => {
-  const runtime = await initService(new ExternalService(), createSKStore);
+  const runtime = await initService(new ExternalService(), createRuntime);
   const resource = "external";
   const success = (id: number): Entry<TJSON, TJSON> => {
     return [id, [`success: mock_result(${id.toString()})`]];
@@ -833,25 +833,25 @@ it("testExternalCall", async () => {
 class TestWithToken
   implements Mapper<number, number, number, [number, number]>
 {
-  constructor(private skstore: SKStore) {}
+  constructor(private context: Context) {}
 
   mapElement(
     key: number,
     it: NonEmptyIterator<number>,
   ): Iterable<[number, [number, number]]> {
-    const time = this.skstore.getRefreshToken("token_5s");
+    const time = this.context.getRefreshToken("token_5s");
     return [[key, [it.first(), time]]];
   }
 }
 
 class TokensResource implements Resource {
   reactiveCompute(
-    skstore: SKStore,
+    context: Context,
     cs: {
       input: EagerCollection<number, number>;
     },
   ): EagerCollection<number, [number, number]> {
-    return cs.input.map(TestWithToken, skstore);
+    return cs.input.map(TestWithToken, context);
   }
 }
 
@@ -861,7 +861,7 @@ class TokensService implements SkipService {
   refreshTokens = { token_5s: 5000 };
 
   reactiveCompute(
-    _store: SKStore,
+    _context: Context,
     inputCollections: {
       input: EagerCollection<number, number>;
     },
@@ -875,7 +875,7 @@ async function timeout(ms: number) {
 }
 
 it("testTokens", async () => {
-  const runtime = await initService(new TokensService(), createSKStore);
+  const runtime = await initService(new TokensService(), createRuntime);
   const resource = "tokens";
   runtime.put("input", 1, [0]);
   const start = runtime.getOne(resource, {}, 1)[0] as [number, number];
@@ -898,26 +898,26 @@ class JSONExtract
   implements
     Mapper<number, { value: JSONObject; pattern: string }, number, TJSON[]>
 {
-  constructor(private skstore: SKStore) {}
+  constructor(private context: Context) {}
 
   mapElement(
     key: number,
     it: NonEmptyIterator<{ value: JSONObject; pattern: string }>,
   ): Iterable<[number, TJSON[]]> {
     const value = it.first();
-    const result = this.skstore.jsonExtract(value.value, value.pattern);
+    const result = this.context.jsonExtract(value.value, value.pattern);
     return Array([key, result]);
   }
 }
 
 class JSONExtractResource implements Resource {
   reactiveCompute(
-    skstore: SKStore,
+    context: Context,
     cs: {
       input: EagerCollection<number, { value: JSONObject; pattern: string }>;
     },
   ): EagerCollection<number, TJSON[]> {
-    return cs.input.map(JSONExtract, skstore);
+    return cs.input.map(JSONExtract, context);
   }
 }
 
@@ -926,7 +926,7 @@ class JSONExtractService implements SkipService {
   resources = { jsonExtract: JSONExtractResource };
 
   reactiveCompute(
-    _store: SKStore,
+    _context: Context,
     inputCollections: {
       input: EagerCollection<number, { value: JSONObject; pattern: string }>;
     },
@@ -936,7 +936,7 @@ class JSONExtractService implements SkipService {
 }
 
 it("testJSONExtract", async () => {
-  const runtime = await initService(new JSONExtractService(), createSKStore);
+  const runtime = await initService(new JSONExtractService(), createRuntime);
   const resource = "jsonExtract";
   runtime.patch("input", [
     [

@@ -16,14 +16,12 @@ import type {
   EagerCollection,
   LazyCollection,
   TJSON,
-  RefreshToken,
   JSONObject,
   Success,
   Entry,
   CollectionReader,
   CallResourceCompute,
-  Notifier,
-  Watermarked,
+  UpdatedValues,
 } from "../skipruntime_api.js";
 
 import type {
@@ -39,7 +37,7 @@ import {
   EagerCollectionImpl,
   EagerCollectionReader,
   LSelfImpl,
-  SKStoreFactoryImpl,
+  RuntimeFactoryImpl,
 } from "./skipruntime_impl.js";
 import { UnknownCollectionError } from "../skipruntime_errors.js";
 
@@ -198,7 +196,7 @@ export class ContextImpl implements Context {
   getDiff<K extends TJSON, V extends TJSON>(collection: string, from: string) {
     const ctx = this.ref.get();
     if (ctx != null)
-      throw new Error("getDiff: Cannot be called durring update.");
+      throw new Error("getDiff: Cannot be called during update.");
     const result = this.skjson.runWithGC(() => {
       return this.skjson.clone(
         this.skjson.importJSON(
@@ -212,7 +210,7 @@ export class ContextImpl implements Context {
     if (typeof result == "number") {
       throw this.handles.deleteHandle(result as Handle<unknown>);
     }
-    return result as Watermarked<K, V>;
+    return result as UpdatedValues<K, V>;
   }
 
   getArray<K extends TJSON, V>(eagerHdl: string, key: K) {
@@ -336,7 +334,7 @@ export class ContextImpl implements Context {
     return this.exports.SkipRuntime_getToken(
       this.pointer(),
       this.skjson.exportString(key),
-    ) as RefreshToken;
+    );
   }
 
   size = (eagerHdl: string) => {
@@ -421,7 +419,7 @@ export class ContextImpl implements Context {
     ) as TJSON[];
   }
 
-  /* Must produce a valid SKStore key ideally with no collision */
+  /* Must produce a valid Skip key ideally with no collision */
   keyOfJSON(value: TJSON): string {
     return (
       "b64_" +
@@ -539,8 +537,8 @@ export class ContextImpl implements Context {
 
   subscribe<K extends TJSON, V extends TJSON>(
     collectionName: string,
-    from: string,
-    nofify: Notifier<K, V>,
+    since: string,
+    f: (values: Entry<K, V>[], watermark: string, update: boolean) => void,
   ): bigint {
     const collection = this.resources[collectionName];
     if (!collection) {
@@ -551,8 +549,14 @@ export class ContextImpl implements Context {
     const result = this.skjson.runWithGC(() => {
       return this.exports.SkipRuntime_subscribe(
         this.skjson.exportString(collection),
-        BigInt(from),
-        this.handles.register(nofify as Notifier<TJSON, TJSON>),
+        BigInt(since),
+        this.handles.register(
+          f as (
+            values: Entry<TJSON, TJSON>[],
+            watermark: string,
+            update: boolean,
+          ) => void,
+        ),
       );
     });
     if (result < 0) {
@@ -627,21 +631,18 @@ class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
     };
   }
 
-  forEach(callbackfn: (value: T, index: number) => void, thisArg?: any): void {
+  forEach(f: (value: T, index: number) => void, thisObj?: any): void {
     let value = this.next();
     let index = 0;
     while (value != null) {
-      callbackfn.apply(thisArg, [value, index]);
+      f.apply(thisObj, [value, index]);
       value = this.next();
       index++;
     }
   }
 
-  map<U>(
-    callbackfn: (value: T, index: number) => U,
-    thisArg?: any,
-  ): Iterable<U> {
-    return this.toArray().map(callbackfn, thisArg);
+  map<U>(f: (value: T, index: number) => U, thisObj?: any): U[] {
+    return this.toArray().map(f, thisObj);
   }
 }
 
@@ -1242,8 +1243,8 @@ class LinksImpl implements Links {
       );
     };
     this.env.shared.set(
-      "SKStore",
-      new SKStoreFactoryImpl(
+      "SkipRuntimeFactory",
+      new RuntimeFactoryImpl(
         () => new ContextImpl(skjson(), fromWasm, this.handles, this.env, ref),
         create,
       ),

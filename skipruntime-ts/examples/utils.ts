@@ -1,4 +1,4 @@
-import type { TJSON, EntryPoint, Entry, JSONObject } from "@skipruntime/core";
+import type { TJSON, Entrypoint, Entry, JSONObject } from "@skipruntime/core";
 import { SkipRESTRuntime } from "@skipruntime/core";
 import { createInterface } from "readline";
 import { connect, Protocol, Client } from "@skipruntime/client";
@@ -18,7 +18,7 @@ interface Delete {
   keys: string[];
 }
 
-function toWs(entrypoint: EntryPoint) {
+function toWs(entrypoint: Entrypoint) {
   if (entrypoint.secured)
     return `wss://${entrypoint.host}:${entrypoint.port.toString()}`;
   return `ws://${entrypoint.host}:${entrypoint.port.toString()}`;
@@ -29,7 +29,7 @@ class SkipHttpAccessV1 {
   private client?: Client;
 
   constructor(
-    private entrypoint: EntryPoint = {
+    private entrypoint: Entrypoint = {
       host: "localhost",
       port: 3587,
     },

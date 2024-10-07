@@ -1,11 +1,11 @@
 import type {
   TJSON,
   Entry,
-  EntryPoint,
+  Entrypoint,
   ReactiveResponse,
 } from "./skipruntime_api.js";
 
-function toHttp(entrypoint: EntryPoint) {
+function toHttp(entrypoint: Entrypoint) {
   if (entrypoint.secured)
     return `https://${entrypoint.host}:${entrypoint.port}`;
   return `http://${entrypoint.host}:${entrypoint.port}`;
@@ -39,7 +39,7 @@ export class SkipRESTRuntime {
   private entrypoint: string;
 
   constructor(
-    entrypoint: EntryPoint = {
+    entrypoint: Entrypoint = {
       host: "localhost",
       port: 3587,
     },

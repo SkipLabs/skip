@@ -1,12 +1,13 @@
 import { run, type ModuleInit } from "std";
 import type {
-  SKStore,
-  SKStoreFactory,
+  Context,
+  RuntimeFactory,
   TJSON,
   CallResourceCompute,
-  EntryPoint,
+  Entrypoint,
   EagerCollection,
-  SkipBuilder,
+  CollectionWriter,
+  SkipRuntime,
 } from "./skipruntime_api.js";
 
 import { init as runtimeInit } from "std/runtime.js";
@@ -33,18 +34,21 @@ async function wasmUrl(): Promise<URL> {
   return new URL("./libskip-runtime-ts.wasm", import.meta.url);
 }
 
-export type CreateSKStore = typeof createSKStore;
+export type CreateRuntime = typeof createRuntime;
 
-export async function createSKStore(
+export async function createRuntime(
   init: (
-    skstore: SKStore,
+    context: Context,
     inputs: Record<string, EagerCollection<TJSON, TJSON>>,
   ) => CallResourceCompute,
   inputs: Record<string, [TJSON, TJSON][]>,
-  remotes: Record<string, EntryPoint> = {},
+  remotes: Record<string, Entrypoint> = {},
   tokens: Record<string, number> = {},
-): Promise<SkipBuilder> {
+  writers: Record<string, CollectionWriter<TJSON, TJSON>> = {},
+): Promise<SkipRuntime> {
   const data = await run(wasmUrl, modules, [], "SKDB_factory");
-  const factory = data.environment.shared.get("SKStore") as SKStoreFactory;
-  return factory.runSKStore(init, inputs, remotes, tokens);
+  const factory = data.environment.shared.get(
+    "SkipRuntimeFactory",
+  ) as RuntimeFactory;
+  return factory.createRuntime(init, inputs, remotes, tokens, writers);
 }

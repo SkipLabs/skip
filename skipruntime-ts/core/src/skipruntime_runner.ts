@@ -3,23 +3,23 @@ import type {
   CollectionWriter,
   EagerCollection,
   SkipRuntime,
-  SKStore,
+  Context,
   TJSON,
 } from "./skipruntime_api.js";
 
 import type { SkipService } from "./skipruntime_service.js";
 
-import type { CreateSKStore } from "./skipruntime_init.js";
+import type { CreateRuntime } from "./skipruntime_init.js";
 import type { EagerCollectionImpl } from "./internals/skipruntime_impl.js";
 
 export async function runService(
   service: SkipService,
-  createSKStore: CreateSKStore,
+  createRuntime: CreateRuntime,
 ): Promise<SkipRuntime> {
   const iCollections: Record<string, CollectionWriter<TJSON, TJSON>> = {};
   const rCollections: Record<string, CollectionReader<TJSON, TJSON>> = {};
-  const initSKStore = (
-    store: SKStore,
+  const init = (
+    context: Context,
     inputs: Record<string, EagerCollection<TJSON, TJSON>>,
   ) => {
     if (service.inputCollections) {
@@ -38,7 +38,7 @@ export async function runService(
         ).toCollectionWriter();
       }
     }
-    const result = service.reactiveCompute(store, inputs);
+    const result = service.reactiveCompute(context, inputs);
     for (const [key, col] of Object.entries(result)) {
       rCollections[key] = (
         col as EagerCollectionImpl<TJSON, TJSON>
@@ -53,14 +53,14 @@ export async function runService(
         throw new Error(`Unknown resource ${name}`);
       }
       const resource = new resourceConst(params);
-      return resource.reactiveCompute(store, collections).getId();
+      return resource.reactiveCompute(context, collections).getId();
     };
   };
-  const builder = await createSKStore(
-    initSKStore,
+  return await createRuntime(
+    init,
     service.inputCollections ?? {},
     service.remoteCollections ?? {},
     service.refreshTokens ?? {},
+    iCollections,
   );
-  return builder(iCollections);
 }
