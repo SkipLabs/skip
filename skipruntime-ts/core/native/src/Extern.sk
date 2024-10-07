@@ -984,8 +984,8 @@ fun getDiff(collection: String, from: Int): SKJSON.CJSON {
               "values",
               getAll_(context.unsafeGetEagerDir(DirName::create(collection))),
             ),
-            ("tick", SKJSON.CJInt(context.tick.value)),
-            ("update", SKJSON.CJBool(false)),
+            ("watermark", SKJSON.CJInt(context.tick.value)),
+            ("isInitial", SKJSON.CJBool(true)),
           ],
           x -> x,
         ),
@@ -1002,8 +1002,8 @@ fun getDiff(collection: String, from: Int): SKJSON.CJSON {
         SKJSON.CJFields::create(
           Array[
             ("values", SKJSON.CJArray(values.toArray())),
-            ("tick", SKJSON.CJInt(context.tick.value)),
-            ("update", SKJSON.CJBool(true)),
+            ("watermark", SKJSON.CJInt(context.tick.value)),
+            ("isInitial", SKJSON.CJBool(false)),
           ],
           x -> x,
         ),

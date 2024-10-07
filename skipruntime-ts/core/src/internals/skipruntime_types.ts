@@ -10,7 +10,7 @@ import type {
   JSONObject,
   Entry,
   CollectionReader,
-  Watermarked,
+  UpdatedValues,
 } from "../skipruntime_api.js";
 
 export type CtxMapping<
@@ -79,7 +79,7 @@ export interface Context {
   getDiff<K extends TJSON, V extends TJSON>(
     collection: string,
     watermark: string,
-  ): Watermarked<K, V>;
+  ): UpdatedValues<K, V>;
 
   getArrayLazy<K extends TJSON, V>(collection: string, key: K): V[];
   getOneLazy<K extends TJSON, V>(collection: string, key: K): V;

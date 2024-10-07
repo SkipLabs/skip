@@ -23,7 +23,7 @@ import type {
   Entry,
   CollectionWriter,
   CallResourceCompute,
-  Watermarked,
+  UpdatedValues,
   ReactiveResponse,
 } from "../skipruntime_api.js";
 import { UnknownCollectionError } from "../skipruntime_errors.js";
@@ -459,7 +459,7 @@ export class EagerCollectionReader<K extends TJSON, V extends TJSON>
     return this.context.getAll<K, V>(this.eagerHdl);
   }
 
-  getDiff(from: string): Watermarked<K, V> {
+  getDiff(from: string): UpdatedValues<K, V> {
     return this.context.getDiff(this.eagerHdl, from);
   }
 
