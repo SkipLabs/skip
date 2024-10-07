@@ -397,7 +397,7 @@ export interface ExternalCall<
   call(key: K, timestamp: number): Promise<AValue<V, Metadata>>;
 }
 
-export interface SKStore extends Constant {
+export interface Context extends Constant {
   /**
    * Creates a lazy reactive collection.
    * @param compute - the function to compute entries of the lazy collection

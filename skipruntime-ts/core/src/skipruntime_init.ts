@@ -1,6 +1,6 @@
 import { run, type ModuleInit } from "std";
 import type {
-  SKStore,
+  Context,
   RuntimeFactory,
   TJSON,
   CallResourceCompute,

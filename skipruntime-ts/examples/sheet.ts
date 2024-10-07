@@ -1,5 +1,5 @@
 import type {
-  SKStore,
+  Context,
   LazyCompute,
   EagerCollection,
   LazyCollection,
@@ -70,7 +70,7 @@ class CallCompute implements Mapper<string, TJSON, string, TJSON> {
 
 class ComputedCells implements Resource {
   reactiveCompute(
-    _store: SKStore,
+    _context: Context,
     collections: { output: EagerCollection<string, TJSON> },
   ): EagerCollection<string, TJSON> {
     return collections.output;
@@ -82,13 +82,13 @@ class Service implements SkipService {
   resources = { computed: ComputedCells };
 
   reactiveCompute(
-    store: SKStore,
+    context: Context,
     inputCollections: Record<string, EagerCollection<string, TJSON>>,
   ): Record<string, EagerCollection<TJSON, TJSON>> {
     const cells = inputCollections["cells"];
     // Use lazy dir to create eval dependency graph
     // Its calls it self to get other computed cells
-    const evaluator = store.lazy(ComputeExpression, cells);
+    const evaluator = context.lazy(ComputeExpression, cells);
     // Build a sub dependency graph for each sheet (For example purpose)
     // A parsing phase can be added to prevent expression parsing each time:
     // Parsing => Immutable ast
