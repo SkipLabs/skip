@@ -19,7 +19,7 @@ import type {
 import {
   Sum,
   ValueMapper,
-  createSKStore,
+  createRuntime,
   initService,
 } from "../src/skip-runtime.js";
 
@@ -58,7 +58,7 @@ class Map1Service implements SkipService {
 }
 
 it("testMap1", async () => {
-  const runtime = await initService(new Map1Service(), createSKStore);
+  const runtime = await initService(new Map1Service(), createRuntime);
   runtime.put("input", "1", [10]);
   expect(runtime.getOne("map1", {}, "1")).toEqual([12]);
 });
@@ -112,7 +112,7 @@ class Map2Service implements SkipService {
 }
 
 it("testMap2", async () => {
-  const runtime = await initService(new Map2Service(), createSKStore);
+  const runtime = await initService(new Map2Service(), createRuntime);
   const resource = "map2";
   runtime.put("input1", "1", [10]);
   runtime.put("input2", "1", [20]);
@@ -164,7 +164,7 @@ class Map3Service implements SkipService {
 }
 
 it("testMap2", async () => {
-  const runtime = await initService(new Map3Service(), createSKStore);
+  const runtime = await initService(new Map3Service(), createRuntime);
   const resource = "map3";
   runtime.put("input1", "1", [1, 2, 3]);
   runtime.put("input2", "1", [10]);
@@ -217,7 +217,7 @@ class ValueMapperService implements SkipService {
 }
 
 it("valueMapper", async () => {
-  const runtime = await initService(new ValueMapperService(), createSKStore);
+  const runtime = await initService(new ValueMapperService(), createRuntime);
   const resource = "valueMapper";
   runtime.patch("input", [
     [1, [1]],
@@ -274,7 +274,7 @@ class SizeService implements SkipService {
 }
 
 it("testSize", async () => {
-  const runtime = await initService(new SizeService(), createSKStore);
+  const runtime = await initService(new SizeService(), createRuntime);
   const resource = "size";
   runtime.patch("input1", [
     [1, [0]],
@@ -341,7 +341,7 @@ class SlicedMap1Service implements SkipService {
 }
 
 it("testSlicedMap1", async () => {
-  const runtime = await initService(new SlicedMap1Service(), createSKStore);
+  const runtime = await initService(new SlicedMap1Service(), createRuntime);
   const resource = "slice";
   // Inserts [[0, 0], ..., [30, 30]
   const values = Array.from({ length: 31 }, (_, i): Entry<number, number> => {
@@ -411,7 +411,7 @@ class LazyService implements SkipService {
 }
 
 it("testLazy", async () => {
-  const runtime = await initService(new LazyService(), createSKStore);
+  const runtime = await initService(new LazyService(), createRuntime);
   const resource = "lazy";
   runtime.patch("input", [
     [0, [10]],
@@ -471,7 +471,7 @@ class MapReduceService implements SkipService {
 }
 
 it("testMapReduce", async () => {
-  const runtime = await initService(new MapReduceService(), createSKStore);
+  const runtime = await initService(new MapReduceService(), createRuntime);
   const resource = "mapReduce";
   runtime.patch("input", [
     [0, [1]],
@@ -540,7 +540,7 @@ function sorted(entries: Entry<TJSON, TJSON>[]): Entry<TJSON, TJSON>[] {
 }
 
 it("testMerge1", async () => {
-  const runtime = await initService(new Merge1Service(), createSKStore);
+  const runtime = await initService(new Merge1Service(), createRuntime);
   const resource = "merge1";
   runtime.put("input1", 1, [10]);
   runtime.put("input2", 1, [20]);
@@ -594,7 +594,7 @@ class MergeReduceService implements SkipService {
 }
 
 it("testMergeReduce", async () => {
-  const runtime = await initService(new MergeReduceService(), createSKStore);
+  const runtime = await initService(new MergeReduceService(), createRuntime);
   const resource = "mergeReduce";
   runtime.put("input1", 1, [10]);
   runtime.put("input2", 1, [20]);
@@ -680,7 +680,7 @@ class AsyncLazyService implements SkipService {
 }
 
 it("testAsyncLazy", async () => {
-  const runtime = await initService(new AsyncLazyService(), createSKStore);
+  const runtime = await initService(new AsyncLazyService(), createRuntime);
   const data = runtime.head("asyncLazy", {}, new Uint8Array([]));
 
   const updates: Entry<TJSON, TJSON>[][] = [];
@@ -767,7 +767,7 @@ class ExternalService implements SkipService {
 }
 
 it("testExternalCall", async () => {
-  const runtime = await initService(new ExternalService(), createSKStore);
+  const runtime = await initService(new ExternalService(), createRuntime);
   const resource = "external";
   const success = (id: number): Entry<TJSON, TJSON> => {
     return [id, [`success: mock_result(${id.toString()})`]];
@@ -875,7 +875,7 @@ async function timeout(ms: number) {
 }
 
 it("testTokens", async () => {
-  const runtime = await initService(new TokensService(), createSKStore);
+  const runtime = await initService(new TokensService(), createRuntime);
   const resource = "tokens";
   runtime.put("input", 1, [0]);
   const start = runtime.getOne(resource, {}, 1)[0] as [number, number];
@@ -936,7 +936,7 @@ class JSONExtractService implements SkipService {
 }
 
 it("testJSONExtract", async () => {
-  const runtime = await initService(new JSONExtractService(), createSKStore);
+  const runtime = await initService(new JSONExtractService(), createRuntime);
   const resource = "jsonExtract";
   runtime.patch("input", [
     [

@@ -351,16 +351,17 @@ export type CallResourceCompute = (
   params: Record<string, string>,
 ) => string;
 
-export interface SKStoreFactory extends Shared {
-  runSKStore(
+export interface RuntimeFactory extends Shared {
+  createRuntime(
     init: (
-      skstore: SKStore,
+      context: Context,
       collections: Record<string, EagerCollection<TJSON, TJSON>>,
     ) => CallResourceCompute,
     inputs: Record<string, [TJSON, TJSON][]>,
     remotes?: Record<string, Entrypoint>,
     tokens?: Record<string, number>,
-  ): SkipBuilder;
+    writers?: Record<string, CollectionWriter<TJSON, TJSON>>,
+  ): SkipRuntime;
 }
 
 /**
@@ -461,10 +462,6 @@ export type Watermarked<K extends TJSON, V extends TJSON> = {
   watermark: string;
   update?: boolean;
 };
-
-export type SkipBuilder = (
-  iCollection: Record<string, CollectionWriter<TJSON, TJSON>>,
-) => SkipRuntime;
 
 export interface CollectionWriter<K extends TJSON, V extends TJSON> {
   write(key: K, value: V[]): void;

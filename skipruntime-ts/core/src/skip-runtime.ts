@@ -2,7 +2,7 @@ export type { SkipService, Resource } from "./skipruntime_service.js";
 export { UnknownCollectionError } from "./skipruntime_errors.js";
 export type { Opaque } from "./internals/skipruntime_module.js";
 export { runService as initService } from "./skipruntime_runner.js";
-export { createSKStore } from "./skipruntime_init.js";
+export { createRuntime } from "./skipruntime_init.js";
 
 export type {
   AValue,

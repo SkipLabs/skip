@@ -9,12 +9,12 @@ import type {
 
 import type { SkipService } from "./skipruntime_service.js";
 
-import type { CreateSKStore } from "./skipruntime_init.js";
+import type { CreateRuntime } from "./skipruntime_init.js";
 import type { EagerCollectionImpl } from "./internals/skipruntime_impl.js";
 
 export async function runService(
   service: SkipService,
-  createSKStore: CreateSKStore,
+  createRuntime: CreateRuntime,
 ): Promise<SkipRuntime> {
   const iCollections: Record<string, CollectionWriter<TJSON, TJSON>> = {};
   const rCollections: Record<string, CollectionReader<TJSON, TJSON>> = {};
@@ -56,11 +56,11 @@ export async function runService(
       return resource.reactiveCompute(store, collections).getId();
     };
   };
-  const builder = await createSKStore(
-    initSKStore,
+  return await createRuntime(
+    init,
     service.inputCollections ?? {},
     service.remoteCollections ?? {},
     service.refreshTokens ?? {},
+    iCollections,
   );
-  return builder(iCollections);
 }

@@ -8,7 +8,7 @@ import type {
   AsyncLazyCollection,
   Mapper,
   SKStore,
-  SKStoreFactory,
+  RuntimeFactory,
   Loadable,
   JSONObject,
   TJSON,
@@ -25,7 +25,6 @@ import type {
   CallResourceCompute,
   Watermarked,
   ReactiveResponse,
-  SkipBuilder,
 } from "../skipruntime_api.js";
 import { UnknownCollectionError } from "../skipruntime_errors.js";
 
@@ -320,7 +319,7 @@ export class SKStoreImpl extends SkFrozen implements SKStore {
   }
 }
 
-export class SKStoreFactoryImpl implements SKStoreFactory {
+export class RuntimeFactoryImpl implements RuntimeFactory {
   //
   constructor(
     private context: () => Context,
@@ -335,29 +334,27 @@ export class SKStoreFactoryImpl implements SKStoreFactory {
   ) {}
 
   getName() {
-    return "SKStore";
+    return "SkipRuntimeFactory";
   }
 
-  runSKStore(
+  createRuntime(
     init: (
-      skstore: SKStore,
+      context: Context,
       collections: Record<string, EagerCollection<TJSON, TJSON>>,
     ) => CallResourceCompute,
     inputs: Record<string, [TJSON, TJSON][]> = {},
     remotes: Record<string, Entrypoint> = {},
     tokens: Record<string, number> = {},
-  ): SkipBuilder {
-    const context = this.context();
-    const skstore = new SKStoreImpl(context);
+    writers: Record<string, CollectionWriter<TJSON, TJSON>> = {},
+  ): SkipRuntime {
+    const internalContext = this.internalContext();
     this.create(
-      (collections) => init(skstore, collections),
+      (collections) => init(new ContextImpl(internalContext), collections),
       [...Object.keys(inputs), ...Object.keys(remotes)],
       tokens,
       inputs,
     );
-    return (iCollections: Record<string, CollectionWriter<TJSON, TJSON>>) => {
-      return new SkipRuntimeImpl(context, iCollections);
-    };
+    return new SkipRuntimeImpl(internalContext, writers);
   }
 }
 
