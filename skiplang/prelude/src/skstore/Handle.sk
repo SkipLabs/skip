@@ -164,6 +164,13 @@ mutable class TWriter<K: Key, V: File>{
     this.!writes[key] = Array[value];
   }
 
+  mutable fun append(key: K, value: V): void {
+    this.writes.maybeGet(key) match {
+    | Some(values) -> this.!writes[key] = values.concat(Array[value])
+    | _ -> this.!writes[key] = Array[value]
+    }
+  }
+
   mutable fun remove(key: K): void {
     this.!writes[key] = Array[];
   }
@@ -586,6 +593,14 @@ class EHandle<K: Key, V: File>(
   ): void {
     dir = context.unsafeGetEagerDir(this.dirName);
     dir.writeArray(context, key, values);
+  }
+
+  fun onDelete(
+    context: mutable Context,
+    optOnDelete: ?Postponable = None(),
+  ): void {
+    dir = context.unsafeGetEagerDir(this.dirName);
+    dir.onDelete(context, optOnDelete);
   }
 
   fun items(

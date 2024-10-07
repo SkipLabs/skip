@@ -354,6 +354,7 @@ mutable class Context{
   mutable newDirs: SortedSet<DirName> = SortedSet[],
   mutable toReset: SortedSet<DirName> = SortedSet[],
   mutable globals: SortedMap<String, File> = SortedMap[],
+  mutable persistents: SortedMap<String, File> = SortedMap[],
   mutable dirty: List<Path> = List[],
   mutable dirtyReaders: List<ArrowKey> = List[],
   mutable canReuse: CanReuse = CRIfMatch(),
@@ -439,6 +440,7 @@ mutable class Context{
       newDirs => this.newDirs,
       toReset => this.toReset,
       globals => this.globals,
+      persistents => this.persistents,
       dirty => this.dirty,
       dirtyReaders => this.dirtyReaders,
       canReuse => this.canReuse,
@@ -476,6 +478,7 @@ mutable class Context{
       newDirs => this.newDirs,
       toReset => this.toReset,
       globals => this.globals,
+      persistents => this.persistents,
       dirty => this.dirty,
       dirtyReaders => this.dirtyReaders,
       canReuse => this.canReuse,
@@ -516,6 +519,7 @@ mutable class Context{
     this.!newDirs = ctx.newDirs;
     this.!toReset = ctx.toReset;
     this.!globals = ctx.globals;
+    this.!persistents = ctx.persistents;
     this.!dirty = ctx.dirty;
     this.!dirtyReaders = ctx.dirtyReaders;
     this.!canReuse = ctx.canReuse;
@@ -1057,12 +1061,12 @@ mutable class Context{
     if (this.debugMode) {
       print_debug("REMOVED: " + dirName);
     };
-    if (this.hasPre.contains(dirName)) {
-      this.!hasPre = this.hasPre.remove(dirName);
-    };
     this.unsafeMaybeGetEagerDir(dirName) match {
     | None() -> return void
     | Some(dir) ->
+      if (this.hasPre.contains(dirName)) {
+        this.!hasPre = this.hasPre.remove(dirName);
+      };
       for (parentName => _ in dir.parents) {
         this.unsafeMaybeGetEagerDir(parentName) match {
         | None() -> continue
@@ -1070,7 +1074,9 @@ mutable class Context{
           !parent.childDirs = parent.childDirs.remove(dirName);
           this.setDir(parent.dirName, parent)
         }
-      }
+      };
+      dir.removeSubDirs(this);
+      dir.optOnDelete.each(this.postpone)
     };
     this.!deps = this.deps.removeDir(dirName);
     this.!dirsWithSharedSubDirs = this.dirsWithSharedSubDirs.remove(dirName);
@@ -1114,6 +1120,18 @@ mutable class Context{
 
   readonly fun getGlobal(name: String): ?File {
     this.globals.maybeGet(name)
+  }
+
+  mutable fun setPersistent(name: String, file: File): void {
+    this.!persistents = this.persistents.set(name, file);
+  }
+
+  mutable fun removePersistent(name: String): void {
+    this.!persistents = this.persistents.remove(name);
+  }
+
+  readonly fun getPersistent(name: String): ?File {
+    this.persistents.maybeGet(name)
   }
 }
 
