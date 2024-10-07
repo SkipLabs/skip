@@ -19,7 +19,6 @@ import type {
   TJSON,
   JSONObject,
   Entry,
-  Notifier,
   Param,
   SkipService,
   Mapper,
@@ -29,6 +28,7 @@ import type {
   Resource,
   SkipRuntime,
   ReactiveResponse,
+  CollectionUpdate,
 } from "../skipruntime_api.js";
 
 import type { SKJSON } from "skjson";
@@ -223,7 +223,7 @@ export interface FromWasm {
   // Notifier
 
   SkipRuntime_createNotifier<K extends TJSON, V extends TJSON>(
-    ref: Handle<Notifier<K, V>>,
+    ref: Handle<(update: CollectionUpdate<K, V>) => void>,
   ): ptr<Internal.Notifier>;
 
   // Runtime
@@ -375,14 +375,16 @@ interface ToWasm {
 
   // Notifier
 
-  SkipRuntime_Notifier__notify(
-    notifier: Handle<Notifier<TJSON, TJSON>>,
+  SkipRuntime_Notifier__notify<K extends TJSON, V extends TJSON>(
+    notifier: Handle<(update: CollectionUpdate<K, V>) => void>,
     values: ptr<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
     tick: bigint,
     updates: boolean,
   ): void;
 
-  SkipRuntime_deleteNotifier(notifier: Handle<Notifier<TJSON, TJSON>>): void;
+  SkipRuntime_deleteNotifier<K extends TJSON, V extends TJSON>(
+    notifier: Handle<(update: CollectionUpdate<K, V>) => void>,
+  ): void;
 
   // Accumulator
 
@@ -644,19 +646,21 @@ class LinksImpl implements Links {
   }
 
   // Notifier
-  notifyOfNotifier(
-    sknotifier: Handle<Notifier<TJSON, TJSON>>,
+  notifyOfNotifier<K extends TJSON, V extends TJSON>(
+    sknotifier: Handle<(update: CollectionUpdate<K, V>) => void>,
     skvalues: ptr<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
-    sktick: bigint,
-    skupdates: boolean,
+    watermark: bigint,
+    isInitial: boolean,
   ) {
     const skjson = this.getSkjson();
     const notifier = this.handles.get(sknotifier);
-    const values = skjson.importJSON(skvalues) as Entry<TJSON, TJSON>[];
-    notifier(skjson.clone(values), Number(sktick), skupdates);
+    const values = skjson.clone(skjson.importJSON(skvalues) as Entry<K, V>[]);
+    notifier({ values, watermark, isInitial });
   }
 
-  deleteNotifier(notifier: Handle<Notifier<TJSON, TJSON>>) {
+  deleteNotifier<K extends TJSON, V extends TJSON>(
+    notifier: Handle<(update: CollectionUpdate<K, V>) => void>,
+  ) {
     this.handles.deleteHandle(notifier);
   }
 
@@ -1088,7 +1092,7 @@ class SkipRuntimeImpl implements SkipRuntime {
       throw this.refs.handles.deleteAsError(result as Handle<ErrorObject>);
     }
     const [collection, watermark] = result as [string, string];
-    return { collection, watermark: Number(watermark) };
+    return { collection, watermark: BigInt(watermark) };
   }
 
   getAll<K extends TJSON, V extends TJSON>(
@@ -1111,7 +1115,7 @@ class SkipRuntimeImpl implements SkipRuntime {
     }
     const [values, reactive] = result as [Entry<K, V>[], [string, string]];
     const [collection, watermark] = reactive;
-    return { values, reactive: { collection, watermark: Number(watermark) } };
+    return { values, reactive: { collection, watermark: BigInt(watermark) } };
   }
 
   getOne<V extends TJSON>(
@@ -1167,17 +1171,17 @@ class SkipRuntimeImpl implements SkipRuntime {
 
   subscribe<K extends TJSON, V extends TJSON>(
     reactiveId: string,
-    from: string,
-    notify: Notifier<K, V>,
+    since: bigint,
+    f: (update: CollectionUpdate<K, V>) => void,
     reactiveAuth?: Uint8Array,
   ): bigint {
     const session = this.refs.skjson.runWithGC(() => {
       const sknotifier = this.refs.fromWasm.SkipRuntime_createNotifier(
-        this.refs.handles.register(notify),
+        this.refs.handles.register(f),
       );
       return this.refs.fromWasm.SkipRuntime_Runtime__subscribe(
         this.refs.skjson.exportString(reactiveId),
-        BigInt(from),
+        since,
         sknotifier,
         reactiveAuth ? this.refs.skjson.exportBytes(reactiveAuth) : null,
       );
