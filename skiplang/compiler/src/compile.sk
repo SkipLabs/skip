@@ -195,7 +195,7 @@ class TickConfigFile(value: (Int, Config.Config)) extends SKStore.File
 
 fun getOrInitializeBackend(
   context: mutable SKStore.Context,
-  config: Config.Config,
+  ptrBitSize: Int,
 ): SKStore.EagerDir {
   backendDirName = SKStore.DirName::create("/backend/");
   context.unsafeMaybeGetEagerDir(backendDirName) match {
@@ -219,7 +219,7 @@ fun getOrInitializeBackend(
 
   converter = OuterIstToIR.Converter::create(
     context,
-    config,
+    ptrBitSize,
     SKStore.DirName::create("/converter/"),
     outerIst,
   );
@@ -374,7 +374,7 @@ fun compile(
 
   // FIXME: Backend initialization should _not_ peek into the config
   // as it is likely to change across invocations.
-  getOrInitializeBackend(context, config).writeArray(
+  getOrInitializeBackend(context, config.ptrBitSize).writeArray(
     context,
     SKStore.IID(0),
     Array[TickConfigFile((context.tick.value, config))],
