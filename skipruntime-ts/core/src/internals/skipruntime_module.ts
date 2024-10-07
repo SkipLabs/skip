@@ -21,7 +21,7 @@ import type {
   Entry,
   CollectionReader,
   CallResourceCompute,
-  Watermarked,
+  UpdatedValues,
 } from "../skipruntime_api.js";
 
 import type {
@@ -210,7 +210,7 @@ export class ContextImpl implements Context {
     if (typeof result == "number") {
       throw this.handles.deleteHandle(result as Handle<unknown>);
     }
-    return result as Watermarked<K, V>;
+    return result as UpdatedValues<K, V>;
   }
 
   getArray<K extends TJSON, V>(eagerHdl: string, key: K) {

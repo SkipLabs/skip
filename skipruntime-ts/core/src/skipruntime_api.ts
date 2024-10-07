@@ -243,9 +243,9 @@ export interface CollectionReader<K extends TJSON, V extends TJSON> {
   /**
    * Get a diff of added/updated entries in a collection since some watermark.
    * @param since A watermark from which to compute the diff
-   * @returns {Watermarked} An object containing updated entries and a new watermark string.
+   * @returns {UpdatedValues} An object containing updated entries and a new watermark string.
    */
-  getDiff(since: string): Watermarked<K, V>;
+  getDiff(since: string): UpdatedValues<K, V>;
 
   /**
    * Subscribe to updates of the collection since some initial watermark
@@ -457,10 +457,10 @@ export type ReactiveResponse = {
   watermark: string;
 };
 
-export type Watermarked<K extends TJSON, V extends TJSON> = {
+export type UpdatedValues<K extends TJSON, V extends TJSON> = {
   values: Entry<K, V>[];
   watermark: string;
-  update?: boolean;
+  isInitial?: boolean;
 };
 
 export interface CollectionWriter<K extends TJSON, V extends TJSON> {
