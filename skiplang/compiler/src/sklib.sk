@@ -98,6 +98,25 @@ class Metadata{
   }
 }
 
+class BinaryFormat {
+  children =
+  | BinaryFormatELF()
+  | BinaryFormatMachO()
+  | BinaryFormatWasm()
+}
+
+fun create_metadata_file(
+  data: String,
+  section_name: String,
+  config: Config.Config,
+): readonly Bytes {
+  binary_format = config.target match {
+  | "aarch64-apple-darwin" | "x86_64-apple-darwin" -> BinaryFormatMachO()
+  | "wasm32-unknown-unknown" -> BinaryFormatWasm()
+  | _ -> BinaryFormatELF()
+  };
+}
+
 const kMetadataFile: String = "lib.skmeta";
 
 fun read_metadata(path: String): Result<Metadata, ARParser.Error> {
@@ -152,6 +171,7 @@ mutable class .SklibBuilder(
     };
     lib_file_name = Path.basename(path);
     for ((obj_file_header, contents) in lib_ar.items()) {
+      // Avoid copying special files/symbols index files.
       if (!obj_file_header.identifier.endsWith(".o")) continue;
       this.files.push(
         (`${lib_file_name}@${obj_file_header.identifier}`, contents),
