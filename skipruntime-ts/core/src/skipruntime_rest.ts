@@ -75,7 +75,10 @@ export class SkipRESTRuntime {
     );
     const strReactiveResponse = headers.get("x-reactive-response");
     const reactive = strReactiveResponse
-      ? (JSON.parse(strReactiveResponse) as ReactiveResponse)
+      ? (JSON.parse(strReactiveResponse, (key: string, value: string) => {
+          if (key == "watermark") return BigInt(value);
+          return value;
+        }) as ReactiveResponse)
       : undefined;
     const values = optValues ?? [];
     return reactive ? { values, reactive } : { values };
@@ -96,7 +99,10 @@ export class SkipRESTRuntime {
     const reactiveResponse = headers.get("x-reactive-response");
     if (!reactiveResponse)
       throw new Error("Reactive response must be suplied.");
-    return JSON.parse(reactiveResponse) as ReactiveResponse;
+    return JSON.parse(reactiveResponse, (key: string, value: string) => {
+      if (key == "watermark") return BigInt(value);
+      return value;
+    }) as ReactiveResponse;
   }
 
   async getOne<V extends TJSON>(

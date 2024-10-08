@@ -29,7 +29,10 @@ const [_e, headers] = await fetchJSON<ReactiveResponse>(
 
 const strReactiveResponse = headers.get("x-reactive-response");
 const reactive = strReactiveResponse
-  ? (JSON.parse(strReactiveResponse) as ReactiveResponse)
+  ? (JSON.parse(strReactiveResponse, (key: string, value: string) => {
+      if (key == "watermark") return BigInt(value);
+      return value;
+    }) as ReactiveResponse)
   : undefined;
 
 if (!reactive) {
