@@ -1,9 +1,5 @@
 module Skargo;
 
-// FIXME: Move into stdlib.
-@cpp_extern("SKIP_get_mtime")
-native fun getLastModificationTime(fileName: String): Int;
-
 class OutputFile(
   /// Absolute path to the produced file.
   path: String,
@@ -129,7 +125,12 @@ mutable class BuildRunner(
     if (!this.fingerprints.containsKey(unit)) {
       this.fingerprints![unit] = (
         unit.target.srcs
-          .map(f -> (f, getLastModificationTime(Path.join(unit.pkg.root(), f))))
+          .map(f ->
+            (
+              f,
+              FileSystem.getLastModificationTime(Path.join(unit.pkg.root(), f)),
+            )
+          )
           .collect(Array),
         this.bctx.unit_graph[unit].map(dep -> this.fingerprint_for(dep)),
         this.bctx.build_config,
@@ -144,7 +145,12 @@ mutable class BuildRunner(
             FileSystem.readTextFile(dep_file)
               .split("\n")
               .map(f ->
-                (f, getLastModificationTime(Path.join(unit.pkg.root(), f)))
+                (
+                  f,
+                  FileSystem.getLastModificationTime(
+                    Path.join(unit.pkg.root(), f),
+                  ),
+                )
               )
               .collect(Array)
           } else {
