@@ -4,7 +4,7 @@
  * overview page] for a detailed description and introduction to the SkipRuntime system.
  */
 
-import type { Opt, int } from "std";
+import type { Opaque, Opt, int } from "std";
 import type { Constant } from "./internals/skipruntime_module.js";
 
 /**
@@ -18,8 +18,8 @@ export type JSONObject = { [key: string]: TJSON | null };
 /**
  * A `Param` is a valid parameter to a Skip runtime mapper function: either a constant JS
  * value or a Skip-runtime-managed value.  In either case, restricting mapper parameters to
- * this type ensures that reactive computations can be re-evaluated as needed with consistent
- * semantics.
+ * this type helps developers to ensure that reactive computations can be re-evaluated as
+ * needed with consistent semantics.
  */
 export type Param =
   | null
@@ -234,7 +234,7 @@ export interface EagerCollection<K extends TJSON, V extends TJSON>
  * The type of a _lazy_ reactive function which produces a value for some `key`, possibly using a `self` reference to get/produce other lazily-computed results.
  */
 export interface LazyCompute<K extends TJSON, V extends TJSON> {
-  compute(selfHdl: LazyCollection<K, V>, key: K): Opt<V>;
+  compute(self: LazyCollection<K, V>, key: K): Opt<V>;
 }
 
 export interface Context extends Constant {
@@ -261,11 +261,20 @@ export interface Context extends Constant {
 
 export type Entry<K extends TJSON, V extends TJSON> = [K, V[]];
 
-export type Notifier<K extends TJSON, V extends TJSON> = (
-  values: Entry<K, V>[],
-  watermark: number,
-  update: boolean,
-) => void;
+export type Watermark = Opaque<bigint, "watermark">;
+export type SubscriptionID = Opaque<bigint, "subscription">;
+
+/**
+ * Represents some update(s) to a collection, containing: an array of all updated keys and
+ * their new `values`, where an empty value array indicates deletion; a new `watermark` for
+ * the point after these updates; and, a flag `isInitial` which is set when this update is
+ * the initial chunk of data rather than an update to the preceding state.
+ */
+export type CollectionUpdate<K extends TJSON, V extends TJSON> = {
+  values: Entry<K, V>[];
+  watermark: Watermark;
+  isInitial?: boolean;
+};
 
 export interface SkipRuntime {
   // READ
@@ -298,12 +307,12 @@ export interface SkipRuntime {
 
   subscribe<K extends TJSON, V extends TJSON>(
     reactiveId: string,
-    from: string,
-    notify: Notifier<K, V>,
+    since: Watermark,
+    f: (update: CollectionUpdate<K, V>) => void,
     reactiveAuth?: Uint8Array,
-  ): bigint;
+  ): SubscriptionID;
 
-  unsubscribe(id: bigint): void;
+  unsubscribe(id: SubscriptionID): void;
 
   // WRITE
 
@@ -349,5 +358,5 @@ export interface SkipService {
 
 export type ReactiveResponse = {
   collection: string;
-  watermark: number;
+  watermark: Watermark;
 };
