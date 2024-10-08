@@ -18,7 +18,12 @@ export function createRESTServer(runtime: SkipRuntime): express.Express {
         req.query as Record<string, string>,
         reactiveAuth,
       );
-      res.set("X-Reactive-Response", JSON.stringify(data));
+      res.set(
+        "X-Reactive-Response",
+        JSON.stringify(data, (_key: string, value: unknown) =>
+          typeof value === "bigint" ? value.toString() : value,
+        ),
+      );
       res.status(200).json({});
     } catch (e: unknown) {
       res.status(500).json(e instanceof Error ? e.message : e);
