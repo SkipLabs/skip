@@ -13,7 +13,7 @@ interface Closable {
 }
 
 export class RemoteResources implements ExternalSupplier {
-  private client?: Client;
+  private client?: Promise<[Client, Protocol.Creds]>;
   private resources = new Map<string, Closable>();
 
   constructor(
@@ -76,6 +76,18 @@ export class RemoteResources implements ExternalSupplier {
     cb: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void,
     reactiveAuth?: Uint8Array,
   ): void {
+    if (!this.client) {
+      if (!this.creds) {
+        this.client = Protocol.generateCredentials().then((creds) => {
+          this.creds = creds;
+          return connect(this.uri, this.creds).then((c) => [c, creds]);
+        });
+      } else {
+        this.client = connect(this.uri, this.creds).then((c) => {
+          return [c, this.creds!];
+        });
+      }
+    }
     this.link_(resource, params, cb, reactiveAuth).catch((e: unknown) => {
       console.error(e);
     });
@@ -98,17 +110,10 @@ export class RemoteResources implements ExternalSupplier {
     cb: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void,
     reactiveAuth?: Uint8Array,
   ): Promise<void> {
-    if (!this.creds) {
-      this.creds = await Protocol.generateCredentials();
-    }
-    const publicKey = new Uint8Array(
-      await Protocol.exportKey(this.creds.publicKey),
-    );
+    const [client, creds] = await this.client!;
+    const publicKey = new Uint8Array(await Protocol.exportKey(creds.publicKey));
     const reactive = await this.auth(resource, params, publicKey);
-    if (!this.client) {
-      this.client = await connect(this.uri, this.creds);
-    }
-    const close = this.client.subscribe(
+    const close = client.subscribe(
       reactive.collection,
       BigInt(reactive.watermark),
       cb,
