@@ -65,7 +65,10 @@ export class RemoteResources implements ExternalSupplier {
       const reactiveResponse = headers.get("x-reactive-response");
       if (!reactiveResponse)
         throw new Error("Reactive response must be suplied.");
-      return JSON.parse(reactiveResponse) as ReactiveResponse;
+      return JSON.parse(reactiveResponse, (key: string, value: string) => {
+        if (key == "watermark") return BigInt(value);
+        return value;
+      }) as ReactiveResponse;
     };
     return new RemoteResources(uri, auth, creds);
   }
