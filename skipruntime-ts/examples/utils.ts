@@ -87,7 +87,7 @@ class SkipHttpAccessV1 {
     }
     this.client.subscribe(
       reactive.collection,
-      BigInt(reactive.watermark),
+      reactive.watermark,
       (updates: [string, TJSON[]][], isInit: boolean) => {
         console.log("Update", Object.fromEntries(updates), isInit);
       },

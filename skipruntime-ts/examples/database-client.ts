@@ -40,7 +40,7 @@ const client = await connect(`ws://localhost:${replication.toString()}`, creds);
 
 client.subscribe(
   reactive.collection,
-  BigInt(reactive.watermark),
+  reactive.watermark,
   (updates: [string, TJSON[]][], isInit: boolean) => {
     console.log("Update", Object.fromEntries(updates), isInit);
   },
