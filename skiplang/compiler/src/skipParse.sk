@@ -133,9 +133,8 @@ fun writeFiles(
 
   for (lib_name => dep in dependencies) {
     (lib_path, _) = dep;
-    file = IO.File::open(lib_path, IO.OpenOptions{read => true});
-    lib = Sklib::read(file) match {
-    | Success(lib) -> lib
+    lib_metadata = Sklib.read_metadata(lib_path) match {
+    | Success(data) -> data
     | Failure(err) ->
       print_error(`Could not read ${lib_path}: ${err}`);
       skipExit(3)
@@ -144,27 +143,19 @@ fun writeFiles(
     for (f in old_files_per_package
       .maybeGet(lib_name)
       .default(SortedSet[])
-      .difference(SortedSet::createFromIterator(lib.sources.keys()))) {
+      .difference(
+        SortedSet::createFromItems(lib_metadata.sources.map(s -> s.i0)),
+      )) {
       stale_files.push(`${lib_name}:${f}`)
     };
 
-    for (src_path => header in lib.sources) {
+    for ((src_path, lastModifTime, contents) in lib_metadata.sources) {
       key = `${lib_name}:${src_path}`;
       current_files.push(key);
-
-      lastModifTime = header.mtime;
       timeArr = fileTimeDir.unsafeGetArray(context, SKStore.SID(key));
       if (timeArr.size() > 0 && timeArr[0].value == lastModifTime) continue;
-      contents = lib.read_file(src_path) match {
-      | Success(v) -> v
-      | Failure(err) ->
-        print_error(`Could not read ${src_path} from ${lib_path} (${err})`);
-        skipExit(3)
-      };
       writeFile(context, key, lastModifTime, contents)
-    };
-
-    file.close();
+    }
   };
 
   for (file_name in stale_files) {
