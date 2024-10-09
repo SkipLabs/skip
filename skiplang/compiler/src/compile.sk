@@ -411,7 +411,8 @@ fun compile_sklib(conf: Config.Config): void {
       conf.target,
       getcwd(),
     );
-
+    // FIXME: Do not write available but not accessed env vars to sklib.
+    Environ.vars().each(kv -> sklib.add_env_var(kv.i0, kv.i1));
     conf.direct_dependencies.each(dep_name ->
       sklib.add_dependency(dep_name, conf.dependencies[dep_name].i1)
     );

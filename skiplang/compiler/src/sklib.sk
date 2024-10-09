@@ -10,6 +10,7 @@ class Metadata{
   hash: String,
   pkg_dir: String,
   sources: Array<(String, Int, String)>,
+  env: Array<(String, String)>,
   dependencies: Array<(String, String)>,
   links: Array<String>,
   preambles: Array<String>,
@@ -31,6 +32,13 @@ class Metadata{
               "contents" => JSON.String(contents),
             ]
           }),
+        ),
+      ),
+      "env" => JSON.Array(
+        Vector::createFromItems(
+          this.env.map(e ->
+            JSON.Array(Vector[JSON.String(e.i0), JSON.String(e.i1)])
+          ),
         ),
       ),
       "dependencies" => JSON.Array(
@@ -78,6 +86,19 @@ class Metadata{
           )
         })
         .collect(Array),
+      env => try {
+        json["env"]
+          .expectArray()
+          .value.map(a -> {
+            kv = a.expectArray().value;
+            (kv[0].expectString(), kv[1].expectString())
+          })
+          .collect(Array)
+      } catch {
+      // TODO: Get rid of this once bootstrap is updated.
+      | JSON.KeyNotFoundError("env") -> Array[]
+      | e -> throw e
+      },
       dependencies => json["dependencies"]
         .expectArray()
         .value.map(o -> {
@@ -124,6 +145,7 @@ mutable class .SklibBuilder(
   name: String,
   target: String,
   pkg_dir: String,
+  env: mutable Vector<(String, String)> = mutable Vector[],
   sources: mutable Vector<(String, Int, String)> = mutable Vector[],
   dependencies: mutable Vector<(String, String)> = mutable Vector[],
   links: mutable Vector<String> = mutable Vector[],
@@ -170,12 +192,17 @@ mutable class .SklibBuilder(
     )
   }
 
+  mutable fun add_env_var(key: String, value: String): void {
+    this.env.push((key, value))
+  }
+
   readonly fun hash(): Int {
     // TODO: Digest everything, including compiler version.
     (
       this.name,
       this.target,
       this.sources.sortedBy(s ~> s.i0).collect(Array),
+      this.env.sorted(),
       // FIXME: Bytes should implement Hashable. For now, we convert to String.
       this.files.sortedBy(f ~> Path.basename(f.i0)).map(f ->
         (f.i0, f.i1.toString())
@@ -200,6 +227,7 @@ mutable class .SklibBuilder(
         hash => this.hash().toString(),
         pkg_dir => this.pkg_dir,
         sources => this.sources.collect(Array),
+        env => this.env.collect(Array),
         dependencies => this.dependencies.collect(Array),
         links => this.links.collect(Array),
         preambles => this.preambles.collect(Array),

@@ -3816,7 +3816,9 @@ fun expr_(
   | A.Literal(l) -> N.Literal(l)
   | A.Var(n) -> N.Var(n)
   | A.MacroVar(n) -> expandExpressionMacro(env, n)
-  | A.Seq _ -> invariant_violation("assert false")
+  | A.Seq _
+  | A.EnvMacro _ ->
+    invariant_violation("assert false")
   | A.If(e1, e2, e3) ->
     N.If(
       expr(context, acc, env, e1),

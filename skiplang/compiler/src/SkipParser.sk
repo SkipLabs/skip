@@ -4508,7 +4508,8 @@ mutable class SkipParser{
     | TokenKind.YIELD()
     | TokenKind.FOREACH_FIELD()
     | TokenKind.FOREACH_FUNCTION()
-    | TokenKind.LOG() ->
+    | TokenKind.LOG()
+    | TokenKind.ENV() ->
       true
     // async, untracked, mutable, static and class can start a declaration, so must disambiguate after functions
     // which have pattern branch lists as bodies
@@ -4551,6 +4552,7 @@ mutable class SkipParser{
     | TokenKind.FOREACH_FIELD() -> this.parseForEachFieldMacro()
     | TokenKind.FOREACH_FUNCTION() -> this.parseForEachFunctionMacro()
     | TokenKind.LOG() -> this.parseLogMacro()
+    | TokenKind.ENV() -> this.parseEnvMacro()
     | _ -> this.parseWithExpression()
     }
   }
@@ -4773,6 +4775,31 @@ mutable class SkipParser{
     ParseTree.LogMacroTree{range => this.createRange(start), keyword, params}
   }
 
+  // env:
+  //    #env  (  string-literal  )
+  mutable fun parseEnvMacro(): ParseTree {
+    start = this.mark();
+    envKeyword = this.eatTree(TokenKind.ENV());
+    openParen = this.eatTree(TokenKind.OPEN_PAREN());
+    varName = this.peek() match {
+    | TokenKind.STRING_LITERAL() -> this.eatTree(TokenKind.STRING_LITERAL())
+    | _ ->
+      this.errorResult(
+        errorInvalidEnvMacroArgument,
+        `Unexpected '${this.peekToken().value}'.`,
+      )
+    };
+    closeParen = this.eatTree(TokenKind.CLOSE_PAREN());
+
+    ParseTree.EnvMacroTree{
+      range => this.createRange(start),
+      envKeyword,
+      openParen,
+      varName,
+      closeParen,
+    }
+  }
+
   // for-each-loop-expression:
   //    forEach  (  for-each-value  in  expression  )  binding-expression  else-branch-opt
   mutable fun parseForEachLoopExpression(): ParseTree {
@@ -4945,7 +4972,8 @@ mutable class SkipParser{
     | ParseTree.YieldBreakExpressionTree _
     | ParseTree.ForEachFieldMacroTree _
     | ParseTree.ForEachFunctionMacroTree _
-    | ParseTree.LogMacroTree _ ->
+    | ParseTree.LogMacroTree _
+    | ParseTree.EnvMacroTree _ ->
       void
 
     | ParseTree.CallArrayExpressionTree{func, bang} ->
@@ -5261,5 +5289,6 @@ const errorTooManyForEachFieldArguments: Int = 192;
 const errorLambdaTypeExpected: Int = 193;
 const errorExpectedLogArguments: Int = 194;
 const errorTooManyLogArguments: Int = 195;
+const errorInvalidEnvMacroArgument: Int = 196;
 
 module end;

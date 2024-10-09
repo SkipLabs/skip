@@ -341,6 +341,7 @@ fun expr_<Tenv: frozen, Tacc>(
   | Ast.ForEachFunctionMacro(annotation, function, functionName, body) ->
     (!acc, !body) = k(f, env, acc, body);
     (acc, Ast.ForEachFunctionMacro(annotation, function, functionName, body))
+  | x @ Ast.EnvMacro _ -> (acc, x)
   }
 }
 
