@@ -69,6 +69,11 @@ update-js-deps:
 check:
 	find * -name Skargo.toml -exec sh -c 'bin/cd_sh $$(dirname {}) "skargo check"' \;
 
+.PHONY: check-ts
+check-ts:
+	bun install
+	bin/check-ts.sh
+
 .PHONY: clean
 clean:
 	rm -Rf build
