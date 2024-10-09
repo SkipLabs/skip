@@ -44,7 +44,7 @@ nodeclient-%: build
 	node examples/dist/$*-client.js
 
 nodeserver-%: build
-	node examples/dist/&*-server.js
+	node examples/dist/$*-server.js
 
 .PHONY: clean
 clean:
