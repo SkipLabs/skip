@@ -26,7 +26,7 @@ build:
 
 .PHONY: bunbuild
 bunbuild:
-	cd .. && bun install && bun run build
+	cd .. && bun install && npm run build
 
 bunrun-%: bunbuild
 	bun run examples/$*.ts
