@@ -29,12 +29,10 @@ class MultResource implements Resource {
     const sub = context.useExternalResource<string, number>(
       "sumexample",
       "sub",
-      {},
     );
     const add = context.useExternalResource<string, number>(
       "sumexample",
       "add",
-      {},
     );
     return sub.merge(add).map(Mult);
   }
