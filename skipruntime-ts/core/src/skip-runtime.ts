@@ -24,7 +24,13 @@ export type {
 
 export { UnknownCollectionError } from "./skipruntime_errors.js";
 export { ValueMapper } from "./skipruntime_api.js";
-export { Sum, Min, Max, parseReactiveResponse } from "./skipruntime_utils.js";
+export {
+  Sum,
+  Min,
+  Max,
+  parseReactiveResponse,
+  reactiveResponseHeader,
+} from "./skipruntime_utils.js";
 export { freeze } from "./skipruntime_init.js";
 export {
   fetchJSON,

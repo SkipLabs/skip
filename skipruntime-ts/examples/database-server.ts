@@ -1,4 +1,5 @@
 import { SkipRESTRuntime } from "@skipruntime/core";
+import { reactiveResponseHeader } from "@skipruntime/core";
 
 import express from "express";
 
@@ -47,7 +48,8 @@ app.head("/auth/users", (req, res) => {
   runtime
     .head("users", {}, reactiveAuth)
     .then((reactiveResponse) => {
-      res.set("Skip-Reactive-Response-Token", JSON.stringify(reactiveResponse));
+      const [name, value] = reactiveResponseHeader(reactiveResponse);
+      res.set(name, value);
       res.status(200).json({});
     })
     .catch(() => {
