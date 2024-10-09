@@ -15,10 +15,7 @@ import type {
   ExternalSupplier,
 } from "../src/skip-runtime.js";
 import { Sum, ValueMapper, initService } from "../src/skip-runtime.js";
-import {
-  TimeCollection,
-  ExternalResources,
-} from "../src/skipruntime_helpers.js";
+import { TimeCollection, ExternalService } from "../src/skipruntime_helpers.js";
 
 //// testMap1
 
@@ -790,7 +787,7 @@ class ExternalResource implements Resource {
   }
 }
 
-class ExternalService implements SkipService {
+class TestExternalService implements SkipService {
   inputCollections = { input1: [], input2: [] };
   resources = { external: ExternalResource };
   externalServices = { external: new External() };
@@ -806,9 +803,9 @@ class ExternalService implements SkipService {
   }
 }
 
-it("testExtenal", async () => {
+it("testExternal", async () => {
   const resource = "external";
-  const runtime = await initService(new ExternalService());
+  const runtime = await initService(new TestExternalService());
   runtime.update("input1", [
     [0, [10]],
     [1, [20]],
@@ -863,7 +860,7 @@ class TokensResource implements Resource {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-const system = new ExternalResources({ timer: new TimeCollection() });
+const system = new ExternalService({ timer: new TimeCollection() });
 
 class TokensService implements SkipService {
   inputCollections = { input: [] };

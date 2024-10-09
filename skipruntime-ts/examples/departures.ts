@@ -5,7 +5,7 @@ import type {
   Resource,
 } from "@skipruntime/core";
 import { runService } from "@skipruntime/server";
-import { ExternalResources, Polled } from "@skipruntime/core";
+import { ExternalService, Polled } from "@skipruntime/core";
 
 type Departure = {
   year: string;
@@ -58,7 +58,7 @@ class Service implements SkipService {
     departures: DeparturesResource,
   };
   externalServices = {
-    http: new ExternalResources({ departures }),
+    http: new ExternalService({ departures }),
   };
 
   reactiveCompute(

@@ -14,7 +14,7 @@ export interface ExternalResource {
   ): void;
 }
 
-export class ExternalResources implements ExternalSupplier {
+export class ExternalService implements ExternalSupplier {
   constructor(private resources: Record<string, ExternalResource>) {}
 
   link(

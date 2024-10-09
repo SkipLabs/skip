@@ -34,6 +34,6 @@ export {
 export { RemoteResources } from "./skipruntime_remote.js";
 export {
   type ExternalResource,
-  ExternalResources,
+  ExternalService,
   Polled,
 } from "./skipruntime_helpers.js";
