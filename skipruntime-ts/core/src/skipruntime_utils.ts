@@ -1,5 +1,5 @@
 import type { Opt } from "std";
-import type { Accumulator } from "./skipruntime_api.js";
+import type { Accumulator, ReactiveResponse } from "./skipruntime_api.js";
 
 export class Sum implements Accumulator<number, number> {
   default = 0;
@@ -35,4 +35,18 @@ export class Max implements Accumulator<number, number> {
   dismiss(acc: number, value: number): Opt<number> {
     return value < acc ? acc : null;
   }
+}
+
+export function parseReactiveResponse(
+  header: Headers | string,
+): ReactiveResponse | undefined {
+  const strReactiveResponse =
+    typeof header == "string"
+      ? header
+      : header.get("Skip-Reactive-Response-Token");
+  if (!strReactiveResponse) return undefined;
+  return JSON.parse(strReactiveResponse, (key: string, value: string) => {
+    if (key == "watermark") return BigInt(value);
+    return value;
+  }) as ReactiveResponse;
 }
