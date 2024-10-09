@@ -1,6 +1,6 @@
 /**
- * This file contains the SkipRuntime public API: types, interfaces, and operations that can be
- * used to specify and interact with reactive computations. See [todo: pointer to public
+ * This file contains the Skip Runtime public API: types, interfaces, and operations that can
+ * be used to specify and interact with reactive computations. See [todo: pointer to public
  * overview page] for a detailed description and introduction to the SkipRuntime system.
  */
 
@@ -350,7 +350,7 @@ export interface ExternalSupplier {
 
 export interface Resource {
   reactiveCompute(
-    conetxt: Context,
+    context: Context,
     collections: Record<string, EagerCollection<TJSON, TJSON>>,
     publicToken?: Uint8Array,
   ): EagerCollection<TJSON, TJSON>;
