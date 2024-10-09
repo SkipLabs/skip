@@ -7,7 +7,7 @@ import type {
   SkipService,
   Resource,
 } from "@skipruntime/core";
-import { RemoteResources } from "@skipruntime/core";
+import { ExternalSkipService } from "@skipruntime/core";
 
 import { runService } from "@skipruntime/server";
 
@@ -41,7 +41,7 @@ class MultResource implements Resource {
 class Service implements SkipService {
   resources = { data: MultResource };
   externalServices = {
-    sumexample: RemoteResources.direct({ host: "localhost", port: 3587 }),
+    sumexample: ExternalSkipService.direct({ host: "localhost", port: 3587 }),
   };
 
   reactiveCompute(
