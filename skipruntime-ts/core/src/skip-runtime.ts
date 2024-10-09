@@ -31,7 +31,7 @@ export {
   SkipRESTRuntime,
   type Entrypoint,
 } from "./skipruntime_rest.js";
-export { RemoteResources } from "./skipruntime_remote.js";
+export { ExternalSkipService } from "./skipruntime_remote.js";
 export {
   type ExternalResource,
   ExternalService,
