@@ -47,7 +47,7 @@ app.head("/auth/users", (req, res) => {
   runtime
     .head("users", {}, reactiveAuth)
     .then((reactiveResponse) => {
-      res.set("X-Reactive-Response", JSON.stringify(reactiveResponse));
+      res.set("Skip-Reactive-Response-Token", JSON.stringify(reactiveResponse));
       res.status(200).json({});
     })
     .catch(() => {
