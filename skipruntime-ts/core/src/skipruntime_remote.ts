@@ -4,6 +4,7 @@ import type {
   ReactiveResponse,
   TJSON,
 } from "./skipruntime_api.js";
+import { getReactiveResponse } from "./skipruntime_utils.js";
 
 import { connect, Protocol, Client } from "@skipruntime/client";
 import { fetchJSON, type Entrypoint } from "./skipruntime_rest.js";
@@ -62,13 +63,10 @@ export class ExternalSkipService implements ExternalSupplier {
         "HEAD",
         header,
       );
-      const reactiveResponse = headers.get("x-reactive-response");
+      const reactiveResponse = getReactiveResponse(headers);
       if (!reactiveResponse)
         throw new Error("Reactive response must be suplied.");
-      return JSON.parse(reactiveResponse, (key: string, value: string) => {
-        if (key == "watermark") return BigInt(value);
-        return value;
-      }) as ReactiveResponse;
+      return reactiveResponse;
     };
     return new ExternalSkipService(uri, auth, creds);
   }
