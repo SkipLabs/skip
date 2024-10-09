@@ -47,7 +47,8 @@ class DeparturesResource implements Resource {
       asylum: get("asylum", "JOR,LBN"),
       resettlement: get("resettlement", "NOR,USA"),
     };
-    return context.manageResource("http", "departures", params);
+
+    return context.useExternalResource("http", "departures", params);
   }
 }
 
@@ -56,7 +57,7 @@ class Service implements SkipService {
   resources = {
     departures: DeparturesResource,
   };
-  remoteCollections = {
+  externalServices = {
     http: new ExternalResources({ departures }),
   };
 

@@ -293,7 +293,7 @@ export interface FromWasm {
     pattern: ptr<Internal.String>,
   ): ptr<Internal.CJArray>;
 
-  SkipRuntime_Context__manageResource(
+  SkipRuntime_Context__useExternalResource(
     supplier: ptr<Internal.String>,
     resource: ptr<Internal.String>,
     params: ptr<Internal.CJObject>,
@@ -748,17 +748,15 @@ class LinksImpl implements Links {
   initService(service: SkipService): SkipRuntime {
     const skjson = this.getSkjson();
     const result = skjson.runWithGC(() => {
-      const skremoteCollections =
+      const skExternalServices =
         this.fromWasm.SkipRuntime_ExternalSupplierMap__create();
-      if (service.remoteCollections) {
-        for (const [name, remote] of Object.entries(
-          service.remoteCollections,
-        )) {
+      if (service.externalServices) {
+        for (const [name, remote] of Object.entries(service.externalServices)) {
           const skremote = this.fromWasm.SkipRuntime_createExternalSupplier(
             this.handles.register(remote),
           );
           this.fromWasm.SkipRuntime_ExternalSupplierMap__add(
-            skremoteCollections,
+            skExternalServices,
             skjson.exportString(name),
             skremote,
           );
@@ -782,7 +780,7 @@ class LinksImpl implements Links {
         this.handles.register(service),
         skjson.exportJSON(service.inputCollections ?? {}),
         skresources,
-        skremoteCollections,
+        skExternalServices,
       );
       return this.fromWasm.SkipRuntime_initService(skservice);
     });
@@ -1009,18 +1007,19 @@ class ContextImpl extends SkFrozen implements Context {
     return new LazyCollectionImpl<K, V>(lazyCollection, this.refs);
   }
 
-  manageResource<K extends TJSON, V extends TJSON>(
+  useExternalResource<K extends TJSON, V extends TJSON>(
     supplier: string,
     resource: string,
-    params: Record<string, string>,
+    params: Record<string, string | number>,
     reactiveAuth?: Uint8Array,
   ): EagerCollection<K, V> {
-    const skcollection = this.refs.fromWasm.SkipRuntime_Context__manageResource(
-      this.refs.skjson.exportString(supplier),
-      this.refs.skjson.exportString(resource),
-      this.refs.skjson.exportJSON(params),
-      reactiveAuth ? this.refs.skjson.exportBytes(reactiveAuth) : null,
-    );
+    const skcollection =
+      this.refs.fromWasm.SkipRuntime_Context__useExternalResource(
+        this.refs.skjson.exportString(supplier),
+        this.refs.skjson.exportString(resource),
+        this.refs.skjson.exportJSON(params),
+        reactiveAuth ? this.refs.skjson.exportBytes(reactiveAuth) : null,
+      );
     const collection = this.refs.skjson.importString(skcollection);
     return new EagerCollectionImpl<K, V>(collection, this.refs);
   }

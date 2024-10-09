@@ -778,28 +778,22 @@ class ExternalResource implements Resource {
     },
     reactiveAuth?: Uint8Array,
   ): EagerCollection<number, number[]> {
-    const v1 = cs.input2.maybeGetOne(0);
-    const v2 = cs.input2.maybeGetOne(1);
-    const external = context.manageResource(
+    const v1 = (cs.input2.maybeGetOne(0) ?? 0).toString();
+    const v2 = (cs.input2.maybeGetOne(1) ?? 0).toString();
+    const external = context.useExternalResource<number, number>(
       "external",
       "mock",
-      {
-        v1: (v1 ?? 0).toString(),
-        v2: (v2 ?? 0).toString(),
-      },
+      { v1, v2 },
       reactiveAuth,
     );
-    return cs.input1.map(
-      ExternalCheck,
-      external as EagerCollection<number, number>,
-    );
+    return cs.input1.map(ExternalCheck, external);
   }
 }
 
 class ExternalService implements SkipService {
   inputCollections = { input1: [], input2: [] };
   resources = { external: ExternalResource };
-  remoteCollections = { external: new External() };
+  externalServices = { external: new External() };
 
   reactiveCompute(
     _context: Context,
@@ -859,7 +853,7 @@ class TokensResource implements Resource {
     _cs: Record<string, EagerCollection<TJSON, TJSON>>,
     reactiveAuth?: Uint8Array,
   ): EagerCollection<string, number> {
-    return context.manageResource(
+    return context.useExternalResource(
       "system",
       "timer",
       { "5ms": 5 },
@@ -874,7 +868,7 @@ const system = new ExternalResources({ timer: new TimeCollection() });
 class TokensService implements SkipService {
   inputCollections = { input: [] };
   resources = { tokens: TokensResource };
-  remoteCollections = { system };
+  externalServices = { system };
 
   reactiveCompute(
     _context: Context,
