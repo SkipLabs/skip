@@ -1,6 +1,9 @@
 import express from "express";
 import type { Entry, TJSON, SkipRuntime } from "@skipruntime/core";
-import { UnknownCollectionError } from "@skipruntime/core";
+import {
+  UnknownCollectionError,
+  reactiveResponseHeader,
+} from "@skipruntime/core";
 
 export function createRESTServer(runtime: SkipRuntime): express.Express {
   const app = express();
@@ -18,12 +21,8 @@ export function createRESTServer(runtime: SkipRuntime): express.Express {
         req.query as Record<string, string>,
         reactiveAuth,
       );
-      res.set(
-        "Skip-Reactive-Response-Token",
-        JSON.stringify(data, (_key: string, value: unknown) =>
-          typeof value === "bigint" ? value.toString() : value,
-        ),
-      );
+      const [name, value] = reactiveResponseHeader(data);
+      res.set(name, value);
       res.status(200).json({});
     } catch (e: unknown) {
       res.status(500).json(e instanceof Error ? e.message : e);
@@ -56,7 +55,8 @@ export function createRESTServer(runtime: SkipRuntime): express.Express {
         reactiveAuth,
       );
       if (data.reactive) {
-        res.set("Skip-Reactive-Response-Token", JSON.stringify(data.reactive));
+        const [name, value] = reactiveResponseHeader(data.reactive);
+        res.set(name, value);
       }
       res.status(200).json(data.values);
     } catch (e: unknown) {
