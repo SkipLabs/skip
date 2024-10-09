@@ -1,4 +1,8 @@
-import { fetchJSON, type ReactiveResponse } from "@skipruntime/core";
+import {
+  fetchJSON,
+  type ReactiveResponse,
+  getReactiveResponse,
+} from "@skipruntime/core";
 import { connect, Protocol } from "@skipruntime/client";
 import type { TJSON } from "@skipruntime/client/protocol.js";
 
@@ -27,13 +31,7 @@ const [_e, headers] = await fetchJSON<ReactiveResponse>(
   header,
 );
 
-const strReactiveResponse = headers.get("x-reactive-response");
-const reactive = strReactiveResponse
-  ? (JSON.parse(strReactiveResponse, (key: string, value: string) => {
-      if (key == "watermark") return BigInt(value);
-      return value;
-    }) as ReactiveResponse)
-  : undefined;
+const reactive = getReactiveResponse(headers);
 
 if (!reactive) {
   throw new Error("Reactive response must be supplied.");

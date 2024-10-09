@@ -276,6 +276,17 @@ export type CollectionUpdate<K extends TJSON, V extends TJSON> = {
   isInitial?: boolean;
 };
 
+/**
+ * A `ReactiveResponse` contains metadata which can be used to initiate and manage reactive
+ * connections to/from a service.  It specifies a `collection` and a current `watermark`,
+ * and is sent by Skip services in the `"x-reactive-response"` HTTP header by default,
+ * allowing clients to initiate reactive subscriptions or request diffs as needed.
+ */
+export type ReactiveResponse = {
+  collection: string;
+  watermark: Watermark;
+};
+
 export interface SkipRuntime {
   // READ
   getAll<K extends TJSON, V extends TJSON>(
@@ -355,8 +366,3 @@ export interface SkipService {
     inputCollections: Record<string, EagerCollection<TJSON, TJSON>>,
   ): Record<string, EagerCollection<TJSON, TJSON>>;
 }
-
-export type ReactiveResponse = {
-  collection: string;
-  watermark: Watermark;
-};
