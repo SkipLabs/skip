@@ -40,7 +40,7 @@ export class Max implements Accumulator<number, number> {
 export function getReactiveResponse(
   httpHeaders: Headers,
 ): ReactiveResponse | undefined {
-  const strReactiveResponse = httpHeaders.get("x-reactive-response");
+  const strReactiveResponse = httpHeaders.get("Skip-Reactive-Response-Token");
   if (!strReactiveResponse) return undefined;
   return JSON.parse(strReactiveResponse, (key: string, value: string) => {
     if (key == "watermark") return BigInt(value);
