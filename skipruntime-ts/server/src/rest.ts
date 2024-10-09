@@ -19,7 +19,7 @@ export function createRESTServer(runtime: SkipRuntime): express.Express {
         reactiveAuth,
       );
       res.set(
-        "X-Reactive-Response",
+        "Skip-Reactive-Response-Token",
         JSON.stringify(data, (_key: string, value: unknown) =>
           typeof value === "bigint" ? value.toString() : value,
         ),
@@ -56,7 +56,7 @@ export function createRESTServer(runtime: SkipRuntime): express.Express {
         reactiveAuth,
       );
       if (data.reactive) {
-        res.set("X-Reactive-Response", JSON.stringify(data.reactive));
+        res.set("Skip-Reactive-Response-Token", JSON.stringify(data.reactive));
       }
       res.status(200).json(data.values);
     } catch (e: unknown) {

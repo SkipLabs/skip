@@ -1,6 +1,6 @@
 /**
- * This file contains the SkipRuntime public API: types, interfaces, and operations that can be
- * used to specify and interact with reactive computations. See [todo: pointer to public
+ * This file contains the Skip Runtime public API: types, interfaces, and operations that can
+ * be used to specify and interact with reactive computations. See [todo: pointer to public
  * overview page] for a detailed description and introduction to the SkipRuntime system.
  */
 
@@ -276,6 +276,17 @@ export type CollectionUpdate<K extends TJSON, V extends TJSON> = {
   isInitial?: boolean;
 };
 
+/**
+ * A `ReactiveResponse` contains metadata which can be used to initiate and manage reactive
+ * connections to/from a service.  It specifies a `collection` and a current `watermark`,
+ * and is sent by Skip services in the `"Skip-Reactive-Response-Token"` HTTP header by default,
+ * allowing clients to initiate reactive subscriptions or request diffs as needed.
+ */
+export type ReactiveResponse = {
+  collection: string;
+  watermark: Watermark;
+};
+
 export interface SkipRuntime {
   // READ
   getAll<K extends TJSON, V extends TJSON>(
@@ -339,7 +350,7 @@ export interface ExternalSupplier {
 
 export interface Resource {
   reactiveCompute(
-    conetxt: Context,
+    context: Context,
     collections: Record<string, EagerCollection<TJSON, TJSON>>,
     publicToken?: Uint8Array,
   ): EagerCollection<TJSON, TJSON>;
@@ -355,8 +366,3 @@ export interface SkipService {
     inputCollections: Record<string, EagerCollection<TJSON, TJSON>>,
   ): Record<string, EagerCollection<TJSON, TJSON>>;
 }
-
-export type ReactiveResponse = {
-  collection: string;
-  watermark: Watermark;
-};
