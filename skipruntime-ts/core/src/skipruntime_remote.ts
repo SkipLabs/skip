@@ -12,7 +12,7 @@ interface Closable {
   close(): void;
 }
 
-export class RemoteResources implements ExternalSupplier {
+export class ExternalSkipService implements ExternalSupplier {
   private client?: Promise<[Client, Protocol.Creds]>;
   private resources = new Map<string, Closable>();
 
@@ -34,17 +34,17 @@ export class RemoteResources implements ExternalSupplier {
       reactiveAuth: Uint8Array,
     ) => Promise<ReactiveResponse>,
     creds?: Protocol.Creds,
-  ): RemoteResources {
+  ): ExternalSkipService {
     let uri = `ws://${entrypoint.host}:${entrypoint.port.toString()}`;
     if (entrypoint.secured)
       uri = `wss://${entrypoint.host}:${entrypoint.port.toString()}`;
-    return new RemoteResources(uri, auth, creds);
+    return new ExternalSkipService(uri, auth, creds);
   }
 
   static direct(
     entrypoint: Entrypoint,
     creds?: Protocol.Creds,
-  ): RemoteResources {
+  ): ExternalSkipService {
     let uri = `http://${entrypoint.host}:${entrypoint.port.toString()}`;
     if (entrypoint.secured)
       uri = `https://${entrypoint.host}:${entrypoint.port.toString()}`;
@@ -70,7 +70,7 @@ export class RemoteResources implements ExternalSupplier {
         return value;
       }) as ReactiveResponse;
     };
-    return new RemoteResources(uri, auth, creds);
+    return new ExternalSkipService(uri, auth, creds);
   }
 
   link(

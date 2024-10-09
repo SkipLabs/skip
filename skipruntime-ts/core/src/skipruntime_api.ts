@@ -249,10 +249,10 @@ export interface Context extends Constant {
     ...params: Params
   ): LazyCollection<K, V>;
 
-  manageResource<K extends TJSON, V extends TJSON>(
+  useExternalResource<K extends TJSON, V extends TJSON>(
     supplier: string,
     resource: string,
-    params: Record<string, string | number>,
+    params?: Record<string, string | number>,
     reactiveAuth?: Uint8Array,
   ): EagerCollection<K, V>;
 
@@ -347,7 +347,7 @@ export interface Resource {
 
 export interface SkipService {
   inputCollections?: Record<string, [TJSON, TJSON][]>;
-  remoteCollections?: Record<string, ExternalSupplier>;
+  externalServices?: Record<string, ExternalSupplier>;
   resources?: Record<string, new (params: Record<string, string>) => Resource>;
 
   reactiveCompute(

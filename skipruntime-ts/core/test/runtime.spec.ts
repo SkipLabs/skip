@@ -15,10 +15,7 @@ import type {
   ExternalSupplier,
 } from "../src/skip-runtime.js";
 import { Sum, ValueMapper, initService } from "../src/skip-runtime.js";
-import {
-  TimeCollection,
-  ExternalResources,
-} from "../src/skipruntime_helpers.js";
+import { TimeCollection, ExternalService } from "../src/skipruntime_helpers.js";
 
 //// testMap1
 
@@ -778,28 +775,22 @@ class ExternalResource implements Resource {
     },
     reactiveAuth?: Uint8Array,
   ): EagerCollection<number, number[]> {
-    const v1 = cs.input2.maybeGetOne(0);
-    const v2 = cs.input2.maybeGetOne(1);
-    const external = context.manageResource(
+    const v1 = (cs.input2.maybeGetOne(0) ?? 0).toString();
+    const v2 = (cs.input2.maybeGetOne(1) ?? 0).toString();
+    const external = context.useExternalResource<number, number>(
       "external",
       "mock",
-      {
-        v1: (v1 ?? 0).toString(),
-        v2: (v2 ?? 0).toString(),
-      },
+      { v1, v2 },
       reactiveAuth,
     );
-    return cs.input1.map(
-      ExternalCheck,
-      external as EagerCollection<number, number>,
-    );
+    return cs.input1.map(ExternalCheck, external);
   }
 }
 
-class ExternalService implements SkipService {
+class TestExternalService implements SkipService {
   inputCollections = { input1: [], input2: [] };
   resources = { external: ExternalResource };
-  remoteCollections = { external: new External() };
+  externalServices = { external: new External() };
 
   reactiveCompute(
     _context: Context,
@@ -812,9 +803,9 @@ class ExternalService implements SkipService {
   }
 }
 
-it("testExtenal", async () => {
+it("testExternal", async () => {
   const resource = "external";
-  const runtime = await initService(new ExternalService());
+  const runtime = await initService(new TestExternalService());
   runtime.update("input1", [
     [0, [10]],
     [1, [20]],
@@ -859,7 +850,7 @@ class TokensResource implements Resource {
     _cs: Record<string, EagerCollection<TJSON, TJSON>>,
     reactiveAuth?: Uint8Array,
   ): EagerCollection<string, number> {
-    return context.manageResource(
+    return context.useExternalResource(
       "system",
       "timer",
       { "5ms": 5 },
@@ -869,12 +860,12 @@ class TokensResource implements Resource {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-const system = new ExternalResources({ timer: new TimeCollection() });
+const system = new ExternalService({ timer: new TimeCollection() });
 
 class TokensService implements SkipService {
   inputCollections = { input: [] };
   resources = { tokens: TokensResource };
-  remoteCollections = { system };
+  externalServices = { system };
 
   reactiveCompute(
     _context: Context,
