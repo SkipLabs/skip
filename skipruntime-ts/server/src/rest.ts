@@ -73,7 +73,7 @@ export function createRESTServer(runtime: SkipRuntime): express.Express {
     const data = req.body as TJSON[];
     const collectionName = req.params.collection;
     try {
-      runtime.update(collectionName, [[key, [data]]]);
+      runtime.update(collectionName, [[key, data]]);
       res.status(200).json({});
     } catch (e: unknown) {
       if (e instanceof UnknownCollectionError) {

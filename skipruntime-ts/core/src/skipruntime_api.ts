@@ -361,7 +361,7 @@ export interface Resource {
 }
 
 export interface SkipService {
-  inputCollections?: Record<string, [TJSON, TJSON][]>;
+  inputCollections?: Record<string, Entry<TJSON, TJSON>[]>;
   externalServices?: Record<string, ExternalSupplier>;
   resources?: Record<string, new (params: Record<string, string>) => Resource>;
 
