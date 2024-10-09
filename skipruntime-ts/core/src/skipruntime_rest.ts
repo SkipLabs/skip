@@ -1,5 +1,5 @@
 import type { TJSON, Entry, ReactiveResponse } from "./skipruntime_api.js";
-import { getReactiveResponse } from "./skipruntime_utils.js";
+import { parseReactiveResponse } from "./skipruntime_utils.js";
 
 export type Entrypoint = {
   host: string;
@@ -74,7 +74,7 @@ export class SkipRESTRuntime {
       "GET",
       header,
     );
-    const reactive = getReactiveResponse(headers);
+    const reactive = parseReactiveResponse(headers);
     const values = optValues ?? [];
     return reactive ? { values, reactive } : { values };
   }
@@ -91,7 +91,7 @@ export class SkipRESTRuntime {
       "HEAD",
       header,
     );
-    const reactiveResponse = getReactiveResponse(headers);
+    const reactiveResponse = parseReactiveResponse(headers);
     if (!reactiveResponse)
       throw new Error("Reactive response must be suplied.");
     else {
