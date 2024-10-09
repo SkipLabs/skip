@@ -5,7 +5,7 @@ import type {
   Resource,
 } from "@skipruntime/core";
 import { runService } from "@skipruntime/server";
-import { ExternalResources, Polled } from "@skipruntime/core";
+import { ExternalService, Polled } from "@skipruntime/core";
 
 type Departure = {
   year: string;
@@ -47,7 +47,8 @@ class DeparturesResource implements Resource {
       asylum: get("asylum", "JOR,LBN"),
       resettlement: get("resettlement", "NOR,USA"),
     };
-    return context.manageResource("http", "departures", params);
+
+    return context.useExternalResource("http", "departures", params);
   }
 }
 
@@ -56,8 +57,8 @@ class Service implements SkipService {
   resources = {
     departures: DeparturesResource,
   };
-  remoteCollections = {
-    http: new ExternalResources({ departures }),
+  externalServices = {
+    http: new ExternalService({ departures }),
   };
 
   reactiveCompute(

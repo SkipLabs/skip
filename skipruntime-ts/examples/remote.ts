@@ -7,7 +7,7 @@ import type {
   SkipService,
   Resource,
 } from "@skipruntime/core";
-import { RemoteResources } from "@skipruntime/core";
+import { ExternalSkipService } from "@skipruntime/core";
 
 import { runService } from "@skipruntime/server";
 
@@ -26,16 +26,22 @@ class MultResource implements Resource {
     context: Context,
     _collections: Record<string, EagerCollection<TJSON, TJSON>>,
   ): EagerCollection<string, number> {
-    const sub = context.manageResource<string, number>("sumexample", "sub", {});
-    const add = context.manageResource<string, number>("sumexample", "add", {});
+    const sub = context.useExternalResource<string, number>(
+      "sumexample",
+      "sub",
+    );
+    const add = context.useExternalResource<string, number>(
+      "sumexample",
+      "add",
+    );
     return sub.merge(add).map(Mult);
   }
 }
 
 class Service implements SkipService {
   resources = { data: MultResource };
-  remoteCollections = {
-    sumexample: RemoteResources.direct({ host: "localhost", port: 3587 }),
+  externalServices = {
+    sumexample: ExternalSkipService.direct({ host: "localhost", port: 3587 }),
   };
 
   reactiveCompute(
