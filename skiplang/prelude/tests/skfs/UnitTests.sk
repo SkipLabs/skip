@@ -48,8 +48,8 @@ fun compareResults(
   readV = context.getValue(SKStore.Path::fromString(path));
   try {
     T.expectEq(
-      readV,
-      values.map(x -> IBox(x)),
+      readV.map(IBox::type).map(v -> v.value),
+      values,
       kind + " test for path " + path,
     );
   } catch {
