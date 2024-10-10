@@ -72,34 +72,34 @@ fun testPre(): void {
   write(context, dirSInput1, SKStore.IID(4), Array[SKStore.StringFile("4")]);
   _ = context.updateWithStatus();
   T.expectEq(
-    Array<SKStore.File>[SKStore.IntFile(3)],
+    Array[3],
     getData(
       context,
       dirInputEHandle.pre(context).fromSome().dirName,
       SKStore.IID(3),
-    ),
+    ).map(toInt),
     "Test pre 1",
   );
   write(context, dirSInput1, SKStore.IID(3), Array[]);
   _ = context.updateWithStatus();
   T.expectEq(
-    Array<SKStore.File>[SKStore.IntFile(4)],
+    Array[4],
     getData(
       context,
       dirInputEHandle.pre(context).fromSome().dirName,
       SKStore.IID(4),
-    ),
+    ).map(toInt),
     "Test pre 2",
   );
   write(context, dirSInput1, SKStore.IID(4), Array[]);
   _ = context.updateWithStatus();
   T.expectEq(
-    Array<SKStore.File>[],
+    Array[],
     getData(
       context,
       dirInputEHandle.pre(context).fromSome().dirName,
       SKStore.IID(3),
-    ),
+    ).map(toInt),
     "Test pre 3",
   )
 }

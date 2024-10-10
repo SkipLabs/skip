@@ -56,6 +56,10 @@ module end;
 
 module SKStoreTest;
 
+fun toInt(f: SKStore.File): Int {
+  SKStore.IntFile::type(f).value
+}
+
 @test
 fun testCount(): void {
   context = SKStore.run(context ~> {
@@ -123,8 +127,8 @@ fun testCount(): void {
     write(context, dirSInput, SKStore.IID(i), files);
     _ = context.updateWithStatus();
     T.expectEq(
-      Array<SKStore.File>[SKStore.IntFile(if (i < 2) 2 else i + 1)],
-      getData(context, countDir.dirName, SKStore.IID(0)),
+      Array[if (i < 2) 2 else i + 1],
+      getData(context, countDir.dirName, SKStore.IID(0)).map(toInt),
       `TestCount: ${incrTestNbr()}`,
     );
   };
@@ -133,8 +137,8 @@ fun testCount(): void {
     write(context, dirSInput, SKStore.IID(size - j - 1), Array[]);
     _ = context.updateWithStatus();
     T.expectEq(
-      Array<SKStore.File>[SKStore.IntFile(size - j - 1)],
-      getData(context, countDir.dirName, SKStore.IID(0)),
+      Array[size - j - 1],
+      getData(context, countDir.dirName, SKStore.IID(0)).map(toInt),
       `TestCount: ${incrTestNbr()}`,
     );
   };
@@ -148,8 +152,8 @@ fun testCount(): void {
     );
     _ = context.updateWithStatus();
     T.expectEq(
-      Array<SKStore.File>[SKStore.IntFile(size / 2 + j + 1)],
-      getData(context, countDir.dirName, SKStore.IID(0)),
+      Array[size / 2 + j + 1],
+      getData(context, countDir.dirName, SKStore.IID(0)).map(toInt),
       `TestCount: ${incrTestNbr()}`,
     );
   };
@@ -158,8 +162,8 @@ fun testCount(): void {
     write(context, dirSInput, SKStore.IID(size - j - 1), Array[]);
     _ = context.updateWithStatus();
     T.expectEq(
-      Array<SKStore.File>[SKStore.IntFile(size - j - 1)],
-      getData(context, countDir.dirName, SKStore.IID(0)),
+      Array[size - j - 1],
+      getData(context, countDir.dirName, SKStore.IID(0)).map(toInt),
       `TestCount: ${incrTestNbr()}`,
     );
   };
@@ -168,8 +172,8 @@ fun testCount(): void {
     write(context, dirSInput, SKStore.IID(size - j - 1), Array[]);
     _ = context.updateWithStatus();
     T.expectEq(
-      Array<SKStore.File>[SKStore.IntFile(size / 2)],
-      getData(context, countDir.dirName, SKStore.IID(0)),
+      Array[size / 2],
+      getData(context, countDir.dirName, SKStore.IID(0)).map(toInt),
       `TestCount: ${incrTestNbr()}`,
     );
   };
@@ -183,8 +187,8 @@ fun testCount(): void {
     );
     _ = context.updateWithStatus();
     T.expectEq(
-      Array<SKStore.File>[SKStore.IntFile(size / 2 + j + 1)],
-      getData(context, countDir.dirName, SKStore.IID(0)),
+      Array[size / 2 + j + 1],
+      getData(context, countDir.dirName, SKStore.IID(0)).map(toInt),
       `TestCount: ${incrTestNbr()}`,
     );
   };
@@ -204,8 +208,8 @@ fun testCount(): void {
     write(context, dirSumInput, SKStore.IID(i), files);
     _ = context.updateWithStatus();
     T.expectEq(
-      Array<SKStore.File>[SKStore.IntFile(if (i == 0) 1 else i * (i + 1) / 2)],
-      getData(context, sumDir.dirName, SKStore.IID(0)),
+      Array[if (i == 0) 1 else i * (i + 1) / 2],
+      getData(context, sumDir.dirName, SKStore.IID(0)).map(toInt),
       `TestCount: ${incrTestNbr()}`,
     );
   };
@@ -217,8 +221,8 @@ fun testCount(): void {
     !sum = sum - (size - i - 1);
     _ = context.updateWithStatus();
     T.expectEq(
-      Array<SKStore.File>[SKStore.IntFile(sum)],
-      getData(context, sumDir.dirName, SKStore.IID(0)),
+      Array[sum],
+      getData(context, sumDir.dirName, SKStore.IID(0)).map(toInt),
       `TestCount: ${incrTestNbr()}`,
     );
   }

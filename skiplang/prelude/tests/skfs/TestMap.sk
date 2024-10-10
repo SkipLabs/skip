@@ -2,6 +2,14 @@ module alias T = SKTest;
 
 module SKStoreTest;
 
+fun keyToInt(k: SKStore.Key): Int {
+  SKStore.IID::keyType(k).value
+}
+
+fun toString(f: SKStore.File): String {
+  SKStore.StringFile::type(f).value
+}
+
 fun testMap(): mutable SKStore.Context {
   data = Array[
     (SKStore.IID(1), SKStore.IntFile(1)),
@@ -173,13 +181,13 @@ fun testMultiMap(): void {
     .unsafeGetEagerDir(dirNameResult)
     .getChangesAfter(tick);
   T.expectEq(
-    Array<SKStore.Key>[SKStore.IID(0), SKStore.IID(1)],
-    changedKeys.collect(Array).sorted(),
+    Array[0, 1],
+    changedKeys.collect(Array).sorted().map(keyToInt),
     "Test multiMap 1",
   );
   T.expectEq(
-    getData(context, dirNameResult, SKStore.IID(0)),
-    Array[SKStore.StringFile("11")],
+    getData(context, dirNameResult, SKStore.IID(0)).map(toString),
+    Array["11"],
   );
   T.expectEq(
     getData(context, dirNameResult, SKStore.IID(1))
@@ -268,11 +276,14 @@ fun testMultiMapSameParent(): void {
     .unsafeGetEagerDir(dirNameResult)
     .getChangesAfter(tick);
   T.expectEq(
-    Array<SKStore.Key>[SKStore.IID(0), SKStore.IID(1)],
-    changedKeys.collect(Array).sorted(),
+    Array[0, 1],
+    changedKeys.collect(Array).sorted().map(keyToInt),
     "Test multiMap 1",
   );
-  T.expectEq(getData(context, dirNameResult, SKStore.IID(0)), Array[]);
+  T.expectEq(
+    getData(context, dirNameResult, SKStore.IID(0)).map(toString),
+    Array[],
+  );
   T.expectEq(
     getData(context, dirNameResult, SKStore.IID(1))
       .map(x -> SKStore.StringFile::type(x).value)
