@@ -1,8 +1,5 @@
 module SKTest;
 
-// TODO: Get rid of this.
-extension base class .Inspect uses Equality {}
-
 class ExpectationError(
   msg: String,
   expected: String,
@@ -13,12 +10,12 @@ class ExpectationError(
   }
 }
 
-fun expectEq<T: frozen>(
+fun expectEq<T: frozen & Equality>(
   actual: T,
   expected: T,
   msg: String = "expected equality",
 ): void {
-  if (inspect(actual) != inspect(expected)) {
+  if (actual != expected) {
     throw ExpectationError(
       msg,
       inspect(expected).toString(),
@@ -27,12 +24,12 @@ fun expectEq<T: frozen>(
   }
 }
 
-fun expectNe<T: frozen>(
+fun expectNe<T: frozen & Equality>(
   actual: T,
   expected: T,
   msg: String = "expected difference",
 ): void {
-  if (inspect(actual) == inspect(expected)) {
+  if (actual == expected) {
     throw ExpectationError(
       msg,
       inspect(expected).toString(),
