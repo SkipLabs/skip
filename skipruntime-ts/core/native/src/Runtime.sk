@@ -275,6 +275,25 @@ fun initService(service: Service): Result<void, .Exception> {
   })
 }
 
+fun closeService(): Result<void, .Exception> {
+  SKStore.runWithResult(context ~> {
+    dir = context.unsafeGetEagerDir(kResourceSessionDir);
+    keys = dir.keys();
+    keys.each((key) -> {
+      if (!dir.getArrayRaw(key).isEmpty()) {
+        closeSession_(context, SKStore.SID::keyType(key).value)
+      }
+    });
+    remoteCollections = context
+      .getPersistent(kRemoteSpecifiers)
+      .map(RemoteSpecifiers::type)
+      .map(v -> v.value)
+      .fromSome();
+    remoteCollections.each((_k, es) -> es.shutdown());
+    context.removePersistent(kRemoteSpecifiers);
+  })
+}
+
 class LinkToResource(
   supplier: ExternalSupplier,
   writer: CollectionWriter,
@@ -904,12 +923,7 @@ fun closeReactiveResource(
   });
 }
 
-fun closeSession(
-  context: mutable SKStore.Context,
-  reactiveAuth: ?Array<UInt8>,
-): void {
-  //
-  session = toSessionName(reactiveAuth.default(Array[]));
+fun closeSession_(context: mutable SKStore.Context, session: String): void {
   rDirName = SKStore.DirName::create(`/sk_prv/resources/session/${session}/`);
   resourceHdl = SKStore.EHandle(
     ResourceKey::keyType,
@@ -928,6 +942,13 @@ fun closeSession(
   );
   rsessionsHdl.writeArray(context, SKStore.SID(session), Array[]);
   context.update();
+}
+
+fun closeSession(
+  context: mutable SKStore.Context,
+  reactiveAuth: ?Array<UInt8>,
+): void {
+  closeSession_(context, toSessionName(reactiveAuth.default(Array[])));
 }
 
 fun subscribe(
