@@ -105,6 +105,16 @@ export class ExternalSkipService implements ExternalSupplier {
     if (closable) closable.close();
   }
 
+  shutdown(): void {
+    if (this.client) {
+      this.client
+        .then((client) => {
+          client[0].close();
+        })
+        .catch((e: unknown) => console.error(e));
+    }
+  }
+
   private async link_(
     resource: string,
     params: Record<string, string>,

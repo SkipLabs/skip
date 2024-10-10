@@ -735,6 +735,10 @@ class External implements ExternalSupplier {
     return;
   }
 
+  shutdown() {
+    return;
+  }
+
   private async mock(
     params: { v1: string; v2: string },
     cb: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void,
