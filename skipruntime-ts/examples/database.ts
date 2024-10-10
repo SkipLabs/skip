@@ -1,9 +1,9 @@
 import type {
   Context,
-  TJSON,
   EagerCollection,
   SkipService,
   Resource,
+  Entry,
 } from "@skipruntime/core";
 
 import { runService } from "@skipruntime/server";
@@ -89,9 +89,9 @@ class UsersResource implements Resource {
 /*****************************************************************************/
 
 class Service implements SkipService {
-  inputCollections: { users: [TJSON, TJSON][] };
+  inputCollections: { users: Entry<string, User>[] };
 
-  constructor(users: [TJSON, TJSON][]) {
+  constructor(users: Entry<string, User>[]) {
     this.inputCollections = { users };
   }
 
@@ -101,8 +101,8 @@ class Service implements SkipService {
 
   reactiveCompute(
     _context: Context,
-    inputCollections: { users: EagerCollection<string, TJSON> },
-  ): Record<string, EagerCollection<string, TJSON>> {
+    inputCollections: { users: EagerCollection<string, User> },
+  ): Record<string, EagerCollection<string, User>> {
     return inputCollections;
   }
 }
@@ -110,14 +110,17 @@ class Service implements SkipService {
 // Command that starts the service
 
 const db = await initDB();
-const data = await new Promise<[string, User][]>(function (resolve, reject) {
+const data = await new Promise<Entry<string, User>[]>(function (
+  resolve,
+  reject,
+) {
   db.all(
     "SELECT id, object FROM data",
     (err, data: { id: string; object: string }[]) => {
       if (err) {
         reject(err);
       } else {
-        resolve(data.map((v) => [v.id, JSON.parse(v.object)]));
+        resolve(data.map((v) => [v.id, [JSON.parse(v.object)]]));
       }
     },
   );

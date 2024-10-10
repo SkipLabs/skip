@@ -67,7 +67,7 @@ fun initCtx(): SKStore.Context {
 
 class Input(
   name: String,
-  values: Array<(SKJSON.CJSON, SKJSON.CJSON)>,
+  values: Array<(SKJSON.CJSON, Array<SKJSON.CJSON>)>,
   keyConverter: KeyConverter,
   fileConverter: FileConverter,
 )
@@ -91,16 +91,20 @@ fun initService(service: Service): Result<void, .Exception> {
       );
       mInputs = mutable Map<String, Collection>[];
       service.inputCollections.each(input -> {
-        iHdl = context.mkdir(
-          f ~> f,
-          k ~> k,
-          SKStore.DirName::create(`/${input.name}/`),
+        iDirName = SKStore.DirName::create(`/${input.name}/`);
+        context.mkdirMulti(
+          iDirName,
           input.values.map(v ->
             (
               input.keyConverter.fromJSON(v.i0),
-              input.fileConverter.fromJSON(v.i1),
+              v.i1.map(input.fileConverter.fromJSON),
             )
           ),
+        );
+        iHdl = SKStore.EHandle<SKStore.Key, SKStore.File>(
+          k ~> k,
+          f ~> f,
+          iDirName,
         );
         mInputs.add(
           input.name,
