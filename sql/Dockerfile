@@ -1,8 +1,8 @@
-FROM skiplabs/skdb-base as skdb
+FROM skiplabs/skdb-base AS skdb
 
 COPY . /skdb
 
 WORKDIR /skdb
 
-RUN make clean && make -C compiler clean && make build/skdb && make build/init.sql
+RUN make clean && make -C skiplang/compiler clean && make build/skdb && make build/init.sql
 

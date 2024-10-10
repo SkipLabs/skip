@@ -1,5 +1,5 @@
-FROM skiplabs/skdb as skdb
-FROM eclipse-temurin:20 as skgw
+FROM skiplabs/skdb AS skdb
+FROM eclipse-temurin:20 AS skgw
 
 COPY . /skdb
 
@@ -10,7 +10,7 @@ RUN ../gradlew jar --no-daemon --console plain
 # Build the development image by copying out artifacts
 ################################################################################
 
-FROM eclipse-temurin:20 as dev
+FROM eclipse-temurin:20 AS dev
 
 WORKDIR /skdb
 
