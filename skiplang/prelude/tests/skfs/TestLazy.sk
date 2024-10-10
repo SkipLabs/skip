@@ -62,22 +62,22 @@ fun testLazy(): void {
   _ = context.updateWithStatus();
 
   T.expectEq(
-    Array<SKStore.File>[SKStore.IntFile(23)],
-    getData(context, dir2, SKStore.IID(0)),
+    Array[23],
+    getData(context, dir2, SKStore.IID(0)).map(toInt),
     "Lazy basic",
   );
   write(context, input, SKStore.IID(0), Array[SKStore.IntFile(22)]);
   _status = context.updateWithStatus();
 
   T.expectEq(
-    Array<SKStore.File>[SKStore.IntFile(22)],
-    getData(context, dir2, SKStore.IID(0)),
+    Array[22],
+    getData(context, dir2, SKStore.IID(0)).map(toInt),
     "Lazy after update",
   );
 
   T.expectEq(
-    Array<SKStore.File>[SKStore.IntFile(22)],
-    getData(context, dir3, SKStore.IID(0)),
+    Array[22],
+    getData(context, dir3, SKStore.IID(0)).map(toInt),
     "Eeager after update",
   )
 }
