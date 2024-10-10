@@ -45,6 +45,10 @@ export class ExternalService implements ExternalSupplier {
     }
     resource.close(params, reactiveAuth);
   }
+
+  shutdown(): void {
+    return;
+  }
 }
 
 type Timemout = number | object;

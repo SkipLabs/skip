@@ -124,4 +124,11 @@ const data = await new Promise<[string, User][]>(function (resolve, reject) {
 });
 db.close();
 
-await runService(new Service(data), 8081);
+const closable = await runService(new Service(data), 8081);
+
+function shutdown() {
+  closable.close();
+}
+
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
