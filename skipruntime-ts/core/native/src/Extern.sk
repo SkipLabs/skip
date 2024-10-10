@@ -659,7 +659,7 @@ fun subscribeOfRuntime(
   from: Int,
   notifier: Notifier,
   reactiveAuth: ?Array<UInt8>,
-): SKJSON.CJSON {
+): Int {
   SKStore.runWithResult(context ~> {
     subscribe(
       context,
@@ -669,8 +669,8 @@ fun subscribeOfRuntime(
       reactiveAuth,
     )
   }) match {
-  | Success(id) -> SKJSON.CJString(id.toString())
-  | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
+  | Success(id) -> id
+  | Failure(err) -> -getErrorHdl(err).toInt()
   };
 }
 
