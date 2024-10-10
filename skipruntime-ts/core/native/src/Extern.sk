@@ -159,6 +159,10 @@ native fun closeOfExternalSupplier(
   reactiveAuth: ?Array<UInt8>,
 ): void;
 
+@cpp_extern("SkipRuntime_ExternalSupplier__shutdown")
+@debug
+native fun shutdownOfExternalSupplier(externalSupplier: UInt32): void;
+
 @cpp_extern("SkipRuntime_deleteExternalSupplier")
 @debug
 native fun deleteExternalSupplier(externalSupplier: UInt32): void;
@@ -199,6 +203,10 @@ class ExternExternalSupplier(
       jsonParams(params),
       reactiveAuth,
     )
+  }
+
+  fun shutdown(): void {
+    shutdownOfExternalSupplier(this.eptr.value)
   }
 }
 
@@ -739,6 +747,16 @@ fun useExternalResource(
 @export("SkipRuntime_initService")
 fun initSkipRuntimeService(service: Service): Float {
   initService(service) match {
+  | Success _ -> 0.0
+  | Failure(err) -> getErrorHdl(err)
+  };
+}
+
+/************ closeService ****************/
+
+@export("SkipRuntime_closeService")
+fun closeSkipRuntimeService(): Float {
+  closeService() match {
   | Success _ -> 0.0
   | Failure(err) -> getErrorHdl(err)
   };

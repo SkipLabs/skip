@@ -331,6 +331,8 @@ export interface SkipRuntime {
     collection: string,
     values: Entry<K, V>[],
   ): void;
+
+  close(): void;
 }
 
 export interface ExternalSupplier {
@@ -346,6 +348,8 @@ export interface ExternalSupplier {
     params: Record<string, string | number>,
     reactiveAuth?: Uint8Array,
   ): void;
+
+  shutdown(): void;
 }
 
 export interface Resource {

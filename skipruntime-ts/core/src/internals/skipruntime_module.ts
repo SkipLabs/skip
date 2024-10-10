@@ -282,6 +282,9 @@ export interface FromWasm {
   // initService
   SkipRuntime_initService(service: ptr<Internal.Service>): number;
 
+  // closeClose
+  SkipRuntime_closeService(): Handle<ErrorObject>;
+
   // Context
 
   SkipRuntime_Context__lazy(
@@ -343,6 +346,10 @@ interface ToWasm {
     skresource: ptr<Internal.String>,
     skparams: ptr<Internal.CJObject>,
     reactiveAuth: ptr<Internal.Array<Internal.Byte>>,
+  ): void;
+
+  SkipRuntime_ExternalSupplier__shutdown(
+    supplier: Handle<ExternalSupplier>,
   ): void;
 
   SkipRuntime_deleteExternalSupplier(supplier: Handle<ExternalSupplier>): void;
@@ -739,6 +746,11 @@ class LinksImpl implements Links {
     const resource = skjson.importString(skresource);
     const params = skjson.importJSON(skparams, true) as Record<string, string>;
     supplier.close(resource, params, reactiveAuth);
+  }
+
+  shutdownOfExternalSupplier(sksupplier: Handle<ExternalSupplier>) {
+    const supplier = this.handles.get(sksupplier);
+    supplier.shutdown();
   }
 
   deleteExternalSupplier(supplier: Handle<ExternalSupplier>) {
@@ -1225,6 +1237,15 @@ class SkipRuntimeImpl implements SkipRuntime {
       throw this.refs.handles.deleteAsError(result);
     }
   }
+
+  close(): void {
+    const result = this.refs.skjson.runWithGC(() => {
+      return this.refs.fromWasm.SkipRuntime_closeService();
+    });
+    if (result != 0) {
+      throw this.refs.handles.deleteAsError(result);
+    }
+  }
 }
 
 class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
@@ -1327,6 +1348,8 @@ class Manager implements ToWasmManager {
       links.closeOfExternalSupplier.bind(links);
     toWasm.SkipRuntime_ExternalSupplier__link =
       links.linkOfExternalSupplier.bind(links);
+    toWasm.SkipRuntime_ExternalSupplier__shutdown =
+      links.shutdownOfExternalSupplier.bind(links);
     toWasm.SkipRuntime_deleteExternalSupplier =
       links.deleteExternalSupplier.bind(links);
 

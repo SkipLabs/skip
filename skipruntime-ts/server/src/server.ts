@@ -21,6 +21,7 @@ export async function runService(
   // TODO: Return a proper object.
   return {
     close: () => {
+      runtime.close();
       replicationServer.close();
       httpServer.close();
     },

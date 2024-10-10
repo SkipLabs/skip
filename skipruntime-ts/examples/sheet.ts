@@ -98,4 +98,11 @@ class Service implements SkipService {
   }
 }
 
-await runService(new Service(), 9998);
+const closable = await runService(new Service(), 9998);
+
+function shutdown() {
+  closable.close();
+}
+
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
