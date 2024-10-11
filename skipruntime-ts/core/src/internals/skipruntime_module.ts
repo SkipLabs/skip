@@ -34,10 +34,7 @@ import type {
 } from "../skipruntime_api.js";
 
 import type { SKJSON } from "skjson";
-import {
-  AccessRefusedError,
-  UnknownCollectionError,
-} from "../skipruntime_errors.js";
+import { UnknownCollectionError } from "../skipruntime_errors.js";
 
 export type Handle<T> = Internal.Opaque<int, { handle_for: T }>;
 
@@ -1205,8 +1202,8 @@ class SkipRuntimeImpl implements SkipRuntime {
     if (session == -1n) {
       throw new UnknownCollectionError(`Unknown collection '${reactiveId}'`);
     } else if (session == -2n) {
-      throw new AccessRefusedError(
-        "Access to collection '${reactiveId}' refused.",
+      throw new UnknownCollectionError(
+        `Access to collection '${reactiveId}' refused.`,
       );
     } else if (session < 0n) {
       throw new Error("Unknown error");
