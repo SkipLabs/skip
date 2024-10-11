@@ -23,7 +23,7 @@ export function createRESTServer(runtime: SkipRuntime): express.Express {
       );
       const [name, value] = reactiveResponseHeader(data);
       res.set(name, value);
-      res.status(200).json({});
+      res.status(200).json();
     } catch (e: unknown) {
       res.status(500).json(e instanceof Error ? e.message : e);
     }
@@ -74,10 +74,10 @@ export function createRESTServer(runtime: SkipRuntime): express.Express {
     const collectionName = req.params.collection;
     try {
       runtime.update(collectionName, [[key, data]]);
-      res.status(200).json({});
+      res.sendStatus(200);
     } catch (e: unknown) {
       if (e instanceof UnknownCollectionError) {
-        res.status(400).json("Bad request");
+        res.sendStatus(404);
       } else {
         res.status(500).json(e instanceof Error ? e.message : e);
       }
@@ -92,10 +92,10 @@ export function createRESTServer(runtime: SkipRuntime): express.Express {
     const collectionName = req.params.collection;
     try {
       runtime.update(collectionName, data);
-      res.status(200).json({});
+      res.sendStatus(200);
     } catch (e: unknown) {
       if (e instanceof UnknownCollectionError) {
-        res.status(400).json("Bad request");
+        res.sendStatus(404);
       } else {
         res.status(500).json(e instanceof Error ? e.message : e);
       }
@@ -106,10 +106,10 @@ export function createRESTServer(runtime: SkipRuntime): express.Express {
     const collectionName = req.params.collection;
     try {
       runtime.update(collectionName, [[key, []]]);
-      res.status(200).json({});
+      res.sendStatus(200);
     } catch (e: unknown) {
       if (e instanceof UnknownCollectionError) {
-        res.status(400).json("Bad request");
+        res.sendStatus(404);
       } else {
         res.status(500).json(e instanceof Error ? e.message : e);
       }
