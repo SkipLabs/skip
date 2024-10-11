@@ -1,14 +1,13 @@
 import type {
   Context,
   TJSON,
-  Mapper,
   EagerCollection,
   NonEmptyIterator,
   SkipService,
   Resource,
-} from "skip-runtime";
+} from "@skipruntime/core";
 
-import { runService } from "skip-runtime";
+import { runService } from "@skipruntime/server";
 
 type Post = {
   author_id: number;
@@ -26,6 +25,8 @@ type Upvote = {
   post_id: number;
   user_id: number;
 };
+
+type Upvoted = Post & { upvotes: number; author: User };
 
 class HackerNewsService implements SkipService {
   inputCollections = { posts: [], users: [], upvotes: [] };
@@ -71,10 +72,10 @@ class PostsMapper {
   mapElement(
     key: number,
     it: NonEmptyIterator<Post>,
-  ): Iterable<[[number, number], Post & { upvotes: number; author: User }]> {
+  ): Iterable<[[number, number], Upvoted]> {
     const post = it.first();
     const upvotes = this.upvotes.getArray(key).length;
-    const author = this.users.getOne(post.author_id);
+    const author = this.users.maybeGetOne(post.author_id)!;
     return [[[-upvotes, key], { ...post, upvotes, author }]];
   }
 }
@@ -93,17 +94,14 @@ class PostsResource implements Resource {
   private limit: number;
 
   constructor(params: Record<string, string>) {
-    console.log(params.limit);
-    this.limit = Number(params.limit);
+    console.log(params["limit"]);
+    this.limit = Number(params["limit"]);
   }
 
   reactiveCompute(
     _context: Context,
     collections: {
-      postsWithUpvotes: EagerCollection<
-        [number, number],
-        Post & { upvotes: number; author: User }
-      >;
+      postsWithUpvotes: EagerCollection<[number, number], Upvoted>;
     },
   ): EagerCollection<string, TJSON> {
     // console.log("limit", this.limit);
