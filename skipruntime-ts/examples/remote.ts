@@ -27,12 +27,10 @@ class MultResource implements Resource {
     _collections: Record<string, EagerCollection<TJSON, TJSON>>,
   ): EagerCollection<string, number> {
     const sub = context.useExternalResource<string, number>(
-      "sumexample",
-      "sub",
+      {supplier: "sumexample", resource: "sub"},
     );
     const add = context.useExternalResource<string, number>(
-      "sumexample",
-      "add",
+      {supplier: "sumexample", resource: "add"},
     );
     return sub.merge(add).map(Mult);
   }

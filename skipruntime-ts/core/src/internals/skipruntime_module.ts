@@ -1021,18 +1021,18 @@ class ContextImpl extends SkFrozen implements Context {
     return new LazyCollectionImpl<K, V>(lazyCollection, this.refs);
   }
 
-  useExternalResource<K extends TJSON, V extends TJSON>(
+  useExternalResource<K extends TJSON, V extends TJSON>(service: {
     supplier: string,
     resource: string,
-    params: Record<string, string | number> = {},
+    params?: Record<string, string | number>,
     reactiveAuth?: Uint8Array,
-  ): EagerCollection<K, V> {
+  }): EagerCollection<K, V> {
     const skcollection =
       this.refs.fromWasm.SkipRuntime_Context__useExternalResource(
-        this.refs.skjson.exportString(supplier),
-        this.refs.skjson.exportString(resource),
-        this.refs.skjson.exportJSON(params),
-        reactiveAuth ? this.refs.skjson.exportBytes(reactiveAuth) : null,
+        this.refs.skjson.exportString(service.supplier),
+        this.refs.skjson.exportString(service.resource),
+        this.refs.skjson.exportJSON((service.params === undefined)? {} : service.params),
+        service.reactiveAuth ? this.refs.skjson.exportBytes(service.reactiveAuth) : null,
       );
     const collection = this.refs.skjson.importString(skcollection);
     return new EagerCollectionImpl<K, V>(collection, this.refs);
