@@ -42,11 +42,11 @@ class DeparturesResource implements Resource {
       resettlement: get("resettlement", "NOR,USA"),
     };
 
-    return context.useExternalResource(
-      "externalDeparturesAPI",
-      "departures",
+    return context.useExternalResource({
+      supplier: "http",
+      resource: "departures",
       params,
-    );
+    });
   }
 }
 
