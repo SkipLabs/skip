@@ -17,7 +17,7 @@ export type JSONObject = { [key: string]: TJSON | null };
 
 /**
  * A `Param` is a valid parameter to a Skip runtime mapper function: either a constant JS
- * value or a Skip-runtime-managed value.  In either case, restricting mapper parameters to
+ * value or a Skip-runtime-managed value. In either case, restricting mapper parameters to
  * this type helps developers to ensure that reactive computations can be re-evaluated as
  * needed with consistent semantics.
  */
@@ -98,7 +98,7 @@ export interface Accumulator<T extends TJSON, V extends TJSON> {
 export interface NonEmptyIterator<T> extends Iterable<T> {
   /**
    * Return the next element of the iteration.
-   *   `first` cannot be called after `next`
+   * `first` cannot be called after `next`
    */
   next(): Opt<T>;
 
@@ -249,6 +249,14 @@ export interface Context extends Constant {
     ...params: Params
   ): LazyCollection<K, V>;
 
+  /**
+   * Call a external service to manage an external resource
+   * @param supplier - the name of the external supplier corresponding to a key in externalServices field of SkipService
+   * @param resource - the resource name managed by the supplier
+   * @param params - the parameters to apply to the resource
+   * @param reactiveAuth - the caller client user Skip session authentification
+   * @returns The reactive collection of the external resource
+   */
   useExternalResource<K extends TJSON, V extends TJSON>(
     supplier: string,
     resource: string,
@@ -278,7 +286,7 @@ export type CollectionUpdate<K extends TJSON, V extends TJSON> = {
 
 /**
  * A `ReactiveResponse` contains metadata which can be used to initiate and manage reactive
- * connections to/from a service.  It specifies a `collection` and a current `watermark`,
+ * connections to/from a service. It specifies a `collection` and a current `watermark`,
  * and is sent by Skip services in the `"Skip-Reactive-Response-Token"` HTTP header by default,
  * allowing clients to initiate reactive subscriptions or request diffs as needed.
  */
@@ -287,20 +295,45 @@ export type ReactiveResponse = {
   watermark: Watermark;
 };
 
+/**
+ * SkipRuntime is the result of initService
+ * It gives acces to service reactivly computed resources
+ */
 export interface SkipRuntime {
-  // READ
+  /**
+   * Creates if not exists and get all current values of specified resource
+   * @param resource - the resource name corresponding to a key in remotes field of SkipService
+   * @param params - the parameters of the resource used to build the resource with the corresponding constructor specified in remotes field of SkipService
+   * @param reactiveAuth - the client user Skip session authentification
+   * @returns The current values of the corresponding resource with reactive responce token to allow subscription
+   */
   getAll<K extends TJSON, V extends TJSON>(
     resource: string,
     params: Record<string, string>,
     reactiveAuth?: Uint8Array,
   ): { values: Entry<K, V>[]; reactive?: ReactiveResponse };
 
+  /**
+   * Creates specified resource
+   * @param resource - the resource name correspond to the a key in remotes field of SkipService
+   * @param params - the parameters of the resource used to build the resource with the corresponding constructor specified in remotes field of SkipService
+   * @param reactiveAuth - the client user Skip session authentification
+   * @returns The reactive responce token to allow subscription
+   */
   createResource(
     resource: string,
     params: Record<string, string>,
     reactiveAuth?: Uint8Array,
   ): ReactiveResponse;
 
+  /**
+   * Creates if not exists and get the current value of specified key in specified resource
+   * @param resource - the resource name correspond to the a key in remotes field of SkipService
+   * @param params - the parameters of the resource used to build the resource with the corresponding constructor specified in remotes field of SkipService
+   * @param key - the key of value to return
+   * @param reactiveAuth - the client user Skip session authentification
+   * @returns The current value of specified key in the corresponding resource
+   */
   getOne<V extends TJSON>(
     resource: string,
     params: Record<string, string>,
@@ -308,14 +341,32 @@ export interface SkipRuntime {
     reactiveAuth?: Uint8Array,
   ): V[];
 
+  /**
+   * Close the specified resource
+   * @param resource - the resource name correspond to the a key in remotes field of SkipService
+   * @param params - the parameters of the resource used to build the resource with the corresponding constructor specified in remotes field of SkipService
+   * @param reactiveAuth - the client user Skip session authentification
+   */
   closeResource(
     resource: string,
     params: Record<string, string>,
     reactiveAuth?: Uint8Array,
   ): void;
 
+  /**
+   * Close of the resources corresponding the specified reactiveAuth
+   * @param reactiveAuth - the client user Skip session authentification
+   */
   closeSession(reactiveAuth?: Uint8Array): void;
 
+  /**
+   * Subscribe to a reactive ressource according a given reactive response
+   * @param reactiveId - the reactive response collection
+   * @param since - the reactive response watermark
+   * @param f - the callback called on collection updates
+   * @param reactiveAuth The client user Skip session authentification corresponding to the reactive response
+   * @returns The subcription identifier
+   */
   subscribe<K extends TJSON, V extends TJSON>(
     reactiveId: string,
     since: Watermark,
@@ -323,19 +374,39 @@ export interface SkipRuntime {
     reactiveAuth?: Uint8Array,
   ): SubscriptionID;
 
+  /**
+   * Unsubscribe to a reactive ressource according a given subcription identifier
+   * @param id - the subcription identifier
+   */
   unsubscribe(id: SubscriptionID): void;
 
-  // WRITE
-
+  /**
+   * Update an inout collection
+   * @param input - the name of the input collection to update
+   * @param values - the values of the input collection to update
+   */
   update<K extends TJSON, V extends TJSON>(
     input: string,
     values: Entry<K, V>[],
   ): void;
 
+  /**
+   * Close all the resource and shutdown the SkipService
+   */
   close(): void;
 }
 
+/**
+ * ExternalSupplier allows to have access to external ressources
+ */
 export interface ExternalSupplier {
+  /**
+   * Subscribe to the external resource
+   * @param resource - the name of the external resource
+   * @param params - the parameters of the external resource
+   * @param cb - the callback called on collection updates
+   * @param reactiveAuth - the client user Skip session authentification of the caller
+   */
   subscribe(
     resource: string,
     params: Record<string, string | number>,
@@ -343,16 +414,34 @@ export interface ExternalSupplier {
     reactiveAuth?: Uint8Array,
   ): void;
 
+  /**
+   * Unsubscribe to the external resource
+   * @param resource - the name of the external resource
+   * @param params - the parameters of the external resource
+   * @param reactiveAuth - the client user Skip session authentification of the caller
+   */
   unsubscribe(
     resource: string,
     params: Record<string, string | number>,
     reactiveAuth?: Uint8Array,
   ): void;
 
+  /**
+   * Shutdown the external supplier
+   */
   shutdown(): void;
 }
 
+/**
+ * A Resource allows to supply a SkipService reactive resource
+ */
 export interface Resource {
+  /**
+   * Build a reactive compute graph of the reactive ressource
+   * @param context {Context} - the reactive graph context
+   * @param collections - the collection returned by SkipService reactiveCompute
+   * @param reactiveAuth - the client user Skip session authentification
+   */
   reactiveCompute(
     context: Context,
     collections: Record<string, EagerCollection<TJSON, TJSON>>,
@@ -361,10 +450,19 @@ export interface Resource {
 }
 
 export interface SkipService {
+  /** The input collections specification of the service */
   inputCollections?: Record<string, Entry<TJSON, TJSON>[]>;
+  /** The external services of the service */
   externalServices?: Record<string, ExternalSupplier>;
+  /** The reactive resources of the service */
   resources?: Record<string, new (params: Record<string, string>) => Resource>;
 
+  /**
+   * Build a reactive shared initial compute graph
+   * @param context {Context} - the reactive graph context
+   * @param inputCollections - the input collections of SkipService
+   * @returns - the reactive collections accessible by the resources
+   */
   reactiveCompute(
     context: Context,
     inputCollections: Record<string, EagerCollection<TJSON, TJSON>>,
