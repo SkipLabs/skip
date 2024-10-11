@@ -20,10 +20,6 @@ class LinksImpl implements Links {
     this.env = env;
   }
 
-  SKIP_read_line_fill!: () => int;
-  SKIP_read_to_end_fill!: () => int;
-  SKIP_read_line_get!: (index: int) => int;
-
   SKIP_print_error!: (strPtr: ptr<Internal.String>) => void;
   SKIP_print_error_raw!: (strPtr: ptr<Internal.String>) => void;
   SKIP_print_debug!: (strPtr: ptr<Internal.String>) => void;
@@ -129,17 +125,6 @@ class LinksImpl implements Links {
     this.SKIP_js_get_envn = (index: int) =>
       utils.exportString(this.env!.environment[index]);
 
-    this.SKIP_read_line_fill = () => {
-      this.lineBuffer = utils.readStdInLine();
-      return this.lineBuffer.length;
-    };
-    this.SKIP_read_to_end_fill = () => {
-      this.lineBuffer = utils.readStdInToEnd();
-      return this.lineBuffer.length;
-    };
-    this.SKIP_read_line_get = (i: int) => {
-      return this.lineBuffer[i];
-    };
     this.SKIP_FileSystem_appendTextFile = (
       path: ptr<Internal.String>,
       contents: ptr<Internal.String>,
@@ -267,9 +252,6 @@ class Manager implements ToWasmManager {
       path: ptr<Internal.String>,
       contents: ptr<Internal.String>,
     ) => links.SKIP_FileSystem_appendTextFile(path, contents);
-    toWasm.SKIP_read_line_fill = () => links.SKIP_read_line_fill();
-    toWasm.SKIP_read_to_end_fill = () => links.SKIP_read_to_end_fill();
-    toWasm.SKIP_read_line_get = (index: int) => links.SKIP_read_line_get(index);
     toWasm.SKIP_setenv = (
       skName: ptr<Internal.String>,
       skValue: ptr<Internal.String>,
@@ -339,9 +321,6 @@ interface ToWasm {
     path: ptr<Internal.String>,
     contents: ptr<Internal.String>,
   ) => void;
-  SKIP_read_line_fill: () => int;
-  SKIP_read_to_end_fill: () => int;
-  SKIP_read_line_get: (index: int) => int;
   SKIP_setenv: (
     skName: ptr<Internal.String>,
     skvalue: ptr<Internal.String>,
