@@ -71,7 +71,7 @@ export class ExternalSkipService implements ExternalSupplier {
     return new ExternalSkipService(uri, auth, creds);
   }
 
-  link(
+  subscribe(
     resource: string,
     params: Record<string, string>,
     cb: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void,
@@ -94,7 +94,7 @@ export class ExternalSkipService implements ExternalSupplier {
     });
   }
 
-  close(
+  unsubscribe(
     resource: string,
     params: Record<string, string>,
     reactiveAuth?: Uint8Array,

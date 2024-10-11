@@ -328,7 +328,7 @@ export interface SkipRuntime {
   // WRITE
 
   update<K extends TJSON, V extends TJSON>(
-    collection: string,
+    input: string,
     values: Entry<K, V>[],
   ): void;
 
@@ -336,14 +336,14 @@ export interface SkipRuntime {
 }
 
 export interface ExternalSupplier {
-  link(
+  subscribe(
     resource: string,
     params: Record<string, string | number>,
     cb: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void,
     reactiveAuth?: Uint8Array,
   ): void;
 
-  close(
+  unsubscribe(
     resource: string,
     params: Record<string, string | number>,
     reactiveAuth?: Uint8Array,
@@ -356,7 +356,7 @@ export interface Resource {
   reactiveCompute(
     context: Context,
     collections: Record<string, EagerCollection<TJSON, TJSON>>,
-    publicToken?: Uint8Array,
+    reactiveAuth?: Uint8Array,
   ): EagerCollection<TJSON, TJSON>;
 }
 
