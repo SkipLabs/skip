@@ -30,10 +30,14 @@ export async function fetchJSON<V>(
     },
     signal: AbortSignal.timeout(1000),
   });
-  const responseJSON = method != "HEAD" ? ((await response.json()) as V) : null;
   if (!response.ok) {
-    throw new Error(JSON.stringify(responseJSON));
+    throw new Error(`${response.status}: ${response.statusText}`);
   }
+  const responseText = await response.text();
+  const responseJSON =
+    responseText.length > 0 && responseText != response.statusText
+      ? JSON.parse(responseText)
+      : null;
   return [responseJSON, response.headers];
 }
 

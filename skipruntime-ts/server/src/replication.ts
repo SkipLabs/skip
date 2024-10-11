@@ -1,10 +1,11 @@
 import { WebSocket, type WebSocketServer, type MessageEvent } from "ws";
-import type {
-  TJSON,
-  SkipRuntime,
-  CollectionUpdate,
-  Watermark,
-  SubscriptionID,
+import {
+  type TJSON,
+  type SkipRuntime,
+  type CollectionUpdate,
+  type Watermark,
+  type SubscriptionID,
+  UnknownCollectionError,
 } from "@skipruntime/core";
 import { Protocol } from "@skipruntime/client";
 
@@ -79,19 +80,26 @@ function handleMessage(
       return;
     }
     case "tail": {
-      // FIXME: Respond with error 1004 if collection does not exist
-      // (for current user).
-      session.subscribe(msg.collection, msg.since as Watermark, (update) => {
-        ws.send(
-          Protocol.encodeMsg({
-            type: "data",
-            collection: msg.collection,
-            isInit: update.isInitial ?? false,
-            tick: update.watermark,
-            payload: JSON.stringify(update.values),
-          }),
-        );
-      });
+      try {
+        session.subscribe(msg.collection, msg.since as Watermark, (update) => {
+          ws.send(
+            Protocol.encodeMsg({
+              type: "data",
+              collection: msg.collection,
+              isInit: update.isInitial ?? false,
+              tick: update.watermark,
+              payload: JSON.stringify(update.values),
+            }),
+          );
+        });
+      } catch (e: unknown) {
+        // Respond with error 1004 if collection does not exist
+        // (for current user).
+        if (e instanceof UnknownCollectionError) {
+          throw new ReplicationServerError(1004, "Not found");
+        }
+        throw e;
+      }
       return;
     }
     case "aborttail": {
