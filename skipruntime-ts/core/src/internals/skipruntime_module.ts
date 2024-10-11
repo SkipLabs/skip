@@ -1031,9 +1031,7 @@ class ContextImpl extends SkFrozen implements Context {
       this.refs.fromWasm.SkipRuntime_Context__useExternalResource(
         this.refs.skjson.exportString(service.supplier),
         this.refs.skjson.exportString(service.resource),
-        this.refs.skjson.exportJSON(
-          service.params === undefined ? {} : service.params,
-        ),
+        this.refs.skjson.exportJSON(service.params ?? {}),
         service.reactiveAuth
           ? this.refs.skjson.exportBytes(service.reactiveAuth)
           : null,
