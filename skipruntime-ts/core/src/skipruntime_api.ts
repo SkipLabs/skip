@@ -353,6 +353,8 @@ export interface ExternalSupplier {
 }
 
 export interface Resource {
+  constructor(params: Record<string, string>);
+
   reactiveCompute(
     context: Context,
     collections: Record<string, EagerCollection<TJSON, TJSON>>,
