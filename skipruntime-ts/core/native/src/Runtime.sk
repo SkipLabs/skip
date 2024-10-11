@@ -307,7 +307,12 @@ class LinkToResource(
 ) extends SKStore.Postponable {
   fun perform(context: mutable SKStore.Context): void {
     pushContext(context);
-    this.supplier.link(this.writer, this.name, this.params, this.reactiveAuth);
+    this.supplier.subscribe(
+      this.writer,
+      this.name,
+      this.params,
+      this.reactiveAuth,
+    );
     popContext();
   }
 }
@@ -320,7 +325,7 @@ class CloseResource(
 ) extends SKStore.Postponable {
   fun perform(context: mutable SKStore.Context): void {
     pushContext(context);
-    this.supplier.close(this.name, this.params, this.reactiveAuth);
+    this.supplier.unsubscribe(this.name, this.params, this.reactiveAuth);
     popContext();
   }
 }

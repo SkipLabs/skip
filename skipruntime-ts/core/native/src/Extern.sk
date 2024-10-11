@@ -140,9 +140,9 @@ class ExternLazyCompute(eptr: SKStore.ExternalPointer) extends LazyCompute {
 
 /************  ExternalSupplier ****************/
 
-@cpp_extern("SkipRuntime_ExternalSupplier__link")
+@cpp_extern("SkipRuntime_ExternalSupplier__subscribe")
 @debug
-native fun linkOfExternalSupplier(
+native fun subscribeOfExternalSupplier(
   externalSupplier: UInt32,
   collection: String,
   resource: String,
@@ -150,9 +150,9 @@ native fun linkOfExternalSupplier(
   reactiveAuth: ?Array<UInt8>,
 ): void;
 
-@cpp_extern("SkipRuntime_ExternalSupplier__close")
+@cpp_extern("SkipRuntime_ExternalSupplier__unsubscribe")
 @debug
-native fun closeOfExternalSupplier(
+native fun unsubscribeOfExternalSupplier(
   externalSupplier: UInt32,
   resource: String,
   params: SKJSON.CJObject,
@@ -177,13 +177,13 @@ fun createExternalSupplier(externalSupplier: UInt32): ExternExternalSupplier {
 class ExternExternalSupplier(
   eptr: SKStore.ExternalPointer,
 ) extends ExternalSupplier {
-  fun link(
+  fun subscribe(
     collection: CollectionWriter,
     resource: String,
     params: Map<String, PValue>,
     reactiveAuth: ?Array<UInt8>,
   ): void {
-    linkOfExternalSupplier(
+    subscribeOfExternalSupplier(
       this.eptr.value,
       collection.dirName.toString(),
       resource,
@@ -192,12 +192,12 @@ class ExternExternalSupplier(
     )
   }
 
-  fun close(
+  fun unsubscribe(
     resource: String,
     params: Map<String, PValue>,
     reactiveAuth: ?Array<UInt8>,
   ): void {
-    closeOfExternalSupplier(
+    unsubscribeOfExternalSupplier(
       this.eptr.value,
       resource,
       jsonParams(params),

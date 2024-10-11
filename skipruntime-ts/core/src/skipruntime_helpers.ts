@@ -17,7 +17,7 @@ export interface ExternalResource {
 export class ExternalService implements ExternalSupplier {
   constructor(private resources: Record<string, ExternalResource>) {}
 
-  link(
+  subscribe(
     resourceName: string,
     params: Record<string, string | number>,
     cb: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void,
@@ -32,7 +32,7 @@ export class ExternalService implements ExternalSupplier {
     resource.open(params, cb, reactiveAuth);
   }
 
-  close(
+  unsubscribe(
     resourceName: string,
     params: Record<string, string>,
     reactiveAuth?: Uint8Array,
