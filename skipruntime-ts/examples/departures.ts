@@ -22,12 +22,6 @@ type Result = {
   results: Departure[];
 };
 
-const departures = new Polled(
-  "https://api.unhcr.org/rsq/v1/departures",
-  10000,
-  (data: Result) => data.results.map((v, idx) => [idx, [v]]),
-);
-
 class DeparturesResource implements Resource {
   reactiveCompute(
     context: Context,
@@ -48,7 +42,11 @@ class DeparturesResource implements Resource {
       resettlement: get("resettlement", "NOR,USA"),
     };
 
-    return context.useExternalResource("http", "departures", params);
+    return context.useExternalResource(
+      "externalDeparturesAPI",
+      "departures",
+      params,
+    );
   }
 }
 
@@ -58,7 +56,13 @@ class Service implements SkipService {
     departures: DeparturesResource,
   };
   externalServices = {
-    http: new ExternalService({ departures }),
+    externalDeparturesAPI: new ExternalService({
+      departures: new Polled(
+        "https://api.unhcr.org/rsq/v1/departures",
+        10000,
+        (data: Result) => data.results.map((v, idx) => [idx, [v]]),
+      ),
+    }),
   };
 
   reactiveCompute(
