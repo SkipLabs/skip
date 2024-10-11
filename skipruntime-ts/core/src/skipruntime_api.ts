@@ -257,12 +257,12 @@ export interface Context extends Constant {
    * @param reactiveAuth - the caller client user Skip session authentification
    * @returns The reactive collection of the external resource
    */
-  useExternalResource<K extends TJSON, V extends TJSON>(
+  useExternalResource<K extends TJSON, V extends TJSON>(service: {
     supplier: string,
     resource: string,
     params?: Record<string, string | number>,
     reactiveAuth?: Uint8Array,
-  ): EagerCollection<K, V>;
+  }): EagerCollection<K, V>;
 
   jsonExtract(value: JSONObject, pattern: string): TJSON[];
 }

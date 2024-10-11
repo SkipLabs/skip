@@ -781,11 +781,12 @@ class ExternalResource implements Resource {
   ): EagerCollection<number, number[]> {
     const v1 = (cs.input2.maybeGetOne(0) ?? 0).toString();
     const v2 = (cs.input2.maybeGetOne(1) ?? 0).toString();
-    const external = context.useExternalResource<number, number>(
-      "external",
-      "mock",
-      { v1, v2 },
+    const external = context.useExternalResource<number, number>({
+      supplier: "external",
+      resource: "mock",
+      params: { v1, v2 },
       reactiveAuth,
+    }
     );
     return cs.input1.map(ExternalCheck, external);
   }
@@ -854,11 +855,12 @@ class TokensResource implements Resource {
     _cs: Record<string, EagerCollection<TJSON, TJSON>>,
     reactiveAuth?: Uint8Array,
   ): EagerCollection<string, number> {
-    return context.useExternalResource(
-      "system",
-      "timer",
-      { "5ms": 5 },
+    return context.useExternalResource({
+      supplier: "system",
+      resource: "timer",
+      params: { "5ms": 5 },
       reactiveAuth,
+    }
     );
   }
 }
