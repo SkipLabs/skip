@@ -258,10 +258,10 @@ export interface Context extends Constant {
    * @returns The reactive collection of the external resource
    */
   useExternalResource<K extends TJSON, V extends TJSON>(service: {
-    supplier: string,
-    resource: string,
-    params?: Record<string, string | number>,
-    reactiveAuth?: Uint8Array,
+    supplier: string;
+    resource: string;
+    params?: Record<string, string | number>;
+    reactiveAuth?: Uint8Array;
   }): EagerCollection<K, V>;
 
   jsonExtract(value: JSONObject, pattern: string): TJSON[];
