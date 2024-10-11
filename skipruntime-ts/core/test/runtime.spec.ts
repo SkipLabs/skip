@@ -715,7 +715,7 @@ async function timeout(ms: number) {
 }
 
 class External implements ExternalSupplier {
-  link(
+  subscribe(
     resource: string,
     params: { v1: string; v2: string },
     cb: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void,
@@ -727,7 +727,7 @@ class External implements ExternalSupplier {
     return;
   }
 
-  close(
+  unsubscribe(
     _resource: string,
     _params: { v1: string; v2: string },
     _reactiveAuth?: Uint8Array,

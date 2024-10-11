@@ -330,7 +330,7 @@ interface ToWasm {
 
   // ExternalSupplier
 
-  SkipRuntime_ExternalSupplier__link(
+  SkipRuntime_ExternalSupplier__subscribe(
     supplier: Handle<ExternalSupplier>,
     collection: ptr<Internal.String>,
     resource: ptr<Internal.String>,
@@ -338,7 +338,7 @@ interface ToWasm {
     reactiveAuth: ptr<Internal.Array<Internal.Byte>>,
   ): void;
 
-  SkipRuntime_ExternalSupplier__close(
+  SkipRuntime_ExternalSupplier__unsubscribe(
     supplier: Handle<ExternalSupplier>,
     skresource: ptr<Internal.String>,
     skparams: ptr<Internal.CJObject>,
@@ -708,7 +708,7 @@ class LinksImpl implements Links {
 
   // ExternalSupplier
 
-  linkOfExternalSupplier(
+  subscribeOfExternalSupplier(
     sksupplier: Handle<ExternalSupplier>,
     skwriter: ptr<Internal.String>,
     skresource: ptr<Internal.String>,
@@ -726,10 +726,15 @@ class LinksImpl implements Links {
     );
     const resource = skjson.importString(skresource);
     const params = skjson.importJSON(skparams, true) as Record<string, string>;
-    supplier.link(resource, params, writer.update.bind(writer), reactiveAuth);
+    supplier.subscribe(
+      resource,
+      params,
+      writer.update.bind(writer),
+      reactiveAuth,
+    );
   }
 
-  closeOfExternalSupplier(
+  unsubscribeOfExternalSupplier(
     sksupplier: Handle<ExternalSupplier>,
     skresource: ptr<Internal.String>,
     skparams: ptr<Internal.CJObject>,
@@ -742,7 +747,7 @@ class LinksImpl implements Links {
       : undefined;
     const resource = skjson.importString(skresource);
     const params = skjson.importJSON(skparams, true) as Record<string, string>;
-    supplier.close(resource, params, reactiveAuth);
+    supplier.unsubscribe(resource, params, reactiveAuth);
   }
 
   shutdownOfExternalSupplier(sksupplier: Handle<ExternalSupplier>) {
@@ -1341,10 +1346,10 @@ class Manager implements ToWasmManager {
 
     // ExternalSupplier
 
-    toWasm.SkipRuntime_ExternalSupplier__close =
-      links.closeOfExternalSupplier.bind(links);
-    toWasm.SkipRuntime_ExternalSupplier__link =
-      links.linkOfExternalSupplier.bind(links);
+    toWasm.SkipRuntime_ExternalSupplier__unsubscribe =
+      links.unsubscribeOfExternalSupplier.bind(links);
+    toWasm.SkipRuntime_ExternalSupplier__subscribe =
+      links.subscribeOfExternalSupplier.bind(links);
     toWasm.SkipRuntime_ExternalSupplier__shutdown =
       links.shutdownOfExternalSupplier.bind(links);
     toWasm.SkipRuntime_deleteExternalSupplier =
