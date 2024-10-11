@@ -786,8 +786,7 @@ class ExternalResource implements Resource {
       resource: "mock",
       params: { v1, v2 },
       reactiveAuth,
-    }
-    );
+    });
     return cs.input1.map(ExternalCheck, external);
   }
 }
@@ -860,8 +859,7 @@ class TokensResource implements Resource {
       resource: "timer",
       params: { "5ms": 5 },
       reactiveAuth,
-    }
-    );
+    });
   }
 }
 
