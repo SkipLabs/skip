@@ -236,25 +236,8 @@ fun getOrInitializeBackend(
       | Some(errors) ->
         SkipError.printErrorsAndExit(
           SkipError.ErrorsFile::type(errors).value.reversed().toArray(),
-          filename -> {
-            contents = FileCache.fileDir.unsafeGetArray(
-              context,
-              SKStore.SID(filename),
-            )[0].value;
-
-            if (filename.contains(":")) {
-              !filename = filename.splitFirst(":") match {
-              // Display bare paths for errors pertaining to the sklib
-              // currently being built if any.
-              | (l, f) if (Some(l) == conf.lib_name) -> f
-
-              // Errors in dependencies are displayed as:
-              //  /path/to/foo.sklib:src/bar.sk
-              | (l, f) -> conf.dependencies[l].i0 + ":" + f
-              }
-            };
-
-            (filename, contents)
+          file -> {
+            FileCache.fileDir.unsafeGetArray(context, file)[0].value
           },
         )
       };

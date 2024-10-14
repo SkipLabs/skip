@@ -12,12 +12,23 @@ module alias Error = SkipError;
 
 module FileCache;
 
+class InputSource(
+  /// Name of the package this source file belongs to, if any.
+  pkg_opt: ?String,
+  /// Absolute path of the original source file. NOTE: As we read the
+  /// source files of dependencies from the compiled `.sklib`s, the
+  /// path does not always map to a file with the same contents on the
+  /// actual file system (and sometimes maps to no file at all, as in
+  /// the case of using the bootstrap `libstd.sklib`).
+  path: String,
+) extends SKStore.Key uses Hashable
+
 const fileDirName: SKStore.DirName = SKStore.DirName::create("/fileCache/");
 const fileDir: SKStore.EHandle<
-  SKStore.SID,
+  InputSource,
   SKStore.StringFile,
 > = SKStore.EHandle(
-  SKStore.SID::keyType,
+  InputSource::keyType,
   SKStore.StringFile::type,
   fileDirName,
 );
@@ -69,10 +80,6 @@ fun pkgDelta(
     modified_files.collect(Array),
     deleted_files.collect(Array),
   )
-}
-
-fun formatPkgSrc(pkg_opt: ?String, path: String): String {
-  pkg_opt.map(p -> `${p}:`).default("") + path
 }
 
 fun writeFiles(
@@ -130,21 +137,19 @@ fun writeFiles(
 
     // Update added/modified files.
     for (src_path in added_files.concat(modified_files)) {
-      key = formatPkgSrc(pkg_opt, src_path);
       // FIXME: This is O(n).
       src_contents = srcs.find(src ~> src.i0 == src_path).fromSome().i2;
       fileDir.writeArray(
         context,
-        SKStore.SID(key),
+        InputSource(pkg_opt, src_path),
         Array[SKStore.StringFile(src_contents)],
       )
     };
     // Invalidate deleted files.
     for (src_path in deleted_files) {
-      key = formatPkgSrc(pkg_opt, src_path);
       fileDir.writeArray(
         context,
-        SKStore.SID(key),
+        InputSource(pkg_opt, src_path),
         Array[SKStore.StringFile("")],
       )
     }
@@ -192,19 +197,19 @@ fun getAst(
   astDir.get(context, SKStore.SID(fileName)).value
 }
 
-fun parseFile(fileName: String, source: String): DefsFile {
+fun parseFile(file: FileCache.InputSource, source: String): DefsFile {
   fileResult = SkipParser.parseSource(source, true);
-  ast = parseToAst(fileName, fileResult);
+  ast = parseToAst(file, fileResult);
   DefsFile(ast)
 }
 
 fun parseToAst(
-  filename: String,
+  file: FileCache.InputSource,
   parseResults: Parser.ParseResults,
 ): List<SkipAst.Definition> {
-  parseResults.throwOnError(filename);
+  parseResults.throwOnError(file);
   List::createFromItems(
-    ConvertTree.Converter{filename}.convertTree(parseResults.tree),
+    ConvertTree.Converter{file}.convertTree(parseResults.tree),
   );
 }
 
