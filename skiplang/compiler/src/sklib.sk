@@ -4,21 +4,23 @@
 
 module Sklib;
 
-class Metadata(
+class Metadata{
   name: String,
   target: String,
   hash: String,
+  pkg_dir: String,
   sources: Array<(String, Int, String)>,
   dependencies: Array<(String, String)>,
   links: Array<String>,
   preambles: Array<String>,
   has_object_code: Bool,
-) {
+} {
   fun toJSON(): JSON.Object {
     JSON.Object[
       "name" => JSON.String(this.name),
       "target" => JSON.String(this.target),
       "hash" => JSON.String(this.hash),
+      "pkg_dir" => JSON.String(this.pkg_dir),
       "sources" => JSON.Array(
         Vector::createFromItems(
           this.sources.map(s -> {
@@ -60,11 +62,12 @@ class Metadata(
     json = JSON.decode(
       String::fromUtf8(bytes.values().collect(Array)),
     ).expectObject();
-    Metadata(
-      json["name"].expectString(),
-      json["target"].expectString(),
-      json["hash"].expectString(),
-      json["sources"]
+    Metadata{
+      name => json["name"].expectString(),
+      target => json["target"].expectString(),
+      hash => json["hash"].expectString(),
+      pkg_dir => json["pkg_dir"].expectString(),
+      sources => json["sources"]
         .expectArray()
         .value.map(o -> {
           src = o.expectObject();
@@ -75,23 +78,23 @@ class Metadata(
           )
         })
         .collect(Array),
-      json["dependencies"]
+      dependencies => json["dependencies"]
         .expectArray()
         .value.map(o -> {
           dep = o.expectObject();
           (dep["name"].expectString(), dep["hash"].expectString())
         })
         .collect(Array),
-      json["link"]
+      links => json["link"]
         .expectArray()
         .value.map(s -> s.expectString())
         .collect(Array),
-      json["preambles"]
+      preambles => json["preambles"]
         .expectArray()
         .value.map(s -> s.expectString())
         .collect(Array),
-      json["has_object_code"].expectBool(),
-    );
+      has_object_code => json["has_object_code"].expectBool(),
+    };
   }
 }
 
@@ -120,6 +123,7 @@ fun read_metadata(path: String): Result<Metadata, ARParser.Error> {
 mutable class .SklibBuilder(
   name: String,
   target: String,
+  pkg_dir: String,
   sources: mutable Vector<(String, Int, String)> = mutable Vector[],
   dependencies: mutable Vector<(String, String)> = mutable Vector[],
   links: mutable Vector<String> = mutable Vector[],
@@ -190,16 +194,17 @@ mutable class .SklibBuilder(
     ar = ARParser.Builder::createGNU(file, file_names);
     ar.append_id(
       kMetadataFile,
-      Metadata(
-        this.name,
-        this.target,
-        this.hash().toString(),
-        this.sources.collect(Array),
-        this.dependencies.collect(Array),
-        this.links.collect(Array),
-        this.preambles.collect(Array),
-        file_names.any(fn -> fn.endsWith(".o")),
-      ).serialize(),
+      Metadata{
+        name => this.name,
+        target => this.target,
+        hash => this.hash().toString(),
+        pkg_dir => this.pkg_dir,
+        sources => this.sources.collect(Array),
+        dependencies => this.dependencies.collect(Array),
+        links => this.links.collect(Array),
+        preambles => this.preambles.collect(Array),
+        has_object_code => file_names.any(fn -> fn.endsWith(".o")),
+      }.serialize(),
     ) match {
     | Success _ -> void
     | Failure(err) -> return Failure(err)

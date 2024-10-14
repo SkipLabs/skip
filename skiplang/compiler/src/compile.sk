@@ -401,7 +401,11 @@ fun compile_sklib(conf: Config.Config): void {
   runCompilerPhase("native/write_sklib", () -> {
     // NOTE: Static libraries (`.a` archives) provided as input files are
     // bundled into the `sklib`.
-    sklib = mutable SklibBuilder(conf.lib_name.fromSome(), conf.target);
+    sklib = mutable SklibBuilder(
+      conf.lib_name.fromSome(),
+      conf.target,
+      getcwd(),
+    );
 
     conf.direct_dependencies.each(dep_name ->
       sklib.add_dependency(dep_name, conf.dependencies[dep_name].i1)
