@@ -12,27 +12,27 @@
 module FileRange;
 
 base class .Pos{
-  filename: String,
+  file: FileCache.InputSource,
   range: TextRange,
 } uses Hashable, Orderable, Show {
-  static fun create(filename: String, range: TextRange): FileRange {
-    FileRange{filename, range}
+  static fun create(file: FileCache.InputSource, range: TextRange): FileRange {
+    FileRange{file, range}
   }
 
   static fun fromStartEnd(start: FilePosition, end: FilePosition): FileRange {
-    // TODO: invariant(start.filename == end.filename);
+    // TODO: invariant(start.file == end.file);
     FileRange.create(
-      start.filename,
+      start.file,
       TextRange.create(start.position, end.position),
     );
   }
 
   fun start(): FilePosition {
-    FilePosition.create(this.filename, this.range.start);
+    FilePosition.create(this.file, this.range.start);
   }
 
   fun end(): FilePosition {
-    FilePosition.create(this.filename, this.range.end);
+    FilePosition.create(this.file, this.range.end);
   }
 
   fun startPosition(): Position {
@@ -44,12 +44,12 @@ base class .Pos{
   }
 
   fun contains(position: FilePosition): Bool {
-    // TODO: invariant(this.filename == position.filename);
+    // TODO: invariant(this.file == position.file);
     this.range.contains(position.position);
   }
 
   protected fun defaultToString(): String {
-    this.filename + this.range.toString()
+    this.file.toString() + this.range.toString()
   }
 
   overridable fun toString(): String {
@@ -82,11 +82,17 @@ class .FileRange extends Pos {
   }
 }
 
-const none: FileRange = create("", TextRange.none);
-const builtin: FileRange = create("<builtin>", TextRange.none);
+const none: FileRange = create(
+  FileCache.InputSource(None(), ""),
+  TextRange.none,
+);
+const builtin: FileRange = create(
+  FileCache.InputSource(None(), "<builtin>"),
+  TextRange.none,
+);
 
-fun create(filename: String, range: TextRange): FileRange {
-  FileRange::create(filename, range);
+fun create(file: FileCache.InputSource, range: TextRange): FileRange {
+  FileRange::create(file, range);
 }
 
 fun fromStartEnd(start: FilePosition, end: FilePosition): FileRange {
