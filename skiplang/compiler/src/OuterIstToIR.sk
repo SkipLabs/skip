@@ -2967,16 +2967,6 @@ class SwitchBranch<T>(value: T, actionIndex: Int, pos: FileRange)
 
 mutable class SwitchAction(body: I.Stmt, block: mutable GBlock)
 
-// Normally Return inside a memoized function gets turned into a special call.
-// But when we really truly want an actual return, we convey that override
-// to the I.Return handler by providing a Type with this wacky FileRange.
-//
-// TODO: Maybe just say that a Return outside a try must be a "real" one.
-private const kForceReturnHackPos: FileRange = FileRange{
-  filename => "<builtin>.HackForceReturn///\0///",
-  range => TextRange.none,
-};
-
 // Manages converting a single function from OuterIst to GIR.
 mutable class OuterIstEmitter{
   converter: Converter,
@@ -4890,12 +4880,7 @@ mutable class OuterIstEmitter{
     | I.Return(expr) ->
       pos = expr.pos;
       value = this.emitExpr(context, expr);
-      if (expr.ty.pos == kForceReturnHackPos) {
-        // Generate a physical return right here.
-        _ = this.emitInstr(GReturn{pos, value})
-      } else {
-        this.emitReturn(value, pos)
-      }
+      this.emitReturn(value, pos)
     | I.Try _ -> this.funInfo.die("Try should have been lowered")
     | I.TryCatch(pos, body, excBinding, catchMatch) ->
       this.emitTry(
