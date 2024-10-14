@@ -40,16 +40,16 @@ async function createWs(uri: string): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(uri);
     socket.binaryType = "arraybuffer";
-    socket.onclose = (_event) => {
+    socket.onclose = (_event: any) => {
       reject(new Error("Socket closed before open"));
     };
-    socket.onerror = (_event) => {
+    socket.onerror = (_event: any) => {
       reject(new Error("Socket error"));
     };
-    socket.onmessage = (_event) => {
+    socket.onmessage = (_event: any) => {
       reject(new Error("Socket messaged before open"));
     };
-    socket.onopen = (_event) => {
+    socket.onopen = (_event: any) => {
       resolve(socket);
     };
   });
@@ -106,7 +106,8 @@ class ResilientWebSocket {
 
         this.socket = socket;
         return;
-      } catch (_error) {
+      } catch (error) {
+        console.error(error);
         const backoffMs = 500 + Math.random() * 1000;
         await new Promise((resolve) => setTimeout(resolve, backoffMs));
       }
