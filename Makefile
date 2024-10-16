@@ -127,13 +127,32 @@ setup-git-hooks: .git/hooks/pre-commit
 
 .PHONY: test
 test:
-	$(MAKE) --keep-going SKARGO_PROFILE=dev SKDB_WASM=sql/target/wasm32-unknown-unknown/dev/skdb.wasm SKDB_BIN=sql/target/host/dev/skdb sktest-prelude test-native tstest-sql tstest-skipruntime-ts
+	$(MAKE) --keep-going SKARGO_PROFILE=dev SKDB_WASM=sql/target/wasm32-unknown-unknown/dev/skdb.wasm SKDB_BIN=sql/target/host/dev/skdb test-prelude test-skjson test-skipruntime-ts test-native test-wasm
+
+.PHONY: test-prelude
+test-prelude:
+	bin/cd_sh skiplang/prelude "skargo test --profile $(SKARGO_PROFILE)"
+
+.PHONY: test-skjson
+test-skjson:
+	bin/cd_sh skiplang/skjson "skargo test --profile $(SKARGO_PROFILE)"
+
+.PHONY: test-skipruntime-ts
+test-skipruntime-ts:
+	$(MAKE) -C skipruntime-ts test
+
+test-%:
+	cd $* && skargo test --profile $(SKARGO_PROFILE)
 
 .PHONY: test-native
 test-native: build/skdb
 	cd sql/ && SKARGO_PROFILE=$(SKARGO_PROFILE) ./test_sql.sh \
 	|tee /tmp/native-test.out ; \
 	! grep -v '\*\|^[[:blank:]]*$$\|OK\|PASS' /tmp/native-test.out
+
+.PHONY: test-wasm
+test-wasm:
+	cd sql && make test
 
 .PHONY: test-client
 test-client:
@@ -218,19 +237,5 @@ skcheck-%:
 skfmt-%:
 	cd $* && skargo fmt
 
-sktest-%:
-	cd $* && skargo test --profile $(SKARGO_PROFILE)
-
 skbuild-%:
 	cd $* && skargo b --profile $(SKARGO_PROFILE)
-
-
-
-.PHONY: test-wasm
-test-wasm:
-	cd sql && make test
-
-## Backward Compatibility
-
-.PHONY: test-skfs
-test-skfs: sktest-prelude
