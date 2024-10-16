@@ -45,7 +45,7 @@ class SkipHttpAccessV1 {
   }
 
   async writeMany(data: Write[], port?: number) {
-    const promises = data.map((w) =>
+    const promises = data.map(async (w) =>
       this.runtimes[port ?? this.defaultPort].patch(w.collection, w.entries),
     );
     if (promises.length == 1) {
