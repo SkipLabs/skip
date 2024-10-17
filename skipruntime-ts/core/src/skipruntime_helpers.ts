@@ -146,10 +146,9 @@ function toId(
   params: Record<string, string | number>,
   reactiveAuth?: Uint8Array,
 ): string {
-  const strparams: string[] = [];
-  for (const key of Object.keys(params).sort()) {
-    strparams.push(`${key}:${params[key].toString()}`);
-  }
+  const strparams = Object.entries(params)
+    .map(([key, value]) => `${key}:${value.toString()}`)
+    .sort();
   const hex = reactiveAuth ? Buffer.from(reactiveAuth).toString("hex") : "";
   return `[${strparams.join(",")}]${hex}`;
 }

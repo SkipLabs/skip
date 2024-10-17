@@ -56,7 +56,7 @@ class LinksImpl implements Links {
     const buf = new Uint8Array(4);
     const crypto = this.env == undefined ? new Crypto() : this.env.crypto();
     crypto.getRandomValues(buf);
-    return new Uint32Array(buf)[0];
+    return new Uint32Array(buf)[0]!; // allocated above
   };
 
   SKIP_js_get_argc!: () => int;
@@ -122,12 +122,19 @@ class LinksImpl implements Links {
     };
 
     this.SKIP_js_get_argc = () => utils.args.length;
-    this.SKIP_js_get_argn = (index: int) =>
-      utils.exportString(utils.args[index]);
+    this.SKIP_js_get_argn = (index: int) => {
+      const arg = utils.args[index];
+      if (arg === undefined) throw new Error(`Invalid arg index: ${index}`);
+      return utils.exportString(arg);
+    };
     this.SKIP_js_get_envc = () =>
       this.env && this.env.environment ? this.env.environment.length : 0;
-    this.SKIP_js_get_envn = (index: int) =>
-      utils.exportString(this.env!.environment[index]);
+    this.SKIP_js_get_envn = (index: int) => {
+      const env = this.env?.environment[index];
+      if (env === undefined)
+        throw new Error(`Environment entry not found: ${index}`);
+      return utils.exportString(env);
+    };
 
     this.SKIP_read_line_fill = () => {
       this.lineBuffer = utils.readStdInLine();
@@ -138,7 +145,10 @@ class LinksImpl implements Links {
       return this.lineBuffer.length;
     };
     this.SKIP_read_line_get = (i: int) => {
-      return this.lineBuffer[i];
+      const line = this.lineBuffer[i];
+      if (line === undefined)
+        throw new Error(`Invalid read_line buffer index: ${i}`);
+      return line;
     };
     this.SKIP_FileSystem_appendTextFile = (
       path: ptr<Internal.String>,
