@@ -43,8 +43,8 @@ class DeparturesResource implements Resource {
     };
 
     return context.useExternalResource({
-      supplier: "http",
-      resource: "departures",
+      supplier: "externalDeparturesAPI",
+      resource: "departuresFromAPI",
       params,
     });
   }
@@ -57,7 +57,7 @@ class Service implements SkipService {
   };
   externalServices = {
     externalDeparturesAPI: new ExternalService({
-      departures: new Polled(
+      departuresFromAPI: new Polled(
         "https://api.unhcr.org/rsq/v1/departures",
         10000,
         (data: Result) => data.results.map((v, idx) => [idx, [v]]),
