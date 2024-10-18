@@ -213,21 +213,14 @@ if (values.dev) {
   }
 
   const schemeAndRest = host.split("://", 2);
-  const hostAndPort = schemeAndRest[schemeAndRest.length - 1].split(":", 2);
-
-  if (hostAndPort.length < 1) {
+  const [shost, sport] = schemeAndRest[schemeAndRest.length - 1]!.split(":", 2);
+  if (shost === undefined) {
     console.log("Invalid host");
     process.exit(1);
-  } else if (hostAndPort.length === 1) {
-    dbCreds = await getCredsFromDevServer(
-      hostAndPort[0],
-      3586,
-      values.db as string,
-    );
   } else {
     dbCreds = await getCredsFromDevServer(
-      hostAndPort[0],
-      parseInt(hostAndPort[1]),
+      shost,
+      sport ? parseInt(sport) : 3586,
       values.db as string,
     );
   }
@@ -282,8 +275,9 @@ if (
   process.exit(1);
 }
 
-const firstPair = Object.entries(dbCreds)[0];
-const accessKey = (values["access-key"] ?? firstPair[0]) as string;
+const firstPair = Object.entries(dbCreds)[0]!; // checked by preceding if
+const firstKey = firstPair[0]!; // Object.entries is an array of key-value pairs
+const accessKey = (values["access-key"] ?? firstKey) as string;
 const privateKey = dbCreds[accessKey] as string;
 
 if (!privateKey) {
@@ -314,7 +308,7 @@ const display = function (rows: Record<string, unknown>[]) {
     }
 
     const acc: string[] = [];
-    const keys = Object.keys(rows[0]);
+    const keys = Object.keys(rows[0]!); // checked by preceding if
 
     acc.push(keys.join("|"));
 
@@ -340,7 +334,8 @@ const display = function (rows: Record<string, unknown>[]) {
 if (values["create-db"]) {
   const db = values["create-db"] as string;
   const remote = await skdb.connectedRemote();
-  const result = await remote!.createDatabase(db);
+  if (remote === undefined) throw new Error("No connected remote");
+  const result = await remote.createDatabase(db);
   // b64 encode
   const newDbCreds = {};
   //@ts-ignore
@@ -359,7 +354,8 @@ if (values["create-db"]) {
 
 if (values["create-user"]) {
   const remote = await skdb.connectedRemote();
-  const result = await remote!.createUser();
+  if (remote === undefined) throw new Error("No connected remote");
+  const result = await remote.createUser();
   // b64 encode
   const newDbCreds = {};
   const b64pk = Buffer.from(result.privateKey).toString("base64");
@@ -376,19 +372,22 @@ if (values["create-user"]) {
 
 if (values.schema) {
   const remote = await skdb.connectedRemote();
-  const schema = await remote!.schema();
+  if (remote === undefined) throw new Error("No connected remote");
+  const schema = await remote.schema();
   console.log(schema.trim());
 }
 
 if (values["table-schema"]) {
   const remote = await skdb.connectedRemote();
-  const schema = await remote!.tableSchema(values["table-schema"] as string);
+  if (remote === undefined) throw new Error("No connected remote");
+  const schema = await remote.tableSchema(values["table-schema"] as string);
   console.log(schema.trim());
 }
 
 if (values["view-schema"]) {
   const remote = await skdb.connectedRemote();
-  const schema = await remote!.viewSchema(values["view-schema"] as string);
+  if (remote === undefined) throw new Error("No connected remote");
+  const schema = await remote.viewSchema(values["view-schema"] as string);
   console.log(schema.trim());
 }
 
@@ -439,7 +438,8 @@ const remoteRepl = async function () {
     if (query.trim() === ".schema") {
       try {
         const remote = await skdb.connectedRemote();
-        const schema = await remote!.schema();
+        if (remote === undefined) throw new Error("No connected remote");
+        const schema = await remote.schema();
         console.log(schema);
       } catch (ex) {
         console.error("Could not query schema.");
@@ -449,10 +449,13 @@ const remoteRepl = async function () {
     }
 
     if (query.startsWith(".table-schema")) {
-      const [_, table] = query.split(" ", 2);
+      const table = query.split(" ", 2)[1];
+      if (table === undefined)
+        throw new Error(`No table name found in query: ${query}`);
       try {
         const remote = await skdb.connectedRemote();
-        const schema = await remote!.tableSchema(table);
+        if (remote === undefined) throw new Error("No connected remote");
+        const schema = await remote.tableSchema(table);
         console.log(schema);
       } catch {
         console.error(`Could not find schema for ${table}.`);
@@ -461,10 +464,13 @@ const remoteRepl = async function () {
     }
 
     if (query.startsWith(".view-schema")) {
-      const [_, view] = query.split(" ", 2);
+      const view = query.split(" ", 2)[1];
+      if (view === undefined)
+        throw new Error(`No view name found in query: ${query}`);
       try {
         const remote = await skdb.connectedRemote();
-        const schema = await remote!.viewSchema(view);
+        if (remote === undefined) throw new Error("No connected remote");
+        const schema = await remote.viewSchema(view);
         console.log(schema);
       } catch {
         console.error(`Could not find schema for ${view}.`);
@@ -474,7 +480,8 @@ const remoteRepl = async function () {
 
     try {
       const remote = await skdb.connectedRemote();
-      const rows = await remote!.exec(query, {});
+      if (remote === undefined) throw new Error("No connected remote");
+      const rows = await remote.exec(query, {});
       display(rows);
     } catch (ex) {
       console.error("Could not eval query. Try `.help`");
@@ -608,7 +615,8 @@ try {
 if (query.trim() !== "") {
   try {
     const remote = await skdb.connectedRemote();
-    const rows = await remote!.exec(query, {});
+    if (remote === undefined) throw new Error("No connected remote");
+    const rows = await remote.exec(query, {});
     display(rows);
   } catch (ex) {
     console.error("Could not eval query.");

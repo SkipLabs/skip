@@ -307,7 +307,11 @@ export class SKDBSyncImpl implements SKDBSync {
       .replace(/[ ]+/g, " ")
       .split(",");
 
-    const colNames = colTypes.map((col) => col.split(" ")[1]);
+    const colNames = colTypes.map((col) => {
+      const name = col.split(" ")[1];
+      if (name === undefined) throw new Error(`Missing column name for ${col}`);
+      return name;
+    });
 
     const colIndex = new Map<string, number>();
     colNames.forEach((v, i) => {
@@ -320,7 +324,7 @@ export class SKDBSyncImpl implements SKDBSync {
         if (valueIndex >= valuesArray.length) break;
         const values: unknown[] = [];
         let valuesSize = 0;
-        const obj = valuesArray[valueIndex];
+        const obj = valuesArray[valueIndex]!; // checked by preceding if
         for (const fieldName in obj) {
           if (!colIndex.has(fieldName)) {
             throw new Error("Field not found: " + fieldName);
