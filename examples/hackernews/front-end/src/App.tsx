@@ -139,7 +139,7 @@ function Post() {
     try {
       const response = await fetch(`${BASE_URL}/posts/${postId}`);
       console.log(response);
-      const data = await response.json();
+      const data = (await response.json()) as SetStateAction<Post | null>;
       console.log(data);
       return data;
     } catch (error) {

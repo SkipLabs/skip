@@ -93,6 +93,7 @@ class SKDBMechanismImpl implements SKDBMechanism {
         acc[table] = { since: wm };
       }
       const diffSpec = JSON.stringify(acc, (_key, value) =>
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
         typeof value === "bigint" ? Number(value) : value,
       );
       let d = client.runLocal(["diff", "--format=csv", session], diffSpec);
