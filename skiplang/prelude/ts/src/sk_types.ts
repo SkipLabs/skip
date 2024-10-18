@@ -120,7 +120,7 @@ export class Options {
   }
 
   static fromFlags(flags: int) {
-    let is = (flags: int, value: int) => {
+    const is = (flags: int, value: int) => {
       return (flags & value) == value;
     };
     return new Options(
@@ -246,7 +246,7 @@ export class Utils {
   private stacks: Map<ptr<Internal.Exception>, string>;
 
   exit = (code: int) => {
-    let message =
+    const message =
       code != 0 && this.stderr.length > 0 ? this.stderr.join("") : undefined;
     throw new SkRuntimeExit(code, message);
   };
@@ -281,7 +281,7 @@ export class Utils {
     kind?: Stream,
     newLine: boolean = false,
   ) => {
-    let str = this.importString(strPtr);
+    const str = this.importString(strPtr);
     this.log(str, kind, newLine);
   };
 
@@ -301,12 +301,12 @@ export class Utils {
 
   runCheckError = <T>(fn: () => T) => {
     this.clearMainEnvironment();
-    let res = fn();
+    const res = fn();
     if (this.stddebug.length > 0) {
       console.log(this.stddebug.join(""));
     }
     if (this.stderr.length > 0) {
-      let error = new Error(this.stderr.join(""));
+      const error = new Error(this.stderr.join(""));
       (error as any).cause = this.exception;
       throw error;
     }
@@ -340,7 +340,7 @@ export class Utils {
     if (exitCode != 0 || this.stderr.length > 0) {
       const message = this.stderr.length > 0 ? this.stderr.join("") : undefined;
       let tmp = "";
-      let lines: string[] = [];
+      const lines: string[] = [];
       message?.split("\n").forEach((line) => {
         const matches = [...line.matchAll(/external:([0-9]+)/g)].sort(
           (v1: string[], v2: string[]) => {
@@ -368,7 +368,7 @@ export class Utils {
       if (tmp != "") {
         lines.push(tmp);
       }
-      let error = new SkRuntimeExit(exitCode, lines.join("\n").trim());
+      const error = new SkRuntimeExit(exitCode, lines.join("\n").trim());
       (error as any).cause = this.exception;
       throw error;
     }
@@ -382,16 +382,16 @@ export class Utils {
     return null;
   };
   importString = (strPtr: ptr<Internal.String>) => {
-    let size = this.exports.SKIP_String_byteSize(strPtr);
-    let utf8 = new Uint8Array(this.exports.memory.buffer, strPtr, size);
+    const size = this.exports.SKIP_String_byteSize(strPtr);
+    const utf8 = new Uint8Array(this.exports.memory.buffer, strPtr, size);
     return this.env.decodeUTF8(utf8);
   };
   exportString = (s: string): ptr<Internal.String> => {
-    var data = new Uint8Array(this.exports.memory.buffer);
-    var i = 0,
-      addr = this.exports.SKIP_Obstack_alloc(s.length * 4);
-    for (var ci = 0; ci != s.length; ci++) {
-      var c = s.charCodeAt(ci);
+    const data = new Uint8Array(this.exports.memory.buffer);
+    let i = 0;
+    const addr = this.exports.SKIP_Obstack_alloc(s.length * 4);
+    for (let ci = 0; ci != s.length; ci++) {
+      let c = s.charCodeAt(ci);
       if (c < 128) {
         data[addr + i++] = c;
         continue;
@@ -402,7 +402,7 @@ export class Utils {
         if (c > 0xd7ff && c < 0xdc00) {
           if (++ci >= s.length)
             throw new Error("UTF-8 encode: incomplete surrogate pair");
-          var c2 = s.charCodeAt(ci);
+          const c2 = s.charCodeAt(ci);
           if (c2 < 0xdc00 || c2 > 0xdfff)
             throw new Error(
               `UTF-8 encode: second surrogate character 0x${c2.toString(16)} at index ${ci} out of range`,
@@ -421,21 +421,21 @@ export class Utils {
     skArray: ptr<Internal.Array<Internal.Byte>>,
     sizeof: int = 1,
   ) => {
-    let size = this.exports.SKIP_getArraySize(skArray) * sizeof;
-    let skData = new Uint8Array(this.exports.memory.buffer, skArray, size);
-    let copy = new Uint8Array(size);
+    const size = this.exports.SKIP_getArraySize(skArray) * sizeof;
+    const skData = new Uint8Array(this.exports.memory.buffer, skArray, size);
+    const copy = new Uint8Array(size);
     copy.set(skData);
     return copy;
   };
   importBytes2 = (skBytes: ptr<Internal.T<any>>, size: int = 1) => {
-    let skData = new Uint8Array(this.exports.memory.buffer, skBytes, size);
-    let copy = new Uint8Array(size);
+    const skData = new Uint8Array(this.exports.memory.buffer, skBytes, size);
+    const copy = new Uint8Array(size);
     copy.set(skData);
     return copy;
   };
   exportBytes = (view: Uint8Array) => {
-    let skArray = this.exports.SKIP_createByteArray(view.byteLength);
-    let data = new Uint8Array(
+    const skArray = this.exports.SKIP_createByteArray(view.byteLength);
+    const data = new Uint8Array(
       this.exports.memory.buffer,
       skArray,
       view.byteLength,
@@ -444,7 +444,7 @@ export class Utils {
     return skArray;
   };
   exportBytes2 = (view: Uint8Array, skBytes: ptr<Internal.T<any>>) => {
-    let data = new Uint8Array(
+    const data = new Uint8Array(
       this.exports.memory.buffer,
       skBytes,
       view.byteLength,
@@ -452,15 +452,15 @@ export class Utils {
     data.set(view);
   };
   importUInt32s = (skArray: ptr<Internal.Array<Internal.UInt32>>) => {
-    let size = this.exports.SKIP_getArraySize(skArray);
-    let skData = new Uint32Array(this.exports.memory.buffer, skArray, size);
-    let copy = new Uint32Array(size);
+    const size = this.exports.SKIP_getArraySize(skArray);
+    const skData = new Uint32Array(this.exports.memory.buffer, skArray, size);
+    const copy = new Uint32Array(size);
     copy.set(skData);
     return copy;
   };
   exportUInt32s(array: Uint32Array) {
-    let skArray = this.exports.SKIP_createUInt32Array(array.length);
-    let skData = new Uint32Array(
+    const skArray = this.exports.SKIP_createUInt32Array(array.length);
+    const skData = new Uint32Array(
       this.exports.memory.buffer,
       skArray,
       array.length,
@@ -469,15 +469,15 @@ export class Utils {
     return skArray;
   }
   importFloats = (skArray: ptr<Internal.Array<Internal.Float>>) => {
-    let size = this.exports.SKIP_getArraySize(skArray);
-    let skData = new Float64Array(this.exports.memory.buffer, skArray, size);
-    let copy = new Float64Array(size);
+    const size = this.exports.SKIP_getArraySize(skArray);
+    const skData = new Float64Array(this.exports.memory.buffer, skArray, size);
+    const copy = new Float64Array(size);
     copy.set(skData);
     return copy;
   };
   exportFloats(array: Float64Array) {
-    let skArray = this.exports.SKIP_createFloatArray(array.length);
-    let skData = new Float64Array(
+    const skArray = this.exports.SKIP_createFloatArray(array.length);
+    const skData = new Float64Array(
       this.exports.memory.buffer,
       skArray,
       array.length,
@@ -503,8 +503,8 @@ export class Utils {
     return new Uint8ClampedArray(this.exports.memory.buffer, dataPtr, length);
   };
   init = () => {
-    let heapBase = this.exports.__heap_base.valueOf();
-    let size = this.exports.memory.buffer.byteLength - heapBase;
+    const heapBase = this.exports.__heap_base.valueOf();
+    const size = this.exports.memory.buffer.byteLength - heapBase;
     this.exports.SKIP_skstore_init(size);
     this.exports.SKIP_initializeSkip();
     this.exports.SKIP_skstore_end_of_init();
@@ -536,18 +536,18 @@ export class Utils {
     if (rethrow && this.exception) {
       throw this.exception;
     } else {
-      let skMessage =
+      const skMessage =
         skExc != 0 ? this.exports.SKIP_getExceptionMessage(skExc) : null;
       let message =
         skMessage != null && skMessage != 0
           ? this.importString(skMessage)
           : "SKStore Internal error";
-      let lines = message.split("\n");
+      const lines = message.split("\n");
       if (lines[0]!.startsWith("external:")) {
         // only "".split("") is the empty array
-        let external = lines.shift()!;
+        const external = lines.shift()!;
         message = lines.join("\n");
-        let id = parseInt(external.substring(9));
+        const id = parseInt(external.substring(9));
         if (this.state.exceptions.has(id)) {
           throw this.state.exceptions.get(id)!.err;
         } else if (message.trim() == "") {
@@ -594,11 +594,11 @@ export class Utils {
       this.exports.SKIP_getExceptionMessage(skExc),
     );
     let errStack = this.stacks.get(skExc);
-    let lines = message.split("\n");
+    const lines = message.split("\n");
     if (lines[0]!.startsWith("external:")) {
       // only "".split("") is the empty array
-      let external = lines.shift()!;
-      let id = parseInt(external.substring(9));
+      const external = lines.shift()!;
+      const id = parseInt(external.substring(9));
       if (this.state.exceptions.has(id)) {
         const exception = this.state.exceptions.get(id);
         if (exception) {
@@ -639,7 +639,7 @@ export class Utils {
   getMemoryBuffer = () => this.exports.memory.buffer;
 
   readStdInLine = () => {
-    let lineBuffer = new Array<int>();
+    const lineBuffer = new Array<int>();
     const endOfLine = 10;
     if (this.current_stdin >= this.stdin.length) {
       this.exports.SKIP_throw_EndOfFile();
@@ -660,7 +660,7 @@ export class Utils {
   };
 
   readStdInToEnd = () => {
-    let lineBuffer = new Array<int>();
+    const lineBuffer = new Array<int>();
     while (this.current_stdin < this.stdin.length) {
       lineBuffer.push(this.stdin[this.current_stdin]!); // checked by while condition
       this.current_stdin++;
@@ -670,9 +670,9 @@ export class Utils {
 
   runWithGc = <T>(fn: () => T) => {
     this.stddebug = new Array();
-    let obsPos = this.exports.SKIP_new_Obstack();
+    const obsPos = this.exports.SKIP_new_Obstack();
     try {
-      let res = fn();
+      const res = fn();
       this.exports.SKIP_destroy_Obstack(obsPos);
       return cloneIfProxy(res);
     } catch (ex) {
@@ -793,9 +793,9 @@ export class Format implements Text {
 }
 
 export function resolve(path: string) {
-  let elements = import.meta.url.split("/");
+  const elements = import.meta.url.split("/");
   elements.pop();
-  let pelems = path.split("/");
+  const pelems = path.split("/");
   pelems.forEach((e) => {
     if (e == "..") {
       if (elements.length == 1) {
@@ -811,7 +811,7 @@ export function resolve(path: string) {
 }
 
 export function trimEndChar(str: string, ch: string) {
-  var end = str.length;
+  let end = str.length;
   while (end > 0 && str[end - 1] === ch) --end;
   return end < str.length ? str.substring(0, end) : str;
 }
@@ -842,12 +842,12 @@ export function loadWasm(
   environment: Environment,
   main?: string,
 ) {
-  let wasm = {};
-  let links = managers.map((manager) => manager.prepare(wasm));
+  const wasm = {};
+  const links = managers.map((manager) => manager.prepare(wasm));
   return WebAssembly.instantiate(buffer, { env: wasm }).then((result) => {
-    let instance = result.instance;
-    let exports = instance.exports;
-    let utils = new Utils(instance.exports, environment, main);
+    const instance = result.instance;
+    const exports = instance.exports;
+    const utils = new Utils(instance.exports, environment, main);
     utils.init();
     links.forEach((link) => {
       if (link) {
@@ -864,8 +864,8 @@ async function start(
   environment: Environment,
   main?: string,
 ) {
-  let promises = modules.map((fn) => fn(environment));
-  let ms = await Promise.all(promises);
+  const promises = modules.map((fn) => fn(environment));
+  const ms = await Promise.all(promises);
   return await loadWasm(buffer, ms, environment, main);
 }
 
@@ -881,7 +881,7 @@ export async function loadEnv(extensions: EnvInit[], envVals?: Array<string>) {
     ? import(/* @vite-ignore */ nodeImport)
     : import("./sk_browser.js"));
   // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-  let env = environment.environment(envVals) as Environment;
+  const env = environment.environment(envVals) as Environment;
   extensions.map((fn) => fn(env));
   return env;
 }
@@ -921,7 +921,7 @@ export async function run(
   main?: string,
   getWasmSource?: () => Promise<Uint8Array>,
 ) {
-  let env = await loadEnv(extensions);
+  const env = await loadEnv(extensions);
   let buffer: Uint8Array;
   if (getWasmSource) {
     buffer = await getWasmSource();
