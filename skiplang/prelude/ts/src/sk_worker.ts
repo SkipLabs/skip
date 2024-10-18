@@ -198,6 +198,7 @@ export class PromiseWorker {
       const parameters = fn.parameters.map((p) => {
         if (typeof p == "function") {
           let subscriptionId = new MessageId(this.source, ++this.lastId);
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call
           let wfn = (result: Return) => void p.apply(null, result.value);
           let key = asKey(subscriptionId);
           this.subscriptions.set(key, wfn);

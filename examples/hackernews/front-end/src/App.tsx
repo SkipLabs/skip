@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext } from "react";
+import { type SetStateAction, useState, useEffect, useContext } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -8,6 +8,7 @@ import {
 } from "react-router-dom";
 import "./App.css";
 import { SkipContext } from "./SkipContext.ts";
+import { ReactiveResponse } from "@skipruntime/core";
 import { Client, Protocol } from "@skipruntime/client";
 
 const BASE_URL = "http://localhost:5000";
@@ -75,11 +76,11 @@ function Feed() {
       const response = await fetch(BASE_URL, {
         headers: { "X-Reactive-Auth": btoa(pubkey) },
       });
-      const data = await response.json();
+      const data = (await response.json()) as SetStateAction<Post[]>;
       setPosts(data);
       const reactiveToken = JSON.parse(
         response.headers.get("Skip-Reactive-Response-Token")!,
-      );
+      ) as ReactiveResponse;
       // TODO: Make this happen transparently in the skip client.
       const reactiveCollection = reactiveToken.collection;
       const reactiveWatermark = BigInt(reactiveToken.watermark);
