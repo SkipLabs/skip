@@ -584,7 +584,7 @@ class ResilientStream {
       });
     }, failureThresholdMs);
     // TODO: Fix the following error.
-    // @ts-ignore
+    // @ts-expect-error: Argument of type 'Timeout' is not assignable to parameter of type 'number'.
     this.setFailureDetectionTimeout(timeout);
   }
 
