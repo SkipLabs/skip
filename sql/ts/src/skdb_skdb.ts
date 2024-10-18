@@ -291,7 +291,10 @@ class LinksImpl implements Links, ToWasm {
                 utils.runCheckError(() => {
                   exported.SKIP_reactive_print_result(value);
                 });
-                this.userFuns[value]();
+                const userFun = this.userFuns[value];
+                if (userFun === undefined)
+                  throw new Error(`Unbound function id: ${value}`);
+                userFun();
               });
             }
           }
@@ -328,33 +331,45 @@ class LinksImpl implements Links, ToWasm {
       this.object = {};
     };
     this.SKIP_push_object_field_null = () => {
-      const field_name: string = this.field_names[this.objectIdx];
+      const field_name = this.field_names[this.objectIdx];
+      if (field_name === undefined)
+        throw new Error(`Missing field name at index ${this.objectIdx}`);
       this.object[field_name] = null;
       this.objectIdx++;
     };
     this.SKIP_push_object_field_int32 = (n: int) => {
-      const field_name: string = this.field_names[this.objectIdx];
+      const field_name = this.field_names[this.objectIdx];
+      if (field_name === undefined)
+        throw new Error(`Missing field name at index ${this.objectIdx}`);
       this.object[field_name] = n;
       this.objectIdx++;
     };
     this.SKIP_push_object_field_int64 = (skV: ptr<Internal.String>) => {
-      const field_name: string = this.field_names[this.objectIdx];
+      const field_name = this.field_names[this.objectIdx];
+      if (field_name === undefined)
+        throw new Error(`Missing field name at index ${this.objectIdx}`);
       this.object[field_name] = parseInt(utils.importString(skV), 10);
       this.objectIdx++;
     };
     this.SKIP_push_object_field_float = (skV: ptr<Internal.String>) => {
-      const field_name: string = this.field_names[this.objectIdx];
+      const field_name = this.field_names[this.objectIdx];
+      if (field_name === undefined)
+        throw new Error(`Missing field name at index ${this.objectIdx}`);
       this.object[field_name] = parseFloat(utils.importString(skV));
       this.objectIdx++;
     };
     this.SKIP_push_object_field_string = (skV: ptr<Internal.String>) => {
-      const field_name: string = this.field_names[this.objectIdx];
+      const field_name = this.field_names[this.objectIdx];
+      if (field_name === undefined)
+        throw new Error(`Missing field name at index ${this.objectIdx}`);
       this.object[field_name] = utils.importString(skV);
       this.objectIdx++;
     };
     this.SKIP_push_object_field_json = (skV: ptr<InternalJ.CJSON>) => {
       const jsu = skjson();
-      const field_name: string = this.field_names[this.objectIdx];
+      const field_name = this.field_names[this.objectIdx];
+      if (field_name === undefined)
+        throw new Error(`Missing field name at index ${this.objectIdx}`);
       this.object[field_name] = jsu.importJSON(skV, true);
       this.objectIdx++;
     };
