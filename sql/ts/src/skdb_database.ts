@@ -96,7 +96,7 @@ class SKDBMechanismImpl implements SKDBMechanism {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-return
         typeof value === "bigint" ? Number(value) : value,
       );
-      let d = client.runLocal(["diff", "--format=csv", session], diffSpec);
+      const d = client.runLocal(["diff", "--format=csv", session], diffSpec);
       if (d.trim() == "") {
         return null;
       }
@@ -143,7 +143,7 @@ export class SKDBSyncImpl implements SKDBSync {
     env: Environment,
     save: () => Promise<boolean>,
   ): SKDBSync {
-    let client = new SKDBSyncImpl(env);
+    const client = new SKDBSyncImpl(env);
     client.save = save;
     client.runLocal = handle.main;
     client.clientUuid = env.crypto().randomUUID();

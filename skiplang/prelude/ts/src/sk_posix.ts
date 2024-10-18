@@ -94,7 +94,7 @@ class LinksImpl implements Links, ToWasm {
       skContents: ptr<Internal.String>,
       len: int,
     ) => {
-      var res = this.fs.read(fd, len);
+      const res = this.fs.read(fd, len);
       if (res !== null) {
         utils.exportBytes2(new TextEncoder().encode(res), skContents);
       }
@@ -133,8 +133,8 @@ class Manager implements ToWasmManager {
   }
 
   prepare = (wasm: object) => {
-    let toWasm = wasm as ToWasm;
-    let links = new LinksImpl(this.environment);
+    const toWasm = wasm as ToWasm;
+    const links = new LinksImpl(this.environment);
     toWasm.SKIP_js_open = (
       skPath: ptr<Internal.String>,
       flags: int,

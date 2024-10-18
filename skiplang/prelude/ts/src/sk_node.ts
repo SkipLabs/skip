@@ -29,8 +29,8 @@ class WrkImpl implements Wrk {
   };
 }
 
-var decoder = new util.TextDecoder("utf8");
-var encoder = new util.TextEncoder();
+const decoder = new util.TextDecoder("utf8");
+const encoder = new util.TextEncoder();
 
 class Env implements Environment {
   shared: Map<string, Shared>;
