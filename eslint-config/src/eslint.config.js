@@ -26,19 +26,6 @@ export default tseslint.config(
       jsdoc,
     },
     rules: {
-      "no-unused-vars": [
-        "error",
-        {
-          args: "none",
-          caughtErrors: "all",
-          ignoreRestSiblings: true,
-          argsIgnorePattern: "^_",
-          caughtErrorsIgnorePattern: "^_",
-          destructuredArrayIgnorePattern: "^_",
-          varsIgnorePattern: "^_",
-          reportUsedIgnorePattern: true,
-        },
-      ],
       "prefer-spread": "off",
       "@stylistic/js/lines-between-class-members": [
         "error",

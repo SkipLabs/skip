@@ -641,8 +641,6 @@ class ResilientStream {
 /* Stream MUX protocol */
 /* ***************************************************************************/
 
-/* eslint-disable no-unused-vars */
-
 enum MuxedSocketState {
   IDLE,
   AUTH_SENT,
@@ -650,8 +648,6 @@ enum MuxedSocketState {
   CLOSEWAIT, // can send data
   CLOSED,
 }
-
-/* eslint-enable no-unused-vars */
 
 type MuxAuth = {
   type: "auth";
@@ -1294,16 +1290,12 @@ export class MuxedSocket {
   }
 }
 
-/* eslint-disable no-unused-vars */
-
 enum StreamState {
   OPEN,
   CLOSING,
   CLOSEWAIT,
   CLOSED,
 }
-
-/* eslint-enable no-unused-vars */
 
 class Stream {
   // constants
