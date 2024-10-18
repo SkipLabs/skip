@@ -44,7 +44,6 @@ class Env implements Environment {
   base64Encode: (toEncode: string, url?: boolean) => string;
   environment: Array<string>;
   throwRuntime: (code: int) => void;
-  // @ts-ignore
   createSocket: (uri: string) => WebSocket;
   createWorker: (url: URL, options?: WorkerOptions) => Wrk;
   createWorkerWrapper: (worker: any) => Wrk;
@@ -63,9 +62,12 @@ class Env implements Environment {
     const cwd = process.cwd();
     if (url && url instanceof URL && url.pathname) {
       filename = "./" + path.relative(cwd, url.pathname);
-      // @ts-ignore
-    } else if (url != "" && url.default) {
-      // @ts-ignore
+    } else if (
+      url != "" &&
+      // @ts-expect-error: Property 'default' does not exist on type 'string | URL'.
+      url.default
+    ) {
+      // @ts-expect-error: Property 'default' does not exist on type 'string | URL'.
       filename = "./" + path.relative(cwd, url.default as string);
     } else {
       filename = url;

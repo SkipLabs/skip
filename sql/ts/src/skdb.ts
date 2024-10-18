@@ -40,7 +40,6 @@ export async function createSkdb(
   const asWorker = options.asWorker ?? !options.getWasmSource;
   const disableWarnings = options.disableWarnings ?? false;
   if (!asWorker) {
-    // @ts-ignore
     return createOnThisThread(
       disableWarnings,
       modules,

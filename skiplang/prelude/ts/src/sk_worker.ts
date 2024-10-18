@@ -343,7 +343,7 @@ export const onWorkerMessage = <T>(
           new Message(data.id, new Return(false, "Database must be created")),
         );
       } else {
-        //@ts-ignore
+        // @ts-expect-error: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{}'.
         let fn = runner[fun.fn];
         if (typeof fn !== "function") {
           post(
