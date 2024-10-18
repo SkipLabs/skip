@@ -270,7 +270,7 @@ function apply<R>(
         post(new Message(id, new Return(true, conv(result))));
       })
       .catch((e: any) => {
-        // Firefox don't transmit Worker message if an object of type Error is in the message.
+        // Firefox doesn't transmit Worker message if an object of type Error is in the message.
         post(
           new Message(
             id,
