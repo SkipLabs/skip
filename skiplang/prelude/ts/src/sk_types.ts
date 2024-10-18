@@ -844,7 +844,7 @@ export function loadWasm(
   let links = managers.map((manager) => manager.prepare(wasm));
   return WebAssembly.instantiate(buffer, { env: wasm }).then((result) => {
     let instance = result.instance;
-    let exports = instance.exports as any;
+    let exports = instance.exports;
     let utils = new Utils(instance.exports, environment, main);
     utils.init();
     links.forEach((link) => {
