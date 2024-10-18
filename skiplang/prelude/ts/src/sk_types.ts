@@ -320,7 +320,7 @@ export class Utils {
       if (!this.mainFn) {
         this.exports.skip_main();
       } else {
-        //@ts-ignore
+        // @ts-expect-error: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type 'Exported'.
         this.exports[this.mainFn]();
       }
     } catch (exn) {
@@ -386,7 +386,6 @@ export class Utils {
   };
   exportString = (s: string): ptr<Internal.String> => {
     var data = new Uint8Array(this.exports.memory.buffer);
-    // @ts-ignore
     var i = 0,
       addr = this.exports.SKIP_Obstack_alloc(s.length * 4);
     for (var ci = 0; ci != s.length; ci++) {
@@ -878,8 +877,7 @@ export async function loadEnv(extensions: EnvInit[], envVals?: Array<string>) {
   const nodeImport = "./sk_node.js";
   const environment = await (isNode()
     ? import(/* @vite-ignore */ nodeImport)
-    : //@ts-ignore
-      import("./sk_browser.js"));
+    : import("./sk_browser.js"));
   let env = environment.environment(envVals) as Environment;
   extensions.map((fn) => fn(env));
   return env;

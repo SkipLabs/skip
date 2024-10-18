@@ -10,7 +10,6 @@ export async function createOnThisThread(
 ) {
   const data = await run(
     getWasmUrl,
-    // @ts-ignore
     modules,
     [],
     "SKDB_factory",
