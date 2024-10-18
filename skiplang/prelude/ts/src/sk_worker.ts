@@ -217,6 +217,7 @@ export class PromiseWorker {
           new Promise(function (resolve, reject) {
             self.callbacks.set(asKey(messageId), (result: Return) => {
               if (result.success) {
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
                 resolve(result.value);
               } else if (result.value instanceof Error) {
                 reject(result.value);
@@ -230,6 +231,7 @@ export class PromiseWorker {
       );
     };
     this.onMessage = (message: MessageEvent) => {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       let data = Message.asReturn(message.data ?? message);
       if (!data) {
         throw new UnmanagedMessage(JSON.stringify(message));
@@ -311,7 +313,8 @@ export const onWorkerMessage = <T>(
     } else {
       let fun = data.payload as Function;
       let parameters = fun.parameters.map((p) => {
-        const subscription = typeof p == "object" ? MessageId.as(p) : null;
+        const subscription =
+          typeof p == "object" ? MessageId.as(p as object) : null;
         if (subscription) {
           return (...args: any[]) => {
             post(new Message(subscription, new Return(true, args)));
@@ -357,28 +360,37 @@ export const onWorkerMessage = <T>(
             ),
           );
         } else {
-          apply(post, data!.id, runner, fn, parameters, (result: any) => {
-            if (fun.wrap?.wrap) {
-              let wId = wrappedId++;
-              wrapped.set(wId, {
-                value: result,
-                autoremove: fun.wrap.autoremove,
-              });
-              if (result instanceof Wrappable) {
-                result.wrappedId = wId;
+          let fn_at_assumed_type = fn as (...args: any) => Promise<unknown>;
+          apply(
+            post,
+            data!.id,
+            runner,
+            fn_at_assumed_type,
+            parameters,
+            (result: any) => {
+              if (fun.wrap?.wrap) {
+                let wId = wrappedId++;
+                wrapped.set(wId, {
+                  value: result,
+                  autoremove: fun.wrap.autoremove,
+                });
+                if (result instanceof Wrappable) {
+                  result.wrappedId = wId;
+                }
+                result = new Wrapped(wId);
               }
-              result = new Wrapped(wId);
-            }
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-            return result;
-          });
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+              return result;
+            },
+          );
         }
       }
     }
   } else {
     let caller = data.payload as Caller;
     let parameters = caller.parameters.map((p) => {
-      const subscription = typeof p == "object" ? MessageId.as(p) : null;
+      const subscription =
+        typeof p == "object" ? MessageId.as(p as object) : null;
       if (subscription) {
         return (...args: any[]) => {
           post(new Message(subscription, new Return(true, args)));
@@ -401,7 +413,8 @@ export const onWorkerMessage = <T>(
         ),
       );
     } else {
-      apply(post, data!.id, fni.obj, fni.fn, parameters);
+      let fn_at_assumed_type = fni.fn as (...args: any) => Promise<unknown>;
+      apply(post, data!.id, fni.obj, fn_at_assumed_type, parameters);
     }
     if (obj?.autoremove || caller.remove) {
       wrapped.delete(caller.wrapped);
