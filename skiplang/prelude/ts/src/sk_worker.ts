@@ -27,11 +27,11 @@ export class Function {
 
   static as(obj: object) {
     if (!("fn" in obj) || !("parameters" in obj)) return null;
-    let wrap =
+    const wrap =
       "wrap" in obj
         ? (obj.wrap! as { wrap: boolean; autoremove: boolean })
         : undefined;
-    let fn = new Function(
+    const fn = new Function(
       obj.fn! as string,
       obj.parameters! as Array<any>,
       wrap,
@@ -70,7 +70,7 @@ export class Caller {
       !("remove" in obj)
     )
       return null;
-    let fn = new Caller(
+    const fn = new Caller(
       obj.wrapped! as number,
       obj.fn! as string,
       obj.parameters! as Array<any>,
@@ -173,7 +173,7 @@ export class Message {
   }
 }
 
-var sourcesLastId = 0;
+let sourcesLastId = 0;
 
 export class PromiseWorker {
   private lastId: number;
@@ -191,16 +191,16 @@ export class PromiseWorker {
     this.source = ++sourcesLastId;
     this.callbacks = new Map();
     this.subscriptions = new Map();
-    let self = this;
+    const self = this;
     this.post = (fn: Function | Caller) => {
-      let messageId = new MessageId(this.source, ++this.lastId);
-      let subscribed = new Set<string>();
+      const messageId = new MessageId(this.source, ++this.lastId);
+      const subscribed = new Set<string>();
       const parameters = fn.parameters.map((p) => {
         if (typeof p == "function") {
-          let subscriptionId = new MessageId(this.source, ++this.lastId);
+          const subscriptionId = new MessageId(this.source, ++this.lastId);
           // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-          let wfn = (result: Return) => void p.apply(null, result.value);
-          let key = asKey(subscriptionId);
+          const wfn = (result: Return) => void p.apply(null, result.value);
+          const key = asKey(subscriptionId);
           this.subscriptions.set(key, wfn);
           subscribed.add(key);
           return subscriptionId;
@@ -226,25 +226,25 @@ export class PromiseWorker {
                 reject(new Error(JSON.stringify(result.value)));
               }
             });
-            let message = new Message(messageId, fn);
+            const message = new Message(messageId, fn);
             self.worker.postMessage(message);
           }),
       );
     };
     this.onMessage = (message: MessageEvent) => {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-      let data = Message.asReturn(message.data ?? message);
+      const data = Message.asReturn(message.data ?? message);
       if (!data) {
         throw new UnmanagedMessage(JSON.stringify(message));
       } else {
-        let result = data.payload as Return;
-        let callback = this.callbacks.get(asKey(data.id));
+        const result = data.payload as Return;
+        const callback = this.callbacks.get(asKey(data.id));
         if (callback) {
           this.callbacks.delete(asKey(data.id));
           callback(data.payload);
           return;
         }
-        let subscription = this.subscriptions.get(asKey(data.id));
+        const subscription = this.subscriptions.get(asKey(data.id));
         if (subscription) {
           subscription(data.payload);
           return;
@@ -291,9 +291,9 @@ function apply<R>(
   }
 }
 
-var runner: object;
-var wrappedId = 0;
-var wrapped = new Map<number, { value: any; autoremove: boolean }>();
+let runner: object;
+let wrappedId = 0;
+const wrapped = new Map<number, { value: any; autoremove: boolean }>();
 
 export interface Creator<T> {
   getName: () => string;
@@ -312,8 +312,8 @@ export const onWorkerMessage = <T>(
     if (!data) {
       post("Invalid worker message");
     } else {
-      let fun = data.payload as Function;
-      let parameters = fun.parameters.map((p) => {
+      const fun = data.payload as Function;
+      const parameters = fun.parameters.map((p) => {
         const subscription =
           typeof p == "object" ? MessageId.as(p as object) : null;
         if (subscription) {
@@ -352,7 +352,7 @@ export const onWorkerMessage = <T>(
         );
       } else {
         // @ts-expect-error: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{}'.
-        let fn = runner[fun.fn];
+        const fn = runner[fun.fn];
         if (typeof fn !== "function") {
           post(
             new Message(
@@ -361,7 +361,7 @@ export const onWorkerMessage = <T>(
             ),
           );
         } else {
-          let fn_at_assumed_type = fn as (...args: any) => Promise<unknown>;
+          const fn_at_assumed_type = fn as (...args: any) => Promise<unknown>;
           apply(
             post,
             data!.id,
@@ -370,7 +370,7 @@ export const onWorkerMessage = <T>(
             parameters,
             (result: any) => {
               if (fun.wrap?.wrap) {
-                let wId = wrappedId++;
+                const wId = wrappedId++;
                 wrapped.set(wId, {
                   value: result,
                   autoremove: fun.wrap.autoremove,
@@ -388,8 +388,8 @@ export const onWorkerMessage = <T>(
       }
     }
   } else {
-    let caller = data.payload as Caller;
-    let parameters = caller.parameters.map((p) => {
+    const caller = data.payload as Caller;
+    const parameters = caller.parameters.map((p) => {
       const subscription =
         typeof p == "object" ? MessageId.as(p as object) : null;
       if (subscription) {
@@ -401,8 +401,8 @@ export const onWorkerMessage = <T>(
         return p;
       }
     });
-    let obj = wrapped.get(caller.wrapped);
-    let fni =
+    const obj = wrapped.get(caller.wrapped);
+    const fni =
       caller.fn == ""
         ? { fn: obj?.value, obj: null }
         : { fn: obj?.value[caller.fn], obj: obj?.value };
@@ -414,7 +414,7 @@ export const onWorkerMessage = <T>(
         ),
       );
     } else {
-      let fn_at_assumed_type = fni.fn as (...args: any) => Promise<unknown>;
+      const fn_at_assumed_type = fni.fn as (...args: any) => Promise<unknown>;
       apply(post, data!.id, fni.obj, fn_at_assumed_type, parameters);
     }
     if (obj?.autoremove || caller.remove) {

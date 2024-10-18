@@ -72,11 +72,11 @@ class Env implements Environment {
     this.fileSystem = new MemFS();
     this.system = new MemSys();
     this.environment = environment ?? [];
-    let global = typeof window == "undefined" ? self : window;
+    const global = typeof window == "undefined" ? self : window;
     this.timestamp = () => global.performance.now();
-    var decoder = new TextDecoder("utf8");
+    const decoder = new TextDecoder("utf8");
     this.decodeUTF8 = (utf8: ArrayBuffer) => decoder.decode(utf8);
-    var encoder = new TextEncoder(); // always utf-8
+    const encoder = new TextEncoder(); // always utf-8
     this.encodeUTF8 = (str: string) => encoder.encode(str);
     this.base64Decode = (base64: string) =>
       Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));

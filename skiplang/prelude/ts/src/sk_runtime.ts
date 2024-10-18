@@ -101,7 +101,7 @@ class LinksImpl implements Links {
     ) => utils.replace_exn(oldex, newex);
     this.SKIP_throw_cruntime = utils.exit;
     this.SKIP_print_char = (c: int) => {
-      var str = String.fromCharCode(c);
+      const str = String.fromCharCode(c);
       utils.log(str, Stream.OUT);
     };
     this.SKIP_delete_external_exception = utils.deleteException;
@@ -153,8 +153,8 @@ class LinksImpl implements Links {
       path: ptr<Internal.String>,
       contents: ptr<Internal.String>,
     ) => {
-      let strPath = utils.importString(path);
-      let strContents = utils.importString(contents);
+      const strPath = utils.importString(path);
+      const strContents = utils.importString(contents);
       if (this.env) {
         this.env.fs().appendToFile(strPath, strContents);
       }
@@ -172,7 +172,7 @@ class LinksImpl implements Links {
     };
     this.SKIP_getenv = (skName: ptr<Internal.String>) => {
       if (this.env) {
-        let value = this.env.sys().getenv(utils.importString(skName));
+        const value = this.env.sys().getenv(utils.importString(skName));
         return value ? utils.exportString(value) : null;
       }
       return null;
@@ -192,8 +192,8 @@ class Manager implements ToWasmManager {
   }
 
   prepare = (wasm: object) => {
-    let toWasm = wasm as ToWasm;
-    let links = new LinksImpl(this.env);
+    const toWasm = wasm as ToWasm;
+    const links = new LinksImpl(this.env);
     toWasm._ZSt9terminatev = () => {
       throw new Error("_ZSt9terminatev");
     };
