@@ -1,3 +1,5 @@
+/* eslint-disable */
+
 import { test } from "@playwright/test";
 import { tests } from "./tests";
 
