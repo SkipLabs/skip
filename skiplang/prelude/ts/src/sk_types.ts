@@ -321,7 +321,9 @@ export class Utils {
         this.exports.skip_main();
       } else {
         // @ts-expect-error: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type 'Exported'.
-        this.exports[this.mainFn]();
+        const mainFn = this.exports[this.mainFn];
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+        mainFn();
       }
     } catch (exn) {
       if (exn instanceof SkRuntimeExit) {
@@ -611,7 +613,7 @@ export class Utils {
     }
     const toObject: (error: Error) => ErrorObject = (error?: Error) => {
       const errcause = (error as any).cause;
-      const errstack = (error as any).stack?.split("\n") as string[];
+      const errstack = error?.stack?.split("\n");
       if (errstack) {
         return errcause
           ? { message, cause: errcause, stack: errstack }
@@ -878,6 +880,7 @@ export async function loadEnv(extensions: EnvInit[], envVals?: Array<string>) {
   const environment = await (isNode()
     ? import(/* @vite-ignore */ nodeImport)
     : import("./sk_browser.js"));
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
   let env = environment.environment(envVals) as Environment;
   extensions.map((fn) => fn(env));
   return env;
