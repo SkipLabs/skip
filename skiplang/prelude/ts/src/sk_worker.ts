@@ -204,6 +204,7 @@ export class PromiseWorker {
           subscribed.add(key);
           return subscriptionId;
         } else {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-return
           return p;
         }
       });
@@ -261,7 +262,9 @@ function apply<R>(
   caller: any,
   fn: (...args: any) => Promise<R>,
   parameters: any[],
-  conv: (res: any) => any = (v) => v,
+  conv: (res: any) => any = (v) =>
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+    v,
 ): void {
   try {
     const promise = fn.apply(caller, parameters);
@@ -314,6 +317,7 @@ export const onWorkerMessage = <T>(
             post(new Message(subscription, new Return(true, args)));
           };
         } else {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-return
           return p;
         }
       });
@@ -365,6 +369,7 @@ export const onWorkerMessage = <T>(
               }
               result = new Wrapped(wId);
             }
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-return
             return result;
           });
         }
@@ -379,6 +384,7 @@ export const onWorkerMessage = <T>(
           post(new Message(subscription, new Return(true, args)));
         };
       } else {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
         return p;
       }
     });

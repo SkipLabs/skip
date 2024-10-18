@@ -168,10 +168,12 @@ class Manager implements ToWasmManager {
         create_new,
       );
     //
+    /* eslint-disable @typescript-eslint/no-unsafe-return */
     toWasm.SKIP_js_pipe = () => links.SKIP_js_pipe();
     toWasm.SKIP_js_fork = () => links.SKIP_js_fork();
     toWasm.SKIP_js_dup2 = () => links.SKIP_js_dup2();
     toWasm.SKIP_js_execvp = () => links.SKIP_js_execvp();
+    /* eslint-enable @typescript-eslint/no-unsafe-return */
     return links;
   };
 }

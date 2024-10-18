@@ -689,7 +689,7 @@ export class Utils {
       state = create();
       this.states.set(name, state);
     }
-    return state;
+    return state as T;
   }
 }
 
