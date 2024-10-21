@@ -60,7 +60,7 @@ function Feed() {
         {posts.map((post) => (
           <li key={post.id}>
             <div
-              className="votearrow"
+              className="votearrow prevent-select"
               title="upvote"
               onClick={() => upvotePost(post.id)}
             ></div>
