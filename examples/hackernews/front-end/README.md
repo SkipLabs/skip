@@ -1,11 +1,11 @@
 # Reactive HackerNews example front end
 
-Make sure `skdb-ts-thin` (name subject to change...) is built locally:
+Make sure `skip` is built locally:
 ```bash
-$ (cd ../../../skdb-ts-thin && tsc)
+$ (cd ../../../ && npm install && npm run build)
 ```
 
-Install npm dependencies (must happen after building `skdb-ts-thin`):
+Install npm dependencies (must happen after building `skip`):
 ```bash
 npm install
 ```
