@@ -7,8 +7,6 @@ import type {
   Resource,
 } from "@skipruntime/core";
 
-import { runService } from "@skipruntime/server";
-
 type Post = {
   author_id: number;
   title: string;
@@ -28,7 +26,7 @@ type Upvote = {
 
 type Upvoted = Post & { upvotes: number; author: User };
 
-class HackerNewsService implements SkipService {
+export default class HackerNewsService implements SkipService {
   inputCollections = { posts: [], users: [], upvotes: [] };
   resources = { posts: PostsResource };
 
@@ -110,7 +108,3 @@ class PostsResource implements Resource {
       .map(PostsCleanupKeyMapper);
   }
 }
-
-// Spawn a local HTTP server to support reading/writing and creating
-// reactive requests.
-runService(new HackerNewsService(), 8080);
