@@ -26,12 +26,13 @@ import type {
   LazyCompute,
   ExternalSupplier,
   Resource,
-  SkipRuntime,
   ReactiveResponse,
   CollectionUpdate,
   Watermark,
   SubscriptionID,
 } from "../skipruntime_api.js";
+
+import type { ServiceInstance } from "../skipruntime_init.js";
 
 import type { SKJSON } from "skjson";
 import { UnknownCollectionError } from "../skipruntime_errors.js";
@@ -483,8 +484,8 @@ class LinksImpl implements Links {
     this.utils = utils;
     this.fromWasm = exports as FromWasm;
     this.env.shared.set(
-      "SkipRuntime",
-      new SkipRuntimeFactory(this.initService.bind(this)),
+      "ServiceInstanceFactory",
+      new ServiceInstanceFactory(this.initService.bind(this)),
     );
   }
 
@@ -759,7 +760,7 @@ class LinksImpl implements Links {
     this.handles.deleteHandle(supplier);
   }
 
-  initService(service: SkipService): SkipRuntime {
+  initService(service: SkipService): ServiceInstance {
     const skjson = this.getSkjson();
     const result = skjson.runWithGC(() => {
       const skExternalServices =
@@ -801,7 +802,7 @@ class LinksImpl implements Links {
     if (result != 0) {
       throw this.handles.deleteAsError(result as Handle<ErrorObject>);
     }
-    return new SkipRuntimeImpl(
+    return new ServiceInstanceImpl(
       new Refs(skjson, this.fromWasm, this.handles, this.needGC.bind(this)),
     );
   }
@@ -1075,19 +1076,19 @@ export function check<T>(value: T): void {
   }
 }
 
-export class SkipRuntimeFactory implements Shared {
-  constructor(private init: (service: SkipService) => SkipRuntime) {}
+export class ServiceInstanceFactory implements Shared {
+  constructor(private init: (service: SkipService) => ServiceInstance) {}
 
-  initService(service: SkipService): SkipRuntime {
+  initService(service: SkipService): ServiceInstance {
     return this.init(service);
   }
 
   getName() {
-    return "SkipRuntime";
+    return "ServiceInstanceFactory";
   }
 }
 
-class SkipRuntimeImpl implements SkipRuntime {
+class ServiceInstanceImpl implements ServiceInstance {
   constructor(private refs: Refs) {}
 
   createResource(

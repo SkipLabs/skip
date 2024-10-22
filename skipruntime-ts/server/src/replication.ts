@@ -1,10 +1,10 @@
 import { WebSocket, type WebSocketServer, type MessageEvent } from "ws";
 import {
   type TJSON,
-  type SkipRuntime,
   type CollectionUpdate,
   type Watermark,
   type SubscriptionID,
+  type ServiceInstance,
   UnknownCollectionError,
 } from "@skipruntime/core";
 import { Protocol } from "@skipruntime/client";
@@ -13,7 +13,7 @@ class TailingSession {
   private subsessions = new Map<string, SubscriptionID>();
 
   constructor(
-    private replication: SkipRuntime,
+    private replication: ServiceInstance,
     private pubkey: ArrayBuffer,
   ) {}
 
@@ -149,7 +149,7 @@ export class ReplicationServer {
 
   constructor(
     private wss: WebSocketServer,
-    private replication: SkipRuntime,
+    private replication: ServiceInstance,
   ) {
     wss.on("connection", (ws) => {
       this.onconnection(ws);
