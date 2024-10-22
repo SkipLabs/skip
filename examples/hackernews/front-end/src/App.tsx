@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -7,6 +7,8 @@ import {
   useParams,
 } from "react-router-dom";
 import "./App.css";
+import { SkipContext } from "./SkipContext.ts";
+import { Client, Protocol } from "@skipruntime/client";
 
 const BASE_URL = "http://localhost:5000";
 
@@ -23,35 +25,90 @@ export default function App() {
   );
 }
 
-function Feed() {
-  const [posts, setPosts] = useState([]);
+type Post = {
+  id: number;
+  title: string;
+  body: string;
+  url: string;
+  upvotes: number;
+};
 
-  async function getPosts() {
-    try {
-      const response = await fetch(BASE_URL);
+function Feed() {
+  const [posts, setPosts] = useState<Post[]>([]);
+
+  // // Non-reactive (polling) version:
+  // async function getPosts() {
+  //   try {
+  //     const response = await fetch(BASE_URL);
+  //     const data = await response.json();
+  //     return data;
+  //   } catch (error) {
+  //     console.error(error);
+  //   }
+  // }
+
+  // async function upvotePost(postId: number) {
+  //   try {
+  //     await fetch(`${BASE_URL}/posts/${postId}/upvotes`, { method: "POST" });
+  //     getPosts().then(setPosts);
+  //   } catch (error) {
+  //     console.error(error);
+  //   }
+  // }
+
+  // useEffect(() => {
+  //   const intervalId = setInterval(() => {
+  //     getPosts().then(setPosts);
+  //   }, 1000);
+
+  //   return () => clearInterval(intervalId);
+  // }, []);
+
+  // Reactive version:
+  const skipclient: Client = useContext(SkipContext)!;
+  useEffect(() => {
+    async function getInitialData() {
+      // TODO: Simplify this.
+      const pubkey = String.fromCharCode.apply(null, [
+        ...new Uint8Array(await Protocol.exportKey(skipclient.creds.publicKey)),
+      ]);
+      const response = await fetch(BASE_URL, {
+        headers: {
+          "X-Reactive-Auth": btoa(pubkey),
+        },
+      });
       const data = await response.json();
-      return data;
+      setPosts(data);
+      const reactiveToken = JSON.parse(
+        response.headers.get("Skip-Reactive-Response-Token")!,
+      );
+      // TODO: Make this happen transparently in the skip client.
+      const reactiveCollection = reactiveToken.collection;
+      const reactiveWatermark = BigInt(reactiveToken.watermark);
+      skipclient.subscribe(
+        reactiveCollection,
+        reactiveWatermark,
+        (updates, _isInit) => {
+          const updatedPosts = updates[0][1]! as Post[];
+          setPosts(updatedPosts);
+        },
+      );
+    }
+
+    try {
+      getInitialData();
     } catch (error) {
       console.error(error);
     }
-  }
+  }, []);
 
-  async function upvotePost(postId) {
+  async function upvotePost(postId: number) {
     try {
       await fetch(`${BASE_URL}/posts/${postId}/upvotes`, { method: "POST" });
-      getPosts().then(setPosts);
     } catch (error) {
       console.error(error);
     }
   }
-
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      getPosts().then(setPosts);
-    }, 1000);
-
-    return () => clearInterval(intervalId);
-  }, []);
 
   return (
     <>
@@ -60,7 +117,7 @@ function Feed() {
         {posts.map((post) => (
           <li key={post.id}>
             <div
-              className="votearrow"
+              className="votearrow prevent-select"
               title="upvote"
               onClick={() => upvotePost(post.id)}
             ></div>
@@ -77,10 +134,10 @@ function Feed() {
 }
 
 function Post() {
-  const post_id = useParams().post_id;
-  const [post, setPost] = useState(null);
+  const post_id = parseInt(useParams().post_id!);
+  const [post, setPost] = useState<Post | null>(null);
 
-  async function getPost(postId) {
+  async function getPost(postId: number) {
     try {
       const response = await fetch(`${BASE_URL}/posts/${postId}`);
       console.log(response);

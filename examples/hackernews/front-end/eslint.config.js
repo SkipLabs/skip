@@ -1,4 +1,4 @@
-import config from "eslint-config-skiplabs";
+import config from "@skiplabs/eslint-config";
 import globals from "globals";
 import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
