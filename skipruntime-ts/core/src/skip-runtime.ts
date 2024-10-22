@@ -28,10 +28,11 @@ export {
   Sum,
   Min,
   Max,
+  freeze,
   parseReactiveResponse,
   reactiveResponseHeader,
 } from "./skipruntime_utils.js";
-export { freeze } from "./skipruntime_init.js";
+
 export {
   fetchJSON,
   SkipRESTRuntime,
