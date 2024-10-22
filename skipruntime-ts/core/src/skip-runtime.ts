@@ -1,4 +1,4 @@
-export { initService } from "./skipruntime_init.js";
+export { type ServiceInstance, initService } from "./skipruntime_init.js";
 
 export type {
   Mapper,
@@ -11,7 +11,6 @@ export type {
   TJSON,
   JSONObject,
   Accumulator,
-  SkipRuntime,
   Entry,
   ReactiveResponse,
   SkipService,
