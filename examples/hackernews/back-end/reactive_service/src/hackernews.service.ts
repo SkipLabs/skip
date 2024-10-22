@@ -1,13 +1,12 @@
 import type {
   Context,
+  Entry,
   TJSON,
   EagerCollection,
   NonEmptyIterator,
   SkipService,
   Resource,
 } from "@skipruntime/core";
-
-import { runService } from "@skipruntime/server";
 
 type Post = {
   author_id: number;
@@ -28,9 +27,21 @@ type Upvote = {
 
 type Upvoted = Post & { upvotes: number; author: User };
 
-class HackerNewsService implements SkipService {
-  inputCollections = { posts: [], users: [], upvotes: [] };
+export default class HackerNewsService implements SkipService {
+  inputCollections: {
+    posts: Entry<string, Post>[];
+    users: Entry<string, User>[];
+    upvotes: Entry<string, Upvote>[];
+  };
   resources = { posts: PostsResource };
+
+  constructor(
+    posts: Entry<string, Post>[],
+    users: Entry<string, User>[],
+    upvotes: Entry<string, Upvote>[],
+  ) {
+    this.inputCollections = { posts, users, upvotes };
+  }
 
   reactiveCompute(
     _context: Context,
@@ -72,21 +83,24 @@ class PostsMapper {
   mapElement(
     key: number,
     it: NonEmptyIterator<Post>,
-  ): Iterable<[[number, number], Upvoted]> {
+  ): Iterable<[number, Upvoted]> {
     const post = it.first();
     const upvotes = this.upvotes.getArray(key).length;
     const author = this.users.maybeGetOne(post.author_id)!;
-    return [[[-upvotes, key], { ...post, upvotes, author }]];
+    // Projecting all posts on key 0 so that they can later be sorted.
+    return [[0, { ...post, upvotes, author }]];
   }
 }
 
-class PostsCleanupKeyMapper {
+class SortingMapper {
   mapElement(
-    key: [number, number],
-    it: NonEmptyIterator<TJSON>,
-  ): Iterable<[string, TJSON]> {
-    const post = it.first();
-    return [[key[1].toString(), post]];
+    key: number,
+    it: NonEmptyIterator<Upvoted>,
+  ): Iterable<[number, Upvoted]> {
+    const posts = it.toArray();
+    // Sorting in descending order of upvotes.
+    posts.sort((a, b) => b.upvotes - a.upvotes);
+    return posts.map((p) => [key, p]);
   }
 }
 
@@ -94,23 +108,15 @@ class PostsResource implements Resource {
   private limit: number;
 
   constructor(params: Record<string, string>) {
-    console.log(params["limit"]);
     this.limit = Number(params["limit"]);
   }
 
   reactiveCompute(
     _context: Context,
     collections: {
-      postsWithUpvotes: EagerCollection<[number, number], Upvoted>;
+      postsWithUpvotes: EagerCollection<number, Upvoted>;
     },
-  ): EagerCollection<string, TJSON> {
-    // console.log("limit", this.limit);
-    return collections.postsWithUpvotes
-      .take(this.limit)
-      .map(PostsCleanupKeyMapper);
+  ): EagerCollection<number, Upvoted> {
+    return collections.postsWithUpvotes.take(this.limit).map(SortingMapper);
   }
 }
-
-// Spawn a local HTTP server to support reading/writing and creating
-// reactive requests.
-runService(new HackerNewsService(), 8080);

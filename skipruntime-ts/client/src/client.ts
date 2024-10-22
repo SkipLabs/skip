@@ -140,7 +140,7 @@ class Subscription {
 }
 
 export class Client {
-  private creds: Creds;
+  public creds: Creds;
   private socket: ResilientWebSocket;
   private subscriptions = new Map<string, Subscription>();
   private closed: boolean = false;
