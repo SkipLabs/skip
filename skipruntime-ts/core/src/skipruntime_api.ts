@@ -251,11 +251,11 @@ export interface Context extends Constant {
   ): LazyCollection<K, V>;
 
   /**
-   * Call a external service to manage an external resource
+   * Call an external service to manage an external resource
    * @param service - the object configuring the external service
-   * @param service.supplier - the name of the external supplier corresponding to a key in externalServices field of SkipService
+   * @param service.supplier - the name of the external supplier, which must correspond to a key inthe `externalServices` field of the `SkipService` this `Context` belongs to
    * @param service.resource - the resource name managed by the supplier
-   * @param service.params - the parameters to apply to the resource
+   * @param service.params - the parameters to supply to the resource
    * @param service.reactiveAuth - the caller client user Skip session authentification
    * @returns The reactive collection of the external resource
    */
