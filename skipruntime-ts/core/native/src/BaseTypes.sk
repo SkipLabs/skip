@@ -91,4 +91,20 @@ base class Service(
   ): Map<String, Collection>;
 }
 
+value class ReactiveResponse(id: String, watermark: SKStore.Tick)
+
+value class Values(
+  values: Array<(SKJSON.CJSON, Array<SKJSON.CJSON>)>,
+  reactive: ReactiveResponse,
+)
+
+base class Request {
+  children =
+  | Identified(id: String)
+}
+
+base class Checker extends Request {
+  fun check(request: String): void;
+}
+
 module end;

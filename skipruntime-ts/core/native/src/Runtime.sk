@@ -78,7 +78,89 @@ class ResourceKey(
   }
 }
 
+class ResourceStatus(
+  loadable: SKStore.DirName,
+  status: Status,
+) extends SKStore.File {}
+
 class ServiceFile(value: Map<String, Collection>) extends SKStore.File
+
+base class Status(created: Int, modified: Int) uses Show {
+  children =
+  | Loading()
+  | Error(error: SKJSON.CJSON)
+  | Ok()
+
+  static fun create(): Status {
+    time = Time.time_ms();
+    Loading(time, time)
+  }
+
+  fun ok(): Status {
+    Ok(this.created, Time.time_ms())
+  }
+
+  fun err(error: SKJSON.CJSON): Status {
+    Error(error, this.created, Time.time_ms())
+  }
+
+  fun toString(): String
+  | Loading(created, modified) ->
+    `Loading{created: ${created}, modified: ${modified}}`
+  | Error(error, created, modified) ->
+    `Error{error: ${error.toJSON()}, created: ${created}, modified: ${modified}}`
+  | Ok(created, modified) -> `Ok{created: ${created}, modified: ${modified}}`
+}
+
+class StatusFile(status: Status) extends SKStore.File
+
+class RequestFile(
+  timestamp: Int,
+  resource: ResourceInfo,
+  checker: ?Checker,
+) extends SKStore.File
+
+class RequestStatuses(statuses: Array<ResourceStatus>) extends SKStore.File {
+  //
+  fun getResult<T>(request: String, values: T): GetResult<T> {
+    errors = mutable Vector[];
+    loading: Bool = false;
+    for (resourceStatus in this.statuses) {
+      resourceStatus.status match {
+      | Error(error, _, _) -> errors.push(error)
+      | Loading _ -> !loading = true
+      | Ok _ -> void
+      }
+    };
+    GetResult(if (loading) Some(request) else None(), values, errors.toArray())
+  }
+
+  fun isLoading(): Bool {
+    for (resourceStatus in this.statuses) {
+      resourceStatus.status match {
+      | Loading _ -> break true
+      | Error _
+      | Ok _ ->
+        void
+      }
+    } else {
+      false
+    }
+  }
+
+  fun getErrors(): Array<SKJSON.CJSON> {
+    errors = mutable Vector[];
+    for (resourceStatus in this.statuses) {
+      resourceStatus.status match {
+      | Error(error, _, _) -> errors.push(error)
+      | Loading _
+      | Ok _ ->
+        void
+      }
+    };
+    errors.toArray()
+  }
+}
 
 class RemoteSpecifiers(
   value: Map<String, ExternalSupplier>,
@@ -88,7 +170,51 @@ class ResourceInfo(
   name: String,
   collection: Collection,
   reactiveAuth: ?Array<UInt8>,
-) extends SKStore.File
+  statusRef: SKStore.DirName,
+) extends SKStore.File {
+  /**
+   * Create a status request
+   */
+  fun createRequest(
+    context: mutable SKStore.Context,
+    optChecker: ?Checker,
+  ): String {
+    requestId = Ksuid::create().toString();
+    SKStore.EHandle(
+      SKStore.SID::keyType,
+      RequestFile::type,
+      this.statusRef.sub("requests"),
+    ).writeArray(
+      context,
+      SKStore.SID(requestId),
+      Array[RequestFile(Time.time_ms(), this, optChecker)],
+    );
+    context.update();
+    requestId;
+  }
+
+  fun getResult<T>(
+    context: mutable SKStore.Context,
+    request: String,
+    values: T,
+  ): GetResult<T> {
+    SKStore.EHandle(
+      SKStore.SID::keyType,
+      RequestStatuses::type,
+      this.statusRef.sub("all"),
+    )
+      .get(context, SKStore.SID(request))
+      .getResult(request, values)
+  }
+
+  fun clearRequest(context: mutable SKStore.Context, requestId: String): void {
+    SKStore.EHandle(
+      SKStore.SID::keyType,
+      RequestFile::type,
+      this.statusRef.sub("requests"),
+    ).writeArray(context, SKStore.SID(requestId), Array[]);
+  }
+}
 
 fun initCtx(): SKStore.Context {
   SKStore.Context{}
@@ -105,7 +231,7 @@ fun initService(service: Service): Result<void, .Exception> {
   if (SKStore.gHasContext() == 0) {
     SKStore.gContextInit(initCtx());
   };
-  session = `${Ksuid::create().toString()}`;
+  session = Ksuid::create().toString();
   SKStore.runWithResult(context ~> {
     context.setPersistent(
       kRemoteSpecifiers,
@@ -161,6 +287,24 @@ fun initService(service: Service): Result<void, .Exception> {
           }
         },
       );
+      // Service status
+      statusHdl = context
+        .mkdir(
+          SKStore.DirName::keyType,
+          StatusFile::type,
+          kSessionDir.sub("status"),
+          Array[],
+        )
+        .map(
+          SKStore.IID::keyType,
+          ResourceStatus::type,
+          context,
+          kSessionDir.sub("statuses"),
+          (_ctx, writer, key, it) ~> {
+            writer.set(SKStore.IID(0), ResourceStatus(key, it.first.status));
+          },
+        );
+
       rSessionHdl = context.mkdir(
         SKStore.SID::keyType,
         SKStore.IntFile::type,
@@ -175,21 +319,12 @@ fun initService(service: Service): Result<void, .Exception> {
           kResourceGraphDir,
           (context, writer, key, _it) ~> {
             rsession = key.value;
-            dirname = SKStore.DirName::create(
-              `/sk_prv/resources/session/${rsession}/`,
-            );
-            nDirname = SKStore.DirName::create(
-              `/sk_prv/resources/session/${rsession}/names/`,
-            );
-            gDirname = SKStore.DirName::create(
-              `/sk_prv/resources/session/${rsession}/graph/`,
-            );
-            cDirname = SKStore.DirName::create(
-              `/sk_prv/resources/session/${rsession}/collections/`,
-            );
-            dDirname = SKStore.DirName::create(
-              `/sk_prv/resources/session/${rsession}/data/`,
-            );
+            // Resource graph
+            dirname = resourceSessionDirName(rsession);
+            nDirname = dirname.sub("names");
+            gDirname = dirname.sub("graph");
+            cDirname = dirname.sub("collections");
+            dDirname = dirname.sub("data");
             namesHdl = context
               .mkdir(
                 ResourceKey::keyType,
@@ -220,6 +355,57 @@ fun initService(service: Service): Result<void, .Exception> {
                 pushContext(context);
                 try {
                   resourceId = it.first.value;
+                  statusRef = dirname.sub(resourceId);
+                  // Status graph
+                  sStatusHdl = context
+                    .mkdir(
+                      SKStore.DirName::keyType,
+                      StatusFile::type,
+                      statusRef.sub("status"),
+                      Array[],
+                      true,
+                    )
+                    .map(
+                      SKStore.IID::keyType,
+                      ResourceStatus::type,
+                      context,
+                      statusRef.sub("statuses"),
+                      (_ctx, writer, key, it) ~> {
+                        writer.set(
+                          SKStore.IID(0),
+                          ResourceStatus(key, it.first.status),
+                        );
+                      },
+                    );
+                  _sRequestsHdl = context
+                    .mkdir(
+                      SKStore.SID::keyType,
+                      RequestFile::type,
+                      statusRef.sub("requests"),
+                      Array[],
+                      true,
+                    )
+                    .map(
+                      SKStore.SID::keyType,
+                      RequestStatuses::type,
+                      context,
+                      statusRef.sub("all"),
+                      (ctx, writer, key, it) ~> {
+                        rf = it.first;
+                        timestamp = rf.timestamp;
+                        statuses = statusHdl
+                          .getArray(ctx, SKStore.IID(0))
+                          .concat(sStatusHdl.getArray(ctx, SKStore.IID(0)))
+                          .filter(rs -> rs.status.created <= timestamp);
+                        requestStatuses = RequestStatuses(statuses);
+                        writer.set(key, requestStatuses);
+                        rf.checker match {
+                        | Some(checker) if (!requestStatuses.isLoading()) ->
+                          ctx.postpone(CheckRequest(statusRef, key, checker))
+                        | _ -> void
+                        }
+                      },
+                    );
                   resourceBuilder = service.resources.get(key.name);
                   resource = resourceBuilder.build(key.params.value);
                   allCollections = mutable Map[];
@@ -247,6 +433,7 @@ fun initService(service: Service): Result<void, .Exception> {
                       resourceId,
                       collection with {hdl => resourceData},
                       key.reactiveAuth,
+                      statusRef,
                     ),
                   );
                   popContext()
@@ -317,6 +504,24 @@ fun closeService(): Result<void, .Exception> {
   })
 }
 
+class CheckRequest(
+  statusRef: SKStore.DirName,
+  request: SKStore.SID,
+  checker: Checker,
+) extends SKStore.Postponable {
+  //
+  fun perform(context: mutable SKStore.Context): void {
+    pushContext(context);
+    this.checker.check(this.request.value);
+    popContext();
+    SKStore.EHandle(
+      SKStore.SID::keyType,
+      RequestFile::type,
+      this.statusRef.sub("requests"),
+    ).writeArray(context, this.request, Array[]);
+  }
+}
+
 class LinkToResource(
   supplier: ExternalSupplier,
   writer: CollectionWriter,
@@ -324,7 +529,9 @@ class LinkToResource(
   params: Map<String, PValue>,
   reactiveAuth: ?Array<UInt8>,
 ) extends SKStore.Postponable {
+  //
   fun perform(context: mutable SKStore.Context): void {
+    this.writer.status(context, Status::create());
     pushContext(context);
     this.supplier.subscribe(
       this.writer,
@@ -869,6 +1076,7 @@ class CollectionWriter(dirName: SKStore.DirName) {
     | Some(context) ->
       try {
         this.update_(context, values, isInit);
+        this.updateStatus(context, status ~> status.ok());
         Success(void)
       } catch {
       | ex -> Failure(ex)
@@ -876,9 +1084,82 @@ class CollectionWriter(dirName: SKStore.DirName) {
     | _ ->
       SKStore.runWithResult(context ~> {
         this.update_(context, values, isInit);
+        this.updateStatus(context, status ~> status.ok());
         context.update();
       })
     }
+  }
+
+  fun error(error: SKJSON.CJSON): Result<void, .Exception> {
+    getContext() match {
+    | Some(context) ->
+      try {
+        this.updateStatus(context, status ~> status.err(error));
+        Success(void)
+      } catch {
+      | ex -> Failure(ex)
+      }
+    | _ ->
+      SKStore.runWithResult(context ~> {
+        this.updateStatus(context, status ~> status.err(error));
+        context.update();
+      })
+    }
+  }
+
+  fun loading(): Result<void, .Exception> {
+    getContext() match {
+    | Some(context) ->
+      try {
+        this.status(context, Status::create());
+        Success(void)
+      } catch {
+      | ex -> Failure(ex)
+      }
+    | _ ->
+      SKStore.runWithResult(context ~> {
+        this.status(context, Status::create());
+        context.update();
+      })
+    }
+  }
+
+  fun status(context: mutable SKStore.Context, status: Status): void {
+    context.maybeGetEagerDir(this.dirName) match {
+    | Some(dir) ->
+      dirname = this.sessionId(context, dir) match {
+      | Some(sessionId) -> resourceSessionDirName(sessionId).sub("status")
+      | _ -> kSessionDir.sub("status")
+      };
+      shdl = SKStore.EHandle(
+        SKStore.DirName::keyType,
+        StatusFile::type,
+        dirname,
+      );
+      shdl.writeArray(context, this.dirName, Array[StatusFile(status)])
+    | _ -> void
+    };
+  }
+
+  fun updateStatus(
+    context: mutable SKStore.Context,
+    update: Status ~> Status,
+  ): void {
+    context.maybeGetEagerDir(this.dirName) match {
+    | Some(dir) ->
+      dirname = this.sessionId(context, dir) match {
+      | Some(sessionId) -> resourceSessionDirName(sessionId).sub("status")
+      | _ -> kSessionDir.sub("status")
+      };
+      shdl = SKStore.EHandle(
+        SKStore.DirName::keyType,
+        StatusFile::type,
+        dirname,
+      );
+      status = update(shdl.get(context, this.dirName).status);
+      shdl.writeArray(context, this.dirName, Array[StatusFile(status)])
+    | _ -> void
+    };
   }
 
   private fun update_(
@@ -904,14 +1185,61 @@ class CollectionWriter(dirName: SKStore.DirName) {
     });
     keys.each(key -> chdl.writeArray(context, key, Array[]));
   }
+
+  private fun sessionId(
+    context: mutable SKStore.Context,
+    dir: SKStore.EagerDir,
+  ): ?String {
+    dir.creator match {
+    | Some(arrow) ->
+      this.extractSessionId(arrow.parentName) match {
+      | Some(dn) -> Some(dn)
+      | _ ->
+        context.maybeGetEagerDir(arrow.parentName) match {
+        | Some(sdir) -> this.sessionId(context, sdir)
+        | _ -> None()
+        }
+      }
+    | _ -> None()
+    }
+  }
+
+  private const kSessionDir: Array<String> = Array[
+    "",
+    "sk_prv",
+    "resources",
+    "session",
+    "#",
+    "graph",
+    "",
+  ];
+
+  private fun extractSessionId(dirName: SKStore.DirName): ?String {
+    elements = dirName.toString().split("/");
+    if (elements.size() == static::kSessionDir.size()) {
+      session: ?String = None();
+      for (idx in Range(0, elements.size())) {
+        if (idx == 4) {
+          !session = Some(elements[idx]);
+        } else if (elements[idx] != static::kSessionDir[idx]) {
+          return None()
+        }
+      };
+      return session;
+    };
+    None()
+  }
 }
 
-value class ReactiveResponse(id: String, watermark: SKStore.Tick)
-
-value class Values(
-  values: Array<(SKJSON.CJSON, Array<SKJSON.CJSON>)>,
-  reactive: ReactiveResponse,
-)
+value class GetResult<T>(
+  request: ?String,
+  values: T,
+  errors: Array<SKJSON.CJSON>,
+) {
+  fun loading(): Bool {
+    this.request.isSome()
+  }
+}
 
 fun createReactiveResource(
   context: mutable SKStore.Context,
@@ -925,27 +1253,64 @@ fun createReactiveResource(
 
 fun getAll(
   context: mutable SKStore.Context,
-  resource: String,
+  resourceName: String,
   params: Map<String, PValue>,
   reactiveAuth: ?Array<UInt8>,
-): Values {
-  names = createResource_(context, resource, params, reactiveAuth);
-  values = names.collection.getAll(context);
-  Values(values, ReactiveResponse(names.name, context.tick))
+  optRequest: ?Request,
+): GetResult<Values> {
+  resource = createResource_(context, resourceName, params, reactiveAuth);
+  // create requests
+  request = optRequest match {
+  | Some(checker @ Checker _) -> resource.createRequest(context, Some(checker))
+  | Some(Identified(req)) -> req
+  | _ -> resource.createRequest(context, None())
+  };
+  values = Values(
+    resource.collection.getAll(context),
+    ReactiveResponse(resource.name, context.tick),
+  );
+  // return result type
+  res = resource.getResult(context, request, values);
+  if (!res.loading()) {
+    optRequest match {
+    | Some(Identified _)
+    | None() ->
+      resource.clearRequest(context, request)
+    | Some(Checker _) -> void
+    };
+  };
+  res;
 }
 
 fun getForKey(
   context: mutable SKStore.Context,
-  resource: String,
+  resourceName: String,
   params: Map<String, PValue>,
   key: SKJSON.CJSON,
   reactiveAuth: ?Array<UInt8>,
-): Array<SKJSON.CJSON> {
-  names = createResource_(context, resource, params, reactiveAuth);
+  optRequest: ?Request,
+): GetResult<Array<SKJSON.CJSON>> {
+  resource = createResource_(context, resourceName, params, reactiveAuth);
+  // create requests
+  request = optRequest match {
+  | Some(checker @ Checker _) -> resource.createRequest(context, Some(checker))
+  | Some(Identified(req)) -> req
+  | _ -> resource.createRequest(context, None())
+  };
   pushContext(context);
-  res = names.collection.getArray(key);
+  values = resource.collection.getArray(key);
   popContext();
-  res
+  // return result type
+  res = resource.getResult(context, request, values);
+  if (!res.loading()) {
+    optRequest match {
+    | Some(Identified _)
+    | None() ->
+      resource.clearRequest(context, request)
+    | Some(Checker _) -> void
+    };
+  };
+  res;
 }
 
 fun closeReactiveResource(
@@ -955,7 +1320,7 @@ fun closeReactiveResource(
   reactiveAuth: ?Array<UInt8>,
 ): void {
   session = toSessionName(reactiveAuth.default(Array[]));
-  rDirName = SKStore.DirName::create(`/sk_prv/resources/session/${session}/`);
+  rDirName = resourceSessionDirName(session);
   context.maybeGetEagerDir(rDirName).each(_ -> {
     rObject = ResourceKey(resource, Params(params), reactiveAuth);
     resourceHdl = SKStore.EHandle(
@@ -969,7 +1334,7 @@ fun closeReactiveResource(
 }
 
 fun closeSession_(context: mutable SKStore.Context, session: String): void {
-  rDirName = SKStore.DirName::create(`/sk_prv/resources/session/${session}/`);
+  rDirName = resourceSessionDirName(session);
   resourceHdl = SKStore.EHandle(
     ResourceKey::keyType,
     SKStore.IntFile::type,
@@ -1095,7 +1460,7 @@ private fun createResource_(
     Array[SKStore.IntFile(0)],
   );
   context.update();
-  rDirName = SKStore.DirName::create(`/sk_prv/resources/session/${session}/`);
+  rDirName = resourceSessionDirName(session);
   rObject = ResourceKey(resource, Params(params), reactiveAuth);
   resourceHdl = SKStore.EHandle(
     ResourceKey::keyType,
@@ -1104,9 +1469,7 @@ private fun createResource_(
   );
   resourceHdl.writeArray(context, rObject, Array[SKStore.IntFile(0)]);
   context.update();
-  gDirName = SKStore.DirName::create(
-    `/sk_prv/resources/session/${session}/graph/`,
-  );
+  gDirName = rDirName.sub("graph");
   graphHdl = SKStore.EHandle(
     ResourceKey::keyType,
     ResourceInfo::type,

@@ -234,6 +234,24 @@ fun updateOfCollectionWriter(
   };
 }
 
+@export("SkipRuntime_CollectionWriter__loading")
+fun loadingOfCollectionWriter(collection: String): Float {
+  writer = CollectionWriter(SKStore.DirName::create(collection));
+  writer.loading() match {
+  | Success _ -> 0.0
+  | Failure(err) -> getErrorHdl(err)
+  };
+}
+
+@export("SkipRuntime_CollectionWriter__error")
+fun errorOfCollectionWriter(collection: String, error: SKJSON.CJSON): Float {
+  writer = CollectionWriter(SKStore.DirName::create(collection));
+  writer.error(error) match {
+  | Success _ -> 0.0
+  | Failure(err) -> getErrorHdl(err)
+  };
+}
+
 /************  Resource ****************/
 
 @cpp_extern("SkipRuntime_Resource__reactiveCompute")
@@ -292,6 +310,32 @@ class ExternResourceBuilder(
 ) extends ResourceBuilder {
   fun build(params: Map<String, PValue>): Resource {
     buildOfResourceBuilder(this.eptr.value, jsonParams(params))
+  }
+}
+
+/************  Checker ****************/
+
+@cpp_extern("SkipRuntime_Checker__check")
+@debug
+native fun checkOfChecker(executor: UInt32, request: String): void;
+
+@cpp_extern("SkipRuntime_deleteChecker")
+@debug
+native fun deleteChecker(mapper: UInt32): void;
+
+@export("SkipRuntime_createChecker")
+fun createChecker(executor: UInt32): ExternChecker {
+  ExternChecker(SKStore.ExternalPointer::create(executor, deleteChecker))
+}
+
+@export("SkipRuntime_createIdentified")
+fun createIdentified(request: String): Identified {
+  Identified(request)
+}
+
+class ExternChecker(eptr: SKStore.ExternalPointer) extends Checker {
+  fun check(request: String): void {
+    checkOfChecker(this.eptr.value, request)
   }
 }
 
@@ -598,28 +642,63 @@ fun getAllOfRuntime(
   resource: String,
   jsonParams: SKJSON.CJObject,
   reactiveAuth: ?Array<UInt8>,
+  optRequest: ?Request,
 ): SKJSON.CJSON {
-  SKStore.runWithResult(context ~> {
-    getAll(context, resource, params(jsonParams), reactiveAuth)
+  (getContext() match {
+  | Some(context) ->
+    try {
+      Success(
+        getAll(context, resource, params(jsonParams), reactiveAuth, optRequest),
+      )
+    } catch {
+    | ex -> Failure(ex)
+    }
+  | _ ->
+    SKStore.runWithResult(context ~> {
+      getAll(context, resource, params(jsonParams), reactiveAuth, optRequest)
+    })
   }) match {
-  | Success(values) ->
-    SKJSON.CJArray(
-      Array[
+  | Success(result) ->
+    reactive = Array<(String, SKJSON.CJSON)>[
+      ("collection", SKJSON.CJString(result.values.reactive.id)),
+      (
+        "watermark",
+        SKJSON.CJString(result.values.reactive.watermark.value.toString()),
+      ),
+    ];
+    response = Array<(String, SKJSON.CJSON)>[
+      (
+        "values",
         SKJSON.CJArray(
-          values.values.map(v ->
+          result.values.values.map(v ->
             SKJSON.CJArray(Array[v.i0, SKJSON.CJArray(v.i1)])
           ),
         ),
-        SKJSON.CJArray(
-          Array[
-            SKJSON.CJString(values.reactive.id),
-            SKJSON.CJString(values.reactive.watermark.value.toString()),
-          ],
+      ),
+      (
+        "reactive",
+        SKJSON.CJObject(
+          SKJSON.CJFields::create(reactive.sortedBy(x ~> x.i0), x -> x),
         ),
-      ],
+      ),
+    ];
+    fields = mutable Vector<(String, SKJSON.CJSON)>[
+      (
+        "values",
+        SKJSON.CJObject(
+          SKJSON.CJFields::create(response.sortedBy(x ~> x.i0), x -> x),
+        ),
+      ),
+      ("errors", SKJSON.CJArray(result.errors)),
+    ];
+    result.request.each(request ->
+      fields.push(("request", SKJSON.CJString(request)))
+    );
+    SKJSON.CJObject(
+      SKJSON.CJFields::create(fields.sortedBy(x ~> x.i0).toArray(), x -> x),
     )
   | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
-  };
+  }
 }
 
 @export("SkipRuntime_Runtime__getForKey")
@@ -628,11 +707,47 @@ fun getForKeyOfRuntime(
   jsonParams: SKJSON.CJObject,
   key: SKJSON.CJSON,
   reactiveAuth: ?Array<UInt8>,
+  optRequest: ?Request,
 ): SKJSON.CJSON {
-  SKStore.runWithResult(context ~> {
-    getForKey(context, resource, params(jsonParams), key, reactiveAuth)
+  (getContext() match {
+  | Some(context) ->
+    try {
+      Success(
+        getForKey(
+          context,
+          resource,
+          params(jsonParams),
+          key,
+          reactiveAuth,
+          optRequest,
+        ),
+      )
+    } catch {
+    | ex -> Failure(ex)
+    }
+  | _ ->
+    SKStore.runWithResult(context ~> {
+      getForKey(
+        context,
+        resource,
+        params(jsonParams),
+        key,
+        reactiveAuth,
+        optRequest,
+      )
+    })
   }) match {
-  | Success(value) -> SKJSON.CJArray(value)
+  | Success(result) ->
+    fields = mutable Vector<(String, SKJSON.CJSON)>[
+      ("values", SKJSON.CJArray(result.values)),
+      ("errors", SKJSON.CJArray(result.errors)),
+    ];
+    result.request.each(request ->
+      fields.push(("request", SKJSON.CJString(request)))
+    );
+    SKJSON.CJObject(
+      SKJSON.CJFields::create(fields.sortedBy(x ~> x.i0).toArray(), x -> x),
+    )
   | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
   };
 }

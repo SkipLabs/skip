@@ -11,7 +11,6 @@ export type {
   TJSON,
   JSONObject,
   Accumulator,
-  SkipRuntime,
   Entry,
   ReactiveResponse,
   SkipService,
@@ -22,6 +21,7 @@ export type {
   SubscriptionID,
 } from "./skipruntime_api.js";
 
+export type { Values, SkipRuntime } from "./internals/skipruntime_module.js";
 export { UnknownCollectionError } from "./skipruntime_errors.js";
 export { ValueMapper } from "./skipruntime_api.js";
 export {

@@ -1,6 +1,9 @@
 import { run, type ModuleInit } from "std";
-import type { SkipRuntime, SkipService } from "./skipruntime_api.js";
-import type { SkipRuntimeFactory } from "./internals/skipruntime_module.js";
+import type { SkipService } from "./skipruntime_api.js";
+import type {
+  SkipRuntimeFactory,
+  SkipRuntime,
+} from "./internals/skipruntime_module.js";
 
 import { init as runtimeInit } from "std/runtime.js";
 import { init as posixInit } from "std/posix.js";
@@ -19,13 +22,18 @@ const modules: ModuleInit[] = [
   skruntimeInit,
 ];
 
-async function wasmUrl(): Promise<URL> {
+interface Imported {
+  default: string;
+}
+
+async function wasmUrl(): Promise<URL | string> {
   //@ts-expect-error  ImportMeta is incomplete
   if (import.meta.env || import.meta.webpack) {
-    /* eslint-disable @typescript-eslint/no-unsafe-return */
-    //@ts-expect-error  Cannot find module './skstore.wasm?url' or its corresponding type declarations.
-    return await import("./libskip-runtime-ts.wasm?url");
-    /* eslint-enable @typescript-eslint/no-unsafe-return */
+    const imported = (await import(
+      //@ts-expect-error  Cannot find module './skstore.wasm?url' or its corresponding type declarations.
+      "./libskip-runtime-ts.wasm?url"
+    )) as Imported;
+    return imported.default;
   }
 
   return new URL("./libskip-runtime-ts.wasm", import.meta.url);
