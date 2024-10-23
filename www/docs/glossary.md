@@ -16,6 +16,21 @@
   a graph of data and computation dependencies that the engine can use to
   efficiently maintain reactive computations as inputs and data are updated.
 
+* _Service_: A single-host reactive service implemented using the Skip
+  runtime.  A service provides reactive *resources* which can be accessed by
+  clients or other reactive services, which specify parameters and are provided
+  with reactively-updated data computed and maintained by the service.  A
+  service consists of some *input collections*, metadata to access *external
+  services* (other Skip services and/or non-Skip HTTP endpoints) and a
+  computation graph defining how to produce outputs from its inputs.
+
+* _Resource_: The output of a Skip service is one or more *resources*, which are
+  updated and maintained reactively. Requests against resources can include
+  parameters, and the corresponding results -- a *resource instance* specific to
+  that client and request parameters -- are computed/updated until the client
+  disconnects or unsubscribes.  Non-reactive requests can also be made, allowing
+  legacy clients to query reactive services' resources.
+
 * _Collection_: The core data structure over which reactive computations
   operate, collections associate *keys* with one or more *values*, both of
   which can be arbitrary JSON data.  Collections can either be *eager*, meaning
@@ -32,22 +47,6 @@
   would be computed if the equivalent non-reactive computation were executed
   from scratch on the current input)
 
-* _Service_: A single-host reactive service implemented using the Skip
-  runtime.  A service consists of some input and output *tables*, and a
-  *computation graph* defining how its outputs are produced from its inputs.
-
-* _Table_: A data structure produced or consumed by Skip services and/or
-  clients. Tables are *collections* with the proper metadata and structure that
-  allows them to be (a) serialized and replicated over the wire with access
-  controls and writer/author information and (b) queried and manipulated using
-  SQL, evaluated reactively by the Skip runtime.
-
 * _(Skip) Client_: A thin client for a Skip reactive service which does not
   itself use the Skip Runtime, but operates over data which is kept up-to-date
-  by the service. Clients can also push *events* to be processed by the reactive
-  service.
-
-* _Event_: A JSON payload sent from a client to a Skip service via websocket.
-  The event structure and event-handling logic are defined by an application,
-  and can be used for example as a request/response interface or to handle
-  inputs from a client.
+  by the service.
