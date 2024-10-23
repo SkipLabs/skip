@@ -22,12 +22,11 @@ export type {
 } from "./skipruntime_api.js";
 
 export { UnknownCollectionError } from "./skipruntime_errors.js";
-export { ValueMapper } from "./skipruntime_api.js";
+export { freeze, ValueMapper } from "./skipruntime_api.js";
 export {
   Sum,
   Min,
   Max,
-  freeze,
   parseReactiveResponse,
   reactiveResponseHeader,
 } from "./skipruntime_utils.js";
