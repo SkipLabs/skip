@@ -26,12 +26,13 @@ import type {
   LazyCompute,
   ExternalSupplier,
   Resource,
-  SkipRuntime,
   ReactiveResponse,
   CollectionUpdate,
   Watermark,
   SubscriptionID,
 } from "../skipruntime_api.js";
+
+import type { ServiceInstance } from "../skipruntime_init.js";
 
 import type { SKJSON } from "skjson";
 import { UnknownCollectionError } from "../skipruntime_errors.js";
@@ -67,6 +68,58 @@ abstract class SkFrozen implements Constant {
     sk_freeze(this);
     // Inheriting classes should call Object.freeze at the end of their
     // constructor
+  }
+}
+
+/**
+ * _Deep-freeze_ an object, returning the same object that was passed in.
+ *
+ * This function is similar to
+ * {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/freeze | `Object.freeze()`}
+ * but freezes the object and deep-freezes all its properties,
+ * recursively. The object is then not only _immutable_ but also
+ * _constant_. Note that as a result all objects reachable from the
+ * parameter will be frozen and no longer mutable or extensible, even from
+ * other references.
+ *
+ * The primary use for this function is to satisfy the requirement that all
+ * parameters to Skip `Mapper` constructors must be deep-frozen: objects
+ * that have not been constructed by Skip can be passed to `freeze()` before
+ * passing them to a `Mapper` constructor.
+ *
+ * @param value - The object to deep-freeze.
+ * @returns The same object that was passed in.
+ */
+export function freeze<T>(value: T): T & Param {
+  if (
+    typeof value == "string" ||
+    typeof value == "number" ||
+    typeof value == "boolean"
+  ) {
+    return value;
+  } else if (typeof value == "object") {
+    if (value === null) {
+      return value;
+    } else if (isSkFrozen(value)) {
+      return value;
+    } else if (Object.isFrozen(value)) {
+      check(value);
+      return value as T & Param;
+    } else if (Array.isArray(value)) {
+      const length: number = value.length;
+      for (let i = 0; i < length; i++) {
+        value[i] = freeze(value[i]);
+      }
+      return Object.freeze(sk_freeze(value));
+    } else {
+      const jso = value as Record<string, any>;
+      for (const key of Object.keys(jso)) {
+        jso[key] = freeze(jso[key]);
+      }
+      return Object.freeze(sk_freeze(jso)) as T & Constant;
+    }
+  } else {
+    throw new Error(`'${typeof value}' cannot be frozen.`);
   }
 }
 
@@ -483,8 +536,8 @@ class LinksImpl implements Links {
     this.utils = utils;
     this.fromWasm = exports as FromWasm;
     this.env.shared.set(
-      "SkipRuntime",
-      new SkipRuntimeFactory(this.initService.bind(this)),
+      "ServiceInstanceFactory",
+      new ServiceInstanceFactory(this.initService.bind(this)),
     );
   }
 
@@ -759,7 +812,7 @@ class LinksImpl implements Links {
     this.handles.deleteHandle(supplier);
   }
 
-  initService(service: SkipService): SkipRuntime {
+  initService(service: SkipService): ServiceInstance {
     const skjson = this.getSkjson();
     const result = skjson.runWithGC(() => {
       const skExternalServices =
@@ -801,7 +854,7 @@ class LinksImpl implements Links {
     if (result != 0) {
       throw this.handles.deleteAsError(result as Handle<ErrorObject>);
     }
-    return new SkipRuntimeImpl(
+    return new ServiceInstanceImpl(
       new Refs(skjson, this.fromWasm, this.handles, this.needGC.bind(this)),
     );
   }
@@ -1075,19 +1128,19 @@ export function check<T>(value: T): void {
   }
 }
 
-export class SkipRuntimeFactory implements Shared {
-  constructor(private init: (service: SkipService) => SkipRuntime) {}
+export class ServiceInstanceFactory implements Shared {
+  constructor(private init: (service: SkipService) => ServiceInstance) {}
 
-  initService(service: SkipService): SkipRuntime {
+  initService(service: SkipService): ServiceInstance {
     return this.init(service);
   }
 
   getName() {
-    return "SkipRuntime";
+    return "ServiceInstanceFactory";
   }
 }
 
-class SkipRuntimeImpl implements SkipRuntime {
+class ServiceInstanceImpl implements ServiceInstance {
   constructor(private refs: Refs) {}
 
   createResource(
