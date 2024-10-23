@@ -4,6 +4,10 @@ function scenarios(): Step[][] {
   return [
     [
       {
+        type: "log",
+        payload: { resource: "departures" },
+      },
+      {
         type: "request",
         payload: { resource: "departures" },
       },
@@ -33,6 +37,30 @@ function scenarios(): Step[][] {
             ],
           },
         ],
+      },
+      {
+        type: "log",
+        payload: { resource: "departures" },
+      },
+      {
+        type: "log",
+        payload: { resource: "departures" },
+      },
+      {
+        type: "log",
+        payload: { resource: "departures" },
+      },
+      {
+        type: "log",
+        payload: { resource: "departures" },
+      },
+      {
+        type: "log",
+        payload: { resource: "departures" },
+      },
+      {
+        type: "log",
+        payload: { resource: "departures" },
       },
     ],
   ];
