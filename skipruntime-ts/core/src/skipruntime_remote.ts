@@ -74,7 +74,11 @@ export class ExternalSkipService implements ExternalSupplier {
   subscribe(
     resource: string,
     params: Record<string, string>,
-    cb: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void,
+    callbacks: {
+      update: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void;
+      error: (error: TJSON) => void;
+      loading: () => void;
+    },
     reactiveAuth?: Uint8Array,
   ): void {
     if (!this.client) {
@@ -89,9 +93,11 @@ export class ExternalSkipService implements ExternalSupplier {
         });
       }
     }
-    this.link_(resource, params, cb, reactiveAuth).catch((e: unknown) => {
-      console.error(e);
-    });
+    this.subscribe_(resource, params, callbacks, reactiveAuth).catch(
+      (e: unknown) => {
+        console.error(e);
+      },
+    );
   }
 
   unsubscribe(
@@ -115,19 +121,24 @@ export class ExternalSkipService implements ExternalSupplier {
     }
   }
 
-  private async link_(
+  private async subscribe_(
     resource: string,
     params: Record<string, string>,
-    cb: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void,
+    callbacks: {
+      update: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void;
+      error: (error: TJSON) => void;
+      loading: () => void;
+    },
     reactiveAuth?: Uint8Array,
   ): Promise<void> {
     const [client, creds] = await this.client!;
     const publicKey = new Uint8Array(await Protocol.exportKey(creds.publicKey));
     const reactive = await this.auth(resource, params, publicKey);
+    // TODO Manage Status
     const close = client.subscribe(
       reactive.collection,
       BigInt(reactive.watermark),
-      cb,
+      callbacks.update,
     );
     this.resources.set(this.toId(resource, params, reactiveAuth), close);
   }

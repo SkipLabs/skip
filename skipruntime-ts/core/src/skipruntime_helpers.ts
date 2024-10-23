@@ -4,7 +4,11 @@ import { fetchJSON } from "./skipruntime_rest.js";
 export interface ExternalResource {
   open(
     params: Record<string, string | number>,
-    cb: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void,
+    callbacks: {
+      update: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void;
+      error: (error: TJSON) => void;
+      loading: () => void;
+    },
     reactiveAuth?: Uint8Array,
   ): void;
 
@@ -20,7 +24,11 @@ export class ExternalService implements ExternalSupplier {
   subscribe(
     resourceName: string,
     params: Record<string, string | number>,
-    cb: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void,
+    callbacks: {
+      update: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void;
+      error: (error: TJSON) => void;
+      loading: () => void;
+    },
     reactiveAuth?: Uint8Array,
   ): void {
     const resource = this.resources[resourceName] as
@@ -29,7 +37,7 @@ export class ExternalService implements ExternalSupplier {
     if (!resource) {
       throw new Error(`Unkonwn resource named '${resourceName}'`);
     }
-    resource.open(params, cb, reactiveAuth);
+    resource.open(params, callbacks, reactiveAuth);
   }
 
   unsubscribe(
@@ -58,7 +66,11 @@ export class TimeCollection implements ExternalResource {
 
   open(
     params: Record<string, string | number>,
-    cb: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void,
+    callbacks: {
+      update: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void;
+      error: (error: TJSON) => void;
+      loading: () => void;
+    },
     reactiveAuth?: Uint8Array,
   ) {
     const time = new Date().getTime();
@@ -66,7 +78,7 @@ export class TimeCollection implements ExternalResource {
     for (const name of Object.keys(params)) {
       values.push([name, [time]]);
     }
-    cb(values, true);
+    callbacks.update(values, true);
     const id = toId(params, reactiveAuth);
     const intervals: Record<string, Timemout> = {};
     for (const [name, duration] of Object.entries(params)) {
@@ -74,7 +86,7 @@ export class TimeCollection implements ExternalResource {
       if (ms > 0) {
         intervals[name] = setInterval(() => {
           const newvalue: Entry<TJSON, TJSON> = [name, [new Date().getTime()]];
-          cb([newvalue], false);
+          callbacks.update([newvalue], true);
         }, ms);
       }
     }
@@ -107,7 +119,11 @@ export class Polled<S extends TJSON, K extends TJSON, V extends TJSON>
 
   open(
     params: Record<string, string | number>,
-    cb: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void,
+    callbacks: {
+      update: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void;
+      error: (error: TJSON) => void;
+      loading: () => void;
+    },
     reactiveAuth?: Uint8Array,
   ): void {
     this.close(params, reactiveAuth);
@@ -118,11 +134,15 @@ export class Polled<S extends TJSON, K extends TJSON, V extends TJSON>
     const strParams = new URLSearchParams(querieParams).toString();
     const uri = `${this.uri}?${strParams}`;
     const call = () => {
+      callbacks.loading();
       fetchJSON(uri, "GET", {})
         .then((r) => {
-          cb(this.conv(r[0] as S), true);
+          callbacks.update(this.conv(r[0] as S), true);
         })
-        .catch((e: unknown) => console.error(e));
+        .catch((e: unknown) => {
+          callbacks.error(e instanceof Error ? e.message : JSON.stringify(e));
+          console.error(e);
+        });
     };
     call();
     this.intervals.set(
