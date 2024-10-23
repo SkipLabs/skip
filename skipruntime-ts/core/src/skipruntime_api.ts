@@ -36,7 +36,7 @@ export { freeze } from "./internals/skipruntime_module.js";
  * For each key & values in the input collection (of type K1/V1 respectively),
  * produces some key/value pairs for the output collection (of type K2/V2 respectively)
  * @param key - a key found in the input collection
- * @param it - the values mapped to by `key` in the input collection
+ * @param values - the values mapped to by `key` in the input collection
  * @returns an iterable of key/value pairs to output for the given input(s)
  */
 export interface Mapper<
@@ -45,7 +45,7 @@ export interface Mapper<
   K2 extends TJSON,
   V2 extends TJSON,
 > {
-  mapElement(key: K1, it: NonEmptyIterator<V1>): Iterable<[K2, V2]>;
+  mapElement(key: K1, values: NonEmptyIterator<V1>): Iterable<[K2, V2]>;
 }
 
 /**
@@ -65,8 +65,8 @@ export abstract class ValueMapper<
 {
   abstract mapValue(value: V1, key: K): V2;
 
-  mapElement(key: K, it: NonEmptyIterator<V1>): Iterable<[K, V2]> {
-    return it.toArray().map((v) => [key, this.mapValue(v, key)]);
+  mapElement(key: K, values: NonEmptyIterator<V1>): Iterable<[K, V2]> {
+    return values.toArray().map((v) => [key, this.mapValue(v, key)]);
   }
 }
 
