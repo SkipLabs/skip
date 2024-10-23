@@ -1,16 +1,19 @@
 import { run, type ModuleInit } from "std";
-import type { SkipRuntime, SkipService } from "./skipruntime_api.js";
-import type { SkipRuntimeFactory } from "./internals/skipruntime_module.js";
+import type {
+  CollectionUpdate,
+  Entry,
+  ReactiveResponse,
+  SkipService,
+  SubscriptionID,
+  TJSON,
+  Watermark,
+} from "./skipruntime_api.js";
+import type { ServiceInstanceFactory } from "./internals/skipruntime_module.js";
 
 import { init as runtimeInit } from "std/runtime.js";
 import { init as posixInit } from "std/posix.js";
 import { init as skjsonInit } from "skjson";
-import {
-  check,
-  isSkFrozen,
-  sk_freeze,
-  init as skruntimeInit,
-} from "./internals/skipruntime_module.js";
+import { init as skruntimeInit } from "./internals/skipruntime_module.js";
 
 const modules: ModuleInit[] = [
   runtimeInit,
@@ -31,62 +34,113 @@ async function wasmUrl(): Promise<URL> {
   return new URL("./libskip-runtime-ts.wasm", import.meta.url);
 }
 
-export async function initService(service: SkipService): Promise<SkipRuntime> {
+export async function initService(
+  service: SkipService,
+): Promise<ServiceInstance> {
   const data = await run(wasmUrl, modules, []);
   const factory = data.environment.shared.get(
-    "SkipRuntime",
-  ) as SkipRuntimeFactory;
+    "ServiceInstanceFactory",
+  ) as ServiceInstanceFactory;
   return factory.initService(service);
 }
 
 /**
- * _Deep-freeze_ an object, returning the same object that was passed in.
- *
- * This function is similar to
- * {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/freeze | `Object.freeze()`}
- * but freezes the object and deep-freezes all its properties,
- * recursively. The object is then not only _immutable_ but also
- * _constant_. Note that as a result all objects reachable from the
- * parameter will be frozen and no longer mutable or extensible, even from
- * other references.
- *
- * The primary use for this function is to satisfy the requirement that all
- * parameters to Skip `Mapper` constructors must be deep-frozen: objects
- * that have not been constructed by Skip can be passed to `freeze()` before
- * passing them to a `Mapper` constructor.
- *
- * @param value - The object to deep-freeze.
- * @returns The same object that was passed in.
+ * A `ServiceInstance` is the result of `initService`
+ * It gives access to a service's reactively computed resources, and allows to manage sessions or shut down the service.
  */
-export function freeze<T>(value: T): T {
-  if (
-    typeof value == "string" ||
-    typeof value == "number" ||
-    typeof value == "boolean"
-  ) {
-    return value;
-  } else if (typeof value == "object") {
-    if (value === null) {
-      return value;
-    } else if (isSkFrozen(value)) {
-      return value;
-    } else if (Object.isFrozen(value)) {
-      check(value);
-      return value;
-    } else if (Array.isArray(value)) {
-      const length: number = value.length;
-      for (let i = 0; i < length; i++) {
-        value[i] = freeze(value[i]);
-      }
-      return Object.freeze(sk_freeze(value));
-    } else {
-      const jso = value as Record<string, any>;
-      for (const key of Object.keys(jso)) {
-        jso[key] = freeze(jso[key]);
-      }
-      return Object.freeze(sk_freeze(jso)) as T;
-    }
-  } else {
-    throw new Error(`'${typeof value}' cannot be frozen.`);
-  }
+export interface ServiceInstance {
+  /**
+   * Creates if not exists and get all current values of specified resource
+   * @param resource - the resource name corresponding to a key in remotes field of SkipService
+   * @param params - the parameters of the resource used to build the resource with the corresponding constructor specified in remotes field of SkipService
+   * @param reactiveAuth - the client user Skip session authentification
+   * @returns The current values of the corresponding resource with reactive responce token to allow subscription
+   */
+  getAll<K extends TJSON, V extends TJSON>(
+    resource: string,
+    params: Record<string, string>,
+    reactiveAuth?: Uint8Array,
+  ): { values: Entry<K, V>[]; reactive?: ReactiveResponse };
+
+  /**
+   * Creates specified resource
+   * @param resource - the resource name correspond to the a key in remotes field of SkipService
+   * @param params - the parameters of the resource used to build the resource with the corresponding constructor specified in remotes field of SkipService
+   * @param reactiveAuth - the client user Skip session authentification
+   * @returns The reactive responce token to allow subscription
+   */
+  createResource(
+    resource: string,
+    params: Record<string, string>,
+    reactiveAuth?: Uint8Array,
+  ): ReactiveResponse;
+
+  /**
+   * Creates if not exists and get the current value of specified key in specified resource
+   * @param resource - the resource name correspond to the a key in remotes field of SkipService
+   * @param params - the parameters of the resource used to build the resource with the corresponding constructor specified in remotes field of SkipService
+   * @param key - the key of value to return
+   * @param reactiveAuth - the client user Skip session authentification
+   * @returns The current value of specified key in the corresponding resource
+   */
+  getOne<V extends TJSON>(
+    resource: string,
+    params: Record<string, string>,
+    key: string | number,
+    reactiveAuth?: Uint8Array,
+  ): V[];
+
+  /**
+   * Close the specified resource
+   * @param resource - the resource name correspond to the a key in remotes field of SkipService
+   * @param params - the parameters of the resource used to build the resource with the corresponding constructor specified in remotes field of SkipService
+   * @param reactiveAuth - the client user Skip session authentification
+   */
+  closeResource(
+    resource: string,
+    params: Record<string, string>,
+    reactiveAuth?: Uint8Array,
+  ): void;
+
+  /**
+   * Close of the resources corresponding the specified reactiveAuth
+   * @param reactiveAuth - the client user Skip session authentification
+   */
+  closeSession(reactiveAuth?: Uint8Array): void;
+
+  /**
+   * Subscribe to a reactive ressource according a given reactive response
+   * @param reactiveId - the reactive response collection
+   * @param since - the reactive response watermark
+   * @param f - the callback called on collection updates
+   * @param reactiveAuth The client user Skip session authentification corresponding to the reactive response
+   * @returns The subcription identifier
+   */
+  subscribe<K extends TJSON, V extends TJSON>(
+    reactiveId: string,
+    since: Watermark,
+    f: (update: CollectionUpdate<K, V>) => void,
+    reactiveAuth?: Uint8Array,
+  ): SubscriptionID;
+
+  /**
+   * Unsubscribe to a reactive ressource according a given subcription identifier
+   * @param id - the subcription identifier
+   */
+  unsubscribe(id: SubscriptionID): void;
+
+  /**
+   * Update an inout collection
+   * @param input - the name of the input collection to update
+   * @param values - the values of the input collection to update
+   */
+  update<K extends TJSON, V extends TJSON>(
+    input: string,
+    values: Entry<K, V>[],
+  ): void;
+
+  /**
+   * Close all the resource and shutdown the SkipService
+   */
+  close(): void;
 }

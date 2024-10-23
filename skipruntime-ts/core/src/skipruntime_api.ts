@@ -20,6 +20,7 @@ export type JSONObject = { [key: string]: TJSON | null };
  * value or a Skip-runtime-managed value. In either case, restricting mapper parameters to
  * this type helps developers to ensure that reactive computations can be re-evaluated as
  * needed with consistent semantics.
+ * `Constant`s are recursively-frozen objects managed by the Skip runtime; non-Skip objects can be made constant by passing them to `freeze`.
  */
 export type Param =
   | null
@@ -29,7 +30,7 @@ export type Param =
   | Constant
   | readonly Param[]
   | { readonly [k: string]: Param };
-
+export { freeze } from "./internals/skipruntime_module.js";
 /**
  * The type of a reactive function mapping over an arbitrary collection.
  * For each key & values in the input collection (of type K1/V1 respectively),
@@ -295,107 +296,6 @@ export type ReactiveResponse = {
   collection: string;
   watermark: Watermark;
 };
-
-/**
- * SkipRuntime is the result of initService
- * It gives acces to service reactivly computed resources
- */
-export interface SkipRuntime {
-  /**
-   * Creates if not exists and get all current values of specified resource
-   * @param resource - the resource name corresponding to a key in remotes field of SkipService
-   * @param params - the parameters of the resource used to build the resource with the corresponding constructor specified in remotes field of SkipService
-   * @param reactiveAuth - the client user Skip session authentification
-   * @returns The current values of the corresponding resource with reactive responce token to allow subscription
-   */
-  getAll<K extends TJSON, V extends TJSON>(
-    resource: string,
-    params: Record<string, string>,
-    reactiveAuth?: Uint8Array,
-  ): { values: Entry<K, V>[]; reactive?: ReactiveResponse };
-
-  /**
-   * Creates specified resource
-   * @param resource - the resource name correspond to the a key in remotes field of SkipService
-   * @param params - the parameters of the resource used to build the resource with the corresponding constructor specified in remotes field of SkipService
-   * @param reactiveAuth - the client user Skip session authentification
-   * @returns The reactive responce token to allow subscription
-   */
-  createResource(
-    resource: string,
-    params: Record<string, string>,
-    reactiveAuth?: Uint8Array,
-  ): ReactiveResponse;
-
-  /**
-   * Creates if not exists and get the current value of specified key in specified resource
-   * @param resource - the resource name correspond to the a key in remotes field of SkipService
-   * @param params - the parameters of the resource used to build the resource with the corresponding constructor specified in remotes field of SkipService
-   * @param key - the key of value to return
-   * @param reactiveAuth - the client user Skip session authentification
-   * @returns The current value of specified key in the corresponding resource
-   */
-  getOne<V extends TJSON>(
-    resource: string,
-    params: Record<string, string>,
-    key: string | number,
-    reactiveAuth?: Uint8Array,
-  ): V[];
-
-  /**
-   * Close the specified resource
-   * @param resource - the resource name correspond to the a key in remotes field of SkipService
-   * @param params - the parameters of the resource used to build the resource with the corresponding constructor specified in remotes field of SkipService
-   * @param reactiveAuth - the client user Skip session authentification
-   */
-  closeResource(
-    resource: string,
-    params: Record<string, string>,
-    reactiveAuth?: Uint8Array,
-  ): void;
-
-  /**
-   * Close of the resources corresponding the specified reactiveAuth
-   * @param reactiveAuth - the client user Skip session authentification
-   */
-  closeSession(reactiveAuth?: Uint8Array): void;
-
-  /**
-   * Subscribe to a reactive ressource according a given reactive response
-   * @param reactiveId - the reactive response collection
-   * @param since - the reactive response watermark
-   * @param f - the callback called on collection updates
-   * @param reactiveAuth The client user Skip session authentification corresponding to the reactive response
-   * @returns The subcription identifier
-   */
-  subscribe<K extends TJSON, V extends TJSON>(
-    reactiveId: string,
-    since: Watermark,
-    f: (update: CollectionUpdate<K, V>) => void,
-    reactiveAuth?: Uint8Array,
-  ): SubscriptionID;
-
-  /**
-   * Unsubscribe to a reactive ressource according a given subcription identifier
-   * @param id - the subcription identifier
-   */
-  unsubscribe(id: SubscriptionID): void;
-
-  /**
-   * Update an inout collection
-   * @param input - the name of the input collection to update
-   * @param values - the values of the input collection to update
-   */
-  update<K extends TJSON, V extends TJSON>(
-    input: string,
-    values: Entry<K, V>[],
-  ): void;
-
-  /**
-   * Close all the resource and shutdown the SkipService
-   */
-  close(): void;
-}
 
 /**
  * ExternalSupplier allows to have access to external ressources

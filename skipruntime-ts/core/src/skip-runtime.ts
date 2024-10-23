@@ -1,4 +1,4 @@
-export { initService } from "./skipruntime_init.js";
+export { type ServiceInstance, initService } from "./skipruntime_init.js";
 
 export type {
   Mapper,
@@ -11,7 +11,6 @@ export type {
   TJSON,
   JSONObject,
   Accumulator,
-  SkipRuntime,
   Entry,
   ReactiveResponse,
   SkipService,
@@ -23,7 +22,7 @@ export type {
 } from "./skipruntime_api.js";
 
 export { UnknownCollectionError } from "./skipruntime_errors.js";
-export { ValueMapper } from "./skipruntime_api.js";
+export { freeze, ValueMapper } from "./skipruntime_api.js";
 export {
   Sum,
   Min,
@@ -31,7 +30,7 @@ export {
   parseReactiveResponse,
   reactiveResponseHeader,
 } from "./skipruntime_utils.js";
-export { freeze } from "./skipruntime_init.js";
+
 export {
   fetchJSON,
   SkipRESTRuntime,
