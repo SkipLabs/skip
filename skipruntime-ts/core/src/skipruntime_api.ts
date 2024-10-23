@@ -305,13 +305,20 @@ export interface ExternalSupplier {
    * Subscribe to the external resource
    * @param resource - the name of the external resource
    * @param params - the parameters of the external resource
-   * @param cb - the callback called on collection updates
+   * @param callbacks - the callbacks to react on update/error/loading
+   * @param callbacks.update - the update callback
+   * @param callbacks.error - the error callback
+   * @param callbacks.loading - the loading callback
    * @param reactiveAuth - the client user Skip session authentification of the caller
    */
   subscribe(
     resource: string,
     params: Record<string, string | number>,
-    cb: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void,
+    callbacks: {
+      update: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void;
+      error: (error: TJSON) => void;
+      loading: () => void;
+    },
     reactiveAuth?: Uint8Array,
   ): void;
 

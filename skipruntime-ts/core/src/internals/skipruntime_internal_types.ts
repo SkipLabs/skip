@@ -51,3 +51,6 @@ export type Accumulator = T<typeof accumulator>;
 
 declare const notifier: unique symbol;
 export type Notifier = T<typeof notifier>;
+
+declare const request: unique symbol;
+export type Request = T<typeof request>;

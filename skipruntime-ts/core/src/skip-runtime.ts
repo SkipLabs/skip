@@ -1,4 +1,4 @@
-export { type ServiceInstance, initService } from "./skipruntime_init.js";
+export { initService } from "./skipruntime_init.js";
 
 export type {
   Mapper,
@@ -21,6 +21,10 @@ export type {
   SubscriptionID,
 } from "./skipruntime_api.js";
 
+export type {
+  Values,
+  ServiceInstance,
+} from "./internals/skipruntime_module.js";
 export { UnknownCollectionError } from "./skipruntime_errors.js";
 export { freeze, ValueMapper } from "./skipruntime_api.js";
 export {

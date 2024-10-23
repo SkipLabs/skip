@@ -32,9 +32,7 @@ import type {
   SubscriptionID,
 } from "../skipruntime_api.js";
 
-import type { ServiceInstance } from "../skipruntime_init.js";
-
-import type { SKJSON } from "skjson";
+import type { Exportable, SKJSON } from "skjson";
 import { UnknownCollectionError } from "../skipruntime_errors.js";
 
 export type Handle<T> = Internal.Opaque<int, { handle_for: T }>;
@@ -179,6 +177,15 @@ export interface FromWasm {
     isInit: boolean,
   ): Handle<ErrorObject>;
 
+  SkipRuntime_CollectionWriter__error(
+    name: ptr<Internal.String>,
+    error: ptr<Internal.CJSON>,
+  ): Handle<ErrorObject>;
+
+  SkipRuntime_CollectionWriter__loading(
+    name: ptr<Internal.String>,
+  ): Handle<ErrorObject>;
+
   // Resource
 
   SkipRuntime_createResource(ref: Handle<Resource>): ptr<Internal.Resource>;
@@ -290,14 +297,16 @@ export interface FromWasm {
     resource: ptr<Internal.String>,
     jsonParams: ptr<Internal.CJObject>,
     reactiveAuth: ptr<Internal.Array<Internal.Byte>> | null,
-  ): ptr<Internal.CJArray | Internal.CJFloat>;
+    request: ptr<Internal.Request> | null,
+  ): ptr<Internal.CJObject | Internal.CJFloat>;
 
   SkipRuntime_Runtime__getForKey(
     resource: ptr<Internal.String>,
     jsonParams: ptr<Internal.CJObject>,
     key: ptr<Internal.CJSON>,
     reactiveAuth: ptr<Internal.Array<Internal.Byte>> | null,
-  ): ptr<Internal.CJArray | Internal.CJFloat>;
+    request: ptr<Internal.Request> | null,
+  ): ptr<Internal.CJObject | Internal.CJFloat>;
 
   SkipRuntime_Runtime__closeResource(
     resource: ptr<Internal.String>,
@@ -352,6 +361,14 @@ export interface FromWasm {
     params: ptr<Internal.CJObject>,
     reactiveAuth: ptr<Internal.Array<Internal.Byte>> | null,
   ): ptr<Internal.String>;
+
+  // Checker
+
+  SkipRuntime_createIdentified(
+    supplier: ptr<Internal.String>,
+  ): ptr<Internal.Request>;
+
+  SkipRuntime_createChecker(ref: Handle<Checker>): ptr<Internal.Request>;
 }
 
 interface ToWasm {
@@ -462,6 +479,15 @@ interface ToWasm {
   SkipRuntime_deleteAccumulator(
     notifier: Handle<Accumulator<TJSON, TJSON>>,
   ): void;
+
+  // Checker
+
+  SkipRuntime_Checker__check(
+    checker: Handle<Checker>,
+    request: ptr<Internal.String>,
+  ): void;
+
+  SkipRuntime_deleteChecker(checker: Handle<Checker>): void;
 }
 
 class Handles {
@@ -782,7 +808,11 @@ class LinksImpl implements Links {
     supplier.subscribe(
       resource,
       params,
-      writer.update.bind(writer),
+      {
+        update: writer.update.bind(writer),
+        error: writer.error.bind(writer),
+        loading: writer.loading.bind(writer),
+      },
       reactiveAuth,
     );
   }
@@ -810,6 +840,18 @@ class LinksImpl implements Links {
 
   deleteExternalSupplier(supplier: Handle<ExternalSupplier>) {
     this.handles.deleteHandle(supplier);
+  }
+
+  // Checker
+
+  checkOfChecker(skchecker: Handle<Checker>, skrequest: ptr<Internal.String>) {
+    const skjson = this.getSkjson();
+    const checker = this.handles.get(skchecker);
+    checker.check(skjson.importString(skrequest));
+  }
+
+  deleteChecker(checker: Handle<Checker>) {
+    this.handles.deleteHandle(checker);
   }
 
   initService(service: SkipService): ServiceInstance {
@@ -854,7 +896,7 @@ class LinksImpl implements Links {
     if (result != 0) {
       throw this.handles.deleteAsError(result as Handle<ErrorObject>);
     }
-    return new ServiceInstanceImpl(
+    return new ServiceInstance(
       new Refs(skjson, this.fromWasm, this.handles, this.needGC.bind(this)),
     );
   }
@@ -1047,6 +1089,37 @@ class CollectionWriter<K extends TJSON, V extends TJSON> {
       throw this.refs.handles.deleteAsError(result);
     }
   }
+
+  loading(): void {
+    const todo = () => {
+      return this.refs.fromWasm.SkipRuntime_CollectionWriter__loading(
+        this.refs.skjson.exportString(this.collection),
+      );
+    };
+    const needGC = this.refs.needGC();
+    let result: Handle<ErrorObject>;
+    if (needGC) result = this.refs.skjson.runWithGC(todo);
+    else result = todo();
+    if (result != 0) {
+      throw this.refs.handles.deleteAsError(result);
+    }
+  }
+
+  error(error: TJSON): void {
+    const todo = () => {
+      return this.refs.fromWasm.SkipRuntime_CollectionWriter__error(
+        this.refs.skjson.exportString(this.collection),
+        this.refs.skjson.exportJSON(error),
+      );
+    };
+    const needGC = this.refs.needGC();
+    let result: Handle<ErrorObject>;
+    if (needGC) result = this.refs.skjson.runWithGC(todo);
+    else result = todo();
+    if (result != 0) {
+      throw this.refs.handles.deleteAsError(result);
+    }
+  }
 }
 
 class ContextImpl extends SkFrozen implements Context {
@@ -1140,9 +1213,90 @@ export class ServiceInstanceFactory implements Shared {
   }
 }
 
-class ServiceInstanceImpl implements ServiceInstance {
+export type Values<K extends TJSON, V extends TJSON> = {
+  values: Entry<K, V>[];
+  reactive?: ReactiveResponse;
+};
+
+export type GetResult<T> = {
+  request?: string;
+  values: T;
+  errors: TJSON[];
+};
+
+export type Executor<T> = {
+  resolve: (value: T) => void;
+  reject: (reason?: any) => void;
+};
+
+interface Checker {
+  check(request: string): void;
+}
+
+class AllChecker<K extends TJSON, V extends TJSON> implements Checker {
+  constructor(
+    private service: ServiceInstance,
+    private executor: Executor<Values<K, V>>,
+    private resource: string,
+    private params: Record<string, string>,
+    private reactiveAuth?: Uint8Array,
+  ) {}
+
+  check(request: string): void {
+    const result = this.service.getAll<K, V>(
+      this.resource,
+      this.params,
+      this.reactiveAuth,
+      request,
+    );
+    if (result.errors.length > 0) {
+      this.executor.reject(new Error(JSON.stringify(result.errors)));
+    } else {
+      this.executor.resolve(result.values);
+    }
+  }
+}
+
+class OneChecker<V extends TJSON> implements Checker {
+  constructor(
+    private service: ServiceInstance,
+    private executor: Executor<V[]>,
+    private resource: string,
+    private params: Record<string, string>,
+    private key: string | number,
+    private reactiveAuth?: Uint8Array,
+  ) {}
+
+  check(request: string): void {
+    const result = this.service.getOne<V>(
+      this.resource,
+      this.params,
+      this.key,
+      this.reactiveAuth,
+      request,
+    );
+    if (result.errors.length > 0) {
+      this.executor.reject(new Error(JSON.stringify(result.errors)));
+    } else {
+      this.executor.resolve(result.values);
+    }
+  }
+}
+
+/**
+ * SkipRuntime is the result of initService
+ * It gives acces to service reactivly computed resources
+ */
+export class ServiceInstance {
   constructor(private refs: Refs) {}
 
+  /**
+   * Creates specified resource
+   * @param resource - the resource name correspond to the a key in remotes field of SkipService
+   * @param params - the parameters of the resource used to build the resource with the corresponding constructor specified in remotes field of SkipService
+   * @param reactiveAuth - the client user Skip session authentification
+   * @returns The reactive responce token to allow subscription
+   */
   createResource(
     resource: string,
     params: Record<string, string>,
@@ -1165,55 +1319,116 @@ class ServiceInstanceImpl implements ServiceInstance {
     return { collection, watermark: BigInt(watermark) as Watermark };
   }
 
+  /**
+   * Creates if not exists and get all current values of specified resource
+   * @param resource - the resource name corresponding to a key in remotes field of SkipService
+   * @param params - the parameters of the resource used to build the resource with the corresponding constructor specified in remotes field of SkipService
+   * @param reactiveAuth - the client user Skip session authentification
+   * @returns The current values of the corresponding resource with reactive responce token to allow subscription
+   */
   getAll<K extends TJSON, V extends TJSON>(
     resource: string,
     params: Record<string, string>,
     reactiveAuth?: Uint8Array,
-  ): { values: Entry<K, V>[]; reactive?: ReactiveResponse } {
-    const result = this.refs.skjson.runWithGC(() => {
+    request?: string | Executor<Values<K, V>>,
+  ): GetResult<Values<K, V>> {
+    const todo = () => {
       return this.refs.skjson.importJSON(
         this.refs.fromWasm.SkipRuntime_Runtime__getAll(
           this.refs.skjson.exportString(resource),
           this.refs.skjson.exportJSON(params),
           reactiveAuth ? this.refs.skjson.exportBytes(reactiveAuth) : null,
+          request !== undefined
+            ? typeof request == "string"
+              ? this.refs.fromWasm.SkipRuntime_createIdentified(
+                  this.refs.skjson.exportString(request),
+                )
+              : this.refs.fromWasm.SkipRuntime_createChecker(
+                  this.refs.handles.register(
+                    new AllChecker(
+                      this,
+                      request,
+                      resource,
+                      params,
+                      reactiveAuth,
+                    ),
+                  ),
+                )
+            : null,
         ),
         true,
       );
-    });
+    };
+    const needGC = this.refs.needGC();
+    let result: Exportable;
+    if (needGC) result = this.refs.skjson.runWithGC(todo);
+    else result = todo();
     if (typeof result == "number") {
       throw this.refs.handles.deleteAsError(result as Handle<ErrorObject>);
     }
-    const [values, reactive] = result as [Entry<K, V>[], [string, string]];
-    const [collection, watermark] = reactive;
-    return {
-      values,
-      reactive: { collection, watermark: BigInt(watermark) as Watermark },
-    };
+    return result as GetResult<Values<K, V>>;
   }
 
+  /**
+   * Creates if not exists and get the current value of specified key in specified resource
+   * @param resource - the resource name correspond to the a key in remotes field of SkipService
+   * @param params - the parameters of the resource used to build the resource with the corresponding constructor specified in remotes field of SkipService
+   * @param key - the key of value to return
+   * @param reactiveAuth - the client user Skip session authentification
+   * @returns The current value of specified key in the corresponding resource
+   */
   getOne<V extends TJSON>(
     resource: string,
     params: Record<string, string>,
     key: string | number,
     reactiveAuth?: Uint8Array,
-  ): V[] {
-    const result = this.refs.skjson.runWithGC(() => {
+    request?: string | Executor<V[]>,
+  ): GetResult<V[]> {
+    const todo = () => {
       return this.refs.skjson.importJSON(
         this.refs.fromWasm.SkipRuntime_Runtime__getForKey(
           this.refs.skjson.exportString(resource),
           this.refs.skjson.exportJSON(params),
           this.refs.skjson.exportJSON(key),
           reactiveAuth ? this.refs.skjson.exportBytes(reactiveAuth) : null,
+          request !== undefined
+            ? typeof request == "string"
+              ? this.refs.fromWasm.SkipRuntime_createIdentified(
+                  this.refs.skjson.exportString(request),
+                )
+              : this.refs.fromWasm.SkipRuntime_createChecker(
+                  this.refs.handles.register(
+                    new OneChecker(
+                      this,
+                      request,
+                      resource,
+                      params,
+                      key,
+                      reactiveAuth,
+                    ),
+                  ),
+                )
+            : null,
         ),
         true,
       );
-    });
+    };
+    const needGC = this.refs.needGC();
+    let result: Exportable;
+    if (needGC) result = this.refs.skjson.runWithGC(todo);
+    else result = todo();
     if (typeof result == "number") {
       throw this.refs.handles.deleteAsError(result as Handle<ErrorObject>);
     }
-    return result as V[];
+    return result as GetResult<V[]>;
   }
 
+  /**
+   * Close the specified resource
+   * @param resource - the resource name correspond to the a key in remotes field of SkipService
+   * @param params - the parameters of the resource used to build the resource with the corresponding constructor specified in remotes field of SkipService
+   * @param reactiveAuth - the client user Skip session authentification
+   */
   closeResource(
     resource: string,
     params: Record<string, string>,
@@ -1231,6 +1446,10 @@ class ServiceInstanceImpl implements ServiceInstance {
     }
   }
 
+  /**
+   * Close of the resources corresponding the specified reactiveAuth
+   * @param reactiveAuth - the client user Skip session authentification
+   */
   closeSession(reactiveAuth?: Uint8Array): void {
     const result = this.refs.skjson.runWithGC(() => {
       return this.refs.fromWasm.SkipRuntime_Runtime__closeSession(
@@ -1242,6 +1461,14 @@ class ServiceInstanceImpl implements ServiceInstance {
     }
   }
 
+  /**
+   * Subscribe to a reactive ressource according a given reactive response
+   * @param reactiveId - the reactive response collection
+   * @param since - the reactive response watermark
+   * @param f - the callback called on collection updates
+   * @param reactiveAuth The client user Skip session authentification corresponding to the reactive response
+   * @returns The subcription identifier
+   */
   subscribe<K extends TJSON, V extends TJSON>(
     reactiveId: string,
     since: Watermark,
@@ -1271,6 +1498,10 @@ class ServiceInstanceImpl implements ServiceInstance {
     return session as SubscriptionID;
   }
 
+  /**
+   * Unsubscribe to a reactive ressource according a given subcription identifier
+   * @param id - the subcription identifier
+   */
   unsubscribe(id: SubscriptionID): void {
     const result = this.refs.skjson.runWithGC(() => {
       return this.refs.fromWasm.SkipRuntime_Runtime__unsubscribe(id);
@@ -1280,13 +1511,18 @@ class ServiceInstanceImpl implements ServiceInstance {
     }
   }
 
+  /**
+   * Update an input collection
+   * @param input - the name of the input collection to update
+   * @param values - the values of the input collection to update
+   */
   update<K extends TJSON, V extends TJSON>(
-    collection: string,
+    input: string,
     values: Entry<K, V>[],
   ): void {
     const result = this.refs.skjson.runWithGC(() => {
       return this.refs.fromWasm.SkipRuntime_Runtime__update(
-        this.refs.skjson.exportString(collection),
+        this.refs.skjson.exportString(input),
         this.refs.skjson.exportJSON(values),
       );
     });
@@ -1295,6 +1531,9 @@ class ServiceInstanceImpl implements ServiceInstance {
     }
   }
 
+  /**
+   * Close all the resource and shutdown the SkipService
+   */
   close(): void {
     const result = this.refs.skjson.runWithGC(() => {
       return this.refs.fromWasm.SkipRuntime_closeService();
@@ -1441,6 +1680,11 @@ class Manager implements ToWasmManager {
     toWasm.SkipRuntime_Accumulator__dismiss =
       links.dismissOfAccumulator.bind(links);
     toWasm.SkipRuntime_deleteAccumulator = links.deleteAccumulator.bind(links);
+
+    // Checker
+
+    toWasm.SkipRuntime_Checker__check = links.checkOfChecker.bind(links);
+    toWasm.SkipRuntime_deleteChecker = links.deleteChecker.bind(links);
 
     return links;
   }

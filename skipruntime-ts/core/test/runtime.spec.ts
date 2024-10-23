@@ -13,9 +13,29 @@ import type {
   Resource,
   Entry,
   ExternalSupplier,
+  ServiceInstance,
 } from "../src/skip-runtime.js";
 import { Sum, ValueMapper, initService } from "../src/skip-runtime.js";
 import { TimeCollection, ExternalService } from "../src/skipruntime_helpers.js";
+
+function getAll<K extends TJSON, V extends TJSON>(
+  service: ServiceInstance,
+  resource: string,
+  params: Record<string, string> = {},
+  reactiveAuth?: Uint8Array,
+): Entry<K, V>[] {
+  return service.getAll<K, V>(resource, params, reactiveAuth).values.values;
+}
+
+function getOne<V extends TJSON>(
+  service: ServiceInstance,
+  resource: string,
+  params: Record<string, string>,
+  key: string | number,
+  reactiveAuth?: Uint8Array,
+): V[] {
+  return service.getOne<V>(resource, params, key, reactiveAuth).values;
+}
 
 //// testMap1
 
@@ -54,7 +74,7 @@ class Map1Service implements SkipService {
 it("testMap1", async () => {
   const runtime = await initService(new Map1Service());
   runtime.update("input", [["1", [10]]]);
-  expect(runtime.getOne("map1", {}, "1")).toEqual([12]);
+  expect(getOne(runtime, "map1", {}, "1")).toEqual([12]);
 });
 
 //// testMap2
@@ -110,10 +130,10 @@ it("testMap2", async () => {
   const resource = "map2";
   runtime.update("input1", [["1", [10]]]);
   runtime.update("input2", [["1", [20]]]);
-  expect(runtime.getOne(resource, {}, "1")).toEqual([30]);
+  expect(getOne(runtime, resource, {}, "1")).toEqual([30]);
   runtime.update("input1", [["2", [3]]]);
   runtime.update("input2", [["2", [7]]]);
-  expect(runtime.getAll(resource, {}).values).toEqual([
+  expect(getAll(runtime, resource, {})).toEqual([
     ["1", [30]],
     ["2", [10]],
   ]);
@@ -162,10 +182,10 @@ it("testMap3", async () => {
   const resource = "map3";
   runtime.update("input1", [["1", [1, 2, 3]]]);
   runtime.update("input2", [["1", [10]]]);
-  expect(runtime.getOne(resource, {}, "1")).toEqual([36]);
+  expect(getOne(runtime, resource, {}, "1")).toEqual([36]);
   runtime.update("input1", [["2", [3]]]);
   runtime.update("input2", [["2", [7]]]);
-  expect(runtime.getAll(resource, {}).values).toEqual([
+  expect(getAll(runtime, resource, {})).toEqual([
     ["1", [36]],
     ["2", [10]],
   ]);
@@ -219,7 +239,7 @@ it("valueMapper", async () => {
     [5, [5]],
     [10, [10]],
   ]);
-  expect(runtime.getAll(resource, {}).values).toEqual([
+  expect(getAll(runtime, resource, {})).toEqual([
     [1, [2]],
     [2, [6]],
     [5, [30]],
@@ -274,7 +294,7 @@ it("testSize", async () => {
     [1, [0]],
     [2, [2]],
   ]);
-  expect(runtime.getAll(resource, {}).values).toEqual([
+  expect(getAll(runtime, resource, {})).toEqual([
     [1, [0]],
     [2, [2]],
   ]);
@@ -282,12 +302,12 @@ it("testSize", async () => {
     [1, [10]],
     [2, [5]],
   ]);
-  expect(runtime.getAll(resource, {}).values).toEqual([
+  expect(getAll(runtime, resource, {})).toEqual([
     [1, [2]],
     [2, [4]],
   ]);
   runtime.update("input2", [[1, []]]);
-  expect(runtime.getAll(resource, {}).values).toEqual([
+  expect(getAll(runtime, resource, {})).toEqual([
     [1, [1]],
     [2, [3]],
   ]);
@@ -342,7 +362,7 @@ it("testSlicedMap1", async () => {
     return [i, [i]];
   });
   runtime.update("input", values);
-  expect(runtime.getAll(resource, {}).values).toEqual([
+  expect(getAll(runtime, resource, {})).toEqual([
     [1, [1]],
     [3, [9]],
     [4, [16]],
@@ -411,18 +431,18 @@ it("testLazy", async () => {
     [0, [10]],
     [1, [20]],
   ]);
-  expect(runtime.getAll(resource, {}).values).toEqual([
+  expect(getAll(runtime, resource, {})).toEqual([
     [0, [2]],
     [1, [2]],
   ]);
   runtime.update("input", [[2, [4]]]);
-  expect(runtime.getAll(resource, {}).values).toEqual([
+  expect(getAll(runtime, resource, {})).toEqual([
     [0, [2]],
     [1, [2]],
     [2, [2]],
   ]);
   runtime.update("input", [[2, []]]);
-  expect(runtime.getAll(resource, {}).values).toEqual([
+  expect(getAll(runtime, resource, {})).toEqual([
     [0, [2]],
     [1, [2]],
   ]);
@@ -472,12 +492,12 @@ it("testMapReduce", async () => {
     [1, [1]],
     [2, [1]],
   ]);
-  expect(runtime.getAll(resource, {}).values).toEqual([
+  expect(getAll(runtime, resource, {})).toEqual([
     [0, [2]],
     [1, [1]],
   ]);
   runtime.update("input", [[3, [2]]]);
-  expect(runtime.getAll(resource, {}).values).toEqual([
+  expect(getAll(runtime, resource, {})).toEqual([
     [0, [2]],
     [1, [3]],
   ]);
@@ -485,13 +505,13 @@ it("testMapReduce", async () => {
     [0, [2]],
     [1, [2]],
   ]);
-  expect(runtime.getAll(resource, {}).values).toEqual([
+  expect(getAll(runtime, resource, {})).toEqual([
     [0, [3]],
     [1, [4]],
   ]);
 
   runtime.update("input", [[3, []]]);
-  expect(runtime.getAll(resource, {}).values).toEqual([
+  expect(getAll(runtime, resource, {})).toEqual([
     [0, [3]],
     [1, [2]],
   ]);
@@ -538,15 +558,15 @@ it("testMerge1", async () => {
   const resource = "merge1";
   runtime.update("input1", [[1, [10]]]);
   runtime.update("input2", [[1, [20]]]);
-  expect(sorted(runtime.getAll(resource, {}).values)).toEqual([[1, [10, 20]]]);
+  expect(sorted(getAll(runtime, resource, {}))).toEqual([[1, [10, 20]]]);
   runtime.update("input1", [[2, [3]]]);
   runtime.update("input2", [[2, [7]]]);
-  expect(sorted(runtime.getAll(resource, {}).values)).toEqual([
+  expect(sorted(getAll(runtime, resource, {}))).toEqual([
     [1, [10, 20]],
     [2, [3, 7]],
   ]);
   runtime.update("input1", [[1, []]]);
-  expect(sorted(runtime.getAll(resource, {}).values)).toEqual([
+  expect(sorted(getAll(runtime, resource, {}))).toEqual([
     [1, [20]],
     [2, [3, 7]],
   ]);
@@ -592,15 +612,15 @@ it("testMergeReduce", async () => {
   const resource = "mergeReduce";
   runtime.update("input1", [[1, [10]]]);
   runtime.update("input2", [[1, [20]]]);
-  expect(runtime.getAll(resource, {}).values).toEqual([[1, [30]]]);
+  expect(getAll(runtime, resource, {})).toEqual([[1, [30]]]);
   runtime.update("input1", [[2, [3]]]);
   runtime.update("input2", [[2, [7]]]);
-  expect(runtime.getAll(resource, {}).values).toEqual([
+  expect(getAll(runtime, resource, {})).toEqual([
     [1, [30]],
     [2, [10]],
   ]);
   runtime.update("input1", [[1, []]]);
-  expect(runtime.getAll(resource, {}).values).toEqual([
+  expect(getAll(runtime, resource, {})).toEqual([
     [1, [20]],
     [2, [10]],
   ]);
@@ -682,7 +702,7 @@ it("testJSONExtract", async () => {
     ],
   ]);
   //
-  const res = runtime.getAll(resource, {}).values;
+  const res = getAll(runtime, resource, {});
   expect(res).toEqual([
     [
       0,
@@ -718,11 +738,17 @@ class External implements ExternalSupplier {
   subscribe(
     resource: string,
     params: { v1: string; v2: string },
-    cb: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void,
+    callbacks: {
+      update: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void;
+      error: (error: TJSON) => void;
+      loading: () => void;
+    },
     _reactiveAuth?: Uint8Array,
   ) {
     if (resource == "mock") {
-      this.mock(params, cb).catch((e: unknown) => console.error(e));
+      this.mock(params, callbacks.update).catch((e: unknown) =>
+        console.error(e),
+      );
     }
     return;
   }
@@ -819,13 +845,13 @@ it("testExternal", async () => {
     [1, [10]],
   ]);
   // No value registered in external mock resource
-  expect(runtime.getAll(resource, {}).values).toEqual([
+  expect(getAll(runtime, resource, {})).toEqual([
     [0, [[10]]],
     [1, [[20]]],
   ]);
   await timeout(1);
   // After 1ms values are added to external mock resource
-  expect(runtime.getAll(resource, {}).values).toEqual([
+  expect(getAll(runtime, resource, {})).toEqual([
     [0, [[10, 15]]],
     [1, [[20, 30]]],
   ]);
@@ -834,13 +860,13 @@ it("testExternal", async () => {
     [1, [11]],
   ]);
   // New params => No value registered in external mock resource
-  expect(runtime.getAll(resource, {}).values).toEqual([
+  expect(getAll(runtime, resource, {})).toEqual([
     [0, [[10]]],
     [1, [[20]]],
   ]);
   await timeout(6);
   // After 5ms values are added to external mock resource
-  expect(runtime.getAll(resource, {}).values).toEqual([
+  expect(getAll(runtime, resource, {})).toEqual([
     [0, [[10, 16]]],
     [1, [[20, 31]]],
   ]);
@@ -881,13 +907,16 @@ class TokensService implements SkipService {
 it("testCloseSession", async () => {
   const runtime = await initService(new TokensService());
   const resource = "tokens";
-  const start = runtime.getOne(resource, {}, "5ms");
+  const start = getOne(runtime, resource, {}, "5ms");
   await timeout(2);
-  expect(runtime.getOne(resource, {}, "5ms")).toEqual(start);
-  await timeout(4);
-  const current = runtime.getOne(resource, {}, "5ms");
-  expect(current == start).toEqual(false);
-  runtime.closeResource(resource, {});
+  try {
+    expect(getOne(runtime, resource, {}, "5ms")).toEqual(start);
+    await timeout(4);
+    const current = getOne(runtime, resource, {}, "5ms");
+    expect(current == start).toEqual(false);
+  } finally {
+    runtime.closeResource(resource, {});
+  }
 });
 
 //// testMultipleResources
