@@ -88,9 +88,8 @@ class SKDBMechanismImpl implements SKDBMechanism {
       client.runLocal(["disconnect", session], "").trim();
     };
     this.diff = (session: string, watermarks: Map<string, bigint>) => {
-      const acc = {};
+      const acc: { [key: string]: { since: bigint } } = {};
       for (const [table, wm] of watermarks.entries()) {
-        // @ts-ignore
         acc[table] = { since: wm };
       }
       const diffSpec = JSON.stringify(acc, (_key, value) =>
