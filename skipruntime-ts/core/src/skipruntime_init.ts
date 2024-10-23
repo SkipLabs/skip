@@ -45,7 +45,7 @@ export async function initService(
 }
 
 /**
- * An `ServiceInstance` is the result of `initService`
+ * A `ServiceInstance` is the result of `initService`
  * It gives access to a service's reactively computed resources, and allows to manage sessions or shut down the service.
  */
 export interface ServiceInstance {

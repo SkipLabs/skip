@@ -20,6 +20,7 @@ export type JSONObject = { [key: string]: TJSON | null };
  * value or a Skip-runtime-managed value. In either case, restricting mapper parameters to
  * this type helps developers to ensure that reactive computations can be re-evaluated as
  * needed with consistent semantics.
+ * `Constant`s are recursively-frozen objects managed by the Skip runtime; non-Skip objects can be made constant by passing them to `freeze`.
  */
 export type Param =
   | null
@@ -29,7 +30,7 @@ export type Param =
   | Constant
   | readonly Param[]
   | { readonly [k: string]: Param };
-
+export { freeze } from "./internals/skipruntime_module.js";
 /**
  * The type of a reactive function mapping over an arbitrary collection.
  * For each key & values in the input collection (of type K1/V1 respectively),
