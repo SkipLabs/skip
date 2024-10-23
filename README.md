@@ -1,18 +1,14 @@
-# skdb
+# skip &middot; [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/skiplabs/skip/blob/main/LICENSE) [![CircleCI](https://dl.circleci.com/status-badge/img/gh/SkipLabs/skip/tree/main.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/SkipLabs/skip/tree/main)
 
-This repository contains the source code for SKDB and its associated
-components.
+Skip is a framework for building reactive services.
 
+## Installation
 
-## Dependencies
+## Documentation
 
-You will need at least the following installed:
+## Examples
 
- * LLVM 15.
- * wasm-ld 15 (this is part of LLVM, but your distribution might split it into
-   a separate package: your wasm-ld version must match your LLVM version).
- * typescript 5.5 or later.
-
+## Contributing
 
 ## License
 
