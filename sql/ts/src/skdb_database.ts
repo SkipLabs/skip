@@ -223,7 +223,7 @@ export class SKDBSyncImpl implements SKDBSync {
   }
 
   subscribe = (viewName: string, f: (change: string) => void) => {
-    const fileName = "/subscriptions/sub" + this.subscriptionCount;
+    const fileName = `/subscriptions/sub ${this.subscriptionCount}`;
     this.fs.watchFile(fileName, f);
     this.subscriptionCount++;
     this.runLocal(

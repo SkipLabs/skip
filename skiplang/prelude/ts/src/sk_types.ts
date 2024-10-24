@@ -41,7 +41,7 @@ class SkRuntimeExit extends Error {
   code: int;
 
   constructor(code: int, message?: string) {
-    super(message ?? "Runtime exit with code: " + code);
+    super(message ?? `Runtime exit with code: ${code}`);
     this.code = code;
   }
 }
@@ -405,11 +405,7 @@ export class Utils {
           var c2 = s.charCodeAt(ci);
           if (c2 < 0xdc00 || c2 > 0xdfff)
             throw new Error(
-              "UTF-8 encode: second surrogate character 0x" +
-                c2.toString(16) +
-                " at index " +
-                ci +
-                " out of range",
+              `UTF-8 encode: second surrogate character 0x${c2.toString(16)} at index ${ci} out of range`,
             );
           c = 0x10000 + ((c & 0x03ff) << 10) + (c2 & 0x03ff);
           data[addr + i++] = (c >> 18) | 240;
@@ -825,7 +821,7 @@ export function trimEndChar(str: string, ch: string) {
 export function humanSize(bytes: int) {
   const thresh = 1024;
   if (Math.abs(bytes) < thresh) {
-    return bytes + " B";
+    return `${bytes} B`;
   }
 
   const units = ["kB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
@@ -839,7 +835,7 @@ export function humanSize(bytes: int) {
     u < units.length - 1
   );
 
-  return bytes.toFixed(1) + " " + units[u];
+  return `${bytes.toFixed(1)} ${units[u]}`;
 }
 
 export function loadWasm(

@@ -128,7 +128,7 @@ export class Wrapped {
 }
 
 function asKey(messageId: MessageId) {
-  return "" + messageId.source + ":" + messageId.id;
+  return `${messageId.source}:${messageId.id}`;
 }
 
 export class Sender {
