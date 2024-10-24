@@ -42,7 +42,7 @@ class Env implements Environment {
   throwRuntime = (code: int) => {
     this.onException();
     if (code != 0) {
-      throw new Error("Error with code: " + code);
+      throw new Error(`Error with code: ${code}`);
     }
   };
   fs() {
