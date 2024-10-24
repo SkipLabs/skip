@@ -95,7 +95,7 @@ function Feed() {
     }
 
     try {
-      getInitialData();
+      void getInitialData();
     } catch (error) {
       console.error(error);
     }
@@ -118,7 +118,7 @@ function Feed() {
             <div
               className="votearrow prevent-select"
               title="upvote"
-              onClick={() => upvotePost(post.id)}
+              onClick={() => void upvotePost(post.id)}
             ></div>
             &nbsp;
             <Link to={`/posts/${post.id}`}>{post.title}</Link>&nbsp;
@@ -150,7 +150,7 @@ function Post() {
 
   useEffect(() => {
     const intervalId = setInterval(() => {
-      getPost(post_id).then((post) =>
+      void getPost(post_id).then((post) =>
         post === undefined ? undefined : setPost(post),
       );
     }, 1000);
