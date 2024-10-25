@@ -201,6 +201,7 @@ export class PromiseWorker {
     this.source = ++sourcesLastId;
     this.callbacks = new Map();
     this.subscriptions = new Map();
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     let self = this;
     this.post = (fn: Function | Caller) => {
       let messageId = new MessageId(this.source, ++this.lastId);
