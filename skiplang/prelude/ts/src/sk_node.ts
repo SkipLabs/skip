@@ -71,9 +71,9 @@ class Env implements Environment {
       filename = url;
     }
     return new Promise<Uint8Array>(function (resolve, reject) {
-      fs.readFile(filename, {}, (err, data) => {
-        err ? reject(err) : resolve(data);
-      });
+      fs.readFile(filename, {}, (err, data) =>
+        err ? reject(err) : resolve(data),
+      );
     });
   }
   onException() {}
