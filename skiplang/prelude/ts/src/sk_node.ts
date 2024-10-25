@@ -64,7 +64,7 @@ class Env implements Environment {
     if (url && url instanceof URL && url.pathname) {
       filename = "./" + path.relative(cwd, url.pathname);
       // @ts-ignore
-    } else if (url && url.default) {
+    } else if (url != "" && url.default) {
       // @ts-ignore
       filename = "./" + path.relative(cwd, url.default as string);
     } else {
