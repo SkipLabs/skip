@@ -28,7 +28,7 @@ class File {
 
   close() {
     if (this.withChange && this.onChange) {
-      this.onChange!(this.changes ?? "");
+      this.onChange(this.changes ?? "");
     }
     this.options = undefined;
     this.changes = "";

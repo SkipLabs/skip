@@ -95,7 +95,7 @@ export class Return {
 
   static as(obj: object) {
     if (!("success" in obj) || !("value" in obj)) return null;
-    return new Return(obj.success! as boolean, obj.value!);
+    return new Return(obj.success! as boolean, obj.value);
   }
 }
 
@@ -337,7 +337,7 @@ export const onWorkerMessage = <T>(
         } else {
           apply(
             post,
-            data!.id,
+            data.id,
             creator,
             creator.create,
             parameters,
@@ -365,7 +365,7 @@ export const onWorkerMessage = <T>(
           const fn_at_assumed_type = fn as (...args: any) => Promise<unknown>;
           apply(
             post,
-            data!.id,
+            data.id,
             runner,
             fn_at_assumed_type,
             parameters,
@@ -416,7 +416,7 @@ export const onWorkerMessage = <T>(
       );
     } else {
       const fn_at_assumed_type = fni.fn as (...args: any) => Promise<unknown>;
-      apply(post, data!.id, fni.obj, fn_at_assumed_type, parameters);
+      apply(post, data.id, fni.obj, fn_at_assumed_type, parameters);
     }
     if (obj?.autoremove || caller.remove) {
       wrapped.delete(caller.wrapped);

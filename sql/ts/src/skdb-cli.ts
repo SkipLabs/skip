@@ -275,7 +275,7 @@ if (
 }
 
 const firstPair = Object.entries(dbCreds)[0]!; // checked by preceding if
-const firstKey = firstPair[0]!; // Object.entries is an array of key-value pairs
+const firstKey = firstPair[0];
 const accessKey = (values["access-key"] ?? firstKey) as string;
 const privateKey = dbCreds[accessKey] as string;
 

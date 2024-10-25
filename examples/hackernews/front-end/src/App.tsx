@@ -88,7 +88,7 @@ function Feed() {
         reactiveCollection,
         reactiveWatermark,
         (updates, _isInit) => {
-          const updatedPosts = updates[0][1]! as Post[];
+          const updatedPosts = updates[0][1] as Post[];
           setPosts(updatedPosts);
         },
       );
