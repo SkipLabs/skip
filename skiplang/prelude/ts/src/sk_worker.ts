@@ -150,34 +150,26 @@ export class Message {
     this.payload = payload;
   }
 
+  private static convert(f: (_: object) => unknown, obj: object) {
+    if (!("id" in obj && typeof obj.id === "object")) return null;
+    if (!("payload" in obj && typeof obj.payload === "object")) return null;
+    const { id, payload } = obj as { id: object; payload: object };
+    const messageId = MessageId.as(id);
+    const messagePayload = f(payload);
+    if (!messageId || !messagePayload) return null;
+    return new Message(messageId, messagePayload);
+  }
+
   static asFunction(obj: object) {
-    if (!("id" in obj) || !("payload" in obj)) return null;
-    let messageId = MessageId.as(obj.id!);
-    let payload = Function.as(obj.payload!);
-    if (messageId && payload) {
-      return new Message(messageId, payload);
-    }
-    return null;
+    return Message.convert((x) => Function.as(x), obj);
   }
 
   static asCaller(obj: object) {
-    if (!("id" in obj) || !("payload" in obj)) return null;
-    let messageId = MessageId.as(obj.id!);
-    let payload = Caller.convert(obj.payload!);
-    if (messageId && payload) {
-      return new Message(messageId, payload);
-    }
-    return null;
+    return Message.convert((x) => Caller.convert(x), obj);
   }
 
   static asReturn(obj: object) {
-    if (!("id" in obj) || !("payload" in obj)) return null;
-    let messageId = MessageId.as(obj.id!);
-    let payload = Return.as(obj.payload!);
-    if (messageId && payload) {
-      return new Message(messageId, payload);
-    }
-    return null;
+    return Message.convert((x) => Return.as(x), obj);
   }
 }
 
