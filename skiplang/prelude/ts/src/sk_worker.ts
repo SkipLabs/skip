@@ -354,7 +354,7 @@ export const onWorkerMessage = <T>(
           );
         } else {
           apply(post, data!.id, runner, fn, parameters, (result: any) => {
-            if (fun.wrap && fun.wrap.wrap) {
+            if (fun.wrap?.wrap) {
               let wId = wrappedId++;
               wrapped.set(wId, {
                 value: result,
