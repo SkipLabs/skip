@@ -1074,48 +1074,46 @@ class CollectionWriter<K extends TJSON, V extends TJSON> {
   ) {}
 
   update(values: Entry<K, V>[], isInit: boolean): void {
-    const todo = () => {
+    const update_ = () => {
       return this.refs.fromWasm.SkipRuntime_CollectionWriter__update(
         this.refs.skjson.exportString(this.collection),
         this.refs.skjson.exportJSON(values),
         isInit,
       );
     };
-    const needGC = this.refs.needGC();
-    let result: Handle<ErrorObject>;
-    if (needGC) result = this.refs.skjson.runWithGC(todo);
-    else result = todo();
+    const result: Handle<ErrorObject> = this.refs.needGC()
+      ? this.refs.skjson.runWithGC(update_)
+      : update_();
+
     if (result != 0) {
       throw this.refs.handles.deleteAsError(result);
     }
   }
 
   loading(): void {
-    const todo = () => {
+    const loading_ = () => {
       return this.refs.fromWasm.SkipRuntime_CollectionWriter__loading(
         this.refs.skjson.exportString(this.collection),
       );
     };
-    const needGC = this.refs.needGC();
-    let result: Handle<ErrorObject>;
-    if (needGC) result = this.refs.skjson.runWithGC(todo);
-    else result = todo();
+    const result: Handle<ErrorObject> = this.refs.needGC()
+      ? this.refs.skjson.runWithGC(loading_)
+      : loading_();
     if (result != 0) {
       throw this.refs.handles.deleteAsError(result);
     }
   }
 
   error(error: TJSON): void {
-    const todo = () => {
+    const error_ = () => {
       return this.refs.fromWasm.SkipRuntime_CollectionWriter__error(
         this.refs.skjson.exportString(this.collection),
         this.refs.skjson.exportJSON(error),
       );
     };
-    const needGC = this.refs.needGC();
-    let result: Handle<ErrorObject>;
-    if (needGC) result = this.refs.skjson.runWithGC(todo);
-    else result = todo();
+    const result: Handle<ErrorObject> = this.refs.needGC()
+      ? this.refs.skjson.runWithGC(error_)
+      : error_();
     if (result != 0) {
       throw this.refs.handles.deleteAsError(result);
     }
@@ -1332,7 +1330,7 @@ export class ServiceInstance {
     reactiveAuth?: Uint8Array,
     request?: string | Executor<Values<K, V>>,
   ): GetResult<Values<K, V>> {
-    const todo = () => {
+    const get_ = () => {
       return this.refs.skjson.importJSON(
         this.refs.fromWasm.SkipRuntime_Runtime__getAll(
           this.refs.skjson.exportString(resource),
@@ -1359,10 +1357,10 @@ export class ServiceInstance {
         true,
       );
     };
-    const needGC = this.refs.needGC();
-    let result: Exportable;
-    if (needGC) result = this.refs.skjson.runWithGC(todo);
-    else result = todo();
+    const result: Exportable = this.refs.needGC()
+      ? this.refs.skjson.runWithGC(get_)
+      : get_();
+
     if (typeof result == "number") {
       throw this.refs.handles.deleteAsError(result as Handle<ErrorObject>);
     }
@@ -1384,7 +1382,7 @@ export class ServiceInstance {
     reactiveAuth?: Uint8Array,
     request?: string | Executor<V[]>,
   ): GetResult<V[]> {
-    const todo = () => {
+    const get_ = () => {
       return this.refs.skjson.importJSON(
         this.refs.fromWasm.SkipRuntime_Runtime__getForKey(
           this.refs.skjson.exportString(resource),
@@ -1414,9 +1412,9 @@ export class ServiceInstance {
       );
     };
     const needGC = this.refs.needGC();
-    let result: Exportable;
-    if (needGC) result = this.refs.skjson.runWithGC(todo);
-    else result = todo();
+    const result: Exportable = needGC
+      ? this.refs.skjson.runWithGC(get_)
+      : get_();
     if (typeof result == "number") {
       throw this.refs.handles.deleteAsError(result as Handle<ErrorObject>);
     }
