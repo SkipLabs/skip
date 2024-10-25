@@ -13,29 +13,9 @@ import type {
   Resource,
   Entry,
   ExternalSupplier,
-  ServiceInstance,
 } from "../src/skip-runtime.js";
 import { Sum, ValueMapper, initService } from "../src/skip-runtime.js";
 import { TimeCollection, ExternalService } from "../src/skipruntime_helpers.js";
-
-function getAll<K extends TJSON, V extends TJSON>(
-  service: ServiceInstance,
-  resource: string,
-  params: Record<string, string> = {},
-  reactiveAuth?: Uint8Array,
-): Entry<K, V>[] {
-  return service.getAll<K, V>(resource, params, reactiveAuth).values.values;
-}
-
-function getOne<V extends TJSON>(
-  service: ServiceInstance,
-  resource: string,
-  params: Record<string, string>,
-  key: string | number,
-  reactiveAuth?: Uint8Array,
-): V[] {
-  return service.getOne<V>(resource, params, key, reactiveAuth).values;
-}
 
 //// testMap1
 
@@ -74,7 +54,7 @@ class Map1Service implements SkipService {
 it("testMap1", async () => {
   const service = await initService(new Map1Service());
   service.update("input", [["1", [10]]]);
-  expect(getOne(service, "map1", {}, "1")).toEqual([12]);
+  expect(service.getOne("map1", "1").payload).toEqual([12]);
 });
 
 //// testMap2
@@ -130,10 +110,10 @@ it("testMap2", async () => {
   const resource = "map2";
   service.update("input1", [["1", [10]]]);
   service.update("input2", [["1", [20]]]);
-  expect(getOne(service, resource, {}, "1")).toEqual([30]);
+  expect(service.getOne(resource, "1").payload).toEqual([30]);
   service.update("input1", [["2", [3]]]);
   service.update("input2", [["2", [7]]]);
-  expect(getAll(service, resource, {})).toEqual([
+  expect(service.getAll(resource).payload.values).toEqual([
     ["1", [30]],
     ["2", [10]],
   ]);
@@ -182,10 +162,10 @@ it("testMap3", async () => {
   const resource = "map3";
   service.update("input1", [["1", [1, 2, 3]]]);
   service.update("input2", [["1", [10]]]);
-  expect(getOne(service, resource, {}, "1")).toEqual([36]);
+  expect(service.getOne(resource, "1").payload).toEqual([36]);
   service.update("input1", [["2", [3]]]);
   service.update("input2", [["2", [7]]]);
-  expect(getAll(service, resource, {})).toEqual([
+  expect(service.getAll(resource).payload.values).toEqual([
     ["1", [36]],
     ["2", [10]],
   ]);
@@ -239,7 +219,7 @@ it("valueMapper", async () => {
     [5, [5]],
     [10, [10]],
   ]);
-  expect(getAll(service, resource, {})).toEqual([
+  expect(service.getAll(resource).payload.values).toEqual([
     [1, [2]],
     [2, [6]],
     [5, [30]],
@@ -294,7 +274,7 @@ it("testSize", async () => {
     [1, [0]],
     [2, [2]],
   ]);
-  expect(getAll(service, resource, {})).toEqual([
+  expect(service.getAll(resource).payload.values).toEqual([
     [1, [0]],
     [2, [2]],
   ]);
@@ -302,12 +282,12 @@ it("testSize", async () => {
     [1, [10]],
     [2, [5]],
   ]);
-  expect(getAll(service, resource, {})).toEqual([
+  expect(service.getAll(resource).payload.values).toEqual([
     [1, [2]],
     [2, [4]],
   ]);
   service.update("input2", [[1, []]]);
-  expect(getAll(service, resource, {})).toEqual([
+  expect(service.getAll(resource).payload.values).toEqual([
     [1, [1]],
     [2, [3]],
   ]);
@@ -362,7 +342,7 @@ it("testSlicedMap1", async () => {
     return [i, [i]];
   });
   service.update("input", values);
-  expect(getAll(service, resource, {})).toEqual([
+  expect(service.getAll(resource).payload.values).toEqual([
     [1, [1]],
     [3, [9]],
     [4, [16]],
@@ -431,18 +411,18 @@ it("testLazy", async () => {
     [0, [10]],
     [1, [20]],
   ]);
-  expect(getAll(service, resource, {})).toEqual([
+  expect(service.getAll(resource).payload.values).toEqual([
     [0, [2]],
     [1, [2]],
   ]);
   service.update("input", [[2, [4]]]);
-  expect(getAll(service, resource, {})).toEqual([
+  expect(service.getAll(resource).payload.values).toEqual([
     [0, [2]],
     [1, [2]],
     [2, [2]],
   ]);
   service.update("input", [[2, []]]);
-  expect(getAll(service, resource, {})).toEqual([
+  expect(service.getAll(resource).payload.values).toEqual([
     [0, [2]],
     [1, [2]],
   ]);
@@ -492,12 +472,12 @@ it("testMapReduce", async () => {
     [1, [1]],
     [2, [1]],
   ]);
-  expect(getAll(service, resource, {})).toEqual([
+  expect(service.getAll(resource).payload.values).toEqual([
     [0, [2]],
     [1, [1]],
   ]);
   service.update("input", [[3, [2]]]);
-  expect(getAll(service, resource, {})).toEqual([
+  expect(service.getAll(resource).payload.values).toEqual([
     [0, [2]],
     [1, [3]],
   ]);
@@ -505,13 +485,13 @@ it("testMapReduce", async () => {
     [0, [2]],
     [1, [2]],
   ]);
-  expect(getAll(service, resource, {})).toEqual([
+  expect(service.getAll(resource).payload.values).toEqual([
     [0, [3]],
     [1, [4]],
   ]);
 
   service.update("input", [[3, []]]);
-  expect(getAll(service, resource, {})).toEqual([
+  expect(service.getAll(resource).payload.values).toEqual([
     [0, [3]],
     [1, [2]],
   ]);
@@ -558,15 +538,17 @@ it("testMerge1", async () => {
   const resource = "merge1";
   service.update("input1", [[1, [10]]]);
   service.update("input2", [[1, [20]]]);
-  expect(sorted(getAll(service, resource, {}))).toEqual([[1, [10, 20]]]);
+  expect(sorted(service.getAll(resource).payload.values)).toEqual([
+    [1, [10, 20]],
+  ]);
   service.update("input1", [[2, [3]]]);
   service.update("input2", [[2, [7]]]);
-  expect(sorted(getAll(service, resource, {}))).toEqual([
+  expect(sorted(service.getAll(resource).payload.values)).toEqual([
     [1, [10, 20]],
     [2, [3, 7]],
   ]);
   service.update("input1", [[1, []]]);
-  expect(sorted(getAll(service, resource, {}))).toEqual([
+  expect(sorted(service.getAll(resource).payload.values)).toEqual([
     [1, [20]],
     [2, [3, 7]],
   ]);
@@ -612,15 +594,15 @@ it("testMergeReduce", async () => {
   const resource = "mergeReduce";
   service.update("input1", [[1, [10]]]);
   service.update("input2", [[1, [20]]]);
-  expect(getAll(service, resource, {})).toEqual([[1, [30]]]);
+  expect(service.getAll(resource).payload.values).toEqual([[1, [30]]]);
   service.update("input1", [[2, [3]]]);
   service.update("input2", [[2, [7]]]);
-  expect(getAll(service, resource, {})).toEqual([
+  expect(service.getAll(resource).payload.values).toEqual([
     [1, [30]],
     [2, [10]],
   ]);
   service.update("input1", [[1, []]]);
-  expect(getAll(service, resource, {})).toEqual([
+  expect(service.getAll(resource).payload.values).toEqual([
     [1, [20]],
     [2, [10]],
   ]);
@@ -702,8 +684,7 @@ it("testJSONExtract", async () => {
     ],
   ]);
   //
-  const res = getAll(service, resource, {});
-  expect(res).toEqual([
+  expect(service.getAll(resource).payload.values).toEqual([
     [
       0,
       [
@@ -845,13 +826,13 @@ it("testExternal", async () => {
     [1, [10]],
   ]);
   // No value registered in external mock resource
-  expect(getAll(service, resource, {})).toEqual([
+  expect(service.getAll(resource).payload.values).toEqual([
     [0, [[10]]],
     [1, [[20]]],
   ]);
   await timeout(1);
   // After 1ms values are added to external mock resource
-  expect(getAll(service, resource, {})).toEqual([
+  expect(service.getAll(resource).payload.values).toEqual([
     [0, [[10, 15]]],
     [1, [[20, 30]]],
   ]);
@@ -860,13 +841,13 @@ it("testExternal", async () => {
     [1, [11]],
   ]);
   // New params => No value registered in external mock resource
-  expect(getAll(service, resource, {})).toEqual([
+  expect(service.getAll(resource).payload.values).toEqual([
     [0, [[10]]],
     [1, [[20]]],
   ]);
   await timeout(6);
   // After 5ms values are added to external mock resource
-  expect(getAll(service, resource, {})).toEqual([
+  expect(service.getAll(resource).payload.values).toEqual([
     [0, [[10, 16]]],
     [1, [[20, 31]]],
   ]);
@@ -907,12 +888,12 @@ class TokensService implements SkipService {
 it("testCloseSession", async () => {
   const service = await initService(new TokensService());
   const resource = "tokens";
-  const start = getOne(service, resource, {}, "5ms");
+  const start = service.getOne(resource, "5ms").payload;
   await timeout(2);
   try {
-    expect(getOne(service, resource, {}, "5ms")).toEqual(start);
+    expect(service.getOne(resource, "5ms").payload).toEqual(start);
     await timeout(4);
-    const current = getOne(service, resource, {}, "5ms");
+    const current = service.getOne(resource, "5ms").payload;
     expect(current == start).toEqual(false);
   } finally {
     service.closeResource(resource, {});
@@ -961,11 +942,11 @@ class MultipleResourcesService implements SkipService {
 it("testMultipleResources", async () => {
   const service = await initService(new MultipleResourcesService());
   service.update("input1", [["1", [10]]]);
-  expect(service.getOne("resource1", {}, "1")).toEqual([10]);
+  expect(service.getOne("resource1", "1").payload).toEqual([10]);
   service.update("input2", [["1", [20]]]);
-  expect(service.getOne("resource2", {}, "1")).toEqual([20]);
+  expect(service.getOne("resource2", "1").payload).toEqual([20]);
   service.update("input1", [["1", [30]]]);
-  expect(service.getOne("resource1", {}, "1")).toEqual([30]);
+  expect(service.getOne("resource1", "1").payload).toEqual([30]);
   service.update("input2", [["1", [40]]]);
-  expect(service.getOne("resource2", {}, "1")).toEqual([40]);
+  expect(service.getOne("resource2", "1").payload).toEqual([40]);
 });
