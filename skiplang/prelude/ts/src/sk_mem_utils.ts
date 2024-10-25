@@ -73,7 +73,7 @@ class File {
 export class MemFS implements FileSystem {
   private fileDescrs: Map<string, number>;
   private fileDescrNbr: int;
-  private files: Array<File>;
+  private files: File[];
   // invariant: range(fileDescrs) ⊆ domain(files)
 
   constructor() {

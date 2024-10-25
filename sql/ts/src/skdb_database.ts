@@ -116,7 +116,7 @@ export class SKDBSyncImpl implements SKDBSync {
   private fs: FileSystem;
 
   save!: () => Promise<boolean>;
-  runLocal!: (new_args: Array<string>, new_stdin: string) => string;
+  runLocal!: (new_args: string[], new_stdin: string) => string;
   watch!: (
     query: string,
     params: Params,

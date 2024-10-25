@@ -42,7 +42,7 @@ class Env implements Environment {
   encodeUTF8: (str: string) => Uint8Array;
   base64Decode: (base64: string) => Uint8Array;
   base64Encode: (toEncode: string, url?: boolean) => string;
-  environment: Array<string>;
+  environment: string[];
   throwRuntime: (code: int) => void;
   createSocket: (uri: string) => WebSocket;
   createWorker: (url: URL, options?: WorkerOptions) => Wrk;
@@ -82,7 +82,7 @@ class Env implements Environment {
     /* default nop hook */
   }
 
-  constructor(environment?: Array<string>) {
+  constructor(environment?: string[]) {
     this.shared = new Map<string, Shared>();
     this.fileSystem = new MemFS();
     this.system = new MemSys();
@@ -107,6 +107,6 @@ class Env implements Environment {
   }
 }
 
-export function environment(environment?: Array<string>) {
+export function environment(environment?: string[]) {
   return new Env(environment);
 }

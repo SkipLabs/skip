@@ -37,7 +37,7 @@ class Env implements Environment {
   createWorker: (url: URL, options?: WorkerOptions) => Wrk;
   createWorkerWrapper: (worker: Worker) => Wrk;
   crypto: () => Crypto;
-  environment: Array<string>;
+  environment: string[];
 
   throwRuntime = (code: int) => {
     this.onException();
@@ -67,7 +67,7 @@ class Env implements Environment {
       .then((ab) => new Uint8Array(ab));
   }
 
-  constructor(environment?: Array<string>) {
+  constructor(environment?: string[]) {
     this.shared = new Map<string, Shared>();
     this.fileSystem = new MemFS();
     this.system = new MemSys();
@@ -96,6 +96,6 @@ class Env implements Environment {
   }
 }
 
-export function environment(environment?: Array<string>) {
+export function environment(environment?: string[]) {
   return new Env(environment);
 }
