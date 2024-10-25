@@ -4,11 +4,7 @@ export class Wrappable {
   wrappedId?: int;
 }
 
-class UnmanagedMessage extends Error {
-  constructor(msg?: string) {
-    super(msg);
-  }
-}
+class UnmanagedMessage extends Error {}
 
 export class Function {
   fn: string;

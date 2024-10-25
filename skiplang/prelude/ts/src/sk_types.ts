@@ -46,11 +46,7 @@ class SkRuntimeExit extends Error {
   }
 }
 
-class SkError extends Error {
-  constructor(msg: string) {
-    super(msg);
-  }
-}
+class SkError extends Error {}
 
 export interface Shared {
   getName: () => string;
