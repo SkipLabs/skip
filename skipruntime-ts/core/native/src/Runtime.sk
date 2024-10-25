@@ -1262,7 +1262,7 @@ fun getAll(
   // create requests
   request = optRequest match {
   | Some(checker @ Checker _) -> resource.createRequest(context, Some(checker))
-  | Some(Identified(req)) -> req
+  | Some(Identifier(req)) -> req
   | _ -> resource.createRequest(context, None())
   };
   values = Values(
@@ -1273,7 +1273,7 @@ fun getAll(
   res = resource.getResult(context, request, values);
   if (!res.loading()) {
     optRequest match {
-    | Some(Identified _)
+    | Some(Identifier _)
     | None() ->
       resource.clearRequest(context, request)
     | Some(Checker _) -> void
@@ -1294,7 +1294,7 @@ fun getForKey(
   // create requests
   request = optRequest match {
   | Some(checker @ Checker _) -> resource.createRequest(context, Some(checker))
-  | Some(Identified(req)) -> req
+  | Some(Identifier(req)) -> req
   | _ -> resource.createRequest(context, None())
   };
   pushContext(context);
@@ -1304,7 +1304,7 @@ fun getForKey(
   res = resource.getResult(context, request, values);
   if (!res.loading()) {
     optRequest match {
-    | Some(Identified _)
+    | Some(Identifier _)
     | None() ->
       resource.clearRequest(context, request)
     | Some(Checker _) -> void

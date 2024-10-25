@@ -364,7 +364,7 @@ export interface FromWasm {
 
   // Checker
 
-  SkipRuntime_createIdentified(
+  SkipRuntime_createIdentifier(
     supplier: ptr<Internal.String>,
   ): ptr<Internal.Request>;
 
@@ -1340,7 +1340,7 @@ export class ServiceInstance {
           reactiveAuth ? this.refs.skjson.exportBytes(reactiveAuth) : null,
           request !== undefined
             ? typeof request == "string"
-              ? this.refs.fromWasm.SkipRuntime_createIdentified(
+              ? this.refs.fromWasm.SkipRuntime_createIdentifier(
                   this.refs.skjson.exportString(request),
                 )
               : this.refs.fromWasm.SkipRuntime_createChecker(
@@ -1393,7 +1393,7 @@ export class ServiceInstance {
           reactiveAuth ? this.refs.skjson.exportBytes(reactiveAuth) : null,
           request !== undefined
             ? typeof request == "string"
-              ? this.refs.fromWasm.SkipRuntime_createIdentified(
+              ? this.refs.fromWasm.SkipRuntime_createIdentifier(
                   this.refs.skjson.exportString(request),
                 )
               : this.refs.fromWasm.SkipRuntime_createChecker(
