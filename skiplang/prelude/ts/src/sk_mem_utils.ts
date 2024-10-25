@@ -35,7 +35,7 @@ class File {
   }
 
   write(contents: string, append: boolean = false) {
-    if (!this.options || !this.options.write) {
+    if (!this.options?.write) {
       throw new Error("The file cannot be written");
     }
     if ((this.contents && this.options.append) || append) {
@@ -52,7 +52,7 @@ class File {
   }
 
   read(len: int) {
-    if (!this.options || !this.options.read) {
+    if (!this.options?.read) {
       throw new Error("The file cannot be read");
     }
     let clen = this.contents ? this.contents.length : 0;
