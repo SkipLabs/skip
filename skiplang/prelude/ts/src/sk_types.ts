@@ -884,9 +884,7 @@ export async function loadEnv(extensions: EnvInit[], envVals?: Array<string>) {
     : //@ts-ignore
       import("./sk_browser.js"));
   let env = environment.environment(envVals) as Environment;
-  if (extensions) {
-    extensions.map((fn) => fn(env));
-  }
+  extensions.map((fn) => fn(env));
   return env;
 }
 
