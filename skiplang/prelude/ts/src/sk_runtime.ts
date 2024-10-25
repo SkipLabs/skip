@@ -73,6 +73,7 @@ class LinksImpl implements Links {
   SKIP_glock() {
     /* nop since js is sequential */
   }
+
   SKIP_gunlock() {
     /* nop since js is sequential */
   }
@@ -191,6 +192,7 @@ class LinksImpl implements Links {
 
 class Manager implements ToWasmManager {
   env: Environment | undefined;
+
   constructor(env?: Environment) {
     this.env = env;
   }
