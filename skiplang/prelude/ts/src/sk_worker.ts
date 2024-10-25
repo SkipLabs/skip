@@ -292,7 +292,7 @@ function apply<R>(
   }
 }
 
-let runner: object;
+let runner: object | undefined;
 let wrappedId = 0;
 const wrapped = new Map<number, { value: any; autoremove: boolean }>();
 
