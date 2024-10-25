@@ -1594,6 +1594,9 @@ class SKDBServer implements RemoteSKDB {
             }
             client.writeCsv(payload, this.replicationUid);
           });
+          // the linter seems to be unable to see the assignment to
+          // resolveSignalled above
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
           if (!resolved && resolveSignalled) {
             resolved = true;
             resolve();
