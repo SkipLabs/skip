@@ -262,7 +262,6 @@ if (values.dev) {
 ////////////////////////////////////////////////////////////////////////////////
 
 if (
-  !dbCreds ||
   Object.entries(
     dbCreds as {
       [s: string]: unknown;
