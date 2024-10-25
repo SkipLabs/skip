@@ -536,9 +536,7 @@ export class Utils {
       throw this.exception;
     } else {
       let skMessage =
-        skExc != null && skExc != 0
-          ? this.exports.SKIP_getExceptionMessage(skExc)
-          : null;
+        skExc != 0 ? this.exports.SKIP_getExceptionMessage(skExc) : null;
       let message =
         skMessage != null && skMessage != 0
           ? this.importString(skMessage)
@@ -588,7 +586,7 @@ export class Utils {
   };
 
   getErrorObject = (skExc: ptr<Internal.Exception>): ErrorObject => {
-    if (skExc == null || skExc == 0) {
+    if (skExc == 0) {
       return { message: "SKStore Internal error" };
     }
     let message = this.importString(
