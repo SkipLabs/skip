@@ -156,7 +156,7 @@ export interface Environment {
   shared: Map<string, Shared>;
   name: () => string;
   disableWarnings: boolean;
-  environment: Array<string>;
+  environment: string[];
   createSocket: (uri: string) => WebSocket;
   createWorker: (url: URL, options?: WorkerOptions) => Wrk;
   createWorkerWrapper: (worker: Worker) => Wrk;
@@ -218,7 +218,7 @@ function utf8Encode(str: string): Uint8Array {
   return new TextEncoder().encode(str);
 }
 
-export type Main = (new_args: Array<string>, new_stdin: string) => string;
+export type Main = (new_args: string[], new_stdin: string) => string;
 
 export type App = {
   environment: Environment;
@@ -231,12 +231,12 @@ export class Utils {
   private state: State;
   private states: Map<string, any>;
 
-  args: Array<string>;
+  args: string[];
   private current_stdin: number;
   private stdin: Uint8Array;
-  private stdout: Array<string>;
-  private stderr: Array<string>;
-  private stddebug: Array<string>;
+  private stdout: string[];
+  private stderr: string[];
+  private stddebug: string[];
   private mainFn?: string;
   private exception?: Error;
   private stacks: Map<ptr<Internal.Exception>, string>;
@@ -281,10 +281,7 @@ export class Utils {
     this.log(str, kind, newLine);
   };
 
-  clearMainEnvironment = (
-    new_args: Array<string> = [],
-    new_stdin: string = "",
-  ) => {
+  clearMainEnvironment = (new_args: string[] = [], new_stdin: string = "") => {
     this.args = [this.mainFn ?? "main"].concat(new_args);
     this.exception = undefined;
     this.stacks = new Map();
@@ -309,7 +306,7 @@ export class Utils {
     return res;
   };
 
-  main = (new_args: Array<string>, new_stdin: string) => {
+  main = (new_args: string[], new_stdin: string) => {
     let exitCode = 0;
     this.clearMainEnvironment(new_args, new_stdin);
     try {
@@ -755,7 +752,7 @@ export const l = (text: string, category?: string) => {
   return new Locale(text, category);
 };
 
-export const f = (format: Text | string, parameters: Array<Text | string>) => {
+export const f = (format: Text | string, parameters: (Text | string)[]) => {
   return new Format(format, parameters);
 };
 
@@ -769,9 +766,9 @@ export const check: (value: Text | string) => Text = (value: Text | string) => {
 
 export class Format implements Text {
   format: Text | string;
-  parameters: Array<Text | string>;
+  parameters: (Text | string)[];
 
-  constructor(format: Text | string, parameters: Array<Text | string>) {
+  constructor(format: Text | string, parameters: (Text | string)[]) {
     this.format = format;
     this.parameters = parameters;
   }
@@ -834,7 +831,7 @@ export function humanSize(bytes: int) {
 
 export function loadWasm(
   buffer: ArrayBuffer,
-  managers: Array<ToWasmManager>,
+  managers: ToWasmManager[],
   environment: Environment,
   main?: string,
 ) {
@@ -869,7 +866,7 @@ export function isNode() {
   return typeof process !== "undefined" && process.release.name == "node";
 }
 
-export async function loadEnv(extensions: EnvInit[], envVals?: Array<string>) {
+export async function loadEnv(extensions: EnvInit[], envVals?: string[]) {
   // hack: this way of importing is deliberate so that web bundlers
   // don't follow the node dynamic import
   const nodeImport = "./sk_node.js";

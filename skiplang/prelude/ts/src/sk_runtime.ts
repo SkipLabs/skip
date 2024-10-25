@@ -13,7 +13,7 @@ import type * as Internal from "./sk_internal_types.js";
 
 class LinksImpl implements Links {
   env: Environment | undefined;
-  lineBuffer!: Array<int>;
+  lineBuffer!: int[];
   lastTime!: int;
 
   constructor(env?: Environment) {
