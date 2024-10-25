@@ -623,7 +623,7 @@ export class Utils {
       }
     };
     if (errStack) {
-      const stack: string[] = errStack.split("\n") as string[];
+      const stack: string[] = errStack.split("\n");
       return this.exception
         ? { message, cause: toObject(this.exception), stack }
         : { message, stack };
