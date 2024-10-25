@@ -1220,7 +1220,7 @@ export type Values<K extends TJSON, V extends TJSON> = {
 
 export type GetResult<T> = {
   request?: string;
-  values: T;
+  payload: T;
   errors: TJSON[];
 };
 
@@ -1252,7 +1252,7 @@ class AllChecker<K extends TJSON, V extends TJSON> implements Checker {
     if (result.errors.length > 0) {
       this.executor.reject(new Error(JSON.stringify(result.errors)));
     } else {
-      this.executor.resolve(result.values);
+      this.executor.resolve(result.payload);
     }
   }
 }
