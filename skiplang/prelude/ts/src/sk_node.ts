@@ -78,7 +78,9 @@ class Env implements Environment {
       );
     });
   }
-  onException() {}
+  onException() {
+    /* default nop hook */
+  }
 
   constructor(environment?: Array<string>) {
     this.shared = new Map<string, Shared>();

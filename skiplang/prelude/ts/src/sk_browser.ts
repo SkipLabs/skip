@@ -85,7 +85,9 @@ class Env implements Environment {
       return url ? base64.replaceAll("+", "-").replaceAll("/", "_") : base64;
     };
     this.storage = () => localStorage;
-    this.onException = () => {};
+    this.onException = () => {
+      /* default nop hook */
+    };
     this.createSocket = (uri: string) => new WebSocket(uri);
     this.createWorker = (url: URL, options?: WorkerOptions) =>
       WrkImpl.fromPath(url, options);
