@@ -250,12 +250,12 @@ export class Utils {
   constructor(exports: WebAssembly.Exports, env: Environment, mainFn?: string) {
     this.stacks = new Map();
     this.states = new Map();
-    this.args = new Array();
+    this.args = [];
     this.current_stdin = 0;
     this.stdin = utf8Encode("");
-    this.stdout = new Array();
-    this.stderr = new Array();
-    this.stddebug = new Array();
+    this.stdout = [];
+    this.stderr = [];
+    this.stddebug = [];
     this.exports = exports as any as Exported;
     this.env = env;
     this.state = new State();
@@ -290,9 +290,9 @@ export class Utils {
     this.stacks = new Map();
     this.current_stdin = 0;
     this.stdin = utf8Encode(new_stdin);
-    this.stdout = new Array();
-    this.stderr = new Array();
-    this.stddebug = new Array();
+    this.stdout = [];
+    this.stderr = [];
+    this.stddebug = [];
   };
 
   runCheckError = <T>(fn: () => T) => {
@@ -665,7 +665,7 @@ export class Utils {
   };
 
   runWithGc = <T>(fn: () => T) => {
-    this.stddebug = new Array();
+    this.stddebug = [];
     const obsPos = this.exports.SKIP_new_Obstack();
     try {
       const res = fn();

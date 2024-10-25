@@ -79,7 +79,7 @@ export class MemFS implements FileSystem {
   constructor() {
     this.fileDescrs = new Map();
     this.fileDescrNbr = 2;
-    this.files = new Array();
+    this.files = [];
   }
 
   exists(filename: string): boolean {
