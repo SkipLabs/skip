@@ -863,7 +863,6 @@ class TokensResource implements Resource {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-call
 const system = new ExternalService({ timer: new TimeCollection() });
 
 class TokensService implements SkipService {
@@ -889,4 +888,55 @@ it("testCloseSession", async () => {
   const current = runtime.getOne(resource, {}, "5ms");
   expect(current == start).toEqual(false);
   runtime.closeResource(resource, {});
+});
+
+//// testMultipleResources
+
+class Resource1 implements Resource {
+  reactiveCompute(
+    _context: Context,
+    collections: {
+      input1: EagerCollection<string, number>;
+    },
+  ): EagerCollection<string, number> {
+    return collections.input1;
+  }
+}
+
+class Resource2 implements Resource {
+  reactiveCompute(
+    _context: Context,
+    collections: {
+      input2: EagerCollection<string, number>;
+    },
+  ): EagerCollection<string, number> {
+    return collections.input2;
+  }
+}
+
+class MultipleResourcesService implements SkipService {
+  inputCollections = { input1: [], input2: [] };
+  resources = { resource1: Resource1, resource2: Resource2 };
+
+  reactiveCompute(
+    _context: Context,
+    inputCollections: {
+      input1: EagerCollection<number, number>;
+      input2: EagerCollection<number, number>;
+    },
+  ) {
+    return inputCollections;
+  }
+}
+
+it("testMultipleResources", async () => {
+  const service = await initService(new MultipleResourcesService());
+  service.update("input1", [["1", [10]]]);
+  expect(service.getOne("resource1", {}, "1")).toEqual([10]);
+  service.update("input2", [["1", [20]]]);
+  expect(service.getOne("resource2", {}, "1")).toEqual([20]);
+  service.update("input1", [["1", [30]]]);
+  expect(service.getOne("resource1", {}, "1")).toEqual([30]);
+  service.update("input2", [["1", [40]]]);
+  expect(service.getOne("resource2", {}, "1")).toEqual([40]);
 });
