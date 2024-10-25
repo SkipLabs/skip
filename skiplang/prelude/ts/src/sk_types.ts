@@ -336,7 +336,7 @@ export class Utils {
       console.log(this.stddebug.join(""));
     }
     if (exitCode != 0 || this.stderr.length > 0) {
-      let message = this.stderr.length > 0 ? this.stderr.join("") : undefined;
+      const message = this.stderr.length > 0 ? this.stderr.join("") : undefined;
       let tmp = "";
       let lines: string[] = [];
       message?.split("\n").forEach((line) => {
@@ -366,8 +366,7 @@ export class Utils {
       if (tmp != "") {
         lines.push(tmp);
       }
-      message = lines.join("\n");
-      let error = new SkRuntimeExit(exitCode, message?.trim());
+      let error = new SkRuntimeExit(exitCode, lines.join("\n").trim());
       (error as any).cause = this.exception;
       throw error;
     }
