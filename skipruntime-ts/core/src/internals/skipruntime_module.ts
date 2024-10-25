@@ -1270,15 +1270,15 @@ class OneChecker<V extends TJSON> implements Checker {
   check(request: string): void {
     const result = this.service.getOne<V>(
       this.resource,
-      this.params,
       this.key,
+      this.params,
       this.reactiveAuth,
       request,
     );
     if (result.errors.length > 0) {
       this.executor.reject(new Error(JSON.stringify(result.errors)));
     } else {
-      this.executor.resolve(result.values);
+      this.executor.resolve(result.payload);
     }
   }
 }
@@ -1328,7 +1328,7 @@ export class ServiceInstance {
    */
   getAll<K extends TJSON, V extends TJSON>(
     resource: string,
-    params: Record<string, string>,
+    params: Record<string, string> = {},
     reactiveAuth?: Uint8Array,
     request?: string | Executor<Values<K, V>>,
   ): GetResult<Values<K, V>> {
@@ -1372,15 +1372,15 @@ export class ServiceInstance {
   /**
    * Creates if not exists and get the current value of specified key in specified resource
    * @param resource - the resource name correspond to the a key in remotes field of SkipService
-   * @param params - the parameters of the resource used to build the resource with the corresponding constructor specified in remotes field of SkipService
    * @param key - the key of value to return
+   * @param params - the parameters of the resource used to build the resource with the corresponding constructor specified in remotes field of SkipService
    * @param reactiveAuth - the client user Skip session authentification
    * @returns The current value of specified key in the corresponding resource
    */
   getOne<V extends TJSON>(
     resource: string,
-    params: Record<string, string>,
     key: string | number,
+    params: Record<string, string> = {},
     reactiveAuth?: Uint8Array,
     request?: string | Executor<V[]>,
   ): GetResult<V[]> {

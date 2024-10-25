@@ -39,8 +39,8 @@ export function createRESTServer(service: ServiceInstance): express.Express {
       const promise = new Promise(function (resolve, reject) {
         service.getOne(
           resourceName,
-          req.query as Record<string, string>,
           key,
+          req.query as Record<string, string>,
           reactiveAuth,
           {
             resolve,
