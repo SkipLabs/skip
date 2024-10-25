@@ -374,10 +374,6 @@ class LinksImpl implements Links, ToWasm {
       this.objectIdx++;
     };
     this.SKIP_push_object = () => {
-      const objects = this.stdout_objects[this.stream];
-      if (!objects) {
-        this.stdout_objects[this.stream] = [];
-      }
       this.stdout_objects[this.stream].push(this.object);
     };
     this.SKIP_js_mark_query = (queryID: int) => {
