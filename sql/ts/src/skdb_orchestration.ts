@@ -111,7 +111,7 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
       const dataView = new DataView(buf);
       const textEncoder = new TextEncoder();
       let encodeResult = textEncoder.encodeInto(name, uint8View.subarray(4));
-      const suffixIdx = 4 + (encodeResult.written ?? 0);
+      const suffixIdx = 4 + encodeResult.written;
       dataView.setUint8(0, 0x4); // type
       const scopeLookup = new Map([
         ["all", 0x0],
