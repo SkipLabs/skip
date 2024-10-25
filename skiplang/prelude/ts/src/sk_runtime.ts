@@ -70,8 +70,12 @@ class LinksImpl implements Links {
   SKIP_getenv!: (skName: ptr<Internal.String>) => Opt<ptr<Internal.String>>;
   SKIP_unsetenv!: (skName: ptr<Internal.String>) => void;
 
-  SKIP_glock() {}
-  SKIP_gunlock() {}
+  SKIP_glock() {
+    /* nop since js is sequential */
+  }
+  SKIP_gunlock() {
+    /* nop since js is sequential */
+  }
 
   complete = (utils: Utils, _exports: object) => {
     this.SKIP_etry = utils.etry;
