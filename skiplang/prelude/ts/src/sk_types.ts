@@ -531,7 +531,7 @@ export class Utils {
     }
   };
   ethrow = (skExc: ptr<Internal.Exception>, rethrow: boolean) => {
-    if (this.env && this.env.onException) this.env.onException();
+    this.env.onException();
     if (rethrow && this.exception) {
       throw this.exception;
     } else {
