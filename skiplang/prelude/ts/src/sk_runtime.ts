@@ -127,8 +127,7 @@ class LinksImpl implements Links {
       if (arg === undefined) throw new Error(`Invalid arg index: ${index}`);
       return utils.exportString(arg);
     };
-    this.SKIP_js_get_envc = () =>
-      this.env && this.env.environment ? this.env.environment.length : 0;
+    this.SKIP_js_get_envc = () => (this.env ? this.env.environment.length : 0);
     this.SKIP_js_get_envn = (index: int) => {
       const env = this.env?.environment[index];
       if (env === undefined)
