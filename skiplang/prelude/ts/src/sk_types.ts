@@ -866,8 +866,7 @@ async function start(
   main?: string,
 ) {
   let promises = modules.map((fn) => fn(environment));
-  let cs = await Promise.all(promises);
-  let ms = cs.filter((c) => c != null);
+  let ms = await Promise.all(promises);
   return await loadWasm(buffer, ms, environment, main);
 }
 
