@@ -121,6 +121,7 @@ class SKDBMemory implements PagedMemory {
   };
 
   update = () => {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     while (true) {
       const dirtyPage = this.popDirtyPage();
       if (dirtyPage == -1) break;

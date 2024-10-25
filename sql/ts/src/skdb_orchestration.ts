@@ -494,6 +494,7 @@ class ResilientMuxedSocket {
     const backoffMs = 500 + Math.random() * 1000;
     await new Promise((resolve) => setTimeout(resolve, backoffMs));
 
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     while (true) {
       try {
         const socket = await MuxedSocket.connect(

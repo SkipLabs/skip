@@ -398,6 +398,7 @@ const remoteRepl = async function () {
     undefined,
     !values["simple-output"],
   );
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   while (true) {
     if (process.stdin.closed) {
       rl.close();
@@ -497,6 +498,7 @@ const localRepl = async function () {
     undefined,
     !values["simple-output"],
   );
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   while (true) {
     const query = await rl.question(`local> `);
 
