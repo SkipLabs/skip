@@ -1,7 +1,5 @@
 import type { int, Wrk } from "./sk_types.js";
 
-interface Payload {}
-
 export class Wrappable {
   wrappedId?: int;
 }
@@ -12,7 +10,7 @@ class UnmanagedMessage extends Error {
   }
 }
 
-export class Function implements Payload {
+export class Function {
   fn: string;
   parameters: Array<any>;
   wrap?: { wrap: boolean; autoremove: boolean };
@@ -46,7 +44,7 @@ export class Function implements Payload {
   }
 }
 
-export class Caller implements Payload {
+export class Caller {
   wrapped: number;
   fn: string;
   parameters: Array<any>;
@@ -86,7 +84,7 @@ export class Caller implements Payload {
   }
 }
 
-export class Return implements Payload {
+export class Return {
   success: boolean;
   value: any;
 
@@ -145,9 +143,9 @@ export class Sender {
 
 export class Message {
   id: MessageId;
-  payload: Payload;
+  payload: unknown;
 
-  constructor(id: MessageId, payload: Payload) {
+  constructor(id: MessageId, payload: unknown) {
     this.id = id;
     this.payload = payload;
   }
