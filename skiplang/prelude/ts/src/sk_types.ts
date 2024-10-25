@@ -451,6 +451,7 @@ export class Utils {
     copy.set(skData);
     return copy;
   };
+
   exportUInt32s(array: Uint32Array) {
     const skArray = this.exports.SKIP_createUInt32Array(array.length);
     const skData = new Uint32Array(
@@ -468,6 +469,7 @@ export class Utils {
     copy.set(skData);
     return copy;
   };
+
   exportFloats(array: Float64Array) {
     const skArray = this.exports.SKIP_createFloatArray(array.length);
     const skData = new Float64Array(
@@ -552,6 +554,7 @@ export class Utils {
       throw err;
     }
   };
+
   replace_exn(oldex: ptr<Internal.Exception>, newex: ptr<Internal.Exception>) {
     const stack = this.stacks.get(oldex);
     if (stack) {

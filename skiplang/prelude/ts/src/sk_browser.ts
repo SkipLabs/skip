@@ -45,12 +45,15 @@ class Env implements Environment {
       throw new Error(`Error with code: ${code}`);
     }
   };
+
   fs() {
     return this.fileSystem;
   }
+
   sys() {
     return this.system;
   }
+
   name() {
     return "browser";
   }

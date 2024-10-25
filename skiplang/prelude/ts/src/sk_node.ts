@@ -48,15 +48,19 @@ class Env implements Environment {
   createWorker: (url: URL, options?: WorkerOptions) => Wrk;
   createWorkerWrapper: (worker: any) => Wrk;
   crypto: () => Crypto;
+
   fs() {
     return this.fileSystem;
   }
+
   sys() {
     return this.system;
   }
+
   name() {
     return "node";
   }
+
   fetch(url: URL | string) {
     let filename: string | URL;
     const cwd = process.cwd();
@@ -78,6 +82,7 @@ class Env implements Environment {
       );
     });
   }
+
   onException() {
     /* default nop hook */
   }
