@@ -1266,7 +1266,7 @@ class OneChecker<V extends TJSON> implements Checker {
   ) {}
 
   check(request: string): void {
-    const result = this.service.getOne<V>(
+    const result = this.service.getArray<V>(
       this.resource,
       this.key,
       this.params,
@@ -1282,20 +1282,20 @@ class OneChecker<V extends TJSON> implements Checker {
 }
 
 /**
- * SkipRuntime is the result of initService
- * It gives acces to service reactivly computed resources
+ * A `ServiceInstance` is a running instance of a `SkipService`, providing access to its resources
+ * and operations to manage susbscriptions and the service itself.
  */
 export class ServiceInstance {
   constructor(private refs: Refs) {}
 
   /**
-   * Creates specified resource
-   * @param resource - the resource name correspond to the a key in remotes field of SkipService
-   * @param params - the parameters of the resource used to build the resource with the corresponding constructor specified in remotes field of SkipService
-   * @param reactiveAuth - the client user Skip session authentification
-   * @returns The reactive responce token to allow subscription
+   * Instantiate a resource with some parameters and client session authentication token
+   * @param resource - A resource name, which must correspond to a key in this `SkipService`'s `resources` field
+   * @param params - Resource parameters, which will be passed to the resource constructor specified in this `SkipService`'s `resources` field
+   * @param reactiveAuth - A client-generated Skip session authentication token
+   * @returns A response token which can be used to initiate reactive subscription
    */
-  createResource(
+  instantiateResource(
     resource: string,
     params: Record<string, string>,
     reactiveAuth?: Uint8Array,
@@ -1368,14 +1368,14 @@ export class ServiceInstance {
   }
 
   /**
-   * Creates if not exists and get the current value of specified key in specified resource
-   * @param resource - the resource name correspond to the a key in remotes field of SkipService
-   * @param key - the key of value to return
-   * @param params - the parameters of the resource used to build the resource with the corresponding constructor specified in remotes field of SkipService
-   * @param reactiveAuth - the client user Skip session authentification
-   * @returns The current value of specified key in the corresponding resource
+   * Get the current value of a key in the specified resource instance, creating it if it doesn't already exist
+   * @param resource - A resource name, which must correspond to a key in this `SkipService`'s `resources` field
+   * @param key - A key to look up in the resource instance
+   * @param params - Resource parameters, passed to the resource constructor specified in this `SkipService`'s `resources` field
+   * @param reactiveAuth - the client Skip session authentication token
+   * @returns The current value(s) for this key in the specified resource instance
    */
-  getOne<V extends TJSON>(
+  getArray<V extends TJSON>(
     resource: string,
     key: string | number,
     params: Record<string, string> = {},
@@ -1422,12 +1422,12 @@ export class ServiceInstance {
   }
 
   /**
-   * Close the specified resource
-   * @param resource - the resource name correspond to the a key in remotes field of SkipService
-   * @param params - the parameters of the resource used to build the resource with the corresponding constructor specified in remotes field of SkipService
-   * @param reactiveAuth - the client user Skip session authentification
+   * Close the specified resource instance
+   * @param resource - The resource name, which must correspond to a key in this `SkipService`'s `resources` field
+   * @param params - Resource parameters which were used to instantiate the resource
+   * @param reactiveAuth - The client Skip session authentication for this resource instance
    */
-  closeResource(
+  closeResourceInstance(
     resource: string,
     params: Record<string, string>,
     reactiveAuth?: Uint8Array,
@@ -1445,8 +1445,8 @@ export class ServiceInstance {
   }
 
   /**
-   * Close of the resources corresponding the specified reactiveAuth
-   * @param reactiveAuth - the client user Skip session authentification
+   * Close all resource instances maintained for the specified `reactiveAuth` session
+   * @param reactiveAuth - A client Skip session authentication token
    */
   closeSession(reactiveAuth?: Uint8Array): void {
     const result = this.refs.skjson.runWithGC(() => {
@@ -1460,12 +1460,11 @@ export class ServiceInstance {
   }
 
   /**
-   * Subscribe to a reactive ressource according a given reactive response
-   * @param reactiveId - the reactive response collection
-   * @param since - the reactive response watermark
-   * @param f - the callback called on collection updates
-   * @param reactiveAuth The client user Skip session authentification corresponding to the reactive response
-   * @returns The subcription identifier
+   * Initiate reactive subscription on a resource instance
+   * @param reactiveResponse - the reactive response
+   * @param f - A callback to execute on collection updates
+   * @param reactiveAuth The client Skip session authentication token corresponding to the reactive response
+   * @returns A subcription identifier
    */
   subscribe<K extends TJSON, V extends TJSON>(
     reactiveId: string,
@@ -1497,8 +1496,8 @@ export class ServiceInstance {
   }
 
   /**
-   * Unsubscribe to a reactive ressource according a given subcription identifier
-   * @param id - the subcription identifier
+   * Terminate a client's subscription to a reactive resource instance
+   * @param id - The subcription identifier returned by a call to `subscribe`
    */
   unsubscribe(id: SubscriptionID): void {
     const result = this.refs.skjson.runWithGC(() => {
@@ -1511,17 +1510,17 @@ export class ServiceInstance {
 
   /**
    * Update an input collection
-   * @param input - the name of the input collection to update
-   * @param values - the values of the input collection to update
+   * @param collection - the name of the input collection to update
+   * @param entries - entries to update in the collection.
    */
   update<K extends TJSON, V extends TJSON>(
-    input: string,
-    values: Entry<K, V>[],
+    collection: string,
+    entries: Entry<K, V>[],
   ): void {
     const result = this.refs.skjson.runWithGC(() => {
       return this.refs.fromWasm.SkipRuntime_Runtime__update(
-        this.refs.skjson.exportString(input),
-        this.refs.skjson.exportJSON(values),
+        this.refs.skjson.exportString(collection),
+        this.refs.skjson.exportJSON(entries),
       );
     });
     if (result != 0) {
@@ -1530,7 +1529,8 @@ export class ServiceInstance {
   }
 
   /**
-   * Close all the resource and shutdown the SkipService
+   * Close all resources and shut down the service.
+   * Any subsequent calls on the service will result in errors.
    */
   close(): void {
     const result = this.refs.skjson.runWithGC(() => {
