@@ -3,6 +3,7 @@ import {
   type TJSON,
   type CollectionUpdate,
   type Watermark,
+  type ReactiveResponse,
   type SubscriptionID,
   type ServiceInstance,
   UnknownCollectionError,
@@ -18,17 +19,15 @@ class TailingSession {
   ) {}
 
   subscribe(
-    collection: string,
-    since: Watermark,
+    reactiveResponse: ReactiveResponse,
     callback: (update: CollectionUpdate<string, TJSON>) => void,
   ) {
     const subsession = this.replication.subscribe<string, TJSON>(
-      collection,
-      since,
+      reactiveResponse,
       callback,
       new Uint8Array(this.pubkey),
     );
-    this.subsessions.set(collection, subsession);
+    this.subsessions.set(reactiveResponse.collection, subsession);
   }
 
   unsubscribe(collection: string) {
@@ -81,7 +80,11 @@ function handleMessage(
     }
     case "tail": {
       try {
-        session.subscribe(msg.collection, msg.since as Watermark, (update) => {
+        const reactiveResponse = {
+          collection: msg.collection,
+          watermark: msg.since as Watermark,
+        };
+        session.subscribe(reactiveResponse, (update) => {
           ws.send(
             Protocol.encodeMsg({
               type: "data",

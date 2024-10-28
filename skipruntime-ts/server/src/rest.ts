@@ -1,5 +1,5 @@
 import express from "express";
-import type { ServiceInstance, Entry, TJSON } from "@skipruntime/core";
+import type { Entry, TJSON, ServiceInstance, Values } from "@skipruntime/core";
 import {
   UnknownCollectionError,
   reactiveResponseHeader,
@@ -16,7 +16,7 @@ export function createRESTServer(service: ServiceInstance): express.Express {
     if (!strReactiveAuth) throw new Error("X-Reactive-Auth must be specified.");
     const reactiveAuth = new Uint8Array(Buffer.from(strReactiveAuth, "base64"));
     try {
-      const data = service.createResource(
+      const data = service.instantiateResource(
         resourceName,
         req.query as Record<string, string>,
         reactiveAuth,
@@ -31,13 +31,28 @@ export function createRESTServer(service: ServiceInstance): express.Express {
   app.get("/v1/:resource/:key", (req, res) => {
     const key = req.params.key;
     const resourceName = req.params.resource;
+    const strReactiveAuth = req.headers["x-reactive-auth"] as string;
+    const reactiveAuth = strReactiveAuth
+      ? new Uint8Array(Buffer.from(strReactiveAuth, "base64"))
+      : undefined;
     try {
-      const data = service.getOne(
-        resourceName,
-        req.query as Record<string, string>,
-        key,
-      );
-      res.status(200).json(data);
+      const promise = new Promise(function (resolve, reject) {
+        service.getArray(
+          resourceName,
+          key,
+          req.query as Record<string, string>,
+          reactiveAuth,
+          {
+            resolve,
+            reject,
+          },
+        );
+      });
+      promise
+        .then((data) => res.status(200).json(data))
+        .catch((e: unknown) =>
+          res.status(500).json(e instanceof Error ? e.message : e),
+        );
     } catch (e: unknown) {
       res.status(500).json(e instanceof Error ? e.message : e);
     }
@@ -49,16 +64,32 @@ export function createRESTServer(service: ServiceInstance): express.Express {
       ? new Uint8Array(Buffer.from(strReactiveAuth, "base64"))
       : undefined;
     try {
-      const data = service.getAll(
-        resourceName,
-        req.query as Record<string, string>,
-        reactiveAuth,
-      );
-      if (data.reactive) {
-        const [name, value] = reactiveResponseHeader(data.reactive);
-        res.set(name, value);
-      }
-      res.status(200).json(data.values);
+      const promise = new Promise<Values<TJSON, TJSON>>(function (
+        resolve,
+        reject,
+      ) {
+        service.getAll(
+          resourceName,
+          req.query as Record<string, string>,
+          reactiveAuth,
+          {
+            resolve,
+            reject,
+          },
+        );
+      });
+      promise
+        .then((data) => {
+          const reactive = data.reactive;
+          if (reactive) {
+            const [name, value] = reactiveResponseHeader(reactive);
+            res.set(name, value);
+          }
+          res.status(200).json(data.values);
+        })
+        .catch((e: unknown) =>
+          res.status(500).json(e instanceof Error ? e.message : e),
+        );
     } catch (e: unknown) {
       res.status(500).json(e instanceof Error ? e.message : e);
     }
