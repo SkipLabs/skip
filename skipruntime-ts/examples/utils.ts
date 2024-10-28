@@ -1,4 +1,4 @@
-import type { TJSON, Entrypoint, Entry, JSONObject } from "@skipruntime/core";
+import type { TJSON, Entrypoint, Entry } from "@skipruntime/core";
 import { SkipRESTRuntime } from "@skipruntime/core";
 import { createInterface } from "readline";
 import { connect, Protocol, Client } from "@skipruntime/client";
@@ -71,6 +71,20 @@ class SkipHttpAccessV1 {
     return Promise.allSettled(promises);
   }
 
+  async log(resource: string, params: Record<string, string>, port?: number) {
+    const publicKey = new Uint8Array(
+      await Protocol.exportKey(this.creds.publicKey),
+    );
+    const runtime = this.runtimes[port ?? this.defaultPort];
+    if (runtime === undefined) throw new Error(`Invalid port ${port}`);
+    const result = await runtime.getAll(resource, params, publicKey);
+    console.log(
+      JSON.stringify(result, (_key: string, value: unknown) =>
+        typeof value === "bigint" ? value.toString() : value,
+      ),
+    );
+  }
+
   async request(
     resource: string,
     params: Record<string, string>,
@@ -100,18 +114,33 @@ class SkipHttpAccessV1 {
 
 interface RequestQuery {
   type: "request";
-  payload: JSONObject;
+  payload: {
+    resource: string;
+    params?: Record<string, string>;
+    port?: number;
+  };
 }
+
+interface LogQuery {
+  type: "log";
+  payload: {
+    resource: string;
+    params?: Record<string, string>;
+    port?: number;
+  };
+}
+
 interface WriteQuery {
   type: "write";
   payload: Write[];
 }
+
 interface DeleteQuery {
   type: "delete";
   payload: Delete[];
 }
 
-export type Step = RequestQuery | WriteQuery | DeleteQuery;
+export type Step = RequestQuery | LogQuery | WriteQuery | DeleteQuery;
 
 class Session {
   scenario: Step[];
@@ -166,6 +195,7 @@ class Player {
     private perform: (l: string) => void,
     private send: (l: Step) => void,
     private error: (e: string) => void,
+    private exit: () => void,
   ) {}
 
   start(idx: number) {
@@ -266,6 +296,12 @@ class Player {
           this.stop();
         },
       ],
+      [
+        /^exit$/g,
+        () => {
+          this.exit();
+        },
+      ],
     ];
     let done = false;
     for (const pattern of patterns) {
@@ -301,11 +337,26 @@ export async function run(scenarios: Step[][], ports: number[] = [3587]) {
             const jsquery = JSON.parse(query) as {
               resource: string;
               params?: Record<string, string>;
-              port: number;
+              port?: number;
             };
             access
               .request(jsquery.resource, jsquery.params ?? {}, jsquery.port)
               .then(console.log)
+              .catch((e: unknown) => {
+                console.error(e);
+              });
+          },
+        ],
+        [
+          /^log (.*)$/g,
+          (query: string) => {
+            const jsquery = JSON.parse(query) as {
+              resource: string;
+              params?: Record<string, string>;
+              port?: number;
+            };
+            access
+              .log(jsquery.resource, jsquery.params ?? {}, jsquery.port)
               .catch((e: unknown) => {
                 console.error(e);
               });
@@ -359,13 +410,12 @@ export async function run(scenarios: Step[][], ports: number[] = [3587]) {
     online,
     (step) => {
       if (step.type == "request") {
-        const jsquery = step.payload as {
-          resource: string;
-          params?: Record<string, string>;
-          port?: number;
-        };
         access
-          .request(jsquery.resource, jsquery.params ?? {}, jsquery.port)
+          .request(
+            step.payload.resource,
+            step.payload.params ?? {},
+            step.payload.port,
+          )
           .then(console.log)
           .catch((e: unknown) => {
             console.error(e);
@@ -374,6 +424,12 @@ export async function run(scenarios: Step[][], ports: number[] = [3587]) {
         access
           .writeMany(step.payload)
           .then(console.log)
+          .catch((e: unknown) => {
+            console.error(e);
+          });
+      } else if (step.type == "log") {
+        access
+          .log(step.payload.resource, step.payload.params ?? {})
           .catch((e: unknown) => {
             console.error(e);
           });
@@ -387,6 +443,7 @@ export async function run(scenarios: Step[][], ports: number[] = [3587]) {
       }
     },
     console.error,
+    access.close.bind(access),
   );
   const rl = createInterface({
     input: process.stdin,
