@@ -73,9 +73,7 @@ function Feed() {
         ...new Uint8Array(await Protocol.exportKey(skipclient.creds.publicKey)),
       ]);
       const response = await fetch(BASE_URL, {
-        headers: {
-          "X-Reactive-Auth": btoa(pubkey),
-        },
+        headers: { "X-Reactive-Auth": btoa(pubkey) },
       });
       const data = await response.json();
       setPosts(data);
@@ -100,7 +98,7 @@ function Feed() {
     } catch (error) {
       console.error(error);
     }
-  }, []);
+  }, [skipclient]);
 
   async function upvotePost(postId: number) {
     try {
@@ -155,7 +153,7 @@ function Post() {
     }, 1000);
 
     return () => clearInterval(intervalId);
-  }, []);
+  }, [post_id]);
 
   return (
     <>
