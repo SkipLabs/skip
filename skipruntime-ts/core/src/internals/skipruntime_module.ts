@@ -319,8 +319,8 @@ export interface FromWasm {
   ): Handle<ErrorObject>;
 
   SkipRuntime_Runtime__subscribe(
-    reactiveId: ptr<Internal.String>,
-    from: bigint,
+    collection: ptr<Internal.String>,
+    fromWatermark: bigint,
     notifier: ptr<Internal.Notifier>,
     reactiveAuth: ptr<Internal.Array<Internal.Byte>> | null,
   ): bigint;
@@ -1467,8 +1467,7 @@ export class ServiceInstance {
    * @returns A subcription identifier
    */
   subscribe<K extends TJSON, V extends TJSON>(
-    reactiveId: string,
-    since: Watermark,
+    reactiveResponse: ReactiveResponse,
     f: (update: CollectionUpdate<K, V>) => void,
     reactiveAuth?: Uint8Array,
   ): SubscriptionID {
@@ -1477,17 +1476,19 @@ export class ServiceInstance {
         this.refs.handles.register(f),
       );
       return this.refs.fromWasm.SkipRuntime_Runtime__subscribe(
-        this.refs.skjson.exportString(reactiveId),
-        since,
+        this.refs.skjson.exportString(reactiveResponse.collection),
+        reactiveResponse.watermark,
         sknotifier,
         reactiveAuth ? this.refs.skjson.exportBytes(reactiveAuth) : null,
       );
     });
     if (session == -1n) {
-      throw new UnknownCollectionError(`Unknown collection '${reactiveId}'`);
+      throw new UnknownCollectionError(
+        `Unknown collection '${reactiveResponse.collection}'`,
+      );
     } else if (session == -2n) {
       throw new UnknownCollectionError(
-        `Access to collection '${reactiveId}' refused.`,
+        `Access to collection '${reactiveResponse.collection}' refused.`,
       );
     } else if (session < 0n) {
       throw new Error("Unknown error");
