@@ -16,7 +16,7 @@ export function createRESTServer(service: ServiceInstance): express.Express {
     if (!strReactiveAuth) throw new Error("X-Reactive-Auth must be specified.");
     const reactiveAuth = new Uint8Array(Buffer.from(strReactiveAuth, "base64"));
     try {
-      const data = service.createResource(
+      const data = service.instantiateResource(
         resourceName,
         req.query as Record<string, string>,
         reactiveAuth,
@@ -37,7 +37,7 @@ export function createRESTServer(service: ServiceInstance): express.Express {
       : undefined;
     try {
       const promise = new Promise(function (resolve, reject) {
-        service.getOne(
+        service.getArray(
           resourceName,
           key,
           req.query as Record<string, string>,

@@ -54,7 +54,7 @@ class Map1Service implements SkipService {
 it("testMap1", async () => {
   const service = await initService(new Map1Service());
   service.update("input", [["1", [10]]]);
-  expect(service.getOne("map1", "1").payload).toEqual([12]);
+  expect(service.getArray("map1", "1").payload).toEqual([12]);
 });
 
 //// testMap2
@@ -110,7 +110,7 @@ it("testMap2", async () => {
   const resource = "map2";
   service.update("input1", [["1", [10]]]);
   service.update("input2", [["1", [20]]]);
-  expect(service.getOne(resource, "1").payload).toEqual([30]);
+  expect(service.getArray(resource, "1").payload).toEqual([30]);
   service.update("input1", [["2", [3]]]);
   service.update("input2", [["2", [7]]]);
   expect(service.getAll(resource).payload.values).toEqual([
@@ -162,7 +162,7 @@ it("testMap3", async () => {
   const resource = "map3";
   service.update("input1", [["1", [1, 2, 3]]]);
   service.update("input2", [["1", [10]]]);
-  expect(service.getOne(resource, "1").payload).toEqual([36]);
+  expect(service.getArray(resource, "1").payload).toEqual([36]);
   service.update("input1", [["2", [3]]]);
   service.update("input2", [["2", [7]]]);
   expect(service.getAll(resource).payload.values).toEqual([
@@ -888,15 +888,15 @@ class TokensService implements SkipService {
 it("testCloseSession", async () => {
   const service = await initService(new TokensService());
   const resource = "tokens";
-  const start = service.getOne(resource, "5ms").payload;
+  const start = service.getArray(resource, "5ms").payload;
   await timeout(2);
   try {
-    expect(service.getOne(resource, "5ms").payload).toEqual(start);
+    expect(service.getArray(resource, "5ms").payload).toEqual(start);
     await timeout(4);
-    const current = service.getOne(resource, "5ms").payload;
+    const current = service.getArray(resource, "5ms").payload;
     expect(current == start).toEqual(false);
   } finally {
-    service.closeResource(resource, {});
+    service.closeResourceInstance(resource, {});
   }
 });
 
@@ -942,11 +942,11 @@ class MultipleResourcesService implements SkipService {
 it("testMultipleResources", async () => {
   const service = await initService(new MultipleResourcesService());
   service.update("input1", [["1", [10]]]);
-  expect(service.getOne("resource1", "1").payload).toEqual([10]);
+  expect(service.getArray("resource1", "1").payload).toEqual([10]);
   service.update("input2", [["1", [20]]]);
-  expect(service.getOne("resource2", "1").payload).toEqual([20]);
+  expect(service.getArray("resource2", "1").payload).toEqual([20]);
   service.update("input1", [["1", [30]]]);
-  expect(service.getOne("resource1", "1").payload).toEqual([30]);
+  expect(service.getArray("resource1", "1").payload).toEqual([30]);
   service.update("input2", [["1", [40]]]);
-  expect(service.getOne("resource2", "1").payload).toEqual([40]);
+  expect(service.getArray("resource2", "1").payload).toEqual([40]);
 });
