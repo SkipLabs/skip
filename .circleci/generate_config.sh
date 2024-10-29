@@ -1,6 +1,8 @@
 #!/bin/bash
 
 # TODO: This is flaky as it relies on coarse directory-level diffs.
+git diff --quiet HEAD $(git merge-base main HEAD) -- $(jq --raw-output ".workspaces[]" package.json)
+check_ts=$?
 git diff --quiet HEAD $(git merge-base main HEAD) -- skiplang/compiler/ skiplang/prelude/ :^skiplang/prelude/ts
 skc=$?
 git diff --quiet HEAD $(git merge-base main HEAD) -- skiplang/prelude/src/skstore/ skiplang/compiler/runtime/
@@ -21,6 +23,15 @@ echo "workflows:"
     jobs:
       - check-format
 EOF
+
+if (( $check_ts != 0 ))
+then
+    cat <<EOF
+  check-ts:
+    jobs:
+      - check-ts
+EOF
+fi
 
 if (( $skc != 0 ))
 then
