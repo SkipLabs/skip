@@ -18,8 +18,8 @@ class Mult extends ManyToOneMapper<string, number, number> {
 
 class MultResource implements Resource {
   reactiveCompute(
-    context: Context,
     _collections: Record<string, EagerCollection<TJSON, TJSON>>,
+    context: Context,
   ): EagerCollection<string, number> {
     const sub = context.useExternalResource<string, number>({
       supplier: "sumexample",
@@ -40,7 +40,6 @@ class Service implements SkipService {
   };
 
   reactiveCompute(
-    _context: Context,
     inputCollections: Record<string, EagerCollection<string, number>>,
   ) {
     return inputCollections;

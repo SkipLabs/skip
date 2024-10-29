@@ -370,13 +370,13 @@ export interface ExternalSupplier {
 export interface Resource {
   /**
    * Build a reactive compute graph of the reactive ressource
-   * @param context {Context} - the reactive graph context
    * @param collections - the collection returned by SkipService reactiveCompute
+   * @param context {Context} - the reactive graph context
    * @param reactiveAuth - the client user Skip session authentification
    */
   reactiveCompute(
-    context: Context,
     collections: Record<string, EagerCollection<TJSON, TJSON>>,
+    context: Context,
     reactiveAuth?: Uint8Array,
   ): EagerCollection<TJSON, TJSON>;
 }
@@ -391,12 +391,12 @@ export interface SkipService {
 
   /**
    * Build a reactive shared initial compute graph
-   * @param context {Context} - the reactive graph context
    * @param inputCollections - the input collections of SkipService
+   * @param context {Context} - the reactive graph context
    * @returns - the reactive collections accessible by the resources
    */
   reactiveCompute(
-    context: Context,
     inputCollections: Record<string, EagerCollection<TJSON, TJSON>>,
+    context: Context,
   ): Record<string, EagerCollection<TJSON, TJSON>>;
 }

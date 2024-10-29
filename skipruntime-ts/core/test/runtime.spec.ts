@@ -29,12 +29,9 @@ class Map1 implements Mapper<string, number, string, number> {
 }
 
 class Map1Resource implements Resource {
-  reactiveCompute(
-    _context: Context,
-    collections: {
-      input: EagerCollection<string, number>;
-    },
-  ): EagerCollection<string, number> {
+  reactiveCompute(collections: {
+    input: EagerCollection<string, number>;
+  }): EagerCollection<string, number> {
     return collections.input.map(Map1);
   }
 }
@@ -43,10 +40,9 @@ class Map1Service implements SkipService {
   inputCollections = { input: [] };
   resources = { map1: Map1Resource };
 
-  reactiveCompute(
-    _context: Context,
-    inputCollections: { input: EagerCollection<number, number> },
-  ) {
+  reactiveCompute(inputCollections: {
+    input: EagerCollection<number, number>;
+  }) {
     return inputCollections;
   }
 }
@@ -78,13 +74,10 @@ class Map2 implements Mapper<string, number, string, number> {
 }
 
 class Map2Resource implements Resource {
-  reactiveCompute(
-    _context: Context,
-    collections: {
-      input1: EagerCollection<string, number>;
-      input2: EagerCollection<string, number>;
-    },
-  ): EagerCollection<string, number> {
+  reactiveCompute(collections: {
+    input1: EagerCollection<string, number>;
+    input2: EagerCollection<string, number>;
+  }): EagerCollection<string, number> {
     return collections.input1.map(Map2, collections.input2);
   }
 }
@@ -93,13 +86,10 @@ class Map2Service implements SkipService {
   inputCollections = { input1: [], input2: [] };
   resources = { map2: Map2Resource };
 
-  reactiveCompute(
-    _context: Context,
-    inputCollections: {
-      input1: EagerCollection<string, number>;
-      input2: EagerCollection<string, number>;
-    },
-  ) {
+  reactiveCompute(inputCollections: {
+    input1: EagerCollection<string, number>;
+    input2: EagerCollection<string, number>;
+  }) {
     return inputCollections;
   }
 }
@@ -130,13 +120,10 @@ class Map3 implements Mapper<string, number, string, number> {
 }
 
 class Map3Resource implements Resource {
-  reactiveCompute(
-    _context: Context,
-    cs: {
-      input1: EagerCollection<string, number>;
-      input2: EagerCollection<string, number>;
-    },
-  ): EagerCollection<string, number> {
+  reactiveCompute(cs: {
+    input1: EagerCollection<string, number>;
+    input2: EagerCollection<string, number>;
+  }): EagerCollection<string, number> {
     return cs.input1.map(Map2, cs.input2).map(Map3);
   }
 }
@@ -145,13 +132,10 @@ class Map3Service implements SkipService {
   inputCollections = { input1: [], input2: [] };
   resources = { map3: Map3Resource };
 
-  reactiveCompute(
-    _context: Context,
-    inputCollections: {
-      input1: EagerCollection<number, number>;
-      input2: EagerCollection<number, number>;
-    },
-  ) {
+  reactiveCompute(inputCollections: {
+    input1: EagerCollection<number, number>;
+    input2: EagerCollection<number, number>;
+  }) {
     return inputCollections;
   }
 }
@@ -185,12 +169,9 @@ class AddKeyAndValue extends OneToOneMapper<number, number, number> {
 }
 
 class OneToOneMapperResource implements Resource {
-  reactiveCompute(
-    _context: Context,
-    cs: {
-      input: EagerCollection<number, number>;
-    },
-  ): EagerCollection<number, number> {
+  reactiveCompute(cs: {
+    input: EagerCollection<number, number>;
+  }): EagerCollection<number, number> {
     return cs.input.map(SquareValues).map(AddKeyAndValue);
   }
 }
@@ -199,12 +180,9 @@ class OneToOneMapperService implements SkipService {
   inputCollections = { input: [] };
   resources = { valueMapper: OneToOneMapperResource };
 
-  reactiveCompute(
-    _context: Context,
-    inputCollections: {
-      input: EagerCollection<number, number>;
-    },
-  ) {
+  reactiveCompute(inputCollections: {
+    input: EagerCollection<number, number>;
+  }) {
     return inputCollections;
   }
 }
@@ -240,13 +218,10 @@ class SizeMapper implements Mapper<number, number, number, number> {
 }
 
 class SizeResource implements Resource {
-  reactiveCompute(
-    _context: Context,
-    cs: {
-      input1: EagerCollection<number, number>;
-      input2: EagerCollection<number, number>;
-    },
-  ): EagerCollection<number, number> {
+  reactiveCompute(cs: {
+    input1: EagerCollection<number, number>;
+    input2: EagerCollection<number, number>;
+  }): EagerCollection<number, number> {
     return cs.input1.map(SizeMapper, cs.input2);
   }
 }
@@ -255,13 +230,10 @@ class SizeService implements SkipService {
   inputCollections = { input1: [], input2: [] };
   resources = { size: SizeResource };
 
-  reactiveCompute(
-    _context: Context,
-    inputCollections: {
-      input1: EagerCollection<number, number>;
-      input2: EagerCollection<number, number>;
-    },
-  ) {
+  reactiveCompute(inputCollections: {
+    input1: EagerCollection<number, number>;
+    input2: EagerCollection<number, number>;
+  }) {
     return inputCollections;
   }
 }
@@ -295,12 +267,9 @@ it("testSize", async () => {
 //// testSlicedMap1
 
 class SlicedMap1Resource implements Resource {
-  reactiveCompute(
-    _context: Context,
-    cs: {
-      input: EagerCollection<number, number>;
-    },
-  ): EagerCollection<number, number> {
+  reactiveCompute(cs: {
+    input: EagerCollection<number, number>;
+  }): EagerCollection<number, number> {
     return cs.input
       .slice([
         [1, 1],
@@ -323,12 +292,9 @@ class SlicedMap1Service implements SkipService {
   inputCollections = { input: [] };
   resources = { slice: SlicedMap1Resource };
 
-  reactiveCompute(
-    _context: Context,
-    inputCollections: {
-      input: EagerCollection<number, number>;
-    },
-  ) {
+  reactiveCompute(inputCollections: {
+    input: EagerCollection<number, number>;
+  }) {
     return inputCollections;
   }
 }
@@ -379,10 +345,10 @@ class MapLazy implements Mapper<number, number, number, number> {
 
 class LazyResource implements Resource {
   reactiveCompute(
-    context: Context,
     cs: {
       input: EagerCollection<number, number>;
     },
+    context: Context,
   ): EagerCollection<number, number> {
     const lazy = context.lazy(TestLazyAdd, cs.input);
     return cs.input.map(MapLazy, lazy);
@@ -393,12 +359,9 @@ class LazyService implements SkipService {
   inputCollections = { input: [] };
   resources = { lazy: LazyResource };
 
-  reactiveCompute(
-    _context: Context,
-    inputCollections: {
-      input: EagerCollection<number, number>;
-    },
-  ) {
+  reactiveCompute(inputCollections: {
+    input: EagerCollection<number, number>;
+  }) {
     return inputCollections;
   }
 }
@@ -439,12 +402,9 @@ class TestOddEven implements Mapper<number, number, number, number> {
 }
 
 class MapReduceResource implements Resource {
-  reactiveCompute(
-    _context: Context,
-    cs: {
-      input: EagerCollection<number, number>;
-    },
-  ): EagerCollection<number, number> {
+  reactiveCompute(cs: {
+    input: EagerCollection<number, number>;
+  }): EagerCollection<number, number> {
     return cs.input.mapReduce(TestOddEven, new Sum());
   }
 }
@@ -453,12 +413,9 @@ class MapReduceService implements SkipService {
   inputCollections = { input: [] };
   resources = { mapReduce: MapReduceResource };
 
-  reactiveCompute(
-    _context: Context,
-    inputCollections: {
-      input: EagerCollection<number, number>;
-    },
-  ) {
+  reactiveCompute(inputCollections: {
+    input: EagerCollection<number, number>;
+  }) {
     return inputCollections;
   }
 }
@@ -499,13 +456,10 @@ it("testMapReduce", async () => {
 //// testMerge1
 
 class Merge1Resource implements Resource {
-  reactiveCompute(
-    _context: Context,
-    cs: {
-      input1: EagerCollection<number, number>;
-      input2: EagerCollection<number, number>;
-    },
-  ): EagerCollection<number, number> {
+  reactiveCompute(cs: {
+    input1: EagerCollection<number, number>;
+    input2: EagerCollection<number, number>;
+  }): EagerCollection<number, number> {
     return cs.input1.merge(cs.input2);
   }
 }
@@ -514,13 +468,10 @@ class Merge1Service implements SkipService {
   inputCollections = { input1: [], input2: [] };
   resources = { merge1: Merge1Resource };
 
-  reactiveCompute(
-    _context: Context,
-    inputCollections: {
-      input1: EagerCollection<number, number>;
-      input2: EagerCollection<number, number>;
-    },
-  ) {
+  reactiveCompute(inputCollections: {
+    input1: EagerCollection<number, number>;
+    input2: EagerCollection<number, number>;
+  }) {
     return inputCollections;
   }
 }
@@ -562,13 +513,10 @@ class IdentityMapper extends OneToOneMapper<number, number, number> {
 }
 
 class MergeReduceResource implements Resource {
-  reactiveCompute(
-    _context: Context,
-    cs: {
-      input1: EagerCollection<number, number>;
-      input2: EagerCollection<number, number>;
-    },
-  ): EagerCollection<number, number> {
+  reactiveCompute(cs: {
+    input1: EagerCollection<number, number>;
+    input2: EagerCollection<number, number>;
+  }): EagerCollection<number, number> {
     return cs.input1.merge(cs.input2).mapReduce(IdentityMapper, new Sum());
   }
 }
@@ -577,13 +525,10 @@ class MergeReduceService implements SkipService {
   inputCollections = { input1: [], input2: [] };
   resources = { mergeReduce: MergeReduceResource };
 
-  reactiveCompute(
-    _context: Context,
-    inputCollections: {
-      input1: EagerCollection<number, number>;
-      input2: EagerCollection<number, number>;
-    },
-  ) {
+  reactiveCompute(inputCollections: {
+    input1: EagerCollection<number, number>;
+    input2: EagerCollection<number, number>;
+  }) {
     return inputCollections;
   }
 }
@@ -627,10 +572,10 @@ class JSONExtract
 
 class JSONExtractResource implements Resource {
   reactiveCompute(
-    context: Context,
     cs: {
       input: EagerCollection<number, { value: JSONObject; pattern: string }>;
     },
+    context: Context,
   ): EagerCollection<number, TJSON[]> {
     return cs.input.map(JSONExtract, context);
   }
@@ -640,12 +585,9 @@ class JSONExtractService implements SkipService {
   inputCollections = { input: [] };
   resources = { jsonExtract: JSONExtractResource };
 
-  reactiveCompute(
-    _context: Context,
-    inputCollections: {
-      input: EagerCollection<number, { value: JSONObject; pattern: string }>;
-    },
-  ) {
+  reactiveCompute(inputCollections: {
+    input: EagerCollection<number, { value: JSONObject; pattern: string }>;
+  }) {
     return inputCollections;
   }
 }
@@ -778,11 +720,11 @@ class ExternalCheck implements Mapper<number, number, number, number[]> {
 
 class ExternalResource implements Resource {
   reactiveCompute(
-    context: Context,
     cs: {
       input1: EagerCollection<number, number>;
       input2: EagerCollection<number, number>;
     },
+    context: Context,
     reactiveAuth?: Uint8Array,
   ): EagerCollection<number, number[]> {
     const v1 = (cs.input2.maybeGetOne(0) ?? 0).toString();
@@ -802,13 +744,10 @@ class TestExternalService implements SkipService {
   resources = { external: ExternalResource };
   externalServices = { external: new External() };
 
-  reactiveCompute(
-    _context: Context,
-    inputCollections: {
-      input1: EagerCollection<number, number>;
-      input2: EagerCollection<number, number>;
-    },
-  ) {
+  reactiveCompute(inputCollections: {
+    input1: EagerCollection<number, number>;
+    input2: EagerCollection<number, number>;
+  }) {
     return inputCollections;
   }
 }
@@ -856,8 +795,8 @@ it("testExternal", async () => {
 
 class TokensResource implements Resource {
   reactiveCompute(
-    context: Context,
     _cs: Record<string, EagerCollection<TJSON, TJSON>>,
+    context: Context,
     reactiveAuth?: Uint8Array,
   ): EagerCollection<string, number> {
     return context.useExternalResource({
@@ -876,10 +815,7 @@ class TokensService implements SkipService {
   resources = { tokens: TokensResource };
   externalServices = { system };
 
-  reactiveCompute(
-    _context: Context,
-    _ic: Record<string, EagerCollection<TJSON, TJSON>>,
-  ) {
+  reactiveCompute() {
     return {};
   }
 }
@@ -902,23 +838,17 @@ it("testCloseSession", async () => {
 //// testMultipleResources
 
 class Resource1 implements Resource {
-  reactiveCompute(
-    _context: Context,
-    collections: {
-      input1: EagerCollection<string, number>;
-    },
-  ): EagerCollection<string, number> {
+  reactiveCompute(collections: {
+    input1: EagerCollection<string, number>;
+  }): EagerCollection<string, number> {
     return collections.input1;
   }
 }
 
 class Resource2 implements Resource {
-  reactiveCompute(
-    _context: Context,
-    collections: {
-      input2: EagerCollection<string, number>;
-    },
-  ): EagerCollection<string, number> {
+  reactiveCompute(collections: {
+    input2: EagerCollection<string, number>;
+  }): EagerCollection<string, number> {
     return collections.input2;
   }
 }
@@ -927,13 +857,10 @@ class MultipleResourcesService implements SkipService {
   inputCollections = { input1: [], input2: [] };
   resources = { resource1: Resource1, resource2: Resource2 };
 
-  reactiveCompute(
-    _context: Context,
-    inputCollections: {
-      input1: EagerCollection<number, number>;
-      input2: EagerCollection<number, number>;
-    },
-  ) {
+  reactiveCompute(inputCollections: {
+    input1: EagerCollection<number, number>;
+    input2: EagerCollection<number, number>;
+  }) {
     return inputCollections;
   }
 }
