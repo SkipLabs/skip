@@ -494,6 +494,7 @@ class ResilientMuxedSocket {
     const backoffMs = 500 + Math.random() * 1000;
     await new Promise((resolve) => setTimeout(resolve, backoffMs));
 
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     while (true) {
       try {
         const socket = await MuxedSocket.connect(
@@ -584,7 +585,7 @@ class ResilientStream {
       });
     }, failureThresholdMs);
     // TODO: Fix the following error.
-    // @ts-ignore
+    // @ts-expect-error: Argument of type 'Timeout' is not assignable to parameter of type 'number'.
     this.setFailureDetectionTimeout(timeout);
   }
 
@@ -641,8 +642,6 @@ class ResilientStream {
 /* Stream MUX protocol */
 /* ***************************************************************************/
 
-/* eslint-disable no-unused-vars */
-
 enum MuxedSocketState {
   IDLE,
   AUTH_SENT,
@@ -650,8 +649,6 @@ enum MuxedSocketState {
   CLOSEWAIT, // can send data
   CLOSED,
 }
-
-/* eslint-enable no-unused-vars */
 
 type MuxAuth = {
   type: "auth";
@@ -1294,16 +1291,12 @@ export class MuxedSocket {
   }
 }
 
-/* eslint-disable no-unused-vars */
-
 enum StreamState {
   OPEN,
   CLOSING,
   CLOSEWAIT,
   CLOSED,
 }
-
-/* eslint-enable no-unused-vars */
 
 class Stream {
   // constants
@@ -1601,6 +1594,9 @@ class SKDBServer implements RemoteSKDB {
             }
             client.writeCsv(payload, this.replicationUid);
           });
+          // the linter seems to be unable to see the assignment to
+          // resolveSignalled above
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
           if (!resolved && resolveSignalled) {
             resolved = true;
             resolve();

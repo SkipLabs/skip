@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext } from "react";
+import { type SetStateAction, useState, useEffect, useContext } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -8,6 +8,7 @@ import {
 } from "react-router-dom";
 import "./App.css";
 import { SkipContext } from "./SkipContext.ts";
+import { ReactiveResponse } from "@skipruntime/core";
 import { Client, Protocol } from "@skipruntime/client";
 
 const BASE_URL = "http://localhost:5000";
@@ -75,11 +76,11 @@ function Feed() {
       const response = await fetch(BASE_URL, {
         headers: { "X-Reactive-Auth": btoa(pubkey) },
       });
-      const data = await response.json();
+      const data = (await response.json()) as SetStateAction<Post[]>;
       setPosts(data);
       const reactiveToken = JSON.parse(
         response.headers.get("Skip-Reactive-Response-Token")!,
-      );
+      ) as ReactiveResponse;
       // TODO: Make this happen transparently in the skip client.
       const reactiveCollection = reactiveToken.collection;
       const reactiveWatermark = BigInt(reactiveToken.watermark);
@@ -87,14 +88,14 @@ function Feed() {
         reactiveCollection,
         reactiveWatermark,
         (updates, _isInit) => {
-          const updatedPosts = updates[0][1]! as Post[];
+          const updatedPosts = updates[0][1] as Post[];
           setPosts(updatedPosts);
         },
       );
     }
 
     try {
-      getInitialData();
+      void getInitialData();
     } catch (error) {
       console.error(error);
     }
@@ -117,7 +118,7 @@ function Feed() {
             <div
               className="votearrow prevent-select"
               title="upvote"
-              onClick={() => upvotePost(post.id)}
+              onClick={() => void upvotePost(post.id)}
             ></div>
             &nbsp;
             <Link to={`/posts/${post.id}`}>{post.title}</Link>&nbsp;
@@ -139,7 +140,7 @@ function Post() {
     try {
       const response = await fetch(`${BASE_URL}/posts/${postId}`);
       console.log(response);
-      const data = await response.json();
+      const data = (await response.json()) as SetStateAction<Post | null>;
       console.log(data);
       return data;
     } catch (error) {
@@ -149,7 +150,7 @@ function Post() {
 
   useEffect(() => {
     const intervalId = setInterval(() => {
-      getPost(post_id).then((post) =>
+      void getPost(post_id).then((post) =>
         post === undefined ? undefined : setPost(post),
       );
     }, 1000);

@@ -12,9 +12,4 @@ export default [
     ],
   },
   ...config,
-  {
-    rules: {
-      "@typescript-eslint/ban-ts-comment": "warn",
-    },
-  },
 ];

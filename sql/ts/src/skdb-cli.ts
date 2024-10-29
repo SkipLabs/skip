@@ -275,7 +275,7 @@ if (
 }
 
 const firstPair = Object.entries(dbCreds)[0]!; // checked by preceding if
-const firstKey = firstPair[0]!; // Object.entries is an array of key-value pairs
+const firstKey = firstPair[0];
 const accessKey = (values["access-key"] ?? firstKey) as string;
 const privateKey = dbCreds[accessKey] as string;
 
@@ -398,6 +398,7 @@ const remoteRepl = async function () {
     undefined,
     !values["simple-output"],
   );
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   while (true) {
     if (process.stdin.closed) {
       rl.close();
@@ -497,6 +498,7 @@ const localRepl = async function () {
     undefined,
     !values["simple-output"],
   );
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   while (true) {
     const query = await rl.question(`local> `);
 

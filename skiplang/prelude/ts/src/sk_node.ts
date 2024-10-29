@@ -29,8 +29,8 @@ class WrkImpl implements Wrk {
   };
 }
 
-var decoder = new util.TextDecoder("utf8");
-var encoder = new util.TextEncoder();
+const decoder = new util.TextDecoder("utf8");
+const encoder = new util.TextEncoder();
 
 class Env implements Environment {
   shared: Map<string, Shared>;
@@ -42,30 +42,36 @@ class Env implements Environment {
   encodeUTF8: (str: string) => Uint8Array;
   base64Decode: (base64: string) => Uint8Array;
   base64Encode: (toEncode: string, url?: boolean) => string;
-  environment: Array<string>;
+  environment: string[];
   throwRuntime: (code: int) => void;
-  // @ts-ignore
   createSocket: (uri: string) => WebSocket;
   createWorker: (url: URL, options?: WorkerOptions) => Wrk;
   createWorkerWrapper: (worker: any) => Wrk;
   crypto: () => Crypto;
+
   fs() {
     return this.fileSystem;
   }
+
   sys() {
     return this.system;
   }
+
   name() {
     return "node";
   }
+
   fetch(url: URL | string) {
     let filename: string | URL;
     const cwd = process.cwd();
     if (url && url instanceof URL && url.pathname) {
       filename = "./" + path.relative(cwd, url.pathname);
-      // @ts-ignore
-    } else if (url != "" && url.default) {
-      // @ts-ignore
+    } else if (
+      url != "" &&
+      // @ts-expect-error: Property 'default' does not exist on type 'string | URL'.
+      url.default
+    ) {
+      // @ts-expect-error: Property 'default' does not exist on type 'string | URL'.
       filename = "./" + path.relative(cwd, url.default as string);
     } else {
       filename = url;
@@ -76,9 +82,12 @@ class Env implements Environment {
       );
     });
   }
-  onException() {}
 
-  constructor(environment?: Array<string>) {
+  onException() {
+    /* default nop hook */
+  }
+
+  constructor(environment?: string[]) {
     this.shared = new Map<string, Shared>();
     this.fileSystem = new MemFS();
     this.system = new MemSys();
@@ -103,6 +112,6 @@ class Env implements Environment {
   }
 }
 
-export function environment(environment?: Array<string>) {
+export function environment(environment?: string[]) {
   return new Env(environment);
 }

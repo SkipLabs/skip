@@ -93,9 +93,10 @@ class SKDBMechanismImpl implements SKDBMechanism {
         acc[table] = { since: wm };
       }
       const diffSpec = JSON.stringify(acc, (_key, value) =>
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
         typeof value === "bigint" ? Number(value) : value,
       );
-      let d = client.runLocal(["diff", "--format=csv", session], diffSpec);
+      const d = client.runLocal(["diff", "--format=csv", session], diffSpec);
       if (d.trim() == "") {
         return null;
       }
@@ -115,7 +116,7 @@ export class SKDBSyncImpl implements SKDBSync {
   private fs: FileSystem;
 
   save!: () => Promise<boolean>;
-  runLocal!: (new_args: Array<string>, new_stdin: string) => string;
+  runLocal!: (new_args: string[], new_stdin: string) => string;
   watch!: (
     query: string,
     params: Params,
@@ -142,7 +143,7 @@ export class SKDBSyncImpl implements SKDBSync {
     env: Environment,
     save: () => Promise<boolean>,
   ): SKDBSync {
-    let client = new SKDBSyncImpl(env);
+    const client = new SKDBSyncImpl(env);
     client.save = save;
     client.runLocal = handle.main;
     client.clientUuid = env.crypto().randomUUID();
