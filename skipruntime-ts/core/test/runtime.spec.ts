@@ -22,9 +22,9 @@ import { TimeCollection, ExternalService } from "../src/skipruntime_helpers.js";
 class Map1 implements Mapper<string, number, string, number> {
   mapElement(
     key: string,
-    it: NonEmptyIterator<number>,
+    values: NonEmptyIterator<number>,
   ): Iterable<[string, number]> {
-    return Array([key, it.first() + 2]);
+    return Array([key, values.first() + 2]);
   }
 }
 
@@ -64,12 +64,11 @@ class Map2 implements Mapper<string, number, string, number> {
 
   mapElement(
     key: string,
-    it: NonEmptyIterator<number>,
+    values: NonEmptyIterator<number>,
   ): Iterable<[string, number]> {
     const result: [string, number][] = [];
-    const values = it.toArray();
     const other_values = this.other.getArray(key);
-    for (const v of values) {
+    for (const v of values.toArray()) {
       for (const other_v of other_values) {
         result.push([key, v + other_v]);
       }
@@ -124,9 +123,9 @@ it("testMap2", async () => {
 class Map3 implements Mapper<string, number, string, number> {
   mapElement(
     key: string,
-    it: NonEmptyIterator<number>,
+    values: NonEmptyIterator<number>,
   ): Iterable<[string, number]> {
-    return [[key, it.toArray().reduce((x, y) => x + y, 0)]];
+    return [[key, values.toArray().reduce((x, y) => x + y, 0)]];
   }
 }
 
@@ -234,9 +233,9 @@ class SizeMapper implements Mapper<number, number, number, number> {
 
   mapElement(
     key: number,
-    it: NonEmptyIterator<number>,
+    values: NonEmptyIterator<number>,
   ): Iterable<[number, number]> {
-    return [[key, it.first() + this.other.size()]];
+    return [[key, values.first() + this.other.size()]];
   }
 }
 
@@ -372,9 +371,9 @@ class MapLazy implements Mapper<number, number, number, number> {
 
   mapElement(
     key: number,
-    it: NonEmptyIterator<number>,
+    values: NonEmptyIterator<number>,
   ): Iterable<[number, number]> {
-    return Array([key, this.other.getOne(key) - it.first()]);
+    return Array([key, this.other.getOne(key) - values.first()]);
   }
 }
 
@@ -433,9 +432,9 @@ it("testLazy", async () => {
 class TestOddEven implements Mapper<number, number, number, number> {
   mapElement(
     key: number,
-    it: NonEmptyIterator<number>,
+    values: NonEmptyIterator<number>,
   ): Iterable<[number, number]> {
-    return Array([key % 2, it.first()]);
+    return Array([key % 2, values.first()]);
   }
 }
 
@@ -618,9 +617,9 @@ class JSONExtract
 
   mapElement(
     key: number,
-    it: NonEmptyIterator<{ value: JSONObject; pattern: string }>,
+    values: NonEmptyIterator<{ value: JSONObject; pattern: string }>,
   ): Iterable<[number, TJSON[]]> {
-    const value = it.first();
+    const value = values.first();
     const result = this.context.jsonExtract(value.value, value.pattern);
     return Array([key, result]);
   }
@@ -766,10 +765,10 @@ class ExternalCheck implements Mapper<number, number, number, number[]> {
 
   mapElement(
     key: number,
-    it: NonEmptyIterator<number>,
+    values: NonEmptyIterator<number>,
   ): Iterable<[number, number[]]> {
     const result = this.external.maybeGetOne(key);
-    const value = it.toArray();
+    const value = values.toArray();
     if (result != null) {
       value.push(result);
     }
