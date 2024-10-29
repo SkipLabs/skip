@@ -31,13 +31,16 @@ export type Param =
   | readonly Param[]
   | { readonly [k: string]: Param };
 export { freeze } from "./internals/skipruntime_module.js";
+
 /**
  * The type of a reactive function mapping over an arbitrary collection.
- * For each key & values in the input collection (of type K1/V1 respectively),
- * produces some key/value pairs for the output collection (of type K2/V2 respectively)
+ * For each element (association of key of type K1 to values of type V1) in
+ * the input collection, produces some key-value pairs for the output
+ * collection (of types K2 and V2 respectively). The output collection will
+ * itself combine multiple values for each individual key.
  * @param key - a key found in the input collection
- * @param values - the values mapped to by `key` in the input collection
- * @returns an iterable of key/value pairs to output for the given input(s)
+ * @param values - the values associated with `key` in the input collection
+ * @returns an iterable of key-value pairs to output for the given input(s)
  */
 export interface Mapper<
   K1 extends TJSON,
@@ -49,15 +52,14 @@ export interface Mapper<
 }
 
 /**
- * A specialized form of `Mapper` which re-uses the input collection's key structure
- * in the output collection.
- *
- * For cases where the mapper just maps values and preserves the key structure, this
- * saves some boilerplate: instead of writing the fully general `mapElement` that
- * potentially modifies, adds, or removes keys, just implement the simpler `mapValue`
- * to transform values.
+ * A specialized form of `Mapper` which maps values one-to-one, reusing the
+ * input collection's key structure in the output collection. Use this form
+ * to map each value associated with a key to an output value for that
+ * key. This saves some boilerplate: instead of writing the fully general
+ * `mapElement` that potentially modifies, adds, or removes keys, just
+ * implement the simpler `mapValue` to transform individual values.
  */
-export abstract class ValueMapper<
+export abstract class OneToOneMapper<
   K extends TJSON,
   V1 extends TJSON,
   V2 extends TJSON,
@@ -67,6 +69,28 @@ export abstract class ValueMapper<
 
   mapElement(key: K, values: NonEmptyIterator<V1>): Iterable<[K, V2]> {
     return values.toArray().map((v) => [key, this.mapValue(v, key)]);
+  }
+}
+
+/**
+ * A specialized form of `Mapper` which maps values many-to-one, reusing the
+ * input collection's key structure in the output collection. Use this form
+ * to map all the values associated with a key to a single output value for
+ * that key. This saves some boilerplate: instead of writing the fully
+ * general `mapElement` that potentially modifies, adds, or removes keys,
+ * just implement the simpler `mapValues` to transform the values associated
+ * with each key.
+ */
+export abstract class ManyToOneMapper<
+  K extends TJSON,
+  V1 extends TJSON,
+  V2 extends TJSON,
+> implements Mapper<K, V1, K, V2>
+{
+  abstract mapValues(values: NonEmptyIterator<V1>, key: K): V2;
+
+  mapElement(key: K, values: NonEmptyIterator<V1>): Iterable<[K, V2]> {
+    return [[key, this.mapValues(values, key)]];
   }
 }
 
