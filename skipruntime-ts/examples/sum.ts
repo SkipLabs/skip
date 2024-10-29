@@ -12,21 +12,21 @@ import { runService } from "@skipruntime/server";
 class Plus implements Mapper<string, number, string, number> {
   mapElement(
     key: string,
-    it: NonEmptyIterator<number>,
+    values: NonEmptyIterator<number>,
   ): Iterable<[string, number]> {
-    return [[key, it.toArray().reduce((p, c) => p + c, 0)]];
+    return [[key, values.toArray().reduce((p, c) => p + c, 0)]];
   }
 }
 
 class Minus implements Mapper<string, number, string, number> {
   mapElement(
     key: string,
-    it: NonEmptyIterator<number>,
+    values: NonEmptyIterator<number>,
   ): Iterable<[string, number]> {
     const acc = (p: number | null, c: number) => {
       return p !== null ? p - c : c;
     };
-    return [[key, it.toArray().reduce(acc, null) ?? 0]];
+    return [[key, values.toArray().reduce(acc, null) ?? 0]];
   }
 }
 

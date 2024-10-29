@@ -55,9 +55,9 @@ class CallCompute implements Mapper<string, TJSON, string, TJSON> {
 
   mapElement(
     key: string,
-    it: NonEmptyIterator<TJSON>,
+    values: NonEmptyIterator<TJSON>,
   ): Iterable<[string, TJSON]> {
-    const v = it.uniqueValue();
+    const v = values.uniqueValue();
     if (typeof v == "string" && v.startsWith("=")) {
       return Array([key, this.evaluator.getOne(key)]);
     }

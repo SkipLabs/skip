@@ -36,7 +36,7 @@ export { freeze } from "./internals/skipruntime_module.js";
  * For each key & values in the input collection (of type K1/V1 respectively),
  * produces some key/value pairs for the output collection (of type K2/V2 respectively)
  * @param key - a key found in the input collection
- * @param it - the values mapped to by `key` in the input collection
+ * @param values - the values mapped to by `key` in the input collection
  * @returns an iterable of key/value pairs to output for the given input(s)
  */
 export interface Mapper<
@@ -45,7 +45,7 @@ export interface Mapper<
   K2 extends TJSON,
   V2 extends TJSON,
 > {
-  mapElement(key: K1, it: NonEmptyIterator<V1>): Iterable<[K2, V2]>;
+  mapElement(key: K1, values: NonEmptyIterator<V1>): Iterable<[K2, V2]>;
 }
 
 /**
@@ -65,8 +65,8 @@ export abstract class ValueMapper<
 {
   abstract mapValue(value: V1, key: K): V2;
 
-  mapElement(key: K, it: NonEmptyIterator<V1>): Iterable<[K, V2]> {
-    return it.toArray().map((v) => [key, this.mapValue(v, key)]);
+  mapElement(key: K, values: NonEmptyIterator<V1>): Iterable<[K, V2]> {
+    return values.toArray().map((v) => [key, this.mapValue(v, key)]);
   }
 }
 
@@ -251,11 +251,11 @@ export interface Context extends Constant {
   ): LazyCollection<K, V>;
 
   /**
-   * Call a external service to manage an external resource
+   * Call an external service to manage an external resource
    * @param service - the object configuring the external service
-   * @param service.supplier - the name of the external supplier corresponding to a key in externalServices field of SkipService
+   * @param service.supplier - the name of the external supplier, which must correspond to a key inthe `externalServices` field of the `SkipService` this `Context` belongs to
    * @param service.resource - the resource name managed by the supplier
-   * @param service.params - the parameters to apply to the resource
+   * @param service.params - the parameters to supply to the resource
    * @param service.reactiveAuth - the caller client user Skip session authentification
    * @returns The reactive collection of the external resource
    */
