@@ -782,12 +782,12 @@ class Collection(
         kFileToFile,
         context,
         dirName,
-        (ctx, writer, key, it) ~> {
+        (ctx, writer, key, values) ~> {
           pushContext(ctx);
           try {
             for (entry in mapper.mapElement(
               keyConverter.toJSON(key),
-              it.map(fileConverter.toJSON),
+              values.map(fileConverter.toJSON),
             )) {
               writer.append(
                 keyConverter.fromJSON(entry.i0),
@@ -969,12 +969,12 @@ class Collection(
         kFileToFile,
         context,
         dirName,
-        (ctx, writer, key, it) ~> {
+        (ctx, writer, key, values) ~> {
           pushContext(ctx);
           try {
             for (entry in mapper.mapElement(
               keyConverter.toJSON(key),
-              it.map(fileConverter.toJSON),
+              values.map(fileConverter.toJSON),
             )) {
               writer.append(
                 keyConverter.fromJSON(entry.i0),

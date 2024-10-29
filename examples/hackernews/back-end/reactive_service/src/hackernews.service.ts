@@ -67,9 +67,9 @@ export default class HackerNewsService implements SkipService {
 class UpvotesMapper {
   mapElement(
     key: number,
-    it: NonEmptyIterator<Upvote>,
+    values: NonEmptyIterator<Upvote>,
   ): Iterable<[number, number]> {
-    const value = it.first().post_id;
+    const value = values.first().post_id;
     return [[value, key]];
   }
 }
@@ -82,9 +82,9 @@ class PostsMapper {
 
   mapElement(
     key: number,
-    it: NonEmptyIterator<Post>,
+    values: NonEmptyIterator<Post>,
   ): Iterable<[number, Upvoted]> {
-    const post = it.first();
+    const post = values.first();
     const upvotes = this.upvotes.getArray(key).length;
     const author = this.users.maybeGetOne(post.author_id)!;
     // Projecting all posts on key 0 so that they can later be sorted.
@@ -95,9 +95,9 @@ class PostsMapper {
 class SortingMapper {
   mapElement(
     key: number,
-    it: NonEmptyIterator<Upvoted>,
+    values: NonEmptyIterator<Upvoted>,
   ): Iterable<[number, Upvoted]> {
-    const posts = it.toArray();
+    const posts = values.toArray();
     // Sorting in descending order of upvotes.
     posts.sort((a, b) => b.upvotes - a.upvotes);
     return posts.map((p) => [key, p]);
