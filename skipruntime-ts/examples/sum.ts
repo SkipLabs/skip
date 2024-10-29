@@ -1,32 +1,27 @@
 import type {
   Context,
-  Mapper,
   EagerCollection,
   NonEmptyIterator,
   SkipService,
   Resource,
 } from "@skipruntime/core";
 
+import { ManyToOneMapper } from "@skipruntime/core";
+
 import { runService } from "@skipruntime/server";
 
-class Plus implements Mapper<string, number, string, number> {
-  mapElement(
-    key: string,
-    values: NonEmptyIterator<number>,
-  ): Iterable<[string, number]> {
-    return [[key, values.toArray().reduce((p, c) => p + c, 0)]];
+class Plus extends ManyToOneMapper<string, number, number> {
+  mapValues(values: NonEmptyIterator<number>): number {
+    return values.toArray().reduce((p, c) => p + c, 0);
   }
 }
 
-class Minus implements Mapper<string, number, string, number> {
-  mapElement(
-    key: string,
-    values: NonEmptyIterator<number>,
-  ): Iterable<[string, number]> {
+class Minus extends ManyToOneMapper<string, number, number> {
+  mapValues(values: NonEmptyIterator<number>): number {
     const acc = (p: number | null, c: number) => {
       return p !== null ? p - c : c;
     };
-    return [[key, values.toArray().reduce(acc, null) ?? 0]];
+    return values.toArray().reduce(acc, null) ?? 0;
   }
 }
 

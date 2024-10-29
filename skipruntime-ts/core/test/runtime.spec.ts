@@ -14,7 +14,7 @@ import type {
   Entry,
   ExternalSupplier,
 } from "../src/skip-runtime.js";
-import { Sum, ValueMapper, initService } from "../src/skip-runtime.js";
+import { Sum, OneToOneMapper, initService } from "../src/skip-runtime.js";
 import { TimeCollection, ExternalService } from "../src/skipruntime_helpers.js";
 
 //// testMap1
@@ -170,21 +170,21 @@ it("testMap3", async () => {
   ]);
 });
 
-//// testValueMapper
+//// testOneToOneMapper
 
-class SquareValues extends ValueMapper<number, number, number> {
+class SquareValues extends OneToOneMapper<number, number, number> {
   mapValue(v: number) {
     return v * v;
   }
 }
 
-class AddKeyAndValue extends ValueMapper<number, number, number> {
+class AddKeyAndValue extends OneToOneMapper<number, number, number> {
   mapValue(v: number, k: number) {
     return k + v;
   }
 }
 
-class ValueMapperResource implements Resource {
+class OneToOneMapperResource implements Resource {
   reactiveCompute(
     _context: Context,
     cs: {
@@ -195,9 +195,9 @@ class ValueMapperResource implements Resource {
   }
 }
 
-class ValueMapperService implements SkipService {
+class OneToOneMapperService implements SkipService {
   inputCollections = { input: [] };
-  resources = { valueMapper: ValueMapperResource };
+  resources = { valueMapper: OneToOneMapperResource };
 
   reactiveCompute(
     _context: Context,
@@ -210,7 +210,7 @@ class ValueMapperService implements SkipService {
 }
 
 it("valueMapper", async () => {
-  const service = await initService(new ValueMapperService());
+  const service = await initService(new OneToOneMapperService());
   const resource = "valueMapper";
   service.update("input", [
     [1, [1]],
@@ -555,7 +555,7 @@ it("testMerge1", async () => {
 
 //// testMergeReduce
 
-class IdentityMapper extends ValueMapper<number, number, number> {
+class IdentityMapper extends OneToOneMapper<number, number, number> {
   mapValue(v: number) {
     return v;
   }
