@@ -1,22 +1,18 @@
 import type { TJSON } from "@skipruntime/client";
 import type {
   Context,
-  Mapper,
   EagerCollection,
   NonEmptyIterator,
   SkipService,
   Resource,
 } from "@skipruntime/core";
-import { ExternalSkipService } from "@skipruntime/core";
+import { ExternalSkipService, ManyToOneMapper } from "@skipruntime/core";
 
 import { runService } from "@skipruntime/server";
 
-class Mult implements Mapper<string, number, string, number> {
-  mapElement(
-    key: string,
-    values: NonEmptyIterator<number>,
-  ): Iterable<[string, number]> {
-    return [[key, values.toArray().reduce((p, c) => p * c, 1)]];
+class Mult extends ManyToOneMapper<string, number, number> {
+  mapValues(values: NonEmptyIterator<number>): number {
+    return values.toArray().reduce((p, c) => p * c, 1);
   }
 }
 
