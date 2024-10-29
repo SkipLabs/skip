@@ -20,6 +20,16 @@ jobs:
           command: |
             make check-fmt
 
+  check-ts:
+    docker:
+      - image: skiplabs/skdb-base:latest
+    steps:
+      - checkout
+      - setup
+      - run:
+          name: Typecheck and lint typescript sources
+          command: bun install && npm run build && npm run lint
+
   compiler:
     docker:
       - image: skiplabs/skdb-base:latest
@@ -61,6 +71,7 @@ jobs:
           name: Run native skdb tests
           command: |
             make test-native
+
   skdb-wasm:
     docker:
       - image: skiplabs/skdb-base:latest
@@ -75,6 +86,7 @@ jobs:
             make test-wasm
       - store_test_results:
           path: ~/test-results/skdb-wasm.xml
+
   skjson:
     docker:
       - image: skiplabs/skdb-base:latest
@@ -88,6 +100,7 @@ jobs:
             cd skiplang/skjson && skargo test --junitxml ~/test-results/skjson.xml
       - store_test_results:
           path: ~/test-results/skjson.xml
+
   skipruntime-wasm:
     docker:
       - image: skiplabs/skdb-base:latest
