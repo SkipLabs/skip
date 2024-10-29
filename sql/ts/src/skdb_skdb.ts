@@ -207,13 +207,13 @@ class LinksImpl implements Links, ToWasm {
   private state: ExternalFuns;
   private field_names: string[];
   private objectIdx: number;
-  private stream: 0 | 1 | 2;
+  private stream: 0 | 1 | 2 | 3;
   private object: Record<string, any>;
   private stdout_objects: [
     Record<string, any>[],
     Record<string, any>[],
     Record<string, any>[],
-    [] | [{ tick: number }],
+    Record<string, any>[],
   ];
   private storage?: Storage;
   //
@@ -318,7 +318,16 @@ class LinksImpl implements Links, ToWasm {
       return this.funLastTick.get(queryID) ?? 0;
     };
     this.SKIP_switch_to = (stream: int) => {
-      this.stream = stream as 0 | 1 | 2;
+      switch (stream) {
+        case 0:
+        case 1:
+        case 2:
+        case 3:
+          this.stream = stream;
+          break;
+        default:
+          throw new Error(`Invalid stream ${stream}`);
+      }
     };
     this.SKIP_clear_field_names = () => {
       this.field_names = [];
@@ -374,10 +383,6 @@ class LinksImpl implements Links, ToWasm {
       this.objectIdx++;
     };
     this.SKIP_push_object = () => {
-      const objects = this.stdout_objects[this.stream];
-      if (!objects) {
-        this.stdout_objects[this.stream] = [];
-      }
       this.stdout_objects[this.stream].push(this.object);
     };
     this.SKIP_js_mark_query = (queryID: int) => {
@@ -476,7 +481,9 @@ class LinksImpl implements Links, ToWasm {
           const rows = new SKDBTable(...this.stdout_objects[0]);
           const added = new SKDBTable(...this.stdout_objects[1]);
           const removed = new SKDBTable(...this.stdout_objects[2]);
-          const tick = this.stdout_objects[3][0]?.tick;
+          const tick = (
+            this.stdout_objects[3][0] as { tick: number } | undefined
+          )?.tick;
           if (added.length > 0 || removed.length > 0) {
             update(added, removed);
           } else if (rows.length || first) {

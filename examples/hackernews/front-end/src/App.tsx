@@ -149,7 +149,9 @@ function Post() {
 
   useEffect(() => {
     const intervalId = setInterval(() => {
-      getPost(post_id).then(setPost);
+      getPost(post_id).then((post) =>
+        post === undefined ? undefined : setPost(post),
+      );
     }, 1000);
 
     return () => clearInterval(intervalId);

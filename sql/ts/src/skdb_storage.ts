@@ -77,16 +77,8 @@ export class IDBStorage implements Storage {
   }
 
   private async storePages(): Promise<boolean> {
-    if (this.storeName == null) {
-      return new Promise((resolve, _) => {
-        resolve(true);
-      });
-    }
     const storeName = this.storeName;
     return new Promise((resolve, _reject) => {
-      if (this.db == null) {
-        resolve(true);
-      }
       const db = this.db;
       const tx = db.transaction(storeName, "readwrite");
       tx.onabort = () => {
