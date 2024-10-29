@@ -65,10 +65,9 @@ class CallCompute extends OneToOneMapper<string, TJSON, TJSON> {
 }
 
 class ComputedCells implements Resource {
-  reactiveCompute(
-    _context: Context,
-    collections: { output: EagerCollection<string, TJSON> },
-  ): EagerCollection<string, TJSON> {
+  reactiveCompute(collections: {
+    output: EagerCollection<string, TJSON>;
+  }): EagerCollection<string, TJSON> {
     return collections.output;
   }
 }
@@ -78,8 +77,8 @@ class Service implements SkipService {
   resources = { computed: ComputedCells };
 
   reactiveCompute(
-    context: Context,
     inputCollections: { cells: EagerCollection<string, TJSON> },
+    context: Context,
   ): Record<string, EagerCollection<TJSON, TJSON>> {
     const cells = inputCollections.cells;
     // Use lazy dir to create eval dependency graph
