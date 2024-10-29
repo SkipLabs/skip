@@ -79,11 +79,11 @@ class ExternMapper(eptr: SKStore.ExternalPointer) extends Mapper {
 
   fun mapElement(
     key: SKJSON.CJSON,
-    it: mutable SKStore.NonEmptyIterator<SKJSON.CJSON>,
+    values: mutable SKStore.NonEmptyIterator<SKJSON.CJSON>,
   ): mutable Iterator<(SKJSON.CJSON, SKJSON.CJSON)> {
-    mapElementOfMapper(this.eptr.value, key, it) match {
-    | SKJSON.CJArray(values) ->
-      values
+    mapElementOfMapper(this.eptr.value, key, values) match {
+    | SKJSON.CJArray(vals) ->
+      vals
         .map(e ->
           e match {
           | SKJSON.CJArray(av) ->
