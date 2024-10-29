@@ -1,5 +1,5 @@
 import type { TJSON, Entrypoint, Entry } from "@skipruntime/core";
-import { SkipRESTRuntime } from "@skipruntime/core";
+import { SkipRESTService } from "@skipruntime/core";
 import { createInterface } from "readline";
 import { connect, Protocol, Client } from "@skipruntime/client";
 
@@ -25,7 +25,7 @@ function toWs(entrypoint: Entrypoint) {
 }
 
 class SkipHttpAccessV1 {
-  private runtimes: Record<number, SkipRESTRuntime>;
+  private services: Record<number, SkipRESTService>;
   private client?: Client;
   private defaultPort: number;
 
@@ -34,9 +34,9 @@ class SkipHttpAccessV1 {
     ports: number[] = [3587],
   ) {
     this.defaultPort = ports[0] ?? 3587;
-    this.runtimes = {};
+    this.services = {};
     for (const port of ports) {
-      this.runtimes[port] = new SkipRESTRuntime({ host: "localhost", port });
+      this.services[port] = new SkipRESTService({ host: "localhost", port });
     }
   }
 
@@ -45,10 +45,10 @@ class SkipHttpAccessV1 {
   }
 
   async writeMany(data: Write[], port?: number) {
-    const runtime = this.runtimes[port ?? this.defaultPort];
-    if (runtime === undefined) throw new Error(`Invalid port ${port}`);
+    const service = this.services[port ?? this.defaultPort];
+    if (service === undefined) throw new Error(`Invalid port ${port}`);
     const promises = data.map(async (w) =>
-      runtime.patch(w.collection, w.entries),
+      service.patch(w.collection, w.entries),
     );
     if (promises.length == 1) {
       return promises[0];
@@ -57,12 +57,12 @@ class SkipHttpAccessV1 {
   }
 
   async deleteMany(data: Delete[], port?: number) {
-    const runtime = this.runtimes[port ?? this.defaultPort];
-    if (runtime === undefined) throw new Error(`Invalid port ${port}`);
+    const service = this.services[port ?? this.defaultPort];
+    if (service === undefined) throw new Error(`Invalid port ${port}`);
     const promises: Promise<void>[] = [];
     for (const x of data) {
       for (const key of x.keys) {
-        promises.push(runtime.deleteKey(x.collection, key));
+        promises.push(service.deleteKey(x.collection, key));
       }
     }
     if (promises.length == 1) {
@@ -75,9 +75,9 @@ class SkipHttpAccessV1 {
     const publicKey = new Uint8Array(
       await Protocol.exportKey(this.creds.publicKey),
     );
-    const runtime = this.runtimes[port ?? this.defaultPort];
-    if (runtime === undefined) throw new Error(`Invalid port ${port}`);
-    const result = await runtime.getAll(resource, params, publicKey);
+    const service = this.services[port ?? this.defaultPort];
+    if (service === undefined) throw new Error(`Invalid port ${port}`);
+    const result = await service.getAll(resource, params, publicKey);
     console.log(
       JSON.stringify(result, (_key: string, value: unknown) =>
         typeof value === "bigint" ? value.toString() : value,
@@ -93,9 +93,9 @@ class SkipHttpAccessV1 {
     const publicKey = new Uint8Array(
       await Protocol.exportKey(this.creds.publicKey),
     );
-    const runtime = this.runtimes[port ?? this.defaultPort];
-    if (runtime === undefined) throw new Error(`Invalid port ${port}`);
-    const reactive = await runtime.head(resource, params, publicKey);
+    const service = this.services[port ?? this.defaultPort];
+    if (service === undefined) throw new Error(`Invalid port ${port}`);
+    const reactive = await service.head(resource, params, publicKey);
     if (!this.client) {
       this.client = await connect(
         toWs({ host: "localhost", port: port ?? this.defaultPort }),

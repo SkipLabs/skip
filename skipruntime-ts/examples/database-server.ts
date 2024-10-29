@@ -1,4 +1,4 @@
-import { SkipRESTRuntime } from "@skipruntime/core";
+import { SkipRESTService } from "@skipruntime/core";
 import { reactiveResponseHeader } from "@skipruntime/core";
 
 import express from "express";
@@ -7,7 +7,7 @@ import express from "express";
   This is the user facing server of the database example
 */
 
-const runtime = new SkipRESTRuntime({
+const service = new SkipRESTService({
   host: "localhost",
   port: 8081,
 });
@@ -45,7 +45,7 @@ app.head("/auth/users", (req, res) => {
     return;
   }
   const reactiveAuth = new Uint8Array(Buffer.from(strReactiveAuth, "base64"));
-  runtime
+  service
     .head("users", {}, reactiveAuth)
     .then((reactiveResponse) => {
       const [name, value] = reactiveResponseHeader(reactiveResponse);
@@ -63,8 +63,8 @@ app.get("/user/:id", (req, res) => {
     res.status(500).json("Internal error");
     return;
   }
-  runtime
-    .getOne("users", {}, "123", strReactiveAuth)
+  service
+    .getArray("users", {}, "123", strReactiveAuth)
     .then((user) => {
       res.status(200).json(user);
     })
@@ -80,7 +80,7 @@ app.put("/user/:id", (req, res) => {
     $id: key,
     $object: JSON.stringify(data),
   })
-    .then(() => runtime.put("users", key, [data]))
+    .then(() => service.put("users", key, [data]))
     .then(() => {
       res.status(200).json({});
     })
@@ -91,7 +91,7 @@ app.put("/user/:id", (req, res) => {
 app.delete("/user/:id", (req, res) => {
   const key = req.params.id;
   run("DELETE FROM data WHERE id = $id", { $id: key })
-    .then(() => runtime.deleteKey("users", key))
+    .then(() => service.deleteKey("users", key))
     .then(() => {
       res.status(200).json({});
     })

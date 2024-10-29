@@ -41,7 +41,7 @@ export async function fetchJSON<V>(
   return [responseJSON, response.headers];
 }
 
-export class SkipRESTRuntime {
+export class SkipRESTService {
   private entrypoint: string;
 
   constructor(
@@ -103,7 +103,7 @@ export class SkipRESTRuntime {
     }
   }
 
-  async getOne<V extends TJSON>(
+  async getArray<V extends TJSON>(
     resource: string,
     params: Record<string, string>,
     key: string,
