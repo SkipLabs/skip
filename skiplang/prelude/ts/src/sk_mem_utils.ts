@@ -35,22 +35,24 @@ class File {
   }
 
   write(contents: string, append: boolean = false) {
-    if (!this.options || !this.options.write) {
+    if (!this.options?.write) {
       throw new Error("The file cannot be written");
     }
     if ((this.contents && this.options.append) || append) {
-      this.contents += contents;
+      this.contents =
+        this.contents === undefined ? contents : this.contents.concat(contents);
     } else {
       this.contents = contents;
     }
     let old = this.changes;
-    this.changes += contents;
+    this.changes =
+      this.changes === undefined ? contents : this.changes.concat(contents);
     this.withChange = this.changes != old;
     return contents.length;
   }
 
   read(len: int) {
-    if (!this.options || !this.options.read) {
+    if (!this.options?.read) {
       throw new Error("The file cannot be read");
     }
     let clen = this.contents ? this.contents.length : 0;

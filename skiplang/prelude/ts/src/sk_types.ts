@@ -41,7 +41,7 @@ class SkRuntimeExit extends Error {
   code: int;
 
   constructor(code: int, message?: string) {
-    super(message ?? "Runtime exit with code: " + code);
+    super(message ?? `Runtime exit with code: ${code}`);
     this.code = code;
   }
 }
@@ -336,7 +336,7 @@ export class Utils {
       console.log(this.stddebug.join(""));
     }
     if (exitCode != 0 || this.stderr.length > 0) {
-      let message = this.stderr.length > 0 ? this.stderr.join("") : undefined;
+      const message = this.stderr.length > 0 ? this.stderr.join("") : undefined;
       let tmp = "";
       let lines: string[] = [];
       message?.split("\n").forEach((line) => {
@@ -366,8 +366,7 @@ export class Utils {
       if (tmp != "") {
         lines.push(tmp);
       }
-      message = lines.join("\n");
-      let error = new SkRuntimeExit(exitCode, message?.trim());
+      let error = new SkRuntimeExit(exitCode, lines.join("\n").trim());
       (error as any).cause = this.exception;
       throw error;
     }
@@ -405,11 +404,7 @@ export class Utils {
           var c2 = s.charCodeAt(ci);
           if (c2 < 0xdc00 || c2 > 0xdfff)
             throw new Error(
-              "UTF-8 encode: second surrogate character 0x" +
-                c2.toString(16) +
-                " at index " +
-                ci +
-                " out of range",
+              `UTF-8 encode: second surrogate character 0x${c2.toString(16)} at index ${ci} out of range`,
             );
           c = 0x10000 + ((c & 0x03ff) << 10) + (c2 & 0x03ff);
           data[addr + i++] = (c >> 18) | 240;
@@ -536,14 +531,12 @@ export class Utils {
     }
   };
   ethrow = (skExc: ptr<Internal.Exception>, rethrow: boolean) => {
-    if (this.env && this.env.onException) this.env.onException();
+    this.env.onException();
     if (rethrow && this.exception) {
       throw this.exception;
     } else {
       let skMessage =
-        skExc != null && skExc != 0
-          ? this.exports.SKIP_getExceptionMessage(skExc)
-          : null;
+        skExc != 0 ? this.exports.SKIP_getExceptionMessage(skExc) : null;
       let message =
         skMessage != null && skMessage != 0
           ? this.importString(skMessage)
@@ -593,7 +586,7 @@ export class Utils {
   };
 
   getErrorObject = (skExc: ptr<Internal.Exception>): ErrorObject => {
-    if (skExc == null || skExc == 0) {
+    if (skExc == 0) {
       return { message: "SKStore Internal error" };
     }
     let message = this.importString(
@@ -825,7 +818,7 @@ export function trimEndChar(str: string, ch: string) {
 export function humanSize(bytes: int) {
   const thresh = 1024;
   if (Math.abs(bytes) < thresh) {
-    return bytes + " B";
+    return `${bytes} B`;
   }
 
   const units = ["kB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
@@ -839,7 +832,7 @@ export function humanSize(bytes: int) {
     u < units.length - 1
   );
 
-  return bytes.toFixed(1) + " " + units[u];
+  return `${bytes.toFixed(1)} ${units[u]}`;
 }
 
 export function loadWasm(
@@ -871,8 +864,7 @@ async function start(
   main?: string,
 ) {
   let promises = modules.map((fn) => fn(environment));
-  let cs = await Promise.all(promises);
-  let ms = cs.filter((c) => c != null);
+  let ms = await Promise.all(promises);
   return await loadWasm(buffer, ms, environment, main);
 }
 
@@ -889,9 +881,7 @@ export async function loadEnv(extensions: EnvInit[], envVals?: Array<string>) {
     : //@ts-ignore
       import("./sk_browser.js"));
   let env = environment.environment(envVals) as Environment;
-  if (extensions) {
-    extensions.map((fn) => fn(env));
-  }
+  extensions.map((fn) => fn(env));
   return env;
 }
 
