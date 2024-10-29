@@ -46,11 +46,7 @@ class SkRuntimeExit extends Error {
   }
 }
 
-class SkError extends Error {
-  constructor(msg: string) {
-    super(msg);
-  }
-}
+class SkError extends Error {}
 
 export interface Shared {
   getName: () => string;
@@ -120,7 +116,7 @@ export class Options {
   }
 
   static fromFlags(flags: int) {
-    let is = (flags: int, value: int) => {
+    const is = (flags: int, value: int) => {
       return (flags & value) == value;
     };
     return new Options(
@@ -160,7 +156,7 @@ export interface Environment {
   shared: Map<string, Shared>;
   name: () => string;
   disableWarnings: boolean;
-  environment: Array<string>;
+  environment: string[];
   createSocket: (uri: string) => WebSocket;
   createWorker: (url: URL, options?: WorkerOptions) => Wrk;
   createWorkerWrapper: (worker: Worker) => Wrk;
@@ -222,7 +218,7 @@ function utf8Encode(str: string): Uint8Array {
   return new TextEncoder().encode(str);
 }
 
-export type Main = (new_args: Array<string>, new_stdin: string) => string;
+export type Main = (new_args: string[], new_stdin: string) => string;
 
 export type App = {
   environment: Environment;
@@ -235,18 +231,18 @@ export class Utils {
   private state: State;
   private states: Map<string, any>;
 
-  args: Array<string>;
+  args: string[];
   private current_stdin: number;
   private stdin: Uint8Array;
-  private stdout: Array<string>;
-  private stderr: Array<string>;
-  private stddebug: Array<string>;
+  private stdout: string[];
+  private stderr: string[];
+  private stddebug: string[];
   private mainFn?: string;
   private exception?: Error;
   private stacks: Map<ptr<Internal.Exception>, string>;
 
   exit = (code: int) => {
-    let message =
+    const message =
       code != 0 && this.stderr.length > 0 ? this.stderr.join("") : undefined;
     throw new SkRuntimeExit(code, message);
   };
@@ -254,12 +250,12 @@ export class Utils {
   constructor(exports: WebAssembly.Exports, env: Environment, mainFn?: string) {
     this.stacks = new Map();
     this.states = new Map();
-    this.args = new Array();
+    this.args = [];
     this.current_stdin = 0;
     this.stdin = utf8Encode("");
-    this.stdout = new Array();
-    this.stderr = new Array();
-    this.stddebug = new Array();
+    this.stdout = [];
+    this.stderr = [];
+    this.stddebug = [];
     this.exports = exports as any as Exported;
     this.env = env;
     this.state = new State();
@@ -281,47 +277,46 @@ export class Utils {
     kind?: Stream,
     newLine: boolean = false,
   ) => {
-    let str = this.importString(strPtr);
+    const str = this.importString(strPtr);
     this.log(str, kind, newLine);
   };
 
-  clearMainEnvironment = (
-    new_args: Array<string> = [],
-    new_stdin: string = "",
-  ) => {
+  clearMainEnvironment = (new_args: string[] = [], new_stdin: string = "") => {
     this.args = [this.mainFn ?? "main"].concat(new_args);
     this.exception = undefined;
     this.stacks = new Map();
     this.current_stdin = 0;
     this.stdin = utf8Encode(new_stdin);
-    this.stdout = new Array();
-    this.stderr = new Array();
-    this.stddebug = new Array();
+    this.stdout = [];
+    this.stderr = [];
+    this.stddebug = [];
   };
 
   runCheckError = <T>(fn: () => T) => {
     this.clearMainEnvironment();
-    let res = fn();
+    const res = fn();
     if (this.stddebug.length > 0) {
       console.log(this.stddebug.join(""));
     }
     if (this.stderr.length > 0) {
-      let error = new Error(this.stderr.join(""));
+      const error = new Error(this.stderr.join(""));
       (error as any).cause = this.exception;
       throw error;
     }
     return res;
   };
 
-  main = (new_args: Array<string>, new_stdin: string) => {
+  main = (new_args: string[], new_stdin: string) => {
     let exitCode = 0;
     this.clearMainEnvironment(new_args, new_stdin);
     try {
       if (!this.mainFn) {
         this.exports.skip_main();
       } else {
-        //@ts-ignore
-        this.exports[this.mainFn]();
+        // @ts-expect-error: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type 'Exported'.
+        const mainFn = this.exports[this.mainFn];
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+        mainFn();
       }
     } catch (exn) {
       if (exn instanceof SkRuntimeExit) {
@@ -338,7 +333,7 @@ export class Utils {
     if (exitCode != 0 || this.stderr.length > 0) {
       const message = this.stderr.length > 0 ? this.stderr.join("") : undefined;
       let tmp = "";
-      let lines: string[] = [];
+      const lines: string[] = [];
       message?.split("\n").forEach((line) => {
         const matches = [...line.matchAll(/external:([0-9]+)/g)].sort(
           (v1: string[], v2: string[]) => {
@@ -366,7 +361,7 @@ export class Utils {
       if (tmp != "") {
         lines.push(tmp);
       }
-      let error = new SkRuntimeExit(exitCode, lines.join("\n").trim());
+      const error = new SkRuntimeExit(exitCode, lines.join("\n").trim());
       (error as any).cause = this.exception;
       throw error;
     }
@@ -380,17 +375,16 @@ export class Utils {
     return null;
   };
   importString = (strPtr: ptr<Internal.String>) => {
-    let size = this.exports.SKIP_String_byteSize(strPtr);
-    let utf8 = new Uint8Array(this.exports.memory.buffer, strPtr, size);
+    const size = this.exports.SKIP_String_byteSize(strPtr);
+    const utf8 = new Uint8Array(this.exports.memory.buffer, strPtr, size);
     return this.env.decodeUTF8(utf8);
   };
   exportString = (s: string): ptr<Internal.String> => {
-    var data = new Uint8Array(this.exports.memory.buffer);
-    // @ts-ignore
-    var i = 0,
-      addr = this.exports.SKIP_Obstack_alloc(s.length * 4);
-    for (var ci = 0; ci != s.length; ci++) {
-      var c = s.charCodeAt(ci);
+    const data = new Uint8Array(this.exports.memory.buffer);
+    let i = 0;
+    const addr = this.exports.SKIP_Obstack_alloc(s.length * 4);
+    for (let ci = 0; ci != s.length; ci++) {
+      let c = s.charCodeAt(ci);
       if (c < 128) {
         data[addr + i++] = c;
         continue;
@@ -401,7 +395,7 @@ export class Utils {
         if (c > 0xd7ff && c < 0xdc00) {
           if (++ci >= s.length)
             throw new Error("UTF-8 encode: incomplete surrogate pair");
-          var c2 = s.charCodeAt(ci);
+          const c2 = s.charCodeAt(ci);
           if (c2 < 0xdc00 || c2 > 0xdfff)
             throw new Error(
               `UTF-8 encode: second surrogate character 0x${c2.toString(16)} at index ${ci} out of range`,
@@ -420,21 +414,21 @@ export class Utils {
     skArray: ptr<Internal.Array<Internal.Byte>>,
     sizeof: int = 1,
   ) => {
-    let size = this.exports.SKIP_getArraySize(skArray) * sizeof;
-    let skData = new Uint8Array(this.exports.memory.buffer, skArray, size);
-    let copy = new Uint8Array(size);
+    const size = this.exports.SKIP_getArraySize(skArray) * sizeof;
+    const skData = new Uint8Array(this.exports.memory.buffer, skArray, size);
+    const copy = new Uint8Array(size);
     copy.set(skData);
     return copy;
   };
   importBytes2 = (skBytes: ptr<Internal.T<any>>, size: int = 1) => {
-    let skData = new Uint8Array(this.exports.memory.buffer, skBytes, size);
-    let copy = new Uint8Array(size);
+    const skData = new Uint8Array(this.exports.memory.buffer, skBytes, size);
+    const copy = new Uint8Array(size);
     copy.set(skData);
     return copy;
   };
   exportBytes = (view: Uint8Array) => {
-    let skArray = this.exports.SKIP_createByteArray(view.byteLength);
-    let data = new Uint8Array(
+    const skArray = this.exports.SKIP_createByteArray(view.byteLength);
+    const data = new Uint8Array(
       this.exports.memory.buffer,
       skArray,
       view.byteLength,
@@ -443,7 +437,7 @@ export class Utils {
     return skArray;
   };
   exportBytes2 = (view: Uint8Array, skBytes: ptr<Internal.T<any>>) => {
-    let data = new Uint8Array(
+    const data = new Uint8Array(
       this.exports.memory.buffer,
       skBytes,
       view.byteLength,
@@ -451,15 +445,16 @@ export class Utils {
     data.set(view);
   };
   importUInt32s = (skArray: ptr<Internal.Array<Internal.UInt32>>) => {
-    let size = this.exports.SKIP_getArraySize(skArray);
-    let skData = new Uint32Array(this.exports.memory.buffer, skArray, size);
-    let copy = new Uint32Array(size);
+    const size = this.exports.SKIP_getArraySize(skArray);
+    const skData = new Uint32Array(this.exports.memory.buffer, skArray, size);
+    const copy = new Uint32Array(size);
     copy.set(skData);
     return copy;
   };
+
   exportUInt32s(array: Uint32Array) {
-    let skArray = this.exports.SKIP_createUInt32Array(array.length);
-    let skData = new Uint32Array(
+    const skArray = this.exports.SKIP_createUInt32Array(array.length);
+    const skData = new Uint32Array(
       this.exports.memory.buffer,
       skArray,
       array.length,
@@ -468,15 +463,16 @@ export class Utils {
     return skArray;
   }
   importFloats = (skArray: ptr<Internal.Array<Internal.Float>>) => {
-    let size = this.exports.SKIP_getArraySize(skArray);
-    let skData = new Float64Array(this.exports.memory.buffer, skArray, size);
-    let copy = new Float64Array(size);
+    const size = this.exports.SKIP_getArraySize(skArray);
+    const skData = new Float64Array(this.exports.memory.buffer, skArray, size);
+    const copy = new Float64Array(size);
     copy.set(skData);
     return copy;
   };
+
   exportFloats(array: Float64Array) {
-    let skArray = this.exports.SKIP_createFloatArray(array.length);
-    let skData = new Float64Array(
+    const skArray = this.exports.SKIP_createFloatArray(array.length);
+    const skData = new Float64Array(
       this.exports.memory.buffer,
       skArray,
       array.length,
@@ -502,8 +498,8 @@ export class Utils {
     return new Uint8ClampedArray(this.exports.memory.buffer, dataPtr, length);
   };
   init = () => {
-    let heapBase = this.exports.__heap_base.valueOf();
-    let size = this.exports.memory.buffer.byteLength - heapBase;
+    const heapBase = this.exports.__heap_base.valueOf();
+    const size = this.exports.memory.buffer.byteLength - heapBase;
     this.exports.SKIP_skstore_init(size);
     this.exports.SKIP_initializeSkip();
     this.exports.SKIP_skstore_end_of_init();
@@ -535,18 +531,18 @@ export class Utils {
     if (rethrow && this.exception) {
       throw this.exception;
     } else {
-      let skMessage =
+      const skMessage =
         skExc != 0 ? this.exports.SKIP_getExceptionMessage(skExc) : null;
       let message =
         skMessage != null && skMessage != 0
           ? this.importString(skMessage)
           : "SKStore Internal error";
-      let lines = message.split("\n");
+      const lines = message.split("\n");
       if (lines[0]!.startsWith("external:")) {
         // only "".split("") is the empty array
-        let external = lines.shift()!;
+        const external = lines.shift()!;
         message = lines.join("\n");
-        let id = parseInt(external.substring(9));
+        const id = parseInt(external.substring(9));
         if (this.state.exceptions.has(id)) {
           throw this.state.exceptions.get(id)!.err;
         } else if (message.trim() == "") {
@@ -558,6 +554,7 @@ export class Utils {
       throw err;
     }
   };
+
   replace_exn(oldex: ptr<Internal.Exception>, newex: ptr<Internal.Exception>) {
     const stack = this.stacks.get(oldex);
     if (stack) {
@@ -593,11 +590,11 @@ export class Utils {
       this.exports.SKIP_getExceptionMessage(skExc),
     );
     let errStack = this.stacks.get(skExc);
-    let lines = message.split("\n");
+    const lines = message.split("\n");
     if (lines[0]!.startsWith("external:")) {
       // only "".split("") is the empty array
-      let external = lines.shift()!;
-      let id = parseInt(external.substring(9));
+      const external = lines.shift()!;
+      const id = parseInt(external.substring(9));
       if (this.state.exceptions.has(id)) {
         const exception = this.state.exceptions.get(id);
         if (exception) {
@@ -612,7 +609,7 @@ export class Utils {
     }
     const toObject: (error: Error) => ErrorObject = (error?: Error) => {
       const errcause = (error as any).cause;
-      const errstack = (error as any).stack?.split("\n") as string[];
+      const errstack = error?.stack?.split("\n");
       if (errstack) {
         return errcause
           ? { message, cause: errcause, stack: errstack }
@@ -622,7 +619,7 @@ export class Utils {
       }
     };
     if (errStack) {
-      const stack: string[] = errStack.split("\n") as string[];
+      const stack: string[] = errStack.split("\n");
       return this.exception
         ? { message, cause: toObject(this.exception), stack }
         : { message, stack };
@@ -638,7 +635,7 @@ export class Utils {
   getMemoryBuffer = () => this.exports.memory.buffer;
 
   readStdInLine = () => {
-    let lineBuffer = new Array<int>();
+    const lineBuffer = new Array<int>();
     const endOfLine = 10;
     if (this.current_stdin >= this.stdin.length) {
       this.exports.SKIP_throw_EndOfFile();
@@ -659,7 +656,7 @@ export class Utils {
   };
 
   readStdInToEnd = () => {
-    let lineBuffer = new Array<int>();
+    const lineBuffer = new Array<int>();
     while (this.current_stdin < this.stdin.length) {
       lineBuffer.push(this.stdin[this.current_stdin]!); // checked by while condition
       this.current_stdin++;
@@ -668,10 +665,10 @@ export class Utils {
   };
 
   runWithGc = <T>(fn: () => T) => {
-    this.stddebug = new Array();
-    let obsPos = this.exports.SKIP_new_Obstack();
+    this.stddebug = [];
+    const obsPos = this.exports.SKIP_new_Obstack();
     try {
-      let res = fn();
+      const res = fn();
       this.exports.SKIP_destroy_Obstack(obsPos);
       return cloneIfProxy(res);
     } catch (ex) {
@@ -690,7 +687,7 @@ export class Utils {
       state = create();
       this.states.set(name, state);
     }
-    return state;
+    return state as T;
   }
 }
 
@@ -758,7 +755,7 @@ export const l = (text: string, category?: string) => {
   return new Locale(text, category);
 };
 
-export const f = (format: Text | string, parameters: Array<Text | string>) => {
+export const f = (format: Text | string, parameters: (Text | string)[]) => {
   return new Format(format, parameters);
 };
 
@@ -772,9 +769,9 @@ export const check: (value: Text | string) => Text = (value: Text | string) => {
 
 export class Format implements Text {
   format: Text | string;
-  parameters: Array<Text | string>;
+  parameters: (Text | string)[];
 
-  constructor(format: Text | string, parameters: Array<Text | string>) {
+  constructor(format: Text | string, parameters: (Text | string)[]) {
     this.format = format;
     this.parameters = parameters;
   }
@@ -792,9 +789,9 @@ export class Format implements Text {
 }
 
 export function resolve(path: string) {
-  let elements = import.meta.url.split("/");
+  const elements = import.meta.url.split("/");
   elements.pop();
-  let pelems = path.split("/");
+  const pelems = path.split("/");
   pelems.forEach((e) => {
     if (e == "..") {
       if (elements.length == 1) {
@@ -810,7 +807,7 @@ export function resolve(path: string) {
 }
 
 export function trimEndChar(str: string, ch: string) {
-  var end = str.length;
+  let end = str.length;
   while (end > 0 && str[end - 1] === ch) --end;
   return end < str.length ? str.substring(0, end) : str;
 }
@@ -837,16 +834,16 @@ export function humanSize(bytes: int) {
 
 export function loadWasm(
   buffer: ArrayBuffer,
-  managers: Array<ToWasmManager>,
+  managers: ToWasmManager[],
   environment: Environment,
   main?: string,
 ) {
-  let wasm = {};
-  let links = managers.map((manager) => manager.prepare(wasm));
+  const wasm = {};
+  const links = managers.map((manager) => manager.prepare(wasm));
   return WebAssembly.instantiate(buffer, { env: wasm }).then((result) => {
-    let instance = result.instance;
-    let exports = instance.exports as any;
-    let utils = new Utils(instance.exports, environment, main);
+    const instance = result.instance;
+    const exports = instance.exports;
+    const utils = new Utils(instance.exports, environment, main);
     utils.init();
     links.forEach((link) => {
       if (link) {
@@ -863,8 +860,8 @@ async function start(
   environment: Environment,
   main?: string,
 ) {
-  let promises = modules.map((fn) => fn(environment));
-  let ms = await Promise.all(promises);
+  const promises = modules.map((fn) => fn(environment));
+  const ms = await Promise.all(promises);
   return await loadWasm(buffer, ms, environment, main);
 }
 
@@ -872,15 +869,15 @@ export function isNode() {
   return typeof process !== "undefined" && process.release.name == "node";
 }
 
-export async function loadEnv(extensions: EnvInit[], envVals?: Array<string>) {
+export async function loadEnv(extensions: EnvInit[], envVals?: string[]) {
   // hack: this way of importing is deliberate so that web bundlers
   // don't follow the node dynamic import
   const nodeImport = "./sk_node.js";
   const environment = await (isNode()
     ? import(/* @vite-ignore */ nodeImport)
-    : //@ts-ignore
-      import("./sk_browser.js"));
-  let env = environment.environment(envVals) as Environment;
+    : import("./sk_browser.js"));
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+  const env = environment.environment(envVals) as Environment;
   extensions.map((fn) => fn(env));
   return env;
 }
@@ -920,7 +917,7 @@ export async function run(
   main?: string,
   getWasmSource?: () => Promise<Uint8Array>,
 ) {
-  let env = await loadEnv(extensions);
+  const env = await loadEnv(extensions);
   let buffer: Uint8Array;
   if (getWasmSource) {
     buffer = await getWasmSource();

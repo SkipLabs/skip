@@ -152,7 +152,7 @@ type ObjectProxy<Base extends { [k: string]: Exportable }> = {
 } & Base;
 
 function isObjectProxy(x: any): x is ObjectProxy<{ [k: string]: Exportable }> {
-  return sk_isObjectProxy in x && x[sk_isObjectProxy];
+  return sk_isObjectProxy in x && (x[sk_isObjectProxy] as boolean);
 }
 
 export const reactiveObject = {
@@ -237,7 +237,7 @@ type ArrayProxy<T> = {
 };
 
 function isArrayProxy(x: any): x is ArrayProxy<any> {
-  return sk_isArrayProxy in x && x[sk_isArrayProxy];
+  return sk_isArrayProxy in x && (x[sk_isArrayProxy] as boolean);
 }
 
 export const reactiveArray = {
@@ -320,6 +320,7 @@ function clone<T>(value: T): T {
       return value.map(clone) as T;
     } else if (isArrayProxy(value)) {
       return Array.from({ length: value.length }, (_, i) =>
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
         clone(value[i]),
       ) as T;
     } else if (isObjectProxy(value)) {

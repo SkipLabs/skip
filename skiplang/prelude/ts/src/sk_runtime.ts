@@ -13,7 +13,7 @@ import type * as Internal from "./sk_internal_types.js";
 
 class LinksImpl implements Links {
   env: Environment | undefined;
-  lineBuffer!: Array<int>;
+  lineBuffer!: int[];
   lastTime!: int;
 
   constructor(env?: Environment) {
@@ -70,8 +70,13 @@ class LinksImpl implements Links {
   SKIP_getenv!: (skName: ptr<Internal.String>) => Opt<ptr<Internal.String>>;
   SKIP_unsetenv!: (skName: ptr<Internal.String>) => void;
 
-  SKIP_glock() {}
-  SKIP_gunlock() {}
+  SKIP_glock() {
+    /* nop since js is sequential */
+  }
+
+  SKIP_gunlock() {
+    /* nop since js is sequential */
+  }
 
   complete = (utils: Utils, _exports: object) => {
     this.SKIP_etry = utils.etry;
@@ -101,7 +106,7 @@ class LinksImpl implements Links {
     ) => utils.replace_exn(oldex, newex);
     this.SKIP_throw_cruntime = utils.exit;
     this.SKIP_print_char = (c: int) => {
-      var str = String.fromCharCode(c);
+      const str = String.fromCharCode(c);
       utils.log(str, Stream.OUT);
     };
     this.SKIP_delete_external_exception = utils.deleteException;
@@ -153,8 +158,8 @@ class LinksImpl implements Links {
       path: ptr<Internal.String>,
       contents: ptr<Internal.String>,
     ) => {
-      let strPath = utils.importString(path);
-      let strContents = utils.importString(contents);
+      const strPath = utils.importString(path);
+      const strContents = utils.importString(contents);
       if (this.env) {
         this.env.fs().appendToFile(strPath, strContents);
       }
@@ -172,7 +177,7 @@ class LinksImpl implements Links {
     };
     this.SKIP_getenv = (skName: ptr<Internal.String>) => {
       if (this.env) {
-        let value = this.env.sys().getenv(utils.importString(skName));
+        const value = this.env.sys().getenv(utils.importString(skName));
         return value ? utils.exportString(value) : null;
       }
       return null;
@@ -187,13 +192,14 @@ class LinksImpl implements Links {
 
 class Manager implements ToWasmManager {
   env: Environment | undefined;
+
   constructor(env?: Environment) {
     this.env = env;
   }
 
   prepare = (wasm: object) => {
-    let toWasm = wasm as ToWasm;
-    let links = new LinksImpl(this.env);
+    const toWasm = wasm as ToWasm;
+    const links = new LinksImpl(this.env);
     toWasm._ZSt9terminatev = () => {
       throw new Error("_ZSt9terminatev");
     };

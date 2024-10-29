@@ -1,3 +1,5 @@
+/* eslint-disable */
+
 import { MuxedSocket } from "./node_modules/skdb/dist/skdb_orchestration.js";
 
 export async function connect(env, uri, creds, timeoutMs = 60000) {

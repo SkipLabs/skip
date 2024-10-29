@@ -1,3 +1,5 @@
+/* eslint-disable */
+
 import { expect } from "@playwright/test";
 import { createSkdb, SKDB, Params, SKDBTable } from "skdb";
 

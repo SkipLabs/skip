@@ -3,9 +3,9 @@ interface Imported {
 }
 
 export async function getWasmUrl(): Promise<URL | string> {
-  // @ts-ignore
+  // @ts-expect-error: Property 'env' does not exist on type 'ImportMeta'.
   if (import.meta.env || import.meta.webpack) {
-    // @ts-ignore
+    // @ts-expect-error: Cannot find module './libskdb.wasm?url' or its corresponding type declarations.
     const imported = (await import("./libskdb.wasm?url")) as Imported;
     return imported.default;
   }

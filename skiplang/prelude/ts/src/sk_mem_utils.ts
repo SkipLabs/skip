@@ -28,7 +28,7 @@ class File {
 
   close() {
     if (this.withChange && this.onChange) {
-      this.onChange!(this.changes ?? "");
+      this.onChange(this.changes ?? "");
     }
     this.options = undefined;
     this.changes = "";
@@ -44,7 +44,7 @@ class File {
     } else {
       this.contents = contents;
     }
-    let old = this.changes;
+    const old = this.changes;
     this.changes =
       this.changes === undefined ? contents : this.changes.concat(contents);
     this.withChange = this.changes != old;
@@ -55,12 +55,12 @@ class File {
     if (!this.options?.read) {
       throw new Error("The file cannot be read");
     }
-    let clen = this.contents ? this.contents.length : 0;
+    const clen = this.contents ? this.contents.length : 0;
     if (this.cursor >= clen) {
       return null;
     }
-    let end = Math.min(clen, this.cursor + len);
-    let res = this.contents?.substring(this.cursor, end);
+    const end = Math.min(clen, this.cursor + len);
+    const res = this.contents?.substring(this.cursor, end);
     this.cursor = end;
     return res;
   }
@@ -73,13 +73,13 @@ class File {
 export class MemFS implements FileSystem {
   private fileDescrs: Map<string, number>;
   private fileDescrNbr: int;
-  private files: Array<File>;
+  private files: File[];
   // invariant: range(fileDescrs) ⊆ domain(files)
 
   constructor() {
     this.fileDescrs = new Map();
     this.fileDescrNbr = 2;
-    this.files = new Array();
+    this.files = [];
   }
 
   exists(filename: string): boolean {
@@ -87,7 +87,7 @@ export class MemFS implements FileSystem {
   }
 
   openFile(filename: string, options: Options, _mode: int): number {
-    let existing = this.fileDescrs.get(filename);
+    const existing = this.fileDescrs.get(filename);
     if (existing != undefined) {
       if (options.create && options.create_new) {
         throw new Error("The file '" + filename + "' already exists");
@@ -95,7 +95,7 @@ export class MemFS implements FileSystem {
       this.files[existing]!.open(options); // invariant
       return existing;
     }
-    let fd = this.fileDescrNbr;
+    const fd = this.fileDescrNbr;
     this.files[fd] = new File(options);
     this.fileDescrs.set(filename, fd);
     this.fileDescrNbr++;
@@ -103,7 +103,7 @@ export class MemFS implements FileSystem {
   }
 
   watchFile(filename: string, f: (change: string) => void): void {
-    let fd = this.fileDescrNbr;
+    const fd = this.fileDescrNbr;
     this.files[fd] = new File();
     this.fileDescrs.set(filename, fd);
     this.fileDescrNbr++;
@@ -117,13 +117,13 @@ export class MemFS implements FileSystem {
   }
 
   appendToFile(filename: string, content: string) {
-    let fd = this.fileDescrs.get(filename);
+    const fd = this.fileDescrs.get(filename);
     let file: File;
     if (fd != undefined) {
       file = this.files[fd]!; // invariant
     } else {
       file = new File();
-      let fd = this.fileDescrNbr;
+      const fd = this.fileDescrNbr;
       this.files[fd] = file;
       this.fileDescrs.set(filename, fd);
       this.fileDescrNbr++;
