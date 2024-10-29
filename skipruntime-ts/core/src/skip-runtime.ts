@@ -37,7 +37,7 @@ export {
 
 export {
   fetchJSON,
-  SkipRESTRuntime,
+  SkipRESTService,
   type Entrypoint,
 } from "./skipruntime_rest.js";
 export { ExternalSkipService } from "./skipruntime_remote.js";
