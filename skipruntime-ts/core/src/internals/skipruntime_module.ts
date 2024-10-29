@@ -664,8 +664,8 @@ class LinksImpl implements Links {
       : undefined;
     // TODO: Manage skstore
     const collection = resource.reactiveCompute(
-      new ContextImpl(refs),
       collections,
+      new ContextImpl(refs),
       reactiveAuth,
     );
     const res = (collection as EagerCollectionImpl<TJSON, TJSON>).collection;
@@ -716,7 +716,7 @@ class LinksImpl implements Links {
       collections[key] = new EagerCollectionImpl(name, refs);
     }
     // TODO: Manage skstore
-    const result = service.reactiveCompute(new ContextImpl(refs), collections);
+    const result = service.reactiveCompute(collections, new ContextImpl(refs));
     const collectionsNames: Record<string, string> = {};
     for (const [name, collection] of Object.entries(result)) {
       collectionsNames[name] = (

@@ -1,5 +1,4 @@
 import type {
-  Context,
   EagerCollection,
   NonEmptyIterator,
   SkipService,
@@ -26,25 +25,19 @@ class Minus extends ManyToOneMapper<string, number, number> {
 }
 
 class Add implements Resource {
-  reactiveCompute(
-    _context: Context,
-    cs: {
-      input1: EagerCollection<string, number>;
-      input2: EagerCollection<string, number>;
-    },
-  ): EagerCollection<string, number> {
+  reactiveCompute(cs: {
+    input1: EagerCollection<string, number>;
+    input2: EagerCollection<string, number>;
+  }): EagerCollection<string, number> {
     return cs.input1.merge(cs.input2).map(Plus);
   }
 }
 
 class Sub implements Resource {
-  reactiveCompute(
-    _context: Context,
-    cs: {
-      input1: EagerCollection<string, number>;
-      input2: EagerCollection<string, number>;
-    },
-  ): EagerCollection<string, number> {
+  reactiveCompute(cs: {
+    input1: EagerCollection<string, number>;
+    input2: EagerCollection<string, number>;
+  }): EagerCollection<string, number> {
     return cs.input1.merge(cs.input2).map(Minus);
   }
 }
@@ -54,7 +47,6 @@ class Service implements SkipService {
   resources = { add: Add, sub: Sub };
 
   reactiveCompute(
-    _context: Context,
     inputCollections: Record<string, EagerCollection<string, number>>,
   ) {
     return inputCollections;
