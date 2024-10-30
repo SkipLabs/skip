@@ -19,14 +19,15 @@ export type {
   CollectionUpdate,
   Watermark,
   SubscriptionID,
-} from "./skipruntime_api.js";
+} from "@skipruntime/api";
 
 export type {
   Values,
   ServiceInstance,
 } from "./internals/skipruntime_module.js";
 export { UnknownCollectionError } from "./skipruntime_errors.js";
-export { freeze, OneToOneMapper, ManyToOneMapper } from "./skipruntime_api.js";
+export { OneToOneMapper, ManyToOneMapper } from "@skipruntime/api";
+export { freeze } from "./internals/skipruntime_module.js";
 export {
   Sum,
   Min,

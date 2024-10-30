@@ -1,4 +1,4 @@
-declare const opaque: unique symbol;
+const opaque: unique symbol = Symbol.for("Skip.opaque");
 export type Opaque<Value, Tag> = Value & { [opaque]: Tag };
 
 declare const t: unique symbol;

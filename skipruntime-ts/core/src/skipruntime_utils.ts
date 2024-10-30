@@ -1,5 +1,5 @@
 import type { Opt } from "std";
-import type { Accumulator, ReactiveResponse } from "./skipruntime_api.js";
+import type { Accumulator, ReactiveResponse } from "@skipruntime/api";
 
 export class Sum implements Accumulator<number, number> {
   default = 0;
