@@ -24,8 +24,8 @@ type Result = {
 
 class DeparturesResource implements Resource {
   reactiveCompute(
-    context: Context,
     cs: { config: EagerCollection<string, (string | number)[]> },
+    context: Context,
   ): EagerCollection<number, Departure> {
     const get = (name: string, def: string) => {
       const r = cs.config.maybeGetOne(name);
@@ -65,10 +65,7 @@ class Service implements SkipService {
     }),
   };
 
-  reactiveCompute(
-    _context: Context,
-    ic: { config: EagerCollection<string, string[]> },
-  ) {
+  reactiveCompute(ic: { config: EagerCollection<string, string[]> }) {
     return ic;
   }
 }
