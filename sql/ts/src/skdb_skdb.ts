@@ -1,5 +1,12 @@
-import type { int, ptr, Environment, Links, ToWasmManager, Utils } from "std";
-import type * as Internal from "std/internal.js";
+import type {
+  int,
+  ptr,
+  Environment,
+  Links,
+  ToWasmManager,
+  Utils,
+} from "@skip-wasm/std";
+import type * as Internal from "@skip-wasm/std/internal.js";
 import type {
   PagedMemory,
   Page,
@@ -12,8 +19,8 @@ import type {
 import { ExternalFuns, SKDBTable } from "./skdb_util.js";
 import { IDBStorage } from "./skdb_storage.js";
 import { SKDBImpl, SKDBSyncImpl } from "./skdb_database.js";
-import type { SKJSON } from "skjson";
-import type * as InternalJ from "skjson/internal.js";
+import type { SKJSON } from "@skip-wasm/json";
+import type * as InternalJ from "@skip-wasm/json/internal.js";
 
 interface Exported {
   sk_pop_dirty_page: () => number;

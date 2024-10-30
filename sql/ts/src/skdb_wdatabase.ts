@@ -1,5 +1,10 @@
-import type { Wrk } from "std";
-import { PromiseWorker, Function, Caller, Wrapped } from "std/worker.js";
+import type { Wrk } from "@skip-wasm/std";
+import {
+  PromiseWorker,
+  Function,
+  Caller,
+  Wrapped,
+} from "@skip-wasm/std/worker.js";
 import type {
   SKDB,
   ProtoResponseCreds,

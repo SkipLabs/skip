@@ -8,8 +8,8 @@ import type {
   Environment,
   Opt,
   Shared,
-} from "std";
-import { sk_isArrayProxy, sk_isObjectProxy } from "std";
+} from "@skip-wasm/std";
+import { sk_isArrayProxy, sk_isObjectProxy } from "@skip-wasm/std";
 import type * as Internal from "./skjson_internal_types.js";
 
 export enum Type {

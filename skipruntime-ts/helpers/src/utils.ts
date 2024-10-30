@@ -1,4 +1,4 @@
-import type { Opt } from "std";
+import type { Opt } from "@skip-wasm/std";
 import type { Accumulator, ReactiveResponse } from "@skipruntime/api";
 
 export class Sum implements Accumulator<number, number> {

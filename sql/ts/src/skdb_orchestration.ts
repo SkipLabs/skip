@@ -1,4 +1,4 @@
-import type { Environment } from "std";
+import type { Environment } from "@skip-wasm/std";
 import type {
   SKDBMechanism,
   RemoteSKDB,

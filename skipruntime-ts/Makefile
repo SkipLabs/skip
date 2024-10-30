@@ -48,4 +48,4 @@ clean:
 
 .PHONY: test
 test: bunbuild
-	../bin/cd_sh core "bun run test"
+	../bin/cd_sh wasm "bun run test"
