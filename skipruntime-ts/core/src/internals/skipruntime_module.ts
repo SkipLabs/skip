@@ -35,7 +35,7 @@ import type {
 import { Frozen, type Constant } from "@skipruntime/api/internals.js";
 
 import type { Exportable, SKJSON } from "skjson";
-import { UnknownCollectionError } from "../skipruntime_errors.js";
+import { UnknownCollectionError } from "@skipruntime/helpers/errors.js";
 
 export type Handle<T> = Internal.Opaque<int, { handle_for: T }>;
 

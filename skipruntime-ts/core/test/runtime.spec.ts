@@ -14,8 +14,12 @@ import type {
   Entry,
   ExternalSupplier,
 } from "../src/skip-runtime.js";
-import { Sum, OneToOneMapper, initService } from "../src/skip-runtime.js";
-import { TimeCollection, ExternalService } from "../src/skipruntime_helpers.js";
+import { OneToOneMapper, initService } from "../src/skip-runtime.js";
+import { Sum } from "@skipruntime/helpers";
+import {
+  TimeCollection,
+  ExternalService,
+} from "@skipruntime/helpers/external.js";
 
 //// testMap1
 

@@ -25,7 +25,7 @@ export type {
   Values,
   ServiceInstance,
 } from "./internals/skipruntime_module.js";
-export { UnknownCollectionError } from "./skipruntime_errors.js";
+export { UnknownCollectionError } from "@skipruntime/helpers/errors.js";
 export { OneToOneMapper, ManyToOneMapper } from "@skipruntime/api";
 export { freeze } from "./internals/skipruntime_module.js";
 export {
@@ -34,16 +34,14 @@ export {
   Max,
   parseReactiveResponse,
   reactiveResponseHeader,
-} from "./skipruntime_utils.js";
+  ExternalSkipService,
+  type ExternalResource,
+  ExternalService,
+  Polled,
+} from "@skipruntime/helpers";
 
 export {
   fetchJSON,
   SkipRESTService,
   type Entrypoint,
-} from "./skipruntime_rest.js";
-export { ExternalSkipService } from "./skipruntime_remote.js";
-export {
-  type ExternalResource,
-  ExternalService,
-  Polled,
-} from "./skipruntime_helpers.js";
+} from "@skipruntime/helpers/rest.js";
