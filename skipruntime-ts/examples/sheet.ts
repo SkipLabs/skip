@@ -6,9 +6,9 @@ import type {
   TJSON,
   SkipService,
   Resource,
-} from "@skipruntime/core";
+} from "skip-wasm";
 
-import { OneToOneMapper } from "@skipruntime/core";
+import { OneToOneMapper } from "skip-wasm";
 
 import { runService } from "@skipruntime/server";
 
