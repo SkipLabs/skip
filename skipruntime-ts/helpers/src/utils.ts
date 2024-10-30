@@ -1,5 +1,11 @@
 import type { Opt } from "@skip-wasm/std";
-import type { Accumulator, ReactiveResponse } from "@skipruntime/api";
+import { ManyToOneMapper } from "@skipruntime/api";
+import type {
+  Accumulator,
+  NonEmptyIterator,
+  ReactiveResponse,
+  TJSON,
+} from "@skipruntime/api";
 
 export class Sum implements Accumulator<number, number> {
   default = 0;
@@ -34,6 +40,15 @@ export class Max implements Accumulator<number, number> {
 
   dismiss(acc: number, value: number): Opt<number> {
     return value < acc ? acc : null;
+  }
+}
+
+export class CountMapper<
+  K extends TJSON,
+  V extends TJSON,
+> extends ManyToOneMapper<K, V, number> {
+  mapValues(values: NonEmptyIterator<V>): number {
+    return values.toArray().length;
   }
 }
 

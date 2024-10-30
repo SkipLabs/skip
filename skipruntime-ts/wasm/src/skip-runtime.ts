@@ -32,6 +32,7 @@ export {
   Sum,
   Min,
   Max,
+  CountMapper,
   parseReactiveResponse,
   reactiveResponseHeader,
   ExternalSkipService,
