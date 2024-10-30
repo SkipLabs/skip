@@ -1211,6 +1211,16 @@ export class ServiceInstanceFactory implements Shared {
   }
 }
 
+type ReactivePart = {
+  collection: string;
+  watermark: string;
+};
+
+type ValuesPart<K extends TJSON, V extends TJSON> = {
+  values: Entry<K, V>[];
+  reactive?: ReactivePart;
+};
+
 export type Values<K extends TJSON, V extends TJSON> = {
   values: Entry<K, V>[];
   reactive?: ReactiveResponse;
@@ -1226,6 +1236,28 @@ export type Executor<T> = {
   resolve: (value: T) => void;
   reject: (reason?: any) => void;
 };
+
+function toReactiveResponse(reactive: ReactivePart): ReactiveResponse {
+  return {
+    collection: reactive.collection,
+    watermark: BigInt(reactive.watermark) as Watermark,
+  };
+}
+
+function toGetResult<K extends TJSON, V extends TJSON>(
+  result: GetResult<ValuesPart<K, V>>,
+): GetResult<Values<K, V>> {
+  return {
+    request: result.request,
+    payload: {
+      values: result.payload.values,
+      reactive: result.payload.reactive
+        ? toReactiveResponse(result.payload.reactive)
+        : undefined,
+    },
+    errors: result.errors,
+  };
+}
 
 interface Checker {
   check(request: string): void;
@@ -1364,7 +1396,7 @@ export class ServiceInstance {
     if (typeof result == "number") {
       throw this.refs.handles.deleteAsError(result as Handle<ErrorObject>);
     }
-    return result as GetResult<Values<K, V>>;
+    return toGetResult(result as GetResult<ValuesPart<K, V>>);
   }
 
   /**
