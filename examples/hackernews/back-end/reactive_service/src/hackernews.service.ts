@@ -1,5 +1,4 @@
 import type {
-  Context,
   Entry,
   TJSON,
   EagerCollection,
@@ -43,14 +42,11 @@ export default class HackerNewsService implements SkipService {
     this.inputCollections = { posts, users, upvotes };
   }
 
-  reactiveCompute(
-    _context: Context,
-    inputCollections: {
-      posts: EagerCollection<number, Post>;
-      users: EagerCollection<number, User>;
-      upvotes: EagerCollection<number, Upvote>;
-    },
-  ): Record<string, EagerCollection<TJSON, TJSON>> {
+  reactiveCompute(inputCollections: {
+    posts: EagerCollection<number, Post>;
+    users: EagerCollection<number, User>;
+    upvotes: EagerCollection<number, Upvote>;
+  }): Record<string, EagerCollection<TJSON, TJSON>> {
     const upvotes = inputCollections.upvotes.map(UpvotesMapper);
     const postsWithUpvotes = inputCollections.posts.map(
       PostsMapper,
@@ -111,12 +107,9 @@ class PostsResource implements Resource {
     this.limit = Number(params["limit"]);
   }
 
-  reactiveCompute(
-    _context: Context,
-    collections: {
-      postsWithUpvotes: EagerCollection<number, Upvoted>;
-    },
-  ): EagerCollection<number, Upvoted> {
+  reactiveCompute(collections: {
+    postsWithUpvotes: EagerCollection<number, Upvoted>;
+  }): EagerCollection<number, Upvoted> {
     return collections.postsWithUpvotes.take(this.limit).map(SortingMapper);
   }
 }
