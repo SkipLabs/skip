@@ -1,5 +1,5 @@
 import { run, type ModuleInit } from "std";
-import type { SkipService } from "./skipruntime_api.js";
+import type { SkipService } from "@skipruntime/api";
 import type {
   ServiceInstanceFactory,
   ServiceInstance,

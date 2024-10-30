@@ -1,4 +1,4 @@
-import type { TJSON, Entry, ReactiveResponse } from "./skipruntime_api.js";
+import type { TJSON, Entry, ReactiveResponse } from "@skipruntime/api";
 import { parseReactiveResponse } from "./skipruntime_utils.js";
 
 export type Entrypoint = {

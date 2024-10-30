@@ -3,7 +3,7 @@ import type {
   ExternalSupplier,
   ReactiveResponse,
   TJSON,
-} from "./skipruntime_api.js";
+} from "@skipruntime/api";
 import { parseReactiveResponse } from "./skipruntime_utils.js";
 
 import { connect, Protocol, Client } from "@skipruntime/client";
