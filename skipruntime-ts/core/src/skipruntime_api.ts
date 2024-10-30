@@ -12,8 +12,8 @@ import type { Constant } from "./internals/skipruntime_module.js";
  * and values in the Skip Runtime, ensuring that they can be serialized and managed by the
  * reactive computation engine.
  */
-export type TJSON = number | boolean | string | JSONObject | (TJSON | null)[];
-export type JSONObject = { [key: string]: TJSON | null };
+import type { JSONObject, TJSON } from "skjson";
+export type { JSONObject, TJSON } from "skjson";
 
 /**
  * A `Param` is a valid parameter to a Skip runtime mapper function: either a constant JS

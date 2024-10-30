@@ -1,9 +1,7 @@
 // Interfaces
 
-export interface JSONObject {
-  [key: string]: TJSON | null;
-}
-export type TJSON = number | JSONObject | boolean | (TJSON | null)[] | string;
+import type { TJSON } from "skjson";
+export type { JSONObject, TJSON } from "skjson";
 
 export type Entry<K extends TJSON, V extends TJSON> = [K, V[]];
 
