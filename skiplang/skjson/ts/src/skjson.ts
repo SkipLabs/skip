@@ -395,13 +395,7 @@ class Mapping {
 
 export type JSONObject = { [key: string]: TJSON | null };
 
-export type TJSON =
-  | number
-  | JSONObject
-  | boolean
-  | (TJSON | null)[]
-  | string
-  | bigint;
+export type TJSON = number | JSONObject | boolean | (TJSON | null)[] | string;
 
 export type Exportable =
   | TJSON
