@@ -4,10 +4,10 @@ import type {
   ReactiveResponse,
   TJSON,
 } from "@skipruntime/api";
-import { parseReactiveResponse } from "./skipruntime_utils.js";
+import { parseReactiveResponse } from "./utils.js";
 
 import { connect, Protocol, Client } from "@skipruntime/client";
-import { fetchJSON, type Entrypoint } from "./skipruntime_rest.js";
+import { fetchJSON, type Entrypoint } from "./rest.js";
 
 interface Closable {
   close(): void;
