@@ -2,7 +2,7 @@ import {
   fetchJSON,
   type ReactiveResponse,
   parseReactiveResponse,
-} from "@skipruntime/core";
+} from "skip-wasm";
 import { connect, Protocol } from "@skipruntime/client";
 import type { TJSON } from "@skipruntime/client/protocol.js";
 
