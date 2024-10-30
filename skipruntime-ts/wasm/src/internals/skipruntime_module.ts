@@ -8,8 +8,8 @@ import type {
   Opt,
   ErrorObject,
   Shared,
-} from "std";
-import { errorObjectAsError } from "std";
+} from "@skip-wasm/std";
+import { errorObjectAsError } from "@skip-wasm/std";
 import type * as Internal from "./skipruntime_internal_types.js";
 import type {
   Accumulator,

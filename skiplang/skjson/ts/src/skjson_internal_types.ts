@@ -1,5 +1,5 @@
-import type { T } from "std/internal.js";
-export type * from "std/internal.js";
+import type { T } from "@skip-wasm/std/internal.js";
+export type * from "@skip-wasm/std/internal.js";
 
 declare const _CJNull: unique symbol;
 export type CJNull = CJSON<typeof _CJNull>;
