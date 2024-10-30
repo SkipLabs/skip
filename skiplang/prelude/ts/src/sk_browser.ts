@@ -33,7 +33,7 @@ class Env implements Environment {
   onException: () => void;
   base64Decode: (base64: string) => Uint8Array;
   base64Encode: (toEncode: string, url?: boolean) => string;
-  createSocket: (uri: string) => WebSocket;
+  createSocket: (url: string) => WebSocket;
   createWorker: (url: URL, options?: WorkerOptions) => Wrk;
   createWorkerWrapper: (worker: Worker) => Wrk;
   crypto: () => Crypto;
@@ -91,7 +91,7 @@ class Env implements Environment {
     this.onException = () => {
       /* default nop hook */
     };
-    this.createSocket = (uri: string) => new WebSocket(uri);
+    this.createSocket = (url: string) => new WebSocket(url);
     this.createWorker = (url: URL, options?: WorkerOptions) =>
       WrkImpl.fromPath(url, options);
     this.createWorkerWrapper = (worker: Worker) => new WrkImpl(worker);
