@@ -4,6 +4,7 @@ export {
   Sum,
   Min,
   Max,
+  CountMapper,
   parseReactiveResponse,
   reactiveResponseHeader,
 } from "./utils.js";
