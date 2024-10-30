@@ -26,7 +26,7 @@ export type {
   ServiceInstance,
 } from "./internals/skipruntime_module.js";
 export { UnknownCollectionError } from "./skipruntime_errors.js";
-export { freeze, ValueMapper } from "./skipruntime_api.js";
+export { freeze, OneToOneMapper, ManyToOneMapper } from "./skipruntime_api.js";
 export {
   Sum,
   Min,
