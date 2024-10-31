@@ -87,10 +87,10 @@ class UsersResource implements Resource {
 /*****************************************************************************/
 
 class Service implements SkipService {
-  inputCollections: { users: Entry<string, User>[] };
+  initialData: { users: Entry<string, User>[] };
 
   constructor(users: Entry<string, User>[]) {
-    this.inputCollections = { users };
+    this.initialData = { users };
   }
 
   resources = {

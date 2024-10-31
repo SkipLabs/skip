@@ -887,7 +887,7 @@ class LinksImpl implements Links {
       }
       const skservice = this.fromWasm.SkipRuntime_createService(
         this.handles.register(service),
-        skjson.exportJSON(service.inputCollections ?? {}),
+        skjson.exportJSON(service.initialData ?? {}),
         skresources,
         skExternalServices,
       );
