@@ -438,7 +438,7 @@ async function timeout(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-class External implements ExternalSupplier {
+class MockExternal implements ExternalSupplier {
   subscribe(
     resource: string,
     params: { v1: string; v2: string },
@@ -484,7 +484,7 @@ class External implements ExternalSupplier {
   }
 }
 
-class ExternalCheck implements Mapper<number, number, number, number[]> {
+class MockExternalCheck implements Mapper<number, number, number, number[]> {
   constructor(private external: EagerCollection<number, number>) {}
 
   mapElement(
@@ -500,7 +500,7 @@ class ExternalCheck implements Mapper<number, number, number, number[]> {
   }
 }
 
-class ExternalResource implements Resource {
+class MockExternalResource implements Resource {
   reactiveCompute(
     cs: {
       input1: EagerCollection<number, number>;
@@ -517,14 +517,14 @@ class ExternalResource implements Resource {
       params: { v1, v2 },
       reactiveAuth,
     });
-    return cs.input1.map(ExternalCheck, external);
+    return cs.input1.map(MockExternalCheck, external);
   }
 }
 
 class TestExternalService implements SkipService {
   initialData = { input1: [], input2: [] };
-  resources = { external: ExternalResource };
-  externalServices = { external: new External() };
+  resources = { external: MockExternalResource };
+  externalServices = { external: new MockExternal() };
 
   reactiveCompute(inputCollections: {
     input1: EagerCollection<number, number>;
