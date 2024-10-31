@@ -190,13 +190,6 @@ const astDir: SKStore.EHandle<SKStore.SID, DefsFile> = SKStore.EHandle(
 
 class DefsFile(value: List<SkipAst.Definition>) extends SKStore.File
 
-fun getAst(
-  context: mutable SKStore.Context,
-  fileName: String,
-): List<SkipAst.Definition> {
-  astDir.get(context, SKStore.SID(fileName)).value
-}
-
 fun parseFile(file: FileCache.InputSource, source: String): DefsFile {
   fileResult = SkipParser.parseSource(source, true);
   ast = parseToAst(file, fileResult);
