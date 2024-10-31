@@ -109,7 +109,7 @@ export class TimeCollection implements ExternalResource {
 export class Polled<S extends TJSON, K extends TJSON, V extends TJSON>
   implements ExternalResource
 {
-  private intervals = new Map<string, number | object>();
+  private intervals = new Map<string, Timeout>();
 
   constructor(
     private url: string,
@@ -157,7 +157,7 @@ export class Polled<S extends TJSON, K extends TJSON, V extends TJSON>
   ): void {
     const interval = this.intervals.get(toId(params, reactiveAuth));
     if (interval) {
-      clearInterval(interval as number);
+      clearInterval(interval);
     }
   }
 }
