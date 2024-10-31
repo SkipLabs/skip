@@ -280,7 +280,7 @@ export interface Context extends Constant {
    * @param service.supplier - the name of the external supplier, which must correspond to a key inthe `externalServices` field of the `SkipService` this `Context` belongs to
    * @param service.resource - the resource name managed by the supplier
    * @param service.params - the parameters to supply to the resource
-   * @param service.reactiveAuth - the caller client user Skip session authentification
+   * @param service.reactiveAuth - the caller client user Skip session authentication
    * @returns The reactive collection of the external resource
    */
   useExternalResource<K extends TJSON, V extends TJSON>(service: {
@@ -333,7 +333,7 @@ export interface ExternalSupplier {
    * @param callbacks.update - the update callback
    * @param callbacks.error - the error callback
    * @param callbacks.loading - the loading callback
-   * @param reactiveAuth - the client user Skip session authentification of the caller
+   * @param reactiveAuth - the client user Skip session authentication of the caller
    */
   subscribe(
     resource: string,
@@ -350,7 +350,7 @@ export interface ExternalSupplier {
    * Unsubscribe to the external resource
    * @param resource - the name of the external resource
    * @param params - the parameters of the external resource
-   * @param reactiveAuth - the client user Skip session authentification of the caller
+   * @param reactiveAuth - the client user Skip session authentication of the caller
    */
   unsubscribe(
     resource: string,
@@ -372,7 +372,7 @@ export interface Resource {
    * Build a reactive compute graph of the reactive ressource
    * @param collections - the collection returned by SkipService reactiveCompute
    * @param context {Context} - the reactive graph context
-   * @param reactiveAuth - the client user Skip session authentification
+   * @param reactiveAuth - the client user Skip session authentication
    */
   reactiveCompute(
     collections: Record<string, EagerCollection<TJSON, TJSON>>,
