@@ -51,7 +51,7 @@ class DeparturesResource implements Resource {
 }
 
 class Service implements SkipService {
-  inputCollections = { config: [] };
+  initialData = { config: [] };
   resources = {
     departures: DeparturesResource,
   };

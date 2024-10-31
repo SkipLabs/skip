@@ -27,7 +27,7 @@ type Upvote = {
 type Upvoted = Post & { upvotes: number; author: User };
 
 export default class HackerNewsService implements SkipService {
-  inputCollections: {
+  initialData: {
     posts: Entry<string, Post>[];
     users: Entry<string, User>[];
     upvotes: Entry<string, Upvote>[];
@@ -39,7 +39,7 @@ export default class HackerNewsService implements SkipService {
     users: Entry<string, User>[],
     upvotes: Entry<string, Upvote>[],
   ) {
-    this.inputCollections = { posts, users, upvotes };
+    this.initialData = { posts, users, upvotes };
   }
 
   reactiveCompute(inputCollections: {
