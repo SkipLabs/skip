@@ -393,9 +393,8 @@ class Mapping {
   }
 }
 
+export type Json = number | boolean | string | (Json | null)[] | JsonObject;
 export type JsonObject = { [key: string]: Json | null };
-
-export type Json = number | JsonObject | boolean | (Json | null)[] | string;
 
 export type Exportable =
   | Json

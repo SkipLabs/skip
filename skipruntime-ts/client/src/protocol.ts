@@ -1,9 +1,8 @@
 // Interfaces
 
-export interface JsonObject {
-  [key: string]: Json | null;
-}
-export type Json = number | JsonObject | boolean | (Json | null)[] | string;
+// Replicate definition of Json from skjson to avoid a dependency
+export type Json = number | boolean | string | (Json | null)[] | JsonObject;
+export type JsonObject = { [key: string]: Json | null };
 
 export type Entry<K extends Json, V extends Json> = [K, V[]];
 
