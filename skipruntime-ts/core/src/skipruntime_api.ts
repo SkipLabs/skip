@@ -382,8 +382,8 @@ export interface Resource {
 }
 
 export interface SkipService {
-  /** The input collections specification of the service */
-  inputCollections?: Record<string, Entry<TJSON, TJSON>[]>;
+  /** The data used to initially populate the input collections of the service */
+  initialData?: Record<string, Entry<TJSON, TJSON>[]>;
   /** The external services of the service */
   externalServices?: Record<string, ExternalSupplier>;
   /** The reactive resources of the service */

@@ -37,7 +37,7 @@ class Map1Resource implements Resource {
 }
 
 class Map1Service implements SkipService {
-  inputCollections = { input: [] };
+  initialData = { input: [] };
   resources = { map1: Map1Resource };
 
   reactiveCompute(inputCollections: {
@@ -83,7 +83,7 @@ class Map2Resource implements Resource {
 }
 
 class Map2Service implements SkipService {
-  inputCollections = { input1: [], input2: [] };
+  initialData = { input1: [], input2: [] };
   resources = { map2: Map2Resource };
 
   reactiveCompute(inputCollections: {
@@ -129,7 +129,7 @@ class Map3Resource implements Resource {
 }
 
 class Map3Service implements SkipService {
-  inputCollections = { input1: [], input2: [] };
+  initialData = { input1: [], input2: [] };
   resources = { map3: Map3Resource };
 
   reactiveCompute(inputCollections: {
@@ -177,7 +177,7 @@ class OneToOneMapperResource implements Resource {
 }
 
 class OneToOneMapperService implements SkipService {
-  inputCollections = { input: [] };
+  initialData = { input: [] };
   resources = { valueMapper: OneToOneMapperResource };
 
   reactiveCompute(inputCollections: {
@@ -227,7 +227,7 @@ class SizeResource implements Resource {
 }
 
 class SizeService implements SkipService {
-  inputCollections = { input1: [], input2: [] };
+  initialData = { input1: [], input2: [] };
   resources = { size: SizeResource };
 
   reactiveCompute(inputCollections: {
@@ -289,7 +289,7 @@ class SlicedMap1Resource implements Resource {
 }
 
 class SlicedMap1Service implements SkipService {
-  inputCollections = { input: [] };
+  initialData = { input: [] };
   resources = { slice: SlicedMap1Resource };
 
   reactiveCompute(inputCollections: {
@@ -356,7 +356,7 @@ class LazyResource implements Resource {
 }
 
 class LazyService implements SkipService {
-  inputCollections = { input: [] };
+  initialData = { input: [] };
   resources = { lazy: LazyResource };
 
   reactiveCompute(inputCollections: {
@@ -410,7 +410,7 @@ class MapReduceResource implements Resource {
 }
 
 class MapReduceService implements SkipService {
-  inputCollections = { input: [] };
+  initialData = { input: [] };
   resources = { mapReduce: MapReduceResource };
 
   reactiveCompute(inputCollections: {
@@ -465,7 +465,7 @@ class Merge1Resource implements Resource {
 }
 
 class Merge1Service implements SkipService {
-  inputCollections = { input1: [], input2: [] };
+  initialData = { input1: [], input2: [] };
   resources = { merge1: Merge1Resource };
 
   reactiveCompute(inputCollections: {
@@ -522,7 +522,7 @@ class MergeReduceResource implements Resource {
 }
 
 class MergeReduceService implements SkipService {
-  inputCollections = { input1: [], input2: [] };
+  initialData = { input1: [], input2: [] };
   resources = { mergeReduce: MergeReduceResource };
 
   reactiveCompute(inputCollections: {
@@ -582,7 +582,7 @@ class JSONExtractResource implements Resource {
 }
 
 class JSONExtractService implements SkipService {
-  inputCollections = { input: [] };
+  initialData = { input: [] };
   resources = { jsonExtract: JSONExtractResource };
 
   reactiveCompute(inputCollections: {
@@ -740,7 +740,7 @@ class ExternalResource implements Resource {
 }
 
 class TestExternalService implements SkipService {
-  inputCollections = { input1: [], input2: [] };
+  initialData = { input1: [], input2: [] };
   resources = { external: ExternalResource };
   externalServices = { external: new External() };
 
@@ -811,7 +811,7 @@ class TokensResource implements Resource {
 const system = new ExternalService({ timer: new TimeCollection() });
 
 class TokensService implements SkipService {
-  inputCollections = { input: [] };
+  initialData = { input: [] };
   resources = { tokens: TokensResource };
   externalServices = { system };
 
@@ -854,7 +854,7 @@ class Resource2 implements Resource {
 }
 
 class MultipleResourcesService implements SkipService {
-  inputCollections = { input1: [], input2: [] };
+  initialData = { input1: [], input2: [] };
   resources = { resource1: Resource1, resource2: Resource2 };
 
   reactiveCompute(inputCollections: {

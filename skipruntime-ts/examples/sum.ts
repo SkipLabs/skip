@@ -43,7 +43,7 @@ class Sub implements Resource {
 }
 
 class Service implements SkipService {
-  inputCollections = { input1: [], input2: [] };
+  initialData = { input1: [], input2: [] };
   resources = { add: Add, sub: Sub };
 
   reactiveCompute(
