@@ -1353,7 +1353,7 @@ export class ServiceInstance {
    * Creates if not exists and get all current values of specified resource
    * @param resource - the resource name corresponding to a key in remotes field of SkipService
    * @param params - the parameters of the resource used to build the resource with the corresponding constructor specified in remotes field of SkipService
-   * @param reactiveAuth - the client user Skip session authentification
+   * @param reactiveAuth - the client user Skip session authentication
    * @returns The current values of the corresponding resource with reactive responce token to allow subscription
    */
   getAll<K extends TJSON, V extends TJSON>(
