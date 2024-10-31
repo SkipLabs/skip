@@ -19,8 +19,8 @@ npm run test --if-present
 if [[ "$3" =~ ^([0-9]{6})$ ]];
 then
     echo "Publishing with OTP $otp"
-    npm publish --release -- --otp=$otp
+    npm publish --release  --access public -- --otp=$otp
 else
     echo "Publishing without OTP"
-    npm publish --release
+    npm publish --release --access public
 fi
