@@ -112,7 +112,7 @@ export class Polled<S extends TJSON, K extends TJSON, V extends TJSON>
   private intervals = new Map<string, number | object>();
 
   constructor(
-    private uri: string,
+    private url: string,
     private duration: number,
     private conv: (data: S) => Entry<K, V>[],
   ) {}
@@ -132,10 +132,10 @@ export class Polled<S extends TJSON, K extends TJSON, V extends TJSON>
       querieParams[key] = value.toString();
     }
     const strParams = new URLSearchParams(querieParams).toString();
-    const uri = `${this.uri}?${strParams}`;
+    const url = `${this.url}?${strParams}`;
     const call = () => {
       callbacks.loading();
-      fetchJSON(uri, "GET", {})
+      fetchJSON(url, "GET", {})
         .then((r) => {
           callbacks.update(this.conv(r[0] as S), true);
         })
