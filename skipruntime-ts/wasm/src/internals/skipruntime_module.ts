@@ -24,7 +24,7 @@ import type {
   Mapper,
   Context,
   LazyCompute,
-  ExternalSupplier,
+  ExternalService,
   Resource,
   ReactiveResponse,
   CollectionUpdate,
@@ -156,11 +156,11 @@ export interface FromWasm {
     ref: Handle<LazyCompute<K, V>>,
   ): ptr<Internal.LazyCompute>;
 
-  // ExternalSupplier
+  // ExternalService
 
-  SkipRuntime_createExternalSupplier(
-    ref: Handle<ExternalSupplier>,
-  ): ptr<Internal.ExternalSupplier>;
+  SkipRuntime_createExternalService(
+    ref: Handle<ExternalService>,
+  ): ptr<Internal.ExternalService>;
 
   // CollectionWriter
 
@@ -193,7 +193,7 @@ export interface FromWasm {
     ref: Handle<SkipService>,
     jsInputs: ptr<Internal.CJObject>,
     resources: ptr<Internal.ResourceBuilderMap>,
-    remotes: ptr<Internal.ExternalSupplierMap>,
+    remotes: ptr<Internal.ExternalServiceMap>,
   ): ptr<Internal.Service>;
 
   // ResourceBuilderMap
@@ -206,13 +206,13 @@ export interface FromWasm {
     collection: ptr<Internal.ResourceBuilder>,
   ): void;
 
-  // ExternalSupplierMap
+  // ExternalServiceMap
 
-  SkipRuntime_ExternalSupplierMap__create(): ptr<Internal.ExternalSupplierMap>;
-  SkipRuntime_ExternalSupplierMap__add(
-    map: ptr<Internal.ExternalSupplierMap>,
+  SkipRuntime_ExternalServiceMap__create(): ptr<Internal.ExternalServiceMap>;
+  SkipRuntime_ExternalServiceMap__add(
+    map: ptr<Internal.ExternalServiceMap>,
     key: ptr<Internal.String>,
-    collection: ptr<Internal.ExternalSupplier>,
+    collection: ptr<Internal.ExternalService>,
   ): void;
 
   // Collection
@@ -391,28 +391,28 @@ interface ToWasm {
 
   SkipRuntime_deleteLazyCompute(mapper: Handle<JSONLazyCompute>): void;
 
-  // ExternalSupplier
+  // ExternalService
 
-  SkipRuntime_ExternalSupplier__subscribe(
-    supplier: Handle<ExternalSupplier>,
+  SkipRuntime_ExternalService__subscribe(
+    supplier: Handle<ExternalService>,
     collection: ptr<Internal.String>,
     resource: ptr<Internal.String>,
     params: ptr<Internal.CJObject>,
     reactiveAuth: ptr<Internal.Array<Internal.Byte>>,
   ): void;
 
-  SkipRuntime_ExternalSupplier__unsubscribe(
-    supplier: Handle<ExternalSupplier>,
+  SkipRuntime_ExternalService__unsubscribe(
+    supplier: Handle<ExternalService>,
     skresource: ptr<Internal.String>,
     skparams: ptr<Internal.CJObject>,
     reactiveAuth: ptr<Internal.Array<Internal.Byte>>,
   ): void;
 
-  SkipRuntime_ExternalSupplier__shutdown(
-    supplier: Handle<ExternalSupplier>,
+  SkipRuntime_ExternalService__shutdown(
+    supplier: Handle<ExternalService>,
   ): void;
 
-  SkipRuntime_deleteExternalSupplier(supplier: Handle<ExternalSupplier>): void;
+  SkipRuntime_deleteExternalService(supplier: Handle<ExternalService>): void;
 
   // Resource
 
@@ -778,10 +778,10 @@ class LinksImpl implements Links {
     this.handles.deleteHandle(accumulator);
   }
 
-  // ExternalSupplier
+  // ExternalService
 
-  subscribeOfExternalSupplier(
-    sksupplier: Handle<ExternalSupplier>,
+  subscribeOfExternalService(
+    sksupplier: Handle<ExternalService>,
     skwriter: ptr<Internal.String>,
     skresource: ptr<Internal.String>,
     skparams: ptr<Internal.CJObject>,
@@ -810,8 +810,8 @@ class LinksImpl implements Links {
     );
   }
 
-  unsubscribeOfExternalSupplier(
-    sksupplier: Handle<ExternalSupplier>,
+  unsubscribeOfExternalService(
+    sksupplier: Handle<ExternalService>,
     skresource: ptr<Internal.String>,
     skparams: ptr<Internal.CJObject>,
     skreactiveAuth: ptr<Internal.Array<Internal.Byte>>,
@@ -826,12 +826,12 @@ class LinksImpl implements Links {
     supplier.unsubscribe(resource, params, reactiveAuth);
   }
 
-  shutdownOfExternalSupplier(sksupplier: Handle<ExternalSupplier>) {
+  shutdownOfExternalService(sksupplier: Handle<ExternalService>) {
     const supplier = this.handles.get(sksupplier);
     supplier.shutdown();
   }
 
-  deleteExternalSupplier(supplier: Handle<ExternalSupplier>) {
+  deleteExternalService(supplier: Handle<ExternalService>) {
     this.handles.deleteHandle(supplier);
   }
 
@@ -851,13 +851,13 @@ class LinksImpl implements Links {
     const skjson = this.getSkjson();
     const result = skjson.runWithGC(() => {
       const skExternalServices =
-        this.fromWasm.SkipRuntime_ExternalSupplierMap__create();
+        this.fromWasm.SkipRuntime_ExternalServiceMap__create();
       if (service.externalServices) {
         for (const [name, remote] of Object.entries(service.externalServices)) {
-          const skremote = this.fromWasm.SkipRuntime_createExternalSupplier(
+          const skremote = this.fromWasm.SkipRuntime_createExternalService(
             this.handles.register(remote),
           );
-          this.fromWasm.SkipRuntime_ExternalSupplierMap__add(
+          this.fromWasm.SkipRuntime_ExternalServiceMap__add(
             skExternalServices,
             skjson.exportString(name),
             skremote,
@@ -1662,16 +1662,16 @@ class Manager implements ToWasmManager {
       links.computeOfLazyCompute.bind(links);
     toWasm.SkipRuntime_deleteLazyCompute = links.deleteLazyCompute.bind(links);
 
-    // ExternalSupplier
+    // ExternalService
 
-    toWasm.SkipRuntime_ExternalSupplier__unsubscribe =
-      links.unsubscribeOfExternalSupplier.bind(links);
-    toWasm.SkipRuntime_ExternalSupplier__subscribe =
-      links.subscribeOfExternalSupplier.bind(links);
-    toWasm.SkipRuntime_ExternalSupplier__shutdown =
-      links.shutdownOfExternalSupplier.bind(links);
-    toWasm.SkipRuntime_deleteExternalSupplier =
-      links.deleteExternalSupplier.bind(links);
+    toWasm.SkipRuntime_ExternalService__unsubscribe =
+      links.unsubscribeOfExternalService.bind(links);
+    toWasm.SkipRuntime_ExternalService__subscribe =
+      links.subscribeOfExternalService.bind(links);
+    toWasm.SkipRuntime_ExternalService__shutdown =
+      links.shutdownOfExternalService.bind(links);
+    toWasm.SkipRuntime_deleteExternalService =
+      links.deleteExternalService.bind(links);
 
     // Resource
 
