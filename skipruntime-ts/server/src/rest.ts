@@ -1,9 +1,6 @@
 import express from "express";
-import type { Entry, TJSON, ServiceInstance, Values } from "@skipruntime/core";
-import {
-  UnknownCollectionError,
-  reactiveResponseHeader,
-} from "@skipruntime/core";
+import type { Entry, TJSON, ServiceInstance, Values } from "skip-wasm";
+import { UnknownCollectionError, reactiveResponseHeader } from "skip-wasm";
 
 export function createRESTServer(service: ServiceInstance): express.Express {
   const app = express();

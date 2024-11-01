@@ -1,4 +1,4 @@
-import type { Environment, FileSystem } from "std";
+import type { Environment, FileSystem } from "@skip-wasm/std";
 import type {
   SKDBMechanism,
   SKDB,

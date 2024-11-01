@@ -1,11 +1,10 @@
+import type { Opaque, Opt, int, Constant } from "./internals.js";
+
 /**
  * This file contains the Skip Runtime public API: types, interfaces, and operations that can
  * be used to specify and interact with reactive computations. See [todo: pointer to public
  * overview page] for a detailed description and introduction to the SkipRuntime system.
  */
-
-import type { Opaque, Opt, int } from "std";
-import type { Constant } from "./internals/skipruntime_module.js";
 
 /**
  * The `TJSON` type describes JSON-serializable values and serves as an upper bound on keys
@@ -30,7 +29,6 @@ export type Param =
   | Constant
   | readonly Param[]
   | { readonly [k: string]: Param };
-export { freeze } from "./internals/skipruntime_module.js";
 
 /**
  * The type of a reactive function mapping over an arbitrary collection.

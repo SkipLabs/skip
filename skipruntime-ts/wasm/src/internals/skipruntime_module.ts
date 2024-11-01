@@ -8,8 +8,8 @@ import type {
   Opt,
   ErrorObject,
   Shared,
-} from "std";
-import { errorObjectAsError } from "std";
+} from "@skip-wasm/std";
+import { errorObjectAsError } from "@skip-wasm/std";
 import type * as Internal from "./skipruntime_internal_types.js";
 import type {
   Accumulator,
@@ -30,21 +30,19 @@ import type {
   CollectionUpdate,
   Watermark,
   SubscriptionID,
-} from "../skipruntime_api.js";
+} from "@skipruntime/api";
 
-import type { Exportable, SKJSON } from "skjson";
-import { UnknownCollectionError } from "../skipruntime_errors.js";
+import { Frozen, type Constant } from "@skipruntime/api/internals.js";
+
+import type { Exportable, SKJSON } from "@skip-wasm/json";
+import { UnknownCollectionError } from "@skipruntime/helpers/errors.js";
 
 export type Handle<T> = Internal.Opaque<int, { handle_for: T }>;
 
-export const sk_frozen: unique symbol = Symbol();
+const sk_frozen: unique symbol = Symbol.for("Skip.frozen");
 
 type JSONMapper = Mapper<TJSON, TJSON, TJSON, TJSON>;
 type JSONLazyCompute = LazyCompute<TJSON, TJSON>;
-
-export interface Constant {
-  [sk_frozen]: true;
-}
 
 export function sk_freeze<T extends object>(x: T): T & Constant {
   return Object.defineProperty(x, sk_frozen, {
@@ -58,14 +56,9 @@ export function isSkFrozen(x: any): x is Constant {
   return sk_frozen in x && x[sk_frozen] === true;
 }
 
-abstract class SkFrozen implements Constant {
-  // tsc misses that Object.defineProperty in the constructor inits this
-  [sk_frozen]!: true;
-
-  constructor() {
+abstract class SkFrozen extends Frozen {
+  protected freeze() {
     sk_freeze(this);
-    // Inheriting classes should call Object.freeze at the end of their
-    // constructor
   }
 }
 
@@ -88,7 +81,7 @@ abstract class SkFrozen implements Constant {
  * @param value - The object to deep-freeze.
  * @returns The same object that was passed in.
  */
-export function freeze<T>(value: T): T & Param {
+export function freeze<T>(value: T): (T & Param) | (T & Constant) {
   if (
     typeof value == "string" ||
     typeof value == "number" ||
