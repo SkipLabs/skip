@@ -61,7 +61,7 @@ export class GenericExternalService implements ExternalService {
 
 type Timeout = ReturnType<typeof setInterval>;
 
-export class TimeCollection implements ExternalResource {
+export class TimerResource implements ExternalResource {
   private intervals = new Map<string, Record<string, Timeout>>();
 
   open(

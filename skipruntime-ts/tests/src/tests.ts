@@ -18,7 +18,7 @@ import type {
 import { OneToOneMapper } from "@skipruntime/api";
 import { Sum } from "@skipruntime/helpers";
 import {
-  TimeCollection,
+  TimerResource,
   GenericExternalService,
 } from "@skipruntime/helpers/external.js";
 
@@ -551,7 +551,7 @@ class TokensResource implements Resource {
   }
 }
 
-const system = new GenericExternalService({ timer: new TimeCollection() });
+const system = new GenericExternalService({ timer: new TimerResource() });
 
 class TokensService implements SkipService {
   initialData = { input: [] };
