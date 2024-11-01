@@ -29,7 +29,7 @@ export type LazyCompute = T<typeof lazycompute> & {
 };
 
 declare const externalsupplier: unique symbol;
-export type ExternalSupplier = T<typeof externalsupplier>;
+export type ExternalService = T<typeof externalsupplier>;
 
 declare const resource: unique symbol;
 export type Resource = T<typeof resource>;
@@ -44,7 +44,7 @@ declare const resourcebuildermap: unique symbol;
 export type ResourceBuilderMap = T<typeof resourcebuildermap>;
 
 declare const externalsuppliermap: unique symbol;
-export type ExternalSupplierMap = T<typeof externalsuppliermap>;
+export type ExternalServiceMap = T<typeof externalsuppliermap>;
 
 declare const accumulator: unique symbol;
 export type Accumulator = T<typeof accumulator>;
