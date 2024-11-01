@@ -1,5 +1,5 @@
-import type { Entry, ExternalSupplier, TJSON } from "./skipruntime_api.js";
-import { fetchJSON } from "./skipruntime_rest.js";
+import type { Entry, ExternalSupplier, TJSON } from "@skipruntime/api";
+import { fetchJSON } from "./rest.js";
 
 export interface ExternalResource {
   open(

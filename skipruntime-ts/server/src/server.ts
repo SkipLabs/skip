@@ -1,6 +1,6 @@
 import { WebSocketServer } from "ws";
 import * as http from "http";
-import { initService, type SkipService } from "@skipruntime/core";
+import { initService, type SkipService } from "skip-wasm";
 import { createRESTServer } from "./rest.js";
 import { ReplicationServer } from "./replication.js";
 

@@ -239,3 +239,44 @@ skfmt-%:
 
 skbuild-%:
 	cd $* && skargo b --profile $(SKARGO_PROFILE)
+
+.PHONY: publish-std
+publish-std:
+	bin/release_npm.sh @skip-wasm/std skiplang/prelude/ts/package.json $(OPT)
+
+.PHONY: publish-json
+publish-json:
+	bin/release_npm.sh @skip-wasm/json skiplang/skjson/ts/package.json $(OPT)
+
+.PHONY: publish-date
+publish-date:
+	bin/release_npm.sh @skip-wasm/date skiplang/skdate/ts/package.json $(OPT)
+
+.PHONY: publish-api
+publish-api:
+	bin/release_npm.sh @skipruntime/api skipruntime-ts/api/package.json $(OPT)
+
+.PHONY: publish-client
+publish-client:
+	bin/release_npm.sh @skipruntime/client skipruntime-ts/client/package.json $(OPT)
+
+.PHONY: publish-helpers
+publish-helpers:
+	bin/release_npm.sh @skipruntime/helpers skipruntime-ts/helpers/package.json $(OPT)
+
+.PHONY: publish-tests
+publish-tests:
+	bin/release_npm.sh @skipruntime/tests skipruntime-ts/tests/package.json $(OPT)
+
+.PHONY: publish-wasm
+publish-wasm:
+	mkdir -p skipruntime/wasm/dist/src
+	cd skipruntime/native && npm run build
+	bin/release_npm.sh skip-wasm skipruntime-ts/wasm/package.json $(OPT)
+
+.PHONY: publish-server
+publish-server:
+	bin/release_npm.sh @skipruntime/server skipruntime-ts/server/package.json $(OPT)
+
+.PHONY: publish-all
+publish-all: clean publish-std publish-json publish-date publish-api publish-client publish-helpers publish-tests publish-wasm publish-server

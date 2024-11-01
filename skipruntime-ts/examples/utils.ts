@@ -1,5 +1,5 @@
-import type { TJSON, Entrypoint, Entry } from "@skipruntime/core";
-import { SkipRESTService } from "@skipruntime/core";
+import type { TJSON, Entry } from "@skipruntime/api";
+import { SkipRESTService, type Entrypoint } from "@skipruntime/helpers/rest.js";
 import { createInterface } from "readline";
 import { connect, Protocol, Client } from "@skipruntime/client";
 

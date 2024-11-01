@@ -8,7 +8,7 @@ import {
 } from "react-router-dom";
 import "./App.css";
 import { SkipContext } from "./SkipContext.ts";
-import { ReactiveResponse } from "@skipruntime/core";
+import { ReactiveResponse } from "@skipruntime/api";
 import { Client, Protocol } from "@skipruntime/client";
 
 const BASE_URL = "http://localhost:5000";

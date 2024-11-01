@@ -5,7 +5,7 @@ SKARGO_PROFILE?=release
 
 .PHONY: check-src
 check-src:
-	../bin/cd_sh core "bun run tsc && bun run lint"
+	../bin/cd_sh wasm "bun run tsc && bun run lint"
 	../bin/cd_sh client "bun run tsc && bun run lint"
 	../bin/cd_sh server "bun run tsc && bun run lint"
 
@@ -48,4 +48,4 @@ clean:
 
 .PHONY: test
 test: bunbuild
-	../bin/cd_sh core "bun run test"
+	../bin/cd_sh wasm "bun run test"

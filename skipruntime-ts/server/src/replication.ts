@@ -7,7 +7,7 @@ import {
   type SubscriptionID,
   type ServiceInstance,
   UnknownCollectionError,
-} from "@skipruntime/core";
+} from "skip-wasm";
 import { Protocol } from "@skipruntime/client";
 
 class TailingSession {
