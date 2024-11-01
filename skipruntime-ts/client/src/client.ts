@@ -36,9 +36,9 @@ const protoVersion = 1;
 // FIXME
 const npmVersion = "";
 
-async function createWs(uri: string): Promise<WebSocket> {
+async function createWs(url: string): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
-    const socket = new WebSocket(uri);
+    const socket = new WebSocket(url);
     socket.binaryType = "arraybuffer";
     socket.onclose = (_event: any) => {
       reject(new Error("Socket closed before open"));
@@ -56,15 +56,15 @@ async function createWs(uri: string): Promise<WebSocket> {
 }
 
 class ResilientWebSocket {
-  private uri: string;
+  private url: string;
   private socket?: WebSocket;
 
   onmessage?: (data: ArrayBuffer) => void;
   shouldReconnect?: () => boolean;
   onreconnect?: () => void;
 
-  constructor(uri: string) {
-    this.uri = uri;
+  constructor(url: string) {
+    this.url = url;
   }
 
   async connect(): Promise<void> {
@@ -91,7 +91,7 @@ class ResilientWebSocket {
     };
     for (;;) {
       try {
-        const socket = await createWs(this.uri);
+        const socket = await createWs(this.url);
         socket.onclose = (_event) => {
           maybeReplaceWs();
         };
@@ -153,9 +153,9 @@ export class Client {
     this.socket = socket;
   }
 
-  static async connect(uri: string, creds: Creds): Promise<Client> {
+  static async connect(url: string, creds: Creds): Promise<Client> {
     // FIXME: Periodic ping.
-    const socket = new ResilientWebSocket(uri);
+    const socket = new ResilientWebSocket(url);
     const client = new Client(creds, socket);
     socket.onmessage = (data) => {
       client.onmessage(data);
@@ -299,10 +299,10 @@ export class Client {
 
 /**
  * Connects to a remote Skip reactive service.
- * @param uri Remote reactive service url.
+ * @param url Remote reactive service url.
  * @param creds Credentials, generated with `generateCredentials()`.
  * @returns Client
  */
-export async function connect(uri: string, creds: Creds): Promise<Client> {
-  return Client.connect(uri, creds);
+export async function connect(url: string, creds: Creds): Promise<Client> {
+  return Client.connect(url, creds);
 }

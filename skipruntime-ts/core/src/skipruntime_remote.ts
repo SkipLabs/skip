@@ -18,7 +18,7 @@ export class ExternalSkipService implements ExternalSupplier {
   private resources = new Map<string, Closable>();
 
   constructor(
-    private uri: string,
+    private url: string,
     private auth: (
       resource: string,
       params: Record<string, string>,
@@ -36,19 +36,19 @@ export class ExternalSkipService implements ExternalSupplier {
     ) => Promise<ReactiveResponse>,
     creds?: Protocol.Creds,
   ): ExternalSkipService {
-    let uri = `ws://${entrypoint.host}:${entrypoint.port.toString()}`;
+    let url = `ws://${entrypoint.host}:${entrypoint.port.toString()}`;
     if (entrypoint.secured)
-      uri = `wss://${entrypoint.host}:${entrypoint.port.toString()}`;
-    return new ExternalSkipService(uri, auth, creds);
+      url = `wss://${entrypoint.host}:${entrypoint.port.toString()}`;
+    return new ExternalSkipService(url, auth, creds);
   }
 
   static direct(
     entrypoint: Entrypoint,
     creds?: Protocol.Creds,
   ): ExternalSkipService {
-    let uri = `http://${entrypoint.host}:${entrypoint.port.toString()}`;
+    let url = `http://${entrypoint.host}:${entrypoint.port.toString()}`;
     if (entrypoint.secured)
-      uri = `https://${entrypoint.host}:${entrypoint.port.toString()}`;
+      url = `https://${entrypoint.host}:${entrypoint.port.toString()}`;
     const auth = async (
       resource: string,
       params: Record<string, string>,
@@ -59,7 +59,7 @@ export class ExternalSkipService implements ExternalSupplier {
         "X-Reactive-Auth": Buffer.from(reactiveAuth).toString("base64"),
       };
       const [_data, headers] = await fetchJSON(
-        `${uri}/v1/${resource}?${qParams}`,
+        `${url}/v1/${resource}?${qParams}`,
         "HEAD",
         header,
       );
@@ -68,7 +68,7 @@ export class ExternalSkipService implements ExternalSupplier {
         throw new Error("Reactive response must be suplied.");
       return reactiveResponse;
     };
-    return new ExternalSkipService(uri, auth, creds);
+    return new ExternalSkipService(url, auth, creds);
   }
 
   subscribe(
@@ -85,10 +85,10 @@ export class ExternalSkipService implements ExternalSupplier {
       if (!this.creds) {
         this.client = Protocol.generateCredentials().then((creds) => {
           this.creds = creds;
-          return connect(this.uri, this.creds).then((c) => [c, creds]);
+          return connect(this.url, this.creds).then((c) => [c, creds]);
         });
       } else {
-        this.client = connect(this.uri, this.creds).then((c) => {
+        this.client = connect(this.url, this.creds).then((c) => {
           return [c, this.creds!];
         });
       }
