@@ -15,7 +15,7 @@ export type {
   ReactiveResponse,
   SkipService,
   Resource,
-  ExternalSupplier,
+  ExternalService,
   CollectionUpdate,
   Watermark,
   SubscriptionID,
@@ -36,7 +36,7 @@ export {
   reactiveResponseHeader,
   ExternalSkipService,
   type ExternalResource,
-  ExternalService,
+  GenericExternalService,
   Polled,
 } from "@skipruntime/helpers";
 
@@ -45,3 +45,4 @@ export {
   SkipRESTService,
   type Entrypoint,
 } from "@skipruntime/helpers/rest.js";
+

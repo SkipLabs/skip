@@ -12,14 +12,14 @@ import type {
   SkipService,
   Resource,
   Entry,
-  ExternalSupplier,
+  ExternalService,
   ReactiveResponse,
 } from "@skipruntime/api";
 import { OneToOneMapper } from "@skipruntime/api";
 import { Sum } from "@skipruntime/helpers";
 import {
   TimeCollection,
-  ExternalService,
+  GenericExternalService,
 } from "@skipruntime/helpers/external.js";
 
 type Values<K extends TJSON, V extends TJSON> = {
@@ -432,13 +432,13 @@ class JSONExtractService implements SkipService {
   }
 }
 
-//// testExternalSupplier
+//// testExternalService
 
 async function timeout(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-class MockExternal implements ExternalSupplier {
+class MockExternal implements ExternalService {
   subscribe(
     resource: string,
     params: { v1: string; v2: string },
@@ -551,7 +551,7 @@ class TokensResource implements Resource {
   }
 }
 
-const system = new ExternalService({ timer: new TimeCollection() });
+const system = new GenericExternalService({ timer: new TimeCollection() });
 
 class TokensService implements SkipService {
   initialData = { input: [] };
