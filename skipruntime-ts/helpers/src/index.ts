@@ -1,5 +1,9 @@
-export { ExternalSkipService } from "./remote.js";
-export { type ExternalResource, ExternalService, Polled } from "./external.js";
+export { SkipExternalService } from "./remote.js";
+export {
+  type ExternalResource,
+  GenericExternalService,
+  Polled,
+} from "./external.js";
 export {
   Sum,
   Min,
