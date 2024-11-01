@@ -6,7 +6,7 @@ import type {
   SkipService,
   Resource,
 } from "skip-wasm";
-import { ExternalSkipService, ManyToOneMapper } from "skip-wasm";
+import { SkipExternalService, ManyToOneMapper } from "skip-wasm";
 
 import { runService } from "@skipruntime/server";
 
@@ -36,7 +36,7 @@ class MultResource implements Resource {
 class Service implements SkipService {
   resources = { data: MultResource };
   externalServices = {
-    sumexample: ExternalSkipService.direct({ host: "localhost", port: 3587 }),
+    sumexample: SkipExternalService.direct({ host: "localhost", port: 3587 }),
   };
 
   reactiveCompute(

@@ -34,7 +34,7 @@ export {
   Max,
   parseReactiveResponse,
   reactiveResponseHeader,
-  ExternalSkipService,
+  SkipExternalService,
   type ExternalResource,
   GenericExternalService,
   Polled,
@@ -45,4 +45,3 @@ export {
   SkipRESTService,
   type Entrypoint,
 } from "@skipruntime/helpers/rest.js";
-
