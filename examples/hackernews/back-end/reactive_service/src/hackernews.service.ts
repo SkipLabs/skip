@@ -1,6 +1,6 @@
 import type {
   Entry,
-  TJSON,
+  Json,
   EagerCollection,
   NonEmptyIterator,
   SkipService,
@@ -46,7 +46,7 @@ export default class HackerNewsService implements SkipService {
     posts: EagerCollection<number, Post>;
     users: EagerCollection<number, User>;
     upvotes: EagerCollection<number, Upvote>;
-  }): Record<string, EagerCollection<TJSON, TJSON>> {
+  }): Record<string, EagerCollection<Json, Json>> {
     const upvotes = inputCollections.upvotes.map(UpvotesMapper);
     const postsWithUpvotes = inputCollections.posts.map(
       PostsMapper,

@@ -2,7 +2,7 @@ import type {
   Entry,
   ExternalService,
   ReactiveResponse,
-  TJSON,
+  Json,
 } from "@skipruntime/api";
 import { parseReactiveResponse } from "./utils.js";
 
@@ -75,8 +75,8 @@ export class SkipExternalService implements ExternalService {
     resource: string,
     params: Record<string, string>,
     callbacks: {
-      update: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void;
-      error: (error: TJSON) => void;
+      update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
+      error: (error: Json) => void;
       loading: () => void;
     },
     reactiveAuth?: Uint8Array,
@@ -125,8 +125,8 @@ export class SkipExternalService implements ExternalService {
     resource: string,
     params: Record<string, string>,
     callbacks: {
-      update: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void;
-      error: (error: TJSON) => void;
+      update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
+      error: (error: Json) => void;
       loading: () => void;
     },
     reactiveAuth?: Uint8Array,

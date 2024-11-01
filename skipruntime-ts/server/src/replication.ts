@@ -1,6 +1,6 @@
 import { WebSocket, type WebSocketServer, type MessageEvent } from "ws";
 import {
-  type TJSON,
+  type Json,
   type CollectionUpdate,
   type Watermark,
   type ReactiveResponse,
@@ -20,9 +20,9 @@ class TailingSession {
 
   subscribe(
     reactiveResponse: ReactiveResponse,
-    callback: (update: CollectionUpdate<string, TJSON>) => void,
+    callback: (update: CollectionUpdate<string, Json>) => void,
   ) {
-    const subsession = this.replication.subscribe<string, TJSON>(
+    const subsession = this.replication.subscribe<string, Json>(
       reactiveResponse,
       callback,
       new Uint8Array(this.pubkey),

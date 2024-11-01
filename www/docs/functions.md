@@ -20,14 +20,14 @@ Although non-determinism is not necessarily a bug in the strictest sense, it can
 
 Mappers must implement the Skip `Mapper` interface and define a `mapElement` function which takes a key and corresponding values from an input collection and produces some key/value pairs defining an output collection.
 
-All keys and values must be JSON-encodable (i.e. extend `TJSON`), but the input collection's key/value types `K1`/`V1` do not need to coincide with the output collection's key/value types `K2`/`V2`.
+All keys and values must be JSON-encodable (i.e. extend `Json`), but the input collection's key/value types `K1`/`V1` do not need to coincide with the output collection's key/value types `K2`/`V2`.
 
 ```typescript
 interface Mapper<
-  K1 extends TJSON,
-  V1 extends TJSON,
-  K2 extends TJSON,
-  V2 extends TJSON,
+  K1 extends Json,
+  V1 extends Json,
+  K2 extends Json,
+  V2 extends Json,
 > {
   mapElement(key: K1, values: NonEmptyIterator<V1>): Iterable<[K2, V2]>;
 }

@@ -1,4 +1,4 @@
-import type { TJSON, Entry } from "@skipruntime/api";
+import type { Json, Entry } from "@skipruntime/api";
 import { SkipRESTService, type Entrypoint } from "@skipruntime/helpers/rest.js";
 import { createInterface } from "readline";
 import { connect, Protocol, Client } from "@skipruntime/client";
@@ -10,7 +10,7 @@ export interface ClientDefinition {
 
 interface Write {
   collection: string;
-  entries: Entry<TJSON, TJSON>[];
+  entries: Entry<Json, Json>[];
 }
 
 interface Delete {
@@ -105,7 +105,7 @@ class SkipHttpAccessV1 {
     this.client.subscribe(
       reactive.collection,
       reactive.watermark,
-      (updates: [string, TJSON[]][], isInit: boolean) => {
+      (updates: [string, Json[]][], isInit: boolean) => {
         console.log("Update", Object.fromEntries(updates), isInit);
       },
     );

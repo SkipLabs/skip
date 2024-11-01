@@ -7,12 +7,12 @@ import type { Opaque, Opt, int, Constant } from "./internals.js";
  */
 
 /**
- * The `TJSON` type describes JSON-serializable values and serves as an upper bound on keys
+ * The `Json` type describes JSON-serializable values and serves as an upper bound on keys
  * and values in the Skip Runtime, ensuring that they can be serialized and managed by the
  * reactive computation engine.
  */
-export type TJSON = number | boolean | string | JSONObject | (TJSON | null)[];
-export type JSONObject = { [key: string]: TJSON | null };
+export type Json = number | boolean | string | JsonObject | (Json | null)[];
+export type JsonObject = { [key: string]: Json | null };
 
 /**
  * A `Param` is a valid parameter to a Skip runtime mapper function: either a constant JS
@@ -41,10 +41,10 @@ export type Param =
  * @returns an iterable of key-value pairs to output for the given input(s)
  */
 export interface Mapper<
-  K1 extends TJSON,
-  V1 extends TJSON,
-  K2 extends TJSON,
-  V2 extends TJSON,
+  K1 extends Json,
+  V1 extends Json,
+  K2 extends Json,
+  V2 extends Json,
 > {
   mapElement(key: K1, values: NonEmptyIterator<V1>): Iterable<[K2, V2]>;
 }
@@ -58,9 +58,9 @@ export interface Mapper<
  * implement the simpler `mapValue` to transform individual values.
  */
 export abstract class OneToOneMapper<
-  K extends TJSON,
-  V1 extends TJSON,
-  V2 extends TJSON,
+  K extends Json,
+  V1 extends Json,
+  V2 extends Json,
 > implements Mapper<K, V1, K, V2>
 {
   abstract mapValue(value: V1, key: K): V2;
@@ -80,9 +80,9 @@ export abstract class OneToOneMapper<
  * with each key.
  */
 export abstract class ManyToOneMapper<
-  K extends TJSON,
-  V1 extends TJSON,
-  V2 extends TJSON,
+  K extends Json,
+  V1 extends Json,
+  V2 extends Json,
 > implements Mapper<K, V1, K, V2>
 {
   abstract mapValues(values: NonEmptyIterator<V1>, key: K): V2;
@@ -96,7 +96,7 @@ export abstract class ManyToOneMapper<
  * The type of a reactive accumulator (a.k.a. reducer) function, which computes an output
  * value over a collection as values are added/removed to the collection
  */
-export interface Accumulator<T extends TJSON, V extends TJSON> {
+export interface Accumulator<T extends Json, V extends Json> {
   default: Opt<V>;
   /**
    * The computation to perform when an input value is added
@@ -160,7 +160,7 @@ export interface NonEmptyIterator<T> extends Iterable<T> {
 /**
  * A _Lazy_ reactive collection, whose values are computed only when queried
  */
-export interface LazyCollection<K extends TJSON, V extends TJSON>
+export interface LazyCollection<K extends Json, V extends Json>
   extends Constant {
   /**
    * Get (and potentially compute) all values mapped to by some key of a lazy reactive
@@ -186,7 +186,7 @@ export interface LazyCollection<K extends TJSON, V extends TJSON>
  * An _Eager_ reactive collection, whose values are computed eagerly and kept up
  * to date whenever inputs are changed
  */
-export interface EagerCollection<K extends TJSON, V extends TJSON>
+export interface EagerCollection<K extends Json, V extends Json>
   extends Constant {
   /**
    * Get (and potentially compute) all values mapped to by some key of a lazy reactive
@@ -205,7 +205,7 @@ export interface EagerCollection<K extends TJSON, V extends TJSON>
    * @param mapper - function to apply to each element of this collection
    * @returns The resulting (eager) output collection
    */
-  map<K2 extends TJSON, V2 extends TJSON, Params extends Param[]>(
+  map<K2 extends Json, V2 extends Json, Params extends Param[]>(
     mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
     ...params: Params
   ): EagerCollection<K2, V2>;
@@ -218,9 +218,9 @@ export interface EagerCollection<K extends TJSON, V extends TJSON>
    * @returns An eager collection containing the output of the accumulator
    */
   mapReduce<
-    K2 extends TJSON,
-    V2 extends TJSON,
-    V3 extends TJSON,
+    K2 extends Json,
+    V2 extends Json,
+    V3 extends Json,
     Params extends Param[],
   >(
     mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
@@ -256,7 +256,7 @@ export interface EagerCollection<K extends TJSON, V extends TJSON>
 /**
  * The type of a _lazy_ reactive function which produces a value for some `key`, possibly using a `self` reference to get/produce other lazily-computed results.
  */
-export interface LazyCompute<K extends TJSON, V extends TJSON> {
+export interface LazyCompute<K extends Json, V extends Json> {
   compute(self: LazyCollection<K, V>, key: K): Opt<V>;
 }
 
@@ -267,7 +267,7 @@ export interface Context extends Constant {
    * @param params - any additional parameters to the computation
    * @returns The resulting lazy collection
    */
-  lazy<K extends TJSON, V extends TJSON, Params extends Param[]>(
+  lazy<K extends Json, V extends Json, Params extends Param[]>(
     compute: new (...params: Params) => LazyCompute<K, V>,
     ...params: Params
   ): LazyCollection<K, V>;
@@ -281,17 +281,17 @@ export interface Context extends Constant {
    * @param service.reactiveAuth - the caller client user Skip session authentication
    * @returns The reactive collection of the external resource
    */
-  useExternalResource<K extends TJSON, V extends TJSON>(service: {
+  useExternalResource<K extends Json, V extends Json>(service: {
     supplier: string;
     resource: string;
     params?: Record<string, string | number>;
     reactiveAuth?: Uint8Array;
   }): EagerCollection<K, V>;
 
-  jsonExtract(value: JSONObject, pattern: string): TJSON[];
+  jsonExtract(value: JsonObject, pattern: string): Json[];
 }
 
-export type Entry<K extends TJSON, V extends TJSON> = [K, V[]];
+export type Entry<K extends Json, V extends Json> = [K, V[]];
 
 export type Watermark = Opaque<bigint, "watermark">;
 export type SubscriptionID = Opaque<bigint, "subscription">;
@@ -302,7 +302,7 @@ export type SubscriptionID = Opaque<bigint, "subscription">;
  * the point after these updates; and, a flag `isInitial` which is set when this update is
  * the initial chunk of data rather than an update to the preceding state.
  */
-export type CollectionUpdate<K extends TJSON, V extends TJSON> = {
+export type CollectionUpdate<K extends Json, V extends Json> = {
   values: Entry<K, V>[];
   watermark: Watermark;
   isInitial?: boolean;
@@ -348,8 +348,8 @@ export interface ExternalService {
     resource: string,
     params: Record<string, string | number>,
     callbacks: {
-      update: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void;
-      error: (error: TJSON) => void;
+      update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
+      error: (error: Json) => void;
       loading: () => void;
     },
     reactiveAuth?: Uint8Array,
@@ -384,15 +384,15 @@ export interface Resource {
    * @param reactiveAuth - the client user Skip session authentication
    */
   reactiveCompute(
-    collections: Record<string, EagerCollection<TJSON, TJSON>>,
+    collections: Record<string, EagerCollection<Json, Json>>,
     context: Context,
     reactiveAuth?: Uint8Array,
-  ): EagerCollection<TJSON, TJSON>;
+  ): EagerCollection<Json, Json>;
 }
 
 export interface SkipService {
   /** The data used to initially populate the input collections of the service */
-  initialData?: Record<string, Entry<TJSON, TJSON>[]>;
+  initialData?: Record<string, Entry<Json, Json>[]>;
   /** The external services of the service */
   externalServices?: Record<string, ExternalService>;
   /** The reactive resources of the service */
@@ -405,7 +405,7 @@ export interface SkipService {
    * @returns - the reactive collections accessible by the resources
    */
   reactiveCompute(
-    inputCollections: Record<string, EagerCollection<TJSON, TJSON>>,
+    inputCollections: Record<string, EagerCollection<Json, Json>>,
     context: Context,
-  ): Record<string, EagerCollection<TJSON, TJSON>>;
+  ): Record<string, EagerCollection<Json, Json>>;
 }

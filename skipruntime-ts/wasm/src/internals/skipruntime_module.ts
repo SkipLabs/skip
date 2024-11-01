@@ -16,8 +16,8 @@ import type {
   NonEmptyIterator,
   EagerCollection,
   LazyCollection,
-  TJSON,
-  JSONObject,
+  Json,
+  JsonObject,
   Entry,
   Param,
   SkipService,
@@ -41,8 +41,8 @@ export type Handle<T> = Internal.Opaque<int, { handle_for: T }>;
 
 const sk_frozen: unique symbol = Symbol.for("Skip.frozen");
 
-type JSONMapper = Mapper<TJSON, TJSON, TJSON, TJSON>;
-type JSONLazyCompute = LazyCompute<TJSON, TJSON>;
+type JSONMapper = Mapper<Json, Json, Json, Json>;
+type JSONLazyCompute = LazyCompute<Json, Json>;
 
 export function sk_freeze<T extends object>(x: T): T & Constant {
   return Object.defineProperty(x, sk_frozen, {
@@ -142,17 +142,17 @@ export interface FromWasm {
 
   // Mapper
   SkipRuntime_createMapper<
-    K1 extends TJSON,
-    V1 extends TJSON,
-    K2 extends TJSON,
-    V2 extends TJSON,
+    K1 extends Json,
+    V1 extends Json,
+    K2 extends Json,
+    V2 extends Json,
   >(
     ref: Handle<Mapper<K1, V1, K2, V2>>,
   ): ptr<Internal.Mapper>;
 
   // LazyCompute
 
-  SkipRuntime_createLazyCompute<K extends TJSON, V extends TJSON>(
+  SkipRuntime_createLazyCompute<K extends Json, V extends Json>(
     ref: Handle<LazyCompute<K, V>>,
   ): ptr<Internal.LazyCompute>;
 
@@ -274,7 +274,7 @@ export interface FromWasm {
 
   // Notifier
 
-  SkipRuntime_createNotifier<K extends TJSON, V extends TJSON>(
+  SkipRuntime_createNotifier<K extends Json, V extends Json>(
     ref: Handle<(update: CollectionUpdate<K, V>) => void>,
   ): ptr<Internal.Notifier>;
 
@@ -327,7 +327,7 @@ export interface FromWasm {
 
   // Accumulator
 
-  SkipRuntime_createAccumulator<K1 extends TJSON, V1 extends TJSON>(
+  SkipRuntime_createAccumulator<K1 extends Json, V1 extends Json>(
     ref: Handle<Accumulator<K1, V1>>,
     defaultValue: ptr<Internal.CJSON>,
   ): ptr<Internal.Accumulator>;
@@ -445,33 +445,33 @@ interface ToWasm {
 
   // Notifier
 
-  SkipRuntime_Notifier__notify<K extends TJSON, V extends TJSON>(
+  SkipRuntime_Notifier__notify<K extends Json, V extends Json>(
     notifier: Handle<(update: CollectionUpdate<K, V>) => void>,
     values: ptr<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
     tick: bigint,
     updates: boolean,
   ): void;
 
-  SkipRuntime_deleteNotifier<K extends TJSON, V extends TJSON>(
+  SkipRuntime_deleteNotifier<K extends Json, V extends Json>(
     notifier: Handle<(update: CollectionUpdate<K, V>) => void>,
   ): void;
 
   // Accumulator
 
   SkipRuntime_Accumulator__accumulate(
-    notifier: Handle<Accumulator<TJSON, TJSON>>,
+    notifier: Handle<Accumulator<Json, Json>>,
     acc: ptr<Internal.CJSON>,
     value: ptr<Internal.CJSON>,
   ): ptr<Internal.CJSON>;
 
   SkipRuntime_Accumulator__dismiss(
-    notifier: Handle<Accumulator<TJSON, TJSON>>,
+    notifier: Handle<Accumulator<Json, Json>>,
     cumul: ptr<Internal.CJSON>,
     value: ptr<Internal.CJSON>,
   ): ptr<Internal.CJSON>;
 
   SkipRuntime_deleteAccumulator(
-    notifier: Handle<Accumulator<TJSON, TJSON>>,
+    notifier: Handle<Accumulator<Json, Json>>,
   ): void;
 
   // Checker
@@ -599,10 +599,10 @@ class LinksImpl implements Links {
     const skjson = this.getSkjson();
     const mapper = this.handles.get(skmapper);
     const result = mapper.mapElement(
-      skjson.importJSON(key) as TJSON,
+      skjson.importJSON(key) as Json,
       new NonEmptyIteratorImpl(skjson, this.fromWasm, values),
     );
-    return skjson.exportJSON(Array.from(result) as [[TJSON, TJSON]]);
+    return skjson.exportJSON(Array.from(result) as [[Json, Json]]);
   }
 
   deleteMapper(mapper: Handle<JSONMapper>) {
@@ -620,11 +620,11 @@ class LinksImpl implements Links {
     const lazyCompute = this.handles.get(sklazyCompute);
     const self = skjson.importString(skself);
     const computed = lazyCompute.compute(
-      new LazyCollectionImpl<TJSON, TJSON>(
+      new LazyCollectionImpl<Json, Json>(
         self,
         new Refs(skjson, this.fromWasm, this.handles, this.needGC.bind(this)),
       ),
-      skjson.importJSON(skkey) as TJSON,
+      skjson.importJSON(skkey) as Json,
     );
     return skjson.exportJSON(computed ? [computed] : []);
   }
@@ -642,7 +642,7 @@ class LinksImpl implements Links {
   ): ptr<Internal.String> {
     const skjson = this.getSkjson();
     const resource = this.handles.get(skresource);
-    const collections: Record<string, EagerCollection<TJSON, TJSON>> = {};
+    const collections: Record<string, EagerCollection<Json, Json>> = {};
     const keysIds = skjson.importJSON(skcollections) as Record<string, string>;
     const refs = new Refs(
       skjson,
@@ -662,7 +662,7 @@ class LinksImpl implements Links {
       new ContextImpl(refs),
       reactiveAuth,
     );
-    const res = (collection as EagerCollectionImpl<TJSON, TJSON>).collection;
+    const res = (collection as EagerCollectionImpl<Json, Json>).collection;
     return skjson.exportString(res);
   }
 
@@ -698,7 +698,7 @@ class LinksImpl implements Links {
   ) {
     const skjson = this.getSkjson();
     const service = this.handles.get(skservice);
-    const collections: Record<string, EagerCollection<TJSON, TJSON>> = {};
+    const collections: Record<string, EagerCollection<Json, Json>> = {};
     const keysIds = skjson.importJSON(skcollections) as Record<string, string>;
     const refs = new Refs(
       skjson,
@@ -714,7 +714,7 @@ class LinksImpl implements Links {
     const collectionsNames: Record<string, string> = {};
     for (const [name, collection] of Object.entries(result)) {
       collectionsNames[name] = (
-        collection as EagerCollectionImpl<TJSON, TJSON>
+        collection as EagerCollectionImpl<Json, Json>
       ).collection;
     }
     return skjson.exportJSON(collectionsNames);
@@ -725,7 +725,7 @@ class LinksImpl implements Links {
   }
 
   // Notifier
-  notifyOfNotifier<K extends TJSON, V extends TJSON>(
+  notifyOfNotifier<K extends Json, V extends Json>(
     sknotifier: Handle<(update: CollectionUpdate<K, V>) => void>,
     skvalues: ptr<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
     watermark: Watermark,
@@ -737,7 +737,7 @@ class LinksImpl implements Links {
     notifier({ values, watermark, isInitial });
   }
 
-  deleteNotifier<K extends TJSON, V extends TJSON>(
+  deleteNotifier<K extends Json, V extends Json>(
     notifier: Handle<(update: CollectionUpdate<K, V>) => void>,
   ) {
     this.handles.deleteHandle(notifier);
@@ -746,7 +746,7 @@ class LinksImpl implements Links {
   // Accumulator
 
   accumulateOfAccumulator(
-    skaccumulator: Handle<Accumulator<TJSON, TJSON>>,
+    skaccumulator: Handle<Accumulator<Json, Json>>,
     skacc: ptr<Internal.CJSON>,
     skvalue: ptr<Internal.CJSON>,
   ) {
@@ -754,14 +754,14 @@ class LinksImpl implements Links {
     const accumulator = this.handles.get(skaccumulator);
     return skjson.exportJSON(
       accumulator.accumulate(
-        skacc ? (skjson.importJSON(skacc) as TJSON) : null,
-        skjson.importJSON(skvalue) as TJSON,
+        skacc ? (skjson.importJSON(skacc) as Json) : null,
+        skjson.importJSON(skvalue) as Json,
       ),
     );
   }
 
   dismissOfAccumulator(
-    skaccumulator: Handle<Accumulator<TJSON, TJSON>>,
+    skaccumulator: Handle<Accumulator<Json, Json>>,
     skcumul: ptr<Internal.CJSON>,
     skvalue: ptr<Internal.CJSON>,
   ) {
@@ -769,13 +769,13 @@ class LinksImpl implements Links {
     const accumulator = this.handles.get(skaccumulator);
     return skjson.exportJSON(
       accumulator.dismiss(
-        skjson.importJSON(skcumul) as TJSON,
-        skjson.importJSON(skvalue) as TJSON,
+        skjson.importJSON(skcumul) as Json,
+        skjson.importJSON(skvalue) as Json,
       ),
     );
   }
 
-  deleteAccumulator(accumulator: Handle<Accumulator<TJSON, TJSON>>) {
+  deleteAccumulator(accumulator: Handle<Accumulator<Json, Json>>) {
     this.handles.deleteHandle(accumulator);
   }
 
@@ -896,7 +896,7 @@ class LinksImpl implements Links {
   }
 }
 
-class LazyCollectionImpl<K extends TJSON, V extends TJSON>
+class LazyCollectionImpl<K extends Json, V extends Json>
   extends SkFrozen
   implements LazyCollection<K, V>
 {
@@ -936,7 +936,7 @@ class LazyCollectionImpl<K extends TJSON, V extends TJSON>
   }
 }
 
-class EagerCollectionImpl<K extends TJSON, V extends TJSON>
+class EagerCollectionImpl<K extends Json, V extends Json>
   extends SkFrozen
   implements EagerCollection<K, V>
 {
@@ -990,7 +990,7 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
     return this.derive<K, V>(skcollection);
   }
 
-  map<K2 extends TJSON, V2 extends TJSON, Params extends Param[]>(
+  map<K2 extends Json, V2 extends Json, Params extends Param[]>(
     mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
     ...params: Params
   ): EagerCollection<K2, V2> {
@@ -1011,9 +1011,9 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
   }
 
   mapReduce<
-    K2 extends TJSON,
-    V2 extends TJSON,
-    V3 extends TJSON,
+    K2 extends Json,
+    V2 extends Json,
+    V3 extends Json,
     Params extends Param[],
   >(
     mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
@@ -1052,7 +1052,7 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
     return this.derive<K, V>(mapped);
   }
 
-  private derive<K2 extends TJSON, V2 extends TJSON>(
+  private derive<K2 extends Json, V2 extends Json>(
     skcollection: ptr<Internal.String>,
   ): EagerCollection<K2, V2> {
     return new EagerCollectionImpl<K2, V2>(
@@ -1062,7 +1062,7 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
   }
 }
 
-class CollectionWriter<K extends TJSON, V extends TJSON> {
+class CollectionWriter<K extends Json, V extends Json> {
   constructor(
     public collection: string,
     private refs: Refs,
@@ -1099,7 +1099,7 @@ class CollectionWriter<K extends TJSON, V extends TJSON> {
     }
   }
 
-  error(error: TJSON): void {
+  error(error: Json): void {
     const error_ = () => {
       return this.refs.fromWasm.SkipRuntime_CollectionWriter__error(
         this.refs.skjson.exportString(this.collection),
@@ -1121,7 +1121,7 @@ class ContextImpl extends SkFrozen implements Context {
     Object.freeze(this);
   }
 
-  lazy<K extends TJSON, V extends TJSON, Params extends Param[]>(
+  lazy<K extends Json, V extends Json, Params extends Param[]>(
     compute: new (...params: Params) => LazyCompute<K, V>,
     ...params: Params
   ): LazyCollection<K, V> {
@@ -1140,7 +1140,7 @@ class ContextImpl extends SkFrozen implements Context {
     return new LazyCollectionImpl<K, V>(lazyCollection, this.refs);
   }
 
-  useExternalResource<K extends TJSON, V extends TJSON>(service: {
+  useExternalResource<K extends Json, V extends Json>(service: {
     supplier: string;
     resource: string;
     params?: Record<string, string | number>;
@@ -1159,13 +1159,13 @@ class ContextImpl extends SkFrozen implements Context {
     return new EagerCollectionImpl<K, V>(collection, this.refs);
   }
 
-  jsonExtract(value: JSONObject, pattern: string): TJSON[] {
+  jsonExtract(value: JsonObject, pattern: string): Json[] {
     return this.refs.skjson.importJSON(
       this.refs.fromWasm.SkipRuntime_Context__jsonExtract(
         this.refs.skjson.exportJSON(value),
         this.refs.skjson.exportString(pattern),
       ),
-    ) as TJSON[];
+    ) as Json[];
   }
 }
 
@@ -1211,12 +1211,12 @@ type ReactivePart = {
   watermark: string;
 };
 
-type ValuesPart<K extends TJSON, V extends TJSON> = {
+type ValuesPart<K extends Json, V extends Json> = {
   values: Entry<K, V>[];
   reactive?: ReactivePart;
 };
 
-export type Values<K extends TJSON, V extends TJSON> = {
+export type Values<K extends Json, V extends Json> = {
   values: Entry<K, V>[];
   reactive?: ReactiveResponse;
 };
@@ -1224,7 +1224,7 @@ export type Values<K extends TJSON, V extends TJSON> = {
 export type GetResult<T> = {
   request?: string;
   payload: T;
-  errors: TJSON[];
+  errors: Json[];
 };
 
 export type Executor<T> = {
@@ -1239,7 +1239,7 @@ function toReactiveResponse(reactive: ReactivePart): ReactiveResponse {
   };
 }
 
-function toGetResult<K extends TJSON, V extends TJSON>(
+function toGetResult<K extends Json, V extends Json>(
   result: GetResult<ValuesPart<K, V>>,
 ): GetResult<Values<K, V>> {
   return {
@@ -1258,7 +1258,7 @@ interface Checker {
   check(request: string): void;
 }
 
-class AllChecker<K extends TJSON, V extends TJSON> implements Checker {
+class AllChecker<K extends Json, V extends Json> implements Checker {
   constructor(
     private service: ServiceInstance,
     private executor: Executor<Values<K, V>>,
@@ -1282,7 +1282,7 @@ class AllChecker<K extends TJSON, V extends TJSON> implements Checker {
   }
 }
 
-class OneChecker<V extends TJSON> implements Checker {
+class OneChecker<V extends Json> implements Checker {
   constructor(
     private service: ServiceInstance,
     private executor: Executor<V[]>,
@@ -1351,7 +1351,7 @@ export class ServiceInstance {
    * @param reactiveAuth - the client user Skip session authentication
    * @returns The current values of the corresponding resource with reactive responce token to allow subscription
    */
-  getAll<K extends TJSON, V extends TJSON>(
+  getAll<K extends Json, V extends Json>(
     resource: string,
     params: Record<string, string> = {},
     reactiveAuth?: Uint8Array,
@@ -1402,7 +1402,7 @@ export class ServiceInstance {
    * @param reactiveAuth - the client Skip session authentication token
    * @returns The current value(s) for this key in the specified resource instance
    */
-  getArray<V extends TJSON>(
+  getArray<V extends Json>(
     resource: string,
     key: string | number,
     params: Record<string, string> = {},
@@ -1493,7 +1493,7 @@ export class ServiceInstance {
    * @param reactiveAuth The client Skip session authentication token corresponding to the reactive response
    * @returns A subcription identifier
    */
-  subscribe<K extends TJSON, V extends TJSON>(
+  subscribe<K extends Json, V extends Json>(
     reactiveResponse: ReactiveResponse,
     f: (update: CollectionUpdate<K, V>) => void,
     reactiveAuth?: Uint8Array,
@@ -1541,7 +1541,7 @@ export class ServiceInstance {
    * @param collection - the name of the input collection to update
    * @param entries - entries to update in the collection.
    */
-  update<K extends TJSON, V extends TJSON>(
+  update<K extends Json, V extends Json>(
     collection: string,
     entries: Entry<K, V>[],
   ): void {
