@@ -59,10 +59,10 @@ export class ExternalService implements ExternalSupplier {
   }
 }
 
-type Timemout = number | object;
+type Timeout = ReturnType<typeof setInterval>;
 
 export class TimeCollection implements ExternalResource {
-  private intervals = new Map<string, Record<string, Timemout>>();
+  private intervals = new Map<string, Record<string, Timeout>>();
 
   open(
     params: Record<string, string | number>,
@@ -80,7 +80,7 @@ export class TimeCollection implements ExternalResource {
     }
     callbacks.update(values, true);
     const id = toId(params, reactiveAuth);
-    const intervals: Record<string, Timemout> = {};
+    const intervals: Record<string, Timeout> = {};
     for (const [name, duration] of Object.entries(params)) {
       const ms = Number(duration);
       if (ms > 0) {
@@ -100,7 +100,7 @@ export class TimeCollection implements ExternalResource {
     const intervals = this.intervals.get(toId(params, reactiveAuth));
     if (intervals != null) {
       for (const interval of Object.values(intervals)) {
-        clearInterval(interval as number);
+        clearInterval(interval);
       }
     }
   }
@@ -109,7 +109,7 @@ export class TimeCollection implements ExternalResource {
 export class Polled<S extends TJSON, K extends TJSON, V extends TJSON>
   implements ExternalResource
 {
-  private intervals = new Map<string, number | object>();
+  private intervals = new Map<string, Timeout>();
 
   constructor(
     private url: string,
@@ -157,7 +157,7 @@ export class Polled<S extends TJSON, K extends TJSON, V extends TJSON>
   ): void {
     const interval = this.intervals.get(toId(params, reactiveAuth));
     if (interval) {
-      clearInterval(interval as number);
+      clearInterval(interval);
     }
   }
 }
