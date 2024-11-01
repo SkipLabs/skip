@@ -1,6 +1,6 @@
 import type {
   Entry,
-  ExternalSupplier,
+  ExternalService,
   ReactiveResponse,
   TJSON,
 } from "@skipruntime/api";
@@ -13,7 +13,7 @@ interface Closable {
   close(): void;
 }
 
-export class ExternalSkipService implements ExternalSupplier {
+export class SkipExternalService implements ExternalService {
   private client?: Promise<[Client, Protocol.Creds]>;
   private resources = new Map<string, Closable>();
 
