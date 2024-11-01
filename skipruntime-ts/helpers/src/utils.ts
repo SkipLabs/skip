@@ -4,7 +4,7 @@ import type {
   Accumulator,
   NonEmptyIterator,
   ReactiveResponse,
-  TJSON,
+  Json,
 } from "@skipruntime/api";
 
 export class Sum implements Accumulator<number, number> {
@@ -44,8 +44,8 @@ export class Max implements Accumulator<number, number> {
 }
 
 export class CountMapper<
-  K extends TJSON,
-  V extends TJSON,
+  K extends Json,
+  V extends Json,
 > extends ManyToOneMapper<K, V, number> {
   mapValues(values: NonEmptyIterator<V>): number {
     return values.toArray().length;

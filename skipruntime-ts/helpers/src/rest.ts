@@ -1,4 +1,4 @@
-import type { TJSON, Entry, ReactiveResponse } from "@skipruntime/api";
+import type { Json, Entry, ReactiveResponse } from "@skipruntime/api";
 import { parseReactiveResponse } from "./utils.js";
 
 export type Entrypoint = {
@@ -17,7 +17,7 @@ export async function fetchJSON<V>(
   url: string,
   method: "POST" | "GET" | "PUT" | "PATCH" | "HEAD" | "DELETE" = "GET",
   headers: Record<string, string> = {},
-  data?: TJSON,
+  data?: Json,
 ): Promise<[V | null, Headers]> {
   const body = data ? JSON.stringify(data) : undefined;
   const response = await fetch(url, {
@@ -53,7 +53,7 @@ export class SkipRESTService {
     this.entrypoint = toHttp(entrypoint);
   }
 
-  async getAll<K extends TJSON, V extends TJSON>(
+  async getAll<K extends Json, V extends Json>(
     resource: string,
     params: Record<string, string>,
     reactiveAuth?: Uint8Array | string,
@@ -103,7 +103,7 @@ export class SkipRESTService {
     }
   }
 
-  async getArray<V extends TJSON>(
+  async getArray<V extends Json>(
     resource: string,
     params: Record<string, string>,
     key: string,
@@ -119,7 +119,7 @@ export class SkipRESTService {
     return data ?? [];
   }
 
-  async put<V extends TJSON>(
+  async put<V extends Json>(
     collection: string,
     key: string,
     value: V[],
@@ -132,7 +132,7 @@ export class SkipRESTService {
     );
   }
 
-  async patch<K extends TJSON, V extends TJSON>(
+  async patch<K extends Json, V extends Json>(
     collection: string,
     values: Entry<K, V>[],
   ): Promise<void> {

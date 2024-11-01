@@ -2,10 +2,10 @@ import { expect } from "earl";
 
 import type {
   Context,
-  TJSON,
+  Json,
   Mapper,
   EagerCollection,
-  JSONObject,
+  JsonObject,
   LazyCompute,
   LazyCollection,
   NonEmptyIterator,
@@ -22,7 +22,7 @@ import {
   GenericExternalService,
 } from "@skipruntime/helpers/external.js";
 
-type Values<K extends TJSON, V extends TJSON> = {
+type Values<K extends Json, V extends Json> = {
   values: Entry<K, V>[];
   reactive?: ReactiveResponse;
 };
@@ -30,20 +30,20 @@ type Values<K extends TJSON, V extends TJSON> = {
 type GetResult<T> = {
   request?: string;
   payload: T;
-  errors: TJSON[];
+  errors: Json[];
 };
 
 interface ServiceInstance {
-  getAll<K extends TJSON, V extends TJSON>(
+  getAll<K extends Json, V extends Json>(
     resource: string,
     params?: Record<string, string>,
   ): GetResult<Values<K, V>>;
-  getArray<V extends TJSON>(
+  getArray<V extends Json>(
     resource: string,
     key: string | number,
     params?: Record<string, string>,
   ): GetResult<V[]>;
-  update<K extends TJSON, V extends TJSON>(
+  update<K extends Json, V extends Json>(
     collection: string,
     entries: Entry<K, V>[],
   ): void;
@@ -356,7 +356,7 @@ class Merge1Service implements SkipService {
   }
 }
 
-function sorted(entries: Entry<TJSON, TJSON>[]): Entry<TJSON, TJSON>[] {
+function sorted(entries: Entry<Json, Json>[]): Entry<Json, Json>[] {
   for (const entry of entries) {
     entry[1].sort();
   }
@@ -396,14 +396,14 @@ class MergeReduceService implements SkipService {
 
 class JSONExtract
   implements
-    Mapper<number, { value: JSONObject; pattern: string }, number, TJSON[]>
+    Mapper<number, { value: JsonObject; pattern: string }, number, Json[]>
 {
   constructor(private context: Context) {}
 
   mapElement(
     key: number,
-    values: NonEmptyIterator<{ value: JSONObject; pattern: string }>,
-  ): Iterable<[number, TJSON[]]> {
+    values: NonEmptyIterator<{ value: JsonObject; pattern: string }>,
+  ): Iterable<[number, Json[]]> {
     const value = values.first();
     const result = this.context.jsonExtract(value.value, value.pattern);
     return Array([key, result]);
@@ -413,10 +413,10 @@ class JSONExtract
 class JSONExtractResource implements Resource {
   reactiveCompute(
     cs: {
-      input: EagerCollection<number, { value: JSONObject; pattern: string }>;
+      input: EagerCollection<number, { value: JsonObject; pattern: string }>;
     },
     context: Context,
-  ): EagerCollection<number, TJSON[]> {
+  ): EagerCollection<number, Json[]> {
     return cs.input.map(JSONExtract, context);
   }
 }
@@ -426,7 +426,7 @@ class JSONExtractService implements SkipService {
   resources = { jsonExtract: JSONExtractResource };
 
   reactiveCompute(inputCollections: {
-    input: EagerCollection<number, { value: JSONObject; pattern: string }>;
+    input: EagerCollection<number, { value: JsonObject; pattern: string }>;
   }) {
     return inputCollections;
   }
@@ -443,8 +443,8 @@ class MockExternal implements ExternalService {
     resource: string,
     params: { v1: string; v2: string },
     callbacks: {
-      update: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void;
-      error: (error: TJSON) => void;
+      update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
+      error: (error: Json) => void;
       loading: () => void;
     },
     _reactiveAuth?: Uint8Array,
@@ -471,7 +471,7 @@ class MockExternal implements ExternalService {
 
   private async mock(
     params: { v1: string; v2: string },
-    cb: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void,
+    cb: (updates: Entry<Json, Json>[], isInit: boolean) => void,
   ) {
     await timeout(0);
     cb(
@@ -538,7 +538,7 @@ class TestExternalService implements SkipService {
 
 class TokensResource implements Resource {
   reactiveCompute(
-    _cs: Record<string, EagerCollection<TJSON, TJSON>>,
+    _cs: Record<string, EagerCollection<Json, Json>>,
     context: Context,
     reactiveAuth?: Uint8Array,
   ): EagerCollection<string, number> {
