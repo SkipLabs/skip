@@ -1,8 +1,6 @@
-import {
-  fetchJSON,
-  type ReactiveResponse,
-  parseReactiveResponse,
-} from "skip-wasm";
+import type { ReactiveResponse } from "@skipruntime/api";
+import { parseReactiveResponse } from "@skipruntime/helpers";
+import { fetchJSON } from "@skipruntime/helpers/rest.js";
 import { connect, Protocol } from "@skipruntime/client";
 import type { TJSON } from "@skipruntime/client/protocol.js";
 
