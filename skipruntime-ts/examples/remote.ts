@@ -1,12 +1,13 @@
-import type { TJSON } from "@skipruntime/client";
 import type {
   Context,
   EagerCollection,
   NonEmptyIterator,
   SkipService,
   Resource,
-} from "skip-wasm";
-import { SkipExternalService, ManyToOneMapper } from "skip-wasm";
+  TJSON,
+} from "@skipruntime/api";
+import { ManyToOneMapper } from "@skipruntime/api";
+import { SkipExternalService } from "@skipruntime/helpers";
 
 import { runService } from "@skipruntime/server";
 

@@ -1,4 +1,9 @@
-import type { EagerCollection, SkipService, Resource, Entry } from "skip-wasm";
+import type {
+  EagerCollection,
+  SkipService,
+  Resource,
+  Entry,
+} from "@skipruntime/api";
 
 import { runService } from "@skipruntime/server";
 

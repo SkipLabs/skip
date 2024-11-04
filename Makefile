@@ -270,8 +270,8 @@ publish-tests:
 
 .PHONY: publish-wasm
 publish-wasm:
-	mkdir -p skipruntime/wasm/dist/src
-	cd skipruntime/native && npm run build
+	mkdir -p skipruntime-ts/wasm/dist/src
+	cd skipruntime-ts/native && npm run build
 	bin/release_npm.sh skip-wasm skipruntime-ts/wasm/package.json $(OPT)
 
 .PHONY: publish-server
