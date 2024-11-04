@@ -329,6 +329,7 @@ export interface FromWasm {
 
   SkipRuntime_createAccumulator<K1 extends TJSON, V1 extends TJSON>(
     ref: Handle<Accumulator<K1, V1>>,
+    defaultValue: ptr<Internal.CJSON>,
   ): ptr<Internal.Accumulator>;
 
   // initService
@@ -1030,6 +1031,7 @@ class EagerCollectionImpl<K extends TJSON, V extends TJSON>
     );
     const skaccumulator = this.refs.fromWasm.SkipRuntime_createAccumulator(
       this.refs.handles.register(accumulator),
+      this.refs.skjson.exportJSON(accumulator.default),
     );
     const mapped = this.refs.fromWasm.SkipRuntime_Collection__mapReduce(
       this.refs.skjson.exportString(this.collection),
