@@ -3,9 +3,9 @@ import type {
   NonEmptyIterator,
   SkipService,
   Resource,
-} from "skip-wasm";
+} from "@skipruntime/api";
 
-import { ManyToOneMapper } from "skip-wasm";
+import { ManyToOneMapper } from "@skipruntime/api";
 
 import { runService } from "@skipruntime/server";
 
