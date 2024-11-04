@@ -5,7 +5,7 @@ import type {
   Resource,
 } from "skip-wasm";
 import { runService } from "@skipruntime/server";
-import { ExternalService, Polled } from "skip-wasm";
+import { GenericExternalService, Polled } from "skip-wasm";
 
 type Departure = {
   year: string;
@@ -56,7 +56,7 @@ class Service implements SkipService {
     departures: DeparturesResource,
   };
   externalServices = {
-    externalDeparturesAPI: new ExternalService({
+    externalDeparturesAPI: new GenericExternalService({
       departuresFromAPI: new Polled(
         "https://api.unhcr.org/rsq/v1/departures",
         10000,

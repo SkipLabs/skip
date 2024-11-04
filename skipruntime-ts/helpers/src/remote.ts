@@ -1,6 +1,6 @@
 import type {
   Entry,
-  ExternalSupplier,
+  ExternalService,
   ReactiveResponse,
   TJSON,
 } from "@skipruntime/api";
@@ -13,7 +13,7 @@ interface Closable {
   close(): void;
 }
 
-export class ExternalSkipService implements ExternalSupplier {
+export class SkipExternalService implements ExternalService {
   private client?: Promise<[Client, Protocol.Creds]>;
   private resources = new Map<string, Closable>();
 
@@ -35,17 +35,17 @@ export class ExternalSkipService implements ExternalSupplier {
       reactiveAuth: Uint8Array,
     ) => Promise<ReactiveResponse>,
     creds?: Protocol.Creds,
-  ): ExternalSkipService {
+  ): SkipExternalService {
     let url = `ws://${entrypoint.host}:${entrypoint.port.toString()}`;
     if (entrypoint.secured)
       url = `wss://${entrypoint.host}:${entrypoint.port.toString()}`;
-    return new ExternalSkipService(url, auth, creds);
+    return new SkipExternalService(url, auth, creds);
   }
 
   static direct(
     entrypoint: Entrypoint,
     creds?: Protocol.Creds,
-  ): ExternalSkipService {
+  ): SkipExternalService {
     let url = `http://${entrypoint.host}:${entrypoint.port.toString()}`;
     if (entrypoint.secured)
       url = `https://${entrypoint.host}:${entrypoint.port.toString()}`;
@@ -68,7 +68,7 @@ export class ExternalSkipService implements ExternalSupplier {
         throw new Error("Reactive response must be suplied.");
       return reactiveResponse;
     };
-    return new ExternalSkipService(url, auth, creds);
+    return new SkipExternalService(url, auth, creds);
   }
 
   subscribe(

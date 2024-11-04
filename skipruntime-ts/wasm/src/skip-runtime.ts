@@ -15,7 +15,7 @@ export type {
   ReactiveResponse,
   SkipService,
   Resource,
-  ExternalSupplier,
+  ExternalService,
   CollectionUpdate,
   Watermark,
   SubscriptionID,
@@ -35,9 +35,9 @@ export {
   CountMapper,
   parseReactiveResponse,
   reactiveResponseHeader,
-  ExternalSkipService,
+  SkipExternalService,
   type ExternalResource,
-  ExternalService,
+  GenericExternalService,
   Polled,
 } from "@skipruntime/helpers";
 

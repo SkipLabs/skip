@@ -138,11 +138,11 @@ class ExternLazyCompute(eptr: SKStore.ExternalPointer) extends LazyCompute {
   }
 }
 
-/************  ExternalSupplier ****************/
+/************  ExternalService ****************/
 
-@cpp_extern("SkipRuntime_ExternalSupplier__subscribe")
+@cpp_extern("SkipRuntime_ExternalService__subscribe")
 @debug
-native fun subscribeOfExternalSupplier(
+native fun subscribeOfExternalService(
   externalSupplier: UInt32,
   collection: String,
   resource: String,
@@ -150,40 +150,40 @@ native fun subscribeOfExternalSupplier(
   reactiveAuth: ?Array<UInt8>,
 ): void;
 
-@cpp_extern("SkipRuntime_ExternalSupplier__unsubscribe")
+@cpp_extern("SkipRuntime_ExternalService__unsubscribe")
 @debug
-native fun unsubscribeOfExternalSupplier(
+native fun unsubscribeOfExternalService(
   externalSupplier: UInt32,
   resource: String,
   params: SKJSON.CJObject,
   reactiveAuth: ?Array<UInt8>,
 ): void;
 
-@cpp_extern("SkipRuntime_ExternalSupplier__shutdown")
+@cpp_extern("SkipRuntime_ExternalService__shutdown")
 @debug
-native fun shutdownOfExternalSupplier(externalSupplier: UInt32): void;
+native fun shutdownOfExternalService(externalSupplier: UInt32): void;
 
-@cpp_extern("SkipRuntime_deleteExternalSupplier")
+@cpp_extern("SkipRuntime_deleteExternalService")
 @debug
-native fun deleteExternalSupplier(externalSupplier: UInt32): void;
+native fun deleteExternalService(externalSupplier: UInt32): void;
 
-@export("SkipRuntime_createExternalSupplier")
-fun createExternalSupplier(externalSupplier: UInt32): ExternExternalSupplier {
-  ExternExternalSupplier(
-    SKStore.ExternalPointer::create(externalSupplier, deleteExternalSupplier),
+@export("SkipRuntime_createExternalService")
+fun createExternalService(externalSupplier: UInt32): ExternExternalService {
+  ExternExternalService(
+    SKStore.ExternalPointer::create(externalSupplier, deleteExternalService),
   )
 }
 
-class ExternExternalSupplier(
+class ExternExternalService(
   eptr: SKStore.ExternalPointer,
-) extends ExternalSupplier {
+) extends ExternalService {
   fun subscribe(
     collection: CollectionWriter,
     resource: String,
     params: Map<String, PValue>,
     reactiveAuth: ?Array<UInt8>,
   ): void {
-    subscribeOfExternalSupplier(
+    subscribeOfExternalService(
       this.eptr.value,
       collection.dirName.toString(),
       resource,
@@ -197,7 +197,7 @@ class ExternExternalSupplier(
     params: Map<String, PValue>,
     reactiveAuth: ?Array<UInt8>,
   ): void {
-    unsubscribeOfExternalSupplier(
+    unsubscribeOfExternalService(
       this.eptr.value,
       resource,
       jsonParams(params),
@@ -206,7 +206,7 @@ class ExternExternalSupplier(
   }
 
   fun shutdown(): void {
-    shutdownOfExternalSupplier(this.eptr.value)
+    shutdownOfExternalService(this.eptr.value)
   }
 }
 
@@ -346,7 +346,7 @@ fun createService(
   service: UInt32,
   jsInputs: SKJSON.CJObject,
   resources: mutable Map<String, ResourceBuilder>,
-  remotes: mutable Map<String, ExternalSupplier>,
+  remotes: mutable Map<String, ExternalService>,
 ): ExternService {
   keyConverter = JSONKeyConverter();
   fileConverter = JSONFileConverter();
@@ -422,18 +422,18 @@ fun addOfResourceBuilderMap(
   builders.add(name, builder)
 }
 
-/************  ExternalSupplierMap ****************/
+/************  ExternalServiceMap ****************/
 
-@export("SkipRuntime_ExternalSupplierMap__create")
-fun createOfExternalSupplierMap(): mutable Map<String, ExternalSupplier> {
+@export("SkipRuntime_ExternalServiceMap__create")
+fun createOfExternalServiceMap(): mutable Map<String, ExternalService> {
   mutable Map[]
 }
 
-@export("SkipRuntime_ExternalSupplierMap__add")
-fun addOfExternalSupplierMap(
-  suppliers: mutable Map<String, ExternalSupplier>,
+@export("SkipRuntime_ExternalServiceMap__add")
+fun addOfExternalServiceMap(
+  suppliers: mutable Map<String, ExternalService>,
   name: String,
-  supplier: ExternalSupplier,
+  supplier: ExternalService,
 ): void {
   suppliers.add(name, supplier)
 }

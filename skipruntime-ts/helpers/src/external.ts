@@ -1,4 +1,4 @@
-import type { Entry, ExternalSupplier, TJSON } from "@skipruntime/api";
+import type { Entry, ExternalService, TJSON } from "@skipruntime/api";
 import { fetchJSON } from "./rest.js";
 
 export interface ExternalResource {
@@ -18,7 +18,7 @@ export interface ExternalResource {
   ): void;
 }
 
-export class ExternalService implements ExternalSupplier {
+export class GenericExternalService implements ExternalService {
   constructor(private resources: Record<string, ExternalResource>) {}
 
   subscribe(
@@ -61,7 +61,7 @@ export class ExternalService implements ExternalSupplier {
 
 type Timeout = ReturnType<typeof setInterval>;
 
-export class TimeCollection implements ExternalResource {
+export class TimerResource implements ExternalResource {
   private intervals = new Map<string, Record<string, Timeout>>();
 
   open(

@@ -320,9 +320,20 @@ export type ReactiveResponse = {
 };
 
 /**
- * ExternalSupplier allows to have access to external ressources
+ * External services must be carefully managed in reactive Skip services to make sure that
+ * dependencies are properly tracked and data from external systems is kept up to date.
+ *
+ * There are two main implementations of `ExternalService`, depending on whether the external
+ * data source is a reactive Skip service or not.
+ *
+ * If it _is_ a Skip service, then use `SkipExternalService`, specifying an entrypoint and/or
+ * auth handler.  The external Skip service will update its resources reactively and those
+ * changes will propagate through this service.
+ *
+ * If it is _not_ a Skip service, then use `GenericExternalService` and `Polled` to specify
+ * the external source and desired polling frequency.
  */
-export interface ExternalSupplier {
+export interface ExternalService {
   /**
    * Subscribe to the external resource
    * @param resource - the name of the external resource
@@ -383,7 +394,7 @@ export interface SkipService {
   /** The data used to initially populate the input collections of the service */
   initialData?: Record<string, Entry<TJSON, TJSON>[]>;
   /** The external services of the service */
-  externalServices?: Record<string, ExternalSupplier>;
+  externalServices?: Record<string, ExternalService>;
   /** The reactive resources of the service */
   resources?: Record<string, new (params: Record<string, string>) => Resource>;
 
