@@ -1,4 +1,5 @@
-import { SkipRESTService, reactiveResponseHeader } from "skip-wasm";
+import { SkipRESTService } from "@skipruntime/helpers/rest.js";
+import { reactiveResponseHeader } from "@skipruntime/helpers";
 
 import express from "express";
 

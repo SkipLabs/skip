@@ -3,9 +3,9 @@ import type {
   EagerCollection,
   Context,
   Resource,
-} from "skip-wasm";
+} from "@skipruntime/api";
 import { runService } from "@skipruntime/server";
-import { GenericExternalService, Polled } from "skip-wasm";
+import { GenericExternalService, Polled } from "@skipruntime/helpers";
 
 type Departure = {
   year: string;
