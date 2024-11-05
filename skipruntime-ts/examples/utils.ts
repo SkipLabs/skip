@@ -1,5 +1,8 @@
 import type { Json, Entry } from "@skipruntime/api";
-import { SkipRESTService, type Entrypoint } from "@skipruntime/helpers/rest.js";
+import {
+  RESTWrapperOfSkipService,
+  type Entrypoint,
+} from "@skipruntime/helpers/rest.js";
 import { createInterface } from "readline";
 import { connect, Protocol, Client } from "@skipruntime/client";
 
@@ -25,7 +28,7 @@ function toWs(entrypoint: Entrypoint) {
 }
 
 class SkipHttpAccessV1 {
-  private services: Record<number, SkipRESTService>;
+  private services: Record<number, RESTWrapperOfSkipService>;
   private client?: Client;
   private defaultPort: number;
 
@@ -36,7 +39,10 @@ class SkipHttpAccessV1 {
     this.defaultPort = ports[0] ?? 3587;
     this.services = {};
     for (const port of ports) {
-      this.services[port] = new SkipRESTService({ host: "localhost", port });
+      this.services[port] = new RESTWrapperOfSkipService({
+        host: "localhost",
+        port,
+      });
     }
   }
 
