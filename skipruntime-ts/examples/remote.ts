@@ -4,7 +4,7 @@ import type {
   NonEmptyIterator,
   SkipService,
   Resource,
-  TJSON,
+  Json,
 } from "@skipruntime/api";
 import { ManyToOneMapper } from "@skipruntime/api";
 import { SkipExternalService } from "@skipruntime/helpers";
@@ -19,7 +19,7 @@ class Mult extends ManyToOneMapper<string, number, number> {
 
 class MultResource implements Resource {
   reactiveCompute(
-    _collections: Record<string, EagerCollection<TJSON, TJSON>>,
+    _collections: Record<string, EagerCollection<Json, Json>>,
     context: Context,
   ): EagerCollection<string, number> {
     const sub = context.useExternalResource<string, number>({

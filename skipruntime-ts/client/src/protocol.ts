@@ -1,11 +1,11 @@
 // Interfaces
 
-export interface JSONObject {
-  [key: string]: TJSON | null;
+export interface JsonObject {
+  [key: string]: Json | null;
 }
-export type TJSON = number | JSONObject | boolean | (TJSON | null)[] | string;
+export type Json = number | JsonObject | boolean | (Json | null)[] | string;
 
-export type Entry<K extends TJSON, V extends TJSON> = [K, V[]];
+export type Entry<K extends Json, V extends Json> = [K, V[]];
 
 export interface ProtoAuth {
   type: "auth";

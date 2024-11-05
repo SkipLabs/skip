@@ -1,5 +1,5 @@
 import express from "express";
-import type { Entry, TJSON, ServiceInstance, Values } from "skip-wasm";
+import type { Entry, Json, ServiceInstance, Values } from "skip-wasm";
 import { UnknownCollectionError, reactiveResponseHeader } from "skip-wasm";
 
 export function createRESTServer(service: ServiceInstance): express.Express {
@@ -62,7 +62,7 @@ export function createRESTServer(service: ServiceInstance): express.Express {
       ? new Uint8Array(Buffer.from(strReactiveAuth, "base64"))
       : undefined;
     try {
-      const promise = new Promise<Values<TJSON, TJSON>>(function (
+      const promise = new Promise<Values<Json, Json>>(function (
         resolve,
         reject,
       ) {
@@ -99,7 +99,7 @@ export function createRESTServer(service: ServiceInstance): express.Express {
       return;
     }
     const key = req.params.id;
-    const data = req.body as TJSON[];
+    const data = req.body as Json[];
     const collectionName = req.params.collection;
     try {
       service.update(collectionName, [[key, data]]);
@@ -117,7 +117,7 @@ export function createRESTServer(service: ServiceInstance): express.Express {
       res.status(400).json(`Bad request body ${JSON.stringify(req.body)}`);
       return;
     }
-    const data = req.body as Entry<TJSON, TJSON>[];
+    const data = req.body as Entry<Json, Json>[];
     const collectionName = req.params.collection;
     try {
       service.update(collectionName, data);
