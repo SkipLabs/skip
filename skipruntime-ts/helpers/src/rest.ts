@@ -63,11 +63,11 @@ export class SkipRESTService {
     if (reactiveAuth) {
       if (typeof reactiveAuth == "string") {
         header = {
-          "X-Reactive-Auth": reactiveAuth,
+          "Skip-Reactive-Auth": reactiveAuth,
         };
       } else {
         header = {
-          "X-Reactive-Auth": Buffer.from(reactiveAuth.buffer).toString(
+          "Skip-Reactive-Auth": Buffer.from(reactiveAuth.buffer).toString(
             "base64",
           ),
         };
@@ -147,11 +147,11 @@ export class SkipRESTService {
     if (reactiveAuth) {
       if (typeof reactiveAuth == "string") {
         return {
-          "X-Reactive-Auth": reactiveAuth,
+          "Skip-Reactive-Auth": reactiveAuth,
         };
       } else {
         return {
-          "X-Reactive-Auth": Buffer.from(reactiveAuth.buffer).toString(
+          "Skip-Reactive-Auth": Buffer.from(reactiveAuth.buffer).toString(
             "base64",
           ),
         };

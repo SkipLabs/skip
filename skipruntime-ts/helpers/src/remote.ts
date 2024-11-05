@@ -56,7 +56,7 @@ export class SkipExternalService implements ExternalService {
     ) => {
       const qParams = new URLSearchParams(params).toString();
       const header = {
-        "X-Reactive-Auth": Buffer.from(reactiveAuth).toString("base64"),
+        "Skip-Reactive-Auth": Buffer.from(reactiveAuth).toString("base64"),
       };
       const [_data, headers] = await fetchJSON(
         `${url}/v1/${resource}?${qParams}`,

@@ -74,7 +74,7 @@ function Feed() {
         ...new Uint8Array(await Protocol.exportKey(skipclient.creds.publicKey)),
       ]);
       const response = await fetch(BASE_URL, {
-        headers: { "X-Reactive-Auth": btoa(pubkey) },
+        headers: { "Skip-Reactive-Auth": btoa(pubkey) },
       });
       const data = (await response.json()) as SetStateAction<Post[]>;
       setPosts(data);

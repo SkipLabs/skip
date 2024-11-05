@@ -118,7 +118,7 @@ using any web framework), which orchestrates the instantiation of
 Example[fn:2]:
 #+BEGIN_SRC plantuml :file mirroring.png
   !theme superhero-outline
-  Client -> "REST service" : GET /users/123/likes\nX-Reactive-Auth: {pubkey}
+  Client -> "REST service" : GET /users/123/likes\nSkip-Reactive-Auth: {pubkey}
   "REST service" -> "Reactive service" : create_reactive_request(\n  "likes_per_author",\n  { author_id: 123 },\n  pubkey\n)
   "REST service" <-- "Reactive service" : reactive_request_id
   "REST service" -> "Reactive service" : diff(reactive_request_id, 0)
@@ -187,7 +187,7 @@ handled through a WebSocket):
 
 - ~GET /{resource}~
   Headers:
-    - (optional) ~X-Reactive-Auth~: Reactive service authentication
+    - (optional) ~Skip-Reactive-Auth~: Reactive service authentication
       token.
 
   Parameters: Query parameters are passed down to the reactive
@@ -195,16 +195,16 @@ handled through a WebSocket):
 
   Returns the whole collection at current tick in the response body.
 
-  If an ~X-Reactive-Auth~ header is set by the client, the server
+  If an ~Skip-Reactive-Auth~ header is set by the client, the server
   creates a long-lived response collection, the identifier of which is
   returned in the ~Skip-Reactive-Response-Token~ header. This identifier can
   then be used to stream further updates through the WebSocket API.
   Updates are restricted to the session identified by the
-  ~X-Reactive-Auth~ token.
+  ~Skip-Reactive-Auth~ token.
 
 - ~HEAD /{resource}~
   Headers:
-    - (optional) ~X-Reactive-Auth~: Reactive service authentication
+    - (optional) ~Skip-Reactive-Auth~: Reactive service authentication
       token.
   Parameters: Query parameters are passed down to the reactive
   resource.
@@ -329,7 +329,7 @@ diff -u $a $b
 -        for post in cur.fetchall()
 -    ]
 -    cur.close()
-+    public_key = request.headers['X-Reactive-Auth']
++    public_key = request.headers['Skip-Reactive-Auth']
 +
 +    if public_key:
 +        # Create reactive request for the reactive resource `posts`,
@@ -340,7 +340,7 @@ diff -u $a $b
 +                'limit': 10
 +            },
 +            headers = {
-+                'X-Reactive-Auth': public_key,
++                'Skip-Reactive-Auth': public_key,
 +            }
 +        ).content
 +
@@ -354,7 +354,7 @@ diff -u $a $b
 +        return diff['data'], { 'X-Reactive-Request-Id': f'{reactive_request_id}:{tick}' }
 +
 +    else:
-+        # If the client didn't set the `X-Reactive-Auth` header, they
++        # If the client didn't set the `Skip-Reactive-Auth` header, they
 +        # are not interested in reactive updates for this query, so we
 +        # just respond with the current values.
 +        posts = requests.get(f'/collections/{reactive_request_id}').json()

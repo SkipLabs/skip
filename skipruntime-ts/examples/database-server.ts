@@ -38,9 +38,9 @@ const run = function (
 };
 
 app.head("/auth/users", (req, res) => {
-  const strReactiveAuth = req.headers["x-reactive-auth"] as string;
+  const strReactiveAuth = req.headers["skip-reactive-auth"] as string;
   if (!strReactiveAuth) {
-    console.error("X-Reactive-Auth must be specified.");
+    console.error("Skip-Reactive-Auth must be specified.");
     res.status(500).json("Internal error");
     return;
   }
@@ -57,9 +57,9 @@ app.head("/auth/users", (req, res) => {
     });
 });
 app.get("/user/:id", (req, res) => {
-  const strReactiveAuth = req.headers["x-reactive-auth"] as string;
+  const strReactiveAuth = req.headers["skip-reactive-auth"] as string;
   if (!strReactiveAuth) {
-    console.error("X-Reactive-Auth must be specified.");
+    console.error("Skip-Reactive-Auth must be specified.");
     res.status(500).json("Internal error");
     return;
   }
