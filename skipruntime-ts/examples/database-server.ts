@@ -1,4 +1,4 @@
-import { SkipRESTService } from "@skipruntime/helpers/rest.js";
+import { RESTWrapperOfSkipService } from "@skipruntime/helpers/rest.js";
 import { reactiveResponseHeader } from "@skipruntime/helpers";
 
 import express from "express";
@@ -7,7 +7,7 @@ import express from "express";
   This is the user facing server of the database example
 */
 
-const service = new SkipRESTService({
+const service = new RESTWrapperOfSkipService({
   host: "localhost",
   port: 8081,
 });
