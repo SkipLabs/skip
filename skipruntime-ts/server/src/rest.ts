@@ -9,8 +9,9 @@ export function createRESTServer(service: ServiceInstance): express.Express {
   // READS
   app.head("/v1/:resource", (req, res) => {
     const resourceName = req.params.resource;
-    const strReactiveAuth = req.headers["x-reactive-auth"] as string;
-    if (!strReactiveAuth) throw new Error("X-Reactive-Auth must be specified.");
+    const strReactiveAuth = req.headers["skip-reactive-auth"] as string;
+    if (!strReactiveAuth)
+      throw new Error("Skip-Reactive-Auth must be specified.");
     const reactiveAuth = new Uint8Array(Buffer.from(strReactiveAuth, "base64"));
     try {
       const data = service.instantiateResource(
@@ -28,7 +29,7 @@ export function createRESTServer(service: ServiceInstance): express.Express {
   app.get("/v1/:resource/:key", (req, res) => {
     const key = req.params.key;
     const resourceName = req.params.resource;
-    const strReactiveAuth = req.headers["x-reactive-auth"] as string;
+    const strReactiveAuth = req.headers["skip-reactive-auth"] as string;
     const reactiveAuth = strReactiveAuth
       ? new Uint8Array(Buffer.from(strReactiveAuth, "base64"))
       : undefined;
@@ -56,7 +57,7 @@ export function createRESTServer(service: ServiceInstance): express.Express {
   });
   app.get("/v1/:resource", (req, res) => {
     const resourceName = req.params.resource;
-    const strReactiveAuth = req.headers["x-reactive-auth"] as string;
+    const strReactiveAuth = req.headers["skip-reactive-auth"] as string;
     const reactiveAuth = strReactiveAuth
       ? new Uint8Array(Buffer.from(strReactiveAuth, "base64"))
       : undefined;
