@@ -202,9 +202,10 @@ class ResourceInfo(
       SKStore.SID::keyType,
       RequestStatuses::type,
       this.statusRef.sub("all"),
-    )
-      .get(context, SKStore.SID(request))
-      .getResult(request, values)
+    ).maybeGet(context, SKStore.SID(request)) match {
+    | Some(statuses) -> statuses.getResult(request, values)
+    | _ -> GetResult(None(), values, Array[])
+    }
   }
 
   fun clearRequest(context: mutable SKStore.Context, requestId: String): void {
