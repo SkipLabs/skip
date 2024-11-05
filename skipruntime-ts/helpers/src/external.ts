@@ -127,11 +127,11 @@ export class Polled<S extends Json, K extends Json, V extends Json>
     reactiveAuth?: Uint8Array,
   ): void {
     this.close(params, reactiveAuth);
-    const querieParams: Record<string, string> = {};
+    const queryParams: Record<string, string> = {};
     for (const [key, value] of Object.entries(params)) {
-      querieParams[key] = value.toString();
+      queryParams[key] = value.toString();
     }
-    const strParams = new URLSearchParams(querieParams).toString();
+    const strParams = new URLSearchParams(queryParams).toString();
     const url = `${this.url}?${strParams}`;
     const call = () => {
       callbacks.loading();
