@@ -21,7 +21,7 @@ const publicKey = new Uint8Array(await Protocol.exportKey(creds.publicKey));
 console.log("Connect to replication server for resource /users");
 
 const header = {
-  "X-Reactive-Auth": Buffer.from(publicKey.buffer).toString("base64"),
+  "Skip-Reactive-Auth": Buffer.from(publicKey.buffer).toString("base64"),
 };
 const [_e, headers] = await fetchJSON<ReactiveResponse>(
   `${url}/auth/users`,
