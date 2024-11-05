@@ -2,7 +2,7 @@ import type { ReactiveResponse } from "@skipruntime/api";
 import { parseReactiveResponse } from "@skipruntime/helpers";
 import { fetchJSON } from "@skipruntime/helpers/rest.js";
 import { connect, Protocol } from "@skipruntime/client";
-import type { TJSON } from "@skipruntime/client/protocol.js";
+import type { Json } from "@skipruntime/client/protocol.js";
 
 /*
   This is the client simulator of database example
@@ -40,7 +40,7 @@ const client = await connect(`ws://localhost:${replication.toString()}`, creds);
 client.subscribe(
   reactive.collection,
   reactive.watermark,
-  (updates: [string, TJSON[]][], isInit: boolean) => {
+  (updates: [string, Json[]][], isInit: boolean) => {
     console.log("Update", Object.fromEntries(updates), isInit);
   },
 );

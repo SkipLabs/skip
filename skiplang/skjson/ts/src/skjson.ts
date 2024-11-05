@@ -393,12 +393,12 @@ class Mapping {
   }
 }
 
-export type JSONObject = { [key: string]: TJSON | null };
+export type JsonObject = { [key: string]: Json | null };
 
-export type TJSON = number | JSONObject | boolean | (TJSON | null)[] | string;
+export type Json = number | JsonObject | boolean | (Json | null)[] | string;
 
 export type Exportable =
-  | TJSON
+  | Json
   | null
   | undefined
   | ObjectProxy<{ [k: string]: Exportable }>
@@ -411,13 +411,13 @@ export interface SKJSON extends Shared {
   exportJSON(v: boolean): ptr<Internal.CJBool>;
   exportJSON(v: string): ptr<Internal.CJString>;
   exportJSON(v: any[]): ptr<Internal.CJArray>;
-  exportJSON(v: JSONObject): ptr<Internal.CJObject>;
+  exportJSON(v: JsonObject): ptr<Internal.CJObject>;
   exportJSON<T extends Internal.CJSON>(
     v: (ObjectProxy<{ [k: string]: Exportable }> | ArrayProxy<any>) & {
       __pointer: ptr<T>;
     },
   ): ptr<T>;
-  exportJSON(v: TJSON | null): ptr<Internal.CJSON>;
+  exportJSON(v: Json | null): ptr<Internal.CJSON>;
   importOptJSON(value: Opt<ptr<Internal.CJSON>>, copy?: boolean): Exportable;
   importString(v: ptr<Internal.String>): string;
   exportString(v: string): ptr<Internal.String>;

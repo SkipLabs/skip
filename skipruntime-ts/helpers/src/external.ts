@@ -1,12 +1,12 @@
-import type { Entry, ExternalService, TJSON } from "@skipruntime/api";
+import type { Entry, ExternalService, Json } from "@skipruntime/api";
 import { fetchJSON } from "./rest.js";
 
 export interface ExternalResource {
   open(
     params: Record<string, string | number>,
     callbacks: {
-      update: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void;
-      error: (error: TJSON) => void;
+      update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
+      error: (error: Json) => void;
       loading: () => void;
     },
     reactiveAuth?: Uint8Array,
@@ -25,8 +25,8 @@ export class GenericExternalService implements ExternalService {
     resourceName: string,
     params: Record<string, string | number>,
     callbacks: {
-      update: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void;
-      error: (error: TJSON) => void;
+      update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
+      error: (error: Json) => void;
       loading: () => void;
     },
     reactiveAuth?: Uint8Array,
@@ -67,8 +67,8 @@ export class TimerResource implements ExternalResource {
   open(
     params: Record<string, string | number>,
     callbacks: {
-      update: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void;
-      error: (error: TJSON) => void;
+      update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
+      error: (error: Json) => void;
       loading: () => void;
     },
     reactiveAuth?: Uint8Array,
@@ -85,7 +85,7 @@ export class TimerResource implements ExternalResource {
       const ms = Number(duration);
       if (ms > 0) {
         intervals[name] = setInterval(() => {
-          const newvalue: Entry<TJSON, TJSON> = [name, [new Date().getTime()]];
+          const newvalue: Entry<Json, Json> = [name, [new Date().getTime()]];
           callbacks.update([newvalue], true);
         }, ms);
       }
@@ -106,7 +106,7 @@ export class TimerResource implements ExternalResource {
   }
 }
 
-export class Polled<S extends TJSON, K extends TJSON, V extends TJSON>
+export class Polled<S extends Json, K extends Json, V extends Json>
   implements ExternalResource
 {
   private intervals = new Map<string, Timeout>();
@@ -120,8 +120,8 @@ export class Polled<S extends TJSON, K extends TJSON, V extends TJSON>
   open(
     params: Record<string, string | number>,
     callbacks: {
-      update: (updates: Entry<TJSON, TJSON>[], isInit: boolean) => void;
-      error: (error: TJSON) => void;
+      update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
+      error: (error: Json) => void;
       loading: () => void;
     },
     reactiveAuth?: Uint8Array,

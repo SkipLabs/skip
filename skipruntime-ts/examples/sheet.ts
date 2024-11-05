@@ -3,7 +3,7 @@ import type {
   LazyCompute,
   EagerCollection,
   LazyCollection,
-  TJSON,
+  Json,
   SkipService,
   Resource,
 } from "@skipruntime/api";
@@ -13,7 +13,7 @@ import { OneToOneMapper } from "@skipruntime/api";
 import { runService } from "@skipruntime/server";
 
 class ComputeExpression implements LazyCompute<string, string> {
-  constructor(private skall: EagerCollection<string, TJSON>) {}
+  constructor(private skall: EagerCollection<string, Json>) {}
 
   compute(selfHdl: LazyCollection<string, string>, key: string): string | null {
     const getComputed = (key: string) => {
@@ -50,12 +50,12 @@ class ComputeExpression implements LazyCompute<string, string> {
   }
 }
 
-class CallCompute extends OneToOneMapper<string, TJSON, TJSON> {
+class CallCompute extends OneToOneMapper<string, Json, Json> {
   constructor(private evaluator: LazyCollection<string, string>) {
     super();
   }
 
-  mapValue(value: TJSON, key: string): TJSON {
+  mapValue(value: Json, key: string): Json {
     if (typeof value == "string" && value.startsWith("=")) {
       return this.evaluator.getOne(key);
     } else {
@@ -66,8 +66,8 @@ class CallCompute extends OneToOneMapper<string, TJSON, TJSON> {
 
 class ComputedCells implements Resource {
   reactiveCompute(collections: {
-    output: EagerCollection<string, TJSON>;
-  }): EagerCollection<string, TJSON> {
+    output: EagerCollection<string, Json>;
+  }): EagerCollection<string, Json> {
     return collections.output;
   }
 }
@@ -77,9 +77,9 @@ class Service implements SkipService {
   resources = { computed: ComputedCells };
 
   reactiveCompute(
-    inputCollections: { cells: EagerCollection<string, TJSON> },
+    inputCollections: { cells: EagerCollection<string, Json> },
     context: Context,
-  ): Record<string, EagerCollection<TJSON, TJSON>> {
+  ): Record<string, EagerCollection<Json, Json>> {
     const cells = inputCollections.cells;
     // Use lazy dir to create eval dependency graph
     // Its calls it self to get other computed cells

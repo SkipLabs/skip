@@ -1,6 +1,6 @@
 import type {
-  JSONObject,
-  TJSON,
+  JsonObject,
+  Json,
   Entry,
   ProtoPing,
   ProtoPong,
@@ -14,8 +14,8 @@ import type {
 } from "./protocol.js";
 
 export type {
-  JSONObject,
-  TJSON,
+  JsonObject,
+  Json,
   Entry,
   ProtoPing,
   ProtoPong,
@@ -135,7 +135,7 @@ async function authMsg(creds: Creds): Promise<ProtoAuth> {
 
 class Subscription {
   constructor(
-    public callback: (updates: Entry<string, TJSON>[], isInit: boolean) => void,
+    public callback: (updates: Entry<string, Json>[], isInit: boolean) => void,
     public watermark: bigint,
   ) {}
 }
@@ -176,7 +176,7 @@ export class Client {
   subscribe(
     collection: string,
     watermark: bigint,
-    cb: (updates: Entry<string, TJSON>[], isInit: boolean) => void,
+    cb: (updates: Entry<string, Json>[], isInit: boolean) => void,
   ): {
     close: () => void;
   } {
@@ -236,7 +236,7 @@ export class Client {
         return;
       }
       case "data": {
-        const payload = JSON.parse(msg.payload) as Entry<string, TJSON>[];
+        const payload = JSON.parse(msg.payload) as Entry<string, Json>[];
         const sub = this.subscriptions.get(msg.collection);
         // NOTE: Black holing data for unsubscribed collections.
         if (sub) {
