@@ -63,11 +63,11 @@ def posts_index():
 
 
     headers = {}
-    # If the client didn't set the `X-Reactive-Auth` header, they
+    # If the client didn't set the `Skip-Reactive-Auth` header, they
     # are not interested in reactive updates for this query, so we
     # just respond with the current values.
-    if 'X-Reactive-Auth' in request.headers:
-        headers['X-Reactive-Auth'] = request.headers['X-Reactive-Auth']
+    if 'Skip-Reactive-Auth' in request.headers:
+        headers['Skip-Reactive-Auth'] = request.headers['Skip-Reactive-Auth']
     # Get the initial data, which will be returned to the client
     # along with a reactive request token for subscribing to
     # further updates.
@@ -86,7 +86,7 @@ def posts_index():
     posts = resp.json()[0][1]
 
     resp_headers = {}
-    if 'X-Reactive-Auth' in request.headers:
+    if 'Skip-Reactive-Auth' in request.headers:
         resp_headers['Skip-Reactive-Response-Token'] = resp.headers['Skip-Reactive-Response-Token']
 
     return posts, resp_headers
