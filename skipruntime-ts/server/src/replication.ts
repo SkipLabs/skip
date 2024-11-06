@@ -82,7 +82,7 @@ function handleMessage(
       try {
         const reactiveResponse = {
           collection: msg.collection,
-          watermark: msg.since as Watermark,
+          watermark: msg.since.toString() as Watermark,
         };
         session.subscribe(reactiveResponse, (update) => {
           ws.send(
@@ -90,7 +90,7 @@ function handleMessage(
               type: "data",
               collection: msg.collection,
               isInit: update.isInitial ?? false,
-              tick: update.watermark,
+              tick: BigInt(update.watermark),
               payload: JSON.stringify(update.values),
             }),
           );

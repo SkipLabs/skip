@@ -41,15 +41,15 @@ app.head("/auth/users", (req, res) => {
   const strReactiveAuth = req.headers["skip-reactive-auth"] as string;
   if (!strReactiveAuth) {
     console.error("Skip-Reactive-Auth must be specified.");
-    res.status(500).json("Internal error");
+    res.status(400).json("Must include reactive auth token in HEAD request");
     return;
   }
   const reactiveAuth = new Uint8Array(Buffer.from(strReactiveAuth, "base64"));
   service
     .head("users", {}, reactiveAuth)
     .then((reactiveResponse) => {
-      const [name, value] = reactiveResponseHeader(reactiveResponse);
-      res.set(name, value);
+      const [name, token] = reactiveResponseHeader(reactiveResponse);
+      res.set(name, token);
       res.status(200).json({});
     })
     .catch(() => {

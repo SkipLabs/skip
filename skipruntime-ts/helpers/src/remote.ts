@@ -135,11 +135,7 @@ export class SkipExternalService implements ExternalService {
     const publicKey = new Uint8Array(await Protocol.exportKey(creds.publicKey));
     const reactive = await this.auth(resource, params, publicKey);
     // TODO Manage Status
-    const close = client.subscribe(
-      reactive.collection,
-      BigInt(reactive.watermark),
-      callbacks.update,
-    );
+    const close = client.subscribe(reactive, callbacks.update);
     this.resources.set(this.toId(resource, params, reactiveAuth), close);
   }
 
