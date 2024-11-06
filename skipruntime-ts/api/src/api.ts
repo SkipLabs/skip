@@ -293,7 +293,7 @@ export interface Context extends Constant {
 
 export type Entry<K extends Json, V extends Json> = [K, V[]];
 
-export type Watermark = Opaque<bigint, "watermark">;
+export type Watermark = Opaque<string, "watermark">;
 export type SubscriptionID = Opaque<bigint, "subscription">;
 
 /**
