@@ -25,8 +25,7 @@ export enum Type {
 
 interface WasmAccess {
   SKIP_SKJSON_typeOf: (json: ptr<Internal.CJSON>) => int;
-  SKIP_SKJSON_asInt: (json: ptr<Internal.CJSON>) => int;
-  SKIP_SKJSON_asFloat: (json: ptr<Internal.CJSON>) => float;
+  SKIP_SKJSON_asNumber: (json: ptr<Internal.CJSON>) => number;
   SKIP_SKJSON_asBoolean: (json: ptr<Internal.CJSON>) => boolean;
   SKIP_SKJSON_asString: (json: ptr<Internal.CJSON>) => ptr<Internal.String>;
   SKIP_SKJSON_asArray: (json: ptr<Internal.CJSON>) => ptr<Internal.CJArray>;
@@ -97,9 +96,8 @@ function interpretPointer<T extends Internal.CJSON>(
     case Type.Null:
       return null;
     case Type.Int:
-      return hdl.access.SKIP_SKJSON_asInt(ptr);
     case Type.Float:
-      return hdl.access.SKIP_SKJSON_asFloat(ptr);
+      return hdl.access.SKIP_SKJSON_asNumber(ptr);
     case Type.Boolean:
       return hdl.access.SKIP_SKJSON_asBoolean(ptr);
     case Type.String:

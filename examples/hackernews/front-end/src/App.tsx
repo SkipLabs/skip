@@ -81,17 +81,10 @@ function Feed() {
       const reactiveToken = JSON.parse(
         response.headers.get("Skip-Reactive-Response-Token")!,
       ) as ReactiveResponse;
-      // TODO: Make this happen transparently in the skip client.
-      const reactiveCollection = reactiveToken.collection;
-      const reactiveWatermark = BigInt(reactiveToken.watermark);
-      skipclient.subscribe(
-        reactiveCollection,
-        reactiveWatermark,
-        (updates, _isInit) => {
-          const updatedPosts = updates[0][1] as Post[];
-          setPosts(updatedPosts);
-        },
-      );
+      skipclient.subscribe(reactiveToken, (updates, _isInit) => {
+        const updatedPosts = updates[0][1] as Post[];
+        setPosts(updatedPosts);
+      });
     }
 
     try {

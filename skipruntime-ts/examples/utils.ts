@@ -84,11 +84,7 @@ class SkipHttpAccessV1 {
     const service = this.services[port ?? this.defaultPort];
     if (service === undefined) throw new Error(`Invalid port ${port}`);
     const result = await service.getAll(resource, params, publicKey);
-    console.log(
-      JSON.stringify(result, (_key: string, value: unknown) =>
-        typeof value === "bigint" ? value.toString() : value,
-      ),
-    );
+    console.log(JSON.stringify(result));
   }
 
   async request(
@@ -109,8 +105,7 @@ class SkipHttpAccessV1 {
       );
     }
     this.client.subscribe(
-      reactive.collection,
-      reactive.watermark,
+      reactive,
       (updates: [string, Json[]][], isInit: boolean) => {
         console.log("Update", Object.fromEntries(updates), isInit);
       },

@@ -728,13 +728,17 @@ class LinksImpl implements Links {
   notifyOfNotifier<K extends Json, V extends Json>(
     sknotifier: Handle<(update: CollectionUpdate<K, V>) => void>,
     skvalues: ptr<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
-    watermark: Watermark,
+    watermark: bigint,
     isInitial: boolean,
   ) {
     const skjson = this.getSkjson();
     const notifier = this.handles.get(sknotifier);
     const values = skjson.clone(skjson.importJSON(skvalues) as Entry<K, V>[]);
-    notifier({ values, watermark, isInitial });
+    notifier({
+      values,
+      watermark: watermark.toString() as Watermark,
+      isInitial,
+    });
   }
 
   deleteNotifier<K extends Json, V extends Json>(
@@ -1206,16 +1210,6 @@ export class ServiceInstanceFactory implements Shared {
   }
 }
 
-type ReactivePart = {
-  collection: string;
-  watermark: string;
-};
-
-type ValuesPart<K extends Json, V extends Json> = {
-  values: Entry<K, V>[];
-  reactive?: ReactivePart;
-};
-
 export type Values<K extends Json, V extends Json> = {
   values: Entry<K, V>[];
   reactive?: ReactiveResponse;
@@ -1231,28 +1225,6 @@ export type Executor<T> = {
   resolve: (value: T) => void;
   reject: (reason?: any) => void;
 };
-
-function toReactiveResponse(reactive: ReactivePart): ReactiveResponse {
-  return {
-    collection: reactive.collection,
-    watermark: BigInt(reactive.watermark) as Watermark,
-  };
-}
-
-function toGetResult<K extends Json, V extends Json>(
-  result: GetResult<ValuesPart<K, V>>,
-): GetResult<Values<K, V>> {
-  return {
-    request: result.request,
-    payload: {
-      values: result.payload.values,
-      reactive: result.payload.reactive
-        ? toReactiveResponse(result.payload.reactive)
-        : undefined,
-    },
-    errors: result.errors,
-  };
-}
 
 interface Checker {
   check(request: string): void;
@@ -1340,8 +1312,8 @@ export class ServiceInstance {
     if (typeof result == "number") {
       throw this.refs.handles.deleteAsError(result as Handle<ErrorObject>);
     }
-    const [collection, watermark] = result as [string, string];
-    return { collection, watermark: BigInt(watermark) as Watermark };
+    const [collection, watermark] = result as [string, Watermark];
+    return { collection, watermark };
   }
 
   /**
@@ -1391,7 +1363,7 @@ export class ServiceInstance {
     if (typeof result == "number") {
       throw this.refs.handles.deleteAsError(result as Handle<ErrorObject>);
     }
-    return toGetResult(result as GetResult<ValuesPart<K, V>>);
+    return result as GetResult<Values<K, V>>;
   }
 
   /**
@@ -1504,7 +1476,7 @@ export class ServiceInstance {
       );
       return this.refs.fromWasm.SkipRuntime_Runtime__subscribe(
         this.refs.skjson.exportString(reactiveResponse.collection),
-        reactiveResponse.watermark,
+        BigInt(reactiveResponse.watermark),
         sknotifier,
         reactiveAuth ? this.refs.skjson.exportBytes(reactiveAuth) : null,
       );
