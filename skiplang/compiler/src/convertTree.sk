@@ -9,9 +9,9 @@ module ConvertTree;
 
 type ParseTree = ParseTree.ParseTree;
 
-class Converter{filename: String} {
+class Converter{file: FileCache.InputSource} {
   fun treeToString(tree: ParseTree): String {
-    this.filename + tree.toDebugString();
+    this.file.toString() + tree.toDebugString();
   }
 
   // Generic functions go here so tehy aren't in the let rec
@@ -58,7 +58,7 @@ class Converter{filename: String} {
   }
 
   fun convertPosition(position: Position): FilePosition {
-    FilePosition.create(this.filename, position);
+    FilePosition.create(this.file, position);
   }
 
   fun convertPositions(start: Position, end: Position): FileRange {
@@ -853,7 +853,11 @@ class Converter{filename: String} {
             ),
             (
               1,
-              (range, SkipAst.Literal(SkipAst.StringLiteral(range.filename))),
+              (
+                range,
+                // FIXME: Use absolute path.
+                SkipAst.Literal(SkipAst.StringLiteral(range.file.toString())),
+              ),
             ),
             (
               2,
@@ -2277,7 +2281,7 @@ class Converter{filename: String} {
     | _ ->
       invariant_violation(
         "unexpected ColonTypeSpecifier " +
-          this.filename +
+          this.file.toString() +
           this.treeToString(tree),
       )
     }

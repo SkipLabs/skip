@@ -36,10 +36,13 @@ class Error{
   }
 }
 
-fun errorFromSyntaxError(error: SyntaxError, filename: String): Error {
+fun errorFromSyntaxError(
+  error: SyntaxError,
+  file: FileCache.InputSource,
+): Error {
   SkipError.Error{
     traces => error.messages.map(message -> {
-      (FileRange.create(filename, message.i0), message.i1);
+      (FileRange.create(file, message.i0), message.i1);
     }),
     fix => error.fix,
   }
@@ -47,7 +50,7 @@ fun errorFromSyntaxError(error: SyntaxError, filename: String): Error {
 
 fun errorsToString(
   errors: Vector<Error>,
-  get_file: (String) -> (String, String),
+  get_file: (FileCache.InputSource) -> String,
 ): String {
   strErrors = mutable Vector[];
   for (error in errors) {
@@ -62,7 +65,7 @@ fun errorsToString(
 
 fun printErrors(
   errors: Vector<Error>,
-  get_file: String -> (String, String),
+  get_file: FileCache.InputSource -> String,
 ): void {
   print_error(errorsToString(errors, get_file));
 }
@@ -87,12 +90,7 @@ fun throwFlattenedErrors(errors: Vector<Vector<Error>>): void {
 
 fun printErrorsAndExit<T>(
   errors: Array<SkipErrorException>,
-  get_file: String -> (String, String) = filename -> {
-    if (filename.contains(":")) {
-      !filename = filename.splitFirst(":").i1
-    };
-    (filename, FileSystem.readTextFile(filename))
-  },
+  get_file: FileCache.InputSource -> String,
 ): T {
   SkipError.printErrors(
     errors.map(x -> x.errors).flatten().collect(Vector),
@@ -126,13 +124,16 @@ fun keepErrors(
 
 fun catchErrors(
   _phase: Int,
-  _context: mutable SKStore.Context,
+  context: mutable SKStore.Context,
   f: () -> void,
 ): void {
   try {
     f()
   } catch {
-  | err @ SkipError.SkipErrorException _ -> printErrorsAndExit(Array[err])
+  | err @ SkipError.SkipErrorException _ ->
+    printErrorsAndExit(Array[err], file -> {
+      FileCache.fileDir.unsafeGetArray(context, file)[0].value
+    })
   | exn ->
     debug(exn);
     throw exn
@@ -207,7 +208,8 @@ fun renderTextRange(range: TextRange): String {
 }
 
 private fun render_pos(pos: FileRange): String {
-  file = `File "${pos.filename}"`;
+  // TODO: Heuristic to use relative path when relevant.
+  file = `File "${pos.file}"`;
 
   position = if (!pos.range.isNone()) {
     `, ${renderTextRange(pos.range)}:`
@@ -220,10 +222,10 @@ private fun render_pos(pos: FileRange): String {
 
 private fun traceToString(
   trace: Trace,
-  get_file: (String) -> (String, String),
+  get_file: (FileCache.InputSource) -> String,
 ): String {
-  (filename, contents) = get_file(trace.i0.filename);
-  render_pos(trace.i0 with {filename}) +
+  contents = get_file(trace.i0.file);
+  render_pos(trace.i0) +
     trace.i1 +
     "\n" +
     get_context_of_pos(trace.i0.range, contents);
@@ -366,13 +368,19 @@ fun error<T>(pos: FileRange, msg: String, fix: ?Fix = None()): T {
   errorl(List[(pos, msg)], fix);
 }
 
-fun fatalError<T>(pos: FileRange, msg: String, fix: ?Fix = None()): T {
+fun fatalError<T>(
+  context: mutable SKStore.Context,
+  pos: FileRange,
+  msg: String,
+  fix: ?Fix = None(),
+): T {
   printErrorsAndExit(
     Array[
       SkipErrorException{
         errors => Vector[Error{traces => List[(pos, msg)], fix}],
       },
     ],
+    file -> FileCache.fileDir.unsafeGetArray(context, file)[0].value,
   );
 }
 
