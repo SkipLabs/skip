@@ -1,74 +1,21 @@
-import type {
-  Entry,
-  ExternalService,
-  ReactiveResponse,
-  Json,
-} from "@skipruntime/api";
-import { parseReactiveResponse } from "./utils.js";
+import type { Entry, ExternalService, Json } from "@skipruntime/api";
 
-import { connect, Protocol, Client } from "@skipruntime/client";
-import { fetchJSON, type Entrypoint } from "./rest.js";
+import type { Entrypoint } from "./rest.js";
 
 interface Closable {
   close(): void;
 }
 
 export class SkipExternalService implements ExternalService {
-  private client?: Promise<[Client, Protocol.Creds]>;
   private resources = new Map<string, Closable>();
 
-  constructor(
-    private url: string,
-    private auth: (
-      resource: string,
-      params: Record<string, string>,
-      reactiveAuth: Uint8Array,
-    ) => Promise<ReactiveResponse>,
-    private creds?: Protocol.Creds,
-  ) {}
+  constructor(private url: string) {}
 
-  static fromEntrypoint(
-    entrypoint: Entrypoint,
-    auth: (
-      resource: string,
-      params: Record<string, string>,
-      reactiveAuth: Uint8Array,
-    ) => Promise<ReactiveResponse>,
-    creds?: Protocol.Creds,
-  ): SkipExternalService {
-    let url = `ws://${entrypoint.host}:${entrypoint.port.toString()}`;
-    if (entrypoint.secured)
-      url = `wss://${entrypoint.host}:${entrypoint.port.toString()}`;
-    return new SkipExternalService(url, auth, creds);
-  }
-
-  static direct(
-    entrypoint: Entrypoint,
-    creds?: Protocol.Creds,
-  ): SkipExternalService {
+  static direct(entrypoint: Entrypoint): SkipExternalService {
     let url = `http://${entrypoint.host}:${entrypoint.port.toString()}`;
     if (entrypoint.secured)
       url = `https://${entrypoint.host}:${entrypoint.port.toString()}`;
-    const auth = async (
-      resource: string,
-      params: Record<string, string>,
-      reactiveAuth: Uint8Array,
-    ) => {
-      const qParams = new URLSearchParams(params).toString();
-      const header = {
-        "Skip-Reactive-Auth": Buffer.from(reactiveAuth).toString("base64"),
-      };
-      const [_data, headers] = await fetchJSON(
-        `${url}/v1/${resource}?${qParams}`,
-        "HEAD",
-        header,
-      );
-      const reactiveResponse = parseReactiveResponse(headers);
-      if (!reactiveResponse)
-        throw new Error("Reactive response must be suplied.");
-      return reactiveResponse;
-    };
-    return new SkipExternalService(url, auth, creds);
+    return new SkipExternalService(url);
   }
 
   subscribe(
@@ -76,79 +23,46 @@ export class SkipExternalService implements ExternalService {
     params: Record<string, string>,
     callbacks: {
       update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
+      // FIXME: What is `error()` used for?
       error: (error: Json) => void;
+      // FIXME: What is `loading()` used for?
       loading: () => void;
     },
-    reactiveAuth?: Uint8Array,
   ): void {
-    if (!this.client) {
-      if (!this.creds) {
-        this.client = Protocol.generateCredentials().then((creds) => {
-          this.creds = creds;
-          return connect(this.url, this.creds).then((c) => [c, creds]);
-        });
-      } else {
-        this.client = connect(this.url, this.creds).then((c) => {
-          return [c, this.creds!];
-        });
-      }
-    }
-    this.subscribe_(resource, params, callbacks, reactiveAuth).catch(
-      (e: unknown) => {
-        console.error(e);
-      },
+    // TODO Manage Status
+    const evSource = new EventSource(
+      `${this.url}?${new URLSearchParams(params)}`,
     );
+    evSource.onmessage = (e: MessageEvent<string>) => {
+      const msg = JSON.parse(e.data);
+      callbacks.update(
+        msg.updates as Entry<Json, Json>[],
+        msg.isInit as boolean,
+      );
+    };
+    evSource.onerror = (e) => {
+      console.log(e);
+    };
+    this.resources.set(this.toId(resource, params), evSource);
   }
 
-  unsubscribe(
-    resource: string,
-    params: Record<string, string>,
-    reactiveAuth?: Uint8Array,
-  ) {
-    const closable = this.resources.get(
-      this.toId(resource, params, reactiveAuth),
-    );
+  unsubscribe(resource: string, params: Record<string, string>) {
+    const closable = this.resources.get(this.toId(resource, params));
     if (closable) closable.close();
   }
 
   shutdown(): void {
-    if (this.client) {
-      this.client
-        .then((client) => {
-          client[0].close();
-        })
-        .catch((e: unknown) => console.error(e));
+    for (const res of this.resources.values()) {
+      res.close();
     }
   }
 
-  private async subscribe_(
-    resource: string,
-    params: Record<string, string>,
-    callbacks: {
-      update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
-      error: (error: Json) => void;
-      loading: () => void;
-    },
-    reactiveAuth?: Uint8Array,
-  ): Promise<void> {
-    const [client, creds] = await this.client!;
-    const publicKey = new Uint8Array(await Protocol.exportKey(creds.publicKey));
-    const reactive = await this.auth(resource, params, publicKey);
-    // TODO Manage Status
-    const close = client.subscribe(reactive, callbacks.update);
-    this.resources.set(this.toId(resource, params, reactiveAuth), close);
-  }
-
-  private toId(
-    resource: string,
-    params: Record<string, string>,
-    reactiveAuth?: Uint8Array,
-  ): string {
+  private toId(resource: string, params: Record<string, string>): string {
+    // TODO: This is equivalent to `querystring.encode(params, ',', ':')`.
     const strparams: string[] = [];
     for (const key of Object.keys(params).sort()) {
       strparams.push(`${key}:${params[key]}`);
     }
-    const hex = reactiveAuth ? Buffer.from(reactiveAuth).toString("hex") : "";
-    return `${resource}[${strparams.join(",")}]${hex}`;
+    return `${resource}[${strparams.join(",")}]`;
   }
 }
