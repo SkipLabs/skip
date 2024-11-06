@@ -11,6 +11,7 @@ import type {
   ProtoAbortTail,
   ProtoData,
   Creds,
+  ReactiveResponse,
 } from "./protocol.js";
 
 export type {
@@ -26,6 +27,7 @@ export type {
   ProtoAbortTail,
   ProtoData,
   Creds,
+  ReactiveResponse,
 };
 
 import * as Protocol from "./protocol.js";
@@ -174,25 +176,24 @@ export class Client {
   }
 
   subscribe(
-    collection: string,
-    watermark: bigint,
+    reactiveToken: ReactiveResponse,
     cb: (updates: Entry<string, Json>[], isInit: boolean) => void,
   ): {
     close: () => void;
   } {
-    const sub = new Subscription(cb, watermark);
-    this.subscriptions.set(collection, sub);
+    const sub = new Subscription(cb, BigInt(reactiveToken.watermark));
+    this.subscriptions.set(reactiveToken.collection, sub);
     this.socket.send(
       Protocol.encodeMsg({
         type: "tail",
         since: sub.watermark,
-        collection,
+        collection: reactiveToken.collection,
       }),
     );
 
     return {
       close: () => {
-        this.unsubscribe(collection);
+        this.unsubscribe(reactiveToken.collection);
       },
     };
   }

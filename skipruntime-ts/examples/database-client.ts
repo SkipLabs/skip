@@ -37,13 +37,9 @@ if (!reactive) {
 
 const client = await connect(`ws://localhost:${replication.toString()}`, creds);
 
-client.subscribe(
-  reactive.collection,
-  reactive.watermark,
-  (updates: [string, Json[]][], isInit: boolean) => {
-    console.log("Update", Object.fromEntries(updates), isInit);
-  },
-);
+client.subscribe(reactive, (updates: [string, Json[]][], isInit: boolean) => {
+  console.log("Update", Object.fromEntries(updates), isInit);
+});
 
 await sleep(1000);
 
