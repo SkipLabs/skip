@@ -43,6 +43,6 @@ export {
 
 export {
   fetchJSON,
-  SkipRESTService,
+  RESTWrapperOfSkipService,
   type Entrypoint,
 } from "@skipruntime/helpers/rest.js";
