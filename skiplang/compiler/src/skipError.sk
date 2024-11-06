@@ -90,10 +90,7 @@ fun throwFlattenedErrors(errors: Vector<Vector<Error>>): void {
 
 fun printErrorsAndExit<T>(
   errors: Array<SkipErrorException>,
-  get_file: FileCache.InputSource -> String = file -> {
-    // FIXME: Read directly from FileCache.filesDir.
-    FileSystem.readTextFile(file.path)
-  },
+  get_file: FileCache.InputSource -> String,
 ): T {
   SkipError.printErrors(
     errors.map(x -> x.errors).flatten().collect(Vector),
@@ -127,13 +124,16 @@ fun keepErrors(
 
 fun catchErrors(
   _phase: Int,
-  _context: mutable SKStore.Context,
+  context: mutable SKStore.Context,
   f: () -> void,
 ): void {
   try {
     f()
   } catch {
-  | err @ SkipError.SkipErrorException _ -> printErrorsAndExit(Array[err])
+  | err @ SkipError.SkipErrorException _ ->
+    printErrorsAndExit(Array[err], file -> {
+      FileCache.fileDir.unsafeGetArray(context, file)[0].value
+    })
   | exn ->
     debug(exn);
     throw exn
@@ -368,13 +368,19 @@ fun error<T>(pos: FileRange, msg: String, fix: ?Fix = None()): T {
   errorl(List[(pos, msg)], fix);
 }
 
-fun fatalError<T>(pos: FileRange, msg: String, fix: ?Fix = None()): T {
+fun fatalError<T>(
+  context: mutable SKStore.Context,
+  pos: FileRange,
+  msg: String,
+  fix: ?Fix = None(),
+): T {
   printErrorsAndExit(
     Array[
       SkipErrorException{
         errors => Vector[Error{traces => List[(pos, msg)], fix}],
       },
     ],
+    file -> FileCache.fileDir.unsafeGetArray(context, file)[0].value,
   );
 }
 
