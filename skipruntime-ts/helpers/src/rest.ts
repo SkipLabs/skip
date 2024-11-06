@@ -119,17 +119,12 @@ export class RESTWrapperOfSkipService {
     return data ?? [];
   }
 
-  async put<V extends Json>(
+  async put<K extends Json, V extends Json>(
     collection: string,
-    key: string,
+    key: K,
     value: V[],
   ): Promise<void> {
-    await fetchJSON(
-      `${this.entrypoint}/v1/${collection}/${key}`,
-      "PUT",
-      {},
-      value,
-    );
+    return await this.patch(collection, [[key, value]]);
   }
 
   async patch<K extends Json, V extends Json>(
@@ -139,8 +134,8 @@ export class RESTWrapperOfSkipService {
     await fetchJSON(`${this.entrypoint}/v1/${collection}`, "PATCH", {}, values);
   }
 
-  async deleteKey(collection: string, key: string): Promise<void> {
-    await fetchJSON(`${this.entrypoint}/v1/${collection}/${key}`, "DELETE", {});
+  async deleteKey<K extends Json>(collection: string, key: K): Promise<void> {
+    return await this.patch(collection, [[key, []]]);
   }
 
   private header(reactiveAuth?: Uint8Array | string): Record<string, string> {
