@@ -1,8 +1,6 @@
 import type { ReactiveResponse } from "@skipruntime/api";
 import { parseReactiveResponse } from "@skipruntime/helpers";
 import { fetchJSON } from "@skipruntime/helpers/rest.js";
-import { connect, Protocol } from "@skipruntime/client";
-import type { Json } from "@skipruntime/client/protocol.js";
 
 /*
   This is the client simulator of database example
@@ -14,9 +12,6 @@ async function sleep(ms: number) {
 const replication = 8081;
 const port = 8082;
 const url = `http://localhost:${port.toString()}`;
-const creds = await Protocol.generateCredentials();
-
-const publicKey = new Uint8Array(await Protocol.exportKey(creds.publicKey));
 
 console.log("Connect to replication server for resource /users");
 
@@ -35,11 +30,11 @@ if (!reactive) {
   throw new Error("Reactive response must be supplied.");
 }
 
-const client = await connect(`ws://localhost:${replication.toString()}`, creds);
-
-client.subscribe(reactive, (updates: [string, Json[]][], isInit: boolean) => {
-  console.log("Update", Object.fromEntries(updates), isInit);
-});
+const evSource = new EventSource(`//localhost:${replication.toString()}`);
+evSource.onmessage = (e) => {
+  const msg = JSON.parse(e.data);
+  console.log("Update", Object.fromEntries(msg.updates), msg.isInit);
+};
 
 await sleep(1000);
 
