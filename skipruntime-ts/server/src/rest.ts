@@ -93,25 +93,6 @@ export function createRESTServer(service: ServiceInstance): express.Express {
     }
   });
   // WRITES
-  app.put("/v1/:collection/:id", (req, res) => {
-    if (!Array.isArray(req.body)) {
-      res.status(400).json(`Bad request body ${JSON.stringify(req.body)}`);
-      return;
-    }
-    const key = req.params.id;
-    const data = req.body as Json[];
-    const collectionName = req.params.collection;
-    try {
-      service.update(collectionName, [[key, data]]);
-      res.sendStatus(200);
-    } catch (e: unknown) {
-      if (e instanceof UnknownCollectionError) {
-        res.sendStatus(404);
-      } else {
-        res.status(500).json(e instanceof Error ? e.message : e);
-      }
-    }
-  });
   app.patch("/v1/:collection", (req, res) => {
     if (!Array.isArray(req.body)) {
       res.status(400).json(`Bad request body ${JSON.stringify(req.body)}`);
@@ -130,20 +111,5 @@ export function createRESTServer(service: ServiceInstance): express.Express {
       }
     }
   });
-  app.delete("/v1/:collection/:id", (req, res) => {
-    const key = req.params.id;
-    const collectionName = req.params.collection;
-    try {
-      service.update(collectionName, [[key, []]]);
-      res.sendStatus(200);
-    } catch (e: unknown) {
-      if (e instanceof UnknownCollectionError) {
-        res.sendStatus(404);
-      } else {
-        res.status(500).json(e instanceof Error ? e.message : e);
-      }
-    }
-  });
-
   return app;
 }
