@@ -60,10 +60,7 @@ export function parseReactiveResponse(
       ? header
       : header.get("Skip-Reactive-Response-Token");
   if (!strReactiveResponse) return undefined;
-  return JSON.parse(strReactiveResponse, (key: string, value: string) => {
-    if (key == "watermark") return BigInt(value);
-    return value;
-  }) as ReactiveResponse;
+  return JSON.parse(strReactiveResponse) as ReactiveResponse;
 }
 
 export function reactiveResponseHeader(
