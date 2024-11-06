@@ -11,6 +11,7 @@ import type { Opaque, Opt, int, Constant } from "./internals.js";
  * and values in the Skip Runtime, ensuring that they can be serialized and managed by the
  * reactive computation engine.
  */
+// Replicate definition of Json from skjson to avoid a dependency
 export type Json = number | boolean | string | JsonObject | (Json | null)[];
 export type JsonObject = { [key: string]: Json | null };
 
