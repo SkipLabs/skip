@@ -12,4 +12,4 @@ export {
   parseReactiveResponse,
   reactiveResponseHeader,
 } from "./utils.js";
-export { SkipRESTService } from "./rest.js";
+export { RESTWrapperOfSkipService } from "./rest.js";
