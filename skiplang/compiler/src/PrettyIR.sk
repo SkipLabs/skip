@@ -1188,7 +1188,8 @@ mutable class Metadata{
   // DISubprogram for function definition and location scope.  Note that the
   // DISubprogram must be unique for each function that gets written out.
   mutable fun diSubprogram(funPos: FunPosBase): DISubprogram {
-    file = this.diFile(funPos.pos.filename);
+    // FIXME: Use absolute path.
+    file = this.diFile(funPos.pos.file.toString());
 
     // Canonicalize the SFunctionID to handle sharing.
     origID = PrettyDefID(funPos.id.id);

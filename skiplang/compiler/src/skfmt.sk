@@ -14,7 +14,12 @@ fun prettyPrint(
   parsed = SkipParser.parseSource(contents, false);
   if (parsed.errors.size() > 0) {
     // Parse errors are expected. Exceptions are bugs.
-    Failure(SkipError.errorFromSyntaxError(parsed.errors[0], filename))
+    Failure(
+      SkipError.errorFromSyntaxError(
+        parsed.errors[0],
+        FileCache.InputSource(None(), filename),
+      ),
+    )
   } else {
     Success(SkipPrinter.printTreeToString(parsed.tree, contents) + "\n")
   }
@@ -64,18 +69,16 @@ untracked fun main(): void {
       );
       FileSystem.readTextFile(file)
     };
-    prettyPrint(contents, file) match {
+    prettyPrint(contents, assumeFilename.default(file)) match {
     | Failure(error) ->
-      print_error_ln(
-        SkipError.errorsToString(Vector[error], filename ->
-          (
-            assumeFilename.default(filename),
-            if (filename == file) contents else {
-              FileSystem.readTextFile(filename)
-            },
-          )
-        ),
-      );
+      get_file = (f) -> {
+        if (f.path == file) {
+          contents
+        } else {
+          FileSystem.readTextFile(f.path)
+        }
+      };
+      print_error_ln(SkipError.errorsToString(Vector[error], get_file));
       skipExit(1)
     | Success(formattedContents) ->
       if (inplace) {
