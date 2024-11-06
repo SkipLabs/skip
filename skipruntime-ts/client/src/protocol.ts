@@ -7,6 +7,11 @@ export type Json = number | JsonObject | boolean | (Json | null)[] | string;
 
 export type Entry<K extends Json, V extends Json> = [K, V[]];
 
+export type ReactiveResponse = {
+  collection: string;
+  watermark: string;
+};
+
 export interface ProtoAuth {
   type: "auth";
   protoVersion: number;
