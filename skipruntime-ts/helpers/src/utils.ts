@@ -69,10 +69,5 @@ export function parseReactiveResponse(
 export function reactiveResponseHeader(
   reactiveResponse: ReactiveResponse,
 ): [string, string] {
-  return [
-    "Skip-Reactive-Response-Token",
-    JSON.stringify(reactiveResponse, (_key: string, value: unknown) =>
-      typeof value === "bigint" ? value.toString() : value,
-    ),
-  ];
+  return ["Skip-Reactive-Response-Token", JSON.stringify(reactiveResponse)];
 }
