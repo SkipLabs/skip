@@ -99,7 +99,10 @@ function handleMessage(
         // Respond with error 1004 if collection does not exist
         // (for current user).
         if (e instanceof UnknownCollectionError) {
-          throw new ReplicationServerError(1004, "Not found");
+          throw new ReplicationServerError(
+            1004,
+            `Collection ${msg.collection} not found`,
+          );
         }
         throw e;
       }
@@ -222,6 +225,7 @@ export class ReplicationServer {
   }
 
   private errorHandler(ws: WebSocket, error: any) {
+    console.error(error);
     if (error instanceof ReplicationServerError) {
       ws.send(
         Protocol.encodeMsg({
