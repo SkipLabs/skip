@@ -222,6 +222,7 @@ export class ReplicationServer {
   }
 
   private errorHandler(ws: WebSocket, error: any) {
+    console.error(error);
     if (error instanceof ReplicationServerError) {
       ws.send(
         Protocol.encodeMsg({
