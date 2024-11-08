@@ -3,7 +3,7 @@ import type {
   float,
   ptr,
   Links,
-  Opt,
+  Nullable,
   Utils,
   ToWasmManager,
   Environment,
@@ -67,7 +67,9 @@ class LinksImpl implements Links {
     skName: ptr<Internal.String>,
     skvalue: ptr<Internal.String>,
   ) => void;
-  SKIP_getenv!: (skName: ptr<Internal.String>) => Opt<ptr<Internal.String>>;
+  SKIP_getenv!: (
+    skName: ptr<Internal.String>,
+  ) => Nullable<ptr<Internal.String>>;
   SKIP_unsetenv!: (skName: ptr<Internal.String>) => void;
 
   SKIP_glock() {
@@ -361,7 +363,7 @@ interface ToWasm {
     skName: ptr<Internal.String>,
     skvalue: ptr<Internal.String>,
   ) => void;
-  SKIP_getenv: (skName: ptr<Internal.String>) => Opt<ptr<Internal.String>>;
+  SKIP_getenv: (skName: ptr<Internal.String>) => Nullable<ptr<Internal.String>>;
   SKIP_unsetenv: (skName: ptr<Internal.String>) => void;
 }
 

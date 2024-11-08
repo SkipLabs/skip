@@ -5,7 +5,7 @@ import type {
   Utils,
   ToWasmManager,
   Environment,
-  Opt,
+  Nullable,
   ErrorObject,
   Shared,
 } from "@skip-wasm/std";
@@ -132,10 +132,10 @@ export interface FromWasm {
   ): ptr<Internal.CJSON>;
   SkipRuntime_NonEmptyIterator__uniqueValue(
     values: ptr<Internal.NonEmptyIterator>,
-  ): Opt<ptr<Internal.CJSON>>;
+  ): Nullable<ptr<Internal.CJSON>>;
   SkipRuntime_NonEmptyIterator__next(
     values: ptr<Internal.NonEmptyIterator>,
-  ): Opt<ptr<Internal.CJSON>>;
+  ): Nullable<ptr<Internal.CJSON>>;
   SkipRuntime_NonEmptyIterator__clone(
     values: ptr<Internal.NonEmptyIterator>,
   ): ptr<Internal.NonEmptyIterator>;
@@ -370,7 +370,7 @@ interface ToWasm {
   SkipRuntime_getErrorHdl(exn: ptr<Internal.Exception>): Handle<ErrorObject>;
   SkipRuntime_pushContext(refs: ptr<Internal.Context>): void;
   SkipRuntime_popContext(): void;
-  SkipRuntime_getContext(): Opt<ptr<Internal.Context>>;
+  SkipRuntime_getContext(): Nullable<ptr<Internal.Context>>;
 
   // Mapper
 
@@ -524,7 +524,7 @@ class Stack {
     this.stack.push(pointer);
   }
 
-  get(): Opt<ptr<Internal.Context>> {
+  get(): Nullable<ptr<Internal.Context>> {
     if (this.stack.length == 0) return null;
     return this.stack[this.stack.length - 1]!;
   }
@@ -930,13 +930,13 @@ class LazyCollectionImpl<K extends Json, V extends Json>
     ) as V;
   }
 
-  maybeGetOne(key: K): Opt<V> {
+  maybeGetOne(key: K): Nullable<V> {
     return this.refs.skjson.importJSON(
       this.refs.fromWasm.SkipRuntime_LazyCollection__maybeGetOne(
         this.refs.skjson.exportString(this.lazyCollection),
         this.refs.skjson.exportJSON(key),
       ),
-    ) as Opt<V>;
+    ) as Nullable<V>;
   }
 }
 
@@ -961,13 +961,13 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     ) as V[];
   }
 
-  maybeGetOne(key: K): Opt<V> {
+  maybeGetOne(key: K): Nullable<V> {
     return this.refs.skjson.importJSON(
       this.refs.fromWasm.SkipRuntime_Collection__maybeGetOne(
         this.refs.skjson.exportString(this.collection),
         this.refs.skjson.exportJSON(key),
       ),
-    ) as Opt<V>;
+    ) as Nullable<V>;
   }
 
   size = () => {
@@ -1557,10 +1557,10 @@ class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
     this.pointer = pointer;
   }
 
-  next(): Opt<T> {
+  next(): Nullable<T> {
     return this.skjson.importOptJSON(
       this.exports.SkipRuntime_NonEmptyIterator__next(this.pointer),
-    ) as Opt<T>;
+    ) as Nullable<T>;
   }
 
   first(): T {
@@ -1569,10 +1569,11 @@ class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
     ) as T;
   }
 
-  uniqueValue(): Opt<T> {
+  uniqueValue(): Nullable<T> {
+    throw new Error("todo");
     return this.skjson.importOptJSON(
       this.exports.SkipRuntime_NonEmptyIterator__uniqueValue(this.pointer),
-    ) as Opt<T>;
+    ) as Nullable<T>;
   }
 
   toArray: () => T[] = () => {

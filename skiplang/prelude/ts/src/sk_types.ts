@@ -13,7 +13,7 @@ export type ErrorObject = {
   cause?: ErrorObject;
 };
 
-export type Opt<T> = T | null;
+export type Nullable<T> = T | null;
 
 export enum Stream {
   OUT,
@@ -732,7 +732,7 @@ export class Raw implements Text {
 
 export class Locale implements Text {
   text: string;
-  category: Opt<string>;
+  category: Nullable<string>;
 
   constructor(text: string, category?: string) {
     this.text = text;
