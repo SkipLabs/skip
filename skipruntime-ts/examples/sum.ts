@@ -25,7 +25,7 @@ class Minus extends ManyToOneMapper<string, number, number> {
 }
 
 class Add implements Resource {
-  reactiveCompute(cs: {
+  instantiate(cs: {
     input1: EagerCollection<string, number>;
     input2: EagerCollection<string, number>;
   }): EagerCollection<string, number> {
@@ -34,7 +34,7 @@ class Add implements Resource {
 }
 
 class Sub implements Resource {
-  reactiveCompute(cs: {
+  instantiate(cs: {
     input1: EagerCollection<string, number>;
     input2: EagerCollection<string, number>;
   }): EagerCollection<string, number> {
@@ -46,7 +46,7 @@ class Service implements SkipService {
   initialData = { input1: [], input2: [] };
   resources = { add: Add, sub: Sub };
 
-  reactiveCompute(
+  createGraph(
     inputCollections: Record<string, EagerCollection<string, number>>,
   ) {
     return inputCollections;

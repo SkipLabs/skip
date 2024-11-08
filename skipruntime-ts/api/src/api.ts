@@ -372,12 +372,12 @@ export interface ExternalService {
  */
 export interface Resource {
   /**
-   * Build a reactive compute graph of the reactive ressource
-   * @param collections - the collection returned by SkipService reactiveCompute
+   * Build a reactive compute graph of the reactive resource
+   * @param collections - the collections returned by SkipService's `createGraph`
    * @param context {Context} - the reactive graph context
    * @param reactiveAuth - the client user Skip session authentication
    */
-  reactiveCompute(
+  instantiate(
     collections: Record<string, EagerCollection<Json, Json>>,
     context: Context,
     reactiveAuth?: Uint8Array,
@@ -398,7 +398,7 @@ export interface SkipService {
    * @param context {Context} - the reactive graph context
    * @returns - the reactive collections accessible by the resources
    */
-  reactiveCompute(
+  createGraph(
     inputCollections: Record<string, EagerCollection<Json, Json>>,
     context: Context,
   ): Record<string, EagerCollection<Json, Json>>;
