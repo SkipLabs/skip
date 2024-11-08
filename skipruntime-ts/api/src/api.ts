@@ -143,13 +143,6 @@ export interface NonEmptyIterator<T> extends Iterable<T> {
   toArray(): T[];
 
   /**
-   * Performs the specified action for each element in the iterator.
-   * @param f - A callback to invoke on each element
-   * @param thisObj - An object to bind as `this` within the `f` invocations
-   */
-  forEach(f: (value: T, index: number) => void, thisObj?: any): void;
-
-  /**
    * Calls a defined callback function on each element of an array, and returns an array
    * containing the results.
    * @param f - A function to apply to each element

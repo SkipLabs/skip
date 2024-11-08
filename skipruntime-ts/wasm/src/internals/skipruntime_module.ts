@@ -1593,16 +1593,6 @@ class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
     };
   }
 
-  forEach(f: (value: T, index: number) => void, thisObj?: any): void {
-    let value = this.next();
-    let index = 0;
-    while (value != null) {
-      f.apply(thisObj, [value, index]);
-      value = this.next();
-      index++;
-    }
-  }
-
   map<U>(f: (value: T, index: number) => U, thisObj?: any): U[] {
     return this.toArray().map(f, thisObj);
   }
