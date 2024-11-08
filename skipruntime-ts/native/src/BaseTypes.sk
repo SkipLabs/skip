@@ -10,10 +10,10 @@ base class KeyConverter {
   fun fromJSON(json: SKJSON.CJSON): SKStore.Key;
 }
 
-base class Accumulator<V1: frozen, V2: frozen>(default: V2) {
+base class Reducer<V1: frozen, V2: frozen>(default: V2) {
   fun getType(): SKStore.File ~> V2;
-  fun accumulate(acc: V2, value: V1): V2;
-  fun dismiss(cumul: V2, value: V1): ?V2;
+  fun add(acc: V2, value: V1): V2;
+  fun remove(acc: V2, value: V1): ?V2;
 }
 
 /**
@@ -28,7 +28,7 @@ base class Mapper {
   fun getKeyConverter(): KeyConverter;
   fun getFileConverter(): FileConverter;
 
-  fun mapElement(
+  fun mapEntry(
     key: SKJSON.CJSON,
     values: mutable SKStore.NonEmptyIterator<SKJSON.CJSON>,
   ): mutable Iterator<(SKJSON.CJSON, SKJSON.CJSON)>;
@@ -71,7 +71,7 @@ base class ExternalService {
 }
 
 base class Resource {
-  fun reactiveCompute(
+  fun instantiate(
     collections: Map<String, Collection>,
     reactiveAuth: ?Array<UInt8>,
   ): Collection;
@@ -86,7 +86,7 @@ base class Service(
   resources: Map<String, ResourceBuilder>,
   remoteCollections: Map<String, ExternalService> = Map[],
 ) {
-  fun reactiveCompute(
+  fun createGraph(
     inputCollections: Map<String, Collection>,
   ): Map<String, Collection>;
 }

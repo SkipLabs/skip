@@ -1,44 +1,44 @@
-import type { Opt } from "@skip-wasm/std";
+import type { Nullable } from "@skip-wasm/std";
 import { ManyToOneMapper } from "@skipruntime/api";
 import type {
-  Accumulator,
+  Reducer,
   NonEmptyIterator,
   ReactiveResponse,
   Json,
 } from "@skipruntime/api";
 
-export class Sum implements Accumulator<number, number> {
+export class Sum implements Reducer<number, number> {
   default = 0;
 
-  accumulate(acc: number, value: number): number {
+  add(acc: number, value: number): number {
     return acc + value;
   }
 
-  dismiss(acc: number, value: number): Opt<number> {
+  remove(acc: number, value: number): Nullable<number> {
     return acc - value;
   }
 }
 
-export class Min implements Accumulator<number, number> {
+export class Min implements Reducer<number, number> {
   default = null;
 
-  accumulate(acc: Opt<number>, value: number): number {
+  add(acc: Nullable<number>, value: number): number {
     return acc === null ? value : Math.min(acc, value);
   }
 
-  dismiss(acc: number, value: number): Opt<number> {
+  remove(acc: number, value: number): Nullable<number> {
     return value > acc ? acc : null;
   }
 }
 
-export class Max implements Accumulator<number, number> {
+export class Max implements Reducer<number, number> {
   default = null;
 
-  accumulate(acc: Opt<number>, value: number): number {
+  add(acc: Nullable<number>, value: number): number {
     return acc === null ? value : Math.max(acc, value);
   }
 
-  dismiss(acc: number, value: number): Opt<number> {
+  remove(acc: number, value: number): Nullable<number> {
     return value < acc ? acc : null;
   }
 }

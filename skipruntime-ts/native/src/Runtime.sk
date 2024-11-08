@@ -37,27 +37,27 @@ class Handle(
   value: SKStore.EHandle<SKStore.Key, SKStore.File>,
 ) extends SKStore.File
 
-class ConvAccumulator(
+class ConvReducer(
   private fileConverter: FileConverter,
   private accConverter: FileConverter,
-  private accumulator: Accumulator<SKJSON.CJSON, SKJSON.CJSON>,
-) extends Accumulator<SKStore.File, SKStore.File> {
+  private reducer: Reducer<SKJSON.CJSON, SKJSON.CJSON>,
+) extends Reducer<SKStore.File, SKStore.File> {
   fun getType(): SKStore.File ~> SKStore.File {
     f ~> f
   }
 
-  fun accumulate(acc: SKStore.File, value: SKStore.File): SKStore.File {
+  fun add(acc: SKStore.File, value: SKStore.File): SKStore.File {
     this.accConverter.fromJSON(
-      this.accumulator.accumulate(
+      this.reducer.add(
         this.accConverter.toJSON(acc),
         this.fileConverter.toJSON(value),
       ),
     );
   }
 
-  fun dismiss(cumul: SKStore.File, value: SKStore.File): ?SKStore.File {
-    this.accumulator.dismiss(
-      this.accConverter.toJSON(cumul),
+  fun remove(acc: SKStore.File, value: SKStore.File): ?SKStore.File {
+    this.reducer.remove(
+      this.accConverter.toJSON(acc),
       this.fileConverter.toJSON(value),
     ).map(this.accConverter.fromJSON)
   }
@@ -278,7 +278,7 @@ fun initService(service: Service): Result<void, .Exception> {
           try {
             writer.set(
               SKStore.SID(it.first.value),
-              ServiceFile(service.reactiveCompute(inputCollections)),
+              ServiceFile(service.createGraph(inputCollections)),
             );
             popContext()
           } catch {
@@ -414,7 +414,7 @@ fun initService(service: Service): Result<void, .Exception> {
                   serviceCollections
                     .get(context, SKStore.SID(session))
                     .value.each((k, c) -> allCollections.set(k, c));
-                  collection = resource.reactiveCompute(
+                  collection = resource.instantiate(
                     allCollections.chill(),
                     key.reactiveAuth,
                   );
@@ -563,7 +563,7 @@ class CloseResource(
  * @param params - any additional parameters to the computation
  * @returns The resulting lazy collection
  */
-fun lazy(compute: LazyCompute): LazyCollection {
+fun createLazyCollection(compute: LazyCompute): LazyCollection {
   getContext() match {
   | Some(context) ->
     collectionId = `collection_${SKStore.genSym(0)}`;
@@ -745,10 +745,9 @@ class Collection(
    * If multiple values are mapped to by the key, any of them can be returned.
    * @returns the value for this `key`, or null if no such value exists
    */
-  fun maybeGetOne(key: SKJSON.CJSON): ?SKJSON.CJSON {
+  fun getUnique(key: SKJSON.CJSON): ?SKJSON.CJSON {
     value = this.getArray(key);
-    if (value.isEmpty()) return None();
-    Some(value[0])
+    if (value.size() == 1) Some(value[0]) else None();
   }
 
   /**
@@ -762,14 +761,14 @@ class Collection(
 
   /**
    * Create a new eager reactive collection by mapping some computation `mapper` over this
-   * one and then reducing the results with `accumulator`
+   * one and then reducing the results with `reducer`
    * @param mapper - function to apply to each element of this collection
-   * @param accumulator - function to combine results of the `mapper`
-   * @returns An eager collection containing the output of the accumulator
+   * @param reducer - function to combine results of the `mapper`
+   * @returns An eager collection containing the output of the reducer
    */
   fun mapReduce(
     mapper: Mapper,
-    accumulator: Accumulator<SKJSON.CJSON, SKJSON.CJSON>,
+    reducer: Reducer<SKJSON.CJSON, SKJSON.CJSON>,
     accConverter: FileConverter,
   ): Collection {
     getContext() match {
@@ -786,7 +785,7 @@ class Collection(
         (ctx, writer, key, values) ~> {
           pushContext(ctx);
           try {
-            for (entry in mapper.mapElement(
+            for (entry in mapper.mapEntry(
               keyConverter.toJSON(key),
               values.map(fileConverter.toJSON),
             )) {
@@ -803,11 +802,11 @@ class Collection(
           }
         },
         accReducer(
-          ConvAccumulator(
+          ConvReducer(
             fileConverter,
             accConverter,
-            accumulator,
-            accConverter.fromJSON(accumulator.default),
+            reducer,
+            accConverter.fromJSON(reducer.default),
           ),
         ),
       );
@@ -973,7 +972,7 @@ class Collection(
         (ctx, writer, key, values) ~> {
           pushContext(ctx);
           try {
-            for (entry in mapper.mapElement(
+            for (entry in mapper.mapEntry(
               keyConverter.toJSON(key),
               values.map(fileConverter.toJSON),
             )) {
@@ -1041,26 +1040,11 @@ class LazyCollection(
    * Get (and potentially compute) a value of a lazy reactive collection.
    * @throws {Error} when either zero or multiple such values exist
    */
-  fun getOne(key: SKJSON.CJSON): SKJSON.CJSON {
+  fun getUnique(key: SKJSON.CJSON): SKJSON.CJSON {
     getContext() match {
     | Some(context) ->
       this.fileConverter.toJSON(
         this.hdl.get(context, this.keyConverter.fromJSON(key)),
-      )
-    | _ -> invariant_violation("Store context must be specified.")
-    }
-  }
-
-  /**
-   * Get (and potentially compute) a value of a lazy reactive collection, if one exists.
-   * If multiple values are mapped to by the key, any of them can be returned.
-   * @returns the value for this `key`, or null if no such value exists
-   */
-  fun maybeGetOne(key: SKJSON.CJSON): ?SKJSON.CJSON {
-    getContext() match {
-    | Some(context) ->
-      this.hdl.maybeGet(context, this.keyConverter.fromJSON(key)).map(
-        this.fileConverter.toJSON,
       )
     | _ -> invariant_violation("Store context must be specified.")
     }

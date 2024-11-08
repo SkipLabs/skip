@@ -1,4 +1,4 @@
-import type { Opaque, Opt, int, Constant } from "./internals.js";
+import type { Opaque, Nullable, int, Constant } from "./internals.js";
 
 /**
  * This file contains the Skip Runtime public API: types, interfaces, and operations that can
@@ -12,8 +12,8 @@ import type { Opaque, Opt, int, Constant } from "./internals.js";
  * reactive computation engine.
  */
 // Replicate definition of Json from skjson to avoid a dependency
-export type Json = number | boolean | string | JsonObject | (Json | null)[];
-export type JsonObject = { [key: string]: Json | null };
+export type Json = number | boolean | string | JsonObject | Nullable<Json>[];
+export type JsonObject = { [key: string]: Nullable<Json> };
 
 /**
  * A `Param` is a valid parameter to a Skip runtime mapper function: either a constant JS
@@ -47,7 +47,7 @@ export interface Mapper<
   K2 extends Json,
   V2 extends Json,
 > {
-  mapElement(key: K1, values: NonEmptyIterator<V1>): Iterable<[K2, V2]>;
+  mapEntry(key: K1, values: NonEmptyIterator<V1>): Iterable<[K2, V2]>;
 }
 
 /**
@@ -55,7 +55,7 @@ export interface Mapper<
  * input collection's key structure in the output collection. Use this form
  * to map each value associated with a key to an output value for that
  * key. This saves some boilerplate: instead of writing the fully general
- * `mapElement` that potentially modifies, adds, or removes keys, just
+ * `mapEntry` that potentially modifies, adds, or removes keys, just
  * implement the simpler `mapValue` to transform individual values.
  */
 export abstract class OneToOneMapper<
@@ -66,7 +66,7 @@ export abstract class OneToOneMapper<
 {
   abstract mapValue(value: V1, key: K): V2;
 
-  mapElement(key: K, values: NonEmptyIterator<V1>): Iterable<[K, V2]> {
+  mapEntry(key: K, values: NonEmptyIterator<V1>): Iterable<[K, V2]> {
     return values.toArray().map((v) => [key, this.mapValue(v, key)]);
   }
 }
@@ -76,7 +76,7 @@ export abstract class OneToOneMapper<
  * input collection's key structure in the output collection. Use this form
  * to map all the values associated with a key to a single output value for
  * that key. This saves some boilerplate: instead of writing the fully
- * general `mapElement` that potentially modifies, adds, or removes keys,
+ * general `mapEntry` that potentially modifies, adds, or removes keys,
  * just implement the simpler `mapValues` to transform the values associated
  * with each key.
  */
@@ -88,24 +88,24 @@ export abstract class ManyToOneMapper<
 {
   abstract mapValues(values: NonEmptyIterator<V1>, key: K): V2;
 
-  mapElement(key: K, values: NonEmptyIterator<V1>): Iterable<[K, V2]> {
+  mapEntry(key: K, values: NonEmptyIterator<V1>): Iterable<[K, V2]> {
     return [[key, this.mapValues(values, key)]];
   }
 }
 
 /**
- * The type of a reactive accumulator (a.k.a. reducer) function, which computes an output
- * value over a collection as values are added/removed to the collection
+ * The type of a reactive reducer function, which computes an output
+ * value over a collection as values are added/removed
  */
-export interface Accumulator<T extends Json, V extends Json> {
-  default: Opt<V>;
+export interface Reducer<T extends Json, V extends Json> {
+  default: Nullable<V>;
   /**
    * The computation to perform when an input value is added
    * @param acc - the current accumulated value
    * @param value - the added value
    * @returns the resulting accumulated value
    */
-  accumulate(acc: Opt<V>, value: T): V;
+  add(acc: Nullable<V>, value: T): V;
 
   /**
    * The computation to perform when an input value is removed
@@ -113,8 +113,13 @@ export interface Accumulator<T extends Json, V extends Json> {
    * @param value - the removed value
    * @returns the resulting accumulated value
    */
-  dismiss(acc: V, value: T): Opt<V>;
+  remove(acc: V, value: T): Nullable<V>;
 }
+
+/**
+ * An exception indicating that `getUnique` was called on a structure without a unique element
+ */
+export class NonUniqueValueException extends Error {}
 
 /**
  * A mutable iterator with at least one element
@@ -124,30 +129,18 @@ export interface NonEmptyIterator<T> extends Iterable<T> {
    * Return the next element of the iteration.
    * `first` cannot be called after `next`
    */
-  next(): Opt<T>;
+  next(): Nullable<T>;
 
   /**
-   * Returns the first element of the iteration.
-   * @throws {Error} when called after `next`
+   * Return the first element of the iteration iff it contains exactly one element.
+   * Otherwise, throw a `NonUniqueValueException`.
    */
-  first(): T;
-
-  /**
-   * Returns the first element of the iteration iff it contains exactly one element
-   */
-  uniqueValue(): Opt<T>;
+  getUnique(): T;
 
   /**
    * Returns an array containing all values of the iterator
    */
   toArray(): T[];
-
-  /**
-   * Performs the specified action for each element in the iterator.
-   * @param f - A callback to invoke on each element
-   * @param thisObj - An object to bind as `this` within the `f` invocations
-   */
-  forEach(f: (value: T, index: number) => void, thisObj?: any): void;
 
   /**
    * Calls a defined callback function on each element of an array, and returns an array
@@ -164,23 +157,15 @@ export interface NonEmptyIterator<T> extends Iterable<T> {
 export interface LazyCollection<K extends Json, V extends Json>
   extends Constant {
   /**
-   * Get (and potentially compute) all values mapped to by some key of a lazy reactive
-   * collection.
+   * Get (and potentially compute) all values mapped to by some key.
    */
   getArray(key: K): V[];
 
   /**
-   * Get (and potentially compute) a value of a lazy reactive collection.
-   * @throws {Error} when either zero or multiple such values exist
+   * Get (and potentially compute) the singleton value mapped to by some key.
+   * @throws {NonUniqueValueException} when the key maps to either zero or multiple values
    */
-  getOne(key: K): V;
-
-  /**
-   * Get (and potentially compute) a value of a lazy reactive collection, if one exists.
-   * If multiple values are mapped to by the key, any of them can be returned.
-   * @returns the value for this `key`, or null if no such value exists
-   */
-  maybeGetOne(key: K): Opt<V>;
+  getUnique(key: K): V;
 }
 
 /**
@@ -190,17 +175,16 @@ export interface LazyCollection<K extends Json, V extends Json>
 export interface EagerCollection<K extends Json, V extends Json>
   extends Constant {
   /**
-   * Get (and potentially compute) all values mapped to by some key of a lazy reactive
-   * collection.
+   * Get all values mapped to by some key.
    */
   getArray(key: K): V[];
 
   /**
-   * Get a value of an eager reactive collection, if one exists.
-   * If multiple values are mapped to by the key, any of them can be returned.
-   * @returns the value for this `key`, or null if no such value exists
+   * Get the singleton value mapped to by some key.
+   * @throws {NonUniqueValueException} when the key maps to either zero or multiple values
    */
-  maybeGetOne(key: K): Opt<V>;
+  getUnique(key: K): V;
+
   /**
    * Create a new eager collection by mapping some computation over this one
    * @param mapper - function to apply to each element of this collection
@@ -213,21 +197,21 @@ export interface EagerCollection<K extends Json, V extends Json>
 
   /**
    * Create a new eager reactive collection by mapping some computation `mapper` over this
-   * one and then reducing the results with `accumulator`
+   * one and then reducing the results with `reducer`
    * @param mapper - function to apply to each element of this collection
-   * @param accumulator - function to combine results of the `mapper`
-   * @returns An eager collection containing the output of the accumulator
+   * @param reducer - function to combine results of the `mapper`
+   * @returns An eager collection containing the output of the reducer
    */
   mapReduce<
     K2 extends Json,
     V2 extends Json,
-    V3 extends Json,
+    Acc extends Json,
     Params extends Param[],
   >(
     mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
-    accumulator: Accumulator<V2, V3>,
+    reducer: Reducer<V2, Acc>,
     ...params: Params
-  ): EagerCollection<K2, V3>;
+  ): EagerCollection<K2, Acc>;
 
   /**
    * Create a new eager collection by keeping only the elements whose keys are in
@@ -258,7 +242,7 @@ export interface EagerCollection<K extends Json, V extends Json>
  * The type of a _lazy_ reactive function which produces a value for some `key`, possibly using a `self` reference to get/produce other lazily-computed results.
  */
 export interface LazyCompute<K extends Json, V extends Json> {
-  compute(self: LazyCollection<K, V>, key: K): Opt<V>;
+  compute(self: LazyCollection<K, V>, key: K): Nullable<V>;
 }
 
 export interface Context extends Constant {
@@ -268,23 +252,23 @@ export interface Context extends Constant {
    * @param params - any additional parameters to the computation
    * @returns The resulting lazy collection
    */
-  lazy<K extends Json, V extends Json, Params extends Param[]>(
+  createLazyCollection<K extends Json, V extends Json, Params extends Param[]>(
     compute: new (...params: Params) => LazyCompute<K, V>,
     ...params: Params
   ): LazyCollection<K, V>;
 
   /**
    * Call an external service to manage an external resource
-   * @param service - the object configuring the external service
-   * @param service.supplier - the name of the external supplier, which must correspond to a key inthe `externalServices` field of the `SkipService` this `Context` belongs to
-   * @param service.resource - the resource name managed by the supplier
-   * @param service.params - the parameters to supply to the resource
-   * @param service.reactiveAuth - the caller client user Skip session authentication
-   * @returns The reactive collection of the external resource
+   * @param resource - the object configuring the external resource
+   * @param resource.service - the name of the external service, which must correspond to a key in the `externalServices` field of the `SkipService` this `Context` belongs to
+   * @param resource.identifier - the resource identifier managed by the service
+   * @param resource.params - the parameters to supply to the resource
+   * @param resource.reactiveAuth - the caller client user Skip session authentication
+   * @returns An eager reactive collection of the external resource
    */
-  useExternalResource<K extends Json, V extends Json>(service: {
-    supplier: string;
-    resource: string;
+  useExternalResource<K extends Json, V extends Json>(resource: {
+    service: string;
+    identifier: string;
     params?: Record<string, string | number>;
     reactiveAuth?: Uint8Array;
   }): EagerCollection<K, V>;
@@ -379,12 +363,12 @@ export interface ExternalService {
  */
 export interface Resource {
   /**
-   * Build a reactive compute graph of the reactive ressource
-   * @param collections - the collection returned by SkipService reactiveCompute
+   * Build a reactive compute graph of the reactive resource
+   * @param collections - the collections returned by SkipService's `createGraph`
    * @param context {Context} - the reactive graph context
    * @param reactiveAuth - the client user Skip session authentication
    */
-  reactiveCompute(
+  instantiate(
     collections: Record<string, EagerCollection<Json, Json>>,
     context: Context,
     reactiveAuth?: Uint8Array,
@@ -405,7 +389,7 @@ export interface SkipService {
    * @param context {Context} - the reactive graph context
    * @returns - the reactive collections accessible by the resources
    */
-  reactiveCompute(
+  createGraph(
     inputCollections: Record<string, EagerCollection<Json, Json>>,
     context: Context,
   ): Record<string, EagerCollection<Json, Json>>;

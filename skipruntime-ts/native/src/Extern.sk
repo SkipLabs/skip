@@ -51,9 +51,9 @@ fun cloneOfNonEmptyIterator(
 
 /************  Mapper ****************/
 
-@cpp_extern("SkipRuntime_Mapper__mapElement")
+@cpp_extern("SkipRuntime_Mapper__mapEntry")
 @debug
-native fun mapElementOfMapper(
+native fun mapEntryOfMapper(
   mapper: UInt32,
   key: SKJSON.CJSON,
   values: mutable SKStore.NonEmptyIterator<SKJSON.CJSON>,
@@ -77,11 +77,11 @@ class ExternMapper(eptr: SKStore.ExternalPointer) extends Mapper {
     JSONFileConverter()
   }
 
-  fun mapElement(
+  fun mapEntry(
     key: SKJSON.CJSON,
     values: mutable SKStore.NonEmptyIterator<SKJSON.CJSON>,
   ): mutable Iterator<(SKJSON.CJSON, SKJSON.CJSON)> {
-    mapElementOfMapper(this.eptr.value, key, values) match {
+    mapEntryOfMapper(this.eptr.value, key, values) match {
     | SKJSON.CJArray(vals) ->
       vals
         .map(e ->
@@ -254,9 +254,9 @@ fun errorOfCollectionWriter(collection: String, error: SKJSON.CJSON): Float {
 
 /************  Resource ****************/
 
-@cpp_extern("SkipRuntime_Resource__reactiveCompute")
+@cpp_extern("SkipRuntime_Resource__instantiate")
 @debug
-native fun reactiveComputeOfResource(
+native fun instantiateOfResource(
   resource: UInt32,
   collections: SKJSON.CJObject,
   reactiveAuth: ?Array<UInt8>,
@@ -272,11 +272,11 @@ fun createResource(resource: UInt32): ExternResource {
 }
 
 class ExternResource(eptr: SKStore.ExternalPointer) extends Resource {
-  fun reactiveCompute(
+  fun instantiate(
     collections: Map<String, Collection>,
     reactiveAuth: ?Array<UInt8>,
   ): Collection {
-    collectionName = reactiveComputeOfResource(
+    collectionName = instantiateOfResource(
       this.eptr.value,
       collectionsByName(collections),
       reactiveAuth,
@@ -379,22 +379,17 @@ fun createService(
 @debug
 native fun deleteService(service: UInt32): void;
 
-@cpp_extern("SkipRuntime_Service__reactiveCompute")
+@cpp_extern("SkipRuntime_Service__createGraph")
 @debug
-native fun reactiveComputeOfService(
+native fun createGraphOfService(
   resource: UInt32,
   collections: SKJSON.CJObject,
 ): SKJSON.CJObject;
 
 class ExternService(eptr: SKStore.ExternalPointer) extends Service {
   //
-  fun reactiveCompute(
-    inputs: Map<String, Collection>,
-  ): Map<String, Collection> {
-    names = reactiveComputeOfService(
-      this.eptr.value,
-      collectionsByName(inputs),
-    );
+  fun createGraph(inputs: Map<String, Collection>): Map<String, Collection> {
+    names = createGraphOfService(this.eptr.value, collectionsByName(inputs));
     map = mutable Map[];
     names match {
     | SKJSON.CJObject(nfields) ->
@@ -447,13 +442,12 @@ fun getArrayOfCollection(
 ): SKJSON.CJArray {
   SKJSON.CJArray(collectionForName(collection).getArray(key))
 }
-
-@export("SkipRuntime_Collection__maybeGetOne")
-fun maybeGetOneOfCollection(
+@export("SkipRuntime_Collection__getUnique")
+fun getUniqueOfCollection(
   collection: String,
   key: SKJSON.CJSON,
 ): ?SKJSON.CJSON {
-  collectionForName(collection).maybeGetOne(key)
+  collectionForName(collection).getUnique(key)
 }
 
 @export("SkipRuntime_Collection__map")
@@ -465,10 +459,10 @@ fun mapOfCollection(collection: String, mapper: Mapper): String {
 fun mapReduceOfCollection(
   collection: String,
   mapper: Mapper,
-  accumulator: JSONAccumulator,
+  reducer: JSONReducer,
 ): String {
   collectionForName(collection)
-    .mapReduce(mapper, accumulator, JSONFileConverter())
+    .mapReduce(mapper, reducer, JSONFileConverter())
     .getId()
 }
 
@@ -515,18 +509,9 @@ fun sizeOfCollection(collection: String): Int {
 fun getArrayOfLazyCollection(lazy: String, key: SKJSON.CJSON): SKJSON.CJArray {
   SKJSON.CJArray(lazyForName(lazy).getArray(key))
 }
-
-@export("SkipRuntime_LazyCollection__maybeGetOne")
-fun maybeGetOneOfLazyCollection(
-  lazy: String,
-  key: SKJSON.CJSON,
-): ?SKJSON.CJSON {
-  lazyForName(lazy).maybeGetOne(key)
-}
-
-@export("SkipRuntime_LazyCollection__getOne")
-fun getOneOfLazyCollection(lazy: String, key: SKJSON.CJSON): SKJSON.CJSON {
-  lazyForName(lazy).getOne(key)
+@export("SkipRuntime_LazyCollection__getUnique")
+fun getUniqueOfLazyCollection(lazy: String, key: SKJSON.CJSON): SKJSON.CJSON {
+  lazyForName(lazy).getUnique(key)
 }
 
 /************  Notifier ****************/
@@ -566,52 +551,46 @@ class Notifier(eptr: SKStore.ExternalPointer) {
   }
 }
 
-/************  Accumulator ****************/
+/************  Reducer ****************/
 
-@cpp_extern("SkipRuntime_Accumulator__accumulate")
+@cpp_extern("SkipRuntime_Reducer__add")
 @debug
-native fun accumulateOfAccumulator(
-  accumulator: UInt32,
+native fun addOfReducer(
+  reducer: UInt32,
   acc: SKJSON.CJSON,
   value: SKJSON.CJSON,
 ): SKJSON.CJSON;
 
-@cpp_extern("SkipRuntime_Accumulator__dismiss")
+@cpp_extern("SkipRuntime_Reducer__remove")
 @debug
-native fun dismissOfAccumulator(
-  accumulator: UInt32,
-  cumul: SKJSON.CJSON,
+native fun removeOfReducer(
+  reducer: UInt32,
+  acc: SKJSON.CJSON,
   value: SKJSON.CJSON,
 ): ?SKJSON.CJSON;
 
-@cpp_extern("SkipRuntime_deleteAccumulator")
+@cpp_extern("SkipRuntime_deleteReducer")
 @debug
-native fun deleteAccumulator(accumulator: UInt32): void;
+native fun deleteReducer(reducer: UInt32): void;
 
-@export("SkipRuntime_createAccumulator")
-fun createAccumulator(
-  accumulator: UInt32,
-  default: SKJSON.CJSON,
-): JSONAccumulator {
-  JSONAccumulator(
-    SKStore.ExternalPointer::create(accumulator, deleteAccumulator),
-    default,
-  )
+@export("SkipRuntime_createReducer")
+fun createReducer(reducer: UInt32, default: SKJSON.CJSON): JSONReducer {
+  JSONReducer(SKStore.ExternalPointer::create(reducer, deleteReducer), default)
 }
 
-class JSONAccumulator(
+class JSONReducer(
   eptr: SKStore.ExternalPointer,
-) extends Accumulator<SKJSON.CJSON, SKJSON.CJSON> {
+) extends Reducer<SKJSON.CJSON, SKJSON.CJSON> {
   fun getType(): SKStore.File ~> SKJSON.CJSON {
     f ~> JSONFile::type(f).value
   }
 
-  fun accumulate(acc: SKJSON.CJSON, value: SKJSON.CJSON): SKJSON.CJSON {
-    accumulateOfAccumulator(this.eptr.value, acc, value)
+  fun add(acc: SKJSON.CJSON, value: SKJSON.CJSON): SKJSON.CJSON {
+    addOfReducer(this.eptr.value, acc, value)
   }
 
-  fun dismiss(cumul: SKJSON.CJSON, value: SKJSON.CJSON): ?SKJSON.CJSON {
-    dismissOfAccumulator(this.eptr.value, cumul, value)
+  fun remove(acc: SKJSON.CJSON, value: SKJSON.CJSON): ?SKJSON.CJSON {
+    removeOfReducer(this.eptr.value, acc, value)
   }
 }
 
@@ -829,9 +808,9 @@ fun updateOfRuntime(input: String, values: SKJSON.CJArray): Float {
 
 /************ Context ****************/
 
-@export("SkipRuntime_Context__lazy")
+@export("SkipRuntime_Context__createLazyCollection")
 fun lazyOfContext(compute: LazyCompute): String {
-  lazy(compute).getId()
+  createLazyCollection(compute).getId()
 }
 
 @export("SkipRuntime_Context__jsonExtract")
@@ -844,14 +823,14 @@ fun jsonExtractOfContext(
 
 @export("SkipRuntime_Context__useExternalResource")
 fun useExternalResource(
-  supplier: String,
-  resource: String,
+  service: String,
+  identifier: String,
   jsonparams: SKJSON.CJObject,
   reactiveAuth: ?Array<UInt8>,
 ): String {
   useExternalCollection(
-    supplier,
-    resource,
+    service,
+    identifier,
     params(jsonparams),
     reactiveAuth,
   ).getId()

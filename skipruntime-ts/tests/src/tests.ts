@@ -15,7 +15,7 @@ import type {
   ExternalService,
   ReactiveResponse,
 } from "@skipruntime/api";
-import { OneToOneMapper } from "@skipruntime/api";
+import { NonUniqueValueException, OneToOneMapper } from "@skipruntime/api";
 import { Sum } from "@skipruntime/helpers";
 import {
   TimerResource,
@@ -53,16 +53,16 @@ interface ServiceInstance {
 //// testMap1
 
 class Map1 implements Mapper<string, number, string, number> {
-  mapElement(
+  mapEntry(
     key: string,
     values: NonEmptyIterator<number>,
   ): Iterable<[string, number]> {
-    return Array([key, values.first() + 2]);
+    return Array([key, values.getUnique() + 2]);
   }
 }
 
 class Map1Resource implements Resource {
-  reactiveCompute(collections: {
+  instantiate(collections: {
     input: EagerCollection<string, number>;
   }): EagerCollection<string, number> {
     return collections.input.map(Map1);
@@ -73,9 +73,7 @@ class Map1Service implements SkipService {
   initialData = { input: [] };
   resources = { map1: Map1Resource };
 
-  reactiveCompute(inputCollections: {
-    input: EagerCollection<number, number>;
-  }) {
+  createGraph(inputCollections: { input: EagerCollection<number, number> }) {
     return inputCollections;
   }
 }
@@ -85,7 +83,7 @@ class Map1Service implements SkipService {
 class Map2 implements Mapper<string, number, string, number> {
   constructor(private other: EagerCollection<string, number>) {}
 
-  mapElement(
+  mapEntry(
     key: string,
     values: NonEmptyIterator<number>,
   ): Iterable<[string, number]> {
@@ -101,7 +99,7 @@ class Map2 implements Mapper<string, number, string, number> {
 }
 
 class Map2Resource implements Resource {
-  reactiveCompute(collections: {
+  instantiate(collections: {
     input1: EagerCollection<string, number>;
     input2: EagerCollection<string, number>;
   }): EagerCollection<string, number> {
@@ -113,7 +111,7 @@ class Map2Service implements SkipService {
   initialData = { input1: [], input2: [] };
   resources = { map2: Map2Resource };
 
-  reactiveCompute(inputCollections: {
+  createGraph(inputCollections: {
     input1: EagerCollection<string, number>;
     input2: EagerCollection<string, number>;
   }) {
@@ -124,7 +122,7 @@ class Map2Service implements SkipService {
 //// testMap3
 
 class Map3 implements Mapper<string, number, string, number> {
-  mapElement(
+  mapEntry(
     key: string,
     values: NonEmptyIterator<number>,
   ): Iterable<[string, number]> {
@@ -133,7 +131,7 @@ class Map3 implements Mapper<string, number, string, number> {
 }
 
 class Map3Resource implements Resource {
-  reactiveCompute(cs: {
+  instantiate(cs: {
     input1: EagerCollection<string, number>;
     input2: EagerCollection<string, number>;
   }): EagerCollection<string, number> {
@@ -145,7 +143,7 @@ class Map3Service implements SkipService {
   initialData = { input1: [], input2: [] };
   resources = { map3: Map3Resource };
 
-  reactiveCompute(inputCollections: {
+  createGraph(inputCollections: {
     input1: EagerCollection<number, number>;
     input2: EagerCollection<number, number>;
   }) {
@@ -168,7 +166,7 @@ class AddKeyAndValue extends OneToOneMapper<number, number, number> {
 }
 
 class OneToOneMapperResource implements Resource {
-  reactiveCompute(cs: {
+  instantiate(cs: {
     input: EagerCollection<number, number>;
   }): EagerCollection<number, number> {
     return cs.input.map(SquareValues).map(AddKeyAndValue);
@@ -179,9 +177,7 @@ class OneToOneMapperService implements SkipService {
   initialData = { input: [] };
   resources = { valueMapper: OneToOneMapperResource };
 
-  reactiveCompute(inputCollections: {
-    input: EagerCollection<number, number>;
-  }) {
+  createGraph(inputCollections: { input: EagerCollection<number, number> }) {
     return inputCollections;
   }
 }
@@ -191,16 +187,16 @@ class OneToOneMapperService implements SkipService {
 class SizeMapper implements Mapper<number, number, number, number> {
   constructor(private other: EagerCollection<number, number>) {}
 
-  mapElement(
+  mapEntry(
     key: number,
     values: NonEmptyIterator<number>,
   ): Iterable<[number, number]> {
-    return [[key, values.first() + this.other.size()]];
+    return [[key, values.getUnique() + this.other.size()]];
   }
 }
 
 class SizeResource implements Resource {
-  reactiveCompute(cs: {
+  instantiate(cs: {
     input1: EagerCollection<number, number>;
     input2: EagerCollection<number, number>;
   }): EagerCollection<number, number> {
@@ -212,7 +208,7 @@ class SizeService implements SkipService {
   initialData = { input1: [], input2: [] };
   resources = { size: SizeResource };
 
-  reactiveCompute(inputCollections: {
+  createGraph(inputCollections: {
     input1: EagerCollection<number, number>;
     input2: EagerCollection<number, number>;
   }) {
@@ -223,7 +219,7 @@ class SizeService implements SkipService {
 //// testSlicedMap1
 
 class SlicedMap1Resource implements Resource {
-  reactiveCompute(cs: {
+  instantiate(cs: {
     input: EagerCollection<number, number>;
   }): EagerCollection<number, number> {
     return cs.input
@@ -248,9 +244,7 @@ class SlicedMap1Service implements SkipService {
   initialData = { input: [] };
   resources = { slice: SlicedMap1Resource };
 
-  reactiveCompute(inputCollections: {
-    input: EagerCollection<number, number>;
-  }) {
+  createGraph(inputCollections: { input: EagerCollection<number, number> }) {
     return inputCollections;
   }
 }
@@ -260,34 +254,30 @@ class SlicedMap1Service implements SkipService {
 class TestLazyAdd implements LazyCompute<number, number> {
   constructor(private other: EagerCollection<number, number>) {}
 
-  compute(
-    _selfHdl: LazyCollection<number, number>,
-    key: number,
-  ): number | null {
-    const v = this.other.maybeGetOne(key);
-    return (v ?? 0) + 2;
+  compute(_selfHdl: LazyCollection<number, number>, key: number): number {
+    return this.other.getUnique(key) + 2;
   }
 }
 
 class MapLazy implements Mapper<number, number, number, number> {
   constructor(private other: LazyCollection<number, number>) {}
 
-  mapElement(
+  mapEntry(
     key: number,
     values: NonEmptyIterator<number>,
   ): Iterable<[number, number]> {
-    return Array([key, this.other.getOne(key) - values.first()]);
+    return Array([key, this.other.getUnique(key) - values.getUnique()]);
   }
 }
 
 class LazyResource implements Resource {
-  reactiveCompute(
+  instantiate(
     cs: {
       input: EagerCollection<number, number>;
     },
     context: Context,
   ): EagerCollection<number, number> {
-    const lazy = context.lazy(TestLazyAdd, cs.input);
+    const lazy = context.createLazyCollection(TestLazyAdd, cs.input);
     return cs.input.map(MapLazy, lazy);
   }
 }
@@ -296,9 +286,7 @@ class LazyService implements SkipService {
   initialData = { input: [] };
   resources = { lazy: LazyResource };
 
-  reactiveCompute(inputCollections: {
-    input: EagerCollection<number, number>;
-  }) {
+  createGraph(inputCollections: { input: EagerCollection<number, number> }) {
     return inputCollections;
   }
 }
@@ -306,16 +294,16 @@ class LazyService implements SkipService {
 //// testMapReduce
 
 class TestOddEven implements Mapper<number, number, number, number> {
-  mapElement(
+  mapEntry(
     key: number,
     values: NonEmptyIterator<number>,
   ): Iterable<[number, number]> {
-    return Array([key % 2, values.first()]);
+    return Array([key % 2, values.getUnique()]);
   }
 }
 
 class MapReduceResource implements Resource {
-  reactiveCompute(cs: {
+  instantiate(cs: {
     input: EagerCollection<number, number>;
   }): EagerCollection<number, number> {
     return cs.input.mapReduce(TestOddEven, new Sum());
@@ -326,9 +314,7 @@ class MapReduceService implements SkipService {
   initialData = { input: [] };
   resources = { mapReduce: MapReduceResource };
 
-  reactiveCompute(inputCollections: {
-    input: EagerCollection<number, number>;
-  }) {
+  createGraph(inputCollections: { input: EagerCollection<number, number> }) {
     return inputCollections;
   }
 }
@@ -336,7 +322,7 @@ class MapReduceService implements SkipService {
 //// testMerge1
 
 class Merge1Resource implements Resource {
-  reactiveCompute(cs: {
+  instantiate(cs: {
     input1: EagerCollection<number, number>;
     input2: EagerCollection<number, number>;
   }): EagerCollection<number, number> {
@@ -348,7 +334,7 @@ class Merge1Service implements SkipService {
   initialData = { input1: [], input2: [] };
   resources = { merge1: Merge1Resource };
 
-  reactiveCompute(inputCollections: {
+  createGraph(inputCollections: {
     input1: EagerCollection<number, number>;
     input2: EagerCollection<number, number>;
   }) {
@@ -372,7 +358,7 @@ class IdentityMapper extends OneToOneMapper<number, number, number> {
 }
 
 class MergeReduceResource implements Resource {
-  reactiveCompute(cs: {
+  instantiate(cs: {
     input1: EagerCollection<number, number>;
     input2: EagerCollection<number, number>;
   }): EagerCollection<number, number> {
@@ -384,7 +370,7 @@ class MergeReduceService implements SkipService {
   initialData = { input1: [], input2: [] };
   resources = { mergeReduce: MergeReduceResource };
 
-  reactiveCompute(inputCollections: {
+  createGraph(inputCollections: {
     input1: EagerCollection<number, number>;
     input2: EagerCollection<number, number>;
   }) {
@@ -400,18 +386,18 @@ class JSONExtract
 {
   constructor(private context: Context) {}
 
-  mapElement(
+  mapEntry(
     key: number,
     values: NonEmptyIterator<{ value: JsonObject; pattern: string }>,
   ): Iterable<[number, Json[]]> {
-    const value = values.first();
+    const value = values.getUnique();
     const result = this.context.jsonExtract(value.value, value.pattern);
     return Array([key, result]);
   }
 }
 
 class JSONExtractResource implements Resource {
-  reactiveCompute(
+  instantiate(
     cs: {
       input: EagerCollection<number, { value: JsonObject; pattern: string }>;
     },
@@ -425,7 +411,7 @@ class JSONExtractService implements SkipService {
   initialData = { input: [] };
   resources = { jsonExtract: JSONExtractResource };
 
-  reactiveCompute(inputCollections: {
+  createGraph(inputCollections: {
     input: EagerCollection<number, { value: JsonObject; pattern: string }>;
   }) {
     return inputCollections;
@@ -487,21 +473,23 @@ class MockExternal implements ExternalService {
 class MockExternalCheck implements Mapper<number, number, number, number[]> {
   constructor(private external: EagerCollection<number, number>) {}
 
-  mapElement(
+  mapEntry(
     key: number,
     values: NonEmptyIterator<number>,
   ): Iterable<[number, number[]]> {
-    const result = this.external.maybeGetOne(key);
-    const value = values.toArray();
-    if (result != null) {
-      value.push(result);
+    try {
+      const result = this.external.getUnique(key);
+      return [[key, [...values, result]]];
+    } catch (e) {
+      if (e instanceof NonUniqueValueException)
+        return [[key, values.toArray()]];
+      throw e;
     }
-    return [[key, value]];
   }
 }
 
 class MockExternalResource implements Resource {
-  reactiveCompute(
+  instantiate(
     cs: {
       input1: EagerCollection<number, number>;
       input2: EagerCollection<number, number>;
@@ -509,11 +497,11 @@ class MockExternalResource implements Resource {
     context: Context,
     reactiveAuth?: Uint8Array,
   ): EagerCollection<number, number[]> {
-    const v1 = (cs.input2.maybeGetOne(0) ?? 0).toString();
-    const v2 = (cs.input2.maybeGetOne(1) ?? 0).toString();
+    const v1 = cs.input2.getUnique(0).toString();
+    const v2 = cs.input2.getUnique(1).toString();
     const external = context.useExternalResource<number, number>({
-      supplier: "external",
-      resource: "mock",
+      service: "external",
+      identifier: "mock",
       params: { v1, v2 },
       reactiveAuth,
     });
@@ -526,7 +514,7 @@ class TestExternalService implements SkipService {
   resources = { external: MockExternalResource };
   externalServices = { external: new MockExternal() };
 
-  reactiveCompute(inputCollections: {
+  createGraph(inputCollections: {
     input1: EagerCollection<number, number>;
     input2: EagerCollection<number, number>;
   }) {
@@ -537,14 +525,14 @@ class TestExternalService implements SkipService {
 //// testCloseSession
 
 class TokensResource implements Resource {
-  reactiveCompute(
+  instantiate(
     _cs: Record<string, EagerCollection<Json, Json>>,
     context: Context,
     reactiveAuth?: Uint8Array,
   ): EagerCollection<string, number> {
     return context.useExternalResource({
-      supplier: "system",
-      resource: "timer",
+      service: "system",
+      identifier: "timer",
       params: { "5ms": 5 },
       reactiveAuth,
     });
@@ -558,7 +546,7 @@ class TokensService implements SkipService {
   resources = { tokens: TokensResource };
   externalServices = { system };
 
-  reactiveCompute() {
+  createGraph() {
     return {};
   }
 }
@@ -566,7 +554,7 @@ class TokensService implements SkipService {
 //// testMultipleResources
 
 class Resource1 implements Resource {
-  reactiveCompute(collections: {
+  instantiate(collections: {
     input1: EagerCollection<string, number>;
   }): EagerCollection<string, number> {
     return collections.input1;
@@ -574,7 +562,7 @@ class Resource1 implements Resource {
 }
 
 class Resource2 implements Resource {
-  reactiveCompute(collections: {
+  instantiate(collections: {
     input2: EagerCollection<string, number>;
   }): EagerCollection<string, number> {
     return collections.input2;
@@ -585,7 +573,7 @@ class MultipleResourcesService implements SkipService {
   initialData = { input1: [], input2: [] };
   resources = { resource1: Resource1, resource2: Resource2 };
 
-  reactiveCompute(inputCollections: {
+  createGraph(inputCollections: {
     input1: EagerCollection<number, number>;
     input2: EagerCollection<number, number>;
   }) {

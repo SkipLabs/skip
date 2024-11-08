@@ -23,16 +23,16 @@ type Result = {
 };
 
 class DeparturesResource implements Resource {
-  reactiveCompute(
+  instantiate(
     cs: { config: EagerCollection<string, (string | number)[]> },
     context: Context,
   ): EagerCollection<number, Departure> {
     const get = (name: string, def: string) => {
-      const r = cs.config.maybeGetOne(name);
-      if (r != null) {
-        return r.join(",");
+      try {
+        return cs.config.getUnique(name).join(",");
+      } catch (_e) {
+        return def;
       }
-      return def;
     };
     const params = {
       page: 1,
@@ -43,8 +43,8 @@ class DeparturesResource implements Resource {
     };
 
     return context.useExternalResource({
-      supplier: "externalDeparturesAPI",
-      resource: "departuresFromAPI",
+      service: "externalDeparturesAPI",
+      identifier: "departuresFromAPI",
       params,
     });
   }
@@ -65,7 +65,7 @@ class Service implements SkipService {
     }),
   };
 
-  reactiveCompute(ic: { config: EagerCollection<string, string[]> }) {
+  createGraph(ic: { config: EagerCollection<string, string[]> }) {
     return ic;
   }
 }

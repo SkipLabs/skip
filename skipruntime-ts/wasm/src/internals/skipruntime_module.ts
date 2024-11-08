@@ -5,14 +5,14 @@ import type {
   Utils,
   ToWasmManager,
   Environment,
-  Opt,
+  Nullable,
   ErrorObject,
   Shared,
 } from "@skip-wasm/std";
 import { errorObjectAsError } from "@skip-wasm/std";
 import type * as Internal from "./skipruntime_internal_types.js";
 import type {
-  Accumulator,
+  Reducer,
   NonEmptyIterator,
   EagerCollection,
   LazyCollection,
@@ -32,6 +32,7 @@ import type {
   SubscriptionID,
 } from "@skipruntime/api";
 
+import { NonUniqueValueException } from "@skipruntime/api";
 import { Frozen, type Constant } from "@skipruntime/api/internals.js";
 
 import type { Exportable, SKJSON } from "@skip-wasm/json";
@@ -132,10 +133,10 @@ export interface FromWasm {
   ): ptr<Internal.CJSON>;
   SkipRuntime_NonEmptyIterator__uniqueValue(
     values: ptr<Internal.NonEmptyIterator>,
-  ): Opt<ptr<Internal.CJSON>>;
+  ): Nullable<ptr<Internal.CJSON>>;
   SkipRuntime_NonEmptyIterator__next(
     values: ptr<Internal.NonEmptyIterator>,
-  ): Opt<ptr<Internal.CJSON>>;
+  ): Nullable<ptr<Internal.CJSON>>;
   SkipRuntime_NonEmptyIterator__clone(
     values: ptr<Internal.NonEmptyIterator>,
   ): ptr<Internal.NonEmptyIterator>;
@@ -222,7 +223,7 @@ export interface FromWasm {
     key: ptr<Internal.CJSON>,
   ): ptr<Internal.CJArray<Internal.CJSON>>;
 
-  SkipRuntime_Collection__maybeGetOne(
+  SkipRuntime_Collection__getUnique(
     collection: ptr<Internal.String>,
     key: ptr<Internal.CJSON>,
   ): ptr<Internal.CJSON>;
@@ -235,7 +236,7 @@ export interface FromWasm {
   SkipRuntime_Collection__mapReduce(
     collection: ptr<Internal.String>,
     mapper: ptr<Internal.Mapper>,
-    accumulator: ptr<Internal.Accumulator>,
+    reducer: ptr<Internal.Reducer>,
   ): ptr<Internal.String>;
 
   SkipRuntime_Collection__slice(
@@ -262,12 +263,7 @@ export interface FromWasm {
     key: ptr<Internal.CJSON>,
   ): ptr<Internal.CJArray<Internal.CJSON>>;
 
-  SkipRuntime_LazyCollection__maybeGetOne(
-    collection: ptr<Internal.String>,
-    key: ptr<Internal.CJSON>,
-  ): ptr<Internal.CJSON>;
-
-  SkipRuntime_LazyCollection__getOne(
+  SkipRuntime_LazyCollection__getUnique(
     collection: ptr<Internal.String>,
     key: ptr<Internal.CJSON>,
   ): ptr<Internal.CJSON>;
@@ -325,12 +321,12 @@ export interface FromWasm {
     values: ptr<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
   ): Handle<ErrorObject>;
 
-  // Accumulator
+  // Reducer
 
-  SkipRuntime_createAccumulator<K1 extends Json, V1 extends Json>(
-    ref: Handle<Accumulator<K1, V1>>,
+  SkipRuntime_createReducer<K1 extends Json, V1 extends Json>(
+    ref: Handle<Reducer<K1, V1>>,
     defaultValue: ptr<Internal.CJSON>,
-  ): ptr<Internal.Accumulator>;
+  ): ptr<Internal.Reducer>;
 
   // initService
   SkipRuntime_initService(service: ptr<Internal.Service>): number;
@@ -340,7 +336,7 @@ export interface FromWasm {
 
   // Context
 
-  SkipRuntime_Context__lazy(
+  SkipRuntime_Context__createLazyCollection(
     compute: ptr<Internal.LazyCompute>,
   ): ptr<Internal.String>;
 
@@ -350,8 +346,8 @@ export interface FromWasm {
   ): ptr<Internal.CJArray>;
 
   SkipRuntime_Context__useExternalResource(
-    supplier: ptr<Internal.String>,
-    resource: ptr<Internal.String>,
+    service: ptr<Internal.String>,
+    identifier: ptr<Internal.String>,
     params: ptr<Internal.CJObject>,
     reactiveAuth: ptr<Internal.Array<Internal.Byte>> | null,
   ): ptr<Internal.String>;
@@ -370,11 +366,11 @@ interface ToWasm {
   SkipRuntime_getErrorHdl(exn: ptr<Internal.Exception>): Handle<ErrorObject>;
   SkipRuntime_pushContext(refs: ptr<Internal.Context>): void;
   SkipRuntime_popContext(): void;
-  SkipRuntime_getContext(): Opt<ptr<Internal.Context>>;
+  SkipRuntime_getContext(): Nullable<ptr<Internal.Context>>;
 
   // Mapper
 
-  SkipRuntime_Mapper__mapElement(
+  SkipRuntime_Mapper__mapEntry(
     mapper: Handle<JSONMapper>,
     key: ptr<Internal.CJSON>,
     values: ptr<Internal.NonEmptyIterator>,
@@ -417,7 +413,7 @@ interface ToWasm {
 
   // Resource
 
-  SkipRuntime_Resource__reactiveCompute(
+  SkipRuntime_Resource__instantiate(
     resource: Handle<Resource>,
     collections: ptr<Internal.CJObject>,
     reactiveAuth: ptr<Internal.Array<Internal.Byte>>,
@@ -436,7 +432,7 @@ interface ToWasm {
 
   // Service
 
-  SkipRuntime_Service__reactiveCompute(
+  SkipRuntime_Service__createGraph(
     resource: Handle<SkipService>,
     collections: ptr<Internal.CJObject>,
   ): ptr<Internal.CJObject>;
@@ -456,23 +452,21 @@ interface ToWasm {
     notifier: Handle<(update: CollectionUpdate<K, V>) => void>,
   ): void;
 
-  // Accumulator
+  // Reducer
 
-  SkipRuntime_Accumulator__accumulate(
-    notifier: Handle<Accumulator<Json, Json>>,
+  SkipRuntime_Reducer__add(
+    reducer: Handle<Reducer<Json, Json>>,
     acc: ptr<Internal.CJSON>,
     value: ptr<Internal.CJSON>,
   ): ptr<Internal.CJSON>;
 
-  SkipRuntime_Accumulator__dismiss(
-    notifier: Handle<Accumulator<Json, Json>>,
-    cumul: ptr<Internal.CJSON>,
+  SkipRuntime_Reducer__remove(
+    reducer: Handle<Reducer<Json, Json>>,
+    acc: ptr<Internal.CJSON>,
     value: ptr<Internal.CJSON>,
   ): ptr<Internal.CJSON>;
 
-  SkipRuntime_deleteAccumulator(
-    notifier: Handle<Accumulator<Json, Json>>,
-  ): void;
+  SkipRuntime_deleteReducer(reducer: Handle<Reducer<Json, Json>>): void;
 
   // Checker
 
@@ -524,7 +518,7 @@ class Stack {
     this.stack.push(pointer);
   }
 
-  get(): Opt<ptr<Internal.Context>> {
+  get(): Nullable<ptr<Internal.Context>> {
     if (this.stack.length == 0) return null;
     return this.stack[this.stack.length - 1]!;
   }
@@ -591,14 +585,14 @@ class LinksImpl implements Links {
 
   // Mapper
 
-  mapElementOfMapper(
+  mapEntryOfMapper(
     skmapper: Handle<JSONMapper>,
     key: ptr<Internal.CJSON>,
     values: ptr<Internal.NonEmptyIterator>,
   ): ptr<Internal.CJArray> {
     const skjson = this.getSkjson();
     const mapper = this.handles.get(skmapper);
-    const result = mapper.mapElement(
+    const result = mapper.mapEntry(
       skjson.importJSON(key) as Json,
       new NonEmptyIteratorImpl(skjson, this.fromWasm, values),
     );
@@ -635,7 +629,7 @@ class LinksImpl implements Links {
 
   // Resource
 
-  reactiveComputeOfResource(
+  instantiateOfResource(
     skresource: Handle<Resource>,
     skcollections: ptr<Internal.CJObject>,
     skreactiveAuth: ptr<Internal.Array<Internal.Byte>>,
@@ -657,7 +651,7 @@ class LinksImpl implements Links {
       ? skjson.importBytes(skreactiveAuth)
       : undefined;
     // TODO: Manage skstore
-    const collection = resource.reactiveCompute(
+    const collection = resource.instantiate(
       collections,
       new ContextImpl(refs),
       reactiveAuth,
@@ -692,7 +686,7 @@ class LinksImpl implements Links {
 
   // Service
 
-  reactiveComputeOfService(
+  createGraphOfService(
     skservice: Handle<SkipService>,
     skcollections: ptr<Internal.CJObject>,
   ) {
@@ -710,7 +704,7 @@ class LinksImpl implements Links {
       collections[key] = new EagerCollectionImpl(name, refs);
     }
     // TODO: Manage skstore
-    const result = service.reactiveCompute(collections, new ContextImpl(refs));
+    const result = service.createGraph(collections, new ContextImpl(refs));
     const collectionsNames: Record<string, string> = {};
     for (const [name, collection] of Object.entries(result)) {
       collectionsNames[name] = (
@@ -747,40 +741,40 @@ class LinksImpl implements Links {
     this.handles.deleteHandle(notifier);
   }
 
-  // Accumulator
+  // Reducer
 
-  accumulateOfAccumulator(
-    skaccumulator: Handle<Accumulator<Json, Json>>,
+  addOfReducer(
+    skreducer: Handle<Reducer<Json, Json>>,
     skacc: ptr<Internal.CJSON>,
     skvalue: ptr<Internal.CJSON>,
   ) {
     const skjson = this.getSkjson();
-    const accumulator = this.handles.get(skaccumulator);
+    const reducer = this.handles.get(skreducer);
     return skjson.exportJSON(
-      accumulator.accumulate(
+      reducer.add(
         skacc ? (skjson.importJSON(skacc) as Json) : null,
         skjson.importJSON(skvalue) as Json,
       ),
     );
   }
 
-  dismissOfAccumulator(
-    skaccumulator: Handle<Accumulator<Json, Json>>,
-    skcumul: ptr<Internal.CJSON>,
+  removeOfReducer(
+    skreducer: Handle<Reducer<Json, Json>>,
+    skacc: ptr<Internal.CJSON>,
     skvalue: ptr<Internal.CJSON>,
   ) {
     const skjson = this.getSkjson();
-    const accumulator = this.handles.get(skaccumulator);
+    const reducer = this.handles.get(skreducer);
     return skjson.exportJSON(
-      accumulator.dismiss(
-        skjson.importJSON(skcumul) as Json,
+      reducer.remove(
+        skjson.importJSON(skacc) as Json,
         skjson.importJSON(skvalue) as Json,
       ),
     );
   }
 
-  deleteAccumulator(accumulator: Handle<Accumulator<Json, Json>>) {
-    this.handles.deleteHandle(accumulator);
+  deleteReducer(reducer: Handle<Reducer<Json, Json>>) {
+    this.handles.deleteHandle(reducer);
   }
 
   // ExternalService
@@ -921,22 +915,15 @@ class LazyCollectionImpl<K extends Json, V extends Json>
     ) as V[];
   }
 
-  getOne(key: K): V {
-    return this.refs.skjson.importJSON(
-      this.refs.fromWasm.SkipRuntime_LazyCollection__getOne(
+  getUnique(key: K): V {
+    const v = this.refs.skjson.importOptJSON(
+      this.refs.fromWasm.SkipRuntime_LazyCollection__getUnique(
         this.refs.skjson.exportString(this.lazyCollection),
         this.refs.skjson.exportJSON(key),
       ),
-    ) as V;
-  }
-
-  maybeGetOne(key: K): Opt<V> {
-    return this.refs.skjson.importJSON(
-      this.refs.fromWasm.SkipRuntime_LazyCollection__maybeGetOne(
-        this.refs.skjson.exportString(this.lazyCollection),
-        this.refs.skjson.exportJSON(key),
-      ),
-    ) as Opt<V>;
+    ) as Nullable<V>;
+    if (v == null) throw new NonUniqueValueException();
+    return v;
   }
 }
 
@@ -961,13 +948,15 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     ) as V[];
   }
 
-  maybeGetOne(key: K): Opt<V> {
-    return this.refs.skjson.importJSON(
-      this.refs.fromWasm.SkipRuntime_Collection__maybeGetOne(
+  getUnique(key: K): V {
+    const v = this.refs.skjson.importOptJSON(
+      this.refs.fromWasm.SkipRuntime_Collection__getUnique(
         this.refs.skjson.exportString(this.collection),
         this.refs.skjson.exportJSON(key),
       ),
-    ) as Opt<V>;
+    ) as Nullable<V>;
+    if (v == null) throw new NonUniqueValueException();
+    return v;
   }
 
   size = () => {
@@ -1021,7 +1010,7 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     Params extends Param[],
   >(
     mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
-    accumulator: Accumulator<V2, V3>,
+    reducer: Reducer<V2, V3>,
     ...params: Params
   ) {
     params.forEach(check);
@@ -1033,14 +1022,14 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     const skmapper = this.refs.fromWasm.SkipRuntime_createMapper(
       this.refs.handles.register(mapperObj),
     );
-    const skaccumulator = this.refs.fromWasm.SkipRuntime_createAccumulator(
-      this.refs.handles.register(accumulator),
-      this.refs.skjson.exportJSON(accumulator.default),
+    const skreducer = this.refs.fromWasm.SkipRuntime_createReducer(
+      this.refs.handles.register(reducer),
+      this.refs.skjson.exportJSON(reducer.default),
     );
     const mapped = this.refs.fromWasm.SkipRuntime_Collection__mapReduce(
       this.refs.skjson.exportString(this.collection),
       skmapper,
-      skaccumulator,
+      skreducer,
     );
     return this.derive<K2, V3>(mapped);
   }
@@ -1125,7 +1114,7 @@ class ContextImpl extends SkFrozen implements Context {
     Object.freeze(this);
   }
 
-  lazy<K extends Json, V extends Json, Params extends Param[]>(
+  createLazyCollection<K extends Json, V extends Json, Params extends Param[]>(
     compute: new (...params: Params) => LazyCompute<K, V>,
     ...params: Params
   ): LazyCollection<K, V> {
@@ -1139,24 +1128,24 @@ class ContextImpl extends SkFrozen implements Context {
       this.refs.handles.register(computeObj),
     );
     const sklazyCollection =
-      this.refs.fromWasm.SkipRuntime_Context__lazy(skcompute);
+      this.refs.fromWasm.SkipRuntime_Context__createLazyCollection(skcompute);
     const lazyCollection = this.refs.skjson.importString(sklazyCollection);
     return new LazyCollectionImpl<K, V>(lazyCollection, this.refs);
   }
 
-  useExternalResource<K extends Json, V extends Json>(service: {
-    supplier: string;
-    resource: string;
+  useExternalResource<K extends Json, V extends Json>(resource: {
+    service: string;
+    identifier: string;
     params?: Record<string, string | number>;
     reactiveAuth?: Uint8Array;
   }): EagerCollection<K, V> {
     const skcollection =
       this.refs.fromWasm.SkipRuntime_Context__useExternalResource(
-        this.refs.skjson.exportString(service.supplier),
-        this.refs.skjson.exportString(service.resource),
-        this.refs.skjson.exportJSON(service.params ?? {}),
-        service.reactiveAuth
-          ? this.refs.skjson.exportBytes(service.reactiveAuth)
+        this.refs.skjson.exportString(resource.service),
+        this.refs.skjson.exportString(resource.identifier),
+        this.refs.skjson.exportJSON(resource.params ?? {}),
+        resource.reactiveAuth
+          ? this.refs.skjson.exportBytes(resource.reactiveAuth)
           : null,
       );
     const collection = this.refs.skjson.importString(skcollection);
@@ -1557,22 +1546,18 @@ class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
     this.pointer = pointer;
   }
 
-  next(): Opt<T> {
+  next(): Nullable<T> {
     return this.skjson.importOptJSON(
       this.exports.SkipRuntime_NonEmptyIterator__next(this.pointer),
-    ) as Opt<T>;
+    ) as Nullable<T>;
   }
 
-  first(): T {
-    return this.skjson.importJSON(
-      this.exports.SkipRuntime_NonEmptyIterator__first(this.pointer),
-    ) as T;
-  }
-
-  uniqueValue(): Opt<T> {
-    return this.skjson.importOptJSON(
+  getUnique(): T {
+    const value = this.skjson.importOptJSON(
       this.exports.SkipRuntime_NonEmptyIterator__uniqueValue(this.pointer),
-    ) as Opt<T>;
+    ) as Nullable<T>;
+    if (value == null) throw new NonUniqueValueException();
+    return value;
   }
 
   toArray: () => T[] = () => {
@@ -1592,16 +1577,6 @@ class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
         return { value, done: value == null } as IteratorResult<T>;
       },
     };
-  }
-
-  forEach(f: (value: T, index: number) => void, thisObj?: any): void {
-    let value = this.next();
-    let index = 0;
-    while (value != null) {
-      f.apply(thisObj, [value, index]);
-      value = this.next();
-      index++;
-    }
   }
 
   map<U>(f: (value: T, index: number) => U, thisObj?: any): U[] {
@@ -1626,8 +1601,7 @@ class Manager implements ToWasmManager {
 
     // Mapper
 
-    toWasm.SkipRuntime_Mapper__mapElement =
-      links.mapElementOfMapper.bind(links);
+    toWasm.SkipRuntime_Mapper__mapEntry = links.mapEntryOfMapper.bind(links);
     toWasm.SkipRuntime_deleteMapper = links.deleteMapper.bind(links);
 
     // LazyCompute
@@ -1649,8 +1623,8 @@ class Manager implements ToWasmManager {
 
     // Resource
 
-    toWasm.SkipRuntime_Resource__reactiveCompute =
-      links.reactiveComputeOfResource.bind(links);
+    toWasm.SkipRuntime_Resource__instantiate =
+      links.instantiateOfResource.bind(links);
     toWasm.SkipRuntime_deleteResource = links.deleteResource.bind(links);
 
     // ResourceBuilder
@@ -1662,8 +1636,8 @@ class Manager implements ToWasmManager {
 
     // Service
 
-    toWasm.SkipRuntime_Service__reactiveCompute =
-      links.reactiveComputeOfService.bind(links);
+    toWasm.SkipRuntime_Service__createGraph =
+      links.createGraphOfService.bind(links);
     toWasm.SkipRuntime_deleteService = links.deleteService.bind(links);
 
     // Notifier
@@ -1671,13 +1645,11 @@ class Manager implements ToWasmManager {
     toWasm.SkipRuntime_Notifier__notify = links.notifyOfNotifier.bind(links);
     toWasm.SkipRuntime_deleteNotifier = links.deleteNotifier.bind(links);
 
-    // Accumulator
+    // Reducer
 
-    toWasm.SkipRuntime_Accumulator__accumulate =
-      links.accumulateOfAccumulator.bind(links);
-    toWasm.SkipRuntime_Accumulator__dismiss =
-      links.dismissOfAccumulator.bind(links);
-    toWasm.SkipRuntime_deleteAccumulator = links.deleteAccumulator.bind(links);
+    toWasm.SkipRuntime_Reducer__add = links.addOfReducer.bind(links);
+    toWasm.SkipRuntime_Reducer__remove = links.removeOfReducer.bind(links);
+    toWasm.SkipRuntime_deleteReducer = links.deleteReducer.bind(links);
 
     // Checker
 

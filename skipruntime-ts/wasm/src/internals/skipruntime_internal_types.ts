@@ -46,8 +46,8 @@ export type ResourceBuilderMap = T<typeof resourcebuildermap>;
 declare const externalsuppliermap: unique symbol;
 export type ExternalServiceMap = T<typeof externalsuppliermap>;
 
-declare const accumulator: unique symbol;
-export type Accumulator = T<typeof accumulator>;
+declare const reducer: unique symbol;
+export type Reducer = T<typeof reducer>;
 
 declare const notifier: unique symbol;
 export type Notifier = T<typeof notifier>;
