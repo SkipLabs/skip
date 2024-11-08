@@ -17,7 +17,7 @@ class ComputeExpression implements LazyCompute<string, string> {
 
   compute(selfHdl: LazyCollection<string, string>, key: string): string | null {
     const getComputed = (key: string) => {
-      const v = selfHdl.getOne(key);
+      const v = selfHdl.getUnique(key);
       if (typeof v == "number") return v;
       if (typeof v == "string") {
         const nv = parseFloat(v);
@@ -25,9 +25,9 @@ class ComputeExpression implements LazyCompute<string, string> {
       }
       throw new Error(`Invalid value for cell '${key}'`);
     };
-    const v = this.skall.maybeGetOne(key) as string | null;
-    if (v?.startsWith("=")) {
-      try {
+    try {
+      const v = this.skall.getUnique(key) as string;
+      if (v.startsWith("=")) {
         // Fake evaluator in this exemple
         switch (v.substring(1)) {
           case "A1 + A2": {
@@ -40,12 +40,12 @@ class ComputeExpression implements LazyCompute<string, string> {
           default:
             return "# Not managed expression.";
         }
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : JSON.stringify(e);
-        return "# " + msg;
+      } else {
+        return v;
       }
-    } else {
-      return v;
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : JSON.stringify(e);
+      return "# " + msg;
     }
   }
 }
@@ -57,7 +57,7 @@ class CallCompute extends OneToOneMapper<string, Json, Json> {
 
   mapValue(value: Json, key: string): Json {
     if (typeof value == "string" && value.startsWith("=")) {
-      return this.evaluator.getOne(key);
+      return this.evaluator.getUnique(key);
     } else {
       return value;
     }

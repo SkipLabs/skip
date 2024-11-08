@@ -65,7 +65,7 @@ class UpvotesMapper {
     key: number,
     values: NonEmptyIterator<Upvote>,
   ): Iterable<[number, number]> {
-    const value = values.first().post_id;
+    const value = values.getUnique().post_id;
     return [[value, key]];
   }
 }
@@ -80,9 +80,9 @@ class PostsMapper {
     key: number,
     values: NonEmptyIterator<Post>,
   ): Iterable<[number, Upvoted]> {
-    const post = values.first();
+    const post = values.getUnique();
     const upvotes = this.upvotes.getArray(key).length;
-    const author = this.users.maybeGetOne(post.author_id)!;
+    const author = this.users.getUnique(post.author_id);
     // Projecting all posts on key 0 so that they can later be sorted.
     return [[0, { ...post, upvotes, author }]];
   }

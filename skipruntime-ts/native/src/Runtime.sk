@@ -745,10 +745,9 @@ class Collection(
    * If multiple values are mapped to by the key, any of them can be returned.
    * @returns the value for this `key`, or null if no such value exists
    */
-  fun maybeGetOne(key: SKJSON.CJSON): ?SKJSON.CJSON {
+  fun getUnique(key: SKJSON.CJSON): ?SKJSON.CJSON {
     value = this.getArray(key);
-    if (value.isEmpty()) return None();
-    Some(value[0])
+    if (value.size() == 1) Some(value[0]) else None();
   }
 
   /**
@@ -1041,26 +1040,11 @@ class LazyCollection(
    * Get (and potentially compute) a value of a lazy reactive collection.
    * @throws {Error} when either zero or multiple such values exist
    */
-  fun getOne(key: SKJSON.CJSON): SKJSON.CJSON {
+  fun getUnique(key: SKJSON.CJSON): SKJSON.CJSON {
     getContext() match {
     | Some(context) ->
       this.fileConverter.toJSON(
         this.hdl.get(context, this.keyConverter.fromJSON(key)),
-      )
-    | _ -> invariant_violation("Store context must be specified.")
-    }
-  }
-
-  /**
-   * Get (and potentially compute) a value of a lazy reactive collection, if one exists.
-   * If multiple values are mapped to by the key, any of them can be returned.
-   * @returns the value for this `key`, or null if no such value exists
-   */
-  fun maybeGetOne(key: SKJSON.CJSON): ?SKJSON.CJSON {
-    getContext() match {
-    | Some(context) ->
-      this.hdl.maybeGet(context, this.keyConverter.fromJSON(key)).map(
-        this.fileConverter.toJSON,
       )
     | _ -> invariant_violation("Store context must be specified.")
     }

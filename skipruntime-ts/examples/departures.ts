@@ -28,11 +28,11 @@ class DeparturesResource implements Resource {
     context: Context,
   ): EagerCollection<number, Departure> {
     const get = (name: string, def: string) => {
-      const r = cs.config.maybeGetOne(name);
-      if (r != null) {
-        return r.join(",");
+      try {
+        return cs.config.getUnique(name).join(",");
+      } catch (_e) {
+        return def;
       }
-      return def;
     };
     const params = {
       page: 1,
