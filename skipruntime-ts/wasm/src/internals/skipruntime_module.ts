@@ -417,7 +417,7 @@ interface ToWasm {
 
   // Resource
 
-  SkipRuntime_Resource__reactiveCompute(
+  SkipRuntime_Resource__instantiate(
     resource: Handle<Resource>,
     collections: ptr<Internal.CJObject>,
     reactiveAuth: ptr<Internal.Array<Internal.Byte>>,
@@ -436,7 +436,7 @@ interface ToWasm {
 
   // Service
 
-  SkipRuntime_Service__reactiveCompute(
+  SkipRuntime_Service__createGraph(
     resource: Handle<SkipService>,
     collections: ptr<Internal.CJObject>,
   ): ptr<Internal.CJObject>;
@@ -633,7 +633,7 @@ class LinksImpl implements Links {
 
   // Resource
 
-  reactiveComputeOfResource(
+  instantiateOfResource(
     skresource: Handle<Resource>,
     skcollections: ptr<Internal.CJObject>,
     skreactiveAuth: ptr<Internal.Array<Internal.Byte>>,
@@ -655,7 +655,7 @@ class LinksImpl implements Links {
       ? skjson.importBytes(skreactiveAuth)
       : undefined;
     // TODO: Manage skstore
-    const collection = resource.reactiveCompute(
+    const collection = resource.instantiate(
       collections,
       new ContextImpl(refs),
       reactiveAuth,
@@ -690,7 +690,7 @@ class LinksImpl implements Links {
 
   // Service
 
-  reactiveComputeOfService(
+  createGraphOfService(
     skservice: Handle<SkipService>,
     skcollections: ptr<Internal.CJObject>,
   ) {
@@ -708,7 +708,7 @@ class LinksImpl implements Links {
       collections[key] = new EagerCollectionImpl(name, refs);
     }
     // TODO: Manage skstore
-    const result = service.reactiveCompute(collections, new ContextImpl(refs));
+    const result = service.createGraph(collections, new ContextImpl(refs));
     const collectionsNames: Record<string, string> = {};
     for (const [name, collection] of Object.entries(result)) {
       collectionsNames[name] = (
@@ -1637,8 +1637,8 @@ class Manager implements ToWasmManager {
 
     // Resource
 
-    toWasm.SkipRuntime_Resource__reactiveCompute =
-      links.reactiveComputeOfResource.bind(links);
+    toWasm.SkipRuntime_Resource__instantiate =
+      links.instantiateOfResource.bind(links);
     toWasm.SkipRuntime_deleteResource = links.deleteResource.bind(links);
 
     // ResourceBuilder
@@ -1650,8 +1650,8 @@ class Manager implements ToWasmManager {
 
     // Service
 
-    toWasm.SkipRuntime_Service__reactiveCompute =
-      links.reactiveComputeOfService.bind(links);
+    toWasm.SkipRuntime_Service__createGraph =
+      links.createGraphOfService.bind(links);
     toWasm.SkipRuntime_deleteService = links.deleteService.bind(links);
 
     // Notifier

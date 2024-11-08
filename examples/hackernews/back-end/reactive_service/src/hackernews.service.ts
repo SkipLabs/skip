@@ -42,7 +42,7 @@ export default class HackerNewsService implements SkipService {
     this.initialData = { posts, users, upvotes };
   }
 
-  reactiveCompute(inputCollections: {
+  createGraph(inputCollections: {
     posts: EagerCollection<number, Post>;
     users: EagerCollection<number, User>;
     upvotes: EagerCollection<number, Upvote>;
@@ -107,7 +107,7 @@ class PostsResource implements Resource {
     this.limit = Number(params["limit"]);
   }
 
-  reactiveCompute(collections: {
+  instantiate(collections: {
     postsWithUpvotes: EagerCollection<number, Upvoted>;
   }): EagerCollection<number, Upvoted> {
     return collections.postsWithUpvotes.take(this.limit).map(SortingMapper);

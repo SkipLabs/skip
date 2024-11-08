@@ -254,9 +254,9 @@ fun errorOfCollectionWriter(collection: String, error: SKJSON.CJSON): Float {
 
 /************  Resource ****************/
 
-@cpp_extern("SkipRuntime_Resource__reactiveCompute")
+@cpp_extern("SkipRuntime_Resource__instantiate")
 @debug
-native fun reactiveComputeOfResource(
+native fun instantiateOfResource(
   resource: UInt32,
   collections: SKJSON.CJObject,
   reactiveAuth: ?Array<UInt8>,
@@ -272,11 +272,11 @@ fun createResource(resource: UInt32): ExternResource {
 }
 
 class ExternResource(eptr: SKStore.ExternalPointer) extends Resource {
-  fun reactiveCompute(
+  fun instantiate(
     collections: Map<String, Collection>,
     reactiveAuth: ?Array<UInt8>,
   ): Collection {
-    collectionName = reactiveComputeOfResource(
+    collectionName = instantiateOfResource(
       this.eptr.value,
       collectionsByName(collections),
       reactiveAuth,
@@ -379,22 +379,17 @@ fun createService(
 @debug
 native fun deleteService(service: UInt32): void;
 
-@cpp_extern("SkipRuntime_Service__reactiveCompute")
+@cpp_extern("SkipRuntime_Service__createGraph")
 @debug
-native fun reactiveComputeOfService(
+native fun createGraphOfService(
   resource: UInt32,
   collections: SKJSON.CJObject,
 ): SKJSON.CJObject;
 
 class ExternService(eptr: SKStore.ExternalPointer) extends Service {
   //
-  fun reactiveCompute(
-    inputs: Map<String, Collection>,
-  ): Map<String, Collection> {
-    names = reactiveComputeOfService(
-      this.eptr.value,
-      collectionsByName(inputs),
-    );
+  fun createGraph(inputs: Map<String, Collection>): Map<String, Collection> {
+    names = createGraphOfService(this.eptr.value, collectionsByName(inputs));
     map = mutable Map[];
     names match {
     | SKJSON.CJObject(nfields) ->

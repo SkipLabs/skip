@@ -278,7 +278,7 @@ fun initService(service: Service): Result<void, .Exception> {
           try {
             writer.set(
               SKStore.SID(it.first.value),
-              ServiceFile(service.reactiveCompute(inputCollections)),
+              ServiceFile(service.createGraph(inputCollections)),
             );
             popContext()
           } catch {
@@ -414,7 +414,7 @@ fun initService(service: Service): Result<void, .Exception> {
                   serviceCollections
                     .get(context, SKStore.SID(session))
                     .value.each((k, c) -> allCollections.set(k, c));
-                  collection = resource.reactiveCompute(
+                  collection = resource.instantiate(
                     allCollections.chill(),
                     key.reactiveAuth,
                   );

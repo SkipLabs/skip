@@ -23,7 +23,7 @@ type Result = {
 };
 
 class DeparturesResource implements Resource {
-  reactiveCompute(
+  instantiate(
     cs: { config: EagerCollection<string, (string | number)[]> },
     context: Context,
   ): EagerCollection<number, Departure> {
@@ -65,7 +65,7 @@ class Service implements SkipService {
     }),
   };
 
-  reactiveCompute(ic: { config: EagerCollection<string, string[]> }) {
+  createGraph(ic: { config: EagerCollection<string, string[]> }) {
     return ic;
   }
 }

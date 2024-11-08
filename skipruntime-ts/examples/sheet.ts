@@ -65,7 +65,7 @@ class CallCompute extends OneToOneMapper<string, Json, Json> {
 }
 
 class ComputedCells implements Resource {
-  reactiveCompute(collections: {
+  instantiate(collections: {
     output: EagerCollection<string, Json>;
   }): EagerCollection<string, Json> {
     return collections.output;
@@ -76,7 +76,7 @@ class Service implements SkipService {
   initialData = { cells: [] };
   resources = { computed: ComputedCells };
 
-  reactiveCompute(
+  createGraph(
     inputCollections: { cells: EagerCollection<string, Json> },
     context: Context,
   ): Record<string, EagerCollection<Json, Json>> {
