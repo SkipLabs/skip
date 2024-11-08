@@ -261,7 +261,7 @@ export interface Context extends Constant {
    * @param params - any additional parameters to the computation
    * @returns The resulting lazy collection
    */
-  lazy<K extends Json, V extends Json, Params extends Param[]>(
+  createLazyCollection<K extends Json, V extends Json, Params extends Param[]>(
     compute: new (...params: Params) => LazyCompute<K, V>,
     ...params: Params
   ): LazyCollection<K, V>;

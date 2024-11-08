@@ -340,7 +340,7 @@ export interface FromWasm {
 
   // Context
 
-  SkipRuntime_Context__lazy(
+  SkipRuntime_Context__createLazyCollection(
     compute: ptr<Internal.LazyCompute>,
   ): ptr<Internal.String>;
 
@@ -1123,7 +1123,7 @@ class ContextImpl extends SkFrozen implements Context {
     Object.freeze(this);
   }
 
-  lazy<K extends Json, V extends Json, Params extends Param[]>(
+  createLazyCollection<K extends Json, V extends Json, Params extends Param[]>(
     compute: new (...params: Params) => LazyCompute<K, V>,
     ...params: Params
   ): LazyCollection<K, V> {
@@ -1137,7 +1137,7 @@ class ContextImpl extends SkFrozen implements Context {
       this.refs.handles.register(computeObj),
     );
     const sklazyCollection =
-      this.refs.fromWasm.SkipRuntime_Context__lazy(skcompute);
+      this.refs.fromWasm.SkipRuntime_Context__createLazyCollection(skcompute);
     const lazyCollection = this.refs.skjson.importString(sklazyCollection);
     return new LazyCollectionImpl<K, V>(lazyCollection, this.refs);
   }

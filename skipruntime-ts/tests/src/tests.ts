@@ -287,7 +287,7 @@ class LazyResource implements Resource {
     },
     context: Context,
   ): EagerCollection<number, number> {
-    const lazy = context.lazy(TestLazyAdd, cs.input);
+    const lazy = context.createLazyCollection(TestLazyAdd, cs.input);
     return cs.input.map(MapLazy, lazy);
   }
 }
