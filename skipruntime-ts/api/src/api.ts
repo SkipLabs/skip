@@ -268,16 +268,16 @@ export interface Context extends Constant {
 
   /**
    * Call an external service to manage an external resource
-   * @param service - the object configuring the external service
-   * @param service.supplier - the name of the external supplier, which must correspond to a key inthe `externalServices` field of the `SkipService` this `Context` belongs to
-   * @param service.resource - the resource name managed by the supplier
-   * @param service.params - the parameters to supply to the resource
-   * @param service.reactiveAuth - the caller client user Skip session authentication
-   * @returns The reactive collection of the external resource
+   * @param resource - the object configuring the external resource
+   * @param resource.service - the name of the external service, which must correspond to a key in the `externalServices` field of the `SkipService` this `Context` belongs to
+   * @param resource.identifier - the resource identifier managed by the service
+   * @param resource.params - the parameters to supply to the resource
+   * @param resource.reactiveAuth - the caller client user Skip session authentication
+   * @returns An eager reactive collection of the external resource
    */
-  useExternalResource<K extends Json, V extends Json>(service: {
-    supplier: string;
-    resource: string;
+  useExternalResource<K extends Json, V extends Json>(resource: {
+    service: string;
+    identifier: string;
     params?: Record<string, string | number>;
     reactiveAuth?: Uint8Array;
   }): EagerCollection<K, V>;

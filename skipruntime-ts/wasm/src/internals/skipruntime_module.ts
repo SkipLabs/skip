@@ -350,8 +350,8 @@ export interface FromWasm {
   ): ptr<Internal.CJArray>;
 
   SkipRuntime_Context__useExternalResource(
-    supplier: ptr<Internal.String>,
-    resource: ptr<Internal.String>,
+    service: ptr<Internal.String>,
+    identifier: ptr<Internal.String>,
     params: ptr<Internal.CJObject>,
     reactiveAuth: ptr<Internal.Array<Internal.Byte>> | null,
   ): ptr<Internal.String>;
@@ -1142,19 +1142,19 @@ class ContextImpl extends SkFrozen implements Context {
     return new LazyCollectionImpl<K, V>(lazyCollection, this.refs);
   }
 
-  useExternalResource<K extends Json, V extends Json>(service: {
-    supplier: string;
-    resource: string;
+  useExternalResource<K extends Json, V extends Json>(resource: {
+    service: string;
+    identifier: string;
     params?: Record<string, string | number>;
     reactiveAuth?: Uint8Array;
   }): EagerCollection<K, V> {
     const skcollection =
       this.refs.fromWasm.SkipRuntime_Context__useExternalResource(
-        this.refs.skjson.exportString(service.supplier),
-        this.refs.skjson.exportString(service.resource),
-        this.refs.skjson.exportJSON(service.params ?? {}),
-        service.reactiveAuth
-          ? this.refs.skjson.exportBytes(service.reactiveAuth)
+        this.refs.skjson.exportString(resource.service),
+        this.refs.skjson.exportString(resource.identifier),
+        this.refs.skjson.exportJSON(resource.params ?? {}),
+        resource.reactiveAuth
+          ? this.refs.skjson.exportBytes(resource.reactiveAuth)
           : null,
       );
     const collection = this.refs.skjson.importString(skcollection);

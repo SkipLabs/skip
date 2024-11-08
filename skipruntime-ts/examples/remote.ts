@@ -23,12 +23,12 @@ class MultResource implements Resource {
     context: Context,
   ): EagerCollection<string, number> {
     const sub = context.useExternalResource<string, number>({
-      supplier: "sumexample",
-      resource: "sub",
+      service: "sumexample",
+      identifier: "sub",
     });
     const add = context.useExternalResource<string, number>({
-      supplier: "sumexample",
-      resource: "add",
+      service: "sumexample",
+      identifier: "add",
     });
     return sub.merge(add).map(Mult);
   }

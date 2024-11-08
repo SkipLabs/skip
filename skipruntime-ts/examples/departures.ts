@@ -43,8 +43,8 @@ class DeparturesResource implements Resource {
     };
 
     return context.useExternalResource({
-      supplier: "externalDeparturesAPI",
-      resource: "departuresFromAPI",
+      service: "externalDeparturesAPI",
+      identifier: "departuresFromAPI",
       params,
     });
   }
