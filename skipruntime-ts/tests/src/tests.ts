@@ -53,7 +53,7 @@ interface ServiceInstance {
 //// testMap1
 
 class Map1 implements Mapper<string, number, string, number> {
-  mapElement(
+  mapEntry(
     key: string,
     values: NonEmptyIterator<number>,
   ): Iterable<[string, number]> {
@@ -85,7 +85,7 @@ class Map1Service implements SkipService {
 class Map2 implements Mapper<string, number, string, number> {
   constructor(private other: EagerCollection<string, number>) {}
 
-  mapElement(
+  mapEntry(
     key: string,
     values: NonEmptyIterator<number>,
   ): Iterable<[string, number]> {
@@ -124,7 +124,7 @@ class Map2Service implements SkipService {
 //// testMap3
 
 class Map3 implements Mapper<string, number, string, number> {
-  mapElement(
+  mapEntry(
     key: string,
     values: NonEmptyIterator<number>,
   ): Iterable<[string, number]> {
@@ -191,7 +191,7 @@ class OneToOneMapperService implements SkipService {
 class SizeMapper implements Mapper<number, number, number, number> {
   constructor(private other: EagerCollection<number, number>) {}
 
-  mapElement(
+  mapEntry(
     key: number,
     values: NonEmptyIterator<number>,
   ): Iterable<[number, number]> {
@@ -272,7 +272,7 @@ class TestLazyAdd implements LazyCompute<number, number> {
 class MapLazy implements Mapper<number, number, number, number> {
   constructor(private other: LazyCollection<number, number>) {}
 
-  mapElement(
+  mapEntry(
     key: number,
     values: NonEmptyIterator<number>,
   ): Iterable<[number, number]> {
@@ -306,7 +306,7 @@ class LazyService implements SkipService {
 //// testMapReduce
 
 class TestOddEven implements Mapper<number, number, number, number> {
-  mapElement(
+  mapEntry(
     key: number,
     values: NonEmptyIterator<number>,
   ): Iterable<[number, number]> {
@@ -400,7 +400,7 @@ class JSONExtract
 {
   constructor(private context: Context) {}
 
-  mapElement(
+  mapEntry(
     key: number,
     values: NonEmptyIterator<{ value: JsonObject; pattern: string }>,
   ): Iterable<[number, Json[]]> {
@@ -487,7 +487,7 @@ class MockExternal implements ExternalService {
 class MockExternalCheck implements Mapper<number, number, number, number[]> {
   constructor(private external: EagerCollection<number, number>) {}
 
-  mapElement(
+  mapEntry(
     key: number,
     values: NonEmptyIterator<number>,
   ): Iterable<[number, number[]]> {

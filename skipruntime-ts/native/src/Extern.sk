@@ -51,9 +51,9 @@ fun cloneOfNonEmptyIterator(
 
 /************  Mapper ****************/
 
-@cpp_extern("SkipRuntime_Mapper__mapElement")
+@cpp_extern("SkipRuntime_Mapper__mapEntry")
 @debug
-native fun mapElementOfMapper(
+native fun mapEntryOfMapper(
   mapper: UInt32,
   key: SKJSON.CJSON,
   values: mutable SKStore.NonEmptyIterator<SKJSON.CJSON>,
@@ -77,11 +77,11 @@ class ExternMapper(eptr: SKStore.ExternalPointer) extends Mapper {
     JSONFileConverter()
   }
 
-  fun mapElement(
+  fun mapEntry(
     key: SKJSON.CJSON,
     values: mutable SKStore.NonEmptyIterator<SKJSON.CJSON>,
   ): mutable Iterator<(SKJSON.CJSON, SKJSON.CJSON)> {
-    mapElementOfMapper(this.eptr.value, key, values) match {
+    mapEntryOfMapper(this.eptr.value, key, values) match {
     | SKJSON.CJArray(vals) ->
       vals
         .map(e ->
