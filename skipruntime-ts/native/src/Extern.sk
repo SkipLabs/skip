@@ -465,10 +465,10 @@ fun mapOfCollection(collection: String, mapper: Mapper): String {
 fun mapReduceOfCollection(
   collection: String,
   mapper: Mapper,
-  accumulator: JSONAccumulator,
+  reducer: JSONReducer,
 ): String {
   collectionForName(collection)
-    .mapReduce(mapper, accumulator, JSONFileConverter())
+    .mapReduce(mapper, reducer, JSONFileConverter())
     .getId()
 }
 
@@ -566,52 +566,46 @@ class Notifier(eptr: SKStore.ExternalPointer) {
   }
 }
 
-/************  Accumulator ****************/
+/************  Reducer ****************/
 
-@cpp_extern("SkipRuntime_Accumulator__accumulate")
+@cpp_extern("SkipRuntime_Reducer__add")
 @debug
-native fun accumulateOfAccumulator(
-  accumulator: UInt32,
+native fun addOfReducer(
+  reducer: UInt32,
   acc: SKJSON.CJSON,
   value: SKJSON.CJSON,
 ): SKJSON.CJSON;
 
-@cpp_extern("SkipRuntime_Accumulator__dismiss")
+@cpp_extern("SkipRuntime_Reducer__remove")
 @debug
-native fun dismissOfAccumulator(
-  accumulator: UInt32,
-  cumul: SKJSON.CJSON,
+native fun removeOfReducer(
+  reducer: UInt32,
+  acc: SKJSON.CJSON,
   value: SKJSON.CJSON,
 ): ?SKJSON.CJSON;
 
-@cpp_extern("SkipRuntime_deleteAccumulator")
+@cpp_extern("SkipRuntime_deleteReducer")
 @debug
-native fun deleteAccumulator(accumulator: UInt32): void;
+native fun deleteReducer(reducer: UInt32): void;
 
-@export("SkipRuntime_createAccumulator")
-fun createAccumulator(
-  accumulator: UInt32,
-  default: SKJSON.CJSON,
-): JSONAccumulator {
-  JSONAccumulator(
-    SKStore.ExternalPointer::create(accumulator, deleteAccumulator),
-    default,
-  )
+@export("SkipRuntime_createReducer")
+fun createReducer(reducer: UInt32, default: SKJSON.CJSON): JSONReducer {
+  JSONReducer(SKStore.ExternalPointer::create(reducer, deleteReducer), default)
 }
 
-class JSONAccumulator(
+class JSONReducer(
   eptr: SKStore.ExternalPointer,
-) extends Accumulator<SKJSON.CJSON, SKJSON.CJSON> {
+) extends Reducer<SKJSON.CJSON, SKJSON.CJSON> {
   fun getType(): SKStore.File ~> SKJSON.CJSON {
     f ~> JSONFile::type(f).value
   }
 
-  fun accumulate(acc: SKJSON.CJSON, value: SKJSON.CJSON): SKJSON.CJSON {
-    accumulateOfAccumulator(this.eptr.value, acc, value)
+  fun add(acc: SKJSON.CJSON, value: SKJSON.CJSON): SKJSON.CJSON {
+    addOfReducer(this.eptr.value, acc, value)
   }
 
-  fun dismiss(cumul: SKJSON.CJSON, value: SKJSON.CJSON): ?SKJSON.CJSON {
-    dismissOfAccumulator(this.eptr.value, cumul, value)
+  fun remove(acc: SKJSON.CJSON, value: SKJSON.CJSON): ?SKJSON.CJSON {
+    removeOfReducer(this.eptr.value, acc, value)
   }
 }
 

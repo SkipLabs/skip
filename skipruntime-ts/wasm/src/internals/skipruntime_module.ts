@@ -12,7 +12,7 @@ import type {
 import { errorObjectAsError } from "@skip-wasm/std";
 import type * as Internal from "./skipruntime_internal_types.js";
 import type {
-  Accumulator,
+  Reducer,
   NonEmptyIterator,
   EagerCollection,
   LazyCollection,
@@ -235,7 +235,7 @@ export interface FromWasm {
   SkipRuntime_Collection__mapReduce(
     collection: ptr<Internal.String>,
     mapper: ptr<Internal.Mapper>,
-    accumulator: ptr<Internal.Accumulator>,
+    reducer: ptr<Internal.Reducer>,
   ): ptr<Internal.String>;
 
   SkipRuntime_Collection__slice(
@@ -325,12 +325,12 @@ export interface FromWasm {
     values: ptr<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
   ): Handle<ErrorObject>;
 
-  // Accumulator
+  // Reducer
 
-  SkipRuntime_createAccumulator<K1 extends Json, V1 extends Json>(
-    ref: Handle<Accumulator<K1, V1>>,
+  SkipRuntime_createReducer<K1 extends Json, V1 extends Json>(
+    ref: Handle<Reducer<K1, V1>>,
     defaultValue: ptr<Internal.CJSON>,
-  ): ptr<Internal.Accumulator>;
+  ): ptr<Internal.Reducer>;
 
   // initService
   SkipRuntime_initService(service: ptr<Internal.Service>): number;
@@ -456,23 +456,21 @@ interface ToWasm {
     notifier: Handle<(update: CollectionUpdate<K, V>) => void>,
   ): void;
 
-  // Accumulator
+  // Reducer
 
-  SkipRuntime_Accumulator__accumulate(
-    notifier: Handle<Accumulator<Json, Json>>,
+  SkipRuntime_Reducer__add(
+    reducer: Handle<Reducer<Json, Json>>,
     acc: ptr<Internal.CJSON>,
     value: ptr<Internal.CJSON>,
   ): ptr<Internal.CJSON>;
 
-  SkipRuntime_Accumulator__dismiss(
-    notifier: Handle<Accumulator<Json, Json>>,
-    cumul: ptr<Internal.CJSON>,
+  SkipRuntime_Reducer__remove(
+    reducer: Handle<Reducer<Json, Json>>,
+    acc: ptr<Internal.CJSON>,
     value: ptr<Internal.CJSON>,
   ): ptr<Internal.CJSON>;
 
-  SkipRuntime_deleteAccumulator(
-    notifier: Handle<Accumulator<Json, Json>>,
-  ): void;
+  SkipRuntime_deleteReducer(reducer: Handle<Reducer<Json, Json>>): void;
 
   // Checker
 
@@ -747,40 +745,40 @@ class LinksImpl implements Links {
     this.handles.deleteHandle(notifier);
   }
 
-  // Accumulator
+  // Reducer
 
-  accumulateOfAccumulator(
-    skaccumulator: Handle<Accumulator<Json, Json>>,
+  addOfReducer(
+    skreducer: Handle<Reducer<Json, Json>>,
     skacc: ptr<Internal.CJSON>,
     skvalue: ptr<Internal.CJSON>,
   ) {
     const skjson = this.getSkjson();
-    const accumulator = this.handles.get(skaccumulator);
+    const reducer = this.handles.get(skreducer);
     return skjson.exportJSON(
-      accumulator.accumulate(
+      reducer.add(
         skacc ? (skjson.importJSON(skacc) as Json) : null,
         skjson.importJSON(skvalue) as Json,
       ),
     );
   }
 
-  dismissOfAccumulator(
-    skaccumulator: Handle<Accumulator<Json, Json>>,
-    skcumul: ptr<Internal.CJSON>,
+  removeOfReducer(
+    skreducer: Handle<Reducer<Json, Json>>,
+    skacc: ptr<Internal.CJSON>,
     skvalue: ptr<Internal.CJSON>,
   ) {
     const skjson = this.getSkjson();
-    const accumulator = this.handles.get(skaccumulator);
+    const reducer = this.handles.get(skreducer);
     return skjson.exportJSON(
-      accumulator.dismiss(
-        skjson.importJSON(skcumul) as Json,
+      reducer.remove(
+        skjson.importJSON(skacc) as Json,
         skjson.importJSON(skvalue) as Json,
       ),
     );
   }
 
-  deleteAccumulator(accumulator: Handle<Accumulator<Json, Json>>) {
-    this.handles.deleteHandle(accumulator);
+  deleteReducer(reducer: Handle<Reducer<Json, Json>>) {
+    this.handles.deleteHandle(reducer);
   }
 
   // ExternalService
@@ -1021,7 +1019,7 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     Params extends Param[],
   >(
     mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
-    accumulator: Accumulator<V2, V3>,
+    reducer: Reducer<V2, V3>,
     ...params: Params
   ) {
     params.forEach(check);
@@ -1033,14 +1031,14 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     const skmapper = this.refs.fromWasm.SkipRuntime_createMapper(
       this.refs.handles.register(mapperObj),
     );
-    const skaccumulator = this.refs.fromWasm.SkipRuntime_createAccumulator(
-      this.refs.handles.register(accumulator),
-      this.refs.skjson.exportJSON(accumulator.default),
+    const skreducer = this.refs.fromWasm.SkipRuntime_createReducer(
+      this.refs.handles.register(reducer),
+      this.refs.skjson.exportJSON(reducer.default),
     );
     const mapped = this.refs.fromWasm.SkipRuntime_Collection__mapReduce(
       this.refs.skjson.exportString(this.collection),
       skmapper,
-      skaccumulator,
+      skreducer,
     );
     return this.derive<K2, V3>(mapped);
   }
@@ -1671,13 +1669,11 @@ class Manager implements ToWasmManager {
     toWasm.SkipRuntime_Notifier__notify = links.notifyOfNotifier.bind(links);
     toWasm.SkipRuntime_deleteNotifier = links.deleteNotifier.bind(links);
 
-    // Accumulator
+    // Reducer
 
-    toWasm.SkipRuntime_Accumulator__accumulate =
-      links.accumulateOfAccumulator.bind(links);
-    toWasm.SkipRuntime_Accumulator__dismiss =
-      links.dismissOfAccumulator.bind(links);
-    toWasm.SkipRuntime_deleteAccumulator = links.deleteAccumulator.bind(links);
+    toWasm.SkipRuntime_Reducer__add = links.addOfReducer.bind(links);
+    toWasm.SkipRuntime_Reducer__remove = links.removeOfReducer.bind(links);
+    toWasm.SkipRuntime_deleteReducer = links.deleteReducer.bind(links);
 
     // Checker
 

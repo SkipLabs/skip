@@ -51,28 +51,28 @@ class JSONID(value: SKJSON.CJSON) extends SKStore.Key {
 class JSONFile(value: SKJSON.CJSON) extends SKStore.File
 
 fun accReducer<V1: SKStore.File, V2: SKStore.File>(
-  accumulator: Accumulator<V1, V2>,
+  reducer: Reducer<V1, V2>,
 ): SKStore.EReducer<V1, V2> {
   SKStore.EReducer{
-    type => accumulator.getType(),
+    type => reducer.getType(),
     canReset => true,
     init => iter ~> {
-      acc = accumulator.default;
+      acc = reducer.default;
       for (x in iter) {
-        !acc = accumulator.accumulate(acc, x)
+        !acc = reducer.add(acc, x)
       };
       Array[acc]
     },
     update => (state, old, new) ~> {
       acc = state[0];
       for (x in old) {
-        accumulator.dismiss(acc, x) match {
+        reducer.remove(acc, x) match {
         | Some(v) -> !acc = v
         | _ -> return None()
         }
       };
       for (x in new) {
-        !acc = accumulator.accumulate(acc, x)
+        !acc = reducer.add(acc, x)
       };
       Some(Array[acc])
     },
