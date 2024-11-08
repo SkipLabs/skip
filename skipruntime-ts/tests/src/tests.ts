@@ -15,7 +15,7 @@ import type {
   ExternalService,
   ReactiveResponse,
 } from "@skipruntime/api";
-import { OneToOneMapper } from "@skipruntime/api";
+import { NonUniqueValueException, OneToOneMapper } from "@skipruntime/api";
 import { Sum } from "@skipruntime/helpers";
 import {
   TimerResource,
@@ -57,7 +57,7 @@ class Map1 implements Mapper<string, number, string, number> {
     key: string,
     values: NonEmptyIterator<number>,
   ): Iterable<[string, number]> {
-    return Array([key, values.first() + 2]);
+    return Array([key, values.getUnique() + 2]);
   }
 }
 
@@ -191,7 +191,7 @@ class SizeMapper implements Mapper<number, number, number, number> {
     key: number,
     values: NonEmptyIterator<number>,
   ): Iterable<[number, number]> {
-    return [[key, values.first() + this.other.size()]];
+    return [[key, values.getUnique() + this.other.size()]];
   }
 }
 
@@ -254,12 +254,8 @@ class SlicedMap1Service implements SkipService {
 class TestLazyAdd implements LazyCompute<number, number> {
   constructor(private other: EagerCollection<number, number>) {}
 
-  compute(
-    _selfHdl: LazyCollection<number, number>,
-    key: number,
-  ): number | null {
-    const v = this.other.maybeGetOne(key);
-    return (v ?? 0) + 2;
+  compute(_selfHdl: LazyCollection<number, number>, key: number): number {
+    return this.other.getUnique(key) + 2;
   }
 }
 
@@ -270,7 +266,7 @@ class MapLazy implements Mapper<number, number, number, number> {
     key: number,
     values: NonEmptyIterator<number>,
   ): Iterable<[number, number]> {
-    return Array([key, this.other.getOne(key) - values.first()]);
+    return Array([key, this.other.getUnique(key) - values.getUnique()]);
   }
 }
 
@@ -302,7 +298,7 @@ class TestOddEven implements Mapper<number, number, number, number> {
     key: number,
     values: NonEmptyIterator<number>,
   ): Iterable<[number, number]> {
-    return Array([key % 2, values.first()]);
+    return Array([key % 2, values.getUnique()]);
   }
 }
 
@@ -394,7 +390,7 @@ class JSONExtract
     key: number,
     values: NonEmptyIterator<{ value: JsonObject; pattern: string }>,
   ): Iterable<[number, Json[]]> {
-    const value = values.first();
+    const value = values.getUnique();
     const result = this.context.jsonExtract(value.value, value.pattern);
     return Array([key, result]);
   }
@@ -481,12 +477,14 @@ class MockExternalCheck implements Mapper<number, number, number, number[]> {
     key: number,
     values: NonEmptyIterator<number>,
   ): Iterable<[number, number[]]> {
-    const result = this.external.maybeGetOne(key);
-    const value = values.toArray();
-    if (result != null) {
-      value.push(result);
+    try {
+      const result = this.external.getUnique(key);
+      return [[key, [...values, result]]];
+    } catch (e) {
+      if (e instanceof NonUniqueValueException)
+        return [[key, values.toArray()]];
+      throw e;
     }
-    return [[key, value]];
   }
 }
 
@@ -499,8 +497,8 @@ class MockExternalResource implements Resource {
     context: Context,
     reactiveAuth?: Uint8Array,
   ): EagerCollection<number, number[]> {
-    const v1 = (cs.input2.maybeGetOne(0) ?? 0).toString();
-    const v2 = (cs.input2.maybeGetOne(1) ?? 0).toString();
+    const v1 = cs.input2.getUnique(0).toString();
+    const v2 = cs.input2.getUnique(1).toString();
     const external = context.useExternalResource<number, number>({
       service: "external",
       identifier: "mock",

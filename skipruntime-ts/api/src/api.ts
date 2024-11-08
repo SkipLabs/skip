@@ -117,6 +117,11 @@ export interface Reducer<T extends Json, V extends Json> {
 }
 
 /**
+ * An exception indicating that `getUnique` was called on a structure without a unique element
+ */
+export class NonUniqueValueException extends Error {}
+
+/**
  * A mutable iterator with at least one element
  */
 export interface NonEmptyIterator<T> extends Iterable<T> {
@@ -127,15 +132,10 @@ export interface NonEmptyIterator<T> extends Iterable<T> {
   next(): Nullable<T>;
 
   /**
-   * Returns the first element of the iteration.
-   * @throws {Error} when called after `next`
+   * Return the first element of the iteration iff it contains exactly one element.
+   * Otherwise, throw a `NonUniqueValueException`.
    */
-  first(): T;
-
-  /**
-   * Returns the first element of the iteration iff it contains exactly one element
-   */
-  uniqueValue(): Opt<T>;
+  getUnique(): T;
 
   /**
    * Returns an array containing all values of the iterator
@@ -157,23 +157,15 @@ export interface NonEmptyIterator<T> extends Iterable<T> {
 export interface LazyCollection<K extends Json, V extends Json>
   extends Constant {
   /**
-   * Get (and potentially compute) all values mapped to by some key of a lazy reactive
-   * collection.
+   * Get (and potentially compute) all values mapped to by some key.
    */
   getArray(key: K): V[];
 
   /**
-   * Get (and potentially compute) a value of a lazy reactive collection.
-   * @throws {Error} when either zero or multiple such values exist
+   * Get (and potentially compute) the singleton value mapped to by some key.
+   * @throws {NonUniqueValueException} when the key maps to either zero or multiple values
    */
-  getOne(key: K): V;
-
-  /**
-   * Get (and potentially compute) a value of a lazy reactive collection, if one exists.
-   * If multiple values are mapped to by the key, any of them can be returned.
-   * @returns the value for this `key`, or null if no such value exists
-   */
-  maybeGetOne(key: K): Opt<V>;
+  getUnique(key: K): V;
 }
 
 /**
@@ -183,17 +175,16 @@ export interface LazyCollection<K extends Json, V extends Json>
 export interface EagerCollection<K extends Json, V extends Json>
   extends Constant {
   /**
-   * Get (and potentially compute) all values mapped to by some key of a lazy reactive
-   * collection.
+   * Get all values mapped to by some key.
    */
   getArray(key: K): V[];
 
   /**
-   * Get a value of an eager reactive collection, if one exists.
-   * If multiple values are mapped to by the key, any of them can be returned.
-   * @returns the value for this `key`, or null if no such value exists
+   * Get the singleton value mapped to by some key.
+   * @throws {NonUniqueValueException} when the key maps to either zero or multiple values
    */
-  maybeGetOne(key: K): Opt<V>;
+  getUnique(key: K): V;
+
   /**
    * Create a new eager collection by mapping some computation over this one
    * @param mapper - function to apply to each element of this collection

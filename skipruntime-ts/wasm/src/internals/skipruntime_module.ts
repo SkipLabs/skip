@@ -32,6 +32,7 @@ import type {
   SubscriptionID,
 } from "@skipruntime/api";
 
+import { NonUniqueValueException } from "@skipruntime/api";
 import { Frozen, type Constant } from "@skipruntime/api/internals.js";
 
 import type { Exportable, SKJSON } from "@skip-wasm/json";
@@ -222,7 +223,7 @@ export interface FromWasm {
     key: ptr<Internal.CJSON>,
   ): ptr<Internal.CJArray<Internal.CJSON>>;
 
-  SkipRuntime_Collection__maybeGetOne(
+  SkipRuntime_Collection__getUnique(
     collection: ptr<Internal.String>,
     key: ptr<Internal.CJSON>,
   ): ptr<Internal.CJSON>;
@@ -262,12 +263,7 @@ export interface FromWasm {
     key: ptr<Internal.CJSON>,
   ): ptr<Internal.CJArray<Internal.CJSON>>;
 
-  SkipRuntime_LazyCollection__maybeGetOne(
-    collection: ptr<Internal.String>,
-    key: ptr<Internal.CJSON>,
-  ): ptr<Internal.CJSON>;
-
-  SkipRuntime_LazyCollection__getOne(
+  SkipRuntime_LazyCollection__getUnique(
     collection: ptr<Internal.String>,
     key: ptr<Internal.CJSON>,
   ): ptr<Internal.CJSON>;
@@ -919,22 +915,15 @@ class LazyCollectionImpl<K extends Json, V extends Json>
     ) as V[];
   }
 
-  getOne(key: K): V {
-    return this.refs.skjson.importJSON(
-      this.refs.fromWasm.SkipRuntime_LazyCollection__getOne(
-        this.refs.skjson.exportString(this.lazyCollection),
-        this.refs.skjson.exportJSON(key),
-      ),
-    ) as V;
-  }
-
-  maybeGetOne(key: K): Nullable<V> {
-    return this.refs.skjson.importJSON(
-      this.refs.fromWasm.SkipRuntime_LazyCollection__maybeGetOne(
+  getUnique(key: K): V {
+    const v = this.refs.skjson.importOptJSON(
+      this.refs.fromWasm.SkipRuntime_LazyCollection__getUnique(
         this.refs.skjson.exportString(this.lazyCollection),
         this.refs.skjson.exportJSON(key),
       ),
     ) as Nullable<V>;
+    if (v == null) throw new NonUniqueValueException();
+    return v;
   }
 }
 
@@ -959,13 +948,15 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     ) as V[];
   }
 
-  maybeGetOne(key: K): Nullable<V> {
-    return this.refs.skjson.importJSON(
-      this.refs.fromWasm.SkipRuntime_Collection__maybeGetOne(
+  getUnique(key: K): V {
+    const v = this.refs.skjson.importOptJSON(
+      this.refs.fromWasm.SkipRuntime_Collection__getUnique(
         this.refs.skjson.exportString(this.collection),
         this.refs.skjson.exportJSON(key),
       ),
     ) as Nullable<V>;
+    if (v == null) throw new NonUniqueValueException();
+    return v;
   }
 
   size = () => {
@@ -1561,17 +1552,12 @@ class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
     ) as Nullable<T>;
   }
 
-  first(): T {
-    return this.skjson.importJSON(
-      this.exports.SkipRuntime_NonEmptyIterator__first(this.pointer),
-    ) as T;
-  }
-
-  uniqueValue(): Nullable<T> {
-    throw new Error("todo");
-    return this.skjson.importOptJSON(
+  getUnique(): T {
+    const value = this.skjson.importOptJSON(
       this.exports.SkipRuntime_NonEmptyIterator__uniqueValue(this.pointer),
     ) as Nullable<T>;
+    if (value == null) throw new NonUniqueValueException();
+    return value;
   }
 
   toArray: () => T[] = () => {
