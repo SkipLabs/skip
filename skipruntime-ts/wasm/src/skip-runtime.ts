@@ -10,7 +10,7 @@ export type {
   Context,
   Json,
   JsonObject,
-  Accumulator,
+  Reducer,
   Entry,
   ReactiveResponse,
   SkipService,

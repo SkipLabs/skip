@@ -94,10 +94,10 @@ export abstract class ManyToOneMapper<
 }
 
 /**
- * The type of a reactive accumulator (a.k.a. reducer) function, which computes an output
- * value over a collection as values are added/removed to the collection
+ * The type of a reactive reducer function, which computes an output
+ * value over a collection as values are added/removed
  */
-export interface Accumulator<T extends Json, V extends Json> {
+export interface Reducer<T extends Json, V extends Json> {
   default: Nullable<V>;
   /**
    * The computation to perform when an input value is added
@@ -213,21 +213,21 @@ export interface EagerCollection<K extends Json, V extends Json>
 
   /**
    * Create a new eager reactive collection by mapping some computation `mapper` over this
-   * one and then reducing the results with `accumulator`
+   * one and then reducing the results with `reducer`
    * @param mapper - function to apply to each element of this collection
-   * @param accumulator - function to combine results of the `mapper`
-   * @returns An eager collection containing the output of the accumulator
+   * @param reducer - function to combine results of the `mapper`
+   * @returns An eager collection containing the output of the reducer
    */
   mapReduce<
     K2 extends Json,
     V2 extends Json,
-    V3 extends Json,
+    Acc extends Json,
     Params extends Param[],
   >(
     mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
-    accumulator: Accumulator<V2, V3>,
+    reducer: Reducer<V2, Acc>,
     ...params: Params
-  ): EagerCollection<K2, V3>;
+  ): EagerCollection<K2, Acc>;
 
   /**
    * Create a new eager collection by keeping only the elements whose keys are in
