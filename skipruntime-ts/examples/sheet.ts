@@ -83,7 +83,7 @@ class Service implements SkipService {
     const cells = inputCollections.cells;
     // Use lazy dir to create eval dependency graph
     // Its calls it self to get other computed cells
-    const evaluator = context.lazy(ComputeExpression, cells);
+    const evaluator = context.createLazyCollection(ComputeExpression, cells);
     // Build a sub dependency graph for each sheet (For example purpose)
     // A parsing phase can be added to prevent expression parsing each time:
     // Parsing => Immutable ast
