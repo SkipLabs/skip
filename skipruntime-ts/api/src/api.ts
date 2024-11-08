@@ -1,4 +1,4 @@
-import type { Opaque, Opt, int, Constant } from "./internals.js";
+import type { Opaque, Nullable, int, Constant } from "./internals.js";
 
 /**
  * This file contains the Skip Runtime public API: types, interfaces, and operations that can
@@ -12,8 +12,8 @@ import type { Opaque, Opt, int, Constant } from "./internals.js";
  * reactive computation engine.
  */
 // Replicate definition of Json from skjson to avoid a dependency
-export type Json = number | boolean | string | JsonObject | (Json | null)[];
-export type JsonObject = { [key: string]: Json | null };
+export type Json = number | boolean | string | JsonObject | Nullable<Json>[];
+export type JsonObject = { [key: string]: Nullable<Json> };
 
 /**
  * A `Param` is a valid parameter to a Skip runtime mapper function: either a constant JS
@@ -98,14 +98,14 @@ export abstract class ManyToOneMapper<
  * value over a collection as values are added/removed to the collection
  */
 export interface Accumulator<T extends Json, V extends Json> {
-  default: Opt<V>;
+  default: Nullable<V>;
   /**
    * The computation to perform when an input value is added
    * @param acc - the current accumulated value
    * @param value - the added value
    * @returns the resulting accumulated value
    */
-  accumulate(acc: Opt<V>, value: T): V;
+  add(acc: Nullable<V>, value: T): V;
 
   /**
    * The computation to perform when an input value is removed
@@ -113,7 +113,7 @@ export interface Accumulator<T extends Json, V extends Json> {
    * @param value - the removed value
    * @returns the resulting accumulated value
    */
-  dismiss(acc: V, value: T): Opt<V>;
+  remove(acc: V, value: T): Nullable<V>;
 }
 
 /**
@@ -124,7 +124,7 @@ export interface NonEmptyIterator<T> extends Iterable<T> {
    * Return the next element of the iteration.
    * `first` cannot be called after `next`
    */
-  next(): Opt<T>;
+  next(): Nullable<T>;
 
   /**
    * Returns the first element of the iteration.
@@ -258,7 +258,7 @@ export interface EagerCollection<K extends Json, V extends Json>
  * The type of a _lazy_ reactive function which produces a value for some `key`, possibly using a `self` reference to get/produce other lazily-computed results.
  */
 export interface LazyCompute<K extends Json, V extends Json> {
-  compute(self: LazyCollection<K, V>, key: K): Opt<V>;
+  compute(self: LazyCollection<K, V>, key: K): Nullable<V>;
 }
 
 export interface Context extends Constant {
