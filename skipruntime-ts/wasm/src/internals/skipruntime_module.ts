@@ -374,7 +374,7 @@ interface ToWasm {
 
   // Mapper
 
-  SkipRuntime_Mapper__mapElement(
+  SkipRuntime_Mapper__mapEntry(
     mapper: Handle<JSONMapper>,
     key: ptr<Internal.CJSON>,
     values: ptr<Internal.NonEmptyIterator>,
@@ -591,14 +591,14 @@ class LinksImpl implements Links {
 
   // Mapper
 
-  mapElementOfMapper(
+  mapEntryOfMapper(
     skmapper: Handle<JSONMapper>,
     key: ptr<Internal.CJSON>,
     values: ptr<Internal.NonEmptyIterator>,
   ): ptr<Internal.CJArray> {
     const skjson = this.getSkjson();
     const mapper = this.handles.get(skmapper);
-    const result = mapper.mapElement(
+    const result = mapper.mapEntry(
       skjson.importJSON(key) as Json,
       new NonEmptyIteratorImpl(skjson, this.fromWasm, values),
     );
@@ -1627,8 +1627,7 @@ class Manager implements ToWasmManager {
 
     // Mapper
 
-    toWasm.SkipRuntime_Mapper__mapElement =
-      links.mapElementOfMapper.bind(links);
+    toWasm.SkipRuntime_Mapper__mapEntry = links.mapEntryOfMapper.bind(links);
     toWasm.SkipRuntime_deleteMapper = links.deleteMapper.bind(links);
 
     // LazyCompute

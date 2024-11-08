@@ -61,7 +61,7 @@ export default class HackerNewsService implements SkipService {
 }
 
 class UpvotesMapper {
-  mapElement(
+  mapEntry(
     key: number,
     values: NonEmptyIterator<Upvote>,
   ): Iterable<[number, number]> {
@@ -76,7 +76,7 @@ class PostsMapper {
     private upvotes: EagerCollection<number, number>,
   ) {}
 
-  mapElement(
+  mapEntry(
     key: number,
     values: NonEmptyIterator<Post>,
   ): Iterable<[number, Upvoted]> {
@@ -89,7 +89,7 @@ class PostsMapper {
 }
 
 class SortingMapper {
-  mapElement(
+  mapEntry(
     key: number,
     values: NonEmptyIterator<Upvoted>,
   ): Iterable<[number, Upvoted]> {

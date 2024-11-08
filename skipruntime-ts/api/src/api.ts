@@ -47,7 +47,7 @@ export interface Mapper<
   K2 extends Json,
   V2 extends Json,
 > {
-  mapElement(key: K1, values: NonEmptyIterator<V1>): Iterable<[K2, V2]>;
+  mapEntry(key: K1, values: NonEmptyIterator<V1>): Iterable<[K2, V2]>;
 }
 
 /**
@@ -55,7 +55,7 @@ export interface Mapper<
  * input collection's key structure in the output collection. Use this form
  * to map each value associated with a key to an output value for that
  * key. This saves some boilerplate: instead of writing the fully general
- * `mapElement` that potentially modifies, adds, or removes keys, just
+ * `mapEntry` that potentially modifies, adds, or removes keys, just
  * implement the simpler `mapValue` to transform individual values.
  */
 export abstract class OneToOneMapper<
@@ -66,7 +66,7 @@ export abstract class OneToOneMapper<
 {
   abstract mapValue(value: V1, key: K): V2;
 
-  mapElement(key: K, values: NonEmptyIterator<V1>): Iterable<[K, V2]> {
+  mapEntry(key: K, values: NonEmptyIterator<V1>): Iterable<[K, V2]> {
     return values.toArray().map((v) => [key, this.mapValue(v, key)]);
   }
 }
@@ -76,7 +76,7 @@ export abstract class OneToOneMapper<
  * input collection's key structure in the output collection. Use this form
  * to map all the values associated with a key to a single output value for
  * that key. This saves some boilerplate: instead of writing the fully
- * general `mapElement` that potentially modifies, adds, or removes keys,
+ * general `mapEntry` that potentially modifies, adds, or removes keys,
  * just implement the simpler `mapValues` to transform the values associated
  * with each key.
  */
@@ -88,7 +88,7 @@ export abstract class ManyToOneMapper<
 {
   abstract mapValues(values: NonEmptyIterator<V1>, key: K): V2;
 
-  mapElement(key: K, values: NonEmptyIterator<V1>): Iterable<[K, V2]> {
+  mapEntry(key: K, values: NonEmptyIterator<V1>): Iterable<[K, V2]> {
     return [[key, this.mapValues(values, key)]];
   }
 }
