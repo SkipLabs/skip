@@ -512,8 +512,8 @@ class MockExternalResource implements Resource {
     const v1 = (cs.input2.maybeGetOne(0) ?? 0).toString();
     const v2 = (cs.input2.maybeGetOne(1) ?? 0).toString();
     const external = context.useExternalResource<number, number>({
-      supplier: "external",
-      resource: "mock",
+      service: "external",
+      identifier: "mock",
       params: { v1, v2 },
       reactiveAuth,
     });
@@ -543,8 +543,8 @@ class TokensResource implements Resource {
     reactiveAuth?: Uint8Array,
   ): EagerCollection<string, number> {
     return context.useExternalResource({
-      supplier: "system",
-      resource: "timer",
+      service: "system",
+      identifier: "timer",
       params: { "5ms": 5 },
       reactiveAuth,
     });
