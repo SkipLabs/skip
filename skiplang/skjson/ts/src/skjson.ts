@@ -6,7 +6,7 @@ import type {
   Utils,
   ToWasmManager,
   Environment,
-  Opt,
+  Nullable,
   Shared,
 } from "@skip-wasm/std";
 import { sk_isArrayProxy, sk_isObjectProxy } from "@skip-wasm/std";
@@ -34,15 +34,15 @@ interface WasmAccess {
   SKIP_SKJSON_fieldAt: (
     json: ptr<Internal.CJObject>,
     idx: int,
-  ) => ptr<Internal.String>; // Should be Opt<...>
+  ) => ptr<Internal.String>; // Should be Nullable<...>
   SKIP_SKJSON_get: (
     json: ptr<Internal.CJObject>,
     idx: int,
-  ) => Opt<ptr<Internal.CJSON>>;
+  ) => Nullable<ptr<Internal.CJSON>>;
   SKIP_SKJSON_at: <T extends Internal.CJSON>(
     json: ptr<Internal.CJArray<T>>,
     idx: int,
-  ) => Opt<ptr<T>>;
+  ) => Nullable<ptr<T>>;
 
   SKIP_SKJSON_objectSize: (json: ptr<Internal.CJObject>) => int;
   SKIP_SKJSON_arraySize: (json: ptr<Internal.CJArray>) => int;
@@ -415,7 +415,10 @@ export interface SKJSON extends Shared {
     },
   ): ptr<T>;
   exportJSON(v: Json | null): ptr<Internal.CJSON>;
-  importOptJSON(value: Opt<ptr<Internal.CJSON>>, copy?: boolean): Exportable;
+  importOptJSON(
+    value: Nullable<ptr<Internal.CJSON>>,
+    copy?: boolean,
+  ): Exportable;
   importString(v: ptr<Internal.String>): string;
   exportString(v: string): ptr<Internal.String>;
   exportBytes(v: Uint8Array): ptr<Internal.Array<Internal.Byte>>;
@@ -441,7 +444,10 @@ class SKJSONShared implements SKJSON {
     public clone: <T>(v: T) => T,
   ) {}
 
-  importOptJSON(value: Opt<ptr<Internal.CJSON>>, copy?: boolean): Exportable {
+  importOptJSON(
+    value: Nullable<ptr<Internal.CJSON>>,
+    copy?: boolean,
+  ): Exportable {
     if (value === null || value === 0) {
       return null;
     }

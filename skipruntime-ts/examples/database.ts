@@ -75,7 +75,7 @@ async function initDB(): Promise<sqlite3.Database> {
 type User = { name: string; country: string };
 
 class UsersResource implements Resource {
-  reactiveCompute(cs: {
+  instantiate(cs: {
     users: EagerCollection<string, User>;
   }): EagerCollection<string, User> {
     return cs.users;
@@ -97,7 +97,7 @@ class Service implements SkipService {
     users: UsersResource,
   };
 
-  reactiveCompute(inputCollections: {
+  createGraph(inputCollections: {
     users: EagerCollection<string, User>;
   }): Record<string, EagerCollection<string, User>> {
     return inputCollections;

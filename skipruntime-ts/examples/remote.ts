@@ -18,17 +18,17 @@ class Mult extends ManyToOneMapper<string, number, number> {
 }
 
 class MultResource implements Resource {
-  reactiveCompute(
+  instantiate(
     _collections: Record<string, EagerCollection<Json, Json>>,
     context: Context,
   ): EagerCollection<string, number> {
     const sub = context.useExternalResource<string, number>({
-      supplier: "sumexample",
-      resource: "sub",
+      service: "sumexample",
+      identifier: "sub",
     });
     const add = context.useExternalResource<string, number>({
-      supplier: "sumexample",
-      resource: "add",
+      service: "sumexample",
+      identifier: "add",
     });
     return sub.merge(add).map(Mult);
   }
@@ -40,7 +40,7 @@ class Service implements SkipService {
     sumexample: SkipExternalService.direct({ host: "localhost", port: 3587 }),
   };
 
-  reactiveCompute(
+  createGraph(
     inputCollections: Record<string, EagerCollection<string, number>>,
   ) {
     return inputCollections;
