@@ -102,19 +102,17 @@ type JoinObject = { value: Json; side: "left" | "right" };
 
 class AddJoinSideField implements Mapper<Json, Json, Json, JoinObject> {
   constructor(private joinSide: "left" | "right") {}
+
   mapEntry(
     key: Json,
     values: NonEmptyIterator<Json>,
   ): Iterable<[Json, JoinObject]> {
-    let result: Array<[Json, JoinObject]> = [];
+    const result: [Json, JoinObject][] = [];
     for (const v of values) {
       if (typeof v !== "object") {
         throw new Error(
           "joinCollection only works on objects, not: " + JSON.stringify(v),
         );
-      }
-      if (v === null) {
-        throw new Error("joinCollection does not accept null");
       }
       result.push([key, { value: v, side: this.joinSide }]);
     }
@@ -125,12 +123,12 @@ class AddJoinSideField implements Mapper<Json, Json, Json, JoinObject> {
 function mergeObjects(object1: JoinObject, object2: JoinObject): Json {
   const v1 = object1.value;
   const v2 = object2.value;
-  if (typeof v1 !== "object" || v1 === null) {
+  if (typeof v1 !== "object") {
     throw new Error(
       "mergeObjects only works with objects, not: " + JSON.stringify(v1),
     );
   }
-  if (typeof v2 !== "object" || v1 === null) {
+  if (typeof v2 !== "object") {
     throw new Error(
       "mergeObjects only works with objects, not: " + JSON.stringify(v2),
     );
@@ -149,11 +147,12 @@ function mergeObjects(object1: JoinObject, object2: JoinObject): Json {
 
 class MergeJoinFields implements Mapper<JoinObject, JoinObject, Json, Json> {
   constructor(private allowNN: boolean) {}
+
   mapEntry(
     key: Json,
     values: NonEmptyIterator<JoinObject>,
   ): Iterable<[Json, Json]> {
-    const result: Array<[Json, Json]> = [];
+    const result: [Json, Json][] = [];
     let countLeft = 0;
     let countRight = 0;
     for (const value of values) {

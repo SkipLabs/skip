@@ -817,7 +817,7 @@ export function initTests(
     try {
       service.update("input1", [[1, [{ field1: 10 }, { field1: 11 }]]]);
       service.update("input2", [[1, [{ field2: 13 }, { field2: 14 }]]]);
-      throw null;
+      throw new Error("Should not happen");
     } catch (e) {
       if (e instanceof Error) {
         expect(e.message.includes("More than one value detected")).toEqual(
@@ -829,7 +829,7 @@ export function initTests(
     }
     try {
       service.update("input1", [[1, ["hello"]]]);
-      throw null;
+      throw new Error("Should not happen");
     } catch (e) {
       if (e instanceof Error) {
         expect(e.message.includes("only works on objects")).toEqual(true);
