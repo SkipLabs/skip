@@ -123,7 +123,7 @@ function mergeObjects(object1: JoinObject, object2: JoinObject): Json {
 }
 
 class MergeJoinFields implements Mapper<JoinObject, JoinObject, Json, Json> {
-  constructor(private allowNN: boolean) {}
+  constructor(private allowMultipleValuesOnBothSides: boolean) {}
 
   mapEntry(
     key: Json,
@@ -141,7 +141,7 @@ class MergeJoinFields implements Mapper<JoinObject, JoinObject, Json, Json> {
       }
     }
     if (countLeft > 1 && countRight > 1) {
-      if (!this.allowNN) {
+      if (!this.allowMultipleValuesOnBothSides) {
         throw new Error(
           "More than one value detected on both sides for key: " +
             JSON.stringify(key),
@@ -168,10 +168,13 @@ export function joinCollections<
 >(
   col1: EagerCollection<K, V1>,
   col2: EagerCollection<K, V2>,
-  allowNN: boolean = false,
+  allowMultipleValuesOnBothSides: boolean = false,
 ): EagerCollection<K, V1 & V2> {
   return col1
     .map(AddJoinSideField, "left")
     .merge(col2.map(AddJoinSideField, "right"))
-    .map(MergeJoinFields, allowNN) as EagerCollection<K, V1 & V2>;
+    .map(MergeJoinFields, allowMultipleValuesOnBothSides) as EagerCollection<
+    K,
+    V1 & V2
+  >;
 }
