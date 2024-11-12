@@ -16,7 +16,11 @@ import type {
   ReactiveResponse,
 } from "@skipruntime/api";
 import { NonUniqueValueException, OneToOneMapper } from "@skipruntime/api";
-import { Sum } from "@skipruntime/helpers";
+import {
+  Sum,
+  joinCollections,
+  type UniqueEagerCollection,
+} from "@skipruntime/helpers";
 import {
   TimerResource,
   GenericExternalService,
@@ -377,6 +381,29 @@ const mergeReduceService: SkipService = {
     return inputCollections;
   },
 };
+
+// Test join
+
+class JoinResource implements Resource {
+  instantiate(cs: {
+    input1: UniqueEagerCollection<number, JsonObject>;
+    input2: EagerCollection<number, JsonObject>;
+  }): EagerCollection<number, JsonObject> {
+    return joinCollections(cs.input1, cs.input2);
+  }
+}
+
+class JoinService implements SkipService {
+  initialData = { input1: [], input2: [] };
+  resources = { join: JoinResource };
+
+  createGraph(inputCollections: {
+    input1: EagerCollection<number, JsonObject>;
+    input2: EagerCollection<number, JsonObject>;
+  }) {
+    return inputCollections;
+  }
+}
 
 // testJSONExtract
 
@@ -775,6 +802,41 @@ export function initTests(
       [1, [20]],
       [2, [10]],
     ]);
+  });
+
+  it("testJoin", async () => {
+    const service = await initService(new JoinService());
+    const resource = "join";
+    service.update("input1", [[1, [{ field1: 10 }]]]);
+    service.update("input2", [[1, [{ field2: 20 }]]]);
+    service.update("input1", [[2, [{ field1: 10 }]]]);
+    service.update("input2", [[3, [{ field2: 20 }]]]);
+    expect(service.getAll(resource).payload.values).toEqual([
+      [1, [{ field1: 10, field2: 20 }]],
+    ]);
+    try {
+      service.update("input1", [[1, [{ field1: 10 }, { field1: 11 }]]]);
+      service.update("input2", [[1, [{ field2: 13 }, { field2: 14 }]]]);
+      throw null;
+    } catch (e) {
+      if (e instanceof Error) {
+        expect(e.message.includes("More than one value detected")).toEqual(
+          true,
+        );
+      } else {
+        throw e;
+      }
+    }
+    try {
+      service.update("input1", [[1, ["hello"]]]);
+      throw null;
+    } catch (e) {
+      if (e instanceof Error) {
+        expect(e.message.includes("only works on objects")).toEqual(true);
+      } else {
+        throw e;
+      }
+    }
   });
 
   it("testJSONExtract", async () => {
