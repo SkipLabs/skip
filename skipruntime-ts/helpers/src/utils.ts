@@ -72,29 +72,6 @@ export function reactiveResponseHeader(
 }
 
 /*****************************************************************************/
-// Unique collection
-/*****************************************************************************/
-
-export type UniqueEagerCollection<
-  K extends Json,
-  V extends Json,
-> = EagerCollection<K, V> & { unique: true };
-
-class UniqueMapper<K extends Json, V extends Json>
-  implements Mapper<K, V, K, V>
-{
-  mapEntry(key: K, values: NonEmptyIterator<V>): Iterable<[K, V]> {
-    return [[key, values.getUnique()]];
-  }
-}
-
-export function makeUniqueCollection<K extends Json, V extends Json>(
-  col: EagerCollection<K, V>,
-): UniqueEagerCollection<K, V> {
-  return { ...col.map(UniqueMapper<K, V>), unique: true };
-}
-
-/*****************************************************************************/
 // Joins
 /*****************************************************************************/
 

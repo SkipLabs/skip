@@ -11,7 +11,6 @@ export {
   CountMapper,
   parseReactiveResponse,
   reactiveResponseHeader,
-  type UniqueEagerCollection,
   joinCollections,
 } from "./utils.js";
 export { RESTWrapperOfSkipService } from "./rest.js";
