@@ -1,5 +1,6 @@
-import type { ReactiveResponse } from "@skipruntime/api";
-import { parseReactiveResponse } from "@skipruntime/helpers";
+// TODO: Remove once global `EventSource` makes it out of experimental
+// in nodejs LTS.
+import EventSource from "eventsource";
 import { fetchJSON } from "@skipruntime/helpers/rest.js";
 
 /*
@@ -15,25 +16,15 @@ const url = `http://localhost:${port.toString()}`;
 
 console.log("Connect to replication server for resource /users");
 
-const header = {
-  "Skip-Reactive-Auth": Buffer.from(publicKey.buffer).toString("base64"),
-};
-const [_e, headers] = await fetchJSON<ReactiveResponse>(
-  `${url}/auth/users`,
-  "HEAD",
-  header,
+const evSource = new EventSource(
+  `http://localhost:${replication.toString()}/v1/users`,
 );
-
-const reactive = parseReactiveResponse(headers);
-
-if (!reactive) {
-  throw new Error("Reactive response must be supplied.");
-}
-
-const evSource = new EventSource(`//localhost:${replication.toString()}`);
-evSource.onmessage = (e) => {
+evSource.onmessage = (e: MessageEvent<string>) => {
   const msg = JSON.parse(e.data);
-  console.log("Update", Object.fromEntries(msg.updates), msg.isInit);
+  console.log("Update", msg.values, msg.isInitial);
+};
+evSource.onerror = (e) => {
+  console.log(e);
 };
 
 await sleep(1000);
@@ -47,20 +38,14 @@ await fetchJSON(
   { name: "daniel", country: "UK" },
 );
 
-console.log(
-  "Get /user/123",
-  (await fetchJSON(`${url}/user/123`, "GET", header))[0],
-);
+console.log("Get /user/123", (await fetchJSON(`${url}/user/123`, "GET"))[0]);
 
 await sleep(1000);
 console.log("Delete /user/123");
 
 await fetchJSON(`${url}/user/123`, "DELETE", {});
 
-console.log(
-  "Get /user/123",
-  (await fetchJSON(`${url}/user/123`, "GET", header))[0],
-);
+console.log("Get /user/123", (await fetchJSON(`${url}/user/123`, "GET"))[0]);
 
 await sleep(1000);
-client.close();
+evSource.close();
