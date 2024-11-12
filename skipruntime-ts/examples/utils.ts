@@ -1,8 +1,8 @@
+// TODO: Remove once global `EventSource` makes it out of experimental
+// in nodejs LTS.
+import EventSource from "eventsource";
 import type { Json, Entry } from "@skipruntime/api";
-import {
-  RESTWrapperOfSkipService,
-  type Entrypoint,
-} from "@skipruntime/helpers/rest.js";
+import { RESTWrapperOfSkipService } from "@skipruntime/helpers/rest.js";
 import { createInterface } from "readline";
 
 export interface ClientDefinition {
@@ -20,19 +20,11 @@ interface Delete {
   keys: string[];
 }
 
-function toWs(entrypoint: Entrypoint) {
-  if (entrypoint.secured)
-    return `wss://${entrypoint.host}:${entrypoint.port.toString()}`;
-  return `ws://${entrypoint.host}:${entrypoint.port.toString()}`;
-}
-
 class SkipHttpAccessV1 {
   private services: Record<number, RESTWrapperOfSkipService>;
   private defaultPort: number;
 
-  constructor(
-    ports: number[] = [3587],
-  ) {
+  constructor(ports: number[] = [3587]) {
     this.defaultPort = ports[0] ?? 3587;
     this.services = {};
     for (const port of ports) {
@@ -77,18 +69,16 @@ class SkipHttpAccessV1 {
     console.log(JSON.stringify(result));
   }
 
-  async request(
-    resource: string,
-    params: Record<string, string>,
-    port?: number,
-  ) {
+  request(resource: string, params: Record<string, string>, port?: number) {
     const service = this.services[port ?? this.defaultPort];
     if (service === undefined) throw new Error(`Invalid port ${port}`);
 
-    const evSource = new EventSource(`//localhost:${port ?? this.defaultPort}?${querystring.encode(params)}`);
-    evSource.onmessage = (e) => {
+    const evSource = new EventSource(
+      `//localhost:${port ?? this.defaultPort}/v1/${resource}?${new URLSearchParams(params)}`,
+    );
+    evSource.onmessage = (e: MessageEvent<string>) => {
       const msg = JSON.parse(e.data);
-      console.log("Update", Object.fromEntries(msg.updates), msg.isInit);
+      console.log("Update", msg.updates, msg.isInit);
     };
   }
 }
@@ -302,7 +292,7 @@ class Player {
  * @param scenarios The scenarios
  * @param ports  The ports
  */
-export async function run(scenarios: Step[][], ports: number[] = [3587]) {
+export function run(scenarios: Step[][], ports: number[] = [3587]) {
   const access = new SkipHttpAccessV1(ports);
   const online = (line: string) => {
     if (line == "exit") {
@@ -318,12 +308,11 @@ export async function run(scenarios: Step[][], ports: number[] = [3587]) {
               params?: Record<string, string>;
               port?: number;
             };
-            access
-              .request(jsquery.resource, jsquery.params ?? {}, jsquery.port)
-              .then(console.log)
-              .catch((e: unknown) => {
-                console.error(e);
-              });
+            access.request(
+              jsquery.resource,
+              jsquery.params ?? {},
+              jsquery.port,
+            );
           },
         ],
         [
@@ -389,16 +378,11 @@ export async function run(scenarios: Step[][], ports: number[] = [3587]) {
     online,
     (step) => {
       if (step.type == "request") {
-        access
-          .request(
-            step.payload.resource,
-            step.payload.params ?? {},
-            step.payload.port,
-          )
-          .then(console.log)
-          .catch((e: unknown) => {
-            console.error(e);
-          });
+        access.request(
+          step.payload.resource,
+          step.payload.params ?? {},
+          step.payload.port,
+        );
       } else if (step.type == "write") {
         access
           .writeMany(step.payload)
@@ -422,7 +406,9 @@ export async function run(scenarios: Step[][], ports: number[] = [3587]) {
       }
     },
     console.error,
-    access.close.bind(access),
+    () => {
+      return;
+    },
   );
   const rl = createInterface({
     input: process.stdin,

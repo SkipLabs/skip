@@ -43,4 +43,4 @@ function scenarios() {
   ];
 }
 
-await run(scenarios());
+run(scenarios());
