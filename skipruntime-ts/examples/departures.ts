@@ -1,9 +1,4 @@
-import type {
-  SkipService,
-  EagerCollection,
-  Context,
-  Resource,
-} from "@skipruntime/api";
+import type { EagerCollection, Context, Resource } from "@skipruntime/api";
 import { runService } from "@skipruntime/server";
 import { GenericExternalService, Polled } from "@skipruntime/helpers";
 

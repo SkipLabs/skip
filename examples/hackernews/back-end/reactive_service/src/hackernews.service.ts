@@ -1,6 +1,5 @@
 import type {
   Entry,
-  Json,
   EagerCollection,
   NonEmptyIterator,
   SkipService,
