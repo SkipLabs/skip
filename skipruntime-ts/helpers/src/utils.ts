@@ -5,6 +5,7 @@ import type {
   NonEmptyIterator,
   ReactiveResponse,
   Json,
+  JsonObject,
   EagerCollection,
   Mapper,
 } from "@skipruntime/api";
@@ -173,8 +174,8 @@ class MergeJoinFields implements Mapper<JoinObject, JoinObject, Json, Json> {
 
 export function joinCollections<
   K extends Json,
-  V1 extends Json,
-  V2 extends Json,
+  V1 extends JsonObject,
+  V2 extends JsonObject,
 >(
   col1: EagerCollection<K, V1>,
   col2: EagerCollection<K, V2>,
