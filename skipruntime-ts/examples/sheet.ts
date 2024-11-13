@@ -72,26 +72,26 @@ class ComputedCells implements Resource {
   }
 }
 
-const service: SkipService = {
-  initialData: { cells: [] },
-  resources: { computed: ComputedCells },
-
-  createGraph(
-    inputCollections: { cells: EagerCollection<string, Json> },
-    context: Context,
-  ): Record<string, EagerCollection<Json, Json>> {
-    const cells = inputCollections.cells;
-    // Create evaluation dependency graph as _lazy_ collection, calling itself to access other cells
-    const evaluator = context.createLazyCollection(ComputeExpression, cells);
-    // Produce eager collection for output resource
-    return { output: cells.map(CallCompute, evaluator) };
+const service = await runService(
+  {
+    initialData: { cells: [] },
+    resources: { computed: ComputedCells },
+    createGraph(
+      inputCollections: { cells: EagerCollection<string, Json> },
+      context: Context,
+    ): Record<string, EagerCollection<Json, Json>> {
+      const cells = inputCollections.cells;
+      // Create evaluation dependency graph as _lazy_ collection, calling itself to access other cells
+      const evaluator = context.createLazyCollection(ComputeExpression, cells);
+      // Produce eager collection for output resource
+      return { output: cells.map(CallCompute, evaluator) };
+    },
   },
-};
-
-const closable = await runService(service, 9998);
+  9998,
+);
 
 function shutdown() {
-  closable.close();
+  service.close();
 }
 
 process.on("SIGTERM", shutdown);
