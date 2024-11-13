@@ -1,6 +1,6 @@
 import sqlite3 from "sqlite3";
 import { runService } from "@skipruntime/server";
-import HackerNewsService from "./dist/hackernews.service.js";
+import serviceWithInitialData from "./dist/hackernews.service.js";
 
 async function selectAll(db, table) {
   return new Promise((resolve, reject) => {
@@ -23,4 +23,4 @@ const upvotes = await selectAll(db, "upvotes");
 
 // Spawn a local HTTP server to support reading/writing and creating
 // reactive requests.
-runService(new HackerNewsService(posts, users, upvotes), 8080);
+runService(serviceWithInitialData(posts, users, upvotes), 8080);
