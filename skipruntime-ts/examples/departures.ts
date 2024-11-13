@@ -50,30 +50,28 @@ class DeparturesResource implements Resource {
   }
 }
 
-const service: SkipService = {
-  initialData: { config: [] },
-  resources: {
-    departures: DeparturesResource,
+const service = await runService(
+  {
+    initialData: { config: [] },
+    resources: {
+      departures: DeparturesResource,
+    },
+    externalServices: {
+      externalDeparturesAPI: new GenericExternalService({
+        departuresFromAPI: new Polled(
+          "https://api.unhcr.org/rsq/v1/departures",
+          10000,
+          (data: Result) => data.results.map((v, idx) => [idx, [v]]),
+        ),
+      }),
+    },
+    createGraph: (ic) => ic,
   },
-  externalServices: {
-    externalDeparturesAPI: new GenericExternalService({
-      departuresFromAPI: new Polled(
-        "https://api.unhcr.org/rsq/v1/departures",
-        10000,
-        (data: Result) => data.results.map((v, idx) => [idx, [v]]),
-      ),
-    }),
-  },
-
-  createGraph(ic: { config: EagerCollection<string, string[]> }) {
-    return ic;
-  },
-};
-
-const closable = await runService(service, 3590);
+  3590,
+);
 
 function shutdown() {
-  closable.close();
+  service.close();
 }
 
 process.on("SIGTERM", shutdown);
