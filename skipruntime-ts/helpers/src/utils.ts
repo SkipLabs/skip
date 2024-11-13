@@ -9,6 +9,8 @@ import type {
   Mapper,
 } from "@skipruntime/api";
 
+import { OneToOneMapper } from "@skipruntime/api";
+
 export class Sum implements Reducer<number, number> {
   default = 0;
 
@@ -77,24 +79,32 @@ export function reactiveResponseHeader(
 
 type JoinObject = { value: Json; side: "left" | "right" };
 
-class AddJoinSideField implements Mapper<Json, Json, Json, JoinObject> {
-  constructor(private joinSide: "left" | "right") {}
-
-  mapEntry(
-    key: Json,
-    values: NonEmptyIterator<Json>,
-  ): Iterable<[Json, JoinObject]> {
-    const result: [Json, JoinObject][] = [];
-    for (const v of values) {
-      if (typeof v !== "object") {
-        throw new Error(
-          "joinCollection only works on objects, not: " + JSON.stringify(v),
-        );
-      }
-      result.push([key, { value: v, side: this.joinSide }]);
-    }
-    return result;
+class AddJoinSideField extends OneToOneMapper<Json, Json, JoinObject> {
+  constructor(private joinSide: "left" | "right") {
+    super();
   }
+
+  mapValue(v: Json, _key: Json): JoinObject {
+    if (typeof v !== "object") {
+      throw new Error(
+        "joinCollections only works on objects, not: " + JSON.stringify(v),
+      );
+    }
+    return { value: v, side: this.joinSide };
+  }
+}
+
+function haveDistinctFields(obj1: object, obj2: object): boolean {
+  const keys1 = new Set(Object.keys(obj1));
+  const keys2 = Object.keys(obj2);
+
+  for (const key of keys2) {
+    if (keys1.has(key)) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function mergeObjects(object1: JoinObject, object2: JoinObject): Json {
@@ -110,8 +120,7 @@ function mergeObjects(object1: JoinObject, object2: JoinObject): Json {
       "mergeObjects only works with objects, not: " + JSON.stringify(v2),
     );
   }
-  const keys1 = Object.keys(v1);
-  if (keys1.some((key) => key in v2)) {
+  if (!haveDistinctFields(v1, v2)) {
     throw new Error(
       "Objects don't have distinct fields: " +
         JSON.stringify(v1) +

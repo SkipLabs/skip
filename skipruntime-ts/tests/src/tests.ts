@@ -16,11 +16,7 @@ import type {
   ReactiveResponse,
 } from "@skipruntime/api";
 import { NonUniqueValueException, OneToOneMapper } from "@skipruntime/api";
-import {
-  Sum,
-  joinCollections,
-  type UniqueEagerCollection,
-} from "@skipruntime/helpers";
+import { Sum, joinCollections } from "@skipruntime/helpers";
 import {
   TimerResource,
   GenericExternalService,
@@ -386,7 +382,7 @@ const mergeReduceService: SkipService = {
 
 class JoinResource implements Resource {
   instantiate(cs: {
-    input1: UniqueEagerCollection<number, JsonObject>;
+    input1: EagerCollection<number, JsonObject>;
     input2: EagerCollection<number, JsonObject>;
   }): EagerCollection<number, JsonObject> {
     return joinCollections(cs.input1, cs.input2);
@@ -837,6 +833,20 @@ export function initTests(
         throw e;
       }
     }
+    // One to many case
+    service.update("input2", [[2, [{ field3: 10 }, { field4: 10 }]]]);
+    // Many to one case
+    service.update("input1", [[1, [{ field1: 2 }]]]);
+    expect(service.getAll(resource).payload.values).toEqual([
+      [1, [{ field1: 2, field2: 20 }]],
+      [
+        2,
+        [
+          { field1: 10, field3: 10 },
+          { field1: 10, field4: 10 },
+        ],
+      ],
+    ]);
   });
 
   it("testJSONExtract", async () => {
