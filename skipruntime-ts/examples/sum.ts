@@ -23,25 +23,24 @@ class Minus extends ManyToOneMapper<string, number, number> {
   }
 }
 
-class Add implements Resource {
-  instantiate(cs: {
-    input1: EagerCollection<string, number>;
-    input2: EagerCollection<string, number>;
-  }): EagerCollection<string, number> {
+type Collections = {
+  input1: EagerCollection<string, number>;
+  input2: EagerCollection<string, number>;
+};
+
+class Add implements Resource<Collections> {
+  instantiate(cs: Collections): EagerCollection<string, number> {
     return cs.input1.merge(cs.input2).map(Plus);
   }
 }
 
-class Sub implements Resource {
-  instantiate(cs: {
-    input1: EagerCollection<string, number>;
-    input2: EagerCollection<string, number>;
-  }): EagerCollection<string, number> {
+class Sub implements Resource<Collections> {
+  instantiate(cs: Collections): EagerCollection<string, number> {
     return cs.input1.merge(cs.input2).map(Minus);
   }
 }
 
-const closable = await runService(
+const closable = await runService<Collections, Collections>(
   {
     initialData: { input1: [], input2: [] },
     resources: { add: Add, sub: Sub },

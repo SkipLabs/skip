@@ -38,7 +38,7 @@ export function serviceWithInitialData(
   posts: Entry<string, Post>[],
   users: Entry<string, User>[],
   upvotes: Entry<string, Upvote>[],
-): SkipService {
+): SkipService<Inputs, ResourceInputs> {
   return {
     initialData: { posts, users, upvotes },
     resources: { posts: PostsResource },
