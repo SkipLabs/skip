@@ -69,14 +69,14 @@ class Map1Resource implements Resource {
   }
 }
 
-class Map1Service implements SkipService {
-  initialData = { input: [] };
-  resources = { map1: Map1Resource };
+const map1Service: SkipService = {
+  initialData: { input: [] },
+  resources: { map1: Map1Resource },
 
   createGraph(inputCollections: { input: EagerCollection<number, number> }) {
     return inputCollections;
-  }
-}
+  },
+};
 
 //// testMap2
 
@@ -107,17 +107,17 @@ class Map2Resource implements Resource {
   }
 }
 
-class Map2Service implements SkipService {
-  initialData = { input1: [], input2: [] };
-  resources = { map2: Map2Resource };
+const map2Service: SkipService = {
+  initialData: { input1: [], input2: [] },
+  resources: { map2: Map2Resource },
 
   createGraph(inputCollections: {
     input1: EagerCollection<string, number>;
     input2: EagerCollection<string, number>;
   }) {
     return inputCollections;
-  }
-}
+  },
+};
 
 //// testMap3
 
@@ -139,17 +139,17 @@ class Map3Resource implements Resource {
   }
 }
 
-class Map3Service implements SkipService {
-  initialData = { input1: [], input2: [] };
-  resources = { map3: Map3Resource };
+const map3Service: SkipService = {
+  initialData: { input1: [], input2: [] },
+  resources: { map3: Map3Resource },
 
   createGraph(inputCollections: {
     input1: EagerCollection<number, number>;
     input2: EagerCollection<number, number>;
   }) {
     return inputCollections;
-  }
-}
+  },
+};
 
 //// testOneToOneMapper
 
@@ -173,14 +173,14 @@ class OneToOneMapperResource implements Resource {
   }
 }
 
-class OneToOneMapperService implements SkipService {
-  initialData = { input: [] };
-  resources = { valueMapper: OneToOneMapperResource };
+const oneToOneMapperService: SkipService = {
+  initialData: { input: [] },
+  resources: { valueMapper: OneToOneMapperResource },
 
   createGraph(inputCollections: { input: EagerCollection<number, number> }) {
     return inputCollections;
-  }
-}
+  },
+};
 
 //// testSize
 
@@ -204,17 +204,17 @@ class SizeResource implements Resource {
   }
 }
 
-class SizeService implements SkipService {
-  initialData = { input1: [], input2: [] };
-  resources = { size: SizeResource };
+const sizeService: SkipService = {
+  initialData: { input1: [], input2: [] },
+  resources: { size: SizeResource },
 
   createGraph(inputCollections: {
     input1: EagerCollection<number, number>;
     input2: EagerCollection<number, number>;
   }) {
     return inputCollections;
-  }
-}
+  },
+};
 
 //// testSlicedMap1
 
@@ -240,14 +240,14 @@ class SlicedMap1Resource implements Resource {
   }
 }
 
-class SlicedMap1Service implements SkipService {
-  initialData = { input: [] };
-  resources = { slice: SlicedMap1Resource };
+const slicedMap1Service: SkipService = {
+  initialData: { input: [] },
+  resources: { slice: SlicedMap1Resource },
 
   createGraph(inputCollections: { input: EagerCollection<number, number> }) {
     return inputCollections;
-  }
-}
+  },
+};
 
 //// testLazy
 
@@ -282,14 +282,14 @@ class LazyResource implements Resource {
   }
 }
 
-class LazyService implements SkipService {
-  initialData = { input: [] };
-  resources = { lazy: LazyResource };
+const lazyService: SkipService = {
+  initialData: { input: [] },
+  resources: { lazy: LazyResource },
 
   createGraph(inputCollections: { input: EagerCollection<number, number> }) {
     return inputCollections;
-  }
-}
+  },
+};
 
 //// testMapReduce
 
@@ -310,14 +310,14 @@ class MapReduceResource implements Resource {
   }
 }
 
-class MapReduceService implements SkipService {
-  initialData = { input: [] };
-  resources = { mapReduce: MapReduceResource };
+const mapReduceService: SkipService = {
+  initialData: { input: [] },
+  resources: { mapReduce: MapReduceResource },
 
   createGraph(inputCollections: { input: EagerCollection<number, number> }) {
     return inputCollections;
-  }
-}
+  },
+};
 
 //// testMerge1
 
@@ -330,17 +330,17 @@ class Merge1Resource implements Resource {
   }
 }
 
-class Merge1Service implements SkipService {
-  initialData = { input1: [], input2: [] };
-  resources = { merge1: Merge1Resource };
+const merge1Service: SkipService = {
+  initialData: { input1: [], input2: [] },
+  resources: { merge1: Merge1Resource },
 
   createGraph(inputCollections: {
     input1: EagerCollection<number, number>;
     input2: EagerCollection<number, number>;
   }) {
     return inputCollections;
-  }
-}
+  },
+};
 
 function sorted(entries: Entry<Json, Json>[]): Entry<Json, Json>[] {
   for (const entry of entries) {
@@ -366,17 +366,17 @@ class MergeReduceResource implements Resource {
   }
 }
 
-class MergeReduceService implements SkipService {
-  initialData = { input1: [], input2: [] };
-  resources = { mergeReduce: MergeReduceResource };
+const mergeReduceService: SkipService = {
+  initialData: { input1: [], input2: [] },
+  resources: { mergeReduce: MergeReduceResource },
 
   createGraph(inputCollections: {
     input1: EagerCollection<number, number>;
     input2: EagerCollection<number, number>;
   }) {
     return inputCollections;
-  }
-}
+  },
+};
 
 // testJSONExtract
 
@@ -407,16 +407,16 @@ class JSONExtractResource implements Resource {
   }
 }
 
-class JSONExtractService implements SkipService {
-  initialData = { input: [] };
-  resources = { jsonExtract: JSONExtractResource };
+const jsonExtractService: SkipService = {
+  initialData: { input: [] },
+  resources: { jsonExtract: JSONExtractResource },
 
   createGraph(inputCollections: {
     input: EagerCollection<number, { value: JsonObject; pattern: string }>;
   }) {
     return inputCollections;
-  }
-}
+  },
+};
 
 //// testExternalService
 
@@ -509,18 +509,18 @@ class MockExternalResource implements Resource {
   }
 }
 
-class TestExternalService implements SkipService {
-  initialData = { input1: [], input2: [] };
-  resources = { external: MockExternalResource };
-  externalServices = { external: new MockExternal() };
+const testExternalService: SkipService = {
+  initialData: { input1: [], input2: [] },
+  resources: { external: MockExternalResource },
+  externalServices: { external: new MockExternal() },
 
   createGraph(inputCollections: {
     input1: EagerCollection<number, number>;
     input2: EagerCollection<number, number>;
   }) {
     return inputCollections;
-  }
-}
+  },
+};
 
 //// testCloseSession
 
@@ -541,15 +541,15 @@ class TokensResource implements Resource {
 
 const system = new GenericExternalService({ timer: new TimerResource() });
 
-class TokensService implements SkipService {
-  initialData = { input: [] };
-  resources = { tokens: TokensResource };
-  externalServices = { system };
+const tokensService: SkipService = {
+  initialData: { input: [] },
+  resources: { tokens: TokensResource },
+  externalServices: { system },
 
   createGraph() {
     return {};
-  }
-}
+  },
+};
 
 //// testMultipleResources
 
@@ -569,29 +569,29 @@ class Resource2 implements Resource {
   }
 }
 
-class MultipleResourcesService implements SkipService {
-  initialData = { input1: [], input2: [] };
-  resources = { resource1: Resource1, resource2: Resource2 };
+const multipleResourcesService: SkipService = {
+  initialData: { input1: [], input2: [] },
+  resources: { resource1: Resource1, resource2: Resource2 },
 
   createGraph(inputCollections: {
     input1: EagerCollection<number, number>;
     input2: EagerCollection<number, number>;
   }) {
     return inputCollections;
-  }
-}
+  },
+};
 
 export function initTests(
   initService: (service: SkipService) => Promise<ServiceInstance>,
 ) {
   it("testMap1", async () => {
-    const service = await initService(new Map1Service());
+    const service = await initService(map1Service);
     service.update("input", [["1", [10]]]);
     expect(service.getArray("map1", "1").payload).toEqual([12]);
   });
 
   it("testMap2", async () => {
-    const service = await initService(new Map2Service());
+    const service = await initService(map2Service);
     const resource = "map2";
     service.update("input1", [["1", [10]]]);
     service.update("input2", [["1", [20]]]);
@@ -605,7 +605,7 @@ export function initTests(
   });
 
   it("testMap3", async () => {
-    const service = await initService(new Map3Service());
+    const service = await initService(map3Service);
     const resource = "map3";
     service.update("input1", [["1", [1, 2, 3]]]);
     service.update("input2", [["1", [10]]]);
@@ -619,7 +619,7 @@ export function initTests(
   });
 
   it("valueMapper", async () => {
-    const service = await initService(new OneToOneMapperService());
+    const service = await initService(oneToOneMapperService);
     const resource = "valueMapper";
     service.update("input", [
       [1, [1]],
@@ -636,7 +636,7 @@ export function initTests(
   });
 
   it("testSize", async () => {
-    const service = await initService(new SizeService());
+    const service = await initService(sizeService);
     const resource = "size";
     service.update("input1", [
       [1, [0]],
@@ -662,7 +662,7 @@ export function initTests(
   });
 
   it("testSlicedMap1", async () => {
-    const service = await initService(new SlicedMap1Service());
+    const service = await initService(slicedMap1Service);
     const resource = "slice";
     // Inserts [[0, 0], ..., [30, 30]
     const values = Array.from({ length: 31 }, (_, i): Entry<number, number> => {
@@ -681,7 +681,7 @@ export function initTests(
   });
 
   it("testLazy", async () => {
-    const service = await initService(new LazyService());
+    const service = await initService(lazyService);
     const resource = "lazy";
     service.update("input", [
       [0, [10]],
@@ -705,7 +705,7 @@ export function initTests(
   });
 
   it("testMapReduce", async () => {
-    const service = await initService(new MapReduceService());
+    const service = await initService(mapReduceService);
     const resource = "mapReduce";
     service.update("input", [
       [0, [1]],
@@ -738,7 +738,7 @@ export function initTests(
   });
 
   it("testMerge1", async () => {
-    const service = await initService(new Merge1Service());
+    const service = await initService(merge1Service);
     const resource = "merge1";
     service.update("input1", [[1, [10]]]);
     service.update("input2", [[1, [20]]]);
@@ -759,7 +759,7 @@ export function initTests(
   });
 
   it("testMergeReduce", async () => {
-    const service = await initService(new MergeReduceService());
+    const service = await initService(mergeReduceService);
     const resource = "mergeReduce";
     service.update("input1", [[1, [10]]]);
     service.update("input2", [[1, [20]]]);
@@ -778,7 +778,7 @@ export function initTests(
   });
 
   it("testJSONExtract", async () => {
-    const service = await initService(new JSONExtractService());
+    const service = await initService(jsonExtractService);
     const resource = "jsonExtract";
     service.update("input", [
       [
@@ -837,7 +837,7 @@ export function initTests(
 
   it("testExternal", async () => {
     const resource = "external";
-    const service = await initService(new TestExternalService());
+    const service = await initService(testExternalService);
     service.update("input1", [
       [0, [10]],
       [1, [20]],
@@ -875,7 +875,7 @@ export function initTests(
   });
 
   it("testCloseSession", async () => {
-    const service = await initService(new TokensService());
+    const service = await initService(tokensService);
     const resource = "tokens";
     const start = service.getArray(resource, "5ms").payload;
     await timeout(2);
@@ -890,7 +890,7 @@ export function initTests(
   });
 
   it("testMultipleResources", async () => {
-    const service = await initService(new MultipleResourcesService());
+    const service = await initService(multipleResourcesService);
     service.update("input1", [["1", [10]]]);
     expect(service.getArray("resource1", "1").payload).toEqual([10]);
     service.update("input2", [["1", [20]]]);

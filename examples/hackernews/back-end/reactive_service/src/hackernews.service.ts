@@ -26,38 +26,33 @@ type Upvote = {
 
 type Upvoted = Post & { upvotes: number; author: User };
 
-export default class HackerNewsService implements SkipService {
-  initialData: {
-    posts: Entry<string, Post>[];
-    users: Entry<string, User>[];
-    upvotes: Entry<string, Upvote>[];
+type Inputs = {
+  posts: EagerCollection<number, Post>;
+  users: EagerCollection<number, User>;
+  upvotes: EagerCollection<number, Upvote>;
+};
+type ResourceInputs = {
+  postsWithUpvotes: EagerCollection<number, Upvoted>;
+};
+
+export function serviceWithInitialData(
+  posts: Entry<string, Post>[],
+  users: Entry<string, User>[],
+  upvotes: Entry<string, Upvote>[],
+): SkipService {
+  return {
+    initialData: { posts, users, upvotes },
+    resources: { posts: PostsResource },
+    createGraph: (inputCollections: Inputs): ResourceInputs => {
+      return {
+        postsWithUpvotes: inputCollections.posts.map(
+          PostsMapper,
+          inputCollections.users,
+          inputCollections.upvotes.map(UpvotesMapper),
+        ),
+      };
+    },
   };
-  resources = { posts: PostsResource };
-
-  constructor(
-    posts: Entry<string, Post>[],
-    users: Entry<string, User>[],
-    upvotes: Entry<string, Upvote>[],
-  ) {
-    this.initialData = { posts, users, upvotes };
-  }
-
-  createGraph(inputCollections: {
-    posts: EagerCollection<number, Post>;
-    users: EagerCollection<number, User>;
-    upvotes: EagerCollection<number, Upvote>;
-  }): Record<string, EagerCollection<Json, Json>> {
-    const upvotes = inputCollections.upvotes.map(UpvotesMapper);
-    const postsWithUpvotes = inputCollections.posts.map(
-      PostsMapper,
-      inputCollections.users,
-      upvotes,
-    );
-
-    return {
-      postsWithUpvotes,
-    };
-  }
 }
 
 class UpvotesMapper {
@@ -107,9 +102,7 @@ class PostsResource implements Resource {
     this.limit = Number(params["limit"]);
   }
 
-  instantiate(collections: {
-    postsWithUpvotes: EagerCollection<number, Upvoted>;
-  }): EagerCollection<number, Upvoted> {
+  instantiate(collections: ResourceInputs): EagerCollection<number, Upvoted> {
     return collections.postsWithUpvotes.take(this.limit).map(SortingMapper);
   }
 }

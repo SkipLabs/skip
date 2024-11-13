@@ -50,12 +50,12 @@ class DeparturesResource implements Resource {
   }
 }
 
-class Service implements SkipService {
-  initialData = { config: [] };
-  resources = {
+const service: SkipService = {
+  initialData: { config: [] },
+  resources: {
     departures: DeparturesResource,
-  };
-  externalServices = {
+  },
+  externalServices: {
     externalDeparturesAPI: new GenericExternalService({
       departuresFromAPI: new Polled(
         "https://api.unhcr.org/rsq/v1/departures",
@@ -63,14 +63,14 @@ class Service implements SkipService {
         (data: Result) => data.results.map((v, idx) => [idx, [v]]),
       ),
     }),
-  };
+  },
 
   createGraph(ic: { config: EagerCollection<string, string[]> }) {
     return ic;
-  }
-}
+  },
+};
 
-const closable = await runService(new Service(), 3590);
+const closable = await runService(service, 3590);
 
 function shutdown() {
   closable.close();

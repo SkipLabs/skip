@@ -86,22 +86,13 @@ class UsersResource implements Resource {
 // Setting up the service
 /*****************************************************************************/
 
-class Service implements SkipService {
-  initialData: { users: Entry<string, User>[] };
-
-  constructor(users: Entry<string, User>[]) {
-    this.initialData = { users };
-  }
-
-  resources = {
-    users: UsersResource,
+function serviceWithInitialData(users: Entry<string, User>[]): SkipService {
+  return {
+    initialData: { users },
+    resources: { users: UsersResource },
+    createGraph: (inputCollections: { users: EagerCollection<string, User> }) =>
+      inputCollections,
   };
-
-  createGraph(inputCollections: {
-    users: EagerCollection<string, User>;
-  }): Record<string, EagerCollection<string, User>> {
-    return inputCollections;
-  }
 }
 
 // Command that starts the service
@@ -124,7 +115,7 @@ const data = await new Promise<Entry<string, User>[]>(function (
 });
 db.close();
 
-const closable = await runService(new Service(data), 8081);
+const closable = await runService(serviceWithInitialData(data), 8081);
 
 function shutdown() {
   closable.close();

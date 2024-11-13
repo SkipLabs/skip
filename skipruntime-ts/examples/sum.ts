@@ -42,18 +42,12 @@ class Sub implements Resource {
   }
 }
 
-class Service implements SkipService {
-  initialData = { input1: [], input2: [] };
-  resources = { add: Add, sub: Sub };
-
-  createGraph(
-    inputCollections: Record<string, EagerCollection<string, number>>,
-  ) {
-    return inputCollections;
-  }
-}
-
-const closable = await runService(new Service(), 3587);
+const service: SkipService = {
+  initialData: { input1: [], input2: [] },
+  resources: { add: Add, sub: Sub },
+  createGraph: (inputs) => inputs,
+};
+const closable = await runService(service, 3587);
 
 function shutdown() {
   closable.close();

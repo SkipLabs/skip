@@ -72,28 +72,23 @@ class ComputedCells implements Resource {
   }
 }
 
-class Service implements SkipService {
-  initialData = { cells: [] };
-  resources = { computed: ComputedCells };
+const service: SkipService = {
+  initialData: { cells: [] },
+  resources: { computed: ComputedCells },
 
   createGraph(
     inputCollections: { cells: EagerCollection<string, Json> },
     context: Context,
   ): Record<string, EagerCollection<Json, Json>> {
     const cells = inputCollections.cells;
-    // Use lazy dir to create eval dependency graph
-    // Its calls it self to get other computed cells
+    // Create evaluation dependency graph as _lazy_ collection, calling itself to access other cells
     const evaluator = context.createLazyCollection(ComputeExpression, cells);
-    // Build a sub dependency graph for each sheet (For example purpose)
-    // A parsing phase can be added to prevent expression parsing each time:
-    // Parsing => Immutable ast
-    // Evaluation => Compute tree with context
-    const output = cells.map(CallCompute, evaluator);
-    return { output };
-  }
-}
+    // Produce eager collection for output resource
+    return { output: cells.map(CallCompute, evaluator) };
+  },
+};
 
-const closable = await runService(new Service(), 9998);
+const closable = await runService(service, 9998);
 
 function shutdown() {
   closable.close();
