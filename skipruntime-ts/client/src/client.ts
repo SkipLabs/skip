@@ -30,6 +30,8 @@ export type {
   ReactiveResponse,
 };
 
+import WebSocket from "ws";
+
 import * as Protocol from "./protocol.js";
 
 export { Protocol };

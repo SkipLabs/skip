@@ -782,7 +782,13 @@ mutable class Context{
         | Some(child @ EagerDir _) ->
           this.!toReset = this.toReset.set(parentName);
           parentMaps = child.parents.maybeGet(parentName) match {
-          | None() -> invariant_violation("Could not find parent")
+          | None() ->
+            invariant_violation(
+              "Could not find parent: " +
+                parentName +
+                " for child " +
+                childName,
+            )
           | Some(f) -> f
           };
           EagerDir::update(

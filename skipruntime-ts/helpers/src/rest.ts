@@ -31,7 +31,9 @@ export async function fetchJSON<V>(
     signal: AbortSignal.timeout(1000),
   });
   if (!response.ok) {
-    throw new Error(`${response.status}: ${response.statusText}`);
+    const objStr = JSON.stringify(await response.json());
+    const msg = `${response.status}, ${response.statusText}, ${objStr}`;
+    throw new Error(msg);
   }
   const responseText = await response.text();
   const responseJSON =
