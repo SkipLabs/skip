@@ -152,8 +152,9 @@ class MergeJoinFields implements Mapper<JoinObject, JoinObject, Json, Json> {
     if (countLeft > 1 && countRight > 1) {
       if (!this.allowMultipleValuesOnBothSides) {
         throw new Error(
-          "More than one value detected on both sides for key: " +
-            JSON.stringify(key),
+          `Potentially expensive join of ${countLeft} x ${countRight} \
+           values for key: ${JSON.stringify(key)}. \
+           If this is intended, pass allowMultipleValuesOnBothSides = true.`,
         );
       }
     }
