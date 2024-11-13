@@ -358,7 +358,7 @@ export interface ExternalService {
   shutdown(): void;
 }
 
-export type NamedCollections = Record<string, EagerCollection<Json, Json>>;
+export type NamedCollections = { [name: string]: EagerCollection<Json, Json> };
 
 /**
  * `Resource`s make up the public interface of a SkipService, specifying how to respond
