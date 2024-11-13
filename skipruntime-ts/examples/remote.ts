@@ -34,23 +34,24 @@ class MultResource implements Resource {
   }
 }
 
-const service: SkipService = {
-  resources: { data: MultResource },
-  externalServices: {
-    sumexample: SkipExternalService.direct({ host: "localhost", port: 3587 }),
-  },
+const service = await runService(
+  {
+    resources: { data: MultResource },
+    externalServices: {
+      sumexample: SkipExternalService.direct({ host: "localhost", port: 3587 }),
+    },
 
-  createGraph(
-    inputCollections: Record<string, EagerCollection<string, number>>,
-  ) {
-    return inputCollections;
+    createGraph(
+      inputCollections: Record<string, EagerCollection<string, number>>,
+    ) {
+      return inputCollections;
+    },
   },
-};
-
-const closable = await runService(service, 3588);
+  3588,
+);
 
 function shutdown() {
-  closable.close();
+  service.close();
 }
 
 process.on("SIGTERM", shutdown);

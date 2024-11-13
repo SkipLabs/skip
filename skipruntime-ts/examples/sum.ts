@@ -42,12 +42,14 @@ class Sub implements Resource {
   }
 }
 
-const service: SkipService = {
-  initialData: { input1: [], input2: [] },
-  resources: { add: Add, sub: Sub },
-  createGraph: (inputs) => inputs,
-};
-const closable = await runService(service, 3587);
+const closable = await runService(
+  {
+    initialData: { input1: [], input2: [] },
+    resources: { add: Add, sub: Sub },
+    createGraph: (inputs) => inputs,
+  },
+  3587,
+);
 
 function shutdown() {
   closable.close();
