@@ -358,39 +358,55 @@ export interface ExternalService {
   shutdown(): void;
 }
 
+export type NamedCollections = Record<string, EagerCollection<Json, Json>>;
+
 /**
- * A Resource allows to supply a SkipService reactive resource
+ * `Resource`s make up the public interface of a SkipService, specifying how to respond
+ * to reactive requests, either by accessing data from the static computation graph
+ * generated in the service's `createGraph` function or extending it with further reactive
+ *  computations as needed to handle the request.
  */
-export interface Resource {
+export interface Resource<
+  Collections extends NamedCollections = NamedCollections,
+> {
   /**
    * Build a reactive compute graph of the reactive resource
    * @param collections - the collections returned by SkipService's `createGraph`
    * @param context {Context} - the reactive graph context
    * @param reactiveAuth - the client user Skip session authentication
+   * @returns - An eager collection containing the outputs of this resource for the given
+   * parameters, produced from the static output collections of the service's `createGraph`
    */
   instantiate(
-    collections: Record<string, EagerCollection<Json, Json>>,
+    collections: Collections,
     context: Context,
     reactiveAuth?: Uint8Array,
   ): EagerCollection<Json, Json>;
 }
 
-export interface SkipService {
+export interface SkipService<
+  Inputs extends NamedCollections = NamedCollections,
+  ResourceInputs extends NamedCollections = NamedCollections,
+> {
   /** The data used to initially populate the input collections of the service */
-  initialData?: Record<string, Entry<Json, Json>[]>;
-  /** The external services of the service */
+  initialData?: { [Name in keyof Inputs]: Entry<Json, Json>[] };
+  /** The external service dependencies of the service */
   externalServices?: Record<string, ExternalService>;
-  /** The reactive resources of the service */
-  resources?: Record<string, new (params: Record<string, string>) => Resource>;
+  /** The reactive resources which compose the public interface of this reactive service */
+  resources?: Record<
+    string,
+    new (params: Record<string, string>) => Resource<ResourceInputs>
+  >;
 
   /**
-   * Build a reactive shared initial compute graph
-   * @param inputCollections - the input collections of SkipService
+   * Build a static reactive compute graph by defining some collections to be passed
+   * to resources.
+   *
+   * This graph can be extended by the resources' `instantiate` methods to extend the
+   * compute graph dynamically as needed to serve requests.
+   * @param inputCollections - the input collections of this service
    * @param context {Context} - the reactive graph context
    * @returns - the reactive collections accessible by the resources
    */
-  createGraph(
-    inputCollections: Record<string, EagerCollection<Json, Json>>,
-    context: Context,
-  ): Record<string, EagerCollection<Json, Json>>;
+  createGraph(inputCollections: Inputs, context: Context): ResourceInputs;
 }
