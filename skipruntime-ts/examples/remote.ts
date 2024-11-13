@@ -2,7 +2,6 @@ import type {
   Context,
   EagerCollection,
   NonEmptyIterator,
-  SkipService,
   Resource,
   Json,
 } from "@skipruntime/api";

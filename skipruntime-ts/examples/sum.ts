@@ -1,7 +1,6 @@
 import type {
   EagerCollection,
   NonEmptyIterator,
-  SkipService,
   Resource,
 } from "@skipruntime/api";
 

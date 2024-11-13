@@ -4,7 +4,6 @@ import type {
   EagerCollection,
   LazyCollection,
   Json,
-  SkipService,
   Resource,
 } from "@skipruntime/api";
 
