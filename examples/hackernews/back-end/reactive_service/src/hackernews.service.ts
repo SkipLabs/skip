@@ -25,6 +25,15 @@ type Upvote = {
 
 type Upvoted = Post & { upvotes: number; author: User };
 
+type Inputs = {
+  posts: EagerCollection<number, Post>;
+  users: EagerCollection<number, User>;
+  upvotes: EagerCollection<number, Upvote>;
+};
+type Outputs = {
+  postsWithUpvotes: EagerCollection<number, Upvoted>;
+};
+
 export function serviceWithInitialData(
   posts: Entry<string, Post>[],
   users: Entry<string, User>[],
@@ -33,11 +42,7 @@ export function serviceWithInitialData(
   return {
     initialData: { posts, users, upvotes },
     resources: { posts: PostsResource },
-    createGraph: (inputCollections: {
-      posts: EagerCollection<number, Post>;
-      users: EagerCollection<number, User>;
-      upvotes: EagerCollection<number, Upvote>;
-    }) => {
+    createGraph: (inputCollections: Inputs) => {
       return {
         postsWithUpvotes: inputCollections.posts.map(
           PostsMapper,
@@ -96,9 +101,7 @@ class PostsResource implements Resource {
     this.limit = Number(params["limit"]);
   }
 
-  instantiate(collections: {
-    postsWithUpvotes: EagerCollection<number, Upvoted>;
-  }): EagerCollection<number, Upvoted> {
+  instantiate(collections: Outputs): EagerCollection<number, Upvoted> {
     return collections.postsWithUpvotes.take(this.limit).map(SortingMapper);
   }
 }
