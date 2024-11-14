@@ -66,7 +66,7 @@ class CallCompute extends OneToOneMapper<string, Json, Json> {
 type Inputs = { cells: EagerCollection<string, Json> };
 type Outputs = { output: EagerCollection<string, Json> };
 
-class ComputedCells implements Resource {
+class ComputedCells implements Resource<Outputs> {
   instantiate(collections: Outputs): EagerCollection<string, Json> {
     return collections.output;
   }

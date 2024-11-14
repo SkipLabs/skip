@@ -2,8 +2,8 @@ import type {
   Context,
   EagerCollection,
   NonEmptyIterator,
+  NamedCollections,
   Resource,
-  Json,
 } from "@skipruntime/api";
 import { ManyToOneMapper } from "@skipruntime/api";
 import { SkipExternalService } from "@skipruntime/helpers";
@@ -18,7 +18,7 @@ class Mult extends ManyToOneMapper<string, number, number> {
 
 class MultResource implements Resource {
   instantiate(
-    _collections: Record<string, EagerCollection<Json, Json>>,
+    _collections: NamedCollections,
     context: Context,
   ): EagerCollection<string, number> {
     const sub = context.useExternalResource<string, number>({
@@ -40,9 +40,7 @@ const service = await runService(
       sumexample: SkipExternalService.direct({ host: "localhost", port: 3587 }),
     },
 
-    createGraph(
-      inputCollections: Record<string, EagerCollection<string, number>>,
-    ) {
+    createGraph(inputCollections: NamedCollections) {
       return inputCollections;
     },
   },
