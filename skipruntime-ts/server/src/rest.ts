@@ -18,7 +18,6 @@ export function createRESTServer(service: ServiceInstance): express.Express {
         req.params.resource,
         req.params.key,
         req.query as Record<string, string>,
-        undefined,
         {
           resolve: (data: Json) => {
             res.status(200).json(data);
@@ -67,7 +66,6 @@ export function createRESTServer(service: ServiceInstance): express.Express {
           service.getAll(
             req.params.resource,
             req.query as Record<string, string>,
-            undefined,
             {
               resolve: (data: Values<Json, Json>) => {
                 res.status(200).json(data.values);

@@ -9,13 +9,9 @@ export interface ExternalResource {
       error: (error: Json) => void;
       loading: () => void;
     },
-    reactiveAuth?: Uint8Array,
   ): void;
 
-  close(
-    params: Record<string, string | number>,
-    reactiveAuth?: Uint8Array,
-  ): void;
+  close(params: Record<string, string | number>): void;
 }
 
 export class GenericExternalService implements ExternalService {
@@ -29,7 +25,6 @@ export class GenericExternalService implements ExternalService {
       error: (error: Json) => void;
       loading: () => void;
     },
-    reactiveAuth?: Uint8Array,
   ): void {
     const resource = this.resources[resourceName] as
       | ExternalResource
@@ -37,21 +32,17 @@ export class GenericExternalService implements ExternalService {
     if (!resource) {
       throw new Error(`Unkonwn resource named '${resourceName}'`);
     }
-    resource.open(params, callbacks, reactiveAuth);
+    resource.open(params, callbacks);
   }
 
-  unsubscribe(
-    resourceName: string,
-    params: Record<string, string>,
-    reactiveAuth?: Uint8Array,
-  ) {
+  unsubscribe(resourceName: string, params: Record<string, string>) {
     const resource = this.resources[resourceName] as
       | ExternalResource
       | undefined;
     if (!resource) {
       throw new Error(`Unkonwn resource named '${resourceName}'`);
     }
-    resource.close(params, reactiveAuth);
+    resource.close(params);
   }
 
   shutdown(): void {
@@ -71,7 +62,6 @@ export class TimerResource implements ExternalResource {
       error: (error: Json) => void;
       loading: () => void;
     },
-    reactiveAuth?: Uint8Array,
   ) {
     const time = new Date().getTime();
     const values: Entry<string, number>[] = [];
@@ -79,7 +69,7 @@ export class TimerResource implements ExternalResource {
       values.push([name, [time]]);
     }
     callbacks.update(values, true);
-    const id = toId(params, reactiveAuth);
+    const id = toId(params);
     const intervals: Record<string, Timeout> = {};
     for (const [name, duration] of Object.entries(params)) {
       const ms = Number(duration);
@@ -93,11 +83,8 @@ export class TimerResource implements ExternalResource {
     this.intervals.set(id, intervals);
   }
 
-  close(
-    params: Record<string, string | number>,
-    reactiveAuth?: Uint8Array,
-  ): void {
-    const intervals = this.intervals.get(toId(params, reactiveAuth));
+  close(params: Record<string, string | number>): void {
+    const intervals = this.intervals.get(toId(params));
     if (intervals != null) {
       for (const interval of Object.values(intervals)) {
         clearInterval(interval);
@@ -124,9 +111,8 @@ export class Polled<S extends Json, K extends Json, V extends Json>
       error: (error: Json) => void;
       loading: () => void;
     },
-    reactiveAuth?: Uint8Array,
   ): void {
-    this.close(params, reactiveAuth);
+    this.close(params);
     const queryParams: Record<string, string> = {};
     for (const [key, value] of Object.entries(params)) {
       queryParams[key] = value.toString();
@@ -145,30 +131,20 @@ export class Polled<S extends Json, K extends Json, V extends Json>
         });
     };
     call();
-    this.intervals.set(
-      toId(params, reactiveAuth),
-      setInterval(call, this.duration),
-    );
+    this.intervals.set(toId(params), setInterval(call, this.duration));
   }
 
-  close(
-    params: Record<string, string | number>,
-    reactiveAuth?: Uint8Array,
-  ): void {
-    const interval = this.intervals.get(toId(params, reactiveAuth));
+  close(params: Record<string, string | number>): void {
+    const interval = this.intervals.get(toId(params));
     if (interval) {
       clearInterval(interval);
     }
   }
 }
 
-function toId(
-  params: Record<string, string | number>,
-  reactiveAuth?: Uint8Array,
-): string {
+function toId(params: Record<string, string | number>): string {
   const strparams = Object.entries(params)
     .map(([key, value]) => `${key}:${value.toString()}`)
     .sort();
-  const hex = reactiveAuth ? Buffer.from(reactiveAuth).toString("hex") : "";
-  return `[${strparams.join(",")}]${hex}`;
+  return `[${strparams.join(",")}]`;
 }

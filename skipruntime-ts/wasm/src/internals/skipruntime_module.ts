@@ -279,13 +279,11 @@ export interface FromWasm {
   SkipRuntime_Runtime__createResource(
     resource: ptr<Internal.String>,
     jsonParams: ptr<Internal.CJObject>,
-    reactiveAuth: ptr<Internal.Array<Internal.Byte>> | null,
   ): ptr<Internal.CJArray | Internal.CJFloat>;
 
   SkipRuntime_Runtime__getAll(
     resource: ptr<Internal.String>,
     jsonParams: ptr<Internal.CJObject>,
-    reactiveAuth: ptr<Internal.Array<Internal.Byte>> | null,
     request: ptr<Internal.Request> | null,
   ): ptr<Internal.CJObject | Internal.CJFloat>;
 
@@ -293,25 +291,18 @@ export interface FromWasm {
     resource: ptr<Internal.String>,
     jsonParams: ptr<Internal.CJObject>,
     key: ptr<Internal.CJSON>,
-    reactiveAuth: ptr<Internal.Array<Internal.Byte>> | null,
     request: ptr<Internal.Request> | null,
   ): ptr<Internal.CJObject | Internal.CJFloat>;
 
   SkipRuntime_Runtime__closeResource(
     resource: ptr<Internal.String>,
     jsonParams: ptr<Internal.CJObject>,
-    reactiveAuth: ptr<Internal.Array<Internal.Byte>> | null,
-  ): Handle<ErrorObject>;
-
-  SkipRuntime_Runtime__closeSession(
-    reactiveAuth: ptr<Internal.Array<Internal.Byte>> | null,
   ): Handle<ErrorObject>;
 
   SkipRuntime_Runtime__subscribe(
     collection: ptr<Internal.String>,
     fromWatermark: bigint,
     notifier: ptr<Internal.Notifier>,
-    reactiveAuth: ptr<Internal.Array<Internal.Byte>> | null,
   ): bigint;
 
   SkipRuntime_Runtime__unsubscribe(id: bigint): Handle<ErrorObject>;
@@ -349,7 +340,6 @@ export interface FromWasm {
     service: ptr<Internal.String>,
     identifier: ptr<Internal.String>,
     params: ptr<Internal.CJObject>,
-    reactiveAuth: ptr<Internal.Array<Internal.Byte>> | null,
   ): ptr<Internal.String>;
 
   // Checker
@@ -395,14 +385,12 @@ interface ToWasm {
     collection: ptr<Internal.String>,
     resource: ptr<Internal.String>,
     params: ptr<Internal.CJObject>,
-    reactiveAuth: ptr<Internal.Array<Internal.Byte>>,
   ): void;
 
   SkipRuntime_ExternalService__unsubscribe(
     supplier: Handle<ExternalService>,
     skresource: ptr<Internal.String>,
     skparams: ptr<Internal.CJObject>,
-    reactiveAuth: ptr<Internal.Array<Internal.Byte>>,
   ): void;
 
   SkipRuntime_ExternalService__shutdown(
@@ -416,7 +404,6 @@ interface ToWasm {
   SkipRuntime_Resource__instantiate(
     resource: Handle<Resource>,
     collections: ptr<Internal.CJObject>,
-    reactiveAuth: ptr<Internal.Array<Internal.Byte>>,
   ): ptr<Internal.String>;
 
   SkipRuntime_deleteResource(resource: Handle<Resource>): void;
@@ -632,7 +619,6 @@ class LinksImpl implements Links {
   instantiateOfResource(
     skresource: Handle<Resource>,
     skcollections: ptr<Internal.CJObject>,
-    skreactiveAuth: ptr<Internal.Array<Internal.Byte>>,
   ): ptr<Internal.String> {
     const skjson = this.getSkjson();
     const resource = this.handles.get(skresource);
@@ -647,15 +633,7 @@ class LinksImpl implements Links {
     for (const [key, name] of Object.entries(keysIds)) {
       collections[key] = new EagerCollectionImpl(name, refs);
     }
-    const reactiveAuth = skreactiveAuth
-      ? skjson.importBytes(skreactiveAuth)
-      : undefined;
-    // TODO: Manage skstore
-    const collection = resource.instantiate(
-      collections,
-      new ContextImpl(refs),
-      reactiveAuth,
-    );
+    const collection = resource.instantiate(collections, new ContextImpl(refs));
     const res = (collection as EagerCollectionImpl<Json, Json>).collection;
     return skjson.exportString(res);
   }
@@ -785,45 +763,32 @@ class LinksImpl implements Links {
     skwriter: ptr<Internal.String>,
     skresource: ptr<Internal.String>,
     skparams: ptr<Internal.CJObject>,
-    skreactiveAuth: ptr<Internal.Array<Internal.Byte>>,
   ) {
     const skjson = this.getSkjson();
     const supplier = this.handles.get(sksupplier);
-    const reactiveAuth = skreactiveAuth
-      ? skjson.importBytes(skreactiveAuth)
-      : undefined;
     const writer = new CollectionWriter(
       skjson.importString(skwriter),
       new Refs(skjson, this.fromWasm, this.handles, this.needGC.bind(this)),
     );
     const resource = skjson.importString(skresource);
     const params = skjson.importJSON(skparams, true) as Record<string, string>;
-    supplier.subscribe(
-      resource,
-      params,
-      {
-        update: writer.update.bind(writer),
-        error: writer.error.bind(writer),
-        loading: writer.loading.bind(writer),
-      },
-      reactiveAuth,
-    );
+    supplier.subscribe(resource, params, {
+      update: writer.update.bind(writer),
+      error: writer.error.bind(writer),
+      loading: writer.loading.bind(writer),
+    });
   }
 
   unsubscribeOfExternalService(
     sksupplier: Handle<ExternalService>,
     skresource: ptr<Internal.String>,
     skparams: ptr<Internal.CJObject>,
-    skreactiveAuth: ptr<Internal.Array<Internal.Byte>>,
   ) {
     const skjson = this.getSkjson();
     const supplier = this.handles.get(sksupplier);
-    const reactiveAuth = skreactiveAuth
-      ? skjson.importBytes(skreactiveAuth)
-      : undefined;
     const resource = skjson.importString(skresource);
     const params = skjson.importJSON(skparams, true) as Record<string, string>;
-    supplier.unsubscribe(resource, params, reactiveAuth);
+    supplier.unsubscribe(resource, params);
   }
 
   shutdownOfExternalService(sksupplier: Handle<ExternalService>) {
@@ -1138,16 +1103,12 @@ class ContextImpl extends SkFrozen implements Context {
     service: string;
     identifier: string;
     params?: Record<string, string | number>;
-    reactiveAuth?: Uint8Array;
   }): EagerCollection<K, V> {
     const skcollection =
       this.refs.fromWasm.SkipRuntime_Context__useExternalResource(
         this.refs.skjson.exportString(resource.service),
         this.refs.skjson.exportString(resource.identifier),
         this.refs.skjson.exportJSON(resource.params ?? {}),
-        resource.reactiveAuth
-          ? this.refs.skjson.exportBytes(resource.reactiveAuth)
-          : null,
       );
     const collection = this.refs.skjson.importString(skcollection);
     return new EagerCollectionImpl<K, V>(collection, this.refs);
@@ -1226,14 +1187,12 @@ class AllChecker<K extends Json, V extends Json> implements Checker {
     private executor: Executor<Values<K, V>>,
     private resource: string,
     private params: Record<string, string>,
-    private reactiveAuth?: Uint8Array,
   ) {}
 
   check(request: string): void {
     const result = this.service.getAll<K, V>(
       this.resource,
       this.params,
-      this.reactiveAuth,
       request,
     );
     if (result.errors.length > 0) {
@@ -1251,7 +1210,6 @@ class OneChecker<V extends Json> implements Checker {
     private resource: string,
     private params: Record<string, string>,
     private key: string | number,
-    private reactiveAuth?: Uint8Array,
   ) {}
 
   check(request: string): void {
@@ -1259,7 +1217,6 @@ class OneChecker<V extends Json> implements Checker {
       this.resource,
       this.key,
       this.params,
-      this.reactiveAuth,
       request,
     );
     if (result.errors.length > 0) {
@@ -1281,20 +1238,17 @@ export class ServiceInstance {
    * Instantiate a resource with some parameters and client session authentication token
    * @param resource - A resource name, which must correspond to a key in this `SkipService`'s `resources` field
    * @param params - Resource parameters, which will be passed to the resource constructor specified in this `SkipService`'s `resources` field
-   * @param reactiveAuth - A client-generated Skip session authentication token
    * @returns A response token which can be used to initiate reactive subscription
    */
   instantiateResource(
     resource: string,
     params: Record<string, string>,
-    reactiveAuth?: Uint8Array,
   ): ReactiveResponse {
     const result = this.refs.skjson.runWithGC(() => {
       return this.refs.skjson.importJSON(
         this.refs.fromWasm.SkipRuntime_Runtime__createResource(
           this.refs.skjson.exportString(resource),
           this.refs.skjson.exportJSON(params),
-          reactiveAuth ? this.refs.skjson.exportBytes(reactiveAuth) : null,
         ),
         true,
       );
@@ -1310,13 +1264,11 @@ export class ServiceInstance {
    * Creates if not exists and get all current values of specified resource
    * @param resource - the resource name corresponding to a key in remotes field of SkipService
    * @param params - the parameters of the resource used to build the resource with the corresponding constructor specified in remotes field of SkipService
-   * @param reactiveAuth - the client user Skip session authentication
    * @returns The current values of the corresponding resource with reactive responce token to allow subscription
    */
   getAll<K extends Json, V extends Json>(
     resource: string,
     params: Record<string, string> = {},
-    reactiveAuth?: Uint8Array,
     request?: string | Executor<Values<K, V>>,
   ): GetResult<Values<K, V>> {
     const get_ = () => {
@@ -1324,7 +1276,6 @@ export class ServiceInstance {
         this.refs.fromWasm.SkipRuntime_Runtime__getAll(
           this.refs.skjson.exportString(resource),
           this.refs.skjson.exportJSON(params),
-          reactiveAuth ? this.refs.skjson.exportBytes(reactiveAuth) : null,
           request !== undefined
             ? typeof request == "string"
               ? this.refs.fromWasm.SkipRuntime_createIdentifier(
@@ -1332,13 +1283,7 @@ export class ServiceInstance {
                 )
               : this.refs.fromWasm.SkipRuntime_createChecker(
                   this.refs.handles.register(
-                    new AllChecker(
-                      this,
-                      request,
-                      resource,
-                      params,
-                      reactiveAuth,
-                    ),
+                    new AllChecker(this, request, resource, params),
                   ),
                 )
             : null,
@@ -1361,14 +1306,12 @@ export class ServiceInstance {
    * @param resource - A resource name, which must correspond to a key in this `SkipService`'s `resources` field
    * @param key - A key to look up in the resource instance
    * @param params - Resource parameters, passed to the resource constructor specified in this `SkipService`'s `resources` field
-   * @param reactiveAuth - the client Skip session authentication token
    * @returns The current value(s) for this key in the specified resource instance
    */
   getArray<V extends Json>(
     resource: string,
     key: string | number,
     params: Record<string, string> = {},
-    reactiveAuth?: Uint8Array,
     request?: string | Executor<V[]>,
   ): GetResult<V[]> {
     const get_ = () => {
@@ -1377,7 +1320,6 @@ export class ServiceInstance {
           this.refs.skjson.exportString(resource),
           this.refs.skjson.exportJSON(params),
           this.refs.skjson.exportJSON(key),
-          reactiveAuth ? this.refs.skjson.exportBytes(reactiveAuth) : null,
           request !== undefined
             ? typeof request == "string"
               ? this.refs.fromWasm.SkipRuntime_createIdentifier(
@@ -1385,14 +1327,7 @@ export class ServiceInstance {
                 )
               : this.refs.fromWasm.SkipRuntime_createChecker(
                   this.refs.handles.register(
-                    new OneChecker(
-                      this,
-                      request,
-                      resource,
-                      params,
-                      key,
-                      reactiveAuth,
-                    ),
+                    new OneChecker(this, request, resource, params, key),
                   ),
                 )
             : null,
@@ -1414,33 +1349,15 @@ export class ServiceInstance {
    * Close the specified resource instance
    * @param resource - The resource name, which must correspond to a key in this `SkipService`'s `resources` field
    * @param params - Resource parameters which were used to instantiate the resource
-   * @param reactiveAuth - The client Skip session authentication for this resource instance
    */
   closeResourceInstance(
     resource: string,
     params: Record<string, string>,
-    reactiveAuth?: Uint8Array,
   ): void {
     const result = this.refs.skjson.runWithGC(() => {
       return this.refs.fromWasm.SkipRuntime_Runtime__closeResource(
         this.refs.skjson.exportString(resource),
         this.refs.skjson.exportJSON(params),
-        reactiveAuth ? this.refs.skjson.exportBytes(reactiveAuth) : null,
-      );
-    });
-    if (result != 0) {
-      throw this.refs.handles.deleteAsError(result);
-    }
-  }
-
-  /**
-   * Close all resource instances maintained for the specified `reactiveAuth` session
-   * @param reactiveAuth - A client Skip session authentication token
-   */
-  closeSession(reactiveAuth?: Uint8Array): void {
-    const result = this.refs.skjson.runWithGC(() => {
-      return this.refs.fromWasm.SkipRuntime_Runtime__closeSession(
-        reactiveAuth ? this.refs.skjson.exportBytes(reactiveAuth) : null,
       );
     });
     if (result != 0) {
@@ -1452,13 +1369,11 @@ export class ServiceInstance {
    * Initiate reactive subscription on a resource instance
    * @param reactiveResponse - the reactive response
    * @param f - A callback to execute on collection updates
-   * @param reactiveAuth The client Skip session authentication token corresponding to the reactive response
    * @returns A subcription identifier
    */
   subscribe<K extends Json, V extends Json>(
     reactiveResponse: ReactiveResponse,
     f: (update: CollectionUpdate<K, V>) => void,
-    reactiveAuth?: Uint8Array,
   ): SubscriptionID {
     const session = this.refs.skjson.runWithGC(() => {
       const sknotifier = this.refs.fromWasm.SkipRuntime_createNotifier(
@@ -1468,16 +1383,11 @@ export class ServiceInstance {
         this.refs.skjson.exportString(reactiveResponse.collection),
         BigInt(reactiveResponse.watermark),
         sknotifier,
-        reactiveAuth ? this.refs.skjson.exportBytes(reactiveAuth) : null,
       );
     });
     if (session == -1n) {
       throw new UnknownCollectionError(
         `Unknown collection '${reactiveResponse.collection}'`,
-      );
-    } else if (session == -2n) {
-      throw new UnknownCollectionError(
-        `Access to collection '${reactiveResponse.collection}' refused.`,
       );
     } else if (session < 0n) {
       throw new Error("Unknown error");

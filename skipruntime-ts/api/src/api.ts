@@ -263,14 +263,12 @@ export interface Context extends Constant {
    * @param resource.service - the name of the external service, which must correspond to a key in the `externalServices` field of the `SkipService` this `Context` belongs to
    * @param resource.identifier - the resource identifier managed by the service
    * @param resource.params - the parameters to supply to the resource
-   * @param resource.reactiveAuth - the caller client user Skip session authentication
    * @returns An eager reactive collection of the external resource
    */
   useExternalResource<K extends Json, V extends Json>(resource: {
     service: string;
     identifier: string;
     params?: Record<string, string | number>;
-    reactiveAuth?: Uint8Array;
   }): EagerCollection<K, V>;
 
   jsonExtract(value: JsonObject, pattern: string): Json[];
@@ -327,7 +325,6 @@ export interface ExternalService {
    * @param callbacks.update - the update callback
    * @param callbacks.error - the error callback
    * @param callbacks.loading - the loading callback
-   * @param reactiveAuth - the client user Skip session authentication of the caller
    */
   subscribe(
     resource: string,
@@ -337,20 +334,14 @@ export interface ExternalService {
       error: (error: Json) => void;
       loading: () => void;
     },
-    reactiveAuth?: Uint8Array,
   ): void;
 
   /**
    * Unsubscribe to the external resource
    * @param resource - the name of the external resource
    * @param params - the parameters of the external resource
-   * @param reactiveAuth - the client user Skip session authentication of the caller
    */
-  unsubscribe(
-    resource: string,
-    params: Record<string, string | number>,
-    reactiveAuth?: Uint8Array,
-  ): void;
+  unsubscribe(resource: string, params: Record<string, string | number>): void;
 
   /**
    * Shutdown the external supplier
@@ -373,14 +364,12 @@ export interface Resource<
    * Build a reactive compute graph of the reactive resource
    * @param collections - the collections returned by SkipService's `createGraph`
    * @param context {Context} - the reactive graph context
-   * @param reactiveAuth - the client user Skip session authentication
    * @returns - An eager collection containing the outputs of this resource for the given
    * parameters, produced from the static output collections of the service's `createGraph`
    */
   instantiate(
     collections: Collections,
     context: Context,
-    reactiveAuth?: Uint8Array,
   ): EagerCollection<Json, Json>;
 }
 
