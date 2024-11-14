@@ -147,7 +147,6 @@ native fun subscribeOfExternalService(
   collection: String,
   resource: String,
   params: SKJSON.CJObject,
-  reactiveAuth: ?Array<UInt8>,
 ): void;
 
 @cpp_extern("SkipRuntime_ExternalService__unsubscribe")
@@ -156,7 +155,6 @@ native fun unsubscribeOfExternalService(
   externalSupplier: UInt32,
   resource: String,
   params: SKJSON.CJObject,
-  reactiveAuth: ?Array<UInt8>,
 ): void;
 
 @cpp_extern("SkipRuntime_ExternalService__shutdown")
@@ -181,28 +179,17 @@ class ExternExternalService(
     collection: CollectionWriter,
     resource: String,
     params: Map<String, PValue>,
-    reactiveAuth: ?Array<UInt8>,
   ): void {
     subscribeOfExternalService(
       this.eptr.value,
       collection.dirName.toString(),
       resource,
       jsonParams(params),
-      reactiveAuth,
     )
   }
 
-  fun unsubscribe(
-    resource: String,
-    params: Map<String, PValue>,
-    reactiveAuth: ?Array<UInt8>,
-  ): void {
-    unsubscribeOfExternalService(
-      this.eptr.value,
-      resource,
-      jsonParams(params),
-      reactiveAuth,
-    )
+  fun unsubscribe(resource: String, params: Map<String, PValue>): void {
+    unsubscribeOfExternalService(this.eptr.value, resource, jsonParams(params))
   }
 
   fun shutdown(): void {
@@ -259,7 +246,6 @@ fun errorOfCollectionWriter(collection: String, error: SKJSON.CJSON): Float {
 native fun instantiateOfResource(
   resource: UInt32,
   collections: SKJSON.CJObject,
-  reactiveAuth: ?Array<UInt8>,
 ): String;
 
 @cpp_extern("SkipRuntime_deleteResource")
@@ -272,14 +258,10 @@ fun createResource(resource: UInt32): ExternResource {
 }
 
 class ExternResource(eptr: SKStore.ExternalPointer) extends Resource {
-  fun instantiate(
-    collections: Map<String, Collection>,
-    reactiveAuth: ?Array<UInt8>,
-  ): Collection {
+  fun instantiate(collections: Map<String, Collection>): Collection {
     collectionName = instantiateOfResource(
       this.eptr.value,
       collectionsByName(collections),
-      reactiveAuth,
     );
     collectionForName(collectionName)
   }
@@ -600,10 +582,9 @@ class JSONReducer(
 fun createResourceOfRuntime(
   resource: String,
   jsonParams: SKJSON.CJObject,
-  reactiveAuth: ?Array<UInt8>,
 ): SKJSON.CJSON {
   SKStore.runWithResult(context ~> {
-    createReactiveResource(context, resource, params(jsonParams), reactiveAuth)
+    createReactiveResource(context, resource, params(jsonParams))
   }) match {
   | Success(reactive) ->
     SKJSON.CJArray(
@@ -620,21 +601,18 @@ fun createResourceOfRuntime(
 fun getAllOfRuntime(
   resource: String,
   jsonParams: SKJSON.CJObject,
-  reactiveAuth: ?Array<UInt8>,
   optRequest: ?Request,
 ): SKJSON.CJSON {
   (getContext() match {
   | Some(context) ->
     try {
-      Success(
-        getAll(context, resource, params(jsonParams), reactiveAuth, optRequest),
-      )
+      Success(getAll(context, resource, params(jsonParams), optRequest))
     } catch {
     | ex -> Failure(ex)
     }
   | _ ->
     SKStore.runWithResult(context ~> {
-      getAll(context, resource, params(jsonParams), reactiveAuth, optRequest)
+      getAll(context, resource, params(jsonParams), optRequest)
     })
   }) match {
   | Success(result) ->
@@ -685,35 +663,18 @@ fun getForKeyOfRuntime(
   resource: String,
   jsonParams: SKJSON.CJObject,
   key: SKJSON.CJSON,
-  reactiveAuth: ?Array<UInt8>,
   optRequest: ?Request,
 ): SKJSON.CJSON {
   (getContext() match {
   | Some(context) ->
     try {
-      Success(
-        getForKey(
-          context,
-          resource,
-          params(jsonParams),
-          key,
-          reactiveAuth,
-          optRequest,
-        ),
-      )
+      Success(getForKey(context, resource, params(jsonParams), key, optRequest))
     } catch {
     | ex -> Failure(ex)
     }
   | _ ->
     SKStore.runWithResult(context ~> {
-      getForKey(
-        context,
-        resource,
-        params(jsonParams),
-        key,
-        reactiveAuth,
-        optRequest,
-      )
+      getForKey(context, resource, params(jsonParams), key, optRequest)
     })
   }) match {
   | Success(result) ->
@@ -735,20 +696,9 @@ fun getForKeyOfRuntime(
 fun closeResourceOfRuntime(
   resource: String,
   jsonParams: SKJSON.CJObject,
-  reactiveAuth: ?Array<UInt8>,
 ): Float {
   SKStore.runWithResult(context ~> {
-    closeReactiveResource(context, resource, params(jsonParams), reactiveAuth)
-  }) match {
-  | Success _ -> 0.0
-  | Failure(err) -> getErrorHdl(err)
-  };
-}
-
-@export("SkipRuntime_Runtime__closeSession")
-fun closeSessionOfRuntime(reactiveAuth: ?Array<UInt8>): Float {
-  SKStore.runWithResult(context ~> {
-    closeSession(context, reactiveAuth)
+    closeReactiveResource(context, resource, params(jsonParams))
   }) match {
   | Success _ -> 0.0
   | Failure(err) -> getErrorHdl(err)
@@ -756,20 +706,9 @@ fun closeSessionOfRuntime(reactiveAuth: ?Array<UInt8>): Float {
 }
 
 @export("SkipRuntime_Runtime__subscribe")
-fun subscribeOfRuntime(
-  reactiveId: String,
-  from: Int,
-  notifier: Notifier,
-  reactiveAuth: ?Array<UInt8>,
-): Int {
+fun subscribeOfRuntime(reactiveId: String, from: Int, notifier: Notifier): Int {
   SKStore.runWithResult(context ~> {
-    subscribe(
-      context,
-      reactiveId,
-      SKStore.Tick(from),
-      notifier.notify,
-      reactiveAuth,
-    )
+    subscribe(context, reactiveId, SKStore.Tick(from), notifier.notify)
   }) match {
   | Success(id) -> id
   | Failure(err) -> -getErrorHdl(err).toInt()
@@ -826,14 +765,8 @@ fun useExternalResource(
   service: String,
   identifier: String,
   jsonparams: SKJSON.CJObject,
-  reactiveAuth: ?Array<UInt8>,
 ): String {
-  useExternalCollection(
-    service,
-    identifier,
-    params(jsonparams),
-    reactiveAuth,
-  ).getId()
+  useExternalCollection(service, identifier, params(jsonparams)).getId()
 }
 
 /************ initService ****************/

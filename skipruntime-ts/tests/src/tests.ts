@@ -433,7 +433,6 @@ class MockExternal implements ExternalService {
       error: (error: Json) => void;
       loading: () => void;
     },
-    _reactiveAuth?: Uint8Array,
   ) {
     if (resource == "mock") {
       this.mock(params, callbacks.update).catch((e: unknown) =>
@@ -443,11 +442,7 @@ class MockExternal implements ExternalService {
     return;
   }
 
-  unsubscribe(
-    _resource: string,
-    _params: { v1: string; v2: string },
-    _reactiveAuth?: Uint8Array,
-  ) {
+  unsubscribe(_resource: string, _params: { v1: string; v2: string }) {
     return;
   }
 
@@ -495,7 +490,6 @@ class MockExternalResource implements Resource {
       input2: EagerCollection<number, number>;
     },
     context: Context,
-    reactiveAuth?: Uint8Array,
   ): EagerCollection<number, number[]> {
     const v1 = cs.input2.getUnique(0).toString();
     const v2 = cs.input2.getUnique(1).toString();
@@ -503,7 +497,6 @@ class MockExternalResource implements Resource {
       service: "external",
       identifier: "mock",
       params: { v1, v2 },
-      reactiveAuth,
     });
     return cs.input1.map(MockExternalCheck, external);
   }
@@ -528,13 +521,11 @@ class TokensResource implements Resource {
   instantiate(
     _cs: Record<string, EagerCollection<Json, Json>>,
     context: Context,
-    reactiveAuth?: Uint8Array,
   ): EagerCollection<string, number> {
     return context.useExternalResource({
       service: "system",
       identifier: "timer",
       params: { "5ms": 5 },
-      reactiveAuth,
     });
   }
 }
