@@ -9,6 +9,7 @@ import type {
   LazyCompute,
   LazyCollection,
   NonEmptyIterator,
+  NamedCollections,
   SkipService,
   Resource,
   Entry,
@@ -61,19 +62,19 @@ class Map1 implements Mapper<string, number, string, number> {
   }
 }
 
-class Map1Resource implements Resource {
-  instantiate(collections: {
-    input: EagerCollection<string, number>;
-  }): EagerCollection<string, number> {
+type Input_SN = { input: EagerCollection<string, number> };
+
+class Map1Resource implements Resource<Input_SN> {
+  instantiate(collections: Input_SN): EagerCollection<string, number> {
     return collections.input.map(Map1);
   }
 }
 
-const map1Service: SkipService = {
+const map1Service: SkipService<Input_SN, Input_SN> = {
   initialData: { input: [] },
   resources: { map1: Map1Resource },
 
-  createGraph(inputCollections: { input: EagerCollection<number, number> }) {
+  createGraph(inputCollections: Input_SN) {
     return inputCollections;
   },
 };
@@ -98,23 +99,22 @@ class Map2 implements Mapper<string, number, string, number> {
   }
 }
 
-class Map2Resource implements Resource {
-  instantiate(collections: {
-    input1: EagerCollection<string, number>;
-    input2: EagerCollection<string, number>;
-  }): EagerCollection<string, number> {
+type Input_SN_SN = {
+  input1: EagerCollection<string, number>;
+  input2: EagerCollection<string, number>;
+};
+
+class Map2Resource implements Resource<Input_SN_SN> {
+  instantiate(collections: Input_SN_SN): EagerCollection<string, number> {
     return collections.input1.map(Map2, collections.input2);
   }
 }
 
-const map2Service: SkipService = {
+const map2Service: SkipService<Input_SN_SN, Input_SN_SN> = {
   initialData: { input1: [], input2: [] },
   resources: { map2: Map2Resource },
 
-  createGraph(inputCollections: {
-    input1: EagerCollection<string, number>;
-    input2: EagerCollection<string, number>;
-  }) {
+  createGraph(inputCollections: Input_SN_SN) {
     return inputCollections;
   },
 };
@@ -130,23 +130,17 @@ class Map3 implements Mapper<string, number, string, number> {
   }
 }
 
-class Map3Resource implements Resource {
-  instantiate(cs: {
-    input1: EagerCollection<string, number>;
-    input2: EagerCollection<string, number>;
-  }): EagerCollection<string, number> {
+class Map3Resource implements Resource<Input_SN_SN> {
+  instantiate(cs: Input_SN_SN): EagerCollection<string, number> {
     return cs.input1.map(Map2, cs.input2).map(Map3);
   }
 }
 
-const map3Service: SkipService = {
+const map3Service: SkipService<Input_SN_SN, Input_SN_SN> = {
   initialData: { input1: [], input2: [] },
   resources: { map3: Map3Resource },
 
-  createGraph(inputCollections: {
-    input1: EagerCollection<number, number>;
-    input2: EagerCollection<number, number>;
-  }) {
+  createGraph(inputCollections: Input_SN_SN) {
     return inputCollections;
   },
 };
@@ -165,19 +159,19 @@ class AddKeyAndValue extends OneToOneMapper<number, number, number> {
   }
 }
 
-class OneToOneMapperResource implements Resource {
-  instantiate(cs: {
-    input: EagerCollection<number, number>;
-  }): EagerCollection<number, number> {
+type Input_NN = { input: EagerCollection<number, number> };
+
+class OneToOneMapperResource implements Resource<Input_NN> {
+  instantiate(cs: Input_NN): EagerCollection<number, number> {
     return cs.input.map(SquareValues).map(AddKeyAndValue);
   }
 }
 
-const oneToOneMapperService: SkipService = {
+const oneToOneMapperService: SkipService<Input_NN, Input_NN> = {
   initialData: { input: [] },
   resources: { valueMapper: OneToOneMapperResource },
 
-  createGraph(inputCollections: { input: EagerCollection<number, number> }) {
+  createGraph(inputCollections: Input_NN) {
     return inputCollections;
   },
 };
@@ -195,33 +189,30 @@ class SizeMapper implements Mapper<number, number, number, number> {
   }
 }
 
-class SizeResource implements Resource {
-  instantiate(cs: {
-    input1: EagerCollection<number, number>;
-    input2: EagerCollection<number, number>;
-  }): EagerCollection<number, number> {
+type Input_NN_NN = {
+  input1: EagerCollection<number, number>;
+  input2: EagerCollection<number, number>;
+};
+
+class SizeResource implements Resource<Input_NN_NN> {
+  instantiate(cs: Input_NN_NN): EagerCollection<number, number> {
     return cs.input1.map(SizeMapper, cs.input2);
   }
 }
 
-const sizeService: SkipService = {
+const sizeService: SkipService<Input_NN_NN, Input_NN_NN> = {
   initialData: { input1: [], input2: [] },
   resources: { size: SizeResource },
 
-  createGraph(inputCollections: {
-    input1: EagerCollection<number, number>;
-    input2: EagerCollection<number, number>;
-  }) {
+  createGraph(inputCollections: Input_NN_NN) {
     return inputCollections;
   },
 };
 
 //// testSlicedMap1
 
-class SlicedMap1Resource implements Resource {
-  instantiate(cs: {
-    input: EagerCollection<number, number>;
-  }): EagerCollection<number, number> {
+class SlicedMap1Resource implements Resource<Input_NN> {
+  instantiate(cs: Input_NN): EagerCollection<number, number> {
     return cs.input
       .slice([
         [1, 1],
@@ -240,11 +231,11 @@ class SlicedMap1Resource implements Resource {
   }
 }
 
-const slicedMap1Service: SkipService = {
+const slicedMap1Service: SkipService<Input_NN, Input_NN> = {
   initialData: { input: [] },
   resources: { slice: SlicedMap1Resource },
 
-  createGraph(inputCollections: { input: EagerCollection<number, number> }) {
+  createGraph(inputCollections: Input_NN) {
     return inputCollections;
   },
 };
@@ -270,23 +261,18 @@ class MapLazy implements Mapper<number, number, number, number> {
   }
 }
 
-class LazyResource implements Resource {
-  instantiate(
-    cs: {
-      input: EagerCollection<number, number>;
-    },
-    context: Context,
-  ): EagerCollection<number, number> {
+class LazyResource implements Resource<Input_NN> {
+  instantiate(cs: Input_NN, context: Context): EagerCollection<number, number> {
     const lazy = context.createLazyCollection(TestLazyAdd, cs.input);
     return cs.input.map(MapLazy, lazy);
   }
 }
 
-const lazyService: SkipService = {
+const lazyService: SkipService<Input_NN, Input_NN> = {
   initialData: { input: [] },
   resources: { lazy: LazyResource },
 
-  createGraph(inputCollections: { input: EagerCollection<number, number> }) {
+  createGraph(inputCollections: Input_NN) {
     return inputCollections;
   },
 };
@@ -302,42 +288,34 @@ class TestOddEven implements Mapper<number, number, number, number> {
   }
 }
 
-class MapReduceResource implements Resource {
-  instantiate(cs: {
-    input: EagerCollection<number, number>;
-  }): EagerCollection<number, number> {
+class MapReduceResource implements Resource<Input_NN> {
+  instantiate(cs: Input_NN): EagerCollection<number, number> {
     return cs.input.mapReduce(TestOddEven, new Sum());
   }
 }
 
-const mapReduceService: SkipService = {
+const mapReduceService: SkipService<Input_NN, Input_NN> = {
   initialData: { input: [] },
   resources: { mapReduce: MapReduceResource },
 
-  createGraph(inputCollections: { input: EagerCollection<number, number> }) {
+  createGraph(inputCollections: Input_NN) {
     return inputCollections;
   },
 };
 
 //// testMerge1
 
-class Merge1Resource implements Resource {
-  instantiate(cs: {
-    input1: EagerCollection<number, number>;
-    input2: EagerCollection<number, number>;
-  }): EagerCollection<number, number> {
+class Merge1Resource implements Resource<Input_NN_NN> {
+  instantiate(cs: Input_NN_NN): EagerCollection<number, number> {
     return cs.input1.merge(cs.input2);
   }
 }
 
-const merge1Service: SkipService = {
+const merge1Service: SkipService<Input_NN_NN, Input_NN_NN> = {
   initialData: { input1: [], input2: [] },
   resources: { merge1: Merge1Resource },
 
-  createGraph(inputCollections: {
-    input1: EagerCollection<number, number>;
-    input2: EagerCollection<number, number>;
-  }) {
+  createGraph(inputCollections: Input_NN_NN) {
     return inputCollections;
   },
 };
@@ -357,23 +335,17 @@ class IdentityMapper extends OneToOneMapper<number, number, number> {
   }
 }
 
-class MergeReduceResource implements Resource {
-  instantiate(cs: {
-    input1: EagerCollection<number, number>;
-    input2: EagerCollection<number, number>;
-  }): EagerCollection<number, number> {
+class MergeReduceResource implements Resource<Input_NN_NN> {
+  instantiate(cs: Input_NN_NN): EagerCollection<number, number> {
     return cs.input1.merge(cs.input2).mapReduce(IdentityMapper, new Sum());
   }
 }
 
-const mergeReduceService: SkipService = {
+const mergeReduceService: SkipService<Input_NN_NN, Input_NN_NN> = {
   initialData: { input1: [], input2: [] },
   resources: { mergeReduce: MergeReduceResource },
 
-  createGraph(inputCollections: {
-    input1: EagerCollection<number, number>;
-    input2: EagerCollection<number, number>;
-  }) {
+  createGraph(inputCollections: Input_NN_NN) {
     return inputCollections;
   },
 };
@@ -396,24 +368,24 @@ class JSONExtract
   }
 }
 
-class JSONExtractResource implements Resource {
+type Input_NJP = {
+  input: EagerCollection<number, { value: JsonObject; pattern: string }>;
+};
+
+class JSONExtractResource implements Resource<Input_NJP> {
   instantiate(
-    cs: {
-      input: EagerCollection<number, { value: JsonObject; pattern: string }>;
-    },
+    cs: Input_NJP,
     context: Context,
   ): EagerCollection<number, Json[]> {
     return cs.input.map(JSONExtract, context);
   }
 }
 
-const jsonExtractService: SkipService = {
+const jsonExtractService: SkipService<Input_NJP, Input_NJP> = {
   initialData: { input: [] },
   resources: { jsonExtract: JSONExtractResource },
 
-  createGraph(inputCollections: {
-    input: EagerCollection<number, { value: JsonObject; pattern: string }>;
-  }) {
+  createGraph(inputCollections: Input_NJP) {
     return inputCollections;
   },
 };
@@ -483,12 +455,9 @@ class MockExternalCheck implements Mapper<number, number, number, number[]> {
   }
 }
 
-class MockExternalResource implements Resource {
+class MockExternalResource implements Resource<Input_NN_NN> {
   instantiate(
-    cs: {
-      input1: EagerCollection<number, number>;
-      input2: EagerCollection<number, number>;
-    },
+    cs: Input_NN_NN,
     context: Context,
   ): EagerCollection<number, number[]> {
     const v1 = cs.input2.getUnique(0).toString();
@@ -502,15 +471,12 @@ class MockExternalResource implements Resource {
   }
 }
 
-const testExternalService: SkipService = {
+const testExternalService: SkipService<Input_NN_NN, Input_NN_NN> = {
   initialData: { input1: [], input2: [] },
   resources: { external: MockExternalResource },
   externalServices: { external: new MockExternal() },
 
-  createGraph(inputCollections: {
-    input1: EagerCollection<number, number>;
-    input2: EagerCollection<number, number>;
-  }) {
+  createGraph(inputCollections: Input_NN_NN) {
     return inputCollections;
   },
 };
@@ -519,7 +485,7 @@ const testExternalService: SkipService = {
 
 class TokensResource implements Resource {
   instantiate(
-    _cs: Record<string, EagerCollection<Json, Json>>,
+    _cs: NamedCollections,
     context: Context,
   ): EagerCollection<string, number> {
     return context.useExternalResource({
@@ -544,30 +510,27 @@ const tokensService: SkipService = {
 
 //// testMultipleResources
 
-class Resource1 implements Resource {
-  instantiate(collections: {
-    input1: EagerCollection<string, number>;
-  }): EagerCollection<string, number> {
+type Input1_SN = { input1: EagerCollection<string, number> };
+
+class Resource1 implements Resource<Input1_SN> {
+  instantiate(collections: Input1_SN): EagerCollection<string, number> {
     return collections.input1;
   }
 }
 
-class Resource2 implements Resource {
-  instantiate(collections: {
-    input2: EagerCollection<string, number>;
-  }): EagerCollection<string, number> {
+type Input2_SN = { input2: EagerCollection<string, number> };
+
+class Resource2 implements Resource<Input2_SN> {
+  instantiate(collections: Input2_SN): EagerCollection<string, number> {
     return collections.input2;
   }
 }
 
-const multipleResourcesService: SkipService = {
+const multipleResourcesService: SkipService<Input_SN_SN, Input_SN_SN> = {
   initialData: { input1: [], input2: [] },
   resources: { resource1: Resource1, resource2: Resource2 },
 
-  createGraph(inputCollections: {
-    input1: EagerCollection<number, number>;
-    input2: EagerCollection<number, number>;
-  }) {
+  createGraph(inputCollections: Input_SN_SN) {
     return inputCollections;
   },
 };

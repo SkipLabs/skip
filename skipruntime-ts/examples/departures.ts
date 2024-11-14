@@ -17,9 +17,11 @@ type Result = {
   results: Departure[];
 };
 
-class DeparturesResource implements Resource {
+type ResourceInputs = { config: EagerCollection<string, (string | number)[]> };
+
+class DeparturesResource implements Resource<ResourceInputs> {
   instantiate(
-    cs: { config: EagerCollection<string, (string | number)[]> },
+    cs: ResourceInputs,
     context: Context,
   ): EagerCollection<number, Departure> {
     const get = (name: string, def: string) => {
