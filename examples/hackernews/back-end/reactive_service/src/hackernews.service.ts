@@ -35,9 +35,9 @@ type ResourceInputs = {
 };
 
 export function serviceWithInitialData(
-  posts: Entry<string, Post>[],
-  users: Entry<string, User>[],
-  upvotes: Entry<string, Upvote>[],
+  posts: Entry<number, Post>[],
+  users: Entry<number, User>[],
+  upvotes: Entry<number, Upvote>[],
 ): SkipService<Inputs, ResourceInputs> {
   return {
     initialData: { posts, users, upvotes },
