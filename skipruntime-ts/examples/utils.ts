@@ -74,7 +74,7 @@ class SkipHttpAccessV1 {
     if (service === undefined) throw new Error(`Invalid port ${port}`);
 
     const evSource = new EventSource(
-      `//localhost:${port ?? this.defaultPort}/v1/${resource}?${new URLSearchParams(params)}`,
+      `http://localhost:${port ?? this.defaultPort}/v1/${resource}?${new URLSearchParams(params)}`,
     );
     evSource.addEventListener("init", (e: MessageEvent<string>) => {
       const updates = JSON.parse(e.data);
@@ -84,6 +84,9 @@ class SkipHttpAccessV1 {
       const updates = JSON.parse(e.data);
       console.log("Update", updates);
     });
+    evSource.onerror = (e: MessageEvent<string>) => {
+      console.log("Error", e);
+    };
   }
 }
 

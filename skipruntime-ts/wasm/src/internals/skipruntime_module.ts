@@ -445,7 +445,7 @@ interface ToWasm {
     notifier: Handle<(update: CollectionUpdate<K, V>) => void>,
     values: ptr<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
     tick: bigint,
-    updates: boolean,
+    isUpdates: number,
   ): void;
 
   SkipRuntime_deleteNotifier<K extends Json, V extends Json>(
@@ -723,11 +723,12 @@ class LinksImpl implements Links {
     sknotifier: Handle<(update: CollectionUpdate<K, V>) => void>,
     skvalues: ptr<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
     watermark: bigint,
-    isInitial: boolean,
+    isUpdates: number,
   ) {
     const skjson = this.getSkjson();
     const notifier = this.handles.get(sknotifier);
     const values = skjson.clone(skjson.importJSON(skvalues) as Entry<K, V>[]);
+    const isInitial = isUpdates ? false : true;
     notifier({
       values,
       watermark: watermark.toString() as Watermark,
