@@ -2,6 +2,7 @@ import type {
   EagerCollection,
   NonEmptyIterator,
   Resource,
+  CollectionsOf,
 } from "@skipruntime/api";
 
 import { ManyToOneMapper } from "@skipruntime/api";
@@ -23,24 +24,25 @@ class Minus extends ManyToOneMapper<string, number, number> {
   }
 }
 
-type Collections = {
-  input1: EagerCollection<string, number>;
-  input2: EagerCollection<string, number>;
+type CollectionTypes = {
+  input1: [string, number];
+  input2: [string, number];
 };
+type Collections = CollectionsOf<CollectionTypes>;
 
-class Add implements Resource<Collections> {
+class Add implements Resource<CollectionTypes> {
   instantiate(cs: Collections): EagerCollection<string, number> {
     return cs.input1.merge(cs.input2).map(Plus);
   }
 }
 
-class Sub implements Resource<Collections> {
+class Sub implements Resource<CollectionTypes> {
   instantiate(cs: Collections): EagerCollection<string, number> {
     return cs.input1.merge(cs.input2).map(Minus);
   }
 }
 
-const closable = await runService<Collections, Collections>(
+const closable = await runService<CollectionTypes, CollectionTypes>(
   {
     initialData: { input1: [], input2: [] },
     resources: { add: Add, sub: Sub },

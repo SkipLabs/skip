@@ -1,16 +1,12 @@
 import { WebSocketServer } from "ws";
 import * as http from "http";
-import {
-  initService,
-  type SkipService,
-  type NamedCollections,
-} from "skip-wasm";
+import { initService, type SkipService, type CollectionTypes } from "skip-wasm";
 import { createRESTServer } from "./rest.js";
 import { ReplicationServer } from "./replication.js";
 
 export async function runService<
-  Inputs extends NamedCollections,
-  Outputs extends NamedCollections,
+  Inputs extends CollectionTypes,
+  Outputs extends CollectionTypes,
 >(
   service: SkipService<Inputs, Outputs>,
   port: number = 443,

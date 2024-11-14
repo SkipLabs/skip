@@ -358,7 +358,47 @@ export interface ExternalService {
   shutdown(): void;
 }
 
-export type NamedCollections = { [name: string]: EagerCollection<Json, Json> };
+/**
+ * A specification of the names, key types and value types of some
+ * collections.
+ *
+ * For example:
+ * {
+ *   name1: [Key1, Value1];
+ *   name2: [Key2, Value2];
+ * }
+ */
+export type CollectionTypes = { [name: string]: [Json, Json] };
+
+/**
+ * Transform a specification of collection types to the corresponding type
+ * of flat concrete data, as used by `SkipService.initialData`.
+ *
+ * For example:
+ *   EntrysOf<{ name1: [Key1, Value1]; name2: [Key2, Value2]; }>
+ * = {
+ *   name1: Entry<Key1, Value1>[];
+ *   name2: Entry<Key2, Value2>[];
+ * }
+ */
+export type EntrysOf<Types extends CollectionTypes> = {
+  [name in keyof Types]: Entry<Types[name][0], Types[name][1]>[];
+};
+
+/**
+ * Transform a specification of collection types to the corresponding
+ * `EagerCollection` types.
+ *
+ * For example:
+ *   CollectionsOf<{ name1: [Key1, Value1]; name2: [Key2, Value2]; }>
+ * = {
+ *   name1: EagerCollection<Key1, Value1>;
+ *   name2: EagerCollection<Key2, Value2>;
+ * }
+ */
+export type CollectionsOf<Types extends CollectionTypes> = {
+  [name in keyof Types]: EagerCollection<Types[name][0], Types[name][1]>;
+};
 
 /**
  * `Resource`s make up the public interface of a SkipService, specifying how to respond
@@ -367,7 +407,7 @@ export type NamedCollections = { [name: string]: EagerCollection<Json, Json> };
  *  computations as needed to handle the request.
  */
 export interface Resource<
-  Collections extends NamedCollections = NamedCollections,
+  ResourceInputs extends CollectionTypes = CollectionTypes,
 > {
   /**
    * Build a reactive compute graph of the reactive resource
@@ -378,26 +418,18 @@ export interface Resource<
    * parameters, produced from the static output collections of the service's `createGraph`
    */
   instantiate(
-    collections: Collections,
+    collections: CollectionsOf<ResourceInputs>,
     context: Context,
     reactiveAuth?: Uint8Array,
   ): EagerCollection<Json, Json>;
 }
 
-// Initial data for services' initial collections are provided as an object with arrays of
-// entries for each input collection
-type InitialData<Inputs extends NamedCollections> = {
-  [Name in keyof Inputs]: Inputs[Name] extends EagerCollection<infer K, infer V>
-    ? Entry<K, V>[]
-    : Entry<Json, Json>[];
-};
-
 export interface SkipService<
-  Inputs extends NamedCollections = NamedCollections,
-  ResourceInputs extends NamedCollections = NamedCollections,
+  Inputs extends CollectionTypes = CollectionTypes,
+  ResourceInputs extends CollectionTypes = CollectionTypes,
 > {
   /** The data used to initially populate the input collections of the service */
-  initialData?: InitialData<Inputs>;
+  initialData?: EntrysOf<Inputs>;
   /** The external service dependencies of the service */
   externalServices?: Record<string, ExternalService>;
   /** The reactive resources which compose the public interface of this reactive service */
@@ -416,5 +448,8 @@ export interface SkipService<
    * @param context {Context} - the reactive graph context
    * @returns - the reactive collections accessible by the resources
    */
-  createGraph(inputCollections: Inputs, context: Context): ResourceInputs;
+  createGraph(
+    inputCollections: CollectionsOf<Inputs>,
+    context: Context,
+  ): CollectionsOf<ResourceInputs>;
 }

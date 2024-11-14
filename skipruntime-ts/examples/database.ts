@@ -1,5 +1,5 @@
 import type {
-  EagerCollection,
+  CollectionsOf,
   SkipService,
   Resource,
   Entry,
@@ -74,10 +74,10 @@ async function initDB(): Promise<sqlite3.Database> {
 
 type User = { name: string; country: string };
 
-type UsersCollection = {
-  users: EagerCollection<string, User>;
-};
-class UsersResource implements Resource<UsersCollection> {
+type UsersCollectionType = { users: [string, User] };
+type UsersCollection = CollectionsOf<UsersCollectionType>;
+
+class UsersResource implements Resource<UsersCollectionType> {
   instantiate(cs: UsersCollection): UsersCollection["users"] {
     return cs.users;
   }
@@ -89,7 +89,7 @@ class UsersResource implements Resource<UsersCollection> {
 
 function serviceWithInitialData(
   users: Entry<string, User>[],
-): SkipService<UsersCollection, UsersCollection> {
+): SkipService<UsersCollectionType, UsersCollectionType> {
   return {
     initialData: { users },
     resources: { users: UsersResource },

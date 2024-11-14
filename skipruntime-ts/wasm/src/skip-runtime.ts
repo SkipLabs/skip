@@ -19,7 +19,9 @@ export type {
   CollectionUpdate,
   Watermark,
   SubscriptionID,
-  NamedCollections,
+  CollectionTypes,
+  EntrysOf,
+  CollectionsOf,
 } from "@skipruntime/api";
 
 export type {

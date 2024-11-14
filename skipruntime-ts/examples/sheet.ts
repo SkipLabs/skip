@@ -5,6 +5,7 @@ import type {
   LazyCollection,
   Json,
   Resource,
+  CollectionsOf,
 } from "@skipruntime/api";
 
 import { OneToOneMapper } from "@skipruntime/api";
@@ -63,15 +64,18 @@ class CallCompute extends OneToOneMapper<string, Json, Json> {
   }
 }
 
-type Inputs = { cells: EagerCollection<string, Json> };
-type Outputs = { output: EagerCollection<string, Json> };
+type InputTypes = { cells: [string, Json] };
+type Inputs = CollectionsOf<InputTypes>;
+
+type OutputTypes = { output: [string, Json] };
+type Outputs = CollectionsOf<OutputTypes>;
 
 class ComputedCells implements Resource {
   instantiate(collections: Outputs): EagerCollection<string, Json> {
     return collections.output;
   }
 }
-const service = await runService<Inputs, Outputs>(
+const service = await runService<InputTypes, OutputTypes>(
   {
     initialData: { cells: [] },
     resources: { computed: ComputedCells },

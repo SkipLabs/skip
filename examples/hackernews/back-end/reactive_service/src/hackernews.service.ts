@@ -2,6 +2,7 @@ import type {
   Entry,
   EagerCollection,
   NonEmptyIterator,
+  CollectionsOf,
   SkipService,
   Resource,
 } from "skip-wasm";
@@ -25,20 +26,21 @@ type Upvote = {
 
 type Upvoted = Post & { upvotes: number; author: User };
 
-type Inputs = {
-  posts: EagerCollection<number, Post>;
-  users: EagerCollection<number, User>;
-  upvotes: EagerCollection<number, Upvote>;
+type InputTypes = {
+  posts: [number, Post];
+  users: [number, User];
+  upvotes: [number, Upvote];
 };
-type ResourceInputs = {
-  postsWithUpvotes: EagerCollection<number, Upvoted>;
-};
+type Inputs = CollectionsOf<InputTypes>;
+
+type ResourceInputTypes = { postsWithUpvotes: [number, Upvoted] };
+type ResourceInputs = CollectionsOf<ResourceInputTypes>;
 
 export function serviceWithInitialData(
   posts: Entry<number, Post>[],
   users: Entry<number, User>[],
   upvotes: Entry<number, Upvote>[],
-): SkipService<Inputs, ResourceInputs> {
+): SkipService<InputTypes, ResourceInputTypes> {
   return {
     initialData: { posts, users, upvotes },
     resources: { posts: PostsResource },

@@ -73,7 +73,7 @@ const map1Service: SkipService = {
   initialData: { input: [] },
   resources: { map1: Map1Resource },
 
-  createGraph(inputCollections: { input: EagerCollection<number, number> }) {
+  createGraph(inputCollections: { input: EagerCollection<string, number> }) {
     return inputCollections;
   },
 };
