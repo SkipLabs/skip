@@ -63,22 +63,19 @@ class CallCompute extends OneToOneMapper<string, Json, Json> {
   }
 }
 
+type Inputs = { cells: EagerCollection<string, Json> };
+type Outputs = { output: EagerCollection<string, Json> };
+
 class ComputedCells implements Resource {
-  instantiate(collections: {
-    output: EagerCollection<string, Json>;
-  }): EagerCollection<string, Json> {
+  instantiate(collections: Outputs): EagerCollection<string, Json> {
     return collections.output;
   }
 }
-
-const service = await runService(
+const service = await runService<Inputs, Outputs>(
   {
     initialData: { cells: [] },
     resources: { computed: ComputedCells },
-    createGraph(
-      inputCollections: { cells: EagerCollection<string, Json> },
-      context: Context,
-    ): Record<string, EagerCollection<Json, Json>> {
+    createGraph(inputCollections: Inputs, context: Context): Outputs {
       const cells = inputCollections.cells;
       // Create evaluation dependency graph as _lazy_ collection, calling itself to access other cells
       const evaluator = context.createLazyCollection(ComputeExpression, cells);
