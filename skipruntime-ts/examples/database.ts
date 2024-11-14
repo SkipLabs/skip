@@ -74,10 +74,11 @@ async function initDB(): Promise<sqlite3.Database> {
 
 type User = { name: string; country: string };
 
-class UsersResource implements Resource {
-  instantiate(cs: {
-    users: EagerCollection<string, User>;
-  }): EagerCollection<string, User> {
+type UsersCollection = {
+  users: EagerCollection<string, User>;
+};
+class UsersResource implements Resource<UsersCollection> {
+  instantiate(cs: UsersCollection): UsersCollection["users"] {
     return cs.users;
   }
 }
@@ -86,12 +87,13 @@ class UsersResource implements Resource {
 // Setting up the service
 /*****************************************************************************/
 
-function serviceWithInitialData(users: Entry<string, User>[]): SkipService {
+function serviceWithInitialData(
+  users: Entry<string, User>[],
+): SkipService<UsersCollection, UsersCollection> {
   return {
     initialData: { users },
     resources: { users: UsersResource },
-    createGraph: (inputCollections: { users: EagerCollection<string, User> }) =>
-      inputCollections,
+    createGraph: (inputCollections) => inputCollections,
   };
 }
 
