@@ -816,9 +816,7 @@ export function initTests(
       throw new Error("Should not happen");
     } catch (e) {
       if (e instanceof Error) {
-        expect(e.message.includes("More than one value detected")).toEqual(
-          true,
-        );
+        expect(e.message.includes("Potentially expensive join")).toEqual(true);
       } else {
         throw e;
       }
