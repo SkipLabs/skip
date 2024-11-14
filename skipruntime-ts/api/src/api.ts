@@ -384,12 +384,20 @@ export interface Resource<
   ): EagerCollection<Json, Json>;
 }
 
+// Initial data for services' initial collections are provided as an object with arrays of
+// entries for each input collection
+type InitialData<Inputs extends NamedCollections> = {
+  [Name in keyof Inputs]: Inputs[Name] extends EagerCollection<infer K, infer V>
+    ? Entry<K, V>[]
+    : Entry<Json, Json>[];
+};
+
 export interface SkipService<
   Inputs extends NamedCollections = NamedCollections,
   ResourceInputs extends NamedCollections = NamedCollections,
 > {
   /** The data used to initially populate the input collections of the service */
-  initialData?: { [Name in keyof Inputs]: Entry<Json, Json>[] };
+  initialData?: InitialData<Inputs>;
   /** The external service dependencies of the service */
   externalServices?: Record<string, ExternalService>;
   /** The reactive resources which compose the public interface of this reactive service */
