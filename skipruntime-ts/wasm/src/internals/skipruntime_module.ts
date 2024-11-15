@@ -74,13 +74,6 @@ export function check<T>(value: T): void {
   } else if (typeof value == "object") {
     if (value === null || isSkFrozen(value)) {
       return;
-    }
-    if (Object.isFrozen(value)) {
-      if (Array.isArray(value)) {
-        value.forEach(check);
-      } else {
-        Object.values(value).forEach(check);
-      }
     } else {
       throw new Error("Invalid object: must be deep-frozen.");
     }
@@ -99,6 +92,10 @@ export function check<T>(value: T): void {
  * _constant_. Note that as a result all objects reachable from the
  * parameter will be frozen and no longer mutable or extensible, even from
  * other references.
+ *
+ * The argument object and all its properties, recursively, must not already
+ * be frozen by `Object.freeze` (or else `deepFreeze` cannot mark them
+ * deep-frozen).
  *
  * The primary use for this function is to satisfy the requirement that all
  * parameters to Skip `Mapper` constructors must be deep-frozen: objects
@@ -121,8 +118,7 @@ export function deepFreeze<T>(value: T): T & Param {
     } else if (isSkFrozen(value)) {
       return value;
     } else if (Object.isFrozen(value)) {
-      check(value);
-      return value as T & Param;
+      throw new Error(`Cannot deep-freeze an Object.frozen value.`);
     } else if (Array.isArray(value)) {
       for (const elt of value) {
         deepFreeze(elt);
