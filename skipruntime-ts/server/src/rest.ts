@@ -36,6 +36,8 @@ export function createRESTServer(service: ServiceInstance): express.Express {
     try {
       res.format({
         "text/event-stream": function () {
+          // TODO: Use watermark in `Last-Event-ID` header if provided
+          // (upon reconnecting).
           const resource = service.instantiateResource(
             req.params.resource,
             req.query as Record<string, string>,
@@ -47,7 +49,13 @@ export function createRESTServer(service: ServiceInstance): express.Express {
           const subscriptionID = service.subscribe(
             resource,
             (update: CollectionUpdate<string, Json>) => {
-              res.write(`data: ${JSON.stringify(update)}\n\n`);
+              if (update.isInitial) {
+                res.write(`event: init\n`);
+              } else {
+                res.write(`event: update\n`);
+              }
+              res.write(`id: ${update.watermark}\n`);
+              res.write(`data: ${JSON.stringify(update.values)}\n\n`);
             },
           );
           req.on("close", () => {
