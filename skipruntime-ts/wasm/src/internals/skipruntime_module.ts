@@ -64,6 +64,31 @@ abstract class SkFrozen extends Frozen {
   }
 }
 
+export function check<T>(value: T): void {
+  if (
+    typeof value == "string" ||
+    typeof value == "number" ||
+    typeof value == "boolean"
+  ) {
+    return;
+  } else if (typeof value == "object") {
+    if (value === null || isSkFrozen(value)) {
+      return;
+    }
+    if (Object.isFrozen(value)) {
+      if (Array.isArray(value)) {
+        value.forEach(check);
+      } else {
+        Object.values(value).forEach(check);
+      }
+    } else {
+      throw new Error("Invalid object: must be frozen.");
+    }
+  } else {
+    throw new Error(`'${typeof value}' cannot be managed by skstore.`);
+  }
+}
+
 /**
  * _Deep-freeze_ an object, returning the same object that was passed in.
  *
@@ -1128,31 +1153,6 @@ class ContextImpl extends SkFrozen implements Context {
         this.refs.skjson.exportString(pattern),
       ),
     ) as Json[];
-  }
-}
-
-export function check<T>(value: T): void {
-  if (
-    typeof value == "string" ||
-    typeof value == "number" ||
-    typeof value == "boolean"
-  ) {
-    return;
-  } else if (typeof value == "object") {
-    if (value === null || isSkFrozen(value)) {
-      return;
-    }
-    if (Object.isFrozen(value)) {
-      if (Array.isArray(value)) {
-        value.forEach(check);
-      } else {
-        Object.values(value).forEach(check);
-      }
-    } else {
-      throw new Error("Invalid object: must be frozen.");
-    }
-  } else {
-    throw new Error(`'${typeof value}' cannot be managed by skstore.`);
   }
 }
 
