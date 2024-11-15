@@ -21,7 +21,7 @@ interface Delete {
 }
 
 class SkipHttpAccessV1 {
-  private services: Record<number, RESTWrapperOfSkipService>;
+  private services: { [port: number]: RESTWrapperOfSkipService };
   private defaultPort: number;
 
   constructor(ports: number[] = [3587]) {
@@ -62,14 +62,22 @@ class SkipHttpAccessV1 {
     return Promise.allSettled(promises);
   }
 
-  async log(resource: string, params: Record<string, string>, port?: number) {
+  async log(
+    resource: string,
+    params: { [param: string]: string },
+    port?: number,
+  ) {
     const service = this.services[port ?? this.defaultPort];
     if (service === undefined) throw new Error(`Invalid port ${port}`);
     const result = await service.getAll(resource, params);
     console.log(JSON.stringify(result));
   }
 
-  request(resource: string, params: Record<string, string>, port?: number) {
+  request(
+    resource: string,
+    params: { [param: string]: string },
+    port?: number,
+  ) {
     const service = this.services[port ?? this.defaultPort];
     if (service === undefined) throw new Error(`Invalid port ${port}`);
 
@@ -94,7 +102,7 @@ interface RequestQuery {
   type: "request";
   payload: {
     resource: string;
-    params?: Record<string, string>;
+    params?: { [param: string]: string };
     port?: number;
   };
 }
@@ -103,7 +111,7 @@ interface LogQuery {
   type: "log";
   payload: {
     resource: string;
-    params?: Record<string, string>;
+    params?: { [param: string]: string };
     port?: number;
   };
 }
@@ -312,7 +320,7 @@ export function run(scenarios: Step[][], ports: number[] = [3587]) {
           (query: string) => {
             const jsquery = JSON.parse(query) as {
               resource: string;
-              params?: Record<string, string>;
+              params?: { [param: string]: string };
               port?: number;
             };
             access.request(
@@ -327,7 +335,7 @@ export function run(scenarios: Step[][], ports: number[] = [3587]) {
           (query: string) => {
             const jsquery = JSON.parse(query) as {
               resource: string;
-              params?: Record<string, string>;
+              params?: { [param: string]: string };
               port?: number;
             };
             access

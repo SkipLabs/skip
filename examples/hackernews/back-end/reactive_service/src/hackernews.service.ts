@@ -97,7 +97,7 @@ class SortingMapper {
 class PostsResource implements Resource<ResourceInputs> {
   private limit: number;
 
-  constructor(params: Record<string, string>) {
+  constructor(params: { [param: string]: string }) {
     this.limit = Number(params["limit"]);
   }
 
