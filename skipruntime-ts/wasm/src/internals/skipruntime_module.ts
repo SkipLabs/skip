@@ -25,6 +25,7 @@ import type {
   Context,
   LazyCompute,
   ExternalService,
+  NamedCollections,
   Resource,
   ReactiveResponse,
   CollectionUpdate,
@@ -104,7 +105,7 @@ export function freeze<T>(value: T): (T & Param) | (T & Constant) {
       }
       return Object.freeze(sk_freeze(value));
     } else {
-      const jso = value as Record<string, any>;
+      const jso = value as { [key: string]: any };
       for (const key of Object.keys(jso)) {
         jso[key] = freeze(jso[key]);
       }
@@ -117,10 +118,10 @@ export function freeze<T>(value: T): (T & Param) | (T & Constant) {
 
 class ResourceBuilder {
   constructor(
-    private builder: new (params: Record<string, string>) => Resource,
+    private builder: new (params: { [param: string]: string }) => Resource,
   ) {}
 
-  build(parameters: Record<string, string>): Resource {
+  build(parameters: { [param: string]: string }): Resource {
     const builder = this.builder;
     return new builder(parameters);
   }
@@ -622,8 +623,10 @@ class LinksImpl implements Links {
   ): ptr<Internal.String> {
     const skjson = this.getSkjson();
     const resource = this.handles.get(skresource);
-    const collections: Record<string, EagerCollection<Json, Json>> = {};
-    const keysIds = skjson.importJSON(skcollections) as Record<string, string>;
+    const collections: NamedCollections = {};
+    const keysIds = skjson.importJSON(skcollections) as {
+      [key: string]: string;
+    };
     const refs = new Refs(
       skjson,
       this.fromWasm,
@@ -651,7 +654,7 @@ class LinksImpl implements Links {
     const skjson = this.getSkjson();
     const builder = this.handles.get(skbuilder);
     const resource = builder.build(
-      skjson.importJSON(skparams) as Record<string, string>,
+      skjson.importJSON(skparams) as { [param: string]: string },
     );
     return this.fromWasm.SkipRuntime_createResource(
       this.handles.register(resource),
@@ -670,8 +673,10 @@ class LinksImpl implements Links {
   ) {
     const skjson = this.getSkjson();
     const service = this.handles.get(skservice);
-    const collections: Record<string, EagerCollection<Json, Json>> = {};
-    const keysIds = skjson.importJSON(skcollections) as Record<string, string>;
+    const collections: NamedCollections = {};
+    const keysIds = skjson.importJSON(skcollections) as {
+      [key: string]: string;
+    };
     const refs = new Refs(
       skjson,
       this.fromWasm,
@@ -683,7 +688,7 @@ class LinksImpl implements Links {
     }
     // TODO: Manage skstore
     const result = service.createGraph(collections, new ContextImpl(refs));
-    const collectionsNames: Record<string, string> = {};
+    const collectionsNames: { [name: string]: string } = {};
     for (const [name, collection] of Object.entries(result)) {
       collectionsNames[name] = (
         collection as EagerCollectionImpl<Json, Json>
@@ -771,7 +776,9 @@ class LinksImpl implements Links {
       new Refs(skjson, this.fromWasm, this.handles, this.needGC.bind(this)),
     );
     const resource = skjson.importString(skresource);
-    const params = skjson.importJSON(skparams, true) as Record<string, string>;
+    const params = skjson.importJSON(skparams, true) as {
+      [param: string]: string;
+    };
     supplier.subscribe(resource, params, {
       update: writer.update.bind(writer),
       error: writer.error.bind(writer),
@@ -787,7 +794,9 @@ class LinksImpl implements Links {
     const skjson = this.getSkjson();
     const supplier = this.handles.get(sksupplier);
     const resource = skjson.importString(skresource);
-    const params = skjson.importJSON(skparams, true) as Record<string, string>;
+    const params = skjson.importJSON(skparams, true) as {
+      [param: string]: string;
+    };
     supplier.unsubscribe(resource, params);
   }
 
@@ -1102,7 +1111,7 @@ class ContextImpl extends SkFrozen implements Context {
   useExternalResource<K extends Json, V extends Json>(resource: {
     service: string;
     identifier: string;
-    params?: Record<string, string | number>;
+    params?: { [param: string]: string | number };
   }): EagerCollection<K, V> {
     const skcollection =
       this.refs.fromWasm.SkipRuntime_Context__useExternalResource(
@@ -1186,7 +1195,7 @@ class AllChecker<K extends Json, V extends Json> implements Checker {
     private service: ServiceInstance,
     private executor: Executor<Values<K, V>>,
     private resource: string,
-    private params: Record<string, string>,
+    private params: { [param: string]: string },
   ) {}
 
   check(request: string): void {
@@ -1208,7 +1217,7 @@ class OneChecker<V extends Json> implements Checker {
     private service: ServiceInstance,
     private executor: Executor<V[]>,
     private resource: string,
-    private params: Record<string, string>,
+    private params: { [param: string]: string },
     private key: string | number,
   ) {}
 
@@ -1242,7 +1251,7 @@ export class ServiceInstance {
    */
   instantiateResource(
     resource: string,
-    params: Record<string, string>,
+    params: { [param: string]: string },
   ): ReactiveResponse {
     const result = this.refs.skjson.runWithGC(() => {
       return this.refs.skjson.importJSON(
@@ -1268,7 +1277,7 @@ export class ServiceInstance {
    */
   getAll<K extends Json, V extends Json>(
     resource: string,
-    params: Record<string, string> = {},
+    params: { [param: string]: string } = {},
     request?: string | Executor<Values<K, V>>,
   ): GetResult<Values<K, V>> {
     const get_ = () => {
@@ -1311,7 +1320,7 @@ export class ServiceInstance {
   getArray<V extends Json>(
     resource: string,
     key: string | number,
-    params: Record<string, string> = {},
+    params: { [param: string]: string } = {},
     request?: string | Executor<V[]>,
   ): GetResult<V[]> {
     const get_ = () => {
@@ -1352,7 +1361,7 @@ export class ServiceInstance {
    */
   closeResourceInstance(
     resource: string,
-    params: Record<string, string>,
+    params: { [param: string]: string },
   ): void {
     const result = this.refs.skjson.runWithGC(() => {
       return this.refs.fromWasm.SkipRuntime_Runtime__closeResource(

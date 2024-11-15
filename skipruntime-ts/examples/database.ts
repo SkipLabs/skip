@@ -29,7 +29,7 @@ async function initDB(): Promise<sqlite3.Database> {
   };
   const run = (
     query: string,
-    params: Record<string, string>,
+    params: { [param: string]: string },
   ): Promise<void> => {
     return new Promise((resolve, reject) => {
       db.run(query, params, (err) => {
