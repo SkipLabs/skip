@@ -33,13 +33,14 @@ export class SkipExternalService implements ExternalService {
     const evSource = new EventSource(
       `${this.url}?${new URLSearchParams(params)}`,
     );
-    evSource.onmessage = (e: MessageEvent<string>) => {
-      const msg = JSON.parse(e.data);
-      callbacks.update(
-        msg.updates as Entry<Json, Json>[],
-        msg.isInit as boolean,
-      );
-    };
+    evSource.addEventListener("init", (e: MessageEvent<string>) => {
+      const updates = JSON.parse(e.data) as Entry<Json, Json>[];
+      callbacks.update(updates, true);
+    });
+    evSource.addEventListener("update", (e: MessageEvent<string>) => {
+      const updates = JSON.parse(e.data) as Entry<Json, Json>[];
+      callbacks.update(updates, false);
+    });
     evSource.onerror = (e) => {
       console.log(e);
     };

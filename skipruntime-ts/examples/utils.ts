@@ -76,10 +76,14 @@ class SkipHttpAccessV1 {
     const evSource = new EventSource(
       `//localhost:${port ?? this.defaultPort}/v1/${resource}?${new URLSearchParams(params)}`,
     );
-    evSource.onmessage = (e: MessageEvent<string>) => {
-      const msg = JSON.parse(e.data);
-      console.log("Update", msg.updates, msg.isInit);
-    };
+    evSource.addEventListener("init", (e: MessageEvent<string>) => {
+      const updates = JSON.parse(e.data);
+      console.log("Init", updates);
+    });
+    evSource.addEventListener("update", (e: MessageEvent<string>) => {
+      const updates = JSON.parse(e.data);
+      console.log("Update", updates);
+    });
   }
 }
 

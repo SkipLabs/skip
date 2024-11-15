@@ -19,10 +19,14 @@ console.log("Connect to replication server for resource /users");
 const evSource = new EventSource(
   `http://localhost:${replication.toString()}/v1/users`,
 );
-evSource.onmessage = (e: MessageEvent<string>) => {
-  const msg = JSON.parse(e.data);
-  console.log("Update", msg.values, msg.isInitial);
-};
+evSource.addEventListener("init", (e: MessageEvent<string>) => {
+  const updates = JSON.parse(e.data);
+  console.log("Init", updates);
+});
+evSource.addEventListener("update", (e: MessageEvent<string>) => {
+  const updates = JSON.parse(e.data);
+  console.log("Update", updates);
+});
 evSource.onerror = (e) => {
   console.log(e);
 };
