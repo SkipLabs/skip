@@ -83,7 +83,7 @@ abstract class SkFrozen extends Frozen {
  * @param value - The object to deep-freeze.
  * @returns The same object that was passed in.
  */
-export function deepFreeze<T>(value: T): (T & Param) | (T & Constant) {
+export function deepFreeze<T>(value: T): T & Param {
   if (
     typeof value == "string" ||
     typeof value == "number" ||
@@ -99,17 +99,15 @@ export function deepFreeze<T>(value: T): (T & Param) | (T & Constant) {
       check(value);
       return value as T & Param;
     } else if (Array.isArray(value)) {
-      const length: number = value.length;
-      for (let i = 0; i < length; i++) {
-        value[i] = deepFreeze(value[i]);
+      for (const elt of value) {
+        deepFreeze(elt);
       }
       return Object.freeze(sk_freeze(value));
     } else {
-      const jso = value as { [key: string]: any };
-      for (const key of Object.keys(jso)) {
-        jso[key] = deepFreeze(jso[key]);
+      for (const val of Object.values(value)) {
+        deepFreeze(val);
       }
-      return Object.freeze(sk_freeze(jso)) as T & Constant;
+      return Object.freeze(sk_freeze(value));
     }
   } else {
     throw new Error(`'${typeof value}' cannot be deep-frozen.`);
