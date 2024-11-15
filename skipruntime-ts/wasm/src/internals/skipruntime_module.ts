@@ -77,13 +77,13 @@ abstract class SkFrozen extends Frozen {
  *
  * The primary use for this function is to satisfy the requirement that all
  * parameters to Skip `Mapper` constructors must be deep-frozen: objects
- * that have not been constructed by Skip can be passed to `freeze()` before
- * passing them to a `Mapper` constructor.
+ * that have not been constructed by Skip can be passed to `deepFreeze()`
+ * before passing them to a `Mapper` constructor.
  *
  * @param value - The object to deep-freeze.
  * @returns The same object that was passed in.
  */
-export function freeze<T>(value: T): (T & Param) | (T & Constant) {
+export function deepFreeze<T>(value: T): (T & Param) | (T & Constant) {
   if (
     typeof value == "string" ||
     typeof value == "number" ||
@@ -101,18 +101,18 @@ export function freeze<T>(value: T): (T & Param) | (T & Constant) {
     } else if (Array.isArray(value)) {
       const length: number = value.length;
       for (let i = 0; i < length; i++) {
-        value[i] = freeze(value[i]);
+        value[i] = deepFreeze(value[i]);
       }
       return Object.freeze(sk_freeze(value));
     } else {
       const jso = value as { [key: string]: any };
       for (const key of Object.keys(jso)) {
-        jso[key] = freeze(jso[key]);
+        jso[key] = deepFreeze(jso[key]);
       }
       return Object.freeze(sk_freeze(jso)) as T & Constant;
     }
   } else {
-    throw new Error(`'${typeof value}' cannot be frozen.`);
+    throw new Error(`'${typeof value}' cannot be deep-frozen.`);
   }
 }
 

@@ -20,7 +20,7 @@ export type JsonObject = { [key: string]: Nullable<Json> };
  * value or a Skip-runtime-managed value. In either case, restricting mapper parameters to
  * this type helps developers to ensure that reactive computations can be re-evaluated as
  * needed with consistent semantics.
- * `Constant`s are recursively-frozen objects managed by the Skip runtime; non-Skip objects can be made constant by passing them to `freeze`.
+ * `Constant`s are deep-frozen objects managed by the Skip runtime; non-Skip objects can be made constant by passing them to `deepFreeze`.
  */
 export type Param =
   | null
