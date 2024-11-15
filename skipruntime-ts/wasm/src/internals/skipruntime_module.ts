@@ -82,10 +82,10 @@ export function check<T>(value: T): void {
         Object.values(value).forEach(check);
       }
     } else {
-      throw new Error("Invalid object: must be frozen.");
+      throw new Error("Invalid object: must be deep-frozen.");
     }
   } else {
-    throw new Error(`'${typeof value}' cannot be managed by skstore.`);
+    throw new Error(`'${typeof value}' cannot be deep-frozen.`);
   }
 }
 
