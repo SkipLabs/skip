@@ -26,7 +26,7 @@ app.use(express.urlencoded({ extended: true }));
 
 const run = function (
   query: string,
-  params: Record<string, string>,
+  params: { [param: string]: string },
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     db.run(query, params, (err) => {

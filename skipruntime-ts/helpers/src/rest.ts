@@ -15,7 +15,7 @@ function toHttp(entrypoint: Entrypoint) {
 export async function fetchJSON<V>(
   url: string,
   method: "POST" | "GET" | "PUT" | "PATCH" | "HEAD" | "DELETE" = "GET",
-  headers: Record<string, string> = {},
+  headers: { [header: string]: string } = {},
   data?: Json,
 ): Promise<[V | null, Headers]> {
   const body = data ? JSON.stringify(data) : undefined;
@@ -54,7 +54,7 @@ export class RESTWrapperOfSkipService {
 
   async getAll<K extends Json, V extends Json>(
     resource: string,
-    params: Record<string, string>,
+    params: { [param: string]: string },
   ): Promise<Entry<K, V>[]> {
     const qParams = new URLSearchParams(params).toString();
     const [optValues, _headers] = await fetchJSON<Entry<K, V>[]>(
@@ -67,7 +67,7 @@ export class RESTWrapperOfSkipService {
 
   async getArray<V extends Json>(
     resource: string,
-    params: Record<string, string>,
+    params: { [param: string]: string },
     key: string,
   ): Promise<V[]> {
     const qParams = new URLSearchParams(params).toString();

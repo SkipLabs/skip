@@ -3,7 +3,7 @@ import { fetchJSON } from "./rest.js";
 
 export interface ExternalResource {
   open(
-    params: Record<string, string | number>,
+    params: { [param: string]: string | number },
     callbacks: {
       update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
       error: (error: Json) => void;
@@ -11,15 +11,15 @@ export interface ExternalResource {
     },
   ): void;
 
-  close(params: Record<string, string | number>): void;
+  close(params: { [param: string]: string | number }): void;
 }
 
 export class GenericExternalService implements ExternalService {
-  constructor(private resources: Record<string, ExternalResource>) {}
+  constructor(private resources: { [name: string]: ExternalResource }) {}
 
   subscribe(
     resourceName: string,
-    params: Record<string, string | number>,
+    params: { [param: string]: string | number },
     callbacks: {
       update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
       error: (error: Json) => void;
@@ -35,7 +35,7 @@ export class GenericExternalService implements ExternalService {
     resource.open(params, callbacks);
   }
 
-  unsubscribe(resourceName: string, params: Record<string, string>) {
+  unsubscribe(resourceName: string, params: { [param: string]: string }) {
     const resource = this.resources[resourceName] as
       | ExternalResource
       | undefined;
@@ -53,10 +53,10 @@ export class GenericExternalService implements ExternalService {
 type Timeout = ReturnType<typeof setInterval>;
 
 export class TimerResource implements ExternalResource {
-  private intervals = new Map<string, Record<string, Timeout>>();
+  private intervals = new Map<string, { [name: string]: Timeout }>();
 
   open(
-    params: Record<string, string | number>,
+    params: { [param: string]: string | number },
     callbacks: {
       update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
       error: (error: Json) => void;
@@ -70,7 +70,7 @@ export class TimerResource implements ExternalResource {
     }
     callbacks.update(values, true);
     const id = toId(params);
-    const intervals: Record<string, Timeout> = {};
+    const intervals: { [name: string]: Timeout } = {};
     for (const [name, duration] of Object.entries(params)) {
       const ms = Number(duration);
       if (ms > 0) {
@@ -83,7 +83,7 @@ export class TimerResource implements ExternalResource {
     this.intervals.set(id, intervals);
   }
 
-  close(params: Record<string, string | number>): void {
+  close(params: { [param: string]: string | number }): void {
     const intervals = this.intervals.get(toId(params));
     if (intervals != null) {
       for (const interval of Object.values(intervals)) {
@@ -105,7 +105,7 @@ export class Polled<S extends Json, K extends Json, V extends Json>
   ) {}
 
   open(
-    params: Record<string, string | number>,
+    params: { [param: string]: string | number },
     callbacks: {
       update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
       error: (error: Json) => void;
@@ -113,7 +113,7 @@ export class Polled<S extends Json, K extends Json, V extends Json>
     },
   ): void {
     this.close(params);
-    const queryParams: Record<string, string> = {};
+    const queryParams: { [param: string]: string } = {};
     for (const [key, value] of Object.entries(params)) {
       queryParams[key] = value.toString();
     }
@@ -134,7 +134,7 @@ export class Polled<S extends Json, K extends Json, V extends Json>
     this.intervals.set(toId(params), setInterval(call, this.duration));
   }
 
-  close(params: Record<string, string | number>): void {
+  close(params: { [param: string]: string | number }): void {
     const interval = this.intervals.get(toId(params));
     if (interval) {
       clearInterval(interval);
@@ -142,7 +142,7 @@ export class Polled<S extends Json, K extends Json, V extends Json>
   }
 }
 
-function toId(params: Record<string, string | number>): string {
+function toId(params: { [param: string]: string | number }): string {
   const strparams = Object.entries(params)
     .map(([key, value]) => `${key}:${value.toString()}`)
     .sort();
