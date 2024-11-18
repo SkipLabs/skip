@@ -17,10 +17,6 @@ const kResourceCollectionsDir: SKStore.DirName = SKStore.DirName::create(
 
 const kRemoteSpecifiers: String = "SkipRuntime.RemoteSpecifiers";
 
-fun resourceSessionDirName(sessionId: String): SKStore.DirName {
-  SKStore.DirName::create(`/sk_prv/resources/session/${sessionId}/`)
-}
-
 class JSONKeyConverter() extends KeyConverter {
   fun toJSON(value: SKStore.Key): SKJSON.CJSON {
     JSONID::keyType(value).value
@@ -151,38 +147,23 @@ fun base64<T: Show>(toEncode: T): String {
   }
 }
 
-fun toSessionName(reactiveAuth: Array<UInt8>): String {
-  encoded = `b64_${Base64.encodeBytes(reactiveAuth, true)}`;
-  encoded.searchRight(ch ~> ch != '=') match {
-  | Some(i) ->
-    _ = i.next();
-    encoded.getIter().substring(i)
-  | None() -> ""
-  }
-}
-
 fun paramsToString(params: Map<String, PValue>): String {
   vec = mutable Vector[];
   params.each((k, v) -> vec.push(`${k}:${v}`));
   `{${vec.join(",")}}`
 }
 
-fun toResoureId(
-  resource: String,
-  params: Map<String, PValue>,
-  reactiveAuth: ?Array<UInt8>,
-): String {
+fun toResoureId(resource: String, params: Map<String, PValue>): String {
   strParams = base64(paramsToString(params));
-  `${resource}_${strParams}_${reactiveAuth.map(toSessionName).default("")}`;
+  `${resource}_${strParams}`;
 }
 
 fun toSuppliedResoureId(
   supplier: String,
   resource: String,
   params: Map<String, PValue>,
-  reactiveAuth: ?Array<UInt8>,
 ): String {
-  `${supplier}_${toResoureId(resource, params, reactiveAuth)}`;
+  `${supplier}_${toResoureId(resource, params)}`;
 }
 
 fun collectionForName(name: String): Collection {
