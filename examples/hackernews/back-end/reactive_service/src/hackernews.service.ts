@@ -94,7 +94,7 @@ class SortingMapper {
   }
 }
 
-class PostsResource implements Resource {
+class PostsResource implements Resource<ResourceInputs> {
   private limit: number;
 
   constructor(params: Record<string, string>) {
