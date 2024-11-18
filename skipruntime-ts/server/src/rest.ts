@@ -17,7 +17,7 @@ export function createRESTServer(service: ServiceInstance): express.Express {
       service.getArray(
         req.params.resource,
         req.params.key,
-        req.query as Record<string, string>,
+        req.query as { [param: string]: string },
         {
           resolve: (data: Json) => {
             res.status(200).json(data);
@@ -39,7 +39,7 @@ export function createRESTServer(service: ServiceInstance): express.Express {
           // (upon reconnecting).
           const resource = service.instantiateResource(
             req.params.resource,
-            req.query as Record<string, string>,
+            req.query as { [param: string]: string },
           );
           res.writeHead(200, {
             Connection: "keep-alive",

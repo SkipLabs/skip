@@ -37,18 +37,21 @@ type GetResult<T> = {
 interface ServiceInstance {
   getAll<K extends Json, V extends Json>(
     resource: string,
-    params?: Record<string, string>,
+    params?: { [param: string]: string },
   ): GetResult<Values<K, V>>;
   getArray<V extends Json>(
     resource: string,
     key: string | number,
-    params?: Record<string, string>,
+    params?: { [param: string]: string },
   ): GetResult<V[]>;
   update<K extends Json, V extends Json>(
     collection: string,
     entries: Entry<K, V>[],
   ): void;
-  closeResourceInstance(resource: string, params: Record<string, string>): void;
+  closeResourceInstance(
+    resource: string,
+    params: { [param: string]: string },
+  ): void;
 }
 
 //// testMap1
