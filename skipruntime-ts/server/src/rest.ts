@@ -1,93 +1,84 @@
 import express from "express";
-import type { Entry, Json, ServiceInstance, Values } from "skip-wasm";
-import { UnknownCollectionError, reactiveResponseHeader } from "skip-wasm";
+import type {
+  Entry,
+  Json,
+  ServiceInstance,
+  Values,
+  CollectionUpdate,
+} from "skip-wasm";
+import { UnknownCollectionError } from "skip-wasm";
 
 export function createRESTServer(service: ServiceInstance): express.Express {
   const app = express();
   app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
   // READS
-  app.head("/v1/:resource", (req, res) => {
-    const resourceName = req.params.resource;
-    const strReactiveAuth = req.headers["skip-reactive-auth"] as string;
-    if (!strReactiveAuth)
-      throw new Error("Skip-Reactive-Auth must be specified.");
-    const reactiveAuth = new Uint8Array(Buffer.from(strReactiveAuth, "base64"));
-    try {
-      const data = service.instantiateResource(
-        resourceName,
-        req.query as Record<string, string>,
-        reactiveAuth,
-      );
-      const [name, value] = reactiveResponseHeader(data);
-      res.set(name, value);
-      res.status(200).json();
-    } catch (e: unknown) {
-      res.status(500).json(e instanceof Error ? e.message : e);
-    }
-  });
   app.get("/v1/:resource/:key", (req, res) => {
-    const key = req.params.key;
-    const resourceName = req.params.resource;
-    const strReactiveAuth = req.headers["skip-reactive-auth"] as string;
-    const reactiveAuth = strReactiveAuth
-      ? new Uint8Array(Buffer.from(strReactiveAuth, "base64"))
-      : undefined;
     try {
-      const promise = new Promise(function (resolve, reject) {
-        service.getArray(
-          resourceName,
-          key,
-          req.query as Record<string, string>,
-          reactiveAuth,
-          {
-            resolve,
-            reject,
+      service.getArray(
+        req.params.resource,
+        req.params.key,
+        req.query as Record<string, string>,
+        undefined,
+        {
+          resolve: (data: Json) => {
+            res.status(200).json(data);
           },
-        );
-      });
-      promise
-        .then((data) => res.status(200).json(data))
-        .catch((e: unknown) =>
-          res.status(500).json(e instanceof Error ? e.message : e),
-        );
+          reject: (err: unknown) => {
+            res.status(500).json(err instanceof Error ? err.message : err);
+          },
+        },
+      );
     } catch (e: unknown) {
       res.status(500).json(e instanceof Error ? e.message : e);
     }
   });
   app.get("/v1/:resource", (req, res) => {
-    const resourceName = req.params.resource;
-    const strReactiveAuth = req.headers["skip-reactive-auth"] as string;
-    const reactiveAuth = strReactiveAuth
-      ? new Uint8Array(Buffer.from(strReactiveAuth, "base64"))
-      : undefined;
     try {
-      const promise = new Promise<Values<Json, Json>>(function (
-        resolve,
-        reject,
-      ) {
-        service.getAll(
-          resourceName,
-          req.query as Record<string, string>,
-          reactiveAuth,
-          {
-            resolve,
-            reject,
-          },
-        );
+      res.format({
+        "text/event-stream": function () {
+          // TODO: Use watermark in `Last-Event-ID` header if provided
+          // (upon reconnecting).
+          const resource = service.instantiateResource(
+            req.params.resource,
+            req.query as Record<string, string>,
+          );
+          res.writeHead(200, {
+            Connection: "keep-alive",
+            "Cache-Control": "no-cache",
+          });
+          const subscriptionID = service.subscribe(
+            resource,
+            (update: CollectionUpdate<string, Json>) => {
+              if (update.isInitial) {
+                res.write(`event: init\n`);
+              } else {
+                res.write(`event: update\n`);
+              }
+              res.write(`id: ${update.watermark}\n`);
+              res.write(`data: ${JSON.stringify(update.values)}\n\n`);
+            },
+          );
+          req.on("close", () => {
+            service.unsubscribe(subscriptionID);
+            res.end();
+          });
+        },
+        default: function () {
+          service.getAll(
+            req.params.resource,
+            req.query as Record<string, string>,
+            undefined,
+            {
+              resolve: (data: Values<Json, Json>) => {
+                res.status(200).json(data.values);
+              },
+              reject: (err: unknown) => {
+                res.status(500).json(err instanceof Error ? err.message : err);
+              },
+            },
+          );
+        },
       });
-      promise
-        .then((data) => {
-          const reactive = data.reactive;
-          if (reactive) {
-            const [name, value] = reactiveResponseHeader(reactive);
-            res.set(name, value);
-          }
-          res.status(200).json(data.values);
-        })
-        .catch((e: unknown) =>
-          res.status(500).json(e instanceof Error ? e.message : e),
-        );
     } catch (e: unknown) {
       res.status(500).json(e instanceof Error ? e.message : e);
     }
