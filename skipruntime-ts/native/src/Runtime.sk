@@ -65,16 +65,10 @@ class ConvReducer(
 
 class ResourceCollection(value: Collection) extends SKStore.File
 
-class ResourceKey(
-  name: String,
-  params: Params,
-  reactiveAuth: ?Array<UInt8>,
-) extends SKStore.Key {
+class ResourceKey(name: String, params: Params) extends SKStore.Key {
   //
   fun toString(): String {
-    `${this.name}:${paramsToString(this.params.value)}:${toSessionName(
-      this.reactiveAuth.default(Array[]),
-    )}`
+    `${this.name}:${paramsToString(this.params.value)}`
   }
 }
 
@@ -169,7 +163,6 @@ class RemoteSpecifiers(
 class ResourceInfo(
   name: String,
   collection: Collection,
-  reactiveAuth: ?Array<UInt8>,
   statusRef: SKStore.DirName,
 ) extends SKStore.File {
   /**
@@ -228,6 +221,149 @@ class Input(
   fileConverter: FileConverter,
 )
 
+fun buildResourcesGraph(
+  context: mutable SKStore.Context,
+  session: String,
+  statusHdl: SKStore.EHandle<SKStore.IID, ResourceStatus>,
+  servicesHdl: SKStore.EHandle<SKStore.SID, ServiceFile>,
+  inputCollections: Map<String, Collection>,
+  resources: Map<String, ResourceBuilder>,
+): void {
+  dirname = kResourceSessionDir;
+  nDirname = dirname.sub("names");
+  gDirname = dirname.sub("graph");
+  cDirname = dirname.sub("collections");
+  dDirname = dirname.sub("data");
+  namesHdl = context
+    .mkdir(ResourceKey::keyType, SKStore.IntFile::type, dirname, Array[])
+    .map(
+      ResourceKey::keyType,
+      SKStore.StringFile::type,
+      context,
+      nDirname,
+      (_ctx, writer, key, _) ~> {
+        resourceId = toResoureId(key.name, key.params.value);
+        writer.set(key, SKStore.StringFile(resourceId));
+      },
+    );
+  collectionHdl = namesHdl.map(
+    ResourceKey::keyType,
+    ResourceInfo::type,
+    context,
+    gDirname,
+    (context, writer, key, it) ~> {
+      pushContext(context);
+      try {
+        resourceId = it.first.value;
+        statusRef = dirname.sub(resourceId);
+        // Status graph
+        sStatusHdl = context
+          .mkdir(
+            SKStore.DirName::keyType,
+            StatusFile::type,
+            statusRef.sub("status"),
+            Array[],
+            true,
+          )
+          .map(
+            SKStore.IID::keyType,
+            ResourceStatus::type,
+            context,
+            statusRef.sub("statuses"),
+            (_ctx, writer, key, it) ~> {
+              writer.set(SKStore.IID(0), ResourceStatus(key, it.first.status));
+            },
+          );
+        _sRequestsHdl = context
+          .mkdir(
+            SKStore.SID::keyType,
+            RequestFile::type,
+            statusRef.sub("requests"),
+            Array[],
+            true,
+          )
+          .map(
+            SKStore.SID::keyType,
+            RequestStatuses::type,
+            context,
+            statusRef.sub("all"),
+            (ctx, writer, key, it) ~> {
+              rf = it.first;
+              timestamp = rf.timestamp;
+              statuses = statusHdl
+                .getArray(ctx, SKStore.IID(0))
+                .concat(sStatusHdl.getArray(ctx, SKStore.IID(0)))
+                .filter(rs -> rs.status.created <= timestamp);
+              requestStatuses = RequestStatuses(statuses);
+              writer.set(key, requestStatuses);
+              rf.checker match {
+              | Some(checker) if (!requestStatuses.isLoading()) ->
+                ctx.postpone(CheckRequest(statusRef, key, checker))
+              | _ -> void
+              }
+            },
+          );
+        resourceBuilder = resources.get(key.name);
+        resource = resourceBuilder.build(key.params.value);
+        allCollections = mutable Map[];
+        inputCollections.each((k, c) -> allCollections.add(k, c));
+        servicesHdl.get(context, SKStore.SID(session)).value.each((k, c) ->
+          allCollections.set(k, c)
+        );
+        collection = resource.instantiate(allCollections.chill());
+        // Ensure the name of the resource result
+        resourceData = collection.hdl.map(
+          kKeyToKey,
+          kFileToFile,
+          context,
+          dDirname.sub(resourceId),
+          (_ctx, writer, key, it) ~> {
+            writer.setArray(key, it.collect(Array));
+          },
+        );
+        writer.set(
+          key,
+          ResourceInfo(
+            resourceId,
+            collection with {hdl => resourceData},
+            statusRef,
+          ),
+        );
+        popContext()
+      } catch {
+      | ex ->
+        popContext();
+        throw ex
+      }
+    },
+  );
+  key = SKStore.SID(session);
+  _ = collectionHdl
+    .map(
+      SKStore.SID::keyType,
+      ResourceInfo::type,
+      context,
+      cDirname,
+      (_ctx, writer, _, it) ~> {
+        writer.set(key, it.first);
+      },
+    )
+    .map(
+      SKStore.SID::keyType,
+      ResourceInfo::type,
+      context,
+      kResourceCollectionsDir,
+      (_ctx, writer, _key, it) ~> {
+        loop {
+          it.next() match {
+          | None() -> break void
+          | Some(ri) -> writer.set(SKStore.SID(ri.name), ri)
+          }
+        }
+      },
+    )
+}
+
 fun initService(service: Service): Result<void, .Exception> {
   if (SKStore.gHasContext() == 0) {
     SKStore.gContextInit(initCtx());
@@ -268,7 +404,7 @@ fun initService(service: Service): Result<void, .Exception> {
         )
       });
       inputCollections = mInputs.chill();
-      serviceCollections = sessionHdl.map(
+      servicesHdl = sessionHdl.map(
         SKStore.SID::keyType,
         ServiceFile::type,
         context,
@@ -305,176 +441,14 @@ fun initService(service: Service): Result<void, .Exception> {
             writer.set(SKStore.IID(0), ResourceStatus(key, it.first.status));
           },
         );
-
-      rSessionHdl = context.mkdir(
-        SKStore.SID::keyType,
-        SKStore.IntFile::type,
-        kResourceSessionDir,
-        Array[],
-      );
-      _ = rSessionHdl
-        .map(
-          SKStore.SID::keyType,
-          ResourceCollections::type,
-          context,
-          kResourceGraphDir,
-          (context, writer, key, _it) ~> {
-            rsession = key.value;
-            // Resource graph
-            dirname = resourceSessionDirName(rsession);
-            nDirname = dirname.sub("names");
-            gDirname = dirname.sub("graph");
-            cDirname = dirname.sub("collections");
-            dDirname = dirname.sub("data");
-            namesHdl = context
-              .mkdir(
-                ResourceKey::keyType,
-                SKStore.IntFile::type,
-                dirname,
-                Array[],
-              )
-              .map(
-                ResourceKey::keyType,
-                SKStore.StringFile::type,
-                context,
-                nDirname,
-                (_ctx, writer, key, _) ~> {
-                  resourceId = toResoureId(
-                    key.name,
-                    key.params.value,
-                    key.reactiveAuth,
-                  );
-                  writer.set(key, SKStore.StringFile(resourceId));
-                },
-              );
-            collectionHdl = namesHdl.map(
-              ResourceKey::keyType,
-              ResourceInfo::type,
-              context,
-              gDirname,
-              (context, writer, key, it) ~> {
-                pushContext(context);
-                try {
-                  resourceId = it.first.value;
-                  statusRef = dirname.sub(resourceId);
-                  // Status graph
-                  sStatusHdl = context
-                    .mkdir(
-                      SKStore.DirName::keyType,
-                      StatusFile::type,
-                      statusRef.sub("status"),
-                      Array[],
-                      true,
-                    )
-                    .map(
-                      SKStore.IID::keyType,
-                      ResourceStatus::type,
-                      context,
-                      statusRef.sub("statuses"),
-                      (_ctx, writer, key, it) ~> {
-                        writer.set(
-                          SKStore.IID(0),
-                          ResourceStatus(key, it.first.status),
-                        );
-                      },
-                    );
-                  _sRequestsHdl = context
-                    .mkdir(
-                      SKStore.SID::keyType,
-                      RequestFile::type,
-                      statusRef.sub("requests"),
-                      Array[],
-                      true,
-                    )
-                    .map(
-                      SKStore.SID::keyType,
-                      RequestStatuses::type,
-                      context,
-                      statusRef.sub("all"),
-                      (ctx, writer, key, it) ~> {
-                        rf = it.first;
-                        timestamp = rf.timestamp;
-                        statuses = statusHdl
-                          .getArray(ctx, SKStore.IID(0))
-                          .concat(sStatusHdl.getArray(ctx, SKStore.IID(0)))
-                          .filter(rs -> rs.status.created <= timestamp);
-                        requestStatuses = RequestStatuses(statuses);
-                        writer.set(key, requestStatuses);
-                        rf.checker match {
-                        | Some(checker) if (!requestStatuses.isLoading()) ->
-                          ctx.postpone(CheckRequest(statusRef, key, checker))
-                        | _ -> void
-                        }
-                      },
-                    );
-                  resourceBuilder = service.resources.get(key.name);
-                  resource = resourceBuilder.build(key.params.value);
-                  allCollections = mutable Map[];
-                  inputCollections.each((k, c) -> allCollections.add(k, c));
-                  serviceCollections
-                    .get(context, SKStore.SID(session))
-                    .value.each((k, c) -> allCollections.set(k, c));
-                  collection = resource.instantiate(
-                    allCollections.chill(),
-                    key.reactiveAuth,
-                  );
-                  // Ensure the name of the resource result
-                  resourceData = collection.hdl.map(
-                    kKeyToKey,
-                    kFileToFile,
-                    context,
-                    dDirname.sub(resourceId),
-                    (_ctx, writer, key, it) ~> {
-                      writer.setArray(key, it.collect(Array));
-                    },
-                  );
-                  writer.set(
-                    key,
-                    ResourceInfo(
-                      resourceId,
-                      collection with {hdl => resourceData},
-                      key.reactiveAuth,
-                      statusRef,
-                    ),
-                  );
-                  popContext()
-                } catch {
-                | ex ->
-                  popContext();
-                  throw ex
-                }
-              },
-            );
-            sessionResources = collectionHdl.map(
-              SKStore.SID::keyType,
-              ResourceInfo::type,
-              context,
-              cDirname,
-              (_ctx, writer, _, it) ~> {
-                writer.set(key, it.first);
-              },
-            );
-            writer.set(key, ResourceCollections(sessionResources));
-          },
-        )
-        .map(
-          SKStore.SID::keyType,
-          ResourceInfo::type,
-          context,
-          kResourceCollectionsDir,
-          (ctx, writer, key, it) ~> {
-            loop {
-              it.next() match {
-              | None() -> break void
-              | Some(hdl) ->
-                namesArray = hdl.value.getArray(ctx, key);
-                for (names in namesArray) {
-                  writer.set(SKStore.SID(names.name), names)
-                }
-              }
-            }
-          },
-        )
+      buildResourcesGraph(
+        context,
+        session,
+        statusHdl,
+        servicesHdl,
+        inputCollections,
+        service.resources,
+      )
     } else {
       SKStore.EHandle(
         SKStore.IID::keyType,
@@ -492,7 +466,7 @@ fun closeService(): Result<void, .Exception> {
     keys = dir.keys();
     keys.each((key) -> {
       if (!dir.getArrayRaw(key).isEmpty()) {
-        closeSession_(context, SKStore.SID::keyType(key).value)
+        dir.writeArray(context, key, Array[])
       }
     });
     remoteCollections = context
@@ -528,18 +502,12 @@ class LinkToResource(
   writer: CollectionWriter,
   name: String,
   params: Map<String, PValue>,
-  reactiveAuth: ?Array<UInt8>,
 ) extends SKStore.Postponable {
   //
   fun perform(context: mutable SKStore.Context): void {
     this.writer.status(context, Status::create());
     pushContext(context);
-    this.supplier.subscribe(
-      this.writer,
-      this.name,
-      this.params,
-      this.reactiveAuth,
-    );
+    this.supplier.subscribe(this.writer, this.name, this.params);
     popContext();
   }
 }
@@ -548,11 +516,10 @@ class CloseResource(
   supplier: ExternalService,
   name: String,
   params: Map<String, PValue>,
-  reactiveAuth: ?Array<UInt8>,
 ) extends SKStore.Postponable {
   fun perform(context: mutable SKStore.Context): void {
     pushContext(context);
-    this.supplier.unsubscribe(this.name, this.params, this.reactiveAuth);
+    this.supplier.unsubscribe(this.name, this.params);
     popContext();
   }
 }
@@ -617,7 +584,6 @@ fun useExternalCollection(
   supplier: String,
   resource: String,
   params: Map<String, PValue>,
-  reactiveAuth: ?Array<UInt8>,
 ): Collection {
   getContext() match {
   | Some(context) ->
@@ -628,12 +594,7 @@ fun useExternalCollection(
       .fromSome();
 
     externalSupplier = remoteCollections.get(supplier);
-    collectionId = toSuppliedResoureId(
-      supplier,
-      resource,
-      params,
-      reactiveAuth,
-    );
+    collectionId = toSuppliedResoureId(supplier, resource, params);
     dirName = subDirName(context, collectionId);
     paramsDir = dirName.sub("params");
     dataDir = dirName.sub("data");
@@ -664,17 +625,9 @@ fun useExternalCollection(
               CollectionWriter(storeDir),
               resource,
               it.first.value,
-              reactiveAuth,
             ),
           ),
-          Some(
-            CloseResource(
-              externalSupplier,
-              resource,
-              it.first.value,
-              reactiveAuth,
-            ),
-          ),
+          Some(CloseResource(externalSupplier, resource, it.first.value)),
         );
         writer.set(key, Handle(store));
       },
@@ -1112,9 +1065,10 @@ class CollectionWriter(dirName: SKStore.DirName) {
   fun status(context: mutable SKStore.Context, status: Status): void {
     context.maybeGetEagerDir(this.dirName) match {
     | Some(dir) ->
-      dirname = this.sessionId(context, dir) match {
-      | Some(sessionId) -> resourceSessionDirName(sessionId).sub("status")
-      | _ -> kSessionDir.sub("status")
+      dirname = if (this.isResource(context, dir)) {
+        kResourceSessionDir.sub("status")
+      } else {
+        kSessionDir.sub("status")
       };
       shdl = SKStore.EHandle(
         SKStore.DirName::keyType,
@@ -1132,9 +1086,10 @@ class CollectionWriter(dirName: SKStore.DirName) {
   ): void {
     context.maybeGetEagerDir(this.dirName) match {
     | Some(dir) ->
-      dirname = this.sessionId(context, dir) match {
-      | Some(sessionId) -> resourceSessionDirName(sessionId).sub("status")
-      | _ -> kSessionDir.sub("status")
+      dirname = if (this.isResource(context, dir)) {
+        kResourceSessionDir.sub("status")
+      } else {
+        kSessionDir.sub("status")
       };
       shdl = SKStore.EHandle(
         SKStore.DirName::keyType,
@@ -1171,21 +1126,21 @@ class CollectionWriter(dirName: SKStore.DirName) {
     keys.each(key -> chdl.writeArray(context, key, Array[]));
   }
 
-  private fun sessionId(
+  private fun isResource(
     context: mutable SKStore.Context,
     dir: SKStore.EagerDir,
-  ): ?String {
+  ): Bool {
     dir.creator match {
     | Some(arrow) ->
-      this.extractSessionId(arrow.parentName) match {
-      | Some(dn) -> Some(dn)
-      | _ ->
+      if (this.isResourceDir(arrow.parentName)) {
+        true
+      } else {
         context.maybeGetEagerDir(arrow.parentName) match {
-        | Some(sdir) -> this.sessionId(context, sdir)
-        | _ -> None()
+        | Some(sdir) -> this.isResource(context, sdir)
+        | _ -> false
         }
       }
-    | _ -> None()
+    | _ -> false
     }
   }
 
@@ -1199,20 +1154,8 @@ class CollectionWriter(dirName: SKStore.DirName) {
     "",
   ];
 
-  private fun extractSessionId(dirName: SKStore.DirName): ?String {
-    elements = dirName.toString().split("/");
-    if (elements.size() == static::kSessionDir.size()) {
-      session: ?String = None();
-      for (idx in Range(0, elements.size())) {
-        if (idx == 4) {
-          !session = Some(elements[idx]);
-        } else if (elements[idx] != static::kSessionDir[idx]) {
-          return None()
-        }
-      };
-      return session;
-    };
-    None()
+  private fun isResourceDir(dirName: SKStore.DirName): Bool {
+    dirName == kResourceSessionDir
   }
 }
 
@@ -1230,9 +1173,8 @@ fun createReactiveResource(
   context: mutable SKStore.Context,
   resource: String,
   params: Map<String, PValue>,
-  reactiveAuth: ?Array<UInt8>,
 ): ReactiveResponse {
-  names = createResource_(context, resource, params, reactiveAuth);
+  names = createResource_(context, resource, params);
   ReactiveResponse(names.name, context.tick)
 }
 
@@ -1240,10 +1182,9 @@ fun getAll(
   context: mutable SKStore.Context,
   resourceName: String,
   params: Map<String, PValue>,
-  reactiveAuth: ?Array<UInt8>,
   optRequest: ?Request,
 ): GetResult<Values> {
-  resource = createResource_(context, resourceName, params, reactiveAuth);
+  resource = createResource_(context, resourceName, params);
   // create requests
   request = optRequest match {
   | Some(checker @ Checker _) -> resource.createRequest(context, Some(checker))
@@ -1272,10 +1213,9 @@ fun getForKey(
   resourceName: String,
   params: Map<String, PValue>,
   key: SKJSON.CJSON,
-  reactiveAuth: ?Array<UInt8>,
   optRequest: ?Request,
 ): GetResult<Array<SKJSON.CJSON>> {
-  resource = createResource_(context, resourceName, params, reactiveAuth);
+  resource = createResource_(context, resourceName, params);
   // create requests
   request = optRequest match {
   | Some(checker @ Checker _) -> resource.createRequest(context, Some(checker))
@@ -1302,48 +1242,17 @@ fun closeReactiveResource(
   context: mutable SKStore.Context,
   resource: String,
   params: Map<String, PValue>,
-  reactiveAuth: ?Array<UInt8>,
 ): void {
-  session = toSessionName(reactiveAuth.default(Array[]));
-  rDirName = resourceSessionDirName(session);
-  context.maybeGetEagerDir(rDirName).each(_ -> {
-    rObject = ResourceKey(resource, Params(params), reactiveAuth);
+  context.maybeGetEagerDir(kResourceSessionDir).each(_ -> {
+    rObject = ResourceKey(resource, Params(params));
     resourceHdl = SKStore.EHandle(
       ResourceKey::keyType,
       SKStore.IntFile::type,
-      rDirName,
+      kResourceSessionDir,
     );
     resourceHdl.writeArray(context, rObject, Array[]);
     context.update();
   });
-}
-
-fun closeSession_(context: mutable SKStore.Context, session: String): void {
-  rDirName = resourceSessionDirName(session);
-  resourceHdl = SKStore.EHandle(
-    ResourceKey::keyType,
-    SKStore.IntFile::type,
-    rDirName,
-  );
-  dir = context.unsafeGetEagerDir(rDirName);
-  dir.unsafeIterKeys((key, _) -> {
-    resourceHdl.writeArray(context, ResourceKey::keyType(key), Array[]);
-  });
-  context.update();
-  rsessionsHdl = SKStore.EHandle(
-    SKStore.SID::keyType,
-    SKStore.IntFile::type,
-    kResourceSessionDir,
-  );
-  rsessionsHdl.writeArray(context, SKStore.SID(session), Array[]);
-  context.update();
-}
-
-fun closeSession(
-  context: mutable SKStore.Context,
-  reactiveAuth: ?Array<UInt8>,
-): void {
-  closeSession_(context, toSessionName(reactiveAuth.default(Array[])));
 }
 
 fun subscribe(
@@ -1355,7 +1264,6 @@ fun subscribe(
     SKStore.Tick,
     Bool,
   ) ~> void,
-  reactiveAuth: ?Array<UInt8>,
 ): Int {
   session = SKStore.genSym(0);
   resourcesCollectionsHdl = SKStore.EHandle(
@@ -1364,10 +1272,9 @@ fun subscribe(
     kResourceCollectionsDir,
   );
   resourcesCollectionsHdl.maybeGet(context, SKStore.SID(reactiveId)) match {
-  | Some(info) if (info.reactiveAuth == reactiveAuth) ->
+  | Some(info) ->
     info.collection.subscribe(context, session, from, notify);
     session
-  | Some _ -> -2
   | _ -> -1
   }
 }
@@ -1431,30 +1338,16 @@ private fun createResource_(
   context: mutable SKStore.Context,
   resource: String,
   params: Map<String, PValue>,
-  reactiveAuth: ?Array<UInt8>,
 ): ResourceInfo {
-  session = toSessionName(reactiveAuth.default(Array[]));
-  rsessions = SKStore.EHandle(
-    SKStore.SID::keyType,
-    SKStore.IntFile::type,
-    kResourceSessionDir,
-  );
-  rsessions.writeArray(
-    context,
-    SKStore.SID(session),
-    Array[SKStore.IntFile(0)],
-  );
-  context.update();
-  rDirName = resourceSessionDirName(session);
-  rObject = ResourceKey(resource, Params(params), reactiveAuth);
+  rObject = ResourceKey(resource, Params(params));
   resourceHdl = SKStore.EHandle(
     ResourceKey::keyType,
     SKStore.IntFile::type,
-    rDirName,
+    kResourceSessionDir,
   );
   resourceHdl.writeArray(context, rObject, Array[SKStore.IntFile(0)]);
   context.update();
-  gDirName = rDirName.sub("graph");
+  gDirName = kResourceSessionDir.sub("graph");
   graphHdl = SKStore.EHandle(
     ResourceKey::keyType,
     ResourceInfo::type,
