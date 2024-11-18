@@ -57,18 +57,24 @@ At its core, a Skip service is a reactive computation graph describing how to co
 const users: db.getUsers(...);
 const groups: db.getGroups(...);
 
+// Type alias for inputs to our service
+type Inputs = {
+  users: EagerCollection<UserID, User>;
+  groups: EagerCollection<GroupID, Group>;
+};
+
+// Type alias for inputs to the active friends resource
+type ResourceInputs = Inputs & { actives: EagerCollection<GroupID, UserID> };
+
 // Specify and run service
 const service = await runService({
-    initialData: {users, groups},
-    resources: {activeUsers : ActiveUsersResource},
-    createGraph(inputs: {
-      users: EagerCollection<UserID, User>;
-      groups: EagerCollection<GroupID, Group>;
-    }): {actives : EagerCollection<GroupID, UserID>} {
-      return { actives: groups.map(FilterActive, users) };
-	}
-  }
-)
+  initialData: { users, groups },
+  resources: { activeFriends: ActiveFriendsResource },
+  createGraph(inputs: Inputs): ResourceInputs {
+    const actives = groups.map(FilterActive, inputs.users);
+    return { ...inputs, actives };
+  },
+});
 
 class FilterActive implements Mapper<GroupID, Group, GroupID, UserID> {
   constructor(private users: EagerCollection<UserID, User>) {}
@@ -79,22 +85,18 @@ class FilterActive implements Mapper<GroupID, Group, GroupID, UserID> {
   }
 }
 
-class ActiveUsersResource implements Resource {
-
-  instantiate(collections: {
-    users: EagerCollection<UserID, User>;
-    groups: EagerCollection<GroupID, Group>;
-	actives : EagerCollection<GroupID, UserID>;
-  }): EagerCollection<GroupID, UserID> {
-	
-  }
-}
-
-class FilterByFriend implements Mapper<GroupID, UserID, GroupID, UserID> {
-  constructor(private users: EagerCollection<UserID, User>) {}
+class FilterFriends implements Mapper<GroupID, UserID, GroupID, UserID> {
+  constructor(private user: User) {}
   mapElement(gid: GroupID, uid: UserID): Iterable<[GroupID, UserID]> {
-    const friends
+    return user.friends.includes(uid) ? [[gid, uid]] : [];
   }
 }
 
+class ActiveFriendsResource implements Resource<ResourceInputs> {
+  constructor(private params: {}) {}
+  instantiate(inputs: ResourceInputs): EagerCollection<GroupID, UserID> {
+    const user = inputs.users.getUnique(this.params.uid);
+    return inputs.actives.map(FilterFriends, user);
+  }
+}
 ```
