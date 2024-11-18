@@ -1,4 +1,4 @@
-import { type SetStateAction, useState, useEffect, useContext } from "react";
+import { type SetStateAction, useState, useEffect } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -7,9 +7,6 @@ import {
   useParams,
 } from "react-router-dom";
 import "./App.css";
-import { SkipContext } from "./SkipContext.ts";
-import { ReactiveResponse } from "@skipruntime/api";
-import { Client, Protocol } from "@skipruntime/client";
 
 const BASE_URL = "http://localhost:5000";
 
@@ -66,33 +63,14 @@ function Feed() {
   // }, []);
 
   // Reactive version:
-  const skipclient: Client = useContext(SkipContext)!;
   useEffect(() => {
-    async function getInitialData() {
-      // TODO: Simplify this.
-      const pubkey = String.fromCharCode.apply(null, [
-        ...new Uint8Array(await Protocol.exportKey(skipclient.creds.publicKey)),
-      ]);
-      const response = await fetch(BASE_URL, {
-        headers: { "Skip-Reactive-Auth": btoa(pubkey) },
-      });
-      const data = (await response.json()) as SetStateAction<Post[]>;
-      setPosts(data);
-      const reactiveToken = JSON.parse(
-        response.headers.get("Skip-Reactive-Response-Token")!,
-      ) as ReactiveResponse;
-      skipclient.subscribe(reactiveToken, (updates, _isInit) => {
-        const updatedPosts = updates[0][1] as Post[];
-        setPosts(updatedPosts);
-      });
-    }
-
-    try {
-      void getInitialData();
-    } catch (error) {
-      console.error(error);
-    }
-  }, [skipclient]);
+    const evSource = new EventSource(BASE_URL);
+    evSource.onmessage = (e: MessageEvent<string>) => {
+      const data = JSON.parse(e.data);
+      const updatedPosts = data[0][1] as Post[];
+      setPosts(updatedPosts);
+    };
+  }, []);
 
   async function upvotePost(postId: number) {
     try {

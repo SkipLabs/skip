@@ -6,7 +6,6 @@ SKARGO_PROFILE?=release
 .PHONY: check-src
 check-src:
 	../bin/cd_sh wasm "bun run tsc && bun run lint"
-	../bin/cd_sh client "bun run tsc && bun run lint"
 	../bin/cd_sh server "bun run tsc && bun run lint"
 
 .PHONY: check-examples

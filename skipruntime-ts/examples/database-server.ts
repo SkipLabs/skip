@@ -1,5 +1,4 @@
 import { RESTWrapperOfSkipService } from "@skipruntime/helpers/rest.js";
-import { reactiveResponseHeader } from "@skipruntime/helpers";
 
 import express from "express";
 
@@ -37,34 +36,9 @@ const run = function (
   });
 };
 
-app.head("/auth/users", (req, res) => {
-  const strReactiveAuth = req.headers["skip-reactive-auth"] as string;
-  if (!strReactiveAuth) {
-    console.error("Skip-Reactive-Auth must be specified.");
-    res.status(400).json("Must include reactive auth token in HEAD request");
-    return;
-  }
-  const reactiveAuth = new Uint8Array(Buffer.from(strReactiveAuth, "base64"));
+app.get("/user/:id", (_req, res) => {
   service
-    .head("users", {}, reactiveAuth)
-    .then((reactiveResponse) => {
-      const [name, token] = reactiveResponseHeader(reactiveResponse);
-      res.set(name, token);
-      res.status(200).json({});
-    })
-    .catch(() => {
-      res.status(500).json("Internal error");
-    });
-});
-app.get("/user/:id", (req, res) => {
-  const strReactiveAuth = req.headers["skip-reactive-auth"] as string;
-  if (!strReactiveAuth) {
-    console.error("Skip-Reactive-Auth must be specified.");
-    res.status(500).json("Internal error");
-    return;
-  }
-  service
-    .getArray("users", {}, "123", strReactiveAuth)
+    .getArray("users", {}, "123")
     .then((user) => {
       res.status(200).json(user);
     })
@@ -84,7 +58,8 @@ app.put("/user/:id", (req, res) => {
     .then(() => {
       res.status(200).json({});
     })
-    .catch(() => {
+    .catch((e: unknown) => {
+      console.log(e);
       res.status(500).json("Internal error");
     });
 });

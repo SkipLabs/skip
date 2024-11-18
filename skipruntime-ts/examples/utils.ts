@@ -1,10 +1,9 @@
+// TODO: Remove once global `EventSource` makes it out of experimental
+// in nodejs LTS.
+import EventSource from "eventsource";
 import type { Json, Entry } from "@skipruntime/api";
-import {
-  RESTWrapperOfSkipService,
-  type Entrypoint,
-} from "@skipruntime/helpers/rest.js";
+import { RESTWrapperOfSkipService } from "@skipruntime/helpers/rest.js";
 import { createInterface } from "readline";
-import { connect, Protocol, Client } from "@skipruntime/client";
 
 export interface ClientDefinition {
   port: number;
@@ -21,21 +20,11 @@ interface Delete {
   keys: string[];
 }
 
-function toWs(entrypoint: Entrypoint) {
-  if (entrypoint.secured)
-    return `wss://${entrypoint.host}:${entrypoint.port.toString()}`;
-  return `ws://${entrypoint.host}:${entrypoint.port.toString()}`;
-}
-
 class SkipHttpAccessV1 {
   private services: Record<number, RESTWrapperOfSkipService>;
-  private client?: Client;
   private defaultPort: number;
 
-  constructor(
-    private creds: Protocol.Creds,
-    ports: number[] = [3587],
-  ) {
+  constructor(ports: number[] = [3587]) {
     this.defaultPort = ports[0] ?? 3587;
     this.services = {};
     for (const port of ports) {
@@ -44,10 +33,6 @@ class SkipHttpAccessV1 {
         port,
       });
     }
-  }
-
-  close() {
-    if (this.client) this.client.close();
   }
 
   async writeMany(data: Write[], port?: number) {
@@ -78,38 +63,27 @@ class SkipHttpAccessV1 {
   }
 
   async log(resource: string, params: Record<string, string>, port?: number) {
-    const publicKey = new Uint8Array(
-      await Protocol.exportKey(this.creds.publicKey),
-    );
     const service = this.services[port ?? this.defaultPort];
     if (service === undefined) throw new Error(`Invalid port ${port}`);
-    const result = await service.getAll(resource, params, publicKey);
+    const result = await service.getAll(resource, params);
     console.log(JSON.stringify(result));
   }
 
-  async request(
-    resource: string,
-    params: Record<string, string>,
-    port?: number,
-  ) {
-    const publicKey = new Uint8Array(
-      await Protocol.exportKey(this.creds.publicKey),
-    );
+  request(resource: string, params: Record<string, string>, port?: number) {
     const service = this.services[port ?? this.defaultPort];
     if (service === undefined) throw new Error(`Invalid port ${port}`);
-    const reactive = await service.head(resource, params, publicKey);
-    if (!this.client) {
-      this.client = await connect(
-        toWs({ host: "localhost", port: port ?? this.defaultPort }),
-        this.creds,
-      );
-    }
-    this.client.subscribe(
-      reactive,
-      (updates: [string, Json[]][], isInit: boolean) => {
-        console.log("Update", Object.fromEntries(updates), isInit);
-      },
+
+    const evSource = new EventSource(
+      `//localhost:${port ?? this.defaultPort}/v1/${resource}?${new URLSearchParams(params)}`,
     );
+    evSource.addEventListener("init", (e: MessageEvent<string>) => {
+      const updates = JSON.parse(e.data);
+      console.log("Init", updates);
+    });
+    evSource.addEventListener("update", (e: MessageEvent<string>) => {
+      const updates = JSON.parse(e.data);
+      console.log("Update", updates);
+    });
   }
 }
 
@@ -322,12 +296,10 @@ class Player {
  * @param scenarios The scenarios
  * @param ports  The ports
  */
-export async function run(scenarios: Step[][], ports: number[] = [3587]) {
-  const creds = await Protocol.generateCredentials();
-  const access = new SkipHttpAccessV1(creds, ports);
+export function run(scenarios: Step[][], ports: number[] = [3587]) {
+  const access = new SkipHttpAccessV1(ports);
   const online = (line: string) => {
     if (line == "exit") {
-      access.close();
       return;
     }
     try {
@@ -340,12 +312,11 @@ export async function run(scenarios: Step[][], ports: number[] = [3587]) {
               params?: Record<string, string>;
               port?: number;
             };
-            access
-              .request(jsquery.resource, jsquery.params ?? {}, jsquery.port)
-              .then(console.log)
-              .catch((e: unknown) => {
-                console.error(e);
-              });
+            access.request(
+              jsquery.resource,
+              jsquery.params ?? {},
+              jsquery.port,
+            );
           },
         ],
         [
@@ -411,16 +382,11 @@ export async function run(scenarios: Step[][], ports: number[] = [3587]) {
     online,
     (step) => {
       if (step.type == "request") {
-        access
-          .request(
-            step.payload.resource,
-            step.payload.params ?? {},
-            step.payload.port,
-          )
-          .then(console.log)
-          .catch((e: unknown) => {
-            console.error(e);
-          });
+        access.request(
+          step.payload.resource,
+          step.payload.params ?? {},
+          step.payload.port,
+        );
       } else if (step.type == "write") {
         access
           .writeMany(step.payload)
@@ -444,7 +410,9 @@ export async function run(scenarios: Step[][], ports: number[] = [3587]) {
       }
     },
     console.error,
-    access.close.bind(access),
+    () => {
+      return;
+    },
   );
   const rl = createInterface({
     input: process.stdin,
