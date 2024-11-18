@@ -26,7 +26,9 @@ export type Param =
   | null
   | boolean
   | number
+  | bigint
   | string
+  | symbol
   | Constant
   | readonly Param[]
   | { readonly [k: string]: Param };
