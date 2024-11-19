@@ -1242,7 +1242,6 @@ export class ServiceInstance {
    * @param identifier - The resource instance identifier
    * @param resource - A resource name, which must correspond to a key in this `SkipService`'s `resources` field
    * @param params - Resource parameters, which will be passed to the resource constructor specified in this `SkipService`'s `resources` field
-   * @returns A response token which can be used to initiate reactive subscription
    */
   instantiateResource(
     identifier: string,
@@ -1364,8 +1363,8 @@ export class ServiceInstance {
   /**
    * Initiate reactive subscription on a resource instance
    * @param resourceInstanceId - the resource instance identifier
-   * @param watermark - the watermark where to start the subscription
    * @param f - A callback to execute on collection updates
+   * @param watermark - the watermark where to start the subscription
    * @returns A subcription identifier
    */
   subscribe<K extends Json, V extends Json>(

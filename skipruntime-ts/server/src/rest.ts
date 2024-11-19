@@ -32,7 +32,7 @@ export function createRESTServer(service: ServiceInstance): express.Express {
         "text/event-stream": function () {
           // TODO: Use watermark in `Last-Event-ID` header if provided
           // (upon reconnecting).
-          let uuid = crypto.randomUUID();
+          const uuid = crypto.randomUUID();
           service.instantiateResource(
             uuid,
             req.params.resource,
