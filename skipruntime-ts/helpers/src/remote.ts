@@ -22,7 +22,7 @@ export class SkipExternalService implements ExternalService {
     resource: string,
     params: { [param: string]: string },
     callbacks: {
-      update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
+      update: (updates: Entry<Json, Json>[], isInitial: boolean) => void;
       // FIXME: What is `error()` used for?
       error: (error: Json) => void;
       // FIXME: What is `loading()` used for?

@@ -292,17 +292,6 @@ export type CollectionUpdate<K extends Json, V extends Json> = {
 };
 
 /**
- * A `ReactiveResponse` contains metadata which can be used to initiate and manage reactive
- * connections to/from a service. It specifies a `collection` and a current `watermark`,
- * and is sent by Skip services in the `"Skip-Reactive-Response-Token"` HTTP header by default,
- * allowing clients to initiate reactive subscriptions or request diffs as needed.
- */
-export type ReactiveResponse = {
-  collection: string;
-  watermark: Watermark;
-};
-
-/**
  * External services must be carefully managed in reactive Skip services to make sure that
  * dependencies are properly tracked and data from external systems is kept up to date.
  *
