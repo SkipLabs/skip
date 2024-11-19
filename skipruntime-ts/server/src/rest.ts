@@ -65,7 +65,7 @@ export function createRESTServer(service: ServiceInstance): express.Express {
             req.query as Record<string, string>,
             {
               resolve: (data: Entry<Json, Json>[]) => {
-                res.status(200).json(data.values);
+                res.status(200).json(data);
               },
               reject: (err: unknown) => {
                 res.status(500).json(err instanceof Error ? err.message : err);
