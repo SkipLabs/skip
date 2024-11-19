@@ -14,7 +14,7 @@ This guide takes a "top-down" approach, showing you how to use our APIs in an id
 
 Alternatively, you can work from the "bottom-up" by reading our [Skip fundamentals](TODO:docusaurus link) tutorial, which explains the concepts and components of the Skip runtime from first principles.
 
-Finally, if you'd like to just get your hands dirty and dive into the code, you can explore [examples](TODO: docusaurus link) of reactive services, [API docs](TODO: docusaurus link), or a before/after [example](TODO: docusaurus link) of retrofitting a legacy service with reactive features.
+Finally, if you'd like to just dive into the code, you can explore [examples](TODO: docusaurus link) of reactive services, [API docs](TODO: docusaurus link), or a before/after [example](TODO: docusaurus link) of retrofitting a legacy service with reactive features.
 
 ## Tutorial
 
@@ -30,19 +30,19 @@ Skip is a framework for building _reactive_ software which is responsive to chan
 From the outside, reactive services can be treated similarly to streaming sources: they push real-time updates to clients and other subscribers, supporting smooth real-time user experiences.
 Unlike event-based streaming frameworks, though, Skip programs are written in a declarative style: instead of reasoning about updates directly, you write code that reasons about a "current" snapshot of state, and the Skip framework automatically processes changes and keeps everything in sync.
 
-In order to do so, Skip tracks dependencies in a _computation graph_ in which input changes can be propagated through to relevant outputs *without* re-evaluating any computation whose inputs haven't changed.
+In order to do so, Skip tracks dependencies in a _computation graph_ in which input changes can be propagated through to relevant outputs *without* reevaluating any computation whose inputs haven't changed.
 
 Skip's core abstractions are best understood in terms of this computation graph.
 
 The primary data structure used in Skip is called a _collection_, and associates *keys* with one or more *values*.
-Collection keys and values are both immutable data stored in the Skip framework's native heap; in Typescript, any JSON-serializable value can be used. (i.e. primitives, arrays, objects, and nested combinations thereof)
+Collection keys and values are both immutable data stored in the Skip framework's native heap; in Typescript, any JSON-serializable value can be used (that is:  primitives, arrays, objects, and nested combinations thereof, but not functions or classes).
 Collections can be accessed by key or manipulated to create new collections.
 
 These manipulations do _not_ mutate in-place but instead create a _new_ collection in the computation graph with a dependency edge from the input collection(s).
 For example, `collection.map(Foo)` creates a _new_ collection with the results of applying `Foo` to the data in `collection`, which is then updated in real time whenever the contents of `collection` change.
 (Along with `map`, Skip collections offer `mapReduce` and utilities like `merge`, `slice`, etc.)
 
-Maps and other operations over Skip collections can be sequenced and combined to create complex computation graphs which are maintained up-to-date by re-executing computation edges when inputs change.
+Maps and other operations over Skip collections can be sequenced and combined to create complex computation graphs which are maintained up-to-date by reexecuting computation edges when inputs change.
 Due to the structured nature of collections and maps, this can be done very efficiently -- always proportional to the size of the _change_, not the total size of the collection.
 
 However, in order for the Skip framework to process updates correctly by reexecuting portions of its computation graph on changed inputs, it is crucial to capture all relevant dependencies.
@@ -149,6 +149,6 @@ In this example, our `ActiveFriends` resource filters each groups' current activ
 
 This guide implements an example reactive service which can be queried or subscribed to by user's clients to see up-to-date listings of which of their active friends belong to each group, maintained up to date as input data changes without any explicit management of updates in the service's declarative logic.
 
-We've showed the core reactive logic without going into full detail on how to deploy and interact with a Skip service; see the [Deploying](todo: docusaurus link) guide for more details on how to wire reactivity into a generic web application, including how to handle user writes and feed those into input collection
+We've shown the core reactive logic here without going into full detail on how to deploy and interact with a Skip service; see the [Deploying](todo: docusaurus link) guide for more details on how to wire reactivity into a generic web application, including how to handle user writes and feed those into input collection
 
 We've also elided the details of syncing data from external sources like databases or non-reactive APIs; see [todo: docusaurus link] for more details on how to keep your reactive service hydrated and in sync with updates from other components of your application.
