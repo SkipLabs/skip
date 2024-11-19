@@ -30,8 +30,27 @@ Skip is a framework for building _reactive_ software which is responsive to chan
 From the outside, reactive services can be treated similarly to streaming sources: they push real-time updates to clients and other subscribers, supporting smooth real-time user experiences.
 Unlike event-based streaming frameworks, though, Skip programs are written in a declarative style: instead of reasoning about updates directly, you write code that reasons about a "current" snapshot of state, and the Skip framework automatically processes changes and keeps everything in sync.
 
-In order to do so, Skip tracks dependencies such that a change to an input can be propagated through that dependency graph without re-evaluating computations whose inputs haven't changed.
-Therefore, while reading this guide and working with the Skip framework, it is crucial to reason about (im)mutability and side-effects in your code so that it can be reliably evaluated by the framework.
+In order to do so, Skip tracks dependencies in a _computation graph_ in which input changes can be propagated through to relevant outputs *without* re-evaluating any computation whose inputs haven't changed.
+
+Skip's core abstractions are best understood in terms of this computation graph.
+
+The primary data structure used in Skip is called a _collection_, and associates *keys* with one or more *values*.
+Collection keys and values are both immutable data stored in the Skip framework's native heap; in Typescript, any JSON-serializable value can be used. (i.e. primitives, arrays, objects, and nested combinations thereof)
+Collections can be accessed by key or manipulated to create new collections, which can either be _eager_ (updated in response to input changes) or _lazy_ (updated in response to queries for specific keys).
+
+These manipulations do _not_ mutate in-place but instead create a _new_ collection in the computation graph with a dependency edge from the input collection(s).
+For example, `collection.map(Foo)` creates a _new_ collection with the results of applying `Foo` to the data in `collection`, which is then updated in real time whenever the contents of `collection` change.
+(Along with `map`, Skip collections offer `mapReduce` and utilities like `merge`, `slice`, etc.)
+
+Maps and other operations over Skip collections can be sequenced and combined to create complex computation graphs which are maintained up-to-date by re-executing computation edges when inputs change.
+Due to the structured nature of collections and maps, this can be done very efficiently -- always proportional to the size of the _change_, not the total size of the collection.
+
+However, in order for the Skip framework to process updates correctly by reexecuting portions of its computation graph on changed inputs, it is crucial to capture all relevant dependencies.
+For example, if a _mapper function_ (like `Foo` above) above reads and/or writes some global mutable state, then it may produce unexpected values when reexecuted by the framework.
+In order to mitigate this, Skip programs written in Typescript use `Mapper` classes to define reactive computations which avoid the most problematic cases of untracked dependencies.
+Nonetheless, while reading this guide and working with Skip, it is important to reason about (im)mutability and avoid side-effects in your code so that it can be reliably evaluated by the framework.
+
+Some examples of Mappers are shown [below](todo: docusaurus link to "anatomy" section of this page) and more details are available [here](todo: docusaurus link to functions page) or in the API [docs](todo: docusaurus link).
 
 ### The anatomy of a Skip service
 
