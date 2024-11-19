@@ -64,6 +64,24 @@ abstract class SkFrozen extends Frozen {
   }
 }
 
+export function check<T>(value: T): void {
+  if (
+    typeof value == "string" ||
+    typeof value == "number" ||
+    typeof value == "boolean"
+  ) {
+    return;
+  } else if (typeof value == "object") {
+    if (value === null || isSkFrozen(value)) {
+      return;
+    } else {
+      throw new Error("Invalid object: must be deep-frozen.");
+    }
+  } else {
+    throw new Error(`'${typeof value}' cannot be deep-frozen.`);
+  }
+}
+
 /**
  * _Deep-freeze_ an object, returning the same object that was passed in.
  *
@@ -75,19 +93,26 @@ abstract class SkFrozen extends Frozen {
  * parameter will be frozen and no longer mutable or extensible, even from
  * other references.
  *
+ * The argument object and all its properties, recursively, must not already
+ * be frozen by `Object.freeze` (or else `deepFreeze` cannot mark them
+ * deep-frozen). Undefined, function (and hence class) values cannot be
+ * deep-frozen.
+ *
  * The primary use for this function is to satisfy the requirement that all
  * parameters to Skip `Mapper` constructors must be deep-frozen: objects
- * that have not been constructed by Skip can be passed to `freeze()` before
- * passing them to a `Mapper` constructor.
+ * that have not been constructed by Skip can be passed to `deepFreeze()`
+ * before passing them to a `Mapper` constructor.
  *
  * @param value - The object to deep-freeze.
  * @returns The same object that was passed in.
  */
-export function freeze<T>(value: T): (T & Param) | (T & Constant) {
+export function deepFreeze<T>(value: T): T & Param {
   if (
-    typeof value == "string" ||
+    typeof value == "bigint" ||
+    typeof value == "boolean" ||
     typeof value == "number" ||
-    typeof value == "boolean"
+    typeof value == "string" ||
+    typeof value == "symbol"
   ) {
     return value;
   } else if (typeof value == "object") {
@@ -96,23 +121,21 @@ export function freeze<T>(value: T): (T & Param) | (T & Constant) {
     } else if (isSkFrozen(value)) {
       return value;
     } else if (Object.isFrozen(value)) {
-      check(value);
-      return value as T & Param;
+      throw new Error(`Cannot deep-freeze an Object.frozen value.`);
     } else if (Array.isArray(value)) {
-      const length: number = value.length;
-      for (let i = 0; i < length; i++) {
-        value[i] = freeze(value[i]);
+      for (const elt of value) {
+        deepFreeze(elt);
       }
       return Object.freeze(sk_freeze(value));
     } else {
-      const jso = value as { [key: string]: any };
-      for (const key of Object.keys(jso)) {
-        jso[key] = freeze(jso[key]);
+      for (const val of Object.values(value)) {
+        deepFreeze(val);
       }
-      return Object.freeze(sk_freeze(jso)) as T & Constant;
+      return Object.freeze(sk_freeze(value));
     }
   } else {
-    throw new Error(`'${typeof value}' cannot be frozen.`);
+    // typeof value == "function" || typeof value == "undefined"
+    throw new Error(`'${typeof value}' values cannot be deep-frozen.`);
   }
 }
 
@@ -1130,31 +1153,6 @@ class ContextImpl extends SkFrozen implements Context {
         this.refs.skjson.exportString(pattern),
       ),
     ) as Json[];
-  }
-}
-
-export function check<T>(value: T): void {
-  if (
-    typeof value == "string" ||
-    typeof value == "number" ||
-    typeof value == "boolean"
-  ) {
-    return;
-  } else if (typeof value == "object") {
-    if (value === null || isSkFrozen(value)) {
-      return;
-    }
-    if (Object.isFrozen(value)) {
-      if (Array.isArray(value)) {
-        value.forEach(check);
-      } else {
-        Object.values(value).forEach(check);
-      }
-    } else {
-      throw new Error("Invalid object: must be frozen.");
-    }
-  } else {
-    throw new Error(`'${typeof value}' cannot be managed by skstore.`);
   }
 }
 
