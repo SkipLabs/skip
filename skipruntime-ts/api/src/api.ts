@@ -18,7 +18,7 @@ export type JsonObject = { [key: string]: Nullable<Json> };
 /**
  * A `Param` is a valid parameter to a Skip runtime mapper function: either a constant JS
  * value or a Skip-runtime-managed value. In either case, restricting mapper parameters to
- * this type helps developers to ensure that reactive computations can be re-evaluated as
+ * this type helps developers to ensure that reactive computations can be reevaluated as
  * needed with consistent semantics.
  * `Constant`s are recursively-frozen objects managed by the Skip runtime; non-Skip objects can be made constant by passing them to `freeze`.
  */
