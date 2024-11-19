@@ -1,11 +1,6 @@
 import express from "express";
-import type {
-  Entry,
-  Json,
-  ServiceInstance,
-  Values,
-  CollectionUpdate,
-} from "skip-wasm";
+import crypto from "crypto";
+import type { Entry, Json, ServiceInstance, CollectionUpdate } from "skip-wasm";
 import { UnknownCollectionError } from "skip-wasm";
 
 export function createRESTServer(service: ServiceInstance): express.Express {
@@ -37,7 +32,9 @@ export function createRESTServer(service: ServiceInstance): express.Express {
         "text/event-stream": function () {
           // TODO: Use watermark in `Last-Event-ID` header if provided
           // (upon reconnecting).
-          const resource = service.instantiateResource(
+          const uuid = crypto.randomUUID();
+          service.instantiateResource(
+            uuid,
             req.params.resource,
             req.query as { [param: string]: string },
           );
@@ -46,7 +43,7 @@ export function createRESTServer(service: ServiceInstance): express.Express {
             "Cache-Control": "no-cache",
           });
           const subscriptionID = service.subscribe(
-            resource,
+            uuid,
             (update: CollectionUpdate<string, Json>) => {
               if (update.isInitial) {
                 res.write(`event: init\n`);
@@ -67,8 +64,8 @@ export function createRESTServer(service: ServiceInstance): express.Express {
             req.params.resource,
             req.query as Record<string, string>,
             {
-              resolve: (data: Values<Json, Json>) => {
-                res.status(200).json(data.values);
+              resolve: (data: Entry<Json, Json>[]) => {
+                res.status(200).json(data);
               },
               reject: (err: unknown) => {
                 res.status(500).json(err instanceof Error ? err.message : err);
