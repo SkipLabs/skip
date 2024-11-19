@@ -28,7 +28,7 @@ export type {
 } from "./internals/skipruntime_module.js";
 export { UnknownCollectionError } from "@skipruntime/helpers/errors.js";
 export { OneToOneMapper, ManyToOneMapper } from "@skipruntime/api";
-export { freeze } from "./internals/skipruntime_module.js";
+export { deepFreeze } from "./internals/skipruntime_module.js";
 export {
   Sum,
   Min,
