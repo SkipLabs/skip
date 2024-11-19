@@ -10,7 +10,7 @@ Before you begin, we recommend installing the NPM packages for the Skip API, ser
 
 We have several resources available to help you learn the Skip framework, depending on your bcakground and preferences.
 
-This guide takes a "top-down" approach, showing you how to use our latest APIs in an idiomatic and practical way.  We recommend that most users start here.
+This guide takes a "top-down" approach, showing you how to use our APIs in an idiomatic and practical way.  We recommend that most users start here.
 
 Alternatively, you can work from the "bottom-up" by reading our [Skip fundamentals](TODO:docusaurus link) tutorial, which explains the concepts and components of the Skip runtime from first principles.
 
@@ -21,7 +21,7 @@ Finally, if you'd like to just get your hands dirty and dive into the code, you 
 This guide will walk you through getting your first reactive service up and running using the Skip runtime.
 It will also show how to write client code to read or subscribe to data from your reactive service.
 
-We aim to make this as beginner friendly as possible, but assume a basic understanding of imperative programming, including core JavaScript/Typescript syntax and semantics.
+We aim to make this as beginner friendly as possible, but assume an understanding of programming basics, including core JavaScript/Typescript syntax and semantics.
 
 ### Reactive Programming
 
@@ -36,7 +36,7 @@ Skip's core abstractions are best understood in terms of this computation graph.
 
 The primary data structure used in Skip is called a _collection_, and associates *keys* with one or more *values*.
 Collection keys and values are both immutable data stored in the Skip framework's native heap; in Typescript, any JSON-serializable value can be used. (i.e. primitives, arrays, objects, and nested combinations thereof)
-Collections can be accessed by key or manipulated to create new collections, which can either be _eager_ (updated in response to input changes) or _lazy_ (updated in response to queries for specific keys).
+Collections can be accessed by key or manipulated to create new collections.
 
 These manipulations do _not_ mutate in-place but instead create a _new_ collection in the computation graph with a dependency edge from the input collection(s).
 For example, `collection.map(Foo)` creates a _new_ collection with the results of applying `Foo` to the data in `collection`, which is then updated in real time whenever the contents of `collection` change.
@@ -72,7 +72,7 @@ Skip is designed to bridge this gap, letting you express the moment-in-time logi
 At its core, a Skip service is a reactive computation graph describing how to compute some output _resources_ from some input data and/or external API inputs.
 
 A service is specified by an object passed to `runService`, which will then spin up a Skip runtime and server.
-That object consists of `initialData` used to populate the service's input collections, some `resources` to make available over HTTPS, and a function `createGraph` defining a static computation graph mapping the `ServiceInputs` to `ResourceInputs`.
+That object consists of `initialData` used to populate the service's input collections, some `resources` to make available over HTTP, and a function `createGraph` defining a static computation graph mapping the `ServiceInputs` to `ResourceInputs`.
 This static computation graph will be maintained up-to-date at all times, and can be an arbitrarily complex computation graph or as simple as returning the input collections directly, depending on the service.
 
 In this example, we pull initial user and group data from an external source-of-truth database, expose a single resource called `activeFriends`, and define a reactive computation of the active users in each group. 
@@ -148,5 +148,7 @@ In this example, our `ActiveFriends` resource filters each groups' current activ
 ### Next steps
 
 This guide implements an example reactive service which can be queried or subscribed to by user's clients to see up-to-date listings of which of their active friends belong to each group, maintained up to date as input data changes without any explicit management of updates in the service's declarative logic.
-We have showed the example without going into full detail on Skip data structures or programming primitives; see [todo: docusaurus link] for more details on the Skip programming model, collections, mapper functions, etc.
-We've also elided the details of syncing data from external sources like databases or non-reactive APIs; see [todo: docusaurus link] for more details on how to keep your reactive service hydrated and in sync with updates from your app's write path.
+
+We've showed the core reactive logic without going into full detail on how to deploy and interact with a Skip service; see the [Deploying](todo: docusaurus link) guide for more details on how to wire reactivity into a generic web application, including how to handle user writes and feed those into input collection
+
+We've also elided the details of syncing data from external sources like databases or non-reactive APIs; see [todo: docusaurus link] for more details on how to keep your reactive service hydrated and in sync with updates from other components of your application.
