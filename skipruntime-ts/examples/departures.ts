@@ -64,7 +64,10 @@ const service = await runService(
     },
     createGraph: (ic) => ic,
   },
-  3590,
+  {
+    control_port: 3591,
+    streaming_port: 3590,
+  },
 );
 
 function shutdown() {

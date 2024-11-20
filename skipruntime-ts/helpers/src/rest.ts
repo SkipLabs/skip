@@ -2,14 +2,15 @@ import type { Json, Entry } from "@skipruntime/api";
 
 export type Entrypoint = {
   host: string;
-  port: number;
+  streaming_port: number;
+  control_port: number;
   secured?: boolean;
 };
 
 function toHttp(entrypoint: Entrypoint) {
   if (entrypoint.secured)
-    return `https://${entrypoint.host}:${entrypoint.port}`;
-  return `http://${entrypoint.host}:${entrypoint.port}`;
+    return `https://${entrypoint.host}:${entrypoint.control_port}`;
+  return `http://${entrypoint.host}:${entrypoint.control_port}`;
 }
 
 export async function fetchJSON<V>(
@@ -46,7 +47,8 @@ export class RESTWrapperOfSkipService {
   constructor(
     entrypoint: Entrypoint = {
       host: "localhost",
-      port: 3587,
+      streaming_port: 8080,
+      control_port: 8081,
     },
   ) {
     this.entrypoint = toHttp(entrypoint);
@@ -58,7 +60,7 @@ export class RESTWrapperOfSkipService {
   ): Promise<Entry<K, V>[]> {
     const qParams = new URLSearchParams(params).toString();
     const [optValues, _headers] = await fetchJSON<Entry<K, V>[]>(
-      `${this.entrypoint}/v1/${resource}?${qParams}`,
+      `${this.entrypoint}/v1/resources/${resource}?${qParams}`,
       "GET",
     );
     const values = optValues ?? [];
@@ -72,7 +74,7 @@ export class RESTWrapperOfSkipService {
   ): Promise<V[]> {
     const qParams = new URLSearchParams(params).toString();
     const [data, _headers] = await fetchJSON<V[]>(
-      `${this.entrypoint}/v1/${resource}/${key}?${qParams}`,
+      `${this.entrypoint}/v1/resources/${resource}/${key}?${qParams}`,
       "GET",
     );
     return data ?? [];
@@ -90,7 +92,12 @@ export class RESTWrapperOfSkipService {
     collection: string,
     values: Entry<K, V>[],
   ): Promise<void> {
-    await fetchJSON(`${this.entrypoint}/v1/${collection}`, "PATCH", {}, values);
+    await fetchJSON(
+      `${this.entrypoint}/v1/inputs/${collection}`,
+      "PATCH",
+      {},
+      values,
+    );
   }
 
   async deleteKey<K extends Json>(collection: string, key: K): Promise<void> {
