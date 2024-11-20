@@ -20,26 +20,23 @@ interface Delete {
   keys: string[];
 }
 
-class SkipHttpAccessV1 {
-  private services: { [port: number]: RESTWrapperOfSkipService };
-  private defaultPort: number;
+export class SkipHttpAccessV1 {
+  private service: RESTWrapperOfSkipService;
 
-  constructor(ports: number[] = [3587]) {
-    this.defaultPort = ports[0] ?? 3587;
-    this.services = {};
-    for (const port of ports) {
-      this.services[port] = new RESTWrapperOfSkipService({
-        host: "localhost",
-        port,
-      });
-    }
+  constructor(
+    private streaming_port: number = 8080,
+    private control_port: number = 8081,
+  ) {
+    this.service = new RESTWrapperOfSkipService({
+      host: "localhost",
+      control_port,
+      streaming_port,
+    });
   }
 
-  async writeMany(data: Write[], port?: number) {
-    const service = this.services[port ?? this.defaultPort];
-    if (service === undefined) throw new Error(`Invalid port ${port}`);
+  async writeMany(data: Write[]) {
     const promises = data.map(async (w) =>
-      service.patch(w.collection, w.entries),
+      this.service.patch(w.collection, w.entries),
     );
     if (promises.length == 1) {
       return promises[0];
@@ -47,13 +44,11 @@ class SkipHttpAccessV1 {
     return Promise.allSettled(promises);
   }
 
-  async deleteMany(data: Delete[], port?: number) {
-    const service = this.services[port ?? this.defaultPort];
-    if (service === undefined) throw new Error(`Invalid port ${port}`);
+  async deleteMany(data: Delete[]) {
     const promises: Promise<void>[] = [];
     for (const x of data) {
       for (const key of x.keys) {
-        promises.push(service.deleteKey(x.collection, key));
+        promises.push(this.service.deleteKey(x.collection, key));
       }
     }
     if (promises.length == 1) {
@@ -62,39 +57,42 @@ class SkipHttpAccessV1 {
     return Promise.allSettled(promises);
   }
 
-  async log(
-    resource: string,
-    params: { [param: string]: string },
-    port?: number,
-  ) {
-    const service = this.services[port ?? this.defaultPort];
-    if (service === undefined) throw new Error(`Invalid port ${port}`);
-    const result = await service.getAll(resource, params);
+  async log(resource: string, params: { [param: string]: string }) {
+    const result = await this.service.getAll(resource, params);
     console.log(JSON.stringify(result));
   }
 
-  request(
-    resource: string,
-    params: { [param: string]: string },
-    port?: number,
-  ) {
-    const service = this.services[port ?? this.defaultPort];
-    if (service === undefined) throw new Error(`Invalid port ${port}`);
-
-    const evSource = new EventSource(
-      `http://localhost:${port ?? this.defaultPort}/v1/${resource}?${new URLSearchParams(params)}`,
-    );
-    evSource.addEventListener("init", (e: MessageEvent<string>) => {
-      const updates = JSON.parse(e.data);
-      console.log("Init", updates);
-    });
-    evSource.addEventListener("update", (e: MessageEvent<string>) => {
-      const updates = JSON.parse(e.data);
-      console.log("Update", updates);
-    });
-    evSource.onerror = (e: MessageEvent<string>) => {
-      console.log("Error", e);
-    };
+  request(resource: string, params: { [param: string]: string }) {
+    fetch(`http://localhost:${this.control_port}/v1/streams`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        resource,
+        params,
+      }),
+    })
+      .then((resp) => resp.json())
+      .then((uuid) => {
+        const evSource = new EventSource(
+          `http://localhost:${this.streaming_port}/v1/streams/${uuid}`,
+        );
+        evSource.addEventListener("init", (e: MessageEvent<string>) => {
+          const updates = JSON.parse(e.data);
+          console.log("Init", updates);
+        });
+        evSource.addEventListener("update", (e: MessageEvent<string>) => {
+          const updates = JSON.parse(e.data);
+          console.log("Update", updates);
+        });
+        evSource.onerror = (e: MessageEvent<string>) => {
+          console.log("Error", e);
+        };
+      })
+      .catch((e: unknown) => {
+        console.log(e);
+      });
   }
 }
 
@@ -305,10 +303,15 @@ class Player {
 /**
  * Run the client with specified scenarios
  * @param scenarios The scenarios
- * @param ports  The ports
+ * @param streaming_port  Port of the streaming server
+ * @param control_port  Port of the control server
  */
-export function run(scenarios: Step[][], ports: number[] = [3587]) {
-  const access = new SkipHttpAccessV1(ports);
+export function run(
+  scenarios: Step[][],
+  streaming_port: number = 8080,
+  control_port: number = 8081,
+) {
+  const access = new SkipHttpAccessV1(streaming_port, control_port);
   const online = (line: string) => {
     if (line == "exit") {
       return;
@@ -321,13 +324,8 @@ export function run(scenarios: Step[][], ports: number[] = [3587]) {
             const jsquery = JSON.parse(query) as {
               resource: string;
               params?: { [param: string]: string };
-              port?: number;
             };
-            access.request(
-              jsquery.resource,
-              jsquery.params ?? {},
-              jsquery.port,
-            );
+            access.request(jsquery.resource, jsquery.params ?? {});
           },
         ],
         [
@@ -336,10 +334,9 @@ export function run(scenarios: Step[][], ports: number[] = [3587]) {
             const jsquery = JSON.parse(query) as {
               resource: string;
               params?: { [param: string]: string };
-              port?: number;
             };
             access
-              .log(jsquery.resource, jsquery.params ?? {}, jsquery.port)
+              .log(jsquery.resource, jsquery.params ?? {})
               .catch((e: unknown) => {
                 console.error(e);
               });
@@ -393,11 +390,7 @@ export function run(scenarios: Step[][], ports: number[] = [3587]) {
     online,
     (step) => {
       if (step.type == "request") {
-        access.request(
-          step.payload.resource,
-          step.payload.params ?? {},
-          step.payload.port,
-        );
+        access.request(step.payload.resource, step.payload.params ?? {});
       } else if (step.type == "write") {
         access
           .writeMany(step.payload)

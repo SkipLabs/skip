@@ -59,4 +59,4 @@ function scenarios() {
   ];
 }
 
-run(scenarios(), [9998]);
+run(scenarios(), 9998, 9999);

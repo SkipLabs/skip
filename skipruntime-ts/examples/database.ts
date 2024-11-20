@@ -117,7 +117,10 @@ const data = await new Promise<Entry<string, User>[]>(function (
 });
 db.close();
 
-const closable = await runService(serviceWithInitialData(data), 8081);
+const closable = await runService(serviceWithInitialData(data), {
+  streaming_port: 8080,
+  control_port: 8081,
+});
 
 function shutdown() {
   closable.close();
