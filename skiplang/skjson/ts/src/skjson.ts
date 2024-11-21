@@ -12,6 +12,8 @@ import type {
 import { sk_isArrayProxy, sk_isObjectProxy } from "@skip-wasm/std";
 import type * as Internal from "./skjson_internal_types.js";
 
+const sk_frozen: unique symbol = Symbol.for("Skip.frozen");
+
 export enum Type {
   Undefined,
   Null,
@@ -142,7 +144,7 @@ function getItemAt<T extends Internal.CJSON>(
 
 type ObjectProxy<Base extends { [k: string]: Exportable }> = {
   [sk_isObjectProxy]: true;
-  __sk_frozen: true;
+  [sk_frozen]: true;
   __pointer: ptr<Internal.CJSON>;
   clone: () => ObjectProxy<Base>;
   toJSON: () => Base;
@@ -160,7 +162,7 @@ export const reactiveObject = {
     self: ObjectProxy<Base>,
   ): any {
     if (prop === sk_isObjectProxy) return true;
-    if (prop === "__sk_frozen") return true;
+    if (prop === sk_frozen) return true;
     if (prop === "__pointer") return hdl.pointer;
     if (prop === "clone") return (): ObjectProxy<Base> => clone(self);
     if (typeof prop === "symbol") return undefined;
@@ -186,7 +188,7 @@ export const reactiveObject = {
   },
   has(hdl: WasmHandle<Internal.CJObject>, prop: string | symbol): boolean {
     if (prop === sk_isObjectProxy) return true;
-    if (prop === "__sk_frozen") return true;
+    if (prop === sk_frozen) return true;
     if (prop === "__pointer") return true;
     if (prop === "clone") return true;
     if (prop === "keys") return true;
@@ -219,7 +221,7 @@ export const reactiveObject = {
 
 type ArrayProxy<T> = {
   [sk_isArrayProxy]: true;
-  __sk_frozen: true;
+  [sk_frozen]: true;
   __pointer: ptr<Internal.CJSON>;
   length: number;
   clone: () => ArrayProxy<T>;
@@ -245,7 +247,7 @@ export const reactiveArray = {
     self: ArrayProxy<T>,
   ): any {
     if (prop === sk_isArrayProxy) return true;
-    if (prop === "__sk_frozen") return true;
+    if (prop === sk_frozen) return true;
     if (prop === "__pointer") return hdl.pointer;
     if (prop === "length") return hdl.access.SKIP_SKJSON_arraySize(hdl.pointer);
     if (prop === "clone") return (): ArrayProxy<T> => clone(self);
@@ -280,7 +282,7 @@ export const reactiveArray = {
   },
   has(_hdl: WasmHandle<Internal.CJArray>, prop: string | symbol): boolean {
     if (prop === sk_isArrayProxy) return true;
-    if (prop === "__sk_frozen") return true;
+    if (prop === sk_frozen) return true;
     if (prop === "__pointer") return true;
     if (prop === "length") return true;
     if (prop === "clone") return true;
