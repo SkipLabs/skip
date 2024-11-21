@@ -369,7 +369,7 @@ export interface Resource<
 
 // Initial data for services' initial collections are provided as an object with arrays of
 // entries for each input collection
-type InitialData<Inputs extends NamedCollections> = {
+export type InitialData<Inputs extends NamedCollections> = {
   [Name in keyof Inputs]: Inputs[Name] extends EagerCollection<infer K, infer V>
     ? Entry<K, V>[]
     : Entry<Json, Json>[];
