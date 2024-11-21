@@ -58,9 +58,9 @@ app.get("/users", (_req, res) => {
     });
 });
 
-app.get("/user/:id", (_req, res) => {
+app.get("/user/:id", (req, res) => {
   service
-    .getArray("users", {}, "123")
+    .getArray("users", {}, req.params.id)
     .then((user) => {
       res.status(200).json(user);
     })
