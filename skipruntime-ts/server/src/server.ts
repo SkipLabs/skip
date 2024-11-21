@@ -2,11 +2,83 @@ import { initService } from "skip-wasm";
 import type { SkipService, NamedCollections } from "skip-wasm";
 import { controlService, streamingService } from "./rest.js";
 
+/**
+ * Initialize and start a reactive Skip service.
+ *
+ * Calling `runService` will start a reactive service based on the `service` specification and `options`.
+ * The service offers two interfaces over HTTP: a control API on `options.control_port`, and a streaming API on `options.streaming_port`.
+ *
+ * The service exposes resources and input collections specified by `service: SkipService`.
+ * Resources can be read and input collections can be written.
+ * Each input _collection_ has a _name_, and associates _keys_ to _values_.
+ * Each resource has a _name_ and identifies a collection that associates _keys_ to _values_.
+ *
+ * The control API responds to the following HTTP requests:
+ *
+ * - `GET /v1/resources/:resource?param1=value1&...&paramN=valueN`:
+ *   Synchronous read of an entire resource.
+ *
+ *   Instantiates the named `resource` with parameters `{param1=value1,...,paramN=valueN}` and responds with the entire contents of the resource. The returned data will be a JSON-encoded value of type `[Json, Json[]][]`: an array of entries each of which associates a key to an array of its values.
+ *
+ * - `GET /v1/resources/:resource/:key?param1=value1&...&paramN=valueN`:
+ *   Synchronous read of a single key from a resource.
+ *
+ *   Instantiates the named `resource` with parameters `{param1=value1,...,paramN=valueN}` and responds with the values associated with the given `key`. The returned data will be a JSON-encoded value of type `Json[]`: an array of the `key`'s values.
+ *
+ * - `PATCH /v1/inputs/:collection`:
+ *   Partial write (update only the specified keys) of an input collection.
+ *
+ *   The `collection` must be the name of one of the service's input collections, that is, one of the keys of the `Inputs` type parameter.
+ *   The body of the request must be a JSON-encoded value of type `CollectionUpdate.values`, that is `[Json, Json[]][]`: an array of entries each of which associates a key to an array of its new values.
+ *   Updates the named `collection` with the key-values entries in the request body.
+ *
+ * - `PUT /v1/inputs/:collection/:key`:
+ *   Update of a single key of an input collection.
+ *
+ *   The `collection` must be the name of one of the service's input collections, that is, one of the keys of the `Inputs` type parameter.
+ *   The body of the request must be a JSON-encoded value of type `Json[]`: an array of the `key`'s new values.
+ *   Updates the named `collection` to associate the `key` with the values in the request body.
+ *
+ * - `POST /v1/streams`:
+ *   Instantiate a resource and return a UUID to subscribe to updates.
+ *
+ *   Requires the request to have a `Content-Type: application/json` header.
+ *   The body of the request must be a JSON-encoded value of type `{ resource: string, params: { [param: string]: string } }`.
+ *   Instantiates the named `resource` with parameters `params` and responds with a UUID that can be used to subscribe to updates.
+ *
+ * - `DELETE /v1/streams/:uuid`:
+ *   Destroy a resource instance.
+ *
+ *   Destroys the resource instance identified by `uuid`.
+ *
+ * The streaming API responds to the following HTTP requests:
+ *
+ * - `GET /v1/streams/:uuid`:
+ *   Server-sent events endpoint to subscribe to updates of the resource instance represented by the UUID.
+ *
+ *   Requires the request to have an `Accept: text/event-stream` header.
+ *   The `uuid` must have been obtained from a `POST /v1/streams` request, and not yet `DELETE`d.
+ *   Provides an HTTP server-sent event stream of updates to the resource identified by `uuid`.
+ *   Each event will be a serialization of a `CollectionUpdate` of the form:
+ * ```
+ *     event: (init | update)\n
+ *     id: <watermark>\n
+ *     data: <values>\n\n
+ * ```
+ *
+ * @typeParam Inputs - named collections from which the service computes
+ * @typeParam ResourceInputs - named collections provided to resource computations
+ * @param service - service specification
+ * @param options - service configuration options
+ * @param options.control_port - port on which control service will listen
+ * @param options.streaming_port - port on which streaming service will listen
+ * @returns - function to close the service
+ */
 export async function runService<
   Inputs extends NamedCollections,
-  Outputs extends NamedCollections,
+  ResourceInputs extends NamedCollections,
 >(
-  service: SkipService<Inputs, Outputs>,
+  service: SkipService<Inputs, ResourceInputs>,
   options: {
     streaming_port: number;
     control_port: number;
