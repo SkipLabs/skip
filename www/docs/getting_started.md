@@ -93,10 +93,15 @@ type ResourceInputs = {
 // Mapper function to compute the active users of each group
 class ActiveUsers implements Mapper<GroupID, Group, GroupID, UserID> {
   constructor(private users: EagerCollection<UserID, User>) {}
-  mapElement(gid: GroupID, group: Group): Iterable<[GroupID, UserID]> {
-    return group.members
-      .filter((uid) => users.getUnique(uid).active)
-      .map((uid) => [gid, uid]);
+  mapEntry(
+    gid: GroupID,
+    group: NonEmptyIterator<Group>,
+  ): Iterable<[GroupID, UserID]> {
+    const actives: Array<[GroupID, UserID]> = [];
+    for (const uid of group.getUnique().members) {
+      if (this.users.getUnique(uid).active) actives.push([gid, uid]);
+    }
+    return actives;
   }
 }
 
@@ -111,7 +116,7 @@ const service = await runService({
   initialData: { users, groups },
   resources: { activeFriends: ActiveFriends },
   createGraph(input: ServiceInputs): ResourceInputs {
-    const actives = groups.map(ActiveUsers, input.users);
+    const actives = input.groups.map(ActiveUsers, input.users);
     return { users: input.users, actives };
   },
 });
@@ -129,15 +134,28 @@ Resources are parameterized by some input HTTP `params` and use an `instantiate`
 // Mapper function to filter out those active users who are also friends with `user`
 class FilterFriends implements Mapper<GroupID, UserID, GroupID, UserID> {
   constructor(private user: User) {}
-  mapElement(gid: GroupID, uid: UserID): Iterable<[GroupID, UserID]> {
-    return user.friends.includes(uid) ? [[gid, uid]] : [];
+  mapEntry(
+    gid: GroupID,
+    uids: NonEmptyIterator<UserID>,
+  ): Iterable<[GroupID, UserID]> {
+    return uids
+      .toArray()
+      .reduce(
+        (acc, uid) =>
+          this.user.friends.includes(uid) ? [...acc, [gid, uid]] : acc,
+        [] as Array<[GroupID, UserID]>,
+      );
   }
 }
 
 class ActiveFriends implements Resource<ResourceInputs> {
-  constructor(private params: { uid: string }) {}
+  private uid: UserID;
+  constructor(params: { [param: string]: string }) {
+    if (!params["uid"]) throw new Error("Missing required parameter 'uid'");
+    this.uid = parseInt(params["uid"]);
+  }
   instantiate(inputs: ResourceInputs): EagerCollection<GroupID, UserID> {
-    const user = inputs.users.getUnique(UserID(this.params.uid));
+    const user = inputs.users.getUnique(this.uid);
     return inputs.actives.map(FilterFriends, user);
   }
 }
