@@ -9,7 +9,7 @@ import type {
   Nullable,
   Shared,
 } from "@skip-wasm/std";
-import { sk_isArrayProxy, sk_isObjectProxy } from "@skip-wasm/std";
+import { sk_isObjectProxy } from "@skip-wasm/std";
 import type * as Internal from "./skjson_internal_types.js";
 
 const sk_frozen: unique symbol = Symbol.for("Skip.frozen");
@@ -106,10 +106,10 @@ function interpretPointer<T extends Internal.CJSON>(
       return hdl.utils.importString(hdl.access.SKIP_SKJSON_asString(ptr));
     case Type.Array: {
       const aPtr = hdl.access.SKIP_SKJSON_asArray(ptr);
-      return new Proxy(
-        hdl.derive(aPtr),
-        reactiveArray,
-      ) as unknown as ArrayProxy<any>;
+      const length = hdl.access.SKIP_SKJSON_arraySize(aPtr);
+      return Array.from({ length }, (_, idx) =>
+        interpretPointer(hdl, hdl.access.SKIP_SKJSON_at(aPtr, idx)),
+      );
     }
     case Type.Object: {
       const oPtr = hdl.access.SKIP_SKJSON_asObject(ptr);
@@ -133,13 +133,6 @@ function getFieldAt<T extends Internal.CJObject>(
   idx: int,
 ): Exportable {
   return interpretPointer(hdl, hdl.access.SKIP_SKJSON_get(hdl.pointer, idx));
-}
-
-function getItemAt<T extends Internal.CJSON>(
-  hdl: WasmHandle<Internal.CJArray<T>>,
-  idx: int,
-): Exportable {
-  return interpretPointer(hdl, hdl.access.SKIP_SKJSON_at(hdl.pointer, idx));
 }
 
 type ObjectProxy<Base extends { [k: string]: Exportable }> = {
@@ -219,110 +212,10 @@ export const reactiveObject = {
   },
 };
 
-type ArrayProxy<T> = {
-  [sk_isArrayProxy]: true;
-  [sk_frozen]: true;
-  __pointer: ptr<Internal.CJSON>;
-  length: number;
-  clone: () => ArrayProxy<T>;
-  toJSON: () => T[];
-  toString: () => string;
-  join(sep?: string): string;
-  forEach: (
-    callbackfn: (value: T, index: number, array: T[]) => void,
-    thisArg?: any,
-  ) => void;
-  [Symbol.iterator]: T[][typeof Symbol.iterator];
-  [idx: number]: T;
-};
-
-function isArrayProxy(x: any): x is ArrayProxy<any> {
-  return sk_isArrayProxy in x && (x[sk_isArrayProxy] as boolean);
-}
-
-export const reactiveArray = {
-  get<T>(
-    hdl: WasmHandle<Internal.CJArray>,
-    prop: string | symbol,
-    self: ArrayProxy<T>,
-  ): any {
-    if (prop === sk_isArrayProxy) return true;
-    if (prop === sk_frozen) return true;
-    if (prop === "__pointer") return hdl.pointer;
-    if (prop === "length") return hdl.access.SKIP_SKJSON_arraySize(hdl.pointer);
-    if (prop === "clone") return (): ArrayProxy<T> => clone(self);
-    if (prop === "toJSON")
-      return (): any[] => {
-        const res: any[] = [];
-        const length: number = self.length;
-        for (let i = 0; i < length; i++) {
-          res.push(getItemAt(hdl, i));
-        }
-        return res;
-      };
-    if (prop === "forEach")
-      return (
-        callbackfn: (value: T, index: number, array: T[]) => void,
-        thisArg?: any,
-      ): void => {
-        self.toJSON().forEach(callbackfn, thisArg);
-      };
-    if (prop === "toString") return () => JSON.stringify(self);
-    if (prop === "join") return (sep?: string) => clone(self).join(sep);
-    if (typeof prop === "symbol") {
-      if (prop === Symbol.iterator) return self.toJSON()[Symbol.iterator];
-    } else {
-      const v = parseInt(prop);
-      if (!isNaN(v)) return getItemAt(hdl, v);
-    }
-    return undefined;
-  },
-  set(_hdl: WasmHandle<Internal.CJArray>, _prop: string | symbol, _value: any) {
-    throw new Error("Reactive array cannot be modified.");
-  },
-  has(_hdl: WasmHandle<Internal.CJArray>, prop: string | symbol): boolean {
-    if (prop === sk_isArrayProxy) return true;
-    if (prop === sk_frozen) return true;
-    if (prop === "__pointer") return true;
-    if (prop === "length") return true;
-    if (prop === "clone") return true;
-    if (prop === "toJSON") return true;
-    if (prop === "toString") return true;
-    if (prop === "join") return true;
-    if (prop === Symbol.iterator) return true;
-    return false;
-  },
-  ownKeys(hdl: WasmHandle<Internal.CJArray>) {
-    const l = hdl.access.SKIP_SKJSON_arraySize(hdl.pointer);
-    const res = Array.from(Array(l).keys()).map((v) => v.toString());
-    return res;
-  },
-  getOwnPropertyDescriptor(
-    hdl: WasmHandle<Internal.CJArray>,
-    prop: string | symbol,
-  ) {
-    if (typeof prop === "symbol") return undefined;
-    const v = parseInt(prop);
-    if (isNaN(v)) return undefined;
-    const value = getItemAt(hdl, v);
-    return {
-      configurable: true,
-      enumerable: true,
-      writable: false,
-      value,
-    };
-  },
-};
-
 function clone<T>(value: T): T {
   if (value !== null && typeof value === "object") {
     if (Array.isArray(value)) {
       return value.map(clone) as T;
-    } else if (isArrayProxy(value)) {
-      return Array.from({ length: value.length }, (_, i) =>
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-        clone(value[i]),
-      ) as T;
     } else if (isObjectProxy(value)) {
       return Object.fromEntries(
         Array.from(value.keys).map((k) => [k, clone(value[k])]),
@@ -401,7 +294,7 @@ export type Exportable =
   | null
   | undefined
   | ObjectProxy<{ [k: string]: Exportable }>
-  | ArrayProxy<any>;
+  | Exportable[];
 
 export interface SKJSON extends Shared {
   importJSON(value: ptr<Internal.CJSON>, copy?: boolean): Exportable;
@@ -412,7 +305,7 @@ export interface SKJSON extends Shared {
   exportJSON(v: any[]): ptr<Internal.CJArray>;
   exportJSON(v: JsonObject): ptr<Internal.CJObject>;
   exportJSON<T extends Internal.CJSON>(
-    v: (ObjectProxy<{ [k: string]: Exportable }> | ArrayProxy<any>) & {
+    v: ObjectProxy<{ [k: string]: Exportable }> & {
       __pointer: ptr<T>;
     },
   ): ptr<T>;
@@ -499,7 +392,7 @@ class LinksImpl implements Links {
         });
         return fromWasm.SKIP_SKJSON_endCJArray(arr);
       } else if (typeof value == "object") {
-        if (isObjectProxy(value) || isArrayProxy(value)) {
+        if (isObjectProxy(value)) {
           return value.__pointer;
         } else {
           const obj = fromWasm.SKIP_SKJSON_startCJObject();
