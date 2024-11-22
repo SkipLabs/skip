@@ -1,0 +1,53 @@
+services:
+  # Reverse proxy
+  haproxy:
+    image: haproxy:3.0-alpine3.20
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - ./certs/:/etc/ssl:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      www:
+        condition: service_healthy
+
+  # Web application
+  web:
+    image: reactive-hackernews/web-service
+    build: ./web_service
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # SQL database
+  db:
+    image: postgres
+    restart: always
+    user: postgres
+    environment:
+      POSTGRES_PASSWORD: change_me
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 1s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
+
+  # Reactive cache
+  reactive_cache:
+    image: reactive-hackernews/skip-service
+    build: ./reactive_service
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Front-end
+  www:
+    image: reactive-hackernews/www
+    build: ./www
+
+volumes:
+  pgdata:
