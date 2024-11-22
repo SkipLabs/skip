@@ -138,13 +138,19 @@ class FilterFriends implements Mapper<GroupID, UserID, GroupID, UserID> {
     gid: GroupID,
     uids: NonEmptyIterator<UserID>,
   ): Iterable<[GroupID, UserID]> {
-    return uids
-      .toArray()
-      .reduce(
-        (acc, uid) =>
-          this.user.friends.includes(uid) ? [...acc, [gid, uid]] : acc,
-        [] as Array<[GroupID, UserID]>,
-      );
+    return uids.toArray().reduce(
+      (acc, uid) => {
+        let is_friend = false;
+        for (const friend_id of this.user.friends) {
+          if (friend_id == uid) {
+            is_friend = true;
+            break;
+          }
+        }
+        return is_friend ? [...acc, [gid, uid]] : acc;
+      },
+      [] as Array<[GroupID, UserID]>,
+    );
   }
 }
 
