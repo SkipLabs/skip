@@ -47,16 +47,10 @@ class ActiveUsers implements Mapper<GroupID, Group, GroupID, UserID> {
     gid: GroupID,
     group: NonEmptyIterator<Group>,
   ): Iterable<[GroupID, UserID]> {
-    const actives: [GroupID, UserID][] = [];
-    for (const uid of group.getUnique().members) {
-      if (this.users.getUnique(uid).active) actives.push([gid, uid]);
-    }
-    return actives;
-    // Logic should be as follows, but WasmHandle proxies don't support filter/map???
-    //        return group
-    //          .getUnique()
-    //          .members.filter((uid) => this.users.getUnique(uid).active)
-    //          .map((uid) => [gid, uid]);
+    return group
+      .getUnique()
+      .members.filter((uid) => this.users.getUnique(uid).active)
+      .map((uid) => [gid, uid]);
   }
 }
 
@@ -68,16 +62,11 @@ class FilterFriends implements Mapper<GroupID, UserID, GroupID, UserID> {
     gid: GroupID,
     uids: NonEmptyIterator<UserID>,
   ): Iterable<[GroupID, UserID]> {
-    return uids.toArray().reduce<[GroupID, UserID][]>((acc, uid) => {
-      let is_friend = false;
-      for (const friend_id of this.user.friends) {
-        if (friend_id == uid) {
-          is_friend = true;
-          break;
-        }
-      }
-      return is_friend ? [...acc, [gid, uid]] : acc;
-    }, []);
+    return uids
+      .toArray()
+      .reduce<
+        [GroupID, UserID][]
+      >((acc, uid) => (this.user.friends.includes(uid) ? [...acc, [gid, uid]] : acc), []);
   }
 }
 
