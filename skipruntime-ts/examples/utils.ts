@@ -2,7 +2,7 @@
 // in nodejs LTS.
 import EventSource from "eventsource";
 import type { Json, Entry } from "@skipruntime/api";
-import { RESTWrapperOfSkipService } from "@skipruntime/helpers/rest.js";
+import { RESTWrapperOfSkipService } from "@skipruntime/helpers";
 import { createInterface } from "readline";
 
 export interface ClientDefinition {
