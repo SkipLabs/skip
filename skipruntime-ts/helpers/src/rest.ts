@@ -103,4 +103,15 @@ export class RESTWrapperOfSkipService {
   async deleteKey<K extends Json>(collection: string, key: K): Promise<void> {
     return await this.patch(collection, [[key, []]]);
   }
+
+  async getStreamUUID(
+    resource: string,
+    params: { [param: string]: string } = {},
+  ): Promise<string> {
+    return fetch(`${this.entrypoint}/v1/streams`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ resource, params }),
+    }).then((res) => res.json() as Promise<string>);
+  }
 }
