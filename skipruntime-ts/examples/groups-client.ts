@@ -3,10 +3,9 @@
 import EventSource from "eventsource";
 import { fetchJSON } from "@skipruntime/helpers/rest.js";
 
-const restPort = 8990;
-const reactivePort = 8991;
+const port = 8082;
 
-const restURL = `http://localhost:${restPort.toString()}`;
+const url = `http://localhost:${port.toString()}/`;
 async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -16,9 +15,8 @@ async function sleep(ms: number) {
 /*****************************************************/
 
 console.log("Listening for Bob's active friends in each group...");
-const evSource = new EventSource(
-  `http://localhost:${reactivePort.toString()}/v1/active_friends?uid=bob`,
-);
+const evSource = new EventSource(`${url}/active_friends/bob`);
+
 evSource.addEventListener("init", (e: MessageEvent<string>) => {
   const updates = JSON.parse(e.data);
   console.log("Initial data: ", updates);
@@ -33,16 +31,10 @@ evSource.onerror = console.error;
 /*       BEGIN SCENARIO OF CHANGING INPUTS        */
 /**************************************************/
 
-console.log("Getting Bob's active friends in group #1...");
-console.log(
-  "result: ",
-  (await fetchJSON(`${restURL}/active_friends/bob/group1`, "GET"))[0],
-);
-
 await sleep(1000);
 console.log("Setting Carol to active...");
 await fetchJSON(
-  `${restURL}/users/carol`,
+  `${url}/users/carol`,
   "PUT",
   {},
   { name: "Carol", active: true, friends: ["bob", "alice"] },
@@ -51,7 +43,7 @@ await fetchJSON(
 await sleep(1000);
 console.log("Setting Alice to inactive...");
 await fetchJSON(
-  `${restURL}/users/alice`,
+  `${url}/users/alice`,
   "PUT",
   {},
   { name: "Alice", active: false, friends: ["bob", "carol"] },
@@ -60,7 +52,7 @@ await fetchJSON(
 await sleep(1000);
 console.log("Setting Eve as Bob's friend...");
 await fetchJSON(
-  `${restURL}/users/bob`,
+  `${url}/users/bob`,
   "PUT",
   {},
   { name: "Bob", active: true, friends: ["alice", "carol", "eve"] },
@@ -69,7 +61,7 @@ await fetchJSON(
 await sleep(1000);
 console.log("Removing Carol and adding Eve to group 2...");
 await fetchJSON(
-  `${restURL}/groups/group2`,
+  `${url}/groups/group2`,
   "PUT",
   {},
   { name: "Group 2", members: ["bob", "eve"] },

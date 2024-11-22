@@ -105,7 +105,7 @@ const service = await runService(
       return { users: input.users, actives };
     },
   },
-  8991,
+  { streaming_port: 8080, control_port: 8081 },
 );
 function shutdown() {
   service.close();
