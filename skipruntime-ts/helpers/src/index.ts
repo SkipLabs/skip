@@ -5,4 +5,4 @@ export {
   Polled,
 } from "./external.js";
 export { Sum, Min, Max, CountMapper } from "./utils.js";
-export { RESTWrapperOfSkipService } from "./rest.js";
+export { fetchJSON, RESTWrapperOfSkipService } from "./rest.js";
