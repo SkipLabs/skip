@@ -1,8 +1,11 @@
 # Reactive HackerNews example
 
 This example is made of three parts: the skip reactive service (in
-`back-end/reactive_service`), the web service (in `back-end/`), and
-the front-end (in `front-end`).
+`reactive_service/`), the web service (in `web_service/`), and the
+front-end (in `www/`).
 
-In order to run it, please refer to the `README.md` in each of those
-directories.
+In order to run it, do:
+```
+$ docker compose build
+$ docker compose up
+```
