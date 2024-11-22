@@ -378,7 +378,7 @@ export function run(
         }
       }
       if (!done) {
-        console.error(`Unknow command line '${line}'`);
+        console.error(`Unknown command line '${line}'`);
       }
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : JSON.stringify(e);
