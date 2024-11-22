@@ -18,8 +18,32 @@ app.get("/active_friends/:uid/:gid", (req, res) => {
     .then((actives) => {
       res.status(200).json(actives);
     })
-    .catch(() => {
-      res.status(500).json("Internal error");
+    .catch((e: unknown) => {
+      res.status(500).json(e);
+    });
+});
+
+app.put("/users/:uid", (req, res) => {
+  service
+    .put("users", req.params.uid, [req.body])
+    .then(() => {
+      res.status(200).json({});
+    })
+    .catch((e: unknown) => {
+      console.error("express error: ", e);
+      res.status(500).json(e);
+    });
+});
+
+app.put("/groups/:gid", (req, res) => {
+  service
+    .put("groups", req.params.gid, [req.body])
+    .then(() => {
+      res.status(200).json({});
+    })
+    .catch((e: unknown) => {
+      console.error("express error: ", e);
+      res.status(500).json(e);
     });
 });
 
