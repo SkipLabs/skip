@@ -13,7 +13,7 @@ const restURL = `http://localhost:${restPort.toString()}`;
 console.log("Connecting to reactive server for resource /activeFriends");
 
 const evSource = new EventSource(
-  `http://localhost:${reactivePort.toString()}/v1/activeFriends`,
+  `http://localhost:${reactivePort.toString()}/v1/active_friends?uid=bob`,
 );
 evSource.addEventListener("init", (e: MessageEvent<string>) => {
   const updates = JSON.parse(e.data);

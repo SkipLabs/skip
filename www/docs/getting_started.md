@@ -114,7 +114,7 @@ const [users, groups] = await Promise.all([
 // Specify and run the reactive service
 const service = await runService({
   initialData: { users, groups },
-  resources: { activeFriends: ActiveFriends },
+  resources: { active_friends: ActiveFriends },
   createGraph(input: ServiceInputs): ResourceInputs {
     const actives = input.groups.map(ActiveUsers, input.users);
     return { users: input.users, actives };

@@ -93,7 +93,7 @@ class ActiveFriends implements Resource<ResourceInputs> {
 const service = await runService(
   {
     initialData,
-    resources: { activeFriends: ActiveFriends },
+    resources: { active_friends: ActiveFriends },
     createGraph(input: ServiceInputs): ResourceInputs {
       const actives = input.groups.map(ActiveUsers, input.users);
       return { users: input.users, actives };
