@@ -20,19 +20,37 @@ const sidebars: SidebarsConfig = {
     "mirroring",
     "deploying",
     "debugging",
-    {
-      type: "category",
-      label: "Skip API",
-      link: {
-        type: "doc",
-        id: "api/index",
-      },
-      items: require("./docs/api/typedoc-sidebar.cjs"),
-    },
     "resources",
     "encyclopedia",
     "glossary",
     "reference",
+    {
+      type: "category",
+      label: "@skipruntime/api",
+      link: {
+        type: "doc",
+        id: "api/api/index",
+      },
+      items: require("./docs/api/api/typedoc-sidebar.cjs"),
+    },
+    {
+      type: "category",
+      label: "@skipruntime/server",
+      link: {
+        type: "doc",
+        id: "api/server/index",
+      },
+      items: require("./docs/api/server/typedoc-sidebar.cjs"),
+    },
+    {
+      type: "category",
+      label: "@skipruntime/helpers",
+      link: {
+        type: "doc",
+        id: "api/helpers/index",
+      },
+      items: require("./docs/api/helpers/typedoc-sidebar.cjs"),
+    },
   ],
 };
 
