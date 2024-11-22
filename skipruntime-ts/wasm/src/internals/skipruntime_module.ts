@@ -36,6 +36,7 @@ import { NonUniqueValueException } from "@skipruntime/api";
 import { Frozen, type Constant } from "@skipruntime/api/internals.js";
 
 import type { Exportable, SKJSON } from "@skip-wasm/json";
+import { isObjectProxy } from "@skip-wasm/json";
 import { UnknownCollectionError } from "@skipruntime/helpers/errors.js";
 
 export type Handle<T> = Internal.Opaque<int, { handle_for: T }>;
@@ -63,22 +64,20 @@ abstract class SkFrozen extends Frozen {
   }
 }
 
-export function check<T>(value: T): void {
+function checkOrCloneParam<T>(value: T): T {
   if (
     typeof value == "string" ||
     typeof value == "number" ||
     typeof value == "boolean"
-  ) {
-    return;
-  } else if (typeof value == "object") {
-    if (value === null || isSkFrozen(value)) {
-      return;
-    } else {
-      throw new Error("Invalid object: must be deep-frozen.");
-    }
-  } else {
-    throw new Error(`'${typeof value}' cannot be deep-frozen.`);
+  )
+    return value;
+  if (typeof value == "object") {
+    if (value === null) return value;
+    if (isObjectProxy(value)) return value.clone() as T;
+    if (isSkFrozen(value)) return value;
+    throw new Error("Invalid object: must be deep-frozen.");
   }
+  throw new Error(`'${typeof value}' cannot be deep-frozen.`);
 }
 
 /**
@@ -984,8 +983,8 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
     ...params: Params
   ): EagerCollection<K2, V2> {
-    params.forEach(check);
-    const mapperObj = new mapper(...params);
+    const mapperParams = params.map(checkOrCloneParam) as Params;
+    const mapperObj = new mapper(...mapperParams);
     Object.freeze(mapperObj);
     if (!mapperObj.constructor.name) {
       throw new Error("Mapper classes must be defined at top-level.");
@@ -1010,8 +1009,8 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     reducer: Reducer<V2, V3>,
     ...params: Params
   ) {
-    params.forEach(check);
-    const mapperObj = new mapper(...params);
+    const mapperParams = params.map(checkOrCloneParam) as Params;
+    const mapperObj = new mapper(...mapperParams);
     Object.freeze(mapperObj);
     if (!mapperObj.constructor.name) {
       throw new Error("Mapper classes must be defined at top-level.");
@@ -1115,8 +1114,8 @@ class ContextImpl extends SkFrozen implements Context {
     compute: new (...params: Params) => LazyCompute<K, V>,
     ...params: Params
   ): LazyCollection<K, V> {
-    params.forEach(check);
-    const computeObj = new compute(...params);
+    const mapperParams = params.map(checkOrCloneParam) as Params;
+    const computeObj = new compute(...mapperParams);
     Object.freeze(computeObj);
     if (!computeObj.constructor.name) {
       throw new Error("LazyCompute classes must be defined at top-level.");

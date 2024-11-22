@@ -144,7 +144,9 @@ type ObjectProxy<Base extends { [k: string]: Exportable }> = {
   keys: IterableIterator<keyof Base>;
 } & Base;
 
-function isObjectProxy(x: any): x is ObjectProxy<{ [k: string]: Exportable }> {
+export function isObjectProxy(
+  x: any,
+): x is ObjectProxy<{ [k: string]: Exportable }> {
   return sk_isObjectProxy in x && (x[sk_isObjectProxy] as boolean);
 }
 
