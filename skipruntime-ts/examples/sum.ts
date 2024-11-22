@@ -46,7 +46,10 @@ const closable = await runService<Collections, Collections>(
     resources: { add: Add, sub: Sub },
     createGraph: (inputs) => inputs,
   },
-  3587,
+  {
+    control_port: 3588,
+    streaming_port: 3587,
+  },
 );
 
 function shutdown() {

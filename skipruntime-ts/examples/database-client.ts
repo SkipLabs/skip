@@ -10,15 +10,12 @@ import { fetchJSON } from "@skipruntime/helpers/rest.js";
 async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
-const replication = 8081;
 const port = 8082;
 const url = `http://localhost:${port.toString()}`;
 
 console.log("Connect to replication server for resource /users");
 
-const evSource = new EventSource(
-  `http://localhost:${replication.toString()}/v1/users`,
-);
+const evSource = new EventSource(`${url}/users`);
 evSource.addEventListener("init", (e: MessageEvent<string>) => {
   const updates = JSON.parse(e.data);
   console.log("Init", updates);

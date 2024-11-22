@@ -66,4 +66,4 @@ function scenarios(): Step[][] {
   ];
 }
 
-run(scenarios(), [3590]);
+run(scenarios(), 3590, 3591);

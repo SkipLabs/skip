@@ -83,7 +83,10 @@ const service = await runService<Inputs, Outputs>(
       return { output: cells.map(CallCompute, evaluator) };
     },
   },
-  9998,
+  {
+    control_port: 9999,
+    streaming_port: 9998,
+  },
 );
 
 function shutdown() {

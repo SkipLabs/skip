@@ -503,7 +503,7 @@ fun getUniqueOfLazyCollection(lazy: String, key: SKJSON.CJSON): SKJSON.CJSON {
 native fun notifyOfNotifier(
   notifier: UInt32,
   values: SKJSON.CJArray,
-  tick: Int,
+  watermark: String,
   updates: Int32,
 ): void;
 
@@ -519,7 +519,7 @@ fun createNotifier(notifier: UInt32): Notifier {
 class Notifier(eptr: SKStore.ExternalPointer) {
   fun notify(
     values: Array<(SKJSON.CJSON, Array<SKJSON.CJSON>)>,
-    tick: SKStore.Tick,
+    watermark: String,
     updates: Bool,
   ): void {
     notifyOfNotifier(
@@ -527,7 +527,7 @@ class Notifier(eptr: SKStore.ExternalPointer) {
       SKJSON.CJArray(
         values.map(v -> SKJSON.CJArray(Array[v.i0, SKJSON.CJArray(v.i1)])),
       ),
-      tick.value,
+      watermark,
       Int32::truncate(if (updates) 1 else 0),
     )
   }
@@ -580,20 +580,15 @@ class JSONReducer(
 
 @export("SkipRuntime_Runtime__createResource")
 fun createResourceOfRuntime(
+  identifier: String,
   resource: String,
   jsonParams: SKJSON.CJObject,
-): SKJSON.CJSON {
+): Float {
   SKStore.runWithResult(context ~> {
-    createReactiveResource(context, resource, params(jsonParams))
+    createReactiveResource(context, identifier, resource, params(jsonParams))
   }) match {
-  | Success(reactive) ->
-    SKJSON.CJArray(
-      Array[
-        SKJSON.CJString(reactive.id),
-        SKJSON.CJString(reactive.watermark.value.toString()),
-      ],
-    )
-  | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
+  | Success _ -> 0.0
+  | Failure(err) -> getErrorHdl(err)
   };
 }
 
@@ -616,34 +611,13 @@ fun getAllOfRuntime(
     })
   }) match {
   | Success(result) ->
-    reactive = Array<(String, SKJSON.CJSON)>[
-      ("collection", SKJSON.CJString(result.values.reactive.id)),
+    fields = mutable Vector<(String, SKJSON.CJSON)>[
       (
-        "watermark",
-        SKJSON.CJString(result.values.reactive.watermark.value.toString()),
-      ),
-    ];
-    response = Array<(String, SKJSON.CJSON)>[
-      (
-        "values",
+        "payload",
         SKJSON.CJArray(
           result.values.values.map(v ->
             SKJSON.CJArray(Array[v.i0, SKJSON.CJArray(v.i1)])
           ),
-        ),
-      ),
-      (
-        "reactive",
-        SKJSON.CJObject(
-          SKJSON.CJFields::create(reactive.sortedBy(x ~> x.i0), x -> x),
-        ),
-      ),
-    ];
-    fields = mutable Vector<(String, SKJSON.CJSON)>[
-      (
-        "payload",
-        SKJSON.CJObject(
-          SKJSON.CJFields::create(response.sortedBy(x ~> x.i0), x -> x),
         ),
       ),
       ("errors", SKJSON.CJArray(result.errors)),
@@ -693,12 +667,9 @@ fun getForKeyOfRuntime(
 }
 
 @export("SkipRuntime_Runtime__closeResource")
-fun closeResourceOfRuntime(
-  resource: String,
-  jsonParams: SKJSON.CJObject,
-): Float {
+fun closeResourceOfRuntime(identifier: String): Float {
   SKStore.runWithResult(context ~> {
-    closeReactiveResource(context, resource, params(jsonParams))
+    closeReactiveResource(context, identifier)
   }) match {
   | Success _ -> 0.0
   | Failure(err) -> getErrorHdl(err)
@@ -706,9 +677,13 @@ fun closeResourceOfRuntime(
 }
 
 @export("SkipRuntime_Runtime__subscribe")
-fun subscribeOfRuntime(reactiveId: String, from: Int, notifier: Notifier): Int {
+fun subscribeOfRuntime(
+  reactiveId: String,
+  notifier: Notifier,
+  watermark: ?String,
+): Int {
   SKStore.runWithResult(context ~> {
-    subscribe(context, reactiveId, SKStore.Tick(from), notifier.notify)
+    subscribe(context, reactiveId, notifier.notify, watermark)
   }) match {
   | Success(id) -> id
   | Failure(err) -> -getErrorHdl(err).toInt()
