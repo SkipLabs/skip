@@ -8,7 +8,8 @@ import express from "express";
 
 const service = new RESTWrapperOfSkipService({
   host: "localhost",
-  port: 8081,
+  control_port: 8081,
+  streaming_port: 8080,
 });
 
 import sqlite3 from "sqlite3";
@@ -35,6 +36,27 @@ const run = function (
     });
   });
 };
+
+app.get("/users", (_req, res) => {
+  fetch("http://localhost:8081/v1/streams", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      resource: "users",
+      params: {},
+    }),
+  })
+    .then((rres) => {
+      return rres.text();
+    })
+    .then((uuid) => {
+      res.redirect(301, "http://localhost:8080/v1/streams/" + uuid);
+    })
+    .catch((e: unknown) => {
+      console.log(e);
+      res.status(500).json("Internal error");
+    });
+});
 
 app.get("/user/:id", (_req, res) => {
   service

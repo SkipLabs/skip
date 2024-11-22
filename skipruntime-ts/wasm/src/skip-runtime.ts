@@ -12,7 +12,6 @@ export type {
   JsonObject,
   Reducer,
   Entry,
-  ReactiveResponse,
   SkipService,
   Resource,
   ExternalService,
@@ -22,10 +21,7 @@ export type {
   NamedCollections,
 } from "@skipruntime/api";
 
-export type {
-  Values,
-  ServiceInstance,
-} from "./internals/skipruntime_module.js";
+export type { ServiceInstance } from "./internals/skipruntime_module.js";
 export { UnknownCollectionError } from "@skipruntime/helpers/errors.js";
 export { OneToOneMapper, ManyToOneMapper } from "@skipruntime/api";
 export { deepFreeze } from "./internals/skipruntime_module.js";
@@ -34,8 +30,6 @@ export {
   Min,
   Max,
   CountMapper,
-  parseReactiveResponse,
-  reactiveResponseHeader,
   SkipExternalService,
   type ExternalResource,
   GenericExternalService,

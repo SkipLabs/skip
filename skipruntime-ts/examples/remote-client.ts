@@ -1,12 +1,8 @@
-import { run, type Step } from "./utils.js";
+import { SkipHttpAccessV1, run, type Step } from "./utils.js";
 
 function scenarios() {
   return [
     [
-      {
-        type: "request",
-        payload: { resource: "data", port: 3588 },
-      },
       {
         type: "write",
         payload: [{ collection: "input1", entries: [["v1", [2]]] }],
@@ -43,4 +39,7 @@ function scenarios() {
   ];
 }
 
-run(scenarios(), [3587, 3588]);
+const access = new SkipHttpAccessV1(3589, 3590);
+access.request("data", {});
+
+run(scenarios(), 3587, 3588);

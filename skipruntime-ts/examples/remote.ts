@@ -37,14 +37,21 @@ const service = await runService(
   {
     resources: { data: MultResource },
     externalServices: {
-      sumexample: SkipExternalService.direct({ host: "localhost", port: 3587 }),
+      sumexample: SkipExternalService.direct({
+        host: "localhost",
+        streaming_port: 3587,
+        control_port: 3588,
+      }),
     },
 
     createGraph(inputCollections: NamedCollections) {
       return inputCollections;
     },
   },
-  3588,
+  {
+    streaming_port: 3589,
+    control_port: 3590,
+  },
 );
 
 function shutdown() {

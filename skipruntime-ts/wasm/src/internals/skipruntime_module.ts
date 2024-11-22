@@ -27,7 +27,6 @@ import type {
   ExternalService,
   NamedCollections,
   Resource,
-  ReactiveResponse,
   CollectionUpdate,
   Watermark,
   SubscriptionID,
@@ -301,9 +300,10 @@ export interface FromWasm {
   // Runtime
 
   SkipRuntime_Runtime__createResource(
+    identifier: ptr<Internal.String>,
     resource: ptr<Internal.String>,
     jsonParams: ptr<Internal.CJObject>,
-  ): ptr<Internal.CJArray | Internal.CJFloat>;
+  ): Handle<ErrorObject>;
 
   SkipRuntime_Runtime__getAll(
     resource: ptr<Internal.String>,
@@ -319,14 +319,13 @@ export interface FromWasm {
   ): ptr<Internal.CJObject | Internal.CJFloat>;
 
   SkipRuntime_Runtime__closeResource(
-    resource: ptr<Internal.String>,
-    jsonParams: ptr<Internal.CJObject>,
+    identifier: ptr<Internal.String>,
   ): Handle<ErrorObject>;
 
   SkipRuntime_Runtime__subscribe(
     collection: ptr<Internal.String>,
-    fromWatermark: bigint,
     notifier: ptr<Internal.Notifier>,
+    watermark: Nullable<ptr<Internal.String>>,
   ): bigint;
 
   SkipRuntime_Runtime__unsubscribe(id: bigint): Handle<ErrorObject>;
@@ -1168,11 +1167,6 @@ export class ServiceInstanceFactory implements Shared {
   }
 }
 
-export type Values<K extends Json, V extends Json> = {
-  values: Entry<K, V>[];
-  reactive?: ReactiveResponse;
-};
-
 export type GetResult<T> = {
   request?: string;
   payload: T;
@@ -1191,7 +1185,7 @@ interface Checker {
 class AllChecker<K extends Json, V extends Json> implements Checker {
   constructor(
     private service: ServiceInstance,
-    private executor: Executor<Values<K, V>>,
+    private executor: Executor<Entry<K, V>[]>,
     private resource: string,
     private params: { [param: string]: string },
   ) {}
@@ -1243,28 +1237,25 @@ export class ServiceInstance {
 
   /**
    * Instantiate a resource with some parameters and client session authentication token
+   * @param identifier - The resource instance identifier
    * @param resource - A resource name, which must correspond to a key in this `SkipService`'s `resources` field
    * @param params - Resource parameters, which will be passed to the resource constructor specified in this `SkipService`'s `resources` field
-   * @returns A response token which can be used to initiate reactive subscription
    */
   instantiateResource(
+    identifier: string,
     resource: string,
     params: { [param: string]: string },
-  ): ReactiveResponse {
+  ): void {
     const result = this.refs.skjson.runWithGC(() => {
-      return this.refs.skjson.importJSON(
-        this.refs.fromWasm.SkipRuntime_Runtime__createResource(
-          this.refs.skjson.exportString(resource),
-          this.refs.skjson.exportJSON(params),
-        ),
-        true,
+      return this.refs.fromWasm.SkipRuntime_Runtime__createResource(
+        this.refs.skjson.exportString(identifier),
+        this.refs.skjson.exportString(resource),
+        this.refs.skjson.exportJSON(params),
       );
     });
-    if (typeof result == "number") {
-      throw this.refs.handles.deleteAsError(result as Handle<ErrorObject>);
+    if (result != 0) {
+      throw this.refs.handles.deleteAsError(result);
     }
-    const [collection, watermark] = result as [string, Watermark];
-    return { collection, watermark };
   }
 
   /**
@@ -1276,8 +1267,8 @@ export class ServiceInstance {
   getAll<K extends Json, V extends Json>(
     resource: string,
     params: { [param: string]: string } = {},
-    request?: string | Executor<Values<K, V>>,
-  ): GetResult<Values<K, V>> {
+    request?: string | Executor<Entry<K, V>[]>,
+  ): GetResult<Entry<K, V>[]> {
     const get_ = () => {
       return this.refs.skjson.importJSON(
         this.refs.fromWasm.SkipRuntime_Runtime__getAll(
@@ -1305,7 +1296,7 @@ export class ServiceInstance {
     if (typeof result == "number") {
       throw this.refs.handles.deleteAsError(result as Handle<ErrorObject>);
     }
-    return result as GetResult<Values<K, V>>;
+    return result as GetResult<Entry<K, V>[]>;
   }
 
   /**
@@ -1354,17 +1345,12 @@ export class ServiceInstance {
 
   /**
    * Close the specified resource instance
-   * @param resource - The resource name, which must correspond to a key in this `SkipService`'s `resources` field
-   * @param params - Resource parameters which were used to instantiate the resource
+   * @param resourceInstanceId - The resource identifier
    */
-  closeResourceInstance(
-    resource: string,
-    params: { [param: string]: string },
-  ): void {
+  closeResourceInstance(resourceInstanceId: string): void {
     const result = this.refs.skjson.runWithGC(() => {
       return this.refs.fromWasm.SkipRuntime_Runtime__closeResource(
-        this.refs.skjson.exportString(resource),
-        this.refs.skjson.exportJSON(params),
+        this.refs.skjson.exportString(resourceInstanceId),
       );
     });
     if (result != 0) {
@@ -1374,27 +1360,29 @@ export class ServiceInstance {
 
   /**
    * Initiate reactive subscription on a resource instance
-   * @param reactiveResponse - the reactive response
+   * @param resourceInstanceId - the resource instance identifier
    * @param f - A callback to execute on collection updates
+   * @param watermark - the watermark where to start the subscription
    * @returns A subcription identifier
    */
   subscribe<K extends Json, V extends Json>(
-    reactiveResponse: ReactiveResponse,
+    resourceInstanceId: string,
     f: (update: CollectionUpdate<K, V>) => void,
+    watermark?: string,
   ): SubscriptionID {
     const session = this.refs.skjson.runWithGC(() => {
       const sknotifier = this.refs.fromWasm.SkipRuntime_createNotifier(
         this.refs.handles.register(f),
       );
       return this.refs.fromWasm.SkipRuntime_Runtime__subscribe(
-        this.refs.skjson.exportString(reactiveResponse.collection),
-        BigInt(reactiveResponse.watermark),
+        this.refs.skjson.exportString(resourceInstanceId),
         sknotifier,
+        watermark ? this.refs.skjson.exportString(watermark) : null,
       );
     });
     if (session == -1n) {
       throw new UnknownCollectionError(
-        `Unknown collection '${reactiveResponse.collection}'`,
+        `Unknown resource instance '${resourceInstanceId}'`,
       );
     } else if (session < 0n) {
       throw new Error("Unknown error");
