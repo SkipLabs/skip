@@ -170,6 +170,30 @@ class ActiveFriends implements Resource<ResourceInputs> {
 
 In this example, our `ActiveFriends` resource filters each groups' current active users to those users who are also currently friends with the given `uid`.
 
+### See it in action
+
+This guide aims to give the high-level ideas of how to write and reason about a Skip reactive service.
+You can see and run the full example [here](https://github.com/SkipLabs/skip/blob/main/skipruntime-ts/examples/groups.ts), along with a corresponding [web application](https://github.com/SkipLabs/skip/blob/main/skipruntime-ts/examples/groups-server.ts) and [client](https://github.com/SkipLabs/skip/blob/main/skipruntime-ts/examples/groups-client.ts).
+
+Run the service and web app as follows:
+
+```
+cd skipruntime-ts
+make bunbuild
+bun run examples/groups.ts &
+bun run examples groups-server.ts &
+```
+
+With the reactive service running, you can run the client script with `bun run examples/groups-client.ts` and see changes in `active_friends` reflected in real time as users' friend lists, `active` status, and group memberships change.
+
+Alternatively, use curl to listen for updates, e.g. with
+
+```
+curl -LN http://localhost:8082/active_friends/bob
+```
+
+and see the raw event stream as you issue updates to the input `users` and `groups` data from another shell.
+
 ### Next steps
 
 This guide implements an example reactive service which can be queried or subscribed to by user's clients to see up-to-date listings of which of their active friends belong to each group, maintained up to date as input data changes without any explicit management of updates in the service's declarative logic.
