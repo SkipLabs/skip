@@ -25,7 +25,7 @@ export class SkipHttpAccessV1 {
 
   constructor(
     private streaming_port: number = 8080,
-    private control_port: number = 8081,
+    control_port: number = 8081,
   ) {
     this.service = new RESTWrapperOfSkipService({
       host: "localhost",
@@ -63,17 +63,8 @@ export class SkipHttpAccessV1 {
   }
 
   request(resource: string, params: { [param: string]: string }) {
-    fetch(`http://localhost:${this.control_port}/v1/streams`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        resource,
-        params,
-      }),
-    })
-      .then((resp) => resp.json())
+    this.service
+      .getStreamUUID(resource, params)
       .then((uuid) => {
         const evSource = new EventSource(
           `http://localhost:${this.streaming_port}/v1/streams/${uuid}`,
