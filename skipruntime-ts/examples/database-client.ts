@@ -1,7 +1,7 @@
 // TODO: Remove once global `EventSource` makes it out of experimental
 // in nodejs LTS.
 import EventSource from "eventsource";
-import { fetchJSON } from "@skipruntime/helpers/rest.js";
+import { fetchJSON } from "@skipruntime/helpers";
 
 /*
   This is the client simulator of database example
