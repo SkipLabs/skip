@@ -152,7 +152,7 @@ class ActiveFriends implements Resource<ResourceInputs> {
   private uid: UserID;
   constructor(params: { [param: string]: string }) {
     if (!params["uid"]) throw new Error("Missing required parameter 'uid'");
-    this.uid = parseInt(params["uid"]);
+    this.uid = params["uid"];
   }
   instantiate(inputs: ResourceInputs): EagerCollection<GroupID, UserID> {
     const user = inputs.users.getUnique(this.uid);
