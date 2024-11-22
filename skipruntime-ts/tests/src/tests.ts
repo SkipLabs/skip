@@ -48,6 +48,7 @@ interface ServiceInstance {
     params: { [param: string]: string },
   ): void;
   closeResourceInstance(resourceInstanceId: string): void;
+  close(): void;
 }
 
 //// testMap1
@@ -817,6 +818,7 @@ export function initTests(
       [1, [[20, 31]]],
     ]);
     service.closeResourceInstance(constantResourceId);
+    service.close();
   });
 
   it("testCloseSession", async () => {
@@ -831,6 +833,7 @@ export function initTests(
     const current = service.getArray(resource, "5ms").payload;
     expect(current == start).toEqual(false);
     service.closeResourceInstance(constantResourceId);
+    service.close();
   });
 
   it("testMultipleResources", async () => {
