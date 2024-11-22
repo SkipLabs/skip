@@ -46,11 +46,9 @@ app.get("/users", (_req, res) => {
       params: {},
     }),
   })
-    .then((rres) => {
-      return rres.text();
-    })
+    .then((rres) => rres.json())
     .then((uuid) => {
-      res.redirect(301, "http://localhost:8080/v1/streams/" + uuid);
+      res.redirect(301, `http://localhost:8080/v1/streams/${uuid}`);
     })
     .catch((e: unknown) => {
       console.log(e);
@@ -58,9 +56,9 @@ app.get("/users", (_req, res) => {
     });
 });
 
-app.get("/user/:id", (_req, res) => {
+app.get("/user/:id", (req, res) => {
   service
-    .getArray("users", {}, "123")
+    .getArray("users", {}, req.params.id)
     .then((user) => {
       res.status(200).json(user);
     })
