@@ -38,15 +38,8 @@ const run = function (
 };
 
 app.get("/users", (_req, res) => {
-  fetch("http://localhost:8081/v1/streams", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      resource: "users",
-      params: {},
-    }),
-  })
-    .then((rres) => rres.json())
+  service
+    .getStreamUUID("users")
     .then((uuid) => {
       res.redirect(301, `http://localhost:8080/v1/streams/${uuid}`);
     })
