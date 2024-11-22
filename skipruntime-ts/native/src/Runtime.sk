@@ -2,6 +2,7 @@ module SkipRuntime;
 
 const kKeyToKey: SKStore.Key ~> SKStore.Key = k ~> k;
 const kFileToFile: SKStore.File ~> SKStore.File = f ~> f;
+const kGarbageMillis: Int = 30000;
 
 class ReadInCreatorException() extends Exception {
   fun getMessage(): String {
@@ -192,7 +193,7 @@ class ResourceInfo(
       SKStore.SID(requestId),
       Array[RequestFile(Time.time_ms(), this, optChecker)],
     );
-    context.update();
+    updateContext(context);
     requestId;
   }
 
@@ -245,6 +246,12 @@ fun buildResourcesGraph(
     SKStore.SID::keyType,
     ResourceDef::type,
     dirname,
+    Array[],
+  );
+  _ = context.mkdir(
+    SKStore.SID::keyType,
+    SKStore.IntFile::type,
+    kResourceGarbageDir,
     Array[],
   );
   idbyresourceHdl = resourcesHdl.map(
@@ -453,26 +460,33 @@ fun initService(service: Service): Result<void, .Exception> {
         kSessionDir,
       ).writeArray(context, SKStore.IID(0), Array[SKStore.StringFile(session)]);
     };
-    context.update();
+    updateContext(context);
   })
 }
 
 fun closeService(): Result<void, .Exception> {
   SKStore.runWithResult(context ~> {
-    dir = context.unsafeGetEagerDir(kResourceSessionDir);
-    keys = dir.keys();
-    keys.each((key) -> {
-      if (!dir.getArrayRaw(key).isEmpty()) {
-        dir.writeArray(context, key, Array[])
-      }
+    resourceHdl = SKStore.EHandle(
+      SKStore.SID::keyType,
+      ResourceDef::type,
+      kResourceSessionDir,
+    );
+    todestroy = mutable Vector[];
+    resourceHdl.items(context).each(kf -> {
+      kf.i1.next().each(_f -> todestroy.push(SKStore.SID::keyType(kf.i0)))
     });
-    remoteCollections = context
+    todestroy.each(key -> {
+      resourceHdl.writeArray(context, key, Array[]);
+    });
+    context
       .getPersistent(kRemoteSpecifiers)
       .map(RemoteSpecifiers::type)
       .map(v -> v.value)
-      .fromSome();
-    remoteCollections.each((_k, es) -> es.shutdown());
+      .each(remoteCollections -> {
+        remoteCollections.each((_k, es) -> es.shutdown());
+      });
     context.removePersistent(kRemoteSpecifiers);
+    context.update();
   })
 }
 
@@ -1020,7 +1034,7 @@ class CollectionWriter(dirName: SKStore.DirName) {
       SKStore.runWithResult(context ~> {
         this.update_(context, values, isInit);
         this.updateStatus(context, status ~> status.ok());
-        context.update();
+        updateContext(context);
       })
     }
   }
@@ -1037,7 +1051,7 @@ class CollectionWriter(dirName: SKStore.DirName) {
     | _ ->
       SKStore.runWithResult(context ~> {
         this.updateStatus(context, status ~> status.err(error));
-        context.update();
+        updateContext(context);
       })
     }
   }
@@ -1054,7 +1068,7 @@ class CollectionWriter(dirName: SKStore.DirName) {
     | _ ->
       SKStore.runWithResult(context ~> {
         this.status(context, Status::create());
-        context.update();
+        updateContext(context);
       })
     }
   }
@@ -1232,10 +1246,16 @@ fun closeReactiveResource(
   identifier: String,
   update: Bool = true,
 ): void {
-  context.maybeGetEagerDir(kResourceSessionDir).each(dir -> {
-    dir.writeArray(context, SKStore.SID(identifier), Array[]);
-    if (update) context.update();
-  });
+  garbageHdl = SKStore.EHandle(
+    SKStore.SID::keyType,
+    SKStore.IntFile::type,
+    kResourceGarbageDir,
+  );
+  sid = SKStore.SID(identifier);
+  if (garbageHdl.maybeGet(context, sid).isSome()) return void;
+  time = Time.time_ms();
+  garbageHdl.writeArray(context, sid, Array[SKStore.IntFile(time)]);
+  if (update) updateContext(context);
 }
 
 fun subscribe(
@@ -1244,6 +1264,12 @@ fun subscribe(
   notify: (Array<(SKJSON.CJSON, Array<SKJSON.CJSON>)>, String, Bool) ~> void,
   optWatermark: ?String,
 ): Int {
+  garbageHdl = SKStore.EHandle(
+    SKStore.SID::keyType,
+    SKStore.IntFile::type,
+    kResourceGarbageDir,
+  );
+  sid = SKStore.SID(identifier);
   session = SKStore.genSym(0);
   resourceHdl = SKStore.EHandle(
     SKStore.SID::keyType,
@@ -1255,7 +1281,7 @@ fun subscribe(
     ResourceInfo::type,
     kResourceCollectionsDir,
   );
-  resourceHdl.maybeGet(context, SKStore.SID(identifier)) match {
+  resourceHdl.maybeGet(context, sid) match {
   | Some(definition) ->
     info = resourcesCollectionsHdl.get(context, definition);
     start = `${info.session}/`;
@@ -1272,6 +1298,11 @@ fun subscribe(
         notify(values, `${info.session}/${tick}`, update)
       },
     );
+    if (garbageHdl.maybeGet(context, sid).isSome()) {
+      garbageHdl.writeArray(context, sid, Array[]);
+      context.update();
+    };
+    checkGarbage(context);
     session
   | _ -> -1
   }
@@ -1295,7 +1326,7 @@ fun put(
     SKStore.DirName::create(`/${collection}/`),
   );
   chdl.writeArray(context, JSONID(key), value.map(v -> JSONFile(v)));
-  context.update();
+  updateContext(context);
 }
 
 fun update(
@@ -1315,7 +1346,7 @@ fun update(
       keyValue.i1.map(v -> JSONFile(v)),
     )
   );
-  context.update();
+  updateContext(context);
 }
 
 fun delete(
@@ -1329,7 +1360,7 @@ fun delete(
     SKStore.DirName::create(`/${collection}/`),
   );
   chdl.writeArray(context, JSONID(key), Array[]);
-  context.update();
+  updateContext(context);
 }
 
 private fun createResource_(
@@ -1350,13 +1381,45 @@ private fun createResource_(
   | _ -> void
   };
   resourceHdl.writeArray(context, key, Array[definition]);
-  context.update();
+  updateContext(context);
   graphHdl = SKStore.EHandle(
     ResourceDef::keyType,
     ResourceInfo::type,
     kResourceCollectionsDir,
   );
   graphHdl.get(context, definition);
+}
+
+fun checkGarbage(context: mutable SKStore.Context): void {
+  garbageHdl = SKStore.EHandle(
+    SKStore.SID::keyType,
+    SKStore.IntFile::type,
+    kResourceGarbageDir,
+  );
+  resourceHdl = SKStore.EHandle(
+    SKStore.SID::keyType,
+    ResourceDef::type,
+    kResourceSessionDir,
+  );
+  time = Time.time_ms();
+  destroyed = mutable Vector[];
+  garbageHdl.items(context).each(kf -> {
+    kf.i1.next().each(f -> {
+      suppressed = SKStore.IntFile::type(f).value;
+      if (time - suppressed > kGarbageMillis) {
+        key = SKStore.SID::keyType(kf.i0);
+        destroyed.push(key);
+        resourceHdl.writeArray(context, key, Array[]);
+      }
+    })
+  });
+  destroyed.each(key -> garbageHdl.writeArray(context, key, Array[]));
+  if (!destroyed.isEmpty()) context.update();
+}
+
+fun updateContext(context: mutable SKStore.Context): void {
+  context.update();
+  checkGarbage(context);
 }
 
 module end;
