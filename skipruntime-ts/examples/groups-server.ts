@@ -12,9 +12,9 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.get("/activeFriends/:uid/:gid", (req, res) => {
+app.get("/active_friends/:uid/:gid", (req, res) => {
   service
-    .getArray("activeFriends", { uid: req.params.uid }, req.params.gid)
+    .getArray("active_friends", { uid: req.params.uid }, req.params.gid)
     .then((actives) => {
       res.status(200).json(actives);
     })
