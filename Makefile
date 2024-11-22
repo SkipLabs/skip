@@ -212,24 +212,6 @@ test-bun: npm
 	cp -r build/package/skdb build/bun/node_modules/
 	cd build/bun && bun bun.js true && bun bun.js false
 
-exbuild-%:
-	cd skipruntime-ts && make build-$*
-
-exrun-%:
-	cd skipruntime-ts && make bunrun-$*
-
-excheck-%:
-	cd skipruntime-ts && make check-$*
-
-nexrun-%:
-	cd skipruntime-ts && make noderun-$*
-
-explay-%:
-	cd skipruntime-ts && make bunplay-$*
-
-nexplay-%:
-	cd skipruntime-ts && make nodeplay-$*
-
 skcheck-%:
 	cd $* && skargo c --profile $(SKARGO_PROFILE)
 
