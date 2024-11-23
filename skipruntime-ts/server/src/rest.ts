@@ -15,7 +15,7 @@ export function controlService(service: ServiceInstance): express.Express {
         req.body.resource as string,
         req.body.params as { [param: string]: string },
       );
-      res.status(201).json(uuid);
+      res.status(201).send(uuid);
     } catch (e: unknown) {
       console.log(e);
       res.status(500).json(e instanceof Error ? e.message : e);

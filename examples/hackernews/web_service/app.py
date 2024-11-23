@@ -54,7 +54,7 @@ def posts_index():
                 }
             },
         )
-        uuid = resp.json()
+        uuid = resp.text
 
         return redirect(f"/streams/{uuid}", code=307)
 
