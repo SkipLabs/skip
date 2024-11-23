@@ -112,6 +112,6 @@ export class RESTWrapperOfSkipService {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ resource, params }),
-    }).then((res) => res.json() as Promise<string>);
+    }).then((res) => res.text());
   }
 }
