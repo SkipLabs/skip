@@ -51,7 +51,7 @@ export class SkipExternalService implements ExternalService {
         params,
       }),
     })
-      .then((resp) => resp.json())
+      .then((resp) => resp.text())
       .then((uuid) => {
         const evSource = new EventSource(`${this.url}/v1/streams/${uuid}`);
         evSource.addEventListener("init", (e: MessageEvent<string>) => {
