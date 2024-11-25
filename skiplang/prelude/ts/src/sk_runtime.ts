@@ -12,13 +12,10 @@ import { Stream } from "./sk_types.js";
 import type * as Internal from "./sk_internal_types.js";
 
 class LinksImpl implements Links {
-  env: Environment | undefined;
   lineBuffer!: int[];
   lastTime!: int;
 
-  constructor(env?: Environment) {
-    this.env = env;
-  }
+  constructor(private readonly env?: Environment) {}
 
   SKIP_read_line_fill!: () => int;
   SKIP_read_to_end_fill!: () => int;
@@ -193,11 +190,7 @@ class LinksImpl implements Links {
 }
 
 class Manager implements ToWasmManager {
-  env: Environment | undefined;
-
-  constructor(env?: Environment) {
-    this.env = env;
-  }
+  constructor(private readonly env?: Environment) {}
 
   prepare = (wasm: object) => {
     const toWasm = wasm as ToWasm;

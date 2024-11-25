@@ -15,7 +15,9 @@ export interface ExternalResource {
 }
 
 export class GenericExternalService implements ExternalService {
-  constructor(private resources: { [name: string]: ExternalResource }) {}
+  constructor(
+    private readonly resources: { [name: string]: ExternalResource },
+  ) {}
 
   subscribe(
     resourceName: string,
@@ -53,7 +55,7 @@ export class GenericExternalService implements ExternalService {
 type Timeout = ReturnType<typeof setInterval>;
 
 export class TimerResource implements ExternalResource {
-  private intervals = new Map<string, { [name: string]: Timeout }>();
+  private readonly intervals = new Map<string, { [name: string]: Timeout }>();
 
   open(
     params: { [param: string]: string | number },
@@ -96,12 +98,12 @@ export class TimerResource implements ExternalResource {
 export class Polled<S extends Json, K extends Json, V extends Json>
   implements ExternalResource
 {
-  private intervals = new Map<string, Timeout>();
+  private readonly intervals = new Map<string, Timeout>();
 
   constructor(
-    private url: string,
-    private duration: number,
-    private conv: (data: S) => Entry<K, V>[],
+    private readonly url: string,
+    private readonly duration: number,
+    private readonly conv: (data: S) => Entry<K, V>[],
   ) {}
 
   open(

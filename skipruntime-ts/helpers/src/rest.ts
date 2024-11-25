@@ -49,7 +49,7 @@ export async function fetchJSON<V>(
  * `SkipServiceBroker` provides a method-call interface to the backing HTTP interface.
  */
 export class SkipServiceBroker {
-  private entrypoint: string;
+  private readonly entrypoint: string;
 
   /**
    * Construct a broker for a Skip service at the given entry point.

@@ -245,7 +245,7 @@ function encodeProtoMsg(msg: ProtoMsg): ArrayBuffer {
 
 class ProtoMsgDecoder {
   private bufs: Uint8Array[] = [];
-  private msgs: (ProtoMsg | null)[] = [];
+  private readonly msgs: (ProtoMsg | null)[] = [];
 
   private popBufs(): ArrayBuffer {
     if (this.bufs.length == 1) {
@@ -533,7 +533,7 @@ class ResilientMuxedSocket {
 }
 
 class ResilientStream {
-  private socket: ResilientMuxedSocket;
+  private readonly socket: ResilientMuxedSocket;
   private stream?: Stream;
 
   private failureDetectionTimeout?: number;
@@ -689,7 +689,7 @@ export interface Creds {
 
 export class MuxedSocket {
   // constants
-  private reauthTimeoutMs = 5 * 60 * 1000; // 5 mins - half of the 10 min window
+  private readonly reauthTimeoutMs = 5 * 60 * 1000; // 5 mins - half of the 10 min window
 
   // state
   private state: MuxedSocketState = MuxedSocketState.IDLE;
@@ -708,9 +708,9 @@ export class MuxedSocket {
   onError?: (errorCode: number, msg: string) => void;
 
   private constructor(
-    private socket: WebSocket,
-    private creds: Creds,
-    private env: Environment,
+    private readonly socket: WebSocket,
+    private readonly creds: Creds,
+    private readonly env: Environment,
   ) {
     // pre-condition: socket is open
   }
@@ -1438,10 +1438,10 @@ class SKDBServer implements RemoteSKDB {
   private onRebootFn?: () => void;
 
   private constructor(
-    private env: Environment,
-    private client: SKDBMechanism,
-    private connection: ResilientMuxedSocket,
-    private creds: Creds,
+    private readonly env: Environment,
+    private readonly client: SKDBMechanism,
+    private readonly connection: ResilientMuxedSocket,
+    private readonly creds: Creds,
   ) {}
 
   static async connect(

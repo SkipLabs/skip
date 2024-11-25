@@ -9,11 +9,7 @@ import * as crypto from "crypto";
 import { Worker } from "worker_threads";
 
 class WrkImpl implements Wrk {
-  worker: Worker;
-
-  constructor(worker: Worker) {
-    this.worker = worker;
-  }
+  constructor(private readonly worker: Worker) {}
 
   static fromPath(url: URL, options: WorkerOptions | undefined): Wrk {
     const filename = "./" + path.relative(process.cwd(), url.pathname);

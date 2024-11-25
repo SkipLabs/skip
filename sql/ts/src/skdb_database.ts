@@ -109,11 +109,11 @@ class SKDBMechanismImpl implements SKDBMechanism {
 }
 
 export class SKDBSyncImpl implements SKDBSync {
-  private environment: Environment;
+  private readonly environment: Environment;
   private subscriptionCount: number = 0;
   private clientUuid: string = "";
   private accessKey?: string;
-  private fs: FileSystem;
+  private readonly fs: FileSystem;
 
   save!: () => Promise<boolean>;
   runLocal!: (new_args: string[], new_stdin: string) => string;
@@ -424,11 +424,7 @@ export class SKDBSyncImpl implements SKDBSync {
 }
 
 export class SKDBImpl implements SKDB {
-  private skdbSync: SKDBSync;
-
-  constructor(skdbSync: SKDBSync) {
-    this.skdbSync = skdbSync;
-  }
+  constructor(private readonly skdbSync: SKDBSync) {}
 
   currentUser?: string;
 

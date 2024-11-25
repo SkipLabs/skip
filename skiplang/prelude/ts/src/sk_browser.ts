@@ -2,11 +2,7 @@ import type { float, int, Environment, Wrk, Shared } from "./sk_types.js";
 import { MemFS, MemSys } from "./sk_mem_utils.js";
 
 class WrkImpl implements Wrk {
-  worker: Worker;
-
-  constructor(worker: Worker) {
-    this.worker = worker;
-  }
+  constructor(private readonly worker: Worker) {}
 
   static fromPath(url: URL, options?: WorkerOptions) {
     return new this(new Worker(url, options));
