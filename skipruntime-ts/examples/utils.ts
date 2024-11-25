@@ -2,7 +2,7 @@
 // in nodejs LTS.
 import EventSource from "eventsource";
 import type { Json, Entry } from "@skipruntime/api";
-import { RESTWrapperOfSkipService } from "@skipruntime/helpers";
+import { SkipServiceBroker } from "@skipruntime/helpers";
 import { createInterface } from "readline";
 
 export interface ClientDefinition {
@@ -21,13 +21,13 @@ interface Delete {
 }
 
 export class SkipHttpAccessV1 {
-  private service: RESTWrapperOfSkipService;
+  private service: SkipServiceBroker;
 
   constructor(
     private streaming_port: number = 8080,
     control_port: number = 8081,
   ) {
-    this.service = new RESTWrapperOfSkipService({
+    this.service = new SkipServiceBroker({
       host: "localhost",
       control_port,
       streaming_port,

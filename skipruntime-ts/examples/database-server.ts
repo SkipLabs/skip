@@ -1,4 +1,4 @@
-import { RESTWrapperOfSkipService } from "@skipruntime/helpers";
+import { SkipServiceBroker } from "@skipruntime/helpers";
 
 import express from "express";
 
@@ -6,7 +6,7 @@ import express from "express";
   This is the user facing server of the database example
 */
 
-const service = new RESTWrapperOfSkipService({
+const service = new SkipServiceBroker({
   host: "localhost",
   control_port: 8081,
   streaming_port: 8080,

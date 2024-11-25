@@ -41,7 +41,7 @@ export async function fetchJSON<V>(
   return [responseJSON, response.headers];
 }
 
-export class RESTWrapperOfSkipService {
+export class SkipServiceBroker {
   private entrypoint: string;
 
   constructor(
