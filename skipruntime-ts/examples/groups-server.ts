@@ -16,7 +16,7 @@ app.get("/active_friends/:uid", (req, res) => {
   service
     .getStreamUUID("active_friends", { uid: req.params.uid })
     .then((uuid) => {
-      res.redirect(301, `http://localhost:8080/v1/streams/${uuid}`);
+      res.redirect(301, service.streamURL(uuid));
     })
     .catch((e: unknown) => {
       res.status(500).json(e);
