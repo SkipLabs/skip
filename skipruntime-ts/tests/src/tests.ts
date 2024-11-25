@@ -48,6 +48,16 @@ interface ServiceInstance {
   ): void;
 }
 
+class StringifyKey implements Mapper<number, number, string, number> {
+  mapEntry(
+    key: number,
+    values: NonEmptyIterator<number>,
+  ): Iterable<[string, number]> {
+    const keyStr = key.toString();
+    return values.map((v) => [keyStr, v]);
+  }
+}
+
 //// testMap1
 
 class Map1 implements Mapper<string, number, string, number> {
@@ -159,8 +169,8 @@ class AddKeyAndValue extends OneToOneMapper<number, number, number> {
 type Input_NN = { input: EagerCollection<number, number> };
 
 class OneToOneMapperResource implements Resource<Input_NN> {
-  instantiate(cs: Input_NN): EagerCollection<number, number> {
-    return cs.input.map(SquareValues).map(AddKeyAndValue);
+  instantiate(cs: Input_NN): EagerCollection<string, number> {
+    return cs.input.map(SquareValues).map(AddKeyAndValue).map(StringifyKey);
   }
 }
 
@@ -192,8 +202,8 @@ type Input_NN_NN = {
 };
 
 class SizeResource implements Resource<Input_NN_NN> {
-  instantiate(cs: Input_NN_NN): EagerCollection<number, number> {
-    return cs.input1.map(SizeMapper, cs.input2);
+  instantiate(cs: Input_NN_NN): EagerCollection<string, number> {
+    return cs.input1.map(SizeMapper, cs.input2).map(StringifyKey);
   }
 }
 
@@ -209,12 +219,13 @@ const sizeService: SkipService<Input_NN_NN, Input_NN_NN> = {
 //// testSlicedMap1
 
 class SlicedMap1Resource implements Resource<Input_NN> {
-  instantiate(cs: Input_NN): EagerCollection<number, number> {
+  instantiate(cs: Input_NN): EagerCollection<string, number> {
     return cs.input
       .slice([1, 1], [3, 4], [7, 9], [20, 50], [42, 1337])
       .map(SquareValues)
       .take(7)
-      .slice([0, 7], [8, 15], [19, 2000]);
+      .slice([0, 7], [8, 15], [19, 2000])
+      .map(StringifyKey);
   }
 }
 
@@ -249,9 +260,9 @@ class MapLazy implements Mapper<number, number, number, number> {
 }
 
 class LazyResource implements Resource<Input_NN> {
-  instantiate(cs: Input_NN, context: Context): EagerCollection<number, number> {
+  instantiate(cs: Input_NN, context: Context): EagerCollection<string, number> {
     const lazy = context.createLazyCollection(TestLazyAdd, cs.input);
-    return cs.input.map(MapLazy, lazy);
+    return cs.input.map(MapLazy, lazy).map(StringifyKey);
   }
 }
 
@@ -276,8 +287,8 @@ class TestOddEven implements Mapper<number, number, number, number> {
 }
 
 class MapReduceResource implements Resource<Input_NN> {
-  instantiate(cs: Input_NN): EagerCollection<number, number> {
-    return cs.input.mapReduce(TestOddEven, new Sum());
+  instantiate(cs: Input_NN): EagerCollection<string, number> {
+    return cs.input.mapReduce(TestOddEven, new Sum()).map(StringifyKey);
   }
 }
 
@@ -293,8 +304,8 @@ const mapReduceService: SkipService<Input_NN, Input_NN> = {
 //// testMerge1
 
 class Merge1Resource implements Resource<Input_NN_NN> {
-  instantiate(cs: Input_NN_NN): EagerCollection<number, number> {
-    return cs.input1.merge(cs.input2);
+  instantiate(cs: Input_NN_NN): EagerCollection<string, number> {
+    return cs.input1.merge(cs.input2).map(StringifyKey);
   }
 }
 
@@ -323,8 +334,11 @@ class IdentityMapper extends OneToOneMapper<number, number, number> {
 }
 
 class MergeReduceResource implements Resource<Input_NN_NN> {
-  instantiate(cs: Input_NN_NN): EagerCollection<number, number> {
-    return cs.input1.merge(cs.input2).mapReduce(IdentityMapper, new Sum());
+  instantiate(cs: Input_NN_NN): EagerCollection<string, number> {
+    return cs.input1
+      .merge(cs.input2)
+      .mapReduce(IdentityMapper, new Sum())
+      .map(StringifyKey);
   }
 }
 
@@ -341,17 +355,17 @@ const mergeReduceService: SkipService<Input_NN_NN, Input_NN_NN> = {
 
 class JSONExtract
   implements
-    Mapper<number, { value: JsonObject; pattern: string }, number, Json[]>
+    Mapper<number, { value: JsonObject; pattern: string }, string, Json[]>
 {
   constructor(private context: Context) {}
 
   mapEntry(
     key: number,
     values: NonEmptyIterator<{ value: JsonObject; pattern: string }>,
-  ): Iterable<[number, Json[]]> {
+  ): Iterable<[string, Json[]]> {
     const value = values.getUnique();
     const result = this.context.jsonExtract(value.value, value.pattern);
-    return Array([key, result]);
+    return Array([key.toString(), result]);
   }
 }
 
@@ -363,7 +377,7 @@ class JSONExtractResource implements Resource<Input_NJP> {
   instantiate(
     cs: Input_NJP,
     context: Context,
-  ): EagerCollection<number, Json[]> {
+  ): EagerCollection<string, Json[]> {
     return cs.input.map(JSONExtract, context);
   }
 }

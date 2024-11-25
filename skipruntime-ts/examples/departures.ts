@@ -23,7 +23,7 @@ class DeparturesResource implements Resource<ResourceInputs> {
   instantiate(
     cs: ResourceInputs,
     context: Context,
-  ): EagerCollection<number, Departure> {
+  ): EagerCollection<string, Departure> {
     const get = (name: string, def: string) => {
       try {
         return cs.config.getUnique(name).join(",");
@@ -58,7 +58,7 @@ const service = await runService(
         departuresFromAPI: new Polled(
           "https://api.unhcr.org/rsq/v1/departures",
           10000,
-          (data: Result) => data.results.map((v, idx) => [idx, [v]]),
+          (data: Result) => data.results.map((v, idx) => [idx.toString(), [v]]),
         ),
       }),
     },

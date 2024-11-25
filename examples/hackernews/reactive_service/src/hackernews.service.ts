@@ -86,11 +86,11 @@ class SortingMapper {
   mapEntry(
     key: number,
     values: NonEmptyIterator<Upvoted>,
-  ): Iterable<[number, Upvoted]> {
+  ): Iterable<[string, Upvoted]> {
     const posts = values.toArray();
     // Sorting in descending order of upvotes.
     posts.sort((a, b) => b.upvotes - a.upvotes);
-    return posts.map((p) => [key, p]);
+    return posts.map((p) => [key.toString(), p]);
   }
 }
 
@@ -101,7 +101,7 @@ class PostsResource implements Resource<ResourceInputs> {
     this.limit = Number(params["limit"]);
   }
 
-  instantiate(collections: ResourceInputs): EagerCollection<number, Upvoted> {
+  instantiate(collections: ResourceInputs): EagerCollection<string, Upvoted> {
     return collections.postsWithUpvotes.take(this.limit).map(SortingMapper);
   }
 }
