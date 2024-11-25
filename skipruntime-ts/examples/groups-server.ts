@@ -1,8 +1,8 @@
-import { RESTWrapperOfSkipService } from "@skipruntime/helpers/rest.js";
+import { SkipServiceBroker } from "@skipruntime/helpers/rest.js";
 
 import express from "express";
 
-const service = new RESTWrapperOfSkipService({
+const service = new SkipServiceBroker({
   host: "localhost",
   control_port: 8081,
   streaming_port: 8080,
