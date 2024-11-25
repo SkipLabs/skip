@@ -364,7 +364,7 @@ export interface Resource<
   instantiate(
     collections: Collections,
     context: Context,
-  ): EagerCollection<Json, Json>;
+  ): EagerCollection<string, Json>;
 }
 
 // Initial data for services' initial collections are provided as an object with arrays of
