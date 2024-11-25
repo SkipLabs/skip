@@ -41,7 +41,7 @@ app.get("/users", (_req, res) => {
   service
     .getStreamUUID("users")
     .then((uuid) => {
-      res.redirect(301, `http://localhost:8080/v1/streams/${uuid}`);
+      res.redirect(301, service.streamURL(uuid));
     })
     .catch((e: unknown) => {
       console.log(e);
