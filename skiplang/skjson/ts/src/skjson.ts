@@ -332,7 +332,7 @@ class LinksImpl implements Links {
   SKJSON_console!: (json: ptr<Internal.CJSON>) => void;
   SKJSON_error!: (json: ptr<Internal.CJSON>) => void;
 
-  constructor(public env: Environment) {}
+  constructor(private readonly env: Environment) {}
 
   complete = (utils: Utils, exports: object) => {
     const fromWasm = exports as FromWasm;
@@ -405,11 +405,7 @@ class LinksImpl implements Links {
 }
 
 class Manager implements ToWasmManager {
-  env: Environment;
-
-  constructor(env: Environment) {
-    this.env = env;
-  }
+  constructor(private readonly env: Environment) {}
 
   prepare = (wasm: object) => {
     const toWasm = wasm as ToWasm;

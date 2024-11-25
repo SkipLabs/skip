@@ -56,15 +56,11 @@ function makeSKDBStore(
 }
 
 export class IDBStorage implements Storage {
-  private storeName: string;
-  private memory: PagedMemory;
-  private db: IDBDatabase;
-
-  private constructor(storeName: string, db: IDBDatabase, memory: PagedMemory) {
-    this.storeName = storeName;
-    this.memory = memory;
-    this.db = db;
-  }
+  private constructor(
+    private readonly storeName: string,
+    private readonly db: IDBDatabase,
+    private readonly memory: PagedMemory,
+  ) {}
 
   static async create(
     dbName: string,

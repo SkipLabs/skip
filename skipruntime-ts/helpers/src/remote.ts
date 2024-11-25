@@ -11,11 +11,11 @@ interface Closable {
 }
 
 export class SkipExternalService implements ExternalService {
-  private resources = new Map<string, Closable>();
+  private readonly resources = new Map<string, Closable>();
 
   constructor(
-    private url: string,
-    private control_url: string,
+    private readonly url: string,
+    private readonly control_url: string,
   ) {}
 
   // TODO: Support Skip external services going through a gateway.

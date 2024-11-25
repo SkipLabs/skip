@@ -71,9 +71,9 @@ class File {
 }
 
 export class MemFS implements FileSystem {
-  private fileDescrs: Map<string, number>;
+  private readonly fileDescrs: Map<string, number>;
   private fileDescrNbr: int;
-  private files: File[];
+  private readonly files: File[];
   // invariant: range(fileDescrs) ⊆ domain(files)
 
   constructor() {
@@ -153,7 +153,7 @@ export class MemFS implements FileSystem {
 }
 
 export class MemSys implements System {
-  private env: Map<string, string>;
+  private readonly env: Map<string, string>;
 
   constructor() {
     this.env = new Map();
