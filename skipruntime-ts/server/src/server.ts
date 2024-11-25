@@ -3,6 +3,16 @@ import type { SkipService, NamedCollections } from "skip-wasm";
 import { controlService, streamingService } from "./rest.js";
 
 /**
+ * A running Skip server.
+ */
+export type SkipServer = {
+  /**
+   * Stop accepting new connections, close existing connections, and halt a running service.
+   */
+  close: () => void;
+};
+
+/**
  * Initialize and start a reactive Skip service.
  *
  * Calling `runService` will start a reactive service based on the `service` specification and `options`.
@@ -72,7 +82,7 @@ import { controlService, streamingService } from "./rest.js";
  * @param options - service configuration options
  * @param options.control_port - port on which control service will listen
  * @param options.streaming_port - port on which streaming service will listen
- * @returns - function to close the service
+ * @returns - object to manage the running server
  */
 export async function runService<
   Inputs extends NamedCollections,
@@ -86,7 +96,7 @@ export async function runService<
     streaming_port: 8080,
     control_port: 8081,
   },
-): Promise<{ close: () => void }> {
+): Promise<SkipServer> {
   const runtime = await initService(service);
   const controlHttpServer = controlService(runtime).listen(
     options.control_port,
@@ -105,7 +115,6 @@ export async function runService<
     },
   );
 
-  // TODO: Return a proper object.
   return {
     close: () => {
       controlHttpServer.close();
