@@ -211,10 +211,11 @@ const sizeService: SkipService<Input_NN_NN, Input_NN_NN> = {
 class SlicedMap1Resource implements Resource<Input_NN> {
   instantiate(cs: Input_NN): EagerCollection<number, number> {
     return cs.input
-      .slice([1, 1], [3, 4], [7, 9], [20, 50], [42, 1337])
+      .slices([1, 1], [3, 4], [7, 9], [20, 50], [42, 1337])
       .map(SquareValues)
       .take(7)
-      .slice([0, 7], [8, 15], [19, 2000]);
+      .slices([0, 7], [8, 15], [19, 2000])
+      .slice(0, 2000);
   }
 }
 

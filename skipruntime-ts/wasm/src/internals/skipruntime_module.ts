@@ -963,7 +963,11 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     );
   };
 
-  slice(...ranges: [K, K][]): EagerCollection<K, V> {
+  slice(start: K, end: K): EagerCollection<K, V> {
+    return this.slices([start, end]);
+  }
+
+  slices(...ranges: [K, K][]): EagerCollection<K, V> {
     const skcollection = this.refs.fromWasm.SkipRuntime_Collection__slice(
       this.refs.skjson.exportString(this.collection),
       this.refs.skjson.exportJSON(ranges),
