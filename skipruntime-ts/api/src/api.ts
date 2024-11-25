@@ -217,9 +217,13 @@ export interface EagerCollection<K extends Json, V extends Json>
 
   /**
    * Create a new eager collection by keeping only the elements whose keys are in
-   * the given ranges.
+   * the given range.
    */
-  slice(...ranges: [K, K][]): EagerCollection<K, V>;
+  slice(start: K, end: K): EagerCollection<K, V>;
+  /**
+   * Same as `slice`, but accepts multiple ranges.
+   */
+  slices(...ranges: [K, K][]): EagerCollection<K, V>;
 
   /**
    * Create a new eager collection by keeping the given number of the first elements.
