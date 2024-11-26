@@ -71,7 +71,15 @@ class ConvReducer(
 
 class ResourceCollection(value: Collection) extends SKStore.File
 
-class ResourceDef(name: String, params: Params) extends SKStore.File
+class ResourceDef(
+  name: String,
+  params: Params,
+) extends SKStore.File, SKStore.Key {
+  //
+  fun toString(): String {
+    `${this.name}:${paramsToString(this.params.value)}`
+  }
+}
 
 class ResourceStatus(
   loadable: SKStore.DirName,
@@ -239,16 +247,35 @@ fun buildResourcesGraph(
     dirname,
     Array[],
   );
-  _ = resourcesHdl.map(
-    SKStore.SID::keyType,
+  idbyresourceHdl = resourcesHdl.map(
+    ResourceDef::keyType,
+    SKStore.StringFile::type,
+    context,
+    dirname.sub("idbyresource"),
+    (_c, writer, key, it) ~> {
+      writer.set(it.first, SKStore.StringFile(key.value));
+    },
+  );
+  availablesHdl = idbyresourceHdl.map(
+    ResourceDef::keyType,
+    SKStore.IntFile::type,
+    context,
+    dirname.sub("availables"),
+    (_c, writer, key, _it) ~> {
+      // map to ignore array changes
+      // to prevent recompute on each add/remove session
+      writer.set(key, SKStore.IntFile(1))
+    },
+  );
+  _ = availablesHdl.map(
+    ResourceDef::keyType,
     ResourceInfo::type,
     context,
     kResourceCollectionsDir,
-    (context, writer, key, it) ~> {
+    (context, writer, key, _it) ~> {
       pushContext(context);
       try {
-        resourceId = base64(key.value);
-        def = it.first;
+        resourceId = toResourceId(key.name, key.params.value);
         statusRef = dirname.sub(resourceId);
         // Status graph
         sStatusHdl = context
@@ -297,8 +324,8 @@ fun buildResourcesGraph(
               }
             },
           );
-        resourceBuilder = resources.get(def.name);
-        resource = resourceBuilder.build(def.params.value);
+        resourceBuilder = resources.get(key.name);
+        resource = resourceBuilder.build(key.params.value);
         allCollections = mutable Map[];
         inputCollections.each((k, c) -> allCollections.add(k, c));
         servicesHdl.get(context, SKStore.SID(session)).value.each((k, c) ->
@@ -1218,14 +1245,19 @@ fun subscribe(
   optWatermark: ?String,
 ): Int {
   session = SKStore.genSym(0);
-  resourcesCollectionsHdl = SKStore.EHandle(
+  resourceHdl = SKStore.EHandle(
     SKStore.SID::keyType,
+    ResourceDef::type,
+    kResourceSessionDir,
+  );
+  resourcesCollectionsHdl = SKStore.EHandle(
+    ResourceDef::keyType,
     ResourceInfo::type,
     kResourceCollectionsDir,
   );
-
-  resourcesCollectionsHdl.maybeGet(context, SKStore.SID(identifier)) match {
-  | Some(info) ->
+  resourceHdl.maybeGet(context, SKStore.SID(identifier)) match {
+  | Some(definition) ->
+    info = resourcesCollectionsHdl.get(context, definition);
     start = `${info.session}/`;
     from = optWatermark match {
     | Some(watermark) if (watermark.startsWith(start)) ->
@@ -1320,11 +1352,11 @@ private fun createResource_(
   resourceHdl.writeArray(context, key, Array[definition]);
   context.update();
   graphHdl = SKStore.EHandle(
-    SKStore.SID::keyType,
+    ResourceDef::keyType,
     ResourceInfo::type,
     kResourceCollectionsDir,
   );
-  graphHdl.get(context, SKStore.SID(identifier));
+  graphHdl.get(context, definition);
 }
 
 module end;

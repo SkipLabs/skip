@@ -1,5 +1,4 @@
 import { expect } from "earl";
-// Temporary comment external related tests
 import type {
   Context,
   Json,
@@ -9,22 +8,19 @@ import type {
   LazyCompute,
   LazyCollection,
   NonEmptyIterator,
-  //NamedCollections,
+  NamedCollections,
   SkipService,
   Resource,
   Entry,
-  //ExternalService,
+  ExternalService,
 } from "@skipruntime/api";
-import {
-  /* NonUniqueValueException, */ OneToOneMapper,
-} from "@skipruntime/api";
+import { NonUniqueValueException, OneToOneMapper } from "@skipruntime/api";
 import { Sum } from "@skipruntime/helpers";
-/*
+
 import {
   TimerResource,
   GenericExternalService,
 } from "@skipruntime/helpers/external.js";
-*/
 
 type GetResult<T> = {
   request?: string;
@@ -46,6 +42,12 @@ interface ServiceInstance {
     collection: string,
     entries: Entry<K, V>[],
   ): void;
+  instantiateResource(
+    identifier: string,
+    resource: string,
+    params: { [param: string]: string },
+  ): void;
+  closeResourceInstance(resourceInstanceId: string): void;
 }
 
 //// testMap1
@@ -380,7 +382,6 @@ const jsonExtractService: SkipService<Input_NJP, Input_NJP> = {
 
 //// testExternalService
 
-/*
 async function timeout(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -460,7 +461,6 @@ class MockExternalResource implements Resource<Input_NN_NN> {
   }
 }
 
-
 const testExternalService: SkipService<Input_NN_NN, Input_NN_NN> = {
   initialData: { input1: [], input2: [] },
   resources: { external: MockExternalResource },
@@ -470,7 +470,6 @@ const testExternalService: SkipService<Input_NN_NN, Input_NN_NN> = {
     return inputCollections;
   },
 };
-
 
 //// testCloseSession
 
@@ -498,7 +497,7 @@ const tokensService: SkipService = {
     return {};
   },
 };
-*/
+
 //// testMultipleResources
 
 type Input1_SN = { input1: EagerCollection<string, number> };
@@ -778,9 +777,6 @@ export function initTests(
     ]);
   });
 
-  /*
-  
-  Temporary disconnected test until sharing management
   it("testExternal", async () => {
     const resource = "external";
     const service = await initService(testExternalService);
@@ -792,6 +788,8 @@ export function initTests(
       [0, [5]],
       [1, [10]],
     ]);
+    const constantResourceId = "unsafe.identifier";
+    service.instantiateResource(constantResourceId, resource, {});
     // No value registered in external mock resource
     expect(service.getAll(resource).payload).toEqual([
       [0, [[10]]],
@@ -818,20 +816,22 @@ export function initTests(
       [0, [[10, 16]]],
       [1, [[20, 31]]],
     ]);
+    service.closeResourceInstance(constantResourceId);
   });
 
   it("testCloseSession", async () => {
     const service = await initService(tokensService);
     const resource = "tokens";
+    const constantResourceId = "unsafe.identifier";
+    service.instantiateResource(constantResourceId, resource, {});
     const start = service.getArray(resource, "5ms").payload;
     await timeout(2);
     expect(service.getArray(resource, "5ms").payload).toEqual(start);
     await timeout(4);
     const current = service.getArray(resource, "5ms").payload;
     expect(current == start).toEqual(false);
+    service.closeResourceInstance(constantResourceId);
   });
-
-  */
 
   it("testMultipleResources", async () => {
     const service = await initService(multipleResourcesService);
