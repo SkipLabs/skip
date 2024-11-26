@@ -1,4 +1,5 @@
 import type { Json, Entry } from "@skipruntime/api";
+import { NonUniqueValueException } from "@skipruntime/api";
 
 export type Entrypoint = {
   host: string;
@@ -103,6 +104,26 @@ export class SkipServiceBroker {
       "GET",
     );
     return data ?? [];
+  }
+
+  /**
+   * Read the single value a resource associates with a key.
+   * @param resource - name of resource, must be a key of the `resources` field of the `SkipService` running at `entrypoint`
+   * @param params - resource instance parameters
+   * @param key - key to read
+   * @returns - the value associated to the key
+   * @throws {NonUniqueValueException} when the key is associated to either zero or multiple values
+   */
+  async getUnique<V extends Json>(
+    resource: string,
+    params: { [param: string]: string },
+    key: string,
+  ): Promise<V> {
+    return this.getArray<V>(resource, params, key).then((values) => {
+      if (values.length !== 1 || values[0] === undefined)
+        throw new NonUniqueValueException();
+      return values[0];
+    });
   }
 
   /**
