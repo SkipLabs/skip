@@ -22,6 +22,7 @@ export type {
 } from "@skipruntime/api";
 
 export type { ServiceInstance } from "./internals/skipruntime_module.js";
+export { DebuggingServiceInstance } from "./internals/skipruntime_debugging_module.js";
 export { UnknownCollectionError } from "@skipruntime/helpers/errors.js";
 export { OneToOneMapper, ManyToOneMapper } from "@skipruntime/api";
 export { deepFreeze } from "./internals/skipruntime_module.js";

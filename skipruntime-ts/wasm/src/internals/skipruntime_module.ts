@@ -38,6 +38,7 @@ import { Frozen, type Constant } from "@skipruntime/api/internals.js";
 import type { Exportable, SKJSON } from "@skip-wasm/json";
 import { isObjectProxy } from "@skip-wasm/json";
 import { UnknownCollectionError } from "@skipruntime/helpers/errors.js";
+import type { FromWasm as FromWasmDebugging } from "./skipruntime_debugging_module.js";
 
 export type Handle<T> = Internal.Opaque<int, { handle_for: T }>;
 
@@ -149,6 +150,9 @@ class ResourceBuilder {
     return new builder(parameters);
   }
 }
+
+// Merges both FromWasm interfaces
+export interface FromWasm extends FromWasmDebugging {}
 
 export interface FromWasm {
   // NonEmptyIterator
@@ -1240,7 +1244,15 @@ class OneChecker<V extends Json> implements Checker {
  * and operations to manage susbscriptions and the service itself.
  */
 export class ServiceInstance {
-  constructor(private readonly refs: Refs) {}
+  protected readonly refs: Refs;
+
+  constructor(refs_or_base: Refs | ServiceInstance) {
+    if (refs_or_base instanceof ServiceInstance) {
+      this.refs = refs_or_base.refs;
+    } else {
+      this.refs = refs_or_base;
+    }
+  }
 
   /**
    * Instantiate a resource with some parameters and client session authentication token

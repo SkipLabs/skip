@@ -1,6 +1,7 @@
 import { initService } from "skip-wasm";
 import type { SkipService, NamedCollections } from "skip-wasm";
 import { controlService, streamingService } from "./rest.js";
+import { debuggingService } from "./restDebugging.js";
 
 /**
  * A running Skip server.
@@ -82,6 +83,7 @@ export type SkipServer = {
  * @param options - service configuration options
  * @param options.control_port - port on which control service will listen
  * @param options.streaming_port - port on which streaming service will listen
+ * @param options.debugging_port - port on which debugging service will listen
  * @returns - object to manage the running server
  */
 export async function runService<
@@ -92,6 +94,7 @@ export async function runService<
   options: {
     streaming_port: number;
     control_port: number;
+    debugging_port?: number;
   } = {
     streaming_port: 8080,
     control_port: 8081,
@@ -114,11 +117,22 @@ export async function runService<
       );
     },
   );
+  const debugging_port = options.debugging_port;
+  const debuggingHttpServer = debugging_port
+    ? debuggingService(runtime).listen(debugging_port, () => {
+        console.log(
+          `Skip debugging service listening on port ${debugging_port.toString()}`,
+        );
+      })
+    : undefined;
 
   return {
     close: () => {
       controlHttpServer.close();
       streamingHttpServer.close();
+      if (debuggingHttpServer) {
+        debuggingHttpServer.close();
+      }
       runtime.close();
     },
   };
