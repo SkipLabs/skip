@@ -57,3 +57,50 @@ Encapsulating external reactive dependencies as eager collections, that complex 
 
 ## Non-Skip Services
 
+Of course, unless your application is built from the ground up using the Skip framework, it is likely that your application depends on some non-reactive external system: REST APIs, databases, external HTTP endpoints, and the like.
+These systems operate on a pull-based request/response paradigm, so some work is required to adapt them to Skip's eager push-based paradigm.
+
+### Polling
+
+The simplest option is *polling*, sending periodic requests to pull data from external sources and feed it into the reactive system.
+To specify a polled external dependency, specify it in your service definition, e.g. as follows
+
+```typescript
+const service = await runService(
+  {
+    initialData: ...
+    resources: ...
+    createGraph: ...
+    externalServices: {
+      myExternalService: new GenericExternalService({
+        my_resource: new Polled(
+          // HTTP endpoint
+          "https://api.example.com/my_resource",
+		  // Polling interval, in milliseconds
+          5000,
+		  // data processing into `Entry<K, V>[]` key/values structure
+          (data: Result) => data.results.map((value, idx) => [idx, [value]]))
+      }),
+    },
+  }
+);
+```
+
+Although the underlying data source is non-reactive, this external service can be used identically to reactive external Skip services as in the previous section, e.g.
+
+```typescript
+// Pull in data from external resource:
+const externalData : EagerCollection<K, V> = context.useExternalResource({
+  service: "myExternalService",
+  identifier: "my_resource",
+  params: {foo: bar, ...}
+});
+
+// Use the same as any other reactive eager collection:
+externalData.map(...);
+externalData.getArray(...);
+```
+
+When the external resource is "used" in this fashion, Skip queries the HTTP endpoint with the given `params` periodically, updating `externalData` with the results and allowing it to be used as if it were a reactive resource.
+The frequency of those requests is an important consideration, depending on the latency requirements of the application as well as the load capacity of the external system.
+
