@@ -342,7 +342,6 @@ mutable base class WriteChecker private {
 mutable class Context{
   mutable toPurge: SortedSet<DirName> = SortedSet[],
   mutable purgeLimit: ?Tick = None(),
-  mutable pwd: String = "/",
   mutable dirs: Dirs = Dirs{},
   mutable reads: SortedSet<Path> = SortedSet[],
   mutable time: Time = Time(0),
@@ -428,7 +427,6 @@ mutable class Context{
     static{
       toPurge => this.toPurge,
       purgeLimit => this.purgeLimit,
-      pwd => this.pwd,
       dirs => this.dirs,
       reads => this.reads,
       time => this.time,
@@ -466,7 +464,6 @@ mutable class Context{
     mutable static{
       toPurge => this.toPurge,
       purgeLimit => this.purgeLimit,
-      pwd => this.pwd,
       dirs => this.dirs,
       reads => this.reads,
       time => this.time,
@@ -507,7 +504,6 @@ mutable class Context{
   mutable fun replaceFromSaved(ctx: readonly Context): void {
     this.!toPurge = ctx.toPurge;
     this.!purgeLimit = ctx.purgeLimit;
-    this.!pwd = ctx.pwd;
     this.!dirs = ctx.dirs;
     this.!reads = ctx.reads;
     this.!time = ctx.time;
