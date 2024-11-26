@@ -1,13 +1,5 @@
-# Resources
+# Services and Resources
 
-## Example apps
+## Overview
 
-## Tutorials
-
-## FAQ
-
-## Share Skip
-
-## Skip branding
-
-## Community code of conduct
+## Resource HTTP API
