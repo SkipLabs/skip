@@ -114,6 +114,10 @@ export class RESTWrapperOfSkipService {
     }).then((res) => res.text());
   }
 
+  async deleteUUID(uuid: string): Promise<void> {
+    await fetchJSON(`${this.controlUrl}/v1/streams/${uuid}`, "DELETE");
+  }
+
   streamURL(uuid: string): string {
     const host = this.entrypoint.host;
     const port = this.entrypoint.streaming_port;
