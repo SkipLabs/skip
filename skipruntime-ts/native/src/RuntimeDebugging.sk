@@ -1,2 +1,46 @@
 module SkipRuntime;
+
+private fun dirInfo(
+  dirNameDir: readonly (SKStore.DirName, SKStore.Dir),
+): SKJSON.CJSON {
+  (dirName, dir) = dirNameDir;
+  fields = mutable Vector<(.String, SKJSON.CJSON)>[];
+  fields.push(("name", SKJSON.CJString(dirName.toString())));
+  fields.push(("isInput", SKJSON.CJBool(dir.isInput())));
+  fields.push(("time", SKJSON.CJInt(dir.getTime().value)));
+  dir match {
+  | SKStore.EagerDir{totalSize, creator} ->
+    fields.push(("kind", SKJSON.CJString("eager")));
+    fields.push(("totalSize", SKJSON.CJInt(totalSize)));
+    creator match {
+    | None() -> void
+    | Some(SKStore.ArrowKey(parentName, childName, key)) ->
+      fields.push(
+        (
+          "creator",
+          SKJSON.CJObject(
+            SKJSON.CJFields::create(
+              Array[
+                ("key", SKJSON.CJString(key.toString())),
+                ("parent", SKJSON.CJString(parentName.toString())),
+                ("child", SKJSON.CJString(childName.toString())),
+              ],
+              x -> x,
+            ),
+          ),
+        ),
+      )
+    }
+  | SKStore.LazyDir _ -> fields.push(("kind", SKJSON.CJString("lazy")))
+  | SKStore.DeletedDir _ -> fields.push(("kind", SKJSON.CJString("deleted")))
+  };
+  SKJSON.CJObject(SKJSON.CJFields::create(fields.toArray(), x -> x))
+}
+
+private fun contextDirs(
+  context: readonly SKStore.Context,
+): Array<SKJSON.CJSON> {
+  context.dirs.state.items().map(dirInfo).collect(Array)
+}
+
 module end;

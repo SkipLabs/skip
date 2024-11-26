@@ -4,11 +4,21 @@ import { DebuggingServiceInstance, type ServiceInstance } from "skip-wasm";
 export function debuggingService(
   baseService: ServiceInstance,
 ): express.Express {
-  // @ts-expect-error error TS6133: '_service' is declared but its value is never read.
-  const _service = new DebuggingServiceInstance(baseService);
+  const service = new DebuggingServiceInstance(baseService);
 
   const app = express();
   app.use(express.json());
+
+  // LOW-LEVEL
+  app.get("/v1/debug/raw/dirs", (_req, res) => {
+    try {
+      const result = service.dirs();
+      res.status(200).json(result);
+    } catch (e: unknown) {
+      console.log(e);
+      res.status(500).json(e instanceof Error ? e.message : e);
+    }
+  });
 
   return app;
 }

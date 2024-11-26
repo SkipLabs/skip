@@ -1,2 +1,11 @@
 module SkipRuntime;
+
+@export("SkipRuntime_Debug__dirs")
+fun dirs(): SKJSON.CJSON {
+  SKStore.runWithResult(contextDirs) match {
+  | Success(result) -> SKJSON.CJArray(result)
+  | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
+  }
+}
+
 module end;
