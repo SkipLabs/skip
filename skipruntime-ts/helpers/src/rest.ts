@@ -188,6 +188,9 @@ export class SkipServiceBroker {
 
   /**
    * Destroy a resource instance.
+   *
+   * Under normal circumstances, resource instances are deleted automatically after some period of inactivity; this method enables immediately deleting live streams under exceptional circumstances.
+   *
    * @param uuid - resource instance UUID
    * @returns {void}
    */
