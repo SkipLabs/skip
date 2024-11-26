@@ -54,8 +54,10 @@ base class CmdKind {
   | NNotify(String)
   | NTail()
   | NWatch(
+    identifier: String,
     start: Tick,
     (DirName, Array<(Key, Array<File>)>, Tick, Bool) ~> void,
+    () ~> void,
     changes: Bool,
   )
 }
@@ -862,7 +864,7 @@ mutable class Context{
     | NTail() ->
       cond = unfreezeCond(sub.cond);
       _ = condBroadcast(cond)
-    | NWatch(initTick, fn, changes) ->
+    | NWatch(_, initTick, fn, _, changes) ->
       for (dirSub in sub.dirSubs) {
         dirName = dirSub.dirName;
         this.unsafeMaybeGetDir(dirName) match {
