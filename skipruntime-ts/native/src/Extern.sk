@@ -764,4 +764,14 @@ fun closeSkipRuntimeService(): Float {
   };
 }
 
+/************ debugging ****************/
+
+@export("SkipRuntime_Debug__dirList")
+fun dirList(): SKJSON.CJSON {
+  SKStore.runWithResult(contextDirList) match {
+  | Success(result) -> SKJSON.CJArray(result)
+  | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
+  }
+}
+
 module end;

@@ -109,6 +109,17 @@ export function controlService(service: ServiceInstance): express.Express {
     }
   });
 
+  // DEBUGGING
+  app.get("/v1/debug/raw/dirs", (_req, res) => {
+    try {
+      const result = service.dirList();
+      res.status(200).json(result);
+    } catch (e: unknown) {
+      console.log(e);
+      res.status(500).json(e instanceof Error ? e.message : e);
+    }
+  });
+
   return app;
 }
 

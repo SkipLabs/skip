@@ -373,6 +373,12 @@ export interface FromWasm {
   ): ptr<Internal.Request>;
 
   SkipRuntime_createChecker(ref: Handle<Checker>): ptr<Internal.Request>;
+
+  // Debug
+
+  SkipRuntime_Debug__dirList(): ptr<
+    Internal.CJFloat | Internal.CJArray<Internal.CJObject>
+  >;
 }
 
 interface ToWasm {
@@ -1442,6 +1448,22 @@ export class ServiceInstance {
       throw this.refs.handles.deleteAsError(result);
     }
   }
+
+  /**
+   * Debugging
+   */
+
+  dirList(): DirList {
+    const result = this.refs.skjson.runWithGC(() => {
+      return this.refs.skjson.importJSON(
+        this.refs.fromWasm.SkipRuntime_Debug__dirList(),
+      );
+    });
+    if (typeof result == "number") {
+      throw this.refs.handles.deleteAsError(result as Handle<ErrorObject>);
+    }
+    return result as DirList;
+  }
 }
 
 class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
@@ -1488,6 +1510,16 @@ class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
     return this.toArray().map(f, thisObj);
   }
 }
+
+type DirList = ({ name: string; isInput: boolean; time: int } & (
+  | {
+      kind: "eager";
+      totalSize: int;
+      creator?: { parent: string; child: string; key: string };
+    }
+  | { kind: "lazy" }
+  | { kind: "deleted" }
+))[];
 
 class Manager implements ToWasmManager {
   constructor(private readonly env: Environment) {}
