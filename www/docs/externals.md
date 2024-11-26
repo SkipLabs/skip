@@ -57,6 +57,3 @@ Encapsulating external reactive dependencies as eager collections, that complex 
 
 ## Non-Skip Services
 
-## Streaming sources
-
-TODO: set up an example with a streaming source!
