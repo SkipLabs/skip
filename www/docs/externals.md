@@ -104,3 +104,10 @@ externalData.getArray(...);
 When the external resource is "used" in this fashion, Skip queries the HTTP endpoint with the given `params` periodically, updating `externalData` with the results and allowing it to be used as if it were a reactive resource.
 The frequency of those requests is an important consideration, depending on the latency requirements of the application as well as the load capacity of the external system.
 
+### Custom External Resources/Services
+
+If more control is required or your external system does not fit into this paradigm, then the `ExternalService` and `ExternalResource` interfaces both support extensions to define arbitrary logic for `subscribe`/`unsubscribe`-ing from services and `open`/`close`-ing resource.
+
+For example, your service can keep track of open resources and combine requests to the external service if it supports batched requests, lessening request load and potentially allowing more optimized execution in the non-reactive system.
+Similarly, an external relational database may support some limited form of reactivity/listening, such as PostgreSQL's `pg_notify`; in that case, a custom Skip `ExteralService` can interpret those updates into a form suitable for use within the Skip framework.
+TODO: work out some examples here?
