@@ -11,11 +11,11 @@ The core of these mechanisms is the [`ExternalService` type](todo: API docs link
 Each Skip reactive service can specify any number of `ExternalService`s, which can then be brought into the reactive computation graph as an `EagerCollection` with [`Context#useExternalResource`](todo: API docs link).
 
 Skip provides two `ExternalService` implementations -- one which polls external HTTP services, and one which subscribes to external Skip services.
-If your use case falls outside of these defaults, you can define your own custom external service by providing another `ExternalService` implementation with whatever arbitrary behavior is required.
+If your use case falls outside of these defaults, you can define your own custom external service by providing another `ExternalService` implementation with the required behavior.
 
 ## External Skip Services
 
-Skip reactive services are designed to interoperate simply and easily: services push their changes reactively from the bottom-up, eagerly propagating updates through a distributed system.
+Skip reactive services are designed to interoperate simply and easily: services push their changes reactively from the bottom up, eagerly propagating updates through a distributed system.
 
 To receive data from another Skip service, specify it in the `externalServices` field of your `SkipService`, for example as follows:
 
@@ -42,9 +42,9 @@ That dependency can then be referenced anywhere with access to the Skip context 
 ```typescript
 // Pull in data from external resource:
 const externalData : EagerCollection<K, V> = context.useExternalResource({
-  service: "myOtherService",
-  identifier: "my_resource",
-  params: {foo: bar, ...}
+  service: "myOtherService", // References this service's `externalServices` field
+  identifier: "my_resource", // References the other service's `resources` field
+  params: {foo: bar, ...}  // Passed to other service's Resource constructor
 });
 
 // Use the same as any other reactive eager collection:
@@ -101,13 +101,13 @@ externalData.map(...);
 externalData.getArray(...);
 ```
 
-When the external resource is "used" in this fashion, Skip queries the HTTP endpoint with the given `params` periodically, updating `externalData` with the results and allowing it to be used as if it were a reactive resource.
+When the external resource is "used" in this fashion, Skip queries the HTTP endpoint with the given query `params` periodically, updating `externalData` with the results and allowing it to be used as if it were a reactive resource.
 The frequency of those requests is an important consideration, depending on the latency requirements of the application as well as the load capacity of the external system.
 
 ### Custom External Resources/Services
 
-If more control is required or your external system does not fit into this paradigm, then the `ExternalService` and `ExternalResource` interfaces both support extensions to define arbitrary logic for `subscribe`/`unsubscribe`-ing from services and `open`/`close`-ing resource.
+If more control is required or your external system does not fit this form, then the `ExternalService` and `ExternalResource` interfaces both support extensions to define arbitrary logic for `subscribe`/`unsubscribe`-ing from services and `open`/`close`-ing resource.
 
-For example, your service can keep track of open resources and combine requests to the external service if it supports batched requests, lessening request load and potentially allowing more optimized execution in the non-reactive system.
+For example, your service can keep track of open resources and combine requests to the external service if it supports batched requests, reducing request load and potentially allowing more optimized execution in the non-reactive system.
 Similarly, an external relational database may support some limited form of reactivity/listening, such as PostgreSQL's `pg_notify`; in that case, a custom Skip `ExteralService` can interpret those updates into a form suitable for use within the Skip framework.
 TODO: work out some examples here?
