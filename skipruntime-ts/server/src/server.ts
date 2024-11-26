@@ -60,6 +60,7 @@ export type SkipServer = {
  *   Destroy a resource instance.
  *
  *   Destroys the resource instance identified by `uuid`.
+ *   Under normal circumstances, resource instances are deleted automatically after some period of inactivity; this interface enables immediately deleting live streams under exceptional circumstances.
  *
  * The streaming API responds to the following HTTP requests:
  *
