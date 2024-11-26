@@ -1,3 +1,0 @@
-# Mirroring
-
-## Overview
