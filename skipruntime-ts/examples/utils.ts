@@ -23,7 +23,10 @@ interface Delete {
 export class SkipHttpAccessV1 {
   private service: RESTWrapperOfSkipService;
 
-  constructor(streaming_port: number = 8080, control_port: number = 8081) {
+  constructor(
+    private streaming_port: number = 8080,
+    control_port: number = 8081,
+  ) {
     this.service = new RESTWrapperOfSkipService({
       host: "localhost",
       control_port,
@@ -63,7 +66,9 @@ export class SkipHttpAccessV1 {
     this.service
       .getStreamUUID(resource, params)
       .then((uuid) => {
-        const evSource = new EventSource(this.service.streamURL(uuid));
+        const evSource = new EventSource(
+          `http://localhost:${this.streaming_port}/v1/streams/${uuid}`,
+        );
         evSource.addEventListener("init", (e: MessageEvent<string>) => {
           const updates = JSON.parse(e.data);
           console.log("Init", updates);
