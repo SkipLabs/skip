@@ -1,9 +1,5 @@
 # Client connections
 
-## Overview
+## Event Streams
 
-## Skip Listener
-
-## Websockets
-
-## Run Skip client-side
+## Synchronous HTTP interface
