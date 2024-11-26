@@ -1458,7 +1458,6 @@ fun createReactiveResource(
   resource: String,
   params: SKJSON.CJSON,
 ): ResourceInfo {
-  definition = ResourceDef(resource, params);
   resourceHdl = SKStore.EHandle(
     SKStore.SID::keyType,
     ResourceDef::type,
@@ -1469,6 +1468,7 @@ fun createReactiveResource(
   | Some _ -> throw ExistingResourceException()
   | _ -> void
   };
+  definition = ResourceDef(resource, params);
   resourceHdl.writeArray(context, key, Array[definition]);
   updateContext(context);
   graphHdl = SKStore.EHandle(
