@@ -498,6 +498,10 @@ fun getUniqueOfLazyCollection(lazy: String, key: SKJSON.CJSON): SKJSON.CJSON {
 
 /************  Notifier ****************/
 
+@cpp_extern("SkipRuntime_Notifier__subscribed")
+@debug
+native fun subscribedOfNotifier(notifier: UInt32): void;
+
 @cpp_extern("SkipRuntime_Notifier__notify")
 @debug
 native fun notifyOfNotifier(
@@ -507,16 +511,24 @@ native fun notifyOfNotifier(
   updates: Int32,
 ): void;
 
+@cpp_extern("SkipRuntime_Notifier__close")
+@debug
+native fun closeOfNotifier(notifier: UInt32): void;
+
 @cpp_extern("SkipRuntime_deleteNotifier")
 @debug
 native fun deleteNotifier(notifier: UInt32): void;
 
 @export("SkipRuntime_createNotifier")
 fun createNotifier(notifier: UInt32): Notifier {
-  Notifier(SKStore.ExternalPointer::create(notifier, deleteNotifier))
+  ExternNotifier(SKStore.ExternalPointer::create(notifier, deleteNotifier))
 }
 
-class Notifier(eptr: SKStore.ExternalPointer) {
+class ExternNotifier(eptr: SKStore.ExternalPointer) extends Notifier {
+  fun subscribed(): void {
+    subscribedOfNotifier(this.eptr.value)
+  }
+
   fun notify(
     values: Array<(SKJSON.CJSON, Array<SKJSON.CJSON>)>,
     watermark: String,
@@ -530,6 +542,10 @@ class Notifier(eptr: SKStore.ExternalPointer) {
       watermark,
       Int32::truncate(if (updates) 1 else 0),
     )
+  }
+
+  fun close(): void {
+    closeOfNotifier(this.eptr.value)
   }
 }
 
@@ -683,7 +699,7 @@ fun subscribeOfRuntime(
   watermark: ?String,
 ): Int {
   SKStore.runWithResult(context ~> {
-    subscribe(context, reactiveId, notifier.notify, watermark)
+    subscribe(context, reactiveId, notifier, watermark)
   }) match {
   | Success(id) -> id
   | Failure(err) -> -getErrorHdl(err).toInt()

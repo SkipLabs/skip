@@ -295,7 +295,7 @@ export interface FromWasm {
   // Notifier
 
   SkipRuntime_createNotifier<K extends Json, V extends Json>(
-    ref: Handle<(update: CollectionUpdate<K, V>) => void>,
+    notifier: Handle<Notifier<K, V>>,
   ): ptr<Internal.Notifier>;
 
   // Runtime
@@ -452,15 +452,23 @@ interface ToWasm {
 
   // Notifier
 
+  SkipRuntime_Notifier__subscribed<K extends Json, V extends Json>(
+    notifier: Handle<Notifier<K, V>>,
+  ): void;
+
   SkipRuntime_Notifier__notify<K extends Json, V extends Json>(
-    notifier: Handle<(update: CollectionUpdate<K, V>) => void>,
+    notifier: Handle<Notifier<K, V>>,
     values: ptr<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
     tick: bigint,
     isUpdates: number,
   ): void;
 
+  SkipRuntime_Notifier__close<K extends Json, V extends Json>(
+    notifier: Handle<Notifier<K, V>>,
+  ): void;
+
   SkipRuntime_deleteNotifier<K extends Json, V extends Json>(
-    notifier: Handle<(update: CollectionUpdate<K, V>) => void>,
+    notifier: Handle<Notifier<K, V>>,
   ): void;
 
   // Reducer
@@ -538,6 +546,12 @@ class Stack {
     this.stack.pop();
   }
 }
+
+type Notifier<K extends Json, V extends Json> = {
+  subscribed: () => void;
+  notify: (update: CollectionUpdate<K, V>) => void;
+  close: () => void;
+};
 
 class Refs {
   constructor(
@@ -726,7 +740,7 @@ class LinksImpl implements Links {
 
   // Notifier
   notifyOfNotifier<K extends Json, V extends Json>(
-    sknotifier: Handle<(update: CollectionUpdate<K, V>) => void>,
+    sknotifier: Handle<Notifier<K, V>>,
     skvalues: ptr<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
     watermark: bigint,
     isUpdates: number,
@@ -735,15 +749,29 @@ class LinksImpl implements Links {
     const notifier = this.handles.get(sknotifier);
     const values = skjson.clone(skjson.importJSON(skvalues) as Entry<K, V>[]);
     const isInitial = isUpdates ? false : true;
-    notifier({
+    notifier.notify({
       values,
       watermark: watermark.toString() as Watermark,
       isInitial,
     });
   }
 
+  subscribedOfNotifier<K extends Json, V extends Json>(
+    sknotifier: Handle<Notifier<K, V>>,
+  ) {
+    const notifier = this.handles.get(sknotifier);
+    notifier.subscribed();
+  }
+
+  closeOfNotifier<K extends Json, V extends Json>(
+    sknotifier: Handle<Notifier<K, V>>,
+  ) {
+    const notifier = this.handles.get(sknotifier);
+    notifier.close();
+  }
+
   deleteNotifier<K extends Json, V extends Json>(
-    notifier: Handle<(update: CollectionUpdate<K, V>) => void>,
+    notifier: Handle<Notifier<K, V>>,
   ) {
     this.handles.deleteHandle(notifier);
   }
@@ -1368,18 +1396,25 @@ export class ServiceInstance {
   /**
    * Initiate reactive subscription on a resource instance
    * @param resourceInstanceId - the resource instance identifier
-   * @param f - A callback to execute on collection updates
+   * @param notifier - the object containing subscription callbacks
+   * @param notifier.subscribed - A callback to execute when subscription effectivly done
+   * @param notifier.notify - A callback to execute on collection updates
+   * @param notifier.close - A callback to execute on resource close
    * @param watermark - the watermark where to start the subscription
    * @returns A subcription identifier
    */
   subscribe<K extends Json, V extends Json>(
     resourceInstanceId: string,
-    f: (update: CollectionUpdate<K, V>) => void,
+    notifier: {
+      subscribed: () => void;
+      notify: (update: CollectionUpdate<K, V>) => void;
+      close: () => void;
+    },
     watermark?: string,
   ): SubscriptionID {
     const session = this.refs.skjson.runWithGC(() => {
       const sknotifier = this.refs.fromWasm.SkipRuntime_createNotifier(
-        this.refs.handles.register(f),
+        this.refs.handles.register(notifier),
       );
       return this.refs.fromWasm.SkipRuntime_Runtime__subscribe(
         this.refs.skjson.exportString(resourceInstanceId),
@@ -1547,7 +1582,10 @@ class Manager implements ToWasmManager {
 
     // Notifier
 
+    toWasm.SkipRuntime_Notifier__subscribed =
+      links.subscribedOfNotifier.bind(links);
     toWasm.SkipRuntime_Notifier__notify = links.notifyOfNotifier.bind(links);
+    toWasm.SkipRuntime_Notifier__close = links.closeOfNotifier.bind(links);
     toWasm.SkipRuntime_deleteNotifier = links.deleteNotifier.bind(links);
 
     // Reducer
