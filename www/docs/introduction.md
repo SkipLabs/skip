@@ -11,12 +11,6 @@ Under the hood, the Skip framework efficiently evaluates and updates reactive co
 
 ## Background
 
-TODO: brief Skiplang story/history/context: probably best for someone with more first-hand experience than me to write this.
-
- * developed at facebook to speed up updates and deliver real-time experience through the back-end
- * couldn't be achieved in Hack/PHP, so an in-house language was designed and developed specifically for reactive computation.
- * spun out from open-source into SkipLabs
-
 ## Core concepts
 
 The main components of the *Skip Runtime*, the reactive computation engine at the core of the Skip system, are *collections* and *mappers*.
