@@ -41,9 +41,20 @@ export async function fetchJSON<V>(
   return [responseJSON, response.headers];
 }
 
-export class RESTWrapperOfSkipService {
+/**
+ * Wrapper providing a method-call interface to the Skip service HTTP APIs.
+ *
+ * Skip services, as started by `runService`, support an HTTP interface for reading from resources and writing to input collections.
+ * `SkipServiceBroker` provides a method-call interface to the backing HTTP interface.
+ */
+export class SkipServiceBroker {
   private entrypoint: string;
 
+  /**
+   * Construct a broker for a Skip service at the given entry point.
+   * @param entrypoint - entry point of backing service
+   * @returns - method-call broker to service
+   */
   constructor(
     entrypoint: Entrypoint = {
       host: "localhost",
@@ -54,6 +65,13 @@ export class RESTWrapperOfSkipService {
     this.entrypoint = toHttp(entrypoint);
   }
 
+  /**
+   * Read the entire contents of a resource.
+   *
+   * @param resource - name of resource, must be a key of the `resources` field of the `SkipService` running at `entrypoint`
+   * @param params - resource instance parameters
+   * @returns - all entries in resource
+   */
   async getAll<K extends Json, V extends Json>(
     resource: string,
     params: { [param: string]: string },
@@ -67,6 +85,13 @@ export class RESTWrapperOfSkipService {
     return values;
   }
 
+  /**
+   * Read the values a resource associates with a single key.
+   * @param resource - name of resource, must be a key of the `resources` field of the `SkipService` running at `entrypoint`
+   * @param params - resource instance parameters
+   * @param key - key to read
+   * @returns - the values associated to the key
+   */
   async getArray<V extends Json>(
     resource: string,
     params: { [param: string]: string },
@@ -80,30 +105,55 @@ export class RESTWrapperOfSkipService {
     return data ?? [];
   }
 
+  /**
+   * Write the values for a single key in a collection.
+   * @param collection - name of the input collection to update, must be a key of the `Inputs` type parameter of the `SkipService` running at `entrypoint`
+   * @param key - key of entry to write
+   * @param values - values of entry to write
+   * @returns {void}
+   */
   async put<K extends Json, V extends Json>(
     collection: string,
     key: K,
-    value: V[],
+    values: V[],
   ): Promise<void> {
-    return await this.patch(collection, [[key, value]]);
+    return await this.patch(collection, [[key, values]]);
   }
 
+  /**
+   * Write multiple entries to a collection.
+   * @param collection - name of the input collection to update, must be a key of the `Inputs` type parameter of the `SkipService` running at `entrypoint`
+   * @param entries - entries to write
+   * @returns {void}
+   */
   async patch<K extends Json, V extends Json>(
     collection: string,
-    values: Entry<K, V>[],
+    entries: Entry<K, V>[],
   ): Promise<void> {
     await fetchJSON(
       `${this.entrypoint}/v1/inputs/${collection}`,
       "PATCH",
       {},
-      values,
+      entries,
     );
   }
 
+  /**
+   * Remove all values associated with a key in a collection.
+   * @param collection - name of the input collection to update, must be a key of the `Inputs` type parameter of the `SkipService` running at `entrypoint`
+   * @param key - key of entry to delete
+   * @returns {void}
+   */
   async deleteKey<K extends Json>(collection: string, key: K): Promise<void> {
     return await this.patch(collection, [[key, []]]);
   }
 
+  /**
+   * Create a resource instance UUID.
+   * @param resource - name of resource, must be a key of the `resources` field of the `SkipService` running at `entrypoint`
+   * @param params - resource instance parameters
+   * @returns - UUID that can be used to subscribe to updates to resource instance
+   */
   async getStreamUUID(
     resource: string,
     params: { [param: string]: string } = {},
@@ -115,6 +165,11 @@ export class RESTWrapperOfSkipService {
     }).then((res) => res.text());
   }
 
+  /**
+   * Destroy a resource instance.
+   * @param uuid - resource instance UUID
+   * @returns {void}
+   */
   async deleteUUID(uuid: string): Promise<void> {
     await fetchJSON(`${this.entrypoint}/v1/streams/${uuid}`, "DELETE");
   }
