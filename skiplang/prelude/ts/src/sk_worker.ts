@@ -7,19 +7,11 @@ export class Wrappable {
 class UnmanagedMessage extends Error {}
 
 export class Function {
-  fn: string;
-  parameters: any[];
-  wrap?: { wrap: boolean; autoremove: boolean };
-
   constructor(
-    fn: string,
-    parameters: any[],
-    wrap?: { wrap: boolean; autoremove: boolean },
-  ) {
-    this.fn = fn;
-    this.parameters = parameters;
-    this.wrap = wrap;
-  }
+    public fn: string,
+    public parameters: any[],
+    public wrap?: { wrap: boolean; autoremove: boolean },
+  ) {}
 
   static as(obj: object) {
     if (!("fn" in obj) || !("parameters" in obj)) return null;
@@ -37,22 +29,12 @@ export class Function {
 }
 
 export class Caller {
-  wrapped: number;
-  fn: string;
-  parameters: any[];
-  remove: boolean;
-
   constructor(
-    wrapped: number,
-    fn: string,
-    parameters: any[],
-    remove: boolean = false,
-  ) {
-    this.wrapped = wrapped;
-    this.fn = fn;
-    this.parameters = parameters;
-    this.remove = remove;
-  }
+    public wrapped: number,
+    public fn: string,
+    public parameters: any[],
+    public remove: boolean = false,
+  ) {}
 
   static convert(obj: object) {
     if (
@@ -77,13 +59,10 @@ export class Caller {
 }
 
 export class Return {
-  success: boolean;
-  value: any;
-
-  constructor(success: boolean, value: any) {
-    this.success = success;
-    this.value = value;
-  }
+  constructor(
+    public success: boolean,
+    public value: any,
+  ) {}
 
   static as(obj: object) {
     if (!("success" in obj) || !("value" in obj)) return null;
@@ -92,13 +71,10 @@ export class Return {
 }
 
 export class MessageId {
-  source: number;
-  id: number;
-
-  constructor(source: number, id: number) {
-    this.source = source;
-    this.id = id;
-  }
+  constructor(
+    public source: number,
+    public id: number,
+  ) {}
 
   static as(obj: object) {
     if (!("source" in obj) || !("id" in obj)) return null;
@@ -107,11 +83,7 @@ export class MessageId {
 }
 
 export class Wrapped {
-  wrapped: number;
-
-  constructor(wrapped: number) {
-    this.wrapped = wrapped;
-  }
+  constructor(public wrapped: number) {}
 
   static as(obj: object) {
     if (!("wrapped" in obj)) return null;
@@ -124,23 +96,17 @@ function asKey(messageId: MessageId) {
 }
 
 export class Sender {
-  close: () => void;
-  send: <T>() => Promise<T>;
-
-  constructor(close: () => void, send: <T>() => Promise<T>) {
-    this.close = close;
-    this.send = send;
-  }
+  constructor(
+    public close: () => void,
+    public send: <T>() => Promise<T>,
+  ) {}
 }
 
 export class Message {
-  id: MessageId;
-  payload: unknown;
-
-  constructor(id: MessageId, payload: unknown) {
-    this.id = id;
-    this.payload = payload;
-  }
+  constructor(
+    public id: MessageId,
+    public payload: unknown,
+  ) {}
 
   private static convert(f: (_: object) => unknown, obj: object) {
     if (!("id" in obj && typeof obj.id === "object")) return null;

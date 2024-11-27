@@ -4,11 +4,7 @@ import type { SKDB, Params } from "./skdb_types.js";
 /* The type used to represent callable external functions. */
 /* ***************************************************************************/
 export class SKDBCallable<_T1, _T2> {
-  private id: number;
-
-  constructor(id: number) {
-    this.id = id;
-  }
+  constructor(private readonly id: number) {}
 
   getId(): number {
     return this.id;
@@ -16,11 +12,7 @@ export class SKDBCallable<_T1, _T2> {
 }
 
 export class ExternalFuns {
-  private externalFuns: ((obj: any) => any)[];
-
-  constructor() {
-    this.externalFuns = [];
-  }
+  private readonly externalFuns: ((obj: any) => any)[] = [];
 
   register<T1, T2>(f: (obj: T1) => T2): SKDBCallable<T1, T2> {
     if (typeof f != "function") {
@@ -114,9 +106,9 @@ export class SKDBTable extends Array<Record<string, unknown>> {
 /* ***************************************************************************/
 
 export class SKDBTransaction {
-  private params: Params;
-  private stmts: string[];
-  private db_handle: SKDB;
+  private readonly params: Params;
+  private readonly stmts: string[];
+  private readonly db_handle: SKDB;
 
   constructor(skdb: SKDB) {
     this.params = {};

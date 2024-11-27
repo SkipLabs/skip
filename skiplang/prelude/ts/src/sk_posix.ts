@@ -32,7 +32,7 @@ interface ToWasm {
 }
 
 class LinksImpl implements Links, ToWasm {
-  private fs: FileSystem;
+  private readonly fs: FileSystem;
   SKIP_check_if_file_exists!: (skPath: ptr<Internal.String>) => boolean;
   SKIP_js_open!: (skPath: ptr<Internal.String>, flags: int, mode: int) => int;
   SKIP_js_close!: (fd: int) => void;
@@ -126,11 +126,7 @@ class LinksImpl implements Links, ToWasm {
 }
 
 class Manager implements ToWasmManager {
-  private environment: Environment;
-
-  constructor(environment: Environment) {
-    this.environment = environment;
-  }
+  constructor(private readonly environment: Environment) {}
 
   prepare = (wasm: object) => {
     const toWasm = wasm as ToWasm;

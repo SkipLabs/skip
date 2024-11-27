@@ -43,40 +43,21 @@ interface Exported {
 }
 
 class SKDBHandleImpl implements SKDBHandle {
-  runner: (fn: () => string) => SKDBTable;
-  main: (new_args: string[], new_stdin: string) => string;
-  watch: (
-    query: string,
-    params: Params,
-    onChange: (rows: SKDBTable) => void,
-  ) => { close: () => void };
-  watchChanges: (
-    query: string,
-    params: Params,
-    init: (rows: SKDBTable) => void,
-    update: (added: SKDBTable, removed: SKDBTable) => void,
-  ) => { close: () => void };
-
   constructor(
-    main: (new_args: string[], new_stdin: string) => string,
-    runner: (fn: () => string) => SKDBTable,
-    watch: (
+    public main: (new_args: string[], new_stdin: string) => string,
+    public runner: (fn: () => string) => SKDBTable,
+    public watch: (
       query: string,
       params: Params,
       onChange: (rows: SKDBTable) => void,
     ) => { close: () => void },
-    watchChanges: (
+    public watchChanges: (
       query: string,
       params: Params,
       init: (rows: SKDBTable) => void,
       update: (added: SKDBTable, removed: SKDBTable) => void,
     ) => { close: () => void },
-  ) {
-    this.runner = runner;
-    this.main = main;
-    this.watch = watch;
-    this.watchChanges = watchChanges;
-  }
+  ) {}
 
   init() {
     this.main([], "");
@@ -101,11 +82,11 @@ interface ToWasm {
 }
 
 class SKDBMemory implements PagedMemory {
-  memory: ArrayBuffer;
-  persistentSize: number;
-  nbrInitPages: number;
-  pageSize: number;
-  popDirtyPage: () => number;
+  private readonly memory: ArrayBuffer;
+  private readonly persistentSize: number;
+  private readonly nbrInitPages: number;
+  private readonly pageSize: number;
+  private readonly popDirtyPage: () => number;
   private dirtyPagesMap!: number[];
   private dirtyPages!: number[];
 
@@ -211,7 +192,7 @@ class SKDBSharedImpl implements SKDBShared {
 }
 
 class LinksImpl implements Links, ToWasm {
-  private environment: Environment;
+  private readonly environment: Environment;
   private state: ExternalFuns;
   private field_names: string[];
   private objectIdx: number;
@@ -533,11 +514,7 @@ class LinksImpl implements Links, ToWasm {
 }
 
 class Manager implements ToWasmManager {
-  private environment: Environment;
-
-  constructor(environment: Environment) {
-    this.environment = environment;
-  }
+  constructor(private readonly environment: Environment) {}
 
   prepare = (wasm: object) => {
     const toWasm = wasm as ToWasm;

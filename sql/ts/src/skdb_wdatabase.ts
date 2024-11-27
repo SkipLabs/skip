@@ -19,13 +19,10 @@ import { SKDBGroupImpl } from "./skdb_group.js";
 /* eslint-disable @typescript-eslint/no-invalid-void-type */
 
 class WrappedRemote implements RemoteSKDB {
-  private worker: PromiseWorker;
-  private wrapped: number;
-
-  constructor(worker: PromiseWorker, wrapped: number) {
-    this.worker = worker;
-    this.wrapped = wrapped;
-  }
+  constructor(
+    private readonly worker: PromiseWorker,
+    private readonly wrapped: number,
+  ) {}
 
   createDatabase(dbName: string) {
     return this.worker
@@ -109,7 +106,7 @@ class WrappedRemote implements RemoteSKDB {
 }
 
 export class SKDBWorker implements SKDB {
-  private worker: PromiseWorker;
+  private readonly worker: PromiseWorker;
 
   constructor(worker: Wrk) {
     this.worker = new PromiseWorker(worker);

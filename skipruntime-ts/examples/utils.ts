@@ -24,7 +24,7 @@ export class SkipHttpAccessV1 {
   private service: SkipServiceBroker;
 
   constructor(
-    private streaming_port: number = 8080,
+    private readonly streaming_port: number = 8080,
     control_port: number = 8081,
   ) {
     this.service = new SkipServiceBroker({
@@ -118,21 +118,14 @@ interface DeleteQuery {
 export type Step = RequestQuery | LogQuery | WriteQuery | DeleteQuery;
 
 class Session {
-  scenario: Step[];
-  perform: (l: Step) => void;
-  error: (e: string) => void;
   current = 0;
   on = false;
 
   constructor(
-    scenario: Step[],
-    perform: (l: Step) => void,
-    error: (e: string) => void,
-  ) {
-    this.scenario = scenario;
-    this.perform = perform;
-    this.error = error;
-  }
+    private readonly scenario: Step[],
+    private readonly perform: (l: Step) => void,
+    private readonly error: (e: string) => void,
+  ) {}
 
   next(): boolean {
     if (this.current >= this.scenario.length) {
@@ -166,11 +159,11 @@ class Player {
   running?: Session;
 
   constructor(
-    private scenarios: Step[][],
-    private perform: (l: string) => void,
-    private send: (l: Step) => void,
-    private error: (e: string) => void,
-    private exit: () => void,
+    private readonly scenarios: Step[][],
+    private readonly perform: (l: string) => void,
+    private readonly send: (l: Step) => void,
+    private readonly error: (e: string) => void,
+    private readonly exit: () => void,
   ) {}
 
   start(idx: number) {

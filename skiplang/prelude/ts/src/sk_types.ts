@@ -61,28 +61,14 @@ const O_TRUNC = 1000;
 const O_APPEND = 4000;
 
 export class Options {
-  read: boolean;
-  write: boolean;
-  append: boolean;
-  truncate: boolean;
-  create: boolean;
-  create_new: boolean;
-
   constructor(
-    read: boolean = true,
-    write: boolean = false,
-    append: boolean = false,
-    truncate: boolean = false,
-    create: boolean = true,
-    create_new: boolean = false,
-  ) {
-    this.read = read;
-    this.write = write;
-    this.append = append;
-    this.truncate = truncate;
-    this.create = create;
-    this.create_new = create_new;
-  }
+    public read: boolean = true,
+    public write: boolean = false,
+    public append: boolean = false,
+    public truncate: boolean = false,
+    public create: boolean = true,
+    public create_new: boolean = false,
+  ) {}
 
   static w() {
     return new Options(false, true);
@@ -226,10 +212,10 @@ export type App = {
 };
 
 export class Utils {
-  private exports: Exported;
-  private env: Environment;
-  private state: State;
-  private states: Map<string, any>;
+  private readonly exports: Exported;
+  private readonly env: Environment;
+  private readonly state: State;
+  private readonly states: Map<string, any>;
 
   args: string[];
   private current_stdin: number;
@@ -237,7 +223,7 @@ export class Utils {
   private stdout: string[];
   private stderr: string[];
   private stddebug: string[];
-  private mainFn?: string;
+  private readonly mainFn?: string;
   private exception?: Error;
   private stacks: Map<ptr<Internal.Exception>, string>;
 
@@ -713,7 +699,7 @@ export interface Text {
 }
 
 export class Raw implements Text {
-  text: string;
+  private readonly text: string;
 
   constructor(text: string, _category?: string) {
     this.text = text;
@@ -731,13 +717,10 @@ export class Raw implements Text {
 }
 
 export class Locale implements Text {
-  text: string;
-  category: Nullable<string>;
-
-  constructor(text: string, category?: string) {
-    this.text = text;
-    this.category = category ? category : null;
-  }
+  constructor(
+    private readonly text: string,
+    private readonly category: Nullable<string> = null,
+  ) {}
 
   toJSON: () => object = () => {
     return {
@@ -768,13 +751,10 @@ export const check: (value: Text | string) => Text = (value: Text | string) => {
 };
 
 export class Format implements Text {
-  format: Text | string;
-  parameters: (Text | string)[];
-
-  constructor(format: Text | string, parameters: (Text | string)[]) {
-    this.format = format;
-    this.parameters = parameters;
-  }
+  constructor(
+    private readonly format: Text | string,
+    private readonly parameters: (Text | string)[],
+  ) {}
 
   toJSON: () => object = () => {
     return {
