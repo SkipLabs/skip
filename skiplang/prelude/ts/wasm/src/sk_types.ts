@@ -861,7 +861,7 @@ export async function loadEnv(extensions: EnvInit[], envVals?: string[]) {
     : import("./sk_browser.js"));
   // eslint-disable-next-line @typescript-eslint/no-unsafe-call
   const env = environment.environment(envVals) as Environment;
-  extensions.map((fn) => fn(env));
+  extensions.forEach((fn) => fn(env));
   return env;
 }
 
