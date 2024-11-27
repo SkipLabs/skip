@@ -264,30 +264,6 @@ interface FromWasm extends WasmAccess {
   SKIP_SKJSON_createCJBool: (v: boolean) => ptr<Internal.CJBool>;
 }
 
-class Mapping {
-  private nextID: number = 0;
-  private objects: any[] = [];
-  private freeIDs: int[] = [];
-
-  register(v: any) {
-    const freeID = this.freeIDs.pop();
-    const id = freeID ?? this.nextID++;
-    this.objects[id] = v;
-    return id;
-  }
-
-  get(id: int): any {
-    return this.objects[id];
-  }
-
-  delete(id: int): any {
-    const current: unknown = this.objects[id];
-    this.objects[id] = null;
-    this.freeIDs.push(id);
-    return current;
-  }
-}
-
 export type Json = number | boolean | string | (Json | null)[] | JsonObject;
 export type JsonObject = { [key: string]: Json | null };
 
@@ -353,16 +329,10 @@ class SKJSONShared implements SKJSON {
 }
 
 class LinksImpl implements Links {
-  env: Environment;
-  mapping: Mapping;
-
   SKJSON_console!: (json: ptr<Internal.CJSON>) => void;
   SKJSON_error!: (json: ptr<Internal.CJSON>) => void;
 
-  constructor(env: Environment) {
-    this.env = env;
-    this.mapping = new Mapping();
-  }
+  constructor(public env: Environment) {}
 
   complete = (utils: Utils, exports: object) => {
     const fromWasm = exports as FromWasm;
