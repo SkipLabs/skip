@@ -81,7 +81,7 @@ const map1Service: SkipService<Input_SN, Input_SN> = {
 //// testMap2
 
 class Map2 implements Mapper<string, number, string, number> {
-  constructor(private other: EagerCollection<string, number>) {}
+  constructor(private readonly other: EagerCollection<string, number>) {}
 
   mapEntry(
     key: string,
@@ -178,7 +178,7 @@ const oneToOneMapperService: SkipService<Input_NN, Input_NN> = {
 //// testSize
 
 class SizeMapper implements Mapper<number, number, number, number> {
-  constructor(private other: EagerCollection<number, number>) {}
+  constructor(private readonly other: EagerCollection<number, number>) {}
 
   mapEntry(
     key: number,
@@ -233,7 +233,7 @@ const slicedMap1Service: SkipService<Input_NN, Input_NN> = {
 //// testLazy
 
 class TestLazyAdd implements LazyCompute<number, number> {
-  constructor(private other: EagerCollection<number, number>) {}
+  constructor(private readonly other: EagerCollection<number, number>) {}
 
   compute(_selfHdl: LazyCollection<number, number>, key: number): number {
     return this.other.getUnique(key) + 2;
@@ -241,7 +241,7 @@ class TestLazyAdd implements LazyCompute<number, number> {
 }
 
 class MapLazy implements Mapper<number, number, number, number> {
-  constructor(private other: LazyCollection<number, number>) {}
+  constructor(private readonly other: LazyCollection<number, number>) {}
 
   mapEntry(
     key: number,
@@ -346,7 +346,7 @@ class JSONExtract
   implements
     Mapper<number, { value: JsonObject; pattern: string }, number, Json[]>
 {
-  constructor(private context: Context) {}
+  constructor(private readonly context: Context) {}
 
   mapEntry(
     key: number,
@@ -428,7 +428,7 @@ class MockExternal implements ExternalService {
 }
 
 class MockExternalCheck implements Mapper<number, number, number, number[]> {
-  constructor(private external: EagerCollection<number, number>) {}
+  constructor(private readonly external: EagerCollection<number, number>) {}
 
   mapEntry(
     key: number,

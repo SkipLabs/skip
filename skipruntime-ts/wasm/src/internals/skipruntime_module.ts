@@ -139,7 +139,9 @@ export function deepFreeze<T>(value: T): T & Param {
 
 class ResourceBuilder {
   constructor(
-    private builder: new (params: { [param: string]: string }) => Resource,
+    private readonly builder: new (params: {
+      [param: string]: string;
+    }) => Resource,
   ) {}
 
   build(parameters: { [param: string]: string }): Resource {
@@ -489,8 +491,8 @@ interface ToWasm {
 
 class Handles {
   private nextID: number = 1;
-  private objects: any[] = [];
-  private freeIDs: int[] = [];
+  private readonly objects: any[] = [];
+  private readonly freeIDs: int[] = [];
 
   register<T>(v: T): Handle<T> {
     const freeID = this.freeIDs.pop();
@@ -521,7 +523,7 @@ class Handles {
 }
 
 class Stack {
-  stack: ptr<Internal.Context>[] = [];
+  private readonly stack: ptr<Internal.Context>[] = [];
 
   push(pointer: ptr<Internal.Context>) {
     this.stack.push(pointer);
@@ -547,13 +549,13 @@ class Refs {
 }
 
 class LinksImpl implements Links {
-  private handles = new Handles();
-  private stack = new Stack();
+  private readonly handles = new Handles();
+  private readonly stack = new Stack();
   private utils!: Utils;
   private fromWasm!: FromWasm;
   skjson?: SKJSON;
 
-  constructor(private env: Environment) {}
+  constructor(private readonly env: Environment) {}
 
   complete(utils: Utils, exports: object) {
     this.utils = utils;
@@ -895,8 +897,8 @@ class LazyCollectionImpl<K extends Json, V extends Json>
   implements LazyCollection<K, V>
 {
   constructor(
-    private lazyCollection: string,
-    private refs: Refs,
+    private readonly lazyCollection: string,
+    private readonly refs: Refs,
   ) {
     super();
     Object.freeze(this);
@@ -929,7 +931,7 @@ class EagerCollectionImpl<K extends Json, V extends Json>
 {
   constructor(
     public collection: string,
-    private refs: Refs,
+    private readonly refs: Refs,
   ) {
     super();
     Object.freeze(this);
@@ -1058,7 +1060,7 @@ class EagerCollectionImpl<K extends Json, V extends Json>
 class CollectionWriter<K extends Json, V extends Json> {
   constructor(
     public collection: string,
-    private refs: Refs,
+    private readonly refs: Refs,
   ) {}
 
   update(values: Entry<K, V>[], isInit: boolean): void {
@@ -1109,7 +1111,7 @@ class CollectionWriter<K extends Json, V extends Json> {
 }
 
 class ContextImpl extends SkFrozen implements Context {
-  constructor(private refs: Refs) {
+  constructor(private readonly refs: Refs) {
     super();
     Object.freeze(this);
   }
@@ -1159,7 +1161,9 @@ class ContextImpl extends SkFrozen implements Context {
 }
 
 export class ServiceInstanceFactory implements Shared {
-  constructor(private init: (service: SkipService) => ServiceInstance) {}
+  constructor(
+    private readonly init: (service: SkipService) => ServiceInstance,
+  ) {}
 
   initService(service: SkipService): ServiceInstance {
     return this.init(service);
@@ -1187,10 +1191,10 @@ interface Checker {
 
 class AllChecker<K extends Json, V extends Json> implements Checker {
   constructor(
-    private service: ServiceInstance,
-    private executor: Executor<Entry<K, V>[]>,
-    private resource: string,
-    private params: { [param: string]: string },
+    private readonly service: ServiceInstance,
+    private readonly executor: Executor<Entry<K, V>[]>,
+    private readonly resource: string,
+    private readonly params: { [param: string]: string },
   ) {}
 
   check(request: string): void {
@@ -1209,11 +1213,11 @@ class AllChecker<K extends Json, V extends Json> implements Checker {
 
 class OneChecker<V extends Json> implements Checker {
   constructor(
-    private service: ServiceInstance,
-    private executor: Executor<V[]>,
-    private resource: string,
-    private params: { [param: string]: string },
-    private key: string | number,
+    private readonly service: ServiceInstance,
+    private readonly executor: Executor<V[]>,
+    private readonly resource: string,
+    private readonly params: { [param: string]: string },
+    private readonly key: string | number,
   ) {}
 
   check(request: string): void {
@@ -1236,7 +1240,7 @@ class OneChecker<V extends Json> implements Checker {
  * and operations to manage susbscriptions and the service itself.
  */
 export class ServiceInstance {
-  constructor(private refs: Refs) {}
+  constructor(private readonly refs: Refs) {}
 
   /**
    * Instantiate a resource with some parameters and client session authentication token
@@ -1441,19 +1445,11 @@ export class ServiceInstance {
 }
 
 class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
-  private skjson: SKJSON;
-  private exports: FromWasm;
-  private pointer: ptr<Internal.NonEmptyIterator>;
-
   constructor(
-    skjson: SKJSON,
-    exports: FromWasm,
-    pointer: ptr<Internal.NonEmptyIterator>,
-  ) {
-    this.skjson = skjson;
-    this.exports = exports;
-    this.pointer = pointer;
-  }
+    private readonly skjson: SKJSON,
+    private readonly exports: FromWasm,
+    private readonly pointer: ptr<Internal.NonEmptyIterator>,
+  ) {}
 
   next(): Nullable<T> {
     return this.skjson.importOptJSON(
@@ -1494,7 +1490,7 @@ class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
 }
 
 class Manager implements ToWasmManager {
-  constructor(private env: Environment) {}
+  constructor(private readonly env: Environment) {}
 
   //
   prepare(wasm: object) {

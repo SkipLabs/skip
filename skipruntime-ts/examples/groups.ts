@@ -56,7 +56,7 @@ class ActiveUsers implements Mapper<GroupID, Group, GroupID, UserID> {
 
 // Mapper function to filter out those active users who are also friends with `user`
 class FilterFriends implements Mapper<GroupID, UserID, GroupID, UserID> {
-  constructor(private user: User) {}
+  constructor(private readonly user: User) {}
 
   mapEntry(
     gid: GroupID,
@@ -71,7 +71,7 @@ class FilterFriends implements Mapper<GroupID, UserID, GroupID, UserID> {
 }
 
 class ActiveFriends implements Resource<ResourceInputs> {
-  private uid: UserID;
+  private readonly uid: UserID;
 
   constructor(params: { [param: string]: string }) {
     if (!params["uid"]) throw new Error("Missing required parameter 'uid'");
