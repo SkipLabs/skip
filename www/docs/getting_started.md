@@ -2,9 +2,9 @@
 
 ## Installation
 
-Before you begin, we recommend installing the NPM packages for the Skip API, server, client, and helpers.
+Before you begin, we recommend installing the NPM packages for the Skip API, server, and helpers.
 
-```npm install @skipruntime/api @skipruntime/server @skipruntime/client @skipruntime/helpers```
+```npm install @skipruntime/api @skipruntime/server @skipruntime/helpers```
 
 ## Introduction
 
@@ -12,9 +12,9 @@ We have several resources available to help you learn the Skip framework, depend
 
 This guide takes a "top-down" approach, showing you how to use our APIs in an idiomatic and practical way.  We recommend that most users start here.
 
-Alternatively, you can work from the "bottom-up" by reading our [Skip fundamentals](TODO:docusaurus link) tutorial, which explains the concepts and components of the Skip runtime from first principles.
+Alternatively, you can work from the "bottom-up" by reading our [Skip fundamentals](fundamentals.md) tutorial, which explains the concepts and components of the Skip runtime from first principles.
 
-Finally, if you'd like to just dive into the code, you can explore [examples](TODO: docusaurus link) of reactive services, [API docs](TODO: docusaurus link), or a before/after [example](TODO: docusaurus link) of retrofitting a legacy service with reactive features.
+Finally, if you'd like to just dive into the code, you can explore [examples](TODO) of reactive services, [API docs](api/api), or a before/after [example](TODO) of retrofitting a legacy service with reactive features.
 
 ## Tutorial
 
@@ -50,7 +50,7 @@ For example, if a _mapper function_ (like `Foo` above) above reads and/or writes
 In order to mitigate this, Skip programs written in Typescript use `Mapper` classes to define reactive computations which avoid the most problematic cases of untracked dependencies.
 Nonetheless, while reading this guide and working with Skip, it is important to reason about (im)mutability and avoid side-effects in your code so that it can be reliably evaluated by the framework.
 
-Some examples of Mappers are shown [below](todo: docusaurus link to "anatomy" section of this page) and more details are available [here](todo: docusaurus link to functions page) or in the API [docs](todo: docusaurus link).
+Some examples of Mappers are shown [below](getting_started#the-anatomy-of-a-skip-service) and more details are available [here](functions.md) or in the API [docs](api/api).
 
 ### The anatomy of a Skip service
 
@@ -198,6 +198,6 @@ and see the raw event stream as you issue updates to the input `users` and `grou
 
 This guide implements an example reactive service which can be queried or subscribed to by user's clients to see up-to-date listings of which of their active friends belong to each group, maintained up to date as input data changes without any explicit management of updates in the service's declarative logic.
 
-We've shown the core reactive logic here without going into full detail on how to deploy and interact with a Skip service; see the [Deploying](todo: docusaurus link) guide for more details on how to wire reactivity into a generic web application, including how to handle user writes and feed those into input collections.
+We've shown the core reactive logic here without going into full detail on how to deploy and interact with a Skip service; see the [Deploying](deploying.md) guide for more details on how to wire reactivity into a generic web application, including how to handle user writes and feed those into input collections.
 
-We've also elided the details of syncing data from external sources like databases or non-reactive APIs; see [todo: docusaurus link] for more details on how to keep your reactive service hydrated and in sync with updates from other components of your application.
+We've also elided the details of syncing data from external sources like databases or non-reactive APIs; see the [Externals](externals.md) guide for more details on how to keep your reactive service hydrated and in sync with updates from other components of your application.
