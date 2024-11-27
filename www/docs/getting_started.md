@@ -2,9 +2,9 @@
 
 ## Installation
 
-Before you begin, we recommend installing the NPM packages for the Skip API, server, client, and helpers.
+Before you begin, we recommend installing the NPM packages for the Skip API, server, and helpers.
 
-```npm install @skipruntime/api @skipruntime/server @skipruntime/client @skipruntime/helpers```
+```npm install @skipruntime/api @skipruntime/server @skipruntime/helpers```
 
 ## Introduction
 
