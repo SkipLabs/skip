@@ -40,7 +40,7 @@ export function controlService(service: ServiceInstance): express.Express {
         req.params.key,
         req.query as { [param: string]: string },
         {
-          resolve: (data: Json) => {
+          resolve: (data: Json[]) => {
             res.status(200).json(data);
           },
           reject: (err: unknown) => {
