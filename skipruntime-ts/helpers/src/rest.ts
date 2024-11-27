@@ -42,16 +42,16 @@ export async function fetchJSON<V>(
 }
 
 export class RESTWrapperOfSkipService {
-  private controlUrl: string;
+  private entrypoint: string;
 
   constructor(
-    private entrypoint: Entrypoint = {
+    entrypoint: Entrypoint = {
       host: "localhost",
       streaming_port: 8080,
       control_port: 8081,
     },
   ) {
-    this.controlUrl = toHttp(entrypoint);
+    this.entrypoint = toHttp(entrypoint);
   }
 
   async getAll<K extends Json, V extends Json>(
@@ -59,11 +59,12 @@ export class RESTWrapperOfSkipService {
     params: { [param: string]: string },
   ): Promise<Entry<K, V>[]> {
     const qParams = new URLSearchParams(params).toString();
-    const [data, _headers] = await fetchJSON<Entry<K, V>[]>(
-      `${this.controlUrl}/v1/resources/${resource}?${qParams}`,
+    const [optValues, _headers] = await fetchJSON<Entry<K, V>[]>(
+      `${this.entrypoint}/v1/resources/${resource}?${qParams}`,
       "GET",
     );
-    return data ?? [];
+    const values = optValues ?? [];
+    return values;
   }
 
   async getArray<V extends Json>(
@@ -73,7 +74,7 @@ export class RESTWrapperOfSkipService {
   ): Promise<V[]> {
     const qParams = new URLSearchParams(params).toString();
     const [data, _headers] = await fetchJSON<V[]>(
-      `${this.controlUrl}/v1/resources/${resource}/${key}?${qParams}`,
+      `${this.entrypoint}/v1/resources/${resource}/${key}?${qParams}`,
       "GET",
     );
     return data ?? [];
@@ -92,7 +93,7 @@ export class RESTWrapperOfSkipService {
     values: Entry<K, V>[],
   ): Promise<void> {
     await fetchJSON(
-      `${this.controlUrl}/v1/inputs/${collection}`,
+      `${this.entrypoint}/v1/inputs/${collection}`,
       "PATCH",
       {},
       values,
@@ -107,7 +108,7 @@ export class RESTWrapperOfSkipService {
     resource: string,
     params: { [param: string]: string } = {},
   ): Promise<string> {
-    return fetch(`${this.controlUrl}/v1/streams`, {
+    return fetch(`${this.entrypoint}/v1/streams`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ resource, params }),
@@ -115,12 +116,6 @@ export class RESTWrapperOfSkipService {
   }
 
   async deleteUUID(uuid: string): Promise<void> {
-    await fetchJSON(`${this.controlUrl}/v1/streams/${uuid}`, "DELETE");
-  }
-
-  streamURL(uuid: string): string {
-    const host = this.entrypoint.host;
-    const port = this.entrypoint.streaming_port;
-    return `http://${host}:${port}/v1/streams/${uuid}`;
+    await fetchJSON(`${this.entrypoint}/v1/streams/${uuid}`, "DELETE");
   }
 }
