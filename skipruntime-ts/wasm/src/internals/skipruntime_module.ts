@@ -498,7 +498,7 @@ interface ToWasm {
 }
 
 class Handles {
-  private nextID: number = 1;
+  private nextID: int = 1;
   private readonly objects: any[] = [];
   private readonly freeIDs: int[] = [];
 
