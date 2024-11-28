@@ -74,6 +74,15 @@ useEffect(() => {
 
 ## Synchronous HTTP interface
 
+Skip reactive services also support synchronous (i.e. non-reactive) reads of resources, either in their entirety or at a specific key.
+Note that this requires instantiation of the resource, just the same as reactive streaming would.
+As such, there is some overhead to synchronous reads and they are generally not needed in systems built using reactive services.
+They are useful, however, for debugging the state of reactive systems and for maintaining compatibility with legacy systems and non-reactive clients.
+
+To make a synchronous read, call either `getAll` or `getArray` on the reactive service handle in your web service to query the corresponding routes on the reactive service; an example using `getArray` is given in the example Express web service below.
+
+Then, from your client, issue HTTP `GET` requests to e.g. `http://reactive.service.hostname/my_resource/foo/key1` to make a synchronous read of data in the `foo` resource instance associated with key `key1`.
+
 # Example web service configuration
 
 Skip reactive services instantiate resources on request, generating a unique UUID for each unique query and serving the resulting stream of updates over HTTP.
@@ -96,17 +105,26 @@ const reactive_service = new SkipServiceBroker({
   control_port,
 });
 
-// On receiving a GET request for a resource instance,
+// On receiving a GET request for a reactive resource instance,
 //  1. Parse out any params from the request
 //  2. Request a stream identifier with those parameters from the reactive service
 //  3. Redirect the client to the corresponding stream address
 app.get("/my_resource/:id", (req, res) => {
-  const params = { id: req.params.id, foo: req.params.bar, ...};
+  const params = { id: req.params.id, foo: req.params.bar, ... };
   reactive_service
     .getStreamUUID("my_resource", params)
     .then((uuid) => {
       res.redirect(301, `http://${reactive_host}:${streaming_port}/v1/streams/${uuid}`);
     })
 });
-```
 
+// Synchronous read of a specific key in a resource instance
+app.get("/my_resource/:id/:key", (req, res) => {
+  const params = { id: req.params.id, foo: req.params.bar, ... };
+  reactive_service
+    .getArray("my_resource", params, req.params.key)
+    .then((data) => {
+      res.status(200).json(data);
+    });
+});
+```
