@@ -14,7 +14,7 @@ function toHttp(entrypoint: Entrypoint) {
   return `http://${entrypoint.host}:${entrypoint.control_port}`;
 }
 
-export async function fetchJSON<V>(
+export async function fetchJSON<V extends Json>(
   url: string,
   method: "POST" | "GET" | "PUT" | "PATCH" | "HEAD" | "DELETE" = "GET",
   headers: { [header: string]: string } = {},
