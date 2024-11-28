@@ -388,7 +388,7 @@ export interface SkipService<
   /** The external service dependencies of the service */
   externalServices?: { [name: string]: ExternalService };
   /** The reactive resources which compose the public interface of this reactive service */
-  resources?: {
+  resources: {
     [name: string]: new (params: {
       [param: string]: string;
     }) => Resource<ResourceInputs>;
