@@ -121,17 +121,18 @@ export function streamingService(service: ServiceInstance): express.Express {
       res.sendStatus(406);
       return;
     }
-    res.writeHead(200, {
-      "Content-Type": "text/event-stream",
-      Connection: "keep-alive",
-      "Cache-Control": "no-cache",
-    });
-    res.flushHeaders();
-
     try {
-      const subscriptionID = service.subscribe(
-        req.params.uuid,
-        (update: CollectionUpdate<string, Json>) => {
+      const uuid = req.params.uuid;
+      const subscriptionID = service.subscribe(uuid, {
+        subscribed: () => {
+          res.writeHead(200, {
+            "Content-Type": "text/event-stream",
+            Connection: "keep-alive",
+            "Cache-Control": "no-cache",
+          });
+          res.flushHeaders();
+        },
+        notify: (update: CollectionUpdate<string, Json>) => {
           if (update.isInitial) {
             res.write(`event: init\n`);
           } else {
@@ -140,15 +141,20 @@ export function streamingService(service: ServiceInstance): express.Express {
           res.write(`id: ${update.watermark}\n`);
           res.write(`data: ${JSON.stringify(update.values)}\n\n`);
         },
-        // TODO: React upon resource instance deletion.
-      );
+        close: () => {
+          res.end();
+        },
+      });
       req.on("close", () => {
         service.unsubscribe(subscriptionID);
-        res.end();
       });
     } catch (e: unknown) {
-      res.end();
       console.log(e);
+      if (e instanceof UnknownCollectionError) {
+        res.sendStatus(404);
+      } else {
+        res.sendStatus(500);
+      }
     }
   });
 

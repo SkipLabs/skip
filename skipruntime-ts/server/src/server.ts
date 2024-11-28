@@ -118,8 +118,8 @@ export async function runService<
   return {
     close: () => {
       controlHttpServer.close();
-      streamingHttpServer.close();
       runtime.close();
+      streamingHttpServer.close();
     },
   };
 }
