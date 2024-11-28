@@ -9,6 +9,44 @@ By design, client code does not need to import or reason about the internal deta
 
 ## Event Streams
 
+Clients of reactive services can opt to receive pushed data updates using HTTP server-sent events.
+
+The simplest way to see the data that your client will receive is to use `curl`, e.g. `curl -LN http://reactive.service.hostname/my_resource/foo` to stream from `my_resource` with parameter `foo`, which will produce output like the following:
+
+```
+event: init
+id: 1065359156
+data: [["key1",["value1"]],["key2",["value2","value3"]]]
+
+event: update
+id: 1065376268
+data: [["key2",["value2"]]]
+
+event: update
+id: 1065371604
+data: [["key3",["value4"]]]
+```
+
+The `init` event contains all available data for the resource when the connection is created, and can be used to set up initial client state.
+
+Subsequent `update` events indicate changes _only_ at the included keys: the first update here removes `"value3"` from `"key2"`, while the second removes adds a new binding from `"key3"` to `"value4"`.
+
+All events include an `id` metadata which should mostly be ignored, but can be useful for debugging, replay, and similar.
+
+In practice, client apps don't need to interact with this raw data stream: JavaScript provides a useful `EventSource` interface to maintain the connection and register event-handler callbacks.
+
+```typescript
+const stream = new EventSource("http://reactive.service.hostname/my_resource/foo");
+stream.addEventListener("init", (e: MessageEvent<string>) => {
+  const initial_data = JSON.parse(e.data);
+  console.log("Initial data: ", initial_data);
+});
+stream.addEventListener("update", (e: MessageEvent<string>) => {
+  const updates = JSON.parse(e.data);
+  console.log("Updated data: ", updates);
+});
+```
+
 ## Synchronous HTTP interface
 
 # Example web service configuration
