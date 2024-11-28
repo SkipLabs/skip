@@ -48,6 +48,11 @@ class ActiveFriends implements Resource<ResourceInputs> {
 
 In this setup, the reactive service exposes some routes corresponding to the resource, each expecting an HTTP query parameter `uid`.
 When a request is made, the `constructor` is invoked with the given parameters and then `instantiate` called on the resulting object, extending the static computation graph (which updates `inputs`) with additional reactive computation, getting the relevant `user` and filtering active users according to whether or not they are friends.
-The return value of the `instantiate` function makes up the output served to the client for this request, reactively updating according to any changes to input data: users, groups, friend relationships, etc.
+The eager collection returned by the `instantiate` function is the output served to the client for this request, reactively updating according to any changes to input data: users, groups, friend relationships, etc.
+
+This _resource instance_ can be explicitly closed by the client, or it will be garbage collected by the Skip framework after a period of inactivity.
+
+When a Skip service depends on the output of another Skip service, its "request" for a resource instance is made using the [`Context#useExternalResource`](api/api/interfaces/Context#useexternalresource) API.
+After registering an external service `"myOtherService"` (as described [here](externals.md)) with some `"my_resource"`, your service can call `context.useExternalResource("myOtherService", "my_resource", params)` to access that resource with the given parameters, allowing reactive computation to propagate through multiple services.
 
 ## Resource HTTP API
