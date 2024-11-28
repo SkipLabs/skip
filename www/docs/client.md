@@ -47,6 +47,31 @@ stream.addEventListener("update", (e: MessageEvent<string>) => {
 });
 ```
 
+### React clients
+
+This event-listener setup integrates cleanly with React-based frontends using [`useEffect`](https://react.dev/reference/react/useEffect) and [`useState`](https://react.dev/reference/react/useState).
+A React component powered by a Skip reactive service can establish the event stream and register listener callbacks as follows, calling the React `set` state functions within the callbacks with the data received from the reactive backend service.
+
+```typescript
+const [foo, setFoo] = useState(...);
+useEffect(() => {
+  const stream = new EventSource("http://reactive.service.hostname/my_resource/foo");
+  stream.addEventListener("init", (e: MessageEvent<string>) => {
+    const initial_data = JSON.parse(e.data);
+	const initialFoo = ...; // create an initial "foo" using `initial_data`
+	setFoo(initialFoo);
+  });
+  stream.addEventListener("update", (e: MessageEvent<string>) => {
+    const updates = JSON.parse(e.data);
+	const updatedFoo = ...; // update "foo" using `updates`
+	setFoo(updatedfoo);
+  });
+  return () => {
+    stream.close();
+  };
+}, [])
+```
+
 ## Synchronous HTTP interface
 
 # Example web service configuration
