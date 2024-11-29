@@ -891,17 +891,15 @@ class LinksImpl implements Links {
       }
       const skresources =
         this.fromWasm.SkipRuntime_ResourceBuilderMap__create();
-      if (service.resources) {
-        for (const [name, builder] of Object.entries(service.resources)) {
-          const skbuilder = this.fromWasm.SkipRuntime_createResourceBuilder(
-            this.handles.register(new ResourceBuilder(builder)),
-          );
-          this.fromWasm.SkipRuntime_ResourceBuilderMap__add(
-            skresources,
-            skjson.exportString(name),
-            skbuilder,
-          );
-        }
+      for (const [name, builder] of Object.entries(service.resources)) {
+        const skbuilder = this.fromWasm.SkipRuntime_createResourceBuilder(
+          this.handles.register(new ResourceBuilder(builder)),
+        );
+        this.fromWasm.SkipRuntime_ResourceBuilderMap__add(
+          skresources,
+          skjson.exportString(name),
+          skbuilder,
+        );
       }
       const skservice = this.fromWasm.SkipRuntime_createService(
         this.handles.register(service),
