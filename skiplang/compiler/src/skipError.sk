@@ -208,8 +208,13 @@ fun renderTextRange(range: TextRange): String {
 }
 
 private fun render_pos(pos: FileRange): String {
-  // TODO: Heuristic to use relative path when relevant.
-  file = `File "${pos.file}"`;
+  // TODO: Better heuristic to use relative path when relevant.
+  cwd = getcwd();
+  path = pos.file.path;
+  if (pos.file.path.startsWith(cwd)) {
+    !path = path.stripPrefix(cwd);
+  };
+  file = `File "${path}"`;
 
   position = if (!pos.range.isNone()) {
     `, ${renderTextRange(pos.range)}:`
