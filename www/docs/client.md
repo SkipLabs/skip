@@ -1,17 +1,17 @@
 # Client connections
 
 Clients can subscribe to updates from a reactive service using the widely-available [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events) protocol, or make synchronous read requests for specific data.
-This means that Skip clients are thin and lightweight: all major browsers implement the requisite `EventSource` interface, and other types of clients can easily implement parsers for the simple text-based protocol.
+This means that Skip clients are thin and lightweight: the JavaScript `EventSource` interface is widely implemented, and other types of clients can easily implement parsers for the simple text-based protocol.
 
-Note that this page describes mechanisms for front-end clients or non-Skip systems to access the outputs of a Skip service; to communicate among Skip services it is both simpler and more efficient to use [external dependencies](todo: docusaurus link).
+Note that this page describes mechanisms for front-end clients or non-Skip systems to access the outputs of a Skip service; to communicate among Skip services it is both simpler and more efficient to use [external dependencies](externals.md).
 
-By design, client code does not need to import or reason about the internal details of Skip reactive services; this page abstracts over those details, but for completeness's sake we provide a simple explanatory example [below](todo: intrapage link to "Example web service configuration") of a backend service which can support such clients.
+By design, client code does not need to import or reason about the internal details of Skip reactive services; this page abstracts over those details, but for completeness's sake we provide a simple explanatory example [below](client.md#example-web-service-configuration) of a backend service which can support such clients.
 
 ## Event Streams
 
 Clients of reactive services can opt to receive pushed data updates using HTTP server-sent events.
 
-The simplest way to see the data that your client will receive is to use `curl`, e.g. `curl -LN http://reactive.service.hostname/my_resource/foo` to stream from `my_resource` with parameter `foo`, which will produce output like the following:
+The simplest way to see the data that your client will receive is to use `curl`, e.g. `curl -LN http://reactive.service.hostname/my_resource/foo` to stream from `my_resource` with parameter `foo`, which will produce output like the following for the example service [below](client.md#example-web-service-configuration):
 
 ```
 event: init
@@ -29,9 +29,9 @@ data: [["key3",["value4"]]]
 
 The `init` event contains all available data for the resource when the connection is created, and can be used to set up initial client state.
 
-Subsequent `update` events indicate changes _only_ at the included keys: the first update here removes `"value3"` from `"key2"`, while the second removes adds a new binding from `"key3"` to `"value4"`.
+Subsequent `update` events indicate changes _only_ at the included keys: the first update here removes `"value3"` from `"key2"`, while the second removes adds a new entry associating `"key3"` to `"value4"`.
 
-All events include an `id` metadata which should mostly be ignored, but can be useful for debugging, replay, and similar.
+All events include an `id` metadata field which should mostly be ignored, but can be useful for debugging, replay, and similar purposes.
 
 In practice, client apps don't need to interact with this raw data stream: JavaScript provides a useful `EventSource` interface to maintain the connection and register event-handler callbacks.
 
@@ -76,16 +76,16 @@ useEffect(() => {
 
 Skip reactive services also support synchronous (i.e. non-reactive) reads of resources, either in their entirety or at a specific key.
 Note that this requires instantiation of the resource, just the same as reactive streaming would.
-As such, there is some overhead to synchronous reads and they are generally not needed in systems built using reactive services.
+As such, there is little advantage to synchronous reads in systems built using reactive services.
 They are useful, however, for debugging the state of reactive systems and for maintaining compatibility with legacy systems and non-reactive clients.
 
-To make a synchronous read, call either `getAll` or `getArray` on the reactive service handle in your web service to query the corresponding routes on the reactive service; an example using `getArray` is given in the example Express web service below.
+To make a synchronous read, call either `getAll` or `getArray` on the reactive service handle (i.e. `SkipServiceBroker`) in your web service to query the corresponding routes on the reactive service; an example using `getArray` is given in the example Express web service [below](client.md#example-web-service-configuration).
 
 Then, from your client, issue HTTP `GET` requests to e.g. `http://reactive.service.hostname/my_resource/foo/key1` to make a synchronous read of data in the `foo` resource instance associated with key `key1`.
 
 # Example web service configuration
 
-Skip reactive services instantiate resources on request, generating a unique UUID for each unique query and serving the resulting stream of updates over HTTP.
+Skip reactive services instantiate resources on request, generating a UUID for each distinct query and serving the resulting stream of updates over HTTP.
 Managing these UUIDs is straightforward, but is best done using a traditional web service to request stream UUIDs and transparently redirect clients to their data.
 
 A simple explanatory example is given here using the [Express](https://expressjs.com) web framework, but any web framework will do -- Skip is designed to work over HTTP with whatever backend framework you like.
