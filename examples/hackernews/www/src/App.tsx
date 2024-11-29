@@ -66,6 +66,9 @@ function Feed() {
       const updatedPosts = data[0][1] as Post[];
       setPosts(updatedPosts);
     });
+    return () => {
+      evSource.close();
+    };
   }, []);
 
   async function upvotePost(postId: number) {
