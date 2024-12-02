@@ -56,3 +56,53 @@ When a Skip service depends on the output of another Skip service, its "request"
 After registering an external service `"myOtherService"` (as described [here](externals.md)) with some `"my_resource"`, your service can call `context.useExternalResource("myOtherService", "my_resource", params)` to access that resource with the given parameters, allowing reactive computation to propagate through multiple services.
 
 ## Resource HTTP API
+
+Skip reactive services expose a REST API across two separate ports: a *streaming* port for public-facing data streaming, and a *control* port for stream creation/deletion and synchronous reads/writes.
+This bifurcation makes it easier to redirect clients directly to streaming endpoints while avoiding exposing sensitive control routes publicly.
+
+### Streaming API
+
+The data streaming API (on port 8080 by default) consists of a single endpoint:
+
+```
+GET /v1/streams/:uuid
+```
+
+After instantiating a resource and receiving the corresponding UUID (via the control API), clients can query this endpoint to receive initial data and updates via server-sent events, as described [here](client.md).
+
+### Control API
+
+The control API (on port 8081 by default) surfaces resource instantiation/deletion operations and synchronous read/write operations.
+
+Resource instantiation and deletion are controlled by two routes:
+
+```
+POST /v1/streams
+DELETE /v1/streams/:uuid
+```
+
+The `POST` route instantiates a resource according to the JSON-encoded request body (consisting of the resource identifier and any parameters, structured as `{resource: string; params: {[param: string]: string} }`) and returns a UUID identifying the resource, which can then be used in a query to the streaming API.
+The `DELETE` route closes and tears down the resource instance identified by its `uuid` parameter, terminating any active streams.
+
+Synchronous reads from reactive resources can either access the resource in its entirety or read the data for a single key, using the following two routes:
+
+```
+GET /v1/resources/:resource
+GET /v1/resources/:resource/:key
+```
+
+Lastly, clients can update the input collections of a reactive service:
+
+```
+PATCH /v1/inputs/:collection
+PUT /v1/inputs/:collection/:key
+```
+
+Both routes update input collections with the value(s) passed in their JSON-encoded request body payloads.
+
+The `PATCH` route updates multiple keys simultaneously in the input collection speecified by its path parameter.
+Its request body must be an array of `[K, V[]]` entries for the key/value types `K` and `V` of the input collection.
+For example, with string keys and number values, a request body of `[["key1",[10,20]],["key2",[]],["key3",[50]]]` associates `key1` to the values `10` and `20`, deletes any values under `key2`, and associates `key3` to the value 50.
+
+The `PUT` route updates a single key of an input collection as specified by its path parameters; its request body must be an array of values.
+A `PUT` request with some `key` and request `body` is equivalent to a `PATCH` of the same resource with payload `[key, body]`.
