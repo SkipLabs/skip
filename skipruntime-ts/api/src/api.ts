@@ -207,13 +207,32 @@ export interface EagerCollection<K extends Json, V extends Json>
   mapReduce<
     K2 extends Json,
     V2 extends Json,
-    Acc extends Json,
-    Params extends Param[],
+    Accum extends Json,
+    MapperParams extends Param[],
+    ReducerParams extends Param[],
   >(
-    mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
-    reducer: Reducer<V2, Acc>,
-    ...params: Params
-  ): EagerCollection<K2, Acc>;
+    mapper: new (...params: MapperParams) => Mapper<K, V, K2, V2>,
+    reducer: new (...params: ReducerParams) => Reducer<V2, Accum>,
+    mapperParams: MapperParams,
+    reducerParams: ReducerParams,
+  ): EagerCollection<K2, Accum>;
+
+  // Type overloads for `mapReduce`, allowing callers to not pass mapper/reducer parameters
+  // when the mapper/reducer take no parameters
+  mapReduce<
+    K2 extends Json,
+    V2 extends Json,
+    Accum extends Json,
+    MapperParams extends Param[],
+  >(
+    mapper: new (...params: MapperParams) => Mapper<K, V, K2, V2>,
+    reducer: new () => Reducer<V2, Accum>,
+    mapperParams: MapperParams,
+  ): EagerCollection<K2, Accum>;
+  mapReduce<K2 extends Json, V2 extends Json, Accum extends Json>(
+    mapper: new () => Mapper<K, V, K2, V2>,
+    reducer: new () => Reducer<V2, Accum>,
+  ): EagerCollection<K2, Accum>;
 
   /**
    * Create a new eager collection by keeping only the elements whose keys are in
