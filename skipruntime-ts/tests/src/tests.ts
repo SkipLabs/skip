@@ -281,7 +281,7 @@ class TestOddEven implements Mapper<number, number, number, number> {
 
 class MapReduceResource implements Resource<Input_NN> {
   instantiate(cs: Input_NN): EagerCollection<number, number> {
-    return cs.input.mapReduce(TestOddEven, Sum);
+    return cs.input.mapReduce(TestOddEven)(Sum);
   }
 }
 
@@ -332,7 +332,7 @@ class OffsetMapper extends OneToOneMapper<number, number, number> {
 
 class MergeReduceResource implements Resource<Input_NN_NN> {
   instantiate(cs: Input_NN_NN): EagerCollection<number, number> {
-    return cs.input1.merge(cs.input2).mapReduce(OffsetMapper, Sum, [5]);
+    return cs.input1.merge(cs.input2).mapReduce(OffsetMapper, 5)(Sum);
   }
 }
 

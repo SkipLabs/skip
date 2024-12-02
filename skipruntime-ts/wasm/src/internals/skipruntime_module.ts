@@ -1031,49 +1031,44 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     return this.derive<K2, V2>(mapped);
   }
 
-  mapReduce<
-    K2 extends Json,
-    V2 extends Json,
-    Accum extends Json,
-    MapperParams extends Param[],
-    ReducerParams extends Param[],
-  >(
+  mapReduce<K2 extends Json, V2 extends Json, MapperParams extends Param[]>(
     mapper: new (...params: MapperParams) => Mapper<K, V, K2, V2>,
-    reducer: new (...params: ReducerParams) => Reducer<V2, Accum>,
-    mapperParams?: MapperParams,
-    reducerParams?: ReducerParams,
+    ...mapperParams: MapperParams
   ) {
-    const mParams = (mapperParams ?? []).map(checkOrCloneParam) as MapperParams;
-    const rParams = (reducerParams ?? []).map(
-      checkOrCloneParam,
-    ) as ReducerParams;
+    return <Accum extends Json, ReducerParams extends Param[]>(
+      reducer: new (...params: ReducerParams) => Reducer<V2, Accum>,
+      ...reducerParams: ReducerParams
+    ) => {
+      const mParams = mapperParams.map(checkOrCloneParam) as MapperParams;
+      const rParams = reducerParams.map(checkOrCloneParam) as ReducerParams;
 
-    const mapperObj = new mapper(...mParams);
-    const reducerObj = new reducer(...rParams);
+      const mapperObj = new mapper(...mParams);
+      const reducerObj = new reducer(...rParams);
 
-    Object.freeze(mapperObj);
-    Object.freeze(reducerObj);
+      Object.freeze(mapperObj);
+      Object.freeze(reducerObj);
 
-    if (!mapperObj.constructor.name) {
-      throw new Error("Mapper classes must be defined at top-level.");
-    }
-    if (!reducerObj.constructor.name) {
-      throw new Error("Reducer classes must be defined at top-level.");
-    }
+      if (!mapperObj.constructor.name) {
+        throw new Error("Mapper classes must be defined at top-level.");
+      }
+      if (!reducerObj.constructor.name) {
+        throw new Error("Reducer classes must be defined at top-level.");
+      }
 
-    const skmapper = this.refs.fromWasm.SkipRuntime_createMapper(
-      this.refs.handles.register(mapperObj),
-    );
-    const skreducer = this.refs.fromWasm.SkipRuntime_createReducer(
-      this.refs.handles.register(reducerObj),
-      this.refs.skjson.exportJSON(reducerObj.default),
-    );
-    const mapped = this.refs.fromWasm.SkipRuntime_Collection__mapReduce(
-      this.refs.skjson.exportString(this.collection),
-      skmapper,
-      skreducer,
-    );
-    return this.derive<K2, Accum>(mapped);
+      const skmapper = this.refs.fromWasm.SkipRuntime_createMapper(
+        this.refs.handles.register(mapperObj),
+      );
+      const skreducer = this.refs.fromWasm.SkipRuntime_createReducer(
+        this.refs.handles.register(reducerObj),
+        this.refs.skjson.exportJSON(reducerObj.default),
+      );
+      const mapped = this.refs.fromWasm.SkipRuntime_Collection__mapReduce(
+        this.refs.skjson.exportString(this.collection),
+        skmapper,
+        skreducer,
+      );
+      return this.derive<K2, Accum>(mapped);
+    };
   }
 
   merge(...others: EagerCollection<K, V>[]): EagerCollection<K, V> {
