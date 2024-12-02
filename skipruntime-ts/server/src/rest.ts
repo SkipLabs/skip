@@ -89,26 +89,6 @@ export function controlService(service: ServiceInstance): express.Express {
     }
   });
 
-  app.put("/v1/inputs/:collection/:key", (req, res) => {
-    if (!Array.isArray(req.body)) {
-      res.status(400).json(`Bad request body ${JSON.stringify(req.body)}`);
-      return;
-    }
-    try {
-      service.update(req.params.collection, [
-        [req.params.key, req.body as Json[]],
-      ]);
-      res.sendStatus(200);
-    } catch (e: unknown) {
-      if (e instanceof UnknownCollectionError) {
-        res.sendStatus(404);
-      } else {
-        console.log(e);
-        res.status(500).json(e instanceof Error ? e.message : e);
-      }
-    }
-  });
-
   return app;
 }
 

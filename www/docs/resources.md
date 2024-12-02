@@ -95,14 +95,9 @@ Lastly, clients can update the input collections of a reactive service:
 
 ```
 PATCH /v1/inputs/:collection
-PUT /v1/inputs/:collection/:key
 ```
 
-Both routes update input collections with the value(s) passed in their JSON-encoded request body payloads.
+This route updates an input collection `collection` with the value(s) passed in its JSON-encoded request payload.
+It updates multiple keys simultaneously with the data in the body of the request, which must be an array of `[K, V[]]` entries for the key/value types `K` and `V` of the input collection.
 
-The `PATCH` route updates multiple keys simultaneously in the input collection speecified by its path parameter.
-Its request body must be an array of `[K, V[]]` entries for the key/value types `K` and `V` of the input collection.
-For example, with string keys and number values, a request body of `[["key1",[10,20]],["key2",[]],["key3",[50]]]` associates `key1` to the values `10` and `20`, deletes any values under `key2`, and associates `key3` to the value 50.
-
-The `PUT` route updates a single key of an input collection as specified by its path parameters; its request body must be an array of values.
-A `PUT` request with some `key` and request `body` is equivalent to a `PATCH` of the same resource with payload `[key, body]`.
+For example, with `string` keys and `number` values, a request body of `[["key1",[10,20]],["key2",[]],["key3",[50]]]` associates `key1` to the values `10` and `20`, deletes any values under `key2`, and associates `key3` to the value 50.
