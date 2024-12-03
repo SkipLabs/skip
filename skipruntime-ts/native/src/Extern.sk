@@ -448,6 +448,16 @@ fun mapReduceOfCollection(
     .getId()
 }
 
+@export("SkipRuntime_Collection__reduce")
+fun reduceOfCollection(collection: String, reducer: JSONReducer): String {
+  collectionForName(collection)
+    .mapReduce(
+      IdentityMapper(JSONKeyConverter(), JSONFileConverter()),
+      reducer,
+      JSONFileConverter(),
+    )
+    .getId()
+}
 @export("SkipRuntime_Collection__slice")
 fun sliceOfCollection(collection: String, ranges: SKJSON.CJArray): String {
   collectionForName(collection)

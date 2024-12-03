@@ -217,6 +217,11 @@ export interface EagerCollection<K extends Json, V extends Json>
     ...reducerParams: ReducerParams
   ) => EagerCollection<K2, Accum>;
 
+  reduce<Accum extends Json, Params extends Param[]>(
+    reducer: new (...params: Params) => Reducer<V, Accum>,
+    ...params: Params
+  ): EagerCollection<K, Accum>;
+
   /**
    * Create a new eager collection by keeping only the elements whose keys are in
    * the given range.
