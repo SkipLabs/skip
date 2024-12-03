@@ -281,7 +281,7 @@ class TestOddEven implements Mapper<number, number, number, number> {
 
 class MapReduceResource implements Resource<Input_NN> {
   instantiate(cs: Input_NN): EagerCollection<number, number> {
-    return cs.input.mapReduce(TestOddEven, new Sum());
+    return cs.input.mapReduce(TestOddEven)(Sum);
   }
 }
 
@@ -320,15 +320,19 @@ function sorted(entries: Entry<Json, Json>[]): Entry<Json, Json>[] {
 
 //// testMergeReduce
 
-class IdentityMapper extends OneToOneMapper<number, number, number> {
+class OffsetMapper extends OneToOneMapper<number, number, number> {
+  constructor(private offset: number) {
+    super();
+  }
+
   mapValue(v: number) {
-    return v;
+    return v + this.offset;
   }
 }
 
 class MergeReduceResource implements Resource<Input_NN_NN> {
   instantiate(cs: Input_NN_NN): EagerCollection<number, number> {
-    return cs.input1.merge(cs.input2).mapReduce(IdentityMapper, new Sum());
+    return cs.input1.merge(cs.input2).mapReduce(OffsetMapper, 5)(Sum);
   }
 }
 
@@ -706,17 +710,17 @@ export function initTests(
     const resource = "mergeReduce";
     service.update("input1", [[1, [10]]]);
     service.update("input2", [[1, [20]]]);
-    expect(service.getAll(resource).payload).toEqual([[1, [30]]]);
+    expect(service.getAll(resource).payload).toEqual([[1, [40]]]);
     service.update("input1", [[2, [3]]]);
     service.update("input2", [[2, [7]]]);
     expect(service.getAll(resource).payload).toEqual([
-      [1, [30]],
-      [2, [10]],
+      [1, [40]],
+      [2, [20]],
     ]);
     service.update("input1", [[1, []]]);
     expect(service.getAll(resource).payload).toEqual([
-      [1, [20]],
-      [2, [10]],
+      [1, [25]],
+      [2, [20]],
     ]);
   });
 

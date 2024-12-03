@@ -199,21 +199,23 @@ export interface EagerCollection<K extends Json, V extends Json>
 
   /**
    * Create a new eager reactive collection by mapping some computation `mapper` over this
-   * one and then reducing the results with `reducer`
+   * one and then reducing the results with `reducer`.
+   * Note that this function is _curried_ so that mapper and reducer rest parameters can be
+   * provided separately, e.g. as `mapReduce(MyMapper, foo, bar)(MyReducer, baz)`
    * @param mapper - function to apply to each element of this collection
-   * @param reducer - function to combine results of the `mapper`
-   * @returns An eager collection containing the output of the reducer
+   * @param mapperParams - parameters to the mapper constructor
+   * @returns A function which takes a `reducer` and corresponding parameters and returns the
+   * resulting eager collection of reduced values.
+   * `reducer` - function to combine results of the `mapper`
+   * `reducerParams` - parameters to the reducer constructor
    */
-  mapReduce<
-    K2 extends Json,
-    V2 extends Json,
-    Acc extends Json,
-    Params extends Param[],
-  >(
-    mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
-    reducer: Reducer<V2, Acc>,
-    ...params: Params
-  ): EagerCollection<K2, Acc>;
+  mapReduce<K2 extends Json, V2 extends Json, MapperParams extends Param[]>(
+    mapper: new (...params: MapperParams) => Mapper<K, V, K2, V2>,
+    ...mapperParams: MapperParams
+  ): <Accum extends Json, ReducerParams extends Param[]>(
+    reducer: new (...params: ReducerParams) => Reducer<V2, Accum>,
+    ...reducerParams: ReducerParams
+  ) => EagerCollection<K2, Accum>;
 
   /**
    * Create a new eager collection by keeping only the elements whose keys are in

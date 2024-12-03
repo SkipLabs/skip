@@ -1031,35 +1031,44 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     return this.derive<K2, V2>(mapped);
   }
 
-  mapReduce<
-    K2 extends Json,
-    V2 extends Json,
-    V3 extends Json,
-    Params extends Param[],
-  >(
-    mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
-    reducer: Reducer<V2, V3>,
-    ...params: Params
+  mapReduce<K2 extends Json, V2 extends Json, MapperParams extends Param[]>(
+    mapper: new (...params: MapperParams) => Mapper<K, V, K2, V2>,
+    ...mapperParams: MapperParams
   ) {
-    const mapperParams = params.map(checkOrCloneParam) as Params;
-    const mapperObj = new mapper(...mapperParams);
-    Object.freeze(mapperObj);
-    if (!mapperObj.constructor.name) {
-      throw new Error("Mapper classes must be defined at top-level.");
-    }
-    const skmapper = this.refs.fromWasm.SkipRuntime_createMapper(
-      this.refs.handles.register(mapperObj),
-    );
-    const skreducer = this.refs.fromWasm.SkipRuntime_createReducer(
-      this.refs.handles.register(reducer),
-      this.refs.skjson.exportJSON(reducer.default),
-    );
-    const mapped = this.refs.fromWasm.SkipRuntime_Collection__mapReduce(
-      this.refs.skjson.exportString(this.collection),
-      skmapper,
-      skreducer,
-    );
-    return this.derive<K2, V3>(mapped);
+    return <Accum extends Json, ReducerParams extends Param[]>(
+      reducer: new (...params: ReducerParams) => Reducer<V2, Accum>,
+      ...reducerParams: ReducerParams
+    ) => {
+      const mParams = mapperParams.map(checkOrCloneParam) as MapperParams;
+      const rParams = reducerParams.map(checkOrCloneParam) as ReducerParams;
+
+      const mapperObj = new mapper(...mParams);
+      const reducerObj = new reducer(...rParams);
+
+      Object.freeze(mapperObj);
+      Object.freeze(reducerObj);
+
+      if (!mapperObj.constructor.name) {
+        throw new Error("Mapper classes must be defined at top-level.");
+      }
+      if (!reducerObj.constructor.name) {
+        throw new Error("Reducer classes must be defined at top-level.");
+      }
+
+      const skmapper = this.refs.fromWasm.SkipRuntime_createMapper(
+        this.refs.handles.register(mapperObj),
+      );
+      const skreducer = this.refs.fromWasm.SkipRuntime_createReducer(
+        this.refs.handles.register(reducerObj),
+        this.refs.skjson.exportJSON(reducerObj.default),
+      );
+      const mapped = this.refs.fromWasm.SkipRuntime_Collection__mapReduce(
+        this.refs.skjson.exportString(this.collection),
+        skmapper,
+        skreducer,
+      );
+      return this.derive<K2, Accum>(mapped);
+    };
   }
 
   merge(...others: EagerCollection<K, V>[]): EagerCollection<K, V> {
