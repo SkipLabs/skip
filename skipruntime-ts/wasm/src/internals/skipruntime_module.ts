@@ -263,6 +263,11 @@ export interface FromWasm {
     reducer: ptr<Internal.Reducer>,
   ): ptr<Internal.String>;
 
+  SkipRuntime_Collection__reduce(
+    collection: ptr<Internal.String>,
+    reducer: ptr<Internal.Reducer>,
+  ): ptr<Internal.String>;
+
   SkipRuntime_Collection__slice(
     collection: ptr<Internal.String>,
     range: ptr<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
@@ -1069,6 +1074,28 @@ class EagerCollectionImpl<K extends Json, V extends Json>
       );
       return this.derive<K2, Accum>(mapped);
     };
+  }
+
+  reduce<Accum extends Json, Params extends Param[]>(
+    reducer: new (...params: Params) => Reducer<V, Accum>,
+    ...params: Params
+  ): EagerCollection<K, Accum> {
+    const reducerParams = params.map(checkOrCloneParam) as Params;
+    const reducerObj = new reducer(...reducerParams);
+    Object.freeze(reducerObj);
+    if (!reducerObj.constructor.name) {
+      throw new Error("Reducer classes must be defined at top-level.");
+    }
+    const skreducer = this.refs.fromWasm.SkipRuntime_createReducer(
+      this.refs.handles.register(reducerObj),
+      this.refs.skjson.exportJSON(reducerObj.default),
+    );
+    return this.derive<K, Accum>(
+      this.refs.fromWasm.SkipRuntime_Collection__reduce(
+        this.refs.skjson.exportString(this.collection),
+        skreducer,
+      ),
+    );
   }
 
   merge(...others: EagerCollection<K, V>[]): EagerCollection<K, V> {

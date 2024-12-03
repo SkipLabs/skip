@@ -330,15 +330,24 @@ class OffsetMapper extends OneToOneMapper<number, number, number> {
   }
 }
 
-class MergeReduceResource implements Resource<Input_NN_NN> {
+class MergeMapReduceResource implements Resource<Input_NN_NN> {
   instantiate(cs: Input_NN_NN): EagerCollection<number, number> {
     return cs.input1.merge(cs.input2).mapReduce(OffsetMapper, 5)(Sum);
   }
 }
 
+class MergeReduceResource implements Resource<Input_NN_NN> {
+  instantiate(cs: Input_NN_NN): EagerCollection<number, number> {
+    return cs.input1.merge(cs.input2).reduce(Sum);
+  }
+}
+
 const mergeReduceService: SkipService<Input_NN_NN, Input_NN_NN> = {
   initialData: { input1: [], input2: [] },
-  resources: { mergeReduce: MergeReduceResource },
+  resources: {
+    mergeMapReduce: MergeMapReduceResource,
+    mergeReduce: MergeReduceResource,
+  },
 
   createGraph(inputCollections: Input_NN_NN) {
     return inputCollections;
@@ -708,6 +717,25 @@ export function initTests(
   it("testMergeReduce", async () => {
     const service = await initService(mergeReduceService);
     const resource = "mergeReduce";
+    service.update("input1", [[1, [10]]]);
+    service.update("input2", [[1, [20]]]);
+    expect(service.getAll(resource).payload).toEqual([[1, [30]]]);
+    service.update("input1", [[2, [3]]]);
+    service.update("input2", [[2, [7]]]);
+    expect(service.getAll(resource).payload).toEqual([
+      [1, [30]],
+      [2, [10]],
+    ]);
+    service.update("input1", [[1, []]]);
+    expect(service.getAll(resource).payload).toEqual([
+      [1, [20]],
+      [2, [10]],
+    ]);
+  });
+
+  it("testMergeMapReduce", async () => {
+    const service = await initService(mergeReduceService);
+    const resource = "mergeMapReduce";
     service.update("input1", [[1, [10]]]);
     service.update("input2", [[1, [20]]]);
     expect(service.getAll(resource).payload).toEqual([[1, [40]]]);
