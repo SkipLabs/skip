@@ -2,19 +2,6 @@ SHELL := /bin/bash
 
 SKARGO_PROFILE?=release
 
-
-.PHONY: check-src
-check-src:
-	../bin/cd_sh wasm "bun run tsc && bun run lint"
-	../bin/cd_sh server "bun run tsc && bun run lint"
-
-.PHONY: check-examples
-check-examples:
-	../bin/cd_sh examples "bun run tsc && bun run lint"
-
-.PHONY: check-all
-check-all: build check-src check-examples
-
 .PHONY: build
 build:
 	../bin/cd_sh .. "npm install && npm run build"
