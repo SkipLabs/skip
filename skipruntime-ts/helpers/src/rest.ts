@@ -1,6 +1,11 @@
 import type { Json, Entry } from "@skipruntime/api";
 import { NonUniqueValueException } from "@skipruntime/api";
 
+/**
+ * An entry point of a Skip reactive service.
+ *
+ * URLs for the service's control and streaming APIs can be constructed from an `Entrypoint`.
+ */
 export type Entrypoint = {
   host: string;
   streaming_port: number;
