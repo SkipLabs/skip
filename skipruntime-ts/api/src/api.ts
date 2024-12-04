@@ -74,6 +74,31 @@ export abstract class OneToOneMapper<
 }
 
 /**
+ * A specialized form of `Mapper` which maps values one-to-many, reusing the
+ * input collection's key structure in the output collection. Use this form
+ * to map each value associated with a key to any number of values for that
+ * same key. This saves some boilerplate: instead of writing the fully
+ * general `mapEntry` that potentially modifies, adds, or removes keys,
+ * just implement the simpler `mapValue` to transform the values associated
+ * with each key.
+ */
+export abstract class OneToManyMapper<
+  K extends Json,
+  V1 extends Json,
+  V2 extends Json,
+> implements Mapper<K, V1, K, V2>
+{
+  abstract mapValue(value: V1, key: K): V2[];
+
+  mapEntry(key: K, values: NonEmptyIterator<V1>): Iterable<[K, V2]> {
+    const res: [K, V2][] = [];
+    for (const v1 of values)
+      for (const v2 of this.mapValue(v1, key)) res.push([key, v2]);
+    return res;
+  }
+}
+
+/**
  * A specialized form of `Mapper` which maps values many-to-one, reusing the
  * input collection's key structure in the output collection. Use this form
  * to map all the values associated with a key to a single output value for
