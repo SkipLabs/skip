@@ -1,4 +1,3 @@
-export { SkipExternalService } from "./remote.js";
 export {
   type ExternalResource,
   GenericExternalService,
