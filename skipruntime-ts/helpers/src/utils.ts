@@ -38,6 +38,18 @@ export class Max implements Reducer<number, number> {
   }
 }
 
+export class Count<T extends Json> implements Reducer<T, number> {
+  default = 0;
+
+  add(accum: number): number {
+    return accum + 1;
+  }
+
+  remove(accum: number): Nullable<number> {
+    return accum - 1;
+  }
+}
+
 export class CountMapper<
   K extends Json,
   V extends Json,
