@@ -28,7 +28,6 @@ import {
 } from "@skipruntime/api";
 
 import { Frozen } from "@skipruntime/api/internals.js";
-import { errorObjectAsError, type ErrorObject } from "@skiplang/std";
 import { UnknownCollectionError } from "./errors.js";
 import {
   ResourceBuilder,
@@ -148,10 +147,6 @@ class Handles {
     this.objects[id] = null;
     this.freeIDs.push(id);
     return current;
-  }
-
-  deleteAsError(error: Handle<ErrorObject>): Error {
-    return errorObjectAsError(this.deleteHandle(error));
   }
 }
 
@@ -554,7 +549,7 @@ export class ServiceInstance {
         this.refs.skjson.exportJSON(params),
       );
     });
-    if (errorHdl) throw this.refs.handles.deleteAsError(errorHdl);
+    if (errorHdl) throw this.refs.handles.deleteHandle(errorHdl);
   }
 
   /**
@@ -588,7 +583,7 @@ export class ServiceInstance {
     };
     const result = this.refs.needGC() ? this.refs.runWithGC(get_) : get_();
     if (typeof result == "number")
-      throw this.refs.handles.deleteAsError(result as Handle<ErrorObject>);
+      throw this.refs.handles.deleteHandle(result as Handle<Error>);
     return result as GetResult<Entry<K, V>[]>;
   }
 
@@ -627,7 +622,7 @@ export class ServiceInstance {
     const needGC = this.refs.needGC();
     const result = needGC ? this.refs.runWithGC(get_) : get_();
     if (typeof result == "number")
-      throw this.refs.handles.deleteAsError(result as Handle<ErrorObject>);
+      throw this.refs.handles.deleteHandle(result as Handle<Error>);
     return result as GetResult<V[]>;
   }
 
@@ -641,7 +636,7 @@ export class ServiceInstance {
         resourceInstanceId,
       );
     });
-    if (errorHdl) throw this.refs.handles.deleteAsError(errorHdl);
+    if (errorHdl) throw this.refs.handles.deleteHandle(errorHdl);
   }
 
   /**
@@ -692,7 +687,7 @@ export class ServiceInstance {
       return this.refs.binding.SkipRuntime_Runtime__unsubscribe(id);
     });
     if (errorHdl) {
-      throw this.refs.handles.deleteAsError(errorHdl);
+      throw this.refs.handles.deleteHandle(errorHdl);
     }
   }
 
@@ -712,7 +707,7 @@ export class ServiceInstance {
       );
     });
     if (errorHdl) {
-      throw this.refs.handles.deleteAsError(errorHdl);
+      throw this.refs.handles.deleteHandle(errorHdl);
     }
   }
 
@@ -725,7 +720,7 @@ export class ServiceInstance {
       return this.refs.binding.SkipRuntime_closeService();
     });
     if (errorHdl) {
-      throw this.refs.handles.deleteAsError(errorHdl);
+      throw this.refs.handles.deleteHandle(errorHdl);
     }
   }
 }
@@ -788,7 +783,7 @@ export class ToBinding {
     private binding: FromBinding,
     private runWithGC: <T>(fn: () => T) => T,
     private getConverter: () => JsonConverter,
-    private getErrorObject: (skExc: Pointer<Internal.Exception>) => ErrorObject,
+    private getError: (skExc: Pointer<Internal.Exception>) => Error,
   ) {
     this.stack = new Stack();
     this.handles = new Handles();
@@ -802,10 +797,8 @@ export class ToBinding {
     return this.handles.deleteHandle(id);
   }
 
-  SkipRuntime_getErrorHdl(
-    exn: Pointer<Internal.Exception>,
-  ): Handle<ErrorObject> {
-    return this.handles.register(this.getErrorObject(exn));
+  SkipRuntime_getErrorHdl(exn: Pointer<Internal.Exception>): Handle<Error> {
+    return this.handles.register(this.getError(exn));
   }
 
   SkipRuntime_pushContext(context: Pointer<Internal.Context>): void {
@@ -1104,7 +1097,7 @@ export class ToBinding {
       );
       return refs.binding.SkipRuntime_initService(skservice);
     });
-    if (errorHdl) throw refs.handles.deleteAsError(errorHdl);
+    if (errorHdl) throw refs.handles.deleteHandle(errorHdl);
     return new ServiceInstance(refs);
   }
 
