@@ -9,6 +9,7 @@ SKARGO_PROFILE?=release
 SKDB_WASM=sql/target/wasm32-unknown-unknown/$(SKARGO_PROFILE)/skdb.wasm
 SKDB_BIN=sql/target/host/$(SKARGO_PROFILE)/skdb
 SDKMAN_DIR?=$(HOME)/.sdkman
+DOCS_SITE_DIR?=/dev/null
 
 ################################################################################
 # skdb wasm + js client
@@ -103,16 +104,32 @@ fmt: fmt-sk fmt-c fmt-js
 check-fmt: fmt
 	if ! git diff --quiet --exit-code; then echo "make fmt changed some files:"; git status --porcelain; exit 1; fi
 
-# regenerate api docs served by run-docs from ts sources
+# regenerate api docs served by docs-run from ts sources
 .PHONY: docs
 docs:
 	bun install && npm run build
 	cd www && bun install && npx docusaurus generate-typedoc
 
 # run the docs site locally at http://localhost:3000
-.PHONY: run-docs
-run-docs:
+.PHONY: docs-run
+docs-run: # depends on docs, but can't be tracked reliably
 	cd www && npm run start
+
+# generate the docs site as static files
+.PHONY: docs-build
+docs-build: # depends on docs, but can't be tracked reliably
+	cd www && npm run build
+
+# run the static docs site locally
+.PHONY: docs-serve
+docs-serve: # depends on build, but can't be tracked reliably
+	cd www && npm run serve
+
+# update the static docs site repo
+# must set DOCS_SITE_DIR to the root of the docs-site repo checkout
+.PHONY: docs-sync
+docs-sync: # depends on build, but can't be tracked reliably
+	cd www && rsync --archive --exclude=.git --exclude=README.md --delete build/ $(DOCS_SITE_DIR)/
 
 # install the repo pre-commit hook locally
 .git/hooks/pre-commit: bin/git_hooks/check_format.sh
