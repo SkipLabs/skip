@@ -5,7 +5,6 @@ import type {
   ToWasmManager,
   Environment,
   Nullable,
-  ErrorObject,
   Shared,
   Pointer,
 } from "@skip-wasm/std";
@@ -85,16 +84,16 @@ export interface FromWasm {
     name: ptr<Internal.String>,
     values: ptr<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
     isInit: boolean,
-  ): Handle<ErrorObject>;
+  ): Handle<Error>;
 
   SkipRuntime_CollectionWriter__error(
     name: ptr<Internal.String>,
     error: ptr<Internal.CJSON>,
-  ): Handle<ErrorObject>;
+  ): Handle<Error>;
 
   SkipRuntime_CollectionWriter__loading(
     name: ptr<Internal.String>,
-  ): Handle<ErrorObject>;
+  ): Handle<Error>;
 
   // Resource
 
@@ -201,7 +200,7 @@ export interface FromWasm {
     identifier: ptr<Internal.String>,
     resource: ptr<Internal.String>,
     jsonParams: ptr<Internal.CJObject>,
-  ): Handle<ErrorObject>;
+  ): Handle<Error>;
 
   SkipRuntime_Runtime__getAll(
     resource: ptr<Internal.String>,
@@ -218,7 +217,7 @@ export interface FromWasm {
 
   SkipRuntime_Runtime__closeResource(
     identifier: ptr<Internal.String>,
-  ): Handle<ErrorObject>;
+  ): Handle<Error>;
 
   SkipRuntime_Runtime__subscribe(
     collection: ptr<Internal.String>,
@@ -226,12 +225,12 @@ export interface FromWasm {
     watermark: Nullable<ptr<Internal.String>>,
   ): bigint;
 
-  SkipRuntime_Runtime__unsubscribe(id: bigint): Handle<ErrorObject>;
+  SkipRuntime_Runtime__unsubscribe(id: bigint): Handle<Error>;
 
   SkipRuntime_Runtime__update(
     input: ptr<Internal.String>,
     values: ptr<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
-  ): Handle<ErrorObject>;
+  ): Handle<Error>;
 
   // Reducer
 
@@ -241,10 +240,10 @@ export interface FromWasm {
   ): ptr<Internal.Reducer>;
 
   // initService
-  SkipRuntime_initService(service: ptr<Internal.Service>): Handle<ErrorObject>;
+  SkipRuntime_initService(service: ptr<Internal.Service>): Handle<Error>;
 
   // closeClose
-  SkipRuntime_closeService(): Handle<ErrorObject>;
+  SkipRuntime_closeService(): Handle<Error>;
 
   // Context
 
@@ -274,7 +273,7 @@ export interface FromWasm {
 
 interface ToWasm {
   //
-  SkipRuntime_getErrorHdl(exn: ptr<Internal.Exception>): Handle<ErrorObject>;
+  SkipRuntime_getErrorHdl(exn: ptr<Internal.Exception>): Handle<Error>;
   SkipRuntime_pushContext(refs: ptr<Internal.Context>): void;
   SkipRuntime_popContext(): void;
   SkipRuntime_getContext(): Nullable<ptr<Internal.Context>>;
@@ -453,7 +452,7 @@ export class WasmFromBinding implements FromBinding {
     name: string,
     values: Pointer<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
     isInit: boolean,
-  ): Handle<ErrorObject> {
+  ): Handle<Error> {
     return this.fromWasm.SkipRuntime_CollectionWriter__update(
       this.utils.exportString(name),
       toPtr(values),
@@ -464,14 +463,14 @@ export class WasmFromBinding implements FromBinding {
   SkipRuntime_CollectionWriter__error(
     name: string,
     error: Pointer<Internal.CJSON>,
-  ): Handle<ErrorObject> {
+  ): Handle<Error> {
     return this.fromWasm.SkipRuntime_CollectionWriter__error(
       this.utils.exportString(name),
       toPtr(error),
     );
   }
 
-  SkipRuntime_CollectionWriter__loading(name: string): Handle<ErrorObject> {
+  SkipRuntime_CollectionWriter__loading(name: string): Handle<Error> {
     return this.fromWasm.SkipRuntime_CollectionWriter__loading(
       this.utils.exportString(name),
     );
@@ -664,7 +663,7 @@ export class WasmFromBinding implements FromBinding {
     identifier: string,
     resource: string,
     jsonParams: Pointer<Internal.CJObject>,
-  ): Handle<ErrorObject> {
+  ): Handle<Error> {
     return this.fromWasm.SkipRuntime_Runtime__createResource(
       this.utils.exportString(identifier),
       this.utils.exportString(resource),
@@ -698,7 +697,7 @@ export class WasmFromBinding implements FromBinding {
     );
   }
 
-  SkipRuntime_Runtime__closeResource(identifier: string): Handle<ErrorObject> {
+  SkipRuntime_Runtime__closeResource(identifier: string): Handle<Error> {
     return this.fromWasm.SkipRuntime_Runtime__closeResource(
       this.utils.exportString(identifier),
     );
@@ -716,14 +715,14 @@ export class WasmFromBinding implements FromBinding {
     );
   }
 
-  SkipRuntime_Runtime__unsubscribe(id: bigint): Handle<ErrorObject> {
+  SkipRuntime_Runtime__unsubscribe(id: bigint): Handle<Error> {
     return this.fromWasm.SkipRuntime_Runtime__unsubscribe(id);
   }
 
   SkipRuntime_Runtime__update(
     input: string,
     values: Pointer<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
-  ): Handle<ErrorObject> {
+  ): Handle<Error> {
     return this.fromWasm.SkipRuntime_Runtime__update(
       this.utils.exportString(input),
       toPtr(values),
@@ -737,13 +736,11 @@ export class WasmFromBinding implements FromBinding {
     return this.fromWasm.SkipRuntime_createReducer(ref, toPtr(defaultValue));
   }
 
-  SkipRuntime_initService(
-    service: Pointer<Internal.Service>,
-  ): Handle<ErrorObject> {
+  SkipRuntime_initService(service: Pointer<Internal.Service>): Handle<Error> {
     return this.fromWasm.SkipRuntime_initService(toPtr(service));
   }
 
-  SkipRuntime_closeService(): Handle<ErrorObject> {
+  SkipRuntime_closeService(): Handle<Error> {
     return this.fromWasm.SkipRuntime_closeService();
   }
 
@@ -816,7 +813,7 @@ class LinksImpl implements Links {
   }
 
   //
-  getErrorHdl(exn: ptr<Internal.Exception>): Handle<ErrorObject> {
+  getErrorHdl(exn: ptr<Internal.Exception>): Handle<Error> {
     return this.tobinding.SkipRuntime_getErrorHdl(exn);
   }
 

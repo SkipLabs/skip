@@ -9,26 +9,7 @@ export interface Pointer<InternalType extends T<any>> {
 export type float = number;
 export type int = number;
 
-export type ErrorObject = {
-  message: string;
-  stack?: string[];
-  cause?: ErrorObject;
-};
-
 export type Nullable<T> = T | null;
-
-export function errorObjectAsError(e: ErrorObject): Error {
-  const error = new Error(e.message);
-  error.stack = e.stack?.join("\n");
-  if (e.cause) {
-    Object.defineProperty(error, "cause", {
-      enumerable: true,
-      writable: true,
-      value: errorObjectAsError(e.cause),
-    });
-  }
-  return error;
-}
 
 export const sk_isObjectProxy: unique symbol = Symbol();
 

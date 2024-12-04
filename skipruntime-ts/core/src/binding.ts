@@ -11,8 +11,6 @@ import {
   type SkipService,
 } from "@skipruntime/api";
 
-import type { ErrorObject } from "@skiplang/std";
-
 export type Handle<T> = Internal.Opaque<number, { handle_for: T }>;
 
 export class ResourceBuilder {
@@ -81,14 +79,14 @@ export interface FromBinding {
     name: string,
     values: Pointer<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
     isInit: boolean,
-  ): Handle<ErrorObject>;
+  ): Handle<Error>;
 
   SkipRuntime_CollectionWriter__error(
     name: string,
     error: Pointer<Internal.CJSON>,
-  ): Handle<ErrorObject>;
+  ): Handle<Error>;
 
-  SkipRuntime_CollectionWriter__loading(name: string): Handle<ErrorObject>;
+  SkipRuntime_CollectionWriter__loading(name: string): Handle<Error>;
 
   // Resource
 
@@ -192,7 +190,7 @@ export interface FromBinding {
     identifier: string,
     resource: string,
     jsonParams: Pointer<Internal.CJObject>,
-  ): Handle<ErrorObject>;
+  ): Handle<Error>;
 
   SkipRuntime_Runtime__getAll(
     resource: string,
@@ -207,7 +205,7 @@ export interface FromBinding {
     request: Pointer<Internal.Request> | null,
   ): Pointer<Internal.CJObject | Internal.CJFloat>;
 
-  SkipRuntime_Runtime__closeResource(identifier: string): Handle<ErrorObject>;
+  SkipRuntime_Runtime__closeResource(identifier: string): Handle<Error>;
 
   SkipRuntime_Runtime__subscribe(
     collection: string,
@@ -215,12 +213,12 @@ export interface FromBinding {
     watermark: Nullable<string>,
   ): bigint;
 
-  SkipRuntime_Runtime__unsubscribe(id: bigint): Handle<ErrorObject>;
+  SkipRuntime_Runtime__unsubscribe(id: bigint): Handle<Error>;
 
   SkipRuntime_Runtime__update(
     input: string,
     values: Pointer<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
-  ): Handle<ErrorObject>;
+  ): Handle<Error>;
 
   // Reducer
 
@@ -230,12 +228,10 @@ export interface FromBinding {
   ): Pointer<Internal.Reducer>;
 
   // initService
-  SkipRuntime_initService(
-    service: Pointer<Internal.Service>,
-  ): Handle<ErrorObject>;
+  SkipRuntime_initService(service: Pointer<Internal.Service>): Handle<Error>;
 
   // closeClose
-  SkipRuntime_closeService(): Handle<ErrorObject>;
+  SkipRuntime_closeService(): Handle<Error>;
 
   // Context
 
