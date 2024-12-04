@@ -8,10 +8,10 @@ const config: Config = {
   favicon: "img/favicon.svg",
 
   // Set the production url of your site here
-  url: "https://skiplabsdocscms-00-pbrstreetgang-00s-projects.vercel.app/",
+  url: "https://docs-site-sigma.vercel.app/",
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
-  baseUrl: "/",
+  baseUrl: "/docs/",
 
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
@@ -74,7 +74,7 @@ const config: Config = {
         //   position: "left",
         //   label: "Docs",
         // },
-        // { to: "/docs/api", label: "API", position: "left" },
+        // { to: "/docs/docs/api", label: "API", position: "left" },
         // { to: "/blog", label: "Blog", position: "left" },
         { to: "?", label: "Search", position: "left" },
         // { to: "/CHANGELOG", label: "Release notes", position: "left" },
@@ -103,19 +103,19 @@ const config: Config = {
           items: [
             {
               label: "Getting started",
-              to: "/docs/getting_started",
+              to: "/docs/docs/getting_started",
             },
             {
               label: "Core concepts",
-              to: "/docs/introduction#core-concepts",
+              to: "/docs/docs/introduction#core-concepts",
             },
             {
               label: "Skip API",
-              to: "/docs/api/api",
+              to: "/docs/docs/api/api",
             },
             {
               label: "Resources",
-              to: "/docs/resources",
+              to: "/docs/docs/resources",
             },
           ],
         },
@@ -167,7 +167,7 @@ const config: Config = {
       "docusaurus-plugin-typedoc",
       {
         id: "api",
-        out: "docs/api/api",
+        out: "/docs/docs/api/api",
         entryPoints: ["../skipruntime-ts/api/src/api.ts"],
         tsconfig: "../skipruntime-ts/api/tsconfig.json",
         readme: "none",
@@ -189,7 +189,7 @@ const config: Config = {
       "docusaurus-plugin-typedoc",
       {
         id: "server",
-        out: "docs/api/server",
+        out: "/docs/docs/api/server",
         entryPoints: ["../skipruntime-ts/server/src/server.ts"],
         tsconfig: "../skipruntime-ts/server/tsconfig.json",
         readme: "none",
@@ -211,7 +211,7 @@ const config: Config = {
       "docusaurus-plugin-typedoc",
       {
         id: "helpers",
-        out: "docs/api/helpers",
+        out: "/docs/docs/api/helpers",
         entryPoints: ["../skipruntime-ts/helpers/src/index.ts"],
         tsconfig: "../skipruntime-ts/helpers/tsconfig.json",
         readme: "none",
