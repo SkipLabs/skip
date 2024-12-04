@@ -1,8 +1,8 @@
 import type * as Internal from "@skiplang/std/internal.js";
-import type { Pointer, float, int, ErrorObject, Nullable } from "@skiplang/std";
+import type { Pointer, float, int, Nullable } from "@skiplang/std";
 import { cloneIfProxy } from "@skiplang/std";
 
-export type { float, int, ErrorObject, Nullable, Pointer };
+export type { float, int, Nullable, Pointer };
 
 export type ptr<InternalType extends Internal.T<any>> = Internal.Opaque<
   number,
@@ -579,9 +579,9 @@ export class Utils {
     }
   };
 
-  getErrorObject = (skExc: ptr<Internal.Exception>): ErrorObject => {
+  getErrorObject = (skExc: ptr<Internal.Exception>): Error => {
     if (skExc == 0) {
-      return { message: "SKStore Internal error" };
+      return new Error("SKStore Internal error");
     }
     let message = this.importString(
       this.exports.SKIP_getExceptionMessage(skExc),
@@ -604,27 +604,18 @@ export class Utils {
         message = "SKStore Internal error";
       }
     }
-    const toObject: (error: Error) => ErrorObject = (error?: Error) => {
-      const errcause = (error as any).cause;
-      const errstack = error?.stack?.split("\n");
-      if (errstack) {
-        return errcause
-          ? { message, cause: errcause, stack: errstack }
-          : { message, stack: errstack };
-      } else {
-        return errcause ? { message, cause: errcause } : { message };
-      }
-    };
+    const error = new Error(message);
     if (errStack) {
-      const stack: string[] = errStack.split("\n");
-      return this.exception
-        ? { message, cause: toObject(this.exception), stack }
-        : { message, stack };
-    } else {
-      return this.exception
-        ? { message, cause: toObject(this.exception) }
-        : { message };
+      error.stack = errStack;
     }
+    if (this.exception) {
+      Object.defineProperty(error, "cause", {
+        enumerable: true,
+        writable: true,
+        value: this.exception,
+      });
+    }
+    return error;
   };
 
   getPersistentSize = () => this.exports.SKIP_get_persistent_size();
