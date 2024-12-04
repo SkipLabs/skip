@@ -1,4 +1,5 @@
-import type { int, Wrk } from "./sk_types.js";
+import type { int } from "@skiplang/std";
+import type { Wrk } from "./sk_types.js";
 
 export class Wrappable {
   wrappedId?: int;
