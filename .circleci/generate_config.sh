@@ -10,7 +10,7 @@ skstore=$?
 git diff --quiet HEAD $(git merge-base main HEAD) -- sql/ skiplang/sqlparser/ skiplang/skbuild/
 skdb=$?
 git diff --quiet HEAD $(git merge-base main HEAD) -- skipruntime-ts/
-skipruntime_wasm=$?
+skipruntime=$?
 git diff --quiet HEAD $(git merge-base main HEAD) -- skiplang/prelude/ts/
 ts_prelude=$?
 
@@ -69,11 +69,14 @@ then
 EOF
 fi
 
-if (( $skdb != 0 || $skstore != 0 || $skipruntime_wasm != 0 || $ts_prelude != 0 ))
+if (( $skdb != 0 || $skstore != 0 || $skipruntime != 0 || $ts_prelude != 0 ))
 then
     cat <<EOF
   skipruntime-wasm:
     jobs:
       - skipruntime-wasm
+  skipruntime-native:
+    jobs:
+      - skipruntime-native
 EOF
 fi
