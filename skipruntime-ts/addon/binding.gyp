@@ -11,7 +11,7 @@
       ],
       "cflags!": ["-fno-exceptions"],
       "cflags_cc!": ["-fno-exceptions"],
-      "libraries": ["~/skip-runtime/libskip-runtime-ts.so"]
+      "libraries": ["<!(pwd)/dist/libskip-runtime-ts.so"],
     }
   ]
 }
