@@ -48,3 +48,7 @@ clean:
 .PHONY: test
 test: bunbuild
 	../bin/cd_sh wasm "bun run test"
+
+.PHONY: test-native
+test-native: bunbuild
+	../bin/cd_sh addon "npm run test"
