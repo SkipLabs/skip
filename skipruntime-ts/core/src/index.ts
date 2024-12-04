@@ -38,9 +38,17 @@ import {
 } from "./binding.js";
 
 export { UnknownCollectionError, sk_freeze, isSkFrozen };
+export { SkipExternalService } from "./remote.js";
 
 export type JSONMapper = Mapper<Json, Json, Json, Json>;
 export type JSONLazyCompute = LazyCompute<Json, Json>;
+
+export type Entrypoint = {
+  host: string;
+  streaming_port: number;
+  control_port: number;
+  secured?: boolean;
+};
 
 abstract class SkFrozen extends Frozen {
   protected freeze() {

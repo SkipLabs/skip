@@ -22,7 +22,11 @@ export type {
 
 export type { ServiceInstance } from "@skipruntime/core";
 export { OneToOneMapper, ManyToOneMapper } from "@skipruntime/api";
-export { deepFreeze, UnknownCollectionError } from "@skipruntime/core";
+export {
+  deepFreeze,
+  UnknownCollectionError,
+  SkipExternalService,
+} from "@skipruntime/core";
 export {
   type ExternalResource,
   GenericExternalService,
