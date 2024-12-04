@@ -1,5 +1,5 @@
-import type { T } from "@skip-wasm/std/internal.js";
-export type * from "@skip-wasm/std/internal.js";
+import type { T, Vector, Pair, String } from "@skiplang/std/internal.js";
+export type * from "@skiplang/std/internal.js";
 
 declare const _CJNull: unique symbol;
 export type CJNull = CJSON<typeof _CJNull>;
@@ -27,3 +27,6 @@ export type CJSON<Sub = any, Sub2 = any> = T<typeof _CJSON> & {
   sub: Sub;
   sub2: Sub2;
 };
+
+export type PartialCJObj = Vector<Pair<String, CJSON>>;
+export type PartialCJArray<T extends CJSON> = Vector<T>;

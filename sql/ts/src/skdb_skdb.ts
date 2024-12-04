@@ -6,7 +6,7 @@ import type {
   ToWasmManager,
   Utils,
 } from "@skip-wasm/std";
-import type * as Internal from "@skip-wasm/std/internal.js";
+import type * as Internal from "@skiplang/std/internal.js";
 import type {
   PagedMemory,
   Page,
@@ -19,8 +19,9 @@ import type {
 import { ExternalFuns, SKDBTable } from "./skdb_util.js";
 import { IDBStorage } from "./skdb_storage.js";
 import { SKDBImpl, SKDBSyncImpl } from "./skdb_database.js";
-import type { SKJSON } from "@skip-wasm/json";
-import type * as InternalJ from "@skip-wasm/json/internal.js";
+import type { SKJSONShared } from "@skip-wasm/json";
+import type { JsonConverter } from "@skiplang/json";
+import type * as InternalJ from "@skiplang/json/internal.js";
 
 interface Exported {
   sk_pop_dirty_page: () => number;
@@ -213,7 +214,7 @@ class LinksImpl implements Links, ToWasm {
   private notifications: Set<number>[];
   private notifying: boolean;
   private freeQueryIDs: number[];
-  private skjson?: SKJSON;
+  private skjson?: JsonConverter;
 
   SKIP_last_tick!: (queryID: int) => int;
   SKIP_switch_to!: (stream: int) => void;
@@ -258,7 +259,9 @@ class LinksImpl implements Links, ToWasm {
     const exported = exports as Exported;
     const skjson = () => {
       if (this.skjson == undefined) {
-        this.skjson = this.environment.shared.get("SKJSON")! as SKJSON;
+        this.skjson = (
+          this.environment.shared.get("SKJSON")! as SKJSONShared
+        ).converter;
       }
       return this.skjson;
     };
