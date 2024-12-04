@@ -1432,7 +1432,6 @@ private fun createResource_(
   resource: String,
   params: Map<String, PValue>,
 ): ResourceInfo {
-  definition = ResourceDef(resource, Params(params));
   resourceHdl = SKStore.EHandle(
     SKStore.SID::keyType,
     ResourceDef::type,
@@ -1443,6 +1442,7 @@ private fun createResource_(
   | Some _ -> throw ExistingResourceException()
   | _ -> void
   };
+  definition = ResourceDef(resource, Params(params));
   resourceHdl.writeArray(context, key, Array[definition]);
   updateContext(context);
   graphHdl = SKStore.EHandle(
