@@ -1,9 +1,8 @@
-import type {
-  EagerCollection,
-  InitialData,
-  Mapper,
-  NonEmptyIterator,
-  Resource,
+import {
+  type EagerCollection,
+  type InitialData,
+  type Resource,
+  OneToManyMapper,
 } from "@skipruntime/api";
 
 import { runService } from "@skipruntime/server";
@@ -40,33 +39,24 @@ type ResourceInputs = {
 };
 
 // Mapper function to compute the active users of each group
-class ActiveUsers implements Mapper<GroupID, Group, GroupID, UserID> {
-  constructor(private users: EagerCollection<UserID, User>) {}
+class ActiveUsers extends OneToManyMapper<GroupID, Group, UserID> {
+  constructor(private users: EagerCollection<UserID, User>) {
+    super();
+  }
 
-  mapEntry(
-    gid: GroupID,
-    group: NonEmptyIterator<Group>,
-  ): Iterable<[GroupID, UserID]> {
-    return group
-      .getUnique()
-      .members.filter((uid) => this.users.getUnique(uid).active)
-      .map((uid) => [gid, uid]);
+  mapValue(group: Group): UserID[] {
+    return group.members.filter((uid) => this.users.getUnique(uid).active);
   }
 }
 
 // Mapper function to filter out those active users who are also friends with `user`
-class FilterFriends implements Mapper<GroupID, UserID, GroupID, UserID> {
-  constructor(private readonly user: User) {}
+class FilterFriends extends OneToManyMapper<GroupID, UserID, UserID> {
+  constructor(private readonly user: User) {
+    super();
+  }
 
-  mapEntry(
-    gid: GroupID,
-    uids: NonEmptyIterator<UserID>,
-  ): Iterable<[GroupID, UserID]> {
-    return uids
-      .toArray()
-      .reduce<
-        [GroupID, UserID][]
-      >((acc, uid) => (this.user.friends.includes(uid) ? [...acc, [gid, uid]] : acc), []);
+  mapValue(uid: UserID): UserID[] {
+    return this.user.friends.includes(uid) ? [uid] : [];
   }
 }
 
