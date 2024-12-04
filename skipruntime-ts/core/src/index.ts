@@ -38,11 +38,19 @@ import {
 } from "./binding.js";
 
 export { UnknownCollectionError };
+export { SkipExternalService } from "./remote.js";
 
 const sk_frozen: unique symbol = Symbol.for("Skip.frozen");
 
 export type JSONMapper = Mapper<Json, Json, Json, Json>;
 export type JSONLazyCompute = LazyCompute<Json, Json>;
+
+export type Entrypoint = {
+  host: string;
+  streaming_port: number;
+  control_port: number;
+  secured?: boolean;
+};
 
 export function sk_freeze<T extends object>(x: T): T & Constant {
   return Object.defineProperty(x, sk_frozen, {
