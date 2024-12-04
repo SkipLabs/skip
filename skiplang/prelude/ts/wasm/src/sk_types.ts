@@ -1,19 +1,30 @@
-import type * as Internal from "./sk_internal_types.js";
-export type { Opaque } from "./sk_internal_types.js";
+import type * as Internal from "@skiplang/std/internal.js";
+import type { Pointer, float, int, ErrorObject, Nullable } from "@skiplang/std";
+import { cloneIfProxy } from "@skiplang/std";
 
-export type float = number;
-export type int = number;
+export type { float, int, ErrorObject, Nullable, Pointer };
+
 export type ptr<InternalType extends Internal.T<any>> = Internal.Opaque<
   number,
   InternalType
->;
-export type ErrorObject = {
-  message: string;
-  stack?: string[];
-  cause?: ErrorObject;
-};
+> &
+  Pointer<InternalType>;
 
-export type Nullable<T> = T | null;
+export function toPtr<T extends Internal.T<any>>(pointer: Pointer<T>): ptr<T> {
+  return pointer as ptr<T>;
+}
+
+export function toNullablePtr<T extends Internal.T<any>>(
+  pointer: Nullable<Pointer<T>>,
+): Nullable<ptr<T>> {
+  return pointer ? (pointer as ptr<T>) : null;
+}
+
+export function toNullablePointer<T extends Internal.T<any>>(
+  ptrVal: Nullable<ptr<T>>,
+): Nullable<Pointer<T>> {
+  return ptrVal !== null && ptrVal != 0 ? ptrVal : null;
+}
 
 export enum Stream {
   OUT,
@@ -654,9 +665,10 @@ export class Utils {
     this.stddebug = [];
     const obsPos = this.exports.SKIP_new_Obstack();
     try {
-      const res = fn();
+      // clone must be done before SKIP_destroy_Obstack
+      const res = cloneIfProxy(fn());
       this.exports.SKIP_destroy_Obstack(obsPos);
-      return cloneIfProxy(res);
+      return res;
     } catch (ex) {
       this.exports.SKIP_destroy_Obstack(obsPos);
       throw ex;
@@ -906,32 +918,4 @@ export async function run(
     buffer = await env.fetch(url);
   }
   return await start(modules, buffer, env, main);
-}
-
-export const sk_isObjectProxy: unique symbol = Symbol();
-
-export function cloneIfProxy<T>(v: T): T {
-  if (
-    v !== null &&
-    typeof v === "object" &&
-    sk_isObjectProxy in v &&
-    v[sk_isObjectProxy] &&
-    "clone" in v
-  ) {
-    return (v.clone as () => T)();
-  }
-  return v;
-}
-
-export function errorObjectAsError(e: ErrorObject): Error {
-  const error = new Error(e.message);
-  error.stack = e.stack?.join("\n");
-  if (e.cause) {
-    Object.defineProperty(error, "cause", {
-      enumerable: true,
-      writable: true,
-      value: errorObjectAsError(e.cause),
-    });
-  }
-  return error;
 }
