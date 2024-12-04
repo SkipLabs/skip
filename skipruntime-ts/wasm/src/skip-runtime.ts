@@ -26,6 +26,10 @@ export {
   deepFreeze,
   UnknownCollectionError,
   SkipExternalService,
+  Sum,
+  Min,
+  Max,
+  CountMapper,
 } from "@skipruntime/core";
 export {
   type ExternalResource,

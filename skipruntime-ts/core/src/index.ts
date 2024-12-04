@@ -39,6 +39,7 @@ import {
 
 export { UnknownCollectionError, sk_freeze, isSkFrozen };
 export { SkipExternalService } from "./remote.js";
+export { Sum, Min, Max, CountMapper } from "./utils.js";
 
 export type JSONMapper = Mapper<Json, Json, Json, Json>;
 export type JSONLazyCompute = LazyCompute<Json, Json>;
