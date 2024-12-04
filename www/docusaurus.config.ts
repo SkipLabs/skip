@@ -77,7 +77,7 @@ const config: Config = {
         // { to: "/docs/api", label: "API", position: "left" },
         // { to: "/blog", label: "Blog", position: "left" },
         { to: "?", label: "Search", position: "left" },
-        { to: "/CHANGELOG", label: "Release notes", position: "left" },
+        // { to: "/CHANGELOG", label: "Release notes", position: "left" },
         {
           label: "Chat (Discord)",
           href: "https://discord.gg/4dMEBA46mE",
