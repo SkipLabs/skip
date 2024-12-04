@@ -2,7 +2,7 @@ import {
   type EagerCollection,
   type InitialData,
   type Resource,
-  OneToOneMapper,
+  OneToManyMapper,
 } from "@skipruntime/api";
 
 import { runService } from "@skipruntime/server";
@@ -35,11 +35,11 @@ type ServiceInputs = {
 // Type alias for inputs to the active friends resource
 type ResourceInputs = {
   users: EagerCollection<UserID, User>;
-  actives: EagerCollection<GroupID, UserID[]>;
+  actives: EagerCollection<GroupID, UserID>;
 };
 
 // Mapper function to compute the active users of each group
-class ActiveUsers extends OneToOneMapper<GroupID, Group, UserID[]> {
+class ActiveUsers extends OneToManyMapper<GroupID, Group, UserID> {
   constructor(private users: EagerCollection<UserID, User>) {
     super();
   }
@@ -50,13 +50,13 @@ class ActiveUsers extends OneToOneMapper<GroupID, Group, UserID[]> {
 }
 
 // Mapper function to filter out those active users who are also friends with `user`
-class FilterFriends extends OneToOneMapper<GroupID, UserID[], UserID[]> {
+class FilterFriends extends OneToManyMapper<GroupID, UserID, UserID> {
   constructor(private readonly user: User) {
     super();
   }
 
-  mapValue(uids: UserID[]): UserID[] {
-    return uids.filter((uid) => this.user.friends.includes(uid));
+  mapValue(uid: UserID): UserID[] {
+    return this.user.friends.includes(uid) ? [uid] : [];
   }
 }
 
@@ -68,7 +68,7 @@ class ActiveFriends implements Resource<ResourceInputs> {
     this.uid = params["uid"];
   }
 
-  instantiate(inputs: ResourceInputs): EagerCollection<GroupID, UserID[]> {
+  instantiate(inputs: ResourceInputs): EagerCollection<GroupID, UserID> {
     const user = inputs.users.getUnique(this.uid);
     return inputs.actives.map(FilterFriends, user);
   }
