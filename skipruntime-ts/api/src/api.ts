@@ -368,7 +368,7 @@ export interface Resource<
   /**
    * Build a reactive compute graph of the reactive resource
    * @param collections - the collections returned by SkipService's `createGraph`
-   * @param context {Context} - the reactive graph context
+   * @param context - the reactive graph context
    * @returns - An eager collection containing the outputs of this resource for the given
    * parameters, produced from the static output collections of the service's `createGraph`
    */
@@ -408,7 +408,7 @@ export interface SkipService<
    * This graph can be extended by the resources' `instantiate` methods to extend the
    * compute graph dynamically as needed to serve requests.
    * @param inputCollections - the input collections of this service
-   * @param context {Context} - the reactive graph context
+   * @param context - the reactive graph context
    * @returns - the reactive collections accessible by the resources
    */
   createGraph(inputCollections: Inputs, context: Context): ResourceInputs;
