@@ -39,6 +39,7 @@ import {
 
 export { UnknownCollectionError };
 export { SkipExternalService } from "./remote.js";
+export { Sum, Min, Max, CountMapper } from "./utils.js";
 
 const sk_frozen: unique symbol = Symbol.for("Skip.frozen");
 

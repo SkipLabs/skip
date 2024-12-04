@@ -15,7 +15,7 @@ import type {
   ExternalService,
 } from "@skipruntime/api";
 import { NonUniqueValueException, OneToOneMapper } from "@skipruntime/api";
-import { Sum } from "@skipruntime/helpers";
+import { Sum } from "@skipruntime/core";
 
 import {
   TimerResource,
