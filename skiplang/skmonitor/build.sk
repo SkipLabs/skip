@@ -1,0 +1,29 @@
+module SkmonitorBuild;
+
+@skbuild_extra_sources
+fun extra_sources(env: Skbuild.Env): Array<String> {
+  if (env.isWasm32()) {
+    Array["extra/wasm32.sk"]
+  } else {
+    Array["extra/host.sk"]
+  }
+}
+
+@skbuild_source_dirs
+fun source_dirs(env: Skbuild.Env): Array<String> {
+  if (!env.isWasm32()) {
+    Array["extern", "extern/common"]
+  } else {
+    Array["extern/common"]
+  }
+}
+
+module end;
+
+@debug
+fun main(): void {
+  Skbuild.build() match {
+  | Failure(err) -> skipExit(err.code)
+  | _ -> void
+  };
+}

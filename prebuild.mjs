@@ -9,6 +9,7 @@ const symlinks = {
   "skipwasm-date": "./skiplang/skdate/ts/src",
   "skiplang-json": "./skiplang/skjson/ts/binding/src",
   "skipwasm-json": "./skiplang/skjson/ts/wasm/src",
+  "skipwasm-monitor": "./skiplang/skmonitor/ts/src",
 };
 
 const filename = fileURLToPath(import.meta.url);
