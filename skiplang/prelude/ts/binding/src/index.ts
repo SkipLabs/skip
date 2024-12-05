@@ -10,6 +10,11 @@ export interface Pointer<InternalType extends T<any>> {
 export type float = number;
 export type int = number;
 
+/**
+ * Potentially `null` values.
+ *
+ * The type `Nullable<T>` of potentially `null` values of type `T`.
+ */
 export type Nullable<T> = T | null;
 
 export const sk_isObjectProxy: unique symbol = Symbol();
