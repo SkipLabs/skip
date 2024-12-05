@@ -8,7 +8,7 @@ const config: Config = {
   favicon: "img/favicon.svg",
 
   // Set the production url of your site here
-  url: "https://skiplabsdocscms-00-pbrstreetgang-00s-projects.vercel.app/",
+  url: "https://docs-site-sigma.vercel.app/",
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
   baseUrl: "/",
