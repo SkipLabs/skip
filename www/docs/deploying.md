@@ -2,20 +2,19 @@
 
 The process of setting up and deploying a Skip service is mostly similar to that of other backend systems (databases, caches, etc.) but there are some important nuances to be aware of.
 
-This page walks through those details, or you can refer to the examples [setup](https://github.com/SkipLabs/skip/tree/main/examples/hackernews) for a representative and complete practical configuration based on standard tooling including Docker, HAProxy, Flask, and React.
+This page walks through those details, or you can refer to an example's [setup](https://github.com/SkipLabs/skip/tree/main/examples/hackernews) for a representative and complete practical configuration based on standard tooling including Docker, HAProxy, Flask, and React.
 
 ## Overview
 
 Skip reactive services define an HTTP interface for reading, writing, and subscribing to data.
-In production use cases for web applications, this should be deployed behind a reverse proxy such as Nginx, HAProxy, or Traefik which is responsible for traffic encryption, load balancing, HTTP tunnelling, and dispatching requests to backend services.
+In production use cases for web applications, this should be deployed behind a reverse proxy such as Nginx, HAProxy, or Traefik which is responsible for traffic encryption, load balancing, HTTP tunneling, and dispatching requests to backend services.
 Throughout this page we will show HAProxy configuration in examples, but it should be directly applicable to other proxies.
 
 Skip is agnostic to your choice of reverse proxy, but it is important that it is configured with HTTP/2 for request/response multiplexing, to avoid browser limitations on concurrent server-sent event connections, and to ensure that TLS is used.
 
 ### Running your service
 
-We recommend using Docker Compose to package and run your reactive service.
-For example, use the following `Dockerfile` to build and run your service, exposing the necessary ports and initializing the service.
+You can build and run your reactive service using Docker Compose and the following `Dockerfile` to expose the necessary ports and initialize the service.
 ```
 FROM node:lts-alpine3.19
 WORKDIR /app
@@ -51,12 +50,12 @@ backend skip
 
 The `acl` and `use_backend` lines in the frontend configuration forward any traffic at a path beginning with `streams` to the `skip` backend.
 Then, that backend rewrites those public-facing urls to the form expected by the reactive service (in this case, just by prepending `/v1`) and specifies the reactive service's address: `reactive_service:8080` here for a service defined as `reactive_service` using Docker Compose and using the default port.
-This is a simple "hello world" configuration for a single reactive service; in practice, more involved URL rewriting schemes and ACLs can be employed to orchestrate traffic between multiple public HTTPs endpoints and/or backend reactive services.
+This is a simple "hello world" configuration for a single reactive service; in practice, more involved URL rewriting schemes and ACLs can be employed to orchestrate traffic between multiple public HTTPS endpoints and/or backend reactive services.
 
 ### Control operations and reads/writes
 
 The control port of your Skip reactive service should in general only be exposed to other backend services within your secure network, since it allows access to stream creation/deletion and data read/write operations.
 
 This also allows a Skip reactive service to be integrated into your existing web backend(s) -- regardless of their choice of programming language or web framework.
-For example, we show [here](https://github.com/SkipLabs/skip/tree/main/examples/hackernews/web_service/app.py) an example Python web app using Flask and backed by a reactive service which it communicates to directly over HTTP using the `requests` library and [here](https://github.com/SkipLabs/skip/tree/main/skipruntime-ts) (at `*-server.ts`) for a variety of examples in JavaScript using Express.
-For JavaScript backends, we also provide a programmatic interface [`SkipServiceBroker`](TODO) which simplifies the integration and obviates the need to construct and manipulate HTTP requests directly.
+For example, see [here](https://github.com/SkipLabs/skip/tree/main/examples/hackernews/web_service/app.py) for an example Python web app using Flask and backed by a reactive service which it communicates to directly over HTTP using the `requests` library, and [here](https://github.com/SkipLabs/skip/tree/main/skipruntime-ts) (at `*-server.ts`) for a variety of examples in JavaScript using Express.
+For JavaScript backends, we also provide a programmatic interface [`SkipServiceBroker`](api/helpers/classes/SkipServiceBroker) which simplifies the integration and obviates the need to construct and manipulate HTTP requests directly.
