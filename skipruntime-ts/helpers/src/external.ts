@@ -1,6 +1,9 @@
 import type { Entry, ExternalService, Json } from "@skipruntime/api";
 import { fetchJSON } from "./rest.js";
 
+/**
+ * Interface required by `GenericExternalService` for external resources.
+ */
 export interface ExternalResource {
   open(
     params: Json,
@@ -14,7 +17,15 @@ export interface ExternalResource {
   close(params: Json): void;
 }
 
+/**
+ * A generic external service providing external resources.
+ *
+ * `GenericExternalService` provides an implementation of `ExternalService` for external resources by lifting the `open` and `close` operations from `ExternalResource` to the `subscribe` and `unsubscribe` operations required by `ExternalService`.
+ */
 export class GenericExternalService implements ExternalService {
+  /**
+   * @param resources - Association of resource names to `ExternalResource`s.
+   */
   constructor(
     private readonly resources: { [name: string]: ExternalResource },
   ) {}
@@ -106,11 +117,24 @@ function defaultParamEncoder(params: Json): string {
   } else return `params=${JSON.stringify(params)}`;
 }
 
+/**
+ * An external resource that is refreshed at some polling interval.
+ *
+ * @typeParam S - Type of data received from external resource.
+ * @typeParam K - Type of keys.
+ * @typeParam V - Type of values.
+ */
 export class Polled<S extends Json, K extends Json, V extends Json>
   implements ExternalResource
 {
   private readonly intervals = new Map<string, Timeout>();
 
+  /**
+   * @param url - HTTP endpoint of external resource to poll.
+   * @param duration - Refresh interval, in milliseconds.
+   * @param conv - Function to convert data of type `S` received from external resource to `key`-`value` entries.
+   * @param encodeParams - Function to use to encode params of type `Json` for external resource request.
+   */
   constructor(
     private readonly url: string,
     private readonly duration: number,
