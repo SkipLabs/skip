@@ -8,7 +8,7 @@ const config: Config = {
   favicon: "img/favicon.svg",
 
   // Set the production url of your site here
-  url: "https://skiplabsdocscms-00-pbrstreetgang-00s-projects.vercel.app/",
+  url: "https://skiplabs.io/",
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
   baseUrl: "/",
@@ -97,63 +97,63 @@ const config: Config = {
     },
     footer: {
       style: "dark",
-      links: [
-        {
-          title: "Popular Topics",
-          items: [
-            {
-              label: "Getting started",
-              to: "/docs/getting_started",
-            },
-            {
-              label: "Core concepts",
-              to: "/docs/introduction#core-concepts",
-            },
-            {
-              label: "Skip API",
-              to: "/docs/api/api",
-            },
-            {
-              label: "Resources",
-              to: "/docs/resources",
-            },
-          ],
-        },
-        // {
-        //   title: "Community",
-        //   items: [
-        //     {
-        //       label: "GitHub",
-        //       href: "https://github.com/SkipLabs/skdb",
-        //     },
-        //     // {
-        //     //   label: "Stack Overflow",
-        //     //   href: "https://stackoverflow.com/questions/tagged/skiplabs",
-        //     // },
-        //     {
-        //       label: "Discord",
-        //       href: "https://discord.gg/4dMEBA46mE",
-        //     },
-        //     // {
-        //     //   label: "Twitter",
-        //     //   href: "https://twitter.com/skiplabs",
-        //     // },
-        //   ],
-        // },
-        // {
-        //   title: "More",
-        //   items: [
-        //     {
-        //       label: "Blog",
-        //       to: "/blog",
-        //     },
-        //     {
-        //       label: "GitHub",
-        //       href: "https://github.com/SkipLabs/skdb",
-        //     },
-        //   ],
-        // },
-      ],
+      // links: [
+      //   {
+      //     title: "Popular Topics",
+      //     items: [
+      //       {
+      //         label: "Getting started",
+      //         to: "/docs/getting_started",
+      //       },
+      //       {
+      //         label: "Core concepts",
+      //         to: "/docs/introduction#core-concepts",
+      //       },
+      //       {
+      //         label: "Skip API",
+      //         to: "/docs/api/api",
+      //       },
+      //       {
+      //         label: "Resources",
+      //         to: "/docs/resources",
+      //       },
+      //     ],
+      //   },
+      //   {
+      //     title: "Community",
+      //     items: [
+      //       {
+      //         label: "GitHub",
+      //         href: "https://github.com/SkipLabs/skdb",
+      //       },
+      //       // {
+      //       //   label: "Stack Overflow",
+      //       //   href: "https://stackoverflow.com/questions/tagged/skiplabs",
+      //       // },
+      //       {
+      //         label: "Discord",
+      //         href: "https://discord.gg/4dMEBA46mE",
+      //       },
+      //       // {
+      //       //   label: "Twitter",
+      //       //   href: "https://twitter.com/skiplabs",
+      //       // },
+      //     ],
+      //   },
+      //   {
+      //     title: "More",
+      //     items: [
+      //       {
+      //         label: "Blog",
+      //         to: "/blog",
+      //       },
+      //       {
+      //         label: "GitHub",
+      //         href: "https://github.com/SkipLabs/skdb",
+      //       },
+      //     ],
+      //   },
+      // ],
       copyright: `Copyright © ${new Date().getFullYear()} SkipLabs, Inc.`,
     },
     prism: {
