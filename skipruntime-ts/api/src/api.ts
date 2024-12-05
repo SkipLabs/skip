@@ -1,4 +1,5 @@
 import type { Opaque, Nullable, int, Constant } from "./internals.js";
+export type { Constant, Nullable, Opaque };
 
 /**
  * This file contains the Skip Runtime public API: types, interfaces, and operations that can
@@ -283,6 +284,9 @@ export interface LazyCompute<K extends Json, V extends Json> {
   compute(self: LazyCollection<K, V>, key: K): Nullable<V>;
 }
 
+/**
+ * Skip Runtime internal state.
+ */
 export interface Context extends Constant {
   /**
    * Creates a lazy reactive collection.
