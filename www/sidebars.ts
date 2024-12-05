@@ -21,7 +21,6 @@ const sidebars: SidebarsConfig = {
     "fundamentals",
     "deploying",
     "debugging",
-    "encyclopedia",
     "glossary",
     "reference",
     {
