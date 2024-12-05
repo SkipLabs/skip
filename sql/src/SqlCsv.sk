@@ -780,6 +780,7 @@ fun buildDiffChain(
   mutable SKStore.Context,
   SKStore.Context,
 ) ~> void) {
+  SKDBMonitor.startReplicationBatchHangling();
   strategies = Vector::mcreate();
 
   tableDiffs.each(td -> {
@@ -830,7 +831,8 @@ fun buildDiffChain(
     try {
       for (strategy in strategiesArray) {
         strategy(newRoot, delta, root)
-      }
+      };
+      SKDBMonitor.endReplicationBatchHangling()
     } catch {
     | exn ->
       writer = mutable Debug.BufferedWriter(print_raw, 4096);
@@ -838,6 +840,7 @@ fun buildDiffChain(
         nack(writer, tdiff)
       };
       writer.flush();
+      SKDBMonitor.endReplicationBatchHangling();
       throw exn
     }
   })
@@ -849,6 +852,7 @@ mutable class DiffParsingState(
 )
 
 fun nack(writer: mutable Debug.BufferedWriter, diff: FinalTableDiff): void {
+  SKDBMonitor.addReplicationRejectedRows(1 + diff.lines.size());
   writer.write("^" + SKDB.feedbackTable(diff.table.name.origName) + "\n");
   for (line in diff.lines) {
     writer.write(line);
@@ -866,12 +870,14 @@ fun replayDiff(
 ): SKStore.ContextOp {
   SKDB.getReplicationState(context, Some(identity)) match {
   | Some(SKDB.RSError()) ->
+    SKDBMonitor.replicationReboot();
     print_raw(":reboot\n");
     return SKStore.CStop(None())
   | _ -> void
   };
 
   userFileOpt = user.map(x -> SKDB.UserFile::create(context, x));
+  userFileOpt.each(uf -> SKDBMonitor.setUser(uf.name));
   immContext = context.clone();
   state: ?(mutable DiffParsingState) = None();
   try {
@@ -886,6 +892,7 @@ fun replayDiff(
         None()
 
       | None() ->
+        SKDBMonitor.startReplicationTable();
         (table, snapshot) = parseHeader(context, line);
         schema = schemas.maybeGet(table.name.toString());
         Some(
@@ -898,6 +905,8 @@ fun replayDiff(
       | Some(
         DiffParsingState(tableDiffs, currentDiff),
       ) if (String.getByte(line, 0) == 94) -> // startsWith("^")
+        SKDBMonitor.endReplicationTable();
+        SKDBMonitor.startReplicationTable();
         (table, snapshot) = parseHeader(context, line);
         schema = schemas.maybeGet(table.name.toString());
         tableDiffs.push(currentDiff);
@@ -911,6 +920,7 @@ fun replayDiff(
       | Some(
         DiffParsingState(tableDiffs, currentDiff),
       ) if (String.getByte(line, 0) == 58) -> // startsWith(":")
+        SKDBMonitor.endReplicationTable();
         currentDiff.lines.push(line);
         tableDiffs.push(currentDiff);
         checkpoint = parseCheckpoint(line);
@@ -928,14 +938,16 @@ fun replayDiff(
       | current @ Some(DiffParsingState(_, currentDiff)) if (
         line == "!rebuild"
       ) ->
+        SKDBMonitor.replicationRebuild();
         if (!rebuildsEnabled) {
           SKDB.setReplicationState(context, identity, SKDB.RSError());
+          SKDBMonitor.endReplicationTable();
           invariant_violation("Received rebuild when processing disabled.")
         };
         currentDiff.!rebuild = true;
         current
-
       | current @ Some(DiffParsingState(_, currentDiff)) ->
+        SKDBMonitor.addReplicationRowUpdates(1);
         currentDiff.lines.push(line); // capture the raw input for if we end up rejecting the txn
         table = currentDiff.sourceSchema match {
         | Some(schema) -> currentDiff.table with {schema}
