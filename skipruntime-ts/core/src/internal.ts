@@ -1,7 +1,5 @@
-import type { T } from "@skip-wasm/std/internal.js";
-import type { CJSON } from "@skip-wasm/json/internal.js";
-export type * from "@skip-wasm/std/internal.js";
-export type * from "@skip-wasm/json/internal.js";
+export type * from "@skiplang/json/internal.js";
+import type { T, CJSON } from "@skiplang/json/internal.js";
 
 /* eslint-disable @typescript-eslint/no-unused-vars */
 

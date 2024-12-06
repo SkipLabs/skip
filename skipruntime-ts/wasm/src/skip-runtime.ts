@@ -8,8 +8,6 @@ export type {
   LazyCollection,
   LazyCompute,
   Context,
-  Json,
-  JsonObject,
   Reducer,
   Entry,
   SkipService,
@@ -19,18 +17,13 @@ export type {
   Watermark,
   SubscriptionID,
   NamedCollections,
+  Json,
 } from "@skipruntime/api";
 
-export type { ServiceInstance } from "./internals/skipruntime_module.js";
-export { UnknownCollectionError } from "@skipruntime/helpers/errors.js";
+export type { ServiceInstance } from "@skipruntime/core";
 export { OneToOneMapper, ManyToOneMapper } from "@skipruntime/api";
-export { deepFreeze } from "./internals/skipruntime_module.js";
+export { deepFreeze, UnknownCollectionError } from "@skipruntime/core";
 export {
-  Sum,
-  Min,
-  Max,
-  CountMapper,
-  SkipExternalService,
   type ExternalResource,
   GenericExternalService,
   Polled,
