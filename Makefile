@@ -240,7 +240,7 @@ skbuild-%:
 
 .PHONY: publish-std
 publish-std:
-	bin/release_npm.sh @skip-wasm/std skiplang/prelude/ts/package.json $(OPT)
+	bin/release_npm.sh @skip-wasm/std skiplang/prelude/ts/wasm/package.json $(OPT)
 
 .PHONY: publish-json
 publish-json:
