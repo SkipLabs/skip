@@ -935,22 +935,22 @@ class LazyCollectionImpl<K extends Json, V extends Json>
     Object.freeze(this);
   }
 
-  getArray(key: K): V[] {
+  getArray(key: K): (V & Param)[] {
     return this.refs.skjson.importJSON(
       this.refs.fromWasm.SkipRuntime_LazyCollection__getArray(
         this.refs.skjson.exportString(this.lazyCollection),
         this.refs.skjson.exportJSON(key),
       ),
-    ) as V[];
+    ) as (V & Param)[];
   }
 
-  getUnique(key: K): V {
+  getUnique(key: K): V & Param {
     const v = this.refs.skjson.importOptJSON(
       this.refs.fromWasm.SkipRuntime_LazyCollection__getUnique(
         this.refs.skjson.exportString(this.lazyCollection),
         this.refs.skjson.exportJSON(key),
       ),
-    ) as Nullable<V>;
+    ) as Nullable<V & Param>;
     if (v == null) throw new NonUniqueValueException();
     return v;
   }
@@ -968,22 +968,22 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     Object.freeze(this);
   }
 
-  getArray(key: K): V[] {
+  getArray(key: K): (V & Param)[] {
     return this.refs.skjson.importJSON(
       this.refs.fromWasm.SkipRuntime_Collection__getArray(
         this.refs.skjson.exportString(this.collection),
         this.refs.skjson.exportJSON(key),
       ),
-    ) as V[];
+    ) as (V & Param)[];
   }
 
-  getUnique(key: K): V {
+  getUnique(key: K): V & Param {
     const v = this.refs.skjson.importOptJSON(
       this.refs.fromWasm.SkipRuntime_Collection__getUnique(
         this.refs.skjson.exportString(this.collection),
         this.refs.skjson.exportJSON(key),
       ),
-    ) as Nullable<V>;
+    ) as Nullable<V & Param>;
     if (v == null) throw new NonUniqueValueException();
     return v;
   }
@@ -1520,25 +1520,25 @@ class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
     private readonly pointer: ptr<Internal.NonEmptyIterator>,
   ) {}
 
-  next(): Nullable<T> {
+  next(): Nullable<T & Param> {
     return this.skjson.importOptJSON(
       this.exports.SkipRuntime_NonEmptyIterator__next(this.pointer),
-    ) as Nullable<T>;
+    ) as Nullable<T & Param>;
   }
 
-  getUnique(): T {
+  getUnique(): T & Param {
     const value = this.skjson.importOptJSON(
       this.exports.SkipRuntime_NonEmptyIterator__uniqueValue(this.pointer),
-    ) as Nullable<T>;
+    ) as Nullable<T & Param>;
     if (value == null) throw new NonUniqueValueException();
     return value;
   }
 
-  toArray: () => T[] = () => {
+  toArray: () => (T & Param)[] = () => {
     return Array.from(this);
   };
 
-  [Symbol.iterator](): Iterator<T> {
+  [Symbol.iterator](): Iterator<T & Param> {
     const cloned_iter = new NonEmptyIteratorImpl<T>(
       this.skjson,
       this.exports,
@@ -1548,12 +1548,12 @@ class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
     return {
       next() {
         const value = cloned_iter.next();
-        return { value, done: value == null } as IteratorResult<T>;
+        return { value, done: value == null } as IteratorResult<T & Param>;
       },
     };
   }
 
-  map<U>(f: (value: T, index: number) => U, thisObj?: any): U[] {
+  map<U>(f: (value: T & Param, index: number) => U, thisObj?: any): U[] {
     return this.toArray().map(f, thisObj);
   }
 }
