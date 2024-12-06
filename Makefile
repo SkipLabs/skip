@@ -238,13 +238,27 @@ skfmt-%:
 skbuild-%:
 	cd $* && skargo b --profile $(SKARGO_PROFILE)
 
+.PHONY: publish-std-core
+publish-std-core:
+	bin/release_npm.sh @skiplang/std skiplang/prelude/ts/binding/package.json $(OPT)
+
+.PHONY: publish-std-wasm
+publish-std-wasm:
+	bin/release_npm.sh @skip-wasm/std skiplang/prelude/ts/wasm/package.json $(OPT)
+
 .PHONY: publish-std
-publish-std:
-	bin/release_npm.sh @skip-wasm/std skiplang/prelude/ts/package.json $(OPT)
+publish-std: publish-std-core publish-std-wasm
+
+.PHONY: publish-json-core
+publish-json-core:
+	bin/release_npm.sh @skiplang/json skiplang/skjson/ts/binding/package.json $(OPT)
+
+.PHONY: publish-json-wasm
+publish-json-wasm:
+	bin/release_npm.sh @skip-wasm/json skiplang/skjson/ts/wasm/package.json $(OPT)
 
 .PHONY: publish-json
-publish-json:
-	bin/release_npm.sh @skip-wasm/json skiplang/skjson/ts/package.json $(OPT)
+publish-json: publish-json-core publish-json-wasm
 
 .PHONY: publish-date
 publish-date:
@@ -253,6 +267,11 @@ publish-date:
 .PHONY: publish-api
 publish-api:
 	bin/release_npm.sh @skipruntime/api skipruntime-ts/api/package.json $(OPT)
+
+
+.PHONY: publish-core
+publish-core:
+	bin/release_npm.sh @skipruntime/core skipruntime-ts/core/package.json $(OPT)
 
 .PHONY: publish-helpers
 publish-helpers:
@@ -273,4 +292,4 @@ publish-server:
 	bin/release_npm.sh @skipruntime/server skipruntime-ts/server/package.json $(OPT)
 
 .PHONY: publish-all
-publish-all: clean publish-std publish-json publish-date publish-api publish-helpers publish-tests publish-wasm publish-server
+publish-all: clean publish-std publish-json publish-date publish-api publish-core publish-helpers publish-tests publish-wasm publish-server

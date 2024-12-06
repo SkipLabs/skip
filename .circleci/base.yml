@@ -28,7 +28,7 @@ jobs:
       - setup
       - run:
           name: Typecheck and lint typescript sources
-          command: bun install && npm run build && npm run lint
+          command: npm install && npm run build && npm run lint
 
   compiler:
     docker:
@@ -108,9 +108,6 @@ jobs:
       - checkout
       - setup
       - run:
-          name: Typecheck and lint skip runtime
-          command: cd skipruntime-ts && make check-all
-      - run:
           name: Run wasm skip runtime tests
           no_output_timeout: 10m
           command: |
@@ -118,3 +115,18 @@ jobs:
             cd skipruntime-ts && make test
       - store_test_results:
           path: ~/test-results/skipruntime-wasm.xml
+
+  skipruntime-native:
+    docker:
+      - image: skiplabs/skdb-base:latest
+    steps:
+      - checkout
+      - setup
+      - run:
+          name: Run addon skip runtime tests
+          no_output_timeout: 10m
+          command: |
+            mkdir -p ~/test-results
+            cd skipruntime-ts && make test-native
+      - store_test_results:
+          path: ~/test-results/skipruntime-native.xml

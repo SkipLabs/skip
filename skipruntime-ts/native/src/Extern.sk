@@ -790,4 +790,35 @@ fun closeSkipRuntimeService(): Float {
   };
 }
 
+class ExternalException(
+  type: String,
+  message: String,
+  stack: String,
+) extends .Exception {
+  fun getMessage(): String {
+    this.message
+  }
+}
+
+@export("SkipRuntime_throwExternalException")
+fun throwExternalException(type: String, message: String, stack: String): void {
+  throw ExternalException(type, message, stack)
+}
+
+@export("SkipRuntime_getExceptionStack")
+fun getExceptionStack(exn: .Exception): ?String {
+  exn match {
+  | ExternalException(_, _, stack) -> Some(stack)
+  | _ -> None()
+  }
+}
+
+@export("SkipRuntime_getExceptionType")
+fun getExceptionType(exn: .Exception): String {
+  exn match {
+  | ExternalException(type, _, _) -> type
+  | _ -> exn.getClassName()
+  }
+}
+
 module end;

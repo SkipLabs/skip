@@ -46,6 +46,8 @@ class ResourceCollections(
   value: SKStore.EHandle<SKStore.SID, ResourceInfo>,
 ) extends SKStore.File
 
+class ServiceDefinition(runId: String, service: Service) extends SKStore.File
+
 class Handle(
   value: SKStore.EHandle<SKStore.Key, SKStore.File>,
 ) extends SKStore.File
@@ -93,7 +95,10 @@ class ResourceStatus(
   status: Status,
 ) extends SKStore.File {}
 
-class ServiceFile(value: Map<String, Collection>) extends SKStore.File
+class ServiceFile(
+  value: Map<String, Collection>,
+  inputs: Map<String, Collection>,
+) extends SKStore.File
 
 base class Status(created: Int, modified: Int) uses Show {
   children =
@@ -240,11 +245,9 @@ class Input(
 
 fun buildResourcesGraph(
   context: mutable SKStore.Context,
-  session: String,
+  definitionHdl: SKStore.EHandle<SKStore.IID, ServiceDefinition>,
   statusHdl: SKStore.EHandle<SKStore.IID, ResourceStatus>,
   servicesHdl: SKStore.EHandle<SKStore.SID, ServiceFile>,
-  inputCollections: Map<String, Collection>,
-  resources: Map<String, ResourceBuilder>,
 ): void {
   dirname = kResourceSessionDir;
   dDirname = dirname.sub("data");
@@ -286,6 +289,13 @@ fun buildResourcesGraph(
     context,
     kResourceCollectionsDir,
     (context, writer, key, _it) ~> {
+      (runId, resources) = definitionHdl.maybeGet(
+        context,
+        SKStore.IID(0),
+      ) match {
+      | Some(definition) -> (definition.runId, definition.service.resources)
+      | _ -> return void
+      };
       pushContext(context);
       try {
         resourceId = toResourceId(key.name, key.params.value);
@@ -339,12 +349,8 @@ fun buildResourcesGraph(
           );
         resourceBuilder = resources.get(key.name);
         resource = resourceBuilder.build(key.params.value);
-        allCollections = mutable Map[];
-        inputCollections.each((k, c) -> allCollections.add(k, c));
-        servicesHdl.get(context, SKStore.SID(session)).value.each((k, c) ->
-          allCollections.set(k, c)
-        );
-        collection = resource.instantiate(allCollections.chill());
+        collections = servicesHdl.get(context, SKStore.SID(runId)).value;
+        collection = resource.instantiate(collections);
         // Ensure the name of the resource result
         resourceData = collection.hdl.map(
           kKeyToKey,
@@ -361,7 +367,7 @@ fun buildResourcesGraph(
             resourceId,
             collection with {hdl => resourceData},
             statusRef,
-            session,
+            runId,
           ),
         );
         popContext()
@@ -378,53 +384,53 @@ fun initService(service: Service): Result<void, .Exception> {
   if (SKStore.gHasContext() == 0) {
     SKStore.gContextInit(initCtx());
   };
-  session = Ksuid::create().toString();
+  runId = Ksuid::create().toString();
   SKStore.runWithResult(context ~> {
-    context.setPersistent(
-      kRemoteSpecifiers,
-      RemoteSpecifiers(service.remoteCollections),
-    );
     if (context.unsafeMaybeGetEagerDir(kSessionDir) is None()) {
       sessionHdl = context.mkdir(
         SKStore.IID::keyType,
-        SKStore.StringFile::type,
+        ServiceDefinition::type,
         kSessionDir,
-        Array[(SKStore.IID(0), SKStore.StringFile(session))],
+        Array[(SKStore.IID(0), ServiceDefinition(runId, service))],
       );
-      mInputs = mutable Map<String, Collection>[];
-      service.initialData.each(input -> {
-        iDirName = SKStore.DirName::create(`/${input.name}/`);
-        context.mkdirMulti(
-          iDirName,
-          input.values.map(v ->
-            (
-              input.keyConverter.fromJSON(v.i0),
-              v.i1.map(input.fileConverter.fromJSON),
-            )
-          ),
-        );
-        iHdl = SKStore.EHandle<SKStore.Key, SKStore.File>(
-          kKeyToKey,
-          kFileToFile,
-          iDirName,
-        );
-        mInputs.add(
-          input.name,
-          Collection(iHdl, input.keyConverter, input.fileConverter),
-        )
-      });
-      inputCollections = mInputs.chill();
       servicesHdl = sessionHdl.map(
         SKStore.SID::keyType,
         ServiceFile::type,
         context,
         kGraphDir,
         (ctx, writer, _key, it) ~> {
+          serviceDef = it.first;
           pushContext(ctx);
+          mInputs = mutable Map<String, Collection>[];
+          serviceDef.service.initialData.each(input -> {
+            iDirName = SKStore.DirName::create(`/${input.name}/`);
+            ctx.mkdirMulti(
+              iDirName,
+              input.values.map(v ->
+                (
+                  input.keyConverter.fromJSON(v.i0),
+                  v.i1.map(input.fileConverter.fromJSON),
+                )
+              ),
+            );
+            iHdl = SKStore.EHandle<SKStore.Key, SKStore.File>(
+              kKeyToKey,
+              kFileToFile,
+              iDirName,
+            );
+            mInputs.add(
+              input.name,
+              Collection(iHdl, input.keyConverter, input.fileConverter),
+            )
+          });
+          inputCollections = mInputs.chill();
           try {
             writer.set(
-              SKStore.SID(it.first.value),
-              ServiceFile(service.createGraph(inputCollections)),
+              SKStore.SID(serviceDef.runId),
+              ServiceFile(
+                serviceDef.service.createGraph(inputCollections),
+                inputCollections,
+              ),
             );
             popContext()
           } catch {
@@ -451,47 +457,50 @@ fun initService(service: Service): Result<void, .Exception> {
             writer.set(SKStore.IID(0), ResourceStatus(key, it.first.status));
           },
         );
-      buildResourcesGraph(
-        context,
-        session,
-        statusHdl,
-        servicesHdl,
-        inputCollections,
-        service.resources,
-      )
+      buildResourcesGraph(context, sessionHdl, statusHdl, servicesHdl)
     } else {
-      SKStore.EHandle(
+      closeService_(context);
+      sessionHdl = SKStore.EHandle(
         SKStore.IID::keyType,
-        SKStore.StringFile::type,
+        ServiceDefinition::type,
         kSessionDir,
-      ).writeArray(context, SKStore.IID(0), Array[SKStore.StringFile(session)]);
+      );
+      sessionHdl.writeArray(context, SKStore.IID(0), Array[]);
+      context.update();
+      sessionHdl.writeArray(
+        context,
+        SKStore.IID(0),
+        Array[ServiceDefinition(runId, service)],
+      );
     };
     updateContext(context);
   })
 }
 
+fun closeService_(context: mutable SKStore.Context): void {
+  resourceHdl = SKStore.EHandle(
+    SKStore.SID::keyType,
+    ResourceDef::type,
+    kResourceSessionDir,
+  );
+  todestroy = mutable Vector[];
+  resourceHdl.items(context).each(kf -> {
+    kf.i1.next().each(_f -> todestroy.push(SKStore.SID::keyType(kf.i0)))
+  });
+  todestroy.each(key -> destroyReactiveResource(context, key));
+  sessionHdl = SKStore.EHandle(
+    SKStore.IID::keyType,
+    ServiceDefinition::type,
+    kSessionDir,
+  );
+  sessionHdl.maybeGet(context, SKStore.IID(0)).each(def -> {
+    def.service.remoteCollections.each((_k, es) -> es.shutdown());
+  });
+  context.update();
+}
+
 fun closeService(): Result<void, .Exception> {
-  SKStore.runWithResult(context ~> {
-    resourceHdl = SKStore.EHandle(
-      SKStore.SID::keyType,
-      ResourceDef::type,
-      kResourceSessionDir,
-    );
-    todestroy = mutable Vector[];
-    resourceHdl.items(context).each(kf -> {
-      kf.i1.next().each(_f -> todestroy.push(SKStore.SID::keyType(kf.i0)))
-    });
-    todestroy.each(key -> destroyReactiveResource(context, key));
-    context
-      .getPersistent(kRemoteSpecifiers)
-      .map(RemoteSpecifiers::type)
-      .map(v -> v.value)
-      .each(remoteCollections -> {
-        remoteCollections.each((_k, es) -> es.shutdown());
-      });
-    context.removePersistent(kRemoteSpecifiers);
-    context.update();
-  })
+  SKStore.runWithResult(closeService_)
 }
 
 class CheckRequest(
@@ -602,12 +611,15 @@ fun useExternalCollection(
 ): Collection {
   getContext() match {
   | Some(context) ->
-    remoteCollections = context
-      .getPersistent(kRemoteSpecifiers)
-      .map(RemoteSpecifiers::type)
-      .map(v -> v.value)
-      .fromSome();
-
+    sessionHdl = SKStore.EHandle(
+      SKStore.IID::keyType,
+      ServiceDefinition::type,
+      kSessionDir,
+    );
+    remoteCollections = sessionHdl.get(
+      context,
+      SKStore.IID(0),
+    ).service.remoteCollections;
     externalSupplier = remoteCollections.get(supplier);
     collectionId = toSuppliedResourceId(supplier, resource, params);
     dirName = subDirName(context, collectionId);
