@@ -1,6 +1,11 @@
 import express from "express";
-import { UnknownCollectionError } from "skip-wasm";
-import type { Entry, Json, ServiceInstance, CollectionUpdate } from "skip-wasm";
+import { UnknownCollectionError } from "@skipruntime/wasm";
+import type {
+  Entry,
+  Json,
+  ServiceInstance,
+  CollectionUpdate,
+} from "@skipruntime/wasm";
 
 export function controlService(service: ServiceInstance): express.Express {
   const app = express();
