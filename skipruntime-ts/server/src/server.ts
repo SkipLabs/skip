@@ -1,5 +1,5 @@
-import { initService } from "@skipruntime/wasm";
-import type { SkipService, NamedCollections } from "@skipruntime/wasm";
+import { initService } from "@skipruntime/runtime";
+import type { SkipService, NamedCollections } from "@skipruntime/runtime";
 import { controlService, streamingService } from "./rest.js";
 
 /**
