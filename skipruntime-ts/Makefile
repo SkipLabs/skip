@@ -6,26 +6,24 @@ SKARGO_PROFILE?=release
 build:
 	../bin/cd_sh .. "npm install && npm run build"
 
-.PHONY: bunbuild
-bunbuild:
-	../bin/cd_sh .. "bun install && npm run build"
-
-bunrun-%: bunbuild
+bunrun-%: build
 	bun run examples/$*.ts
 
-bunclient-%: bunbuild
+bunclient-%:
 	bun run examples/$*-client.ts
 
-bunserver-%: bunbuild
+bunserver-%:
 	bun run examples/$*-server.ts
 
 noderun-%: build
 	node examples/dist/$*.js
 
-nodeclient-%: build
+nodeclient-%:
+	cd examples && tsc
 	node examples/dist/$*-client.js
 
-nodeserver-%: build
+nodeserver-%:
+	cd examples && tsc
 	node examples/dist/$*-server.js
 
 .PHONY: clean

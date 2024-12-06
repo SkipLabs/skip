@@ -163,7 +163,6 @@ class Player {
     private readonly perform: (l: string) => void,
     private readonly send: (l: Step) => void,
     private readonly error: (e: string) => void,
-    private readonly exit: () => void,
   ) {}
 
   start(idx: number) {
@@ -262,12 +261,6 @@ class Player {
         /^stop$/g,
         () => {
           this.stop();
-        },
-      ],
-      [
-        /^exit$/g,
-        () => {
-          this.exit();
         },
       ],
     ];
@@ -398,9 +391,6 @@ export function run(
       }
     },
     console.error,
-    () => {
-      return;
-    },
   );
   const rl = createInterface({
     input: process.stdin,
@@ -410,7 +400,6 @@ export function run(
   rl.prompt();
   rl.on("line", (line: string) => {
     if (line == "exit") {
-      player.online(line);
       process.exit(0);
     } else {
       player.online(line);
