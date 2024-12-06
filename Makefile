@@ -244,7 +244,7 @@ publish-std:
 
 .PHONY: publish-json
 publish-json:
-	bin/release_npm.sh @skip-wasm/json skiplang/skjson/ts/package.json $(OPT)
+	bin/release_npm.sh @skip-wasm/json skiplang/skjson/ts/wasm/package.json $(OPT)
 
 .PHONY: publish-date
 publish-date:
