@@ -624,7 +624,11 @@ class LinksImpl implements Links {
     const mapper = this.handles.get(skmapper);
     const result = mapper.mapEntry(
       skjson.importJSON(key) as Json,
-      new NonEmptyIteratorImpl(skjson, this.fromWasm, values),
+      new NonEmptyIteratorImpl(
+        skjson,
+        this.fromWasm,
+        values,
+      ) as NonEmptyIterator<Json>,
     );
     return skjson.exportJSON(Array.from(result) as [[Json, Json]]);
   }
@@ -676,7 +680,10 @@ class LinksImpl implements Links {
       this.needGC.bind(this),
     );
     for (const [key, name] of Object.entries(keysIds)) {
-      collections[key] = new EagerCollectionImpl(name, refs);
+      collections[key] = new EagerCollectionImpl(name, refs) as EagerCollection<
+        Json,
+        Json
+      >;
     }
     const collection = resource.instantiate(collections, new ContextImpl(refs));
     const res = (collection as EagerCollectionImpl<Json, Json>).collection;
@@ -726,7 +733,10 @@ class LinksImpl implements Links {
       this.needGC.bind(this),
     );
     for (const [key, name] of Object.entries(keysIds)) {
-      collections[key] = new EagerCollectionImpl(name, refs);
+      collections[key] = new EagerCollectionImpl(name, refs) as EagerCollection<
+        Json,
+        Json
+      >;
     }
     // TODO: Manage skstore
     const result = service.createGraph(collections, new ContextImpl(refs));
@@ -792,8 +802,8 @@ class LinksImpl implements Links {
     const reducer = this.handles.get(skreducer);
     return skjson.exportJSON(
       reducer.add(
-        skacc ? (skjson.importJSON(skacc) as Json) : null,
-        skjson.importJSON(skvalue) as Json,
+        skacc ? (skjson.importJSON(skacc) as Json & Param) : null,
+        skjson.importJSON(skvalue) as Json & Param,
       ),
     );
   }
@@ -807,8 +817,8 @@ class LinksImpl implements Links {
     const reducer = this.handles.get(skreducer);
     return skjson.exportJSON(
       reducer.remove(
-        skjson.importJSON(skacc) as Json,
-        skjson.importJSON(skvalue) as Json,
+        skjson.importJSON(skacc) as Json & Param,
+        skjson.importJSON(skvalue) as Json & Param,
       ),
     );
   }
