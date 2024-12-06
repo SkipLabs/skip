@@ -1,20 +1,21 @@
-import type { Opaque, Nullable, int, Constant } from "./internals.js";
-export type { Constant, Nullable, Opaque };
+import type { Nullable, int } from "@skiplang/std";
+import type { Opaque, Constant } from "./internals.js";
+
+import type { Json, JsonObject } from "@skiplang/json";
+export type { Json, JsonObject, Constant, Opaque };
+
+/**
+ * Potentially `null` values.
+ *
+ * The type `Nullable<T>` of potentially `null` values of type `T`.
+ */
+export type { Nullable };
 
 /**
  * This file contains the Skip Runtime public API: types, interfaces, and operations that can
  * be used to specify and interact with reactive computations. See [todo: pointer to public
  * overview page] for a detailed description and introduction to the SkipRuntime system.
  */
-
-/**
- * The `Json` type describes JSON-serializable values and serves as an upper bound on keys
- * and values in the Skip Runtime, ensuring that they can be serialized and managed by the
- * reactive computation engine.
- */
-// Replicate definition of Json from skjson to avoid a dependency
-export type Json = number | boolean | string | JsonObject | Nullable<Json>[];
-export type JsonObject = { [key: string]: Nullable<Json> };
 
 /**
  * A `Param` is a valid parameter to a Skip runtime mapper function: either a constant JS
