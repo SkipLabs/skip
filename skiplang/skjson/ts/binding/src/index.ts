@@ -5,7 +5,7 @@ export type { Pointer, Nullable, Binding };
 export type { Type };
 
 export const sk_isObjectProxy: unique symbol = Symbol();
-const sk_frozen: unique symbol = Symbol.for("Skip.frozen");
+export const sk_frozen: unique symbol = Symbol.for("Skip.frozen");
 
 export type Constant = { [sk_frozen]: true };
 
@@ -15,6 +15,10 @@ export function sk_freeze<T extends object>(x: T): T & Constant {
     writable: false,
     value: true,
   }) as T & Constant;
+}
+
+export function isSkFrozen(x: any): x is Constant {
+  return sk_frozen in x && x[sk_frozen] === true;
 }
 
 /**
