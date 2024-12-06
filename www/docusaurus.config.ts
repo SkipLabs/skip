@@ -62,7 +62,7 @@ const config: Config = {
     // Replace with your project's social card
     image: "img/skiplabs.svg",
     navbar: {
-      title: "Skip",
+      title: "",
       logo: {
         alt: "Skip Logo",
         src: "img/logo.svg",
