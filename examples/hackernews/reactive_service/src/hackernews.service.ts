@@ -4,7 +4,7 @@ import type {
   NonEmptyIterator,
   SkipService,
   Resource,
-} from "@skipruntime/wasm";
+} from "@skipruntime/runtime";
 
 type Post = {
   author_id: number;
