@@ -19,6 +19,7 @@ import { init as runtimeInit } from "@skip-wasm/std/runtime.js";
 import { init as posixInit } from "@skip-wasm/std/posix.js";
 import { init as skjsonInit } from "@skip-wasm/json";
 import { init as skdateInit } from "@skip-wasm/date";
+import { init as skmonitorInit } from "@skip-wasm/monitor";
 import { init as skdbInit } from "./skdb_skdb.js";
 
 const modules: ModuleInit[] = [
@@ -26,6 +27,7 @@ const modules: ModuleInit[] = [
   posixInit,
   skjsonInit,
   skdateInit,
+  skmonitorInit,
   skdbInit,
 ];
 
