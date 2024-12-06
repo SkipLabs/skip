@@ -107,9 +107,16 @@ function interpretPointer<T extends Internal.CJSON>(
     case Type.Array: {
       const aPtr = hdl.access.SKIP_SKJSON_asArray(ptr);
       const length = hdl.access.SKIP_SKJSON_arraySize(aPtr);
-      return Array.from({ length }, (_, idx) =>
+      const array = Array.from({ length }, (_, idx) =>
         interpretPointer(hdl, hdl.access.SKIP_SKJSON_at(aPtr, idx)),
       );
+      return Object.freeze(
+        Object.defineProperty(array, sk_frozen, {
+          enumerable: false,
+          writable: false,
+          value: true,
+        }),
+      ) as Exportable;
     }
     case Type.Object: {
       const oPtr = hdl.access.SKIP_SKJSON_asObject(ptr);
@@ -272,7 +279,7 @@ export type Exportable =
   | null
   | undefined
   | ObjectProxy<{ [k: string]: Exportable }>
-  | Exportable[];
+  | (readonly Exportable[] & { [sk_frozen]: true });
 
 export interface SKJSON extends Shared {
   importJSON(value: ptr<Internal.CJSON>, copy?: boolean): Exportable;

@@ -30,9 +30,7 @@ export type Param =
   | bigint
   | string
   | symbol
-  | Constant
-  | readonly Param[]
-  | { readonly [k: string]: Param };
+  | Constant;
 
 /**
  * The type of a reactive function mapping over an arbitrary collection.
@@ -67,7 +65,7 @@ export abstract class OneToOneMapper<
   V2 extends Json,
 > implements Mapper<K, V1, K, V2>
 {
-  abstract mapValue(value: V1, key: K): V2;
+  abstract mapValue(value: V1 & Param, key: K): V2;
 
   mapEntry(key: K, values: NonEmptyIterator<V1>): Iterable<[K, V2]> {
     return values.toArray().map((v) => [key, this.mapValue(v, key)]);
@@ -89,7 +87,7 @@ export abstract class OneToManyMapper<
   V2 extends Json,
 > implements Mapper<K, V1, K, V2>
 {
-  abstract mapValue(value: V1, key: K): V2[];
+  abstract mapValue(value: V1 & Param, key: K): V2[];
 
   mapEntry(key: K, values: NonEmptyIterator<V1>): Iterable<[K, V2]> {
     const res: [K, V2][] = [];
@@ -133,7 +131,7 @@ export interface Reducer<T extends Json, V extends Json> {
    * @param value - the added value
    * @returns the resulting accumulated value
    */
-  add(acc: Nullable<V>, value: T): V;
+  add(acc: Nullable<V>, value: T & Param): V;
 
   /**
    * The computation to perform when an input value is removed
@@ -141,7 +139,7 @@ export interface Reducer<T extends Json, V extends Json> {
    * @param value - the removed value
    * @returns the resulting accumulated value
    */
-  remove(acc: V, value: T): Nullable<V>;
+  remove(acc: V, value: T & Param): Nullable<V>;
 }
 
 /**
@@ -152,23 +150,23 @@ export class NonUniqueValueException extends Error {}
 /**
  * A mutable iterator with at least one element
  */
-export interface NonEmptyIterator<T> extends Iterable<T> {
+export interface NonEmptyIterator<T> extends Iterable<T & Param> {
   /**
    * Return the next element of the iteration.
    * `first` cannot be called after `next`
    */
-  next(): Nullable<T>;
+  next(): Nullable<T & Param>;
 
   /**
    * Return the first element of the iteration iff it contains exactly one element.
    * Otherwise, throw a `NonUniqueValueException`.
    */
-  getUnique(): T;
+  getUnique(): T & Param;
 
   /**
    * Returns an array containing all values of the iterator
    */
-  toArray(): T[];
+  toArray(): (T & Param)[];
 
   /**
    * Calls a defined callback function on each element of an array, and returns an array
@@ -176,7 +174,7 @@ export interface NonEmptyIterator<T> extends Iterable<T> {
    * @param f - A function to apply to each element
    * @param thisObj - An object to bind as `this` within the `f` invocations
    */
-  map<U>(f: (value: T, index: number) => U, thisObj?: any): U[];
+  map<U>(f: (value: T & Param, index: number) => U, thisObj?: any): U[];
 }
 
 /**
@@ -187,13 +185,13 @@ export interface LazyCollection<K extends Json, V extends Json>
   /**
    * Get (and potentially compute) all values mapped to by some key.
    */
-  getArray(key: K): V[];
+  getArray(key: K): (V & Param)[];
 
   /**
    * Get (and potentially compute) the singleton value mapped to by some key.
    * @throws {NonUniqueValueException} when the key maps to either zero or multiple values
    */
-  getUnique(key: K): V;
+  getUnique(key: K): V & Param;
 }
 
 /**
@@ -205,13 +203,13 @@ export interface EagerCollection<K extends Json, V extends Json>
   /**
    * Get all values mapped to by some key.
    */
-  getArray(key: K): V[];
+  getArray(key: K): (V & Param)[];
 
   /**
    * Get the singleton value mapped to by some key.
    * @throws {NonUniqueValueException} when the key maps to either zero or multiple values
    */
-  getUnique(key: K): V;
+  getUnique(key: K): V & Param;
 
   /**
    * Create a new eager collection by mapping some computation over this one
