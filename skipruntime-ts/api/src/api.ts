@@ -30,9 +30,7 @@ export type Param =
   | bigint
   | string
   | symbol
-  | Constant
-  | readonly Param[]
-  | { readonly [k: string]: Param };
+  | Constant;
 
 /**
  * The type of a reactive function mapping over an arbitrary collection.
