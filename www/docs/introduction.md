@@ -9,8 +9,6 @@ Skip services expose reactive *resources*: data and computation outputs which ca
 Skip services are written in a declarative style, defining a reactive computation graph over some input data.
 Under the hood, the Skip framework efficiently evaluates and updates reactive computations, delivering up-to-date and correct results without incurring heavy recomputation costs or requiring any bug-prone explicit handling of dependency tracking or change propagation.
 
-## Background
-
 ## Core concepts
 
 The main components of the *Skip Runtime*, the reactive computation engine at the core of the Skip system, are *collections* and *mappers*.
