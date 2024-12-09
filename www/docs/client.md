@@ -83,7 +83,7 @@ To make a synchronous read, call either `getAll` or `getArray` on the reactive s
 
 Then, from your client, issue HTTP `GET` requests to e.g. `http://reactive.service.hostname/my_resource/foo/key1` to make a synchronous read of data in the `foo` resource instance associated with key `key1`.
 
-# Example web service configuration
+## Example web service configuration
 
 Skip reactive services instantiate resources on request, generating a UUID for each distinct query and serving the resulting stream of updates over HTTP.
 Managing these UUIDs is straightforward, but is best done using a traditional web service to request stream UUIDs and transparently redirect clients to their data.
