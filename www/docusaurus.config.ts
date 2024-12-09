@@ -79,20 +79,38 @@ const config: Config = {
         // { to: "?", label: "Search", position: "left" },
         // { to: "/CHANGELOG", label: "Release notes", position: "left" },
         {
-          label: "Chat (Discord)",
+          href: "https://github.com/SkipLabs/skip",
+          position: "right",
+          className: "header-github-link",
+          "aria-label": "GitHub repository",
+        },
+        {
+          href: "https://www.linkedin.com/company/skiplabs/",
+          position: "right",
+          className: "header-linkedin-link",
+          "aria-label": "LinkedIn",
+        },
+        {
           href: "https://discord.gg/4dMEBA46mE",
           position: "right",
+          className: "header-discord-link",
+          "aria-label": "Chat (Discord)",
         },
-        {
-          label: "Star on GitHub",
-          href: "https://github.com/SkipLabs/skdb",
-          position: "right",
-        },
-        {
-          label: "Follow on X",
-          href: "https://x.com/skiplabs",
-          position: "right",
-        },
+        // {
+        //   label: "Chat (Discord)",
+        //   href: "https://discord.gg/4dMEBA46mE",
+        //   position: "right",
+        // },
+        // {
+        //   label: "Star on GitHub",
+        //   href: "https://github.com/SkipLabs/skip",
+        //   position: "right",
+        // },
+        // {
+        //   label: "Follow on X",
+        //   href: "https://x.com/skiplabs",
+        //   position: "right",
+        // },
       ],
     },
     footer: {
