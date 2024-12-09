@@ -8,7 +8,7 @@ Before you begin, we recommend installing the NPM packages for the Skip API, ser
 
 ## Introduction
 
-We have several resources available to help you learn the Skip framework, depending on your bcakground and preferences.
+We have several resources available to help you learn the Skip framework, depending on your background and preferences.
 
 This guide takes a "top-down" approach, showing you how to use our APIs in an idiomatic and practical way.  We recommend that most users start here.
 
