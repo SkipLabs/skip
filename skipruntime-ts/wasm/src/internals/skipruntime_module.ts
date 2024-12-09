@@ -41,11 +41,13 @@ import { UnknownCollectionError } from "@skipruntime/helpers/errors.js";
 
 export type Handle<T> = Internal.Opaque<int, { handle_for: T }>;
 
-const sk_frozen: unique symbol = Symbol.for("Skip.frozen");
-
 type JSONMapper = Mapper<Json, Json, Json, Json>;
 type JSONLazyCompute = LazyCompute<Json, Json>;
 
+/* NB: `sk_frozen` and `sk_freeze` are both duplicated in skjson.ts to avoid
+ * circular module dependencies. Make sure to mirror any changes there!
+ */
+const sk_frozen: unique symbol = Symbol.for("Skip.frozen");
 export function sk_freeze<T extends object>(x: T): T & Constant {
   return Object.defineProperty(x, sk_frozen, {
     enumerable: false,
@@ -624,7 +626,11 @@ class LinksImpl implements Links {
     const mapper = this.handles.get(skmapper);
     const result = mapper.mapEntry(
       skjson.importJSON(key) as Json,
-      new NonEmptyIteratorImpl(skjson, this.fromWasm, values),
+      new NonEmptyIteratorImpl(
+        skjson,
+        this.fromWasm,
+        values,
+      ) as NonEmptyIterator<Json>,
     );
     return skjson.exportJSON(Array.from(result) as [[Json, Json]]);
   }
@@ -676,7 +682,10 @@ class LinksImpl implements Links {
       this.needGC.bind(this),
     );
     for (const [key, name] of Object.entries(keysIds)) {
-      collections[key] = new EagerCollectionImpl(name, refs);
+      collections[key] = new EagerCollectionImpl(name, refs) as EagerCollection<
+        Json,
+        Json
+      >;
     }
     const collection = resource.instantiate(collections, new ContextImpl(refs));
     const res = (collection as EagerCollectionImpl<Json, Json>).collection;
@@ -726,7 +735,10 @@ class LinksImpl implements Links {
       this.needGC.bind(this),
     );
     for (const [key, name] of Object.entries(keysIds)) {
-      collections[key] = new EagerCollectionImpl(name, refs);
+      collections[key] = new EagerCollectionImpl(name, refs) as EagerCollection<
+        Json,
+        Json
+      >;
     }
     // TODO: Manage skstore
     const result = service.createGraph(collections, new ContextImpl(refs));
@@ -792,8 +804,8 @@ class LinksImpl implements Links {
     const reducer = this.handles.get(skreducer);
     return skjson.exportJSON(
       reducer.add(
-        skacc ? (skjson.importJSON(skacc) as Json) : null,
-        skjson.importJSON(skvalue) as Json,
+        skacc ? (skjson.importJSON(skacc) as Json & Param) : null,
+        skjson.importJSON(skvalue) as Json & Param,
       ),
     );
   }
@@ -807,8 +819,8 @@ class LinksImpl implements Links {
     const reducer = this.handles.get(skreducer);
     return skjson.exportJSON(
       reducer.remove(
-        skjson.importJSON(skacc) as Json,
-        skjson.importJSON(skvalue) as Json,
+        skjson.importJSON(skacc) as Json & Param,
+        skjson.importJSON(skvalue) as Json & Param,
       ),
     );
   }
@@ -935,22 +947,22 @@ class LazyCollectionImpl<K extends Json, V extends Json>
     Object.freeze(this);
   }
 
-  getArray(key: K): V[] {
+  getArray(key: K): (V & Param)[] {
     return this.refs.skjson.importJSON(
       this.refs.fromWasm.SkipRuntime_LazyCollection__getArray(
         this.refs.skjson.exportString(this.lazyCollection),
         this.refs.skjson.exportJSON(key),
       ),
-    ) as V[];
+    ) as (V & Param)[];
   }
 
-  getUnique(key: K): V {
+  getUnique(key: K): V & Param {
     const v = this.refs.skjson.importOptJSON(
       this.refs.fromWasm.SkipRuntime_LazyCollection__getUnique(
         this.refs.skjson.exportString(this.lazyCollection),
         this.refs.skjson.exportJSON(key),
       ),
-    ) as Nullable<V>;
+    ) as Nullable<V & Param>;
     if (v == null) throw new NonUniqueValueException();
     return v;
   }
@@ -968,22 +980,22 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     Object.freeze(this);
   }
 
-  getArray(key: K): V[] {
+  getArray(key: K): (V & Param)[] {
     return this.refs.skjson.importJSON(
       this.refs.fromWasm.SkipRuntime_Collection__getArray(
         this.refs.skjson.exportString(this.collection),
         this.refs.skjson.exportJSON(key),
       ),
-    ) as V[];
+    ) as (V & Param)[];
   }
 
-  getUnique(key: K): V {
+  getUnique(key: K): V & Param {
     const v = this.refs.skjson.importOptJSON(
       this.refs.fromWasm.SkipRuntime_Collection__getUnique(
         this.refs.skjson.exportString(this.collection),
         this.refs.skjson.exportJSON(key),
       ),
-    ) as Nullable<V>;
+    ) as Nullable<V & Param>;
     if (v == null) throw new NonUniqueValueException();
     return v;
   }
@@ -1520,25 +1532,25 @@ class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
     private readonly pointer: ptr<Internal.NonEmptyIterator>,
   ) {}
 
-  next(): Nullable<T> {
+  next(): Nullable<T & Param> {
     return this.skjson.importOptJSON(
       this.exports.SkipRuntime_NonEmptyIterator__next(this.pointer),
-    ) as Nullable<T>;
+    ) as Nullable<T & Param>;
   }
 
-  getUnique(): T {
+  getUnique(): T & Param {
     const value = this.skjson.importOptJSON(
       this.exports.SkipRuntime_NonEmptyIterator__uniqueValue(this.pointer),
-    ) as Nullable<T>;
+    ) as Nullable<T & Param>;
     if (value == null) throw new NonUniqueValueException();
     return value;
   }
 
-  toArray: () => T[] = () => {
+  toArray: () => (T & Param)[] = () => {
     return Array.from(this);
   };
 
-  [Symbol.iterator](): Iterator<T> {
+  [Symbol.iterator](): Iterator<T & Param> {
     const cloned_iter = new NonEmptyIteratorImpl<T>(
       this.skjson,
       this.exports,
@@ -1548,12 +1560,12 @@ class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
     return {
       next() {
         const value = cloned_iter.next();
-        return { value, done: value == null } as IteratorResult<T>;
+        return { value, done: value == null } as IteratorResult<T & Param>;
       },
     };
   }
 
-  map<U>(f: (value: T, index: number) => U, thisObj?: any): U[] {
+  map<U>(f: (value: T & Param, index: number) => U, thisObj?: any): U[] {
     return this.toArray().map(f, thisObj);
   }
 }
