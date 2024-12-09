@@ -1,12 +1,12 @@
 {
-  "name": "skip-wasm",
-  "version": "0.0.4",
+  "name": "@skipruntime/wasm",
+  "version": "0.0.1",
   "type": "module",
   "exports": {
     ".": "./dist/src/skip-runtime.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && skargo build -r --target wasm32-unknown-unknown --lib --manifest-path=../native/Skargo.toml --out-dir=./dist/src/",
     "clean": "rm -rf dist",
     "lint": "eslint",
     "test": "mocha"
@@ -17,8 +17,9 @@
     "mocha": "^10.8.2"
   },
   "dependencies": {
+    "@skiplang/json": "^0.0.1",
     "@skipruntime/api": "^0.0.3",
-    "@skipruntime/helpers": "^0.0.4",
+    "@skipruntime/core": "^0.0.1",
     "@skip-wasm/json": "^1.0.3",
     "@skip-wasm/std": "^1.0.2"
   }

@@ -1,156 +1,45 @@
 import type {
-  int,
   ptr,
   Links,
   Utils,
   ToWasmManager,
   Environment,
   Nullable,
-  ErrorObject,
   Shared,
+  Pointer,
 } from "@skip-wasm/std";
-import { errorObjectAsError } from "@skip-wasm/std";
-import type * as Internal from "./skipruntime_internal_types.js";
+import type * as Internal from "@skipruntime/core/internal.js";
 import type {
   Reducer,
-  NonEmptyIterator,
-  EagerCollection,
-  LazyCollection,
-  Json,
-  JsonObject,
-  Entry,
-  Param,
   SkipService,
   Mapper,
-  Context,
   LazyCompute,
   ExternalService,
-  NamedCollections,
   Resource,
-  CollectionUpdate,
   Watermark,
-  SubscriptionID,
 } from "@skipruntime/api";
+import {
+  ServiceInstance,
+  ToBinding,
+  type JSONLazyCompute,
+  type JSONMapper,
+} from "@skipruntime/core";
 
-import { NonUniqueValueException } from "@skipruntime/api";
-import { Frozen, type Constant } from "@skipruntime/api/internals.js";
+import type {
+  Checker,
+  FromBinding,
+  Handle,
+  ResourceBuilder,
+  Notifier,
+} from "@skipruntime/core/binding.js";
 
-import type { Exportable, SKJSON } from "@skip-wasm/json";
-import { isObjectProxy } from "@skip-wasm/json";
-import { UnknownCollectionError } from "@skipruntime/helpers/errors.js";
-
-export type Handle<T> = Internal.Opaque<int, { handle_for: T }>;
-
-type JSONMapper = Mapper<Json, Json, Json, Json>;
-type JSONLazyCompute = LazyCompute<Json, Json>;
-
-/* NB: `sk_frozen` and `sk_freeze` are both duplicated in skjson.ts to avoid
- * circular module dependencies. Make sure to mirror any changes there!
- */
-const sk_frozen: unique symbol = Symbol.for("Skip.frozen");
-export function sk_freeze<T extends object>(x: T): T & Constant {
-  return Object.defineProperty(x, sk_frozen, {
-    enumerable: false,
-    writable: false,
-    value: true,
-  }) as T & Constant;
-}
-
-export function isSkFrozen(x: any): x is Constant {
-  return sk_frozen in x && x[sk_frozen] === true;
-}
-
-abstract class SkFrozen extends Frozen {
-  protected freeze() {
-    sk_freeze(this);
-  }
-}
-
-function checkOrCloneParam<T>(value: T): T {
-  if (
-    typeof value == "string" ||
-    typeof value == "number" ||
-    typeof value == "boolean"
-  )
-    return value;
-  if (typeof value == "object") {
-    if (value === null) return value;
-    if (isObjectProxy(value)) return value.clone() as T;
-    if (isSkFrozen(value)) return value;
-    throw new Error("Invalid object: must be deep-frozen.");
-  }
-  throw new Error(`'${typeof value}' cannot be deep-frozen.`);
-}
-
-/**
- * _Deep-freeze_ an object, returning the same object that was passed in.
- *
- * This function is similar to
- * {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/freeze | `Object.freeze()`}
- * but freezes the object and deep-freezes all its properties,
- * recursively. The object is then not only _immutable_ but also
- * _constant_. Note that as a result all objects reachable from the
- * parameter will be frozen and no longer mutable or extensible, even from
- * other references.
- *
- * The argument object and all its properties, recursively, must not already
- * be frozen by `Object.freeze` (or else `deepFreeze` cannot mark them
- * deep-frozen). Undefined, function (and hence class) values cannot be
- * deep-frozen.
- *
- * The primary use for this function is to satisfy the requirement that all
- * parameters to Skip `Mapper` constructors must be deep-frozen: objects
- * that have not been constructed by Skip can be passed to `deepFreeze()`
- * before passing them to a `Mapper` constructor.
- *
- * @param value - The object to deep-freeze.
- * @returns The same object that was passed in.
- */
-export function deepFreeze<T>(value: T): T & Param {
-  if (
-    typeof value == "bigint" ||
-    typeof value == "boolean" ||
-    typeof value == "number" ||
-    typeof value == "string" ||
-    typeof value == "symbol"
-  ) {
-    return value;
-  } else if (typeof value == "object") {
-    if (value === null) {
-      return value;
-    } else if (isSkFrozen(value)) {
-      return value;
-    } else if (Object.isFrozen(value)) {
-      throw new Error(`Cannot deep-freeze an Object.frozen value.`);
-    } else if (Array.isArray(value)) {
-      for (const elt of value) {
-        deepFreeze(elt);
-      }
-      return Object.freeze(sk_freeze(value));
-    } else {
-      for (const val of Object.values(value)) {
-        deepFreeze(val);
-      }
-      return Object.freeze(sk_freeze(value));
-    }
-  } else {
-    // typeof value == "function" || typeof value == "undefined"
-    throw new Error(`'${typeof value}' values cannot be deep-frozen.`);
-  }
-}
-
-class ResourceBuilder {
-  constructor(
-    private readonly builder: new (params: {
-      [param: string]: string;
-    }) => Resource,
-  ) {}
-
-  build(parameters: { [param: string]: string }): Resource {
-    const builder = this.builder;
-    return new builder(parameters);
-  }
-}
+import type { Json } from "@skiplang/json";
+import {
+  toPtr,
+  toNullablePtr,
+  toNullablePointer,
+  SKJSONShared,
+} from "@skip-wasm/json";
 
 export interface FromWasm {
   // NonEmptyIterator
@@ -195,16 +84,16 @@ export interface FromWasm {
     name: ptr<Internal.String>,
     values: ptr<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
     isInit: boolean,
-  ): Handle<ErrorObject>;
+  ): Handle<Error>;
 
   SkipRuntime_CollectionWriter__error(
     name: ptr<Internal.String>,
     error: ptr<Internal.CJSON>,
-  ): Handle<ErrorObject>;
+  ): Handle<Error>;
 
   SkipRuntime_CollectionWriter__loading(
     name: ptr<Internal.String>,
-  ): Handle<ErrorObject>;
+  ): Handle<Error>;
 
   // Resource
 
@@ -252,7 +141,7 @@ export interface FromWasm {
   SkipRuntime_Collection__getUnique(
     collection: ptr<Internal.String>,
     key: ptr<Internal.CJSON>,
-  ): ptr<Internal.CJSON>;
+  ): Nullable<ptr<Internal.CJSON>>;
 
   SkipRuntime_Collection__map(
     collection: ptr<Internal.String>,
@@ -311,7 +200,7 @@ export interface FromWasm {
     identifier: ptr<Internal.String>,
     resource: ptr<Internal.String>,
     jsonParams: ptr<Internal.CJObject>,
-  ): Handle<ErrorObject>;
+  ): Handle<Error>;
 
   SkipRuntime_Runtime__getAll(
     resource: ptr<Internal.String>,
@@ -328,7 +217,7 @@ export interface FromWasm {
 
   SkipRuntime_Runtime__closeResource(
     identifier: ptr<Internal.String>,
-  ): Handle<ErrorObject>;
+  ): Handle<Error>;
 
   SkipRuntime_Runtime__subscribe(
     collection: ptr<Internal.String>,
@@ -336,12 +225,12 @@ export interface FromWasm {
     watermark: Nullable<ptr<Internal.String>>,
   ): bigint;
 
-  SkipRuntime_Runtime__unsubscribe(id: bigint): Handle<ErrorObject>;
+  SkipRuntime_Runtime__unsubscribe(id: bigint): Handle<Error>;
 
   SkipRuntime_Runtime__update(
     input: ptr<Internal.String>,
     values: ptr<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
-  ): Handle<ErrorObject>;
+  ): Handle<Error>;
 
   // Reducer
 
@@ -351,10 +240,10 @@ export interface FromWasm {
   ): ptr<Internal.Reducer>;
 
   // initService
-  SkipRuntime_initService(service: ptr<Internal.Service>): number;
+  SkipRuntime_initService(service: ptr<Internal.Service>): Handle<Error>;
 
   // closeClose
-  SkipRuntime_closeService(): Handle<ErrorObject>;
+  SkipRuntime_closeService(): Handle<Error>;
 
   // Context
 
@@ -384,7 +273,7 @@ export interface FromWasm {
 
 interface ToWasm {
   //
-  SkipRuntime_getErrorHdl(exn: ptr<Internal.Exception>): Handle<ErrorObject>;
+  SkipRuntime_getErrorHdl(exn: ptr<Internal.Exception>): Handle<Error>;
   SkipRuntime_pushContext(refs: ptr<Internal.Context>): void;
   SkipRuntime_popContext(): void;
   SkipRuntime_getContext(): Nullable<ptr<Internal.Context>>;
@@ -466,7 +355,7 @@ interface ToWasm {
   SkipRuntime_Notifier__notify<K extends Json, V extends Json>(
     notifier: Handle<Notifier<K, V>>,
     values: ptr<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
-    tick: bigint,
+    watermark: Watermark,
     isUpdates: number,
   ): void;
 
@@ -490,7 +379,7 @@ interface ToWasm {
     reducer: Handle<Reducer<Json, Json>>,
     acc: ptr<Internal.CJSON>,
     value: ptr<Internal.CJSON>,
-  ): ptr<Internal.CJSON>;
+  ): Nullable<ptr<Internal.CJSON>>;
 
   SkipRuntime_deleteReducer(reducer: Handle<Reducer<Json, Json>>): void;
 
@@ -504,115 +393,440 @@ interface ToWasm {
   SkipRuntime_deleteChecker(checker: Handle<Checker>): void;
 }
 
-class Handles {
-  private nextID: number = 1;
-  private readonly objects: any[] = [];
-  private readonly freeIDs: int[] = [];
-
-  register<T>(v: T): Handle<T> {
-    const freeID = this.freeIDs.pop();
-    const id = freeID ?? this.nextID++;
-    this.objects[id] = v;
-    return id as Handle<T>;
-  }
-
-  get<T>(id: Handle<T>): T {
-    return this.objects[id] as T;
-  }
-
-  apply<R, P extends any[]>(id: Handle<(..._: P) => R>, parameters: P): R {
-    const fn = this.get(id);
-    return fn.apply(null, parameters);
-  }
-
-  deleteHandle<T>(id: Handle<T>): T {
-    const current = this.get(id);
-    this.objects[id] = null;
-    this.freeIDs.push(id);
-    return current;
-  }
-
-  deleteAsError(id: Handle<ErrorObject>): Error {
-    return errorObjectAsError(this.deleteHandle(id));
-  }
-}
-
-class Stack {
-  private readonly stack: ptr<Internal.Context>[] = [];
-
-  push(pointer: ptr<Internal.Context>) {
-    this.stack.push(pointer);
-  }
-
-  get(): Nullable<ptr<Internal.Context>> {
-    if (this.stack.length == 0) return null;
-    return this.stack[this.stack.length - 1]!;
-  }
-
-  pop(): void {
-    this.stack.pop();
-  }
-}
-
-type Notifier<K extends Json, V extends Json> = {
-  subscribed: () => void;
-  notify: (update: CollectionUpdate<K, V>) => void;
-  close: () => void;
-};
-
-class Refs {
+export class WasmFromBinding implements FromBinding {
   constructor(
-    public skjson: SKJSON,
-    public fromWasm: FromWasm,
-    public handles: Handles,
-    public needGC: () => boolean,
+    private utils: Utils,
+    private fromWasm: FromWasm,
   ) {}
+
+  SkipRuntime_NonEmptyIterator__first(
+    values: Pointer<Internal.NonEmptyIterator>,
+  ): Pointer<Internal.CJSON> {
+    return this.fromWasm.SkipRuntime_NonEmptyIterator__first(toPtr(values));
+  }
+
+  SkipRuntime_NonEmptyIterator__uniqueValue(
+    values: Pointer<Internal.NonEmptyIterator>,
+  ): Nullable<Pointer<Internal.CJSON>> {
+    return toNullablePointer(
+      this.fromWasm.SkipRuntime_NonEmptyIterator__uniqueValue(toPtr(values)),
+    );
+  }
+
+  SkipRuntime_NonEmptyIterator__next(
+    values: Pointer<Internal.NonEmptyIterator>,
+  ): Nullable<Pointer<Internal.CJSON>> {
+    return toNullablePointer(
+      this.fromWasm.SkipRuntime_NonEmptyIterator__next(toPtr(values)),
+    );
+  }
+
+  SkipRuntime_NonEmptyIterator__clone(
+    values: Pointer<Internal.NonEmptyIterator>,
+  ): Pointer<Internal.NonEmptyIterator> {
+    return this.fromWasm.SkipRuntime_NonEmptyIterator__clone(toPtr(values));
+  }
+
+  SkipRuntime_createMapper<
+    K1 extends Json,
+    V1 extends Json,
+    K2 extends Json,
+    V2 extends Json,
+  >(ref: Handle<Mapper<K1, V1, K2, V2>>): Pointer<Internal.Mapper> {
+    return this.fromWasm.SkipRuntime_createMapper(ref);
+  }
+
+  SkipRuntime_createLazyCompute<K extends Json, V extends Json>(
+    ref: Handle<LazyCompute<K, V>>,
+  ): Pointer<Internal.LazyCompute> {
+    return this.fromWasm.SkipRuntime_createLazyCompute(ref);
+  }
+
+  SkipRuntime_createExternalService(
+    ref: Handle<ExternalService>,
+  ): Pointer<Internal.ExternalService> {
+    return this.fromWasm.SkipRuntime_createExternalService(ref);
+  }
+
+  SkipRuntime_CollectionWriter__update(
+    name: string,
+    values: Pointer<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
+    isInit: boolean,
+  ): Handle<Error> {
+    return this.fromWasm.SkipRuntime_CollectionWriter__update(
+      this.utils.exportString(name),
+      toPtr(values),
+      isInit,
+    );
+  }
+
+  SkipRuntime_CollectionWriter__error(
+    name: string,
+    error: Pointer<Internal.CJSON>,
+  ): Handle<Error> {
+    return this.fromWasm.SkipRuntime_CollectionWriter__error(
+      this.utils.exportString(name),
+      toPtr(error),
+    );
+  }
+
+  SkipRuntime_CollectionWriter__loading(name: string): Handle<Error> {
+    return this.fromWasm.SkipRuntime_CollectionWriter__loading(
+      this.utils.exportString(name),
+    );
+  }
+
+  SkipRuntime_createResource(
+    ref: Handle<Resource>,
+  ): Pointer<Internal.Resource> {
+    return this.fromWasm.SkipRuntime_createResource(ref);
+  }
+
+  SkipRuntime_createResourceBuilder(
+    ref: Handle<ResourceBuilder>,
+  ): Pointer<Internal.ResourceBuilder> {
+    return this.fromWasm.SkipRuntime_createResourceBuilder(ref);
+  }
+
+  SkipRuntime_createService(
+    ref: Handle<SkipService>,
+    jsInputs: Pointer<Internal.CJObject>,
+    resources: Pointer<Internal.ResourceBuilderMap>,
+    remotes: Pointer<Internal.ExternalServiceMap>,
+  ): Pointer<Internal.Service> {
+    return this.fromWasm.SkipRuntime_createService(
+      ref,
+      toPtr(jsInputs),
+      toPtr(resources),
+      toPtr(remotes),
+    );
+  }
+
+  SkipRuntime_ResourceBuilderMap__create(): Pointer<Internal.ResourceBuilderMap> {
+    return this.fromWasm.SkipRuntime_ResourceBuilderMap__create();
+  }
+
+  SkipRuntime_ResourceBuilderMap__add(
+    map: Pointer<Internal.ResourceBuilderMap>,
+    key: string,
+    collection: Pointer<Internal.ResourceBuilder>,
+  ): void {
+    this.fromWasm.SkipRuntime_ResourceBuilderMap__add(
+      toPtr(map),
+      this.utils.exportString(key),
+      toPtr(collection),
+    );
+  }
+
+  SkipRuntime_ExternalServiceMap__create(): Pointer<Internal.ExternalServiceMap> {
+    return this.fromWasm.SkipRuntime_ExternalServiceMap__create();
+  }
+
+  SkipRuntime_ExternalServiceMap__add(
+    map: Pointer<Internal.ExternalServiceMap>,
+    key: string,
+    collection: Pointer<Internal.ExternalService>,
+  ): void {
+    this.fromWasm.SkipRuntime_ExternalServiceMap__add(
+      toPtr(map),
+      this.utils.exportString(key),
+      toPtr(collection),
+    );
+  }
+
+  SkipRuntime_Collection__getArray(
+    collection: string,
+    key: Pointer<Internal.CJSON>,
+  ): Pointer<Internal.CJArray<Internal.CJSON>> {
+    return this.fromWasm.SkipRuntime_Collection__getArray(
+      this.utils.exportString(collection),
+      toPtr(key),
+    );
+  }
+
+  SkipRuntime_Collection__getUnique(
+    collection: string,
+    key: Pointer<Internal.CJSON>,
+  ): Nullable<Pointer<Internal.CJSON>> {
+    return toNullablePointer(
+      this.fromWasm.SkipRuntime_Collection__getUnique(
+        this.utils.exportString(collection),
+        toPtr(key),
+      ),
+    );
+  }
+
+  SkipRuntime_Collection__map(
+    collection: string,
+    mapper: Pointer<Internal.Mapper>,
+  ): string {
+    return this.utils.importString(
+      this.fromWasm.SkipRuntime_Collection__map(
+        this.utils.exportString(collection),
+        toPtr(mapper),
+      ),
+    );
+  }
+
+  SkipRuntime_Collection__mapReduce(
+    collection: string,
+    mapper: Pointer<Internal.Mapper>,
+    reducer: Pointer<Internal.Reducer>,
+  ): string {
+    return this.utils.importString(
+      this.fromWasm.SkipRuntime_Collection__mapReduce(
+        this.utils.exportString(collection),
+        toPtr(mapper),
+        toPtr(reducer),
+      ),
+    );
+  }
+
+  SkipRuntime_Collection__reduce(
+    collection: string,
+    reducer: Pointer<Internal.Reducer>,
+  ): string {
+    return this.utils.importString(
+      this.fromWasm.SkipRuntime_Collection__reduce(
+        this.utils.exportString(collection),
+        toPtr(reducer),
+      ),
+    );
+  }
+
+  SkipRuntime_Collection__slice(
+    collection: string,
+    range: Pointer<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
+  ): string {
+    return this.utils.importString(
+      this.fromWasm.SkipRuntime_Collection__slice(
+        this.utils.exportString(collection),
+        toPtr(range),
+      ),
+    );
+  }
+
+  SkipRuntime_Collection__take(collection: string, limit: bigint): string {
+    return this.utils.importString(
+      this.fromWasm.SkipRuntime_Collection__take(
+        this.utils.exportString(collection),
+        limit,
+      ),
+    );
+  }
+
+  SkipRuntime_Collection__merge(
+    collection: string,
+    others: Pointer<Internal.CJArray<Internal.CJString>>,
+  ): string {
+    return this.utils.importString(
+      this.fromWasm.SkipRuntime_Collection__merge(
+        this.utils.exportString(collection),
+        toPtr(others),
+      ),
+    );
+  }
+
+  SkipRuntime_Collection__size(collection: string): bigint {
+    return this.fromWasm.SkipRuntime_Collection__size(
+      this.utils.exportString(collection),
+    );
+  }
+
+  SkipRuntime_LazyCollection__getArray(
+    collection: string,
+    key: Pointer<Internal.CJSON>,
+  ): Pointer<Internal.CJArray<Internal.CJSON>> {
+    return this.fromWasm.SkipRuntime_LazyCollection__getArray(
+      this.utils.exportString(collection),
+      toPtr(key),
+    );
+  }
+
+  SkipRuntime_LazyCollection__getUnique(
+    collection: string,
+    key: Pointer<Internal.CJSON>,
+  ): Pointer<Internal.CJSON> {
+    return this.fromWasm.SkipRuntime_LazyCollection__getUnique(
+      this.utils.exportString(collection),
+      toPtr(key),
+    );
+  }
+
+  SkipRuntime_createNotifier<K extends Json, V extends Json>(
+    ref: Handle<Notifier<K, V>>,
+  ): Pointer<Internal.Notifier> {
+    return this.fromWasm.SkipRuntime_createNotifier(ref);
+  }
+
+  SkipRuntime_Runtime__createResource(
+    identifier: string,
+    resource: string,
+    jsonParams: Pointer<Internal.CJObject>,
+  ): Handle<Error> {
+    return this.fromWasm.SkipRuntime_Runtime__createResource(
+      this.utils.exportString(identifier),
+      this.utils.exportString(resource),
+      toPtr(jsonParams),
+    );
+  }
+
+  SkipRuntime_Runtime__getAll(
+    resource: string,
+    jsonParams: Pointer<Internal.CJObject>,
+    request: Nullable<Pointer<Internal.Request>>,
+  ): Pointer<Internal.CJObject | Internal.CJFloat> {
+    return this.fromWasm.SkipRuntime_Runtime__getAll(
+      this.utils.exportString(resource),
+      toPtr(jsonParams),
+      toNullablePtr(request),
+    );
+  }
+
+  SkipRuntime_Runtime__getForKey(
+    resource: string,
+    jsonParams: Pointer<Internal.CJObject>,
+    key: Pointer<Internal.CJSON>,
+    request: Pointer<Internal.Request> | null,
+  ): Pointer<Internal.CJObject | Internal.CJFloat> {
+    return this.fromWasm.SkipRuntime_Runtime__getForKey(
+      this.utils.exportString(resource),
+      toPtr(jsonParams),
+      toPtr(key),
+      toNullablePtr(request),
+    );
+  }
+
+  SkipRuntime_Runtime__closeResource(identifier: string): Handle<Error> {
+    return this.fromWasm.SkipRuntime_Runtime__closeResource(
+      this.utils.exportString(identifier),
+    );
+  }
+
+  SkipRuntime_Runtime__subscribe(
+    collection: string,
+    notifier: Pointer<Internal.Notifier>,
+    watermark: Nullable<string>,
+  ): bigint {
+    return this.fromWasm.SkipRuntime_Runtime__subscribe(
+      this.utils.exportString(collection),
+      toPtr(notifier),
+      watermark ? this.utils.exportString(watermark) : null,
+    );
+  }
+
+  SkipRuntime_Runtime__unsubscribe(id: bigint): Handle<Error> {
+    return this.fromWasm.SkipRuntime_Runtime__unsubscribe(id);
+  }
+
+  SkipRuntime_Runtime__update(
+    input: string,
+    values: Pointer<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
+  ): Handle<Error> {
+    return this.fromWasm.SkipRuntime_Runtime__update(
+      this.utils.exportString(input),
+      toPtr(values),
+    );
+  }
+
+  SkipRuntime_createReducer<K1 extends Json, V1 extends Json>(
+    ref: Handle<Reducer<K1, V1>>,
+    defaultValue: Pointer<Internal.CJSON>,
+  ): Pointer<Internal.Reducer> {
+    return this.fromWasm.SkipRuntime_createReducer(ref, toPtr(defaultValue));
+  }
+
+  SkipRuntime_initService(service: Pointer<Internal.Service>): Handle<Error> {
+    return this.fromWasm.SkipRuntime_initService(toPtr(service));
+  }
+
+  SkipRuntime_closeService(): Handle<Error> {
+    return this.fromWasm.SkipRuntime_closeService();
+  }
+
+  SkipRuntime_Context__createLazyCollection(
+    compute: Pointer<Internal.LazyCompute>,
+  ): string {
+    return this.utils.importString(
+      this.fromWasm.SkipRuntime_Context__createLazyCollection(toPtr(compute)),
+    );
+  }
+
+  SkipRuntime_Context__jsonExtract(
+    from: Pointer<Internal.CJObject>,
+    pattern: string,
+  ): Pointer<Internal.CJArray> {
+    return this.fromWasm.SkipRuntime_Context__jsonExtract(
+      toPtr(from),
+      this.utils.exportString(pattern),
+    );
+  }
+
+  SkipRuntime_Context__useExternalResource(
+    service: string,
+    identifier: string,
+    params: Pointer<Internal.CJObject>,
+  ): string {
+    return this.utils.importString(
+      this.fromWasm.SkipRuntime_Context__useExternalResource(
+        this.utils.exportString(service),
+        this.utils.exportString(identifier),
+        toPtr(params),
+      ),
+    );
+  }
+
+  SkipRuntime_createIdentifier(supplier: string): Pointer<Internal.Request> {
+    return this.fromWasm.SkipRuntime_createIdentifier(
+      this.utils.exportString(supplier),
+    );
+  }
+
+  SkipRuntime_createChecker(ref: Handle<Checker>): Pointer<Internal.Request> {
+    return this.fromWasm.SkipRuntime_createChecker(ref);
+  }
 }
 
 class LinksImpl implements Links {
-  private readonly handles = new Handles();
-  private readonly stack = new Stack();
+  private tobinding!: ToBinding;
   private utils!: Utils;
-  private fromWasm!: FromWasm;
-  skjson?: SKJSON;
 
   constructor(private readonly env: Environment) {}
 
   complete(utils: Utils, exports: object) {
     this.utils = utils;
-    this.fromWasm = exports as FromWasm;
+    const fromBinding = new WasmFromBinding(utils, exports as FromWasm);
+    this.tobinding = new ToBinding(
+      fromBinding,
+      utils.runWithGc.bind(utils),
+      () => (this.env.shared.get("SKJSON")! as SKJSONShared).converter,
+      (skExc: Pointer<Internal.Exception>) =>
+        this.utils.getErrorObject(toPtr(skExc)),
+    );
+
     this.env.shared.set(
       "ServiceInstanceFactory",
-      new ServiceInstanceFactory(this.initService.bind(this)),
+      new ServiceInstanceFactory(
+        this.tobinding.initService.bind(this.tobinding),
+      ),
     );
   }
 
   //
-  private getSkjson() {
-    if (this.skjson == undefined) {
-      this.skjson = this.env.shared.get("SKJSON")! as SKJSON;
-    }
-    return this.skjson;
-  }
-
-  getErrorHdl(exn: ptr<Internal.Exception>): Handle<ErrorObject> {
-    return this.handles.register(this.utils.getErrorObject(exn));
+  getErrorHdl(exn: ptr<Internal.Exception>): Handle<Error> {
+    return this.tobinding.SkipRuntime_getErrorHdl(exn);
   }
 
   pushContext(context: ptr<Internal.Context>) {
-    this.stack.push(context);
+    this.tobinding.SkipRuntime_pushContext(context);
   }
 
   popContext() {
-    this.stack.pop();
+    this.tobinding.SkipRuntime_popContext();
   }
 
   getContext() {
-    return this.stack.get();
-  }
-
-  private needGC() {
-    return this.getContext() == null;
+    return toNullablePtr(this.tobinding.SkipRuntime_getContext());
   }
 
   // Mapper
@@ -622,21 +836,13 @@ class LinksImpl implements Links {
     key: ptr<Internal.CJSON>,
     values: ptr<Internal.NonEmptyIterator>,
   ): ptr<Internal.CJArray> {
-    const skjson = this.getSkjson();
-    const mapper = this.handles.get(skmapper);
-    const result = mapper.mapEntry(
-      skjson.importJSON(key) as Json,
-      new NonEmptyIteratorImpl(
-        skjson,
-        this.fromWasm,
-        values,
-      ) as NonEmptyIterator<Json>,
+    return toPtr(
+      this.tobinding.SkipRuntime_Mapper__mapEntry(skmapper, key, values),
     );
-    return skjson.exportJSON(Array.from(result) as [[Json, Json]]);
   }
 
   deleteMapper(mapper: Handle<JSONMapper>) {
-    this.handles.deleteHandle(mapper);
+    this.tobinding.SkipRuntime_deleteMapper(mapper);
   }
 
   // LazyCompute
@@ -646,21 +852,17 @@ class LinksImpl implements Links {
     skself: ptr<Internal.String>,
     skkey: ptr<Internal.CJSON>,
   ) {
-    const skjson = this.getSkjson();
-    const lazyCompute = this.handles.get(sklazyCompute);
-    const self = skjson.importString(skself);
-    const computed = lazyCompute.compute(
-      new LazyCollectionImpl<Json, Json>(
-        self,
-        new Refs(skjson, this.fromWasm, this.handles, this.needGC.bind(this)),
+    return toPtr(
+      this.tobinding.SkipRuntime_LazyCompute__compute(
+        sklazyCompute,
+        this.utils.importString(skself),
+        skkey,
       ),
-      skjson.importJSON(skkey) as Json,
     );
-    return skjson.exportJSON(computed ? [computed] : []);
   }
 
   deleteLazyCompute(lazyCompute: Handle<JSONLazyCompute>) {
-    this.handles.deleteHandle(lazyCompute);
+    this.tobinding.SkipRuntime_deleteLazyCompute(lazyCompute);
   }
 
   // Resource
@@ -669,31 +871,16 @@ class LinksImpl implements Links {
     skresource: Handle<Resource>,
     skcollections: ptr<Internal.CJObject>,
   ): ptr<Internal.String> {
-    const skjson = this.getSkjson();
-    const resource = this.handles.get(skresource);
-    const collections: NamedCollections = {};
-    const keysIds = skjson.importJSON(skcollections) as {
-      [key: string]: string;
-    };
-    const refs = new Refs(
-      skjson,
-      this.fromWasm,
-      this.handles,
-      this.needGC.bind(this),
+    return this.utils.exportString(
+      this.tobinding.SkipRuntime_Resource__instantiate(
+        skresource,
+        skcollections,
+      ),
     );
-    for (const [key, name] of Object.entries(keysIds)) {
-      collections[key] = new EagerCollectionImpl(name, refs) as EagerCollection<
-        Json,
-        Json
-      >;
-    }
-    const collection = resource.instantiate(collections, new ContextImpl(refs));
-    const res = (collection as EagerCollectionImpl<Json, Json>).collection;
-    return skjson.exportString(res);
   }
 
   deleteResource(resource: Handle<Resource>) {
-    this.handles.deleteHandle(resource);
+    this.tobinding.SkipRuntime_deleteResource(resource);
   }
 
   // ResourceBuilder
@@ -702,18 +889,13 @@ class LinksImpl implements Links {
     skbuilder: Handle<ResourceBuilder>,
     skparams: ptr<Internal.CJObject>,
   ): ptr<Internal.Resource> {
-    const skjson = this.getSkjson();
-    const builder = this.handles.get(skbuilder);
-    const resource = builder.build(
-      skjson.importJSON(skparams) as { [param: string]: string },
-    );
-    return this.fromWasm.SkipRuntime_createResource(
-      this.handles.register(resource),
+    return toPtr(
+      this.tobinding.SkipRuntime_ResourceBuilder__build(skbuilder, skparams),
     );
   }
 
   deleteResourceBuilder(builder: Handle<ResourceBuilder>) {
-    this.handles.deleteHandle(builder);
+    this.tobinding.SkipRuntime_deleteResourceBuilder(builder);
   }
 
   // Service
@@ -722,75 +904,46 @@ class LinksImpl implements Links {
     skservice: Handle<SkipService>,
     skcollections: ptr<Internal.CJObject>,
   ) {
-    const skjson = this.getSkjson();
-    const service = this.handles.get(skservice);
-    const collections: NamedCollections = {};
-    const keysIds = skjson.importJSON(skcollections) as {
-      [key: string]: string;
-    };
-    const refs = new Refs(
-      skjson,
-      this.fromWasm,
-      this.handles,
-      this.needGC.bind(this),
+    return toPtr(
+      this.tobinding.SkipRuntime_Service__createGraph(skservice, skcollections),
     );
-    for (const [key, name] of Object.entries(keysIds)) {
-      collections[key] = new EagerCollectionImpl(name, refs) as EagerCollection<
-        Json,
-        Json
-      >;
-    }
-    // TODO: Manage skstore
-    const result = service.createGraph(collections, new ContextImpl(refs));
-    const collectionsNames: { [name: string]: string } = {};
-    for (const [name, collection] of Object.entries(result)) {
-      collectionsNames[name] = (
-        collection as EagerCollectionImpl<Json, Json>
-      ).collection;
-    }
-    return skjson.exportJSON(collectionsNames);
   }
 
   deleteService(service: Handle<SkipService>) {
-    this.handles.deleteHandle(service);
+    this.tobinding.SkipRuntime_deleteService(service);
   }
 
   // Notifier
   notifyOfNotifier<K extends Json, V extends Json>(
     sknotifier: Handle<Notifier<K, V>>,
     skvalues: ptr<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
-    watermark: bigint,
+    watermark: Watermark,
     isUpdates: number,
   ) {
-    const skjson = this.getSkjson();
-    const notifier = this.handles.get(sknotifier);
-    const values = skjson.clone(skjson.importJSON(skvalues) as Entry<K, V>[]);
-    const isInitial = isUpdates ? false : true;
-    notifier.notify({
-      values,
-      watermark: watermark.toString() as Watermark,
-      isInitial,
-    });
+    this.tobinding.SkipRuntime_Notifier__notify(
+      sknotifier,
+      skvalues,
+      watermark,
+      isUpdates,
+    );
   }
 
   subscribedOfNotifier<K extends Json, V extends Json>(
     sknotifier: Handle<Notifier<K, V>>,
   ) {
-    const notifier = this.handles.get(sknotifier);
-    notifier.subscribed();
+    this.tobinding.SkipRuntime_Notifier__subscribed(sknotifier);
   }
 
   closeOfNotifier<K extends Json, V extends Json>(
     sknotifier: Handle<Notifier<K, V>>,
   ) {
-    const notifier = this.handles.get(sknotifier);
-    notifier.close();
+    this.tobinding.SkipRuntime_Notifier__close(sknotifier);
   }
 
   deleteNotifier<K extends Json, V extends Json>(
     notifier: Handle<Notifier<K, V>>,
   ) {
-    this.handles.deleteHandle(notifier);
+    this.tobinding.SkipRuntime_deleteNotifier(notifier);
   }
 
   // Reducer
@@ -800,13 +953,8 @@ class LinksImpl implements Links {
     skacc: ptr<Internal.CJSON>,
     skvalue: ptr<Internal.CJSON>,
   ) {
-    const skjson = this.getSkjson();
-    const reducer = this.handles.get(skreducer);
-    return skjson.exportJSON(
-      reducer.add(
-        skacc ? (skjson.importJSON(skacc) as Json & Param) : null,
-        skjson.importJSON(skvalue) as Json & Param,
-      ),
+    return toPtr(
+      this.tobinding.SkipRuntime_Reducer__add(skreducer, skacc, skvalue),
     );
   }
 
@@ -815,18 +963,13 @@ class LinksImpl implements Links {
     skacc: ptr<Internal.CJSON>,
     skvalue: ptr<Internal.CJSON>,
   ) {
-    const skjson = this.getSkjson();
-    const reducer = this.handles.get(skreducer);
-    return skjson.exportJSON(
-      reducer.remove(
-        skjson.importJSON(skacc) as Json & Param,
-        skjson.importJSON(skvalue) as Json & Param,
-      ),
+    return toNullablePtr(
+      this.tobinding.SkipRuntime_Reducer__remove(skreducer, skacc, skvalue),
     );
   }
 
   deleteReducer(reducer: Handle<Reducer<Json, Json>>) {
-    this.handles.deleteHandle(reducer);
+    this.tobinding.SkipRuntime_deleteReducer(reducer);
   }
 
   // ExternalService
@@ -837,21 +980,12 @@ class LinksImpl implements Links {
     skresource: ptr<Internal.String>,
     skparams: ptr<Internal.CJObject>,
   ) {
-    const skjson = this.getSkjson();
-    const supplier = this.handles.get(sksupplier);
-    const writer = new CollectionWriter(
-      skjson.importString(skwriter),
-      new Refs(skjson, this.fromWasm, this.handles, this.needGC.bind(this)),
+    this.tobinding.SkipRuntime_ExternalService__subscribe(
+      sksupplier,
+      this.utils.importString(skwriter),
+      this.utils.importString(skresource),
+      skparams,
     );
-    const resource = skjson.importString(skresource);
-    const params = skjson.importJSON(skparams, true) as {
-      [param: string]: string;
-    };
-    supplier.subscribe(resource, params, {
-      update: writer.update.bind(writer),
-      error: writer.error.bind(writer),
-      loading: writer.loading.bind(writer),
-    });
   }
 
   unsubscribeOfExternalService(
@@ -859,378 +993,32 @@ class LinksImpl implements Links {
     skresource: ptr<Internal.String>,
     skparams: ptr<Internal.CJObject>,
   ) {
-    const skjson = this.getSkjson();
-    const supplier = this.handles.get(sksupplier);
-    const resource = skjson.importString(skresource);
-    const params = skjson.importJSON(skparams, true) as {
-      [param: string]: string;
-    };
-    supplier.unsubscribe(resource, params);
+    this.tobinding.SkipRuntime_ExternalService__unsubscribe(
+      sksupplier,
+      this.utils.importString(skresource),
+      skparams,
+    );
   }
 
   shutdownOfExternalService(sksupplier: Handle<ExternalService>) {
-    const supplier = this.handles.get(sksupplier);
-    supplier.shutdown();
+    this.tobinding.SkipRuntime_ExternalService__shutdown(sksupplier);
   }
 
   deleteExternalService(supplier: Handle<ExternalService>) {
-    this.handles.deleteHandle(supplier);
+    this.tobinding.SkipRuntime_deleteExternalService(supplier);
   }
 
   // Checker
 
   checkOfChecker(skchecker: Handle<Checker>, skrequest: ptr<Internal.String>) {
-    const skjson = this.getSkjson();
-    const checker = this.handles.get(skchecker);
-    checker.check(skjson.importString(skrequest));
+    this.tobinding.SkipRuntime_Checker__check(
+      skchecker,
+      this.utils.importString(skrequest),
+    );
   }
 
   deleteChecker(checker: Handle<Checker>) {
-    this.handles.deleteHandle(checker);
-  }
-
-  initService(service: SkipService): ServiceInstance {
-    const skjson = this.getSkjson();
-    const result = skjson.runWithGC(() => {
-      const skExternalServices =
-        this.fromWasm.SkipRuntime_ExternalServiceMap__create();
-      if (service.externalServices) {
-        for (const [name, remote] of Object.entries(service.externalServices)) {
-          const skremote = this.fromWasm.SkipRuntime_createExternalService(
-            this.handles.register(remote),
-          );
-          this.fromWasm.SkipRuntime_ExternalServiceMap__add(
-            skExternalServices,
-            skjson.exportString(name),
-            skremote,
-          );
-        }
-      }
-      const skresources =
-        this.fromWasm.SkipRuntime_ResourceBuilderMap__create();
-      for (const [name, builder] of Object.entries(service.resources)) {
-        const skbuilder = this.fromWasm.SkipRuntime_createResourceBuilder(
-          this.handles.register(new ResourceBuilder(builder)),
-        );
-        this.fromWasm.SkipRuntime_ResourceBuilderMap__add(
-          skresources,
-          skjson.exportString(name),
-          skbuilder,
-        );
-      }
-      const skservice = this.fromWasm.SkipRuntime_createService(
-        this.handles.register(service),
-        skjson.exportJSON(service.initialData ?? {}),
-        skresources,
-        skExternalServices,
-      );
-      return this.fromWasm.SkipRuntime_initService(skservice);
-    });
-    if (result != 0) {
-      throw this.handles.deleteAsError(result as Handle<ErrorObject>);
-    }
-    return new ServiceInstance(
-      new Refs(skjson, this.fromWasm, this.handles, this.needGC.bind(this)),
-    );
-  }
-}
-
-class LazyCollectionImpl<K extends Json, V extends Json>
-  extends SkFrozen
-  implements LazyCollection<K, V>
-{
-  constructor(
-    private readonly lazyCollection: string,
-    private readonly refs: Refs,
-  ) {
-    super();
-    Object.freeze(this);
-  }
-
-  getArray(key: K): (V & Param)[] {
-    return this.refs.skjson.importJSON(
-      this.refs.fromWasm.SkipRuntime_LazyCollection__getArray(
-        this.refs.skjson.exportString(this.lazyCollection),
-        this.refs.skjson.exportJSON(key),
-      ),
-    ) as (V & Param)[];
-  }
-
-  getUnique(key: K): V & Param {
-    const v = this.refs.skjson.importOptJSON(
-      this.refs.fromWasm.SkipRuntime_LazyCollection__getUnique(
-        this.refs.skjson.exportString(this.lazyCollection),
-        this.refs.skjson.exportJSON(key),
-      ),
-    ) as Nullable<V & Param>;
-    if (v == null) throw new NonUniqueValueException();
-    return v;
-  }
-}
-
-class EagerCollectionImpl<K extends Json, V extends Json>
-  extends SkFrozen
-  implements EagerCollection<K, V>
-{
-  constructor(
-    public collection: string,
-    private readonly refs: Refs,
-  ) {
-    super();
-    Object.freeze(this);
-  }
-
-  getArray(key: K): (V & Param)[] {
-    return this.refs.skjson.importJSON(
-      this.refs.fromWasm.SkipRuntime_Collection__getArray(
-        this.refs.skjson.exportString(this.collection),
-        this.refs.skjson.exportJSON(key),
-      ),
-    ) as (V & Param)[];
-  }
-
-  getUnique(key: K): V & Param {
-    const v = this.refs.skjson.importOptJSON(
-      this.refs.fromWasm.SkipRuntime_Collection__getUnique(
-        this.refs.skjson.exportString(this.collection),
-        this.refs.skjson.exportJSON(key),
-      ),
-    ) as Nullable<V & Param>;
-    if (v == null) throw new NonUniqueValueException();
-    return v;
-  }
-
-  size = () => {
-    return Number(
-      this.refs.fromWasm.SkipRuntime_Collection__size(
-        this.refs.skjson.exportString(this.collection),
-      ),
-    );
-  };
-
-  slice(start: K, end: K): EagerCollection<K, V> {
-    return this.slices([start, end]);
-  }
-
-  slices(...ranges: [K, K][]): EagerCollection<K, V> {
-    const skcollection = this.refs.fromWasm.SkipRuntime_Collection__slice(
-      this.refs.skjson.exportString(this.collection),
-      this.refs.skjson.exportJSON(ranges),
-    );
-    return this.derive<K, V>(skcollection);
-  }
-
-  take(limit: int): EagerCollection<K, V> {
-    const skcollection = this.refs.fromWasm.SkipRuntime_Collection__take(
-      this.refs.skjson.exportString(this.collection),
-      BigInt(limit),
-    );
-    return this.derive<K, V>(skcollection);
-  }
-
-  map<K2 extends Json, V2 extends Json, Params extends Param[]>(
-    mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
-    ...params: Params
-  ): EagerCollection<K2, V2> {
-    const mapperParams = params.map(checkOrCloneParam) as Params;
-    const mapperObj = new mapper(...mapperParams);
-    Object.freeze(mapperObj);
-    if (!mapperObj.constructor.name) {
-      throw new Error("Mapper classes must be defined at top-level.");
-    }
-    const skmapper = this.refs.fromWasm.SkipRuntime_createMapper(
-      this.refs.handles.register(mapperObj),
-    );
-    const mapped = this.refs.fromWasm.SkipRuntime_Collection__map(
-      this.refs.skjson.exportString(this.collection),
-      skmapper,
-    );
-    return this.derive<K2, V2>(mapped);
-  }
-
-  mapReduce<K2 extends Json, V2 extends Json, MapperParams extends Param[]>(
-    mapper: new (...params: MapperParams) => Mapper<K, V, K2, V2>,
-    ...mapperParams: MapperParams
-  ) {
-    return <Accum extends Json, ReducerParams extends Param[]>(
-      reducer: new (...params: ReducerParams) => Reducer<V2, Accum>,
-      ...reducerParams: ReducerParams
-    ) => {
-      const mParams = mapperParams.map(checkOrCloneParam) as MapperParams;
-      const rParams = reducerParams.map(checkOrCloneParam) as ReducerParams;
-
-      const mapperObj = new mapper(...mParams);
-      const reducerObj = new reducer(...rParams);
-
-      Object.freeze(mapperObj);
-      Object.freeze(reducerObj);
-
-      if (!mapperObj.constructor.name) {
-        throw new Error("Mapper classes must be defined at top-level.");
-      }
-      if (!reducerObj.constructor.name) {
-        throw new Error("Reducer classes must be defined at top-level.");
-      }
-
-      const skmapper = this.refs.fromWasm.SkipRuntime_createMapper(
-        this.refs.handles.register(mapperObj),
-      );
-      const skreducer = this.refs.fromWasm.SkipRuntime_createReducer(
-        this.refs.handles.register(reducerObj),
-        this.refs.skjson.exportJSON(reducerObj.default),
-      );
-      const mapped = this.refs.fromWasm.SkipRuntime_Collection__mapReduce(
-        this.refs.skjson.exportString(this.collection),
-        skmapper,
-        skreducer,
-      );
-      return this.derive<K2, Accum>(mapped);
-    };
-  }
-
-  reduce<Accum extends Json, Params extends Param[]>(
-    reducer: new (...params: Params) => Reducer<V, Accum>,
-    ...params: Params
-  ): EagerCollection<K, Accum> {
-    const reducerParams = params.map(checkOrCloneParam) as Params;
-    const reducerObj = new reducer(...reducerParams);
-    Object.freeze(reducerObj);
-    if (!reducerObj.constructor.name) {
-      throw new Error("Reducer classes must be defined at top-level.");
-    }
-    const skreducer = this.refs.fromWasm.SkipRuntime_createReducer(
-      this.refs.handles.register(reducerObj),
-      this.refs.skjson.exportJSON(reducerObj.default),
-    );
-    return this.derive<K, Accum>(
-      this.refs.fromWasm.SkipRuntime_Collection__reduce(
-        this.refs.skjson.exportString(this.collection),
-        skreducer,
-      ),
-    );
-  }
-
-  merge(...others: EagerCollection<K, V>[]): EagerCollection<K, V> {
-    const otherNames = others.map(
-      (other) => (other as EagerCollectionImpl<K, V>).collection,
-    );
-    const mapped = this.refs.fromWasm.SkipRuntime_Collection__merge(
-      this.refs.skjson.exportString(this.collection),
-      this.refs.skjson.exportJSON(otherNames),
-    );
-    return this.derive<K, V>(mapped);
-  }
-
-  private derive<K2 extends Json, V2 extends Json>(
-    skcollection: ptr<Internal.String>,
-  ): EagerCollection<K2, V2> {
-    return new EagerCollectionImpl<K2, V2>(
-      this.refs.skjson.importString(skcollection),
-      this.refs,
-    );
-  }
-}
-
-class CollectionWriter<K extends Json, V extends Json> {
-  constructor(
-    public collection: string,
-    private readonly refs: Refs,
-  ) {}
-
-  update(values: Entry<K, V>[], isInit: boolean): void {
-    const update_ = () => {
-      return this.refs.fromWasm.SkipRuntime_CollectionWriter__update(
-        this.refs.skjson.exportString(this.collection),
-        this.refs.skjson.exportJSON(values),
-        isInit,
-      );
-    };
-    const result: Handle<ErrorObject> = this.refs.needGC()
-      ? this.refs.skjson.runWithGC(update_)
-      : update_();
-
-    if (result != 0) {
-      throw this.refs.handles.deleteAsError(result);
-    }
-  }
-
-  loading(): void {
-    const loading_ = () => {
-      return this.refs.fromWasm.SkipRuntime_CollectionWriter__loading(
-        this.refs.skjson.exportString(this.collection),
-      );
-    };
-    const result: Handle<ErrorObject> = this.refs.needGC()
-      ? this.refs.skjson.runWithGC(loading_)
-      : loading_();
-    if (result != 0) {
-      throw this.refs.handles.deleteAsError(result);
-    }
-  }
-
-  error(error: Json): void {
-    const error_ = () => {
-      return this.refs.fromWasm.SkipRuntime_CollectionWriter__error(
-        this.refs.skjson.exportString(this.collection),
-        this.refs.skjson.exportJSON(error),
-      );
-    };
-    const result: Handle<ErrorObject> = this.refs.needGC()
-      ? this.refs.skjson.runWithGC(error_)
-      : error_();
-    if (result != 0) {
-      throw this.refs.handles.deleteAsError(result);
-    }
-  }
-}
-
-class ContextImpl extends SkFrozen implements Context {
-  constructor(private readonly refs: Refs) {
-    super();
-    Object.freeze(this);
-  }
-
-  createLazyCollection<K extends Json, V extends Json, Params extends Param[]>(
-    compute: new (...params: Params) => LazyCompute<K, V>,
-    ...params: Params
-  ): LazyCollection<K, V> {
-    const mapperParams = params.map(checkOrCloneParam) as Params;
-    const computeObj = new compute(...mapperParams);
-    Object.freeze(computeObj);
-    if (!computeObj.constructor.name) {
-      throw new Error("LazyCompute classes must be defined at top-level.");
-    }
-    const skcompute = this.refs.fromWasm.SkipRuntime_createLazyCompute(
-      this.refs.handles.register(computeObj),
-    );
-    const sklazyCollection =
-      this.refs.fromWasm.SkipRuntime_Context__createLazyCollection(skcompute);
-    const lazyCollection = this.refs.skjson.importString(sklazyCollection);
-    return new LazyCollectionImpl<K, V>(lazyCollection, this.refs);
-  }
-
-  useExternalResource<K extends Json, V extends Json>(resource: {
-    service: string;
-    identifier: string;
-    params?: { [param: string]: string | number };
-  }): EagerCollection<K, V> {
-    const skcollection =
-      this.refs.fromWasm.SkipRuntime_Context__useExternalResource(
-        this.refs.skjson.exportString(resource.service),
-        this.refs.skjson.exportString(resource.identifier),
-        this.refs.skjson.exportJSON(resource.params ?? {}),
-      );
-    const collection = this.refs.skjson.importString(skcollection);
-    return new EagerCollectionImpl<K, V>(collection, this.refs);
-  }
-
-  jsonExtract(value: JsonObject, pattern: string): Json[] {
-    return this.refs.skjson.importJSON(
-      this.refs.fromWasm.SkipRuntime_Context__jsonExtract(
-        this.refs.skjson.exportJSON(value),
-        this.refs.skjson.exportString(pattern),
-      ),
-    ) as Json[];
+    this.tobinding.SkipRuntime_deleteChecker(checker);
   }
 }
 
@@ -1245,328 +1033,6 @@ export class ServiceInstanceFactory implements Shared {
 
   getName() {
     return "ServiceInstanceFactory";
-  }
-}
-
-export type GetResult<T> = {
-  request?: string;
-  payload: T;
-  errors: Json[];
-};
-
-export type Executor<T> = {
-  resolve: (value: T) => void;
-  reject: (reason?: any) => void;
-};
-
-interface Checker {
-  check(request: string): void;
-}
-
-class AllChecker<K extends Json, V extends Json> implements Checker {
-  constructor(
-    private readonly service: ServiceInstance,
-    private readonly executor: Executor<Entry<K, V>[]>,
-    private readonly resource: string,
-    private readonly params: { [param: string]: string },
-  ) {}
-
-  check(request: string): void {
-    const result = this.service.getAll<K, V>(
-      this.resource,
-      this.params,
-      request,
-    );
-    if (result.errors.length > 0) {
-      this.executor.reject(new Error(JSON.stringify(result.errors)));
-    } else {
-      this.executor.resolve(result.payload);
-    }
-  }
-}
-
-class OneChecker<V extends Json> implements Checker {
-  constructor(
-    private readonly service: ServiceInstance,
-    private readonly executor: Executor<V[]>,
-    private readonly resource: string,
-    private readonly params: { [param: string]: string },
-    private readonly key: string | number,
-  ) {}
-
-  check(request: string): void {
-    const result = this.service.getArray<V>(
-      this.resource,
-      this.key,
-      this.params,
-      request,
-    );
-    if (result.errors.length > 0) {
-      this.executor.reject(new Error(JSON.stringify(result.errors)));
-    } else {
-      this.executor.resolve(result.payload);
-    }
-  }
-}
-
-/**
- * A `ServiceInstance` is a running instance of a `SkipService`, providing access to its resources
- * and operations to manage susbscriptions and the service itself.
- */
-export class ServiceInstance {
-  constructor(private readonly refs: Refs) {}
-
-  /**
-   * Instantiate a resource with some parameters and client session authentication token
-   * @param identifier - The resource instance identifier
-   * @param resource - A resource name, which must correspond to a key in this `SkipService`'s `resources` field
-   * @param params - Resource parameters, which will be passed to the resource constructor specified in this `SkipService`'s `resources` field
-   */
-  instantiateResource(
-    identifier: string,
-    resource: string,
-    params: { [param: string]: string },
-  ): void {
-    const result = this.refs.skjson.runWithGC(() => {
-      return this.refs.fromWasm.SkipRuntime_Runtime__createResource(
-        this.refs.skjson.exportString(identifier),
-        this.refs.skjson.exportString(resource),
-        this.refs.skjson.exportJSON(params),
-      );
-    });
-    if (result != 0) {
-      throw this.refs.handles.deleteAsError(result);
-    }
-  }
-
-  /**
-   * Creates if not exists and get all current values of specified resource
-   * @param resource - the resource name corresponding to a key in remotes field of SkipService
-   * @param params - the parameters of the resource used to build the resource with the corresponding constructor specified in remotes field of SkipService
-   * @returns The current values of the corresponding resource with reactive responce token to allow subscription
-   */
-  getAll<K extends Json, V extends Json>(
-    resource: string,
-    params: { [param: string]: string } = {},
-    request?: string | Executor<Entry<K, V>[]>,
-  ): GetResult<Entry<K, V>[]> {
-    const get_ = () => {
-      return this.refs.skjson.importJSON(
-        this.refs.fromWasm.SkipRuntime_Runtime__getAll(
-          this.refs.skjson.exportString(resource),
-          this.refs.skjson.exportJSON(params),
-          request !== undefined
-            ? typeof request == "string"
-              ? this.refs.fromWasm.SkipRuntime_createIdentifier(
-                  this.refs.skjson.exportString(request),
-                )
-              : this.refs.fromWasm.SkipRuntime_createChecker(
-                  this.refs.handles.register(
-                    new AllChecker(this, request, resource, params),
-                  ),
-                )
-            : null,
-        ),
-        true,
-      );
-    };
-    const result: Exportable = this.refs.needGC()
-      ? this.refs.skjson.runWithGC(get_)
-      : get_();
-
-    if (typeof result == "number") {
-      throw this.refs.handles.deleteAsError(result as Handle<ErrorObject>);
-    }
-    return result as GetResult<Entry<K, V>[]>;
-  }
-
-  /**
-   * Get the current value of a key in the specified resource instance, creating it if it doesn't already exist
-   * @param resource - A resource name, which must correspond to a key in this `SkipService`'s `resources` field
-   * @param key - A key to look up in the resource instance
-   * @param params - Resource parameters, passed to the resource constructor specified in this `SkipService`'s `resources` field
-   * @returns The current value(s) for this key in the specified resource instance
-   */
-  getArray<V extends Json>(
-    resource: string,
-    key: string | number,
-    params: { [param: string]: string } = {},
-    request?: string | Executor<V[]>,
-  ): GetResult<V[]> {
-    const get_ = () => {
-      return this.refs.skjson.importJSON(
-        this.refs.fromWasm.SkipRuntime_Runtime__getForKey(
-          this.refs.skjson.exportString(resource),
-          this.refs.skjson.exportJSON(params),
-          this.refs.skjson.exportJSON(key),
-          request !== undefined
-            ? typeof request == "string"
-              ? this.refs.fromWasm.SkipRuntime_createIdentifier(
-                  this.refs.skjson.exportString(request),
-                )
-              : this.refs.fromWasm.SkipRuntime_createChecker(
-                  this.refs.handles.register(
-                    new OneChecker(this, request, resource, params, key),
-                  ),
-                )
-            : null,
-        ),
-        true,
-      );
-    };
-    const needGC = this.refs.needGC();
-    const result: Exportable = needGC
-      ? this.refs.skjson.runWithGC(get_)
-      : get_();
-    if (typeof result == "number") {
-      throw this.refs.handles.deleteAsError(result as Handle<ErrorObject>);
-    }
-    return result as GetResult<V[]>;
-  }
-
-  /**
-   * Close the specified resource instance
-   * @param resourceInstanceId - The resource identifier
-   */
-  closeResourceInstance(resourceInstanceId: string): void {
-    const result = this.refs.skjson.runWithGC(() => {
-      return this.refs.fromWasm.SkipRuntime_Runtime__closeResource(
-        this.refs.skjson.exportString(resourceInstanceId),
-      );
-    });
-    if (result != 0) {
-      throw this.refs.handles.deleteAsError(result);
-    }
-  }
-
-  /**
-   * Initiate reactive subscription on a resource instance
-   * @param resourceInstanceId - the resource instance identifier
-   * @param notifier - the object containing subscription callbacks
-   * @param notifier.subscribed - A callback to execute when subscription effectivly done
-   * @param notifier.notify - A callback to execute on collection updates
-   * @param notifier.close - A callback to execute on resource close
-   * @param watermark - the watermark where to start the subscription
-   * @returns A subcription identifier
-   */
-  subscribe<K extends Json, V extends Json>(
-    resourceInstanceId: string,
-    notifier: {
-      subscribed: () => void;
-      notify: (update: CollectionUpdate<K, V>) => void;
-      close: () => void;
-    },
-    watermark?: string,
-  ): SubscriptionID {
-    const session = this.refs.skjson.runWithGC(() => {
-      const sknotifier = this.refs.fromWasm.SkipRuntime_createNotifier(
-        this.refs.handles.register(notifier),
-      );
-      return this.refs.fromWasm.SkipRuntime_Runtime__subscribe(
-        this.refs.skjson.exportString(resourceInstanceId),
-        sknotifier,
-        watermark ? this.refs.skjson.exportString(watermark) : null,
-      );
-    });
-    if (session == -1n) {
-      throw new UnknownCollectionError(
-        `Unknown resource instance '${resourceInstanceId}'`,
-      );
-    } else if (session < 0n) {
-      throw new Error("Unknown error");
-    }
-    return session as SubscriptionID;
-  }
-
-  /**
-   * Terminate a client's subscription to a reactive resource instance
-   * @param id - The subcription identifier returned by a call to `subscribe`
-   */
-  unsubscribe(id: SubscriptionID): void {
-    const result = this.refs.skjson.runWithGC(() => {
-      return this.refs.fromWasm.SkipRuntime_Runtime__unsubscribe(id);
-    });
-    if (result != 0) {
-      throw this.refs.handles.deleteAsError(result);
-    }
-  }
-
-  /**
-   * Update an input collection
-   * @param collection - the name of the input collection to update
-   * @param entries - entries to update in the collection.
-   */
-  update<K extends Json, V extends Json>(
-    collection: string,
-    entries: Entry<K, V>[],
-  ): void {
-    const result = this.refs.skjson.runWithGC(() => {
-      return this.refs.fromWasm.SkipRuntime_Runtime__update(
-        this.refs.skjson.exportString(collection),
-        this.refs.skjson.exportJSON(entries),
-      );
-    });
-    if (result != 0) {
-      throw this.refs.handles.deleteAsError(result);
-    }
-  }
-
-  /**
-   * Close all resources and shut down the service.
-   * Any subsequent calls on the service will result in errors.
-   */
-  close(): void {
-    const result = this.refs.skjson.runWithGC(() => {
-      return this.refs.fromWasm.SkipRuntime_closeService();
-    });
-    if (result != 0) {
-      throw this.refs.handles.deleteAsError(result);
-    }
-  }
-}
-
-class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
-  constructor(
-    private readonly skjson: SKJSON,
-    private readonly exports: FromWasm,
-    private readonly pointer: ptr<Internal.NonEmptyIterator>,
-  ) {}
-
-  next(): Nullable<T & Param> {
-    return this.skjson.importOptJSON(
-      this.exports.SkipRuntime_NonEmptyIterator__next(this.pointer),
-    ) as Nullable<T & Param>;
-  }
-
-  getUnique(): T & Param {
-    const value = this.skjson.importOptJSON(
-      this.exports.SkipRuntime_NonEmptyIterator__uniqueValue(this.pointer),
-    ) as Nullable<T & Param>;
-    if (value == null) throw new NonUniqueValueException();
-    return value;
-  }
-
-  toArray: () => (T & Param)[] = () => {
-    return Array.from(this);
-  };
-
-  [Symbol.iterator](): Iterator<T & Param> {
-    const cloned_iter = new NonEmptyIteratorImpl<T>(
-      this.skjson,
-      this.exports,
-      this.exports.SkipRuntime_NonEmptyIterator__clone(this.pointer),
-    );
-
-    return {
-      next() {
-        const value = cloned_iter.next();
-        return { value, done: value == null } as IteratorResult<T & Param>;
-      },
-    };
-  }
-
-  map<U>(f: (value: T & Param, index: number) => U, thisObj?: any): U[] {
-    return this.toArray().map(f, thisObj);
   }
 }
 
