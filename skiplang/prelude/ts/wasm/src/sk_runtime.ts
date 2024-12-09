@@ -1,15 +1,13 @@
+import type { float, int, Nullable } from "@skiplang/std";
 import type {
-  int,
-  float,
   ptr,
   Links,
-  Nullable,
   Utils,
   ToWasmManager,
   Environment,
 } from "./sk_types.js";
 import { Stream } from "./sk_types.js";
-import type * as Internal from "./sk_internal_types.js";
+import type * as Internal from "@skiplang/std/internal.js";
 
 class LinksImpl implements Links {
   lineBuffer!: int[];

@@ -1,4 +1,5 @@
-import type { float, int, Environment, Wrk, Shared } from "./sk_types.js";
+import type { float, int } from "@skiplang/std";
+import type { Environment, Wrk, Shared } from "./sk_types.js";
 import { MemFS, MemSys } from "./sk_mem_utils.js";
 
 import * as path from "path";
