@@ -12,7 +12,17 @@ import type {
 import { sk_isObjectProxy } from "@skip-wasm/std";
 import type * as Internal from "./skjson_internal_types.js";
 
+/* Redefining Skip runtime types/symbols to avoid circular module dependency */
 const sk_frozen: unique symbol = Symbol.for("Skip.frozen");
+type Constant = { [sk_frozen]: true };
+function sk_freeze<T extends object>(x: T): T & Constant {
+  return Object.defineProperty(x, sk_frozen, {
+    enumerable: false,
+    writable: false,
+    value: true,
+  }) as T & Constant;
+}
+/* END Skip runtime redefinitions */
 
 export enum Type {
   Undefined,
@@ -107,9 +117,10 @@ function interpretPointer<T extends Internal.CJSON>(
     case Type.Array: {
       const aPtr = hdl.access.SKIP_SKJSON_asArray(ptr);
       const length = hdl.access.SKIP_SKJSON_arraySize(aPtr);
-      return Array.from({ length }, (_, idx) =>
+      const array = Array.from({ length }, (_, idx) =>
         interpretPointer(hdl, hdl.access.SKIP_SKJSON_at(aPtr, idx)),
       );
+      return sk_freeze(array);
     }
     case Type.Object: {
       const oPtr = hdl.access.SKIP_SKJSON_asObject(ptr);
@@ -272,7 +283,7 @@ export type Exportable =
   | null
   | undefined
   | ObjectProxy<{ [k: string]: Exportable }>
-  | Exportable[];
+  | (readonly Exportable[] & Constant);
 
 export interface SKJSON extends Shared {
   importJSON(value: ptr<Internal.CJSON>, copy?: boolean): Exportable;
