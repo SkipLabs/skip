@@ -41,11 +41,13 @@ import { UnknownCollectionError } from "@skipruntime/helpers/errors.js";
 
 export type Handle<T> = Internal.Opaque<int, { handle_for: T }>;
 
-const sk_frozen: unique symbol = Symbol.for("Skip.frozen");
-
 type JSONMapper = Mapper<Json, Json, Json, Json>;
 type JSONLazyCompute = LazyCompute<Json, Json>;
 
+/* NB: `sk_frozen` and `sk_freeze` are both duplicated in skjson.ts to avoid
+ * circular module dependencies. Make sure to mirror any changes there!
+ */
+const sk_frozen: unique symbol = Symbol.for("Skip.frozen");
 export function sk_freeze<T extends object>(x: T): T & Constant {
   return Object.defineProperty(x, sk_frozen, {
     enumerable: false,
