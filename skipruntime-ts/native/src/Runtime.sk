@@ -22,14 +22,15 @@ class ExistingSubscriptionException() extends Exception {
   }
 }
 
-class Params(value: Map<String, PValue>) extends SKStore.File uses Orderable {
+class Params private (
+  sortedKeys: Array<String>,
+  sortedVals: Array<SKJSON.CJSON>,
+) extends SKStore.File uses Orderable {
   fun compare(other: Params): Order {
-    keys = this.value.keys().collect(Array).sorted();
-    okeys = other.value.keys().collect(Array).sorted();
-    kcomp = keys.compare(okeys);
+    kcomp = this.sortedKeys.compare(other.sortedKeys);
     if (kcomp == EQ()) {
-      for (key in keys) {
-        vcomp = this.value.get(key).compare(other.value.get(key));
+      for ((v1, v2) in this.sortedVals.zip(other.sortedVals)) {
+        vcomp = v1.compare(v2);
         if (vcomp != EQ()) {
           break vcomp
         }
@@ -39,6 +40,18 @@ class Params(value: Map<String, PValue>) extends SKStore.File uses Orderable {
     } else {
       kcomp
     }
+  }
+  fun items(): mutable Iterator<(String, SKJSON.CJSON)> {
+    for (i in Range(0, this.sortedKeys.size())) {
+      yield (this.sortedKeys[i], this.sortedVals[i])
+    }
+  }
+  fun toString(): String {
+    vec = mutable Vector[];
+    for ((k, v) in this.items()) {
+      vec.push(`${k}:${v.prettyPrint()}`);
+    };
+    `{${vec.join(",")}}`
   }
 }
 
@@ -86,7 +99,7 @@ class ResourceDef(
 ) extends SKStore.File, SKStore.Key {
   //
   fun toString(): String {
-    `${this.name}:${paramsToString(this.params.value)}`
+    `${this.name}:${this.params.toString()}`
   }
 }
 
@@ -298,7 +311,7 @@ fun buildResourcesGraph(
       };
       pushContext(context);
       try {
-        resourceId = toResourceId(key.name, key.params.value);
+        resourceId = toResourceId(key.name, key.params);
         statusRef = dirname.sub(resourceId);
         // Status graph
         sStatusHdl = context
@@ -348,7 +361,7 @@ fun buildResourcesGraph(
             },
           );
         resourceBuilder = resources.get(key.name);
-        resource = resourceBuilder.build(key.params.value);
+        resource = resourceBuilder.build(key.params);
         collections = servicesHdl.get(context, SKStore.SID(runId)).value;
         collection = resource.instantiate(collections);
         // Ensure the name of the resource result
@@ -525,7 +538,7 @@ class LinkToResource(
   supplier: ExternalService,
   writer: CollectionWriter,
   name: String,
-  params: Map<String, PValue>,
+  params: Params,
 ) extends SKStore.Postponable {
   //
   fun perform(context: mutable SKStore.Context): void {
@@ -539,7 +552,7 @@ class LinkToResource(
 class CloseResource(
   supplier: ExternalService,
   name: String,
-  params: Map<String, PValue>,
+  params: Params,
 ) extends SKStore.Postponable {
   fun perform(context: mutable SKStore.Context): void {
     pushContext(context);
@@ -607,7 +620,7 @@ fun jsonExtract(from: SKJSON.CJObject, pattern: String): Array<SKJSON.CJSON> {
 fun useExternalCollection(
   supplier: String,
   resource: String,
-  params: Map<String, PValue>,
+  params: Params,
 ): Collection {
   getContext() match {
   | Some(context) ->
@@ -629,7 +642,7 @@ fun useExternalCollection(
       SKStore.IID::keyType,
       Params::type,
       paramsDir,
-      Array[(SKStore.IID(0), Params(params))],
+      Array[(SKStore.IID(0), params)],
     );
     collectionHdl = hdl.map(
       SKStore.IID::keyType,
@@ -637,8 +650,11 @@ fun useExternalCollection(
       context,
       dirName,
       (context, writer, key, it) ~> {
+        resource_params = it.first;
         name = mutable Vector<String>[];
-        it.first.value.each((k, v) -> name.push(`${k}:${v}`));
+        resource_params.items().each((kv) ->
+          name.push(`${kv.i0}:${kv.i1.prettyPrint()}`)
+        );
         storeDir = dirName.sub(base64(name.join("|")));
         store = context.mkdir(
           kKeyToKey,
@@ -651,10 +667,10 @@ fun useExternalCollection(
               externalSupplier,
               CollectionWriter(storeDir),
               resource,
-              it.first.value,
+              resource_params,
             ),
           ),
-          Some(CloseResource(externalSupplier, resource, it.first.value)),
+          Some(CloseResource(externalSupplier, resource, resource_params)),
         );
         writer.set(key, Handle(store));
       },
@@ -1200,7 +1216,7 @@ fun createReactiveResource(
 fun getAll(
   context: mutable SKStore.Context,
   resourceName: String,
-  params: Map<String, PValue>,
+  params: Params,
   optRequest: ?Request,
 ): GetResult<Values> {
   resourceInstanceId = Ksuid::create().toString();
@@ -1232,7 +1248,7 @@ fun getAll(
 fun getForKey(
   context: mutable SKStore.Context,
   resourceName: String,
-  params: Map<String, PValue>,
+  params: Params,
   key: SKJSON.CJSON,
   optRequest: ?Request,
 ): GetResult<Array<SKJSON.CJSON>> {
@@ -1442,9 +1458,9 @@ private fun createResource_(
   context: mutable SKStore.Context,
   identifier: String,
   resource: String,
-  params: Map<String, PValue>,
+  params: Params,
 ): ResourceInfo {
-  definition = ResourceDef(resource, Params(params));
+  definition = ResourceDef(resource, params);
   resourceHdl = SKStore.EHandle(
     SKStore.SID::keyType,
     ResourceDef::type,
