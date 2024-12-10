@@ -82,13 +82,13 @@ export class SkipServiceBroker {
     resource: string,
     params: { [param: string]: string },
   ): Promise<Entry<K, V>[]> {
-    const qParams = new URLSearchParams(params).toString();
-    const [optValues, _headers] = await fetchJSON<Entry<K, V>[]>(
-      `${this.entrypoint}/v1/resources/${resource}?${qParams}`,
-      "GET",
+    const [data, _headers] = await fetchJSON<Entry<K, V>[]>(
+      `${this.entrypoint}/v1/snapshot`,
+      "POST",
+      {},
+      { resource, params },
     );
-    const values = optValues ?? [];
-    return values;
+    return data ?? [];
   }
 
   /**
@@ -103,10 +103,11 @@ export class SkipServiceBroker {
     params: { [param: string]: string },
     key: string,
   ): Promise<V[]> {
-    const qParams = new URLSearchParams(params).toString();
     const [data, _headers] = await fetchJSON<V[]>(
-      `${this.entrypoint}/v1/resources/${resource}/${key}?${qParams}`,
-      "GET",
+      `${this.entrypoint}/v1/snapshot`,
+      "POST",
+      {},
+      { resource, key, params },
     );
     return data ?? [];
   }
