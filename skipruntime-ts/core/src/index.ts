@@ -19,7 +19,7 @@ import {
   type Mapper,
   type NamedCollections,
   type NonEmptyIterator,
-  type Param,
+  type DepSafeValue,
   type Reducer,
   type Resource,
   type SkipService,
@@ -74,9 +74,11 @@ function checkOrCloneParam<T>(value: T): T {
 }
 
 /**
- * _Deep-freeze_ an object, returning the same object that was passed in.
+ * _Deep-freeze_ a value, returning the same value that was passed in and making it safe to
+ * use in reactive computations.
  *
- * This function is similar to
+ * For primitive values and Skip-runtime-managed objects this is a no-op; for other objects,
+ * this function is similar to
  * {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/freeze | `Object.freeze()`}
  * but freezes the object and deep-freezes all its properties,
  * recursively. The object is then not only _immutable_ but also
@@ -94,10 +96,10 @@ function checkOrCloneParam<T>(value: T): T {
  * that have not been constructed by Skip can be passed to `deepFreeze()`
  * before passing them to a `Mapper` constructor.
  *
- * @param value - The object to deep-freeze.
- * @returns The same object that was passed in.
+ * @param value - The value to deep-freeze.
+ * @returns The same value that was passed in.
  */
-export function deepFreeze<T>(value: T): T & Param {
+export function deepFreeze<T>(value: T): T & DepSafeValue {
   if (
     typeof value == "bigint" ||
     typeof value == "boolean" ||
@@ -198,22 +200,22 @@ class LazyCollectionImpl<K extends Json, V extends Json>
     Object.freeze(this);
   }
 
-  getArray(key: K): (V & Param)[] {
+  getArray(key: K): (V & DepSafeValue)[] {
     return this.refs.skjson.importJSON(
       this.refs.binding.SkipRuntime_LazyCollection__getArray(
         this.lazyCollection,
         this.refs.skjson.exportJSON(key),
       ),
-    ) as (V & Param)[];
+    ) as (V & DepSafeValue)[];
   }
 
-  getUnique(key: K): V & Param {
+  getUnique(key: K): V & DepSafeValue {
     const v = this.refs.skjson.importOptJSON(
       this.refs.binding.SkipRuntime_LazyCollection__getUnique(
         this.lazyCollection,
         this.refs.skjson.exportJSON(key),
       ),
-    ) as Nullable<V & Param>;
+    ) as Nullable<V & DepSafeValue>;
     if (v == null) throw new NonUniqueValueException();
     return v;
   }
@@ -231,22 +233,22 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     Object.freeze(this);
   }
 
-  getArray(key: K): (V & Param)[] {
+  getArray(key: K): (V & DepSafeValue)[] {
     return this.refs.skjson.importJSON(
       this.refs.binding.SkipRuntime_Collection__getArray(
         this.collection,
         this.refs.skjson.exportJSON(key),
       ),
-    ) as (V & Param)[];
+    ) as (V & DepSafeValue)[];
   }
 
-  getUnique(key: K): V & Param {
+  getUnique(key: K): V & DepSafeValue {
     const v = this.refs.skjson.importOptJSON(
       this.refs.binding.SkipRuntime_Collection__getUnique(
         this.collection,
         this.refs.skjson.exportJSON(key),
       ),
-    ) as Nullable<V & Param>;
+    ) as Nullable<V & DepSafeValue>;
     if (v == null) throw new NonUniqueValueException();
     return v;
   }
@@ -277,7 +279,7 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     return this.derive<K, V>(skcollection);
   }
 
-  map<K2 extends Json, V2 extends Json, Params extends Param[]>(
+  map<K2 extends Json, V2 extends Json, Params extends DepSafeValue[]>(
     mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
     ...params: Params
   ): EagerCollection<K2, V2> {
@@ -297,11 +299,15 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     return this.derive<K2, V2>(mapped);
   }
 
-  mapReduce<K2 extends Json, V2 extends Json, MapperParams extends Param[]>(
+  mapReduce<
+    K2 extends Json,
+    V2 extends Json,
+    MapperParams extends DepSafeValue[],
+  >(
     mapper: new (...params: MapperParams) => Mapper<K, V, K2, V2>,
     ...mapperParams: MapperParams
   ) {
-    return <Accum extends Json, ReducerParams extends Param[]>(
+    return <Accum extends Json, ReducerParams extends DepSafeValue[]>(
       reducer: new (...params: ReducerParams) => Reducer<V2, Accum>,
       ...reducerParams: ReducerParams
     ) => {
@@ -337,7 +343,7 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     };
   }
 
-  reduce<Accum extends Json, Params extends Param[]>(
+  reduce<Accum extends Json, Params extends DepSafeValue[]>(
     reducer: new (...params: Params) => Reducer<V, Accum>,
     ...params: Params
   ): EagerCollection<K, Accum> {
@@ -426,7 +432,11 @@ class ContextImpl extends SkFrozen implements Context {
     Object.freeze(this);
   }
 
-  createLazyCollection<K extends Json, V extends Json, Params extends Param[]>(
+  createLazyCollection<
+    K extends Json,
+    V extends Json,
+    Params extends DepSafeValue[],
+  >(
     compute: new (...params: Params) => LazyCompute<K, V>,
     ...params: Params
   ): LazyCollection<K, V> {
@@ -745,26 +755,26 @@ export class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
     this.pointer = pointer;
   }
 
-  next(): Nullable<T & Param> {
+  next(): Nullable<T & DepSafeValue> {
     return this.skjson.importOptJSON(
       this.binding.SkipRuntime_NonEmptyIterator__next(this.pointer),
-    ) as Nullable<T & Param>;
+    ) as Nullable<T & DepSafeValue>;
   }
 
-  getUnique(): T & Param {
+  getUnique(): T & DepSafeValue {
     const value = this.skjson.importOptJSON(
       this.binding.SkipRuntime_NonEmptyIterator__uniqueValue(this.pointer),
-    ) as Nullable<T & Param>;
+    ) as Nullable<T & DepSafeValue>;
     if (value == null) throw new NonUniqueValueException();
     return value;
   }
 
-  toArray: () => (T & Param)[] = () => {
+  toArray: () => (T & DepSafeValue)[] = () => {
     return Array.from(this);
   };
 
-  [Symbol.iterator](): Iterator<T & Param> {
-    const cloned_iter = new NonEmptyIteratorImpl<T & Param>(
+  [Symbol.iterator](): Iterator<T & DepSafeValue> {
+    const cloned_iter = new NonEmptyIteratorImpl<T & DepSafeValue>(
       this.skjson,
       this.binding,
       this.binding.SkipRuntime_NonEmptyIterator__clone(this.pointer),
@@ -773,12 +783,14 @@ export class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
     return {
       next() {
         const value = cloned_iter.next();
-        return { value, done: value == null } as IteratorResult<T & Param>;
+        return { value, done: value == null } as IteratorResult<
+          T & DepSafeValue
+        >;
       },
     };
   }
 
-  map<U>(f: (value: T & Param, index: number) => U, thisObj?: any): U[] {
+  map<U>(f: (value: T & DepSafeValue, index: number) => U, thisObj?: any): U[] {
     return this.toArray().map(f, thisObj);
   }
 }
@@ -987,7 +999,7 @@ export class ToBinding {
     return skjson.exportJSON(
       reducer.add(
         skacc ? (skjson.importJSON(skacc) as Json) : null,
-        skjson.importJSON(skvalue) as Json & Param,
+        skjson.importJSON(skvalue) as Json & DepSafeValue,
       ),
     );
   }
@@ -1002,7 +1014,7 @@ export class ToBinding {
     return skjson.exportJSON(
       reducer.remove(
         skjson.importJSON(skacc) as Json,
-        skjson.importJSON(skvalue) as Json & Param,
+        skjson.importJSON(skvalue) as Json & DepSafeValue,
       ),
     );
   }
