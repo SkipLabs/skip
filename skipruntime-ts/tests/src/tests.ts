@@ -31,12 +31,12 @@ type GetResult<T> = {
 interface ServiceInstance {
   getAll<K extends Json, V extends Json>(
     resource: string,
-    params?: { [param: string]: string },
+    params?: { [param: string]: Json },
   ): GetResult<Entry<K, V>[]>;
   getArray<V extends Json>(
     resource: string,
     key: string | number,
-    params?: { [param: string]: string },
+    params?: { [param: string]: Json },
   ): GetResult<V[]>;
   update<K extends Json, V extends Json>(
     collection: string,
@@ -45,7 +45,7 @@ interface ServiceInstance {
   instantiateResource(
     identifier: string,
     resource: string,
-    params: { [param: string]: string },
+    params: { [param: string]: Json },
   ): void;
   closeResourceInstance(resourceInstanceId: string): void;
   close(): void;
