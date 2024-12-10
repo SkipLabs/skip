@@ -1,6 +1,6 @@
 import type { int, Nullable, Opaque } from "@skiplang/std";
-import type { Constant, Json, JsonObject, Param } from "@skiplang/json";
-export type { Constant, Json, JsonObject, Opaque, Param };
+import type { Managed, Json, JsonObject, Param } from "@skiplang/json";
+export type { Managed, Json, JsonObject, Opaque, Param };
 export { deepFreeze } from "@skiplang/json";
 
 /**
@@ -165,7 +165,7 @@ export interface NonEmptyIterator<T> extends Iterable<T & Param> {
  * A _Lazy_ reactive collection, whose values are computed only when queried
  */
 export interface LazyCollection<K extends Json, V extends Json>
-  extends Constant {
+  extends Managed {
   /**
    * Get (and potentially compute) all values mapped to by some key.
    */
@@ -183,7 +183,7 @@ export interface LazyCollection<K extends Json, V extends Json>
  * to date whenever inputs are changed
  */
 export interface EagerCollection<K extends Json, V extends Json>
-  extends Constant {
+  extends Managed {
   /**
    * Get all values mapped to by some key.
    */
@@ -269,7 +269,7 @@ export interface LazyCompute<K extends Json, V extends Json> {
 /**
  * Skip Runtime internal state.
  */
-export interface Context extends Constant {
+export interface Context extends Managed {
   /**
    * Creates a lazy reactive collection.
    * @param compute - the function to compute entries of the lazy collection
