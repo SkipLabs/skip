@@ -1,8 +1,8 @@
 import type { Nullable, int } from "@skiplang/std";
-import type { Opaque, Constant } from "./internals.js";
+import type { Opaque, DepSafeObj } from "./internals.js";
 
 import type { Json, JsonObject } from "@skiplang/json";
-export type { Json, JsonObject, Constant, Opaque };
+export type { Json, JsonObject, DepSafeObj, Opaque };
 
 /**
  * Potentially `null` values.
@@ -18,20 +18,26 @@ export type { Nullable };
  */
 
 /**
- * A `Param` is a valid parameter to a Skip runtime mapper function: either a constant JS
- * value or a Skip-runtime-managed value. In either case, restricting mapper parameters to
- * this type helps developers to ensure that reactive computations can be reevaluated as
- * needed with consistent semantics.
- * `Constant`s are deep-frozen objects managed by the Skip runtime; non-Skip objects can be made constant by passing them to `deepFreeze`.
+ * A `DepSafeValue` is _dependency-safe_ and can be used safely in reactive computations.
+ * This is either because it is:
+ * (1) a primitive JavaScript value (boolean, number, string, etc.)
+ * (2) a Skip-runtime-managed object, with tracked dependencies, or
+ * (3) a deep-frozen and therefore immutable JavaScript object.
+ *
+ * Values used in reactive computations must be dependency-safe so that reactive computations
+ * can be reevaluated as needed with consistent semantics.
+ *
+ * All objects/values that come _out_ of the Skip runtime are dependency-safe by default;
+ * non-Skip objects can be made dependency-safe by passing them to `deepFreeze`.
  */
-export type Param =
+export type DepSafeValue =
   | null
   | boolean
   | number
   | bigint
   | string
   | symbol
-  | Constant;
+  | DepSafeObj;
 
 /**
  * The type of a reactive function mapping over an arbitrary collection.
@@ -49,7 +55,7 @@ export interface Mapper<
   K2 extends Json,
   V2 extends Json,
 > {
-  mapEntry(key: K1, values: NonEmptyIterator<V1>): Iterable<[K2, V2]>;
+  mapEntry(key: K1, values: Values<V1>): Iterable<[K2, V2]>;
 }
 
 /**
@@ -66,9 +72,9 @@ export abstract class OneToOneMapper<
   V2 extends Json,
 > implements Mapper<K, V1, K, V2>
 {
-  abstract mapValue(value: V1 & Param, key: K): V2;
+  abstract mapValue(value: V1 & DepSafeValue, key: K): V2;
 
-  mapEntry(key: K, values: NonEmptyIterator<V1>): Iterable<[K, V2]> {
+  mapEntry(key: K, values: Values<V1>): Iterable<[K, V2]> {
     return values.toArray().map((v) => [key, this.mapValue(v, key)]);
   }
 }
@@ -88,9 +94,9 @@ export abstract class OneToManyMapper<
   V2 extends Json,
 > implements Mapper<K, V1, K, V2>
 {
-  abstract mapValue(value: V1 & Param, key: K): V2[];
+  abstract mapValue(value: V1 & DepSafeValue, key: K): V2[];
 
-  mapEntry(key: K, values: NonEmptyIterator<V1>): Iterable<[K, V2]> {
+  mapEntry(key: K, values: Values<V1>): Iterable<[K, V2]> {
     const res: [K, V2][] = [];
     for (const v1 of values)
       for (const v2 of this.mapValue(v1, key)) res.push([key, v2]);
@@ -113,9 +119,9 @@ export abstract class ManyToOneMapper<
   V2 extends Json,
 > implements Mapper<K, V1, K, V2>
 {
-  abstract mapValues(values: NonEmptyIterator<V1>, key: K): V2;
+  abstract mapValues(values: Values<V1>, key: K): V2;
 
-  mapEntry(key: K, values: NonEmptyIterator<V1>): Iterable<[K, V2]> {
+  mapEntry(key: K, values: Values<V1>): Iterable<[K, V2]> {
     return [[key, this.mapValues(values, key)]];
   }
 }
@@ -132,7 +138,7 @@ export interface Reducer<T extends Json, V extends Json> {
    * @param value - the added value
    * @returns the resulting accumulated value
    */
-  add(acc: Nullable<V>, value: T & Param): V;
+  add(acc: Nullable<V>, value: T & DepSafeValue): V;
 
   /**
    * The computation to perform when an input value is removed
@@ -140,7 +146,7 @@ export interface Reducer<T extends Json, V extends Json> {
    * @param value - the removed value
    * @returns the resulting accumulated value
    */
-  remove(acc: V, value: T & Param): Nullable<V>;
+  remove(acc: V, value: T & DepSafeValue): Nullable<V>;
 }
 
 /**
@@ -149,25 +155,25 @@ export interface Reducer<T extends Json, V extends Json> {
 export class NonUniqueValueException extends Error {}
 
 /**
- * A mutable iterator with at least one element
+ * A mutable iterator of dependency-safe values with at least one element
  */
-export interface NonEmptyIterator<T> extends Iterable<T & Param> {
+export interface Values<T> extends Iterable<T & DepSafeValue> {
   /**
    * Return the next element of the iteration.
    * `first` cannot be called after `next`
    */
-  next(): Nullable<T & Param>;
+  next(): Nullable<T & DepSafeValue>;
 
   /**
    * Return the first element of the iteration iff it contains exactly one element.
    * Otherwise, throw a `NonUniqueValueException`.
    */
-  getUnique(): T & Param;
+  getUnique(): T & DepSafeValue;
 
   /**
    * Returns an array containing all values of the iterator
    */
-  toArray(): (T & Param)[];
+  toArray(): (T & DepSafeValue)[];
 
   /**
    * Calls a defined callback function on each element of an array, and returns an array
@@ -175,24 +181,24 @@ export interface NonEmptyIterator<T> extends Iterable<T & Param> {
    * @param f - A function to apply to each element
    * @param thisObj - An object to bind as `this` within the `f` invocations
    */
-  map<U>(f: (value: T & Param, index: number) => U, thisObj?: any): U[];
+  map<U>(f: (value: T & DepSafeValue, index: number) => U, thisObj?: any): U[];
 }
 
 /**
  * A _Lazy_ reactive collection, whose values are computed only when queried
  */
 export interface LazyCollection<K extends Json, V extends Json>
-  extends Constant {
+  extends DepSafeObj {
   /**
    * Get (and potentially compute) all values mapped to by some key.
    */
-  getArray(key: K): (V & Param)[];
+  getArray(key: K): (V & DepSafeValue)[];
 
   /**
    * Get (and potentially compute) the singleton value mapped to by some key.
    * @throws {NonUniqueValueException} when the key maps to either zero or multiple values
    */
-  getUnique(key: K): V & Param;
+  getUnique(key: K): V & DepSafeValue;
 }
 
 /**
@@ -200,24 +206,24 @@ export interface LazyCollection<K extends Json, V extends Json>
  * to date whenever inputs are changed
  */
 export interface EagerCollection<K extends Json, V extends Json>
-  extends Constant {
+  extends DepSafeObj {
   /**
    * Get all values mapped to by some key.
    */
-  getArray(key: K): (V & Param)[];
+  getArray(key: K): (V & DepSafeValue)[];
 
   /**
    * Get the singleton value mapped to by some key.
    * @throws {NonUniqueValueException} when the key maps to either zero or multiple values
    */
-  getUnique(key: K): V & Param;
+  getUnique(key: K): V & DepSafeValue;
 
   /**
    * Create a new eager collection by mapping some computation over this one
    * @param mapper - function to apply to each element of this collection
    * @returns The resulting (eager) output collection
    */
-  map<K2 extends Json, V2 extends Json, Params extends Param[]>(
+  map<K2 extends Json, V2 extends Json, Params extends DepSafeValue[]>(
     mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
     ...params: Params
   ): EagerCollection<K2, V2>;
@@ -234,15 +240,19 @@ export interface EagerCollection<K extends Json, V extends Json>
    * `reducer` - function to combine results of the `mapper`
    * `reducerParams` - parameters to the reducer constructor
    */
-  mapReduce<K2 extends Json, V2 extends Json, MapperParams extends Param[]>(
+  mapReduce<
+    K2 extends Json,
+    V2 extends Json,
+    MapperParams extends DepSafeValue[],
+  >(
     mapper: new (...params: MapperParams) => Mapper<K, V, K2, V2>,
     ...mapperParams: MapperParams
-  ): <Accum extends Json, ReducerParams extends Param[]>(
+  ): <Accum extends Json, ReducerParams extends DepSafeValue[]>(
     reducer: new (...params: ReducerParams) => Reducer<V2, Accum>,
     ...reducerParams: ReducerParams
   ) => EagerCollection<K2, Accum>;
 
-  reduce<Accum extends Json, Params extends Param[]>(
+  reduce<Accum extends Json, Params extends DepSafeValue[]>(
     reducer: new (...params: Params) => Reducer<V, Accum>,
     ...params: Params
   ): EagerCollection<K, Accum>;
@@ -286,14 +296,18 @@ export interface LazyCompute<K extends Json, V extends Json> {
 /**
  * Skip Runtime internal state.
  */
-export interface Context extends Constant {
+export interface Context extends DepSafeObj {
   /**
    * Creates a lazy reactive collection.
    * @param compute - the function to compute entries of the lazy collection
    * @param params - any additional parameters to the computation
    * @returns The resulting lazy collection
    */
-  createLazyCollection<K extends Json, V extends Json, Params extends Param[]>(
+  createLazyCollection<
+    K extends Json,
+    V extends Json,
+    Params extends DepSafeValue[],
+  >(
     compute: new (...params: Params) => LazyCompute<K, V>,
     ...params: Params
   ): LazyCollection<K, V>;

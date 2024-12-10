@@ -1,6 +1,6 @@
 import type { Nullable } from "@skip-wasm/std";
 import { ManyToOneMapper } from "@skipruntime/api";
-import type { Reducer, NonEmptyIterator, Json } from "@skipruntime/api";
+import type { Reducer, Values, Json } from "@skipruntime/api";
 
 export class Sum implements Reducer<number, number> {
   default = 0;
@@ -42,7 +42,7 @@ export class CountMapper<
   K extends Json,
   V extends Json,
 > extends ManyToOneMapper<K, V, number> {
-  mapValues(values: NonEmptyIterator<V>): number {
+  mapValues(values: Values<V>): number {
     return values.toArray().length;
   }
 }

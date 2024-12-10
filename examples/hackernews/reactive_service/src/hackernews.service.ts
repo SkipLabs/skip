@@ -1,7 +1,7 @@
 import type {
   Entry,
   EagerCollection,
-  NonEmptyIterator,
+  Values,
   SkipService,
   Resource,
 } from "@skipruntime/runtime";
@@ -55,10 +55,7 @@ export function serviceWithInitialData(
 }
 
 class UpvotesMapper {
-  mapEntry(
-    key: number,
-    values: NonEmptyIterator<Upvote>,
-  ): Iterable<[number, number]> {
+  mapEntry(key: number, values: Values<Upvote>): Iterable<[number, number]> {
     const value = values.getUnique().post_id;
     return [[value, key]];
   }
@@ -70,10 +67,7 @@ class PostsMapper {
     private upvotes: EagerCollection<number, number>,
   ) {}
 
-  mapEntry(
-    key: number,
-    values: NonEmptyIterator<Post>,
-  ): Iterable<[number, Upvoted]> {
+  mapEntry(key: number, values: Values<Post>): Iterable<[number, Upvoted]> {
     const post: Post = values.getUnique();
     const upvotes = this.upvotes.getArray(key).length;
     const author = this.users.getUnique(post.author_id);
@@ -83,10 +77,7 @@ class PostsMapper {
 }
 
 class SortingMapper {
-  mapEntry(
-    key: number,
-    values: NonEmptyIterator<Upvoted>,
-  ): Iterable<[number, Upvoted]> {
+  mapEntry(key: number, values: Values<Upvoted>): Iterable<[number, Upvoted]> {
     const posts = values.toArray();
     // Sorting in descending order of upvotes.
     posts.sort((a, b) => b.upvotes - a.upvotes);
