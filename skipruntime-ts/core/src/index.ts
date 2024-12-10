@@ -23,7 +23,7 @@ import {
   type LazyCompute,
   type Mapper,
   type NamedCollections,
-  type NonEmptyIterator,
+  type Values,
   type DepSafe,
   type Reducer,
   type Resource,
@@ -668,7 +668,7 @@ export class ServiceInstance {
   }
 }
 
-export class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
+class ValuesImpl<T> implements Values<T> {
   constructor(
     private readonly skjson: JsonConverter,
     private readonly binding: FromBinding,
@@ -698,7 +698,7 @@ export class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
   };
 
   [Symbol.iterator](): Iterator<T & DepSafe> {
-    const cloned_iter = new NonEmptyIteratorImpl<T & DepSafe>(
+    const cloned_iter = new ValuesImpl<T & DepSafe>(
       this.skjson,
       this.binding,
       this.binding.SkipRuntime_NonEmptyIterator__clone(this.pointer),
@@ -767,7 +767,7 @@ export class ToBinding {
     const mapper = this.handles.get(skmapper);
     const result = mapper.mapEntry(
       skjson.importJSON(key) as Json,
-      new NonEmptyIteratorImpl<Json>(skjson, this.binding, values),
+      new ValuesImpl<Json>(skjson, this.binding, values),
     );
     return skjson.exportJSON(Array.from(result) as [[Json, Json]]);
   }

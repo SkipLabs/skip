@@ -32,7 +32,7 @@ export interface Mapper<
   K2 extends Json,
   V2 extends Json,
 > {
-  mapEntry(key: K1, values: NonEmptyIterator<V1>): Iterable<[K2, V2]>;
+  mapEntry(key: K1, values: Values<V1>): Iterable<[K2, V2]>;
 }
 
 /**
@@ -51,7 +51,7 @@ export abstract class OneToOneMapper<
 {
   abstract mapValue(value: V1 & DepSafe, key: K): V2;
 
-  mapEntry(key: K, values: NonEmptyIterator<V1>): Iterable<[K, V2]> {
+  mapEntry(key: K, values: Values<V1>): Iterable<[K, V2]> {
     return values.toArray().map((v) => [key, this.mapValue(v, key)]);
   }
 }
@@ -73,7 +73,7 @@ export abstract class OneToManyMapper<
 {
   abstract mapValue(value: V1 & DepSafe, key: K): V2[];
 
-  mapEntry(key: K, values: NonEmptyIterator<V1>): Iterable<[K, V2]> {
+  mapEntry(key: K, values: Values<V1>): Iterable<[K, V2]> {
     const res: [K, V2][] = [];
     for (const v1 of values)
       for (const v2 of this.mapValue(v1, key)) res.push([key, v2]);
@@ -96,9 +96,9 @@ export abstract class ManyToOneMapper<
   V2 extends Json,
 > implements Mapper<K, V1, K, V2>
 {
-  abstract mapValues(values: NonEmptyIterator<V1>, key: K): V2;
+  abstract mapValues(values: Values<V1>, key: K): V2;
 
-  mapEntry(key: K, values: NonEmptyIterator<V1>): Iterable<[K, V2]> {
+  mapEntry(key: K, values: Values<V1>): Iterable<[K, V2]> {
     return [[key, this.mapValues(values, key)]];
   }
 }
@@ -132,9 +132,9 @@ export interface Reducer<T extends Json, V extends Json> {
 export class NonUniqueValueException extends Error {}
 
 /**
- * A mutable iterator with at least one element
+ * A mutable iterator of dependency-safe values with at least one element
  */
-export interface NonEmptyIterator<T> extends Iterable<T & DepSafe> {
+export interface Values<T> extends Iterable<T & DepSafe> {
   /**
    * Return the next element of the iteration.
    * `first` cannot be called after `next`
