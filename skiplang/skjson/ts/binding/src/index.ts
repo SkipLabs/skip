@@ -47,20 +47,28 @@ export abstract class SkManaged extends Frozen {
 }
 
 /**
- * A `Param` is a valid parameter to a Skip runtime mapper function: either a constant JS
- * value or a Skip-runtime-managed value. In either case, restricting mapper parameters to
- * this type helps developers to ensure that reactive computations can be reevaluated as
- * needed with consistent semantics.
- * `Constant`s are deep-frozen objects managed by the Skip runtime; non-Skip objects can be made constant by passing them to `deepFreeze`.
+ * A `DepSafe` value is _dependency-safe_ and can be used safely in reactive computations.
+ *
+ * This is either because it is:
+ * (1) a primitive JavaScript value (boolean, number, string, etc.)
+ * (2) a Skip-runtime-managed object with tracked dependencies, or
+ * (3) a deep-frozen and therefore immutable JavaScript object.
+ *
+ * Values used in reactive computations must be dependency-safe so that reactive computations
+ * can be reevaluated as needed with consistent semantics.
+ *
+ * All objects/values that come _out_ of the Skip runtime are dependency-safe by default;
+ * non-Skip objects can be made dependency-safe by passing them to `deepFreeze`, which
+ * recursively freezes their fields and returns an immutable `Managed` object.
  */
-export type Param =
+export type DepSafe =
   | null
   | boolean
   | number
   | bigint
   | string
   | symbol
-  | Constant;
+  | Managed;
 
 export function checkOrCloneParam<T>(value: T): T {
   if (
@@ -102,7 +110,7 @@ export function checkOrCloneParam<T>(value: T): T {
  * @param value - The object to deep-freeze.
  * @returns The same object that was passed in.
  */
-export function deepFreeze<T>(value: T): T & Param {
+export function deepFreeze<T>(value: T): T & DepSafe {
   if (
     typeof value == "bigint" ||
     typeof value == "boolean" ||

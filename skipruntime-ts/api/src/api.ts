@@ -1,6 +1,6 @@
 import type { int, Nullable, Opaque } from "@skiplang/std";
-import type { Managed, Json, JsonObject, Param } from "@skiplang/json";
-export type { Managed, Json, JsonObject, Opaque, Param };
+import type { Managed, Json, JsonObject, DepSafe } from "@skiplang/json";
+export type { Managed, Json, JsonObject, Opaque, DepSafe };
 export { deepFreeze } from "@skiplang/json";
 
 /**
@@ -49,7 +49,7 @@ export abstract class OneToOneMapper<
   V2 extends Json,
 > implements Mapper<K, V1, K, V2>
 {
-  abstract mapValue(value: V1 & Param, key: K): V2;
+  abstract mapValue(value: V1 & DepSafe, key: K): V2;
 
   mapEntry(key: K, values: NonEmptyIterator<V1>): Iterable<[K, V2]> {
     return values.toArray().map((v) => [key, this.mapValue(v, key)]);
@@ -71,7 +71,7 @@ export abstract class OneToManyMapper<
   V2 extends Json,
 > implements Mapper<K, V1, K, V2>
 {
-  abstract mapValue(value: V1 & Param, key: K): V2[];
+  abstract mapValue(value: V1 & DepSafe, key: K): V2[];
 
   mapEntry(key: K, values: NonEmptyIterator<V1>): Iterable<[K, V2]> {
     const res: [K, V2][] = [];
@@ -115,7 +115,7 @@ export interface Reducer<T extends Json, V extends Json> {
    * @param value - the added value
    * @returns the resulting accumulated value
    */
-  add(acc: Nullable<V>, value: T & Param): V;
+  add(acc: Nullable<V>, value: T & DepSafe): V;
 
   /**
    * The computation to perform when an input value is removed
@@ -123,7 +123,7 @@ export interface Reducer<T extends Json, V extends Json> {
    * @param value - the removed value
    * @returns the resulting accumulated value
    */
-  remove(acc: V, value: T & Param): Nullable<V>;
+  remove(acc: V, value: T & DepSafe): Nullable<V>;
 }
 
 /**
@@ -134,23 +134,23 @@ export class NonUniqueValueException extends Error {}
 /**
  * A mutable iterator with at least one element
  */
-export interface NonEmptyIterator<T> extends Iterable<T & Param> {
+export interface NonEmptyIterator<T> extends Iterable<T & DepSafe> {
   /**
    * Return the next element of the iteration.
    * `first` cannot be called after `next`
    */
-  next(): Nullable<T & Param>;
+  next(): Nullable<T & DepSafe>;
 
   /**
    * Return the first element of the iteration iff it contains exactly one element.
    * Otherwise, throw a `NonUniqueValueException`.
    */
-  getUnique(): T & Param;
+  getUnique(): T & DepSafe;
 
   /**
    * Returns an array containing all values of the iterator
    */
-  toArray(): (T & Param)[];
+  toArray(): (T & DepSafe)[];
 
   /**
    * Calls a defined callback function on each element of an array, and returns an array
@@ -158,7 +158,7 @@ export interface NonEmptyIterator<T> extends Iterable<T & Param> {
    * @param f - A function to apply to each element
    * @param thisObj - An object to bind as `this` within the `f` invocations
    */
-  map<U>(f: (value: T & Param, index: number) => U, thisObj?: any): U[];
+  map<U>(f: (value: T & DepSafe, index: number) => U, thisObj?: any): U[];
 }
 
 /**
@@ -169,13 +169,13 @@ export interface LazyCollection<K extends Json, V extends Json>
   /**
    * Get (and potentially compute) all values mapped to by some key.
    */
-  getArray(key: K): (V & Param)[];
+  getArray(key: K): (V & DepSafe)[];
 
   /**
    * Get (and potentially compute) the singleton value mapped to by some key.
    * @throws {NonUniqueValueException} when the key maps to either zero or multiple values
    */
-  getUnique(key: K): V & Param;
+  getUnique(key: K): V & DepSafe;
 }
 
 /**
@@ -187,20 +187,20 @@ export interface EagerCollection<K extends Json, V extends Json>
   /**
    * Get all values mapped to by some key.
    */
-  getArray(key: K): (V & Param)[];
+  getArray(key: K): (V & DepSafe)[];
 
   /**
    * Get the singleton value mapped to by some key.
    * @throws {NonUniqueValueException} when the key maps to either zero or multiple values
    */
-  getUnique(key: K): V & Param;
+  getUnique(key: K): V & DepSafe;
 
   /**
    * Create a new eager collection by mapping some computation over this one
    * @param mapper - function to apply to each element of this collection
    * @returns The resulting (eager) output collection
    */
-  map<K2 extends Json, V2 extends Json, Params extends Param[]>(
+  map<K2 extends Json, V2 extends Json, Params extends DepSafe[]>(
     mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
     ...params: Params
   ): EagerCollection<K2, V2>;
@@ -217,15 +217,15 @@ export interface EagerCollection<K extends Json, V extends Json>
    * `reducer` - function to combine results of the `mapper`
    * `reducerParams` - parameters to the reducer constructor
    */
-  mapReduce<K2 extends Json, V2 extends Json, MapperParams extends Param[]>(
+  mapReduce<K2 extends Json, V2 extends Json, MapperParams extends DepSafe[]>(
     mapper: new (...params: MapperParams) => Mapper<K, V, K2, V2>,
     ...mapperParams: MapperParams
-  ): <Accum extends Json, ReducerParams extends Param[]>(
+  ): <Accum extends Json, ReducerParams extends DepSafe[]>(
     reducer: new (...params: ReducerParams) => Reducer<V2, Accum>,
     ...reducerParams: ReducerParams
   ) => EagerCollection<K2, Accum>;
 
-  reduce<Accum extends Json, Params extends Param[]>(
+  reduce<Accum extends Json, Params extends DepSafe[]>(
     reducer: new (...params: Params) => Reducer<V, Accum>,
     ...params: Params
   ): EagerCollection<K, Accum>;
@@ -276,7 +276,11 @@ export interface Context extends Managed {
    * @param params - any additional parameters to the computation
    * @returns The resulting lazy collection
    */
-  createLazyCollection<K extends Json, V extends Json, Params extends Param[]>(
+  createLazyCollection<
+    K extends Json,
+    V extends Json,
+    Params extends DepSafe[],
+  >(
     compute: new (...params: Params) => LazyCompute<K, V>,
     ...params: Params
   ): LazyCollection<K, V>;
