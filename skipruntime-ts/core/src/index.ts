@@ -509,17 +509,17 @@ class AllChecker<K extends Json, V extends Json> implements Checker {
   }
 }
 
-class OneChecker<V extends Json> implements Checker {
+class OneChecker<K extends Json, V extends Json> implements Checker {
   constructor(
     private readonly service: ServiceInstance,
     private readonly executor: Executor<V[]>,
     private readonly resource: string,
     private readonly params: { [param: string]: string },
-    private readonly key: string | number,
+    private readonly key: K,
   ) {}
 
   check(request: string): void {
-    const result = this.service.getArray<V>(
+    const result = this.service.getArray<K, V>(
       this.resource,
       this.key,
       this.params,
@@ -603,9 +603,9 @@ export class ServiceInstance {
    * @param params - Resource parameters, passed to the resource constructor specified in this `SkipService`'s `resources` field
    * @returns The current value(s) for this key in the specified resource instance
    */
-  getArray<V extends Json>(
+  getArray<K extends Json, V extends Json>(
     resource: string,
-    key: string | number,
+    key: K,
     params: { [param: string]: string } = {},
     request?: string | Executor<V[]>,
   ): GetResult<V[]> {
