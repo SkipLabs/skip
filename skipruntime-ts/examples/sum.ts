@@ -1,21 +1,17 @@
-import type {
-  EagerCollection,
-  NonEmptyIterator,
-  Resource,
-} from "@skipruntime/api";
+import type { EagerCollection, Values, Resource } from "@skipruntime/api";
 
 import { ManyToOneMapper } from "@skipruntime/api";
 
 import { runService } from "@skipruntime/server";
 
 class Plus extends ManyToOneMapper<string, number, number> {
-  mapValues(values: NonEmptyIterator<number>): number {
+  mapValues(values: Values<number>): number {
     return values.toArray().reduce((p, c) => p + c, 0);
   }
 }
 
 class Minus extends ManyToOneMapper<string, number, number> {
-  mapValues(values: NonEmptyIterator<number>): number {
+  mapValues(values: Values<number>): number {
     const acc = (p: number | null, c: number) => {
       return p !== null ? p - c : c;
     };

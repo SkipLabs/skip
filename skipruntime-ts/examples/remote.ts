@@ -1,7 +1,7 @@
 import type {
   Context,
   EagerCollection,
-  NonEmptyIterator,
+  Values,
   NamedCollections,
   Resource,
 } from "@skipruntime/api";
@@ -11,7 +11,7 @@ import { SkipExternalService } from "@skipruntime/core";
 import { runService } from "@skipruntime/server";
 
 class Mult extends ManyToOneMapper<string, number, number> {
-  mapValues(values: NonEmptyIterator<number>): number {
+  mapValues(values: Values<number>): number {
     return values.toArray().reduce((p, c) => p * c, 1);
   }
 }
