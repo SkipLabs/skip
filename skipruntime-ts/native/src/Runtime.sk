@@ -1204,15 +1204,6 @@ value class GetResult<T>(
   }
 }
 
-fun createReactiveResource(
-  context: mutable SKStore.Context,
-  identifier: String,
-  resource: String,
-  params: Map<String, PValue>,
-): void {
-  _ = createResource_(context, identifier, resource, params);
-}
-
 fun getAll(
   context: mutable SKStore.Context,
   resourceName: String,
@@ -1220,7 +1211,12 @@ fun getAll(
   optRequest: ?Request,
 ): GetResult<Values> {
   resourceInstanceId = Ksuid::create().toString();
-  resource = createResource_(context, resourceInstanceId, resourceName, params);
+  resource = createReactiveResource(
+    context,
+    resourceInstanceId,
+    resourceName,
+    params,
+  );
   // create requests
   request = optRequest match {
   | Some(checker @ Checker _) -> resource.createRequest(context, Some(checker))
@@ -1253,7 +1249,12 @@ fun getForKey(
   optRequest: ?Request,
 ): GetResult<Array<SKJSON.CJSON>> {
   resourceInstanceId = Ksuid::create().toString();
-  resource = createResource_(context, resourceInstanceId, resourceName, params);
+  resource = createReactiveResource(
+    context,
+    resourceInstanceId,
+    resourceName,
+    params,
+  );
   // create requests
   request = optRequest match {
   | Some(checker @ Checker _) -> resource.createRequest(context, Some(checker))
@@ -1454,7 +1455,7 @@ fun delete(
   updateContext(context);
 }
 
-private fun createResource_(
+fun createReactiveResource(
   context: mutable SKStore.Context,
   identifier: String,
   resource: String,
