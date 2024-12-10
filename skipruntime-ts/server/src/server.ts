@@ -25,15 +25,12 @@ export type SkipServer = {
  *
  * The control API responds to the following HTTP requests:
  *
- * - `GET /v1/resources/:resource?param1=value1&...&paramN=valueN`:
- *   Synchronous read of an entire resource.
+ * - `POST /v1/snapshot`:
+ *   Synchronous read of a resource.
  *
- *   Instantiates the named `resource` with parameters `{param1=value1,...,paramN=valueN}` and responds with the entire contents of the resource. The returned data will be a JSON-encoded value of type `[Json, Json[]][]`: an array of entries each of which associates a key to an array of its values.
- *
- * - `GET /v1/resources/:resource/:key?param1=value1&...&paramN=valueN`:
- *   Synchronous read of a single key from a resource.
- *
- *   Instantiates the named `resource` with parameters `{param1=value1,...,paramN=valueN}` and responds with the values associated with the given `key`. The returned data will be a JSON-encoded value of type `Json[]`: an array of the `key`'s values.
+ *   Requires a JSON-encoded request body of the form `{ resource: string; params: { [param: string]: string }; key?: Json }`.
+ *   Instantiates the named `resource` with the given `params`, and responds with the values associated with the given `key` or with the entire contents of the resource if no `key` is provided.
+ *   If `key` is provided, the returned data will be a JSON-encoded value of type `Json[]`: an array of the `key`'s values; otherwise, it will be a JSON-encoded value of type `[Json, Json[]][]`: an array of entries, each of which associates a key to an array of its values.
  *
  * - `PATCH /v1/inputs/:collection`:
  *   Partial write (update only the specified keys) of an input collection.
