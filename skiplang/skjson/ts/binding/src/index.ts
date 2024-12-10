@@ -5,20 +5,20 @@ export type { Pointer, Nullable, Binding };
 export type { Type };
 
 export const sk_isObjectProxy: unique symbol = Symbol();
-export const sk_frozen: unique symbol = Symbol.for("Skip.frozen");
+export const sk_dep_safe: unique symbol = Symbol.for("Skip.dependency-safe");
 
-export type Constant = { [sk_frozen]: true };
+export type DepSafeObj = { [sk_dep_safe]: true };
 
-export function sk_freeze<T extends object>(x: T): T & Constant {
-  return Object.defineProperty(x, sk_frozen, {
+export function sk_freeze<T extends object>(x: T): T & DepSafeObj {
+  return Object.defineProperty(x, sk_dep_safe, {
     enumerable: false,
     writable: false,
     value: true,
-  }) as T & Constant;
+  }) as T & DepSafeObj;
 }
 
-export function isSkFrozen(x: any): x is Constant {
-  return sk_frozen in x && x[sk_frozen] === true;
+export function isSkFrozen(x: any): x is DepSafeObj {
+  return sk_dep_safe in x && x[sk_dep_safe] === true;
 }
 
 /**
@@ -34,11 +34,11 @@ export type Exportable =
   | null
   | undefined
   | ObjectProxy<{ [k: string]: Exportable }>
-  | (readonly Exportable[] & Constant);
+  | (readonly Exportable[] & DepSafeObj);
 
 export type ObjectProxy<Base extends { [k: string]: Exportable }> = {
   [sk_isObjectProxy]: true;
-  [sk_frozen]: true;
+  [sk_dep_safe]: true;
   __pointer: Pointer<Internal.CJSON>;
   clone: () => ObjectProxy<Base>;
   toJSON: () => Base;
@@ -58,7 +58,7 @@ export const reactiveObject = {
     self: ObjectProxy<Base>,
   ): any {
     if (prop === sk_isObjectProxy) return true;
-    if (prop === sk_frozen) return true;
+    if (prop === sk_dep_safe) return true;
     if (prop === "__pointer") return hdl.pointer;
     if (prop === "clone") return (): ObjectProxy<Base> => clone(self);
     if (typeof prop === "symbol") return undefined;
@@ -84,7 +84,7 @@ export const reactiveObject = {
   },
   has(hdl: ObjectHandle<Internal.CJObject>, prop: string | symbol): boolean {
     if (prop === sk_isObjectProxy) return true;
-    if (prop === sk_frozen) return true;
+    if (prop === sk_dep_safe) return true;
     if (prop === "__pointer") return true;
     if (prop === "clone") return true;
     if (prop === "keys") return true;

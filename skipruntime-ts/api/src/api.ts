@@ -1,8 +1,8 @@
 import type { Nullable, int } from "@skiplang/std";
-import type { Opaque, Constant } from "./internals.js";
+import type { Opaque, DepSafeObj } from "./internals.js";
 
 import type { Json, JsonObject } from "@skiplang/json";
-export type { Json, JsonObject, Constant, Opaque };
+export type { Json, JsonObject, DepSafeObj, Opaque };
 
 /**
  * Potentially `null` values.
@@ -31,7 +31,7 @@ export type Param =
   | bigint
   | string
   | symbol
-  | Constant;
+  | DepSafeObj;
 
 /**
  * The type of a reactive function mapping over an arbitrary collection.
@@ -182,7 +182,7 @@ export interface NonEmptyIterator<T> extends Iterable<T & Param> {
  * A _Lazy_ reactive collection, whose values are computed only when queried
  */
 export interface LazyCollection<K extends Json, V extends Json>
-  extends Constant {
+  extends DepSafeObj {
   /**
    * Get (and potentially compute) all values mapped to by some key.
    */
@@ -200,7 +200,7 @@ export interface LazyCollection<K extends Json, V extends Json>
  * to date whenever inputs are changed
  */
 export interface EagerCollection<K extends Json, V extends Json>
-  extends Constant {
+  extends DepSafeObj {
   /**
    * Get all values mapped to by some key.
    */
@@ -286,7 +286,7 @@ export interface LazyCompute<K extends Json, V extends Json> {
 /**
  * Skip Runtime internal state.
  */
-export interface Context extends Constant {
+export interface Context extends DepSafeObj {
   /**
    * Creates a lazy reactive collection.
    * @param compute - the function to compute entries of the lazy collection
