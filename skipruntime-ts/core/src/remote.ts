@@ -31,7 +31,7 @@ export class SkipExternalService implements ExternalService {
 
   subscribe(
     resource: string,
-    params: { [param: string]: string },
+    params: { [param: string]: Json },
     callbacks: {
       update: (updates: Entry<Json, Json>[], isInitial: boolean) => void;
       // FIXME: What is `error()` used for?
@@ -72,7 +72,7 @@ export class SkipExternalService implements ExternalService {
       });
   }
 
-  unsubscribe(resource: string, params: { [param: string]: string }) {
+  unsubscribe(resource: string, params: { [param: string]: Json }) {
     const closable = this.resources.get(this.toId(resource, params));
     if (closable) closable.close();
   }
@@ -83,11 +83,11 @@ export class SkipExternalService implements ExternalService {
     }
   }
 
-  private toId(resource: string, params: { [param: string]: string }): string {
+  private toId(resource: string, params: { [param: string]: Json }): string {
     // TODO: This is equivalent to `querystring.encode(params, ',', ':')`.
     const strparams: string[] = [];
     for (const key of Object.keys(params).sort()) {
-      strparams.push(`${key}:${params[key]}`);
+      strparams.push(`${key}:${btoa(JSON.stringify(params[key]))}`);
     }
     return `${resource}[${strparams.join(",")}]`;
   }
