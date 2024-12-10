@@ -354,6 +354,32 @@ const mergeReduceService: SkipService<Input_NN_NN, Input_NN_NN> = {
   },
 };
 
+// testJSONParams
+
+// test `params` with nested structure
+type StructuredParams = { x: number; y: { a: number; bs: number[] } };
+
+class JsonParamsResource implements Resource<Input_NN> {
+  private offset: number;
+
+  constructor(params: { [param: string]: Json }) {
+    const offsets: StructuredParams = params["offsets"] as StructuredParams;
+    this.offset =
+      offsets.x + offsets.y.a + offsets.y.bs.reduce((x, y) => x + y, 0);
+  }
+
+  instantiate(cs: Input_NN): EagerCollection<number, number> {
+    return cs.input.map(OffsetMapper, this.offset);
+  }
+}
+const jsonParamsService: SkipService<Input_NN, Input_NN> = {
+  initialData: { input: [] },
+  resources: { jsonParams: JsonParamsResource },
+  createGraph(inputs: Input_NN) {
+    return inputs;
+  },
+};
+
 // testJSONExtract
 
 class JSONExtract
@@ -749,6 +775,36 @@ export function initTests(
     expect(service.getAll(resource).payload).toEqual([
       [1, [25]],
       [2, [20]],
+    ]);
+  });
+
+  it("testJSONParams", async () => {
+    const service = await initService(jsonParamsService);
+    const resource = "jsonParams";
+    const plus15_params = { x: 1, y: { a: 2, bs: [3, 4, 5] } };
+    const plus42_params = {
+      x: 7,
+      y: { a: 7, bs: [14, 14], extra_garbage: "not used by resource" },
+    };
+    service.update("input", [[1, [1]]]);
+    expect(
+      service.getAll(resource, { offsets: plus15_params }).payload,
+    ).toEqual([[1, [16]]]);
+    expect(
+      service.getAll(resource, { offsets: plus42_params }).payload,
+    ).toEqual([[1, [43]]]);
+    service.update("input", [[2, [2]]]);
+    expect(
+      service.getAll(resource, { offsets: plus15_params }).payload,
+    ).toEqual([
+      [1, [16]],
+      [2, [17]],
+    ]);
+    expect(
+      service.getAll(resource, { offsets: plus42_params }).payload,
+    ).toEqual([
+      [1, [43]],
+      [2, [44]],
     ]);
   });
 
