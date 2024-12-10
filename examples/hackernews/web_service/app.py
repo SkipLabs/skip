@@ -59,9 +59,14 @@ def posts_index():
         return redirect(f"/streams/{uuid}", code=307)
 
     else:
-        resp = requests.get(
-            f"{REACTIVE_SERVICE_URL}/resources/posts",
-            params={ 'limit': 10 },
+        resp = requests.post(
+            f"{REACTIVE_SERVICE_URL}/snapshot",
+            json={
+                'resource': "posts",
+                'params': {
+                    'limit': 10
+                }
+            },
         )
 
         # The reactive service returns an array of (id, values) where
