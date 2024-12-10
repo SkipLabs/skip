@@ -7,8 +7,8 @@ import type {
 } from "@skiplang/json";
 import {
   sk_freeze,
-  isSkFrozen,
-  SkFrozen,
+  isSkManaged,
+  SkManaged,
   checkOrCloneParam,
 } from "@skiplang/json";
 import type * as Internal from "./internal.js";
@@ -41,7 +41,7 @@ import {
   type FromBinding,
 } from "./binding.js";
 
-export { UnknownCollectionError, sk_freeze, isSkFrozen };
+export { UnknownCollectionError, sk_freeze, isSkManaged };
 export { SkipExternalService } from "./remote.js";
 export { Sum, Min, Max, Count, CountMapper } from "./utils.js";
 
@@ -117,7 +117,7 @@ export class Refs {
 }
 
 class LazyCollectionImpl<K extends Json, V extends Json>
-  extends SkFrozen
+  extends SkManaged
   implements LazyCollection<K, V>
 {
   constructor(
@@ -150,7 +150,7 @@ class LazyCollectionImpl<K extends Json, V extends Json>
 }
 
 class EagerCollectionImpl<K extends Json, V extends Json>
-  extends SkFrozen
+  extends SkManaged
   implements EagerCollection<K, V>
 {
   constructor(
@@ -350,7 +350,7 @@ class CollectionWriter<K extends Json, V extends Json> {
   }
 }
 
-class ContextImpl extends SkFrozen implements Context {
+class ContextImpl extends SkManaged implements Context {
   constructor(private readonly refs: Refs) {
     super();
     Object.freeze(this);

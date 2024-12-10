@@ -5,21 +5,21 @@ export type { Pointer, Nullable, Binding };
 export type { Type };
 
 export const sk_isObjectProxy: unique symbol = Symbol();
-export const sk_frozen: unique symbol = Symbol.for("Skip.frozen");
+export const sk_managed: unique symbol = Symbol.for("Skip.managed");
 
 /**
- * Values that are either unmodifiable or managed by the Skip Runtime.
+ * Values that are either unmodifiable or tracked by the Skip Runtime.
  *
- * A `Constant` value is either managed by the Skip Runtime, in which case its modifications are carefully tracked by the reactive computation system, or it is deep-frozen, meaning that it cannot be modified and neither can its sub-objects, recursively.
- * See `deepFreeze` to make an object `Constant`.
+ * A `Managed` value is either managed by the Skip Runtime, in which case its modifications are carefully tracked by the reactive computation system, or it is deep-frozen, meaning that it cannot be modified and neither can its sub-objects, recursively.
+ * See `deepFreeze` to make an object `Managed`.
  *
- * `Constant` values are important because they can be used in code that will be executed by the reactive computation system without introducing the possibility of producing stale or unreproducible results.
+ * `Managed` values are important because they can be used in code that will be executed by the reactive computation system without introducing the possibility of stale or unreproducible results.
  */
-export type Constant = { [sk_frozen]: true };
+export type Managed = { [sk_managed]: true };
 
-export abstract class Frozen implements Constant {
+export abstract class Frozen implements Managed {
   // tsc misses that Object.defineProperty in the constructor inits this
-  [sk_frozen]!: true;
+  [sk_managed]!: true;
 
   constructor() {
     this.freeze();
@@ -28,19 +28,19 @@ export abstract class Frozen implements Constant {
   protected abstract freeze(): void;
 }
 
-export function sk_freeze<T extends object>(x: T): T & Constant {
-  return Object.defineProperty(x, sk_frozen, {
+export function sk_freeze<T extends object>(x: T): T & Managed {
+  return Object.defineProperty(x, sk_managed, {
     enumerable: false,
     writable: false,
     value: true,
-  }) as T & Constant;
+  }) as T & Managed;
 }
 
-export function isSkFrozen(x: any): x is Constant {
-  return sk_frozen in x && x[sk_frozen] === true;
+export function isSkManaged(x: any): x is Managed {
+  return sk_managed in x && x[sk_managed] === true;
 }
 
-export abstract class SkFrozen extends Frozen {
+export abstract class SkManaged extends Frozen {
   protected freeze() {
     sk_freeze(this);
   }
@@ -72,7 +72,7 @@ export function checkOrCloneParam<T>(value: T): T {
   if (typeof value == "object") {
     if (value === null) return value;
     if (isObjectProxy(value)) return value.clone() as T;
-    if (isSkFrozen(value)) return value;
+    if (isSkManaged(value)) return value;
     throw new Error("Invalid object: must be deep-frozen.");
   }
   throw new Error(`'${typeof value}' cannot be deep-frozen.`);
@@ -114,7 +114,7 @@ export function deepFreeze<T>(value: T): T & Param {
   } else if (typeof value == "object") {
     if (value === null) {
       return value;
-    } else if (isSkFrozen(value)) {
+    } else if (isSkManaged(value)) {
       return value;
     } else if (Object.isFrozen(value)) {
       throw new Error(`Cannot deep-freeze an Object.frozen value.`);
@@ -148,11 +148,11 @@ export type Exportable =
   | null
   | undefined
   | ObjectProxy<{ [k: string]: Exportable }>
-  | (readonly Exportable[] & Constant);
+  | (readonly Exportable[] & Managed);
 
 export type ObjectProxy<Base extends { [k: string]: Exportable }> = {
   [sk_isObjectProxy]: true;
-  [sk_frozen]: true;
+  [sk_managed]: true;
   __pointer: Pointer<Internal.CJSON>;
   clone: () => ObjectProxy<Base>;
   toJSON: () => Base;
@@ -172,7 +172,7 @@ export const reactiveObject = {
     self: ObjectProxy<Base>,
   ): any {
     if (prop === sk_isObjectProxy) return true;
-    if (prop === sk_frozen) return true;
+    if (prop === sk_managed) return true;
     if (prop === "__pointer") return hdl.pointer;
     if (prop === "clone") return (): ObjectProxy<Base> => clone(self);
     if (typeof prop === "symbol") return undefined;
@@ -198,7 +198,7 @@ export const reactiveObject = {
   },
   has(hdl: ObjectHandle<Internal.CJObject>, prop: string | symbol): boolean {
     if (prop === sk_isObjectProxy) return true;
-    if (prop === sk_frozen) return true;
+    if (prop === sk_managed) return true;
     if (prop === "__pointer") return true;
     if (prop === "clone") return true;
     if (prop === "keys") return true;
