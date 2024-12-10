@@ -80,7 +80,7 @@ export class SkipServiceBroker {
    */
   async getAll<K extends Json, V extends Json>(
     resource: string,
-    params: { [param: string]: string },
+    params: { [param: string]: Json },
   ): Promise<Entry<K, V>[]> {
     const [data, _headers] = await fetchJSON<Entry<K, V>[]>(
       `${this.entrypoint}/v1/snapshot`,
@@ -100,7 +100,7 @@ export class SkipServiceBroker {
    */
   async getArray<V extends Json>(
     resource: string,
-    params: { [param: string]: string },
+    params: { [param: string]: Json },
     key: string,
   ): Promise<V[]> {
     const [data, _headers] = await fetchJSON<V[]>(
@@ -122,7 +122,7 @@ export class SkipServiceBroker {
    */
   async getUnique<V extends Json>(
     resource: string,
-    params: { [param: string]: string },
+    params: { [param: string]: Json },
     key: string,
   ): Promise<V> {
     return this.getArray<V>(resource, params, key).then((values) => {
@@ -183,7 +183,7 @@ export class SkipServiceBroker {
    */
   async getStreamUUID(
     resource: string,
-    params: { [param: string]: string } = {},
+    params: { [param: string]: Json } = {},
   ): Promise<string> {
     return fetch(`${this.entrypoint}/v1/streams`, {
       method: "POST",

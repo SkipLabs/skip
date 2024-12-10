@@ -309,7 +309,7 @@ export interface Context extends Constant {
   useExternalResource<K extends Json, V extends Json>(resource: {
     service: string;
     identifier: string;
-    params?: { [param: string]: string | number };
+    params?: { [param: string]: Json };
   }): EagerCollection<K, V>;
 
   jsonExtract(value: JsonObject, pattern: string): Json[];
@@ -358,7 +358,7 @@ export interface ExternalService {
    */
   subscribe(
     resource: string,
-    params: { [param: string]: string | number },
+    params: { [param: string]: Json },
     callbacks: {
       update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
       error: (error: Json) => void;
@@ -371,10 +371,7 @@ export interface ExternalService {
    * @param resource - the name of the external resource
    * @param params - the parameters of the external resource
    */
-  unsubscribe(
-    resource: string,
-    params: { [param: string]: string | number },
-  ): void;
+  unsubscribe(resource: string, params: { [param: string]: Json }): void;
 
   /**
    * Shutdown the external supplier
@@ -425,7 +422,7 @@ export interface SkipService<
   /** The reactive resources which compose the public interface of this reactive service */
   resources: {
     [name: string]: new (params: {
-      [param: string]: string;
+      [param: string]: Json;
     }) => Resource<ResourceInputs>;
   };
 

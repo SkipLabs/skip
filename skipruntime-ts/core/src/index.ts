@@ -447,7 +447,7 @@ class ContextImpl extends SkFrozen implements Context {
   useExternalResource<K extends Json, V extends Json>(resource: {
     service: string;
     identifier: string;
-    params?: { [param: string]: string | number };
+    params?: { [param: string]: Json };
   }): EagerCollection<K, V> {
     const collection =
       this.refs.binding.SkipRuntime_Context__useExternalResource(
@@ -492,7 +492,7 @@ class AllChecker<K extends Json, V extends Json> implements Checker {
     private readonly service: ServiceInstance,
     private readonly executor: Executor<Entry<K, V>[]>,
     private readonly resource: string,
-    private readonly params: { [param: string]: string },
+    private readonly params: { [param: string]: Json },
   ) {}
 
   check(request: string): void {
@@ -514,7 +514,7 @@ class OneChecker<K extends Json, V extends Json> implements Checker {
     private readonly service: ServiceInstance,
     private readonly executor: Executor<V[]>,
     private readonly resource: string,
-    private readonly params: { [param: string]: string },
+    private readonly params: { [param: string]: Json },
     private readonly key: K,
   ) {}
 
@@ -549,7 +549,7 @@ export class ServiceInstance {
   instantiateResource(
     identifier: string,
     resource: string,
-    params: { [param: string]: string },
+    params: { [param: string]: Json },
   ): void {
     const errorHdl = this.refs.runWithGC(() => {
       return this.refs.binding.SkipRuntime_Runtime__createResource(
@@ -569,7 +569,7 @@ export class ServiceInstance {
    */
   getAll<K extends Json, V extends Json>(
     resource: string,
-    params: { [param: string]: string } = {},
+    params: { [param: string]: Json } = {},
     request?: string | Executor<Entry<K, V>[]>,
   ): GetResult<Entry<K, V>[]> {
     const get_ = () => {
@@ -606,7 +606,7 @@ export class ServiceInstance {
   getArray<K extends Json, V extends Json>(
     resource: string,
     key: K,
-    params: { [param: string]: string } = {},
+    params: { [param: string]: Json } = {},
     request?: string | Executor<V[]>,
   ): GetResult<V[]> {
     const get_ = () => {
@@ -895,7 +895,7 @@ export class ToBinding {
     const skjson = this.getJsonConverter();
     const builder = this.handles.get(skbuilder);
     const resource = builder.build(
-      skjson.importJSON(skparams) as { [param: string]: string },
+      skjson.importJSON(skparams) as { [param: string]: Json },
     );
     return this.binding.SkipRuntime_createResource(
       this.handles.register(resource),
@@ -1023,7 +1023,7 @@ export class ToBinding {
     const supplier = this.handles.get(sksupplier);
     const writer = new CollectionWriter(writerId, this.refs());
     const params = skjson.importJSON(skparams, true) as {
-      [param: string]: string;
+      [param: string]: Json;
     };
     supplier.subscribe(resource, params, {
       update: writer.update.bind(writer),
@@ -1040,7 +1040,7 @@ export class ToBinding {
     const skjson = this.getJsonConverter();
     const supplier = this.handles.get(sksupplier);
     const params = skjson.importJSON(skparams, true) as {
-      [param: string]: string;
+      [param: string]: Json;
     };
     supplier.unsubscribe(resource, params);
   }
