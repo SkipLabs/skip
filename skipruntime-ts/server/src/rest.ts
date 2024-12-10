@@ -38,37 +38,23 @@ export function controlService(service: ServiceInstance): express.Express {
   });
 
   // READS
-  app.get("/v1/resources/:resource/:key", (req, res) => {
+  app.post("/v1/snapshot", (req, res) => {
     try {
-      service.getArray(
-        req.params.resource,
-        req.params.key,
-        req.query as { [param: string]: string },
-        {
-          resolve: (data: Json[]) => {
-            res.status(200).json(data);
-          },
-          reject: (err: unknown) => {
-            res.status(500).json(err instanceof Error ? err.message : err);
-          },
-        },
-      );
-    } catch (e: unknown) {
-      console.log(e);
-      res.status(500).json(e instanceof Error ? e.message : e);
-    }
-  });
-
-  app.get("/v1/resources/:resource", (req, res) => {
-    try {
-      service.getAll(req.params.resource, req.query as Record<string, string>, {
-        resolve: (data: Entry<Json, Json>[]) => {
+      const resource = req.body.resource as string;
+      const params = req.body.params as { [param: string]: string };
+      const callbacks = {
+        resolve: (data: Json[]) => {
           res.status(200).json(data);
         },
         reject: (err: unknown) => {
           res.status(500).json(err instanceof Error ? err.message : err);
         },
-      });
+      };
+      if (req.body.key) {
+        service.getArray(resource, req.body.key, params, callbacks);
+      } else {
+        service.getAll(resource, params, callbacks);
+      }
     } catch (e: unknown) {
       console.log(e);
       res.status(500).json(e instanceof Error ? e.message : e);
