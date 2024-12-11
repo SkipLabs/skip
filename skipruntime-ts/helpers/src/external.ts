@@ -3,7 +3,7 @@ import { fetchJSON } from "./rest.js";
 
 export interface ExternalResource {
   open(
-    params: { [param: string]: string | number },
+    params: { [param: string]: Json },
     callbacks: {
       update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
       error: (error: Json) => void;
@@ -11,7 +11,7 @@ export interface ExternalResource {
     },
   ): void;
 
-  close(params: { [param: string]: string | number }): void;
+  close(params: { [param: string]: Json }): void;
 }
 
 export class GenericExternalService implements ExternalService {
@@ -21,7 +21,7 @@ export class GenericExternalService implements ExternalService {
 
   subscribe(
     resourceName: string,
-    params: { [param: string]: string | number },
+    params: { [param: string]: Json },
     callbacks: {
       update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
       error: (error: Json) => void;
@@ -37,7 +37,7 @@ export class GenericExternalService implements ExternalService {
     resource.open(params, callbacks);
   }
 
-  unsubscribe(resourceName: string, params: { [param: string]: string }) {
+  unsubscribe(resourceName: string, params: { [param: string]: Json }) {
     const resource = this.resources[resourceName] as
       | ExternalResource
       | undefined;
@@ -58,7 +58,7 @@ export class TimerResource implements ExternalResource {
   private readonly intervals = new Map<string, { [name: string]: Timeout }>();
 
   open(
-    params: { [param: string]: string | number },
+    params: { [param: string]: Json },
     callbacks: {
       update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
       error: (error: Json) => void;
@@ -85,7 +85,7 @@ export class TimerResource implements ExternalResource {
     this.intervals.set(id, intervals);
   }
 
-  close(params: { [param: string]: string | number }): void {
+  close(params: { [param: string]: Json }): void {
     const intervals = this.intervals.get(toId(params));
     if (intervals != null) {
       for (const interval of Object.values(intervals)) {
@@ -93,6 +93,15 @@ export class TimerResource implements ExternalResource {
       }
     }
   }
+}
+
+function defaultParamEncoder(params: { [param: string]: Json }): string {
+  const queryParams: { [param: string]: string } = {};
+  for (const [key, value] of Object.entries(params)) {
+    if (typeof value == "object") queryParams[key] = JSON.stringify(value);
+    else queryParams[key] = value.toString();
+  }
+  return new URLSearchParams(queryParams).toString();
 }
 
 export class Polled<S extends Json, K extends Json, V extends Json>
@@ -104,10 +113,13 @@ export class Polled<S extends Json, K extends Json, V extends Json>
     private readonly url: string,
     private readonly duration: number,
     private readonly conv: (data: S) => Entry<K, V>[],
+    private readonly encodeParams: (params: {
+      [param: string]: Json;
+    }) => string = defaultParamEncoder,
   ) {}
 
   open(
-    params: { [param: string]: string | number },
+    params: { [param: string]: Json },
     callbacks: {
       update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
       error: (error: Json) => void;
@@ -115,12 +127,7 @@ export class Polled<S extends Json, K extends Json, V extends Json>
     },
   ): void {
     this.close(params);
-    const queryParams: { [param: string]: string } = {};
-    for (const [key, value] of Object.entries(params)) {
-      queryParams[key] = value.toString();
-    }
-    const strParams = new URLSearchParams(queryParams).toString();
-    const url = `${this.url}?${strParams}`;
+    const url = `${this.url}?${this.encodeParams(params)}`;
     const call = () => {
       callbacks.loading();
       fetchJSON(url, "GET", {})
@@ -136,7 +143,7 @@ export class Polled<S extends Json, K extends Json, V extends Json>
     this.intervals.set(toId(params), setInterval(call, this.duration));
   }
 
-  close(params: { [param: string]: string | number }): void {
+  close(params: { [param: string]: Json }): void {
     const interval = this.intervals.get(toId(params));
     if (interval) {
       clearInterval(interval);
@@ -144,9 +151,9 @@ export class Polled<S extends Json, K extends Json, V extends Json>
   }
 }
 
-function toId(params: { [param: string]: string | number }): string {
+function toId(params: { [param: string]: Json }): string {
   const strparams = Object.entries(params)
-    .map(([key, value]) => `${key}:${value.toString()}`)
+    .map(([key, value]) => `${key}:${btoa(JSON.stringify(value))}`)
     .sort();
   return `[${strparams.join(",")}]`;
 }

@@ -178,7 +178,7 @@ class ExternExternalService(
   fun subscribe(
     collection: CollectionWriter,
     resource: String,
-    params: Map<String, PValue>,
+    params: Params,
   ): void {
     subscribeOfExternalService(
       this.eptr.value,
@@ -188,7 +188,7 @@ class ExternExternalService(
     )
   }
 
-  fun unsubscribe(resource: String, params: Map<String, PValue>): void {
+  fun unsubscribe(resource: String, params: Params): void {
     unsubscribeOfExternalService(this.eptr.value, resource, jsonParams(params))
   }
 
@@ -290,7 +290,7 @@ fun createResourceBuilder(resourceBuilder: UInt32): ExternResourceBuilder {
 class ExternResourceBuilder(
   eptr: SKStore.ExternalPointer,
 ) extends ResourceBuilder {
-  fun build(params: Map<String, PValue>): Resource {
+  fun build(params: Params): Resource {
     buildOfResourceBuilder(this.eptr.value, jsonParams(params))
   }
 }
@@ -765,9 +765,9 @@ fun jsonExtractOfContext(
 fun useExternalResource(
   service: String,
   identifier: String,
-  jsonparams: SKJSON.CJObject,
+  jsonParams: SKJSON.CJObject,
 ): String {
-  useExternalCollection(service, identifier, params(jsonparams)).getId()
+  useExternalCollection(service, identifier, params(jsonParams)).getId()
 }
 
 /************ initService ****************/
