@@ -177,13 +177,6 @@ fun collectionsByName(collections: Map<String, Collection>): SKJSON.CJObject {
   SKJSON.CJObject(SKJSON.CJFields::create(fields.toArray(), x -> x));
 }
 
-fun params(params: SKJSON.CJObject): Params {
-  params match {
-  | SKJSON.CJObject(fields) ->
-    sortedItems = fields.items().collect(Array).sortedBy(x ~> x.i0);
-    Params(sortedItems.map(kv ~> kv.i0), sortedItems.map(kv ~> kv.i1))
-  };
-}
 fun jsonParams(params: Params): SKJSON.CJObject {
   SKJSON.CJObject(
     SKJSON.CJFields::create(params.items().collect(Array), x -> x),

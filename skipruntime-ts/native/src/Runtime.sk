@@ -26,11 +26,18 @@ class Params private (
   sortedKeys: Array<String>,
   sortedVals: Array<SKJSON.CJSON>,
 ) extends SKStore.File uses Orderable {
+  static fun create(jsonObj: SKJSON.CJObject): this {
+    jsonObj match {
+    | SKJSON.CJObject(fields) ->
+      sortedItems = fields.items().collect(Array).sortedBy(x ~> x.i0);
+      Params(sortedItems.map(kv ~> kv.i0), sortedItems.map(kv ~> kv.i1))
+    };
+  }
   fun compare(other: Params): Order {
     kcomp = this.sortedKeys.compare(other.sortedKeys);
     if (kcomp == EQ()) {
-      for ((v1, v2) in this.sortedVals.zip(other.sortedVals)) {
-        vcomp = v1.compare(v2);
+      for (i in Range(0, this.sortedVals.size())) {
+        vcomp = this.sortedVals[i].compare(other.sortedVals[i]);
         if (vcomp != EQ()) {
           break vcomp
         }
