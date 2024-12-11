@@ -39,13 +39,6 @@ export type SkipServer = {
  *   The body of the request must be a JSON-encoded value of type `CollectionUpdate.values`, that is `[Json, Json[]][]`: an array of entries each of which associates a key to an array of its new values.
  *   Updates the named `collection` with the key-values entries in the request body.
  *
- * - `PUT /v1/inputs/:collection/:key`:
- *   Update of a single key of an input collection.
- *
- *   The `collection` must be the name of one of the service's input collections, that is, one of the keys of the `Inputs` type parameter.
- *   The body of the request must be a JSON-encoded value of type `Json[]`: an array of the `key`'s new values.
- *   Updates the named `collection` to associate the `key` with the values in the request body.
- *
  * - `POST /v1/streams`:
  *   Instantiate a resource and return a UUID to subscribe to updates.
  *
