@@ -95,6 +95,15 @@ export class TimerResource implements ExternalResource {
   }
 }
 
+function defaultParamEncoder(params: { [param: string]: Json }): string {
+  const queryParams: { [param: string]: string } = {};
+  for (const [key, value] of Object.entries(params)) {
+    if (typeof value == "object") queryParams[key] = JSON.stringify(value);
+    else queryParams[key] = value.toString();
+  }
+  return new URLSearchParams(queryParams).toString();
+}
+
 export class Polled<S extends Json, K extends Json, V extends Json>
   implements ExternalResource
 {
@@ -104,6 +113,9 @@ export class Polled<S extends Json, K extends Json, V extends Json>
     private readonly url: string,
     private readonly duration: number,
     private readonly conv: (data: S) => Entry<K, V>[],
+    private readonly encodeParams: (params: {
+      [param: string]: Json;
+    }) => string = defaultParamEncoder,
   ) {}
 
   open(
@@ -115,13 +127,7 @@ export class Polled<S extends Json, K extends Json, V extends Json>
     },
   ): void {
     this.close(params);
-    const queryParams: { [param: string]: string } = {};
-    for (const [key, value] of Object.entries(params)) {
-      if (typeof value == "object") queryParams[key] = JSON.stringify(value);
-      else queryParams[key] = value.toString();
-    }
-    const strParams = new URLSearchParams(queryParams).toString();
-    const url = `${this.url}?${strParams}`;
+    const url = `${this.url}?${this.encodeParams(params)}`;
     const call = () => {
       callbacks.loading();
       fetchJSON(url, "GET", {})
