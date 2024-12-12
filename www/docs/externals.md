@@ -109,4 +109,4 @@ The frequency of those requests is an important consideration, depending on the 
 If more control is required or your external system does not fit this form, then the `ExternalService` and `ExternalResource` interfaces both support extensions to define arbitrary logic for `subscribe`/`unsubscribe`-ing from services and `open`/`close`-ing resource.
 
 For example, your service can keep track of open resources and combine requests to the external service if it supports batched requests, reducing request load and potentially allowing more optimized execution in the non-reactive system.
-Similarly, an external relational database may support some limited form of reactivity/listening, such as PostgreSQL's `pg_notify`; in that case, a custom Skip `ExteralService` can interpret those updates into a form suitable for use within the Skip framework.
+Similarly, an external relational database may support some limited form of reactivity/listening, such as PostgreSQL's `pg_notify`; in that case, a custom Skip `ExternalService` can interpret those updates into a form suitable for use within the Skip framework.
