@@ -8,8 +8,8 @@
     ".": "./dist/src/index.js"
   },
   "scripts": {
-    "prepare": "mkdir -p dist && skargo build -r --lib --manifest-path=../native/Skargo.toml --out-dir=./dist",
-    "build": "skargo build -r --lib --manifest-path=../native/Skargo.toml --out-dir=./dist && npm i & tsc",
+    "prepare": "host=$(node -e \"const process = require('process');console.log(process.arch + '-' + process.platform)\") && mkdir -p dist && skargo build -r --lib --manifest-path=../native/Skargo.toml --out-dir=./dist && mv dist/libskip-runtime-ts.so dist/libskip-runtime-ts-$host.so",
+    "build": "host=$(node -e \"const process = require('process');console.log(process.arch + '-' + process.platform)\") && mkdir -p dist && skargo build -r --lib --manifest-path=../native/Skargo.toml --out-dir=./dist  && mv dist/libskip-runtime-ts.so dist/libskip-runtime-ts-$host.so && tsc && npm i",
     "clean": "rm -rf dist build",
     "lint": "eslint",
     "test": "mocha"
@@ -20,8 +20,6 @@
     "mocha": "^10.8.2"
   },
   "dependencies": {
-    "@skiplang/json": "^0.0.1",
-    "@skipruntime/api": "^0.0.3",
     "@skipruntime/core": "^0.0.1"
   }
 }
