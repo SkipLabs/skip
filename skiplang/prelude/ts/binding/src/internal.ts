@@ -1,4 +1,10 @@
 const opaque: unique symbol = Symbol.for("Skip.opaque");
+
+/**
+ * Type that is tagged to distinguish it from the underlying untagged type.
+ *
+ * The type `Opaque<Value, Tag>` is equivalent to `Value` but is "tagged" with type `Tag` so that it is structurally distinct from `Value`.
+ */
 export type Opaque<Value, Tag> = Value & { [opaque]: Tag };
 
 declare const t: unique symbol;
