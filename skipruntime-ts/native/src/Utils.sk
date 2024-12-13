@@ -151,14 +151,14 @@ fun base64<T: Show>(toEncode: T): String {
   | None() -> ""
   }
 }
-fun toResourceId(resource: String, params: Params): String {
-  `${resource}_${base64(params.toString())}`
+fun toResourceId(resource: String, params: SKJSON.CJSON): String {
+  `${resource}_${base64(params.prettyPrint())}`
 }
 
 fun toSuppliedResourceId(
   supplier: String,
   resource: String,
-  params: Params,
+  params: SKJSON.CJSON,
 ): String {
   `${supplier}_${toResourceId(resource, params)}`;
 }
@@ -175,12 +175,6 @@ fun collectionsByName(collections: Map<String, Collection>): SKJSON.CJObject {
   fields = mutable Vector[];
   collections.each((k, c) -> fields.push((k, SKJSON.CJString(c.getId()))));
   SKJSON.CJObject(SKJSON.CJFields::create(fields.toArray(), x -> x));
-}
-
-fun jsonParams(params: Params): SKJSON.CJObject {
-  SKJSON.CJObject(
-    SKJSON.CJFields::create(params.items().collect(Array), x -> x),
-  )
 }
 
 module end;

@@ -146,7 +146,7 @@ native fun subscribeOfExternalService(
   externalSupplier: UInt32,
   collection: String,
   resource: String,
-  params: SKJSON.CJObject,
+  params: SKJSON.CJSON,
 ): void;
 
 @cpp_extern("SkipRuntime_ExternalService__unsubscribe")
@@ -154,7 +154,7 @@ native fun subscribeOfExternalService(
 native fun unsubscribeOfExternalService(
   externalSupplier: UInt32,
   resource: String,
-  params: SKJSON.CJObject,
+  params: SKJSON.CJSON,
 ): void;
 
 @cpp_extern("SkipRuntime_ExternalService__shutdown")
@@ -178,18 +178,18 @@ class ExternExternalService(
   fun subscribe(
     collection: CollectionWriter,
     resource: String,
-    params: Params,
+    params: SKJSON.CJSON,
   ): void {
     subscribeOfExternalService(
       this.eptr.value,
       collection.dirName.toString(),
       resource,
-      jsonParams(params),
+      params,
     )
   }
 
-  fun unsubscribe(resource: String, params: Params): void {
-    unsubscribeOfExternalService(this.eptr.value, resource, jsonParams(params))
+  fun unsubscribe(resource: String, params: SKJSON.CJSON): void {
+    unsubscribeOfExternalService(this.eptr.value, resource, params)
   }
 
   fun shutdown(): void {
@@ -273,7 +273,7 @@ class ExternResource(eptr: SKStore.ExternalPointer) extends Resource {
 @debug
 native fun buildOfResourceBuilder(
   builder: UInt32,
-  params: SKJSON.CJObject,
+  params: SKJSON.CJSON,
 ): Resource;
 
 @cpp_extern("SkipRuntime_deleteResourceBuilder")
@@ -290,8 +290,8 @@ fun createResourceBuilder(resourceBuilder: UInt32): ExternResourceBuilder {
 class ExternResourceBuilder(
   eptr: SKStore.ExternalPointer,
 ) extends ResourceBuilder {
-  fun build(params: Params): Resource {
-    buildOfResourceBuilder(this.eptr.value, jsonParams(params))
+  fun build(params: SKJSON.CJSON): Resource {
+    buildOfResourceBuilder(this.eptr.value, params)
   }
 }
 
@@ -608,15 +608,10 @@ class JSONReducer(
 fun createResourceOfRuntime(
   identifier: String,
   resource: String,
-  jsonParams: SKJSON.CJObject,
+  params: SKJSON.CJSON,
 ): Float {
   SKStore.runWithResult(context ~> {
-    createReactiveResource(
-      context,
-      identifier,
-      resource,
-      Params::create(jsonParams),
-    )
+    createReactiveResource(context, identifier, resource, params)
   }) match {
   | Success _ -> 0.0
   | Failure(err) -> getErrorHdl(err)
@@ -626,19 +621,19 @@ fun createResourceOfRuntime(
 @export("SkipRuntime_Runtime__getAll")
 fun getAllOfRuntime(
   resource: String,
-  jsonParams: SKJSON.CJObject,
+  params: SKJSON.CJSON,
   optRequest: ?Request,
 ): SKJSON.CJSON {
   (getContext() match {
   | Some(context) ->
     try {
-      Success(getAll(context, resource, Params::create(jsonParams), optRequest))
+      Success(getAll(context, resource, params, optRequest))
     } catch {
     | ex -> Failure(ex)
     }
   | _ ->
     SKStore.runWithResult(context ~> {
-      getAll(context, resource, Params::create(jsonParams), optRequest)
+      getAll(context, resource, params, optRequest)
     })
   }) match {
   | Success(result) ->
@@ -666,28 +661,20 @@ fun getAllOfRuntime(
 @export("SkipRuntime_Runtime__getForKey")
 fun getForKeyOfRuntime(
   resource: String,
-  jsonParams: SKJSON.CJObject,
+  params: SKJSON.CJSON,
   key: SKJSON.CJSON,
   optRequest: ?Request,
 ): SKJSON.CJSON {
   (getContext() match {
   | Some(context) ->
     try {
-      Success(
-        getForKey(
-          context,
-          resource,
-          Params::create(jsonParams),
-          key,
-          optRequest,
-        ),
-      )
+      Success(getForKey(context, resource, params, key, optRequest))
     } catch {
     | ex -> Failure(ex)
     }
   | _ ->
     SKStore.runWithResult(context ~> {
-      getForKey(context, resource, Params::create(jsonParams), key, optRequest)
+      getForKey(context, resource, params, key, optRequest)
     })
   }) match {
   | Success(result) ->
@@ -778,9 +765,9 @@ fun jsonExtractOfContext(
 fun useExternalResource(
   service: String,
   identifier: String,
-  jsonParams: SKJSON.CJObject,
+  params: SKJSON.CJSON,
 ): String {
-  useExternalCollection(service, identifier, Params::create(jsonParams)).getId()
+  useExternalCollection(service, identifier, params).getId()
 }
 
 /************ initService ****************/
