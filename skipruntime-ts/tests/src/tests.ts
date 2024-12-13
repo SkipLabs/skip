@@ -31,22 +31,18 @@ type GetResult<T> = {
 interface ServiceInstance {
   getAll<K extends Json, V extends Json>(
     resource: string,
-    params?: { [param: string]: Json },
+    params?: Json,
   ): GetResult<Entry<K, V>[]>;
   getArray<V extends Json>(
     resource: string,
     key: string | number,
-    params?: { [param: string]: Json },
+    params?: Json,
   ): GetResult<V[]>;
   update<K extends Json, V extends Json>(
     collection: string,
     entries: Entry<K, V>[],
   ): void;
-  instantiateResource(
-    identifier: string,
-    resource: string,
-    params: { [param: string]: Json },
-  ): void;
+  instantiateResource(identifier: string, resource: string, params: Json): void;
   closeResourceInstance(resourceInstanceId: string): void;
   close(): void;
 }
@@ -362,7 +358,9 @@ type StructuredParams = { x: number; y: { a: number; bs: number[] } };
 class JsonParamsResource implements Resource<Input_NN> {
   private offset: number;
 
-  constructor(params: { [param: string]: Json }) {
+  constructor(params: Json) {
+    if (typeof params != "object" || !("offsets" in params))
+      throw new Error("Malformed resource params");
     const offsets: StructuredParams = params["offsets"] as StructuredParams;
     this.offset =
       offsets.x + offsets.y.a + offsets.y.bs.reduce((x, y) => x + y, 0);

@@ -98,8 +98,9 @@ class SortingMapper {
 class PostsResource implements Resource<ResourceInputs> {
   private limit: number;
 
-  constructor(params: { [param: string]: Json }) {
-    this.limit = Number(params["limit"]);
+  constructor(param: Json) {
+    if (typeof param == "number") this.limit = param;
+    else this.limit = 25;
   }
 
   instantiate(collections: ResourceInputs): EagerCollection<number, Upvoted> {

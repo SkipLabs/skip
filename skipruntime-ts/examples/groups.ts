@@ -8,22 +8,22 @@ import {
 
 import { runService } from "@skipruntime/server";
 
-type UserID = string;
-type GroupID = string;
+type UserID = number;
+type GroupID = number;
 type User = { name: string; active?: boolean; friends: UserID[] };
 type Group = { name: string; members: UserID[] };
 
 // Load initial data from a source-of-truth database (mocked for simplicity)
 const initialData: InitialData<ServiceInputs> = {
   users: [
-    ["bob", [{ name: "Bob", active: true, friends: ["alice", "carol"] }]],
-    ["alice", [{ name: "Alice", active: true, friends: ["bob", "carol"] }]],
-    ["carol", [{ name: "Carol", active: false, friends: ["bob", "alice"] }]],
-    ["eve", [{ name: "Eve", active: true, friends: [] }]],
+    [0, [{ name: "Bob", active: true, friends: [1, 2] }]],
+    [1, [{ name: "Alice", active: true, friends: [0, 2] }]],
+    [2, [{ name: "Carol", active: false, friends: [0, 1] }]],
+    [3, [{ name: "Eve", active: true, friends: [] }]],
   ],
   groups: [
-    ["group1", [{ name: "Group 1", members: ["alice", "carol", "eve"] }]],
-    ["group2", [{ name: "Group 2", members: ["bob", "carol"] }]],
+    [1001, [{ name: "Group 1", members: [1, 2, 3] }]],
+    [1002, [{ name: "Group 2", members: [0, 2] }]],
   ],
 };
 
@@ -64,10 +64,10 @@ class FilterFriends extends OneToManyMapper<GroupID, UserID, UserID> {
 class ActiveFriends implements Resource<ResourceInputs> {
   private readonly uid: UserID;
 
-  constructor(params: { [param: string]: Json }) {
-    if (!params["uid"] || typeof params["uid"] != "string")
-      throw new Error("Missing required string parameter 'uid'");
-    this.uid = params["uid"];
+  constructor(params: Json) {
+    if (typeof params != "number")
+      throw new Error("Missing required number parameter 'uid'");
+    this.uid = params;
   }
 
   instantiate(inputs: ResourceInputs): EagerCollection<GroupID, UserID> {
