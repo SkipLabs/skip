@@ -57,12 +57,12 @@ export class SkipHttpAccessV1 {
     return Promise.allSettled(promises);
   }
 
-  async log(resource: string, params: { [param: string]: Json }) {
+  async log(resource: string, params: Json) {
     const result = await this.service.getAll(resource, params);
     console.log(JSON.stringify(result));
   }
 
-  request(resource: string, params: { [param: string]: Json }) {
+  request(resource: string, params: Json) {
     this.service
       .getStreamUUID(resource, params)
       .then((uuid) => {
@@ -91,7 +91,7 @@ interface RequestQuery {
   type: "request";
   payload: {
     resource: string;
-    params?: { [param: string]: Json };
+    params?: Json;
     port?: number;
   };
 }
@@ -100,7 +100,7 @@ interface LogQuery {
   type: "log";
   payload: {
     resource: string;
-    params?: { [param: string]: Json };
+    params?: Json;
     port?: number;
   };
 }
@@ -300,7 +300,7 @@ export function run(
           (query: string) => {
             const jsquery = JSON.parse(query) as {
               resource: string;
-              params?: { [param: string]: Json };
+              params?: Json;
             };
             access.request(jsquery.resource, jsquery.params ?? {});
           },
@@ -310,7 +310,7 @@ export function run(
           (query: string) => {
             const jsquery = JSON.parse(query) as {
               resource: string;
-              params?: { [param: string]: Json };
+              params?: Json;
             };
             access
               .log(jsquery.resource, jsquery.params ?? {})

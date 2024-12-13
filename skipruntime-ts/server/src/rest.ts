@@ -18,7 +18,7 @@ export function controlService(service: ServiceInstance): express.Express {
       service.instantiateResource(
         uuid,
         req.body.resource as string,
-        req.body.params as { [param: string]: Json },
+        req.body as Json,
       );
       res.status(201).send(uuid);
     } catch (e: unknown) {
@@ -41,7 +41,7 @@ export function controlService(service: ServiceInstance): express.Express {
   app.post("/v1/snapshot", (req, res) => {
     try {
       const resource = req.body.resource as string;
-      const params = req.body.params as { [param: string]: Json };
+      const params = req.body as Json;
       const callbacks = {
         resolve: (data: Json[]) => {
           res.status(200).json(data);
