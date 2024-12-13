@@ -2,7 +2,6 @@ export type * from "@skipruntime/api";
 export type { ServiceInstance } from "@skipruntime/core";
 export { OneToOneMapper, ManyToOneMapper } from "@skipruntime/api";
 export {
-  deepFreeze,
   UnknownCollectionError,
   SkipExternalService,
   Sum,

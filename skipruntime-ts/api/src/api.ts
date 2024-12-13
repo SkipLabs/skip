@@ -1,8 +1,7 @@
-import type { Nullable, int } from "@skiplang/std";
-import type { Opaque, Constant } from "./internals.js";
-
-import type { Json, JsonObject } from "@skiplang/json";
-export type { Json, JsonObject, Constant, Opaque };
+import type { int, Nullable, Opaque } from "@skiplang/std";
+import type { Constant, Json, JsonObject, Param } from "@skiplang/json";
+export type { Constant, Json, JsonObject, Opaque, Param };
+export { deepFreeze } from "@skiplang/json";
 
 /**
  * Potentially `null` values.
@@ -16,22 +15,6 @@ export type { Nullable };
  * be used to specify and interact with reactive computations. See [todo: pointer to public
  * overview page] for a detailed description and introduction to the SkipRuntime system.
  */
-
-/**
- * A `Param` is a valid parameter to a Skip runtime mapper function: either a constant JS
- * value or a Skip-runtime-managed value. In either case, restricting mapper parameters to
- * this type helps developers to ensure that reactive computations can be reevaluated as
- * needed with consistent semantics.
- * `Constant`s are deep-frozen objects managed by the Skip runtime; non-Skip objects can be made constant by passing them to `deepFreeze`.
- */
-export type Param =
-  | null
-  | boolean
-  | number
-  | bigint
-  | string
-  | symbol
-  | Constant;
 
 /**
  * The type of a reactive function mapping over an arbitrary collection.

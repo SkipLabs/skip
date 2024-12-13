@@ -17,6 +17,17 @@ export const sk_frozen: unique symbol = Symbol.for("Skip.frozen");
  */
 export type Constant = { [sk_frozen]: true };
 
+export abstract class Frozen implements Constant {
+  // tsc misses that Object.defineProperty in the constructor inits this
+  [sk_frozen]!: true;
+
+  constructor() {
+    this.freeze();
+  }
+
+  protected abstract freeze(): void;
+}
+
 export function sk_freeze<T extends object>(x: T): T & Constant {
   return Object.defineProperty(x, sk_frozen, {
     enumerable: false,
@@ -27,6 +38,101 @@ export function sk_freeze<T extends object>(x: T): T & Constant {
 
 export function isSkFrozen(x: any): x is Constant {
   return sk_frozen in x && x[sk_frozen] === true;
+}
+
+export abstract class SkFrozen extends Frozen {
+  protected freeze() {
+    sk_freeze(this);
+  }
+}
+
+/**
+ * A `Param` is a valid parameter to a Skip runtime mapper function: either a constant JS
+ * value or a Skip-runtime-managed value. In either case, restricting mapper parameters to
+ * this type helps developers to ensure that reactive computations can be reevaluated as
+ * needed with consistent semantics.
+ * `Constant`s are deep-frozen objects managed by the Skip runtime; non-Skip objects can be made constant by passing them to `deepFreeze`.
+ */
+export type Param =
+  | null
+  | boolean
+  | number
+  | bigint
+  | string
+  | symbol
+  | Constant;
+
+export function checkOrCloneParam<T>(value: T): T {
+  if (
+    typeof value == "string" ||
+    typeof value == "number" ||
+    typeof value == "boolean"
+  )
+    return value;
+  if (typeof value == "object") {
+    if (value === null) return value;
+    if (isObjectProxy(value)) return value.clone() as T;
+    if (isSkFrozen(value)) return value;
+    throw new Error("Invalid object: must be deep-frozen.");
+  }
+  throw new Error(`'${typeof value}' cannot be deep-frozen.`);
+}
+
+/**
+ * _Deep-freeze_ an object, returning the same object that was passed in.
+ *
+ * This function is similar to
+ * {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/freeze | `Object.freeze()`}
+ * but freezes the object and deep-freezes all its properties,
+ * recursively. The object is then not only _immutable_ but also
+ * _constant_. Note that as a result all objects reachable from the
+ * parameter will be frozen and no longer mutable or extensible, even from
+ * other references.
+ *
+ * The argument object and all its properties, recursively, must not already
+ * be frozen by `Object.freeze` (or else `deepFreeze` cannot mark them
+ * deep-frozen). Undefined, function (and hence class) values cannot be
+ * deep-frozen.
+ *
+ * The primary use for this function is to satisfy the requirement that all
+ * parameters to Skip `Mapper` constructors must be deep-frozen: objects
+ * that have not been constructed by Skip can be passed to `deepFreeze()`
+ * before passing them to a `Mapper` constructor.
+ *
+ * @param value - The object to deep-freeze.
+ * @returns The same object that was passed in.
+ */
+export function deepFreeze<T>(value: T): T & Param {
+  if (
+    typeof value == "bigint" ||
+    typeof value == "boolean" ||
+    typeof value == "number" ||
+    typeof value == "string" ||
+    typeof value == "symbol"
+  ) {
+    return value;
+  } else if (typeof value == "object") {
+    if (value === null) {
+      return value;
+    } else if (isSkFrozen(value)) {
+      return value;
+    } else if (Object.isFrozen(value)) {
+      throw new Error(`Cannot deep-freeze an Object.frozen value.`);
+    } else if (Array.isArray(value)) {
+      for (const elt of value) {
+        deepFreeze(elt);
+      }
+      return Object.freeze(sk_freeze(value));
+    } else {
+      for (const val of Object.values(value)) {
+        deepFreeze(val);
+      }
+      return Object.freeze(sk_freeze(value));
+    }
+  } else {
+    // typeof value == "function" || typeof value == "undefined"
+    throw new Error(`'${typeof value}' values cannot be deep-frozen.`);
+  }
 }
 
 /**

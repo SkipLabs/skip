@@ -1,4 +1,5 @@
 import type { T } from "./internal.js";
+export type { Opaque } from "./internal.js";
 
 export const skpointer: unique symbol = Symbol.for("Skip.pointer");
 
