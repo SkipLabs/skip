@@ -7,6 +7,14 @@ export type { Type };
 export const sk_isObjectProxy: unique symbol = Symbol();
 export const sk_frozen: unique symbol = Symbol.for("Skip.frozen");
 
+/**
+ * Values that are either unmodifiable or managed by the Skip Runtime.
+ *
+ * A `Constant` value is either managed by the Skip Runtime, in which case its modifications are carefully tracked by the reactive computation system, or it is deep-frozen, meaning that it cannot be modified and neither can its sub-objects, recursively.
+ * See `deepFreeze` to make an object `Constant`.
+ *
+ * `Constant` values are important because they can be used in code that will be executed by the reactive computation system without introducing the possibility of producing stale or unreproducible results.
+ */
 export type Constant = { [sk_frozen]: true };
 
 export function sk_freeze<T extends object>(x: T): T & Constant {
