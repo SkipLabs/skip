@@ -72,10 +72,10 @@ export class SkipServiceBroker {
     params: Json,
   ): Promise<Entry<K, V>[]> {
     const [data, _headers] = await fetchJSON<Entry<K, V>[]>(
-      `${this.entrypoint}/v1/snapshot`,
+      `${this.entrypoint}/v1/snapshot/${resource}`,
       "POST",
       {},
-      { resource, params },
+      params,
     );
     return data ?? [];
   }
@@ -93,10 +93,10 @@ export class SkipServiceBroker {
     key: string,
   ): Promise<V[]> {
     const [data, _headers] = await fetchJSON<V[]>(
-      `${this.entrypoint}/v1/snapshot`,
+      `${this.entrypoint}/v1/snapshot/${resource}`,
       "POST",
       {},
-      { resource, key, params },
+      { key, params },
     );
     return data ?? [];
   }
@@ -171,10 +171,10 @@ export class SkipServiceBroker {
    * @returns - UUID that can be used to subscribe to updates to resource instance
    */
   async getStreamUUID(resource: string, params: Json = {}): Promise<string> {
-    return fetch(`${this.entrypoint}/v1/streams`, {
+    return fetch(`${this.entrypoint}/v1/streams/${resource}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ resource, params }),
+      body: JSON.stringify(params),
     }).then((res) => res.text());
   }
 
