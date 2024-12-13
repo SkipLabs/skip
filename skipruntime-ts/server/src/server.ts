@@ -25,12 +25,19 @@ export type SkipServer = {
  *
  * The control API responds to the following HTTP requests:
  *
- * - `POST /v1/snapshot`:
- *   Synchronous read of a resource.
+ * - `POST /v1/snapshot/:resource`:
+ *   Synchronous read of an entire resource.
  *
- *   Requires a JSON-encoded request body of the form `{ resource: string; params: { [param: string]: Json }; key?: Json }`.
- *   Instantiates the named `resource` with the given `params`, and responds with the values associated with the given `key` or with the entire contents of the resource if no `key` is provided.
- *   If `key` is provided, the returned data will be a JSON-encoded value of type `Json[]`: an array of the `key`'s values; otherwise, it will be a JSON-encoded value of type `[Json, Json[]][]`: an array of entries, each of which associates a key to an array of its values.
+ *  The body of the request must be a JSON-encoded value, which is passed as parameters to the resource constructor.
+ *  Responds with the current contents of the named `resource` with the given parameters, instantiating the resource if needed.
+ *  Data is returned as a JSON-encoded array of key/value entries, with each entry a tuple of the form `[key, [value1, value2, ...]]`.
+ *
+ * - `POST /v1/snapshot/:resource/lookup`:
+ *   Synchronous read of a specific key in a resource.
+ *
+ *  The body of the request must be a JSON-encoded object with a `key` field and a `params` field.
+ *  Responds with the values associated to `key` in the named `resource` with the given parameters, instantiating the resource if needed.
+ *  Data is returned as a JSON-encoded array of values.
  *
  * - `PATCH /v1/inputs/:collection`:
  *   Partial write (update only the specified keys) of an input collection.
@@ -39,12 +46,19 @@ export type SkipServer = {
  *   The body of the request must be a JSON-encoded value of type `CollectionUpdate.values`, that is `[Json, Json[]][]`: an array of entries each of which associates a key to an array of its new values.
  *   Updates the named `collection` with the key-values entries in the request body.
  *
- * - `POST /v1/streams`:
+ * - `PUT /v1/inputs/:collection/:key`:
+ *   Update of a single key of an input collection.
+ *
+ *   The `collection` must be the name of one of the service's input collections, that is, one of the keys of the `Inputs` type parameter.
+ *   The body of the request must be a JSON-encoded array of the `key`'s new values.
+ *   Updates the named `collection` to associate the `key` with the values in the request body.
+ *
+ * - `POST /v1/streams/:resource`:
  *   Instantiate a resource and return a UUID to subscribe to updates.
  *
  *   Requires the request to have a `Content-Type: application/json` header.
- *   The body of the request must be a JSON-encoded value of type `{ resource: string, params: { [param: string]: Json } }`.
- *   Instantiates the named `resource` with parameters `params` and responds with a UUID that can be used to subscribe to updates.
+ *   The body of the request must be a JSON-encoded value, which will be passed as parameters to the resource constructor.
+ *   Instantiates the named `resource` with the given parameters and responds with a UUID that can be used to subscribe to updates.
  *
  * - `DELETE /v1/streams/:uuid`:
  *   Destroy a resource instance.
