@@ -72,7 +72,7 @@ check:
 
 .PHONY: check-ts
 check-ts:
-	bun install
+	npm install
 	bin/check-ts.sh
 
 .PHONY: clean
@@ -107,8 +107,9 @@ check-fmt: fmt
 # regenerate api docs served by docs-run from ts sources
 .PHONY: docs
 docs:
-	bun install && npm run build
-	cd www && bun install && npx docusaurus generate-typedoc
+	npm install
+	-npm run build
+	cd www && npm install && npx docusaurus generate-typedoc
 
 # run the docs site locally at http://localhost:3000
 .PHONY: docs-run
