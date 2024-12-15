@@ -238,8 +238,8 @@ skfmt-%:
 skbuild-%:
 	cd $* && skargo b --profile $(SKARGO_PROFILE)
 
-.PHONY: publish-std-core
-publish-std-core:
+.PHONY: publish-std-binding
+publish-std-binding:
 	bin/release_npm.sh @skiplang/std skiplang/prelude/ts/binding/package.json $(OPT)
 
 .PHONY: publish-std-wasm
@@ -247,10 +247,10 @@ publish-std-wasm:
 	bin/release_npm.sh @skip-wasm/std skiplang/prelude/ts/wasm/package.json $(OPT)
 
 .PHONY: publish-std
-publish-std: publish-std-core publish-std-wasm
+publish-std: publish-std-biding publish-std-wasm
 
-.PHONY: publish-json-core
-publish-json-core:
+.PHONY: publish-json-binding
+publish-json-binding:
 	bin/release_npm.sh @skiplang/json skiplang/skjson/ts/binding/package.json $(OPT)
 
 .PHONY: publish-json-wasm
@@ -258,7 +258,7 @@ publish-json-wasm:
 	bin/release_npm.sh @skip-wasm/json skiplang/skjson/ts/wasm/package.json $(OPT)
 
 .PHONY: publish-json
-publish-json: publish-json-core publish-json-wasm
+publish-json: publish-json-binding publish-json-wasm
 
 .PHONY: publish-date
 publish-date:
@@ -283,13 +283,19 @@ publish-tests:
 
 .PHONY: publish-wasm
 publish-wasm:
-	mkdir -p skipruntime-ts/wasm/dist/src
-	cd skipruntime-ts/native && npm run build
-	bin/release_npm.sh skip-wasm skipruntime-ts/wasm/package.json $(OPT)
+	bin/release_npm.sh @skipruntime/wasm skipruntime-ts/wasm/package.json $(OPT)
+
+.PHONY: publish-addon
+publish-addon:
+	bin/release_npm.sh @skipruntime/addon skipruntime-ts/addon/package.json $(OPT)
 
 .PHONY: publish-server
 publish-server:
 	bin/release_npm.sh @skipruntime/server skipruntime-ts/server/package.json $(OPT)
 
+.PHONY: publish-runtime
+publish-runtime:
+	bin/release_npm.sh @skipruntime/runtime skipruntime-ts/runtime/package.json $(OPT)
+
 .PHONY: publish-all
-publish-all: clean publish-std publish-json publish-date publish-api publish-core publish-helpers publish-tests publish-wasm publish-server
+publish-all: clean publish-std publish-json publish-date publish-api publish-core publish-helpers publish-tests publish-wasm publish-addon publish-runtime publish-server
