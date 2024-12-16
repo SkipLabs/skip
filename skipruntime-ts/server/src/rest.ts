@@ -9,17 +9,13 @@ import type {
 
 export function controlService(service: ServiceInstance): express.Express {
   const app = express();
-  app.use(express.json());
+  app.use(express.json({ strict: false }));
 
   // Streaming control API.
-  app.post("/v1/streams", (req, res) => {
+  app.post("/v1/streams/:resource", (req, res) => {
     try {
       const uuid = crypto.randomUUID();
-      service.instantiateResource(
-        uuid,
-        req.body.resource as string,
-        req.body.params as { [param: string]: Json },
-      );
+      service.instantiateResource(uuid, req.params.resource, req.body as Json);
       res.status(201).send(uuid);
     } catch (e: unknown) {
       console.log(e);
@@ -38,10 +34,8 @@ export function controlService(service: ServiceInstance): express.Express {
   });
 
   // READS
-  app.post("/v1/snapshot", (req, res) => {
+  app.post("/v1/snapshot/:resource", (req, res) => {
     try {
-      const resource = req.body.resource as string;
-      const params = req.body.params as { [param: string]: Json };
       const callbacks = {
         resolve: (data: Json[]) => {
           res.status(200).json(data);
@@ -50,11 +44,37 @@ export function controlService(service: ServiceInstance): express.Express {
           res.status(500).json(err instanceof Error ? err.message : err);
         },
       };
-      if (req.body.key) {
-        service.getArray(resource, req.body.key, params, callbacks);
-      } else {
-        service.getAll(resource, params, callbacks);
-      }
+      service.getAll(req.params.resource, req.body as Json, callbacks);
+    } catch (e: unknown) {
+      console.log(e);
+      res.status(500).json(e instanceof Error ? e.message : e);
+    }
+  });
+
+  app.post("/v1/snapshot/:resource/lookup", (req, res) => {
+    try {
+      const callbacks = {
+        resolve: (data: Json[]) => {
+          res.status(200).json(data);
+        },
+        reject: (err: unknown) => {
+          res.status(500).json(err instanceof Error ? err.message : err);
+        },
+      };
+      if (
+        typeof req.body != "object" ||
+        !("key" in req.body) ||
+        !("params" in req.body)
+      )
+        throw new Error(
+          `Invalid request body for synchronous lookup: ${JSON.stringify(req.body)}`,
+        );
+      service.getArray(
+        req.params.resource,
+        req.body.key,
+        req.body.params as Json,
+        callbacks,
+      );
     } catch (e: unknown) {
       console.log(e);
       res.status(500).json(e instanceof Error ? e.message : e);

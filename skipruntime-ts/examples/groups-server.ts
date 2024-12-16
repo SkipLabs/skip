@@ -14,7 +14,7 @@ app.use(express.json());
 
 app.get("/active_friends/:uid", (req, res) => {
   service
-    .getStreamUUID("active_friends", { uid: req.params.uid })
+    .getStreamUUID("active_friends", Number(req.params.uid))
     .then((uuid) => {
       res.redirect(301, `http://localhost:8080/v1/streams/${uuid}`);
     })
@@ -25,7 +25,7 @@ app.get("/active_friends/:uid", (req, res) => {
 
 app.put("/users/:uid", (req, res) => {
   service
-    .put("users", req.params.uid, [req.body])
+    .put("users", Number(req.params.uid), [req.body])
     .then(() => {
       res.status(200).json({});
     })
@@ -37,7 +37,7 @@ app.put("/users/:uid", (req, res) => {
 
 app.put("/groups/:gid", (req, res) => {
   service
-    .put("groups", req.params.gid, [req.body])
+    .put("groups", Number(req.params.gid), [req.body])
     .then(() => {
       res.status(200).json({});
     })

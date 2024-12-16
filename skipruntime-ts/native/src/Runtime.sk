@@ -22,43 +22,12 @@ class ExistingSubscriptionException() extends Exception {
   }
 }
 
-class Params private (
-  sortedKeys: Array<String>,
-  sortedVals: Array<SKJSON.CJSON>,
-) extends SKStore.File uses Orderable {
-  static fun create(jsonObj: SKJSON.CJObject): this {
-    jsonObj match {
-    | SKJSON.CJObject(fields) ->
-      sortedItems = fields.items().collect(Array).sortedBy(x ~> x.i0);
-      Params(sortedItems.map(kv ~> kv.i0), sortedItems.map(kv ~> kv.i1))
-    };
-  }
+class Params(json: SKJSON.CJSON) extends SKStore.File uses Orderable {
   fun compare(other: Params): Order {
-    kcomp = this.sortedKeys.compare(other.sortedKeys);
-    if (kcomp == EQ()) {
-      for (i in Range(0, this.sortedVals.size())) {
-        vcomp = this.sortedVals[i].compare(other.sortedVals[i]);
-        if (vcomp != EQ()) {
-          break vcomp
-        }
-      } else {
-        EQ()
-      }
-    } else {
-      kcomp
-    }
-  }
-  fun items(): mutable Iterator<(String, SKJSON.CJSON)> {
-    for (i in Range(0, this.sortedKeys.size())) {
-      yield (this.sortedKeys[i], this.sortedVals[i])
-    }
+    this.json.compare(other.json)
   }
   fun toString(): String {
-    vec = mutable Vector[];
-    for ((k, v) in this.items()) {
-      vec.push(`${k}:${v.prettyPrint()}`);
-    };
-    `{${vec.join(",")}}`
+    this.json.prettyPrint()
   }
 }
 
@@ -102,11 +71,11 @@ class ResourceCollection(value: Collection) extends SKStore.File
 
 class ResourceDef(
   name: String,
-  params: Params,
+  params: SKJSON.CJSON,
 ) extends SKStore.File, SKStore.Key {
   //
   fun toString(): String {
-    `${this.name}:${this.params.toString()}`
+    `${this.name}:${this.params.prettyPrint()}`
   }
 }
 
@@ -545,7 +514,7 @@ class LinkToResource(
   supplier: ExternalService,
   writer: CollectionWriter,
   name: String,
-  params: Params,
+  params: SKJSON.CJSON,
 ) extends SKStore.Postponable {
   //
   fun perform(context: mutable SKStore.Context): void {
@@ -559,7 +528,7 @@ class LinkToResource(
 class CloseResource(
   supplier: ExternalService,
   name: String,
-  params: Params,
+  params: SKJSON.CJSON,
 ) extends SKStore.Postponable {
   fun perform(context: mutable SKStore.Context): void {
     pushContext(context);
@@ -627,7 +596,7 @@ fun jsonExtract(from: SKJSON.CJObject, pattern: String): Array<SKJSON.CJSON> {
 fun useExternalCollection(
   supplier: String,
   resource: String,
-  params: Params,
+  params: SKJSON.CJSON,
 ): Collection {
   getContext() match {
   | Some(context) ->
@@ -649,7 +618,7 @@ fun useExternalCollection(
       SKStore.IID::keyType,
       Params::type,
       paramsDir,
-      Array[(SKStore.IID(0), params)],
+      Array[(SKStore.IID(0), Params(params))],
     );
     collectionHdl = hdl.map(
       SKStore.IID::keyType,
@@ -657,12 +626,7 @@ fun useExternalCollection(
       context,
       dirName,
       (context, writer, key, it) ~> {
-        resource_params = it.first;
-        name = mutable Vector<String>[];
-        resource_params.items().each((kv) ->
-          name.push(`${kv.i0}:${kv.i1.prettyPrint()}`)
-        );
-        storeDir = dirName.sub(base64(name.join("|")));
+        storeDir = dirName.sub(base64(it.first.toString()));
         store = context.mkdir(
           kKeyToKey,
           kFileToFile,
@@ -674,10 +638,10 @@ fun useExternalCollection(
               externalSupplier,
               CollectionWriter(storeDir),
               resource,
-              resource_params,
+              it.first.json,
             ),
           ),
-          Some(CloseResource(externalSupplier, resource, resource_params)),
+          Some(CloseResource(externalSupplier, resource, it.first.json)),
         );
         writer.set(key, Handle(store));
       },
@@ -1214,7 +1178,7 @@ value class GetResult<T>(
 fun getAll(
   context: mutable SKStore.Context,
   resourceName: String,
-  params: Params,
+  params: SKJSON.CJSON,
   optRequest: ?Request,
 ): GetResult<Values> {
   resourceInstanceId = Ksuid::create().toString();
@@ -1251,7 +1215,7 @@ fun getAll(
 fun getForKey(
   context: mutable SKStore.Context,
   resourceName: String,
-  params: Params,
+  params: SKJSON.CJSON,
   key: SKJSON.CJSON,
   optRequest: ?Request,
 ): GetResult<Array<SKJSON.CJSON>> {
@@ -1466,7 +1430,7 @@ fun createReactiveResource(
   context: mutable SKStore.Context,
   identifier: String,
   resource: String,
-  params: Params,
+  params: SKJSON.CJSON,
 ): ResourceInfo {
   definition = ResourceDef(resource, params);
   resourceHdl = SKStore.EHandle(
