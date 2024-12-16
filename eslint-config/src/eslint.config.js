@@ -73,6 +73,7 @@ export default tseslint.config(
       "jsdoc/require-param-description": "off",
       "jsdoc/tag-lines": "off",
       "jsdoc/check-tag-names": "off",
+      "jsdoc/valid-types": "off",
     },
   },
   { files: ["**/*.js"], ...tseslint.configs.disableTypeChecked },
