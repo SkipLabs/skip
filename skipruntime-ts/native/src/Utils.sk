@@ -151,22 +151,14 @@ fun base64<T: Show>(toEncode: T): String {
   | None() -> ""
   }
 }
-
-fun paramsToString(params: Map<String, PValue>): String {
-  vec = mutable Vector[];
-  params.each((k, v) -> vec.push(`${k}:${v}`));
-  `{${vec.join(",")}}`
-}
-
-fun toResourceId(resource: String, params: Map<String, PValue>): String {
-  strParams = base64(paramsToString(params));
-  `${resource}_${strParams}`;
+fun toResourceId(resource: String, params: Params): String {
+  `${resource}_${base64(params.toString())}`
 }
 
 fun toSuppliedResourceId(
   supplier: String,
   resource: String,
-  params: Map<String, PValue>,
+  params: Params,
 ): String {
   `${supplier}_${toResourceId(resource, params)}`;
 }
@@ -185,37 +177,10 @@ fun collectionsByName(collections: Map<String, Collection>): SKJSON.CJObject {
   SKJSON.CJObject(SKJSON.CJFields::create(fields.toArray(), x -> x));
 }
 
-fun params(params: SKJSON.CJObject): Map<String, PValue> {
-  map = mutable Map[];
-  params match {
-  | SKJSON.CJObject(fields) ->
-    for (fieldName => field in fields) {
-      map![fieldName] = field match {
-      | SKJSON.CJString(v) -> PString(v)
-      | SKJSON.CJInt(v) -> PInt(v)
-      | SKJSON.CJFloat(v) -> PFloat(v)
-      | _ -> invariant_violation("Invalid parameter value.")
-      }
-    }
-  };
-  map.chill()
-}
-
-fun jsonParams(params: Map<String, PValue>): SKJSON.CJObject {
-  fields = mutable Vector[];
-  params.each((k, v) ->
-    fields.push(
-      (
-        k,
-        v match {
-        | PString(sv) -> SKJSON.CJString(sv)
-        | PInt(iv) -> SKJSON.CJInt(iv)
-        | PFloat(fv) -> SKJSON.CJFloat(fv)
-        },
-      ),
-    )
-  );
-  SKJSON.CJObject(SKJSON.CJFields::create(fields.toArray(), x -> x))
+fun jsonParams(params: Params): SKJSON.CJObject {
+  SKJSON.CJObject(
+    SKJSON.CJFields::create(params.items().collect(Array), x -> x),
+  )
 }
 
 module end;

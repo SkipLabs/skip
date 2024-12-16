@@ -1,6 +1,7 @@
 import {
   type EagerCollection,
   type InitialData,
+  type Json,
   type Resource,
   OneToManyMapper,
 } from "@skipruntime/api";
@@ -63,8 +64,9 @@ class FilterFriends extends OneToManyMapper<GroupID, UserID, UserID> {
 class ActiveFriends implements Resource<ResourceInputs> {
   private readonly uid: UserID;
 
-  constructor(params: { [param: string]: string }) {
-    if (!params["uid"]) throw new Error("Missing required parameter 'uid'");
+  constructor(params: { [param: string]: Json }) {
+    if (!params["uid"] || typeof params["uid"] != "string")
+      throw new Error("Missing required string parameter 'uid'");
     this.uid = params["uid"];
   }
 

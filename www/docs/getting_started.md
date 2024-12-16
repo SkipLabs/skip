@@ -140,7 +140,7 @@ class FilterFriends extends OneToOneMapper<GroupID, UserID[], UserID[]> {
 class ActiveFriends implements Resource<ResourceInputs> {
   private readonly uid: UserID;
 
-  constructor(params: { [param: string]: string }) {
+  constructor(params: { [param: string]: Json }) {
     if (!params["uid"]) throw new Error("Missing required parameter 'uid'");
     this.uid = params["uid"];
   }
