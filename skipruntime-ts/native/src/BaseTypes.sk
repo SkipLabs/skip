@@ -41,26 +41,14 @@ base class LazyCompute {
   fun compute(self: LazyCollection, key: SKJSON.CJSON): Array<SKJSON.CJSON>;
 }
 
-base class PValue uses Show, Orderable {
-  children =
-  | PInt(Int)
-  | PFloat(Float)
-  | PString(String)
-
-  fun toString(): String
-  | PInt(v) -> v.toString()
-  | PFloat(v) -> v.toString()
-  | PString(v) -> v
-}
-
 base class ExternalService {
   fun subscribe(
     collection: CollectionWriter,
     resource: String,
-    params: Map<String, PValue>,
+    params: Params,
   ): void;
 
-  fun unsubscribe(resource: String, params: Map<String, PValue>): void;
+  fun unsubscribe(resource: String, params: Params): void;
 
   fun shutdown(): void;
 }
@@ -70,7 +58,7 @@ base class Resource {
 }
 
 base class ResourceBuilder {
-  fun build(parameters: Map<String, PValue>): Resource;
+  fun build(parameters: Params): Resource;
 }
 
 base class Service(

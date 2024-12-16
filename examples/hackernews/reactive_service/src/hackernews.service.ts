@@ -1,9 +1,10 @@
 import type {
-  Entry,
   EagerCollection,
+  Entry,
+  Json,
   NonEmptyIterator,
-  SkipService,
   Resource,
+  SkipService,
 } from "@skipruntime/runtime";
 
 type Post = {
@@ -97,7 +98,7 @@ class SortingMapper {
 class PostsResource implements Resource<ResourceInputs> {
   private limit: number;
 
-  constructor(params: { [param: string]: string }) {
+  constructor(params: { [param: string]: Json }) {
     this.limit = Number(params["limit"]);
   }
 

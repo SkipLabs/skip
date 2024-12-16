@@ -28,7 +28,7 @@ export type SkipServer = {
  * - `POST /v1/snapshot`:
  *   Synchronous read of a resource.
  *
- *   Requires a JSON-encoded request body of the form `{ resource: string; params: { [param: string]: string }; key?: Json }`.
+ *   Requires a JSON-encoded request body of the form `{ resource: string; params: { [param: string]: Json }; key?: Json }`.
  *   Instantiates the named `resource` with the given `params`, and responds with the values associated with the given `key` or with the entire contents of the resource if no `key` is provided.
  *   If `key` is provided, the returned data will be a JSON-encoded value of type `Json[]`: an array of the `key`'s values; otherwise, it will be a JSON-encoded value of type `[Json, Json[]][]`: an array of entries, each of which associates a key to an array of its values.
  *
@@ -43,7 +43,7 @@ export type SkipServer = {
  *   Instantiate a resource and return a UUID to subscribe to updates.
  *
  *   Requires the request to have a `Content-Type: application/json` header.
- *   The body of the request must be a JSON-encoded value of type `{ resource: string, params: { [param: string]: string } }`.
+ *   The body of the request must be a JSON-encoded value of type `{ resource: string, params: { [param: string]: Json } }`.
  *   Instantiates the named `resource` with parameters `params` and responds with a UUID that can be used to subscribe to updates.
  *
  * - `DELETE /v1/streams/:uuid`:

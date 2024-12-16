@@ -34,7 +34,7 @@ The service has two input collections `"users"` and `"groups"` (populated here w
 class ActiveFriends implements Resource<ResourceInputs> {
   private uid: UserID;
 
-  constructor(params: { [param: string]: string }) {
+  constructor(params: { [param: string]: Json }) {
     if (!params["uid"]) throw new Error("Missing required parameter 'uid'");
     this.uid = params["uid"];
   }
@@ -81,7 +81,7 @@ POST /v1/streams
 DELETE /v1/streams/:uuid
 ```
 
-The `POST` route instantiates a resource according to the JSON-encoded request body (consisting of the resource identifier and any parameters, structured as `{ resource: string; params: { [param: string]: string } }`) and returns a UUID identifying the resource, which can then be used in a query to the streaming API.
+The `POST` route instantiates a resource according to the JSON-encoded request body (consisting of the resource identifier and any parameters, structured as `{ resource: string; params: { [param: string]: any } }`) and returns a UUID identifying the resource, which can then be used in a query to the streaming API.
 The `DELETE` route closes and tears down the resource instance identified by its `uuid` parameter, terminating any active streams.
 
 Synchronous reads from reactive resources can either access the resource in its entirety or read the data for a single key, using route:
@@ -90,7 +90,7 @@ Synchronous reads from reactive resources can either access the resource in its 
 POST /v1/snapshot
 ```
 
-This `POST` route requires a JSON-encoded request body of the form `{ resource: string; params: { [param: string]: string }; key?: any }`.
+This `POST` route requires a JSON-encoded request body of the form `{ resource: string; params: { [param: string]: any }; key?: any }`.
 It instantiates a resource if needed to according to the `resource` and `params` fields of the request body, then either returns the values indicated by the `key` or _all_ keys/values if no `key` is provided.
 For reads of a specific `key`, data is returned as an array of values associated to that key; for reads of an entire resource, data is returned as an array of key/value entries, with each entry a tuple of the form `[key, [value1, value2, ...]]`.
 

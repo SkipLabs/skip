@@ -16,11 +16,11 @@ export type Handle<T> = Internal.Opaque<number, { handle_for: T }>;
 export class ResourceBuilder {
   constructor(
     private readonly builder: new (params: {
-      [param: string]: string;
+      [param: string]: Json;
     }) => Resource,
   ) {}
 
-  build(parameters: { [param: string]: string }): Resource {
+  build(parameters: { [param: string]: Json }): Resource {
     const builder = this.builder;
     return new builder(parameters);
   }
