@@ -48,6 +48,11 @@ export { Sum, Min, Max, CountMapper } from "./utils.js";
 export type JSONMapper = Mapper<Json, Json, Json, Json>;
 export type JSONLazyCompute = LazyCompute<Json, Json>;
 
+/**
+ * An entry point of a Skip reactive service.
+ *
+ * URLs for the service's control and streaming APIs can be constructed from an `Entrypoint`.
+ */
 export type Entrypoint = {
   host: string;
   streaming_port: number;
