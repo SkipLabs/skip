@@ -199,18 +199,18 @@ export interface FromWasm {
   SkipRuntime_Runtime__createResource(
     identifier: ptr<Internal.String>,
     resource: ptr<Internal.String>,
-    jsonParams: ptr<Internal.CJObject>,
+    params: ptr<Internal.CJSON>,
   ): Handle<Error>;
 
   SkipRuntime_Runtime__getAll(
     resource: ptr<Internal.String>,
-    jsonParams: ptr<Internal.CJObject>,
+    params: ptr<Internal.CJSON>,
     request: ptr<Internal.Request> | null,
   ): ptr<Internal.CJObject | Internal.CJFloat>;
 
   SkipRuntime_Runtime__getForKey(
     resource: ptr<Internal.String>,
-    jsonParams: ptr<Internal.CJObject>,
+    params: ptr<Internal.CJSON>,
     key: ptr<Internal.CJSON>,
     request: ptr<Internal.Request> | null,
   ): ptr<Internal.CJObject | Internal.CJFloat>;
@@ -259,7 +259,7 @@ export interface FromWasm {
   SkipRuntime_Context__useExternalResource(
     service: ptr<Internal.String>,
     identifier: ptr<Internal.String>,
-    params: ptr<Internal.CJObject>,
+    params: ptr<Internal.CJSON>,
   ): ptr<Internal.String>;
 
   // Checker
@@ -304,13 +304,13 @@ interface ToWasm {
     supplier: Handle<ExternalService>,
     collection: ptr<Internal.String>,
     resource: ptr<Internal.String>,
-    params: ptr<Internal.CJObject>,
+    params: ptr<Internal.CJSON>,
   ): void;
 
   SkipRuntime_ExternalService__unsubscribe(
     supplier: Handle<ExternalService>,
     skresource: ptr<Internal.String>,
-    skparams: ptr<Internal.CJObject>,
+    skparams: ptr<Internal.CJSON>,
   ): void;
 
   SkipRuntime_ExternalService__shutdown(
@@ -332,7 +332,7 @@ interface ToWasm {
 
   SkipRuntime_ResourceBuilder__build(
     builder: Handle<ResourceBuilder>,
-    params: ptr<Internal.CJObject>,
+    params: ptr<Internal.CJSON>,
   ): ptr<Internal.Resource>;
 
   SkipRuntime_deleteResourceBuilder(builder: Handle<ResourceBuilder>): void;
@@ -662,36 +662,36 @@ export class WasmFromBinding implements FromBinding {
   SkipRuntime_Runtime__createResource(
     identifier: string,
     resource: string,
-    jsonParams: Pointer<Internal.CJObject>,
+    params: Pointer<Internal.CJSON>,
   ): Handle<Error> {
     return this.fromWasm.SkipRuntime_Runtime__createResource(
       this.utils.exportString(identifier),
       this.utils.exportString(resource),
-      toPtr(jsonParams),
+      toPtr(params),
     );
   }
 
   SkipRuntime_Runtime__getAll(
     resource: string,
-    jsonParams: Pointer<Internal.CJObject>,
+    params: Pointer<Internal.CJSON>,
     request: Nullable<Pointer<Internal.Request>>,
   ): Pointer<Internal.CJObject | Internal.CJFloat> {
     return this.fromWasm.SkipRuntime_Runtime__getAll(
       this.utils.exportString(resource),
-      toPtr(jsonParams),
+      toPtr(params),
       toNullablePtr(request),
     );
   }
 
   SkipRuntime_Runtime__getForKey(
     resource: string,
-    jsonParams: Pointer<Internal.CJObject>,
+    params: Pointer<Internal.CJSON>,
     key: Pointer<Internal.CJSON>,
     request: Pointer<Internal.Request> | null,
   ): Pointer<Internal.CJObject | Internal.CJFloat> {
     return this.fromWasm.SkipRuntime_Runtime__getForKey(
       this.utils.exportString(resource),
-      toPtr(jsonParams),
+      toPtr(params),
       toPtr(key),
       toNullablePtr(request),
     );
@@ -765,7 +765,7 @@ export class WasmFromBinding implements FromBinding {
   SkipRuntime_Context__useExternalResource(
     service: string,
     identifier: string,
-    params: Pointer<Internal.CJObject>,
+    params: Pointer<Internal.CJSON>,
   ): string {
     return this.utils.importString(
       this.fromWasm.SkipRuntime_Context__useExternalResource(
@@ -887,7 +887,7 @@ class LinksImpl implements Links {
 
   buildOfResourceBuilder(
     skbuilder: Handle<ResourceBuilder>,
-    skparams: ptr<Internal.CJObject>,
+    skparams: ptr<Internal.CJSON>,
   ): ptr<Internal.Resource> {
     return toPtr(
       this.tobinding.SkipRuntime_ResourceBuilder__build(skbuilder, skparams),
@@ -978,7 +978,7 @@ class LinksImpl implements Links {
     sksupplier: Handle<ExternalService>,
     skwriter: ptr<Internal.String>,
     skresource: ptr<Internal.String>,
-    skparams: ptr<Internal.CJObject>,
+    skparams: ptr<Internal.CJSON>,
   ) {
     this.tobinding.SkipRuntime_ExternalService__subscribe(
       sksupplier,
@@ -991,7 +991,7 @@ class LinksImpl implements Links {
   unsubscribeOfExternalService(
     sksupplier: Handle<ExternalService>,
     skresource: ptr<Internal.String>,
-    skparams: ptr<Internal.CJObject>,
+    skparams: ptr<Internal.CJSON>,
   ) {
     this.tobinding.SkipRuntime_ExternalService__unsubscribe(
       sksupplier,
