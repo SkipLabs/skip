@@ -79,7 +79,7 @@ Note that this requires instantiation of the resource, just the same as reactive
 As such, there is little advantage to synchronous reads in systems built using reactive services.
 They are useful, however, for debugging the state of reactive systems and for maintaining compatibility with legacy systems and non-reactive clients.
 
-To make a synchronous read, call either [`getAll`](api/helpers/classes/SkipServiceBroker#getAll) or [`getArray`](api/helpers/classes/SkipServiceBroker#getArray) on the reactive service handle (i.e. `SkipServiceBroker`) in your web service to query the corresponding routes on the reactive service; an example using `getArray` is given in the example Express web service [below](client.md#example-web-service-configuration).
+To make a synchronous read, call either [`getAll`](api/helpers/classes/SkipServiceBroker#getall) or [`getArray`](api/helpers/classes/SkipServiceBroker#getarray) on the reactive service handle (i.e. `SkipServiceBroker`) in your web service to query the corresponding routes on the reactive service; an example using `getArray` is given in the example Express web service [below](client.md#example-web-service-configuration).
 Then, from your client, issue HTTP `GET` requests to e.g. `http://reactive.service.hostname/my_resource/foo/key1` to make a synchronous read of data in the `foo` resource instance associated with key `key1`.
 
 Synchronous writes and other reactive service operations can be exposed analogously, by calling [`patch`](api/helpers/classes/SkipServiceBroker#patch) or [`put`](api/helpers/classes/SkipServiceBroker#put) on the reactive service from your web backend.
