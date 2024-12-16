@@ -1,3 +1,9 @@
+/**
+ * The @skipruntime/runtime package contains internal implementation detail for the Skip Runtime and should not need to be used directly. See the public API exposed by the @skipruntime/api package.
+ *
+ * @packageDocumentation
+ */
+
 export type * from "@skipruntime/api";
 export type { ServiceInstance } from "@skipruntime/core";
 export { OneToOneMapper, ManyToOneMapper } from "@skipruntime/api";
