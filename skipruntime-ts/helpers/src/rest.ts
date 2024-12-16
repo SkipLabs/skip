@@ -8,6 +8,15 @@ function toHttp(entrypoint: Entrypoint) {
   return `http://${entrypoint.host}:${entrypoint.control_port}`;
 }
 
+/**
+ * Perform an HTTP fetch where input and output data is `Json`.
+ *
+ * @param url - URL from which to fetch
+ * @param method - HTTP method of request
+ * @param headers - additional headers to add to request
+ * @param data - data to convert to JSON and send in request body
+ * @returns - response parsed as JSON, and headers
+ */
 export async function fetchJSON<V extends Json>(
   url: string,
   method: "POST" | "GET" | "PUT" | "PATCH" | "HEAD" | "DELETE" = "GET",
