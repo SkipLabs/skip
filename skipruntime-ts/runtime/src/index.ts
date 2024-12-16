@@ -1,15 +1,7 @@
 export type * from "@skipruntime/api";
 export type { ServiceInstance } from "@skipruntime/core";
 export { OneToOneMapper, ManyToOneMapper } from "@skipruntime/api";
-export {
-  UnknownCollectionError,
-  SkipExternalService,
-  Sum,
-  Min,
-  Max,
-  CountMapper,
-  type Entrypoint,
-} from "@skipruntime/core";
+export { UnknownCollectionError } from "@skipruntime/core";
 export {
   type ExternalResource,
   GenericExternalService,
