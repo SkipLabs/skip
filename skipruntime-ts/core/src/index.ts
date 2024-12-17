@@ -7,8 +7,8 @@ import type {
 } from "@skiplang/json";
 import {
   sk_freeze,
-  isSkFrozen,
-  SkFrozen,
+  isSkManaged,
+  SkManaged,
   checkOrCloneParam,
 } from "@skiplang/json";
 import type * as Internal from "./internal.js";
@@ -23,8 +23,8 @@ import {
   type LazyCompute,
   type Mapper,
   type NamedCollections,
-  type NonEmptyIterator,
-  type Param,
+  type Values,
+  type DepSafe,
   type Reducer,
   type Resource,
   type SkipService,
@@ -41,7 +41,7 @@ import {
   type FromBinding,
 } from "./binding.js";
 
-export { UnknownCollectionError, sk_freeze, isSkFrozen };
+export { UnknownCollectionError, sk_freeze, isSkManaged };
 export { SkipExternalService } from "./remote.js";
 export { Sum, Min, Max, Count, CountMapper } from "./utils.js";
 
@@ -117,7 +117,7 @@ export class Refs {
 }
 
 class LazyCollectionImpl<K extends Json, V extends Json>
-  extends SkFrozen
+  extends SkManaged
   implements LazyCollection<K, V>
 {
   constructor(
@@ -128,29 +128,29 @@ class LazyCollectionImpl<K extends Json, V extends Json>
     Object.freeze(this);
   }
 
-  getArray(key: K): (V & Param)[] {
+  getArray(key: K): (V & DepSafe)[] {
     return this.refs.skjson.importJSON(
       this.refs.binding.SkipRuntime_LazyCollection__getArray(
         this.lazyCollection,
         this.refs.skjson.exportJSON(key),
       ),
-    ) as (V & Param)[];
+    ) as (V & DepSafe)[];
   }
 
-  getUnique(key: K): V & Param {
+  getUnique(key: K): V & DepSafe {
     const v = this.refs.skjson.importOptJSON(
       this.refs.binding.SkipRuntime_LazyCollection__getUnique(
         this.lazyCollection,
         this.refs.skjson.exportJSON(key),
       ),
-    ) as Nullable<V & Param>;
+    ) as Nullable<V & DepSafe>;
     if (v == null) throw new NonUniqueValueException();
     return v;
   }
 }
 
 class EagerCollectionImpl<K extends Json, V extends Json>
-  extends SkFrozen
+  extends SkManaged
   implements EagerCollection<K, V>
 {
   constructor(
@@ -161,22 +161,22 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     Object.freeze(this);
   }
 
-  getArray(key: K): (V & Param)[] {
+  getArray(key: K): (V & DepSafe)[] {
     return this.refs.skjson.importJSON(
       this.refs.binding.SkipRuntime_Collection__getArray(
         this.collection,
         this.refs.skjson.exportJSON(key),
       ),
-    ) as (V & Param)[];
+    ) as (V & DepSafe)[];
   }
 
-  getUnique(key: K): V & Param {
+  getUnique(key: K): V & DepSafe {
     const v = this.refs.skjson.importOptJSON(
       this.refs.binding.SkipRuntime_Collection__getUnique(
         this.collection,
         this.refs.skjson.exportJSON(key),
       ),
-    ) as Nullable<V & Param>;
+    ) as Nullable<V & DepSafe>;
     if (v == null) throw new NonUniqueValueException();
     return v;
   }
@@ -207,7 +207,7 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     return this.derive<K, V>(skcollection);
   }
 
-  map<K2 extends Json, V2 extends Json, Params extends Param[]>(
+  map<K2 extends Json, V2 extends Json, Params extends DepSafe[]>(
     mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
     ...params: Params
   ): EagerCollection<K2, V2> {
@@ -227,11 +227,11 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     return this.derive<K2, V2>(mapped);
   }
 
-  mapReduce<K2 extends Json, V2 extends Json, MapperParams extends Param[]>(
+  mapReduce<K2 extends Json, V2 extends Json, MapperParams extends DepSafe[]>(
     mapper: new (...params: MapperParams) => Mapper<K, V, K2, V2>,
     ...mapperParams: MapperParams
   ) {
-    return <Accum extends Json, ReducerParams extends Param[]>(
+    return <Accum extends Json, ReducerParams extends DepSafe[]>(
       reducer: new (...params: ReducerParams) => Reducer<V2, Accum>,
       ...reducerParams: ReducerParams
     ) => {
@@ -267,7 +267,7 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     };
   }
 
-  reduce<Accum extends Json, Params extends Param[]>(
+  reduce<Accum extends Json, Params extends DepSafe[]>(
     reducer: new (...params: Params) => Reducer<V, Accum>,
     ...params: Params
   ): EagerCollection<K, Accum> {
@@ -350,13 +350,17 @@ class CollectionWriter<K extends Json, V extends Json> {
   }
 }
 
-class ContextImpl extends SkFrozen implements Context {
+class ContextImpl extends SkManaged implements Context {
   constructor(private readonly refs: Refs) {
     super();
     Object.freeze(this);
   }
 
-  createLazyCollection<K extends Json, V extends Json, Params extends Param[]>(
+  createLazyCollection<
+    K extends Json,
+    V extends Json,
+    Params extends DepSafe[],
+  >(
     compute: new (...params: Params) => LazyCompute<K, V>,
     ...params: Params
   ): LazyCollection<K, V> {
@@ -664,7 +668,7 @@ export class ServiceInstance {
   }
 }
 
-export class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
+class ValuesImpl<T> implements Values<T> {
   constructor(
     private readonly skjson: JsonConverter,
     private readonly binding: FromBinding,
@@ -675,26 +679,26 @@ export class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
     this.pointer = pointer;
   }
 
-  next(): Nullable<T & Param> {
+  next(): Nullable<T & DepSafe> {
     return this.skjson.importOptJSON(
       this.binding.SkipRuntime_NonEmptyIterator__next(this.pointer),
-    ) as Nullable<T & Param>;
+    ) as Nullable<T & DepSafe>;
   }
 
-  getUnique(): T & Param {
+  getUnique(): T & DepSafe {
     const value = this.skjson.importOptJSON(
       this.binding.SkipRuntime_NonEmptyIterator__uniqueValue(this.pointer),
-    ) as Nullable<T & Param>;
+    ) as Nullable<T & DepSafe>;
     if (value == null) throw new NonUniqueValueException();
     return value;
   }
 
-  toArray: () => (T & Param)[] = () => {
+  toArray: () => (T & DepSafe)[] = () => {
     return Array.from(this);
   };
 
-  [Symbol.iterator](): Iterator<T & Param> {
-    const cloned_iter = new NonEmptyIteratorImpl<T & Param>(
+  [Symbol.iterator](): Iterator<T & DepSafe> {
+    const cloned_iter = new ValuesImpl<T & DepSafe>(
       this.skjson,
       this.binding,
       this.binding.SkipRuntime_NonEmptyIterator__clone(this.pointer),
@@ -703,12 +707,12 @@ export class NonEmptyIteratorImpl<T> implements NonEmptyIterator<T> {
     return {
       next() {
         const value = cloned_iter.next();
-        return { value, done: value == null } as IteratorResult<T & Param>;
+        return { value, done: value == null } as IteratorResult<T & DepSafe>;
       },
     };
   }
 
-  map<U>(f: (value: T & Param, index: number) => U, thisObj?: any): U[] {
+  map<U>(f: (value: T & DepSafe, index: number) => U, thisObj?: any): U[] {
     return this.toArray().map(f, thisObj);
   }
 }
@@ -763,7 +767,7 @@ export class ToBinding {
     const mapper = this.handles.get(skmapper);
     const result = mapper.mapEntry(
       skjson.importJSON(key) as Json,
-      new NonEmptyIteratorImpl<Json>(skjson, this.binding, values),
+      new ValuesImpl<Json>(skjson, this.binding, values),
     );
     return skjson.exportJSON(Array.from(result) as [[Json, Json]]);
   }
@@ -915,7 +919,7 @@ export class ToBinding {
     return skjson.exportJSON(
       reducer.add(
         skacc ? (skjson.importJSON(skacc) as Json) : null,
-        skjson.importJSON(skvalue) as Json & Param,
+        skjson.importJSON(skvalue) as Json & DepSafe,
       ),
     );
   }
@@ -930,7 +934,7 @@ export class ToBinding {
     return skjson.exportJSON(
       reducer.remove(
         skjson.importJSON(skacc) as Json,
-        skjson.importJSON(skvalue) as Json & Param,
+        skjson.importJSON(skvalue) as Json & DepSafe,
       ),
     );
   }

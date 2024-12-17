@@ -7,7 +7,7 @@ import type {
   JsonObject,
   LazyCompute,
   LazyCollection,
-  NonEmptyIterator,
+  Values,
   NamedCollections,
   SkipService,
   Resource,
@@ -50,10 +50,7 @@ interface ServiceInstance {
 //// testMap1
 
 class Map1 implements Mapper<string, number, string, number> {
-  mapEntry(
-    key: string,
-    values: NonEmptyIterator<number>,
-  ): Iterable<[string, number]> {
+  mapEntry(key: string, values: Values<number>): Iterable<[string, number]> {
     return Array([key, values.getUnique() + 2]);
   }
 }
@@ -80,10 +77,7 @@ const map1Service: SkipService<Input_SN, Input_SN> = {
 class Map2 implements Mapper<string, number, string, number> {
   constructor(private readonly other: EagerCollection<string, number>) {}
 
-  mapEntry(
-    key: string,
-    values: NonEmptyIterator<number>,
-  ): Iterable<[string, number]> {
+  mapEntry(key: string, values: Values<number>): Iterable<[string, number]> {
     const result: [string, number][] = [];
     const other_values = this.other.getArray(key);
     for (const v of values.toArray()) {
@@ -118,10 +112,7 @@ const map2Service: SkipService<Input_SN_SN, Input_SN_SN> = {
 //// testMap3
 
 class Map3 implements Mapper<string, number, string, number> {
-  mapEntry(
-    key: string,
-    values: NonEmptyIterator<number>,
-  ): Iterable<[string, number]> {
+  mapEntry(key: string, values: Values<number>): Iterable<[string, number]> {
     return [[key, values.toArray().reduce((x, y) => x + y, 0)]];
   }
 }
@@ -177,10 +168,7 @@ const oneToOneMapperService: SkipService<Input_NN, Input_NN> = {
 class SizeMapper implements Mapper<number, number, number, number> {
   constructor(private readonly other: EagerCollection<number, number>) {}
 
-  mapEntry(
-    key: number,
-    values: NonEmptyIterator<number>,
-  ): Iterable<[number, number]> {
+  mapEntry(key: number, values: Values<number>): Iterable<[number, number]> {
     return [[key, values.getUnique() + this.other.size()]];
   }
 }
@@ -240,10 +228,7 @@ class TestLazyAdd implements LazyCompute<number, number> {
 class MapLazy implements Mapper<number, number, number, number> {
   constructor(private readonly other: LazyCollection<number, number>) {}
 
-  mapEntry(
-    key: number,
-    values: NonEmptyIterator<number>,
-  ): Iterable<[number, number]> {
+  mapEntry(key: number, values: Values<number>): Iterable<[number, number]> {
     return Array([key, this.other.getUnique(key) - values.getUnique()]);
   }
 }
@@ -267,10 +252,7 @@ const lazyService: SkipService<Input_NN, Input_NN> = {
 //// testMapReduce
 
 class TestOddEven implements Mapper<number, number, number, number> {
-  mapEntry(
-    key: number,
-    values: NonEmptyIterator<number>,
-  ): Iterable<[number, number]> {
+  mapEntry(key: number, values: Values<number>): Iterable<[number, number]> {
     return Array([key % 2, values.getUnique()]);
   }
 }
@@ -388,7 +370,7 @@ class JSONExtract
 
   mapEntry(
     key: number,
-    values: NonEmptyIterator<{ value: JsonObject; pattern: string }>,
+    values: Values<{ value: JsonObject; pattern: string }>,
   ): Iterable<[number, Json[]]> {
     const value = values.getUnique();
     const result = this.context.jsonExtract(value.value, value.pattern);
@@ -468,10 +450,7 @@ class MockExternal implements ExternalService {
 class MockExternalCheck implements Mapper<number, number, number, number[]> {
   constructor(private readonly external: EagerCollection<number, number>) {}
 
-  mapEntry(
-    key: number,
-    values: NonEmptyIterator<number>,
-  ): Iterable<[number, number[]]> {
+  mapEntry(key: number, values: Values<number>): Iterable<[number, number[]]> {
     try {
       const result = this.external.getUnique(key);
       return [[key, [...values, result]]];
