@@ -220,8 +220,11 @@ const slicedMap1Service: SkipService<Input_NN, Input_NN> = {
 class TestLazyAdd implements LazyCompute<number, number> {
   constructor(private readonly other: EagerCollection<number, number>) {}
 
-  compute(_selfHdl: LazyCollection<number, number>, key: number): number {
-    return this.other.getUnique(key) + 2;
+  compute(
+    _selfHdl: LazyCollection<number, number>,
+    key: number,
+  ): Iterable<number> {
+    return [this.other.getUnique(key) + 2];
   }
 }
 

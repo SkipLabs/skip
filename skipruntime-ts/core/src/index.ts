@@ -785,11 +785,11 @@ export class ToBinding {
   ): Pointer<Internal.CJArray> {
     const skjson = this.getJsonConverter();
     const lazyCompute = this.handles.get(sklazyCompute);
-    const computed = lazyCompute.compute(
+    const result = lazyCompute.compute(
       new LazyCollectionImpl<Json, Json>(self, this.refs()),
       skjson.importJSON(skkey) as Json,
     );
-    return skjson.exportJSON(computed ? [computed] : []);
+    return skjson.exportJSON(Array.from(result));
   }
 
   SkipRuntime_deleteLazyCompute(lazyCompute: Handle<JSONLazyCompute>): void {
