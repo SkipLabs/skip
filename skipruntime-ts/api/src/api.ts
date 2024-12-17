@@ -263,7 +263,7 @@ export interface EagerCollection<K extends Json, V extends Json>
  * The type of a _lazy_ reactive function which produces a value for some `key`, possibly using a `self` reference to get/produce other lazily-computed results.
  */
 export interface LazyCompute<K extends Json, V extends Json> {
-  compute(self: LazyCollection<K, V>, key: K): Nullable<V>;
+  compute(self: LazyCollection<K, V>, key: K): Iterable<V>;
 }
 
 /**
