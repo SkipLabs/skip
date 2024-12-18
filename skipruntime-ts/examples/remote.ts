@@ -6,7 +6,7 @@ import type {
   Resource,
 } from "@skipruntime/api";
 import { ManyToOneMapper } from "@skipruntime/api";
-import { SkipExternalService } from "@skipruntime/core";
+import { SkipExternalService } from "@skipruntime/helpers";
 
 import { runService } from "@skipruntime/server";
 
