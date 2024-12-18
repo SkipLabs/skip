@@ -1,6 +1,7 @@
 import type { Json, Entry } from "@skipruntime/api";
 import { NonUniqueValueException } from "@skipruntime/api";
 import type { Entrypoint } from "@skipruntime/core";
+export type { Entrypoint };
 
 function toHttp(entrypoint: Entrypoint) {
   if (entrypoint.secured)

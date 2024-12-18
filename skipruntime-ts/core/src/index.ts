@@ -1,3 +1,9 @@
+/**
+ * The @skipruntime/core package contains internal implementation detail for the Skip Framework and should not need to be used directly. See the public API exposed by the @skipruntime/helpers package.
+ *
+ * @packageDocumentation
+ */
+
 import type {
   Pointer,
   Nullable,
