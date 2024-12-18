@@ -14,7 +14,10 @@ import { runService } from "@skipruntime/server";
 class ComputeExpression implements LazyCompute<string, string> {
   constructor(private skall: EagerCollection<string, Json>) {}
 
-  compute(selfHdl: LazyCollection<string, string>, key: string): string | null {
+  compute(
+    selfHdl: LazyCollection<string, string>,
+    key: string,
+  ): Iterable<string> {
     const getComputed = (key: string) => {
       const v = selfHdl.getUnique(key);
       if (typeof v == "number") return v;
@@ -32,19 +35,21 @@ class ComputeExpression implements LazyCompute<string, string> {
           case "A1 + A2": {
             const v1 = getComputed("A1");
             const v2 = getComputed("A2");
-            return (v1 + v2).toString();
+            return [(v1 + v2).toString()];
           }
           case "A3 * A2":
-            return (getComputed("A3") * getComputed("A2")).toString();
+            return [(getComputed("A3") * getComputed("A2")).toString()];
           default:
-            return "# Not managed expression.";
+            return [
+              `# Syntax error; unmanaged expression: "${+v.substring(1)}"`,
+            ];
         }
       } else {
         return v;
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : JSON.stringify(e);
-      return "# " + msg;
+      return ["# " + msg];
     }
   }
 }
