@@ -1,20 +1,8 @@
 /**
- * The @skipruntime/runtime package contains internal implementation detail for the Skip Runtime and should not need to be used directly. See the public API exposed by the @skipruntime/api package.
+ * The @skipruntime/runtime package contains internal implementation detail for @skipruntime/server and should not need to be used directly. See the public API exposed by the @skipruntime/server package.
  *
  * @packageDocumentation
  */
-
-export type * from "@skipruntime/api";
-export type { ServiceInstance } from "@skipruntime/core";
-export { OneToOneMapper, ManyToOneMapper } from "@skipruntime/api";
-export { UnknownCollectionError } from "@skipruntime/core";
-export {
-  type ExternalResource,
-  GenericExternalService,
-  Polled,
-} from "@skipruntime/helpers";
-
-export { fetchJSON, SkipServiceBroker } from "@skipruntime/helpers/rest.js";
 
 import { initService as wasmInitService } from "@skipruntime/wasm";
 import type { ServiceInstance } from "@skipruntime/core";
