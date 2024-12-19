@@ -19,7 +19,6 @@ const sidebars: SidebarsConfig = {
     "externals",
     "client",
     "deploying",
-    "debugging",
     "glossary",
     "reference",
     {
