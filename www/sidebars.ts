@@ -20,7 +20,6 @@ const sidebars: SidebarsConfig = {
     "client",
     "deploying",
     "glossary",
-    "reference",
     {
       type: "category",
       label: "@skipruntime/api",
