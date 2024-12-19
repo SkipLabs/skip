@@ -97,10 +97,10 @@ export class SkipServiceBroker {
    * @param key - key to read
    * @returns - the values associated to the key
    */
-  async getArray<V extends Json>(
+  async getArray<K extends Json, V extends Json>(
     resource: string,
     params: Json,
-    key: string,
+    key: K,
   ): Promise<V[]> {
     const [data, _headers] = await fetchJSON<V[]>(
       `${this.entrypoint}/v1/snapshot/${resource}`,
@@ -119,12 +119,12 @@ export class SkipServiceBroker {
    * @returns - the value associated to the key
    * @throws {NonUniqueValueException} when the key is associated to either zero or multiple values
    */
-  async getUnique<V extends Json>(
+  async getUnique<K extends Json, V extends Json>(
     resource: string,
     params: Json,
-    key: string,
+    key: K,
   ): Promise<V> {
-    return this.getArray<V>(resource, params, key).then((values) => {
+    return this.getArray<K, V>(resource, params, key).then((values) => {
       if (values.length !== 1 || values[0] === undefined)
         throw new NonUniqueValueException();
       return values[0];
