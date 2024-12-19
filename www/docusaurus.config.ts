@@ -191,7 +191,7 @@ const config: Config = {
         readme: "none",
         indexFormat: "table",
         disableSources: true,
-        groupOrder: ["Interfaces", "Classes", "Type Aliases", "functions"],
+        groupOrder: ["Type Aliases", "Interfaces", "Classes", "functions"],
         sidebar: { pretty: true },
         textContentMappings: {
           "title.indexPage": "@skipruntime/api",
@@ -213,7 +213,7 @@ const config: Config = {
         readme: "none",
         indexFormat: "table",
         disableSources: true,
-        groupOrder: ["Interfaces", "Classes", "Type Aliases", "functions"],
+        groupOrder: ["Type Aliases", "Interfaces", "Classes", "functions"],
         sidebar: { pretty: true },
         textContentMappings: {
           "title.indexPage": "@skipruntime/server",
@@ -235,7 +235,7 @@ const config: Config = {
         readme: "none",
         indexFormat: "table",
         disableSources: true,
-        groupOrder: ["Interfaces", "Classes", "Type Aliases", "functions"],
+        groupOrder: ["Type Aliases", "Interfaces", "Classes", "functions"],
         sidebar: { pretty: true },
         textContentMappings: {
           "title.indexPage": "@skipruntime/helpers",

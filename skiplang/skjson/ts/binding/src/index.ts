@@ -15,7 +15,13 @@ export const sk_managed: unique symbol = Symbol.for("Skip.managed");
  *
  * `Managed` values are important because they can be used in code that will be executed by the reactive computation system without introducing the possibility of stale or unreproducible results.
  */
-export type Managed = { [sk_managed]: true };
+export type Managed = {
+  /**
+   * @ignore
+   * @hidden
+   */
+  [sk_managed]: true;
+};
 
 export abstract class Frozen implements Managed {
   // tsc misses that Object.defineProperty in the constructor inits this
@@ -49,17 +55,15 @@ export abstract class SkManaged extends Frozen {
 /**
  * A `DepSafe` value is _dependency-safe_ and can be used safely in reactive computations.
  *
- * This is either because it is:
- * (1) a primitive JavaScript value (boolean, number, string, etc.)
- * (2) a Skip-runtime-managed object with tracked dependencies, or
- * (3) a deep-frozen and therefore immutable JavaScript object.
+ * A value can be safely used as a dependency of a reactive computation if it is:
+ * 1. a primitive JavaScript value (boolean, number, string, etc.)
+ * 2. managed by the Skip runtime, which will correctly track dependencies, or
+ * 3. a deep-frozen and therefore constant JavaScript object.
  *
- * Values used in reactive computations must be dependency-safe so that reactive computations
- * can be reevaluated as needed with consistent semantics.
+ * Values used in reactive computations must be dependency-safe so that reactive computations can be reevaluated as needed with consistent semantics.
  *
- * All objects/values that come _out_ of the Skip runtime are dependency-safe by default;
- * non-Skip objects can be made dependency-safe by passing them to `deepFreeze`, which
- * recursively freezes their fields and returns an immutable `Managed` object.
+ * All objects/values that come _out_ of the Skip runtime are dependency-safe.
+ * Non-Skip objects can be made dependency-safe by passing them to `deepFreeze`, which recursively freezes their fields and returns a constant `Managed` object.
  */
 export type DepSafe =
   | null
@@ -87,26 +91,18 @@ export function checkOrCloneParam<T>(value: T): T {
 }
 
 /**
- * _Deep-freeze_ an object, returning the same object that was passed in.
+ * _Deep-freeze_ an object, making it dependency-safe.
  *
- * This function is similar to
- * {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/freeze | `Object.freeze()`}
- * but freezes the object and deep-freezes all its properties,
- * recursively. The object is then not only _immutable_ but also
- * _constant_. Note that as a result all objects reachable from the
- * parameter will be frozen and no longer mutable or extensible, even from
- * other references.
+ * This function is similar to {@link https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/freeze | Object.freeze()} but freezes the object and deep-freezes all its properties, recursively.
+ * The object is then not only _immutable_ but also _constant_.
+ * Note that as a result all objects reachable from the parameter will be frozen and no longer mutable or extensible, even from other references.
  *
- * The argument object and all its properties, recursively, must not already
- * be frozen by `Object.freeze` (or else `deepFreeze` cannot mark them
- * deep-frozen). Undefined, function (and hence class) values cannot be
- * deep-frozen.
+ * The argument object and all its properties, recursively, must not already be frozen by `Object.freeze` (or else `deepFreeze` cannot mark them deep-frozen).
+ * Undefined, function (and hence class) values cannot be deep-frozen.
  *
- * The primary use for this function is to satisfy the requirement that all
- * parameters to Skip `Mapper` constructors must be deep-frozen: objects
- * that have not been constructed by Skip can be passed to `deepFreeze()`
- * before passing them to a `Mapper` constructor.
+ * The primary use for this function is to satisfy the requirement that all parameters to Skip `Mapper` or `Reducer` constructors must be dependency-safe: objects that have not been constructed by Skip can be passed to `deepFreeze()` before passing them to a `Mapper` or `Reducer` constructor.
  *
+ * @typeParam T - Type of value to deep-freeze.
  * @param value - The object to deep-freeze.
  * @returns The same object that was passed in.
  */
@@ -144,11 +140,15 @@ export function deepFreeze<T>(value: T): T & DepSafe {
 }
 
 /**
- * The `Json` type describes JSON-serializable values and serves as an upper bound on keys
- * and values in the Skip Runtime, ensuring that they can be serialized and managed by the
- * reactive computation engine.
+ * JSON-serializable values.
+ *
+ * The `Json` type describes JSON-serializable values and serves as an upper bound on keys and values in the Skip Runtime, ensuring that they can be serialized and managed by the reactive computation engine.
  */
 export type Json = number | boolean | string | (Json | null)[] | JsonObject;
+
+/**
+ * Objects containing `Json` values.
+ */
 export type JsonObject = { [key: string]: Json | null };
 
 export type Exportable =

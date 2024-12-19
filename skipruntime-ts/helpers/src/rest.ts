@@ -12,11 +12,12 @@ function toHttp(entrypoint: Entrypoint) {
 /**
  * Perform an HTTP fetch where input and output data is `Json`.
  *
- * @param url - URL from which to fetch
- * @param method - HTTP method of request
- * @param headers - additional headers to add to request
- * @param data - data to convert to JSON and send in request body
- * @returns - response parsed as JSON, and headers
+ * @typeParam V - Type response is *assumed* to have.
+ * @param url - URL from which to fetch.
+ * @param method - HTTP method of request.
+ * @param headers - Additional headers to add to request.
+ * @param data - Data to convert to JSON and send in request body.
+ * @returns Response parsed as JSON, and headers.
  */
 export async function fetchJSON<V extends Json>(
   url: string,
@@ -57,8 +58,9 @@ export class SkipServiceBroker {
 
   /**
    * Construct a broker for a Skip service at the given entry point.
-   * @param entrypoint - entry point of backing service
-   * @returns - method-call broker to service
+   *
+   * @param entrypoint - Entry point of backing service.
+   * @returns Method-call broker to service.
    */
   constructor(
     entrypoint: Entrypoint = {
@@ -73,9 +75,11 @@ export class SkipServiceBroker {
   /**
    * Read the entire contents of a resource.
    *
-   * @param resource - name of resource, must be a key of the `resources` field of the `SkipService` running at `entrypoint`
-   * @param params - resource instance parameters
-   * @returns - all entries in resource
+   * @typeParam K - Type of keys.
+   * @typeParam V - Type of values.
+   * @param resource - Name of resource, must be a key of the `resources` field of the `SkipService` running at `entrypoint`.
+   * @param params - Resource instance parameters.
+   * @returns All entries in resource.
    */
   async getAll<K extends Json, V extends Json>(
     resource: string,
@@ -92,10 +96,13 @@ export class SkipServiceBroker {
 
   /**
    * Read the values a resource associates with a single key.
-   * @param resource - name of resource, must be a key of the `resources` field of the `SkipService` running at `entrypoint`
-   * @param params - resource instance parameters
-   * @param key - key to read
-   * @returns - the values associated to the key
+   *
+   * @typeParam K - Type of keys.
+   * @typeParam V - Type of values.
+   * @param resource - Name of resource, must be a key of the `resources` field of the `SkipService` running at `entrypoint`.
+   * @param params - Resource instance parameters.
+   * @param key - Key to read.
+   * @returns The values associated to the key.
    */
   async getArray<K extends Json, V extends Json>(
     resource: string,
@@ -113,11 +120,14 @@ export class SkipServiceBroker {
 
   /**
    * Read the single value a resource associates with a key.
-   * @param resource - name of resource, must be a key of the `resources` field of the `SkipService` running at `entrypoint`
-   * @param params - resource instance parameters
-   * @param key - key to read
-   * @returns - the value associated to the key
-   * @throws {NonUniqueValueException} when the key is associated to either zero or multiple values
+   *
+   * @typeParam K - Type of keys.
+   * @typeParam V - Type of values.
+   * @param resource - Name of resource, must be a key of the `resources` field of the `SkipService` running at `entrypoint`.
+   * @param params - Resource instance parameters.
+   * @param key - Key to read.
+   * @returns The value associated to the key.
+   * @throws `NonUniqueValueException` when the key is associated to either zero or multiple values.
    */
   async getUnique<K extends Json, V extends Json>(
     resource: string,
@@ -133,9 +143,12 @@ export class SkipServiceBroker {
 
   /**
    * Write the values for a single key in a collection.
-   * @param collection - name of the input collection to update, must be a key of the `Inputs` type parameter of the `SkipService` running at `entrypoint`
-   * @param key - key of entry to write
-   * @param values - values of entry to write
+   *
+   * @typeParam K - Type of keys.
+   * @typeParam V - Type of values.
+   * @param collection - Name of the input collection to update, must be a key of the `Inputs` type parameter of the `SkipService` running at `entrypoint`.
+   * @param key - Key of entry to write.
+   * @param values - Values of entry to write.
    * @returns {void}
    */
   async put<K extends Json, V extends Json>(
@@ -148,8 +161,11 @@ export class SkipServiceBroker {
 
   /**
    * Write multiple entries to a collection.
-   * @param collection - name of the input collection to update, must be a key of the `Inputs` type parameter of the `SkipService` running at `entrypoint`
-   * @param entries - entries to write
+   *
+   * @typeParam K - Type of keys.
+   * @typeParam V - Type of values.
+   * @param collection - Name of the input collection to update, must be a key of the `Inputs` type parameter of the `SkipService` running at `entrypoint`.
+   * @param entries - Entries to write.
    * @returns {void}
    */
   async patch<K extends Json, V extends Json>(
@@ -166,8 +182,10 @@ export class SkipServiceBroker {
 
   /**
    * Remove all values associated with a key in a collection.
-   * @param collection - name of the input collection to update, must be a key of the `Inputs` type parameter of the `SkipService` running at `entrypoint`
-   * @param key - key of entry to delete
+   *
+   * @typeParam K - Type of keys.
+   * @param collection - Name of the input collection to update, must be a key of the `Inputs` type parameter of the `SkipService` running at `entrypoint`.
+   * @param key - Key of entry to delete.
    * @returns {void}
    */
   async deleteKey<K extends Json>(collection: string, key: K): Promise<void> {
@@ -176,9 +194,12 @@ export class SkipServiceBroker {
 
   /**
    * Create a resource instance UUID.
-   * @param resource - name of resource, must be a key of the `resources` field of the `SkipService` running at `entrypoint`
-   * @param params - resource instance parameters
-   * @returns - UUID that can be used to subscribe to updates to resource instance
+   *
+   * @typeParam K - Type of keys.
+   * @typeParam V - Type of values.
+   * @param resource - Name of resource, must be a key of the `resources` field of the `SkipService` running at `entrypoint`.
+   * @param params - Resource instance parameters.
+   * @returns UUID that can be used to subscribe to updates to resource instance.
    */
   async getStreamUUID(resource: string, params: Json = {}): Promise<string> {
     return fetch(`${this.entrypoint}/v1/streams/${resource}`, {
@@ -193,7 +214,7 @@ export class SkipServiceBroker {
    *
    * Under normal circumstances, resource instances are deleted automatically after some period of inactivity; this method enables immediately deleting live streams under exceptional circumstances.
    *
-   * @param uuid - resource instance UUID
+   * @param uuid - Resource instance UUID.
    * @returns {void}
    */
   async deleteUUID(uuid: string): Promise<void> {

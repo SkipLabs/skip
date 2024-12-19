@@ -60,9 +60,24 @@ export type JSONLazyCompute = LazyCompute<Json, Json>;
  * URLs for the service's control and streaming APIs can be constructed from an `Entrypoint`.
  */
 export type Entrypoint = {
+  /**
+   * Hostname of the service.
+   */
   host: string;
+
+  /**
+   * Port to use for the service's streaming interface.
+   */
   streaming_port: number;
+
+  /**
+   * Port to use for the service's control interface.
+   */
   control_port: number;
+
+  /**
+   * Flag that when set indicates that https should be used instead of http.
+   */
   secured?: boolean;
 };
 

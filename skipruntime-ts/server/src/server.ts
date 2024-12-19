@@ -81,13 +81,13 @@ export type SkipServer = {
  *     data: <values>\n\n
  * ```
  *
- * @typeParam Inputs - named collections from which the service computes
- * @typeParam ResourceInputs - named collections provided to resource computations
- * @param service - service specification
- * @param options - service configuration options
- * @param options.control_port - port on which control service will listen
- * @param options.streaming_port - port on which streaming service will listen
- * @returns - object to manage the running server
+ * @typeParam Inputs - Named collections from which the service computes.
+ * @typeParam ResourceInputs - Named collections provided to resource computations.
+ * @param service - Service specification.
+ * @param options - Service configuration options.
+ * @param options.control_port - Port on which control service will listen.
+ * @param options.streaming_port - Port on which streaming service will listen.
+ * @returns Object to manage the running server.
  */
 export async function runService<
   Inputs extends NamedCollections,

@@ -10,14 +10,29 @@ interface Closable {
   close(): void;
 }
 
+/**
+ * An external Skip reactive service.
+ *
+ * `SkipExternalService` provides an implementation of `ExternalService` for an external Skip service.
+ */
 export class SkipExternalService implements ExternalService {
   private readonly resources = new Map<string, Closable>();
 
+  /**
+   * @param url - URL to use for the service's streaming interface.
+   * @param control_url - URL to use for the service's control interface.
+   */
   constructor(
     private readonly url: string,
     private readonly control_url: string,
   ) {}
 
+  /**
+   * Constructor accepting an `Entrypoint`.
+   *
+   * @param entrypoint - The entry point for the external Skip service.
+   * @returns An `ExternalService` to interact with the service running at `entrypoint`.
+   */
   // TODO: Support Skip external services going through a gateway.
   static direct(entrypoint: Entrypoint): SkipExternalService {
     let url = `http://${entrypoint.host}:${entrypoint.streaming_port.toString()}`;
