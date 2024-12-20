@@ -142,10 +142,19 @@ export interface FromBinding {
     mapper: Pointer<Internal.Mapper>,
     reducer: Pointer<Internal.Reducer>,
   ): string;
+  SkipRuntime_Collection__nativeMapReduce(
+    collection: string,
+    mapper: Pointer<Internal.Mapper>,
+    reducer: string,
+  ): string;
 
   SkipRuntime_Collection__reduce(
     collection: string,
     reducer: Pointer<Internal.Reducer>,
+  ): string;
+  SkipRuntime_Collection__nativeReduce(
+    collection: string,
+    reducer: string,
   ): string;
 
   SkipRuntime_Collection__slice(
