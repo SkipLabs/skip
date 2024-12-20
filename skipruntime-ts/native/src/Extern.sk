@@ -427,10 +427,25 @@ fun mapReduceOfCollection(
   collectionForName(collection).mapReduce(Some(mapper), reducer).getId()
 }
 
+@export("SkipRuntime_Collection__nativeMapReduce")
+fun nativeMapReduce(
+  collection: String,
+  mapper: Mapper,
+  reducer: String,
+): String {
+  collectionForName(collection).nativeMapReduce(Some(mapper), reducer).getId()
+}
+
 @export("SkipRuntime_Collection__reduce")
 fun reduceOfCollection(collection: String, reducer: JSONReducer): String {
   collectionForName(collection).mapReduce(None(), reducer).getId()
 }
+
+@export("SkipRuntime_Collection__nativeReduce")
+fun nativeReduceOfCollection(collection: String, reducer: String): String {
+  collectionForName(collection).nativeMapReduce(None(), reducer).getId()
+}
+
 @export("SkipRuntime_Collection__slice")
 fun sliceOfCollection(collection: String, ranges: SKJSON.CJArray): String {
   collectionForName(collection)

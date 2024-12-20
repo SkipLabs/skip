@@ -18,6 +18,9 @@ import {
   SkManaged,
   checkOrCloneParam,
 } from "@skiplang/json";
+
+import { sknative } from "@skiplang/std";
+
 import type * as Internal from "./internal.js";
 import {
   NonUniqueValueException,
@@ -49,7 +52,7 @@ import {
 
 export { UnknownCollectionError, sk_freeze, isSkManaged };
 export { SkipExternalService } from "./remote.js";
-export { Sum, Min, Max, Count, CountMapper } from "./utils.js";
+export { Sum, Min, Max, Count } from "./utils.js";
 
 export type JSONMapper = Mapper<Json, Json, Json, Json>;
 export type JSONLazyCompute = LazyCompute<Json, Json>;
@@ -275,16 +278,28 @@ class EagerCollectionImpl<K extends Json, V extends Json>
       const skmapper = this.refs.binding.SkipRuntime_createMapper(
         this.refs.handles.register(mapperObj),
       );
-      const skreducer = this.refs.binding.SkipRuntime_createReducer(
-        this.refs.handles.register(reducerObj),
-        this.refs.skjson.exportJSON(reducerObj.initial),
-      );
-      const mapped = this.refs.binding.SkipRuntime_Collection__mapReduce(
-        this.collection,
-        skmapper,
-        skreducer,
-      );
-      return this.derive<K2, Accum>(mapped);
+
+      if (sknative in reducerObj && typeof reducerObj[sknative] == "string") {
+        return this.derive<K2, Accum>(
+          this.refs.binding.SkipRuntime_Collection__nativeMapReduce(
+            this.collection,
+            skmapper,
+            reducerObj[sknative],
+          ),
+        );
+      } else {
+        const skreducer = this.refs.binding.SkipRuntime_createReducer(
+          this.refs.handles.register(reducerObj),
+          this.refs.skjson.exportJSON(reducerObj.initial),
+        );
+        return this.derive<K2, Accum>(
+          this.refs.binding.SkipRuntime_Collection__mapReduce(
+            this.collection,
+            skmapper,
+            skreducer,
+          ),
+        );
+      }
     };
   }
 
@@ -298,16 +313,25 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     if (!reducerObj.constructor.name) {
       throw new Error("Reducer classes must be defined at top-level.");
     }
-    const skreducer = this.refs.binding.SkipRuntime_createReducer(
-      this.refs.handles.register(reducerObj),
-      this.refs.skjson.exportJSON(reducerObj.initial),
-    );
-    return this.derive<K, Accum>(
-      this.refs.binding.SkipRuntime_Collection__reduce(
-        this.collection,
-        skreducer,
-      ),
-    );
+    if (sknative in reducerObj && typeof reducerObj[sknative] == "string") {
+      return this.derive<K, Accum>(
+        this.refs.binding.SkipRuntime_Collection__nativeReduce(
+          this.collection,
+          reducerObj[sknative],
+        ),
+      );
+    } else {
+      const skreducer = this.refs.binding.SkipRuntime_createReducer(
+        this.refs.handles.register(reducerObj),
+        this.refs.skjson.exportJSON(reducerObj.initial),
+      );
+      return this.derive<K, Accum>(
+        this.refs.binding.SkipRuntime_Collection__reduce(
+          this.collection,
+          skreducer,
+        ),
+      );
+    }
   }
 
   merge(...others: EagerCollection<K, V>[]): EagerCollection<K, V> {
