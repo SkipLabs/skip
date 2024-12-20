@@ -22,34 +22,14 @@ const kResourceInstance2SubIdDir: SKStore.DirName = SKStore.DirName::create(
   "/sk_prv/resources/instance2subid/",
 );
 
-class JSONKeyConverter() extends KeyConverter {
-  fun toJSON(value: SKStore.Key): SKJSON.CJSON {
-    JSONID::keyType(value).value
-  }
-
-  fun fromJSON(json: SKJSON.CJSON): SKStore.Key {
-    JSONID(json)
-  }
-}
-
-class JSONFileConverter() extends FileConverter {
-  fun toJSON(value: SKStore.File): SKJSON.CJSON {
-    JSONFile::type(value).value
-  }
-
-  fun fromJSON(json: SKJSON.CJSON): SKStore.File {
-    JSONFile(json)
-  }
-}
-
-class JSONID(value: SKJSON.CJSON) extends SKStore.Key {
+class JSONID(json: SKJSON.CJSON) extends SKStore.Key {
   //
   fun toString(): String {
-    this.value.prettyPrint()
+    this.json.prettyPrint()
   }
 }
 
-class JSONFile(value: SKJSON.CJSON) extends SKStore.File
+class JSONFile(json: SKJSON.CJSON) extends SKStore.File
 
 fun accReducer<V1: SKStore.File, V2: SKStore.File>(
   reducer: Reducer<V1, V2>,
@@ -87,27 +67,6 @@ fun identityMap<K: SKStore.Key, V: SKStore.File>(
   it: mutable SKStore.NonEmptyIterator<V>,
 ): void {
   writer.setArray(key, it.collect(Array));
-}
-
-class IdentityMapper(
-  private keyConverter: KeyConverter,
-  private fileConverter: FileConverter,
-) extends Mapper {
-  //
-  fun getKeyConverter(): KeyConverter {
-    this.keyConverter
-  }
-
-  fun getFileConverter(): FileConverter {
-    this.fileConverter
-  }
-
-  fun mapEntry(
-    key: SKJSON.CJSON,
-    values: mutable SKStore.NonEmptyIterator<SKJSON.CJSON>,
-  ): mutable Iterator<(SKJSON.CJSON, SKJSON.CJSON)> {
-    values.collect(Array).map(v -> (key, v)).iterator()
-  }
 }
 
 fun noFilter<K: SKStore.Key, V: SKStore.File>(
@@ -164,11 +123,11 @@ fun toSuppliedResourceId(
 }
 
 fun collectionForName(name: String): Collection {
-  Collection::forName(name, JSONKeyConverter(), JSONFileConverter())
+  Collection::forName(name)
 }
 
 fun lazyForName(name: String): LazyCollection {
-  LazyCollection::forName(name, JSONKeyConverter(), JSONFileConverter())
+  LazyCollection::forName(name)
 }
 
 fun collectionsByName(collections: Map<String, Collection>): SKJSON.CJObject {
