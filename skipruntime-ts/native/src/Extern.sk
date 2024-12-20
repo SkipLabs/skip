@@ -69,14 +69,6 @@ fun createMapper(mapper: UInt32): ExternMapper {
 }
 
 class ExternMapper(eptr: SKStore.ExternalPointer) extends Mapper {
-  fun getKeyConverter(): KeyConverter {
-    JSONKeyConverter()
-  }
-
-  fun getFileConverter(): FileConverter {
-    JSONFileConverter()
-  }
-
   fun mapEntry(
     key: SKJSON.CJSON,
     values: mutable SKStore.NonEmptyIterator<SKJSON.CJSON>,
@@ -123,13 +115,6 @@ fun createLazyCompute(lazyCompute: UInt32): ExternLazyCompute {
 }
 
 class ExternLazyCompute(eptr: SKStore.ExternalPointer) extends LazyCompute {
-  fun getKeyConverter(): KeyConverter {
-    JSONKeyConverter()
-  }
-  fun getFileConverter(): FileConverter {
-    JSONFileConverter()
-  }
-
   fun compute(self: LazyCollection, key: SKJSON.CJSON): Array<SKJSON.CJSON> {
     computeOfLazyCompute(this.eptr.value, self.getId(), key) match {
     | SKJSON.CJArray(value) -> value
@@ -330,8 +315,6 @@ fun createService(
   resources: mutable Map<String, ResourceBuilder>,
   remotes: mutable Map<String, ExternalService>,
 ): ExternService {
-  keyConverter = JSONKeyConverter();
-  fileConverter = JSONFileConverter();
   inputs = mutable Vector[];
   jsInputs match {
   | SKJSON.CJObject(fields) ->
@@ -343,8 +326,6 @@ fun createService(
             e = SKJSON.expectArray(v);
             (e[0], SKJSON.expectArray(e[1]))
           }),
-          keyConverter,
-          fileConverter,
         ),
       )
     }
@@ -443,20 +424,12 @@ fun mapReduceOfCollection(
   mapper: Mapper,
   reducer: JSONReducer,
 ): String {
-  collectionForName(collection)
-    .mapReduce(mapper, reducer, JSONFileConverter())
-    .getId()
+  collectionForName(collection).mapReduce(Some(mapper), reducer).getId()
 }
 
 @export("SkipRuntime_Collection__reduce")
 fun reduceOfCollection(collection: String, reducer: JSONReducer): String {
-  collectionForName(collection)
-    .mapReduce(
-      IdentityMapper(JSONKeyConverter(), JSONFileConverter()),
-      reducer,
-      JSONFileConverter(),
-    )
-    .getId()
+  collectionForName(collection).mapReduce(None(), reducer).getId()
 }
 @export("SkipRuntime_Collection__slice")
 fun sliceOfCollection(collection: String, ranges: SKJSON.CJArray): String {
@@ -590,7 +563,7 @@ class JSONReducer(
   eptr: SKStore.ExternalPointer,
 ) extends Reducer<SKJSON.CJSON, SKJSON.CJSON> {
   fun getType(): SKStore.File ~> SKJSON.CJSON {
-    f ~> JSONFile::type(f).value
+    f ~> JSONFile::type(f).json
   }
 
   fun add(acc: SKJSON.CJSON, value: SKJSON.CJSON): SKJSON.CJSON {
