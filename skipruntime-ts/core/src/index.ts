@@ -277,7 +277,7 @@ class EagerCollectionImpl<K extends Json, V extends Json>
       );
       const skreducer = this.refs.binding.SkipRuntime_createReducer(
         this.refs.handles.register(reducerObj),
-        this.refs.skjson.exportJSON(reducerObj.default),
+        this.refs.skjson.exportJSON(reducerObj.initial),
       );
       const mapped = this.refs.binding.SkipRuntime_Collection__mapReduce(
         this.collection,
@@ -300,7 +300,7 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     }
     const skreducer = this.refs.binding.SkipRuntime_createReducer(
       this.refs.handles.register(reducerObj),
-      this.refs.skjson.exportJSON(reducerObj.default),
+      this.refs.skjson.exportJSON(reducerObj.initial),
     );
     return this.derive<K, Accum>(
       this.refs.binding.SkipRuntime_Collection__reduce(
