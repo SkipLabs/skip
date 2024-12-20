@@ -153,10 +153,19 @@ export interface FromWasm {
     mapper: ptr<Internal.Mapper>,
     reducer: ptr<Internal.Reducer>,
   ): ptr<Internal.String>;
+  SkipRuntime_Collection__nativeMapReduce(
+    collection: ptr<Internal.String>,
+    mapper: ptr<Internal.Mapper>,
+    reducer: ptr<Internal.String>,
+  ): ptr<Internal.String>;
 
   SkipRuntime_Collection__reduce(
     collection: ptr<Internal.String>,
     reducer: ptr<Internal.Reducer>,
+  ): ptr<Internal.String>;
+  SkipRuntime_Collection__nativeReduce(
+    collection: ptr<Internal.String>,
+    reducer: ptr<Internal.String>,
   ): ptr<Internal.String>;
 
   SkipRuntime_Collection__slice(
@@ -581,6 +590,19 @@ export class WasmFromBinding implements FromBinding {
       ),
     );
   }
+  SkipRuntime_Collection__nativeMapReduce(
+    collection: string,
+    mapper: Pointer<Internal.Mapper>,
+    reducer: string,
+  ): string {
+    return this.utils.importString(
+      this.fromWasm.SkipRuntime_Collection__nativeMapReduce(
+        this.utils.exportString(collection),
+        toPtr(mapper),
+        this.utils.exportString(reducer),
+      ),
+    );
+  }
 
   SkipRuntime_Collection__reduce(
     collection: string,
@@ -590,6 +612,17 @@ export class WasmFromBinding implements FromBinding {
       this.fromWasm.SkipRuntime_Collection__reduce(
         this.utils.exportString(collection),
         toPtr(reducer),
+      ),
+    );
+  }
+  SkipRuntime_Collection__nativeReduce(
+    collection: string,
+    reducer: string,
+  ): string {
+    return this.utils.importString(
+      this.fromWasm.SkipRuntime_Collection__nativeReduce(
+        this.utils.exportString(collection),
+        this.utils.exportString(reducer),
       ),
     );
   }
