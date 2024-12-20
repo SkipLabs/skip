@@ -161,12 +161,12 @@ export interface Reducer<V extends Json, A extends Json> {
   /**
    * Initial accumulated value, providing the accumulated value for keys that are not associated to any values.
    */
-  default: Nullable<A>;
+  initial: Nullable<A>;
 
   /**
    * Include a new value into the accumulated value.
    *
-   * @param accum - The current accumulated value; `null` only if `default` is `null` and `value` is the first to be added.
+   * @param accum - The current accumulated value; `null` only if `initial` is `null` and `value` is the first to be added.
    * @param value - The added value.
    * @returns The updated accumulated value.
    */
@@ -175,14 +175,14 @@ export interface Reducer<V extends Json, A extends Json> {
   /**
    * Exclude a previously added value from the accumulated value.
    *
-   * It is always valid for `remove` to return `null`, in which case the correct accumulated value will be computed using `default` and `add` on each of the key's values.
+   * It is always valid for `remove` to return `null`, in which case the correct accumulated value will be computed using `initial` and `add` on each of the key's values.
    *
-   * **WARNING**: If `remove` returns a non-`null` value, then it **must** be equal to calling `add` on each of the values associated to the key, starting from `default`.
+   * **WARNING**: If `remove` returns a non-`null` value, then it **must** be equal to calling `add` on each of the values associated to the key, starting from `initial`.
    * That is, `accum`, `add(remove(accum, value), value)`, and `remove(add(accum, value), value)` must all be equal for any `accum` and `value` unless both the mentioned `remove` calls return `null`.
    *
    * @param accum - The current accumulated value.
    * @param value - The removed value.
-   * @returns The updated accumulated value, or `null` indicating that the accumulated value should be recomputed using `add` and `default`.
+   * @returns The updated accumulated value, or `null` indicating that the accumulated value should be recomputed using `add` and `initial`.
    */
   remove(accum: A, value: V & DepSafe): Nullable<A>;
 }
@@ -304,13 +304,13 @@ export interface EagerCollection<K extends Json, V extends Json>
    *
    * For `collection.reduce(ReducerClass, reducerParams)`, the `ReducerClass` parameter should be the constructor function of a top-level class that implements the `Reducer` interface.
    * This `ReducerClass` is instantiated to obtain a reducer object `ReducerClass(reducerParams)`.
-   * For each entry `[key, values]` in `collection`, the result collection associates each `key` to the accumulated result of calling `ReducerClass(reducerParams).add` on each value in `values`, starting from `ReducerClass(reducerParams).default`.
-   * That is, if `values` is `[v1,...,vN]`, then `key` will be associated with `add(...add(add(default, v1), v2),...,vN)` in the output collection.
+   * For each entry `[key, values]` in `collection`, the result collection associates each `key` to the accumulated result of calling `ReducerClass(reducerParams).add` on each value in `values`, starting from `ReducerClass(reducerParams).initial`.
+   * That is, if `values` is `[v1,...,vN]`, then `key` will be associated with `add(...add(add(initial, v1), v2),...,vN)` in the output collection.
    *
    * This not only produces the output collection, but also records a dependency edge in the computation graph, so that future updates to the input collection will eagerly trigger recomputation of the affected part of the output collection.
    *
    * During such recomputations, if an update is made to the input collection that results in a value that used to be associated to a key no longer being associated, then the reducer object's `remove` function is used to update the accumulated value.
-   * The `remove` function may return `null`, in which case the accumulated value is recomputed using `add` and `default`.
+   * The `remove` function may return `null`, in which case the accumulated value is recomputed using `add` and `initial`.
    *
    * @remarks
    * The reason `reduce` accepts the `Reducer` class constructor and `params` separately and instantiates the class internally is to avoid the resulting `add` and `remove` functions from being able to access other objects that the Skip Runtime is not aware of, and hence cannot track updates to.
