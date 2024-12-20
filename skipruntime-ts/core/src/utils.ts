@@ -8,7 +8,7 @@ import type { Reducer, Values, Json } from "@skipruntime/api";
  * A `Reducer` that maintains the sum of values as they are added and removed from a collection.
  */
 export class Sum implements Reducer<number, number> {
-  default = 0;
+  initial = 0;
 
   add(accum: number, value: number): number {
     return accum + value;
@@ -25,7 +25,7 @@ export class Sum implements Reducer<number, number> {
  * A `Reducer` that maintains the minimum of values as they are added and removed from a collection.
  */
 export class Min implements Reducer<number, number> {
-  default = null;
+  initial = null;
 
   add(accum: Nullable<number>, value: number): number {
     return accum === null ? value : Math.min(accum, value);
@@ -42,7 +42,7 @@ export class Min implements Reducer<number, number> {
  * A `Reducer` that maintains the maximum of values as they are added and removed from a collection.
  */
 export class Max implements Reducer<number, number> {
-  default = null;
+  initial = null;
 
   add(accum: Nullable<number>, value: number): number {
     return accum === null ? value : Math.max(accum, value);
@@ -59,7 +59,7 @@ export class Max implements Reducer<number, number> {
  * A `Reducer` that maintains the number of values as they are added and removed from a collection.
  */
 export class Count<T extends Json> implements Reducer<T, number> {
-  default = 0;
+  initial = 0;
 
   add(accum: number): number {
     return accum + 1;
