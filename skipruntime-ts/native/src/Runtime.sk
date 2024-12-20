@@ -731,6 +731,102 @@ class Collection(hdl: SKStore.EHandle<JSONID, JSONFile>) {
     }
   }
 
+  fun nativeMapReduceImpl<V_elt: SKStore.File, V_acc: SKStore.File>(
+    mapperOpt: ?Mapper,
+    reducer: SKStore.EReducer<V_elt, V_acc>,
+    eltType: SKStore.File ~> V_elt,
+    inputConv: SKJSON.CJSON ~> V_elt,
+    outputConv: V_acc ~> SKJSON.CJSON,
+  ): Collection {
+    mapper = (ctx, writer, key, values) ~> {
+      mapperOpt match {
+      | None() ->
+        writer.setArray(key, values.map(x -> inputConv(x.json)).collect(Array))
+      | Some(mapper) ->
+        pushContext(ctx);
+        try {
+          for (entry in mapper.mapEntry(key.json, values.map(x -> x.json))) {
+            writer.append(JSONID(entry.i0), inputConv(entry.i1))
+          };
+          popContext();
+        } catch {
+        | ex ->
+          popContext();
+          throw ex
+        }
+      }
+    };
+    getContext() match {
+    | Some(context) ->
+      hdl = this.hdl.mapReduce(
+        JSONID::keyType,
+        eltType,
+        context,
+        this.hdl.dirName.sub(`collection_${SKStore.genSym(0)}`),
+        mapper,
+        reducer,
+      );
+      Collection(
+        hdl.map(
+          JSONID::keyType,
+          JSONFile::type,
+          context,
+          this.hdl.dirName.sub(`collection_${SKStore.genSym(1)}`),
+          (_ctx, writer, key, values) ~> {
+            writer.setArray(
+              key,
+              values.map(x -> JSONFile(outputConv(x))).collect(Array),
+            )
+          },
+        ),
+      )
+    | _ -> invariant_violation("Store context must be specified.")
+    }
+  }
+
+  fun nativeMapReduce(mapperOpt: ?Mapper, reducer: String): Collection {
+    jsonToIntFile = json ~>
+      json match {
+      | SKJSON.CJInt(x) -> SKStore.IntFile(x)
+      | _ -> throw SKStore.Error("Non-number JSON input to native reducer")
+      };
+    reducer match {
+    | "sum" ->
+      this.nativeMapReduceImpl(
+        mapperOpt,
+        SKStore.sumReducer(),
+        SKStore.IntFile::type,
+        jsonToIntFile,
+        file ~> SKJSON.CJInt(file.value),
+      )
+    | "min" ->
+      this.nativeMapReduceImpl(
+        mapperOpt,
+        SKStore.minReducer(),
+        SKStore.IntFile::type,
+        jsonToIntFile,
+        file ~> SKJSON.CJInt(file.value),
+      )
+    | "max" ->
+      this.nativeMapReduceImpl(
+        mapperOpt,
+        SKStore.maxReducer(),
+        SKStore.IntFile::type,
+        jsonToIntFile,
+        file ~> SKJSON.CJInt(file.value),
+      )
+    | "count" ->
+      this.nativeMapReduceImpl(
+        mapperOpt,
+        SKStore.countReducer(),
+        JSONFile::type,
+        json ~> JSONFile(json),
+        file ~> SKJSON.CJInt(file.value),
+      )
+    | _ -> throw SKStore.Error("Unrecognized native reducer: " + reducer)
+    }
+  }
+
   /**
    * Create a new eager collection by keeping only the elements whose keys are in
    * the given ranges.
