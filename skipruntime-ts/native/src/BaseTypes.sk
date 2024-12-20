@@ -1,15 +1,5 @@
 module SkipRuntime;
 
-base class FileConverter {
-  fun toJSON(value: SKStore.File): SKJSON.CJSON;
-  fun fromJSON(json: SKJSON.CJSON): SKStore.File;
-}
-
-base class KeyConverter {
-  fun toJSON(value: SKStore.Key): SKJSON.CJSON;
-  fun fromJSON(json: SKJSON.CJSON): SKStore.Key;
-}
-
 base class Reducer<V1: frozen, V2: frozen>(initial: V2) {
   fun getType(): SKStore.File ~> V2;
   fun add(acc: V2, value: V1): V2;
@@ -25,9 +15,6 @@ base class Reducer<V1: frozen, V2: frozen>(initial: V2) {
  * @returns an iterable of key/value pairs to output for the given input(s)
  */
 base class Mapper {
-  fun getKeyConverter(): KeyConverter;
-  fun getFileConverter(): FileConverter;
-
   fun mapEntry(
     key: SKJSON.CJSON,
     values: mutable SKStore.NonEmptyIterator<SKJSON.CJSON>,
@@ -35,9 +22,6 @@ base class Mapper {
 }
 
 base class LazyCompute {
-  fun getKeyConverter(): KeyConverter;
-  fun getFileConverter(): FileConverter;
-
   fun compute(self: LazyCollection, key: SKJSON.CJSON): Array<SKJSON.CJSON>;
 }
 
