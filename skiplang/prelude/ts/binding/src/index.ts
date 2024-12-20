@@ -7,6 +7,12 @@ export interface Pointer<InternalType extends T<any>> {
   [skpointer]: InternalType;
 }
 
+export const sknative: unique symbol = Symbol.for("Skip.native_stub");
+
+export interface NativeStub {
+  [sknative]: string;
+}
+
 export type float = number;
 export type int = number;
 
