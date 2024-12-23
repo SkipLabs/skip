@@ -12,8 +12,6 @@ We have several resources available to help you learn the Skip framework, depend
 
 This guide takes a "top-down" approach, showing you how to use our APIs in an idiomatic and practical way.  We recommend that most users start here.
 
-Alternatively, you can work from the "bottom-up" by reading our [Skip fundamentals](fundamentals.md) tutorial, which explains the concepts and components of the Skip runtime from first principles.
-
 Finally, if you'd like to just dive into the code, you can explore [examples](TODO) of reactive services, [API docs](api/api), or a before/after [example](TODO) of retrofitting a legacy service with reactive features.
 
 ## Tutorial
