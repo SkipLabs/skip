@@ -247,7 +247,7 @@ publish-std-wasm:
 	bin/release_npm.sh @skip-wasm/std skiplang/prelude/ts/wasm/package.json $(OPT)
 
 .PHONY: publish-std
-publish-std: publish-std-biding publish-std-wasm
+publish-std: publish-std-binding publish-std-wasm
 
 .PHONY: publish-json-binding
 publish-json-binding:
