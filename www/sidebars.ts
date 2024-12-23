@@ -18,11 +18,8 @@ const sidebars: SidebarsConfig = {
     "resources",
     "externals",
     "client",
-    "fundamentals",
     "deploying",
-    "debugging",
     "glossary",
-    "reference",
     {
       type: "category",
       label: "@skipruntime/api",
