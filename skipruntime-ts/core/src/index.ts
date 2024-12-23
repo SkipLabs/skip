@@ -4,6 +4,7 @@
  * @packageDocumentation
  */
 
+import type { Opaque } from "@skiplang/std";
 import type {
   Pointer,
   Nullable,
@@ -34,7 +35,6 @@ import {
   type Reducer,
   type Resource,
   type SkipService,
-  type SubscriptionID,
   type Watermark,
 } from "@skipruntime/api";
 
@@ -472,6 +472,8 @@ class OneChecker<K extends Json, V extends Json> implements Checker {
     }
   }
 }
+
+export type SubscriptionID = Opaque<bigint, "subscription">;
 
 /**
  * A `ServiceInstance` is a running instance of a `SkipService`, providing access to its resources
