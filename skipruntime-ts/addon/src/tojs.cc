@@ -48,7 +48,10 @@ CJSON SkipRuntime_Collection__getUnique(char* collection, CJSON key);
 char* SkipRuntime_Collection__map(char* collection, SKMapper mapper);
 char* SkipRuntime_Collection__mapReduce(char* collection, SKMapper mapper,
                                         SKReducer reducer);
+char* SkipRuntime_Collection__nativeMapReduce(char* collection, SKMapper mapper,
+                                        char* reducer);
 char* SkipRuntime_Collection__reduce(char* collection, SKReducer reducer);
+char* SkipRuntime_Collection__nativeReduce(char* collection, char* reducer);
 char* SkipRuntime_Collection__slice(char* collection, CJArray ranges);
 char* SkipRuntime_Collection__take(char* collection, int64_t limit);
 char* SkipRuntime_Collection__merge(char* collection, CJArray others);
@@ -727,6 +730,38 @@ void MapReduceOfEagerCollection(
   });
 }
 
+void NativeMapReduceOfEagerCollection(
+    const v8::FunctionCallbackInfo<v8::Value>& args) {
+  Isolate* isolate = args.GetIsolate();
+  if (args.Length() != 3) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(
+        Exception::TypeError(FromUtf8(isolate, "Must have three parameters.")));
+    return;
+  }
+  if (!args[0]->IsString() || !args[2]->IsString()) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(Exception::TypeError(
+        FromUtf8(isolate, "The first and third parameters must be strings.")));
+    return;
+  }
+  if (!args[1]->IsExternal()) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(Exception::TypeError(
+        FromUtf8(isolate, "The second parameter must be a pointer.")));
+    return;
+  }
+
+  NatTryCatch(isolate, [&args](Isolate* isolate) {
+    char* skCollection = ToSKString(isolate, args[0].As<String>());
+    SKMapper skmapper = args[1].As<External>()->Value();
+    char* reducer = ToSKString(isolate, args[2].As<String>());
+    char* skResult =
+        SkipRuntime_Collection__nativeMapReduce(skCollection, skmapper, reducer);
+    args.GetReturnValue().Set(FromUtf8(isolate, skResult));
+  });
+}
+
 void ReduceOfEagerCollection(const v8::FunctionCallbackInfo<v8::Value>& args) {
   Isolate* isolate = args.GetIsolate();
   if (args.Length() != 2) {
@@ -751,6 +786,27 @@ void ReduceOfEagerCollection(const v8::FunctionCallbackInfo<v8::Value>& args) {
     char* skCollection = ToSKString(isolate, args[0].As<String>());
     SKMapper skreducer = args[1].As<External>()->Value();
     char* skResult = SkipRuntime_Collection__reduce(skCollection, skreducer);
+    args.GetReturnValue().Set(FromUtf8(isolate, skResult));
+  });
+}
+void NativeReduceOfEagerCollection(const v8::FunctionCallbackInfo<v8::Value>& args) {
+  Isolate* isolate = args.GetIsolate();
+  if (args.Length() != 2) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(
+        Exception::TypeError(FromUtf8(isolate, "Must have three parameters.")));
+    return;
+  }
+  if (!args[0]->IsString() || !args[1]->IsString()) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(Exception::TypeError(
+        FromUtf8(isolate, "Both parameters must be strings.")));
+    return;
+  }
+  NatTryCatch(isolate, [&args](Isolate* isolate) {
+    char* skCollection = ToSKString(isolate, args[0].As<String>());
+    char* reducer = ToSKString(isolate, args[1].As<String>());
+    char* skResult = SkipRuntime_Collection__nativeReduce(skCollection, reducer);
     args.GetReturnValue().Set(FromUtf8(isolate, skResult));
   });
 }
@@ -1201,8 +1257,12 @@ void GetToJSBinding(const FunctionCallbackInfo<Value>& args) {
               MapOfEagerCollection);
   AddFunction(isolate, binding, "SkipRuntime_Collection__mapReduce",
               MapReduceOfEagerCollection);
+  AddFunction(isolate, binding, "SkipRuntime_Collection__nativeMapReduce",
+              NativeMapReduceOfEagerCollection);
   AddFunction(isolate, binding, "SkipRuntime_Collection__reduce",
               ReduceOfEagerCollection);
+  AddFunction(isolate, binding, "SkipRuntime_Collection__nativeReduce",
+              NativeReduceOfEagerCollection);
   AddFunction(isolate, binding, "SkipRuntime_Collection__slice",
               SliceOfEagerCollection);
   AddFunction(isolate, binding, "SkipRuntime_Collection__take",
