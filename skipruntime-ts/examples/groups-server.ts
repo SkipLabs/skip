@@ -1,4 +1,4 @@
-import { SkipServiceBroker } from "@skipruntime/helpers/rest.js";
+import { SkipServiceBroker } from "@skipruntime/helpers";
 
 import express from "express";
 

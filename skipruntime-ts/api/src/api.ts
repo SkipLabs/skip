@@ -305,7 +305,6 @@ export interface Context extends Managed {
 export type Entry<K extends Json, V extends Json> = [K, V[]];
 
 export type Watermark = Opaque<string, "watermark">;
-export type SubscriptionID = Opaque<bigint, "subscription">;
 
 /**
  * Represents some update(s) to a collection, containing: an array of all updated keys and

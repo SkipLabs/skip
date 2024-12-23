@@ -1,5 +1,5 @@
 import { initService } from "@skipruntime/runtime";
-import type { SkipService, NamedCollections } from "@skipruntime/runtime";
+import type { SkipService, NamedCollections } from "@skipruntime/api";
 import { controlService, streamingService } from "./rest.js";
 
 /**
