@@ -33,14 +33,14 @@ then
 EOF
 fi
 
-if (( $skc != 0 ))
-then
-    cat <<EOF
-  compiler:
-    jobs:
-      - compiler
-EOF
-fi
+#if (( $skc != 0 ))
+#then
+#    cat <<EOF
+#  compiler:
+#    jobs:
+#      - compiler
+#EOF
+#fi
 
 if (( $skstore != 0 ))
 then

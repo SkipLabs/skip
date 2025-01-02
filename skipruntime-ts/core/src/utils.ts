@@ -1,22 +1,20 @@
 import type { Nullable } from "@skip-wasm/std";
-import { ManyToOneMapper } from "@skipruntime/api";
-import type { Reducer, Values, Json } from "@skipruntime/api";
+import { type NativeStub, sknative } from "@skiplang/std";
+import type { Reducer, Json } from "@skipruntime/api";
 
 /**
  * `Reducer` to maintain the sum of input values.
  *
  * A `Reducer` that maintains the sum of values as they are added and removed from a collection.
  */
-export class Sum implements Reducer<number, number> {
-  initial = 0;
+export class Sum implements NativeStub, Reducer<number, number> {
+  [sknative] = "sum";
 
-  add(accum: number, value: number): number {
-    return accum + value;
-  }
-
-  remove(accum: number, value: number): Nullable<number> {
-    return accum - value;
-  }
+  // Lie to TypeScript that this implements Reducer, but leave out any implementations
+  // since we provide a native implementation.
+  initial!: number;
+  add!: (accum: number) => number;
+  remove!: (accum: number) => Nullable<number>;
 }
 
 /**
@@ -24,16 +22,14 @@ export class Sum implements Reducer<number, number> {
  *
  * A `Reducer` that maintains the minimum of values as they are added and removed from a collection.
  */
-export class Min implements Reducer<number, number> {
-  initial = null;
+export class Min implements NativeStub, Reducer<number, number> {
+  [sknative] = "min";
 
-  add(accum: Nullable<number>, value: number): number {
-    return accum === null ? value : Math.min(accum, value);
-  }
-
-  remove(accum: number, value: number): Nullable<number> {
-    return value > accum ? accum : null;
-  }
+  // Lie to TypeScript that this implements Reducer, but leave out any implementations
+  // since we provide a native implementation.
+  initial!: number;
+  add!: (accum: number) => number;
+  remove!: (accum: number) => Nullable<number>;
 }
 
 /**
@@ -41,16 +37,14 @@ export class Min implements Reducer<number, number> {
  *
  * A `Reducer` that maintains the maximum of values as they are added and removed from a collection.
  */
-export class Max implements Reducer<number, number> {
-  initial = null;
+export class Max implements NativeStub, Reducer<number, number> {
+  [sknative] = "max";
 
-  add(accum: Nullable<number>, value: number): number {
-    return accum === null ? value : Math.max(accum, value);
-  }
-
-  remove(accum: number, value: number): Nullable<number> {
-    return value < accum ? accum : null;
-  }
+  // Lie to TypeScript that this implements Reducer, but leave out any implementations
+  // since we provide a native implementation.
+  initial!: number;
+  add!: (accum: number) => number;
+  remove!: (accum: number) => Nullable<number>;
 }
 
 /**
@@ -58,31 +52,12 @@ export class Max implements Reducer<number, number> {
  *
  * A `Reducer` that maintains the number of values as they are added and removed from a collection.
  */
-export class Count<T extends Json> implements Reducer<T, number> {
-  initial = 0;
+export class Count<T extends Json> implements Reducer<T, number>, NativeStub {
+  [sknative] = "count";
 
-  add(accum: number): number {
-    return accum + 1;
-  }
-
-  remove(accum: number): Nullable<number> {
-    return accum - 1;
-  }
-}
-
-/**
- * `Mapper` to count input values.
- *
- * A `Mapper` that associates each key in the output with the number of values it is associated with in the input.
- *
- * @remarks
- * If there are many values associated to keys in a collection, and they are updated frequently, using the `Count` `Reducer` instead could be more efficient.
- */
-export class CountMapper<
-  K extends Json,
-  V extends Json,
-> extends ManyToOneMapper<K, V, number> {
-  mapValues(values: Values<V>): number {
-    return values.toArray().length;
-  }
+  // Lie to TypeScript that this implements Reducer, but leave out any implementations
+  // since we provide a native implementation.
+  initial!: number;
+  add!: (accum: number) => number;
+  remove!: (accum: number) => Nullable<number>;
 }

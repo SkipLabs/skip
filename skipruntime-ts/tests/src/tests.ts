@@ -15,7 +15,7 @@ import type {
   ExternalService,
 } from "@skipruntime/api";
 import { NonUniqueValueException, OneToOneMapper } from "@skipruntime/api";
-import { Sum } from "@skipruntime/core";
+import { Count, Sum } from "@skipruntime/core";
 
 import {
   TimerResource,
@@ -269,6 +269,23 @@ class MapReduceResource implements Resource<Input_NN> {
 const mapReduceService: SkipService<Input_NN, Input_NN> = {
   initialData: { input: [] },
   resources: { mapReduce: MapReduceResource },
+
+  createGraph(inputCollections: Input_NN) {
+    return inputCollections;
+  },
+};
+
+//// testCount
+
+class CountResource implements Resource<Input_NN> {
+  instantiate(cs: Input_NN): EagerCollection<number, number> {
+    return cs.input.reduce(Count);
+  }
+}
+
+const countService: SkipService<Input_NN, Input_NN> = {
+  initialData: { input: [] },
+  resources: { count: CountResource },
 
   createGraph(inputCollections: Input_NN) {
     return inputCollections;
@@ -698,6 +715,37 @@ export function initTests(
     expect(service.getAll(resource).payload).toEqual([
       [0, [3]],
       [1, [2]],
+    ]);
+  });
+
+  it("testCount", async () => {
+    const service = await initService(countService);
+    const resource = "count";
+    service.update("input", [
+      [0, []],
+      [1, [1]],
+      [2, [1, 2]],
+    ]);
+    expect(service.getAll(resource).payload).toEqual([
+      [1, [1]],
+      [2, [2]],
+    ]);
+    service.update("input", [[3, [1, 2, 3]]]);
+    expect(service.getAll(resource).payload).toEqual([
+      [1, [1]],
+      [2, [2]],
+      [3, [3]],
+    ]);
+    service.update("input", [
+      [0, [5]],
+      [1, [5, 6]],
+      [3, []],
+    ]);
+    expect(service.getAll(resource).payload).toEqual([
+      [0, [1]],
+      [1, [2]],
+      [2, [2]],
+      [3, [0]],
     ]);
   });
 
