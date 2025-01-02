@@ -57,21 +57,7 @@ const activeGroupMembers : EagerCollection<GroupID, UserID> = users.map(ActiveUs
 
 This general form of `Mapper` allows arbitrary manipulation of collections' key/value structure, but is often unnecessary and clunky for simple maps, especially those that preserve the key structure of their input and just manipulate the values.
 
-For example, to maintain a _count_ of active users per group, we can define a `ManyToOneMapper`:
-
-```typescript
-class CountUsers extends ManyToOneMapper<GroupID, UserID, number> {
-  mapValues(values: NonEmptyIterator<UserID>): number {
-    return values.toArray().length;
-  }
-}
-```
-
-Then, map over the eager collection of group members to produce an eager collection `activeGroupMembers.map(CountUsers)` of type `EagerCollection<GroupID, number>` which maintains up-to-date counts of active users per group, as users' activity status and group memberships change.
-Note that this mapper -- counting the number of values per key -- is available as a generic utility `CountMapper` in Skip; this example is provided just to demonstrate a use of `ManyToOneMapper`.
-
-
-The simplest form of mapper maintains input collections' key/value structure one-to-one.
+Simpler mappers that maintain input collections' key/value structure one-to-one can be defined more succinctly.
 For example, to compute the number of groups each user belongs to, we can define a `OneToOneMapper`:
 
 ```typescript
@@ -81,3 +67,17 @@ class GroupsPerUser extends OneToOneMapper<UserID, User, number> {
   }
 }
 ```
+
+It is also common to collapse multiple values for a single key down to some aggregate with a `ManyToOneMapper`; for example, to maintain a _count_ of active users per group:
+
+```typescript
+class CountUsers extends ManyToOneMapper<GroupID, UserID, number> {
+  mapValues(values: NonEmptyIterator<UserID>): number {
+    return values.toArray().length;
+  }
+}
+```
+
+By mapping `CountUsers` over the eager collection of group members, we can produce an eager collection `activeGroupMembers.map(CountUsers)` of type `EagerCollection<GroupID, number>` with counts of active users per group, maintained up-to-date as users' activity status and group memberships change.
+
+Note that this particular mapper -- counting the number of values per key -- is available as a generic utility `Count` in Skip with a fast native implementation; this example is provided just to demonstrate a use of `ManyToOneMapper`.
