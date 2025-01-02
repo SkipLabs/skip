@@ -258,6 +258,60 @@ fun sumReducer(): EReducer<IntFile, IntFile> {
   };
 }
 
+fun minReducer(): EReducer<IntFile, IntFile> {
+  EReducer{
+    type => IntFile::type,
+    canReset => true,
+    init => iter ~> {
+      min: ?Int = None();
+      for (x in iter) {
+        if (min.isNone() || x.value < min.fromSome()) !min = Some(x.value);
+      };
+      min match {
+      | Some(x) -> Array[IntFile(x)]
+      | None() -> Array[]
+      }
+    },
+    update => (state, old, new) ~> {
+      min = state[0].value;
+      for (x in new) {
+        if (x.value < min) !min = x.value;
+      };
+      for (x in old) {
+        if (x.value <= min) return None()
+      };
+      Some(Array[IntFile(min)])
+    },
+  }
+}
+
+fun maxReducer(): EReducer<IntFile, IntFile> {
+  EReducer{
+    type => IntFile::type,
+    canReset => true,
+    init => iter ~> {
+      max: ?Int = None();
+      for (x in iter) {
+        if (max.isNone() || x.value > max.fromSome()) !max = Some(x.value);
+      };
+      max match {
+      | Some(x) -> Array[IntFile(x)]
+      | None() -> Array[]
+      }
+    },
+    update => (state, old, new) ~> {
+      max = state[0].value;
+      for (x in new) {
+        if (x.value > max) !max = x.value;
+      };
+      for (x in old) {
+        if (x.value >= max) return None()
+      };
+      Some(Array[IntFile(max)])
+    },
+  }
+}
+
 /*****************************************************************************/
 /* The preferred way of accessing the file-system. */
 /*****************************************************************************/
