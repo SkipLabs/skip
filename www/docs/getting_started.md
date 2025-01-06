@@ -12,7 +12,7 @@ We have several resources available to help you learn the Skip framework, depend
 
 This guide takes a "top-down" approach, showing you how to use our APIs in an idiomatic and practical way.  We recommend that most users start here.
 
-Finally, if you'd like to just dive into the code, you can explore [examples](TODO) of reactive services, [API docs](api/api), or a before/after [example](TODO) of retrofitting a legacy service with reactive features.
+Finally, if you'd like to just dive into the code, you can explore the [API docs](api/api), [examples](https://github.com/SkipLabs/skip/blob/main/skipruntime-ts/examples) of reactive services, or an [example configuration](https://github.com/SkipLabs/skip/blob/main/examples/hackernews) complete with reverse proxy and database.
 
 ## Tutorial
 
