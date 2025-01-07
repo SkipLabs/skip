@@ -1,3 +1,9 @@
+/**
+ * This package provides functionality to take a reactive service definition and spawn the http servers to expose it through HTTP/SSE.
+ *
+ * @packageDocumentation
+ */
+
 import { initService } from "@skipruntime/runtime";
 import type { SkipService, NamedCollections } from "@skipruntime/api";
 import { controlService, streamingService } from "./rest.js";
