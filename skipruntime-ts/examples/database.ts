@@ -7,7 +7,7 @@ import type {
 
 import { runService } from "@skipruntime/server";
 
-import sqlite3 from "sqlite3";
+import Database from "better-sqlite3";
 
 /*
   This is the skip runtime service of the database example  
@@ -17,54 +17,25 @@ import sqlite3 from "sqlite3";
 // Populate the database with made-up values (if it's not already there)
 /*****************************************************************************/
 
-async function initDB(): Promise<sqlite3.Database> {
-  const db = new sqlite3.Database("./db.sqlite");
-  const exec = (query: string): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      db.exec(query, (err) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
-  };
-  const run = (
-    query: string,
-    params: { [param: string]: string },
-  ): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      db.run(query, params, (err) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
-  };
-  // Create the table if it doesn't exist
-  await exec(`CREATE TABLE IF NOT EXISTS data (
-    id TEXT PRIMARY KEY,
-    object JSON
-    )`);
+function initDB(): Database.Database {
+  const db = new Database("./db.sqlite");
 
-  await run("INSERT OR REPLACE INTO data (id, object) VALUES ($id, $object)", {
-    $id: "123",
-    $object: JSON.stringify({
-      name: "daniel",
-      country: "FR",
-    }),
-  });
-  await run("INSERT OR REPLACE INTO data (id, object) VALUES ($id, $object)", {
-    $id: "124",
-    $object: JSON.stringify({
-      name: "josh",
-      country: "UK",
-    }),
-  });
-  await run("INSERT OR REPLACE INTO data (id, object) VALUES ($id, $object)", {
-    $id: "125",
-    $object: JSON.stringify({
-      name: "julien",
-      country: "ES",
-    }),
-  });
+  // Create the table if it doesn't exist
+  db.prepare(
+    `CREATE TABLE IF NOT EXISTS data (
+      id TEXT PRIMARY KEY,
+      object JSON
+    )`,
+  ).run();
+
+  const insertOrReplace = db.prepare(
+    "INSERT OR REPLACE INTO data (id, object) VALUES (?, ?)",
+  );
+
+  insertOrReplace.run("123", JSON.stringify({ name: "daniel", country: "FR" }));
+  insertOrReplace.run("124", JSON.stringify({ name: "josh", country: "UK" }));
+  insertOrReplace.run("125", JSON.stringify({ name: "julien", country: "ES" }));
+
   return db;
 }
 
@@ -99,22 +70,12 @@ function serviceWithInitialData(
 
 // Command that starts the service
 
-const db = await initDB();
-const data = await new Promise<Entry<string, User>[]>(function (
-  resolve,
-  reject,
-) {
-  db.all(
-    "SELECT id, object FROM data",
-    (err, data: { id: string; object: string }[]) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve(data.map((v) => [v.id, [JSON.parse(v.object)]]));
-      }
-    },
-  );
-});
+const db = initDB();
+const data: Entry<string, User>[] = db
+  .prepare<[], { id: string; object: string }>("SELECT id, object FROM data")
+  .all()
+  .map((v) => [v.id, [JSON.parse(v.object)]]);
+
 db.close();
 
 const closable = await runService(serviceWithInitialData(data), {
