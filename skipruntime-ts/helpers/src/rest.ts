@@ -1,7 +1,32 @@
 import type { Json, Entry } from "@skipruntime/api";
 import { NonUniqueValueException } from "@skipruntime/api";
-import type { Entrypoint } from "@skipruntime/core";
-export type { Entrypoint };
+
+/**
+ * An entry point of a Skip reactive service.
+ *
+ * URLs for the service's control and streaming APIs can be constructed from an `Entrypoint`.
+ */
+export type Entrypoint = {
+  /**
+   * Hostname of the service.
+   */
+  host: string;
+
+  /**
+   * Port to use for the service's streaming interface.
+   */
+  streaming_port: number;
+
+  /**
+   * Port to use for the service's control interface.
+   */
+  control_port: number;
+
+  /**
+   * Flag that when set indicates that https should be used instead of http.
+   */
+  secured?: boolean;
+};
 
 function toHttp(entrypoint: Entrypoint) {
   if (entrypoint.secured)
