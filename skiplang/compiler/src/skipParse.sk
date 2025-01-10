@@ -71,9 +71,12 @@ const packageDir: SKStore.EHandle<
 fun pkgDelta(
   old_pkg: InputPackageFiles,
   new_pkg: InputPackageFiles,
-): (Array<String>, Array<String>) {
+): (Array<(String, String)>, Array<(String, String)>) {
   if (old_pkg.base_dir != new_pkg.base_dir) {
-    return (new_pkg.srcs.map(s -> s.i0), old_pkg.srcs.map(s -> s.i0))
+    return (
+      new_pkg.srcs.map(s -> (new_pkg.base_dir, s.i0)),
+      old_pkg.srcs.map(s -> (old_pkg.base_dir, s.i0)),
+    )
   };
 
   modified_files = mutable Vector[];
@@ -97,7 +100,10 @@ fun pkgDelta(
     }
   };
 
-  (modified_files.collect(Array), removed_files.collect(Array))
+  (
+    modified_files.map(f -> (new_pkg.base_dir, f)).collect(Array),
+    removed_files.map(f -> (old_pkg.base_dir, f)).collect(Array),
+  )
 }
 
 fun updatePackageFiles(
@@ -111,19 +117,19 @@ fun updatePackageFiles(
     InputPackageName(name),
   ) match {
   | Some(old_pkg) -> pkgDelta(old_pkg, pkg)
-  | None() -> (pkg.srcs.map(s -> s.i0), Array[])
+  | None() -> (pkg.srcs.map(s -> (pkg.base_dir, s.i0)), Array[])
   };
-  for (src_path in modified_files) {
+  for ((pkg_base_dir, src_path) in modified_files) {
     fileDir.writeArray(
       context,
-      InputSource(name, Path.join(pkg.base_dir, src_path)),
+      InputSource(name, Path.join(pkg_base_dir, src_path)),
       Array[SKStore.StringFile(get_file_contents(src_path))],
     )
   };
-  for (src_path in removed_files) {
+  for ((pkg_base_dir, src_path) in removed_files) {
     fileDir.writeArray(
       context,
-      InputSource(name, Path.join(pkg.base_dir, src_path)),
+      InputSource(name, Path.join(pkg_base_dir, src_path)),
       Array[SKStore.StringFile("")],
     )
   };
