@@ -364,7 +364,7 @@ export interface EagerCollection<K extends Json, V extends Json>
    * @param end - The greatest key whose entry will be kept in the result.
    * @returns The restricted eager collection.
    */
-  slice(start: K, end: K): EagerCollection<K, V>;
+  slice(start: K & DepSafe, end: K & DepSafe): EagerCollection<K, V>;
 
   /**
    * Create a new eager collection by keeping only the elements whose keys are in at least one of the given ranges.
@@ -372,7 +372,7 @@ export interface EagerCollection<K extends Json, V extends Json>
    * @param ranges - The pairs of lower and upper bounds on keys to keep in the result.
    * @returns The restricted eager collection.
    */
-  slices(...ranges: [K, K][]): EagerCollection<K, V>;
+  slices(...ranges: [K & DepSafe, K & DepSafe][]): EagerCollection<K, V>;
 
   /**
    * Create a new eager collection by keeping the first entries.
