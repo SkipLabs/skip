@@ -3,7 +3,7 @@ import {
   type Nullable,
   sknative,
 } from "../skiplang-std/index.js";
-import type { Reducer, Json } from "./api.js";
+import type { Reducer, Json } from "@skipruntime/core";
 
 /**
  * `Reducer` to maintain the sum of input values.

@@ -15,7 +15,8 @@ import type {
   ExternalService,
   ServiceInstance,
 } from "@skipruntime/core";
-import { SkipNonUniqueValueError, Count, Sum } from "@skipruntime/core";
+import { SkipNonUniqueValueError } from "@skipruntime/core";
+import { Count, Sum } from "@skipruntime/helpers";
 
 import {
   TimerResource,

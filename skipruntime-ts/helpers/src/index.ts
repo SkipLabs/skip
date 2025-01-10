@@ -12,4 +12,4 @@ export {
 } from "./external.js";
 export { SkipExternalService } from "./remote.js";
 export { SkipServiceBroker, fetchJSON, type Entrypoint } from "./rest.js";
-export { Count, Max, Min, Sum } from "@skipruntime/core";
+export { Count, Max, Min, Sum } from "./utils.js";
