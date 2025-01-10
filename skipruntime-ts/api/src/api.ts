@@ -646,7 +646,11 @@ export interface SkipService<
   Inputs extends NamedCollections = NamedCollections,
   ResourceInputs extends NamedCollections = NamedCollections,
 > {
-  /** Initial data for this service's input collections. */
+  /**
+   * Initial data for this service's input collections.
+   *
+   * @remarks While the initial data is not required to have a `DepSafe` type (only a subtype of `Json` is required); note that any modifications made to any objects passed as `initialData` will *not* be seen by a service once started.
+   */
   initialData?: InitialData<Inputs>;
 
   /** External services that may be used by this service's reactive computation. */
