@@ -32,39 +32,27 @@ evSource.onerror = console.error;
 
 await sleep(1000);
 console.log("Setting Carol to active...");
-await fetchJSON(
-  `${url}/users/2`,
-  "PUT",
-  {},
-  { name: "Carol", active: true, friends: [0, 1] },
-);
+await fetchJSON(`${url}/users/2`, "PUT", {
+  body: { name: "Carol", active: true, friends: [0, 1] },
+});
 
 await sleep(1000);
 console.log("Setting Alice to inactive...");
-await fetchJSON(
-  `${url}/users/1`,
-  "PUT",
-  {},
-  { name: "Alice", active: false, friends: [0, 2] },
-);
+await fetchJSON(`${url}/users/1`, "PUT", {
+  body: { name: "Alice", active: false, friends: [0, 2] },
+});
 
 await sleep(1000);
 console.log("Setting Eve as Bob's friend...");
-await fetchJSON(
-  `${url}/users/0`,
-  "PUT",
-  {},
-  { name: "Bob", active: true, friends: [1, 2, 3] },
-);
+await fetchJSON(`${url}/users/0`, "PUT", {
+  body: { name: "Bob", active: true, friends: [1, 2, 3] },
+});
 
 await sleep(1000);
 console.log("Removing Carol and adding Eve to group 2...");
-await fetchJSON(
-  `${url}/groups/1002`,
-  "PUT",
-  {},
-  { name: "Group 2", members: [0, 3] },
-);
+await fetchJSON(`${url}/groups/1002`, "PUT", {
+  body: { name: "Group 2", members: [0, 3] },
+});
 
 await sleep(1000);
 console.log("Closing listener event stream...");
