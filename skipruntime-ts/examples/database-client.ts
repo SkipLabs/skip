@@ -32,12 +32,9 @@ await sleep(1000);
 
 console.log('Set /user/123 to { name: "daniel", country: "UK" }');
 
-await fetchJSON(
-  `${url}/user/123`,
-  "PUT",
-  {},
-  { name: "daniel", country: "UK" },
-);
+await fetchJSON(`${url}/user/123`, "PUT", {
+  body: { name: "daniel", country: "UK" },
+});
 
 console.log("Get /user/123", (await fetchJSON(`${url}/user/123`, "GET"))[0]);
 
