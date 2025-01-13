@@ -12,30 +12,17 @@ const service = new SkipServiceBroker({
   streaming_port: 8080,
 });
 
-import sqlite3 from "sqlite3";
+import Database from "better-sqlite3";
 
 type User = {
   name: string;
   country: string;
 };
 
-const db = new sqlite3.Database("./db.sqlite");
+const db = new Database("./db.sqlite");
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-// WRITES
-
-const run = function (
-  query: string,
-  params: { [param: string]: string },
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    db.run(query, params, (err) => {
-      if (err) reject(err);
-      else resolve();
-    });
-  });
-};
 
 app.get("/users", (_req, res) => {
   service
@@ -64,30 +51,49 @@ app.get("/user/:id", (req, res) => {
 app.put("/user/:id", (req, res) => {
   const key = req.params.id;
   const data = req.body as User;
-  run("INSERT OR REPLACE INTO data (id, object) VALUES ($id, $object)", {
-    $id: key,
-    $object: JSON.stringify(data),
-  })
-    .then(() => service.put("users", key, [data]))
-    .then(() => {
-      res.status(200).json({});
-    })
-    .catch((e: unknown) => {
-      console.log(e);
-      res.status(500).json("Internal error");
+
+  try {
+    db.prepare(
+      "INSERT OR REPLACE INTO data (id, object) VALUES ($id, $object)",
+    ).run({
+      id: key,
+      object: JSON.stringify(data),
     });
+
+    service
+      .put("users", key, [data])
+      .then(() => {
+        res.status(200).json({});
+      })
+      .catch((e: unknown) => {
+        console.log(e);
+        res.status(500).json("Internal error");
+      });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json("Internal error");
+  }
 });
+
 app.delete("/user/:id", (req, res) => {
   const key = req.params.id;
-  run("DELETE FROM data WHERE id = $id", { $id: key })
-    .then(() => service.deleteKey("users", key))
-    .then(() => {
-      res.status(200).json({});
-    })
-    .catch((e: unknown) => {
-      console.log(e);
-      res.status(500).json("Internal error");
-    });
+
+  try {
+    db.prepare("DELETE FROM data WHERE id = $id").run({ id: key });
+
+    service
+      .deleteKey("users", key)
+      .then(() => {
+        res.status(200).json({});
+      })
+      .catch((e: unknown) => {
+        console.log(e);
+        res.status(500).json("Internal error");
+      });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json("Internal error");
+  }
 });
 
 const port = 8082;
