@@ -4,7 +4,7 @@ import EventSource from "eventsource";
 
 import type { Entry, ExternalService, Json } from "@skipruntime/api";
 
-import type { Entrypoint } from "./index.js";
+import type { Entrypoint } from "./rest.js";
 
 interface Closable {
   close(): void;
