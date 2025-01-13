@@ -730,10 +730,6 @@ class ValuesImpl<T> implements Values<T> {
       },
     };
   }
-
-  map<U>(f: (value: T & DepSafe, index: number) => U, thisObj?: any): U[] {
-    return this.toArray().map(f, thisObj);
-  }
 }
 
 export class ToBinding {
