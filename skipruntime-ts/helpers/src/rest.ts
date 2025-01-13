@@ -135,7 +135,7 @@ export class SkipServiceBroker {
     key: K,
   ): Promise<V[]> {
     const [data, _headers] = await fetchJSON<V[]>(
-      `${this.entrypoint}/v1/snapshot/${resource}`,
+      `${this.entrypoint}/v1/snapshot/${resource}/lookup`,
       "POST",
       {},
       { key, params },
