@@ -55,7 +55,8 @@ app.get("/user/:id", (req, res) => {
     .then((user) => {
       res.status(200).json(user);
     })
-    .catch(() => {
+    .catch((e: unknown) => {
+      console.log(e);
       res.status(500).json("Internal error");
     });
 });
@@ -83,7 +84,8 @@ app.delete("/user/:id", (req, res) => {
     .then(() => {
       res.status(200).json({});
     })
-    .catch(() => {
+    .catch((e: unknown) => {
+      console.log(e);
       res.status(500).json("Internal error");
     });
 });
