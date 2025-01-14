@@ -324,6 +324,7 @@ void NatTryCatch(Isolate* isolate, std::function<void(Isolate*)> run) {
     if (v8Error->IsNativeError()) {
       char* stack = SkipRuntime_getExceptionStack(e.m_skipException);
       if (stack != nullptr && strlen(stack) > 0) {
+        sk_string_check_c_safe(stack);
         Local<Context> context = isolate->GetCurrentContext();
         Local<Object> exc = v8Error.As<Object>();
         exc->Set(context, FromUtf8(isolate, "stack"), FromUtf8(isolate, stack))
@@ -378,9 +379,10 @@ void GetErrorObject(const v8::FunctionCallbackInfo<v8::Value>& args) {
   SKError skExn = args[0].As<External>()->Value();
 
   std::ostringstream error;
-  char* type = SkipRuntime_getExceptionStack(skExn);
-  if (type != nullptr && strlen(type) > 0) {
-    error << SkipRuntime_getExceptionStack(skExn) << ": ";
+  char* type = SkipRuntime_getExceptionType(skExn);
+  sk_string_check_c_safe(type);
+  if (strlen(type) > 0) {
+    error << type << ": ";
   }
   error << (char*)sk_get_exception_message(skExn);
   Local<Value> v8Error =
@@ -388,12 +390,14 @@ void GetErrorObject(const v8::FunctionCallbackInfo<v8::Value>& args) {
   if (v8Error->IsNativeError()) {
     char* stack = SkipRuntime_getExceptionStack(skExn);
     if (stack != nullptr && strlen(stack) > 0) {
+      sk_string_check_c_safe(stack);
       Local<Context> context = isolate->GetCurrentContext();
       Local<Object> exc = v8Error.As<Object>();
       exc->Set(context, FromUtf8(isolate, "stack"), FromUtf8(isolate, stack))
           .FromJust();
     }
   }
+  args.GetReturnValue().Set(v8Error);
 }
 
 char* ToSKString(Isolate* isolate, Local<Value> value) {
