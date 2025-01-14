@@ -91,7 +91,7 @@ fmt-sk:
 
 .PHONY: fmt-c
 fmt-c:
-	find . -path ./skiplang/prelude/libbacktrace -not -prune -or -path ./sql/test/TPC-h/tnt-tpch -not -prune -or -regex '.*\.[ch]\(pp\)*' | parallel clang-format -i {}
+	find . -path ./node_modules -not -prune -or -path ./skiplang/prelude/libbacktrace -not -prune -or -path ./sql/test/TPC-h/tnt-tpch -not -prune -or -regex '.*\.[ch]\(c\|pp\)*' | parallel clang-format -i {}
 
 .PHONY: fmt-js
 fmt-js:
