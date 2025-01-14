@@ -40,24 +40,32 @@ function toHttp(entrypoint: Entrypoint) {
  * @typeParam V - Type response is *assumed* to have.
  * @param url - URL from which to fetch.
  * @param method - HTTP method of request.
- * @param headers - Additional headers to add to request.
- * @param data - Data to convert to JSON and send in request body.
+ * @param options - Optional parameters.
+ * @param options.headers - Additional headers to add to request.
+ * @param options.body - Data to convert to JSON and send in request body.
+ * @param options.timeout - Timeout for request, in milliseconds. Defaults to 1000ms.
  * @returns Response parsed as JSON, and headers.
  */
 export async function fetchJSON<V extends Json>(
   url: string,
   method: "POST" | "GET" | "PUT" | "PATCH" | "HEAD" | "DELETE" = "GET",
-  headers: { [header: string]: string } = {},
-  data?: Json,
+  options: {
+    headers?: { [header: string]: string };
+    body?: Json;
+    timeout?: number;
+  } = {
+    headers: {},
+    timeout: 1000,
+  },
 ): Promise<[V | null, Headers]> {
-  const body = data ? JSON.stringify(data) : undefined;
+  const body = options.body ? JSON.stringify(options.body) : undefined;
   const response = await fetch(url, {
     method,
     body,
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
-      ...headers,
+      ...options.headers,
     },
     signal: AbortSignal.timeout(1000),
   });
@@ -113,8 +121,7 @@ export class SkipServiceBroker {
     const [data, _headers] = await fetchJSON<Entry<K, V>[]>(
       `${this.entrypoint}/v1/snapshot/${resource}`,
       "POST",
-      {},
-      params,
+      { body: params },
     );
     return data ?? [];
   }
@@ -137,8 +144,7 @@ export class SkipServiceBroker {
     const [data, _headers] = await fetchJSON<V[]>(
       `${this.entrypoint}/v1/snapshot/${resource}/lookup`,
       "POST",
-      {},
-      { key, params },
+      { body: { key, params } },
     );
     return data ?? [];
   }
@@ -197,12 +203,9 @@ export class SkipServiceBroker {
     collection: string,
     entries: Entry<K, V>[],
   ): Promise<void> {
-    await fetchJSON(
-      `${this.entrypoint}/v1/inputs/${collection}`,
-      "PATCH",
-      {},
-      entries,
-    );
+    await fetchJSON(`${this.entrypoint}/v1/inputs/${collection}`, "PATCH", {
+      body: entries,
+    });
   }
 
   /**
