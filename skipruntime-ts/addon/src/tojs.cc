@@ -33,7 +33,7 @@ SKExternalService SkipRuntime_createExternalService(int32_t ref);
 SKResource SkipRuntime_createResource(int32_t ref);
 SKResourceBuilder SkipRuntime_createResourceBuilder(int32_t ref);
 SKChecker SkipRuntime_createChecker(int32_t ref);
-SKIdentifier SkipRuntime_createIdentifier(int32_t ref);
+SKIdentifier SkipRuntime_createIdentifier(char* name);
 SKService SkipRuntime_createService(int32_t ref, CJObject inputs,
                                     SKResourceBuilderMap resources,
                                     SKExternalServiceMap exservices);
@@ -49,7 +49,7 @@ char* SkipRuntime_Collection__map(char* collection, SKMapper mapper);
 char* SkipRuntime_Collection__mapReduce(char* collection, SKMapper mapper,
                                         SKReducer reducer);
 char* SkipRuntime_Collection__nativeMapReduce(char* collection, SKMapper mapper,
-                                        char* reducer);
+                                              char* reducer);
 char* SkipRuntime_Collection__reduce(char* collection, SKReducer reducer);
 char* SkipRuntime_Collection__nativeReduce(char* collection, char* reducer);
 char* SkipRuntime_Collection__slice(char* collection, CJArray ranges);
@@ -470,15 +470,15 @@ void CreateIdentifier(const FunctionCallbackInfo<Value>& args) {
         Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
     return;
   };
-  if (!args[0]->IsNumber()) {
+  if (!args[0]->IsString()) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a number.")));
+        FromUtf8(isolate, "The parameter must be a string.")));
     return;
   }
   NatTryCatch(isolate, [&args](Isolate* isolate) {
-    SKIdentifier skIdentifier =
-        SkipRuntime_createIdentifier(args[0].As<Int32>()->Value());
+    char* skId = ToSKString(isolate, args[0].As<String>());
+    SKIdentifier skIdentifier = SkipRuntime_createIdentifier(skId);
     args.GetReturnValue().Set(External::New(isolate, skIdentifier));
   });
 }
@@ -756,8 +756,8 @@ void NativeMapReduceOfEagerCollection(
     char* skCollection = ToSKString(isolate, args[0].As<String>());
     SKMapper skmapper = args[1].As<External>()->Value();
     char* reducer = ToSKString(isolate, args[2].As<String>());
-    char* skResult =
-        SkipRuntime_Collection__nativeMapReduce(skCollection, skmapper, reducer);
+    char* skResult = SkipRuntime_Collection__nativeMapReduce(skCollection,
+                                                             skmapper, reducer);
     args.GetReturnValue().Set(FromUtf8(isolate, skResult));
   });
 }
@@ -789,7 +789,8 @@ void ReduceOfEagerCollection(const v8::FunctionCallbackInfo<v8::Value>& args) {
     args.GetReturnValue().Set(FromUtf8(isolate, skResult));
   });
 }
-void NativeReduceOfEagerCollection(const v8::FunctionCallbackInfo<v8::Value>& args) {
+void NativeReduceOfEagerCollection(
+    const v8::FunctionCallbackInfo<v8::Value>& args) {
   Isolate* isolate = args.GetIsolate();
   if (args.Length() != 2) {
     // Throw an Error that is passed back to JavaScript
@@ -806,7 +807,8 @@ void NativeReduceOfEagerCollection(const v8::FunctionCallbackInfo<v8::Value>& ar
   NatTryCatch(isolate, [&args](Isolate* isolate) {
     char* skCollection = ToSKString(isolate, args[0].As<String>());
     char* reducer = ToSKString(isolate, args[1].As<String>());
-    char* skResult = SkipRuntime_Collection__nativeReduce(skCollection, reducer);
+    char* skResult =
+        SkipRuntime_Collection__nativeReduce(skCollection, reducer);
     args.GetReturnValue().Set(FromUtf8(isolate, skResult));
   });
 }
