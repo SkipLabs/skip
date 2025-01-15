@@ -62,9 +62,7 @@ class Env implements Environment {
     } else {
       fUrl = new URL(url, import.meta.url);
     }
-    return fetch(fUrl)
-      .then((res) => res.arrayBuffer())
-      .then((ab) => new Uint8Array(ab));
+    return fetch(fUrl).then((res) => res.arrayBuffer());
   }
 
   constructor(environment?: string[]) {

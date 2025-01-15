@@ -166,7 +166,7 @@ export interface Environment {
   fs: () => FileSystem;
   sys: () => System;
   crypto: () => Crypto;
-  fetch: (url: URL | string) => Promise<Uint8Array>;
+  fetch: (url: URL | string) => Promise<Uint8Array | ArrayBuffer>;
 }
 
 export interface Memory {
@@ -839,7 +839,7 @@ export function loadWasm(
 
 async function start(
   modules: ModuleInit[],
-  buffer: Uint8Array,
+  buffer: Uint8Array | ArrayBuffer,
   environment: Environment,
   main?: string,
 ) {
@@ -861,7 +861,7 @@ export async function loadEnv(extensions: EnvInit[], envVals?: string[]) {
     : import("./sk_browser.js"));
   // eslint-disable-next-line @typescript-eslint/no-unsafe-call
   const env = environment.environment(envVals) as Environment;
-  extensions.map((fn) => fn(env));
+  extensions.forEach((fn) => fn(env));
   return env;
 }
 
@@ -901,7 +901,7 @@ export async function run(
   getWasmSource?: () => Promise<Uint8Array>,
 ) {
   const env = await loadEnv(extensions);
-  let buffer: Uint8Array;
+  let buffer: Uint8Array | ArrayBuffer;
   if (getWasmSource) {
     buffer = await getWasmSource();
   } else {

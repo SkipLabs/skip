@@ -3,7 +3,7 @@ import type { Environment, Wrk, Shared } from "./sk_types.js";
 import { MemFS, MemSys } from "./sk_mem_utils.js";
 
 import * as path from "path";
-import * as fs from "fs";
+import * as fsPromises from "fs/promises";
 import * as util from "util";
 import * as perf_hooks from "perf_hooks";
 import * as crypto from "crypto";
@@ -73,11 +73,7 @@ class Env implements Environment {
     } else {
       filename = url;
     }
-    return new Promise<Uint8Array>(function (resolve, reject) {
-      fs.readFile(filename, {}, (err, data) =>
-        err ? reject(err) : resolve(data),
-      );
-    });
+    return fsPromises.readFile(filename);
   }
 
   onException() {
