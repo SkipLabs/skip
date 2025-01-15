@@ -101,7 +101,6 @@ class LazyDir{
       context.!reads = readsCopy;
       result
     };
-    newDir = LazyDir{time, dirName, lazyFun, collect};
     context.maybeGetLazyDir(dirName) match {
     | Some(ldir) if (native_eq(ldir.lazyFun, lazyFun) == 0) ->
       if (context.debugMode) {
@@ -109,6 +108,7 @@ class LazyDir{
       };
       ldir
     | _ ->
+      newDir = LazyDir{time, dirName, lazyFun, collect};
       updateDirtyReaders(context, Path::create(dirName.tag(), DirTag()));
       context.setDir(dirName, newDir);
       newDir
