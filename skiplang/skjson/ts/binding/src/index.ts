@@ -300,16 +300,14 @@ function getFieldAt<T extends Internal.CJObject>(
 }
 
 class ObjectHandle<T extends Internal.CJSON> {
-  binding: Binding;
-  pointer: Pointer<T>;
-  fields?: Map<string, number>;
+  private fields?: Map<string, number>;
 
-  constructor(binding: Binding, pointer: Pointer<T>) {
-    this.pointer = pointer;
-    this.binding = binding;
-  }
+  constructor(
+    public readonly binding: Binding,
+    public readonly pointer: Pointer<T>,
+  ) {}
 
-  objectFields(this: ObjectHandle<Internal.CJObject>) {
+  objectFields() {
     if (!this.fields) {
       this.fields = new Map();
       const size = this.binding.SKIP_SKJSON_objectSize(this.pointer);
