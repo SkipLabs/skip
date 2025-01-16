@@ -188,14 +188,14 @@ export const reactiveObject = {
     if (prop === "toJSON")
       return (): Base => {
         return Object.fromEntries(
-          Array.from(fields).map(([k, ptr]) => [k, getFieldAt(hdl, ptr)]),
+          Array.from(fields).map(([k, ptr]) => [k, hdl.getFieldAt(ptr)]),
         ) as Base;
       };
     if (prop === "keys") return fields.keys();
     if (prop === "toString") return () => JSON.stringify(self);
     const idx = fields.get(prop);
     if (idx === undefined) return undefined;
-    return getFieldAt(hdl, idx);
+    return hdl.getFieldAt(idx);
   },
   set(
     _hdl: ObjectHandle<Internal.CJObject>,
@@ -227,7 +227,7 @@ export const reactiveObject = {
     const fields = hdl.objectFields();
     const idx = fields.get(prop);
     if (idx === undefined) return undefined;
-    const value = getFieldAt(hdl, idx);
+    const value = hdl.getFieldAt(idx);
     return {
       configurable: true,
       enumerable: true,
@@ -292,13 +292,6 @@ function interpretPointer<T extends Internal.CJSON>(
   }
 }
 
-function getFieldAt<T extends Internal.CJObject>(
-  hdl: ObjectHandle<T>,
-  idx: number,
-): Exportable {
-  return interpretPointer(hdl, hdl.binding.SKIP_SKJSON_get(hdl.pointer, idx));
-}
-
 class ObjectHandle<T extends Internal.CJSON> {
   private fields?: Map<string, number>;
 
@@ -306,6 +299,13 @@ class ObjectHandle<T extends Internal.CJSON> {
     public readonly binding: Binding,
     public readonly pointer: Pointer<T>,
   ) {}
+
+  getFieldAt(idx: number): Exportable {
+    return interpretPointer(
+      this,
+      this.binding.SKIP_SKJSON_get(this.pointer, idx),
+    );
+  }
 
   objectFields() {
     if (!this.fields) {
