@@ -282,7 +282,7 @@ function interpretPointer<T extends Internal.CJSON>(
     case Type.Object: {
       const oPtr = hdl.binding.SKIP_SKJSON_asObject(pointer);
       return new Proxy(
-        hdl.derive(oPtr),
+        new ObjectHandle(hdl.binding, oPtr),
         reactiveObject,
       ) as unknown as ObjectProxy<{ [k: string]: Exportable }>;
     }
@@ -318,10 +318,6 @@ class ObjectHandle<T extends Internal.CJSON> {
       }
     }
     return this.fields;
-  }
-
-  derive<U extends Internal.CJSON>(pointer: Pointer<U>) {
-    return new ObjectHandle(this.binding, pointer);
   }
 }
 
