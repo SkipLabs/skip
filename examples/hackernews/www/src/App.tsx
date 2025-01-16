@@ -58,8 +58,8 @@ function Feed() {
     const evSource = new EventSource("/api/posts");
     evSource.addEventListener("init", (e: MessageEvent<string>) => {
       const data = JSON.parse(e.data);
-      const updatedPosts = data[0][1] as Post[];
-      setPosts(updatedPosts);
+      const initialPosts = data[0][1] as Post[];
+      setPosts(initialPosts);
     });
     evSource.addEventListener("update", (e: MessageEvent<string>) => {
       const data = JSON.parse(e.data);
