@@ -256,33 +256,33 @@ export function clone<T>(value: T): T {
 }
 
 function interpretPointer<T extends Internal.CJSON>(
-  hdl: ObjectHandle<any>,
+  binding: Binding,
   pointer: Nullable<Pointer<T>>,
 ): Exportable {
   if (pointer === null) return null;
-  const type = hdl.binding.SKIP_SKJSON_typeOf(pointer);
+  const type = binding.SKIP_SKJSON_typeOf(pointer);
   switch (type) {
     case Type.Null:
       return null;
     case Type.Int:
     case Type.Float:
-      return hdl.binding.SKIP_SKJSON_asNumber(pointer);
+      return binding.SKIP_SKJSON_asNumber(pointer);
     case Type.Boolean:
-      return hdl.binding.SKIP_SKJSON_asBoolean(pointer);
+      return binding.SKIP_SKJSON_asBoolean(pointer);
     case Type.String:
-      return hdl.binding.SKIP_SKJSON_asString(pointer);
+      return binding.SKIP_SKJSON_asString(pointer);
     case Type.Array: {
-      const aPtr = hdl.binding.SKIP_SKJSON_asArray(pointer);
-      const length = hdl.binding.SKIP_SKJSON_arraySize(aPtr);
+      const aPtr = binding.SKIP_SKJSON_asArray(pointer);
+      const length = binding.SKIP_SKJSON_arraySize(aPtr);
       const array = Array.from({ length }, (_, idx) =>
-        interpretPointer(hdl, hdl.binding.SKIP_SKJSON_at(aPtr, idx)),
+        interpretPointer(binding, binding.SKIP_SKJSON_at(aPtr, idx)),
       );
       return sk_freeze(array);
     }
     case Type.Object: {
-      const oPtr = hdl.binding.SKIP_SKJSON_asObject(pointer);
+      const oPtr = binding.SKIP_SKJSON_asObject(pointer);
       return new Proxy(
-        new ObjectHandle(hdl.binding, oPtr),
+        new ObjectHandle(binding, oPtr),
         reactiveObject,
       ) as unknown as ObjectProxy<{ [k: string]: Exportable }>;
     }
@@ -296,13 +296,13 @@ class ObjectHandle<T extends Internal.CJSON> {
   private fields?: Map<string, number>;
 
   constructor(
-    public readonly binding: Binding,
+    private readonly binding: Binding,
     public readonly pointer: Pointer<T>,
   ) {}
 
   getFieldAt(idx: number): Exportable {
     return interpretPointer(
-      this,
+      this.binding,
       this.binding.SKIP_SKJSON_get(this.pointer, idx),
     );
   }
@@ -363,7 +363,7 @@ export function importJSON<T extends Internal.CJSON>(
   pointer: Pointer<T>,
   copy?: boolean,
 ): Exportable {
-  const value = interpretPointer(new ObjectHandle(binding, pointer), pointer);
+  const value = interpretPointer(binding, pointer);
   return copy && value !== null ? clone(value) : value;
 }
 
