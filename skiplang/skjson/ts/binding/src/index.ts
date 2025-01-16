@@ -187,10 +187,7 @@ export const reactiveObject = {
     if (prop === "toString") return hdl.toString.bind(hdl);
     if (prop === "keys") return hdl.keys();
     if (typeof prop === "symbol") return undefined;
-    const fields = hdl.objectFields();
-    const idx = fields.get(prop);
-    if (idx === undefined) return undefined;
-    return hdl.getFieldAt(idx);
+    return hdl.get(prop);
   },
   set(
     _hdl: ObjectHandle<Internal.CJObject>,
@@ -335,6 +332,12 @@ class ObjectHandle<T extends Internal.CJSON> {
 
   keys() {
     return this.objectFields().keys();
+  }
+
+  get(prop: string) {
+    const idx = this.objectFields().get(prop);
+    if (idx === undefined) return undefined;
+    return this.getFieldAt(idx);
   }
 }
 
