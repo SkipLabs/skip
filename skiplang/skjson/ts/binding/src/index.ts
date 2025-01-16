@@ -185,9 +185,9 @@ export const reactiveObject = {
     if (prop === "clone") return (): ObjectProxy<Base> => clone(self);
     if (prop === "toJSON") return hdl.toJSON.bind(hdl);
     if (prop === "toString") return hdl.toString.bind(hdl);
+    if (prop === "keys") return hdl.keys();
     if (typeof prop === "symbol") return undefined;
     const fields = hdl.objectFields();
-    if (prop === "keys") return fields.keys();
     const idx = fields.get(prop);
     if (idx === undefined) return undefined;
     return hdl.getFieldAt(idx);
@@ -212,7 +212,7 @@ export const reactiveObject = {
     return fields.has(prop);
   },
   ownKeys(hdl: ObjectHandle<Internal.CJObject>) {
-    return Array.from(hdl.objectFields().keys());
+    return Array.from(hdl.keys());
   },
   getOwnPropertyDescriptor(
     hdl: ObjectHandle<Internal.CJObject>,
@@ -331,6 +331,10 @@ class ObjectHandle<T extends Internal.CJSON> {
   // Hijacks NodeJS' console.log
   [Symbol.for("nodejs.util.inspect.custom")]() {
     return this.toString();
+  }
+
+  keys() {
+    return this.objectFields().keys();
   }
 }
 
