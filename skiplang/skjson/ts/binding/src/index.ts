@@ -216,16 +216,7 @@ export const reactiveObject = {
     prop: string | symbol,
   ) {
     if (typeof prop === "symbol") return undefined;
-    const fields = hdl.objectFields();
-    const idx = fields.get(prop);
-    if (idx === undefined) return undefined;
-    const value = hdl.getFieldAt(idx);
-    return {
-      configurable: true,
-      enumerable: true,
-      writable: false,
-      value,
-    };
+    return hdl.getOwnPropertyDescriptor(prop);
   },
 };
 
@@ -338,6 +329,18 @@ class ObjectHandle<T extends Internal.CJSON> {
     const idx = this.objectFields().get(prop);
     if (idx === undefined) return undefined;
     return this.getFieldAt(idx);
+  }
+
+  getOwnPropertyDescriptor(prop: string) {
+    const idx = this.objectFields().get(prop);
+    if (idx === undefined) return undefined;
+    const value = this.getFieldAt(idx);
+    return {
+      configurable: true,
+      enumerable: true,
+      writable: false,
+      value,
+    };
   }
 }
 
