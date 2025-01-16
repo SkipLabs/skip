@@ -57,7 +57,7 @@ Let's consider an example reactive service, powering a real-time feature in a so
 ```typescript
 type UserID = ... ;
 type GroupID = ... ;
-type User = { name: string, active: boolean, friends: userID[], ... } ;
+type User = { name: string, active: boolean, friends: UserID[], ... } ;
 type Group = { name: string, members: UserID[], ... };
 ```
 
