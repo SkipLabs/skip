@@ -99,13 +99,15 @@ def upvote_post(post_id):
             db.commit()
 
     # Write into the reactive input collection.
-    resp = requests.put(
-        f"{REACTIVE_SERVICE_URL}/inputs/upvotes/{upvote_id}",
-        json=[{
-            'id': upvote_id,
-            'post_id': post_id,
-            'user_id': user_id,
-        }],
+    resp = requests.patch(
+        f"{REACTIVE_SERVICE_URL}/inputs/upvotes",
+        json=[[
+            upvote_id,
+            [{
+                'post_id': post_id,
+                'user_id': user_id,
+            }]
+        ]],
     )
 
     return "ok", 200
