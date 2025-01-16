@@ -205,8 +205,7 @@ export const reactiveObject = {
     if (prop === "toJSON") return true;
     if (prop === "toString") return true;
     if (typeof prop === "symbol") return false;
-    const fields = hdl.objectFields();
-    return fields.has(prop);
+    return hdl.has(prop);
   },
   ownKeys(hdl: ObjectHandle<Internal.CJObject>) {
     return Array.from(hdl.keys());
@@ -329,6 +328,10 @@ class ObjectHandle<T extends Internal.CJSON> {
     const idx = this.objectFields().get(prop);
     if (idx === undefined) return undefined;
     return this.getFieldAt(idx);
+  }
+
+  has(prop: string) {
+    return this.objectFields().has(prop);
   }
 
   getOwnPropertyDescriptor(prop: string) {
