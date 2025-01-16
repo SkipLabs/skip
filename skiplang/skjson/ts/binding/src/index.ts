@@ -184,13 +184,8 @@ export const reactiveObject = {
     if (prop === "__pointer") return hdl.pointer;
     if (prop === "clone") return (): ObjectProxy<Base> => clone(self);
     if (typeof prop === "symbol") return undefined;
+    if (prop === "toJSON") return hdl.toJSON.bind(hdl);
     const fields = hdl.objectFields();
-    if (prop === "toJSON")
-      return (): Base => {
-        return Object.fromEntries(
-          Array.from(fields).map(([k, ptr]) => [k, hdl.getFieldAt(ptr)]),
-        ) as Base;
-      };
     if (prop === "keys") return fields.keys();
     if (prop === "toString") return () => JSON.stringify(self);
     const idx = fields.get(prop);
@@ -318,6 +313,15 @@ class ObjectHandle<T extends Internal.CJSON> {
       }
     }
     return this.fields;
+  }
+
+  toJSON() {
+    return Object.fromEntries(
+      Array.from(this.objectFields()).map(([k, ptr]) => [
+        k,
+        this.getFieldAt(ptr),
+      ]),
+    );
   }
 }
 
