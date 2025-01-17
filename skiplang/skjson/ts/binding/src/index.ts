@@ -158,14 +158,16 @@ export type Exportable =
   | ObjectProxy<{ [k: string]: Exportable }>
   | (readonly Exportable[] & Managed);
 
-export type ObjectProxy<Base extends { [k: string]: Exportable }> = {
-  [sk_isObjectProxy]: true;
-  [sk_managed]: true;
-  __pointer: Pointer<Internal.CJSON>;
-  clone: () => ObjectProxy<Base>;
-  toJSON: () => Base;
-  keys: IterableIterator<keyof Base>;
-} & Base;
+export type ObjectProxy<Base extends { [k: string]: Exportable }> =
+  ObjectHandle<Internal.CJObject> &
+    Base & {
+      [sk_isObjectProxy]: true;
+      [sk_managed]: true;
+      __pointer: Pointer<Internal.CJSON>;
+      clone: () => ObjectProxy<Base>;
+      toJSON: () => Base;
+      keys: IterableIterator<keyof Base>;
+    };
 
 export function isObjectProxy(
   x: any,
@@ -266,7 +268,7 @@ function interpretPointer<T extends Internal.CJSON>(
       return new Proxy(
         new ObjectHandle(binding, oPtr),
         reactiveObject,
-      ) as unknown as ObjectProxy<{ [k: string]: Exportable }>;
+      ) as ObjectProxy<{ [k: string]: Exportable }>;
     }
     case Type.Undefined:
     default:
