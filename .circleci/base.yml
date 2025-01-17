@@ -104,6 +104,13 @@ jobs:
   skipruntime:
     docker:
       - image: skiplabs/skdb-base:latest
+      - image: cimg/postgres:17.0
+        environment:
+          PGHOST: localhost
+          PGDATABASE: postgres
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: secret
     steps:
       - checkout
       - setup
@@ -111,8 +118,6 @@ jobs:
           name: Run wasm skip runtime tests
           no_output_timeout: 10m
           command: |
-            docker pull postgres:latest
-            docker run --name skip-postgres-container -e POSTGRES_USER=root -e POSTGRES_PASSWORD=secret -p 5432:5432 -d postgres
             mkdir -p ~/test-results
             cd skipruntime-ts && make test
       - store_test_results:
