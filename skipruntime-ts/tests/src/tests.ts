@@ -582,7 +582,7 @@ const pg_config = {
   host: "localhost",
   port: 5432,
   database: "postgres",
-  user: "root",
+  user: "postgres",
   password: "secret",
 };
 const postgres = new PostgresExternalService(pg_config);
@@ -1025,7 +1025,7 @@ export function initTests(
       console.warn("To test properly, run the following then retry:");
       console.warn("\tdocker pull postgres:latest");
       console.warn(
-        "\tdocker run --name skip-postgres-container -e POSTGRES_USER=root -e POSTGRES_PASSWORD=secret -p 5432:5432 -d postgres",
+        "\tdocker run --name skip-postgres-container -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=secret -p 5432:5432 -d postgres",
       );
       return;
     }
