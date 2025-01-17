@@ -103,31 +103,31 @@ void SkipRuntime_deleteLazyCompute(uint32_t lazyComputeId) {
 }
 
 void SkipRuntime_ExternalService__subscribe(uint32_t externalSupplierId,
-                                            char* collection, char* resource,
-                                            CJObject params) {
+                                            char* collection, char* sessionId,
+                                            char* resource, CJObject params) {
   Isolate* isolate = Isolate::GetCurrent();
   Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[4] = {
+  Local<Value> argv[5] = {
       Number::New(isolate, externalSupplierId),
       FromUtf8(isolate, collection),
+      FromUtf8(isolate, sessionId),
       FromUtf8(isolate, resource),
       External::New(isolate, params),
   };
-  CallJSVoidFunction(isolate, externFunctions,
-                     "SkipRuntime_ExternalService__subscribe", 4, argv);
+  return CallJSVoidFunction(isolate, externFunctions,
+                            "SkipRuntime_ExternalService__subscribe", 5, argv);
 }
 
 void SkipRuntime_ExternalService__unsubscribe(uint32_t externalSupplierId,
-                                              char* resource, CJObject params) {
+                                              char* sessionId) {
   Isolate* isolate = Isolate::GetCurrent();
   Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[3] = {
+  Local<Value> argv[2] = {
       Number::New(isolate, externalSupplierId),
-      FromUtf8(isolate, resource),
-      External::New(isolate, params),
+      FromUtf8(isolate, sessionId),
   };
   CallJSVoidFunction(isolate, externFunctions,
-                     "SkipRuntime_ExternalService__unsubscribe", 3, argv);
+                     "SkipRuntime_ExternalService__unsubscribe", 2, argv);
 }
 
 void SkipRuntime_ExternalService__shutdown(uint32_t externalSupplierId) {
