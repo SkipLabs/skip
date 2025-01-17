@@ -169,9 +169,9 @@ class ResourceInfo(
    */
   fun createRequest(
     context: mutable SKStore.Context,
+    requestId: String,
     optChecker: ?Checker,
-  ): String {
-    requestId = Ksuid::create().toString();
+  ): void {
     SKStore.EHandle(
       SKStore.SID::keyType,
       RequestFile::type,
@@ -181,8 +181,7 @@ class ResourceInfo(
       SKStore.SID(requestId),
       Array[RequestFile(Time.time_ms(), this, optChecker)],
     );
-    updateContext(context);
-    requestId;
+    context.update();
   }
 
   fun getResult<T>(
@@ -1203,29 +1202,31 @@ value class GetResult<T>(
   }
 }
 
-fun getAll(
+fun request<T>(
   context: mutable SKStore.Context,
   resourceName: String,
   params: SKJSON.CJSON,
   optRequest: ?Request,
-): GetResult<Values> {
-  resourceInstanceId = Ksuid::create().toString();
-  resource = createReactiveResource(
-    context,
-    resourceInstanceId,
-    resourceName,
-    params,
-  );
-  // create requests
-  request = optRequest match {
-  | Some(checker @ Checker _) -> resource.createRequest(context, Some(checker))
-  | Some(Identifier(req)) -> req
-  | _ -> resource.createRequest(context, None())
+  getValues: (mutable SKStore.Context, ResourceInfo) ~> T,
+): GetResult<T> {
+  (request, resource) = optRequest match {
+  | Some(Identifier(req)) -> (req, getReactiveResource(context, req))
+  | _ ->
+    resourceInstanceId = Ksuid::create().toString();
+    resource = createReactiveResource(
+      context,
+      resourceInstanceId,
+      resourceName,
+      params,
+    );
+    optChecker = optRequest match {
+    | Some(checker @ Checker _) -> Some(checker)
+    | _ -> None()
+    };
+    resource.createRequest(context, resourceInstanceId, optChecker);
+    (resourceInstanceId, resource)
   };
-  values = Values(
-    resource.collection.getAll(context),
-    `${resource.session}/${context.tick}`,
-  );
+  values = getValues(context, resource);
   // return result type
   res = resource.getResult(context, request, values);
   if (!res.loading()) {
@@ -1233,11 +1234,25 @@ fun getAll(
     | Some(Identifier _)
     | None() ->
       resource.clearRequest(context, request);
-      closeReactiveResource(context, resourceInstanceId, false)
+      closeReactiveResource(context, request, false)
     | Some(Checker _) -> void
     };
   };
   res;
+}
+
+fun getAll(
+  context: mutable SKStore.Context,
+  resourceName: String,
+  params: SKJSON.CJSON,
+  optRequest: ?Request,
+): GetResult<Values> {
+  request(context, resourceName, params, optRequest, (context, resource) ~>
+    Values(
+      resource.collection.getAll(context),
+      `${resource.session}/${context.tick}`,
+    )
+  )
 }
 
 fun getForKey(
@@ -1247,34 +1262,12 @@ fun getForKey(
   key: SKJSON.CJSON,
   optRequest: ?Request,
 ): GetResult<Array<SKJSON.CJSON>> {
-  resourceInstanceId = Ksuid::create().toString();
-  resource = createReactiveResource(
-    context,
-    resourceInstanceId,
-    resourceName,
-    params,
-  );
-  // create requests
-  request = optRequest match {
-  | Some(checker @ Checker _) -> resource.createRequest(context, Some(checker))
-  | Some(Identifier(req)) -> req
-  | _ -> resource.createRequest(context, None())
-  };
-  pushContext(context);
-  values = resource.collection.getArray(key);
-  popContext();
-  // return result type
-  res = resource.getResult(context, request, values);
-  if (!res.loading()) {
-    optRequest match {
-    | Some(Identifier _)
-    | None() ->
-      resource.clearRequest(context, request);
-      closeReactiveResource(context, resourceInstanceId, false)
-    | Some(Checker _) -> void
-    };
-  };
-  res;
+  request(context, resourceName, params, optRequest, (context, resource) ~> {
+    pushContext(context);
+    values = resource.collection.getArray(key);
+    popContext();
+    values
+  })
 }
 
 fun destroyReactiveResource(
@@ -1472,12 +1465,31 @@ fun createReactiveResource(
   };
   definition = ResourceDef(resource, params);
   resourceHdl.writeArray(context, key, Array[definition]);
-  updateContext(context);
+  context.update();
   graphHdl = SKStore.EHandle(
     ResourceDef::keyType,
     ResourceInfo::type,
     kResourceCollectionsDir,
   );
+  graphHdl.get(context, definition);
+}
+
+fun getReactiveResource(
+  context: mutable SKStore.Context,
+  identifier: String,
+): ResourceInfo {
+  resourceHdl = SKStore.EHandle(
+    SKStore.SID::keyType,
+    ResourceDef::type,
+    kResourceSessionDir,
+  );
+  graphHdl = SKStore.EHandle(
+    ResourceDef::keyType,
+    ResourceInfo::type,
+    kResourceCollectionsDir,
+  );
+  key = SKStore.SID(identifier);
+  definition = resourceHdl.get(context, key);
   graphHdl.get(context, definition);
 }
 
