@@ -327,6 +327,11 @@ class ObjectHandle<T extends Internal.CJSON> {
   toString() {
     return JSON.stringify(this.toJSON());
   }
+
+  // Hijacks NodeJS' console.log
+  [Symbol.for("nodejs.util.inspect.custom")]() {
+    return this.toString();
+  }
 }
 
 export function exportJSON(
