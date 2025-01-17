@@ -183,19 +183,11 @@ export const reactiveObject = {
     if (prop === sk_managed) return true;
     if (prop === "__pointer") return hdl.pointer;
     if (prop === "clone") return (): ObjectProxy<Base> => clone(self);
+    if (prop === "toJSON") return hdl.toJSON.bind(hdl);
+    if (prop === "toString") return hdl.toString.bind(hdl);
+    if (prop === "keys") return hdl.keys();
     if (typeof prop === "symbol") return undefined;
-    const fields = hdl.objectFields();
-    if (prop === "toJSON")
-      return (): Base => {
-        return Object.fromEntries(
-          Array.from(fields).map(([k, ptr]) => [k, getFieldAt(hdl, ptr)]),
-        ) as Base;
-      };
-    if (prop === "keys") return fields.keys();
-    if (prop === "toString") return () => JSON.stringify(self);
-    const idx = fields.get(prop);
-    if (idx === undefined) return undefined;
-    return getFieldAt(hdl, idx);
+    return hdl.get(prop);
   },
   set(
     _hdl: ObjectHandle<Internal.CJObject>,
@@ -213,27 +205,17 @@ export const reactiveObject = {
     if (prop === "toJSON") return true;
     if (prop === "toString") return true;
     if (typeof prop === "symbol") return false;
-    const fields = hdl.objectFields();
-    return fields.has(prop);
+    return hdl.has(prop);
   },
   ownKeys(hdl: ObjectHandle<Internal.CJObject>) {
-    return Array.from(hdl.objectFields().keys());
+    return Array.from(hdl.keys());
   },
   getOwnPropertyDescriptor(
     hdl: ObjectHandle<Internal.CJObject>,
     prop: string | symbol,
   ) {
     if (typeof prop === "symbol") return undefined;
-    const fields = hdl.objectFields();
-    const idx = fields.get(prop);
-    if (idx === undefined) return undefined;
-    const value = getFieldAt(hdl, idx);
-    return {
-      configurable: true,
-      enumerable: true,
-      writable: false,
-      value,
-    };
+    return hdl.getOwnPropertyDescriptor(prop);
   },
 };
 
@@ -256,33 +238,33 @@ export function clone<T>(value: T): T {
 }
 
 function interpretPointer<T extends Internal.CJSON>(
-  hdl: ObjectHandle<any>,
+  binding: Binding,
   pointer: Nullable<Pointer<T>>,
 ): Exportable {
   if (pointer === null) return null;
-  const type = hdl.binding.SKIP_SKJSON_typeOf(pointer);
+  const type = binding.SKIP_SKJSON_typeOf(pointer);
   switch (type) {
     case Type.Null:
       return null;
     case Type.Int:
     case Type.Float:
-      return hdl.binding.SKIP_SKJSON_asNumber(pointer);
+      return binding.SKIP_SKJSON_asNumber(pointer);
     case Type.Boolean:
-      return hdl.binding.SKIP_SKJSON_asBoolean(pointer);
+      return binding.SKIP_SKJSON_asBoolean(pointer);
     case Type.String:
-      return hdl.binding.SKIP_SKJSON_asString(pointer);
+      return binding.SKIP_SKJSON_asString(pointer);
     case Type.Array: {
-      const aPtr = hdl.binding.SKIP_SKJSON_asArray(pointer);
-      const length = hdl.binding.SKIP_SKJSON_arraySize(aPtr);
+      const aPtr = binding.SKIP_SKJSON_asArray(pointer);
+      const length = binding.SKIP_SKJSON_arraySize(aPtr);
       const array = Array.from({ length }, (_, idx) =>
-        interpretPointer(hdl, hdl.binding.SKIP_SKJSON_at(aPtr, idx)),
+        interpretPointer(binding, binding.SKIP_SKJSON_at(aPtr, idx)),
       );
       return sk_freeze(array);
     }
     case Type.Object: {
-      const oPtr = hdl.binding.SKIP_SKJSON_asObject(pointer);
+      const oPtr = binding.SKIP_SKJSON_asObject(pointer);
       return new Proxy(
-        hdl.derive(oPtr),
+        new ObjectHandle(binding, oPtr),
         reactiveObject,
       ) as unknown as ObjectProxy<{ [k: string]: Exportable }>;
     }
@@ -292,24 +274,22 @@ function interpretPointer<T extends Internal.CJSON>(
   }
 }
 
-function getFieldAt<T extends Internal.CJObject>(
-  hdl: ObjectHandle<T>,
-  idx: number,
-): Exportable {
-  return interpretPointer(hdl, hdl.binding.SKIP_SKJSON_get(hdl.pointer, idx));
-}
-
 class ObjectHandle<T extends Internal.CJSON> {
-  binding: Binding;
-  pointer: Pointer<T>;
-  fields?: Map<string, number>;
+  private fields?: Map<string, number>;
 
-  constructor(binding: Binding, pointer: Pointer<T>) {
-    this.pointer = pointer;
-    this.binding = binding;
+  constructor(
+    private readonly binding: Binding,
+    public readonly pointer: Pointer<T>,
+  ) {}
+
+  private getFieldAt(idx: number): Exportable {
+    return interpretPointer(
+      this.binding,
+      this.binding.SKIP_SKJSON_get(this.pointer, idx),
+    );
   }
 
-  objectFields(this: ObjectHandle<Internal.CJObject>) {
+  private objectFields() {
     if (!this.fields) {
       this.fields = new Map();
       const size = this.binding.SKIP_SKJSON_objectSize(this.pointer);
@@ -322,8 +302,48 @@ class ObjectHandle<T extends Internal.CJSON> {
     return this.fields;
   }
 
-  derive<U extends Internal.CJSON>(pointer: Pointer<U>) {
-    return new ObjectHandle(this.binding, pointer);
+  toJSON() {
+    return Object.fromEntries(
+      Array.from(this.objectFields()).map(([k, ptr]) => [
+        k,
+        this.getFieldAt(ptr),
+      ]),
+    );
+  }
+
+  toString() {
+    return JSON.stringify(this.toJSON());
+  }
+
+  // Hijacks NodeJS' console.log
+  [Symbol.for("nodejs.util.inspect.custom")]() {
+    return this.toString();
+  }
+
+  keys() {
+    return this.objectFields().keys();
+  }
+
+  get(prop: string) {
+    const idx = this.objectFields().get(prop);
+    if (idx === undefined) return undefined;
+    return this.getFieldAt(idx);
+  }
+
+  has(prop: string) {
+    return this.objectFields().has(prop);
+  }
+
+  getOwnPropertyDescriptor(prop: string) {
+    const idx = this.objectFields().get(prop);
+    if (idx === undefined) return undefined;
+    const value = this.getFieldAt(idx);
+    return {
+      configurable: true,
+      enumerable: true,
+      writable: false,
+      value,
+    };
   }
 }
 
@@ -369,7 +389,7 @@ export function importJSON<T extends Internal.CJSON>(
   pointer: Pointer<T>,
   copy?: boolean,
 ): Exportable {
-  const value = interpretPointer(new ObjectHandle(binding, pointer), pointer);
+  const value = interpretPointer(binding, pointer);
   return copy && value !== null ? clone(value) : value;
 }
 
