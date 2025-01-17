@@ -25,6 +25,7 @@ import {
 import {
   TimerResource,
   GenericExternalService,
+  PostgresExternalService,
 } from "@skipruntime/helpers/external.js";
 
 import { it as mit, type AsyncFunc } from "mocha";
@@ -544,6 +545,57 @@ const multipleResourcesService: SkipService<Input_SN_SN, Input_SN_SN> = {
   },
 };
 
+//// testPostgres
+type PostgresRow = { id: number; x: number };
+class PostgresRowExtract extends OneToOneMapper<number, PostgresRow, number> {
+  mapValue(row: PostgresRow): number {
+    return row.x;
+  }
+}
+
+class PointwiseSum extends OneToOneMapper<number, number, number> {
+  constructor(private other: EagerCollection<number, number>) {
+    super();
+  }
+
+  mapValue(v: number, k: number) {
+    return this.other.getArray(k).reduce((x, y) => x + y, v);
+  }
+}
+
+class PostgresResource implements Resource<Input_NN> {
+  instantiate(
+    collections: Input_NN,
+    context: Context,
+  ): EagerCollection<number, number> {
+    const pg_data: EagerCollection<number, number> = context
+      .useExternalResource<number, PostgresRow>({
+        service: "postgres",
+        identifier: "skip_test",
+        params: { key: { col: "id", type: "INTEGER" } },
+      })
+      .map(PostgresRowExtract);
+    return collections.input.map(PointwiseSum, pg_data);
+  }
+}
+const pg_config = {
+  host: "localhost",
+  port: 5432,
+  database: "postgres",
+  user: "root",
+  password: "secret",
+};
+const postgres = new PostgresExternalService(pg_config);
+
+const postgresService: SkipService<Input_NN, Input_NN> = {
+  initialData: { input: [] },
+  resources: { resource: PostgresResource },
+  externalServices: { postgres },
+  createGraph(inputs: Input_NN) {
+    return inputs;
+  },
+};
+
 export function initTests(
   category: string,
   initService: (service: SkipService) => Promise<ServiceInstance>,
@@ -948,5 +1000,54 @@ export function initTests(
     expect(service.getArray("resource1", "1").payload).toEqual([30]);
     service.update("input2", [["1", [40]]]);
     expect(service.getArray("resource2", "1").payload).toEqual([40]);
+  });
+
+  async function trySetupPostgres(retries: number = 3): Promise<boolean> {
+    if (!("_connected" in postgres.client) || retries < 0) {
+      return false;
+    }
+    if (!postgres.client._connected) {
+      await timeout(50);
+      return await trySetupPostgres(retries - 1);
+    }
+    await postgres.client.query(
+      "DROP TABLE IF EXISTS skip_test; CREATE TABLE skip_test (id INTEGER PRIMARY KEY, x INTEGER); INSERT INTO skip_test VALUES (1, 1), (2, 2), (3, 3);",
+    );
+    return true;
+  }
+
+  it("testPostgres", async () => {
+    const hasPostgres = await trySetupPostgres();
+    if (!hasPostgres) {
+      console.warn(
+        "Default pass on testPostgres since no local PostgreSQL instance found;",
+      );
+      console.warn("To test properly, run the following then retry:");
+      console.warn("\tdocker pull postgres:latest");
+      console.warn(
+        "\tdocker run --name skip-postgres-container -e POSTGRES_USER=root -e POSTGRES_PASSWORD=secret -p 5432:5432 -d postgres",
+      );
+      return;
+    }
+    const service = await initService(postgresService);
+    service.update("input", [
+      [1, [10]],
+      [2, [20]],
+      [3, [30]],
+    ]);
+    service.instantiateResource("unsafe.fixed.resource.ident", "resource", {});
+    expect(service.getAll("resource").payload).toEqual([
+      [1, [10]],
+      [2, [20]],
+      [3, [30]],
+    ]);
+    await timeout(5);
+    expect(service.getAll("resource").payload).toEqual([
+      [1, [11]],
+      [2, [22]],
+      [3, [33]],
+    ]);
+
+    service.close();
   });
 }
