@@ -196,6 +196,8 @@ function toId(params: Json): string {
   } else return btoa(JSON.stringify(params));
 }
 
+const min32bitInt = -2147483648;
+const max32bitInt = 2147483647;
 function validateKeyParam(params: Json): {
   col: string;
   type: string;
@@ -219,7 +221,7 @@ function validateKeyParam(params: Json): {
     throw new Error("No key type specified for external Postgres data source");
   const type: string = params["key"]["type"];
 
-  var select;
+  let select;
   switch (type) {
     case "TEXT":
       select = (table: string, key: string) =>
@@ -232,15 +234,13 @@ function validateKeyParam(params: Json): {
         if (!Number.isSafeInteger(keyNum))
           throw new Error("Invalid BIGINT key: " + key);
         return format(
-          "SELECT * FROM %I WHERE %I = " + keyNum + ";",
+          "SELECT * FROM %I WHERE %I = " + keyNum.toString() + ";",
           table,
           col,
         );
       };
       break;
     case "INTEGER":
-      const min32bitInt = -2147483648;
-      const max32bitInt = 2147483647;
       select = (table: string, key: string) => {
         const keyNum = Number(key);
         // Checks if key is a safe 32-bit integer
@@ -251,7 +251,7 @@ function validateKeyParam(params: Json): {
         )
           throw new Error("Invalid BIGINT key: " + key);
         return format(
-          "SELECT * FROM %I WHERE %I = " + keyNum + ";",
+          "SELECT * FROM %I WHERE %I = " + keyNum.toString() + ";",
           table,
           col,
         );
@@ -270,7 +270,8 @@ function validateKeyParam(params: Json): {
 export class PostgresExternalService implements ExternalService {
   client: Client;
   clientID: string;
-  private open_subscription_IDs: Set<string> = new Set();
+  private open_subscription_IDs: Set<string> = new Set<string>();
+
   constructor(db_config: {
     host: string;
     port: number;
@@ -282,9 +283,14 @@ export class PostgresExternalService implements ExternalService {
     this.clientID = "skip_pg_client_" + Math.random().toString(36).slice(2);
 
     this.client = new pg.Client(db_config);
-    this.client
-      .connect()
-      .then(() => this.client.query(format(`LISTEN %I;`, this.clientID)));
+    this.client.connect().then(
+      () => this.client.query(format(`LISTEN %I;`, this.clientID)),
+      () => {
+        throw new Error(
+          "Error connecting to Postgres at " + JSON.stringify(db_config),
+        );
+      },
+    );
   }
 
   subscribe(
@@ -300,11 +306,11 @@ export class PostgresExternalService implements ExternalService {
 
     const id: string = `${this.clientID}.${table}.${key.col}`;
 
-    var setup = async () => {
+    const setup = async () => {
       callbacks.loading();
       const init = await this.client.query(format("SELECT * FROM %I;", table));
       callbacks.update(
-        init.rows.map((row) => [row[key.col], [row]]), //@ts-ignore
+        init.rows.map((row) => [row[key.col], [row]]) as Entry<Json, Json>[],
         true,
       );
       // Reuse existing trigger/function if possible
@@ -342,26 +348,33 @@ FOR EACH ROW EXECUTE FUNCTION %I();`,
       }
       this.client.on("notification", (msg) => {
         if (msg.payload != undefined) {
-          this.client.query(key.select(table, msg.payload)).then((changes) => {
-            const k =
-              key.type == "TEXT"
-                ? (msg.payload as string)
-                : Number(msg.payload);
-            callbacks.update([[k, changes.rows]], false); //@ts-ignore
-          });
+          this.client.query(key.select(table, msg.payload)).then(
+            (changes) => {
+              const k = key.type == "TEXT" ? msg.payload! : Number(msg.payload);
+              callbacks.update([[k, changes.rows as Json[]]], false);
+            },
+            () => {
+              throw new Error("Error pulling updated Postgres rows");
+            },
+          );
         }
       });
       this.open_subscription_IDs.add(id);
     };
-    setup();
+    setup().catch(() => {
+      throw new Error("Error setting up Postgres notifications");
+    });
   }
 
   unsubscribe(table: string, params: Json): void {
     const key = validateKeyParam(params);
     const id: string = `${this.clientID}.${table}.${key.col}`;
-    this.client
-      .query(format("DROP FUNCTION %I CASCADE;", id))
-      .then(() => this.open_subscription_IDs.delete(id));
+    this.client.query(format("DROP FUNCTION %I CASCADE;", id)).then(
+      () => this.open_subscription_IDs.delete(id),
+      () => {
+        throw new Error("Error unsubscribing from Postgres table " + table);
+      },
+    );
   }
 
   shutdown(): void {
@@ -373,7 +386,12 @@ FOR EACH ROW EXECUTE FUNCTION %I();`,
             .join(", ") +
           " CASCADE;",
       )
-      .then(() => this.client.end());
+      .then(() => this.client.end())
+      .catch(() => {
+        throw new Error(
+          "Error shutting down Postgres external service; trigger functions may need teardown.",
+        );
+      });
     return;
   }
 }
