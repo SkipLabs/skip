@@ -45,6 +45,7 @@ export class SkipExternalService implements ExternalService {
   }
 
   subscribe(
+    instance: string,
     resource: string,
     params: Json,
     callbacks: {
@@ -80,30 +81,24 @@ export class SkipExternalService implements ExternalService {
         evSource.onerror = (e) => {
           console.log(e);
         };
-        this.resources.set(this.toId(resource, params), evSource);
+        this.resources.set(instance, evSource);
       })
       .catch((e: unknown) => {
         console.log(e);
       });
   }
 
-  unsubscribe(resource: string, params: Json) {
-    const closable = this.resources.get(this.toId(resource, params));
-    if (closable) closable.close();
+  unsubscribe(instance: string) {
+    const closable = this.resources.get(instance);
+    if (closable) {
+      closable.close();
+      this.resources.delete(instance);
+    }
   }
 
   shutdown(): void {
     for (const res of this.resources.values()) {
       res.close();
     }
-  }
-
-  private toId(resource: string, params: Json): string {
-    if (typeof params == "object") {
-      const strparams = Object.entries(params)
-        .map(([key, value]) => `${key}:${btoa(JSON.stringify(value))}`)
-        .sort();
-      return `${resource}[${strparams.join(",")}]`;
-    } else return `${resource}[${btoa(JSON.stringify(params))}]`;
   }
 }

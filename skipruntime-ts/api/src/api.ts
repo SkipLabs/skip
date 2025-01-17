@@ -519,6 +519,7 @@ export interface ExternalService {
   /**
    * Subscribe to a resource provided by the external service.
    *
+   * @param instance - Instance identifier of the external resource.
    * @param resource - Name of the external resource.
    * @param params - Parameters of the external resource.
    * @param callbacks - Callbacks to react on error/loading/update.
@@ -528,6 +529,7 @@ export interface ExternalService {
    * @returns {void}
    */
   subscribe(
+    instance: string,
     resource: string,
     params: Json,
     callbacks: {
@@ -540,11 +542,10 @@ export interface ExternalService {
   /**
    * Unsubscribe from a resource provided by the external service.
    *
-   * @param resource - Name of the external resource.
-   * @param params - Parameters of the external resource.
+   * @param instance - Instance identifier of the external resource.
    * @returns {void}
    */
-  unsubscribe(resource: string, params: Json): void;
+  unsubscribe(instance: string): void;
 
   /**
    * Shutdown the external service.

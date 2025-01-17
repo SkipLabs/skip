@@ -487,6 +487,7 @@ class CheckRequest(
 
 class LinkToResource(
   supplier: ExternalService,
+  instance: String,
   writer: CollectionWriter,
   name: String,
   params: SKJSON.CJSON,
@@ -495,19 +496,18 @@ class LinkToResource(
   fun perform(context: mutable SKStore.Context): void {
     this.writer.status(context, Status::create());
     pushContext(context);
-    this.supplier.subscribe(this.writer, this.name, this.params);
+    this.supplier.subscribe(this.instance, this.writer, this.name, this.params);
     popContext();
   }
 }
 
 class CloseResource(
   supplier: ExternalService,
-  name: String,
-  params: SKJSON.CJSON,
+  instance: String,
 ) extends SKStore.Postponable {
   fun perform(context: mutable SKStore.Context): void {
     pushContext(context);
-    this.supplier.unsubscribe(this.name, this.params);
+    this.supplier.unsubscribe(this.instance);
     popContext();
   }
 }
@@ -598,6 +598,7 @@ fun useExternalCollection(
       context,
       dirName,
       (context, writer, key, it) ~> {
+        instance = Ksuid::create().toString();
         storeDir = dirName.sub(base64(it.first.toString()));
         store = context.mkdir(
           JSONID::keyType,
@@ -608,12 +609,13 @@ fun useExternalCollection(
           Some(
             LinkToResource(
               externalSupplier,
+              instance,
               CollectionWriter(storeDir),
               resource,
               it.first.json,
             ),
           ),
-          Some(CloseResource(externalSupplier, resource, it.first.json)),
+          Some(CloseResource(externalSupplier, instance)),
         );
         writer.set(key, Handle(store));
       },
