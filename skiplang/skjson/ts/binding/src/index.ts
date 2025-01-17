@@ -282,14 +282,14 @@ class ObjectHandle<T extends Internal.CJSON> {
     public readonly pointer: Pointer<T>,
   ) {}
 
-  getFieldAt(idx: number): Exportable {
+  private getFieldAt(idx: number): Exportable {
     return interpretPointer(
       this.binding,
       this.binding.SKIP_SKJSON_get(this.pointer, idx),
     );
   }
 
-  objectFields() {
+  private objectFields() {
     if (!this.fields) {
       this.fields = new Map();
       const size = this.binding.SKIP_SKJSON_objectSize(this.pointer);
