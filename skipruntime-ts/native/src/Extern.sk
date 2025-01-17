@@ -623,7 +623,10 @@ fun getAllOfRuntime(
     }
   | _ ->
     SKStore.runWithResult(context ~> {
-      getAll(context, resource, params, optRequest)
+      res = getAll(context, resource, params, optRequest);
+      /* Ensure all resources closed at right time */
+      updateContext(context);
+      res
     })
   }) match {
   | Success(result) ->
@@ -664,7 +667,10 @@ fun getForKeyOfRuntime(
     }
   | _ ->
     SKStore.runWithResult(context ~> {
-      getForKey(context, resource, params, key, optRequest)
+      res = getForKey(context, resource, params, key, optRequest);
+      /* Ensure all resources closed at right time */
+      updateContext(context);
+      res
     })
   }) match {
   | Success(result) ->
