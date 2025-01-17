@@ -312,14 +312,14 @@ interface ToWasm {
   SkipRuntime_ExternalService__subscribe(
     supplier: Handle<ExternalService>,
     collection: ptr<Internal.String>,
+    instance: ptr<Internal.String>,
     resource: ptr<Internal.String>,
     params: ptr<Internal.CJSON>,
   ): void;
 
   SkipRuntime_ExternalService__unsubscribe(
     supplier: Handle<ExternalService>,
-    skresource: ptr<Internal.String>,
-    skparams: ptr<Internal.CJSON>,
+    instance: ptr<Internal.String>,
   ): void;
 
   SkipRuntime_ExternalService__shutdown(
@@ -1012,12 +1012,14 @@ class LinksImpl implements Links {
   subscribeOfExternalService(
     sksupplier: Handle<ExternalService>,
     skwriter: ptr<Internal.String>,
+    skinstance: ptr<Internal.String>,
     skresource: ptr<Internal.String>,
     skparams: ptr<Internal.CJSON>,
   ) {
-    this.tobinding.SkipRuntime_ExternalService__subscribe(
+    return this.tobinding.SkipRuntime_ExternalService__subscribe(
       sksupplier,
       this.utils.importString(skwriter),
+      this.utils.importString(skinstance),
       this.utils.importString(skresource),
       skparams,
     );
@@ -1025,13 +1027,11 @@ class LinksImpl implements Links {
 
   unsubscribeOfExternalService(
     sksupplier: Handle<ExternalService>,
-    skresource: ptr<Internal.String>,
-    skparams: ptr<Internal.CJSON>,
+    skinstance: ptr<Internal.String>,
   ) {
     this.tobinding.SkipRuntime_ExternalService__unsubscribe(
       sksupplier,
-      this.utils.importString(skresource),
-      skparams,
+      this.utils.importString(skinstance),
     );
   }
 

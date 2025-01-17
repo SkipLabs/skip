@@ -130,6 +130,7 @@ class ExternLazyCompute(eptr: SKStore.ExternalPointer) extends LazyCompute {
 native fun subscribeOfExternalService(
   externalSupplier: UInt32,
   collection: String,
+  instance: String,
   resource: String,
   params: SKJSON.CJSON,
 ): void;
@@ -138,8 +139,7 @@ native fun subscribeOfExternalService(
 @debug
 native fun unsubscribeOfExternalService(
   externalSupplier: UInt32,
-  resource: String,
-  params: SKJSON.CJSON,
+  instance: String,
 ): void;
 
 @cpp_extern("SkipRuntime_ExternalService__shutdown")
@@ -161,6 +161,7 @@ class ExternExternalService(
   eptr: SKStore.ExternalPointer,
 ) extends ExternalService {
   fun subscribe(
+    instance: String,
     collection: CollectionWriter,
     resource: String,
     params: SKJSON.CJSON,
@@ -168,13 +169,14 @@ class ExternExternalService(
     subscribeOfExternalService(
       this.eptr.value,
       collection.dirName.toString(),
+      instance,
       resource,
       params,
     )
   }
 
-  fun unsubscribe(resource: String, params: SKJSON.CJSON): void {
-    unsubscribeOfExternalService(this.eptr.value, resource, params)
+  fun unsubscribe(instance: String): void {
+    unsubscribeOfExternalService(this.eptr.value, instance)
   }
 
   fun shutdown(): void {

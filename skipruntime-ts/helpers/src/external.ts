@@ -6,6 +6,7 @@ import { fetchJSON } from "./rest.js";
  */
 export interface ExternalResource {
   open(
+    instance: string,
     params: Json,
     callbacks: {
       update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
@@ -14,7 +15,7 @@ export interface ExternalResource {
     },
   ): void;
 
-  close(params: Json): void;
+  close(instance: string): void;
 }
 
 /**
@@ -23,6 +24,8 @@ export interface ExternalResource {
  * `GenericExternalService` provides an implementation of `ExternalService` for external resources by lifting the `open` and `close` operations from `ExternalResource` to the `subscribe` and `unsubscribe` operations required by `ExternalService`.
  */
 export class GenericExternalService implements ExternalService {
+  private readonly instances = new Map<string, ExternalResource>();
+
   /**
    * @param resources - Association of resource names to `ExternalResource`s.
    */
@@ -31,6 +34,7 @@ export class GenericExternalService implements ExternalService {
   ) {}
 
   subscribe(
+    instance: string,
     resourceName: string,
     params: Json,
     callbacks: {
@@ -38,24 +42,23 @@ export class GenericExternalService implements ExternalService {
       error: (error: Json) => void;
       loading: () => void;
     },
-  ): void {
+  ) {
     const resource = this.resources[resourceName] as
       | ExternalResource
       | undefined;
     if (!resource) {
       throw new Error(`Unkonwn resource named '${resourceName}'`);
     }
-    resource.open(params, callbacks);
+    this.instances.set(instance, resource);
+    resource.open(instance, params, callbacks);
   }
 
-  unsubscribe(resourceName: string, params: Json) {
-    const resource = this.resources[resourceName] as
-      | ExternalResource
-      | undefined;
-    if (!resource) {
-      throw new Error(`Unkonwn resource named '${resourceName}'`);
+  unsubscribe(instance: string) {
+    const resource = this.instances.get(instance);
+    if (resource) {
+      resource.close(instance);
+      this.instances.delete(instance);
     }
-    resource.close(params);
   }
 
   shutdown(): void {
@@ -64,11 +67,13 @@ export class GenericExternalService implements ExternalService {
 }
 
 type Timeout = ReturnType<typeof setInterval>;
+type Timeouts = { [name: string]: Timeout };
 
 export class TimerResource implements ExternalResource {
   private readonly intervals = new Map<string, { [name: string]: Timeout }>();
 
   open(
+    instance: string,
     params: Json,
     callbacks: {
       update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
@@ -82,8 +87,7 @@ export class TimerResource implements ExternalResource {
       values.push([name, [time]]);
     }
     callbacks.update(values, true);
-    const id = toId(params);
-    const intervals: { [name: string]: Timeout } = {};
+    const intervals: Timeouts = {};
     for (const [name, duration] of Object.entries(params)) {
       const ms = Number(duration);
       if (ms > 0) {
@@ -93,15 +97,16 @@ export class TimerResource implements ExternalResource {
         }, ms);
       }
     }
-    this.intervals.set(id, intervals);
+    this.intervals.set(instance, intervals);
   }
 
-  close(params: Json): void {
-    const intervals = this.intervals.get(toId(params));
+  close(instance: string): void {
+    const intervals = this.intervals.get(instance);
     if (intervals != null) {
       for (const interval of Object.values(intervals)) {
         clearInterval(interval);
       }
+      this.intervals.delete(instance);
     }
   }
 }
@@ -145,14 +150,14 @@ export class Polled<S extends Json, K extends Json, V extends Json>
   ) {}
 
   open(
+    instance: string,
     params: Json,
     callbacks: {
       update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
       error: (error: Json) => void;
       loading: () => void;
     },
-  ): void {
-    this.close(params);
+  ) {
     const url = `${this.url}?${this.encodeParams(params)}`;
     const call = () => {
       callbacks.loading();
@@ -166,22 +171,14 @@ export class Polled<S extends Json, K extends Json, V extends Json>
         });
     };
     call();
-    this.intervals.set(toId(params), setInterval(call, this.duration));
+    this.intervals.set(instance, setInterval(call, this.duration));
   }
 
-  close(params: Json): void {
-    const interval = this.intervals.get(toId(params));
+  close(instance: string): void {
+    const interval = this.intervals.get(instance);
     if (interval) {
       clearInterval(interval);
+      this.intervals.delete(instance);
     }
   }
-}
-
-function toId(params: Json): string {
-  if (typeof params == "object") {
-    const strparams = Object.entries(params)
-      .map(([key, value]) => `${key}:${btoa(JSON.stringify(value))}`)
-      .sort();
-    return `[${strparams.join(",")}]`;
-  } else return btoa(JSON.stringify(params));
 }
