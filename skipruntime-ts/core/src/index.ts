@@ -963,6 +963,7 @@ export class ToBinding {
   SkipRuntime_ExternalService__subscribe(
     sksupplier: Handle<ExternalService>,
     writerId: string,
+    instance: string,
     resource: string,
     skparams: Pointer<Internal.CJObject>,
   ): void {
@@ -970,7 +971,7 @@ export class ToBinding {
     const supplier = this.handles.get(sksupplier);
     const writer = new CollectionWriter(writerId, this.refs());
     const params = skjson.importJSON(skparams, true) as Json;
-    supplier.subscribe(resource, params, {
+    supplier.subscribe(instance, resource, params, {
       update: writer.update.bind(writer),
       error: writer.error.bind(writer),
       loading: writer.loading.bind(writer),
@@ -979,13 +980,10 @@ export class ToBinding {
 
   SkipRuntime_ExternalService__unsubscribe(
     sksupplier: Handle<ExternalService>,
-    resource: string,
-    skparams: Pointer<Internal.CJObject>,
+    instance: string,
   ): void {
-    const skjson = this.getJsonConverter();
     const supplier = this.handles.get(sksupplier);
-    const params = skjson.importJSON(skparams, true) as Json;
-    supplier.unsubscribe(resource, params);
+    supplier.unsubscribe(instance);
   }
 
   SkipRuntime_ExternalService__shutdown(

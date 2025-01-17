@@ -15,37 +15,12 @@ import type {
   ExternalService,
 } from "@skipruntime/api";
 import { NonUniqueValueException, OneToOneMapper } from "@skipruntime/api";
-import { Count, Sum } from "@skipruntime/core";
+import { Count, Sum, type ServiceInstance } from "@skipruntime/core";
 
 import {
   TimerResource,
   GenericExternalService,
 } from "@skipruntime/helpers/external.js";
-
-type GetResult<T> = {
-  request?: string;
-  payload: T;
-  errors: Json[];
-};
-
-interface ServiceInstance {
-  getAll<K extends Json, V extends Json>(
-    resource: string,
-    params?: Json,
-  ): GetResult<Entry<K, V>[]>;
-  getArray<V extends Json>(
-    resource: string,
-    key: string | number,
-    params?: Json,
-  ): GetResult<V[]>;
-  update<K extends Json, V extends Json>(
-    collection: string,
-    entries: Entry<K, V>[],
-  ): void;
-  instantiateResource(identifier: string, resource: string, params: Json): void;
-  closeResourceInstance(resourceInstanceId: string): void;
-  close(): void;
-}
 
 //// testMap1
 
@@ -428,6 +403,7 @@ async function timeout(ms: number) {
 
 class MockExternal implements ExternalService {
   subscribe(
+    _instance: string,
     resource: string,
     params: { v1: string; v2: string },
     callbacks: {
@@ -441,10 +417,9 @@ class MockExternal implements ExternalService {
         console.error(e),
       );
     }
-    return;
   }
 
-  unsubscribe(_resource: string, _params: { v1: string; v2: string }) {
+  unsubscribe(_instance: string) {
     return;
   }
 
