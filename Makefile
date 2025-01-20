@@ -276,13 +276,13 @@ publish-helpers:
 publish-wasm:
 	bin/release_npm.sh @skipruntime/wasm skipruntime-ts/wasm/package.json $(OPT)
 
-.PHONY: publish-addon
-publish-addon:
-	bin/release_npm.sh @skipruntime/addon skipruntime-ts/addon/package.json $(OPT)
+.PHONY: publish-native
+publish-native:
+	bin/release_npm.sh @skipruntime/native skipruntime-ts/addon/package.json $(OPT)
 
 .PHONY: publish-server
 publish-server:
 	bin/release_npm.sh @skipruntime/server skipruntime-ts/server/package.json $(OPT)
 
 .PHONY: publish-all
-publish-all: clean publish-std publish-json publish-date publish-core publish-helpers publish-wasm publish-addon publish-server
+publish-all: clean publish-std publish-json publish-date publish-core publish-helpers publish-wasm publish-native publish-server
