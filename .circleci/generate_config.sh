@@ -69,7 +69,7 @@ then
 EOF
 fi
 
-if (( $skdb != 0 || $skstore != 0 || $skipruntime != 0 || $ts_prelude != 0 ))
+if (( $skstore != 0 || $skipruntime != 0 || $ts_prelude != 0 ))
 then
     cat <<EOF
   skipruntime:
