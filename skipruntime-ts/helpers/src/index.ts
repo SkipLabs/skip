@@ -7,6 +7,7 @@
 export {
   type ExternalResource,
   GenericExternalService,
+  PostgresExternalService,
   Polled,
 } from "./external.js";
 export { SkipExternalService } from "./remote.js";
