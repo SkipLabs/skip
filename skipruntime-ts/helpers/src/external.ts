@@ -187,15 +187,6 @@ export class Polled<S extends Json, K extends Json, V extends Json>
   }
 }
 
-function toId(params: Json): string {
-  if (typeof params == "object") {
-    const strparams = Object.entries(params)
-      .map(([key, value]) => `${key}:${btoa(JSON.stringify(value))}`)
-      .sort();
-    return `[${strparams.join(",")}]`;
-  } else return btoa(JSON.stringify(params));
-}
-
 const min32bitInt = -2147483648;
 const max32bitInt = 2147483647;
 function validateKeyParam(params: Json): {
@@ -270,7 +261,7 @@ function validateKeyParam(params: Json): {
 export class PostgresExternalService implements ExternalService {
   client: Client;
   clientID: string;
-  private open_subscription_IDs: Set<string> = new Set<string>();
+  private open_instances: Set<string> = new Set<string>();
 
   constructor(db_config: {
     host: string;
@@ -294,6 +285,7 @@ export class PostgresExternalService implements ExternalService {
   }
 
   subscribe(
+    instance: string,
     table: string,
     params: Json,
     callbacks: {
@@ -304,8 +296,6 @@ export class PostgresExternalService implements ExternalService {
   ): void {
     const key = validateKeyParam(params);
 
-    const id: string = `${this.clientID}.${table}.${key.col}`;
-
     const setup = async () => {
       callbacks.loading();
       const init = await this.client.query(format("SELECT * FROM %I;", table));
@@ -314,7 +304,7 @@ export class PostgresExternalService implements ExternalService {
         true,
       );
       // Reuse existing trigger/function if possible
-      if (!this.open_subscription_IDs.has(id)) {
+      if (!this.open_instances.has(instance)) {
         await this.client.query(
           format(
             `
@@ -327,7 +317,7 @@ BEGIN
   END IF;
   RETURN NULL;
 END $f$ LANGUAGE PLPGSQL;`,
-            id,
+            instance,
             this.clientID,
             key.col,
             this.clientID,
@@ -340,9 +330,9 @@ END $f$ LANGUAGE PLPGSQL;`,
 CREATE OR REPLACE TRIGGER %I
 AFTER INSERT OR UPDATE OR DELETE ON %I
 FOR EACH ROW EXECUTE FUNCTION %I();`,
-            id,
+            instance,
             table,
-            id,
+            instance,
           ),
         );
       }
@@ -359,20 +349,20 @@ FOR EACH ROW EXECUTE FUNCTION %I();`,
           );
         }
       });
-      this.open_subscription_IDs.add(id);
+      this.open_instances.add(instance);
     };
     setup().catch(() => {
       throw new Error("Error setting up Postgres notifications");
     });
   }
 
-  unsubscribe(table: string, params: Json): void {
-    const key = validateKeyParam(params);
-    const id: string = `${this.clientID}.${table}.${key.col}`;
-    this.client.query(format("DROP FUNCTION %I CASCADE;", id)).then(
-      () => this.open_subscription_IDs.delete(id),
+  unsubscribe(instance: string): void {
+    this.client.query(format("DROP FUNCTION %I CASCADE;", instance)).then(
+      () => this.open_instances.delete(instance),
       () => {
-        throw new Error("Error unsubscribing from Postgres table " + table);
+        throw new Error(
+          "Error unsubscribing from resource instance: " + instance,
+        );
       },
     );
   }
@@ -381,7 +371,7 @@ FOR EACH ROW EXECUTE FUNCTION %I();`,
     this.client
       .query(
         "DROP FUNCTION " +
-          Array.from(this.open_subscription_IDs)
+          Array.from(this.open_instances)
             .map((x) => format("%I", x))
             .join(", ") +
           " CASCADE;",
