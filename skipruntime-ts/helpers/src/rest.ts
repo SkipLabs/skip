@@ -173,24 +173,6 @@ export class SkipServiceBroker {
   }
 
   /**
-   * Write the values for a single key in a collection.
-   *
-   * @typeParam K - Type of keys.
-   * @typeParam V - Type of values.
-   * @param collection - Name of the input collection to update, must be a key of the `Inputs` type parameter of the `SkipService` running at `entrypoint`.
-   * @param key - Key of entry to write.
-   * @param values - Values of entry to write.
-   * @returns {void}
-   */
-  async put<K extends Json, V extends Json>(
-    collection: string,
-    key: K,
-    values: V[],
-  ): Promise<void> {
-    return await this.update(collection, [[key, values]]);
-  }
-
-  /**
    * Write multiple entries to a collection.
    *
    * @typeParam K - Type of keys.
