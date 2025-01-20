@@ -1,4 +1,4 @@
-import type { EagerCollection, Context, Resource } from "@skipruntime/api";
+import type { EagerCollection, Context, Resource } from "@skipruntime/core";
 import { initService } from "@skipruntime/wasm";
 import { runService } from "@skipruntime/server";
 import { GenericExternalService, Polled } from "@skipruntime/helpers";

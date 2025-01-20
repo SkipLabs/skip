@@ -1,6 +1,6 @@
 import express from "express";
 import { ServiceInstance, UnknownCollectionError } from "@skipruntime/core";
-import type { CollectionUpdate, Entry, Json } from "@skipruntime/api";
+import type { CollectionUpdate, Entry, Json } from "@skipruntime/core";
 
 export function controlService(service: ServiceInstance): express.Express {
   const app = express();

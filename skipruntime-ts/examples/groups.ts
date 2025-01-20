@@ -4,7 +4,7 @@ import {
   type Json,
   type Resource,
   OneToManyMapper,
-} from "@skipruntime/api";
+} from "@skipruntime/core";
 
 import { initService } from "@skipruntime/wasm";
 import { runService } from "@skipruntime/server";

@@ -5,7 +5,7 @@ import type {
   Values,
   Resource,
   SkipService,
-} from "@skipruntime/api";
+} from "@skipruntime/core";
 
 type Post = {
   author_id: number;

@@ -4,8 +4,8 @@ import type {
   Values,
   NamedCollections,
   Resource,
-} from "@skipruntime/api";
-import { ManyToOneMapper } from "@skipruntime/api";
+} from "@skipruntime/core";
+import { ManyToOneMapper } from "@skipruntime/core";
 import { SkipExternalService } from "@skipruntime/helpers";
 
 import { initService } from "@skipruntime/wasm";

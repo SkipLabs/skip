@@ -3,7 +3,7 @@ import type {
   SkipService,
   Resource,
   Entry,
-} from "@skipruntime/api";
+} from "@skipruntime/core";
 
 import { runService } from "@skipruntime/server";
 import { initService } from "@skipruntime/wasm";
