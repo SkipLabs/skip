@@ -187,7 +187,7 @@ export class SkipServiceBroker {
     key: K,
     values: V[],
   ): Promise<void> {
-    return await this.patch(collection, [[key, values]]);
+    return await this.update(collection, [[key, values]]);
   }
 
   /**
@@ -199,7 +199,7 @@ export class SkipServiceBroker {
    * @param entries - Entries to write.
    * @returns {void}
    */
-  async patch<K extends Json, V extends Json>(
+  async update<K extends Json, V extends Json>(
     collection: string,
     entries: Entry<K, V>[],
   ): Promise<void> {
@@ -217,7 +217,7 @@ export class SkipServiceBroker {
    * @returns {void}
    */
   async deleteKey<K extends Json>(collection: string, key: K): Promise<void> {
-    return await this.patch(collection, [[key, []]]);
+    return await this.update(collection, [[key, []]]);
   }
 
   /**
