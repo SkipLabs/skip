@@ -1,6 +1,6 @@
-import type { EagerCollection, Values, Resource } from "@skipruntime/api";
+import type { EagerCollection, Values, Resource } from "@skipruntime/core";
 
-import { ManyToOneMapper } from "@skipruntime/api";
+import { ManyToOneMapper } from "@skipruntime/core";
 
 import { initService } from "@skipruntime/wasm";
 import { runService } from "@skipruntime/server";

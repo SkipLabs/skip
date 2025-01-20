@@ -1,5 +1,5 @@
-import type { Json, Entry } from "@skipruntime/api";
-import { NonUniqueValueException } from "@skipruntime/api";
+import type { Json, Entry } from "@skipruntime/core";
+import { NonUniqueValueException } from "@skipruntime/core";
 
 /**
  * An entry point of a Skip reactive service.

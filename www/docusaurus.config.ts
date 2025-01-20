@@ -186,15 +186,15 @@ const config: Config = {
       {
         id: "api",
         out: "docs/api/api",
-        entryPoints: ["../skipruntime-ts/api/src/api.ts"],
-        tsconfig: "../skipruntime-ts/api/tsconfig.json",
+        entryPoints: ["../skipruntime-ts/core/src/api.ts"],
+        tsconfig: "../skipruntime-ts/core/tsconfig.json",
         readme: "none",
         indexFormat: "table",
         disableSources: true,
         groupOrder: ["Type Aliases", "Interfaces", "Classes", "functions"],
         sidebar: { pretty: true },
         textContentMappings: {
-          "title.indexPage": "@skipruntime/api",
+          "title.indexPage": "@skipruntime/core",
           "title.memberPage": "{name}",
         },
         parametersFormat: "table",

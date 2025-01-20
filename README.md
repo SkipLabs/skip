@@ -10,7 +10,7 @@ TypeScript interfaces and abstractions are provided so that you can write a reac
 
 To get started, install the NPM packages for the Skip runtime API, server, and helpers:
 
-```npm install @skipruntime/api @skipruntime/server @skipruntime/helpers```
+```npm install @skipruntime/core @skipruntime/server @skipruntime/helpers```
 
 From there, you're ready to start building a reactive service!
 See the [getting started guide](https://skiplabs.io/docs/getting_started) to walk through some of Skip's core concepts by example and get up to speed.

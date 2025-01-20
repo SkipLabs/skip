@@ -1,12 +1,11 @@
 import { run, type ModuleInit } from "@skip-wasm/std";
-import type { SkipService } from "@skipruntime/api";
 import type { ServiceInstanceFactory } from "./internals/skipruntime_module.js";
 
 import { init as runtimeInit } from "@skip-wasm/std/runtime.js";
 import { init as posixInit } from "@skip-wasm/std/posix.js";
 import { init as skjsonInit } from "@skip-wasm/json";
 import { init as skruntimeInit } from "./internals/skipruntime_module.js";
-import type { ServiceInstance } from "@skipruntime/core";
+import type { SkipService, ServiceInstance } from "@skipruntime/core";
 
 const modules: ModuleInit[] = [
   runtimeInit,

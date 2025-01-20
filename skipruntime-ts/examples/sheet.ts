@@ -5,9 +5,9 @@ import type {
   LazyCollection,
   Json,
   Resource,
-} from "@skipruntime/api";
+} from "@skipruntime/core";
 
-import { OneToOneMapper } from "@skipruntime/api";
+import { OneToOneMapper } from "@skipruntime/core";
 
 import { initService } from "@skipruntime/wasm";
 import { runService } from "@skipruntime/server";

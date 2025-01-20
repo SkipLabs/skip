@@ -1,7 +1,7 @@
 // TODO: Remove once global `EventSource` makes it out of experimental
 // in nodejs LTS.
 import EventSource from "eventsource";
-import type { Json, Entry } from "@skipruntime/api";
+import type { Json, Entry } from "@skipruntime/core";
 import { SkipServiceBroker } from "@skipruntime/helpers";
 import { createInterface } from "readline";
 

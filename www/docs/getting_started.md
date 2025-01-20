@@ -4,7 +4,7 @@
 
 Before you begin, we recommend installing the NPM packages for the Skip API, server, and helpers.
 
-```npm install @skipruntime/api @skipruntime/server @skipruntime/helpers```
+```npm install @skipruntime/core @skipruntime/server @skipruntime/helpers```
 
 ## Introduction
 

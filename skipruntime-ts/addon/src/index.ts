@@ -19,7 +19,7 @@ type AddOn = {
 
 const skip_runtime: AddOn = require("../../build/Release/skip_runtime.node");
 
-import type { SkipService } from "@skipruntime/api";
+import type { SkipService } from "@skipruntime/core";
 
 const jsonBinding: JsonBinding = skip_runtime.getJsonBinding();
 const jsonConverter = buildJsonConverter(jsonBinding);
