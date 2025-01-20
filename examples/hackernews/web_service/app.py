@@ -1,4 +1,4 @@
-from flask import Flask, g, json, request, Response, redirect, url_for
+from flask import Flask, json, request, redirect
 import psycopg2
 import requests
 
@@ -79,9 +79,9 @@ def create_post():
             db.commit()
 
     # Write into the reactive input collection.
-    requests.put(
-        f"{REACTIVE_SERVICE_URL}/inputs/posts/{post_id}",
-        json=[{ **params, 'id': post_id }]
+    requests.patch(
+        f"{REACTIVE_SERVICE_URL}/inputs/posts",
+        json=[[post_id, [{**params, "id": post_id}]]],
     )
 
     return "ok", 200
@@ -99,7 +99,7 @@ def upvote_post(post_id):
             db.commit()
 
     # Write into the reactive input collection.
-    resp = requests.patch(
+    requests.patch(
         f"{REACTIVE_SERVICE_URL}/inputs/upvotes",
         json=[[
             upvote_id,
