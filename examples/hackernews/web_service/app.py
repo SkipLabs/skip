@@ -47,7 +47,7 @@ def posts_index():
     if 'text/event-stream' in request.accept_mimetypes:
         resp = requests.post(
             f"{REACTIVE_SERVICE_URL}/streams/posts",
-            json={ 'limit': 10 },
+            json=10,
         )
         uuid = resp.text
 
@@ -56,7 +56,7 @@ def posts_index():
     else:
         resp = requests.post(
             f"{REACTIVE_SERVICE_URL}/snapshot/posts",
-            json={ 'limit': 10 },
+            json=10,
         )
 
         # The reactive service returns an array of (id, values) where
