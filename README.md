@@ -12,6 +12,30 @@ To get started, install the NPM packages for the Skip runtime API, server, and h
 
 ```npm install @skipruntime/core @skipruntime/server @skipruntime/helpers```
 
+Two versions of the runtime are available, a wasm `@skipruntime/wasm` and a native `@skipruntime/addon`.
+The `wasm` version works just as well with `node` as with bun, but has the disadvantage of having a limited memory address space.
+The `addon` version does not have this disadvantage, however it is currently only available for `node` and is a little less easy to install.
+
+### The Wasm runtime installation
+
+```npm install @skipruntime/wasm```
+
+### The native runtime installation
+
+First, install the Skip runtime native library:
+
+- Precompiled packages
+
+  ```To be specified```
+
+- Built and installed from skip git repository:
+
+  ```To be specified```
+
+Then, the related npm package:
+
+```npm install @skipruntime/addon```
+
 From there, you're ready to start building a reactive service!
 See the [getting started guide](https://skiplabs.io/docs/getting_started) to walk through some of Skip's core concepts by example and get up to speed.
 

@@ -6,6 +6,30 @@ Before you begin, we recommend installing the NPM packages for the Skip API, ser
 
 ```npm install @skipruntime/core @skipruntime/server @skipruntime/helpers```
 
+Two versions of the runtime are available, a wasm `@skipruntime/wasm` and a native `@skipruntime/addon`.
+The `wasm` version works just as well with `node` as with bun, but has the disadvantage of having a limited memory address space.
+The `addon` version does not have this disadvantage, however it is currently only available for `node` and is a little less easy to install.
+
+### The Wasm runtime installation
+
+```npm install @skipruntime/wasm```
+
+### The native runtime installation
+
+First, install the Skip runtime native library:
+
+- Precompiled packages
+
+  ```To be specified```
+
+- Built and installed from skip git repository:
+
+  ```To be specified```
+
+Then, the related npm package:
+
+```npm install @skipruntime/addon```
+
 ## Introduction
 
 We have several resources available to help you learn the Skip framework, depending on your background and preferences.
@@ -106,14 +130,14 @@ const [users, groups] = await Promise.all([
 ]);
 
 // Specify and run the reactive service
-const service = await runService({
+const instance = await initService({
   initialData: { users, groups },
   resources: { active_friends: ActiveFriends },
   createGraph(input: ServiceInputs): ResourceInputs {
     const actives = input.groups.map(ActiveUsers, input.users);
     return { users: input.users, actives };
-  },
-});
+  }});
+const service = runService(instance);
 ```
 
 This example service operates over two _input collections_ (one for users and one for groups, as specified by `ServiceInputs`) and passes some `ResourceInputs` to its resources: a reactively-computed collection `actives` of the set of active users in each group, along with the `users` input collection.
