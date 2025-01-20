@@ -6,9 +6,9 @@ Before you begin, we recommend installing the NPM packages for the Skip API, ser
 
 ```npm install @skipruntime/core @skipruntime/server @skipruntime/helpers```
 
-Two versions of the runtime are available, a wasm `@skipruntime/wasm` and a native `@skipruntime/addon`.
-The `wasm` version works just as well with `node` as with bun, but has the disadvantage of having a limited memory address space.
-The `addon` version does not have this disadvantage, however it is currently only available for `node` and is a little less easy to install.
+Two versions of the runtime are available, a Wasm `@skipruntime/wasm` and a native `@skipruntime/native`.
+The Wasm runtime works with both `node` and `bun`, but is limited to Wasm's 32-bit memory address space.
+The native runtime does not have this limitation, but it is currently only available for Node and is a bit more involved to install.
 
 ### The Wasm runtime installation
 
@@ -28,7 +28,7 @@ First, install the Skip runtime native library:
 
 Then, the related npm package:
 
-```npm install @skipruntime/addon```
+```npm install @skipruntime/native```
 
 ## Introduction
 
