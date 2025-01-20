@@ -27,6 +27,8 @@ import {
   GenericExternalService,
 } from "@skipruntime/helpers/external.js";
 
+import { it as mit, type AsyncFunc } from "mocha";
+
 //// testMap1
 
 class Map1 implements Mapper<string, number, string, number> {
@@ -543,8 +545,12 @@ const multipleResourcesService: SkipService<Input_SN_SN, Input_SN_SN> = {
 };
 
 export function initTests(
+  category: string,
   initService: (service: SkipService) => Promise<ServiceInstance>,
 ) {
+  const it = (title: string, fn?: AsyncFunc) =>
+    mit(`${title}[${category}]`, fn);
+
   it("testMap1", async () => {
     const service = await initService(map1Service);
     service.update("input", [["1", [10]]]);

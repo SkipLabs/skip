@@ -272,10 +272,6 @@ publish-core:
 publish-helpers:
 	bin/release_npm.sh @skipruntime/helpers skipruntime-ts/helpers/package.json $(OPT)
 
-.PHONY: publish-tests
-publish-tests:
-	bin/release_npm.sh @skipruntime/tests skipruntime-ts/tests/package.json $(OPT)
-
 .PHONY: publish-wasm
 publish-wasm:
 	bin/release_npm.sh @skipruntime/wasm skipruntime-ts/wasm/package.json $(OPT)
@@ -289,4 +285,4 @@ publish-server:
 	bin/release_npm.sh @skipruntime/server skipruntime-ts/server/package.json $(OPT)
 
 .PHONY: publish-all
-publish-all: clean publish-std publish-json publish-date publish-core publish-helpers publish-tests publish-wasm publish-addon publish-server
+publish-all: clean publish-std publish-json publish-date publish-core publish-helpers publish-wasm publish-addon publish-server
