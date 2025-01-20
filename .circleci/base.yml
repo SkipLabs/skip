@@ -101,7 +101,7 @@ jobs:
       - store_test_results:
           path: ~/test-results/skjson.xml
 
-  skipruntime-wasm:
+  skipruntime:
     docker:
       - image: skiplabs/skdb-base:latest
     steps:
@@ -114,19 +114,4 @@ jobs:
             mkdir -p ~/test-results
             cd skipruntime-ts && make test
       - store_test_results:
-          path: ~/test-results/skipruntime-wasm.xml
-
-  skipruntime-native:
-    docker:
-      - image: skiplabs/skdb-base:latest
-    steps:
-      - checkout
-      - setup
-      - run:
-          name: Run addon skip runtime tests
-          no_output_timeout: 10m
-          command: |
-            mkdir -p ~/test-results
-            cd skipruntime-ts && make test-native
-      - store_test_results:
-          path: ~/test-results/skipruntime-native.xml
+          path: ~/test-results/skipruntime.xml
