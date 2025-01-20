@@ -17,7 +17,7 @@ type AddOn = {
   getErrorObject: (skExc: Pointer<IException>) => Error;
 };
 
-const skip_runtime: AddOn = require("../../build/Release/skip_runtime.node");
+const skip_runtime: AddOn = require("../build/Release/skip_runtime.node");
 
 import type { SkipService } from "@skipruntime/core";
 

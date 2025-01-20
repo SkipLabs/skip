@@ -4,19 +4,13 @@
   "gypfile": true,
   "type": "module",
   "exports": {
-    ".": "./dist/src/index.js"
+    ".": "./dist/index.js"
   },
   "scripts": {
     "prepare": "host=$(node -e \"const process = require('process');console.log(process.arch + '-' + process.platform)\") && mkdir -p dist && skargo build -r --lib --manifest-path=../native/Skargo.toml --out-dir=./dist && mv dist/libskip-runtime-ts.so dist/libskip-runtime-ts-$host.so",
     "build": "host=$(node -e \"const process = require('process');console.log(process.arch + '-' + process.platform)\") && mkdir -p dist && skargo build -r --lib --manifest-path=../native/Skargo.toml --out-dir=./dist  && mv dist/libskip-runtime-ts.so dist/libskip-runtime-ts-$host.so && tsc && npm i",
     "clean": "rm -rf dist build",
-    "lint": "eslint",
-    "test": "mocha"
-  },
-  "devDependencies": {
-    "@skipruntime/tests": "0.0.9",
-    "@types/mocha": "^10.0.10",
-    "mocha": "^11.0.1"
+    "lint": "eslint"
   },
   "dependencies": {
     "@skipruntime/core": "0.0.5"
