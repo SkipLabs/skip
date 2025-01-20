@@ -8,6 +8,7 @@ import type {
 import { ManyToOneMapper } from "@skipruntime/api";
 import { SkipExternalService } from "@skipruntime/helpers";
 
+import { initService } from "@skipruntime/wasm";
 import { runService } from "@skipruntime/server";
 
 class Mult extends ManyToOneMapper<string, number, number> {
@@ -32,27 +33,24 @@ class MultResource implements Resource {
     return sub.merge(add).map(Mult);
   }
 }
-
-const service = await runService(
-  {
-    resources: { data: MultResource },
-    externalServices: {
-      sumexample: SkipExternalService.direct({
-        host: "localhost",
-        streaming_port: 3587,
-        control_port: 3588,
-      }),
-    },
-
-    createGraph(inputCollections: NamedCollections) {
-      return inputCollections;
-    },
+const instance = await initService({
+  resources: { data: MultResource },
+  externalServices: {
+    sumexample: SkipExternalService.direct({
+      host: "localhost",
+      streaming_port: 3587,
+      control_port: 3588,
+    }),
   },
-  {
-    streaming_port: 3589,
-    control_port: 3590,
+
+  createGraph(inputCollections: NamedCollections) {
+    return inputCollections;
   },
-);
+});
+const service = runService(instance, {
+  streaming_port: 3589,
+  control_port: 3590,
+});
 
 function shutdown() {
   service.close();

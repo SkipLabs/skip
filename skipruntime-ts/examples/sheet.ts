@@ -9,6 +9,7 @@ import type {
 
 import { OneToOneMapper } from "@skipruntime/api";
 
+import { initService } from "@skipruntime/wasm";
 import { runService } from "@skipruntime/server";
 
 class ComputeExpression implements LazyCompute<string, string> {
@@ -76,23 +77,22 @@ class ComputedCells implements Resource<Outputs> {
     return collections.output;
   }
 }
-const service = await runService<Inputs, Outputs>(
-  {
-    initialData: { cells: [] },
-    resources: { computed: ComputedCells },
-    createGraph(inputCollections: Inputs, context: Context): Outputs {
-      const cells = inputCollections.cells;
-      // Create evaluation dependency graph as _lazy_ collection, calling itself to access other cells
-      const evaluator = context.createLazyCollection(ComputeExpression, cells);
-      // Produce eager collection for output resource
-      return { output: cells.map(CallCompute, evaluator) };
-    },
+const instance = await initService({
+  initialData: { cells: [] },
+  resources: { computed: ComputedCells },
+  createGraph(inputCollections: Inputs, context: Context): Outputs {
+    const cells = inputCollections.cells;
+    // Create evaluation dependency graph as _lazy_ collection, calling itself to access other cells
+    const evaluator = context.createLazyCollection(ComputeExpression, cells);
+    // Produce eager collection for output resource
+    return { output: cells.map(CallCompute, evaluator) };
   },
-  {
-    control_port: 9999,
-    streaming_port: 9998,
-  },
-);
+});
+
+const service = runService(instance, {
+  control_port: 9999,
+  streaming_port: 9998,
+});
 
 function shutdown() {
   service.close();
