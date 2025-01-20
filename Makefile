@@ -293,9 +293,5 @@ publish-addon:
 publish-server:
 	bin/release_npm.sh @skipruntime/server skipruntime-ts/server/package.json $(OPT)
 
-.PHONY: publish-runtime
-publish-runtime:
-	bin/release_npm.sh @skipruntime/runtime skipruntime-ts/runtime/package.json $(OPT)
-
 .PHONY: publish-all
-publish-all: clean publish-std publish-json publish-date publish-api publish-core publish-helpers publish-tests publish-wasm publish-addon publish-runtime publish-server
+publish-all: clean publish-std publish-json publish-date publish-api publish-core publish-helpers publish-tests publish-wasm publish-addon publish-server

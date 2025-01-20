@@ -4,8 +4,7 @@
  * @packageDocumentation
  */
 
-import { initService } from "@skipruntime/runtime";
-import type { SkipService, NamedCollections } from "@skipruntime/api";
+import { ServiceInstance } from "@skipruntime/core";
 import { controlService, streamingService } from "./rest.js";
 
 /**
@@ -82,17 +81,14 @@ export type SkipServer = {
  *
  * @typeParam Inputs - Named collections from which the service computes.
  * @typeParam ResourceInputs - Named collections provided to resource computations.
- * @param service - Service specification.
+ * @param instance - The Service instance.
  * @param options - Service configuration options.
  * @param options.control_port - Port on which control service will listen.
  * @param options.streaming_port - Port on which streaming service will listen.
  * @returns Object to manage the running server.
  */
-export async function runService<
-  Inputs extends NamedCollections,
-  ResourceInputs extends NamedCollections,
->(
-  service: SkipService<Inputs, ResourceInputs>,
+export function runService(
+  instance: ServiceInstance,
   options: {
     streaming_port: number;
     control_port: number;
@@ -100,9 +96,8 @@ export async function runService<
     streaming_port: 8080,
     control_port: 8081,
   },
-): Promise<SkipServer> {
-  const runtime = await initService(service);
-  const controlHttpServer = controlService(runtime).listen(
+): SkipServer {
+  const controlHttpServer = controlService(instance).listen(
     options.control_port,
     () => {
       console.log(
@@ -110,7 +105,7 @@ export async function runService<
       );
     },
   );
-  const streamingHttpServer = streamingService(runtime).listen(
+  const streamingHttpServer = streamingService(instance).listen(
     options.streaming_port,
     () => {
       console.log(
@@ -122,7 +117,7 @@ export async function runService<
   return {
     close: () => {
       controlHttpServer.close();
-      runtime.close();
+      instance.close();
       streamingHttpServer.close();
     },
   };
