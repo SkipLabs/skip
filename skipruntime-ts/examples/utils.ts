@@ -36,7 +36,7 @@ export class SkipHttpAccessV1 {
 
   async writeMany(data: Write[]) {
     const promises = data.map(async (w) =>
-      this.service.patch(w.collection, w.entries),
+      this.service.update(w.collection, w.entries),
     );
     if (promises.length == 1) {
       return promises[0];

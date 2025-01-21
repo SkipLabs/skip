@@ -25,7 +25,7 @@ app.get("/active_friends/:uid", (req, res) => {
 
 app.put("/users/:uid", (req, res) => {
   service
-    .put("users", Number(req.params.uid), [req.body])
+    .update("users", [[Number(req.params.uid), [req.body]]])
     .then(() => {
       res.status(200).json({});
     })
@@ -37,7 +37,7 @@ app.put("/users/:uid", (req, res) => {
 
 app.put("/groups/:gid", (req, res) => {
   service
-    .put("groups", Number(req.params.gid), [req.body])
+    .update("groups", [[Number(req.params.gid), [req.body]]])
     .then(() => {
       res.status(200).json({});
     })
