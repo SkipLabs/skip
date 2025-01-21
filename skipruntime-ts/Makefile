@@ -1,23 +1,7 @@
 SHELL := /bin/bash
 
 SKARGO_PROFILE?=release
-NPM_WORKSPACES=\
-    -w eslint-config\
-    -w tsconfig\
-    -w skiplang/prelude/ts/binding\
-    -w skiplang/prelude/ts/wasm\
-    -w skiplang/skdate/ts\
-    -w skiplang/skjson/ts/binding\
-    -w skiplang/skjson/ts/wasm\
-    -w skipruntime-ts/api\
-    -w skipruntime-ts/core\
-    -w skipruntime-ts/helpers\
-    -w skipruntime-ts/tests\
-    -w skipruntime-ts/wasm\
-    -w skipruntime-ts/addon\
-    -w skipruntime-ts/runtime\
-    -w skipruntime-ts/server\
-    -w skipruntime-ts/examples
+NPM_WORKSPACES=$(shell jq --raw-output "[.workspaces[] | select(startswith(\"sql\") | not)] | map(\"-w \" + .) | .[]" ../package.json)
 
 .PHONY: build
 build:
