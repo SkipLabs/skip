@@ -3,9 +3,10 @@ import type {
   SkipService,
   Resource,
   Entry,
-} from "@skipruntime/api";
+} from "@skipruntime/core";
 
 import { runService } from "@skipruntime/server";
+import { initService } from "@skipruntime/wasm";
 
 import Database from "better-sqlite3";
 
@@ -78,7 +79,9 @@ const data: Entry<string, User>[] = db
 
 db.close();
 
-const closable = await runService(serviceWithInitialData(data), {
+const instance = await initService(serviceWithInitialData(data));
+
+const closable = runService(instance, {
   streaming_port: 8080,
   control_port: 8081,
 });

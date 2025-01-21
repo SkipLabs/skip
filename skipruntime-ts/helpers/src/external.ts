@@ -1,4 +1,4 @@
-import type { Entry, ExternalService, Json } from "@skipruntime/api";
+import type { Entry, ExternalService, Json } from "@skipruntime/core";
 import { fetchJSON } from "./rest.js";
 
 /**

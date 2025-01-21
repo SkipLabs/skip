@@ -1,4 +1,5 @@
-import type { EagerCollection, Context, Resource } from "@skipruntime/api";
+import type { EagerCollection, Context, Resource } from "@skipruntime/core";
+import { initService } from "@skipruntime/wasm";
 import { runService } from "@skipruntime/server";
 import { GenericExternalService, Polled } from "@skipruntime/helpers";
 
@@ -47,28 +48,27 @@ class DeparturesResource implements Resource<ResourceInputs> {
   }
 }
 
-const service = await runService(
-  {
-    initialData: { config: [] },
-    resources: {
-      departures: DeparturesResource,
-    },
-    externalServices: {
-      externalDeparturesAPI: new GenericExternalService({
-        departuresFromAPI: new Polled(
-          "https://api.unhcr.org/rsq/v1/departures",
-          10000,
-          (data: Result) => data.results.map((v, idx) => [idx, [v]]),
-        ),
-      }),
-    },
-    createGraph: (ic) => ic,
+const instance = await initService({
+  initialData: { config: [] },
+  resources: {
+    departures: DeparturesResource,
   },
-  {
-    control_port: 3591,
-    streaming_port: 3590,
+  externalServices: {
+    externalDeparturesAPI: new GenericExternalService({
+      departuresFromAPI: new Polled(
+        "https://api.unhcr.org/rsq/v1/departures",
+        10000,
+        (data: Result) => data.results.map((v, idx) => [idx, [v]]),
+      ),
+    }),
   },
-);
+  createGraph: (ic) => ic,
+});
+
+const service = runService(instance, {
+  control_port: 3591,
+  streaming_port: 3590,
+});
 
 function shutdown() {
   service.close();

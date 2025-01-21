@@ -39,7 +39,7 @@ import {
   type Resource,
   type SkipService,
   type Watermark,
-} from "@skipruntime/api";
+} from "./api.js";
 
 import { UnknownCollectionError } from "./errors.js";
 import {
@@ -52,6 +52,7 @@ import {
 
 export { UnknownCollectionError, sk_freeze, isSkManaged };
 export { Sum, Min, Max, Count } from "./utils.js";
+export * from "./api.js";
 
 export type JSONMapper = Mapper<Json, Json, Json, Json>;
 export type JSONLazyCompute = LazyCompute<Json, Json>;

@@ -20,7 +20,7 @@ Skip reactive services are designed to interoperate simply and easily: services 
 To receive data from another Skip service, specify it in the `externalServices` field of your `SkipService`, for example as follows:
 
 ```typescript
-const service = await runService(
+const instance = await initService(
   {
     initialData: ...
     resources: ...
@@ -34,6 +34,8 @@ const service = await runService(
     },
   }
 );
+
+const service = runService(instance);
 ```
 
 This instantiates a new service, with a dependency on a service named `myOtherService` running at the specified ports of `my.other.service.net`.
@@ -66,7 +68,7 @@ The simplest option is *polling*, sending periodic requests to pull data from ex
 To specify a polled external dependency, specify it in your service definition, e.g. as follows
 
 ```typescript
-const service = await runService(
+const instannce = await initService(
   {
     initialData: ...
     resources: ...
@@ -84,6 +86,8 @@ const service = await runService(
     },
   }
 );
+
+const service = await runService(instannce);
 ```
 
 Although the underlying data source is non-reactive, this external service can be used identically to reactive external Skip services as in the previous section, e.g.

@@ -22,7 +22,7 @@ const sidebars: SidebarsConfig = {
     "glossary",
     {
       type: "category",
-      label: "@skipruntime/api",
+      label: "@skipruntime/core",
       link: {
         type: "doc",
         id: "api/api/index",
