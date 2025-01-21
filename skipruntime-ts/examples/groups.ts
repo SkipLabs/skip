@@ -4,8 +4,9 @@ import {
   type Json,
   type Resource,
   OneToManyMapper,
-} from "@skipruntime/api";
+} from "@skipruntime/core";
 
+import { initService } from "@skipruntime/wasm";
 import { runService } from "@skipruntime/server";
 
 type UserID = number;
@@ -76,18 +77,20 @@ class ActiveFriends implements Resource<ResourceInputs> {
   }
 }
 
-// Specify and run the reactive service
-const service = await runService(
-  {
-    initialData,
-    resources: { active_friends: ActiveFriends },
-    createGraph(input: ServiceInputs): ResourceInputs {
-      const actives = input.groups.map(ActiveUsers, input.users);
-      return { users: input.users, actives };
-    },
+const instance = await initService({
+  initialData,
+  resources: { active_friends: ActiveFriends },
+  createGraph(input: ServiceInputs): ResourceInputs {
+    const actives = input.groups.map(ActiveUsers, input.users);
+    return { users: input.users, actives };
   },
-  { streaming_port: 8080, control_port: 8081 },
-);
+});
+
+// Specify and run the reactive service
+const service = runService(instance, {
+  streaming_port: 8080,
+  control_port: 8081,
+});
 function shutdown() {
   service.close();
 }

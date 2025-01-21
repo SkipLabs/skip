@@ -9,7 +9,7 @@ import {
   type Reducer,
   type Resource,
   type SkipService,
-} from "@skipruntime/api";
+} from "./api.js";
 
 export type Handle<T> = Internal.Opaque<number, { handle_for: T }>;
 

@@ -18,7 +18,7 @@ In this way, we can think of resources as parameterized outputs; request paramet
 For a concrete example, take the "active friends" resource from the getting-started [example](getting_started.md#the-anatomy-of-a-skip-service) service:
 
 ```typescript
-const service = await runService({
+const instance = await initService({
   initialData: { users, groups },
   resources: { active_friends: ActiveFriends },
   createGraph(input: ServiceInputs): ResourceInputs {
@@ -26,6 +26,8 @@ const service = await runService({
     return { users: input.users, actives };
   },
 });
+
+const service = await runService(instance);
 ```
 
 The service has two input collections `"users"` and `"groups"` (populated here with some initial data), no external dependencies (i.e. the service definition does not define the optional `externalServices` field), and one resource: `ActiveFriends`, defined as follows:

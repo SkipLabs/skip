@@ -5,7 +5,7 @@ NPM_WORKSPACES=$(shell jq --raw-output "[.workspaces[] | select((startswith(\"sq
 
 .PHONY: build
 build:
-	../bin/cd_sh .. "npm install $(NPM_WORKSPACES) && npm run build $(NPM_WORKSPACES) --if-present"
+	../bin/cd_sh .. "SKIPRUNTIME=$$(dirname $(CURDIR))/build/skipruntime npm install $(NPM_WORKSPACES) && npm run build $(NPM_WORKSPACES) --if-present"
 
 bunrun-%: build
 	bun run examples/$*.ts
@@ -33,8 +33,4 @@ clean:
 
 .PHONY: test
 test: build
-	../bin/cd_sh wasm "bun run test"
-
-.PHONY: test-native
-test-native: build
-	../bin/cd_sh addon "npm run test"
+	../bin/cd_sh tests "npm run test"

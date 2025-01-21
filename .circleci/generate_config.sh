@@ -72,11 +72,8 @@ fi
 if (( $skdb != 0 || $skstore != 0 || $skipruntime != 0 || $ts_prelude != 0 ))
 then
     cat <<EOF
-  skipruntime-wasm:
+  skipruntime:
     jobs:
-      - skipruntime-wasm
-  skipruntime-native:
-    jobs:
-      - skipruntime-native
+      - skipruntime
 EOF
 fi

@@ -10,7 +10,13 @@ TypeScript interfaces and abstractions are provided so that you can write a reac
 
 To get started, install the NPM packages for the Skip runtime API, server, and helpers:
 
-```npm install @skipruntime/api @skipruntime/server @skipruntime/helpers```
+```npm install @skipruntime/core @skipruntime/server @skipruntime/helpers```
+
+Two versions of the runtime are available, a Wasm `@skipruntime/wasm` and a native `@skipruntime/native`.
+The Wasm runtime works with both `node` and `bun`, but is limited to Wasm's 32-bit memory address space.
+The native runtime does not have this limitation, but it is currently only available for Node and is a bit more involved to install.
+
+You can install the Wasm runtime with `npm install @skipruntime/wasm` and the native runtime by following the [instructions](./INSTALL.md).
 
 From there, you're ready to start building a reactive service!
 See the [getting started guide](https://skiplabs.io/docs/getting_started) to walk through some of Skip's core concepts by example and get up to speed.

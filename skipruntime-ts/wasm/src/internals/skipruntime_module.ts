@@ -17,7 +17,7 @@ import type {
   ExternalService,
   Resource,
   Watermark,
-} from "@skipruntime/api";
+} from "@skipruntime/core";
 import {
   ServiceInstance,
   ToBinding,

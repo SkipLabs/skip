@@ -1,6 +1,6 @@
 import type { Nullable } from "@skip-wasm/std";
 import { type NativeStub, sknative } from "@skiplang/std";
-import type { Reducer, Json } from "@skipruntime/api";
+import type { Reducer, Json } from "./api.js";
 
 /**
  * `Reducer` to maintain the sum of input values.

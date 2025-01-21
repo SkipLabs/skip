@@ -14,7 +14,7 @@ The framework handles all the complexities of state management, integrations and
 You can install via:
 
 ```
-npm i @skipruntime/api @skipruntime/server @skipruntime/helpers
+npm i @skipruntime/core @skipruntime/server @skipruntime/helpers
 ```
 
 This is an alpha release \- we are happy with its stability and functionality but are looking forward to feedback on the interfaces and developer experience.

@@ -72,7 +72,7 @@ check:
 
 .PHONY: check-ts
 check-ts:
-	npm install
+	SKIPRUNTIME=$(CURDIR)/build/skipruntime npm install
 	bin/check-ts.sh
 
 .PHONY: clean
@@ -107,7 +107,7 @@ check-fmt: fmt
 # regenerate api docs served by docs-run from ts sources
 .PHONY: docs
 docs:
-	npm install && npm run build
+	SKIPRUNTIME=$(CURDIR)/build/skipruntime npm install && npm run build
 	cd www && npm install && npx docusaurus generate-typedoc
 
 # run the docs site locally at http://localhost:3000
@@ -264,11 +264,6 @@ publish-json: publish-json-binding publish-json-wasm
 publish-date:
 	bin/release_npm.sh @skip-wasm/date skiplang/skdate/ts/package.json $(OPT)
 
-.PHONY: publish-api
-publish-api:
-	bin/release_npm.sh @skipruntime/api skipruntime-ts/api/package.json $(OPT)
-
-
 .PHONY: publish-core
 publish-core:
 	bin/release_npm.sh @skipruntime/core skipruntime-ts/core/package.json $(OPT)
@@ -277,25 +272,17 @@ publish-core:
 publish-helpers:
 	bin/release_npm.sh @skipruntime/helpers skipruntime-ts/helpers/package.json $(OPT)
 
-.PHONY: publish-tests
-publish-tests:
-	bin/release_npm.sh @skipruntime/tests skipruntime-ts/tests/package.json $(OPT)
-
 .PHONY: publish-wasm
 publish-wasm:
 	bin/release_npm.sh @skipruntime/wasm skipruntime-ts/wasm/package.json $(OPT)
 
-.PHONY: publish-addon
-publish-addon:
-	bin/release_npm.sh @skipruntime/addon skipruntime-ts/addon/package.json $(OPT)
+.PHONY: publish-native
+publish-native:
+	bin/release_npm.sh @skipruntime/native skipruntime-ts/addon/package.json $(OPT)
 
 .PHONY: publish-server
 publish-server:
 	bin/release_npm.sh @skipruntime/server skipruntime-ts/server/package.json $(OPT)
 
-.PHONY: publish-runtime
-publish-runtime:
-	bin/release_npm.sh @skipruntime/runtime skipruntime-ts/runtime/package.json $(OPT)
-
 .PHONY: publish-all
-publish-all: clean publish-std publish-json publish-date publish-api publish-core publish-helpers publish-tests publish-wasm publish-addon publish-runtime publish-server
+publish-all: clean publish-std publish-json publish-date publish-core publish-helpers publish-wasm publish-native publish-server

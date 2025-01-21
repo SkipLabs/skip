@@ -11,8 +11,7 @@
       ],
       "cflags!": ["-fno-exceptions"],
       "cflags_cc!": ["-fno-exceptions"],
-      "libraries": ["-L<!(pwd)/dist -lskip-runtime-ts-<!(node -e \"const process = require('process');console.log(process.arch + '-' + process.platform)\")"],
-      "ldflags": ['-Wl,-rpath,<(module_root_dir)/dist'],
+      "libraries": ["-L<!(echo $SKIPRUNTIME) -lskip-runtime-ts"],
     }
   ]
 }
