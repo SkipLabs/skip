@@ -1,10 +1,11 @@
 SHELL := /bin/bash
 
 SKARGO_PROFILE?=release
+NPM_WORKSPACES=$(shell jq --raw-output "[.workspaces[] | select(startswith(\"sql\") | not)] | map(\"-w \" + .) | .[]" ../package.json)
 
 .PHONY: build
 build:
-	../bin/cd_sh .. "npm install && npm run build"
+	../bin/cd_sh .. "npm install $(NPM_WORKSPACES) && npm run build $(NPM_WORKSPACES) --if-present"
 
 bunrun-%: build
 	bun run examples/$*.ts
