@@ -79,12 +79,12 @@ def create_post():
             db.commit()
 
     # Write into the reactive input collection.
-    requests.patch(
+    resp = requests.patch(
         f"{REACTIVE_SERVICE_URL}/inputs/posts",
         json=[[post_id, [{**params, "id": post_id}]]],
     )
 
-    return "ok", 200
+    return resp.reason, resp.status_code
 
 @app.post("/posts/<int:post_id>/upvotes")
 def upvote_post(post_id):
@@ -99,7 +99,7 @@ def upvote_post(post_id):
             db.commit()
 
     # Write into the reactive input collection.
-    requests.patch(
+    resp = requests.patch(
         f"{REACTIVE_SERVICE_URL}/inputs/upvotes",
         json=[[
             upvote_id,
@@ -110,7 +110,7 @@ def upvote_post(post_id):
         ]],
     )
 
-    return "ok", 200
+    return resp.reason, resp.status_code
 
 @app.get("/healthcheck")
 def healthcheck():
