@@ -24,7 +24,11 @@ type Post = {
 
 function Feed() {
   const [posts, setPosts] = useState<Post[]>([]);
-  const [newPost, setNewPost] = useState<{title: string, body: string, url: string}>({ title: "", body: "", url: "" });
+  const [newPost, setNewPost] = useState<{
+    title: string;
+    body: string;
+    url: string;
+  }>({ title: "", body: "", url: "" });
   const [editPost, setEditPost] = useState<Post | null>(null);
 
   // // Non-reactive (polling) version:

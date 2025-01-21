@@ -161,17 +161,7 @@ def upvote_post(post_id):
     # Write into the reactive input collection.
     resp = requests.patch(
         f"{REACTIVE_SERVICE_URL}/inputs/upvotes",
-        json=[
-            [
-                upvote_id,
-                [
-                    {
-                        "post_id": post_id,
-                        "user_id": user_id,
-                    }
-                ],
-            ]
-        ],
+        json=[[upvote_id, [{"post_id": post_id, "user_id": user_id}]]],
     )
 
     return resp.reason, resp.status_code
