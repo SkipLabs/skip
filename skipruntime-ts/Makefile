@@ -1,10 +1,27 @@
 SHELL := /bin/bash
 
 SKARGO_PROFILE?=release
+NPM_WORKSPACES=\
+    -w eslint-config\
+    -w tsconfig\
+    -w skiplang/prelude/ts/binding\
+    -w skiplang/prelude/ts/wasm\
+    -w skiplang/skdate/ts\
+    -w skiplang/skjson/ts/binding\
+    -w skiplang/skjson/ts/wasm\
+    -w skipruntime-ts/api\
+    -w skipruntime-ts/core\
+    -w skipruntime-ts/helpers\
+    -w skipruntime-ts/tests\
+    -w skipruntime-ts/wasm\
+    -w skipruntime-ts/addon\
+    -w skipruntime-ts/runtime\
+    -w skipruntime-ts/server\
+    -w skipruntime-ts/examples
 
 .PHONY: build
 build:
-	../bin/cd_sh .. "npm install && npm run build"
+	../bin/cd_sh .. "npm install $(NPM_WORKSPACES) && npm run build $(NPM_WORKSPACES) --if-present"
 
 bunrun-%: build
 	bun run examples/$*.ts
