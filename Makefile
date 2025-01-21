@@ -72,7 +72,7 @@ check:
 
 .PHONY: check-ts
 check-ts:
-	npm install
+	SKIPRUNTIME=$(CURDIR)/build/skipruntime npm install
 	bin/check-ts.sh
 
 .PHONY: clean
@@ -107,7 +107,7 @@ check-fmt: fmt
 # regenerate api docs served by docs-run from ts sources
 .PHONY: docs
 docs:
-	npm install && npm run build
+	SKIPRUNTIME=$(CURDIR)/build/skipruntime npm install && npm run build
 	cd www && npm install && npx docusaurus generate-typedoc
 
 # run the docs site locally at http://localhost:3000

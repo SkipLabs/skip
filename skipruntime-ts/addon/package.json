@@ -7,8 +7,8 @@
     ".": "./dist/index.js"
   },
   "scripts": {
-    "prepare": "host=$(node -e \"const process = require('process');console.log(process.arch + '-' + process.platform)\") && mkdir -p dist && skargo build -r --lib --manifest-path=../native/Skargo.toml --out-dir=./dist && mv dist/libskip-runtime-ts.so dist/libskip-runtime-ts-$host.so",
-    "build": "host=$(node -e \"const process = require('process');console.log(process.arch + '-' + process.platform)\") && mkdir -p dist && skargo build -r --lib --manifest-path=../native/Skargo.toml --out-dir=./dist  && mv dist/libskip-runtime-ts.so dist/libskip-runtime-ts-$host.so && tsc && npm i",
+    "prepare": "skargo build -r --lib --manifest-path=../native/Skargo.toml --out-dir=../../build/skipruntime",
+    "build": "skargo build -r --lib --manifest-path=../native/Skargo.toml --out-dir=../../build/skipruntime && tsc && SKIPRUNTIME=$(realpath ../../build/skipruntime) npm i",
     "clean": "rm -rf dist build",
     "lint": "eslint"
   },

@@ -10,25 +10,7 @@ Two versions of the runtime are available, a Wasm `@skipruntime/wasm` and a nati
 The Wasm runtime works with both `node` and `bun`, but is limited to Wasm's 32-bit memory address space.
 The native runtime does not have this limitation, but it is currently only available for Node and is a bit more involved to install.
 
-### The Wasm runtime installation
-
-```npm install @skipruntime/wasm```
-
-### The native runtime installation
-
-First, install the Skip runtime native library:
-
-- Precompiled packages
-
-  ```To be specified```
-
-- Built and installed from skip git repository:
-
-  ```To be specified```
-
-Then, the related npm package:
-
-```npm install @skipruntime/native```
+You can install the Wasm runtime with `npm install @skipruntime/wasm` and the native runtime by following the [instructions](https://github.com/SkipLabs/skip/blob/main/INSTALL.md).
 
 ## Introduction
 
