@@ -2,9 +2,10 @@ from flask import Flask, json, request, redirect
 import psycopg2
 import requests
 
-REACTIVE_SERVICE_URL = 'http://reactive_cache:8081/v1'
+REACTIVE_SERVICE_URL = "http://reactive_cache:8081/v1"
 
-def get_db(): 
+
+def get_db():
     conn = psycopg2.connect(
         host="db",
         user="postgres",
@@ -13,7 +14,9 @@ def get_db():
 
     return conn
 
+
 app = Flask(__name__)
+
 
 def format_post(post):
     return {
@@ -22,8 +25,9 @@ def format_post(post):
         "url": post[2],
         "body": post[3],
         "author": post[4],
-        "upvotes": post[5]
+        "upvotes": post[5],
     }
+
 
 @app.get("/posts")
 def posts_index():
@@ -43,8 +47,7 @@ def posts_index():
 
     # return json.jsonify(res)
 
-
-    if 'text/event-stream' in request.accept_mimetypes:
+    if "text/event-stream" in request.accept_mimetypes:
         resp = requests.post(
             f"{REACTIVE_SERVICE_URL}/streams/posts",
             json=10,
@@ -65,17 +68,71 @@ def posts_index():
         # the `id` key).
         return resp.json()[0][1]
 
+
 @app.post("/posts")
 def create_post():
     params = request.json
-    title = params['title']
-    url = params['url']
-    body = params['body']
+    title = params["title"]
+    url = params["url"]
+    body = params["body"]
+    author_id = 1
 
     with get_db() as db:
         with db.cursor() as cur:
-            cur.execute(f"INSERT INTO posts(title, url, body) VALUES('{title}', '{url}', '{body}') RETURNING id")
+            cur.execute(
+                f"INSERT INTO posts(title, url, body, author_id) VALUES('{title}', '{url}', '{body}', '{author_id}') RETURNING id"
+            )
             post_id = cur.fetchone()[0]
+            db.commit()
+
+    # Write into the reactive input collection.
+    resp = requests.patch(
+        f"{REACTIVE_SERVICE_URL}/inputs/posts",
+        json=[[post_id, [{**params, "id": post_id, "author_id": author_id}]]],
+    )
+
+    return resp.reason, resp.status_code
+
+
+@app.delete("/posts/<int:post_id>")
+def delete_post(post_id):
+    with get_db() as db:
+        with db.cursor() as cur:
+            # Get all upvote IDs related to the post.
+            cur.execute(f"SELECT id FROM upvotes WHERE post_id={post_id}")
+            upvote_ids = [row[0] for row in cur.fetchall()]
+
+            # Delete upvotes related to the post.
+            cur.execute(f"DELETE FROM upvotes WHERE post_id={post_id}")
+            # Delete the post.
+            cur.execute(f"DELETE FROM posts WHERE id={post_id}")
+            db.commit()
+
+    # Write into the reactive input collection.
+    requests.patch(
+        f"{REACTIVE_SERVICE_URL}/inputs/upvotes",
+        json=[[upvote_id, []] for upvote_id in upvote_ids],
+    )
+    resp = requests.patch(
+        f"{REACTIVE_SERVICE_URL}/inputs/posts",
+        json=[[post_id, []]],
+    )
+
+    return resp.reason, resp.status_code
+
+
+@app.put("/posts/<int:post_id>")
+def update_post(post_id):
+    params = request.json
+    title = params["title"]
+    url = params["url"]
+    body = params["body"]
+
+    with get_db() as db:
+        with db.cursor() as cur:
+            cur.execute(
+                f"UPDATE posts SET title='{title}', url='{url}', body='{body}' WHERE id={post_id}"
+            )
             db.commit()
 
     # Write into the reactive input collection.
@@ -86,6 +143,7 @@ def create_post():
 
     return resp.reason, resp.status_code
 
+
 @app.post("/posts/<int:post_id>/upvotes")
 def upvote_post(post_id):
     # TODO
@@ -94,23 +152,30 @@ def upvote_post(post_id):
 
     with get_db() as db:
         with db.cursor() as cur:
-            cur.execute(f"INSERT INTO upvotes(post_id, user_id) VALUES({post_id}, {user_id}) RETURNING id")
+            cur.execute(
+                f"INSERT INTO upvotes(post_id, user_id) VALUES({post_id}, {user_id}) RETURNING id"
+            )
             upvote_id = cur.fetchone()[0]
             db.commit()
 
     # Write into the reactive input collection.
     resp = requests.patch(
         f"{REACTIVE_SERVICE_URL}/inputs/upvotes",
-        json=[[
-            upvote_id,
-            [{
-                'post_id': post_id,
-                'user_id': user_id,
-            }]
-        ]],
+        json=[
+            [
+                upvote_id,
+                [
+                    {
+                        "post_id": post_id,
+                        "user_id": user_id,
+                    }
+                ],
+            ]
+        ],
     )
 
     return resp.reason, resp.status_code
+
 
 @app.get("/healthcheck")
 def healthcheck():
