@@ -61,7 +61,7 @@ app.put("/user/:id", (req, res) => {
     });
 
     service
-      .put("users", key, [data])
+      .update("users", [[key, [data]]])
       .then(() => {
         res.status(200).json({});
       })
