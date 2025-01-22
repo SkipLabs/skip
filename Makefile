@@ -75,6 +75,13 @@ check-ts:
 	SKIPRUNTIME=$(CURDIR)/build/skipruntime npm install
 	bin/check-ts.sh
 
+.PHONY: check-sh
+check-sh:
+	find . -name node_modules -not -prune -or \
+	       -name libbacktrace -not -prune -or \
+		   -name tnt-tpch -not -prune -or \
+		   -name "*.sh" | xargs shellcheck --exclude SC2181 --exclude SC2002
+
 .PHONY: clean
 clean:
 	rm -Rf build
