@@ -13,7 +13,8 @@ cd "$SCRIPT_DIR/../" || exit 1
 usage() {
     echo "Usage: $0 NAME:TAG+"
     echo "  where NAME:TAG is one of"
-    echo "    skip-base:latest"
+    echo "    skiplang:latest"
+    echo "    skip:latest"
     echo "    skdb:latest"
     echo "    skdb-base:latest"
     echo "    skdb-dev-server:latest, skdb-dev-server:quickstart"
@@ -27,8 +28,11 @@ fi
 
 for name_tag in "$@"; do
   case "${name_tag%:latest}" in
-    skip-base)
-      BUILD_SKIP_BASE=true
+    skiplang)
+      BUILD_SKIPLANG=true
+      ;;
+    skip)
+      BUILD_SKIP=true
       ;;
     skdb)
       BUILD_SKDB=true
@@ -65,8 +69,12 @@ dockerbuild () {
        "$@"
 }
 
-if ${BUILD_SKIP_BASE:-false}; then
-  dockerbuild --file Dockerfile --tag skiplabs/skip-base:latest
+if ${BUILD_SKIPLANG:-false}; then
+  dockerbuild --file Dockerfile --target skiplang --tag skiplabs/skiplang:latest
+fi
+
+if ${BUILD_SKIP:-false}; then
+  dockerbuild --file Dockerfile --tag skiplabs/skip:latest
 fi
 
 if ${BUILD_SKDB_BASE:-false}; then

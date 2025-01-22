@@ -1,4 +1,4 @@
-FROM skiplabs/skip-base AS base
+FROM skiplabs/skip AS base
 
 RUN apt-get install -q -y sqlite3
 RUN npx playwright install-deps
