@@ -247,6 +247,28 @@ const config: Config = {
         useHTMLEncodedBrackets: true,
       },
     ],
+    [
+      "docusaurus-plugin-typedoc",
+      {
+        id: "adapters/postgres",
+        out: "docs/api/adapters/postgres",
+        entryPoints: ["../skipruntime-ts/adapters/postgres/src/index.ts"],
+        tsconfig: "../skipruntime-ts/adapters/postgres/tsconfig.json",
+        readme: "none",
+        indexFormat: "table",
+        disableSources: true,
+        groupOrder: ["Type Aliases", "Interfaces", "Classes", "functions"],
+        sidebar: { pretty: true },
+        textContentMappings: {
+          "title.indexPage": "@skip-adapter/postgres",
+          "title.memberPage": "{name}",
+        },
+        parametersFormat: "table",
+        enumMembersFormat: "table",
+        useCodeBlocks: true,
+        useHTMLEncodedBrackets: true,
+      },
+    ],
   ],
 };
 
