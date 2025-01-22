@@ -594,35 +594,54 @@ const pgSetupClient = new pg.Client(pg_config);
 pgSetupClient.connect().catch(() => {
   throw new Error("Error connecting to PostgreSQL test instance");
 });
+let pgIsSetup = false;
 
-const postgres = new PostgresExternalService(pg_config);
-
-async function trySetupPostgres(retries: number = 3): Promise<boolean> {
+async function trySetupDB(
+  service: PostgresExternalService,
+  retries: number = 3,
+): Promise<boolean> {
   if (retries <= 0) {
     return false;
   }
   if (
-    !postgres.isConnected() ||
+    !service.isConnected() ||
     !("_connected" in pgSetupClient) ||
     !pgSetupClient._connected
   ) {
     await timeout(50);
-    return await trySetupPostgres(retries - 1);
+    return await trySetupDB(service, retries - 1);
   }
-  await pgSetupClient.query(
-    "DROP TABLE IF EXISTS skip_test; CREATE TABLE skip_test (id INTEGER PRIMARY KEY, x INTEGER); INSERT INTO skip_test VALUES (1, 1), (2, 2), (3, 3);",
-  );
-  await pgSetupClient.end();
+  if (!pgIsSetup) {
+    await pgSetupClient.query(
+      "DROP TABLE IF EXISTS skip_test; CREATE TABLE skip_test (id INTEGER PRIMARY KEY, x INTEGER); INSERT INTO skip_test VALUES (1, 1), (2, 2), (3, 3);",
+    );
+    await pgSetupClient.end();
+    pgIsSetup = true;
+  }
+
   return true;
 }
 
-const postgresService: SkipService<Input_NN, Input_NN> = {
-  initialData: { input: [] },
-  resources: { resource: PostgresResource },
-  externalServices: { postgres },
-  createGraph(inputs: Input_NN) {
-    return inputs;
-  },
+// Wrap service instantiation in a function so that the WASM and Native tests get ahold
+// of separate DB clients and manage their lifecycle properly; normally you'd just
+// construct a service object like the other tests in this file.
+const postgresService: () => Promise<
+  SkipService<Input_NN, Input_NN>
+> = async () => {
+  const postgres = new PostgresExternalService(pg_config);
+
+  if (!(await trySetupDB(postgres))) {
+    throw new Error("Failed to set up test Postgres DB");
+  }
+
+  return {
+    initialData: { input: [] },
+    resources: { resource: PostgresResource },
+    externalServices: { postgres },
+    createGraph(inputs: Input_NN) {
+      return inputs;
+    },
+  };
 };
 
 export function initTests(
@@ -1032,8 +1051,10 @@ export function initTests(
   });
 
   it("testPostgres", async () => {
-    const hasPostgres = await trySetupPostgres();
-    if (!hasPostgres) {
+    let service;
+    try {
+      service = await initService(await postgresService());
+    } catch {
       if ("CIRCLECI" in process.env) {
         throw new Error("Failed to set up CircleCI environment with Postgres.");
       }
@@ -1047,7 +1068,7 @@ export function initTests(
       );
       return;
     }
-    const service = await initService(postgresService);
+
     service.update("input", [
       [1, [10]],
       [2, [20]],
