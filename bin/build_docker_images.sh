@@ -26,7 +26,8 @@ dockerbuild () {
     docker build . --no-cache --progress=plain --tag "$tag" --file "$file" "$@"
 }
 
-dockerbuild skiplabs/skdb-base . "${DOCKERBUILD_EXTRA[@]}"
+dockerbuild skiplabs/skip-base . "${DOCKERBUILD_EXTRA[@]}"
+dockerbuild skiplabs/skdb-base sql --target base "${DOCKERBUILD_EXTRA[@]}"
 dockerbuild skiplabs/skdb sql "${DOCKERBUILD_EXTRA[@]}"
 if $PROD; then
   dockerbuild skiplabs/server-core sql/server/core
