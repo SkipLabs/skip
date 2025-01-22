@@ -7,6 +7,8 @@ git diff --quiet HEAD $(git merge-base main HEAD) -- skiplang/compiler/ skiplang
 skc=$?
 git diff --quiet HEAD $(git merge-base main HEAD) -- skiplang/prelude/src/skstore/ skiplang/compiler/runtime/
 skstore=$?
+git diff --quiet HEAD $(git merge-base main HEAD) -- skiplang/skjson
+skjson=$?
 git diff --quiet HEAD $(git merge-base main HEAD) -- sql/ skiplang/sqlparser/ skiplang/skbuild/
 skdb=$?
 git diff --quiet HEAD $(git merge-base main HEAD) -- skipruntime-ts/
@@ -51,6 +53,15 @@ then
 EOF
 fi
 
+if (( $skjson != 0 ))
+then
+    cat <<EOF
+  skjson:
+    jobs:
+      - skjson
+EOF
+fi
+
 if (( $skdb != 0 || $skstore != 0 ))
 then
     cat <<EOF
@@ -60,7 +71,7 @@ then
 EOF
 fi
 
-if (( $skdb != 0 || $skstore != 0 || $ts_prelude != 0 ))
+if (( $skdb != 0 || $skstore != 0 || $ts_prelude != 0 || $skjson != 0 ))
 then
     cat <<EOF
   skdb-wasm:
@@ -69,7 +80,7 @@ then
 EOF
 fi
 
-if (( $skdb != 0 || $skstore != 0 || $skipruntime != 0 || $ts_prelude != 0 ))
+if (( $skstore != 0 || $skipruntime != 0 || $ts_prelude != 0 || $skjson != 0 ))
 then
     cat <<EOF
   skipruntime:
