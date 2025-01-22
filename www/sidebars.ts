@@ -47,6 +47,15 @@ const sidebars: SidebarsConfig = {
       },
       items: require("./docs/api/helpers/typedoc-sidebar.cjs"),
     },
+    {
+      type: "category",
+      label: "@skip-adapter/postgres",
+      link: {
+        type: "doc",
+        id: "api/adapters/postgres/index",
+      },
+      items: require("./docs/api/adapters/postgres/typedoc-sidebar.cjs"),
+    },
   ],
 };
 
