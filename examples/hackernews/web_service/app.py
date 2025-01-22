@@ -108,17 +108,30 @@ def delete_post(post_id):
             cur.execute(f"DELETE FROM posts WHERE id={post_id}")
             db.commit()
 
-    # Write into the reactive input collection.
-    requests.patch(
+    # Write into the reactive input collections.
+    upvotes_resp = requests.patch(
         f"{REACTIVE_SERVICE_URL}/inputs/upvotes",
         json=[[upvote_id, []] for upvote_id in upvote_ids],
     )
-    resp = requests.patch(
+    posts_resp = requests.patch(
         f"{REACTIVE_SERVICE_URL}/inputs/posts",
         json=[[post_id, []]],
     )
 
-    return resp.reason, resp.status_code
+    if upvotes_resp.status_code != 200 and posts_resp.status_code != 200:
+        reason = f"Failed to update upvotes: {upvotes_resp.reason} and posts: {posts_resp.reason}"
+        status_code = 500
+    elif upvotes_resp.status_code != 200:
+        reason = f"Failed to update upvotes: {upvotes_resp.reason}"
+        status_code = upvotes_resp.status_code
+    elif posts_resp.status_code != 200:
+        reason = f"Failed to update posts: {posts_resp.reason}"
+        status_code = posts_resp.status_code
+    else:
+        reason = "ok"
+        status_code = 200
+
+    return reason, status_code
 
 
 @app.put("/posts/<int:post_id>")
