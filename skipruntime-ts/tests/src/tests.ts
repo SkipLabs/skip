@@ -29,6 +29,9 @@ import {
 
 import { it as mit, type AsyncFunc } from "mocha";
 
+import pg from "pg";
+import { PostgresExternalService } from "@skip-adapter/postgres";
+
 //// testMap1
 
 class Map1 implements Mapper<string, number, string, number> {
@@ -544,6 +547,103 @@ const multipleResourcesService: SkipService<Input_SN_SN, Input_SN_SN> = {
   },
 };
 
+//// testPostgres
+type PostgresRow = { id: number; x: number };
+class PostgresRowExtract extends OneToOneMapper<number, PostgresRow, number> {
+  mapValue(row: PostgresRow): number {
+    return row.x;
+  }
+}
+
+class PointwiseSum extends OneToOneMapper<number, number, number> {
+  constructor(private other: EagerCollection<number, number>) {
+    super();
+  }
+
+  mapValue(v: number, k: number) {
+    return this.other.getArray(k).reduce((x, y) => x + y, v);
+  }
+}
+
+class PostgresResource implements Resource<Input_NN> {
+  instantiate(
+    collections: Input_NN,
+    context: Context,
+  ): EagerCollection<number, number> {
+    const pg_data: EagerCollection<number, number> = context
+      .useExternalResource<number, PostgresRow>({
+        service: "postgres",
+        identifier: "skip_test",
+        params: { key: { col: "id", type: "INTEGER" } },
+      })
+      .map(PostgresRowExtract);
+    return collections.input.map(PointwiseSum, pg_data);
+  }
+}
+
+const pg_config = {
+  host: "localhost",
+  port: 5432,
+  database: "postgres",
+  user: "postgres",
+  password: "secret",
+};
+
+// One-off client to create a test SQL table and set up its contents
+const pgSetupClient = new pg.Client(pg_config);
+pgSetupClient.connect().catch(() => {
+  throw new Error("Error connecting to PostgreSQL test instance");
+});
+let pgIsSetup = false;
+
+async function trySetupDB(
+  service: PostgresExternalService,
+  retries: number = 3,
+): Promise<boolean> {
+  if (retries <= 0) {
+    return false;
+  }
+  if (
+    !service.isConnected() ||
+    !("_connected" in pgSetupClient) ||
+    !pgSetupClient._connected
+  ) {
+    await timeout(50);
+    return await trySetupDB(service, retries - 1);
+  }
+  if (!pgIsSetup) {
+    await pgSetupClient.query(
+      "DROP TABLE IF EXISTS skip_test; CREATE TABLE skip_test (id INTEGER PRIMARY KEY, x INTEGER); INSERT INTO skip_test VALUES (1, 1), (2, 2), (3, 3);",
+    );
+    await pgSetupClient.end();
+    pgIsSetup = true;
+  }
+
+  return true;
+}
+
+// Wrap service instantiation in a function so that the WASM and Native tests get ahold
+// of separate DB clients and manage their lifecycle properly; normally you'd just
+// construct a service object like the other tests in this file.
+const postgresService: () => Promise<
+  SkipService<Input_NN, Input_NN>
+> = async () => {
+  const postgres = new PostgresExternalService(pg_config);
+
+  if (!(await trySetupDB(postgres))) {
+    throw new Error("Failed to set up test Postgres DB");
+  }
+
+  return {
+    initialData: { input: [] },
+    resources: { resource: PostgresResource },
+    externalServices: { postgres },
+    createGraph(inputs: Input_NN) {
+      return inputs;
+    },
+  };
+};
+
 export function initTests(
   category: string,
   initService: (service: SkipService) => Promise<ServiceInstance>,
@@ -948,5 +1048,45 @@ export function initTests(
     expect(service.getArray("resource1", "1").payload).toEqual([30]);
     service.update("input2", [["1", [40]]]);
     expect(service.getArray("resource2", "1").payload).toEqual([40]);
+  });
+
+  it("testPostgres", async () => {
+    let service;
+    try {
+      service = await initService(await postgresService());
+    } catch {
+      if ("CIRCLECI" in process.env) {
+        throw new Error("Failed to set up CircleCI environment with Postgres.");
+      }
+      console.warn(
+        "Default pass on testPostgres since no local PostgreSQL instance found;",
+      );
+      console.warn("To test properly, run the following then retry:");
+      console.warn("\tdocker pull postgres:latest");
+      console.warn(
+        "\tdocker run --name skip-postgres-container -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=secret -p 5432:5432 -d postgres",
+      );
+      return;
+    }
+
+    service.update("input", [
+      [1, [10]],
+      [2, [20]],
+      [3, [30]],
+    ]);
+    service.instantiateResource("unsafe.fixed.resource.ident", "resource", {});
+    expect(service.getAll("resource").payload).toEqual([
+      [1, [10]],
+      [2, [20]],
+      [3, [30]],
+    ]);
+    await timeout(5);
+    expect(service.getAll("resource").payload).toEqual([
+      [1, [11]],
+      [2, [22]],
+      [3, [33]],
+    ]);
+
+    service.close();
   });
 }
