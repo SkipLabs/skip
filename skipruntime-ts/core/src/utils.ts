@@ -1,5 +1,4 @@
-import type { Nullable } from "@skip-wasm/std";
-import { type NativeStub, sknative } from "@skiplang/std";
+import { type NativeStub, type Nullable, sknative } from "@skiplang/std";
 import type { Reducer, Json } from "./api.js";
 
 /**
