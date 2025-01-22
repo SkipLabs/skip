@@ -51,7 +51,7 @@ for step in "${steps[@]}"; do
             ;;
         other-CI-tools)
             # Assumes other steps have been run before
-            apt-get install -q -y pip
+            apt-get install -q -y pip shellcheck
             pip install black
             ;;
         *)
