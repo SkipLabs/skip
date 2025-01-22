@@ -1,23 +1,13 @@
-FROM ubuntu:22.04 AS stage0
+FROM ubuntu:22.04 AS skiplang-base
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
     apt-get install -q -y wget gnupg && \
     wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - && \
-    wget -O - https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | apt-key add - && \
     echo "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-15 main" >> /etc/apt/sources.list.d/llvm.list && \
     echo "deb-src http://apt.llvm.org/jammy/ llvm-toolchain-jammy-15 main" >> /etc/apt/sources.list.d/llvm.list && \
-    echo "deb https://deb.nodesource.com/node_22.x nodistro main" >> /etc/apt/sources.list.d/nodejs.list && \
     apt-get update && \
-    apt-get install -q -y automake clang-15 clang-format-15 curl file gawk gcc git jq lld-15 llvm-15 make nodejs parallel sqlite3 unzip zip && \
-    npm install -g bun && \
-    npm install -g prettier && \
-    npx playwright install-deps
-
-RUN sh -c 'curl -s "https://get.sdkman.io?rcupdate=false" | bash'
-RUN bash -c "source $HOME/.sdkman/bin/sdkman-init.sh && \
-    sdk install gradle && \
-    sdk install java 20.0.2-tem"
+    apt-get install -q -y automake clang-15 clang-format-15 curl file gawk gcc git jq lld-15 llvm-15 make parallel unzip zip
 
 RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-15 100 && \
     update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-15 100 && \
@@ -31,14 +21,23 @@ RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-15 100 && 
 ENV CC=clang
 ENV CXX=clang++
 
-FROM stage0 AS bootstrap
+FROM skiplang-base AS bootstrap
 
 COPY ./skiplang /work
 
 WORKDIR /work/compiler
 RUN make clean && make STAGE=0
 
-FROM stage0 AS base
+FROM skiplang-base AS skiplang
 
 COPY --from=bootstrap /work/compiler/stage0/bin/ /usr/bin/
 COPY --from=bootstrap /work/compiler/stage0/lib/ /usr/lib/
+
+FROM skiplang AS skip
+
+RUN wget -O - https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | apt-key add - && \
+    echo "deb https://deb.nodesource.com/node_22.x nodistro main" >> /etc/apt/sources.list.d/nodejs.list && \
+    apt-get update && \
+    apt-get install -q -y nodejs && \
+    npm install -g bun && \
+    npm install -g prettier
