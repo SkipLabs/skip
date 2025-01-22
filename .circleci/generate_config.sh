@@ -25,9 +25,9 @@ cat .circleci/base.yml
 echo "workflows:"
 
     cat <<EOF
-  check-format:
+  fast-checks:
     jobs:
-      - check-format
+      - fast-checks
 EOF
 
 if (( check_ts != 0 ))
