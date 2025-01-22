@@ -25,10 +25,12 @@ import {
 import {
   TimerResource,
   GenericExternalService,
-  PostgresExternalService,
 } from "@skipruntime/helpers/external.js";
 
 import { it as mit, type AsyncFunc } from "mocha";
+
+import pg from "pg";
+import { PostgresExternalService } from "@skip-adapter/postgres";
 
 //// testMap1
 
@@ -578,6 +580,7 @@ class PostgresResource implements Resource<Input_NN> {
     return collections.input.map(PointwiseSum, pg_data);
   }
 }
+
 const pg_config = {
   host: "localhost",
   port: 5432,
@@ -585,7 +588,33 @@ const pg_config = {
   user: "postgres",
   password: "secret",
 };
+
+// One-off client to create a test SQL table and set up its contents
+const pgSetupClient = new pg.Client(pg_config);
+pgSetupClient.connect().catch(() => {
+  throw new Error("Error connecting to PostgreSQL test instance");
+});
+
 const postgres = new PostgresExternalService(pg_config);
+
+async function trySetupPostgres(retries: number = 3): Promise<boolean> {
+  if (retries <= 0) {
+    return false;
+  }
+  if (
+    !postgres.isConnected() ||
+    !("_connected" in pgSetupClient) ||
+    !pgSetupClient._connected
+  ) {
+    await timeout(50);
+    return await trySetupPostgres(retries - 1);
+  }
+  await pgSetupClient.query(
+    "DROP TABLE IF EXISTS skip_test; CREATE TABLE skip_test (id INTEGER PRIMARY KEY, x INTEGER); INSERT INTO skip_test VALUES (1, 1), (2, 2), (3, 3);",
+  );
+  await pgSetupClient.end();
+  return true;
+}
 
 const postgresService: SkipService<Input_NN, Input_NN> = {
   initialData: { input: [] },
@@ -1002,23 +1031,12 @@ export function initTests(
     expect(service.getArray("resource2", "1").payload).toEqual([40]);
   });
 
-  async function trySetupPostgres(retries: number = 3): Promise<boolean> {
-    if (!("_connected" in postgres.client) || retries < 0) {
-      return false;
-    }
-    if (!postgres.client._connected) {
-      await timeout(50);
-      return await trySetupPostgres(retries - 1);
-    }
-    await postgres.client.query(
-      "DROP TABLE IF EXISTS skip_test; CREATE TABLE skip_test (id INTEGER PRIMARY KEY, x INTEGER); INSERT INTO skip_test VALUES (1, 1), (2, 2), (3, 3);",
-    );
-    return true;
-  }
-
   it("testPostgres", async () => {
     const hasPostgres = await trySetupPostgres();
     if (!hasPostgres) {
+      if ("CIRCLECI" in process.env) {
+        throw new Error("Failed to set up CircleCI environment with Postgres.");
+      }
       console.warn(
         "Default pass on testPostgres since no local PostgreSQL instance found;",
       );
