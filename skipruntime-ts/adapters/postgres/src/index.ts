@@ -1,4 +1,4 @@
-import type { Entry, ExternalService, Json } from "@skipruntime/api";
+import type { Entry, ExternalService, Json } from "@skipruntime/core";
 
 import pg from "pg";
 import format from "pg-format";
