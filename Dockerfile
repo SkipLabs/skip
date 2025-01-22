@@ -9,15 +9,9 @@ RUN apt-get update && \
     echo "deb-src http://apt.llvm.org/jammy/ llvm-toolchain-jammy-15 main" >> /etc/apt/sources.list.d/llvm.list && \
     echo "deb https://deb.nodesource.com/node_22.x nodistro main" >> /etc/apt/sources.list.d/nodejs.list && \
     apt-get update && \
-    apt-get install -q -y automake clang-15 clang-format-15 curl file gawk gcc git jq lld-15 llvm-15 make nodejs parallel sqlite3 unzip zip && \
+    apt-get install -q -y automake clang-15 clang-format-15 curl file gawk gcc git jq lld-15 llvm-15 make nodejs parallel unzip zip && \
     npm install -g bun && \
-    npm install -g prettier && \
-    npx playwright install-deps
-
-RUN sh -c 'curl -s "https://get.sdkman.io?rcupdate=false" | bash'
-RUN bash -c "source $HOME/.sdkman/bin/sdkman-init.sh && \
-    sdk install gradle && \
-    sdk install java 20.0.2-tem"
+    npm install -g prettier
 
 RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-15 100 && \
     update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-15 100 && \
