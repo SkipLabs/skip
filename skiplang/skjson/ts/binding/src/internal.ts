@@ -1,5 +1,5 @@
-import type { T, Vector, Pair, String } from "@skiplang/std/internal.js";
-export type * from "@skiplang/std/internal.js";
+import type { T, Vector, Pair, String } from "../skiplang-std/internal.js";
+export type * from "../skiplang-std/internal.js";
 
 declare const _CJNull: unique symbol;
 export type CJNull = CJSON<typeof _CJNull>;

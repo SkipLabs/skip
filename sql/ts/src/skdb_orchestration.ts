@@ -1,4 +1,4 @@
-import type { Environment } from "@skip-wasm/std";
+import type { Environment } from "../skipwasm-std/index.js";
 import type {
   SKDBMechanism,
   RemoteSKDB,
@@ -6,6 +6,8 @@ import type {
   MirrorDefn,
 } from "./skdb_types.js";
 import { SKDBTable } from "./skdb_util.js";
+
+export type { Environment };
 
 const npmVersion = "";
 

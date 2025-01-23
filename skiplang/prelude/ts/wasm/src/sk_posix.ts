@@ -1,4 +1,4 @@
-import type { int } from "@skiplang/std";
+import type { int } from "../skiplang-std/index.js";
 import type {
   ptr,
   Environment,
@@ -8,7 +8,7 @@ import type {
   FileSystem,
 } from "./sk_types.js";
 import { Options } from "./sk_types.js";
-import type * as Internal from "@skiplang/std/internal.js";
+import type * as Internal from "../skiplang-std/internal.js";
 
 interface ToWasm {
   SKIP_check_if_file_exists: (skPath: ptr<Internal.String>) => boolean;

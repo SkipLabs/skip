@@ -1,5 +1,5 @@
 import * as Internal from "./internal.js";
-import type { Pointer, Nullable } from "@skiplang/std";
+import type { Pointer, Nullable } from "../skiplang-std/index.js";
 
 export enum Type {
   Undefined,

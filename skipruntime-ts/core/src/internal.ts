@@ -1,5 +1,6 @@
-export type * from "@skiplang/json/internal.js";
-import type { T, CJSON } from "@skiplang/json/internal.js";
+export type * from "../skiplang-json/internal.js";
+import type { T, CJSON } from "../skiplang-json/internal.js";
+export type { Exception } from "../skiplang-std/internal.js";
 
 /* eslint-disable @typescript-eslint/no-unused-vars */
 

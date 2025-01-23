@@ -1,11 +1,11 @@
-import type { Exception as IException } from "@skiplang/std/internal.js";
+import type { Exception as IException } from "@skipruntime/core/internal.js";
 import { ServiceInstance, ToBinding } from "@skipruntime/core";
 import type { FromBinding as SkipRuntimeFromBinding } from "@skipruntime/core/binding.js";
 import {
   buildJsonConverter,
   type Binding as JsonBinding,
   type Pointer,
-} from "@skiplang/json";
+} from "@skipruntime/core/json.js";
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 

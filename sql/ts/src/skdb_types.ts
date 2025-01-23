@@ -1,4 +1,4 @@
-import type { Shared } from "@skip-wasm/std";
+import type { Shared } from "../skipwasm-std/index.js";
 import { SKDBTable } from "./skdb_util.js";
 
 export interface SKDBHandle {

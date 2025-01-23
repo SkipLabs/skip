@@ -7,7 +7,7 @@ import type {
   Nullable,
   Shared,
   Pointer,
-} from "@skip-wasm/std";
+} from "../../skipwasm-std/index.js";
 import type * as Internal from "@skipruntime/core/internal.js";
 import type {
   Reducer,
@@ -33,13 +33,13 @@ import type {
   Notifier,
 } from "@skipruntime/core/binding.js";
 
-import type { Json } from "@skiplang/json";
+import type { Json } from "@skipruntime/core/json.js";
 import {
   toPtr,
   toNullablePtr,
   toNullablePointer,
   SKJSONShared,
-} from "@skip-wasm/json";
+} from "../../skipwasm-json/skjson.js";
 
 export interface FromWasm {
   // NonEmptyIterator

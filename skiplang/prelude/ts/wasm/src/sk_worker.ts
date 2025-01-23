@@ -1,4 +1,4 @@
-import type { int } from "@skiplang/std";
+import type { int } from "../skiplang-std/index.js";
 import type { Wrk } from "./sk_types.js";
 
 export class Wrappable {

@@ -5,8 +5,8 @@ import type {
   Links,
   ToWasmManager,
   Utils,
-} from "@skip-wasm/std";
-import type * as Internal from "@skiplang/std/internal.js";
+} from "../skipwasm-std/index.js";
+import type * as Internal from "../skiplang-std/internal.js";
 import type {
   PagedMemory,
   Page,
@@ -19,9 +19,9 @@ import type {
 import { ExternalFuns, SKDBTable } from "./skdb_util.js";
 import { IDBStorage } from "./skdb_storage.js";
 import { SKDBImpl, SKDBSyncImpl } from "./skdb_database.js";
-import type { SKJSONShared } from "@skip-wasm/json";
-import type { JsonConverter } from "@skiplang/json";
-import type * as InternalJ from "@skiplang/json/internal.js";
+import type { SKJSONShared } from "../skipwasm-json/skjson.js";
+import type { JsonConverter } from "../skiplang-json/index.js";
+import type * as InternalJ from "../skiplang-json/internal.js";
 
 interface Exported {
   sk_pop_dirty_page: () => number;
