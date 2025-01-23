@@ -11,9 +11,6 @@ MAKEFLAGS += --no-print-directory
 REAL_DIR=$(shell realpath $(ROOT_DIR))
 SERVER_DIR=$(ROOT_DIR)/server
 SDKMAN_INIT=$(SDKMAN_DIR)/bin/sdkman-init.sh
-SKDB_CLI=$(SRV_DIR)/node_modules/skdb/dist/skdb-cli.js
-SKDB_CLI_DIR=$(SRV_DIR)/node_modules/skdb
-SKDB_CLI_CMD=./dist/skdb-cli.js
 SKDB_CMD=$(REAL_DIR)/target/host/release/skdb
 SKDB_DATABASES=$(SRV_DIR)/build/dbs
 SKGW_DIR=$(SERVER_DIR)/dev
@@ -35,7 +32,7 @@ build: build_server $(SDKMAN_INIT) $(SKGW_DIR) $(SRV_DIR)/build/skdb.conf
 	$(SRV_DIR)/service_server.sh $(SDKMAN_DIR) $(SKGW_DIR) $(SRV_DIR)/build/skdb.conf $(SKDB_DATABASES) $(SERVER_JAR)
 
 .PHONY: $(SRV_DIR)/build/skdb.conf
-$(SRV_DIR)/build/skdb.conf: $(SKDB_CLI) $(SKDB_DATABASES) $(SKDB_INIT)
+$(SRV_DIR)/build/skdb.conf: $(SKDB_DATABASES) $(SKDB_INIT)
 	@echo "skdb_port=8110" > $(SRV_DIR)/build/skdb.conf
 	@echo "skdb_databases=$(SKDB_DATABASES)" >> $(SRV_DIR)/build/skdb.conf
 	@echo "skdb=$(SKDB_CMD)" >> $(SRV_DIR)/build/skdb.conf

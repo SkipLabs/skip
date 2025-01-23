@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
-import { tests, type Test } from "./tests";
-import { createSkdb, SKDB } from "skdb";
+import { tests, type Test } from "./tests.js";
+import { createSkdb, type SKDB } from "skdb";
 
 function run(t: Test, asWorker: boolean) {
   test(t.name, async () => {
