@@ -97,8 +97,12 @@ fmt-c:
 fmt-js:
 	npx prettier --log-level warn --write .
 
+.PHONY: fmt-py
+fmt-py:
+	black --line-length 80 .
+
 .PHONY: fmt
-fmt: fmt-sk fmt-c fmt-js
+fmt: fmt-sk fmt-c fmt-js fmt-py
 
 .PHONY: check-fmt
 check-fmt: fmt

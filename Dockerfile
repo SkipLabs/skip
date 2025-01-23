@@ -38,6 +38,7 @@ FROM skiplang AS skip
 RUN wget -O - https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | apt-key add - && \
     echo "deb https://deb.nodesource.com/node_22.x nodistro main" >> /etc/apt/sources.list.d/nodejs.list && \
     apt-get update && \
-    apt-get install -q -y nodejs && \
+    apt-get install -q -y nodejs pip && \
     npm install -g bun && \
-    npm install -g prettier
+    npm install -g prettier && \
+    pip install black
