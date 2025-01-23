@@ -1,7 +1,7 @@
 import { test } from "@playwright/test";
-import { setup, apitests } from "./apitests";
+import { setup, apitests } from "./apitests.js";
 import { webcrypto as crypto } from "crypto";
-import { SKDB } from "skdb";
+import type { SKDB } from "skdb";
 
 function runServer(
   t: {
@@ -13,7 +13,7 @@ function runServer(
   suffix: string = "",
 ) {
   test(t.name, async () => {
-    const skdb = await setup(8110, crypto, asWorker, suffix);
+    const skdb = await setup(8110, crypto as Crypto, asWorker, suffix);
     const res = await t.fun(skdb);
     t.check(res);
   });

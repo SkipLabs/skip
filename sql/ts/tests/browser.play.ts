@@ -1,7 +1,7 @@
 /* eslint-disable */
 
 import { test } from "@playwright/test";
-import { tests } from "./tests";
+import { tests, type Test } from "./tests.js";
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
@@ -14,12 +14,11 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-function run(t, asWorker: boolean) {
+function run(t: Test, asWorker: boolean) {
   test(t.name, async ({ page }) => {
     await page.evaluate(`window.asWorker = ${asWorker};`);
     await page.evaluate(`window.test = ${t.fun};`);
     let res = await page.evaluate(async () => {
-      // @ts-ignore
       let m = await import("skdb");
       // @ts-ignore
       let skdb = await m.createSkdb({ asWorker: window.asWorker });
