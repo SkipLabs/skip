@@ -1,9 +1,9 @@
-import { run, type ModuleInit } from "@skip-wasm/std";
+import { run, type ModuleInit } from "../skipwasm-std/index.js";
 import type { ServiceInstanceFactory } from "./internals/skipruntime_module.js";
 
-import { init as runtimeInit } from "@skip-wasm/std/runtime.js";
-import { init as posixInit } from "@skip-wasm/std/posix.js";
-import { init as skjsonInit } from "@skip-wasm/json";
+import { init as runtimeInit } from "../skipwasm-std/sk_runtime.js";
+import { init as posixInit } from "../skipwasm-std/sk_posix.js";
+import { init as skjsonInit } from "../skipwasm-json/skjson.js";
 import { init as skruntimeInit } from "./internals/skipruntime_module.js";
 import type { SkipService, ServiceInstance } from "@skipruntime/core";
 

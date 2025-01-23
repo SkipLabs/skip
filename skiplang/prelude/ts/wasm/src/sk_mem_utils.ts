@@ -1,4 +1,4 @@
-import type { int } from "@skiplang/std";
+import type { int } from "../skiplang-std/index.js";
 import type { FileSystem, System } from "./sk_types.js";
 import { Options } from "./sk_types.js";
 

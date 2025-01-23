@@ -4,22 +4,22 @@
  * @packageDocumentation
  */
 
-import type { Opaque } from "@skiplang/std";
+import type { Opaque } from "../skiplang-std/index.js";
 import type {
   Pointer,
   Nullable,
   Json,
   JsonConverter,
   JsonObject,
-} from "@skiplang/json";
+} from "../skiplang-json/index.js";
 import {
   sk_freeze,
   isSkManaged,
   SkManaged,
   checkOrCloneParam,
-} from "@skiplang/json";
+} from "../skiplang-json/index.js";
 
-import { sknative } from "@skiplang/std";
+import { sknative } from "../skiplang-std/index.js";
 
 import type * as Internal from "./internal.js";
 import {
