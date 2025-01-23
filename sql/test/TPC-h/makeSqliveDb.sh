@@ -1,6 +1,6 @@
 #!/bin/bash
 
-(cd tnt-tpch
+(cd tnt-tpch || exit
  make tpch-dbgen/dbgen
  (cd tpch-dbgen/ && ./dbgen -f -s 1)
  ./create_db.sh customer lineitem nation orders partsupp part region supplier)

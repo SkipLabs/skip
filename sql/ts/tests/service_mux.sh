@@ -15,11 +15,12 @@ if [[ -z "$3" ]]; then
     exit 1
 fi
 
-source $1/bin/sdkman-init.sh
-cd $2
+# shellcheck disable=SC1091 # Not following sourced file
+source "$1"/bin/sdkman-init.sh
+cd "$2" || exit
 
 run_test_server () {
-    exec gradle --console plain -q runMuxTestServer "--args=8090 &> /dev/null" &> $1/test_server.log & 
+    exec gradle --console plain -q runMuxTestServer "--args=8090 &> /dev/null" &> "$1"/test_server.log & 
     pid2=$!
 
     thost="http://localhost:8090"
@@ -48,7 +49,7 @@ i=0
 while [[ $i -lt 10 ]];
 do
     echo "Running mux server ($i)"
-    pid=$(run_test_server $3)
+    pid=$(run_test_server "$3")
     if [[ -n "$pid" ]]; then
         echo -e "$pid"
         break;
@@ -57,6 +58,6 @@ do
 done
 
 if [ $i -ge 10 ]; then
-  kill $pid1
+  kill "$pid"
   exit 2
 fi

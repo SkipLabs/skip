@@ -89,15 +89,15 @@ if [ ! -f "test/dates/minus_one_day.sql" ]; then
 fi
 
 run_test () {
-  cat $1 | $SKDB --always-allow-joins | sort > "$1.out";
-  cat $1 | sqlite3 | sort > "$1.res"
+  cat "$1" | $SKDB --always-allow-joins | sort > "$1.out";
+  cat "$1" | sqlite3 | sort > "$1.res"
   diff=$(diff -u "$1.out" "$1.res")
   if [ "$diff" == "" ]; then
       rm -f "$1.out"
       rm -f "$1.res"
       pass "$2"
   else
-      echo $diff > "$1.diff"
+      echo "$diff" > "$1.diff"
       fail "$2"
       exit 2
   fi
@@ -116,48 +116,48 @@ run_date () {
 run_date_test () {
   rm -f "$1.out"
   rm -f "$1.res"
-  run_date $1 "A: %A" "$3"
-  run_date $1 "a: %a" "$3"
-  run_date $1 "B: %B" "$3"
-  run_date $1 "b: %b" "$3"
-  run_date $1 "C: %C" "$3"
-  run_date $1 "D: %D" "$3"
-  run_date $1 "d: %d" "$3"
-  run_date $1 "e: %e" "$3"
-  run_date $1 "F: %F" "$3"
-  run_date $1 "H: %H" "$3"
-  run_date $1 "h: %h" "$3"
-  run_date $1 "I: %I" "$3"
-  run_date $1 "j: %j" "$3"
-  run_date $1 "k: %k" "$3"
-  run_date $1 "L: %L" "$3"
-  run_date $1 "l: %l" "$3"
-  run_date $1 "M: %M" "$3"
-  run_date $1 "m: %m" "$3"
-  run_date $1 "n: line1%nn: line2" "$3"
-  run_date $1 "P: %P" "$3"
-  run_date $1 "p: %p" "$3"
-  run_date $1 "Q: %Q" "$3"
-  run_date $1 "R: %R" "$3"
-  run_date $1 "S: %S" "$3"
-  run_date $1 "T: %T" "$3"
-  run_date $1 "t: a%tb" "$3"
-  run_date $1 "U: %U" "$3"
-  run_date $1 "u: %u" "$3"
-  run_date $1 "V: %V" "$3"
-  run_date $1 "W: %W" "$3"
-  run_date $1 "w: %w" "$3"
-  run_date $1 "Y: %Y" "$3"
-  run_date $1 "y: %y" "$3"
-  run_l_date $1 "z: %z" "$3"
-  run_l_date $1 "Z: %Z" "$3"
+  run_date "$1" "A: %A" "$3"
+  run_date "$1" "a: %a" "$3"
+  run_date "$1" "B: %B" "$3"
+  run_date "$1" "b: %b" "$3"
+  run_date "$1" "C: %C" "$3"
+  run_date "$1" "D: %D" "$3"
+  run_date "$1" "d: %d" "$3"
+  run_date "$1" "e: %e" "$3"
+  run_date "$1" "F: %F" "$3"
+  run_date "$1" "H: %H" "$3"
+  run_date "$1" "h: %h" "$3"
+  run_date "$1" "I: %I" "$3"
+  run_date "$1" "j: %j" "$3"
+  run_date "$1" "k: %k" "$3"
+  run_date "$1" "L: %L" "$3"
+  run_date "$1" "l: %l" "$3"
+  run_date "$1" "M: %M" "$3"
+  run_date "$1" "m: %m" "$3"
+  run_date "$1" "n: line1%nn: line2" "$3"
+  run_date "$1" "P: %P" "$3"
+  run_date "$1" "p: %p" "$3"
+  run_date "$1" "Q: %Q" "$3"
+  run_date "$1" "R: %R" "$3"
+  run_date "$1" "S: %S" "$3"
+  run_date "$1" "T: %T" "$3"
+  run_date "$1" "t: a%tb" "$3"
+  run_date "$1" "U: %U" "$3"
+  run_date "$1" "u: %u" "$3"
+  run_date "$1" "V: %V" "$3"
+  run_date "$1" "W: %W" "$3"
+  run_date "$1" "w: %w" "$3"
+  run_date "$1" "Y: %Y" "$3"
+  run_date "$1" "y: %y" "$3"
+  run_l_date "$1" "z: %z" "$3"
+  run_l_date "$1" "Z: %Z" "$3"
   diff=$(diff -u "$1.out" "$1.res")
   if [ "$diff" == "" ]; then
       rm -f "$1.out"
       rm -f "$1.res"
       pass "$2"
   else
-      echo $diff > "$1.diff"
+      echo "$diff" > "$1.diff"
       fail "$2"
       exit 2
   fi
@@ -185,7 +185,7 @@ run_hour_test () {
             echo "select strftime('%Y-%m-%d %H:%M:%S', '$d $i', '$1');"
           done < "test/dates/valid_date_list2.txt" > "test/dates/hour_$suffix.sql"
 	fi
-        run_test test/dates/hour_$suffix.sql "$1 (at hour $i)"
+        run_test "test/dates/hour_$suffix.sql" "$1 (at hour $i)"
     done
 }
 
@@ -199,7 +199,7 @@ run_hour_test2 () {
             echo "select strftime('%Y-%m-%d %H:%M:%S', '$d $i', '$1');"
           done < "test/dates/valid_date_list2.txt" > "test/dates/hour_$suffix.sql"
 	fi
-        run_test test/dates/hour_$suffix.sql "$1 (at hour $i)"
+        run_test "test/dates/hour_$suffix.sql" "$1 (at hour $i)"
     done
 }
 
@@ -218,7 +218,7 @@ run_modify_time () {
       echo "select strftime('%Y-%m-%d %H:%M:%S', '$date',  '$2$i $3');"
     done  > "test/dates/$1.sql"
   fi
-  run_test "test/dates/$1.sql" $1
+  run_test "test/dates/$1.sql" "$1"
 }
 
 ##############################################################################
@@ -239,7 +239,7 @@ run_epoch_utc_test () {
       rm -f "$1.res"
       pass "$2"
   else
-      echo $diff > "$1.diff";
+      echo "$diff" > "$1.diff";
       fail "$2"
       exit 2
   fi
@@ -259,7 +259,7 @@ run_epoch_locale_test () {
       rm -f "$1.res"
       pass "$2"
   else
-      echo $diff > "$1.diff";
+      echo "$diff" > "$1.diff";
       fail "$2"
       exit 2
   fi

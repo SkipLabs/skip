@@ -5,8 +5,6 @@ if [ -z "$SKARGO_PROFILE" ]; then
     SKARGO_PROFILE=dev
 fi
 
-SKDB_CMD="skargo run -q --profile $SKARGO_PROFILE -- "
-
 DB=/tmp/test.db
 
 rm -f /tmp/foo $DB
@@ -19,7 +17,7 @@ for i in {1..1}; do
     $SKDB subscribe v1 --connect --data $DB --file "/tmp/foo$i"
 done
 
-for j in {1..10}; do
+for _ in {1..10}; do
     (for i in {1..100}; do echo "insert into t2 values($i, $i);"; done;) | $SKDB --data $DB &
 done;
 wait
