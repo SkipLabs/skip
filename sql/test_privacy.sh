@@ -20,12 +20,12 @@ $SKDB_CMD --init $DBCOPYFILE
 SKDB="$SKDB_CMD --data $DBFILE"
 SKDB_COPY="$SKDB_CMD --data $DBCOPYFILE"
 
-cat privacy/init.sql | $SKDB
-cat privacy/init.sql | $SKDB_COPY
+$SKDB < privacy/init.sql
+$SKDB_COPY < privacy/init.sql
 
 echo "create table t1 (id INTEGER primary key, skdb_access TEXT);" | $SKDB
 echo "create table t1 (id INTEGER primary key, skdb_access TEXT);" | $SKDB_COPY
-subt1=`$SKDB subscribe t1`
+subt1=$($SKDB subscribe t1)
 
 echo "create table t2 (id INTEGER primary key, skdb_access TEXT);" | $SKDB
 echo "create reactive view v1 as select id, id as skdb_access from t1 ;" | $SKDB
@@ -108,7 +108,7 @@ else
 fi
 
 # Let's check that user2 can read
-if $SKDB tail $subt1 --user ID2 2>&1 | grep -q "238|\"ID22\""; then
+if $SKDB tail "$subt1" --user ID2 2>&1 | grep -q "238|\"ID22\""; then
     pass "GROUP PERMISSIONS4"
 else
     fail "GROUP PERMISSIONS4"
@@ -118,7 +118,7 @@ fi
 echo "insert into skdb_user_permissions values ('ID2', skdb_permission(''), 'root')" | $SKDB
 
 # Let's check that user2 cannot read
-if $SKDB tail $subt1 --user ID2 2>&1 | grep -q "238|\"ID22\""; then
+if $SKDB tail "$subt1" --user ID2 2>&1 | grep -q "238|\"ID22\""; then
     fail "GROUP PERMISSIONS6"
 else
     pass "GROUP PERMISSIONS6"
@@ -127,7 +127,7 @@ fi
 echo "delete from skdb_user_permissions where userID='ID2';" | $SKDB
 
 # Let's check that user2 can read again
-if $SKDB tail $subt1 --user ID2 2>&1 | grep -q "238|\"ID22\""; then
+if $SKDB tail "$subt1" --user ID2 2>&1 | grep -q "238|\"ID22\""; then
     pass "GROUP PERMISSIONS7"
 else
     fail "GROUP PERMISSIONS7"
@@ -137,7 +137,7 @@ fi
 echo "delete from skdb_group_permissions where groupID='ID22' and userID='ID2';" | $SKDB
 
 # Let's check that user2 cannot read (after being kicked out)
-if $SKDB tail $subt1 --user ID2 2>&1 | grep -q "238|\"ID22\""; then
+if $SKDB tail "$subt1" --user ID2 2>&1 | grep -q "238|\"ID22\""; then
     fail "GROUP PERMISSIONS8"
 else
     pass "GROUP PERMISSIONS8"
@@ -169,7 +169,7 @@ else
 fi
 
 # Let's check that user1 can read
-if $SKDB tail $subt1 --user ID1 2>&1 | grep -q "240|\"ID23\""; then
+if $SKDB tail "$subt1" --user ID1 2>&1 | grep -q "240|\"ID23\""; then
     pass "GROUP PERMISSIONS11"
 else
     fail "GROUP PERMISSIONS11"
@@ -278,7 +278,7 @@ fi
 # PERMISSION CHANGES WHILE TAILING
 ###############################################################################
 
-$SKDB tail $subt1 --format=csv --user ID3 --follow |
+$SKDB tail "$subt1" --format=csv --user ID3 --follow |
   $SKDB_COPY write-csv --enable-rebuilds > /dev/null &
 
 # Just leaving enough time for the tailer to fill up with data. The
@@ -319,7 +319,7 @@ pass "GROUP PERMISSION UPDATE2"
 )| $SKDB
 
 # restart tail. it will have exited after sending a rebuild
-$SKDB tail $subt1 --format=csv --user ID3 --follow |
+$SKDB tail "$subt1" --format=csv --user ID3 --follow |
   $SKDB_COPY write-csv --enable-rebuilds > /dev/null &
 tailerID=$!
 

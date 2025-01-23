@@ -15,19 +15,19 @@ fail() { printf "%-50s FAILED\n" "$1:"; }
 run_diff () {
     rm -f /tmp/kk1 /tmp/kk2 /tmp/kk3 $DB
 
-    nviews=`cat $2 | grep VIEW | sed 's/CREATE REACTIVE VIEW V//' | sed 's/ .*//' | sort -n -r | head -n 1`
+    nviews=$(cat "$2" | grep VIEW | sed 's/CREATE REACTIVE VIEW V//' | sed 's/ .*//' | sort -n -r | head -n 1)
 
     $SKDB_CMD --init $DB
-    cat $1 $2 | $SKDB
+    cat "$1" "$2" | $SKDB
 
     for i in $(seq 0 $((nviews))); do
-        rm -f /tmp/V$i
+        rm -f "/tmp/V$i"
         $SKDB subscribe "V$i" --connect --updates "/tmp/V$i" > /dev/null &
     done
 
     wait
 
-    cat $3 $4 $5 | $SKDB
+    cat "$3" "$4" "$5" | $SKDB
 
     rm -f /tmp/selects.sql
 
@@ -45,12 +45,11 @@ run_diff () {
 
     cat /tmp/selects.sql | $SKDB | sort -n > /tmp/kk1
 
-    cat $2 | sed 's/CREATE REACTIVE VIEW V[0-9]* AS //' > /tmp/selects2.sql
+    cat "$2" | sed 's/CREATE REACTIVE VIEW V[0-9]* AS //' > /tmp/selects2.sql
 
-    cat $1 $3 $4 $5 /tmp/selects2.sql | sqlite3 | sort -n > /tmp/kk2
+    cat "$1" "$3" "$4" "$5" /tmp/selects2.sql | sqlite3 | sort -n > /tmp/kk2
 
     diff /tmp/kk1 /tmp/kk2
-    diff /tmp/kk1 /tmp/kk2 > /dev/null
     if [ $? -eq 0 ]; then
         pass "$2 (part-1)"
     else
@@ -71,19 +70,19 @@ run_diff () {
 run_diff_no_sqlite () {
     rm -f /tmp/kk1 /tmp/kk2 /tmp/kk3 $DB
 
-    nviews=`cat $2 | grep VIEW | sed 's/CREATE REACTIVE VIEW V//' | sed 's/ .*//' | sort -n -r | head -n 1`
+    nviews=$(cat "$2" | grep VIEW | sed 's/CREATE REACTIVE VIEW V//' | sed 's/ .*//' | sort -n -r | head -n 1)
 
     $SKDB_CMD --init $DB
-    cat $1 $2 | $SKDB
+    cat "$1" "$2" | $SKDB
 
     for i in $(seq 0 $((nviews))); do
-        rm -f /tmp/V$i
+        rm -f "/tmp/V$i"
         $SKDB subscribe "V$i" --connect --updates "/tmp/V$i" > /dev/null &
     done
 
     wait
 
-    cat $3 $4 $5 | $SKDB
+    cat "$3" "$4" "$5" | $SKDB
 
     rm -f /tmp/selects.sql
 

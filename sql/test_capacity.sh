@@ -17,9 +17,9 @@ done
 skdb --init /tmp/test2.db
 skdb --data /tmp/test.db --dump | skdb --data /tmp/test2.db
 
-j=`echo "select 1 + max(a) from t1;" | skdb --data /tmp/test2.db`
+j=$(echo "select 1 + max(a) from t1;" | skdb --data /tmp/test2.db)
 
-if [ $i -eq $j ]
+if [ "$i" -eq "$j" ]
 then
     echo -e "TEST CAPACITY:\tOK"
 else

@@ -33,16 +33,18 @@ fi
 [ -e "$4/test_chrome.db" ] && rm "$4/test_chrome.db" 1>&2
 [ -e "$4/test_chrome_worker.db" ] && rm "$4/test_chrome_worker.db" 1>&2
 
+# shellcheck disable=SC2034 # value indirectly referenced just below
 while IFS='=' read -r key value
 do
-eval ${key}="\${value}"
+    eval "${key}=\${value}"
 done < "$3"
 
-source $1/bin/sdkman-init.sh
-cd $2
+# shellcheck disable=SC1091 # Not following sourced file
+source "$1"/bin/sdkman-init.sh
+cd "$2" || exit
 
 run_server () {
-    java -jar $4 --config $2 &> $3/server.log &
+    java -jar "$4" --config "$2" &> "$3"/server.log &
     pid1=$!
 
     host="http://localhost:$1"
@@ -71,12 +73,14 @@ run_server () {
     fi
 }
 
+skdb_port=3586
+
 pid1=""
 i=0
 while [[ $i -lt 10 ]];
 do
     echo "Running local server ($i)"
-    pid1=$(run_server $skdb_port $3 $4 $5)
+    pid1=$(run_server "$skdb_port" "$3" "$4" "$5")
     if [[ -n "$pid1" ]]; then
         echo "$pid1"
         break;

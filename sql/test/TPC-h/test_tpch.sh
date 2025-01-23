@@ -14,7 +14,7 @@ rm -f /tmp/nation_count
 
 START=$SECONDS
 ./makeSqliveDb.sh
-TOTAL=$(($SECONDS - $START))
+TOTAL=$((SECONDS - START))
 if (( TOTAL > 1800 ));
 then
     echo -e "BUILD TPC-H:\tFAILED ($TOTAL)"
@@ -34,8 +34,8 @@ $SKDB subscribe nation_count --connect --data /tmp/test.db --updates /tmp/nation
 ###############################################################################
 
 START=$SECONDS
-cat view1.sql | $SKDB --data /tmp/test.db
-TOTAL=$(($SECONDS - $START))
+$SKDB --data /tmp/test.db < view1.sql
+TOTAL=$((SECONDS - START))
 if (( TOTAL > 120 ));
 then
     echo -e "BUILD VIEW1:\tFAILED ($TOTAL)"
@@ -49,7 +49,7 @@ fi
 
 START=$SECONDS
 echo "create index view1_o_orderdate on view1(o_orderdate);" | $SKDB --data /tmp/test.db
-TOTAL=$(($SECONDS - $START))
+TOTAL=$((SECONDS - START))
 if (( TOTAL > 10 ));
 then
     echo -e "BUILD INDEX view1_o_orderdate:\tFAILED ($TOTAL)"
@@ -64,8 +64,8 @@ fi
 rm -f /tmp/query1
 
 START=$SECONDS
-cat query1.sql | $SKDB --data /tmp/test.db
-TOTAL=$(($SECONDS - $START))
+$SKDB --data /tmp/test.db < query1.sql
+TOTAL=$((SECONDS - START))
 if (( TOTAL > 3 ));
 then
     echo -e "BUILD query1 REACTIVE VIEW:\tFAILED ($TOTAL)"
@@ -82,8 +82,8 @@ $SKDB subscribe query1 --connect --data /tmp/test.db --updates /tmp/query1 > /de
 rm -f /tmp/query2
 
 START=$SECONDS
-cat query2.sql | $SKDB --data /tmp/test.db
-TOTAL=$(($SECONDS - $START))
+$SKDB --data /tmp/test.db < query2.sql
+TOTAL=$((SECONDS - START))
 if (( TOTAL > 20 ));
 then
     echo -e "BUILD query2 REACTIVE VIEW:\tFAILED ($TOTAL)"
@@ -100,8 +100,8 @@ $SKDB subscribe query2 --connect --data /tmp/test.db --updates /tmp/query2 > /de
 rm -f /tmp/query3
 
 START=$SECONDS
-cat query3.sql | $SKDB --data /tmp/test.db
-TOTAL=$(($SECONDS - $START))
+$SKDB --data /tmp/test.db < query3.sql
+TOTAL=$((SECONDS - START))
 if (( TOTAL > 30 ));
 then
     echo -e "BUILD query3 REACTIVE VIEW:\tFAILED ($TOTAL)"
@@ -128,7 +128,7 @@ $SKDB subscribe query3 --connect --data /tmp/test.db --updates /tmp/query3 > /de
 
 START=$SECONDS
 echo "delete from customer where c_custkey <= 10000;" | $SKDB --data /tmp/test.db
-TOTAL=$(($SECONDS - $START))
+TOTAL=$((SECONDS - START))
 if (( TOTAL > 50 ));
 then
     echo -e "RUN DELETE:\tFAILED ($TOTAL)"
@@ -142,7 +142,7 @@ fi
 
 START=$SECONDS
 echo "delete from lineitem where l_orderkey < 10;" | $SKDB --data /tmp/test.db
-TOTAL=$(($SECONDS - $START))
+TOTAL=$((SECONDS - START))
 if (( TOTAL > 5 ));
 then
     echo -e "RUN DELETE2:\tFAILED ($TOTAL)"

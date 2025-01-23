@@ -12,9 +12,10 @@ else
     SDKMAN=/root/.sdkman
 fi
 
+# shellcheck disable=SC1091 # Not following sourced file
 source "$SDKMAN/bin/sdkman-init.sh"
 
-cd $SCRIPT_DIR/../dev
+cd "$SCRIPT_DIR/../dev" || exit
 
 ################################################################################
 # start server in background
@@ -33,15 +34,15 @@ else
 fi
 
 function start_server {
-    gradle --console plain run $SERVER_ARGS > $SERVER_LOG 2>&1 &
+    gradle --console plain run "$SERVER_ARGS" > $SERVER_LOG 2>&1 &
     pid=$!
-    echo $pid > $SERVER_PID_FILE
+    echo $pid > "$SERVER_PID_FILE"
     echo "started server: $pid"
 }
 
 start_server
 
-if [[ -z $(cat $SERVER_PID_FILE) ]]
+if [[ -z "$(cat "$SERVER_PID_FILE")" ]]
 then
     echo "couldn't start server"
     exit 1
@@ -74,29 +75,29 @@ function kill_random_skdb_pid {
     proc_type=$1
     signal=$2
     pid=$(pgrep -f "skdb.*$proc_type" | shuf -n 1)
-    if [[ ! -z $pid ]]
+    if [[ -n "$pid" ]]
     then
-        if [[ $signal == "-STOP" ]]
+        if [[ "$signal" == "-STOP" ]]
         then
-            echo $pid >> $PAUSED_PROCS_FILE
+            echo "$pid" >> $PAUSED_PROCS_FILE
         fi
-        kill $signal $pid
-        echo kill_random_skdb_pid: $proc_type, $signal, $pid, $?
+        kill "$signal" "$pid"
+        echo "kill_random_skdb_pid: $proc_type, $signal, $pid, $?"
     fi
 }
 
 function restart_server {
     wait_to_restart=$1
-    pid=$(cat $SERVER_PID_FILE)
-    kill -TERM $pid
-    echo restart_server: $pid, $?, $wait_to_restart
-    wait $pid
-    sleep $wait_to_restart
+    pid=$(cat "$SERVER_PID_FILE")
+    kill -TERM "$pid"
+    echo "restart_server: $pid, $?, $wait_to_restart"
+    wait "$pid"
+    sleep "$wait_to_restart"
     start_server
 }
 
 delay_secs=10
-if [[ ! -z $1 ]]
+if [[ -n $1 ]]
 then
     delay_secs=$1
 fi
@@ -136,11 +137,12 @@ targets=(
 
 while true
 do
-    sleep $delay_secs &
+    sleep "$delay_secs" &
     wait $!
-    rand=$(( $RANDOM % ${#targets[@]} ))
+    rand=$(( RANDOM % ${#targets[@]} ))
     cmd=${targets[$rand]}
+    # shellcheck disable=SC2086 # Not sure what is intended here
     eval $cmd
 done
 
-wait $SERVER_PID
+wait "$SERVER_PID"

@@ -2,21 +2,23 @@
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-SQL_PATH=$(realpath $SCRIPT_DIR/../..)
+SQL_PATH=$(realpath "$SCRIPT_DIR/../..")
 
 SKDB_BIN="skargo run -q --release --manifest-path $SQL_PATH/Skargo.toml --"
 
 if [ -f ~/.skdb/config.prop ];then
   file=$(realpath ~/.skdb/config.prop)
+  # shellcheck disable=SC2034 # value indirectly referenced just below
   while IFS='=' read -r key value
   do
-    eval ${key}="\${value}"
+    eval "${key}=\${value}"
   done < "$file"
-  if [[ $# -gt 0 ]]; then
-    server_args="$* --config $file"
-  else
-    server_args="--config $file"
-  fi
+  # server_args is unused
+  # if [[ $# -gt 0 ]]; then
+  #   server_args="$* --config $file"
+  # else
+  #   server_args="--config $file"
+  # fi
 fi
 
 if [ -z "$skdb_port" ]; then
@@ -33,6 +35,7 @@ SERVER_LOG=/tmp/server.log
 
 SKDB="$SKDB_BIN --data $SERVER_DB"
 
+# shellcheck disable=SC2317 # handle_term is referenced in trap below
 handle_term() {
     kill "$(cat "$SERVER_PID_FILE")"
     kill "$client1"
@@ -89,28 +92,29 @@ echo "Starting clients..."
 client1_out=/tmp/client1.out
 client2_out=/tmp/client2.out
 
-/usr/bin/env node $SCRIPT_DIR/soak_client.mjs 1 $skdb_port > $client1_out 2>&1 &
+/usr/bin/env node "$SCRIPT_DIR/soak_client.mjs" 1 "$skdb_port" > "$client1_out" 2>&1 &
 client1=$!
 
-/usr/bin/env node $SCRIPT_DIR/soak_client.mjs 2 $skdb_port > $client2_out 2>&1 &
+/usr/bin/env node "$SCRIPT_DIR/soak_client.mjs" 2 "$skdb_port" > "$client2_out" 2>&1 &
 client2=$!
 
+# shellcheck disable=SC2317 # monitor is referenced in trap below
 monitor() {
     kill -USR1 "$(cat "$SERVER_PID_FILE")"
-    kill -USR1 $client1
-    kill -USR1 $client2
+    kill -USR1 "$client1"
+    kill -USR1 "$client2"
 
-    echo "Dumping current status at" $(date) ":"
+    echo "Dumping current status at $(date):"
 
     echo "********************************************************************************"
-    echo "Chaos log:" $SOAK_SERVER_LOG
+    echo "Chaos log: $SOAK_SERVER_LOG"
     echo "----------"
-    cat $SOAK_SERVER_LOG
+    cat "$SOAK_SERVER_LOG"
 
     echo "********************************************************************************"
-    echo "Server log:" $SERVER_LOG
+    echo "Server log: $SERVER_LOG"
     echo "-----------"
-    cat $SERVER_LOG
+    cat "$SERVER_LOG"
 
     echo "********************************************************************************"
     echo "Server state:"
@@ -138,22 +142,23 @@ monitor() {
     $SKDB <<< "select * from pk_filtered order by id desc limit 20;"
 
     echo "********************************************************************************"
-    echo "Client 1 log:" $client1_out
+    echo "Client 1 log: $client1_out"
     echo "-------------"
-    cat $client1_out|tr -d '\0'
-    truncate -s 0 $client1_out
+    cat "$client1_out" | tr -d '\0'
+    truncate -s 0 "$client1_out"
 
     echo "********************************************************************************"
-    echo "Client 2 log:" $client2_out
+    echo "Client 2 log: $client2_out"
     echo "-------------"
-    cat $client2_out|tr -d '\0'
-    truncate -s 0 $client2_out
+    cat "$client2_out" | tr -d '\0'
+    truncate -s 0 "$client2_out"
 
-    wait -n $client1 $client2
+    wait -n "$client1" "$client2"
 }
 trap 'monitor' SIGUSR1
 
 echo "To monitor progress send SIGUSR1 to $$."
+# shellcheck disable=SC2016 # Intentional single quotes to prevent expansion
 echo 'Or: kill -USR1 $(pgrep test_soak.sh)'
 
 wait -n $client1 $client2
