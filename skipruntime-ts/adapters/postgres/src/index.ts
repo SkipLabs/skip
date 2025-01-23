@@ -34,12 +34,16 @@ function validateKeyParam(params: Json): {
       select = (table: string, key: string) =>
         format("SELECT * FROM %I WHERE %I = %L;", table, col, key);
       break;
+    case "BIGSERIAL":
     case "BIGINT":
       select = (table: string, key: string) => {
         const keyNum = Number(key);
-        // Checks if key is a safe 64-bit integer
-        if (!Number.isSafeInteger(keyNum))
-          throw new Error("Invalid BIGINT key: " + key);
+        // Checks if key is a safe 64-bit integer (and positive, if serial)
+        if (
+          !Number.isSafeInteger(keyNum) ||
+          (type == "BIGSERIAL" && keyNum < 1)
+        )
+          throw new Error(`Invalid ${type} key: ${key}`);
         return format(
           "SELECT * FROM %I WHERE %I = " + keyNum.toString() + ";",
           table,
@@ -47,16 +51,18 @@ function validateKeyParam(params: Json): {
         );
       };
       break;
+    case "SERIAL":
     case "INTEGER":
       select = (table: string, key: string) => {
         const keyNum = Number(key);
-        // Checks if key is a safe 32-bit integer
+        // Checks if key is a safe 32-bit integer (and positive, if serial)
         if (
           !Number.isSafeInteger(keyNum) ||
           keyNum < min32bitInt ||
-          keyNum > max32bitInt
+          keyNum > max32bitInt ||
+          (type == "SERIAL" && keyNum < 1)
         )
-          throw new Error("Invalid INTEGER key: " + key);
+          throw new Error(`Invalid ${type} key: ${key}`);
         return format(
           "SELECT * FROM %I WHERE %I = " + keyNum.toString() + ";",
           table,
@@ -72,7 +78,7 @@ function validateKeyParam(params: Json): {
 
 /**
  * An External Service wrapping a PostgreSQL database, exposing its tables as "resources" in the Skip runtime.
- * Subscription `params` MUST include a field `key` identifying the table column that should be used as the key in the resulting collection (and its type, one of INTEGER, BIGINT, or TEXT).
+ * Subscription `params` MUST include a field `key` identifying the table column that should be used as the key in the resulting collection (and its type, one of INTEGER, BIGINT, SERIAL, BIGSERIAL, or TEXT).
  */
 
 export class PostgresExternalService implements ExternalService {
@@ -108,7 +114,9 @@ export class PostgresExternalService implements ExternalService {
   subscribe(
     instance: string,
     table: string,
-    params: Json & { key: "INTEGER" | "BIGINT" | "TEXT" },
+    params: Json & {
+      key: "INTEGER" | "BIGINT" | "TEXT" | "SERIAL" | "BIGSERIAL";
+    },
     callbacks: {
       update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
       error: (error: Json) => void;
