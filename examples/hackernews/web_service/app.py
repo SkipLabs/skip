@@ -85,13 +85,7 @@ def create_post():
             post_id = cur.fetchone()[0]
             db.commit()
 
-    # Write into the reactive input collection.
-    resp = requests.patch(
-        f"{REACTIVE_SERVICE_URL}/inputs/posts",
-        json=[[post_id, [{**params, "id": post_id, "author_id": author_id}]]],
-    )
-
-    return resp.reason, resp.status_code
+    return "ok", 200
 
 
 @app.delete("/posts/<int:post_id>")
@@ -107,31 +101,7 @@ def delete_post(post_id):
             # Delete the post.
             cur.execute(f"DELETE FROM posts WHERE id={post_id}")
             db.commit()
-
-    # Write into the reactive input collections.
-    upvotes_resp = requests.patch(
-        f"{REACTIVE_SERVICE_URL}/inputs/upvotes",
-        json=[[upvote_id, []] for upvote_id in upvote_ids],
-    )
-    posts_resp = requests.patch(
-        f"{REACTIVE_SERVICE_URL}/inputs/posts",
-        json=[[post_id, []]],
-    )
-
-    if upvotes_resp.status_code != 200 and posts_resp.status_code != 200:
-        reason = f"Failed to update upvotes: {upvotes_resp.reason} and posts: {posts_resp.reason}"
-        status_code = 500
-    elif upvotes_resp.status_code != 200:
-        reason = f"Failed to update upvotes: {upvotes_resp.reason}"
-        status_code = upvotes_resp.status_code
-    elif posts_resp.status_code != 200:
-        reason = f"Failed to update posts: {posts_resp.reason}"
-        status_code = posts_resp.status_code
-    else:
-        reason = "ok"
-        status_code = 200
-
-    return reason, status_code
+    return "ok", 200
 
 
 @app.put("/posts/<int:post_id>")
@@ -148,13 +118,7 @@ def update_post(post_id):
             )
             db.commit()
 
-    # Write into the reactive input collection.
-    resp = requests.patch(
-        f"{REACTIVE_SERVICE_URL}/inputs/posts",
-        json=[[post_id, [{**params, "id": post_id}]]],
-    )
-
-    return resp.reason, resp.status_code
+    return "ok", 200
 
 
 @app.post("/posts/<int:post_id>/upvotes")
@@ -171,13 +135,7 @@ def upvote_post(post_id):
             upvote_id = cur.fetchone()[0]
             db.commit()
 
-    # Write into the reactive input collection.
-    resp = requests.patch(
-        f"{REACTIVE_SERVICE_URL}/inputs/upvotes",
-        json=[[upvote_id, [{"post_id": post_id, "user_id": user_id}]]],
-    )
-
-    return resp.reason, resp.status_code
+    return "ok", 200
 
 
 @app.get("/healthcheck")
