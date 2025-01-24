@@ -1,11 +1,13 @@
 import type {
+  Context,
   EagerCollection,
-  Entry,
   Json,
   Values,
   Resource,
   SkipService,
-} from "@skipruntime/api";
+} from "@skipruntime/core";
+
+import { PostgresExternalService } from "@skip-adapter/postgres";
 
 type Post = {
   author_id: number;
