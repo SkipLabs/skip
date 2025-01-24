@@ -56,7 +56,12 @@ class PostsMapper {
   mapEntry(key: number, values: Values<Post>): Iterable<[number, Upvoted]> {
     const post: Post = values.getUnique();
     const upvotes = this.upvotes.getArray(key).length;
-    const author = this.users.getUnique(post.author_id);
+    let author;
+    try {
+      author = this.users.getUnique(post.author_id);
+    } catch {
+      author = { name: "unknown author", email: "unknown email" };
+    }
     // Projecting all posts on key 0 so that they can later be sorted.
     return [[0, { ...post, upvotes, author }]];
   }
