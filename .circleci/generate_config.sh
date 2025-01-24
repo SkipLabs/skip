@@ -5,7 +5,7 @@ git diff --quiet HEAD $(git merge-base main HEAD) -- $(jq --raw-output ".workspa
 check_ts=$?
 git diff --quiet HEAD $(git merge-base main HEAD) -- skiplang/compiler/ skiplang/prelude/ :^skiplang/prelude/ts
 skc=$?
-git diff --quiet HEAD $(git merge-base main HEAD) -- skiplang/prelude/src/skstore/ skiplang/compiler/runtime/
+git diff --quiet HEAD $(git merge-base main HEAD) -- skiplang/prelude/src/skstore/ skiplang/prelude/runtime/
 skstore=$?
 git diff --quiet HEAD $(git merge-base main HEAD) -- skiplang/skjson
 skjson=$?
