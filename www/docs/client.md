@@ -82,7 +82,7 @@ They are useful, however, for debugging the state of reactive systems and for ma
 To make a synchronous read, call either [`getAll`](api/helpers/classes/SkipServiceBroker#getall) or [`getArray`](api/helpers/classes/SkipServiceBroker#getarray) on the reactive service handle (i.e. `SkipServiceBroker`) in your web service to query the corresponding routes on the reactive service; an example using `getArray` is given in the example Express web service [below](client.md#example-web-service-configuration).
 Then, from your client, issue HTTP `GET` requests to e.g. `http://reactive.service.hostname/my_resource/foo/key1` to make a synchronous read of data in the `foo` resource instance associated with key `key1`.
 
-Synchronous writes and other reactive service operations can be exposed analogously, by calling [`patch`](api/helpers/classes/SkipServiceBroker#patch) or [`put`](api/helpers/classes/SkipServiceBroker#put) on the reactive service from your web backend.
+Synchronous writes and other reactive service operations can be exposed analogously, by calling [`update`](api/helpers/classes/SkipServiceBroker#update) on the reactive service from your web backend.
 
 Note that, though `SkipServiceBroker` offers a convenient programmatic interface to the underlying reactive service operations, it is a thin wrapper around the HTTP interface documented [here](api/server/functions/runService).
 If your web backend is written in a different language, then you can construct and send equivalent requests, accessing the `/v1/snapshot` route for synchronous resource reads and `/v1/resources/:collection` for synchronous input collection writes.
