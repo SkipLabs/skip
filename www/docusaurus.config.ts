@@ -184,8 +184,8 @@ const config: Config = {
     [
       "docusaurus-plugin-typedoc",
       {
-        id: "api",
-        out: "docs/api/api",
+        id: "core",
+        out: "docs/api/core",
         entryPoints: ["../skipruntime-ts/core/src/api.ts"],
         tsconfig: "../skipruntime-ts/core/tsconfig.json",
         readme: "none",
