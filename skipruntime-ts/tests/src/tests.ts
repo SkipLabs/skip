@@ -591,9 +591,6 @@ const pg_config = {
 
 // One-off client to create a test SQL table and set up its contents
 const pgSetupClient = new pg.Client(pg_config);
-pgSetupClient.connect().catch(() => {
-  throw new Error("Error connecting to PostgreSQL test instance");
-});
 let pgIsSetup = false;
 
 async function trySetupDB(
@@ -629,7 +626,9 @@ const postgresService: () => Promise<
   SkipService<Input_NN, Input_NN>
 > = async () => {
   const postgres = new PostgresExternalService(pg_config);
-
+  pgSetupClient.connect().catch(() => {
+    throw new Error("Error connecting to PostgreSQL test instance");
+  });
   if (!(await trySetupDB(postgres))) {
     throw new Error("Failed to set up test Postgres DB");
   }
