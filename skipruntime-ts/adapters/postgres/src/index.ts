@@ -77,10 +77,13 @@ function validateKeyParam(params: Json): {
 }
 
 /**
- * An External Service wrapping a PostgreSQL database, exposing its tables as "resources" in the Skip runtime.
- * Subscription `params` MUST include a field `key` identifying the table column that should be used as the key in the resulting collection (and its type, one of INTEGER, BIGINT, SERIAL, BIGSERIAL, or TEXT).
+ * An `ExternalService` wrapping a PostgreSQL database.
+ *
+ * Expose the tables of a PostgreSQL database as *resources* in the Skip runtime.
+ *
+ * @remarks
+ * Subscription `params` **must** include a field `key` whose value is an object with a string field `col` identifying the table column that should be used as the key in the resulting collection, and a field `type` whose value is one of `INTEGER`, `BIGINT`, `SERIAL`, `BIGSERIAL`, or `TEXT`.
  */
-
 export class PostgresExternalService implements ExternalService {
   private client: pg.Client;
   private clientID: string;
@@ -90,6 +93,14 @@ export class PostgresExternalService implements ExternalService {
     return "_connected" in this.client && !!this.client._connected;
   }
 
+  /**
+   * @param db_config - Configuration of database to which to connect.
+   * @param db_config.host - Host serving database.
+   * @param db_config.port - Port on which database server listens.
+   * @param db_config.database - Name of database to which to connect.
+   * @param db_config.user - User as whom to authenticate.
+   * @param db_config.password - Password for user.
+   */
   constructor(db_config: {
     host: string;
     port: number;
@@ -97,7 +108,7 @@ export class PostgresExternalService implements ExternalService {
     user: string;
     password: string;
   }) {
-    //generate random client ID for PostgreSQL notifications
+    // generate random client ID for PostgreSQL notifications
     this.clientID = "skip_pg_client_" + Math.random().toString(36).slice(2);
 
     this.client = new pg.Client(db_config);
@@ -111,11 +122,26 @@ export class PostgresExternalService implements ExternalService {
     );
   }
 
+  /**
+   * Subscribe to a resource provided by the external service.
+   *
+   * @param instance - Instance identifier of the external resource.
+   * @param resource - Name of the table to expose as a resource.
+   * @param params - Parameters of the external resource; **must** include a field `key` whose value is an object with a string field `col` identifying the table column that should be used as the key in the resulting collection, and a field `type` whose value is one of `INTEGER`, `BIGINT`, `SERIAL`, `BIGSERIAL`, or `TEXT`.
+   * @param callbacks - Callbacks to react on error/loading/update.
+   * @param callbacks.error - Error callback.
+   * @param callbacks.loading - Loading callback.
+   * @param callbacks.update - Update callback.
+   * @returns {void}
+   */
   subscribe(
     instance: string,
-    table: string,
+    resource: string,
     params: Json & {
-      key: "INTEGER" | "BIGINT" | "TEXT" | "SERIAL" | "BIGSERIAL";
+      key: {
+        col: string;
+        type: "INTEGER" | "BIGINT" | "SERIAL" | "BIGSERIAL" | "TEXT";
+      };
     },
     callbacks: {
       update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
@@ -123,6 +149,7 @@ export class PostgresExternalService implements ExternalService {
       loading: () => void;
     },
   ): void {
+    const table = resource;
     const key = validateKeyParam(params);
 
     const setup = async () => {
