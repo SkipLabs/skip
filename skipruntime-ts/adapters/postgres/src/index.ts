@@ -186,29 +186,31 @@ FOR EACH ROW EXECUTE FUNCTION %I();`,
   }
 
   unsubscribe(instance: string): void {
-    this.client.query(format("DROP FUNCTION %I CASCADE;", instance)).then(
-      () => this.open_instances.delete(instance),
-      () => {
-        throw new Error(
-          "Error unsubscribing from resource instance: " + instance,
-        );
-      },
-    );
+    this.client
+      .query(format("DROP FUNCTION IF EXISTS %I CASCADE;", instance))
+      .then(
+        () => this.open_instances.delete(instance),
+        () => {
+          throw new Error(
+            "Error unsubscribing from resource instance: " + instance,
+          );
+        },
+      );
   }
 
   shutdown(): void {
+    const query =
+      "DROP FUNCTION IF EXISTS " +
+      Array.from(this.open_instances)
+        .map((x) => format("%I", x))
+        .join(", ") +
+      " CASCADE;";
+    this.open_instances.clear();
+
     const shutdown =
       this.open_instances.size == 0
         ? this.client.end()
-        : this.client
-            .query(
-              "DROP FUNCTION " +
-                Array.from(this.open_instances)
-                  .map((x) => format("%I", x))
-                  .join(", ") +
-                " CASCADE;",
-            )
-            .then(() => this.client.end());
+        : this.client.query(query).then(() => this.client.end());
 
     shutdown.catch(() => {
       throw new Error(
