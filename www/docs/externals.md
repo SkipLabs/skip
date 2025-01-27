@@ -7,8 +7,8 @@ However, when those inputs come from external systems or services it is crucial 
 
 Skip provides mechanisms to do so easily, whether those external systems are other reactive Skip services or non-reactive systems like databases or external APIs.
 
-The core of these mechanisms is the [`ExternalService` type](api/api/interfaces/ExternalService), which provides a generic interface which can be implemented to wrap arbitrary external systems for use in your Skip service.
-Each Skip reactive service can specify any number of `ExternalService`s, which can then be brought into the reactive computation graph as an `EagerCollection` with [`Context#useExternalResource`](api/api/interfaces/Context#useexternalresource).
+The core of these mechanisms is the [`ExternalService` type](api/core/interfaces/ExternalService), which provides a generic interface which can be implemented to wrap arbitrary external systems for use in your Skip service.
+Each Skip reactive service can specify any number of `ExternalService`s, which can then be brought into the reactive computation graph as an `EagerCollection` with [`Context#useExternalResource`](api/core/interfaces/Context#useexternalresource).
 
 Skip provides two `ExternalService` implementations -- one which polls external HTTP services, and one which subscribes to external Skip services.
 If your use case falls outside of these defaults, you can define your own custom external service by providing another `ExternalService` implementation with the required behavior.
