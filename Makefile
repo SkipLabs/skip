@@ -99,7 +99,7 @@ fmt-js:
 
 .PHONY: fmt-py
 fmt-py:
-	black --line-length 80 .
+	black --quiet --line-length 80 .
 
 .PHONY: fmt
 fmt: fmt-sk fmt-c fmt-js fmt-py
