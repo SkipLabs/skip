@@ -1,6 +1,6 @@
 import { loadEnv, isNode } from "../skipwasm-std/index.js";
 import { createOnThisThread } from "./skdb_create.js";
-import type { Wrk, ModuleInit } from "../skipwasm-std/index.js";
+import type { Wrk, ModuleInit, EnvInit } from "../skipwasm-std/index.js";
 import type { SKDB } from "./skdb_types.js";
 import { SKDBWorker } from "./skdb_wdatabase.js";
 export { SKDBTable } from "./skdb_util.js";
@@ -20,6 +20,7 @@ import { init as posixInit } from "../skipwasm-std/sk_posix.js";
 import { init as skjsonInit } from "../skipwasm-json/skjson.js";
 import { init as skdateInit } from "../skipwasm-date/sk_date.js";
 import { init as skdbInit } from "./skdb_skdb.js";
+import { complete as skdbComplete } from "./skdb_env.js";
 
 const modules: ModuleInit[] = [
   runtimeInit,
@@ -28,6 +29,8 @@ const modules: ModuleInit[] = [
   skdateInit,
   skdbInit,
 ];
+
+const extensions: EnvInit[] = [skdbComplete];
 
 export async function createSkdb(
   options: {
@@ -43,6 +46,7 @@ export async function createSkdb(
     return createOnThisThread(
       disableWarnings,
       modules,
+      extensions,
       options.dbName,
       options.getWasmSource,
     );

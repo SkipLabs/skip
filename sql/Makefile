@@ -28,12 +28,16 @@ clean:
 install-test: build
 	cd ts/tests && npx playwright install
 
-.PHONY: test
-test: install-test
+
+.PHONY: run-test
+run-test:
 	cd ts/tests && make ROOT_DIR=${SCRIPT_DIR} -f service_common.mk
 	cd ts/tests && make ROOT_DIR=${SCRIPT_DIR} -f service_server.mk
 	cd ts/tests && make ROOT_DIR=${SCRIPT_DIR} -f service_mux.mk
 	cd ts/tests && npx playwright test --reporter=line
+
+.PHONY: test
+test: install-test run-test
 
 .PHONY: test-client-node
 test-client-node: install-test

@@ -41,7 +41,6 @@ class Env implements Environment {
   base64Encode: (toEncode: string, url?: boolean) => string;
   environment: string[];
   throwRuntime: (code: int) => void;
-  createSocket: (url: string) => WebSocket;
   createWorker: (url: URL, options?: WorkerOptions) => Wrk;
   createWorkerWrapper: (worker: any) => Wrk;
   crypto: () => Crypto;
@@ -95,7 +94,6 @@ class Env implements Environment {
       this.onException();
       process.exit(code);
     };
-    this.createSocket = (url: string) => new WebSocket(url);
     this.createWorker = (url: URL, options?: WorkerOptions) =>
       WrkImpl.fromPath(url, options);
     this.createWorkerWrapper = (_worker: Worker) => {
