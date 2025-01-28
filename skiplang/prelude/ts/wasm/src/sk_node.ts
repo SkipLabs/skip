@@ -1,5 +1,5 @@
 import type { float, int } from "../skiplang-std/index.js";
-import type { Environment, Wrk, Shared } from "./sk_types.js";
+import type { Environment, Shared } from "./sk_types.js";
 import { MemFS, MemSys } from "./sk_mem_utils.js";
 
 import * as path from "path";
@@ -7,24 +7,6 @@ import * as fsPromises from "fs/promises";
 import * as util from "util";
 import * as perf_hooks from "perf_hooks";
 import * as crypto from "crypto";
-import { Worker } from "worker_threads";
-
-class WrkImpl implements Wrk {
-  constructor(private readonly worker: Worker) {}
-
-  static fromPath(url: URL, options: WorkerOptions | undefined): Wrk {
-    const filename = "./" + path.relative(process.cwd(), url.pathname);
-    return new this(new Worker(filename, options));
-  }
-
-  postMessage = (message: any) => {
-    this.worker.postMessage(message);
-  };
-
-  onMessage = (listener: (value: any) => void) => {
-    this.worker.on("message", listener);
-  };
-}
 
 const decoder = new util.TextDecoder("utf8");
 const encoder = new util.TextEncoder();
@@ -41,8 +23,6 @@ class Env implements Environment {
   base64Encode: (toEncode: string, url?: boolean) => string;
   environment: string[];
   throwRuntime: (code: int) => void;
-  createWorker: (url: URL, options?: WorkerOptions) => Wrk;
-  createWorkerWrapper: (worker: any) => Wrk;
   crypto: () => Crypto;
 
   fs() {
@@ -93,11 +73,6 @@ class Env implements Environment {
     this.throwRuntime = (code: int) => {
       this.onException();
       process.exit(code);
-    };
-    this.createWorker = (url: URL, options?: WorkerOptions) =>
-      WrkImpl.fromPath(url, options);
-    this.createWorkerWrapper = (_worker: Worker) => {
-      throw new Error("Not implemented");
     };
     this.crypto = () => crypto as Crypto;
   }

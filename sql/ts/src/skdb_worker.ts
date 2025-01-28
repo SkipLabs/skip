@@ -1,6 +1,6 @@
 import { type EnvInit, type ModuleInit } from "../skipwasm-std/index.js";
 import { createOnThisThread } from "./skdb_create.js";
-import { onWorkerMessage, type Creator } from "../skipwasm-std/sk_worker.js";
+import { onWorkerMessage, type Creator } from "../skipwasm-worker/worker.js";
 import type { SKDB } from "./skdb.js";
 
 import { init as runtimeInit } from "../skipwasm-std/sk_runtime.js";

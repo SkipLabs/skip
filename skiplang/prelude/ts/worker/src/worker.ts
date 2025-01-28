@@ -1,8 +1,17 @@
-import type { int } from "../skiplang-std/index.js";
-import type { Wrk } from "./sk_types.js";
+import type { Environment } from "../skipwasm-std/index.js";
+
+export interface Wrk {
+  postMessage: (message: any) => void;
+  onMessage: (listener: (value: any) => void) => void;
+}
+
+export interface WrkEnvironment extends Environment {
+  createWorker: (url: URL, options?: WorkerOptions) => Wrk;
+  createWorkerWrapper: (worker: Worker) => Wrk;
+}
 
 export class Wrappable {
-  wrappedId?: int;
+  wrappedId?: number;
 }
 
 class UnmanagedMessage extends Error {}
