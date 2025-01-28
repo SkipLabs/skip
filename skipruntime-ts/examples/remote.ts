@@ -45,13 +45,13 @@ const service = {
     return inputCollections;
   },
 };
-const closable = await runService(service, {
+const server = await runService(service, {
   streaming_port: 3589,
   control_port: 3590,
 });
 
 function shutdown() {
-  closable.close();
+  server.close();
 }
 
 process.on("SIGTERM", shutdown);
