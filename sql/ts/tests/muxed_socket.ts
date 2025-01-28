@@ -1,7 +1,7 @@
 /* eslint-disable */
 
 import { expect } from "@playwright/test";
-import type { Creds, Environment, MuxedSocket } from "skdb/orchestration.js";
+import type { Creds, DBEnvironment, MuxedSocket } from "skdb/orchestration.js";
 
 ////////////////////////////////////////////////////////////////////////////////
 // tests
@@ -10,11 +10,11 @@ export interface Test {
   name: string;
   slow?: boolean;
   check(res: unknown): void;
-  fun(env: Environment, mu: Mu): Promise<unknown>;
+  fun(env: DBEnvironment, mu: Mu): Promise<unknown>;
 }
 
 export interface Mu {
-  connectAndAuth(env: Environment): Promise<MuxedSocket>;
+  connectAndAuth(env: DBEnvironment): Promise<MuxedSocket>;
   toHex(buf: ArrayBuffer): string;
   request_echo(n: number): ArrayBuffer;
   request_close(): ArrayBuffer;
@@ -22,7 +22,7 @@ export interface Mu {
   request_error(): ArrayBuffer;
   request_concurrent_streaming(): ArrayBuffer;
   connect(
-    env: Environment,
+    env: DBEnvironment,
     uri: string,
     creds: Creds,
     timeoutMs?: number,
@@ -33,7 +33,7 @@ export const ms_tests: () => Test[] = () => {
   return [
     {
       name: "Happy Path Client Opens Client Closes",
-      fun: async (env: Environment, mu: Mu) => {
+      fun: async (env: DBEnvironment, mu: Mu) => {
         const socket = await mu.connectAndAuth(env);
         const stream = await socket.openStream();
         let promise = new Promise(function (resolve, _reject) {
@@ -53,7 +53,7 @@ export const ms_tests: () => Test[] = () => {
     },
     {
       name: "Happy Path Client Opens Server Closes",
-      fun: async (env: Environment, mu: Mu) => {
+      fun: async (env: DBEnvironment, mu: Mu) => {
         const socket = await mu.connectAndAuth(env);
         const stream = await socket.openStream();
         let promise = new Promise(function (resolve, _reject) {
@@ -78,7 +78,7 @@ export const ms_tests: () => Test[] = () => {
     },
     {
       name: "Happy Path Server Opens Client Closes",
-      fun: async (env: Environment, mu: Mu) => {
+      fun: async (env: DBEnvironment, mu: Mu) => {
         const socket = await mu.connectAndAuth(env);
         const stream = await socket.openStream();
         stream.send(mu.request_stream());
@@ -107,7 +107,7 @@ export const ms_tests: () => Test[] = () => {
     },
     {
       name: "Happy Path Server Opens Server Closes",
-      fun: async (env: Environment, mu: Mu) => {
+      fun: async (env: DBEnvironment, mu: Mu) => {
         const socket = await mu.connectAndAuth(env);
         let promise = new Promise(function (resolve, _reject) {
           let received: Array<ArrayBuffer> = [];
@@ -136,7 +136,7 @@ export const ms_tests: () => Test[] = () => {
     },
     {
       name: "Concurrent Streams Initiated From The Client",
-      fun: async (env: Environment, mu: Mu) => {
+      fun: async (env: DBEnvironment, mu: Mu) => {
         const socket = await mu.connectAndAuth(env);
         let promise = new Promise(function (resolve, _reject) {
           socket.onClose = () => resolve(receivedData.map(mu.toHex));
@@ -165,7 +165,7 @@ export const ms_tests: () => Test[] = () => {
     },
     {
       name: "Concurrent Streams Initiated From Both Ends",
-      fun: async (env: Environment, mu: Mu) => {
+      fun: async (env: DBEnvironment, mu: Mu) => {
         const socket = await mu.connectAndAuth(env);
 
         let received: Array<ArrayBuffer> = [];
@@ -223,7 +223,7 @@ export const ms_tests: () => Test[] = () => {
     },
     {
       name: "Client Errors Stream",
-      fun: async (env: Environment, mu: Mu) => {
+      fun: async (env: DBEnvironment, mu: Mu) => {
         const socket = await mu.connectAndAuth(env);
         const stream = await socket.openStream();
         let promise = new Promise(function (resolve, _reject) {
@@ -246,7 +246,7 @@ export const ms_tests: () => Test[] = () => {
     },
     {
       name: "Server Errors Stream",
-      fun: async (env: Environment, mu: Mu) => {
+      fun: async (env: DBEnvironment, mu: Mu) => {
         const socket = await mu.connectAndAuth(env);
         const stream = await socket.openStream();
         let promise = new Promise(function (resolve, _reject) {
@@ -283,7 +283,7 @@ export const ms_tests: () => Test[] = () => {
     },
     {
       name: "Auth Short AccessKey",
-      fun: async (env: Environment, mu: Mu) => {
+      fun: async (env: DBEnvironment, mu: Mu) => {
         const key = await env
           .crypto()
           .subtle.importKey(
@@ -319,7 +319,7 @@ export const ms_tests: () => Test[] = () => {
     },
     {
       name: "Auth Fail",
-      fun: async (env: Environment, mu: Mu) => {
+      fun: async (env: DBEnvironment, mu: Mu) => {
         const key = await env.crypto().subtle.importKey(
           "raw",
           env.encodeUTF8("this-is-not-correct"), // <--
@@ -365,7 +365,7 @@ export const ms_tests: () => Test[] = () => {
     },
     {
       name: "Error Connection",
-      fun: async (env: Environment, mu: Mu) => {
+      fun: async (env: DBEnvironment, mu: Mu) => {
         const socket = await mu.connectAndAuth(env);
         const stream = await socket.openStream();
         let promise = new Promise(function (resolve, reject) {
@@ -394,7 +394,7 @@ export const ms_tests: () => Test[] = () => {
     },
     {
       name: "Threads",
-      fun: async (env: Environment, mu: Mu) => {
+      fun: async (env: DBEnvironment, mu: Mu) => {
         const socket = await mu.connectAndAuth(env);
         let promise = new Promise(function (resolve, _reject) {
           let streamCount = 6;
