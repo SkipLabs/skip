@@ -167,18 +167,18 @@ You can see and run the full example [here](https://github.com/SkipLabs/skip/blo
 Run the service and web app as follows:
 
 ```
-cd skipruntime-ts
-make bunbuild
-bun run examples/groups.ts &
-bun run examples groups-server.ts &
+cd skipruntime-ts/examples
+npm run build
+node dist/groups-server.js &
+node dist/groups.js &
 ```
 
-With the reactive service running, you can run the client script with `bun run examples/groups-client.ts` and see changes in `active_friends` reflected in real time as users' friend lists, `active` status, and group memberships change.
+With the reactive service running, you can run the client script with `node dist/groups-client.js` and see changes in `active_friends` reflected in real time as users' friend lists, `active` status, and group memberships change.
 
 Alternatively, use curl to listen for updates, e.g. with
 
 ```
-curl -LN http://localhost:8082/active_friends/bob
+curl -LN http://localhost:8082/active_friends/0
 ```
 
 and see the raw event stream as you issue updates to the input `users` and `groups` data from another shell.
