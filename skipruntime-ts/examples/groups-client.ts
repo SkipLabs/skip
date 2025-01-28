@@ -5,7 +5,7 @@ import { fetchJSON } from "@skipruntime/helpers";
 
 const port = 8082;
 
-const url = `http://localhost:${port.toString()}/`;
+const url = `http://localhost:${port.toString()}`;
 async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
