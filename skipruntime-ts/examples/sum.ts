@@ -2,7 +2,6 @@ import type { EagerCollection, Values, Resource } from "@skipruntime/core";
 
 import { ManyToOneMapper } from "@skipruntime/core";
 
-import { initService } from "@skipruntime/wasm";
 import { runService } from "@skipruntime/server";
 
 class Plus extends ManyToOneMapper<string, number, number> {
@@ -37,13 +36,13 @@ class Sub implements Resource<Collections> {
   }
 }
 
-const instance = await initService({
+const service = {
   initialData: { input1: [], input2: [] },
   resources: { add: Add, sub: Sub },
-  createGraph: (inputs) => inputs,
-});
+  createGraph: (inputs : Collections) => inputs,
+};
 
-const closable = runService(instance, {
+const closable = await runService(service, {
   control_port: 3588,
   streaming_port: 3587,
 });
