@@ -16,6 +16,7 @@ import {
   WrkImpl,
 } from "../skipwasm-worker/node.js";
 import { SKDBWorker } from "./skdb_wdatabase.js";
+import { environment as createEnvironment } from "../skipwasm-std/sk_node.js";
 
 export async function createSkdb(
   options: {
@@ -24,7 +25,12 @@ export async function createSkdb(
     disableWarnings?: boolean;
   } = {},
 ): Promise<SKDB> {
-  return await createSkdbFor(workerComplete, createWorker, options);
+  return await createSkdbFor(
+    workerComplete,
+    createWorker,
+    createEnvironment,
+    options,
+  );
 }
 
 async function createWorker(disableWarnings: boolean, dbName?: string) {

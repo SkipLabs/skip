@@ -10,6 +10,8 @@ import { init as skdateInit } from "../skipwasm-date/sk_date.js";
 import { init as skdbInit } from "./skdb_skdb.js";
 import { complete as skdbComplete } from "./skdb_env.js";
 
+import { environment as createEnvironment } from "../skipwasm-std/sk_browser.js";
+
 const modules: ModuleInit[] = [
   runtimeInit,
   posixInit,
@@ -30,7 +32,13 @@ class DbCreator implements Creator<SKDB> {
   }
 
   async create(dbName?: string) {
-    return createOnThisThread(false, modules, extensions, dbName);
+    return createOnThisThread(
+      false,
+      modules,
+      extensions,
+      createEnvironment,
+      dbName,
+    );
   }
 }
 
