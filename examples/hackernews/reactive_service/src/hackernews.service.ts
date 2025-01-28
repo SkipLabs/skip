@@ -1,11 +1,13 @@
 import type {
+  Context,
   EagerCollection,
-  Entry,
   Json,
   Values,
   Resource,
   SkipService,
-} from "@skipruntime/api";
+} from "@skipruntime/core";
+
+import { PostgresExternalService } from "@skip-adapter/postgres";
 
 type Post = {
   author_id: number;
@@ -26,34 +28,17 @@ type Upvote = {
 
 type Upvoted = Post & { upvotes: number; author: User };
 
-type Inputs = {
-  posts: EagerCollection<number, Post>;
-  users: EagerCollection<number, User>;
-  upvotes: EagerCollection<number, Upvote>;
-};
 type ResourceInputs = {
   postsWithUpvotes: EagerCollection<number, Upvoted>;
 };
 
-export function serviceWithInitialData(
-  posts: Entry<number, Post>[],
-  users: Entry<number, User>[],
-  upvotes: Entry<number, Upvote>[],
-): SkipService<Inputs, ResourceInputs> {
-  return {
-    initialData: { posts, users, upvotes },
-    resources: { posts: PostsResource },
-    createGraph: (inputCollections: Inputs): ResourceInputs => {
-      return {
-        postsWithUpvotes: inputCollections.posts.map(
-          PostsMapper,
-          inputCollections.users,
-          inputCollections.upvotes.map(UpvotesMapper),
-        ),
-      };
-    },
-  };
-}
+const postgres = new PostgresExternalService({
+  host: "db",
+  port: 5432,
+  database: "postgres",
+  user: "postgres",
+  password: "change_me",
+});
 
 class UpvotesMapper {
   mapEntry(key: number, values: Values<Upvote>): Iterable<[number, number]> {
@@ -71,7 +56,12 @@ class PostsMapper {
   mapEntry(key: number, values: Values<Post>): Iterable<[number, Upvoted]> {
     const post: Post = values.getUnique();
     const upvotes = this.upvotes.getArray(key).length;
-    const author = this.users.getUnique(post.author_id);
+    let author;
+    try {
+      author = this.users.getUnique(post.author_id);
+    } catch {
+      author = { name: "unknown author", email: "unknown email" };
+    }
     // Projecting all posts on key 0 so that they can later be sorted.
     return [[0, { ...post, upvotes, author }]];
   }
@@ -98,3 +88,34 @@ class PostsResource implements Resource<ResourceInputs> {
     return collections.postsWithUpvotes.take(this.limit).map(SortingMapper);
   }
 }
+
+export const service: SkipService<{}, ResourceInputs> = {
+  initialData: {},
+  resources: { posts: PostsResource },
+  externalServices: { postgres },
+  createGraph(_: {}, context: Context): ResourceInputs {
+    const serialIDKey = { key: { col: "id", type: "SERIAL" } };
+    const posts = context.useExternalResource<number, Post>({
+      service: "postgres",
+      identifier: "posts",
+      params: serialIDKey,
+    });
+    const users = context.useExternalResource<number, User>({
+      service: "postgres",
+      identifier: "users",
+      params: serialIDKey,
+    });
+    const upvotes = context.useExternalResource<number, Upvote>({
+      service: "postgres",
+      identifier: "upvotes",
+      params: serialIDKey,
+    });
+    return {
+      postsWithUpvotes: posts.map(
+        PostsMapper,
+        users,
+        upvotes.map(UpvotesMapper),
+      ),
+    };
+  },
+};
