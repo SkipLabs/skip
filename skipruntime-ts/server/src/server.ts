@@ -4,7 +4,7 @@
  * @packageDocumentation
  */
 
-import { ServiceInstance } from "@skipruntime/core";
+import { type SkipService, ServiceInstance } from "@skipruntime/core";
 import { controlService, streamingService } from "./rest.js";
 
 /**
@@ -81,14 +81,14 @@ export type SkipServer = {
  *
  * @typeParam Inputs - Named collections from which the service computes.
  * @typeParam ResourceInputs - Named collections provided to resource computations.
- * @param instance - The Service instance.
+ * @param service - The SkipService definition to run
  * @param options - Service configuration options.
  * @param options.control_port - Port on which control service will listen.
  * @param options.streaming_port - Port on which streaming service will listen.
  * @returns Object to manage the running server.
  */
-export function runService(
-  instance: ServiceInstance,
+export async function runService(
+  service: SkipService,
   options: {
     streaming_port: number;
     control_port: number;
@@ -96,7 +96,21 @@ export function runService(
     streaming_port: 8080,
     control_port: 8081,
   },
-): SkipServer {
+): Promise<SkipServer> {
+  let instance: ServiceInstance;
+  try {
+    const runtime = await import("@skipruntime/native");
+    instance = await runtime.initService(service);
+  } catch {
+    try {
+      const runtime = await import("@skipruntime/wasm");
+      instance = await runtime.initService(service);
+    } catch {
+      throw new Error(
+        "No Skip runtime found; one of `@skipruntime/native` (on a supported platform) or `@skipruntime/wasm` is required.",
+      );
+    }
+  }
   const controlHttpServer = controlService(instance).listen(
     options.control_port,
     () => {
