@@ -20,22 +20,20 @@ Skip reactive services are designed to interoperate simply and easily: services 
 To receive data from another Skip service, specify it in the `externalServices` field of your `SkipService`, for example as follows:
 
 ```typescript
-const instance = await initService(
-  {
-    initialData: ...
-    resources: ...
-    createGraph: ...
-    externalServices: {
-      myOtherService: SkipExternalService.direct({
-        host: "my.other.service.net",
-        streaming_port: 8080,
-        control_port: 8081,
-      }),
-    },
-  }
-);
+const service = {
+  initialData: ...
+  resources: ...
+  createGraph: ...
+  externalServices: {
+    myOtherService: SkipExternalService.direct({
+      host: "my.other.service.net",
+      streaming_port: 8080,
+      control_port: 8081,
+    }),
+  },
+};
 
-const service = runService(instance);
+await runService(service);
 ```
 
 This instantiates a new service, with a dependency on a service named `myOtherService` running at the specified ports of `my.other.service.net`.
@@ -68,26 +66,23 @@ The simplest option is *polling*, sending periodic requests to pull data from ex
 To specify a polled external dependency, specify it in your service definition, e.g. as follows
 
 ```typescript
-const instannce = await initService(
-  {
-    initialData: ...
-    resources: ...
-    createGraph: ...
-    externalServices: {
-      myExternalService: new GenericExternalService({
-        my_resource: new Polled(
-          // HTTP endpoint
-          "https://api.example.com/my_resource",
-		  // Polling interval, in milliseconds
-          5000,
-		  // data processing into `Entry<K, V>[]` key/values structure
-          (data: Result) => data.results.map((value, idx) => [idx, [value]]))
-      }),
-    },
-  }
-);
-
-const service = await runService(instannce);
+const service = {
+  initialData: ...
+  resources: ...
+  createGraph: ...
+  externalServices: {
+    myExternalService: new GenericExternalService({
+      my_resource: new Polled(
+        // HTTP endpoint
+        "https://api.example.com/my_resource",
+	    // Polling interval, in milliseconds
+        5000,
+	    // data processing into `Entry<K, V>[]` key/values structure
+        (data: Result) => data.results.map((value, idx) => [idx, [value]]))
+    }),
+  },
+};
+await runService(service);
 ```
 
 Although the underlying data source is non-reactive, this external service can be used identically to reactive external Skip services as in the previous section, e.g.

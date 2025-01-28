@@ -39,16 +39,16 @@ class Sub implements Resource<Collections> {
 const service = {
   initialData: { input1: [], input2: [] },
   resources: { add: Add, sub: Sub },
-  createGraph: (inputs : Collections) => inputs,
+  createGraph: (inputs: Collections) => inputs,
 };
 
-const closable = await runService(service, {
+const server = await runService(service, {
   control_port: 3588,
   streaming_port: 3587,
 });
 
 function shutdown() {
-  closable.close();
+  server.close();
 }
 
 process.on("SIGTERM", shutdown);

@@ -76,7 +76,7 @@ class ComputedCells implements Resource<Outputs> {
     return collections.output;
   }
 }
-const service  = {
+const service = {
   initialData: { cells: [] },
   resources: { computed: ComputedCells },
   createGraph(inputCollections: Inputs, context: Context): Outputs {
@@ -88,13 +88,13 @@ const service  = {
   },
 };
 
-const closable = await runService(service, {
+const server = await runService(service, {
   control_port: 9999,
   streaming_port: 9998,
 });
 
 function shutdown() {
-  closable.close();
+  server.close();
 }
 
 process.on("SIGTERM", shutdown);

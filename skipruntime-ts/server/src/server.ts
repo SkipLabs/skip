@@ -81,7 +81,7 @@ export type SkipServer = {
  *
  * @typeParam Inputs - Named collections from which the service computes.
  * @typeParam ResourceInputs - Named collections provided to resource computations.
- * @param service - The SkipService definition to run
+ * @param service - The SkipService definition to run.
  * @param options - Service configuration options.
  * @param options.control_port - Port on which control service will listen.
  * @param options.streaming_port - Port on which streaming service will listen.

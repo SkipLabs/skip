@@ -1,4 +1,9 @@
-import type { Context, EagerCollection, Resource, SkipService } from "@skipruntime/core";
+import type {
+  Context,
+  EagerCollection,
+  Resource,
+  SkipService,
+} from "@skipruntime/core";
 import { runService } from "@skipruntime/server";
 import { GenericExternalService, Polled } from "@skipruntime/helpers";
 
@@ -47,7 +52,7 @@ class DeparturesResource implements Resource<ResourceInputs> {
   }
 }
 
-const service : SkipService<ResourceInputs, ResourceInputs> = {
+const service: SkipService<ResourceInputs, ResourceInputs> = {
   initialData: { config: [] },
   resources: {
     departures: DeparturesResource,
@@ -64,13 +69,13 @@ const service : SkipService<ResourceInputs, ResourceInputs> = {
   createGraph: (ic) => ic,
 };
 
-const closable = await runService(service, {
+const server = await runService(service, {
   control_port: 3591,
   streaming_port: 3590,
 });
 
 function shutdown() {
-  closable.close();
+  server.close();
 }
 
 process.on("SIGTERM", shutdown);
