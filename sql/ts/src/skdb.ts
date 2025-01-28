@@ -1,6 +1,5 @@
-import { loadEnv, isNode } from "../skipwasm-std/index.js";
 import { createOnThisThread } from "./skdb_create.js";
-import type { Wrk, ModuleInit, EnvInit } from "../skipwasm-std/index.js";
+import type { ModuleInit, EnvInit } from "../skipwasm-std/index.js";
 import type { SKDB } from "./skdb_types.js";
 import { SKDBWorker } from "./skdb_wdatabase.js";
 export { SKDBTable } from "./skdb_util.js";
@@ -32,7 +31,12 @@ const modules: ModuleInit[] = [
 
 const extensions: EnvInit[] = [skdbComplete];
 
-export async function createSkdb(
+export async function createSkdbFor(
+  skdbComplete: EnvInit,
+  createWorker: (
+    disableWarnings: boolean,
+    dbName?: string,
+  ) => Promise<SKDBWorker>,
   options: {
     dbName?: string;
     asWorker?: boolean;
@@ -46,7 +50,7 @@ export async function createSkdb(
     return createOnThisThread(
       disableWarnings,
       modules,
-      extensions,
+      [...extensions, skdbComplete],
       options.dbName,
       options.getWasmSource,
     );
@@ -56,24 +60,4 @@ export async function createSkdb(
     }
     return createWorker(disableWarnings, options.dbName);
   }
-}
-
-async function createWorker(disableWarnings: boolean, dbName?: string) {
-  const env = await loadEnv([]);
-  env.disableWarnings = disableWarnings;
-  let worker: Wrk;
-  if (isNode()) {
-    const url = new URL("./skdb_nodeworker.js", import.meta.url);
-    worker = env.createWorker(url, { type: "module" });
-  } else {
-    // important that this line looks exactly like this for bundlers to discover the file
-    const wrapped = new Worker(new URL("./skdb_worker.js", import.meta.url), {
-      type: "module",
-    });
-    worker = env.createWorkerWrapper(wrapped);
-  }
-
-  const skdb = new SKDBWorker(worker);
-  await skdb.create(dbName, disableWarnings);
-  return skdb;
 }

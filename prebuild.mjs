@@ -5,6 +5,7 @@ import { fileURLToPath } from "url";
 const symlinks = {
   "skiplang-std": "./skiplang/prelude/ts/binding/src",
   "skipwasm-std": "./skiplang/prelude/ts/wasm/src",
+  "skipwasm-worker": "./skiplang/prelude/ts/worker/src",
   "skipwasm-date": "./skiplang/skdate/ts/src",
   "skiplang-json": "./skiplang/skjson/ts/binding/src",
   "skipwasm-json": "./skiplang/skjson/ts/wasm/src",

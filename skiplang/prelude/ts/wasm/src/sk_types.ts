@@ -144,18 +144,11 @@ export interface System {
   unsetenv(name: string): void;
 }
 
-export interface Wrk {
-  postMessage: (message: any) => void;
-  onMessage: (listener: (value: any) => void) => void;
-}
-
 export interface Environment {
   shared: Map<string, Shared>;
   name: () => string;
   disableWarnings: boolean;
   environment: string[];
-  createWorker: (url: URL, options?: WorkerOptions) => Wrk;
-  createWorkerWrapper: (worker: Worker) => Wrk;
   timestamp: () => float;
   decodeUTF8: (utf8: ArrayBuffer) => string;
   encodeUTF8: (str: string) => Uint8Array;

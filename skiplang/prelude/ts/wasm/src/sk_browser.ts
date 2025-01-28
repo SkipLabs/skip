@@ -1,22 +1,6 @@
 import type { float, int } from "../skiplang-std/index.js";
-import type { Environment, Wrk, Shared } from "./sk_types.js";
+import type { Environment, Shared } from "./sk_types.js";
 import { MemFS, MemSys } from "./sk_mem_utils.js";
-
-class WrkImpl implements Wrk {
-  constructor(private readonly worker: Worker) {}
-
-  static fromPath(url: URL, options?: WorkerOptions) {
-    return new this(new Worker(url, options));
-  }
-
-  postMessage = (message: any) => {
-    this.worker.postMessage(message);
-  };
-
-  onMessage = (listener: (value: any) => void) => {
-    this.worker.onmessage = listener;
-  };
-}
 
 class Env implements Environment {
   shared: Map<string, Shared>;
@@ -30,8 +14,6 @@ class Env implements Environment {
   onException: () => void;
   base64Decode: (base64: string) => Uint8Array;
   base64Encode: (toEncode: string, url?: boolean) => string;
-  createWorker: (url: URL, options?: WorkerOptions) => Wrk;
-  createWorkerWrapper: (worker: Worker) => Wrk;
   crypto: () => Crypto;
   environment: string[];
 
@@ -85,9 +67,6 @@ class Env implements Environment {
     this.onException = () => {
       /* default nop hook */
     };
-    this.createWorker = (url: URL, options?: WorkerOptions) =>
-      WrkImpl.fromPath(url, options);
-    this.createWorkerWrapper = (worker: Worker) => new WrkImpl(worker);
     this.crypto = () => crypto;
   }
 }
