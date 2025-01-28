@@ -1,5 +1,5 @@
 import { createOnThisThread } from "./skdb_create.js";
-import type { ModuleInit, EnvInit } from "../skipwasm-std/index.js";
+import type { ModuleInit, EnvInit, EnvCreator } from "../skipwasm-std/index.js";
 import type { SKDB } from "./skdb_types.js";
 import { SKDBWorker } from "./skdb_wdatabase.js";
 export { SKDBTable } from "./skdb_util.js";
@@ -37,27 +37,23 @@ export async function createSkdbFor(
     disableWarnings: boolean,
     dbName?: string,
   ) => Promise<SKDBWorker>,
+  createEnvironment: EnvCreator,
   options: {
     dbName?: string;
     asWorker?: boolean;
-    getWasmSource?: () => Promise<Uint8Array>;
     disableWarnings?: boolean;
   } = {},
 ): Promise<SKDB> {
-  const asWorker = options.asWorker ?? !options.getWasmSource;
   const disableWarnings = options.disableWarnings ?? false;
-  if (!asWorker) {
+  if (!options.asWorker) {
     return createOnThisThread(
       disableWarnings,
       modules,
       [...extensions, skdbComplete],
+      createEnvironment,
       options.dbName,
-      options.getWasmSource,
     );
   } else {
-    if (options.getWasmSource) {
-      throw new Error("getWasmSource is not compatible with worker");
-    }
     return createWorker(disableWarnings, options.dbName);
   }
 }
