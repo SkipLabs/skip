@@ -45,3 +45,8 @@ test-example-%:
 
 .PHONY: test-examples
 test-examples: build-examples test-example-groups test-example-database test-example-departures test-example-remote test-example-sheet test-example-sum
+
+regen-%:
+	cd tests/examples && ./$*.sh ../tests/examples/$*.exp.out ../tests/examples/$*.exp.err
+
+regenerate-expectations: build build-examples regen-groups regen-database regen-departures regen-remote regen-sheet regen-sum
