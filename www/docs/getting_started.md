@@ -112,14 +112,15 @@ const [users, groups] = await Promise.all([
 ]);
 
 // Specify and run the reactive service
-const instance = await initService({
+const service = {
   initialData: { users, groups },
   resources: { active_friends: ActiveFriends },
   createGraph(input: ServiceInputs): ResourceInputs {
     const actives = input.groups.map(ActiveUsers, input.users);
     return { users: input.users, actives };
-  }});
-const service = runService(instance);
+  }
+};
+await runService(service);
 ```
 
 This example service operates over two _input collections_ (one for users and one for groups, as specified by `ServiceInputs`) and passes some `ResourceInputs` to its resources: a reactively-computed collection `actives` of the set of active users in each group, along with the `users` input collection.
