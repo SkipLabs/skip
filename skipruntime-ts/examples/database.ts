@@ -6,7 +6,6 @@ import type {
 } from "@skipruntime/core";
 
 import { runService } from "@skipruntime/server";
-import { initService } from "@skipruntime/wasm";
 
 import Database from "better-sqlite3";
 
@@ -79,15 +78,13 @@ const data: Entry<string, User>[] = db
 
 db.close();
 
-const instance = await initService(serviceWithInitialData(data));
-
-const closable = runService(instance, {
+const server = await runService(serviceWithInitialData(data), {
   streaming_port: 8080,
   control_port: 8081,
 });
 
 function shutdown() {
-  closable.close();
+  server.close();
 }
 
 process.on("SIGTERM", shutdown);

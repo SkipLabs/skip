@@ -4,7 +4,7 @@
  * @packageDocumentation
  */
 
-import { ServiceInstance } from "@skipruntime/core";
+import { type SkipService, ServiceInstance } from "@skipruntime/core";
 import { controlService, streamingService } from "./rest.js";
 
 /**
@@ -81,22 +81,68 @@ export type SkipServer = {
  *
  * @typeParam Inputs - Named collections from which the service computes.
  * @typeParam ResourceInputs - Named collections provided to resource computations.
- * @param instance - The Service instance.
+ * @param service - The SkipService definition to run.
  * @param options - Service configuration options.
  * @param options.control_port - Port on which control service will listen.
  * @param options.streaming_port - Port on which streaming service will listen.
+ * @param options.platform - Skip runtime platform to be used to run the service: either `wasm`, `native`, or `auto` (which is the default and will prefer `native` if available).
  * @returns Object to manage the running server.
  */
-export function runService(
-  instance: ServiceInstance,
+export async function runService(
+  service: SkipService,
   options: {
     streaming_port: number;
     control_port: number;
+    platform?: "wasm" | "native" | "auto";
   } = {
     streaming_port: 8080,
     control_port: 8081,
+    platform: "auto",
   },
-): SkipServer {
+): Promise<SkipServer> {
+  let instance: ServiceInstance;
+
+  const initNative = async () => {
+    try {
+      const runtime = await import("@skipruntime/native");
+      return await runtime.initService(service);
+    } catch {
+      throw new Error(
+        'Error loading Skip runtime for specified "native" platform.',
+      );
+    }
+  };
+
+  const initWasm = async () => {
+    try {
+      const runtime = await import("@skipruntime/wasm");
+      return await runtime.initService(service);
+    } catch {
+      throw new Error(
+        'Error loading Skip runtime for specified "wasm" platform.',
+      );
+    }
+  };
+  switch (options.platform) {
+    case "native":
+      instance = await initNative();
+      break;
+    case "wasm":
+      instance = await initWasm();
+      break;
+    default:
+      try {
+        instance = await initNative();
+      } catch {
+        try {
+          instance = await initWasm();
+        } catch {
+          throw new Error(
+            "No Skip runtime found; one of `@skipruntime/native` (on a supported platform) or `@skipruntime/wasm` is required.",
+          );
+        }
+      }
+  }
   const controlHttpServer = controlService(instance).listen(
     options.control_port,
     () => {
