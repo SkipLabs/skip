@@ -34,3 +34,14 @@ clean:
 .PHONY: test
 test: build
 	../bin/cd_sh tests "npm run test"
+
+build-examples:
+	cd examples && npm install && npm run build
+
+test-example-%:
+	cd tests/examples && ./$*.sh /tmp/$*.out /tmp/$*.err
+	diff /tmp/$*.out tests/examples/$*.exp.out >/dev/null
+	diff /tmp/$*.err tests/examples/$*.exp.err >/dev/null
+
+.PHONY: test-examples
+test-examples: build-examples test-example-groups test-example-database test-example-departures test-example-remote test-example-sheet test-example-sum
