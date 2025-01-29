@@ -85,7 +85,7 @@ export type SkipServer = {
  * @param options - Service configuration options.
  * @param options.control_port - Port on which control service will listen.
  * @param options.streaming_port - Port on which streaming service will listen.
- * @param options.platform - Skip runtime platform to be used to run the service: either `wasm`, `native`, or `auto` (which is the default and will prefer `native` if available).
+ * @param options.platform - Skip runtime platform to be used to run the service: either `wasm` (the default), `native`, or `auto` (which will prefer `native` if available).
  * @returns Object to manage the running server.
  */
 export async function runService(
@@ -97,7 +97,7 @@ export async function runService(
   } = {
     streaming_port: 8080,
     control_port: 8081,
-    platform: "auto",
+    platform: "wasm",
   },
 ): Promise<SkipServer> {
   let instance: ServiceInstance;
@@ -124,16 +124,11 @@ export async function runService(
     }
   };
   switch (options.platform) {
-    case "native":
-      instance = await initNative();
-      break;
-    case "wasm":
-      instance = await initWasm();
-      break;
-    default:
+    case "auto":
+      // TODO: investigate and fix "symbol lookup error" when native platform is unavailable
       try {
         instance = await initNative();
-      } catch {
+      } catch (_e: any) {
         try {
           instance = await initWasm();
         } catch {
@@ -142,6 +137,14 @@ export async function runService(
           );
         }
       }
+      break;
+    case "native":
+      instance = await initNative();
+      break;
+    case "wasm":
+    default:
+      instance = await initWasm();
+      break;
   }
   const controlHttpServer = controlService(instance).listen(
     options.control_port,
