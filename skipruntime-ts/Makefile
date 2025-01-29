@@ -36,17 +36,23 @@ test: build
 	../bin/cd_sh tests "npm run test"
 
 build-examples:
-	cd examples && npm install && npm run build
+	../bin/cd_sh examples "npm install && npm run build"
 
 test-example-%:
-	cd tests/examples && ./$*.sh /tmp/$*.out /tmp/$*.err
+	../bin/cd_sh tests/examples "./$*.sh /tmp/$*.out /tmp/$*.err"
 	diff /tmp/$*.out tests/examples/$*.exp.out >/dev/null
 	diff /tmp/$*.err tests/examples/$*.exp.err >/dev/null
 
+
+EXAMPLES := $(patsubst tests/examples/%.sh,%,$(wildcard tests/examples/*.sh))
+
+EXAMPLE_TARGETS := $(patsubst %,test-example-%,$(EXAMPLES))
 .PHONY: test-examples
-test-examples: build-examples test-example-groups test-example-database test-example-departures test-example-remote test-example-sheet test-example-sum
+test-examples: build-examples $(EXAMPLE_TARGETS)
 
 regen-%:
 	cd tests/examples && ./$*.sh ../tests/examples/$*.exp.out ../tests/examples/$*.exp.err
 
-regenerate-expectations: build build-examples regen-groups regen-database regen-departures regen-remote regen-sheet regen-sum
+REGEN_TARGETS := $(patsubst %,regen-%,$(EXAMPLES))
+.PHONY: regenerate-expectations
+regenerate-expectations: build build-examples $(REGEN_TARGETS)
