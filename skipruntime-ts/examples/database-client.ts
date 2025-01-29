@@ -17,12 +17,10 @@ console.log("Connect to replication server for resource /users");
 
 const evSource = new EventSource(`${url}/users`);
 evSource.addEventListener("init", (e: MessageEvent<string>) => {
-  const initial_data = JSON.parse(e.data);
-  console.log("Init", initial_data);
+  console.log("Init", e.data);
 });
 evSource.addEventListener("update", (e: MessageEvent<string>) => {
-  const updates = JSON.parse(e.data);
-  console.log("Update", updates);
+  console.log("Update", e.data);
 });
 evSource.onerror = (e) => {
   console.log(e);
