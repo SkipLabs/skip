@@ -2,13 +2,11 @@
 // in nodejs LTS.
 import EventSource from "eventsource";
 import { fetchJSON } from "@skipruntime/helpers";
+import { sleep } from "./utils.js";
 
 const port = 8082;
 
 const url = `http://localhost:${port.toString()}`;
-async function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 /*****************************************************/
 /* SET UP EVENT SOURCE LISTENING TO REACTIVE SERVICE */
@@ -30,30 +28,30 @@ evSource.onerror = console.error;
 /*       BEGIN SCENARIO OF CHANGING INPUTS        */
 /**************************************************/
 
-await sleep(1000);
+await sleep(100);
 console.log("Setting Carol to active...");
 await fetchJSON(`${url}/users/2`, "PUT", {
   body: { name: "Carol", active: true, friends: [0, 1] },
 });
 
-await sleep(1000);
+await sleep(100);
 console.log("Setting Alice to inactive...");
 await fetchJSON(`${url}/users/1`, "PUT", {
   body: { name: "Alice", active: false, friends: [0, 2] },
 });
 
-await sleep(1000);
+await sleep(100);
 console.log("Setting Eve as Bob's friend...");
 await fetchJSON(`${url}/users/0`, "PUT", {
   body: { name: "Bob", active: true, friends: [1, 2, 3] },
 });
 
-await sleep(1000);
+await sleep(100);
 console.log("Removing Carol and adding Eve to group 2...");
 await fetchJSON(`${url}/groups/1002`, "PUT", {
   body: { name: "Group 2", members: [0, 3] },
 });
 
-await sleep(1000);
+await sleep(100);
 console.log("Closing listener event stream...");
 evSource.close();

@@ -1,62 +1,27 @@
-import { run, type Step } from "./utils.js";
+import { sleep, subscribe } from "./utils.js";
+import { SkipServiceBroker } from "@skipruntime/helpers";
 
-function scenarios() {
-  return [
-    [
-      {
-        type: "request",
-        payload: { resource: "computed" },
-      },
-      {
-        type: "write",
-        payload: [
-          {
-            collection: "cells",
-            entries: [
-              ["A1", ["23"]],
-              ["A2", ["2"]],
-            ],
-          },
-        ],
-      },
-      {
-        type: "write",
-        payload: [
-          {
-            collection: "cells",
-            entries: [["A3", ["=A1 + A2"]]],
-          },
-        ],
-      },
-      {
-        type: "write",
-        payload: [
-          {
-            collection: "cells",
-            entries: [["A1", ["5"]]],
-          },
-        ],
-      },
-      {
-        type: "write",
-        payload: [
-          {
-            collection: "cells",
-            entries: [["A4", ["=A3 * A2"]]],
-          },
-        ],
-      },
-      {
-        type: "delete",
-        payload: [
-          {
-            collection: "cells",
-            keys: ["A3"],
-          },
-        ],
-      },
-    ] as Step[],
-  ];
-}
+const streaming_port = 9998;
+const control_port = 9999;
+const service = new SkipServiceBroker({
+  host: "localhost",
+  control_port,
+  streaming_port,
+});
 
-run(scenarios(), 9998, 9999);
+const closable = await subscribe(service, "computed", streaming_port);
+await sleep(10);
+await service.update("cells", [
+  ["A1", [23]],
+  ["A2", [2]],
+]);
+await sleep(10);
+await service.update("cells", [["A3", ["=A1 + A2"]]]);
+await sleep(10);
+await service.update("cells", [["A1", [5]]]);
+await sleep(10);
+await service.update("cells", [["A4", ["=A3 * A2"]]]);
+await sleep(10);
+await service.deleteKey("cells", "A3");
+await sleep(10);
+closable.close();
