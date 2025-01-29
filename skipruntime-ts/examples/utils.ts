@@ -20,12 +20,10 @@ export async function subscribe(
       `http://localhost:${streaming_port}/v1/streams/${uuid}`,
     );
     evSource.addEventListener("init", (e: MessageEvent<string>) => {
-      const updates = JSON.parse(e.data);
-      console.log("Init", updates);
+      console.log("Init", e.data);
     });
     evSource.addEventListener("update", (e: MessageEvent<string>) => {
-      const updates = JSON.parse(e.data);
-      console.log("Update", updates);
+      console.log("Update", e.data);
     });
     evSource.onerror = (e: MessageEvent<string>) => {
       console.log("Error", e);
