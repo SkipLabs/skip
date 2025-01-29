@@ -57,15 +57,12 @@ export class SkipExternalService implements ExternalService {
     },
   ): void {
     // TODO Manage Status
-    fetch(`${this.control_url}/v1/streams`, {
+    fetch(`${this.control_url}/v1/streams/${resource}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        resource,
-        params,
-      }),
+      body: JSON.stringify(params),
     })
       .then((resp) => resp.text())
       .then((uuid) => {
