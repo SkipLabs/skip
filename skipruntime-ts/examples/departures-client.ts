@@ -1,69 +1,35 @@
-import { run, type Step } from "./utils.js";
+import { sleep, subscribe } from "./utils.js";
+import { SkipServiceBroker } from "@skipruntime/helpers";
 
-function scenarios(): Step[][] {
-  return [
-    [
-      {
-        type: "log",
-        payload: { resource: "departures" },
-      },
-      {
-        type: "request",
-        payload: { resource: "departures" },
-      },
-      {
-        type: "write",
-        payload: [{ collection: "config", entries: [["year", [[2015]]]] }],
-      },
-      {
-        type: "write",
-        payload: [{ collection: "config", entries: [["origin", [["SYR"]]]] }],
-      },
-      {
-        type: "write",
-        payload: [
-          { collection: "config", entries: [["resettlement", [["USA"]]]] },
-        ],
-      },
-      {
-        type: "write",
-        payload: [
-          {
-            collection: "config",
-            entries: [
-              ["year", [[2016, 2017]]],
-              ["origin", [["MMR", "SYR"]]],
-              ["resettlement", [["NOR", "USA"]]],
-            ],
-          },
-        ],
-      },
-      {
-        type: "log",
-        payload: { resource: "departures" },
-      },
-      {
-        type: "log",
-        payload: { resource: "departures" },
-      },
-      {
-        type: "log",
-        payload: { resource: "departures" },
-      },
-      {
-        type: "log",
-        payload: { resource: "departures" },
-      },
-      {
-        type: "log",
-        payload: { resource: "departures" },
-      },
-      {
-        type: "log",
-        payload: { resource: "departures" },
-      },
-    ],
-  ];
-}
+const streaming_port = 3590;
+const control_port = 3591;
+const service = new SkipServiceBroker({
+  host: "localhost",
+  control_port,
+  streaming_port,
+});
 
-run(scenarios(), 3590, 3591);
+console.log(JSON.stringify(await service.getAll("departures", {})));
+await sleep(10);
+const closable = await subscribe(service, "departures", streaming_port);
+await sleep(10);
+await service.update("config", [["year", [[2015]]]]);
+await sleep(1000);
+console.log(JSON.stringify(await service.getAll("departures", {})));
+await sleep(10);
+await service.update("config", [["origin", [["SYR"]]]]);
+await sleep(1000);
+console.log(JSON.stringify(await service.getAll("departures", {})));
+await sleep(10);
+await service.update("config", [["resettlement", [["USA"]]]]);
+await sleep(1000);
+console.log(JSON.stringify(await service.getAll("departures", {})));
+await sleep(10);
+await service.update("config", [
+  ["year", [[2016, 2017]]],
+  ["origin", [["MMR", "SYR"]]],
+  ["resettlement", [["NOR", "USA"]]],
+]);
+await sleep(1000);
+console.log(JSON.stringify(await service.getAll("departures", {})));
+closable.close();
