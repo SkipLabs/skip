@@ -67,7 +67,7 @@ export async function fetchJSON<V extends Json>(
       Accept: "application/json",
       ...options.headers,
     },
-    signal: AbortSignal.timeout(1000),
+    signal: AbortSignal.timeout(options.timeout ?? 1000),
   });
   if (!response.ok) {
     throw new Error(`${response.status}: ${response.statusText}`);
