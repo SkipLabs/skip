@@ -447,7 +447,7 @@ struct file_mapping {
   uint64_t gid;
   size_t capacity;
   void** pconsts;
-  char persistent_fileName[1];
+  char persistent_fileName[];
 };
 
 /*****************************************************************************/
