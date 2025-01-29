@@ -421,7 +421,7 @@ sk_cell_t* sk_get_pages(sk_obstack_t* from_page, size_t nbr_pages) {
 
 size_t binarySearch(sk_cell_t* arr, size_t l, size_t r, char* x) {
   if (l >= r) {
-    if (((char*)arr[l].key <= x && x < (char*)(arr[l].value))) {
+    if ((char*)arr[l].key <= x && x < (char*)(arr[l].value)) {
       return l;
     } else {
       return (size_t)-1;
