@@ -3,7 +3,6 @@ import type {
   LazyCompute,
   EagerCollection,
   LazyCollection,
-  Json,
   Resource,
 } from "@skipruntime/core";
 
@@ -11,13 +10,13 @@ import { OneToOneMapper } from "@skipruntime/core";
 
 import { runService } from "@skipruntime/server";
 
-class ComputeExpression implements LazyCompute<string, string> {
-  constructor(private skall: EagerCollection<string, Json>) {}
+class ComputeExpression implements LazyCompute<string, string | number> {
+  constructor(private skall: EagerCollection<string, number | string>) {}
 
   compute(
-    selfHdl: LazyCollection<string, string>,
+    selfHdl: LazyCollection<string, number | string>,
     key: string,
-  ): Iterable<string> {
+  ): Iterable<number | string> {
     const getComputed = (key: string) => {
       const v = selfHdl.getUnique(key);
       if (typeof v == "number") return v;
@@ -28,24 +27,24 @@ class ComputeExpression implements LazyCompute<string, string> {
       throw new Error(`Invalid value for cell '${key}'`);
     };
     try {
-      const v = this.skall.getUnique(key) as string;
-      if (v.startsWith("=")) {
+      const v = this.skall.getUnique(key);
+      if (typeof v == "string" && v.startsWith("=")) {
         // Fake evaluator in this exemple
         switch (v.substring(1)) {
           case "A1 + A2": {
             const v1 = getComputed("A1");
             const v2 = getComputed("A2");
-            return [(v1 + v2).toString()];
+            return [v1 + v2];
           }
           case "A3 * A2":
-            return [(getComputed("A3") * getComputed("A2")).toString()];
+            return [getComputed("A3") * getComputed("A2")];
           default:
             return [
               `# Syntax error; unmanaged expression: "${+v.substring(1)}"`,
             ];
         }
       } else {
-        return v;
+        return [v];
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : JSON.stringify(e);
@@ -54,12 +53,16 @@ class ComputeExpression implements LazyCompute<string, string> {
   }
 }
 
-class CallCompute extends OneToOneMapper<string, Json, Json> {
-  constructor(private evaluator: LazyCollection<string, string>) {
+class CallCompute extends OneToOneMapper<
+  string,
+  number | string,
+  number | string
+> {
+  constructor(private evaluator: LazyCollection<string, number | string>) {
     super();
   }
 
-  mapValue(value: Json, key: string): Json {
+  mapValue(value: number | string, key: string): number | string {
     if (typeof value == "string" && value.startsWith("=")) {
       return this.evaluator.getUnique(key);
     } else {
@@ -68,11 +71,11 @@ class CallCompute extends OneToOneMapper<string, Json, Json> {
   }
 }
 
-type Inputs = { cells: EagerCollection<string, Json> };
-type Outputs = { output: EagerCollection<string, Json> };
+type Inputs = { cells: EagerCollection<string, number | string> };
+type Outputs = { output: EagerCollection<string, number | string> };
 
 class ComputedCells implements Resource<Outputs> {
-  instantiate(collections: Outputs): EagerCollection<string, Json> {
+  instantiate(collections: Outputs): EagerCollection<string, number | string> {
     return collections.output;
   }
 }

@@ -2,13 +2,11 @@
 // in nodejs LTS.
 import EventSource from "eventsource";
 import { fetchJSON } from "@skipruntime/helpers";
+import { sleep } from "./utils.js";
 
 const port = 8082;
 
 const url = `http://localhost:${port.toString()}`;
-async function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 /*****************************************************/
 /* SET UP EVENT SOURCE LISTENING TO REACTIVE SERVICE */

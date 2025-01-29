@@ -1,46 +1,30 @@
-import { run, type Step } from "./utils.js";
+import { sleep, subscribe } from "./utils.js";
+import { SkipServiceBroker } from "@skipruntime/helpers";
 
-function scenarios() {
-  return [
-    [
-      {
-        type: "request",
-        payload: { resource: "add" },
-      },
-      {
-        type: "write",
-        payload: [{ collection: "input1", entries: [["v1", [2]]] }],
-      },
-      {
-        type: "write",
-        payload: [{ collection: "input2", entries: [["v1", [3]]] }],
-      },
-      {
-        type: "delete",
-        payload: [{ collection: "input1", keys: ["v1"] }],
-      },
-      {
-        type: "write",
-        payload: [
-          {
-            collection: "input1",
-            entries: [
-              ["v1", [2]],
-              ["v2", [6]],
-            ],
-          },
-        ],
-      },
-      {
-        type: "write",
-        payload: [{ collection: "input2", entries: [["v2", [0]]] }],
-      },
-      {
-        type: "write",
-        payload: [{ collection: "input1", entries: [["v1", [8]]] }],
-      },
-    ] as Step[],
-  ];
-}
+const streaming_port = 3587;
+const control_port = 3588;
 
-run(scenarios(), 3587, 3588);
+const service = new SkipServiceBroker({
+  host: "localhost",
+  control_port,
+  streaming_port,
+});
+
+const closable = await subscribe(service, "add", streaming_port);
+await sleep(10);
+await service.update("input1", [["v1", [2]]]);
+await sleep(10);
+await service.update("input2", [["v1", [3]]]);
+await sleep(10);
+await service.deleteKey("input1", "v1");
+await sleep(10);
+await service.update("input1", [
+  ["v1", [2]],
+  ["v2", [6]],
+]);
+await sleep(10);
+await service.update("input2", [["v2", [0]]]);
+await sleep(10);
+await service.update("input1", [["v1", [8]]]);
+await sleep(10);
+closable.close();
