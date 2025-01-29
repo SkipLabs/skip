@@ -3,6 +3,7 @@
 set -e
 
 LLVM_VERSION=15
+PRIORITY=100
 
 apt-get update
 apt-get install -q -y wget gnupg
@@ -16,11 +17,11 @@ apt-get install -q -y automake clang-$LLVM_VERSION clang-format-$LLVM_VERSION cu
 npm install -g bun
 npm install -g prettier
 
-update-alternatives --install /usr/bin/clang clang /usr/bin/clang-$LLVM_VERSION 100
-update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-$LLVM_VERSION 100
-update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-$LLVM_VERSION 100
-update-alternatives --install /usr/bin/llc llc /usr/bin/llc-$LLVM_VERSION 100
-update-alternatives --install /usr/bin/llvm-ar llvm-ar /usr/bin/llvm-ar-$LLVM_VERSION 100
-update-alternatives --install /usr/bin/llvm-config llvm-config /usr/bin/llvm-config-$LLVM_VERSION 100
-update-alternatives --install /usr/bin/llvm-link llvm-link /usr/bin/llvm-link-$LLVM_VERSION 100
-update-alternatives --install /usr/bin/wasm-ld wasm-ld /usr/bin/wasm-ld-$LLVM_VERSION 100
+update-alternatives --install /usr/bin/clang clang /usr/bin/clang-$LLVM_VERSION $PRIORITY
+update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-$LLVM_VERSION $PRIORITY
+update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-$LLVM_VERSION $PRIORITY
+update-alternatives --install /usr/bin/llc llc /usr/bin/llc-$LLVM_VERSION $PRIORITY
+update-alternatives --install /usr/bin/llvm-ar llvm-ar /usr/bin/llvm-ar-$LLVM_VERSION $PRIORITY
+update-alternatives --install /usr/bin/llvm-config llvm-config /usr/bin/llvm-config-$LLVM_VERSION $PRIORITY
+update-alternatives --install /usr/bin/llvm-link llvm-link /usr/bin/llvm-link-$LLVM_VERSION $PRIORITY
+update-alternatives --install /usr/bin/wasm-ld wasm-ld /usr/bin/wasm-ld-$LLVM_VERSION $PRIORITY
