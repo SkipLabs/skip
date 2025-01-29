@@ -118,8 +118,8 @@ function defaultParamEncoder(params: Json): string {
       if (typeof value == "object") queryParams[key] = JSON.stringify(value);
       else queryParams[key] = value.toString();
     }
-    return new URLSearchParams(queryParams).toString();
-  } else return `params=${JSON.stringify(params)}`;
+    return `?${new URLSearchParams(queryParams).toString()}`;
+  } else return `?params=${JSON.stringify(params)}`;
 }
 
 /**
@@ -135,6 +135,13 @@ export class Polled<S extends Json, K extends Json, V extends Json>
   private readonly intervals = new Map<string, Timeout>();
 
   /**
+   * Construct a `Polled` external resource.
+   *
+   * The URL of the external resource is formed by appending the given base `url` and the result of `encodeParams(params)` where `params` are the parameters provided when instantiating the resource.
+   * The default `encodeParams` function produces a query string consisting of a leading `?` followed by the encoding of the `params` given by [URLSearchParams.toString](https://developer.mozilla.org/en-US/docs/Web/API/URLSearchParams/toString) when `params` is an object and otherwise a single key-value pair `params=JSON.stringify(params)`.
+   *
+   * Note that the result of `encodeParams` contains the `?` separator, but it need not be at the beginning of the returned string, so some parameters can be used in part of the URL preceding the `?`.
+   *
    * @param url - HTTP endpoint of external resource to poll.
    * @param duration - Refresh interval, in milliseconds.
    * @param conv - Function to convert data of type `S` received from external resource to `key`-`value` entries.
@@ -158,7 +165,7 @@ export class Polled<S extends Json, K extends Json, V extends Json>
       loading: () => void;
     },
   ) {
-    const url = `${this.url}?${this.encodeParams(params)}`;
+    const url = `${this.url}${this.encodeParams(params)}`;
     const call = () => {
       callbacks.loading();
       fetchJSON(url, "GET", {})
