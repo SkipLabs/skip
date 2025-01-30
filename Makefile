@@ -9,7 +9,6 @@ SKARGO_PROFILE?=release
 SKDB_WASM=sql/target/wasm32-unknown-unknown/$(SKARGO_PROFILE)/skdb.wasm
 SKDB_BIN=sql/target/host/$(SKARGO_PROFILE)/skdb
 SDKMAN_DIR?=$(HOME)/.sdkman
-DOCS_SITE_DIR?=/dev/null
 
 ################################################################################
 # skdb wasm + js client
@@ -119,7 +118,7 @@ check-fmt: fmt
 .PHONY: docs
 docs:
 	npm install && npm run build
-	cd www && npm install && npx docusaurus generate-typedoc
+	cd www && rm -rf docs/api && npm install && npx docusaurus generate-typedoc
 
 # run the docs site locally at http://localhost:3000
 .PHONY: docs-run
@@ -128,19 +127,20 @@ docs-run: # depends on docs, but can't be tracked reliably
 
 # generate the docs site as static files
 .PHONY: docs-build
-docs-build: # depends on docs, but can't be tracked reliably
-	cd www && npm run build
+docs-build: docs
+	cd www && rm -rf build && npm run build
 
 # run the static docs site locally
 .PHONY: docs-serve
-docs-serve: # depends on build, but can't be tracked reliably
+docs-serve: # depends on docs-build, but can't be tracked reliably
 	cd www && npm run serve
 
 # update the static docs site repo
-# must set DOCS_SITE_DIR to the root of the docs-site repo checkout
-.PHONY: docs-sync
-docs-sync: # depends on build, but can't be tracked reliably
-	cd www && rsync --archive --exclude=.git --exclude=README.md --delete build/ $(DOCS_SITE_DIR)/
+.PHONY: docs-publish
+docs-publish: docs-build
+	cd www && rsync --archive --exclude=.git --exclude=README.md --delete build/ docs_site/
+	@echo "Test locally: make docs-serve"
+	@echo "Push to live site: cd www/docs_site/; git add -A; git commit -m 'update to $(shell git describe --always)'; git push; cd -"
 
 # install the repo pre-commit hook locally
 .git/hooks/pre-commit: bin/git_hooks/check_format.sh
