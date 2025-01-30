@@ -126,3 +126,22 @@ jobs:
             make test-skipruntime-ts
       - store_test_results:
           path: ~/test-results/skipruntime.xml
+
+  check-hackernews-example:
+    docker:
+      - image: cimg/base:2025.01
+    steps:
+      - checkout
+      - setup
+      - setup_remote_docker
+      - run:
+          name: Build docker images
+          working_directory: ~/project/examples/hackernews
+          command: docker compose build
+      - run:
+          name: Start services
+          working_directory: ~/project/examples/hackernews
+          command: docker compose up --wait
+      - run:
+          name: Test back end health
+          command: (docker run --network hackernews_default -it cimg/base:2025.01 curl --silent --max-time 0.1 --insecure --location https://haproxy/api/posts || true) | grep --quiet "data:"
