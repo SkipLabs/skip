@@ -40,8 +40,8 @@ build-examples:
 
 test-example-%:
 	../bin/cd_sh tests/examples "./$*.sh /tmp/$*.out /tmp/$*.err"
-	diff /tmp/$*.out tests/examples/$*.exp.out >/dev/null
-	diff /tmp/$*.err tests/examples/$*.exp.err >/dev/null
+	diff /tmp/$*.out tests/examples/$*.exp.out
+	diff /tmp/$*.err tests/examples/$*.exp.err
 
 
 EXAMPLES := $(patsubst tests/examples/%.sh,%,$(wildcard tests/examples/*.sh))
