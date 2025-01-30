@@ -20,6 +20,7 @@ const sidebars: SidebarsConfig = {
     "client",
     "deploying",
     "glossary",
+    "community",
     {
       type: "category",
       label: "@skipruntime/core",
