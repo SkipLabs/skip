@@ -54,6 +54,9 @@ for step in "${steps[@]}"; do
             npm install -g prettier
             update-alternatives --auto clang
             ;;
+        other-dev-tools)
+            apt-get install -q -y rsync
+            ;;
         *)
             echo "Unknown step $step"
             usage
