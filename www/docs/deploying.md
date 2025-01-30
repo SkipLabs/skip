@@ -7,7 +7,7 @@ This page walks through those details, or you can refer to an example's [setup](
 ## Overview
 
 Skip reactive services define an HTTP interface for reading, writing, and subscribing to data.
-In production use cases for web applications, this should be deployed behind a reverse proxy such as Nginx, HAProxy, or Traefik which is responsible for traffic encryption, load balancing, HTTP tunneling, and dispatching requests to backend services.
+In production use cases for web applications, this should be deployed behind a gateway or reverse proxy such as Kong, Nginx, HAProxy, or Traefik which is responsible for traffic encryption, load balancing, rate limiting, HTTP tunneling, and dispatching requests to backend services.
 Throughout this page we will show HAProxy configuration in examples, but it should be directly applicable to other proxies.
 
 Skip is agnostic to your choice of reverse proxy, but it is important that it is configured with HTTP/2 for request/response multiplexing, to avoid browser limitations on concurrent server-sent event connections, and to ensure that TLS is used.
@@ -32,7 +32,9 @@ Within that file, you should perform any necessary setup and then spin up the se
 ### Data Streaming
 
 As described in the documentation for [resources and services](resources.md#resource-http-api), the Skip reactive service HTTP interface exposes control operations on one port and data streaming on another; the default streaming port is `8080` and the default control port is `8081`.
-Your application should expose _only_ the streaming port to the outside world; using HAProxy we can restrict and direct traffic as follows:
+**Important**: Similar to how your database connection should not be exposed to the outside world, your application should expose _only_ the streaming port to the outside world, the control port should be hidden.
+
+Using HAProxy we can restrict and direct traffic as follows:
 
 ```
 frontend www
