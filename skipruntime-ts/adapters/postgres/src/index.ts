@@ -205,11 +205,14 @@ FOR EACH ROW EXECUTE FUNCTION %I();`,
           );
         }
       });
-      this.open_instances.add(instance);
     };
-    setup().catch(() => {
-      throw new Error("Error setting up Postgres notifications");
-    });
+    setup().then(
+      () => this.open_instances.add(instance),
+      (e: unknown) => {
+        console.error("Error setting up Postgres notifications");
+        throw e;
+      },
+    );
   }
 
   unsubscribe(instance: string): void {
