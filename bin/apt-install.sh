@@ -46,13 +46,12 @@ for step in "${steps[@]}"; do
             echo "deb https://deb.nodesource.com/node_22.x nodistro main" >> /etc/apt/sources.list.d/nodejs.list
             apt-get update
             apt-get install -q -y nodejs
-            npm install -g bun
-            npm install -g prettier
             ;;
         other-CI-tools)
             # Assumes other steps have been run before
             apt-get install -q -y pip shellcheck
             pip install black
+            npm install -g prettier
             ;;
         *)
             echo "Unknown step $step"

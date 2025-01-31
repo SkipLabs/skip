@@ -1,6 +1,7 @@
 FROM skiplabs/skip AS base
 
 RUN apt-get install -q -y sqlite3
+RUN npm install -g bun
 RUN npx playwright install-deps
 
 RUN sh -c 'curl -s "https://get.sdkman.io?rcupdate=false" | bash'
