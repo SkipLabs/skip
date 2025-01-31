@@ -28,6 +28,9 @@ import { it as mit, type AsyncFunc } from "mocha";
 import pg from "pg";
 import { PostgresExternalService } from "@skip-adapter/postgres";
 
+import { Kafka, logLevel as kafkaLogLevel } from "kafkajs";
+import { KafkaExternalService } from "@skip-adapter/kafka";
+
 async function withAlternateConsoleError(
   altConsoleError: (...messages: any[]) => void,
   f: () => Promise<void>,
@@ -663,6 +666,57 @@ INSERT INTO skip_test2 (id, x) VALUES (1, 100), (2, 100), (2, 100), (3, 100), (3
   return true;
 }
 
+class ParseAndMultiply implements Mapper<string, string, string, number> {
+  constructor(private other: EagerCollection<number, number>) {}
+
+  mapEntry(key: string, values: Values<string>): Iterable<[string, number]> {
+    const val = Number(values.getUnique());
+    const otherVal = this.other.getUnique(val);
+    return [[key, val * otherVal]];
+  }
+}
+
+class KafkaResource implements Resource<Input_NN> {
+  instantiate(
+    collections: Input_NN,
+    context: Context,
+  ): EagerCollection<string, number> {
+    return context
+      .useExternalResource({
+        service: "kafka",
+        identifier: "skip-test-topic",
+        params: {},
+      })
+      .map(ParseAndMultiply, collections.input);
+  }
+}
+
+const kafka_config = {
+  clientId: "skip-kafka-test",
+  brokers: [{ host: "localhost", port: 9092 }],
+  retry: { multiplier: 1.5 },
+  logLevel: kafkaLogLevel.NOTHING,
+};
+function kafkaService(): SkipService<Input_NN, Input_NN> {
+  const kafka = new KafkaExternalService(kafka_config);
+  return {
+    initialData: {
+      input: [
+        [1, [10]],
+        [2, [20]],
+        [3, [30]],
+        [4, [40]],
+        [5, [50]],
+      ],
+    },
+    resources: { resource: KafkaResource },
+    externalServices: { kafka },
+    createGraph(inputs: Input_NN) {
+      return inputs;
+    },
+  };
+};
+
 // Wrap service instantiation in a function so that the WASM and Native tests get ahold
 // of separate DB clients and manage their lifecycle properly; normally you'd just
 // construct a service object like the other tests in this file.
@@ -678,7 +732,13 @@ const postgresService: () => Promise<
   }
 
   return {
-    initialData: { input: [] },
+    initialData: {
+      input: [
+        [1, [10]],
+        [2, [20]],
+        [3, [30]],
+      ],
+    },
     resources: {
       resource: PostgresResource,
       resourceWithException: PostgresResourceWithException,
@@ -1220,11 +1280,6 @@ export function initTests(
       this.skip();
     }
     try {
-      service.update("input", [
-        [1, [10]],
-        [2, [20]],
-        [3, [30]],
-      ]);
       service.instantiateResource(
         "unsafe.fixed.resource.ident.1",
         "resource",
@@ -1302,6 +1357,69 @@ export function initTests(
       await pgClient.query("INSERT INTO skip_test (id, x) VALUES (1,1),(2,2);");
       await pgClient.end();
       await service.close();
+    }
+  });
+
+  it("testKafka", async function () {
+    const resourceId = "unsafe.fixed.resource.ident";
+    let service;
+    let producer;
+    try {
+      service = await initService(kafkaService());
+      producer = new Kafka({
+        ...kafka_config,
+        clientId: "skip-test-producer",
+        brokers: ["localhost:9092"],
+        retry: { retries: 3, maxRetryTime: 1000 },
+      }).producer();
+      await producer.connect();
+    } catch {
+      if ("CIRCLECI" in process.env) {
+        throw new Error("Failed to set up CircleCI environment with Kafka.");
+      }
+      console.warn(
+        "Default pass on testKafka since no local Kafka cluster found;",
+      );
+      console.warn("To test properly, run the following then retry:");
+      console.warn("\tdocker pull apache/kafka:latest");
+      console.warn(
+        "\tdocker run -d --name=skip-kafka-container -p 9092:9092 apache/kafka",
+      );
+      console.warn(
+        "\tdocker exec -ti skip-kafka-container /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic skip-test-topic",
+      );
+      this.skip();
+    }
+    try {
+      service.instantiateResource(resourceId, "resource", {});
+      expect(service.getAll("resource").payload).toEqual([]);
+
+      const messages = Array.from({ length: 5 }, () => {
+        const noise = Math.floor(Math.random() * 1_000_000_000);
+        return { key: String(noise), value: String(1 + (noise % 5)) };
+      });
+      producer.send({ topic: "skip-test-topic", messages });
+
+      let retries = 0;
+      while (true) {
+        try {
+          await timeout(100 * 2 ** retries); // exponential backoff until kafka converges
+          messages.forEach(({ key, value }) => {
+            const expected = 10 * Number(value) ** 2;
+            expect(service.getArray("resource", key).payload).toEqual([
+              expected,
+            ]);
+          });
+          break;
+        } catch (e: unknown) {
+          if (retries > 5) throw e;
+          retries += 1;
+        }
+      }
+    } finally {
+      await producer.disconnect();
+      service.closeResourceInstance(resourceId);
+      service.close();
     }
   });
 
