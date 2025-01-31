@@ -50,6 +50,15 @@ EXAMPLE_TARGETS := $(patsubst %,test-example-%,$(EXAMPLES))
 .PHONY: test-examples
 test-examples: build-examples $(EXAMPLE_TARGETS)
 
+.PHONY: test-error-types
+test-error-types: # Best-effort check that we don't throw generic JS errors; prefer some version of SkipError instead.
+	grep -qr "throw new Error" $(CURDIR) \
+	--exclude-dir node_modules \
+	--exclude-dir dist \
+	--exclude-dir native \
+	--exclude-dir examples \
+	--exclude-dir tests
+
 regen-%:
 	cd tests/examples && ./$*.sh ../tests/examples/$*.exp.out ../tests/examples/$*.exp.err
 
