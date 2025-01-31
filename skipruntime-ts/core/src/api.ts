@@ -6,6 +6,7 @@
 
 import type { int, Nullable, Opaque } from "@skiplang/std";
 import type { Managed, Json, JsonObject, DepSafe } from "@skiplang/json";
+export * from "./errors.js";
 export type { Managed, Json, JsonObject, Opaque, DepSafe };
 export { deepFreeze } from "@skiplang/json";
 export type { Nullable };
