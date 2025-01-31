@@ -4,7 +4,11 @@
  * @packageDocumentation
  */
 
-import { type SkipService, ServiceInstance } from "@skipruntime/core";
+import {
+  type SkipService,
+  ServiceInstance,
+  SkipPlatformError,
+} from "@skipruntime/core";
 import { controlService, streamingService } from "./rest.js";
 
 /**
@@ -107,7 +111,7 @@ export async function runService(
       const runtime = await import("@skipruntime/native");
       return await runtime.initService(service);
     } catch {
-      throw new Error(
+      throw new SkipPlatformError(
         'Error loading Skip runtime for specified "native" platform.',
       );
     }
@@ -118,7 +122,7 @@ export async function runService(
       const runtime = await import("@skipruntime/wasm");
       return await runtime.initService(service);
     } catch {
-      throw new Error(
+      throw new SkipPlatformError(
         'Error loading Skip runtime for specified "wasm" platform.',
       );
     }
@@ -132,7 +136,7 @@ export async function runService(
         try {
           instance = await initWasm();
         } catch {
-          throw new Error(
+          throw new SkipPlatformError(
             "No Skip runtime found; one of `@skipruntime/native` (on a supported platform) or `@skipruntime/wasm` is required.",
           );
         }

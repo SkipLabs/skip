@@ -23,7 +23,6 @@ import { sknative } from "@skiplang/std";
 
 import type * as Internal from "./internal.js";
 import {
-  NonUniqueValueException,
   type CollectionUpdate,
   type Context,
   type EagerCollection,
@@ -41,7 +40,12 @@ import {
   type Watermark,
 } from "./api.js";
 
-import { UnknownCollectionError } from "./errors.js";
+import {
+  SkipClassNameError,
+  SkipError,
+  SkipNonUniqueValueError,
+  SkipUnknownCollectionError,
+} from "./errors.js";
 import {
   ResourceBuilder,
   type Notifier,
@@ -50,9 +54,10 @@ import {
   type FromBinding,
 } from "./binding.js";
 
-export { UnknownCollectionError, sk_freeze, isSkManaged };
+export { sk_freeze, isSkManaged };
 export { Sum, Min, Max, Count } from "./utils.js";
 export * from "./api.js";
+export * from "./errors.js";
 
 export type JSONMapper = Mapper<Json, Json, Json, Json>;
 export type JSONLazyCompute = LazyCompute<Json, Json>;
@@ -141,7 +146,7 @@ class LazyCollectionImpl<K extends Json, V extends Json>
         this.refs.skjson.exportJSON(key),
       ),
     ) as Nullable<V & DepSafe>;
-    if (v == null) throw new NonUniqueValueException();
+    if (v == null) throw new SkipNonUniqueValueError();
     return v;
   }
 }
@@ -174,7 +179,7 @@ class EagerCollectionImpl<K extends Json, V extends Json>
         this.refs.skjson.exportJSON(key),
       ),
     ) as Nullable<V & DepSafe>;
-    if (v == null) throw new NonUniqueValueException();
+    if (v == null) throw new SkipNonUniqueValueError();
     return v;
   }
 
@@ -212,7 +217,9 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     const mapperObj = new mapper(...mapperParams);
     Object.freeze(mapperObj);
     if (!mapperObj.constructor.name) {
-      throw new Error("Mapper classes must be defined at top-level.");
+      throw new SkipClassNameError(
+        "Mapper classes must be defined at top-level.",
+      );
     }
     const skmapper = this.refs.binding.SkipRuntime_createMapper(
       this.refs.handles.register(mapperObj),
@@ -242,10 +249,14 @@ class EagerCollectionImpl<K extends Json, V extends Json>
       Object.freeze(reducerObj);
 
       if (!mapperObj.constructor.name) {
-        throw new Error("Mapper classes must be defined at top-level.");
+        throw new SkipClassNameError(
+          "Mapper classes must be defined at top-level.",
+        );
       }
       if (!reducerObj.constructor.name) {
-        throw new Error("Reducer classes must be defined at top-level.");
+        throw new SkipClassNameError(
+          "Reducer classes must be defined at top-level.",
+        );
       }
 
       const skmapper = this.refs.binding.SkipRuntime_createMapper(
@@ -284,7 +295,9 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     const reducerObj = new reducer(...reducerParams);
     Object.freeze(reducerObj);
     if (!reducerObj.constructor.name) {
-      throw new Error("Reducer classes must be defined at top-level.");
+      throw new SkipClassNameError(
+        "Reducer classes must be defined at top-level.",
+      );
     }
     if (sknative in reducerObj && typeof reducerObj[sknative] == "string") {
       return this.derive<K, Accum>(
@@ -386,7 +399,9 @@ class ContextImpl extends SkManaged implements Context {
     const computeObj = new compute(...mapperParams);
     Object.freeze(computeObj);
     if (!computeObj.constructor.name) {
-      throw new Error("LazyCompute classes must be defined at top-level.");
+      throw new SkipClassNameError(
+        "LazyCompute classes must be defined at top-level.",
+      );
     }
     const skcompute = this.refs.binding.SkipRuntime_createLazyCompute(
       this.refs.handles.register(computeObj),
@@ -632,11 +647,11 @@ export class ServiceInstance {
       );
     });
     if (session == -1n) {
-      throw new UnknownCollectionError(
+      throw new SkipUnknownCollectionError(
         `Unknown resource instance '${resourceInstanceId}'`,
       );
     } else if (session < 0n) {
-      throw new Error("Unknown error");
+      throw new SkipError("Unknown error");
     }
     return session as SubscriptionID;
   }
@@ -709,7 +724,7 @@ class ValuesImpl<T> implements Values<T> {
     const value = this.skjson.importOptJSON(
       this.binding.SkipRuntime_NonEmptyIterator__uniqueValue(this.pointer),
     ) as Nullable<T & DepSafe>;
-    if (value == null) throw new NonUniqueValueException();
+    if (value == null) throw new SkipNonUniqueValueError();
     return value;
   }
 
