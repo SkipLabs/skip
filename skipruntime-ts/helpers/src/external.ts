@@ -1,4 +1,5 @@
 import type { Entry, ExternalService, Json } from "@skipruntime/core";
+import { SkipUnknownResourceError } from "@skipruntime/core";
 import { fetchJSON } from "./rest.js";
 
 /**
@@ -47,7 +48,9 @@ export class GenericExternalService implements ExternalService {
       | ExternalResource
       | undefined;
     if (!resource) {
-      throw new Error(`Unkonwn resource named '${resourceName}'`);
+      throw new SkipUnknownResourceError(
+        `Unknown resource named '${resourceName}'`,
+      );
     }
     this.instances.set(instance, resource);
     resource.open(instance, params, callbacks);

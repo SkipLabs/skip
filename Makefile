@@ -159,7 +159,7 @@ test-skjson:
 
 .PHONY: test-skipruntime-ts
 test-skipruntime-ts:
-	$(MAKE) -C skipruntime-ts test test-examples
+	$(MAKE) -C skipruntime-ts test test-examples test-error-types
 
 test-%:
 	cd $* && skargo test --profile $(SKARGO_PROFILE)
