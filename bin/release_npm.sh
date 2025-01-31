@@ -12,7 +12,7 @@ fi
 
 cd $(dirname $2)
 
-npm run build
+npm run build --if-present
 
 npm run test --if-present
 
