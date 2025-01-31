@@ -10,8 +10,8 @@ declare ptr @SKIP_llvm_memcpy(ptr, ptr, i64)
 
 ; LLVM intrinsics
 
-declare void @llvm.lifetime.start(i64, ptr nocapture) argmemonly nounwind
-declare void @llvm.lifetime.end(i64, ptr nocapture) argmemonly nounwind
+declare void @llvm.lifetime.start(i64 immarg, ptr nocapture) argmemonly nounwind
+declare void @llvm.lifetime.end(i64 immarg, ptr nocapture) argmemonly nounwind
 
 declare i32 @llvm.eh.typeid.for(ptr) nounwind readnone
 
