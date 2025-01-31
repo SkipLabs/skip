@@ -188,21 +188,12 @@ export interface Reducer<V extends Json, A extends Json> {
 }
 
 /**
- * Exception indicating a key did not have a unique value.
- *
- * Some collections are used to associate each key to a unique value.
- * When this expectation is not met (a key is associated to either zero or multiple values), operations such as `getUnique` throw `NonUniqueValueException`.
- * @hideconstructor
- */
-export class NonUniqueValueException extends Error {}
-
-/**
  * An iterable collection of dependency-safe values.
  */
 export interface Values<T> extends Iterable<T & DepSafe> {
   /**
    * Return the first value, if there is exactly one.
-   * @throws {@link NonUniqueValueException} if this iterable contains either zero or multiple values.
+   * @throws {@link SkipNonUniqueValueError} if this iterable contains either zero or multiple values.
    */
   getUnique(): T & DepSafe;
 
@@ -237,7 +228,7 @@ export interface LazyCollection<K extends Json, V extends Json>
    *
    * @param key - The key to query.
    * @returns The value associated to `key`.
-   * @throws {@link NonUniqueValueException} if `key` is associated to either zero or multiple values.
+   * @throws {@link SkipNonUniqueValueError} if `key` is associated to either zero or multiple values.
    */
   getUnique(key: K): V & DepSafe;
 }
@@ -267,7 +258,7 @@ export interface EagerCollection<K extends Json, V extends Json>
    *
    * @param key - The key to query.
    * @returns The value associated to `key`.
-   * @throws {@link NonUniqueValueException} if `key` is associated to either zero or multiple values.
+   * @throws {@link SkipNonUniqueValueError} if `key` is associated to either zero or multiple values.
    */
   getUnique(key: K): V & DepSafe;
 
