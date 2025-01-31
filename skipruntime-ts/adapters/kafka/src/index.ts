@@ -1,39 +1,109 @@
 import type { Entry, ExternalService, Json } from "@skipruntime/core";
 
-const { Kafka } = require("kafkajs");
+import { Kafka, logLevel as kafkaLogLevel } from "kafkajs";
+
+import type { Consumer, ConsumerConfig } from "kafkajs";
 
 /**
- * An `ExternalService` wrapping a PostgreSQL database.
- *
- * Expose the tables of a PostgreSQL database as *resources* in the Skip runtime.
- *
+ * Adapter for easily creating Kafka _consumers_, subscribing to external event/message streams and exposing their content as eager collections within the Skip runtime.
  */
 export class KafkaExternalService implements ExternalService {
-  private clientID: string;
+  private consumers: Map<string, Consumer> = new Map();
+  private consumerOptions: ConsumerConfig;
   private client: Kafka;
 
-  /**
-   */
-  constructor(kafka_config: { brokers:{host:string;port:number}[]}) {
-    this.clientID = "skip_kafka_client_" + Math.random().toString(36).slice(2);
-    this.client = new Kafka({...kafka_config, clientID: this.clientID)
+  constructor(
+    kafka_config: {
+      clientId: string;
+      brokers: { host: string; port: number }[];
+      logLevel?: kafkaLogLevel;
+    },
+    consumerOptions: Omit<ConsumerConfig, "groupId"> = {},
+  ) {
+    const brokers = kafka_config.brokers.map(
+      (obj) => `${obj.host}:${obj.port}`,
+    );
+    const logLevel: kafkaLogLevel =
+      kafka_config.logLevel ?? kafkaLogLevel.ERROR;
+
+    this.client = new Kafka({ ...kafka_config, brokers, logLevel });
+    const groupId =
+      "skip_kafka_consumer_" + Math.random().toString(36).slice(2);
+    this.consumerOptions = { ...consumerOptions, groupId };
   }
 
   /**
    * Subscribe to a resource provided by the external service.
+   *
+   * @param instance - Instance identifier of the external resource.
+   * @param resource - Name of the Kafka topic to expose as a resource.
+   * @param params - Parameters of the external resource. TODO document special options here
+   * @param callbacks - Callbacks to react on error/loading/update.
+   * @param callbacks.error - Error callback.
+   * @param callbacks.loading - Loading callback.
+   * @param callbacks.update - Update callback.
+   * @returns {void}
    */
   subscribe(
     instance: string,
-    resource: string,
-    params: Json,
+    topic: string,
+    params: Json & { fromBeginning?: boolean },
     callbacks: {
       update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
       error: (error: Json) => void;
       loading: () => void;
     },
-  ): void {}
+  ): void {
+    callbacks.update([], true);
+    const consumer = this.client.consumer(this.consumerOptions);
+    const fromBeginning = params.fromBeginning ?? true;
+    const setup = async () => {
+      await consumer.connect();
+      await consumer.subscribe({ topic, fromBeginning });
+      consumer.run({
+        eachBatch: async ({ batch }) => {
+          const entries: Map<string, string[]> = new Map();
+          batch.messages.forEach((msg) => {
+            const key = String(msg.key);
+            const val = String(msg.value);
+            if (entries.has(key)) entries.get(key)!.push(val);
+            else entries.set(key, [val]);
+          });
+          const ea = Array.from(entries);
+          callbacks.update(ea, false);
+        },
+      });
+    };
+    setup().then(
+      () => this.consumers.set(instance, consumer),
+      (e: unknown) => {
+        console.error("Error setting up Kafka subscription: ", e);
+        throw e;
+      },
+    );
+  }
 
-  unsubscribe(instance: string): void {}
+  unsubscribe(instance: string): void {
+    const consumer: Consumer | undefined = this.consumers.get(instance);
+    if (consumer !== undefined) {
+      this.consumers.delete(instance);
+      consumer.disconnect().catch((e) => {
+        console.error(`Error disconnecting Kafka consumer ${instance}: ${e}`);
+        throw e;
+      });
+    }
+  }
 
-  shutdown(): void {}
+  private async _shutdown(): Promise<void> {
+    const consumers = Array.from(this.consumers.values());
+    this.consumers.clear();
+    await Promise.all(Array.from(consumers, (c: Consumer) => c.disconnect()));
+  }
+
+  shutdown(): void {
+    this._shutdown().catch((e) => {
+      console.error(`Error shutting down KafkaExternalService: ${e}`);
+      throw e;
+    });
+  }
 }
