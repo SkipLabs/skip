@@ -230,17 +230,18 @@ FOR EACH ROW EXECUTE FUNCTION %I();`,
   }
 
   unsubscribe(instance: string): void {
-    this.client
-      .query(format("DROP FUNCTION IF EXISTS %I CASCADE;", instance))
-      .then(
-        () => this.open_instances.delete(instance),
-        (e: unknown) => {
-          console.error(
-            "Error unsubscribing from resource instance: " + instance,
-          );
-          throw e;
-        },
-      );
+    if (this.open_instances.has(instance))
+      this.client
+        .query(format("DROP FUNCTION IF EXISTS %I CASCADE;", instance))
+        .then(
+          () => this.open_instances.delete(instance),
+          (e: unknown) => {
+            console.error(
+              "Error unsubscribing from resource instance: " + instance,
+            );
+            throw e;
+          },
+        );
   }
 
   shutdown(): void {
