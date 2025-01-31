@@ -114,10 +114,11 @@ export class PostgresExternalService implements ExternalService {
     this.client = new pg.Client(db_config);
     this.client.connect().then(
       () => this.client.query(format(`LISTEN %I;`, this.clientID)),
-      () => {
-        throw new Error(
+      (e: unknown) => {
+        console.error(
           "Error connecting to Postgres at " + JSON.stringify(db_config),
         );
+        throw e;
       },
     );
   }
@@ -194,13 +195,15 @@ FOR EACH ROW EXECUTE FUNCTION %I();`,
       }
       this.client.on("notification", (msg) => {
         if (msg.payload != undefined) {
-          this.client.query(key.select(table, msg.payload)).then(
+          const query = key.select(table, msg.payload);
+          this.client.query(query).then(
             (changes) => {
               const k = key.type == "TEXT" ? msg.payload! : Number(msg.payload);
               callbacks.update([[k, changes.rows as Json[]]], false);
             },
-            () => {
-              throw new Error("Error pulling updated Postgres rows");
+            (e: unknown) => {
+              console.error(`Error executing Postgres query: ${query}`);
+              throw e;
             },
           );
         }
@@ -220,10 +223,11 @@ FOR EACH ROW EXECUTE FUNCTION %I();`,
       .query(format("DROP FUNCTION IF EXISTS %I CASCADE;", instance))
       .then(
         () => this.open_instances.delete(instance),
-        () => {
-          throw new Error(
+        (e: unknown) => {
+          console.error(
             "Error unsubscribing from resource instance: " + instance,
           );
+          throw e;
         },
       );
   }
@@ -242,10 +246,11 @@ FOR EACH ROW EXECUTE FUNCTION %I();`,
         ? this.client.end()
         : this.client.query(query).then(() => this.client.end());
 
-    shutdown.catch(() => {
-      throw new Error(
+    shutdown.catch((e: unknown) => {
+      console.error(
         "Error shutting down Postgres external service; trigger functions may need teardown.",
       );
+      throw e;
     });
   }
 }
