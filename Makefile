@@ -292,5 +292,9 @@ publish-server:
 publish-postgres-adapter:
 	bin/release_npm.sh @skip-adapter/postgres skipruntime-ts/adapters/postgres/package.json $(OPT)
 
+.PHONY: publish-metapackage
+publish-metapackage:
+	bin/release_npm.sh @skiplabs/skip skipruntime-ts/metapackage/package.json $(OPT)
+
 .PHONY: publish-all
-publish-all: clean publish-std publish-json publish-date publish-core publish-helpers publish-wasm publish-native publish-server publish-postgres-adapter
+publish-all: clean publish-std publish-json publish-date publish-core publish-helpers publish-wasm publish-native publish-server publish-postgres-adapter publish-metapackage
