@@ -1,5 +1,5 @@
 import type { Json, Entry } from "@skipruntime/core";
-import { NonUniqueValueException } from "@skipruntime/core";
+import { SkipNonUniqueValueError, SkipFetchError } from "@skipruntime/core";
 
 /**
  * An entry point of a Skip reactive service.
@@ -70,7 +70,7 @@ export async function fetchJSON<V extends Json>(
     signal: AbortSignal.timeout(options.timeout ?? 1000),
   });
   if (!response.ok) {
-    throw new Error(`${response.status}: ${response.statusText}`);
+    throw new SkipFetchError(`${response.status}: ${response.statusText}`);
   }
   const responseText = await response.text();
   const responseJSON =
@@ -158,7 +158,7 @@ export class SkipServiceBroker {
    * @param params - Resource instance parameters.
    * @param key - Key to read.
    * @returns The value associated to the key.
-   * @throws `NonUniqueValueException` when the key is associated to either zero or multiple values.
+   * @throws `SkipNonUniqueValueError` when the key is associated to either zero or multiple values.
    */
   async getUnique<K extends Json, V extends Json>(
     resource: string,
@@ -167,7 +167,7 @@ export class SkipServiceBroker {
   ): Promise<V> {
     return this.getArray<K, V>(resource, params, key).then((values) => {
       if (values.length !== 1 || values[0] === undefined)
-        throw new NonUniqueValueException();
+        throw new SkipNonUniqueValueError();
       return values[0];
     });
   }

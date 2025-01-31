@@ -1,5 +1,9 @@
 import express from "express";
-import { ServiceInstance, UnknownCollectionError } from "@skipruntime/core";
+import {
+  ServiceInstance,
+  SkipUnknownCollectionError,
+  SkipRESTError,
+} from "@skipruntime/core";
 import type { CollectionUpdate, Entry, Json } from "@skipruntime/core";
 
 export function controlService(service: ServiceInstance): express.Express {
@@ -61,7 +65,7 @@ export function controlService(service: ServiceInstance): express.Express {
         !("key" in req.body) ||
         !("params" in req.body)
       )
-        throw new Error(
+        throw new SkipRESTError(
           `Invalid request body for synchronous lookup: ${JSON.stringify(req.body)}`,
         );
       service.getArray(
@@ -86,7 +90,7 @@ export function controlService(service: ServiceInstance): express.Express {
       service.update(req.params.collection, req.body as Entry<Json, Json>[]);
       res.sendStatus(200);
     } catch (e: unknown) {
-      if (e instanceof UnknownCollectionError) {
+      if (e instanceof SkipUnknownCollectionError) {
         res.sendStatus(404);
       } else {
         console.log(e);
@@ -136,7 +140,7 @@ export function streamingService(service: ServiceInstance): express.Express {
       });
     } catch (e: unknown) {
       console.log(e);
-      if (e instanceof UnknownCollectionError) {
+      if (e instanceof SkipUnknownCollectionError) {
         res.sendStatus(404);
       } else {
         res.sendStatus(500);
