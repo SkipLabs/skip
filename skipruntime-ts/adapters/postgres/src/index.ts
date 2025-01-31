@@ -1,7 +1,14 @@
-import type { Entry, ExternalService, Json } from "@skipruntime/core";
+import {
+  type Entry,
+  type ExternalService,
+  type Json,
+  SkipError,
+} from "@skipruntime/core";
 
 import pg from "pg";
 import format from "pg-format";
+
+export class SkipPostgresError extends SkipError {}
 
 const min32bitInt = -2147483648;
 const max32bitInt = 2147483647;
@@ -16,16 +23,20 @@ function validateKeyParam(params: Json): {
     typeof params["key"] != "object" ||
     params["key"] == null
   )
-    throw new Error("No key specified for external Postgres data source");
+    throw new SkipPostgresError(
+      "No key specified for external Postgres data source",
+    );
 
   if (!("col" in params["key"]) || typeof params["key"]["col"] != "string")
-    throw new Error(
+    throw new SkipPostgresError(
       "No key column specified for external Postgres data source",
     );
   const col: string = params["key"]["col"];
 
   if (!("type" in params["key"]) || typeof params["key"]["type"] != "string")
-    throw new Error("No key type specified for external Postgres data source");
+    throw new SkipPostgresError(
+      "No key type specified for external Postgres data source",
+    );
   const type: string = params["key"]["type"];
 
   let select;
@@ -43,7 +54,7 @@ function validateKeyParam(params: Json): {
           !Number.isSafeInteger(keyNum) ||
           (type == "BIGSERIAL" && keyNum < 1)
         )
-          throw new Error(`Invalid ${type} key: ${key}`);
+          throw new SkipPostgresError(`Invalid ${type} key: ${key}`);
         return format(
           "SELECT * FROM %I WHERE %I = " + keyNum.toString() + ";",
           table,
@@ -62,7 +73,7 @@ function validateKeyParam(params: Json): {
           keyNum > max32bitInt ||
           (type == "SERIAL" && keyNum < 1)
         )
-          throw new Error(`Invalid ${type} key: ${key}`);
+          throw new SkipPostgresError(`Invalid ${type} key: ${key}`);
         return format(
           "SELECT * FROM %I WHERE %I = " + keyNum.toString() + ";",
           table,
@@ -71,7 +82,7 @@ function validateKeyParam(params: Json): {
       };
       break;
     default:
-      throw new Error("Unsupported Postgres key type: " + type);
+      throw new SkipPostgresError("Unsupported Postgres key type: " + type);
   }
   return { col, type, select };
 }

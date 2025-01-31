@@ -16,7 +16,7 @@ import type {
   ServiceInstance,
 } from "@skipruntime/core";
 import {
-  NonUniqueValueException,
+  SkipNonUniqueValueError,
   OneToOneMapper,
   Count,
   Sum,
@@ -460,7 +460,7 @@ class MockExternalCheck implements Mapper<number, number, number, number[]> {
       const result = this.external.getUnique(key);
       return [[key, [...values, result]]];
     } catch (e) {
-      if (e instanceof NonUniqueValueException)
+      if (e instanceof SkipNonUniqueValueError)
         return [[key, values.toArray()]];
       throw e;
     }
