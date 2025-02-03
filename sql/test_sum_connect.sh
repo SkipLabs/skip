@@ -17,7 +17,7 @@ for i in {1..1}; do
     $SKDB subscribe v1 --connect --data $DB --file "/tmp/foo$i"
 done
 
-for j in {1..10}; do
+for _ in {1..10}; do
     (echo "begin transaction;"; for i in {1..10000}; do echo "insert into t1 values($i);"; done; echo "commit;"; ) | $SKDB --data $DB &
 done;
 wait

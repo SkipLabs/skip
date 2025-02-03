@@ -21,15 +21,15 @@ echo "create reactive view v1 as select * from t1;" | $SKDB --data /tmp/test.db
 
 $SKDB subscribe v1 --connect --notify /tmp/nn --data /tmp/test.db > /dev/null
 
-n1=`cat /tmp/nn`
+n1=$(cat /tmp/nn)
 
 echo "insert into t1 values(22);" | $SKDB --data /tmp/test.db
 
-n2=`cat /tmp/nn`
+n2=$(cat /tmp/nn)
 
 echo "insert into t1 values(23);" | $SKDB --data /tmp/test.db
 
-n3=`cat /tmp/nn`
+n3=$(cat /tmp/nn)
 
 if (( n1 < n2 ))
 then

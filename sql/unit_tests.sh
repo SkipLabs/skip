@@ -231,14 +231,14 @@ fi
 
 tmpfile=$(mktemp /tmp/testfile.XXXXXX)
 tmpfile_dump=$(mktemp /tmp/testfile.XXXXXX)
-rm -f $tmpfile $tmpfile_dump
-$SKDB --init $tmpfile
-cat test/unit/test_dump_index.sql | $SKDB --data $tmpfile
-$SKDB dump --data $tmpfile > $tmpfile_dump
+rm -f "$tmpfile" "$tmpfile_dump"
+$SKDB --init "$tmpfile"
+cat test/unit/test_dump_index.sql | $SKDB --data "$tmpfile"
+$SKDB dump --data "$tmpfile" > "$tmpfile_dump"
 
-diff $tmpfile_dump test/unit/test_dump_index.exp  > /dev/null
+diff "$tmpfile_dump" test/unit/test_dump_index.exp  > /dev/null
 if [ $? -eq 0 ]; then
-    rm $tmpfile $tmpfile_dump
+    rm "$tmpfile" "$tmpfile_dump"
     pass "DUMP INDEXES"
 else
     fail "DUMP INDEXES"
@@ -332,7 +332,7 @@ fi
 
 for f in test/unit/checks/*.sql;
 do
-    base=$(basename $f .sql)
+    base=$(basename "$f" .sql)
     if diff -q <(cat "test/unit/checks/$base.sql" | $SKDB --always-allow-joins 2>&1) "test/unit/checks/$base.exp" > /dev/null 2>&1; then
         pass "SELECT CHECK - $base"
     else

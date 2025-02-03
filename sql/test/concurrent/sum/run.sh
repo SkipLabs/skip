@@ -15,14 +15,14 @@ $SKDB --init /tmp/test.db
 
 cat create.sql | $SKDB --data /tmp/test.db
 
-for i in {1..10}
+for _ in {1..10}
 do
     cat inserts.sql | $SKDB --data /tmp/test.db &
 done
 wait
 
 echo "SELECT * FROM t1;" | $SKDB --data /tmp/test.db  > /tmp/test_result
-sum=`cat /tmp/test_result | egrep '^[0-9]+$' | awk '{x += $1} END { print (x == 1099511627776) }'`
+sum=$(cat /tmp/test_result | grep -E '^[0-9]+$' | awk '{x += $1} END { print (x == 1099511627776) }')
 
 if [[ sum -eq 1 ]]
 then

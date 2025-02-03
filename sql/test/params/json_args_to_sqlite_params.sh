@@ -8,4 +8,4 @@
 #
 # See also test_args.json and expected_params.sql
 
-jq --raw-output 'to_entries | .[] | if (.value | type) == "string" then ".param set @\(.key) \"'\''\(.value)'\''\"" else ".param set @\(.key) \(.value)" end' $1
+jq --raw-output 'to_entries | .[] | if (.value | type) == "string" then ".param set @\(.key) \"'\''\(.value)'\''\"" else ".param set @\(.key) \(.value)" end' "$1"

@@ -11,4 +11,4 @@ node dist/database-server.js >/dev/null &
 sleep 0.25 # give a moment for service to spin up
 node dist/database-client.js >"$1" 2>"$2"
 
-kill $(jobs -p)
+jobs -p | xargs kill

@@ -21,7 +21,7 @@ check-file () {
     code=$(git show :"$file");
     # check if formatting changes code
     diff=$(echo "$code" | $fmt | diff <(echo "$code") -)
-    if ! [ -z "$diff" ]; then
+    if [ -n "$diff" ]; then
         # report file and diff
         echo -e "\n$file\n$diff";
         # fail

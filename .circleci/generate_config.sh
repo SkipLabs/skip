@@ -1,19 +1,23 @@
 #!/bin/bash
 
 # TODO: This is flaky as it relies on coarse directory-level diffs.
-git diff --quiet HEAD $(git merge-base main HEAD) -- $(jq --raw-output ".workspaces[]" package.json)
+
+BASE="$(git merge-base main HEAD)"
+
+# shellcheck disable=SC2046 # We actually want splitting in jq command output
+git diff --quiet HEAD "$BASE" -- $(jq --raw-output ".workspaces[]" package.json)
 check_ts=$?
-git diff --quiet HEAD $(git merge-base main HEAD) -- skiplang/compiler/ skiplang/prelude/ :^skiplang/prelude/ts
+git diff --quiet HEAD "$BASE" -- skiplang/compiler/ skiplang/prelude/ :^skiplang/prelude/ts
 skc=$?
-git diff --quiet HEAD $(git merge-base main HEAD) -- skiplang/prelude/src/skstore/ skiplang/prelude/runtime/
+git diff --quiet HEAD "$BASE" -- skiplang/prelude/src/skstore/ skiplang/prelude/runtime/
 skstore=$?
-git diff --quiet HEAD $(git merge-base main HEAD) -- skiplang/skjson
+git diff --quiet HEAD "$BASE" -- skiplang/skjson
 skjson=$?
-git diff --quiet HEAD $(git merge-base main HEAD) -- sql/ skiplang/sqlparser/ skiplang/skbuild/
+git diff --quiet HEAD "$BASE" -- sql/ skiplang/sqlparser/ skiplang/skbuild/
 skdb=$?
-git diff --quiet HEAD $(git merge-base main HEAD) -- skipruntime-ts/
+git diff --quiet HEAD "$BASE" -- skipruntime-ts/
 skipruntime=$?
-git diff --quiet HEAD $(git merge-base main HEAD) -- skiplang/prelude/ts/
+git diff --quiet HEAD "$BASE" -- skiplang/prelude/ts/
 ts_prelude=$?
 
 cat .circleci/base.yml
@@ -21,12 +25,12 @@ cat .circleci/base.yml
 echo "workflows:"
 
     cat <<EOF
-  check-format:
+  fast-checks:
     jobs:
-      - check-format
+      - fast-checks
 EOF
 
-if (( $check_ts != 0 ))
+if (( check_ts != 0 ))
 then
     cat <<EOF
   check-ts:
@@ -35,7 +39,7 @@ then
 EOF
 fi
 
-if (( $skc != 0 ))
+if (( skc != 0 ))
 then
    cat <<EOF
   compiler:
@@ -44,7 +48,7 @@ then
 EOF
 fi
 
-if (( $skstore != 0 ))
+if (( skstore != 0 ))
 then
     cat <<EOF
   skstore:
@@ -53,7 +57,7 @@ then
 EOF
 fi
 
-if (( $skjson != 0 ))
+if (( skjson != 0 ))
 then
     cat <<EOF
   skjson:
@@ -62,7 +66,7 @@ then
 EOF
 fi
 
-if (( $skdb != 0 || $skstore != 0 ))
+if (( skdb != 0 || skstore != 0 ))
 then
     cat <<EOF
   skdb:
@@ -71,7 +75,7 @@ then
 EOF
 fi
 
-if (( $skdb != 0 || $skstore != 0 || $ts_prelude != 0 || $skjson != 0 ))
+if (( skdb != 0 || skstore != 0 || ts_prelude != 0 || skjson != 0 ))
 then
     cat <<EOF
   skdb-wasm:
@@ -80,7 +84,7 @@ then
 EOF
 fi
 
-if (( $skstore != 0 || $skipruntime != 0 || $ts_prelude != 0 || $skjson != 0 ))
+if (( skstore != 0 || skipruntime != 0 || ts_prelude != 0 || skjson != 0 ))
 then
     cat <<EOF
   skipruntime:

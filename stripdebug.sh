@@ -1,8 +1,6 @@
 #!/bin/bash
 
-scriptdir=`dirname ${0}`
-scriptdir=`(cd ${scriptdir}; pwd)`
-scriptname=`basename ${0}`
+scriptname=$(basename "$0")
 
 set -e
 
@@ -10,8 +8,8 @@ function errorexit()
 {
   errorcode=${1}
   shift
-  echo $@
-  exit ${errorcode}
+  echo "$@"
+  exit "$errorcode"
 }
 
 function usage()
@@ -19,11 +17,11 @@ function usage()
   echo "USAGE ${scriptname} <tostrip>"
 }
 
-tostripdir=`dirname "$1"`
-tostripfile=`basename "$1"`
+tostripdir=$(dirname "$1")
+tostripfile=$(basename "$1")
 
 
-if [ -z ${tostripfile} ] ; then
+if [ -z "$tostripfile" ] ; then
   usage
   errorexit 0 "tostrip must be specified"
 fi
