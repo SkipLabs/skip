@@ -4,11 +4,7 @@
  * @packageDocumentation
  */
 
-import {
-  type SkipService,
-  ServiceInstance,
-  SkipPlatformError,
-} from "@skipruntime/core";
+import { type SkipService, ServiceInstance } from "@skipruntime/core";
 import { controlService, streamingService } from "./rest.js";
 
 /**

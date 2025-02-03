@@ -29,12 +29,6 @@ export class SkipRESTError extends SkipError {}
 export class SkipFetchError extends SkipError {}
 
 /**
- * Exception indicating an issue loading the Skip runtime for a specific platform.
- * @hideconstructor
- */
-export class SkipPlatformError extends SkipError {}
-
-/**
  * Exception indicating a non-top-level class being used as a mapper/reducer/etc.
  *
  * The Skip runtime requires that these classes be defined at the top-level, so that their names can be used to generate cache keys and the like.
