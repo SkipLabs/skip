@@ -11,7 +11,7 @@ export class SkipError extends Error {}
 export class SkipUnknownCollectionError extends SkipError {}
 
 /**
- * Exception indicating an attempted read/write to a collection that does not exist.
+ * Exception indicating an attempted read/write to a resource that does not exist.
  * @hideconstructor
  */
 export class SkipUnknownResourceError extends SkipError {}
@@ -29,13 +29,14 @@ export class SkipRESTError extends SkipError {}
 export class SkipFetchError extends SkipError {}
 
 /**
- * Exception indicating an issue loading the Skip runtime for a specific (native or wasm) platform.
+ * Exception indicating an issue loading the Skip runtime for a specific platform.
  * @hideconstructor
  */
 export class SkipPlatformError extends SkipError {}
 
 /**
  * Exception indicating a non-top-level class being used as a mapper/reducer/etc.
+ *
  * The Skip runtime requires that these classes be defined at the top-level, so that their names can be used to generate cache keys and the like.
  * @hideconstructor
  */
