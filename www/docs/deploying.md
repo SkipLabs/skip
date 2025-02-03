@@ -29,7 +29,7 @@ CMD ["npm", "start"]
 The `npm start` command will, by default, run your service by executing `./server.js`.
 Within that file, you should perform any necessary setup and then spin up the service by calling `runService`; see [here](https://github.com/SkipLabs/skip/tree/main/examples/hackernews/reactive_service/server.js) for an example.
 
-### Data Streaming
+### Data streaming
 
 As described in the documentation for [resources and services](resources.md#resource-http-api), the Skip reactive service HTTP interface exposes control operations on one port and data streaming on another; the default streaming port is `8080` and the default control port is `8081`.
 **Important**: Similar to how your database connection should not be exposed to the outside world, your application should expose _only_ the streaming port to the outside world, the control port should be hidden.
