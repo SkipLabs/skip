@@ -1,3 +1,9 @@
+/**
+ * This is an adapter to connect PostgreSQL to the Skip Framework, allowing a table of a PostgreSQL database to be exposed as a Skip Resource.
+ *
+ * @packageDocumentation
+ */
+
 import {
   type Entry,
   type ExternalService,
