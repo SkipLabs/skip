@@ -14,6 +14,10 @@ import {
 import pg from "pg";
 import format from "pg-format";
 
+/**
+ * Exception indicating an error while establishing the connection between PostgreSQL and Skip.
+ * @hideconstructor
+ */
 export class SkipPostgresError extends SkipError {}
 
 const min32bitInt = -2147483648;
