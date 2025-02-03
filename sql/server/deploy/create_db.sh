@@ -23,7 +23,7 @@ DB_SUFFIX=.db
 
 DB_FILE=$DB_PREFIX$DB_NAME$DB_SUFFIX
 
-mkdir -p $DB_PREFIX
+mkdir -p "$DB_PREFIX"
 
 if [[ -e $DB_FILE ]]
 then

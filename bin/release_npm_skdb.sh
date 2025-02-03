@@ -12,7 +12,7 @@ then
     exit 1
 fi
 
-cd "$SCRIPT_DIR/../" || exit 1
+cd "$SCRIPT_DIR/../" || exit
 
 make npm
 
@@ -22,7 +22,7 @@ read -r -p "Enter 6-digit NPM 2FA code (or press enter to attempt publish withou
 if [[ "$otp" =~ ^([0-9]{6})$ ]];
 then
     echo "Publishing with OTP $otp"
-    (cd build/packages/skdb && npm publish --release -- --otp=$otp)
+    (cd build/packages/skdb && npm publish --release -- --otp="$otp")
 else
     echo "Publishing without OTP"
     (cd build/packages/skdb && npm publish --release)

@@ -6,7 +6,7 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 current_version=$(npm view skdb-dev version)
 
-cd "$SCRIPT_DIR/../packages/dev" || exit 1
+cd "$SCRIPT_DIR/../packages/dev" || exit
 
 if grep -q "version.*$current_version" package.json
 then

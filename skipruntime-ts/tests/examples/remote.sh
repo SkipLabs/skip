@@ -12,4 +12,4 @@ node dist/remote.js >/dev/null &
 sleep 0.25 # give a moment for services to spin up
 node dist/remote-client.js >"$1" 2>"$2"
 
-kill $(jobs -p)
+jobs -p | xargs kill

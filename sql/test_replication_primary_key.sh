@@ -53,13 +53,13 @@ replicate_to_local() {
     table=$1
     user=$2
     sub=$($SKDB_BIN --data $SERVER_DB subscribe --connect --ignore-source 1234 "$table" skdb_groups skdb_group_permissions skdb_users skdb_user_permissions)
-    $SKDB_BIN --data $SERVER_DB tail --user $user --format=csv --since 0 "$sub" |
+    $SKDB_BIN --data $SERVER_DB tail --user "$user" --format=csv --since 0 "$sub" |
 	$SKDB_BIN write-csv --data $LOCAL_DB --source 9999 > $WRITE_OUTPUT
 }
 
 replicate_to_server() {
     user=$1
-    cat $UPDATES | $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user $user > $WRITE_OUTPUT
+    cat $UPDATES | $SKDB_BIN write-csv --data $SERVER_DB --source 1234 --user "$user" > $WRITE_OUTPUT
 }
 
 replicate_diff_to_server() {
@@ -88,13 +88,13 @@ replicate_to_local2() {
     table=$1
     user=$2
     sub=$($SKDB_BIN --data $SERVER_DB subscribe --connect --ignore-source 5678 "$table"  skdb_groups skdb_group_permissions skdb_users skdb_user_permissions)
-    $SKDB_BIN --data $SERVER_DB tail --user $user --format=csv --since 0 "$sub" |
+    $SKDB_BIN --data $SERVER_DB tail --user "$user" --format=csv --since 0 "$sub" |
 	$SKDB_BIN write-csv --data $LOCAL2_DB --source 7777 > $WRITE_OUTPUT
 }
 
 replicate_local2_to_server() {
     user=$1
-    cat $UPDATES2 | $SKDB_BIN write-csv --data $SERVER_DB --source 5678 --user $user > $WRITE_OUTPUT
+    cat $UPDATES2 | $SKDB_BIN write-csv --data $SERVER_DB --source 5678 --user "$user" > $WRITE_OUTPUT
 }
 
 run_test() {
@@ -1121,7 +1121,7 @@ test_user_privacy_control() {
 
     $SKDB_BIN --data $LOCAL2_DB <<< "INSERT INTO test_with_pk VALUES (44, 'baz', 'new_group');"
 
-    $SKDB_BIN --data $LOCAL2_DB diff --format=csv --since 31 $(cat $SESSION2) | $SKDB_BIN write-csv --data $SERVER_DB --source 3333 --user test_user2 > $WRITE_OUTPUT
+    $SKDB_BIN --data $LOCAL2_DB diff --format=csv --since 31 "$(cat $SESSION2)" | $SKDB_BIN write-csv --data $SERVER_DB --source 3333 --user test_user2 > $WRITE_OUTPUT
     replicate_to_local test_with_pk test_user
 
     $SKDB_BIN --data $SERVER_DB <<< 'select * from test_with_pk;' > "$server_output"

@@ -5,7 +5,7 @@ set -e
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 REPO="$SCRIPT_DIR/../../.."
-cd $REPO || exit 1
+cd "$REPO" || exit
 
 git clean -xdn | sed 's|Would remove |/|g' > .dockerignore
 

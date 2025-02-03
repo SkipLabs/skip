@@ -10,7 +10,7 @@ commands:
             git submodule update --init --recursive
 
 jobs:
-  check-format:
+  fast-checks:
     docker:
       - image: skiplabs/skip:latest
     steps:
@@ -19,6 +19,10 @@ jobs:
           name: Check code is formatted
           command: |
             make check-fmt
+      - run:
+          name: Check shell scripts
+          command: |
+            make check-sh
 
   check-ts:
     docker:

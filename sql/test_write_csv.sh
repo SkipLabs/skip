@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 if [ -z "$SKARGO_PROFILE" ]; then
