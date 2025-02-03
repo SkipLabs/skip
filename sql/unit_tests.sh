@@ -103,7 +103,7 @@ else
     fail "PARSE FLOAT"
 fi
 
-gcc test/unit/utf8_string/make_utf8_insert_select.c -o /tmp/make_utf8_insert_select
+clang test/unit/utf8_string/make_utf8_insert_select.c -o /tmp/make_utf8_insert_select
 /tmp/make_utf8_insert_select | $SKDB > /tmp/kk1
 
 diff /tmp/kk1 test/unit/utf8_string/expected_string.txt > /dev/null
