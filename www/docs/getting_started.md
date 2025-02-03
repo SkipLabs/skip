@@ -2,15 +2,26 @@
 
 ## Installation
 
-Before you begin, we recommend installing the NPM packages for the Skip API, server, and helpers.
+Before you begin, we recommend installing the NPM packages for the Skip Framework.
 
-```npm install @skipruntime/core @skipruntime/server @skipruntime/helpers```
+```npm install @skiplabs/skip```
 
-Two versions of the runtime are available, a Wasm `@skipruntime/wasm` and a native `@skipruntime/native`.
+The `@skiplabs/skip` package just depends on the separate component packages:
+- `@skipruntime/core`: The Skip Runtime public API
+- `@skipruntime/server`: Expose a reactive service through HTTP/SSE servers
+- `@skipruntime/helpers`: Potential useful functionality for working with Skip
+- `@skipruntime/wasm`: The Wasm version of the Skip Runtime
+
+and optionally:
+- `@skipruntime/native`: The native version of the Skip Runtime
+- `@skip-adapter/postgres`: Connector between PostgreSQL and Skip
+
+Note that two versions of the runtime are available, Wasm `@skipruntime/wasm` and native `@skipruntime/native`.
 The Wasm runtime works with both `node` and `bun`, but is limited to Wasm's 32-bit memory address space.
 The native runtime does not have this limitation, but it is currently only available for Node and is a bit more involved to install.
 
-You can install the Wasm runtime with `npm install @skipruntime/wasm` and the native runtime by following the [instructions](https://github.com/SkipLabs/skip/blob/main/INSTALL.md).
+The Wasm runtime is installed by default, but a package using Skip can choose to explicitly depend on only `@skipruntime/core`, `@skipruntime/server`, and `@skipruntime/native` to reduce weight.
+The Wasm runtime can be installed separately with `npm install @skipruntime/wasm` and the native runtime by following the [instructions](https://github.com/SkipLabs/skip/blob/main/INSTALL.md).
 
 ## Introduction
 
