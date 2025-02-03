@@ -9,7 +9,7 @@ Before you begin, we recommend installing the NPM packages for the Skip Framewor
 The `@skiplabs/skip` package just depends on the separate component packages:
 - `@skipruntime/core`: The Skip Runtime public API
 - `@skipruntime/server`: Expose a reactive service through HTTP/SSE servers
-- `@skipruntime/helpers`: Potential useful functionality for working with Skip
+- `@skipruntime/helpers`: Potentially useful functionality for working with Skip
 - `@skipruntime/wasm`: The Wasm version of the Skip Runtime
 
 and optionally:
@@ -38,7 +38,7 @@ It will also show how to write client code to read or subscribe to data from you
 
 We aim to make this as beginner friendly as possible, but assume an understanding of programming basics, including core JavaScript/Typescript syntax and semantics.
 
-### Reactive Programming
+### Reactive programming
 
 Skip is a framework for building _reactive_ software which is responsive to changing inputs in real-time, efficient to execute, and intuitive to write and reason about.
 

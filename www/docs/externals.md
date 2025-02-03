@@ -13,7 +13,7 @@ Each Skip reactive service can specify any number of `ExternalService`s, which c
 Skip provides two `ExternalService` implementations -- one which polls external HTTP services, and one which subscribes to external Skip services.
 If your use case falls outside of these defaults, you can define your own custom external service by providing another `ExternalService` implementation with the required behavior.
 
-## External Skip Services
+## External Skip services
 
 Skip reactive services are designed to interoperate simply and easily: services push their changes reactively from the bottom up, eagerly propagating updates through a distributed system.
 
@@ -55,7 +55,7 @@ externalData.getArray(...);
 This simple setup underlies one of the main strengths of the Skip framework: by receiving data from dependencies, computing any local changes, and pushing updates to dependents, multiple Skip services combine to implement an end-to-end reactive system.
 Encapsulating external reactive dependencies as eager collections, that complex system is defined with simple declarative logic over the "current" state without explicit management of updates/changes.
 
-## Non-Skip Services
+## Non-Skip services
 
 Of course, unless your application is built from the ground up using the Skip framework, it is likely that your application depends on some non-reactive external system: REST APIs, databases, external HTTP endpoints, and the like.
 These systems operate on a pull-based request/response paradigm, so some work is required to adapt them to Skip's eager push-based paradigm.
@@ -103,7 +103,7 @@ externalData.getArray(...);
 When the external resource is "used" in this fashion, Skip queries the HTTP endpoint with the given query `params` periodically, updating `externalData` with the results and allowing it to be used as if it were a reactive resource.
 The frequency of those requests is an important consideration, depending on the latency requirements of the application as well as the load capacity of the external system.
 
-### Custom External Resources/Services
+### Custom external resources/services
 
 If more control is required or your external system does not fit this form, then the `ExternalService` and `ExternalResource` interfaces both support extensions to define arbitrary logic for `subscribe`/`unsubscribe`-ing from services and `open`/`close`-ing resource.
 
