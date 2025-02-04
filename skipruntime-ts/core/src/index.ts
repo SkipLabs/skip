@@ -352,11 +352,11 @@ class CollectionWriter<K extends Json, V extends Json> {
         isInit,
       );
     };
-    if (this.refs.needGC()) {
-      this.refs.runWithGC(update_);
-    } else {
-      update_();
-    }
+    const errorHdl = this.refs.needGC()
+      ? this.refs.runWithGC(update_)
+      : update_();
+
+    if (errorHdl) throw this.refs.handles.deleteHandle(errorHdl);
   }
 
   loading(): void {
@@ -365,8 +365,10 @@ class CollectionWriter<K extends Json, V extends Json> {
         this.collection,
       );
     };
-    if (this.refs.needGC()) this.refs.runWithGC(loading_);
-    else loading_();
+    const errorHdl = this.refs.needGC()
+      ? this.refs.runWithGC(loading_)
+      : loading_();
+    if (errorHdl) throw this.refs.handles.deleteHandle(errorHdl);
   }
 
   error(error: Json): void {
@@ -376,8 +378,10 @@ class CollectionWriter<K extends Json, V extends Json> {
         this.refs.skjson.exportJSON(error),
       );
     };
-    if (this.refs.needGC()) this.refs.runWithGC(error_);
-    else error_();
+    const errorHdl = this.refs.needGC()
+      ? this.refs.runWithGC(error_)
+      : error_();
+    if (errorHdl) throw this.refs.handles.deleteHandle(errorHdl);
   }
 }
 
