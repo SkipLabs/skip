@@ -29,7 +29,7 @@ We have several resources available to help you learn the Skip framework, depend
 
 This guide takes a "top-down" approach, showing you how to use our APIs in an idiomatic and practical way.  We recommend that most users start here.
 
-Finally, if you'd like to just dive into the code, you can explore the [API docs](api/api), [examples](https://github.com/SkipLabs/skip/blob/main/skipruntime-ts/examples) of reactive services, or an [example configuration](https://github.com/SkipLabs/skip/blob/main/examples/hackernews) complete with reverse proxy and database.
+Finally, if you'd like to just dive into the code, you can explore the [API docs](api/core), [examples](https://github.com/SkipLabs/skip/blob/main/skipruntime-ts/examples) of reactive services, or an [example configuration](https://github.com/SkipLabs/skip/blob/main/examples/hackernews) complete with reverse proxy and database.
 
 ## Tutorial
 
@@ -65,7 +65,7 @@ For example, if a _mapper function_ (like `Foo` above) above reads and/or writes
 In order to mitigate this, Skip programs written in Typescript use `Mapper` classes to define reactive computations which avoid the most problematic cases of untracked dependencies.
 Nonetheless, while reading this guide and working with Skip, it is important to reason about (im)mutability and avoid side-effects in your code so that it can be reliably evaluated by the framework.
 
-Some examples of Mappers are shown [below](getting_started#the-anatomy-of-a-skip-service) and more details are available [here](functions.md) or in the API [docs](api/api).
+Some examples of Mappers are shown [below](getting_started#the-anatomy-of-a-skip-service) and more details are available [here](functions.md) or in the API [docs](api/core).
 
 ### The anatomy of a Skip service
 

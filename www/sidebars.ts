@@ -26,9 +26,9 @@ const sidebars: SidebarsConfig = {
       label: "@skipruntime/core",
       link: {
         type: "doc",
-        id: "api/api/index",
+        id: "api/core/index",
       },
-      items: require("./docs/api/api/typedoc-sidebar.cjs"),
+      items: require("./docs/api/core/typedoc-sidebar.cjs"),
     },
     {
       type: "category",

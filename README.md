@@ -23,7 +23,7 @@ See the [getting started guide](https://skiplabs.io/docs/getting_started) to wal
 
 ## Documentation
 
-See our documentation [here](https://skiplabs.io/docs) for introductions to the core concepts, components, and features of the Skip framework, or dive into the [API docs](https://skiplabs.io/docs/api/api) for comprehensive explanations of our TypeScript interfaces and abstractions.
+See our documentation [here](https://skiplabs.io/docs) for introductions to the core concepts, components, and features of the Skip framework, or dive into the [API docs](https://skiplabs.io/docs/api/core) for comprehensive explanations of our TypeScript interfaces and abstractions.
 
 ## Examples
 

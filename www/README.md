@@ -15,7 +15,7 @@ The workflow for working on API docs is:
 - $ cd /path/to/repo/root
 - $ make docs                           # to initialize the api docs
 - $ make docs-run                       # to run the docs site locally
-- visit http://localhost:3000/docs/api/api
+- visit http://localhost:3000/docs/api/core
 - edit the doc comments in the sources
 - $ cd /path/to/repo/root
 - $ make docs                           # to regenerate the api docs
