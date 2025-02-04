@@ -1,8 +1,8 @@
 ---
-sidebar_label: Community Creations
+sidebar_label: Community creations
 ---
 
-# Creations from the Skip Community
+# Creations from the Skip community
 
 This is a list of some Skip-related creations by the community.
 
