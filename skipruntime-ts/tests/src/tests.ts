@@ -412,6 +412,8 @@ async function timeout(ms: number) {
 }
 
 class MockExternal implements ExternalService {
+  exception?: Error;
+
   subscribe(
     _instance: string,
     resource: string,
@@ -423,9 +425,9 @@ class MockExternal implements ExternalService {
     },
   ) {
     if (resource == "mock") {
-      this.mock(params, callbacks.update).catch((e: unknown) =>
-        console.error(e),
-      );
+      this.mock(params, callbacks.update).catch((e: unknown) => {
+        this.exception = e as Error;
+      });
     }
   }
 
@@ -652,7 +654,6 @@ class TestLazyWithUseExternalService implements LazyCompute<number, number> {
     _selfHdl: LazyCollection<number, number>,
     key: number,
   ): Iterable<number> {
-    console.log("Call useExternalResource");
     this.context.useExternalResource({
       service: "external",
       identifier: "mock",
@@ -678,6 +679,62 @@ const lazyWithUseExternalServiceService: SkipService<Input_NN, Input_NN> = {
   externalServices: { external: new MockExternal() },
 
   createGraph(inputCollections: Input_NN) {
+    return inputCollections;
+  },
+};
+
+//// testMapWithException
+
+class MapWithException implements Mapper<string, number, string, number> {
+  mapEntry(_key: string, _values: Values<number>): Iterable<[string, number]> {
+    throw new Error("Something goes wrong.");
+  }
+}
+
+class MapWithExceptionResource implements Resource<Input_SN> {
+  instantiate(collections: Input_SN): EagerCollection<string, number> {
+    return collections.input.map(MapWithException);
+  }
+}
+
+const mapWithExceptionService: SkipService<Input_SN, Input_SN> = {
+  initialData: { input: [] },
+  resources: { mapWithException: MapWithExceptionResource },
+
+  createGraph(inputCollections: Input_SN) {
+    return inputCollections;
+  },
+};
+
+//// testMapWithExceptionOnExternal
+
+class NMapWithException implements Mapper<number, number, number, number> {
+  mapEntry(_key: number, _values: Values<number>): Iterable<[number, number]> {
+    throw new Error("Something goes wrong.");
+  }
+}
+
+class MapWithExceptionOnExternalResource implements Resource<Input_SN> {
+  instantiate(
+    _cs: Input_SN,
+    context: Context,
+  ): EagerCollection<number, number> {
+    const external = context.useExternalResource<number, number>({
+      service: "external",
+      identifier: "mock",
+      params: { v1: 10, v2: 20 },
+    });
+    return external.map(NMapWithException);
+  }
+}
+
+const mapWithExceptionOnExternMock = new MockExternal();
+const mapWithExceptionOnExternalService: SkipService<Input_SN, Input_SN> = {
+  initialData: { input: [] },
+  resources: { mapWithException: MapWithExceptionOnExternalResource },
+  externalServices: { external: mapWithExceptionOnExternMock },
+
+  createGraph(inputCollections: Input_SN) {
     return inputCollections;
   },
 };
@@ -1140,6 +1197,37 @@ export function initTests(
       new RegExp(
         /^(?:Error: )?useExternalResource is not allowed in a lazy computation graph.$/,
       ),
+    );
+  });
+
+  it("testMapWithException", async () => {
+    const service = await initService(mapWithExceptionService);
+    service.instantiateResource(
+      "unsafe.fixed.resource.ident",
+      "mapWithException",
+      {},
+    );
+    const update = () =>
+      service.update("input", [
+        [0, [10]],
+        [1, [20]],
+      ]);
+    expect(update).toThrow(new RegExp(/^(?:Error: )?Something goes wrong.$/));
+  });
+
+  it("testMapWithExceptionOnExternal", async () => {
+    const service = await initService(mapWithExceptionOnExternalService);
+    service.instantiateResource(
+      "unsafe.fixed.resource.ident",
+      "mapWithException",
+      {},
+    );
+    await timeout(0);
+    const message = mapWithExceptionOnExternMock.exception
+      ? mapWithExceptionOnExternMock.exception.message
+      : "No exceptions";
+    expect(message).toMatchRegex(
+      new RegExp(/^(?:Error: )?Something goes wrong.$/),
     );
   });
 }
