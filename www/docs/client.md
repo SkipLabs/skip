@@ -7,7 +7,7 @@ Note that this page describes mechanisms for front-end clients or non-Skip syste
 
 By design, client code does not need to import or reason about the internal details of Skip reactive services; this page abstracts over those details, but for completeness's sake we provide a simple explanatory example [below](client.md#example-web-service-configuration) of a backend service which can support such clients.
 
-## Event Streams
+## Event streams
 
 Clients of reactive services can opt to receive pushed data updates using HTTP server-sent events.
 

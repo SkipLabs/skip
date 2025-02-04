@@ -1,3 +1,9 @@
+/**
+ * This is an adapter to connect PostgreSQL to the Skip Framework, allowing a table of a PostgreSQL database to be exposed as a Skip Resource.
+ *
+ * @packageDocumentation
+ */
+
 import {
   type Entry,
   type ExternalService,
@@ -8,6 +14,10 @@ import {
 import pg from "pg";
 import format from "pg-format";
 
+/**
+ * Exception indicating an error while establishing the connection between PostgreSQL and Skip.
+ * @hideconstructor
+ */
 export class SkipPostgresError extends SkipError {}
 
 const min32bitInt = -2147483648;
