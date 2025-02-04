@@ -8,7 +8,7 @@ This page describes the concepts and abstractions that make up the _inter_-servi
 
 ## Overview
 
-A Skip [reactive service](api/api/interfaces/SkipService) describes a reactive computation from some set of inputs to some set of outputs.
+A Skip [reactive service](api/core/interfaces/SkipService) describes a reactive computation from some set of inputs to some set of outputs.
 
 A service's inputs are its *input collections* (data owned by the service that can be freely read/written/mapped over) and its *external services* (any dependencies on outside systems or APIs).
 
@@ -53,7 +53,7 @@ The eager collection returned by the `instantiate` function is the output served
 
 This _resource instance_ can be explicitly closed by the client, or it will be garbage collected by the Skip framework after a period of inactivity.
 
-When a Skip service depends on the output of another Skip service, its "request" for a resource instance is made using the [`Context#useExternalResource`](api/api/interfaces/Context#useexternalresource) API.
+When a Skip service depends on the output of another Skip service, its "request" for a resource instance is made using the [`Context#useExternalResource`](api/core/interfaces/Context#useexternalresource) API.
 After registering an external service `"myOtherService"` (as described [here](externals.md)) with some `"my_resource"`, your service can call `context.useExternalResource("myOtherService", "my_resource", params)` to access that resource with the given parameters, allowing reactive computation to propagate through multiple services.
 
 ## Resource HTTP API
