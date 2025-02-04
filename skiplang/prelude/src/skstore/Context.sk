@@ -956,6 +956,18 @@ mutable class Context{
       }
     | _ -> void
     };
+    this.currentArrow().each(a -> {
+      this.unsafeMaybeGetDir(a.childName) match {
+      | Some(LazyDir _) ->
+        error(
+          `Error: input directory ${dirName} cannot be created into ${
+            a.childName
+          } lazy directory.`,
+        )
+      | _ -> void
+      }
+    });
+
     vector: mutable Vector<FixedRow<Array<File>>> = mutable Vector[];
     time = this.timeStamp();
 
