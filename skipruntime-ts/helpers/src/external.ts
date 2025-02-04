@@ -149,6 +149,9 @@ export class Polled<S extends Json, K extends Json, V extends Json>
    * @param duration - Refresh interval, in milliseconds.
    * @param conv - Function to convert data of type `S` received from external resource to `key`-`value` entries.
    * @param encodeParams - Function to use to encode params of type `Json` for external resource request.
+   * @param options - Optional parameters.
+   * @param options.headers - Additional headers to add to request.
+   * @param options.timeout - Timeout for request, in milliseconds. Defaults to 1000ms.
    */
   constructor(
     private readonly url: string,
@@ -157,6 +160,10 @@ export class Polled<S extends Json, K extends Json, V extends Json>
     private readonly encodeParams: (
       params: Json,
     ) => string = defaultParamEncoder,
+    private readonly options?: {
+      headers?: { [header: string]: string };
+      timeout?: number;
+    },
   ) {}
 
   open(
@@ -171,7 +178,7 @@ export class Polled<S extends Json, K extends Json, V extends Json>
     const url = `${this.url}${this.encodeParams(params)}`;
     const call = () => {
       callbacks.loading();
-      fetchJSON(url, "GET", {})
+      fetchJSON(url, "GET", this.options)
         .then((r) => {
           callbacks.update(this.conv(r[0] as S), true);
         })
