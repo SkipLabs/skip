@@ -13,12 +13,18 @@ pass() { printf "%-50s OK\n" "$1:"; }
 fail() { printf "%-50s FAILED\n" "$1:"; }
 
 run_diff () {
+    creation_script=$1
+    shift
+    views_script=$1
+    shift
+    more_scripts=("$@")
+
     rm -f /tmp/kk1 /tmp/kk2 /tmp/kk3 $DB
 
-    nviews=$(cat "$2" | grep VIEW | sed 's/CREATE REACTIVE VIEW V//' | sed 's/ .*//' | sort -n -r | head -n 1)
+    nviews=$(cat "$views_script" | grep VIEW | sed 's/CREATE REACTIVE VIEW V//' | sed 's/ .*//' | sort -n -r | head -n 1)
 
     $SKDB_CMD --init $DB
-    cat "$1" "$2" | $SKDB
+    cat "$creation_script" "$views_script" | $SKDB
 
     for i in $(seq 0 $((nviews))); do
         rm -f "/tmp/V$i"
@@ -27,7 +33,7 @@ run_diff () {
 
     wait
 
-    cat "$3" "$4" "$5" | $SKDB
+    cat "${more_scripts[@]}" | $SKDB
 
     rm -f /tmp/selects.sql
 
@@ -45,24 +51,24 @@ run_diff () {
 
     cat /tmp/selects.sql | $SKDB | sort -n > /tmp/kk1
 
-    cat "$2" | sed 's/CREATE REACTIVE VIEW V[0-9]* AS //' > /tmp/selects2.sql
+    cat "$views_script" | sed 's/CREATE REACTIVE VIEW V[0-9]* AS //' > /tmp/selects2.sql
 
-    cat "$1" "$3" "$4" "$5" /tmp/selects2.sql | sqlite3 | sort -n > /tmp/kk2
+    cat "$creation_script" "${more_scripts[@]}" /tmp/selects2.sql | sqlite3 | sort -n > /tmp/kk2
 
     diff /tmp/kk1 /tmp/kk2
     if [ $? -eq 0 ]; then
-        pass "$2 (part-1)"
+        pass "$views_script (part-1)"
     else
-        fail "$2 (part-1)"
+        fail "$views_script (part-1)"
     fi
 
     cat /tmp/replays | sort -n > /tmp/kk3
 
     diff /tmp/kk1 /tmp/kk3 > /dev/null
     if [ $? -eq 0 ]; then
-        pass "$2 (part-2)"
+        pass "$views_script (part-2)"
     else
-        fail "$2 (part-2)"
+        fail "$views_script (part-2)"
     fi
 
 }
