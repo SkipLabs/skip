@@ -320,7 +320,11 @@ mutable class TakeIterator<+T>(
   private mutable n: Int,
 ) extends Iterator<T> {
   readonly fun sizeHint(): ?Int {
-    this.base.sizeHint().map(sizeHint -> max(0, sizeHint - this.n))
+    if (this.n > 0) {
+      this.base.sizeHint().map(base -> min(base, this.n))
+    } else {
+      Some(0)
+    }
   }
 
   mutable fun next(): ?T {
