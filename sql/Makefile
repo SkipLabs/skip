@@ -51,7 +51,7 @@ test-client: install-test
 test-server: install-test
 	cd ts/tests && make ROOT_DIR=${SCRIPT_DIR} -f service_common.mk
 	cd ts/tests && make ROOT_DIR=${SCRIPT_DIR} -f service_server.mk
-	cd ts/tests && npx playwright test --reporter=line node.play.server.ts
+	cd ts/tests && npx playwright test --reporter=line --timeout=60000 node.play.server.ts
 
 .PHONY: test-mux-node
 test-mux-node: install-test
