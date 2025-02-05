@@ -251,57 +251,57 @@ skbuild-%:
 
 .PHONY: publish-std-binding
 publish-std-binding:
-	bin/release_npm.sh @skiplang/std skiplang/prelude/ts/binding/package.json $(OPT)
+	bin/release_npm.sh @skiplang/std skiplang/prelude/ts/binding/package.json $(OTP)
 
 .PHONY: publish-std-wasm
 publish-std-wasm:
-	bin/release_npm.sh @skip-wasm/std skiplang/prelude/ts/wasm/package.json $(OPT)
+	bin/release_npm.sh @skip-wasm/std skiplang/prelude/ts/wasm/package.json $(OTP)
 
 .PHONY: publish-std
 publish-std: publish-std-binding publish-std-wasm
 
 .PHONY: publish-json-binding
 publish-json-binding:
-	bin/release_npm.sh @skiplang/json skiplang/skjson/ts/binding/package.json $(OPT)
+	bin/release_npm.sh @skiplang/json skiplang/skjson/ts/binding/package.json $(OTP)
 
 .PHONY: publish-json-wasm
 publish-json-wasm:
-	bin/release_npm.sh @skip-wasm/json skiplang/skjson/ts/wasm/package.json $(OPT)
+	bin/release_npm.sh @skip-wasm/json skiplang/skjson/ts/wasm/package.json $(OTP)
 
 .PHONY: publish-json
 publish-json: publish-json-binding publish-json-wasm
 
 .PHONY: publish-date
 publish-date:
-	bin/release_npm.sh @skip-wasm/date skiplang/skdate/ts/package.json $(OPT)
+	bin/release_npm.sh @skip-wasm/date skiplang/skdate/ts/package.json $(OTP)
 
 .PHONY: publish-core
 publish-core:
-	bin/release_npm.sh @skipruntime/core skipruntime-ts/core/package.json $(OPT)
+	bin/release_npm.sh @skipruntime/core skipruntime-ts/core/package.json $(OTP)
 
 .PHONY: publish-helpers
 publish-helpers:
-	bin/release_npm.sh @skipruntime/helpers skipruntime-ts/helpers/package.json $(OPT)
+	bin/release_npm.sh @skipruntime/helpers skipruntime-ts/helpers/package.json $(OTP)
 
 .PHONY: publish-wasm
 publish-wasm:
-	bin/release_npm.sh @skipruntime/wasm skipruntime-ts/wasm/package.json $(OPT)
+	bin/release_npm.sh @skipruntime/wasm skipruntime-ts/wasm/package.json $(OTP)
 
 .PHONY: publish-native
 publish-native:
-	bin/release_npm.sh @skipruntime/native skipruntime-ts/addon/package.json $(OPT)
+	bin/release_npm.sh @skipruntime/native skipruntime-ts/addon/package.json $(OTP)
 
 .PHONY: publish-server
 publish-server:
-	bin/release_npm.sh @skipruntime/server skipruntime-ts/server/package.json $(OPT)
+	bin/release_npm.sh @skipruntime/server skipruntime-ts/server/package.json $(OTP)
 
 .PHONY: publish-postgres-adapter
 publish-postgres-adapter:
-	bin/release_npm.sh @skip-adapter/postgres skipruntime-ts/adapters/postgres/package.json $(OPT)
+	bin/release_npm.sh @skip-adapter/postgres skipruntime-ts/adapters/postgres/package.json $(OTP)
 
 .PHONY: publish-metapackage
 publish-metapackage:
-	bin/release_npm.sh @skiplabs/skip skipruntime-ts/metapackage/package.json $(OPT)
+	bin/release_npm.sh @skiplabs/skip skipruntime-ts/metapackage/package.json $(OTP)
 
 .PHONY: publish-all
 publish-all: clean publish-std publish-json publish-date publish-core publish-helpers publish-wasm publish-native publish-server publish-postgres-adapter publish-metapackage
