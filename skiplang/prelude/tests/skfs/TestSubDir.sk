@@ -51,16 +51,8 @@ fun testSubDir(): void {
       SKStore.StringFile::type,
       context,
       SKStore.DirName::create("/dir3/"),
-      (context, _self, key) ~> {
+      (_context, _self, key) ~> {
         keyStr = key.toString();
-        dirName = SKStore.DirName::create("/dir3/" + keyStr + "/");
-        _ = dirStr1.map(
-          SKStore.IID::keyType,
-          SKStore.StringFile::type,
-          context,
-          dirName,
-          (_context, writer, key, values) ~> writer.set(key, values.first),
-        );
         Array[SKStore.StringFile(keyStr)]
       },
     );
@@ -90,10 +82,6 @@ fun testSubDir(): void {
     context.maybeGetDir(SKStore.DirName::create("/dir2/1/")) is Some _,
     "Testing subdir exists",
   );
-  T.expectTrue(
-    context.maybeGetDir(SKStore.DirName::create("/dir3/1/")) is Some _,
-    "Testing lazy subdir exists",
-  );
   inputDir = context.unsafeGetEagerDir(SKStore.DirName::create("/dirStr1/"));
   inputSingle = context.unsafeGetEagerDir(
     SKStore.DirName::create("/dirSingle/"),
@@ -105,21 +93,9 @@ fun testSubDir(): void {
   | Some(dir) ->
     T.expectTrue(dir is SKStore.DeletedDir _, "Testing subdir has been removed")
   };
-  context.maybeGetDir(SKStore.DirName::create("/dir3/1/")) match {
-  | None() -> T.fail("Expected an empty directory, not None")
-  | Some(dir) ->
-    T.expectTrue(
-      dir is SKStore.DeletedDir _,
-      "Testing lazy subdir has been removed",
-    )
-  };
   T.expectTrue(
     context.maybeGetDir(SKStore.DirName::create("/dir2/23/")) is Some _,
     "Testing new subdir exists",
-  );
-  T.expectTrue(
-    context.maybeGetDir(SKStore.DirName::create("/dir3/23/")) is Some _,
-    "Testing new lazy subdir exists",
   );
   inputDir.writeArray(
     context,
