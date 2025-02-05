@@ -467,15 +467,19 @@ class AllChecker<K extends Json, V extends Json> implements Checker {
   ) {}
 
   check(request: string): void {
-    const result = this.service.getAll<K, V>(
-      this.resource,
-      this.params,
-      request,
-    );
-    if (result.errors.length > 0) {
-      this.executor.reject(new Error(JSON.stringify(result.errors)));
-    } else {
-      this.executor.resolve(result.payload);
+    try {
+      const result = this.service.getAll<K, V>(
+        this.resource,
+        this.params,
+        request,
+      );
+      if (result.errors.length > 0) {
+        this.executor.reject(new Error(JSON.stringify(result.errors)));
+      } else {
+        this.executor.resolve(result.payload);
+      }
+    } catch (ex: unknown) {
+      this.executor.reject(ex);
     }
   }
 }
@@ -490,16 +494,20 @@ class OneChecker<K extends Json, V extends Json> implements Checker {
   ) {}
 
   check(request: string): void {
-    const result = this.service.getArray<K, V>(
-      this.resource,
-      this.key,
-      this.params,
-      request,
-    );
-    if (result.errors.length > 0) {
-      this.executor.reject(new Error(JSON.stringify(result.errors)));
-    } else {
-      this.executor.resolve(result.payload);
+    try {
+      const result = this.service.getArray<K, V>(
+        this.resource,
+        this.key,
+        this.params,
+        request,
+      );
+      if (result.errors.length > 0) {
+        this.executor.reject(new Error(JSON.stringify(result.errors)));
+      } else {
+        this.executor.resolve(result.payload);
+      }
+    } catch (ex: unknown) {
+      this.executor.reject(ex);
     }
   }
 }
