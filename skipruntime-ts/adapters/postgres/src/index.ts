@@ -14,6 +14,10 @@ import {
 import pg from "pg";
 import format from "pg-format";
 
+// Pass timestamp strings straight through instead of attempting to convert to JS Date object, which would be clobbered in the Skip heap
+pg.types.setTypeParser(pg.types.builtins.TIMESTAMP, (x: string) => x);
+pg.types.setTypeParser(pg.types.builtins.TIMESTAMPTZ, (x: string) => x);
+
 /**
  * Exception indicating an error while establishing the connection between PostgreSQL and Skip.
  * @hideconstructor
