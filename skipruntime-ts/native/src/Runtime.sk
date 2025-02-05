@@ -22,6 +22,12 @@ class ExistingSubscriptionException() extends Exception {
   }
 }
 
+class UseExternalResourceException() extends Exception {
+  fun getMessage(): String {
+    "useExternalResource is not allowed in a lazy computation graph."
+  }
+}
+
 class Params(json: SKJSON.CJSON) extends SKStore.File uses Orderable {
   fun compare(other: Params): Order {
     this.json.compare(other.json)
@@ -571,6 +577,12 @@ fun useExternalCollection(
 ): Collection {
   getContext() match {
   | Some(context) ->
+    context.currentArrow().each(a -> {
+      context.unsafeMaybeGetDir(a.childName) match {
+      | Some(SKStore.LazyDir _) -> throw UseExternalResourceException()
+      | _ -> void
+      }
+    });
     sessionHdl = SKStore.EHandle(
       SKStore.IID::keyType,
       ServiceDefinition::type,

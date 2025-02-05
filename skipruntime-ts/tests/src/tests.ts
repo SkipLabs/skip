@@ -643,6 +643,45 @@ const postgresService: () => Promise<
   };
 };
 
+//// testLazyWithUseExternalService
+
+class TestLazyWithUseExternalService implements LazyCompute<number, number> {
+  constructor(private readonly context: Context) {}
+
+  compute(
+    _selfHdl: LazyCollection<number, number>,
+    key: number,
+  ): Iterable<number> {
+    console.log("Call useExternalResource");
+    this.context.useExternalResource({
+      service: "external",
+      identifier: "mock",
+      params: { v1: "param1", v2: "param1" },
+    });
+    return [key];
+  }
+}
+
+class LazyWithUseExternalServiceResource implements Resource<Input_NN> {
+  instantiate(cs: Input_NN, context: Context): EagerCollection<number, number> {
+    const lazy = context.createLazyCollection(
+      TestLazyWithUseExternalService,
+      context,
+    );
+    return cs.input.map(MapLazy, lazy);
+  }
+}
+
+const lazyWithUseExternalServiceService: SkipService<Input_NN, Input_NN> = {
+  initialData: { input: [] },
+  resources: { lazy: LazyWithUseExternalServiceResource },
+  externalServices: { external: new MockExternal() },
+
+  createGraph(inputCollections: Input_NN) {
+    return inputCollections;
+  },
+};
+
 export function initTests(
   category: string,
   initService: (service: SkipService) => Promise<ServiceInstance>,
@@ -1087,5 +1126,20 @@ export function initTests(
     ]);
 
     service.close();
+  });
+
+  it("testLazyWithUseExternalService", async () => {
+    const service = await initService(lazyWithUseExternalServiceService);
+    service.instantiateResource("unsafe.fixed.resource.ident", "lazy", {});
+    const update = () =>
+      service.update("input", [
+        [0, [10]],
+        [1, [20]],
+      ]);
+    expect(update).toThrow(
+      new RegExp(
+        /^(?:Error: )?useExternalResource is not allowed in a lazy computation graph.$/,
+      ),
+    );
   });
 }
