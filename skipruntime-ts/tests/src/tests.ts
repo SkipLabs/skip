@@ -550,9 +550,14 @@ const multipleResourcesService: SkipService<Input_SN_SN, Input_SN_SN> = {
 };
 
 //// testPostgres
-type PostgresRow = { id: number; x: number };
+type PostgresRow = { id: number; x: number; createdAt: string };
+const pgDateFmt = /\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d.\d{6}/;
 class PostgresRowExtract extends OneToOneMapper<number, PostgresRow, number> {
   mapValue(row: PostgresRow): number {
+    if (!pgDateFmt.test(row.createdAt))
+      throw new Error(
+        "Malformed timestamp string from postgres: " + row.createdAt,
+      );
     return row.x;
   }
 }
@@ -611,9 +616,10 @@ async function trySetupDB(
     return await trySetupDB(service, retries - 1);
   }
   if (!pgIsSetup) {
-    await pgSetupClient.query(
-      "DROP TABLE IF EXISTS skip_test; CREATE TABLE skip_test (id INTEGER PRIMARY KEY, x INTEGER); INSERT INTO skip_test VALUES (1, 1), (2, 2), (3, 3);",
-    );
+    await pgSetupClient.query(`
+DROP TABLE IF EXISTS skip_test;
+CREATE TABLE skip_test (id INTEGER PRIMARY KEY, x INTEGER, "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
     await pgSetupClient.end();
     pgIsSetup = true;
   }
