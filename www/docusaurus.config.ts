@@ -83,9 +83,15 @@ const config: Config = {
       theme: prismThemes.github,
       darkTheme: prismThemes.dracula,
     },
+    hubspot: {
+      accountId: 47141383,
+      async: true,
+      defer: true,
+    },
   } satisfies Preset.ThemeConfig,
 
   plugins: [
+    "docusaurus-plugin-hubspot",
     [
       "docusaurus-plugin-typedoc",
       {
