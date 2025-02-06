@@ -1,5 +1,5 @@
 import { expect } from "@playwright/test";
-import { SKDB, SKDBTable } from "skdb";
+import { type SKDB, SKDBTable } from "skdb";
 
 export type Test = {
   name: string;
@@ -1390,7 +1390,7 @@ export const tests = (asWorker: boolean) => {
         await skdb.exec("insert into t1 values(TRUE, false);");
         return await skdb.exec("select true, false, a, b from t1;");
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toEqual([{ a: 1, b: 0, "col<0>": 1, "col<1>": 0 }]);
       },
     },
@@ -1403,7 +1403,7 @@ export const tests = (asWorker: boolean) => {
         );
         return await skdb.exec("select 1;");
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toEqual([{ "col<0>": 1 }]);
       },
     },
@@ -1412,7 +1412,7 @@ export const tests = (asWorker: boolean) => {
       fun: async (skdb: SKDB) => {
         return await skdb.exec("create table t1 (a TEXT PRIMARY KEY);");
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toEqual([]);
       },
     },
@@ -1427,7 +1427,7 @@ export const tests = (asWorker: boolean) => {
           return (e as Error).message;
         }
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toEqual([{ b: 22 }]);
       },
     },
@@ -1442,7 +1442,7 @@ export const tests = (asWorker: boolean) => {
           return (e as Error).message;
         }
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toEqual([{ b: 22 }]);
       },
     },
@@ -1454,7 +1454,7 @@ export const tests = (asWorker: boolean) => {
         await skdb.exec("UPDATE widgets SET id = 'c', name = 'gear2';");
         return await skdb.exec("select * from widgets;");
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toEqual([{ id: "c", name: "gear2" }]);
       },
     },
@@ -1467,7 +1467,7 @@ export const tests = (asWorker: boolean) => {
         await skdb.exec("INSERT INTO widgets (id, price) values ('a', 10.0);");
         return await skdb.exec("select * from widgets");
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toEqual([{ id: "a", price: 10 }]);
       },
     },
@@ -1481,7 +1481,7 @@ export const tests = (asWorker: boolean) => {
         );
         return await skdb.exec("select 1;");
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toEqual([{ "col<0>": 1 }]);
       },
     },
@@ -1493,7 +1493,7 @@ export const tests = (asWorker: boolean) => {
         await skdb.exec("create view if not exists v1 as select * from t1;");
         return await skdb.exec("select 1;");
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toEqual([{ "col<0>": 1 }]);
       },
     },
@@ -1524,7 +1524,7 @@ export const tests = (asWorker: boolean) => {
         await skdb.insert("t1", [11]);
         return await skdb.exec("select * from t1");
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toEqual([{ aBc: 11 }]);
       },
     },
@@ -1537,7 +1537,7 @@ export const tests = (asWorker: boolean) => {
         await skdb.insert("t1", [13]);
         return await skdb.exec("select * from t1 limit 1");
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toEqual([{ aBc: 11 }]);
       },
     },
@@ -1551,7 +1551,7 @@ export const tests = (asWorker: boolean) => {
         );
         return skdb.exec("SELECT * FROM t1;");
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toEqual([{ a: 13 }]);
       },
     },
@@ -1562,7 +1562,7 @@ export const tests = (asWorker: boolean) => {
         await skdb.exec("INSERT INTO t1 VALUES (@key);", { key: 13 });
         return skdb.exec("SELECT * FROM t1;");
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toEqual([{ a: 13 }]);
       },
     },
@@ -1573,7 +1573,7 @@ export const tests = (asWorker: boolean) => {
         await skdb.insert("t1", [13, 9, 42]);
         return skdb.exec("SELECT * FROM t1;");
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toEqual([{ a: 13, b: 9, c: 42 }]);
       },
     },
@@ -1602,7 +1602,7 @@ export const tests = (asWorker: boolean) => {
         await skdb.exec("create table t1 (a BOOLEAN, b boolean);");
         return await skdb.schema();
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toMatch(/^CREATE TABLE t1/);
       },
     },
@@ -1612,7 +1612,7 @@ export const tests = (asWorker: boolean) => {
         await skdb.exec("create table t1 (a BOOLEAN, b boolean);");
         return await skdb.schema("t1");
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toMatch(/^CREATE TABLE t1/);
       },
     },
@@ -1623,7 +1623,7 @@ export const tests = (asWorker: boolean) => {
         await skdb.exec("create reactive view v1 as select * from t1;");
         return await skdb.schema("v1");
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toMatch(/^CREATE REACTIVE VIEW v1/);
       },
     },
@@ -1687,7 +1687,7 @@ export const tests = (asWorker: boolean) => {
         ]);
         return await skdb.exec("select * from t1");
       },
-      check: (res) => {
+      check: (res: unknown) => {
         const str = JSON.stringify(res);
         expect(str).toMatch(/foo/);
         expect(str).toMatch(/bar/);
@@ -1704,7 +1704,7 @@ export const tests = (asWorker: boolean) => {
         await skdb.insertMany("t1", values);
         return await skdb.exec("select count(*) as c from t1");
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toEqual([{ c: 2100 }]);
       },
     },
@@ -1721,7 +1721,7 @@ export const tests = (asWorker: boolean) => {
           return (e as Error).message;
         }
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toMatch(/Missing/);
       },
     },
@@ -1738,7 +1738,7 @@ export const tests = (asWorker: boolean) => {
           return (e as Error).message;
         }
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toMatch(/not found/);
       },
     },
@@ -1751,7 +1751,7 @@ export const tests = (asWorker: boolean) => {
           return (e as Error).message;
         }
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toMatch(/Construction not implemented/);
       },
     },

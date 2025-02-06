@@ -4,11 +4,17 @@
  * @packageDocumentation
  */
 
-import type { int, Nullable, Opaque } from "@skiplang/std";
-import type { Managed, Json, JsonObject, DepSafe } from "@skiplang/json";
+import type { int, Nullable, Opaque } from "../skiplang-std/index.js";
+import type {
+  Managed,
+  Json,
+  JsonObject,
+  DepSafe,
+} from "../skiplang-json/index.js";
+
 export * from "./errors.js";
 export type { Managed, Json, JsonObject, Opaque, DepSafe };
-export { deepFreeze } from "@skiplang/json";
+export { deepFreeze } from "../skiplang-json/index.js";
 export type { Nullable };
 
 /**

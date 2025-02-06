@@ -1,10 +1,6 @@
-/* eslint-disable */
+import { MuxedSocket, type Environment } from "skdb/orchestration.js";
 
-import { MuxedSocket } from "./node_modules/skdb/dist/skdb_orchestration.js";
-
-export async function connect(env, uri, creds, timeoutMs = 60000) {
-  return await MuxedSocket.connect(env, uri, creds, timeoutMs);
-}
+export const connect = MuxedSocket.connect.bind(null);
 
 export function request_close() {
   const buf = new ArrayBuffer(4);
@@ -20,7 +16,7 @@ export function request_error() {
   return buf;
 }
 
-export function request_echo(n) {
+export function request_echo(n: number) {
   const buf = new ArrayBuffer(8);
   const dv = new DataView(buf);
   dv.setUint32(0, 0x1);
@@ -42,7 +38,7 @@ export function request_concurrent_streaming() {
   return buf;
 }
 
-export function toHex(buf) {
+export function toHex(buf: ArrayBuffer) {
   return (
     "0x" +
     [...new Uint8Array(buf)]
@@ -51,7 +47,7 @@ export function toHex(buf) {
   );
 }
 
-export async function connectAndAuth(env) {
+export async function connectAndAuth(env: Environment) {
   const key = await env
     .crypto()
     .subtle.importKey(
@@ -61,7 +57,7 @@ export async function connectAndAuth(env) {
       false,
       ["sign"],
     );
-  const socket = await MuxedSocket.connect(env, "ws://localhost:8090", {
+  const socket = await connect(env, "ws://localhost:8090", {
     accessKey: "ABCDEFGHIJKLMNOPQRST",
     privateKey: key,
     deviceUuid: "f6a0a084-d21f-487d-813a-971c183309a3",

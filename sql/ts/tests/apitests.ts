@@ -1,7 +1,7 @@
 /* eslint-disable */
 
 import { expect } from "@playwright/test";
-import { createSkdb, SKDB, Params, SKDBTable } from "skdb";
+import { createSkdb, type SKDB, type Params, SKDBTable } from "skdb";
 
 type dbs = {
   root: SKDB;
@@ -49,7 +49,7 @@ async function getCredsFromDevServer(
 
 export async function setup(
   port: number,
-  crypto,
+  crypto: Crypto,
   asWorker: boolean,
   suffix: string = "",
 ) {
@@ -286,8 +286,11 @@ function waitSynch(
   max: number = 10,
 ) {
   let count = 0;
-  const test = (resolve, reject) => {
-    const cb = (value) => {
+  const test = (
+    resolve: (value: unknown) => void,
+    reject: (reason?: any) => void,
+  ) => {
+    const cb = (value: unknown) => {
       if (check(value) || count == max) {
         resolve(value);
       } else {
@@ -1046,7 +1049,7 @@ async function testSchemaChanges(root: SKDB, skdb1: SKDB, skdb2: SKDB) {
   ).toHaveLength(6);
 }
 
-export const apitests = (asWorker) => {
+export const apitests = (asWorker: boolean) => {
   return [
     {
       name: asWorker ? "API in Worker" : "API",
@@ -1081,7 +1084,7 @@ export const apitests = (asWorker) => {
         dbs.user2.closeConnection();
         return "";
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toEqual("");
       },
     },

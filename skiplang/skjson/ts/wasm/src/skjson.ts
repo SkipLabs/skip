@@ -8,19 +8,23 @@ import {
   type Environment,
   type Shared,
   toPtr,
-} from "@skip-wasm/std";
+} from "../skipwasm-std/index.js";
 
-import type * as Internal from "@skiplang/json/internal.js";
+import type * as Internal from "../skiplang-json/internal.js";
 import type {
   Binding,
   Type,
   Pointer,
   Nullable,
   JsonConverter,
-} from "@skiplang/json";
+} from "../skiplang-json/index.js";
 
-import { buildJsonConverter } from "@skiplang/json";
-export { toPtr, toNullablePtr, toNullablePointer } from "@skip-wasm/std";
+import { buildJsonConverter } from "../skiplang-json/index.js";
+export {
+  toPtr,
+  toNullablePtr,
+  toNullablePointer,
+} from "../skipwasm-std/index.js";
 
 interface WasmAccess {
   SKIP_SKJSON_typeOf: (json: ptr<Internal.CJSON>) => Type;

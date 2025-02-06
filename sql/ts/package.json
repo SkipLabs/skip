@@ -2,27 +2,22 @@
   "name": "skdb",
   "version": "1.0.0",
   "type": "module",
-  "main": "./dist/skdb.js",
   "exports": {
-    ".": "./dist/skdb.js"
+    ".": "./dist/src/skdb.js",
+    "./orchestration.js": "./dist/src/skdb_orchestration.js"
   },
   "scripts": {
-    "build": "tsc && skargo build -r --target wasm32-unknown-unknown --lib --manifest-path=../Skargo.toml --out-dir=./dist/",
-    "clean": "rm -rf dist",
+    "build": "node ../../prebuild.mjs skiplang-std skiplang-json skipwasm-std skipwasm-json skipwasm-date && tsc && skargo build -r --target wasm32-unknown-unknown --lib --manifest-path=../Skargo.toml --out-dir=./dist/src/",
+    "clean": "rm -rf dist skiplang-std skiplang-json skipwasm-std skipwasm-json skipwasm-date",
     "lint": "eslint",
-    "cli": "node ./dist/skdb-cli.js"
+    "cli": "node ./dist/src/skdb-cli.js"
   },
   "bin": {
-    "skdb-cli": "./dist/skdb-cli.js"
+    "skdb-cli": "./dist/src/skdb-cli.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",
     "@types/express": "^5.0.0",
     "@types/ws": "^8.5.13"
-  },
-  "dependencies": {
-    "@skip-wasm/std": "1.0.6",
-    "@skip-wasm/date": "1.0.5",
-    "@skip-wasm/json": "1.0.7"
   }
 }

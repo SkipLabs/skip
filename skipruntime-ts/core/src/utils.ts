@@ -1,4 +1,8 @@
-import { type NativeStub, type Nullable, sknative } from "@skiplang/std";
+import {
+  type NativeStub,
+  type Nullable,
+  sknative,
+} from "../skiplang-std/index.js";
 import type { Reducer, Json } from "./api.js";
 
 /**
