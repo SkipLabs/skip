@@ -9,7 +9,7 @@ fi
 node dist/groups.js >/dev/null &
 node dist/groups-server.js >/dev/null &
 
-sleep 0.25 # give a moment for service to spin up
+sleep 1 # give a moment for service to spin up
 node dist/groups-client.js >"$1" 2>"$2"
 
 jobs -p | xargs kill

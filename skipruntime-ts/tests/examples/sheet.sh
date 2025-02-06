@@ -7,7 +7,7 @@ if [ "$#" -ne 2 ]; then
 fi
 
 node dist/sheet.js >/dev/null &
-sleep 0.25 # give a moment for service to spin up
+sleep 1 # give a moment for service to spin up
 node dist/sheet-client.js >"$1" 2>"$2"
 
 jobs -p | xargs kill
