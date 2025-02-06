@@ -19,6 +19,8 @@ git diff --quiet HEAD "$BASE" -- skipruntime-ts/
 skipruntime=$?
 git diff --quiet HEAD "$BASE" -- skiplang/prelude/ts/
 ts_prelude=$?
+git diff --quiet HEAD "$BASE" -- examples/hackernews/
+hackernews_example=$?
 
 cat .circleci/base.yml
 
@@ -90,5 +92,14 @@ then
   skipruntime:
     jobs:
       - skipruntime
+EOF
+fi
+
+if (( hackernews_example != 0))
+then
+    cat <<EOF
+  hackernews-example:
+    jobs:
+      - check-hackernews-example
 EOF
 fi
