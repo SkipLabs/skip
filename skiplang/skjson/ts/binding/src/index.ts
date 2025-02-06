@@ -1,6 +1,6 @@
 import * as Internal from "./internal.js";
 import { Type, type Binding } from "./binding.js";
-import type { Pointer, Nullable } from "@skiplang/std";
+import type { Pointer, Nullable } from "../skiplang-std/index.js";
 export type { Pointer, Nullable, Binding };
 export type { Type };
 

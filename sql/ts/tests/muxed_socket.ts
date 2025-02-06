@@ -1,19 +1,42 @@
 /* eslint-disable */
 
 import { expect } from "@playwright/test";
+import type { Creds, Environment, MuxedSocket } from "skdb/orchestration.js";
 
 ////////////////////////////////////////////////////////////////////////////////
 // tests
 ////////////////////////////////////////////////////////////////////////////////
+export interface Test {
+  name: string;
+  slow?: boolean;
+  check(res: unknown): void;
+  fun(env: Environment, mu: Mu): Promise<unknown>;
+}
 
-export const ms_tests = () => {
+export interface Mu {
+  connectAndAuth(env: Environment): Promise<MuxedSocket>;
+  toHex(buf: ArrayBuffer): string;
+  request_echo(n: number): ArrayBuffer;
+  request_close(): ArrayBuffer;
+  request_stream(): ArrayBuffer;
+  request_error(): ArrayBuffer;
+  request_concurrent_streaming(): ArrayBuffer;
+  connect(
+    env: Environment,
+    uri: string,
+    creds: Creds,
+    timeoutMs?: number,
+  ): Promise<MuxedSocket>;
+}
+
+export const ms_tests: () => Test[] = () => {
   return [
     {
       name: "Happy Path Client Opens Client Closes",
-      fun: async (env, mu) => {
+      fun: async (env: Environment, mu: Mu) => {
         const socket = await mu.connectAndAuth(env);
         const stream = await socket.openStream();
-        let promise = new Promise(function (resolve, reject) {
+        let promise = new Promise(function (resolve, _reject) {
           let result = "";
           stream.onData = (data) => {
             result = mu.toHex(data);
@@ -26,14 +49,14 @@ export const ms_tests = () => {
         });
         return await promise;
       },
-      check: (res) => expect(res).toEqual("0x00000000"),
+      check: (res: unknown) => expect(res).toEqual("0x00000000"),
     },
     {
       name: "Happy Path Client Opens Server Closes",
-      fun: async (env, mu) => {
+      fun: async (env: Environment, mu: Mu) => {
         const socket = await mu.connectAndAuth(env);
         const stream = await socket.openStream();
-        let promise = new Promise(function (resolve, reject) {
+        let promise = new Promise(function (resolve, _reject) {
           let data = "";
           stream.onData = (d) => {
             data = mu.toHex(d);
@@ -49,18 +72,18 @@ export const ms_tests = () => {
         });
         return await promise;
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toEqual("0x00000000");
       },
     },
     {
       name: "Happy Path Server Opens Client Closes",
-      fun: async (env, mu) => {
+      fun: async (env: Environment, mu: Mu) => {
         const socket = await mu.connectAndAuth(env);
         const stream = await socket.openStream();
         stream.send(mu.request_stream());
         stream.close();
-        let promise = new Promise(function (resolve, reject) {
+        let promise = new Promise(function (resolve, _reject) {
           let received: Array<ArrayBuffer> = [];
           let size = 0;
           socket.onStream = (stream) => {
@@ -78,15 +101,15 @@ export const ms_tests = () => {
         });
         return JSON.stringify(await promise);
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toEqual(JSON.stringify([2, ["0xabcdef12", "0x00000002"]]));
       },
     },
     {
       name: "Happy Path Server Opens Server Closes",
-      fun: async (env, mu) => {
+      fun: async (env: Environment, mu: Mu) => {
         const socket = await mu.connectAndAuth(env);
-        let promise = new Promise(function (resolve, reject) {
+        let promise = new Promise(function (resolve, _reject) {
           let received: Array<ArrayBuffer> = [];
           let size = 0;
           socket.onStream = (stream) => {
@@ -107,15 +130,15 @@ export const ms_tests = () => {
         stream.close();
         return JSON.stringify(await promise);
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toEqual(JSON.stringify([2, ["0xabcdef12", "0x00000002"]]));
       },
     },
     {
       name: "Concurrent Streams Initiated From The Client",
-      fun: async (env, mu) => {
+      fun: async (env: Environment, mu: Mu) => {
         const socket = await mu.connectAndAuth(env);
-        let promise = new Promise(function (resolve, reject) {
+        let promise = new Promise(function (resolve, _reject) {
           socket.onClose = () => resolve(receivedData.map(mu.toHex));
         });
         let receivedData: Array<ArrayBuffer> = [];
@@ -136,17 +159,17 @@ export const ms_tests = () => {
         setTimeout(() => socket.closeSocket(), 2000);
         return JSON.stringify(await promise);
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toEqual(JSON.stringify(["0x00000000", "0x00000001"]));
       },
     },
     {
       name: "Concurrent Streams Initiated From Both Ends",
-      fun: async (env, mu) => {
+      fun: async (env: Environment, mu: Mu) => {
         const socket = await mu.connectAndAuth(env);
 
         let received: Array<ArrayBuffer> = [];
-        let promise = new Promise(function (resolve, reject) {
+        let promise = new Promise(function (resolve, _reject) {
           // worth noting that the output is deterministic due to the JS
           // concurrency model
           socket.onClose = () => resolve(received.map(mu.toHex));
@@ -183,7 +206,7 @@ export const ms_tests = () => {
         stream2.close();
         return JSON.stringify(await promise);
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toEqual(
           JSON.stringify([
             "0x00000001",
@@ -200,12 +223,12 @@ export const ms_tests = () => {
     },
     {
       name: "Client Errors Stream",
-      fun: async (env, mu) => {
+      fun: async (env: Environment, mu: Mu) => {
         const socket = await mu.connectAndAuth(env);
         const stream = await socket.openStream();
-        let promise = new Promise(function (resolve, reject) {
+        let promise = new Promise(function (resolve, _reject) {
           let receivedData = false;
-          stream.onData = (data) => {
+          stream.onData = (_data) => {
             receivedData = true;
           };
 
@@ -217,19 +240,19 @@ export const ms_tests = () => {
         });
         return JSON.stringify(await promise);
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toEqual("false");
       },
     },
     {
       name: "Server Errors Stream",
-      fun: async (env, mu) => {
+      fun: async (env: Environment, mu: Mu) => {
         const socket = await mu.connectAndAuth(env);
         const stream = await socket.openStream();
-        let promise = new Promise(function (resolve, reject) {
+        let promise = new Promise(function (resolve, _reject) {
           let receivedData = false;
           let receivedClose = false;
-          stream.onData = (data) => {
+          stream.onData = (_data) => {
             receivedData = false;
           };
 
@@ -239,7 +262,7 @@ export const ms_tests = () => {
 
           let receivedCode = 0;
 
-          stream.onError = (code, msg) => {
+          stream.onError = (code, _msg) => {
             receivedCode = code;
           };
 
@@ -254,13 +277,13 @@ export const ms_tests = () => {
         });
         return JSON.stringify(await promise);
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toEqual(JSON.stringify([false, false, 5]));
       },
     },
     {
       name: "Auth Short AccessKey",
-      fun: async (env, mu) => {
+      fun: async (env: Environment, mu: Mu) => {
         const key = await env
           .crypto()
           .subtle.importKey(
@@ -277,26 +300,26 @@ export const ms_tests = () => {
         });
         let receivedError = false;
         let receivedData = "";
-        let promise = new Promise(function (resolve, reject) {
+        let promise = new Promise(function (resolve, _reject) {
           socket.onClose = () => resolve([receivedError, receivedData]);
           setTimeout(() => socket.closeSocket(), 2000);
         });
         const stream = await socket.openStream();
         stream.onData = (data) => (receivedData = mu.toHex(data));
-        socket.onError = (code, msg) => {
+        socket.onError = (_code, _msg) => {
           receivedError = true;
         };
         stream.send(mu.request_echo(0));
         stream.close();
         return JSON.stringify(await promise);
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toEqual(JSON.stringify([false, "0x00000000"]));
       },
     },
     {
       name: "Auth Fail",
-      fun: async (env, mu) => {
+      fun: async (env: Environment, mu: Mu) => {
         const key = await env.crypto().subtle.importKey(
           "raw",
           env.encodeUTF8("this-is-not-correct"), // <--
@@ -312,7 +335,7 @@ export const ms_tests = () => {
         let receivedData = "";
         let receivedCode = 0;
         let promise = new Promise(function (resolve, reject) {
-          socket.onError = (code, msg) => {
+          socket.onError = (code, _msg) => {
             setTimeout(() => {
               if (receivedData == "") {
                 resolve([code, receivedData]);
@@ -331,18 +354,18 @@ export const ms_tests = () => {
                 reject(JSON.stringify([receivedCode, receivedData]));
               stream.send(mu.request_echo(0));
             })
-            .catch((ex) => {});
+            .catch((_ex) => {});
           setTimeout(() => socket.closeSocket(), 2000);
         });
         return JSON.stringify(await promise);
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toEqual(JSON.stringify([1002, ""]));
       },
     },
     {
       name: "Error Connection",
-      fun: async (env, mu) => {
+      fun: async (env: Environment, mu: Mu) => {
         const socket = await mu.connectAndAuth(env);
         const stream = await socket.openStream();
         let promise = new Promise(function (resolve, reject) {
@@ -365,15 +388,15 @@ export const ms_tests = () => {
         });
         return JSON.stringify(await promise);
       },
-      check: (res) => {
+      check: (res: unknown) => {
         expect(res).toEqual(JSON.stringify([99, "test"]));
       },
     },
     {
       name: "Threads",
-      fun: async (env, mu, to) => {
+      fun: async (env: Environment, mu: Mu) => {
         const socket = await mu.connectAndAuth(env);
-        let promise = new Promise(function (resolve, reject) {
+        let promise = new Promise(function (resolve, _reject) {
           let streamCount = 6;
           let received: Array<number> = [];
 
@@ -402,7 +425,7 @@ export const ms_tests = () => {
         });
         return JSON.stringify(await promise);
       },
-      check: (res) => {
+      check: (res: unknown) => {
         let val = 10001 * (10000 / 2);
         expect(res).toEqual(JSON.stringify([val, val, val, val, val, val]));
       },

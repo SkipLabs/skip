@@ -1,12 +1,12 @@
-import { type ModuleInit } from "@skip-wasm/std";
+import { type ModuleInit } from "../skipwasm-std/index.js";
 import { createOnThisThread } from "./skdb_create.js";
-import { onWorkerMessage, type Creator } from "@skip-wasm/std/worker.js";
+import { onWorkerMessage, type Creator } from "../skipwasm-std/sk_worker.js";
 import type { SKDB } from "./skdb.js";
 
-import { init as runtimeInit } from "@skip-wasm/std/runtime.js";
-import { init as posixInit } from "@skip-wasm/std/posix.js";
-import { init as skjsonInit } from "@skip-wasm/json";
-import { init as skdateInit } from "@skip-wasm/date";
+import { init as runtimeInit } from "../skipwasm-std/sk_runtime.js";
+import { init as posixInit } from "../skipwasm-std/sk_posix.js";
+import { init as skjsonInit } from "../skipwasm-json/skjson.js";
+import { init as skdateInit } from "../skipwasm-date/sk_date.js";
 import { init as skdbInit } from "./skdb_skdb.js";
 
 const modules: ModuleInit[] = [

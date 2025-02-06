@@ -1,6 +1,6 @@
-import type * as Internal from "@skiplang/std/internal.js";
-import type { Pointer, float, int, Nullable } from "@skiplang/std";
-import { cloneIfProxy } from "@skiplang/std";
+import type * as Internal from "../skiplang-std/internal.js";
+import type { Pointer, float, int, Nullable } from "../skiplang-std/index.js";
+import { cloneIfProxy } from "../skiplang-std/index.js";
 
 export type { float, int, Nullable, Pointer };
 

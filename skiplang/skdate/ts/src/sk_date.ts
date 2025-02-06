@@ -1,5 +1,11 @@
-import type { int, ptr, Links, ToWasmManager, Utils } from "@skip-wasm/std";
-import type * as Internal from "@skiplang/std/internal.js";
+import type {
+  int,
+  ptr,
+  Links,
+  ToWasmManager,
+  Utils,
+} from "../skipwasm-std/index.js";
+import type * as Internal from "../skiplang-std/internal.js";
 
 interface ToWasm {
   SKIP_localetimezone: (year: int, month: int, day: int) => int;
