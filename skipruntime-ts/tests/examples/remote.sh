@@ -9,7 +9,7 @@ fi
 node dist/sum.js >/dev/null &
 node dist/remote.js >/dev/null &
 
-sleep 0.25 # give a moment for services to spin up
+sleep 1 # give a moment for services to spin up
 node dist/remote-client.js >"$1" 2>"$2"
 
 jobs -p | xargs kill

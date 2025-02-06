@@ -14,6 +14,7 @@ const service = new SkipServiceBroker({
 const local_delay = 10;
 const remote_delay = 2000;
 
+await sleep(remote_delay);
 console.log(JSON.stringify(await service.getAll("departures", {})));
 await sleep(local_delay);
 const closable = await subscribe(service, "departures", streaming_port);
