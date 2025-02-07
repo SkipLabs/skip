@@ -28,7 +28,7 @@ evSource.onerror = console.error;
 /*       BEGIN SCENARIO OF CHANGING INPUTS        */
 /**************************************************/
 
-await sleep(100);
+await sleep(500);
 console.log("Setting Carol to active...");
 await fetchJSON(`${url}/users/2`, "PUT", {
   body: { name: "Carol", active: true, friends: [0, 1] },

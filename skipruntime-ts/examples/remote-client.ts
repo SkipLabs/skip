@@ -19,7 +19,7 @@ const remote_service = new SkipServiceBroker({
 
 const closable = await subscribe(remote_service, "data", remote_streaming_port);
 
-await sleep(10);
+await sleep(500);
 await sum_service.update("input1", [["v1", [2]]]);
 await sleep(10);
 await sum_service.update("input2", [["v1", [3]]]);
