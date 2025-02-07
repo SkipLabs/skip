@@ -1566,6 +1566,9 @@ fun runWithGcIntern(
     }) match {
     | Some(x) -> x
     | None() ->
+      if (synchronizer is None _) {
+        gGlobalUnlock();
+      };
       destroyObstack(pos);
       return context
     };
@@ -1581,7 +1584,6 @@ fun runWithGcIntern(
           sync,
           underLockF,
         );
-        gGlobalUnlock();
         context.notifyAll(startTick);
         destroyObstack(pos)
       | Some _ ->
