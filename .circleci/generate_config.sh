@@ -6,21 +6,21 @@ BASE="$(git merge-base main HEAD)"
 
 # shellcheck disable=SC2046 # We actually want splitting in jq command output
 git diff --quiet HEAD "$BASE" -- $(jq --raw-output ".workspaces[]" package.json)
-check_ts=$?
+check_ts=1
 git diff --quiet HEAD "$BASE" -- skiplang/compiler/ skiplang/prelude/ :^skiplang/prelude/ts
-skc=$?
+skc=1
 git diff --quiet HEAD "$BASE" -- skiplang/prelude/src/skstore/ skiplang/prelude/runtime/
-skstore=$?
+skstore=1
 git diff --quiet HEAD "$BASE" -- skiplang/skjson
-skjson=$?
+skjson=1
 git diff --quiet HEAD "$BASE" -- sql/ skiplang/sqlparser/ skiplang/skbuild/
-skdb=$?
+skdb=1
 git diff --quiet HEAD "$BASE" -- skipruntime-ts/
-skipruntime=$?
+skipruntime=1
 git diff --quiet HEAD "$BASE" -- skiplang/prelude/ts/
-ts_prelude=$?
+ts_prelude=1
 git diff --quiet HEAD "$BASE" -- examples/hackernews/
-hackernews_example=$?
+hackernews_example=1
 
 cat .circleci/base.yml
 

@@ -3,8 +3,8 @@
 set -e
 
 default_steps=(skiplang-build-deps skipruntime-deps)
-LLVM_VERSION=15
-PRIORITY=101
+LLVM_VERSION=16
+PRIORITY=102
 
 usage() {
     echo "Usage: $0 step*"
