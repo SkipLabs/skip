@@ -14,11 +14,13 @@ const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
 
 export function link(packages) {
-  for (const [simlink, target] of Object.entries(symlinks)) {
-    if (!packages.has(simlink)) continue;
-    if (!fs.existsSync(simlink)) {
-      fs.symlinkSync(path.resolve(dirname, target), simlink, "dir");
-    }
+  for (const [symlink, target] of Object.entries(symlinks)) {
+    if (!packages.has(symlink)) continue;
+    const rand = new Uint32Array(1);
+    crypto.getRandomValues(rand);
+    const tmp = "tmp" + rand.toString("hex");
+    fs.symlinkSync(path.resolve(dirname, target), tmp, "dir");
+    fs.renameSync(tmp, symlink);
   }
 }
 
