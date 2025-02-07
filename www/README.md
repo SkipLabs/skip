@@ -17,12 +17,20 @@ The workflow for working on API docs is:
 - $ make docs-run                       # to run the docs site locally
 - visit http://localhost:3000/docs/api/core
 - edit the doc comments in the sources
-- $ cd /path/to/repo/root
 - $ make docs                           # to regenerate the api docs
 ```
 A faster but not robust way to regenerate the api docs is:
 ```
 - cd /path/to/repo/root/www && npx docusaurus generate-typedoc
+```
+To publish the docs to the live site:
+```
+- $ make docs-publish
+```
+This will suggest to run:
+```
+Test locally: make docs-serve
+Push to live site: cd www/docs_site/; git add -A; git commit -m 'update to <commit>'; git push; cd -
 ```
 
 The documentation for the tags that TypeDoc recognizes is
