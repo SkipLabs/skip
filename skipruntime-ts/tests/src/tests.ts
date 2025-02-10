@@ -15,12 +15,7 @@ import type {
   ExternalService,
   ServiceInstance,
 } from "@skipruntime/core";
-import {
-  SkipNonUniqueValueError,
-  OneToOneMapper,
-  Count,
-  Sum,
-} from "@skipruntime/core";
+import { SkipNonUniqueValueError, Count, Sum } from "@skipruntime/core";
 
 import {
   TimerResource,
@@ -117,17 +112,17 @@ const map3Service: SkipService<Input_SN_SN, Input_SN_SN> = {
   },
 };
 
-//// testOneToOneMapper
+//// test a one-to-one Mapper
 
-class SquareValues extends OneToOneMapper<number, number, number> {
-  mapValue(v: number) {
-    return v * v;
+class SquareValues implements Mapper<number, number, number, number> {
+  mapEntry(k: number, vs: Values<number>): Iterable<[number, number]> {
+    return vs.toArray().map((v) => [k, v * v]);
   }
 }
 
-class AddKeyAndValue extends OneToOneMapper<number, number, number> {
-  mapValue(v: number, k: number) {
-    return k + v;
+class AddKeyAndValue implements Mapper<number, number, number, number> {
+  mapEntry(k: number, vs: Values<number>): Iterable<[number, number]> {
+    return vs.toArray().map((v) => [k, k + v]);
   }
 }
 
@@ -303,13 +298,11 @@ function sorted(entries: Entry<Json, Json>[]): Entry<Json, Json>[] {
 
 //// testMergeReduce
 
-class OffsetMapper extends OneToOneMapper<number, number, number> {
-  constructor(private offset: number) {
-    super();
-  }
+class OffsetMapper implements Mapper<number, number, number, number> {
+  constructor(private offset: number) {}
 
-  mapValue(v: number) {
-    return v + this.offset;
+  mapEntry(k: number, vs: Values<number>): Iterable<[number, number]> {
+    return vs.toArray().map((v) => [k, v + this.offset]);
   }
 }
 
@@ -550,25 +543,32 @@ const multipleResourcesService: SkipService<Input_SN_SN, Input_SN_SN> = {
 };
 
 //// testPostgres
+
 type PostgresRow = { id: number; x: number; createdAt: string };
+
 const pgDateFmt = /\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d.\d{6}/;
-class PostgresRowExtract extends OneToOneMapper<number, PostgresRow, number> {
-  mapValue(row: PostgresRow): number {
-    if (!pgDateFmt.test(row.createdAt))
-      throw new Error(
-        "Malformed timestamp string from postgres: " + row.createdAt,
-      );
-    return row.x;
+
+class PostgresRowExtract
+  implements Mapper<number, PostgresRow, number, number>
+{
+  mapEntry(key: number, rows: Values<PostgresRow>): Iterable<[number, number]> {
+    return rows.toArray().map((row) => {
+      if (!pgDateFmt.test(row.createdAt))
+        throw new Error(
+          "Malformed timestamp string from postgres: " + row.createdAt,
+        );
+      return [key, row.x];
+    });
   }
 }
 
-class PointwiseSum extends OneToOneMapper<number, number, number> {
-  constructor(private other: EagerCollection<number, number>) {
-    super();
-  }
+class PointwiseSum implements Mapper<number, number, number, number> {
+  constructor(private other: EagerCollection<number, number>) {}
 
-  mapValue(v: number, k: number) {
-    return this.other.getArray(k).reduce((x, y) => x + y, v);
+  mapEntry(k: number, vs: Values<number>): Iterable<[number, number]> {
+    return vs
+      .toArray()
+      .map((v) => [k, this.other.getArray(k).reduce((x, y) => x + y, v)]);
   }
 }
 

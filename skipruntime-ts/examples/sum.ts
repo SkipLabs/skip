@@ -1,21 +1,24 @@
-import type { EagerCollection, Values, Resource } from "@skipruntime/core";
-
-import { ManyToOneMapper } from "@skipruntime/core";
+import type {
+  EagerCollection,
+  Mapper,
+  Resource,
+  Values,
+} from "@skipruntime/core";
 
 import { runService } from "@skipruntime/server";
 
-class Plus extends ManyToOneMapper<string, number, number> {
-  mapValues(values: Values<number>): number {
-    return values.toArray().reduce((p, c) => p + c, 0);
+class Plus implements Mapper<string, number, string, number> {
+  mapEntry(key: string, values: Values<number>): Iterable<[string, number]> {
+    return [[key, values.toArray().reduce((p, c) => p + c, 0)]];
   }
 }
 
-class Minus extends ManyToOneMapper<string, number, number> {
-  mapValues(values: Values<number>): number {
+class Minus implements Mapper<string, number, string, number> {
+  mapEntry(key: string, values: Values<number>): Iterable<[string, number]> {
     const acc = (p: number | null, c: number) => {
       return p !== null ? p - c : c;
     };
-    return values.toArray().reduce(acc, null) ?? 0;
+    return [[key, values.toArray().reduce(acc, null) ?? 0]];
   }
 }
 
