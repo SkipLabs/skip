@@ -80,8 +80,12 @@ run_diff () {
 export -f run_diff pass fail
 
 MAXIMUM_RESIDENT_SET_SIZE_MB=700
+LIMITING=(--memsuspend "${MAXIMUM_RESIDENT_SET_SIZE_MB}M" --memfree "${MAXIMUM_RESIDENT_SET_SIZE_MB}M")
+if ${CIRCLECI:-false}; then
+    LIMITING+=(--jobs 8)
+fi
 
-parallel --memsuspend ${MAXIMUM_RESIDENT_SET_SIZE_MB}M --memfree ${MAXIMUM_RESIDENT_SET_SIZE_MB}M --colsep ' ' run_diff <<END
+parallel "${LIMITING[@]}" --colsep ' ' run_diff <<END
 test/diff/select2_create.sql test/diff/select2_min_views.sql test/diff/select2_inserts.sql
 test/diff/select2_create.sql test/diff/select2_min_views.sql test/diff/select2_inserts.sql test/diff/select2_deletes.sql
 test/diff/select2_create.sql test/diff/select2_min_views.sql test/diff/select2_inserts.sql test/diff/select2_deletes.sql test/diff/select2_inserts.sql
