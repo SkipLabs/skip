@@ -69,13 +69,13 @@ Some examples of Mappers are shown [below](getting_started#the-anatomy-of-a-skip
 
 ### The anatomy of a Skip service
 
-Let's consider an example reactive service, powering a real-time feature in a social media application with the following simplified types.
+Let's consider an example reactive service, powering a real-time feature in a social media application with the following types.
 
 ```typescript
-type UserID = ... ;
-type GroupID = ... ;
-type User = { name: string, active: boolean, friends: UserID[], ... } ;
-type Group = { name: string, members: UserID[], ... };
+type UserID = number;
+type GroupID = number;
+type User = { name: string; active?: boolean; friends: UserID[] };
+type Group = { name: string; members: UserID[] };
 ```
 
 Suppose we want to display to users which of their currently-active friends are members of some group(s).
@@ -102,40 +102,42 @@ type ServiceInputs = {
 // Type alias for inputs to the active friends resource
 type ResourceInputs = {
   users: EagerCollection<UserID, User>;
-  actives: EagerCollection<GroupID, UserID[]>;
+  activeMembers: EagerCollection<GroupID, UserID>;
 };
 
 // Mapper function to compute the active users of each group
-class ActiveUsers extends OneToOneMapper<GroupID, Group, UserID[]> {
-  constructor(private users: EagerCollection<UserID, User>) {
-    super();
-  }
+class ActiveMembers implements Mapper<GroupID, Group, GroupID, UserID> {
+  constructor(private users: EagerCollection<UserID, User>) {}
 
-  mapValue(group: Group): UserID[] {
-    return group.members.filter((uid) => this.users.getUnique(uid).active);
+  mapEntry(gid: GroupID, group: Values<Group>): Iterable<[GroupID, UserID]> {
+    return group
+      .getUnique()
+      .members.flatMap((uid) =>
+        this.users.getUnique(uid).active ? [[gid, uid]] : [],
+      );
   }
 }
 
 // Load initial data from a source-of-truth database (mocked for simplicity)
-const [users, groups] = await Promise.all([
-  db.getUsers( ... ),
-  db.getGroups( ... ),
-]);
+const initialData: InitialData<ServiceInputs> = {
+  users: ... ,
+  groups: ... ,
+};
 
 // Specify and run the reactive service
 const service = {
-  initialData: { users, groups },
-  resources: { active_friends: ActiveFriends },
+  initialData,
+  resources: {},
   createGraph(input: ServiceInputs): ResourceInputs {
-    const actives = input.groups.map(ActiveUsers, input.users);
-    return { users: input.users, actives };
-  }
+    const activeMembers = input.groups.map(ActiveMembers, users);
+    return { users: input.users, activeMembers };
+  },
 };
 await runService(service);
 ```
 
-This example service operates over two _input collections_ (one for users and one for groups, as specified by `ServiceInputs`) and passes some `ResourceInputs` to its resources: a reactively-computed collection `actives` of the set of active users in each group, along with the `users` input collection.
-This `actives` collection is the "output" of the static computation graph, produced by mapping over the input groups and filtering out users that have the `active` flag set; since this only has to be done once for the entire service, it can be maintained at all times.
+This example service operates over two _input collections_ (one for users and one for groups, as specified by `ServiceInputs`) and passes some `ResourceInputs` to its resources: a reactively-computed collection `activeMembers` of the set of active users in each group, along with the `users` input collection.
+This `activeMembers` collection is the "output" of the static computation graph, produced by mapping over the input groups and taking users that have the `active` flag set; since this only has to be done once for the entire service, it can be maintained at all times.
 
 Our service wants to expose a resource -- parameterized by a user ID -- which can be queried or subscribed to by clients to view that user's active friends in each group.
 Maintaining this resource up-to-date for all users at all times would be infeasible at scale, so resources can make dynamic extensions to the reactive computation graph which are instantiated/dropped as needed to serve requests.
@@ -143,13 +145,14 @@ Maintaining this resource up-to-date for all users at all times would be infeasi
 Resources are parameterized by some input HTTP `params` and use an `instantiate` function to set up any reactive computation, operating over the service's `ResourceInputs` to produce a single output collection.
 
 ```typescript
-// Mapper function to filter out those active users who are also friends with `user`
-class FilterFriends extends OneToOneMapper<GroupID, UserID[], UserID[]> {
-  constructor(private readonly user: User) {
-    super();
-  }
-  mapValue(uids: UserID[]): UserID[] {
-    return uids.filter((uid) => this.user.friends.includes(uid));
+// Mapper function to find users that are active and also friends with `user`
+class FilterFriends implements Mapper<GroupID, UserID, GroupID, UserID> {
+  constructor(private readonly user: User) {}
+
+  mapEntry(gid: GroupID, uids: Values<UserID>): Iterable<[GroupID, UserID]> {
+    return uids
+      .toArray()
+      .flatMap((uid) => (this.user.friends.includes(uid) ? [[gid, uid]] : []));
   }
 }
 
@@ -162,9 +165,9 @@ class ActiveFriends implements Resource<ResourceInputs> {
     this.uid = params;
   }
 
-  instantiate(inputs: ResourceInputs): EagerCollection<GroupID, UserID[]> {
+  instantiate(inputs: ResourceInputs): EagerCollection<GroupID, UserID> {
     const user = inputs.users.getUnique(this.uid);
-    return inputs.actives.map(FilterFriends, user);
+    return inputs.activeMembers.map(FilterFriends, user);
   }
 }
 ```
