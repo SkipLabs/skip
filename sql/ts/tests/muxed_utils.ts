@@ -1,4 +1,4 @@
-import { MuxedSocket, type Environment } from "skdb/orchestration.js";
+import { MuxedSocket, type DBEnvironment } from "skdb/orchestration.js";
 
 export const connect = MuxedSocket.connect.bind(null);
 
@@ -47,7 +47,7 @@ export function toHex(buf: ArrayBuffer) {
   );
 }
 
-export async function connectAndAuth(env: Environment) {
+export async function connectAndAuth(env: DBEnvironment) {
   const key = await env
     .crypto()
     .subtle.importKey(

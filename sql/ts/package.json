@@ -3,12 +3,15 @@
   "version": "1.0.0",
   "type": "module",
   "exports": {
-    ".": "./dist/src/skdb.js",
+    ".": {
+      "node": "./dist/src/node.js",
+      "default": "./dist/src/browser.js"
+    },
     "./orchestration.js": "./dist/src/skdb_orchestration.js"
   },
   "scripts": {
-    "build": "node ../../prebuild.mjs skiplang-std skiplang-json skipwasm-std skipwasm-json skipwasm-date && tsc && skargo build -r --target wasm32-unknown-unknown --lib --manifest-path=../Skargo.toml --out-dir=./dist/src/",
-    "clean": "rm -rf dist skiplang-std skiplang-json skipwasm-std skipwasm-json skipwasm-date",
+    "build": "node ../../prebuild.mjs skiplang-std skiplang-json skipwasm-std skipwasm-json skipwasm-date skipwasm-worker && tsc && skargo build -r --target wasm32-unknown-unknown --lib --manifest-path=../Skargo.toml --out-dir=./dist/src/",
+    "clean": "rm -rf dist skiplang-std skiplang-json skipwasm-std skipwasm-json skipwasm-date skipwasm-worker",
     "lint": "eslint",
     "cli": "node ./dist/src/skdb-cli.js"
   },

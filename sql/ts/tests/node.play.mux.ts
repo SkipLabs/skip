@@ -2,7 +2,7 @@
 
 import { test } from "@playwright/test";
 import { ms_tests, type Test } from "./muxed_socket.js";
-import type { Environment } from "skdb/orchestration.js";
+import type { DBEnvironment } from "skdb/orchestration.js";
 import * as mu from "./muxed_utils.js";
 import { webcrypto as crypto } from "crypto";
 import { WebSocket } from "ws";
@@ -22,7 +22,7 @@ function runMS(t: Test) {
     if (t.slow) {
       test.slow();
     }
-    const res = await t.fun(new Env() as unknown as Environment, mu);
+    const res = await t.fun(new Env() as unknown as DBEnvironment, mu);
     t.check(res);
   });
 }

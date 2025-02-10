@@ -1,6 +1,6 @@
-import { type ModuleInit } from "../skipwasm-std/index.js";
+import { type EnvInit, type ModuleInit } from "../skipwasm-std/index.js";
 import { createOnThisThread } from "./skdb_create.js";
-import { onWorkerMessage, type Creator } from "../skipwasm-std/sk_worker.js";
+import { onWorkerMessage, type Creator } from "../skipwasm-worker/worker.js";
 import type { SKDB } from "./skdb.js";
 
 import { init as runtimeInit } from "../skipwasm-std/sk_runtime.js";
@@ -8,6 +8,9 @@ import { init as posixInit } from "../skipwasm-std/sk_posix.js";
 import { init as skjsonInit } from "../skipwasm-json/skjson.js";
 import { init as skdateInit } from "../skipwasm-date/sk_date.js";
 import { init as skdbInit } from "./skdb_skdb.js";
+import { complete as skdbComplete } from "./skdb_env.js";
+
+import { environment as createEnvironment } from "../skipwasm-std/sk_browser.js";
 
 const modules: ModuleInit[] = [
   runtimeInit,
@@ -16,6 +19,8 @@ const modules: ModuleInit[] = [
   skdateInit,
   skdbInit,
 ];
+
+const extensions: EnvInit[] = [skdbComplete];
 
 class DbCreator implements Creator<SKDB> {
   getName() {
@@ -27,7 +32,13 @@ class DbCreator implements Creator<SKDB> {
   }
 
   async create(dbName?: string) {
-    return createOnThisThread(false, modules, dbName);
+    return createOnThisThread(
+      false,
+      modules,
+      extensions,
+      createEnvironment,
+      dbName,
+    );
   }
 }
 

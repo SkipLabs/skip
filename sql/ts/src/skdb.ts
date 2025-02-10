@@ -1,6 +1,5 @@
-import { loadEnv, isNode } from "../skipwasm-std/index.js";
 import { createOnThisThread } from "./skdb_create.js";
-import type { Wrk, ModuleInit } from "../skipwasm-std/index.js";
+import type { ModuleInit, EnvInit, EnvCreator } from "../skipwasm-std/index.js";
 import type { SKDB } from "./skdb_types.js";
 import { SKDBWorker } from "./skdb_wdatabase.js";
 export { SKDBTable } from "./skdb_util.js";
@@ -20,6 +19,7 @@ import { init as posixInit } from "../skipwasm-std/sk_posix.js";
 import { init as skjsonInit } from "../skipwasm-json/skjson.js";
 import { init as skdateInit } from "../skipwasm-date/sk_date.js";
 import { init as skdbInit } from "./skdb_skdb.js";
+import { complete as skdbComplete } from "./skdb_env.js";
 
 const modules: ModuleInit[] = [
   runtimeInit,
@@ -29,47 +29,31 @@ const modules: ModuleInit[] = [
   skdbInit,
 ];
 
-export async function createSkdb(
+const extensions: EnvInit[] = [skdbComplete];
+
+export async function createSkdbFor(
+  skdbComplete: EnvInit,
+  createWorker: (
+    disableWarnings: boolean,
+    dbName?: string,
+  ) => Promise<SKDBWorker>,
+  createEnvironment: EnvCreator,
   options: {
     dbName?: string;
     asWorker?: boolean;
-    getWasmSource?: () => Promise<Uint8Array>;
     disableWarnings?: boolean;
   } = {},
 ): Promise<SKDB> {
-  const asWorker = options.asWorker ?? !options.getWasmSource;
   const disableWarnings = options.disableWarnings ?? false;
-  if (!asWorker) {
+  if (!options.asWorker) {
     return createOnThisThread(
       disableWarnings,
       modules,
+      [...extensions, skdbComplete],
+      createEnvironment,
       options.dbName,
-      options.getWasmSource,
     );
   } else {
-    if (options.getWasmSource) {
-      throw new Error("getWasmSource is not compatible with worker");
-    }
     return createWorker(disableWarnings, options.dbName);
   }
-}
-
-async function createWorker(disableWarnings: boolean, dbName?: string) {
-  const env = await loadEnv([]);
-  env.disableWarnings = disableWarnings;
-  let worker: Wrk;
-  if (isNode()) {
-    const url = new URL("./skdb_nodeworker.js", import.meta.url);
-    worker = env.createWorker(url, { type: "module" });
-  } else {
-    // important that this line looks exactly like this for bundlers to discover the file
-    const wrapped = new Worker(new URL("./skdb_worker.js", import.meta.url), {
-      type: "module",
-    });
-    worker = env.createWorkerWrapper(wrapped);
-  }
-
-  const skdb = new SKDBWorker(worker);
-  await skdb.create(dbName, disableWarnings);
-  return skdb;
 }

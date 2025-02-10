@@ -12,6 +12,7 @@ import type {
 import { SKDBTable } from "./skdb_util.js";
 import { SKDBGroupImpl } from "./skdb_group.js";
 import { connect } from "./skdb_orchestration.js";
+import type { DBEnvironment } from "./skdb_env.js";
 
 class SKDBMechanismImpl implements SKDBMechanism {
   writeCsv: (payload: string, source: string) => void;
@@ -178,7 +179,7 @@ export class SKDBSyncImpl implements SKDBSync {
     );
 
     this.connectedRemote = await connect(
-      this.environment,
+      this.environment as DBEnvironment,
       mechanism,
       endpoint,
       db,
