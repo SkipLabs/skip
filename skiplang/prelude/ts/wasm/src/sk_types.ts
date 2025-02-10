@@ -144,19 +144,11 @@ export interface System {
   unsetenv(name: string): void;
 }
 
-export interface Wrk {
-  postMessage: (message: any) => void;
-  onMessage: (listener: (value: any) => void) => void;
-}
-
 export interface Environment {
   shared: Map<string, Shared>;
   name: () => string;
   disableWarnings: boolean;
   environment: string[];
-  createSocket: (url: string) => WebSocket;
-  createWorker: (url: URL, options?: WorkerOptions) => Wrk;
-  createWorkerWrapper: (worker: Worker) => Wrk;
   timestamp: () => float;
   decodeUTF8: (utf8: ArrayBuffer) => string;
   encodeUTF8: (str: string) => Uint8Array;
@@ -852,15 +844,14 @@ export function isNode() {
   return typeof process !== "undefined" && process.release.name == "node";
 }
 
-export async function loadEnv(extensions: EnvInit[], envVals?: string[]) {
-  // hack: this way of importing is deliberate so that web bundlers
-  // don't follow the node dynamic import
-  const nodeImport = "./sk_node.js";
-  const environment = await (isNode()
-    ? import(/* @vite-ignore */ nodeImport)
-    : import("./sk_browser.js"));
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-  const env = environment.environment(envVals) as Environment;
+export type EnvCreator = (environment?: string[]) => Environment;
+
+export function loadEnv(
+  createEnvironment: EnvCreator,
+  extensions: EnvInit[],
+  envVals?: string[],
+) {
+  const env = createEnvironment(envVals);
   extensions.forEach((fn) => fn(env));
   return env;
 }
@@ -897,16 +888,11 @@ export async function run(
   wasmUrl: URL | (() => URL | string | Promise<URL | string>),
   modules: ModuleInit[],
   extensions: EnvInit[],
+  createEnvironment: EnvCreator,
   main?: string,
-  getWasmSource?: () => Promise<Uint8Array>,
 ) {
-  const env = await loadEnv(extensions);
-  let buffer: Uint8Array | ArrayBuffer;
-  if (getWasmSource) {
-    buffer = await getWasmSource();
-  } else {
-    const url = typeof wasmUrl === "function" ? await wasmUrl() : wasmUrl;
-    buffer = await env.fetch(url);
-  }
+  const env = loadEnv(createEnvironment, extensions);
+  const url = typeof wasmUrl === "function" ? await wasmUrl() : wasmUrl;
+  const buffer = await env.fetch(url);
   return await start(modules, buffer, env, main);
 }

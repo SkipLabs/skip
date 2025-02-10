@@ -4,7 +4,7 @@ import { parseArgs } from "util";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { createSkdb } from "./skdb.js";
+import { createSkdb } from "./node.js";
 import { webcrypto } from "crypto";
 import * as readline from "readline/promises";
 import * as process from "process";

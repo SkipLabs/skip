@@ -1,4 +1,3 @@
-import type { Environment } from "../skipwasm-std/index.js";
 import type {
   SKDBMechanism,
   RemoteSKDB,
@@ -6,8 +5,9 @@ import type {
   MirrorDefn,
 } from "./skdb_types.js";
 import { SKDBTable } from "./skdb_util.js";
+import type { DBEnvironment } from "./skdb_env.js";
 
-export type { Environment };
+export type { DBEnvironment };
 
 const npmVersion = "";
 
@@ -399,7 +399,7 @@ class ResilientMuxedSocket {
   }
 
   static async connect(
-    env: Environment,
+    env: DBEnvironment,
     policy: ResiliencyPolicy,
     uri: string,
     creds: Creds,
@@ -413,7 +413,7 @@ class ResilientMuxedSocket {
   }
 
   private constructor(
-    private env: Environment,
+    private env: DBEnvironment,
     private policy: ResiliencyPolicy,
     private uri: string,
     private creds: Creds,
@@ -712,7 +712,7 @@ export class MuxedSocket {
   private constructor(
     private readonly socket: WebSocket,
     private readonly creds: Creds,
-    private readonly env: Environment,
+    private readonly env: DBEnvironment,
   ) {
     // pre-condition: socket is open
   }
@@ -832,7 +832,7 @@ export class MuxedSocket {
   }
 
   static async connect(
-    env: Environment,
+    env: DBEnvironment,
     uri: string,
     creds: Creds,
     timeoutMs: number = 60000,
@@ -1074,7 +1074,7 @@ export class MuxedSocket {
 
   private static async encodeAuthMsg(
     creds: Creds,
-    env: Environment,
+    env: DBEnvironment,
   ): Promise<ArrayBuffer> {
     const clientVersion = "js-" + npmVersion;
     const crypto = env.crypto();
@@ -1412,7 +1412,7 @@ class Stream {
 }
 
 export async function connect(
-  env: Environment,
+  env: DBEnvironment,
   client: SKDBMechanism,
   endpoint: string,
   db: string,
@@ -1440,14 +1440,14 @@ class SKDBServer implements RemoteSKDB {
   private onRebootFn?: () => void;
 
   private constructor(
-    private readonly env: Environment,
+    private readonly env: DBEnvironment,
     private readonly client: SKDBMechanism,
     private readonly connection: ResilientMuxedSocket,
     private readonly creds: Creds,
   ) {}
 
   static async connect(
-    env: Environment,
+    env: DBEnvironment,
     client: SKDBMechanism,
     endpoint: string,
     db: string,

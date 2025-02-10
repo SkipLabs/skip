@@ -1,4 +1,8 @@
-import { run, type ModuleInit } from "../skipwasm-std/index.js";
+import {
+  run,
+  type EnvCreator,
+  type ModuleInit,
+} from "../skipwasm-std/index.js";
 import type { ServiceInstanceFactory } from "./internals/skipruntime_module.js";
 
 import { init as runtimeInit } from "../skipwasm-std/sk_runtime.js";
@@ -31,10 +35,11 @@ async function wasmUrl(): Promise<URL | string> {
   return new URL("./libskip-runtime-ts.wasm", import.meta.url);
 }
 
-export async function initService(
+export async function initServiceFor(
+  createEnvironment: EnvCreator,
   service: SkipService,
 ): Promise<ServiceInstance> {
-  const data = await run(wasmUrl, modules, []);
+  const data = await run(wasmUrl, modules, [], createEnvironment);
   const factory = data.environment.shared.get(
     "ServiceInstanceFactory",
   ) as ServiceInstanceFactory;
