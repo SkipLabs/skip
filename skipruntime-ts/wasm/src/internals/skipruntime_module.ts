@@ -252,7 +252,7 @@ export interface FromWasm {
   SkipRuntime_initService(service: ptr<Internal.Service>): Handle<Error>;
 
   // closeClose
-  SkipRuntime_closeService(): Handle<Error>;
+  SkipRuntime_closeService(): ptr<Internal.CJSON>;
 
   // Context
 
@@ -324,7 +324,7 @@ interface ToWasm {
 
   SkipRuntime_ExternalService__shutdown(
     supplier: Handle<ExternalService>,
-  ): void;
+  ): Handle<Promise<void>>;
 
   SkipRuntime_deleteExternalService(supplier: Handle<ExternalService>): void;
 
@@ -775,7 +775,7 @@ export class WasmFromBinding implements FromBinding {
     return this.fromWasm.SkipRuntime_initService(toPtr(service));
   }
 
-  SkipRuntime_closeService(): Handle<Error> {
+  SkipRuntime_closeService(): Pointer<Internal.CJSON> {
     return this.fromWasm.SkipRuntime_closeService();
   }
 
@@ -1036,7 +1036,7 @@ class LinksImpl implements Links {
   }
 
   shutdownOfExternalService(sksupplier: Handle<ExternalService>) {
-    this.tobinding.SkipRuntime_ExternalService__shutdown(sksupplier);
+    return this.tobinding.SkipRuntime_ExternalService__shutdown(sksupplier);
   }
 
   deleteExternalService(supplier: Handle<ExternalService>) {

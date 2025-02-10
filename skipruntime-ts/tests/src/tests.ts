@@ -430,7 +430,7 @@ class MockExternal implements ExternalService {
   }
 
   shutdown() {
-    return;
+    return Promise.resolve();
   }
 
   private async mock(

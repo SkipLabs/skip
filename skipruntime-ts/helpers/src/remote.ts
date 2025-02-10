@@ -93,9 +93,10 @@ export class SkipExternalService implements ExternalService {
     }
   }
 
-  shutdown(): void {
+  shutdown(): Promise<void> {
     for (const res of this.resources.values()) {
       res.close();
     }
+    return Promise.resolve();
   }
 }

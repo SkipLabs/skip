@@ -258,7 +258,7 @@ FOR EACH ROW EXECUTE FUNCTION %I();`,
         );
   }
 
-  shutdown(): void {
+  shutdown(): Promise<void> {
     const query =
       "DROP FUNCTION IF EXISTS " +
       Array.from(this.open_instances)
@@ -266,17 +266,8 @@ FOR EACH ROW EXECUTE FUNCTION %I();`,
         .join(", ") +
       " CASCADE;";
     this.open_instances.clear();
-
-    const shutdown =
-      this.open_instances.size == 0
-        ? this.client.end()
-        : this.client.query(query).then(() => this.client.end());
-
-    shutdown.catch((e: unknown) => {
-      console.error(
-        "Error shutting down Postgres external service; trigger functions may need teardown.",
-      );
-      throw e;
-    });
+    return this.open_instances.size == 0
+      ? this.client.end()
+      : this.client.query(query).then(() => this.client.end());
   }
 }

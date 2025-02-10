@@ -707,13 +707,22 @@ export class ServiceInstance {
   /**
    * Close all resources and shut down the service.
    * Any subsequent calls on the service will result in errors.
+   * @returns The promise of externals services shutdowns
    */
-  close(): void {
-    const errorHdl = this.refs.runWithGC(() => {
-      return this.refs.binding.SkipRuntime_closeService();
+  close(): Promise<unknown> {
+    const result = this.refs.runWithGC(() => {
+      return this.refs.skjson.importJSON(
+        this.refs.binding.SkipRuntime_closeService(),
+        true,
+      );
     });
-    if (errorHdl) {
-      throw this.refs.handles.deleteHandle(errorHdl);
+    if (Array.isArray(result)) {
+      const handles = result as Handle<Promise<void>>[];
+      const promises = handles.map((h) => this.refs.handles.deleteHandle(h));
+      return Promise.all(promises);
+    } else {
+      const errorHdl = result as Handle<Error>;
+      return Promise.reject(this.refs.handles.deleteHandle(errorHdl));
     }
   }
 }
@@ -1019,9 +1028,9 @@ export class ToBinding {
 
   SkipRuntime_ExternalService__shutdown(
     sksupplier: Handle<ExternalService>,
-  ): void {
+  ): Handle<Promise<void>> {
     const supplier = this.handles.get(sksupplier);
-    supplier.shutdown();
+    return this.handles.register(supplier.shutdown());
   }
 
   SkipRuntime_deleteExternalService(supplier: Handle<ExternalService>): void {
