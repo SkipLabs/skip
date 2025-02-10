@@ -589,16 +589,24 @@ int sk_is_static(void* ptr) {
 
 typedef size_t slot_t;
 
-size_t sk_bit_size(size_t size) {
-  return (size_t)(sizeof(size_t) * 8 - __builtin_clzl(size - 1));
+#if !(defined(__has_builtin) && __has_builtin(__builtin_stdc_bit_width))
+static inline size_t __builtin_stdc_bit_width(size_t size) {
+  return size ? (size_t)(sizeof(size_t) * 8UL - __builtin_clzl(size)) : 0;
 }
+#endif
 
 slot_t sk_slot_of_size(size_t size) {
-  size = (size + (sizeof(void*) - 1)) & ~(sizeof(void*) - 1);
-  return sk_bit_size(size);
+  // Must return a value between 0 and FTABLE_SIZE - 1 included
+  if (__builtin_expect(size < sizeof(void*), 0)) {
+    // sk_size_of_slot requires slot to be at least log2(sizeof(void*))
+    size = sizeof(void*);
+  }
+  return __builtin_stdc_bit_width(size - 1);
 }
 
 size_t sk_size_of_slot(slot_t slot) {
+  // Must return a multiple of sizeof(void*) and at least sizeof(void*)
+  // Hence slot is expected to be at least log2(sizeof(void*))
   return 1 << slot;
 }
 
