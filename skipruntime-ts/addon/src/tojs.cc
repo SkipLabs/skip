@@ -41,7 +41,7 @@ SKNotifier SkipRuntime_createNotifier(int32_t ref);
 SKReducer SkipRuntime_createReducer(int32_t ref, CJSON json);
 
 double SkipRuntime_initService(SKService service);
-double SkipRuntime_closeService();
+CJSON SkipRuntime_closeService();
 
 CJArray SkipRuntime_Collection__getArray(char* collection, CJSON key);
 CJSON SkipRuntime_Collection__getUnique(char* collection, CJSON key);
@@ -583,8 +583,8 @@ void InitService(const FunctionCallbackInfo<Value>& args) {
 void CloseService(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
   NatTryCatch(isolate, [&args](Isolate* isolate) {
-    double skerror = SkipRuntime_closeService();
-    args.GetReturnValue().Set(Number::New(isolate, skerror));
+    CJSON skresult = SkipRuntime_closeService();
+    args.GetReturnValue().Set(External::New(isolate, skresult));
   });
 }
 

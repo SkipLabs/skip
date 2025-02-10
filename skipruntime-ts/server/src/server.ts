@@ -144,9 +144,10 @@ export async function runService(
   );
 
   return {
-    close: () => {
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+    close: async () => {
       controlHttpServer.close();
-      instance.close();
+      await instance.close();
       streamingHttpServer.close();
     },
   };
