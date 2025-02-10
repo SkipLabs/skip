@@ -18,37 +18,46 @@ In this way, we can think of resources as parameterized outputs; request paramet
 For a concrete example, take the "active friends" resource from the getting-started [example](getting_started.md#the-anatomy-of-a-skip-service) service:
 
 ```typescript
+// Load initial data from a source-of-truth database (mocked for simplicity)
+const initialData: InitialData<ServiceInputs> = {
+  users: ... ,
+  groups: ... ,
+};
+
+// Specify and run the reactive service
 const service = {
-  initialData: { users, groups },
+  initialData,
   resources: { active_friends: ActiveFriends },
   createGraph(input: ServiceInputs): ResourceInputs {
-    const actives = input.groups.map(ActiveUsers, input.users);
-    return { users: input.users, actives };
+    const users = input.users;
+    const activeMembers = input.groups.map(ActiveMembers, users);
+    return { users, activeMembers };
   },
 };
 await runService(service);
 ```
 
-The service has two input collections `"users"` and `"groups"` (populated here with some initial data), no external dependencies (i.e. the service definition does not define the optional `externalServices` field), and one resource: `ActiveFriends`, defined as follows:
+The service has two input collections `users` and `groups` (where here we have elided their population with initial data), no external dependencies (i.e. the service definition does not define the optional `externalServices` field), and one resource: `ActiveFriends`, defined as follows:
 
 ```typescript
 class ActiveFriends implements Resource<ResourceInputs> {
-  private uid: UserID;
+  private readonly uid: UserID;
 
-  constructor(params: { [param: string]: Json }) {
-    if (!params["uid"]) throw new Error("Missing required parameter 'uid'");
-    this.uid = params["uid"];
+  constructor(params: Json) {
+    if (typeof params != "number")
+      throw new Error("Missing required number parameter 'uid'");
+    this.uid = params;
   }
 
   instantiate(inputs: ResourceInputs): EagerCollection<GroupID, UserID> {
     const user = inputs.users.getUnique(this.uid);
-    return inputs.actives.map(FilterFriends, user);
+    return inputs.activeMembers.map(FilterFriends, user);
   }
 }
 ```
 
 In this setup, the reactive service exposes some routes corresponding to the resource, each expecting an HTTP query parameter `uid`.
-When a request is made, the `constructor` is invoked with the given parameters and then `instantiate` called on the resulting object, extending the static computation graph (which updates `inputs`) with additional reactive computation, getting the relevant `user` and filtering active users according to whether or not they are friends.
+When a request is made, the `constructor` is invoked with the given parameters and then `instantiate` is called on the resulting object, extending the static computation graph (which updates `inputs`) with additional reactive computation, getting the relevant `user` and filtering active users according to whether or not they are friends.
 The eager collection returned by the `instantiate` function is the output served to the client for this request, reactively updating according to any changes to input data: users, groups, friend relationships, etc.
 
 This _resource instance_ can be explicitly closed by the client, or it will be garbage collected by the Skip framework after a period of inactivity.
