@@ -587,23 +587,27 @@ int sk_is_static(void* ptr) {
 /* Free table. */
 /*****************************************************************************/
 
+typedef size_t slot_t;
+
 size_t sk_bit_size(size_t size) {
   return (size_t)(sizeof(size_t) * 8 - __builtin_clzl(size - 1));
 }
 
-size_t sk_pow2_size(size_t size) {
+slot_t sk_slot_of_size(size_t size) {
   size = (size + (sizeof(void*) - 1)) & ~(sizeof(void*) - 1);
-  return (1 << sk_bit_size(size));
+  return sk_bit_size(size);
 }
 
-void sk_add_ftable(void* ptr, size_t size) {
-  int slot = sk_bit_size(size);
+size_t sk_size_of_slot(slot_t slot) {
+  return 1 << slot;
+}
+
+void sk_add_ftable(void* ptr, slot_t slot) {
   *(void**)ptr = ginfo->ftable[slot];
   ginfo->ftable[slot] = ptr;
 }
 
-void* sk_get_ftable(size_t size) {
-  int slot = sk_bit_size(size);
+void* sk_get_ftable(slot_t slot) {
   void** ptr = ginfo->ftable[slot];
   if (ptr == NULL) {
     return ptr;
@@ -692,9 +696,10 @@ void SKIP_print_persistent_size() {
 
 void* sk_palloc(size_t size) {
   sk_check_has_lock();
-  size = sk_pow2_size(size);
+  slot_t slot = sk_slot_of_size(size);
+  size = sk_size_of_slot(slot);
   ginfo->total_palloc_size += size;
-  sk_cell_t* ptr = sk_get_ftable(size);
+  sk_cell_t* ptr = sk_get_ftable(slot);
   if (ptr != NULL) {
     return ptr;
   }
@@ -709,7 +714,8 @@ void* sk_palloc(size_t size) {
 
 void sk_pfree_size(void* chunk, size_t size) {
   sk_check_has_lock();
-  size = sk_pow2_size(size);
+  slot_t slot = sk_slot_of_size(size);
+  size = sk_size_of_slot(slot);
   ginfo->total_palloc_size -= size;
-  sk_add_ftable(chunk, size);
+  sk_add_ftable(chunk, slot);
 }
