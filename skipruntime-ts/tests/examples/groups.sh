@@ -13,10 +13,10 @@ if [ "$#" -lt 2 ]; then
 fi
 
 if [ "$3" = "native" ]; then
-    echo "Run groups with native platform"
+    echo "Running 'groups' example on @skipruntime/native"
     LD_LIBRARY_PATH=$(realpath ../../build/skipruntime) SKIP_PLATFORM="native" node dist/groups.js >/dev/null &
 else
-    echo "Run groups with wasm platform"
+    echo "Running 'groups' example on @skipruntime/wasm"
     node dist/groups.js >/dev/null &
 fi
 
