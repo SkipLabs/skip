@@ -1,5 +1,5 @@
 OLEVEL   ?= -O3
-CXXFLAGS ?= $(OLEVEL) -mllvm -inline-threshold=0 # -enable-new-pm=false
+CXXFLAGS ?= $(OLEVEL)
 SKARGO_PROFILE ?= release
 SKC_ARGS ?= --canonize-paths
 SKARGO_ARGS ?= --profile $(SKARGO_PROFILE) $(foreach opt,$(SKC_ARGS),--skcopt $(opt))
