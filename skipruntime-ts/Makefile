@@ -3,9 +3,22 @@ SHELL := /bin/bash
 SKARGO_PROFILE?=release
 NPM_WORKSPACES=$(shell jq --raw-output "[.workspaces[] | select((startswith(\"sql\") or contains(\"examples\")) | not)] | map(\"-w \" + .) | .[]" ../package.json)
 
+
+.PHONY: install
+install:
+	../bin/cd_sh .. "npm install $(NPM_WORKSPACES)"
+
+.PHONY: install-all
+install-all:
+	../bin/cd_sh .. "npm install"
+
 .PHONY: build
 build:
-	../bin/cd_sh .. "npm install $(NPM_WORKSPACES) && npm run build $(NPM_WORKSPACES) --if-present"
+	../bin/cd_sh .. "npm run build $(NPM_WORKSPACES) --if-present"
+
+.PHONY: build-with-exemple
+build-with-exemple: build
+	../bin/cd_sh examples "npm run build -w skipruntime-examples"
 
 bunrun-%: build
 	bun run examples/$*.ts
@@ -31,10 +44,14 @@ nodeserver-%:
 clean:
 	make -C .. clean
 
-.PHONY: test
-test: build
+.PHONY: run-test
+run-test:
 	../bin/cd_sh tests "npm run test"
 
+.PHONY: test
+test: install build run-test
+
+.PHONY: build-examples
 build-examples:
 	../bin/cd_sh examples "npm install && npm run build"
 
@@ -43,12 +60,31 @@ test-example-%:
 	diff /tmp/$*.out tests/examples/$*.exp.out
 	diff /tmp/$*.err tests/examples/$*.exp.err
 
+test-wasm-example-%:
+	../bin/cd_sh tests/examples "./$*.sh /tmp/$*-wasm.out /tmp/$*-wasm.err"
+	diff /tmp/$*-wasm.out tests/examples/$*.exp.out
+	diff /tmp/$*-wasm.err tests/examples/$*.exp.err
+
+test-native-example-%:
+	../bin/cd_sh tests/examples "./$*.sh /tmp/$*-native.out /tmp/$*-native.err native"
+	diff /tmp/$*-native.out tests/examples/$*.exp.out
+	diff /tmp/$*-native.err tests/examples/$*.exp.err
 
 EXAMPLES := $(patsubst tests/examples/%.sh,%,$(wildcard tests/examples/*.sh))
 
-EXAMPLE_TARGETS := $(patsubst %,test-example-%,$(EXAMPLES))
-.PHONY: test-examples
-test-examples: build-examples $(EXAMPLE_TARGETS)
+WASM_EXAMPLE_TARGETS := $(patsubst %,test-wasm-example-%,$(EXAMPLES))
+.PHONY: run-wasm-examples
+run-wasm-examples: $(WASM_EXAMPLE_TARGETS)
+
+.PHONY: test-wasm-examples
+test-wasm-examples: build-examples run-wasm-examples
+
+NATIVE_EXAMPLE_TARGETS := $(patsubst %,test-native-example-%,$(EXAMPLES))
+.PHONY: run-native-examples
+run-native-examples: $(NATIVE_EXAMPLE_TARGETS)
+
+.PHONY: test-native-examples
+test-native-examples: build-examples run-native-examples
 
 .PHONY: test-error-types
 test-error-types: # Best-effort check that we don't throw generic JS errors; prefer some version of SkipError instead.
