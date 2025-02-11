@@ -16,10 +16,6 @@ install-all:
 build:
 	../bin/cd_sh .. "npm run build $(NPM_WORKSPACES) --if-present"
 
-.PHONY: build-with-exemple
-build-with-exemple: build
-	../bin/cd_sh examples "npm run build -w skipruntime-examples"
-
 bunrun-%: build
 	bun run examples/$*.ts
 
@@ -52,8 +48,8 @@ run-test:
 test: install build run-test
 
 .PHONY: build-examples
-build-examples:
-	../bin/cd_sh examples "npm install && npm run build"
+build-examples: build
+	../bin/cd_sh examples "npm run build -w skipruntime-examples"
 
 test-example-%:
 	../bin/cd_sh tests/examples "./$*.sh /tmp/$*.out /tmp/$*.err"
@@ -72,19 +68,11 @@ test-native-example-%:
 
 EXAMPLES := $(patsubst tests/examples/%.sh,%,$(wildcard tests/examples/*.sh))
 
-WASM_EXAMPLE_TARGETS := $(patsubst %,test-wasm-example-%,$(EXAMPLES))
-.PHONY: run-wasm-examples
-run-wasm-examples: $(WASM_EXAMPLE_TARGETS)
-
 .PHONY: test-wasm-examples
-test-wasm-examples: build-examples run-wasm-examples
-
-NATIVE_EXAMPLE_TARGETS := $(patsubst %,test-native-example-%,$(EXAMPLES))
-.PHONY: run-native-examples
-run-native-examples: $(NATIVE_EXAMPLE_TARGETS)
+test-wasm-examples: $(patsubst %,test-wasm-example-%,$(EXAMPLES))
 
 .PHONY: test-native-examples
-test-native-examples: build-examples run-native-examples
+test-native-examples: $(patsubst %,test-native-example-%,$(EXAMPLES))
 
 .PHONY: test-error-types
 test-error-types: # Best-effort check that we don't throw generic JS errors; prefer some version of SkipError instead.
@@ -95,9 +83,12 @@ test-error-types: # Best-effort check that we don't throw generic JS errors; pre
 	--exclude-dir examples \
 	--exclude-dir tests
 
+.PHONY: test-all
+test-all: install-all build-examples run-test test-wasm-examples test-native-examples test-error-types
+
 regen-%:
 	cd tests/examples && ./$*.sh ../tests/examples/$*.exp.out ../tests/examples/$*.exp.err
 
 REGEN_TARGETS := $(patsubst %,regen-%,$(EXAMPLES))
 .PHONY: regenerate-expectations
-regenerate-expectations: build build-examples $(REGEN_TARGETS)
+regenerate-expectations: build-examples $(REGEN_TARGETS)
