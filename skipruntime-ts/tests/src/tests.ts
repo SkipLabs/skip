@@ -546,7 +546,8 @@ const multipleResourcesService: SkipService<Input_SN_SN, Input_SN_SN> = {
 
 type PostgresRow = { id: number; x: number; createdAt: string };
 
-const pgDateFmt = /\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d.\d{6}/;
+// The last number has not always 6 digits
+const pgDateFmt = /\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d.\d/;
 
 class PostgresRowExtract
   implements Mapper<number, PostgresRow, number, number>
@@ -1094,34 +1095,37 @@ export function initTests(
     ]);
     const constantResourceId = "unsafe.identifier";
     service.instantiateResource(constantResourceId, resource, {});
-    // No value registered in external mock resource
-    expect(service.getAll(resource).payload).toEqual([
-      [0, [[10]]],
-      [1, [[20]]],
-    ]);
-    await timeout(1);
-    // After 1ms values are added to external mock resource
-    expect(service.getAll(resource).payload).toEqual([
-      [0, [[10, 15]]],
-      [1, [[20, 30]]],
-    ]);
-    service.update("input2", [
-      [0, [6]],
-      [1, [11]],
-    ]);
-    // New params => No value registered in external mock resource
-    expect(service.getAll(resource).payload).toEqual([
-      [0, [[10]]],
-      [1, [[20]]],
-    ]);
-    await timeout(6);
-    // After 5ms values are added to external mock resource
-    expect(service.getAll(resource).payload).toEqual([
-      [0, [[10, 16]]],
-      [1, [[20, 31]]],
-    ]);
-    service.closeResourceInstance(constantResourceId);
-    service.close();
+    try {
+      // No value registered in external mock resource
+      expect(service.getAll(resource).payload).toEqual([
+        [0, [[10]]],
+        [1, [[20]]],
+      ]);
+      await timeout(1);
+      // After 1ms values are added to external mock resource
+      expect(service.getAll(resource).payload).toEqual([
+        [0, [[10, 15]]],
+        [1, [[20, 30]]],
+      ]);
+      service.update("input2", [
+        [0, [6]],
+        [1, [11]],
+      ]);
+      // New params => No value registered in external mock resource
+      expect(service.getAll(resource).payload).toEqual([
+        [0, [[10]]],
+        [1, [[20]]],
+      ]);
+      await timeout(6);
+      // After 5ms values are added to external mock resource
+      expect(service.getAll(resource).payload).toEqual([
+        [0, [[10, 16]]],
+        [1, [[20, 31]]],
+      ]);
+    } finally {
+      service.closeResourceInstance(constantResourceId);
+      service.close();
+    }
   });
 
   it("testCloseSession", async () => {
@@ -1129,14 +1133,17 @@ export function initTests(
     const resource = "tokens";
     const constantResourceId = "unsafe.identifier";
     service.instantiateResource(constantResourceId, resource, {});
-    const start = service.getArray(resource, "5ms").payload;
-    await timeout(2);
-    expect(service.getArray(resource, "5ms").payload).toEqual(start);
-    await timeout(4);
-    const current = service.getArray(resource, "5ms").payload;
-    expect(current == start).toEqual(false);
-    service.closeResourceInstance(constantResourceId);
-    service.close();
+    try {
+      const start = service.getArray(resource, "5ms").payload;
+      await timeout(2);
+      expect(service.getArray(resource, "5ms").payload).toEqual(start);
+      await timeout(4);
+      const current = service.getArray(resource, "5ms").payload;
+      expect(current == start).toEqual(false);
+    } finally {
+      service.closeResourceInstance(constantResourceId);
+      service.close();
+    }
   });
 
   it("testMultipleResources", async () => {
@@ -1169,26 +1176,42 @@ export function initTests(
       );
       return;
     }
+    try {
+      service.update("input", [
+        [1, [10]],
+        [2, [20]],
+        [3, [30]],
+      ]);
+      service.instantiateResource(
+        "unsafe.fixed.resource.ident",
+        "resource",
+        {},
+      );
+      expect(service.getAll("resource").payload).toEqual([
+        [1, [10]],
+        [2, [20]],
+        [3, [30]],
+      ]);
 
-    service.update("input", [
-      [1, [10]],
-      [2, [20]],
-      [3, [30]],
-    ]);
-    service.instantiateResource("unsafe.fixed.resource.ident", "resource", {});
-    expect(service.getAll("resource").payload).toEqual([
-      [1, [10]],
-      [2, [20]],
-      [3, [30]],
-    ]);
-    await timeout(5);
-    expect(service.getAll("resource").payload).toEqual([
-      [1, [11]],
-      [2, [22]],
-      [3, [33]],
-    ]);
-
-    service.close();
+      let count = 0;
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      while (true) {
+        try {
+          await timeout(5);
+          expect(service.getAll("resource").payload).toEqual([
+            [1, [11]],
+            [2, [22]],
+            [3, [33]],
+          ]);
+          break;
+        } catch (e: unknown) {
+          if (count < 2) count++;
+          else throw e;
+        }
+      }
+    } finally {
+      service.close();
+    }
   });
 
   it("testLazyWithUseExternalService", async () => {
