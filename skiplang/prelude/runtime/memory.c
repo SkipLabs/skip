@@ -25,8 +25,14 @@ typedef struct sk_size_info {
 
 void* sk_ftable[SK_FTABLE_SIZE][SK_FTABLE_SIZE] = {0};
 
-size_t sk_bit_size(size_t size) {
-  return (size_t)(sizeof(size_t) * 8 - __builtin_clzl(size - 1));
+#if !(defined(__has_builtin) && __has_builtin(__builtin_stdc_bit_width))
+static inline size_t __builtin_stdc_bit_width(size_t size) {
+  return size ? (size_t)(sizeof(size_t) * 8UL - __builtin_clzl(size)) : 0;
+}
+#endif
+
+static inline size_t sk_bit_size(size_t size) {
+  return __builtin_stdc_bit_width(size - 1);
 }
 
 size_t sk_pow2_size(size_t size) {
