@@ -13,10 +13,10 @@ if [ "$#" -lt 2 ]; then
 fi
 
 if [ "$3" = "native" ]; then
-    echo "Run sheet with native platform"
+    echo "Running 'sheet' example on @skipruntime/native"
     LD_LIBRARY_PATH=$(realpath ../../build/skipruntime) SKIP_PLATFORM="native" node dist/sheet.js >/dev/null &
 else
-    echo "Run sheet with wasm platform"
+    echo "Running 'sheet' example on @skipruntime/wasm"
     node dist/sheet.js >/dev/null &
 fi
 
