@@ -114,7 +114,7 @@ export class TimerResource implements ExternalResource {
   }
 }
 
-function defaultParamEncoder(params: Json): string {
+export function defaultParamEncoder(params: Json): string {
   if (typeof params == "object") {
     const queryParams: { [param: string]: string } = {};
     for (const [key, value] of Object.entries(params)) {

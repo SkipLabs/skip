@@ -8,6 +8,7 @@ export {
   type ExternalResource,
   GenericExternalService,
   Polled,
+  defaultParamEncoder,
 } from "./external.js";
 export { SkipExternalService } from "./remote.js";
 export { SkipServiceBroker, fetchJSON, type Entrypoint } from "./rest.js";
