@@ -663,9 +663,7 @@ const kafka_config = {
   retry: { multiplier: 1.5 },
   logLevel: kafkaLogLevel.NOTHING,
 };
-const kafkaService: () => Promise<
-  SkipService<Input_NN, Input_NN>
-> = async () => {
+const kafkaService: () => SkipService<Input_NN, Input_NN> = () => {
   const kafka = new KafkaExternalService(kafka_config);
   return {
     initialData: {
@@ -1282,7 +1280,7 @@ export function initTests(
     let service;
     let producer;
     try {
-      service = await initService(await kafkaService());
+      service = await initService(kafkaService());
       producer = new Kafka({
         ...kafka_config,
         clientId: "skip-test-producer",
@@ -1315,9 +1313,10 @@ export function initTests(
         const noise = Math.floor(Math.random() * 1_000_000_000);
         return { key: String(noise), value: String(1 + (noise % 5)) };
       });
-      producer.send({ topic: "skip-test-topic", messages });
+      await producer.send({ topic: "skip-test-topic", messages });
 
       let retries = 0;
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       while (true) {
         try {
           await timeout(100 * 2 ** retries); // exponential backoff until kafka converges

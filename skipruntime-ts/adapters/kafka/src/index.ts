@@ -8,7 +8,7 @@ import type { Consumer, ConsumerConfig } from "kafkajs";
  * Adapter for easily creating Kafka _consumers_, subscribing to external event/message streams and exposing their content as eager collections within the Skip runtime.
  */
 export class KafkaExternalService implements ExternalService {
-  private consumers: Map<string, Consumer> = new Map();
+  private consumers: Map<string, Consumer> = new Map<string, Consumer>();
   private consumerOptions: ConsumerConfig;
   private client: Kafka;
 
@@ -36,7 +36,7 @@ export class KafkaExternalService implements ExternalService {
    * Subscribe to a resource provided by the external service.
    *
    * @param instance - Instance identifier of the external resource.
-   * @param resource - Name of the Kafka topic to expose as a resource.
+   * @param topic - Name of the Kafka topic to expose as a resource.
    * @param params - Parameters of the external resource. TODO document special options here
    * @param callbacks - Callbacks to react on error/loading/update.
    * @param callbacks.error - Error callback.
@@ -60,17 +60,17 @@ export class KafkaExternalService implements ExternalService {
     const setup = async () => {
       await consumer.connect();
       await consumer.subscribe({ topic, fromBeginning });
-      consumer.run({
+      await consumer.run({
+        // eslint-disable-next-line @typescript-eslint/require-await
         eachBatch: async ({ batch }) => {
-          const entries: Map<string, string[]> = new Map();
+          const entries: Map<string, string[]> = new Map<string, string[]>();
           batch.messages.forEach((msg) => {
             const key = String(msg.key);
             const val = String(msg.value);
             if (entries.has(key)) entries.get(key)!.push(val);
             else entries.set(key, [val]);
           });
-          const ea = Array.from(entries);
-          callbacks.update(ea, false);
+          callbacks.update(Array.from(entries), false);
         },
       });
     };
@@ -87,7 +87,7 @@ export class KafkaExternalService implements ExternalService {
     const consumer: Consumer | undefined = this.consumers.get(instance);
     if (consumer !== undefined) {
       this.consumers.delete(instance);
-      consumer.disconnect().catch((e) => {
+      consumer.disconnect().catch((e: unknown) => {
         console.error(`Error disconnecting Kafka consumer ${instance}: ${e}`);
         throw e;
       });
@@ -101,7 +101,7 @@ export class KafkaExternalService implements ExternalService {
   }
 
   shutdown(): void {
-    this._shutdown().catch((e) => {
+    this._shutdown().catch((e: unknown) => {
       console.error(`Error shutting down KafkaExternalService: ${e}`);
       throw e;
     });
