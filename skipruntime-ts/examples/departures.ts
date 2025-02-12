@@ -7,6 +7,9 @@ import type {
 import { runService } from "@skipruntime/server";
 import { GenericExternalService, Polled } from "@skipruntime/helpers";
 
+const platform: "wasm" | "native" =
+  process.env["SKIP_PLATFORM"] == "native" ? "native" : "wasm";
+
 type Departure = {
   year: string;
   origin: string;
@@ -72,6 +75,7 @@ const service: SkipService<ResourceInputs, ResourceInputs> = {
 const server = await runService(service, {
   control_port: 3591,
   streaming_port: 3590,
+  platform,
 });
 
 function shutdown() {
