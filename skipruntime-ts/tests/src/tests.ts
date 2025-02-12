@@ -1398,9 +1398,10 @@ export function initTests(
         const noise = Math.floor(Math.random() * 1_000_000_000);
         return { key: String(noise), value: String(1 + (noise % 5)) };
       });
-      producer.send({ topic: "skip-test-topic", messages });
+      await producer.send({ topic: "skip-test-topic", messages });
 
       let retries = 0;
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       while (true) {
         try {
           await timeout(100 * 2 ** retries); // exponential backoff until kafka converges
