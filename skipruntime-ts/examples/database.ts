@@ -13,6 +13,9 @@ import Database from "better-sqlite3";
   This is the skip runtime service of the database example  
 */
 
+const platform: "wasm" | "native" =
+  process.env["SKIP_PLATFORM"] == "native" ? "native" : "wasm";
+
 /*****************************************************************************/
 // Populate the database with made-up values (if it's not already there)
 /*****************************************************************************/
@@ -81,6 +84,7 @@ db.close();
 const server = await runService(serviceWithInitialData(data), {
   streaming_port: 8080,
   control_port: 8081,
+  platform,
 });
 
 function shutdown() {

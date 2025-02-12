@@ -9,6 +9,9 @@ import {
 
 import { runService } from "@skipruntime/server";
 
+const platform: "wasm" | "native" =
+  process.env["SKIP_PLATFORM"] == "native" ? "native" : "wasm";
+
 type UserID = number;
 type GroupID = number;
 type User = { name: string; active?: boolean; friends: UserID[] };
@@ -117,6 +120,7 @@ const service = {
 const server = await runService(service, {
   streaming_port: 8080,
   control_port: 8081,
+  platform,
 });
 function shutdown() {
   server.close();

@@ -10,6 +10,9 @@ import type {
 
 import { runService } from "@skipruntime/server";
 
+const platform: "wasm" | "native" =
+  process.env["SKIP_PLATFORM"] == "native" ? "native" : "wasm";
+
 class ComputeExpression implements LazyCompute<string, string | number> {
   constructor(private skall: EagerCollection<string, number | string>) {}
 
@@ -95,6 +98,7 @@ const service = {
 const server = await runService(service, {
   control_port: 9999,
   streaming_port: 9998,
+  platform,
 });
 
 function shutdown() {

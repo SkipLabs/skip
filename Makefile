@@ -166,7 +166,7 @@ test-skjson:
 
 .PHONY: test-skipruntime-ts
 test-skipruntime-ts:
-	$(MAKE) -C skipruntime-ts test test-examples test-error-types
+	$(MAKE) -C skipruntime-ts install-all build-with-exemple run-test run-wasm-examples run-native-examples test-error-types
 
 test-%:
 	cd $* && skargo test --profile $(SKARGO_PROFILE)
