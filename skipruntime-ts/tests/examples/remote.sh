@@ -13,11 +13,11 @@ if [ "$#" -lt 2 ]; then
 fi
 
 if [ "$3" = "native" ]; then
-    echo "Run remote with native platform"
+    echo "Running 'remote' example on @skipruntime/native"
     LD_LIBRARY_PATH=$(realpath ../../build/skipruntime) SKIP_PLATFORM="native" node dist/sum.js >/dev/null &
     LD_LIBRARY_PATH=$(realpath ../../build/skipruntime) SKIP_PLATFORM="native" node dist/remote.js >/dev/null &
 else
-    echo "Run remote with wasm platform"
+    echo "Running 'remote' example on @skipruntime/wasm"
     node dist/sum.js >/dev/null &
     node dist/remote.js >/dev/null &
 fi

@@ -13,10 +13,10 @@ if [ "$#" -lt 2 ]; then
 fi
 
 if [ "$3" = "native" ]; then
-    echo "Run database with native platform"
+    echo "Running 'database' example on @skipruntime/native"
     LD_LIBRARY_PATH=$(realpath ../../build/skipruntime) SKIP_PLATFORM="native" node dist/database.js >/dev/null &
 else
-    echo "Run database with wasm platform"
+    echo "Running 'database' example on @skipruntime/wasm"
     node dist/database.js >/dev/null &
 fi
 

@@ -13,10 +13,10 @@ if [ "$#" -lt 2 ]; then
 fi
 
 if [ "$3" = "native" ]; then
-    echo "Run sum with native platform"
+    echo "Running 'sum' example on @skipruntime/native"
     LD_LIBRARY_PATH=$(realpath ../../build/skipruntime) SKIP_PLATFORM="native" node dist/sum.js >/dev/null &
 else
-    echo "Run sum with wasm platform"
+    echo "Running 'sum' example on @skipruntime/wasm"
     node dist/sum.js >/dev/null &
 fi
 
