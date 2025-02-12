@@ -19,6 +19,7 @@ base class LazyResult {
 
 class LazyDir{
   time: Time,
+  timeStack: TimeStack,
   dirName: DirName,
   data: SortedMap<Key, LazyResult> = SortedMap[],
   lazyFun: ((mutable Context, Key) ~> LazyResult),
@@ -30,6 +31,10 @@ class LazyDir{
 
   fun getTime(): Time {
     this.time
+  }
+
+  fun getTimeStack(): TimeStack {
+    this.timeStack
   }
 
   fun reset(context: mutable Context): void {
@@ -108,7 +113,13 @@ class LazyDir{
       };
       ldir
     | _ ->
-      newDir = LazyDir{time, dirName, lazyFun, collect};
+      newDir = LazyDir{
+        time,
+        timeStack => TimeStack::create(context, time),
+        dirName,
+        lazyFun,
+        collect,
+      };
       updateDirtyReaders(context, Path::create(dirName.tag(), DirTag()));
       context.setDir(dirName, newDir);
       newDir
@@ -179,7 +190,7 @@ class LazyDir{
       | Some(a) -> Some(ArrowKey(a.childName, this.dirName, key))
       | _ -> None()
       };
-      arrow.each(context.enter);
+      arrow.each(a -> context.enter(a, this.timeStack));
       res = this.lazyFun(context, key);
       arrow.each(context.leave);
       res

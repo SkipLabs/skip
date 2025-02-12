@@ -642,6 +642,7 @@ mutable class FixedDataMapIterator<T> private {
 
 class EagerDir{
   time: Time,
+  timeStack: TimeStack,
   dirName: DirName,
   input: Bool,
   fixedData: FixedDataMap,
@@ -896,6 +897,10 @@ class EagerDir{
     this.time
   }
 
+  fun getTimeStack(): TimeStack {
+    this.timeStack
+  }
+
   private fun getAllKeysWithValues(): SortedSet<Key> {
     result = SortedSet[];
     this.unsafeGetFileIter().each(kv -> {
@@ -925,6 +930,7 @@ class EagerDir{
     oldVec: mutable Vector<(Path, MInfo)>,
     parent: EagerDir,
     childName: DirName,
+    timeStack: TimeStack,
     f: MapFun,
     acc: mutable Vector<FixedRow<Array<File>>>,
     current: mutable IntRef,
@@ -943,6 +949,7 @@ class EagerDir{
         oldVec,
         parent.dirName,
         childName,
+        timeStack,
         key,
         fixedFiles,
         f,
@@ -971,6 +978,7 @@ class EagerDir{
       oldVec,
       parent.dirName,
       childName,
+      timeStack,
       key,
       fixedFiles,
       f,
@@ -982,6 +990,7 @@ class EagerDir{
     context: mutable Context,
     parent: EagerDir,
     childName: DirName,
+    timeStack: TimeStack,
     f: MapFun,
     currentStart: Int,
     currentEnd: Int,
@@ -1013,6 +1022,7 @@ class EagerDir{
           oldVec,
           parent,
           childName,
+          timeStack,
           f,
           acc,
           current,
@@ -1035,6 +1045,7 @@ class EagerDir{
         oldVec,
         parent.dirName,
         childName,
+        timeStack,
         key,
         parent.getIterRaw(key),
         f,
@@ -1047,7 +1058,16 @@ class EagerDir{
 
     while (current.value <= currentEnd) {
       fixedKey = parent.fixedData.data[current.value].key;
-      static::fixedMapData(context, oldVec, parent, childName, f, acc, current);
+      static::fixedMapData(
+        context,
+        oldVec,
+        parent,
+        childName,
+        timeStack,
+        f,
+        acc,
+        current,
+      );
       !size = size + 1;
       if (shouldGC(obstack) != 0) {
         return (acc, oldVec, Some(fixedKey), current.value);
@@ -1061,6 +1081,7 @@ class EagerDir{
     oldVec: mutable Vector<(Path, MInfo)>,
     parent: EagerDir,
     childName: DirName,
+    timeStack: TimeStack,
     f: MapFun,
     acc: mutable Vector<FixedRow<Array<File>>>,
     rangeOpt: ?KeyRange,
@@ -1101,6 +1122,7 @@ class EagerDir{
             context,
             parent,
             childName,
+            timeStack,
             f,
             lcurrent,
             currentEnd,
@@ -1126,12 +1148,13 @@ class EagerDir{
     oldVec: mutable Vector<(Path, MInfo)>,
     parentName: DirName,
     childName: DirName,
+    timeStack: TimeStack,
     key: Key,
     valueIter: mutable Iterator<File>,
     f: MapFun,
   ): void {
     arrow = ArrowKey(parentName, childName, key);
-    context.enter(arrow);
+    context.enter(arrow, timeStack);
 
     if (context.debugMode) {
       print_string(`MAP_ROW: ${parentName} ${key}`);
@@ -1224,6 +1247,13 @@ class EagerDir{
     if (context.debugMode) {
       print_string(`REUSING: ${childName}`);
     };
+    childDir = context.unsafeGetEagerDir(childName);
+    time = context.timeStamp();
+    !childDir = childDir with {
+      time,
+      timeStack => TimeStack::create(context, time),
+    };
+    context.setDir(childName, childDir);
     context.!newDirs = context.newDirs.set(childName);
   }
 
@@ -1297,6 +1327,9 @@ class EagerDir{
       acc = mutable Vector[];
       oldVec = mutable Vector[];
 
+      time = context.timeStamp();
+      timeStack = TimeStack::create(context, time);
+
       if (!unsafeSkipInit) {
         for (parentName => parentData in parents) {
           for (p in parentData) {
@@ -1309,6 +1342,7 @@ class EagerDir{
                 oldVec,
                 parent,
                 childName,
+                timeStack,
                 f,
                 acc,
                 None(),
@@ -1320,6 +1354,7 @@ class EagerDir{
                   oldVec,
                   parent,
                   childName,
+                  timeStack,
                   f,
                   acc,
                   Some(range),
@@ -1331,7 +1366,6 @@ class EagerDir{
       };
 
       fixedData = FixedDataMap::create(acc);
-      time = context.timeStamp();
       totalSize = acc.size();
       reducer = reducerOpt.map(ireducer ->
         Reducer::create(fixedData, ireducer)
@@ -1352,6 +1386,7 @@ class EagerDir{
 
       EagerDir{
         time,
+        timeStack,
         dirName => childName,
         input => false,
         parents,
@@ -1545,6 +1580,7 @@ class EagerDir{
   ): void {
     parent = context.unsafeGetEagerDir(parentName);
     childName = childRef.dirName;
+    timeStack = childRef.timeStack;
 
     dirty = SortedSet[];
     if (contextDirtyReaders.containsKey(parent.dirName)) {
@@ -1591,7 +1627,7 @@ class EagerDir{
       childRef,
       (contextOpt, key, child) ~> {
         ctx = contextOpt.fromSome();
-        ctx.enter(ArrowKey(parentName, childName, key));
+        ctx.enter(ArrowKey(parentName, childName, key), timeStack);
         path = Path::create(parentName, key);
         oldInfo = static::getOld(child, path);
         oldKeys = SortedSet<Key>::createFromItems(oldInfo.getKeys());
@@ -1796,7 +1832,8 @@ class EagerDir{
       | Some(childDir) ->
         !childDirs = childDirs.set(childName);
         context.addToUpdate(
-          (childDir.time, parentTime),
+          childDir.timeStack,
+          parentTime,
           Arrow(this.dirName, childName),
         )
       }
@@ -1812,7 +1849,8 @@ class EagerDir{
       | None() -> continue
       | Some(childDir) ->
         context.addToUpdate(
-          (childDir.time, parentTime),
+          childDir.timeStack,
+          parentTime,
           Arrow(this.dirName, childName),
         )
       }
