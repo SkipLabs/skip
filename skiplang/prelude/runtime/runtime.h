@@ -173,7 +173,7 @@ typedef struct {
   uint16_t m_unused_internedMetadataByteSize;
   SkipInt m_userByteSize;
   SkipInt m_unused_padding;
-  SkipInt m_refMask[0];
+  SkipInt m_refMask[];
   // a 0-terminated name follows if m_hasName is true
 } SKIP_gc_type_t;
 
@@ -202,7 +202,7 @@ SKIP_gc_type_t* get_gc_type(char* skip_object);
 
 typedef struct {
   void** vtable;
-  char data[0];
+  char data[];
 } sk_class_inst_t;
 
 /*****************************************************************************/
@@ -215,7 +215,7 @@ typedef struct {
 #endif
   uint32_t length;
   void** vtable;
-  char data[0];
+  char data[];
 } sk_array_t;
 
 #define skip_array_len(obj) (container_of(obj, sk_array_t, data)->length)
@@ -292,7 +292,7 @@ typedef struct {
   uint32_t size;
   uint32_t hash;
 #endif
-  char data[0];
+  char data[];
 } sk_string_t;
 
 #define sk_string_header_size (offsetof(sk_string_t, data))

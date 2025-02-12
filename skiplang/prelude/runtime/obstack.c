@@ -68,7 +68,7 @@ typedef struct sk_obstack {
   struct sk_obstack* previous;
   size_t size;
   sk_saved_obstack_t saved;
-  char user_data[0];
+  char user_data[];
 } sk_obstack_t;
 
 static __thread sk_saved_obstack_t init_saved = {NULL, NULL, NULL};
