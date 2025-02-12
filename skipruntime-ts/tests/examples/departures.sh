@@ -13,10 +13,10 @@ if [ "$#" -lt 2 ]; then
 fi
 
 if [ "$3" = "native" ]; then
-    echo "Run departures with native platform"
+    echo "Running 'departures' example on @skipruntime/native"
     LD_LIBRARY_PATH=$(realpath ../../build/skipruntime) SKIP_PLATFORM="native" node dist/departures.js >/dev/null &
 else
-    echo "Run departures with wasm platform"
+    echo "Running 'departures' example on @skipruntime/wasm"
     node dist/departures.js >/dev/null &
 fi
 
