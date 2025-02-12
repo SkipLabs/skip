@@ -9,6 +9,9 @@ SKARGO_PROFILE?=release
 SKDB_WASM=sql/target/wasm32-unknown-unknown/$(SKARGO_PROFILE)/skdb.wasm
 SKDB_BIN=sql/target/host/$(SKARGO_PROFILE)/skdb
 SDKMAN_DIR?=$(HOME)/.sdkman
+SKIPRUNTIME?=$(CURDIR)/build/skipruntime
+
+export SKIPRUNTIME
 
 ################################################################################
 # skdb wasm + js client
