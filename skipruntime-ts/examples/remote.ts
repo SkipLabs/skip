@@ -1,17 +1,17 @@
 import type {
   Context,
   EagerCollection,
-  Values,
+  Mapper,
   NamedCollections,
   Resource,
+  Values,
 } from "@skipruntime/core";
-import { ManyToOneMapper } from "@skipruntime/core";
 import { SkipExternalService } from "@skipruntime/helpers";
 import { runService } from "@skipruntime/server";
 
-class Mult extends ManyToOneMapper<string, number, number> {
-  mapValues(values: Values<number>): number {
-    return values.toArray().reduce((p, c) => p * c, 1);
+class Mult implements Mapper<string, number, string, number> {
+  mapEntry(key: string, values: Values<number>): Iterable<[string, number]> {
+    return [[key, values.toArray().reduce((p, c) => p * c, 1)]];
   }
 }
 

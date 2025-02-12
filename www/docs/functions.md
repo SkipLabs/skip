@@ -29,55 +29,72 @@ interface Mapper<
   K2 extends Json,
   V2 extends Json,
 > {
-  mapElement(key: K1, values: NonEmptyIterator<V1>): Iterable<[K2, V2]>;
+  mapEntry(key: K1, values: Values<V1>): Iterable<[K2, V2]>;
 }
 ```
 
-For example, in a social media application with Users and Groups, we might want to maintain the set of active users for each group.
-First, we define a mapping function:
+First, let us revisit the example `Mapper` from the [previous section](getting_started.md):
+```typescript
+// Mapper function to compute the active users of each group
+class ActiveMembers implements Mapper<GroupID, Group, GroupID, UserID> {
+  constructor(private users: EagerCollection<UserID, User>) {}
+
+  mapEntry(gid: GroupID, group: Values<Group>): Iterable<[GroupID, UserID]> {
+    return group
+      .getUnique()
+      .members.flatMap((uid) =>
+        this.users.getUnique(uid).active ? [[gid, uid]] : [],
+      );
+  }
+}
+```
+The type instantiation `Mapper<GroupID, Group, GroupID, UserID>` indicates that this `Mapper` will be applied over a collection with `GroupID` keys and `Group` values, and produce a collection with `GroupID` keys and `UserID` values.
+Note that while this function is mapped over a `GroupID` to `Group` collection, it also has access to the `users` collection provided to the constructor, and can read from `users` while processing each entry.
+The Skip Runtime tracks that the output collection depends on both the input collection as well as the `users` collection, and keeps the output collection up-to-date in reaction to changes to either dependency.
+
+Extending that social media application with Users and Groups example, suppose we want to maintain an index providing the set of groups of which each user is a member.
+First, we define a mapper function:
 
 ```typescript
-class ActiveUsersByGroup implements Mapper<UserID, User, GroupID, UserID> {
-  mapElement(
-    uid: UserID,
-    users: NonEmptyIterator<User>,
-  ): Iterable<[GroupID, UserID]> {
-    const user = users.uniqueValue();
-    if (user.isActive) return user.groups.map((gid) => [gid, uid]);
-    else return [];
+// Mapper function to compute the groups each user belongs to
+class GroupsPerUser implements Mapper<GroupID, Group, UserID, GroupID> {
+  mapEntry(gid: GroupID, group: Values<Group>): Iterable<[UserID, GroupID]> {
+    return group.getUnique().members.map((uid) => [uid, gid]);
   }
 }
 ```
 
-Then, given an eager collection `users` of type `EagerCollection<UserID, User>`, we can create an eager collection of active group members:
+Then, given an eager collection `groups` of type `EagerCollection<GroupID, Group>`, we can create an eager collection of groups per user:
 
 ```typescript
-const activeGroupMembers : EagerCollection<GroupID, UserID> = users.map(ActiveUsersByGroup);
+const groupsPerUser: EagerCollection<UserID, GroupID> = groups.map(GroupsPerUser);
 ```
 
-This general form of `Mapper` allows arbitrary manipulation of collections' key/value structure, but is often unnecessary and clunky for simple maps, especially those that preserve the key structure of their input and just manipulate the values.
+This general form of `Mapper` allows arbitrary manipulation of collections' key/value structure.
+For example, note that the key types of the input and output collections of `GroupsPerUser` are different, as are the value types.
 
-Simpler mappers that maintain input collections' key/value structure one-to-one can be defined more succinctly.
-For example, to compute the number of groups each user belongs to, we can define a `OneToOneMapper`:
+Simpler mappers can maintain input collections' key/value structure _one-to-one_ (mapping one input value to one output value for the same key); for example, to compute each user's number of friends, we can define a `Mapper`:
 
 ```typescript
-class GroupsPerUser extends OneToOneMapper<UserID, User, number> {
-  mapValue(user: User) : number {
-    return user.groups.length
+// Mapper function to compute each user's number of friends
+class NumFriendsPerUser implements Mapper<UserID, User, UserID, number> {
+  mapEntry(uid: UserID, user: Values<User>): Iterable<[UserID, number]> {
+    return [[uid, user.getUnique().friends.length]];
   }
 }
 ```
 
-It is also common to collapse multiple values for a single key down to some aggregate with a `ManyToOneMapper`; for example, to maintain a _count_ of active users per group:
+It is also common to collapse multiple values for a single key down to some aggregate with a _many-to-one_ `Mapper`; for example, to compute the number of active users in each group:
 
 ```typescript
-class CountUsers extends ManyToOneMapper<GroupID, UserID, number> {
-  mapValues(values: NonEmptyIterator<UserID>): number {
-    return values.toArray().length;
+// Mapper function to compute a _count_ of active users per group
+class NumActiveMembers implements Mapper<GroupID, UserID, GroupID, number> {
+  mapEntry(gid: GroupID, uids: Values<UserID>): Iterable<[GroupID, number]> {
+    return [[gid, uids.toArray().length]];
   }
 }
 ```
 
-By mapping `CountUsers` over the eager collection of group members, we can produce an eager collection `activeGroupMembers.map(CountUsers)` of type `EagerCollection<GroupID, number>` with counts of active users per group, maintained up-to-date as users' activity status and group memberships change.
+By mapping `NumActiveMembers` over the eager collection of active group members, we can produce an eager collection `activeMembers.map(NumActiveMembers)` of type `EagerCollection<GroupID, number>` with counts of active users per group, maintained up-to-date as users' activity status and group memberships change.
 
-Note that this particular mapper -- counting the number of values per key -- is available as a generic utility `Count` in Skip with a fast native implementation; this example is provided just to demonstrate a use of `ManyToOneMapper`.
+Note that this particular mapper -- counting the number of values per key -- would be better implemented as a `Reducer`, which is in fact available as a generic utility `Count` in Skip with a fast native implementation; this example is provided just to demonstrate use of a collapsing `Mapper`.

@@ -1,12 +1,12 @@
 import type {
   Context,
-  LazyCompute,
   EagerCollection,
   LazyCollection,
+  LazyCompute,
+  Mapper,
   Resource,
+  Values,
 } from "@skipruntime/core";
-
-import { OneToOneMapper } from "@skipruntime/core";
 
 import { runService } from "@skipruntime/server";
 
@@ -53,21 +53,22 @@ class ComputeExpression implements LazyCompute<string, string | number> {
   }
 }
 
-class CallCompute extends OneToOneMapper<
-  string,
-  number | string,
-  number | string
-> {
-  constructor(private evaluator: LazyCollection<string, number | string>) {
-    super();
-  }
+class CallCompute
+  implements Mapper<string, number | string, string, number | string>
+{
+  constructor(private evaluator: LazyCollection<string, number | string>) {}
 
-  mapValue(value: number | string, key: string): number | string {
-    if (typeof value == "string" && value.startsWith("=")) {
-      return this.evaluator.getUnique(key);
-    } else {
-      return value;
-    }
+  mapEntry(
+    key: string,
+    values: Values<number | string>,
+  ): Iterable<[string, number | string]> {
+    return values
+      .toArray()
+      .map((value) =>
+        typeof value == "string" && value.startsWith("=")
+          ? [key, this.evaluator.getUnique(key)]
+          : [key, value],
+      );
   }
 }
 
