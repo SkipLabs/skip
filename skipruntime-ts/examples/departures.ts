@@ -5,7 +5,11 @@ import type {
   SkipService,
 } from "@skipruntime/core";
 import { runService } from "@skipruntime/server";
-import { GenericExternalService, Polled } from "@skipruntime/helpers";
+import {
+  GenericExternalService,
+  Polled,
+  defaultParamEncoder,
+} from "@skipruntime/helpers";
 
 const platform: "wasm" | "native" =
   process.env["SKIP_PLATFORM"] == "native" ? "native" : "wasm";
@@ -66,6 +70,8 @@ const service: SkipService<ResourceInputs, ResourceInputs> = {
         "https://api.unhcr.org/rsq/v1/departures",
         10000,
         (data: Result) => data.results.map((v, idx) => [idx, [v]]),
+        defaultParamEncoder,
+        { timeout: 1500 },
       ),
     }),
   },
