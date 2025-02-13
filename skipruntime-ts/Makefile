@@ -2,7 +2,9 @@ SHELL := /bin/bash
 
 SKARGO_PROFILE?=release
 NPM_WORKSPACES=$(shell jq --raw-output "[.workspaces[] | select((startswith(\"sql\") or contains(\"examples\")) | not)] | map(\"-w \" + .) | .[]" ../package.json)
+SKIPRUNTIME?=$(realpath $(CURDIR)/..)/build/skipruntime
 
+export SKIPRUNTIME
 
 .PHONY: install
 install:
