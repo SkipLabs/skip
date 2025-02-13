@@ -93,6 +93,7 @@ export class SkipServiceBroker {
    * Construct a broker for a Skip service at the given entry point.
    *
    * @param entrypoint - Entry point of backing service.
+   * @param timeout - Timeout for request, in milliseconds. Defaults to 1000ms.
    * @returns Method-call broker to service.
    */
   constructor(
@@ -101,6 +102,7 @@ export class SkipServiceBroker {
       streaming_port: 8080,
       control_port: 8081,
     },
+    private timeout?: number,
   ) {
     this.entrypoint = toHttp(entrypoint);
   }
@@ -121,7 +123,7 @@ export class SkipServiceBroker {
     const [data, _headers] = await fetchJSON<Entry<K, V>[]>(
       `${this.entrypoint}/v1/snapshot/${resource}`,
       "POST",
-      { body: params },
+      { body: params, timeout: this.timeout },
     );
     return data ?? [];
   }
@@ -144,7 +146,7 @@ export class SkipServiceBroker {
     const [data, _headers] = await fetchJSON<V[]>(
       `${this.entrypoint}/v1/snapshot/${resource}/lookup`,
       "POST",
-      { body: { key, params } },
+      { body: { key, params }, timeout: this.timeout },
     );
     return data ?? [];
   }
@@ -187,6 +189,7 @@ export class SkipServiceBroker {
   ): Promise<void> {
     await fetchJSON(`${this.entrypoint}/v1/inputs/${collection}`, "PATCH", {
       body: entries,
+      timeout: this.timeout,
     });
   }
 
@@ -216,6 +219,7 @@ export class SkipServiceBroker {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(params),
+      signal: AbortSignal.timeout(this.timeout ?? 1000),
     }).then((res) => res.text());
   }
 
@@ -228,6 +232,8 @@ export class SkipServiceBroker {
    * @returns {void}
    */
   async deleteUUID(uuid: string): Promise<void> {
-    await fetchJSON(`${this.entrypoint}/v1/streams/${uuid}`, "DELETE");
+    await fetchJSON(`${this.entrypoint}/v1/streams/${uuid}`, "DELETE", {
+      timeout: this.timeout,
+    });
   }
 }
