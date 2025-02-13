@@ -3,11 +3,14 @@ import { SkipServiceBroker } from "@skipruntime/helpers";
 
 const streaming_port = 3590;
 const control_port = 3591;
-const service = new SkipServiceBroker({
-  host: "localhost",
-  control_port,
-  streaming_port,
-});
+const service = new SkipServiceBroker(
+  {
+    host: "localhost",
+    control_port,
+    streaming_port,
+  },
+  2000,
+);
 
 // Time to wait (in milliseconds) for local/remote operations to complete,
 // allowing for reproducible/consistent test output
