@@ -118,6 +118,13 @@ jobs:
           PGPORT: 5432
           PGUSER: postgres
           PGPASSWORD: secret
+      - image: wurstmeister/zookeeper
+      - image: wurstmeister/kafka
+        environment:
+          KAFKA_ZOOKEEPER_CONNECT: "localhost:2181"
+          KAFKA_CREATE_TOPICS: "skip-test-topic:1:1"
+          KAFKA_LISTENERS: "PLAINTEXT://:9092"
+          KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://:9092"
     steps:
       - checkout
       - setup
