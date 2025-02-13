@@ -99,6 +99,10 @@ export function controlService(service: ServiceInstance): express.Express {
     }
   });
 
+  app.get("/v1/healthcheck", (_, res) => {
+    res.sendStatus(200);
+  });
+
   return app;
 }
 
