@@ -114,6 +114,14 @@ export class TimerResource implements ExternalResource {
   }
 }
 
+/**
+ * Encode params for external resource request.
+ *
+ * Produces a query string consisting of a leading `?` followed by the encoding of the `params` given by [URLSearchParams.toString](https://developer.mozilla.org/en-US/docs/Web/API/URLSearchParams/toString) when `params` is an object and otherwise a single key-value pair `params=JSON.stringify(params)`.
+ *
+ * @param params - Resource parameters.
+ * @returns Query string.
+ */
 export function defaultParamEncoder(params: Json): string {
   if (typeof params == "object") {
     const queryParams: { [param: string]: string } = {};
@@ -141,7 +149,6 @@ export class Polled<S extends Json, K extends Json, V extends Json>
    * Construct a `Polled` external resource.
    *
    * The URL of the external resource is formed by appending the given base `url` and the result of `encodeParams(params)` where `params` are the parameters provided when instantiating the resource.
-   * The default `encodeParams` function produces a query string consisting of a leading `?` followed by the encoding of the `params` given by [URLSearchParams.toString](https://developer.mozilla.org/en-US/docs/Web/API/URLSearchParams/toString) when `params` is an object and otherwise a single key-value pair `params=JSON.stringify(params)`.
    *
    * Note that the result of `encodeParams` contains the `?` separator, but it need not be at the beginning of the returned string, so some parameters can be used in part of the URL preceding the `?`.
    *
