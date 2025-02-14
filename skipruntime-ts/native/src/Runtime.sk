@@ -16,12 +16,6 @@ class ExistingResourceException() extends Exception {
   }
 }
 
-class ExistingSubscriptionException() extends Exception {
-  fun getMessage(): String {
-    "A resource instance with specified identifier already subscribed."
-  }
-}
-
 class UseExternalResourceException() extends Exception {
   fun getMessage(): String {
     "useExternalResource is not allowed in a lazy computation graph."
@@ -1358,7 +1352,7 @@ fun subscribe(
   );
   subId = `subscription.${identifier}`;
   if (context.getPersistent(subId).isSome()) {
-    throw ExistingSubscriptionException()
+    return -2
   };
   resourceHdl.maybeGet(context, sid) match {
   | Some(definition) ->
