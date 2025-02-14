@@ -5,10 +5,11 @@
  */
 
 export {
+  defaultParamEncoder,
   type ExternalResource,
   GenericExternalService,
   Polled,
-  defaultParamEncoder,
+  TimerResource,
 } from "./external.js";
 export { SkipExternalService } from "./remote.js";
 export { SkipServiceBroker, fetchJSON, type Entrypoint } from "./rest.js";
