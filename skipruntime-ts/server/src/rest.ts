@@ -2,6 +2,7 @@ import express from "express";
 import {
   ServiceInstance,
   SkipUnknownCollectionError,
+  SkipResourceInstanceInUseError,
   SkipRESTError,
 } from "@skipruntime/core";
 import type { CollectionUpdate, Entry, Json } from "@skipruntime/core";
@@ -146,6 +147,8 @@ export function streamingService(service: ServiceInstance): express.Express {
       console.log(e);
       if (e instanceof SkipUnknownCollectionError) {
         res.sendStatus(404);
+      } else if (e instanceof SkipResourceInstanceInUseError) {
+        res.sendStatus(409);
       } else {
         res.sendStatus(500);
       }
