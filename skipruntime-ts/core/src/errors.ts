@@ -44,3 +44,12 @@ export class SkipClassNameError extends SkipError {}
  * @hideconstructor
  */
 export class SkipNonUniqueValueError extends SkipError {}
+
+/**
+ * Exception indicating a resource instance is already in use.
+ *
+ * Only one stream is alowed by resource instance.
+ * When a subcribed instance is newly subscribed the `SkipResourceInstanceInUseError` is thrown.
+ * @hideconstructor
+ */
+export class SkipResourceInstanceInUseError extends SkipError {}
