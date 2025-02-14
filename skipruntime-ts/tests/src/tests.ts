@@ -15,12 +15,13 @@ import type {
   ExternalService,
   ServiceInstance,
 } from "@skipruntime/core";
-import { SkipNonUniqueValueError, Count, Sum } from "@skipruntime/core";
-
+import { SkipNonUniqueValueError } from "@skipruntime/core";
 import {
-  TimerResource,
+  Count,
   GenericExternalService,
-} from "@skipruntime/helpers/external.js";
+  Sum,
+  TimerResource,
+} from "@skipruntime/helpers";
 
 import { it as mit, type AsyncFunc } from "mocha";
 

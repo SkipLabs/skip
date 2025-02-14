@@ -55,7 +55,6 @@ import {
 } from "./binding.js";
 
 export { sk_freeze, isSkManaged };
-export { Sum, Min, Max, Count } from "./utils.js";
 export * from "./api.js";
 export * from "./errors.js";
 
