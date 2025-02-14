@@ -42,8 +42,8 @@ import {
 
 import {
   SkipClassNameError,
-  SkipError,
   SkipNonUniqueValueError,
+  SkipResourceInstanceInUseError,
   SkipUnknownCollectionError,
 } from "./errors.js";
 import {
@@ -662,8 +662,12 @@ export class ServiceInstance {
       throw new SkipUnknownCollectionError(
         `Unknown resource instance '${resourceInstanceId}'`,
       );
+    } else if (session == -2n) {
+      throw new SkipResourceInstanceInUseError(
+        `Resource instance '${resourceInstanceId}' cannot be subscribed twice.`,
+      );
     } else if (session < 0n) {
-      throw new SkipError("Unknown error");
+      throw this.refs.handles.deleteHandle(Number(-session) as Handle<Error>);
     }
     return session as SubscriptionID;
   }
