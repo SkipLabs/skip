@@ -27,8 +27,11 @@ file10=$(mktemp /tmp/file.XXXXXX)
 
 rm -Rf "$db" "$tailfile2" "$tailfile3" "$tailfile4" "$tailfile5" "$tailfile6" "$tailfile7" "$tailfile8" "$tailfile9" "$tailfile10" "$file1" "$file2" "$file3" "$file4" "$file5" "$file6" "$file7" "$file8" "$file9" "$file10"
 
-if [ -z "$SKARGO_PROFILE" ]; then
-    SKARGO_PROFILE=dev
+if [ -z "$SKDB_BIN" ]; then
+    if [ -z "$SKARGO_PROFILE" ]; then
+        SKARGO_PROFILE=dev
+    fi
+    SKDB_BIN="skargo run -q --profile $SKARGO_PROFILE -- "
 fi
 
 $SKDB_BIN --init "$db"

@@ -1,10 +1,13 @@
 #!/bin/bash
 
-if [ -z "$SKARGO_PROFILE" ]; then
-    SKARGO_PROFILE=dev
+if [ -z "$SKDB_BIN" ]; then
+    if [ -z "$SKARGO_PROFILE" ]; then
+        SKARGO_PROFILE=dev
+    fi
+    SKDB_BIN="skargo run -q --manifest-path ./sql/Skargo.toml --profile $SKARGO_PROFILE -- "
 fi
 
-SKDB="skargo run -q --manifest-path ./sql/Skargo.toml --profile $SKARGO_PROFILE -- "
+SKDB=$SKDB_BIN
 
 rm -f /tmp/data
 rm -f /tmp/data2

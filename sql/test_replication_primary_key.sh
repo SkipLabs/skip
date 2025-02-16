@@ -1,10 +1,12 @@
 #!/bin/bash
 
-if [ -z "$SKARGO_PROFILE" ]; then
-    SKARGO_PROFILE=dev
+if [ -z "$SKDB_BIN" ]; then
+    if [ -z "$SKARGO_PROFILE" ]; then
+        SKARGO_PROFILE=dev
+    fi
+    SKDB_BIN="skargo run -q --profile $SKARGO_PROFILE -- "
 fi
 
-SKDB_BIN="skargo run -q --profile $SKARGO_PROFILE -- "
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 SERVER_DB=/tmp/server.db
