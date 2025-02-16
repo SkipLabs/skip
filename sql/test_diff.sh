@@ -6,10 +6,12 @@ fi
 
 export SKDB_CMD="skargo run -q --profile $SKARGO_PROFILE -- "
 
-pass() { printf "%-50s OK\n" "$1:"; }
-fail() { printf "%-50s FAILED\n" "$1:"; }
+pass() { printf "%-55s OK\n" "$1:"; }
+fail() { printf "%-55s FAILED\n" "$1:"; }
 
 run_diff () {
+    test_id=$1
+    shift
     use_sqlite=true
     if [ "$1" = "--no-sqlite" ]; then
         use_sqlite=false
@@ -21,7 +23,8 @@ run_diff () {
     shift
     more_scripts=("$@")
 
-    TMP_DIR=$(mktemp -t --directory skdb.test_diff.XXXXXXXX)
+    TMP_DIR=skdb.test_diff.$test_id
+    mkdir -p "$TMP_DIR"
     # shellcheck disable=SC2064 # Intended immediate expansion
     trap "rm -rf '$TMP_DIR'" EXIT
 
@@ -60,9 +63,9 @@ run_diff () {
 
         diff "$TMP_DIR/kk1" "$TMP_DIR/kk2"
         if [ $? -eq 0 ]; then
-            pass "$views_script (part-1)"
+            pass "$test_id - $views_script (part-1)"
         else
-            fail "$views_script (part-1)"
+            fail "$test_id - $views_script (part-1)"
         fi
     fi
 
@@ -70,11 +73,10 @@ run_diff () {
 
     diff "$TMP_DIR/kk1" "$TMP_DIR/kk3" > /dev/null
     if [ $? -eq 0 ]; then
-        pass "$views_script (part-2)"
+        pass "$test_id - $views_script (part-2)"
     else
-        fail "$views_script (part-2)"
+        fail "$test_id - $views_script (part-2)"
     fi
-
 }
 
 export -f run_diff pass fail
@@ -86,43 +88,43 @@ if ${CIRCLECI:-false}; then
 fi
 
 parallel "${LIMITING[@]}" --colsep ' ' run_diff <<END
-test/diff/select2_create.sql test/diff/select2_min_views.sql test/diff/select2_inserts.sql
-test/diff/select2_create.sql test/diff/select2_min_views.sql test/diff/select2_inserts.sql test/diff/select2_deletes.sql
-test/diff/select2_create.sql test/diff/select2_min_views.sql test/diff/select2_inserts.sql test/diff/select2_deletes.sql test/diff/select2_inserts.sql
-test/diff/select1_create.sql test/diff/select1_views.sql test/diff/select1_inserts.sql
-test/diff/select1_float_create.sql test/diff/select1_float_views.sql test/diff/select1_float_inserts.sql
-test/diff/select2_create.sql test/diff/select2_views.sql test/diff/select2_inserts.sql
-test/diff/select3_create.sql test/diff/select3_views.sql test/diff/select3_inserts.sql
-test/diff/select3_create.sql test/diff/select3_views.sql test/diff/select3_inserts.sql test/diff/select3_partial_delete.sql
-test/diff/select4.1-create.sql test/diff/select4.1-views.sql test/diff/select4.1-inserts.sql
-test/diff/select5.1-create.sql test/diff/select5.1-views.sql test/diff/select5.1-inserts.sql
-test/diff/groupby_create.sql test/diff/groupby_views.sql test/diff/groupby_inserts.sql
-test/diff/groupby_create.sql test/diff/groupby_views.sql test/diff/groupby_inserts.sql test/diff/groupby_delete.sql
-test/diff/slt_good_0_create.sql test/diff/slt_good_0_views.sql test/diff/slt_good_0_inserts.sql
---no-sqlite test/diff/select2_create.sql test/diff/select2_min_views_limit1.sql test/diff/select2_inserts.sql
---no-sqlite test/diff/select2_create.sql test/diff/select2_min_views_limit1.sql test/diff/select2_inserts.sql test/diff/select2_deletes.sql
---no-sqlite test/diff/select2_create.sql test/diff/select2_min_views_limit1.sql test/diff/select2_inserts.sql test/diff/select2_deletes.sql test/diff/select2_inserts.sql
---no-sqlite test/diff/select1_create.sql test/diff/select1_views_limit1.sql test/diff/select1_inserts.sql
---no-sqlite test/diff/select1_float_create.sql test/diff/select1_float_views_limit1.sql test/diff/select1_float_inserts.sql
---no-sqlite test/diff/select2_create.sql test/diff/select2_views_limit1.sql test/diff/select2_inserts.sql
---no-sqlite test/diff/select3_create.sql test/diff/select3_views_limit1.sql test/diff/select3_inserts.sql
---no-sqlite test/diff/select3_create.sql test/diff/select3_views_limit1.sql test/diff/select3_inserts.sql test/diff/select3_partial_delete.sql
---no-sqlite test/diff/select4.1-create.sql test/diff/select4.1-views_limit1.sql test/diff/select4.1-inserts.sql
---no-sqlite test/diff/select5.1-create.sql test/diff/select5.1-views_limit1.sql test/diff/select5.1-inserts.sql
---no-sqlite test/diff/groupby_create.sql test/diff/groupby_views_limit1.sql test/diff/groupby_inserts.sql
---no-sqlite test/diff/groupby_create.sql test/diff/groupby_views_limit1.sql test/diff/groupby_inserts.sql test/diff/groupby_delete.sql
---no-sqlite test/diff/slt_good_0_create.sql test/diff/slt_good_0_views_limit1.sql test/diff/slt_good_0_inserts.sql
---no-sqlite test/diff/select2_create.sql test/diff/select2_min_views_limit5.sql test/diff/select2_inserts.sql
---no-sqlite test/diff/select2_create.sql test/diff/select2_min_views_limit5.sql test/diff/select2_inserts.sql test/diff/select2_deletes.sql
---no-sqlite test/diff/select2_create.sql test/diff/select2_min_views_limit5.sql test/diff/select2_inserts.sql test/diff/select2_deletes.sql test/diff/select2_inserts.sql
---no-sqlite test/diff/select1_create.sql test/diff/select1_views_limit5.sql test/diff/select1_inserts.sql
---no-sqlite test/diff/select1_float_create.sql test/diff/select1_float_views_limit5.sql test/diff/select1_float_inserts.sql
---no-sqlite test/diff/select2_create.sql test/diff/select2_views_limit5.sql test/diff/select2_inserts.sql
---no-sqlite test/diff/select3_create.sql test/diff/select3_views_limit5.sql test/diff/select3_inserts.sql
---no-sqlite test/diff/select3_create.sql test/diff/select3_views_limit5.sql test/diff/select3_inserts.sql test/diff/select3_partial_delete.sql
---no-sqlite test/diff/select4.1-create.sql test/diff/select4.1-views_limit5.sql test/diff/select4.1-inserts.sql
---no-sqlite test/diff/select5.1-create.sql test/diff/select5.1-views_limit5.sql test/diff/select5.1-inserts.sql
---no-sqlite test/diff/groupby_create.sql test/diff/groupby_views_limit5.sql test/diff/groupby_inserts.sql
---no-sqlite test/diff/groupby_create.sql test/diff/groupby_views_limit5.sql test/diff/groupby_inserts.sql test/diff/groupby_delete.sql
---no-sqlite test/diff/slt_good_0_create.sql test/diff/slt_good_0_views_limit5.sql test/diff/slt_good_0_inserts.sql
+01 test/diff/select2_create.sql test/diff/select2_min_views.sql test/diff/select2_inserts.sql
+02 test/diff/select2_create.sql test/diff/select2_min_views.sql test/diff/select2_inserts.sql test/diff/select2_deletes.sql
+03 test/diff/select2_create.sql test/diff/select2_min_views.sql test/diff/select2_inserts.sql test/diff/select2_deletes.sql test/diff/select2_inserts.sql
+04 test/diff/select1_create.sql test/diff/select1_views.sql test/diff/select1_inserts.sql
+05 test/diff/select1_float_create.sql test/diff/select1_float_views.sql test/diff/select1_float_inserts.sql
+06 test/diff/select2_create.sql test/diff/select2_views.sql test/diff/select2_inserts.sql
+07 test/diff/select3_create.sql test/diff/select3_views.sql test/diff/select3_inserts.sql
+08 test/diff/select3_create.sql test/diff/select3_views.sql test/diff/select3_inserts.sql test/diff/select3_partial_delete.sql
+09 test/diff/select4.1-create.sql test/diff/select4.1-views.sql test/diff/select4.1-inserts.sql
+10 test/diff/select5.1-create.sql test/diff/select5.1-views.sql test/diff/select5.1-inserts.sql
+11 test/diff/groupby_create.sql test/diff/groupby_views.sql test/diff/groupby_inserts.sql
+12 test/diff/groupby_create.sql test/diff/groupby_views.sql test/diff/groupby_inserts.sql test/diff/groupby_delete.sql
+13 test/diff/slt_good_0_create.sql test/diff/slt_good_0_views.sql test/diff/slt_good_0_inserts.sql
+14 --no-sqlite test/diff/select2_create.sql test/diff/select2_min_views_limit1.sql test/diff/select2_inserts.sql
+15 --no-sqlite test/diff/select2_create.sql test/diff/select2_min_views_limit1.sql test/diff/select2_inserts.sql test/diff/select2_deletes.sql
+16 --no-sqlite test/diff/select2_create.sql test/diff/select2_min_views_limit1.sql test/diff/select2_inserts.sql test/diff/select2_deletes.sql test/diff/select2_inserts.sql
+17 --no-sqlite test/diff/select1_create.sql test/diff/select1_views_limit1.sql test/diff/select1_inserts.sql
+18 --no-sqlite test/diff/select1_float_create.sql test/diff/select1_float_views_limit1.sql test/diff/select1_float_inserts.sql
+19 --no-sqlite test/diff/select2_create.sql test/diff/select2_views_limit1.sql test/diff/select2_inserts.sql
+20 --no-sqlite test/diff/select3_create.sql test/diff/select3_views_limit1.sql test/diff/select3_inserts.sql
+21 --no-sqlite test/diff/select3_create.sql test/diff/select3_views_limit1.sql test/diff/select3_inserts.sql test/diff/select3_partial_delete.sql
+22 --no-sqlite test/diff/select4.1-create.sql test/diff/select4.1-views_limit1.sql test/diff/select4.1-inserts.sql
+23 --no-sqlite test/diff/select5.1-create.sql test/diff/select5.1-views_limit1.sql test/diff/select5.1-inserts.sql
+24 --no-sqlite test/diff/groupby_create.sql test/diff/groupby_views_limit1.sql test/diff/groupby_inserts.sql
+25 --no-sqlite test/diff/groupby_create.sql test/diff/groupby_views_limit1.sql test/diff/groupby_inserts.sql test/diff/groupby_delete.sql
+26 --no-sqlite test/diff/slt_good_0_create.sql test/diff/slt_good_0_views_limit1.sql test/diff/slt_good_0_inserts.sql
+27 --no-sqlite test/diff/select2_create.sql test/diff/select2_min_views_limit5.sql test/diff/select2_inserts.sql
+28 --no-sqlite test/diff/select2_create.sql test/diff/select2_min_views_limit5.sql test/diff/select2_inserts.sql test/diff/select2_deletes.sql
+29 --no-sqlite test/diff/select2_create.sql test/diff/select2_min_views_limit5.sql test/diff/select2_inserts.sql test/diff/select2_deletes.sql test/diff/select2_inserts.sql
+30 --no-sqlite test/diff/select1_create.sql test/diff/select1_views_limit5.sql test/diff/select1_inserts.sql
+31 --no-sqlite test/diff/select1_float_create.sql test/diff/select1_float_views_limit5.sql test/diff/select1_float_inserts.sql
+32 --no-sqlite test/diff/select2_create.sql test/diff/select2_views_limit5.sql test/diff/select2_inserts.sql
+33 --no-sqlite test/diff/select3_create.sql test/diff/select3_views_limit5.sql test/diff/select3_inserts.sql
+34 --no-sqlite test/diff/select3_create.sql test/diff/select3_views_limit5.sql test/diff/select3_inserts.sql test/diff/select3_partial_delete.sql
+35 --no-sqlite test/diff/select4.1-create.sql test/diff/select4.1-views_limit5.sql test/diff/select4.1-inserts.sql
+36 --no-sqlite test/diff/select5.1-create.sql test/diff/select5.1-views_limit5.sql test/diff/select5.1-inserts.sql
+37 --no-sqlite test/diff/groupby_create.sql test/diff/groupby_views_limit5.sql test/diff/groupby_inserts.sql
+38 --no-sqlite test/diff/groupby_create.sql test/diff/groupby_views_limit5.sql test/diff/groupby_inserts.sql test/diff/groupby_delete.sql
+39 --no-sqlite test/diff/slt_good_0_create.sql test/diff/slt_good_0_views_limit5.sql test/diff/slt_good_0_inserts.sql
 END
