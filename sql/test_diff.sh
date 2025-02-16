@@ -1,10 +1,13 @@
 #!/bin/bash
 
-if [ -z "$SKARGO_PROFILE" ]; then
-    SKARGO_PROFILE=dev
+if [ -z "$SKDB_BIN" ]; then
+    if [ -z "$SKARGO_PROFILE" ]; then
+        SKARGO_PROFILE=dev
+    fi
+    SKDB_BIN="skargo run -q --profile $SKARGO_PROFILE -- "
 fi
 
-export SKDB_CMD="skargo run -q --profile $SKARGO_PROFILE -- "
+export SKDB_CMD=$SKDB_BIN
 
 pass() { printf "%-55s OK\n" "$1:"; }
 fail() { printf "%-55s FAILED\n" "$1:"; }
