@@ -26,10 +26,16 @@ type Upvote = {
   user_id: number;
 };
 
-type Upvoted = Post & { upvotes: number; author: User };
+type PostWithUpvoteIds = Post & { upvotes: number[]; author: User };
 
-type ResourceInputs = {
-  postsWithUpvotes: EagerCollection<number, Upvoted>;
+type PostWithUpvoteCount = Omit<Post, "author_id"> & {
+  upvotes: number;
+  upvoted: boolean;
+  author: User;
+};
+
+type Session = User & {
+  user_id: number;
 };
 
 const postgres = new PostgresExternalService({
@@ -41,9 +47,9 @@ const postgres = new PostgresExternalService({
 });
 
 class UpvotesMapper {
-  mapEntry(key: number, values: Values<Upvote>): Iterable<[number, number]> {
-    const value = values.getUnique().post_id;
-    return [[value, key]];
+  mapEntry(_key: number, values: Values<Upvote>): Iterable<[number, number]> {
+    const upvote: Upvote = values.getUnique();
+    return [[upvote.post_id, upvote.user_id]];
   }
 }
 
@@ -53,47 +59,131 @@ class PostsMapper {
     private upvotes: EagerCollection<number, number>,
   ) {}
 
-  mapEntry(key: number, values: Values<Post>): Iterable<[number, Upvoted]> {
+  mapEntry(
+    key: number,
+    values: Values<Post>,
+  ): Iterable<[[number, number], PostWithUpvoteIds]> {
     const post: Post = values.getUnique();
-    const upvotes = this.upvotes.getArray(key).length;
+    const upvotes: number[] = this.upvotes.getArray(key);
     let author;
     try {
       author = this.users.getUnique(post.author_id);
     } catch {
       author = { name: "unknown author", email: "unknown email" };
     }
-    // Projecting all posts on key 0 so that they can later be sorted.
-    return [[0, { ...post, upvotes, author }]];
+    return [[[-upvotes.length, key], { ...post, upvotes, author }]];
   }
 }
 
-class SortingMapper {
-  mapEntry(key: number, values: Values<Upvoted>): Iterable<[number, Upvoted]> {
-    const posts = values.toArray();
-    // Sorting in descending order of upvotes.
-    posts.sort((a, b) => b.upvotes - a.upvotes);
-    return posts.map((p) => [key, p]);
+class CleanupMapper {
+  constructor(private readonly session: Session | null) {}
+
+  mapEntry(
+    key: [number, number],
+    values: Values<PostWithUpvoteIds>,
+  ): Iterable<[number, PostWithUpvoteCount]> {
+    const post = values.getUnique();
+    let upvoted;
+    if (this.session === null) upvoted = false;
+    else upvoted = post.upvotes.includes(this.session.user_id);
+    const upvotes = post.upvotes.length;
+    return [
+      [
+        key[1],
+        {
+          title: post.title,
+          url: post.url,
+          body: post.body,
+          author: post.author,
+          upvotes,
+          upvoted,
+        },
+      ],
+    ];
   }
 }
 
-class PostsResource implements Resource<ResourceInputs> {
+type PostsResourceInputs = {
+  postsWithUpvotes: EagerCollection<[number, number], PostWithUpvoteIds>;
+  sessions: EagerCollection<string, Session>;
+};
+
+type PostsResourceParams = { limit?: number; session_id?: string };
+
+class PostsResource implements Resource<PostsResourceInputs> {
   private limit: number;
+  private session_id: string;
 
-  constructor(param: Json) {
-    if (typeof param == "number") this.limit = param;
-    else this.limit = 25;
+  constructor(jsonParams: Json) {
+    const params = jsonParams as PostsResourceParams;
+    if (params.limit === undefined) this.limit = 25;
+    else this.limit = params.limit;
+    if (params.session_id === undefined)
+      throw new Error("Missing required session_id.");
+    else this.session_id = params.session_id as string;
   }
 
-  instantiate(collections: ResourceInputs): EagerCollection<number, Upvoted> {
-    return collections.postsWithUpvotes.take(this.limit).map(SortingMapper);
+  instantiate(
+    collections: PostsResourceInputs,
+  ): EagerCollection<number, PostWithUpvoteCount> {
+    let session;
+    try {
+      session = collections.sessions.getUnique(this.session_id);
+    } catch {
+      session = null;
+    }
+    return collections.postsWithUpvotes
+      .take(this.limit)
+      .map(CleanupMapper, session);
   }
 }
 
-export const service: SkipService<{}, ResourceInputs> = {
-  initialData: {},
-  resources: { posts: PostsResource },
+class FilterSessionMapper {
+  constructor(private session_id: string) {}
+
+  mapEntry(key: string, values: Values<Session>): Iterable<[number, Session]> {
+    if (key != this.session_id) return [];
+    const sessions = values.toArray();
+    if (sessions.length > 0) return [[0, sessions[0] as Session]];
+    else return [];
+  }
+}
+
+type SessionsResourceInputs = {
+  sessions: EagerCollection<string, Session>;
+};
+
+class SessionsResource implements Resource<SessionsResourceInputs> {
+  private session_id: string;
+
+  constructor(jsonParams: Json) {
+    const params = jsonParams as PostsResourceParams;
+    if (params.session_id === undefined)
+      throw new Error("Missing required session_id.");
+    else this.session_id = params.session_id as string;
+  }
+
+  instantiate(
+    collections: SessionsResourceInputs,
+  ): EagerCollection<number, Session> {
+    return collections.sessions.map(FilterSessionMapper, this.session_id);
+  }
+}
+
+type PostsServiceInputs = {
+  sessions: EagerCollection<string, Session>;
+};
+
+export const service: SkipService<PostsServiceInputs, PostsResourceInputs> = {
+  initialData: {
+    sessions: [],
+  },
+  resources: { posts: PostsResource, sessions: SessionsResource },
   externalServices: { postgres },
-  createGraph(_: {}, context: Context): ResourceInputs {
+  createGraph(
+    inputs: PostsServiceInputs,
+    context: Context,
+  ): PostsResourceInputs {
     const serialIDKey = { key: { col: "id", type: "SERIAL" } };
     const posts = context.useExternalResource<number, Post>({
       service: "postgres",
@@ -116,6 +206,7 @@ export const service: SkipService<{}, ResourceInputs> = {
         users,
         upvotes.map(UpvotesMapper),
       ),
+      sessions: inputs.sessions,
     };
   },
 };

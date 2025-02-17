@@ -1,4 +1,5 @@
-from flask import Flask, json, request, redirect
+from flask import Flask, json, request, session, redirect
+import secrets
 import psycopg2
 import requests
 
@@ -17,6 +18,14 @@ def get_db():
 
 app = Flask(__name__)
 
+app.secret_key = b"53cr37_changeme"
+
+
+@app.before_request
+def ensure_session_cookie():
+    if "session_id" not in session:
+        session["session_id"] = secrets.token_urlsafe(32)
+
 
 def format_post(post):
     return {
@@ -27,6 +36,72 @@ def format_post(post):
         "author": post[4],
         "upvotes": post[5],
     }
+
+
+@app.post("/login")
+def login():
+    with get_db() as db:
+        with db.cursor() as cur:
+            res = cur.execute(
+                "SELECT id, name, email FROM users WHERE LOWER(email) = LOWER(%s)",
+                (request.json["email"],),
+            )
+            if cur.rowcount < 1:
+                return "Unauthorized", 401
+            user = cur.fetchone()
+
+    user_session = {
+        "user_id": user[0],
+        "name": user[1],
+        "email": user[2],
+    }
+
+    # Store the user_id in the Flask session to avoid a round-trip when upvoting.
+    session["user_id"] = user_session["user_id"]
+
+    # TODO: Error handling.
+    requests.patch(
+        f"{REACTIVE_SERVICE_URL}/inputs/sessions",
+        json=[[session["session_id"], [user_session]]],
+    )
+
+    return user_session
+
+
+@app.post("/logout")
+def logout():
+    requests.patch(
+        f"{REACTIVE_SERVICE_URL}/inputs/sessions",
+        json=[[session["session_id"], []]],
+    )
+
+    del session["user_id"]
+
+    return "ok", 200
+
+
+@app.get("/session")
+def user_session():
+    if "text/event-stream" in request.accept_mimetypes:
+        resp = requests.post(
+            f"{REACTIVE_SERVICE_URL}/streams/sessions",
+            json={
+                "session_id": session["session_id"],
+            },
+        )
+        uuid = resp.text
+
+        return redirect(f"/streams/{uuid}", code=307)
+
+    else:
+        resp = requests.post(
+            f"{REACTIVE_SERVICE_URL}/snapshot/sessions",
+            json={
+                "session_id": session["session_id"],
+            },
+        )
+
+        return resp.json()[0][1]
 
 
 @app.get("/posts")
@@ -50,7 +125,13 @@ def posts_index():
     if "text/event-stream" in request.accept_mimetypes:
         resp = requests.post(
             f"{REACTIVE_SERVICE_URL}/streams/posts",
-            json=10,
+            json={
+                "limit": 10,
+                "session_id": session["session_id"],
+            },
+            # headers={
+            #     "Authorization": session['session_id'],
+            # },
         )
         uuid = resp.text
 
@@ -59,7 +140,10 @@ def posts_index():
     else:
         resp = requests.post(
             f"{REACTIVE_SERVICE_URL}/snapshot/posts",
-            json=10,
+            json={
+                "limit": 10,
+                "session_id": session["session_id"],
+            },
         )
 
         # The reactive service returns an array of (id, values) where
@@ -71,11 +155,13 @@ def posts_index():
 
 @app.post("/posts")
 def create_post():
+    if "user_id" not in session:
+        return "Unauthorized", 401
     params = request.json
     title = params["title"]
     url = params["url"]
     body = params["body"]
-    author_id = 1
+    author_id = session["user_id"]
 
     with get_db() as db:
         with db.cursor() as cur:
@@ -122,19 +208,40 @@ def update_post(post_id):
     return "ok", 200
 
 
-@app.post("/posts/<int:post_id>/upvotes")
+@app.put("/posts/<int:post_id>/upvotes")
 def upvote_post(post_id):
-    # TODO
-    # user_id = get_current_user().id
-    user_id = 0
+    if "user_id" not in session:
+        return "Unauthorized", 401
 
+    user_id = session["user_id"]
     with get_db() as db:
         with db.cursor() as cur:
             cur.execute(
                 "SELECT * FROM upvotes WHERE post_id = %s AND user_id = %s",
                 (post_id, user_id),
             )
-            upvote_id = cur.fetchone()[0]
+            if cur.rowcount > 0:
+                return "ok", 200
+            cur.execute(
+                "INSERT INTO upvotes(post_id, user_id) VALUES(%s, %s)",
+                (post_id, user_id),
+            )
+            db.commit()
+
+    return "ok", 200
+
+
+@app.delete("/posts/<int:post_id>/upvotes")
+def deupvote_post(post_id):
+    if "user_id" not in session:
+        return "Unauthorized", 401
+
+    with get_db() as db:
+        with db.cursor() as cur:
+            cur.execute(
+                "DELETE FROM upvotes WHERE post_id = %s AND user_id = %s",
+                (post_id, session["user_id"]),
+            )
             db.commit()
 
     return "ok", 200
