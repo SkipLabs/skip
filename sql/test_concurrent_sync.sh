@@ -3,11 +3,14 @@
 pass() { printf "%-20s OK\n" "$1:"; }
 fail() { printf "%-20s FAILED\n" "$1:"; }
 
-if [ -z "$SKARGO_PROFILE" ]; then
-    SKARGO_PROFILE=dev
+if [ -z "$SKDB_BIN" ]; then
+    if [ -z "$SKARGO_PROFILE" ]; then
+        SKARGO_PROFILE=dev
+    fi
+    SKDB_BIN="skargo run -q --manifest-path ./sql/Skargo.toml --profile $SKARGO_PROFILE -- "
 fi
 
-SKDB="skargo run -q --profile $SKARGO_PROFILE -- "
+SKDB=$SKDB_BIN
 
 # Test that launches a bunch of unix process that insert numbers in a table
 # concurrently. We check at the end that the sum of the numbers is correct.

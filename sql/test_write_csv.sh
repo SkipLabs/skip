@@ -1,11 +1,14 @@
 #!/bin/bash
 
-if [ -z "$SKARGO_PROFILE" ]; then
-    SKARGO_PROFILE=dev
+if [ -z "$SKDB_BIN" ]; then
+    if [ -z "$SKARGO_PROFILE" ]; then
+        SKARGO_PROFILE=dev
+    fi
+    SKDB_BIN="skargo run -q --profile $SKARGO_PROFILE -- "
 fi
 
 DB=/tmp/write-csv.db
-SKDB="skargo run --profile $SKARGO_PROFILE -- "
+SKDB=$SKDB_BIN
 WRITE_CSV="$SKDB write-csv --always-allow-joins --data $DB"
 
 $SKDB --init $DB
