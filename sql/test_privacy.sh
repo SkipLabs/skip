@@ -8,11 +8,14 @@ DBCOPYFILE=/tmp/test_copy.db
 
 rm -f $DBFILE $DBCOPYFILE
 
-if [ -z "$SKARGO_PROFILE" ]; then
-    SKARGO_PROFILE=dev
+if [ -z "$SKDB_BIN" ]; then
+    if [ -z "$SKARGO_PROFILE" ]; then
+        SKARGO_PROFILE=dev
+    fi
+    SKDB_BIN="skargo run -q --profile $SKARGO_PROFILE -- "
 fi
 
-SKDB_CMD="skargo run -q --profile $SKARGO_PROFILE -- "
+SKDB_CMD=$SKDB_BIN
 
 $SKDB_CMD --init $DBFILE
 $SKDB_CMD --init $DBCOPYFILE
