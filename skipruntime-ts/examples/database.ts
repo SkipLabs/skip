@@ -91,4 +91,5 @@ async function shutdown() {
   await server.close();
 }
 
+// eslint-disable-next-line @typescript-eslint/no-misused-promises
 ["SIGTERM", "SIGINT"].map((sig) => process.on(sig, shutdown));
