@@ -14,7 +14,7 @@ export type SkipServer = {
   /**
    * Stop accepting new connections, close existing connections, and halt a running service.
    */
-  close: () => void;
+  close: () => Promise<void>;
 };
 
 /**
@@ -144,7 +144,6 @@ export async function runService(
   );
 
   return {
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
     close: async () => {
       controlHttpServer.close();
       await instance.close();
