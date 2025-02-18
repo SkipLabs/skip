@@ -62,9 +62,6 @@ base class CJSON uses Orderable {
 }
 
 value class CJFields(cols: Array<String>, values: Array<CJSON>) uses Orderable {
-  fun isEmpty(): Bool {
-    this.values.isEmpty()
-  }
   static fun empty(): this {
     static(Array[], Array[])
   }
@@ -79,6 +76,9 @@ value class CJFields(cols: Array<String>, values: Array<CJSON>) uses Orderable {
     static(internFieldNames(fields.map(x -> x.i0)), fields.map(x -> x.i1))
   }
 
+  fun isEmpty(): Bool {
+    this.values.isEmpty()
+  }
   fun items(): mutable Iterator<(String, CJSON)> {
     for (i => value in this.values) {
       fieldName = this.cols[i];
