@@ -11,6 +11,11 @@ export class KafkaExternalService implements ExternalService {
   private consumers: Map<string, Consumer> = new Map<string, Consumer>();
   private consumerOptions: ConsumerConfig;
   private client: Kafka;
+  private messageProcessor: (msg: {
+    key: string;
+    value: string;
+    topic: string;
+  }) => Iterable<[Json, Json]>;
 
   constructor(
     kafka_config: {
@@ -18,6 +23,11 @@ export class KafkaExternalService implements ExternalService {
       brokers: { host: string; port: number }[];
       logLevel?: kafkaLogLevel;
     },
+    messageProcessor: (msg: {
+      key: string;
+      value: string;
+      topic: string;
+    }) => Iterable<[Json, Json]> = (msg) => [[msg.key, msg.value]],
     consumerOptions: Omit<ConsumerConfig, "groupId"> = {},
   ) {
     const brokers = kafka_config.brokers.map(
@@ -29,6 +39,7 @@ export class KafkaExternalService implements ExternalService {
     this.client = new Kafka({ ...kafka_config, brokers, logLevel });
     const groupId =
       "skip_kafka_consumer_" + Math.random().toString(36).slice(2);
+    this.messageProcessor = messageProcessor;
     this.consumerOptions = { ...consumerOptions, groupId };
   }
 
@@ -63,12 +74,16 @@ export class KafkaExternalService implements ExternalService {
       await consumer.run({
         // eslint-disable-next-line @typescript-eslint/require-await
         eachBatch: async ({ batch }) => {
-          const entries: Map<string, string[]> = new Map<string, string[]>();
+          const entries: Map<Json, Json[]> = new Map<Json, Json[]>();
           batch.messages.forEach((msg) => {
-            const key = String(msg.key);
-            const val = String(msg.value);
-            if (entries.has(key)) entries.get(key)!.push(val);
-            else entries.set(key, [val]);
+            for (const [k, v] of this.messageProcessor({
+              key: String(msg.key),
+              value: String(msg.value),
+              topic,
+            })) {
+              if (entries.has(k)) entries.get(k)!.push(v);
+              else entries.set(k, [v]);
+            }
           });
           callbacks.update(Array.from(entries), false);
         },
