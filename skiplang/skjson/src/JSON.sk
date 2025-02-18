@@ -62,6 +62,10 @@ base class CJSON uses Orderable {
 }
 
 value class CJFields(cols: Array<String>, values: Array<CJSON>) uses Orderable {
+  /* Invariant:
+    - cols and values have the same length
+      - requires that internFieldNames preserves cols length
+    - cols was sorted lexicographically and had no duplicates, before being passed to internFieldNames */
   static fun empty(): this {
     static(Array[], Array[])
   }
