@@ -1335,7 +1335,7 @@ export function initTests(
     } finally {
       await producer.disconnect();
       service.closeResourceInstance(resourceId);
-      service.close();
+      await service.close();
     }
   });
 

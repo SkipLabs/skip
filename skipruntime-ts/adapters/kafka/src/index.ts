@@ -109,16 +109,9 @@ export class KafkaExternalService implements ExternalService {
     }
   }
 
-  private async _shutdown(): Promise<void> {
+  async shutdown(): Promise<void> {
     const consumers = Array.from(this.consumers.values());
     this.consumers.clear();
     await Promise.all(Array.from(consumers, (c: Consumer) => c.disconnect()));
-  }
-
-  shutdown(): void {
-    this._shutdown().catch((e: unknown) => {
-      console.error(`Error shutting down KafkaExternalService: ${e}`);
-      throw e;
-    });
   }
 }
