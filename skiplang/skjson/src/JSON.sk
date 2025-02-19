@@ -89,6 +89,17 @@ value class CJFields(cols: Array<String>, values: Array<CJSON>) uses Orderable {
       yield (fieldName, value);
     }
   }
+  fun mapAcc<R>(f: (R, String, CJSON) -> (R, CJSON), acc: R): (R, this) {
+    ((_i, !acc), !this.values) = this.values.mapAcc(
+      (i_acc, v) -> {
+        (i, a) = i_acc;
+        (!a, !v) = f(a, this.cols[i], v);
+        ((i + 1, a), v)
+      },
+      (0, acc),
+    );
+    (acc, this)
+  }
 }
 
 mutable class CJSONBuilder{
