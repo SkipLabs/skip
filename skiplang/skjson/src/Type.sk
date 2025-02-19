@@ -431,14 +431,14 @@ class Type private (types: Array<(Int, SType)>) uses Orderable {
         j = 0;
         newValues = mutable Vector[];
         loop {
-          if (i >= tyFields.size() || j >= fieldNames.size()) {
+          if (j >= fieldNames.size()) {
             return CJObject(CJFields(fieldNames, newValues.toArray()))
           };
-          if (tyFields[i].name < fieldNames[j]) {
+          if (i < tyFields.size() && tyFields[i].name < fieldNames[j]) {
             !i = i + 1;
             continue
           };
-          if (tyFields[i].name > fieldNames[j]) {
+          if (i >= tyFields.size() || tyFields[i].name > fieldNames[j]) {
             newValues.push(fieldValues[j]);
             !j = j + 1;
             continue
