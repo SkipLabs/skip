@@ -15,6 +15,33 @@ base class CJSON uses Orderable {
   | CJArray(Array<CJSON>)
   | CJObject(CJFields)
 
+  /* The order is such that null < bool < number < string < array < object */
+  fun compare(other: CJSON): Order {
+    (this, other) match {
+    | (CJNull(), CJNull()) -> EQ()
+    | (CJNull(), _) -> LT()
+    | (_, CJNull()) -> GT()
+    | (CJBool(a), CJBool(b)) -> a.compare(b)
+    | (CJBool(_), _) -> LT()
+    | (_, CJBool(_)) -> GT()
+    | (CJInt(a), CJInt(b)) -> a.compare(b)
+    | (CJFloat(a), CJFloat(b)) -> a.compare(b)
+    | (CJInt(a), CJFloat(b)) -> a.toFloat().compare(b)
+    | (CJFloat(a), CJInt(b)) -> a.compare(b.toFloat())
+    | (CJInt(_), _) -> LT()
+    | (CJFloat(_), _) -> LT()
+    | (_, CJInt(_)) -> GT()
+    | (_, CJFloat(_)) -> GT()
+    | (CJString(a), CJString(b)) -> a.compare(b)
+    | (CJString(_), _) -> LT()
+    | (_, CJString(_)) -> GT()
+    | (CJArray(a), CJArray(b)) -> a.compare(b)
+    | (CJArray(_), _) -> LT()
+    | (_, CJArray(_)) -> GT()
+    | (CJObject(a), CJObject(b)) -> a.compare(b)
+    }
+  }
+
   fun toJSON(): JSON.Value
   | CJNull() -> JSON.Null()
   | CJBool(x) -> JSON.Bool(x)
@@ -81,6 +108,25 @@ value class CJFields private (
       if (i != 0) invariant(fields[i - 1].i0 < elt.i0);
     };
     static(internFieldNames(fields.map(x -> x.i0)), fields.map(x -> x.i1))
+  }
+
+  fun compare(other: CJFields): Order {
+    i = 0;
+    while (i < this.cols.size()) {
+      if (i >= other.cols.size()) {
+        return GT();
+      };
+      this.cols[i].compare(other.cols[i]) match {
+      | EQ() -> void
+      | cmp -> return cmp
+      };
+      this.values[i].compare(other.values[i]) match {
+      | EQ() -> void
+      | cmp -> return cmp
+      };
+      !i = i + 1;
+    };
+    if (i < other.cols.size()) LT() else EQ()
   }
 
   fun isEmpty(): Bool {
