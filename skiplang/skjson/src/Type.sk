@@ -425,11 +425,8 @@ class Type private (types: Array<(Int, SType)>) uses Orderable {
       | (TArray(_), _) -> void
       | (TObject(objectFields), CJObject(fields)) ->
         tyFields = objectFields.fields;
-        fieldNames = fields.cols;
-        (_, fieldValues) = fields.values.mapAcc(
-          (acc, v) -> {
-            (iFieldName, iTyField) = acc;
-            fieldName = fieldNames[iFieldName];
+        (_, !fields) = fields.mapAcc(
+          (iTyField, fieldName, v) -> {
             while (
               iTyField < tyFields.size() &&
               tyFields[iTyField].name < fieldName
@@ -443,11 +440,11 @@ class Type private (types: Array<(Int, SType)>) uses Orderable {
               !v = tyFields[iTyField].type.convertNum(v);
               !iTyField = iTyField + 1;
             };
-            ((iFieldName + 1, iTyField), v)
+            (iTyField, v)
           },
-          (0, 0),
+          0,
         );
-        return CJObject(CJFields(fieldNames, fieldValues))
+        return CJObject(fields)
       | (TObject(_), _) -> void
       }
     };
