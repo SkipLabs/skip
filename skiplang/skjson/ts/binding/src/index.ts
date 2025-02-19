@@ -143,6 +143,12 @@ export function deepFreeze<T>(value: T): T & DepSafe {
  * JSON-serializable values.
  *
  * The `Json` type describes JSON-serializable values and serves as an upper bound on keys and values in the Skip Runtime, ensuring that they can be serialized and managed by the reactive computation engine.
+ *
+ * `Json` values are compared by the Skip Runtime in the following way:
+ * - null < false < true < numbers < strings < arrays < objects
+ * - strings are compared lexicographically
+ * - arrays are compared lexicographically
+ * - objects are compared lexicographically based on their key-value pairs ordered by keys
  */
 export type Json = boolean | number | string | (Json | null)[] | JsonObject;
 
