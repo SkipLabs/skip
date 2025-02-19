@@ -122,9 +122,10 @@ const server = await runService(service, {
   control_port: 8081,
   platform,
 });
-function shutdown() {
-  server.close();
+
+async function shutdown() {
+  await server.close();
 }
 
-process.on("SIGTERM", shutdown);
-process.on("SIGINT", shutdown);
+// eslint-disable-next-line @typescript-eslint/no-misused-promises
+["SIGTERM", "SIGINT"].map((sig) => process.on(sig, shutdown));

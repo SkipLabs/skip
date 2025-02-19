@@ -422,7 +422,8 @@ fun initService(service: Service): Result<void, .Exception> {
         );
       buildResourcesGraph(context, sessionHdl, statusHdl, servicesHdl)
     } else {
-      closeService_(context);
+      // Can be done because it's only used on test, we can add a environment variable or some way to protect that usage
+      _ = closeService_(context);
       sessionHdl = SKStore.EHandle(
         SKStore.IID::keyType,
         ServiceDefinition::type,
@@ -440,7 +441,7 @@ fun initService(service: Service): Result<void, .Exception> {
   })
 }
 
-fun closeService_(context: mutable SKStore.Context): void {
+fun closeService_(context: mutable SKStore.Context): Array<Float> {
   resourceHdl = SKStore.EHandle(
     SKStore.SID::keyType,
     ResourceDef::type,
@@ -456,13 +457,19 @@ fun closeService_(context: mutable SKStore.Context): void {
     ServiceDefinition::type,
     kSessionDir,
   );
-  sessionHdl.maybeGet(context, SKStore.IID(0)).each(def -> {
-    def.service.remoteCollections.each((_k, es) -> es.shutdown());
-  });
+  handles = sessionHdl.maybeGet(context, SKStore.IID(0)) match {
+  | Some(def) ->
+    def.service.remoteCollections
+      .values()
+      .map(es -> es.shutdown())
+      .collect(Array)
+  | _ -> Array[]
+  };
   context.update();
+  handles;
 }
 
-fun closeService(): Result<void, .Exception> {
+fun closeService(): Result<Array<Float>, .Exception> {
   SKStore.runWithResult(closeService_)
 }
 

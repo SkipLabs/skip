@@ -130,12 +130,12 @@ void SkipRuntime_ExternalService__unsubscribe(uint32_t externalSupplierId,
                      "SkipRuntime_ExternalService__unsubscribe", 2, argv);
 }
 
-void SkipRuntime_ExternalService__shutdown(uint32_t externalSupplierId) {
+double SkipRuntime_ExternalService__shutdown(uint32_t externalSupplierId) {
   Isolate* isolate = Isolate::GetCurrent();
   Local<Object> externFunctions = kExternFunctions.Get(isolate);
   Local<Value> argv[1] = {Number::New(isolate, externalSupplierId)};
-  CallJSVoidFunction(isolate, externFunctions,
-                     "SkipRuntime_ExternalService__shutdown", 1, argv);
+  return CallJSNumberFunction(isolate, externFunctions,
+                              "SkipRuntime_ExternalService__shutdown", 1, argv);
 }
 
 void SkipRuntime_deleteExternalService(uint32_t externalSupplierId) {

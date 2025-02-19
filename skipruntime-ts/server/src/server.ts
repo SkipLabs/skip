@@ -14,7 +14,7 @@ export type SkipServer = {
   /**
    * Stop accepting new connections, close existing connections, and halt a running service.
    */
-  close: () => void;
+  close: () => Promise<void>;
 };
 
 /**
@@ -144,9 +144,9 @@ export async function runService(
   );
 
   return {
-    close: () => {
+    close: async () => {
       controlHttpServer.close();
-      instance.close();
+      await instance.close();
       streamingHttpServer.close();
     },
   };
