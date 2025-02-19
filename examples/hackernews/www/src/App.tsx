@@ -8,75 +8,11 @@ import {
 } from "react-router-dom";
 import "./App.css";
 
-type Session = {
-  id: string;
-  name: string;
-  email: string;
-};
-
 export default function App() {
-  return (
-    <Router>
-      <div>
-        <Routes>
-          <Route path="/" Component={Feed} />
-          <Route path="/login" Component={Login} />
-        </Routes>
-      </div>
-    </Router>
-  );
-}
-
-type Post = {
-  id: number;
-  title: string;
-  body: string;
-  url: string;
-  upvotes: number;
-  upvoted: boolean;
-};
-
-function Feed() {
-  const navigate = useNavigate();
   const [posts, setPosts] = useState<Post[]>([]);
   const previousPostsValue = useRef<Post[]>([]);
-  const [newPost, setNewPost] = useState<{
-    title: string;
-    body: string;
-    url: string;
-  }>({ title: "", body: "", url: "" });
-  const [editPost, setEditPost] = useState<Post | null>(null);
-
-  // // Non-reactive (polling) version:
-  // async function getPosts() {
-  //   try {
-  //     const response = await fetch("/");
-  //     const data = await response.json();
-  //     return data;
-  //   } catch (error) {
-  //     console.error(error);
-  //   }
-  // }
-
-  // async function upvotePost(postId: number) {
-  //   try {
-  //     await fetch(`${BASE_URL}/posts/${postId}/upvotes`, { method: "POST" });
-  //     getPosts().then(setPosts);
-  //   } catch (error) {
-  //     console.error(error);
-  //   }
-  // }
-
-  // useEffect(() => {
-  //   const intervalId = setInterval(() => {
-  //     getPosts().then(setPosts);
-  //   }, 1000);
-
-  //   return () => clearInterval(intervalId);
-  // }, []);
-
-  // Reactive version:
   const [session, setSession] = useState<Session | null>(null);
+
   function updateSession(data: [number, Session[]][]) {
     let session;
     if (data.length > 0 && data[0][1].length > 0) {
@@ -86,6 +22,7 @@ function Feed() {
     }
     setSession(session);
   }
+
   useEffect(() => {
     const evSource = new EventSource("/api/session");
     evSource.addEventListener("init", (e: MessageEvent<string>) => {
@@ -141,6 +78,89 @@ function Feed() {
     };
   }, []);
 
+  return (
+    <Router>
+      <div>
+        <Routes>
+          <Route path="/" element={<Feed posts={posts} session={session} />} />
+          <Route path="/submit" Component={Submit} />
+          <Route path="/login" Component={Login} />
+        </Routes>
+      </div>
+    </Router>
+  );
+}
+
+type User = {
+  name: string;
+  email: string;
+};
+
+type Session = User & { id: string };
+
+function Header(props: { session: Session | null }) {
+  function logout() {
+    void fetch("/api/logout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    }).catch((err: unknown) => {
+      console.log(err);
+    });
+  }
+
+  const navigate = useNavigate();
+  return (
+    <div className="header">
+      <img src="/skip_white.svg" width="16" height="16" />
+      <span className="title">Skip News</span>
+      <span className="menu">
+        new | past | comments |{" "}
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            props.session !== null ? navigate("/submit") : navigate("/login");
+          }}
+        >
+          submit
+        </a>
+      </span>
+      <span className="login">
+        {props.session && (
+          <>
+            {props.session.name} |{" "}
+            <a
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                logout();
+              }}
+            >
+              logout
+            </a>
+          </>
+        )}
+        {!props.session && <Link to="/login">login</Link>}
+      </span>
+    </div>
+  );
+}
+
+type Post = {
+  id: number;
+  title: string;
+  body: string;
+  url: string;
+  upvotes: number;
+  upvoted: boolean;
+  author: User;
+};
+
+function Feed(props: { posts: Post[]; session: Session | null }) {
+  const posts = props.posts;
+  const session = props.session;
+  const navigate = useNavigate();
+
   function toggleUpvote(post: Post) {
     let method = post.upvoted ? "DELETE" : "PUT";
     void fetch(`/api/posts/${post.id}/upvotes`, { method }).catch(
@@ -150,14 +170,46 @@ function Feed() {
     );
   }
 
-  async function deletePost(postId: number) {
-    try {
-      await fetch(`/api/posts/${postId}`, { method: "DELETE" });
-    } catch (error) {
-      console.error(error);
-    }
-  }
+  return (
+    <>
+      <Header session={session} />
+      <div className="body">
+        <ol>
+          {posts.map((post) => (
+            <li className="post" key={post.id}>
+              <p className="title">
+                <div
+                  className={post.upvoted ? "votearrow-active" : "votearrow"}
+                  title="upvote"
+                  onClick={() =>
+                    session !== null ? toggleUpvote(post) : navigate("/login")
+                  }
+                ></div>
+                <span className="posttitle">
+                  <a href={post.url}>{post.title}</a>
+                </span>
+                <span className="comhead">
+                  <a href="#">({post.url})</a>
+                </span>
+              </p>
+              <p className="subtext">
+                {post.upvotes} points by {post.author.name} X hours ago
+              </p>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </>
+  );
+}
 
+function Submit() {
+  const navigate = useNavigate();
+  const [newPost, setNewPost] = useState<{
+    title: string;
+    body: string;
+    url: string;
+  }>({ title: "", body: "", url: "" });
   async function createPost() {
     try {
       await fetch(`/api/posts`, {
@@ -171,122 +223,37 @@ function Feed() {
     }
   }
 
-  async function updatePost(postId: number) {
-    try {
-      await fetch(`/api/posts/${postId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editPost),
-      });
-      setEditPost(null);
-    } catch (error) {
-      console.error(error);
-    }
-  }
-
-  function logout() {
-    void fetch("/api/logout", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-    }).catch((err: unknown) => {
-      console.log(err);
-    });
-  }
-
   return (
     <>
-      <h1>HackerNews example</h1>
-      {session && (
-        <p>
-          {session.name}{" "}
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              logout();
-            }}
-          >
-            Logout
-          </a>
-        </p>
-      )}
-      {!session && <Link to="/login">Login</Link>}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          createPost();
-        }}
-      >
-        <input
-          type="text"
-          placeholder="Title"
-          value={newPost.title}
-          onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
-        />
-        <input
-          type="text"
-          placeholder="Body"
-          value={newPost.body}
-          onChange={(e) => setNewPost({ ...newPost, body: e.target.value })}
-        />
-        <input
-          type="text"
-          placeholder="URL"
-          value={newPost.url}
-          onChange={(e) => setNewPost({ ...newPost, url: e.target.value })}
-        />
-        <button type="submit">Create Post</button>
-      </form>
-      <ul>
-        {posts.map((post) => (
-          <li key={post.id}>
-            <div
-              className={post.upvoted ? "votearrow-active" : "votearrow"}
-              title="upvote"
-              onClick={() =>
-                session !== null ? toggleUpvote(post) : navigate("/login")
-              }
-            ></div>
-            &nbsp;
-            {post.title}&nbsp;
-            <a href={post.url}>({post.url})</a>
-            <br />
-            {post.upvotes} points
-            <button onClick={() => deletePost(post.id)}>Delete</button>
-            <button onClick={() => setEditPost(post)}>Edit</button>
-          </li>
-        ))}
-      </ul>
-      {editPost && (
+      <Header session={null} />
+      <div className="body">
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            updatePost(editPost.id);
+            createPost().then((_) => navigate("/"));
           }}
         >
           <input
             type="text"
             placeholder="Title"
-            value={editPost.title}
-            onChange={(e) =>
-              setEditPost({ ...editPost, title: e.target.value })
-            }
+            value={newPost.title}
+            onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
           />
           <input
             type="text"
             placeholder="Body"
-            value={editPost.body}
-            onChange={(e) => setEditPost({ ...editPost, body: e.target.value })}
+            value={newPost.body}
+            onChange={(e) => setNewPost({ ...newPost, body: e.target.value })}
           />
           <input
             type="text"
             placeholder="URL"
-            value={editPost.url}
-            onChange={(e) => setEditPost({ ...editPost, url: e.target.value })}
+            value={newPost.url}
+            onChange={(e) => setNewPost({ ...newPost, url: e.target.value })}
           />
-          <button type="submit">Update Post</button>
+          <button type="submit">Create Post</button>
         </form>
-      )}
+      </div>
     </>
   );
 }
@@ -317,7 +284,7 @@ function Login() {
 
   return (
     <>
-      <h1>HackerNews example</h1>
+      <Header session={null} />
       {loginError !== null && <p style={{ color: "red" }}>{loginError}</p>}
       <form
         onSubmit={(e) => {
