@@ -247,6 +247,8 @@ export interface EagerCollection<K extends Json, V extends Json>
   /**
    * Create a new eager collection by keeping only the elements whose keys are in the given range.
    *
+   * See {@link Json} for a reference on `Json` value ordering.
+   *
    * @param start - The least key whose entry will be kept in the result.
    * @param end - The greatest key whose entry will be kept in the result.
    * @returns The restricted eager collection.
@@ -256,6 +258,8 @@ export interface EagerCollection<K extends Json, V extends Json>
   /**
    * Create a new eager collection by keeping only the elements whose keys are in at least one of the given ranges.
    *
+   * See {@link Json} for a reference on `Json` value ordering.
+   *
    * @param ranges - The pairs of lower and upper bounds on keys to keep in the result.
    * @returns The restricted eager collection.
    */
@@ -263,6 +267,8 @@ export interface EagerCollection<K extends Json, V extends Json>
 
   /**
    * Create a new eager collection by keeping the first entries.
+   *
+   * See {@link Json} for a reference on `Json` value ordering.
    *
    * @param limit - The number of entries to keep.
    * @returns The restricted eager collection.
