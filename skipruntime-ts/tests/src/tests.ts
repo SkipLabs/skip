@@ -430,7 +430,7 @@ class MockExternal implements ExternalService {
   }
 
   shutdown() {
-    return;
+    return Promise.resolve();
   }
 
   private async mock(
@@ -1125,7 +1125,7 @@ export function initTests(
       ]);
     } finally {
       service.closeResourceInstance(constantResourceId);
-      service.close();
+      await service.close();
     }
   });
 
@@ -1143,7 +1143,7 @@ export function initTests(
       expect(current == start).toEqual(false);
     } finally {
       service.closeResourceInstance(constantResourceId);
-      service.close();
+      await service.close();
     }
   });
 
@@ -1211,7 +1211,7 @@ export function initTests(
         }
       }
     } finally {
-      service.close();
+      await service.close();
     }
   });
 

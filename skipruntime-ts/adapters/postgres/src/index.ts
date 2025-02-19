@@ -137,15 +137,29 @@ export class PostgresExternalService implements ExternalService {
     this.clientID = "skip_pg_client_" + Math.random().toString(36).slice(2);
 
     this.client = new pg.Client(db_config);
-    this.client.connect().then(
-      () => this.client.query(format(`LISTEN %I;`, this.clientID)),
-      (e: unknown) => {
-        console.error(
-          "Error connecting to Postgres at " + JSON.stringify(db_config),
-        );
-        throw e;
-      },
-    );
+    this.client
+      .connect()
+      .then(() => this.client.query(format(`LISTEN %I;`, this.clientID)))
+      .then(
+        () => {
+          const handler = () => {
+            void this.shutdown().then(() => process.exit());
+          };
+          [
+            "SIGINT",
+            "SIGTERM",
+            "SIGUSR1",
+            "SIGUSR2",
+            "uncaughtException",
+          ].forEach((sig) => process.on(sig, handler));
+        },
+        (e: unknown) => {
+          console.error(
+            "Error connecting to Postgres at " + JSON.stringify(db_config),
+          );
+          throw e;
+        },
+      );
   }
 
   /**
@@ -258,7 +272,9 @@ FOR EACH ROW EXECUTE FUNCTION %I();`,
         );
   }
 
-  shutdown(): void {
+  shutdown(): Promise<void> {
+    if (this.open_instances.size == 0) return this.client.end();
+
     const query =
       "DROP FUNCTION IF EXISTS " +
       Array.from(this.open_instances)
@@ -266,17 +282,6 @@ FOR EACH ROW EXECUTE FUNCTION %I();`,
         .join(", ") +
       " CASCADE;";
     this.open_instances.clear();
-
-    const shutdown =
-      this.open_instances.size == 0
-        ? this.client.end()
-        : this.client.query(query).then(() => this.client.end());
-
-    shutdown.catch((e: unknown) => {
-      console.error(
-        "Error shutting down Postgres external service; trigger functions may need teardown.",
-      );
-      throw e;
-    });
+    return this.client.query(query).then(() => this.client.end());
   }
 }

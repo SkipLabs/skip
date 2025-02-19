@@ -64,8 +64,8 @@ export class GenericExternalService implements ExternalService {
     }
   }
 
-  shutdown(): void {
-    return;
+  shutdown(): Promise<void> {
+    return Promise.resolve();
   }
 }
 

@@ -236,7 +236,7 @@ export interface FromBinding {
   SkipRuntime_initService(service: Pointer<Internal.Service>): Handle<Error>;
 
   // closeClose
-  SkipRuntime_closeService(): Handle<Error>;
+  SkipRuntime_closeService(): Pointer<Internal.CJSON>;
 
   // Context
 

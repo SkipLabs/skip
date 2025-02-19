@@ -144,7 +144,7 @@ native fun unsubscribeOfExternalService(
 
 @cpp_extern("SkipRuntime_ExternalService__shutdown")
 @debug
-native fun shutdownOfExternalService(externalSupplier: UInt32): void;
+native fun shutdownOfExternalService(externalSupplier: UInt32): Float;
 
 @cpp_extern("SkipRuntime_deleteExternalService")
 @debug
@@ -179,7 +179,7 @@ class ExternExternalService(
     unsubscribeOfExternalService(this.eptr.value, instance)
   }
 
-  fun shutdown(): void {
+  fun shutdown(): Float {
     shutdownOfExternalService(this.eptr.value)
   }
 }
@@ -779,10 +779,10 @@ fun initSkipRuntimeService(service: Service): Float {
 /************ closeService ****************/
 
 @export("SkipRuntime_closeService")
-fun closeSkipRuntimeService(): Float {
+fun closeSkipRuntimeService(): SKJSON.CJSON {
   closeService() match {
-  | Success _ -> 0.0
-  | Failure(err) -> getErrorHdl(err)
+  | Success(handles) -> SKJSON.CJArray(handles.map(h -> SKJSON.CJFloat(h)))
+  | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
   };
 }
 
