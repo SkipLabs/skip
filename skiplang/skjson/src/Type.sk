@@ -426,28 +426,28 @@ class Type private (types: Array<(Int, SType)>) uses Orderable {
       | (TObject(objectFields), CJObject(fields)) ->
         tyFields = objectFields.fields;
         fieldNames = fields.cols;
-        fieldValues = fields.values;
-        i = 0;
-        j = 0;
-        newValues = mutable Vector[];
-        loop {
-          if (j >= fieldNames.size()) {
-            return CJObject(CJFields(fieldNames, newValues.toArray()))
-          };
-          if (i < tyFields.size() && tyFields[i].name < fieldNames[j]) {
-            !i = i + 1;
-            continue
-          };
-          if (i >= tyFields.size() || tyFields[i].name > fieldNames[j]) {
-            newValues.push(fieldValues[j]);
-            !j = j + 1;
-            continue
-          };
-          invariant(tyFields[i].name == fieldNames[j]);
-          newValues.push(tyFields[i].type.convertNum(fieldValues[j]));
-          !i = i + 1;
-          !j = j + 1;
-        }
+        (_, fieldValues) = fields.values.mapAcc(
+          (acc, v) -> {
+            (iFieldName, iTyField) = acc;
+            fieldName = fieldNames[iFieldName];
+            while (
+              iTyField < tyFields.size() &&
+              tyFields[iTyField].name < fieldName
+            ) {
+              !iTyField = iTyField + 1;
+            };
+            if (
+              iTyField < tyFields.size() &&
+              tyFields[iTyField].name == fieldName
+            ) {
+              !v = tyFields[iTyField].type.convertNum(v);
+              !iTyField = iTyField + 1;
+            };
+            ((iFieldName + 1, iTyField), v)
+          },
+          (0, 0),
+        );
+        return CJObject(CJFields(fieldNames, fieldValues))
       | (TObject(_), _) -> void
       }
     };
