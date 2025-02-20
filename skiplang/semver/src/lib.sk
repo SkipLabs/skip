@@ -40,7 +40,7 @@ class Version(
   }
 }
 
-class VersionReq(comparators: Array<Comparator>) uses Show {
+class VersionReq(comparators: Array<Comparator>) uses Equality, Show {
   const kStar: VersionReq = VersionReq(Array[]);
 
   fun matches(version: Version): Bool {
@@ -94,7 +94,7 @@ class Comparator(
   minor: ?Int,
   patch: ?Int,
   pre: Prerelease,
-) uses Show {
+) uses Equality, Show {
   fun matches(version: Version): Bool {
     this.op match {
     | Exact()
@@ -154,7 +154,7 @@ class Comparator(
   }
 }
 
-base class Op {
+base class Op uses Equality {
   children =
   | Exact()
   | Greater()
