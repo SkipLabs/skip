@@ -7,6 +7,7 @@ import type { Nullable, Reducer, Json } from "@skipruntime/core";
  * A `Reducer` that maintains the sum of values as they are added and removed from a collection.
  */
 export class Sum implements NativeStub, Reducer<number, number> {
+  /** @hidden */
   [sknative] = "sum";
 
   // Lie to TypeScript that this implements Reducer, but leave out any implementations
@@ -22,6 +23,7 @@ export class Sum implements NativeStub, Reducer<number, number> {
  * A `Reducer` that maintains the minimum of values as they are added and removed from a collection.
  */
 export class Min implements NativeStub, Reducer<number, number> {
+  /** @hidden */
   [sknative] = "min";
 
   // Lie to TypeScript that this implements Reducer, but leave out any implementations
@@ -37,6 +39,7 @@ export class Min implements NativeStub, Reducer<number, number> {
  * A `Reducer` that maintains the maximum of values as they are added and removed from a collection.
  */
 export class Max implements NativeStub, Reducer<number, number> {
+  /** @hidden */
   [sknative] = "max";
 
   // Lie to TypeScript that this implements Reducer, but leave out any implementations
@@ -52,6 +55,7 @@ export class Max implements NativeStub, Reducer<number, number> {
  * A `Reducer` that maintains the number of values as they are added and removed from a collection.
  */
 export class Count<T extends Json> implements Reducer<T, number>, NativeStub {
+  /** @hidden */
   [sknative] = "count";
 
   // Lie to TypeScript that this implements Reducer, but leave out any implementations
