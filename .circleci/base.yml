@@ -91,19 +91,22 @@ jobs:
       - store_test_results:
           path: ~/test-results/skdb-wasm.xml
 
-  skjson:
+  skiplang-lib-tests:
     docker:
       - image: skiplabs/skiplang:latest
+    parameters:
+      libname:
+        type: string
     steps:
       - checkout
       - setup
       - run:
-          name: Run skjson tests
+          name: Run << parameters.libname >> tests
           command: |
             mkdir -p ~/test-results
-            cd skiplang/skjson && skargo test --junitxml ~/test-results/skjson.xml
+            cd skiplang/<< parameters.libname >> && skargo test --junitxml ~/test-results/<< parameters.libname >>.xml
       - store_test_results:
-          path: ~/test-results/skjson.xml
+          path: ~/test-results
 
   skipruntime:
     docker:

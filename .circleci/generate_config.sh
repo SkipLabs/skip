@@ -22,6 +22,15 @@ ts_prelude=$?
 git diff --quiet HEAD "$BASE" -- examples/hackernews/
 hackernews_example=$?
 
+SKIPLANG_LIBS_CHANGED=()
+for lib_tests in skiplang/*/tests; do
+  lib=$(basename "$(dirname "$lib_tests")")
+  if [ "$lib" != compiler ] && [ "$lib" != prelude ] && \
+    ! git diff --quiet HEAD "$BASE" -- "skiplang/$lib"; then
+      SKIPLANG_LIBS_CHANGED+=("$lib")
+  fi
+done
+
 cat .circleci/base.yml
 
 echo "workflows:"
@@ -59,13 +68,14 @@ then
 EOF
 fi
 
-if (( skjson != 0 ))
-then
-    cat <<EOF
-  skjson:
-    jobs:
-      - skjson
-EOF
+if [ ${#SKIPLANG_LIBS_CHANGED[@]} -gt 0 ]; then
+  echo "  skiplang-libs-tests:"
+  echo "    jobs:"
+  for lib in "${SKIPLANG_LIBS_CHANGED[@]}"; do
+    echo "      - skiplang-lib-tests:"
+    echo "          libname: $lib"
+    echo "          name: $lib"
+  done
 fi
 
 if (( skdb != 0 || skstore != 0 ))

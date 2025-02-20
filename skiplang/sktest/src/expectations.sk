@@ -10,12 +10,13 @@ class ExpectationError(
   }
 }
 
-fun expectEq<T: frozen & Equality>(
+fun expectCmp<T: frozen>(
   actual: T,
   expected: T,
-  msg: String = "expected equality",
+  f: (T, T) -> Bool,
+  msg: String = "expected successful comparison",
 ): void {
-  if (actual != expected) {
+  if (!f(actual, expected)) {
     throw ExpectationError(
       msg,
       inspect(expected).toString(),
@@ -24,18 +25,20 @@ fun expectEq<T: frozen & Equality>(
   }
 }
 
+fun expectEq<T: frozen & Equality>(
+  actual: T,
+  expected: T,
+  msg: String = "expected equality",
+): void {
+  expectCmp(actual, expected, isEqual, msg)
+}
+
 fun expectNe<T: frozen & Equality>(
   actual: T,
   expected: T,
   msg: String = "expected difference",
 ): void {
-  if (actual == expected) {
-    throw ExpectationError(
-      msg,
-      inspect(expected).toString(),
-      inspect(actual).toString(),
-    )
-  }
+  expectCmp(actual, expected, isNotEqual, msg)
 }
 
 fun expectTrue(b: Bool, msg: String = "expected true"): void {
