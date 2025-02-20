@@ -24,6 +24,19 @@ class WeekDate(year: Int, week: Int, day: Day) uses Orderable {}
 
 base class Entity {
   fun toCalendar(tz: TZKind = TZLocal()): Calendar;
+
+  static fun eq(e1: Entity, e2: Entity): Bool {
+    (e1, e2) match {
+    | (c1 @ Calendar _, c2 @ Calendar _) -> c1 == c2
+    | (d1 @ Date _, d2 @ Date _) -> d1 == d2
+    | (t1 @ Time _, t2 @ Time _) -> t1 == t2
+    | (Calendar _, _)
+    | (_, Calendar _)
+    | (Date _, _)
+    | (_, Date _) ->
+      false
+    }
+  }
 }
 
 class Date private (
