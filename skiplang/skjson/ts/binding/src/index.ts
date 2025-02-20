@@ -76,9 +76,9 @@ export type DepSafe =
 
 export function checkOrCloneParam<T>(value: T): T {
   if (
-    typeof value == "string" ||
+    typeof value == "boolean" ||
     typeof value == "number" ||
-    typeof value == "boolean"
+    typeof value == "string"
   )
     return value;
   if (typeof value == "object") {
@@ -108,9 +108,9 @@ export function checkOrCloneParam<T>(value: T): T {
  */
 export function deepFreeze<T>(value: T): T & DepSafe {
   if (
-    typeof value == "bigint" ||
     typeof value == "boolean" ||
     typeof value == "number" ||
+    typeof value == "bigint" ||
     typeof value == "string" ||
     typeof value == "symbol"
   ) {
@@ -143,8 +143,14 @@ export function deepFreeze<T>(value: T): T & DepSafe {
  * JSON-serializable values.
  *
  * The `Json` type describes JSON-serializable values and serves as an upper bound on keys and values in the Skip Runtime, ensuring that they can be serialized and managed by the reactive computation engine.
+ *
+ * `Json` values are compared by the Skip Runtime in the following way:
+ * - null < false < true < numbers < strings < arrays < objects
+ * - strings are compared lexicographically
+ * - arrays are compared lexicographically
+ * - objects are compared lexicographically based on their key-value pairs ordered by keys
  */
-export type Json = number | boolean | string | (Json | null)[] | JsonObject;
+export type Json = boolean | number | string | (Json | null)[] | JsonObject;
 
 /**
  * Objects containing `Json` values.
@@ -152,9 +158,9 @@ export type Json = number | boolean | string | (Json | null)[] | JsonObject;
 export type JsonObject = { [key: string]: Json | null };
 
 export type Exportable =
-  | Json
   | null
   | undefined
+  | Json
   | ObjectProxy<{ [k: string]: Exportable }>
   | (readonly Exportable[] & Managed);
 
@@ -246,11 +252,11 @@ function interpretPointer<T extends Internal.CJSON>(
   switch (type) {
     case Type.Null:
       return null;
+    case Type.Boolean:
+      return binding.SKIP_SKJSON_asBoolean(pointer);
     case Type.Int:
     case Type.Float:
       return binding.SKIP_SKJSON_asNumber(pointer);
-    case Type.Boolean:
-      return binding.SKIP_SKJSON_asBoolean(pointer);
     case Type.String:
       return binding.SKIP_SKJSON_asString(pointer);
     case Type.Array: {
@@ -353,14 +359,14 @@ export function exportJSON(
 ): Pointer<Internal.CJSON> {
   if (value === null || value === undefined) {
     return binding.SKIP_SKJSON_createCJNull();
+  } else if (typeof value == "boolean") {
+    return binding.SKIP_SKJSON_createCJBool(value);
   } else if (typeof value == "number") {
     if (value === Math.trunc(value)) {
       return binding.SKIP_SKJSON_createCJInt(value);
     } else {
       return binding.SKIP_SKJSON_createCJFloat(value);
     }
-  } else if (typeof value == "boolean") {
-    return binding.SKIP_SKJSON_createCJBool(value);
   } else if (typeof value == "string") {
     return binding.SKIP_SKJSON_createCJString(value);
   } else if (Array.isArray(value)) {
@@ -396,8 +402,8 @@ export function importJSON<T extends Internal.CJSON>(
 export interface JsonConverter {
   importJSON(value: Pointer<Internal.CJSON>, copy?: boolean): Exportable;
   exportJSON(v: null | undefined): Pointer<Internal.CJNull>;
-  exportJSON(v: number): Pointer<Internal.CJFloat | Internal.CJInt>;
   exportJSON(v: boolean): Pointer<Internal.CJBool>;
+  exportJSON(v: number): Pointer<Internal.CJFloat | Internal.CJInt>;
   exportJSON(v: string): Pointer<Internal.CJString>;
   exportJSON(v: any[]): Pointer<Internal.CJArray>;
   exportJSON(v: JsonObject): Pointer<Internal.CJObject>;

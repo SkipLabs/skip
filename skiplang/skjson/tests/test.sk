@@ -545,24 +545,30 @@ fun testPatterns(): void {
           (
             "obj",
             SKJSON.CJObject(
-              SKJSON.CJFields(
-                Array["c"],
+              SKJSON.CJFields::create(
                 Array[
-                  SKJSON.CJObject(
-                    SKJSON.CJFields(
-                      Array["d"],
-                      Array[
-                        SKJSON.CJArray(
-                          Array[
-                            SKJSON.CJFloat(0.0),
-                            SKJSON.CJFloat(1.0),
-                            SKJSON.CJFloat(2.3),
-                          ],
-                        ),
-                      ],
+                  (
+                    "c",
+                    SKJSON.CJObject(
+                      SKJSON.CJFields::create(
+                        Array[
+                          (
+                            "d",
+                            SKJSON.CJArray(
+                              Array[
+                                SKJSON.CJFloat(0.0),
+                                SKJSON.CJFloat(1.0),
+                                SKJSON.CJFloat(2.3),
+                              ],
+                            ),
+                          ),
+                        ],
+                        x -> x,
+                      ),
                     ),
                   ),
                 ],
+                x -> x,
               ),
             ),
           ),
@@ -581,6 +587,86 @@ fun testPatterns(): void {
       patternMatch.i1,
     )
   };
+}
+
+@test
+fun testOrder(): void {
+  before1 = 0.999999999999999889 - 0.001; // next_after(1.0, 0.0)
+  after1 = 1.00000000000000022 + 0.001; // next_after(1.0, 2.0)
+  expectedOrder = Array[
+    SKJSON.CJNull(),
+    SKJSON.CJBool(false),
+    SKJSON.CJBool(true),
+    SKJSON.CJInt(-9223372036854775808), // INT64_MIN
+    SKJSON.CJFloat(-1.1),
+    SKJSON.CJInt(-1),
+    SKJSON.CJFloat(-2.2250738585072014e-308), // Smallest negative double
+    SKJSON.CJFloat(-0.0),
+    SKJSON.CJInt(0),
+    SKJSON.CJFloat(2.2250738585072014e-308), // Smallest positive double
+    SKJSON.CJFloat(0.5),
+    SKJSON.CJFloat(before1),
+    SKJSON.CJInt(1),
+    SKJSON.CJFloat(after1),
+    SKJSON.CJInt(9223372036854775807), // INT64_MAX
+    SKJSON.CJFloat(1.7976931348623157e308), // DBL_MAX
+    SKJSON.CJString(""),
+    SKJSON.CJString("\u0000"), // Null character
+    SKJSON.CJString("A"),
+    SKJSON.CJString("a"),
+    SKJSON.CJString("aa"),
+    SKJSON.CJString("ab"),
+    SKJSON.CJString("abc"),
+    SKJSON.CJString("b"),
+    SKJSON.CJString("ba"),
+    SKJSON.CJString("🐫"),
+    SKJSON.CJArray(Array[]),
+    SKJSON.CJArray(Array[SKJSON.CJNull()]),
+    SKJSON.CJArray(Array[SKJSON.CJBool(false), SKJSON.CJInt(1)]),
+    SKJSON.CJArray(Array[SKJSON.CJBool(false), SKJSON.CJInt(2)]),
+    SKJSON.CJArray(Array[SKJSON.CJBool(true)]),
+    SKJSON.CJArray(Array[SKJSON.CJBool(true), SKJSON.CJInt(0)]),
+    SKJSON.CJArray(Array[SKJSON.CJFloat(before1), SKJSON.CJInt(9)]),
+    SKJSON.CJArray(Array[SKJSON.CJInt(1), SKJSON.CJInt(0)]),
+    SKJSON.CJArray(Array[SKJSON.CJFloat(1.0), SKJSON.CJInt(1)]),
+    SKJSON.CJArray(Array[SKJSON.CJInt(1), SKJSON.CJInt(2)]),
+    SKJSON.CJArray(Array[SKJSON.CJFloat(after1), SKJSON.CJInt(-1)]),
+    SKJSON.CJArray(Array[SKJSON.CJArray(Array[])]),
+    SKJSON.CJArray(Array[SKJSON.CJArray(Array[]), SKJSON.CJArray(Array[])]),
+    SKJSON.CJArray(Array[SKJSON.CJArray(Array[SKJSON.CJNull()])]),
+    SKJSON.CJObject(SKJSON.CJFields::create(Array[], x -> x)),
+    SKJSON.CJObject(
+      SKJSON.CJFields::create(Array[("", SKJSON.CJInt(9))], x -> x),
+    ),
+    SKJSON.CJObject(
+      SKJSON.CJFields::create(
+        Array[("b", SKJSON.CJInt(1)), ("a", SKJSON.CJInt(1))],
+        x -> x,
+      ),
+    ),
+    SKJSON.CJObject(
+      SKJSON.CJFields::create(Array[("a", SKJSON.CJInt(2))], x -> x),
+    ),
+    SKJSON.CJObject(
+      SKJSON.CJFields::create(Array[("a", SKJSON.CJInt(3))], x -> x),
+    ),
+    SKJSON.CJObject(
+      SKJSON.CJFields::create(
+        Array[("b", SKJSON.CJInt(1)), ("a", SKJSON.CJInt(3))],
+        x -> x,
+      ),
+    ),
+    SKJSON.CJObject(
+      SKJSON.CJFields::create(Array[("b", SKJSON.CJInt(0))], x -> x),
+    ),
+  ];
+  rng = Random::mcreate(20250219);
+
+  T.expectEq(expectedOrder.reversed().sorted(), expectedOrder);
+
+  v = Vector::mcreateFromItems(expectedOrder);
+  v.shuffle(rng);
+  T.expectEq(v.sorted().collect(Array), expectedOrder)
 }
 
 module end;

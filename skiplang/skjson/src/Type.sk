@@ -425,29 +425,26 @@ class Type private (types: Array<(Int, SType)>) uses Orderable {
       | (TArray(_), _) -> void
       | (TObject(objectFields), CJObject(fields)) ->
         tyFields = objectFields.fields;
-        fieldNames = fields.cols;
-        fieldValues = fields.values;
-        i = 0;
-        j = 0;
-        newValues = mutable Vector[];
-        loop {
-          if (i >= tyFields.size() || j >= fieldNames.size()) {
-            return CJObject(CJFields(fieldNames, newValues.toArray()))
-          };
-          if (tyFields[i].name < fieldNames[j]) {
-            !i = i + 1;
-            continue
-          };
-          if (tyFields[i].name > fieldNames[j]) {
-            newValues.push(fieldValues[j]);
-            !j = j + 1;
-            continue
-          };
-          invariant(tyFields[i].name == fieldNames[j]);
-          newValues.push(tyFields[i].type.convertNum(fieldValues[j]));
-          !i = i + 1;
-          !j = j + 1;
-        }
+        (_, !fields) = fields.mapAcc(
+          (iTyField, fieldName, v) -> {
+            while (
+              iTyField < tyFields.size() &&
+              tyFields[iTyField].name < fieldName
+            ) {
+              !iTyField = iTyField + 1;
+            };
+            if (
+              iTyField < tyFields.size() &&
+              tyFields[iTyField].name == fieldName
+            ) {
+              !v = tyFields[iTyField].type.convertNum(v);
+              !iTyField = iTyField + 1;
+            };
+            (iTyField, v)
+          },
+          0,
+        );
+        return CJObject(fields)
       | (TObject(_), _) -> void
       }
     };
