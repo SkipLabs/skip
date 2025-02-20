@@ -64,7 +64,9 @@ then
     cat <<EOF
   skjson:
     jobs:
-      - skjson
+      - skiplang-lib-tests:
+          libname: skjson
+          name: skjson
 EOF
 fi
 
