@@ -1,4 +1,4 @@
-import { type NativeStub, sknative } from "../skiplang-std/index.js";
+import { /* type NativeStub, */ sknative } from "../skiplang-std/index.js";
 import type { Nullable, Reducer, Json } from "@skipruntime/core";
 
 /**
@@ -6,7 +6,7 @@ import type { Nullable, Reducer, Json } from "@skipruntime/core";
  *
  * A `Reducer` that maintains the sum of values as they are added and removed from a collection.
  */
-export class Sum implements NativeStub, Reducer<number, number> {
+export class Sum implements /* NativeStub, */ Reducer<number, number> {
   /** @hidden */
   [sknative] = "sum";
 
@@ -22,7 +22,7 @@ export class Sum implements NativeStub, Reducer<number, number> {
  *
  * A `Reducer` that maintains the minimum of values as they are added and removed from a collection.
  */
-export class Min implements NativeStub, Reducer<number, number> {
+export class Min implements /* NativeStub, */ Reducer<number, number> {
   /** @hidden */
   [sknative] = "min";
 
@@ -38,7 +38,7 @@ export class Min implements NativeStub, Reducer<number, number> {
  *
  * A `Reducer` that maintains the maximum of values as they are added and removed from a collection.
  */
-export class Max implements NativeStub, Reducer<number, number> {
+export class Max implements /* NativeStub, */ Reducer<number, number> {
   /** @hidden */
   [sknative] = "max";
 
@@ -54,7 +54,9 @@ export class Max implements NativeStub, Reducer<number, number> {
  *
  * A `Reducer` that maintains the number of values as they are added and removed from a collection.
  */
-export class Count<T extends Json> implements Reducer<T, number>, NativeStub {
+export class Count<T extends Json>
+  implements /* NativeStub, */ Reducer<T, number>
+{
   /** @hidden */
   [sknative] = "count";
 
