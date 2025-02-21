@@ -2,11 +2,21 @@ module alias T = SKTest;
 
 module SKDateTests;
 
+fun eqEntityOpt(o1: ?SKDate.Entity, o2: ?SKDate.Entity): Bool {
+  (o1, o2) match {
+  | (None(), None()) -> true
+  | (None(), Some(_))
+  | (Some(_), None()) ->
+    false
+  | (Some(e1), Some(e2)) -> SKDate.Entity::eq(e1, e2)
+  }
+}
+
 @test
 fun parse1(): void {
   got = SKDate.parseFullDate("2023-09-19");
   expected = SKDate.Date::create(2023, 9, 19);
-  T.expectEq(got, Some(expected))
+  T.expectCmp(got, Some(expected), eqEntityOpt)
 }
 
 @test
@@ -17,7 +27,7 @@ fun parse2(): void {
     SKDate.Time::create(18, 2),
     SKDate.TZLocal(),
   );
-  T.expectEq(got, Some(expected))
+  T.expectCmp(got, Some(expected), eqEntityOpt)
 }
 
 @test
@@ -28,14 +38,14 @@ fun parse3(): void {
     SKDate.Time::create(18, 2),
     SKDate.TZ(SKDate.TimeZone::create(false, 1)),
   );
-  T.expectEq(got, Some(expected))
+  T.expectCmp(got, Some(expected), eqEntityOpt)
 }
 
 @test
 fun parse4(): void {
   got = SKDate.parseFullDate("18:30:25.896");
   expected = SKDate.Time::create(18, 30, 25, 896);
-  T.expectEq(got, Some(expected))
+  T.expectCmp(got, Some(expected), eqEntityOpt)
 }
 
 @test
@@ -67,7 +77,7 @@ fun parse8(): void {
     SKDate.Time::create(0, 0),
     SKDate.utc,
   );
-  T.expectEq(got, Some(expected))
+  T.expectCmp(got, Some(expected), eqEntityOpt)
 }
 
 module end;
