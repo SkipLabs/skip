@@ -420,11 +420,11 @@ fun add_params<Ta>(
   params match {
   | Named(m) ->
     values = if (env.sort_named_params) {
-      canonicalize_params(context, env, tid, m).values()
+      canonicalize_params(context, env, tid, m).values().map(p -> p.i1)
     } else {
-      m.items()
+      m.values()
     };
-    values.map(p -> p.i1).concat(acc.values()).collect(Array)
+    values.concat(acc.values()).collect(Array)
   | Positional(a) -> a.concat(acc)
   }
 }
