@@ -45,17 +45,11 @@ mutable base class FileIterator<+T> extends Iterator<T> {
     | Some(v) -> mutable NonEmptyIterator(v, iter)
     }
   }
-
-  readonly fun isEmpty(): Bool;
 }
 
 mutable class EmptyIterator<T>() extends FileIterator<T> {
   mutable fun next(): ?T {
     None()
-  }
-
-  readonly fun isEmpty(): Bool {
-    true
   }
 }
 
@@ -86,10 +80,6 @@ mutable class NonEmptyIterator<+T>(
       this.!isPastFirstValue = true;
       Some(this.first)
     }
-  }
-
-  readonly fun isEmpty(): Bool {
-    false
   }
 
   mutable fun nonEmptyMap<U>(f: T -> U): mutable NonEmptyIterator<U> {
