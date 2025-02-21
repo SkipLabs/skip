@@ -1546,6 +1546,9 @@ private trait VectorIterator<T, V>(
 ) {
   overridable readonly fun sizeHint(): ?Int {
     index = this.indexMinusGeneration + this.vector.generation_PRIVATE;
+    if (index >= generationSkip) {
+      throwContainerChanged()
+    };
     sz = max(0, this.sz - index);
     Some(sz)
   }
