@@ -624,12 +624,7 @@ fun applyDiffStrategy(
     isEligibleForTomb = (tick, source) ~>
       tick.value < snapshot.default(0) || source == writer;
 
-    !dir = dir.reset(
-      newRoot,
-      writer,
-      Array[].collect(SortedSet),
-      isEligibleForTomb,
-    );
+    !dir = dir.reset(newRoot, writer, SortedSet[], isEligibleForTomb);
 
     SKDB.resetWatermark(newRoot, table.name.lower, identity);
 
