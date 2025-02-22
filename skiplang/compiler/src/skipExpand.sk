@@ -92,8 +92,7 @@ fun populateCache(
     (context, writer, _key, defsFiles) ~> {
       SkipError.catchErrors(1, context, () -> {
         map = mutable Map[];
-        defsFiles.assertUnique();
-        defs = defsFiles.first.value.i1;
+        defs = defsFiles.assertUnique().value.i1;
         for (classDef in defs.class_defs) {
           (_fileRange, childStr) = classDef.name;
           for (classExtends in classDef.extends_) {
@@ -301,8 +300,7 @@ fun populateDefinitions(
     defMapDirName1,
     (context, writer, _key, defsFiles) ~> {
       SkipError.catchErrors(1, context, () -> {
-        defsFiles.assertUnique();
-        defs = defsFiles.first.value.i1;
+        defs = defsFiles.assertUnique().value.i1;
         for (classDef in defs.class_defs) {
           expandedDefFile = ExpandedDefFile(EClass(classDef));
           writer.set(SKStore.SID("class:" + classDef.name.i1), expandedDefFile);
@@ -1065,8 +1063,7 @@ fun program(
         moduleName = key match {
         | SKStore.SID(x) -> x
         };
-        defsFiles.assertUnique();
-        defs = defsFiles.first.value;
+        defs = defsFiles.assertUnique().value;
         writer.set(
           key,
           DefsFile(module_expand(context, expandEnv, moduleName, defs)),
