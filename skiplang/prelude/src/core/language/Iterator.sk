@@ -294,6 +294,15 @@ mutable base class .Iterator<+T> {
   }
 }
 
+mutable class .EmptyIterator<+T>() extends Iterator<T> {
+  readonly fun sizeHint(): ?Int {
+    Some(0)
+  }
+  readonly fun next(): None<T> {
+    None()
+  }
+}
+
 // See Iterator#drop()
 mutable class DropIterator<+T>(
   private base: mutable Iterator<T>,
