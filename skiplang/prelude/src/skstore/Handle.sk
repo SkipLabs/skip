@@ -99,11 +99,11 @@ mutable class NonEmptyIterator<+T>(
   }
 
   mutable fun assertUnique(
-    err: () -> void = () ->
+    err: () -> T = () ->
       invariant_violation("Expected an iterator with only one element"),
-  ): void {
+  ): T {
     this.getUnique() match {
-    | Some(_) -> void
+    | Some(v) -> v
     | None() -> err()
     }
   }
