@@ -1990,46 +1990,6 @@ class EagerDir{
     };
   }
 
-  fun unsafeGetFileIterWithReducer(): mutable Iterator<
-    (Key, mutable Iterator<File>),
-  > {
-    current = mutable IntRef(0);
-    for (key => _ in this.data) {
-      while (
-        current.value < this.fixedData.data.size() &&
-        this.fixedData.data[current.value].key < key
-      ) {
-        fixedKey = this.fixedData.data[current.value].key;
-        fixedFiles = this.getFixedFiles(current.value);
-        while (
-          current.value < this.fixedData.data.size() &&
-          this.fixedData.data[current.value].key == key
-        ) {
-          current.incr();
-        };
-        yield (fixedKey, fixedFiles);
-      };
-      while (
-        current.value < this.fixedData.data.size() &&
-        this.fixedData.data[current.value].key == key
-      ) {
-        current.incr();
-      };
-      yield (key, this.getIterRaw(key));
-    };
-    while (current.value < this.fixedData.data.size()) {
-      fixedKey = this.fixedData.data[current.value].key;
-      fixedFiles = this.getFixedFiles(current.value);
-      while (
-        current.value < this.fixedData.data.size() &&
-        this.fixedData.data[current.value].key == fixedKey
-      ) {
-        current.incr();
-      };
-      yield (fixedKey, fixedFiles);
-    };
-  }
-
   fun onFiles(
     process: mutable Iterator<(Key, mutable Iterator<File>)> -> void,
   ): void {
