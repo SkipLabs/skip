@@ -14,6 +14,7 @@ type Post = {
   title: string;
   url: string;
   body: string;
+  date: number;
 };
 
 type User = {
@@ -94,6 +95,7 @@ class CleanupMapper {
           title: post.title,
           url: post.url,
           body: post.body,
+          date: post.date,
           author: post.author,
           upvotes,
           upvoted,

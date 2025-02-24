@@ -8,7 +8,8 @@ CREATE TABLE posts (
        "author_id" INTEGER,
        "title" TEXT,
        "url" TEXT,
-       "body" TEXT
+       "body" TEXT,
+       "date" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE upvotes (
        "id" SERIAL PRIMARY KEY,

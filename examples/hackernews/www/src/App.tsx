@@ -8,6 +8,17 @@ import {
 } from "react-router-dom";
 import "./App.css";
 
+type Post = {
+  id: number;
+  title: string;
+  body: string;
+  date: Date;
+  url: string;
+  upvotes: number;
+  upvoted: boolean;
+  author: User;
+};
+
 export default function App() {
   const [posts, setPosts] = useState<Post[]>([]);
   const previousPostsValue = useRef<Post[]>([]);
@@ -48,6 +59,7 @@ export default function App() {
     evSource.addEventListener("init", (e: MessageEvent<string>) => {
       const data = JSON.parse(e.data) as [number, any[]][];
       const initialPosts = data.map(([post_id, values]) => {
+        values[0].date = new Date(values[0].date);
         return { ...values[0], id: post_id };
       }) as Post[];
       initialPosts.sort(sortByUpvotes);
@@ -61,6 +73,7 @@ export default function App() {
       for (let [post_id, values] of data) {
         modifiedPosts.push(post_id);
         if (values.length > 0) {
+          values[0].date = new Date(values[0].date);
           updatedPosts.push({ ...values[0], id: post_id });
         }
       }
@@ -146,17 +159,37 @@ function Header(props: { session: Session | null }) {
   );
 }
 
-type Post = {
-  id: number;
-  title: string;
-  body: string;
-  url: string;
-  upvotes: number;
-  upvoted: boolean;
-  author: User;
-};
-
 function Feed(props: { posts: Post[]; session: Session | null }) {
+  function timeSince(curDate: Date, date: Date) {
+    const seconds = Math.floor((curDate.getTime() - date.getTime()) / 1000);
+    if (seconds < 60) {
+      if (seconds == 1) return "1 second";
+      return `${seconds} seconds`;
+    }
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) {
+      if (minutes == 1) return "1 minute";
+      return `${minutes} minutes`;
+    }
+    const hours = Math.floor(seconds / 3600);
+    if (hours < 24) {
+      if (hours == 1) return "1 hour";
+      return `${hours} hours`;
+    }
+    const days = Math.floor(seconds / 86400);
+    if (days == 1) return "1 day";
+    return `${days} days`;
+  }
+
+  const [curDate, setCurDate] = useState<Date>(new Date());
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurDate(new Date());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  });
+
   const posts = props.posts;
   const session = props.session;
   const navigate = useNavigate();
@@ -193,7 +226,8 @@ function Feed(props: { posts: Post[]; session: Session | null }) {
                 </span>
               </p>
               <p className="subtext">
-                {post.upvotes} points by {post.author.name} X hours ago
+                {post.upvotes} points by {post.author.name}{" "}
+                {timeSince(curDate, post.date)} ago
               </p>
             </li>
           ))}
