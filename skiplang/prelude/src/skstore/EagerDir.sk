@@ -480,16 +480,10 @@ class DataMap{
     }
   }
 
-  fun itemsAfterKeyHelper(
-    lastSkippedOpt: ?Boundary<Key>,
-  ): mutable Iterator<(Key, DMap<Path, (Path, Array<File>)>)> {
-    this.data.itemsAfterKey(lastSkippedOpt).iter
-  }
-
   fun itemsAfterKey(
     lastSkippedOpt: ?Boundary<Key>,
-  ): mutable IterHolder<Key, DMap<Path, (Path, Array<File>)>> {
-    mutable IterHolder(this.itemsAfterKeyHelper(lastSkippedOpt))
+  ): mutable Iterator<(Key, DMap<Path, (Path, Array<File>)>)> {
+    this.data.itemsAfterKey(lastSkippedOpt)
   }
 
   fun getHeight(): Int {
@@ -997,7 +991,7 @@ class EagerDir{
     current = mutable IntRef(currentStart);
     size = 0;
 
-    for (key => _ in parent.data.itemsAfterKey(start)) {
+    for ((key, _) in parent.data.itemsAfterKey(start)) {
       end match {
       | Some(endKey) if (key > endKey) -> break void
       | _ -> void
@@ -1933,7 +1927,7 @@ class EagerDir{
       | Some(key) -> max(0, this.fixedData.data.getPos(key))
       },
     );
-    for (key => _ in this.data.data.itemsAfterKey(
+    for ((key, _) in this.data.data.itemsAfterKey(
       start.map(x -> Inclusive(x)),
     )) {
       while (
