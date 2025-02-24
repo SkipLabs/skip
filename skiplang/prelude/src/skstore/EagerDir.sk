@@ -1501,15 +1501,8 @@ class EagerDir{
   private fun getIterRaw(key: Key): mutable Iterator<File> {
     this.reducer match {
     | None() ->
-      for (arr in this.unsafeGetDataIterWithoutTombs(key)) {
-        for (elt in arr.i2) {
-          yield elt
-        }
-      }
-    | Some(compact) ->
-      for (elt in compact.getArray(key)) {
-        yield elt
-      }
+      this.unsafeGetDataIterWithoutTombs(key).flatMap(arr -> arr.i2.iterator())
+    | Some(compact) -> compact.getArray(key).iterator()
     }
   }
 
