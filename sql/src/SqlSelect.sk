@@ -1070,15 +1070,14 @@ class SelectEvaluator{
 
     key match {
     | RowKey _ ->
-      inputRow = inputRows.next() match {
-      | None() -> return void
-      | Some(x @ RowValues _) -> x
-      | Some(x) ->
+      inputRow = inputRows.first match {
+      | x @ RowValues _ -> x
+      | x ->
         debug(x);
         invariant_violation("Unexpected row type")
       };
 
-      repeat = inputRow.repeat;
+      repeat = 0;
 
       for (ir in inputRows) {
         ir match {
