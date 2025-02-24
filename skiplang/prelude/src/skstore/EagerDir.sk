@@ -1064,10 +1064,7 @@ class EagerDir{
     acc: mutable Vector<FixedRow<Array<File>>>,
     rangeOpt: ?KeyRange,
   ): void {
-    last: ?Boundary<Key> = rangeOpt match {
-    | None() -> None()
-    | Some(range) -> Some(Inclusive(range.start))
-    };
+    last: ?Boundary<Key> = rangeOpt.map(range -> Inclusive(range.start));
     current = rangeOpt match {
     | None() -> 0
     | Some(range) -> max(0, parent.fixedData.data.getPos(range.start))
@@ -1956,10 +1953,7 @@ class EagerDir{
       },
     );
     for (key => _ in this.data.data.itemsAfterKey(
-      start match {
-      | None() -> None()
-      | Some(x) -> Some(Inclusive(x))
-      },
+      start.map(x -> Inclusive(x)),
     )) {
       while (
         current.value < this.fixedData.data.size() &&
