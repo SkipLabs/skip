@@ -145,7 +145,7 @@ private fun flattenParams<T>(
         (acc, t) -> acc + (if (isTdefault(t)) 1 else 0),
         0,
       );
-      (pArgs.collect(Array), numOpt, numOpt <= 1)
+      (pArgs, numOpt, numOpt <= 1)
     | Named _ -> invariant_violation("Positional/named mismatch.")
     }
   | Named(funArgs) ->
@@ -4121,11 +4121,7 @@ mutable class OuterIstEmitter{
       }
     | I.EArray(exprs) ->
       this.emitInstr(
-        GEArray{
-          typ,
-          pos,
-          args => exprs.collect(Array).map(e -> this.emitExpr(context, e)),
-        },
+        GEArray{typ, pos, args => exprs.map(e -> this.emitExpr(context, e))},
       )
     | I.Async(stmt, expr) -> this.emitAsync(stmt, expr, typ, pos)
     | I.Await(expr) -> this.emitAwait(context, expr, typ, pos)
