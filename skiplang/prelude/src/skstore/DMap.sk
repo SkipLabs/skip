@@ -15,12 +15,6 @@ value class TickRange{max: Tick, current: Tick} {
   }
 }
 
-mutable class IterHolder<Key, Value>(iter: mutable Iterator<(Key, Value)>) {
-  mutable fun items(): mutable Iterator<(Key, Value)> {
-    this.iter
-  }
-}
-
 base class Boundary<T> {
   children =
   | Inclusive(T)
@@ -104,13 +98,11 @@ base class DMap<Key: Orderable, Value> {
 
   fun itemsAfterKey(
     lastSkippedOpt: ?Boundary<Key>,
-  ): mutable IterHolder<Key, Value> {
-    mutable IterHolder(
-      lastSkippedOpt match {
-      | None() -> this.items()
-      | Some(lastSkipped) -> this.itemsAfterKeyHelper(lastSkipped)
-      },
-    )
+  ): mutable Iterator<(Key, Value)> {
+    lastSkippedOpt match {
+    | None() -> this.items()
+    | Some(lastSkipped) -> this.itemsAfterKeyHelper(lastSkipped)
+    }
   }
 
   fun itemsWithTick(): mutable Iterator<(Key, Value, TickRange)> {
