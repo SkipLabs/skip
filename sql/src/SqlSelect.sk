@@ -24,7 +24,7 @@ type MapFunRow = (
   mutable SKStore.Context,
   mutable SKStore.TWriter<SKStore.Key, Row>,
   SKStore.Key,
-  mutable Iterator<Row>,
+  mutable SKStore.NonEmptyIterator<Row>,
 ) ~> void;
 
 class SubTask(
@@ -1067,7 +1067,7 @@ class SelectEvaluator{
     context: mutable SKStore.Context,
     writer: mutable SKStore.TWriter<SKStore.Key, Row>,
     key: SKStore.Key,
-    inputRows: mutable Iterator<Row>,
+    inputRows: mutable SKStore.NonEmptyIterator<Row>,
   ): void {
     mwriter = mutable MultiWriter{};
 
