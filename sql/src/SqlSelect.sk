@@ -613,10 +613,7 @@ class SelectEvaluator{
         context,
         dataName,
         (context, writer, key, aggrResult) ~> {
-          entry = firstRow(aggrResult) match {
-          | None() -> return void
-          | Some(x) -> x
-          };
+          entry = aggrResult.first;
           evaluator = ExprEvaluator(Array[entry], this.select.from, this.up);
           this.select.having match {
           | None() ->
