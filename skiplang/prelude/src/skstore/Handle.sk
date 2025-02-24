@@ -117,6 +117,16 @@ mutable class NonEmptyIterator<+T>(
     Array::createFromIterator(this.values())
   }
 
+  mutable fun nonEmptyReduce<U>(f: (U, T) -> U, init: T -> U): U {
+    acc = init(this.next().fromSome());
+    loop {
+      this.next() match {
+      | None() -> return acc
+      | Some(x) -> !acc = f(acc, x)
+      }
+    }
+  }
+
   mutable fun map<V>(conv: T -> V): mutable NonEmptyIterator<V> {
     this.materializeIter();
     materializedIter = this.materializedIter.map(v -> v.map(conv));
