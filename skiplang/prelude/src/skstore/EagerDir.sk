@@ -1910,27 +1910,17 @@ class EagerDir{
     };
   }
 
-  private fun getFixedFiles(idx: Int): mutable Iterator<File> {
+  private fun getFixedFilesNoReducer(idx: Int): mutable Iterator<File> {
     key = this.fixedData.data[idx].key;
     while (
       idx < this.fixedData.data.size() &&
       this.fixedData.data[idx].key == key
     ) {
       fixedValues = this.fixedData.data[idx].value;
-      if (this.reducer is None()) {
-        for (elt in fixedValues) {
-          yield elt;
-        };
+      for (elt in fixedValues) {
+        yield elt;
       };
       !idx = idx + 1;
-    };
-
-    this.reducer match {
-    | None() -> void
-    | Some(compact) ->
-      for (elt in compact.getArray(key)) {
-        yield elt
-      }
     }
   }
 
@@ -1960,7 +1950,7 @@ class EagerDir{
         this.fixedData.data[current.value].key < key
       ) {
         fixedKey = this.fixedData.data[current.value].key;
-        fixedFiles = this.getFixedFiles(current.value);
+        fixedFiles = this.getFixedFilesNoReducer(current.value);
         while (
           current.value < this.fixedData.data.size() &&
           this.fixedData.data[current.value].key == fixedKey
@@ -1979,7 +1969,7 @@ class EagerDir{
     };
     while (current.value < this.fixedData.data.size()) {
       fixedKey = this.fixedData.data[current.value].key;
-      fixedFiles = this.getFixedFiles(current.value);
+      fixedFiles = this.getFixedFilesNoReducer(current.value);
       while (
         current.value < this.fixedData.data.size() &&
         this.fixedData.data[current.value].key == fixedKey
