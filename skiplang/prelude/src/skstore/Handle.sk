@@ -108,6 +108,10 @@ mutable class NonEmptyIterator<+T>(
     }
   }
 
+  mutable fun toArray(): Array<T> {
+    Array::createFromIterator(this)
+  }
+
   mutable fun map<V>(conv: T -> V): mutable NonEmptyIterator<V> {
     this.materializeIter();
     materializedIter = this.materializedIter.map(v -> v.map(conv));
