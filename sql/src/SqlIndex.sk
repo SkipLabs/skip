@@ -106,7 +106,7 @@ fun createIndex(
         row = rows.first;
         values = kinds.map(kind -> row.getValue(kind.i0));
         rvalues = RowValues::create(values);
-        writer.setArray(RowKey::create(rvalues, idxKinds), rows.collect(Array));
+        writer.setArray(RowKey::create(rvalues, idxKinds), rows.toArray());
       },
     )
   };
@@ -120,7 +120,7 @@ fun createIndex(
         SKStore.DirName::create(indexName.lower + "unique/proj/"),
         (_, writer, _key, values) ~> {
           result = SortedMap<IndexProjKey, mutable Vector<RowValues>>[];
-          valuesArr = values.collect(Array);
+          valuesArr = values.toArray();
           for (v in valuesArr) {
             k = IndexProjKey::createFromRowValues(v, columnIndices);
             if (v.repeat != 1) {
@@ -148,7 +148,7 @@ fun createIndex(
         SKStore.DirName::create(indexName.lower + "unique/sink/"),
         (_, _, key, values) ~> {
           repeat = 0;
-          valuesArr = values.collect(Array);
+          valuesArr = values.toArray();
           for (r in valuesArr) {
             !repeat = repeat + r.repeat;
           };

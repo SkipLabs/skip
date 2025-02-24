@@ -257,9 +257,7 @@ fun populateCache(
       SkipError.catchErrors(1, context, () -> {
         writer.set(
           key,
-          SKStore.ArrayStringFile(
-            iter.map(x -> x.value).collect(SortedSet).collect(Array),
-          ),
+          SKStore.ArrayStringFile(iter.map(x -> x.value).toArray().sorted()),
         );
       })
     },
@@ -330,7 +328,7 @@ fun populateDefinitions(
         name = key match {
         | SKStore.SID(x) -> x
         };
-        defFilesArray = defFiles.collect(Array);
+        defFilesArray = defFiles.toArray();
         if (name.startsWith("class:")) {
           roots = mutable Vector[];
           exts = mutable Vector[];
