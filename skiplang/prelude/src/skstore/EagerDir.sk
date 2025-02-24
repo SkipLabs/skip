@@ -1912,16 +1912,14 @@ class EagerDir{
 
   private fun getFixedFilesNoReducer(idx: Int): mutable Iterator<File> {
     key = this.fixedData.data[idx].key;
-    while (
-      idx < this.fixedData.data.size() &&
-      this.fixedData.data[idx].key == key
-    ) {
+    do {
       fixedValues = this.fixedData.data[idx].value;
       for (elt in fixedValues) {
         yield elt;
       };
       !idx = idx + 1;
-    }
+    } while (idx < this.fixedData.data.size() &&
+      this.fixedData.data[idx].key == key);
   }
 
   fun unsafeGetFileIter(
