@@ -38,7 +38,7 @@ module SKStore;
 /* Iterator capable of answering if it produces at least one element. */
 /*****************************************************************************/
 
-mutable base class FileIterator<+T> extends Iterator<T> {
+mutable base class FileIterator<+T> {
   static fun create(iter: mutable Iterator<T>): mutable FileIterator<T> {
     iter.next() match {
     | None() -> mutable EmptyFileIterator()
@@ -70,6 +70,15 @@ mutable class NonEmptyIterator<+T>(
       this.!iter = (array.iterator() : mutable Iterator<T>)
     | Some(_) -> void
     };
+  }
+
+  mutable fun values(): mutable Iterator<T> {
+    loop {
+      this.next() match {
+      | Some(v) -> yield v
+      | None() -> yield break
+      }
+    }
   }
 
   mutable fun next(): ?T {
@@ -109,7 +118,7 @@ mutable class NonEmptyIterator<+T>(
   }
 
   mutable fun toArray(): Array<T> {
-    Array::createFromIterator(this)
+    Array::createFromIterator(this.values())
   }
 
   mutable fun map<V>(conv: T -> V): mutable NonEmptyIterator<V> {
