@@ -100,8 +100,7 @@ class Reducer{
       start match {
       | None() -> 0
       | Some(key) ->
-        pos = binSearch(i ~> this.fixed[i].i0, key, 0, this.fixed.size() - 1);
-        if (pos < 0) 0 else pos
+        max(0, binSearch(i ~> this.fixed[i].i0, key, 0, this.fixed.size() - 1))
       },
     );
     for (key => values in Items::create(this.modified.itemsAfter(start))) {
@@ -1071,9 +1070,7 @@ class EagerDir{
     };
     current = rangeOpt match {
     | None() -> 0
-    | Some(range) ->
-      pos = parent.fixedData.data.getPos(range.start);
-      if (pos < 0) 0 else pos
+    | Some(range) -> max(0, parent.fixedData.data.getPos(range.start))
     };
     end = rangeOpt.map(r -> r.end);
     currentEnd = end match {
@@ -1955,9 +1952,7 @@ class EagerDir{
     current = mutable IntRef(
       start match {
       | None() -> 0
-      | Some(key) ->
-        pos = this.fixedData.data.getPos(key);
-        if (pos < 0) 0 else pos
+      | Some(key) -> max(0, this.fixedData.data.getPos(key))
       },
     );
     for (key => _ in this.data.data.itemsAfterKey(
