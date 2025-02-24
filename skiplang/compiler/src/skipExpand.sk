@@ -1035,13 +1035,10 @@ fun program(
     SKStore.DirName::create("/moduleMap2/"),
     (context, writer, key, values) ~> {
       SkipError.catchErrors(1, context, () -> {
-        acc = values.next() match {
-        | None() -> return void
-        | Some(defFile) -> defFile.value
-        };
-        for (defs in values) {
-          !acc = mergeDefs(acc, defs.value);
-        };
+        acc = values.nonEmptyReduce(
+          (acc, d) -> mergeDefs(acc, d.value),
+          firstDefFile -> firstDefFile.value,
+        );
         moduleName = key match {
         | SKStore.SID(x) -> x
         };
