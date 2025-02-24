@@ -55,9 +55,9 @@ mutable class EmptyFileIterator<T>() extends FileIterator<T> {
 
 mutable class NonEmptyIterator<+T>(
   first: T,
-  mutable iter: mutable Iterator<T>,
-  mutable isPastFirstValue: Bool = false,
-  mutable materializedIter: ?Array<T> = None(),
+  private mutable iter: mutable Iterator<T>,
+  private mutable isPastFirstValue: Bool = false,
+  private mutable materializedIter: ?Array<T> = None(),
 ) extends FileIterator<T> {
   // Materialize `iter` into an array to support multiple/repeat iterations
   // This operation is deferred until necessary, to avoid materialization in
