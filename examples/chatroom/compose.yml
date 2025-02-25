@@ -1,0 +1,49 @@
+services:
+  # Reverse proxy
+  haproxy:
+    image: reactive-chatroom/load-balancer
+    build: ./load_balancer
+    ports:
+      - "80:80"
+      - "443:443"
+
+  # Reactive service
+  reactive_cache:
+    image: reactive-chatroom/skip-service
+    build: ./reactive_service
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  # Web backend
+  web:
+    image: reactive-chatroom/web-service
+    build: ./web_service
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  # Web frontend
+  www:
+    image: reactive-chatroom/www
+    build: ./www
+
+  # Kafka event store
+  kafka:
+    image: bitnami/kafka:latest
+    command: sh -c "((sleep 10 && /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server 127.0.0.1:19092 --create --topic skip-chatroom-messages && /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server 127.0.0.1:19092 --create --topic skip-chatroom-likes)&) && /opt/bitnami/scripts/kafka/run.sh"
+    hostname: kafka
+    ports:
+      - "19092:19092"
+    environment:
+      KAFKA_CFG_PROCESS_ROLES: controller,broker
+      KAFKA_CFG_NODE_ID: 0
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_CFG_LISTENERS: "PLAINTEXT://:19092,CONTROLLER://:19093"
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "0@kafka:19093"
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+    healthcheck:
+      test: /opt/bitnami/kafka/bin/kafka-topics.sh --list --bootstrap-server kafka:19092 | wc -l | xargs -I{} test {} -ge 2 || exit 1
+      interval: 1s
+      timeout: 60s
+      retries: 60
