@@ -372,7 +372,7 @@ void sk_staging();
 char* sk_string_create(const char* buffer, uint32_t size);
 void sk_string_check_c_safe(char* str);
 void throw_Invalid_utf8();
-void todo();
+void todo(char* err, char* msg);
 char* sk_get_external_pointer();
 char* sk_get_external_pointer_destructor(char* obj);
 uint32_t sk_get_external_pointer_value(char* obj);
