@@ -73,35 +73,31 @@ base class DMap<Key: Orderable, Value> {
     }
   }
 
-  private fun itemsAfterKeyHelper(
-    boundary: Boundary<Key>,
-  ): mutable Iterator<(Key, Value)> {
+  private fun keysAfterHelper(boundary: Boundary<Key>): mutable Iterator<Key> {
     this match {
     | Nil() -> void
-    | Node{key, value, left, right} ->
+    | Node{key, left, right} ->
       if (
         boundary match {
         | Inclusive(lastSkipped) -> key >= lastSkipped
         | Exclusive(lastSkipped) -> key > lastSkipped
         }
       ) {
-        for (x in left.itemsAfterKeyHelper(boundary)) {
+        for (x in left.keysAfterHelper(boundary)) {
           yield x;
         };
-        yield (key, value);
+        yield key;
       };
-      for (x in right.itemsAfterKeyHelper(boundary)) {
+      for (x in right.keysAfterHelper(boundary)) {
         yield x;
       }
     }
   }
 
-  fun itemsAfterKey(
-    lastSkippedOpt: ?Boundary<Key>,
-  ): mutable Iterator<(Key, Value)> {
+  fun keysAfter(lastSkippedOpt: ?Boundary<Key>): mutable Iterator<Key> {
     lastSkippedOpt match {
-    | None() -> this.items()
-    | Some(lastSkipped) -> this.itemsAfterKeyHelper(lastSkipped)
+    | None() -> this.items().map(item -> item.i0)
+    | Some(lastSkipped) -> this.keysAfterHelper(lastSkipped)
     }
   }
 
