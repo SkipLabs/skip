@@ -257,7 +257,9 @@ fun populateCache(
       SkipError.catchErrors(1, context, () -> {
         writer.set(
           key,
-          SKStore.ArrayStringFile(iter.map(x -> x.value).toArray().sorted()),
+          SKStore.ArrayStringFile(
+            iter.nonEmptyMap(x -> x.value).toArray().sorted(),
+          ),
         );
       })
     },
