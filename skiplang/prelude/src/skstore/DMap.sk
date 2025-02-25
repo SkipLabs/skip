@@ -15,12 +15,6 @@ value class TickRange{max: Tick, current: Tick} {
   }
 }
 
-mutable class IterHolder<Key, Value>(iter: mutable Iterator<(Key, Value)>) {
-  mutable fun items(): mutable Iterator<(Key, Value)> {
-    this.iter
-  }
-}
-
 base class Boundary<T> {
   children =
   | Inclusive(T)
@@ -79,38 +73,32 @@ base class DMap<Key: Orderable, Value> {
     }
   }
 
-  private fun itemsAfterKeyHelper(
-    boundary: Boundary<Key>,
-  ): mutable Iterator<(Key, Value)> {
+  private fun keysAfterHelper(boundary: Boundary<Key>): mutable Iterator<Key> {
     this match {
     | Nil() -> void
-    | Node{key, value, left, right} ->
+    | Node{key, left, right} ->
       if (
         boundary match {
         | Inclusive(lastSkipped) -> key >= lastSkipped
         | Exclusive(lastSkipped) -> key > lastSkipped
         }
       ) {
-        for (x in left.itemsAfterKeyHelper(boundary)) {
+        for (x in left.keysAfterHelper(boundary)) {
           yield x;
         };
-        yield (key, value);
+        yield key;
       };
-      for (x in right.itemsAfterKeyHelper(boundary)) {
+      for (x in right.keysAfterHelper(boundary)) {
         yield x;
       }
     }
   }
 
-  fun itemsAfterKey(
-    lastSkippedOpt: ?Boundary<Key>,
-  ): mutable IterHolder<Key, Value> {
-    mutable IterHolder(
-      lastSkippedOpt match {
-      | None() -> this.items()
-      | Some(lastSkipped) -> this.itemsAfterKeyHelper(lastSkipped)
-      },
-    )
+  fun keysAfter(lastSkippedOpt: ?Boundary<Key>): mutable Iterator<Key> {
+    lastSkippedOpt match {
+    | None() -> this.items().map(item -> item.i0)
+    | Some(lastSkipped) -> this.keysAfterHelper(lastSkipped)
+    }
   }
 
   fun itemsWithTick(): mutable Iterator<(Key, Value, TickRange)> {
