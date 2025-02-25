@@ -77,7 +77,7 @@ mutable class NonEmptyIterator<+T>(
     }
   }
 
-  mutable fun next(): ?T {
+  private mutable fun next(): ?T {
     if (this.isPastFirstValue) {
       this.materializeIter();
       this.iter.next()
@@ -85,6 +85,10 @@ mutable class NonEmptyIterator<+T>(
       this.!isPastFirstValue = true;
       Some(this.first)
     }
+  }
+
+  mutable fun next__ForJS(): ?T {
+    this.next()
   }
 
   mutable fun nonEmptyMap<U>(f: T -> U): mutable NonEmptyIterator<U> {
