@@ -27,16 +27,16 @@ SKIP_gc_type_t* get_gc_type(char* skip_object) {
 void SKIP_Regex_initialize() {}
 
 void SKIP_print_stack_trace() {
-  todo();
+  todo("Not implemented", "SKIP_print_stack_trace");
 }
 void SKIP_print_last_exception_stack_trace_and_exit(void*) {
-  todo();
+  todo("Not implemented", "SKIP_print_last_exception_stack_trace_and_exit");
 }
-void SKIP_unreachableMethodCall(void*, void*) {
-  todo();
+void SKIP_unreachableMethodCall(void* msg, void*) {
+  todo("Unreachable method call", msg);
 }
-void SKIP_unreachableWithExplanation(void*) {
-  todo();
+void SKIP_unreachableWithExplanation(void* explanation) {
+  todo("Unreachable", explanation);
 }
 
 void SKIP_Obstack_vectorUnsafeSet(char** arr, char* x) {
