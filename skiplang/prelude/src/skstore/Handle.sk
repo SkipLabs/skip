@@ -49,12 +49,23 @@ mutable base class FileIterator<+T> {
 
 mutable class EmptyFileIterator<T>() extends FileIterator<T> {}
 
+/* A NonEmptyIterator should only be used in one of the following ways:
+- a single call to assertUnique or getUnique, or
+- a single call to nonEmptyMap, nonEmptyReduce, toArray, or values, or
+- repeated calls to next__ForJS.
+
+Accessing first is a bad pattern. Use assertUnique, getUnique, toArray,
+or values instead. */
 mutable class NonEmptyIterator<+T>(
   first: T,
   private mutable iter: mutable Iterator<T>,
   private mutable isPastFirstValue: Bool = false,
 ) extends FileIterator<T> {
   mutable fun values(): mutable Iterator<T> {
+    invariant(
+      !this.isPastFirstValue,
+      "Trying to iterate a NonEmptyIterator twice (values)",
+    );
     loop {
       this.next() match {
       | Some(v) -> yield v
@@ -77,15 +88,18 @@ mutable class NonEmptyIterator<+T>(
   }
 
   mutable fun nonEmptyMap<U>(f: T -> U): mutable NonEmptyIterator<U> {
+    invariant(
+      !this.isPastFirstValue,
+      "Trying to iterate a NonEmptyIterator twice (nonEmptyMap)",
+    );
     mutable NonEmptyIterator(f(this.first), this.iter.map(f))
   }
 
   mutable fun getUnique(): ?T {
-    if (this.isPastFirstValue) {
-      invariant_violation(
-        "Cannot use getUnique on an iterator that has already been used",
-      )
-    };
+    invariant(
+      !this.isPastFirstValue,
+      "Cannot use getUnique on an iterator that has already been used",
+    );
     this.!isPastFirstValue = true;
     this.iter.next() match {
     | None() -> Some(this.first)
@@ -104,10 +118,18 @@ mutable class NonEmptyIterator<+T>(
   }
 
   mutable fun toArray(): Array<T> {
+    invariant(
+      !this.isPastFirstValue,
+      "Trying to iterate a NonEmptyIterator twice (toArray)",
+    );
     Array::createFromIterator(this.values())
   }
 
   mutable fun nonEmptyReduce<U>(f: (U, T) -> U, init: T -> U): U {
+    invariant(
+      !this.isPastFirstValue,
+      "Trying to iterate a NonEmptyIterator twice (nonEmptyReduce)",
+    );
     acc = init(this.next().fromSome());
     loop {
       this.next() match {
