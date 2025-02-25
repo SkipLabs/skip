@@ -740,9 +740,9 @@ class ValuesImpl<T> implements Values<T> {
     return value;
   }
 
-  toArray: () => (T & DepSafe)[] = () => {
+  toArray(): (T & DepSafe)[] {
     return Array.from(this);
-  };
+  }
 
   [Symbol.iterator](): Iterator<T & DepSafe> {
     const cloned_iter = new ValuesImpl<T & DepSafe>(
