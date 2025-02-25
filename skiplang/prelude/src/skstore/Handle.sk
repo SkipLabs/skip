@@ -53,21 +53,7 @@ mutable class NonEmptyIterator<+T>(
   first: T,
   private mutable iter: mutable Iterator<T>,
   private mutable isPastFirstValue: Bool = false,
-  private mutable materializedIter: ?Array<T> = None(),
 ) extends FileIterator<T> {
-  // Materialize `iter` into an array to support multiple/repeat iterations
-  // This operation is deferred until necessary, to avoid materialization in
-  // cases where only the `first` element is accessed
-  private mutable fun materializeIter(): void {
-    this.materializedIter match {
-    | None() ->
-      array = this.iter.collect(Array);
-      this.!materializedIter = Some(array);
-      this.!iter = (array.iterator() : mutable Iterator<T>)
-    | Some(_) -> void
-    };
-  }
-
   mutable fun values(): mutable Iterator<T> {
     loop {
       this.next() match {
@@ -79,7 +65,6 @@ mutable class NonEmptyIterator<+T>(
 
   private mutable fun next(): ?T {
     if (this.isPastFirstValue) {
-      this.materializeIter();
       this.iter.next()
     } else {
       this.!isPastFirstValue = true;
