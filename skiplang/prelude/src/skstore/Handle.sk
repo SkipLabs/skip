@@ -130,13 +130,7 @@ mutable class NonEmptyIterator<+T>(
       !this.isPastFirstValue,
       "Trying to iterate a NonEmptyIterator twice (nonEmptyReduce)",
     );
-    acc = init(this.next().fromSome());
-    loop {
-      this.next() match {
-      | None() -> return acc
-      | Some(x) -> !acc = f(acc, x)
-      }
-    }
+    this.iter.reduce(f, init(this.first))
   }
 }
 
