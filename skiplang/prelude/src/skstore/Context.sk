@@ -319,12 +319,18 @@ class TimeStack private (private values: Array<Time>) uses Orderable {
     this
   }
 
+  fun maxMinus(): this {
+    !this.values = this.values.map(x -> Time(Int::max - x.value));
+    this
+  }
+
   fun compare(other: TimeStack): Order {
     for (i in Range(0, this.values.size())) {
       if (i >= other.values.size()) return GT();
-      cmp = this.values.compare(other.values);
+      cmp = this.values[i].compare(other.values[i]);
       if (cmp != EQ()) return cmp;
     };
+    if (other.values.size() > this.values.size()) return LT();
     EQ()
   }
 }
