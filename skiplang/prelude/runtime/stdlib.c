@@ -114,9 +114,16 @@ void sk_print_int(uint64_t x) {
   SKIP_print_char('\n');
 }
 
-void todo() {
+#ifdef SKIP64
+void todo(char* err, char* msg) {
+  fprintf(stderr, "%s: %s\n", err, msg);
   SKIP_throw_cruntime(ERROR_TODO);
 }
+#else
+void todo(char*, char*) {
+  SKIP_throw_cruntime(ERROR_TODO);
+}
+#endif
 
 char* SKIP_read_line() {
   int32_t size = SKIP_read_line_fill();
