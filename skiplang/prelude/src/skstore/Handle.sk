@@ -100,15 +100,6 @@ mutable class NonEmptyIterator<+T>(
     | Some _ -> err()
     }
   }
-  mutable fun clone(): mutable NonEmptyIterator<T> {
-    this.materializeIter();
-    mutable NonEmptyIterator(
-      this.first,
-      this.materializedIter.fromSome().iterator(),
-      false,
-      this.materializedIter,
-    )
-  }
 
   mutable fun map<V>(conv: T -> V): mutable NonEmptyIterator<V> {
     this.materializeIter();
