@@ -726,7 +726,7 @@ class ValuesImpl<T> implements Values<T> {
     this.pointer = pointer;
   }
 
-  next(): Nullable<T & DepSafe> {
+  private next(): Nullable<T & DepSafe> {
     return this.skjson.importOptJSON(
       this.binding.SkipRuntime_NonEmptyIterator__next(this.pointer),
     ) as Nullable<T & DepSafe>;
