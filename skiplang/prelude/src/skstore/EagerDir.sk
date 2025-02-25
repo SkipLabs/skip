@@ -100,8 +100,7 @@ class Reducer{
       start match {
       | None() -> 0
       | Some(key) ->
-        pos = binSearch(i ~> this.fixed[i].i0, key, 0, this.fixed.size() - 1);
-        if (pos < 0) 0 else pos
+        max(0, binSearch(i ~> this.fixed[i].i0, key, 0, this.fixed.size() - 1))
       },
     );
     for (key => values in Items::create(this.modified.itemsAfter(start))) {
@@ -613,8 +612,8 @@ class FixedDataMap{data: FixedData<Array<File>>, tombs: FixedDir<Path>} {
 }
 
 mutable class FixedDataMapIterator<T> private {
-  iter: mutable Iterator<T>,
-  mutable currentOpt: ?T = None(),
+  private iter: mutable Iterator<T>,
+  private mutable currentOpt: ?T = None(),
 } {
   static fun create(iter: mutable Iterator<T>): mutable this {
     mutable static{currentOpt => iter.next(), iter => iter}
@@ -1065,15 +1064,10 @@ class EagerDir{
     acc: mutable Vector<FixedRow<Array<File>>>,
     rangeOpt: ?KeyRange,
   ): void {
-    last: ?Boundary<Key> = rangeOpt match {
-    | None() -> None()
-    | Some(range) -> Some(Inclusive(range.start))
-    };
+    last: ?Boundary<Key> = rangeOpt.map(range -> Inclusive(range.start));
     current = rangeOpt match {
     | None() -> 0
-    | Some(range) ->
-      pos = parent.fixedData.data.getPos(range.start);
-      if (pos < 0) 0 else pos
+    | Some(range) -> max(0, parent.fixedData.data.getPos(range.start))
     };
     end = rangeOpt.map(r -> r.end);
     currentEnd = end match {
@@ -1477,7 +1471,7 @@ class EagerDir{
         }
       }
     | Some(modified) ->
-      fixed = FixedDataMapIterator::create(this.fixedData.getIter(key));
+      fixed = FixedDataMapIterator::create(fixedIter);
 
       for (sourceFilesTick in modified.map.itemsWithTick()) {
         (source, (_writer, files), tickRange) = sourceFilesTick;
@@ -1507,15 +1501,8 @@ class EagerDir{
   private fun getIterRaw(key: Key): mutable Iterator<File> {
     this.reducer match {
     | None() ->
-      for (arr in this.unsafeGetDataIterWithoutTombs(key)) {
-        for (elt in arr.i2) {
-          yield elt
-        }
-      }
-    | Some(compact) ->
-      for (elt in compact.getArray(key)) {
-        yield elt
-      }
+      this.unsafeGetDataIterWithoutTombs(key).flatMap(arr -> arr.i2.iterator())
+    | Some(compact) -> compact.getArray(key).iterator()
     }
   }
 
@@ -1916,28 +1903,16 @@ class EagerDir{
     };
   }
 
-  private fun getFixedFiles(idx: Int): mutable Iterator<File> {
+  private fun getFixedFilesNoReducer(idx: Int): mutable Iterator<File> {
     key = this.fixedData.data[idx].key;
-    while (
-      idx < this.fixedData.data.size() &&
-      this.fixedData.data[idx].key == key
-    ) {
+    do {
       fixedValues = this.fixedData.data[idx].value;
-      if (this.reducer is None()) {
-        for (elt in fixedValues) {
-          yield elt;
-        };
+      for (elt in fixedValues) {
+        yield elt;
       };
       !idx = idx + 1;
-    };
-
-    this.reducer match {
-    | None() -> void
-    | Some(compact) ->
-      for (elt in compact.getArray(key)) {
-        yield elt
-      }
-    }
+    } while (idx < this.fixedData.data.size() &&
+      this.fixedData.data[idx].key == key);
   }
 
   fun unsafeGetFileIter(
@@ -1955,23 +1930,18 @@ class EagerDir{
     current = mutable IntRef(
       start match {
       | None() -> 0
-      | Some(key) ->
-        pos = this.fixedData.data.getPos(key);
-        if (pos < 0) 0 else pos
+      | Some(key) -> max(0, this.fixedData.data.getPos(key))
       },
     );
     for (key => _ in this.data.data.itemsAfterKey(
-      start match {
-      | None() -> None()
-      | Some(x) -> Some(Inclusive(x))
-      },
+      start.map(x -> Inclusive(x)),
     )) {
       while (
         current.value < this.fixedData.data.size() &&
         this.fixedData.data[current.value].key < key
       ) {
         fixedKey = this.fixedData.data[current.value].key;
-        fixedFiles = this.getFixedFiles(current.value);
+        fixedFiles = this.getFixedFilesNoReducer(current.value);
         while (
           current.value < this.fixedData.data.size() &&
           this.fixedData.data[current.value].key == fixedKey
@@ -1990,47 +1960,7 @@ class EagerDir{
     };
     while (current.value < this.fixedData.data.size()) {
       fixedKey = this.fixedData.data[current.value].key;
-      fixedFiles = this.getFixedFiles(current.value);
-      while (
-        current.value < this.fixedData.data.size() &&
-        this.fixedData.data[current.value].key == fixedKey
-      ) {
-        current.incr();
-      };
-      yield (fixedKey, fixedFiles);
-    };
-  }
-
-  fun unsafeGetFileIterWithReducer(): mutable Iterator<
-    (Key, mutable Iterator<File>),
-  > {
-    current = mutable IntRef(0);
-    for (key => _ in this.data) {
-      while (
-        current.value < this.fixedData.data.size() &&
-        this.fixedData.data[current.value].key < key
-      ) {
-        fixedKey = this.fixedData.data[current.value].key;
-        fixedFiles = this.getFixedFiles(current.value);
-        while (
-          current.value < this.fixedData.data.size() &&
-          this.fixedData.data[current.value].key == key
-        ) {
-          current.incr();
-        };
-        yield (fixedKey, fixedFiles);
-      };
-      while (
-        current.value < this.fixedData.data.size() &&
-        this.fixedData.data[current.value].key == key
-      ) {
-        current.incr();
-      };
-      yield (key, this.getIterRaw(key));
-    };
-    while (current.value < this.fixedData.data.size()) {
-      fixedKey = this.fixedData.data[current.value].key;
-      fixedFiles = this.getFixedFiles(current.value);
+      fixedFiles = this.getFixedFilesNoReducer(current.value);
       while (
         current.value < this.fixedData.data.size() &&
         this.fixedData.data[current.value].key == fixedKey
