@@ -2,6 +2,8 @@ from flask import Flask, json, request, session, redirect
 import secrets
 import psycopg2
 import requests
+import random
+import time
 
 REACTIVE_SERVICE_URL = "http://reactive_cache:8081/v1"
 
@@ -249,4 +251,25 @@ def deupvote_post(post_id):
 
 @app.get("/healthcheck")
 def healthcheck():
+    return "ok", 200
+
+
+@app.post("/simulate_activity")
+def simulate_activity():
+    with get_db() as db:
+        with db.cursor() as cur:
+            cur.execute("SELECT id FROM posts")
+            post_ids = [x[0] for x in cur.fetchall()]
+
+            for i in range(1000):
+                post_id = random.choice(post_ids)
+                for j in range(random.randrange(20)):
+                    user_id = random.randint(0, 1000)
+                    cur.execute(
+                        "INSERT INTO upvotes(user_id, post_id) VALUES (%s, %s)",
+                        (user_id, post_id),
+                    )
+                    db.commit()
+                time.sleep(1)
+
     return "ok", 200
