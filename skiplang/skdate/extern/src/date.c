@@ -1,16 +1,8 @@
-
-
 #include <langinfo.h>
+#include <stdint.h>
 #include <string.h>
 #include <sys/time.h>
-
-#include <chrono>
-#include <cstdint>
-#include <ctime>
-#include <iomanip>
-#include <sstream>
-
-extern "C" {
+#include <time.h>
 
 uint32_t SKIP_String_byteSize(char*);
 char* sk_string_create(const char* buffer, uint32_t size);
@@ -28,7 +20,7 @@ char* sk_string_create(const char* buffer, uint32_t size);
  * - r => AM/PM Time format string of the locale.
  * - p => AM or PM locale string.
  */
-char* SKIP_locale(u_int32_t code, int32_t value) {
+char* SKIP_locale(uint32_t code, int32_t value) {
   char c = (char)code;
   const char* locale;
   if (c == 'c') {
@@ -52,7 +44,7 @@ char* SKIP_locale(u_int32_t code, int32_t value) {
   } else if (c == 'b') {
     locale = nl_langinfo(ABMON_1 + ((value - 1) % 12));
   } else {
-    char tmp[] = {'%', '%', c};
+    char tmp[] = {'%', '%', c, 0};
     locale = tmp;
   }
   return sk_string_create(locale, strlen(locale));
@@ -78,9 +70,9 @@ int32_t SKIP_localetimezone(uint32_t year, uint32_t month, uint32_t day) {
 }
 
 int64_t SKIP_currenttimemillis() {
-  timeval curTime;
+  struct timeval curTime;
   gettimeofday(&curTime, 0);
-  return std::time(0) * 1000 + curTime.tv_usec / 1000;
+  return time(NULL) * 1000 + curTime.tv_usec / 1000;
 }
 
 char* SKIP_localetimezonename(uint32_t year, uint32_t month, uint32_t day) {
@@ -89,5 +81,4 @@ char* SKIP_localetimezonename(uint32_t year, uint32_t month, uint32_t day) {
   localefor(&local, year, month, day);
   size_t size = strftime(buffer, sizeof(buffer), "%Z", &local);
   return sk_string_create(buffer, size);
-}
 }
