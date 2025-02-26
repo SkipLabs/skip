@@ -44,7 +44,7 @@ char* SKIP_locale(uint32_t code, int32_t value) {
   } else if (c == 'b') {
     locale = nl_langinfo(ABMON_1 + ((value - 1) % 12));
   } else {
-    char tmp[] = {'%', '%', c};
+    char tmp[] = {'%', '%', c, 0};
     locale = tmp;
   }
   return sk_string_create(locale, strlen(locale));
