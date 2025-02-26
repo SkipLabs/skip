@@ -15,7 +15,6 @@ interface ToWasm {
     day: int,
   ) => ptr<Internal.String>;
   SKIP_locale: (code: int, value: int) => ptr<Internal.String>;
-  SKIP_JS_currenttimemillis: () => number;
 }
 
 class LinksImpl implements Links {
@@ -98,7 +97,6 @@ class Manager implements ToWasmManager {
       links.SKIP_localetimezonename(year, month, day);
     toWasm.SKIP_locale = (code: int, value: int) =>
       links.SKIP_locale(code, value);
-    toWasm.SKIP_JS_currenttimemillis = () => Date.now() / 1000;
     return links;
   };
 }
