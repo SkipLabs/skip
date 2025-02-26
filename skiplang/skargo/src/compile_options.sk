@@ -18,6 +18,7 @@ class CompileOptions{
   build_config: BuildConfig,
   /// Filter to apply to the root package to select which targets will be built.
   filter: CompileFilter,
+  skc_extra_options: Array<String>,
 }
 
 fun build_config(
@@ -62,9 +63,15 @@ fun compile_options(args: Cli.ParseResults): CompileOptions {
     args.getBool("tests", Some(false)),
     args.getBool("all-targets", Some(false)),
   );
+  skc_extra_options = args.getArray("skcopt", Some(Array[]));
 
-  CompileOptions{build_config, filter}
+  CompileOptions{build_config, filter, skc_extra_options}
 }
+
+const kSkcOptArg: Cli.Arg = Cli.Arg::string("skcopt")
+  .repeatable()
+  .value_name("option")
+  .about("Pass the given option to skc");
 
 const kProfileArgs: Array<Cli.Arg> = Array[
   Cli.Arg::string("profile")
