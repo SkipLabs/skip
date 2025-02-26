@@ -2,7 +2,7 @@ module Skargo;
 
 class Skc(cmd: String) {
   fun process(): mutable ProcessBuilder {
-    mutable ProcessBuilder{process_cmd => this.cmd}
+    ProcessBuilder::create{cmd => this.cmd}
   }
 }
 
@@ -12,6 +12,10 @@ mutable class ProcessBuilder{
   process_env: mutable Map<String, String> = mutable Map[],
   mutable process_cwd: ?String = None(),
 } {
+  static fun create{cmd: String}: mutable this {
+    mutable static{process_cmd => cmd}
+  }
+
   mutable fun arg(value: String): void {
     this.process_args.push(value)
   }
