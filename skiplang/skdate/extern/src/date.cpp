@@ -4,8 +4,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <sys/time.h>
-
-#include <ctime>
+#include <time.h>
 
 extern "C" {
 
@@ -77,7 +76,7 @@ int32_t SKIP_localetimezone(uint32_t year, uint32_t month, uint32_t day) {
 int64_t SKIP_currenttimemillis() {
   timeval curTime;
   gettimeofday(&curTime, 0);
-  return std::time(0) * 1000 + curTime.tv_usec / 1000;
+  return time(NULL) * 1000 + curTime.tv_usec / 1000;
 }
 
 char* SKIP_localetimezonename(uint32_t year, uint32_t month, uint32_t day) {
