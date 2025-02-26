@@ -13,7 +13,7 @@ git diff --quiet HEAD "$BASE" -- skiplang/prelude/src/skstore/ skiplang/prelude/
 skstore=$?
 git diff --quiet HEAD "$BASE" -- skiplang/skjson
 skjson=$?
-git diff --quiet HEAD "$BASE" -- sql/ skiplang/sqlparser/ skiplang/skbuild/
+git diff --quiet HEAD "$BASE" -- sql/ skiplang/sqlparser/
 skdb=$?
 git diff --quiet HEAD "$BASE" -- skipruntime-ts/
 skipruntime=$?
