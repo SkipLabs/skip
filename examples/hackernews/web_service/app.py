@@ -80,9 +80,9 @@ def create_post():
     with get_db() as db:
         with db.cursor() as cur:
             cur.execute(
-                f"INSERT INTO posts(title, url, body, author_id) VALUES('{title}', '{url}', '{body}', '{author_id}') RETURNING id"
+                "INSERT INTO posts(title, url, body, author_id) VALUES(%s, %s, %s, %s)",
+                (title, url, body, author_id),
             )
-            post_id = cur.fetchone()[0]
             db.commit()
 
     return "ok", 200
@@ -93,13 +93,13 @@ def delete_post(post_id):
     with get_db() as db:
         with db.cursor() as cur:
             # Get all upvote IDs related to the post.
-            cur.execute(f"SELECT id FROM upvotes WHERE post_id={post_id}")
+            cur.execute("SELECT id FROM upvotes WHERE post_id = %s", (post_id,))
             upvote_ids = [row[0] for row in cur.fetchall()]
 
             # Delete upvotes related to the post.
-            cur.execute(f"DELETE FROM upvotes WHERE post_id={post_id}")
+            cur.execute("DELETE FROM upvotes WHERE post_id = %s", (post_id,))
             # Delete the post.
-            cur.execute(f"DELETE FROM posts WHERE id={post_id}")
+            cur.execute("DELETE FROM posts WHERE id = %s", (post_id,))
             db.commit()
     return "ok", 200
 
@@ -114,7 +114,8 @@ def update_post(post_id):
     with get_db() as db:
         with db.cursor() as cur:
             cur.execute(
-                f"UPDATE posts SET title='{title}', url='{url}', body='{body}' WHERE id={post_id}"
+                "UPDATE posts SET title = %s, url = %s, body = %s WHERE id = %s",
+                (title, url, body, post_id),
             )
             db.commit()
 
@@ -130,7 +131,8 @@ def upvote_post(post_id):
     with get_db() as db:
         with db.cursor() as cur:
             cur.execute(
-                f"INSERT INTO upvotes(post_id, user_id) VALUES({post_id}, {user_id}) RETURNING id"
+                "SELECT * FROM upvotes WHERE post_id = %s AND user_id = %s",
+                (post_id, user_id),
             )
             upvote_id = cur.fetchone()[0]
             db.commit()
