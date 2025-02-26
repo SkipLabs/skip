@@ -1300,6 +1300,9 @@ private trait MapIterator<+T, +K: Hashable & Equality, +V>(
 ) {
   overridable readonly fun sizeHint(): ?Int {
     index = this.indexMinusGeneration + this.table.generation_PRIVATE;
+    if (index >= generationSkip) {
+      throwContainerChanged()
+    };
     size = max(0, this.sz - index);
     Some(size)
   }

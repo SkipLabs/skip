@@ -584,7 +584,7 @@ mutable native class .Array<+T>
   }
 
   readonly fun bytes(): readonly Bytes {
-    mutable ArrayBytes(this, Range(0, Unsafe.array_byte_size(this)))
+    ArrayBytes::create(this, Range(0, Unsafe.array_byte_size(this)))
   }
 
   mutable fun mbytes(): mutable MutableBytes {
@@ -856,10 +856,17 @@ fun concatStringSequence(seq: readonly Sequence<String>): String {
   String::fromChars(buf)
 }
 
-private mutable class ArrayBytes<T>(
+private mutable class ArrayBytes<T> private (
   private array: readonly Array<T>,
   private range: Range,
 ) extends Bytes {
+  static fun create(
+    array: readonly Array<T>,
+    range: Range,
+  ): readonly ArrayBytes<T> {
+    mutable static(array, range)
+  }
+
   readonly fun ptr(): Unsafe.Ptr<UInt8> {
     Unsafe.Ptr<UInt8>(Unsafe.array_ptr(this.array, this.range.start))
   }
@@ -898,7 +905,7 @@ private mutable class MutableArrayBytes<T>(
   }
 
   readonly fun slice(start: Int, end: Int = Int::max): readonly Bytes {
-    mutable ArrayBytes(this.array, this.range.subrange(start, end))
+    ArrayBytes::create(this.array, this.range.subrange(start, end))
   }
 
   mutable fun mslice(start: Int, end: Int = Int::max): mutable MutableBytes {

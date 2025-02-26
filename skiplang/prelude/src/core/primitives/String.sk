@@ -552,23 +552,23 @@ private fun isWhitespace(c: Char): Bool {
   }
 }
 
-private mutable class StringBytes(
+private class StringBytes(
   private str: String,
   private range: Range,
 ) extends Bytes {
-  readonly fun ptr(): Unsafe.Ptr<UInt8> {
+  fun ptr(): Unsafe.Ptr<UInt8> {
     Unsafe.Ptr<UInt8>(Unsafe.string_ptr(this.str, this.range.start))
   }
 
-  readonly fun get(index: Int): UInt8 {
+  fun get(index: Int): UInt8 {
     String.getByte(this.str, this.range.start + index)
   }
 
-  readonly fun slice(start: Int, end: Int = Int::max): readonly Bytes {
-    mutable StringBytes(this.str, this.range.subrange(start, end))
+  fun slice(start: Int, end: Int = Int::max): Bytes {
+    StringBytes(this.str, this.range.subrange(start, end))
   }
 
-  readonly fun size(): Int {
+  fun size(): Int {
     this.range.size()
   }
 }

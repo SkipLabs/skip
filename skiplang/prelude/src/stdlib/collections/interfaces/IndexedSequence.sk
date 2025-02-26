@@ -22,7 +22,7 @@ mutable base class .IndexedSequence<+T> extends Sequence<T> {
   readonly fun get(index: Int): T;
 
   overridable readonly fun values(): mutable Iterator<T> {
-    mutable IndexedSequenceIterator<T>(this, 0, this.size(), 1)
+    mutable IndexedSequenceIterator<T>(this, 0, this.size())
   }
 
   // Get the item at the given index as Some() or return None() if the index
@@ -617,7 +617,6 @@ private mutable class IndexedSequenceIterator<T>(
   container: readonly IndexedSequence<T>,
   mutable start: Int,
   mutable size: Int,
-  stride: Int,
 ) extends Iterator<T> {
   readonly fun sizeHint(): ?Int {
     Some(this.size)
@@ -626,7 +625,7 @@ private mutable class IndexedSequenceIterator<T>(
   mutable fun next(): ?T {
     if (this.size > 0) {
       cur = this.start;
-      this.!start = cur + this.stride;
+      this.!start = cur + 1;
       this.!size = this.size - 1;
       Some(this.container[cur])
     } else {
