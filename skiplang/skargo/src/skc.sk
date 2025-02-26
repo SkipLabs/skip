@@ -1,19 +1,23 @@
 module Skargo;
 
-class Skc(cmd: String) {
+class Skc(cmd: String, extra_options: Array<String>) {
   fun process(): mutable ProcessBuilder {
-    ProcessBuilder::create{cmd => this.cmd}
+    ProcessBuilder::create{cmd => this.cmd, args => this.extra_options}
   }
 }
 
 mutable class ProcessBuilder private {
   private process_cmd: String,
-  private process_args: mutable Vector<String> = mutable Vector[],
+  private process_args: mutable Vector<String>,
   private process_env: mutable Map<String, String> = mutable Map[],
   private mutable process_cwd: ?String = None(),
 } {
-  static fun create{cmd: String}: mutable this {
-    mutable static{process_cmd => cmd}
+  static fun create{
+    cmd: String,
+    args: readonly Sequence<String> = Array[],
+  }: mutable this {
+    process_args = Vector::mcreateFromItems(args);
+    mutable static{process_cmd => cmd, process_args}
   }
 
   mutable fun arg(value: String): void {
