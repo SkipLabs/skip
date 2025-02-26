@@ -203,6 +203,14 @@ function Feed(props: { posts: Post[]; session: Session | null }) {
     );
   }
 
+  function simulateActivity() {
+    void fetch("/api/simulate_activity", { method: "POST" }).catch(
+      (err: unknown) => {
+        console.error(err);
+      },
+    );
+  }
+
   return (
     <>
       <Header session={session} />
@@ -233,6 +241,14 @@ function Feed(props: { posts: Post[]; session: Session | null }) {
           ))}
         </ol>
       </div>
+      <button
+        onClick={(e) => {
+          e.preventDefault();
+          simulateActivity();
+        }}
+      >
+        Simulate activity
+      </button>
     </>
   );
 }
