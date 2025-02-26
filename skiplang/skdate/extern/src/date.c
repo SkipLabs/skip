@@ -1,12 +1,8 @@
-
-
 #include <langinfo.h>
 #include <stdint.h>
 #include <string.h>
 #include <sys/time.h>
 #include <time.h>
-
-extern "C" {
 
 uint32_t SKIP_String_byteSize(char*);
 char* sk_string_create(const char* buffer, uint32_t size);
@@ -74,7 +70,7 @@ int32_t SKIP_localetimezone(uint32_t year, uint32_t month, uint32_t day) {
 }
 
 int64_t SKIP_currenttimemillis() {
-  timeval curTime;
+  struct timeval curTime;
   gettimeofday(&curTime, 0);
   return time(NULL) * 1000 + curTime.tv_usec / 1000;
 }
@@ -85,5 +81,4 @@ char* SKIP_localetimezonename(uint32_t year, uint32_t month, uint32_t day) {
   localefor(&local, year, month, day);
   size_t size = strftime(buffer, sizeof(buffer), "%Z", &local);
   return sk_string_create(buffer, size);
-}
 }
