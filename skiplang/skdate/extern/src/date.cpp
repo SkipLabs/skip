@@ -1,10 +1,10 @@
 
 
 #include <langinfo.h>
+#include <stdint.h>
 #include <string.h>
 #include <sys/time.h>
 
-#include <cstdint>
 #include <ctime>
 
 extern "C" {
