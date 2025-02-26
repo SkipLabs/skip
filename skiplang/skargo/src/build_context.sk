@@ -187,11 +187,7 @@ private fun list_rule_targets(
   rule match {
   | FilterRuleAll() -> targets
   | FilterRuleJust(names) ->
-    res = mutable Vector[];
-    for (name in names) {
-      res.push(find_named_target(gctx, targets, name, desc))
-    };
-    res.collect(Array)
+    names.map(name -> find_named_target(gctx, targets, name, desc))
   }
 }
 

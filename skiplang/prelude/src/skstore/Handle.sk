@@ -41,21 +41,15 @@ module SKStore;
 mutable base class FileIterator<+T> extends Iterator<T> {
   static fun create(iter: mutable Iterator<T>): mutable FileIterator<T> {
     iter.next() match {
-    | None() -> mutable EmptyIterator()
+    | None() -> mutable EmptyFileIterator()
     | Some(v) -> mutable NonEmptyIterator(v, iter)
     }
   }
-
-  readonly fun isEmpty(): Bool;
 }
 
-mutable class EmptyIterator<T>() extends FileIterator<T> {
+mutable class EmptyFileIterator<T>() extends FileIterator<T> {
   mutable fun next(): ?T {
     None()
-  }
-
-  readonly fun isEmpty(): Bool {
-    true
   }
 }
 
@@ -86,10 +80,6 @@ mutable class NonEmptyIterator<+T>(
       this.!isPastFirstValue = true;
       Some(this.first)
     }
-  }
-
-  readonly fun isEmpty(): Bool {
-    false
   }
 
   mutable fun nonEmptyMap<U>(f: T -> U): mutable NonEmptyIterator<U> {
@@ -457,7 +447,7 @@ class EHandle<K: Key, V: File>(
       parentName = parentHandle.dirName;
       dynamicMapFun = (context, writer, key, fileIter) ~> {
         FileIterator::create(fileIter) match {
-        | EmptyIterator _ -> return void
+        | EmptyFileIterator _ -> return void
         | iter @ NonEmptyIterator _ ->
           twriter = mutable TWriter<K2, V2>{writes => writer.writes};
           mapFun(
@@ -515,7 +505,7 @@ class EHandle<K: Key, V: File>(
       parentName = parentHandle.dirName;
       dynamicMapFun = (context, writer, key, fileIter) ~> {
         FileIterator::create(fileIter) match {
-        | EmptyIterator _ -> return void
+        | EmptyFileIterator _ -> return void
         | iter @ NonEmptyIterator _ ->
           twriter = mutable TWriter<K2, V2>{writes => writer.writes};
           mapFun(
