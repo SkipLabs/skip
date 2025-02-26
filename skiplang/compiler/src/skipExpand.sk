@@ -332,10 +332,11 @@ fun populateDefinitions(
         name = key match {
         | SKStore.SID(x) -> x
         };
+        defFilesArray = defFiles.collect(Array);
         if (name.startsWith("class:")) {
           roots = mutable Vector[];
           exts = mutable Vector[];
-          for (cd in defFiles) {
+          for (cd in defFilesArray) {
             cd.value match {
             | EClass(c) ->
               if (c.extension is None()) {
@@ -351,7 +352,7 @@ fun populateDefinitions(
           };
 
           if (roots.size() == 0) {
-            writer.setArray(key, defFiles.collect(Array));
+            writer.setArray(key, defFilesArray);
             SkipError.error(
               exts[0].name.i0,
               "Undefined class " + exts[0].name.i1,
@@ -382,7 +383,7 @@ fun populateDefinitions(
           };
           writer.set(key, ExpandedDefFile(EClass(root)))
         } else {
-          writer.setArray(key, defFiles.collect(Array))
+          writer.setArray(key, defFilesArray)
         }
       })
     },
