@@ -159,12 +159,12 @@ fun updateDirtyReaders(
       context.!dirtyReaders = List.Cons(reader, context.dirtyReaders);
     };
     time = if (reader.parentName == reader.childName) {
-      (-child.getTime(), -child.getTime())
+      -child.getTimeStack()
     } else {
-      (child.getTime(), parent.getTime())
+      child.getTimeStack()
     };
     arrow = Arrow(reader.parentName, reader.childName);
-    context.addToUpdate(time, arrow);
+    context.addToUpdate(time, parent.getTime(), arrow);
   };
 }
 
@@ -297,6 +297,44 @@ value class Time(value: Int) uses Orderable, Show {
   }
 }
 
+class TimeStack private (private values: Array<Time>) uses Orderable {
+  static fun createInput(time: Time): this {
+    static(Array[time])
+  }
+
+  static fun create(context: mutable Context, time: Time): this {
+    context.arrowStack.maybeHead() match {
+    | None() -> static::createInput(time)
+    | Some((_arrow, timeStack)) -> timeStack.extend(time)
+    }
+  }
+
+  fun extend(time: Time): this {
+    !this.values = this.values.concat(Array[time]);
+    this
+  }
+
+  fun negate(): this {
+    !this.values = this.values.map(x -> -x);
+    this
+  }
+
+  fun maxMinus(): this {
+    !this.values = this.values.map(x -> Time(Int::max - x.value));
+    this
+  }
+
+  fun compare(other: TimeStack): Order {
+    for (i in Range(0, this.values.size())) {
+      if (i >= other.values.size()) return GT();
+      cmp = this.values[i].compare(other.values[i]);
+      if (cmp != EQ()) return cmp;
+    };
+    if (other.values.size() > this.values.size()) return LT();
+    EQ()
+  }
+}
+
 /*****************************************************************************/
 /* Tells the context if we can reuse directories or not. */
 /*****************************************************************************/
@@ -347,7 +385,7 @@ mutable class Context{
   mutable time: Time = Time(0),
   mutable tick: Tick = Tick(1),
   mutable lazyCapacity: Int = 10,
-  mutable toUpdate: SortedMap<(Time, Time), Arrow> = SortedMap[],
+  mutable toUpdate: SortedMap<(TimeStack, Time), Arrow> = SortedMap[],
   mutable deps: Deps = Deps[],
   mutable debugMode: Bool = debugMode,
   mutable failOnExn: Bool = true,
@@ -359,7 +397,7 @@ mutable class Context{
   mutable dirty: List<Path> = List[],
   mutable dirtyReaders: List<ArrowKey> = List[],
   mutable canReuse: CanReuse = CRIfMatch(),
-  mutable arrowStack: List<ArrowKey> = List[],
+  mutable arrowStack: List<(ArrowKey, TimeStack)> = List[],
   mutable lazyGets: SortedSet<Path> = SortedSet[],
   mutable lazyGetsQueueIn: List<Array<Path>> = List[],
   mutable lazyGetsQueueOut: List<Array<Path>> = List[],
@@ -403,8 +441,12 @@ mutable class Context{
     this.!postponables = List.Cons(postponable, this.postponables);
   }
 
-  mutable fun addToUpdate(time: (Time, Time), arrow: Arrow): void {
-    this.!toUpdate = this.toUpdate.set(time, arrow);
+  mutable fun addToUpdate(
+    timeStack: TimeStack,
+    parentTime: Time,
+    arrow: Arrow,
+  ): void {
+    this.!toUpdate = this.toUpdate.set((timeStack, parentTime), arrow);
   }
 
   mutable fun subscribe(
@@ -540,21 +582,21 @@ mutable class Context{
     this.reads
   }
 
-  mutable fun enter(arrow: ArrowKey): void {
-    this.!arrowStack = List.Cons(arrow, this.arrowStack);
+  mutable fun enter(arrow: ArrowKey, timeStack: TimeStack): void {
+    this.!arrowStack = List.Cons((arrow, timeStack), this.arrowStack);
   }
 
   mutable fun leave(arrow: ArrowKey): void {
     this.arrowStack match {
     | List.Nil() -> invariant_violation("Cannot leave empty context")
     | List.Cons(arr, rl) ->
-      invariant(arr == arrow);
+      invariant(arr.i0 == arrow);
       this.!arrowStack = rl
     }
   }
 
   readonly fun currentArrow(): ?ArrowKey {
-    this.arrowStack.maybeHead()
+    this.arrowStack.maybeHead().map(x -> x.i0)
   }
 
   readonly fun getDeps(path: Path): SortedSet<ArrowKey> {
@@ -608,6 +650,7 @@ mutable class Context{
           preDir = EagerDir{
             time,
             input => false,
+            timeStack => TimeStack::createInput(time),
             dirName => preDirName,
             totalSize => 0,
             fixedData => FixedDataMap::create(),
@@ -997,6 +1040,7 @@ mutable class Context{
     creator = this.currentArrow();
     dir = EagerDir{
       time,
+      timeStack => TimeStack::create(this, time),
       input => true,
       dirName,
       fixedData,
@@ -1095,7 +1139,7 @@ mutable class Context{
       print_debug("REMOVED: " + dirName);
     };
     this.unsafeMaybeGetEagerDir(dirName) match {
-    | None() -> return void
+    | None() -> void
     | Some(dir) ->
       if (this.hasPre.contains(dirName)) {
         this.!hasPre = this.hasPre.remove(dirName);
@@ -1109,12 +1153,16 @@ mutable class Context{
         }
       };
       dir.removeSubDirs(this);
-      dir.optOnDelete.each(this.postpone)
+      dir.optOnDelete.each(this.postpone);
+
+      this.!deps = this.deps.removeDir(dirName);
+      this.!dirsWithSharedSubDirs = this.dirsWithSharedSubDirs.remove(dirName);
+      this.!sharedSubDirsRefCount = this.sharedSubDirsRefCount.remove(dirName);
+      this.setDir(
+        dirName,
+        DeletedDir{dirName, time => dir.time, timeStack => dir.timeStack},
+      )
     };
-    this.!deps = this.deps.removeDir(dirName);
-    this.!dirsWithSharedSubDirs = this.dirsWithSharedSubDirs.remove(dirName);
-    this.!sharedSubDirsRefCount = this.sharedSubDirsRefCount.remove(dirName);
-    this.setDir(dirName, DeletedDir{dirName, time => this.timeStamp()});
   }
 
   mutable fun transitiveChildDirs(dirName: DirName): SortedSet<DirName> {
