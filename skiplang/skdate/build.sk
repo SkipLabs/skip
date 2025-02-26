@@ -1,42 +1,19 @@
-@skbuild_source_dirs
-fun source_dirs(env: Skbuild.Env): Array<String> {
-  if (env.isWasm32()) Array[] else Array["extern/src"]
-}
-
-@debug
 fun main(): void {
-  Skbuild.build() match {
-  | Failure(err) -> skipExit(err.code)
-  | _ -> void
+  Environ.set_var("DEBUG", "true");
+
+  profile = Environ.var("PROFILE");
+  target = Environ.var("TARGET");
+  isWasm32 = target.startsWith("wasm32");
+
+  profile match {
+  | "release" -> Environ.set_var("OPT_LEVEL", "3")
+  | "debug" | "dev" -> Environ.set_var("OPT_LEVEL", "0")
+  | p -> invariant_violation(`Unrecognized profile ${p}`)
   };
 
-  file_path = Path.join(Environ.var("OUT_DIR"), "current_time_millis.sk");
-  file = IO.File::open(
-    file_path,
-    IO.OpenOptions{create => true, truncate => true, write => true},
-  );
-
-  contents = Environ.varOpt("TARGET") match {
-  | Some(t) if (t.startsWith("wasm32")) ->
-    `module SKDate;
-@cpp_extern("SKIP_JS_currenttimemillis")
-native fun jsCurrentTimeMillis(): Float;
-
-fun currentTimeMillis(): Int {
-  (jsCurrentTimeMillis() * 1000.0).toInt()
-}
-module end;`
-  | _ ->
-    `module SKDate;
-@cpp_extern("SKIP_currenttimemillis")
-native fun currentTimeMillis(): Int;
-module end;`
-  };
-  file.write_all(contents.bytes()) match {
-  | Success _ -> void
-  | Failure(err) ->
-    print_error(`Could not write ${file_path}: ${err}`);
-    skipExit(1)
-  };
-  print_string(`skargo:skc-extra-source=${file_path}`)
+  if (!isWasm32) {
+    src = "extern/src/date.c";
+    print_string("skargo:rerun-if-changed=${src}");
+    Cc.Build().flags(Cc.kRecommendedCflags).file(src).compile("date")
+  }
 }
