@@ -32,4 +32,4 @@ $(SKDB_DATABASES):
 	@mkdir -p $(SKDB_DATABASES)
 
 $(SKDB_CMD):
-	@cd $(REAL_DIR);skargo b --release
+	@cd $(REAL_DIR);skargo b --release --bin skdb
