@@ -1,17 +1,3 @@
-const kCflags: Array<String> = Array[
-  "-Werror",
-  "-Wall",
-  "-Wextra",
-  "-Wno-sign-conversion",
-  "-Wno-sometimes-uninitialized",
-  "-Wno-c2x-extensions",
-  "-Wsign-compare",
-  "-Wextra-semi-stmt",
-  // To add: -Wcast-align -Wcast-qual -Wimplicit-int-conversion -Wmissing-noreturn -Wpadded -Wreserved-identifier -Wshorten-64-to-32 -Wtautological-unsigned-zero-compare
-  // -Watomic-implicit-seq-cst ?
-  // If using -Weverything, you may want to add -Wno-declaration-after-statement -Wno-missing-prototypes -Wno-missing-variable-declarations -Wno-shadow -Wno-strict-prototypes -Wno-zero-length-array -Wno-unreachable-code-break -Wno-unreachable-code-return
-];
-
 fun main(): void {
   // FIXME: This should be passed by Skargo.
   Environ.set_var("DEBUG", "true");
@@ -51,7 +37,11 @@ fun main(): void {
     "runtime/xoroshiro128plus.c",
   ];
 
-  cfg = Cc.Build().pic(pic).flags(kCflags).files(srcs).file(magic_c);
+  cfg = Cc.Build()
+    .pic(pic)
+    .flags(Cc.kRecommendedCflags)
+    .files(srcs)
+    .file(magic_c);
   srcs.each(f -> print_string(`skargo:rerun-if-changed=${f}`));
 
   // TODO: `skargo:rerun-if-changed` on sources.
