@@ -28,7 +28,7 @@ char* sk_string_create(const char* buffer, uint32_t size);
  * - r => AM/PM Time format string of the locale.
  * - p => AM or PM locale string.
  */
-char* SKIP_locale(u_int32_t code, int32_t value) {
+char* SKIP_locale(uint32_t code, int32_t value) {
   char c = (char)code;
   const char* locale;
   if (c == 'c') {
