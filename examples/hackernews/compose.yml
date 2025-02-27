@@ -14,6 +14,9 @@ services:
   web:
     image: reactive-hackernews/web-service
     build: ./web_service
+    secrets:
+      - gh_oauth_client_id
+      - gh_oauth_secret
     depends_on:
       db:
         condition: service_healthy
@@ -41,3 +44,9 @@ services:
 
 volumes:
   pgdata:
+
+secrets:
+  gh_oauth_client_id:
+    file: ./gh_oauth_client_id.txt
+  gh_oauth_secret:
+    file: ./gh_oauth_secret.txt
