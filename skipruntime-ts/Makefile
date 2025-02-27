@@ -1,18 +1,22 @@
 SHELL := /bin/bash
 
 SKARGO_PROFILE?=release
-NPM_WORKSPACES=$(shell jq --raw-output "[.workspaces[] | select((startswith(\"sql\") or contains(\"examples\")) | not)] | map(\"-w \" + .) | .[]" ../package.json)
+NPM_WORKSPACES=$(shell jq --raw-output "[.workspaces[] | select(startswith(\"skipruntime-ts\") and (contains(\"examples\") | not))] | map(\"-w \" + .) | .[]" ../package.json)
 SKIPRUNTIME?=$(realpath $(CURDIR)/..)/build/skipruntime
 
 export SKIPRUNTIME
 
+.PHONY: install-root-dependencies
+install-root-dependencies:
+	../bin/cd_sh .. "npm install --workspaces=false"
+
 .PHONY: install
-install:
+install: install-root-dependencies
 	../bin/cd_sh .. "npm install $(NPM_WORKSPACES)"
 
 .PHONY: install-all
-install-all:
-	../bin/cd_sh .. "npm install"
+install-all: install
+	../bin/cd_sh .. "npm install -w skipruntime-ts/examples"
 
 .PHONY: build
 build:
