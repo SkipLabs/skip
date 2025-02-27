@@ -34,18 +34,9 @@ export interface Checker {
 
 export interface FromBinding {
   // NonEmptyIterator
-  SkipRuntime_NonEmptyIterator__first(
-    values: Pointer<Internal.NonEmptyIterator>,
-  ): Pointer<Internal.CJSON>;
-  SkipRuntime_NonEmptyIterator__uniqueValue(
-    values: Pointer<Internal.NonEmptyIterator>,
-  ): Nullable<Pointer<Internal.CJSON>>;
   SkipRuntime_NonEmptyIterator__next(
     values: Pointer<Internal.NonEmptyIterator>,
   ): Nullable<Pointer<Internal.CJSON>>;
-  SkipRuntime_NonEmptyIterator__clone(
-    values: Pointer<Internal.NonEmptyIterator>,
-  ): Pointer<Internal.NonEmptyIterator>;
 
   // Mapper
   SkipRuntime_createMapper<
