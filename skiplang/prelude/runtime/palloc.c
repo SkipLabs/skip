@@ -64,10 +64,14 @@ typedef struct ginfo {
   char* head;
   char* end;
   char* fileName;
+  char* break_ptr;
   size_t total_palloc_size;
+  size_t free_table_size;
 } ginfo_t;
 
 ginfo_t* ginfo = NULL;
+
+sk_session_t* psession = NULL;
 
 /*****************************************************************************/
 /* Global locking. */
@@ -446,6 +450,7 @@ struct file_mapping {
   ginfo_t ginfo_data;
   uint64_t gid;
   size_t capacity;
+  sk_session_t session;
   void** pconsts;
   char persistent_fileName[1];
 };
@@ -485,6 +490,7 @@ void sk_create_mapping(char* fileName, size_t icapacity) {
   gid = &mapping->gid;
   capacity = &mapping->capacity;
   pconsts = &mapping->pconsts;
+  psession = &mapping->session;
 
   size_t fileName_length = (fileName != NULL) ? strlen(fileName) + 1 : 0;
   char* persistent_fileName = mapping->persistent_fileName;
@@ -523,6 +529,8 @@ void sk_create_mapping(char* fileName, size_t icapacity) {
   }
   *capacity = icapacity;
   *pconsts = NULL;
+  psession->low = 0;
+  psession->high = 0;
 
   if (ginfo->fileName != NULL) {
     sk_global_lock_init();
@@ -571,6 +579,7 @@ void sk_load_mapping(char* fileName) {
   gid = &mapping->gid;
   capacity = &mapping->capacity;
   pconsts = &mapping->pconsts;
+  psession = &mapping->session;
 }
 
 /*****************************************************************************/
@@ -632,6 +641,7 @@ void* sk_get_ftable(slot_t slot) {
 typedef struct {
   ginfo_t ginfo_data;
   uint64_t gid;
+  sk_session_t session;
   void** pconsts;
 } no_file_t;
 
@@ -649,8 +659,11 @@ static void sk_init_no_file() {
   gmutex = NULL;
   gid = &no_file->gid;
   pconsts = &no_file->pconsts;
+  psession = &no_file->session;
   *gid = 1;
   *pconsts = NULL;
+  psession->low = 0;
+  psession->high = 0;
 }
 #endif
 
@@ -698,6 +711,16 @@ void SKIP_memory_init(int argc, char** argv) {
 /* Persistent alloc/free primitives. */
 /*****************************************************************************/
 
+uint64_t SKIP_persistent_size() {
+  uint64_t size = (uint64_t)ginfo->total_palloc_size;
+  return size;
+}
+
+uint64_t SKIP_freetable_size() {
+  uint64_t size = (uint64_t)ginfo->free_table_size;
+  return size;
+}
+
 void SKIP_print_persistent_size() {
   printf("%ld\n", ginfo->total_palloc_size);
 }
@@ -709,6 +732,7 @@ void* sk_palloc(size_t size) {
   ginfo->total_palloc_size += size;
   sk_cell_t* ptr = sk_get_ftable(slot);
   if (ptr != NULL) {
+    ginfo->free_table_size -= size;
     return ptr;
   }
   if (ginfo->head + size >= ginfo->end) {
@@ -725,5 +749,6 @@ void sk_pfree_size(void* chunk, size_t size) {
   slot_t slot = sk_slot_of_size(size);
   size = sk_size_of_slot(slot);
   ginfo->total_palloc_size -= size;
+  ginfo->free_table_size += slot;
   sk_add_ftable(chunk, slot);
 }
