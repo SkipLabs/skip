@@ -515,7 +515,7 @@ export type SubscriptionID = Opaque<bigint, "subscription">;
 
 /**
  * A `ServiceInstance` is a running instance of a `SkipService`, providing access to its resources
- * and operations to manage susbscriptions and the service itself.
+ * and operations to manage subscriptions and the service itself.
  */
 export class ServiceInstance {
   constructor(private readonly refs: Refs) {}
@@ -545,7 +545,7 @@ export class ServiceInstance {
    * Creates if not exists and get all current values of specified resource
    * @param resource - the resource name corresponding to a key in remotes field of SkipService
    * @param params - the parameters of the resource used to build the resource with the corresponding constructor specified in remotes field of SkipService
-   * @returns The current values of the corresponding resource with reactive responce token to allow subscription
+   * @returns The current values of the corresponding resource with reactive response token to allow subscription
    */
   getAll<K extends Json, V extends Json>(
     resource: string,
@@ -632,11 +632,11 @@ export class ServiceInstance {
    * Initiate reactive subscription on a resource instance
    * @param resourceInstanceId - the resource instance identifier
    * @param notifier - the object containing subscription callbacks
-   * @param notifier.subscribed - A callback to execute when subscription effectivly done
+   * @param notifier.subscribed - A callback to execute when subscription effectively done
    * @param notifier.notify - A callback to execute on collection updates
    * @param notifier.close - A callback to execute on resource close
    * @param watermark - the watermark where to start the subscription
-   * @returns A subcription identifier
+   * @returns A subscription identifier
    */
   subscribe<K extends Json, V extends Json>(
     resourceInstanceId: string,
@@ -673,7 +673,7 @@ export class ServiceInstance {
 
   /**
    * Terminate a client's subscription to a reactive resource instance
-   * @param id - The subcription identifier returned by a call to `subscribe`
+   * @param id - The subscription identifier returned by a call to `subscribe`
    */
   unsubscribe(id: SubscriptionID): void {
     const errorHdl = this.refs.runWithGC(() => {
