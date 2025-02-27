@@ -9,7 +9,7 @@ import type { Consumer, ConsumerConfig } from "kafkajs";
  */
 export class KafkaExternalService implements ExternalService {
   private consumers: Map<string, Consumer> = new Map<string, Consumer>();
-  private consumerOptions: ConsumerConfig;
+  private consumerOptions: Omit<ConsumerConfig, "groupId">;
   private client: Kafka;
   private messageProcessor: (msg: {
     key: string;
@@ -36,11 +36,9 @@ export class KafkaExternalService implements ExternalService {
     const logLevel: kafkaLogLevel =
       kafka_config.logLevel ?? kafkaLogLevel.ERROR;
 
-    this.client = new Kafka({ ...kafka_config, brokers, logLevel });
-    const groupId =
-      "skip_kafka_consumer_" + Math.random().toString(36).slice(2);
     this.messageProcessor = messageProcessor;
-    this.consumerOptions = { ...consumerOptions, groupId };
+    this.consumerOptions = consumerOptions;
+    this.client = new Kafka({ ...kafka_config, brokers, logLevel });
   }
 
   /**
@@ -66,7 +64,10 @@ export class KafkaExternalService implements ExternalService {
     },
   ): void {
     callbacks.update([], true);
-    const consumer = this.client.consumer(this.consumerOptions);
+    const consumer = this.client.consumer({
+      ...this.consumerOptions,
+      groupId: instance,
+    });
     const fromBeginning = params.fromBeginning ?? true;
     const setup = async () => {
       await consumer.connect();
