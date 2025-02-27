@@ -109,7 +109,6 @@ export function controlService(service: ServiceInstance): express.Express {
 
 export function streamingService(service: ServiceInstance): express.Express {
   const app = express();
-  app.use(express.json());
 
   app.get("/v1/streams/:uuid", (req, res) => {
     if (!req.accepts("text/event-stream")) {
@@ -120,11 +119,10 @@ export function streamingService(service: ServiceInstance): express.Express {
       const uuid = req.params.uuid;
       const subscriptionID = service.subscribe(uuid, {
         subscribed: () => {
-          res.writeHead(200, {
-            "Content-Type": "text/event-stream",
-            Connection: "keep-alive",
-            "Cache-Control": "no-cache",
-          });
+          res.set("Content-Type", "text/event-stream");
+          res.set("Connection", "keep-alive");
+          res.set("Cache-Control", "no-cache");
+          res.status(200);
           res.flushHeaders();
         },
         notify: (update: CollectionUpdate<string, Json>) => {
