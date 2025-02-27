@@ -4,8 +4,10 @@
  * @packageDocumentation
  */
 
-import { type SkipService, ServiceInstance } from "@skipruntime/core";
+import { type SkipService } from "@skipruntime/core";
 import { controlService, streamingService } from "./rest.js";
+import type { Express, Request, Response, NextFunction } from "express";
+import express from "express";
 
 /**
  * A running Skip server.
@@ -90,6 +92,7 @@ export type SkipServer = {
  * @param options.control_port - Port on which control service will listen.
  * @param options.streaming_port - Port on which streaming service will listen.
  * @param options.platform - Skip runtime platform to be used to run the service: either `wasm` (the default) or `native`.
+ * @param options.no_cors - Disable CORS for the streaming endpoint.
  * @returns Object to manage the running server.
  */
 export async function runService(
@@ -98,17 +101,18 @@ export async function runService(
     streaming_port: number;
     control_port: number;
     platform?: "wasm" | "native";
+    no_cors?: boolean;
   } = {
     streaming_port: 8080,
     control_port: 8081,
     platform: "wasm",
+    no_cors: false,
   },
 ): Promise<SkipServer> {
-  let instance: ServiceInstance;
+  let runtime;
   if (options.platform == "native") {
     try {
-      const runtime = await import("@skipruntime/native");
-      instance = await runtime.initService(service);
+      runtime = await import("@skipruntime/native");
     } catch (e) {
       console.error(
         'Error loading Skip runtime for specified "native" platform: ',
@@ -117,8 +121,7 @@ export async function runService(
     }
   } else {
     try {
-      const runtime = await import("@skipruntime/wasm");
-      instance = await runtime.initService(service);
+      runtime = await import("@skipruntime/wasm");
     } catch (e) {
       console.error(
         'Error loading Skip runtime for specified "wasm" platform: ',
@@ -126,6 +129,7 @@ export async function runService(
       throw e;
     }
   }
+  const instance = await runtime.initService(service);
   const controlHttpServer = controlService(instance).listen(
     options.control_port,
     () => {
@@ -134,7 +138,13 @@ export async function runService(
       );
     },
   );
-  const streamingHttpServer = streamingService(instance).listen(
+  const wrapMiddleware = (app: Express) => {
+    if (options.no_cors) {
+      return express().use(no_cors).use(app);
+    }
+    return app;
+  };
+  const streamingHttpServer = wrapMiddleware(streamingService(instance)).listen(
     options.streaming_port,
     () => {
       console.log(
@@ -150,4 +160,17 @@ export async function runService(
       streamingHttpServer.close();
     },
   };
+}
+
+function no_cors(req: Request, res: Response, next: NextFunction) {
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.header("Access-Control-Allow-Methods", "GET,OPTIONS");
+  res.header("Access-Control-Allow-Origin", "*");
+  if (req.method.toUpperCase() == "OPTIONS") {
+    res.statusCode = 204;
+    res.setHeader("Content-Length", "0");
+    res.end();
+  } else {
+    next();
+  }
 }
