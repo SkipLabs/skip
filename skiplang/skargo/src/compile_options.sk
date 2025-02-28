@@ -12,6 +12,7 @@ class BuildConfig{
   requested_arch: TargetArch,
   requested_profile: String,
   export_dir: ?String,
+  skc_extra_options: Array<String>,
 } uses Equality, Hashable
 
 class CompileOptions{
@@ -20,11 +21,12 @@ class CompileOptions{
   filter: CompileFilter,
 }
 
-fun build_config(
+fun build_config{
   target_opt: ?String,
   profile_opt: ?String,
   release: Bool,
-): BuildConfig {
+  skc_extra_options: Array<String>,
+}: BuildConfig {
   BuildConfig{
     requested_arch => target_opt match {
     | Some(t) -> TargetArchTriple(TargetTriple::fromString(t))
@@ -45,16 +47,18 @@ fun build_config(
       }
     },
     export_dir => None(),
+    skc_extra_options,
   };
 }
 
 // TODO: Return Result<...>.
 fun compile_options(args: Cli.ParseResults): CompileOptions {
-  build_config = build_config(
-    args.maybeGetString("target", false),
-    args.maybeGetString("profile"),
-    args.getBool("release"),
-  );
+  build_config = build_config{
+    target_opt => args.maybeGetString("target", false),
+    profile_opt => args.maybeGetString("profile"),
+    release => args.getBool("release"),
+    skc_extra_options => args.getArray("skcopt", Some(Array[])),
+  };
   filter = CompileFilter::from_raw_arguments(
     args.getBool("lib", Some(false)),
     args.getArray("bin", Some(Array[])),
@@ -65,6 +69,11 @@ fun compile_options(args: Cli.ParseResults): CompileOptions {
 
   CompileOptions{build_config, filter}
 }
+
+const kSkcOptArg: Cli.Arg = Cli.Arg::string("skcopt")
+  .repeatable()
+  .value_name("option")
+  .about("Pass the given option to skc");
 
 const kProfileArgs: Array<Cli.Arg> = Array[
   Cli.Arg::string("profile")
