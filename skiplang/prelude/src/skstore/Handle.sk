@@ -74,17 +74,14 @@ mutable class NonEmptyIterator<+T>(
     }
   }
 
-  private mutable fun next(): ?T {
+  @synonym("next__ForJS")
+  mutable fun next(): ?T {
     if (this.isPastFirstValue) {
       this.iter.next()
     } else {
       this.!isPastFirstValue = true;
       Some(this.first)
     }
-  }
-
-  mutable fun next__ForJS(): ?T {
-    this.next()
   }
 
   mutable fun nonEmptyMap<U>(f: T -> U): mutable NonEmptyIterator<U> {
