@@ -11,8 +11,6 @@ git diff --quiet HEAD "$BASE" -- skiplang/prelude/ :^skiplang/prelude/ts
 prelude=$?
 git diff --quiet HEAD "$BASE" -- skiplang/compiler/
 skc=$?
-git diff --quiet HEAD "$BASE" -- sql/ skiplang/sqlparser/
-skdb=$?
 git diff --quiet HEAD "$BASE" -- skipruntime-ts/
 skipruntime=$?
 git diff --quiet HEAD "$BASE" -- skiplang/prelude/ts/
@@ -30,12 +28,12 @@ done
 
 if (( prelude != 0 )); then
   skc=1
-  skdb=1
+  SK_CHANGED[sql]=true
   skdb_wasm=true
   skipruntime=1
 fi
-if (( skdb != 0 )); then
-  skdb_wasm=true
+if ${SK_CHANGED[skiplang/sqlparser]}; then
+  SK_CHANGED[sql]=true
 fi
 if ${SK_CHANGED[skiplang/skjson]}; then
   skdb_wasm=true
@@ -86,7 +84,14 @@ fi
 for dir in "${!SK_CHANGED[@]}"; do
   if ${SK_CHANGED["$dir"]}; then
     case "$dir" in
-      skiplang/compiler | skiplang/prelude | sql | skipruntime-ts/* ) ;;
+      skiplang/compiler | skiplang/prelude | skipruntime-ts/* ) ;;
+      sql)
+        cat <<EOF
+  skdb:
+    jobs:
+      - skdb
+EOF
+        ;;
       *)
         if [ -d "$dir/tests" ]; then
           name=$(basename "$dir")
@@ -99,15 +104,6 @@ for dir in "${!SK_CHANGED[@]}"; do
     esac
   fi
 done
-
-if (( skdb != 0 ))
-then
-    cat <<EOF
-  skdb:
-    jobs:
-      - skdb
-EOF
-fi
 
 if ${skdb_wasm:-false}
 then
