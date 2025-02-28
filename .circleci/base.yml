@@ -91,20 +91,20 @@ jobs:
       - store_test_results:
           path: ~/test-results/skdb-wasm.xml
 
-  skiplang-lib-tests:
+  skip-package-tests:
     docker:
       - image: skiplabs/skiplang:latest
     parameters:
-      libname:
+      dir:
         type: string
     steps:
       - checkout
       - setup
       - run:
-          name: Run << parameters.libname >> tests
+          name: Run << parameters.dir >> tests
           command: |
             mkdir -p ~/test-results
-            cd skiplang/<< parameters.libname >> && skargo test --junitxml ~/test-results/<< parameters.libname >>.xml
+            cd << parameters.dir >> && skargo test --junitxml ~/test-results/$(tr / - <<< "<< parameters.dir >>").xml
       - store_test_results:
           path: ~/test-results
 
