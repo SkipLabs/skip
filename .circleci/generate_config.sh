@@ -22,9 +22,10 @@ ts_prelude=$?
 git diff --quiet HEAD "$BASE" -- examples/
 examples=$?
 
+shopt -s globstar
 declare -A SK_CHANGED
-for lib_tests in skiplang/*/tests; do
-  dir=$(dirname "$lib_tests")
+for skargo_toml in **/Skargo.toml; do
+  dir=$(dirname "$skargo_toml")
   git diff --quiet HEAD "$BASE" -- "$dir" \
     && SK_CHANGED["$dir"]=false || SK_CHANGED["$dir"]=true
 done
@@ -69,14 +70,16 @@ fi
 for dir in "${!SK_CHANGED[@]}"; do
   if ${SK_CHANGED["$dir"]}; then
     case "$dir" in
-      skiplang/compiler | skiplang/prelude) ;;
+      skiplang/compiler | skiplang/prelude | sql | skipruntime-ts/* ) ;;
       *)
-        name=$(basename "$dir")
-        echo "  $name-tests:"
-        echo "    jobs:"
-        echo "      - skip-package-tests:"
-        echo "          dir: $dir"
-        echo "          name: $name"
+        if [ -d "$dir/tests" ]; then
+          name=$(basename "$dir")
+          echo "  $name-tests:"
+          echo "    jobs:"
+          echo "      - skip-package-tests:"
+          echo "          dir: $dir"
+          echo "          name: $name"
+        fi
     esac
   fi
 done
