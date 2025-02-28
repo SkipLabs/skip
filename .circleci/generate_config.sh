@@ -30,6 +30,24 @@ for skargo_toml in **/Skargo.toml; do
     && SK_CHANGED["$dir"]=false || SK_CHANGED["$dir"]=true
 done
 
+if (( prelude != 0 )); then
+  skc=1
+  skdb=1
+  skdb_wasm=true
+  skipruntime=1
+fi
+if (( skdb != 0 )); then
+  skdb_wasm=true
+fi
+if (( skjson != 0 )); then
+  skdb_wasm=true
+  skipruntime=1
+fi
+if (( ts_prelude != 0 )); then
+  skdb_wasm=true
+  skipruntime=1
+fi
+
 cat .circleci/base.yml
 
 echo "workflows:"
@@ -49,7 +67,7 @@ then
 EOF
 fi
 
-if (( skc != 0 || prelude != 0 ))
+if (( skc != 0 ))
 then
    cat <<EOF
   compiler:
@@ -84,7 +102,7 @@ for dir in "${!SK_CHANGED[@]}"; do
   fi
 done
 
-if (( skdb != 0 || prelude != 0 ))
+if (( skdb != 0 ))
 then
     cat <<EOF
   skdb:
@@ -93,7 +111,7 @@ then
 EOF
 fi
 
-if (( skdb != 0 || prelude != 0 || ts_prelude != 0 || skjson != 0 ))
+if ${skdb_wasm:-false}
 then
     cat <<EOF
   skdb-wasm:
@@ -102,7 +120,7 @@ then
 EOF
 fi
 
-if (( prelude != 0 || skipruntime != 0 || ts_prelude != 0 || skjson != 0 ))
+if (( skipruntime != 0 ))
 then
     cat <<EOF
   skipruntime:
