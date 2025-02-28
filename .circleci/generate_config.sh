@@ -22,7 +22,7 @@ shopt -s globstar
 declare -A SK_CHANGED
 for skargo_toml in **/Skargo.toml; do
   dir=$(dirname "$skargo_toml")
-  git diff --quiet HEAD "$BASE" -- "$dir" \
+  git diff --quiet HEAD "$BASE" -- "$dir" :^"$dir/ts" \
     && SK_CHANGED["$dir"]=false || SK_CHANGED["$dir"]=true
 done
 
