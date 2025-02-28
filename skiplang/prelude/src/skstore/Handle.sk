@@ -38,7 +38,7 @@ module SKStore;
 /* Iterator capable of answering if it produces at least one element. */
 /*****************************************************************************/
 
-mutable base class FileIterator<+T> extends Iterator<T> {
+mutable base class FileIterator<+T> {
   static fun create(iter: mutable Iterator<T>): mutable FileIterator<T> {
     iter.next() match {
     | None() -> mutable EmptyFileIterator()
@@ -47,34 +47,36 @@ mutable base class FileIterator<+T> extends Iterator<T> {
   }
 }
 
-mutable class EmptyFileIterator<T>() extends FileIterator<T> {
-  mutable fun next(): ?T {
-    None()
-  }
-}
+mutable class EmptyFileIterator<T>() extends FileIterator<T> {}
 
+/* A NonEmptyIterator should only be used in one of the following ways:
+- a single call to assertUnique or getUnique, or
+- a single call to nonEmptyMap, nonEmptyReduce, toArray, or values, or
+- repeated calls to next__ForJS.
+
+Accessing first is a bad pattern. Use assertUnique, getUnique, toArray,
+or values instead. */
 mutable class NonEmptyIterator<+T>(
   first: T,
-  mutable iter: mutable Iterator<T>,
-  mutable isPastFirstValue: Bool = false,
-  mutable materializedIter: ?Array<T> = None(),
+  private iter: mutable Iterator<T>,
+  private mutable isPastFirstValue: Bool = false,
 ) extends FileIterator<T> {
-  // Materialize `iter` into an array to support multiple/repeat iterations
-  // This operation is deferred until necessary, to avoid materialization in
-  // cases where only the `first` element is accessed
-  private mutable fun materializeIter(): void {
-    this.materializedIter match {
-    | None() ->
-      array = this.iter.collect(Array);
-      this.!materializedIter = Some(array);
-      this.!iter = (array.iterator() : mutable Iterator<T>)
-    | Some(_) -> void
-    };
+  mutable fun values(): mutable Iterator<T> {
+    invariant(
+      !this.isPastFirstValue,
+      "Trying to iterate a NonEmptyIterator twice (values)",
+    );
+    loop {
+      this.next() match {
+      | Some(v) -> yield v
+      | None() -> yield break
+      }
+    }
   }
 
+  @synonym("next__ForJS")
   mutable fun next(): ?T {
     if (this.isPastFirstValue) {
-      this.materializeIter();
       this.iter.next()
     } else {
       this.!isPastFirstValue = true;
@@ -83,42 +85,49 @@ mutable class NonEmptyIterator<+T>(
   }
 
   mutable fun nonEmptyMap<U>(f: T -> U): mutable NonEmptyIterator<U> {
+    invariant(
+      !this.isPastFirstValue,
+      "Trying to iterate a NonEmptyIterator twice (nonEmptyMap)",
+    );
     mutable NonEmptyIterator(f(this.first), this.iter.map(f))
   }
 
-  mutable fun assertUnique(
-    err: () -> void = () ->
-      invariant_violation("Expected an iterator with only one element"),
-  ): void {
-    if (this.isPastFirstValue) {
-      invariant_violation(
-        "Cannot use assertUnique on an iterator that has already been used",
-      )
-    };
+  mutable fun getUnique(): ?T {
+    invariant(
+      !this.isPastFirstValue,
+      "Cannot use getUnique on an iterator that has already been used",
+    );
+    this.!isPastFirstValue = true;
     this.iter.next() match {
-    | None() -> void
-    | Some _ -> err()
+    | None() -> Some(this.first)
+    | Some(_) -> None()
     }
   }
-  mutable fun clone(): mutable NonEmptyIterator<T> {
-    this.materializeIter();
-    mutable NonEmptyIterator(
-      this.first,
-      this.materializedIter.fromSome().iterator(),
-      false,
-      this.materializedIter,
-    )
+
+  mutable fun assertUnique(
+    err: () -> T = () ->
+      invariant_violation("Expected an iterator with only one element"),
+  ): T {
+    this.getUnique() match {
+    | Some(v) -> v
+    | None() -> err()
+    }
   }
 
-  mutable fun map<V>(conv: T -> V): mutable NonEmptyIterator<V> {
-    this.materializeIter();
-    materializedIter = this.materializedIter.map(v -> v.map(conv));
-    mutable NonEmptyIterator(
-      conv(this.first),
-      materializedIter.fromSome().iterator(),
-      false,
-      materializedIter,
-    )
+  mutable fun toArray(): Array<T> {
+    invariant(
+      !this.isPastFirstValue,
+      "Trying to iterate a NonEmptyIterator twice (toArray)",
+    );
+    Array::createFromIterator(this.values())
+  }
+
+  mutable fun nonEmptyReduce<U>(f: (U, T) -> U, init: T -> U): U {
+    invariant(
+      !this.isPastFirstValue,
+      "Trying to iterate a NonEmptyIterator twice (nonEmptyReduce)",
+    );
+    this.iter.reduce(f, init(this.first))
   }
 }
 

@@ -57,10 +57,7 @@ char* SkipRuntime_Collection__take(char* collection, int64_t limit);
 char* SkipRuntime_Collection__merge(char* collection, CJArray others);
 int64_t SkipRuntime_Collection__size(char* collection);
 
-CJSON SkipRuntime_NonEmptyIterator__first(SKNonEmptyIterator it);
 CJSON SkipRuntime_NonEmptyIterator__next(SKNonEmptyIterator it);
-CJSON SkipRuntime_NonEmptyIterator__uniqueValue(SKNonEmptyIterator it);
-SKNonEmptyIterator SkipRuntime_NonEmptyIterator__clone(SKNonEmptyIterator it);
 
 CJSON SkipRuntime_LazyCollection__getArray(char* handle, CJSON key);
 CJSON SkipRuntime_LazyCollection__getUnique(char* handle, CJSON key);
@@ -924,57 +921,6 @@ void NextOfNonEmptyIterator(const FunctionCallbackInfo<Value>& args) {
   });
 }
 
-void FirstOfNonEmptyIterator(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  if (!args[0]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a pointer.")));
-    return;
-  }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    SKNonEmptyIterator skiterator = args[0].As<External>()->Value();
-    CJSON skResult = SkipRuntime_NonEmptyIterator__first(skiterator);
-    args.GetReturnValue().Set(External::New(isolate, skResult));
-  });
-}
-
-void UniqueValueOfNonEmptyIterator(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  if (!args[0]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a pointer.")));
-    return;
-  }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    SKNonEmptyIterator skiterator = args[0].As<External>()->Value();
-    CJSON skResult = SkipRuntime_NonEmptyIterator__uniqueValue(skiterator);
-    Local<Value> returnValue;
-    if (skResult != nullptr) {
-      returnValue = External::New(isolate, skResult);
-    } else {
-      returnValue = Null(isolate);
-    }
-    args.GetReturnValue().Set(returnValue);
-  });
-}
-
-void CloneOfNonEmptyIterator(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  if (!args[0]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a pointer.")));
-    return;
-  }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    SKNonEmptyIterator skiterator = args[0].As<External>()->Value();
-    CJSON skcloned = SkipRuntime_NonEmptyIterator__clone(skiterator);
-    args.GetReturnValue().Set(External::New(isolate, skcloned));
-  });
-}
-
 void GetArrayOfLazyCollection(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
   if (args.Length() != 2) {
@@ -1274,14 +1220,8 @@ void GetToJSBinding(const FunctionCallbackInfo<Value>& args) {
   AddFunction(isolate, binding, "SkipRuntime_Collection__size",
               SizeOfEagerCollection);
   //
-  AddFunction(isolate, binding, "SkipRuntime_NonEmptyIterator__first",
-              FirstOfNonEmptyIterator);
   AddFunction(isolate, binding, "SkipRuntime_NonEmptyIterator__next",
               NextOfNonEmptyIterator);
-  AddFunction(isolate, binding, "SkipRuntime_NonEmptyIterator__uniqueValue",
-              UniqueValueOfNonEmptyIterator);
-  AddFunction(isolate, binding, "SkipRuntime_NonEmptyIterator__clone",
-              CloneOfNonEmptyIterator);
   //
   AddFunction(isolate, binding, "SkipRuntime_LazyCollection__getArray",
               GetArrayOfLazyCollection);
