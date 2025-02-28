@@ -24,9 +24,9 @@ examples=$?
 
 declare -A SK_CHANGED
 for lib_tests in skiplang/*/tests; do
-  lib=$(basename "$(dirname "$lib_tests")")
-  git diff --quiet HEAD "$BASE" -- "skiplang/$lib" \
-    && SK_CHANGED["$lib"]=false || SK_CHANGED["$lib"]=true
+  dir=$(dirname "$lib_tests")
+  git diff --quiet HEAD "$BASE" -- "$dir" \
+    && SK_CHANGED["$dir"]=false || SK_CHANGED["$dir"]=true
 done
 
 cat .circleci/base.yml
@@ -66,16 +66,17 @@ then
 EOF
 fi
 
-for lib in "${!SK_CHANGED[@]}"; do
-  if ${SK_CHANGED["$lib"]}; then
-    case "$lib" in
-      compiler | prelude) ;;
+for dir in "${!SK_CHANGED[@]}"; do
+  if ${SK_CHANGED["$dir"]}; then
+    case "$dir" in
+      skiplang/compiler | skiplang/prelude) ;;
       *)
-        echo "  $lib-tests:"
+        name=$(basename "$dir")
+        echo "  $name-tests:"
         echo "    jobs:"
-        echo "      - skiplang-lib-tests:"
-        echo "          libname: $lib"
-        echo "          name: $lib"
+        echo "      - skip-package-tests:"
+        echo "          dir: $dir"
+        echo "          name: $name"
     esac
   fi
 done
