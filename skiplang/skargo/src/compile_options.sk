@@ -21,11 +21,11 @@ class CompileOptions{
   skc_extra_options: Array<String>,
 }
 
-fun build_config(
+fun build_config{
   target_opt: ?String,
   profile_opt: ?String,
   release: Bool,
-): BuildConfig {
+}: BuildConfig {
   BuildConfig{
     requested_arch => target_opt match {
     | Some(t) -> TargetArchTriple(TargetTriple::fromString(t))
@@ -51,11 +51,11 @@ fun build_config(
 
 // TODO: Return Result<...>.
 fun compile_options(args: Cli.ParseResults): CompileOptions {
-  build_config = build_config(
-    args.maybeGetString("target", false),
-    args.maybeGetString("profile"),
-    args.getBool("release"),
-  );
+  build_config = build_config{
+    target_opt => args.maybeGetString("target", false),
+    profile_opt => args.maybeGetString("profile"),
+    release => args.getBool("release"),
+  };
   filter = CompileFilter::from_raw_arguments(
     args.getBool("lib", Some(false)),
     args.getArray("bin", Some(Array[])),
