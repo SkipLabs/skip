@@ -68,15 +68,13 @@ then
 EOF
 fi
 
-if [ ${#SKIPLANG_LIBS_CHANGED[@]} -gt 0 ]; then
-  echo "  skiplang-libs-tests:"
+for lib in "${SKIPLANG_LIBS_CHANGED[@]}"; do
+  echo "  $lib-tests:"
   echo "    jobs:"
-  for lib in "${SKIPLANG_LIBS_CHANGED[@]}"; do
-    echo "      - skiplang-lib-tests:"
-    echo "          libname: $lib"
-    echo "          name: $lib"
-  done
-fi
+  echo "      - skiplang-lib-tests:"
+  echo "          libname: $lib"
+  echo "          name: $lib"
+done
 
 if (( skdb != 0 || skstore != 0 ))
 then
