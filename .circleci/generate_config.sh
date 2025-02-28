@@ -7,10 +7,10 @@ BASE="$(git merge-base main HEAD)"
 # shellcheck disable=SC2046 # We actually want splitting in jq command output
 git diff --quiet HEAD "$BASE" -- $(jq --raw-output ".workspaces[]" package.json)
 check_ts=$?
-git diff --quiet HEAD "$BASE" -- skiplang/compiler/ skiplang/prelude/ :^skiplang/prelude/ts
+git diff --quiet HEAD "$BASE" -- skiplang/prelude/ :^skiplang/prelude/ts
+prelude=$?
+git diff --quiet HEAD "$BASE" -- skiplang/compiler/
 skc=$?
-git diff --quiet HEAD "$BASE" -- skiplang/prelude/src/skstore/ skiplang/prelude/runtime/
-skstore=$?
 git diff --quiet HEAD "$BASE" -- skiplang/skjson
 skjson=$?
 git diff --quiet HEAD "$BASE" -- sql/ skiplang/sqlparser/
@@ -50,7 +50,7 @@ then
 EOF
 fi
 
-if (( skc != 0 ))
+if (( skc != 0 || prelude != 0 ))
 then
    cat <<EOF
   compiler:
@@ -59,7 +59,7 @@ then
 EOF
 fi
 
-if (( skstore != 0 ))
+if (( prelude != 0 ))
 then
     cat <<EOF
   skstore:
@@ -76,7 +76,7 @@ for lib in "${SKIPLANG_LIBS_CHANGED[@]}"; do
   echo "          name: $lib"
 done
 
-if (( skdb != 0 || skstore != 0 ))
+if (( skdb != 0 || prelude != 0 ))
 then
     cat <<EOF
   skdb:
@@ -85,7 +85,7 @@ then
 EOF
 fi
 
-if (( skdb != 0 || skstore != 0 || ts_prelude != 0 || skjson != 0 ))
+if (( skdb != 0 || prelude != 0 || ts_prelude != 0 || skjson != 0 ))
 then
     cat <<EOF
   skdb-wasm:
@@ -94,7 +94,7 @@ then
 EOF
 fi
 
-if (( skstore != 0 || skipruntime != 0 || ts_prelude != 0 || skjson != 0 ))
+if (( prelude != 0 || skipruntime != 0 || ts_prelude != 0 || skjson != 0 ))
 then
     cat <<EOF
   skipruntime:
