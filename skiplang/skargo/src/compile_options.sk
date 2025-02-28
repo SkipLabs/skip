@@ -12,19 +12,20 @@ class BuildConfig{
   requested_arch: TargetArch,
   requested_profile: String,
   export_dir: ?String,
+  skc_extra_options: Array<String>,
 } uses Equality, Hashable
 
 class CompileOptions{
   build_config: BuildConfig,
   /// Filter to apply to the root package to select which targets will be built.
   filter: CompileFilter,
-  skc_extra_options: Array<String>,
 }
 
 fun build_config{
   target_opt: ?String,
   profile_opt: ?String,
   release: Bool,
+  skc_extra_options: Array<String>,
 }: BuildConfig {
   BuildConfig{
     requested_arch => target_opt match {
@@ -46,6 +47,7 @@ fun build_config{
       }
     },
     export_dir => None(),
+    skc_extra_options,
   };
 }
 
@@ -55,6 +57,7 @@ fun compile_options(args: Cli.ParseResults): CompileOptions {
     target_opt => args.maybeGetString("target", false),
     profile_opt => args.maybeGetString("profile"),
     release => args.getBool("release"),
+    skc_extra_options => args.getArray("skcopt", Some(Array[])),
   };
   filter = CompileFilter::from_raw_arguments(
     args.getBool("lib", Some(false)),
@@ -63,9 +66,8 @@ fun compile_options(args: Cli.ParseResults): CompileOptions {
     args.getBool("tests", Some(false)),
     args.getBool("all-targets", Some(false)),
   );
-  skc_extra_options = args.getArray("skcopt", Some(Array[]));
 
-  CompileOptions{build_config, filter, skc_extra_options}
+  CompileOptions{build_config, filter}
 }
 
 const kSkcOptArg: Cli.Arg = Cli.Arg::string("skcopt")
