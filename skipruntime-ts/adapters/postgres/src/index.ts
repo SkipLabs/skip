@@ -206,9 +206,9 @@ export class PostgresExternalService implements ExternalService {
             `
 CREATE OR REPLACE FUNCTION %I() RETURNS TRIGGER AS $f$
 BEGIN
-  IF NEW IS NOT NULL THEN
+  IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN
     PERFORM pg_notify(%L, NEW.%I::text);
-  ELSIF OLD IS NOT NULL THEN
+  ELSE
     PERFORM pg_notify(%L, OLD.%I::text);
   END IF;
   RETURN NULL;
