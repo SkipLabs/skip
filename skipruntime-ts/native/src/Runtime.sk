@@ -329,7 +329,7 @@ fun buildResourcesGraph(
           context,
           dDirname.sub(resourceId),
           (_ctx, writer, key, it) ~> {
-            writer.setArray(key, it.toArray());
+            writer.setArray(key, Array::createFromIterator(it.values())); // TODO: use it.toArray()
           },
         );
         writer.set(
@@ -760,7 +760,9 @@ class Collection(hdl: SKStore.EHandle<JSONID, JSONFile>) {
       | None() ->
         writer.setArray(
           key,
-          values.nonEmptyMap(x ~> inputConv(x.json)).toArray(),
+          Array::createFromIterator(
+            values.nonEmptyMap(x ~> inputConv(x.json)).values(),
+          ), // TODO: use .toArray()
         )
       | Some(mapper) ->
         pushContext(ctx);
@@ -798,7 +800,9 @@ class Collection(hdl: SKStore.EHandle<JSONID, JSONFile>) {
           (_ctx, writer, key, values) ~> {
             writer.setArray(
               key,
-              values.nonEmptyMap(x -> JSONFile(outputConv(x))).toArray(),
+              Array::createFromIterator(
+                values.nonEmptyMap(x -> JSONFile(outputConv(x))).values(),
+              ), // TODO: use .toArray()
             )
           },
         ),
