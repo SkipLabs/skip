@@ -21,6 +21,8 @@ import {
   GenericExternalService,
   Sum,
   TimerResource,
+  join_one,
+  join_many,
 } from "@skipruntime/helpers";
 
 import { it as mit, type AsyncFunc } from "mocha";
@@ -759,6 +761,61 @@ const mapWithExceptionOnExternalService: SkipService<Input_SN, Input_SN> = {
   },
 };
 
+//// testJoinHelpers
+
+type Post = { title: string; author_id: number };
+type User = { name: string };
+type Upvote = { user_id: number; post_id: number };
+
+type JoinServiceInputs = {
+  posts: EagerCollection<number, Post>;
+  users: EagerCollection<number, User>;
+  upvotes: EagerCollection<number, Upvote>;
+};
+
+type PostWithAuthorAndUpvotes = Omit<Post, "author_id"> & {
+  author: User;
+  upvotes: Omit<Upvote, "post_id">[];
+};
+
+type JoinServiceResourceInputs = {
+  posts: EagerCollection<number, PostWithAuthorAndUpvotes>;
+};
+
+class PostsResource implements Resource<JoinServiceResourceInputs> {
+  instantiate(
+    collections: JoinServiceResourceInputs,
+  ): EagerCollection<number, PostWithAuthorAndUpvotes> {
+    return collections.posts;
+  }
+}
+
+const joinService: SkipService<JoinServiceInputs, JoinServiceResourceInputs> = {
+  initialData: {
+    posts: [],
+    users: [],
+    upvotes: [],
+  },
+  resources: {
+    posts: PostsResource,
+  },
+  createGraph(inputCollections: JoinServiceInputs) {
+    const posts_with_author = join_one(
+      inputCollections.posts,
+      inputCollections.users,
+      {
+        on: "author_id",
+        name: "author",
+      },
+    );
+    const posts = join_many(posts_with_author, inputCollections.upvotes, {
+      on: "post_id",
+      name: "upvotes",
+    });
+    return { posts };
+  },
+};
+
 export function initTests(
   category: string,
   initService: (service: SkipService) => Promise<ServiceInstance>,
@@ -1294,5 +1351,49 @@ export function initTests(
     expect(message).toMatchRegex(
       new RegExp(/^(?:Error: )?Something goes wrong.$/),
     );
+  });
+
+  it("testJoinHelpers", async () => {
+    const service = await initService(joinService);
+    try {
+      service.update("users", [
+        [1, [{ name: "Foo" }]],
+        [2, [{ name: "Bar" }]],
+      ]);
+      service.update("posts", [
+        [1, [{ title: "FooBar", author_id: 1 }]],
+        [2, [{ title: "Baz", author_id: 2 }]],
+      ]);
+      service.update("upvotes", [
+        [1, [{ post_id: 1, user_id: 1 }]],
+        [2, [{ post_id: 1, user_id: 2 }]],
+        [3, [{ post_id: 2, user_id: 2 }]],
+      ]);
+      service.instantiateResource("unsafe.fixed.resource.ident", "posts", {});
+      expect(service.getAll("posts").payload).toEqual([
+        [
+          1,
+          [
+            {
+              title: "FooBar",
+              author: { name: "Foo" },
+              upvotes: [{ user_id: 1 }, { user_id: 2 }],
+            },
+          ],
+        ],
+        [
+          2,
+          [
+            {
+              title: "Baz",
+              author: { name: "Bar" },
+              upvotes: [{ user_id: 2 }],
+            },
+          ],
+        ],
+      ]);
+    } finally {
+      await service.close();
+    }
   });
 }
