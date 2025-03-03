@@ -22,6 +22,22 @@ for skargo_toml in **/Skargo.toml; do
     && SK_CHANGED["$dir"]=false || SK_CHANGED["$dir"]=true
 done
 
+declare -A TS_CHANGED
+# shellcheck disable=SC2046 # We actually want splitting in jq command output
+for dir in $(jq --raw-output ".workspaces[]" package.json); do
+  git diff --quiet HEAD "$BASE" -- "$dir" \
+    && TS_CHANGED["$dir"]=false || TS_CHANGED["$dir"]=true
+done
+
+for dir in "${!TS_CHANGED[@]}"; do
+  changed=${TS_CHANGED["$dir"]}
+  while [ "$dir" != "." ] && [ "$dir" != "/" ]; do
+    if ${TS_CHANGED["$dir"]:-false} && ! $changed; then break; fi
+    TS_CHANGED["$dir"]=$changed
+    dir=$(dirname "$dir")
+  done
+done
+
 if ${SK_CHANGED[skiplang/prelude]}; then
   SK_CHANGED[skiplang/compiler]=true
   SK_CHANGED[sql]=true
