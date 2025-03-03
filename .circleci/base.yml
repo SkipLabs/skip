@@ -51,20 +51,6 @@ jobs:
       - store_test_results:
           path: ~/test-results/skc.xml
 
-  skstore:
-    docker:
-      - image: skiplabs/skiplang:latest
-    steps:
-      - checkout
-      - setup
-      - run:
-          name: Run skstore tests
-          command: |
-            mkdir -p ~/test-results
-            cd skiplang/prelude && skargo test --jobs 8 --junitxml ~/test-results/skstore.xml
-      - store_test_results:
-          path: ~/test-results/skstore.xml
-
   skdb:
     docker:
       - image: skiplabs/skdb-base:latest
@@ -91,20 +77,34 @@ jobs:
       - store_test_results:
           path: ~/test-results/skdb-wasm.xml
 
-  skiplang-lib-tests:
+  skip-package-build:
     docker:
       - image: skiplabs/skiplang:latest
     parameters:
-      libname:
+      dir:
         type: string
     steps:
       - checkout
       - setup
       - run:
-          name: Run << parameters.libname >> tests
+          name: Build << parameters.dir >>
+          command: |
+            cd << parameters.dir >> && skargo build --all-targets
+
+  skip-package-tests:
+    docker:
+      - image: skiplabs/skiplang:latest
+    parameters:
+      dir:
+        type: string
+    steps:
+      - checkout
+      - setup
+      - run:
+          name: Run << parameters.dir >> tests
           command: |
             mkdir -p ~/test-results
-            cd skiplang/<< parameters.libname >> && skargo test --junitxml ~/test-results/<< parameters.libname >>.xml
+            cd << parameters.dir >> && skargo test --jobs 8 --junitxml ~/test-results/$(tr / - <<< "<< parameters.dir >>").xml
       - store_test_results:
           path: ~/test-results
 
