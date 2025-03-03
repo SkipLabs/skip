@@ -93,13 +93,6 @@ EOF
       - compiler
 EOF
         ;;
-      skiplang/prelude)
-    cat <<EOF
-  skstore:
-    jobs:
-      - skstore
-EOF
-        ;;
       *)
         if [ -d "$dir/tests" ]; then
           name=$(basename "$dir")
