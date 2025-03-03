@@ -4,8 +4,6 @@
 
 BASE="$(git merge-base main HEAD)"
 
-git diff --quiet HEAD "$BASE" -- skipruntime-ts/
-skipruntime=$?
 git diff --quiet HEAD "$BASE" -- skiplang/prelude/ts/
 ts_prelude=$?
 git diff --quiet HEAD "$BASE" -- examples/
@@ -41,18 +39,18 @@ if ${SK_CHANGED[skiplang/prelude]}; then
   SK_CHANGED[skiplang/compiler]=true
   SK_CHANGED[sql]=true
   skdb_wasm=true
-  skipruntime=1
+  TS_CHANGED[skipruntime-ts]=true
 fi
 if ${SK_CHANGED[skiplang/sqlparser]}; then
   SK_CHANGED[sql]=true
 fi
 if ${SK_CHANGED[skiplang/skjson]}; then
   skdb_wasm=true
-  skipruntime=1
+  TS_CHANGED[skipruntime-ts]=true
 fi
 if (( ts_prelude != 0 )); then
   skdb_wasm=true
-  skipruntime=1
+  TS_CHANGED[skipruntime-ts]=true
 fi
 
 cat .circleci/base.yml
@@ -77,7 +75,9 @@ fi
 for dir in "${!SK_CHANGED[@]}"; do
   if ${SK_CHANGED["$dir"]}; then
     case "$dir" in
-      skipruntime-ts/* ) ;;
+      skipruntime-ts/* )
+        TS_CHANGED[skipruntime-ts]=true
+        ;;
       sql)
         cat <<EOF
   skdb:
@@ -121,7 +121,7 @@ then
 EOF
 fi
 
-if (( skipruntime != 0 ))
+if ${TS_CHANGED[skipruntime-ts]}
 then
     cat <<EOF
   skipruntime:
