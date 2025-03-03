@@ -36,18 +36,18 @@ done
 if ${SK_CHANGED[skiplang/prelude]}; then
   SK_CHANGED[skiplang/compiler]=true
   SK_CHANGED[sql]=true
-  skdb_wasm=true
+  TS_CHANGED[sql]=true
   TS_CHANGED[skipruntime-ts]=true
 fi
 if ${SK_CHANGED[skiplang/sqlparser]}; then
   SK_CHANGED[sql]=true
 fi
 if ${SK_CHANGED[skiplang/skjson]}; then
-  skdb_wasm=true
+  TS_CHANGED[sql]=true
   TS_CHANGED[skipruntime-ts]=true
 fi
 if ${TS_CHANGED[skiplang/prelude]}; then
-  skdb_wasm=true
+  TS_CHANGED[sql]=true
   TS_CHANGED[skipruntime-ts]=true
 fi
 
@@ -110,7 +110,7 @@ EOF
   fi
 done
 
-if ${skdb_wasm:-false}
+if ${TS_CHANGED[sql]}
 then
     cat <<EOF
   skdb-wasm:
