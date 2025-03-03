@@ -7,8 +7,6 @@ BASE="$(git merge-base main HEAD)"
 # shellcheck disable=SC2046 # We actually want splitting in jq command output
 git diff --quiet HEAD "$BASE" -- $(jq --raw-output ".workspaces[]" package.json)
 check_ts=$?
-git diff --quiet HEAD "$BASE" -- skiplang/compiler/
-skc=$?
 git diff --quiet HEAD "$BASE" -- skipruntime-ts/
 skipruntime=$?
 git diff --quiet HEAD "$BASE" -- skiplang/prelude/ts/
@@ -25,7 +23,7 @@ for skargo_toml in **/Skargo.toml; do
 done
 
 if ${SK_CHANGED[skiplang/prelude]}; then
-  skc=1
+  SK_CHANGED[skiplang/compiler]=true
   SK_CHANGED[sql]=true
   skdb_wasm=true
   skipruntime=1
@@ -61,24 +59,22 @@ then
 EOF
 fi
 
-if (( skc != 0 ))
-then
-   cat <<EOF
-  compiler:
-    jobs:
-      - compiler
-EOF
-fi
-
 for dir in "${!SK_CHANGED[@]}"; do
   if ${SK_CHANGED["$dir"]}; then
     case "$dir" in
-      skiplang/compiler | skipruntime-ts/* ) ;;
+      skipruntime-ts/* ) ;;
       sql)
         cat <<EOF
   skdb:
     jobs:
       - skdb
+EOF
+        ;;
+      skiplang/compiler)
+   cat <<EOF
+  compiler:
+    jobs:
+      - compiler
 EOF
         ;;
       skiplang/prelude)
