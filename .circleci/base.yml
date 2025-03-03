@@ -77,6 +77,20 @@ jobs:
       - store_test_results:
           path: ~/test-results/skdb-wasm.xml
 
+  skip-package-build:
+    docker:
+      - image: skiplabs/skiplang:latest
+    parameters:
+      dir:
+        type: string
+    steps:
+      - checkout
+      - setup
+      - run:
+          name: Build << parameters.dir >>
+          command: |
+            cd << parameters.dir >> && skargo build --all-targets
+
   skip-package-tests:
     docker:
       - image: skiplabs/skiplang:latest
