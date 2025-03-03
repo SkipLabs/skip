@@ -93,15 +93,20 @@ EOF
       - compiler
 EOF
         ;;
+      skiplang/sqlparser) ;;
       *)
+        name=$(basename "$dir")
         if [ -d "$dir/tests" ]; then
-          name=$(basename "$dir")
           echo "  $name-tests:"
           echo "    jobs:"
           echo "      - skip-package-tests:"
-          echo "          dir: $dir"
-          echo "          name: $name"
+        else
+          echo "  $name-build:"
+          echo "    jobs:"
+          echo "      - skip-package-build:"
         fi
+        echo "          dir: $dir"
+        echo "          name: $name"
     esac
   fi
 done
