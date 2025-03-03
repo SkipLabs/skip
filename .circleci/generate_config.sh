@@ -4,9 +4,6 @@
 
 BASE="$(git merge-base main HEAD)"
 
-# shellcheck disable=SC2046 # We actually want splitting in jq command output
-git diff --quiet HEAD "$BASE" -- $(jq --raw-output ".workspaces[]" package.json)
-check_ts=$?
 git diff --quiet HEAD "$BASE" -- skipruntime-ts/
 skipruntime=$?
 git diff --quiet HEAD "$BASE" -- skiplang/prelude/ts/
@@ -22,11 +19,13 @@ for skargo_toml in **/Skargo.toml; do
     && SK_CHANGED["$dir"]=false || SK_CHANGED["$dir"]=true
 done
 
+check_ts=false
 declare -A TS_CHANGED
 # shellcheck disable=SC2046 # We actually want splitting in jq command output
 for dir in $(jq --raw-output ".workspaces[]" package.json); do
   git diff --quiet HEAD "$BASE" -- "$dir" \
     && TS_CHANGED["$dir"]=false || TS_CHANGED["$dir"]=true
+  ${TS_CHANGED["$dir"]} && check_ts=true
 done
 
 for dir in "${!TS_CHANGED[@]}"; do
@@ -66,7 +65,7 @@ echo "workflows:"
       - fast-checks
 EOF
 
-if (( check_ts != 0 ))
+if $check_ts
 then
     cat <<EOF
   check-ts:
