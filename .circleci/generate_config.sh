@@ -15,6 +15,14 @@ for skargo_toml in **/Skargo.toml; do
     && SK_CHANGED["$dir"]=false || SK_CHANGED["$dir"]=true
 done
 
+if ${SK_CHANGED[skiplang/prelude]}; then
+  SK_CHANGED[skiplang/compiler]=true
+  SK_CHANGED[sql]=true
+fi
+if ${SK_CHANGED[skiplang/sqlparser]}; then
+  SK_CHANGED[sql]=true
+fi
+
 check_ts=false
 declare -A TS_CHANGED
 # shellcheck disable=SC2046 # We actually want splitting in jq command output
@@ -22,6 +30,10 @@ for dir in $(jq --raw-output ".workspaces[]" package.json); do
   git diff --quiet HEAD "$BASE" -- "$dir" \
     && TS_CHANGED["$dir"]=false || TS_CHANGED["$dir"]=true
   ${TS_CHANGED["$dir"]} && check_ts=true
+done
+
+for dir in "${!SK_CHANGED[@]}"; do
+  ${SK_CHANGED["$dir"]} && TS_CHANGED["$dir"]=true
 done
 
 for dir in "${!TS_CHANGED[@]}"; do
@@ -33,16 +45,7 @@ for dir in "${!TS_CHANGED[@]}"; do
   done
 done
 
-if ${SK_CHANGED[skiplang/prelude]}; then
-  SK_CHANGED[skiplang/compiler]=true
-  SK_CHANGED[sql]=true
-  TS_CHANGED[sql]=true
-  TS_CHANGED[skipruntime-ts]=true
-fi
-if ${SK_CHANGED[skiplang/sqlparser]}; then
-  SK_CHANGED[sql]=true
-fi
-if ${SK_CHANGED[skiplang/skjson]}; then
+if ${TS_CHANGED[skiplang/skjson]}; then
   TS_CHANGED[sql]=true
   TS_CHANGED[skipruntime-ts]=true
 fi
