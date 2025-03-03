@@ -4,8 +4,6 @@
 
 BASE="$(git merge-base main HEAD)"
 
-git diff --quiet HEAD "$BASE" -- skiplang/prelude/ts/
-ts_prelude=$?
 git diff --quiet HEAD "$BASE" -- examples/
 examples=$?
 
@@ -48,7 +46,7 @@ if ${SK_CHANGED[skiplang/skjson]}; then
   skdb_wasm=true
   TS_CHANGED[skipruntime-ts]=true
 fi
-if (( ts_prelude != 0 )); then
+if ${TS_CHANGED[skiplang/prelude]}; then
   skdb_wasm=true
   TS_CHANGED[skipruntime-ts]=true
 fi
