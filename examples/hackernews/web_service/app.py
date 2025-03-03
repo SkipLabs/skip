@@ -273,3 +273,76 @@ def simulate_activity():
                 time.sleep(1)
 
     return "ok", 200
+
+
+# See https://docs.docker.com/compose/how-tos/use-secrets/
+with open("/run/secrets/gh_oauth_client_id") as f:
+    GH_OAUTH_CLIENT_ID = f.read().strip()
+with open("/run/secrets/gh_oauth_secret") as f:
+    GH_OAUTH_CLIENT_SECRET = f.read().strip()
+GH_OAUTH_ACCESS_TOKEN_URI = "https://github.com/login/oauth/access_token"
+GH_OAUTH_REDIRECT_URI = "https://localhost/api/oauth"
+GH_USER_API_URI = "https://api.github.com/user"
+
+
+@app.get("/oauth")
+def oauth_callback():
+    code = request.args["code"]
+    resp = requests.post(
+        GH_OAUTH_ACCESS_TOKEN_URI,
+        headers={
+            "Accept": "application/json",
+        },
+        json={
+            "client_id": GH_OAUTH_CLIENT_ID,
+            "client_secret": GH_OAUTH_CLIENT_SECRET,
+            "code": code,
+            "redirect_uri": GH_OAUTH_REDIRECT_URI,
+        },
+    )
+
+    session["gh_access_token"] = resp.json()["access_token"]
+    resp = requests.get(
+        f"{GH_USER_API_URI}",
+        headers={
+            "Accept": "application/json",
+            "Authorization": f'Bearer {session["gh_access_token"]}',
+        },
+    )
+    gh_user = resp.json()
+
+    with get_db() as db:
+        with db.cursor() as cur:
+            cur.execute(
+                "SELECT id, name, email FROM users WHERE LOWER(email) = LOWER(%s)",
+                (gh_user["email"],),
+            )
+            if cur.rowcount < 1:
+                cur.execute(
+                    "INSERT INTO users(name, email) VALUES (%s, %s) RETURNING id",
+                    (gh_user["login"], gh_user["email"]),
+                )
+                db.commit()
+                user_session = {
+                    "user_id": cur.fetchone()[0],
+                    "name": gh_user["login"],
+                    "email": gh_user["email"],
+                }
+            else:
+                user = cur.fetchone()
+                user_session = {
+                    "user_id": user[0],
+                    "name": user[1],
+                    "email": user[2],
+                }
+
+    # Store the user_id in the Flask session to avoid a round-trip when upvoting.
+    session["user_id"] = user_session["user_id"]
+
+    # TODO: Error handling.
+    requests.patch(
+        f"{REACTIVE_SERVICE_URL}/inputs/sessions",
+        json=[[session["session_id"], [user_session]]],
+    )
+
+    return redirect("/")
