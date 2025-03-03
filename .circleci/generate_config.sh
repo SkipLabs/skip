@@ -25,9 +25,8 @@ examples=$?
 SKIPLANG_LIBS_CHANGED=()
 for lib_tests in skiplang/*/tests; do
   lib=$(basename "$(dirname "$lib_tests")")
-  if [ "$lib" != compiler ] && [ "$lib" != prelude ] && \
-    ! git diff --quiet HEAD "$BASE" -- "skiplang/$lib"; then
-      SKIPLANG_LIBS_CHANGED+=("$lib")
+  if ! git diff --quiet HEAD "$BASE" -- "skiplang/$lib"; then
+    SKIPLANG_LIBS_CHANGED+=("$lib")
   fi
 done
 
@@ -69,11 +68,15 @@ EOF
 fi
 
 for lib in "${SKIPLANG_LIBS_CHANGED[@]}"; do
-  echo "  $lib-tests:"
-  echo "    jobs:"
-  echo "      - skiplang-lib-tests:"
-  echo "          libname: $lib"
-  echo "          name: $lib"
+  case "$lib" in
+    compiler | prelude) ;;
+    *)
+      echo "  $lib-tests:"
+      echo "    jobs:"
+      echo "      - skiplang-lib-tests:"
+      echo "          libname: $lib"
+      echo "          name: $lib"
+  esac
 done
 
 if (( skdb != 0 || prelude != 0 ))
