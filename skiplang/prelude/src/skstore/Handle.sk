@@ -320,24 +320,20 @@ base class Handle<K: Key, +V: File>(
   type: File ~> V,
   dirName: DirName,
 ) {
-  macro fun getDirName(): DirName {
-    this.dirName
-  }
-
   fun getArray(context: mutable Context, key: K): Array<V> {
-    dir = context.unsafeGetDir(this.getDirName());
+    dir = context.unsafeGetDir(this.dirName);
     dir.getArray(context, key).map(this.type)
   }
 
   fun get(context: mutable Context, key: K): V {
     values = this.getArray(context, key);
     if (values.size() >= 2) {
-      msg = `Error: Duplicate keys '${key}' in '${this.getDirName()}'`;
+      msg = `Error: Duplicate keys '${key}' in '${this.dirName}'`;
       print_error(msg);
       invariant_violation(msg);
     };
     if (values.size() == 0) {
-      msg = `Error: No value for keys '${key}' in '${this.getDirName()}'`;
+      msg = `Error: No value for keys '${key}' in '${this.dirName}'`;
       print_error(msg);
       invariant_violation(msg);
     };
@@ -351,7 +347,7 @@ base class Handle<K: Key, +V: File>(
   }
 
   fun unsafeGetArray(context: mutable Context, key: K): Array<V> {
-    dir = context.unsafeGetDir(this.getDirName());
+    dir = context.unsafeGetDir(this.dirName);
     dir.getArrayRaw(key).map(this.type)
   }
 
@@ -652,14 +648,14 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
   fun items(
     context: mutable Context,
   ): mutable Iterator<(K, mutable Iterator<V>)> {
-    dir = context.unsafeGetEagerDir(this.getDirName());
+    dir = context.unsafeGetEagerDir(this.dirName);
     dir.getIterator(context).map(kv ->
       (this.keyType(kv.i0), kv.i1.map(this.type))
     )
   }
 
   fun getIter(context: mutable Context, key: K): mutable Iterator<V> {
-    dir = context.unsafeGetDir(this.getDirName());
+    dir = context.unsafeGetDir(this.dirName);
     dir.getIter(context, key).map(this.type)
   }
 

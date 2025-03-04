@@ -662,7 +662,7 @@ class Collection(hdl: SKStore.EHandle<JSONID, JSONFile>) {
   }
 
   fun getId(): String {
-    this.hdl.getDirName().toString();
+    this.hdl.dirName.toString();
   }
 
   /**
@@ -931,7 +931,7 @@ class Collection(hdl: SKStore.EHandle<JSONID, JSONFile>) {
     context: mutable SKStore.Context,
   ): Array<(SKJSON.CJSON, Array<SKJSON.CJSON>)> {
     values = mutable Vector<(SKJSON.CJSON, Array<SKJSON.CJSON>)>[];
-    dir = context.unsafeGetEagerDir(this.hdl.getDirName());
+    dir = context.unsafeGetEagerDir(this.hdl.dirName);
     for (kv in dir.unsafeGetFileIter()) {
       (key, files) = kv;
       values.push(
@@ -984,11 +984,8 @@ class Collection(hdl: SKStore.EHandle<JSONID, JSONFile>) {
       ),
       None(),
       Array[
-        SKStore.DirSub(
-          this.hdl.getDirName(),
-          "",
-          SKStore.OJSON(Array[]),
-          (__) ~> None(),
+        SKStore.DirSub(this.hdl.dirName, "", SKStore.OJSON(Array[]), (__) ~>
+          None()
         ),
       ],
       Some(from),
@@ -1051,7 +1048,7 @@ class LazyCollection(private hdl: SKStore.LHandle<JSONID, JSONFile>) {
   }
 
   fun getId(): String {
-    this.hdl.getDirName().toString();
+    this.hdl.dirName.toString();
   }
 
   /**
