@@ -847,6 +847,55 @@ const mapWithExceptionOnExternalService: SkipService<Input_SN, Input_SN> = {
   },
 };
 
+//// testSessions
+
+type Post = {
+  title: string;
+  body: string;
+};
+type PostWithFoo = Post & { foo: string | null };
+
+class SessionsMapper implements Mapper<number, Post, number, PostWithFoo> {
+  private readonly session: { foo: string } | null;
+
+  constructor(session: Json | null) {
+    this.session = session ? (session as { foo: string }) : null;
+  }
+
+  mapEntry(key: number, values: Values<Post>): Iterable<[number, PostWithFoo]> {
+    return values
+      .toArray()
+      .map((v: Post) => [key, { ...v, foo: this.session?.foo ?? null }]);
+  }
+}
+
+type SessionsServiceInputs = {
+  posts: EagerCollection<number, Post>;
+};
+
+class SessionsResource implements Resource<SessionsServiceInputs> {
+  instantiate(
+    inputs: SessionsServiceInputs,
+    context: Context,
+  ): EagerCollection<number, PostWithFoo> {
+    return inputs.posts.map(SessionsMapper, context.session);
+  }
+}
+
+const sessionService: SkipService<
+  SessionsServiceInputs,
+  SessionsServiceInputs
+> = {
+  initialData: {
+    posts: [[0, [{ title: "Title", body: "Body" }]]],
+  },
+  resources: { posts: SessionsResource },
+
+  createGraph(inputCollections: SessionsServiceInputs) {
+    return inputCollections;
+  },
+};
+
 export function initTests(
   category: string,
   initService: (service: SkipService) => Promise<ServiceInstance>,
@@ -1491,5 +1540,88 @@ export function initTests(
         );
       },
     );
+  });
+
+  it("testSessions", async () => {
+    const service = await initService(sessionService);
+    const resource = "posts";
+    const session_id_1 = "session1";
+    const session_id_2 = "session2";
+    service.instantiateResource("res_0", resource, {});
+    service.instantiateResource("res_1", resource, {}, session_id_1);
+    service.instantiateResource("res_2", resource, {}, session_id_2);
+    try {
+      expect(service.getArray(resource, 0).payload).toEqual([
+        {
+          title: "Title",
+          body: "Body",
+          foo: null,
+        },
+      ]);
+      expect(service.getArray(resource, 0, {}, session_id_1).payload).toEqual([
+        {
+          title: "Title",
+          body: "Body",
+          foo: null,
+        },
+      ]);
+      expect(service.getArray(resource, 0, {}, session_id_2).payload).toEqual([
+        {
+          title: "Title",
+          body: "Body",
+          foo: null,
+        },
+      ]);
+
+      service.update("__sessions", [[session_id_1, [{ foo: "bar" }]]]);
+      expect(service.getArray(resource, 0).payload).toEqual([
+        {
+          title: "Title",
+          body: "Body",
+          foo: null,
+        },
+      ]);
+      expect(service.getArray(resource, 0, {}, session_id_1).payload).toEqual([
+        {
+          title: "Title",
+          body: "Body",
+          foo: "bar",
+        },
+      ]);
+      expect(service.getArray(resource, 0, {}, session_id_2).payload).toEqual([
+        {
+          title: "Title",
+          body: "Body",
+          foo: null,
+        },
+      ]);
+
+      service.update("__sessions", [[session_id_1, []]]);
+      expect(service.getArray(resource, 0).payload).toEqual([
+        {
+          title: "Title",
+          body: "Body",
+          foo: null,
+        },
+      ]);
+      expect(service.getArray(resource, 0, {}, session_id_1).payload).toEqual([
+        {
+          title: "Title",
+          body: "Body",
+          foo: null,
+        },
+      ]);
+      expect(service.getArray(resource, 0, {}, session_id_2).payload).toEqual([
+        {
+          title: "Title",
+          body: "Body",
+          foo: null,
+        },
+      ]);
+    } finally {
+      service.closeResourceInstance("res_1");
+      service.closeResourceInstance("res_2");
+      await service.close();
+    }
   });
 }

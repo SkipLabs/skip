@@ -374,7 +374,10 @@ class CollectionWriter<K extends Json, V extends Json> {
 }
 
 class ContextImpl extends SkManaged implements Context {
-  constructor(private readonly refs: Refs) {
+  constructor(
+    private readonly refs: Refs,
+    readonly session: (Json & DepSafe) | null = null,
+  ) {
     super();
     Object.freeze(this);
   }
@@ -512,12 +515,14 @@ export class ServiceInstance {
     identifier: string,
     resource: string,
     params: Json,
+    session_id: string | null = null,
   ): void {
     const errorHdl = this.refs.runWithGC(() => {
       return this.refs.binding.SkipRuntime_Runtime__createResource(
         identifier,
         resource,
         this.refs.skjson.exportJSON(params),
+        session_id,
       );
     });
     if (errorHdl) throw this.refs.handles.deleteHandle(errorHdl);
@@ -532,6 +537,7 @@ export class ServiceInstance {
   getAll<K extends Json, V extends Json>(
     resource: string,
     params: Json = {},
+    session_id: string | null = null,
     request?: string | Executor<Entry<K, V>[]>,
   ): GetResult<Entry<K, V>[]> {
     const get_ = () => {
@@ -539,6 +545,7 @@ export class ServiceInstance {
         this.refs.binding.SkipRuntime_Runtime__getAll(
           resource,
           this.refs.skjson.exportJSON(params),
+          session_id,
           request !== undefined
             ? typeof request == "string"
               ? this.refs.binding.SkipRuntime_createIdentifier(request)
@@ -569,6 +576,7 @@ export class ServiceInstance {
     resource: string,
     key: K,
     params: Json = {},
+    sessionId: string | null = null,
     request?: string | Executor<V[]>,
   ): GetResult<V[]> {
     const get_ = () => {
@@ -576,6 +584,7 @@ export class ServiceInstance {
         this.refs.binding.SkipRuntime_Runtime__getForKey(
           resource,
           this.refs.skjson.exportJSON(params),
+          sessionId,
           this.refs.skjson.exportJSON(key),
           request !== undefined
             ? typeof request == "string"
@@ -870,6 +879,7 @@ export class ToBinding {
   SkipRuntime_Resource__instantiate(
     skresource: Handle<Resource>,
     skcollections: Pointer<Internal.CJObject>,
+    session_id: string | null,
   ): string {
     const skjson = this.getJsonConverter();
     const resource = this.handles.get(skresource);
@@ -881,7 +891,15 @@ export class ToBinding {
     for (const [key, name] of Object.entries(keysIds)) {
       collections[key] = new EagerCollectionImpl<Json, Json>(name, refs);
     }
-    const collection = resource.instantiate(collections, new ContextImpl(refs));
+    const collection = resource.instantiate(
+      collections,
+      new ContextImpl(
+        refs,
+        session_id !== null
+          ? (collections["__sessions"]!.getArray(session_id)[0] ?? null)
+          : null,
+      ),
+    );
     return EagerCollectionImpl.getName(collection);
   }
 
@@ -1093,7 +1111,10 @@ export class ToBinding {
       }
       const skservice = refs.binding.SkipRuntime_createService(
         refs.handles.register(service),
-        refs.skjson.exportJSON(service.initialData ?? {}),
+        refs.skjson.exportJSON({
+          ...(service.initialData ?? {}),
+          __sessions: [],
+        }),
         skresources,
         skExternalServices,
       );

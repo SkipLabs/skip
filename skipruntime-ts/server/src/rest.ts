@@ -13,9 +13,15 @@ export function controlService(service: ServiceInstance): express.Express {
 
   // Streaming control API.
   app.post("/v1/streams/:resource", (req, res) => {
+    const session_id = req.header("Session-Id") ?? null;
     try {
       const uuid = crypto.randomUUID();
-      service.instantiateResource(uuid, req.params.resource, req.body as Json);
+      service.instantiateResource(
+        uuid,
+        req.params.resource,
+        req.body as Json,
+        session_id,
+      );
       res.status(201).send(uuid);
     } catch (e: unknown) {
       console.log(e);
@@ -35,6 +41,7 @@ export function controlService(service: ServiceInstance): express.Express {
 
   // READS
   app.post("/v1/snapshot/:resource", (req, res) => {
+    const session_id = req.header("Session-Id") ?? null;
     try {
       const callbacks = {
         resolve: (data: Json[]) => {
@@ -44,7 +51,12 @@ export function controlService(service: ServiceInstance): express.Express {
           res.status(500).json(err instanceof Error ? err.message : err);
         },
       };
-      service.getAll(req.params.resource, req.body as Json, callbacks);
+      service.getAll(
+        req.params.resource,
+        req.body as Json,
+        session_id,
+        callbacks,
+      );
     } catch (e: unknown) {
       console.log(e);
       res.status(500).json(e instanceof Error ? e.message : e);
@@ -52,6 +64,7 @@ export function controlService(service: ServiceInstance): express.Express {
   });
 
   app.post("/v1/snapshot/:resource/lookup", (req, res) => {
+    const session_id = req.header("Session-Id") ?? null;
     try {
       const callbacks = {
         resolve: (data: Json[]) => {
@@ -73,6 +86,7 @@ export function controlService(service: ServiceInstance): express.Express {
         req.params.resource,
         req.body.key,
         req.body.params as Json,
+        session_id,
         callbacks,
       );
     } catch (e: unknown) {
@@ -97,6 +111,31 @@ export function controlService(service: ServiceInstance): express.Express {
         console.log(e);
         res.status(500).json(e instanceof Error ? e.message : e);
       }
+    }
+  });
+
+  app.put("/v1/sessions/:session_id", (req, res) => {
+    try {
+      service.update("__sessions", [
+        [req.params.session_id, [req.body as Json]],
+      ] as Entry<string, Json>[]);
+      res.sendStatus(200);
+    } catch (e: unknown) {
+      console.log(e);
+      res.status(500).json(e instanceof Error ? e.message : e);
+    }
+  });
+
+  app.delete("/v1/sessions/:session_id", (req, res) => {
+    try {
+      service.update("__sessions", [[req.params.session_id, []]] as Entry<
+        string,
+        Json
+      >[]);
+      res.sendStatus(200);
+    } catch (e: unknown) {
+      console.log(e);
+      res.status(500).json(e instanceof Error ? e.message : e);
     }
   });
 
