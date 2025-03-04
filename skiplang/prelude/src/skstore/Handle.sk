@@ -315,7 +315,11 @@ fun maxReducer(): EReducer<IntFile, IntFile> {
 /* The preferred way of accessing the file-system. */
 /*****************************************************************************/
 
-base class Handle<K: Key, +V: File> {
+base class Handle<K: Key, +V: File>(
+  keyType: Key ~> K,
+  type: File ~> V,
+  dirName: DirName,
+) {
   macro fun getDirName(): DirName {
     this.dirName
   }
@@ -374,11 +378,7 @@ base class Handle<K: Key, +V: File> {
  */
 /*****************************************************************************/
 
-class LHandle<K: Key, +V: File>(
-  keyType: Key ~> K,
-  type: File ~> V,
-  dirName: DirName,
-) extends Handle<K, V> {
+class LHandle<K: Key, +V: File> extends Handle<K, V> {
   static fun create(
     keyType: Key ~> K,
     type: File ~> V,
@@ -415,11 +415,7 @@ class LHandle<K: Key, +V: File>(
 /* Eager handles. */
 /*****************************************************************************/
 
-class EHandle<K: Key, V: File>(
-  keyType: Key ~> K,
-  type: File ~> V,
-  dirName: DirName,
-) extends Handle<K, V> {
+class EHandle<K: Key, V: File> extends Handle<K, V> {
   static fun multiMap<K2: Key, V2: File>(
     typeOutputKey: Key ~> K2,
     typeOutput: File ~> V2,
