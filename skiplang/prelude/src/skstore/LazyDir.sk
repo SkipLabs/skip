@@ -17,7 +17,7 @@ base class LazyResult {
   | LAbsent()
 }
 
-class LazyDir{
+class LazyDir private {
   time: Time,
   timeStack: TimeStack,
   dirName: DirName,
@@ -90,6 +90,10 @@ class LazyDir{
       context.setDir(dirName, newDir);
       newDir
     }
+  }
+
+  fun withData(data: SortedMap<Key, LazyResult>): this {
+    this with {data}
   }
 
   fun getTime(): Time {
