@@ -35,7 +35,7 @@ class LazyDir private {
     lazyFun = (context: mutable Context, key: Key) ~> {
       dir = context.unsafeGetLazyDir(dirName);
       !dir.data[key] = LCycle();
-      context.setDir(dirName, dir);
+      context.setDir(dir);
 
       readsCopy = context.reads;
       context.!reads = SortedSet[];
@@ -46,7 +46,7 @@ class LazyDir private {
       | exn ->
         !dir = context.unsafeGetLazyDir(dirName);
         !dir.data[key] = LAbsent();
-        context.setDir(dirName, dir);
+        context.setDir(dir);
         context.!reads = readsCopy;
         throw exn
       };
@@ -63,7 +63,7 @@ class LazyDir private {
 
       !dir = context.unsafeGetLazyDir(dirName);
       !dir.data[key] = result;
-      context.setDir(dirName, dir);
+      context.setDir(dir);
 
       if (context.debugMode) {
         name = "" + dir.dirName + key;
@@ -87,7 +87,7 @@ class LazyDir private {
         collect,
       };
       updateDirtyReaders(context, Path::create(dirName.tag(), DirTag()));
-      context.setDir(dirName, newDir);
+      context.setDir(newDir);
       newDir
     }
   }
@@ -105,7 +105,7 @@ class LazyDir private {
   }
 
   fun reset(context: mutable Context): void {
-    context.setDir(this.dirName, this);
+    context.setDir(this);
   }
 
   fun keys(): SortedSet<Key> {
@@ -167,7 +167,7 @@ class LazyDir private {
       }
     };
 
-    context.setDir(this.dirName, this);
+    context.setDir(this);
   }
 
   fun unsafeGetArray(
