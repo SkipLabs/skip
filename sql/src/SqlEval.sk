@@ -1195,7 +1195,7 @@ class Evaluator{options: Options, user: ?UserFile} {
           // If the deps haven't changed, that means we can reuse
           // the pre-computed data.
           if (sameDeps != 0) {
-            changedDirNames = delta.dirs.state.getChangesAfter(startTick);
+            changedDirNames = delta.getDirsChangesAfter(startTick);
             for (changedDirName in changedDirNames) {
               if (context.unsafeMaybeGetDir(changedDirName).isNone()) {
                 context.setGlobal(
@@ -2070,7 +2070,7 @@ fun importNext(
   tick: SKStore.Tick,
   sourceCtx: readonly SKStore.Context,
 ): Bool {
-  changedDirNames = sourceCtx.dirs.state.getChangesAfter(tick);
+  changedDirNames = sourceCtx.getDirsChangesAfter(tick);
   updates = mutable Map[];
   hasMultipleVersions = false;
   for (dirName in changedDirNames) {
