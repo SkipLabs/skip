@@ -35,7 +35,8 @@ function Feed() {
       setMessages((messages) => {
         const newMessages = new Map(messages);
         for (const [key, [msg]] of data) {
-          newMessages.set(key, msg);
+          if (msg) newMessages.set(key, msg);
+          else newMessages.delete(key);
         }
         return newMessages;
       });
