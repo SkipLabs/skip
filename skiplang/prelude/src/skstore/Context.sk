@@ -662,9 +662,9 @@ mutable class Context{
             source = Path::create(preDir.dirName, key);
             !preDir = preDir.writeEntry(this, source, source, key, values);
           });
-          this.setDir(preDir.dirName, preDir);
+          this.setDir(preDir);
           updateDirtyReaders(this, Path::create(preDirName.tag(), DirTag()));
-          this.setDir(preDirName, preDir)
+          this.setDir(preDir)
         | Some(preDir) ->
           (isReset, changes) = dir.getChangesAfter(this.tick.prev());
           for (key in changes) {
@@ -677,7 +677,7 @@ mutable class Context{
             writerPath = Path(preDir.dirName, IID(genSym(0)));
             !preDir = preDir.reset(this, writerPath, changes);
           };
-          this.setDir(preDir.dirName, preDir)
+          this.setDir(preDir)
         }
       })
     });
@@ -748,7 +748,7 @@ mutable class Context{
           | _ -> void
           };
         };
-        this.setDir(dirName, dir.withData(data))
+        this.setDir(dir.withData(data))
       }
     };
   }
@@ -1047,12 +1047,13 @@ mutable class Context{
       creator,
       optOnDelete,
     };
-    this.setDir(dirName, dir);
+    this.setDir(dir);
     this.!newDirs = this.newDirs.add(dirName);
     optOnCreate.each(this.postpone)
   }
 
-  mutable fun setDir(dirName: DirName, dir: Dir): void {
+  mutable fun setDir(dir: Dir): void {
+    dirName = dir.getDirName();
     this.!dirs = this.dirs.set(this.tick, dirName, dir);
   }
 
@@ -1148,7 +1149,7 @@ mutable class Context{
         | None() -> continue
         | Some(parent) ->
           !parent.childDirs = parent.childDirs.remove(dirName);
-          this.setDir(parent.dirName, parent)
+          this.setDir(parent)
         }
       };
       dir.removeSubDirs(this);
@@ -1158,7 +1159,6 @@ mutable class Context{
       this.!dirsWithSharedSubDirs = this.dirsWithSharedSubDirs.remove(dirName);
       this.!sharedSubDirsRefCount = this.sharedSubDirsRefCount.remove(dirName);
       this.setDir(
-        dirName,
         DeletedDir{dirName, time => dir.time, timeStack => dir.timeStack},
       )
     };
@@ -1283,7 +1283,7 @@ fun import(
         targetCtx.unsafeMaybeGetEagerDir(dir.dirName) match {
         | None() ->
           if (dir.creator is None()) {
-            targetCtx.setDir(dir.dirName, dir);
+            targetCtx.setDir(dir);
           }
         | Some(inputDir) ->
           !inputDir = inputDir.writeArraySourceManyReturnDir(
@@ -1297,7 +1297,7 @@ fun import(
             );
             !inputDir = inputDir.reset(targetCtx, writerPath, changedKeys);
           };
-          targetCtx.setDir(inputDir.dirName, inputDir)
+          targetCtx.setDir(inputDir)
         }
       | Some(_) -> invariant_violation("Error import: incompatible dir types")
       }
@@ -1384,7 +1384,7 @@ fun resolveContext(
     | None() -> void
     | Some(dir) ->
       !dir = dir.purge(context, context.purgeFrom(context, dir));
-      context.setDir(dirName, dir)
+      context.setDir(dir)
     }
   };
   context.!toPurge = SortedSet[];

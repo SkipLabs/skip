@@ -1242,7 +1242,7 @@ class EagerDir{
       time,
       timeStack => TimeStack::create(context, time),
     };
-    context.setDir(childName, childDir);
+    context.setDir(childDir);
     context.!newDirs = context.newDirs.set(childName);
   }
 
@@ -1389,7 +1389,7 @@ class EagerDir{
       }
     };
     updateDirtyReaders(context, Path::create(childName.tag(), DirTag()));
-    context.setDir(childName, dir);
+    context.setDir(dir);
     for (parentName => parentData in parents) {
       for (p in parentData) {
         (_, rangeOpt, _) = p;
@@ -1419,7 +1419,7 @@ class EagerDir{
         purgeCount => 0,
       };
     };
-    context.setDir(parent.dirName, parent);
+    context.setDir(parent);
   }
 
   fun getArrayRaw(key: Key): Array<File> {
@@ -1683,7 +1683,7 @@ class EagerDir{
       },
     );
 
-    context.setDir(childRef.dirName, childRef);
+    context.setDir(childRef);
 
     for (p in parentMaps) {
       (_, _, onUpdate) = p;
@@ -1877,14 +1877,14 @@ class EagerDir{
       | _ -> CopyTo(this.getDirName(), target)
       },
     );
-    context.setDir(this.dirName, this with {optCopy => Some((target, writer))});
+    context.setDir(this with {optCopy => Some((target, writer))});
   }
 
   fun onDelete(
     context: mutable Context,
     optOnDelete: ?Postponable = None(),
   ): void {
-    context.setDir(this.dirName, this with {optOnDelete});
+    context.setDir(this with {optOnDelete});
   }
 
   fun purgeSlices(
@@ -2118,7 +2118,7 @@ class EagerDir{
     values: Array<File>,
   ): void {
     !this = this.writeArrayReturnDir(context, key, values);
-    context.setDir(this.dirName, this);
+    context.setDir(this);
   }
 
   fun writeArraySourceManyReturnDir(
@@ -2138,7 +2138,7 @@ class EagerDir{
     bindings: mutable Iterator<(Key, (Path, Path, Array<File>))>,
   ): void {
     !this = this.writeArraySourceManyReturnDir(context, bindings);
-    context.setDir(this.dirName, this);
+    context.setDir(this);
   }
 
   fun writeArrayMany(
