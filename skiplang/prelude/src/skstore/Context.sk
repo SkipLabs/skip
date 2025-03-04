@@ -380,7 +380,7 @@ mutable base class WriteChecker private {
 mutable class Context{
   mutable toPurge: SortedSet<DirName> = SortedSet[],
   mutable purgeLimit: ?Tick = None(),
-  mutable dirs: Dirs = Dirs{},
+  private mutable dirs: Dirs = Dirs{},
   mutable reads: SortedSet<Path> = SortedSet[],
   mutable time: Time = Time(0),
   mutable tick: Tick = Tick(1),
@@ -1226,7 +1226,7 @@ mutable class Context{
 // @cpp_extern("SKIP_print_backtrace")
 // native fun printBacktrace(): void;
 
-class Dirs{state: DMap<DirName, Dir> = DMap::empty()} {
+private class Dirs{private state: DMap<DirName, Dir> = DMap::empty()} {
   fun set<T: File>(tick: Tick, key: DirName, value: Dir): this {
     !this.state = this.state.set(tick, key, value);
     this
