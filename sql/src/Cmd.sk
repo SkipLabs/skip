@@ -23,15 +23,13 @@ fun listSubDirs(
   prefix: String,
   dmap: DMap<DirName, Dir>,
 ): Array<(String, Dir)> {
-  prefixLen = prefix.length();
   dmap
     .items()
-    .filter(kv -> {
-      (key, _) = kv;
+    .filterMap(kv -> {
+      (key, dir) = kv;
       keyStr = key.toString();
-      keyStr.take(prefixLen) == prefix
+      if (keyStr.startsWith(prefix)) Some((keyStr, dir)) else None()
     })
-    .map(kv -> (kv.i0.toString(), kv.i1))
     .collect(Array);
 }
 
