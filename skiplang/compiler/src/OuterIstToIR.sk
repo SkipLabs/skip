@@ -940,18 +940,6 @@ class Converter private (
   classes: SKStore.LHandle<SKStore.Key, GClassFile>,
   lower: SKStore.LHandle<SKStore.Key, I.CallableDefFile>,
 ) {
-  fun resetCache(context: mutable SKStore.Context): void {
-    funsDir = context.unsafeGetLazyDir(this.funs.dirName);
-    !funsDir.data = SortedMap[];
-    context.setDir(funsDir.dirName, funsDir);
-    classesDir = context.unsafeGetLazyDir(this.classes.dirName);
-    !classesDir.data = SortedMap[];
-    context.setDir(classesDir.dirName, classesDir);
-    lowerDir = context.unsafeGetLazyDir(this.lower.dirName);
-    !lowerDir.data = SortedMap[];
-    context.setDir(lowerDir.dirName, lowerDir);
-  }
-
   fun getConsts(
     context: mutable SKStore.Context,
     constsProj: SKStore.EHandle<SKStore.IID, I.ConstDefFile>,
