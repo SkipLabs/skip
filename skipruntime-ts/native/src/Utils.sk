@@ -110,8 +110,13 @@ fun base64<T: Show>(toEncode: T): String {
   | None() -> ""
   }
 }
-fun toResourceId(resource: String, params: SKJSON.CJSON): String {
-  `${resource}_${base64(params.prettyPrint())}`
+fun toResourceId(
+  resource: String,
+  params: SKJSON.CJSON,
+  sessionId: ?String = None(),
+): String {
+  `${resource}_${base64(params.prettyPrint())}` +
+    sessionId.map(id -> `_${id}`).default("")
 }
 
 fun toSuppliedResourceId(

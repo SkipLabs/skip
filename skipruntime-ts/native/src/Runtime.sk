@@ -60,10 +60,11 @@ class ResourceCollection(value: Collection) extends SKStore.File
 class ResourceDef(
   name: String,
   params: SKJSON.CJSON,
+  sessionId: ?String,
 ) extends SKStore.File, SKStore.Key {
   //
   fun toString(): String {
-    `${this.name}:${this.params.prettyPrint()}`
+    `${this.name}:${this.params.prettyPrint()}:${this.sessionId}`
   }
 }
 
@@ -269,7 +270,7 @@ fun buildResourcesGraph(
       };
       pushContext(context);
       try {
-        resourceId = toResourceId(key.name, key.params);
+        resourceId = toResourceId(key.name, key.params, key.sessionId);
         statusRef = dirname.sub(resourceId);
         // Status graph
         sStatusHdl = context
@@ -321,7 +322,7 @@ fun buildResourcesGraph(
         resourceBuilder = resources.get(key.name);
         resource = resourceBuilder.build(key.params);
         collections = servicesHdl.get(context, SKStore.SID(runId)).value;
-        collection = resource.instantiate(collections);
+        collection = resource.instantiate(collections, key.sessionId);
         // Ensure the name of the resource result
         resourceData = collection.hdl.map(
           JSONID::keyType,
@@ -1235,6 +1236,7 @@ fun request<T>(
   context: mutable SKStore.Context,
   resourceName: String,
   params: SKJSON.CJSON,
+  sessionId: ?String,
   optRequest: ?Request,
   getValues: (mutable SKStore.Context, ResourceInfo) ~> T,
 ): GetResult<T> {
@@ -1247,6 +1249,7 @@ fun request<T>(
       resourceInstanceId,
       resourceName,
       params,
+      sessionId,
     );
     optChecker = optRequest match {
     | Some(checker @ Checker _) -> Some(checker)
@@ -1274,13 +1277,21 @@ fun getAll(
   context: mutable SKStore.Context,
   resourceName: String,
   params: SKJSON.CJSON,
+  sessionId: ?String,
   optRequest: ?Request,
 ): GetResult<Values> {
-  request(context, resourceName, params, optRequest, (context, resource) ~>
-    Values(
-      resource.collection.getAll(context),
-      `${resource.session}/${context.tick}`,
-    )
+  request(
+    context,
+    resourceName,
+    params,
+    sessionId,
+    optRequest,
+    (context, resource) ~>
+      Values(
+        resource.collection.getAll(context),
+        `${resource.session}/${context.tick}`,
+      )
+    ,
   )
 }
 
@@ -1288,15 +1299,23 @@ fun getForKey(
   context: mutable SKStore.Context,
   resourceName: String,
   params: SKJSON.CJSON,
+  sessionId: ?String,
   key: SKJSON.CJSON,
   optRequest: ?Request,
 ): GetResult<Array<SKJSON.CJSON>> {
-  request(context, resourceName, params, optRequest, (context, resource) ~> {
-    pushContext(context);
-    values = resource.collection.getArray(key);
-    popContext();
-    values
-  })
+  request(
+    context,
+    resourceName,
+    params,
+    sessionId,
+    optRequest,
+    (context, resource) ~> {
+      pushContext(context);
+      values = resource.collection.getArray(key);
+      popContext();
+      values
+    },
+  )
 }
 
 fun destroyReactiveResource(
@@ -1481,6 +1500,7 @@ fun createReactiveResource(
   identifier: String,
   resource: String,
   params: SKJSON.CJSON,
+  sessionId: ?String,
 ): ResourceInfo {
   resourceHdl = SKStore.EHandle(
     SKStore.SID::keyType,
@@ -1492,7 +1512,7 @@ fun createReactiveResource(
   | Some _ -> throw ExistingResourceException()
   | _ -> void
   };
-  definition = ResourceDef(resource, params);
+  definition = ResourceDef(resource, params, sessionId);
   resourceHdl.writeArray(context, key, Array[definition]);
   context.update();
   graphHdl = SKStore.EHandle(
