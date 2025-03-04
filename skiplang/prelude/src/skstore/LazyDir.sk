@@ -25,36 +25,6 @@ class LazyDir{
   private lazyFun: ((mutable Context, Key) ~> LazyResult),
   collect: Bool,
 } extends Dir {
-  fun getTime(): Time {
-    this.time
-  }
-
-  fun getTimeStack(): TimeStack {
-    this.timeStack
-  }
-
-  fun reset(context: mutable Context): void {
-    context.setDir(this.dirName, this);
-  }
-
-  fun keys(): SortedSet<Key> {
-    keys = SortedSet[];
-    for (newKey => value in this.data) {
-      if (value is LDefined _) {
-        !keys = keys.set(newKey);
-      };
-    };
-    keys
-  }
-
-  fun getDirName(): DirName {
-    this.dirName
-  }
-
-  fun isDeleted(): Bool {
-    false
-  }
-
   static fun create(
     context: mutable Context,
     dirName: DirName,
@@ -120,6 +90,36 @@ class LazyDir{
       context.setDir(dirName, newDir);
       newDir
     }
+  }
+
+  fun getTime(): Time {
+    this.time
+  }
+
+  fun getTimeStack(): TimeStack {
+    this.timeStack
+  }
+
+  fun reset(context: mutable Context): void {
+    context.setDir(this.dirName, this);
+  }
+
+  fun keys(): SortedSet<Key> {
+    keys = SortedSet[];
+    for (newKey => value in this.data) {
+      if (value is LDefined _) {
+        !keys = keys.set(newKey);
+      };
+    };
+    keys
+  }
+
+  fun getDirName(): DirName {
+    this.dirName
+  }
+
+  fun isDeleted(): Bool {
+    false
   }
 
   fun getArrayRaw(key: Key): Array<File> {
