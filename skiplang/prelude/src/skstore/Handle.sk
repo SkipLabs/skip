@@ -324,13 +324,9 @@ base class Handle<K: Key, +V: File>(
     this.dirName
   }
 
-  macro overridable fun getType(): SKStore.File ~> V {
-    this.type
-  }
-
   fun getArray(context: mutable Context, key: K): Array<V> {
     dir = context.unsafeGetDir(this.getDirName());
-    dir.getArray(context, key).map(this.getType())
+    dir.getArray(context, key).map(this.type)
   }
 
   fun get(context: mutable Context, key: K): V {
@@ -356,7 +352,7 @@ base class Handle<K: Key, +V: File>(
 
   fun unsafeGetArray(context: mutable Context, key: K): Array<V> {
     dir = context.unsafeGetDir(this.getDirName());
-    dir.getArrayRaw(key).map(this.getType())
+    dir.getArrayRaw(key).map(this.type)
   }
 
   fun unsafeGet(context: mutable Context, key: K): V {
@@ -403,10 +399,10 @@ class LHandle<K: Key, +V: File> extends Handle<K, V> {
     key: Key,
     throwOnCycle: Bool,
   ): Array<V> {
-    dir = context.unsafeGetLazyDir(this.getDirName());
+    dir = context.unsafeGetLazyDir(this.dirName);
     results = dir
       .getArrayWithOptions(context, key, throwOnCycle)
-      .map(this.getType());
+      .map(this.type);
     results
   }
 }
@@ -658,13 +654,13 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
   ): mutable Iterator<(K, mutable Iterator<V>)> {
     dir = context.unsafeGetEagerDir(this.getDirName());
     dir.getIterator(context).map(kv ->
-      (this.keyType(kv.i0), kv.i1.map(this.getType()))
+      (this.keyType(kv.i0), kv.i1.map(this.type))
     )
   }
 
   fun getIter(context: mutable Context, key: K): mutable Iterator<V> {
     dir = context.unsafeGetDir(this.getDirName());
-    dir.getIter(context, key).map(this.getType())
+    dir.getIter(context, key).map(this.type)
   }
 
   fun containsKey(context: mutable Context, key: K): Bool {
