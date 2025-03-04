@@ -5,11 +5,9 @@ import "./App.css";
 export default function App() {
   return (
     <Router>
-      <div>
-        <Routes>
-          <Route path="/" Component={Feed} />
-        </Routes>
-      </div>
+      <Routes>
+        <Route path="/" Component={Feed} />
+      </Routes>
     </Router>
   );
 }
