@@ -1213,6 +1213,10 @@ mutable class Context{
   readonly fun getPersistent(name: String): ?File {
     this.persistents.maybeGet(name)
   }
+
+  readonly fun listDirs(): mutable Iterator<(DirName, Dir)> {
+    this.dirs.items()
+  }
 }
 
 // @cpp_extern("SKIP_print_backtrace")
@@ -1233,6 +1237,9 @@ class Dirs{state: DMap<DirName, Dir> = DMap::empty()} {
       invariant_violation("Directory not found: " + key)
     | Some(x) -> x
     }
+  }
+  fun items(): mutable Iterator<(DirName, Dir)> {
+    this.state.items()
   }
 }
 
