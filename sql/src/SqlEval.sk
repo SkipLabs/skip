@@ -1197,7 +1197,7 @@ class Evaluator{options: Options, user: ?UserFile} {
           if (sameDeps != 0) {
             changedDirNames = delta.dirs.state.getChangesAfter(startTick);
             for (changedDirName in changedDirNames) {
-              if (!context.dirs.state.containsKey(changedDirName)) {
+              if (context.unsafeMaybeGetDir(changedDirName).isNone()) {
                 context.setGlobal(
                   "PRE_COMPUTED_" + changedDirName,
                   delta.unsafeGetDir(changedDirName),
