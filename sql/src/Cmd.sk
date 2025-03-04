@@ -21,10 +21,10 @@ fun cutAfter(level: Int, str: String): String {
 
 fun listSubDirs(
   prefix: String,
-  dmap: DMap<DirName, Dir>,
+  context: readonly Context,
 ): Array<(String, Dir)> {
-  dmap
-    .items()
+  context
+    .listDirs()
     .filterMap(kv -> {
       (key, dir) = kv;
       keyStr = key.toString();
@@ -35,9 +35,9 @@ fun listSubDirs(
 
 fun listDirs(
   prefix: String,
-  dmap: DMap<DirName, Dir>,
+  context: readonly Context,
 ): Array<(DirName, String)> {
-  visited = listSubDirs(prefix, dmap);
+  visited = listSubDirs(prefix, context);
   level = countSlash(prefix);
   visitedNames = visited
     .map(x -> cutAfter(level, x.i0.toString()))
@@ -116,7 +116,7 @@ fun eval(env: mutable CmdEnv, cmd: String): void {
   token.i0 match {
   | "ls" ->
     result = mutable Set[];
-    subDirs = listDirs(env.pwd, env.context.dirs.state);
+    subDirs = listDirs(env.pwd, env.context);
     for (kv in subDirs) {
       (_, relDirName) = kv;
       if (relDirName != "") result.insert(relDirName);
