@@ -375,12 +375,12 @@ base class Handle<K: Key, +V: File> {
 /*****************************************************************************/
 
 class LHandle<K: Key, +V: File>(
-  typeKey: Key ~> K,
+  keyType: Key ~> K,
   type: File ~> V,
   dirName: DirName,
 ) extends Handle<K, V> {
   static fun create(
-    typeKey: Key ~> K,
+    keyType: Key ~> K,
     type: File ~> V,
     context: mutable Context,
     dirName: DirName,
@@ -391,11 +391,11 @@ class LHandle<K: Key, +V: File>(
       context,
       dirName,
       (context, dirName, key) ~> {
-        Some(f(context, LHandle(typeKey, type, dirName), typeKey(key)));
+        Some(f(context, LHandle(keyType, type, dirName), keyType(key)));
       },
       collect,
     );
-    LHandle(typeKey, type, dir.getDirName())
+    LHandle(keyType, type, dir.getDirName())
   }
 
   fun getArrayWithOptions(
