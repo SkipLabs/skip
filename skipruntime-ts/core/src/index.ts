@@ -806,7 +806,7 @@ export class ToBinding {
       skjson.importJSON(key) as Json,
       new ValuesImpl<Json>(skjson, this.binding, values),
     );
-    return skjson.exportJSON(Array.from(result) as [[Json, Json]]);
+    return skjson.exportJSON(Array.from(result));
   }
 
   SkipRuntime_deleteMapper(mapper: Handle<JSONMapper>): void {
