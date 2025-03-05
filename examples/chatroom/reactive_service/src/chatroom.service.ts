@@ -7,7 +7,6 @@ import type {
   SkipService,
   Values,
 } from "@skipruntime/core";
-import { Count } from "@skipruntime/helpers";
 
 import { KafkaExternalService } from "./index.js";
 
@@ -21,13 +20,14 @@ type Message = {
 type Like = {
   id: number;
   message_id: number;
+  author: string;
 };
 
-type LikedMessage = Message & { likes: number };
+type LikedMessage = Message & { likedBy: string[] };
 
 type ResourceInputs = {
   messages: EagerCollection<number, Message>;
-  likesByMessage: EagerCollection<number, number>;
+  likersByMessage: EagerCollection<number, string>;
 };
 
 const kafka = new KafkaExternalService(
@@ -41,26 +41,23 @@ const kafka = new KafkaExternalService(
   },
 );
 
-class GroupByMessage implements Mapper<number, Like, number, number> {
-  mapEntry(id: number, likes: Values<Like>): Iterable<[number, number]> {
-    return likes.toArray().map((like) => [like.message_id, id]);
+class GroupByMessage implements Mapper<number, Like, number, string> {
+  mapEntry(_id: number, likes: Values<Like>): Iterable<[number, string]> {
+    return likes.toArray().map((like) => [-like.message_id, like.author]);
   }
 }
 
-class JoinLikeCounts implements Mapper<number, Message, number, LikedMessage> {
-  constructor(private likesByMessage: EagerCollection<number, number>) {}
+class JoinUniqueLikers
+  implements Mapper<number, Message, number, LikedMessage>
+{
+  constructor(private likersByMessage: EagerCollection<number, string>) {}
   mapEntry(
     id: number,
     messages: Values<Message>,
   ): Iterable<[number, LikedMessage]> {
-    let likes = 0;
-    try {
-      likes = this.likesByMessage.getUnique(id);
-    } catch {}
-
-    return messages
-      .toArray()
-      .map((msg) => [id, { ...(msg as Message), likes }]);
+    const msg = messages.getUnique() as Message;
+    const uniqueLikers = Array.from(new Set(this.likersByMessage.getArray(id)));
+    return [[id, { ...msg, likedBy:uniqueLikers }]];
   }
 }
 
@@ -77,7 +74,7 @@ class MessagesResource implements Resource<ResourceInputs> {
   ): EagerCollection<number, LikedMessage> {
     return collections.messages
       .take(this.limit)
-      .map(JoinLikeCounts, collections.likesByMessage);
+      .map(JoinUniqueLikers, collections.likersByMessage);
   }
 }
 
@@ -94,10 +91,10 @@ export const service: SkipService<{}, ResourceInputs> = {
       service: "kafka",
       identifier: "skip-chatroom-likes",
     });
-    const likesByMessage: EagerCollection<number, number> =
-      likes.mapReduce(GroupByMessage)(Count);
+    const likersByMessage: EagerCollection<number, string> =
+      likes.map(GroupByMessage);
     return {
-      likesByMessage,
+      likersByMessage,
       messages,
     };
   },

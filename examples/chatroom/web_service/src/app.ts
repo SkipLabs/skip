@@ -110,8 +110,8 @@ app.put("/message", (req, res) => {
     },
   );
 });
-app.put("/like/:message_id", (req, res) => {
-  const like = encode({ message_id: Number(req.params.message_id) });
+app.put("/like", (req, res) => {
+  const like = encode(req.body);
   producer.send({ topic: "skip-chatroom-likes", messages: [like] }).then(
     () => res.status(200).json({}),
     (e) => {
