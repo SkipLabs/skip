@@ -6,6 +6,11 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    depends_on:
+      web:
+        condition: service_healthy
+      reactive_cache:
+        condition: service_healthy
 
   # Reactive service
   reactive_cache:
