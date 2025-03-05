@@ -22,22 +22,26 @@ type Message = {
 };
 
 function Feed() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Map<number, Message>>(
+    new Map<number, Message>(),
+  );
   const [author, setAuthor] = useState<string>("");
   const [body, setBody] = useState<string>("");
 
   useEffect(() => {
     const evSource = new EventSource("/api/messages");
-    evSource.addEventListener("init", (e: MessageEvent<string>) => {
-      const data = JSON.parse(e.data);
-      console.log("initial data: ", data);
-      setMessages(data[0][1] as Message[]);
-    });
-    evSource.addEventListener("update", (e: MessageEvent<string>) => {
-      const data = JSON.parse(e.data);
-      console.log("updated data: ", data);
-      setMessages(data[0][1] as Message[]);
-    });
+    const listener = (e: MessageEvent<string>) => {
+      const data = JSON.parse(e.data) as [number, Message[]][];
+      setMessages((messages) => {
+        const newMessages = new Map(messages);
+        for (const [key, [msg]] of data) {
+          newMessages.set(key, msg);
+        }
+        return newMessages;
+      });
+    };
+    evSource.addEventListener("init", listener);
+    evSource.addEventListener("update", listener);
     return () => {
       evSource.close();
     };
@@ -88,7 +92,7 @@ function Feed() {
         <button type="submit">Send Message</button>
       </form>
       <ul>
-        {messages.map((message) => (
+        {Array.from(messages.values()).map((message) => (
           <li key={message.id}>
             <div
               className="votearrow prevent-select"
@@ -96,7 +100,7 @@ function Feed() {
               onClick={() => void likeMessage(message.id)}
             ></div>
             &nbsp;
-            {message.author}&nbsp;
+            {message.body}&nbsp; (--{message.author})&nbsp;
             <br />
             {message.likes} likes
           </li>
