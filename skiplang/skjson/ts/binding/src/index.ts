@@ -235,7 +235,7 @@ export function clone<T>(value: T): T {
       ) as T;
     } else {
       return Object.fromEntries(
-        Object.entries(value).map(([k, v]): [string, any] => [k, clone(v)]),
+        Object.entries(value).map(([k, v]) => [k, clone(v)]),
       ) as T;
     }
   } else {
@@ -417,7 +417,6 @@ export interface JsonConverter {
     value: Nullable<Pointer<Internal.CJSON>>,
     copy?: boolean,
   ): Exportable;
-  is(v: Pointer<Internal.CJSON>, type: Type): boolean;
   clone<T>(v: T): T;
 }
 
@@ -434,10 +433,6 @@ export class JsonConverterImpl implements JsonConverter {
 
   public clone<T>(v: T): T {
     return clone(v);
-  }
-
-  public is(v: Pointer<Internal.CJSON>, type: Type): boolean {
-    return this.binding.SKIP_SKJSON_typeOf(v) == type;
   }
 
   importOptJSON(
