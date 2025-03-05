@@ -17,9 +17,50 @@ const kafka = new Kafka({
   brokers: ["kafka:19092"],
   clientId: "web-backend",
 });
+
+function encode(
+  msg:
+    | { author: string; body: string; timestamp: number }
+    | { message_id: number },
+): { value: string } {
+  return {
+    value: JSON.stringify({ ...msg, id: gensym(), timestamp: Date.now() }),
+  };
+}
+
+const initial_messages: { value: string }[] = [
+  encode({ author: "Bob", body: "Hey guys!", timestamp: Date.now() - 30_000 }),
+  encode({ author: "Alice", body: "Hi, Bob", timestamp: Date.now() - 20_000 }),
+  encode({
+    author: "Eve",
+    body: "Welcome to the chatroom",
+    timestamp: Date.now() - 10_000,
+  }),
+  encode({
+    author: "Skip",
+    body: "Try sending messages/likes and see them reflect instantly across multiple tabs! All data is sent through a Kafka cluster and propagated reactively through a Skip service.",
+    timestamp: Date.now(),
+  }),
+];
+const initial_likes: { value: string }[] = [
+  encode({ message_id: JSON.parse(initial_messages[0].value).id }),
+  encode({ message_id: JSON.parse(initial_messages[0].value).id }),
+  encode({ message_id: JSON.parse(initial_messages[3].value).id }),
+];
+
 const producer = { ...kafka.producer(), isConnected: false };
 producer.on("producer.connect", () => {
   producer.isConnected = true;
+  producer
+    .send({ topic: "skip-chatroom-messages", messages: initial_messages })
+    .catch((e) => {
+      console.error("Error populating initial Kafka messages");
+    });
+  producer
+    .send({ topic: "skip-chatroom-likes", messages: initial_likes })
+    .catch((e) => {
+      console.error("Error populating initial Kafka likes");
+    });
 });
 producer.on("producer.disconnect", () => {
   producer.isConnected = false;
