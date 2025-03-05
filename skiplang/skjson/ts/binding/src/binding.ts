@@ -25,7 +25,7 @@ export interface Binding {
   SKIP_SKJSON_fieldAt(
     json: Pointer<Internal.CJObject>,
     idx: number,
-  ): Nullable<string>; // Should be Nullable<...>
+  ): Nullable<string>;
   SKIP_SKJSON_get(
     json: Pointer<Internal.CJObject>,
     idx: number,

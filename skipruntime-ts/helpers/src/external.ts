@@ -44,9 +44,7 @@ export class GenericExternalService implements ExternalService {
       loading: () => void;
     },
   ) {
-    const resource = this.resources[resourceName] as
-      | ExternalResource
-      | undefined;
+    const resource = this.resources[resourceName];
     if (!resource) {
       throw new SkipUnknownResourceError(
         `Unknown resource named '${resourceName}'`,
