@@ -309,8 +309,8 @@ class EagerCollectionImpl<K extends Json, V extends Json>
   }
 
   merge(...others: EagerCollection<K, V>[]): EagerCollection<K, V> {
-    const otherNames = others.map(
-      (other) => (other as EagerCollectionImpl<K, V>).collection,
+    const otherNames = others.map((other) =>
+      EagerCollectionImpl.getName(other),
     );
     const mapped = this.refs.binding.SkipRuntime_Collection__merge(
       this.collection,
@@ -323,6 +323,12 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     collection: string,
   ): EagerCollection<K2, V2> {
     return new EagerCollectionImpl<K2, V2>(collection, this.refs);
+  }
+
+  static getName<K extends Json, V extends Json>(
+    coll: EagerCollection<K, V>,
+  ): string {
+    return (coll as EagerCollectionImpl<K, V>).collection;
   }
 }
 
@@ -850,7 +856,7 @@ export class ToBinding {
       collections[key] = new EagerCollectionImpl<Json, Json>(name, refs);
     }
     const collection = resource.instantiate(collections, new ContextImpl(refs));
-    return (collection as EagerCollectionImpl<Json, Json>).collection;
+    return EagerCollectionImpl.getName(collection);
   }
 
   SkipRuntime_deleteResource(resource: Handle<Resource>): void {
@@ -894,9 +900,7 @@ export class ToBinding {
     const result = service.createGraph(collections, new ContextImpl(refs));
     const collectionsNames: { [name: string]: string } = {};
     for (const [name, collection] of Object.entries(result)) {
-      collectionsNames[name] = (
-        collection as EagerCollectionImpl<Json, Json>
-      ).collection;
+      collectionsNames[name] = EagerCollectionImpl.getName(collection);
     }
     return skjson.exportJSON(collectionsNames);
   }
