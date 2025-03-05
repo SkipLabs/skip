@@ -19,33 +19,43 @@ const kafka = new Kafka({
 });
 
 function encode(
-  msg:
-    | { author: string; body: string; timestamp: number }
-    | { message_id: number },
+  msg: { author: string; body: string } | { message_id: number },
+  timestamp: number = Date.now(),
 ): { value: string } {
+  // generate numeric IDs by concatenating the current time with 4 digits of noise
+  // so that IDs are ordered and vanishingly unlikely to collide
+  const id = Math.floor(10_000 * (timestamp + Math.random()));
   return {
-    value: JSON.stringify({ ...msg, id: gensym(), timestamp: Date.now() }),
+    value: JSON.stringify({
+      ...msg,
+      id,
+      timestamp,
+    }),
   };
 }
 
 const initial_messages: { value: string }[] = [
-  encode({ author: "Bob", body: "Hey guys!", timestamp: Date.now() - 30_000 }),
-  encode({ author: "Alice", body: "Hi, Bob", timestamp: Date.now() - 20_000 }),
-  encode({
-    author: "Eve",
-    body: "Welcome to the chatroom",
-    timestamp: Date.now() - 10_000,
-  }),
+  encode({ author: "Bob", body: "Hey guys!" }, Date.now() - 30_000),
+  encode({ author: "Alice", body: "Hi, Bob" }, Date.now() - 20_000),
+  encode(
+    { author: "Eve", body: "Welcome to the chatroom" },
+    Date.now() - 10_000,
+  ),
   encode({
     author: "Skip",
-    body: "Try sending messages/likes and see them reflect instantly across multiple tabs! All data is sent through a Kafka cluster and propagated reactively through a Skip service.",
-    timestamp: Date.now(),
+    body: "Try sending messages/likes and see them reflect instantly across multiple tabs! All data is written to Kafka, then reactively processed and pushed to the client by Skip",
   }),
 ];
 const initial_likes: { value: string }[] = [
-  encode({ message_id: JSON.parse(initial_messages[0].value).id }),
-  encode({ message_id: JSON.parse(initial_messages[0].value).id }),
-  encode({ message_id: JSON.parse(initial_messages[3].value).id }),
+  encode({
+    message_id: JSON.parse((initial_messages[0] as { value: string }).value).id,
+  }),
+  encode({
+    message_id: JSON.parse((initial_messages[0] as { value: string }).value).id,
+  }),
+  encode({
+    message_id: JSON.parse((initial_messages[3] as { value: string }).value).id,
+  }),
 ];
 
 const producer = { ...kafka.producer(), isConnected: false };
@@ -53,14 +63,23 @@ producer.on("producer.connect", () => {
   producer.isConnected = true;
   producer
     .send({ topic: "skip-chatroom-messages", messages: initial_messages })
-    .catch((e) => {
-      console.error("Error populating initial Kafka messages");
-    });
-  producer
-    .send({ topic: "skip-chatroom-likes", messages: initial_likes })
-    .catch((e) => {
+    .then(
+      () =>
+        console.log(
+          "successfully populated initial likes: " + initial_messages,
+        ),
+      (e) => {
+        console.error("Error populating initial Kafka messages");
+        throw e;
+      },
+    );
+  producer.send({ topic: "skip-chatroom-likes", messages: initial_likes }).then(
+    () => console.log("successfully populated initial likes: " + initial_likes),
+    (e) => {
       console.error("Error populating initial Kafka likes");
-    });
+      throw e;
+    },
+  );
 });
 producer.on("producer.disconnect", () => {
   producer.isConnected = false;
@@ -69,12 +88,6 @@ producer.on("producer.disconnect", () => {
 });
 
 producer.connect();
-
-// generate numeric IDs by concatenating the current time with 4 digits of noise
-// so that IDs are ordered and vanishingly unlikely to collide
-function gensym(): number {
-  return Math.floor(10000 * (Date.now() + Math.random()));
-}
 
 app.get("/messages", (_req, res) => {
   service
@@ -86,10 +99,7 @@ app.get("/messages", (_req, res) => {
 });
 
 app.put("/message", (req, res) => {
-  const msg = {
-    value: JSON.stringify({ ...req.body, id: gensym(), timestamp: Date.now() }),
-  };
-
+  const msg = encode(req.body);
   producer.send({ topic: "skip-chatroom-messages", messages: [msg] }).then(
     () => {
       res.status(200).json({});
@@ -101,12 +111,7 @@ app.put("/message", (req, res) => {
   );
 });
 app.put("/like/:message_id", (req, res) => {
-  const like = {
-    value: JSON.stringify({
-      message_id: Number(req.params.message_id),
-      id: gensym(),
-    }),
-  };
+  const like = encode({ message_id: Number(req.params.message_id) });
   producer.send({ topic: "skip-chatroom-likes", messages: [like] }).then(
     () => res.status(200).json({}),
     (e) => {

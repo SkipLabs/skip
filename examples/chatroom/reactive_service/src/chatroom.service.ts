@@ -37,7 +37,7 @@ const kafka = new KafkaExternalService(
   },
   (msg) => {
     const value = JSON.parse(msg.value);
-    return [[Number(value.id), value]];
+    return [[-Number(value.id), value]];
   },
 );
 
