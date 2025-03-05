@@ -3,6 +3,8 @@ import { SkipServiceBroker } from "@skipruntime/helpers";
 import express from "express";
 import { Kafka } from "kafkajs";
 
+import { init } from "./init.js";
+
 const service = new SkipServiceBroker({
   host: "reactive_cache",
   control_port: 8081,
@@ -19,11 +21,11 @@ const kafka = new Kafka({
 });
 
 function encode(
-  msg: { author: string; body: string } | { message_id: number },
-  timestamp: number = Date.now(),
+  msg: { author: string } & ({ body: string } | { message_id: number }),
 ): { value: string } {
   // generate numeric IDs by concatenating the current time with 4 digits of noise
-  // so that IDs are ordered and vanishingly unlikely to collide
+  // so that IDs are temporally ordered and vanishingly unlikely to collide
+  const timestamp= Date.now()
   const id = Math.floor(10_000 * (timestamp + Math.random()));
   return {
     value: JSON.stringify({
@@ -34,52 +36,10 @@ function encode(
   };
 }
 
-const initial_messages: { value: string }[] = [
-  encode({ author: "Bob", body: "Hey guys!" }, Date.now() - 30_000),
-  encode({ author: "Alice", body: "Hi, Bob" }, Date.now() - 20_000),
-  encode(
-    { author: "Eve", body: "Welcome to the chatroom" },
-    Date.now() - 10_000,
-  ),
-  encode({
-    author: "Skip",
-    body: "Try sending messages/likes and see them reflect instantly across multiple tabs! All data is written to Kafka, then reactively processed and pushed to the client by Skip",
-  }),
-];
-const initial_likes: { value: string }[] = [
-  encode({
-    message_id: JSON.parse((initial_messages[0] as { value: string }).value).id,
-  }),
-  encode({
-    message_id: JSON.parse((initial_messages[0] as { value: string }).value).id,
-  }),
-  encode({
-    message_id: JSON.parse((initial_messages[3] as { value: string }).value).id,
-  }),
-];
-
 const producer = { ...kafka.producer(), isConnected: false };
 producer.on("producer.connect", () => {
   producer.isConnected = true;
-  producer
-    .send({ topic: "skip-chatroom-messages", messages: initial_messages })
-    .then(
-      () =>
-        console.log(
-          "successfully populated initial likes: " + initial_messages,
-        ),
-      (e) => {
-        console.error("Error populating initial Kafka messages");
-        throw e;
-      },
-    );
-  producer.send({ topic: "skip-chatroom-likes", messages: initial_likes }).then(
-    () => console.log("successfully populated initial likes: " + initial_likes),
-    (e) => {
-      console.error("Error populating initial Kafka likes");
-      throw e;
-    },
-  );
+  init(producer, encode);
 });
 producer.on("producer.disconnect", () => {
   producer.isConnected = false;
