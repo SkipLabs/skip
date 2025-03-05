@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import "./App.css";
 
@@ -68,10 +68,42 @@ function Feed() {
     }
   }
 
+  const messagesRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const element = messagesRef.current;
+    element?.scrollBy(0, element.scrollHeight);
+  }, [messages]);
+
   return (
-    <>
+    <div className="page">
       <h1>Reactive chat room example</h1>
+      <div className="messages" ref={messagesRef}>
+        {Array.from(messages.values()).map((message) => (
+          <div
+            className={
+              message.author == author ? "sent message" : "received message"
+            }
+          >
+            <b>{message.author}:</b>
+            <br />
+            {message.body}&nbsp;
+            <div
+              className="likes prevent-select"
+              onClick={() => void likeMessage(message.id)}
+            >
+              <span
+                className={message.likes > 0 ? "likes-count-badge" : "hidden"}
+              >
+                {message.likes}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+      <br />
       <form
+        className="new-message"
         onSubmit={(e) => {
           e.preventDefault();
           sendMessage();
@@ -79,33 +111,20 @@ function Feed() {
       >
         <input
           type="text"
-          placeholder="Author"
+          placeholder="Name"
           value={author}
+          className="author"
           onChange={(e) => setAuthor(e.target.value)}
         />
         <input
           type="text"
-          placeholder="Body"
+          placeholder="Message"
           value={body}
+          className="body"
           onChange={(e) => setBody(e.target.value)}
         />
         <button type="submit">Send Message</button>
       </form>
-      <ul>
-        {Array.from(messages.values()).map((message) => (
-          <li key={message.id}>
-            <div
-              className="votearrow prevent-select"
-              title="upvote"
-              onClick={() => void likeMessage(message.id)}
-            ></div>
-            &nbsp;
-            {message.body}&nbsp; (--{message.author})&nbsp;
-            <br />
-            {message.likes} likes
-          </li>
-        ))}
-      </ul>
-    </>
+    </div>
   );
 }
