@@ -16,7 +16,7 @@ type Message = {
   id: number;
   body: string;
   author: string;
-  likes: number;
+  likedBy: string[];
 };
 
 function Feed() {
@@ -46,9 +46,16 @@ function Feed() {
     };
   }, []);
 
-  async function likeMessage(id: number) {
+  async function likeMessage(message_id: number) {
     try {
-      await fetch(`/api/like/${id}`, { method: "PUT" });
+      await fetch(`/api/like`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message_id,
+          author: author == "" ? "(no name given)" : author,
+        }),
+      });
     } catch (error) {
       console.error(error);
     }
@@ -59,7 +66,10 @@ function Feed() {
       await fetch(`/api/message`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body, author }),
+        body: JSON.stringify({
+          body,
+          author: author == "" ? "(no name given)" : author,
+        }),
       });
       setBody("");
     } catch (error) {
@@ -78,27 +88,34 @@ function Feed() {
     <div className="page">
       <h1>Reactive chat room example</h1>
       <div className="messages" ref={messagesRef}>
-        {Array.from(messages.values()).map((message) => (
-          <div
-            className={
-              message.author == author ? "sent message" : "received message"
-            }
-          >
-            <b>{message.author}:</b>
-            <br />
-            {message.body}&nbsp;
-            <div
-              className="likes prevent-select"
-              onClick={() => void likeMessage(message.id)}
-            >
-              <span
-                className={message.likes > 0 ? "likes-count-badge" : "hidden"}
+      {Array.from(messages.values()).sort((a,b)=> a.id - b.id).map((message) => {
+          const messageClass =
+            "message " +
+            (message.author == author ||
+            (message.author == "(no name given)" && author == "")
+              ? "sent"
+              : "received");
+          const likeCount = message.likedBy.length;
+          const likeButtonClass =
+            "prevent-select likes " + (likeCount > 0 ? "liked" : "unliked");
+          const likeCountClass = likeCount > 0 ? "likes-count-badge" : "hidden";
+          return (
+            <div className={messageClass}>
+              <b>{message.author}:</b>
+              <br />
+              {message.body}&nbsp;
+              <div
+                className={likeButtonClass}
+                onClick={() => void likeMessage(message.id)}
               >
-                {message.likes}
-              </span>
+                <span className={likeCountClass}>{likeCount}</span>
+                <span className="liked-by-tooltip">
+                  {"Liked by: " + message.likedBy.join(", ")}
+                </span>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       <br />
       <form

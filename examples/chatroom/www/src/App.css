@@ -21,15 +21,47 @@
   height: 35px;
   border: 0px;
   margin: 3px 2px 6px;
-  background:
-    url("assets/thumbs-up-svgrepo-com.svg"),
-    linear-gradient(transparent, transparent) no-repeat;
-  background-size: 35px;
   cursor: Pointer;
   display: inline-block;
   position: absolute;
   bottom: -1em;
   right: -1em;
+}
+
+.liked,
+.unliked:hover {
+  background:
+    url("assets/yellow-thumbsup.svg"),
+    linear-gradient(transparent, transparent) no-repeat;
+  background-size: 35px;
+}
+
+.unliked .liked-by-tooltip {
+  visibility: hidden;
+}
+.liked .liked-by-tooltip {
+    visibility: hidden;
+    opacity:0;
+}
+.liked:hover .liked-by-tooltip {
+  visibility: visible;
+  z-index: 1;
+  position: absolute;
+  overflow: visible;
+  background-color: #111;
+  color: #eee;
+  width: 200px;
+  padding: 0.5em;
+  border-radius: 0.5em;
+  opacity:1;
+  transition:opacity 0.25s 0.25s;
+}
+
+.unliked {
+  background:
+    url("assets/greyscale-thumbsup.svg"),
+    linear-gradient(transparent, transparent) no-repeat;
+  background-size: 35px;
 }
 
 .likes-count-badge {
@@ -73,7 +105,8 @@
 
 .messages {
   padding-bottom: 4em;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   max-height: 80vh;
   overscroll-behavior: none;
   flex-grow: 1;
