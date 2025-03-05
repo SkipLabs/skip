@@ -417,7 +417,6 @@ export interface JsonConverter {
     value: Nullable<Pointer<Internal.CJSON>>,
     copy?: boolean,
   ): Exportable;
-  is(v: Pointer<Internal.CJSON>, type: Type): boolean;
   clone<T>(v: T): T;
 }
 
@@ -434,10 +433,6 @@ export class JsonConverterImpl implements JsonConverter {
 
   public clone<T>(v: T): T {
     return clone(v);
-  }
-
-  public is(v: Pointer<Internal.CJSON>, type: Type): boolean {
-    return this.binding.SKIP_SKJSON_typeOf(v) == type;
   }
 
   importOptJSON(
