@@ -57,7 +57,7 @@ class JoinUniqueLikers
   ): Iterable<[number, LikedMessage]> {
     const msg = messages.getUnique() as Message;
     const uniqueLikers = Array.from(new Set(this.likersByMessage.getArray(id)));
-    return [[id, { ...msg, likedBy:uniqueLikers }]];
+    return [[id, { ...msg, likedBy: uniqueLikers }]];
   }
 }
 

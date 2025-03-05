@@ -5,7 +5,7 @@ export async function init(
   encoder: (msg: any) => { value: string },
 ) {
   const sendMessage = async (msg: any, ...likedBy: string[]) => {
-    const messages:[{value:string}] = [encoder(msg)];
+    const messages: [{ value: string }] = [encoder(msg)];
     await producer.send({ topic: "skip-chatroom-messages", messages });
     const message_id = JSON.parse(messages[0].value).id;
     for (const author of likedBy)
