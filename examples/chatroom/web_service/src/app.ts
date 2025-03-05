@@ -25,7 +25,7 @@ function encode(
 ): { value: string } {
   // generate numeric IDs by concatenating the current time with 4 digits of noise
   // so that IDs are temporally ordered and vanishingly unlikely to collide
-  const timestamp= Date.now()
+  const timestamp = Date.now();
   const id = Math.floor(10_000 * (timestamp + Math.random()));
   return {
     value: JSON.stringify({
