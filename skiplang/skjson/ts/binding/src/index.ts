@@ -235,7 +235,7 @@ export function clone<T>(value: T): T {
       ) as T;
     } else {
       return Object.fromEntries(
-        Object.entries(value).map(([k, v]): [string, any] => [k, clone(v)]),
+        Object.entries(value).map(([k, v]) => [k, clone(v)]),
       ) as T;
     }
   } else {
