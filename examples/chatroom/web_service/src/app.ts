@@ -17,7 +17,17 @@ const kafka = new Kafka({
   brokers: ["kafka:19092"],
   clientId: "web-backend",
 });
-const producer = kafka.producer();
+const producer = { ...kafka.producer(), isConnected: false };
+producer.on("producer.connect", () => {
+  producer.isConnected = true;
+});
+producer.on("producer.disconnect", () => {
+  producer.isConnected = false;
+  //attempt to reconnect
+  producer.connect();
+});
+
+producer.connect();
 
 // generate numeric IDs by concatenating the current time with 4 digits of noise
 // so that IDs are ordered and vanishingly unlikely to collide
@@ -25,25 +35,37 @@ function gensym(): number {
   return Math.floor(10000 * (Date.now() + Math.random()));
 }
 
-app.get("/", (_req, res) => {
+app.get("/messages", (_req, res) => {
   service
     .getStreamUUID("messages")
-    .then((uuid) => res.redirect(307, `/streams/${uuid}`))
+    .then((uuid) => {
+      res.redirect(307, `/streams/${uuid}`);
+    })
     .catch((e: unknown) => res.status(500).json(e));
 });
 
 app.put("/message", (req, res) => {
-  const msg = { ...req.body, id: gensym() };
+  const msg = {
+    value: JSON.stringify({ ...req.body, id: gensym(), timestamp: Date.now() }),
+  };
+
   producer.send({ topic: "skip-chatroom-messages", messages: [msg] }).then(
-    () => res.status(200).json({}),
+    () => {
+      res.status(200).json({});
+    },
     (e) => {
       console.error("kafka producer error: ", e);
       throw e;
     },
   );
 });
-app.put("/like", (req, res) => {
-  const like = { ...req.body, id: gensym() };
+app.put("/like/:message_id", (req, res) => {
+  const like = {
+    value: JSON.stringify({
+      message_id: Number(req.params.message_id),
+      id: gensym(),
+    }),
+  };
   producer.send({ topic: "skip-chatroom-likes", messages: [like] }).then(
     () => res.status(200).json({}),
     (e) => {
@@ -54,7 +76,8 @@ app.put("/like", (req, res) => {
 });
 
 app.get("/healthcheck", (_req, res) => {
-  res.status(200).json({});
+  if (producer.isConnected) res.status(200).json({});
+  else res.status(503).json({ health_status: "Disconnected from Kafka" });
 });
 
 const port = 3031;
