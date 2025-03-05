@@ -61,16 +61,6 @@ fun expectArray(json: CJSON): Array<CJSON> {
   }
 }
 
-fun castBool(json: CJSON): Bool {
-  json match {
-  | CJBool(v) -> v
-  | CJFloat(v) -> v != 0.0
-  | CJInt(v) -> v != 0
-  | CJString(v) -> v.lowercase() == "true"
-  | _ -> false
-  }
-}
-
 @export("SKIP_SKJSON_asObject")
 fun asObject(json: CJSON): CJObject {
   json match {
