@@ -36,19 +36,21 @@ services:
   # Kafka event store
   kafka:
     image: bitnami/kafka:latest
-    command: sh -c "((sleep 10 && /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server 127.0.0.1:19092 --create --topic skip-chatroom-messages && /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server 127.0.0.1:19092 --create --topic skip-chatroom-likes)&) && /opt/bitnami/scripts/kafka/run.sh"
-    hostname: kafka
+    command: sh -c "((sleep 5 && /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --create --topic skip-chatroom-messages && /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --create --topic skip-chatroom-likes)&) &&sed -i 's/INFO/WARN/g' /opt/bitnami/kafka/config/log4j.properties &&/opt/bitnami/scripts/kafka/run.sh"
     ports:
       - "19092:19092"
     environment:
       KAFKA_CFG_PROCESS_ROLES: controller,broker
       KAFKA_CFG_NODE_ID: 0
+      KAFKA_CFG_BROKER_ID: 0
       KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
       KAFKA_CFG_LISTENERS: "PLAINTEXT://:19092,CONTROLLER://:19093"
       KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "0@kafka:19093"
       KAFKA_CFG_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_ADVERTISED_HOST_NAME: kafka
+      KAFKA_CFG_ADVERTISED_HOST_NAME: kafka
     healthcheck:
       test: /opt/bitnami/kafka/bin/kafka-topics.sh --list --bootstrap-server kafka:19092 | wc -l | xargs -I{} test {} -ge 2 || exit 1
       interval: 1s
-      timeout: 60s
-      retries: 60
+      timeout: 10s
+      retries: 10
