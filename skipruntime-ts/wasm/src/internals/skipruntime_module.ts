@@ -209,17 +209,20 @@ export interface FromWasm {
     identifier: ptr<Internal.String>,
     resource: ptr<Internal.String>,
     params: ptr<Internal.CJSON>,
+    session_id: ptr<Internal.String> | null,
   ): Handle<Error>;
 
   SkipRuntime_Runtime__getAll(
     resource: ptr<Internal.String>,
     params: ptr<Internal.CJSON>,
+    session_id: ptr<Internal.String> | null,
     request: ptr<Internal.Request> | null,
   ): ptr<Internal.CJObject | Internal.CJFloat>;
 
   SkipRuntime_Runtime__getForKey(
     resource: ptr<Internal.String>,
     params: ptr<Internal.CJSON>,
+    session_id: ptr<Internal.String> | null,
     key: ptr<Internal.CJSON>,
     request: ptr<Internal.Request> | null,
   ): ptr<Internal.CJObject | Internal.CJFloat>;
@@ -333,6 +336,7 @@ interface ToWasm {
   SkipRuntime_Resource__instantiate(
     resource: Handle<Resource>,
     collections: ptr<Internal.CJObject>,
+    session_id: ptr<Internal.String> | null,
   ): ptr<Internal.String>;
 
   SkipRuntime_deleteResource(resource: Handle<Resource>): void;
@@ -698,22 +702,26 @@ export class WasmFromBinding implements FromBinding {
     identifier: string,
     resource: string,
     params: Pointer<Internal.CJSON>,
+    session_id: string | null,
   ): Handle<Error> {
     return this.fromWasm.SkipRuntime_Runtime__createResource(
       this.utils.exportString(identifier),
       this.utils.exportString(resource),
       toPtr(params),
+      session_id !== null ? this.utils.exportString(session_id) : null,
     );
   }
 
   SkipRuntime_Runtime__getAll(
     resource: string,
     params: Pointer<Internal.CJSON>,
+    session_id: string | null,
     request: Nullable<Pointer<Internal.Request>>,
   ): Pointer<Internal.CJObject | Internal.CJFloat> {
     return this.fromWasm.SkipRuntime_Runtime__getAll(
       this.utils.exportString(resource),
       toPtr(params),
+      session_id !== null ? this.utils.exportString(session_id) : null,
       toNullablePtr(request),
     );
   }
@@ -721,12 +729,14 @@ export class WasmFromBinding implements FromBinding {
   SkipRuntime_Runtime__getForKey(
     resource: string,
     params: Pointer<Internal.CJSON>,
+    session_id: string | null,
     key: Pointer<Internal.CJSON>,
     request: Pointer<Internal.Request> | null,
   ): Pointer<Internal.CJObject | Internal.CJFloat> {
     return this.fromWasm.SkipRuntime_Runtime__getForKey(
       this.utils.exportString(resource),
       toPtr(params),
+      session_id !== null ? this.utils.exportString(session_id) : null,
       toPtr(key),
       toNullablePtr(request),
     );
@@ -905,11 +915,13 @@ class LinksImpl implements Links {
   instantiateOfResource(
     skresource: Handle<Resource>,
     skcollections: ptr<Internal.CJObject>,
+    session_id: ptr<Internal.String> | null,
   ): ptr<Internal.String> {
     return this.utils.exportString(
       this.tobinding.SkipRuntime_Resource__instantiate(
         skresource,
         skcollections,
+        session_id !== null ? this.utils.importString(session_id) : null,
       ),
     );
   }
