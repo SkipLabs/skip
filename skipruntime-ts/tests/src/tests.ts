@@ -1161,8 +1161,10 @@ export function initTests(
 
   it("testPostgres", async () => {
     let service;
+    const pgClient = new pg.Client(pg_config);
     try {
       service = await initService(await postgresService());
+      await pgClient.connect();
     } catch {
       if ("CIRCLECI" in process.env) {
         throw new Error("Failed to set up CircleCI environment with Postgres.");
@@ -1194,7 +1196,7 @@ export function initTests(
         [3, [30]],
       ]);
 
-      let count = 0;
+      let retries = 0;
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       while (true) {
         try {
@@ -1206,11 +1208,30 @@ export function initTests(
           ]);
           break;
         } catch (e: unknown) {
-          if (count < 2) count++;
+          if (retries < 2) retries++;
+          else throw e;
+        }
+      }
+      await pgClient.query("UPDATE skip_test SET x = 1000 WHERE id = 1;");
+      retries = 0;
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      while (true) {
+        try {
+          await timeout(5);
+          expect(service.getAll("resource").payload).toEqual([
+            [1, [1010]],
+            [2, [22]],
+            [3, [33]],
+          ]);
+          break;
+        } catch (e: unknown) {
+          if (retries < 2) retries++;
           else throw e;
         }
       }
     } finally {
+      await pgClient.query("UPDATE skip_test SET x = 1 WHERE id = 1;");
+      await pgClient.end();
       await service.close();
     }
   });
