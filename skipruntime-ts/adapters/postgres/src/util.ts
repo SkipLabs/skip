@@ -7,11 +7,6 @@ import format from "pg-format";
  */
 export class SkipPostgresError extends SkipError {}
 
-const min32bitInt = -2147483648;
-const max32bitInt = 2147483647;
-const min16bitInt = -32768;
-const max16bitInt = 32767;
-
 export type PostgresPKey =
   | "TEXT"
   | "SERIAL"
@@ -59,76 +54,61 @@ export function validateKeyParam(params: Json): {
     );
   const type: string = params["key"]["type"];
 
-  let select;
+  if (type == "TEXT")
+    return {
+      col,
+      type,
+      select: (table: string, key: string) =>
+        format("SELECT * FROM %I WHERE %I = %L;", table, col, key),
+    };
+
+  const int32_MIN = -2147483648;
+  const int32_MAX = 2147483647;
+  const int16_MIN = -32768;
+  const int16_MAX = 32767;
+
+  let boundsCheck: (x: number) => boolean;
   switch (type) {
-    case "TEXT":
-      select = (table: string, key: string) =>
-        format("SELECT * FROM %I WHERE %I = %L;", table, col, key);
-      break;
-    case "BIGSERIAL":
-    case "SERIAL8":
     case "BIGINT":
     case "INT8":
-      select = (table: string, key: string) => {
-        const keyNum = Number(key);
-        // Checks if key is a safe 64-bit integer (and positive, if serial)
-        if (
-          !Number.isSafeInteger(keyNum) ||
-          (keyNum < 1 && ["BIGSERIAL", "SERIAL8"].includes(type))
-        )
-          throw new SkipPostgresError(`Invalid ${type} key: ${key}`);
-        return format(
-          "SELECT * FROM %I WHERE %I = " + keyNum.toString() + ";",
-          table,
-          col,
-        );
-      };
+      boundsCheck = () => true;
       break;
-    case "SERIAL":
-    case "SERIAL4":
     case "INTEGER":
     case "INT":
     case "INT4":
-      select = (table: string, key: string) => {
-        const keyNum = Number(key);
-        // Checks if key is a safe 32-bit integer (and positive, if serial)
-        if (
-          !Number.isSafeInteger(keyNum) ||
-          keyNum < min32bitInt ||
-          keyNum > max32bitInt ||
-          (keyNum < 1 && ["SERIAL", "SERIAL4"].includes(type))
-        )
-          throw new SkipPostgresError(`Invalid ${type} key: ${key}`);
-        return format(
-          "SELECT * FROM %I WHERE %I = " + keyNum.toString() + ";",
-          table,
-          col,
-        );
-      };
+      boundsCheck = (x: number) => x >= int32_MIN && x <= int32_MAX;
+      break;
+    case "SMALLINT":
+    case "INT2":
+      boundsCheck = (x: number) => x >= int16_MIN && x <= int16_MAX;
+      break;
+    case "BIGSERIAL":
+    case "SERIAL8":
+      boundsCheck = (x: number) => x >= 1;
+      break;
+    case "SERIAL":
+    case "SERIAL4":
+      boundsCheck = (x: number) => x >= 1 && x <= int32_MAX;
       break;
     case "SMALLSERIAL":
     case "SERIAL2":
-    case "SMALLINT":
-    case "INT2":
-      select = (table: string, key: string) => {
-        const keyNum = Number(key);
-        // Checks if key is a safe 16-bit integer (and positive, if serial)
-        if (
-          !Number.isSafeInteger(keyNum) ||
-          keyNum < min16bitInt ||
-          keyNum > max16bitInt ||
-          (keyNum < 1 && ["SERIAL2", "SMALLSERIAL"].includes(type))
-        )
-          throw new SkipPostgresError(`Invalid ${type} key: ${key}`);
-        return format(
-          "SELECT * FROM %I WHERE %I = " + keyNum.toString() + ";",
-          table,
-          col,
-        );
-      };
+      boundsCheck = (x: number) => x >= 1 && x <= int16_MAX;
       break;
     default:
       throw new SkipPostgresError("Unsupported Postgres key type: " + type);
   }
-  return { col, type, select };
+  return {
+    col,
+    type,
+    select: (table: string, key: string) => {
+      const keyNum = Number(key);
+      if (!Number.isSafeInteger(keyNum) || !boundsCheck(keyNum))
+        throw new SkipPostgresError(`Invalid ${type} key: ${key}`);
+      return format(
+        "SELECT * FROM %I WHERE %I = " + keyNum.toString() + ";",
+        table,
+        col,
+      );
+    },
+  };
 }
