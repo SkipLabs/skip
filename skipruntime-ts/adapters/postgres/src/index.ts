@@ -26,6 +26,28 @@ export class SkipPostgresError extends SkipError {}
 
 const min32bitInt = -2147483648;
 const max32bitInt = 2147483647;
+const min16bitInt = -32768;
+const max16bitInt = 32767;
+
+export type PostgresPKey =
+  | "TEXT"
+  | "SERIAL"
+  | "SERIAL2"
+  | "SERIAL4"
+  | "SERIAL8"
+  | "BIGSERIAL"
+  | "SMALLSERIAL"
+  | "INTEGER"
+  | "INT"
+  | "INT2"
+  | "INT4"
+  | "INT8"
+  | "BIGINT"
+  | "SMALLINT";
+
+/**
+ * Validate that a specified key column is of a legal type, and return a function to produce a select-query for that key column.
+ */
 function validateKeyParam(params: Json): {
   col: string;
   type: string;
@@ -60,13 +82,15 @@ function validateKeyParam(params: Json): {
         format("SELECT * FROM %I WHERE %I = %L;", table, col, key);
       break;
     case "BIGSERIAL":
+    case "SERIAL8":
     case "BIGINT":
+    case "INT8":
       select = (table: string, key: string) => {
         const keyNum = Number(key);
         // Checks if key is a safe 64-bit integer (and positive, if serial)
         if (
           !Number.isSafeInteger(keyNum) ||
-          (type == "BIGSERIAL" && keyNum < 1)
+          (keyNum < 1 && ["BIGSERIAL", "SERIAL8"].includes(type))
         )
           throw new SkipPostgresError(`Invalid ${type} key: ${key}`);
         return format(
@@ -77,7 +101,10 @@ function validateKeyParam(params: Json): {
       };
       break;
     case "SERIAL":
+    case "SERIAL4":
     case "INTEGER":
+    case "INT":
+    case "INT4":
       select = (table: string, key: string) => {
         const keyNum = Number(key);
         // Checks if key is a safe 32-bit integer (and positive, if serial)
@@ -85,7 +112,28 @@ function validateKeyParam(params: Json): {
           !Number.isSafeInteger(keyNum) ||
           keyNum < min32bitInt ||
           keyNum > max32bitInt ||
-          (type == "SERIAL" && keyNum < 1)
+          (keyNum < 1 && ["SERIAL", "SERIAL4"].includes(type))
+        )
+          throw new SkipPostgresError(`Invalid ${type} key: ${key}`);
+        return format(
+          "SELECT * FROM %I WHERE %I = " + keyNum.toString() + ";",
+          table,
+          col,
+        );
+      };
+      break;
+    case "SMALLSERIAL":
+    case "SERIAL2":
+    case "SMALLINT":
+    case "INT2":
+      select = (table: string, key: string) => {
+        const keyNum = Number(key);
+        // Checks if key is a safe 16-bit integer (and positive, if serial)
+        if (
+          !Number.isSafeInteger(keyNum) ||
+          keyNum < min16bitInt ||
+          keyNum > max16bitInt ||
+          (keyNum < 1 && ["SERIAL2", "SMALLSERIAL"].includes(type))
         )
           throw new SkipPostgresError(`Invalid ${type} key: ${key}`);
         return format(
@@ -107,7 +155,7 @@ function validateKeyParam(params: Json): {
  * Expose the tables of a PostgreSQL database as *resources* in the Skip runtime.
  *
  * @remarks
- * Subscription `params` **must** include a field `key` whose value is an object with a string field `col` identifying the table column that should be used as the key in the resulting collection, and a field `type` whose value is one of `INTEGER`, `BIGINT`, `SERIAL`, `BIGSERIAL`, or `TEXT`.
+ * Subscription `params` **must** include a field `key` whose value is an object with a string field `col` identifying the table column that should be used as the key in the resulting collection, and a field `type` whose value is a Postgres text, integer, or serial type. (i.e. one of `TEXT`, `SERIAL`, `SERIAL2`, `SERIAL4`, `SERIAL8`, `BIGSERIAL`, `SMALLSERIAL`, `INTEGER`, `INT`, `INT2`, `INT4`, `INT8`, `BIGINT`, or `SMALLINT`)
  */
 export class PostgresExternalService implements ExternalService {
   private client: pg.Client;
@@ -167,7 +215,7 @@ export class PostgresExternalService implements ExternalService {
    *
    * @param instance - Instance identifier of the external resource.
    * @param resource - Name of the table to expose as a resource.
-   * @param params - Parameters of the external resource; **must** include a field `key` whose value is an object with a string field `col` identifying the table column that should be used as the key in the resulting collection, and a field `type` whose value is one of `INTEGER`, `BIGINT`, `SERIAL`, `BIGSERIAL`, or `TEXT`.
+   * @param params - Parameters of the external resource; **must** include a field `key` whose value is an object with a string field `col` identifying the table column that should be used as the key in the resulting collection, and a field `type` whose value is a Postgres text, integer, or serial type. (i.e. one of `TEXT`, `SERIAL`, `SERIAL2`, `SERIAL4`, `SERIAL8`, `BIGSERIAL`, `SMALLSERIAL`, `INTEGER`, `INT`, `INT2`, `INT4`, `INT8`, `BIGINT`, or `SMALLINT`)
    * @param callbacks - Callbacks to react on error/loading/update.
    * @param callbacks.error - Error callback.
    * @param callbacks.loading - Loading callback.
@@ -180,7 +228,7 @@ export class PostgresExternalService implements ExternalService {
     params: Json & {
       key: {
         col: string;
-        type: "INTEGER" | "BIGINT" | "SERIAL" | "BIGSERIAL" | "TEXT";
+        type: PostgresPKey;
       };
     },
     callbacks: {
