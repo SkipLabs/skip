@@ -111,7 +111,6 @@ function validateKeyParam(params: Json): {
  */
 export class PostgresExternalService implements ExternalService {
   private client: pg.Client;
-  private clientID: string;
   private open_instances: Set<string> = new Set<string>();
 
   isConnected(): boolean {
@@ -133,33 +132,27 @@ export class PostgresExternalService implements ExternalService {
     user: string;
     password: string;
   }) {
-    // generate random client ID for PostgreSQL notifications
-    this.clientID = "skip_pg_client_" + Math.random().toString(36).slice(2);
-
     this.client = new pg.Client(db_config);
-    this.client
-      .connect()
-      .then(() => this.client.query(format(`LISTEN %I;`, this.clientID)))
-      .then(
-        () => {
-          const handler = () => {
-            void this.shutdown().then(() => process.exit());
-          };
-          [
-            "SIGINT",
-            "SIGTERM",
-            "SIGUSR1",
-            "SIGUSR2",
-            "uncaughtException",
-          ].forEach((sig) => process.on(sig, handler));
-        },
-        (e: unknown) => {
-          console.error(
-            "Error connecting to Postgres at " + JSON.stringify(db_config),
-          );
-          throw e;
-        },
-      );
+    this.client.connect().then(
+      () => {
+        const handler = () => {
+          void this.shutdown().then(() => process.exit());
+        };
+        [
+          "SIGINT",
+          "SIGTERM",
+          "SIGUSR1",
+          "SIGUSR2",
+          "uncaughtException",
+        ].forEach((sig) => process.on(sig, handler));
+      },
+      (e: unknown) => {
+        console.error(
+          "Error connecting to Postgres at " + JSON.stringify(db_config),
+        );
+        throw e;
+      },
+    );
   }
 
   /**
@@ -214,12 +207,13 @@ BEGIN
   RETURN NULL;
 END $f$ LANGUAGE PLPGSQL;`,
             instance,
-            this.clientID,
+            instance,
             key.col,
-            this.clientID,
+            instance,
             key.col,
           ),
         );
+        await this.client.query(format(`LISTEN %I;`, instance));
         await this.client.query(
           format(
             `
@@ -233,7 +227,7 @@ FOR EACH ROW EXECUTE FUNCTION %I();`,
         );
       }
       this.client.on("notification", (msg) => {
-        if (msg.payload != undefined) {
+        if (msg.channel == instance && msg.payload !== undefined) {
           const query = key.select(table, msg.payload);
           this.client.query(query).then(
             (changes) => {
