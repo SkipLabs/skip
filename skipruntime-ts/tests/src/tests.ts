@@ -586,7 +586,16 @@ class PostgresResource implements Resource<Input_NN> {
         params: { key: { col: "id", type: "INTEGER" } },
       })
       .map(PostgresRowExtract);
-    return collections.input.map(PointwiseSum, pg_data);
+    const pg_data2: EagerCollection<number, number> = context
+      .useExternalResource<number, PostgresRow>({
+        service: "postgres",
+        identifier: "skip_test2",
+        params: { key: { col: "id", type: "INTEGER" } },
+      })
+      .map(PostgresRowExtract);
+    return collections.input
+      .map(PointwiseSum, pg_data)
+      .map(PointwiseSum, pg_data2);
   }
 }
 
@@ -621,7 +630,10 @@ async function trySetupDB(
     await pgSetupClient.query(`
 DROP TABLE IF EXISTS skip_test;
 CREATE TABLE skip_test (id INTEGER PRIMARY KEY, x INTEGER, "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
-INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
+INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);
+DROP TABLE IF EXISTS skip_test2;
+CREATE TABLE skip_test2 (id INTEGER PRIMARY KEY, x INTEGER, "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+INSERT INTO skip_test2 (id, x) VALUES (1, 100), (2, 200), (3, 300);`);
     await pgSetupClient.end();
     pgIsSetup = true;
   }
@@ -1200,11 +1212,11 @@ export function initTests(
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       while (true) {
         try {
-          await timeout(5);
+          await timeout(5 + 100 * 2 ** retries);
           expect(service.getAll("resource").payload).toEqual([
-            [1, [11]],
-            [2, [22]],
-            [3, [33]],
+            [1, [111]],
+            [2, [222]],
+            [3, [333]],
           ]);
           break;
         } catch (e: unknown) {
@@ -1213,15 +1225,16 @@ export function initTests(
         }
       }
       await pgClient.query("UPDATE skip_test SET x = 1000 WHERE id = 1;");
+      await pgClient.query("DELETE FROM skip_test WHERE id = 2;");
       retries = 0;
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       while (true) {
         try {
-          await timeout(5);
+          await timeout(5 + 100 * 2 ** retries);
           expect(service.getAll("resource").payload).toEqual([
-            [1, [1010]],
-            [2, [22]],
-            [3, [33]],
+            [1, [1110]],
+            [2, [220]],
+            [3, [333]],
           ]);
           break;
         } catch (e: unknown) {
@@ -1230,7 +1243,8 @@ export function initTests(
         }
       }
     } finally {
-      await pgClient.query("UPDATE skip_test SET x = 1 WHERE id = 1;");
+      await pgClient.query("DELETE FROM skip_test WHERE id = 1;");
+      await pgClient.query("INSERT INTO skip_test (id, x) VALUES (1,1),(2,2);");
       await pgClient.end();
       await service.close();
     }
