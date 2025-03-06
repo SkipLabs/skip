@@ -4,102 +4,17 @@
  * @packageDocumentation
  */
 
-import {
-  type Entry,
-  type ExternalService,
-  type Json,
-  SkipError,
-} from "@skipruntime/core";
+import { type Entry, type ExternalService, type Json } from "@skipruntime/core";
 
 import pg from "pg";
 import format from "pg-format";
 
+export { SkipPostgresError } from "./util.js";
+import { validateKeyParam, type PostgresPKey } from "./util.js";
+
 // Pass timestamp strings straight through instead of attempting to convert to JS Date object, which would be clobbered in the Skip heap
 pg.types.setTypeParser(pg.types.builtins.TIMESTAMP, (x: string) => x);
 pg.types.setTypeParser(pg.types.builtins.TIMESTAMPTZ, (x: string) => x);
-
-/**
- * Exception indicating an error while establishing the connection between PostgreSQL and Skip.
- * @hideconstructor
- */
-export class SkipPostgresError extends SkipError {}
-
-const min32bitInt = -2147483648;
-const max32bitInt = 2147483647;
-function validateKeyParam(params: Json): {
-  col: string;
-  type: string;
-  select: (table: string, key: string) => string;
-} {
-  if (
-    typeof params != "object" ||
-    !("key" in params) ||
-    typeof params["key"] != "object" ||
-    params["key"] == null
-  )
-    throw new SkipPostgresError(
-      "No key specified for external Postgres data source",
-    );
-
-  if (!("col" in params["key"]) || typeof params["key"]["col"] != "string")
-    throw new SkipPostgresError(
-      "No key column specified for external Postgres data source",
-    );
-  const col: string = params["key"]["col"];
-
-  if (!("type" in params["key"]) || typeof params["key"]["type"] != "string")
-    throw new SkipPostgresError(
-      "No key type specified for external Postgres data source",
-    );
-  const type: string = params["key"]["type"];
-
-  let select;
-  switch (type) {
-    case "TEXT":
-      select = (table: string, key: string) =>
-        format("SELECT * FROM %I WHERE %I = %L;", table, col, key);
-      break;
-    case "BIGSERIAL":
-    case "BIGINT":
-      select = (table: string, key: string) => {
-        const keyNum = Number(key);
-        // Checks if key is a safe 64-bit integer (and positive, if serial)
-        if (
-          !Number.isSafeInteger(keyNum) ||
-          (type == "BIGSERIAL" && keyNum < 1)
-        )
-          throw new SkipPostgresError(`Invalid ${type} key: ${key}`);
-        return format(
-          "SELECT * FROM %I WHERE %I = " + keyNum.toString() + ";",
-          table,
-          col,
-        );
-      };
-      break;
-    case "SERIAL":
-    case "INTEGER":
-      select = (table: string, key: string) => {
-        const keyNum = Number(key);
-        // Checks if key is a safe 32-bit integer (and positive, if serial)
-        if (
-          !Number.isSafeInteger(keyNum) ||
-          keyNum < min32bitInt ||
-          keyNum > max32bitInt ||
-          (type == "SERIAL" && keyNum < 1)
-        )
-          throw new SkipPostgresError(`Invalid ${type} key: ${key}`);
-        return format(
-          "SELECT * FROM %I WHERE %I = " + keyNum.toString() + ";",
-          table,
-          col,
-        );
-      };
-      break;
-    default:
-      throw new SkipPostgresError("Unsupported Postgres key type: " + type);
-  }
-  return { col, type, select };
-}
 
 /**
  * An `ExternalService` wrapping a PostgreSQL database.
@@ -107,7 +22,7 @@ function validateKeyParam(params: Json): {
  * Expose the tables of a PostgreSQL database as *resources* in the Skip runtime.
  *
  * @remarks
- * Subscription `params` **must** include a field `key` whose value is an object with a string field `col` identifying the table column that should be used as the key in the resulting collection, and a field `type` whose value is one of `INTEGER`, `BIGINT`, `SERIAL`, `BIGSERIAL`, or `TEXT`.
+ * Subscription `params` **must** include a field `key` whose value is an object with a string field `col` identifying the table column that should be used as the key in the resulting collection, and a field `type` whose value is a Postgres text, integer, or serial type. (i.e. one of `TEXT`, `SERIAL`, `SERIAL2`, `SERIAL4`, `SERIAL8`, `BIGSERIAL`, `SMALLSERIAL`, `INTEGER`, `INT`, `INT2`, `INT4`, `INT8`, `BIGINT`, or `SMALLINT`)
  */
 export class PostgresExternalService implements ExternalService {
   private client: pg.Client;
@@ -167,7 +82,7 @@ export class PostgresExternalService implements ExternalService {
    *
    * @param instance - Instance identifier of the external resource.
    * @param resource - Name of the table to expose as a resource.
-   * @param params - Parameters of the external resource; **must** include a field `key` whose value is an object with a string field `col` identifying the table column that should be used as the key in the resulting collection, and a field `type` whose value is one of `INTEGER`, `BIGINT`, `SERIAL`, `BIGSERIAL`, or `TEXT`.
+   * @param params - Parameters of the external resource; **must** include a field `key` whose value is an object with a string field `col` identifying the table column that should be used as the key in the resulting collection, and a field `type` whose value is a Postgres text, integer, or serial type. (i.e. one of `TEXT`, `SERIAL`, `SERIAL2`, `SERIAL4`, `SERIAL8`, `BIGSERIAL`, `SMALLSERIAL`, `INTEGER`, `INT`, `INT2`, `INT4`, `INT8`, `BIGINT`, or `SMALLINT`)
    * @param callbacks - Callbacks to react on error/loading/update.
    * @param callbacks.error - Error callback.
    * @param callbacks.loading - Loading callback.
@@ -180,7 +95,7 @@ export class PostgresExternalService implements ExternalService {
     params: Json & {
       key: {
         col: string;
-        type: "INTEGER" | "BIGINT" | "SERIAL" | "BIGSERIAL" | "TEXT";
+        type: PostgresPKey;
       };
     },
     callbacks: {
