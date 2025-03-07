@@ -1,3 +1,9 @@
+/**
+ * This is an adapter to connect Kafka clusters to the Skip Framework, allowing topics of the cluster to be exposed as Skip collections.
+ *
+ * @packageDocumentation
+ */
+
 import type { Entry, ExternalService, Json } from "@skipruntime/core";
 
 import { Kafka, logLevel as kafkaLogLevel } from "kafkajs";
@@ -5,7 +11,14 @@ import { Kafka, logLevel as kafkaLogLevel } from "kafkajs";
 import type { Consumer, ConsumerConfig } from "kafkajs";
 
 /**
- * Adapter for easily creating Kafka _consumers_, subscribing to external event/message streams and exposing their content as eager collections within the Skip runtime.
+ * An `ExternalService` wrapping a Kafka cluster, exposing its *topics* as *collections* in the Skip runtime.
+ *
+ * This adapter allows to easily create Kafka _consumers_, subscribing to external event/message streams and exposing their content as eager collections within the Skip runtime.
+ *
+ * For a usage example, refer [here](https://github.com/SkipLabs/skip/tree/main/examples/chatroom).
+ *
+ * @remarks
+ * Subscription `params` may specify a `fromBeginning` boolean, which controls whether to consume all Kafka messages from the cluster, or only those sent since the creation of this external resource.
  */
 export class KafkaExternalService implements ExternalService {
   private consumers: Map<string, Consumer> = new Map<string, Consumer>();
