@@ -632,8 +632,8 @@ DROP TABLE IF EXISTS skip_test;
 CREATE TABLE skip_test (id INTEGER PRIMARY KEY, x INTEGER, "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);
 DROP TABLE IF EXISTS skip_test2;
-CREATE TABLE skip_test2 (id INTEGER PRIMARY KEY, x INTEGER, "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
-INSERT INTO skip_test2 (id, x) VALUES (1, 100), (2, 200), (3, 300);`);
+CREATE TABLE skip_test2 (id INTEGER, x INTEGER, "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+INSERT INTO skip_test2 (id, x) VALUES (1, 100), (2, 100), (2, 100), (3, 100), (3, 100), (3, 100);`);
     await pgSetupClient.end();
     pgIsSetup = true;
   }
