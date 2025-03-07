@@ -716,47 +716,73 @@ export class ServiceInstance {
 }
 
 class ValuesImpl<T> implements Values<T> {
+  /* Lazy Iterable/Sequence: values are generated from
+    the Iterator pointer and stored in materialized.
+    Once finished the pointer is nullified. */
+  private readonly materialized: (T & DepSafe)[] = [];
+
   constructor(
     private readonly skjson: JsonConverter,
     private readonly binding: FromBinding,
-    private readonly pointer: Pointer<Internal.NonEmptyIterator>,
+    private pointer: Pointer<Internal.NonEmptyIterator> | null,
   ) {
-    this.skjson = skjson;
-    this.binding = binding;
     this.pointer = pointer;
   }
 
-  next(): Nullable<T & DepSafe> {
-    return this.skjson.importOptJSON(
+  private next(): Nullable<T & DepSafe> {
+    if (this.pointer === null) {
+      return null;
+    }
+
+    const v = this.skjson.importOptJSON(
       this.binding.SkipRuntime_NonEmptyIterator__next(this.pointer),
     ) as Nullable<T & DepSafe>;
+
+    if (v === null) {
+      this.pointer = null;
+    } else {
+      this.materialized.push(v);
+    }
+    return v;
   }
 
   getUnique(): T & DepSafe {
-    const value = this.skjson.importOptJSON(
-      this.binding.SkipRuntime_NonEmptyIterator__uniqueValue(this.pointer),
-    ) as Nullable<T & DepSafe>;
-    if (value == null) throw new SkipNonUniqueValueError();
-    return value;
+    if (this.materialized.length < 1) {
+      this.next();
+    }
+    const first = this.materialized[0];
+    if (
+      first === undefined /* i.e. this.materialized.length == 0 */ ||
+      this.materialized.length >= 2 ||
+      this.next() !== null
+    ) {
+      throw new SkipNonUniqueValueError();
+    }
+    return first;
   }
 
-  toArray: () => (T & DepSafe)[] = () => {
-    return Array.from(this);
-  };
+  toArray(): (T & DepSafe)[] {
+    while (this.next() !== null);
+    return this.materialized;
+  }
 
   [Symbol.iterator](): Iterator<T & DepSafe> {
-    const cloned_iter = new ValuesImpl<T & DepSafe>(
-      this.skjson,
-      this.binding,
-      this.binding.SkipRuntime_NonEmptyIterator__clone(this.pointer),
-    );
-
-    return {
-      next() {
-        const value = cloned_iter.next();
-        return { value, done: value == null } as IteratorResult<T & DepSafe>;
-      },
+    let i = 0;
+    const next = (): IteratorResult<T & DepSafe> => {
+      // Invariant: this.materialized.length >= i
+      let value = this.materialized[i];
+      if (value === undefined /* i.e. this.materialized.length == i */) {
+        const next = this.next();
+        if (next === null) {
+          return { value: null, done: true };
+        }
+        value = next;
+      }
+      i++;
+      return { value };
     };
+
+    return { next };
   }
 }
 

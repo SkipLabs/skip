@@ -329,7 +329,7 @@ fun buildResourcesGraph(
           context,
           dDirname.sub(resourceId),
           (_ctx, writer, key, it) ~> {
-            writer.setArray(key, it.collect(Array));
+            writer.setArray(key, Array::createFromIterator(it.values())); // TODO: use it.toArray()
           },
         );
         writer.set(
@@ -721,7 +721,10 @@ class Collection(hdl: SKStore.EHandle<JSONID, JSONFile>) {
         (ctx, writer, key, values) ~> {
           pushContext(ctx);
           try {
-            for (entry in mapper.mapEntry(key.json, values.map(x -> x.json))) {
+            for (entry in mapper.mapEntry(
+              key.json,
+              values.nonEmptyMap(x -> x.json),
+            )) {
               writer.append(JSONID(entry.i0), JSONFile(entry.i1))
             };
             popContext();
@@ -755,11 +758,19 @@ class Collection(hdl: SKStore.EHandle<JSONID, JSONFile>) {
     mapper = (ctx, writer, key, values) ~> {
       mapperOpt match {
       | None() ->
-        writer.setArray(key, values.map(x -> inputConv(x.json)).collect(Array))
+        writer.setArray(
+          key,
+          Array::createFromIterator(
+            values.nonEmptyMap(x ~> inputConv(x.json)).values(),
+          ), // TODO: use .toArray()
+        )
       | Some(mapper) ->
         pushContext(ctx);
         try {
-          for (entry in mapper.mapEntry(key.json, values.map(x -> x.json))) {
+          for (entry in mapper.mapEntry(
+            key.json,
+            values.nonEmptyMap(x -> x.json),
+          )) {
             writer.append(JSONID(entry.i0), inputConv(entry.i1))
           };
           popContext();
@@ -789,7 +800,9 @@ class Collection(hdl: SKStore.EHandle<JSONID, JSONFile>) {
           (_ctx, writer, key, values) ~> {
             writer.setArray(
               key,
-              values.map(x -> JSONFile(outputConv(x))).collect(Array),
+              Array::createFromIterator(
+                values.nonEmptyMap(x -> JSONFile(outputConv(x))).values(),
+              ), // TODO: use .toArray()
             )
           },
         ),
@@ -996,7 +1009,10 @@ class Collection(hdl: SKStore.EHandle<JSONID, JSONFile>) {
         (ctx, writer, key, values) ~> {
           pushContext(ctx);
           try {
-            for (entry in mapper.mapEntry(key.json, values.map(x -> x.json))) {
+            for (entry in mapper.mapEntry(
+              key.json,
+              values.nonEmptyMap(x -> x.json),
+            )) {
               writer.append(JSONID(entry.i0), JSONFile(entry.i1))
             };
             popContext();

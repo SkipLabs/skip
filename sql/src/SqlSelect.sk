@@ -24,7 +24,7 @@ type MapFunRow = (
   mutable SKStore.Context,
   mutable SKStore.TWriter<SKStore.Key, Row>,
   SKStore.Key,
-  mutable Iterator<Row>,
+  mutable SKStore.NonEmptyIterator<Row>,
 ) ~> void;
 
 class SubTask(
@@ -613,10 +613,7 @@ class SelectEvaluator{
         context,
         dataName,
         (context, writer, key, aggrResult) ~> {
-          entry = firstRow(aggrResult) match {
-          | None() -> return void
-          | Some(x) -> x
-          };
+          entry = aggrResult.first;
           evaluator = ExprEvaluator(Array[entry], this.select.from, this.up);
           this.select.having match {
           | None() ->
@@ -1067,21 +1064,20 @@ class SelectEvaluator{
     context: mutable SKStore.Context,
     writer: mutable SKStore.TWriter<SKStore.Key, Row>,
     key: SKStore.Key,
-    inputRows: mutable Iterator<Row>,
+    inputRows: mutable SKStore.NonEmptyIterator<Row>,
   ): void {
     mwriter = mutable MultiWriter{};
 
     key match {
     | RowKey _ ->
-      inputRow = inputRows.next() match {
-      | None() -> return void
-      | Some(x @ RowValues _) -> x
-      | Some(x) ->
+      inputRow = inputRows.first match {
+      | x @ RowValues _ -> x
+      | x ->
         debug(x);
         invariant_violation("Unexpected row type")
       };
 
-      repeat = inputRow.repeat;
+      repeat = 0;
 
       for (ir in inputRows) {
         ir match {

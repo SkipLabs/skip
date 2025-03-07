@@ -43,18 +43,9 @@ import {
 
 export interface FromWasm {
   // NonEmptyIterator
-  SkipRuntime_NonEmptyIterator__first(
-    values: ptr<Internal.NonEmptyIterator>,
-  ): ptr<Internal.CJSON>;
-  SkipRuntime_NonEmptyIterator__uniqueValue(
-    values: ptr<Internal.NonEmptyIterator>,
-  ): Nullable<ptr<Internal.CJSON>>;
   SkipRuntime_NonEmptyIterator__next(
     values: ptr<Internal.NonEmptyIterator>,
   ): Nullable<ptr<Internal.CJSON>>;
-  SkipRuntime_NonEmptyIterator__clone(
-    values: ptr<Internal.NonEmptyIterator>,
-  ): ptr<Internal.NonEmptyIterator>;
 
   // Mapper
   SkipRuntime_createMapper<
@@ -408,32 +399,12 @@ export class WasmFromBinding implements FromBinding {
     private fromWasm: FromWasm,
   ) {}
 
-  SkipRuntime_NonEmptyIterator__first(
-    values: Pointer<Internal.NonEmptyIterator>,
-  ): Pointer<Internal.CJSON> {
-    return this.fromWasm.SkipRuntime_NonEmptyIterator__first(toPtr(values));
-  }
-
-  SkipRuntime_NonEmptyIterator__uniqueValue(
-    values: Pointer<Internal.NonEmptyIterator>,
-  ): Nullable<Pointer<Internal.CJSON>> {
-    return toNullablePointer(
-      this.fromWasm.SkipRuntime_NonEmptyIterator__uniqueValue(toPtr(values)),
-    );
-  }
-
   SkipRuntime_NonEmptyIterator__next(
     values: Pointer<Internal.NonEmptyIterator>,
   ): Nullable<Pointer<Internal.CJSON>> {
     return toNullablePointer(
       this.fromWasm.SkipRuntime_NonEmptyIterator__next(toPtr(values)),
     );
-  }
-
-  SkipRuntime_NonEmptyIterator__clone(
-    values: Pointer<Internal.NonEmptyIterator>,
-  ): Pointer<Internal.NonEmptyIterator> {
-    return this.fromWasm.SkipRuntime_NonEmptyIterator__clone(toPtr(values));
   }
 
   SkipRuntime_createMapper<

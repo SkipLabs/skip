@@ -1227,9 +1227,8 @@ fun populateClasses(
     classesDirName,
     (context, writer, _key, values) ~> {
       SkipError.catchErrors(2, context, () -> {
-        if (values.collect(Array).size() > 1) return void;
-        values.first.value match {
-        | GlobalEnv.EClass(def) ->
+        values.getUnique() match {
+        | Some(GlobalEnv.ExpandedDefFile(GlobalEnv.EClass(def))) ->
           inheritedClassArr = inhDir.getArray(
             context,
             SKStore.SID(def.name.i1),
@@ -2084,10 +2083,8 @@ fun populateFuns(
     funsByAnnotationDirName,
     (context, writer, _key, values) ~> {
       SkipError.catchErrors(2, context, () -> {
-        if (values.collect(Array).size() > 1) return void;
-
-        values.first.value match {
-        | GlobalEnv.EFun(f) ->
+        values.getUnique() match {
+        | Some(GlobalEnv.ExpandedDefFile(GlobalEnv.EFun(f))) ->
           for (annotation in f.annotations) {
             writer.set(SKStore.SID(annotation), NameFile(f.name))
           }
@@ -2104,10 +2101,8 @@ fun populateFuns(
     funsDirName,
     (context, writer, _key, values) ~> {
       SkipError.catchErrors(2, context, () -> {
-        if (values.collect(Array).size() > 1) return void;
-
-        values.first.value match {
-        | GlobalEnv.EFun(f) ->
+        values.getUnique() match {
+        | Some(GlobalEnv.ExpandedDefFile(GlobalEnv.EFun(f))) ->
           writer.set(
             SKStore.SID(f.name.i1),
             FunFile(fun_def(context, make_env(), f)),
