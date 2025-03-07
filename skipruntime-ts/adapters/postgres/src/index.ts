@@ -1,5 +1,5 @@
 /**
- * This is an adapter to connect PostgreSQL to the Skip Framework, allowing a table of a PostgreSQL database to be exposed as a Skip Resource.
+ * This is an adapter to connect PostgreSQL to the Skip Framework, allowing tables of a PostgreSQL database to be exposed as Skip collections.
  *
  * @packageDocumentation
  */
@@ -19,7 +19,9 @@ pg.types.setTypeParser(pg.types.builtins.TIMESTAMPTZ, (x: string) => x);
 /**
  * An `ExternalService` wrapping a PostgreSQL database.
  *
- * Expose the tables of a PostgreSQL database as *resources* in the Skip runtime.
+ * Expose the *tables* of a PostgreSQL database as *collections* in the Skip runtime.
+ *
+ * For a usage example, refer [here](https://github.com/SkipLabs/skip/tree/main/examples/hackernews).
  *
  * @remarks
  * Subscription `params` **must** include a field `key` whose value is an object with a string field `col` identifying the table column that should be used as the key in the resulting collection, and a field `type` whose value is a Postgres text, integer, or serial type. (i.e. one of `TEXT`, `SERIAL`, `SERIAL2`, `SERIAL4`, `SERIAL8`, `BIGSERIAL`, `SMALLSERIAL`, `INTEGER`, `INT`, `INT2`, `INT4`, `INT8`, `BIGINT`, or `SMALLINT`)
