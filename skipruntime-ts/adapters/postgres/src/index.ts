@@ -1,5 +1,5 @@
 /**
- * This is an adapter to connect PostgreSQL to the Skip Framework, allowing a table of a PostgreSQL database to be exposed as a Skip Resource.
+ * This is an adapter to connect PostgreSQL to the Skip Framework, allowing tables of a PostgreSQL database to be exposed as Skip collections.
  *
  * @packageDocumentation
  */
@@ -104,7 +104,9 @@ function validateKeyParam(params: Json): {
 /**
  * An `ExternalService` wrapping a PostgreSQL database.
  *
- * Expose the tables of a PostgreSQL database as *resources* in the Skip runtime.
+ * Expose the *tables* of a PostgreSQL database as *collections* in the Skip runtime.
+ *
+ * For a usage example, refer [here](https://github.com/SkipLabs/skip/tree/main/examples/hackernews).
  *
  * @remarks
  * Subscription `params` **must** include a field `key` whose value is an object with a string field `col` identifying the table column that should be used as the key in the resulting collection, and a field `type` whose value is one of `INTEGER`, `BIGINT`, `SERIAL`, `BIGSERIAL`, or `TEXT`.
