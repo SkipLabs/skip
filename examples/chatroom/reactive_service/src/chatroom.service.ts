@@ -8,7 +8,7 @@ import type {
   Values,
 } from "@skipruntime/core";
 
-import { KafkaExternalService } from "./index.js";
+import { KafkaExternalService } from "@skip-adapter/kafka";
 
 type Message = {
   id: number;
