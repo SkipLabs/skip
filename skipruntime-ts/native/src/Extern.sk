@@ -15,38 +15,11 @@ native fun getContext(): ?mutable SKStore.Context;
 
 /************  NonEmptyIterator ****************/
 
-@export("SkipRuntime_NonEmptyIterator__first")
-fun firstOfNonEmptyIterator(
-  values: mutable SKStore.NonEmptyIterator<SKJSON.CJSON>,
-): SKJSON.CJSON {
-  if (values.isPastFirstValue) {
-    throw SKStore.Error(
-      "`first` can't be called after `next` on a NonEmptyIterator",
-    )
-  };
-  values.first
-}
-
-@export("SkipRuntime_NonEmptyIterator__uniqueValue")
-fun uniqueValueOfNonEmptyIterator(
-  values: mutable SKStore.NonEmptyIterator<SKJSON.CJSON>,
-): ?SKJSON.CJSON {
-  value = values.next();
-  if (values.next().isSome()) None() else value
-}
-
 @export("SkipRuntime_NonEmptyIterator__next")
 fun nextOfNonEmptyIterator(
   values: mutable SKStore.NonEmptyIterator<SKJSON.CJSON>,
 ): ?SKJSON.CJSON {
   values.next()
-}
-
-@export("SkipRuntime_NonEmptyIterator__clone")
-fun cloneOfNonEmptyIterator(
-  values: mutable SKStore.NonEmptyIterator<SKJSON.CJSON>,
-): mutable SKStore.NonEmptyIterator<SKJSON.CJSON> {
-  values.clone()
 }
 
 /************  Mapper ****************/
