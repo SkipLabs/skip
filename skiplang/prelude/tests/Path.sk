@@ -197,4 +197,56 @@ fun testJoin(): void {
   t3("a", "/b/", "/c/", "/c");
 }
 
+@test
+fun testRelativeTo(): void {
+  t = (path: String, base: String, result: String) ->
+    T.expectEq(
+      Path.relativeTo{path, base},
+      result,
+      `relativeTo{path => "${path}", base => "${base}"}`,
+    );
+  t("/", "/", ".");
+  t("/", "/a", "..");
+  t("/", "/a/b", "../..");
+
+  t(".", ".", ".");
+  t(".", "a", "..");
+  t(".", "a/b", "../..");
+
+  t("/a/b/c", "/", "a/b/c");
+  t("/a/b/c", "/a", "b/c");
+  t("/a/b/c", "/a/b", "c");
+  t("/a/b/c", "/a/b/c", ".");
+  t("/a/b/c", "/a/b/c/d", "..");
+  t("/a/b/c", "/a/b/c/d/e", "../..");
+  t("/a/b/c", "/d", "../a/b/c");
+  t("/a/b/c", "/d/e", "../../a/b/c");
+
+  t("a/b/c", ".", "a/b/c");
+  t("a/b/c", "a", "b/c");
+  t("a/b/c", "a/b", "c");
+  t("a/b/c", "a/b/c", ".");
+  t("a/b/c", "a/b/c/d", "..");
+  t("a/b/c", "a/b/c/d/e", "../..");
+  t("a/b/c", "d", "../a/b/c");
+  t("a/b/c", "d/e", "../../a/b/c");
+
+  t("../a/b/c", "..", "a/b/c");
+  t("../a/b/c", "../a", "b/c");
+  t("../a/b/c", "../a/b", "c");
+  t("../a/b/c", "../a/b/c", ".");
+  t("../a/b/c", "../a/b/c/d", "..");
+  t("../a/b/c", "../a/b/c/d/e", "../..");
+  t("../a/b/c", "../d", "../a/b/c");
+  t("../a/b/c", "../d/e", "../../a/b/c");
+
+  t("/", "a", "/");
+  t("/", ".", "/");
+  t("/", "..", "/");
+  t("/a/b", "c", "/a/b");
+  t(".", "/", ".");
+  t(".", "/a", ".");
+  t("a/b", "/c/d", "a/b");
+}
+
 module end;
