@@ -103,10 +103,13 @@ export class PostgresExternalService implements ExternalService {
     const setup = async () => {
       callbacks.loading();
       const init = await this.client.query(format("SELECT * FROM %I;", table));
-      callbacks.update(
-        init.rows.map((row) => [row[key.col], [row]]) as Entry<Json, Json>[],
-        true,
-      );
+      const entries: Map<Json, Json[]> = new Map<Json, Json[]>();
+      for (const row of init.rows as { [col: string]: Json }[]) {
+        const k = row[key.col]!;
+        if (entries.has(k)) entries.get(k)!.push(row);
+        else entries.set(k, [row]);
+      }
+      callbacks.update(Array.from(entries), true);
       // Reuse existing trigger/function if possible
       if (!this.open_instances.has(instance)) {
         await this.client.query(
