@@ -296,7 +296,47 @@ fun resolve(
     resolve2(resolve2(path1, path2), path3);
   };
 }
-// TODO: Add relative(path1, path2)
 
+/* Returns path as a relative path to base, such that
+ * join(base, relativeTo{path, base}) == normalize(path).
+ * unless base is absolute and path is relative, in which case path is returned.
+ */
+fun relativeTo{path: String, base: String}: String {
+  if (isAbsolute(path) != isAbsolute(base)) {
+    path
+  } else {
+    !path = normalize(path);
+    !base = normalize(base);
+    if (path == base) {
+      currentDirectory
+    } else if (base == currentDirectory) {
+      path
+    } else if (base == rootDirectory) {
+      path.stripPrefix(rootDirectory)
+    } else if (path == rootDirectory || path == currentDirectory) {
+      baseComponents = base.splitIterator(separator);
+      if (isAbsolute(base)) {
+        _ = baseComponents.next();
+      };
+      baseComponents.map(_ -> parentDirectory).collect(Array).join(separator)
+    } else {
+      pathComponents = path.splitIterator(separator);
+      baseComponents = base.splitIterator(separator);
+      pathElement = pathComponents.next();
+      baseElement = baseComponents.next();
+      while (pathElement.isSome() && pathElement == baseElement) {
+        !pathElement = pathComponents.next();
+        !baseElement = baseComponents.next();
+      };
+      baseComponents
+        .concat(baseElement.iterator())
+        .map(_ -> parentDirectory)
+        .concat(pathElement.iterator())
+        .concat(pathComponents)
+        .collect(Array)
+        .join(separator)
+    }
+  }
+}
 
 module end;
