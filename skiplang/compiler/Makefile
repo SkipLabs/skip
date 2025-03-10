@@ -21,16 +21,16 @@ stage%:
 bootstrap/%.ll: bootstrap/%.ll.gz
 	gunzip -c $< > $@
 
-.PHONY: bootstrap/libskip_runtime64.a bootstrap/libbacktrace.a
-bootstrap/libskip_runtime64.a bootstrap/libbacktrace.a:
-	OUT_DIR=$$(realpath ./bootstrap) $(MAKE) -C ../prelude
+.PHONY: build/libskip_runtime64.a build/libbacktrace.a
+build/libskip_runtime64.a build/libbacktrace.a:
+	OUT_DIR=$$(realpath ./build) $(MAKE) -C ../prelude
 
 .PHONY: stage0/lib/libstd.sklib
 stage0/lib/libstd.sklib:
 	mkdir -p $(@D)
 	PATH=$$(realpath stage0/bin):$(PATH) OUT_DIR=$$(realpath stage0/lib) $(MAKE) -C ../prelude bootstrap
 
-stage0/bin/skc: bootstrap/skc_out64.ll bootstrap/libskip_runtime64.a bootstrap/libbacktrace.a
+stage0/bin/skc: bootstrap/skc_out64.ll build/libskip_runtime64.a build/libbacktrace.a
 	mkdir -p $(@D)
 	clang++ -no-pie $(CXXFLAGS) -o $@ $^ -lpthread -g3
 
@@ -101,8 +101,8 @@ install: stage$(STAGE)
 
 .PHONY: clean
 clean:
-	OUT_DIR=$$(realpath ./bootstrap) $(MAKE) -C ../prelude clean
-	rm -Rf stage* bootstrap/*.ll bootstrap/libbacktrace.a
+	OUT_DIR=$$(realpath ./build) $(MAKE) -C ../prelude clean
+	rm -Rf stage* bootstrap/*.ll build
 
 .PHONY: test
 test: stage$(STAGE)
