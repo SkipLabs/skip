@@ -92,6 +92,7 @@ promote: stage$(STAGE)
 	cp stage$(STAGE)/target/host/$(SKARGO_PROFILE)/deps/skc-*.ll bootstrap/skc_out64.ll && gzip --best --force bootstrap/skc_out64.ll
 	cp stage$(STAGE)/target/host/$(SKARGO_PROFILE)/deps/skargo-*.ll bootstrap/skargo_out64.ll && gzip --best --force bootstrap/skargo_out64.ll
 	cp stage$(STAGE)/target/host/$(SKARGO_PROFILE)/deps/skfmt-*.ll bootstrap/skfmt_out64.ll && gzip --best --force bootstrap/skfmt_out64.ll
+	@echo "Push to bootstrap repository: cd $$(realpath ./bootstrap); git add -A; git commit -m 'Update to $(shell git describe --always)'; git push; cd -"
 
 .PHONY: install
 install: stage$(STAGE)
