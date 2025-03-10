@@ -18,7 +18,8 @@ stage%:
 	mkdir -p $@
 	$(MAKE) $@/bin/skc $@/bin/skfmt $@/bin/skargo $@/lib/libstd.sklib
 
-bootstrap/%.ll: bootstrap/%.ll.gz
+build/%.ll: bootstrap/%.ll.gz
+	mkdir -p $(@D)
 	gunzip -c $< > $@
 
 .PHONY: build/libskip_runtime64.a build/libbacktrace.a
@@ -30,15 +31,15 @@ stage0/lib/libstd.sklib:
 	mkdir -p $(@D)
 	PATH=$$(realpath stage0/bin):$(PATH) OUT_DIR=$$(realpath stage0/lib) $(MAKE) -C ../prelude bootstrap
 
-stage0/bin/skc: bootstrap/skc_out64.ll build/libskip_runtime64.a build/libbacktrace.a
+stage0/bin/skc: build/skc_out64.ll build/libskip_runtime64.a build/libbacktrace.a
 	mkdir -p $(@D)
 	clang++ -no-pie $(CXXFLAGS) -o $@ $^ -lpthread -g3
 
-stage0/bin/skargo: bootstrap/skargo_out64.ll stage0/lib/libstd.sklib
+stage0/bin/skargo: build/skargo_out64.ll stage0/lib/libstd.sklib
 	mkdir -p $(@D)
 	clang++ -no-pie $(CXXFLAGS) -o $@ $^ -lpthread -g3
 
-stage0/bin/skfmt: bootstrap/skfmt_out64.ll stage0/lib/libstd.sklib
+stage0/bin/skfmt: build/skfmt_out64.ll stage0/lib/libstd.sklib
 	mkdir -p $(@D)
 	clang++ -no-pie $(CXXFLAGS) -o $@ $^ -lpthread -g3
 
@@ -102,7 +103,7 @@ install: stage$(STAGE)
 .PHONY: clean
 clean:
 	OUT_DIR=$$(realpath ./build) $(MAKE) -C ../prelude clean
-	rm -Rf stage* bootstrap/*.ll build
+	rm -Rf stage* build
 
 .PHONY: test
 test: stage$(STAGE)
