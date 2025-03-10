@@ -63,6 +63,7 @@ private class Config{
   static_libraries: Array<String>,
   link_args: Array<String>,
   preambles: Array<String>,
+  cwd: WorkingDirectory,
 } {
   static fun make(results: Cli.ParseResults): this {
     optConfig = Optimize.Config::make(
@@ -213,6 +214,7 @@ private class Config{
       skcPreamble.split(Path.listSeparator).toArray()
     | _ -> Array[]
     };
+    cwd = WorkingDirectory::create();
     static{
       release,
       verbose,
@@ -248,11 +250,21 @@ private class Config{
       static_libraries,
       link_args,
       preambles,
+      cwd,
     }
   }
 
   fun isWasm(): Bool {
     this.target.startsWith("wasm32");
+  }
+}
+
+value class WorkingDirectory(private value: String) {
+  static fun create(): this {
+    static(getcwd())
+  }
+  fun toString(): String {
+    this.value
   }
 }
 
