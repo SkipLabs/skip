@@ -14,3 +14,4 @@ export {
 export { SkipExternalService } from "./remote.js";
 export { SkipServiceBroker, fetchJSON, type Entrypoint } from "./rest.js";
 export { Count, Max, Min, Sum } from "./utils.js";
+export { JoinOneMapper, JoinManyMapper } from "./join.js";
