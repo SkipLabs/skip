@@ -63,9 +63,9 @@ export class PostgresExternalService implements ExternalService {
       },
       (e: unknown) => {
         console.error(
-          "Error connecting to Postgres at " + JSON.stringify(db_config),
+          `Error connecting to Postgres at ${JSON.stringify(db_config)}:`,
         );
-        throw e;
+        console.error(e);
       },
     );
   }
@@ -100,7 +100,12 @@ export class PostgresExternalService implements ExternalService {
     const table = resource;
     const key = validateKeyParam(params);
 
-    const setup = async () => {
+    const error = (message: string) => (error: unknown) => {
+      callbacks.error(message);
+      console.error(message, error);
+    };
+
+    const initData = async () => {
       callbacks.loading();
       const init = await this.client.query(format("SELECT * FROM %I;", table));
       const entries: Map<Json, Json[]> = new Map<Json, Json[]>();
@@ -110,8 +115,12 @@ export class PostgresExternalService implements ExternalService {
         else entries.set(k, [row]);
       }
       callbacks.update(Array.from(entries), true);
+    };
+
+    const setupPgNotify = async () => {
       // Reuse existing trigger/function if possible
       if (!this.open_instances.has(instance)) {
+        this.open_instances.add(instance);
         await this.client.query(
           format(
             `
@@ -144,6 +153,15 @@ FOR EACH ROW EXECUTE FUNCTION %I();`,
           ),
         );
       }
+    };
+
+    const setup = async () => {
+      await initData().catch(
+        error(
+          `Uncaught error during Skip async initialization for Postgres table ${table}:`,
+        ),
+      );
+
       this.client.on("notification", (msg) => {
         if (msg.channel == instance && msg.payload !== undefined) {
           const query = key.select(table, msg.payload);
@@ -152,20 +170,19 @@ FOR EACH ROW EXECUTE FUNCTION %I();`,
               const k = key.type == "TEXT" ? msg.payload! : Number(msg.payload);
               callbacks.update([[k, changes.rows as Json[]]], false);
             },
-            (e: unknown) => {
-              console.error(`Error executing Postgres query: ${query}`);
-              throw e;
-            },
+            error(`Error executing Postgres query "${query}":`),
           );
         }
       });
+      await setupPgNotify().catch(
+        error(`Uncaught error setting up Postgres triggers on ${table}:`),
+      );
     };
-    setup().then(
-      () => this.open_instances.add(instance),
-      (e: unknown) => {
-        console.error("Error setting up Postgres notifications");
-        throw e;
-      },
+
+    setup().catch(
+      error(
+        `Uncaught error during async Skip update of Postgres table ${table}`,
+      ),
     );
   }
 
@@ -177,9 +194,9 @@ FOR EACH ROW EXECUTE FUNCTION %I();`,
           () => this.open_instances.delete(instance),
           (e: unknown) => {
             console.error(
-              "Error unsubscribing from resource instance: " + instance,
+              `Error unsubscribing from resource instance ${instance}:`,
+              e,
             );
-            throw e;
           },
         );
   }
