@@ -1,0 +1,27 @@
+module alias T = SKTest;
+
+module PathTest;
+
+@test
+fun testTrimTrailingSeparators(): void {
+  t = (path: String, res: String) ->
+    T.expectEq(
+      Path.trimTrailingSeparators(path),
+      res,
+      `trimTrailingSeparators("${path}")`,
+    );
+  t("", "");
+  t("/", "/");
+  t("//", "/");
+  t("///", "/");
+  t("a", "a");
+  t("a/", "a");
+  t("a//", "a");
+  t("a///", "a");
+  t("a///b", "a///b");
+  t("a///b/", "a///b");
+  t("a///b//", "a///b");
+  t("a///b///", "a///b");
+}
+
+module end;
