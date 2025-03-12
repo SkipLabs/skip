@@ -68,13 +68,18 @@ uint8_t SKIP_String_getByte(unsigned char* bytes, SkipInt idx) {
   return (uint8_t)bytes[idx];
 }
 
-char* SKIP_String_StringIterator__substring(char* argStart, char* argEnd) {
-  // get the index fields of argStart and argEnd, which are
-  // StringIterator objects
-  SkipInt start = ((SkipInt*)argStart)[1];
-  SkipInt end = ((SkipInt*)argEnd)[1];
+/* Must match the layout of StringIterator in the standard library. */
+typedef struct {
+  char* string_data;
+  SkipInt i;
+} sk_StringIterator;
+
+char* SKIP_String_StringIterator__substring(sk_StringIterator* argStart,
+                                            sk_StringIterator* argEnd) {
+  SkipInt start = argStart->i;
+  SkipInt end = argEnd->i;
   SkipInt size = end - start;
-  char* buffer = *((char**)argStart) + start;
+  char* buffer = argStart->string_data + start;
   char* result = sk_string_create(buffer, size);
   return result;
 }
