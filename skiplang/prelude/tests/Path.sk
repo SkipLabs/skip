@@ -69,4 +69,30 @@ fun testBasename(): void {
   t("dir/base///", "base");
 }
 
+@test
+fun testExtname(): void {
+  t = (path: String, res: String) ->
+    T.expectEq(Path.extname(path), res, `extname("${path}")`);
+  t("", "");
+  t("/", "");
+  t(".", "");
+  t("..", "");
+  t("/..", "");
+  t("/.", "");
+  t("dir/..", "");
+  t("dir/.", "");
+  t("base", "");
+  t("dir/base", "");
+  t("dir/base///", "");
+  t("base.ext", ".ext");
+  t("a.b.c", ".c");
+  t(".ext", ".ext");
+  t("a.ext///", ".ext");
+  t("a.", ".");
+  t("dir/base.ext", ".ext");
+  t("dir/base.ext///", ".ext");
+  t("dir/base.ext///.", "");
+  t("dir/base.ext///..", "");
+}
+
 module end;
