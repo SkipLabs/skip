@@ -43,7 +43,7 @@ fun isNormalized(path: String): Bool {
 // trimTrailingSeparators("///") == "/"
 // trimTrailingSeparators("") == ""
 fun trimTrailingSeparators(path: String): String {
-  if (path == rootDirectory) {
+  if (path == rootDirectory || path == "") {
     path
   } else {
     i = path.getEndIter();
@@ -51,7 +51,11 @@ fun trimTrailingSeparators(path: String): String {
       void
     };
     _ = i.next();
-    path.getIter().substring(i)
+    if (i.atStart()) { // Only slashes
+      rootDirectory
+    } else {
+      path.getIter().substring(i)
+    }
   }
 }
 
