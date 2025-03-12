@@ -52,4 +52,21 @@ fun testDirname(): void {
   t("a/b/c/", "a/b");
 }
 
+@test
+fun testBasename(): void {
+  t = (path: String, res: String) ->
+    T.expectEq(Path.basename(path), res, `basename("${path}")`);
+  t("", "");
+  t("/", "");
+  t(".", "");
+  t("..", "");
+  t("/..", "..");
+  t("/.", ".");
+  t("dir/..", "..");
+  t("dir/.", ".");
+  t("base", "base");
+  t("dir/base", "base");
+  t("dir/base///", "base");
+}
+
 module end;
