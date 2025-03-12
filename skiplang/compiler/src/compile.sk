@@ -358,11 +358,20 @@ fun compile(
     Array[TickConfigFile((context.tick.value, config))],
   );
 
+  make_input_source_path = (pkg_base_dir, src_path) ~> {
+    res = Path.join(pkg_base_dir, src_path);
+    if (config.canonize_paths) {
+      !res = config.cwd.makeRelative(res);
+    };
+    res
+  };
+
   FileCache.writeFiles(
     context,
     fileNames,
     config.dependencies,
     config.lib_name,
+    make_input_source_path,
   );
 
   context.update()

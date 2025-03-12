@@ -111,6 +111,7 @@ fun updatePackageFiles(
   name: ?String,
   pkg: InputPackageFiles,
   get_file_contents: String ~> String,
+  make_input_source_path: (String, String) ~> String,
 ): void {
   (modified_files, removed_files) = packageDir.unsafeMaybeGet(
     context,
@@ -122,14 +123,14 @@ fun updatePackageFiles(
   for ((pkg_base_dir, src_path) in modified_files) {
     fileDir.writeArray(
       context,
-      InputSource(name, Path.join(pkg_base_dir, src_path)),
+      InputSource(name, make_input_source_path(pkg_base_dir, src_path)),
       Array[SKStore.StringFile(get_file_contents(src_path))],
     )
   };
   for ((pkg_base_dir, src_path) in removed_files) {
     fileDir.writeArray(
       context,
-      InputSource(name, Path.join(pkg_base_dir, src_path)),
+      InputSource(name, make_input_source_path(pkg_base_dir, src_path)),
       Array[SKStore.StringFile("")],
     )
   };
@@ -141,6 +142,7 @@ fun writeFiles(
   file_names: Array<String>,
   dependencies: Map<String, (String, Sklib.Metadata)>,
   lib_name_opt: ?String,
+  make_input_source_path: (String, String) ~> String,
 ): void {
   // TODO: If `lib_name_opt` is `Some(_)`, ensure there is a
   // `Skargo.toml` in the cwd.
@@ -153,9 +155,15 @@ fun writeFiles(
         .map(fn -> (fn, FileSystem.getLastModificationTime(fn)))
         .collect(Array),
     );
-    updatePackageFiles(context, lib_name_opt, pkg, src ~> {
-      FileSystem.readTextFile(src)
-    })
+    updatePackageFiles(
+      context,
+      lib_name_opt,
+      pkg,
+      src ~> {
+        FileSystem.readTextFile(src)
+      },
+      make_input_source_path,
+    )
   };
 
   // For each (transitive) dependency, invalidate files that were
@@ -172,14 +180,26 @@ fun writeFiles(
       dep_meta.pkg_dir,
       dep_meta.sources.map(s -> (s.i0, s.i1)).collect(Array),
     );
-    updatePackageFiles(context, Some(dep_name), pkg, src ~> {
-      dep_meta.sources.find(f -> f.i0 == src).fromSome().i2
-    })
+    updatePackageFiles(
+      context,
+      Some(dep_name),
+      pkg,
+      src ~> {
+        dep_meta.sources.find(f -> f.i0 == src).fromSome().i2
+      },
+      make_input_source_path,
+    )
   };
 
   if (lib_name_opt is Some _) {
     // Invalidate non-package source files when building a package.
-    updatePackageFiles(context, None(), InputPackageFiles("", Array[]), _ ~> "")
+    updatePackageFiles(
+      context,
+      None(),
+      InputPackageFiles("", Array[]),
+      _ ~> "",
+      make_input_source_path,
+    )
   }
 }
 
