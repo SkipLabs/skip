@@ -24,4 +24,32 @@ fun testTrimTrailingSeparators(): void {
   t("a///b///", "a///b");
 }
 
+@test
+fun testDirname(): void {
+  t = (path: String, res: String) ->
+    T.expectEq(Path.dirname(path), res, `dirname("${path}")`);
+  t("", ".");
+  t(".", ".");
+  t("..", "..");
+  t("/", "/");
+  t("/.", "/");
+  t("/..", "/");
+  t("/a", "/");
+  t("/a/", "/");
+  t("/a/b", "/a");
+  t("/a/b/", "/a");
+  t("/a/b/c", "/a/b");
+  t("/a/b/c/", "/a/b");
+  t("a", ".");
+  t("a/", ".");
+  t("a/b", "a");
+  t("a////b", "a");
+  t("a/b/", "a");
+  t("a/b////", "a");
+  t("a/..", "a");
+  t("a/.", "a");
+  t("a/b/c", "a/b");
+  t("a/b/c/", "a/b");
+}
+
 module end;
