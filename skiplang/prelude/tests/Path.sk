@@ -146,4 +146,55 @@ fun testNormalize(): void {
   t("./..", "..");
 }
 
+@test
+fun testJoin(): void {
+  t1 = (path: String, res: String) ->
+    T.expectEq(Path.join(path), res, `join(${path})`);
+  t2 = (path1: String, path2: String, res: String) ->
+    T.expectEq(Path.join(path1, path2), res, `join(${path1}, ${path2})`);
+  t3 = (path1: String, path2: String, path3: String, res: String) ->
+    T.expectEq(
+      Path.join(path1, path2, path3),
+      res,
+      `join(${path1}, ${path2}, ${path3})`,
+    );
+  t1("", ".");
+  t1(".", ".");
+  t1("..", "..");
+  t1("/", "/");
+  t1("/.", "/");
+  t1("/..", "/..");
+  t1("/a", "/a");
+  t1("/a/", "/a");
+  t2("/a", "b", "/a/b");
+  t2("/a/", "b", "/a/b");
+  t2("/a", "/b", "/b");
+  t2("/a/", "/b", "/b");
+  t2("/a", "/b/", "/b");
+  t2("/a/", "/b/", "/b");
+  t2("a", "b", "a/b");
+  t2("a/", "b", "a/b");
+  t2("a", "/b", "/b");
+  t2("a/", "/b", "/b");
+  t2("a", "/b/", "/b");
+  t2("a/", "/b/", "/b");
+  t3("a", "b", "c", "a/b/c");
+  t3("a/", "b", "c", "a/b/c");
+  t3("a", "b/", "c", "a/b/c");
+  t3("a/", "b/", "c", "a/b/c");
+  t3("a", "b", "/c", "/c");
+  t3("a/", "b", "/c", "/c");
+  t3("a", "b/", "/c", "/c");
+  t3("a/", "b/", "/c", "/c");
+  t3("a", "/b", "c", "/b/c");
+  t3("a/", "/b", "c", "/b/c");
+  t3("a", "/b/", "c", "/b/c");
+  t3("a/", "/b/", "c", "/b/c");
+  t3("a", "/b", "/c", "/c");
+  t3("a/", "/b", "/c", "/c");
+  t3("a", "/b/", "/c", "/c");
+  t3("a/", "/b/", "/c", "/c");
+  t3("a", "/b/", "/c/", "/c");
+}
+
 module end;
