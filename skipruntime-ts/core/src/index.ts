@@ -834,11 +834,17 @@ export class ToBinding {
   ): Pointer<Internal.CJArray> {
     const skjson = this.getJsonConverter();
     const mapper = this.handles.get(skmapper);
-    const result = mapper.mapEntry(
-      skjson.importJSON(key) as Json,
-      new ValuesImpl<Json>(skjson, this.binding, values),
-    );
-    return skjson.exportJSON(Array.from(result));
+    try {
+      const result = mapper.mapEntry(
+        skjson.importJSON(key) as Json,
+        new ValuesImpl<Json>(skjson, this.binding, values),
+      );
+      return skjson.exportJSON(Array.from(result));
+    } catch (e: unknown) {
+      console.error("Uncaught error during Skip runtime reactive update: ", e);
+      // Exception in async context will be dropped -- this `throw` is just to appease typechecker
+      throw e;
+    }
   }
 
   SkipRuntime_deleteMapper(mapper: Handle<JSONMapper>): void {
