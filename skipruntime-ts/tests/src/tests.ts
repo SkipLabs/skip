@@ -28,6 +28,16 @@ import { it as mit, type AsyncFunc } from "mocha";
 import pg from "pg";
 import { PostgresExternalService } from "@skip-adapter/postgres";
 
+async function withAlternateConsoleError(
+  altConsoleError: (...messages: any[]) => void,
+  f: () => Promise<void>,
+): Promise<void> {
+  const systemConsoleError = console.error;
+  console.error = altConsoleError;
+  await f();
+  console.error = systemConsoleError;
+}
+
 //// testMap1
 
 class Map1 implements Mapper<string, number, string, number> {
@@ -406,8 +416,6 @@ async function timeout(ms: number) {
 }
 
 class MockExternal implements ExternalService {
-  exception?: Error;
-
   subscribe(
     _instance: string,
     resource: string,
@@ -419,9 +427,7 @@ class MockExternal implements ExternalService {
     },
   ) {
     if (resource == "mock") {
-      this.mock(params, callbacks.update).catch((e: unknown) => {
-        this.exception = e as Error;
-      });
+      this.mock(params, callbacks.update);
     }
   }
 
@@ -764,7 +770,7 @@ class MapWithExceptionOnExternalResource implements Resource<Input_SN> {
     const external = context.useExternalResource<number, number>({
       service: "external",
       identifier: "mock",
-      params: { v1: 10, v2: 20 },
+      params: { v1: 32, v2: 20 },
     });
     return external.map(NMapWithException);
   }
@@ -1265,15 +1271,31 @@ export function initTests(
         }
       }
 
-      service.instantiateResource(
-        "unsafe.fixed.resource.ident.2",
-        "resourceWithException",
-        {},
+      const errorMessages: any[] = [];
+      await withAlternateConsoleError(
+        (...msgs) => msgs.forEach((x) => errorMessages.push(x)),
+        async () => {
+          service.instantiateResource(
+            "unsafe.fixed.resource.ident.2",
+            "resourceWithException",
+            {},
+          );
+          //TODO: await instantiateResource instead of sleeping here, once that's made asynchronous
+          await timeout(10);
+          await pgClient.query(
+            "INSERT INTO skip_test (id, x) VALUES (42, 42);",
+          );
+          await timeout(10);
+          expect(errorMessages).toHaveLength(2);
+          expect(errorMessages[0]).toEqual(
+            "Uncaught error during Skip runtime reactive update: ",
+          );
+          expect(errorMessages[1]).toBeA(Error);
+          expect((errorMessages[1] as Error).message).toMatchRegex(
+            /^(?:Error: )?Something goes wrong.$/,
+          );
+        },
       );
-      // triggers exception in mapper! should log a trace but doesn't
-      await timeout(50);//TODO: await instantiateResource instead of sleeping here, once that's made asynchronous
-      await pgClient.query("INSERT INTO skip_test (id, x) VALUES (42,42);");
-      await timeout(5);
     } finally {
       await pgClient.query("DELETE FROM skip_test WHERE id = 1;");
       await pgClient.query("DELETE FROM skip_test WHERE id = 42;");
@@ -1286,46 +1308,68 @@ export function initTests(
   it("testLazyWithUseExternalService", async () => {
     const service = await initService(lazyWithUseExternalServiceService);
     service.instantiateResource("unsafe.fixed.resource.ident", "lazy", {});
-    const update = () =>
-      service.update("input", [
-        [0, [10]],
-        [1, [20]],
-      ]);
-    expect(update).toThrow(
-      new RegExp(
-        /^(?:Error: )?useExternalResource is not allowed in a lazy computation graph.$/,
-      ),
+
+    await withAlternateConsoleError(
+      () => {},
+      async () => {
+        const update = () =>
+          service.update("input", [
+            [0, [10]],
+            [1, [20]],
+          ]);
+        expect(update).toThrow(
+          new RegExp(
+            /^(?:Error: )?useExternalResource is not allowed in a lazy computation graph.$/,
+          ),
+        );
+      },
     );
   });
 
   it("testMapWithException", async () => {
-    const service = await initService(mapWithExceptionService);
-    service.instantiateResource(
-      "unsafe.fixed.resource.ident",
-      "mapWithException",
-      {},
+    await withAlternateConsoleError(
+      () => {},
+      async () => {
+        const service = await initService(mapWithExceptionService);
+        service.instantiateResource(
+          "unsafe.fixed.resource.ident",
+          "mapWithException",
+          {},
+        );
+        const update = () =>
+          service.update("input", [
+            [0, [10]],
+            [1, [20]],
+          ]);
+        expect(update).toThrow(
+          new RegExp(/^(?:Error: )?Something goes wrong.$/),
+        );
+      },
     );
-    const update = () =>
-      service.update("input", [
-        [0, [10]],
-        [1, [20]],
-      ]);
-    expect(update).toThrow(new RegExp(/^(?:Error: )?Something goes wrong.$/));
   });
 
   it("testMapWithExceptionOnExternal", async () => {
-    const service = await initService(mapWithExceptionOnExternalService);
-    service.instantiateResource(
-      "unsafe.fixed.resource.ident",
-      "mapWithException",
-      {},
-    );
-    await timeout(0);
-    const message = mapWithExceptionOnExternMock.exception
-      ? mapWithExceptionOnExternMock.exception.message
-      : "No exceptions";
-    expect(message).toMatchRegex(
-      new RegExp(/^(?:Error: )?Something goes wrong.$/),
+    // Capture logged error messages instead of actually logging
+    const errorMessages: any[] = [];
+    await withAlternateConsoleError(
+      (...msgs) => msgs.forEach((x) => errorMessages.push(x)),
+      async () => {
+        const service = await initService(mapWithExceptionOnExternalService);
+        service.instantiateResource(
+          "unsafe.fixed.resource.ident",
+          "mapWithException",
+          {},
+        );
+        await timeout(5);
+        expect(errorMessages).toHaveLength(2);
+        expect(errorMessages[0]).toEqual(
+          "Uncaught error during Skip runtime reactive update: ",
+        );
+        expect(errorMessages[1]).toBeA(Error);
+        expect((errorMessages[1] as Error).message).toMatchRegex(
+          /^(?:Error: )?Something goes wrong.$/,
+        );
+      },
     );
   });
 }
