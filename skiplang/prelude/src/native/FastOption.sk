@@ -197,6 +197,12 @@ private trait FastOptionCommonTrait<+T> extends FastOptionTrait<T> {
       }
     }
   }
+
+  fun iterator(): mutable Iterator<T> {
+    if (this.isSome()) {
+      yield this.unsafeFromSome()
+    }
+  }
 }
 
 private trait FastOptionHashableTrait<+T: Hashable> extends
