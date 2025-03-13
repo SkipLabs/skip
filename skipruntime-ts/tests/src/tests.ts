@@ -1171,7 +1171,7 @@ export function initTests(
     expect(service.getArray("resource2", "1").payload).toEqual([40]);
   });
 
-  it("testPostgres", async () => {
+  it("testPostgres", async function () {
     let service;
     const pgClient = new pg.Client(pg_config);
     try {
@@ -1182,14 +1182,14 @@ export function initTests(
         throw new Error("Failed to set up CircleCI environment with Postgres.");
       }
       console.warn(
-        "Default pass on testPostgres since no local PostgreSQL instance found;",
+        "Skipping testPostgres since no local PostgreSQL instance found;",
       );
       console.warn("To test properly, run the following then retry:");
       console.warn("\tdocker pull postgres:latest");
       console.warn(
         "\tdocker run --name skip-postgres-container -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=secret -p 5432:5432 -d postgres",
       );
-      return;
+      this.skip();
     }
     try {
       service.update("input", [
