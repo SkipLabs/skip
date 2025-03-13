@@ -427,7 +427,7 @@ class MockExternal implements ExternalService {
     },
   ) {
     if (resource == "mock") {
-      this.mock(params, callbacks.update);
+      void this.mock(params, callbacks.update);
     }
   }
 
