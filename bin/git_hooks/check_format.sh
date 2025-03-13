@@ -10,7 +10,7 @@ check-file () {
     # select formatter based on filename extension, must transform stdin to stdout
     if [[ "$file" == *.sk ]]; then # keep in sync with fmt-sk in Makefile
         fmt="skfmt --assume-filename=$file"
-    elif [[ "$file" =~ .*\.[ch](pp)?$ ]]; then # keep in sync with fmt-c in Makefile
+    elif [[ "$file" =~ .*\.(c|cc|cpp|h|hh|hpp)$ ]]; then # keep in sync with fmt-c in Makefile
         fmt="clang-format --assume-filename=$file"
     elif [[ "$file" =~ .*\.(css|html|js|json|mjs|ts|tsx)$ ]]; then # keep in sync with .prettierignore
         fmt="npx prettier --stdin-filepath $file"
