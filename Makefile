@@ -100,7 +100,7 @@ fmt-sk: # Keep in sync with bin/git_hooks/check_format.sh
 
 .PHONY: fmt-c
 fmt-c: # Keep in sync with bin/git_hooks/check_format.sh
-	find . -path ./node_modules -not -prune -or -path ./skiplang/prelude/libbacktrace -not -prune -or -path ./sql/test/TPC-h/tnt-tpch -not -prune -or -regex '.*\.[ch]\(c\|pp\)*' | parallel clang-format -i {}
+	find . -path ./node_modules -not -prune -or -path ./skiplang/prelude/libbacktrace -not -prune -or -path ./sql/test/TPC-h/tnt-tpch -not -prune -or -regex '.*\.\(c\|cc\|cpp\|h\|hh\|hpp\)' | parallel clang-format -i {}
 
 .PHONY: fmt-js
 fmt-js: # Keep in sync with bin/git_hooks/check_format.sh
