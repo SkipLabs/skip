@@ -341,26 +341,30 @@ native class .String uses Hashable, Show, Orderable, AsBytes {
     })
   }
 
-  fun split(delimiter: String, maxCount: Int = Int::max): Vector<String> {
+  fun splitIterator(
+    delimiter: String,
+    maxCount: Int = Int::max,
+  ): mutable Iterator<String> {
     delimiterLength = delimiter.length();
     if (delimiterLength == 0) {
       invariant_violation("String.split: cannot split with empty delimiter")
     } else if (this.isEmpty()) {
-      Vector[""]
+      yield ""
     } else {
-      gen: () -> mutable Iterator<String> = () -> {
-        start = this.getIter();
-        i = start.clone();
-        while (i.search(delimiter) && maxCount > 0) {
-          !maxCount = maxCount - 1;
-          yield start.substring(i);
-          _ = i.drop(delimiterLength);
-          !start = i.clone();
-        };
-        yield start.substring(this.getEndIter());
+      start = this.getIter();
+      i = start.clone();
+      while (i.search(delimiter) && maxCount > 0) {
+        !maxCount = maxCount - 1;
+        yield start.substring(i);
+        _ = i.drop(delimiterLength);
+        !start = i.clone();
       };
-      Vector::createFromIterator(gen());
+      yield start.substring(this.getEndIter());
     }
+  }
+
+  fun split(delimiter: String, maxCount: Int = Int::max): Vector<String> {
+    Vector::createFromIterator(this.splitIterator(delimiter, maxCount));
   }
 
   fun join<TS: readonly Show, T: readonly Sequence<TS>>(pieces: T): String {
