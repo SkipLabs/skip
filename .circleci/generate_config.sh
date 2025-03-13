@@ -19,8 +19,8 @@ git diff --quiet HEAD "$BASE" -- skipruntime-ts/
 skipruntime=$?
 git diff --quiet HEAD "$BASE" -- skiplang/prelude/ts/
 ts_prelude=$?
-git diff --quiet HEAD "$BASE" -- examples/hackernews/
-hackernews_example=$?
+git diff --quiet HEAD "$BASE" -- examples/
+examples=$?
 
 SKIPLANG_LIBS_CHANGED=()
 for lib_tests in skiplang/*/tests; do
@@ -105,11 +105,11 @@ then
 EOF
 fi
 
-if (( hackernews_example != 0))
+if (( examples != 0 ))
 then
     cat <<EOF
-  hackernews-example:
+  examples:
     jobs:
-      - check-hackernews-example
+      - check-examples
 EOF
 fi
