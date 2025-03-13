@@ -7,7 +7,7 @@
 
 // Filesystem Paths
 //
-// Multiple consqcutive /'s are equivalent to a single /.
+// Multiple consecutive /'s are equivalent to a single /.
 // Trailing /'s are not significant in paths.
 
 module Path;
@@ -43,7 +43,7 @@ fun isNormalized(path: String): Bool {
 // trimTrailingSeparators("///") == "/"
 // trimTrailingSeparators("") == ""
 fun trimTrailingSeparators(path: String): String {
-  if (path == rootDirectory) {
+  if (path == rootDirectory || path == "") {
     path
   } else {
     i = path.getEndIter();
@@ -51,7 +51,11 @@ fun trimTrailingSeparators(path: String): String {
       void
     };
     _ = i.next();
-    path.getIter().substring(i)
+    if (i.atStart()) { // Only slashes
+      rootDirectory
+    } else {
+      path.getIter().substring(i)
+    }
   }
 }
 
@@ -59,7 +63,7 @@ fun trimTrailingSeparators(path: String): String {
 // Trailing separators are ignored.
 // Returns "." if path is empty, or contains only a filename.
 //
-// The returned directory name will have traililng spearators removed.
+// The returned directory name will have trailing separators removed.
 //
 // Note that the result of dirname(path) may not be normalize()d.
 //
@@ -292,7 +296,47 @@ fun resolve(
     resolve2(resolve2(path1, path2), path3);
   };
 }
-// TOOD: Add relative(path1, path2)
 
+/* Returns path as a relative path to base, such that
+ * join(base, relativeTo{path, base}) == normalize(path).
+ * unless base is absolute and path is relative, in which case path is returned.
+ */
+fun relativeTo{path: String, base: String}: String {
+  if (isAbsolute(path) != isAbsolute(base)) {
+    path
+  } else {
+    !path = normalize(path);
+    !base = normalize(base);
+    if (path == base) {
+      currentDirectory
+    } else if (base == currentDirectory) {
+      path
+    } else if (base == rootDirectory) {
+      path.stripPrefix(rootDirectory)
+    } else if (path == rootDirectory || path == currentDirectory) {
+      baseComponents = base.splitIterator(separator);
+      if (isAbsolute(base)) {
+        _ = baseComponents.next();
+      };
+      baseComponents.map(_ -> parentDirectory).collect(Array).join(separator)
+    } else {
+      pathComponents = path.splitIterator(separator);
+      baseComponents = base.splitIterator(separator);
+      pathElement = pathComponents.next();
+      baseElement = baseComponents.next();
+      while (pathElement.isSome() && pathElement == baseElement) {
+        !pathElement = pathComponents.next();
+        !baseElement = baseComponents.next();
+      };
+      baseComponents
+        .concat(baseElement.iterator())
+        .map(_ -> parentDirectory)
+        .concat(pathElement.iterator())
+        .concat(pathComponents)
+        .collect(Array)
+        .join(separator)
+    }
+  }
+}
 
 module end;

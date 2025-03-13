@@ -1,0 +1,252 @@
+module alias T = SKTest;
+
+module PathTest;
+
+@test
+fun testTrimTrailingSeparators(): void {
+  t = (path: String, res: String) ->
+    T.expectEq(
+      Path.trimTrailingSeparators(path),
+      res,
+      `trimTrailingSeparators("${path}")`,
+    );
+  t("", "");
+  t("/", "/");
+  t("//", "/");
+  t("///", "/");
+  t("a", "a");
+  t("a/", "a");
+  t("a//", "a");
+  t("a///", "a");
+  t("a///b", "a///b");
+  t("a///b/", "a///b");
+  t("a///b//", "a///b");
+  t("a///b///", "a///b");
+}
+
+@test
+fun testDirname(): void {
+  t = (path: String, res: String) ->
+    T.expectEq(Path.dirname(path), res, `dirname("${path}")`);
+  t("", ".");
+  t(".", ".");
+  t("..", "..");
+  t("/", "/");
+  t("/.", "/");
+  t("/..", "/");
+  t("/a", "/");
+  t("/a/", "/");
+  t("/a/b", "/a");
+  t("/a/b/", "/a");
+  t("/a/b/c", "/a/b");
+  t("/a/b/c/", "/a/b");
+  t("a", ".");
+  t("a/", ".");
+  t("a/b", "a");
+  t("a////b", "a");
+  t("a/b/", "a");
+  t("a/b////", "a");
+  t("a/..", "a");
+  t("a/.", "a");
+  t("a/b/c", "a/b");
+  t("a/b/c/", "a/b");
+}
+
+@test
+fun testBasename(): void {
+  t = (path: String, res: String) ->
+    T.expectEq(Path.basename(path), res, `basename("${path}")`);
+  t("", "");
+  t("/", "");
+  t(".", "");
+  t("..", "");
+  t("/..", "..");
+  t("/.", ".");
+  t("dir/..", "..");
+  t("dir/.", ".");
+  t("base", "base");
+  t("dir/base", "base");
+  t("dir/base///", "base");
+}
+
+@test
+fun testExtname(): void {
+  t = (path: String, res: String) ->
+    T.expectEq(Path.extname(path), res, `extname("${path}")`);
+  t("", "");
+  t("/", "");
+  t(".", "");
+  t("..", "");
+  t("/..", "");
+  t("/.", "");
+  t("dir/..", "");
+  t("dir/.", "");
+  t("base", "");
+  t("dir/base", "");
+  t("dir/base///", "");
+  t("base.ext", ".ext");
+  t("a.b.c", ".c");
+  t(".ext", ".ext");
+  t("a.ext///", ".ext");
+  t("a.", ".");
+  t("dir/base.ext", ".ext");
+  t("dir/base.ext///", ".ext");
+  t("dir/base.ext///.", "");
+  t("dir/base.ext///..", "");
+}
+
+@test
+fun testNormalize(): void {
+  t = (path: String, res: String) ->
+    T.expectEq(Path.normalize(path), res, `normalize("${path}")`);
+  t("", ".");
+  t(".", ".");
+  t("..", "..");
+  t("/", "/");
+  t("/.", "/");
+  t("/..", "/..");
+  t("/a", "/a");
+  t("/a/", "/a");
+  t("/a/b", "/a/b");
+  t("/a/b/", "/a/b");
+  t("/a/b/c", "/a/b/c");
+  t("/a/b/c/", "/a/b/c");
+  t("a", "a");
+  t("a/", "a");
+  t("a///", "a");
+  t("a/b", "a/b");
+  t("a/b/", "a/b");
+  t("a///b", "a/b");
+  t("a/./b", "a/b");
+  t("a/b/c", "a/b/c");
+  t("a/b/c/", "a/b/c");
+  t("a/b/../c", "a/c");
+  t("a/b/../c/", "a/c");
+  t("a/b/../../c", "c");
+  t("a/b/../../c/", "c");
+  t("a/b/../../c/..", ".");
+  t("a/..", ".");
+  t("a/.", "a");
+  t("a/b/c/..", "a/b");
+  t("a/b/c/.", "a/b/c");
+  t("a/b/../../..", "..");
+  t("a/b/../../../", "..");
+  t("a/b/../../../a", "../a");
+  t("a/b/../../../a/", "../a");
+  t("a/b/../../../a/b", "../a/b");
+  t("a/b/../../../..", "../..");
+  t("a/b/../../../../", "../..");
+  t("a/b/c/../../../d", "d");
+  t("../a", "../a");
+  t("../a/", "../a");
+  t("../a/b", "../a/b");
+  t("../a/b/", "../a/b");
+  t("../../a", "../../a");
+  t("../..", "../..");
+  t("./..", "..");
+}
+
+@test
+fun testJoin(): void {
+  t1 = (path: String, res: String) ->
+    T.expectEq(Path.join(path), res, `join(${path})`);
+  t2 = (path1: String, path2: String, res: String) ->
+    T.expectEq(Path.join(path1, path2), res, `join(${path1}, ${path2})`);
+  t3 = (path1: String, path2: String, path3: String, res: String) ->
+    T.expectEq(
+      Path.join(path1, path2, path3),
+      res,
+      `join(${path1}, ${path2}, ${path3})`,
+    );
+  t1("", ".");
+  t1(".", ".");
+  t1("..", "..");
+  t1("/", "/");
+  t1("/.", "/");
+  t1("/..", "/..");
+  t1("/a", "/a");
+  t1("/a/", "/a");
+  t2("/a", "b", "/a/b");
+  t2("/a/", "b", "/a/b");
+  t2("/a", "/b", "/b");
+  t2("/a/", "/b", "/b");
+  t2("/a", "/b/", "/b");
+  t2("/a/", "/b/", "/b");
+  t2("a", "b", "a/b");
+  t2("a/", "b", "a/b");
+  t2("a", "/b", "/b");
+  t2("a/", "/b", "/b");
+  t2("a", "/b/", "/b");
+  t2("a/", "/b/", "/b");
+  t3("a", "b", "c", "a/b/c");
+  t3("a/", "b", "c", "a/b/c");
+  t3("a", "b/", "c", "a/b/c");
+  t3("a/", "b/", "c", "a/b/c");
+  t3("a", "b", "/c", "/c");
+  t3("a/", "b", "/c", "/c");
+  t3("a", "b/", "/c", "/c");
+  t3("a/", "b/", "/c", "/c");
+  t3("a", "/b", "c", "/b/c");
+  t3("a/", "/b", "c", "/b/c");
+  t3("a", "/b/", "c", "/b/c");
+  t3("a/", "/b/", "c", "/b/c");
+  t3("a", "/b", "/c", "/c");
+  t3("a/", "/b", "/c", "/c");
+  t3("a", "/b/", "/c", "/c");
+  t3("a/", "/b/", "/c", "/c");
+  t3("a", "/b/", "/c/", "/c");
+}
+
+@test
+fun testRelativeTo(): void {
+  t = (path: String, base: String, result: String) ->
+    T.expectEq(
+      Path.relativeTo{path, base},
+      result,
+      `relativeTo{path => "${path}", base => "${base}"}`,
+    );
+  t("/", "/", ".");
+  t("/", "/a", "..");
+  t("/", "/a/b", "../..");
+
+  t(".", ".", ".");
+  t(".", "a", "..");
+  t(".", "a/b", "../..");
+
+  t("/a/b/c", "/", "a/b/c");
+  t("/a/b/c", "/a", "b/c");
+  t("/a/b/c", "/a/b", "c");
+  t("/a/b/c", "/a/b/c", ".");
+  t("/a/b/c", "/a/b/c/d", "..");
+  t("/a/b/c", "/a/b/c/d/e", "../..");
+  t("/a/b/c", "/d", "../a/b/c");
+  t("/a/b/c", "/d/e", "../../a/b/c");
+
+  t("a/b/c", ".", "a/b/c");
+  t("a/b/c", "a", "b/c");
+  t("a/b/c", "a/b", "c");
+  t("a/b/c", "a/b/c", ".");
+  t("a/b/c", "a/b/c/d", "..");
+  t("a/b/c", "a/b/c/d/e", "../..");
+  t("a/b/c", "d", "../a/b/c");
+  t("a/b/c", "d/e", "../../a/b/c");
+
+  t("../a/b/c", "..", "a/b/c");
+  t("../a/b/c", "../a", "b/c");
+  t("../a/b/c", "../a/b", "c");
+  t("../a/b/c", "../a/b/c", ".");
+  t("../a/b/c", "../a/b/c/d", "..");
+  t("../a/b/c", "../a/b/c/d/e", "../..");
+  t("../a/b/c", "../d", "../a/b/c");
+  t("../a/b/c", "../d/e", "../../a/b/c");
+
+  t("/", "a", "/");
+  t("/", ".", "/");
+  t("/", "..", "/");
+  t("/a/b", "c", "/a/b");
+  t(".", "/", ".");
+  t(".", "/a", ".");
+  t("a/b", "/c/d", "a/b");
+}
+
+module end;
