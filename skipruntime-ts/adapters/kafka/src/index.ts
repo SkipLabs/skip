@@ -86,8 +86,7 @@ export class KafkaExternalService implements ExternalService {
       await consumer.connect();
       await consumer.subscribe({ topic, fromBeginning });
       await consumer.run({
-        // eslint-disable-next-line @typescript-eslint/require-await
-        eachBatch: async ({ batch }) => {
+        eachBatch: ({ batch }) => {
           const entries: Map<Json, Json[]> = new Map<Json, Json[]>();
           batch.messages.forEach((msg) => {
             for (const [k, v] of this.messageProcessor({
@@ -100,6 +99,7 @@ export class KafkaExternalService implements ExternalService {
             }
           });
           callbacks.update(Array.from(entries), false);
+          return Promise.resolve(undefined);
         },
       });
     };

@@ -715,7 +715,7 @@ function kafkaService(): SkipService<Input_NN, Input_NN> {
       return inputs;
     },
   };
-};
+}
 
 // Wrap service instantiation in a function so that the WASM and Native tests get ahold
 // of separate DB clients and manage their lifecycle properly; normally you'd just
