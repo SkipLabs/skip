@@ -1311,7 +1311,7 @@ export function initTests(
 
     await withAlternateConsoleError(
       () => {},
-      async () => {
+      () => {
         const update = () =>
           service.update("input", [
             [0, [10]],
@@ -1322,6 +1322,7 @@ export function initTests(
             /^(?:Error: )?useExternalResource is not allowed in a lazy computation graph.$/,
           ),
         );
+        return Promise.resolve(undefined);
       },
     );
   });
