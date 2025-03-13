@@ -84,6 +84,7 @@ export class KafkaExternalService implements ExternalService {
     const fromBeginning = params.fromBeginning ?? true;
     const setup = async () => {
       await consumer.connect();
+      this.consumers.set(instance, consumer);
       await consumer.subscribe({ topic, fromBeginning });
       await consumer.run({
         eachBatch: ({ batch }) => {
@@ -103,13 +104,11 @@ export class KafkaExternalService implements ExternalService {
         },
       });
     };
-    setup().then(
-      () => this.consumers.set(instance, consumer),
-      (e: unknown) => {
-        console.error("Error setting up Kafka subscription: ", e);
-        throw e;
-      },
-    );
+    setup().catch((e: unknown) => {
+      const message = `Error subscribing to Kafka external service: ${e}`;
+      console.error(message);
+      callbacks.error(message);
+    });
   }
 
   unsubscribe(instance: string): void {
@@ -118,7 +117,6 @@ export class KafkaExternalService implements ExternalService {
       this.consumers.delete(instance);
       consumer.disconnect().catch((e: unknown) => {
         console.error(`Error disconnecting Kafka consumer ${instance}: ${e}`);
-        throw e;
       });
     }
   }
