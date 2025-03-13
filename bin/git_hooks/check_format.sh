@@ -14,6 +14,8 @@ check-file () {
         fmt="clang-format --assume-filename=$file"
     elif [[ "$file" =~ .*\.(css|html|js|json|mjs|ts|tsx)$ ]]; then # keep in sync with .prettierignore
         fmt="npx prettier --stdin-filepath $file"
+    elif [[ "$file" == *.py ]]; then # keep in sync with fmt-py in Makefile
+        fmt="black - --quiet --line-length 80 --stdin-filename $file"
     else
         exit 0;
     fi
