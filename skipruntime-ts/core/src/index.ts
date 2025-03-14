@@ -12,7 +12,11 @@ import type {
   JsonConverter,
   JsonObject,
 } from "../skiplang-json/index.js";
-import { SkManaged, checkOrCloneParam } from "../skiplang-json/index.js";
+import {
+  deepFreeze,
+  SkManaged,
+  checkOrCloneParam,
+} from "../skiplang-json/index.js";
 
 import { sknative } from "../skiplang-std/index.js";
 
@@ -148,14 +152,17 @@ class LazyCollectionImpl<K extends Json, V extends Json>
     ) as (V & DepSafe)[];
   }
 
-  getUnique(key: K): V & DepSafe {
+  getUnique(key: K, options?: { default: V }): V & DepSafe {
     const v = this.refs.skjson.importOptJSON(
       this.refs.binding.SkipRuntime_LazyCollection__getUnique(
         this.lazyCollection,
         this.refs.skjson.exportJSON(key),
       ),
     ) as Nullable<V & DepSafe>;
-    if (v == null) throw new SkipNonUniqueValueError();
+    if (v == null) {
+      if (options) return deepFreeze(options.default);
+      throw new SkipNonUniqueValueError();
+    }
     return v;
   }
 }
@@ -181,14 +188,17 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     ) as (V & DepSafe)[];
   }
 
-  getUnique(key: K): V & DepSafe {
+  getUnique(key: K, options?: { default: V }): V & DepSafe {
     const v = this.refs.skjson.importOptJSON(
       this.refs.binding.SkipRuntime_Collection__getUnique(
         this.collection,
         this.refs.skjson.exportJSON(key),
       ),
     ) as Nullable<V & DepSafe>;
-    if (v == null) throw new SkipNonUniqueValueError();
+    if (v == null) {
+      if (options) return deepFreeze(options.default);
+      throw new SkipNonUniqueValueError();
+    }
     return v;
   }
 
