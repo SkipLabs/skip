@@ -34,7 +34,7 @@ export abstract class Frozen implements Managed {
   protected abstract freeze(): void;
 }
 
-export function sk_freeze<T extends object>(x: T): T & Managed {
+function sk_freeze<T extends object>(x: T): T & Managed {
   return Object.defineProperty(x, sk_managed, {
     enumerable: false,
     writable: false,
