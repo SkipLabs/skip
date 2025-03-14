@@ -4,32 +4,55 @@
 
 BASE="$(git merge-base main HEAD)"
 
-# shellcheck disable=SC2046 # We actually want splitting in jq command output
-git diff --quiet HEAD "$BASE" -- $(jq --raw-output ".workspaces[]" package.json)
-check_ts=$?
-git diff --quiet HEAD "$BASE" -- skiplang/compiler/ skiplang/prelude/ :^skiplang/prelude/ts
-skc=$?
-git diff --quiet HEAD "$BASE" -- skiplang/prelude/src/skstore/ skiplang/prelude/runtime/
-skstore=$?
-git diff --quiet HEAD "$BASE" -- skiplang/skjson
-skjson=$?
-git diff --quiet HEAD "$BASE" -- sql/ skiplang/sqlparser/
-skdb=$?
-git diff --quiet HEAD "$BASE" -- skipruntime-ts/
-skipruntime=$?
-git diff --quiet HEAD "$BASE" -- skiplang/prelude/ts/
-ts_prelude=$?
 git diff --quiet HEAD "$BASE" -- examples/
 examples=$?
 
-SKIPLANG_LIBS_CHANGED=()
-for lib_tests in skiplang/*/tests; do
-  lib=$(basename "$(dirname "$lib_tests")")
-  if [ "$lib" != compiler ] && [ "$lib" != prelude ] && \
-    ! git diff --quiet HEAD "$BASE" -- "skiplang/$lib"; then
-      SKIPLANG_LIBS_CHANGED+=("$lib")
-  fi
+shopt -s globstar
+declare -A SK_CHANGED
+for skargo_toml in **/Skargo.toml; do
+  dir=$(dirname "$skargo_toml")
+  git diff --quiet HEAD "$BASE" -- "$dir" :^"$dir/ts" \
+    && SK_CHANGED["$dir"]=false || SK_CHANGED["$dir"]=true
 done
+
+if ${SK_CHANGED[skiplang/prelude]}; then
+  SK_CHANGED[skiplang/compiler]=true
+  SK_CHANGED[sql]=true
+fi
+if ${SK_CHANGED[skiplang/sqlparser]}; then
+  SK_CHANGED[sql]=true
+fi
+
+check_ts=false
+declare -A TS_CHANGED
+# shellcheck disable=SC2046 # We actually want splitting in jq command output
+for dir in $(jq --raw-output ".workspaces[]" package.json); do
+  git diff --quiet HEAD "$BASE" -- "$dir" \
+    && TS_CHANGED["$dir"]=false || TS_CHANGED["$dir"]=true
+  ${TS_CHANGED["$dir"]} && check_ts=true
+done
+
+for dir in "${!SK_CHANGED[@]}"; do
+  ${SK_CHANGED["$dir"]} && TS_CHANGED["$dir"]=true
+done
+
+for dir in "${!TS_CHANGED[@]}"; do
+  changed=${TS_CHANGED["$dir"]}
+  while [ "$dir" != "." ] && [ "$dir" != "/" ]; do
+    if ${TS_CHANGED["$dir"]:-false} && ! $changed; then break; fi
+    TS_CHANGED["$dir"]=$changed
+    dir=$(dirname "$dir")
+  done
+done
+
+if ${TS_CHANGED[skiplang/skjson]}; then
+  TS_CHANGED[sql]=true
+  TS_CHANGED[skipruntime-ts]=true
+fi
+if ${TS_CHANGED[skiplang/prelude]}; then
+  TS_CHANGED[sql]=true
+  TS_CHANGED[skipruntime-ts]=true
+fi
 
 cat .circleci/base.yml
 
@@ -41,7 +64,7 @@ echo "workflows:"
       - fast-checks
 EOF
 
-if (( check_ts != 0 ))
+if $check_ts
 then
     cat <<EOF
   check-ts:
@@ -50,44 +73,45 @@ then
 EOF
 fi
 
-if (( skc != 0 ))
-then
+for dir in "${!SK_CHANGED[@]}"; do
+  if ${SK_CHANGED["$dir"]}; then
+    case "$dir" in
+      skipruntime-ts/* )
+        TS_CHANGED[skipruntime-ts]=true
+        ;;
+      sql)
+        cat <<EOF
+  skdb:
+    jobs:
+      - skdb
+EOF
+        ;;
+      skiplang/compiler)
    cat <<EOF
   compiler:
     jobs:
       - compiler
 EOF
-fi
+        ;;
+      skiplang/sqlparser) ;;
+      *)
+        name=$(basename "$dir")
+        if [ -d "$dir/tests" ]; then
+          echo "  $name-tests:"
+          echo "    jobs:"
+          echo "      - skip-package-tests:"
+        else
+          echo "  $name-build:"
+          echo "    jobs:"
+          echo "      - skip-package-build:"
+        fi
+        echo "          dir: $dir"
+        echo "          name: $name"
+    esac
+  fi
+done
 
-if (( skstore != 0 ))
-then
-    cat <<EOF
-  skstore:
-    jobs:
-      - skstore
-EOF
-fi
-
-if [ ${#SKIPLANG_LIBS_CHANGED[@]} -gt 0 ]; then
-  echo "  skiplang-libs-tests:"
-  echo "    jobs:"
-  for lib in "${SKIPLANG_LIBS_CHANGED[@]}"; do
-    echo "      - skiplang-lib-tests:"
-    echo "          libname: $lib"
-    echo "          name: $lib"
-  done
-fi
-
-if (( skdb != 0 || skstore != 0 ))
-then
-    cat <<EOF
-  skdb:
-    jobs:
-      - skdb
-EOF
-fi
-
-if (( skdb != 0 || skstore != 0 || ts_prelude != 0 || skjson != 0 ))
+if ${TS_CHANGED[sql]}
 then
     cat <<EOF
   skdb-wasm:
@@ -96,7 +120,7 @@ then
 EOF
 fi
 
-if (( skstore != 0 || skipruntime != 0 || ts_prelude != 0 || skjson != 0 ))
+if ${TS_CHANGED[skipruntime-ts]}
 then
     cat <<EOF
   skipruntime:
