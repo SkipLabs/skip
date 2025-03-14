@@ -12,12 +12,7 @@ import type {
   JsonConverter,
   JsonObject,
 } from "../skiplang-json/index.js";
-import {
-  sk_freeze,
-  isSkManaged,
-  SkManaged,
-  checkOrCloneParam,
-} from "../skiplang-json/index.js";
+import { SkManaged, checkOrCloneParam } from "../skiplang-json/index.js";
 
 import { sknative } from "../skiplang-std/index.js";
 
@@ -54,7 +49,6 @@ import {
   type FromBinding,
 } from "./binding.js";
 
-export { sk_freeze, isSkManaged };
 export * from "./api.js";
 export * from "./errors.js";
 
