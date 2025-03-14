@@ -36,19 +36,22 @@ class DeparturesResource implements Resource<ResourceInputs> {
     cs: ResourceInputs,
     context: Context,
   ): EagerCollection<number, Departure> {
-    const get = (name: string, def: string) => {
-      try {
-        return cs.config.getUnique(name).join(",");
-      } catch (_e) {
-        return def;
-      }
-    };
     const params = {
       page: 1,
-      year: get("year", "2016,2017"),
-      origin: get("origin", "MMR,SYR"),
-      asylum: get("asylum", "JOR,LBN"),
-      resettlement: get("resettlement", "NOR,USA"),
+      year: cs.config
+        .getUnique("year", { default: ["2016", "2017"] })
+        .join(","),
+      origin: cs.config
+        .getUnique("origin", { default: ["MMR", "SYR"] })
+        .join(","),
+      asylum: cs.config
+        .getUnique("asylum", { default: ["JOR", "LBN"] })
+        .join(","),
+      resettlement: cs.config
+        .getUnique("resettlement", {
+          default: ["NOR", "USA"],
+        })
+        .join(","),
     };
 
     return context.useExternalResource({
