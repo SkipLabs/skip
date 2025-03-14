@@ -84,12 +84,12 @@ export interface Reducer<V extends Json, A extends Json> {
 }
 
 /**
- * An iterable collection of dependency-safe values.
+ * A non-empty iterable collection of dependency-safe values.
  */
 export interface Values<T> extends Iterable<T & DepSafe> {
   /**
    * Return the first value, if there is exactly one.
-   * @throws {@link SkipNonUniqueValueError} if this iterable contains either zero or multiple values.
+   * @throws {@link SkipNonUniqueValueError} if this iterable contains multiple values.
    */
   getUnique(): T & DepSafe;
 
@@ -123,10 +123,12 @@ export interface LazyCollection<K extends Json, V extends Json>
    * For collections that do not use the generality of associating multiple values to a key, `getUnique` saves some boilerplate over `getArray`.
    *
    * @param key - The key to query.
+   * @param options - Optional named parameters
+   * @param options.default - A default value to return if the collection does not associate exactly one value to `key`.
    * @returns The value associated to `key`.
-   * @throws {@link SkipNonUniqueValueError} if `key` is associated to either zero or multiple values.
+   * @throws {@link SkipNonUniqueValueError} if `key` is associated to either zero or multiple values and no `options.default` is provided
    */
-  getUnique(key: K): V & DepSafe;
+  getUnique(key: K, options?: { default: V }): V & DepSafe;
 }
 
 /**
@@ -153,10 +155,12 @@ export interface EagerCollection<K extends Json, V extends Json>
    * For collections that do not use the generality of associating multiple values to a key, `getUnique` saves some boilerplate over `getArray`.
    *
    * @param key - The key to query.
+   * @param options - Optional named parameters
+   * @param options.default - A default value to return if the collection does not associate exactly one value to `key`.
    * @returns The value associated to `key`.
-   * @throws {@link SkipNonUniqueValueError} if `key` is associated to either zero or multiple values.
+   * @throws {@link SkipNonUniqueValueError} if `key` is associated to either zero or multiple values and no `options.default` is provided
    */
-  getUnique(key: K): V & DepSafe;
+  getUnique(key: K, options?: { default: V }): V & DepSafe;
 
   /**
    * Create a new eager collection by mapping a function over the values in this one.

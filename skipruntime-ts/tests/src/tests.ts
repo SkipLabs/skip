@@ -15,7 +15,7 @@ import type {
   ExternalService,
   ServiceInstance,
 } from "@skipruntime/core";
-import { SkipNonUniqueValueError } from "@skipruntime/core";
+
 import {
   Count,
   GenericExternalService,
@@ -461,14 +461,9 @@ class MockExternalCheck implements Mapper<number, number, number, number[]> {
   constructor(private readonly external: EagerCollection<number, number>) {}
 
   mapEntry(key: number, values: Values<number>): Iterable<[number, number[]]> {
-    try {
-      const result = this.external.getUnique(key);
-      return [[key, [...values, result]]];
-    } catch (e) {
-      if (e instanceof SkipNonUniqueValueError)
-        return [[key, values.toArray()]];
-      throw e;
-    }
+    const result = this.external.getUnique(key, { default: NaN });
+    if (Number.isNaN(result)) return [[key, values.toArray()]];
+    return [[key, [...values, result]]];
   }
 }
 
