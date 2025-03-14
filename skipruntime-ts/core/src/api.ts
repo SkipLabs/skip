@@ -318,6 +318,8 @@ export interface LazyCompute<K extends Json, V extends Json> {
  * Skip Runtime internal state.
  */
 export interface Context extends Managed {
+  readonly session: (Json & DepSafe) | null;
+
   /**
    * Create a lazy reactive collection.
    *
