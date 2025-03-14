@@ -12,7 +12,11 @@ import type {
   JsonConverter,
   JsonObject,
 } from "../skiplang-json/index.js";
-import { SkManaged, checkOrCloneParam } from "../skiplang-json/index.js";
+import {
+  deepFreeze,
+  SkManaged,
+  checkOrCloneParam,
+} from "../skiplang-json/index.js";
 
 import { sknative } from "../skiplang-std/index.js";
 
@@ -148,15 +152,18 @@ class LazyCollectionImpl<K extends Json, V extends Json>
     ) as (V & DepSafe)[];
   }
 
-  getUnique(key: K): V & DepSafe {
-    const v = this.refs.skjson.importOptJSON(
-      this.refs.binding.SkipRuntime_LazyCollection__getUnique(
-        this.lazyCollection,
-        this.refs.skjson.exportJSON(key),
-      ),
-    ) as Nullable<V & DepSafe>;
-    if (v == null) throw new SkipNonUniqueValueError();
-    return v;
+  getUnique(key: K, _default?: { ifNone?: V; ifMany?: V }): V & DepSafe {
+    const values = this.getArray(key);
+    switch (values.length) {
+      case 1:
+        return values[0]!;
+      case 0:
+        if (_default?.ifNone !== undefined) return deepFreeze(_default.ifNone);
+        throw new SkipNonUniqueValueError();
+      default:
+        if (_default?.ifMany !== undefined) return deepFreeze(_default.ifMany);
+        throw new SkipNonUniqueValueError();
+    }
   }
 }
 
@@ -181,15 +188,18 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     ) as (V & DepSafe)[];
   }
 
-  getUnique(key: K): V & DepSafe {
-    const v = this.refs.skjson.importOptJSON(
-      this.refs.binding.SkipRuntime_Collection__getUnique(
-        this.collection,
-        this.refs.skjson.exportJSON(key),
-      ),
-    ) as Nullable<V & DepSafe>;
-    if (v == null) throw new SkipNonUniqueValueError();
-    return v;
+  getUnique(key: K, _default?: { ifNone?: V; ifMany?: V }): V & DepSafe {
+    const values = this.getArray(key);
+    switch (values.length) {
+      case 1:
+        return values[0]!;
+      case 0:
+        if (_default?.ifNone !== undefined) return deepFreeze(_default.ifNone);
+        throw new SkipNonUniqueValueError();
+      default:
+        if (_default?.ifMany !== undefined) return deepFreeze(_default.ifMany);
+        throw new SkipNonUniqueValueError();
+    }
   }
 
   size = () => {
@@ -740,7 +750,7 @@ class ValuesImpl<T> implements Values<T> {
     return v;
   }
 
-  getUnique(): T & DepSafe {
+  getUnique(_default?: { ifMany?: T }): T & DepSafe {
     if (this.materialized.length < 1) {
       this.next();
     }
@@ -750,6 +760,7 @@ class ValuesImpl<T> implements Values<T> {
       this.materialized.length >= 2 ||
       this.next() !== null
     ) {
+      if (_default?.ifMany !== undefined) return deepFreeze(_default.ifMany);
       throw new SkipNonUniqueValueError();
     }
     return first;
