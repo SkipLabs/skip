@@ -1021,6 +1021,7 @@ fun writeOutputFiles(
   // arbitrarily pick some unique input file as the CU for this output file.
   metadata = AsmOutput.Metadata::create(
     defs,
+    config.cwd,
     if (!inputFiles.isEmpty()) {
       inputFiles[0]
     } else {
@@ -1645,6 +1646,8 @@ mutable class Metadata{
   // List of LLVM metadata
   metadata: mutable Vector<String> = mutable Vector[],
 
+  cwd: Config.WorkingDirectory,
+
   diFileCache: mutable UnorderedMap<Filename, DIFile> = mutable UnorderedMap[],
 
   // TODO: Right now we only support a single generic subroutine type.  Once we
@@ -1672,9 +1675,10 @@ mutable class Metadata{
 } {
   static fun create(
     defs: readonly AsmDefIDToAsmDef,
+    cwd: Config.WorkingDirectory,
     compilationUnit: String,
   ): mutable Metadata {
-    metadata = mutable Metadata{defs};
+    metadata = mutable Metadata{defs, cwd};
 
     // Reserve the slot for kEmptyBlockIndex since we may have already
     // handed it out.
@@ -1714,8 +1718,8 @@ mutable class Metadata{
           str = mutable TextOutputStream.StringTextOutputStream{};
           str.printf2(
             "!DIFile(filename: %r, directory: %r)",
-            filename,
-            getcwd(),
+            this.cwd.makeRelative(filename),
+            this.cwd.toString(),
           );
           str.toString()
         }),

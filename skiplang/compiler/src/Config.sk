@@ -63,6 +63,8 @@ private class Config{
   static_libraries: Array<String>,
   link_args: Array<String>,
   preambles: Array<String>,
+  canonize_paths: Bool,
+  cwd: WorkingDirectory,
 } {
   static fun make(results: Cli.ParseResults): this {
     optConfig = Optimize.Config::make(
@@ -213,6 +215,8 @@ private class Config{
       skcPreamble.split(Path.listSeparator).toArray()
     | _ -> Array[]
     };
+    canonize_paths = results.getBool("canonize-paths");
+    cwd = WorkingDirectory::create(canonize_paths);
     static{
       release,
       verbose,
@@ -248,11 +252,47 @@ private class Config{
       static_libraries,
       link_args,
       preambles,
+      cwd,
+      canonize_paths,
     }
   }
 
   fun isWasm(): Bool {
     this.target.startsWith("wasm32");
+  }
+}
+
+value class WorkingDirectory{
+  private abs_cwd: String,
+  private rel_cwd: ?String,
+} {
+  static fun create(anonymize: Bool): this {
+    abs_cwd = getcwd();
+    rel_cwd = if (anonymize) {
+      Some(
+        {
+          repo = abs_cwd;
+          while (!FileSystem.exists(Path.join(repo, ".git"))) {
+            if (Path.isRoot(repo)) {
+              break Path.currentDirectory
+            };
+            !repo = Path.parentname(repo);
+          } else {
+            Path.relativeTo{path => abs_cwd, base => repo}
+          }
+        },
+      )
+    } else {
+      None()
+    };
+    static{abs_cwd, rel_cwd}
+  }
+  fun toString(): String {
+    this.rel_cwd.default(this.abs_cwd)
+  }
+  /* Makes a path relative to this working directory. */
+  fun makeRelative(path: String): String {
+    Path.relativeTo{path, base => this.abs_cwd}
   }
 }
 
