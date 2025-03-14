@@ -21,6 +21,7 @@ type User = {
   name: string;
   email: string;
 };
+const unknownUser: User = { name: "unknown author", email: "unknown email" };
 
 type Upvote = {
   post_id: number;
@@ -66,12 +67,9 @@ class PostsMapper {
   ): Iterable<[[number, number], PostWithUpvoteIds]> {
     const post: Post = values.getUnique();
     const upvotes: number[] = this.upvotes.getArray(key);
-    let author;
-    try {
-      author = this.users.getUnique(post.author_id);
-    } catch {
-      author = { name: "unknown author", email: "unknown email" };
-    }
+    const author = this.users.getUnique(post.author_id, {
+      ifNone: unknownUser,
+    });
     return [[[-upvotes.length, key], { ...post, upvotes, author }]];
   }
 }
@@ -128,12 +126,9 @@ class PostsResource implements Resource<PostsResourceInputs> {
   instantiate(
     collections: PostsResourceInputs,
   ): EagerCollection<number, PostWithUpvoteCount> {
-    let session;
-    try {
-      session = collections.sessions.getUnique(this.session_id);
-    } catch {
-      session = null;
-    }
+    const session = collections.sessions.getUnique(this.session_id, {
+      ifNone: null,
+    });
     return collections.postsWithUpvotes
       .take(this.limit)
       .map(CleanupMapper, session);
