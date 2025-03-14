@@ -34,7 +34,7 @@ export abstract class Frozen implements Managed {
   protected abstract freeze(): void;
 }
 
-function sk_freeze<T extends object>(x: T): T & Managed {
+function tagSkManaged<T extends object>(x: T): T & Managed {
   return Object.defineProperty(x, sk_managed, {
     enumerable: false,
     writable: false,
@@ -48,7 +48,7 @@ export function isSkManaged(x: any): x is Managed {
 
 export abstract class SkManaged extends Frozen {
   protected freeze() {
-    sk_freeze(this);
+    tagSkManaged(this);
   }
 }
 
@@ -126,12 +126,12 @@ export function deepFreeze<T>(value: T): T & DepSafe {
       for (const elt of value) {
         deepFreeze(elt);
       }
-      return Object.freeze(sk_freeze(value));
+      return Object.freeze(tagSkManaged(value));
     } else {
       for (const val of Object.values(value)) {
         deepFreeze(val);
       }
-      return Object.freeze(sk_freeze(value));
+      return Object.freeze(tagSkManaged(value));
     }
   } else {
     // typeof value == "function" || typeof value == "undefined"
@@ -265,7 +265,7 @@ function interpretPointer<T extends Internal.CJSON>(
       const array = Array.from({ length }, (_, idx) =>
         interpretPointer(binding, binding.SKIP_SKJSON_at(aPtr, idx)),
       );
-      return sk_freeze(array);
+      return tagSkManaged(array);
     }
     case Type.Object: {
       const oPtr = binding.SKIP_SKJSON_asObject(pointer);
