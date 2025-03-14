@@ -95,23 +95,23 @@ clean-all: clean
 	find . -type d -name 'node_modules' -prune -print0 | xargs -0 rm -rf
 
 .PHONY: fmt-sk
-fmt-sk:
+fmt-sk: # Keep in sync with bin/git_hooks/check_format.sh
 	find . -path ./skiplang/compiler/tests -not -prune -or -name \*.sk | parallel skfmt -i {}
 
 .PHONY: fmt-c
-fmt-c:
-	find . -path ./node_modules -not -prune -or -path ./skiplang/prelude/libbacktrace -not -prune -or -path ./sql/test/TPC-h/tnt-tpch -not -prune -or -regex '.*\.[ch]\(c\|pp\)*' | parallel clang-format -i {}
+fmt-c: # Keep in sync with bin/git_hooks/check_format.sh
+	find . -path ./node_modules -not -prune -or -path ./skiplang/prelude/libbacktrace -not -prune -or -path ./sql/test/TPC-h/tnt-tpch -not -prune -or -regex '.*\.\(c\|cc\|cpp\|h\|hh\|hpp\)' | parallel clang-format -i {}
 
 .PHONY: fmt-js
-fmt-js:
+fmt-js: # Keep in sync with bin/git_hooks/check_format.sh
 	npx prettier --log-level warn --write .
 
 .PHONY: fmt-py
-fmt-py:
+fmt-py: # Keep in sync with bin/git_hooks/check_format.sh
 	black --quiet --line-length 80 .
 
 .PHONY: fmt
-fmt: fmt-sk fmt-c fmt-js fmt-py
+fmt: fmt-sk fmt-c fmt-js fmt-py # Keep in sync with bin/git_hooks/check_format.sh
 
 .PHONY: check-fmt
 check-fmt: fmt
