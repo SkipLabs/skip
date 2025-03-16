@@ -23,6 +23,7 @@ import {
   TimerResource,
   join_one,
   join_many,
+  join_many_through,
 } from "@skipruntime/helpers";
 
 import { it as mit, type AsyncFunc } from "mocha";
@@ -775,18 +776,32 @@ type JoinServiceInputs = {
 
 type PostWithAuthorAndUpvotes = Omit<Post, "author_id"> & {
   author: User;
-  upvotes: Omit<Upvote, "post_id">[];
+  upvotes: Upvote[];
+};
+
+type PostWithAuthorAndUpvoters = Omit<Post, "author_id"> & {
+  author: User;
+  upvoters: User[];
 };
 
 type JoinServiceResourceInputs = {
-  posts: EagerCollection<number, PostWithAuthorAndUpvotes>;
+  posts1: EagerCollection<number, PostWithAuthorAndUpvotes>;
+  posts2: EagerCollection<number, PostWithAuthorAndUpvoters>;
 };
 
-class PostsResource implements Resource<JoinServiceResourceInputs> {
+class Posts1Resource implements Resource<JoinServiceResourceInputs> {
   instantiate(
     collections: JoinServiceResourceInputs,
   ): EagerCollection<number, PostWithAuthorAndUpvotes> {
-    return collections.posts;
+    return collections.posts1;
+  }
+}
+
+class Posts2Resource implements Resource<JoinServiceResourceInputs> {
+  instantiate(
+    collections: JoinServiceResourceInputs,
+  ): EagerCollection<number, PostWithAuthorAndUpvoters> {
+    return collections.posts2;
   }
 }
 
@@ -797,22 +812,33 @@ const joinService: SkipService<JoinServiceInputs, JoinServiceResourceInputs> = {
     upvotes: [],
   },
   resources: {
-    posts: PostsResource,
+    posts1: Posts1Resource,
+    posts2: Posts2Resource,
   },
   createGraph(inputCollections: JoinServiceInputs) {
     const posts_with_author = join_one(
-      inputCollections.posts,
-      inputCollections.users,
       {
-        on: "author_id",
-        name: "author",
+        left: inputCollections.posts,
+        right: inputCollections.users,
+        id: "author_id",
+        as: "author",
       },
     );
-    const posts = join_many(posts_with_author, inputCollections.upvotes, {
-      on: "post_id",
-      name: "upvotes",
+    const posts1 = join_many({
+      left: posts_with_author,
+      right: inputCollections.upvotes,
+      id: "post_id",
+      as: "upvotes",
     });
-    return { posts };
+    const posts2 = join_many_through({
+      left: posts_with_author,
+      right: inputCollections.users,
+      through: inputCollections.upvotes,
+      id_left: "post_id",
+      id_right: "user_id",
+      as: "upvoters",
+    });
+    return { posts1, posts2 };
   },
 };
 
@@ -1369,15 +1395,16 @@ export function initTests(
         [2, [{ post_id: 1, user_id: 2 }]],
         [3, [{ post_id: 2, user_id: 2 }]],
       ]);
-      service.instantiateResource("unsafe.fixed.resource.ident", "posts", {});
-      expect(service.getAll("posts").payload).toEqual([
+      service.instantiateResource("unsafe.fixed.resource.ident1", "posts1", {});
+      service.instantiateResource("unsafe.fixed.resource.ident2", "posts2", {});
+      expect(service.getAll("posts1").payload).toEqual([
         [
           1,
           [
             {
               title: "FooBar",
               author: { name: "Foo" },
-              upvotes: [{ user_id: 1 }, { user_id: 2 }],
+              upvotes: [{ post_id: 1, user_id: 1 }, { post_id: 1, user_id: 2 }],
             },
           ],
         ],
@@ -1387,7 +1414,29 @@ export function initTests(
             {
               title: "Baz",
               author: { name: "Bar" },
-              upvotes: [{ user_id: 2 }],
+              upvotes: [{ post_id: 2, user_id: 2 }],
+            },
+          ],
+        ],
+      ]);
+      expect(service.getAll("posts2").payload).toEqual([
+        [
+          1,
+          [
+            {
+              title: "FooBar",
+              author: { name: "Foo" },
+              upvoters: [{ name: "Foo" }, { name: "Bar" }],
+            },
+          ],
+        ],
+        [
+          2,
+          [
+            {
+              title: "Baz",
+              author: { name: "Bar" },
+              upvoters: [{ name: "Bar" }],
             },
           ],
         ],

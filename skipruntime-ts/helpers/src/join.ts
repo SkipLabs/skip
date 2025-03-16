@@ -9,58 +9,59 @@ import type {
 
 class JoinOneMapper<
   IdProperty extends keyof VLeft,
-  JoinedProperty extends string,
-  K extends Json,
+  AsProperty extends string,
+  KLeft extends Json,
   VLeft extends JsonObject & { [P in IdProperty]: Json },
   VRight extends Json,
 > implements
     Mapper<
-      K,
+      KLeft,
       VLeft,
-      K,
-      Omit<VLeft, IdProperty> & Record<JoinedProperty, VRight>
+      KLeft,
+      Omit<VLeft, IdProperty> & Record<AsProperty, VRight>
     >
 {
   constructor(
     private readonly right: EagerCollection<VLeft[IdProperty], VRight>,
-    private readonly on: IdProperty,
-    private readonly name: JoinedProperty,
+    private readonly id: IdProperty,
+    private readonly as: AsProperty,
   ) {}
 
   mapEntry(
-    key: K,
+    key: KLeft,
     values: Values<VLeft>,
-  ): Iterable<[K, Omit<VLeft, IdProperty> & Record<JoinedProperty, VRight>]> {
+  ): Iterable<[KLeft, Omit<VLeft, IdProperty> & Record<AsProperty, VRight>]> {
     return values.toArray().map((v: VLeft) => {
-      const { [this.on]: key_right, ...value_left } = v;
+      const { [this.id]: key_right, ...value_left } = v;
       const value_right = {
-        [this.name]: this.right.getUnique(key_right),
-      } as Record<JoinedProperty, VRight>;
-      const value_out = { ...value_left, ...value_right } as const;
+        [this.as]: this.right.getUnique(key_right),
+      } as Record<AsProperty, VRight>;
+      const value_out = { ...value_left, ...value_right };
       return [key, value_out];
     });
   }
 }
 
 export function join_one<
-  IdProperty extends keyof V1,
-  JoinedProperty extends string,
-  K extends Json,
-  V1 extends JsonObject & { [P in IdProperty]: Json },
-  V2 extends Json,
->(
-  left: EagerCollection<K, V1>,
-  right: EagerCollection<V1[IdProperty], V2>,
-  options: {
-    on: IdProperty;
-    name: JoinedProperty;
-  },
-): EagerCollection<K, Omit<V1, IdProperty> & Record<JoinedProperty, V2>> {
-  return left.map(
-    JoinOneMapper<IdProperty, JoinedProperty, K, V1, V2>,
-    right,
-    options.on,
-    options.name,
+  IdProperty extends keyof VLeft,
+  AsProperty extends string,
+  KLeft extends Json,
+  VLeft extends JsonObject & { [P in IdProperty]: Json },
+  VRight extends Json,
+>(options: {
+  left: EagerCollection<KLeft, VLeft>;
+  right: EagerCollection<VLeft[IdProperty], VRight>;
+  id: IdProperty;
+  as: AsProperty;
+}): EagerCollection<
+  KLeft,
+  Omit<VLeft, IdProperty> & Record<AsProperty, VRight>
+> {
+  return options.left.map(
+    JoinOneMapper<IdProperty, AsProperty, KLeft, VLeft, VRight>,
+    options.right,
+    options.id,
+    options.as,
   );
 }
 
@@ -68,24 +69,20 @@ class ProjectionMapper<
   ProjectionProperty extends keyof V,
   K extends Json,
   V extends JsonObject & { [P in ProjectionProperty]: Json },
-> implements Mapper<K, V, V[ProjectionProperty], Omit<V, ProjectionProperty>>
+> implements Mapper<K, V, V[ProjectionProperty], V>
 {
   constructor(private readonly proj_property: ProjectionProperty) {}
 
-  mapEntry(
-    _key: K,
-    values: Values<V>,
-  ): Iterable<[V[ProjectionProperty], Omit<V, ProjectionProperty>]> {
+  mapEntry(_key: K, values: Values<V>): Iterable<[V[ProjectionProperty], V]> {
     return values.toArray().map((v: V) => {
-      const { [this.proj_property]: new_key, ...new_value } = v;
-      return [new_key, new_value];
+      return [v[this.proj_property], v];
     });
   }
 }
 
 class JoinManyMapper<
   IdProperty extends keyof VRight,
-  JoinedProperty extends string,
+  AsProperty extends string,
   K extends Json,
   VLeft extends JsonObject,
   VRight extends JsonObject & { [P in IdProperty]: Json },
@@ -94,18 +91,15 @@ class JoinManyMapper<
       VRight[IdProperty],
       VLeft,
       VRight[IdProperty],
-      VLeft & Record<JoinedProperty, Omit<VRight, IdProperty>[]>
+      VLeft & Record<AsProperty, VRight[]>
     >
 {
-  private readonly right: EagerCollection<
-    VRight[IdProperty],
-    Omit<VRight, IdProperty>
-  >;
+  private readonly right: EagerCollection<VRight[IdProperty], VRight>;
 
   constructor(
     right: EagerCollection<K, VRight>,
     on: IdProperty,
-    private readonly name: JoinedProperty,
+    private readonly as: AsProperty,
   ) {
     this.right = right.map(ProjectionMapper<IdProperty, K, VRight>, on);
   }
@@ -113,16 +107,11 @@ class JoinManyMapper<
   mapEntry(
     key: VRight[IdProperty],
     values: Values<VLeft>,
-  ): Iterable<
-    [
-      VRight[IdProperty],
-      VLeft & Record<JoinedProperty, Omit<VRight, IdProperty>[]>,
-    ]
-  > {
+  ): Iterable<[VRight[IdProperty], VLeft & Record<AsProperty, VRight[]>]> {
     return values.toArray().map((value_left: VLeft) => {
-      const value_right = { [this.name]: this.right.getArray(key) } as Record<
-        JoinedProperty,
-        (Omit<VRight, IdProperty> & DepSafe)[]
+      const value_right = { [this.as]: this.right.getArray(key) } as Record<
+        AsProperty,
+        (VRight & DepSafe)[]
       >;
       const value_out = { ...value_left, ...value_right };
       return [key, value_out];
@@ -130,27 +119,132 @@ class JoinManyMapper<
   }
 }
 
-export function join_many<
-  IdProperty extends keyof V2,
-  JoinedProperty extends string,
+class SelectionMapper<
+  P extends keyof V,
   K extends Json,
-  V1 extends JsonObject,
-  V2 extends JsonObject & { [P in IdProperty]: Json },
->(
-  left: EagerCollection<V2[IdProperty], V1>,
-  right: EagerCollection<K, V2>,
-  options: {
-    on: IdProperty;
-    name: JoinedProperty;
+  V extends JsonObject & { [T in P]: Json },
+> implements Mapper<K, V, K, V[P]>
+{
+  constructor(private readonly prop: P) {}
+
+  mapEntry(key: K, values: Values<V>): Iterable<[K, V[P]]> {
+    return values.toArray().map((v) => {
+      return [key, v[this.prop]];
+    });
+  }
+}
+
+class JoinManyThroughMapper<
+  IdLeftProperty extends keyof VThrough,
+  IdRightProperty extends keyof VThrough,
+  AsProperty extends string,
+  VLeft extends JsonObject,
+  VRight extends Json,
+  KThrough extends Json,
+  VThrough extends JsonObject & {
+    [P in IdLeftProperty | IdRightProperty]: Json;
   },
-): EagerCollection<
-  V2[IdProperty],
-  V1 & Record<JoinedProperty, Omit<V2, IdProperty>[]>
+> implements
+    Mapper<
+      VThrough[IdLeftProperty],
+      VLeft,
+      VThrough[IdLeftProperty],
+      VLeft & Record<AsProperty, VRight[]>
+    >
+{
+  private readonly through: EagerCollection<
+    VThrough[IdLeftProperty],
+    VThrough[IdRightProperty]
+  >;
+
+  constructor(
+    private readonly right: EagerCollection<VThrough[IdRightProperty], VRight>,
+    through: EagerCollection<KThrough, VThrough>,
+    id_left: IdLeftProperty,
+    id_right: IdRightProperty,
+    private readonly as: AsProperty,
+  ) {
+    this.through = through
+      .map(ProjectionMapper<IdLeftProperty, KThrough, VThrough>, id_left)
+      .map(
+        SelectionMapper<IdRightProperty, VThrough[IdLeftProperty], VThrough>,
+        id_right,
+      );
+  }
+
+  mapEntry(
+    key: VThrough[IdLeftProperty],
+    values: Values<VLeft>,
+  ): Iterable<
+    [VThrough[IdLeftProperty], VLeft & Record<AsProperty, VRight[]>]
+  > {
+    return values.toArray().map((value_left: VLeft) => {
+      const value_right = {
+        [this.as]: this.through
+          .getArray(key)
+          .map((id_right) => this.right.getUnique(id_right)),
+      } as Record<AsProperty, (VRight & DepSafe)[]>;
+      const value_out = { ...value_left, ...value_right };
+      return [key, value_out];
+    });
+  }
+}
+
+export function join_many_through<
+  IdLeftProperty extends keyof VThrough,
+  IdRightProperty extends keyof VThrough,
+  AsProperty extends string,
+  VLeft extends JsonObject,
+  VRight extends Json,
+  KThrough extends Json,
+  VThrough extends JsonObject & {
+    [P in IdLeftProperty | IdRightProperty]: Json;
+  },
+>(options: {
+  left: EagerCollection<VThrough[IdLeftProperty], VLeft>;
+  right: EagerCollection<VThrough[IdRightProperty], VRight>;
+  as: AsProperty;
+  id_left: IdLeftProperty;
+  id_right: IdRightProperty;
+  through: EagerCollection<KThrough, VThrough>;
+}): EagerCollection<
+  VThrough[IdLeftProperty],
+  VLeft & Record<AsProperty, VRight[]>
 > {
-  return left.map(
-    JoinManyMapper<IdProperty, JoinedProperty, K, V1, V2>,
-    right,
-    options.on,
-    options.name,
+  return options.left.map(
+    JoinManyThroughMapper<
+      IdLeftProperty,
+      IdRightProperty,
+      AsProperty,
+      VLeft,
+      VRight,
+      KThrough,
+      VThrough
+    >,
+    options.right,
+    options.through,
+    options.id_left,
+    options.id_right,
+    options.as,
+  );
+}
+
+export function join_many<
+  IdProperty extends keyof VRight,
+  AsProperty extends string,
+  KRight extends Json,
+  VLeft extends JsonObject,
+  VRight extends JsonObject & { [K in IdProperty]: Json },
+>(options: {
+  left: EagerCollection<VRight[IdProperty], VLeft>;
+  right: EagerCollection<KRight, VRight>;
+  id: IdProperty;
+  as: AsProperty;
+}): EagerCollection<VRight[IdProperty], VLeft & Record<AsProperty, VRight[]>> {
+  return options.left.map(
+    JoinManyMapper<IdProperty, AsProperty, KRight, VLeft, VRight>,
+    options.right,
+    options.id,
+    options.as,
   );
 }
