@@ -1,4 +1,17 @@
-# skip &middot; [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/skiplabs/skip/blob/main/LICENSE) [![CircleCI](https://dl.circleci.com/status-badge/img/gh/SkipLabs/skip/tree/main.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/SkipLabs/skip/tree/main)
+<div align="center">
+  <img src="https://raw.githubusercontent.com/SkipLabs/skip/refs/heads/main/www/static/img/logo.svg" width="160" alt="skip" />
+  <p align="center">
+    <a href="https://skiplabs.io/docs">Docs</a> | <a href="https://discord.gg/4dMEBA46mE">Chat</a>
+  </p>
+  <p align="center">
+    <a href="https://github.com/skiplabs/skip/blob/main/LICENSE">
+      <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT license" />
+    </a>
+    <a href="https://dl.circleci.com/status-badge/redirect/gh/SkipLabs/skip/tree/main">
+      <img src="https://dl.circleci.com/status-badge/img/gh/SkipLabs/skip/tree/main.svg?style=svg" alt="CI status" />
+    </a>
+  </p>
+</div>
 
 Skip is an open-source framework for building _reactive_ backend services.
 
@@ -8,15 +21,15 @@ TypeScript interfaces and abstractions are provided so that you can write a reac
 
 ## Installation
 
-To get started, install the NPM packages for the Skip runtime API, server, and helpers:
+To get started, install the skip NPM package:
 
-```npm install @skipruntime/core @skipruntime/server @skipruntime/helpers```
+```
+npm install @skiplabs/skip
+```
 
 Two versions of the runtime are available, a Wasm `@skipruntime/wasm` and a native `@skipruntime/native`.
-The Wasm runtime works with both `node` and `bun`, but is limited to Wasm's 32-bit memory address space.
-The native runtime does not have this limitation, but it is currently only available for Node and is a bit more involved to install.
-
-You can install the Wasm runtime with `npm install @skipruntime/wasm` and the native runtime by following the [instructions](./INSTALL.md).
+The Wasm runtime is installed by default. It works with both `node` and `bun`, but is limited to Wasm's 32-bit memory address space.
+The native runtime does not have this limitation, but it is currently only available for Node and is a bit more involved to install (see [instructions](./INSTALL.md)).
 
 From there, you're ready to start building a reactive service!
 See the [getting started guide](https://skiplabs.io/docs/getting_started) to walk through some of Skip's core concepts by example and get up to speed.
