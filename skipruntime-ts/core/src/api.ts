@@ -39,9 +39,10 @@ export interface Mapper<
    *
    * @param key - A key found in the input collection.
    * @param values - The values associated with `key` in the input collection.
+   * @param context - The Skip runtime context, which can be used to create/access new collections during the map
    * @returns Key-value pairs to associate in the output collection.
    */
-  mapEntry(key: K1, values: Values<V1>): Iterable<[K2, V2]>;
+  mapEntry(key: K1, values: Values<V1>, context: Context): Iterable<[K2, V2]>;
 }
 
 /**
