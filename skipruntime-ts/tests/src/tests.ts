@@ -724,12 +724,17 @@ const postgresService: () => Promise<
   SkipService<Input_NN, Input_NN>
 > = async () => {
   const postgres = new PostgresExternalService(pg_config);
-  pgSetupClient.connect().catch(() => {
-    throw new Error("Error connecting to PostgreSQL test instance");
-  });
-  if (!(await trySetupDB(postgres))) {
-    throw new Error("Failed to set up test Postgres DB");
-  }
+  await withAlternateConsoleError(
+    () => {},
+    async () => {
+      pgSetupClient.connect().catch(() => {
+        throw new Error("Error connecting to PostgreSQL test instance");
+      });
+      if (!(await trySetupDB(postgres))) {
+        throw new Error("Failed to set up test Postgres DB");
+      }
+    },
+  );
 
   return {
     initialData: {
