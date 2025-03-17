@@ -17,48 +17,14 @@ base class LazyResult {
   | LAbsent()
 }
 
-class LazyDir{
+class LazyDir private {
   time: Time,
   timeStack: TimeStack,
   dirName: DirName,
   data: SortedMap<Key, LazyResult> = SortedMap[],
-  lazyFun: ((mutable Context, Key) ~> LazyResult),
+  private lazyFun: ((mutable Context, Key) ~> LazyResult),
   collect: Bool,
 } extends Dir {
-  fun isInput(): Bool {
-    false
-  }
-
-  fun getTime(): Time {
-    this.time
-  }
-
-  fun getTimeStack(): TimeStack {
-    this.timeStack
-  }
-
-  fun reset(context: mutable Context): void {
-    context.setDir(this.dirName, this);
-  }
-
-  fun keys(): SortedSet<Key> {
-    keys = SortedSet[];
-    for (newKey => value in this.data) {
-      if (value is LDefined _) {
-        !keys = keys.set(newKey);
-      };
-    };
-    keys
-  }
-
-  fun getDirName(): DirName {
-    this.dirName
-  }
-
-  fun isDeleted(): Bool {
-    false
-  }
-
   static fun create(
     context: mutable Context,
     dirName: DirName,
@@ -69,7 +35,7 @@ class LazyDir{
     lazyFun = (context: mutable Context, key: Key) ~> {
       dir = context.unsafeGetLazyDir(dirName);
       !dir.data[key] = LCycle();
-      context.setDir(dirName, dir);
+      context.setDir(dir);
 
       readsCopy = context.reads;
       context.!reads = SortedSet[];
@@ -80,7 +46,7 @@ class LazyDir{
       | exn ->
         !dir = context.unsafeGetLazyDir(dirName);
         !dir.data[key] = LAbsent();
-        context.setDir(dirName, dir);
+        context.setDir(dir);
         context.!reads = readsCopy;
         throw exn
       };
@@ -97,7 +63,7 @@ class LazyDir{
 
       !dir = context.unsafeGetLazyDir(dirName);
       !dir.data[key] = result;
-      context.setDir(dirName, dir);
+      context.setDir(dir);
 
       if (context.debugMode) {
         name = "" + dir.dirName + key;
@@ -121,9 +87,43 @@ class LazyDir{
         collect,
       };
       updateDirtyReaders(context, Path::create(dirName.tag(), DirTag()));
-      context.setDir(dirName, newDir);
+      context.setDir(newDir);
       newDir
     }
+  }
+
+  fun withData(data: SortedMap<Key, LazyResult>): this {
+    this with {data}
+  }
+
+  fun getTime(): Time {
+    this.time
+  }
+
+  fun getTimeStack(): TimeStack {
+    this.timeStack
+  }
+
+  fun reset(context: mutable Context): void {
+    context.setDir(this);
+  }
+
+  fun keys(): SortedSet<Key> {
+    keys = SortedSet[];
+    for (newKey => value in this.data) {
+      if (value is LDefined _) {
+        !keys = keys.set(newKey);
+      };
+    };
+    keys
+  }
+
+  fun getDirName(): DirName {
+    this.dirName
+  }
+
+  fun isDeleted(): Bool {
+    false
   }
 
   fun getArrayRaw(key: Key): Array<File> {
@@ -167,7 +167,7 @@ class LazyDir{
       }
     };
 
-    context.setDir(this.dirName, this);
+    context.setDir(this);
   }
 
   fun unsafeGetArray(

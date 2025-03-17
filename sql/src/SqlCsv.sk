@@ -519,14 +519,14 @@ fun applyDiffStrategy(
         // update incrementally to keep memory usage down. this has a
         // significant effect for large write sets and negligible
         // impact on performance
-        ctx.setDir(newDir.dirName, newDir);
+        ctx.setDir(newDir);
         ctx.update();
 
         newDir
       },
     );
 
-    newRoot.setDir(dir.dirName, dir);
+    newRoot.setDir(dir);
     newRoot.update();
     newRoot.!sourceOverride = None();
     checkpointAndAck(newRoot, delta)
@@ -602,14 +602,14 @@ fun applyDiffStrategy(
         // update incrementally to keep memory usage down. this has a
         // significant effect for large write sets and negligible
         // impact on performance
-        ctx.setDir(newDir.dirName, newDir);
+        ctx.setDir(newDir);
         ctx.update();
 
         newDir
       },
     );
 
-    newRoot.setDir(dir.dirName, dir);
+    newRoot.setDir(dir);
     newRoot.update();
     newRoot.!sourceOverride = None();
     checkpointAndAck(newRoot, delta)
@@ -628,7 +628,7 @@ fun applyDiffStrategy(
 
     SKDB.resetWatermark(newRoot, table.name.lower, identity);
 
-    newRoot.setDir(dir.dirName, dir);
+    newRoot.setDir(dir);
     newRoot.update(); // TODO: could we not do this so we don't get a blip?
   });
 

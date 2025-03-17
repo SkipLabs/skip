@@ -447,11 +447,11 @@ fun execSessions(args: Cli.ParseResults, options: SKDB.Options): void {
 fun execCompact(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
   SKDB.runLockedSql(options, context ~> {
-    for (_dirName => dir in context.dirs.state) {
+    for ((_dirName, dir) in context.listDirs()) {
       dir match {
       | edir @ SKStore.EagerDir _ ->
         !edir = edir.purge(context, context.tick);
-        context.setDir(edir.dirName, edir)
+        context.setDir(edir)
       | _ -> void
       }
     }
@@ -573,7 +573,7 @@ fun execDiff(args: Cli.ParseResults, options: SKDB.Options): void {
 
     for (dirSub in sub.dirSubs) {
       tableName = P.Name::create(
-        dirSub.dirName.dirName.stripPrefix("/").stripSuffix("/"),
+        dirSub.dirName.toString().stripPrefix("/").stripSuffix("/"),
       );
       sinceForTable(tableName) match {
       | None() -> void

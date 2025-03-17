@@ -64,17 +64,31 @@ class Path(dirName: DirName, baseName: Key) uses Orderable {
   }
 }
 
-class DirName(
-  dirName: String,
-  hashTag1: Int,
-  hashTag2: Int,
+class DirName private (
+  private dirName: String,
+  private hashTag1: Int,
+  private hashTag2: Int,
 ) extends Key uses Hashable, Show {
-  static fun create(dirName: String): DirName {
-    !dirName = dirName.lowercase();
-    static::validateDirName(dirName);
+  private static fun create_no_validate(dirName: String): this {
     dirNameHash1 = hash(dirName);
     dirNameHash2 = hash((1, dirName));
     static(dirName, dirNameHash1, dirNameHash2)
+  }
+
+  static fun create(dirName: String): DirName {
+    !dirName = dirName.lowercase();
+    static::validateDirName(dirName);
+    static::create_no_validate(dirName)
+  }
+
+  private fun sub_no_validate(str: String): this {
+    static::create_no_validate(this.dirName + str + "/")
+  }
+
+  fun sub(str: String): this {
+    validator = mutable SKStoreImpl.NameValidator(str, str.chars(), 0);
+    validator.mustBeKey();
+    this.sub_no_validate(str.lowercase())
   }
 
   fun compare(base: Key): Order {
@@ -93,39 +107,27 @@ class DirName(
   }
 
   fun pre(): this {
-    DirName::create(this.dirName + "pre/")
+    this.sub_no_validate("pre")
   }
 
   fun next(): this {
-    DirName::create(this.dirName + "next/")
+    this.sub_no_validate("next")
   }
 
   fun tag(): this {
-    dirName = this.dirName + "tag/";
-    dirNameHash1 = hash(dirName);
-    dirNameHash2 = hash((1, dirName));
-    static(dirName, dirNameHash1, dirNameHash2)
+    this.sub_no_validate("tag")
   }
 
   fun size(): this {
-    dirName = this.dirName + "size/";
-    dirNameHash1 = hash(dirName);
-    dirNameHash2 = hash((1, dirName));
-    static(dirName, dirNameHash1, dirNameHash2)
+    this.sub_no_validate("size")
   }
 
   fun files(): this {
-    dirName = this.dirName + "files/";
-    dirNameHash1 = hash(dirName);
-    dirNameHash2 = hash((1, dirName));
-    static(dirName, dirNameHash1, dirNameHash2)
+    this.sub_no_validate("files")
   }
 
   fun aggr(): this {
-    dirName = this.dirName + "aggr/";
-    dirNameHash1 = hash(dirName);
-    dirNameHash2 = hash((1, dirName));
-    static(dirName, dirNameHash1, dirNameHash2)
+    this.sub_no_validate("aggr")
   }
 
   static private fun validateDirName(dirName: String): void {
@@ -141,12 +143,6 @@ class DirName(
     } catch {
     | _ -> false
     }
-  }
-
-  fun sub(str: String): this {
-    validator = mutable SKStoreImpl.NameValidator(str, str.chars(), 0);
-    validator.mustBeKey();
-    DirName::create(this.dirName + str + "/")
   }
 
   fun toString(): String {
