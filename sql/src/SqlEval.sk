@@ -1195,9 +1195,9 @@ class Evaluator{options: Options, user: ?UserFile} {
           // If the deps haven't changed, that means we can reuse
           // the pre-computed data.
           if (sameDeps != 0) {
-            changedDirNames = delta.dirs.state.getChangesAfter(startTick);
+            changedDirNames = delta.getDirsChangesAfter(startTick);
             for (changedDirName in changedDirNames) {
-              if (!context.dirs.state.containsKey(changedDirName)) {
+              if (context.unsafeMaybeGetDir(changedDirName).isNone()) {
                 context.setGlobal(
                   "PRE_COMPUTED_" + changedDirName,
                   delta.unsafeGetDir(changedDirName),
@@ -1453,7 +1453,7 @@ class Evaluator{options: Options, user: ?UserFile} {
     sinkDir = context.unsafeGetEagerDir(sinkDirName);
     !sinkDir.time.value = Int::max - sinkDir.time.value;
     !sinkDir.timeStack = sinkDir.timeStack.maxMinus();
-    context.setDir(sinkDir.dirName, sinkDir);
+    context.setDir(sinkDir);
     updateTableMap(context);
     sinkDirName
   }
@@ -1597,7 +1597,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       source = SKStore.Path(dir.dirName, SKStore.IID(SKStore.genSym(0)));
       !newDir = newDir.writeEntry(context, source, source, key, Array[row]);
     };
-    context.setDir(newDir.dirName, newDir);
+    context.setDir(newDir);
   }
 
   fun createTable(
@@ -2070,7 +2070,7 @@ fun importNext(
   tick: SKStore.Tick,
   sourceCtx: readonly SKStore.Context,
 ): Bool {
-  changedDirNames = sourceCtx.dirs.state.getChangesAfter(tick);
+  changedDirNames = sourceCtx.getDirsChangesAfter(tick);
   updates = mutable Map[];
   hasMultipleVersions = false;
   for (dirName in changedDirNames) {
@@ -2095,7 +2095,7 @@ fun importNext(
             totalSize => 0,
             creator => None(),
           };
-          targetCtx.setDir(targetDir.dirName, targetDir)
+          targetCtx.setDir(targetDir)
         | Some(_) -> void
         };
         entries = mutable Vector[];
@@ -2123,7 +2123,7 @@ fun importNext(
         writerPath = SKStore.Path(dir.dirName, SKStore.IID(SKStore.genSym(0)));
         !inputDir = inputDir.reset(targetCtx, writerPath, changedKeys);
       };
-      targetCtx.setDir(inputDir.dirName, inputDir)
+      targetCtx.setDir(inputDir)
     }
   };
   hasMultipleVersions
@@ -2373,7 +2373,7 @@ fun getReactiveQueryHandle(
           SKStore.EagerDir::apply(
             context,
             selectDir.dirName,
-            SKStore.DirName::create(selectDir.dirName.toString() + "sink/"),
+            selectDir.dirName.sub("sink"),
             (_ctx, _writer, _key, _valueIter) ~> jsMarkQuery(queryID32),
             None(),
             None(),

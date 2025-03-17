@@ -73,9 +73,7 @@ class EagerFilter private {
     context: mutable Context,
     rangesOpt: ?FilterRange,
   ): void {
-    sinkName = DirName::create(
-      this.childName.toString() + "filter-sink/" + genSym(0) + "/",
-    );
+    sinkName = this.childName.sub("filter-sink").sub(genSym(0).toString());
     EagerDir::apply(
       context,
       this.parentName,
@@ -93,12 +91,15 @@ class EagerFilter private {
   private static fun mkDir(
     context: mutable Context,
     childName: DirName,
-    suffix: String,
+    suffixOpt: ?String,
   ): DirName {
     time = context.timeStamp();
     fixedData = FixedDataMap::create();
     creator = context.currentArrow();
-    dirName = DirName::create(childName.toString() + suffix);
+    dirName = suffixOpt match {
+    | None() -> childName
+    | Some(suffix) -> childName.sub(suffix)
+    };
     dir = EagerDir{
       time,
       timeStack => TimeStack::createInput(time),
@@ -108,7 +109,7 @@ class EagerFilter private {
       totalSize => 0,
       creator,
     };
-    context.setDir(dirName, dir);
+    context.setDir(dir);
     dirName
   }
 
@@ -233,8 +234,8 @@ class EagerFilter private {
       fullFiles,
     );
 
-    context.setDir(fullDir.dirName, fullDir);
-    context.setDir(childDir.dirName, childDir)
+    context.setDir(fullDir);
+    context.setDir(childDir)
   }
 
   static fun create(
@@ -248,8 +249,8 @@ class EagerFilter private {
     rangesOpt: ?Array<KeyRange>,
   ): void {
     filterRange = FilterRange::create(rangesOpt);
-    _ = static::mkDir(context, childName, "");
-    fullName = static::mkDir(context, childName, "full/");
+    _ = static::mkDir(context, childName, None());
+    fullName = static::mkDir(context, childName, Some("full"));
     result = static{
       parentName,
       childName,
