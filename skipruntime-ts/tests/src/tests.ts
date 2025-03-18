@@ -644,6 +644,21 @@ class PostgresResourceWithException implements Resource<Input_NN> {
   }
 }
 
+class StreamingPostgresResource implements Resource<Input_NN> {
+  instantiate(
+    _collections: Input_NN,
+    context: Context,
+  ): EagerCollection<number, number> {
+    return context
+      .useExternalResource<number, PostgresRow>({
+        service: "postgres",
+        identifier: "skip_test",
+        params: { key: { col: "id", type: "INTEGER" }, syncHistoricData: false },
+      })
+      .map(PostgresRowExtract);
+  }
+}
+
 const pg_config = {
   host: "localhost",
   port: 5432,
@@ -767,6 +782,7 @@ const postgresService: () => Promise<
     resources: {
       resource: PostgresResource,
       resourceWithException: PostgresResourceWithException,
+      streamingResource: StreamingPostgresResource,
     },
     externalServices: { postgres },
     createGraph(inputs: Input_NN) {
@@ -1332,6 +1348,21 @@ export function initTests(
           [3, [333]],
         ]),
       );
+      service.instantiateResource(
+        "unsafe.fixed.resource.ident.3",
+        "streamingResource",
+        {},
+      );
+
+      await withRetries(() =>
+        expect(service.getAll("streamingResource").payload).toEqual([]),
+      );
+
+      await pgClient.query("INSERT INTO skip_test (id, x) VALUES (5, 5);");
+
+      await withRetries(() =>
+        expect(service.getAll("streamingResource").payload).toEqual([[5, [5]]]),
+      );
 
       const errorMessages: any[] = [];
       await withAlternateConsoleError(
@@ -1359,9 +1390,10 @@ export function initTests(
         },
       );
     } finally {
-      await pgClient.query("DELETE FROM skip_test WHERE id = 1;");
-      await pgClient.query("DELETE FROM skip_test WHERE id = 42;");
-      await pgClient.query("INSERT INTO skip_test (id, x) VALUES (1,1),(2,2);");
+      await pgClient.query(`
+DROP TABLE IF EXISTS skip_test;
+CREATE TABLE skip_test (id INTEGER PRIMARY KEY, x INTEGER, "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
       await pgClient.end();
       await service.close();
     }
