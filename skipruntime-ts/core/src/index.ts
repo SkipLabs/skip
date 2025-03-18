@@ -828,10 +828,12 @@ export class ToBinding {
   ): Pointer<Internal.CJArray> {
     const skjson = this.getJsonConverter();
     const mapper = this.handles.get(skmapper);
+    const context = new ContextImpl(this.refs());
     try {
       const result = mapper.mapEntry(
         skjson.importJSON(key) as Json,
         new ValuesImpl<Json>(skjson, this.binding, values),
+        context,
       );
       return skjson.exportJSON(Array.from(result));
     } catch (e: unknown) {
