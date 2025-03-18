@@ -355,7 +355,7 @@ interface ToWasm {
   SkipRuntime_Notifier__notify<K extends Json, V extends Json>(
     notifier: Handle<Notifier<K, V>>,
     values: ptr<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
-    watermark: Watermark,
+    watermark: ptr<Internal.String>,
     isUpdates: number,
   ): void;
 
@@ -923,13 +923,13 @@ class LinksImpl implements Links {
   notifyOfNotifier<K extends Json, V extends Json>(
     sknotifier: Handle<Notifier<K, V>>,
     skvalues: ptr<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
-    watermark: Watermark,
+    watermark: ptr<Internal.String>,
     isUpdates: number,
   ) {
     this.tobinding.SkipRuntime_Notifier__notify(
       sknotifier,
       skvalues,
-      watermark,
+      this.utils.importString(watermark) as Watermark,
       isUpdates,
     );
   }
