@@ -1382,9 +1382,7 @@ export function initTests(
       if ("CIRCLECI" in process.env) {
         throw new Error("Failed to set up CircleCI environment with Kafka.");
       }
-      console.warn(
-        "Default pass on testKafka since no local Kafka cluster found;",
-      );
+      console.warn("Skipping testKafka since no local Kafka cluster found;");
       console.warn("To test properly, run the following then retry:");
       console.warn("\tdocker pull apache/kafka:latest");
       console.warn(
