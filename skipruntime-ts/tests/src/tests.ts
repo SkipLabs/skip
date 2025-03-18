@@ -41,6 +41,26 @@ async function withAlternateConsoleError(
   console.error = systemConsoleError;
 }
 
+async function withRetries(
+  f: () => void,
+  maxRetries: number = 5,
+  init: number = 100,
+  exponent: number = 1.5,
+): Promise<void> {
+  let retries = 0;
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  while (true) {
+    try {
+      await timeout(init * exponent ** retries);
+      f();
+      break;
+    } catch (e: unknown) {
+      if (retries < maxRetries) retries++;
+      else throw e;
+    }
+  }
+}
+
 //// testMap1
 
 class Map1 implements Mapper<string, number, string, number> {
@@ -1296,40 +1316,22 @@ export function initTests(
         [3, [30]],
       ]);
 
-      let retries = 0;
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      while (true) {
-        try {
-          await timeout(5 + 100 * 2 ** retries);
-          expect(service.getAll("resource").payload).toEqual([
-            [1, [111]],
-            [2, [222]],
-            [3, [333]],
-          ]);
-          break;
-        } catch (e: unknown) {
-          if (retries < 2) retries++;
-          else throw e;
-        }
-      }
+      await withRetries(() =>
+        expect(service.getAll("resource").payload).toEqual([
+          [1, [111]],
+          [2, [222]],
+          [3, [333]],
+        ]),
+      );
       await pgClient.query("UPDATE skip_test SET x = 1000 WHERE id = 1;");
       await pgClient.query("DELETE FROM skip_test WHERE id = 2;");
-      retries = 0;
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      while (true) {
-        try {
-          await timeout(5 + 100 * 2 ** retries);
-          expect(service.getAll("resource").payload).toEqual([
-            [1, [1110]],
-            [2, [220]],
-            [3, [333]],
-          ]);
-          break;
-        } catch (e: unknown) {
-          if (retries < 2) retries++;
-          else throw e;
-        }
-      }
+      await withRetries(() =>
+        expect(service.getAll("resource").payload).toEqual([
+          [1, [1110]],
+          [2, [220]],
+          [3, [333]],
+        ]),
+      );
 
       const errorMessages: any[] = [];
       await withAlternateConsoleError(
@@ -1403,23 +1405,16 @@ export function initTests(
       });
       await producer.send({ topic: "skip-test-topic", messages });
 
-      let retries = 0;
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      while (true) {
-        try {
-          await timeout(100 * 2 ** retries); // exponential backoff until kafka converges
+      await withRetries(
+        () =>
           messages.forEach(({ key, value }) => {
             const expected = 10 * Number(value) ** 2;
             expect(service.getArray("resource", key).payload).toEqual([
               expected,
             ]);
-          });
-          break;
-        } catch (e: unknown) {
-          if (retries > 5) throw e;
-          retries += 1;
-        }
-      }
+          }),
+        10,
+      );
     } finally {
       await producer.disconnect();
       service.closeResourceInstance(resourceId);
