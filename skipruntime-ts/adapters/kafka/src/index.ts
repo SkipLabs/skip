@@ -69,7 +69,7 @@ export class KafkaExternalService implements ExternalService {
   subscribe(
     instance: string,
     topic: string,
-    params: Json & { fromBeginning?: boolean },
+    params: { fromBeginning?: boolean },
     callbacks: {
       update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
       error: (error: Json) => void;

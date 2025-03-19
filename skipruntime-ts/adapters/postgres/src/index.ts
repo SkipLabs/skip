@@ -90,7 +90,7 @@ export class PostgresExternalService implements ExternalService {
   subscribe(
     instance: string,
     resource: string,
-    params: Json & {
+    params: {
       key: {
         col: string;
         type: PostgresPKey;
