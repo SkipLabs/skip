@@ -41,6 +41,26 @@ async function withAlternateConsoleError(
   console.error = systemConsoleError;
 }
 
+async function withRetries(
+  f: () => void,
+  maxRetries: number = 5,
+  init: number = 100,
+  exponent: number = 1.5,
+): Promise<void> {
+  let retries = 0;
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  while (true) {
+    try {
+      await timeout(init * exponent ** retries);
+      f();
+      break;
+    } catch (e: unknown) {
+      if (retries < maxRetries) retries++;
+      else throw e;
+    }
+  }
+}
+
 //// testMap1
 
 class Map1 implements Mapper<string, number, string, number> {
@@ -624,6 +644,24 @@ class PostgresResourceWithException implements Resource<Input_NN> {
   }
 }
 
+class StreamingPostgresResource implements Resource<Input_NN> {
+  instantiate(
+    _collections: Input_NN,
+    context: Context,
+  ): EagerCollection<number, number> {
+    return context
+      .useExternalResource<number, PostgresRow>({
+        service: "postgres",
+        identifier: "skip_test",
+        params: {
+          key: { col: "id", type: "INTEGER" },
+          syncHistoricData: false,
+        },
+      })
+      .map(PostgresRowExtract);
+  }
+}
+
 const pg_config = {
   host: "localhost",
   port: 5432,
@@ -747,6 +785,7 @@ const postgresService: () => Promise<
     resources: {
       resource: PostgresResource,
       resourceWithException: PostgresResourceWithException,
+      streamingResource: StreamingPostgresResource,
     },
     externalServices: { postgres },
     createGraph(inputs: Input_NN) {
@@ -1296,40 +1335,37 @@ export function initTests(
         [3, [30]],
       ]);
 
-      let retries = 0;
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      while (true) {
-        try {
-          await timeout(5 + 100 * 2 ** retries);
-          expect(service.getAll("resource").payload).toEqual([
-            [1, [111]],
-            [2, [222]],
-            [3, [333]],
-          ]);
-          break;
-        } catch (e: unknown) {
-          if (retries < 2) retries++;
-          else throw e;
-        }
-      }
+      await withRetries(() =>
+        expect(service.getAll("resource").payload).toEqual([
+          [1, [111]],
+          [2, [222]],
+          [3, [333]],
+        ]),
+      );
       await pgClient.query("UPDATE skip_test SET x = 1000 WHERE id = 1;");
       await pgClient.query("DELETE FROM skip_test WHERE id = 2;");
-      retries = 0;
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      while (true) {
-        try {
-          await timeout(5 + 100 * 2 ** retries);
-          expect(service.getAll("resource").payload).toEqual([
-            [1, [1110]],
-            [2, [220]],
-            [3, [333]],
-          ]);
-          break;
-        } catch (e: unknown) {
-          if (retries < 2) retries++;
-          else throw e;
-        }
-      }
+      await withRetries(() =>
+        expect(service.getAll("resource").payload).toEqual([
+          [1, [1110]],
+          [2, [220]],
+          [3, [333]],
+        ]),
+      );
+      service.instantiateResource(
+        "unsafe.fixed.resource.ident.3",
+        "streamingResource",
+        {},
+      );
+
+      await withRetries(() =>
+        expect(service.getAll("streamingResource").payload).toEqual([]),
+      );
+
+      await pgClient.query("INSERT INTO skip_test (id, x) VALUES (5, 5);");
+
+      await withRetries(() =>
+        expect(service.getAll("streamingResource").payload).toEqual([[5, [5]]]),
+      );
 
       const errorMessages: any[] = [];
       await withAlternateConsoleError(
@@ -1357,9 +1393,10 @@ export function initTests(
         },
       );
     } finally {
-      await pgClient.query("DELETE FROM skip_test WHERE id = 1;");
-      await pgClient.query("DELETE FROM skip_test WHERE id = 42;");
-      await pgClient.query("INSERT INTO skip_test (id, x) VALUES (1,1),(2,2);");
+      await pgClient.query(`
+DROP TABLE IF EXISTS skip_test;
+CREATE TABLE skip_test (id INTEGER PRIMARY KEY, x INTEGER, "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
       await pgClient.end();
       await service.close();
     }
@@ -1382,9 +1419,7 @@ export function initTests(
       if ("CIRCLECI" in process.env) {
         throw new Error("Failed to set up CircleCI environment with Kafka.");
       }
-      console.warn(
-        "Default pass on testKafka since no local Kafka cluster found;",
-      );
+      console.warn("Skipping testKafka since no local Kafka cluster found;");
       console.warn("To test properly, run the following then retry:");
       console.warn("\tdocker pull apache/kafka:latest");
       console.warn(
@@ -1405,23 +1440,16 @@ export function initTests(
       });
       await producer.send({ topic: "skip-test-topic", messages });
 
-      let retries = 0;
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      while (true) {
-        try {
-          await timeout(100 * 2 ** retries); // exponential backoff until kafka converges
+      await withRetries(
+        () =>
           messages.forEach(({ key, value }) => {
             const expected = 10 * Number(value) ** 2;
             expect(service.getArray("resource", key).payload).toEqual([
               expected,
             ]);
-          });
-          break;
-        } catch (e: unknown) {
-          if (retries > 5) throw e;
-          retries += 1;
-        }
-      }
+          }),
+        10,
+      );
     } finally {
       await producer.disconnect();
       service.closeResourceInstance(resourceId);
