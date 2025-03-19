@@ -11,6 +11,7 @@ import format from "pg-format";
 
 export { SkipPostgresError } from "./util.js";
 import { validateKeyParam, type PostgresPKey } from "./util.js";
+export type { PostgresPKey } from "./util.js";
 
 // Pass timestamp strings straight through instead of attempting to convert to JS Date object, which would be clobbered in the Skip heap
 pg.types.setTypeParser(pg.types.builtins.TIMESTAMP, (x: string) => x);
