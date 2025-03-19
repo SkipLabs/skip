@@ -2,7 +2,7 @@
 
 The process of setting up and deploying a Skip service is mostly similar to that of other backend systems (databases, caches, etc.) but there are some important nuances to be aware of.
 
-This page walks through those details, or you can refer to an example's [setup](https://github.com/SkipLabs/skip/tree/main/examples/hackernews) for a representative and complete practical configuration based on standard tooling including Docker, HAProxy, Flask, and React.
+This page walks through those details, or you can refer to [example setups](https://github.com/SkipLabs/skip/tree/main/examples) for representative and complete practical configurations based on standard tooling and components such as Docker, HAProxy, Flask, Express, React, PostgreSQL, and Kafka.
 
 ## Overview
 
