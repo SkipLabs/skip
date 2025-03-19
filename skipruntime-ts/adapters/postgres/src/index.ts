@@ -25,7 +25,7 @@ pg.types.setTypeParser(pg.types.builtins.TIMESTAMPTZ, (x: string) => x);
  *
  * @remarks
  * Subscription `params` **must** include a field `key` whose value is an object with a string field `col` identifying the table column that should be used as the key in the resulting collection, and a field `type` whose value is a Postgres text, integer, or serial type. (i.e. one of `TEXT`, `SERIAL`, `SERIAL2`, `SERIAL4`, `SERIAL8`, `BIGSERIAL`, `SMALLSERIAL`, `INTEGER`, `INT`, `INT2`, `INT4`, `INT8`, `BIGINT`, or `SMALLINT`)
- * Subscription `params` **may** also specify `ignoreOldData: true` to receive only _new_ rows as they are created, for use with append-only tables whose history is not needed.
+ * Subscription `params` **may** also specify `syncHistoricData: false` to receive only _new_ rows as they are created, for use with append-only tables whose history is not needed.
  */
 export class PostgresExternalService implements ExternalService {
   private client: pg.Client;
@@ -78,9 +78,9 @@ export class PostgresExternalService implements ExternalService {
    *
    * @param instance - Instance identifier of the external resource.
    * @param resource - Name of the PostgreSQL table to expose as a resource.
-   * @param params - Parameters of the external resource; **must** include a field `key` describing the Postgres column that should be used as the key in the resulting collection
-   * @param params.key - (Required) Object with a field `col` identifying the table column to be used as the key, and a field `type` whose value is a Postgres text, integer, or serial type. (i.e. one of `TEXT`, `SERIAL`, `SERIAL2`, `SERIAL4`, `SERIAL8`, `BIGSERIAL`, `SMALLSERIAL`, `INTEGER`, `INT`, `INT2`, `INT4`, `INT8`, `BIGINT`, or `SMALLINT`)
-   * @param params.ignoreOldData - (Optional) Boolean flag: if true, Skip will ignore pre-existing data and only synchronize updates after subscription
+   * @param params - Parameters of the external resource.
+   * @param params.key - (**Required**) Object with a field `col` identifying the table column to be used as the key, and a field `type` whose value is a Postgres text, integer, or serial type. (i.e. one of `TEXT`, `SERIAL`, `SERIAL2`, `SERIAL4`, `SERIAL8`, `BIGSERIAL`, `SMALLSERIAL`, `INTEGER`, `INT`, `INT2`, `INT4`, `INT8`, `BIGINT`, or `SMALLINT`)
+   * @param params.syncHistoricData - (**Optional**) Boolean flag, `true` by default.  If false, Skip will ignore pre-existing data and only synchronize updates **after** subscription.
    * @param callbacks - Callbacks to react on error/loading/update.
    * @param callbacks.error - Error callback.
    * @param callbacks.loading - Loading callback.
@@ -95,7 +95,7 @@ export class PostgresExternalService implements ExternalService {
         col: string;
         type: PostgresPKey;
       };
-      ignoreOldData?: boolean;
+      syncHistoricData?: boolean;
     },
     callbacks: {
       update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
@@ -112,7 +112,7 @@ export class PostgresExternalService implements ExternalService {
     };
 
     const initData = async () => {
-      if (params.ignoreOldData) {
+      if (!(params.syncHistoricData ?? true)) {
         callbacks.update([], true);
       } else {
         callbacks.loading();
