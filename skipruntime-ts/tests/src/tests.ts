@@ -653,7 +653,10 @@ class StreamingPostgresResource implements Resource<Input_NN> {
       .useExternalResource<number, PostgresRow>({
         service: "postgres",
         identifier: "skip_test",
-        params: { key: { col: "id", type: "INTEGER" }, syncHistoricData: false },
+        params: {
+          key: { col: "id", type: "INTEGER" },
+          syncHistoricData: false,
+        },
       })
       .map(PostgresRowExtract);
   }
