@@ -2,7 +2,7 @@
 
 ## Overview
 
-Skip is designed to carefully track the computation and data dependencies, so that your service's outputs can be efficiently updated if (and only if!) any inputs they depend on change.
+Skip is designed to carefully track computation and data dependencies, so that your service's outputs can be efficiently updated if (and only if!) any inputs they depend on change.
 However, when those inputs come from external systems or services it is crucial to ensure that your reactive service still produces up-to-date results.
 
 Skip provides mechanisms to do so easily, whether those external systems are other reactive Skip services or non-reactive systems like databases or external APIs.
@@ -29,9 +29,9 @@ To receive data from another Skip service, specify it in the `externalServices` 
 
 ```typescript
 const service = {
-  initialData: ...
-  resources: ...
-  createGraph: ...
+  initialData: ...,
+  resources: ...,
+  createGraph: ...,
   externalServices: {
     myOtherService: SkipExternalService.direct({
       host: "my.other.service.net",
@@ -66,9 +66,41 @@ Encapsulating external reactive dependencies as eager collections, that complex 
 ## Non-Skip services
 
 Of course, unless your application is built from the ground up using the Skip framework, it is likely that your application depends on some non-reactive external system: REST APIs, databases, external HTTP endpoints, and the like.
-These systems operate on a pull-based request/response paradigm, so some work is required to adapt them to Skip's eager push-based paradigm.
+
+### PostgreSQL
+
+One common use case for Skip is to reactively update and push results in response to updates in a source-of-truth relational database.
+Skip makes this easy for PostgreSQL users, providing an adapter `PostgresExternalService` that can subscribe to updates from a Postgres database and expose them as an eager collection within your Skip reactive logic.
+
+A complete example is available [here](https://github.com/SkipLabs/skip/tree/main/examples/hackernews/reactive_service); a basic usage is to specify a Skip service with a Postgres external service, i.e.
+
+```typescript
+const service = {
+  initialData: ...,
+  resources: ...,
+  createGraph: ...,
+  externalServices: {
+    postgres: new PostgresExternalService({ host, port,  ... }),
+    ...,
+  },
+}
+```
+
+and subscribe to a table (e.g. `create table t (id serial primary key, value text)`) as an EagerCollection, which can be mapped over or otherwise used in reactive logic.
+
+```typescript
+const t: EagerCollection<number, { id: number, value: string }> =
+  context.useExternalResource({
+    service: "postgres",
+    identifier: "t",
+    params: { key: { col: "id", type: "SERIAL" } },
+  });
+```
+
+PostgreSQL rows are converted into JavaScript objects keyed by column names using the [`pg-types`](https://www.npmjs.com/package/pg-types) package, which can be customized according to its documentation if further control is needed over the JavaScript representation of Postgres data.
 
 ### Polling
+Many existing systems operate on a pull-based request/response paradigm, so some work is required to adapt them to Skip's eager push-based paradigm.
 
 The simplest option is *polling*, sending periodic requests to pull data from external sources and feed it into the reactive system.
 To specify a polled external dependency, specify it in your service definition, e.g. as follows
