@@ -99,6 +99,38 @@ const t: EagerCollection<number, { id: number, value: string }> =
 
 PostgreSQL rows are converted into JavaScript objects keyed by column names using the [`pg-types`](https://www.npmjs.com/package/pg-types) package, which can be customized according to its documentation if further control is needed over the JavaScript representation of Postgres data.
 
+### Kafka
+
+Many backend systems use distributed event streaming and messaging systems to handle real time data.
+Skip can process Kafka message streams, allowing to reactively compute over incoming events, with Kafka "topics" treated as external resources.
+
+An example can be seen [here](https://github.com/SkipLabs/skip/tree/main/examples/chatroom/reactive_service); a basic usage is to specify a Skip service with a Kafka external service, i.e.
+
+```typescript
+const service = {
+  initialData: ...,
+  resources: ...,
+  createGraph: ...,
+  externalServices: {
+    kafka: new KafkaExternalService({ clientId, brokers, ... }),
+    ...,
+  },
+}
+```
+
+and consume messages into a reactive collection as follows:
+
+```typescript
+const myKafkaTopic: EagerCollection<string, string> =
+  context.useExternalResource({
+    service: "kafka",
+    identifier: "my-kafka-topic",
+    params: {},
+  });
+```
+
+By default, Kafka messages are imported into the Skip runtime as their string key and value, but a `KafkaExternalService` can be parameterized by a `messageProcessor` which allows to customize the interpretation of Kafka `{ key: string; value: string; topic: string }` messages as Skip runtime data, for example by performing type conversions or customizing key structure.
+
 ### Polling
 Many existing systems operate on a pull-based request/response paradigm, so some work is required to adapt them to Skip's eager push-based paradigm.
 
