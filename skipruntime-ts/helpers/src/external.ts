@@ -154,7 +154,7 @@ export class PolledExternalService implements ExternalService {
    *
    * @param url - HTTP endpoint of external service to poll.
    * @param interval - Refresh interval, in milliseconds.
-   * @param conv - Function to convert data of type `S` received from external resource to `key`-`value` entries.
+   * @param conv - Function to convert data received from external resource to `key`-`value` entries.
    * @param encodeParams - Function to use to encode params of type `Json` for external resource request.
    * @param options - Optional parameters.
    * @param options.headers - Additional headers to add to request.

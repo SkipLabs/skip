@@ -1,13 +1,13 @@
 import type {
   Context,
   EagerCollection,
+  Json,
   Resource,
   SkipService,
 } from "@skipruntime/core";
 import { runService } from "@skipruntime/server";
 import {
-  GenericExternalService,
-  Polled,
+  PolledExternalService,
   defaultParamEncoder,
 } from "@skipruntime/helpers";
 
@@ -52,8 +52,8 @@ class DeparturesResource implements Resource<ResourceInputs> {
     };
 
     return context.useExternalResource({
-      service: "externalDeparturesAPI",
-      identifier: "departuresFromAPI",
+      service: "polled",
+      identifier: "unhcrDeparturesAPI",
       params,
     });
   }
@@ -65,14 +65,14 @@ const service: SkipService<ResourceInputs, ResourceInputs> = {
     departures: DeparturesResource,
   },
   externalServices: {
-    externalDeparturesAPI: new GenericExternalService({
-      departuresFromAPI: new Polled(
-        "https://api.unhcr.org/rsq/v1/departures",
-        10000,
-        (data: Result) => data.results.map((v, idx) => [idx, [v]]),
-        defaultParamEncoder,
-        { timeout: 1500 },
-      ),
+    polled: new PolledExternalService({
+      unhcrDeparturesAPI: {
+        url: "https://api.unhcr.org/rsq/v1/departures",
+        interval: 10000,
+        conv: (data: Json) =>
+          (data as Result).results.map((v, idx) => [idx, [v]]),
+        options: { timeout: 1500 },
+      },
     }),
   },
   createGraph: (ic) => ic,

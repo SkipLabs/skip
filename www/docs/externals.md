@@ -15,9 +15,7 @@ Skip provides several `ExternalService` implementations:
  * [`SkipExternalService`](api/helpers/classes/SkipExternalService), which is used to connect reactive Skip services together.
  * [`PostgresExternalService`](api/adapters/postgres/classes/PostgresExternalService), which allows to subscribe to reactive updates from a PostgreSQL database.
  * [`KafkaExternalService`](api/adapters/kafka/classes/KafkaExternalService), which allows to connect to and consume messages from a Kafka cluster.
- * [`GenericExternalService`](api/helpers/classes/GenericExternalService), which wraps standalone external resources, such as:
-     * [`TimerResource`](api/helpers/classes/TimerResource), which maintains timestamps updated at customizable intervals, allowing reactive computations to look at or depend upon the "current time" with customizable granularity.
-     * [`Polled`](api/helpers/classes/Polled), which polls a non-reactive HTTP endpoint with configurable parameter encoding, refresh interval, and the like.
+ * [`PolledExternalService`](api/helpers/classes/PolledExternalService), which polls non-reactive HTTP endpoints with configurable parameter encoding, refresh interval, and the like.
 
 If your use case falls outside of these defaults, you can define your own custom external service by providing another `ExternalService` implementation with the required behavior.
 
@@ -145,14 +143,15 @@ const service = {
   resources: ...
   createGraph: ...
   externalServices: {
-    myExternalService: new GenericExternalService({
-      my_resource: new Polled(
+    myExternalService: new PolledExternalService({
+      my_resource: {
         // HTTP endpoint
-        "https://api.example.com/my_resource",
+        url: "https://api.example.com/my_resource",
 	    // Polling interval, in milliseconds
-        5000,
+        interval: 5000,
 	    // data processing into `Entry<K, V>[]` key/values structure
-        (data: Result) => data.results.map((value, idx) => [idx, [value]]))
+        conv: (data: Json) => Array.from(data, (v, k) => [k, [v]])
+      }
     }),
   },
 };
