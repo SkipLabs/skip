@@ -21,6 +21,9 @@ import {
   GenericExternalService,
   Sum,
   TimerResource,
+  join_one,
+  join_many,
+  join_many_through,
 } from "@skipruntime/helpers";
 
 import { it as mit, type AsyncFunc } from "mocha";
@@ -891,6 +894,86 @@ const mapWithExceptionOnExternalService: SkipService<Input_SN, Input_SN> = {
   },
 };
 
+//// testJoinHelpers
+
+type Post = { title: string; author_id: number };
+type User = { name: string };
+type Upvote = { user_id: number; post_id: number };
+
+type JoinServiceInputs = {
+  posts: EagerCollection<number, Post>;
+  users: EagerCollection<number, User>;
+  upvotes: EagerCollection<number, Upvote>;
+};
+
+type PostWithAuthorAndUpvotes = Omit<Post, "author_id"> & {
+  author: User;
+  upvotes: Upvote[];
+};
+
+type PostWithAuthorAndUpvoters = Omit<Post, "author_id"> & {
+  author: User;
+  upvoters: User[];
+};
+
+type JoinServiceResourceInputs = {
+  posts1: EagerCollection<number, PostWithAuthorAndUpvotes>;
+  posts2: EagerCollection<number, PostWithAuthorAndUpvoters>;
+};
+
+class Posts1Resource implements Resource<JoinServiceResourceInputs> {
+  instantiate(
+    collections: JoinServiceResourceInputs,
+  ): EagerCollection<number, PostWithAuthorAndUpvotes> {
+    return collections.posts1;
+  }
+}
+
+class Posts2Resource implements Resource<JoinServiceResourceInputs> {
+  instantiate(
+    collections: JoinServiceResourceInputs,
+  ): EagerCollection<number, PostWithAuthorAndUpvoters> {
+    return collections.posts2;
+  }
+}
+
+const joinService: SkipService<JoinServiceInputs, JoinServiceResourceInputs> = {
+  initialData: {
+    posts: [],
+    users: [],
+    upvotes: [],
+  },
+  resources: {
+    posts1: Posts1Resource,
+    posts2: Posts2Resource,
+  },
+  createGraph(inputCollections: JoinServiceInputs) {
+    const posts_with_author = join_one(
+      {
+        left: inputCollections.posts,
+        right: inputCollections.users,
+        id: "author_id",
+        as: "author",
+      },
+    );
+    const posts1 = join_many({
+      left: posts_with_author,
+      right: inputCollections.upvotes,
+      id: "post_id",
+      as: "upvotes",
+    });
+    const posts2 = join_many_through({
+      left: posts_with_author,
+      right: inputCollections.users,
+      through: inputCollections.upvotes,
+      id_left: "post_id",
+      id_right: "user_id",
+      as: "upvoters",
+    });
+    return { posts1, posts2 };
+  },
+};
+
 export function initTests(
   category: string,
   initService: (service: SkipService) => Promise<ServiceInstance>,
@@ -1524,5 +1607,72 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
         );
       },
     );
+  });
+
+  it("testJoinHelpers", async () => {
+    const service = await initService(joinService);
+    try {
+      service.update("users", [
+        [1, [{ name: "Foo" }]],
+        [2, [{ name: "Bar" }]],
+      ]);
+      service.update("posts", [
+        [1, [{ title: "FooBar", author_id: 1 }]],
+        [2, [{ title: "Baz", author_id: 2 }]],
+      ]);
+      service.update("upvotes", [
+        [1, [{ post_id: 1, user_id: 1 }]],
+        [2, [{ post_id: 1, user_id: 2 }]],
+        [3, [{ post_id: 2, user_id: 2 }]],
+      ]);
+      service.instantiateResource("unsafe.fixed.resource.ident1", "posts1", {});
+      service.instantiateResource("unsafe.fixed.resource.ident2", "posts2", {});
+      expect(service.getAll("posts1").payload).toEqual([
+        [
+          1,
+          [
+            {
+              title: "FooBar",
+              author: { name: "Foo" },
+              upvotes: [{ post_id: 1, user_id: 1 }, { post_id: 1, user_id: 2 }],
+            },
+          ],
+        ],
+        [
+          2,
+          [
+            {
+              title: "Baz",
+              author: { name: "Bar" },
+              upvotes: [{ post_id: 2, user_id: 2 }],
+            },
+          ],
+        ],
+      ]);
+      expect(service.getAll("posts2").payload).toEqual([
+        [
+          1,
+          [
+            {
+              title: "FooBar",
+              author: { name: "Foo" },
+              upvoters: [{ name: "Foo" }, { name: "Bar" }],
+            },
+          ],
+        ],
+        [
+          2,
+          [
+            {
+              title: "Baz",
+              author: { name: "Bar" },
+              upvoters: [{ name: "Bar" }],
+            },
+          ],
+        ],
+      ]);
+    } finally {
+      await service.close();
+    }
   });
 }
