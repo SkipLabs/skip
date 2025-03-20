@@ -68,56 +68,6 @@ export class GenericExternalService implements ExternalService {
 }
 
 type Timeout = ReturnType<typeof setInterval>;
-type Timeouts = { [name: string]: Timeout };
-
-/**
- * An external resource which produces timestamps at set intervals, for use in reactive computations that depend on the "current timestamp" or for automatically triggering reevaluation at a given frequency.
- *
- * @remarks
- * Resource `params` is an object whose property _names_ are string keys, and whose values are time intervals (given in milliseconds) at which to update the corresponding key.
- * For example, if instantiated with params `{ foo: 100, bar: 60_000 }`, the result is a `collection` with string keys and number values, mapping "foo" to a unix timestamp updated ten times per second, and "bar" to a unix timestamp updated once per minute.  By accessing that collection, reactive computations can include the "present time" at whatever granularity is desired, or (by reading the timestamp and then discarding it) force recomputations at whatever frequency is desired.
- */
-export class TimerResource implements ExternalResource {
-  private readonly intervals = new Map<string, { [name: string]: Timeout }>();
-
-  open(
-    instance: string,
-    params: { [identifier: string]: number },
-    callbacks: {
-      update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
-      error: (error: Json) => void;
-      loading: () => void;
-    },
-  ) {
-    const time = new Date().getTime();
-    const values: Entry<string, number>[] = [];
-    for (const name of Object.keys(params)) {
-      values.push([name, [time]]);
-    }
-    callbacks.update(values, true);
-    const intervals: Timeouts = {};
-    for (const [name, duration] of Object.entries(params)) {
-      const ms = Number(duration);
-      if (ms > 0) {
-        intervals[name] = setInterval(() => {
-          const newvalue: Entry<Json, Json> = [name, [new Date().getTime()]];
-          callbacks.update([newvalue], true);
-        }, ms);
-      }
-    }
-    this.intervals.set(instance, intervals);
-  }
-
-  close(instance: string): void {
-    const intervals = this.intervals.get(instance);
-    if (intervals != null) {
-      for (const interval of Object.values(intervals)) {
-        clearInterval(interval);
-      }
-      this.intervals.delete(instance);
-    }
-  }
-}
 
 /**
  * Encode params for external resource request.
