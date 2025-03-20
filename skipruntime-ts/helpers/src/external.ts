@@ -139,26 +139,21 @@ export function defaultParamEncoder(params: Json): string {
 }
 
 /**
- * An external resource that is refreshed at some polling interval.
+ * An external service that is refreshed at some polling interval.
  *
- * @typeParam S - Type of data received from external resource.
- * @typeParam K - Type of keys.
- * @typeParam V - Type of values.
  */
-export class Polled<S extends Json, K extends Json, V extends Json>
-  implements ExternalResource
-{
+export class PolledExternalService implements ExternalService {
   private readonly intervals = new Map<string, Timeout>();
 
   /**
-   * Construct a `Polled` external resource.
+   * Construct a polled external service.
    *
-   * The URL of the external resource is formed by appending the given base `url` and the result of `encodeParams(params)` where `params` are the parameters provided when instantiating the resource.
+   * The URL of the external service is formed by appending the given base `url` and the result of `encodeParams(params)` where `params` are the parameters provided when instantiating a resource.
    *
    * Note that the result of `encodeParams` contains the `?` separator, but it need not be at the beginning of the returned string, so some parameters can be used in part of the URL preceding the `?`.
    *
-   * @param url - HTTP endpoint of external resource to poll.
-   * @param duration - Refresh interval, in milliseconds.
+   * @param url - HTTP endpoint of external service to poll.
+   * @param interval - Refresh interval, in milliseconds.
    * @param conv - Function to convert data of type `S` received from external resource to `key`-`value` entries.
    * @param encodeParams - Function to use to encode params of type `Json` for external resource request.
    * @param options - Optional parameters.
@@ -166,20 +161,20 @@ export class Polled<S extends Json, K extends Json, V extends Json>
    * @param options.timeout - Timeout for request, in milliseconds. Defaults to 1000ms.
    */
   constructor(
-    private readonly url: string,
-    private readonly duration: number,
-    private readonly conv: (data: S) => Entry<K, V>[],
-    private readonly encodeParams: (
-      params: Json,
-    ) => string = defaultParamEncoder,
-    private readonly options?: {
-      headers?: { [header: string]: string };
-      timeout?: number;
+    private readonly resources: {
+      [resource: string]: {
+        url: string;
+        interval: number;
+        conv: (data: Json) => Entry<Json, Json>[];
+        encodeParams?: (params: Json) => string;
+        options?: { headers?: { [header: string]: string }; timeout?: number };
+      };
     },
   ) {}
 
-  open(
+  subscribe(
     instance: string,
+    resourceName: string,
     params: Json,
     callbacks: {
       update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
@@ -187,12 +182,18 @@ export class Polled<S extends Json, K extends Json, V extends Json>
       loading: () => void;
     },
   ) {
-    const url = `${this.url}${this.encodeParams(params)}`;
+    const resource = this.resources[resourceName];
+    if (!resource)
+      throw new SkipUnknownResourceError(
+        `Unknown resource named '${resourceName}'`,
+      );
+
+    const url = `${resource.url}${(resource.encodeParams ?? defaultParamEncoder)(params)}`;
     const call = () => {
       callbacks.loading();
-      fetchJSON(url, "GET", this.options)
+      fetchJSON(url, "GET", resource.options ?? {})
         .then((r) => {
-          callbacks.update(this.conv(r[0] as S), true);
+          callbacks.update(resource.conv(r[0] ?? []), true);
         })
         .catch((e: unknown) => {
           callbacks.error(e instanceof Error ? e.message : JSON.stringify(e));
@@ -200,14 +201,21 @@ export class Polled<S extends Json, K extends Json, V extends Json>
         });
     };
     call();
-    this.intervals.set(instance, setInterval(call, this.duration));
+    this.intervals.set(instance, setInterval(call, resource.interval));
   }
 
-  close(instance: string): void {
+  unsubscribe(instance: string): void {
     const interval = this.intervals.get(instance);
     if (interval) {
       clearInterval(interval);
       this.intervals.delete(instance);
     }
+  }
+  shutdown(): Promise<void> {
+    for (const [instance, interval] of Object.entries(this.intervals)) {
+      clearInterval(interval);
+      this.intervals.delete(instance);
+    }
+    return Promise.resolve();
   }
 }
