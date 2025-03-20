@@ -50,12 +50,27 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: "category",
-      label: "@skip-adapter/postgres",
-      link: {
-        type: "doc",
-        id: "api/adapters/postgres/index",
-      },
-      items: require("./docs/api/adapters/postgres/typedoc-sidebar.cjs"),
+      label: "@skip-adapter",
+      items: [
+        {
+          type: "category",
+          label: "@skip-adapter/postgres",
+          link: {
+            type: "doc",
+            id: "api/adapters/postgres/index",
+          },
+          items: require("./docs/api/adapters/postgres/typedoc-sidebar.cjs"),
+        },
+        {
+          type: "category",
+          label: "@skip-adapter/kafka",
+          link: {
+            type: "doc",
+            id: "api/adapters/kafka/index",
+          },
+          items: require("./docs/api/adapters/kafka/typedoc-sidebar.cjs"),
+        },
+      ],
     },
   ],
 };

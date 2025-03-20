@@ -59,7 +59,8 @@ export class KafkaExternalService implements ExternalService {
    *
    * @param instance - Instance identifier of the external resource.
    * @param topic - Name of the Kafka topic to expose as a resource.
-   * @param params - Parameters of the external resource. `params.fromBeginning` controls whether to consume all Kafka messages from the cluster, or only from the creation of this external resource.
+   * @param params - Parameters of the external resource.
+   * @param params.fromBeginning - Controls whether to consume all Kafka messages from the cluster, or only from the creation of this external resource.
    * @param callbacks - Callbacks to react on error/loading/update.
    * @param callbacks.error - Error callback.
    * @param callbacks.loading - Loading callback.
@@ -69,7 +70,7 @@ export class KafkaExternalService implements ExternalService {
   subscribe(
     instance: string,
     topic: string,
-    params: Json & { fromBeginning?: boolean },
+    params: { fromBeginning?: boolean },
     callbacks: {
       update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
       error: (error: Json) => void;

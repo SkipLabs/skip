@@ -7,6 +7,9 @@ import format from "pg-format";
  */
 export class SkipPostgresError extends SkipError {}
 
+/**
+ * Postgres data types supported for use as Skip collection keys.
+ */
 export type PostgresPKey =
   | "TEXT"
   | "SERIAL"
