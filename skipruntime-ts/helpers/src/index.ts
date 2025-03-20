@@ -6,9 +6,8 @@
 
 export {
   defaultParamEncoder,
-  type ExternalResource,
   GenericExternalService,
-  Polled,
+  PolledExternalService,
   TimerResource,
 } from "./external.js";
 export { SkipExternalService } from "./remote.js";

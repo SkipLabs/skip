@@ -402,12 +402,12 @@ export type CollectionUpdate<K extends Json, V extends Json> = {
  *
  * `Context.useExternalResource` accepts the name of an external service, which must be associated to an instance of this `ExternalService` interface by `SkipService.externalServices`.
  *
- * There are two main implementations of `ExternalService`, depending on whether the external data source is a reactive Skip service or not.
+* Custom implementations of the `ExternalService` interface can be defined as needed, and the Skip framework provides several out of the box: `SkipExternalService` and `PolledExternalService` in the `@skipruntime/helpers` package, and integrations with other systems such as PostgreSQL and Kafka in `@skip-adapter/*` packages.
  *
  * If it _is_ a Skip service, then `SkipExternalService` can be used, specifying an entrypoint.
  * The external Skip service will update its resources reactively and those changes will propagate through this service.
  *
- * If it is _not_ a Skip service, then `GenericExternalService` and `Polled` can be used to specify the external source and desired polling frequency.
+ * If it is _not_ a Skip service, then `PolledExternalService` can be used to specify the external source and desired polling frequency.
  */
 export interface ExternalService {
   /**
