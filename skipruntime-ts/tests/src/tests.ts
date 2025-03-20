@@ -15,7 +15,7 @@ import type {
   ServiceInstance,
 } from "@skipruntime/core";
 import { SkipNonUniqueValueError } from "@skipruntime/core";
-import { Count, GenericExternalService, Sum } from "@skipruntime/helpers";
+import { Count, Sum } from "@skipruntime/helpers";
 
 import { it as mit, type AsyncFunc } from "mocha";
 
