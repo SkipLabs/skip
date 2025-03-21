@@ -118,11 +118,6 @@ export interface FromBinding {
     key: Pointer<Internal.CJSON>,
   ): Pointer<Internal.CJArray<Internal.CJSON>>;
 
-  SkipRuntime_Collection__getUnique(
-    collection: string,
-    key: Pointer<Internal.CJSON>,
-  ): Nullable<Pointer<Internal.CJSON>>;
-
   SkipRuntime_Collection__map(
     collection: string,
     mapper: Pointer<Internal.Mapper>,
@@ -168,11 +163,6 @@ export interface FromBinding {
     collection: string,
     key: Pointer<Internal.CJSON>,
   ): Pointer<Internal.CJArray<Internal.CJSON>>;
-
-  SkipRuntime_LazyCollection__getUnique(
-    collection: string,
-    key: Pointer<Internal.CJSON>,
-  ): Pointer<Internal.CJSON>;
 
   // Notifier
 

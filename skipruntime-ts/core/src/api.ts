@@ -85,14 +85,16 @@ export interface Reducer<V extends Json, A extends Json> {
 }
 
 /**
- * An iterable collection of dependency-safe values.
+ * A non-empty iterable sequence of dependency-safe values.
  */
 export interface Values<T> extends Iterable<T & DepSafe> {
   /**
    * Return the first value, if there is exactly one.
-   * @throws {@link SkipNonUniqueValueError} if this iterable contains either zero or multiple values.
+   * @param _default
+   * @param _default.ifMany - Default value to use instead of throwing if there are multiple values.
+   * @throws {@link SkipNonUniqueValueError} if this iterable contains multiple values.
    */
-  getUnique(): T & DepSafe;
+  getUnique(_default?: { ifMany?: T }): T & DepSafe;
 
   /**
    * Return all the values.
@@ -124,10 +126,13 @@ export interface LazyCollection<K extends Json, V extends Json>
    * For collections that do not use the generality of associating multiple values to a key, `getUnique` saves some boilerplate over `getArray`.
    *
    * @param key - The key to query.
+   * @param _default
+   * @param _default.ifNone - Default value for the case where **zero** values are associated to the given key
+   * @param _default.ifMany - Default value for the case where **multiple** values are associated to the given key
    * @returns The value associated to `key`.
-   * @throws {@link SkipNonUniqueValueError} if `key` is associated to either zero or multiple values.
+   * @throws {@link SkipNonUniqueValueError} if `key` is associated to either zero or multiple values and no suitable default is provided.
    */
-  getUnique(key: K): V & DepSafe;
+  getUnique(key: K, _default?: { ifNone?: V; ifMany?: V }): V & DepSafe;
 }
 
 /**
@@ -154,10 +159,13 @@ export interface EagerCollection<K extends Json, V extends Json>
    * For collections that do not use the generality of associating multiple values to a key, `getUnique` saves some boilerplate over `getArray`.
    *
    * @param key - The key to query.
+   * @param _default
+   * @param _default.ifNone - Default value for the case where **zero** values are associated to the given key
+   * @param _default.ifMany - Default value for the case where **multiple** values are associated to the given key
    * @returns The value associated to `key`.
-   * @throws {@link SkipNonUniqueValueError} if `key` is associated to either zero or multiple values.
+   * @throws {@link SkipNonUniqueValueError} if `key` is associated to either zero or multiple values and no suitable default is provided.
    */
-  getUnique(key: K): V & DepSafe;
+  getUnique(key: K, _default?: { ifNone?: V; ifMany?: V }): V & DepSafe;
 
   /**
    * Create a new eager collection by mapping a function over the values in this one.

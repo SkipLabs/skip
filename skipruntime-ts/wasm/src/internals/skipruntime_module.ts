@@ -129,11 +129,6 @@ export interface FromWasm {
     key: ptr<Internal.CJSON>,
   ): ptr<Internal.CJArray<Internal.CJSON>>;
 
-  SkipRuntime_Collection__getUnique(
-    collection: ptr<Internal.String>,
-    key: ptr<Internal.CJSON>,
-  ): Nullable<ptr<Internal.CJSON>>;
-
   SkipRuntime_Collection__map(
     collection: ptr<Internal.String>,
     mapper: ptr<Internal.Mapper>,
@@ -182,11 +177,6 @@ export interface FromWasm {
     collection: ptr<Internal.String>,
     key: ptr<Internal.CJSON>,
   ): ptr<Internal.CJArray<Internal.CJSON>>;
-
-  SkipRuntime_LazyCollection__getUnique(
-    collection: ptr<Internal.String>,
-    key: ptr<Internal.CJSON>,
-  ): ptr<Internal.CJSON>;
 
   // Notifier
 
@@ -524,18 +514,6 @@ export class WasmFromBinding implements FromBinding {
     );
   }
 
-  SkipRuntime_Collection__getUnique(
-    collection: string,
-    key: Pointer<Internal.CJSON>,
-  ): Nullable<Pointer<Internal.CJSON>> {
-    return toNullablePointer(
-      this.fromWasm.SkipRuntime_Collection__getUnique(
-        this.utils.exportString(collection),
-        toPtr(key),
-      ),
-    );
-  }
-
   SkipRuntime_Collection__map(
     collection: string,
     mapper: Pointer<Internal.Mapper>,
@@ -644,16 +622,6 @@ export class WasmFromBinding implements FromBinding {
     key: Pointer<Internal.CJSON>,
   ): Pointer<Internal.CJArray<Internal.CJSON>> {
     return this.fromWasm.SkipRuntime_LazyCollection__getArray(
-      this.utils.exportString(collection),
-      toPtr(key),
-    );
-  }
-
-  SkipRuntime_LazyCollection__getUnique(
-    collection: string,
-    key: Pointer<Internal.CJSON>,
-  ): Pointer<Internal.CJSON> {
-    return this.fromWasm.SkipRuntime_LazyCollection__getUnique(
       this.utils.exportString(collection),
       toPtr(key),
     );

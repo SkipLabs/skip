@@ -44,7 +44,6 @@ double SkipRuntime_initService(SKService service);
 CJSON SkipRuntime_closeService();
 
 CJArray SkipRuntime_Collection__getArray(char* collection, CJSON key);
-CJSON SkipRuntime_Collection__getUnique(char* collection, CJSON key);
 char* SkipRuntime_Collection__map(char* collection, SKMapper mapper);
 char* SkipRuntime_Collection__mapReduce(char* collection, SKMapper mapper,
                                         SKReducer reducer);
@@ -60,7 +59,6 @@ int64_t SkipRuntime_Collection__size(char* collection);
 CJSON SkipRuntime_NonEmptyIterator__next(SKNonEmptyIterator it);
 
 CJSON SkipRuntime_LazyCollection__getArray(char* handle, CJSON key);
-CJSON SkipRuntime_LazyCollection__getUnique(char* handle, CJSON key);
 
 double SkipRuntime_Runtime__createResource(char* identifier, char* resource,
                                            CJObject jsonParams);
@@ -613,40 +611,6 @@ void GetArrayOfEagerCollection(const FunctionCallbackInfo<Value>& args) {
   });
 }
 
-void GetUniqueOfEagerCollection(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  if (args.Length() != 2) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have two parameters.")));
-    return;
-  }
-  if (!args[0]->IsString()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a string.")));
-    return;
-  }
-  if (!args[1]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a pointer.")));
-    return;
-  }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    char* skCollection = ToSKString(isolate, args[0].As<String>());
-    void* skKey = args[1].As<External>()->Value();
-    void* skResult = SkipRuntime_Collection__getUnique(skCollection, skKey);
-    Local<Value> returnValue;
-    if (skResult != nullptr) {
-      returnValue = External::New(isolate, skResult);
-    } else {
-      returnValue = Null(isolate);
-    }
-    args.GetReturnValue().Set(returnValue);
-  });
-}
-
 void SizeOfEagerCollection(const v8::FunctionCallbackInfo<v8::Value>& args) {
   Isolate* isolate = args.GetIsolate();
   if (args.Length() != 1) {
@@ -949,34 +913,6 @@ void GetArrayOfLazyCollection(const FunctionCallbackInfo<Value>& args) {
   });
 }
 
-void GetUniqueOfLazyCollection(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  if (args.Length() != 2) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have two parameters.")));
-    return;
-  }
-  if (!args[0]->IsString()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a string.")));
-    return;
-  }
-  if (!args[1]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a pointer.")));
-    return;
-  }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    char* skCollection = ToSKString(isolate, args[0].As<String>());
-    void* skKey = args[1].As<External>()->Value();
-    void* skResult = SkipRuntime_LazyCollection__getUnique(skCollection, skKey);
-    args.GetReturnValue().Set(External::New(isolate, skResult));
-  });
-}
-
 void CreateResourceOfRuntime(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
   if (!args[0]->IsString() || !args[1]->IsString() || !args[2]->IsExternal()) {
@@ -1199,8 +1135,6 @@ void GetToJSBinding(const FunctionCallbackInfo<Value>& args) {
   //
   AddFunction(isolate, binding, "SkipRuntime_Collection__getArray",
               GetArrayOfEagerCollection);
-  AddFunction(isolate, binding, "SkipRuntime_Collection__getUnique",
-              GetUniqueOfEagerCollection);
   AddFunction(isolate, binding, "SkipRuntime_Collection__map",
               MapOfEagerCollection);
   AddFunction(isolate, binding, "SkipRuntime_Collection__mapReduce",
@@ -1225,8 +1159,6 @@ void GetToJSBinding(const FunctionCallbackInfo<Value>& args) {
   //
   AddFunction(isolate, binding, "SkipRuntime_LazyCollection__getArray",
               GetArrayOfLazyCollection);
-  AddFunction(isolate, binding, "SkipRuntime_LazyCollection__getUnique",
-              GetUniqueOfLazyCollection);
   //
   AddFunction(isolate, binding, "SkipRuntime_Runtime__createResource",
               CreateResourceOfRuntime);
