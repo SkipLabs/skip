@@ -1,0 +1,581 @@
+module SkipRuntime;
+
+class TransactionException(message: String) extends .Exception {
+  fun getMessage(): String {
+    this.message
+  }
+}
+
+class ResourceInstanceInitFailed(
+  errors: Array<SKJSON.CJSON>,
+) extends Exception {
+  fun getMessage(): String {
+    errors = this.errors.map(e -> e.prettyPrint()).join("\n  ");
+    `Resource instance cannot be initialized:\n  ${errors}`
+  }
+}
+
+class ServiceInstanceInitFailed(errors: Array<SKJSON.CJSON>) extends Exception {
+  fun getMessage(): String {
+    errors = this.errors.map(e -> e.prettyPrint()).join("\n  ");
+    `Service instance cannot be initialized:\n  ${errors}`
+  }
+}
+
+const kTransactionIdKey: String = "transaction";
+const kTransactionExternalKey: String = "transaction.externals";
+const kTransactionClosedKey: String = "transaction.closed";
+const kInitializationsKey: String = "externals.initializations";
+const kSubscriptionsKey: String = "externals.subscriptions";
+
+fun transactionKey(uuid: String): String {
+  `transaction.${uuid}`
+}
+
+fun commitsKey(uuid: String): String {
+  `transaction.commits.${uuid}`
+}
+
+fun aliasesKey(uuid: String): String {
+  `transaction.aliases.${uuid}`
+}
+
+fun linkKey(dirName: SKStore.DirName): String {
+  `transaction.link.${dirName}`
+}
+
+class ExternalServiceDef(
+  name: String,
+  resource: String,
+  params: SKJSON.CJSON,
+) uses Orderable
+
+private fun isInitialized(
+  context: readonly SKStore.Context,
+  dirName: SKStore.DirName,
+): Bool {
+  context.unsafeMaybeGetEagerDir(dirName) match {
+  | Some(dir) ->
+    dirname = sessionId(context, dir) match {
+    | Some(sId) -> kResourceSessionDir.sub(sId).sub("status")
+    | _ -> kSessionDir.sub("status")
+    };
+    shdl = SKStore.EHandle(SKStore.DirName::keyType, StatusFile::type, dirname);
+    shdl.unsafeGet(context, dirName).status.initialiazed.isSome()
+  | _ -> true
+  };
+}
+
+private fun initialized(
+  context: mutable SKStore.Context,
+  toCheck: SortedSet<SKStore.DirName>,
+): Bool {
+  toCheck.map(d -> isInitialized(context, d)).reduce((acc, v) ~> acc && v, true)
+}
+
+private fun initStatus(
+  context: readonly SKStore.Context,
+  dirName: SKStore.DirName,
+): ?SKJSON.CJSON {
+  context.unsafeMaybeGetEagerDir(dirName) match {
+  | Some(dir) ->
+    dirname = sessionId(context, dir) match {
+    | Some(sId) -> kResourceSessionDir.sub(sId).sub("status")
+    | _ -> kSessionDir.sub("status")
+    };
+    shdl = SKStore.EHandle(SKStore.DirName::keyType, StatusFile::type, dirname);
+    shdl.unsafeGet(context, dirName).status.initialiazed
+  | _ -> Some(SKJSON.CJNull())
+  };
+}
+
+private fun fatals(
+  context: mutable SKStore.Context,
+  toCheck: SortedSet<SKStore.DirName>,
+): ?Array<SKJSON.CJSON> {
+  if (toCheck.isEmpty()) return None();
+  errors = mutable Vector[];
+  for (dirName in toCheck) {
+    initStatus(context, dirName) match {
+    | Some(SKJSON.CJNull()) -> void
+    | Some(error) -> errors.push(error)
+    | _ -> return None()
+    }
+  };
+  Some(errors.toArray())
+}
+
+base class Transaction(
+  toCommit: (mutable SKStore.Context) ~> void,
+  toCheck: SortedSet<SKStore.DirName>,
+  executor: Executor,
+) {
+  children =
+  | TMain(context: SKStore.Context)
+  | TIntermediate(alias: String)
+
+  fun initialized(context: mutable SKStore.Context): Bool {
+    initialized(context, this.toCheck)
+  }
+
+  fun collectCommit(
+    context: readonly SKStore.Context,
+    commits: mutable Vector<(mutable SKStore.Context) ~> void>,
+    externals: mutable Map<
+      String,
+      (CloseExternalService, (mutable SKStore.Context) ~> void, Bool),
+    >,
+    ignored: mutable Set<String>,
+  ): void {
+    commits.push(this.toCommit);
+    this.toCheck.each(d -> this.collectExternal(context, d, externals, ignored))
+  }
+
+  private fun collectExternal(
+    context: readonly SKStore.Context,
+    dirName: SKStore.DirName,
+    externals: mutable Map<
+      String,
+      (CloseExternalService, (mutable SKStore.Context) ~> void, Bool),
+    >,
+    ignored: mutable Set<String>,
+  ): void {
+    // The directory could be deleted by an intermediate transaction.
+    context.unsafeMaybeGetEagerDir(dirName) match {
+    | Some(dir) ->
+      statusDirName = sessionId(context, dir) match {
+      | Some(sId) -> kResourceSessionDir.sub(sId).sub("status")
+      | _ -> kSessionDir.sub("status")
+      };
+      dirHdl = SKStore.EHandle(JSONID::keyType, JSONFile::type, dirName);
+      shdl = SKStore.EHandle(
+        SKStore.DirName::keyType,
+        StatusFile::type,
+        statusDirName,
+      );
+      sf = shdl.unsafeGet(context, dirName);
+      values = dir
+        .unsafeGetFileIter()
+        .map(v ->
+          (JSONID::keyType(v.i0), v.i1.collect(Array).map(JSONFile::type))
+        )
+        .collect(Array);
+      externals.add(
+        dirName.toString(),
+        (
+          dir.optOnDelete.fromSome() as CloseExternalService _,
+          ctx ~> {
+            values.each(v ->
+              if (!v.i1.isEmpty()) dirHdl.writeArray(ctx, v.i0, v.i1)
+            );
+            shdl.writeArray(ctx, dirName, Array[sf]);
+          },
+          sf.status.initialiazed.isSome(),
+        ),
+      )
+    | _ -> ignored.insert(dirName.toString())
+    };
+  }
+}
+
+class TransactionFile(value: Transaction) extends SKStore.File
+class AliasesFile(value: List<String>) extends SKStore.File
+class ClosedServicesFile(
+  value: SortedSet<ExternalServiceDef>,
+) extends SKStore.File
+class SubscriptionsFile(value: SortedSet<SKStore.DirName>) extends SKStore.File
+
+base class InitializationFile(
+  services: SortedSet<SKStore.DirName>,
+) extends SKStore.File {
+  children =
+  | ServiceInitialization(executor: Executor)
+  | ResourceInitialization(instances: List<(String, Executor)>)
+}
+
+class ExternalsFile(
+  value: Map<
+    String,
+    (CloseExternalService, (mutable SKStore.Context) ~> void, Bool),
+  >,
+  ignored: Set<String>,
+) extends SKStore.File
+
+private fun getTransaction(
+  root: mutable SKStore.Context,
+  uuid: String,
+): (Transaction, String, TMain) {
+  root.getPersistent(transactionKey(uuid)) match {
+  | Some(TransactionFile(main @ TMain _)) -> (main, uuid, main)
+  | Some(TransactionFile(int @ TIntermediate _)) ->
+    (_, id, main) = getTransaction(root, int.alias);
+    (int, id, main)
+  | _ -> invariant_violation("Invalid transaction.")
+  };
+}
+
+private fun addAlias(
+  context: mutable SKStore.Context,
+  uuid: String,
+  alias: String,
+): void {
+  id = aliasesKey(uuid);
+  aliases = context.getPersistent(id).map(AliasesFile::type) match {
+  | Some(aliases) -> aliases.value
+  | _ -> List.Nil<String>()
+  };
+  context.setPersistent(id, AliasesFile(List.Cons(alias, aliases)))
+}
+
+private fun getAliases(
+  context: mutable SKStore.Context,
+  uuid: String,
+): List<String> {
+  id = aliasesKey(uuid);
+  aliases: List<String> = List.Nil();
+  context.getPersistent(id).map(AliasesFile::type) match {
+  | Some(AliasesFile(list)) ->
+    list.each(alias ->
+      !aliases = List.Cons(alias, aliases).concat(getAliases(context, alias))
+    )
+  | _ -> void
+  };
+  aliases
+}
+
+private fun addClosed(
+  context: mutable SKStore.Context,
+  service: ExternalServiceDef,
+): void {
+  closed = context
+    .getPersistent(kTransactionClosedKey)
+    .map(ClosedServicesFile::type) match {
+  | Some(closed) -> closed.value
+  | _ -> SortedSet[]
+  };
+  context.setPersistent(
+    kTransactionClosedKey,
+    ClosedServicesFile(closed.set(service)),
+  )
+}
+
+private fun isClosed(
+  context: readonly SKStore.Context,
+  service: ExternalServiceDef,
+): Bool {
+  context
+    .getPersistent(kTransactionClosedKey)
+    .map(ClosedServicesFile::type) match {
+  | Some(closed) -> closed.value.contains(service)
+  | _ -> false
+  };
+}
+
+private fun addSubscription(
+  context: mutable SKStore.Context,
+  dirName: SKStore.DirName,
+): void {
+  subscriptions = context
+    .getPersistent(kSubscriptionsKey)
+    .map(SubscriptionsFile::type) match {
+  | Some(subscriptions) -> subscriptions.value
+  | _ -> SortedSet<SKStore.DirName>[]
+  };
+  context.setPersistent(
+    kSubscriptionsKey,
+    SubscriptionsFile(subscriptions.set(dirName)),
+  )
+}
+
+private fun checkResourceInstanceSubcriptions(
+  context: mutable SKStore.Context,
+  resource: ResourceDef,
+  instance: String,
+  executor: Executor,
+): void {
+  resourceId = toResourceId(resource.name, resource.params);
+  key = `${kInitializationsKey}.${resourceId}`;
+  subcriptions = getSubscriptions(context);
+  context.getPersistent(key).map(ResourceInitialization::type) match {
+  | Some(init) ->
+    invariant(
+      subcriptions.isEmpty(),
+      "Multiple initialisation for same resource.",
+    );
+    !init.instances = List.Cons((instance, executor), init.instances);
+    context.setPersistent(key, init)
+  | _ ->
+    if (subcriptions.isEmpty()) {
+      executor.resolve()
+    } else {
+      context.setPersistent(
+        key,
+        ResourceInitialization(
+          List.Cons((instance, executor), List.Nil()),
+          subcriptions,
+        ),
+      )
+    }
+  }
+}
+
+private fun checkSubcriptions(
+  context: mutable SKStore.Context,
+  executor: Executor,
+): void {
+  subcriptions = getSubscriptions(context);
+  if (subcriptions.isEmpty()) {
+    executor.resolve()
+  } else {
+    context.setPersistent(
+      kInitializationsKey,
+      ServiceInitialization(executor, subcriptions),
+    )
+  };
+}
+
+private fun getSubscriptions(
+  context: mutable SKStore.Context,
+): SortedSet<SKStore.DirName> {
+  subcriptions = context
+    .getPersistent(kSubscriptionsKey)
+    .map(SubscriptionsFile::type) match {
+  | Some(subscriptions) -> subscriptions.value
+  | _ -> SortedSet<SKStore.DirName>[]
+  };
+  context.removePersistent(kSubscriptionsKey);
+  subcriptions
+}
+
+mutable class TransactionDef(
+  parent: ?SKStore.StringFile,
+  id: SKStore.StringFile,
+  context: mutable SKStore.Context,
+  tick: SKStore.Tick,
+)
+
+private fun checkInitialization(
+  context: mutable SKStore.Context,
+  resource: ?ResourceDef,
+): void {
+  key = resource match {
+  | Some(def) ->
+    resourceId = toResourceId(def.name, def.params);
+    `${kInitializationsKey}.${resourceId}`
+  | _ -> kInitializationsKey
+  };
+  context.getPersistent(key).map(f ~> f as InitializationFile _) match {
+  | Some(init) ->
+    fatals(context, init.services) match {
+    | Some(errors) ->
+      if (errors.isEmpty()) {
+        init match {
+        | ServiceInitialization(executor, _) -> executor.resolve()
+        | ResourceInitialization(instances, _) ->
+          instances.each(info -> info.i1.resolve())
+        }
+      } else {
+        (init, resource) match {
+        | (ServiceInitialization(executor, _), None()) ->
+          executor.reject(ServiceInstanceInitFailed(errors));
+          context.getPersistent(kTransactionIdKey).map(f ->
+            SKStore.StringFile::type(f).value
+          ) match {
+          | None() -> _ = closeService_(context, false)
+          | _ -> void
+          }
+        | (ResourceInitialization(instances, _), Some _) ->
+          instances.each(info -> {
+            info.i1.reject(ResourceInstanceInitFailed(errors));
+            destroyReactiveResource(context, SKStore.SID(info.i0))
+          })
+        | _ -> invariant_violation("Invalid initialisation state.")
+        }
+      };
+      resource match {
+      | Some(def) ->
+        resourceId = toResourceId(def.name, def.params);
+        context.removePersistent(`${kInitializationsKey}.${resourceId}`)
+      | _ -> context.removePersistent(kInitializationsKey)
+      }
+    | _ -> void
+    }
+  | _ ->
+    // Not created durring resource creation
+    void
+  }
+}
+
+private fun checkTransaction(
+  main: mutable SKStore.Context,
+): mutable TransactionDef {
+  parent = main.getPersistent(kTransactionIdKey).map(SKStore.StringFile::type);
+  // If already in Transaction, it's not necessary to change the context
+  context = if (parent.isSome()) main else main.mclone();
+  transactionId = SKStore.StringFile(Ksuid::create().toString());
+  context.setPersistent(kTransactionIdKey, transactionId);
+  mutable TransactionDef(parent, transactionId, context, context.tick)
+}
+
+private fun finalizeTransaction(
+  root: mutable SKStore.Context,
+  main: mutable SKStore.Context,
+  def: mutable TransactionDef,
+  commit: (mutable SKStore.Context) ~> void,
+  executor: Executor,
+): void {
+  services = getSubscriptions(def.context);
+  if (services.isEmpty()) {
+    def.parent match {
+    | Some(current) -> main.setPersistent(kTransactionIdKey, current)
+    | _ ->
+      commit(main);
+      updateContext(main)
+    };
+    executor.resolve();
+  } else {
+    transaction = def.parent match {
+    | Some(current) ->
+      main.setPersistent(kTransactionIdKey, current);
+      addAlias(root, current.value, def.id.value);
+      TIntermediate(current.value, commit, services, executor)
+    | _ -> TMain(def.context.clone(), commit, services, executor)
+    };
+    root.setPersistent(
+      transactionKey(def.id.value),
+      TransactionFile(transaction),
+    );
+    services.each(c -> root.setPersistent(linkKey(c), def.id));
+  }
+}
+
+private fun performOnTransaction(
+  dirName: SKStore.DirName,
+  toPerform: (
+    root: mutable SKStore.Context,
+    context: mutable SKStore.Context,
+  ) ~> void,
+  commit: Bool = false,
+): Result<void, .Exception> {
+  SKStore.runWithResult(context ~> {
+    context
+      .getPersistent(linkKey(dirName))
+      .map(SKStore.StringFile::type) match {
+    | Some(transactionId) ->
+      (transaction, mainId, tMain) = getTransaction(
+        context,
+        transactionId.value,
+      );
+      tContext = tMain.context.mclone();
+      tContext.setPersistent(kTransactionIdKey, transactionId);
+      try {
+        toPerform(context, tContext);
+        tContext.setPersistent(kTransactionIdKey, SKStore.StringFile(mainId));
+        !tMain.context = tContext.clone();
+        context.setPersistent(transactionKey(mainId), TransactionFile(tMain));
+        if (commit) {
+          if (transaction.initialized(tContext)) {
+            if (mainId != transactionId.value) {
+              transaction.executor.resolve()
+            } else {
+              commitTransaction(context, mainId, tMain)
+            }
+          }
+        };
+      } catch {
+      | e ->
+        rollbackTransaction(context, mainId, tMain);
+        tMain.executor.reject(e)
+      }
+    | _ -> toPerform(context, context)
+    };
+  })
+}
+
+private fun commitTransaction(
+  context: mutable SKStore.Context,
+  mainId: String,
+  transaction: TMain,
+): void {
+  // Collect Created External Resources to transfer prevent there Close/Reload
+  commits = mutable Vector<(mutable SKStore.Context) ~> void>[];
+  externals = mutable Map<
+    String,
+    (CloseExternalService, (mutable SKStore.Context) ~> void, Bool),
+  >[];
+  ignored = mutable Set<String>[];
+  transaction.collectCommit(transaction.context, commits, externals, ignored);
+  getAliases(context, mainId).reversed().each(uuid -> {
+    transactionKey = transactionKey(uuid);
+    context.getPersistent(transactionKey).map(TransactionFile::type).each(tf ->
+      tf.value.collectCommit(transaction.context, commits, externals, ignored)
+    )
+  });
+  allInitialized = externals.values().reduce((acc, v) -> acc && v.i2, true);
+  if (!allInitialized) {
+    throw TransactionException("Committing a not finalized transaction");
+  };
+  context.setPersistent(
+    kTransactionExternalKey,
+    ExternalsFile(externals.chill(), ignored.chill()),
+  );
+  transaction.context.getPersistent(kTransactionClosedKey).each(ces ->
+    context.setPersistent(kTransactionClosedKey, ces)
+  );
+  // Apply all the commits
+  commits.each(commit -> commit(context));
+  context.update();
+  context.removePersistent(kTransactionExternalKey);
+  context.removePersistent(kTransactionClosedKey);
+  // Apply all the externals updates
+  externals.values().each(external -> external.i1(context));
+  updateContext(context);
+  // Clean all the data related to the transaction
+  rollbackTransaction(context, mainId, transaction);
+  transaction.executor.resolve();
+}
+
+private fun rollbackTransaction(
+  context: mutable SKStore.Context,
+  mainId: String,
+  transaction: TMain,
+): void {
+  // Clean the context
+  getAliases(context, mainId).each(uuid -> {
+    transactionKey = transactionKey(uuid);
+    context.getPersistent(transactionKey).map(TransactionFile::type).each(tf -> {
+      tf.value.toCheck.each(path -> context.removePersistent(linkKey(path)));
+      context.removePersistent(transactionKey)
+    })
+  });
+  transaction.toCheck.each(path -> context.removePersistent(linkKey(path)));
+  context.removePersistent(aliasesKey(mainId));
+  context.removePersistent(commitsKey(mainId));
+  context.removePersistent(transactionKey(mainId));
+}
+
+private fun getCloseExternalService(
+  context: readonly SKStore.Context,
+  dirName: SKStore.DirName,
+): ?CloseExternalService {
+  context
+    .getPersistent(kTransactionExternalKey)
+    .map(ExternalsFile::type) match {
+  | Some(ef) -> Some(ef.value.get(dirName.toString()).i0)
+  | _ -> None()
+  }
+}
+
+private fun isIgnored(
+  context: readonly SKStore.Context,
+  dirName: SKStore.DirName,
+): Bool {
+  context
+    .getPersistent(kTransactionExternalKey)
+    .map(ExternalsFile::type) match {
+  | Some(ef) -> ef.ignored.contains(dirName.toString())
+  | _ -> false
+  }
+}
+
+module end;
