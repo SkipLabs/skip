@@ -26,8 +26,7 @@ export function defaultParamEncoder(params: Json): string {
 /**
  * Description of an external HTTP endpoint and how to poll it.
  *
- * The URL of the external resource is formed by appending the given base `url` and the result of `encodeParams(params)` where `params` are the parameters provided to [`Context#useExternalResource`](api/core/interfaces/Context#useexternalresource)
- *
+ * The URL of the external resource is formed by appending the given base `url` and the result of `encodeParams(params)` where `params` are the parameters provided to [`Context#useExternalResource`](https://skiplabs.io/docs/api/core/interfaces/Context#useexternalresource)
  */
 export interface PolledHTTPResource {
   /**
@@ -57,7 +56,7 @@ export interface PolledHTTPResource {
 /**
  * An external HTTP service that is kept up-to-date by polling.
  *
- * A `PolledExternalService` may be composed of one or more [`PolledHTTPResource`](api/helpers/interfaces/PolledHTTPResource)s, each of which describes a single endpoint and how to poll it.
+ * A `PolledExternalService` may be composed of one or more [`PolledHTTPResource`](https://skiplabs.io/docs/api/helpers/interfaces/PolledHTTPResource)s, each of which describes a single endpoint and how to poll it.
  */
 export class PolledExternalService implements ExternalService {
   private readonly intervals = new Map<string, Timeout>();
