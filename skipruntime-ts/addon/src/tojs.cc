@@ -63,15 +63,17 @@ CJSON SkipRuntime_LazyCollection__getArray(char* handle, CJSON key);
 CJSON SkipRuntime_LazyCollection__getUnique(char* handle, CJSON key);
 
 double SkipRuntime_Runtime__createResource(char* identifier, char* resource,
-                                           CJObject jsonParams);
+                                           CJObject jsonParams,
+                                           char* session_id);
 double SkipRuntime_Runtime__closeResource(char* identifier);
 int64_t SkipRuntime_Runtime__subscribe(char* reactiveId, SKNotifier notifier,
                                        char* watermark);
 double SkipRuntime_Runtime__unsubscribe(int64_t id);
 CJSON SkipRuntime_Runtime__getAll(char* resource, CJObject jsonParams,
-                                  SKRequest optRequest);
+                                  char* session_id, SKRequest optRequest);
 CJSON SkipRuntime_Runtime__getForKey(char* resource, CJObject jsonParams,
-                                     CJSON key, SKRequest optRequest);
+                                     char* session_id, CJSON key,
+                                     SKRequest optRequest);
 double SkipRuntime_Runtime__update(char* input, CJSON values);
 }
 
@@ -979,7 +981,8 @@ void GetUniqueOfLazyCollection(const FunctionCallbackInfo<Value>& args) {
 
 void CreateResourceOfRuntime(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
-  if (!args[0]->IsString() || !args[1]->IsString() || !args[2]->IsExternal()) {
+  if (!args[0]->IsString() || !args[1]->IsString() || !args[2]->IsExternal() ||
+      !(args[3]->IsString() || args[3]->IsNull())) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
         Exception::TypeError(FromUtf8(isolate, "Invalid parameters.")));
@@ -989,8 +992,12 @@ void CreateResourceOfRuntime(const FunctionCallbackInfo<Value>& args) {
     char* skidentifier = ToSKString(isolate, args[0].As<String>());
     char* skresource = ToSKString(isolate, args[1].As<String>());
     CJObject skparams = args[2].As<External>()->Value();
-    double skerror =
-        SkipRuntime_Runtime__createResource(skidentifier, skresource, skparams);
+    char* sksessionId = nullptr;
+    if (args[3]->IsString()) {
+      sksessionId = ToSKString(isolate, args[3].As<String>());
+    }
+    double skerror = SkipRuntime_Runtime__createResource(
+        skidentifier, skresource, skparams, sksessionId);
     args.GetReturnValue().Set(Number::New(isolate, skerror));
   });
 }
@@ -1077,21 +1084,31 @@ void GetAllOfRuntime(const FunctionCallbackInfo<Value>& args) {
         FromUtf8(isolate, "The second parameter must be a pointer.")));
     return;
   }
-  if (!args[2]->IsExternal() && !args[2]->IsNull() && !args[2]->IsUndefined()) {
+  if (!args[2]->IsString() && !args[2]->IsNull()) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(Exception::TypeError(
+        FromUtf8(isolate, "The third parameter must be a string or null.")));
+    return;
+  };
+  if (!args[3]->IsExternal() && !args[3]->IsNull() && !args[3]->IsUndefined()) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(Exception::TypeError(FromUtf8(
-        isolate, "The third parameter must be a pointer or undefined.")));
+        isolate, "The fourth parameter must be a pointer or undefined.")));
     return;
   };
   NatTryCatch(isolate, [&args](Isolate* isolate) {
     char* skresource = ToSKString(isolate, args[0].As<String>());
     CJObject skparams = args[1].As<External>()->Value();
-    SKRequest skrequest = nullptr;
-    if (args[2]->IsExternal()) {
-      skrequest = args[2].As<External>()->Value();
+    char* sksessionId = nullptr;
+    if (args[2]->IsString()) {
+      sksessionId = ToSKString(isolate, args[2].As<String>());
     }
-    CJSON skresult =
-        SkipRuntime_Runtime__getAll(skresource, skparams, skrequest);
+    SKRequest skrequest = nullptr;
+    if (args[3]->IsExternal()) {
+      skrequest = args[3].As<External>()->Value();
+    }
+    CJSON skresult = SkipRuntime_Runtime__getAll(skresource, skparams,
+                                                 sksessionId, skrequest);
     args.GetReturnValue().Set(External::New(isolate, skresult));
   });
 }
@@ -1104,28 +1121,44 @@ void GetForKeyOfRuntime(const FunctionCallbackInfo<Value>& args) {
         FromUtf8(isolate, "The first parameter must be a string.")));
     return;
   }
-  if (!args[1]->IsExternal() || !args[2]->IsExternal()) {
+  if (!args[1]->IsExternal()) {
     // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(FromUtf8(
-        isolate, "The second and third parameters must be pointers.")));
+    isolate->ThrowException(Exception::TypeError(
+        FromUtf8(isolate, "The second parameter must be a pointer.")));
     return;
   }
-  if (!args[3]->IsExternal() && !args[3]->IsNull() && !args[3]->IsUndefined()) {
+  if (!args[2]->IsString() && !args[2]->IsNull()) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(Exception::TypeError(
+        FromUtf8(isolate, "The third parameter must be a string or null.")));
+    return;
+  };
+  if (!args[3]->IsExternal() || !args[3]->IsExternal()) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(Exception::TypeError(
+        FromUtf8(isolate, "The fourth parameter must be a pointer.")));
+    return;
+  }
+  if (!args[4]->IsExternal() && !args[4]->IsNull() && !args[4]->IsUndefined()) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(Exception::TypeError(FromUtf8(
-        isolate, "The fourth parameter must be a pointer or undefined.")));
+        isolate, "The fifth parameter must be a pointer or undefined.")));
     return;
   };
   NatTryCatch(isolate, [&args](Isolate* isolate) {
     char* skresource = ToSKString(isolate, args[0].As<String>());
     CJObject skparams = args[1].As<External>()->Value();
-    CJSON skkey = args[2].As<External>()->Value();
-    SKRequest skrequest = nullptr;
-    if (args[3]->IsExternal()) {
-      skrequest = args[3].As<External>()->Value();
+    char* sksessionId = nullptr;
+    if (args[2]->IsString()) {
+      sksessionId = ToSKString(isolate, args[2].As<String>());
     }
-    CJSON skresult =
-        SkipRuntime_Runtime__getForKey(skresource, skparams, skkey, skrequest);
+    CJSON skkey = args[3].As<External>()->Value();
+    SKRequest skrequest = nullptr;
+    if (args[4]->IsExternal()) {
+      skrequest = args[4].As<External>()->Value();
+    }
+    CJSON skresult = SkipRuntime_Runtime__getForKey(
+        skresource, skparams, sksessionId, skkey, skrequest);
     args.GetReturnValue().Set(External::New(isolate, skresult));
   });
 }

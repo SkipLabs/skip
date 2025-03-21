@@ -16,6 +16,7 @@ using v8::External;
 using v8::Isolate;
 using v8::Local;
 using v8::MaybeLocal;
+using v8::Null;
 using v8::Number;
 using v8::Object;
 using v8::Persistent;
@@ -147,15 +148,19 @@ void SkipRuntime_deleteExternalService(uint32_t externalSupplierId) {
 }
 
 char* SkipRuntime_Resource__instantiate(uint32_t resourceId,
-                                        CJObject collections) {
+                                        CJObject collections, char* sessionId) {
   Isolate* isolate = Isolate::GetCurrent();
   Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[2] = {
+  Local<Value> argv[3] = {
       Number::New(isolate, resourceId),
       External::New(isolate, collections),
+      Null(isolate),
   };
+  if (sessionId != nullptr) {
+    argv[2] = FromUtf8(isolate, sessionId);
+  }
   return CallJSStringFunction(isolate, externFunctions,
-                              "SkipRuntime_Resource__instantiate", 2, argv);
+                              "SkipRuntime_Resource__instantiate", 3, argv);
 }
 
 void SkipRuntime_deleteResource(uint32_t resourceId) {

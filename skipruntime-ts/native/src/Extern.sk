@@ -206,6 +206,7 @@ fun errorOfCollectionWriter(collection: String, error: SKJSON.CJSON): Float {
 native fun instantiateOfResource(
   resource: UInt32,
   collections: SKJSON.CJObject,
+  sessionId: ?String,
 ): String;
 
 @cpp_extern("SkipRuntime_deleteResource")
@@ -218,10 +219,14 @@ fun createResource(resource: UInt32): ExternResource {
 }
 
 class ExternResource(eptr: SKStore.ExternalPointer) extends Resource {
-  fun instantiate(collections: Map<String, Collection>): Collection {
+  fun instantiate(
+    collections: Map<String, Collection>,
+    sessionId: ?String,
+  ): Collection {
     collectionName = instantiateOfResource(
       this.eptr.value,
       collectionsByName(collections),
+      sessionId,
     );
     collectionForName(collectionName)
   }
@@ -572,9 +577,10 @@ fun createResourceOfRuntime(
   identifier: String,
   resource: String,
   params: SKJSON.CJSON,
+  sessionId: ?String,
 ): Float {
   SKStore.runWithResult(context ~> {
-    createReactiveResource(context, identifier, resource, params)
+    createReactiveResource(context, identifier, resource, params, sessionId)
   }) match {
   | Success _ -> 0.0
   | Failure(err) -> getErrorHdl(err)
@@ -585,18 +591,19 @@ fun createResourceOfRuntime(
 fun getAllOfRuntime(
   resource: String,
   params: SKJSON.CJSON,
+  sessionId: ?String,
   optRequest: ?Request,
 ): SKJSON.CJSON {
   (getContext() match {
   | Some(context) ->
     try {
-      Success(getAll(context, resource, params, optRequest))
+      Success(getAll(context, resource, params, sessionId, optRequest))
     } catch {
     | ex -> Failure(ex)
     }
   | _ ->
     SKStore.runWithResult(context ~> {
-      res = getAll(context, resource, params, optRequest);
+      res = getAll(context, resource, params, sessionId, optRequest);
       /* Ensure all resources closed at right time */
       updateContext(context);
       res
@@ -628,19 +635,20 @@ fun getAllOfRuntime(
 fun getForKeyOfRuntime(
   resource: String,
   params: SKJSON.CJSON,
+  sessionId: ?String,
   key: SKJSON.CJSON,
   optRequest: ?Request,
 ): SKJSON.CJSON {
   (getContext() match {
   | Some(context) ->
     try {
-      Success(getForKey(context, resource, params, key, optRequest))
+      Success(getForKey(context, resource, params, sessionId, key, optRequest))
     } catch {
     | ex -> Failure(ex)
     }
   | _ ->
     SKStore.runWithResult(context ~> {
-      res = getForKey(context, resource, params, key, optRequest);
+      res = getForKey(context, resource, params, sessionId, key, optRequest);
       /* Ensure all resources closed at right time */
       updateContext(context);
       res

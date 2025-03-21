@@ -77,7 +77,11 @@ class PostsMapper {
 }
 
 class CleanupMapper {
-  constructor(private readonly session: Session | null) {}
+  private readonly session: Session | null;
+
+  constructor(session: Json | null) {
+    this.session = session as Session | null;
+  }
 
   mapEntry(
     key: [number, number],
@@ -107,85 +111,33 @@ class CleanupMapper {
 
 type PostsResourceInputs = {
   postsWithUpvotes: EagerCollection<[number, number], PostWithUpvoteIds>;
-  sessions: EagerCollection<string, Session>;
 };
 
-type PostsResourceParams = { limit?: number; session_id?: string };
+type PostsResourceParams = { limit?: number };
 
 class PostsResource implements Resource<PostsResourceInputs> {
   private limit: number;
-  private session_id: string;
 
   constructor(jsonParams: Json) {
     const params = jsonParams as PostsResourceParams;
     if (params.limit === undefined) this.limit = 25;
     else this.limit = params.limit;
-    if (params.session_id === undefined)
-      throw new Error("Missing required session_id.");
-    else this.session_id = params.session_id as string;
   }
 
   instantiate(
     collections: PostsResourceInputs,
+    context: Context,
   ): EagerCollection<number, PostWithUpvoteCount> {
-    let session;
-    try {
-      session = collections.sessions.getUnique(this.session_id);
-    } catch {
-      session = null;
-    }
     return collections.postsWithUpvotes
       .take(this.limit)
-      .map(CleanupMapper, session);
+      .map(CleanupMapper, context.session);
   }
 }
 
-class FilterSessionMapper {
-  constructor(private session_id: string) {}
-
-  mapEntry(key: string, values: Values<Session>): Iterable<[number, Session]> {
-    if (key != this.session_id) return [];
-    const sessions = values.toArray();
-    if (sessions.length > 0) return [[0, sessions[0] as Session]];
-    else return [];
-  }
-}
-
-type SessionsResourceInputs = {
-  sessions: EagerCollection<string, Session>;
-};
-
-class SessionsResource implements Resource<SessionsResourceInputs> {
-  private session_id: string;
-
-  constructor(jsonParams: Json) {
-    const params = jsonParams as PostsResourceParams;
-    if (params.session_id === undefined)
-      throw new Error("Missing required session_id.");
-    else this.session_id = params.session_id as string;
-  }
-
-  instantiate(
-    collections: SessionsResourceInputs,
-  ): EagerCollection<number, Session> {
-    return collections.sessions.map(FilterSessionMapper, this.session_id);
-  }
-}
-
-type PostsServiceInputs = {
-  sessions: EagerCollection<string, Session>;
-};
-
-export const service: SkipService<PostsServiceInputs, PostsResourceInputs> = {
-  initialData: {
-    sessions: [],
-  },
-  resources: { posts: PostsResource, sessions: SessionsResource },
+export const service: SkipService<{}, PostsResourceInputs> = {
+  resources: { posts: PostsResource },
   externalServices: { postgres },
-  createGraph(
-    inputs: PostsServiceInputs,
-    context: Context,
-  ): PostsResourceInputs {
+  createGraph(_inputs: {}, context: Context): PostsResourceInputs {
     const serialIDKey = { key: { col: "id", type: "SERIAL" } };
     const posts = context.useExternalResource<number, Post>({
       service: "postgres",
@@ -208,7 +160,6 @@ export const service: SkipService<PostsServiceInputs, PostsResourceInputs> = {
         users,
         upvotes.map(UpvotesMapper),
       ),
-      sessions: inputs.sessions,
     };
   },
 };

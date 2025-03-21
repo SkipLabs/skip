@@ -186,17 +186,20 @@ export interface FromBinding {
     identifier: string,
     resource: string,
     jsonParams: Pointer<Internal.CJObject>,
+    sessionId: string | null,
   ): Handle<Error>;
 
   SkipRuntime_Runtime__getAll(
     resource: string,
     jsonParams: Pointer<Internal.CJObject>,
+    sessionId: string | null,
     request: Pointer<Internal.Request> | null,
   ): Pointer<Internal.CJObject | Internal.CJFloat>;
 
   SkipRuntime_Runtime__getForKey(
     resource: string,
     jsonParams: Pointer<Internal.CJObject>,
+    sessionId: string | null,
     key: Pointer<Internal.CJSON>,
     request: Pointer<Internal.Request> | null,
   ): Pointer<Internal.CJObject | Internal.CJFloat>;
