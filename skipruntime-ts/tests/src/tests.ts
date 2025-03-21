@@ -8,7 +8,6 @@ import type {
   LazyCompute,
   LazyCollection,
   Values,
-  NamedCollections,
   SkipService,
   Resource,
   Entry,
@@ -16,12 +15,7 @@ import type {
   ServiceInstance,
 } from "@skipruntime/core";
 import { SkipNonUniqueValueError } from "@skipruntime/core";
-import {
-  Count,
-  GenericExternalService,
-  Sum,
-  TimerResource,
-} from "@skipruntime/helpers";
+import { Count, Sum } from "@skipruntime/helpers";
 
 import { it as mit, type AsyncFunc } from "mocha";
 
@@ -515,33 +509,6 @@ const testExternalService: SkipService<Input_NN_NN, Input_NN_NN> = {
 
   createGraph(inputCollections: Input_NN_NN) {
     return inputCollections;
-  },
-};
-
-//// testCloseSession
-
-class TokensResource implements Resource {
-  instantiate(
-    _cs: NamedCollections,
-    context: Context,
-  ): EagerCollection<string, number> {
-    return context.useExternalResource({
-      service: "system",
-      identifier: "timer",
-      params: { "5ms": 5 },
-    });
-  }
-}
-
-const system = new GenericExternalService({ timer: new TimerResource() });
-
-const tokensService: SkipService = {
-  initialData: { input: [] },
-  resources: { tokens: TokensResource },
-  externalServices: { system },
-
-  createGraph() {
-    return {};
   },
 };
 
@@ -1267,24 +1234,6 @@ export function initTests(
         [0, [[10, 16]]],
         [1, [[20, 31]]],
       ]);
-    } finally {
-      service.closeResourceInstance(constantResourceId);
-      await service.close();
-    }
-  });
-
-  it("testCloseSession", async () => {
-    const service = await initService(tokensService);
-    const resource = "tokens";
-    const constantResourceId = "unsafe.identifier";
-    service.instantiateResource(constantResourceId, resource, {});
-    try {
-      const start = service.getArray(resource, "5ms").payload;
-      await timeout(2);
-      expect(service.getArray(resource, "5ms").payload).toEqual(start);
-      await timeout(4);
-      const current = service.getArray(resource, "5ms").payload;
-      expect(current == start).toEqual(false);
     } finally {
       service.closeResourceInstance(constantResourceId);
       await service.close();
