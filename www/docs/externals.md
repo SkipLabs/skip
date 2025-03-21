@@ -2,7 +2,7 @@
 
 ## Overview
 
-Skip is designed to carefully track the computation and data dependencies, so that your service's outputs can be efficiently updated if (and only if!) any inputs they depend on change.
+Skip is designed to carefully track computation and data dependencies, so that your service's outputs can be efficiently updated if (and only if!) any inputs they depend on change.
 However, when those inputs come from external systems or services it is crucial to ensure that your reactive service still produces up-to-date results.
 
 Skip provides mechanisms to do so easily, whether those external systems are other reactive Skip services or non-reactive systems like databases or external APIs.
@@ -10,7 +10,15 @@ Skip provides mechanisms to do so easily, whether those external systems are oth
 The core of these mechanisms is the [`ExternalService` type](api/core/interfaces/ExternalService), which provides a generic interface which can be implemented to wrap arbitrary external systems for use in your Skip service.
 Each Skip reactive service can specify any number of `ExternalService`s, which can then be brought into the reactive computation graph as an `EagerCollection` with [`Context#useExternalResource`](api/core/interfaces/Context#useexternalresource).
 
-Skip provides two `ExternalService` implementations -- one which polls external HTTP services, and one which subscribes to external Skip services.
+Skip provides several `ExternalService` implementations:
+
+ * [`SkipExternalService`](api/helpers/classes/SkipExternalService), which is used to connect reactive Skip services together.
+ * [`PostgresExternalService`](api/adapters/postgres/classes/PostgresExternalService), which allows to subscribe to reactive updates from a PostgreSQL database.
+ * [`KafkaExternalService`](api/adapters/kafka/classes/KafkaExternalService), which allows to connect to and consume messages from a Kafka cluster.
+ * [`GenericExternalService`](api/helpers/classes/GenericExternalService), which wraps standalone external resources, such as:
+     * [`TimerResource`](api/helpers/classes/TimerResource), which maintains timestamps updated at customizable intervals, allowing reactive computations to look at or depend upon the "current time" with customizable granularity.
+     * [`Polled`](api/helpers/classes/Polled), which polls a non-reactive HTTP endpoint with configurable parameter encoding, refresh interval, and the like.
+
 If your use case falls outside of these defaults, you can define your own custom external service by providing another `ExternalService` implementation with the required behavior.
 
 ## External Skip services
@@ -21,9 +29,9 @@ To receive data from another Skip service, specify it in the `externalServices` 
 
 ```typescript
 const service = {
-  initialData: ...
-  resources: ...
-  createGraph: ...
+  initialData: ...,
+  resources: ...,
+  createGraph: ...,
   externalServices: {
     myOtherService: SkipExternalService.direct({
       host: "my.other.service.net",
@@ -58,9 +66,75 @@ Encapsulating external reactive dependencies as eager collections, that complex 
 ## Non-Skip services
 
 Of course, unless your application is built from the ground up using the Skip framework, it is likely that your application depends on some non-reactive external system: REST APIs, databases, external HTTP endpoints, and the like.
-These systems operate on a pull-based request/response paradigm, so some work is required to adapt them to Skip's eager push-based paradigm.
+
+These external services are provided in Skip framework packages for convenience but they can be customized, added to, or reimplemented as needed for a given use case; nothing beyond the public API is used in their implementations.
+
+### PostgreSQL
+
+One common use case for Skip is to reactively update and push results in response to updates in a relational database.
+Skip makes this easy for PostgreSQL users, providing an adapter `PostgresExternalService` that can subscribe to updates from a Postgres database and expose them as an eager collection within your Skip reactive logic.
+
+A complete example is available [here](https://github.com/SkipLabs/skip/tree/main/examples/hackernews/reactive_service); a basic usage is to specify a Skip service with a Postgres external service, i.e.
+
+```typescript
+const service = {
+  initialData: ...,
+  resources: ...,
+  createGraph: ...,
+  externalServices: {
+    postgres: new PostgresExternalService({ host, port,  ... }),
+    ...,
+  },
+}
+```
+
+and subscribe to a table (e.g. `create table t (id serial primary key, value text)`) as an EagerCollection, which can be mapped over or otherwise used in reactive logic.
+
+```typescript
+const t: EagerCollection<number, { id: number, value: string }> =
+  context.useExternalResource({
+    service: "postgres",
+    identifier: "t",
+    params: { key: { col: "id", type: "SERIAL" } },
+  });
+```
+
+PostgreSQL rows are converted into JavaScript objects keyed by column names using the [`pg-types`](https://www.npmjs.com/package/pg-types) package, which can be customized according to its documentation if further control is needed over the JavaScript representation of Postgres data.
+
+### Kafka
+
+Many backend systems use distributed event streaming and messaging systems to handle real time data.
+Skip can process Kafka message streams, allowing to reactively compute over incoming events, with Kafka "topics" treated as external resources.
+
+An example can be seen [here](https://github.com/SkipLabs/skip/tree/main/examples/chatroom/reactive_service); a basic usage is to specify a Skip service with a Kafka external service, i.e.
+
+```typescript
+const service = {
+  initialData: ...,
+  resources: ...,
+  createGraph: ...,
+  externalServices: {
+    kafka: new KafkaExternalService({ clientId, brokers, ... }),
+    ...,
+  },
+}
+```
+
+and consume messages into a reactive collection as follows:
+
+```typescript
+const myKafkaTopic: EagerCollection<string, string> =
+  context.useExternalResource({
+    service: "kafka",
+    identifier: "my-kafka-topic",
+    params: {},
+  });
+```
+
+By default, Kafka messages are imported into the Skip runtime as their string key and value, but a `KafkaExternalService` can be parameterized by a `messageProcessor` which allows to customize the interpretation of Kafka `{ key: string; value: string; topic: string }` messages as Skip runtime data, for example by performing type conversions or customizing key structure.
 
 ### Polling
+Many existing systems operate on a pull-based request/response paradigm, so some work is required to adapt them to Skip's eager push-based paradigm.
 
 The simplest option is *polling*, sending periodic requests to pull data from external sources and feed it into the reactive system.
 To specify a polled external dependency, specify it in your service definition, e.g. as follows
