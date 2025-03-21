@@ -1,6 +1,6 @@
 ---
 title: Skiplabs Funding
-description: Skiplabs raises $7M in seed funding
+description: Skiplabs raises $8M in seed funding
 slug: skiplabs-funding
 date: 2025-03-25
 authors: jverlaguet
@@ -8,7 +8,7 @@ authors: jverlaguet
 
 **The News**
 
-We’re pleased to announce that Skiplabs has raised $7 million to bring incremental computing to applications everywhere.  We intend to use the entirety of this funding to enhance the open source Skip project and grow the developer community.
+We’re pleased to announce that Skiplabs has raised $8 million to bring incremental computing to applications everywhere.  We intend to use the entirety of this funding to enhance the open source Skip project and grow the developer community.
 
 This financing also means we get to work with [Lenny Pruss](https://www.linkedin.com/in/lennypruss/) at Amplify Partners who have invested in some of today’s most prominent developer platforms such as dbt Labs, Prisma and Temporal to name a few and [Alex Mackenzie](https://www.linkedin.com/in/alex-mackenzie-6aa80ab4/) at Tapestry VC.  Check out Amplify’s blog post that shares their view on Skiplabs and the future of reactive systems and Tapestry’s blog post on why they chose to invest.
 
@@ -20,7 +20,7 @@ We are also humbled to earn the support of individual investors like Adam Gross,
 
 We launched Skip at the start of this year and are very happy with the reception we’ve received so far.  In the first two months since its alpha release, the Skip project has received more than 1,000 stars on github, more than 1,000 unique installations while our Discord community grew by 400%.
 
-What has been most gratifying are the discussions working with users to apply Skip and incremental computing to making their backend applications fast, secure and easy to enhance.  Developers have used Skip to power real-time crypto trading applications, CRM content management systems and sports tournament management
+What has been most gratifying are the discussions working with users to apply Skip and incremental computing to making their backend applications fast, secure and easy to enhance.  Developers have used Skip to power real-time crypto trading applications, CRM content management systems and sports tournament management.
 
 We look forward to hundreds more of these collaborations because the opportunity for incremental computing is everywhere, it just wasn’t easy enough to do before Skip.  Thanks to Skip, incremental computing will become the simplest way of building services that:
 
