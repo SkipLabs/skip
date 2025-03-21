@@ -13,6 +13,8 @@ import type {
   Entry,
   ExternalService,
   ServiceInstance,
+  CollectionUpdate,
+  NamedCollections,
 } from "@skipruntime/core";
 
 import { Count, Sum } from "@skipruntime/helpers";
@@ -433,8 +435,12 @@ async function timeout(ms: number) {
 }
 
 class MockExternal implements ExternalService {
+  public subscribed: string[] = [];
+  public initialized: string[] = [];
+  public unsubscribed: string[] = [];
+
   async subscribe(
-    _instance: string,
+    instance: string,
     resource: string,
     params: { v1: string; v2: string },
     callbacks: {
@@ -442,13 +448,15 @@ class MockExternal implements ExternalService {
       error: (error: unknown) => void;
     },
   ): Promise<void> {
+    this.subscribed.push(instance);
     if (resource == "mock") {
       await this.mock(params, callbacks.update);
+      this.initialized.push(instance);
     }
   }
 
-  unsubscribe(_instance: string) {
-    return;
+  unsubscribe(instance: string) {
+    this.unsubscribed.push(instance);
   }
 
   shutdown() {
@@ -507,6 +515,35 @@ function testExternalService(): SkipService<Input_NN_NN, Input_NN_NN> {
     },
   };
 }
+
+//// initServiceWithExternalService
+
+type Col_N_NA = {
+  c: EagerCollection<number, number[]>;
+};
+
+class CResource implements Resource<Col_N_NA> {
+  instantiate(cs: Col_N_NA): EagerCollection<number, number[]> {
+    return cs.c;
+  }
+}
+
+const initServiceWithExternalService: SkipService<Input_NN, Col_N_NA> = {
+  initialData: { input: [] },
+  resources: { display: CResource },
+  externalServices: { external: new MockExternal() },
+
+  createGraph(is: Input_NN, context: Context) {
+    const external = context.useExternalResource<number, number>({
+      service: "external",
+      identifier: "mock",
+      params: { v1: 5, v2: 10 },
+    });
+    return {
+      c: is.input.map(MockExternalCheck, external),
+    };
+  },
+};
 
 //// testMultipleResources
 
@@ -857,6 +894,38 @@ function mapWithExceptionOnExternalService(): SkipService<Input_SN, Input_SN> {
   };
 }
 
+// testInitServiceWithExternalServiceFailure
+
+class NNResource implements Resource<Input_NN> {
+  instantiate(cs: Input_NN): EagerCollection<number, number> {
+    return cs.input;
+  }
+}
+
+function initServiceWithExternalServiceFailure(): SkipService<
+  NamedCollections,
+  Input_NN
+> {
+  return {
+    initialData: {},
+    resources: { display: NNResource },
+    externalServices: { external: new MockExternal() },
+
+    createGraph(_is: NamedCollections, context: Context) {
+      const external = context
+        .useExternalResource<number, number>({
+          service: "external",
+          identifier: "mock",
+          params: { v1: 32, v2: 20 },
+        })
+        .map(NMapWithException);
+      return {
+        input: external,
+      };
+    },
+  };
+}
+
 export function initTests(
   category: string,
   initService: (service: SkipService) => Promise<ServiceInstance>,
@@ -1190,8 +1259,12 @@ export function initTests(
   });
 
   it("testExternal", async () => {
+    const serviceDef = testExternalService();
+    const mockExternal = serviceDef.externalServices![
+      "external"
+    ] as MockExternal;
     const resource = "external";
-    const service = await initService(testExternalService());
+    const service = await initService(serviceDef);
     await service.update("input1", [
       [0, [10]],
       [1, [20]],
@@ -1200,9 +1273,21 @@ export function initTests(
       [0, [5]],
       [1, [10]],
     ]);
-    const constantResourceId = "unsafe.identifier";
-    await service.instantiateResource(constantResourceId, resource, {});
+    const constantResourceId1 = "unsafe.identifier.1";
+    await service.instantiateResource(constantResourceId1, resource, {});
+    const updates: CollectionUpdate<Json, Json>[] = [];
+    const sid = service.subscribe(constantResourceId1, {
+      subscribed: () => {},
+      notify: (update) => {
+        updates.push(update);
+      },
+      close: () => {},
+    });
+    const constantResourceId2 = "unsafe.identifier.2";
+    await service.instantiateResource(constantResourceId2, resource, {});
     try {
+      expect(mockExternal.subscribed.length).toEqual(1);
+      expect(mockExternal.initialized).toEqual(mockExternal.subscribed);
       expect(await service.getAll(resource)).toEqual([
         [0, [[10, 15]]],
         [1, [[20, 30]]],
@@ -1211,11 +1296,74 @@ export function initTests(
         [0, [6]],
         [1, [11]],
       ]);
+      expect(mockExternal.initialized).toEqual(mockExternal.subscribed);
       expect(await service.getAll(resource)).toEqual([
         [0, [[10, 16]]],
         [1, [[20, 31]]],
       ]);
+      expect(updates.map((update) => update.values)).toEqual([
+        [
+          [0, [[10, 15]]],
+          [1, [[20, 30]]],
+        ],
+        [
+          [0, [[10, 16]]],
+          [1, [[20, 31]]],
+        ],
+      ]);
     } finally {
+      service.unsubscribe(sid);
+      service.closeResourceInstance(constantResourceId1);
+      service.closeResourceInstance(constantResourceId2);
+      await service.close();
+    }
+    expect(mockExternal.unsubscribed.sort()).toEqual(
+      mockExternal.subscribed.sort(),
+    );
+  });
+
+  it("testInitServiceWithExternalService", async () => {
+    const resource = "display";
+    const service = await initService(initServiceWithExternalService);
+    await service.update("input", [
+      [0, [10]],
+      [1, [20]],
+    ]);
+    const constantResourceId = "unsafe.identifier";
+    await service.instantiateResource(constantResourceId, resource, {});
+    const updates: CollectionUpdate<Json, Json>[] = [];
+    const sid = service.subscribe(constantResourceId, {
+      subscribed: () => {},
+      notify: (update) => {
+        updates.push(update);
+      },
+      close: () => {},
+    });
+    try {
+      expect(await service.getAll(resource)).toEqual([
+        [0, [[10, 15]]],
+        [1, [[20, 30]]],
+      ]);
+      await service.update("input", [
+        [0, [20]],
+        [1, [30]],
+      ]);
+      expect(await service.getAll(resource)).toEqual([
+        [0, [[20, 15]]],
+        [1, [[30, 30]]],
+      ]);
+      expect(updates.map((update) => update.values)).toEqual([
+        [
+          [0, [[10, 15]]],
+          [1, [[20, 30]]],
+        ],
+        [
+          [0, [[20, 15]]],
+          [1, [[30, 30]]],
+        ],
+      ]);
+    } finally {
+      service.unsubscribe(sid);
       service.closeResourceInstance(constantResourceId);
       await service.close();
     }
@@ -1416,6 +1564,23 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
       expect((e as Error).message).toMatchRegex(
         new RegExp(/^(?:Error: )?Something goes wrong.$/),
       );
+    }
+  });
+
+  it("testInitServiceWithExternalServiceFailure", async () => {
+    let service;
+    try {
+      service = await initService(initServiceWithExternalServiceFailure());
+      throw new Error("Error was not thrown");
+    } catch (e: unknown) {
+      expect(e).toBeA(Error);
+      expect((e as Error).message).toMatchRegex(
+        new RegExp(
+          /^(?:SkipRuntime\.ServiceInstanceInitFailed: )?Service instance cannot be initialized:/,
+        ),
+      );
+    } finally {
+      if (service) await service.close();
     }
   });
 
