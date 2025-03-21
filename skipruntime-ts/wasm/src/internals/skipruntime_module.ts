@@ -31,6 +31,7 @@ import type {
   Handle,
   ResourceBuilder,
   Notifier,
+  Executor,
 } from "@skipruntime/core/binding.js";
 
 import type { Json } from "@skipruntime/core/json.js";
@@ -75,6 +76,7 @@ export interface FromWasm {
     name: ptr<Internal.String>,
     values: ptr<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
     isInit: boolean,
+    executor: ptr<Internal.Executor>,
   ): Handle<Error>;
 
   SkipRuntime_CollectionWriter__error(
@@ -82,8 +84,9 @@ export interface FromWasm {
     error: ptr<Internal.CJSON>,
   ): Handle<Error>;
 
-  SkipRuntime_CollectionWriter__loading(
+  SkipRuntime_CollectionWriter__initialized(
     name: ptr<Internal.String>,
+    error: ptr<Internal.CJSON>,
   ): Handle<Error>;
 
   // Resource
@@ -190,19 +193,18 @@ export interface FromWasm {
     identifier: ptr<Internal.String>,
     resource: ptr<Internal.String>,
     params: ptr<Internal.CJSON>,
+    executor: ptr<Internal.Executor>,
   ): Handle<Error>;
 
   SkipRuntime_Runtime__getAll(
     resource: ptr<Internal.String>,
     params: ptr<Internal.CJSON>,
-    request: ptr<Internal.Request> | null,
   ): ptr<Internal.CJObject | Internal.CJFloat>;
 
   SkipRuntime_Runtime__getForKey(
     resource: ptr<Internal.String>,
     params: ptr<Internal.CJSON>,
     key: ptr<Internal.CJSON>,
-    request: ptr<Internal.Request> | null,
   ): ptr<Internal.CJObject | Internal.CJFloat>;
 
   SkipRuntime_Runtime__closeResource(
@@ -220,6 +222,7 @@ export interface FromWasm {
   SkipRuntime_Runtime__update(
     input: ptr<Internal.String>,
     values: ptr<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
+    executor: ptr<Internal.Executor>,
   ): Handle<Error>;
 
   // Reducer
@@ -230,7 +233,10 @@ export interface FromWasm {
   ): ptr<Internal.Reducer>;
 
   // initService
-  SkipRuntime_initService(service: ptr<Internal.Service>): Handle<Error>;
+  SkipRuntime_initService(
+    service: ptr<Internal.Service>,
+    executor: ptr<Internal.Executor>,
+  ): Handle<Error>;
 
   // closeClose
   SkipRuntime_closeService(): ptr<Internal.CJSON>;
@@ -252,13 +258,9 @@ export interface FromWasm {
     params: ptr<Internal.CJSON>,
   ): ptr<Internal.String>;
 
-  // Checker
+  // Executor
 
-  SkipRuntime_createIdentifier(
-    supplier: ptr<Internal.String>,
-  ): ptr<Internal.Request>;
-
-  SkipRuntime_createChecker(ref: Handle<Checker>): ptr<Internal.Request>;
+  SkipRuntime_createExecutor(ref: Handle<Executor>): ptr<Internal.Executor>;
 }
 
 interface ToWasm {
@@ -381,6 +383,17 @@ interface ToWasm {
   ): void;
 
   SkipRuntime_deleteChecker(checker: Handle<Checker>): void;
+
+  // Executor
+
+  SkipRuntime_Executor__resolve(skexecutor: Handle<Executor>): void;
+
+  SkipRuntime_Executor__reject(
+    skexecutor: Handle<Executor>,
+    error: Handle<Error>,
+  ): void;
+
+  SkipRuntime_deleteExecutor(executor: Handle<Executor>): void;
 }
 
 export class WasmFromBinding implements FromBinding {
@@ -422,11 +435,13 @@ export class WasmFromBinding implements FromBinding {
     name: string,
     values: Pointer<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
     isInit: boolean,
+    executor: Pointer<Internal.Executor>,
   ): Handle<Error> {
     return this.fromWasm.SkipRuntime_CollectionWriter__update(
       this.utils.exportString(name),
       toPtr(values),
       isInit,
+      toPtr(executor),
     );
   }
 
@@ -440,9 +455,13 @@ export class WasmFromBinding implements FromBinding {
     );
   }
 
-  SkipRuntime_CollectionWriter__loading(name: string): Handle<Error> {
-    return this.fromWasm.SkipRuntime_CollectionWriter__loading(
+  SkipRuntime_CollectionWriter__initialized(
+    name: string,
+    error: Pointer<Internal.CJSON>,
+  ): Handle<Error> {
+    return this.fromWasm.SkipRuntime_CollectionWriter__initialized(
       this.utils.exportString(name),
+      toPtr(error),
     );
   }
 
@@ -637,23 +656,23 @@ export class WasmFromBinding implements FromBinding {
     identifier: string,
     resource: string,
     params: Pointer<Internal.CJSON>,
+    executor: Pointer<Internal.Executor>,
   ): Handle<Error> {
     return this.fromWasm.SkipRuntime_Runtime__createResource(
       this.utils.exportString(identifier),
       this.utils.exportString(resource),
       toPtr(params),
+      toPtr(executor),
     );
   }
 
   SkipRuntime_Runtime__getAll(
     resource: string,
     params: Pointer<Internal.CJSON>,
-    request: Nullable<Pointer<Internal.Request>>,
   ): Pointer<Internal.CJObject | Internal.CJFloat> {
     return this.fromWasm.SkipRuntime_Runtime__getAll(
       this.utils.exportString(resource),
       toPtr(params),
-      toNullablePtr(request),
     );
   }
 
@@ -661,13 +680,11 @@ export class WasmFromBinding implements FromBinding {
     resource: string,
     params: Pointer<Internal.CJSON>,
     key: Pointer<Internal.CJSON>,
-    request: Pointer<Internal.Request> | null,
   ): Pointer<Internal.CJObject | Internal.CJFloat> {
     return this.fromWasm.SkipRuntime_Runtime__getForKey(
       this.utils.exportString(resource),
       toPtr(params),
       toPtr(key),
-      toNullablePtr(request),
     );
   }
 
@@ -696,10 +713,12 @@ export class WasmFromBinding implements FromBinding {
   SkipRuntime_Runtime__update(
     input: string,
     values: Pointer<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
+    executor: Pointer<Internal.Executor>,
   ): Handle<Error> {
     return this.fromWasm.SkipRuntime_Runtime__update(
       this.utils.exportString(input),
       toPtr(values),
+      toPtr(executor),
     );
   }
 
@@ -710,8 +729,14 @@ export class WasmFromBinding implements FromBinding {
     return this.fromWasm.SkipRuntime_createReducer(ref, toPtr(defaultValue));
   }
 
-  SkipRuntime_initService(service: Pointer<Internal.Service>): Handle<Error> {
-    return this.fromWasm.SkipRuntime_initService(toPtr(service));
+  SkipRuntime_initService(
+    service: Pointer<Internal.Service>,
+    executor: ptr<Internal.Executor>,
+  ): Handle<Error> {
+    return this.fromWasm.SkipRuntime_initService(
+      toPtr(service),
+      toPtr(executor),
+    );
   }
 
   SkipRuntime_closeService(): Pointer<Internal.CJSON> {
@@ -750,14 +775,10 @@ export class WasmFromBinding implements FromBinding {
     );
   }
 
-  SkipRuntime_createIdentifier(supplier: string): Pointer<Internal.Request> {
-    return this.fromWasm.SkipRuntime_createIdentifier(
-      this.utils.exportString(supplier),
-    );
-  }
-
-  SkipRuntime_createChecker(ref: Handle<Checker>): Pointer<Internal.Request> {
-    return this.fromWasm.SkipRuntime_createChecker(ref);
+  SkipRuntime_createExecutor(
+    ref: Handle<Executor>,
+  ): Pointer<Internal.Executor> {
+    return this.fromWasm.SkipRuntime_createExecutor(ref);
   }
 }
 
@@ -982,26 +1003,26 @@ class LinksImpl implements Links {
     this.tobinding.SkipRuntime_deleteExternalService(supplier);
   }
 
-  // Checker
-
-  checkOfChecker(skchecker: Handle<Checker>, skrequest: ptr<Internal.String>) {
-    this.tobinding.SkipRuntime_Checker__check(
-      skchecker,
-      this.utils.importString(skrequest),
-    );
+  // Executor
+  resolveOfExecutor(skexecutor: Handle<Executor>) {
+    this.tobinding.SkipRuntime_Executor__resolve(skexecutor);
   }
 
-  deleteChecker(checker: Handle<Checker>) {
-    this.tobinding.SkipRuntime_deleteChecker(checker);
+  rejectOfExecutor(skexecutor: Handle<Executor>, error: Handle<Error>) {
+    this.tobinding.SkipRuntime_Executor__reject(skexecutor, error);
+  }
+
+  deleteExecutor(skexecutor: Handle<Executor>) {
+    this.tobinding.SkipRuntime_deleteExecutor(skexecutor);
   }
 }
 
 export class ServiceInstanceFactory implements Shared {
   constructor(
-    private readonly init: (service: SkipService) => ServiceInstance,
+    private readonly init: (service: SkipService) => Promise<ServiceInstance>,
   ) {}
 
-  initService(service: SkipService): ServiceInstance {
+  initService(service: SkipService): Promise<ServiceInstance> {
     return this.init(service);
   }
 
@@ -1080,10 +1101,11 @@ class Manager implements ToWasmManager {
     toWasm.SkipRuntime_Reducer__remove = links.removeOfReducer.bind(links);
     toWasm.SkipRuntime_deleteReducer = links.deleteReducer.bind(links);
 
-    // Checker
+    // Executor
 
-    toWasm.SkipRuntime_Checker__check = links.checkOfChecker.bind(links);
-    toWasm.SkipRuntime_deleteChecker = links.deleteChecker.bind(links);
+    toWasm.SkipRuntime_Executor__resolve = links.resolveOfExecutor.bind(links);
+    toWasm.SkipRuntime_Executor__reject = links.rejectOfExecutor.bind(links);
+    toWasm.SkipRuntime_deleteExecutor = links.deleteExecutor.bind(links);
 
     return links;
   }

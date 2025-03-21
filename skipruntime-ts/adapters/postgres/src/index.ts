@@ -87,11 +87,10 @@ export class PostgresExternalService implements ExternalService {
    * @param params.syncHistoricData - (**Optional**) Boolean flag, `true` by default.  If false, Skip will ignore pre-existing data and only synchronize updates **after** subscription.
    * @param callbacks - Callbacks to react on error/loading/update.
    * @param callbacks.error - Error callback.
-   * @param callbacks.loading - Loading callback.
    * @param callbacks.update - Update callback.
    * @returns {void}
    */
-  subscribe(
+  async subscribe(
     instance: string,
     resource: string,
     params: {
@@ -102,24 +101,22 @@ export class PostgresExternalService implements ExternalService {
       syncHistoricData?: boolean;
     },
     callbacks: {
-      update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
+      update: (updates: Entry<Json, Json>[], isInit: boolean) => Promise<void>;
       error: (error: Json) => void;
-      loading: () => void;
     },
-  ): void {
+  ): Promise<void> {
     const table = resource;
     const key = validateKeyParam(params);
 
-    const error = (message: string) => (error: unknown) => {
+    const error = (message: string) => (error?: unknown) => {
       callbacks.error(message);
       console.error(message, error);
     };
 
     const initData = async () => {
       if (!(params.syncHistoricData ?? true)) {
-        callbacks.update([], true);
+        await callbacks.update([], true);
       } else {
-        callbacks.loading();
         const init = await this.client.query(
           format("SELECT * FROM %I;", table),
         );
@@ -129,7 +126,7 @@ export class PostgresExternalService implements ExternalService {
           if (entries.has(k)) entries.get(k)!.push(row);
           else entries.set(k, [row]);
         }
-        callbacks.update(Array.from(entries), true);
+        await callbacks.update(Array.from(entries), true);
       }
     };
 
@@ -171,35 +168,34 @@ FOR EACH ROW EXECUTE FUNCTION %I();`,
       }
     };
 
-    const setup = async () => {
-      await initData().catch(
-        error(
-          `Uncaught error during Skip async initialization for Postgres table ${table}:`,
-        ),
-      );
+    await initData();
 
-      this.client.on("notification", (msg) => {
-        if (msg.channel == instance && msg.payload !== undefined) {
-          const query = key.select(table, msg.payload);
-          this.client.query(query).then(
-            (changes) => {
-              const k = key.type == "TEXT" ? msg.payload! : Number(msg.payload);
-              callbacks.update([[k, changes.rows as Json[]]], false);
-            },
-            error(`Error executing Postgres query "${query}":`),
-          );
-        }
-      });
-      await setupPgNotify().catch(
-        error(`Uncaught error setting up Postgres triggers on ${table}:`),
-      );
-    };
-
-    setup().catch(
-      error(
-        `Uncaught error during async Skip update of Postgres table ${table}`,
-      ),
-    );
+    this.client.on("notification", (msg) => {
+      if (
+        msg.channel == instance &&
+        msg.payload !== undefined &&
+        this.open_instances.has(instance)
+      ) {
+        const query = key.select(table, msg.payload);
+        const k = key.type == "TEXT" ? msg.payload : Number(msg.payload);
+        let ok = false;
+        const run = async () => {
+          const changes = await this.client.query(query);
+          ok = true;
+          await callbacks.update([[k, changes.rows as Json[]]], false);
+        };
+        run().catch((e: unknown) => {
+          if (ok) {
+            error(
+              `Uncaught error triggered by Postgres adapter update (key ${k}, table ${table}):`,
+            )(e);
+          } else {
+            error(`Error executing Postgres query "${query}":`)(e);
+          }
+        });
+      }
+    });
+    await setupPgNotify();
   }
 
   unsubscribe(instance: string): void {
@@ -217,16 +213,17 @@ FOR EACH ROW EXECUTE FUNCTION %I();`,
         );
   }
 
-  shutdown(): Promise<void> {
-    if (this.open_instances.size == 0) return this.client.end();
-
-    const query =
-      "DROP FUNCTION IF EXISTS " +
-      Array.from(this.open_instances)
-        .map((x) => format("%I", x))
-        .join(", ") +
-      " CASCADE;";
-    this.open_instances.clear();
-    return this.client.query(query).then(() => this.client.end());
+  async shutdown(): Promise<void> {
+    if (this.open_instances.size > 0) {
+      const query =
+        "DROP FUNCTION IF EXISTS " +
+        Array.from(this.open_instances)
+          .map((x) => format("%I", x))
+          .join(", ") +
+        " CASCADE;";
+      this.open_instances.clear();
+      await this.client.query(query);
+    }
+    await this.client.end();
   }
 }

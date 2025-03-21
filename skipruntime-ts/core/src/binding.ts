@@ -32,6 +32,11 @@ export interface Checker {
   check(request: string): void;
 }
 
+export type Executor = {
+  resolve: () => void;
+  reject: (reason: Error) => void;
+};
+
 export interface FromBinding {
   // NonEmptyIterator
   SkipRuntime_NonEmptyIterator__next(
@@ -66,6 +71,7 @@ export interface FromBinding {
     name: string,
     values: Pointer<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
     isInit: boolean,
+    executor: Pointer<Internal.Executor>,
   ): Handle<Error>;
 
   SkipRuntime_CollectionWriter__error(
@@ -73,7 +79,10 @@ export interface FromBinding {
     error: Pointer<Internal.CJSON>,
   ): Handle<Error>;
 
-  SkipRuntime_CollectionWriter__loading(name: string): Handle<Error>;
+  SkipRuntime_CollectionWriter__initialized(
+    name: string,
+    error: Pointer<Internal.CJSON>,
+  ): Handle<Error>;
 
   // Resource
 
@@ -176,19 +185,18 @@ export interface FromBinding {
     identifier: string,
     resource: string,
     jsonParams: Pointer<Internal.CJObject>,
+    executor: Pointer<Internal.Executor>,
   ): Handle<Error>;
 
   SkipRuntime_Runtime__getAll(
     resource: string,
     jsonParams: Pointer<Internal.CJObject>,
-    request: Pointer<Internal.Request> | null,
   ): Pointer<Internal.CJObject | Internal.CJFloat>;
 
   SkipRuntime_Runtime__getForKey(
     resource: string,
     jsonParams: Pointer<Internal.CJObject>,
     key: Pointer<Internal.CJSON>,
-    request: Pointer<Internal.Request> | null,
   ): Pointer<Internal.CJObject | Internal.CJFloat>;
 
   SkipRuntime_Runtime__closeResource(identifier: string): Handle<Error>;
@@ -204,6 +212,7 @@ export interface FromBinding {
   SkipRuntime_Runtime__update(
     input: string,
     values: Pointer<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
+    executor: Pointer<Internal.Executor>,
   ): Handle<Error>;
 
   // Reducer
@@ -214,7 +223,10 @@ export interface FromBinding {
   ): Pointer<Internal.Reducer>;
 
   // initService
-  SkipRuntime_initService(service: Pointer<Internal.Service>): Handle<Error>;
+  SkipRuntime_initService(
+    service: Pointer<Internal.Service>,
+    executor: Pointer<Internal.Executor>,
+  ): Handle<Error>;
 
   // closeClose
   SkipRuntime_closeService(): Pointer<Internal.CJSON>;
@@ -236,9 +248,7 @@ export interface FromBinding {
     params: Pointer<Internal.CJObject>,
   ): string;
 
-  // Checker
+  // Executor
 
-  SkipRuntime_createIdentifier(supplier: string): Pointer<Internal.Request>;
-
-  SkipRuntime_createChecker(ref: Handle<Checker>): Pointer<Internal.Request>;
+  SkipRuntime_createExecutor(ref: Handle<Executor>): Pointer<Internal.Executor>;
 }

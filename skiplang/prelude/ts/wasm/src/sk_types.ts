@@ -255,9 +255,9 @@ export class Utils {
     str += newLine ? "\n" : "";
     if (kind == Stream.DEBUG) {
       // Flush buffered this.stddebug output at newlines
-      if (str.includes("\n")) this.stddebug.push(str);
+      const idx = str.lastIndexOf("\n");
+      if (idx == -1) this.stddebug.push(str);
       else {
-        const idx = str.lastIndexOf("\n");
         console.error(this.stddebug.join("") + str.slice(0, idx));
         this.stddebug = [str.slice(idx + 1)];
       }

@@ -164,6 +164,7 @@ fun updateOfCollectionWriter(
   collection: String,
   values: SKJSON.CJArray,
   isInit: Int32,
+  executor: Executor,
 ): Float {
   writer = CollectionWriter(SKStore.DirName::create(collection));
   writer.update(
@@ -175,16 +176,20 @@ fun updateOfCollectionWriter(
       })
     },
     isInit != 0,
+    executor,
   ) match {
   | Success _ -> 0.0
   | Failure(err) -> getErrorHdl(err)
   };
 }
 
-@export("SkipRuntime_CollectionWriter__loading")
-fun loadingOfCollectionWriter(collection: String): Float {
+@export("SkipRuntime_CollectionWriter__initialized")
+fun initializedOfCollectionWriter(
+  collection: String,
+  error: SKJSON.CJSON,
+): Float {
   writer = CollectionWriter(SKStore.DirName::create(collection));
-  writer.loading() match {
+  writer.initialized(error) match {
   | Success _ -> 0.0
   | Failure(err) -> getErrorHdl(err)
   };
@@ -255,29 +260,32 @@ class ExternResourceBuilder(
   }
 }
 
-/************  Checker ****************/
+/************  Executor ****************/
 
-@cpp_extern("SkipRuntime_Checker__check")
+@cpp_extern("SkipRuntime_Executor__resolve")
 @debug
-native fun checkOfChecker(executor: UInt32, request: String): void;
+native fun resolveOfExecutor(executor: UInt32): void;
 
-@cpp_extern("SkipRuntime_deleteChecker")
+@cpp_extern("SkipRuntime_Executor__reject")
 @debug
-native fun deleteChecker(mapper: UInt32): void;
+native fun rejectOfExecutor(executor: UInt32, errorHandle: Float): void;
 
-@export("SkipRuntime_createChecker")
-fun createChecker(executor: UInt32): ExternChecker {
-  ExternChecker(SKStore.ExternalPointer::create(executor, deleteChecker))
+@cpp_extern("SkipRuntime_deleteExecutor")
+@debug
+native fun deleteExecutor(mapper: UInt32): void;
+
+@export("SkipRuntime_createExecutor")
+fun createExecutor(executor: UInt32): ExternExecutor {
+  ExternExecutor(SKStore.ExternalPointer::create(executor, deleteExecutor))
 }
 
-@export("SkipRuntime_createIdentifier")
-fun createIdentifier(request: String): Identifier {
-  Identifier(request)
-}
+class ExternExecutor(eptr: SKStore.ExternalPointer) extends Executor {
+  fun resolve(): void {
+    resolveOfExecutor(this.eptr.value)
+  }
 
-class ExternChecker(eptr: SKStore.ExternalPointer) extends Checker {
-  fun check(request: String): void {
-    checkOfChecker(this.eptr.value, request)
+  fun reject(exc: .Exception): void {
+    rejectOfExecutor(this.eptr.value, getErrorHdl(exc))
   }
 }
 
@@ -561,9 +569,10 @@ fun createResourceOfRuntime(
   identifier: String,
   resource: String,
   params: SKJSON.CJSON,
+  executor: Executor,
 ): Float {
   SKStore.runWithResult(context ~> {
-    createReactiveResource(context, identifier, resource, params)
+    createReactiveResource(context, identifier, resource, params, executor)
   }) match {
   | Success _ -> 0.0
   | Failure(err) -> getErrorHdl(err)
@@ -571,25 +580,12 @@ fun createResourceOfRuntime(
 }
 
 @export("SkipRuntime_Runtime__getAll")
-fun getAllOfRuntime(
-  resource: String,
-  params: SKJSON.CJSON,
-  optRequest: ?Request,
-): SKJSON.CJSON {
-  (getContext() match {
-  | Some(context) ->
-    try {
-      Success(getAll(context, resource, params, optRequest))
-    } catch {
-    | ex -> Failure(ex)
-    }
-  | _ ->
-    SKStore.runWithResult(context ~> {
-      res = getAll(context, resource, params, optRequest);
-      /* Ensure all resources closed at right time */
-      updateContext(context);
-      res
-    })
+fun getAllOfRuntime(resource: String, params: SKJSON.CJSON): SKJSON.CJSON {
+  SKStore.runWithResult(context ~> {
+    res = getAll(context, resource, params);
+    /* Ensure all resources closed at right time */
+    updateContext(context);
+    res
   }) match {
   | Success(result) ->
     fields = mutable Vector<(String, SKJSON.CJSON)>[
@@ -603,9 +599,6 @@ fun getAllOfRuntime(
       ),
       ("errors", SKJSON.CJArray(result.errors)),
     ];
-    result.request.each(request ->
-      fields.push(("request", SKJSON.CJString(request)))
-    );
     SKJSON.CJObject(
       SKJSON.CJFields::create(fields.sortedBy(x ~> x.i0).toArray(), x -> x),
     )
@@ -618,31 +611,18 @@ fun getForKeyOfRuntime(
   resource: String,
   params: SKJSON.CJSON,
   key: SKJSON.CJSON,
-  optRequest: ?Request,
 ): SKJSON.CJSON {
-  (getContext() match {
-  | Some(context) ->
-    try {
-      Success(getForKey(context, resource, params, key, optRequest))
-    } catch {
-    | ex -> Failure(ex)
-    }
-  | _ ->
-    SKStore.runWithResult(context ~> {
-      res = getForKey(context, resource, params, key, optRequest);
-      /* Ensure all resources closed at right time */
-      updateContext(context);
-      res
-    })
+  SKStore.runWithResult(context ~> {
+    res = getForKey(context, resource, params, key);
+    /* Ensure all resources closed at right time */
+    updateContext(context);
+    res
   }) match {
   | Success(result) ->
     fields = mutable Vector<(String, SKJSON.CJSON)>[
       ("payload", SKJSON.CJArray(result.values)),
       ("errors", SKJSON.CJArray(result.errors)),
     ];
-    result.request.each(request ->
-      fields.push(("request", SKJSON.CJString(request)))
-    );
     SKJSON.CJObject(
       SKJSON.CJFields::create(fields.sortedBy(x ~> x.i0).toArray(), x -> x),
     )
@@ -685,7 +665,11 @@ fun unsubscribeOfRuntime(session: Int): Float {
 }
 
 @export("SkipRuntime_Runtime__update")
-fun updateOfRuntime(input: String, values: SKJSON.CJArray): Float {
+fun updateOfRuntime(
+  input: String,
+  values: SKJSON.CJArray,
+  executor: Executor,
+): Float {
   SKStore.runWithResult(context ~> {
     update(
       context,
@@ -697,6 +681,7 @@ fun updateOfRuntime(input: String, values: SKJSON.CJArray): Float {
           (e[0], SKJSON.expectArray(e[1]))
         })
       },
+      executor,
     )
   }) match {
   | Success _ -> 0.0
@@ -731,8 +716,8 @@ fun useExternalResource(
 /************ initService ****************/
 
 @export("SkipRuntime_initService")
-fun initSkipRuntimeService(service: Service): Float {
-  initService(service) match {
+fun initSkipRuntimeService(service: Service, executor: Executor): Float {
+  initService(service, executor) match {
   | Success _ -> 0.0
   | Failure(err) -> getErrorHdl(err)
   };

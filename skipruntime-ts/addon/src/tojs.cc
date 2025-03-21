@@ -10,8 +10,9 @@ namespace skipruntime {
 
 extern "C" {
 double SkipRuntime_CollectionWriter__update(char* collection, CJArray values,
-                                            int32_t isInit);
-double SkipRuntime_CollectionWriter__loading(char* collection);
+                                            int32_t isInit,
+                                            SKExecutor executor);
+double SkipRuntime_CollectionWriter__initialized(char* collection, CJSON error);
 double SkipRuntime_CollectionWriter__error(char* collection, CJSON error);
 
 SKResourceBuilderMap SkipRuntime_ResourceBuilderMap__create();
@@ -32,15 +33,14 @@ SKLazyCompute SkipRuntime_createLazyCompute(int32_t ref);
 SKExternalService SkipRuntime_createExternalService(int32_t ref);
 SKResource SkipRuntime_createResource(int32_t ref);
 SKResourceBuilder SkipRuntime_createResourceBuilder(int32_t ref);
-SKChecker SkipRuntime_createChecker(int32_t ref);
-SKIdentifier SkipRuntime_createIdentifier(char* name);
+SKExecutor SkipRuntime_createExecutor(int32_t ref);
 SKService SkipRuntime_createService(int32_t ref, CJObject inputs,
                                     SKResourceBuilderMap resources,
                                     SKExternalServiceMap exservices);
 SKNotifier SkipRuntime_createNotifier(int32_t ref);
 SKReducer SkipRuntime_createReducer(int32_t ref, CJSON json);
 
-double SkipRuntime_initService(SKService service);
+double SkipRuntime_initService(SKService service, SKExecutor executor);
 CJSON SkipRuntime_closeService();
 
 CJArray SkipRuntime_Collection__getArray(char* collection, CJSON key);
@@ -61,16 +61,17 @@ CJSON SkipRuntime_NonEmptyIterator__next(SKNonEmptyIterator it);
 CJSON SkipRuntime_LazyCollection__getArray(char* handle, CJSON key);
 
 double SkipRuntime_Runtime__createResource(char* identifier, char* resource,
-                                           CJObject jsonParams);
+                                           CJObject jsonParams,
+                                           SKExecutor executor);
 double SkipRuntime_Runtime__closeResource(char* identifier);
 int64_t SkipRuntime_Runtime__subscribe(char* reactiveId, SKNotifier notifier,
                                        char* watermark);
 double SkipRuntime_Runtime__unsubscribe(int64_t id);
-CJSON SkipRuntime_Runtime__getAll(char* resource, CJObject jsonParams,
-                                  SKRequest optRequest);
+CJSON SkipRuntime_Runtime__getAll(char* resource, CJObject jsonParams);
 CJSON SkipRuntime_Runtime__getForKey(char* resource, CJObject jsonParams,
-                                     CJSON key, SKRequest optRequest);
-double SkipRuntime_Runtime__update(char* input, CJSON values);
+                                     CJSON key);
+double SkipRuntime_Runtime__update(char* input, CJSON values,
+                                   SKExecutor executor);
 }
 
 using skbinding::AddFunction;
@@ -94,7 +95,7 @@ using v8::Value;
 
 void UpdateOfCollectionWriter(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
-  if (args.Length() != 3) {
+  if (args.Length() != 4) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
         Exception::TypeError(FromUtf8(isolate, "Must have three parameters.")));
@@ -118,33 +119,48 @@ void UpdateOfCollectionWriter(const FunctionCallbackInfo<Value>& args) {
         FromUtf8(isolate, "The third parameter must be a boolean.")));
     return;
   }
+  if (!args[3]->IsExternal()) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(Exception::TypeError(
+        FromUtf8(isolate, "The fourth parameter must be a pointer.")));
+    return;
+  }
   NatTryCatch(isolate, [&args](Isolate* isolate) {
     char* skcollection = ToSKString(isolate, args[0].As<String>());
     CJArray skvalues = args[1].As<External>()->Value();
-    int32_t skisinit = args[1].As<Boolean>()->Value() ? 1 : 0;
-    double skerror =
-        SkipRuntime_CollectionWriter__update(skcollection, skvalues, skisinit);
+    int32_t skisinit = args[2].As<Boolean>()->Value() ? 1 : 0;
+    SKExecutor skexecutor = args[3].As<External>()->Value();
+    double skerror = SkipRuntime_CollectionWriter__update(
+        skcollection, skvalues, skisinit, skexecutor);
     args.GetReturnValue().Set(Number::New(isolate, skerror));
   });
 }
 
-void LoadingOfCollectionWriter(const FunctionCallbackInfo<Value>& args) {
+void InitializedOfCollectionWriter(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
-  if (args.Length() != 1) {
+  if (args.Length() != 2) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameters.")));
+        Exception::TypeError(FromUtf8(isolate, "Must have two parameters.")));
     return;
   };
   if (!args[0]->IsString()) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a string.")));
+        FromUtf8(isolate, "The first parameter must be a string.")));
+    return;
+  }
+  if (!args[1]->IsExternal()) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(Exception::TypeError(
+        FromUtf8(isolate, "The second parameter must be a pointer.")));
     return;
   }
   NatTryCatch(isolate, [&args](Isolate* isolate) {
     char* skcollection = ToSKString(isolate, args[0].As<String>());
-    double skerror = SkipRuntime_CollectionWriter__loading(skcollection);
+    CJSON skerr = args[1].As<External>()->Value();
+    double skerror =
+        SkipRuntime_CollectionWriter__initialized(skcollection, skerr);
     args.GetReturnValue().Set(Number::New(isolate, skerror));
   });
 }
@@ -436,7 +452,7 @@ void CreateResourceBuilder(const FunctionCallbackInfo<Value>& args) {
   });
 }
 
-void CreateChecker(const FunctionCallbackInfo<Value>& args) {
+void CreateExecutor(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
   if (args.Length() != 1) {
     // Throw an Error that is passed back to JavaScript
@@ -451,30 +467,9 @@ void CreateChecker(const FunctionCallbackInfo<Value>& args) {
     return;
   }
   NatTryCatch(isolate, [&args](Isolate* isolate) {
-    SKChecker skChecker =
-        SkipRuntime_createChecker(args[0].As<Int32>()->Value());
-    args.GetReturnValue().Set(External::New(isolate, skChecker));
-  });
-}
-
-void CreateIdentifier(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
-    return;
-  };
-  if (!args[0]->IsString()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a string.")));
-    return;
-  }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    char* skId = ToSKString(isolate, args[0].As<String>());
-    SKIdentifier skIdentifier = SkipRuntime_createIdentifier(skId);
-    args.GetReturnValue().Set(External::New(isolate, skIdentifier));
+    SKExecutor skExecutor =
+        SkipRuntime_createExecutor(args[0].As<Int32>()->Value());
+    args.GetReturnValue().Set(External::New(isolate, skExecutor));
   });
 }
 
@@ -557,20 +552,21 @@ void CreateReducer(const FunctionCallbackInfo<Value>& args) {
 
 void InitService(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
-  if (args.Length() != 1) {
+  if (args.Length() != 2) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
         Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
     return;
   };
-  if (!args[0]->IsExternal()) {
+  if (!args[0]->IsExternal() || !args[1]->IsExternal()) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a pointer.")));
+        FromUtf8(isolate, "The parameters must be pointers.")));
     return;
   }
   NatTryCatch(isolate, [&args](Isolate* isolate) {
-    double skerror = SkipRuntime_initService(args[0].As<External>()->Value());
+    double skerror = SkipRuntime_initService(args[0].As<External>()->Value(),
+                                             args[1].As<External>()->Value());
     args.GetReturnValue().Set(Number::New(isolate, skerror));
   });
 }
@@ -915,7 +911,14 @@ void GetArrayOfLazyCollection(const FunctionCallbackInfo<Value>& args) {
 
 void CreateResourceOfRuntime(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
-  if (!args[0]->IsString() || !args[1]->IsString() || !args[2]->IsExternal()) {
+  if (args.Length() != 4) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(
+        Exception::TypeError(FromUtf8(isolate, "Must have four parameters.")));
+    return;
+  }
+  if (!args[0]->IsString() || !args[1]->IsString() || !args[2]->IsExternal() ||
+      !args[3]->IsExternal()) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
         Exception::TypeError(FromUtf8(isolate, "Invalid parameters.")));
@@ -925,8 +928,9 @@ void CreateResourceOfRuntime(const FunctionCallbackInfo<Value>& args) {
     char* skidentifier = ToSKString(isolate, args[0].As<String>());
     char* skresource = ToSKString(isolate, args[1].As<String>());
     CJObject skparams = args[2].As<External>()->Value();
-    double skerror =
-        SkipRuntime_Runtime__createResource(skidentifier, skresource, skparams);
+    CJObject skexecutor = args[3].As<External>()->Value();
+    double skerror = SkipRuntime_Runtime__createResource(
+        skidentifier, skresource, skparams, skexecutor);
     args.GetReturnValue().Set(Number::New(isolate, skerror));
   });
 }
@@ -1013,21 +1017,10 @@ void GetAllOfRuntime(const FunctionCallbackInfo<Value>& args) {
         FromUtf8(isolate, "The second parameter must be a pointer.")));
     return;
   }
-  if (!args[2]->IsExternal() && !args[2]->IsNull() && !args[2]->IsUndefined()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(FromUtf8(
-        isolate, "The third parameter must be a pointer or undefined.")));
-    return;
-  };
   NatTryCatch(isolate, [&args](Isolate* isolate) {
     char* skresource = ToSKString(isolate, args[0].As<String>());
     CJObject skparams = args[1].As<External>()->Value();
-    SKRequest skrequest = nullptr;
-    if (args[2]->IsExternal()) {
-      skrequest = args[2].As<External>()->Value();
-    }
-    CJSON skresult =
-        SkipRuntime_Runtime__getAll(skresource, skparams, skrequest);
+    CJSON skresult = SkipRuntime_Runtime__getAll(skresource, skparams);
     args.GetReturnValue().Set(External::New(isolate, skresult));
   });
 }
@@ -1046,22 +1039,12 @@ void GetForKeyOfRuntime(const FunctionCallbackInfo<Value>& args) {
         isolate, "The second and third parameters must be pointers.")));
     return;
   }
-  if (!args[3]->IsExternal() && !args[3]->IsNull() && !args[3]->IsUndefined()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(FromUtf8(
-        isolate, "The fourth parameter must be a pointer or undefined.")));
-    return;
-  };
   NatTryCatch(isolate, [&args](Isolate* isolate) {
     char* skresource = ToSKString(isolate, args[0].As<String>());
     CJObject skparams = args[1].As<External>()->Value();
     CJSON skkey = args[2].As<External>()->Value();
-    SKRequest skrequest = nullptr;
-    if (args[3]->IsExternal()) {
-      skrequest = args[3].As<External>()->Value();
-    }
     CJSON skresult =
-        SkipRuntime_Runtime__getForKey(skresource, skparams, skkey, skrequest);
+        SkipRuntime_Runtime__getForKey(skresource, skparams, skkey);
     args.GetReturnValue().Set(External::New(isolate, skresult));
   });
 }
@@ -1080,10 +1063,17 @@ void UpdateOfRuntime(const FunctionCallbackInfo<Value>& args) {
         FromUtf8(isolate, "The second parameter must be a pointer.")));
     return;
   }
+  if (!args[2]->IsExternal()) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(Exception::TypeError(
+        FromUtf8(isolate, "The third parameter must be a pointer.")));
+    return;
+  }
   NatTryCatch(isolate, [&args](Isolate* isolate) {
     char* skinput = ToSKString(isolate, args[0].As<String>());
     CJSON skvalues = args[1].As<External>()->Value();
-    double skerror = SkipRuntime_Runtime__update(skinput, skvalues);
+    SKExecutor skexecutor = args[2].As<External>()->Value();
+    double skerror = SkipRuntime_Runtime__update(skinput, skvalues, skexecutor);
     args.GetReturnValue().Set(Number::New(isolate, skerror));
   });
 }
@@ -1093,8 +1083,8 @@ void GetToJSBinding(const FunctionCallbackInfo<Value>& args) {
   Local<Object> binding = Object::New(isolate);
   AddFunction(isolate, binding, "SkipRuntime_CollectionWriter__update",
               UpdateOfCollectionWriter);
-  AddFunction(isolate, binding, "SkipRuntime_CollectionWriter__loading",
-              LoadingOfCollectionWriter);
+  AddFunction(isolate, binding, "SkipRuntime_CollectionWriter__initialized",
+              InitializedOfCollectionWriter);
   AddFunction(isolate, binding, "SkipRuntime_CollectionWriter__error",
               ErrorOfCollectionWriter);
   //
@@ -1123,9 +1113,7 @@ void GetToJSBinding(const FunctionCallbackInfo<Value>& args) {
   AddFunction(isolate, binding, "SkipRuntime_createResource", CreateResource);
   AddFunction(isolate, binding, "SkipRuntime_createResourceBuilder",
               CreateResourceBuilder);
-  AddFunction(isolate, binding, "SkipRuntime_createChecker", CreateChecker);
-  AddFunction(isolate, binding, "SkipRuntime_createIdentifier",
-              CreateIdentifier);
+  AddFunction(isolate, binding, "SkipRuntime_createExecutor", CreateExecutor);
   AddFunction(isolate, binding, "SkipRuntime_createService", CreateService);
   AddFunction(isolate, binding, "SkipRuntime_createNotifier", CreateNotifier);
   AddFunction(isolate, binding, "SkipRuntime_createReducer", CreateReducer);
