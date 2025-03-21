@@ -68,11 +68,11 @@ struct SkipException : std::exception {
 #define SKExternalService void*
 #define SKLazyCompute void*
 #define SKChecker void*
+#define SKExecutor void*
 #define SKIdentifier void*
 #define SKService void*
 #define SKNotifier void*
 #define SKReducer void*
 #define SKMapper void*
-#define SKRequest void*
 
 #endif  // SKCOMMON_H

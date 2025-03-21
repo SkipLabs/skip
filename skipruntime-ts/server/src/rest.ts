@@ -13,14 +13,16 @@ export function controlService(service: ServiceInstance): express.Express {
 
   // Streaming control API.
   app.post("/v1/streams/:resource", (req, res) => {
-    try {
-      const uuid = crypto.randomUUID();
-      service.instantiateResource(uuid, req.params.resource, req.body as Json);
-      res.status(201).send(uuid);
-    } catch (e: unknown) {
-      console.log(e);
-      res.status(500).json(e instanceof Error ? e.message : e);
-    }
+    const uuid = crypto.randomUUID();
+    service
+      .instantiateResource(uuid, req.params.resource, req.body as Json)
+      .then(() => {
+        res.status(201).send(uuid);
+      })
+      .catch((e: unknown) => {
+        console.log(e);
+        res.status(500).json(e instanceof Error ? e.message : e);
+      });
   });
 
   app.delete("/v1/streams/:uuid", (req, res) => {
@@ -36,15 +38,14 @@ export function controlService(service: ServiceInstance): express.Express {
   // READS
   app.post("/v1/snapshot/:resource", (req, res) => {
     try {
-      const callbacks = {
-        resolve: (data: Json[]) => {
+      service
+        .getAll(req.params.resource, req.body as Json)
+        .then((data) => {
           res.status(200).json(data);
-        },
-        reject: (err: unknown) => {
+        })
+        .catch((err: unknown) => {
           res.status(500).json(err instanceof Error ? err.message : err);
-        },
-      };
-      service.getAll(req.params.resource, req.body as Json, callbacks);
+        });
     } catch (e: unknown) {
       console.log(e);
       res.status(500).json(e instanceof Error ? e.message : e);
@@ -53,14 +54,6 @@ export function controlService(service: ServiceInstance): express.Express {
 
   app.post("/v1/snapshot/:resource/lookup", (req, res) => {
     try {
-      const callbacks = {
-        resolve: (data: Json[]) => {
-          res.status(200).json(data);
-        },
-        reject: (err: unknown) => {
-          res.status(500).json(err instanceof Error ? err.message : err);
-        },
-      };
       if (
         typeof req.body != "object" ||
         !("key" in req.body) ||
@@ -69,12 +62,14 @@ export function controlService(service: ServiceInstance): express.Express {
         throw new SkipRESTError(
           `Invalid request body for synchronous lookup: ${JSON.stringify(req.body)}`,
         );
-      service.getArray(
-        req.params.resource,
-        req.body.key,
-        req.body.params as Json,
-        callbacks,
-      );
+      service
+        .getArray(req.params.resource, req.body.key, req.body.params as Json)
+        .then((data) => {
+          res.status(200).json(data);
+        })
+        .catch((err: unknown) => {
+          res.status(500).json(err instanceof Error ? err.message : err);
+        });
     } catch (e: unknown) {
       console.log(e);
       res.status(500).json(e instanceof Error ? e.message : e);
@@ -87,17 +82,18 @@ export function controlService(service: ServiceInstance): express.Express {
       res.status(400).json(`Bad request body ${JSON.stringify(req.body)}`);
       return;
     }
-    try {
-      service.update(req.params.collection, req.body as Entry<Json, Json>[]);
-      res.sendStatus(200);
-    } catch (e: unknown) {
-      if (e instanceof SkipUnknownCollectionError) {
-        res.sendStatus(404);
-      } else {
-        console.log(e);
-        res.status(500).json(e instanceof Error ? e.message : e);
-      }
-    }
+
+    service
+      .update(req.params.collection, req.body as Entry<Json, Json>[])
+      .then(() => res.sendStatus(200))
+      .catch((e: unknown) => {
+        if (e instanceof SkipUnknownCollectionError) {
+          res.sendStatus(404);
+        } else {
+          console.error(e);
+          res.status(500).json(e instanceof Error ? e.message : e);
+        }
+      });
   });
 
   app.get("/v1/healthcheck", (_, res) => {
