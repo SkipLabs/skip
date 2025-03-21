@@ -346,18 +346,18 @@ base class Handle<K: Key, +V: File>(
     Some(values[0])
   }
 
-  fun unsafeGetArray(context: mutable Context, key: K): Array<V> {
+  fun unsafeGetArray(context: readonly Context, key: K): Array<V> {
     dir = context.unsafeGetDir(this.dirName);
     dir.getArrayRaw(key).map(this.type)
   }
 
-  fun unsafeGet(context: mutable Context, key: K): V {
+  fun unsafeGet(context: readonly Context, key: K): V {
     arr = this.unsafeGetArray(context, key);
     invariant(arr.size() == 1);
     arr[0]
   }
 
-  fun unsafeMaybeGet(context: mutable Context, key: K): ?V {
+  fun unsafeMaybeGet(context: readonly Context, key: K): ?V {
     values = this.unsafeGetArray(context, key);
     if (values.size() == 0) return None();
     Some(values[0])
