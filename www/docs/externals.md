@@ -13,8 +13,8 @@ Each Skip reactive service can specify any number of `ExternalService`s, which c
 Skip provides several `ExternalService` implementations:
 
  * [`SkipExternalService`](api/helpers/classes/SkipExternalService), which is used to connect reactive Skip services together.
- * [`PostgresExternalService`](api/adapters/postgres/classes/PostgresExternalService), which allows to reactively subscribe to updates from a PostgreSQL database.
- * [`KafkaExternalService`](api/adapters/kafka/classes/KafkaExternalService), which allows to subscribe to and consume messages from a Kafka cluster.
+ * [`PostgresExternalService`](api/adapters/postgres/classes/PostgresExternalService), which allows to subscribe to reactive updates from a PostgreSQL database.
+ * [`KafkaExternalService`](api/adapters/kafka/classes/KafkaExternalService), which allows to connect to and consume messages from a Kafka cluster.
  * [`GenericExternalService`](api/helpers/classes/GenericExternalService), which wraps standalone external resources, such as:
      * [`TimerResource`](api/helpers/classes/TimerResource), which maintains timestamps updated at customizable intervals, allowing reactive computations to look at or depend upon the "current time" with customizable granularity.
      * [`Polled`](api/helpers/classes/Polled), which polls a non-reactive HTTP endpoint with configurable parameter encoding, refresh interval, and the like.
@@ -67,9 +67,11 @@ Encapsulating external reactive dependencies as eager collections, that complex 
 
 Of course, unless your application is built from the ground up using the Skip framework, it is likely that your application depends on some non-reactive external system: REST APIs, databases, external HTTP endpoints, and the like.
 
+These external services are provided in Skip framework packages for convenience but they can be customized, added to, or reimplemented as needed for a given use case; nothing beyond the public API is used in their implementations.
+
 ### PostgreSQL
 
-One common use case for Skip is to reactively update and push results in response to updates in a source-of-truth relational database.
+One common use case for Skip is to reactively update and push results in response to updates in a relational database.
 Skip makes this easy for PostgreSQL users, providing an adapter `PostgresExternalService` that can subscribe to updates from a Postgres database and expose them as an eager collection within your Skip reactive logic.
 
 A complete example is available [here](https://github.com/SkipLabs/skip/tree/main/examples/hackernews/reactive_service); a basic usage is to specify a Skip service with a Postgres external service, i.e.
