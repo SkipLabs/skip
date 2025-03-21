@@ -6,10 +6,7 @@ import type {
   SkipService,
 } from "@skipruntime/core";
 import { runService } from "@skipruntime/server";
-import {
-  PolledExternalService,
-  defaultParamEncoder,
-} from "@skipruntime/helpers";
+import { PolledExternalService } from "@skipruntime/helpers";
 
 const platform: "wasm" | "native" =
   process.env["SKIP_PLATFORM"] == "native" ? "native" : "wasm";
