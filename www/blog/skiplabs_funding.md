@@ -1,6 +1,6 @@
 ---
-title: Skiplabs Funding
-description: Skiplabs raises $8M in seed funding
+title: SkipLabs Funding
+description: SkipLabs raises $8M in seed funding
 slug: skiplabs-funding
 date: 2025-03-25
 authors: jverlaguet
@@ -8,9 +8,9 @@ authors: jverlaguet
 
 **The News**
 
-We’re pleased to announce that Skiplabs has raised $8 million to bring incremental computing to applications everywhere.  We intend to use the entirety of this funding to enhance the open source Skip project and grow the developer community.
+We’re pleased to announce that SkipLabs has raised $8 million to bring incremental computing to applications everywhere.  We intend to use the entirety of this funding to enhance the open source Skip project and grow the developer community.
 
-This financing also means we get to work with [Lenny Pruss](https://www.linkedin.com/in/lennypruss/) at Amplify Partners who have invested in some of today’s most prominent developer platforms such as dbt Labs, Prisma and Temporal to name a few and [Alex Mackenzie](https://www.linkedin.com/in/alex-mackenzie-6aa80ab4/) at Tapestry VC.  Check out Amplify’s blog post that shares their view on Skiplabs and the future of reactive systems and Tapestry’s blog post on why they chose to invest.
+This financing also means we get to work with [Lenny Pruss](https://www.linkedin.com/in/lennypruss/) at Amplify Partners who have invested in some of today’s most prominent developer platforms such as dbt Labs, Prisma and Temporal to name a few and [Alex Mackenzie](https://www.linkedin.com/in/alex-mackenzie-6aa80ab4/) at Tapestry VC.  Check out Amplify’s blog post that shares their view on SkipLabs and the future of reactive systems and Tapestry’s blog post on why they chose to invest.
 
 We are also humbled to earn the support of individual investors like Adam Gross, Spencer Kimball, Yann Lecunn, Tom Occhino, Olivier Pomel and Nicolas Vasilache.
 
@@ -44,4 +44,4 @@ In the months ahead we plan to add:
 
 **Thank You**
 
-Our deepest gratitude to our users, investors, advisors and early employees who have believed in and supported Skiplabs’ mission of incremental computing since the earliest days.  We’ll keep shipping and proving you were right all along.  Back to work!
+Our deepest gratitude to our users, investors, advisors and early employees who have believed in and supported SkipLabs’ mission of incremental computing since the earliest days.  We’ll keep shipping and proving you were right all along.  Back to work!
