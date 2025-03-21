@@ -276,9 +276,13 @@ publish-server:
 publish-postgres-adapter:
 	bin/release_npm.sh @skip-adapter/postgres skipruntime-ts/adapters/postgres/package.json $(OTP)
 
+.PHONY: publish-kafka-adapter
+publish-kafka-adapter:
+	bin/release_npm.sh @skip-adapter/kafka skipruntime-ts/adapters/kafka/package.json $(OTP)
+
 .PHONY: publish-metapackage
 publish-metapackage:
 	bin/release_npm.sh @skiplabs/skip skipruntime-ts/metapackage/package.json $(OTP)
 
 .PHONY: publish-all
-publish-all: clean publish-core publish-helpers publish-wasm publish-native publish-server publish-postgres-adapter publish-metapacka
+publish-all: clean publish-core publish-helpers publish-wasm publish-native publish-server publish-postgres-adapter publish-kafka-adapter publish-metapackage
