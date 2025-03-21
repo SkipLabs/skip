@@ -21,6 +21,7 @@ type User = {
   name: string;
   email: string;
 };
+const unknownUser: User = { name: "unknown author", email: "unknown email" };
 
 type Upvote = {
   post_id: number;
@@ -70,7 +71,7 @@ class PostsMapper {
     try {
       author = this.users.getUnique(post.author_id);
     } catch {
-      author = { name: "unknown author", email: "unknown email" };
+      author = unknownUser;
     }
     return [[[-upvotes.length, key], { ...post, upvotes, author }]];
   }
