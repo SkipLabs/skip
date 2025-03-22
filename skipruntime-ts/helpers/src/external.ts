@@ -72,36 +72,35 @@ export class PolledExternalService implements ExternalService {
     },
   ) {}
 
-  subscribe(
+  async subscribe(
     instance: string,
     resourceName: string,
     params: Json,
     callbacks: {
-      update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
-      error: (error: Json) => void;
-      loading: () => void;
+      update: (updates: Entry<Json, Json>[], isInit: boolean) => Promise<void>;
+      error: (error: unknown) => void;
     },
-  ) {
+  ): Promise<void> {
     const resource = this.resources[resourceName];
     if (!resource)
       throw new SkipUnknownResourceError(
         `Unknown resource named '${resourceName}'`,
       );
-
     const url = `${resource.url}${(resource.encodeParams ?? defaultParamEncoder)(params)}`;
-    const call = () => {
-      callbacks.loading();
-      fetchJSON(url, "GET", resource.options ?? {})
-        .then((r) => {
-          callbacks.update(resource.conv(r[0] ?? []), true);
-        })
-        .catch((e: unknown) => {
-          callbacks.error(e instanceof Error ? e.message : JSON.stringify(e));
+    const call = async (init: boolean) => {
+      const [data, _] = await fetchJSON(url, "GET", resource.options ?? {});
+      await callbacks.update(resource.conv(data ?? []), init);
+    };
+    await call(true);
+    this.intervals.set(
+      instance,
+      setInterval(() => {
+        call(false).catch((e: unknown) => {
+          callbacks.error(e);
           console.error(e);
         });
-    };
-    call();
-    this.intervals.set(instance, setInterval(call, resource.interval));
+      }, resource.interval),
+    );
   }
 
   unsubscribe(instance: string): void {
