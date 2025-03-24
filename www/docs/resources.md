@@ -12,7 +12,7 @@ A Skip [reactive service](api/core/interfaces/SkipService) describes a reactive 
 
 A service's inputs are its *input collections* (data owned by the service that can be freely read/written/mapped over) and its *external services* (any dependencies on outside systems or APIs).
 
-A service's outputs are its *resource*, which define the types of requests that the service can handle, either by accessing data from its static computation graph or by dynamically extending it with further reactive computation as needed to handle the request.
+A service's outputs are its *resource*, which define the types of requests that the service can handle, either by accessing data from its shared computation graph or by dynamically extending it with further reactive computation as needed to handle the request.
 In this way, we can think of resources as parameterized outputs; request parameters are used to instantiate the resource and produce a *resource instance* containing the requested data.
 
 For a concrete example, take the "active friends" resource from the getting-started [example](getting_started.md#the-anatomy-of-a-skip-service) service:
@@ -57,7 +57,7 @@ class ActiveFriends implements Resource<ResourceInputs> {
 ```
 
 In this setup, the reactive service exposes some routes corresponding to the resource, each expecting an HTTP query parameter `uid`.
-When a request is made, the `constructor` is invoked with the given parameters and then `instantiate` is called on the resulting object, extending the static computation graph (which updates `inputs`) with additional reactive computation, getting the relevant `user` and filtering active users according to whether or not they are friends.
+When a request is made, the `constructor` is invoked with the given parameters and then `instantiate` is called on the resulting object, extending the shared computation graph (which updates `inputs`) with additional reactive computation, getting the relevant `user` and filtering active users according to whether or not they are friends.
 The eager collection returned by the `instantiate` function is the output served to the client for this request, reactively updating according to any changes to input data: users, groups, friend relationships, etc.
 
 This _resource instance_ can be explicitly closed by the client, or it will be garbage collected by the Skip framework after a period of inactivity.
