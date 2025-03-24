@@ -14,25 +14,33 @@ choose to release either or both of the `latest` and `quickstart` tags.
 
 ## Release NPM packages
 
+We keep all **public** NPM packages (i.e. `@skipruntime/*`, `@skiplang/skip`,
+and `@skip-adapter/*`) at the same version so as to keep updates, documentation,
+and version management simple.  To update from version `$OLD` to version `$NEW`,
+perform the following steps:
+
 1. Check out `main` and make sure your working copy is clean
 
-2. Bump version numbers and/or dependencies for whichever packages you want to
-   update, in `sql/npm.json`, `packages/dev/package.json`, and/or
-   `packages/react/package.json`
+2. Check that relevant changes since the previous release are included in
+   `CHANGELOG.md`, and update section headers to group those changes under
+   version `$NEW`.
 
-3. Commit your changes with a message like `NPM versions: skdb@x.y.z,
-   skdb-dev@a.b.c, skdb-react@1.2.3`, but don't push yet.
+3. Bump _all_ `./skipruntime-ts/**/package.json` version strings and
+   inter-dependencies from `$OLD` to `$NEW`, e.g. by running `sed -i ''
+   's/$OLD/$NEW/g' $(g grep -l $OLD skipruntime-ts/**/package.json)`.
 
-4. Run `release_npm_skdb.sh` to release the base `skdb` package.  Note that this
-   script requires `skargo`, so may need to run inside of a docker
-   environment.  If so, make sure to run `npm login` first so that the CLI can
-   authenticate.
+4. Build and test with `make -C skipruntime-ts build test`.
 
-5. If you're also updating `skdb-dev` or `skdb-react`, then `(cd packages/dev &&
-   rm -rf node_modules && yarn install)` and/or `(cd packages/react && rm -rf
-   node_modules && yarn install)` to update the `yarn.lock` files.  Then, run
-   either or both of `release_npm_skdb_dev.sh` and `release_npm_skdb_react.sh`,
-   and `git add packages/*/yarn.lock && git commit --amend --no-edit` to add the
-   `yarn.lock` changes to your version-bump git commit.
+5. Check that tests pass and changes to `package-lock.json` and
+   `**/package.json` files look reasonable, then git-commit with a message like `NPM
+   version $NEW`, git-tag with `v$NEW`, git-push, and open a PR.
 
-6. `git push origin HEAD`
+6. When you're ready to publish, run `make publish-all` and provide proper NPM
+   auth to publish the new package versions.
+
+7. Update docker-compose `./examples` package dependencies to the now-released
+   `$NEW` versions (e.g. with `sed -i '' 's/$OLD/$NEW/g' $(g grep -l $OLD
+   examples/**/package.json)`), make any necessary changes to keep them
+   building/running with the new versions, add those changes to your PR, and
+   land it!
+
