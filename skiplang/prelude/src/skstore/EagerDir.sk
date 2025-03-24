@@ -665,7 +665,7 @@ class EagerDir private {
     ?(DirName, Key, readonly Context ~> Array<File>) ~> Postponable,
   ) = None(),
   optOnDelete: ?Postponable = None(),
-} extends Dir, File {
+} extends Dir {
   static fun create{
     time: Time,
     timeStack: TimeStack,
@@ -1340,7 +1340,7 @@ class EagerDir private {
     globalName = "PRE_COMPUTED_" + childName;
 
     dir = context.getGlobal(globalName) match {
-    | Some(x @ EagerDir _) ->
+    | Some(EagerDirFile(x)) ->
       invariant(x.creator == context.currentArrow());
       context.removeGlobal(globalName);
       x
@@ -2251,5 +2251,7 @@ class EagerDir private {
     false
   }
 }
+
+class EagerDirFile(dir: EagerDir) extends File
 
 module end;
