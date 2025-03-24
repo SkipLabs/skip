@@ -87,8 +87,8 @@ Skip is designed to bridge this gap, letting you express the moment-in-time logi
 At its core, a Skip service is a reactive computation graph describing how to compute some output _resources_ from some input data and/or external API inputs.
 
 A service is specified by an object passed to `runService`, which will then spin up a Skip runtime and server.
-That object consists of `initialData` used to populate the service's input collections, some `resources` to make available over HTTP, and a function `createGraph` defining a static computation graph mapping the `ServiceInputs` to `ResourceInputs`.
-This static computation graph will be maintained up-to-date at all times, and can be an arbitrarily complex computation graph or as simple as returning the input collections directly, depending on the service.
+That object consists of `initialData` used to populate the service's input collections, some `resources` to make available over HTTP, and a function `createGraph` defining a shared computation graph mapping the `ServiceInputs` to `ResourceInputs`.
+This shared computation graph will be maintained up-to-date at all times, and can be an arbitrarily complex computation graph or as simple as returning the input collections directly, depending on the service.
 
 In this example, we pull initial user and group data from an external source-of-truth database, expose a single resource called `activeFriends`, and define a reactive computation of the active users in each group. 
 
@@ -137,7 +137,7 @@ await runService(service);
 ```
 
 This example service operates over two _input collections_ (one for users and one for groups, as specified by `ServiceInputs`) and passes some `ResourceInputs` to its resources: a reactively-computed collection `activeMembers` of the set of active users in each group, along with the `users` input collection.
-This `activeMembers` collection is the "output" of the static computation graph, produced by mapping over the input groups and taking users that have the `active` flag set; since this only has to be done once for the entire service, it can be maintained at all times.
+This `activeMembers` collection is the "output" of the shared computation graph, produced by mapping over the input groups and taking users that have the `active` flag set; since this only has to be done once for the entire service, it can be maintained at all times.
 
 Our service wants to expose a resource -- parameterized by a user ID -- which can be queried or subscribed to by clients to view that user's active friends in each group.
 Maintaining this resource up-to-date for all users at all times would be infeasible at scale, so resources can make dynamic extensions to the reactive computation graph which are instantiated/dropped as needed to serve requests.

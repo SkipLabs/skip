@@ -465,7 +465,7 @@ export type NamedCollections = { [name: string]: EagerCollection<Json, Json> };
 /**
  * Resource provided by a `SkipService`.
  *
- * `Resource`s make up the public interface of a `SkipService`, specifying how to respond to reactive requests, either by accessing data from the static computation graph generated in the service's `createGraph` function or extending it with further reactive computations as needed to handle the request.
+ * `Resource`s make up the public interface of a `SkipService`, specifying how to respond to reactive requests, either by accessing data from the shared computation graph generated in the service's `createGraph` function or extending it with further reactive computations as needed to handle the request.
  *
  * @typeParam Collections - Collections provided to the resource computation by the service's `createGraph`.
  */
@@ -477,7 +477,7 @@ export interface Resource<
    *
    * @param collections - Collections provided by the service's `createGraph`.
    * @param context - Skip Runtime internal state.
-   * @returns An eager collection containing the outputs of this resource for the given parameters, produced from the static reactive compute graph output collections of the service's `createGraph`.
+   * @returns An eager collection containing the outputs of this resource for the given parameters, produced from the shared reactive compute graph output collections of the service's `createGraph`.
    */
   instantiate(
     collections: Collections,
@@ -511,15 +511,13 @@ export type InitialData<Inputs extends NamedCollections> = {
  * See `runService` for the write requests of the HTTP API, and `SkipServiceBroker` for the write operations of the method-call API.
  *
  * It can be useful to think of the structure of a service's computation as a directed acyclic graph, the _reactive computation graph_, where the vertices are the named collections, and the edges are the functions (`Mapper`s and `Reducer`s) that produce collections from other collections.
- * Part of the graph is structured in a way that is not dependent on the data or requests the service encounters at runtime: it is _static_.
- * The rest of the graph is _dynamic_ in the sense that collections/vertices are added in response to requests and data received at runtime by the service.
- * The static portion of the graph is defined by `createGraph`, which receives the service's input collections.
- * The result of `createGraph` is the boundary of the static reactive computation graph: named collections that are made available to the dynamic reactive computation graph as inputs to the `instantiate` computations of `Resource`s.
+ * The shared portion of the graph is defined by `createGraph`, which receives the service's input collections.
+ * The result of `createGraph` is the boundary of the shared reactive computation graph: named collections that are made available to `Resource`s as inputs to the `instantiate` computations.
  *
  * `Resource`s are the mechanism by which a service's collections are exposed to other services and clients for reading.
- * A `Resource` implementation provides an `instantiate` function which is similar to `createGraph` but receives the boundary collections of the static reactive computation graph and only produces a single collection.
+ * A `Resource` implementation provides an `instantiate` function which is similar to `createGraph` but receives the boundary collections of the shared reactive computation graph and only produces a single collection.
  * The simplest `Resource`s just return one of the collections they receive as an argument, thereby exposing a collection that would otherwise be internal to the service.
- * `Resource`s define the _dynamic_ portion of the reactive computation graph that arises in response to requests and data at runtime, extending the _static_ computation graph.
+ * `Resource`s define extensions of the reactive computation graph that arises in response to requests and data at runtime, extending the shared computation graph.
  *
  * `Resource`s are exposed by a `SkipService` implementation providing `resources` that associates resource names to `Resource` constructors.
  * The interface involves class constructor functions for `Resource`s since they are instantiated at runtime by the Skip framework in response to requests, using parameters provided as part of the request.
@@ -529,9 +527,9 @@ export type InitialData<Inputs extends NamedCollections> = {
  * See `runService` for the HTTP API for reading resources, and `SkipServiceBroker` for a method-call API.
  *
  * Some of a Skip service's collections, those of type `EagerCollection`, are eagerly kept up-to-date by the framework.
- * This includes the static portion of the reactive computation graph, so the static portion serves as pre-computed data that can be used by individual requests.
+ * This includes the boundary of the shared portion of the reactive computation graph, so the shared portion serves as pre-computed data that can be used by individual requests.
  * The result collections produced by instantiating `Resource`s are also eager and kept up-to-date.
- * Note that this implies that the static portion of the reactive computation graph, as well as the results of resources, are eagerly updated when the service receives a write to an input collection.
+ * Note that this implies that the shared portion of the reactive computation graph, as well as the results of resources, are eagerly updated when the service receives a write to an input collection.
  * The computation of a `Resource`'s output collection may use intermediate collections that are either eager or lazy.
  * A lazy collection, of type `LazyCollection`, is one where the entries are only computed on-demand as a result of querying particular keys.
  * Lazy collections memoize computations that are performed as part of computing the result of an update to an input of an eager collection.
@@ -565,7 +563,7 @@ export interface SkipService<
   };
 
   /**
-   * Build the static reactive computation graph by defining collections to be passed to resources.
+   * Build the shared reactive computation graph by defining collections to be passed to resources.
    *
    * @param inputCollections - The service's input collections.
    * @param context - Skip Runtime internal state.
