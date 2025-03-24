@@ -142,7 +142,9 @@ fun testSubSubDirUnit(): void {
       SKStore.IntFile::type,
       context,
       SKStore.DirName::create("/subDir2/"),
-      (_context, writer, key, values) ~> writer.set(key, values.first + 1),
+      (_context, writer, key, values) ~>
+        writer.set(key, SKStore.IntFile(values.first.value + 1))
+      ,
     );
     _ = dir1.map(
       SKStore.IID::keyType,
