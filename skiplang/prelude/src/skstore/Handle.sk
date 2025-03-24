@@ -407,25 +407,19 @@ class LHandle<K: Key, +V: File> extends Handle<K, V> {
 /* Eager handles. */
 /*****************************************************************************/
 
+type TMapFun<K, V, K2, V2> = (
+  mutable Context,
+  mutable TWriter<K2, V2>,
+  K,
+  mutable NonEmptyIterator<V>,
+) ~> void;
+
 class EHandle<K: Key, V: File> extends Handle<K, V> {
   static fun multiMap<K2: Key, V2: File>(
     typeOutputKey: Key ~> K2,
     typeOutput: File ~> V2,
     context: mutable Context,
-    parents: Array<
-      (
-        EHandle<K, V>,
-        (
-          (
-            mutable Context,
-            mutable TWriter<K2, V2>,
-            K,
-            mutable NonEmptyIterator<V>,
-          ) ~> void,
-          ?Array<KeyRange>,
-        ),
-      ),
-    >,
+    parents: Array<(EHandle<K, V>, (TMapFun<K, V, K2, V2>, ?Array<KeyRange>))>,
     dirName: DirName,
   ): EHandle<K2, V2> {
     dynParents = mutable Map[];
@@ -469,20 +463,7 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
     typeOutputKey: Key ~> K2,
     typeOutput: File ~> V2,
     context: mutable Context,
-    parents: Array<
-      (
-        EHandle<K, V>,
-        (
-          (
-            mutable Context,
-            mutable TWriter<K2, V2>,
-            K,
-            mutable NonEmptyIterator<V>,
-          ) ~> void,
-          ?Array<KeyRange>,
-        ),
-      ),
-    >,
+    parents: Array<(EHandle<K, V>, (TMapFun<K, V, K2, V2>, ?Array<KeyRange>))>,
     dirName: DirName,
     reducer: EReducer<V2, V3>,
   ): EHandle<K2, V3> {
@@ -543,12 +524,7 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
     type: File ~> V2,
     context: mutable Context,
     dirName: DirName,
-    f: (
-      mutable Context,
-      mutable TWriter<K2, V2>,
-      K,
-      mutable NonEmptyIterator<V>,
-    ) ~> void,
+    f: TMapFun<K, V, K2, V2>,
     rangeOpt: ?Array<KeyRange> = None(),
   ): EHandle<K2, V2> {
     static::multiMap(
@@ -565,12 +541,7 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
     type: File ~> V2,
     context: mutable Context,
     dirName: DirName,
-    f: (
-      mutable Context,
-      mutable TWriter<K2, V2>,
-      K,
-      mutable NonEmptyIterator<V>,
-    ) ~> void,
+    f: TMapFun<K, V, K2, V2>,
     reducer: EReducer<V2, V3>,
     rangeOpt: ?Array<KeyRange> = None(),
   ): EHandle<K2, V3> {
