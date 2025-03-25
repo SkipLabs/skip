@@ -5,7 +5,8 @@ import requests
 import random
 import time
 
-REACTIVE_SERVICE_URL = "http://reactive_cache:8081/v1"
+SKIP_LEADER_URL = "http://skip_leader:8081/v1"
+SKIP_FOLLOWER_URL = "http://skip_follower:8081/v1"
 
 
 def get_db():
@@ -63,7 +64,7 @@ def login():
 
     # TODO: Error handling.
     requests.patch(
-        f"{REACTIVE_SERVICE_URL}/inputs/sessions",
+        f"{SKIP_LEADER_URL}/inputs/sessions",
         json=[[session["session_id"], [user_session]]],
     )
 
@@ -73,7 +74,7 @@ def login():
 @app.post("/logout")
 def logout():
     requests.patch(
-        f"{REACTIVE_SERVICE_URL}/inputs/sessions",
+        f"{SKIP_LEADER_URL}/inputs/sessions",
         json=[[session["session_id"], []]],
     )
 
@@ -86,7 +87,7 @@ def logout():
 def user_session():
     if "text/event-stream" in request.accept_mimetypes:
         resp = requests.post(
-            f"{REACTIVE_SERVICE_URL}/streams/sessions",
+            f"{SKIP_FOLLOWER_URL}/streams/sessions",
             json={
                 "session_id": session["session_id"],
             },
@@ -97,7 +98,7 @@ def user_session():
 
     else:
         resp = requests.post(
-            f"{REACTIVE_SERVICE_URL}/snapshot/sessions",
+            f"{SKIP_FOLLOWER_URL}/snapshot/sessions",
             json={
                 "session_id": session["session_id"],
             },
@@ -126,7 +127,7 @@ def posts_index():
 
     if "text/event-stream" in request.accept_mimetypes:
         resp = requests.post(
-            f"{REACTIVE_SERVICE_URL}/streams/posts",
+            f"{SKIP_FOLLOWER_URL}/streams/posts",
             json={
                 "limit": 10,
                 "session_id": session["session_id"],
@@ -141,7 +142,7 @@ def posts_index():
 
     else:
         resp = requests.post(
-            f"{REACTIVE_SERVICE_URL}/snapshot/posts",
+            f"{SKIP_FOLLOWER_URL}/snapshot/posts",
             json={
                 "limit": 10,
                 "session_id": session["session_id"],

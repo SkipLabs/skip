@@ -9,6 +9,8 @@ services:
     depends_on:
       www:
         condition: service_healthy
+      skip_follower:
+        condition: service_healthy
 
   # Web application
   web:
@@ -27,11 +29,17 @@ services:
       - pgdata:/var/lib/postgresql/data
 
   # Reactive cache
-  reactive_cache:
-    image: reactive-hackernews/skip-service
-    build: ./reactive_service
+  skip_leader:
+    image: reactive-hackernews/skip-leader
+    build: ./skip_leader
     depends_on:
       db:
+        condition: service_healthy
+  skip_follower:
+    image: reactive-hackernews/skip-follower
+    build: ./skip_follower
+    depends_on:
+      skip_leader:
         condition: service_healthy
 
   # Front-end
