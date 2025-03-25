@@ -27,7 +27,7 @@ CMD ["npm", "start"]
 ```
 
 The `npm start` command will, by default, run your service by executing `./server.js`.
-Within that file, you should perform any necessary setup and then spin up the service by calling `runService`; see [here](https://github.com/SkipLabs/skip/tree/main/examples/hackernews/reactive_service/server.js) for an example.
+Within that file, you should perform any necessary setup and then spin up the service by calling `runService`; see [here](https://github.com/SkipLabs/skip/tree/main/examples/chatroom/reactive_service/server.js) for an example.
 
 ### Data streaming
 

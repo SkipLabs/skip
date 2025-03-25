@@ -7,7 +7,7 @@ import type {
   SkipService,
 } from "@skipruntime/core";
 
-import { PostgresExternalService } from "@skip-adapter/postgres";
+import { SkipExternalService } from "@skipruntime/helpers";
 
 type Post = {
   author_id: number;
@@ -21,12 +21,6 @@ type User = {
   name: string;
   email: string;
 };
-const unknownUser: User = { name: "unknown author", email: "unknown email" };
-
-type Upvote = {
-  post_id: number;
-  user_id: number;
-};
 
 type PostWithUpvoteIds = Post & { upvotes: number[]; author: User };
 
@@ -39,43 +33,6 @@ type PostWithUpvoteCount = Omit<Post, "author_id"> & {
 type Session = User & {
   user_id: number;
 };
-
-const postgres = new PostgresExternalService({
-  host: "db",
-  port: 5432,
-  database: "postgres",
-  user: "postgres",
-  password: "change_me",
-});
-
-class UpvotesMapper {
-  mapEntry(_key: number, values: Values<Upvote>): Iterable<[number, number]> {
-    const upvote: Upvote = values.getUnique();
-    return [[upvote.post_id, upvote.user_id]];
-  }
-}
-
-class PostsMapper {
-  constructor(
-    private users: EagerCollection<number, User>,
-    private upvotes: EagerCollection<number, number>,
-  ) {}
-
-  mapEntry(
-    key: number,
-    values: Values<Post>,
-  ): Iterable<[[number, number], PostWithUpvoteIds]> {
-    const post: Post = values.getUnique();
-    const upvotes: number[] = this.upvotes.getArray(key);
-    let author;
-    try {
-      author = this.users.getUnique(post.author_id);
-    } catch {
-      author = unknownUser;
-    }
-    return [[[-upvotes.length, key], { ...post, upvotes, author }]];
-  }
-}
 
 class CleanupMapper {
   constructor(private readonly session: Session | null) {}
@@ -106,14 +63,14 @@ class CleanupMapper {
   }
 }
 
-type PostsResourceInputs = {
+type ResourceInputs = {
   postsWithUpvotes: EagerCollection<[number, number], PostWithUpvoteIds>;
   sessions: EagerCollection<string, Session>;
 };
 
 type PostsResourceParams = { limit?: number; session_id?: string };
 
-class PostsResource implements Resource<PostsResourceInputs> {
+class PostsResource implements Resource<ResourceInputs> {
   private limit: number;
   private session_id: string;
 
@@ -127,7 +84,7 @@ class PostsResource implements Resource<PostsResourceInputs> {
   }
 
   instantiate(
-    collections: PostsResourceInputs,
+    collections: ResourceInputs,
   ): EagerCollection<number, PostWithUpvoteCount> {
     let session;
     try {
@@ -152,11 +109,7 @@ class FilterSessionMapper {
   }
 }
 
-type SessionsResourceInputs = {
-  sessions: EagerCollection<string, Session>;
-};
-
-class SessionsResource implements Resource<SessionsResourceInputs> {
+class SessionsResource implements Resource<ResourceInputs> {
   private session_id: string;
 
   constructor(jsonParams: Json) {
@@ -166,50 +119,35 @@ class SessionsResource implements Resource<SessionsResourceInputs> {
     else this.session_id = params.session_id as string;
   }
 
-  instantiate(
-    collections: SessionsResourceInputs,
-  ): EagerCollection<number, Session> {
+  instantiate(collections: ResourceInputs): EagerCollection<number, Session> {
     return collections.sessions.map(FilterSessionMapper, this.session_id);
   }
 }
 
-type PostsServiceInputs = {
-  sessions: EagerCollection<string, Session>;
-};
-
-export const service: SkipService<PostsServiceInputs, PostsResourceInputs> = {
-  initialData: {
-    sessions: [],
-  },
+export const service: SkipService<{}, ResourceInputs> = {
+  initialData: {},
   resources: { posts: PostsResource, sessions: SessionsResource },
-  externalServices: { postgres },
-  createGraph(
-    inputs: PostsServiceInputs,
-    context: Context,
-  ): PostsResourceInputs {
-    const serialIDKey = { key: { col: "id", type: "SERIAL" } };
-    const posts = context.useExternalResource<number, Post>({
-      service: "postgres",
-      identifier: "posts",
-      params: serialIDKey,
+  externalServices: {
+    leader: SkipExternalService.direct({
+      host: "skip_leader",
+      streaming_port: 8080,
+      control_port: 8081,
+    }),
+  },
+  createGraph(_inputs: {}, context: Context): ResourceInputs {
+    const postsWithUpvotes = context.useExternalResource<
+      [number, number],
+      PostWithUpvoteIds
+    >({
+      service: "leader",
+      identifier: "postsWithUpvotes",
+      params: {},
     });
-    const users = context.useExternalResource<number, User>({
-      service: "postgres",
-      identifier: "users",
-      params: serialIDKey,
+    const sessions = context.useExternalResource<string, Session>({
+      service: "leader",
+      identifier: "sessions",
+      params: {},
     });
-    const upvotes = context.useExternalResource<number, Upvote>({
-      service: "postgres",
-      identifier: "upvotes",
-      params: serialIDKey,
-    });
-    return {
-      postsWithUpvotes: posts.map(
-        PostsMapper,
-        users,
-        upvotes.map(UpvotesMapper),
-      ),
-      sessions: inputs.sessions,
-    };
+    return { postsWithUpvotes, sessions };
   },
 };
