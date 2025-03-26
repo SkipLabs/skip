@@ -32,6 +32,7 @@ This will suggest to run:
 Test locally: make docs-serve
 Push to live site: cd www/docs_site/; git add -A; git commit -m 'update to <commit>'; git push; cd -
 ```
+Note that the docs_site commit messages will mention the wrong commit hashes if `make docs-publish` is run from a commit that is not (an ancestor of) `main`.
 
 The documentation for the tags that TypeDoc recognizes is
 [here](https://typedoc.org/guides/tags/).
