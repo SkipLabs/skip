@@ -61,14 +61,14 @@ extension class ProjKey extends SKStore.Key {
   }
 }
 
-class LeftFile(SKStore.Key, RowValues) extends SKStore.File
+class LeftFile(RowKey, RowValues) extends SKStore.File
 class LeftShardedFile{
   leftShardID: Int,
   rightShard: Int,
   value: RowValues,
 } extends SKStore.File
 
-class RightFile(SKStore.Key, RowValues) extends SKStore.File
+class RightFile(RowKey, RowValues) extends SKStore.File
 class RightShardedFile{
   leftShard: Int,
   rightShardID: Int,
@@ -402,14 +402,15 @@ class SelectEvaluator{
       joinKind,
       onlyLeftValues,
     } ->
-      leftHandle = SKStore.EHandle(x ~> x, Row::type, leftDirName);
-      rightHandle = SKStore.EHandle(x ~> x, Row::type, rightDirName);
+      leftHandle = SKStore.EHandle(RowKey::keyType, Row::type, leftDirName);
+      rightHandle = SKStore.EHandle(RowKey::keyType, Row::type, rightDirName);
 
       projName = childName.sub("proj");
       shardsDirName = projName.sub("shards");
       shards = context.unsafeMaybeGetEagerDir(shardsDirName) match {
-      | None() -> context.mkdir(x ~> x, ShardStats::type, shardsDirName)
-      | Some(x) -> SKStore.EHandle(x ~> x, ShardStats::type, x.dirName)
+      | None() ->
+        context.mkdir(RowKey::keyType, ShardStats::type, shardsDirName)
+      | Some(x) -> SKStore.EHandle(RowKey::keyType, ShardStats::type, x.dirName)
       };
 
       projLeftName = projName.sub("left");
@@ -439,6 +440,7 @@ class SelectEvaluator{
       );
 
       projLeftFun = (_context, writer, fileKey, valueIter) ~> {
+        fileRowKey = RowKey::keyType(fileKey);
         (rowOpt, shardStats) = normalizeValueIter(valueIter);
         row = rowOpt match {
         | None() -> return void
@@ -450,11 +452,12 @@ class SelectEvaluator{
         shardedFile = LeftShardedFile{leftShardID, rightShard, value => row};
         for (i in Range(0, rightShard)) {
           projKey = ProjKey(key, leftColNbr, leftShardID, i);
-          writer.set(projKey, LeftFile(fileKey, shardedFile.value))
+          writer.set(projKey, LeftFile(fileRowKey, shardedFile.value))
         }
       };
 
       projRightFun = (_context, writer, fileKey, valueIter) ~> {
+        fileRowKey = RowKey::keyType(fileKey);
         (rowOpt, shardStats) = normalizeValueIter(valueIter);
         row = rowOpt match {
         | None() -> return void
@@ -466,7 +469,7 @@ class SelectEvaluator{
         shardedFile = RightShardedFile{leftShard, rightShardID, value => row};
         for (i in Range(0, leftShard)) {
           projKey = ProjKey(key, rightColNbr, i, rightShardID);
-          writer.set(projKey, RightFile(fileKey, shardedFile.value))
+          writer.set(projKey, RightFile(fileRowKey, shardedFile.value))
         }
       };
 
@@ -1580,7 +1583,7 @@ fun makeGroupByKey(
 /*****************************************************************************/
 
 fun makeJoinReducer(
-  shardTable: SKStore.EHandle<SKStore.Key, ShardStats>,
+  shardTable: SKStore.EHandle<RowKey, ShardStats>,
   joinKind: P.JoinKind,
   kinds: Array<(Int, P.IKind, P.Type)>,
   onlyLeftValues: Bool,
@@ -1715,7 +1718,7 @@ fun computeShardSizes(stats: ?ShardStats): (Int, Int) {
 
 fun getStats(
   context: mutable SKStore.Context,
-  shardTable: SKStore.EHandle<SKStore.Key, ShardStats>,
+  shardTable: SKStore.EHandle<RowKey, ShardStats>,
   x: readonly Vector<(SKStore.Key, SKStore.File)>,
 ): ?ShardStats {
   for (kv in x) {
