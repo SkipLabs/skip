@@ -3,6 +3,10 @@ version: 2.1
 commands:
   custom-checkout:
     description: "Shallow checkout code"
+    parameters:
+      submodules:
+        type: boolean
+        default: false
     steps:
       - run:
           name: Shallow checkout code
@@ -18,13 +22,6 @@ commands:
             if << parameters.submodules >>; then clone_args+=(--shallow-submodules --recurse-submodules); fi
             git clone "${clone_args[@]}" "$CIRCLE_REPOSITORY_URL" .
             git reset --hard "$CIRCLE_SHA1"
-  setup:
-    description: "Setup skip toolchain"
-    steps:
-      - run:
-          name: Fetch submodules
-          command: |
-            git submodule update --init --recursive
 
 jobs:
   fast-checks:
@@ -45,8 +42,8 @@ jobs:
     docker:
       - image: skiplabs/skip:latest
     steps:
-      - custom-checkout
-      - setup
+      - custom-checkout:
+          submodules: true
       - run:
           name: Typecheck and lint typescript sources
           command: SKIPRUNTIME=$(pwd)/build/skipruntime npm install && npm run build && npm run lint
@@ -56,8 +53,8 @@ jobs:
       - image: skiplabs/skiplang:latest
     resource_class: xlarge
     steps:
-      - custom-checkout
-      - setup
+      - custom-checkout:
+          submodules: true
       - run:
           name: Run compiler tests
           no_output_timeout: 30m
@@ -72,8 +69,8 @@ jobs:
     docker:
       - image: skiplabs/skdb-base:latest
     steps:
-      - custom-checkout
-      - setup
+      - custom-checkout:
+          submodules: true
       - run:
           name: Run native skdb tests
           command: |
@@ -83,8 +80,8 @@ jobs:
     docker:
       - image: skiplabs/skdb-base:latest
     steps:
-      - custom-checkout
-      - setup
+      - custom-checkout:
+          submodules: true
       - run:
           name: Run wasm skdb tests
           no_output_timeout: 15m
@@ -101,8 +98,8 @@ jobs:
       dir:
         type: string
     steps:
-      - custom-checkout
-      - setup
+      - custom-checkout:
+          submodules: true
       - run:
           name: Build << parameters.dir >>
           command: |
@@ -115,8 +112,8 @@ jobs:
       dir:
         type: string
     steps:
-      - custom-checkout
-      - setup
+      - custom-checkout:
+          submodules: true
       - run:
           name: Run << parameters.dir >> tests
           command: |
@@ -145,8 +142,8 @@ jobs:
           KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "0@localhost:9093"
           KAFKA_CFG_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
     steps:
-      - custom-checkout
-      - setup
+      - custom-checkout:
+          submodules: true
       - run:
           name: Run wasm skip runtime tests
           no_output_timeout: 10m
@@ -160,8 +157,8 @@ jobs:
     docker:
       - image: cimg/base:2025.01
     steps:
-      - custom-checkout
-      - setup
+      - custom-checkout:
+          submodules: true
       - setup_remote_docker
       - run:
           name: Build hackernews docker images
