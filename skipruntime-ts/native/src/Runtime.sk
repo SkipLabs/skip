@@ -449,7 +449,7 @@ fun closeService_(context: mutable SKStore.Context): Array<Float> {
   );
   todestroy = mutable Vector[];
   resourceHdl.items(context).each(kf -> {
-    kf.i1.next().each(_f -> todestroy.push(SKStore.SID::keyType(kf.i0)))
+    kf.i1.next().each(_f -> todestroy.push(kf.i0))
   });
   todestroy.each(key -> destroyReactiveResource(context, key));
   sessionHdl = SKStore.EHandle(
@@ -1534,9 +1534,9 @@ fun checkGarbage(context: mutable SKStore.Context): void {
   destroyed = mutable Vector[];
   garbageHdl.items(context).each(kf -> {
     kf.i1.next().each(f -> {
-      suppressed = SKStore.IntFile::type(f).value;
+      suppressed = f.value;
       if (time - suppressed > kGarbageMillis) {
-        key = SKStore.SID::keyType(kf.i0);
+        key = kf.i0;
         destroyed.push(key);
         resourceHdl.writeArray(context, key, Array[]);
       }
