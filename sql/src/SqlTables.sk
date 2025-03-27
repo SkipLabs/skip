@@ -115,11 +115,12 @@ fun setReplicationState(
   replicationSource: Int,
   state: ReplicationState,
 ): void {
-  replicationDir = context.maybeGetDir(replication) match {
-  | None() -> context.mkdir(x ~> x, ReplicationStateFile::type, replication)
-  | Some(d) ->
-    SKStore.EHandle(x ~> x, ReplicationStateFile::type, d.getDirName())
-  };
+  replicationDir = makeInputDir(
+    SKStore.IID::keyType,
+    ReplicationStateFile::type,
+    context,
+    replication,
+  );
   key = SKStore.IID(replicationSource);
   arr = replicationDir.unsafeGetArray(context, key);
   if (arr.size() < 1) {
