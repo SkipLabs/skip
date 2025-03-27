@@ -579,15 +579,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       dirName = dirDescr.dirName;
 
       Some((context, _, _) ~> {
-        if (context.unsafeMaybeGetEagerDir(dirName) is Some _ && ifNotExists) {
-          currentSchema = getTable(context, pos, name).schema;
-          if (currentSchema != dirDescr.schema) {
-            error(pos, "table exists with a different schema")
-          };
-          return void;
-        };
-
-        this.createTable(context, pos, name, dirDescr, false);
+        this.createTable(context, pos, name, dirDescr, ifNotExists);
         tableDir = context.unsafeGetEagerDir(dirName);
 
         selectDir = evalSelect(context, cselect, None());
