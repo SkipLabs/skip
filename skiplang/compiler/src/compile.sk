@@ -199,8 +199,16 @@ fun getOrInitializeBackend(
   | None() -> void
   };
 
-  _ = context.mkdir(x ~> x, x ~> x, FileCache.fileDirName);
-  _ = context.mkdir(x ~> x, x ~> x, FileCache.packageDirName);
+  _ = context.mkdir(
+    FileCache.InputSource::keyType,
+    SKStore.StringFile::type,
+    FileCache.fileDirName,
+  );
+  _ = context.mkdir(
+    FileCache.InputPackageName::keyType,
+    FileCache.InputPackageFiles::type,
+    FileCache.packageDirName,
+  );
   backendDir = context.mkdir(
     SKStore.IID::keyType,
     TickConfigFile::type,
