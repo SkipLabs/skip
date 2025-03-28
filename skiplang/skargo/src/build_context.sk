@@ -166,6 +166,7 @@ private fun generate_root_units(
         package,
         target,
         build_config.requested_arch,
+        build_config.requested_profile,
         CompileModeBuild(),
         UnitBuildOptions{
           relocation_model => if (
@@ -281,6 +282,7 @@ private fun compute_deps(
         unit.pkg,
         unit.pkg.manifest.lib_target().fromSome(),
         unit.arch,
+        unit.profile,
         CompileModeBuild(),
         unit.build_opts,
       ),
@@ -293,6 +295,7 @@ private fun compute_deps(
           unit.pkg,
           target,
           unit.arch,
+          unit.profile,
           CompileModeRunBuildScript(),
           unit.build_opts,
         ),
@@ -319,6 +322,7 @@ private fun compute_deps(
         dep_package,
         dep_package.manifest.lib_target().fromSome(),
         unit.arch,
+        unit.profile,
         CompileModeBuild(),
         unit.build_opts,
       ),

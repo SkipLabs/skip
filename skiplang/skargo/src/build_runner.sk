@@ -573,21 +573,17 @@ private fun hash_of(
       dep_hashes.push(hash_of(dep, bctx, out))
     };
 
-    out.set(unit, compute_hash(unit, dep_hashes.collect(Array), bctx))
+    out.set(unit, compute_hash(unit, dep_hashes.collect(Array)))
   };
 
   out[unit]
 }
 
-private fun compute_hash(
-  unit: Unit,
-  dep_hashes: Array<Int>,
-  bctx: BuildContext,
-): Int {
+private fun compute_hash(unit: Unit, dep_hashes: Array<Int>): Int {
   (
     unit.pkg.manifest.package_id,
     dep_hashes,
-    bctx.build_config.requested_profile,
+    unit.profile,
     unit.arch,
     unit.mode,
     unit.target.name,
