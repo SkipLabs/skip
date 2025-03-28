@@ -4,10 +4,16 @@ import psycopg2
 import requests
 import random
 import time
+import itertools
 
 SKIP_LEADER_URL = "http://skip_leader:8081/v1"
-SKIP_FOLLOWER_URL = "http://skip_follower:8081/v1"
 
+# round-robin sequence of followers
+SKIP_FOLLOWERS = itertools.cycle([
+    ("1", "http://skip_follower1:8081/v1"),
+    ("2", "http://skip_follower2:8081/v1"),
+    ("3", "http://skip_follower3:8081/v1")
+])
 
 def get_db():
     conn = psycopg2.connect(
@@ -86,19 +92,20 @@ def logout():
 @app.get("/session")
 def user_session():
     if "text/event-stream" in request.accept_mimetypes:
+        (follower, url) = next(SKIP_FOLLOWERS)
         resp = requests.post(
-            f"{SKIP_FOLLOWER_URL}/streams/sessions",
+            f"{url}/streams/sessions",
             json={
                 "session_id": session["session_id"],
             },
         )
         uuid = resp.text
 
-        return redirect(f"/streams/{uuid}", code=307)
+        return redirect(f"/streams/{follower}/{uuid}", code=307)
 
     else:
         resp = requests.post(
-            f"{SKIP_FOLLOWER_URL}/snapshot/sessions",
+            f"{next(SKIP_FOLLOWERS)[1]}/snapshot/sessions",
             json={
                 "session_id": session["session_id"],
             },
@@ -126,8 +133,9 @@ def posts_index():
     # return json.jsonify(res)
 
     if "text/event-stream" in request.accept_mimetypes:
+        (follower, url) = next(SKIP_FOLLOWERS)
         resp = requests.post(
-            f"{SKIP_FOLLOWER_URL}/streams/posts",
+            f"{url}/streams/posts",
             json={
                 "limit": 10,
                 "session_id": session["session_id"],
@@ -137,12 +145,11 @@ def posts_index():
             # },
         )
         uuid = resp.text
-
-        return redirect(f"/streams/{uuid}", code=307)
+        return redirect(f"/streams/{follower}/{uuid}", code=307)
 
     else:
         resp = requests.post(
-            f"{SKIP_FOLLOWER_URL}/snapshot/posts",
+            f"{next(SKIP_FOLLOWERS)[1]}/snapshot/posts",
             json={
                 "limit": 10,
                 "session_id": session["session_id"],

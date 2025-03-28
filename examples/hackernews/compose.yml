@@ -9,7 +9,7 @@ services:
     depends_on:
       www:
         condition: service_healthy
-      skip_follower:
+      skip_leader:
         condition: service_healthy
 
   # Web application
@@ -35,7 +35,19 @@ services:
     depends_on:
       db:
         condition: service_healthy
-  skip_follower:
+  skip_follower1:
+    image: reactive-hackernews/skip-follower
+    build: ./skip_follower
+    depends_on:
+      skip_leader:
+        condition: service_healthy
+  skip_follower2:
+    image: reactive-hackernews/skip-follower
+    build: ./skip_follower
+    depends_on:
+      skip_leader:
+        condition: service_healthy
+  skip_follower3:
     image: reactive-hackernews/skip-follower
     build: ./skip_follower
     depends_on:
