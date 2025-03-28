@@ -450,16 +450,9 @@ mutable class BuildRunner(
   }
 
   private readonly fun build_script_unit_for(unit: Unit): ?Unit {
-    for (dep in this.bctx.unit_graph[unit]) {
-      if (
-        dep.target.is_build_script() &&
-        dep.mode is CompileModeRunBuildScript _
-      ) {
-        return Some(dep)
-      }
-    };
-
-    None()
+    this.bctx.unit_graph[unit].find(u ->
+      u.target.is_build_script() && u.mode is CompileModeRunBuildScript _
+    )
   }
 
   private readonly fun outputs_for(unit: Unit): Array<OutputFile> {
