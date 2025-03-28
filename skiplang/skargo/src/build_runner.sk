@@ -63,11 +63,7 @@ mutable class BuildRunner(
   build_script_outputs: mutable Map<Unit, BuildScriptOutput> = mutable Map[],
 ) {
   static fun create(bctx: BuildContext): mutable BuildRunner {
-    host_layout = Layout::create(
-      bctx,
-      "host",
-      bctx.build_config.requested_profile,
-    );
+    host_layout = Layout::create(bctx, "host", "dev");
     target_layout = bctx.build_config.requested_arch match {
     | TargetArchHost() -> host_layout
     | TargetArchTriple(t) ->
