@@ -166,7 +166,11 @@ mutable class BuildRunner(
         unit.target.name
       }] (${unit.pkg.root()})`;
       if (this.unit_is_dirty(unit)) {
-        if (check && this.bctx.roots.contains(unit)) {
+        if (
+          check &&
+          this.bctx.roots.contains(unit) &&
+          (this.bctx.roots.size() == 1 || unit.target.kind is TestTarget _)
+        ) {
           this.bctx.gctx.console.status("Checking", unit_name);
           this.create_dir(this.layout_for(unit).build);
           this.skc(unit, /* check = */ true)
