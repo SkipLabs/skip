@@ -63,11 +63,7 @@ mutable class BuildRunner(
   build_script_outputs: mutable Map<Unit, BuildScriptOutput> = mutable Map[],
 ) {
   static fun create(bctx: BuildContext): mutable BuildRunner {
-    host_layout = Layout::create(
-      bctx,
-      "host",
-      bctx.build_config.requested_profile,
-    );
+    host_layout = Layout::create(bctx, "host", "dev");
     target_layout = bctx.build_config.requested_arch match {
     | TargetArchHost() -> host_layout
     | TargetArchTriple(t) ->
@@ -133,7 +129,6 @@ mutable class BuildRunner(
           )
           .collect(Array),
         this.bctx.unit_graph[unit].map(dep -> this.fingerprint_for(dep)),
-        this.bctx.build_config,
         if (
           unit.target.is_build_script() &&
           unit.mode is CompileModeRunBuildScript _
@@ -240,16 +235,15 @@ mutable class BuildRunner(
   }
 
   private mutable fun run_build_script(unit: Unit): BuildScriptOutput {
+    assert(unit.target.kind is CustomBuildTarget _);
+    assert(unit.mode is CompileModeRunBuildScript _);
+    build_script_unit = this.bctx.unit_graph[unit].find(u ->
+      u.mode is CompileModeBuild _ && u.target.is_build_script()
+    ).fromSome();
     cmd = ProcessBuilder::create{
       cmd => Path.join(
-        this.build_dir_for(
-          unit with {
-            arch => TargetArchHost(),
-            mode => CompileModeBuild(),
-            build_opts => unit.build_opts with {relocation_model => "static"},
-          },
-        ),
-        unit.target.name,
+        this.build_dir_for(build_script_unit),
+        build_script_unit.target.name,
       ),
     };
 
@@ -450,16 +444,9 @@ mutable class BuildRunner(
   }
 
   private readonly fun build_script_unit_for(unit: Unit): ?Unit {
-    for (dep in this.bctx.unit_graph[unit]) {
-      if (
-        dep.target.is_build_script() &&
-        dep.mode is CompileModeRunBuildScript _
-      ) {
-        return Some(dep)
-      }
-    };
-
-    None()
+    this.bctx.unit_graph[unit].find(u ->
+      u.target.is_build_script() && u.mode is CompileModeRunBuildScript _
+    )
   }
 
   private readonly fun outputs_for(unit: Unit): Array<OutputFile> {
@@ -582,21 +569,17 @@ private fun hash_of(
       dep_hashes.push(hash_of(dep, bctx, out))
     };
 
-    out.set(unit, compute_hash(unit, dep_hashes.collect(Array), bctx))
+    out.set(unit, compute_hash(unit, dep_hashes.collect(Array)))
   };
 
   out[unit]
 }
 
-private fun compute_hash(
-  unit: Unit,
-  dep_hashes: Array<Int>,
-  bctx: BuildContext,
-): Int {
+private fun compute_hash(unit: Unit, dep_hashes: Array<Int>): Int {
   (
     unit.pkg.manifest.package_id,
     dep_hashes,
-    bctx.build_config.requested_profile,
+    unit.profile,
     unit.arch,
     unit.mode,
     unit.target.name,
