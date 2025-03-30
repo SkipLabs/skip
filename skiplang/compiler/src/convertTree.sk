@@ -14,7 +14,7 @@ class Converter{file: FileCache.InputSource} {
     this.file.toString() + tree.toDebugString();
   }
 
-  // Generic functions go here so tehy aren't in the let rec
+  // Generic functions go here so they aren't in the let rec
   fun convertOpt<T>(tree: ParseTree, converter: ParseTree -> T): ?T {
     tree match {
     | ParseTree.EmptyTree _ -> None()
@@ -29,7 +29,9 @@ class Converter{file: FileCache.InputSource} {
     tree match {
     | ParseTree.ParseTreeList{elements} -> elements.map(convertElement)
     | _ ->
-      invariant_violation("Expectd parse tree list: " + this.treeToString(tree))
+      invariant_violation(
+        "Expected parse tree list: " + this.treeToString(tree),
+      )
     }
   }
 
