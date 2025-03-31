@@ -38,18 +38,36 @@ services:
   skip_follower1:
     image: reactive-hackernews/skip-follower
     build: ./skip_follower
+    environment:
+      SKIP_RESOURCE_PREFIX: 1
+    networks:
+      default:
+        aliases:
+          - skip_followers
     depends_on:
       skip_leader:
         condition: service_healthy
   skip_follower2:
     image: reactive-hackernews/skip-follower
     build: ./skip_follower
+    environment:
+      SKIP_RESOURCE_PREFIX: 2
+    networks:
+      default:
+        aliases:
+          - skip_followers
     depends_on:
       skip_leader:
         condition: service_healthy
   skip_follower3:
     image: reactive-hackernews/skip-follower
     build: ./skip_follower
+    environment:
+      SKIP_RESOURCE_PREFIX: 3
+    networks:
+      default:
+        aliases:
+          - skip_followers
     depends_on:
       skip_leader:
         condition: service_healthy
