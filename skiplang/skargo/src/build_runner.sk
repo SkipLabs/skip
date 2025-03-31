@@ -356,6 +356,9 @@ mutable class BuildRunner(
     skc.args(Array["-L", this.layout_for(unit).deps]);
 
     if (unit.target.kind is LibTarget(LibraryTypeSklib _)) {
+      skc.env("SKARGO_MANIFEST_DIR", unit.pkg.root());
+      skc.env("SKARGO_PKG_NAME", unit.pkg.name());
+      skc.env("SKARGO_PKG_VERSION", unit.pkg.version().toString());
       this.build_script_unit_for(unit) match {
       | Some(bs_unit) ->
         bs_out = this.build_script_outputs[bs_unit];
