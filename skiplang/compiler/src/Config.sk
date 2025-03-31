@@ -196,6 +196,10 @@ private class Config{
         }
       }
     };
+    // Export `main` as the main entry point if none was specified.
+    if (emit == "link" && exportAs.isEmpty()) {
+      exportAs.set("main", "skip_main")
+    };
 
     // Mac Clang seems to align stack arrays mod 16 -- is that required to always
     // keep the stack aligned or is 8 OK or what? Does Linux do that too?
