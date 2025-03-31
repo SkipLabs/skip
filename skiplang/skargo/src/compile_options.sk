@@ -8,7 +8,7 @@ const kAvailableProfiles: Array<(String, String)> = Array[
 
 class BuildConfig{
   // TODO: Support multiple requested arches (array `--target` flag).
-  requested_arch: TargetArch,
+  requested_arch: ?TargetTriple,
   requested_profile: String,
   export_dir: ?String,
   skc_extra_options: Array<String>,
@@ -27,10 +27,7 @@ fun build_config{
   skc_extra_options: Array<String>,
 }: BuildConfig {
   BuildConfig{
-    requested_arch => target_opt match {
-    | Some(t) -> TargetArchTriple(TargetTriple::fromString(t))
-    | None() -> TargetArchHost()
-    },
+    requested_arch => target_opt.map(t -> TargetTriple::fromString(t)),
     requested_profile => (release, profile_opt) match {
     | (false, None()) -> kDefaultProfile
     | (true, None())

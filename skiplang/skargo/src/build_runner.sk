@@ -64,11 +64,19 @@ mutable class BuildRunner(
 ) {
   static fun create(bctx: BuildContext): mutable BuildRunner {
     host_layout = Layout::create(bctx, "host", "dev");
-    target_layout = bctx.build_config.requested_arch match {
-    | TargetArchHost() -> host_layout
-    | TargetArchTriple(t) ->
-      Layout::create(bctx, t.toString(), bctx.build_config.requested_profile)
+    target_layout_dest = bctx.build_config.requested_arch match {
+    | None() -> "host"
+    | Some(
+      t,
+    ) if (t == bctx.target_data.target_triple_for_arch(TargetArchHost())) ->
+      "host"
+    | Some(t) -> t.toString()
     };
+    target_layout = Layout::create(
+      bctx,
+      target_layout_dest,
+      bctx.build_config.requested_profile,
+    );
     fingerprint_dir = Path.join(bctx.target_dir, ".fingerprints");
 
     hashes = mutable Map[];
@@ -211,12 +219,8 @@ mutable class BuildRunner(
       } else {
         // NOTE: While the unit is fresh, `skargo` may have been invoked with a
         // custom `--out-dir`, where we should still copy final artifacts.
-        for (output in this.outputs_for(unit)) {
-          output.export_path match {
-          | Some(dst) -> this.link_or_copy(output.path, dst)
-          | None _ -> void
-          }
-        };
+        this.prepare_unit(unit);
+        this.link_targets(unit);
         this.bctx.gctx.console.status("Fresh", unit_name)
       }
     }
