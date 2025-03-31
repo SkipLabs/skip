@@ -1,18 +1,8 @@
 fun main(): void {
-  // FIXME: This should be passed by Skargo.
-  Environ.set_var("DEBUG", "true");
-
-  profile = Environ.var("PROFILE");
   target = Environ.var("TARGET");
   host = Environ.var("HOST");
   out_dir = Environ.var("OUT_DIR");
   pic = (Environ.var("RELOCATION_MODEL") == "pic");
-
-  profile match {
-  | "release" -> Environ.set_var("OPT_LEVEL", "3")
-  | "debug" | "dev" -> Environ.set_var("OPT_LEVEL", "0")
-  | p -> invariant_violation(`Unrecognized profile ${p}`)
-  };
 
   magic_c = Path.join(out_dir, "magic.c");
   FileSystem.writeTextFile(
