@@ -96,7 +96,7 @@ private class Config{
     input_files = input_files_vec.collect(Array);
     static_libraries = static_libs_vec.collect(Array);
 
-    output = results.maybeGetString("output").default("-");
+    output = results.maybeGetString("output").default("a.out");
     emit = results.getString("emit");
     if (
       results.maybeGetString("sklib-name") is Some _ ||
@@ -195,6 +195,10 @@ private class Config{
           skipExit(1)
         }
       }
+    };
+    // Export `main` as the main entry point if none was specified.
+    if (emit == "link" && exportAs.isEmpty()) {
+      exportAs.set("main", "skip_main")
     };
 
     // Mac Clang seems to align stack arrays mod 16 -- is that required to always

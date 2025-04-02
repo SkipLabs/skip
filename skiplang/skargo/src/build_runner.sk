@@ -398,9 +398,7 @@ mutable class BuildRunner(
     | BinTarget(e)
     | TestTarget(e) ->
       skc.args(Array["--export-function-as", `${e}=skip_main`])
-    | CustomBuildTarget() ->
-      // TODO: Get rid of this once it is the default in skc.
-      skc.args(Array["--export-function-as", "main=skip_main"])
+    | CustomBuildTarget() -> void
     };
 
     this.bctx.build_config.requested_profile match {
