@@ -1035,16 +1035,13 @@ fun program(
     DefsFile::type,
     context,
     SKStore.DirName::create("/moduleMap2/"),
-    (context, writer, key, values) ~> {
+    (context, writer, moduleNameKey, values) ~> {
       SkipError.catchErrors(1, context, () -> {
         acc = values.nonEmptyReduce(
           (acc, d) -> mergeDefs(acc, d.value),
           firstDefFile -> firstDefFile.value,
         );
-        moduleName = key match {
-        | SKStore.SID(x) -> x
-        };
-        writer.set(SKStore.SID(moduleName), DefsFile(acc))
+        writer.set(moduleNameKey, DefsFile(acc))
       })
     },
   );
