@@ -1,6 +1,7 @@
 import type {
   Context,
   EagerCollection,
+  Json,
   Values,
   Resource,
   SkipService,
@@ -28,6 +29,12 @@ type Upvote = {
 };
 
 type PostWithUpvoteIds = Post & { upvotes: number[]; author: User };
+
+type PostWithUpvoteCount = Omit<Post, "author_id"> & {
+  upvotes: number;
+  upvoted: boolean;
+  author: User;
+};
 
 type Session = User & {
   user_id: number;
@@ -70,38 +77,116 @@ class PostsMapper {
   }
 }
 
-type ResourceInputs = {
+class CleanupMapper {
+  constructor(private readonly session: Session | null) {}
+
+  mapEntry(
+    key: [number, number],
+    values: Values<PostWithUpvoteIds>,
+  ): Iterable<[number, PostWithUpvoteCount]> {
+    const post = values.getUnique();
+    let upvoted;
+    if (this.session === null) upvoted = false;
+    else upvoted = post.upvotes.includes(this.session.user_id);
+    const upvotes = post.upvotes.length;
+    return [
+      [
+        key[1],
+        {
+          title: post.title,
+          url: post.url,
+          body: post.body,
+          date: post.date,
+          author: post.author,
+          upvotes,
+          upvoted,
+        },
+      ],
+    ];
+  }
+}
+
+type PostsResourceInputs = {
   postsWithUpvotes: EagerCollection<[number, number], PostWithUpvoteIds>;
   sessions: EagerCollection<string, Session>;
 };
 
-class SessionsResource implements Resource<ResourceInputs> {
-  instantiate(collections: ResourceInputs): EagerCollection<string, Session> {
-    return collections.sessions;
+type PostsResourceParams = { limit?: number; session_id?: string };
+
+class PostsResource implements Resource<PostsResourceInputs> {
+  private limit: number;
+  private session_id: string;
+
+  constructor(jsonParams: Json) {
+    const params = jsonParams as PostsResourceParams;
+    if (params.limit === undefined) this.limit = 25;
+    else this.limit = params.limit;
+    if (params.session_id === undefined)
+      throw new Error("Missing required session_id.");
+    else this.session_id = params.session_id as string;
   }
-}
-class PostsWithUpvotesResource implements Resource<ResourceInputs> {
+
   instantiate(
-    collections: ResourceInputs,
-  ): EagerCollection<[number, number], PostWithUpvoteIds> {
-    return collections.postsWithUpvotes;
+    collections: PostsResourceInputs,
+  ): EagerCollection<number, PostWithUpvoteCount> {
+    let session;
+    try {
+      session = collections.sessions.getUnique(this.session_id);
+    } catch {
+      session = null;
+    }
+    return collections.postsWithUpvotes
+      .take(this.limit)
+      .map(CleanupMapper, session);
   }
 }
 
-type ServiceInputs = {
+class FilterSessionMapper {
+  constructor(private session_id: string) {}
+
+  mapEntry(key: string, values: Values<Session>): Iterable<[number, Session]> {
+    if (key != this.session_id) return [];
+    const sessions = values.toArray();
+    if (sessions.length > 0) return [[0, sessions[0] as Session]];
+    else return [];
+  }
+}
+
+type SessionsResourceInputs = {
   sessions: EagerCollection<string, Session>;
 };
 
-export const service: SkipService<ServiceInputs, ResourceInputs> = {
+class SessionsResource implements Resource<SessionsResourceInputs> {
+  private session_id: string;
+
+  constructor(jsonParams: Json) {
+    const params = jsonParams as PostsResourceParams;
+    if (params.session_id === undefined)
+      throw new Error("Missing required session_id.");
+    else this.session_id = params.session_id as string;
+  }
+
+  instantiate(
+    collections: SessionsResourceInputs,
+  ): EagerCollection<number, Session> {
+    return collections.sessions.map(FilterSessionMapper, this.session_id);
+  }
+}
+
+type PostsServiceInputs = {
+  sessions: EagerCollection<string, Session>;
+};
+
+export const service: SkipService<PostsServiceInputs, PostsResourceInputs> = {
   initialData: {
     sessions: [],
   },
-  resources: {
-    postsWithUpvotes: PostsWithUpvotesResource,
-    sessions: SessionsResource,
-  },
+  resources: { posts: PostsResource, sessions: SessionsResource },
   externalServices: { postgres },
-  createGraph(inputs: ServiceInputs, context: Context): ResourceInputs {
+  createGraph(
+    inputs: PostsServiceInputs,
+    context: Context,
+  ): PostsResourceInputs {
     const serialIDKey = { key: { col: "id", type: "SERIAL" } };
     const posts = context.useExternalResource<number, Post>({
       service: "postgres",
