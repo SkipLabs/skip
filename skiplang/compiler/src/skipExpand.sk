@@ -3435,6 +3435,20 @@ fun expr_(
       SkipError.error(varName.i0, `Environment variable ${name} is not set.`)
     | Some(v) -> v.value
     };
+    // Record access to env variable.
+    cur_env_map = context.getGlobal(FileCache.kEnvAccessGlobal) match {
+    | None() -> SortedMap[]
+    | Some(envMapFile) -> FileCache.EnvMapFile::type(envMapFile).value
+    };
+    context.setGlobal(
+      FileCache.kEnvAccessGlobal,
+      FileCache.EnvMapFile(
+        cur_env_map.set(
+          pkg_opt,
+          cur_env_map.maybeGet(pkg_opt).default(SortedSet[]).set(name),
+        ),
+      ),
+    );
     A.Literal(A.StringLiteral(value))
   }
 }
