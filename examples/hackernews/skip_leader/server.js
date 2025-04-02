@@ -1,4 +1,4 @@
-import { runService } from "@skipruntime/server";
+import { runService, asLeader } from "@skipruntime/server";
 import { service } from "./dist/hackernews.service.js";
 
-runService(service);
+runService(asLeader(service));
