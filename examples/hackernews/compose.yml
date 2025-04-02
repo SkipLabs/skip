@@ -30,14 +30,16 @@ services:
 
   # Reactive cache
   skip_leader:
-    image: reactive-hackernews/skip-leader
-    build: ./skip_leader
+    image: reactive-hackernews/reactive-service
+    build: ./reactive_service
     depends_on:
       db:
         condition: service_healthy
+    environment:
+      SKIP_LEADER: true
   skip_follower1: &follower
-    image: reactive-hackernews/skip-follower
-    build: ./skip_follower
+    image: reactive-hackernews/reactive-service
+    build: ./reactive_service
     networks:
       default:
         aliases:
