@@ -4,7 +4,16 @@
  * @packageDocumentation
  */
 
-import { type SkipService } from "@skipruntime/core";
+import type {
+  Context,
+  EagerCollection,
+  Json,
+  NamedCollections,
+  Resource,
+  SkipService,
+} from "@skipruntime/core";
+import { SkipError } from "@skipruntime/core";
+import { SkipExternalService } from "@skipruntime/helpers";
 import { controlService, streamingService } from "./rest.js";
 import type { Express, Request, Response, NextFunction } from "express";
 import express from "express";
@@ -173,4 +182,59 @@ function no_cors(req: Request, res: Response, next: NextFunction) {
   } else {
     next();
   }
+}
+
+class LeaderResource implements Resource {
+  private collection: string;
+
+  constructor(param: Json) {
+    if (typeof param == "string") this.collection = param;
+    else
+      throw new SkipError(
+        "Followers must specify a shared collection to mirror from leader.",
+      );
+  }
+
+  instantiate(collections: NamedCollections): EagerCollection<Json, Json> {
+    if (this.collection in collections) return collections[this.collection]!;
+    throw new SkipError(
+      `Unknown shared collection in leader: ${this.collection}`,
+    );
+  }
+}
+
+export function asLeader(service: SkipService): SkipService {
+  //TODO: add mechanism to split externals between leader/follower
+  return {
+    ...service,
+    resources: { leader: LeaderResource },
+  };
+}
+
+export function asFollower(
+  service: SkipService,
+  leader: {
+    leader: { host: string; streaming_port: number; control_port: number };
+    collections: string[];
+  },
+): SkipService {
+  return {
+    ...service,
+    initialData: {},
+    externalServices: {
+      ...service.externalServices,
+      __skip_leader: SkipExternalService.direct(leader.leader),
+    },
+    createGraph(_inputs: object, context: Context): NamedCollections {
+      const mirroredCollections: NamedCollections = {};
+      for (const collection of leader.collections) {
+        mirroredCollections[collection] = context.useExternalResource({
+          service: "__skip_leader",
+          identifier: "leader",
+          params: collection,
+        });
+      }
+      return mirroredCollections;
+    },
+  };
 }
