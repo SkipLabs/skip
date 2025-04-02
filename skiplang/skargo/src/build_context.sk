@@ -101,14 +101,20 @@ fun create_bctx(
 ): BuildContext {
   resolved_packages = resolve(ws.package);
 
-  roots = generate_root_units(gctx, ws.package, opts.filter, opts.build_config);
   target_data = SkcTargetData::create(
     gctx,
     opts.build_config.requested_arch match {
-    | TargetArchHost _ -> Array[]
-    | TargetArchTriple(triple) -> Array[triple]
+    | Some(triple) -> Array[triple]
+    | None() -> Array[]
     },
     opts.build_config.skc_extra_options,
+  );
+  roots = generate_root_units(
+    gctx,
+    ws.package,
+    opts.filter,
+    opts.build_config,
+    target_data.target_triple_for_arch(TargetArchHost()),
   );
   unit_graph = build_unit_dependencies(roots, resolved_packages);
   target_dir = ws.target_dir();
@@ -128,6 +134,7 @@ private fun generate_root_units(
   package: Package,
   filter: CompileFilter,
   build_config: BuildConfig,
+  host_target_triple: TargetTriple,
 ): Array<Unit> {
   res = mutable Vector[];
 
@@ -165,7 +172,9 @@ private fun generate_root_units(
       Unit(
         package,
         target,
-        build_config.requested_arch,
+        TargetArchTriple(
+          build_config.requested_arch.default(host_target_triple),
+        ),
         build_config.requested_profile,
         CompileModeBuild(),
         UnitBuildOptions{
