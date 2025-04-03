@@ -317,7 +317,7 @@ class SelectEvaluator{
       SelectDir(filtered.dirName, this.types)
     } else {
       handle = SKStore.EHandle(
-        SKStore.Key::unTyped,
+        RowKey::keyType,
         RowValues::type,
         this.select.from[0].i0.dirName,
       );
@@ -350,7 +350,7 @@ class SelectEvaluator{
       );
       kinds = this.kinds;
       _ = filtered.map(
-        SKStore.Key::unTyped,
+        RowKey::keyType,
         RowValues::type,
         context,
         childName,
@@ -513,14 +513,15 @@ class SelectEvaluator{
       this.selectName1
     | None() ->
       if (this.select.isNoop) {
-        return SelectDir(this.select.from[0].i0.dirName, this.types)
-      };
-      resultDir = this.evalSelectTableList(
-        context,
-        List::createFromItems(this.select.from),
-        List[],
-      );
-      resultDir.dirName
+        this.select.from[0].i0.dirName
+      } else {
+        resultDir = this.evalSelectTableList(
+          context,
+          List::createFromItems(this.select.from),
+          List[],
+        );
+        resultDir.dirName
+      }
     | Some(_) ->
       if (!this.select.rest.isEmpty()) {
         invariant_violation("Unexpected select type for aggregate function")
