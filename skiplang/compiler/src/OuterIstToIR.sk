@@ -937,7 +937,7 @@ class Converter private (
   program: I.Program,
   private ptrBitSize: Int,
   private funs: SKStore.LHandle<LazyGFunKey, GFunctionFile>,
-  private classes: SKStore.LHandle<SKStore.Key, GClassFile>,
+  private classes: SKStore.LHandle<LazyGClassKey, GClassFile>,
   lower: SKStore.LHandle<SKStore.Key, I.CallableDefFile>,
 ) {
   fun getConsts(
@@ -962,7 +962,7 @@ class Converter private (
     );
     classDirName = name.sub("classes");
     classes = SKStore.LHandle(
-      SKStore.Key::unTyped,
+      LazyGClassKey::keyType,
       GClassFile::type,
       classDirName,
     );
@@ -982,7 +982,7 @@ class Converter private (
       false,
     );
     _ = SKStore.LHandle::create(
-      SKStore.Key::unTyped,
+      LazyGClassKey::keyType,
       GClassFile::type,
       context,
       classDirName,
@@ -1022,7 +1022,7 @@ class Converter private (
 
   private fun getGFunctionFun(
     context: mutable SKStore.Context,
-    _self: SKStore.LHandle<SKStore.Key, GFunctionFile>,
+    _self: SKStore.LHandle<LazyGFunKey, GFunctionFile>,
     key: LazyGFunKey,
   ): Array<GFunctionFile> {
     file = GFunctionFile(key.value.compile(context, this));
@@ -1039,12 +1039,11 @@ class Converter private (
 
   private fun getGClassImplFun(
     context: mutable SKStore.Context,
-    _self: SKStore.LHandle<SKStore.Key, GClassFile>,
-    key: SKStore.Key,
+    _self: SKStore.LHandle<LazyGClassKey, GClassFile>,
+    key: LazyGClassKey,
   ): Array<GClassFile> {
     gid = key match {
     | LazyGClassKey(x) -> x
-    | _ -> invariant_violation("Unexpected key type")
     };
     value = Array[
       GClassFile(
