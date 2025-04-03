@@ -935,9 +935,9 @@ class GClassFile(value: GClass) extends SKStore.File
 // Manages the overall conversion from OuterIst to IR.
 class Converter private (
   program: I.Program,
-  ptrBitSize: Int,
-  funs: SKStore.LHandle<SKStore.Key, GFunctionFile>,
-  classes: SKStore.LHandle<SKStore.Key, GClassFile>,
+  private ptrBitSize: Int,
+  private funs: SKStore.LHandle<SKStore.Key, GFunctionFile>,
+  private classes: SKStore.LHandle<SKStore.Key, GClassFile>,
   lower: SKStore.LHandle<SKStore.Key, I.CallableDefFile>,
 ) {
   fun getConsts(
@@ -1020,7 +1020,7 @@ class Converter private (
     this.getGFunctionFun(context, this.funs, LazyGFunKey(lazy))[0].value
   }
 
-  fun getGFunctionFun(
+  private fun getGFunctionFun(
     context: mutable SKStore.Context,
     _self: SKStore.LHandle<SKStore.Key, GFunctionFile>,
     key: SKStore.Key,
@@ -1176,7 +1176,7 @@ class Converter private (
     Some((kGetClassMethodName, GMethodDef{function, tparams => Array[], pos}))
   }
 
-  fun finishGClass(
+  private fun finishGClass(
     context: mutable SKStore.Context,
     orig: GClass,
     addInspect: Bool = true,
@@ -1241,7 +1241,7 @@ class Converter private (
   }
 
   // Returns the GClassKind, if known.
-  fun getGClassKind(
+  private fun getGClassKind(
     context: mutable SKStore.Context,
     ref: LazyGClass,
   ): GClassKind {
@@ -1273,7 +1273,7 @@ class Converter private (
     }
   }
 
-  fun getMetaClass(
+  private fun getMetaClass(
     context: mutable SKStore.Context,
     lazyGClass: LazyGClass,
     g: ?GClass = None(),
@@ -1292,7 +1292,7 @@ class Converter private (
     }
   }
 
-  fun allocTparams(prefix: String, count: Int): Array<GTparam> {
+  private fun allocTparams(prefix: String, count: Int): Array<GTparam> {
     Array::fillBy(count, i -> {
       name = "T" + i;
       GTparam(prefix + name, name)
@@ -1350,7 +1350,7 @@ class Converter private (
   // along with the GTapplys it extends, applied to the original's targs.
   // (We can assume this targ congruence for closure classes.)
   // Note: not transitive - we depend on being called on parents before kids.
-  fun flattenClosureClassExtends(
+  private fun flattenClosureClassExtends(
     context: mutable SKStore.Context,
     extends_: Array<GTapply>,
     pos: FileRange,
@@ -2052,7 +2052,7 @@ class Converter private (
     }
   }
 
-  fun makeGFunType{
+  private fun makeGFunType{
     context: mutable SKStore.Context,
     paramTypes: Parameters<I.Type>,
     returnType: I.Type,
@@ -2175,17 +2175,17 @@ class Converter private (
     types.collect(Array).map(t -> this.convertType(context, t))
   }
 
-  fun convertTypeParameter(in_: I.TypeParameter): GTparam {
+  private fun convertTypeParameter(in_: I.TypeParameter): GTparam {
     GTparam(in_.id, in_.name.id)
   }
 
-  fun convertTypeParameters<T: Sequence<I.TypeParameter>>(
+  private fun convertTypeParameters<T: Sequence<I.TypeParameter>>(
     tparams: T,
   ): Array<GTparam> {
     tparams.collect(Array).map(this.convertTypeParameter)
   }
 
-  fun convertFields(
+  private fun convertFields(
     context: mutable SKStore.Context,
     fields: Array<I.Parameter>,
   ): Array<GField> {
@@ -2201,7 +2201,7 @@ class Converter private (
     })
   }
 
-  fun convertExtends(
+  private fun convertExtends(
     context: mutable SKStore.Context,
     in_: I.ClassDef,
     parentMutability: Mutability,
@@ -2480,7 +2480,7 @@ class Converter private (
     function
   }
 
-  fun convertMethodDef(
+  private fun convertMethodDef(
     context: mutable SKStore.Context,
     in_: I.MethodDef,
     physicalClassName: GClassName,
@@ -2611,7 +2611,7 @@ class Converter private (
     )
   }
 
-  fun convertConstDef(
+  private fun convertConstDef(
     context: mutable SKStore.Context,
     in_: I.ConstDef,
   ): ConstLazyGFun {
