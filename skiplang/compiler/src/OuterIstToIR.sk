@@ -938,7 +938,7 @@ class Converter private (
   private ptrBitSize: Int,
   private funs: SKStore.LHandle<LazyGFunKey, GFunctionFile>,
   private classes: SKStore.LHandle<LazyGClassKey, GClassFile>,
-  lower: SKStore.LHandle<SKStore.Key, I.CallableDefFile>,
+  lower: SKStore.LHandle<I.CallableDefFile, I.CallableDefFile>,
 ) {
   fun getConsts(
     context: mutable SKStore.Context,
@@ -968,7 +968,7 @@ class Converter private (
     );
     lowerDirName: SKStore.DirName = SKStore.DirName::create("/lowerDefs/");
     lower = SKStore.LHandle(
-      SKStore.Key::unTyped,
+      I.CallableDefFile::keyType,
       I.CallableDefFile::type,
       lowerDirName,
     );
@@ -990,14 +990,13 @@ class Converter private (
       false,
     );
     _ = SKStore.LHandle::create(
-      SKStore.Key::unTyped,
+      I.CallableDefFile::keyType,
       I.CallableDefFile::type,
       context,
       lowerDirName,
-      (context, _, key) ~> {
+      (context, _self, key) ~> {
         def = key match {
         | I.CallableDefFile(x) -> x
-        | _ -> invariant_violation("Unexpected key type")
         };
         lowered = def.lower(context, program);
         if (shouldDebugSymbol(def.getName())) {
