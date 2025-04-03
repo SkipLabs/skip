@@ -263,7 +263,7 @@ mutable class BuildRunner(
       FileSystem.realpath(Path.join(this.build_dir_for(unit), "out")),
     );
     cmd.env("NAME", unit.pkg.name());
-    cmd.env("PROFILE", this.bctx.build_config.requested_profile);
+    cmd.env("PROFILE", unit.profile);
     cmd.env(
       "VERBOSE",
       (this.bctx.gctx.console.verbosity >= VerbosityVerbose()).toString(),
@@ -404,7 +404,8 @@ mutable class BuildRunner(
     | CustomBuildTarget() -> void
     };
 
-    this.bctx.build_config.requested_profile match {
+    // TODO: Proper Profile class.
+    unit.profile match {
     | "release" -> skc.arg("-O2")
     | "debug" | "dev" -> skc.arg("-O0")
     | _ -> invariant_violation("unreachable")
