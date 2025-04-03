@@ -89,11 +89,11 @@ class Program private (program: SKStore.EHandle<SKStore.SID, DefFile>) {
       context,
       SKStore.DirName::create("/funsDefsProj/"),
       (_context, writer, _, files) ~> {
-        result = files.first.value match {
-        | OuterIst.DFun(funDef) -> Array[FunDefFile(funDef)]
-        | _ -> Array[]
-        };
-        writer.setArray(SKStore.IID(0), result);
+        files.first.value match {
+        | OuterIst.DFun(funDef) ->
+          writer.setArray(SKStore.IID(0), Array[FunDefFile(funDef)])
+        | _ -> void
+        }
       },
     )
   }
