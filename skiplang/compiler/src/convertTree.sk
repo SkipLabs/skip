@@ -14,7 +14,7 @@ class Converter{file: FileCache.InputSource} {
     this.file.toString() + tree.toDebugString();
   }
 
-  // Generic functions go here so tehy aren't in the let rec
+  // Generic functions go here so they aren't in the let rec
   fun convertOpt<T>(tree: ParseTree, converter: ParseTree -> T): ?T {
     tree match {
     | ParseTree.EmptyTree _ -> None()
@@ -29,7 +29,9 @@ class Converter{file: FileCache.InputSource} {
     tree match {
     | ParseTree.ParseTreeList{elements} -> elements.map(convertElement)
     | _ ->
-      invariant_violation("Expectd parse tree list: " + this.treeToString(tree))
+      invariant_violation(
+        "Expected parse tree list: " + this.treeToString(tree),
+      )
     }
   }
 
@@ -705,6 +707,8 @@ class Converter{file: FileCache.InputSource} {
       this.convertForEachFunctionMacro(this.convertRange(range), params, body)
     | ParseTree.LogMacroTree{range, params} ->
       this.convertLogMacro(this.convertRange(range), params)
+    | ParseTree.EnvMacroTree{range, varName} ->
+      this.convertEnvMacro(this.convertRange(range), varName)
     | _ ->
       invariant_violation("Unexpected expression: " + this.treeToString(tree))
     }
@@ -874,6 +878,13 @@ class Converter{file: FileCache.InputSource} {
       this.convertExpression(args[0]),
       Array[],
       Positional(Array[(0, this.convertExpression(args[1])), (1, metadata)]),
+    )
+  }
+
+  fun convertEnvMacro(_range: FileRange, varName: ParseTree): SkipAst.Expr_ {
+    SkipAst.EnvMacro(
+      this.createName(varName, varName.getToken().stringLiteralValue()),
+      this.file.pkg_opt,
     )
   }
 

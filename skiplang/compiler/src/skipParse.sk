@@ -163,7 +163,8 @@ fun writeFiles(
         FileSystem.readTextFile(src)
       },
       make_input_source_path,
-    )
+    );
+    updatePackageEnv(context, lib_name_opt, Environ.vars().collect(Array));
   };
 
   // For each (transitive) dependency, invalidate files that were
@@ -188,7 +189,8 @@ fun writeFiles(
         dep_meta.sources.find(f -> f.i0 == src).fromSome().i2
       },
       make_input_source_path,
-    )
+    );
+    updatePackageEnv(context, Some(dep_name), dep_meta.env)
   };
 
   if (lib_name_opt is Some _) {
@@ -202,6 +204,43 @@ fun writeFiles(
     )
   }
 }
+
+fun updatePackageEnv(
+  context: mutable SKStore.Context,
+  pkg_opt: ?String,
+  env: Array<(String, String)>,
+): void {
+  envDirName = SKStore.DirName::create(
+    `/packageEnv/${pkg_opt.default("_default")}/`,
+  );
+  envDir = context.unsafeMaybeGetEagerDir(envDirName) match {
+  | Some _ ->
+    SKStore.EHandle(SKStore.SID::keyType, SKStore.StringFile::type, envDirName)
+  | None _ ->
+    context.mkdir(SKStore.SID::keyType, SKStore.StringFile::type, envDirName)
+  };
+  previousEnvKeys = SortedSet::createFromIterator(
+    envDir.items(context).map(kv -> SKStore.SID::keyType(kv.i0).value),
+  );
+  seenEnvKeys = SortedSet[];
+  for ((key, value) in env) {
+    envDir.writeArray(
+      context,
+      SKStore.SID(key),
+      Array[SKStore.StringFile(value)],
+    );
+    !seenEnvKeys = seenEnvKeys.set(key);
+  };
+  for (key in previousEnvKeys.difference(seenEnvKeys)) {
+    envDir.writeArray(context, SKStore.SID(key), Array[])
+  };
+}
+
+const kEnvAccessGlobal: String = "ACCESSED_ENV_MAP";
+
+class EnvMapFile(
+  value: SortedMap<?String, SortedSet<String>>,
+) extends SKStore.File
 
 module end;
 

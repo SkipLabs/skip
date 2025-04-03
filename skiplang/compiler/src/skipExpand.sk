@@ -1245,7 +1245,7 @@ fun definition(
 }
 
 /* Classes marked 'native' get a native constructor
- * TODO move the native keyword to cosntructor/field list position
+ * TODO move the native keyword to constructor/field list position
  */
 fun setNativeConstructor(cd: A.Class_def): A.Class_def {
   (cd.native_, cd.params) match {
@@ -1733,7 +1733,8 @@ fun malias_expr_(
   k = ex -> malias_expr(context, env, ex);
   e match {
   | A.Literal _
-  | A.Var _ ->
+  | A.Var _
+  | A.EnvMacro _ ->
     e
   | A.MacroVar _ ->
     report_macro_usage(env, pos);
@@ -2220,7 +2221,8 @@ fun ext_class_tparams_expr_(
   e match {
   | A.Literal _
   | A.Var _
-  | A.MacroVar _ ->
+  | A.MacroVar _
+  | A.EnvMacro _ ->
     e
   | A.Seq(e1, e2) -> A.Seq(k(e1), k(e2))
   | A.If(e1, e2, e3) -> A.If(k(e1), k(e2), k(e3))
@@ -3420,6 +3422,34 @@ fun expr_(
       functionName,
       expr(context, env, body),
     )
+  | A.EnvMacro(varName, pkg_opt) ->
+    pkg_env = SKStore.EHandle(
+      SKStore.SID::keyType,
+      SKStore.StringFile::type,
+      // FIXME: Ensure package names cannot start with an underscore to avoid clash with `_default`.
+      SKStore.DirName::create(`/packageEnv/${pkg_opt.default("_default")}/`),
+    );
+    name = varName.i1;
+    value = pkg_env.maybeGet(context, SKStore.SID(name)) match {
+    | None() ->
+      SkipError.error(varName.i0, `Environment variable ${name} is not set.`)
+    | Some(v) -> v.value
+    };
+    // Record access to env variable.
+    cur_env_map = context.getGlobal(FileCache.kEnvAccessGlobal) match {
+    | None() -> SortedMap[]
+    | Some(envMapFile) -> FileCache.EnvMapFile::type(envMapFile).value
+    };
+    context.setGlobal(
+      FileCache.kEnvAccessGlobal,
+      FileCache.EnvMapFile(
+        cur_env_map.set(
+          pkg_opt,
+          cur_env_map.maybeGet(pkg_opt).default(SortedSet[]).set(name),
+        ),
+      ),
+    );
+    A.Literal(A.StringLiteral(value))
   }
 }
 

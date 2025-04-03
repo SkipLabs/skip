@@ -1942,6 +1942,17 @@ fun printTree(ctx: Context, t: ParseTree): Doc {
   | ParseTree.LogMacroTree{keyword, params} ->
     Doc.Group(Doc.Concat[print(ctx, keyword), Doc.space, print(ctx, params)])
 
+  | ParseTree.EnvMacroTree{envKeyword, openParen, varName, closeParen} ->
+    Doc.Group(
+      Doc.Concat[
+        print(ctx, envKeyword),
+        Doc.space,
+        print(ctx, openParen),
+        print(ctx, varName),
+        print(ctx, closeParen),
+      ],
+    )
+
   | ParseTree.ErrorTree{value} -> Doc.Str(value)
 
   | ParseTree.ParseTreeList _ ->

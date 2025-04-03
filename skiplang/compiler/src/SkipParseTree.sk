@@ -1649,6 +1649,58 @@ class LogMacroTree{
   }
 }
 
+class EnvMacroTree{
+  envKeyword: ParseTree.ParseTree,
+  openParen: ParseTree.ParseTree,
+  varName: ParseTree.ParseTree,
+  closeParen: ParseTree.ParseTree,
+} extends ParseTree.ParseTree {
+  fun getNamedFields(): List<(String, ParseTree.ParseTree)> {
+    List<(String, ParseTree.ParseTree)>[
+      ("envKeyword", this.envKeyword),
+      ("openParen", this.openParen),
+      ("varName", this.varName),
+      ("closeParen", this.closeParen),
+    ];
+  }
+
+  fun getKind(): String {
+    "EnvMacro";
+  }
+
+  fun getChildren(): mutable Iterator<ParseTree.ParseTree> {
+    yield this.envKeyword;
+    yield this.openParen;
+    yield this.varName;
+    yield this.closeParen;
+    yield break;
+  }
+
+  fun transform(
+    codemod: mutable CodeMod,
+  ): (ParseTree.ParseTree, Vector<Subst>) {
+    tx_envKeyword = codemod.transform(this.envKeyword);
+    tx_openParen = codemod.transform(this.openParen);
+    tx_varName = codemod.transform(this.varName);
+    tx_closeParen = codemod.transform(this.closeParen);
+    (
+      EnvMacroTree{
+        range => this.range,
+        envKeyword => tx_envKeyword.i0,
+        openParen => tx_openParen.i0,
+        varName => tx_varName.i0,
+        closeParen => tx_closeParen.i0,
+      },
+      Vector[
+        tx_envKeyword.i1,
+        tx_openParen.i1,
+        tx_varName.i1,
+        tx_closeParen.i1,
+      ].flatten(),
+    );
+  }
+}
+
 class ForEachKeyValueTree{
   key: ParseTree.ParseTree,
   fatArrow: ParseTree.ParseTree,
