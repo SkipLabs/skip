@@ -1,4 +1,22 @@
-import { runService } from "@skipruntime/server";
+import { runService, asFollower, asLeader } from "@skipruntime/server";
 import { service } from "./dist/hackernews.service.js";
 
-runService(service);
+if (process.env["SKIP_LEADER"] == "true") {
+  console.log("Running as leader...");
+  runService(asLeader(service));
+} else if (process.env["SKIP_FOLLOWER"] == "true") {
+  console.log("Running as follower...");
+  runService(
+    asFollower(service, {
+      leader: {
+        host: "skip_leader",
+        streaming_port: 8080,
+        control_port: 8081,
+      },
+      collections: ["postsWithUpvotes", "sessions"],
+    }),
+  );
+} else {
+  console.log("Running non-distributed...")
+  runService(service)
+}

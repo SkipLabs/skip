@@ -72,7 +72,7 @@ These external services are provided in Skip framework packages for convenience 
 One common use case for Skip is to reactively update and push results in response to updates in a relational database.
 Skip makes this easy for PostgreSQL users, providing an adapter `PostgresExternalService` that can subscribe to updates from a Postgres database and expose them as an eager collection within your Skip reactive logic.
 
-A complete example is available [here](https://github.com/SkipLabs/skip/tree/main/examples/hackernews/reactive_service); a basic usage is to specify a Skip service with a Postgres external service, i.e.
+A complete example is available [here](https://github.com/SkipLabs/skip/tree/main/examples/hackernews/skip_leader); a basic usage is to specify a Skip service with a Postgres external service, i.e.
 
 ```typescript
 const service = {
