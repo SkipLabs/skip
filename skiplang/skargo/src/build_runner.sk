@@ -18,7 +18,9 @@ class BuildScriptOutput{
   preambles: Array<String>,
   /// Extra generated (skip) source files.
   extra_sources: Array<String>,
-  // /// Paths to trigger a rerun of this build script.
+  /// Environment variables to set when invoking `skc`.
+  env: Array<(String, String)>,
+  /// Paths to trigger a rerun of this build script.
   rerun_if_changed: Array<String>,
   // /// Environment variables which, when changed, will cause a rebuild.
   // rerun_if_env_changed: Array<String>,
@@ -28,6 +30,7 @@ class BuildScriptOutput{
     link_args = mutable Vector[];
     preambles = mutable Vector[];
     extra_sources = mutable Vector[];
+    env = mutable Vector[];
     rerun_if_changed = mutable Vector[];
     for (line in stdout.split("\n")) {
       if (!line.startsWith("skargo:")) continue;
@@ -37,6 +40,7 @@ class BuildScriptOutput{
       | "skc-link-arg" -> link_args.push(arg)
       | "skc-preamble" -> preambles.push(arg)
       | "skc-extra-source" -> extra_sources.push(arg)
+      | "skc-env" -> env.push(arg.splitFirst("="))
       | "rerun-if-changed" -> rerun_if_changed.push(arg)
       | s -> // TODO: Proper error propagation.
         invariant_violation(`Unrecognized build script directive: ${s}`)
@@ -48,6 +52,7 @@ class BuildScriptOutput{
       link_args => link_args.collect(Array),
       preambles => preambles.collect(Array),
       extra_sources => extra_sources.collect(Array),
+      env => env.collect(Array),
       rerun_if_changed => rerun_if_changed.collect(Array),
     }
   }
@@ -366,7 +371,8 @@ mutable class BuildRunner(
         skc.args(bs_out.libraries);
         if (!bs_out.link_args.isEmpty()) {
           skc.args(Array[`--link-args`, bs_out.link_args.join(" ")])
-        }
+        };
+        bs_out.env.each(kv -> skc.env(kv.i0, kv.i1))
       | None() -> void
       }
     };
