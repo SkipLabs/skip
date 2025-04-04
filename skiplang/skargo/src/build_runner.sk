@@ -270,6 +270,15 @@ mutable class BuildRunner(
     cmd.env("NAME", unit.pkg.name());
     cmd.env("PROFILE", unit.profile);
     cmd.env(
+      "OPT_LEVEL",
+      unit.profile match {
+      | "release" -> "3"
+      | "debug" | "dev" -> "0"
+      | p -> invariant_violation(`Unrecognized profile ${p}`)
+      },
+    );
+    cmd.env("DEBUG", (unit.profile != "release").toString());
+    cmd.env(
       "VERBOSE",
       (this.bctx.gctx.console.verbosity >= VerbosityVerbose()).toString(),
     );
