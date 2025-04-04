@@ -1,15 +1,6 @@
 fun main(): void {
-  Environ.set_var("DEBUG", "true");
-
-  profile = Environ.var("PROFILE");
   target = Environ.var("TARGET");
   isWasm32 = target.startsWith("wasm32");
-
-  profile match {
-  | "release" -> Environ.set_var("OPT_LEVEL", "3")
-  | "debug" | "dev" -> Environ.set_var("OPT_LEVEL", "0")
-  | p -> invariant_violation(`Unrecognized profile ${p}`)
-  };
 
   if (!isWasm32) {
     src = "extern/src/date.c";
