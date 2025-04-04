@@ -5,7 +5,7 @@ import { service } from "./dist/hackernews.service.js";
 if (process.env["SKIP_LEADER"] == "true") {
   console.log("Running as leader...");
   runService(asLeader(service));
-} else {
+} else if (process.env["SKIP_FOLLOWER"] == "true") {
   console.log("Running as follower...");
   runService(
     asFollower(service, {
@@ -17,4 +17,7 @@ if (process.env["SKIP_LEADER"] == "true") {
       collections: ["postsWithUpvotes", "sessions"],
     }),
   );
+} else {
+  console.log("Running non-distributed...");
+  runService(service);
 }
