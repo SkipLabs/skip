@@ -259,17 +259,10 @@ fun getOrInitializeBackend(
             `/packageEnv/${conf.lib_name.default("_default")}/`,
           ),
         );
-        env = SortedMap::createFromItems(
+        env = SortedMap::createFromIterator(
           accessed_env_vars
-            .map(v ->
-              (
-                v,
-                SKStore.StringFile::type(
-                  env_dir.unsafeGetArray(context, SKStore.SID(v))[0],
-                ).value,
-              )
-            )
-            .collect(Array),
+            .map(v -> (v, env_dir.unsafeGet(context, SKStore.SID(v)).value))
+            .iterator(),
         );
         compile_sklib(conf, env);
         return void
