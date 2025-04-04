@@ -9,7 +9,7 @@ services:
     depends_on:
       www:
         condition: service_healthy
-      skip_leader:
+      reactive_service:
         condition: service_healthy
 
   # Web application
@@ -28,35 +28,13 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
-  # Reactive cache
-  skip_leader:
+  # Reactive service
+  reactive_service:
     image: reactive-hackernews/reactive-service
     build: ./reactive_service
     depends_on:
       db:
         condition: service_healthy
-    environment:
-      SKIP_LEADER: true
-  skip_follower1: &follower
-    image: reactive-hackernews/reactive-service
-    build: ./reactive_service
-    networks:
-      default:
-        aliases:
-          - skip_followers
-    depends_on:
-      skip_leader:
-        condition: service_healthy
-    environment:
-      SKIP_RESOURCE_PREFIX: follower1
-  skip_follower2:
-    <<: *follower
-    environment:
-      SKIP_RESOURCE_PREFIX: follower2
-  skip_follower3:
-    <<: *follower
-    environment:
-      SKIP_RESOURCE_PREFIX: follower3
 
   # Front-end
   www:
