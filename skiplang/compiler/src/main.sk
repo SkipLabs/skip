@@ -94,7 +94,10 @@ fun main(): void {
   };
 
   if (results.getBool("version")) {
-    print_string(getBuildVersion());
+    pkg_name = #env ("SKARGO_PKG_NAME");
+    pkg_version = #env ("SKARGO_PKG_VERSION");
+    git_commit = #env ("GIT_COMMIT_HASH");
+    print_string(`${pkg_name} ${pkg_version} (${git_commit})`);
     skipExit(0);
   };
 
