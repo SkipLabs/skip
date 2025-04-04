@@ -36,18 +36,25 @@ const service = {
 }
 ```
 
-Then, anywhere in that service, you can pull in a database table as a Skip collection by specifying a table name and a column to use as the key of the collection, e.g. as follows for a table with schema `CREATE TABLE t (id SERIAL PRIMARY KEY, value TEXT)`.
+Then, anywhere in that service, you can pull in a database table as a Skip collection by specifying a table name and a column to use as the key of the collection.
+For example, given a PostgreSQL table `my_table` with schema
+
+```sql
+CREATE TABLE my_table (id SERIAL PRIMARY KEY, value TEXT);
+```
+
+we can use it as a collection `myTable` in a Skip reactive service as follows.
 
 ```typescript
-const t: EagerCollection<number, { id: number, value: string }> =
+const myTable: EagerCollection<number, { id: number, value: string }> =
   context.useExternalResource({
     service: "postgres",
-    identifier: "t",
+    identifier: "my_table",
     params: { key: { col: "id", type: "SERIAL" } },
   });
 ```
 
-Under the hood, Skip will maintain this collection up-to-date by watching the database for changes to `t`; within your Skip service, you can define arbitrary reactive computations mapping over and accessing `t`, which will update incrementally the same as any other Skip collection.
+Under the hood, Skip will maintain this collection up-to-date by watching the database for changes to `my_table`; the collection `myTable` will update incrementally the same as any other Skip collection and can be used in reactive computations combining multiple tables or any other Skip collection.
 
 Note that, although the `key` column specified here is the primary key column `id` of the table, it need not be a primary key or even unique -- it can be convenient to use a foreign key or other column to group multiple rows per key in the resulting Skip collection.
 
@@ -116,7 +123,7 @@ This [`PolledExternalService`](https://skiplabs.io/docs/api/helpers/classes/Poll
 
 Of course, polling necessarily introduces some latency in the reactive service: data can become stale between polls.
 On the other hand, increasing the request frequency can place undue load on the target non-reactive API.
-As such, care should be taken when setting up a polled dependency to choose a reasonable interval, and where possible polling should be avoided in favor of proper reactive updates.
+As such, care should be taken when setting up a polled dependency to choose a reasonable interval, and where possible polling should be avoided in favor of genuinely reactive updates.
 
 
 ## What's next?
