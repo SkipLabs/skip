@@ -203,6 +203,13 @@ class LeaderResource implements Resource {
   }
 }
 
+/**
+ * Run a `SkipService` as the *leader* in a leader-follower topology.
+ *
+ * Instead of running a `service` on one machine, it can be distributed across multiple in a leader-follower architecture, with one "leader" maintaining the shared computation graph and one or more "followers" across which client-requested resource instances are distributed.
+ *
+ * @returns The *leader* component to run `service` in such a configuration.
+ */
 export function asLeader(service: SkipService): SkipService {
   //TODO: add mechanism to split externals between leader/follower
   return {
@@ -211,6 +218,13 @@ export function asLeader(service: SkipService): SkipService {
   };
 }
 
+/**
+ * Run a `SkipService` as a *follower* in a leader-follower topology.
+ *
+ * Instead of running a `service` on one machine, it can be distributed across multiple in a leader-follower architecture, with one "leader" maintaining the shared computation graph and one or more "followers" across which client-requested resource instances are distributed.
+ *
+ * @returns The *follower* component to run `service` in such a configuration, given the leader's address and the names of the shared computation graph collections to be mirrored from it (typically the `ResourceInputs` of `service`).
+ */
 export function asFollower(
   service: SkipService,
   leader: {
