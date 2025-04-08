@@ -1154,7 +1154,7 @@ class SelectEvaluator{
 
     remainingTables match {
     | List.Nil() ->
-      this.evalSelectRow(context, qkind, key, evaluator, mwriter, repeat)
+      this.evalSelectRow(context, qkind, evaluator, mwriter, repeat)
 
     | _ ->
       this.evalSelectCross(
@@ -1220,7 +1220,6 @@ class SelectEvaluator{
   fun evalSelectRow(
     context: mutable SKStore.Context,
     qkind: ?(Int, QueryKind),
-    _inputKey: SKStore.Key,
     evaluator: SKDB.ExprEvaluator,
     writer: mutable MultiWriter,
     repeat: Int,
