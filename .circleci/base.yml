@@ -1,20 +1,34 @@
 version: 2.1
 
 commands:
-  setup:
-    description: "Setup skip toolchain"
+  custom-checkout:
+    description: "Shallow checkout code"
+    parameters:
+      submodules:
+        type: boolean
+        default: false
     steps:
       - run:
-          name: Fetch submodules
+          name: Shallow checkout code
           command: |
-            git submodule update --init --recursive
+            if [ -z "$CIRCLE_BRANCH" ] || [ -n "$CIRCLE_TAG" ]; then echo "TODO: handle no-branch or tag-triggered CI"; exit 1; fi
+            mkdir -p ~/.ssh
+            echo 'github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=
+            github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=
+            github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+            ' > ~/.ssh/known_hosts
+            cat $CHECKOUT_KEY > ~/.ssh/id_rsa
+            clone_args=(--depth=1 --branch "$CIRCLE_BRANCH")
+            if << parameters.submodules >>; then clone_args+=(--shallow-submodules --recurse-submodules); fi
+            git clone "${clone_args[@]}" "$CIRCLE_REPOSITORY_URL" .
+            git reset --hard "$CIRCLE_SHA1"
 
 jobs:
   fast-checks:
     docker:
       - image: skiplabs/skip:latest
     steps:
-      - checkout
+      - custom-checkout
       - run:
           name: Check code is formatted
           command: |
@@ -28,8 +42,8 @@ jobs:
     docker:
       - image: skiplabs/skip:latest
     steps:
-      - checkout
-      - setup
+      - custom-checkout:
+          submodules: true
       - run:
           name: Typecheck and lint typescript sources
           command: SKIPRUNTIME=$(pwd)/build/skipruntime npm install && npm run build && npm run lint
@@ -39,8 +53,8 @@ jobs:
       - image: skiplabs/skiplang:latest
     resource_class: xlarge
     steps:
-      - checkout
-      - setup
+      - custom-checkout:
+          submodules: true
       - run:
           name: Run compiler tests
           no_output_timeout: 30m
@@ -55,8 +69,8 @@ jobs:
     docker:
       - image: skiplabs/skdb-base:latest
     steps:
-      - checkout
-      - setup
+      - custom-checkout:
+          submodules: true
       - run:
           name: Run native skdb tests
           command: |
@@ -66,8 +80,8 @@ jobs:
     docker:
       - image: skiplabs/skdb-base:latest
     steps:
-      - checkout
-      - setup
+      - custom-checkout:
+          submodules: true
       - run:
           name: Run wasm skdb tests
           no_output_timeout: 15m
@@ -84,8 +98,8 @@ jobs:
       dir:
         type: string
     steps:
-      - checkout
-      - setup
+      - custom-checkout:
+          submodules: true
       - run:
           name: Build << parameters.dir >>
           command: |
@@ -98,8 +112,8 @@ jobs:
       dir:
         type: string
     steps:
-      - checkout
-      - setup
+      - custom-checkout:
+          submodules: true
       - run:
           name: Run << parameters.dir >> tests
           command: |
@@ -128,8 +142,8 @@ jobs:
           KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "0@localhost:9093"
           KAFKA_CFG_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
     steps:
-      - checkout
-      - setup
+      - custom-checkout:
+          submodules: true
       - run:
           name: Run wasm skip runtime tests
           no_output_timeout: 10m
@@ -143,8 +157,8 @@ jobs:
     docker:
       - image: cimg/base:2025.01
     steps:
-      - checkout
-      - setup
+      - custom-checkout:
+          submodules: true
       - setup_remote_docker
       - run:
           name: Build hackernews docker images
