@@ -4,23 +4,23 @@ module SKStore;
 
 fun sumDir<U: File>(
   context: mutable Context,
-  dir: EHandle<SKStore.Key, U>,
+  dir: EHandle<IID, U>,
   proj: Array<U> ~> Int,
   diffName: String,
   name: String,
 ): EHandle<SKStore.IID, IntFile> {
-  diffCountDirName = DirName::create(dir.dirName.toString() + diffName + "/");
-  countDirName = DirName::create(dir.dirName.toString() + name + "/");
+  diffCountDirName = dir.dirName.sub(diffName);
+  countDirName = dir.dirName.sub(name);
   SKStore.EagerDir::apply(
     context,
     dir.dirName,
     diffCountDirName,
     (context, writer, key, newValuesIter) ~> {
       newValues = newValuesIter.collect(Array);
-      preDiffOpt = EHandle(dir.keyType, dir.type, dir.dirName).pre(context);
+      preDiffOpt = dir.pre(context);
       oldValues = preDiffOpt match {
       | None() -> Array[]
-      | Some(preDir) -> preDir.getArray(context, key)
+      | Some(preDir) -> preDir.getArray(context, IID::keyType(key))
       };
       oldCount = if (oldValues.size() == 0) 0 else proj(oldValues);
       newCount = if (newValues.size() == 0) 0 else {
@@ -70,7 +70,7 @@ fun testCount(): void {
 
     sinput = SKStore.DirName::create("/sinput/");
     dirSInput = context.mkdir(
-      SKStore.Key::unTyped,
+      SKStore.IID::keyType,
       SKStore.StringFile::type,
       sinput,
       inputFiles.items().collect(Array),
@@ -91,7 +91,7 @@ fun testCount(): void {
 
     sumInput = SKStore.DirName::create("/sumInput/");
     dirSumInput = context.mkdir(
-      SKStore.Key::unTyped,
+      SKStore.IID::keyType,
       SKStore.StringFile::type,
       sumInput,
       inputSumFiles.items().collect(Array),
