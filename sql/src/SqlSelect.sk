@@ -547,7 +547,7 @@ class SelectEvaluator{
         | Some(entry) -> entry
         | None() ->
           _dir = context.mkdir(
-            SKStore.IID::keyType,
+            SKStore.UnitID::keyType,
             Row::type,
             this.selectName1,
           );
@@ -563,14 +563,14 @@ class SelectEvaluator{
         ) match {
         | Some(row) ->
           _dir = context.mkdir(
-            SKStore.IID::keyType,
+            SKStore.UnitID::keyType,
             Row::type,
             this.selectName1,
-            Array[(SKStore.IID(0), row)],
+            Array[(SKStore.UnitID::singleton, row)],
           )
         | None() ->
           _dir = context.mkdir(
-            SKStore.IID::keyType,
+            SKStore.UnitID::keyType,
             Row::type,
             this.selectName1,
           )
@@ -675,13 +675,17 @@ class SelectEvaluator{
           ) match {
           | Some(emptyRow) ->
             _ = context.mkdir(
-              SKStore.IID::keyType,
+              SKStore.UnitID::keyType,
               Row::type,
               selectName1Empty,
-              Array[(SKStore.IID(0), emptyRow)],
+              Array[(SKStore.UnitID::singleton, emptyRow)],
             )
           | None() ->
-            _ = context.mkdir(SKStore.IID::keyType, Row::type, selectName1Empty)
+            _ = context.mkdir(
+              SKStore.UnitID::keyType,
+              Row::type,
+              selectName1Empty,
+            )
           };
         } else {
           context.!newDirs = context.newDirs.set(selectName1Empty);
@@ -793,19 +797,19 @@ class SelectEvaluator{
     context.unsafeMaybeGetEagerDir(dirName) match {
     | None() ->
       _dir = context.mkdir(
-        SKStore.IID::keyType,
+        SKStore.UnitID::keyType,
         Row::type,
         dirName,
         rowOpt match {
         | None() -> Array[]
-        | Some(row) -> Array[(SKStore.IID(0), row)]
+        | Some(row) -> Array[(SKStore.UnitID::singleton, row)]
         },
       )
     | Some(dir) ->
       context.setDir(
         dir.writeArrayReturnDir(
           context,
-          SKStore.IID(0),
+          SKStore.UnitID::singleton,
           rowOpt match {
           | Some(row) -> Array[row]
           | None() -> Array[]
@@ -1235,7 +1239,7 @@ class SelectEvaluator{
     if (this.select.aggr is Some _) {
       !evaluator = evaluator with {entries => Array[row]};
       key = this.select.groupBy match {
-      | None() -> SKStore.IID(0)
+      | None() -> SKStore.UnitID::singleton
       | Some(groupBy) -> makeGroupByKey(context, evaluator, row, groupBy)
       };
       writer.write(key, row);

@@ -82,16 +82,16 @@ class Program private (program: SKStore.EHandle<SKStore.SID, DefFile>) {
 
   fun getFunsProj(
     context: mutable SKStore.Context,
-  ): SKStore.EHandle<SKStore.IID, FunDefFile> {
+  ): SKStore.EHandle<SKStore.UnitID, FunDefFile> {
     this.program.map(
-      SKStore.IID::keyType,
+      SKStore.UnitID::keyType,
       FunDefFile::type,
       context,
       SKStore.DirName::create("/funsDefsProj/"),
       (_context, writer, _, files) ~> {
         files.first.value match {
         | OuterIst.DFun(funDef) ->
-          writer.setArray(SKStore.IID(0), Array[FunDefFile(funDef)])
+          writer.setArray(SKStore.UnitID::singleton, Array[FunDefFile(funDef)])
         | _ -> void
         }
       },
@@ -100,9 +100,9 @@ class Program private (program: SKStore.EHandle<SKStore.SID, DefFile>) {
 
   fun getConstsProj(
     context: mutable SKStore.Context,
-  ): SKStore.EHandle<SKStore.IID, ConstDefFile> {
+  ): SKStore.EHandle<SKStore.UnitID, ConstDefFile> {
     this.program.map(
-      SKStore.IID::keyType,
+      SKStore.UnitID::keyType,
       ConstDefFile::type,
       context,
       SKStore.DirName::create("/constsDefsProj/"),
@@ -134,23 +134,25 @@ class Program private (program: SKStore.EHandle<SKStore.SID, DefFile>) {
           }
         | _ -> void
         };
-        writer.setArray(SKStore.IID(0), result.toArray());
+        writer.setArray(SKStore.UnitID::singleton, result.toArray());
       },
     )
   }
 
   fun getConsts(
     context: mutable SKStore.Context,
-    constsDir: SKStore.EHandle<SKStore.IID, ConstDefFile>,
+    constsDir: SKStore.EHandle<SKStore.UnitID, ConstDefFile>,
   ): Array<ConstDef> {
-    constsDir.unsafeGetArray(context, SKStore.IID(0)).map(x -> x.value)
+    constsDir.unsafeGetArray(context, SKStore.UnitID::singleton).map(x ->
+      x.value
+    )
   }
 
   fun getFuns(
     context: mutable SKStore.Context,
-    funsDir: SKStore.EHandle<SKStore.IID, FunDefFile>,
+    funsDir: SKStore.EHandle<SKStore.UnitID, FunDefFile>,
   ): Array<FunDef> {
-    funsDir.unsafeGetArray(context, SKStore.IID(0)).map(x -> x.value)
+    funsDir.unsafeGetArray(context, SKStore.UnitID::singleton).map(x -> x.value)
   }
 }
 

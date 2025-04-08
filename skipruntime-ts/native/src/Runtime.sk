@@ -216,8 +216,8 @@ class Input(name: String, values: Array<(SKJSON.CJSON, Array<SKJSON.CJSON>)>)
 
 fun buildResourcesGraph(
   context: mutable SKStore.Context,
-  definitionHdl: SKStore.EHandle<SKStore.IID, ServiceDefinition>,
-  statusHdl: SKStore.EHandle<SKStore.IID, ResourceStatus>,
+  definitionHdl: SKStore.EHandle<SKStore.UnitID, ServiceDefinition>,
+  statusHdl: SKStore.EHandle<SKStore.UnitID, ResourceStatus>,
   servicesHdl: SKStore.EHandle<SKStore.SID, ServiceFile>,
 ): void {
   dirname = kResourceSessionDir;
@@ -262,7 +262,7 @@ fun buildResourcesGraph(
     (context, writer, key, _it) ~> {
       (runId, resources) = definitionHdl.maybeGet(
         context,
-        SKStore.IID(0),
+        SKStore.UnitID::singleton,
       ) match {
       | Some(definition) -> (definition.runId, definition.service.resources)
       | _ -> return void
@@ -281,12 +281,15 @@ fun buildResourcesGraph(
             true,
           )
           .map(
-            SKStore.IID::keyType,
+            SKStore.UnitID::keyType,
             ResourceStatus::type,
             context,
             statusRef.sub("statuses"),
             (_ctx, writer, key, it) ~> {
-              writer.set(SKStore.IID(0), ResourceStatus(key, it.first.status));
+              writer.set(
+                SKStore.UnitID::singleton,
+                ResourceStatus(key, it.first.status),
+              );
             },
           );
         _sRequestsHdl = context
@@ -306,8 +309,8 @@ fun buildResourcesGraph(
               rf = it.first;
               timestamp = rf.timestamp;
               statuses = statusHdl
-                .getArray(ctx, SKStore.IID(0))
-                .concat(sStatusHdl.getArray(ctx, SKStore.IID(0)))
+                .getArray(ctx, SKStore.UnitID::singleton)
+                .concat(sStatusHdl.getArray(ctx, SKStore.UnitID::singleton))
                 .filter(rs -> rs.status.created <= timestamp);
               requestStatuses = RequestStatuses(statuses);
               writer.set(key, requestStatuses);
@@ -359,10 +362,10 @@ fun initService(service: Service): Result<void, .Exception> {
   SKStore.runWithResult(context ~> {
     if (context.unsafeMaybeGetEagerDir(kSessionDir) is None()) {
       sessionHdl = context.mkdir(
-        SKStore.IID::keyType,
+        SKStore.UnitID::keyType,
         ServiceDefinition::type,
         kSessionDir,
-        Array[(SKStore.IID(0), ServiceDefinition(runId, service))],
+        Array[(SKStore.UnitID::singleton, ServiceDefinition(runId, service))],
       );
       servicesHdl = sessionHdl.map(
         SKStore.SID::keyType,
@@ -412,12 +415,15 @@ fun initService(service: Service): Result<void, .Exception> {
           Array[],
         )
         .map(
-          SKStore.IID::keyType,
+          SKStore.UnitID::keyType,
           ResourceStatus::type,
           context,
           kSessionDir.sub("statuses"),
           (_ctx, writer, key, it) ~> {
-            writer.set(SKStore.IID(0), ResourceStatus(key, it.first.status));
+            writer.set(
+              SKStore.UnitID::singleton,
+              ResourceStatus(key, it.first.status),
+            );
           },
         );
       buildResourcesGraph(context, sessionHdl, statusHdl, servicesHdl)
@@ -425,15 +431,15 @@ fun initService(service: Service): Result<void, .Exception> {
       // Can be done because it's only used on test, we can add a environment variable or some way to protect that usage
       _ = closeService_(context);
       sessionHdl = SKStore.EHandle(
-        SKStore.IID::keyType,
+        SKStore.UnitID::keyType,
         ServiceDefinition::type,
         kSessionDir,
       );
-      sessionHdl.writeArray(context, SKStore.IID(0), Array[]);
+      sessionHdl.writeArray(context, SKStore.UnitID::singleton, Array[]);
       context.update();
       sessionHdl.writeArray(
         context,
-        SKStore.IID(0),
+        SKStore.UnitID::singleton,
         Array[ServiceDefinition(runId, service)],
       );
     };
@@ -453,11 +459,11 @@ fun closeService_(context: mutable SKStore.Context): Array<Float> {
   });
   todestroy.each(key -> destroyReactiveResource(context, key));
   sessionHdl = SKStore.EHandle(
-    SKStore.IID::keyType,
+    SKStore.UnitID::keyType,
     ServiceDefinition::type,
     kSessionDir,
   );
-  handles = sessionHdl.maybeGet(context, SKStore.IID(0)) match {
+  handles = sessionHdl.maybeGet(context, SKStore.UnitID::singleton) match {
   | Some(def) ->
     def.service.remoteCollections
       .values()
@@ -585,13 +591,13 @@ fun useExternalCollection(
       }
     });
     sessionHdl = SKStore.EHandle(
-      SKStore.IID::keyType,
+      SKStore.UnitID::keyType,
       ServiceDefinition::type,
       kSessionDir,
     );
     remoteCollections = sessionHdl.get(
       context,
-      SKStore.IID(0),
+      SKStore.UnitID::singleton,
     ).service.remoteCollections;
     externalSupplier = remoteCollections.get(supplier);
     collectionId = toSuppliedResourceId(supplier, resource, params);
@@ -599,13 +605,13 @@ fun useExternalCollection(
     paramsDir = dirName.sub("params");
     dataDir = dirName.sub("data");
     hdl = context.mkdir(
-      SKStore.IID::keyType,
+      SKStore.UnitID::keyType,
       Params::type,
       paramsDir,
-      Array[(SKStore.IID(0), Params(params))],
+      Array[(SKStore.UnitID::singleton, Params(params))],
     );
     collectionHdl = hdl.map(
-      SKStore.IID::keyType,
+      SKStore.UnitID::keyType,
       Handle::type,
       context,
       dirName,

@@ -942,7 +942,7 @@ class Converter private (
 ) {
   fun getConsts(
     context: mutable SKStore.Context,
-    constsProj: SKStore.EHandle<SKStore.IID, I.ConstDefFile>,
+    constsProj: SKStore.EHandle<SKStore.UnitID, I.ConstDefFile>,
   ): Array<ConstLazyGFun> {
     consts = this.program.getConsts(context, constsProj);
     consts.map(cst -> this.convertConstDef(context, cst))
@@ -4938,8 +4938,8 @@ fun createIR(
   shouldRuntimeExport: (I.FunDef ~> Bool),
   outerIst: I.Program,
   converter: Converter,
-  constsProj: SKStore.EHandle<SKStore.IID, I.ConstDefFile>,
-  funDefsProj: SKStore.EHandle<SKStore.IID, I.FunDefFile>,
+  constsProj: SKStore.EHandle<SKStore.UnitID, I.ConstDefFile>,
+  funDefsProj: SKStore.EHandle<SKStore.UnitID, I.FunDefFile>,
 ): GlobalEnv {
   consts = converter.getConsts(context, constsProj);
   funDefs = outerIst.getFuns(context, funDefsProj);
