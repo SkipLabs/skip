@@ -20,8 +20,10 @@ jobs:
             ' > ~/.ssh/known_hosts
             cat $CHECKOUT_KEY > ~/.ssh/id_rsa
             git clone --single-branch --branch "$CIRCLE_BRANCH" "$CIRCLE_REPOSITORY_URL" .
-            git fetch --force origin "+refs/heads/main:refs/remotes/origin/main"
-            git branch main origin/main
+            if [ "$CIRCLE_BRANCH" != "main" ]; then
+              git fetch --force origin "+refs/heads/main:refs/remotes/origin/main"
+              git branch main origin/main
+            fi
             git reset --hard "$CIRCLE_SHA1"
       - run:
           name: Generate config
