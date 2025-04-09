@@ -4,7 +4,7 @@
  * @packageDocumentation
  */
 
-import { type SkipService } from "@skipruntime/core";
+import type { SkipService } from "@skipruntime/core";
 import { controlService, streamingService } from "./rest.js";
 import type { Express, Request, Response, NextFunction } from "express";
 import express from "express";

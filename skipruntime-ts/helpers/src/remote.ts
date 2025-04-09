@@ -2,7 +2,17 @@
 // in nodejs LTS.
 import EventSource from "eventsource";
 
-import type { Entry, ExternalService, Json } from "@skipruntime/core";
+import type {
+  Context,
+  EagerCollection,
+  Entry,
+  ExternalService,
+  Json,
+  NamedCollections,
+  Resource,
+  SkipService,
+} from "@skipruntime/core";
+import { SkipError } from "@skipruntime/core";
 
 import type { Entrypoint } from "./rest.js";
 
@@ -99,4 +109,73 @@ export class SkipExternalService implements ExternalService {
     }
     return Promise.resolve();
   }
+}
+
+class LeaderResource implements Resource {
+  private collection: string;
+
+  constructor(param: Json) {
+    if (typeof param == "string") this.collection = param;
+    else
+      throw new SkipError(
+        "Followers must specify a shared collection to mirror from leader.",
+      );
+  }
+
+  instantiate(collections: NamedCollections): EagerCollection<Json, Json> {
+    if (this.collection in collections) return collections[this.collection]!;
+    throw new SkipError(
+      `Unknown shared collection in leader: ${this.collection}`,
+    );
+  }
+}
+
+/**
+ * Run a `SkipService` as the *leader* in a leader-follower topology.
+ *
+ * Instead of running a `service` on one machine, it can be distributed across multiple in a leader-follower architecture, with one "leader" maintaining the shared computation graph and one or more "followers" across which client-requested resource instances are distributed.
+ *
+ * @returns The *leader* component to run `service` in such a configuration.
+ */
+export function asLeader(service: SkipService): SkipService {
+  //TODO: add mechanism to split externals between leader/follower
+  return {
+    ...service,
+    resources: { leader: LeaderResource },
+  };
+}
+
+/**
+ * Run a `SkipService` as a *follower* in a leader-follower topology.
+ *
+ * Instead of running a `service` on one machine, it can be distributed across multiple in a leader-follower architecture, with one "leader" maintaining the shared computation graph and one or more "followers" across which client-requested resource instances are distributed.
+ *
+ * @returns The *follower* component to run `service` in such a configuration, given the leader's address and the names of the shared computation graph collections to be mirrored from it (typically the `ResourceInputs` of `service`).
+ */
+export function asFollower(
+  service: SkipService,
+  leader: {
+    leader: { host: string; streaming_port: number; control_port: number };
+    collections: string[];
+  },
+): SkipService {
+  return {
+    ...service,
+    initialData: {},
+    externalServices: {
+      ...service.externalServices,
+      __skip_leader: SkipExternalService.direct(leader.leader),
+    },
+    createGraph(_inputs: object, context: Context): NamedCollections {
+      const mirroredCollections: NamedCollections = {};
+      for (const collection of leader.collections) {
+        mirroredCollections[collection] = context.useExternalResource({
+          service: "__skip_leader",
+          identifier: "leader",
+          params: collection,
+        });
+      }
+      return mirroredCollections;
+    },
+  };
 }
