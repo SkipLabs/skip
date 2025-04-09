@@ -19,12 +19,14 @@ jobs:
             github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
             ' > ~/.ssh/known_hosts
             cat $CHECKOUT_KEY > ~/.ssh/id_rsa
-            git clone --single-branch --branch "$CIRCLE_BRANCH" "$CIRCLE_REPOSITORY_URL" .
-            if [ "$CIRCLE_BRANCH" != "main" ]; then
-              git fetch --force origin "+refs/heads/main:refs/remotes/origin/main"
-              git branch main origin/main
+            git clone --single-branch --branch main "$CIRCLE_REPOSITORY_URL" .
+            if [[ "$CIRCLE_BRANCH" =~ ^pull\/* ]]; then
+              git fetch --force origin "$CIRCLE_BRANCH/head:remotes/origin/$CIRCLE_BRANCH"
+            else
+              git fetch --force origin "$CIRCLE_BRANCH:remotes/origin/$CIRCLE_BRANCH"
             fi
             git reset --hard "$CIRCLE_SHA1"
+            git checkout -q -B "$CIRCLE_BRANCH"
       - run:
           name: Generate config
           command: |

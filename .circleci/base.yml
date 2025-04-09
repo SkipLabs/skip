@@ -18,10 +18,21 @@ commands:
             github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
             ' > ~/.ssh/known_hosts
             cat $CHECKOUT_KEY > ~/.ssh/id_rsa
-            clone_args=(--depth=1 --branch "$CIRCLE_BRANCH")
+            if [[ "$CIRCLE_BRANCH" =~ ^pull\/* ]]; then
+              clone_branch=main
+            else
+              clone_branch="$CIRCLE_BRANCH"
+            fi
+            clone_args=(--depth=1 --branch "$clone_branch")
             if << parameters.submodules >>; then clone_args+=(--shallow-submodules --recurse-submodules); fi
             git clone "${clone_args[@]}" "$CIRCLE_REPOSITORY_URL" .
-            git reset --hard "$CIRCLE_SHA1"
+            if [[ "$CIRCLE_BRANCH" =~ ^pull\/* ]]; then
+              git fetch --force origin "$CIRCLE_BRANCH/head:remotes/origin/$CIRCLE_BRANCH"
+              git reset --hard "$CIRCLE_SHA1"
+              git checkout -q -B "$CIRCLE_BRANCH"
+            else
+              git reset --hard "$CIRCLE_SHA1"
+            fi
 
 jobs:
   fast-checks:
