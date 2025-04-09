@@ -28,11 +28,8 @@ commands:
             git clone "${clone_args[@]}" "$CIRCLE_REPOSITORY_URL" .
             if [[ "$CIRCLE_BRANCH" =~ ^pull\/* ]]; then
               git fetch --force origin "$CIRCLE_BRANCH/head:remotes/origin/$CIRCLE_BRANCH"
-              git reset --hard "$CIRCLE_SHA1"
-              git checkout -q -B "$CIRCLE_BRANCH"
-            else
-              git reset --hard "$CIRCLE_SHA1"
             fi
+            git checkout "$CIRCLE_SHA1" -B "$CIRCLE_BRANCH"
 
 jobs:
   fast-checks:
