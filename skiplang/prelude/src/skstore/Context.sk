@@ -1159,9 +1159,7 @@ mutable class Context{
       this.!deps = this.deps.removeDir(dirName);
       this.!dirsWithSharedSubDirs = this.dirsWithSharedSubDirs.remove(dirName);
       this.!sharedSubDirsRefCount = this.sharedSubDirsRefCount.remove(dirName);
-      this.setDir(
-        DeletedDir{dirName, time => dir.time, timeStack => dir.timeStack},
-      )
+      this.setDir(DeletedDir::ofDir(dir))
     };
   }
 

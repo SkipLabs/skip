@@ -3,11 +3,18 @@
 /*****************************************************************************/
 module SKStore;
 
-class DeletedDir{
+class DeletedDir private {
   time: Time,
   timeStack: TimeStack,
   dirName: DirName,
 } extends Dir {
+  static fun ofDir(dir: Dir): this {
+    time = dir.getTime();
+    timeStack = dir.getTimeStack();
+    dirName = dir.getDirName();
+    static{time, timeStack, dirName}
+  }
+
   fun getTime(): Time {
     this.time
   }
