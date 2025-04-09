@@ -205,14 +205,14 @@ class CompactFixedDir protected {
   }
 
   private static fun getMetadata(
-    data: readonly Vector<FixedRow<Key, Array<File>>>,
+    data: readonly Vector<FixedRow<SKDB.RowKey, Array<SKDB.RowValues>>>,
   ): ?FixedDirMetadata {
     possibleResult: ?FixedDirMetadata = None();
 
     for (elt in data) {
       if (elt.value.size() != 1) return None();
-      (elt.key, elt.value[0]) match {
-      | (SKDB.RowKey(row1, k), row2 @ SKDB.RowValues _) ->
+      elt.key match {
+      | SKDB.RowKey(row, k) ->
         possibleResult match {
         | None() ->
           !possibleResult = Some(
@@ -223,8 +223,7 @@ class CompactFixedDir protected {
             return None()
           }
         };
-        if (row1 != row2) return None()
-      | _ -> return None()
+        if (row != elt.value[0]) return None()
       }
     };
     possibleResult
@@ -245,7 +244,7 @@ class CompactFixedDir protected {
   }
 
   protected static fun stripMetadata(
-    row: FixedRow<Key, Array<File>>,
+    row: FixedRow<SKDB.RowKey, Array<SKDB.RowValues>>,
   ): CompactRow {
     invariant(row.value.size() == 1);
     sourceKey = if (row.source.baseName != row.key) {
@@ -257,7 +256,6 @@ class CompactFixedDir protected {
     row.value[0] match {
     | SKDB.RowValues(values, repeat) ->
       CompactRow(values, repeat, row.tag, sourceKey)
-    | _ -> invariant_violation("Unexpected type")
     };
   }
 
