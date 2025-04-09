@@ -141,9 +141,11 @@ fun assertUnique<T, U: Orderable>(
   };
 }
 
-class FixedDir<+T: frozen> extends IFixedDir<Key, T, FixedRow<Key, T>> {
+class FixedDir<K: Orderable, +T: frozen> extends
+  IFixedDir<K, T, FixedRow<K, T>>,
+{
   static fun create<U: T>(
-    data: mutable Vector<FixedRow<Key, U>> = mutable Vector[],
+    data: mutable Vector<FixedRow<K, U>> = mutable Vector[],
   ): this {
     if (!data.isSorted()) {
       data.sort();
@@ -152,7 +154,7 @@ class FixedDir<+T: frozen> extends IFixedDir<Key, T, FixedRow<Key, T>> {
     static{data => data.toArray()}
   }
 
-  fun get(i: Int): FixedRow<Key, T> {
+  fun get(i: Int): FixedRow<K, T> {
     this.data.unsafe_get(i)
   }
 }
