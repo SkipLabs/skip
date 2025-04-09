@@ -407,84 +407,21 @@ class LHandle<K: Key, +V: File> extends Handle<K, V> {
 /* Eager handles. */
 /*****************************************************************************/
 
-class EHandle<K: Key, V: File> extends Handle<K, V> {
-  static fun multiMap<K2: Key, V2: File>(
-    typeOutputKey: Key ~> K2,
-    typeOutput: File ~> V2,
-    context: mutable Context,
-    parents: Array<
-      (
-        EHandle<K, V>,
-        (
-          (
-            mutable Context,
-            mutable TWriter<K2, V2>,
-            K,
-            mutable NonEmptyIterator<V>,
-          ) ~> void,
-          ?Array<KeyRange>,
-        ),
-      ),
-    >,
-    dirName: DirName,
-  ): EHandle<K2, V2> {
-    dynParents = mutable Map[];
-    parentSet = mutable Set[];
-    for (parent in parents) {
-      (parentHandle, parentData) = parent;
-      (mapFun, rangeOpt) = parentData;
-      typeInputKey = parentHandle.keyType;
-      typeInput = parentHandle.type;
-      parentName = parentHandle.dirName;
-      dynamicMapFun = (context, writer, key, fileIter) ~> {
-        FileIterator::create(fileIter) match {
-        | EmptyFileIterator _ -> return void
-        | iter @ NonEmptyIterator _ ->
-          twriter = mutable TWriter<K2, V2>{writes => writer.writes};
-          mapFun(
-            context,
-            twriter,
-            typeInputKey(key),
-            iter.nonEmptyMap(typeInput),
-          );
-          writer.!writes = twriter.writes
-        }
-      };
-      if (!parentSet.contains(parentName)) {
-        parentSet.add(parentName);
-        dynParents.set(parentName, mutable Vector[])
-      };
-      dynParents[parentName].push((dynamicMapFun, rangeOpt, None()))
-    };
-    fixedParents = FixedSingle::create(
-      Vector::mcreateFromItems(
-        dynParents.items().map(kv -> (kv.i0, kv.i1.toArray())).collect(Array),
-      ),
-    );
-    EagerDir::applyMany(context, fixedParents, dirName, None());
-    EHandle(typeOutputKey, typeOutput, dirName)
-  }
+type TMapFun<K, V, K2, V2> = (
+  mutable Context,
+  mutable TWriter<K2, V2>,
+  K,
+  mutable NonEmptyIterator<V>,
+) ~> void;
 
-  static fun multiMapReduce<K2: Key, V2: File, V3: File>(
+class EHandle<K: Key, V: File> extends Handle<K, V> {
+  private static fun genMultiMapReduce<K2: Key, V2: File, V3: File>(
     typeOutputKey: Key ~> K2,
-    typeOutput: File ~> V2,
+    typeOutput: File ~> V3,
     context: mutable Context,
-    parents: Array<
-      (
-        EHandle<K, V>,
-        (
-          (
-            mutable Context,
-            mutable TWriter<K2, V2>,
-            K,
-            mutable NonEmptyIterator<V>,
-          ) ~> void,
-          ?Array<KeyRange>,
-        ),
-      ),
-    >,
+    parents: Array<(EHandle<K, V>, (TMapFun<K, V, K2, V2>, ?Array<KeyRange>))>,
     dirName: DirName,
-    reducer: EReducer<V2, V3>,
+    reducerOpt: ?IReducer = None(),
   ): EHandle<K2, V3> {
     dynParents = mutable Map[];
     parentSet = mutable Set[];
@@ -519,9 +456,40 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
         dynParents.items().map(kv -> (kv.i0, kv.i1.toArray())).collect(Array),
       ),
     );
-    EagerDir::applyMany(
+    EagerDir::applyMany(context, fixedParents, dirName, reducerOpt);
+    EHandle(typeOutputKey, typeOutput, dirName)
+  }
+
+  static fun multiMap<K2: Key, V2: File>(
+    typeOutputKey: Key ~> K2,
+    typeOutput: File ~> V2,
+    context: mutable Context,
+    parents: Array<(EHandle<K, V>, (TMapFun<K, V, K2, V2>, ?Array<KeyRange>))>,
+    dirName: DirName,
+  ): EHandle<K2, V2> {
+    static::genMultiMapReduce(
+      typeOutputKey,
+      typeOutput,
       context,
-      fixedParents,
+      parents,
+      dirName,
+      None(),
+    )
+  }
+
+  static fun multiMapReduce<K2: Key, V2: File, V3: File>(
+    typeOutputKey: Key ~> K2,
+    typeOutput: File ~> V2,
+    context: mutable Context,
+    parents: Array<(EHandle<K, V>, (TMapFun<K, V, K2, V2>, ?Array<KeyRange>))>,
+    dirName: DirName,
+    reducer: EReducer<V2, V3>,
+  ): EHandle<K2, V3> {
+    static::genMultiMapReduce(
+      typeOutputKey,
+      reducer.type,
+      context,
+      parents,
       dirName,
       Some(
         IReducer{
@@ -534,8 +502,7 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
             ),
         },
       ),
-    );
-    EHandle(typeOutputKey, reducer.type, dirName)
+    )
   }
 
   fun map<K2: Key, V2: File>(
@@ -543,21 +510,14 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
     type: File ~> V2,
     context: mutable Context,
     dirName: DirName,
-    f: (
-      mutable Context,
-      mutable TWriter<K2, V2>,
-      K,
-      mutable NonEmptyIterator<V>,
-    ) ~> void,
+    f: TMapFun<K, V, K2, V2>,
     rangeOpt: ?Array<KeyRange> = None(),
   ): EHandle<K2, V2> {
     static::multiMap(
       typeKey,
       type,
       context,
-      Array[
-        (SKStore.EHandle(this.keyType, this.type, this.dirName), (f, rangeOpt)),
-      ],
+      Array[(this, (f, rangeOpt))],
       dirName,
     )
   }
@@ -567,12 +527,7 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
     type: File ~> V2,
     context: mutable Context,
     dirName: DirName,
-    f: (
-      mutable Context,
-      mutable TWriter<K2, V2>,
-      K,
-      mutable NonEmptyIterator<V>,
-    ) ~> void,
+    f: TMapFun<K, V, K2, V2>,
     reducer: EReducer<V2, V3>,
     rangeOpt: ?Array<KeyRange> = None(),
   ): EHandle<K2, V3> {
@@ -580,9 +535,7 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
       typeKey,
       type,
       context,
-      Array[
-        (SKStore.EHandle(this.keyType, this.type, this.dirName), (f, rangeOpt)),
-      ],
+      Array[(this, (f, rangeOpt))],
       dirName,
       reducer,
     )

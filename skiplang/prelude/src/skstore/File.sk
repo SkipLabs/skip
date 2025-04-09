@@ -173,10 +173,6 @@ class StringFile(value: .String) extends File {
   fun toKVString(_format: OutputFormat, key: Key): String {
     "" + escape(key.toString()) + "\t\"" + escape(this.value) + "\"\n"
   }
-
-  fun toKVStringRemove(_format: OutputFormat): String {
-    "" + escape(this.value) + "\t\n"
-  }
 }
 
 class ErrorFile(value: .Exception) extends File
@@ -227,20 +223,6 @@ base class File {
       "\t\"" +
       escape(inspect(this).toString()) +
       "\"\n"
-  }
-}
-
-trait CGroup {
-  fun zero(): inst;
-  fun +(inst): inst;
-  fun -(inst): inst;
-}
-
-base class CGroupFile extends File uses CGroup
-
-extension class .Int uses CGroup {
-  fun zero(): .Int {
-    0
   }
 }
 

@@ -115,11 +115,12 @@ fun setReplicationState(
   replicationSource: Int,
   state: ReplicationState,
 ): void {
-  replicationDir = context.maybeGetDir(replication) match {
-  | None() -> context.mkdir(x ~> x, ReplicationStateFile::type, replication)
-  | Some(d) ->
-    SKStore.EHandle(x ~> x, ReplicationStateFile::type, d.getDirName())
-  };
+  replicationDir = makeInputDir(
+    SKStore.IID::keyType,
+    ReplicationStateFile::type,
+    context,
+    replication,
+  );
   key = SKStore.IID(replicationSource);
   arr = replicationDir.unsafeGetArray(context, key);
   if (arr.size() < 1) {
@@ -211,24 +212,41 @@ fun getDir(dirDescr: DirDescr): SKStore.EHandle<SKStore.Key, Row> {
   SKStore.EHandle(x ~> x, Row::type, dirDescr.dirName)
 }
 
-fun makeDir<T: SKStore.File>(
+fun makeInputDir<K: SKStore.Key, T: SKStore.File>(
+  fromKey: SKStore.Key ~> K,
   fromFile: SKStore.File ~> T,
   context: mutable SKStore.Context,
   dirName: SKStore.DirName,
-  make: () -> SKStore.EHandle<SKStore.Key, T>,
-): SKStore.EHandle<SKStore.Key, T> {
+): SKStore.EHandle<K, T> {
   context.maybeGetDir(dirName) match {
-  | None() -> make()
-  | Some(dir) -> SKStore.EHandle(x ~> x, fromFile, dir.getDirName())
+  | None() -> context.mkdir(fromKey, fromFile, dirName)
+  | Some(dir) -> SKStore.EHandle(fromKey, fromFile, dir.getDirName())
+  };
+}
+
+fun makeMapDir<
+  K: SKStore.Key,
+  T: SKStore.File,
+  K2: SKStore.Key,
+  T2: SKStore.File,
+>(
+  fromKey: SKStore.Key ~> K2,
+  fromFile: SKStore.File ~> T2,
+  context: mutable SKStore.Context,
+  dirName: SKStore.DirName,
+  input: SKStore.EHandle<K, T>,
+  f: SKStore.TMapFun<K, T, K2, T2>,
+): SKStore.EHandle<K2, T2> {
+  context.maybeGetDir(dirName) match {
+  | None() -> input.map(fromKey, fromFile, context, dirName, f)
+  | Some(dir) -> SKStore.EHandle(fromKey, fromFile, dir.getDirName())
   };
 }
 
 fun getTableDir(
   context: mutable SKStore.Context,
-): SKStore.EHandle<SKStore.Key, DirDescr> {
-  makeDir(DirDescr::type, context, tableInfo, () -> {
-    context.mkdir(x ~> x, DirDescr::type, tableInfo)
-  })
+): SKStore.EHandle<SKStore.SID, DirDescr> {
+  makeInputDir(SKStore.SID::keyType, DirDescr::type, context, tableInfo)
 }
 
 /*****************************************************************************/
@@ -375,10 +393,8 @@ class ShardStats(
 
 fun getViewsDir(
   context: mutable SKStore.Context,
-): SKStore.EHandle<SKStore.Key, SelectFile> {
-  makeDir(SelectFile::type, context, views, () ->
-    context.mkdir(x ~> x, SelectFile::type, views)
-  )
+): SKStore.EHandle<SKStore.SID, SelectFile> {
+  makeInputDir(SKStore.SID::keyType, SelectFile::type, context, views)
 }
 
 /*****************************************************************************/
@@ -397,22 +413,30 @@ class SubRequestFile(
 fun getSubsDirs(
   context: mutable SKStore.Context,
 ): (
-  SKStore.EHandle<SKStore.Key, SubRequestFile>,
-  SKStore.EHandle<SKStore.Key, SKStore.IntFile>,
+  SKStore.EHandle<SKStore.SID, SubRequestFile>,
+  SKStore.EHandle<SKStore.SID, SKStore.IntFile>,
 ) {
   if (context.unsafeMaybeGetEagerDir(subsInput) is Some _) {
-    input = SKStore.EHandle(x ~> x, SubRequestFile::type, subsInput);
-    output = SKStore.EHandle(x ~> x, SKStore.IntFile::type, subsOutput);
+    input = SKStore.EHandle(
+      SKStore.SID::keyType,
+      SubRequestFile::type,
+      subsInput,
+    );
+    output = SKStore.EHandle(
+      SKStore.SID::keyType,
+      SKStore.IntFile::type,
+      subsOutput,
+    );
     return (input, output)
   };
-  input = context.mkdir(x ~> x, SubRequestFile::type, subsInput);
+  input = context.mkdir(SKStore.SID::keyType, SubRequestFile::type, subsInput);
   output = input.map(
-    x ~> x,
+    SKStore.SID::keyType,
     SKStore.IntFile::type,
     context,
     subsOutput,
     (context, writer, key, values) ~> {
-      request = SubRequestFile::type(values.first);
+      request = values.first;
       tableDir = getTableDir(context);
       dirSubs = request.viewNames.map(viewName -> {
         (edir, dirDescr) = tableDir.maybeGet(
@@ -553,39 +577,36 @@ class IndexDescr{
 
 fun getIndexInputDir(
   context: mutable SKStore.Context,
-): SKStore.EHandle<SKStore.Key, P.CreateIndex> {
-  makeDir(P.CreateIndex::type, context, indexInput, () ->
-    context.mkdir(x ~> x, P.CreateIndex::type, indexInput)
-  )
+): SKStore.EHandle<SKStore.SID, P.CreateIndex> {
+  makeInputDir(SKStore.SID::keyType, P.CreateIndex::type, context, indexInput)
 }
 
 fun getIndexOutputDir(
   context: mutable SKStore.Context,
-): SKStore.EHandle<SKStore.Key, IndexDescr> {
+): SKStore.EHandle<SKStore.SID, IndexDescr> {
   input = getIndexInputDir(context);
-  makeDir(IndexDescr::type, context, indexOutput, () -> {
-    input.map(
-      x ~> x,
-      IndexDescr::type,
-      context,
-      indexOutput,
-      (context, writer, key, values) ~> {
-        index = values.first;
-        writer.set(
-          key,
-          createUserIndex(
-            context,
-            index.name,
-            index.pos,
-            index.on,
-            index.columns,
-            index.unique,
-            Some(index.toString()),
-          ),
-        )
-      },
-    )
-  })
+  makeMapDir(
+    SKStore.SID::keyType,
+    IndexDescr::type,
+    context,
+    indexOutput,
+    input,
+    (context, writer, key, values) ~> {
+      index = values.first;
+      writer.set(
+        key,
+        createUserIndex(
+          context,
+          index.name,
+          index.pos,
+          index.on,
+          index.columns,
+          index.unique,
+          Some(index.toString()),
+        ),
+      )
+    },
+  )
 }
 
 fun makeIndexEntry(tableName: P.Name, colNbr: Int): SKStore.SID {
@@ -594,42 +615,40 @@ fun makeIndexEntry(tableName: P.Name, colNbr: Int): SKStore.SID {
 
 fun getIndexByColNbr(
   context: mutable SKStore.Context,
-): SKStore.EHandle<SKStore.Key, IndexDescr> {
+): SKStore.EHandle<SKStore.SID, IndexDescr> {
   indexes = getIndexOutputDir(context);
-  makeDir(IndexDescr::type, context, indexByCol, () -> {
-    indexes.map(
-      x ~> x,
-      IndexDescr::type,
-      context,
-      indexByCol,
-      (_context, writer, _key, values) ~> {
-        indexDescr = values.first;
-        for (field in indexDescr.fields) {
-          fieldNbr = field.i0;
-          indexEntry = makeIndexEntry(indexDescr.tableName, fieldNbr);
-          writer.set(indexEntry, indexDescr)
-        }
-      },
-    )
-  })
+  makeMapDir(
+    SKStore.SID::keyType,
+    IndexDescr::type,
+    context,
+    indexByCol,
+    indexes,
+    (_context, writer, _key, values) ~> {
+      indexDescr = values.first;
+      for (field in indexDescr.fields) {
+        fieldNbr = field.i0;
+        indexEntry = makeIndexEntry(indexDescr.tableName, fieldNbr);
+        writer.set(indexEntry, indexDescr)
+      }
+    },
+  )
 }
 
 fun getIndexByName(
   context: mutable SKStore.Context,
-): SKStore.EHandle<SKStore.Key, IndexDescr> {
+): SKStore.EHandle<SKStore.SID, IndexDescr> {
   indexes = getIndexOutputDir(context);
-  makeDir(IndexDescr::type, context, indexByName, () -> {
-    indexes.map(
-      x ~> x,
-      IndexDescr::type,
-      context,
-      indexByName,
-      (_context, writer, _key, values) ~> {
-        indexDescr = values.first;
-        writer.set(SKStore.SID(indexDescr.tableName.lower), indexDescr)
-      },
-    )
-  })
+  makeMapDir(
+    SKStore.SID::keyType,
+    IndexDescr::type,
+    context,
+    indexByName,
+    indexes,
+    (_context, writer, _key, values) ~> {
+      indexDescr = values.first;
+      writer.set(SKStore.SID(indexDescr.tableName.lower), indexDescr)
+    },
+  )
 }
 
 /*****************************************************************************/

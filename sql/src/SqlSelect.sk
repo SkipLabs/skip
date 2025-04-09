@@ -61,14 +61,14 @@ extension class ProjKey extends SKStore.Key {
   }
 }
 
-class LeftFile(SKStore.Key, RowValues) extends SKStore.File
+class LeftFile(RowKey, RowValues) extends SKStore.File
 class LeftShardedFile{
   leftShardID: Int,
   rightShard: Int,
   value: RowValues,
 } extends SKStore.File
 
-class RightFile(SKStore.Key, RowValues) extends SKStore.File
+class RightFile(RowKey, RowValues) extends SKStore.File
 class RightShardedFile{
   leftShard: Int,
   rightShardID: Int,
@@ -317,7 +317,7 @@ class SelectEvaluator{
       SelectDir(filtered.dirName, this.types)
     } else {
       handle = SKStore.EHandle(
-        SKStore.Key::unTyped,
+        RowKey::keyType,
         RowValues::type,
         this.select.from[0].i0.dirName,
       );
@@ -350,7 +350,7 @@ class SelectEvaluator{
       );
       kinds = this.kinds;
       _ = filtered.map(
-        SKStore.Key::unTyped,
+        RowKey::keyType,
         RowValues::type,
         context,
         childName,
@@ -402,14 +402,15 @@ class SelectEvaluator{
       joinKind,
       onlyLeftValues,
     } ->
-      leftHandle = SKStore.EHandle(x ~> x, Row::type, leftDirName);
-      rightHandle = SKStore.EHandle(x ~> x, Row::type, rightDirName);
+      leftHandle = SKStore.EHandle(RowKey::keyType, Row::type, leftDirName);
+      rightHandle = SKStore.EHandle(RowKey::keyType, Row::type, rightDirName);
 
       projName = childName.sub("proj");
       shardsDirName = projName.sub("shards");
       shards = context.unsafeMaybeGetEagerDir(shardsDirName) match {
-      | None() -> context.mkdir(x ~> x, ShardStats::type, shardsDirName)
-      | Some(x) -> SKStore.EHandle(x ~> x, ShardStats::type, x.dirName)
+      | None() ->
+        context.mkdir(RowKey::keyType, ShardStats::type, shardsDirName)
+      | Some(x) -> SKStore.EHandle(RowKey::keyType, ShardStats::type, x.dirName)
       };
 
       projLeftName = projName.sub("left");
@@ -439,6 +440,7 @@ class SelectEvaluator{
       );
 
       projLeftFun = (_context, writer, fileKey, valueIter) ~> {
+        fileRowKey = RowKey::keyType(fileKey);
         (rowOpt, shardStats) = normalizeValueIter(valueIter);
         row = rowOpt match {
         | None() -> return void
@@ -450,11 +452,12 @@ class SelectEvaluator{
         shardedFile = LeftShardedFile{leftShardID, rightShard, value => row};
         for (i in Range(0, rightShard)) {
           projKey = ProjKey(key, leftColNbr, leftShardID, i);
-          writer.set(projKey, LeftFile(fileKey, shardedFile.value))
+          writer.set(projKey, LeftFile(fileRowKey, shardedFile.value))
         }
       };
 
       projRightFun = (_context, writer, fileKey, valueIter) ~> {
+        fileRowKey = RowKey::keyType(fileKey);
         (rowOpt, shardStats) = normalizeValueIter(valueIter);
         row = rowOpt match {
         | None() -> return void
@@ -466,7 +469,7 @@ class SelectEvaluator{
         shardedFile = RightShardedFile{leftShard, rightShardID, value => row};
         for (i in Range(0, leftShard)) {
           projKey = ProjKey(key, rightColNbr, i, rightShardID);
-          writer.set(projKey, RightFile(fileKey, shardedFile.value))
+          writer.set(projKey, RightFile(fileRowKey, shardedFile.value))
         }
       };
 
@@ -510,14 +513,15 @@ class SelectEvaluator{
       this.selectName1
     | None() ->
       if (this.select.isNoop) {
-        return SelectDir(this.select.from[0].i0.dirName, this.types)
-      };
-      resultDir = this.evalSelectTableList(
-        context,
-        List::createFromItems(this.select.from),
-        List[],
-      );
-      resultDir.dirName
+        this.select.from[0].i0.dirName
+      } else {
+        resultDir = this.evalSelectTableList(
+          context,
+          List::createFromItems(this.select.from),
+          List[],
+        );
+        resultDir.dirName
+      }
     | Some(_) ->
       if (!this.select.rest.isEmpty()) {
         invariant_violation("Unexpected select type for aggregate function")
@@ -543,7 +547,7 @@ class SelectEvaluator{
         | Some(entry) -> entry
         | None() ->
           _dir = context.mkdir(
-            SKStore.IID::keyType,
+            SKStore.UnitID::keyType,
             Row::type,
             this.selectName1,
           );
@@ -559,14 +563,14 @@ class SelectEvaluator{
         ) match {
         | Some(row) ->
           _dir = context.mkdir(
-            SKStore.IID::keyType,
+            SKStore.UnitID::keyType,
             Row::type,
             this.selectName1,
-            Array[(SKStore.IID(0), row)],
+            Array[(SKStore.UnitID::singleton, row)],
           )
         | None() ->
           _dir = context.mkdir(
-            SKStore.IID::keyType,
+            SKStore.UnitID::keyType,
             Row::type,
             this.selectName1,
           )
@@ -671,13 +675,17 @@ class SelectEvaluator{
           ) match {
           | Some(emptyRow) ->
             _ = context.mkdir(
-              SKStore.IID::keyType,
+              SKStore.UnitID::keyType,
               Row::type,
               selectName1Empty,
-              Array[(SKStore.IID(0), emptyRow)],
+              Array[(SKStore.UnitID::singleton, emptyRow)],
             )
           | None() ->
-            _ = context.mkdir(SKStore.IID::keyType, Row::type, selectName1Empty)
+            _ = context.mkdir(
+              SKStore.UnitID::keyType,
+              Row::type,
+              selectName1Empty,
+            )
           };
         } else {
           context.!newDirs = context.newDirs.set(selectName1Empty);
@@ -789,19 +797,19 @@ class SelectEvaluator{
     context.unsafeMaybeGetEagerDir(dirName) match {
     | None() ->
       _dir = context.mkdir(
-        SKStore.IID::keyType,
+        SKStore.UnitID::keyType,
         Row::type,
         dirName,
         rowOpt match {
         | None() -> Array[]
-        | Some(row) -> Array[(SKStore.IID(0), row)]
+        | Some(row) -> Array[(SKStore.UnitID::singleton, row)]
         },
       )
     | Some(dir) ->
       context.setDir(
         dir.writeArrayReturnDir(
           context,
-          SKStore.IID(0),
+          SKStore.UnitID::singleton,
           rowOpt match {
           | Some(row) -> Array[row]
           | None() -> Array[]
@@ -1146,7 +1154,7 @@ class SelectEvaluator{
 
     remainingTables match {
     | List.Nil() ->
-      this.evalSelectRow(context, qkind, key, evaluator, mwriter, repeat)
+      this.evalSelectRow(context, qkind, evaluator, mwriter, repeat)
 
     | _ ->
       this.evalSelectCross(
@@ -1212,7 +1220,6 @@ class SelectEvaluator{
   fun evalSelectRow(
     context: mutable SKStore.Context,
     qkind: ?(Int, QueryKind),
-    _inputKey: SKStore.Key,
     evaluator: SKDB.ExprEvaluator,
     writer: mutable MultiWriter,
     repeat: Int,
@@ -1231,7 +1238,7 @@ class SelectEvaluator{
     if (this.select.aggr is Some _) {
       !evaluator = evaluator with {entries => Array[row]};
       key = this.select.groupBy match {
-      | None() -> SKStore.IID(0)
+      | None() -> SKStore.UnitID::singleton
       | Some(groupBy) -> makeGroupByKey(context, evaluator, row, groupBy)
       };
       writer.write(key, row);
@@ -1580,7 +1587,7 @@ fun makeGroupByKey(
 /*****************************************************************************/
 
 fun makeJoinReducer(
-  shardTable: SKStore.EHandle<SKStore.Key, ShardStats>,
+  shardTable: SKStore.EHandle<RowKey, ShardStats>,
   joinKind: P.JoinKind,
   kinds: Array<(Int, P.IKind, P.Type)>,
   onlyLeftValues: Bool,
@@ -1715,7 +1722,7 @@ fun computeShardSizes(stats: ?ShardStats): (Int, Int) {
 
 fun getStats(
   context: mutable SKStore.Context,
-  shardTable: SKStore.EHandle<SKStore.Key, ShardStats>,
+  shardTable: SKStore.EHandle<RowKey, ShardStats>,
   x: readonly Vector<(SKStore.Key, SKStore.File)>,
 ): ?ShardStats {
   for (kv in x) {

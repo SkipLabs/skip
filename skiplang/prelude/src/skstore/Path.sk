@@ -151,10 +151,6 @@ class DirName private (
 }
 
 base class Key uses Orderable, Show {
-  static fun unTyped(x: Key): Key {
-    x
-  }
-
   deferred macro overridable static fun keyType(obj: Key): this {
     obj match {
     | x @ #ThisClass _ -> x
@@ -203,23 +199,17 @@ class IsEmptyTag() extends Key {
   }
 }
 
-class IID(value: Int) extends Key {
-  static fun create(key: String): IID {
-    chars = Vector::mcreateFromItems(key.chars());
-    chars.reverse();
-    base = 1;
-    n = 0;
-    for (c in chars) {
-      if (c == '-') {
-        !n = -n;
-        continue;
-      };
-      !n = n + (c.code() - '0'.code()) * base;
-      !base = base * 10;
-    };
-    IID(n)
-  }
+class NeverID private () extends Key
 
+class UnitID private () extends Key {
+  const singleton: this = UnitID();
+
+  fun toString(): String {
+    "unit"
+  }
+}
+
+class IID(value: Int) extends Key {
   fun toString(): String {
     this.value.toString()
   }

@@ -199,10 +199,18 @@ fun getOrInitializeBackend(
   | None() -> void
   };
 
-  _ = context.mkdir(x ~> x, x ~> x, FileCache.fileDirName);
-  _ = context.mkdir(x ~> x, x ~> x, FileCache.packageDirName);
+  _ = context.mkdir(
+    FileCache.InputSource::keyType,
+    SKStore.StringFile::type,
+    FileCache.fileDirName,
+  );
+  _ = context.mkdir(
+    FileCache.InputPackageName::keyType,
+    FileCache.InputPackageFiles::type,
+    FileCache.packageDirName,
+  );
   backendDir = context.mkdir(
-    SKStore.IID::keyType,
+    SKStore.UnitID::keyType,
     TickConfigFile::type,
     backendDirName,
   );
@@ -225,7 +233,7 @@ fun getOrInitializeBackend(
     context,
     SKStore.DirName::create("/backendSink/"),
     (context, _writer, _key, values) ~> {
-      (_, conf) = TickConfigFile::type(values.first).value;
+      (_, conf) = values.first.value;
 
       context.getGlobal("ERRORS") match {
       | None() -> void
@@ -375,7 +383,7 @@ fun compile(
   // as it is likely to change across invocations.
   getOrInitializeBackend(context, config.ptrBitSize).writeArray(
     context,
-    SKStore.IID(0),
+    SKStore.UnitID::singleton,
     Array[TickConfigFile((context.tick.value, config))],
   );
 

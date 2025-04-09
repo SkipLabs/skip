@@ -94,11 +94,11 @@ fun createIndex(
     !needsReordering = true;
   };
 
-  handle = (SKStore.EHandle(x ~> x, RowValues::type, dirName));
+  handle = SKStore.EHandle(RowKey::keyType, RowValues::type, dirName);
 
   index = if (!needsReordering) handle else {
     handle.map(
-      x ~> x,
+      RowKey::keyType,
       RowValues::type,
       context,
       SKStore.DirName::create(indexName.lower),
@@ -114,7 +114,7 @@ fun createIndex(
     columnIndices = kinds.slice(0, size);
     _ = index
       .map(
-        x ~> x,
+        IndexProjKey::keyType,
         RowValues::type,
         context,
         SKStore.DirName::create(indexName.lower + "unique/proj/"),
@@ -142,11 +142,11 @@ fun createIndex(
         },
       )
       .map(
-        x ~> x,
-        SKStore.StringFile::type,
+        SKStore.NeverID::keyType,
+        SKStore.VoidFile::type,
         context,
         SKStore.DirName::create(indexName.lower + "unique/sink/"),
-        (_, _, key, values) ~> {
+        (_, _, projKey, values) ~> {
           repeat = 0;
           valuesArr = values.toArray();
           for (r in valuesArr) {
@@ -156,10 +156,7 @@ fun createIndex(
             throw Conflict(
               0,
               "UNIQUE constraint failed",
-              key match {
-              | projKey @ IndexProjKey _ -> projKey.toArray()
-              | _ -> invariant_violation("Unexpected key type")
-              },
+              projKey.toArray(),
               valuesArr,
             )
           }
