@@ -52,13 +52,13 @@ type MapFun = (
 /* Compaction types and helpers. */
 /*****************************************************************************/
 
-class Reducer{
+class Reducer<K: Orderable>{
   reducer: IReducer,
-  private fixed: Array<(Key, Array<File>)>,
-  modified: SortedMap<Key, Array<File>>,
+  private fixed: Array<(K, Array<File>)>,
+  modified: SortedMap<K, Array<File>>,
 } {
   static fun create(
-    fixedData: FixedData<Key, Array<File>>,
+    fixedData: FixedData<K, Array<File>>,
     reducer: IReducer,
   ): this {
     acc = mutable Vector[];
@@ -78,8 +78,8 @@ class Reducer{
   }
 
   fun unsafeIter(
-    start: ?Key = None(),
-  ): mutable Iterator<(Key, mutable Iterator<File>)> {
+    start: ?K = None(),
+  ): mutable Iterator<(K, mutable Iterator<File>)> {
     current = mutable IntRef(
       start match {
       | None() -> 0
@@ -114,8 +114,8 @@ class Reducer{
   }
 
   private static fun makeCompactKeyIterator(
-    fixedData: FixedData<Key, Array<File>>,
-    key: Key,
+    fixedData: FixedData<K, Array<File>>,
+    key: K,
     current: mutable IntRef,
   ): readonly Vector<File> {
     result = mutable Vector[];
@@ -131,14 +131,14 @@ class Reducer{
     result
   }
 
-  fun getArray(key: Key): Array<File> {
+  fun getArray(key: K): Array<File> {
     this.modified.maybeGet(key) match {
     | None() -> this.getFixedij(key, 0, this.fixed.size() - 1)
     | Some(values) -> values
     }
   }
 
-  private fun getFixedij(key: Key, i: Int, j: Int): Array<File> {
+  private fun getFixedij(key: K, i: Int, j: Int): Array<File> {
     if (i > j) {
       return Array[];
     };
@@ -150,7 +150,7 @@ class Reducer{
     }
   }
 
-  fun getFixed(key: Key): Array<File> {
+  fun getFixed(key: K): Array<File> {
     this.getFixedij(key, 0, this.fixed.size() - 1)
   }
 }
@@ -676,7 +676,7 @@ class EagerDir protected {
   > = FixedSingle::empty(),
   childDirs: SortedSet<DirName> = SortedSet[],
   private slices: RangeMapList<Key, DirName> = RangeMapList[],
-  private reducer: ?Reducer = None(),
+  private reducer: ?Reducer<Key> = None(),
   private purgeCount: Int = 0,
   private tombLimit: ?Tick = None(),
   optOnDelete: ?Postponable = None(),
