@@ -1148,9 +1148,7 @@ mutable class Context{
       for (parentName => _ in dir.parents) {
         this.unsafeMaybeGetEagerDir(parentName) match {
         | None() -> continue
-        | Some(parent) ->
-          !parent.childDirs = parent.childDirs.remove(dirName);
-          this.setDir(parent)
+        | Some(parent) -> this.setDir(parent.removeChildDir(dirName))
         }
       };
       dir.removeSubDirs(this);
