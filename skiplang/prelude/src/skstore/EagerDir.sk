@@ -633,7 +633,7 @@ mutable class FixedDataMapIterator<T> private {
 /* An Eager Directory. */
 /*****************************************************************************/
 
-class EagerDir{
+class EagerDir private {
   time: Time,
   timeStack: TimeStack,
   dirName: DirName,
@@ -642,7 +642,7 @@ class EagerDir{
   totalSize: Int,
   creator: ?ArrowKey,
   fixedOld: FixedSourceMap = FixedSourceMap::empty(),
-  data: DataMap = DataMap::empty(),
+  data: DataMap,
   old: SortedMap<Path, MInfo> = SortedMap[],
   parents: FixedSingle<
     DirName,
@@ -661,6 +661,30 @@ class EagerDir{
   ) = None(),
   optOnDelete: ?Postponable = None(),
 } extends Dir {
+  static fun create{
+    time: Time,
+    timeStack: TimeStack,
+    dirName: DirName,
+    input: Bool,
+    fixedData: FixedDataMap,
+    totalSize: Int,
+    creator: ?ArrowKey,
+    data: DataMap = DataMap::empty(),
+    optOnDelete: ?Postponable = None(),
+  }: this {
+    static{
+      time,
+      timeStack,
+      dirName,
+      input,
+      fixedData,
+      totalSize,
+      creator,
+      data,
+      optOnDelete,
+    }
+  }
+
   fun reset(
     context: mutable SKStore.Context,
     writer: Path,
