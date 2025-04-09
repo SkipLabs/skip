@@ -190,7 +190,7 @@ class FixedDirMetadata{
 class CompactFixedDir protected {
   metadata: FixedDirMetadata,
 } extends
-  IFixedDir<Key, Array<File>, CompactRow>,
+  IFixedDir<SKDB.RowKey, Array<SKDB.RowValues>, CompactRow>,
   FixedDataFactory<Key, Array<File>>,
 {
   static fun create<L: Key, V: Array<File>>(
@@ -258,7 +258,7 @@ class CompactFixedDir protected {
     };
   }
 
-  fun get(i: Int): FixedRow<Key, Array<File>> {
+  fun get(i: Int): FixedRow<SKDB.RowKey, Array<SKDB.RowValues>> {
     compactRow = this.data.unsafe_get(i);
     rowValues = SKDB.RowValues(compactRow.values, compactRow.repeat);
     rowKey = SKDB.RowKey(rowValues, this.metadata.kinds);
@@ -268,7 +268,7 @@ class CompactFixedDir protected {
     };
     FixedRow(
       rowKey,
-      Array[(rowValues : File)],
+      Array[rowValues],
       Path::create(this.metadata.sourceDir, sourceKey),
       compactRow.tag,
     )
