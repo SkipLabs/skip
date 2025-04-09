@@ -60,17 +60,17 @@ value class FixedRow<K: Orderable, +T>(
   }
 }
 
-base class FixedData<+T> {
+base class FixedData<K: Orderable, +T> {
   fun size(): Int;
-  fun get(idx: Int): FixedRow<Key, T>;
-  fun getPos(key: Key): Int;
-  fun getArray(key: Key): Array<T>;
-  fun getIter(key: Key): mutable Iterator<(Tick, Path, T)>;
-  fun getIterAfter(tick: Tick, key: Key): mutable Iterator<(Tick, Path, T)>;
-  fun getArraySourceKey(source: Path, key: Key): Array<T>;
-  fun getIterSourceKey(source: Path, key: Key): mutable Iterator<T>;
-  fun getChangesAfter(tick: Tick): SortedSet<Key>;
-  fun iterator(): mutable Iterator<FixedRow<Key, T>>;
+  fun get(idx: Int): FixedRow<K, T>;
+  fun getPos(key: K): Int;
+  fun getArray(key: K): Array<T>;
+  fun getIter(key: K): mutable Iterator<(Tick, Path, T)>;
+  fun getIterAfter(tick: Tick, key: K): mutable Iterator<(Tick, Path, T)>;
+  fun getArraySourceKey(source: Path, key: K): Array<T>;
+  fun getIterSourceKey(source: Path, key: K): mutable Iterator<T>;
+  fun getChangesAfter(tick: Tick): SortedSet<K>;
+  fun iterator(): mutable Iterator<FixedRow<K, T>>;
 }
 
 // Assuming delta is monotone, that is, i <= j implies delta(i) <= delta(j),
@@ -227,7 +227,7 @@ class CompactFixedDir protected {
 // internal RowRepresentation of conceptually-FixedRow<Key, T> rows.
 base class IFixedDir<+T: frozen, RowRepresentation: frozen> protected {
   data: Array<RowRepresentation> = Array[],
-} extends FixedData<T> {
+} extends FixedData<Key, T> {
   fun get(i: Int): FixedRow<Key, T>;
 
   fun iterator(): mutable Iterator<FixedRow<Key, T>> {
