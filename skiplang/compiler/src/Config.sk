@@ -8,8 +8,23 @@
 module Config;
 
 private fun hostTarget(): String {
-  // TODO: invoke llvm-config --host-target
-  "x86_64-pc-linux-gnu"
+  p = System.subprocess(Array["llvm-config", "--host-target"]) match {
+  | Success(p) -> p
+  | Failure(err) ->
+    print_string(`Error while detecting host target triple: ${err}`);
+    skipExit(2)
+  };
+  if (!p.success()) {
+    print_string("Error while detecting host target triple:");
+    if (p.stdout != "") {
+      print_string(p.stdout)
+    };
+    if (p.stderr != "") {
+      print_string(p.stderr)
+    };
+    skipExit(2);
+  };
+  p.stdout.trimRight()
 }
 
 // If `--sklib-name` was not provided, infer a name from the output file.
