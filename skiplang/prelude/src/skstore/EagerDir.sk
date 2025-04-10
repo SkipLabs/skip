@@ -76,14 +76,17 @@ class Reducer{
   fixed: Array<(Key, Array<File>)>,
   modified: SortedMap<Key, Array<File>>,
 } {
-  static fun create(fixedData: FixedDataMap, reducer: IReducer): this {
+  static fun create(
+    fixedData: FixedData<Array<File>>,
+    reducer: IReducer,
+  ): this {
     acc = mutable Vector[];
     modified = SortedMap[];
     current = mutable IntRef(0);
-    while (current.value < fixedData.data.size()) {
-      key = fixedData.data[current.value].key;
+    while (current.value < fixedData.size()) {
+      key = fixedData[current.value].key;
       iterator = static::makeCompactKeyIterator(
-        fixedData.data,
+        fixedData,
         key,
         current,
       ).iterator();
@@ -1357,7 +1360,7 @@ class EagerDir{
       fixedData = FixedDataMap::create(acc);
       totalSize = acc.size();
       reducer = reducerOpt.map(ireducer ->
-        Reducer::create(fixedData, ireducer)
+        Reducer::create(fixedData.data, ireducer)
       );
 
       if (context.debugMode) {
