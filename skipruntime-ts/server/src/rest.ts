@@ -16,7 +16,8 @@ export function controlService(service: ServiceInstance): express.Express {
     try {
       const uuid = crypto.randomUUID();
       service.instantiateResource(uuid, req.params.resource, req.body as Json);
-      res.status(201).send(uuid);
+      const prefix = process.env["SKIP_RESOURCE_PREFIX"];
+      res.status(201).send(prefix ? `${prefix}/${uuid}` : uuid);
     } catch (e: unknown) {
       console.log(e);
       res.status(500).json(e instanceof Error ? e.message : e);
