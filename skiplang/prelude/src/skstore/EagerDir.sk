@@ -132,11 +132,11 @@ class Reducer{
     };
   }
 
-  static fun makeCompactKeyIterator(
+  private static fun makeCompactKeyIterator(
     fixedData: FixedData<Array<File>>,
     key: Key,
     current: mutable IntRef,
-  ): Array<File> {
+  ): readonly Vector<File> {
     result = mutable Vector[];
     while (
       current.value < fixedData.size() &&
@@ -147,8 +147,7 @@ class Reducer{
       };
       current.incr();
     };
-    x = result.toArray();
-    x
+    result
   }
 
   fun getArray(key: Key): Array<File> {
