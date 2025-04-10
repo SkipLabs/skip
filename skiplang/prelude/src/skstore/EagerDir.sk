@@ -517,25 +517,25 @@ class DataMap<K: Orderable> private {
   }
 }
 
-class FixedDataMap<K: Orderable>{
-  data: FixedData<K, Array<File>>,
+class FixedDataMap<K: Orderable, F: frozen>{
+  data: FixedData<K, Array<F>>,
   tombs: FixedDir<K, Path>,
 } uses Unsafe.Downcastable {
   private static fun fixedDataFactory(): Concrete<
-    FixedDataFactory<K, Array<File>>,
+    FixedDataFactory<K, Array<F>>,
   > {
     // Does not work as expected if types are not explicitly given
     Unsafe.unsafeSpecializeFactory<
-      FixedDataMap<K>,
-      FixedDataMap<Key>,
-      FixedDataFactory<K, Array<File>>,
+      FixedDataMap<K, F>,
+      FixedDataMap<Key, File>,
+      FixedDataFactory<K, Array<F>>,
       CompactFixedDir,
-      FixedDir<K, Array<File>>,
-    >(static, FixedDataMap, CompactFixedDir, FixedDir<K, Array<File>>)
+      FixedDir<K, Array<F>>,
+    >(static, FixedDataMap, CompactFixedDir, FixedDir<K, Array<F>>)
   }
 
-  static fun create<V: File>(
-    vec: mutable Vector<FixedRow<K, Array<V>>> = mutable Vector[],
+  static fun create(
+    vec: mutable Vector<FixedRow<K, Array<F>>> = mutable Vector[],
     tombs: mutable Vector<FixedRow<K, Path>> = mutable Vector[],
   ): this {
     data = static::fixedDataFactory()::create(vec);
@@ -550,7 +550,7 @@ class FixedDataMap<K: Orderable>{
     this.data.getChangesAfter(tick).union(this.tombs.getChangesAfter(tick))
   }
 
-  fun getIterAll(): mutable Iterator<(Tick, Path, Path, K, Array<File>)> {
+  fun getIterAll(): mutable Iterator<(Tick, Path, Path, K, Array<F>)> {
     iter1 = this.data.iterator();
     iter2 = this.tombs.data.iterator();
     left = iter1.next();
@@ -578,7 +578,7 @@ class FixedDataMap<K: Orderable>{
     }
   }
 
-  fun getIter(key: K): mutable Iterator<(Tick, Path, Path, Array<File>)> {
+  fun getIter(key: K): mutable Iterator<(Tick, Path, Path, Array<F>)> {
     iter1 = this.data.getIter(key);
     iter2 = this.tombs.getIter(key);
     left = iter1.next();
@@ -609,7 +609,7 @@ class FixedDataMap<K: Orderable>{
   fun getIterAfter(
     tick: Tick,
     key: K,
-  ): mutable Iterator<(Tick, Path, Path, Array<File>)> {
+  ): mutable Iterator<(Tick, Path, Path, Array<F>)> {
     iter1 = this.data.getIterAfter(tick, key);
     iter2 = this.tombs.getIterAfter(tick, key);
     left = iter1.next();
@@ -668,7 +668,7 @@ mutable class FixedDataMapIterator<T> private {
 
 class EagerDir protected {
   input: Bool,
-  private fixedData: FixedDataMap<Key>,
+  private fixedData: FixedDataMap<Key, File>,
   private totalSize: Int,
   creator: ?ArrowKey,
   private fixedOld: FixedSourceMap = FixedSourceMap::empty(),
@@ -695,7 +695,7 @@ class EagerDir protected {
     timeStack: TimeStack,
     dirName: DirName,
     input: Bool,
-    fixedData: FixedDataMap<Key> = FixedDataMap::create(),
+    fixedData: FixedDataMap<Key, File> = FixedDataMap::create(),
     creator: ?ArrowKey,
     data: DataMap<Key> = DataMap::empty(),
     optOnDelete: ?Postponable = None(),
@@ -844,7 +844,7 @@ class EagerDir protected {
     FixedSourceMap::create(acc)
   }
 
-  private fun flattenData(limit: Tick): FixedDataMap<Key> {
+  private fun flattenData(limit: Tick): FixedDataMap<Key, File> {
     withRegionValue(() ~> {
       fixedIter = FixedDataMapIterator::create(this.fixedData.getIterAll());
       data = Vector::mcreate(
