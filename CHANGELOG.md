@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.14] - 2025-04-10
+
+### Added
+- asLeader/asFollower utilities for distributed Skip services (#853).
+- Various Skiplang/Skargo improvements for native code (#838-#847, #849)
+
 ## [0.0.13] - 2025-03-21
 
 ### Added
