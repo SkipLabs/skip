@@ -288,14 +288,14 @@ fun writeAndUpdate(
 fun genRanges(
   config: FilterTestConfig,
   rand: mutable Random,
-): Array<SKStore.KeyRange<SKStore.Key>> {
+): Array<SKStore.KeyRange<SKStore.IID>> {
   ranges = mutable Vector[];
   rangesSize = rand.random(1, config.maxRangeWidth);
   for (_ in Range(0, rangesSize)) {
     start = rand.random(0, config.maxRangeWidth);
     ranges.push(
       SKStore.KeyRange::create(
-        (SKStore.IID(start) : SKStore.Key),
+        SKStore.IID(start),
         SKStore.IID(start + rand.random(0, 4)),
       ),
     );
