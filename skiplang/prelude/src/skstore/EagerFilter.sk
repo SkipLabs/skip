@@ -21,7 +21,7 @@ module SKStore;
 
 base class IMaxKeyFile extends File uses Unsafe.Downcastable
 
-class MaxKeyFile(key: Key) extends IMaxKeyFile {
+class MaxKeyFile<+K: frozen>(key: K) extends IMaxKeyFile {
   static fun type(obj: File): this {
     obj match {
     | x @ IMaxKeyFile _ -> Unsafe.cast(x, static)
@@ -156,7 +156,7 @@ class EagerFilter private {
       arr = context
         .unsafeGetEagerDir(this.fullName)
         .getArrayRaw(this.childName);
-      if (arr.size() > 0 && MaxKeyFile::type(arr[0]).key < startKey) {
+      if (arr.size() > 0 && MaxKeyFile<Key>::type(arr[0]).key < startKey) {
         return void;
       }
     };
@@ -227,7 +227,9 @@ class EagerFilter private {
       !childDir = childDir.writeEntry(context, source, source, key, Array[]);
     };
 
-    fullFiles = if (toAdd == 0) Array[MaxKeyFile(keys.max().fromSome())] else {
+    fullFiles = if (toAdd == 0) {
+      Array[MaxKeyFile<Key>(keys.max().fromSome())]
+    } else {
       Array[]
     };
 
