@@ -214,33 +214,27 @@ base class IFixedDir<T: frozen, RowRepresentation: frozen> protected {
   static fun getMetadata(
     data: readonly Vector<FixedRow<Array<File>>>,
   ): ?FixedDirMetadata {
-    if (data.isEmpty()) return None();
-    sourceDir: ?DirName = None();
-    kinds: ?Array<(Int, SQLParser.IKind, SQLParser.Type)> = None();
+    possibleResult: ?FixedDirMetadata = None();
 
     for (elt in data) {
       if (elt.value.size() != 1) return None();
       (elt.key, elt.value[0]) match {
       | (SKDB.RowKey(row1, k), row2 @ SKDB.RowValues _) ->
-        kinds match {
-        | None() -> !kinds = Some(k)
-        | Some(k2) ->
-          if (k != k2) {
+        possibleResult match {
+        | None() ->
+          !possibleResult = Some(
+            FixedDirMetadata{sourceDir => elt.source.dirName, kinds => k},
+          )
+        | Some(FixedDirMetadata{sourceDir, kinds}) ->
+          if (k != kinds || elt.source.dirName != sourceDir) {
             return None()
           }
-        };
-        !sourceDir = sourceDir match {
-        | None() -> Some(elt.source.dirName)
-        | sd @ Some(dir) if (dir == elt.source.dirName) -> sd
-        | _ -> return None()
         };
         if (row1 != row2) return None()
       | _ -> return None()
       }
     };
-    sourceDir.map(sourceDir ->
-      FixedDirMetadata{sourceDir, kinds => kinds.fromSome()}
-    )
+    possibleResult
   }
 
   fun size(): Int {
