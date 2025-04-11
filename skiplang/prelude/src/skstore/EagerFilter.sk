@@ -247,14 +247,16 @@ class EagerFilter private {
     context.setDir(childDir)
   }
 
-  static fun create(
+  static fun create<K: Key, F: File>(
+    keyType: Key ~> K,
+    type: File ~> F,
     context: mutable Context,
     parentName: DirName,
     childName: DirName,
     capacity: Int,
-    fileSize: File ~> Int,
-    removeFromFile: (File, Int) ~> File,
-    filter: (mutable Context, Key, File) ~> Bool,
+    fileSize: F ~> Int,
+    removeFromFile: (F, Int) ~> F,
+    filter: (mutable Context, K, F) ~> Bool,
     rangesOpt: ?Array<KeyRange<Key>>,
   ): void {
     filterRange = FilterRange::create(rangesOpt);
@@ -265,9 +267,10 @@ class EagerFilter private {
       childName,
       fullName,
       capacity,
-      fileSize,
-      removeFromFile,
-      filter,
+      fileSize => (file: File) ~> fileSize(type(file)),
+      removeFromFile => (file: File, n: Int) ~> removeFromFile(type(file), n),
+      filter => (context, key, file) ~>
+        filter(context, keyType(key), type(file)),
     };
     result.bindDirectories(context, filterRange);
     result.syncData(context, None(), filterRange);
