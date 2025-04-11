@@ -661,7 +661,7 @@ class ExprEvaluator(
       sdir = evalSelect(context, select, Some(this));
       dir = context.unsafeGetEagerDir(sdir.dirName);
       if (dir.time.value > 0) {
-        !dir.time = SKStore.Time(-dir.time.value);
+        !dir = dir.reverseTime();
         context.setDir(dir);
       };
       size = dir.size(context);
@@ -848,7 +848,7 @@ class ExprEvaluator(
       dirName = sdir.dirName;
       dir = context.unsafeGetEagerDir(dirName);
       if (dir.time.value > 0) {
-        !dir.time = SKStore.Time(-dir.time.value);
+        !dir = dir.reverseTime();
         context.setDir(dir);
       };
       invariant(query.orderBy is None());
@@ -892,7 +892,7 @@ class ExprEvaluator(
       dirName = sdir.dirName;
       dir = context.unsafeGetEagerDir(dirName);
       if (dir.time.value > 0) {
-        !dir.time = SKStore.Time(-dir.time.value);
+        !dir = dir.reverseTime();
         context.setDir(dir);
       };
       invariant(query.orderBy is None());
@@ -936,7 +936,7 @@ class ExprEvaluator(
       dirName = sdir.dirName;
       dir = context.unsafeGetEagerDir(dirName);
       if (dir.time.value > 0) {
-        !dir.time = SKStore.Time(-dir.time.value);
+        !dir = dir.reverseTime();
         context.setDir(dir);
       };
       invariant(query.orderBy is None());
@@ -1019,7 +1019,7 @@ class ExprEvaluator(
     dirName = sdir.dirName;
     dir = context.unsafeGetEagerDir(dirName);
     if (dir.time.value > 0) {
-      !dir.time = SKStore.Time(-dir.time.value);
+      !dir = dir.reverseTime();
       context.setDir(dir);
     };
     keys = dir.keys();

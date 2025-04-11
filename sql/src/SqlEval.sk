@@ -1443,9 +1443,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       },
     );
     sinkDir = context.unsafeGetEagerDir(sinkDirName);
-    !sinkDir.time.value = Int::max - sinkDir.time.value;
-    !sinkDir.timeStack = sinkDir.timeStack.maxMinus();
-    context.setDir(sinkDir);
+    context.setDir(sinkDir.timeMaxMinus());
     updateTableMap(context);
     sinkDirName
   }
@@ -2078,12 +2076,11 @@ fun importNext(
         targetCtx.unsafeMaybeGetDir(targetDirName) match {
         | None() ->
           time = targetCtx.timeStamp();
-          targetDir = SKStore.EagerDir{
+          targetDir = SKStore.EagerDir::create{
             time,
             timeStack => SKStore.TimeStack::createInput(time),
             input => true,
             dirName => targetDirName,
-            fixedData => SKStore.FixedDataMap::create(),
             totalSize => 0,
             creator => None(),
           };

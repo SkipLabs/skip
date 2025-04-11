@@ -647,13 +647,12 @@ mutable class Context{
         | None() ->
           this.!newDirs = this.newDirs.add(preDirName);
           time = this.timeStamp();
-          preDir = EagerDir{
+          preDir = EagerDir::create{
             time,
             input => false,
             timeStack => TimeStack::createInput(time),
             dirName => preDirName,
             totalSize => 0,
-            fixedData => FixedDataMap::create(),
             creator => this.currentArrow(),
           };
           dir.unsafeIterKeys((key, _time) -> {
@@ -1038,7 +1037,7 @@ mutable class Context{
 
     totalSize = fixedData.data.size();
     creator = this.currentArrow();
-    dir = EagerDir{
+    dir = EagerDir::create{
       time,
       timeStack => TimeStack::create(this, time),
       input => true,
@@ -1148,9 +1147,7 @@ mutable class Context{
       for (parentName => _ in dir.parents) {
         this.unsafeMaybeGetEagerDir(parentName) match {
         | None() -> continue
-        | Some(parent) ->
-          !parent.childDirs = parent.childDirs.remove(dirName);
-          this.setDir(parent)
+        | Some(parent) -> this.setDir(parent.removeChildDir(dirName))
         }
       };
       dir.removeSubDirs(this);
@@ -1159,9 +1156,7 @@ mutable class Context{
       this.!deps = this.deps.removeDir(dirName);
       this.!dirsWithSharedSubDirs = this.dirsWithSharedSubDirs.remove(dirName);
       this.!sharedSubDirsRefCount = this.sharedSubDirsRefCount.remove(dirName);
-      this.setDir(
-        DeletedDir{dirName, time => dir.time, timeStack => dir.timeStack},
-      )
+      this.setDir(DeletedDir::ofDir(dir))
     };
   }
 
@@ -1824,7 +1819,7 @@ fun withRegionValue<T>(f: () ~> T): T {
 /*
   Use with caution!!!
   If f if a unnamed closure, It can only capture variables from ancestors obstack of saved.
-  If the this mecanism is duplicated with a closure the accept parameters,
+  If the this mechanism is duplicated with a closure the accept parameters,
   the parameters must belong to the ancestors obstack of saved.
   The f function can neither create nor delete obstacks.
   The f function can't use callOnParentObstack.

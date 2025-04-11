@@ -214,33 +214,27 @@ base class IFixedDir<T: frozen, RowRepresentation: frozen> protected {
   static fun getMetadata(
     data: readonly Vector<FixedRow<Array<File>>>,
   ): ?FixedDirMetadata {
-    if (data.isEmpty()) return None();
-    sourceDir: ?DirName = None();
-    kinds: ?Array<(Int, SQLParser.IKind, SQLParser.Type)> = None();
+    possibleResult: ?FixedDirMetadata = None();
 
     for (elt in data) {
       if (elt.value.size() != 1) return None();
       (elt.key, elt.value[0]) match {
       | (SKDB.RowKey(row1, k), row2 @ SKDB.RowValues _) ->
-        kinds match {
-        | None() -> !kinds = Some(k)
-        | Some(k2) ->
-          if (k != k2) {
+        possibleResult match {
+        | None() ->
+          !possibleResult = Some(
+            FixedDirMetadata{sourceDir => elt.source.dirName, kinds => k},
+          )
+        | Some(FixedDirMetadata{sourceDir, kinds}) ->
+          if (k != kinds || elt.source.dirName != sourceDir) {
             return None()
           }
-        };
-        !sourceDir = sourceDir match {
-        | None() -> Some(elt.source.dirName)
-        | sd @ Some(dir) if (dir == elt.source.dirName) -> sd
-        | _ -> return None()
         };
         if (row1 != row2) return None()
       | _ -> return None()
       }
     };
-    sourceDir.map(sourceDir ->
-      FixedDirMetadata{sourceDir, kinds => kinds.fromSome()}
-    )
+    possibleResult
   }
 
   fun size(): Int {
@@ -371,124 +365,6 @@ base class IFixedDir<T: frozen, RowRepresentation: frozen> protected {
     acc = mutable Vector[];
     this.getKeyChangesAfter(limit, key, 0, this.data.size() - 1, acc);
     acc.iterator()
-  }
-}
-
-/*****************************************************************************/
-/* Same as FixedDir but with no values. */
-/*****************************************************************************/
-
-value class FixedKey(key: Key, tag: TickRange) uses Orderable {
-  fun compare(fixedKey2: FixedKey): Order {
-    this.key.compare(fixedKey2.key) match {
-    | EQ() -> this.tag.current.compare(fixedKey2.tag.current)
-    | x -> x
-    }
-  }
-}
-
-class FixedSet private {data: Array<FixedKey> = Array[]} {
-  static fun create(set: SortedSet<FixedKey> = SortedSet[]): this {
-    data = mutable Vector[];
-    lastOpt: ?FixedKey = None();
-    for (elt in set) {
-      lastOpt match {
-      | None() -> data.push(elt)
-      | Some(last) ->
-        if (last.key == elt.key) {
-          if (elt.tag.current > last.tag.current) {
-            data![data.size() - 1] = elt;
-          }
-        } else {
-          data.push(elt)
-        }
-      };
-      !lastOpt = Some(elt)
-    };
-    result = data.toArray().clone();
-    cache = Array::mfill(result.size(), false);
-    _ = static::computeTags(cache, result, 0, result.size() - 1);
-    FixedSet{data => result.chill()}
-  }
-
-  fun size(): Int {
-    this.data.size()
-  }
-
-  protected static fun computeTags(
-    cache: mutable Array<Bool>,
-    array: mutable Array<FixedKey>,
-    i: Int,
-    j: Int,
-  ): TickRange {
-    if (i > j) {
-      if (i < 0 || i >= array.size()) {
-        return TickRange::create(Tick(0))
-      } else {
-        loop {
-          elt = array[i];
-          key = elt.key;
-          maxVal = elt.tag.max;
-          loop {
-            !i = i + 1;
-            if (i >= array.size() || array[i].key != key) {
-              return TickRange::create(maxVal)
-            };
-            !maxVal = max(maxVal, array[i].tag.max);
-            if (cache[i]) {
-              return TickRange::create(maxVal)
-            };
-          }
-        }
-      }
-    };
-    pivot = i + (j - i) / 2;
-    elt = array[pivot];
-    tag = elt.tag;
-    right = static::computeTags(cache, array, pivot + 1, j);
-    left = static::computeTags(cache, array, i, pivot - 1);
-    !tag.max = max(tag.max, max(left.max, right.max));
-    array![pivot] = elt with {tag};
-    cache![pivot] = true;
-    tag
-  }
-
-  private fun getChangesAcc(
-    after: Tick,
-    acc: mutable Vector<Key>,
-    i: Int,
-    j: Int,
-  ): void {
-    if (i < 0 || i >= this.data.size()) {
-      return void
-    };
-    if (i >= j) {
-      tick = this.data[i].tag;
-      if (tick.max < after) return void;
-      if (tick.current >= after) {
-        acc.push(this.data[i].key);
-      };
-      return void;
-    };
-    pivot = i + (j - i) / 2;
-    elt = this.data[pivot];
-    tick = elt.tag;
-    if (tick.max < after) return void;
-    if (tick.current >= after) {
-      acc.push(elt.key);
-    };
-    this.getChangesAcc(after, acc, i, pivot - 1);
-    this.getChangesAcc(after, acc, pivot + 1, j);
-  }
-
-  fun getChangesAfter(tick: Tick): SortedSet<Key> {
-    acc = mutable Vector[];
-    this.getChangesAcc(tick, acc, 0, this.data.size() - 1);
-    result = SortedSet[];
-    for (elt in acc) {
-      !result = result.set(elt);
-    };
-    result
   }
 }
 

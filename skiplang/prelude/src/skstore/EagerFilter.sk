@@ -94,18 +94,16 @@ class EagerFilter private {
     suffixOpt: ?String,
   ): DirName {
     time = context.timeStamp();
-    fixedData = FixedDataMap::create();
     creator = context.currentArrow();
     dirName = suffixOpt match {
     | None() -> childName
     | Some(suffix) -> childName.sub(suffix)
     };
-    dir = EagerDir{
+    dir = EagerDir::create{
       time,
       timeStack => TimeStack::createInput(time),
       input => false,
       dirName,
-      fixedData,
       totalSize => 0,
       creator,
     };

@@ -76,14 +76,17 @@ class Reducer{
   fixed: Array<(Key, Array<File>)>,
   modified: SortedMap<Key, Array<File>>,
 } {
-  static fun create(fixedData: FixedDataMap, reducer: IReducer): this {
+  static fun create(
+    fixedData: FixedData<Array<File>>,
+    reducer: IReducer,
+  ): this {
     acc = mutable Vector[];
     modified = SortedMap[];
     current = mutable IntRef(0);
-    while (current.value < fixedData.data.size()) {
-      key = fixedData.data[current.value].key;
+    while (current.value < fixedData.size()) {
+      key = fixedData[current.value].key;
       iterator = static::makeCompactKeyIterator(
-        fixedData.data,
+        fixedData,
         key,
         current,
       ).iterator();
@@ -129,11 +132,11 @@ class Reducer{
     };
   }
 
-  static fun makeCompactKeyIterator(
+  private static fun makeCompactKeyIterator(
     fixedData: FixedData<Array<File>>,
     key: Key,
     current: mutable IntRef,
-  ): Array<File> {
+  ): readonly Vector<File> {
     result = mutable Vector[];
     while (
       current.value < fixedData.size() &&
@@ -144,8 +147,7 @@ class Reducer{
       };
       current.incr();
     };
-    x = result.toArray();
-    x
+    result
   }
 
   fun getArray(key: Key): Array<File> {
@@ -631,7 +633,7 @@ mutable class FixedDataMapIterator<T> private {
 /* An Eager Directory. */
 /*****************************************************************************/
 
-class EagerDir{
+class EagerDir private {
   time: Time,
   timeStack: TimeStack,
   dirName: DirName,
@@ -640,7 +642,7 @@ class EagerDir{
   totalSize: Int,
   creator: ?ArrowKey,
   fixedOld: FixedSourceMap = FixedSourceMap::empty(),
-  data: DataMap = DataMap::empty(),
+  data: DataMap,
   old: SortedMap<Path, MInfo> = SortedMap[],
   parents: FixedSingle<
     DirName,
@@ -659,6 +661,30 @@ class EagerDir{
   ) = None(),
   optOnDelete: ?Postponable = None(),
 } extends Dir {
+  static fun create{
+    time: Time,
+    timeStack: TimeStack,
+    dirName: DirName,
+    input: Bool,
+    fixedData: FixedDataMap = FixedDataMap::create(),
+    totalSize: Int,
+    creator: ?ArrowKey,
+    data: DataMap = DataMap::empty(),
+    optOnDelete: ?Postponable = None(),
+  }: this {
+    static{
+      time,
+      timeStack,
+      dirName,
+      input,
+      fixedData,
+      totalSize,
+      creator,
+      data,
+      optOnDelete,
+    }
+  }
+
   fun reset(
     context: mutable SKStore.Context,
     writer: Path,
@@ -1189,7 +1215,7 @@ class EagerDir{
     context.leave(arrow);
   }
 
-  static fun isReusable(
+  private static fun isReusable(
     context: mutable Context,
     child: EagerDir,
     parents: FixedSingle<
@@ -1232,7 +1258,10 @@ class EagerDir{
     }
   }
 
-  static fun reuseDir(context: mutable Context, childName: DirName): void {
+  private static fun reuseDir(
+    context: mutable Context,
+    childName: DirName,
+  ): void {
     if (context.debugMode) {
       print_string(`REUSING: ${childName}`);
     };
@@ -1357,7 +1386,7 @@ class EagerDir{
       fixedData = FixedDataMap::create(acc);
       totalSize = acc.size();
       reducer = reducerOpt.map(ireducer ->
-        Reducer::create(fixedData, ireducer)
+        Reducer::create(fixedData.data, ireducer)
       );
 
       if (context.debugMode) {
@@ -1398,7 +1427,7 @@ class EagerDir{
     };
   }
 
-  static fun addChildToParent(
+  private static fun addChildToParent(
     context: mutable Context,
     parentName: DirName,
     childName: DirName,
@@ -1611,7 +1640,7 @@ class EagerDir{
         ctx = contextOpt.fromSome();
         ctx.enter(ArrowKey(parentName, childName, key), timeStack);
         path = Path::create(parentName, key);
-        oldInfo = static::getOld(child, path);
+        oldInfo = child.getOld(path);
         oldKeys = SortedSet<Key>::createFromItems(oldInfo.getKeys());
         newDirsCopy = ctx.newDirs;
         readsCopy = ctx.reads;
@@ -1676,7 +1705,7 @@ class EagerDir{
           reads.toArray(),
         );
         // The source cannot be removed from old here
-        // => prevent getting fixed data minfo on multiple call durring update
+        // => prevent getting fixed data minfo on multiple call during update
         !child.old[path] = minfo;
         ctx.leave(ArrowKey(parentName, childName, key));
         child
@@ -2043,15 +2072,29 @@ class EagerDir{
     this.fixedOld.items().each(e -> e.i1.getNewDirs().each(context.removeDir))
   }
 
-  static fun getOld(child: EagerDir, key: Path): MInfo {
-    if (child.old.containsKey(key)) {
-      child.old[key]
+  private fun getOld(key: Path): MInfo {
+    if (this.old.containsKey(key)) {
+      this.old[key]
     } else {
-      child.fixedOld.maybeGet(key) match {
+      this.fixedOld.maybeGet(key) match {
       | None() -> MInfo::empty()
       | Some(v) -> v
       }
     }
+  }
+
+  fun removeChildDir(dirName: DirName): this {
+    this with {childDirs => this.childDirs.remove(dirName)}
+  }
+
+  fun timeMaxMinus(): this {
+    !this.time.value = Int::max - this.time.value;
+    !this.timeStack = this.timeStack.maxMinus();
+    this
+  }
+
+  fun reverseTime(): this {
+    this with {time => SKStore.Time(-this.time.value)}
   }
 
   fun updateNewDirs(
@@ -2059,7 +2102,7 @@ class EagerDir{
     source: Path,
     newDirs: SortedSet<DirName>,
   ): this {
-    minfo = static::getOld(this, source);
+    minfo = this.getOld(source);
     lastRoundDirs = minfo.getNewDirs();
     removed = mutable Vector[];
     if (context.isWithSharedSubDirs(this.dirName)) {
