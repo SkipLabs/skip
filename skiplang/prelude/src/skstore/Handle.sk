@@ -376,7 +376,9 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
     typeOutputKey: Key ~> K2,
     typeOutput: File ~> V3,
     context: mutable Context,
-    parents: Array<(EHandle<K, V>, (TMapFun<K, V, K2, V2>, ?Array<KeyRange>))>,
+    parents: Array<
+      (EHandle<K, V>, (TMapFun<K, V, K2, V2>, ?Array<KeyRange<Key>>)),
+    >,
     dirName: DirName,
     reducerOpt: ?IReducer = None(),
   ): EHandle<K2, V3> {
@@ -421,7 +423,9 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
     typeOutputKey: Key ~> K2,
     typeOutput: File ~> V2,
     context: mutable Context,
-    parents: Array<(EHandle<K, V>, (TMapFun<K, V, K2, V2>, ?Array<KeyRange>))>,
+    parents: Array<
+      (EHandle<K, V>, (TMapFun<K, V, K2, V2>, ?Array<KeyRange<Key>>)),
+    >,
     dirName: DirName,
   ): EHandle<K2, V2> {
     static::genMultiMapReduce(
@@ -438,7 +442,9 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
     typeOutputKey: Key ~> K2,
     typeOutput: File ~> V2,
     context: mutable Context,
-    parents: Array<(EHandle<K, V>, (TMapFun<K, V, K2, V2>, ?Array<KeyRange>))>,
+    parents: Array<
+      (EHandle<K, V>, (TMapFun<K, V, K2, V2>, ?Array<KeyRange<Key>>)),
+    >,
     dirName: DirName,
     reducer: EReducer<V2, V3>,
   ): EHandle<K2, V3> {
@@ -468,7 +474,7 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
     context: mutable Context,
     dirName: DirName,
     f: TMapFun<K, V, K2, V2>,
-    rangeOpt: ?Array<KeyRange> = None(),
+    rangeOpt: ?Array<KeyRange<Key>> = None(),
   ): EHandle<K2, V2> {
     static::multiMap(
       typeKey,
@@ -486,7 +492,7 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
     dirName: DirName,
     f: TMapFun<K, V, K2, V2>,
     reducer: EReducer<V2, V3>,
-    rangeOpt: ?Array<KeyRange> = None(),
+    rangeOpt: ?Array<KeyRange<Key>> = None(),
   ): EHandle<K2, V3> {
     static::multiMapReduce(
       typeKey,
@@ -505,7 +511,7 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
     f: (mutable Context, K, V) ~> Bool,
     fileSize: V ~> Int,
     removeFromFile: (V, Int) ~> V,
-    rangesOpt: ?Array<KeyRange>,
+    rangesOpt: ?Array<KeyRange<Key>>,
   ): EHandle<K, V> {
     EagerFilter::create(
       context,
