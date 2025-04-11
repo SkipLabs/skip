@@ -32,7 +32,7 @@ class SubTask(
   key: SKStore.Key,
   inputRow: Row,
   entries: List<Row>,
-  remainingTables: List<(SKDB.DirDescr, ?Array<SKStore.KeyRange>)>,
+  remainingTables: List<(SKDB.DirDescr, ?Array<SKStore.KeyRange<SKStore.Key>>)>,
 )
 
 class KVFile(value: (SKStore.Key, Array<SKStore.File>)) extends SKStore.File
@@ -819,7 +819,7 @@ class SelectEvaluator{
 
   fun evalSelectTableList(
     context: mutable SKStore.Context,
-    tables: List<(DirDescr, ?Array<SKStore.KeyRange>)>,
+    tables: List<(DirDescr, ?Array<SKStore.KeyRange<SKStore.Key>>)>,
     entries: List<Row>,
   ): SKStore.EHandle<SKStore.Key, Row> {
     tables match {
@@ -858,11 +858,14 @@ class SelectEvaluator{
   fun makeParents(
     context: mutable SKStore.Context,
     dirName: SKStore.DirName,
-    rangeOpt: ?Array<SKStore.KeyRange>,
-    remainingTables: List<(DirDescr, ?Array<SKStore.KeyRange>)>,
+    rangeOpt: ?Array<SKStore.KeyRange<SKStore.Key>>,
+    remainingTables: List<(DirDescr, ?Array<SKStore.KeyRange<SKStore.Key>>)>,
     entries: List<Row>,
   ): Array<
-    (SKStore.EHandle<SKStore.Key, Row>, (MapFunRow, ?Array<SKStore.KeyRange>)),
+    (
+      SKStore.EHandle<SKStore.Key, Row>,
+      (MapFunRow, ?Array<SKStore.KeyRange<SKStore.Key>>),
+    ),
   > {
     queryKind = this.select.rest match {
     | List.Nil() -> None()
@@ -925,8 +928,8 @@ class SelectEvaluator{
   fun evalSelectTable(
     context: mutable SKStore.Context,
     dir: SKStore.EHandle<SKStore.Key, Row>,
-    rangeOpt: ?Array<SKStore.KeyRange>,
-    remainingTables: List<(DirDescr, ?Array<SKStore.KeyRange>)>,
+    rangeOpt: ?Array<SKStore.KeyRange<SKStore.Key>>,
+    remainingTables: List<(DirDescr, ?Array<SKStore.KeyRange<SKStore.Key>>)>,
     entries: List<Row>,
   ): SKStore.EHandle<SKStore.Key, Row> {
     parents = this.makeParents(
@@ -1051,7 +1054,7 @@ class SelectEvaluator{
 
   fun evalSelectTableRows(
     qkind: ?(Int, QueryKind),
-    remainingTables: List<(DirDescr, ?Array<SKStore.KeyRange>)>,
+    remainingTables: List<(DirDescr, ?Array<SKStore.KeyRange<SKStore.Key>>)>,
     entries: List<Row>,
     context: mutable SKStore.Context,
     writer: mutable SKStore.TWriter<SKStore.Key, Row>,
@@ -1122,7 +1125,7 @@ class SelectEvaluator{
 
   fun evalSelectTableRow(
     qkind: ?(Int, QueryKind),
-    remainingTables: List<(DirDescr, ?Array<SKStore.KeyRange>)>,
+    remainingTables: List<(DirDescr, ?Array<SKStore.KeyRange<SKStore.Key>>)>,
     entries: List<Row>,
     context: mutable SKStore.Context,
     mwriter: mutable MultiWriter,
@@ -1270,7 +1273,7 @@ class SelectEvaluator{
 
   fun evalSelectCross(
     context: mutable SKStore.Context,
-    remainingTables: List<(DirDescr, ?Array<SKStore.KeyRange>)>,
+    remainingTables: List<(DirDescr, ?Array<SKStore.KeyRange<SKStore.Key>>)>,
     entries: List<Row>,
     key: SKStore.Key,
     inputRow: SKDB.Row,

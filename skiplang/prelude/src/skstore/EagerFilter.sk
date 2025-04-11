@@ -21,8 +21,8 @@ module SKStore;
 
 class MaxKeyFile(key: Key) extends File
 
-value class FilterRange private (ranges: Array<KeyRange>, max: Key) {
-  static fun create(rangesOpt: ?Array<KeyRange>): ?this {
+value class FilterRange private (ranges: Array<KeyRange<Key>>, max: Key) {
+  static fun create(rangesOpt: ?Array<KeyRange<Key>>): ?this {
     rangesOpt match {
     | None() -> None()
     | Some(ranges) ->
@@ -241,7 +241,7 @@ class EagerFilter private {
     fileSize: File ~> Int,
     removeFromFile: (File, Int) ~> File,
     filter: (mutable Context, Key, File) ~> Bool,
-    rangesOpt: ?Array<KeyRange>,
+    rangesOpt: ?Array<KeyRange<Key>>,
   ): void {
     filterRange = FilterRange::create(rangesOpt);
     _ = static::mkDir(context, childName, None());
