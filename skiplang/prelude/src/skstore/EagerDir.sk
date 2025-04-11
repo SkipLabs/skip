@@ -170,7 +170,7 @@ mutable class IntRef(mutable value: Int) {
 /* Ranges. */
 /*****************************************************************************/
 
-value class KeyRange<K: Show & Orderable> private {
+value class KeyRange<+K: Show & Orderable> private {
   start: K,
   end: K,
 } uses Orderable, Show {
@@ -181,6 +181,37 @@ value class KeyRange<K: Show & Orderable> private {
 
   fun toString(): String {
     `[${this.start}, ${this.end}]`
+  }
+
+  fun compare<K2: Show & Orderable>[K: K2](other: KeyRange<K2>): Order {
+    this.start.compare(other.start) match {
+    | EQ() -> this.end.compare(other.end)
+    | neq -> neq
+    }
+  }
+
+  fun ==<K2: Show & Orderable>[K: K2](other: KeyRange<K2>): Bool {
+    this.compare(other) == EQ()
+  }
+
+  fun !=<K2: Show & Orderable>[K: K2](other: KeyRange<K2>): Bool {
+    this.compare(other) != EQ()
+  }
+
+  fun <<K2: Show & Orderable>[K: K2](other: KeyRange<K2>): Bool {
+    this.compare(other) == LT()
+  }
+
+  fun <=<K2: Show & Orderable>[K: K2](other: KeyRange<K2>): Bool {
+    this.compare(other) != GT()
+  }
+
+  fun ><K2: Show & Orderable>[K: K2](other: KeyRange<K2>): Bool {
+    this.compare(other) == GT()
+  }
+
+  fun >=<K2: Show & Orderable>[K: K2](other: KeyRange<K2>): Bool {
+    this.compare(other) != LT()
   }
 }
 
