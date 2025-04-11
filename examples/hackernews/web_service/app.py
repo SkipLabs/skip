@@ -4,8 +4,7 @@ import psycopg2
 import requests
 import random
 import time
-
-REACTIVE_SERVICE_URL = "http://reactive_cache:8081/v1"
+import os
 
 
 def get_db():
@@ -21,6 +20,18 @@ def get_db():
 app = Flask(__name__)
 
 app.secret_key = b"53cr37_changeme"
+
+
+SKIP_WRITE_URL = (
+    "http://skip_leader:8081/v1"
+    if "DISTRIBUTED_MODE" in os.environ
+    else "http://reactive_service:8081/v1"
+)
+SKIP_READ_URL = (
+    "http://skip_followers:8081/v1"
+    if "DISTRIBUTED_MODE" in os.environ
+    else "http://reactive_service:8081/v1"
+)
 
 
 @app.before_request
@@ -63,7 +74,7 @@ def login():
 
     # TODO: Error handling.
     requests.patch(
-        f"{REACTIVE_SERVICE_URL}/inputs/sessions",
+        f"{SKIP_WRITE_URL}/inputs/sessions",
         json=[[session["session_id"], [user_session]]],
     )
 
@@ -73,7 +84,7 @@ def login():
 @app.post("/logout")
 def logout():
     requests.patch(
-        f"{REACTIVE_SERVICE_URL}/inputs/sessions",
+        f"{SKIP_WRITE_URL}/inputs/sessions",
         json=[[session["session_id"], []]],
     )
 
@@ -86,7 +97,7 @@ def logout():
 def user_session():
     if "text/event-stream" in request.accept_mimetypes:
         resp = requests.post(
-            f"{REACTIVE_SERVICE_URL}/streams/sessions",
+            f"{SKIP_READ_URL}/streams/sessions",
             json={
                 "session_id": session["session_id"],
             },
@@ -97,7 +108,7 @@ def user_session():
 
     else:
         resp = requests.post(
-            f"{REACTIVE_SERVICE_URL}/snapshot/sessions",
+            f"{SKIP_READ_URL}/snapshot/sessions",
             json={
                 "session_id": session["session_id"],
             },
@@ -126,7 +137,7 @@ def posts_index():
 
     if "text/event-stream" in request.accept_mimetypes:
         resp = requests.post(
-            f"{REACTIVE_SERVICE_URL}/streams/posts",
+            f"{SKIP_READ_URL}/streams/posts",
             json={
                 "limit": 10,
                 "session_id": session["session_id"],
@@ -136,12 +147,11 @@ def posts_index():
             # },
         )
         uuid = resp.text
-
         return redirect(f"/streams/{uuid}", code=307)
 
     else:
         resp = requests.post(
-            f"{REACTIVE_SERVICE_URL}/snapshot/posts",
+            f"{SKIP_READ_URL}/snapshot/posts",
             json={
                 "limit": 10,
                 "session_id": session["session_id"],

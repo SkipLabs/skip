@@ -9,6 +9,8 @@ services:
     depends_on:
       www:
         condition: service_healthy
+      reactive_service:
+        condition: service_healthy
 
   # Web application
   web:
@@ -26,9 +28,9 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
-  # Reactive cache
-  reactive_cache:
-    image: reactive-hackernews/skip-service
+  # Reactive service
+  reactive_service:
+    image: reactive-hackernews/reactive-service
     build: ./reactive_service
     depends_on:
       db:
