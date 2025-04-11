@@ -254,13 +254,13 @@ extension base class CValue uses Show {
   | CString(_) -> CString("")
 }
 
-base class CGroupByElt uses Orderable {
+base class CGroupByElt uses Equality {
   children =
   | CGBExpr(CGExpr, P.Type)
   | CGBCol(Int, P.Type)
 }
 
-base class SubSelectTask uses Orderable {
+base class SubSelectTask uses Equality {
   children =
   | SubSelect(CSelect)
   | SubMerge{
@@ -299,7 +299,7 @@ class CSelect{
   directMode: Bool,
   format: SKStore.OutputFormat,
   other: Array<SubSelectTask>,
-} uses Orderable
+} uses Equality
 
 class CJoin{
   kind: P.JoinKind,
@@ -307,7 +307,7 @@ class CJoin{
   on: ?Array<(CGExpr, ?String)>,
 }
 
-base class CGExpr uses Orderable, Hashable {
+base class CGExpr uses Equality, Hashable {
   children =
   | CGNull()
   | CIExpr(CExpr<Int>)
@@ -343,7 +343,7 @@ base class CGExpr uses Orderable, Hashable {
 @cpp_extern("SKIP_largest_string")
 native fun largestString(): String;
 
-base class CExpr<Value: frozen> uses Orderable, Hashable
+base class CExpr<Value: frozen> uses Equality, Hashable
 class CNull<T: frozen>() extends CExpr<T>
 class CISize(Int) extends CExpr<Int>
 
