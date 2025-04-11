@@ -41,6 +41,7 @@ import {
 
 import {
   SkipClassNameError,
+  SkipError,
   SkipNonUniqueValueError,
   SkipResourceInstanceInUseError,
   SkipUnknownCollectionError,
@@ -48,7 +49,7 @@ import {
 import {
   ResourceBuilder,
   type Notifier,
-  type Checker,
+  type Executor,
   type Handle,
   type FromBinding,
 } from "./binding.js";
@@ -342,44 +343,61 @@ class CollectionWriter<K extends Json, V extends Json> {
     private readonly refs: Refs,
   ) {}
 
-  update(values: Entry<K, V>[], isInit: boolean): void {
-    const update_ = () => {
-      return this.refs.binding.SkipRuntime_CollectionWriter__update(
-        this.collection,
-        this.refs.skjson.exportJSON(values),
-        isInit,
-      );
-    };
-    const errorHdl = this.refs.needGC()
-      ? this.refs.runWithGC(update_)
-      : update_();
+  async update(values: Entry<K, V>[], isInit: boolean): Promise<void> {
+    await new Promise<void>((resolve, reject) => {
+      if (!this.refs.needGC()) {
+        reject(new SkipError("CollectionWriter.update cannot be performed."));
+      }
+      const errorHdl = this.refs.runWithGC(() => {
+        const exHdl = this.refs.handles.register({
+          resolve,
+          reject: (ex: Error) => reject(ex),
+        });
+        return this.refs.binding.SkipRuntime_CollectionWriter__update(
+          this.collection,
+          this.refs.skjson.exportJSON(values),
+          isInit,
+          this.refs.binding.SkipRuntime_createExecutor(exHdl),
+        );
+      });
+      if (errorHdl) reject(this.refs.handles.deleteHandle(errorHdl));
+    });
+  }
 
+  error(error: unknown): void {
+    if (!this.refs.needGC()) {
+      throw new SkipError("CollectionWriter.update cannot be performed.");
+    }
+    const errorHdl = this.refs.runWithGC(() =>
+      this.refs.binding.SkipRuntime_CollectionWriter__error(
+        this.collection,
+        this.refs.skjson.exportJSON(this.toJSONError(error)),
+      ),
+    );
     if (errorHdl) throw this.refs.handles.deleteHandle(errorHdl);
   }
 
-  loading(): void {
-    const loading_ = () => {
-      return this.refs.binding.SkipRuntime_CollectionWriter__loading(
+  initialized(error?: unknown): void {
+    if (!this.refs.needGC()) {
+      throw new SkipError("CollectionWriter.update cannot be performed.");
+    }
+    const errorHdl = this.refs.runWithGC(() =>
+      this.refs.binding.SkipRuntime_CollectionWriter__initialized(
         this.collection,
-      );
-    };
-    const errorHdl = this.refs.needGC()
-      ? this.refs.runWithGC(loading_)
-      : loading_();
+        this.refs.skjson.exportJSON(error ? this.toJSONError(error) : null),
+      ),
+    );
     if (errorHdl) throw this.refs.handles.deleteHandle(errorHdl);
   }
 
-  error(error: Json): void {
-    const error_ = () => {
-      return this.refs.binding.SkipRuntime_CollectionWriter__error(
-        this.collection,
-        this.refs.skjson.exportJSON(error),
-      );
-    };
-    const errorHdl = this.refs.needGC()
-      ? this.refs.runWithGC(error_)
-      : error_();
-    if (errorHdl) throw this.refs.handles.deleteHandle(errorHdl);
+  private toJSONError(error: unknown): Json {
+    if (error instanceof Error) return error.message;
+    if (typeof error == "number") return error;
+    if (typeof error == "boolean") return error;
+    if (typeof error == "string") return error;
+    return JSON.parse(
+      JSON.stringify(error, Object.getOwnPropertyNames(error)),
+    ) as Json;
   }
 }
 
@@ -438,70 +456,10 @@ export class ServiceInstanceFactory {
   }
 }
 
-export type GetResult<T> = {
-  request?: string;
+type GetResult<T> = {
   payload: T;
   errors: Json[];
 };
-
-export type Executor<T> = {
-  resolve: (value: T) => void;
-  reject: (reason?: any) => void;
-};
-
-class AllChecker<K extends Json, V extends Json> implements Checker {
-  constructor(
-    private readonly service: ServiceInstance,
-    private readonly executor: Executor<Entry<K, V>[]>,
-    private readonly resource: string,
-    private readonly params: Json,
-  ) {}
-
-  check(request: string): void {
-    try {
-      const result = this.service.getAll<K, V>(
-        this.resource,
-        this.params,
-        request,
-      );
-      if (result.errors.length > 0) {
-        this.executor.reject(new Error(JSON.stringify(result.errors)));
-      } else {
-        this.executor.resolve(result.payload);
-      }
-    } catch (ex: unknown) {
-      this.executor.reject(ex);
-    }
-  }
-}
-
-class OneChecker<K extends Json, V extends Json> implements Checker {
-  constructor(
-    private readonly service: ServiceInstance,
-    private readonly executor: Executor<V[]>,
-    private readonly resource: string,
-    private readonly params: Json,
-    private readonly key: K,
-  ) {}
-
-  check(request: string): void {
-    try {
-      const result = this.service.getArray<K, V>(
-        this.resource,
-        this.key,
-        this.params,
-        request,
-      );
-      if (result.errors.length > 0) {
-        this.executor.reject(new Error(JSON.stringify(result.errors)));
-      } else {
-        this.executor.resolve(result.payload);
-      }
-    } catch (ex: unknown) {
-      this.executor.reject(ex);
-    }
-  }
-}
 
 export type SubscriptionID = Opaque<bigint, "subscription">;
 
@@ -522,15 +480,22 @@ export class ServiceInstance {
     identifier: string,
     resource: string,
     params: Json,
-  ): void {
-    const errorHdl = this.refs.runWithGC(() => {
-      return this.refs.binding.SkipRuntime_Runtime__createResource(
-        identifier,
-        resource,
-        this.refs.skjson.exportJSON(params),
-      );
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const errorHdl = this.refs.runWithGC(() => {
+        const exHdl = this.refs.handles.register({
+          resolve,
+          reject: (ex: Error) => reject(ex),
+        });
+        return this.refs.binding.SkipRuntime_Runtime__createResource(
+          identifier,
+          resource,
+          this.refs.skjson.exportJSON(params),
+          this.refs.binding.SkipRuntime_createExecutor(exHdl),
+        );
+      });
+      if (errorHdl) reject(this.refs.handles.deleteHandle(errorHdl));
     });
-    if (errorHdl) throw this.refs.handles.deleteHandle(errorHdl);
   }
 
   /**
@@ -539,33 +504,31 @@ export class ServiceInstance {
    * @param params - the parameters of the resource used to build the resource with the corresponding constructor specified in remotes field of SkipService
    * @returns The current values of the corresponding resource with reactive response token to allow subscription
    */
-  getAll<K extends Json, V extends Json>(
+  async getAll<K extends Json, V extends Json>(
     resource: string,
     params: Json = {},
-    request?: string | Executor<Entry<K, V>[]>,
-  ): GetResult<Entry<K, V>[]> {
-    const get_ = () => {
-      return this.refs.skjson.importJSON(
-        this.refs.binding.SkipRuntime_Runtime__getAll(
-          resource,
-          this.refs.skjson.exportJSON(params),
-          request !== undefined
-            ? typeof request == "string"
-              ? this.refs.binding.SkipRuntime_createIdentifier(request)
-              : this.refs.binding.SkipRuntime_createChecker(
-                  this.refs.handles.register(
-                    new AllChecker(this, request, resource, params),
-                  ),
-                )
-            : null,
-        ),
-        true,
-      );
-    };
-    const result = this.refs.needGC() ? this.refs.runWithGC(get_) : get_();
-    if (typeof result == "number")
-      throw this.refs.handles.deleteHandle(result as Handle<Error>);
-    return result as GetResult<Entry<K, V>[]>;
+  ): Promise<Entry<K, V>[]> {
+    const uuid = crypto.randomUUID();
+    await this.instantiateResource(uuid, resource, params);
+    try {
+      const result = this.refs.runWithGC(() => {
+        return this.refs.skjson.importJSON(
+          this.refs.binding.SkipRuntime_Runtime__getAll(
+            resource,
+            this.refs.skjson.exportJSON(params),
+          ),
+          true,
+        );
+      });
+      if (typeof result == "number")
+        throw this.refs.handles.deleteHandle(result as Handle<Error>);
+      const info = result as GetResult<Entry<K, V>[]>;
+      if (info.errors.length > 0)
+        throw new SkipError(JSON.stringify(info.errors));
+      return info.payload;
+    } finally {
+      this.closeResourceInstance(uuid);
+    }
   }
 
   /**
@@ -575,36 +538,33 @@ export class ServiceInstance {
    * @param params - Resource parameters, passed to the resource constructor specified in this `SkipService`'s `resources` field
    * @returns The current value(s) for this key in the specified resource instance
    */
-  getArray<K extends Json, V extends Json>(
+  async getArray<K extends Json, V extends Json>(
     resource: string,
     key: K,
     params: Json = {},
-    request?: string | Executor<V[]>,
-  ): GetResult<V[]> {
-    const get_ = () => {
-      return this.refs.skjson.importJSON(
-        this.refs.binding.SkipRuntime_Runtime__getForKey(
-          resource,
-          this.refs.skjson.exportJSON(params),
-          this.refs.skjson.exportJSON(key),
-          request !== undefined
-            ? typeof request == "string"
-              ? this.refs.binding.SkipRuntime_createIdentifier(request)
-              : this.refs.binding.SkipRuntime_createChecker(
-                  this.refs.handles.register(
-                    new OneChecker(this, request, resource, params, key),
-                  ),
-                )
-            : null,
-        ),
-        true,
-      );
-    };
-    const needGC = this.refs.needGC();
-    const result = needGC ? this.refs.runWithGC(get_) : get_();
-    if (typeof result == "number")
-      throw this.refs.handles.deleteHandle(result as Handle<Error>);
-    return result as GetResult<V[]>;
+  ): Promise<V[]> {
+    const uuid = crypto.randomUUID();
+    await this.instantiateResource(uuid, resource, params);
+    try {
+      const result = this.refs.runWithGC(() => {
+        return this.refs.skjson.importJSON(
+          this.refs.binding.SkipRuntime_Runtime__getForKey(
+            resource,
+            this.refs.skjson.exportJSON(params),
+            this.refs.skjson.exportJSON(key),
+          ),
+          true,
+        );
+      });
+      if (typeof result == "number")
+        throw this.refs.handles.deleteHandle(result as Handle<Error>);
+      const info = result as GetResult<V[]>;
+      if (info.errors.length > 0)
+        throw new SkipError(JSON.stringify(info.errors));
+      return info.payload;
+    } finally {
+      this.closeResourceInstance(uuid);
+    }
   }
 
   /**
@@ -684,16 +644,21 @@ export class ServiceInstance {
   update<K extends Json, V extends Json>(
     collection: string,
     entries: Entry<K, V>[],
-  ): void {
-    const errorHdl = this.refs.runWithGC(() => {
-      return this.refs.binding.SkipRuntime_Runtime__update(
-        collection,
-        this.refs.skjson.exportJSON(entries),
-      );
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const errorHdl = this.refs.runWithGC(() => {
+        const exHdl = this.refs.handles.register({
+          resolve,
+          reject: (ex: Error) => reject(ex),
+        });
+        return this.refs.binding.SkipRuntime_Runtime__update(
+          collection,
+          this.refs.skjson.exportJSON(entries),
+          this.refs.binding.SkipRuntime_createExecutor(exHdl),
+        );
+      });
+      if (errorHdl) reject(this.refs.handles.deleteHandle(errorHdl));
     });
-    if (errorHdl) {
-      throw this.refs.handles.deleteHandle(errorHdl);
-    }
   }
 
   /**
@@ -840,18 +805,12 @@ export class ToBinding {
     const skjson = this.getJsonConverter();
     const mapper = this.handles.get(skmapper);
     const context = new ContextImpl(this.refs());
-    try {
-      const result = mapper.mapEntry(
-        skjson.importJSON(key) as Json,
-        new ValuesImpl<Json>(skjson, this.binding, values),
-        context,
-      );
-      return skjson.exportJSON(Array.from(result));
-    } catch (e: unknown) {
-      console.error("Uncaught error during Skip runtime reactive update: ", e);
-      // Exception in async context will be dropped -- this `throw` is just to appease typechecker
-      throw e;
-    }
+    const result = mapper.mapEntry(
+      skjson.importJSON(key) as Json,
+      new ValuesImpl<Json>(skjson, this.binding, values),
+      context,
+    );
+    return skjson.exportJSON(Array.from(result));
   }
 
   SkipRuntime_deleteMapper(mapper: Handle<JSONMapper>): void {
@@ -1036,11 +995,22 @@ export class ToBinding {
     const supplier = this.handles.get(sksupplier);
     const writer = new CollectionWriter(writerId, this.refs());
     const params = skjson.importJSON(skparams, true) as Json;
-    supplier.subscribe(instance, resource, params, {
-      update: writer.update.bind(writer),
-      error: writer.error.bind(writer),
-      loading: writer.loading.bind(writer),
-    });
+    // Ensure notification is made outside the current context update
+    setTimeout(() => {
+      supplier
+        .subscribe(instance, resource, params, {
+          update: writer.update.bind(writer),
+          error: writer.error.bind(writer),
+        })
+        .then(() => writer.initialized())
+        .catch((e: unknown) =>
+          writer.initialized(
+            e instanceof Error
+              ? e.message
+              : JSON.stringify(e, Object.getOwnPropertyNames(e)),
+          ),
+        );
+    }, 0);
   }
 
   SkipRuntime_ExternalService__unsubscribe(
@@ -1062,58 +1032,76 @@ export class ToBinding {
     this.handles.deleteHandle(supplier);
   }
 
-  // Checker
+  // Executor
 
-  SkipRuntime_Checker__check(
-    skchecker: Handle<Checker>,
-    request: string,
+  SkipRuntime_Executor__resolve(skexecutor: Handle<Executor>): void {
+    const checker = this.handles.get(skexecutor);
+    checker.resolve();
+  }
+
+  SkipRuntime_Executor__reject(
+    skexecutor: Handle<Executor>,
+    error: Handle<Error>,
   ): void {
-    const checker = this.handles.get(skchecker);
-    checker.check(request);
+    const checker = this.handles.get(skexecutor);
+    checker.reject(this.handles.deleteHandle(error));
   }
 
-  SkipRuntime_deleteChecker(checker: Handle<Checker>): void {
-    this.handles.deleteHandle(checker);
+  SkipRuntime_deleteExecutor(executor: Handle<Executor>): void {
+    this.handles.deleteHandle(executor);
   }
 
-  initService(service: SkipService): ServiceInstance {
-    const refs = this.refs();
-    const errorHdl = refs.runWithGC(() => {
-      const skExternalServices =
-        refs.binding.SkipRuntime_ExternalServiceMap__create();
-      if (service.externalServices) {
-        for (const [name, remote] of Object.entries(service.externalServices)) {
-          const skremote = refs.binding.SkipRuntime_createExternalService(
-            refs.handles.register(remote),
+  initService(service: SkipService): Promise<ServiceInstance> {
+    return new Promise((resolve, reject) => {
+      const refs = this.refs();
+      const errorHdl = refs.runWithGC(() => {
+        const skExternalServices =
+          refs.binding.SkipRuntime_ExternalServiceMap__create();
+        if (service.externalServices) {
+          for (const [name, remote] of Object.entries(
+            service.externalServices,
+          )) {
+            const skremote = refs.binding.SkipRuntime_createExternalService(
+              refs.handles.register(remote),
+            );
+            refs.binding.SkipRuntime_ExternalServiceMap__add(
+              skExternalServices,
+              name,
+              skremote,
+            );
+          }
+        }
+        const skresources =
+          refs.binding.SkipRuntime_ResourceBuilderMap__create();
+        for (const [name, builder] of Object.entries(service.resources)) {
+          const skbuilder = refs.binding.SkipRuntime_createResourceBuilder(
+            refs.handles.register(new ResourceBuilder(builder)),
           );
-          refs.binding.SkipRuntime_ExternalServiceMap__add(
-            skExternalServices,
+          refs.binding.SkipRuntime_ResourceBuilderMap__add(
+            skresources,
             name,
-            skremote,
+            skbuilder,
           );
         }
-      }
-      const skresources = refs.binding.SkipRuntime_ResourceBuilderMap__create();
-      for (const [name, builder] of Object.entries(service.resources)) {
-        const skbuilder = refs.binding.SkipRuntime_createResourceBuilder(
-          refs.handles.register(new ResourceBuilder(builder)),
-        );
-        refs.binding.SkipRuntime_ResourceBuilderMap__add(
+        const skservice = refs.binding.SkipRuntime_createService(
+          refs.handles.register(service),
+          refs.skjson.exportJSON(service.initialData ?? {}),
           skresources,
-          name,
-          skbuilder,
+          skExternalServices,
         );
-      }
-      const skservice = refs.binding.SkipRuntime_createService(
-        refs.handles.register(service),
-        refs.skjson.exportJSON(service.initialData ?? {}),
-        skresources,
-        skExternalServices,
-      );
-      return refs.binding.SkipRuntime_initService(skservice);
+        const exHdl = refs.handles.register({
+          resolve: () => {
+            resolve(new ServiceInstance(refs));
+          },
+          reject: (ex: Error) => reject(ex),
+        });
+        return refs.binding.SkipRuntime_initService(
+          skservice,
+          refs.binding.SkipRuntime_createExecutor(exHdl),
+        );
+      });
+      if (errorHdl) reject(refs.handles.deleteHandle(errorHdl));
     });
-    if (errorHdl) throw refs.handles.deleteHandle(errorHdl);
-    return new ServiceInstance(refs);
   }
 
   //

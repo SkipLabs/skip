@@ -205,6 +205,31 @@ void SkipRuntime_deleteChecker(uint32_t checkerId) {
                      argv);
 }
 
+void SkipRuntime_Executor__resolve(uint32_t checkerId) {
+  Isolate* isolate = Isolate::GetCurrent();
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[1] = {Number::New(isolate, checkerId)};
+  CallJSVoidFunction(isolate, externFunctions, "SkipRuntime_Executor__resolve",
+                     1, argv);
+}
+
+void SkipRuntime_Executor__reject(uint32_t checkerId, double handle) {
+  Isolate* isolate = Isolate::GetCurrent();
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[2] = {Number::New(isolate, checkerId),
+                          Number::New(isolate, handle)};
+  CallJSVoidFunction(isolate, externFunctions, "SkipRuntime_Executor__reject",
+                     2, argv);
+}
+
+void SkipRuntime_deleteExecutor(uint32_t checkerId) {
+  Isolate* isolate = Isolate::GetCurrent();
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[1] = {Number::New(isolate, checkerId)};
+  CallJSVoidFunction(isolate, externFunctions, "SkipRuntime_deleteExecutor", 1,
+                     argv);
+}
+
 void SkipRuntime_deleteService(uint32_t serviceId) {
   Isolate* isolate = Isolate::GetCurrent();
   Local<Object> externFunctions = kExternFunctions.Get(isolate);

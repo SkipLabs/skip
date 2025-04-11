@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Add a mechanism to wait for external resources initialization at resource creation time (#850).
+- Add transaction mechanism to wait for external resources initialization at write time (#850).
+
 ## [0.0.14] - 2025-04-10
 
 ### Added

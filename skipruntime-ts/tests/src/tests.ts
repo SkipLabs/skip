@@ -13,6 +13,8 @@ import type {
   Entry,
   ExternalService,
   ServiceInstance,
+  CollectionUpdate,
+  NamedCollections,
 } from "@skipruntime/core";
 
 import { Count, Sum } from "@skipruntime/helpers";
@@ -36,7 +38,7 @@ async function withAlternateConsoleError(
 }
 
 async function withRetries(
-  f: () => void,
+  f: () => Promise<void>,
   maxRetries: number = 5,
   init: number = 100,
   exponent: number = 1.5,
@@ -46,7 +48,7 @@ async function withRetries(
   while (true) {
     try {
       await timeout(init * exponent ** retries);
-      f();
+      await f();
       break;
     } catch (e: unknown) {
       if (retries < maxRetries) retries++;
@@ -433,23 +435,28 @@ async function timeout(ms: number) {
 }
 
 class MockExternal implements ExternalService {
-  subscribe(
-    _instance: string,
+  public subscribed: string[] = [];
+  public initialized: string[] = [];
+  public unsubscribed: string[] = [];
+
+  async subscribe(
+    instance: string,
     resource: string,
     params: { v1: string; v2: string },
     callbacks: {
-      update: (updates: Entry<Json, Json>[], isInit: boolean) => void;
-      error: (error: Json) => void;
-      loading: () => void;
+      update: (updates: Entry<Json, Json>[], isInit: boolean) => Promise<void>;
+      error: (error: unknown) => void;
     },
-  ) {
+  ): Promise<void> {
+    this.subscribed.push(instance);
     if (resource == "mock") {
-      void this.mock(params, callbacks.update);
+      await this.mock(params, callbacks.update);
+      this.initialized.push(instance);
     }
   }
 
-  unsubscribe(_instance: string) {
-    return;
+  unsubscribe(instance: string) {
+    this.unsubscribed.push(instance);
   }
 
   shutdown() {
@@ -458,10 +465,9 @@ class MockExternal implements ExternalService {
 
   private async mock(
     params: { v1: string; v2: string },
-    cb: (updates: Entry<Json, Json>[], isInit: boolean) => void,
+    cb: (updates: Entry<Json, Json>[], isInit: boolean) => Promise<void>,
   ) {
-    await timeout(0);
-    cb(
+    await cb(
       [
         [0, [10 + Number(params.v1)]],
         [1, [20 + Number(params.v2)]],
@@ -497,13 +503,45 @@ class MockExternalResource implements Resource<Input_NN_NN> {
   }
 }
 
-const testExternalService: SkipService<Input_NN_NN, Input_NN_NN> = {
-  initialData: { input1: [], input2: [] },
-  resources: { external: MockExternalResource },
+// As the MockExternal as state: force to renew on each test
+function testExternalService(): SkipService<Input_NN_NN, Input_NN_NN> {
+  return {
+    initialData: { input1: [], input2: [] },
+    resources: { external: MockExternalResource },
+    externalServices: { external: new MockExternal() },
+
+    createGraph(inputCollections: Input_NN_NN) {
+      return inputCollections;
+    },
+  };
+}
+
+//// initServiceWithExternalService
+
+type Col_N_NA = {
+  c: EagerCollection<number, number[]>;
+};
+
+class CResource implements Resource<Col_N_NA> {
+  instantiate(cs: Col_N_NA): EagerCollection<number, number[]> {
+    return cs.c;
+  }
+}
+
+const initServiceWithExternalService: SkipService<Input_NN, Col_N_NA> = {
+  initialData: { input: [] },
+  resources: { display: CResource },
   externalServices: { external: new MockExternal() },
 
-  createGraph(inputCollections: Input_NN_NN) {
-    return inputCollections;
+  createGraph(is: Input_NN, context: Context) {
+    const external = context.useExternalResource<number, number>({
+      service: "external",
+      identifier: "mock",
+      params: { v1: 5, v2: 10 },
+    });
+    return {
+      c: is.input.map(MockExternalCheck, external),
+    };
   },
 };
 
@@ -784,15 +822,17 @@ class LazyWithUseExternalServiceResource implements Resource<Input_NN> {
   }
 }
 
-const lazyWithUseExternalServiceService: SkipService<Input_NN, Input_NN> = {
-  initialData: { input: [] },
-  resources: { lazy: LazyWithUseExternalServiceResource },
-  externalServices: { external: new MockExternal() },
+function lazyWithUseExternalServiceService(): SkipService<Input_NN, Input_NN> {
+  return {
+    initialData: { input: [] },
+    resources: { lazy: LazyWithUseExternalServiceResource },
+    externalServices: { external: new MockExternal() },
 
-  createGraph(inputCollections: Input_NN) {
-    return inputCollections;
-  },
-};
+    createGraph(inputCollections: Input_NN) {
+      return inputCollections;
+    },
+  };
+}
 
 //// testMapWithException
 
@@ -842,16 +882,49 @@ class MapWithExceptionOnExternalResource implements Resource<Input_SN> {
   }
 }
 
-const mapWithExceptionOnExternMock = new MockExternal();
-const mapWithExceptionOnExternalService: SkipService<Input_SN, Input_SN> = {
-  initialData: { input: [] },
-  resources: { mapWithException: MapWithExceptionOnExternalResource },
-  externalServices: { external: mapWithExceptionOnExternMock },
+function mapWithExceptionOnExternalService(): SkipService<Input_SN, Input_SN> {
+  return {
+    initialData: { input: [] },
+    resources: { mapWithException: MapWithExceptionOnExternalResource },
+    externalServices: { external: new MockExternal() },
 
-  createGraph(inputCollections: Input_SN) {
-    return inputCollections;
-  },
-};
+    createGraph(inputCollections: Input_SN) {
+      return inputCollections;
+    },
+  };
+}
+
+// testInitServiceWithExternalServiceFailure
+
+class NNResource implements Resource<Input_NN> {
+  instantiate(cs: Input_NN): EagerCollection<number, number> {
+    return cs.input;
+  }
+}
+
+function initServiceWithExternalServiceFailure(): SkipService<
+  NamedCollections,
+  Input_NN
+> {
+  return {
+    initialData: {},
+    resources: { display: NNResource },
+    externalServices: { external: new MockExternal() },
+
+    createGraph(_is: NamedCollections, context: Context) {
+      const external = context
+        .useExternalResource<number, number>({
+          service: "external",
+          identifier: "mock",
+          params: { v1: 32, v2: 20 },
+        })
+        .map(NMapWithException);
+      return {
+        input: external,
+      };
+    },
+  };
+}
 
 export function initTests(
   category: string,
@@ -862,19 +935,19 @@ export function initTests(
 
   it("testMap1", async () => {
     const service = await initService(map1Service);
-    service.update("input", [["1", [10]]]);
-    expect(service.getArray("map1", "1").payload).toEqual([12]);
+    await service.update("input", [["1", [10]]]);
+    expect(await service.getArray("map1", "1")).toEqual([12]);
   });
 
   it("testMap2", async () => {
     const service = await initService(map2Service);
     const resource = "map2";
-    service.update("input1", [["1", [10]]]);
-    service.update("input2", [["1", [20]]]);
-    expect(service.getArray(resource, "1").payload).toEqual([30]);
-    service.update("input1", [["2", [3]]]);
-    service.update("input2", [["2", [7]]]);
-    expect(service.getAll(resource).payload).toEqual([
+    await service.update("input1", [["1", [10]]]);
+    await service.update("input2", [["1", [20]]]);
+    expect(await service.getArray(resource, "1")).toEqual([30]);
+    await service.update("input1", [["2", [3]]]);
+    await service.update("input2", [["2", [7]]]);
+    expect(await service.getAll(resource)).toEqual([
       ["1", [30]],
       ["2", [10]],
     ]);
@@ -883,12 +956,12 @@ export function initTests(
   it("testMap3", async () => {
     const service = await initService(map3Service);
     const resource = "map3";
-    service.update("input1", [["1", [1, 2, 3]]]);
-    service.update("input2", [["1", [10]]]);
-    expect(service.getArray(resource, "1").payload).toEqual([36]);
-    service.update("input1", [["2", [3]]]);
-    service.update("input2", [["2", [7]]]);
-    expect(service.getAll(resource).payload).toEqual([
+    await service.update("input1", [["1", [1, 2, 3]]]);
+    await service.update("input2", [["1", [10]]]);
+    expect(await service.getArray(resource, "1")).toEqual([36]);
+    await service.update("input1", [["2", [3]]]);
+    await service.update("input2", [["2", [7]]]);
+    expect(await service.getAll(resource)).toEqual([
       ["1", [36]],
       ["2", [10]],
     ]);
@@ -897,13 +970,13 @@ export function initTests(
   it("valueMapper", async () => {
     const service = await initService(oneToOneMapperService);
     const resource = "valueMapper";
-    service.update("input", [
+    await service.update("input", [
       [1, [1]],
       [2, [2]],
       [5, [5]],
       [10, [10]],
     ]);
-    expect(service.getAll(resource).payload).toEqual([
+    expect(await service.getAll(resource)).toEqual([
       [1, [2]],
       [2, [6]],
       [5, [30]],
@@ -914,24 +987,24 @@ export function initTests(
   it("testSize", async () => {
     const service = await initService(sizeService);
     const resource = "size";
-    service.update("input1", [
+    await service.update("input1", [
       [1, [0]],
       [2, [2]],
     ]);
-    expect(service.getAll(resource).payload).toEqual([
+    expect(await service.getAll(resource)).toEqual([
       [1, [0]],
       [2, [2]],
     ]);
-    service.update("input2", [
+    await service.update("input2", [
       [1, [10]],
       [2, [5]],
     ]);
-    expect(service.getAll(resource).payload).toEqual([
+    expect(await service.getAll(resource)).toEqual([
       [1, [2]],
       [2, [4]],
     ]);
-    service.update("input2", [[1, []]]);
-    expect(service.getAll(resource).payload).toEqual([
+    await service.update("input2", [[1, []]]);
+    expect(await service.getAll(resource)).toEqual([
       [1, [1]],
       [2, [3]],
     ]);
@@ -944,8 +1017,8 @@ export function initTests(
     const values = Array.from({ length: 31 }, (_, i): Entry<number, number> => {
       return [i, [i]];
     });
-    service.update("input", values);
-    expect(service.getAll(resource).payload).toEqual([
+    await service.update("input", values);
+    expect(await service.getAll(resource)).toEqual([
       [1, [1]],
       [3, [9]],
       [4, [16]],
@@ -959,22 +1032,22 @@ export function initTests(
   it("testLazy", async () => {
     const service = await initService(lazyService);
     const resource = "lazy";
-    service.update("input", [
+    await service.update("input", [
       [0, [10]],
       [1, [20]],
     ]);
-    expect(service.getAll(resource).payload).toEqual([
+    expect(await service.getAll(resource)).toEqual([
       [0, [2]],
       [1, [2]],
     ]);
-    service.update("input", [[2, [4]]]);
-    expect(service.getAll(resource).payload).toEqual([
+    await service.update("input", [[2, [4]]]);
+    expect(await service.getAll(resource)).toEqual([
       [0, [2]],
       [1, [2]],
       [2, [2]],
     ]);
-    service.update("input", [[2, []]]);
-    expect(service.getAll(resource).payload).toEqual([
+    await service.update("input", [[2, []]]);
+    expect(await service.getAll(resource)).toEqual([
       [0, [2]],
       [1, [2]],
     ]);
@@ -983,31 +1056,31 @@ export function initTests(
   it("testMapReduce", async () => {
     const service = await initService(mapReduceService);
     const resource = "mapReduce";
-    service.update("input", [
+    await service.update("input", [
       [0, [1]],
       [1, [1]],
       [2, [1]],
     ]);
-    expect(service.getAll(resource).payload).toEqual([
+    expect(await service.getAll(resource)).toEqual([
       [0, [2]],
       [1, [1]],
     ]);
-    service.update("input", [[3, [2]]]);
-    expect(service.getAll(resource).payload).toEqual([
+    await service.update("input", [[3, [2]]]);
+    expect(await service.getAll(resource)).toEqual([
       [0, [2]],
       [1, [3]],
     ]);
-    service.update("input", [
+    await service.update("input", [
       [0, [2]],
       [1, [2]],
     ]);
-    expect(service.getAll(resource).payload).toEqual([
+    expect(await service.getAll(resource)).toEqual([
       [0, [3]],
       [1, [4]],
     ]);
 
-    service.update("input", [[3, []]]);
-    expect(service.getAll(resource).payload).toEqual([
+    await service.update("input", [[3, []]]);
+    expect(await service.getAll(resource)).toEqual([
       [0, [3]],
       [1, [2]],
     ]);
@@ -1016,27 +1089,27 @@ export function initTests(
   it("testCount", async () => {
     const service = await initService(countService);
     const resource = "count";
-    service.update("input", [
+    await service.update("input", [
       [0, []],
       [1, [1]],
       [2, [1, 2]],
     ]);
-    expect(service.getAll(resource).payload).toEqual([
+    expect(await service.getAll(resource)).toEqual([
       [1, [1]],
       [2, [2]],
     ]);
-    service.update("input", [[3, [1, 2, 3]]]);
-    expect(service.getAll(resource).payload).toEqual([
+    await service.update("input", [[3, [1, 2, 3]]]);
+    expect(await service.getAll(resource)).toEqual([
       [1, [1]],
       [2, [2]],
       [3, [3]],
     ]);
-    service.update("input", [
+    await service.update("input", [
       [0, [5]],
       [1, [5, 6]],
       [3, []],
     ]);
-    expect(service.getAll(resource).payload).toEqual([
+    expect(await service.getAll(resource)).toEqual([
       [0, [1]],
       [1, [2]],
       [2, [2]],
@@ -1047,17 +1120,17 @@ export function initTests(
   it("testMerge1", async () => {
     const service = await initService(merge1Service);
     const resource = "merge1";
-    service.update("input1", [[1, [10]]]);
-    service.update("input2", [[1, [20]]]);
-    expect(sorted(service.getAll(resource).payload)).toEqual([[1, [10, 20]]]);
-    service.update("input1", [[2, [3]]]);
-    service.update("input2", [[2, [7]]]);
-    expect(sorted(service.getAll(resource).payload)).toEqual([
+    await service.update("input1", [[1, [10]]]);
+    await service.update("input2", [[1, [20]]]);
+    expect(sorted(await service.getAll(resource))).toEqual([[1, [10, 20]]]);
+    await service.update("input1", [[2, [3]]]);
+    await service.update("input2", [[2, [7]]]);
+    expect(sorted(await service.getAll(resource))).toEqual([
       [1, [10, 20]],
       [2, [3, 7]],
     ]);
-    service.update("input1", [[1, []]]);
-    expect(sorted(service.getAll(resource).payload)).toEqual([
+    await service.update("input1", [[1, []]]);
+    expect(sorted(await service.getAll(resource))).toEqual([
       [1, [20]],
       [2, [3, 7]],
     ]);
@@ -1066,17 +1139,17 @@ export function initTests(
   it("testMergeReduce", async () => {
     const service = await initService(mergeReduceService);
     const resource = "mergeReduce";
-    service.update("input1", [[1, [10]]]);
-    service.update("input2", [[1, [20]]]);
-    expect(service.getAll(resource).payload).toEqual([[1, [30]]]);
-    service.update("input1", [[2, [3]]]);
-    service.update("input2", [[2, [7]]]);
-    expect(service.getAll(resource).payload).toEqual([
+    await service.update("input1", [[1, [10]]]);
+    await service.update("input2", [[1, [20]]]);
+    expect(await service.getAll(resource)).toEqual([[1, [30]]]);
+    await service.update("input1", [[2, [3]]]);
+    await service.update("input2", [[2, [7]]]);
+    expect(await service.getAll(resource)).toEqual([
       [1, [30]],
       [2, [10]],
     ]);
-    service.update("input1", [[1, []]]);
-    expect(service.getAll(resource).payload).toEqual([
+    await service.update("input1", [[1, []]]);
+    expect(await service.getAll(resource)).toEqual([
       [1, [20]],
       [2, [10]],
     ]);
@@ -1085,17 +1158,17 @@ export function initTests(
   it("testMergeMapReduce", async () => {
     const service = await initService(mergeReduceService);
     const resource = "mergeMapReduce";
-    service.update("input1", [[1, [10]]]);
-    service.update("input2", [[1, [20]]]);
-    expect(service.getAll(resource).payload).toEqual([[1, [40]]]);
-    service.update("input1", [[2, [3]]]);
-    service.update("input2", [[2, [7]]]);
-    expect(service.getAll(resource).payload).toEqual([
+    await service.update("input1", [[1, [10]]]);
+    await service.update("input2", [[1, [20]]]);
+    expect(await service.getAll(resource)).toEqual([[1, [40]]]);
+    await service.update("input1", [[2, [3]]]);
+    await service.update("input2", [[2, [7]]]);
+    expect(await service.getAll(resource)).toEqual([
       [1, [40]],
       [2, [20]],
     ]);
-    service.update("input1", [[1, []]]);
-    expect(service.getAll(resource).payload).toEqual([
+    await service.update("input1", [[1, []]]);
+    expect(await service.getAll(resource)).toEqual([
       [1, [25]],
       [2, [20]],
     ]);
@@ -1109,23 +1182,19 @@ export function initTests(
       x: 7,
       y: { a: 7, bs: [14, 14], extra_garbage: "not used by resource" },
     };
-    service.update("input", [[1, [1]]]);
-    expect(
-      service.getAll(resource, { offsets: plus15_params }).payload,
-    ).toEqual([[1, [16]]]);
-    expect(
-      service.getAll(resource, { offsets: plus42_params }).payload,
-    ).toEqual([[1, [43]]]);
-    service.update("input", [[2, [2]]]);
-    expect(
-      service.getAll(resource, { offsets: plus15_params }).payload,
-    ).toEqual([
+    await service.update("input", [[1, [1]]]);
+    expect(await service.getAll(resource, { offsets: plus15_params })).toEqual([
+      [1, [16]],
+    ]);
+    expect(await service.getAll(resource, { offsets: plus42_params })).toEqual([
+      [1, [43]],
+    ]);
+    await service.update("input", [[2, [2]]]);
+    expect(await service.getAll(resource, { offsets: plus15_params })).toEqual([
       [1, [16]],
       [2, [17]],
     ]);
-    expect(
-      service.getAll(resource, { offsets: plus42_params }).payload,
-    ).toEqual([
+    expect(await service.getAll(resource, { offsets: plus42_params })).toEqual([
       [1, [43]],
       [2, [44]],
     ]);
@@ -1134,7 +1203,7 @@ export function initTests(
   it("testJSONExtract", async () => {
     const service = await initService(jsonExtractService);
     const resource = "jsonExtract";
-    service.update("input", [
+    await service.update("input", [
       [
         0,
         [
@@ -1164,7 +1233,7 @@ export function initTests(
       ],
     ]);
     //
-    expect(service.getAll(resource).payload).toEqual([
+    expect(await service.getAll(resource)).toEqual([
       [
         0,
         [
@@ -1190,46 +1259,111 @@ export function initTests(
   });
 
   it("testExternal", async () => {
+    const serviceDef = testExternalService();
+    const mockExternal = serviceDef.externalServices![
+      "external"
+    ] as MockExternal;
     const resource = "external";
-    const service = await initService(testExternalService);
-    service.update("input1", [
+    const service = await initService(serviceDef);
+    await service.update("input1", [
       [0, [10]],
       [1, [20]],
     ]);
-    service.update("input2", [
+    await service.update("input2", [
       [0, [5]],
       [1, [10]],
     ]);
-    const constantResourceId = "unsafe.identifier";
-    service.instantiateResource(constantResourceId, resource, {});
+    const constantResourceId1 = "unsafe.identifier.1";
+    await service.instantiateResource(constantResourceId1, resource, {});
+    const updates: CollectionUpdate<Json, Json>[] = [];
+    const sid = service.subscribe(constantResourceId1, {
+      subscribed: () => {},
+      notify: (update) => {
+        updates.push(update);
+      },
+      close: () => {},
+    });
+    const constantResourceId2 = "unsafe.identifier.2";
+    await service.instantiateResource(constantResourceId2, resource, {});
     try {
-      // No value registered in external mock resource
-      expect(service.getAll(resource).payload).toEqual([
-        [0, [[10]]],
-        [1, [[20]]],
-      ]);
-      await timeout(1);
-      // After 1ms values are added to external mock resource
-      expect(service.getAll(resource).payload).toEqual([
+      expect(mockExternal.subscribed.length).toEqual(1);
+      expect(mockExternal.initialized).toEqual(mockExternal.subscribed);
+      expect(await service.getAll(resource)).toEqual([
         [0, [[10, 15]]],
         [1, [[20, 30]]],
       ]);
-      service.update("input2", [
+      await service.update("input2", [
         [0, [6]],
         [1, [11]],
       ]);
-      // New params => No value registered in external mock resource
-      expect(service.getAll(resource).payload).toEqual([
-        [0, [[10]]],
-        [1, [[20]]],
-      ]);
-      await timeout(6);
-      // After 5ms values are added to external mock resource
-      expect(service.getAll(resource).payload).toEqual([
+      expect(mockExternal.initialized).toEqual(mockExternal.subscribed);
+      expect(await service.getAll(resource)).toEqual([
         [0, [[10, 16]]],
         [1, [[20, 31]]],
       ]);
+      expect(updates.map((update) => update.values)).toEqual([
+        [
+          [0, [[10, 15]]],
+          [1, [[20, 30]]],
+        ],
+        [
+          [0, [[10, 16]]],
+          [1, [[20, 31]]],
+        ],
+      ]);
     } finally {
+      service.unsubscribe(sid);
+      service.closeResourceInstance(constantResourceId1);
+      service.closeResourceInstance(constantResourceId2);
+      await service.close();
+    }
+    expect(mockExternal.unsubscribed.sort()).toEqual(
+      mockExternal.subscribed.sort(),
+    );
+  });
+
+  it("testInitServiceWithExternalService", async () => {
+    const resource = "display";
+    const service = await initService(initServiceWithExternalService);
+    await service.update("input", [
+      [0, [10]],
+      [1, [20]],
+    ]);
+    const constantResourceId = "unsafe.identifier";
+    await service.instantiateResource(constantResourceId, resource, {});
+    const updates: CollectionUpdate<Json, Json>[] = [];
+    const sid = service.subscribe(constantResourceId, {
+      subscribed: () => {},
+      notify: (update) => {
+        updates.push(update);
+      },
+      close: () => {},
+    });
+    try {
+      expect(await service.getAll(resource)).toEqual([
+        [0, [[10, 15]]],
+        [1, [[20, 30]]],
+      ]);
+      await service.update("input", [
+        [0, [20]],
+        [1, [30]],
+      ]);
+      expect(await service.getAll(resource)).toEqual([
+        [0, [[20, 15]]],
+        [1, [[30, 30]]],
+      ]);
+      expect(updates.map((update) => update.values)).toEqual([
+        [
+          [0, [[10, 15]]],
+          [1, [[20, 30]]],
+        ],
+        [
+          [0, [[20, 15]]],
+          [1, [[30, 30]]],
+        ],
+      ]);
+    } finally {
+      service.unsubscribe(sid);
       service.closeResourceInstance(constantResourceId);
       await service.close();
     }
@@ -1237,14 +1371,14 @@ export function initTests(
 
   it("testMultipleResources", async () => {
     const service = await initService(multipleResourcesService);
-    service.update("input1", [["1", [10]]]);
-    expect(service.getArray("resource1", "1").payload).toEqual([10]);
-    service.update("input2", [["1", [20]]]);
-    expect(service.getArray("resource2", "1").payload).toEqual([20]);
-    service.update("input1", [["1", [30]]]);
-    expect(service.getArray("resource1", "1").payload).toEqual([30]);
-    service.update("input2", [["1", [40]]]);
-    expect(service.getArray("resource2", "1").payload).toEqual([40]);
+    await service.update("input1", [["1", [10]]]);
+    expect(await service.getArray("resource1", "1")).toEqual([10]);
+    await service.update("input2", [["1", [20]]]);
+    expect(await service.getArray("resource2", "1")).toEqual([20]);
+    await service.update("input1", [["1", [30]]]);
+    expect(await service.getArray("resource1", "1")).toEqual([30]);
+    await service.update("input2", [["1", [40]]]);
+    expect(await service.getArray("resource2", "1")).toEqual([40]);
   });
 
   it("testPostgres", async function () {
@@ -1268,19 +1402,14 @@ export function initTests(
       this.skip();
     }
     try {
-      service.instantiateResource(
-        "unsafe.fixed.resource.ident.1",
-        "resource",
-        {},
-      );
-      expect(service.getAll("resource").payload).toEqual([
+      await service.update("input", [
         [1, [10]],
         [2, [20]],
         [3, [30]],
       ]);
 
-      await withRetries(() =>
-        expect(service.getAll("resource").payload).toEqual([
+      await withRetries(async () =>
+        expect(await service.getAll("resource")).toEqual([
           [1, [111]],
           [2, [222]],
           [3, [333]],
@@ -1288,47 +1417,45 @@ export function initTests(
       );
       await pgClient.query("UPDATE skip_test SET x = 1000 WHERE id = 1;");
       await pgClient.query("DELETE FROM skip_test WHERE id = 2;");
-      await withRetries(() =>
-        expect(service.getAll("resource").payload).toEqual([
+      await withRetries(async () =>
+        expect(await service.getAll("resource")).toEqual([
           [1, [1110]],
           [2, [220]],
           [3, [333]],
         ]),
       );
-      service.instantiateResource(
+      await service.instantiateResource(
         "unsafe.fixed.resource.ident.3",
         "streamingResource",
         {},
       );
 
-      await withRetries(() =>
-        expect(service.getAll("streamingResource").payload).toEqual([]),
+      await withRetries(async () =>
+        expect(await service.getAll("streamingResource")).toEqual([]),
       );
 
       await pgClient.query("INSERT INTO skip_test (id, x) VALUES (5, 5);");
 
-      await withRetries(() =>
-        expect(service.getAll("streamingResource").payload).toEqual([[5, [5]]]),
+      await withRetries(async () =>
+        expect(await service.getAll("streamingResource")).toEqual([[5, [5]]]),
+      );
+      await service.instantiateResource(
+        "unsafe.fixed.resource.ident.2",
+        "resourceWithException",
+        {},
       );
 
       const errorMessages: any[] = [];
       await withAlternateConsoleError(
         (...msgs) => msgs.forEach((x) => errorMessages.push(x)),
         async () => {
-          service.instantiateResource(
-            "unsafe.fixed.resource.ident.2",
-            "resourceWithException",
-            {},
-          );
-          //TODO: await instantiateResource instead of sleeping here, once that's made asynchronous
-          await timeout(10);
           await pgClient.query(
             "INSERT INTO skip_test (id, x) VALUES (42, 42);",
           );
           await timeout(10);
           expect(errorMessages).toHaveLength(2);
           expect(errorMessages[0]).toEqual(
-            "Uncaught error during Skip runtime reactive update: ",
+            "Uncaught error triggered by Postgres adapter update (key 42, table skip_test):",
           );
           expect(errorMessages[1]).toBeA(Error);
           expect((errorMessages[1] as Error).message).toMatchRegex(
@@ -1375,25 +1502,20 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
       this.skip();
     }
     try {
-      service.instantiateResource(resourceId, "resource", {});
-      expect(service.getAll("resource").payload).toEqual([]);
+      await service.instantiateResource(resourceId, "resource", {});
+      expect(await service.getAll("resource")).toEqual([]);
 
       const messages = Array.from({ length: 5 }, () => {
         const noise = Math.floor(Math.random() * 1_000_000_000);
         return { key: String(noise), value: String(1 + (noise % 5)) };
       });
       await producer.send({ topic: "skip-test-topic", messages });
-
-      await withRetries(
-        () =>
-          messages.forEach(({ key, value }) => {
-            const expected = 10 * Number(value) ** 2;
-            expect(service.getArray("resource", key).payload).toEqual([
-              expected,
-            ]);
-          }),
-        10,
-      );
+      await withRetries(async () => {
+        for (const { key, value } of messages) {
+          const expected = 10 * Number(value) ** 2;
+          expect(await service.getArray("resource", key)).toEqual([expected]);
+        }
+      }, 10);
     } finally {
       await producer.disconnect();
       service.closeResourceInstance(resourceId);
@@ -1402,71 +1524,82 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
   });
 
   it("testLazyWithUseExternalService", async () => {
-    const service = await initService(lazyWithUseExternalServiceService);
-    service.instantiateResource("unsafe.fixed.resource.ident", "lazy", {});
-
-    await withAlternateConsoleError(
-      () => {},
-      () => {
-        const update = () =>
-          service.update("input", [
-            [0, [10]],
-            [1, [20]],
-          ]);
-        expect(update).toThrow(
-          new RegExp(
-            /^(?:Error: )?useExternalResource is not allowed in a lazy computation graph.$/,
-          ),
-        );
-        return Promise.resolve(undefined);
-      },
+    const service = await initService(lazyWithUseExternalServiceService());
+    await service.instantiateResource(
+      "unsafe.fixed.resource.ident",
+      "lazy",
+      {},
     );
+    try {
+      await service.update("input", [
+        [0, [10]],
+        [1, [20]],
+      ]);
+      throw new Error("Error was not thrown");
+    } catch (e: unknown) {
+      expect(e).toBeA(Error);
+      expect((e as Error).message).toMatchRegex(
+        new RegExp(
+          /^(?:Error: )?useExternalResource is not allowed in a lazy computation graph.$/,
+        ),
+      );
+    }
   });
 
   it("testMapWithException", async () => {
-    await withAlternateConsoleError(
-      () => {},
-      async () => {
-        const service = await initService(mapWithExceptionService);
-        service.instantiateResource(
-          "unsafe.fixed.resource.ident",
-          "mapWithException",
-          {},
-        );
-        const update = () =>
-          service.update("input", [
-            [0, [10]],
-            [1, [20]],
-          ]);
-        expect(update).toThrow(
-          new RegExp(/^(?:Error: )?Something goes wrong.$/),
-        );
-      },
+    const service = await initService(mapWithExceptionService);
+    await service.instantiateResource(
+      "unsafe.fixed.resource.ident",
+      "mapWithException",
+      {},
     );
+    try {
+      await service.update("input", [
+        [0, [10]],
+        [1, [20]],
+      ]);
+      throw new Error("Error was not thrown");
+    } catch (e: unknown) {
+      expect(e).toBeA(Error);
+      expect((e as Error).message).toMatchRegex(
+        new RegExp(/^(?:Error: )?Something goes wrong.$/),
+      );
+    }
+  });
+
+  it("testInitServiceWithExternalServiceFailure", async () => {
+    let service;
+    try {
+      service = await initService(initServiceWithExternalServiceFailure());
+      throw new Error("Error was not thrown");
+    } catch (e: unknown) {
+      expect(e).toBeA(Error);
+      expect((e as Error).message).toMatchRegex(
+        new RegExp(
+          /^(?:SkipRuntime\.ServiceInstanceInitFailed: )?Service instance cannot be initialized:/,
+        ),
+      );
+    } finally {
+      if (service) await service.close();
+    }
   });
 
   it("testMapWithExceptionOnExternal", async () => {
-    // Capture logged error messages instead of actually logging
-    const errorMessages: any[] = [];
-    await withAlternateConsoleError(
-      (...msgs) => msgs.forEach((x) => errorMessages.push(x)),
-      async () => {
-        const service = await initService(mapWithExceptionOnExternalService);
-        service.instantiateResource(
-          "unsafe.fixed.resource.ident",
-          "mapWithException",
-          {},
-        );
-        await timeout(5);
-        expect(errorMessages).toHaveLength(2);
-        expect(errorMessages[0]).toEqual(
-          "Uncaught error during Skip runtime reactive update: ",
-        );
-        expect(errorMessages[1]).toBeA(Error);
-        expect((errorMessages[1] as Error).message).toMatchRegex(
-          /^(?:Error: )?Something goes wrong.$/,
-        );
-      },
-    );
+    const service = await initService(mapWithExceptionOnExternalService());
+    try {
+      await service.instantiateResource(
+        "unsafe.fixed.resource.ident",
+        "mapWithException",
+        {},
+      );
+      throw new Error("Error was not thrown");
+    } catch (e: unknown) {
+      expect(e).toBeA(Error);
+      expect((e as Error).message).toMatchRegex(
+        new RegExp(
+          /^(?:SkipRuntime\.ResourceInstanceInitFailed: )?Resource instance cannot be initialized:/,
+        ),
+      );
+    }
   });
 }
