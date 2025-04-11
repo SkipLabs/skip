@@ -1613,7 +1613,7 @@ class EagerDir{
         ctx = contextOpt.fromSome();
         ctx.enter(ArrowKey(parentName, childName, key), timeStack);
         path = Path::create(parentName, key);
-        oldInfo = static::getOld(child, path);
+        oldInfo = child.getOld(path);
         oldKeys = SortedSet<Key>::createFromItems(oldInfo.getKeys());
         newDirsCopy = ctx.newDirs;
         readsCopy = ctx.reads;
@@ -2045,11 +2045,11 @@ class EagerDir{
     this.fixedOld.items().each(e -> e.i1.getNewDirs().each(context.removeDir))
   }
 
-  static fun getOld(child: EagerDir, key: Path): MInfo {
-    if (child.old.containsKey(key)) {
-      child.old[key]
+  private fun getOld(key: Path): MInfo {
+    if (this.old.containsKey(key)) {
+      this.old[key]
     } else {
-      child.fixedOld.maybeGet(key) match {
+      this.fixedOld.maybeGet(key) match {
       | None() -> MInfo::empty()
       | Some(v) -> v
       }
@@ -2061,7 +2061,7 @@ class EagerDir{
     source: Path,
     newDirs: SortedSet<DirName>,
   ): this {
-    minfo = static::getOld(this, source);
+    minfo = this.getOld(source);
     lastRoundDirs = minfo.getNewDirs();
     removed = mutable Vector[];
     if (context.isWithSharedSubDirs(this.dirName)) {
