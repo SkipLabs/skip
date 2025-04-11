@@ -7,13 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.15] - 2025-04-11
+
+### Added
+- Add an optional env variable prefix to stream UUIDs (#859).
 - Add a mechanism to wait for external resources initialization at resource creation time (#850).
 - Add transaction mechanism to wait for external resources initialization at write time (#850).
 
 ## [0.0.14] - 2025-04-10
 
 ### Added
-- asLeader/asFollower utilities for distributed Skip services (#853).
+- Add asLeader/asFollower utilities for distributed Skip services (#853).
 
 ## [0.0.13] - 2025-03-21
 
@@ -54,7 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.0.10] - 2025-02-05
 
-[unreleased]: https://github.com/skiplabs/skip/compare/v0.0.14...HEAD
+[unreleased]: https://github.com/skiplabs/skip/compare/v0.0.15...HEAD
+[0.0.15]: https://github.com/skiplabs/skip/compare/v0.0.14...v0.0.15
 [0.0.14]: https://github.com/skiplabs/skip/compare/v0.0.13...v0.0.14
 [0.0.13]: https://github.com/skiplabs/skip/compare/v0.0.12...v0.0.13
 [0.0.12]: https://github.com/skiplabs/skip/compare/v0.0.11...v0.0.12
