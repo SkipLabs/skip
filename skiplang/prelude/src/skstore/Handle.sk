@@ -514,13 +514,15 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
     rangesOpt: ?Array<KeyRange<K>>,
   ): EHandle<K, V> {
     EagerFilter::create(
+      this.keyType,
+      this.type,
       context,
       this.dirName,
       childName,
       capacity,
-      (file: File) ~> fileSize(this.type(file)),
-      (file: File, n: Int) ~> removeFromFile(this.type(file), n),
-      (context, key, file) ~> f(context, this.keyType(key), this.type(file)),
+      fileSize,
+      removeFromFile,
+      f,
       rangesOpt,
     );
     EHandle(this.keyType, this.type, childName)
