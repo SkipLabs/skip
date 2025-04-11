@@ -666,7 +666,7 @@ mutable class FixedDataMapIterator<T> private {
 /* An Eager Directory. */
 /*****************************************************************************/
 
-class EagerDir protected {
+base class EagerDir protected {
   input: Bool,
   protected created: Tick,
   protected fixedData: FixedDataMap<Key, File>,
@@ -691,7 +691,7 @@ class EagerDir protected {
   protected purgeCount: Int = 0,
   protected tombLimit: ?Tick = None(),
   optOnDelete: ?Postponable = None(),
-} extends TDir {
+} extends Dir {
   protected fun reset(
     context: mutable Context,
     writer: Path,
@@ -1273,7 +1273,13 @@ class EagerDir protected {
       parentName,
       Array[(f, rangeOpt, onUpdate)],
     );
-    static::applyMany(context, parents, childName, reducerOpt, unsafeSkipInit);
+    TEagerDir::applyMany(
+      context,
+      parents,
+      childName,
+      reducerOpt,
+      unsafeSkipInit,
+    );
   }
 
   protected static fun addChildToParent(
@@ -2056,7 +2062,7 @@ class EagerDir protected {
     | None() ->
       context.!newDirs = context.newDirs.add(preDirName);
       time = context.timeStamp();
-      preDir = EagerDir::create{
+      preDir = TEagerDir::create{
         input => false,
         created => context.getTick(),
         timeStack => TimeStack::createInput(time),
@@ -2119,7 +2125,9 @@ class EagerDir protected {
     | Some(_) -> invariant_violation("Error import: incompatible dir types")
     }
   }
+}
 
+class TEagerDir extends EagerDir, TDir {
   static fun create{
     timeStack: TimeStack,
     created: Tick,
@@ -2254,7 +2262,7 @@ class EagerDir protected {
       data = DataMap::empty();
       fixedOld = FixedSourceMap::create(oldVec, true);
 
-      EagerDir{
+      static{
         timeStack,
         created => context.getTick(),
         dirName => childName,
