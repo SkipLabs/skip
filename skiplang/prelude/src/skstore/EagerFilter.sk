@@ -19,7 +19,16 @@
 /*****************************************************************************/
 module SKStore;
 
-class MaxKeyFile(key: Key) extends File
+base class IMaxKeyFile extends File uses Unsafe.Downcastable
+
+class MaxKeyFile(key: Key) extends IMaxKeyFile {
+  static fun type(obj: File): this {
+    obj match {
+    | x @ IMaxKeyFile _ -> Unsafe.cast(x, static)
+    | _ -> invariant_violation("Expected MaxKeyFile")
+    }
+  }
+}
 
 value class FilterRange<+K: Orderable> private (
   ranges: Array<KeyRange<K>>,
