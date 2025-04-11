@@ -48,8 +48,10 @@ value class FilterRange<+K: Orderable> private (
   }
 }
 
-class EagerFilter<K: Key> private {
+class EagerFilter<K: Key, F: File> private {
   keyType: Key ~> K,
+
+  type: File ~> F,
 
   // The name of the parent directory
   parentName: DirName,
@@ -64,17 +66,17 @@ class EagerFilter<K: Key> private {
   capacity: Int,
 
   // The function that returns the size of a file
-  fileSize: File ~> Int,
+  fileSize: F ~> Int,
 
   // Given a file of a size > 1, returns the same version of the file
   // where N elements have been removed from the file
-  removeFromFile: (File, Int) ~> File,
+  removeFromFile: (F, Int) ~> F,
 
   // The filtering function (on the parent's files)
-  filter: (mutable Context, K, File) ~> Bool,
+  filter: (mutable Context, K, F) ~> Bool,
 } {
   // Returns the size of an entire array
-  private fun arraySize(array: Array<File>): Int {
+  private fun arraySize(array: Array<F>): Int {
     count = 0;
     for (file in array) {
       !count = count + this.fileSize(file);
@@ -175,7 +177,7 @@ class EagerFilter<K: Key> private {
         (key, files) = kv;
         if (startKey <= this.keyType(key)) break void;
         for (file in files) {
-          !size = this.fileSize(file) + size;
+          !size = this.fileSize(this.type(file)) + size;
         };
       }
     };
@@ -191,7 +193,8 @@ class EagerFilter<K: Key> private {
       (untypedKey, files) = kv;
       key = this.keyType(untypedKey);
       vec = mutable Vector[];
-      for (file in files) {
+      for (untypedFile in files) {
+        file = this.type(untypedFile);
         if (!this.filter(context, key, file)) continue;
         rangesOpt match {
         | None() -> void
@@ -253,7 +256,7 @@ class EagerFilter<K: Key> private {
     context.setDir(childDir)
   }
 
-  static fun create<F: File>(
+  static fun create(
     keyType: Key ~> K,
     type: File ~> F,
     context: mutable Context,
@@ -270,13 +273,14 @@ class EagerFilter<K: Key> private {
     fullName = static::mkDir(context, childName, Some("full"));
     result = static{
       keyType,
+      type,
       parentName,
       childName,
       fullName,
       capacity,
-      fileSize => (file: File) ~> fileSize(type(file)),
-      removeFromFile => (file: File, n: Int) ~> removeFromFile(type(file), n),
-      filter => (context, key, file) ~> filter(context, key, type(file)),
+      fileSize,
+      removeFromFile,
+      filter,
     };
     result.bindDirectories(context, filterRange);
     result.syncData(context, None(), filterRange);
