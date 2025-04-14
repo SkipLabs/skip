@@ -73,7 +73,7 @@ To handle that scenario, you can run your Skip service in a *leader-follower* to
     * one *leader* instance to maintain the shared computation graph and/or pull in data from external dependencies like databases or polled APIs, and
     * one or more *followers* which synchronize that shared data from the leader, among which resource instances are distributed in a round-robin fashion.
 
-Utilities are available to run a Skip service in [leader](api/server/functions/asLeader) or [follower](api/server/functions/asFollower) mode, making it easy to scale out from a single-machine deployment to a distributed one.
+Utilities are available to run a Skip service in [leader](api/helpers/functions/asLeader) or [follower](api/helpers/functions/asFollower) mode, making it easy to scale out from a single-machine deployment to a distributed one.
 
 An example of such a deployment can be seen in [this example](https://github.com/SkipLabs/skip/tree/main/examples/hackernews); `./compose.distributed.yml` and `./reverse-proxy/haproxy.distributed.cfg` show a configuration with equivalent client-visible behavior to `compose.yml` and `reverse-proxy/haproxy.cfg` but running with one leader and three followers instead of just one reactive service.
 
