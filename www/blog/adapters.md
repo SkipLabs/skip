@@ -1,6 +1,6 @@
 ---
-title: Skip services with non-reactive dependencies
-description: External integrations for the Skip framework
+title: New built-in resources for Skip services
+description: How to make Postgres and Kafka-backed reactive services
 slug: non-reactive-dependencies
 date: 2025-04-14
 authors: benno
