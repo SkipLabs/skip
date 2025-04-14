@@ -147,9 +147,9 @@ const service = {
       my_resource: {
         // HTTP endpoint
         url: "https://api.example.com/my_resource",
-	    // Polling interval, in milliseconds
+        // Polling interval, in milliseconds
         interval: 5000,
-	    // data processing into `Entry<K, V>[]` key/values structure
+        // data processing into `Entry<K, V>[]` key/values structure
         conv: (data: Json) => Array.from(data, (v, k) => [k, [v]])
       }
     }),
