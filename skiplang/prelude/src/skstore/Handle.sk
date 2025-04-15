@@ -389,18 +389,6 @@ class LHandle<K: Key, +V: File> extends Handle<K, V> {
     );
     LHandle(keyType, type, dir.getDirName())
   }
-
-  fun getArrayWithOptions(
-    context: mutable Context,
-    key: Key,
-    throwOnCycle: Bool,
-  ): Array<V> {
-    dir = context.unsafeGetLazyDir(this.dirName);
-    results = dir
-      .getArrayWithOptions(context, key, throwOnCycle)
-      .map(this.type);
-    results
-  }
 }
 
 /*****************************************************************************/
