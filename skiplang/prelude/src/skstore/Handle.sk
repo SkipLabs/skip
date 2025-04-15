@@ -139,7 +139,8 @@ mutable class TWriter<K: Key, V: File> private {
   mutable writes: SortedMap<Key, Array<File>> = SortedMap[],
 } {
   static fun mcreate(writes: SortedMap<Key, Array<File>>): mutable this {
-    mutable static{writes}
+    invariant(writes.isEmpty(), "TWriter should be created with an empty map");
+    mutable static{}
   }
 
   mutable fun setArray(key: K, values: Array<V>): void {
