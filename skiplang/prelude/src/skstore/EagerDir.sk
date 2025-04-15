@@ -52,14 +52,14 @@ type MapFun = (
 /* Compaction types and helpers. */
 /*****************************************************************************/
 
-class Reducer<K: Orderable>{
-  reducer: IReducer<File>,
-  private fixed: Array<(K, Array<File>)>,
-  modified: SortedMap<K, Array<File>>,
+class Reducer<K: Orderable, F: frozen>{
+  reducer: IReducer<F>,
+  private fixed: Array<(K, Array<F>)>,
+  modified: SortedMap<K, Array<F>>,
 } {
   static fun create(
-    fixedData: FixedData<K, Array<File>>,
-    reducer: IReducer<File>,
+    fixedData: FixedData<K, Array<F>>,
+    reducer: IReducer<F>,
   ): this {
     acc = mutable Vector[];
     modified = SortedMap[];
@@ -79,7 +79,7 @@ class Reducer<K: Orderable>{
 
   fun unsafeIter(
     start: ?K = None(),
-  ): mutable Iterator<(K, mutable Iterator<File>)> {
+  ): mutable Iterator<(K, mutable Iterator<F>)> {
     current = mutable IntRef(
       start match {
       | None() -> 0
@@ -114,10 +114,10 @@ class Reducer<K: Orderable>{
   }
 
   private static fun makeCompactKeyIterator(
-    fixedData: FixedData<K, Array<File>>,
+    fixedData: FixedData<K, Array<F>>,
     key: K,
     current: mutable IntRef,
-  ): readonly Vector<File> {
+  ): readonly Vector<F> {
     result = mutable Vector[];
     while (
       current.value < fixedData.size() &&
@@ -131,14 +131,14 @@ class Reducer<K: Orderable>{
     result
   }
 
-  fun getArray(key: K): Array<File> {
+  fun getArray(key: K): Array<F> {
     this.modified.maybeGet(key) match {
     | None() -> this.getFixedij(key, 0, this.fixed.size() - 1)
     | Some(values) -> values
     }
   }
 
-  private fun getFixedij(key: K, i: Int, j: Int): Array<File> {
+  private fun getFixedij(key: K, i: Int, j: Int): Array<F> {
     if (i > j) {
       return Array[];
     };
@@ -150,7 +150,7 @@ class Reducer<K: Orderable>{
     }
   }
 
-  fun getFixed(key: K): Array<File> {
+  fun getFixed(key: K): Array<F> {
     this.getFixedij(key, 0, this.fixed.size() - 1)
   }
 }
@@ -676,7 +676,7 @@ class EagerDir protected {
   > = FixedSingle::empty(),
   childDirs: SortedSet<DirName> = SortedSet[],
   private slices: RangeMapList<Key, DirName> = RangeMapList[],
-  private reducer: ?Reducer<Key> = None(),
+  private reducer: ?Reducer<Key, File> = None(),
   private purgeCount: Int = 0,
   private tombLimit: ?Tick = None(),
   optOnDelete: ?Postponable = None(),
