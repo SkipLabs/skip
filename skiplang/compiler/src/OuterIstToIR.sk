@@ -935,7 +935,6 @@ class GClassFile(value: GClass) extends SKStore.File
 // Manages the overall conversion from OuterIst to IR.
 class Converter private (
   program: I.Program,
-  private ptrBitSize: Int,
   private funs: SKStore.LHandle<LazyGFunKey, GFunctionFile>,
   private classes: SKStore.LHandle<LazyGClassKey, GClassFile>,
   lower: SKStore.LHandle<I.CallableDefFile, I.CallableDefFile>,
@@ -950,7 +949,6 @@ class Converter private (
 
   static fun create(
     context: mutable SKStore.Context,
-    ptrBitSize: Int,
     name: SKStore.DirName,
     program: I.Program,
   ): this {
@@ -972,7 +970,7 @@ class Converter private (
       I.CallableDefFile::type,
       lowerDirName,
     );
-    converter = static(program, ptrBitSize, funs, classes, lower);
+    converter = static(program, funs, classes, lower);
     _ = SKStore.LHandle::create(
       LazyGFunKey::keyType,
       GFunctionFile::type,
@@ -2240,21 +2238,6 @@ class Converter private (
     classMutable = in_.mutable_.isSome() && kind.isFinal();
     parentMutability = Mutability::fromFlag(classMutable);
 
-    // Magically poke in some LLVM type names for native types.
-    scalarType = classname match {
-    | "Bool" -> Some(ScalarType(1, 1, "i1", IntegerScalarKind()))
-    | "Char" -> Some(ScalarType(32, 32, "i32", IntegerScalarKind()))
-    | "Int" -> Some(ScalarType(64, 64, "i64", IntegerScalarKind()))
-    | "Int8" -> Some(ScalarType(8, 8, "i8", IntegerScalarKind()))
-    | "Int16" -> Some(ScalarType(16, 16, "i16", IntegerScalarKind()))
-    | "Int32" -> Some(ScalarType(32, 32, "i32", IntegerScalarKind()))
-    | "Float" -> Some(ScalarType(64, 64, "double", FloatScalarKind()))
-    | "Runtime.GCPointer" -> Some(ScalarType::gcPointer(this.ptrBitSize))
-    | "Runtime.NonGCPointer" -> Some(ScalarType::nonGCPointer(this.ptrBitSize))
-    | "String" -> Some(ScalarType::gcPointer(this.ptrBitSize))
-    | _ -> None()
-    };
-
     extends_ = this.convertExtends(context, in_, parentMutability);
 
     nonStaticMethods = in_.methods.filter((_, v) ->
@@ -2343,7 +2326,6 @@ class Converter private (
         methodSources => methodSources.chill(),
         annotations => in_.annotations,
         fields => convertedFields,
-        scalarType,
       },
     )
   }

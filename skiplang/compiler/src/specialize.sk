@@ -1496,9 +1496,22 @@ mutable class Specializer{
         fields => Array[], // Computed later after being scalarized
         canInstantiate => gclass.canInstantiate,
         ptrBitSize => this.config.ptrBitSize,
-        scalarType => gclass.scalarType match {
-        | some @ Some _ -> some
-        | None() ->
+        // Magically poke in some LLVM type names for native types.
+        scalarType => gclass.name.id match {
+        | "Bool" -> Some(ScalarType(1, 1, "i1", IntegerScalarKind()))
+        | "Char" -> Some(ScalarType(32, 32, "i32", IntegerScalarKind()))
+        | "Int" -> Some(ScalarType(64, 64, "i64", IntegerScalarKind()))
+        | "Int8" -> Some(ScalarType(8, 8, "i8", IntegerScalarKind()))
+        | "Int16" -> Some(ScalarType(16, 16, "i16", IntegerScalarKind()))
+        | "Int32" -> Some(ScalarType(32, 32, "i32", IntegerScalarKind()))
+        | "Float" -> Some(ScalarType(64, 64, "double", FloatScalarKind()))
+        | "Runtime.GCPointer" ->
+          Some(ScalarType::gcPointer(this.config.ptrBitSize))
+        | "Runtime.NonGCPointer" ->
+          Some(ScalarType::nonGCPointer(this.config.ptrBitSize))
+        | "String" -> Some(ScalarType::gcPointer(this.config.ptrBitSize))
+
+        | _ ->
           kind match {
           | KBase()
           | KClass() ->

@@ -189,10 +189,7 @@ fun ensureCompatibleLLVMVersion(): void {
 
 class TickConfigFile(value: (Int, Config.Config)) extends SKStore.File
 
-fun getOrInitializeBackend(
-  context: mutable SKStore.Context,
-  ptrBitSize: Int,
-): SKStore.EagerDir {
+fun getOrInitializeBackend(context: mutable SKStore.Context): SKStore.EagerDir {
   backendDirName = SKStore.DirName::create("/backend/");
   context.unsafeMaybeGetEagerDir(backendDirName) match {
   | Some(dir) -> return dir
@@ -222,7 +219,6 @@ fun getOrInitializeBackend(
 
   converter = OuterIstToIR.Converter::create(
     context,
-    ptrBitSize,
     SKStore.DirName::create("/converter/"),
     outerIst,
   );
@@ -379,9 +375,7 @@ fun compile(
 
   ensureCompatibleLLVMVersion();
 
-  // FIXME: Backend initialization should _not_ peek into the config
-  // as it is likely to change across invocations.
-  getOrInitializeBackend(context, config.ptrBitSize).writeArray(
+  getOrInitializeBackend(context).writeArray(
     context,
     SKStore.UnitID::singleton,
     Array[TickConfigFile((context.tick.value, config))],
