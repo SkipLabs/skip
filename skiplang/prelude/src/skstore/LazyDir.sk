@@ -9,16 +9,16 @@ class CyclicExn(Key) extends Exception {
   }
 }
 
-base class LazyResult {
+base class LazyResult<F> {
   children =
-  | LDefined(Array<File>, Array<Path>)
+  | LDefined(Array<F>, Array<Path>)
   | LRemoved(Array<Path>)
   | LCycle()
   | LAbsent()
 }
 
 class LazyDir protected {
-  private data: SortedMap<Key, LazyResult> = SortedMap[],
+  private data: SortedMap<Key, LazyResult<File>> = SortedMap[],
   private lazyFun: (mutable Context, DirName, Key) ~> ?Array<File>,
   private collect: Bool,
 } extends Dir {
@@ -148,7 +148,7 @@ class LazyDir protected {
     context.setDir(this);
   }
 
-  private fun doGet(context: mutable Context, key: Key): LazyResult {
+  private fun doGet(context: mutable Context, key: Key): LazyResult<File> {
     dirName = this.dirName;
 
     dir = context.unsafeGetLazyDir(dirName);
