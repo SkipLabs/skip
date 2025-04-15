@@ -669,7 +669,7 @@ class EagerDir protected {
   }
 
   fun reset(
-    context: mutable SKStore.Context,
+    context: mutable Context,
     writer: Path,
     keep: SortedSet<Key>,
     wasSeen: (Tick, Path) ~> Bool = (_, _) ~> true,
@@ -704,11 +704,11 @@ class EagerDir protected {
 
   fun writeDiff(
     isReset: Bool,
-    changes: mutable Iterator<SKStore.Key>,
+    changes: mutable Iterator<Key>,
     writer: mutable Debug.BufferedWriter,
     entity: String, // the name that this dir goes under during replication
     format: OutputFormat,
-    filter: (SKStore.Key -> Bool),
+    filter: (Key -> Bool),
     destinationTime: ?Tick,
     checkpointInterval: Int = Int::max,
   ): Bool {
@@ -1891,9 +1891,7 @@ class EagerDir protected {
     context.setDir(this with {optOnDelete});
   }
 
-  fun purgeSlices(
-    context: mutable Context,
-  ): RangeMapList<SKStore.Key, SKStore.DirName> {
+  fun purgeSlices(context: mutable Context): RangeMapList<Key, DirName> {
     slices = RangeMapList[];
     childDirs = SortedSet[];
     for (slice in this.slices) {
@@ -2065,7 +2063,7 @@ class EagerDir protected {
   }
 
   fun reverseTime(): this {
-    this with {time => SKStore.Time(-this.time.value)}
+    this with {time => Time(-this.time.value)}
   }
 
   fun updateNewDirs(
@@ -2176,7 +2174,7 @@ class EagerDir protected {
 
   fun getIterator(
     context: mutable Context,
-  ): mutable Iterator<(SKStore.Key, mutable Iterator<SKStore.File>)> {
+  ): mutable Iterator<(Key, mutable Iterator<File>)> {
     path = Path::create(this.dirName.files(), FilesTag());
     context.addDep(path);
     this.unsafeGetFileIter()

@@ -77,10 +77,9 @@ class DirSub(
   // the watermark is per-dir because tables can be added and removed
   // from the mirror-set: they don't necessarily all move forward in
   // lock-step.
-  getDestinationWatermark: (readonly SKStore.Context) ~> ?SKStore.Tick,
+  getDestinationWatermark: (readonly Context) ~> ?Tick,
   // this is a dir-specific filter
-  filter: (SKStore.Context, Bool, DirName) ~> (Key -> Bool) = (_, _, _) ~>
-    (_ -> true),
+  filter: (Context, Bool, DirName) ~> (Key -> Bool) = (_, _, _) ~> (_ -> true),
 )
 
 /*****************************************************************************/
@@ -321,7 +320,7 @@ mutable base class WriteChecker private {
   mutable tables: SortedMap<DirName, TableIndexes>,
 } {
   mutable fun checkWrite(
-    context: readonly SKStore.Context,
+    context: readonly Context,
     dirName: DirName,
     indexes: TableIndexes,
     key: Key,
@@ -1146,7 +1145,7 @@ mutable class Context{
 
   readonly fun transitiveChildDirs(dirName: DirName): SortedSet<DirName> {
     this.unsafeMaybeGetEagerDir(dirName) match {
-    | Some(dir @ SKStore.EagerDir _) ->
+    | Some(dir @ EagerDir _) ->
       dir.childDirs.reduce(
         (accDeps, child) -> {
           accDeps.union(this.transitiveChildDirs(child))
@@ -1271,10 +1270,7 @@ fun import(
             entries.iterator(),
           );
           if (isReset) {
-            writerPath = SKStore.Path(
-              dir.dirName,
-              SKStore.IID(SKStore.genSym(0)),
-            );
+            writerPath = Path(dir.dirName, IID(genSym(0)));
             !inputDir = inputDir.reset(targetCtx, writerPath, changedKeys);
           };
           targetCtx.setDir(inputDir)
@@ -1821,7 +1817,7 @@ fun destroyObstackWithValueCheckContext<T>(
   value: T,
   saved: Obstack,
 ): T {
-  (icontextOpt, !value) = SKStore.destroyObstackWithValue(
+  (icontextOpt, !value) = destroyObstackWithValue(
     saved,
     List[(contextOpt.map(ctx -> ctx.clone()), value)],
   ).getHead();
@@ -1852,7 +1848,7 @@ fun withRegionFold<K, T>(
             valueInRegion,
             saved,
           );
-          !optSaved = Some(SKStore.newObstack());
+          !optSaved = Some(newObstack());
         }
       | _ -> break void
       }
