@@ -17,7 +17,7 @@ base class LazyResult<F> {
   | LAbsent()
 }
 
-class LazyDir protected {
+base class LazyDir protected {
   protected data: SortedMap<Key, LazyResult<File>> = SortedMap[],
   protected lazyFun: (mutable Context, DirName, Key) ~> ?Array<File>,
   protected collect: Bool,
@@ -204,7 +204,9 @@ class LazyDir protected {
   fun getIter(context: mutable Context, key: Key): mutable Iterator<File> {
     this.getArray(context, key).iterator()
   }
+}
 
+class TLazyDir extends LazyDir, TDir {
   static fun create(
     context: mutable Context,
     dirName: DirName,
@@ -219,7 +221,7 @@ class LazyDir protected {
       ldir
     | _ ->
       time = context.timeStamp();
-      newDir = LazyDir{
+      newDir = static{
         timeStack => TimeStack::create(context, time),
         dirName,
         lazyFun,
