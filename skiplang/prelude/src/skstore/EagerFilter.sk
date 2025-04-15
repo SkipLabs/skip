@@ -29,7 +29,6 @@ value class FilterRange private (ranges: Array<KeyRange>, max: Key) {
       invariant(ranges.size() > 0);
       maxKey = ranges[0].end;
       for (range in ranges) {
-        invariant(range.start <= range.end);
         if (range.end > maxKey) !maxKey = range.end;
       };
       Some(FilterRange(ranges.sorted(), maxKey))

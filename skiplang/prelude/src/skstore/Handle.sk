@@ -132,40 +132,17 @@ mutable class NonEmptyIterator<+T>(
 }
 
 /*****************************************************************************/
-/* The class handed over to the closures mapping over a directory. */
-/*****************************************************************************/
-
-mutable class Writer{
-  mutable writes: SortedMap<Key, Array<File>> = SortedMap[],
-} {
-  mutable fun setArray(key: Key, values: Array<File>): void {
-    this.!writes[key] = values;
-  }
-
-  mutable fun set(key: Key, value: File): void {
-    this.!writes[key] = Array[value];
-  }
-
-  mutable fun remove(key: Key): void {
-    this.!writes[key] = Array[];
-  }
-
-  readonly fun getWrites(): Array<(Key, Array<File>)> {
-    result = mutable Vector[];
-    for (key => values in this.writes) {
-      result.push((key, values));
-    };
-    result.toArray()
-  }
-}
-
-/*****************************************************************************/
 /* Typed version of Writer. */
 /*****************************************************************************/
 
-mutable class TWriter<K: Key, V: File>{
-  mutable writes: SortedMap<Key, Array<File>> = SortedMap[],
+mutable class TWriter<K: Key, V: File> private {
+  mutable writes: SortedMap<K, Array<V>> = SortedMap[],
 } {
+  static fun mcreate(writes: SortedMap<Key, Array<File>>): mutable this {
+    invariant(writes.isEmpty(), "TWriter should be created with an empty map");
+    mutable static{}
+  }
+
   mutable fun setArray(key: K, values: Array<V>): void {
     this.!writes[key] = values;
   }
@@ -183,14 +160,6 @@ mutable class TWriter<K: Key, V: File>{
 
   mutable fun remove(key: K): void {
     this.!writes[key] = Array[];
-  }
-
-  readonly fun getWrites(): Array<(Key, Array<File>)> {
-    result = mutable Vector[];
-    for (key => values in this.writes) {
-      result.push((key, values));
-    };
-    result.toArray()
   }
 }
 
@@ -389,18 +358,6 @@ class LHandle<K: Key, +V: File> extends Handle<K, V> {
     );
     LHandle(keyType, type, dir.getDirName())
   }
-
-  fun getArrayWithOptions(
-    context: mutable Context,
-    key: Key,
-    throwOnCycle: Bool,
-  ): Array<V> {
-    dir = context.unsafeGetLazyDir(this.dirName);
-    results = dir
-      .getArrayWithOptions(context, key, throwOnCycle)
-      .map(this.type);
-    results
-  }
 }
 
 /*****************************************************************************/
@@ -435,7 +392,7 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
         FileIterator::create(fileIter) match {
         | EmptyFileIterator _ -> return void
         | iter @ NonEmptyIterator _ ->
-          twriter = mutable TWriter<K2, V2>{writes => writer.writes};
+          twriter = TWriter<K2, V2>::mcreate(writer.writes);
           mapFun(
             context,
             twriter,
@@ -547,7 +504,7 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
     capacity: Int,
     f: (mutable SKStore.Context, K, V) ~> Bool,
     fileSize: V ~> Int,
-    removeFromFile: (V, Int) ~> File,
+    removeFromFile: (V, Int) ~> V,
     rangesOpt: ?Array<KeyRange>,
   ): EHandle<K, V> {
     EagerFilter::create(
@@ -581,11 +538,7 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
     context.getEagerDir(this.dirName).isEmpty(context)
   }
 
-  fun writeArray<U: File>[V: U](
-    context: mutable Context,
-    key: K,
-    values: Array<U>,
-  ): void {
+  fun writeArray(context: mutable Context, key: K, values: Array<V>): void {
     dir = context.unsafeGetEagerDir(this.dirName);
     dir.writeArray(context, key, values);
   }

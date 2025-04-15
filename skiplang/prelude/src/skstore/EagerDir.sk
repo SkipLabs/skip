@@ -10,43 +10,30 @@ module SKStore;
 const PURGE_LIMIT: Int = 30;
 
 /*****************************************************************************/
-/* We need to be able to iterate after a given starting point. This method
- * should be in SortedMap.sk but I will move it in a separate diff, because
- * otherwise I force everyone to recompile the compiler.
- */
+/* The class handed over to the closures mapping over a directory. */
 /*****************************************************************************/
 
-mutable class Items<T>(data: mutable Iterator<T>) {
-  static fun create(data: mutable Iterator<T>): mutable this {
-    mutable static(data)
+mutable class Writer{
+  mutable writes: SortedMap<Key, Array<File>> = SortedMap[],
+} {
+  mutable fun setArray(key: Key, values: Array<File>): void {
+    this.!writes[key] = values;
   }
-  mutable fun items(): mutable Iterator<T> {
-    this.data
-  }
-}
 
-extension base class .SortedMap {
-  fun itemsAfter<K2: Orderable, V2>[K: K2, V: V2](
-    start: ?K2,
-  ): mutable Iterator<(K2, V2)> {
-    this match {
-    | SortedMap.Nil() -> void
-    | SortedMap.Node{key, value, left, right} ->
-      if (
-        start match {
-        | None() -> true
-        | Some(x) -> key >= x
-        }
-      ) {
-        for (x in left.itemsAfter(start)) {
-          yield x;
-        };
-        yield (key, value);
-      };
-      for (x in right.itemsAfter(start)) {
-        yield x;
-      }
-    }
+  mutable fun set(key: Key, value: File): void {
+    this.!writes[key] = Array[value];
+  }
+
+  mutable fun remove(key: Key): void {
+    this.!writes[key] = Array[];
+  }
+
+  readonly fun getWrites(): Array<(Key, Array<File>)> {
+    result = mutable Vector[];
+    for (key => values in this.writes) {
+      result.push((key, values));
+    };
+    result.toArray()
   }
 }
 
@@ -60,12 +47,6 @@ type MapFun = (
   Key,
   mutable Iterator<File>,
 ) ~> void;
-
-/*****************************************************************************/
-/* The action passed to aggregate functions. */
-/*****************************************************************************/
-
-value class Aggregate(state: File, reducer: IReducer)
 
 /*****************************************************************************/
 /* Compaction types and helpers. */
@@ -106,7 +87,7 @@ class Reducer{
         max(0, binSearch(i ~> this.fixed[i].i0, key, 0, this.fixed.size() - 1))
       },
     );
-    for (key => values in Items::create(this.modified.itemsAfter(start))) {
+    for ((key, values) in this.modified.itemsAfter(start)) {
       while (
         current.value < this.fixed.size() &&
         this.fixed[current.value].i0 < key
@@ -189,7 +170,12 @@ mutable class IntRef(mutable value: Int) {
 /* Ranges. */
 /*****************************************************************************/
 
-value class KeyRange(start: Key, end: Key) uses Orderable, Show {
+value class KeyRange private {start: Key, end: Key} uses Orderable, Show {
+  static fun create(start: Key, end: Key): this {
+    invariant(start <= end);
+    static{start, end}
+  }
+
   fun toString(): String {
     `[${this.start}, ${this.end}]`
   }
@@ -1335,7 +1321,7 @@ class EagerDir private {
     globalName = "PRE_COMPUTED_" + childName;
 
     dir = context.getGlobal(globalName) match {
-    | Some(x @ EagerDir _) ->
+    | Some(EagerDirFile(x)) ->
       invariant(x.creator == context.currentArrow());
       context.removeGlobal(globalName);
       x
@@ -2241,10 +2227,8 @@ class EagerDir private {
   fun remove(context: mutable Context, baseName: Key): void {
     this.writeArray(context, baseName, Array[]);
   }
-
-  fun isDeleted(): Bool {
-    false
-  }
 }
+
+class EagerDirFile(dir: EagerDir) extends File
 
 module end;

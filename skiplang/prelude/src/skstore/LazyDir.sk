@@ -122,10 +122,6 @@ class LazyDir private {
     this.dirName
   }
 
-  fun isDeleted(): Bool {
-    false
-  }
-
   fun getArrayRaw(key: Key): Array<File> {
     this.data.maybeGet(key) match {
     | Some(LDefined(arr, _)) -> arr
@@ -203,9 +199,7 @@ class LazyDir private {
   }
 
   fun getArray(context: mutable Context, key: Key): Array<File> {
-    path = Path::create(this.dirName, key);
-    context.addDep(path);
-    this.unsafeGetArray(context, key, true)
+    this.getArrayWithOptions(context, key, true)
   }
 
   fun getArrayWithOptions(
