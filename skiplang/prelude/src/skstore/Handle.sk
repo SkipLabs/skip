@@ -135,9 +135,13 @@ mutable class NonEmptyIterator<+T>(
 /* Typed version of Writer. */
 /*****************************************************************************/
 
-mutable class TWriter<K: Key, V: File>{
+mutable class TWriter<K: Key, V: File> private {
   mutable writes: SortedMap<Key, Array<File>> = SortedMap[],
 } {
+  static fun mcreate(writes: SortedMap<Key, Array<File>>): mutable this {
+    mutable static{writes}
+  }
+
   mutable fun setArray(key: K, values: Array<V>): void {
     this.!writes[key] = values;
   }
@@ -387,7 +391,7 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
         FileIterator::create(fileIter) match {
         | EmptyFileIterator _ -> return void
         | iter @ NonEmptyIterator _ ->
-          twriter = mutable TWriter<K2, V2>{writes => writer.writes};
+          twriter = TWriter<K2, V2>::mcreate(writer.writes);
           mapFun(
             context,
             twriter,
