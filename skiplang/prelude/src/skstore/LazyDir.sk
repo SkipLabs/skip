@@ -89,7 +89,14 @@ class LazyDir protected {
     }
   }
 
-  fun withData(data: SortedMap<Key, LazyResult>): this {
+  fun removeKeys(keys: SortedSet<Key>): this {
+    data = this.data;
+    for (key in keys) {
+      data.maybeGet(key) match {
+      | Some(LDefined(_, reads)) -> !data[key] = LRemoved(reads)
+      | _ -> void
+      }
+    };
     this with {data}
   }
 
