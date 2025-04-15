@@ -480,7 +480,10 @@ fun getSubsDirs(
           (context, isReset, dirName) ~> {
             if (isReset) return alwaysTrue;
             tdir = context.unsafeGetEagerDir(dirName);
-            ignoredSrc = SKStore.Path(dirDescr.dirName, SKStore.IID(inputSrc));
+            ignoredSrc = SKStore.Path::create(
+              dirDescr.dirName,
+              SKStore.IID(inputSrc),
+            );
             (file: SKStore.Key) -> {
               rows = tdir.getAllDataIter(context.mclone(), file).collect(Array);
               !updateIsFromIgnoredSource(ignoredSrc, rows)

@@ -191,7 +191,7 @@ base class PredefinedTable private final {
         if (affectedThisUser) {
           destination match {
           | Some(dest) ->
-            writer = (SKStore.Path(dir.dirName, SKStore.IID(dest)));
+            writer = (SKStore.Path::create(dir.dirName, SKStore.IID(dest)));
             rows = dir.getAllDataIter(context.mclone(), rowKey).collect(Array);
             if (!updateIsFromIgnoredSource(writer, rows)) {
               return true;
