@@ -16,15 +16,6 @@ const PURGE_LIMIT: Int = 30;
  */
 /*****************************************************************************/
 
-mutable class Items<T>(data: mutable Iterator<T>) {
-  static fun create(data: mutable Iterator<T>): mutable this {
-    mutable static(data)
-  }
-  mutable fun items(): mutable Iterator<T> {
-    this.data
-  }
-}
-
 extension base class .SortedMap {
   fun itemsAfter<K2: Orderable, V2>[K: K2, V: V2](
     start: ?K2,
@@ -128,7 +119,7 @@ class Reducer{
         max(0, binSearch(i ~> this.fixed[i].i0, key, 0, this.fixed.size() - 1))
       },
     );
-    for (key => values in Items::create(this.modified.itemsAfter(start))) {
+    for ((key, values) in this.modified.itemsAfter(start)) {
       while (
         current.value < this.fixed.size() &&
         this.fixed[current.value].i0 < key
