@@ -17,10 +17,7 @@ base class LazyResult {
   | LAbsent()
 }
 
-class LazyDir private {
-  time: Time,
-  timeStack: TimeStack,
-  dirName: DirName,
+class LazyDir protected {
   data: SortedMap<Key, LazyResult> = SortedMap[],
   private lazyFun: ((mutable Context, Key) ~> LazyResult),
   collect: Bool,
@@ -96,14 +93,6 @@ class LazyDir private {
     this with {data}
   }
 
-  fun getTime(): Time {
-    this.time
-  }
-
-  fun getTimeStack(): TimeStack {
-    this.timeStack
-  }
-
   fun reset(context: mutable Context): void {
     context.setDir(this);
   }
@@ -116,10 +105,6 @@ class LazyDir private {
       };
     };
     keys
-  }
-
-  fun getDirName(): DirName {
-    this.dirName
   }
 
   fun getArrayRaw(key: Key): Array<File> {
