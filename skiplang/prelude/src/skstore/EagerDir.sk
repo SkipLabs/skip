@@ -1790,7 +1790,7 @@ class EagerDir protected {
     context.!dirty = List.Cons(path, context.dirty);
 
     if (this.totalSize != totalSize) {
-      sizePath = Path::create(this.dirName.size(), SizeTag());
+      sizePath = Path::sizeTag(this.dirName);
       context.updateDirtyReaders(sizePath);
       if (
         this.totalSize == 0 && totalSize != 0 ||
@@ -2167,7 +2167,7 @@ class EagerDir protected {
   }
 
   fun size(context: mutable Context): Int {
-    context.addDep(Path::create(this.dirName.size(), SizeTag()));
+    context.addDep(Path::sizeTag(this.dirName));
     this.totalSize
   }
 
