@@ -1800,7 +1800,7 @@ class EagerDir protected {
       }
     };
 
-    filesPath = Path::create(this.dirName.files(), FilesTag());
+    filesPath = Path::filesTag(this.dirName);
     context.updateDirtyReaders(filesPath);
 
     !this = this with {totalSize, reducer};
@@ -2173,7 +2173,7 @@ class EagerDir protected {
   fun getIterator(
     context: mutable Context,
   ): mutable Iterator<(Key, mutable Iterator<File>)> {
-    path = Path::create(this.dirName.files(), FilesTag());
+    path = Path::filesTag(this.dirName);
     context.addDep(path);
     this.unsafeGetFileIter()
   }
