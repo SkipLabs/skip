@@ -22,16 +22,7 @@ app = Flask(__name__)
 app.secret_key = b"53cr37_changeme"
 
 
-SKIP_WRITE_URL = (
-    "http://skip_leader:8081/v1"
-    if "DISTRIBUTED_MODE" in os.environ
-    else "http://reactive_service:8081/v1"
-)
-SKIP_READ_URL = (
-    "http://skip_followers:8081/v1"
-    if "DISTRIBUTED_MODE" in os.environ
-    else "http://reactive_service:8081/v1"
-)
+SKIP_CONTROL_URL = "http://haproxy:8081/v1"
 
 
 @app.before_request
@@ -74,7 +65,7 @@ def login():
 
     # TODO: Error handling.
     requests.patch(
-        f"{SKIP_WRITE_URL}/inputs/sessions",
+        f"{SKIP_CONTROL_URL}/inputs/sessions",
         json=[[session["session_id"], [user_session]]],
     )
 
@@ -84,7 +75,7 @@ def login():
 @app.post("/logout")
 def logout():
     requests.patch(
-        f"{SKIP_WRITE_URL}/inputs/sessions",
+        f"{SKIP_CONTROL_URL}/inputs/sessions",
         json=[[session["session_id"], []]],
     )
 
@@ -97,7 +88,7 @@ def logout():
 def user_session():
     if "text/event-stream" in request.accept_mimetypes:
         resp = requests.post(
-            f"{SKIP_READ_URL}/streams/sessions",
+            f"{SKIP_CONTROL_URL}/streams/sessions",
             json={
                 "session_id": session["session_id"],
             },
@@ -108,7 +99,7 @@ def user_session():
 
     else:
         resp = requests.post(
-            f"{SKIP_READ_URL}/snapshot/sessions",
+            f"{SKIP_CONTROL_URL}/snapshot/sessions",
             json={
                 "session_id": session["session_id"],
             },
@@ -137,7 +128,7 @@ def posts_index():
 
     if "text/event-stream" in request.accept_mimetypes:
         resp = requests.post(
-            f"{SKIP_READ_URL}/streams/posts",
+            f"{SKIP_CONTROL_URL}/streams/posts",
             json={
                 "limit": 10,
                 "session_id": session["session_id"],
@@ -151,7 +142,7 @@ def posts_index():
 
     else:
         resp = requests.post(
-            f"{SKIP_READ_URL}/snapshot/posts",
+            f"{SKIP_CONTROL_URL}/snapshot/posts",
             json={
                 "limit": 10,
                 "session_id": session["session_id"],
