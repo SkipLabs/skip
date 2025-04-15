@@ -346,31 +346,31 @@ mutable class Context{
   mutable purgeLimit: ?Tick = None(),
   private mutable dirs: Dirs = Dirs{},
   mutable reads: SortedSet<Path> = SortedSet[],
-  mutable time: Time = Time(0),
+  private mutable time: Time = Time(0),
   mutable tick: Tick = Tick(1),
-  mutable lazyCapacity: Int = 10,
-  mutable toUpdate: SortedMap<(TimeStack, Time), Arrow> = SortedMap[],
+  private mutable lazyCapacity: Int = 10,
+  private mutable toUpdate: SortedMap<(TimeStack, Time), Arrow> = SortedMap[],
   mutable deps: Deps = Deps[],
   mutable debugMode: Bool = debugMode,
-  mutable failOnExn: Bool = true,
+  private mutable failOnExn: Bool = true,
   mutable hasPre: SortedSet<DirName> = SortedSet[],
   mutable newDirs: SortedSet<DirName> = SortedSet[],
   mutable toReset: SortedSet<DirName> = SortedSet[],
   mutable globals: SortedMap<String, File> = SortedMap[],
-  mutable persistents: SortedMap<String, File> = SortedMap[],
+  private mutable persistents: SortedMap<String, File> = SortedMap[],
   mutable dirty: List<Path> = List[],
-  mutable dirtyReaders: List<ArrowKey> = List[],
+  private mutable dirtyReaders: List<ArrowKey> = List[],
   mutable canReuse: CanReuse = CRIfMatch(),
   mutable arrowStack: List<(ArrowKey, TimeStack)> = List[],
   mutable lazyGets: SortedSet<Path> = SortedSet[],
-  mutable lazyGetsQueueIn: List<Array<Path>> = List[],
-  mutable lazyGetsQueueOut: List<Array<Path>> = List[],
-  mutable lazyGetsRefCount: SortedMap<Path, Int> = SortedMap[],
+  private mutable lazyGetsQueueIn: List<Array<Path>> = List[],
+  private mutable lazyGetsQueueOut: List<Array<Path>> = List[],
+  private mutable lazyGetsRefCount: SortedMap<Path, Int> = SortedMap[],
   mutable sessions: SortedMap<Int, Sub> = SortedMap[],
   mutable removeSubDirs: Bool = true,
-  mutable postponables: List<Postponable> = List[],
-  mutable dirsWithSharedSubDirs: SortedSet<DirName> = SortedSet[],
-  mutable sharedSubDirsRefCount: SortedMap<DirName, Int> = SortedMap[],
+  private mutable postponables: List<Postponable> = List[],
+  private mutable dirsWithSharedSubDirs: SortedSet<DirName> = SortedSet[],
+  private mutable sharedSubDirsRefCount: SortedMap<DirName, Int> = SortedMap[],
   mutable writeChecker: ?(mutable WriteChecker) = None(),
   mutable purgeFrom: (mutable Context, Dir) ~> Tick = (ctx, _) ~>
     Tick(ctx.tick.value - 1000),
@@ -563,7 +563,7 @@ mutable class Context{
     this.arrowStack.maybeHead().map(x -> x.i0)
   }
 
-  readonly fun getDeps(path: Path): SortedSet<ArrowKey> {
+  private readonly fun getDeps(path: Path): SortedSet<ArrowKey> {
     this.deps.maybeGet(path) match {
     | None() -> SortedSet[]
     | Some(deps) -> deps
@@ -599,7 +599,7 @@ mutable class Context{
     _ = this.updatePre();
   }
 
-  mutable fun updatePre(): Bool {
+  private mutable fun updatePre(): Bool {
     if (this.debugMode) {
       print_debug(`------------ UPDATE PRE ------------`);
     };
@@ -681,7 +681,7 @@ mutable class Context{
     };
   }
 
-  mutable fun checkPostponables(): Bool {
+  private mutable fun checkPostponables(): Bool {
     withChange = !this.postponables.isEmpty();
     if (withChange) {
       postponables = this.postponables.reversed();
@@ -691,7 +691,7 @@ mutable class Context{
     withChange;
   }
 
-  mutable fun updateLazyGets(): void {
+  private mutable fun updateLazyGets(): void {
     for (path in this.lazyGets) {
       refCount = this.lazyGetsRefCount.maybeGet(path) match {
       | None() -> 0
@@ -828,7 +828,7 @@ mutable class Context{
     }
   }
 
-  mutable fun perform(list: List<Postponable>): void {
+  private mutable fun perform(list: List<Postponable>): void {
     list match {
     | List.Nil() -> void
     | List.Cons(p, rl) ->
@@ -837,7 +837,7 @@ mutable class Context{
     }
   }
 
-  readonly fun notifySub(sub: Sub, start: Tick): void {
+  private readonly fun notifySub(sub: Sub, start: Tick): void {
     lock = unfreezeLock(sub.lock);
     mutexLock(lock);
     sub.cmd match {
