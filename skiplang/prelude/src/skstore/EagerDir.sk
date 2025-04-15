@@ -1392,7 +1392,7 @@ class EagerDir protected {
         reducer,
       }
     };
-    updateDirtyReaders(context, Path::create(childName.tag(), DirTag()));
+    context.updateDirtyReaders(Path::create(childName.tag(), DirTag()));
     context.setDir(dir);
     for (parentName => parentData in parents) {
       for (p in parentData) {
@@ -1792,22 +1792,22 @@ class EagerDir protected {
 
     if (this.totalSize != totalSize) {
       sizePath = Path::create(this.dirName.size(), SizeTag());
-      updateDirtyReaders(context, sizePath);
+      context.updateDirtyReaders(sizePath);
       if (
         this.totalSize == 0 && totalSize != 0 ||
         this.totalSize != 0 && totalSize == 0
       ) {
         isEmptyPath = Path::create(this.dirName.size(), IsEmptyTag());
-        updateDirtyReaders(context, isEmptyPath);
+        context.updateDirtyReaders(isEmptyPath);
       }
     };
 
     filesPath = Path::create(this.dirName.files(), FilesTag());
-    updateDirtyReaders(context, filesPath);
+    context.updateDirtyReaders(filesPath);
 
     !this = this with {totalSize, reducer};
 
-    updateDirtyReaders(context, path);
+    context.updateDirtyReaders(path);
 
     parentTime = this.time;
     childDirs = SortedSet[];
@@ -2110,7 +2110,7 @@ class EagerDir protected {
     !this.old[source] = minfo;
 
     for (dirName in removed) {
-      updateDirtyReaders(context, Path::create(dirName.tag(), DirTag()));
+      context.updateDirtyReaders(Path::create(dirName.tag(), DirTag()));
     };
     this
   }

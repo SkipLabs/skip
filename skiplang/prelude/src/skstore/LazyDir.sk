@@ -83,7 +83,7 @@ class LazyDir protected {
         lazyFun,
         collect,
       };
-      updateDirtyReaders(context, Path::create(dirName.tag(), DirTag()));
+      context.updateDirtyReaders(Path::create(dirName.tag(), DirTag()));
       context.setDir(newDir);
       newDir
     }
@@ -143,7 +143,7 @@ class LazyDir protected {
       key = path.baseName;
       oldValue = this.data.maybeGet(key);
       !this.data = this.data.remove(key);
-      updateDirtyReaders(context, path);
+      context.updateDirtyReaders(path);
       oldValue match {
       | Some(LDefined(_, reads))
       | Some(LRemoved(reads)) ->
