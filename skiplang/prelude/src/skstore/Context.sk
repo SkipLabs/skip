@@ -620,7 +620,7 @@ mutable class Context{
             creator => this.currentArrow(),
           };
           dir.unsafeIterKeys((key, _time) -> {
-            values = dir.getArrayRaw(key).collect(Array);
+            values = dir.getArrayRaw(key);
             !withChange = true;
             source = Path::create(preDir.dirName, key);
             !preDir = preDir.writeEntry(this, source, source, key, values);
@@ -631,7 +631,7 @@ mutable class Context{
         | Some(preDir) ->
           (isReset, changes) = dir.getChangesAfter(this.tick.prev());
           for (key in changes) {
-            values = dir.getArrayRaw(key).collect(Array);
+            values = dir.getArrayRaw(key);
             !withChange = true;
             source = Path::create(preDir.dirName, key);
             !preDir = preDir.writeEntry(this, source, source, key, values);
