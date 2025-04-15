@@ -346,13 +346,7 @@ class .RangeMapList<+K: Orderable, +V: Orderable> private (
   rmap: RangeMap<K, V>,
   rmaps: List<CompactRangeMap<K, V>>,
 ) {
-  static fun createFromItems<
-    K2: Orderable,
-    V2: Orderable,
-    I: readonly Sequence<((K2, K2), V2)>,
-  >[K: K2, V: V2](
-    items: I,
-  ): RangeMapList<K2, V2> {
+  static fun createFromItems(items: readonly Sequence<((K, K), V)>): this {
     RangeMapList(RangeMap::createFromItems(items), List[])
   }
 
