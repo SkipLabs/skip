@@ -536,6 +536,27 @@ base class .SortedMap<+K: Orderable, +V> uses  //  extends KeyedSequence<K, V>
     ValuesIterator::make(this)
   }
 
+  fun itemsAfter<K2: Orderable>[K: K2](start: ?K2): mutable Iterator<(K2, V)> {
+    this match {
+    | SortedMap.Nil() -> void
+    | SortedMap.Node{key, value, left, right} ->
+      if (
+        start match {
+        | None() -> true
+        | Some(x) -> key >= x
+        }
+      ) {
+        for (x in left.itemsAfter(start)) {
+          yield x;
+        };
+        yield (key, value);
+      };
+      for (x in right.itemsAfter(start)) {
+        yield x;
+      }
+    }
+  }
+
   /* Folds */
   fun reduce<R>(f: (R, K, V) -> R, init: R): R {
     result = init;

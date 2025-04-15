@@ -10,36 +10,6 @@ module SKStore;
 const PURGE_LIMIT: Int = 30;
 
 /*****************************************************************************/
-/* We need to be able to iterate after a given starting point. This method
- * should be in SortedMap.sk but I will move it in a separate diff, because
- * otherwise I force everyone to recompile the compiler.
- */
-/*****************************************************************************/
-
-extension base class .SortedMap {
-  fun itemsAfter<K2: Orderable>[K: K2](start: ?K2): mutable Iterator<(K2, V)> {
-    this match {
-    | SortedMap.Nil() -> void
-    | SortedMap.Node{key, value, left, right} ->
-      if (
-        start match {
-        | None() -> true
-        | Some(x) -> key >= x
-        }
-      ) {
-        for (x in left.itemsAfter(start)) {
-          yield x;
-        };
-        yield (key, value);
-      };
-      for (x in right.itemsAfter(start)) {
-        yield x;
-      }
-    }
-  }
-}
-
-/*****************************************************************************/
 /* The class handed over to the closures mapping over a directory. */
 /*****************************************************************************/
 
