@@ -1796,8 +1796,7 @@ class EagerDir protected {
         this.totalSize == 0 && totalSize != 0 ||
         this.totalSize != 0 && totalSize == 0
       ) {
-        isEmptyPath = Path::create(this.dirName.size(), IsEmptyTag());
-        context.updateDirtyReaders(isEmptyPath);
+        context.updateDirtyReaders(Path::isEmptyTag(this.dirName));
       }
     };
 
@@ -2198,7 +2197,7 @@ class EagerDir protected {
   }
 
   fun isEmpty(context: mutable Context): Bool {
-    context.addDep(Path::create(this.dirName.size(), IsEmptyTag()));
+    context.addDep(Path::isEmptyTag(this.dirName));
     this.totalSize == 0
   }
 
