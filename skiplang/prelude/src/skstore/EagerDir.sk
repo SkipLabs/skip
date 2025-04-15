@@ -51,6 +51,34 @@ extension base class .SortedMap {
 }
 
 /*****************************************************************************/
+/* The class handed over to the closures mapping over a directory. */
+/*****************************************************************************/
+
+mutable class Writer{
+  mutable writes: SortedMap<Key, Array<File>> = SortedMap[],
+} {
+  mutable fun setArray(key: Key, values: Array<File>): void {
+    this.!writes[key] = values;
+  }
+
+  mutable fun set(key: Key, value: File): void {
+    this.!writes[key] = Array[value];
+  }
+
+  mutable fun remove(key: Key): void {
+    this.!writes[key] = Array[];
+  }
+
+  readonly fun getWrites(): Array<(Key, Array<File>)> {
+    result = mutable Vector[];
+    for (key => values in this.writes) {
+      result.push((key, values));
+    };
+    result.toArray()
+  }
+}
+
+/*****************************************************************************/
 /* The signature of a function used by apply. */
 /*****************************************************************************/
 
