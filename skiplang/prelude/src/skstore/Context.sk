@@ -569,15 +569,6 @@ mutable class Context{
     }
   }
 
-  readonly fun debug(path: Path): void {
-    this.dirs.maybeGet(path.dirName) match {
-    | None() -> print_debug("Directory does not exist")
-    | Some(dir) ->
-      values = dir.getArrayRaw(path.baseName);
-      debug(values)
-    }
-  }
-
   mutable fun updateNewDeps(reader: ArrowKey, reads: SortedSet<Path>): void {
     readSet = SortedSet[];
     for (read in reads) {
