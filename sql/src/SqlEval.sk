@@ -1391,10 +1391,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       (context, writer, key, rowIter) ~> {
         entries = mutable Vector[];
         dir = context.unsafeGetEagerDir(inputDir.dirName);
-        writerPath = SKStore.Path::create(
-          selectDir.dirName,
-          SKStore.IID(SKStore.genSym(0)),
-        );
+        writerPath = SKStore.Path::gen(selectDir.dirName);
         for ((_, source, _) in dir.getDataIterWithoutTombs(context, key)) {
           entries.push((key, (source, writerPath, Array<SKStore.File>[])));
         };
@@ -1538,10 +1535,7 @@ class Evaluator{options: Options, user: ?UserFile} {
                 entries = mutable Vector[];
                 dir = context.unsafeGetEagerDir(table.dirName);
                 for (row in rowValues) {
-                  writerPath = SKStore.Path::create(
-                    table.dirName,
-                    SKStore.IID(SKStore.genSym(0)),
-                  );
+                  writerPath = SKStore.Path::gen(table.dirName);
 
                   key: SKStore.Key = RowKey::create(row, kinds);
                   for ((_, source, _) in dir.getDataIterWithoutTombs(
@@ -1584,10 +1578,7 @@ class Evaluator{options: Options, user: ?UserFile} {
     kinds = table.kinds;
     for (row in rows) {
       key = RowKey::create(row, kinds);
-      source = SKStore.Path::create(
-        dir.dirName,
-        SKStore.IID(SKStore.genSym(0)),
-      );
+      source = SKStore.Path::gen(dir.dirName);
       !newDir = newDir.writeEntry(context, source, source, key, Array[row]);
     };
     context.setDir(newDir);
@@ -2112,10 +2103,7 @@ fun importNext(
         entries.iterator(),
       );
       if (isReset) {
-        writerPath = SKStore.Path::create(
-          dir.dirName,
-          SKStore.IID(SKStore.genSym(0)),
-        );
+        writerPath = SKStore.Path::gen(dir.dirName);
         !inputDir = inputDir.reset(targetCtx, writerPath, changedKeys);
       };
       targetCtx.setDir(inputDir)
