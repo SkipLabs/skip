@@ -135,9 +135,9 @@ fun run(f: (mutable Context) -> void): mutable Context {
 /* Dependencies tracking. */
 /*****************************************************************************/
 
-value class Deps(
+value class Deps private (
   data: SortedMap<Path, SortedSet<ArrowKey>> = SortedMap[],
-  idata: HashMap<DirName, SortedSet<Path>> = HashMap[],
+  private idata: HashMap<DirName, SortedSet<Path>> = HashMap[],
 ) {
   static fun createFromItems(items: Array<(Path, ArrowKey)>): this {
     deps = Deps();
@@ -160,11 +160,10 @@ value class Deps(
     !set = set.set(arrowKey);
     !this.data[path] = set;
     !this = this.iset(arrowKey.childName, path);
-
     this
   }
 
-  fun iset(dirName: DirName, arrow: Path): this {
+  private fun iset(dirName: DirName, arrow: Path): this {
     iset = this.idata.maybeGet(dirName) match {
     | None() -> SortedSet[]
     | Some(x) -> x
@@ -174,7 +173,7 @@ value class Deps(
     this
   }
 
-  fun iremove(dirName: DirName, arrow: Path): this {
+  private fun iremove(dirName: DirName, arrow: Path): this {
     iset = this.idata.maybeGet(dirName) match {
     | None() -> SortedSet[]
     | Some(x) -> x
