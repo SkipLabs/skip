@@ -21,23 +21,23 @@ base class Boundary<T> {
   | Exclusive(T)
 }
 
-base class DMap<Key: Orderable, Value> {
+base class DMap<K: Orderable, Value> {
   children =
   | Nil()
   | Node{
     tick: TickRange,
     height: Int,
-    key: Key,
+    key: K,
     value: Value,
-    left: DMap<Key, Value>,
-    right: DMap<Key, Value>,
+    left: DMap<K, Value>,
+    right: DMap<K, Value>,
   }
 
   fun isEmpty(): Bool {
     this is Nil _
   }
 
-  fun items(): mutable Iterator<(Key, Value)> {
+  fun items(): mutable Iterator<(K, Value)> {
     this match {
     | Nil() -> void
     | Node{key, value, left, right} ->
@@ -55,7 +55,7 @@ base class DMap<Key: Orderable, Value> {
     this.items().map(x -> x.i1)
   }
 
-  fun map<Value2>(tick: Tick, f: (Key, Value) -> Value2): DMap<Key, Value2> {
+  fun map<Value2>(tick: Tick, f: (K, Value) -> Value2): DMap<K, Value2> {
     this match {
     | Nil() -> Nil()
     | Node{key, value, left, right, height} ->
@@ -73,7 +73,7 @@ base class DMap<Key: Orderable, Value> {
     }
   }
 
-  private fun keysAfterHelper(boundary: Boundary<Key>): mutable Iterator<Key> {
+  private fun keysAfterHelper(boundary: Boundary<K>): mutable Iterator<K> {
     this match {
     | Nil() -> void
     | Node{key, left, right} ->
@@ -94,14 +94,14 @@ base class DMap<Key: Orderable, Value> {
     }
   }
 
-  fun keysAfter(lastSkippedOpt: ?Boundary<Key>): mutable Iterator<Key> {
+  fun keysAfter(lastSkippedOpt: ?Boundary<K>): mutable Iterator<K> {
     lastSkippedOpt match {
     | None() -> this.items().map(item -> item.i0)
     | Some(lastSkipped) -> this.keysAfterHelper(lastSkipped)
     }
   }
 
-  fun itemsWithTick(): mutable Iterator<(Key, Value, TickRange)> {
+  fun itemsWithTick(): mutable Iterator<(K, Value, TickRange)> {
     this match {
     | Nil() -> void
     | Node{tick, key, value, left, right} ->
@@ -115,7 +115,7 @@ base class DMap<Key: Orderable, Value> {
     }
   }
 
-  fun eachWithTick(f: (Key, Tick) -> void): void
+  fun eachWithTick(f: (K, Tick) -> void): void
   | Nil() -> void
   | Node{key, tick, left, right} ->
     left.eachWithTick(f);
@@ -130,11 +130,11 @@ base class DMap<Key: Orderable, Value> {
   | Nil() -> 0
   | Node{height} -> height
 
-  static fun empty(): DMap<Key, Value> {
+  static fun empty(): DMap<K, Value> {
     Nil()
   }
 
-  fun getChangesAcc(after: Tick, ref: mutable Ref<SortedSet<Key>>): void
+  fun getChangesAcc(after: Tick, ref: mutable Ref<SortedSet<K>>): void
   | Nil() -> void
   | Node{tick, key, left, right} ->
     if (tick.max < after) return void;
@@ -144,13 +144,13 @@ base class DMap<Key: Orderable, Value> {
     left.getChangesAcc(after, ref);
     right.getChangesAcc(after, ref)
 
-  fun getChangesAfter(tick: Tick): SortedSet<Key> {
+  fun getChangesAfter(tick: Tick): SortedSet<K> {
     ref = mutable Ref(SortedSet[]);
     this.getChangesAcc(tick, ref);
     ref.get()
   }
 
-  fun getChangesAfterIter(after: Tick): mutable Iterator<(Tick, Key, Value)> {
+  fun getChangesAfterIter(after: Tick): mutable Iterator<(Tick, K, Value)> {
     this match {
     | Nil() -> void
     | Node{tick, key, value, left, right} ->
@@ -171,7 +171,7 @@ base class DMap<Key: Orderable, Value> {
   fun getChangesRangeAcc(
     tickStart: Tick,
     tickEnd: Tick,
-    acc: mutable Vector<(Key, Value)>,
+    acc: mutable Vector<(K, Value)>,
   ): void
   | Nil() -> void
   | Node{tick, key, value, left, right} ->
@@ -182,7 +182,7 @@ base class DMap<Key: Orderable, Value> {
     left.getChangesRangeAcc(tickStart, tickEnd, acc);
     right.getChangesRangeAcc(tickStart, tickEnd, acc)
 
-  fun getChangesRange(tickStart: Tick, tickEnd: Tick): Vector<(Key, Value)> {
+  fun getChangesRange(tickStart: Tick, tickEnd: Tick): Vector<(K, Value)> {
     acc = mutable Vector[];
     this.getChangesRangeAcc(tickStart, tickEnd, acc);
     unsafe_chill_trust_me(acc)
@@ -190,21 +190,21 @@ base class DMap<Key: Orderable, Value> {
 
   static fun node(
     tick: TickRange,
-    key: Key,
+    key: K,
     value: Value,
-    left: DMap<Key, Value>,
-    right: DMap<Key, Value>,
-  ): DMap<Key, Value> {
+    left: DMap<K, Value>,
+    right: DMap<K, Value>,
+  ): DMap<K, Value> {
     !tick.max = max(tick.max, max(left.getMaxTick(), right.getMaxTick()));
     height = 1 + max(left.getHeight(), right.getHeight());
     Node{tick, height, key, value, left, right}
   }
 
-  fun set(tick: Tick, key: Key, value: Value): DMap<Key, Value> {
+  fun set(tick: Tick, key: K, value: Value): DMap<K, Value> {
     this.set_(TickRange::create(tick), key, value)
   }
 
-  protected fun set_(tick: TickRange, key: Key, value: Value): DMap<Key, Value>
+  protected fun set_(tick: TickRange, key: K, value: Value): DMap<K, Value>
   | Nil() -> static::node(tick, key, value, Nil(), Nil())
   | Node{tick => t, left => l, right => r, key => k, value => v} ->
     !t.max = max(tick.max, t.max);
@@ -215,7 +215,7 @@ base class DMap<Key: Orderable, Value> {
     | GT() -> static::balance(t, k, v, l, r.set_(tick, key, value))
     }
 
-  fun containsKey(k: Key): Bool
+  fun containsKey(k: K): Bool
   | Nil() -> false
   | Node{key, left, right} ->
     k.compare(key) match {
@@ -224,7 +224,7 @@ base class DMap<Key: Orderable, Value> {
     | GT() -> right.containsKey(k)
     }
 
-  fun maybeGet(k: Key): ?Value
+  fun maybeGet(k: K): ?Value
   | Nil() -> None()
   | Node{key, value, left, right} ->
     k.compare(key) match {
@@ -233,11 +233,11 @@ base class DMap<Key: Orderable, Value> {
     | GT() -> right.maybeGet(k)
     }
 
-  fun get(k: Key): Value {
+  fun get(k: K): Value {
     this.maybeGet(k).fromSome()
   }
 
-  fun remove(k: Key): DMap<Key, Value>
+  fun remove(k: K): DMap<K, Value>
   | Nil() -> this
   | Node{tick, key, value, left, right} ->
     k.compare(key) match {
@@ -246,7 +246,7 @@ base class DMap<Key: Orderable, Value> {
     | GT() -> static::node(tick, key, value, left, right.remove(k))
     }
 
-  fun filterChanged(f: (Key, Value, Tick) -> Bool): (DMap<Key, Value>, Bool)
+  fun filterChanged(f: (K, Value, Tick) -> Bool): (DMap<K, Value>, Bool)
   | Nil() -> (this, false)
   | Node{tick, key, value, left, right} ->
     (newLeft, leftChanged) = left.filterChanged(f);
@@ -262,11 +262,11 @@ base class DMap<Key: Orderable, Value> {
       (DMap::merge(left, right), true)
     }
 
-  fun filter(f: (Key, Value, Tick) -> Bool): DMap<Key, Value> {
+  fun filter(f: (K, Value, Tick) -> Bool): DMap<K, Value> {
     this.filterChanged(f).i0
   }
 
-  fun removeMinBinding(): ((TickRange, Key, Value), DMap<Key, Value>) {
+  fun removeMinBinding(): ((TickRange, K, Value), DMap<K, Value>) {
     this match {
     | Nil() -> invariant_violation("Remove min binding on empty DMap")
     | Node{tick, left => Nil(), key, value, right} ->
@@ -277,7 +277,7 @@ base class DMap<Key: Orderable, Value> {
     }
   }
 
-  fun maxBinding(): ?(Key, Value) {
+  fun maxBinding(): ?(K, Value) {
     this match {
     | Nil() -> None()
     | Node{key, value, right => Nil()} -> Some((key, value))
@@ -285,10 +285,7 @@ base class DMap<Key: Orderable, Value> {
     }
   }
 
-  static fun merge(
-    t1: DMap<Key, Value>,
-    t2: DMap<Key, Value>,
-  ): DMap<Key, Value> {
+  static fun merge(t1: DMap<K, Value>, t2: DMap<K, Value>): DMap<K, Value> {
     (t1, t2) match {
     | (Nil(), t) -> t
     | (t, Nil()) -> t
@@ -300,11 +297,11 @@ base class DMap<Key: Orderable, Value> {
 
   protected static fun balance(
     t: TickRange,
-    k: Key,
+    k: K,
     v: Value,
-    l: DMap<Key, Value>,
-    r: DMap<Key, Value>,
-  ): DMap<Key, Value> {
+    l: DMap<K, Value>,
+    r: DMap<K, Value>,
+  ): DMap<K, Value> {
     hl = l.getHeight();
     hr = r.getHeight();
     if (hl > hr + 2) {
