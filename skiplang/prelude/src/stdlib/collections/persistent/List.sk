@@ -368,6 +368,18 @@ mutable base class .List<+T>
     result
   }
 
+  /* a.revAppend(b) is a faster a.reversed().concat(b)
+     This version is constrained by b being non-empty so that the result is
+     proven to be non-empty as well.
+     If b is empty, just use a.reversed() */
+  readonly fun revAppend<U>[T: U](tail: Cons<U>): Cons<U> {
+    result: Cons<U> = tail;
+    for (x in this) {
+      !result = Cons(x, result)
+    };
+    result
+  }
+
   readonly fun sorted[T: readonly Orderable](
     compare: (T, T) ~> Order = (x, y) ~> x.compare(y),
   ): List<T> {
