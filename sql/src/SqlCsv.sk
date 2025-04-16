@@ -353,7 +353,7 @@ fun applyDiffStrategy(
   snapshot: ?Int,
   userFileOpt: ?SKDB.UserFile,
   sourceOverride: ?SKStore.Path = None(),
-): ?((
+): ((
   mutable SKStore.Context,
   mutable SKStore.Context,
   SKStore.Context,
@@ -463,7 +463,7 @@ fun applyDiffStrategy(
   // assignRows - if there are no constraints on the table then we
   // treat the relations as a multiset CRDT. inserts beat deletes when
   // concurrent.
-  assignRows = Some((newRoot, delta, root) ~> {
+  assignRows = (newRoot, delta, root) ~> {
     if (shouldShortCircuitUpdate(root)) {
       checkpointAndAck(newRoot, delta);
       return void;
@@ -530,12 +530,12 @@ fun applyDiffStrategy(
     newRoot.update();
     newRoot.!sourceOverride = None();
     checkpointAndAck(newRoot, delta)
-  });
+  };
 
   // lwwRows - if there is a unique constraint on the table (e.g. a
   // PK) then we resolve this using LWW. the total order is formed
   // using the vector clock. concurrent tiebreaks use the row data.
-  lwwRows = Some((newRoot, delta, root) ~> {
+  lwwRows = (newRoot, delta, root) ~> {
     if (shouldShortCircuitUpdate(root)) {
       checkpointAndAck(newRoot, delta);
       return void;
@@ -613,11 +613,11 @@ fun applyDiffStrategy(
     newRoot.update();
     newRoot.!sourceOverride = None();
     checkpointAndAck(newRoot, delta)
-  });
+  };
 
   // rebuild - this peer fell off the lead 'tail caravan' and got too
   // far behind. we now need to cold start by rebuilding the table.
-  rebuildRows = Some((newRoot, _delta, _root) ~> {
+  rebuildRows = (newRoot, _delta, _root) ~> {
     dir = newRoot.unsafeGetEagerDir(table.dirName);
 
     // so we don't wipe out unsynced rows
@@ -630,7 +630,7 @@ fun applyDiffStrategy(
 
     newRoot.setDir(dir);
     newRoot.update(); // TODO: could we not do this so we don't get a blip?
-  });
+  };
 
   if (rebuild) {
     rebuildRows;
@@ -829,9 +829,7 @@ fun buildDiffChain(
   Some((newRoot, delta, root) ~> {
     try {
       for (strategy in strategiesArray) {
-        if (strategy is Some _) {
-          strategy.fromSome()(newRoot, delta, root)
-        }
+        strategy(newRoot, delta, root)
       }
     } catch {
     | exn ->
