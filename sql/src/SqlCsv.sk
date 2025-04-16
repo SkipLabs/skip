@@ -358,7 +358,7 @@ fun applyDiffStrategy(
   mutable SKStore.Context,
   SKStore.Context,
 ) ~> void) {
-  writer = SKStore.Path::create(table.dirName, SKStore.IID(identity));
+  writer = SKStore.Path::iid(table.dirName, identity);
 
   shouldShortCircuitUpdate = (context) ~> {
     previouslySeen = SKDB.getWatermark(
@@ -816,7 +816,7 @@ fun buildDiffChain(
             Some(checkpoint),
             td.snapshot,
             userFileOpt,
-            Some(SKStore.Path::create(td.table.dirName, SKStore.IID(identity))),
+            Some(SKStore.Path::iid(td.table.dirName, identity)),
           ),
         );
       }
