@@ -96,8 +96,8 @@ fun writeCmd(env: mutable CmdEnv, pathStr: String, cmd: String): void {
   if (cmd != "") {
     !cmd = cmd.stripPrefix(cmd.take(1));
   };
-  (dirName, key) = Path::fromString(pathStr);
-  env.context.maybeGetEagerDir(path.dirName) match {
+  (dirName, key) = splitStringPath(pathStr);
+  env.context.maybeGetEagerDir(dirName) match {
   | None() -> print_error("Could not find input directory: " + dirName)
   | Some(dir) if (!dir.isInput()) -> print_error("Not an input Dir: " + dirName)
   | Some(dir) ->
@@ -168,7 +168,7 @@ fun eval(env: mutable CmdEnv, cmd: String): void {
     };
     files.each(entry -> {
       pathStr = absolutePath(env.pwd, entry);
-      (dirName, key) = Path::fromString(pathStr);
+      (dirName, key) = splitStringPath(pathStr);
       env.context.maybeGetDir(dirName) match {
       | None() -> print_string(`<EMPTY:${dirName}${key}>`)
       | Some(dir) ->

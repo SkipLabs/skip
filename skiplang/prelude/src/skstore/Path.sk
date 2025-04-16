@@ -11,7 +11,7 @@
 module SKStore;
 
 // Decomposes the string into the tuple: (directory name, base name).
-fun splitPath(path: String): (String, String) {
+fun splitStringPath(path: String): (DirName, SID) {
   chars = path.chars();
   i = chars.size() - 1;
   lastSlashOpt = loop {
@@ -39,8 +39,10 @@ fun splitPath(path: String): (String, String) {
   if (baseNameChars.size() == 0) {
     error("Invalid path, missing Key");
   };
-  dirName = String::fromChars(dirNameChars.toArray());
-  baseName = String::fromChars(baseNameChars.toArray());
+  dirNameStr = String::fromChars(dirNameChars.toArray());
+  baseNameStr = String::fromChars(baseNameChars.toArray());
+  dirName = DirName::create(dirNameStr);
+  baseName = SID::create(baseNameStr);
   (dirName, baseName)
 }
 
@@ -50,13 +52,6 @@ native fun hashCombine(Int, Int): Int;
 class Path(dirName: DirName, baseName: Key) uses Orderable {
   static fun create(dirName: DirName, baseName: Key): this {
     static(dirName, baseName)
-  }
-
-  static fun fromString(path: String): (DirName, SID) {
-    (dirNameStr, baseNameStr) = splitPath(path);
-    dirName = DirName::create(dirNameStr);
-    baseName = SID::create(baseNameStr);
-    (dirName, baseName)
   }
 
   fun toString(): String {

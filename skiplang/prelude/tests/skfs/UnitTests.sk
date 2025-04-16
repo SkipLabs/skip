@@ -38,7 +38,7 @@ fun compareResults(
   strPath: String,
   values: Array<Int>,
 ): void {
-  (dirName, key) = SKStore.Path::fromString(strPath);
+  (dirName, key) = SKStore.splitStringPath(strPath);
   dir = context.unsafeGetDir(dirName);
   readV = dir.getArrayRaw(key);
   try {
@@ -62,7 +62,7 @@ fun testUpdate(
 ): void {
   for (kv in writes) {
     (strKey, values) = kv;
-    (dirName, key) = SKStore.Path::fromString(strKey);
+    (dirName, key) = SKStore.splitStringPath(strKey);
     dir = context.unsafeGetEagerDir(dirName);
     dir.writeArray(context, key, values.map(x -> IBox(x)));
   };
