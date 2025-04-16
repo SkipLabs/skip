@@ -35,15 +35,17 @@ fun make(
 fun compareResults(
   context: mutable SKStore.Context,
   kind: String,
-  path: String,
+  strPath: String,
   values: Array<Int>,
 ): void {
-  readV = context.getValue(SKStore.Path::fromString(path));
+  path = SKStore.Path::fromString(strPath);
+  dir = context.unsafeGetDir(path.dirName);
+  readV = dir.getArrayRaw(path.baseName);
   try {
     T.expectEq(
       readV.map(IBox::type).map(v -> v.value),
       values,
-      kind + " test for path " + path,
+      kind + " test for path " + strPath,
     );
   } catch {
   | _ ->
