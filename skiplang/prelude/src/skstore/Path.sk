@@ -52,11 +52,11 @@ class Path(dirName: DirName, baseName: Key) uses Orderable {
     static(dirName, baseName)
   }
 
-  static fun fromString(path: String): this {
+  static fun fromString(path: String): (DirName, SID) {
     (dirNameStr, baseNameStr) = splitPath(path);
     dirName = DirName::create(dirNameStr);
     baseName = SID::create(baseNameStr);
-    Path::create(dirName, baseName)
+    (dirName, baseName)
   }
 
   fun toString(): String {

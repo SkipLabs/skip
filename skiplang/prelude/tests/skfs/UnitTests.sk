@@ -38,9 +38,9 @@ fun compareResults(
   strPath: String,
   values: Array<Int>,
 ): void {
-  path = SKStore.Path::fromString(strPath);
-  dir = context.unsafeGetDir(path.dirName);
-  readV = dir.getArrayRaw(path.baseName);
+  (dirName, key) = SKStore.Path::fromString(strPath);
+  dir = context.unsafeGetDir(dirName);
+  readV = dir.getArrayRaw(key);
   try {
     T.expectEq(
       readV.map(IBox::type).map(v -> v.value),
@@ -61,10 +61,10 @@ fun testUpdate(
   expects: Array<(String, Array<Int>)>,
 ): void {
   for (kv in writes) {
-    (key, values) = kv;
-    path = SKStore.Path::fromString(key);
-    dir = context.unsafeGetEagerDir(path.dirName);
-    dir.writeArray(context, path.baseName, values.map(x -> IBox(x)));
+    (strKey, values) = kv;
+    (dirName, key) = SKStore.Path::fromString(strKey);
+    dir = context.unsafeGetEagerDir(dirName);
+    dir.writeArray(context, key, values.map(x -> IBox(x)));
   };
   context.update();
   for (kv in expects) {
