@@ -630,10 +630,7 @@ mutable class Context{
    * - dirty are files that are made dirty because of a Map.
    */
   /*****************************************************************************/
-  mutable fun updateDirtyReaders(
-    path: Path,
-    addToDirtyList: Bool = true,
-  ): void {
+  mutable fun updateDirtyReaders(path: Path): void {
     for (reader in this.getDeps(path)) {
       child = this.unsafeMaybeGetDir(reader.childName) match {
       | None() -> continue
@@ -643,9 +640,7 @@ mutable class Context{
       | None() -> continue
       | Some(x) -> x
       };
-      if (addToDirtyList) {
-        this.!dirtyReaders = List.Cons(reader, this.dirtyReaders);
-      };
+      this.!dirtyReaders = List.Cons(reader, this.dirtyReaders);
       time = if (reader.parentName == reader.childName) {
         -child.getTimeStack()
       } else {
