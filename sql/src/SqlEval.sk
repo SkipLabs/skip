@@ -681,7 +681,7 @@ class Evaluator{options: Options, user: ?UserFile} {
           selectDir.dirName,
           sinkDirName,
           (context, _writer, key, valueIter) ~> {
-            src = SKStore.Path(selectDir.dirName, key);
+            src = SKStore.Path::create(selectDir.dirName, key);
             rows: Array<SKStore.File> = valueIter
               .map(row -> {
                 row match {
@@ -1295,7 +1295,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         deleteDir,
         sinkDirName,
         (context, _writer, key, valueIter) ~> {
-          src = SKStore.Path(deleteDir, key);
+          src = SKStore.Path::create(deleteDir, key);
           entries = Vector[(key, (src, src, valueIter.collect(Array)))];
           inputDir = context.unsafeGetEagerDir(dir.dirName);
           inputDir.writeArraySourceMany(context, entries.iterator());
@@ -1391,10 +1391,7 @@ class Evaluator{options: Options, user: ?UserFile} {
       (context, writer, key, rowIter) ~> {
         entries = mutable Vector[];
         dir = context.unsafeGetEagerDir(inputDir.dirName);
-        writerPath = SKStore.Path(
-          selectDir.dirName,
-          SKStore.IID(SKStore.genSym(0)),
-        );
+        writerPath = SKStore.Path::gen(selectDir.dirName);
         for ((_, source, _) in dir.getDataIterWithoutTombs(context, key)) {
           entries.push((key, (source, writerPath, Array<SKStore.File>[])));
         };
@@ -1538,10 +1535,7 @@ class Evaluator{options: Options, user: ?UserFile} {
                 entries = mutable Vector[];
                 dir = context.unsafeGetEagerDir(table.dirName);
                 for (row in rowValues) {
-                  writerPath = SKStore.Path(
-                    table.dirName,
-                    SKStore.IID(SKStore.genSym(0)),
-                  );
+                  writerPath = SKStore.Path::gen(table.dirName);
 
                   key: SKStore.Key = RowKey::create(row, kinds);
                   for ((_, source, _) in dir.getDataIterWithoutTombs(
@@ -1584,7 +1578,7 @@ class Evaluator{options: Options, user: ?UserFile} {
     kinds = table.kinds;
     for (row in rows) {
       key = RowKey::create(row, kinds);
-      source = SKStore.Path(dir.dirName, SKStore.IID(SKStore.genSym(0)));
+      source = SKStore.Path::gen(dir.dirName);
       !newDir = newDir.writeEntry(context, source, source, key, Array[row]);
     };
     context.setDir(newDir);
@@ -2109,7 +2103,7 @@ fun importNext(
         entries.iterator(),
       );
       if (isReset) {
-        writerPath = SKStore.Path(dir.dirName, SKStore.IID(SKStore.genSym(0)));
+        writerPath = SKStore.Path::gen(dir.dirName);
         !inputDir = inputDir.reset(targetCtx, writerPath, changedKeys);
       };
       targetCtx.setDir(inputDir)

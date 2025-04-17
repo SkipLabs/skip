@@ -19,7 +19,7 @@
 /*****************************************************************************/
 module SKStore;
 
-class MaxKeyFile(key: Key) extends SKStore.File
+class MaxKeyFile(key: Key) extends File
 
 value class FilterRange private (ranges: Array<KeyRange>, max: Key) {
   static fun create(rangesOpt: ?Array<KeyRange>): ?this {
@@ -57,7 +57,7 @@ class EagerFilter private {
   removeFromFile: (File, Int) ~> File,
 
   // The filtering function (on the parent's files)
-  filter: (mutable SKStore.Context, Key, File) ~> Bool,
+  filter: (mutable Context, Key, File) ~> Bool,
 } {
   // Returns the size of an entire array
   private fun arraySize(array: Array<File>): Int {
@@ -197,7 +197,7 @@ class EagerFilter private {
         invariant(toAdd >= 0);
         if (toAdd == 0) break void;
       };
-      source = Path(this.parentName, key);
+      source = Path::create(this.parentName, key);
       !childDir = childDir.writeEntry(
         context,
         source,
@@ -213,7 +213,7 @@ class EagerFilter private {
     for (kv in childDir.unsafeGetFileIter(startKeyOpt)) {
       (key, _) = kv;
       if (keys.contains(key)) continue;
-      source = Path(this.parentName, key);
+      source = Path::create(this.parentName, key);
       !childDir = childDir.writeEntry(context, source, source, key, Array[]);
     };
 
@@ -221,7 +221,7 @@ class EagerFilter private {
       Array[]
     };
 
-    source = Path(childDir.dirName, SKStore.UnitID::singleton);
+    source = Path::unit(childDir.dirName);
     fullDir = context.unsafeGetEagerDir(this.fullName);
     !fullDir = fullDir.writeEntry(
       context,
@@ -242,7 +242,7 @@ class EagerFilter private {
     capacity: Int,
     fileSize: File ~> Int,
     removeFromFile: (File, Int) ~> File,
-    filter: (mutable SKStore.Context, Key, File) ~> Bool,
+    filter: (mutable Context, Key, File) ~> Bool,
     rangesOpt: ?Array<KeyRange>,
   ): void {
     filterRange = FilterRange::create(rangesOpt);

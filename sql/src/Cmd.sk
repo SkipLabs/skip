@@ -96,16 +96,15 @@ fun writeCmd(env: mutable CmdEnv, pathStr: String, cmd: String): void {
   if (cmd != "") {
     !cmd = cmd.stripPrefix(cmd.take(1));
   };
-  path = Path::fromString(pathStr);
-  env.context.maybeGetEagerDir(path.dirName) match {
-  | None() -> print_error("Could not find input directory: " + path.dirName)
-  | Some(dir) if (!dir.isInput()) ->
-    print_error("Not an input Dir: " + path.dirName)
+  (dirName, key) = splitStringPath(pathStr);
+  env.context.maybeGetEagerDir(dirName) match {
+  | None() -> print_error("Could not find input directory: " + dirName)
+  | Some(dir) if (!dir.isInput()) -> print_error("Not an input Dir: " + dirName)
   | Some(dir) ->
     if (cmd == "") {
-      dir.writeArray(env.context, path.baseName, Array[]);
+      dir.writeArray(env.context, key, Array[]);
     } else {
-      dir.writeArray(env.context, path.baseName, Array[StringFile(cmd)]);
+      dir.writeArray(env.context, key, Array[StringFile(cmd)]);
     }
   };
 }
@@ -169,13 +168,13 @@ fun eval(env: mutable CmdEnv, cmd: String): void {
     };
     files.each(entry -> {
       pathStr = absolutePath(env.pwd, entry);
-      path = Path::fromString(pathStr);
-      env.context.maybeGetDir(path.dirName) match {
-      | None() -> print_string(`<EMPTY:${path}>`)
+      (dirName, key) = splitStringPath(pathStr);
+      env.context.maybeGetDir(dirName) match {
+      | None() -> print_string(`<EMPTY:${dirName}${key}>`)
       | Some(dir) ->
-        arr = dir.getArrayRaw(path.baseName);
+        arr = dir.getArrayRaw(key);
         if (arr.size() == 0) {
-          print_string(`<EMPTY:${path}>`)
+          print_string(`<EMPTY:${dirName}${key}>`)
         } else if (arr.size() == 1) {
           arr[0] match {
           | StringFile(x) -> print_string(x)

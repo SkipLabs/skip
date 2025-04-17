@@ -137,7 +137,7 @@ value class CompactRow<T>(
   values: Array<T>,
   repeat: Int,
   tag: TickRange,
-  sourceKey: ?SKStore.Key,
+  sourceKey: ?Key,
 )
 
 class FixedDirMetadata{
@@ -192,7 +192,7 @@ class CompactFixedDir protected {
     FixedRow(
       rowKey,
       Array[(rowValues : File)],
-      Path(this.metadata.sourceDir, sourceKey),
+      Path::create(this.metadata.sourceDir, sourceKey),
       compactRow.tag,
     )
   }
@@ -608,7 +608,7 @@ private class CompactFSMImpl protected (
 
   private fun reconstructKVPair(row: SKDB.RowValues): (Path, MInfo) {
     rowKey = SKDB.RowKey(row, this.metadata.rowKinds);
-    path = Path(this.metadata.dir, rowKey);
+    path = Path::create(this.metadata.dir, rowKey);
     minfo = this.metadata.minfoType match {
     | ext @ Extension _ -> this.extendKey(rowKey, ext).fromSome()
     | _ -> this.reconstructMInfo(rowKey)

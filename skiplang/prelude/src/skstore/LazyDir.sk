@@ -17,10 +17,7 @@ base class LazyResult {
   | LAbsent()
 }
 
-class LazyDir private {
-  time: Time,
-  timeStack: TimeStack,
-  dirName: DirName,
+class LazyDir protected {
   data: SortedMap<Key, LazyResult> = SortedMap[],
   private lazyFun: ((mutable Context, Key) ~> LazyResult),
   collect: Bool,
@@ -86,22 +83,21 @@ class LazyDir private {
         lazyFun,
         collect,
       };
-      updateDirtyReaders(context, Path::create(dirName.tag(), DirTag()));
+      context.updateDirtyReaders(Path::dirTag(dirName));
       context.setDir(newDir);
       newDir
     }
   }
 
-  fun withData(data: SortedMap<Key, LazyResult>): this {
+  fun removeKeys(keys: SortedSet<Key>): this {
+    data = this.data;
+    for (key in keys) {
+      data.maybeGet(key) match {
+      | Some(LDefined(_, reads)) -> !data[key] = LRemoved(reads)
+      | _ -> void
+      }
+    };
     this with {data}
-  }
-
-  fun getTime(): Time {
-    this.time
-  }
-
-  fun getTimeStack(): TimeStack {
-    this.timeStack
   }
 
   fun reset(context: mutable Context): void {
@@ -116,10 +112,6 @@ class LazyDir private {
       };
     };
     keys
-  }
-
-  fun getDirName(): DirName {
-    this.dirName
   }
 
   fun getArrayRaw(key: Key): Array<File> {
@@ -151,7 +143,7 @@ class LazyDir private {
       key = path.baseName;
       oldValue = this.data.maybeGet(key);
       !this.data = this.data.remove(key);
-      updateDirtyReaders(context, path);
+      context.updateDirtyReaders(path);
       oldValue match {
       | Some(LDefined(_, reads))
       | Some(LRemoved(reads)) ->

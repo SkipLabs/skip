@@ -54,7 +54,7 @@ type MapFun = (
 
 class Reducer{
   reducer: IReducer,
-  fixed: Array<(Key, Array<File>)>,
+  private fixed: Array<(Key, Array<File>)>,
   modified: SortedMap<Key, Array<File>>,
 } {
   static fun create(
@@ -365,7 +365,7 @@ class DataMapValue{
   }
 }
 
-class DataMap{
+class DataMap private {
   data: DMap<Key, DMap<Path, (Path, Array<File>)>> = Nil(),
   tombs: DMap<Key, DMap<Path, Path>> = Nil(),
   nbrEntries: Int = 0,
@@ -619,10 +619,7 @@ mutable class FixedDataMapIterator<T> private {
 /* An Eager Directory. */
 /*****************************************************************************/
 
-class EagerDir private {
-  time: Time,
-  timeStack: TimeStack,
-  dirName: DirName,
+class EagerDir protected {
   input: Bool,
   fixedData: FixedDataMap,
   totalSize: Int,
@@ -672,7 +669,7 @@ class EagerDir private {
   }
 
   fun reset(
-    context: mutable SKStore.Context,
+    context: mutable Context,
     writer: Path,
     keep: SortedSet<Key>,
     wasSeen: (Tick, Path) ~> Bool = (_, _) ~> true,
@@ -707,11 +704,11 @@ class EagerDir private {
 
   fun writeDiff(
     isReset: Bool,
-    changes: mutable Iterator<SKStore.Key>,
+    changes: mutable Iterator<Key>,
     writer: mutable Debug.BufferedWriter,
     entity: String, // the name that this dir goes under during replication
     format: OutputFormat,
-    filter: (SKStore.Key -> Bool),
+    filter: (Key -> Bool),
     destinationTime: ?Tick,
     checkpointInterval: Int = Int::max,
   ): Bool {
@@ -897,14 +894,6 @@ class EagerDir private {
    */
   fun isInput(): Bool {
     this.input
-  }
-
-  fun getTime(): Time {
-    this.time
-  }
-
-  fun getTimeStack(): TimeStack {
-    this.timeStack
   }
 
   private fun getAllKeysWithValues(): SortedSet<Key> {
@@ -1178,7 +1167,7 @@ class EagerDir private {
 
     context.updateNewDeps(ArrowKey(parentName, childName, key), reads);
 
-    source = Path(parentName, key);
+    source = Path::create(parentName, key);
 
     for (kv in kvArray) {
       (k, v) = kv;
@@ -1403,7 +1392,7 @@ class EagerDir private {
         reducer,
       }
     };
-    updateDirtyReaders(context, Path::create(childName.tag(), DirTag()));
+    context.updateDirtyReaders(Path::dirTag(childName));
     context.setDir(dir);
     for (parentName => parentData in parents) {
       for (p in parentData) {
@@ -1797,28 +1786,26 @@ class EagerDir private {
       Some(cdata)
     };
 
-    context.!dirty = List.Cons(Path::create(this.dirName, k), context.dirty);
-
     path = Path::create(this.dirName, k);
+    context.!dirty = List.Cons(path, context.dirty);
 
     if (this.totalSize != totalSize) {
-      sizePath = Path::create(this.dirName.size(), SizeTag());
-      updateDirtyReaders(context, sizePath);
+      sizePath = Path::sizeTag(this.dirName);
+      context.updateDirtyReaders(sizePath);
       if (
         this.totalSize == 0 && totalSize != 0 ||
         this.totalSize != 0 && totalSize == 0
       ) {
-        isEmptyPath = Path::create(this.dirName.size(), IsEmptyTag());
-        updateDirtyReaders(context, isEmptyPath);
+        context.updateDirtyReaders(Path::isEmptyTag(this.dirName));
       }
     };
 
-    filesPath = Path::create(this.dirName.files(), FilesTag());
-    updateDirtyReaders(context, filesPath);
+    filesPath = Path::filesTag(this.dirName);
+    context.updateDirtyReaders(filesPath);
 
     !this = this with {totalSize, reducer};
 
-    updateDirtyReaders(context, path);
+    context.updateDirtyReaders(path);
 
     parentTime = this.time;
     childDirs = SortedSet[];
@@ -1902,9 +1889,7 @@ class EagerDir private {
     context.setDir(this with {optOnDelete});
   }
 
-  fun purgeSlices(
-    context: mutable Context,
-  ): RangeMapList<SKStore.Key, SKStore.DirName> {
+  fun purgeSlices(context: mutable Context): RangeMapList<Key, DirName> {
     slices = RangeMapList[];
     childDirs = SortedSet[];
     for (slice in this.slices) {
@@ -2049,10 +2034,6 @@ class EagerDir private {
     keys
   }
 
-  fun getDirName(): DirName {
-    this.dirName
-  }
-
   fun removeSubDirs(context: mutable Context): void {
     this.old.each((_, v) -> v.getNewDirs().each(context.removeDir));
     this.fixedOld.items().each(e -> e.i1.getNewDirs().each(context.removeDir))
@@ -2080,7 +2061,7 @@ class EagerDir private {
   }
 
   fun reverseTime(): this {
-    this with {time => SKStore.Time(-this.time.value)}
+    this with {time => Time(-this.time.value)}
   }
 
   fun updateNewDirs(
@@ -2125,7 +2106,7 @@ class EagerDir private {
     !this.old[source] = minfo;
 
     for (dirName in removed) {
-      updateDirtyReaders(context, Path::create(dirName.tag(), DirTag()));
+      context.updateDirtyReaders(Path::dirTag(dirName));
     };
     this
   }
@@ -2185,14 +2166,14 @@ class EagerDir private {
   }
 
   fun size(context: mutable Context): Int {
-    context.addDep(Path::create(this.dirName.size(), SizeTag()));
+    context.addDep(Path::sizeTag(this.dirName));
     this.totalSize
   }
 
   fun getIterator(
     context: mutable Context,
-  ): mutable Iterator<(SKStore.Key, mutable Iterator<SKStore.File>)> {
-    path = Path::create(this.dirName.files(), FilesTag());
+  ): mutable Iterator<(Key, mutable Iterator<File>)> {
+    path = Path::filesTag(this.dirName);
     context.addDep(path);
     this.unsafeGetFileIter()
   }
@@ -2216,7 +2197,7 @@ class EagerDir private {
   }
 
   fun isEmpty(context: mutable Context): Bool {
-    context.addDep(Path::create(this.dirName.size(), IsEmptyTag()));
+    context.addDep(Path::isEmptyTag(this.dirName));
     this.totalSize == 0
   }
 

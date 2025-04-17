@@ -77,10 +77,9 @@ class DirSub(
   // the watermark is per-dir because tables can be added and removed
   // from the mirror-set: they don't necessarily all move forward in
   // lock-step.
-  getDestinationWatermark: (readonly SKStore.Context) ~> ?SKStore.Tick,
+  getDestinationWatermark: (readonly Context) ~> ?Tick,
   // this is a dir-specific filter
-  filter: (SKStore.Context, Bool, DirName) ~> (Key -> Bool) = (_, _, _) ~>
-    (_ -> true),
+  filter: (Context, Bool, DirName) ~> (Key -> Bool) = (_, _, _) ~> (_ -> true),
 )
 
 /*****************************************************************************/
@@ -133,48 +132,12 @@ fun run(f: (mutable Context) -> void): mutable Context {
 }
 
 /*****************************************************************************/
-/* Primitives used to make a file "dirty" (dirty means that it needs to be
- * recomputed.
- *
- * - dirtyReaders are files that are made dirty because of a read access
- * - dirty are files that are made dirty because of a Map.
- */
-/*****************************************************************************/
-
-fun updateDirtyReaders(
-  context: mutable Context,
-  path: Path,
-  addToDirtyList: Bool = true,
-): void {
-  for (reader in context.getDeps(path)) {
-    child = context.unsafeMaybeGetDir(reader.childName) match {
-    | None() -> continue
-    | Some(x) -> x
-    };
-    parent = context.unsafeMaybeGetDir(reader.parentName) match {
-    | None() -> continue
-    | Some(x) -> x
-    };
-    if (addToDirtyList) {
-      context.!dirtyReaders = List.Cons(reader, context.dirtyReaders);
-    };
-    time = if (reader.parentName == reader.childName) {
-      -child.getTimeStack()
-    } else {
-      child.getTimeStack()
-    };
-    arrow = Arrow(reader.parentName, reader.childName);
-    context.addToUpdate(time, parent.getTime(), arrow);
-  };
-}
-
-/*****************************************************************************/
 /* Dependencies tracking. */
 /*****************************************************************************/
 
-value class Deps(
+value class Deps private (
   data: SortedMap<Path, SortedSet<ArrowKey>> = SortedMap[],
-  idata: HashMap<DirName, SortedSet<Path>> = HashMap[],
+  private idata: HashMap<DirName, SortedSet<Path>> = HashMap[],
 ) {
   static fun createFromItems(items: Array<(Path, ArrowKey)>): this {
     deps = Deps();
@@ -197,11 +160,10 @@ value class Deps(
     !set = set.set(arrowKey);
     !this.data[path] = set;
     !this = this.iset(arrowKey.childName, path);
-
     this
   }
 
-  fun iset(dirName: DirName, arrow: Path): this {
+  private fun iset(dirName: DirName, arrow: Path): this {
     iset = this.idata.maybeGet(dirName) match {
     | None() -> SortedSet[]
     | Some(x) -> x
@@ -211,7 +173,7 @@ value class Deps(
     this
   }
 
-  fun iremove(dirName: DirName, arrow: Path): this {
+  private fun iremove(dirName: DirName, arrow: Path): this {
     iset = this.idata.maybeGet(dirName) match {
     | None() -> SortedSet[]
     | Some(x) -> x
@@ -357,7 +319,7 @@ mutable base class WriteChecker private {
   mutable tables: SortedMap<DirName, TableIndexes>,
 } {
   mutable fun checkWrite(
-    context: readonly SKStore.Context,
+    context: readonly Context,
     dirName: DirName,
     indexes: TableIndexes,
     key: Key,
@@ -382,31 +344,31 @@ mutable class Context{
   mutable purgeLimit: ?Tick = None(),
   private mutable dirs: Dirs = Dirs{},
   mutable reads: SortedSet<Path> = SortedSet[],
-  mutable time: Time = Time(0),
+  private mutable time: Time = Time(0),
   mutable tick: Tick = Tick(1),
-  mutable lazyCapacity: Int = 10,
-  mutable toUpdate: SortedMap<(TimeStack, Time), Arrow> = SortedMap[],
+  private mutable lazyCapacity: Int = 10,
+  private mutable toUpdate: SortedMap<(TimeStack, Time), Arrow> = SortedMap[],
   mutable deps: Deps = Deps[],
   mutable debugMode: Bool = debugMode,
-  mutable failOnExn: Bool = true,
+  private mutable failOnExn: Bool = true,
   mutable hasPre: SortedSet<DirName> = SortedSet[],
   mutable newDirs: SortedSet<DirName> = SortedSet[],
   mutable toReset: SortedSet<DirName> = SortedSet[],
   mutable globals: SortedMap<String, File> = SortedMap[],
-  mutable persistents: SortedMap<String, File> = SortedMap[],
+  private mutable persistents: SortedMap<String, File> = SortedMap[],
   mutable dirty: List<Path> = List[],
-  mutable dirtyReaders: List<ArrowKey> = List[],
+  private mutable dirtyReaders: List<ArrowKey> = List[],
   mutable canReuse: CanReuse = CRIfMatch(),
   mutable arrowStack: List<(ArrowKey, TimeStack)> = List[],
   mutable lazyGets: SortedSet<Path> = SortedSet[],
-  mutable lazyGetsQueueIn: List<Array<Path>> = List[],
-  mutable lazyGetsQueueOut: List<Array<Path>> = List[],
-  mutable lazyGetsRefCount: SortedMap<Path, Int> = SortedMap[],
+  private mutable lazyGetsQueueIn: List<Array<Path>> = List[],
+  private mutable lazyGetsQueueOut: List<Array<Path>> = List[],
+  private mutable lazyGetsRefCount: SortedMap<Path, Int> = SortedMap[],
   mutable sessions: SortedMap<Int, Sub> = SortedMap[],
   mutable removeSubDirs: Bool = true,
-  mutable postponables: List<Postponable> = List[],
-  mutable dirsWithSharedSubDirs: SortedSet<DirName> = SortedSet[],
-  mutable sharedSubDirsRefCount: SortedMap<DirName, Int> = SortedMap[],
+  private mutable postponables: List<Postponable> = List[],
+  private mutable dirsWithSharedSubDirs: SortedSet<DirName> = SortedSet[],
+  private mutable sharedSubDirsRefCount: SortedMap<DirName, Int> = SortedMap[],
   mutable writeChecker: ?(mutable WriteChecker) = None(),
   mutable purgeFrom: (mutable Context, Dir) ~> Tick = (ctx, _) ~>
     Tick(ctx.tick.value - 1000),
@@ -578,7 +540,7 @@ mutable class Context{
     this.!sourceOverride = ctx.sourceOverride;
   }
 
-  mutable fun getReads(): SortedSet<Path> {
+  readonly fun getReads(): SortedSet<Path> {
     this.reads
   }
 
@@ -599,34 +561,15 @@ mutable class Context{
     this.arrowStack.maybeHead().map(x -> x.i0)
   }
 
-  readonly fun getDeps(path: Path): SortedSet<ArrowKey> {
+  private readonly fun getDeps(path: Path): SortedSet<ArrowKey> {
     this.deps.maybeGet(path) match {
     | None() -> SortedSet[]
     | Some(deps) -> deps
     }
   }
 
-  readonly fun debug(path: Path): void {
-    this.dirs.maybeGet(path.dirName) match {
-    | None() -> print_debug("Directory does not exist")
-    | Some(dir) ->
-      values = dir.getArrayRaw(path.baseName);
-      debug(values)
-    }
-  }
-
-  readonly fun getValue(path: Path): Array<File> {
-    dir = this.dirs[path.dirName];
-    values = dir.getArrayRaw(path.baseName);
-    values
-  }
-
   mutable fun updateNewDeps(reader: ArrowKey, reads: SortedSet<Path>): void {
-    readSet = SortedSet[];
-    for (read in reads) {
-      !readSet = readSet.set(read);
-    };
-    for (path in readSet) {
+    for (path in reads) {
       this.!deps = this.deps.set(path, reader);
     };
   }
@@ -635,7 +578,7 @@ mutable class Context{
     _ = this.updatePre();
   }
 
-  mutable fun updatePre(): Bool {
+  private mutable fun updatePre(): Bool {
     if (this.debugMode) {
       print_debug(`------------ UPDATE PRE ------------`);
     };
@@ -656,24 +599,24 @@ mutable class Context{
             creator => this.currentArrow(),
           };
           dir.unsafeIterKeys((key, _time) -> {
-            values = dir.getArrayRaw(key).collect(Array);
+            values = dir.getArrayRaw(key);
             !withChange = true;
             source = Path::create(preDir.dirName, key);
             !preDir = preDir.writeEntry(this, source, source, key, values);
           });
           this.setDir(preDir);
-          updateDirtyReaders(this, Path::create(preDirName.tag(), DirTag()));
+          this.updateDirtyReaders(Path::dirTag(preDirName));
           this.setDir(preDir)
         | Some(preDir) ->
           (isReset, changes) = dir.getChangesAfter(this.tick.prev());
           for (key in changes) {
-            values = dir.getArrayRaw(key).collect(Array);
+            values = dir.getArrayRaw(key);
             !withChange = true;
             source = Path::create(preDir.dirName, key);
             !preDir = preDir.writeEntry(this, source, source, key, values);
           };
           if (isReset) {
-            writerPath = Path(preDir.dirName, IID(genSym(0)));
+            writerPath = Path::gen(preDir.dirName);
             !preDir = preDir.reset(this, writerPath, changes);
           };
           this.setDir(preDir)
@@ -683,7 +626,41 @@ mutable class Context{
     withChange
   }
 
-  mutable fun checkPostponables(): Bool {
+  /*****************************************************************************/
+  /* Primitives used to make a file "dirty" (dirty means that it needs to be
+   * recomputed.
+   *
+   * - dirtyReaders are files that are made dirty because of a read access
+   * - dirty are files that are made dirty because of a Map.
+   */
+  /*****************************************************************************/
+  mutable fun updateDirtyReaders(
+    path: Path,
+    addToDirtyList: Bool = true,
+  ): void {
+    for (reader in this.getDeps(path)) {
+      child = this.unsafeMaybeGetDir(reader.childName) match {
+      | None() -> continue
+      | Some(x) -> x
+      };
+      parent = this.unsafeMaybeGetDir(reader.parentName) match {
+      | None() -> continue
+      | Some(x) -> x
+      };
+      if (addToDirtyList) {
+        this.!dirtyReaders = List.Cons(reader, this.dirtyReaders);
+      };
+      time = if (reader.parentName == reader.childName) {
+        -child.getTimeStack()
+      } else {
+        child.getTimeStack()
+      };
+      arrow = Arrow(reader.parentName, reader.childName);
+      this.addToUpdate(time, parent.getTime(), arrow);
+    };
+  }
+
+  private mutable fun checkPostponables(): Bool {
     withChange = !this.postponables.isEmpty();
     if (withChange) {
       postponables = this.postponables.reversed();
@@ -693,7 +670,7 @@ mutable class Context{
     withChange;
   }
 
-  mutable fun updateLazyGets(): void {
+  private mutable fun updateLazyGets(): void {
     for (path in this.lazyGets) {
       refCount = this.lazyGetsRefCount.maybeGet(path) match {
       | None() -> 0
@@ -740,14 +717,7 @@ mutable class Context{
       };
       for (dirName => keys in toRemove) {
         dir = this.unsafeGetLazyDir(dirName);
-        data = dir.data;
-        for (key in keys) {
-          data.maybeGet(key) match {
-          | Some(LDefined(_, reads)) -> !data[key] = LRemoved(reads)
-          | _ -> void
-          };
-        };
-        this.setDir(dir.withData(data))
+        this.setDir(dir.removeKeys(keys))
       }
     };
   }
@@ -837,7 +807,7 @@ mutable class Context{
     }
   }
 
-  mutable fun perform(list: List<Postponable>): void {
+  private mutable fun perform(list: List<Postponable>): void {
     list match {
     | List.Nil() -> void
     | List.Cons(p, rl) ->
@@ -846,7 +816,7 @@ mutable class Context{
     }
   }
 
-  readonly fun notifySub(sub: Sub, start: Tick): void {
+  private readonly fun notifySub(sub: Sub, start: Tick): void {
     lock = unfreezeLock(sub.lock);
     mutexLock(lock);
     sub.cmd match {
@@ -1058,7 +1028,7 @@ mutable class Context{
   }
 
   mutable fun getDir(dirName: DirName): Dir {
-    this.addDep(Path::create(dirName.tag(), DirTag()));
+    this.addDep(Path::dirTag(dirName));
     this.dirs.get(dirName);
   }
 
@@ -1153,9 +1123,9 @@ mutable class Context{
     };
   }
 
-  mutable fun transitiveChildDirs(dirName: DirName): SortedSet<DirName> {
+  readonly fun transitiveChildDirs(dirName: DirName): SortedSet<DirName> {
     this.unsafeMaybeGetEagerDir(dirName) match {
-    | Some(dir @ SKStore.EagerDir _) ->
+    | Some(dir @ EagerDir _) ->
       dir.childDirs.reduce(
         (accDeps, child) -> {
           accDeps.union(this.transitiveChildDirs(child))
@@ -1167,7 +1137,7 @@ mutable class Context{
   }
 
   mutable fun maybeGetDir<T: File>(dirName: DirName): ?Dir {
-    this.addDep(Path::create(dirName.tag(), DirTag()));
+    this.addDep(Path::dirTag(dirName));
     this.dirs.maybeGet(dirName);
   }
 
@@ -1280,10 +1250,7 @@ fun import(
             entries.iterator(),
           );
           if (isReset) {
-            writerPath = SKStore.Path(
-              dir.dirName,
-              SKStore.IID(SKStore.genSym(0)),
-            );
+            writerPath = Path::gen(dir.dirName);
             !inputDir = inputDir.reset(targetCtx, writerPath, changedKeys);
           };
           targetCtx.setDir(inputDir)
@@ -1830,7 +1797,7 @@ fun destroyObstackWithValueCheckContext<T>(
   value: T,
   saved: Obstack,
 ): T {
-  (icontextOpt, !value) = SKStore.destroyObstackWithValue(
+  (icontextOpt, !value) = destroyObstackWithValue(
     saved,
     List[(contextOpt.map(ctx -> ctx.clone()), value)],
   ).getHead();
@@ -1861,7 +1828,7 @@ fun withRegionFold<K, T>(
             valueInRegion,
             saved,
           );
-          !optSaved = Some(SKStore.newObstack());
+          !optSaved = Some(newObstack());
         }
       | _ -> break void
       }
