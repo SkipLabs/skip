@@ -356,7 +356,7 @@ mutable class Context{
   mutable toReset: SortedSet<DirName> = SortedSet[],
   mutable globals: SortedMap<String, File> = SortedMap[],
   private mutable persistents: SortedMap<String, File> = SortedMap[],
-  mutable dirty: List<Path> = List[],
+  private mutable dirty: List<Path> = List[],
   private mutable dirtyReaders: List<ArrowKey> = List[],
   mutable canReuse: CanReuse = CRIfMatch(),
   mutable arrowStack: List<(ArrowKey, TimeStack)> = List[],
@@ -696,6 +696,11 @@ mutable class Context{
       dir = this.unsafeGetLazyDir(dirName);
       this.setDir(dir.removeKeys(keys))
     }
+  }
+
+  mutable fun addDirty(dirName: DirName, key: Key): void {
+    path = Path::create(dirName, key);
+    this.!dirty = List.Cons(path, this.dirty);
   }
 
   mutable fun update(): void {
