@@ -356,7 +356,7 @@ mutable class Context{
   mutable toReset: SortedSet<DirName> = SortedSet[],
   mutable globals: SortedMap<String, File> = SortedMap[],
   private mutable persistents: SortedMap<String, File> = SortedMap[],
-  private mutable dirty: List<Path> = List[],
+  private mutable dirty: SortedMap<DirName, SortedSet<Key>> = SortedMap[],
   private mutable dirtyReaders: List<ArrowKey> = List[],
   mutable canReuse: CanReuse = CRIfMatch(),
   mutable arrowStack: List<(ArrowKey, TimeStack)> = List[],
@@ -699,8 +699,10 @@ mutable class Context{
   }
 
   mutable fun addDirty(dirName: DirName, key: Key): void {
-    path = Path::create(dirName, key);
-    this.!dirty = List.Cons(path, this.dirty);
+    this.!dirty[dirName] = this.dirty.maybeGet(dirName) match {
+    | None() -> SortedSet[key]
+    | Some(set) -> set.set(key)
+    }
   }
 
   mutable fun update(): void {
@@ -723,17 +725,9 @@ mutable class Context{
 
     this.updateLazyGets();
 
-    dirty = SortedMap<DirName, SortedSet<Key>>[];
     dirtyReaders = mutable Map<DirName, mutable Map<DirName, SortedSet<Key>>>[];
 
     loop {
-      for (path in this.dirty) {
-        !dirty[path.dirName] = dirty.maybeGet(path.dirName) match {
-        | None() -> SortedSet[path.baseName]
-        | Some(set) -> set.set(path.baseName)
-        };
-      };
-      this.!dirty = List[];
       for (reader in this.dirtyReaders) {
         if (!dirtyReaders.containsKey(reader.parentName)) {
           dirtyReaders![reader.parentName] = mutable Map[];
@@ -750,7 +744,7 @@ mutable class Context{
       toUpdate = this.toUpdate.minimum();
       toUpdate match {
       | None() ->
-        invariant(this.dirty.isEmpty());
+        this.!dirty = SortedMap[];
         invariant(this.dirtyReaders.isEmpty());
         withPostponables = this.checkPostponables();
         withPre = this.updatePre();
@@ -775,7 +769,7 @@ mutable class Context{
           };
           EagerDir::update(
             this,
-            dirty,
+            this.dirty,
             dirtyReaders,
             parentName,
             parentMaps,
