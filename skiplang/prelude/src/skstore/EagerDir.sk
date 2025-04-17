@@ -1589,8 +1589,10 @@ class EagerDir protected {
         })
       }
     };
-    if (contextDirty.containsKey(parent.dirName)) {
-      keys = contextDirty[parent.dirName].values();
+    contextDirty.maybeGet(parent.dirName) match {
+    | None() -> void
+    | Some(dirtyKeys) ->
+      keys = dirtyKeys.values();
       !dirty = withRegionFold(None(), keys, dirty, (_, key, dirtyInRegion) ~> {
         for (p in parentMaps) {
           (_, rangeOpt, _) = p;
