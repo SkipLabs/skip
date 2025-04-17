@@ -28,8 +28,7 @@ value class HashMap<+K: Hashable, +V>(map: SortedMap<Int, V>) {
   }
 
   fun set<K2: Hashable, V2>[K: K2, V: V2](key: K2, value: V2): HashMap<K2, V2> {
-    nthis: HashMap<K2, V2> = this;
-    nthis with {map => this.map.set(key.hash(), value)}
+    HashMap<K2, V2>(this.map.set(key.hash(), value))
   }
 
   fun get<K2: Hashable>[K: K2](key: K2): V {
