@@ -125,33 +125,24 @@ class LazyDir protected {
     context: mutable Context,
     dirtyReadersOpt: ?readonly Map<DirName, SortedSet<Key>>,
   ): void {
-    dirtyReaders = SortedSet[];
-    firstDirtyReaders = dirtyReadersOpt match {
-    | None() -> mutable Map[]
-    | Some(m) -> m
-    };
-
-    for (dirtyReaderDirName => dirtyReaderKeys in firstDirtyReaders) {
-      for (dirtyReaderKey in dirtyReaderKeys) {
-        !dirtyReaders = dirtyReaders.set(
-          Path::create(dirtyReaderDirName, dirtyReaderKey),
-        );
-      }
-    };
-
-    for (path in dirtyReaders) {
-      key = path.baseName;
-      oldValue = this.data.maybeGet(key);
-      !this.data = this.data.remove(key);
-      context.updateDirtyReaders(path);
-      oldValue match {
-      | Some(LDefined(_, reads))
-      | Some(LRemoved(reads)) ->
-        for (read in reads) {
-          arrow = ArrowKey(this.dirName, this.dirName, key);
-          context.!deps = context.deps.remove(read, arrow)
-        }
-      | _ -> void
+    dirtyReadersOpt match {
+    | None() -> void
+    | Some(dirtyReaders) ->
+      for (dirtyReaderDirName => dirtyReaderKeys in dirtyReaders) {
+        for (key in dirtyReaderKeys) {
+          oldValue = this.data.maybeGet(key);
+          !this.data = this.data.remove(key);
+          context.updateDirtyReaders(Path::create(dirtyReaderDirName, key));
+          oldValue match {
+          | Some(LDefined(_, reads))
+          | Some(LRemoved(reads)) ->
+            for (read in reads) {
+              arrow = ArrowKey(this.dirName, this.dirName, key);
+              context.!deps = context.deps.remove(read, arrow)
+            }
+          | _ -> void
+          }
+        };
       }
     };
 
