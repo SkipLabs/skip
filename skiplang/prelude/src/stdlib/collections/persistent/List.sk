@@ -360,25 +360,12 @@ mutable base class .List<+T>
     (acc, list)
   }
 
-  readonly fun reversed(): List<T> {
-    result: List<T> = Nil();
-    for (x in this) {
-      !result = Cons(x, result)
-    };
-    result
-  }
+  readonly overridable fun reversed(): List<T>
+  | Nil() -> Nil()
+  | Cons _ -> this.revAppend(Nil())
 
-  /* a.revAppend(b) is a faster a.reversed().concat(b)
-     This version is constrained by b being non-empty so that the result is
-     proven to be non-empty as well.
-     If b is empty, just use a.reversed() */
-  readonly fun revAppend<U>[T: U](tail: Cons<U>): Cons<U> {
-    result: Cons<U> = tail;
-    for (x in this) {
-      !result = Cons(x, result)
-    };
-    result
-  }
+  /* a.revAppend(b) is a faster a.reversed().concat(b) */
+  readonly fun revAppend<U>[T: U](tail: List<U>): List<U>;
 
   readonly fun sorted[T: readonly Orderable](
     compare: (T, T) ~> Order = (x, y) ~> x.compare(y),
@@ -605,6 +592,30 @@ mutable base class .List<+T>
 
   readonly fun toString[T: readonly Show](): String {
     `List[${this.join(", ")}]`
+  }
+}
+
+extension class Nil {
+  readonly fun reversed(): Nil<T> {
+    Nil()
+  }
+
+  readonly fun revAppend<U>[T: U](tail: List<U>): List<U> {
+    tail
+  }
+}
+
+extension class Cons {
+  readonly fun reversed(): Cons<T> {
+    this.revAppend(Nil())
+  }
+
+  readonly fun revAppend<U>[T: U](tail: List<U>): Cons<U> {
+    result: Cons<U> = Cons(this.head, tail);
+    for (x in this.tail) {
+      !result = Cons(x, result)
+    };
+    result
   }
 }
 

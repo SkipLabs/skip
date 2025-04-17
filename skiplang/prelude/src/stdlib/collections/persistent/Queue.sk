@@ -41,8 +41,8 @@ class .Queue<+T> private {
     | Queue{head => List.Nil(), reversedTail => List.Nil(), siz} ->
       invariant(siz == 0);
       None()
-    | Queue{head => List.Nil(), reversedTail => List.Cons(rhd, rtl), siz} ->
-      rtl.revAppend(List::of(rhd)) match {
+    | Queue{head => List.Nil(), reversedTail => rt @ List.Cons _, siz} ->
+      rt.reversed() match {
       | List.Cons(res, head) ->
         Some((Queue{head, siz => siz - 1, reversedTail => List.Nil()}, res))
       }
