@@ -1,0 +1,85 @@
+module alias T = SKTest;
+
+module QueueTest;
+
+fun checkEmpty<V: frozen & Equality>(q: Queue<V>): void {
+  T.expectEq(q.size(), 0);
+  T.expectEq(q.isEmpty(), true);
+  T.expectEq(q.toArray(), Array[]);
+  T.expectEq(q.values().collect(Array), Array[]);
+  T.expectEq(q.pop(), None());
+}
+
+@test
+fun testEmpty(): void {
+  checkEmpty(Queue[]);
+  checkEmpty(Queue::empty());
+}
+
+@test
+fun testCreateFromItems(): void {
+  four = Queue[1, 2, 3, 4];
+  T.expectEq(four.size(), 4);
+  T.expectEq(four.isEmpty(), false);
+  T.expectEq(four.toArray(), Array[1, 2, 3, 4]);
+  T.expectEq(four.collect(Array), Array[1, 2, 3, 4]);
+  T.expectEq(four.values().collect(Array), Array[1, 2, 3, 4]);
+}
+
+@test
+fun testPushPopTwo(): void {
+  q = Queue[];
+  !q = q.push(1);
+  T.expectEq(q.toArray(), Array[1]);
+  !q = q.push(2);
+  T.expectEq(q.toArray(), Array[1, 2]);
+  (!q, x) = q.pop().fromSome();
+  T.expectEq(x, 1);
+  T.expectEq(q.toArray(), Array[2]);
+  (!q, !x) = q.pop().fromSome();
+  T.expectEq(x, 2);
+  T.expectEq(q.toArray(), Array[]);
+  T.expectEq(q.isEmpty(), true);
+}
+
+@test
+fun testPushPopMore(): void {
+  q = Queue[];
+  !q = q.push(1);
+  !q = q.push(2);
+  (!q, x) = q.pop().fromSome();
+  T.expectEq(x, 1);
+  !q = q.push(3);
+  !q = q.push(4);
+  (!q, !x) = q.pop().fromSome();
+  T.expectEq(x, 2);
+  !q = q.push(5);
+  !q = q.push(6);
+  (!q, !x) = q.pop().fromSome();
+  T.expectEq(x, 3);
+  (!q, !x) = q.pop().fromSome();
+  T.expectEq(x, 4);
+  (!q, !x) = q.pop().fromSome();
+  T.expectEq(x, 5);
+  (!q, !x) = q.pop().fromSome();
+  T.expectEq(x, 6);
+  !q = q.push(7);
+  (!q, !x) = q.pop().fromSome();
+  T.expectEq(x, 7);
+  T.expectEq(q.toArray(), Array[]);
+}
+
+@test
+fun testCompare(): void {
+  T.expectEq(Queue[1, 2, 3], Queue[1, 2, 3]);
+  T.expectEq(Queue[1, 2, 3].compare(Queue[1, 2, 4]), LT());
+  T.expectEq(Queue[1, 2, 3].compare(Queue[1, 2, 3, 4]), LT());
+  T.expectEq(Queue[1, 2, 3, 4].compare(Queue[1, 2, 3]), GT());
+  T.expectEq(Queue[1, 2].pop().fromSome().i0.push(3), Queue[2, 3]);
+  T.expectEq(
+    Queue[1, 2].pop().fromSome().i0.pop().fromSome().i0.push(3),
+    Queue[3],
+  );
+}
+
+module end;

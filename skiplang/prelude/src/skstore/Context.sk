@@ -361,8 +361,7 @@ mutable class Context{
   mutable canReuse: CanReuse = CRIfMatch(),
   mutable arrowStack: List<(ArrowKey, TimeStack)> = List[],
   mutable lazyGets: SortedSet<Path> = SortedSet[],
-  private mutable lazyGetsQueueIn: List<Array<Path>> = List[],
-  private mutable lazyGetsQueueOut: List<Array<Path>> = List[],
+  private mutable lazyGetsQueue: Queue<Array<Path>> = Queue[],
   private mutable lazyGetsRefCount: SortedMap<Path, Int> = SortedMap[],
   mutable sessions: SortedMap<Int, Sub> = SortedMap[],
   mutable removeSubDirs: Bool = true,
@@ -450,8 +449,7 @@ mutable class Context{
       canReuse => this.canReuse,
       arrowStack => this.arrowStack,
       lazyGets => this.lazyGets,
-      lazyGetsQueueIn => this.lazyGetsQueueIn,
-      lazyGetsQueueOut => this.lazyGetsQueueOut,
+      lazyGetsQueue => this.lazyGetsQueue,
       lazyGetsRefCount => this.lazyGetsRefCount,
       sessions => this.sessions,
       removeSubDirs => this.removeSubDirs,
@@ -487,8 +485,7 @@ mutable class Context{
       canReuse => this.canReuse,
       arrowStack => this.arrowStack,
       lazyGets => this.lazyGets,
-      lazyGetsQueueIn => this.lazyGetsQueueIn,
-      lazyGetsQueueOut => this.lazyGetsQueueOut,
+      lazyGetsQueue => this.lazyGetsQueue,
       lazyGetsRefCount => this.lazyGetsRefCount,
       sessions => this.sessions,
       removeSubDirs => this.removeSubDirs,
@@ -527,8 +524,7 @@ mutable class Context{
     this.!canReuse = ctx.canReuse;
     this.!arrowStack = ctx.arrowStack;
     this.!lazyGets = ctx.lazyGets;
-    this.!lazyGetsQueueIn = ctx.lazyGetsQueueIn;
-    this.!lazyGetsQueueOut = ctx.lazyGetsQueueOut;
+    this.!lazyGetsQueue = ctx.lazyGetsQueue;
     this.!lazyGetsRefCount = ctx.lazyGetsRefCount;
     this.!sessions = ctx.sessions;
     this.!removeSubDirs = ctx.removeSubDirs;
@@ -678,48 +674,33 @@ mutable class Context{
       };
       this.!lazyGetsRefCount[path] = refCount + 1;
     };
-    this.!lazyGetsQueueIn = List.Cons(
-      this.lazyGets.toArray(),
-      this.lazyGetsQueueIn,
-    );
+    this.!lazyGetsQueue = this.lazyGetsQueue.push(this.lazyGets.toArray());
     this.!lazyGets = SortedSet[];
-    if (this.tick <= Tick(this.lazyCapacity)) return void;
-    queue = this.lazyGetsQueueOut match {
-    | List.Nil() ->
-      invariant(this.lazyGetsQueueIn is List.Cons _);
-      this.!lazyGetsQueueOut = this.lazyGetsQueueIn.reversed();
-      this.!lazyGetsQueueIn = List[];
-      this.lazyGetsQueueOut
-    | l -> l
-    };
-    queue match {
-    | List.Nil() -> invariant_violation("LazyGets reached empty queue")
-    | List.Cons(lazyGets, rl) ->
-      this.!lazyGetsQueueOut = rl;
-      toRemove = mutable Map[];
-      for (path in lazyGets) {
-        this.lazyGetsRefCount.maybeGet(path) match {
-        | None() ->
-          // Not found, but since the aim is to remove them, we can do nothing.
-          void
-        | Some(refCount) ->
-          !refCount = refCount - 1;
-          if (refCount == 0) {
-            this.!lazyGetsRefCount = this.lazyGetsRefCount.remove(path);
-            if (!toRemove.containsKey(path.dirName)) {
-              toRemove![path.dirName] = SortedSet[];
-            };
-            toRemove![path.dirName] = toRemove[path.dirName].set(path.baseName);
-          } else {
-            this.!lazyGetsRefCount[path] = refCount;
-          }
-        };
+    if (this.lazyGetsQueue.size() <= this.lazyCapacity) return void;
+    (this.!lazyGetsQueue, lazyGets) = this.lazyGetsQueue.pop().fromSome();
+    toRemove = mutable Map[];
+    for (path in lazyGets) {
+      this.lazyGetsRefCount.maybeGet(path) match {
+      | None() ->
+        // Not found, but since the aim is to remove them, we can do nothing.
+        void
+      | Some(refCount) ->
+        !refCount = refCount - 1;
+        if (refCount == 0) {
+          this.!lazyGetsRefCount = this.lazyGetsRefCount.remove(path);
+          if (!toRemove.containsKey(path.dirName)) {
+            toRemove![path.dirName] = SortedSet[];
+          };
+          toRemove![path.dirName] = toRemove[path.dirName].set(path.baseName);
+        } else {
+          this.!lazyGetsRefCount[path] = refCount;
+        }
       };
-      for (dirName => keys in toRemove) {
-        dir = this.unsafeGetLazyDir(dirName);
-        this.setDir(dir.removeKeys(keys))
-      }
     };
+    for (dirName => keys in toRemove) {
+      dir = this.unsafeGetLazyDir(dirName);
+      this.setDir(dir.removeKeys(keys))
+    }
   }
 
   mutable fun update(): void {

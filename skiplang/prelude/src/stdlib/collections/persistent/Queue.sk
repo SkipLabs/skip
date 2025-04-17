@@ -1,0 +1,124 @@
+module Queue;
+
+/* A persistent First-In First-Out queue */
+class .Queue<+T> private {
+  private siz: Int,
+  private head: List<T>,
+  private reversedTail: List<T>,
+} extends Sequence<T> uses Equality[T: Equality], Orderable[T: Orderable] {
+  /* Invariant:
+     - this.size() == this.head.size() + this.reversedTail.size()
+     - The whole queue is the concatenation of head and reversedTail.reversed()
+   */
+  static fun empty(): this {
+    static{siz => 0, head => List.Nil(), reversedTail => List.Nil()}
+  }
+
+  static fun createFromItems<C: readonly Sequence<T>>(items: C): Queue<T> {
+    static{
+      siz => items.size(),
+      head => List.Nil(),
+      reversedTail => List::reverseFromIterator(items.values()),
+    }
+  }
+
+  fun size(): Int {
+    this.siz
+  }
+
+  fun push<U>[T: U](x: U): Queue<U> {
+    Queue<U>{
+      siz => this.siz + 1,
+      head => this.head,
+      reversedTail => List.Cons(x, this.reversedTail),
+    }
+  }
+
+  fun pop(): ?(this, T) {
+    this match {
+    | Queue{head => List.Cons(res, head), siz} ->
+      Some((this with {head, siz => siz - 1}, res))
+    | Queue{head => List.Nil(), reversedTail => List.Nil(), siz} ->
+      invariant(siz == 0);
+      None()
+    | Queue{head => List.Nil(), reversedTail => rt @ List.Cons _, siz} ->
+      rt.reversed() match {
+      | List.Cons(res, head) ->
+        Some((Queue{head, siz => siz - 1, reversedTail => List.Nil()}, res))
+      }
+    }
+  }
+
+  fun values(): mutable Iterator<T> {
+    loop {
+      this.pop() match {
+      | Some((q, x)) ->
+        yield x;
+        !this = q
+      | None() -> yield break
+      }
+    }
+  }
+
+  fun toArray(): Array<T> {
+    Array::fillBy(this.siz, _i -> {
+      (!this, x) = this.pop().fromSome();
+      x
+    })
+  }
+
+  fun compare<T2: Orderable>[T: T2](other: Queue<T2>): Order {
+    loop {
+      (this.pop(), other.pop()) match {
+      | (None(), None()) -> return EQ()
+      | (None(), Some(_)) -> return LT()
+      | (Some(_), None()) -> return GT()
+      | (Some((q1, x1)), Some((q2, x2))) ->
+        cmp = x1.compare(x2);
+        if (cmp != EQ()) {
+          return cmp
+        };
+        !this = q1;
+        !other = q2
+      }
+    }
+  }
+
+  fun <<T2: Orderable>[T: T2](x: Queue<T2>): Bool {
+    this.compare(x) == LT()
+  }
+
+  fun ><T2: Orderable>[T: T2](x: Queue<T2>): Bool {
+    this.compare(x) == GT()
+  }
+
+  fun <=<T2: Orderable>[T: T2](x: Queue<T2>): Bool {
+    this.compare(x) != GT()
+  }
+
+  fun >=<T2: Orderable>[T: T2](x: Queue<T2>): Bool {
+    this.compare(x) != LT()
+  }
+
+  fun ==<T2: Equality>[T: T2](other: Queue<T2>): Bool {
+    if (this.siz != other.siz) return false;
+    loop {
+      (this.pop(), other.pop()) match {
+      | (None(), None()) -> return true
+      | (None(), Some(_))
+      | (Some(_), None()) ->
+        invariant_violation("Queue: broken invariant")
+      | (Some((q1, x1)), Some((q2, x2))) ->
+        if (x1 != x2) return false;
+        !this = q1;
+        !other = q2
+      }
+    }
+  }
+
+  fun !=<T2: Equality>[T: T2](other: Queue<T2>): Bool {
+    !(this == other)
+  }
+}
+
+module end;
