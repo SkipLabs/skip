@@ -3,12 +3,9 @@
 /*****************************************************************************/
 
 value class HashMap<+K: Hashable, +V>(map: SortedMap<Int, V>) {
-  static fun createFromItems<K2: Hashable, V2, I: readonly Sequence<(K2, V2)>>[
-    K: K2,
-    V: V2,
-  ](
+  static fun createFromItems<I: readonly Sequence<(K, V)>>(
     items: I,
-  ): HashMap<K2, V2> {
+  ): HashMap<K, V> {
     HashMap(
       SortedMap::createFromItems(
         items.map(kv -> {
