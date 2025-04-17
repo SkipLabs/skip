@@ -723,16 +723,14 @@ mutable class Context{
 
     this.updateLazyGets();
 
-    dirty = mutable Map<DirName, SortedSet<Key>>[];
+    dirty = SortedMap<DirName, SortedSet<Key>>[];
     dirtyReaders = mutable Map<DirName, mutable Map<DirName, SortedSet<Key>>>[];
 
     loop {
       for (path in this.dirty) {
-        dirty.maybeGet(path.dirName) match {
-        | None() ->
-          set = SortedSet[path.baseName];
-          dirty![path.dirName] = set
-        | Some(set) -> dirty![path.dirName] = set.set(path.baseName)
+        !dirty[path.dirName] = dirty.maybeGet(path.dirName) match {
+        | None() -> SortedSet[path.baseName]
+        | Some(set) -> set.set(path.baseName)
         };
       };
       this.!dirty = List[];
