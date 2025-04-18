@@ -1609,7 +1609,9 @@ class Evaluator{options: Options, user: ?UserFile} {
       authorIdx = dirDescr.cols.maybeGet(skdbAuthorColName);
       accessIdx = dirDescr.cols.maybeGet(skdbAccessColName);
       if (authorIdx is Some _ || accessIdx is Some _) {
-        checker.addTable(dirDescr.dirName, authorIdx, accessIdx);
+        context.!writeChecker = Some(
+          checker.addTable(dirDescr.dirName, authorIdx, accessIdx),
+        );
       }
     };
 
