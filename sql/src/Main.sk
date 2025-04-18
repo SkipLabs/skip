@@ -450,7 +450,7 @@ fun execCompact(args: Cli.ParseResults, options: SKDB.Options): void {
     for ((_dirName, dir) in context.listDirs()) {
       dir match {
       | edir @ SKStore.EagerDir _ ->
-        !edir = edir.purge(context, context.tick);
+        !edir = edir.purge(context, context.getTick());
         context.setDir(edir)
       | _ -> void
       }

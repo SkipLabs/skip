@@ -1165,7 +1165,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         context,
         key,
         SelectFile(
-          context.tick.value,
+          context.getTick().value,
           viewName,
           reactive,
           view.toString(),
@@ -1179,7 +1179,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         if (inTransaction) {
           error(pos, "Cannot create a reactive view in a transaction");
         };
-        startTick = context.tick;
+        startTick = context.getTick();
         // This phase just populates the data.
         _ = SKDB.evalSelect(context, cselect1, None());
         Some((context, delta, _) ~> {
@@ -1740,7 +1740,7 @@ fun sqlPurgeFrom(
     table = getSqlTableName(dir.getDirName());
     ackTable = feedbackTable(table);
     watermark = getWatermark(ctx, ackTable, Some(replicationId));
-    default = SKStore.Tick(ctx.tick.value - 1000);
+    default = SKStore.Tick(ctx.getTick().value - 1000);
     watermark match {
     | Some(SKStore.Tick(x)) if (x < default.value) -> SKStore.Tick(x - 1)
     | _ -> default
@@ -1810,7 +1810,7 @@ private mutable class SQLContext(
       ) ~> void,
     ),
   ): void {
-    startTick = this.context.tick;
+    startTick = this.context.getTick();
     pos = SKStore.newObstack();
 
     (newContext, underLockF) = try {
@@ -2127,7 +2127,7 @@ fun updateTableMap(context: mutable SKStore.Context): void {
   | None() ->
     TableMap{
       version => Version(SKStore.genSym(0)),
-      startTick => context.tick,
+      startTick => context.getTick(),
       map => SortedMap[],
     }
   | Some(file) -> TableMap::type(file)
@@ -2242,7 +2242,7 @@ fun printContext(context: mutable SKStore.Context): void {
       !producedAnyOutput = producedAnyOutput || producedOutput
     };
     if (producedAnyOutput) {
-      writer.write(`:${context.tick.value.toString()}\n`);
+      writer.write(`:${context.getTick().value.toString()}\n`);
       writer.flush()
     }
   | Some _ -> invariant_violation("Unexpected Stdout type")
@@ -2352,7 +2352,7 @@ fun getReactiveQueryHandle(
           );
           fieldNames = schema.map(x -> x.name.origName);
           printReactiveQueryResult(context, selectDir.dirName, fieldNames);
-          if (queryInfo.onlyChanges) printTick(context.tick.next());
+          if (queryInfo.onlyChanges) printTick(context.getTick().next());
           SKStore.EagerDir::apply(
             context,
             selectDir.dirName,
@@ -2442,7 +2442,7 @@ fun printReactiveQueryChanges(
       }
     }
   };
-  printTick(context.tick.next());
+  printTick(context.getTick().next());
 }
 
 private fun printTick(tick: SKStore.Tick): void {

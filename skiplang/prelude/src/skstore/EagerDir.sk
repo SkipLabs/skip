@@ -1171,7 +1171,7 @@ class EagerDir protected {
 
     for (kv in kvArray) {
       (k, v) = kv;
-      acc.push(FixedRow(k, v, source, TickRange::create(context.tick)))
+      acc.push(FixedRow(k, v, source, TickRange::create(context.getTick())))
     };
 
     if (!kvArray.isEmpty() || !newDirs.isEmpty()) {
@@ -1760,9 +1760,9 @@ class EagerDir protected {
       origSource,
       k,
     ).next() is Some _;
-    !map = map.set(context.tick, isMasking, origSource, writer, rvalues);
+    !map = map.set(context.getTick(), isMasking, origSource, writer, rvalues);
 
-    !this.data = this.data.set(context.tick, k, map);
+    !this.data = this.data.set(context.getTick(), k, map);
 
     reducer = this.reducer match {
     | None() -> None()

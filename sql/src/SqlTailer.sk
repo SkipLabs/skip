@@ -368,13 +368,13 @@ fun tailSub(
         // checkpoint without delay so that the downstreams knows that
         // it has received everything without waiting for the condvar
         // timeout
-        writer.write(":" + context.tick.value.toString() + "\n");
+        writer.write(":" + context.getTick().value.toString() + "\n");
         writer.flush();
         flushStdout();
       };
 
       if (couldFollowChanges) {
-        Some(context.tick.value)
+        Some(context.getTick().value)
       } else {
         None()
       }
