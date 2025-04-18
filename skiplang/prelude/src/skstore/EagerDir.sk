@@ -1171,7 +1171,7 @@ class EagerDir protected {
 
     for (kv in kvArray) {
       (k, v) = kv;
-      acc.push(FixedRow(k, v, source, TickRange::create(context.tick)))
+      acc.push(FixedRow(k, v, source, TickRange::create(context.getTick())))
     };
 
     if (!kvArray.isEmpty() || !newDirs.isEmpty()) {
@@ -1553,7 +1553,7 @@ class EagerDir protected {
 
   static fun update(
     context: mutable Context,
-    contextDirty: readonly Map<DirName, SortedSet<Key>>,
+    contextDirty: SortedMap<DirName, SortedSet<Key>>,
     contextDirtyReaders: readonly Map<
       DirName,
       readonly Map<DirName, SortedSet<Key>>,
@@ -1589,8 +1589,10 @@ class EagerDir protected {
         })
       }
     };
-    if (contextDirty.containsKey(parent.dirName)) {
-      keys = contextDirty[parent.dirName].values();
+    contextDirty.maybeGet(parent.dirName) match {
+    | None() -> void
+    | Some(dirtyKeys) ->
+      keys = dirtyKeys.values();
       !dirty = withRegionFold(None(), keys, dirty, (_, key, dirtyInRegion) ~> {
         for (p in parentMaps) {
           (_, rangeOpt, _) = p;
@@ -1729,11 +1731,7 @@ class EagerDir protected {
 
     context.writeChecker match {
     | Some(checker) if (!force) ->
-      checker.tables.maybeGet(this.dirName) match {
-      | None() -> void
-      | Some(indexes) ->
-        checker.checkWrite(context, this.dirName, indexes, k, rvalues)
-      }
+      checker.checkWrite(context, this.dirName, k, rvalues)
     | _ -> void
     };
 
@@ -1758,9 +1756,9 @@ class EagerDir protected {
       origSource,
       k,
     ).next() is Some _;
-    !map = map.set(context.tick, isMasking, origSource, writer, rvalues);
+    !map = map.set(context.getTick(), isMasking, origSource, writer, rvalues);
 
-    !this.data = this.data.set(context.tick, k, map);
+    !this.data = this.data.set(context.getTick(), k, map);
 
     reducer = this.reducer match {
     | None() -> None()
@@ -1786,8 +1784,8 @@ class EagerDir protected {
       Some(cdata)
     };
 
+    context.addDirty(this.dirName, k);
     path = Path::create(this.dirName, k);
-    context.!dirty = List.Cons(path, context.dirty);
 
     if (this.totalSize != totalSize) {
       sizePath = Path::sizeTag(this.dirName);

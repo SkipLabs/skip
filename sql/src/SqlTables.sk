@@ -306,7 +306,7 @@ fun dirDescrCopy(
     creator => context.currentArrow(),
   };
   context.setDir(dir);
-  limit = context.tick;
+  limit = context.getTick();
   _ = SKStore.EagerDir::apply(
     context,
     dirName,
@@ -482,7 +482,7 @@ fun getSubsDirs(
             tdir = context.unsafeGetEagerDir(dirName);
             ignoredSrc = SKStore.Path::iid(dirDescr.dirName, inputSrc);
             (file: SKStore.Key) -> {
-              rows = tdir.getAllDataIter(context.mclone(), file).collect(Array);
+              rows = tdir.unsafeGetAllDataIter(file).collect(Array);
               !updateIsFromIgnoredSource(ignoredSrc, rows)
             }
           }
