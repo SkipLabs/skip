@@ -1,0 +1,30 @@
+module SKMonitor;
+
+fun flush(span: readonly Span): void {
+  trace = span.toJSON().toString();
+  write(trace)
+}
+
+@debug
+@cpp_extern
+native fun write(_trace: String): void;
+
+@debug
+@cpp_extern
+native fun traceIdOpt(): ?String;
+
+@debug
+@cpp_extern
+native fun monitoringOpt(): ?String;
+
+@cpp_extern("SKIP_JS_now")
+native fun jsNow(): Float;
+
+fun now(): Time {
+  jsTime = jsNow();
+  s = jsTime.toInt();
+  ns = ((jsTime - s.toFloat()) * 1000000000.0).toInt();
+  Time(s, ns);
+}
+
+module end;
