@@ -677,8 +677,10 @@ fun checkUserCanWriteRow(
 // given user.
 /*****************************************************************************/
 
+value class TableIndexes(authorIdx: ?Int, accessIdx: ?Int)
+
 mutable class AccessSolver private {
-  private mutable tables: SortedMap<SKStore.DirName, SKStore.TableIndexes>,
+  private mutable tables: SortedMap<SKStore.DirName, TableIndexes>,
   userID: String,
   userMask: Permission,
   private mutable cache: SortedMap<String, Permission>,
@@ -719,8 +721,7 @@ mutable class AccessSolver private {
     authorIdx: ?Int,
     accessIdx: ?Int,
   ): void {
-    tableIndexes = SKStore.TableIndexes(authorIdx, accessIdx);
-    this.!tables[dirName] = tableIndexes;
+    this.!tables[dirName] = TableIndexes(authorIdx, accessIdx);
   }
 
   private mutable fun getPermissions(
