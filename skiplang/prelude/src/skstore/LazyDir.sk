@@ -155,7 +155,7 @@ class LazyDir protected {
     throwOnCycle: Bool = true,
   ): Array<File> {
     if (this.collect) {
-      context.!lazyGets = context.lazyGets.set(Path::create(this.dirName, key));
+      context.addLazyGet(this.dirName, key)
     };
     lazyResult = this.data.maybeGet(key) match {
     | Some(LCycle()) if (throwOnCycle) -> throw CyclicExn(key)
