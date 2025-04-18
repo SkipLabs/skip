@@ -13,14 +13,14 @@ fun buildTailFilter(
   context: readonly SKStore.Context,
   options: SKDB.Options,
   replicationFilter: (
-    SKStore.Context,
+    readonly SKStore.Context,
     Bool,
     SKStore.DirName,
   ) ~> (SKStore.Key -> Bool),
   userId: ?String,
   tailSpec: TailSpec,
   sqlTable: SKDB.DirDescr,
-): (SKStore.Context, Bool, SKStore.DirName) ~> (SKStore.Key -> Bool) {
+): (readonly SKStore.Context, Bool, SKStore.DirName) ~> (SKStore.Key -> Bool) {
   filter = tailSpec.filter match {
   | None() -> replicationFilter
   | Some(strCond) ->
@@ -38,8 +38,8 @@ fun buildTailFilter(
       skipExit(2)
     };
     (context, isReset, dirName) ~> {
-      mcontext = context.mclone();
       conditionFilter = replicationFilter(context, isReset, dirName);
+      mcontext = context.mclone();
       baseName -> {
         inputRow = baseName match {
         | rowKey @ SKDB.RowKey _ -> rowKey.getRowValues()
