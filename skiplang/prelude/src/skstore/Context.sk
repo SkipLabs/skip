@@ -79,7 +79,8 @@ class DirSub(
   // lock-step.
   getDestinationWatermark: (readonly Context) ~> ?Tick,
   // this is a dir-specific filter
-  filter: (Context, Bool, DirName) ~> (Key -> Bool) = (_, _, _) ~> (_ -> true),
+  filter: (readonly Context, Bool, DirName) ~> (Key -> Bool) = (_, _, _) ~>
+    (_ -> true),
 )
 
 /*****************************************************************************/
@@ -794,7 +795,7 @@ mutable class Context{
             writer,
             dirSub.entity,
             dirSub.format,
-            dirSub.filter(ctx, false, dirName),
+            dirSub.filter(this, false, dirName),
             dirSub.getDestinationWatermark(ctx),
           );
           !producedAnyOutput = producedAnyOutput || producedOutput
