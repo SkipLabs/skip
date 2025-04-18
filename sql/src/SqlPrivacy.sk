@@ -679,6 +679,9 @@ fun checkUserCanWriteRow(
 
 value class TableIndexes(authorIdx: ?Int, accessIdx: ?Int)
 
+/* This class is mutable only because of the cache, otherwise
+   it behaves as if it wasn't mutable. A frozen clone and a
+   mutable clone should behave identically. */
 mutable class AccessSolver private {
   private tables: SortedMap<SKStore.DirName, TableIndexes>,
   userID: String,
