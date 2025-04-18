@@ -784,28 +784,31 @@ mutable class AccessSolver private {
   mutable fun checkWrite(
     context: readonly SKStore.Context,
     dirName: SKStore.DirName,
-    indexes: SKStore.TableIndexes,
     key: SKStore.Key,
     files: Array<SKStore.File>,
   ): void {
-    key match {
-    | rowKey @ RowKey _ ->
-      rowValues = rowKey.getRowValues();
-      if (files.size() == 0) {
-        !rowValues = rowValues.setRepeat(0);
-      };
-      checkUserCanWriteRow(
-        context,
-        this,
-        dirName.toString().stripPrefix("/").stripSuffix("/"),
-        indexes.authorIdx,
-        indexes.accessIdx,
-        rowValues,
-      ) match {
-      | SKDB.AROK() -> void
-      | SKDB.ARError(err) -> throw SqlError(0, err.toString())
+    this.tables.maybeGet(dirName) match {
+    | None() -> void
+    | Some(indexes) ->
+      key match {
+      | rowKey @ RowKey _ ->
+        rowValues = rowKey.getRowValues();
+        if (files.size() == 0) {
+          !rowValues = rowValues.setRepeat(0);
+        };
+        checkUserCanWriteRow(
+          context,
+          this,
+          dirName.toString().stripPrefix("/").stripSuffix("/"),
+          indexes.authorIdx,
+          indexes.accessIdx,
+          rowValues,
+        ) match {
+        | SKDB.AROK() -> void
+        | SKDB.ARError(err) -> throw SqlError(0, err.toString())
+        }
+      | _ -> void
       }
-    | _ -> void
     }
   }
 

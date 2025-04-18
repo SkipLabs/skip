@@ -1731,11 +1731,7 @@ class EagerDir protected {
 
     context.writeChecker match {
     | Some(checker) if (!force) ->
-      checker.tables.maybeGet(this.dirName) match {
-      | None() -> void
-      | Some(indexes) ->
-        checker.checkWrite(context, this.dirName, indexes, k, rvalues)
-      }
+      checker.checkWrite(context, this.dirName, k, rvalues)
     | _ -> void
     };
 
