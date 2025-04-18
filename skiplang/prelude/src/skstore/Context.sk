@@ -313,6 +313,9 @@ base class CanReuse {
 /* database as a specific user). */
 /*****************************************************************************/
 
+/* This base class is mutable only because its only child is mutable because
+   of a cache, otherwise it behaves as if it wasn't mutable. A frozen clone
+   and a mutable clone must behave identically. */
 mutable base class WriteChecker {
   mutable fun checkWrite(
     context: readonly Context,
@@ -321,7 +324,6 @@ mutable base class WriteChecker {
     files: Array<File>,
   ): void;
 
-  readonly fun clone(): WriteChecker;
   readonly fun mclone(): mutable WriteChecker;
 }
 
@@ -329,6 +331,11 @@ mutable base class WriteChecker {
 /* The context */
 /*****************************************************************************/
 
+/* Because a context may be cloned shallowly, its fields types must be frozen
+   or behave as if they were.
+   E.g. its only mutable-typed field is writeChecker which is mutable only
+   because of a cache.
+*/
 mutable class Context{
   mutable toPurge: SortedSet<DirName> = SortedSet[],
   mutable purgeLimit: ?Tick = None(),
@@ -418,39 +425,7 @@ mutable class Context{
   }
 
   readonly fun clone(): this {
-    static{
-      toPurge => this.toPurge,
-      purgeLimit => this.purgeLimit,
-      dirs => this.dirs,
-      reads => this.reads,
-      time => this.time,
-      tick => this.tick,
-      lazyCapacity => this.lazyCapacity,
-      toUpdate => this.toUpdate,
-      deps => this.deps,
-      debugMode => this.debugMode,
-      failOnExn => this.failOnExn,
-      hasPre => this.hasPre,
-      newDirs => this.newDirs,
-      toReset => this.toReset,
-      globals => this.globals,
-      persistents => this.persistents,
-      dirty => this.dirty,
-      dirtyReaders => this.dirtyReaders,
-      canReuse => this.canReuse,
-      arrowStack => this.arrowStack,
-      lazyGets => this.lazyGets,
-      lazyGetsQueue => this.lazyGetsQueue,
-      lazyGetsRefCount => this.lazyGetsRefCount,
-      sessions => this.sessions,
-      removeSubDirs => this.removeSubDirs,
-      postponables => this.postponables,
-      dirsWithSharedSubDirs => this.dirsWithSharedSubDirs,
-      sharedSubDirsRefCount => this.sharedSubDirsRefCount,
-      writeChecker => this.writeChecker.map(x -> x.clone()),
-      purgeFrom => this.purgeFrom,
-      sourceOverride => this.sourceOverride,
-    }
+    unsafe_chill_trust_me(this.mclone())
   }
 
   readonly fun mclone(): mutable this {
