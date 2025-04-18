@@ -788,7 +788,6 @@ mutable class Context{
           } else {
             (false, dir.unsafeGetFileIterNoReducer(None()).map(pair -> pair.i0))
           };
-          ctx = this.clone();
           producedOutput = dir.writeDiff(
             shouldRebuild,
             changes,
@@ -796,7 +795,7 @@ mutable class Context{
             dirSub.entity,
             dirSub.format,
             dirSub.filter(this, false, dirName),
-            dirSub.getDestinationWatermark(ctx),
+            dirSub.getDestinationWatermark(this),
           );
           !producedAnyOutput = producedAnyOutput || producedOutput
         | _ -> void
