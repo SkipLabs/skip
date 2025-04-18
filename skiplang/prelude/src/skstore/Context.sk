@@ -1217,10 +1217,13 @@ class Synchronizer(
 
 class ChangedDirs(value: SortedSet<DirName>) extends File
 
-fun cloneContextWithError(context: Context, error: .Exception): Context {
+fun cloneContextWithError(
+  context: Context,
+  error: .Exception,
+): readonly Context {
   newContext = Context::fromSaved(context);
   newContext.setGlobal("Error", ErrorFile(error));
-  newContext.clone()
+  newContext
 }
 
 @export("SKIP_resolve_context")
