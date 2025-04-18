@@ -360,7 +360,7 @@ mutable class Context{
   private mutable dirtyReaders: List<ArrowKey> = List[],
   mutable canReuse: CanReuse = CRIfMatch(),
   mutable arrowStack: List<(ArrowKey, TimeStack)> = List[],
-  mutable lazyGets: SortedSet<Path> = SortedSet[],
+  private mutable lazyGets: SortedSet<Path> = SortedSet[],
   private mutable lazyGetsQueue: Queue<Array<Path>> = Queue[],
   private mutable lazyGetsRefCount: SortedMap<Path, Int> = SortedMap[],
   mutable sessions: SortedMap<Int, Sub> = SortedMap[],
@@ -696,6 +696,10 @@ mutable class Context{
       dir = this.unsafeGetLazyDir(dirName);
       this.setDir(dir.removeKeys(keys))
     }
+  }
+
+  mutable fun addLazyGet(dirName: DirName, key: Key): void {
+    this.!lazyGets = this.lazyGets.set(Path::create(dirName, key))
   }
 
   mutable fun addDirty(dirName: DirName, key: Key): void {
