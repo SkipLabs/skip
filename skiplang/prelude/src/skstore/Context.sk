@@ -345,7 +345,8 @@ mutable class Context{
   private mutable dirs: Dirs = Dirs{},
   mutable reads: SortedSet<Path> = SortedSet[],
   private mutable time: Time = Time(0),
-  mutable tick: Tick = Tick(1),
+  /* Invariant: tick is only updated at the end of updateWithStatus */
+  private mutable tick: Tick = Tick(1),
   private mutable lazyCapacity: Int = 10,
   private mutable toUpdate: SortedMap<(TimeStack, Time), Arrow> = SortedMap[],
   mutable deps: Deps = Deps[],
@@ -370,7 +371,7 @@ mutable class Context{
   private mutable sharedSubDirsRefCount: SortedMap<DirName, Int> = SortedMap[],
   mutable writeChecker: ?(mutable WriteChecker) = None(),
   mutable purgeFrom: (mutable Context, Dir) ~> Tick = (ctx, _) ~>
-    Tick(ctx.tick.value - 1000),
+    Tick(ctx.getTick().value - 1000),
   mutable sourceOverride: ?Path = None(),
 } {
   readonly fun isWithSharedSubDirs(dirName: DirName): Bool {
@@ -899,6 +900,10 @@ mutable class Context{
     }
   }
 
+  readonly fun getTick(): Tick {
+    this.tick
+  }
+
   mutable fun timeStamp(): Time {
     this.!time = this.time.next();
     this.time
@@ -1262,7 +1267,7 @@ fun resolveContext(
   lockF: ?((mutable Context, mutable Context, Context) ~> void),
 ): readonly Context {
   context = synchronizer match {
-  | None() if (tick == root.tick) -> delta
+  | None() if (tick == root.getTick()) -> delta
   | None() -> invariant_violation("Concurrent access without synchronizer")
   | Some(sync) ->
     changedDirs = delta.getDirsChangesAfter(tick);
@@ -1294,7 +1299,7 @@ fun resolveContext(
     | None() -> void
     | Some(f) ->
       try {
-        newRootTick = newRoot.tick;
+        newRootTick = newRoot.getTick();
         f(newRoot, delta, root);
         !changedDirs = changedDirs.union(
           newRoot.getDirsChangesAfter(newRootTick),
@@ -1549,7 +1554,7 @@ fun runWithGcIntern(
   };
   globals = initCtx.globals;
   loop {
-    startTick = context.tick;
+    startTick = context.getTick();
     pos = newObstack();
     (newContext, newContextOp) = (try {
       Some(f(context with {globals}))
@@ -1638,11 +1643,11 @@ fun runLocked(
   };
   gGlobalLock();
   root = gContextGetNoLock();
-  start = root.tick;
+  start = root.getTick();
   context = Context::fromSaved(root);
   f(context);
   newRoot = gContextSyncNoLock(
-    root.tick,
+    root.getTick(),
     root,
     context.clone(),
     None(),
@@ -1933,7 +1938,7 @@ fun runWithResult<T, F>(
   try {
     context = Context::fromSaved(current);
     res = f(context);
-    startTick = current.tick;
+    startTick = current.getTick();
     synchronizer match {
     | None() ->
       !current = gContextSyncNoLock(

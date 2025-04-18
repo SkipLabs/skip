@@ -1617,12 +1617,12 @@ fun makeJoinReducer(
       | x -> x
       };
       stats = oldStats match {
-      | None() -> ShardStats(context.tick, pow2(leftSize), pow2(rightSize))
+      | None() -> ShardStats(context.getTick(), pow2(leftSize), pow2(rightSize))
       | Some(x) -> x
       };
-      if (oldStats is None() || stats.tick < context.tick) {
+      if (oldStats is None() || stats.tick < context.getTick()) {
         !stats = stats with {
-          tick => context.tick,
+          tick => context.getTick(),
           left => stats.left * 2,
           right => stats.right * 2,
         };

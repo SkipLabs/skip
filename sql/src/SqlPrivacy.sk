@@ -726,9 +726,9 @@ mutable class AccessSolver private {
     context: readonly SKStore.Context,
     groupID: String,
   ): Permission {
-    if (context.tick != this.currentTick) {
+    if (context.getTick() != this.currentTick) {
       this.!cache = SortedMap[];
-      this.!currentTick = context.tick;
+      this.!currentTick = context.getTick();
     };
     this.cache.maybeGet(groupID) match {
     | None() ->
