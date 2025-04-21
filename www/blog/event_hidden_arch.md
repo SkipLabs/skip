@@ -12,7 +12,7 @@ authors: charles
 
 One of the most powerful and consistent trends in software for the past decade has been the move from single stack to cloud native applications.  Cloud native applications are inherently distributed and have become popular as developers are drawn to the convenience of containers and platform-as-a-service infrastructure.
 
-The API-ification of important subsystems means today hardly anyone would consider implementing their own payments, shipping, SMS, chat, billing or shopping cart functionality.  Instead they’ll lean on Stripe, Twilio, Shopfy, Shippo, etc; accelerating time-to-value and further distributing the functions of the application.
+The API-ification of important subsystems means today hardly anyone would consider implementing their own payments, shipping, SMS, chat, billing or shopping cart functionality.  Instead they’ll lean on Stripe, Twilio, Shopify, Shippo, etc; accelerating time-to-value and further distributing the functions of the application.
 
 In the last few years developers have moved quickly to incorporate more and diverse AI features into their applications, but AI models and application logic compute requirements are quite different from one another and therefore seldom run in the same stack, further distributing the application.
 
