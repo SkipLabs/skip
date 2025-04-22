@@ -1,0 +1,22 @@
+module SkipRuntime;
+
+@debug
+@cpp_extern("SKIP_unsafe_cast")
+native fun unsafeCast<T: Downcastable, F: T>(t: T): F;
+
+trait Downcastable {
+  static fun const_type_id(): Int;
+
+  fun type_id(): Int;
+}
+
+fun cast<T: Downcastable, F: T>(v: T, c: Concrete<F>): F {
+  invariant(v.type_id() == c::const_type_id(), "invalid cast");
+  unsafeCast<T, F>(v);
+}
+
+fun instanceOf<T: Downcastable, F: T>(v: T, c: Concrete<F>): Bool {
+  v.type_id() == c::const_type_id()
+}
+
+module end;

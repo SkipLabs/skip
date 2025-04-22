@@ -2315,36 +2315,49 @@ private fun llvmWriteCall(
   if (call.typ != tVoid) {
     asm.print("%n = " % call)
   };
+  code match {
+  | ConstantFun{value} ->
+    subf = asm.env().getFunction(value, asm.pos());
+    if (subf.gfunction.id == "SKStore.const_typed_symbol") {
+      Some(SKStore.genSym(0))
+    } else {
+      None()
+    }
+  | _ -> None()
+  } match {
+  | Some(typeId) -> asm.print("add i64 0, %s ;" % typeId)
+  | _ ->
+    asm.print(
+      call match {
+      | RawCall _ -> "tail call"
+      | RawInvoke _ -> "invoke"
+      },
+    );
 
-  asm.print(
-    call match {
-    | RawCall _ -> "tail call"
-    | RawInvoke _ -> "invoke"
-    },
-  );
+    llvmWriteTypeCallAttribute(asm, call.typ, true, false);
 
-  llvmWriteTypeCallAttribute(asm, call.typ, true, false);
+    // Write function.
+    asm.print(" %t " % call);
+    if (codeTemp == "") {
+      asm.print("%n" % code);
+    } else {
+      asm.print("%%%s" % codeTemp);
+    };
+    llvmWriteArgs(asm, call.args);
 
-  // Write function.
-  asm.print(" %t " % call);
-  if (codeTemp == "") {
-    asm.print("%n" % code);
-  } else {
-    asm.print("%%%s" % codeTemp);
+    if (!call.returns) {
+      asm.print(" noreturn")
+    };
+
+    // List invoke successors (unless it's a call).
+    successors = call.getSuccessors();
+    if (!successors.isEmpty()) {
+      call.pos.invariant(successors.size() == 2, "Bad invoke");
+      asm.print(
+        " to %N unwind %N" % successors[0].target % successors[1].target,
+      );
+    }
   };
-  llvmWriteArgs(asm, call.args);
-
-  if (!call.returns) {
-    asm.print(" noreturn")
-  };
-
-  // List invoke successors (unless it's a call).
-  successors = call.getSuccessors();
-  if (!successors.isEmpty()) {
-    call.pos.invariant(successors.size() == 2, "Bad invoke");
-    asm.print(" to %N unwind %N" % successors[0].target % successors[1].target);
-  };
-
   asm.print(", %D\n" % call)
 }
 
