@@ -14,6 +14,7 @@ The `@skiplabs/skip` package just depends on the separate component packages:
 
 and optionally:
 - `@skipruntime/native`: The native version of the Skip Runtime
+- `@skip-adapter/kafka`: Connector between Kafka and Skip
 - `@skip-adapter/postgres`: Connector between PostgreSQL and Skip
 
 Note that two versions of the runtime are available, Wasm `@skipruntime/wasm` and native `@skipruntime/native`.
