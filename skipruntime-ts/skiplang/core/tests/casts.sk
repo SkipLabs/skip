@@ -1,0 +1,50 @@
+module alias T = SKTest;
+
+module CastsTest;
+
+base class Entry uses SkipRuntime.Downcastable
+
+class TEntry<K: frozen & Orderable, V: frozen>{
+  private key_: ?K = None(),
+  values: Array<V> = Array[],
+} extends Entry {
+  //
+  static fun create(key: K, values: Array<V>): TEntry<K, V> {
+    TEntry{key_ => Some(key), values};
+  }
+
+  @no_inline
+  static fun const_type_id(): Int {
+    SKStore.const_typed_symbol(TEntry<K, V>{});
+  }
+
+  fun key(): K {
+    this.key_.fromSome()
+  }
+
+  fun type_id(): Int {
+    static::const_type_id()
+  }
+}
+
+fun instanceOfEntry<K: frozen & Orderable, V: frozen>(entry: Entry): Bool {
+  SkipRuntime.instanceOf(entry, TEntry<K, V>);
+}
+
+@test
+fun casts(): void {
+  entry1: Entry = TEntry::create("v", Array[0, 1]);
+  T.expectEq(instanceOfEntry<String, Int>(entry1), true);
+  T.expectEq(instanceOfEntry<String, Float>(entry1), false);
+  T.expectEq(instanceOfEntry<SKStore.IID, SKStore.IntFile>(entry1), false);
+  entry2: Entry = TEntry::create("v", Array[0.1, 1.1]);
+  T.expectEq(instanceOfEntry<String, Int>(entry2), false);
+  T.expectEq(instanceOfEntry<String, Float>(entry2), true);
+  T.expectEq(instanceOfEntry<SKStore.IID, SKStore.IntFile>(entry2), false);
+  entry3: Entry = TEntry::create(SKStore.IID(0), Array[SKStore.IntFile(0)]);
+  T.expectEq(instanceOfEntry<String, Int>(entry3), false);
+  T.expectEq(instanceOfEntry<String, Float>(entry3), false);
+  T.expectEq(instanceOfEntry<SKStore.IID, SKStore.IntFile>(entry3), true);
+}
+
+module end;

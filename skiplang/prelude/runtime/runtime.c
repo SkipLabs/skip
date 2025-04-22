@@ -20,6 +20,10 @@ SKIP_gc_type_t* get_gc_type(char* skip_object) {
   return *slot1;
 }
 
+void* SKIP_unsafe_cast(void* obj) {
+  return obj;
+}
+
 /*****************************************************************************/
 /* Primitives that are not used in embedded mode. */
 /*****************************************************************************/
