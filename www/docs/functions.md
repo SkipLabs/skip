@@ -7,7 +7,7 @@ This section describes the invariants your code must satisfy, gives some example
 
 ## Overview
 
-Skip mapper functions must be _side-effect-free_ and _deterministic_ in order to reliably and intuitively run in the Skip runtime environment, which will reevaluate them (when their inputs change) and reuse their results (when their outputs are _un_changed).
+Skip mapper functions must be _side-effect-free_ and _deterministic_ in order to reliably and intuitively run in the Skip runtime environment, which will reevaluate them (when their inputs change) and reuse their results (when their inputs are _un_changed).
 
 Out-of-band dependencies on imperative mutable state outside of the Skip heap can lead to stale results when that state changes.
 Similarly, if a reactive computation mutates some external data, that mutation can happen repeatedly when inputs to the computation change, potentially causing bugs if the mutation is not idempotent.
