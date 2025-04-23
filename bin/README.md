@@ -14,7 +14,7 @@ choose to release either or both of the `latest` and `quickstart` tags.
 
 ## Release NPM packages
 
-We keep all **public** NPM packages (i.e. `@skipruntime/*`, `@skiplang/skip`,
+We keep all **public** NPM packages (i.e. `@skipruntime/*`, `@skiplabs/skip`,
 and `@skip-adapter/*`) at the same version so as to keep updates, documentation,
 and version management simple.  To update from version `$OLD` to version `$NEW`,
 perform the following steps:
