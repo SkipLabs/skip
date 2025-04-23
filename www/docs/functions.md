@@ -18,7 +18,7 @@ Although non-determinism is not necessarily a bug in the strictest sense, it can
 
 ## Examples
 
-Mappers must implement the Skip `Mapper` interface and define a `mapElement` function which takes a key and corresponding values from an input collection and produces some key/value pairs defining an output collection.
+Mappers must implement the Skip `Mapper` interface and define a `mapEntry` function which takes a key and corresponding values from an input collection and produces some key/value pairs defining an output collection.
 
 All keys and values must be JSON-encodable (i.e. extend `Json`), but the input collection's key/value types `K1`/`V1` do not need to coincide with the output collection's key/value types `K2`/`V2`.
 
