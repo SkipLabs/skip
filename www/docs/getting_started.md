@@ -61,7 +61,7 @@ Maps and other operations over Skip collections can be sequenced and combined to
 Due to the structured nature of collections and maps, this can be done very efficiently -- always proportional to the size of the _change_, not the total size of the collection.
 
 However, in order for the Skip framework to process updates correctly by reexecuting portions of its computation graph on changed inputs, it is crucial to capture all relevant dependencies.
-For example, if a _mapper function_ (like `Foo` above) above reads and/or writes some global mutable state, then it may produce unexpected values when reexecuted by the framework.
+For example, if a _mapper function_ (like `Foo` above) reads and/or writes some global mutable state, then it may produce unexpected values when reexecuted by the framework.
 In order to mitigate this, Skip programs written in Typescript use `Mapper` classes to define reactive computations which avoid the most problematic cases of untracked dependencies.
 Nonetheless, while reading this guide and working with Skip, it is important to reason about (im)mutability and avoid side-effects in your code so that it can be reliably evaluated by the framework.
 
@@ -93,6 +93,13 @@ This shared computation graph will be maintained up-to-date at all times, and ca
 In this example, we pull initial user and group data from an external source-of-truth database, expose a single resource called `activeFriends`, and define a reactive computation of the active users in each group. 
 
 ```typescript
+import {
+    type EagerCollection,
+    type InitialData,
+    type Mapper,
+    type Values,
+} from "@skipruntime/core";
+
 // Type alias for inputs to our service
 type ServiceInputs = {
   users: EagerCollection<UserID, User>;
@@ -118,10 +125,10 @@ class ActiveMembers implements Mapper<GroupID, Group, GroupID, UserID> {
   }
 }
 
-// Load initial data from a source-of-truth database (mocked for simplicity)
+// Load initial data from a source-of-truth database (empty for now for simplicity)
 const initialData: InitialData<ServiceInputs> = {
-  users: ... ,
-  groups: ... ,
+  users: [],
+  groups: [],
 };
 
 // Specify and run the reactive service
@@ -145,6 +152,18 @@ Maintaining this resource up-to-date for all users at all times would be infeasi
 Resources are parameterized by some input HTTP `params` and use an `instantiate` function to set up any reactive computation, operating over the service's `ResourceInputs` to produce a single output collection.
 
 ```typescript
+import {
+    type EagerCollection,
+    type InitialData,
+    type Mapper,
+    type Values,
+    // two more types to import here
+    type Json,
+    type Resource,
+} from "@skipruntime/core";
+
+// ... rest of your code so far
+
 // Mapper function to find users that are active and also friends with `user`
 class FilterFriends implements Mapper<GroupID, UserID, GroupID, UserID> {
   constructor(private readonly user: User) {}
@@ -174,6 +193,62 @@ class ActiveFriends implements Resource<ResourceInputs> {
 
 In this example, our `ActiveFriends` resource filters each groups' current active users to those users who are also currently friends with the given `uid`.
 
+Now, all we need to do is run the Skip service and broker. 
+```typescript
+import { runService } from "@skipruntime/server";
+
+// Service definition
+const service = {
+    initialData,
+    resources: { active_friends: ActiveFriends },
+    createGraph(input: ServiceInputs): ResourceInputs {
+        const users = input.users;
+        const activeMembers = input.groups.map(ActiveMembers, users);
+        const _groupsPerUser = input.groups.map(GroupsPerUser);
+        const _numFriendsPerUser = users.map(NumFriendsPerUser);
+        const _numActiveMembers = activeMembers.map(NumActiveMembers);
+        return { users, activeMembers };
+    },
+};
+
+// Run the reactive service
+const server = await runService(service, {
+    streaming_port: 8080,
+    control_port: 8081,
+});
+
+// Initialize the SkipServiceBroker
+const serviceBroker = new SkipServiceBroker({
+    host: "localhost",
+    control_port: 8081,
+    streaming_port: 8080,
+});
+```
+
+In your terminal, you should see the following: 
+
+```console
+Skip control service listening on port 8081
+Skip streaming service listening on port 8080
+```
+
+For the sake of the example, you may want to change `initialData` for some mock data e.g.
+
+```typescript
+const initialData: InitialData<ServiceInputs> = {
+    users: [
+        [0, [{ name: "Bob", active: true, friends: [1, 2] }]],
+        [1, [{ name: "Alice", active: true, friends: [0, 2] }]],
+        [2, [{ name: "Carol", active: false, friends: [0, 1] }]],
+        [3, [{ name: "Eve", active: true, friends: [] }]],
+    ],
+    groups: [
+        [1001, [{ name: "Group 1", members: [1, 2, 3] }]],
+        [1002, [{ name: "Group 2", members: [0, 2] }]],
+    ],
+};
+```
+
 ### See it in action
 
 This guide aims to give the high-level ideas of how to write and reason about a Skip reactive service.
@@ -200,7 +275,7 @@ and see the raw event stream as you issue updates to the input `users` and `grou
 
 ### Next steps
 
-This guide implements an example reactive service which can be queried or subscribed to by user's clients to see up-to-date listings of which of their active friends belong to each group, maintained up to date as input data changes without any explicit management of updates in the service's declarative logic.
+This guide implements an example reactive service which can be queried or subscribed to by users' clients to see up-to-date listings of which of their active friends belong to each group, maintained up to date as input data changes without any explicit management of updates in the service's declarative logic.
 
 We've shown the core reactive logic here without going into full detail on how to deploy and interact with a Skip service; see the [Deploying](deploying.md) guide for more details on how to wire reactivity into a generic web application, including how to handle user writes and feed those into input collections.
 
