@@ -21,7 +21,7 @@ Keys and values can be arbitrary JSON data.
 
 Collections can either be *eager*, meaning they are always kept up-to-date, or *lazy*, meaning that values are only computed or updated in response to queries for a particular key.
 
-*Mappers* are values that express a computation from elements of one collection to elements of another collection. Mappers form the *edges* of the Skip reactive computation graph, specifying transformations and compositions of data to produce intermediate results and outputs.
+Each *mapper* expresses a computation from elements of one collection to elements of another collection. Mappers form the *edges* of the Skip reactive computation graph, specifying transformations and compositions of data to produce intermediate results and outputs.
 
 Crucially, mappers must be deterministic and side-effect free, so that the reactive runtime can re-execute them as needed to maintain results that are both up-to-date and guaranteed from-scratch consistent (that is, exactly the same as the result that would be computed if the equivalent non-reactive computation were executed from scratch on the current input).
 

@@ -34,7 +34,7 @@ We realized we could bring the most essential characteristics of Skiplang to alr
 
 ![Skip runtime application stack](./assets/why_skip_stack_diagram.png)
 
-The Skip Runtime integrates with popular Typescript runtimes (e.g. Node, Bun) and using proxy objects gives Typescript a reactive, transactional heap.  We then added a Typescript API that gives developers a simple programming model of map functions applied to the objects Skip is now holding in its transactional heap.  In this way, developers get to stick with their preferred language while Skip can transparently manage both the state of the objects and directs when different parts of a program are recomputed.
+The Skip Runtime integrates with popular TypeScript runtimes (e.g. Node, Bun) and using proxy objects gives TypeScript a reactive, transactional heap.  We then added a TypeScript API that gives developers a simple programming model of map functions applied to the objects Skip is now holding in its transactional heap.  In this way, developers get to stick with their preferred language while Skip can transparently manage both the state of the objects and directs when different parts of a program are recomputed.
 
 We added higher level features to the API to more easily manipulate those collections (filter, slice, join, etc ...), and added support for sub-collections (collections created while computing the entry of a collection), among other things.  In the future we think there’s an opportunity to add other (optional) higher level primitives to make building complex services even easier.
 

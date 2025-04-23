@@ -30,14 +30,14 @@ We have several resources available to help you learn the Skip framework, depend
 
 This guide takes a "top-down" approach, showing you how to use our APIs in an idiomatic and practical way.  We recommend that most users start here.
 
-Finally, if you'd like to just dive into the code, you can explore the [API docs](api/core), [examples](https://github.com/SkipLabs/skip/blob/main/skipruntime-ts/examples) of reactive services, or an [example configuration](https://github.com/SkipLabs/skip/blob/main/examples/hackernews) complete with reverse proxy and database.
+Finally, if you'd like to just dive into the code, you can explore the [API docs](api/core), [examples](https://github.com/SkipLabs/skip/blob/main/skipruntime-ts/examples) of reactive services, or an [example configuration](https://github.com/SkipLabs/skip/blob/main/examples/hackernews) complete with reverse proxy and database, including a version with a distributed leader-follower configuration.
 
 ## Tutorial
 
 This guide will walk you through getting your first reactive service up and running using the Skip runtime.
 It will also show how to write client code to read or subscribe to data from your reactive service.
 
-We aim to make this as beginner friendly as possible, but assume an understanding of programming basics, including core JavaScript/Typescript syntax and semantics.
+We aim to make this as beginner friendly as possible, but assume an understanding of programming basics, including core JavaScript/TypeScript syntax and semantics.
 
 ### Reactive programming
 
@@ -51,7 +51,7 @@ In order to do so, Skip tracks dependencies in a _computation graph_ in which in
 Skip's core abstractions are best understood in terms of this computation graph.
 
 The primary data structure used in Skip is called a _collection_, and associates *keys* with one or more *values*.
-Collection keys and values are both immutable data stored in the Skip framework's native heap; in Typescript, any JSON-serializable value can be used (that is:  primitives, arrays, objects, and nested combinations thereof, but not functions or classes).
+Collection keys and values are both immutable data stored in the Skip framework's native heap; in TypeScript, any JSON-serializable value can be used (that is:  primitives, arrays, objects, and nested combinations thereof, but not functions or classes).
 Collections can be accessed by key or manipulated to create new collections.
 
 These manipulations do _not_ mutate in-place but instead create a _new_ collection in the computation graph with a dependency edge from the input collection(s).
@@ -63,7 +63,7 @@ Due to the structured nature of collections and maps, this can be done very effi
 
 However, in order for the Skip framework to process updates correctly by reexecuting portions of its computation graph on changed inputs, it is crucial to capture all relevant dependencies.
 For example, if a _mapper function_ (like `Foo` above) reads and/or writes some global mutable state, then it may produce unexpected values when reexecuted by the framework.
-In order to mitigate this, Skip programs written in Typescript use `Mapper` classes to define reactive computations which avoid the most problematic cases of untracked dependencies.
+In order to mitigate this, Skip programs written in TypeScript use `Mapper` classes to define reactive computations which avoid the most problematic cases of untracked dependencies.
 Nonetheless, while reading this guide and working with Skip, it is important to reason about (im)mutability and avoid side-effects in your code so that it can be reliably evaluated by the framework.
 
 Some examples of Mappers are shown [below](getting_started#the-anatomy-of-a-skip-service) and more details are available [here](functions.md) or in the API [docs](api/core).
