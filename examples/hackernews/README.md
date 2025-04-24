@@ -21,7 +21,7 @@ transparent to clients, and can be run with:
 $ docker compose -f compose.distributed.yml up --build
 ```
 
-### Overall System Design
+### Overall System Design with optional leader/followers
 
 ```mermaid
 graph TD
@@ -140,6 +140,7 @@ The HackerNews example implements a modern, reactive architecture with the follo
 
 This architecture demonstrates a modern approach to building reactive web applications, combining traditional REST APIs with real-time capabilities, while providing flexibility in deployment through both single-service and distributed configurations.
 
+
 ### Dataflow when posting
 
 ```mermaid
@@ -164,17 +165,18 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    %% Title: Real-time Updates Flow
-    %% Description: Shows how real-time updates are delivered to clients using Server-Sent Events
-
     participant Frontend as React Frontend
     participant HAProxy as HAProxy
-    participant Skip as Skip Service
     participant Web as Flask Web Service
+    participant DB as PostgreSQL
+    participant Skip as Skip Service
 
-    Frontend->>HAProxy: GET /api/posts (EventSource)
-    HAProxy->>Skip: GET /streams/posts
-    Skip-->>Frontend: Server-Sent Events (SSE)
-    Note over Frontend,Skip: Continuous stream of updates
+    Frontend ->> HAProxy: GET /api/posts (EventSource)
+    HAProxy ->> Web: GET /api/posts
+    Web ->> Skip: POST /v1/streams/posts
+    Skip ->> Web: stream_id
+    Web ->> Frontend: Redirect to /api/streams/{stream_id}
+    Frontend ->> HAProxy: GET /api/streams/{stream_id}
+    HAProxy ->> Skip: GET /v1/streams/{stream_id}
+    Skip ->> Frontend: SSE
 ```
-
