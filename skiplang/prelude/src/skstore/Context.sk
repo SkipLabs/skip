@@ -265,10 +265,10 @@ class TimeStack private (private values: Array<Time>) uses Orderable {
     static(Array[time])
   }
 
-  static fun create(context: mutable Context, time: Time): this {
-    context.arrowStack.maybeHead() match {
+  static fun create(context: readonly Context, time: Time): this {
+    context.currentTimeStack() match {
     | None() -> static::createInput(time)
-    | Some((_arrow, timeStack)) -> timeStack.extend(time)
+    | Some(timeStack) -> timeStack.extend(time)
     }
   }
 
@@ -358,7 +358,7 @@ mutable class Context{
   private mutable dirty: SortedMap<DirName, SortedSet<Key>> = SortedMap[],
   private mutable dirtyReaders: List<ArrowKey> = List[],
   mutable canReuse: CanReuse = CRIfMatch(),
-  mutable arrowStack: List<(ArrowKey, TimeStack)> = List[],
+  private mutable arrowStack: List<(ArrowKey, TimeStack)> = List[],
   private mutable lazyGets: SortedSet<Path> = SortedSet[],
   private mutable lazyGetsQueue: Queue<Array<Path>> = Queue[],
   private mutable lazyGetsRefCount: SortedMap<Path, Int> = SortedMap[],
@@ -522,6 +522,10 @@ mutable class Context{
 
   readonly fun currentArrow(): ?ArrowKey {
     this.arrowStack.maybeHead().map(x -> x.i0)
+  }
+
+  readonly fun currentTimeStack(): ?TimeStack {
+    this.arrowStack.maybeHead().map(x -> x.i1)
   }
 
   private readonly fun getDeps(path: Path): SortedSet<ArrowKey> {
