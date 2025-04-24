@@ -1,10 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import {
-  BrowserRouter as Router,
-  Routes,
-  Route,
-  Link,
-} from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
 import "./App.css";
 
 type Post = {
@@ -31,13 +26,13 @@ export default function App() {
   // Check for existing session on load
   useEffect(() => {
     fetch("/api/session")
-      .then(res => res.json())
-      .then(data => {
+      .then((res) => res.json())
+      .then((data) => {
         if (data && data.user_id) {
           setSession(data);
         }
       })
-      .catch(err => console.error("Session check failed:", err));
+      .catch((err) => console.error("Session check failed:", err));
   }, []);
 
   useEffect(() => {
@@ -102,9 +97,7 @@ function Header(props: { session: Session | null }) {
       <span className="title">Skip Blog</span>
       <span className="menu">
         <Link to="/">Home</Link>
-        {props.session && (
-          <Link to="/submit">New Post</Link>
-        )}
+        {props.session && <Link to="/submit">New Post</Link>}
       </span>
       <span className="login">
         {props.session ? (
@@ -131,10 +124,10 @@ function Header(props: { session: Session | null }) {
 function Feed(props: { posts: Post[]; session: Session | null }) {
   function formatDate(date: string | null) {
     if (!date) return "Draft";
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
+    return new Date(date).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     });
   }
 
@@ -208,7 +201,9 @@ function Submit() {
           <textarea
             placeholder="Write your post content here..."
             value={newPost.content}
-            onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
+            onChange={(e) =>
+              setNewPost({ ...newPost, content: e.target.value })
+            }
             required
           />
           <select
@@ -248,7 +243,7 @@ function Login() {
           return resp.json();
         }
       })
-      .then(data => {
+      .then((data) => {
         if (data) {
           // Set the session in the parent component
           window.location.href = "/"; // Force a refresh to update the session

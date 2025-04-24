@@ -47,8 +47,8 @@ def format_post(post):
         "published_at": post[5],
         "author": {
             "name": post[3],  # username from users table
-            "email": post[6]  # email from users table
-        }
+            "email": post[6],  # email from users table
+        },
     }
 
 
@@ -171,8 +171,13 @@ def get_session():
             if cur.rowcount < 1:
                 return "{}", 200
             user = cur.fetchone()
-            return json.dumps({
-                "user_id": user[0],
-                "name": user[1],
-                "email": user[2],
-            }), 200
+            return (
+                json.dumps(
+                    {
+                        "user_id": user[0],
+                        "name": user[1],
+                        "email": user[2],
+                    }
+                ),
+                200,
+            )

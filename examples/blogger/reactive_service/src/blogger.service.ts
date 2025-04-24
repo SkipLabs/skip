@@ -25,7 +25,11 @@ type User = {
   email: string;
 };
 
-const unknownUser: User = { id: 0, username: "unknown author", email: "unknown email" };
+const unknownUser: User = {
+  id: 0,
+  username: "unknown author",
+  email: "unknown email",
+};
 
 type PostWithAuthor = Omit<Post, "author_id"> & {
   author: {
@@ -43,9 +47,7 @@ const postgres = new PostgresExternalService({
 });
 
 class PostsMapper {
-  constructor(
-    private users: EagerCollection<number, User>,
-  ) {}
+  constructor(private users: EagerCollection<number, User>) {}
 
   mapEntry(
     key: number,
@@ -58,18 +60,23 @@ class PostsMapper {
     } catch {
       author = unknownUser;
     }
-    return [[key, {
-      title: post.title,
-      content: post.content,
-      status: post.status,
-      published_at: post.published_at,
-      created_at: post.created_at,
-      updated_at: post.updated_at,
-      author: {
-        name: author.username,
-        email: author.email
-      }
-    }]];
+    return [
+      [
+        key,
+        {
+          title: post.title,
+          content: post.content,
+          status: post.status,
+          published_at: post.published_at,
+          created_at: post.created_at,
+          updated_at: post.updated_at,
+          author: {
+            name: author.username,
+            email: author.email,
+          },
+        },
+      ],
+    ];
   }
 }
 
