@@ -71,7 +71,7 @@ In a Skip service, much of this memory pressure comes from instantiating large n
 To handle that scenario, you can run your Skip service in a *leader-follower* topology, running:
 
     * one *leader* instance to maintain the shared computation graph and/or pull in data from external dependencies like databases or polled APIs, and
-    * one or more *followers* which synchronize that shared data from the leader, among which resource instances are distributed in a round-robin fashion.
+    * one or more *followers* which synchronize that shared data from the leader, among which resource instances are distributed.
 
 Utilities are available to run a Skip service in [leader](api/helpers/functions/asLeader) or [follower](api/helpers/functions/asFollower) mode, making it easy to scale out from a single-machine deployment to a distributed one.
 
