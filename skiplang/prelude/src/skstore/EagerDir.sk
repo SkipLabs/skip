@@ -1165,7 +1165,7 @@ class EagerDir protected {
     context.!newDirs = newDirsCopy;
     context.!reads = readsCopy;
 
-    context.updateNewDeps(ArrowKey(parentName, childName, key), reads);
+    context.updateNewDeps(arrow, reads);
 
     source = Path::create(parentName, key);
 
@@ -1615,7 +1615,8 @@ class EagerDir protected {
       childRef,
       (contextOpt, key, child) ~> {
         ctx = contextOpt.fromSome();
-        ctx.enter(ArrowKey(parentName, childName, key), timeStack);
+        arrow = ArrowKey(parentName, childName, key);
+        ctx.enter(arrow, timeStack);
         path = Path::create(parentName, key);
         oldInfo = child.getOld(path);
         oldKeys = SortedSet<Key>::createFromItems(oldInfo.getKeys());
@@ -1655,14 +1656,12 @@ class EagerDir protected {
         !child = child.updateNewDirs(ctx, path, newDirs);
 
         for (read in reads) {
-          arrowKey = ArrowKey(parentName, child.dirName, key);
-          ctx.!deps = ctx.deps.set(read, arrowKey);
+          ctx.!deps = ctx.deps.set(read, arrow);
         };
 
         for (oldRead in oldInfo.getReads()) {
           if (reads.contains(oldRead)) continue;
-          arrowKey = ArrowKey(parentName, child.dirName, key);
-          ctx.!deps = ctx.deps.remove(oldRead, arrowKey);
+          ctx.!deps = ctx.deps.remove(oldRead, arrow);
         };
 
         for (k => v in mvalues) {
@@ -1684,7 +1683,7 @@ class EagerDir protected {
         // The source cannot be removed from old here
         // => prevent getting fixed data minfo on multiple call during update
         !child.old[path] = minfo;
-        ctx.leave(ArrowKey(parentName, childName, key));
+        ctx.leave(arrow);
         child
       },
     );

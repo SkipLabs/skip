@@ -53,8 +53,8 @@ class LazyDir protected {
       | Some(x) -> LDefined(x, context.reads.toArray())
       };
 
+      arrowKey = ArrowKey(dirName, dirName, key);
       for (read in context.reads) {
-        arrowKey = ArrowKey(dirName, dirName, key);
         context.!deps = context.deps.set(read, arrowKey);
       };
 
@@ -132,8 +132,8 @@ class LazyDir protected {
           oldValue match {
           | Some(LDefined(_, reads))
           | Some(LRemoved(reads)) ->
+            arrow = ArrowKey(this.dirName, this.dirName, key);
             for (read in reads) {
-              arrow = ArrowKey(this.dirName, this.dirName, key);
               context.!deps = context.deps.remove(read, arrow)
             }
           | _ -> void
