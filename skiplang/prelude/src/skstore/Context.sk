@@ -1062,14 +1062,14 @@ mutable class Context{
 
   readonly fun transitiveChildDirs(dirName: DirName): SortedSet<DirName> {
     this.unsafeMaybeGetEagerDir(dirName) match {
-    | Some(dir @ EagerDir _) ->
+    | Some(dir) ->
       dir.childDirs.reduce(
         (accDeps, child) -> {
           accDeps.union(this.transitiveChildDirs(child))
         },
         dir.childDirs,
       )
-    | _ -> SortedSet::create()
+    | None() -> SortedSet::create()
     }
   }
 
