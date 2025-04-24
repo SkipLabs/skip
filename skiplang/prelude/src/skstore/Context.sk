@@ -113,15 +113,16 @@ value class Arrow(parentName: DirName, childName: DirName) uses Orderable
 
 // If during the transformation from A to B, a key is read in a third directory,
 // we will need to remember that the read occurred while processing a map
-// from A to B on the key K. Hence the type: ArrowKey(A, B, K).
+// from A to B on the key K. Hence the type:
+// ArrowKey{parentName => A, childName => B, key => K}.
 // If the read happens during the computation of the result of key K for a lazy
 // directory A, both the child and the parent are the same and equal to A.
 
-value class ArrowKey(
+value class ArrowKey{
   parentName: DirName,
   childName: DirName,
   key: Key,
-) uses Orderable
+} uses Orderable
 
 /*****************************************************************************/
 /* The function used to start the system. */

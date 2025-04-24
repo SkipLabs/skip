@@ -53,7 +53,7 @@ class LazyDir protected {
       | Some(x) -> LDefined(x, context.reads.toArray())
       };
 
-      arrowKey = ArrowKey(dirName, dirName, key);
+      arrowKey = ArrowKey{parentName => dirName, childName => dirName, key};
       for (read in context.reads) {
         context.!deps = context.deps.set(read, arrowKey);
       };
@@ -132,7 +132,11 @@ class LazyDir protected {
           oldValue match {
           | Some(LDefined(_, reads))
           | Some(LRemoved(reads)) ->
-            arrow = ArrowKey(this.dirName, this.dirName, key);
+            arrow = ArrowKey{
+              parentName => this.dirName,
+              childName => this.dirName,
+              key,
+            };
             for (read in reads) {
               context.!deps = context.deps.remove(read, arrow)
             }
@@ -162,7 +166,10 @@ class LazyDir protected {
         print_string("LRemoved: " + Path::create(this.dirName, key).toString())
       };
       arrow = context.currentArrow() match {
-      | Some(a) -> Some(ArrowKey(a.childName, this.dirName, key))
+      | Some(a) ->
+        Some(
+          ArrowKey{parentName => a.childName, childName => this.dirName, key},
+        )
       | _ -> None()
       };
       arrow.each(a -> context.enter(a, this.timeStack));

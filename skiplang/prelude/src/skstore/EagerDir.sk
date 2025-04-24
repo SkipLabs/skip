@@ -1143,7 +1143,7 @@ class EagerDir protected {
     valueIter: mutable Iterator<File>,
     f: MapFun,
   ): void {
-    arrow = ArrowKey(parentName, childName, key);
+    arrow = ArrowKey{parentName, childName, key};
     context.enter(arrow, timeStack);
 
     if (context.debugMode) {
@@ -1615,7 +1615,7 @@ class EagerDir protected {
       childRef,
       (contextOpt, key, child) ~> {
         ctx = contextOpt.fromSome();
-        arrow = ArrowKey(parentName, childName, key);
+        arrow = ArrowKey{parentName, childName, key};
         ctx.enter(arrow, timeStack);
         path = Path::create(parentName, key);
         oldInfo = child.getOld(path);
