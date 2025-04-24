@@ -1,6 +1,6 @@
 -- Create users table (for the blogger)
 CREATE TABLE users (
-    "id" SERIAL PRIMARY KEY DEFAULT nextval('users_id_seq'),
+    "id" SERIAL PRIMARY KEY,
     "username" TEXT UNIQUE NOT NULL,
     "email" TEXT UNIQUE NOT NULL,
     "password_hash" TEXT NOT NULL,
@@ -9,7 +9,7 @@ CREATE TABLE users (
 
 -- Create posts table (including drafts)
 CREATE TABLE posts (
-    "id" SERIAL PRIMARY KEY DEFAULT nextval('posts_id_seq'),
+    "id" SERIAL PRIMARY KEY,
     "author_id" INTEGER REFERENCES users(id),
     "title" TEXT NOT NULL,
     "content" TEXT NOT NULL,
@@ -21,7 +21,7 @@ CREATE TABLE posts (
 
 -- Create tags table for categorizing posts
 CREATE TABLE tags (
-    "id" SERIAL PRIMARY KEY DEFAULT nextval('tags_id_seq'),
+    "id" SERIAL PRIMARY KEY,
     "name" TEXT UNIQUE NOT NULL
 );
 
