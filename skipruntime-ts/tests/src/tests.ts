@@ -15,6 +15,7 @@ import type {
   ServiceInstance,
   CollectionUpdate,
   NamedCollections,
+  SubscriptionID,
 } from "@skipruntime/core";
 
 import { Count, Sum } from "@skipruntime/helpers";
@@ -54,6 +55,63 @@ async function withRetries(
       if (retries < maxRetries) retries++;
       else throw e;
     }
+  }
+}
+
+class Notifier {
+  private updates: CollectionUpdate<Json, Json>[] = [];
+  private sid: SubscriptionID;
+
+  constructor(
+    private service: ServiceInstance,
+    instance: string,
+  ) {
+    this.sid = service.subscribe(instance, {
+      subscribed: () => {},
+      notify: (update) => {
+        this.updates.push(update);
+      },
+      close: () => {},
+    });
+  }
+
+  check(
+    checker: (updates: CollectionUpdate<Json, Json>[]) => void,
+    clear: boolean = true,
+  ): void {
+    checker(this.updates);
+    if (clear) this.updates = [];
+  }
+
+  checkInit<K extends Json, V extends Json>(values: Entry<K, V>[]) {
+    this.check((updates) => {
+      expect([
+        updates.length,
+        updates[0]!.isInitial ? true : false,
+        updates[0]!.values,
+      ]).toEqual([1, true, values]);
+    });
+  }
+
+  checkUpdate<K extends Json, V extends Json>(values: Entry<K, V>[]) {
+    this.check((updates) => {
+      expect([
+        updates.length,
+        updates[0]?.isInitial ? true : false,
+        updates[0]?.values,
+      ]).toEqual([1, false, values]);
+      return false;
+    });
+  }
+
+  checkEmpty() {
+    this.check((updates) => {
+      expect(updates.length).toEqual(0);
+    });
+  }
+
+  close() {
+    this.service.unsubscribe(this.sid);
   }
 }
 
@@ -926,6 +984,17 @@ function initServiceWithExternalServiceFailure(): SkipService<
   };
 }
 
+// testResourceNotifications
+
+const resourceNotificationsService: SkipService<Input_NN, Input_NN> = {
+  initialData: { input: [] },
+  resources: { resource: NNResource },
+
+  createGraph(is: Input_NN) {
+    return is;
+  },
+};
+
 export function initTests(
   category: string,
   initService: (service: SkipService) => Promise<ServiceInstance>,
@@ -1600,6 +1669,39 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
           /^(?:SkipRuntime\.ResourceInstanceInitFailed: )?Resource instance cannot be initialized:/,
         ),
       );
+    }
+  });
+
+  it("testResourceNotifications", async () => {
+    let service;
+    try {
+      service = await initService(resourceNotificationsService);
+      const resource = "resource";
+      const instanceId = "unsafe.fixed.resource.ident.1";
+      await service.instantiateResource(instanceId, resource, {});
+      const notifier = new Notifier(service, instanceId);
+      notifier.checkInit([]);
+      let values: Entry<number, number>[] = [
+        [0, [10]],
+        [1, [20]],
+      ];
+      await service.update("input", values);
+      notifier.checkUpdate(values);
+      values = [
+        [0, []],
+        [1, []],
+      ];
+      await service.update("input", values);
+      notifier.checkUpdate(values);
+      values = [
+        [0, [23, 43]],
+        [1, [54, 56]],
+      ];
+      await service.update("input", values);
+      notifier.checkUpdate(values);
+      service.closeResourceInstance(instanceId);
+    } finally {
+      if (service) await service.close();
     }
   });
 }
