@@ -1,47 +1,66 @@
+-- Create users table (for the blogger)
 CREATE TABLE users (
-       "id" SERIAL PRIMARY KEY,
-       "name" TEXT,
-       "email" TEXT
+    "id" SERIAL PRIMARY KEY DEFAULT nextval('users_id_seq'),
+    "username" TEXT UNIQUE NOT NULL,
+    "email" TEXT UNIQUE NOT NULL,
+    "password_hash" TEXT NOT NULL,
+    "created_at" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Create posts table (including drafts)
 CREATE TABLE posts (
-       "id" SERIAL PRIMARY KEY,
-       "author_id" INTEGER,
-       "title" TEXT,
-       "url" TEXT,
-       "body" TEXT,
-       "date" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE upvotes (
-       "id" SERIAL PRIMARY KEY,
-       "user_id" INTEGER,
-       "post_id" INTEGER
+    "id" SERIAL PRIMARY KEY DEFAULT nextval('posts_id_seq'),
+    "author_id" INTEGER REFERENCES users(id),
+    "title" TEXT NOT NULL,
+    "content" TEXT NOT NULL,
+    "status" TEXT NOT NULL CHECK (status IN ('draft', 'published')),
+    "published_at" TIMESTAMP WITH TIME ZONE,
+    "created_at" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Fixtures
-INSERT INTO users("id", "name", "email") VALUES
-       (1, 'Benno', 'benno@skiplabs.io'),
-       (2, 'Charles', 'charles@skiplabs.io'),
-       (3, 'Daniel', 'daniel@skiplabs.io'),
-       (4, 'Josh', 'josh@skiplabs.io'),
-       (5, 'Julien', 'julien@skiplabs.io'),
-       (6, 'Laure', 'laure@skiplabs.io'),
-       (7, 'Lucas', 'lucas@skiplabs.io'),
-       (8, 'Mehdi', 'mehdi@skiplabs.io');
-SELECT setval('users_id_seq', max(id) + 1) FROM users;
+-- Create tags table for categorizing posts
+CREATE TABLE tags (
+    "id" SERIAL PRIMARY KEY DEFAULT nextval('tags_id_seq'),
+    "name" TEXT UNIQUE NOT NULL
+);
 
-INSERT INTO posts("id", "title", "url", "body", "author_id", "date") VALUES
-       (0, 'Skip''s Origins', 'https://skiplabs.io/blog/skips-origins', '', 5, '2025-02-11 00:00:00+00'),
-       (1, 'New skiplabs website!', 'https://skiplabs.io', '', 2, '2025-01-12 00:00:00+00'),
-       (2, 'Why Skip?', 'https://skiplabs.io/blog/why-skip', '', 5, '2025-02-11 00:00:00+00'),
-       (3, 'Skip alpha just dropped', 'https://skiplabs.io/blog/skip-alpha', '', 3, '2024-12-24 00:00:00+00'),
-       (4, 'Skip docs website', 'https://skiplabs.io/docs/introduction', '', 4, '2024-11-11 00:00:00+00'),
-       (5, 'Building a HN clone with Skip', 'https://github.com/SkipLabs/skip/pull/343/', '', 7, '2024-09-28 00:00:00+00');
-SELECT setval('posts_id_seq', max(id) + 1) FROM posts;
+-- Create post_tags junction table for many-to-many relationship
+CREATE TABLE post_tags (
+    "post_id" INTEGER REFERENCES posts(id) ON DELETE CASCADE,
+    "tag_id" INTEGER REFERENCES tags(id) ON DELETE CASCADE,
+    PRIMARY KEY (post_id, tag_id)
+);
 
-INSERT INTO upvotes("user_id", "post_id") VALUES
-       (1, 0), (2, 0), (5, 0), (8, 0),
-       (1, 1), (2, 1), (3, 1), (4, 1), (5, 1), (6, 1), (7, 1), (8, 1),
-       (3, 2), (5, 2), (7, 2),
-       (1, 3), (3, 3),
-       (2, 4), (3, 4), (5, 4),
-       (1, 5), (2, 5), (3, 5), (4, 5), (5, 5), (6, 5), (8, 5);
+-- Create indexes for better performance
+CREATE INDEX idx_posts_status ON posts(status);
+CREATE INDEX idx_posts_author ON posts(author_id);
+CREATE INDEX idx_posts_published_at ON posts(published_at);
+
+-- Insert SkipLabs team members
+INSERT INTO users (username, email, password_hash) VALUES
+    ('benno', 'benno@skiplabs.io', 'hashed_password_here'),
+    ('charles', 'charles@skiplabs.io', 'hashed_password_here'),
+    ('daniel', 'daniel@skiplabs.io', 'hashed_password_here'),
+    ('josh', 'josh@skiplabs.io', 'hashed_password_here'),
+    ('julien', 'julien@skiplabs.io', 'hashed_password_here'),
+    ('laure', 'laure@skiplabs.io', 'hashed_password_here'),
+    ('lucas', 'lucas@skiplabs.io', 'hashed_password_here'),
+    ('mehdi', 'mehdi@skiplabs.io', 'hashed_password_here');
+
+-- Insert sample tags
+INSERT INTO tags (name) VALUES
+    ('Technology'),
+    ('Programming'),
+    ('Web Development');
+
+-- Insert sample posts (one draft, one published)
+INSERT INTO posts (author_id, title, content, status, published_at) VALUES
+    (1, 'My First Blog Post', 'This is my first blog post content...', 'published', CURRENT_TIMESTAMP),
+    (1, 'Working on Something New', 'This is a draft post...', 'draft', NULL);
+
+-- Link posts to tags
+INSERT INTO post_tags (post_id, tag_id) VALUES
+    (1, 1),
+    (1, 2),
+    (2, 1);
