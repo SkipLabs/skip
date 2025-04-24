@@ -997,16 +997,6 @@ mutable class Context{
     }
   }
 
-  readonly fun unsafeMaybeGetLazyDir(dirName: DirName): ?LazyDir {
-    this.unsafeMaybeGetDir(dirName) match {
-    | None()
-    | Some(DeletedDir _) ->
-      None()
-    | Some(d @ LazyDir _) -> Some(d)
-    | _ -> invariant_violation("unsafeMaybeGetLazyDir: Was expecting LazyDir")
-    }
-  }
-
   readonly fun unsafeMaybeGetEagerDir(dirName: DirName): ?EagerDir {
     this.unsafeMaybeGetDir(dirName) match {
     | None()
