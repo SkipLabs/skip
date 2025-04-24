@@ -58,13 +58,13 @@ useEffect(() => {
   const stream = new EventSource("http://reactive.service.hostname/my_resource/foo");
   stream.addEventListener("init", (e: MessageEvent<string>) => {
     const initial_data = JSON.parse(e.data);
-	const initialFoo = ...; // create an initial "foo" using `initial_data`
-	setFoo(initialFoo);
+    const initialFoo = ...; // create an initial "foo" using `initial_data`
+    setFoo(initialFoo);
   });
   stream.addEventListener("update", (e: MessageEvent<string>) => {
     const updates = JSON.parse(e.data);
-	const updatedFoo = ...; // update "foo" using `updates`
-	setFoo(updatedfoo);
+    const updatedFoo = ...; // update "foo" using `updates`
+    setFoo(updatedfoo);
   });
   return () => {
     stream.close();

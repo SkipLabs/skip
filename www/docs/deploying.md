@@ -38,16 +38,16 @@ Using HAProxy we can restrict and direct traffic as follows:
 
 ```
 frontend www
-	# ...
-	acl url_streams path_beg -i /streams/
-	use_backend skip if url_streams
-	# ...
+    # ...
+    acl url_streams path_beg -i /streams/
+    use_backend skip if url_streams
+    # ...
 
 backend skip
-	mode http
-	# rewrite public-facing url /streams/... to /v1/streams/... for the Skip server
-	http-request set-path /v1%[path]
-	server stream reactive_service:8080
+    mode http
+    # rewrite public-facing url /streams/... to /v1/streams/... for the Skip server
+    http-request set-path /v1%[path]
+    server stream reactive_service:8080
 ```
 
 The `acl` and `use_backend` lines in the frontend configuration forward any traffic at a path beginning with `streams` to the `skip` backend.
