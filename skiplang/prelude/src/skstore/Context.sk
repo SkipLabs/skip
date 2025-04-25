@@ -342,7 +342,6 @@ mutable base class WriteChecker {
 */
 mutable class Context{
   mutable toPurge: SortedSet<DirName> = SortedSet[],
-  mutable purgeLimit: ?Tick = None(),
   private mutable dirs: Dirs = Dirs{},
   mutable reads: SortedSet<Path> = SortedSet[],
   private mutable time: Time = Time(0),
@@ -441,7 +440,6 @@ mutable class Context{
   readonly fun mclone(): mutable this {
     mutable static{
       toPurge => this.toPurge,
-      purgeLimit => this.purgeLimit,
       dirs => this.dirs,
       reads => this.reads,
       time => this.time,
@@ -478,7 +476,6 @@ mutable class Context{
 
   mutable fun replaceFromSaved(ctx: readonly Context): void {
     this.!toPurge = ctx.toPurge;
-    this.!purgeLimit = ctx.purgeLimit;
     this.!dirs = ctx.dirs;
     this.!reads = ctx.reads;
     this.!time = ctx.time;
@@ -1301,7 +1298,7 @@ fun resolveContext(
     context.unsafeMaybeGetEagerDir(dirName) match {
     | None() -> void
     | Some(dir) ->
-      !dir = dir.purge(context, context.purgeFrom(context, dir));
+      !dir = dir.purge(context.purgeFrom(context, dir));
       context.setDir(dir)
     }
   };
