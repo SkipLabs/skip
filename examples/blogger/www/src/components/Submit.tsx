@@ -3,6 +3,7 @@ import { Header } from "./Header";
 import "./Submit.css";
 import Mood from "./Mood";
 import Sugestions from "./Suggestions";
+import Research from "./Research";
 
 export function Submit() {
   const [newPost, setNewPost] = useState<{
@@ -10,10 +11,6 @@ export function Submit() {
     content: string;
     status: string;
   }>({ title: "", content: "", status: "draft" });
-
-  const [mood, setMood] = useState("");
-  const [comments, setComments] = useState("");
-  const [research, setResearch] = useState("");
 
   async function createPost() {
     try {
@@ -83,7 +80,9 @@ export function Submit() {
             <div className="side-section">
               <Sugestions />
             </div>
-            <div className="side-section"></div>
+            <div className="side-section">
+              <Research />
+            </div>
           </div>
         </div>
       </div>

@@ -25,7 +25,9 @@ def get_db():
 app = Flask(__name__)
 
 # JWT Configuration
-JWT_SECRET = os.environ.get("JWT_SECRET", "your-secret-key-here")  # In production, use a secure secret
+JWT_SECRET = os.environ.get(
+    "JWT_SECRET", "your-secret-key-here"
+)  # In production, use a secure secret
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION = timedelta(hours=24)
 
@@ -65,17 +67,17 @@ def token_required(f):
             if auth_header.startswith("Bearer "):
                 token = auth_header.split(" ")[1]
                 logger.info(f"Token found in request: {token[:10]}...")
-        
+
         if not token:
             logger.warning("No token found in request")
             return jsonify({"message": "Token is missing"}), 401
-        
+
         try:
             data = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
             current_user = {
                 "user_id": data["user_id"],
                 "name": data["name"],
-                "email": data["email"]
+                "email": data["email"],
             }
             logger.info(f"Token validated for user: {current_user['name']}")
         except jwt.ExpiredSignatureError:
@@ -84,8 +86,9 @@ def token_required(f):
         except jwt.InvalidTokenError:
             logger.warning("Invalid token")
             return jsonify({"message": "Invalid token"}), 401
-        
+
         return f(current_user, *args, **kwargs)
+
     return decorated
 
 
@@ -94,7 +97,7 @@ def login():
     data = request.json
     username = data.get("username")
     logger.info(f"Login attempt for user: {username}")
-    
+
     with get_db() as db:
         with db.cursor() as cur:
             cur.execute(
@@ -111,19 +114,17 @@ def login():
         "user_id": user[0],
         "name": user[1],
         "email": user[2],
-        "exp": datetime.now(timezone.utc) + JWT_EXPIRATION
+        "exp": datetime.now(timezone.utc) + JWT_EXPIRATION,
     }
     token = jwt.encode(token_data, JWT_SECRET, algorithm=JWT_ALGORITHM)
     logger.info(f"Token generated for user: {user[1]}")
 
-    return jsonify({
-        "token": token,
-        "user": {
-            "user_id": user[0],
-            "name": user[1],
-            "email": user[2]
+    return jsonify(
+        {
+            "token": token,
+            "user": {"user_id": user[0], "name": user[1], "email": user[2]},
         }
-    })
+    )
 
 
 @app.get("/session")
@@ -189,7 +190,7 @@ def delete_post(current_user, post_id):
             post = cur.fetchone()
             if post[0] != current_user["user_id"]:
                 return jsonify({"message": "Unauthorized"}), 403
-            
+
             cur.execute("DELETE FROM posts WHERE id = %s", (post_id,))
             db.commit()
     return jsonify({"message": "Post deleted successfully"}), 200
@@ -212,7 +213,7 @@ def update_post(current_user, post_id):
             post = cur.fetchone()
             if post[0] != current_user["user_id"]:
                 return jsonify({"message": "Unauthorized"}), 403
-            
+
             cur.execute(
                 "UPDATE posts SET title = %s, content = %s, status = %s WHERE id = %s",
                 (title, content, status, post_id),
