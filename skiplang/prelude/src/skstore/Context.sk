@@ -355,7 +355,6 @@ mutable class Context{
   private mutable failOnExn: Bool = true,
   private mutable hasPre: SortedSet<DirName> = SortedSet[],
   mutable newDirs: SortedSet<DirName> = SortedSet[],
-  mutable toReset: SortedSet<DirName> = SortedSet[],
   mutable globals: SortedMap<String, File> = SortedMap[],
   private mutable persistents: SortedMap<String, File> = SortedMap[],
   private mutable dirty: SortedMap<DirName, SortedSet<Key>> = SortedMap[],
@@ -447,7 +446,6 @@ mutable class Context{
       failOnExn => this.failOnExn,
       hasPre => this.hasPre,
       newDirs => this.newDirs,
-      toReset => this.toReset,
       globals => this.globals,
       persistents => this.persistents,
       dirty => this.dirty,
@@ -486,7 +484,6 @@ mutable class Context{
     this.!failOnExn = ctx.failOnExn;
     this.!hasPre = ctx.hasPre;
     this.!newDirs = ctx.newDirs;
-    this.!toReset = ctx.toReset;
     this.!globals = ctx.globals;
     this.!persistents = ctx.persistents;
     this.!dirty = ctx.dirty;
@@ -736,11 +733,9 @@ mutable class Context{
         withPostponables = this.checkPostponables();
         withPre = this.updatePre();
         withChanges = withPostponables || withPre;
-        this.!toReset = SortedSet[];
         this.!tick = this.tick.next();
         break withChanges
       | Some((time, Arrow(parentName, childName))) ->
-        this.!toReset = this.toReset.set(childName);
         this.!toUpdate = this.toUpdate.remove(time);
         this.unsafeMaybeGetDir(childName) match {
         | None()
@@ -749,7 +744,6 @@ mutable class Context{
         | Some(child @ LazyDir _) ->
           child.update(this, dirtyReaders.maybeGet(child.dirName))
         | Some(child @ EagerDir _) ->
-          this.!toReset = this.toReset.set(parentName);
           parentMaps = child.parents.maybeGet(parentName) match {
           | None() -> invariant_violation("Could not find parent")
           | Some(f) -> f
