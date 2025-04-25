@@ -1745,7 +1745,7 @@ fun sqlPurgeFrom(
 }
 
 fun makeSqlContext(): SKStore.Context {
-  SKStore.Context{canReuse => SKStore.CRAlways(SortedSet::create())}
+  SKStore.Context::create{canReuse => SKStore.CRAlways(SortedSet::create())}
 }
 
 class StmtFile(stmt: P.Stmt) extends SKStore.File
@@ -1806,7 +1806,7 @@ private mutable class SQLContext(
     pos = SKStore.newObstack();
 
     (newContext, underLockF) = try {
-      f(this.context with {globals => this.globals})
+      f(this.context.withGlobals(this.globals))
     } catch {
     | ex ->
       cexn = SKStore.destroyObstackWithValue(pos, List[ex]).getHead();

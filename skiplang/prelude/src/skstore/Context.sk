@@ -129,7 +129,7 @@ value class ArrowKey{
 /*****************************************************************************/
 
 fun run(f: (mutable Context) -> void): mutable Context {
-  context = mutable Context{};
+  context = Context::mcreate{};
   f(context);
   context.initPre();
   context
@@ -340,7 +340,7 @@ mutable base class WriteChecker {
    E.g. its only mutable-typed field is writeChecker which is mutable only
    because of a cache.
 */
-mutable class Context{
+mutable class Context private {
   private mutable toPurge: SortedSet<DirName> = SortedSet[],
   private mutable dirs: Dirs = Dirs{},
   mutable reads: SortedSet<Path> = SortedSet[],
@@ -371,6 +371,18 @@ mutable class Context{
     Tick(ctx.getTick().value - 1000),
   mutable sourceOverride: ?Path = None(),
 } {
+  static fun create{canReuse: CanReuse = CRIfMatch()}: this {
+    static{canReuse}
+  }
+
+  static fun mcreate{}: mutable this {
+    mutable static{}
+  }
+
+  fun withGlobals(globals: SortedMap<String, File>): this {
+    this with {globals}
+  }
+
   readonly fun isWithSharedSubDirs(dirName: DirName): Bool {
     this.dirsWithSharedSubDirs.contains(dirName)
   }
@@ -1537,7 +1549,7 @@ fun runWithGcIntern(
     startTick = context.getTick();
     pos = newObstack();
     (newContext, newContextOp) = (try {
-      Some(f(context with {globals}))
+      Some(f(context.withGlobals(globals)))
     } catch {
     | exn ->
       print_error(exn.getMessage());

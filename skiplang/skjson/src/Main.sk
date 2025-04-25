@@ -86,7 +86,7 @@ const schemaGlobalName: String = "SCHEMA_GLOBAL";
 
 fun execInfer(args: Cli.ParseResults): void {
   compact = args.getBool("compact");
-  SKStore.runWithGc(SKStore.Context{}, context ~> {
+  SKStore.runWithGc(SKStore.Context::create{}, context ~> {
     schema = context.getGlobal(schemaGlobalName) match {
     | None() -> Type::any
     | Some(schemaFile) -> SchemaFile::type(schemaFile).value
