@@ -1,27 +1,15 @@
 import { useState, useEffect, useRef } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import "./App.css";
-import { Post, Session } from "./types";
+import { Post } from "./types";
 import { Feed } from "./components/Feed";
 import { Submit } from "./components/Submit";
 import { Login } from "./components/Login";
+import { AuthProvider } from "./contexts/AuthContext";
 
 export default function App() {
   const [posts, setPosts] = useState<Post[]>([]);
   const previousPostsValue = useRef<Post[]>([]);
-  const [session, setSession] = useState<Session | null>(null);
-
-  // Check for existing session on load
-  useEffect(() => {
-    fetch("/api/session")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data && data.user_id) {
-          setSession(data);
-        }
-      })
-      .catch((err) => console.error("Session check failed:", err));
-  }, []);
 
   useEffect(() => {
     const evSource = new EventSource("/api/posts");
@@ -57,14 +45,16 @@ export default function App() {
   }, []);
 
   return (
-    <Router>
-      <div>
-        <Routes>
-          <Route path="/" element={<Feed posts={posts} session={session} />} />
-          <Route path="/submit" Component={Submit} />
-          <Route path="/login" Component={Login} />
-        </Routes>
-      </div>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <div>
+          <Routes>
+            <Route path="/" element={<Feed posts={posts} />} />
+            <Route path="/submit" Component={Submit} />
+            <Route path="/login" Component={Login} />
+          </Routes>
+        </div>
+      </Router>
+    </AuthProvider>
   );
 }

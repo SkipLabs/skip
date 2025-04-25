@@ -12,4 +12,4 @@ export type User = {
   email: string;
 };
 
-export type Session = User & { user_id: number }; 
+export type Session = User & { user_id: number };

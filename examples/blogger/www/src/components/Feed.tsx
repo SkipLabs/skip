@@ -1,12 +1,14 @@
-import { Post, Session } from "../types";
+import { Post } from "../types";
 import { Header } from "./Header";
+import { useAuth } from "../contexts/AuthContext";
 
 interface FeedProps {
   posts: Post[];
-  session: Session | null;
 }
 
-export function Feed({ posts, session }: FeedProps) {
+export function Feed({ posts }: FeedProps) {
+  const { session } = useAuth();
+
   function formatDate(date: string | null) {
     if (!date) return "Draft";
     return new Date(date).toLocaleDateString("en-US", {
@@ -18,7 +20,7 @@ export function Feed({ posts, session }: FeedProps) {
 
   return (
     <>
-      <Header session={session} />
+      <Header />
       <div className="body">
         <h1>Latest Posts</h1>
         {posts.length === 0 ? (
@@ -40,4 +42,4 @@ export function Feed({ posts, session }: FeedProps) {
       </div>
     </>
   );
-} 
+}

@@ -1,19 +1,8 @@
 import { Link } from "react-router-dom";
-import { Session } from "../types";
+import { useAuth } from "../contexts/AuthContext";
 
-interface HeaderProps {
-  session: Session | null;
-}
-
-export function Header({ session }: HeaderProps) {
-  function logout() {
-    void fetch("/api/logout", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-    }).catch((err: unknown) => {
-      console.log(err);
-    });
-  }
+export function Header() {
+  const { session, logout } = useAuth();
 
   return (
     <div className="header">
@@ -27,15 +16,7 @@ export function Header({ session }: HeaderProps) {
         {session ? (
           <>
             <span>Welcome, {session.name}</span>
-            <a
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                logout();
-              }}
-            >
-              Logout
-            </a>
+            <button onClick={logout}>Logout</button>
           </>
         ) : (
           <Link to="/login">Login</Link>

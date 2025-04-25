@@ -1,68 +1,56 @@
 import { useState } from "react";
-import { Header } from "./Header";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 
 export function Login() {
-  const [email, setEmail] = useState<string>("");
-  const [password, setPassword] = useState<string>("");
-  const [loginError, setLoginError] = useState<string | null>();
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const { login } = useAuth();
+  const navigate = useNavigate();
 
-  function login(email: string, _password: string) {
-    fetch("/api/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email,
-        password,
-      }),
-    })
-      .then((resp) => {
-        if (!resp.ok) {
-          setLoginError("Invalid credentials");
-        } else {
-          return resp.json();
-        }
-      })
-      .then((data) => {
-        if (data) {
-          window.location.href = "/"; // Force a refresh to update the session
-        }
-      })
-      .catch((err: unknown) => {
-        console.log(err);
-        setLoginError("Login error");
-      });
-  }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    try {
+      await login(username, password);
+      navigate("/");
+    } catch (err) {
+      setError("Invalid credentials");
+    }
+  };
 
   return (
-    <>
-      <Header session={null} />
-      <div className="body">
-        <h1>Login</h1>
-        {loginError && <p style={{ color: "red" }}>{loginError}</p>}
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            setLoginError(null);
-            login(email, password);
-          }}
-        >
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            disabled
-          />
-          <button type="submit">Login</button>
+    <div className="login-container">
+      <div className="login-box">
+        <h1 className="login-title">Login</h1>
+        <form onSubmit={handleSubmit} className="login-form">
+          {error && <div className="error-message">{error}</div>}
+          <div className="form-group">
+            <label htmlFor="username" className="form-label">Username</label>
+            <input
+              id="username"
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="form-input"
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="password" className="form-label">Password</label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="form-input"
+              required
+            />
+          </div>
+          <button type="submit" className="login-button">Login</button>
         </form>
       </div>
-    </>
+    </div>
   );
 } 

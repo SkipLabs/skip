@@ -10,9 +10,13 @@ export function Submit() {
 
   async function createPost() {
     try {
+      const token = localStorage.getItem("jwt");
       await fetch(`/api/posts`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify(newPost),
       });
       setNewPost({ title: "", content: "", status: "draft" });
@@ -23,7 +27,7 @@ export function Submit() {
 
   return (
     <>
-      <Header session={null} />
+      <Header />
       <div className="body">
         <h1>Create New Post</h1>
         <form
@@ -61,4 +65,4 @@ export function Submit() {
       </div>
     </>
   );
-} 
+}

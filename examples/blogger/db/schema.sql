@@ -39,14 +39,16 @@ CREATE INDEX idx_posts_published_at ON posts(published_at);
 
 -- Insert SkipLabs team members
 INSERT INTO users (username, email, password_hash) VALUES
-    ('benno', 'benno@skiplabs.io', 'hashed_password_here'),
-    ('charles', 'charles@skiplabs.io', 'hashed_password_here'),
-    ('daniel', 'daniel@skiplabs.io', 'hashed_password_here'),
-    ('josh', 'josh@skiplabs.io', 'hashed_password_here'),
-    ('julien', 'julien@skiplabs.io', 'hashed_password_here'),
-    ('laure', 'laure@skiplabs.io', 'hashed_password_here'),
-    ('lucas', 'lucas@skiplabs.io', 'hashed_password_here'),
-    ('mehdi', 'mehdi@skiplabs.io', 'hashed_password_here');
+    ('benno', 'benno@skiplabs.io', 'benno'),
+    ('charles', 'charles@skiplabs.io', 'charles'),
+    ('daniel', 'daniel@skiplabs.io', 'daniel'),
+    ('josh', 'josh@skiplabs.io', 'josh'),
+    ('julien', 'julien@skiplabs.io', 'julien'),
+    ('laure', 'laure@skiplabs.io', 'laure'),
+    ('lucas', 'lucas@skiplabs.io', 'lucas'),
+    ('mehdi', 'mehdi@skiplabs.io', 'mehdi'),
+    ('sumner', 'sumner@skiplabs.io', 'sumner'),
+    ('hugo', 'hugo@skiplabs.io', 'hugo');
 
 -- Insert sample tags
 INSERT INTO tags (name) VALUES
