@@ -1412,7 +1412,7 @@ private native fun destroyObstack(Obstack): void;
 private native fun destroyObstackWithValueRaw<T>(Obstack, Box<T>): Box<T>;
 
 @always_inline
-fun destroyObstackWithValue<T>(obstack: Obstack, value: List<T>): List<T> {
+fun destroyObstackWithValue<T>(obstack: Obstack, value: T): T {
   destroyObstackWithValueRaw(obstack, Box(value)).unbox()
 }
 
@@ -1698,15 +1698,15 @@ fun withRegion<T>(
     !optSaved = Some(newObstack());
     saved = optSaved.fromSome();
     fresult = f(saved, context);
-    copied = destroyObstackWithValue(saved, List[(context.clone(), fresult)]);
-    (icontext, copiedResult) = copied.getHead();
+    copied = destroyObstackWithValue(saved, (context.clone(), fresult));
+    (icontext, copiedResult) = copied;
     context.replaceFromSaved(icontext);
     copiedResult
   } catch {
   | exn ->
     optSaved match {
     | Some(saved) ->
-      cexn = destroyObstackWithValue(saved, List[exn]).getHead();
+      cexn = destroyObstackWithValue(saved, exn);
       replaceExn(cexn);
       throw cexn
     | _ -> throw exn
@@ -1724,7 +1724,7 @@ fun withRegionVoid<T>(f: () ~> void): void {
   | exn ->
     optSaved match {
     | Some(saved) ->
-      cexn = destroyObstackWithValue(saved, List[exn]).getHead();
+      cexn = destroyObstackWithValue(saved, exn);
       replaceExn(cexn);
       throw cexn
     | _ -> throw exn
@@ -1737,13 +1737,12 @@ fun withRegionValue<T>(f: () ~> T): T {
   try {
     !optSaved = Some(newObstack());
     fresult = f();
-    copied = destroyObstackWithValue(optSaved.fromSome(), List[fresult]);
-    copied.getHead();
+    destroyObstackWithValue(optSaved.fromSome(), fresult)
   } catch {
   | exn ->
     optSaved match {
     | Some(saved) ->
-      cexn = destroyObstackWithValue(saved, List[exn]).getHead();
+      cexn = destroyObstackWithValue(saved, exn);
       replaceExn(cexn);
       throw cexn
     | _ -> throw exn
@@ -1774,8 +1773,8 @@ fun destroyObstackWithValueCheckContext<T>(
 ): T {
   (icontextOpt, !value) = destroyObstackWithValue(
     saved,
-    List[(contextOpt.map(ctx -> ctx.clone()), value)],
-  ).getHead();
+    (contextOpt.map(ctx -> ctx.clone()), value),
+  );
   icontextOpt.each(icontext ->
     contextOpt.fromSome().replaceFromSaved(icontext)
   );
@@ -1817,7 +1816,7 @@ fun withRegionFold<K, T>(
   | exn ->
     optSaved match {
     | Some(saved) ->
-      cexn = destroyObstackWithValue(saved, List[exn]).getHead();
+      cexn = destroyObstackWithValue(saved, exn);
       replaceExn(cexn);
       throw cexn
     | _ -> throw exn
@@ -1900,7 +1899,7 @@ fun withRegionFoldRecHelp<K, T>(
   | exn ->
     optSaved match {
     | Some(saved) ->
-      cexn = destroyObstackWithValue(saved, List[exn]).getHead();
+      cexn = destroyObstackWithValue(saved, exn);
       replaceExn(cexn);
       throw cexn
     | _ -> throw exn
