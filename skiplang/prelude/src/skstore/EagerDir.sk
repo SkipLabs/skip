@@ -2084,13 +2084,13 @@ class EagerDir protected {
       };
 
       for (dirName in toRemove) {
-        if (context.decrRefCount(dirName) && context.removeSubDirs) {
+        if (context.decrRefCount(dirName)) {
           context.removeDir(dirName);
           removed.push(dirName)
         }
       };
     } else {
-      if (minfo.getNewDirs().isEmpty() || !context.removeSubDirs) return this;
+      if (minfo.getNewDirs().isEmpty()) return this;
 
       for (dirName in lastRoundDirs) {
         if (newDirs.contains(dirName)) continue;
