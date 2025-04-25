@@ -115,7 +115,7 @@ fun dumpAdjustedInserts(
   origContext: readonly SKStore.Context,
   changes: Map<P.Name, SchemaChange>,
 ): void {
-  context = SKStore.Context::fromSaved(origContext.clone());
+  context = origContext.mclone();
   handle = getTableDir(context);
   sinkName = SKStore.DirName::create("/sink_" + SKStore.genSym(0) + "/");
   _ = handle.map(
