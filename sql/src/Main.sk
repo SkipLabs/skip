@@ -435,7 +435,7 @@ private fun ensureContext(args: Cli.ParseResults): void {
 fun execSessions(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
   SKDB.runSql(options, context ~> {
-    for (id => sub in context.sessions) {
+    for (id => sub in context.getSessions()) {
       print_string(
         id.toString() + "\t" + sub.dirSubs.map(d -> d.entity).join(","),
       );

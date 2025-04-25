@@ -364,7 +364,7 @@ mutable class Context{
   private mutable lazyGets: SortedSet<Path> = SortedSet[],
   private mutable lazyGetsQueue: Queue<Array<Path>> = Queue[],
   private mutable lazyGetsRefCount: SortedMap<Path, Int> = SortedMap[],
-  mutable sessions: SortedMap<Int, Sub> = SortedMap[],
+  private mutable sessions: SortedMap<Int, Sub> = SortedMap[],
   mutable removeSubDirs: Bool = true,
   private mutable postponables: List<Postponable> = List[],
   private mutable dirsWithSharedSubDirs: SortedSet<DirName> = SortedSet[],
@@ -413,6 +413,10 @@ mutable class Context{
 
   readonly fun getSession(sessionId: Int): ?Sub {
     this.sessions.maybeGet(sessionId)
+  }
+
+  readonly fun getSessions(): SortedMap<Int, Sub> {
+    this.sessions
   }
 
   mutable fun subscribe(
