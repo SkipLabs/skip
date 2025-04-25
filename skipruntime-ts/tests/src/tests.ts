@@ -1,4 +1,4 @@
-import { expect } from "earl";
+import { expect, isEqual } from "earl";
 import type {
   Context,
   Json,
@@ -16,6 +16,7 @@ import type {
   CollectionUpdate,
   NamedCollections,
   SubscriptionID,
+  Nullable,
 } from "@skipruntime/core";
 
 import { Count, Sum } from "@skipruntime/helpers";
@@ -61,15 +62,19 @@ async function withRetries(
 class Notifier {
   private updates: CollectionUpdate<Json, Json>[] = [];
   private sid: SubscriptionID;
+  private resolver: Nullable<() => void> = null;
 
   constructor(
     private service: ServiceInstance,
     instance: string,
+    private log: boolean = false,
   ) {
     this.sid = service.subscribe(instance, {
       subscribed: () => {},
       notify: (update) => {
+        if (this.log) console.log("NOTIFY", JSON.stringify(update));
         this.updates.push(update);
+        if (this.resolver) this.resolver();
       },
       close: () => {},
     });
@@ -108,6 +113,45 @@ class Notifier {
     this.check((updates) => {
       expect(updates.length).toEqual(0);
     });
+  }
+
+  async waitNotification(
+    checker: (updates: CollectionUpdate<Json, Json>[]) => boolean,
+    timeout: number = 1000,
+  ) {
+    if (checker(this.updates)) return;
+    return new Promise<void>((resolve, reject) => {
+      try {
+        let rejected = false;
+        const timeoutHdl = setTimeout(() => {
+          rejected = true;
+          reject(new Error("Timeout"));
+        }, timeout);
+        this.resolver = () => {
+          if (rejected) return;
+          if (checker(this.updates)) {
+            clearTimeout(timeoutHdl);
+            resolve();
+            this.updates = [];
+          }
+        };
+      } catch (e: unknown) {
+        reject(e as Error);
+      }
+    });
+  }
+
+  async wait<K extends Json, V extends Json>(
+    values: [boolean, Entry<K, V>[]][],
+    timeout: number = 1000,
+  ) {
+    return this.waitNotification((updates) => {
+      const current = updates.map((u) => [
+        u.isInitial ? true : false,
+        u.values,
+      ]);
+      return isEqual(current, values);
+    }, timeout);
   }
 
   close() {
@@ -1509,45 +1553,46 @@ export function initTests(
       this.skip();
     }
     try {
+      const resource = "resource";
+      const instanceId = "unsafe.fixed.resource.ident.1";
       await service.update("input", [
         [1, [10]],
         [2, [20]],
         [3, [30]],
       ]);
-
-      await withRetries(async () =>
-        expect(await service.getAll("resource")).toEqual([
-          [1, [111]],
-          [2, [222]],
-          [3, [333]],
-        ]),
-      );
+      await service.instantiateResource(instanceId, resource, {});
+      const notifier = new Notifier(service, instanceId);
+      notifier.checkInit([
+        [1, [111]],
+        [2, [222]],
+        [3, [333]],
+      ]);
       await pgClient.query("UPDATE skip_test SET x = 1000 WHERE id = 1;");
       await pgClient.query("DELETE FROM skip_test WHERE id = 2;");
-      await withRetries(async () =>
-        expect(await service.getAll("resource")).toEqual([
-          [1, [1110]],
-          [2, [220]],
-          [3, [333]],
-        ]),
-      );
-      await service.instantiateResource(
-        "unsafe.fixed.resource.ident.3",
-        "streamingResource",
-        {},
-      );
+      await notifier.wait([
+        [false, [[1, [1110]]]],
+        [false, [[2, [220]]]],
+      ]);
+      expect(await service.getAll(resource)).toEqual([
+        [1, [1110]],
+        [2, [220]],
+        [3, [333]],
+      ]);
+      notifier.close();
+      const streamingResource = "streamingResource";
+      const instanceId2 = "unsafe.fixed.resource.ident.2";
 
-      await withRetries(async () =>
-        expect(await service.getAll("streamingResource")).toEqual([]),
-      );
+      await service.instantiateResource(instanceId2, streamingResource, {});
+      const notifier2 = new Notifier(service, instanceId2);
+      notifier2.checkInit([]);
 
       await pgClient.query("INSERT INTO skip_test (id, x) VALUES (5, 5);");
+      await notifier2.wait([[false, [[5, [5]]]]]);
+      expect(await service.getAll(streamingResource)).toEqual([[5, [5]]]);
+      notifier2.close();
 
-      await withRetries(async () =>
-        expect(await service.getAll("streamingResource")).toEqual([[5, [5]]]),
-      );
       await service.instantiateResource(
-        "unsafe.fixed.resource.ident.2",
+        "unsafe.fixed.resource.ident.3",
         "resourceWithException",
         {},
       );
