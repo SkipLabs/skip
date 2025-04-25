@@ -53,5 +53,17 @@ await fetchJSON(`${url}/groups/1002`, "PUT", {
 });
 
 await sleep(100);
+console.log("Setting Bob to have no friends :( ...");
+await fetchJSON(`${url}/users/0`, "PUT", {
+  body: { name: "Bob", active: true, friends: [] },
+});
+
+await sleep(100);
+console.log("Setting Carol as Bob's friend ...");
+await fetchJSON(`${url}/users/0`, "PUT", {
+  body: { name: "Bob", active: true, friends: [2] },
+});
+
+await sleep(100);
 console.log("Closing listener event stream...");
 evSource.close();

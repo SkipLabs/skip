@@ -1,4 +1,4 @@
-import { expect } from "earl";
+import { expect, isEqual } from "earl";
 import type {
   Context,
   Json,
@@ -15,6 +15,8 @@ import type {
   ServiceInstance,
   CollectionUpdate,
   NamedCollections,
+  SubscriptionID,
+  Nullable,
 } from "@skipruntime/core";
 
 import { Count, Sum } from "@skipruntime/helpers";
@@ -54,6 +56,106 @@ async function withRetries(
       if (retries < maxRetries) retries++;
       else throw e;
     }
+  }
+}
+
+class Notifier {
+  private updates: CollectionUpdate<Json, Json>[] = [];
+  private sid: SubscriptionID;
+  private resolver: Nullable<() => void> = null;
+
+  constructor(
+    private service: ServiceInstance,
+    instance: string,
+    private log: boolean = false,
+  ) {
+    this.sid = service.subscribe(instance, {
+      subscribed: () => {},
+      notify: (update) => {
+        if (this.log) console.log("NOTIFY", JSON.stringify(update));
+        this.updates.push(update);
+        if (this.resolver) this.resolver();
+      },
+      close: () => {},
+    });
+  }
+
+  check(
+    checker: (updates: CollectionUpdate<Json, Json>[]) => void,
+    clear: boolean = true,
+  ): void {
+    checker(this.updates);
+    if (clear) this.updates = [];
+  }
+
+  checkInit<K extends Json, V extends Json>(values: Entry<K, V>[]) {
+    this.check((updates) => {
+      expect([
+        updates.length,
+        updates[0]!.isInitial ? true : false,
+        updates[0]!.values,
+      ]).toEqual([1, true, values]);
+    });
+  }
+
+  checkUpdate<K extends Json, V extends Json>(values: Entry<K, V>[]) {
+    this.check((updates) => {
+      expect([
+        updates.length,
+        updates[0]?.isInitial ? true : false,
+        updates[0]?.values,
+      ]).toEqual([1, false, values]);
+      return false;
+    });
+  }
+
+  checkEmpty() {
+    this.check((updates) => {
+      expect(updates.length).toEqual(0);
+    });
+  }
+
+  async waitNotification(
+    checker: (updates: CollectionUpdate<Json, Json>[]) => boolean,
+    timeout: number = 1000,
+  ) {
+    if (checker(this.updates)) return;
+    return new Promise<void>((resolve, reject) => {
+      try {
+        let rejected = false;
+        const timeoutHdl = setTimeout(() => {
+          rejected = true;
+          reject(new Error("Timeout"));
+        }, timeout);
+        this.resolver = () => {
+          if (rejected) return;
+          if (checker(this.updates)) {
+            clearTimeout(timeoutHdl);
+            resolve();
+            this.updates = [];
+          }
+        };
+      } catch (e: unknown) {
+        reject(e as Error);
+      }
+    });
+  }
+
+  async wait<K extends Json, V extends Json>(
+    values: [boolean, Entry<K, V>[]][],
+    timeout: number = 1000,
+  ) {
+    return this.waitNotification((updates) => {
+      const current = updates.map((u) => [
+        u.isInitial ? true : false,
+        u.values,
+      ]);
+      return isEqual(current, values);
+    }, timeout);
+  }
+
+  close() {
+    this.service.unsubscribe(this.sid);
   }
 }
 
@@ -926,6 +1028,55 @@ function initServiceWithExternalServiceFailure(): SkipService<
   };
 }
 
+// testResourceNotifications
+
+const resourceNotificationsService: SkipService<Input_NN, Input_NN> = {
+  initialData: { input: [] },
+  resources: { resource: NNResource },
+
+  createGraph(is: Input_NN) {
+    return is;
+  },
+};
+
+// testResourceRecomputeNotifications
+class Filter implements Mapper<number, number, number, number> {
+  constructor(private readonly values: number[]) {}
+
+  mapEntry(id: number, values: Values<number>): Iterable<[number, number]> {
+    return values
+      .toArray()
+      .flatMap((v) => (this.values.includes(v) ? [[id, v]] : []));
+  }
+}
+
+class ValuesResource implements Resource<Input_NN_NN> {
+  private readonly id: number;
+
+  constructor(params: Json) {
+    if (typeof params != "number")
+      throw new Error("Missing required number parameter 'id'");
+    this.id = params;
+  }
+
+  instantiate(inputs: Input_NN_NN): EagerCollection<number, number> {
+    const ids = inputs.input1.getArray(this.id);
+    return inputs.input2.map(Filter, ids as any);
+  }
+}
+
+const resourceRecomputeNotificationsService: SkipService<
+  Input_NN_NN,
+  Input_NN_NN
+> = {
+  initialData: { input1: [[1, [1, 2]]], input2: [[1, [1]]] },
+  resources: { resource: ValuesResource },
+
+  createGraph(is: Input_NN_NN) {
+    return is;
+  },
+};
+
 export function initTests(
   category: string,
   initService: (service: SkipService) => Promise<ServiceInstance>,
@@ -1402,45 +1553,46 @@ export function initTests(
       this.skip();
     }
     try {
+      const resource = "resource";
+      const instanceId = "unsafe.fixed.resource.ident.1";
       await service.update("input", [
         [1, [10]],
         [2, [20]],
         [3, [30]],
       ]);
-
-      await withRetries(async () =>
-        expect(await service.getAll("resource")).toEqual([
-          [1, [111]],
-          [2, [222]],
-          [3, [333]],
-        ]),
-      );
+      await service.instantiateResource(instanceId, resource, {});
+      const notifier = new Notifier(service, instanceId);
+      notifier.checkInit([
+        [1, [111]],
+        [2, [222]],
+        [3, [333]],
+      ]);
       await pgClient.query("UPDATE skip_test SET x = 1000 WHERE id = 1;");
       await pgClient.query("DELETE FROM skip_test WHERE id = 2;");
-      await withRetries(async () =>
-        expect(await service.getAll("resource")).toEqual([
-          [1, [1110]],
-          [2, [220]],
-          [3, [333]],
-        ]),
-      );
-      await service.instantiateResource(
-        "unsafe.fixed.resource.ident.3",
-        "streamingResource",
-        {},
-      );
+      await notifier.wait([
+        [false, [[1, [1110]]]],
+        [false, [[2, [220]]]],
+      ]);
+      expect(await service.getAll(resource)).toEqual([
+        [1, [1110]],
+        [2, [220]],
+        [3, [333]],
+      ]);
+      notifier.close();
+      const streamingResource = "streamingResource";
+      const instanceId2 = "unsafe.fixed.resource.ident.2";
 
-      await withRetries(async () =>
-        expect(await service.getAll("streamingResource")).toEqual([]),
-      );
+      await service.instantiateResource(instanceId2, streamingResource, {});
+      const notifier2 = new Notifier(service, instanceId2);
+      notifier2.checkInit([]);
 
       await pgClient.query("INSERT INTO skip_test (id, x) VALUES (5, 5);");
+      await notifier2.wait([[false, [[5, [5]]]]]);
+      expect(await service.getAll(streamingResource)).toEqual([[5, [5]]]);
+      notifier2.close();
 
-      await withRetries(async () =>
-        expect(await service.getAll("streamingResource")).toEqual([[5, [5]]]),
-      );
       await service.instantiateResource(
-        "unsafe.fixed.resource.ident.2",
+        "unsafe.fixed.resource.ident.3",
         "resourceWithException",
         {},
       );
@@ -1600,6 +1752,62 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
           /^(?:SkipRuntime\.ResourceInstanceInitFailed: )?Resource instance cannot be initialized:/,
         ),
       );
+    }
+  });
+
+  it("testResourceNotifications", async () => {
+    let service;
+    try {
+      service = await initService(resourceNotificationsService);
+      const resource = "resource";
+      const instanceId = "unsafe.fixed.resource.ident.1";
+      await service.instantiateResource(instanceId, resource, {});
+      const notifier = new Notifier(service, instanceId);
+      notifier.checkInit([]);
+      let values: Entry<number, number>[] = [
+        [0, [10]],
+        [1, [20]],
+      ];
+      await service.update("input", values);
+      notifier.checkUpdate(values);
+      values = [
+        [0, []],
+        [1, []],
+      ];
+      await service.update("input", values);
+      notifier.checkUpdate(values);
+      values = [
+        [0, [23, 43]],
+        [1, [54, 56]],
+      ];
+      await service.update("input", values);
+      notifier.checkUpdate(values);
+      service.closeResourceInstance(instanceId);
+    } finally {
+      if (service) await service.close();
+    }
+  });
+
+  it("testResourceRecomputeNotifications", async () => {
+    let service;
+    try {
+      service = await initService(resourceRecomputeNotificationsService);
+      const resource = "resource";
+      const instanceId = "unsafe.fixed.resource.ident.1";
+      await service.instantiateResource(instanceId, resource, 1);
+      const notifier = new Notifier(service, instanceId);
+      notifier.checkInit([[1, [1]]]);
+      await service.update("input1", [[1, [1]]]);
+      notifier.checkEmpty();
+      await service.update("input1", [[1, []]]);
+      notifier.checkUpdate([[1, []]]);
+      await service.update("input1", [[1, [2]]]);
+      notifier.checkEmpty();
+      await service.update("input1", [[1, [1, 2]]]);
+      notifier.checkUpdate([[1, [1]]]);
+      service.closeResourceInstance(instanceId);
+    } finally {
+      if (service) await service.close();
     }
   });
 }

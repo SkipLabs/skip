@@ -223,19 +223,64 @@ fun buildResourcesGraph(
     ResourceDef::keyType,
     SKStore.IntFile::type,
     context,
-    dirname.sub("availables"),
+    kResourceAvailablesDir,
     (_c, writer, key, _it) ~> {
       // map to ignore array changes
       // to prevent recompute on each add/remove session
       writer.set(key, SKStore.IntFile(1))
     },
   );
-  _ = availablesHdl.map(
+  statusesHdl = availablesHdl.map(
+    ResourceDef::keyType,
+    SKStore.StringFile::type,
+    context,
+    kResourceStatusDir,
+    (context, writer, key, _it) ~> {
+      resourceId = toResourceId(key.name, key.params);
+      statusRef = dirname.sub(resourceId);
+      // Status graph
+      sStatusHdl = context
+        .mkdir(
+          SKStore.DirName::keyType,
+          StatusFile::type,
+          statusRef.sub("status"),
+          Array[],
+          true,
+        )
+        .map(
+          SKStore.UnitID::keyType,
+          ResourceStatus::type,
+          context,
+          statusRef.sub("statuses"),
+          (_ctx, writer, key, it) ~> {
+            writer.set(
+              SKStore.UnitID::singleton,
+              ResourceStatus(key, it.first.status),
+            );
+          },
+        );
+      _ = sStatusHdl.map(
+        SKStore.UnitID::keyType,
+        RequestStatuses::type,
+        context,
+        statusRef.sub("all"),
+        (ctx, writer, key, it) ~> {
+          statuses = statusHdl.getArray(ctx, key).concat(it.toArray());
+          requestStatuses = RequestStatuses(statuses);
+          writer.set(key, requestStatuses);
+        },
+      );
+      writer.set(key, SKStore.StringFile(statusRef.toString()));
+    },
+  );
+  instancesHdl = statusesHdl.map(
     ResourceDef::keyType,
     ResourceInfo::type,
     context,
-    kResourceCollectionsDir,
-    (context, writer, key, _it) ~> {
+    kResourceInstancesDir,
+    (context, writer, key, it) ~> {
+      resourceId = toResourceId(key.name, key.params);
+      statusRef = SKStore.DirName::create(it.first.value);
       (runId, resources) = definitionHdl.maybeGet(
         context,
         SKStore.UnitID::singleton,
@@ -245,69 +290,62 @@ fun buildResourcesGraph(
       };
       pushContext(context);
       try {
-        resourceId = toResourceId(key.name, key.params);
-        statusRef = dirname.sub(resourceId);
-        // Status graph
-        sStatusHdl = context
-          .mkdir(
-            SKStore.DirName::keyType,
-            StatusFile::type,
-            statusRef.sub("status"),
-            Array[],
-            true,
-          )
-          .map(
-            SKStore.UnitID::keyType,
-            ResourceStatus::type,
-            context,
-            statusRef.sub("statuses"),
-            (_ctx, writer, key, it) ~> {
-              writer.set(
-                SKStore.UnitID::singleton,
-                ResourceStatus(key, it.first.status),
-              );
-            },
-          );
-        _ = sStatusHdl.map(
-          SKStore.UnitID::keyType,
-          RequestStatuses::type,
-          context,
-          statusRef.sub("all"),
-          (ctx, writer, key, it) ~> {
-            statuses = statusHdl.getArray(ctx, key).concat(it.toArray());
-            requestStatuses = RequestStatuses(statuses);
-            writer.set(key, requestStatuses);
-          },
-        );
         resourceBuilder = resources.get(key.name);
         resource = resourceBuilder.build(key.params);
         collections = servicesHdl.get(context, SKStore.SID(runId)).value;
         collection = resource.instantiate(collections);
-        // Ensure the name of the resource result
-        resourceData = collection.hdl.map(
-          JSONID::keyType,
-          JSONFile::type,
-          context,
-          dDirname.sub(resourceId),
-          (_ctx, writer, key, it) ~> {
-            writer.setArray(key, Array::createFromIterator(it.values())); // TODO: use it.toArray()
-          },
-        );
-        writer.set(
-          key,
-          ResourceInfo(
-            resourceId,
-            collection with {hdl => resourceData},
-            statusRef,
-            runId,
-          ),
-        );
+        writer.set(key, ResourceInfo(resourceId, collection, statusRef, runId));
         popContext()
       } catch {
       | ex ->
         popContext();
         throw ex
       }
+    },
+  );
+  // Copy the computed collection
+  //   - Ensure the name of the resource result
+  //   - Avoid destruction in case of graph recompute.
+  instancesCopyHdl = statusesHdl.map(
+    ResourceDef::keyType,
+    Handle::type,
+    context,
+    kResourceInstancesDir.sub("copy"),
+    (context, writer, key, it) ~> {
+      resourceId = toResourceId(key.name, key.params);
+      obsName = dDirname.sub(resourceId);
+      hdl = context
+        .mkdir(
+          ResourceDef::keyType,
+          SKStore.StringFile::type,
+          kResourceInstancesDir.sub("copy").sub(resourceId),
+          it.toArray().map(v -> (key, v)),
+        )
+        .map(
+          JSONID::keyType,
+          JSONFile::type,
+          context,
+          obsName,
+          (context, writer, key, _it) ~> {
+            info = instancesHdl.get(context, key);
+            info.collection.items(context).each((kv) -> {
+              writer.setArray(kv.i0, kv.i1.collect(Array))
+            });
+          },
+        );
+      writer.set(key, Handle(hdl))
+    },
+  );
+  _ = instancesHdl.map(
+    ResourceDef::keyType,
+    ResourceInfo::type,
+    context,
+    kResourceCollectionsDir,
+    (context, writer, key, it) ~> {
+      info = it.first;
+      resourceData = instancesCopyHdl.get(context, key).value;
+      !info.collection.hdl = resourceData;
+      writer.set(key, info)
     },
   );
 }
@@ -1107,7 +1145,7 @@ private fun sessionId(
 }
 
 private fun isResourceDir(dirName: SKStore.DirName): Bool {
-  dirName == kResourceAvailablesDir
+  dirName == kResourceStatusDir
 }
 
 class CollectionWriter(dirName: SKStore.DirName) {
