@@ -1705,7 +1705,7 @@ class EagerDir protected {
 
   fun getIter(context: mutable Context, key: Key): mutable Iterator<File> {
     path = Path::create(this.dirName, key);
-    context.addDep(path);
+    context.addRead(path);
     this.getIterRaw(key)
   }
 
@@ -2163,7 +2163,7 @@ class EagerDir protected {
   }
 
   fun size(context: mutable Context): Int {
-    context.addDep(Path::sizeTag(this.dirName));
+    context.addRead(Path::sizeTag(this.dirName));
     this.totalSize
   }
 
@@ -2171,7 +2171,7 @@ class EagerDir protected {
     context: mutable Context,
   ): mutable Iterator<(Key, mutable Iterator<File>)> {
     path = Path::filesTag(this.dirName);
-    context.addDep(path);
+    context.addRead(path);
     this.unsafeGetFileIter()
   }
 
@@ -2180,7 +2180,7 @@ class EagerDir protected {
     key: Key,
   ): mutable Iterator<(Tick, Path, Path, Array<File>)> {
     path = Path::create(this.dirName, key);
-    context.addDep(path);
+    context.addRead(path);
     this.unsafeGetAllDataIter(key)
   }
 
@@ -2189,12 +2189,12 @@ class EagerDir protected {
     key: Key,
   ): mutable Iterator<(Tick, Path, Array<File>)> {
     path = Path::create(this.dirName, key);
-    context.addDep(path);
+    context.addRead(path);
     this.unsafeGetDataIterWithoutTombs(key)
   }
 
   fun isEmpty(context: mutable Context): Bool {
-    context.addDep(Path::isEmptyTag(this.dirName));
+    context.addRead(Path::isEmptyTag(this.dirName));
     this.totalSize == 0
   }
 

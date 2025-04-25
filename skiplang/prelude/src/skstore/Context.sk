@@ -982,7 +982,7 @@ mutable class Context{
   }
 
   private mutable fun getDir(dirName: DirName): Dir {
-    this.addDep(Path::dirTag(dirName));
+    this.addRead(Path::dirTag(dirName));
     this.dirs.get(dirName);
   }
 
@@ -1081,7 +1081,7 @@ mutable class Context{
   }
 
   mutable fun maybeGetDir<T: File>(dirName: DirName): ?Dir {
-    this.addDep(Path::dirTag(dirName));
+    this.addRead(Path::dirTag(dirName));
     this.dirs.maybeGet(dirName);
   }
 
@@ -1089,7 +1089,7 @@ mutable class Context{
     this.dirs.maybeGet(dirName);
   }
 
-  mutable fun addDep(path: Path): void {
+  mutable fun addRead(path: Path): void {
     this.!reads = this.reads.set(path);
   }
 
