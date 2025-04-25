@@ -995,6 +995,44 @@ const resourceNotificationsService: SkipService<Input_NN, Input_NN> = {
   },
 };
 
+// testResourceRecomputeNotifications
+class Filter implements Mapper<number, number, number, number> {
+  constructor(private readonly values: number[]) {}
+
+  mapEntry(id: number, values: Values<number>): Iterable<[number, number]> {
+    return values
+      .toArray()
+      .flatMap((v) => (this.values.includes(v) ? [[id, v]] : []));
+  }
+}
+
+class ValuesResource implements Resource<Input_NN_NN> {
+  private readonly id: number;
+
+  constructor(params: Json) {
+    if (typeof params != "number")
+      throw new Error("Missing required number parameter 'id'");
+    this.id = params;
+  }
+
+  instantiate(inputs: Input_NN_NN): EagerCollection<number, number> {
+    const ids = inputs.input1.getArray(this.id);
+    return inputs.input2.map(Filter, ids as any);
+  }
+}
+
+const resourceRecomputeNotificationsService: SkipService<
+  Input_NN_NN,
+  Input_NN_NN
+> = {
+  initialData: { input1: [[1, [1, 2]]], input2: [[1, [1]]] },
+  resources: { resource: ValuesResource },
+
+  createGraph(is: Input_NN_NN) {
+    return is;
+  },
+};
+
 export function initTests(
   category: string,
   initService: (service: SkipService) => Promise<ServiceInstance>,
@@ -1699,6 +1737,29 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
       ];
       await service.update("input", values);
       notifier.checkUpdate(values);
+      service.closeResourceInstance(instanceId);
+    } finally {
+      if (service) await service.close();
+    }
+  });
+
+  it("testResourceRecomputeNotifications", async () => {
+    let service;
+    try {
+      service = await initService(resourceRecomputeNotificationsService);
+      const resource = "resource";
+      const instanceId = "unsafe.fixed.resource.ident.1";
+      await service.instantiateResource(instanceId, resource, 1);
+      const notifier = new Notifier(service, instanceId);
+      notifier.checkInit([[1, [1]]]);
+      await service.update("input1", [[1, [1]]]);
+      notifier.checkEmpty();
+      await service.update("input1", [[1, []]]);
+      notifier.checkUpdate([[1, []]]);
+      await service.update("input1", [[1, [2]]]);
+      notifier.checkEmpty();
+      await service.update("input1", [[1, [1, 2]]]);
+      notifier.checkUpdate([[1, [1]]]);
       service.closeResourceInstance(instanceId);
     } finally {
       if (service) await service.close();
