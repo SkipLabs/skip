@@ -54,9 +54,7 @@ class LazyDir protected {
       };
 
       arrowKey = ArrowKey{parentName => dirName, childName => dirName, key};
-      for (read in context.reads) {
-        context.!deps = context.deps.set(read, arrowKey);
-      };
+      context.updateNewDeps(arrowKey, context.reads);
 
       !dir = context.unsafeGetLazyDir(dirName);
       !dir.data[key] = result;
