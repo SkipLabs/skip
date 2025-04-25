@@ -341,7 +341,7 @@ mutable base class WriteChecker {
    because of a cache.
 */
 mutable class Context{
-  mutable toPurge: SortedSet<DirName> = SortedSet[],
+  private mutable toPurge: SortedSet<DirName> = SortedSet[],
   private mutable dirs: Dirs = Dirs{},
   mutable reads: SortedSet<Path> = SortedSet[],
   private mutable time: Time = Time(0),
@@ -1135,6 +1135,10 @@ mutable class Context{
 
   readonly fun getDirsChangesAfter(start: Tick): SortedSet<DirName> {
     this.dirs.getChangesAfter(start)
+  }
+
+  mutable fun addToPurge(dirName: DirName): void {
+    this.!toPurge = this.toPurge.set(dirName);
   }
 
   mutable fun purge(): void {
