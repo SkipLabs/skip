@@ -1183,10 +1183,10 @@ class Evaluator{options: Options, user: ?UserFile} {
         // This phase just populates the data.
         _ = SKDB.evalSelect(context, cselect1, None());
         Some((context, delta, _) ~> {
-          sameDeps = unsafeCompareSets(context.deps.data, delta.deps.data);
+          sameDeps = SKStore.Context::unsafeCompareDeps(context, delta);
           // If the deps haven't changed, that means we can reuse
           // the pre-computed data.
-          if (sameDeps != 0) {
+          if (sameDeps) {
             changedDirNames = delta.getDirsChangesAfter(startTick);
             for (changedDirName in changedDirNames) {
               if (context.unsafeMaybeGetDir(changedDirName).isNone()) {
@@ -1665,12 +1665,6 @@ class Evaluator{options: Options, user: ?UserFile} {
 
 @cpp_extern("SKIP_String_concatN")
 native fun concatArray(Array<String>): String;
-
-@cpp_extern("SKIP_unsafe_compare_sets")
-native fun unsafeCompareSets(
-  SortedMap<SKStore.Path, SortedSet<SKStore.ArrowKey>>,
-  SortedMap<SKStore.Path, SortedSet<SKStore.ArrowKey>>,
-): Int32;
 
 fun getLine(buffer: Buffer, pos: Int): Int {
   line = 1;
@@ -2683,4 +2677,22 @@ fun printTable(
   )
 }
 
+module end;
+
+module SKStore;
+
+@cpp_extern("SKIP_unsafe_compare_sets")
+native fun unsafeCompareSets(
+  SortedMap<SKStore.Path, SortedSet<SKStore.ArrowKey>>,
+  SortedMap<SKStore.Path, SortedSet<SKStore.ArrowKey>>,
+): Int32;
+
+extension class Context {
+  static fun unsafeCompareDeps(
+    c1: readonly SKStore.Context,
+    c2: readonly SKStore.Context,
+  ): Bool {
+    unsafeCompareSets(c1.deps.data, c2.deps.data) != 0
+  }
+}
 module end;

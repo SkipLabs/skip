@@ -350,7 +350,7 @@ mutable class Context{
   private mutable tick: Tick = Tick(1),
   private mutable lazyCapacity: Int = 10,
   private mutable toUpdate: SortedMap<(TimeStack, Time), Arrow> = SortedMap[],
-  mutable deps: Deps = Deps[],
+  private mutable deps: Deps = Deps[],
   mutable debugMode: Bool = debugMode,
   private mutable failOnExn: Bool = true,
   mutable hasPre: SortedSet<DirName> = SortedSet[],
@@ -542,6 +542,15 @@ mutable class Context{
     for (path in reads) {
       this.!deps = this.deps.set(path, reader);
     };
+  }
+
+  mutable fun removeDeps(
+    reader: ArrowKey,
+    reads: mutable Iterator<Path>,
+  ): void {
+    for (path in reads) {
+      this.!deps = this.deps.remove(path, reader);
+    }
   }
 
   mutable fun initPre(): void {
