@@ -26,7 +26,8 @@ INSERT INTO users("id", "name", "email") VALUES
        (5, 'Julien', 'julien@skiplabs.io'),
        (6, 'Laure', 'laure@skiplabs.io'),
        (7, 'Lucas', 'lucas@skiplabs.io'),
-       (8, 'Mehdi', 'mehdi@skiplabs.io');
+       (8, 'Mehdi', 'mehdi@skiplabs.io'),
+       (9, 'Hugo', 'hugo@skiplabs.io');
 SELECT setval('users_id_seq', max(id) + 1) FROM users;
 
 INSERT INTO posts("id", "title", "url", "body", "author_id", "date") VALUES
