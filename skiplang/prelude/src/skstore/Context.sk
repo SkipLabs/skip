@@ -353,7 +353,7 @@ mutable class Context{
   private mutable deps: Deps = Deps[],
   mutable debugMode: Bool = debugMode,
   private mutable failOnExn: Bool = true,
-  mutable hasPre: SortedSet<DirName> = SortedSet[],
+  private mutable hasPre: SortedSet<DirName> = SortedSet[],
   mutable newDirs: SortedSet<DirName> = SortedSet[],
   mutable toReset: SortedSet<DirName> = SortedSet[],
   mutable globals: SortedMap<String, File> = SortedMap[],
@@ -1048,6 +1048,13 @@ mutable class Context{
     | Some(d @ EagerDir _) -> Some(d)
     | _ -> invariant_violation("maybeGetEagerDir: Was expecting EagerDir")
     }
+  }
+
+  mutable fun pre(dirName: DirName): ?EagerDir {
+    if (!this.hasPre.contains(dirName)) {
+      this.!hasPre = this.hasPre.add(dirName);
+    };
+    this.maybeGetEagerDir(dirName.pre())
   }
 
   mutable fun removeDir(dirName: DirName): void {
