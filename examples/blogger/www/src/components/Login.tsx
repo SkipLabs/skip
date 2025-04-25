@@ -27,7 +27,9 @@ export function Login() {
         <form onSubmit={handleSubmit} className="login-form">
           {error && <div className="error-message">{error}</div>}
           <div className="form-group">
-            <label htmlFor="username" className="form-label">Username</label>
+            <label htmlFor="username" className="form-label">
+              Username
+            </label>
             <input
               id="username"
               type="text"
@@ -38,7 +40,9 @@ export function Login() {
             />
           </div>
           <div className="form-group">
-            <label htmlFor="password" className="form-label">Password</label>
+            <label htmlFor="password" className="form-label">
+              Password
+            </label>
             <input
               id="password"
               type="password"
@@ -48,9 +52,11 @@ export function Login() {
               required
             />
           </div>
-          <button type="submit" className="login-button">Login</button>
+          <button type="submit" className="login-button">
+            Login
+          </button>
         </form>
       </div>
     </div>
   );
-} 
+}
