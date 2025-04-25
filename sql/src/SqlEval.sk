@@ -2213,7 +2213,7 @@ fun printConsumeDiffResponse(acks: ?StdoutCheckpointAck): void {
 }
 
 fun printContext(context: mutable SKStore.Context): void {
-  context.globals.maybeGet("Stdout") match {
+  context.getGlobal("Stdout") match {
   | None() -> void
   | Some(StdoutFile(format, stdout)) ->
     for (selectDir in stdout.toArray().reversed()) {
@@ -2242,7 +2242,7 @@ fun printContext(context: mutable SKStore.Context): void {
     }
   | Some _ -> invariant_violation("Unexpected Stdout type")
   };
-  context.globals.maybeGet("Ack") match {
+  context.getGlobal("Ack") match {
   | None() -> void
   | Some(acks @ StdoutCheckpointAck _) -> printConsumeDiffResponse(Some(acks))
   | Some _ -> invariant_violation("Unexpected Ack type")
