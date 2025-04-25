@@ -1409,7 +1409,12 @@ private native fun destroyObstack(Obstack): void;
 
 @debug
 @cpp_extern("SKIP_destroy_Obstack_with_value")
-private native fun destroyObstackWithValue<T>(Obstack, List<T>): List<T>;
+private native fun destroyObstackWithValueRaw<T>(Obstack, Box<T>): Box<T>;
+
+@always_inline
+fun destroyObstackWithValue<T>(obstack: Obstack, value: List<T>): List<T> {
+  destroyObstackWithValueRaw(obstack, Box(value)).unbox()
+}
 
 @debug
 @cpp_extern("SKIP_copy_value_to_Obstack")
