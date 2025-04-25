@@ -1836,7 +1836,7 @@ private mutable class SQLContext(
     ) ~> void,
   ): Result<void, Error> {
     this._exec(icontext ~> {
-      context = SKStore.Context::fromSaved(icontext);
+      context = icontext.mclone();
       underLockF = f(context);
       (context.clone(), underLockF);
     });

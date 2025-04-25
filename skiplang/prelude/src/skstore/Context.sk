@@ -480,10 +480,6 @@ mutable class Context private {
     }
   }
 
-  static fun fromSaved(ctx: readonly Context): mutable this {
-    ctx.mclone()
-  }
-
   mutable fun replaceFromSaved(ctx: readonly Context): void {
     this.!toPurge = ctx.toPurge;
     this.!dirs = ctx.dirs;
@@ -1253,7 +1249,7 @@ fun cloneContextWithError(
   context: Context,
   error: .Exception,
 ): readonly Context {
-  newContext = Context::fromSaved(context);
+  newContext = context.mclone();
   newContext.setGlobal("Error", ErrorFile(error));
   newContext
 }
@@ -1281,7 +1277,7 @@ fun resolveContext(
     | _ -> void
     };
 
-    newRoot = Context::fromSaved(root);
+    newRoot = root.mclone();
     newRoot.!globals = delta.globals;
     hasVersioning = false;
 
@@ -1636,7 +1632,7 @@ fun runLocked(
   gGlobalLock();
   root = gContextGetNoLock();
   start = root.getTick();
-  context = Context::fromSaved(root);
+  context = root.mclone();
   f(context);
   newRoot = gContextSyncNoLock(
     root.getTick(),
@@ -1661,7 +1657,7 @@ fun runWithGc(
   _ = runWithGcIntern(
     initCtx,
     icontext ~> {
-      context = Context::fromSaved(icontext);
+      context = icontext.mclone();
       cop = f(context);
       (context.clone(), cop);
     },
@@ -1679,13 +1675,13 @@ fun runWithGcReturnContext(
   result = runWithGcIntern(
     initCtx,
     icontext ~> {
-      context = Context::fromSaved(icontext);
+      context = icontext.mclone();
       cop = f(context);
       (context.clone(), cop);
     },
     synchronizer,
   );
-  Context::fromSaved(result)
+  result.mclone()
 }
 
 fun withRegion<T>(
@@ -1928,7 +1924,7 @@ fun runWithResult<T, F>(
   | Some _ -> gUnsafeContextGet()
   };
   try {
-    context = Context::fromSaved(current);
+    context = current.mclone();
     res = f(context);
     startTick = current.getTick();
     synchronizer match {
