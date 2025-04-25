@@ -1136,6 +1136,16 @@ mutable class Context{
   readonly fun getDirsChangesAfter(start: Tick): SortedSet<DirName> {
     this.dirs.getChangesAfter(start)
   }
+
+  mutable fun purge(): void {
+    for (dirName in this.toPurge) {
+      this.unsafeMaybeGetEagerDir(dirName) match {
+      | None() -> void
+      | Some(dir) -> this.setDir(dir.purge(this.purgeFrom(this, dir)))
+      }
+    };
+    this.!toPurge = SortedSet[];
+  }
 }
 
 // @cpp_extern("SKIP_print_backtrace")
@@ -1294,15 +1304,7 @@ fun resolveContext(
     };
     newRoot
   };
-  for (dirName in context.toPurge) {
-    context.unsafeMaybeGetEagerDir(dirName) match {
-    | None() -> void
-    | Some(dir) ->
-      !dir = dir.purge(context.purgeFrom(context, dir));
-      context.setDir(dir)
-    }
-  };
-  context.!toPurge = SortedSet[];
+  context.purge();
   context
 }
 
