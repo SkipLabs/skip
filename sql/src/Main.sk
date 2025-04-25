@@ -554,7 +554,7 @@ fun execDiff(args: Cli.ParseResults, options: SKDB.Options): void {
   since = args.maybeGetString("since").map(v -> v.toInt());
   SKDB.runSql(options, origContext ~> {
     context = origContext.mclone();
-    sub = context.sessions.maybeGet(sessionID) match {
+    sub = context.getSession(sessionID) match {
     | None() ->
       print_error("Error: session not found");
       skipExit(2)
@@ -590,7 +590,7 @@ fun execDisconnect(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
   sessionID = args.getString("session-id").toInt();
   SKDB.runLockedSql(options, context ~> {
-    context.sessions.maybeGet(sessionID) match {
+    context.getSession(sessionID) match {
     | None() ->
       print_error("Error: session not found");
       skipExit(2)

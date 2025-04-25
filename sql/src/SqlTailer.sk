@@ -176,7 +176,7 @@ fun tailSub(
   legacyTableNames: SortedMap<P.Name, P.Name> = SortedMap::create();
   sub = SKStore.withContext(gContext -> {
     // rebuild the sub with extra filtering as supported by tail
-    gContext.sessions.maybeGet(sessionID) match {
+    gContext.getSession(sessionID) match {
     | None() ->
       print_error("Error: session not found");
       skipExit(2)
@@ -250,7 +250,7 @@ fun tailSub(
   loop {
     localObstack = SKStore.newObstack();
     tick = SKStore.withContext<?Int>(context -> {
-      context.sessions.maybeGet(sessionID) match {
+      context.getSession(sessionID) match {
       | None() ->
         print_error("Error: session not found");
         skipExit(2)

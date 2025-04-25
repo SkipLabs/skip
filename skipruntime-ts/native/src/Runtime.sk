@@ -1289,7 +1289,7 @@ fun destroyReactiveResource(
     .map(SKStore.IntFile::type) match {
   | Some(subId) ->
     session = subId.value;
-    context.sessions.maybeGet(session).each(sub -> {
+    context.getSession(session).each(sub -> {
       close = sub.cmd match {
       | SKStore.NWatch(_, _, _, close, _) -> close
       | _ -> invariant_violation("Not manage session kind")
@@ -1394,7 +1394,7 @@ fun unsubscribe(
   session: Int,
   update: Bool = true,
 ): void {
-  context.sessions.maybeGet(session).each(sub -> {
+  context.getSession(session).each(sub -> {
     (identifier, close) = sub.cmd match {
     | SKStore.NWatch(identifier, _, _, close, _) -> (identifier, close)
     | _ -> invariant_violation("Not manage session kind")
