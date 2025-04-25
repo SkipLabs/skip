@@ -1858,25 +1858,6 @@ class EagerDir protected {
     this with {childDirs, slices, purgeCount}
   }
 
-  fun copyTo(
-    context: mutable Context,
-    target: DirName,
-    copy: ?Postponable = None(),
-    writer: ?(
-      DirName,
-      Key,
-      readonly Context ~> Array<File>,
-    ) ~> Postponable = None(),
-  ): void {
-    context.postpone(
-      copy match {
-      | Some(c) -> c
-      | _ -> CopyTo(this.getDirName(), target)
-      },
-    );
-    context.setDir(this with {optCopy => Some((target, writer))});
-  }
-
   fun onDelete(
     context: mutable Context,
     optOnDelete: ?Postponable = None(),

@@ -29,21 +29,6 @@ class ToWrite(
   }
 }
 
-class CopyTo(from: DirName, to: DirName) extends Postponable {
-  //
-  fun perform(context: mutable Context): void {
-    context.maybeGetEagerDir(this.from).each(fdir ->
-      context.unsafeMaybeGetEagerDir(this.to).each(tdir -> {
-        for (kv in fdir.unsafeGetFileIter()) {
-          (key, files) = kv;
-          rvalues = files.collect(Array);
-          tdir.writeArray(context, key, rvalues)
-        };
-      })
-    )
-  }
-}
-
 /*****************************************************************************/
 /* Sessions. */
 /*****************************************************************************/
