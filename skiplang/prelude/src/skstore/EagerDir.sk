@@ -1426,16 +1426,14 @@ class EagerDir protected {
     limit: Tick,
     key: Key,
   ): mutable Iterator<(Tick, Path, Path, Array<File>)> {
+    fixedIter = this.fixedData.getIterAfter(limit, key);
     this.data.maybeGet(key) match {
     | None() ->
-      fixedIter = this.fixedData.getIterAfter(limit, key);
       for (row in fixedIter) {
         yield row
       }
     | Some(modified) ->
-      fixed = FixedDataMapIterator::create(
-        this.fixedData.getIterAfter(limit, key),
-      );
+      fixed = FixedDataMapIterator::create(fixedIter);
 
       for (tickSourceWriterFiles in modified.itemsAfter(limit)) {
         (tick, source, writer, files) = tickSourceWriterFiles;
