@@ -645,7 +645,6 @@ class EagerDir protected {
   optOnDelete: ?Postponable = None(),
 } extends Dir {
   static fun create{
-    time: Time,
     timeStack: TimeStack,
     dirName: DirName,
     input: Bool,
@@ -656,7 +655,6 @@ class EagerDir protected {
     optOnDelete: ?Postponable = None(),
   }: this {
     static{
-      time,
       timeStack,
       dirName,
       input,
@@ -1240,10 +1238,7 @@ class EagerDir protected {
     };
     childDir = context.unsafeGetEagerDir(childName);
     time = context.timeStamp();
-    !childDir = childDir with {
-      time,
-      timeStack => TimeStack::create(context, time),
-    };
+    !childDir = childDir with {timeStack => TimeStack::create(context, time)};
     context.setDir(childDir);
     context.!newDirs = context.newDirs.set(childName);
   }
@@ -1376,7 +1371,6 @@ class EagerDir protected {
       fixedOld = FixedSourceMap::create(oldVec, true);
 
       EagerDir{
-        time,
         timeStack,
         dirName => childName,
         input => false,
@@ -2024,13 +2018,12 @@ class EagerDir protected {
   }
 
   fun timeMaxMinus(): this {
-    !this.time.value = Int::max - this.time.value;
     !this.timeStack = this.timeStack.maxMinus();
     this
   }
 
   fun reverseTime(): this {
-    this with {time => -this.time, timeStack => -this.timeStack}
+    this with {timeStack => -this.timeStack}
   }
 
   fun updateNewDirs(

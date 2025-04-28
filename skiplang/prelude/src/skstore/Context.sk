@@ -248,7 +248,9 @@ value class Time(value: Int) uses Orderable, Show {
   }
 }
 
-class TimeStack private (private values: Array<Time>) uses Orderable {
+class TimeStack private (
+  private values: /* Invariant: non-empty array */ Array<Time>,
+) uses Orderable {
   static fun createInput(time: Time): this {
     static(Array[time])
   }
@@ -263,6 +265,10 @@ class TimeStack private (private values: Array<Time>) uses Orderable {
   fun extend(time: Time): this {
     !this.values = this.values.concat(Array[time]);
     this
+  }
+
+  fun getLast(): Time {
+    this.values.last()
   }
 
   fun negate(): this {
@@ -559,7 +565,6 @@ mutable class Context private {
           this.!newDirs = this.newDirs.add(preDirName);
           time = this.timeStamp();
           preDir = EagerDir::create{
-            time,
             input => false,
             timeStack => TimeStack::createInput(time),
             dirName => preDirName,
@@ -957,7 +962,6 @@ mutable class Context private {
     totalSize = fixedData.data.size();
     creator = this.currentArrow();
     dir = EagerDir::create{
-      time,
       timeStack => TimeStack::create(this, time),
       input => true,
       dirName,
