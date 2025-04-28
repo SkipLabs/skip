@@ -143,7 +143,7 @@ fun errorAllExistingSubs(
   context: mutable SKStore.Context,
   dir: SKStore.DirName,
 ): void {
-  context.sessions.values().each(sub ->
+  context.getSessions().values().each(sub ->
     if (sub.destinationSource is Some _) {
       for (dirSub in sub.dirSubs) {
         if (dirSub.dirName == dir) {
@@ -306,7 +306,7 @@ fun dirDescrCopy(
     creator => context.currentArrow(),
   };
   context.setDir(dir);
-  limit = context.tick;
+  limit = context.getTick();
   _ = SKStore.EagerDir::apply(
     context,
     dirName,
@@ -482,7 +482,7 @@ fun getSubsDirs(
             tdir = context.unsafeGetEagerDir(dirName);
             ignoredSrc = SKStore.Path::iid(dirDescr.dirName, inputSrc);
             (file: SKStore.Key) -> {
-              rows = tdir.getAllDataIter(context.mclone(), file).collect(Array);
+              rows = tdir.unsafeGetAllDataIter(file).collect(Array);
               !updateIsFromIgnoredSource(ignoredSrc, rows)
             }
           }
@@ -658,7 +658,7 @@ fun getIndexByName(
 fun getDirDescrs(
   origContext: readonly SKStore.Context,
 ): SortedMap<P.Name, SKDB.DirDescr> {
-  context = SKStore.Context::fromSaved(origContext.clone());
+  context = origContext.mclone();
   getTableDir(context)
     .items(context)
     .flatMap(x -> x.i1)
@@ -666,7 +666,7 @@ fun getDirDescrs(
 }
 
 fun getTables(origContext: readonly SKStore.Context): Array<DirDescr> {
-  context = SKStore.Context::fromSaved(origContext.clone());
+  context = origContext.mclone();
   getTableDir(context)
     .items(context)
     .flatMap(x -> x.i1)
@@ -809,7 +809,7 @@ fun dumpTable(
   suffix: ?String,
   legacySchema: Bool = false,
 ): void {
-  context = SKStore.Context::fromSaved(origContext.clone());
+  context = origContext.mclone();
   tableDir = getTableDir(context);
 
   dirDescrOpt = if (legacySchema) {
@@ -840,7 +840,7 @@ fun dumpTable(
 }
 
 fun dumpTables(origContext: readonly SKStore.Context, suffix: ?String): void {
-  context = SKStore.Context::fromSaved(origContext.clone());
+  context = origContext.mclone();
   handle = getTableDir(context);
   sinkName = SKStore.DirName::create("/sink_" + SKStore.genSym(0) + "/");
   _ = handle.map(
@@ -870,7 +870,7 @@ fun dumpTables(origContext: readonly SKStore.Context, suffix: ?String): void {
 }
 
 fun dumpInserts(origContext: readonly SKStore.Context): void {
-  context = SKStore.Context::fromSaved(origContext.clone());
+  context = origContext.mclone();
   handle = getTableDir(context);
   sinkName = SKStore.DirName::create("/sink_" + SKStore.genSym(0) + "/");
   _ = handle.map(
@@ -909,7 +909,7 @@ fun dumpInserts(origContext: readonly SKStore.Context): void {
 }
 
 fun dumpView(origContext: readonly SKStore.Context, viewName: String): void {
-  context = SKStore.Context::fromSaved(origContext.clone());
+  context = origContext.mclone();
   hviews = getViewsDir(context);
   viewsDir = context.unsafeGetEagerDir(hviews.dirName);
   arr = viewsDir.getArrayRaw(SKStore.SID(viewName));
@@ -923,7 +923,7 @@ fun dumpView(origContext: readonly SKStore.Context, viewName: String): void {
 }
 
 fun dumpViews(origContext: readonly SKStore.Context): void {
-  context = SKStore.Context::fromSaved(origContext.clone());
+  context = origContext.mclone();
   handle = getViewsDir(context);
   sinkName = SKStore.DirName::create("/sink_" + SKStore.genSym(0) + "/");
   sortedName = SKStore.DirName::create("/sorted_" + SKStore.genSym(0) + "/");

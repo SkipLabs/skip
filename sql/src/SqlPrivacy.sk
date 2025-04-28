@@ -677,7 +677,13 @@ fun checkUserCanWriteRow(
 // given user.
 /*****************************************************************************/
 
+value class TableIndexes(authorIdx: ?Int, accessIdx: ?Int)
+
+/* This class is mutable only because of the cache, otherwise
+   it behaves as if it wasn't mutable. A frozen clone and a
+   mutable clone should behave identically. */
 mutable class AccessSolver private {
+  private tables: SortedMap<SKStore.DirName, TableIndexes>,
   userID: String,
   userMask: Permission,
   private mutable cache: SortedMap<String, Permission>,
@@ -717,18 +723,18 @@ mutable class AccessSolver private {
     dirName: SKStore.DirName,
     authorIdx: ?Int,
     accessIdx: ?Int,
-  ): void {
-    tableIndexes = SKStore.TableIndexes(authorIdx, accessIdx);
-    this.!tables[dirName] = tableIndexes;
+  ): mutable this {
+    !this.tables[dirName] = TableIndexes(authorIdx, accessIdx);
+    this
   }
 
   private mutable fun getPermissions(
     context: readonly SKStore.Context,
     groupID: String,
   ): Permission {
-    if (context.tick != this.currentTick) {
+    if (context.getTick() != this.currentTick) {
       this.!cache = SortedMap[];
-      this.!currentTick = context.tick;
+      this.!currentTick = context.getTick();
     };
     this.cache.maybeGet(groupID) match {
     | None() ->
@@ -784,28 +790,31 @@ mutable class AccessSolver private {
   mutable fun checkWrite(
     context: readonly SKStore.Context,
     dirName: SKStore.DirName,
-    indexes: SKStore.TableIndexes,
     key: SKStore.Key,
     files: Array<SKStore.File>,
   ): void {
-    key match {
-    | rowKey @ RowKey _ ->
-      rowValues = rowKey.getRowValues();
-      if (files.size() == 0) {
-        !rowValues = rowValues.setRepeat(0);
-      };
-      checkUserCanWriteRow(
-        context,
-        this,
-        dirName.toString().stripPrefix("/").stripSuffix("/"),
-        indexes.authorIdx,
-        indexes.accessIdx,
-        rowValues,
-      ) match {
-      | SKDB.AROK() -> void
-      | SKDB.ARError(err) -> throw SqlError(0, err.toString())
+    this.tables.maybeGet(dirName) match {
+    | None() -> void
+    | Some(indexes) ->
+      key match {
+      | rowKey @ RowKey _ ->
+        rowValues = rowKey.getRowValues();
+        if (files.size() == 0) {
+          !rowValues = rowValues.setRepeat(0);
+        };
+        checkUserCanWriteRow(
+          context,
+          this,
+          dirName.toString().stripPrefix("/").stripSuffix("/"),
+          indexes.authorIdx,
+          indexes.accessIdx,
+          rowValues,
+        ) match {
+        | SKDB.AROK() -> void
+        | SKDB.ARError(err) -> throw SqlError(0, err.toString())
+        }
+      | _ -> void
       }
-    | _ -> void
     }
   }
 
@@ -849,6 +858,18 @@ fun userPrivacyChanged(
   user = UserFile::create(context, userID);
   skdbGroupPermissions.hasChangedForUser(context, user, tick, destination) ||
     skdbUserPermissions.hasChangedForUser(context, user, tick, destination)
+}
+
+module end;
+
+module SKStore;
+
+extension base class WriteChecker {
+  mutable fun addTable(
+    tableName: DirName,
+    authorIdxOpt: ?Int,
+    accessIdxOpt: ?Int,
+  ): mutable this;
 }
 
 module end;

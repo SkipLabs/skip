@@ -1165,7 +1165,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         context,
         key,
         SelectFile(
-          context.tick.value,
+          context.getTick().value,
           viewName,
           reactive,
           view.toString(),
@@ -1179,14 +1179,14 @@ class Evaluator{options: Options, user: ?UserFile} {
         if (inTransaction) {
           error(pos, "Cannot create a reactive view in a transaction");
         };
-        startTick = context.tick;
+        startTick = context.getTick();
         // This phase just populates the data.
         _ = SKDB.evalSelect(context, cselect1, None());
         Some((context, delta, _) ~> {
-          sameDeps = unsafeCompareSets(context.deps.data, delta.deps.data);
+          sameDeps = SKStore.Context::unsafeCompareDeps(context, delta);
           // If the deps haven't changed, that means we can reuse
           // the pre-computed data.
-          if (sameDeps != 0) {
+          if (sameDeps) {
             changedDirNames = delta.getDirsChangesAfter(startTick);
             for (changedDirName in changedDirNames) {
               if (context.unsafeMaybeGetDir(changedDirName).isNone()) {
@@ -1609,7 +1609,9 @@ class Evaluator{options: Options, user: ?UserFile} {
       authorIdx = dirDescr.cols.maybeGet(skdbAuthorColName);
       accessIdx = dirDescr.cols.maybeGet(skdbAccessColName);
       if (authorIdx is Some _ || accessIdx is Some _) {
-        checker.addTable(dirDescr.dirName, authorIdx, accessIdx);
+        context.!writeChecker = Some(
+          checker.addTable(dirDescr.dirName, authorIdx, accessIdx),
+        );
       }
     };
 
@@ -1663,12 +1665,6 @@ class Evaluator{options: Options, user: ?UserFile} {
 
 @cpp_extern("SKIP_String_concatN")
 native fun concatArray(Array<String>): String;
-
-@cpp_extern("SKIP_unsafe_compare_sets")
-native fun unsafeCompareSets(
-  SortedMap<SKStore.Path, SortedSet<SKStore.ArrowKey>>,
-  SortedMap<SKStore.Path, SortedSet<SKStore.ArrowKey>>,
-): Int32;
 
 fun getLine(buffer: Buffer, pos: Int): Int {
   line = 1;
@@ -1740,7 +1736,7 @@ fun sqlPurgeFrom(
     table = getSqlTableName(dir.getDirName());
     ackTable = feedbackTable(table);
     watermark = getWatermark(ctx, ackTable, Some(replicationId));
-    default = SKStore.Tick(ctx.tick.value - 1000);
+    default = SKStore.Tick(ctx.getTick().value - 1000);
     watermark match {
     | Some(SKStore.Tick(x)) if (x < default.value) -> SKStore.Tick(x - 1)
     | _ -> default
@@ -1749,11 +1745,7 @@ fun sqlPurgeFrom(
 }
 
 fun makeSqlContext(): SKStore.Context {
-  SKStore.Context{
-    canReuse => SKStore.CRAlways(SortedSet::create()),
-    failOnExn => true,
-    removeSubDirs => true,
-  }
+  SKStore.Context::create{canReuse => SKStore.CRAlways(SortedSet::create())}
 }
 
 class StmtFile(stmt: P.Stmt) extends SKStore.File
@@ -1810,14 +1802,14 @@ private mutable class SQLContext(
       ) ~> void,
     ),
   ): void {
-    startTick = this.context.tick;
+    startTick = this.context.getTick();
     pos = SKStore.newObstack();
 
     (newContext, underLockF) = try {
-      f(this.context with {globals => this.globals})
+      f(this.context.withGlobals(this.globals))
     } catch {
     | ex ->
-      cexn = SKStore.destroyObstackWithValue(pos, List[ex]).getHead();
+      cexn = SKStore.destroyObstackWithValue(pos, ex);
       throw cexn
     };
 
@@ -1844,7 +1836,7 @@ private mutable class SQLContext(
     ) ~> void,
   ): Result<void, Error> {
     this._exec(icontext ~> {
-      context = SKStore.Context::fromSaved(icontext);
+      context = icontext.mclone();
       underLockF = f(context);
       (context.clone(), underLockF);
     });
@@ -2127,7 +2119,7 @@ fun updateTableMap(context: mutable SKStore.Context): void {
   | None() ->
     TableMap{
       version => Version(SKStore.genSym(0)),
-      startTick => context.tick,
+      startTick => context.getTick(),
       map => SortedMap[],
     }
   | Some(file) -> TableMap::type(file)
@@ -2218,7 +2210,7 @@ fun printConsumeDiffResponse(acks: ?StdoutCheckpointAck): void {
 }
 
 fun printContext(context: mutable SKStore.Context): void {
-  context.globals.maybeGet("Stdout") match {
+  context.getGlobal("Stdout") match {
   | None() -> void
   | Some(StdoutFile(format, stdout)) ->
     for (selectDir in stdout.toArray().reversed()) {
@@ -2242,12 +2234,12 @@ fun printContext(context: mutable SKStore.Context): void {
       !producedAnyOutput = producedAnyOutput || producedOutput
     };
     if (producedAnyOutput) {
-      writer.write(`:${context.tick.value.toString()}\n`);
+      writer.write(`:${context.getTick().value.toString()}\n`);
       writer.flush()
     }
   | Some _ -> invariant_violation("Unexpected Stdout type")
   };
-  context.globals.maybeGet("Ack") match {
+  context.getGlobal("Ack") match {
   | None() -> void
   | Some(acks @ StdoutCheckpointAck _) -> printConsumeDiffResponse(Some(acks))
   | Some _ -> invariant_violation("Unexpected Ack type")
@@ -2352,7 +2344,7 @@ fun getReactiveQueryHandle(
           );
           fieldNames = schema.map(x -> x.name.origName);
           printReactiveQueryResult(context, selectDir.dirName, fieldNames);
-          if (queryInfo.onlyChanges) printTick(context.tick.next());
+          if (queryInfo.onlyChanges) printTick(context.getTick().next());
           SKStore.EagerDir::apply(
             context,
             selectDir.dirName,
@@ -2442,7 +2434,7 @@ fun printReactiveQueryChanges(
       }
     }
   };
-  printTick(context.tick.next());
+  printTick(context.getTick().next());
 }
 
 private fun printTick(tick: SKStore.Tick): void {
@@ -2681,4 +2673,22 @@ fun printTable(
   )
 }
 
+module end;
+
+module SKStore;
+
+@cpp_extern("SKIP_unsafe_compare_sets")
+native fun unsafeCompareSets(
+  SortedMap<SKStore.Path, SortedSet<SKStore.ArrowKey>>,
+  SortedMap<SKStore.Path, SortedSet<SKStore.ArrowKey>>,
+): Int32;
+
+extension class Context {
+  static fun unsafeCompareDeps(
+    c1: readonly SKStore.Context,
+    c2: readonly SKStore.Context,
+  ): Bool {
+    unsafeCompareSets(c1.deps.data, c2.deps.data) != 0
+  }
+}
 module end;

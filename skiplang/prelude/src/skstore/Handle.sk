@@ -521,13 +521,9 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
   }
 
   fun pre(context: mutable Context): ?EHandle<K, V> {
-    if (!context.hasPre.contains(this.dirName)) {
-      context.!hasPre = context.hasPre.add(this.dirName);
-    };
-    context.maybeGetDir(this.dirName.pre()) match {
-    | None() -> None()
-    | Some(dir) -> Some(EHandle(this.keyType, this.type, dir.getDirName()))
-    }
+    context.pre(this.dirName).map(dir ~>
+      EHandle(this.keyType, this.type, dir.getDirName())
+    )
   }
 
   fun size(context: mutable Context): Int {
@@ -541,14 +537,6 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
   fun writeArray(context: mutable Context, key: K, values: Array<V>): void {
     dir = context.unsafeGetEagerDir(this.dirName);
     dir.writeArray(context, key, values);
-  }
-
-  fun onDelete(
-    context: mutable Context,
-    optOnDelete: ?Postponable = None(),
-  ): void {
-    dir = context.unsafeGetEagerDir(this.dirName);
-    dir.onDelete(context, optOnDelete);
   }
 
   fun items(

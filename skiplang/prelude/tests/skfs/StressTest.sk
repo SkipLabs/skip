@@ -404,14 +404,11 @@ fun compareContext(
         | _ -> void
         };
         dir match {
-        | SKStore.LazyDir{data} ->
-          data.maybeGet(key) match {
-          | None()
-          | Some(SKStore.LAbsent())
-          | Some(SKStore.LRemoved _)
-          | Some(SKStore.LCycle _) ->
+        | lazyDir @ SKStore.LazyDir _ ->
+          files = lazyDir.getArrayRaw(key);
+          if (files.isEmpty()) {
             print_string("EMPTY DATA")
-          | Some(SKStore.LDefined(files, _)) ->
+          } else {
             intFiles = files.map(file -> SKStore.IntFile::type(file));
             print_string(`       ${intFiles}`)
           }
@@ -621,7 +618,7 @@ fun updateProgram(
 fun testStress(): void {
   config = Config{};
   print_string("Stress Test Begin");
-  origContext = SKStore.Context{};
+  origContext = SKStore.Context::create{};
   _ = SKStore.runWithGcReturnContext(origContext, context ~> {
     round = context.getGlobal("ROUND") match {
     | None() -> 0

@@ -20,7 +20,7 @@ fun testChangesAfter(): void {
       ],
     );
   });
-  tick = context.tick;
+  tick = context.getTick();
   context.update();
   (isReset, changedKeys) = context
     .unsafeGetEagerDir(dirName)
@@ -31,7 +31,7 @@ fun testChangesAfter(): void {
     changedKeys.collect(Array).sorted(),
     "Test getChangesAfter 0",
   );
-  !tick = context.tick;
+  !tick = context.getTick();
   write(context, dirName, SKStore.IID(1), Array[]);
   write(context, dirName, SKStore.IID(2), Array[SKStore.StringFile("22")]);
   context.update();
@@ -52,7 +52,7 @@ fun testChangesAfter(): void {
 
   rand = Random::mcreate(23);
   for (i in Range(0, 100)) {
-    !tick = context.tick;
+    !tick = context.getTick();
     changes = SortedSet<SKStore.Key>[];
     for (_ in Range(0, rand.random(0, 100))) {
       dir = context.unsafeGetEagerDir(dirName);
@@ -68,7 +68,7 @@ fun testChangesAfter(): void {
 
     dir = context.unsafeGetEagerDir(dirName);
     if (rand.random(0, 10) > 5) {
-      !dir = dir.purge(context, SKStore.Tick(context.tick.value - 1000))
+      !dir = dir.purge(SKStore.Tick(context.getTick().value - 1000))
     };
     (!isReset, !changedKeys) = context
       .unsafeGetEagerDir(dirName)

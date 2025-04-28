@@ -435,7 +435,7 @@ private fun ensureContext(args: Cli.ParseResults): void {
 fun execSessions(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
   SKDB.runSql(options, context ~> {
-    for (id => sub in context.sessions) {
+    for (id => sub in context.getSessions()) {
       print_string(
         id.toString() + "\t" + sub.dirSubs.map(d -> d.entity).join(","),
       );
@@ -450,7 +450,7 @@ fun execCompact(args: Cli.ParseResults, options: SKDB.Options): void {
     for ((_dirName, dir) in context.listDirs()) {
       dir match {
       | edir @ SKStore.EagerDir _ ->
-        !edir = edir.purge(context, context.tick);
+        !edir = edir.purge(context.getTick());
         context.setDir(edir)
       | _ -> void
       }
@@ -554,7 +554,7 @@ fun execDiff(args: Cli.ParseResults, options: SKDB.Options): void {
   since = args.maybeGetString("since").map(v -> v.toInt());
   SKDB.runSql(options, origContext ~> {
     context = origContext.mclone();
-    sub = context.sessions.maybeGet(sessionID) match {
+    sub = context.getSession(sessionID) match {
     | None() ->
       print_error("Error: session not found");
       skipExit(2)
@@ -590,11 +590,11 @@ fun execDisconnect(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
   sessionID = args.getString("session-id").toInt();
   SKDB.runLockedSql(options, context ~> {
-    context.sessions.maybeGet(sessionID) match {
+    context.getSession(sessionID) match {
     | None() ->
       print_error("Error: session not found");
       skipExit(2)
-    | Some(_) -> context.!sessions = context.sessions.remove(sessionID)
+    | Some(_) -> context.unsubscribe(sessionID)
     };
   })
 }

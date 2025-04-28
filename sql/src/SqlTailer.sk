@@ -13,14 +13,14 @@ fun buildTailFilter(
   context: readonly SKStore.Context,
   options: SKDB.Options,
   replicationFilter: (
-    SKStore.Context,
+    readonly SKStore.Context,
     Bool,
     SKStore.DirName,
   ) ~> (SKStore.Key -> Bool),
   userId: ?String,
   tailSpec: TailSpec,
   sqlTable: SKDB.DirDescr,
-): (SKStore.Context, Bool, SKStore.DirName) ~> (SKStore.Key -> Bool) {
+): (readonly SKStore.Context, Bool, SKStore.DirName) ~> (SKStore.Key -> Bool) {
   filter = tailSpec.filter match {
   | None() -> replicationFilter
   | Some(strCond) ->
@@ -38,8 +38,8 @@ fun buildTailFilter(
       skipExit(2)
     };
     (context, isReset, dirName) ~> {
-      mcontext = context.mclone();
       conditionFilter = replicationFilter(context, isReset, dirName);
+      mcontext = context.mclone();
       baseName -> {
         inputRow = baseName match {
         | rowKey @ SKDB.RowKey _ -> rowKey.getRowValues()
@@ -176,7 +176,7 @@ fun tailSub(
   legacyTableNames: SortedMap<P.Name, P.Name> = SortedMap::create();
   sub = SKStore.withContext(gContext -> {
     // rebuild the sub with extra filtering as supported by tail
-    gContext.sessions.maybeGet(sessionID) match {
+    gContext.getSession(sessionID) match {
     | None() ->
       print_error("Error: session not found");
       skipExit(2)
@@ -250,7 +250,7 @@ fun tailSub(
   loop {
     localObstack = SKStore.newObstack();
     tick = SKStore.withContext<?Int>(context -> {
-      context.sessions.maybeGet(sessionID) match {
+      context.getSession(sessionID) match {
       | None() ->
         print_error("Error: session not found");
         skipExit(2)
@@ -368,13 +368,13 @@ fun tailSub(
         // checkpoint without delay so that the downstreams knows that
         // it has received everything without waiting for the condvar
         // timeout
-        writer.write(":" + context.tick.value.toString() + "\n");
+        writer.write(":" + context.getTick().value.toString() + "\n");
         writer.flush();
         flushStdout();
       };
 
       if (couldFollowChanges) {
-        Some(context.tick.value)
+        Some(context.getTick().value)
       } else {
         None()
       }

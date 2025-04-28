@@ -18,9 +18,9 @@ base class LazyResult {
 }
 
 class LazyDir protected {
-  data: SortedMap<Key, LazyResult> = SortedMap[],
+  private data: SortedMap<Key, LazyResult> = SortedMap[],
   private lazyFun: ((mutable Context, Key) ~> LazyResult),
-  collect: Bool,
+  private collect: Bool,
 } extends Dir {
   static fun create(
     context: mutable Context,
@@ -53,10 +53,8 @@ class LazyDir protected {
       | Some(x) -> LDefined(x, context.reads.toArray())
       };
 
-      for (read in context.reads) {
-        arrowKey = ArrowKey(dirName, dirName, key);
-        context.!deps = context.deps.set(read, arrowKey);
-      };
+      arrowKey = ArrowKey{parentName => dirName, childName => dirName, key};
+      context.updateNewDeps(arrowKey, context.reads);
 
       !dir = context.unsafeGetLazyDir(dirName);
       !dir.data[key] = result;
@@ -100,10 +98,6 @@ class LazyDir protected {
     this with {data}
   }
 
-  fun reset(context: mutable Context): void {
-    context.setDir(this);
-  }
-
   fun keys(): SortedSet<Key> {
     keys = SortedSet[];
     for (newKey => value in this.data) {
@@ -125,33 +119,26 @@ class LazyDir protected {
     context: mutable Context,
     dirtyReadersOpt: ?readonly Map<DirName, SortedSet<Key>>,
   ): void {
-    dirtyReaders = SortedSet[];
-    firstDirtyReaders = dirtyReadersOpt match {
-    | None() -> mutable Map[]
-    | Some(m) -> m
-    };
-
-    for (dirtyReaderDirName => dirtyReaderKeys in firstDirtyReaders) {
-      for (dirtyReaderKey in dirtyReaderKeys) {
-        !dirtyReaders = dirtyReaders.set(
-          Path::create(dirtyReaderDirName, dirtyReaderKey),
-        );
-      }
-    };
-
-    for (path in dirtyReaders) {
-      key = path.baseName;
-      oldValue = this.data.maybeGet(key);
-      !this.data = this.data.remove(key);
-      context.updateDirtyReaders(path);
-      oldValue match {
-      | Some(LDefined(_, reads))
-      | Some(LRemoved(reads)) ->
-        for (read in reads) {
-          arrow = ArrowKey(this.dirName, this.dirName, key);
-          context.!deps = context.deps.remove(read, arrow)
-        }
-      | _ -> void
+    dirtyReadersOpt match {
+    | None() -> void
+    | Some(dirtyReaders) ->
+      for (dirtyReaderDirName => dirtyReaderKeys in dirtyReaders) {
+        for (key in dirtyReaderKeys) {
+          oldValue = this.data.maybeGet(key);
+          !this.data = this.data.remove(key);
+          context.updateDirtyReaders(Path::create(dirtyReaderDirName, key));
+          oldValue match {
+          | Some(LDefined(_, reads))
+          | Some(LRemoved(reads)) ->
+            arrow = ArrowKey{
+              parentName => this.dirName,
+              childName => this.dirName,
+              key,
+            };
+            context.removeDeps(arrow, reads.iterator())
+          | _ -> void
+          }
+        };
       }
     };
 
@@ -164,7 +151,7 @@ class LazyDir protected {
     throwOnCycle: Bool = true,
   ): Array<File> {
     if (this.collect) {
-      context.!lazyGets = context.lazyGets.set(Path::create(this.dirName, key));
+      context.addLazyGet(this.dirName, key)
     };
     lazyResult = this.data.maybeGet(key) match {
     | Some(LCycle()) if (throwOnCycle) -> throw CyclicExn(key)
@@ -175,7 +162,10 @@ class LazyDir protected {
         print_string("LRemoved: " + Path::create(this.dirName, key).toString())
       };
       arrow = context.currentArrow() match {
-      | Some(a) -> Some(ArrowKey(a.childName, this.dirName, key))
+      | Some(a) ->
+        Some(
+          ArrowKey{parentName => a.childName, childName => this.dirName, key},
+        )
       | _ -> None()
       };
       arrow.each(a -> context.enter(a, this.timeStack));
@@ -200,18 +190,12 @@ class LazyDir protected {
     throwOnCycle: Bool = true,
   ): Array<File> {
     path = Path::create(this.dirName, key);
-    context.addDep(path);
+    context.addRead(path);
     this.unsafeGetArray(context, key, throwOnCycle)
   }
 
   fun getIter(context: mutable Context, key: Key): mutable Iterator<File> {
     this.getArray(context, key).iterator()
-  }
-
-  fun getArrayAsync(context: mutable Context, key: Key): Array<File> {
-    path = Path::create(this.dirName, key);
-    context.addDep(path);
-    this.unsafeGetArray(context, key, true)
   }
 }
 

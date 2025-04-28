@@ -697,7 +697,6 @@ class EagerDir protected {
         }
       }
     });
-    context.!toReset = context.toReset.set(this.dirName);
 
     this
   }
@@ -872,14 +871,13 @@ class EagerDir protected {
     });
   }
 
-  fun purge(context: mutable Context, limit: Tick): this {
+  fun purge(limit: Tick): this {
     this.tombLimit match { // tombLimit must be monotonic
     | Some(tombLimit) if (limit.value <= tombLimit.value) -> return this
     | _ -> void
     };
     fixedOld = this.purgeOld();
     fixedData = this.flattenData(limit);
-    context.!purgeLimit = Some(limit);
     this with {
       tombLimit => Some(limit),
       data => DataMap::empty(),
@@ -1143,7 +1141,7 @@ class EagerDir protected {
     valueIter: mutable Iterator<File>,
     f: MapFun,
   ): void {
-    arrow = ArrowKey(parentName, childName, key);
+    arrow = ArrowKey{parentName, childName, key};
     context.enter(arrow, timeStack);
 
     if (context.debugMode) {
@@ -1165,13 +1163,13 @@ class EagerDir protected {
     context.!newDirs = newDirsCopy;
     context.!reads = readsCopy;
 
-    context.updateNewDeps(ArrowKey(parentName, childName, key), reads);
+    context.updateNewDeps(arrow, reads);
 
     source = Path::create(parentName, key);
 
     for (kv in kvArray) {
       (k, v) = kv;
-      acc.push(FixedRow(k, v, source, TickRange::create(context.tick)))
+      acc.push(FixedRow(k, v, source, TickRange::create(context.getTick())))
     };
 
     if (!kvArray.isEmpty() || !newDirs.isEmpty()) {
@@ -1553,7 +1551,7 @@ class EagerDir protected {
 
   static fun update(
     context: mutable Context,
-    contextDirty: readonly Map<DirName, SortedSet<Key>>,
+    contextDirty: SortedMap<DirName, SortedSet<Key>>,
     contextDirtyReaders: readonly Map<
       DirName,
       readonly Map<DirName, SortedSet<Key>>,
@@ -1589,8 +1587,10 @@ class EagerDir protected {
         })
       }
     };
-    if (contextDirty.containsKey(parent.dirName)) {
-      keys = contextDirty[parent.dirName].values();
+    contextDirty.maybeGet(parent.dirName) match {
+    | None() -> void
+    | Some(dirtyKeys) ->
+      keys = dirtyKeys.values();
       !dirty = withRegionFold(None(), keys, dirty, (_, key, dirtyInRegion) ~> {
         for (p in parentMaps) {
           (_, rangeOpt, _) = p;
@@ -1613,7 +1613,8 @@ class EagerDir protected {
       childRef,
       (contextOpt, key, child) ~> {
         ctx = contextOpt.fromSome();
-        ctx.enter(ArrowKey(parentName, childName, key), timeStack);
+        arrow = ArrowKey{parentName, childName, key};
+        ctx.enter(arrow, timeStack);
         path = Path::create(parentName, key);
         oldInfo = child.getOld(path);
         oldKeys = SortedSet<Key>::createFromItems(oldInfo.getKeys());
@@ -1652,16 +1653,14 @@ class EagerDir protected {
 
         !child = child.updateNewDirs(ctx, path, newDirs);
 
-        for (read in reads) {
-          arrowKey = ArrowKey(parentName, child.dirName, key);
-          ctx.!deps = ctx.deps.set(read, arrowKey);
-        };
+        ctx.updateNewDeps(arrow, reads);
 
-        for (oldRead in oldInfo.getReads()) {
-          if (reads.contains(oldRead)) continue;
-          arrowKey = ArrowKey(parentName, child.dirName, key);
-          ctx.!deps = ctx.deps.remove(oldRead, arrowKey);
-        };
+        ctx.removeDeps(
+          arrow,
+          oldInfo.getReads().iterator().filter(oldRead ~>
+            !reads.contains(oldRead)
+          ),
+        );
 
         for (k => v in mvalues) {
           !child = child.writeEntry(ctx, path, path, k, v.toArray());
@@ -1682,7 +1681,7 @@ class EagerDir protected {
         // The source cannot be removed from old here
         // => prevent getting fixed data minfo on multiple call during update
         !child.old[path] = minfo;
-        ctx.leave(ArrowKey(parentName, childName, key));
+        ctx.leave(arrow);
         child
       },
     );
@@ -1704,7 +1703,7 @@ class EagerDir protected {
 
   fun getIter(context: mutable Context, key: Key): mutable Iterator<File> {
     path = Path::create(this.dirName, key);
-    context.addDep(path);
+    context.addRead(path);
     this.getIterRaw(key)
   }
 
@@ -1729,16 +1728,12 @@ class EagerDir protected {
 
     context.writeChecker match {
     | Some(checker) if (!force) ->
-      checker.tables.maybeGet(this.dirName) match {
-      | None() -> void
-      | Some(indexes) ->
-        checker.checkWrite(context, this.dirName, indexes, k, rvalues)
-      }
+      checker.checkWrite(context, this.dirName, k, rvalues)
     | _ -> void
     };
 
     if (this.data.nbrEntries >= this.fixedData.size()) {
-      context.!toPurge = context.toPurge.set(this.dirName);
+      context.addToPurge(this.dirName);
     };
 
     totalSize = if (oldValues.size() == 0 && rvalues.size() > 0) {
@@ -1758,9 +1753,9 @@ class EagerDir protected {
       origSource,
       k,
     ).next() is Some _;
-    !map = map.set(context.tick, isMasking, origSource, writer, rvalues);
+    !map = map.set(context.getTick(), isMasking, origSource, writer, rvalues);
 
-    !this.data = this.data.set(context.tick, k, map);
+    !this.data = this.data.set(context.getTick(), k, map);
 
     reducer = this.reducer match {
     | None() -> None()
@@ -1786,8 +1781,8 @@ class EagerDir protected {
       Some(cdata)
     };
 
+    context.addDirty(this.dirName, k);
     path = Path::create(this.dirName, k);
-    context.!dirty = List.Cons(path, context.dirty);
 
     if (this.totalSize != totalSize) {
       sizePath = Path::sizeTag(this.dirName);
@@ -1861,32 +1856,6 @@ class EagerDir protected {
     });
 
     this with {childDirs, slices, purgeCount}
-  }
-
-  fun copyTo(
-    context: mutable Context,
-    target: DirName,
-    copy: ?Postponable = None(),
-    writer: ?(
-      DirName,
-      Key,
-      readonly Context ~> Array<File>,
-    ) ~> Postponable = None(),
-  ): void {
-    context.postpone(
-      copy match {
-      | Some(c) -> c
-      | _ -> CopyTo(this.getDirName(), target)
-      },
-    );
-    context.setDir(this with {optCopy => Some((target, writer))});
-  }
-
-  fun onDelete(
-    context: mutable Context,
-    optOnDelete: ?Postponable = None(),
-  ): void {
-    context.setDir(this with {optOnDelete});
   }
 
   fun purgeSlices(context: mutable Context): RangeMapList<Key, DirName> {
@@ -2088,13 +2057,13 @@ class EagerDir protected {
       };
 
       for (dirName in toRemove) {
-        if (context.decrRefCount(dirName) && context.removeSubDirs) {
+        if (context.decrRefCount(dirName)) {
           context.removeDir(dirName);
           removed.push(dirName)
         }
       };
     } else {
-      if (minfo.getNewDirs().isEmpty() || !context.removeSubDirs) return this;
+      if (minfo.getNewDirs().isEmpty()) return this;
 
       for (dirName in lastRoundDirs) {
         if (newDirs.contains(dirName)) continue;
@@ -2118,7 +2087,6 @@ class EagerDir protected {
   ): this {
     source = Path::create(this.dirName, key);
     !this = this.writeEntry(context, source, source, key, values);
-    context.!toReset = context.toReset.set(this.dirName);
     this
   }
 
@@ -2139,7 +2107,6 @@ class EagerDir protected {
       (key, (origSource, writer, values)) = kv;
       !this = this.writeEntry(context, origSource, writer, key, values);
     };
-    context.!toReset = context.toReset.set(this.dirName);
     this
   }
 
@@ -2166,7 +2133,7 @@ class EagerDir protected {
   }
 
   fun size(context: mutable Context): Int {
-    context.addDep(Path::sizeTag(this.dirName));
+    context.addRead(Path::sizeTag(this.dirName));
     this.totalSize
   }
 
@@ -2174,7 +2141,7 @@ class EagerDir protected {
     context: mutable Context,
   ): mutable Iterator<(Key, mutable Iterator<File>)> {
     path = Path::filesTag(this.dirName);
-    context.addDep(path);
+    context.addRead(path);
     this.unsafeGetFileIter()
   }
 
@@ -2183,7 +2150,7 @@ class EagerDir protected {
     key: Key,
   ): mutable Iterator<(Tick, Path, Path, Array<File>)> {
     path = Path::create(this.dirName, key);
-    context.addDep(path);
+    context.addRead(path);
     this.unsafeGetAllDataIter(key)
   }
 
@@ -2192,12 +2159,12 @@ class EagerDir protected {
     key: Key,
   ): mutable Iterator<(Tick, Path, Array<File>)> {
     path = Path::create(this.dirName, key);
-    context.addDep(path);
+    context.addRead(path);
     this.unsafeGetDataIterWithoutTombs(key)
   }
 
   fun isEmpty(context: mutable Context): Bool {
-    context.addDep(Path::isEmptyTag(this.dirName));
+    context.addRead(Path::isEmptyTag(this.dirName));
     this.totalSize == 0
   }
 

@@ -185,7 +185,7 @@ class ResourceInfo(
 }
 
 fun initCtx(): SKStore.Context {
-  SKStore.Context{}
+  SKStore.Context::create{}
 }
 
 class Input(name: String, values: Array<(SKJSON.CJSON, Array<SKJSON.CJSON>)>)
@@ -202,13 +202,11 @@ fun buildResourcesGraph(
     SKStore.SID::keyType,
     ResourceDef::type,
     dirname,
-    Array[],
   );
   _ = context.mkdir(
     SKStore.SID::keyType,
     SKStore.IntFile::type,
     kResourceGarbageDir,
-    Array[],
   );
   idbyresourceHdl = resourcesHdl.map(
     ResourceDef::keyType,
@@ -415,7 +413,6 @@ fun initService(
         SKStore.DirName::keyType,
         StatusFile::type,
         kSessionDir.sub("status"),
-        Array[],
       );
       statusHdl = statusDefHdl.map(
         SKStore.UnitID::keyType,
@@ -710,8 +707,7 @@ class Collection(hdl: SKStore.EHandle<JSONID, JSONFile>) {
   }
 
   /**
-   * Get (and potentially compute) all values mapped to by some key of a lazy reactive
-   * collection.
+   * Get all values mapped to by some key of an eager reactive collection.
    */
   fun getArray(key: SKJSON.CJSON): Array<SKJSON.CJSON> {
     getContext() match {
@@ -1257,7 +1253,7 @@ fun getAll(
     context,
     Values(
       resource.collection.getAll(context),
-      `${resource.session}/${context.tick}`,
+      `${resource.session}/${context.getTick()}`,
     ),
   );
 }
@@ -1290,7 +1286,7 @@ fun destroyReactiveResource(
     .map(SKStore.IntFile::type) match {
   | Some(subId) ->
     session = subId.value;
-    context.sessions.maybeGet(session).each(sub -> {
+    context.getSession(session).each(sub -> {
       close = sub.cmd match {
       | SKStore.NWatch(_, _, _, close, _) -> close
       | _ -> invariant_violation("Not manage session kind")
@@ -1395,7 +1391,7 @@ fun unsubscribe(
   session: Int,
   update: Bool = true,
 ): void {
-  context.sessions.maybeGet(session).each(sub -> {
+  context.getSession(session).each(sub -> {
     (identifier, close) = sub.cmd match {
     | SKStore.NWatch(identifier, _, _, close, _) -> (identifier, close)
     | _ -> invariant_violation("Not manage session kind")
