@@ -104,7 +104,7 @@ fmt-c: # Keep in sync with bin/git_hooks/check_format.sh
 
 .PHONY: fmt-js
 fmt-js: # Keep in sync with bin/git_hooks/check_format.sh
-	npx prettier --log-level warn --write .
+	npx prettier --log-level debug --write .
 
 .PHONY: fmt-py
 fmt-py: # Keep in sync with bin/git_hooks/check_format.sh
