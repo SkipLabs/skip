@@ -349,7 +349,10 @@ mutable class Context private {
   mutable globals: SortedMap<String, File> = SortedMap[],
   private mutable persistents: SortedMap<String, File> = SortedMap[],
   private mutable dirty: SortedMap<DirName, SortedSet<Key>> = SortedMap[],
-  private mutable dirtyReaders: List<ArrowKey> = List[],
+  private mutable dirtyReaders: /* parentName => childName => keys */ SortedMap<
+    DirName,
+    SortedMap<DirName, SortedSet<Key>>,
+  > = SortedMap[],
   mutable canReuse: CanReuse = CRIfMatch(),
   private mutable arrowStack: List<(ArrowKey, TimeStack)> = List[],
   private mutable lazyGets: SortedSet<Path> = SortedSet[],
@@ -619,7 +622,15 @@ mutable class Context private {
       | None() -> continue
       | Some(x) -> x
       };
-      this.!dirtyReaders = List.Cons(reader, this.dirtyReaders);
+      this.!dirtyReaders[reader.parentName] = {
+        map = this.dirtyReaders.maybeGet(reader.parentName).default(
+          SortedMap[],
+        );
+        map.set(
+          reader.childName,
+          map.maybeGet(reader.childName).default(SortedSet[]).set(reader.key),
+        )
+      };
       time = if (reader.parentName == reader.childName) {
         -child.getTimeStack()
       } else {
@@ -706,26 +717,11 @@ mutable class Context private {
 
     this.updateLazyGets();
 
-    dirtyReaders = mutable Map<DirName, mutable Map<DirName, SortedSet<Key>>>[];
-
     loop {
-      for (reader in this.dirtyReaders) {
-        if (!dirtyReaders.containsKey(reader.parentName)) {
-          dirtyReaders![reader.parentName] = mutable Map[];
-        };
-
-        if (!dirtyReaders[reader.parentName].containsKey(reader.childName)) {
-          dirtyReaders[reader.parentName]![reader.childName] = SortedSet[];
-        };
-        dirtyReaders[reader.parentName]![reader.childName] = dirtyReaders[
-          reader.parentName,
-        ][reader.childName].set(reader.key);
-      };
-      this.!dirtyReaders = List[];
       this.toUpdate.removeMin() match {
       | None() ->
         this.!dirty = SortedMap[];
-        invariant(this.dirtyReaders.isEmpty());
+        this.!dirtyReaders = SortedMap[];
         withPostponables = this.checkPostponables();
         withPre = this.updatePre();
         withChanges = withPostponables || withPre;
@@ -738,7 +734,7 @@ mutable class Context private {
         | Some(DeletedDir _) ->
           void
         | Some(child @ LazyDir _) ->
-          child.update(this, dirtyReaders.maybeGet(child.dirName))
+          child.update(this, this.dirtyReaders.maybeGet(child.dirName))
         | Some(child @ EagerDir _) ->
           parentMaps = child.parents.maybeGet(parentName) match {
           | None() -> invariant_violation("Could not find parent")
@@ -747,7 +743,7 @@ mutable class Context private {
           EagerDir::update(
             this,
             this.dirty,
-            dirtyReaders.maybeGet(parentName),
+            this.dirtyReaders.maybeGet(parentName),
             parentName,
             parentMaps,
             child,
