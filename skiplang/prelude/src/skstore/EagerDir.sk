@@ -2064,10 +2064,17 @@ class EagerDir protected {
   fun writeArraySourceManyReturnDir(
     context: mutable Context,
     bindings: mutable Iterator<(Key, (Path, Path, Array<File>))>,
+    changedKeysIfReset: ?(DirName, SortedSet<Key>) = None(),
   ): this {
     for (kv in bindings) {
       (key, (origSource, writer, values)) = kv;
       !this = this.writeEntry(context, origSource, writer, key, values);
+    };
+    changedKeysIfReset match {
+    | None() -> void
+    | Some((writerDirName, changedKeys)) ->
+      writerPath = Path::gen(writerDirName);
+      !this = this.reset(context, writerPath, changedKeys)
     };
     this
   }

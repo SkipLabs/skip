@@ -1210,11 +1210,8 @@ fun import(
           !inputDir = inputDir.writeArraySourceManyReturnDir(
             targetCtx,
             entries.iterator(),
+            if (isReset) Some((dir.dirName, changedKeys)) else None(),
           );
-          if (isReset) {
-            writerPath = Path::gen(dir.dirName);
-            !inputDir = inputDir.reset(targetCtx, writerPath, changedKeys);
-          };
           targetCtx.setDir(inputDir)
         }
       | Some(_) -> invariant_violation("Error import: incompatible dir types")
