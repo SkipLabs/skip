@@ -2051,22 +2051,13 @@ class EagerDir protected {
     this
   }
 
-  fun writeArrayReturnDir(
-    context: mutable Context,
-    key: Key,
-    values: Array<File>,
-  ): this {
-    source = Path::create(this.dirName, key);
-    !this = this.writeEntry(context, source, source, key, values);
-    this
-  }
-
   fun writeArray(
     context: mutable Context,
     key: Key,
     values: Array<File>,
   ): void {
-    !this = this.writeArrayReturnDir(context, key, values);
+    source = Path::create(this.dirName, key);
+    !this = this.writeEntry(context, source, source, key, values);
     context.setDir(this);
   }
 
