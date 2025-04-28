@@ -233,6 +233,13 @@ value class Tick(value: Int) uses Orderable, Show {
 
 class TickFile(value: Tick) extends File uses Orderable
 
+/* Time refers to the creation time of a directory.
+   Context#time is increased using Context#timeStamp() when a directory is created.
+   It is stored in the last element of the TimeStack of the directory.
+
+   Times and TimeStacks are used to order directory updates.
+   Context#toUpdate is used as a priority queue.
+ */
 value class Time(value: Int) uses Orderable, Show {
   fun next(): this {
     !this.value = genSym(this.value + 1);
