@@ -1532,10 +1532,7 @@ class EagerDir protected {
   static fun update(
     context: mutable Context,
     contextDirty: SortedMap<DirName, SortedSet<Key>>,
-    contextDirtyReaders: readonly Map<
-      DirName,
-      readonly Map<DirName, SortedSet<Key>>,
-    >,
+    contextDirtyReadersOpt: ?readonly Map<DirName, SortedSet<Key>>,
     parentName: DirName,
     parentMaps: Array<
       (MapFun, ?Array<KeyRange>, ?((mutable Context, SortedSet<Key>) ~> void)),
@@ -1547,9 +1544,11 @@ class EagerDir protected {
     timeStack = childRef.timeStack;
 
     dirty = SortedSet[];
-    if (contextDirtyReaders.containsKey(parent.dirName)) {
-      if (contextDirtyReaders[parent.dirName].containsKey(childName)) {
-        keys = contextDirtyReaders[parent.dirName][childName].values();
+    contextDirtyReadersOpt match {
+    | None() -> void
+    | Some(contextDirtyReaders) ->
+      if (contextDirtyReaders.containsKey(childName)) {
+        keys = contextDirtyReaders[childName].values();
         !dirty = withRegionFold(None(), keys, dirty, (_, key, dirtyInRegion) ~> {
           for (p in parentMaps) {
             (_, rangeOpt, _) = p;
