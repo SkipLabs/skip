@@ -1769,10 +1769,7 @@ class EagerDir protected {
     if (this.totalSize != totalSize) {
       sizePath = Path::sizeTag(this.dirName);
       context.updateDirtyReaders(sizePath);
-      if (
-        this.totalSize == 0 && totalSize != 0 ||
-        this.totalSize != 0 && totalSize == 0
-      ) {
+      if ((this.totalSize == 0) != (totalSize == 0)) {
         context.updateDirtyReaders(Path::isEmptyTag(this.dirName));
       }
     };
