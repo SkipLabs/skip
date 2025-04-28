@@ -733,8 +733,9 @@ mutable class Context private {
         | None()
         | Some(DeletedDir _) ->
           void
-        | Some(child @ LazyDir _) ->
-          child.update(this, this.dirtyReaders.maybeGet(child.dirName))
+        | Some(dir @ LazyDir _) ->
+          invariant(parentName == childName);
+          dir.update(this, this.dirtyReaders.maybeGet(dir.dirName))
         | Some(child @ EagerDir _) ->
           parentMaps = child.parents.maybeGet(parentName) match {
           | None() -> invariant_violation("Could not find parent")
