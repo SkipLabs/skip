@@ -1731,7 +1731,7 @@ fun evalWithContext(
 
 fun sqlPurgeFrom(
   replicationId: Int,
-): (mutable SKStore.Context, SKStore.Dir) ~> SKStore.Tick {
+): (readonly SKStore.Context, SKStore.Dir) ~> SKStore.Tick {
   (ctx, dir) ~> {
     table = getSqlTableName(dir.getDirName());
     ackTable = feedbackTable(table);

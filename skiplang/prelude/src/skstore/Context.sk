@@ -363,7 +363,7 @@ mutable class Context private {
   private mutable dirsWithSharedSubDirs: SortedSet<DirName> = SortedSet[],
   private mutable sharedSubDirsRefCount: SortedMap<DirName, Int> = SortedMap[],
   mutable writeChecker: ?(mutable WriteChecker) = None(),
-  mutable purgeFrom: (mutable Context, Dir) ~> Tick = (ctx, _) ~>
+  mutable purgeFrom: (readonly Context, Dir) ~> Tick = (ctx, _) ~>
     Tick(ctx.getTick().value - 1000),
   mutable sourceOverride: ?Path = None(),
 } {
