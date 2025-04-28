@@ -28,7 +28,6 @@ class LazyDir protected {
     f: (mutable Context, DirName, Key) ~> ?Array<File>,
     collect: Bool = true,
   ): Dir {
-    time = context.timeStamp();
     lazyFun = (context: mutable Context, key: Key) ~> {
       dir = context.unsafeGetLazyDir(dirName);
       !dir.data[key] = LCycle();
@@ -74,6 +73,7 @@ class LazyDir protected {
       };
       ldir
     | _ ->
+      time = context.timeStamp();
       newDir = LazyDir{
         timeStack => TimeStack::create(context, time),
         dirName,

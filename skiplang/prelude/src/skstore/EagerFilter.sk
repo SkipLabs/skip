@@ -92,12 +92,12 @@ class EagerFilter private {
     childName: DirName,
     suffixOpt: ?String,
   ): DirName {
-    time = context.timeStamp();
-    creator = context.currentArrow();
     dirName = suffixOpt match {
     | None() -> childName
     | Some(suffix) -> childName.sub(suffix)
     };
+    time = context.timeStamp();
+    creator = context.currentArrow();
     dir = EagerDir::create{
       timeStack => TimeStack::createInput(time),
       input => false,
