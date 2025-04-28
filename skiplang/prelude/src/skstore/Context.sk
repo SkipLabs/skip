@@ -722,8 +722,7 @@ mutable class Context private {
         ][reader.childName].set(reader.key);
       };
       this.!dirtyReaders = List[];
-      toUpdate = this.toUpdate.minimum();
-      toUpdate match {
+      this.toUpdate.removeMin() match {
       | None() ->
         this.!dirty = SortedMap[];
         invariant(this.dirtyReaders.isEmpty());
@@ -732,8 +731,8 @@ mutable class Context private {
         withChanges = withPostponables || withPre;
         this.!tick = this.tick.next();
         break withChanges
-      | Some((time, Arrow(parentName, childName))) ->
-        this.!toUpdate = this.toUpdate.remove(time);
+      | Some((_time, Arrow(parentName, childName), toUpdate)) ->
+        this.!toUpdate = toUpdate;
         this.unsafeMaybeGetDir(childName) match {
         | None()
         | Some(DeletedDir _) ->
