@@ -20,7 +20,7 @@
 /*****************************************************************************/
 module SKStore;
 
-value class FixedRow<T>(
+value class FixedRow<+T>(
   key: Key,
   value: T,
   source: Path,
@@ -31,8 +31,32 @@ value class FixedRow<T>(
     this
   }
 
-  fun compare(other: FixedRow<T>): Order {
+  fun compare<U>(other: FixedRow<U>): Order {
     (this.key, this.source).compare((other.key, other.source))
+  }
+
+  fun <<U>(other: FixedRow<U>): Bool {
+    this.compare(other) == LT()
+  }
+
+  fun <=<U>(other: FixedRow<U>): Bool {
+    this.compare(other) != GT()
+  }
+
+  fun ><U>(other: FixedRow<U>): Bool {
+    this.compare(other) == GT()
+  }
+
+  fun >=<U>(other: FixedRow<U>): Bool {
+    this.compare(other) != LT()
+  }
+
+  fun ==<U>(other: FixedRow<U>): Bool {
+    this.compare(other) == EQ()
+  }
+
+  fun !=<U>(other: FixedRow<U>): Bool {
+    this.compare(other) != EQ()
   }
 }
 
