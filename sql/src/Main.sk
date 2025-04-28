@@ -637,9 +637,8 @@ fun execWatermark(args: Cli.ParseResults, options: SKDB.Options): void {
   source = args.getString("source").toIntOption();
   SKDB.runSql(options, context ~> {
     print_string(
-      SKDB.getWatermark(context.clone(), tableName, source).default(
-        SKStore.Tick(0),
-      ).value,
+      SKDB.getWatermark(context, tableName, source).default(SKStore.Tick(0))
+        .value,
     );
     SKStore.CStop(None())
   });
