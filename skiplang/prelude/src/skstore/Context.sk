@@ -805,8 +805,7 @@ mutable class Context private {
       };
       if (producedAnyOutput) {
         // then we need to produce a checkpoint for flushing and committing
-        ourTime = this.tick.value.toString();
-        writer.write(`:${ourTime}\n`);
+        writer.write(`:${this.tick}\n`);
         writer.flush();
         flushStdout();
       };
@@ -1048,7 +1047,7 @@ mutable class Context private {
 
   mutable fun removeDir(dirName: DirName): void {
     if (this.debugMode) {
-      print_debug("REMOVED: " + dirName);
+      print_debug(`REMOVED: ${dirName}`);
     };
     this.unsafeMaybeGetEagerDir(dirName) match {
     | None() -> void
@@ -1160,7 +1159,7 @@ private class Dirs{private state: DMap<DirName, Dir> = DMap::empty()} {
     this.maybeGet(key) match {
     | None() ->
       // printBacktrace();
-      invariant_violation("Directory not found: " + key)
+      invariant_violation(`Directory not found: ${key}`)
     | Some(x) -> x
     }
   }

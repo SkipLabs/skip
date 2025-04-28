@@ -60,8 +60,7 @@ class LazyDir protected {
       context.setDir(dir);
 
       if (context.debugMode) {
-        name = "" + dir.dirName + key;
-        print_string(`WRITTEN LAZY:  ${name}`);
+        print_string(`WRITTEN LAZY:  ${dirName}${key}`);
       };
       context.!reads = readsCopy;
       result
@@ -69,7 +68,7 @@ class LazyDir protected {
     context.maybeGetLazyDir(dirName) match {
     | Some(ldir) if (native_eq(ldir.lazyFun, lazyFun) == 0) ->
       if (context.debugMode) {
-        print_string(`REUSING: ${dirName.toString()}`);
+        print_string(`REUSING: ${dirName}`);
       };
       ldir
     | _ ->
@@ -158,7 +157,7 @@ class LazyDir protected {
     | x @ Some(LRemoved _)
     | x @ Some(LAbsent()) ->
       if (x is Some(LRemoved _) && context.debugMode) {
-        print_string("LRemoved: " + Path::create(this.dirName, key).toString())
+        print_string(`LRemoved: ${this.dirName}${key}`)
       };
       arrow = ArrowKey{
         parentName => this.dirName,

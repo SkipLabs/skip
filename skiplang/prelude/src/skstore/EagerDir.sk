@@ -712,7 +712,7 @@ class EagerDir protected {
     if (isReset) {
       theirTime = destinationTime match {
       | None() -> ""
-      | Some(t) -> " " + t.value.toString()
+      | Some(t) -> ` ${t.value}`
       };
       writer.write(`^${entity}${theirTime}\n`);
       writer.write("!rebuild\n");
@@ -727,7 +727,7 @@ class EagerDir protected {
         // output a header for the dir
         theirTime = destinationTime match {
         | None() -> ""
-        | Some(t) -> " " + t.value.toString()
+        | Some(t) -> ` ${t.value}`
         };
         writer.write(`^${entity}${theirTime}\n`)
       };
@@ -1217,12 +1217,13 @@ class EagerDir protected {
       same = (native_eq(parents, child.parents) == 0);
       if (same && child.creator != context.currentArrow()) {
         invariant_violation(
-          "Duplicate subdirectory: " +
-            child.dirName.toString() +
-            "\nFirst created: " +
-            inspect(child.creator).toString() +
-            "\nThen: " +
-            inspect(context.currentArrow()).toString(),
+          `Duplicate subdirectory: ${
+            child.dirName
+          }
+           First created: ${inspect(
+            child.creator,
+          )}
+           Then: ${inspect(context.currentArrow())}`,
         );
       };
       same
@@ -1285,14 +1286,14 @@ class EagerDir protected {
     };
 
     if (context.newDirs.contains(childName)) {
-      error(`Error: directory ${childName.toString()} already exists`);
+      error(`Error: directory ${childName} already exists`);
     };
 
     context.currentArrow().each(a -> {
       context.unsafeMaybeGetDir(a.childName) match {
       | Some(LazyDir _) ->
         error(
-          `Error: eager directory ${childName.toString()} cannot be created into ${
+          `Error: eager directory ${childName} cannot be created into ${
             a.childName
           } lazy directory.`,
         )
@@ -1817,8 +1818,7 @@ class EagerDir protected {
     };
 
     if (context.debugMode) {
-      name = "" + this.dirName + k;
-      print_string(`WRITTEN:  ${name}`);
+      print_string(`WRITTEN:  ${this.dirName}${k}`);
     };
 
     if (purgeCount >= PURGE_LIMIT) {
