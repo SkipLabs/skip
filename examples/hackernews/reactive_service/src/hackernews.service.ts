@@ -40,12 +40,18 @@ type Session = User & {
   user_id: number;
 };
 
+const host: string = process.env["PG_HOST"] || "db";
+const port: number = Number(process.env["PG_PORT"]) || 5432;
+const database: string = process.env["PG_DATABASE"] || "postgres";
+const user: string = process.env["PG_USER"] || "postgres";
+const password: string = process.env["PG_PASSWORD"] || "change_me";
+
 const postgres = new PostgresExternalService({
-  host: "db",
-  port: 5432,
-  database: "postgres",
-  user: "postgres",
-  password: "change_me",
+  host,
+  port,
+  database,
+  user,
+  password,
 });
 
 class UpvotesMapper {
