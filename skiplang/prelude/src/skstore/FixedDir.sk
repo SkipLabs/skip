@@ -141,9 +141,9 @@ fun assertUnique<T, U: Orderable>(
   };
 }
 
-class FixedDir<T: frozen> extends IFixedDir<T, FixedRow<T>> {
-  static fun create(
-    data: mutable Vector<FixedRow<T>> = mutable Vector[],
+class FixedDir<+T: frozen> extends IFixedDir<T, FixedRow<T>> {
+  static fun create<U: T>(
+    data: mutable Vector<FixedRow<U>> = mutable Vector[],
   ): this {
     if (!data.isSorted()) {
       data.sort();
@@ -300,12 +300,14 @@ base class IFixedDir<+T: frozen, RowRepresentation: frozen> protected {
     this.getIterSourceKey(source, key).collect(Array)
   }
 
-  protected static fun computeTags(array: mutable Vector<FixedRow<T>>): void {
+  protected static fun computeTags<U: T>(
+    array: mutable Vector<FixedRow<U>>,
+  ): void {
     _: TickRange = static::computeTags_(array, 0, array.size() - 1);
   }
 
-  private static fun computeTags_(
-    array: mutable Vector<FixedRow<T>>,
+  private static fun computeTags_<U: T>(
+    array: mutable Vector<FixedRow<U>>,
     i: Int,
     j: Int,
   ): TickRange {
