@@ -2061,11 +2061,11 @@ class EagerDir protected {
     context.setDir(this);
   }
 
-  fun writeArraySourceManyReturnDir(
+  fun writeArraySourceMany(
     context: mutable Context,
     bindings: mutable Iterator<(Key, (Path, Path, Array<File>))>,
     changedKeysIfReset: ?(DirName, SortedSet<Key>) = None(),
-  ): this {
+  ): void {
     for (kv in bindings) {
       (key, (origSource, writer, values)) = kv;
       !this = this.writeEntry(context, origSource, writer, key, values);
@@ -2076,14 +2076,6 @@ class EagerDir protected {
       writerPath = Path::gen(writerDirName);
       !this = this.reset(context, writerPath, changedKeys)
     };
-    this
-  }
-
-  fun writeArraySourceMany(
-    context: mutable Context,
-    bindings: mutable Iterator<(Key, (Path, Path, Array<File>))>,
-  ): void {
-    !this = this.writeArraySourceManyReturnDir(context, bindings);
     context.setDir(this);
   }
 

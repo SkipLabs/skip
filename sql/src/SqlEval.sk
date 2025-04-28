@@ -2089,12 +2089,11 @@ fun importNext(
     targetCtx.unsafeMaybeGetEagerDir(targetDirName) match {
     | None() -> invariant_violation("Directory should have been created")
     | Some(inputDir) ->
-      !inputDir = inputDir.writeArraySourceManyReturnDir(
+      inputDir.writeArraySourceMany(
         targetCtx,
         entries.iterator(),
         if (isReset) Some((dir.dirName, changedKeys)) else None(),
-      );
-      targetCtx.setDir(inputDir)
+      )
     }
   };
   hasMultipleVersions

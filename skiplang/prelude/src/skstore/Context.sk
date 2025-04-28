@@ -1207,12 +1207,11 @@ fun import(
             targetCtx.setDir(dir);
           }
         | Some(inputDir) ->
-          !inputDir = inputDir.writeArraySourceManyReturnDir(
+          inputDir.writeArraySourceMany(
             targetCtx,
             entries.iterator(),
             if (isReset) Some((dir.dirName, changedKeys)) else None(),
-          );
-          targetCtx.setDir(inputDir)
+          )
         }
       | Some(_) -> invariant_violation("Error import: incompatible dir types")
       }
