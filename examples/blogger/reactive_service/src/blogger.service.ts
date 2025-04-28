@@ -102,7 +102,7 @@ class PostsResource implements Resource<PostsResourceInputs> {
   }
 }
 
-type PostsServiceInputs = {};
+type PostsServiceInputs = Record<string, never>;
 
 export const service: SkipService<PostsServiceInputs, PostsResourceInputs> = {
   initialData: {},

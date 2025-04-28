@@ -208,7 +208,7 @@ jobs:
           command: docker compose up --wait
       - run:
           name: Test blogger back end health
-          command: (docker run --network blogger_default -it cimg/base:2025.01 curl --silent --max-time 0.1 --insecure --location https://haproxy/api/posts || true) | grep --quiet "data:"
+          command: (docker run --network blogger_default -it cimg/base:2025.01 curl --silent --max-time 5 --insecure --location https://blogger_haproxy/api/posts || true) | grep --quiet "event:"
       - run:
           name: Tear down blogger example
           working_directory: ~/project/examples/blogger
