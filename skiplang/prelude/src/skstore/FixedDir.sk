@@ -152,8 +152,8 @@ class FixedDir<T: frozen> extends IFixedDir<T, FixedRow<T>> {
     static{data => data.toArray()}
   }
 
-  protected fun decode(row: FixedRow<T>): FixedRow<T> {
-    row
+  fun get(i: Int): FixedRow<T> {
+    this.data.unsafe_get(i)
   }
 }
 
@@ -204,9 +204,9 @@ class CompactFixedDir protected {
     | _ -> invariant_violation("Unexpected type")
     };
   }
-  protected fun decode(
-    compactRow: CompactRow<?SKDB.CValue>,
-  ): FixedRow<Array<File>> {
+
+  fun get(i: Int): FixedRow<Array<File>> {
+    compactRow = this.data.unsafe_get(i);
     rowValues = SKDB.RowValues(compactRow.values, compactRow.repeat);
     rowKey = SKDB.RowKey(rowValues, this.metadata.kinds);
     sourceKey = compactRow.sourceKey match {
@@ -227,12 +227,10 @@ class CompactFixedDir protected {
 base class IFixedDir<+T: frozen, RowRepresentation: frozen> protected {
   data: Array<RowRepresentation> = Array[],
 } extends FixedData<T> {
-  protected fun decode(repr: RowRepresentation): FixedRow<T>;
+  fun get(i: Int): FixedRow<T>;
 
   fun iterator(): mutable Iterator<FixedRow<T>> {
-    for (elt in this.data.iterator()) {
-      yield this.decode(elt)
-    }
+    this.data.keys().map(i -> this[i])
   }
 
   static fun getMetadata(
@@ -263,10 +261,6 @@ base class IFixedDir<+T: frozen, RowRepresentation: frozen> protected {
 
   fun size(): Int {
     this.data.size()
-  }
-
-  fun get(idx: Int): FixedRow<T> {
-    this.decode(this.data.unsafe_get(idx))
   }
 
   fun getPos(key: Key): Int {
@@ -338,7 +332,7 @@ base class IFixedDir<+T: frozen, RowRepresentation: frozen> protected {
       return void;
     };
     pivot = i + (j - i) / 2;
-    elt = this.decode(this.data[pivot]);
+    elt = this[pivot];
     tick = elt.tag;
     if (tick.max < after) return void;
     if (tick.current >= after) {
@@ -367,7 +361,7 @@ base class IFixedDir<+T: frozen, RowRepresentation: frozen> protected {
   ): void {
     if (i <= j) {
       pivot = i + (j - i) / 2;
-      elt = this.decode(this.data[pivot]);
+      elt = this[pivot];
       tick = elt.tag;
       if (tick.max >= after) {
         if (key <= elt.key) {
