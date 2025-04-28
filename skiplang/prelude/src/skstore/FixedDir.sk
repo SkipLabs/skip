@@ -224,7 +224,7 @@ class CompactFixedDir protected {
 
 //Defines the public interface of a FixedDir, allowing for some alternative
 // internal RowRepresentation of conceptually-FixedRow<T> rows.
-base class IFixedDir<T: frozen, RowRepresentation: frozen> protected {
+base class IFixedDir<+T: frozen, RowRepresentation: frozen> protected {
   data: Array<RowRepresentation> = Array[],
 } extends FixedData<T> {
   protected fun decode(repr: RowRepresentation): FixedRow<T>;
@@ -363,7 +363,7 @@ base class IFixedDir<T: frozen, RowRepresentation: frozen> protected {
     key: Key,
     i: Int,
     j: Int,
-    acc: mutable Vector<(Tick, Path, T)>,
+    push: ((Tick, Path, T)) -> void,
   ): void {
     if (i <= j) {
       pivot = i + (j - i) / 2;
@@ -371,15 +371,15 @@ base class IFixedDir<T: frozen, RowRepresentation: frozen> protected {
       tick = elt.tag;
       if (tick.max >= after) {
         if (key <= elt.key) {
-          this.getKeyChangesAfter(after, key, i, pivot - 1, acc);
+          this.getKeyChangesAfter(after, key, i, pivot - 1, push);
         };
         if (tick.current >= after) {
           if (elt.key.compare(key) is EQ()) {
-            acc.push((tick.current, elt.source, elt.value));
+            push((tick.current, elt.source, elt.value));
           }
         };
         if (key >= elt.key) {
-          this.getKeyChangesAfter(after, key, pivot + 1, j, acc);
+          this.getKeyChangesAfter(after, key, pivot + 1, j, push);
         }
       }
     }
@@ -387,7 +387,7 @@ base class IFixedDir<T: frozen, RowRepresentation: frozen> protected {
 
   fun getIterAfter(limit: Tick, key: Key): mutable Iterator<(Tick, Path, T)> {
     acc = mutable Vector[];
-    this.getKeyChangesAfter(limit, key, 0, this.data.size() - 1, acc);
+    this.getKeyChangesAfter(limit, key, 0, this.data.size() - 1, acc.push);
     acc.iterator()
   }
 }
