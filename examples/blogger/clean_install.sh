@@ -9,11 +9,9 @@ NC='\033[0m' # No Color
 # Function to process a directory
 process_directory() {
     local dir="$1"
-    local has_package_json=false
 
     # Check if directory has package.json
     if [ -f "$dir/package.json" ]; then
-        has_package_json=true
         echo -e "${YELLOW}Processing $dir${NC}"
         
         # Try to change directory, if fails, skip this directory
