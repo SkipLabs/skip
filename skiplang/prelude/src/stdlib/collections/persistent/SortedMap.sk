@@ -808,15 +808,6 @@ base class .SortedMap<+K: Orderable, +V> uses  //  extends KeyedSequence<K, V>
       static::balance(this.key, this.value, this.left.removeMin(), this.right)
     }
 
-  fun removeMinBinding(): SortedMap<K, V>
-  | Nil() -> this
-  | Node _ ->
-    this.left match {
-    | Nil() -> this.right
-    | _ ->
-      static::balance(this.key, this.value, this.left.removeMin(), this.right)
-    }
-
   /* Debugging */
 
   fun checkInvariants(): void
