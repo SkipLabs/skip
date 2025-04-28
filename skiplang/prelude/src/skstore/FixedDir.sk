@@ -175,8 +175,8 @@ class FixedDirMetadata{
 class CompactFixedDir protected {
   metadata: FixedDirMetadata,
 } extends IFixedDir<Array<File>, CompactRow<?SKDB.CValue>> {
-  static fun create(
-    data: mutable Vector<FixedRow<Array<File>>>,
+  static fun create<V: File>(
+    data: mutable Vector<FixedRow<Array<V>>>,
     metadata: FixedDirMetadata,
   ): this {
     if (!data.isSorted()) {
@@ -188,8 +188,8 @@ class CompactFixedDir protected {
       metadata => metadata,
     }
   }
-  protected static fun stripMetadata(
-    row: FixedRow<Array<File>>,
+  protected static fun stripMetadata<V: File>(
+    row: FixedRow<Array<V>>,
   ): CompactRow<?SKDB.CValue> {
     invariant(row.value.size() == 1);
     sourceKey = if (row.source.baseName != row.key) {
