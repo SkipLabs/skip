@@ -2676,6 +2676,20 @@ module end;
 
 module SKStore;
 
+extension class TimeStack {
+  fun maxMinus(): this {
+    !this.values = this.values.map(x -> Time(Int::max - x.value));
+    this
+  }
+}
+
+extension class EagerDir {
+  fun timeMaxMinus(): this {
+    !this.timeStack = this.timeStack.maxMinus();
+    this
+  }
+}
+
 @cpp_extern("SKIP_unsafe_compare_sets")
 native fun unsafeCompareSets(
   SortedMap<SKStore.Path, SortedSet<SKStore.ArrowKey>>,
