@@ -891,6 +891,8 @@ mutable class Context private {
     optOnDelete: ?Postponable = None(),
   ): EHandle<K, V> {
     this.mkdirMulti(
+      convKey,
+      convValue,
       dirName,
       content.map(kv -> {
         (key, value) = kv;
@@ -899,17 +901,18 @@ mutable class Context private {
       ignoreIfExists,
       optOnCreate,
       optOnDelete,
-    );
-    EHandle(convKey, convValue, dirName)
+    )
   }
 
-  mutable fun mkdirMulti(
+  mutable fun mkdirMulti<K: Key, V: File>(
+    convKey: Key ~> K,
+    convValue: File ~> V,
     dirName: DirName,
     content: Array<(Key, Array<File>)> = Array[],
     ignoreIfExists: Bool = false,
     optOnCreate: ?Postponable = None(),
     optOnDelete: ?Postponable = None(),
-  ): void {
+  ): EHandle<K, V> {
     this.unsafeMaybeGetEagerDir(dirName) match {
     | Some(dir) ->
       if (dir.creator != this.currentArrow()) {
@@ -918,7 +921,7 @@ mutable class Context private {
         throw DirAlreadyExists(dirName);
       } else if (ignoreIfExists) {
         this.!newDirs = this.newDirs.add(dirName);
-        return void
+        return EHandle(convKey, convValue, dirName)
       }
     | _ -> void
     };
@@ -972,7 +975,8 @@ mutable class Context private {
     };
     this.setDir(dir);
     this.!newDirs = this.newDirs.add(dirName);
-    optOnCreate.each(this.postpone)
+    optOnCreate.each(this.postpone);
+    EHandle(convKey, convValue, dirName)
   }
 
   mutable fun setDir(dir: Dir): void {

@@ -380,14 +380,11 @@ fun initService(
           mInputs = mutable Map<String, Collection>[];
           serviceDef.service.initialData.each(input -> {
             iDirName = SKStore.DirName::create(`/${input.name}/`);
-            ctx.mkdirMulti(
-              iDirName,
-              input.values.map(v -> (JSONID(v.i0), v.i1.map(x -> JSONFile(x)))),
-            );
-            iHdl = SKStore.EHandle<JSONID, JSONFile>(
+            iHdl = ctx.mkdirMulti(
               JSONID::keyType,
               JSONFile::type,
               iDirName,
+              input.values.map(v -> (JSONID(v.i0), v.i1.map(x -> JSONFile(x)))),
             );
             mInputs.add(input.name, Collection(iHdl))
           });
