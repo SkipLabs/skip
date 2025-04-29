@@ -760,7 +760,7 @@ class EagerDir protected {
     changesWritten > 0
   }
 
-  fun purgeOld(): FixedSourceMap {
+  private fun purgeOld(): FixedSourceMap {
     current = 0;
     acc = mutable Vector[];
     add = minfo -> {
@@ -1454,7 +1454,7 @@ class EagerDir protected {
     }
   }
 
-  fun unsafeGetAllDataIterModified{
+  private fun unsafeGetAllDataIterModified{
     fixedIter: mutable Iterator<(Tick, Path, Path, Array<File>)>,
     modified: mutable Iterator<(Tick, Path, Path, Array<File>)>,
   }: mutable Iterator<(Tick, Path, Path, Array<File>)> {
@@ -1831,7 +1831,9 @@ class EagerDir protected {
     this with {childDirs, slices, purgeCount}
   }
 
-  fun purgeSlices(context: mutable Context): RangeMapList<Key, DirName> {
+  private fun purgeSlices(
+    context: mutable Context,
+  ): RangeMapList<Key, DirName> {
     slices = RangeMapList[];
     childDirs = SortedSet[];
     for (slice in this.slices) {
@@ -1990,7 +1992,7 @@ class EagerDir protected {
     this with {childDirs => this.childDirs.remove(dirName)}
   }
 
-  fun updateNewDirs(
+  private fun updateNewDirs(
     context: mutable Context,
     source: Path,
     newDirs: SortedSet<DirName>,
