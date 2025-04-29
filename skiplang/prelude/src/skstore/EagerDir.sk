@@ -1537,7 +1537,7 @@ class EagerDir protected {
 
   static fun update(
     context: mutable Context,
-    contextDirty: SortedMap<DirName, SortedSet<Key>>,
+    parentDirtyOpt: ?SortedSet<Key>,
     contextDirtyReadersOpt: ?SortedMap<DirName, SortedSet<Key>>,
     parentName: DirName,
     parentMaps: Array<
@@ -1574,7 +1574,7 @@ class EagerDir protected {
         })
       }
     };
-    contextDirty.maybeGet(parent.dirName) match {
+    parentDirtyOpt match {
     | None() -> void
     | Some(dirtyKeys) ->
       keys = dirtyKeys.values();
