@@ -1421,7 +1421,7 @@ base class EagerDir protected {
     /* this is the parent */
     context: mutable Context,
     parentDirtyOpt: ?KeySet,
-    contextDirtyReadersOpt: ?SortedMap<DirName, SortedSet<Key>>,
+    contextDirtyReadersOpt: ?SortedMap<DirName, KeySet>,
     parentMaps: Array<
       (
         MapFun<Key, File>,
@@ -1443,7 +1443,7 @@ base class EagerDir protected {
       contextDirtyReaders.maybeGet(childName) match {
       | None() -> void
       | Some(dirtyKeys) ->
-        keys = dirtyKeys.values();
+        keys = parent.typed().castKeySet(dirtyKeys).values();
         !dirty = withRegionFold(None(), keys, dirty, (_, key, dirtyInRegion) ~> {
           for (p in parentMaps) {
             (_, rangeOpt, _) = p;
