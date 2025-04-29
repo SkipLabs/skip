@@ -344,7 +344,7 @@ mutable class Context private {
   private mutable dirty: SortedMap<DirName, KeySet> = SortedMap[],
   private mutable dirtyReaders: /* parentName => childName => keys */ SortedMap<
     DirName,
-    SortedMap<DirName, SortedSet<Key>>,
+    SortedMap<DirName, KeySet>,
   > = SortedMap[],
   mutable canReuse: CanReuse = CRIfMatch(),
   private mutable arrowStack: List<(ArrowKey, TimeStack)> = List[],
@@ -593,7 +593,10 @@ mutable class Context private {
         );
         map.set(
           reader.childName,
-          map.maybeGet(reader.childName).default(SortedSet[]).set(reader.key),
+          parent.addReaderKeyToKeySetOpt(
+            reader,
+            map.maybeGet(reader.childName),
+          ),
         )
       };
       time = if (reader.parentName == reader.childName) {

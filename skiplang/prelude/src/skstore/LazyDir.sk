@@ -28,7 +28,7 @@ base class LazyDir protected {protected collect: Bool} extends Dir {
 
   fun update(
     context: mutable Context,
-    dirtyReadersOpt: ?SortedMap<DirName, SortedSet<Key>>,
+    dirtyReadersOpt: ?SortedMap<DirName, KeySet>,
   ): void;
 
   fun typed(): TLazyDir;
@@ -108,13 +108,13 @@ class TLazyDir{
 
   fun update(
     context: mutable Context,
-    dirtyReadersOpt: ?SortedMap<DirName, SortedSet<Key>>,
+    dirtyReadersOpt: ?SortedMap<DirName, KeySet>,
   ): void {
     dirtyReadersOpt match {
     | None() -> void
     | Some(dirtyReaders) ->
       for (dirtyReaderDirName => dirtyReaderKeys in dirtyReaders) {
-        for (key in dirtyReaderKeys) {
+        for (key in this.castKeySet(dirtyReaderKeys)) {
           oldValue = this.data.maybeGet(key);
           !this.data = this.data.remove(key);
           context.updateDirtyReaders(Path::create(dirtyReaderDirName, key));
