@@ -29,7 +29,7 @@ data: [["key3",["value4"]]]
 
 The `init` event contains all available data for the resource when the connection is created, and can be used to set up initial client state.
 
-Subsequent `update` events indicate changes _only_ at the included keys: the first update here removes `"value3"` from `"key2"`, while the second removes adds a new entry associating `"key3"` to `"value4"`.
+Subsequent `update` events indicate changes _only_ at the included keys: the first update here removes `"value3"` from `"key2"`, while the second adds a new entry associating `"key3"` to `"value4"`.
 
 All events include an `id` metadata field which should mostly be ignored, but can be useful for debugging, replay, and similar purposes.
 
@@ -58,13 +58,13 @@ useEffect(() => {
   const stream = new EventSource("http://reactive.service.hostname/my_resource/foo");
   stream.addEventListener("init", (e: MessageEvent<string>) => {
     const initial_data = JSON.parse(e.data);
-	const initialFoo = ...; // create an initial "foo" using `initial_data`
-	setFoo(initialFoo);
+    const initialFoo = ...; // create an initial "foo" using `initial_data`
+    setFoo(initialFoo);
   });
   stream.addEventListener("update", (e: MessageEvent<string>) => {
     const updates = JSON.parse(e.data);
-	const updatedFoo = ...; // update "foo" using `updates`
-	setFoo(updatedfoo);
+    const updatedFoo = ...; // update "foo" using `updates`
+    setFoo(updatedfoo);
   });
   return () => {
     stream.close();

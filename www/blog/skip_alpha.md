@@ -8,7 +8,7 @@ authors: skiplabsteam
 
 We’re pleased to share the alpha release of the [Skip Framework](https://github.com/SkipLabs/skip), an open source (MIT license) system for building and running reactive backend services.
 
-Skip gives Typescript developers a simple declarative way to implement and run read-mostly features and services that are performant, transparent and continuously updated.
+Skip gives TypeScript developers a simple declarative way to implement and run read-mostly features and services that are performant, transparent and continuously updated.
 The framework handles all the complexities of state management, integrations and failure handling in the process.
 
 {/* truncate */}

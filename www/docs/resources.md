@@ -12,7 +12,7 @@ A Skip [reactive service](api/core/interfaces/SkipService) describes a reactive 
 
 A service's inputs are its *input collections* (data owned by the service that can be freely read/written/mapped over) and its *external services* (any dependencies on outside systems or APIs).
 
-A service's outputs are its *resource*, which define the types of requests that the service can handle, either by accessing data from its shared computation graph or by dynamically extending it with further reactive computation as needed to handle the request.
+A service's outputs are its *resources*, which define the types of requests that the service can handle, either by accessing data from its shared computation graph or by dynamically extending it with further reactive computation as needed to handle the request.
 In this way, we can think of resources as parameterized outputs; request parameters are used to instantiate the resource and produce a *resource instance* containing the requested data.
 
 For a concrete example, take the "active friends" resource from the getting-started [example](getting_started.md#the-anatomy-of-a-skip-service) service:
@@ -107,7 +107,7 @@ It instantiates the resource if needed, then returns a JSON-encoded array of key
 The second route requires the request body to be a JSON-encoded value with a `key` field and a `params` field.
 It instantiates the resource if needed, then returns a JSON-encoded array of all values associated to `key` in the resource.
 
-Lastly, clients can update the input collections of a reactive service:
+Clients can update the input collections of a reactive service:
 
 ```
 PATCH /v1/inputs/:collection
@@ -117,3 +117,11 @@ This route updates an input collection `collection` with the value(s) passed in 
 It updates multiple keys simultaneously with the data in the body of the request, which must be an array of `[K, V[]]` entries for the key/value types `K` and `V` of the input collection.
 
 For example, with `string` keys and `number` values, a request body of `[["key1",[10,20]],["key2",[]],["key3",[50]]]` associates `key1` to the values `10` and `20`, deletes any values under `key2`, and associates `key3` to the value 50.
+
+Finally, clients can check that the service is running normally:
+
+```
+GET /v1/healthcheck
+```
+
+This route will return HTTP 200 if the service is healthy.
