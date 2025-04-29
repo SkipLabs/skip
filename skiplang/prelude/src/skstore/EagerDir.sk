@@ -636,6 +636,8 @@ class EagerDir protected {
   childDirs: SortedSet<DirName> = SortedSet[],
   private slices: RangeMapList<Key, DirName> = RangeMapList[],
   private reducer: ?Reducer = None(),
+  /* dirty are keys of files that are made dirty because of a Map */
+  private dirty: SortedSet<Key> = SortedSet[],
   private purgeCount: Int = 0,
   private tombLimit: ?Tick = None(),
   optOnDelete: ?Postponable = None(),
@@ -1535,9 +1537,12 @@ class EagerDir protected {
     }
   }
 
+  fun resetDirty(): this {
+    this with {dirty => SortedSet[]}
+  }
+
   static fun update(
     context: mutable Context,
-    parentDirtyOpt: ?SortedSet<Key>,
     contextDirtyReadersOpt: ?SortedMap<DirName, SortedSet<Key>>,
     parentName: DirName,
     parentMaps: Array<
@@ -1574,10 +1579,8 @@ class EagerDir protected {
         })
       }
     };
-    parentDirtyOpt match {
-    | None() -> void
-    | Some(dirtyKeys) ->
-      keys = dirtyKeys.values();
+    if (!parent.dirty.isEmpty()) {
+      keys = parent.dirty.values();
       !dirty = withRegionFold(None(), keys, dirty, (_, key, dirtyInRegion) ~> {
         for (p in parentMaps) {
           (_, rangeOpt, _) = p;
@@ -1768,7 +1771,8 @@ class EagerDir protected {
       Some(cdata)
     };
 
-    context.addDirty(this.dirName, k);
+    context.addDirWithDirty(this.dirName);
+    dirty = this.dirty.set(k);
     path = Path::create(this.dirName, k);
 
     if (this.totalSize != totalSize) {
@@ -1782,7 +1786,7 @@ class EagerDir protected {
     filesPath = Path::filesTag(this.dirName);
     context.updateDirtyReaders(filesPath);
 
-    !this = this with {totalSize, reducer};
+    !this = this with {dirty, totalSize, reducer};
 
     context.updateDirtyReaders(path);
 

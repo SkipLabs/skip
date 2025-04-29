@@ -324,7 +324,7 @@ mutable class Context private {
   mutable newDirs: SortedSet<DirName> = SortedSet[],
   mutable globals: SortedMap<String, File> = SortedMap[],
   private mutable persistents: SortedMap<String, File> = SortedMap[],
-  private mutable dirty: SortedMap<DirName, SortedSet<Key>> = SortedMap[],
+  private mutable dirsWithDirty: SortedSet<DirName> = SortedSet[],
   private mutable dirtyReaders: /* parentName => childName => keys */ SortedMap<
     DirName,
     SortedMap<DirName, SortedSet<Key>>,
@@ -435,7 +435,7 @@ mutable class Context private {
       newDirs => this.newDirs,
       globals => this.globals,
       persistents => this.persistents,
-      dirty => this.dirty,
+      dirsWithDirty => this.dirsWithDirty,
       dirtyReaders => this.dirtyReaders,
       canReuse => this.canReuse,
       arrowStack => this.arrowStack,
@@ -466,7 +466,7 @@ mutable class Context private {
     this.!newDirs = ctx.newDirs;
     this.!globals = ctx.globals;
     this.!persistents = ctx.persistents;
-    this.!dirty = ctx.dirty;
+    this.!dirsWithDirty = ctx.dirsWithDirty;
     this.!dirtyReaders = ctx.dirtyReaders;
     this.!canReuse = ctx.canReuse;
     this.!arrowStack = ctx.arrowStack;
@@ -583,7 +583,7 @@ mutable class Context private {
    * recomputed.
    *
    * - dirtyReaders are files that are made dirty because of a read access
-   * - dirty are files that are made dirty because of a Map.
+   * - dirsWithDirty are dirs containing files that are made dirty because of a Map.
    */
   /*****************************************************************************/
   mutable fun updateDirtyReaders(path: Path): void {
@@ -666,11 +666,8 @@ mutable class Context private {
     this.!lazyGets = this.lazyGets.set(Path::create(dirName, key))
   }
 
-  mutable fun addDirty(dirName: DirName, key: Key): void {
-    this.!dirty[dirName] = this.dirty.maybeGet(dirName) match {
-    | None() -> SortedSet[key]
-    | Some(set) -> set.set(key)
-    }
+  mutable fun addDirWithDirty(dirName: DirName): void {
+    this.!dirsWithDirty = this.dirsWithDirty.set(dirName);
   }
 
   mutable fun update(): void {
@@ -694,7 +691,13 @@ mutable class Context private {
     loop {
       this.toUpdate.removeMin() match {
       | None() ->
-        this.!dirty = SortedMap[];
+        for (dirName in this.dirsWithDirty) {
+          this.unsafeMaybeGetEagerDir(dirName) match {
+          | None() -> void
+          | Some(dir) -> this.setDir(dir.resetDirty())
+          }
+        };
+        this.!dirsWithDirty = SortedSet[];
         this.!dirtyReaders = SortedMap[];
         withPostponables = this.checkPostponables();
         withPre = this.updatePre();
@@ -717,7 +720,6 @@ mutable class Context private {
           };
           EagerDir::update(
             this,
-            this.dirty.maybeGet(parentName),
             this.dirtyReaders.maybeGet(parentName),
             parentName,
             parentMaps,
