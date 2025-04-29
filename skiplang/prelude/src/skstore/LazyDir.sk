@@ -180,17 +180,9 @@ class LazyDir protected {
   }
 
   fun getArray(context: mutable Context, key: Key): Array<File> {
-    this.getArrayWithOptions(context, key, true)
-  }
-
-  fun getArrayWithOptions(
-    context: mutable Context,
-    key: Key,
-    throwOnCycle: Bool = true,
-  ): Array<File> {
     path = Path::create(this.dirName, key);
     context.addRead(path);
-    this.unsafeGetArray(context, key, throwOnCycle)
+    this.unsafeGetArray(context, key, true)
   }
 
   fun getIter(context: mutable Context, key: Key): mutable Iterator<File> {
