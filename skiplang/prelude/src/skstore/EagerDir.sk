@@ -638,10 +638,6 @@ class EagerDir protected {
   reducer: ?Reducer = None(),
   purgeCount: Int = 0,
   tombLimit: ?Tick = None(),
-  optCopy: ?(
-    DirName,
-    ?(DirName, Key, readonly Context ~> Array<File>) ~> Postponable,
-  ) = None(),
   optOnDelete: ?Postponable = None(),
 } extends Dir {
   static fun create{
@@ -1831,16 +1827,6 @@ class EagerDir protected {
       !slices = this.purgeSlices(context);
       !purgeCount = 0;
     };
-
-    this.optCopy.each(info -> {
-      (target, copier) = info;
-      context.postpone(
-        copier match {
-        | Some(w) -> w(target, k, _ctx ~> rvalues)
-        | _ -> ToWrite(target, k, _ctx ~> rvalues)
-        },
-      )
-    });
 
     this with {childDirs, slices, purgeCount}
   }
