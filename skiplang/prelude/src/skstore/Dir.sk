@@ -70,7 +70,9 @@ base class TDir extends Dir {
   }
 
   fun addReaderKeyToKeySetOpt(arrowKey: ArrowKey, keySetOpt: ?KeySet): KeySet {
-    this.addKeyToKeySetOpt(arrowKey.key, keySetOpt)
+    arrowKey match {
+    | TArrowKey{key} -> this.addKeyToKeySetOpt(key, keySetOpt)
+    }
   }
 
   fun castKeyMap<V: frozen>(keyMap: KeyMap<V>): TKeyMap<Key, V> {
@@ -79,6 +81,16 @@ base class TDir extends Dir {
 
   fun castOrEmptyKeyMap<V: frozen>(keyMapOpt: ?KeyMap<V>): TKeyMap<Key, V> {
     keyMapOpt.map(this.castKeyMap).default(TKeyMap::empty())
+  }
+
+  fun keyOfArrowKey(arrowKey: ArrowKey): Key {
+    static::staticKeyOfArrowKey(arrowKey)
+  }
+
+  static fun staticKeyOfArrowKey(arrowKey: ArrowKey): Key {
+    arrowKey match {
+    | TArrowKey{key} -> key
+    }
   }
 }
 

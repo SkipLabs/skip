@@ -107,13 +107,20 @@ value class Arrow(parentName: DirName, childName: DirName) uses Orderable
 // If the read happens during the computation of the result of key K for a lazy
 // directory A, both the child and the parent are the same and equal to A.
 
-value class ArrowKey private {
+base class ArrowKey protected {
   parentName: DirName,
   childName: DirName,
-  key: Key,
 } uses Orderable {
+  fun getKeyString(): String;
+}
+
+class TArrowKey{key: Key} extends ArrowKey {
   static fun create{parentName: DirName, childName: DirName, key: Key}: this {
     static{parentName, childName, key}
+  }
+
+  fun getKeyString(): String {
+    this.key.toString()
   }
 }
 
