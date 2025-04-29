@@ -295,13 +295,10 @@ fun dirDescrCopy(
     "/sink/" + tableName + "/" + version.value + "/",
   );
   time = context.timeStamp();
-  dir = SKStore.EagerDir::create{
+  dir = oldDir.copy{
     timeStack => SKStore.TimeStack::createInput(time),
     dirName => nextName,
     input => true,
-    fixedData => oldDir.fixedData,
-    data => oldDir.data,
-    totalSize => oldDir.totalSize,
     creator => context.currentArrow(),
   };
   context.setDir(dir);
