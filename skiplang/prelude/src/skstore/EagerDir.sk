@@ -1458,28 +1458,32 @@ class EagerDir protected {
   ): mutable Iterator<(Tick, Path, Path, Array<File>)> {
     fixedIter = this.fixedData.getIter(key);
     this.data.maybeGet(key) match {
-    | None() ->
-      for (row in fixedIter) {
-        yield row
-      }
+    | None() -> fixedIter
     | Some(modified) ->
-      fixed = FixedDataMapIterator::create(fixedIter);
+      this.unsafeGetAllDataIterModified{fixedIter, modified => modified.items()}
+    }
+  }
 
-      for (tickSourceWriterFiles in modified.items()) {
-        (tick, source, writer, files) = tickSourceWriterFiles;
-        while (!fixed.isEnd() && fixed.current().i1 < source) {
-          yield fixed.current();
-          fixed.next();
-        };
-        while (!fixed.isEnd() && fixed.current().i1 == source) {
-          fixed.next();
-        };
-        yield (tick, source, writer, files);
-      };
-      while (!fixed.isEnd()) {
+  fun unsafeGetAllDataIterModified{
+    fixedIter: mutable Iterator<(Tick, Path, Path, Array<File>)>,
+    modified: mutable Iterator<(Tick, Path, Path, Array<File>)>,
+  }: mutable Iterator<(Tick, Path, Path, Array<File>)> {
+    fixed = FixedDataMapIterator::create(fixedIter);
+
+    for (tickSourceWriterFiles in modified) {
+      (tick, source, writer, files) = tickSourceWriterFiles;
+      while (!fixed.isEnd() && fixed.current().i1 < source) {
         yield fixed.current();
         fixed.next();
-      }
+      };
+      while (!fixed.isEnd() && fixed.current().i1 == source) {
+        fixed.next();
+      };
+      yield (tick, source, writer, files);
+    };
+    while (!fixed.isEnd()) {
+      yield fixed.current();
+      fixed.next();
     }
   }
 
