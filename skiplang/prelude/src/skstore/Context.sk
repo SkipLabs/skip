@@ -89,11 +89,15 @@ value class Arrow(parentName: DirName, childName: DirName) uses Orderable
 // If the read happens during the computation of the result of key K for a lazy
 // directory A, both the child and the parent are the same and equal to A.
 
-value class ArrowKey{
+value class ArrowKey private {
   parentName: DirName,
   childName: DirName,
   key: Key,
-} uses Orderable
+} uses Orderable {
+  static fun create{parentName: DirName, childName: DirName, key: Key}: this {
+    static{parentName, childName, key}
+  }
+}
 
 /*****************************************************************************/
 /* The function used to start the system. */

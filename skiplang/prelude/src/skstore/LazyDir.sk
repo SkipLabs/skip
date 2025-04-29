@@ -133,7 +133,7 @@ class LazyDir protected {
           oldValue match {
           | Some(LDefined(_, reads))
           | Some(LRemoved(reads)) ->
-            arrow = ArrowKey{
+            arrow = ArrowKey::create{
               parentName => this.dirName,
               childName => this.dirName,
               key,
@@ -174,7 +174,11 @@ class LazyDir protected {
     | Some(x) -> LDefined(x, context.reads.toArray())
     };
 
-    arrowKey = ArrowKey{parentName => dirName, childName => dirName, key};
+    arrowKey = ArrowKey::create{
+      parentName => dirName,
+      childName => dirName,
+      key,
+    };
     context.updateNewDeps(arrowKey, context.reads);
 
     !dir = context.unsafeGetLazyDir(dirName);
@@ -200,7 +204,7 @@ class LazyDir protected {
       if (x is Some(LRemoved _) && context.debugMode) {
         print_string(`LRemoved: ${this.dirName}${key}`)
       };
-      arrow = ArrowKey{
+      arrow = ArrowKey::create{
         parentName => this.dirName,
         childName => this.dirName,
         key,
