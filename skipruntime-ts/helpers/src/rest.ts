@@ -215,12 +215,19 @@ export class SkipServiceBroker {
    * @returns UUID that can be used to subscribe to updates to resource instance.
    */
   async getStreamUUID(resource: string, params: Json = {}): Promise<string> {
-    return fetch(`${this.entrypoint}/v1/streams/${resource}`, {
+    const url = `${this.entrypoint}/v1/streams/${resource}`;
+    const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(params),
       signal: AbortSignal.timeout(this.timeout ?? 1000),
-    }).then((res) => res.text());
+    });
+    if (!response.ok) {
+      throw new SkipFetchError(
+        `Unable to connect to ${url}: ${response.status} - ${response.statusText}`,
+      );
+    }
+    return await response.text();
   }
 
   /**
