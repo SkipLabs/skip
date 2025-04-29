@@ -15,20 +15,6 @@ base class Postponable {
   fun perform(context: mutable Context): void;
 }
 
-class ToWrite(
-  dirName: DirName,
-  key: Key,
-  values: readonly Context ~> Array<File>,
-) extends Postponable {
-  //
-  fun perform(context: mutable Context): void {
-    context.unsafeMaybeGetEagerDir(this.dirName) match {
-    | Some(dir) -> dir.writeArray(context, this.key, this.values(context))
-    | _ -> void
-    }
-  }
-}
-
 /*****************************************************************************/
 /* Sessions. */
 /*****************************************************************************/
