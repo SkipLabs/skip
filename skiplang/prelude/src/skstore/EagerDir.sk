@@ -329,7 +329,7 @@ class DataMapValue{
     }
   }
 
-  fun items(): mutable Iterator<((Tick, Path, Path), Array<File>)> {
+  fun items(): mutable Iterator<(Tick, Path, Path, Array<File>)> {
     mapIter = this.map.itemsWithTick();
     tombsIter = this.tombs.itemsWithTick();
     left = mapIter.next();
@@ -338,20 +338,20 @@ class DataMapValue{
       (left, right) match {
       | (None(), None()) -> break void
       | (None(), Some((v, w, tick))) ->
-        yield ((tick.current, v, w), Array[]);
+        yield (tick.current, v, w, Array[]);
         !right = tombsIter.next()
       | (Some((k, (w, v), tick)), None()) ->
-        yield ((tick.current, k, w), v);
+        yield (tick.current, k, w, v);
         !left = mapIter.next()
       | (Some((k, (w, v), tick)), Some((k2, _, _))) if (k < k2) ->
-        yield ((tick.current, k, w), v);
+        yield (tick.current, k, w, v);
         !left = mapIter.next()
       | (Some((k, (w, v), tick)), Some((k2, _, _))) if (k == k2) ->
-        yield ((tick.current, k, w), v);
+        yield (tick.current, k, w, v);
         !left = mapIter.next();
         !right = tombsIter.next()
       | (Some(_), Some((k2, w, tick))) ->
-        yield ((tick.current, k2, w), Array[]);
+        yield (tick.current, k2, w, Array[]);
         !right = tombsIter.next()
       }
     }
@@ -830,8 +830,8 @@ class EagerDir protected {
           add(fixedIter.current());
           fixedIter.next();
         };
-        for (tickSource => values in map) {
-          (tick, source, writer) = tickSource;
+        for (tickSourceValues in map.items()) {
+          (tick, source, writer, values) = tickSourceValues;
           while (
             !fixedIter.isEnd() &&
             fixedIter.current().i3 == key &&
@@ -1465,8 +1465,8 @@ class EagerDir protected {
     | Some(modified) ->
       fixed = FixedDataMapIterator::create(fixedIter);
 
-      for (tickSourceWriter => files in modified) {
-        (tick, source, writer) = tickSourceWriter;
+      for (tickSourceWriterFiles in modified.items()) {
+        (tick, source, writer, files) = tickSourceWriterFiles;
         while (!fixed.isEnd() && fixed.current().i1 < source) {
           yield fixed.current();
           fixed.next();

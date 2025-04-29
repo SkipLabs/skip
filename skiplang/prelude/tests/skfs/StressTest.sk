@@ -416,8 +416,8 @@ fun compareContext(
           data.maybeGet(key) match {
           | None() -> print_string("EMPTY DATA")
           | Some(sources) ->
-            for (tickSource => files in sources) {
-              (_, k, _) = tickSource;
+            for (tickSourceFiles in sources.items()) {
+              (_, k, _, files) = tickSourceFiles;
               intFiles = files.map(file -> SKStore.IntFile::type(file));
               print_string(`       ${k} => ${intFiles}`)
             }
