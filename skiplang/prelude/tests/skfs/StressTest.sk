@@ -395,8 +395,8 @@ fun compareContext(
         print_string(`Error: values differ for ${dirName}${key}`);
         print_string(`       ${values1}`);
         dir match {
-        | SKStore.EagerDir{fixedData} ->
-          for (fixed in fixedData.getIter(key)) {
+        | eagerDir @ SKStore.EagerDir _ ->
+          for (fixed in eagerDir.unsafeGetAllDataIter(key)) {
             (_, k, _, files) = fixed;
             intFiles = files.map(file -> SKStore.IntFile::type(file));
             print_string(`FIXED  ${k} => ${intFiles}`)
@@ -427,8 +427,8 @@ fun compareContext(
         print_string("");
         print_string(`       ${values2}`);
         dir2 match {
-        | SKStore.EagerDir{fixedData} ->
-          for (fixed in fixedData.getIter(key)) {
+        | eagerDir @ SKStore.EagerDir _ ->
+          for (fixed in eagerDir.unsafeGetAllDataIter(key)) {
             (_, k, _, files) = fixed;
             intFiles = files.map(file -> SKStore.IntFile::type(file));
             print_string(`FIXED  ${k} => ${intFiles}`)
