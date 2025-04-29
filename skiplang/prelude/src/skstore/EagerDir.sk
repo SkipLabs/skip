@@ -621,12 +621,12 @@ mutable class FixedDataMapIterator<T> private {
 
 class EagerDir protected {
   input: Bool,
-  fixedData: FixedDataMap,
-  totalSize: Int,
+  private fixedData: FixedDataMap,
+  private totalSize: Int,
   creator: ?ArrowKey,
-  fixedOld: FixedSourceMap = FixedSourceMap::empty(),
+  private fixedOld: FixedSourceMap = FixedSourceMap::empty(),
   data: DataMap,
-  old: SortedMap<Path, MInfo> = SortedMap[],
+  private old: SortedMap<Path, MInfo> = SortedMap[],
   parents: FixedSingle<
     DirName,
     Array<
@@ -634,10 +634,10 @@ class EagerDir protected {
     >,
   > = FixedSingle::empty(),
   childDirs: SortedSet<DirName> = SortedSet[],
-  slices: RangeMapList<Key, DirName> = RangeMapList[],
-  reducer: ?Reducer = None(),
-  purgeCount: Int = 0,
-  tombLimit: ?Tick = None(),
+  private slices: RangeMapList<Key, DirName> = RangeMapList[],
+  private reducer: ?Reducer = None(),
+  private purgeCount: Int = 0,
+  private tombLimit: ?Tick = None(),
   optOnDelete: ?Postponable = None(),
 } extends Dir {
   static fun create{
