@@ -146,16 +146,12 @@ class LazyDir protected {
     result
   }
 
-  fun unsafeGetArray(
-    context: mutable Context,
-    key: Key,
-    throwOnCycle: Bool = true,
-  ): Array<File> {
+  fun unsafeGetArray(context: mutable Context, key: Key): Array<File> {
     if (this.collect) {
       context.addLazyGet(this.dirName, key)
     };
     lazyResult = this.data.maybeGet(key) match {
-    | Some(LCycle()) if (throwOnCycle) -> throw CyclicExn(key)
+    | Some(LCycle()) -> throw CyclicExn(key)
     | x @ None()
     | x @ Some(LRemoved _)
     | x @ Some(LAbsent()) ->
@@ -182,7 +178,7 @@ class LazyDir protected {
   fun getArray(context: mutable Context, key: Key): Array<File> {
     path = Path::create(this.dirName, key);
     context.addRead(path);
-    this.unsafeGetArray(context, key, true)
+    this.unsafeGetArray(context, key)
   }
 
   fun getIter(context: mutable Context, key: Key): mutable Iterator<File> {
