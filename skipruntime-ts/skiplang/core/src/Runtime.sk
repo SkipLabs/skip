@@ -35,6 +35,11 @@ class ResourceCollections(
 
 class ServiceDefinition(runId: String, service: Service) extends SKStore.File
 
+class ServiceInputs(
+  service: Service,
+  inputs: Map<String, Collection>,
+) extends SKStore.File
+
 class Handle(value: SKStore.EHandle<JSONID, JSONFile>) extends SKStore.File
 
 class StatusHandle(
@@ -307,42 +312,57 @@ fun initService(service: Service): Result<Array<Waitable>, .Exception> {
         kSessionDir,
         Array[(SKStore.UnitID::singleton, ServiceDefinition(runId, service))],
       );
-      servicesHdl = sessionHdl.map(
-        SKStore.SID::keyType,
-        ServiceFile::type,
-        context,
-        kGraphDir,
-        (ctx, writer, _key, it) ~> {
-          serviceDef = it.first;
-          pushContext(ctx);
-          mInputs = mutable Map<String, Collection>[];
-          serviceDef.service.initialData.each(input -> {
-            iDirName = SKStore.DirName::create(`/${input.name}/`);
-            iHdl = ctx.mkdirMulti(
-              JSONID::keyType,
-              JSONFile::type,
-              iDirName,
-              input.values.map(v -> (JSONID(v.i0), v.i1.map(x -> JSONFile(x)))),
-            );
-            mInputs.add(input.name, Collection(iHdl))
-          });
-          inputCollections = mInputs.chill();
-          try {
+      servicesHdl = sessionHdl
+        .map(
+          SKStore.SID::keyType,
+          ServiceInputs::type,
+          context,
+          kSessionDir.sub("inputs"),
+          (ctx, writer, _key, it) ~> {
+            serviceDef = it.first;
+            mInputs = mutable Map<String, Collection>[];
+            serviceDef.service.initialData.each(input -> {
+              iDirName = SKStore.DirName::create(`/${input.name}/`);
+              iHdl = ctx.mkdirMulti(
+                JSONID::keyType,
+                JSONFile::type,
+                iDirName,
+                input.values.map(v ->
+                  (JSONID(v.i0), v.i1.map(x -> JSONFile(x)))
+                ),
+              );
+              mInputs.add(input.name, Collection(iHdl))
+            });
             writer.set(
               SKStore.SID(serviceDef.runId),
-              ServiceFile(
-                serviceDef.service.createGraph(inputCollections),
-                inputCollections,
-              ),
-            );
-            popContext()
-          } catch {
-          | ex ->
-            popContext();
-            throw ex
-          }
-        },
-      );
+              ServiceInputs(serviceDef.service, mInputs.chill()),
+            )
+          },
+        )
+        .map(
+          SKStore.SID::keyType,
+          ServiceFile::type,
+          context,
+          kGraphDir,
+          (ctx, writer, key, it) ~> {
+            definition = it.first;
+            pushContext(ctx);
+            try {
+              writer.set(
+                key,
+                ServiceFile(
+                  definition.service.createGraph(definition.inputs),
+                  definition.inputs,
+                ),
+              );
+              popContext()
+            } catch {
+            | ex ->
+              popContext();
+              throw ex
+            }
+          },
+        );
       // Service status
       statusDefHdl = context.mkdir(
         SKStore.DirName::keyType,
