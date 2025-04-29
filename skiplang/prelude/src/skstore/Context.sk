@@ -983,6 +983,15 @@ mutable class Context private {
     this.dirs.get(dirName);
   }
 
+  mutable fun maybeGetDir<T: File>(dirName: DirName): ?Dir {
+    this.addRead(Path::dirTag(dirName));
+    this.dirs.maybeGet(dirName);
+  }
+
+  readonly fun unsafeMaybeGetDir<T: File>(dirName: DirName): ?Dir {
+    this.dirs.maybeGet(dirName);
+  }
+
   readonly fun unsafeGetDir(dirName: DirName): Dir {
     this.dirs.get(dirName);
   }
@@ -1082,15 +1091,6 @@ mutable class Context private {
       )
     | None() -> SortedSet::create()
     }
-  }
-
-  mutable fun maybeGetDir<T: File>(dirName: DirName): ?Dir {
-    this.addRead(Path::dirTag(dirName));
-    this.dirs.maybeGet(dirName);
-  }
-
-  readonly fun unsafeMaybeGetDir<T: File>(dirName: DirName): ?Dir {
-    this.dirs.maybeGet(dirName);
   }
 
   mutable fun addRead(path: Path): void {
