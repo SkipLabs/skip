@@ -23,7 +23,7 @@ From Alice adding a new friend to live data reactions, this guide makes reactive
 
 {/* truncate */}
 
-### The Simplest, the Merrier
+### The Simpler, the Better
 
 Ever heard the saying, "The simpler, the better"? Well, that especially holds true when it comes to learning—particularly in reactive programming. Think of it like what we expect from a social network: *reactivity* in response to change. Sure, a full-blown social network has more bells and whistles than a carnival, but here we're just tackling a small piece of it. This guide keeps things light and breezy, focusing on the essentials to show how to build a reactive system using **Skip**. It's a proof of concept.
 
