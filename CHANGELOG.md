@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.16] - 2025-04-30
+
+### Fixed
+- Manage HTTP errors in stream creations (#878)
+- Fix bug with empty resources (#882)
+
 ## [0.0.15] - 2025-04-11
 
 ### Added
