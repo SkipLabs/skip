@@ -325,7 +325,7 @@ base class .SortedMap<+K: Orderable, +V> uses  //  extends KeyedSequence<K, V>
     value: V2,
     f: (V2, V2) -> V2,
   ): SortedMap<K2, V2>
-  | Nil() -> SortedMap::node(key, value, Nil(), Nil())
+  | Nil() -> SortedMap::singleton(key, value)
   | Node _ ->
     l: SortedMap<K2, V2> = this.left;
     r: SortedMap<K2, V2> = this.right;
@@ -617,6 +617,10 @@ base class .SortedMap<+K: Orderable, +V> uses  //  extends KeyedSequence<K, V>
   | Nil() -> 0
   | Node _ -> this.h
 
+  static fun singleton(k: K, v: V): Node<K, V> {
+    Node{n => 1, h => 1, key => k, value => v, left => Nil(), right => Nil()}
+  }
+
   protected static fun node<K2: Orderable, V2>[K: K2, V: V2](
     k: K2,
     v: V2,
@@ -710,7 +714,7 @@ base class .SortedMap<+K: Orderable, +V> uses  //  extends KeyedSequence<K, V>
     k: K2,
     v: V2,
   ): SortedMap<K2, V2>
-  | Nil() -> SortedMap::node(k, v, Nil(), Nil())
+  | Nil() -> SortedMap::singleton(k, v)
   | Node _ ->
     SortedMap::balance(
       this.key,
@@ -723,7 +727,7 @@ base class .SortedMap<+K: Orderable, +V> uses  //  extends KeyedSequence<K, V>
     k: K2,
     v: V2,
   ): SortedMap<K2, V2>
-  | Nil() -> SortedMap::node(k, v, Nil(), Nil())
+  | Nil() -> SortedMap::singleton(k, v)
   | Node _ ->
     SortedMap::balance(
       this.key,
