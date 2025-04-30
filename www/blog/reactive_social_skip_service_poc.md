@@ -73,7 +73,7 @@ We are now ready to enter the Skip world!
 
 ### Step 2: The Skip Service
 
-The whole first step can be found [here on GitHub](https://github.com/SkipLabs/reactive_social_network_service_poc/commit/a63289aaae2404e62d1d212d870be042ab47f3e5).
+The whole second step can be found [here on GitHub](https://github.com/SkipLabs/reactive_social_network_service_poc/commit/a63289aaae2404e62d1d212d870be042ab47f3e5).
 
 We are going to need SkipLabs packages:
 
