@@ -12,6 +12,8 @@ export SKDB_CMD=$SKDB_BIN
 pass() { printf "%-55s OK\n" "$1:"; }
 fail() { printf "%-55s FAILED\n" "$1:"; }
 
+set -o pipefail
+
 run_diff () {
     test_id=$1
     shift
@@ -38,6 +40,9 @@ run_diff () {
 
     $SKDB_CMD --init "$DB"
     cat "$creation_script" "$views_script" | $SKDB
+    if [ $? -ne 0 ]; then
+        fail "$test_id - $views_script (creation)"
+    fi
 
     for i in $(seq 0 $((nviews))); do
         $SKDB subscribe "V$i" --connect --updates "$TMP_DIR/V$i" > /dev/null &
@@ -46,6 +51,9 @@ run_diff () {
     wait
 
     cat "${more_scripts[@]}" | $SKDB
+    if [ $? -ne 0 ]; then
+        fail "$test_id - $views_script (inserts)"
+    fi
 
     for i in $(seq 0 $((nviews))); do
         echo "select * from V$i;"
@@ -58,6 +66,9 @@ run_diff () {
     done;
 
     cat "$TMP_DIR/selects.sql" | $SKDB | sort -n > "$TMP_DIR/kk1"
+    if [ $? -ne 0 ]; then
+        fail "$test_id - $views_script (selects)"
+    fi
 
     if $use_sqlite; then
         cat "$views_script" | sed 's/CREATE REACTIVE VIEW V[0-9]* AS //' > "$TMP_DIR/selects2.sql"
