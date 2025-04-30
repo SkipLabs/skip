@@ -341,7 +341,7 @@ Starting the server will display something like:
 
 Skip control service listening on port 8081
 Skip streaming service listening on port 8080
-Groups REST wrapper listening at port 8082
+Web server listening at port 8082
 ```
 
 The Express server listens to the steaming service for updates, and it is now time see it in action!
