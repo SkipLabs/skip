@@ -723,12 +723,9 @@ base class .SortedMap<+K: Orderable, +V> uses  //  extends KeyedSequence<K, V>
     k: K2,
     v: V2,
   ): SortedMap<K2, V2>
-  | Nil() ->
-    new_static: Concrete<SortedMap<K2, V2>> = static;
-    new_static::node(k, v, Nil(), Nil())
+  | Nil() -> SortedMap::node(k, v, Nil(), Nil())
   | Node _ ->
-    new_static: Concrete<SortedMap<K2, V2>> = static;
-    new_static::balance(
+    SortedMap::balance(
       this.key,
       this.value,
       this.left,
