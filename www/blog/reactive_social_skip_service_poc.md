@@ -27,7 +27,7 @@ From Alice adding a new friend to live data reactions, this guide makes reactive
 
 Ever heard the saying, "The simpler, the better"? Well, that especially holds true when it comes to learning—particularly in reactive programming. Think of it like what we expect from a social network: *reactivity* in response to change. Sure, a full-blown social network has more bells and whistles than a carnival, but here we're just tackling a small piece of it. This guide keeps things light and breezy, focusing on the essentials to show how to build a reactive system using **Skip**. It's a proof of concept.
 
-By keeping things simple and working right in the terminal, we can easily follow how data flows and how changes propagate—without getting lost in complexity. So let's dive in and have some fun while we're at it!
+By keeping things simple and working right in the terminal, we can easily follow how data flows and how changes propagate without getting lost in complexity.
 
 We'll start by building a Node project with TypeScript—because types, you know. Then, we'll define our data types. Since this is a social network, we want to represent friends and determine if they're active in a given group. We'll define members with names and associated groups, and for each group, we'll track whether a given member is active. After that, we'll build the Skip service, and finally, we'll wrap things up with a server that uses this service. All this will we be wrapped up in an example where Alice makes a new friend.
 
