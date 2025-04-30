@@ -161,16 +161,14 @@ class LazyDir protected {
       if (x is Some(LRemoved _) && context.debugMode) {
         print_string("LRemoved: " + Path::create(this.dirName, key).toString())
       };
-      arrow = context.currentArrow() match {
-      | Some(a) ->
-        Some(
-          ArrowKey{parentName => a.childName, childName => this.dirName, key},
-        )
-      | _ -> None()
+      arrow = ArrowKey{
+        parentName => this.dirName,
+        childName => this.dirName,
+        key,
       };
-      arrow.each(a -> context.enter(a, this.timeStack));
+      context.enter(arrow, this.timeStack);
       res = this.lazyFun(context, key);
-      arrow.each(context.leave);
+      context.leave(arrow);
       res
     | Some(x) -> x
     };
