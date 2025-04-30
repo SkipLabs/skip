@@ -332,12 +332,18 @@ base class .SortedMap<+K: Orderable, +V> uses  //  extends KeyedSequence<K, V>
     k: K2 = this.key;
     v: V2 = this.value;
     compare(key, this.key) match {
-    | LT() -> SortedMap::balance(k, v, l.setWith(key, value, f), r)
+    | LT() ->
+      newL = l.setWith(key, value, f);
+      if (phys_eq(newL, l)) this else SortedMap::balance(k, v, newL, r)
     | EQ() ->
       newV = f(v, value);
-      node: Node<K2, V2> = n;
-      node with {value => newV}
-    | GT() -> SortedMap::balance(k, v, l, r.setWith(key, value, f))
+      if (phys_eq(newV, v)) this else {
+        node: Node<K2, V2> = n;
+        node with {value => newV}
+      }
+    | GT() ->
+      newR = r.setWith(key, value, f);
+      if (phys_eq(newR, r)) this else SortedMap::balance(k, v, l, newR)
     }
 
   fun remove<K2: Orderable>[K: K2](key: K2): SortedMap<K, V>
