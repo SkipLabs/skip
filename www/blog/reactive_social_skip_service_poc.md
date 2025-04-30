@@ -29,7 +29,7 @@ Ever heard the saying, "The simpler, the better"? Well, that especially holds tr
 
 By keeping things simple and working right in the terminal, we can easily follow how data flows and how changes propagate without getting lost in complexity.
 
-We'll start by building a Node project with TypeScript—because types, you know. Then, we'll define our data types. Since this is a social network, we want to represent friends and determine if they're active in a given group. We'll define members with names and associated groups, and for each group, we'll track whether a given member is active. After that, we'll build the Skip service, and finally, we'll wrap things up with a server that uses this service. All this will we be wrapped up in an example where Alice makes a new friend.
+We'll start by setting up a Node project with TypeScript. Then, we'll define our data types. Since this is a social network, we want to represent friends and determine if they're active in a given group. We'll define members with names and associated groups, and for each group, we'll track whether a given member is active. After that, we'll build the Skip service, and finally, we'll wrap things up with a web server that uses the reactive service. All this will be wrapped up in an example where Alice makes a new friend.
 
 You can follow along with [the full code on GitHub](https://github.com/SkipLabs/reactive_social_network_service_poc), structured with a commit for each step:
 
