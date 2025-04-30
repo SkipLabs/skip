@@ -30,7 +30,8 @@ class .SortedSet<+T: Orderable>(
   }
 
   fun set<U: Orderable>[T: U](s: U): SortedSet<U> {
-    SortedSet(this.inner.set(s, void))
+    inner = this.inner.set(s, void);
+    if (phys_eq(inner, this.inner)) this else SortedSet(inner)
   }
 
   fun remove<U: Orderable>[T: U](s: U): SortedSet<U> {
