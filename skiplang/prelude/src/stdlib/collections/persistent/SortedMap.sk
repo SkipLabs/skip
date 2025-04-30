@@ -326,14 +326,17 @@ base class .SortedMap<+K: Orderable, +V> uses  //  extends KeyedSequence<K, V>
     f: (V2, V2) -> V2,
   ): SortedMap<K2, V2>
   | Nil() -> SortedMap::singleton(key, value)
-  | Node _ ->
+  | n @ Node _ ->
     l: SortedMap<K2, V2> = this.left;
     r: SortedMap<K2, V2> = this.right;
     k: K2 = this.key;
     v: V2 = this.value;
     compare(key, this.key) match {
     | LT() -> SortedMap::balance(k, v, l.setWith(key, value, f), r)
-    | EQ() -> SortedMap::node(k, f(v, value), l, r)
+    | EQ() ->
+      newV = f(v, value);
+      node: Node<K2, V2> = n;
+      node with {value => newV}
     | GT() -> SortedMap::balance(k, v, l, r.setWith(key, value, f))
     }
 
