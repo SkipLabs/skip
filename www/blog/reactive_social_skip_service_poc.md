@@ -388,7 +388,7 @@ Of course, this is just the beginning. You now have a foundation for reactive se
 
 ### What's next?
 
-For the next skip article, what should I tackle first? You tell me!
+For the next Skip article, what should I tackle first? You tell me!
 
 - Listening to live changes from a PostgreSQL database?
 - Scaling your Skip service horizontally?
