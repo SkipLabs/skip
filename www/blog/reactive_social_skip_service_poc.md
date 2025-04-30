@@ -348,7 +348,7 @@ The Express server listens to the steaming service for updates, and it is now ti
 
 ### Step 4: Let's See It Work
 
-We are going to use three terminals: one is already running the server and the service, one to monitor changes on part 8082, and one to push modifications to port 8081.
+We are going to use three terminals: one is already running the server and the service, one will issue writes on port 8081, and one will watch changes on port 8082.
 
 While the service is running, in a fresh terminal, we are going to listen for changes on Alice's friends (index `1`):
 
