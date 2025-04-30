@@ -280,7 +280,7 @@ app.use(express.json());
 
 // Store a reference to the Express server
 const expressServer = app.listen(8082, () => {
-    console.log(`Groups REST wrapper listening at port 8082`);
+    console.log(`Web server listening at port 8082`);
 });
 
 // Utility function to handle errors
