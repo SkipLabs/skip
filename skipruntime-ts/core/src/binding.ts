@@ -10,6 +10,7 @@ import {
   type Resource,
   type SkipService,
 } from "./api.js";
+import type { HandlerInfo } from "./index.js";
 
 export type Handle<T> = Internal.Opaque<number, { handle_for: T }>;
 
@@ -50,13 +51,13 @@ export interface FromBinding {
     K2 extends Json,
     V2 extends Json,
   >(
-    ref: Handle<Mapper<K1, V1, K2, V2>>,
+    ref: Handle<HandlerInfo<Mapper<K1, V1, K2, V2>>>,
   ): Pointer<Internal.Mapper>;
 
   // LazyCompute
 
   SkipRuntime_createLazyCompute<K extends Json, V extends Json>(
-    ref: Handle<LazyCompute<K, V>>,
+    ref: Handle<HandlerInfo<LazyCompute<K, V>>>,
   ): Pointer<Internal.LazyCompute>;
 
   // ExternalService
@@ -218,7 +219,7 @@ export interface FromBinding {
   // Reducer
 
   SkipRuntime_createReducer<K1 extends Json, V1 extends Json>(
-    ref: Handle<Reducer<K1, V1>>,
+    ref: Handle<HandlerInfo<Reducer<K1, V1>>>,
     defaultValue: Pointer<Internal.CJSON>,
   ): Pointer<Internal.Reducer>;
 
