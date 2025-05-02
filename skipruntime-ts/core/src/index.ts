@@ -59,11 +59,17 @@ export * from "./errors.js";
 export type JSONMapper = Mapper<Json, Json, Json, Json>;
 export type JSONLazyCompute = LazyCompute<Json, Json>;
 
+export type HandlerInfo<P> = {
+  object: P;
+  name: string;
+  params: DepSafe[];
+};
+
 function instantiateUserObject<Params extends DepSafe[], Result extends object>(
   what: string,
   ctor: new (...params: Params) => Result,
   params: Params,
-): Result {
+): HandlerInfo<Result> {
   const checkedParams = params.map(checkOrCloneParam) as Params;
   const obj = new ctor(...checkedParams);
   Object.freeze(obj);
@@ -72,7 +78,11 @@ function instantiateUserObject<Params extends DepSafe[], Result extends object>(
       `${what} classes must be defined at top-level.`,
     );
   }
-  return obj;
+  return {
+    object: obj,
+    name: obj.constructor.name,
+    params: checkedParams,
+  };
 }
 
 class Handles {
@@ -256,18 +266,21 @@ class EagerCollectionImpl<K extends Json, V extends Json>
         this.refs.handles.register(mapperObj),
       );
 
-      if (sknative in reducerObj && typeof reducerObj[sknative] == "string") {
+      if (
+        sknative in reducerObj.object &&
+        typeof reducerObj.object[sknative] == "string"
+      ) {
         return this.derive<K2, Accum>(
           this.refs.binding.SkipRuntime_Collection__nativeMapReduce(
             this.collection,
             skmapper,
-            reducerObj[sknative],
+            reducerObj.object[sknative],
           ),
         );
       } else {
         const skreducer = this.refs.binding.SkipRuntime_createReducer(
           this.refs.handles.register(reducerObj),
-          this.refs.json().exportJSON(reducerObj.initial),
+          this.refs.json().exportJSON(reducerObj.object.initial),
         );
         return this.derive<K2, Accum>(
           this.refs.binding.SkipRuntime_Collection__mapReduce(
@@ -285,17 +298,20 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     ...params: Params
   ): EagerCollection<K, Accum> {
     const reducerObj = instantiateUserObject("Reducer", reducer, params);
-    if (sknative in reducerObj && typeof reducerObj[sknative] == "string") {
+    if (
+      sknative in reducerObj.object &&
+      typeof reducerObj.object[sknative] == "string"
+    ) {
       return this.derive<K, Accum>(
         this.refs.binding.SkipRuntime_Collection__nativeReduce(
           this.collection,
-          reducerObj[sknative],
+          reducerObj.object[sknative],
         ),
       );
     } else {
       const skreducer = this.refs.binding.SkipRuntime_createReducer(
         this.refs.handles.register(reducerObj),
-        this.refs.json().exportJSON(reducerObj.initial),
+        this.refs.json().exportJSON(reducerObj.object.initial),
       );
       return this.derive<K, Accum>(
         this.refs.binding.SkipRuntime_Collection__reduce(
@@ -840,14 +856,14 @@ export class ToBinding {
   // Mapper
 
   SkipRuntime_Mapper__mapEntry(
-    skmapper: Handle<JSONMapper>,
+    skmapper: Handle<HandlerInfo<JSONMapper>>,
     key: Pointer<Internal.CJSON>,
     values: Pointer<Internal.NonEmptyIterator>,
   ): Pointer<Internal.CJArray> {
     const skjson = this.getJsonConverter();
     const mapper = this.handles.get(skmapper);
     const context = new ContextImpl(this);
-    const result = mapper.mapEntry(
+    const result = mapper.object.mapEntry(
       skjson.importJSON(key) as Json,
       new ValuesImpl<Json>(skjson, this.binding, values),
       context,
@@ -855,21 +871,21 @@ export class ToBinding {
     return skjson.exportJSON(Array.from(result));
   }
 
-  SkipRuntime_deleteMapper(mapper: Handle<JSONMapper>): void {
+  SkipRuntime_deleteMapper(mapper: Handle<HandlerInfo<JSONMapper>>): void {
     this.handles.deleteHandle(mapper);
   }
 
   // LazyCompute
 
   SkipRuntime_LazyCompute__compute(
-    sklazyCompute: Handle<JSONLazyCompute>,
+    sklazyCompute: Handle<HandlerInfo<JSONLazyCompute>>,
     self: string,
     skkey: Pointer<Internal.CJSON>,
   ): Pointer<Internal.CJArray> {
     const skjson = this.getJsonConverter();
     const lazyCompute = this.handles.get(sklazyCompute);
     const context = new ContextImpl(this);
-    const result = lazyCompute.compute(
+    const result = lazyCompute.object.compute(
       new LazyCollectionImpl<Json, Json>(self, this),
       skjson.importJSON(skkey) as Json,
       context,
@@ -877,7 +893,9 @@ export class ToBinding {
     return skjson.exportJSON(Array.from(result));
   }
 
-  SkipRuntime_deleteLazyCompute(lazyCompute: Handle<JSONLazyCompute>): void {
+  SkipRuntime_deleteLazyCompute(
+    lazyCompute: Handle<HandlerInfo<JSONLazyCompute>>,
+  ): void {
     this.handles.deleteHandle(lazyCompute);
   }
 
@@ -991,14 +1009,14 @@ export class ToBinding {
   // Reducer
 
   SkipRuntime_Reducer__add(
-    skreducer: Handle<Reducer<Json, Json>>,
+    skreducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
     skacc: Nullable<Pointer<Internal.CJSON>>,
     skvalue: Pointer<Internal.CJSON>,
   ): Pointer<Internal.CJSON> {
     const skjson = this.getJsonConverter();
     const reducer = this.handles.get(skreducer);
     return skjson.exportJSON(
-      reducer.add(
+      reducer.object.add(
         skacc ? (skjson.importJSON(skacc) as Json) : null,
         skjson.importJSON(skvalue) as Json & DepSafe,
       ),
@@ -1006,21 +1024,23 @@ export class ToBinding {
   }
 
   SkipRuntime_Reducer__remove(
-    skreducer: Handle<Reducer<Json, Json>>,
+    skreducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
     skacc: Pointer<Internal.CJSON>,
     skvalue: Pointer<Internal.CJSON>,
   ): Nullable<Pointer<Internal.CJSON>> {
     const skjson = this.getJsonConverter();
     const reducer = this.handles.get(skreducer);
     return skjson.exportJSON(
-      reducer.remove(
+      reducer.object.remove(
         skjson.importJSON(skacc) as Json,
         skjson.importJSON(skvalue) as Json & DepSafe,
       ),
     );
   }
 
-  SkipRuntime_deleteReducer(reducer: Handle<Reducer<Json, Json>>): void {
+  SkipRuntime_deleteReducer(
+    reducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
+  ): void {
     this.handles.deleteHandle(reducer);
   }
 
