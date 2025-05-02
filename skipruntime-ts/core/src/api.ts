@@ -320,13 +320,13 @@ export interface LazyCompute<K extends Json, V extends Json> {
    * @param key - The requested key / input.
    * @returns The values of the lazy function for `key`.
    */
-  compute(self: LazyCollection<K, V>, key: K): Iterable<V>;
+  compute(self: LazyCollection<K, V>, key: K, context: Context): Iterable<V>;
 }
 
 /**
  * Skip Runtime internal state.
  */
-export interface Context extends Managed {
+export interface Context {
   /**
    * Create a lazy reactive collection.
    *

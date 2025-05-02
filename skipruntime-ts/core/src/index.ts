@@ -826,9 +826,11 @@ export class ToBinding {
   ): Pointer<Internal.CJArray> {
     const skjson = this.getJsonConverter();
     const lazyCompute = this.handles.get(sklazyCompute);
+    const context = new ContextImpl(this.refs());
     const result = lazyCompute.compute(
       new LazyCollectionImpl<Json, Json>(self, this.refs()),
       skjson.importJSON(skkey) as Json,
+      context,
     );
     return skjson.exportJSON(Array.from(result));
   }

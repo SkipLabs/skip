@@ -496,14 +496,13 @@ class JSONExtract
   implements
     Mapper<number, { value: JsonObject; pattern: string }, number, Json[]>
 {
-  constructor(private readonly context: Context) {}
-
   mapEntry(
     key: number,
     values: Values<{ value: JsonObject; pattern: string }>,
+    context: Context,
   ): Iterable<[number, Json[]]> {
     const value = values.getUnique();
-    const result = this.context.jsonExtract(value.value, value.pattern);
+    const result = context.jsonExtract(value.value, value.pattern);
     return Array([key, result]);
   }
 }
@@ -513,11 +512,8 @@ type Input_NJP = {
 };
 
 class JSONExtractResource implements Resource<Input_NJP> {
-  instantiate(
-    cs: Input_NJP,
-    context: Context,
-  ): EagerCollection<number, Json[]> {
-    return cs.input.map(JSONExtract, context);
+  instantiate(cs: Input_NJP): EagerCollection<number, Json[]> {
+    return cs.input.map(JSONExtract);
   }
 }
 
@@ -899,13 +895,12 @@ const postgresService: () => Promise<
 //// testLazyWithUseExternalService
 
 class TestLazyWithUseExternalService implements LazyCompute<number, number> {
-  constructor(private readonly context: Context) {}
-
   compute(
     _selfHdl: LazyCollection<number, number>,
     key: number,
+    context: Context,
   ): Iterable<number> {
-    this.context.useExternalResource({
+    context.useExternalResource({
       service: "external",
       identifier: "mock",
       params: { v1: "param1", v2: "param1" },
@@ -916,10 +911,7 @@ class TestLazyWithUseExternalService implements LazyCompute<number, number> {
 
 class LazyWithUseExternalServiceResource implements Resource<Input_NN> {
   instantiate(cs: Input_NN, context: Context): EagerCollection<number, number> {
-    const lazy = context.createLazyCollection(
-      TestLazyWithUseExternalService,
-      context,
-    );
+    const lazy = context.createLazyCollection(TestLazyWithUseExternalService);
     return cs.input.map(MapLazy, lazy);
   }
 }
