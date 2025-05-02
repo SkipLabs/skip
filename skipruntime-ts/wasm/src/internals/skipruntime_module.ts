@@ -17,6 +17,7 @@ import type {
   ExternalService,
   Resource,
   Watermark,
+  HandlerInfo,
 } from "@skipruntime/core";
 import {
   ServiceInstance,
@@ -55,13 +56,13 @@ export interface FromWasm {
     K2 extends Json,
     V2 extends Json,
   >(
-    ref: Handle<Mapper<K1, V1, K2, V2>>,
+    ref: Handle<HandlerInfo<Mapper<K1, V1, K2, V2>>>,
   ): ptr<Internal.Mapper>;
 
   // LazyCompute
 
   SkipRuntime_createLazyCompute<K extends Json, V extends Json>(
-    ref: Handle<LazyCompute<K, V>>,
+    ref: Handle<HandlerInfo<LazyCompute<K, V>>>,
   ): ptr<Internal.LazyCompute>;
 
   // ExternalService
@@ -228,7 +229,7 @@ export interface FromWasm {
   // Reducer
 
   SkipRuntime_createReducer<K1 extends Json, V1 extends Json>(
-    ref: Handle<Reducer<K1, V1>>,
+    ref: Handle<HandlerInfo<Reducer<K1, V1>>>,
     defaultValue: ptr<Internal.CJSON>,
   ): ptr<Internal.Reducer>;
 
@@ -273,22 +274,24 @@ interface ToWasm {
   // Mapper
 
   SkipRuntime_Mapper__mapEntry(
-    mapper: Handle<JSONMapper>,
+    mapper: Handle<HandlerInfo<JSONMapper>>,
     key: ptr<Internal.CJSON>,
     values: ptr<Internal.NonEmptyIterator>,
   ): ptr<Internal.CJArray>;
 
-  SkipRuntime_deleteMapper(mapper: Handle<JSONMapper>): void;
+  SkipRuntime_deleteMapper(mapper: Handle<HandlerInfo<JSONMapper>>): void;
 
   // LazyCompute
 
   SkipRuntime_LazyCompute__compute(
-    lazyCompute: Handle<JSONLazyCompute>,
+    lazyCompute: Handle<HandlerInfo<JSONLazyCompute>>,
     self: ptr<Internal.String>,
     key: ptr<Internal.CJSON>,
   ): ptr<Internal.CJArray>;
 
-  SkipRuntime_deleteLazyCompute(mapper: Handle<JSONLazyCompute>): void;
+  SkipRuntime_deleteLazyCompute(
+    mapper: Handle<HandlerInfo<JSONLazyCompute>>,
+  ): void;
 
   // ExternalService
 
@@ -362,18 +365,20 @@ interface ToWasm {
   // Reducer
 
   SkipRuntime_Reducer__add(
-    reducer: Handle<Reducer<Json, Json>>,
+    reducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
     acc: ptr<Internal.CJSON>,
     value: ptr<Internal.CJSON>,
   ): ptr<Internal.CJSON>;
 
   SkipRuntime_Reducer__remove(
-    reducer: Handle<Reducer<Json, Json>>,
+    reducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
     acc: ptr<Internal.CJSON>,
     value: ptr<Internal.CJSON>,
   ): Nullable<ptr<Internal.CJSON>>;
 
-  SkipRuntime_deleteReducer(reducer: Handle<Reducer<Json, Json>>): void;
+  SkipRuntime_deleteReducer(
+    reducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
+  ): void;
 
   // Checker
 
@@ -415,12 +420,14 @@ export class WasmFromBinding implements FromBinding {
     V1 extends Json,
     K2 extends Json,
     V2 extends Json,
-  >(ref: Handle<Mapper<K1, V1, K2, V2>>): Pointer<Internal.Mapper> {
+  >(
+    ref: Handle<HandlerInfo<Mapper<K1, V1, K2, V2>>>,
+  ): Pointer<Internal.Mapper> {
     return this.fromWasm.SkipRuntime_createMapper(ref);
   }
 
   SkipRuntime_createLazyCompute<K extends Json, V extends Json>(
-    ref: Handle<LazyCompute<K, V>>,
+    ref: Handle<HandlerInfo<LazyCompute<K, V>>>,
   ): Pointer<Internal.LazyCompute> {
     return this.fromWasm.SkipRuntime_createLazyCompute(ref);
   }
@@ -723,7 +730,7 @@ export class WasmFromBinding implements FromBinding {
   }
 
   SkipRuntime_createReducer<K1 extends Json, V1 extends Json>(
-    ref: Handle<Reducer<K1, V1>>,
+    ref: Handle<HandlerInfo<Reducer<K1, V1>>>,
     defaultValue: Pointer<Internal.CJSON>,
   ): Pointer<Internal.Reducer> {
     return this.fromWasm.SkipRuntime_createReducer(ref, toPtr(defaultValue));
@@ -827,7 +834,7 @@ class LinksImpl implements Links {
   // Mapper
 
   mapEntryOfMapper(
-    skmapper: Handle<JSONMapper>,
+    skmapper: Handle<HandlerInfo<JSONMapper>>,
     key: ptr<Internal.CJSON>,
     values: ptr<Internal.NonEmptyIterator>,
   ): ptr<Internal.CJArray> {
@@ -836,14 +843,14 @@ class LinksImpl implements Links {
     );
   }
 
-  deleteMapper(mapper: Handle<JSONMapper>) {
+  deleteMapper(mapper: Handle<HandlerInfo<JSONMapper>>) {
     this.tobinding.SkipRuntime_deleteMapper(mapper);
   }
 
   // LazyCompute
 
   computeOfLazyCompute(
-    sklazyCompute: Handle<JSONLazyCompute>,
+    sklazyCompute: Handle<HandlerInfo<JSONLazyCompute>>,
     skself: ptr<Internal.String>,
     skkey: ptr<Internal.CJSON>,
   ) {
@@ -856,7 +863,7 @@ class LinksImpl implements Links {
     );
   }
 
-  deleteLazyCompute(lazyCompute: Handle<JSONLazyCompute>) {
+  deleteLazyCompute(lazyCompute: Handle<HandlerInfo<JSONLazyCompute>>) {
     this.tobinding.SkipRuntime_deleteLazyCompute(lazyCompute);
   }
 
@@ -944,7 +951,7 @@ class LinksImpl implements Links {
   // Reducer
 
   addOfReducer(
-    skreducer: Handle<Reducer<Json, Json>>,
+    skreducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
     skacc: ptr<Internal.CJSON>,
     skvalue: ptr<Internal.CJSON>,
   ) {
@@ -954,7 +961,7 @@ class LinksImpl implements Links {
   }
 
   removeOfReducer(
-    skreducer: Handle<Reducer<Json, Json>>,
+    skreducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
     skacc: ptr<Internal.CJSON>,
     skvalue: ptr<Internal.CJSON>,
   ) {
@@ -963,7 +970,7 @@ class LinksImpl implements Links {
     );
   }
 
-  deleteReducer(reducer: Handle<Reducer<Json, Json>>) {
+  deleteReducer(reducer: Handle<HandlerInfo<Reducer<Json, Json>>>) {
     this.tobinding.SkipRuntime_deleteReducer(reducer);
   }
 
