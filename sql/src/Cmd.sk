@@ -99,7 +99,7 @@ fun writeCmd(env: mutable CmdEnv, pathStr: String, cmd: String): void {
   (dirName, key) = splitStringPath(pathStr);
   env.context.maybeGetEagerDir(dirName) match {
   | None() -> print_error("Could not find input directory: " + dirName)
-  | Some(dir) if (!dir.isInput()) -> print_error("Not an input Dir: " + dirName)
+  | Some(dir) if (!dir.input) -> print_error("Not an input Dir: " + dirName)
   | Some(dir) ->
     if (cmd == "") {
       dir.writeArray(env.context, key, Array[]);

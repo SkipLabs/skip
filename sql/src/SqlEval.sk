@@ -1731,7 +1731,7 @@ fun evalWithContext(
 
 fun sqlPurgeFrom(
   replicationId: Int,
-): (mutable SKStore.Context, SKStore.Dir) ~> SKStore.Tick {
+): (readonly SKStore.Context, SKStore.Dir) ~> SKStore.Tick {
   (ctx, dir) ~> {
     table = getSqlTableName(dir.getDirName());
     ackTable = feedbackTable(table);
@@ -2063,11 +2063,9 @@ fun importNext(
         | None() ->
           time = targetCtx.timeStamp();
           targetDir = SKStore.EagerDir::create{
-            time,
             timeStack => SKStore.TimeStack::createInput(time),
             input => true,
             dirName => targetDirName,
-            totalSize => 0,
             creator => None(),
           };
           targetCtx.setDir(targetDir)
@@ -2090,15 +2088,11 @@ fun importNext(
     targetCtx.unsafeMaybeGetEagerDir(targetDirName) match {
     | None() -> invariant_violation("Directory should have been created")
     | Some(inputDir) ->
-      !inputDir = inputDir.writeArraySourceManyReturnDir(
+      inputDir.writeArraySourceMany(
         targetCtx,
         entries.iterator(),
-      );
-      if (isReset) {
-        writerPath = SKStore.Path::gen(dir.dirName);
-        !inputDir = inputDir.reset(targetCtx, writerPath, changedKeys);
-      };
-      targetCtx.setDir(inputDir)
+        if (isReset) Some((dir.dirName, changedKeys)) else None(),
+      )
     }
   };
   hasMultipleVersions
@@ -2157,45 +2151,41 @@ fun showSelect(
   | SKStore.OTable(fieldNames) ->
     data = mutable Vector[];
     trailing = false;
-    dir.onFiles(files -> {
-      for (kv in files) {
-        (_key, rows) = kv;
-        rowArray = rows.collect(Array); // TODO: remove this collect once #769 is fixed
-        for (row in rowArray) {
-          row match {
-          | RowValues(values, r) ->
-            for (_ in Range(0, r)) {
-              if (data.size() > kMaxOutputRowsTable) {
-                !trailing = true;
-                return void
-              };
-              data.push(values)
-            }
-          | _ -> invariant_violation("Invalid row kind")
-          };
-        };
+    for (kv in dir.unsafeGetFileIter()) {
+      (_key, rows) = kv;
+      rowArray = rows.collect(Array); // TODO: remove this collect once #769 is fixed
+      for (row in rowArray) {
+        row match {
+        | RowValues(values, r) ->
+          for (_ in Range(0, r)) {
+            if (data.size() > kMaxOutputRowsTable) {
+              !trailing = true;
+              return void
+            };
+            data.push(values)
+          }
+        | _ -> invariant_violation("Invalid row kind")
+        }
       }
-    });
+    };
 
     printTable(fieldNames, data.toArray(), trailing)
 
   | _ ->
     RowValues::printHeader(format);
-    dir.onFiles(files ~> {
-      for (kv in files) {
-        (_key, rows) = kv;
-        rowArray = rows.collect(Array); // TODO: remove this collect once #769 is fixed
-        for (row in rowArray) {
-          row match {
-          | rvalues @ RowValues(_, r) ->
-            for (_ in Range(0, r)) {
-              RowValues::printItem(format, rvalues)
-            }
-          | _ -> invariant_violation("Invalid row kind")
+    for (kv in dir.unsafeGetFileIter()) {
+      (_key, rows) = kv;
+      rowArray = rows.collect(Array); // TODO: remove this collect once #769 is fixed
+      for (row in rowArray) {
+        row match {
+        | rvalues @ RowValues(_, r) ->
+          for (_ in Range(0, r)) {
+            RowValues::printItem(format, rvalues)
           }
+        | _ -> invariant_violation("Invalid row kind")
         }
       }
-    })
+    }
   }
 }
 
@@ -2676,6 +2666,20 @@ fun printTable(
 module end;
 
 module SKStore;
+
+extension class TimeStack {
+  fun maxMinus(): this {
+    !this.values = this.values.map(x -> Time(Int::max - x.value));
+    this
+  }
+}
+
+extension class EagerDir {
+  fun timeMaxMinus(): this {
+    !this.timeStack = this.timeStack.maxMinus();
+    this
+  }
+}
 
 @cpp_extern("SKIP_unsafe_compare_sets")
 native fun unsafeCompareSets(

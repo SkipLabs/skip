@@ -15,20 +15,6 @@ base class Postponable {
   fun perform(context: mutable Context): void;
 }
 
-class ToWrite(
-  dirName: DirName,
-  key: Key,
-  values: readonly Context ~> Array<File>,
-) extends Postponable {
-  //
-  fun perform(context: mutable Context): void {
-    context.unsafeMaybeGetEagerDir(this.dirName) match {
-    | Some(dir) -> dir.writeArray(context, this.key, this.values(context))
-    | _ -> void
-    }
-  }
-}
-
 /*****************************************************************************/
 /* Sessions. */
 /*****************************************************************************/
@@ -233,6 +219,13 @@ value class Tick(value: Int) uses Orderable, Show {
 
 class TickFile(value: Tick) extends File uses Orderable
 
+/* Time refers to the creation time of a directory.
+   Context#time is increased using Context#timeStamp() when a directory is created.
+   It is stored in the last element of the TimeStack of the directory.
+
+   Times and TimeStacks are used to order directory updates.
+   Context#toUpdate is used as a priority queue.
+ */
 value class Time(value: Int) uses Orderable, Show {
   fun next(): this {
     !this.value = genSym(this.value + 1);
@@ -248,7 +241,9 @@ value class Time(value: Int) uses Orderable, Show {
   }
 }
 
-class TimeStack private (private values: Array<Time>) uses Orderable {
+class TimeStack private (
+  private values: /* Invariant: non-empty array */ Array<Time>,
+) uses Orderable {
   static fun createInput(time: Time): this {
     static(Array[time])
   }
@@ -265,24 +260,13 @@ class TimeStack private (private values: Array<Time>) uses Orderable {
     this
   }
 
+  fun getLast(): Time {
+    this.values.last()
+  }
+
   fun negate(): this {
     !this.values = this.values.map(x -> -x);
     this
-  }
-
-  fun maxMinus(): this {
-    !this.values = this.values.map(x -> Time(Int::max - x.value));
-    this
-  }
-
-  fun compare(other: TimeStack): Order {
-    for (i in Range(0, this.values.size())) {
-      if (i >= other.values.size()) return GT();
-      cmp = this.values[i].compare(other.values[i]);
-      if (cmp != EQ()) return cmp;
-    };
-    if (other.values.size() > this.values.size()) return LT();
-    EQ()
   }
 }
 
@@ -341,7 +325,10 @@ mutable class Context private {
   mutable globals: SortedMap<String, File> = SortedMap[],
   private mutable persistents: SortedMap<String, File> = SortedMap[],
   private mutable dirty: SortedMap<DirName, SortedSet<Key>> = SortedMap[],
-  private mutable dirtyReaders: List<ArrowKey> = List[],
+  private mutable dirtyReaders: /* parentName => childName => keys */ SortedMap<
+    DirName,
+    SortedMap<DirName, SortedSet<Key>>,
+  > = SortedMap[],
   mutable canReuse: CanReuse = CRIfMatch(),
   private mutable arrowStack: List<(ArrowKey, TimeStack)> = List[],
   private mutable lazyGets: SortedSet<Path> = SortedSet[],
@@ -352,7 +339,7 @@ mutable class Context private {
   private mutable dirsWithSharedSubDirs: SortedSet<DirName> = SortedSet[],
   private mutable sharedSubDirsRefCount: SortedMap<DirName, Int> = SortedMap[],
   mutable writeChecker: ?(mutable WriteChecker) = None(),
-  mutable purgeFrom: (mutable Context, Dir) ~> Tick = (ctx, _) ~>
+  mutable purgeFrom: (readonly Context, Dir) ~> Tick = (ctx, _) ~>
     Tick(ctx.getTick().value - 1000),
   mutable sourceOverride: ?Path = None(),
 } {
@@ -559,11 +546,9 @@ mutable class Context private {
           this.!newDirs = this.newDirs.add(preDirName);
           time = this.timeStamp();
           preDir = EagerDir::create{
-            time,
             input => false,
             timeStack => TimeStack::createInput(time),
             dirName => preDirName,
-            totalSize => 0,
             creator => this.currentArrow(),
           };
           dir.unsafeIterKeys((key, _time) -> {
@@ -573,8 +558,7 @@ mutable class Context private {
             !preDir = preDir.writeEntry(this, source, source, key, values);
           });
           this.setDir(preDir);
-          this.updateDirtyReaders(Path::dirTag(preDirName));
-          this.setDir(preDir)
+          this.updateDirtyReaders(Path::dirTag(preDirName))
         | Some(preDir) ->
           (isReset, changes) = dir.getChangesAfter(this.tick.prev());
           for (key in changes) {
@@ -612,7 +596,15 @@ mutable class Context private {
       | None() -> continue
       | Some(x) -> x
       };
-      this.!dirtyReaders = List.Cons(reader, this.dirtyReaders);
+      this.!dirtyReaders[reader.parentName] = {
+        map = this.dirtyReaders.maybeGet(reader.parentName).default(
+          SortedMap[],
+        );
+        map.set(
+          reader.childName,
+          map.maybeGet(reader.childName).default(SortedSet[]).set(reader.key),
+        )
+      };
       time = if (reader.parentName == reader.childName) {
         -child.getTimeStack()
       } else {
@@ -697,44 +689,27 @@ mutable class Context private {
       print_debug(`------------ UPDATE (TICK: ${this.tick}) ------------`);
     };
 
-    _ = this.timeStamp();
-
     this.updateLazyGets();
 
-    dirtyReaders = mutable Map<DirName, mutable Map<DirName, SortedSet<Key>>>[];
-
     loop {
-      for (reader in this.dirtyReaders) {
-        if (!dirtyReaders.containsKey(reader.parentName)) {
-          dirtyReaders![reader.parentName] = mutable Map[];
-        };
-
-        if (!dirtyReaders[reader.parentName].containsKey(reader.childName)) {
-          dirtyReaders[reader.parentName]![reader.childName] = SortedSet[];
-        };
-        dirtyReaders[reader.parentName]![reader.childName] = dirtyReaders[
-          reader.parentName,
-        ][reader.childName].set(reader.key);
-      };
-      this.!dirtyReaders = List[];
-      toUpdate = this.toUpdate.minimum();
-      toUpdate match {
+      this.toUpdate.removeMin() match {
       | None() ->
         this.!dirty = SortedMap[];
-        invariant(this.dirtyReaders.isEmpty());
+        this.!dirtyReaders = SortedMap[];
         withPostponables = this.checkPostponables();
         withPre = this.updatePre();
         withChanges = withPostponables || withPre;
         this.!tick = this.tick.next();
         break withChanges
-      | Some((time, Arrow(parentName, childName))) ->
-        this.!toUpdate = this.toUpdate.remove(time);
+      | Some((_time, Arrow(parentName, childName), toUpdate)) ->
+        this.!toUpdate = toUpdate;
         this.unsafeMaybeGetDir(childName) match {
         | None()
         | Some(DeletedDir _) ->
           void
-        | Some(child @ LazyDir _) ->
-          child.update(this, dirtyReaders.maybeGet(child.dirName))
+        | Some(dir @ LazyDir _) ->
+          invariant(parentName == childName);
+          dir.update(this, this.dirtyReaders.maybeGet(dir.dirName))
         | Some(child @ EagerDir _) ->
           parentMaps = child.parents.maybeGet(parentName) match {
           | None() -> invariant_violation("Could not find parent")
@@ -742,8 +717,8 @@ mutable class Context private {
           };
           EagerDir::update(
             this,
-            this.dirty,
-            dirtyReaders,
+            this.dirty.maybeGet(parentName),
+            this.dirtyReaders.maybeGet(parentName),
             parentName,
             parentMaps,
             child,
@@ -805,8 +780,7 @@ mutable class Context private {
       };
       if (producedAnyOutput) {
         // then we need to produce a checkpoint for flushing and committing
-        ourTime = this.tick.value.toString();
-        writer.write(`:${ourTime}\n`);
+        writer.write(`:${this.tick}\n`);
         writer.flush();
         flushStdout();
       };
@@ -886,6 +860,8 @@ mutable class Context private {
     optOnDelete: ?Postponable = None(),
   ): EHandle<K, V> {
     this.mkdirMulti(
+      convKey,
+      convValue,
       dirName,
       content.map(kv -> {
         (key, value) = kv;
@@ -894,17 +870,18 @@ mutable class Context private {
       ignoreIfExists,
       optOnCreate,
       optOnDelete,
-    );
-    EHandle(convKey, convValue, dirName)
+    )
   }
 
-  mutable fun mkdirMulti(
+  mutable fun mkdirMulti<K: Key, V: File>(
+    convKey: Key ~> K,
+    convValue: File ~> V,
     dirName: DirName,
-    content: Array<(Key, Array<File>)> = Array[],
+    content: Array<(K, Array<V>)> = Array[],
     ignoreIfExists: Bool = false,
     optOnCreate: ?Postponable = None(),
     optOnDelete: ?Postponable = None(),
-  ): void {
+  ): EHandle<K, V> {
     this.unsafeMaybeGetEagerDir(dirName) match {
     | Some(dir) ->
       if (dir.creator != this.currentArrow()) {
@@ -913,7 +890,7 @@ mutable class Context private {
         throw DirAlreadyExists(dirName);
       } else if (ignoreIfExists) {
         this.!newDirs = this.newDirs.add(dirName);
-        return void
+        return EHandle(convKey, convValue, dirName)
       }
     | _ -> void
     };
@@ -929,8 +906,7 @@ mutable class Context private {
       }
     });
 
-    vector: mutable Vector<FixedRow<Array<File>>> = mutable Vector[];
-    time = this.timeStamp();
+    vector: mutable Vector<FixedRow<Array<V>>> = mutable Vector[];
 
     n = content.size();
     if (n > 0) {
@@ -954,21 +930,20 @@ mutable class Context private {
     };
     fixedData = FixedDataMap::create(vector);
 
-    totalSize = fixedData.data.size();
     creator = this.currentArrow();
+    time = this.timeStamp();
     dir = EagerDir::create{
-      time,
       timeStack => TimeStack::create(this, time),
       input => true,
       dirName,
       fixedData,
-      totalSize,
       creator,
       optOnDelete,
     };
     this.setDir(dir);
     this.!newDirs = this.newDirs.add(dirName);
-    optOnCreate.each(this.postpone)
+    optOnCreate.each(this.postpone);
+    EHandle(convKey, convValue, dirName)
   }
 
   mutable fun setDir(dir: Dir): void {
@@ -979,6 +954,15 @@ mutable class Context private {
   private mutable fun getDir(dirName: DirName): Dir {
     this.addRead(Path::dirTag(dirName));
     this.dirs.get(dirName);
+  }
+
+  mutable fun maybeGetDir<T: File>(dirName: DirName): ?Dir {
+    this.addRead(Path::dirTag(dirName));
+    this.dirs.maybeGet(dirName);
+  }
+
+  readonly fun unsafeMaybeGetDir<T: File>(dirName: DirName): ?Dir {
+    this.dirs.maybeGet(dirName);
   }
 
   readonly fun unsafeGetDir(dirName: DirName): Dir {
@@ -1045,7 +1029,7 @@ mutable class Context private {
 
   mutable fun removeDir(dirName: DirName): void {
     if (this.debugMode) {
-      print_debug("REMOVED: " + dirName);
+      print_debug(`REMOVED: ${dirName}`);
     };
     this.unsafeMaybeGetEagerDir(dirName) match {
     | None() -> void
@@ -1080,15 +1064,6 @@ mutable class Context private {
       )
     | None() -> SortedSet::create()
     }
-  }
-
-  mutable fun maybeGetDir<T: File>(dirName: DirName): ?Dir {
-    this.addRead(Path::dirTag(dirName));
-    this.dirs.maybeGet(dirName);
-  }
-
-  readonly fun unsafeMaybeGetDir<T: File>(dirName: DirName): ?Dir {
-    this.dirs.maybeGet(dirName);
   }
 
   mutable fun addRead(path: Path): void {
@@ -1157,7 +1132,7 @@ private class Dirs{private state: DMap<DirName, Dir> = DMap::empty()} {
     this.maybeGet(key) match {
     | None() ->
       // printBacktrace();
-      invariant_violation("Directory not found: " + key)
+      invariant_violation(`Directory not found: ${key}`)
     | Some(x) -> x
     }
   }
@@ -1205,15 +1180,11 @@ fun import(
             targetCtx.setDir(dir);
           }
         | Some(inputDir) ->
-          !inputDir = inputDir.writeArraySourceManyReturnDir(
+          inputDir.writeArraySourceMany(
             targetCtx,
             entries.iterator(),
-          );
-          if (isReset) {
-            writerPath = Path::gen(dir.dirName);
-            !inputDir = inputDir.reset(targetCtx, writerPath, changedKeys);
-          };
-          targetCtx.setDir(inputDir)
+            if (isReset) Some((dir.dirName, changedKeys)) else None(),
+          )
         }
       | Some(_) -> invariant_violation("Error import: incompatible dir types")
       }

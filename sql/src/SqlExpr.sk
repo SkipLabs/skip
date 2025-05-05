@@ -660,7 +660,7 @@ class ExprEvaluator(
     | CExists(select) ->
       sdir = evalSelect(context, select, Some(this));
       dir = context.unsafeGetEagerDir(sdir.dirName);
-      if (dir.time.value > 0) {
+      if (dir.getTime().value > 0) {
         !dir = dir.reverseTime();
         context.setDir(dir);
       };
@@ -847,7 +847,7 @@ class ExprEvaluator(
       sdir = evalSelect(context, query, Some(this));
       dirName = sdir.dirName;
       dir = context.unsafeGetEagerDir(dirName);
-      if (dir.time.value > 0) {
+      if (dir.getTime().value > 0) {
         !dir = dir.reverseTime();
         context.setDir(dir);
       };
@@ -891,7 +891,7 @@ class ExprEvaluator(
       sdir = evalSelect(context, query, Some(this));
       dirName = sdir.dirName;
       dir = context.unsafeGetEagerDir(dirName);
-      if (dir.time.value > 0) {
+      if (dir.getTime().value > 0) {
         !dir = dir.reverseTime();
         context.setDir(dir);
       };
@@ -935,7 +935,7 @@ class ExprEvaluator(
       sdir = evalSelect(context, query, Some(this));
       dirName = sdir.dirName;
       dir = context.unsafeGetEagerDir(dirName);
-      if (dir.time.value > 0) {
+      if (dir.getTime().value > 0) {
         !dir = dir.reverseTime();
         context.setDir(dir);
       };
@@ -1018,7 +1018,7 @@ class ExprEvaluator(
     sdir = evalSelect(context, select, Some(this));
     dirName = sdir.dirName;
     dir = context.unsafeGetEagerDir(dirName);
-    if (dir.time.value > 0) {
+    if (dir.getTime().value > 0) {
       !dir = dir.reverseTime();
       context.setDir(dir);
     };
@@ -1176,6 +1176,16 @@ fun matching(text: String, pat: Pattern): Bool {
     }
   };
   idx == subs.size()
+}
+
+module end;
+
+module SKStore;
+
+extension class EagerDir {
+  fun reverseTime(): this {
+    this with {timeStack => -this.timeStack}
+  }
 }
 
 module end;

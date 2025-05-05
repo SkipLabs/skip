@@ -699,11 +699,9 @@ base class .SortedMap<+K: Orderable, +V> uses  //  extends KeyedSequence<K, V>
     l match {
     | Nil() -> r
     | Node _ ->
-      r.minimum() match {
+      r.removeMin() match {
       | None() -> l
-      | Some(p) ->
-        (k, v) = p;
-        static::balance(k, v, l, r.removeMin())
+      | Some((k, v, rest)) -> static::balance(k, v, l, rest)
       }
     }
   }
@@ -799,23 +797,16 @@ base class .SortedMap<+K: Orderable, +V> uses  //  extends KeyedSequence<K, V>
     }
   }
 
-  protected fun removeMin(): SortedMap<K, V>
-  | Nil() -> invariant_violation("SortedMap.removeMin called on Nil")
+  fun removeMin(): ?(K, V, SortedMap<K, V>)
+  | Nil() -> None()
   | Node _ ->
-    this.left match {
-    | Nil() -> this.right
-    | _ ->
-      static::balance(this.key, this.value, this.left.removeMin(), this.right)
-    }
-
-  fun removeMinBinding(): SortedMap<K, V>
-  | Nil() -> this
-  | Node _ ->
-    this.left match {
-    | Nil() -> this.right
-    | _ ->
-      static::balance(this.key, this.value, this.left.removeMin(), this.right)
-    }
+    Some(
+      this.left.removeMin() match {
+      | None() -> (this.key, this.value, this.right)
+      | Some((k, v, left)) ->
+        (k, v, static::balance(this.key, this.value, left, this.right))
+      },
+    )
 
   /* Debugging */
 

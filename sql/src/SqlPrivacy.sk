@@ -192,7 +192,7 @@ base class PredefinedTable private final {
           destination match {
           | Some(dest) ->
             writer = (SKStore.Path::iid(dir.dirName, dest));
-            rows = dir.getAllDataIter(context.mclone(), rowKey).collect(Array);
+            rows = dir.unsafeGetAllDataIter(rowKey).collect(Array);
             if (!updateIsFromIgnoredSource(writer, rows)) {
               return true;
             }

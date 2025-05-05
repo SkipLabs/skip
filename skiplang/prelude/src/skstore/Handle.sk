@@ -409,8 +409,8 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
       dynParents[parentName].push((dynamicMapFun, rangeOpt, None()))
     };
     fixedParents = FixedSingle::create(
-      Vector::mcreateFromItems(
-        dynParents.items().map(kv -> (kv.i0, kv.i1.toArray())).collect(Array),
+      Vector::mcreateFromIterator(
+        dynParents.items().map(kv -> (kv.i0, kv.i1.toArray())),
       ),
     );
     EagerDir::applyMany(context, fixedParents, dirName, reducerOpt);
