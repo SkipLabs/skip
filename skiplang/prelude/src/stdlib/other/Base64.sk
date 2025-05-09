@@ -39,19 +39,28 @@ const decodeTable:  Array<Int> = Array[
   41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51                      // 70-7a p-z
 ];
 
-fun decode(str: String):  Array<UInt8> {
+fun decode(str: String): Array<UInt8> {
+  // Return empty array if input is empty
   if (str.isEmpty()) {
     return Array[];
   };
+  // Convert string to character vector
   chars = str.chars();
+
+  // strip whitespace or line breaks
+  !chars = chars.filter(c -> c != '\n' && c != '\r' && c != ' ');
   charsLen = chars.size();
+
+  // Base64 input length must be a multiple of 4
   invariant(charsLen % 4 == 0, "Invalid Base64 data");
+
+  // Estimate decoded output length, adjusting for '=' padding characters
   len = charsLen * 3 / 4 ;
-  if (chars[charsLen - 1] == '=') {
+  if (charsLen > 1 && chars[charsLen - 1] == '=') {
     !len = len - 1;
-  };
-  if (chars[charsLen - 2] == '=') {
-    !len = len - 1;
+    if (chars[charsLen - 2] == '=') {
+      !len = len - 1;
+    }
   };
   dbuf = Array<UInt8>::mfill(len, UInt8::truncate(0));
   decode_(dbuf, chars);
@@ -64,102 +73,55 @@ fun decodeString(encoded: String): String {
 }
 
 private fun decode_(dbuf: mutable Array<UInt8>, chars: Vector<Char>): void {
-    dt = decodeTable;
-    i = 0;
-    j = 0;
-    while (i < chars.size() && j < dbuf.size()) {
-      (a, !i) = (dt[chars[i].code()], i + 1);
-      (b, !i) = (dt[chars[i].code()], i + 1);
-      (c, !i) = (dt[chars[i].code()], i + 1);
-      (d, !i) = (dt[chars[i].code()], i + 1);
-      invariant(a != -1 && b != -1, "Invalid Base64 data");
-      if (j < dbuf.size()) {
-        dbuf.set(j, UInt8::truncate(a.shl(2) + b.and(0x30).shr(4)));
-        !j = j + 1;
-      };
-      if (j < dbuf.size()) {
-        invariant(c != -1, "Invalid Base64 data");
-        dbuf.set(j, UInt8::truncate( b.and(0xf).shl(4) + c.and(0x3c).shr(2)));
-        !j = j + 1;
-      };
-      if (j < dbuf.size()) {
-        invariant(d != -1, "Invalid Base64 data");
-        dbuf.set(j, UInt8::truncate( c.and(0x3).shl(6) + d));
-        !j = j + 1;
-      };
+  dt = decodeTable;
+  i = 0;
+  j = 0;
+
+  while (i + 3 < chars.size() && j < dbuf.size()) {
+    aChar = chars[i];
+    bChar = chars[i+1];
+    cChar = chars[i+2];
+    dChar = chars[i+3];
+    if (aChar == '=' || bChar == '=') break void;
+
+    a = dt[aChar.code()];
+    b = dt[bChar.code()];
+    c = dt[cChar.code()];
+    d = dt[dChar.code()];
+    invariant(a != -1 && b != -1, "Invalid Base64 data");
+
+    if (j < dbuf.size()) {
+      // Byte 1
+      dbuf.set(j, UInt8::truncate(a.shl(2) + b.and(0x30).shr(4)));
+      !j = j + 1;
     };
+    if (j < dbuf.size()) {
+      // Byte 2
+      invariant(c != -1, "Invalid Base64 data");
+      dbuf.set(j, UInt8::truncate(b.and(0x0f).shl(4) + c.and(0x3c).shr(2)));
+      !j = j + 1;
+    };
+    if (j < dbuf.size()) {
+      // Byte 3
+      invariant(d != -1, "Invalid Base64 data");
+      dbuf.set(j, UInt8::truncate(c.and(0x03).shl(6) + d));
+      !j = j + 1;
+    };
+    !i = i + 4;
+  }
 }
 
 /**
  * Base64 encode
  */
 fun encode(str: String, urlSafe: Bool = false): Array<UInt8> {
-  if (str.isEmpty()) {
-    return Array[];
-  };
-  table = if (urlSafe) {urlBase64} else {standardBase64};
-  chars = str.chars();
-  charsLen = chars.size();
-	olen = (charsLen * 4 / 3) + 4; /* 3-byte blocks to 4-byte */
-	!olen = olen + (olen / 72); /* line feeds */
-	!olen = olen + 1; /* nul termination */
-  invariant(charsLen <= olen, "Integer overflow");
-	out = Array::mfill(olen, UInt8::truncate(0));
-  inPos = 0;
-	pos = 0;
-	line = 0;
-	while (charsLen - inPos >= 3) {
-    i0 = chars[inPos].code().shr(2);
-    i1 = chars[inPos].code().and(0x03).shl(4).or(chars[inPos + 1].code().shr(4));
-    i2 = chars[inPos + 1].code().and(0x0f).shl(2).or(chars[inPos + 2].code().shr(6));
-    i3 = chars[inPos + 2].code().and(0x3f);
-    out.set(pos, UInt8::truncate(table[i0].code()));
-    out.set(pos + 1, UInt8::truncate(table[i1].code()));
-    out.set(pos + 2, UInt8::truncate(table[i2].code()));
-    out.set(pos + 3, UInt8::truncate(table[i3].code()));
-    !pos = pos + 4;
-    !inPos = inPos + 3;
-		!line = line + 4;
-		if (line >= 72) {
-      if (!urlSafe) {
-        out.set(pos, UInt8::truncate('\n'.code()));
-        !pos = pos + 1;
-      };
-      !line = 0;
-		};
-	};
-	if (charsLen - inPos > 0) {
-    i0 = chars[inPos].code().shr(2);
-    out.set(pos, UInt8::truncate(table[i0].code()));
-    !pos = pos + 1;
-    if (charsLen - inPos == 1) {
-      i1 = chars[inPos].code().and(0x03).shl(4);
-      out.set(pos, UInt8::truncate(table[i1].code()));
-      out.set(pos+1, UInt8::truncate('='.code()));
-      !pos = pos + 2;
-		} else {
-      i1 = chars[inPos].code().and(0x03).shl(4).or(chars[inPos + 1].code().shr(4));
-      i2 = chars[inPos + 1].code().and(0x0f).shl(2);
-      out.set(pos, UInt8::truncate(table[i1].code()));
-      out.set(pos+1, UInt8::truncate(table[i2].code()));
-      !pos = pos + 2;
-		};
-    out.set(pos, UInt8::truncate('='.code()));
-    !pos = pos + 1;
-    !line = line + 4;
-	};
-  if (pos == olen) {
-    out.chill();
-  } else {
-    out.slice(0, pos);
-  }
+  encodeString(str, urlSafe).utf8()
 }
 
-fun encodeString(str: String, urlSafe: Bool = false):  String {
-  utf8 = encode(str, urlSafe);
-  String::fromUtf8(utf8)
+fun encodeString(str: String, urlSafe: Bool = false): String {
+  if (str.isEmpty()) {return ""};
+  encodeBytes(str.utf8(), urlSafe);
 }
-
 
 fun encodeBytes(bytes: Array<UInt8>, urlSafe: Bool = false): String {
 	ret = mutable Vector<Char>[];
