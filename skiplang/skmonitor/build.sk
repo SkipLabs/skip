@@ -1,0 +1,42 @@
+@debug
+fun main(): void {
+  profile = Environ.var("PROFILE");
+  target = Environ.var("TARGET");
+  isWasm32 = target.startsWith("wasm32");
+
+  profile match {
+  | "release" ->
+    Environ.set_var("DEBUG", "false");
+    Environ.set_var("OPT_LEVEL", "3")
+  | "debug" | "dev" ->
+    Environ.set_var("DEBUG", "true");
+    Environ.set_var("OPT_LEVEL", "0")
+  | p -> invariant_violation(`Unrecognized profile ${p}`)
+  };
+
+  srcs = if (isWasm32) Array["extern/common/trace.c"] else {
+    Array["extern/native.c", "extern/common/trace.c"]
+  };
+
+  cc = Cc.Build().flags(Cc.kRecommendedCflags);
+
+  profile match {
+  | "debug" | "dev" -> !cc = cc.flag("-g")
+  | _ -> void
+  };
+
+  for (src in srcs) {
+    print_string(`skargo:rerun-if-changed=${src}`);
+    !cc = cc.file(src);
+  };
+
+  if (isWasm32) !cc = cc.flag("-nostdlibinc");
+
+  cc.compile("monitor");
+
+  if (isWasm32) {
+    print_string("skargo:skc-extra-source=extra/wasm32.sk")
+  } else {
+    print_string("skargo:skc-extra-source=extra/host.sk")
+  }
+}
