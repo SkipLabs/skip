@@ -830,15 +830,20 @@ mutable class Context private {
     | _ -> invariant_violation("Wrong type for CHANGED_DIRS")
     };
     if (this.tick == start) return void;
-    for (_ => sub in this.sessions) {
-      affected = for (dirSub in sub.dirSubs) {
-        if (changedDirNames.contains(dirSub.dirName)) break true
-      } else {
-        false
-      };
-      if (!affected) continue;
-      this.notifySub(sub, start)
-    }
+    readOnlyWithRegionFold(
+      Some(this),
+      this.sessions.values(),
+      void,
+      (ctx, sub, _) ~> {
+        affected = for (dirSub in sub.dirSubs) {
+          if (changedDirNames.contains(dirSub.dirName)) break true
+        } else {
+          false
+        };
+        if (!affected) return void;
+        ctx.fromSome().notifySub(sub, start);
+      },
+    )
   }
 
   readonly fun getTick(): Tick {
@@ -1735,6 +1740,44 @@ fun destroyObstackWithValueCheckContext<T>(
     contextOpt.fromSome().replaceFromSaved(icontext)
   );
   value
+}
+
+fun readOnlyWithRegionFold<K, T>(
+  contextOpt: ?readonly Context,
+  it: mutable Iterator<K>,
+  value: T,
+  fn: (?readonly Context, K, T) ~> T,
+): T {
+  optSaved: ?Obstack = None();
+  valueInRegion = value;
+  try {
+    !optSaved = Some(newObstack());
+    loop {
+      saved = optSaved.fromSome();
+      callOnParentObstack(saved, it.next) match {
+      | Some(k) ->
+        !valueInRegion = fn(contextOpt, k, valueInRegion);
+        if (shouldGC(saved) != 0) {
+          !valueInRegion = destroyObstackWithValue(saved, valueInRegion);
+          !optSaved = Some(newObstack());
+        }
+      | _ -> break void
+      }
+    };
+    optSaved match {
+    | Some(saved) -> destroyObstackWithValue(saved, valueInRegion)
+    | _ -> value
+    }
+  } catch {
+  | exn ->
+    optSaved match {
+    | Some(saved) ->
+      cexn = destroyObstackWithValue(saved, exn);
+      replaceExn(cexn);
+      throw cexn
+    | _ -> throw exn
+    }
+  }
 }
 
 fun withRegionFold<K, T>(
