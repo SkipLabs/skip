@@ -55,12 +55,18 @@ base class TDir extends Dir {
    */
   fun keys(): SortedSet<Key>;
 
+  fun castKeySet(keySet: KeySet): TKeySet {
+    keySet match {
+    | ks @ TKeySet _ -> ks
+    }
+  }
+
   fun addKeyToSetOpt(key: Key, keySetOpt: ?SortedSet<Key>): SortedSet<Key> {
     keySetOpt.default(SortedSet[]).set(key)
   }
 
   fun addKeyToKeySetOpt(key: Key, keySetOpt: ?KeySet): KeySet {
-    keySetOpt.default(KeySet::empty()).set(key)
+    keySetOpt.map(this.castKeySet).default(TKeySet::empty()).set(key)
   }
 }
 
