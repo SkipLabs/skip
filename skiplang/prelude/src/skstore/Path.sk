@@ -247,18 +247,18 @@ class SID(value: String) extends Key {
   }
 }
 
-base class KeySet
+base class KeySet uses Unsafe.Downcastable
 
-class TKeySet private (inner: SortedSet<Key>) extends KeySet {
+class TKeySet<+K: Orderable> private (inner: SortedSet<K>) extends KeySet {
   static fun empty(): this {
     static(SortedSet[])
   }
 
-  fun set(key: Key): this {
-    static(this.inner.set(key))
+  fun set<K2: Orderable>[K: K2](key: K2): TKeySet<K2> {
+    TKeySet(this.inner.set(key))
   }
 
-  fun values(): mutable Iterator<Key> {
+  fun values(): mutable Iterator<K> {
     this.inner.values()
   }
 }
