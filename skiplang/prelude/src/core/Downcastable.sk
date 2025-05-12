@@ -15,6 +15,10 @@ trait Downcastable {
   }
 }
 
+fun maybeCast<T: Downcastable, F: T>(v: T, c: Concrete<F>): ?F {
+  if (instanceOf(v, c)) Some(unsafeCast<T, F>(v)) else None()
+}
+
 fun cast<T: Downcastable, F: T>(v: T, c: Concrete<F>): F {
   invariant(v.type_id() == c::const_type_id(), "invalid cast");
   unsafeCast<T, F>(v);
