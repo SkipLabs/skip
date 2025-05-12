@@ -247,7 +247,19 @@ class SID(value: String) extends Key {
   }
 }
 
-class KeySet private (inner: SortedSet<Key>) {}
+class KeySet private (inner: SortedSet<Key>) {
+  static fun empty(): this {
+    static(SortedSet[])
+  }
+
+  fun set(key: Key): this {
+    static(this.inner.set(key))
+  }
+
+  fun values(): mutable Iterator<Key> {
+    this.inner.values()
+  }
+}
 
 base class Exception extends .Exception uses Show
 

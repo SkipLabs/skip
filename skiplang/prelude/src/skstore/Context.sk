@@ -341,7 +341,7 @@ mutable class Context private {
   mutable newDirs: SortedSet<DirName> = SortedSet[],
   mutable globals: SortedMap<String, File> = SortedMap[],
   private mutable persistents: SortedMap<String, File> = SortedMap[],
-  private mutable dirty: SortedMap<DirName, SortedSet<Key>> = SortedMap[],
+  private mutable dirty: SortedMap<DirName, KeySet> = SortedMap[],
   private mutable dirtyReaders: /* parentName => childName => keys */ SortedMap<
     DirName,
     SortedMap<DirName, SortedSet<Key>>,
@@ -659,7 +659,10 @@ mutable class Context private {
 
   mutable fun addDirty(dir: TEagerDir, key: Key): void {
     dirName = dir.dirName;
-    this.!dirty[dirName] = dir.addKeyToSetOpt(key, this.dirty.maybeGet(dirName))
+    this.!dirty[dirName] = dir.addKeyToKeySetOpt(
+      key,
+      this.dirty.maybeGet(dirName),
+    )
   }
 
   mutable fun update(): void {
