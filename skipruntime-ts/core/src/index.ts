@@ -401,11 +401,8 @@ class CollectionWriter<K extends Json, V extends Json> {
   }
 }
 
-class ContextImpl extends SkManaged implements Context {
-  constructor(private readonly refs: Refs) {
-    super();
-    Object.freeze(this);
-  }
+class ContextImpl implements Context {
+  constructor(private readonly refs: Refs) {}
 
   createLazyCollection<
     K extends Json,
