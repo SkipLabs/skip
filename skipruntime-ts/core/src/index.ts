@@ -401,11 +401,8 @@ class CollectionWriter<K extends Json, V extends Json> {
   }
 }
 
-class ContextImpl extends SkManaged implements Context {
-  constructor(private readonly refs: Refs) {
-    super();
-    Object.freeze(this);
-  }
+class ContextImpl implements Context {
+  constructor(private readonly refs: Refs) {}
 
   createLazyCollection<
     K extends Json,
@@ -826,9 +823,11 @@ export class ToBinding {
   ): Pointer<Internal.CJArray> {
     const skjson = this.getJsonConverter();
     const lazyCompute = this.handles.get(sklazyCompute);
+    const context = new ContextImpl(this.refs());
     const result = lazyCompute.compute(
       new LazyCollectionImpl<Json, Json>(self, this.refs()),
       skjson.importJSON(skkey) as Json,
+      context,
     );
     return skjson.exportJSON(Array.from(result));
   }
