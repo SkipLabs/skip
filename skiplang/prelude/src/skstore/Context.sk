@@ -332,7 +332,7 @@ mutable class Context private {
   mutable canReuse: CanReuse = CRIfMatch(),
   private mutable arrowStack: List<(ArrowKey, TimeStack)> = List[],
   private mutable lazyGets: SortedSet<Path> = SortedSet[],
-  private mutable lazyGetsQueue: Queue<Array<Path>> = Queue[],
+  private mutable lazyGetsQueue: Queue<SortedSet<Path>> = Queue[],
   private mutable lazyGetsRefCount: SortedMap<Path, Int> = SortedMap[],
   private mutable sessions: SortedMap<Int, Sub> = SortedMap[],
   private mutable postponables: List<Postponable> = List[],
@@ -633,7 +633,7 @@ mutable class Context private {
       };
       this.!lazyGetsRefCount[path] = refCount + 1;
     };
-    this.!lazyGetsQueue = this.lazyGetsQueue.push(this.lazyGets.toArray());
+    this.!lazyGetsQueue = this.lazyGetsQueue.push(this.lazyGets);
     this.!lazyGets = SortedSet[];
     if (this.lazyGetsQueue.size() <= this.lazyCapacity) return void;
     (this.!lazyGetsQueue, lazyGets) = this.lazyGetsQueue.pop().fromSome();
