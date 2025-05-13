@@ -263,6 +263,23 @@ class TKeySet<+K: Orderable> private (inner: SortedSet<K>) extends KeySet {
   }
 }
 
+base class KeyMap<+V> uses Unsafe.Downcastable
+
+class TKeyMap<+K: Orderable, +V: frozen> private (
+  inner: SortedMap<K, V>,
+) extends KeyMap<V> {
+  static fun empty(): this {
+    static(SortedMap[])
+  }
+
+  fun set<K2: Orderable, V2: frozen>[K: K2, V: V2](
+    key: K2,
+    value: V2,
+  ): TKeyMap<K2, V2> {
+    TKeyMap(this.inner.set(key, value))
+  }
+}
+
 base class Exception extends .Exception uses Show
 
 fun error<T>(msg: String): T {
