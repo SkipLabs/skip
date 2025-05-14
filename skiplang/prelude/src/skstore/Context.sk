@@ -633,6 +633,9 @@ mutable class Context private {
       (this.!lazyGetsQueue, lazyGets) = this.lazyGetsQueue.pop().fromSome();
       lazyGets
     };
+
+    if (this.lazyGets.isEmpty() && deadLazyGets.isEmpty()) return void;
+
     toRemove = mutable Map[];
     for (path in this.lazyGets) {
       refCount = this.lazyGetsRefCount.maybeGet(path) match {
