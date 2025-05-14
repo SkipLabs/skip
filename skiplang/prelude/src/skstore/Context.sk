@@ -649,11 +649,12 @@ mutable class Context private {
     this.!lazyGets = SortedMap[]
   }
 
-  mutable fun addLazyGet(dir: LazyDir, key: Key): void {
+  mutable fun addLazyGet(dir: TLazyDir, key: Key): void {
     dirName = dir.dirName;
-    this.!lazyGets[dirName] = this.lazyGets.maybeGet(dirName)
-      .default(SortedSet[])
-      .set(key)
+    this.!lazyGets[dirName] = dir.addKeyToSetOpt(
+      key,
+      this.lazyGets.maybeGet(dirName),
+    )
   }
 
   mutable fun addDirty(dir: EagerDir, key: Key): void {
