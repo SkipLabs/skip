@@ -48,7 +48,49 @@ class LazyDir protected {
     }
   }
 
-  fun removeKeys(keys: readonly Vector<Key>): this {
+  /* Updates the lazyGets ref counts and return as well a potentially updated
+    LazyDir in which dead keys have been removed. */
+  fun updateLazyGets(
+    refCountsOpt: ?SortedMap<Key, Int>,
+    newKeysOpt: ?SortedSet<Key>,
+    deadKeysOpt: ?SortedSet<Key>,
+  ): (?SortedMap<Key, Int>, ?this) {
+    refCounts = refCountsOpt.default(SortedMap[]);
+    newKeys = newKeysOpt.default(SortedSet[]);
+    deadKeys = deadKeysOpt.default(SortedSet[]);
+
+    toRemove = mutable Vector[];
+    !refCounts = refCounts.mergeWith2(
+      newKeys.inner,
+      deadKeys.inner,
+      (key, refCountOpt, newOpt, deadOpt) -> {
+        (refCountOpt, newOpt, deadOpt) match {
+        | (_, None(), None())
+        | (_, Some(void), Some(void)) ->
+          refCountOpt
+        | (None(), None(), Some(void)) ->
+          // Not found, but since the aim is to remove them, we can do nothing.
+          refCountOpt
+        | (Some(1), None(), Some(void)) ->
+          toRemove.push(key);
+          None()
+        | _ ->
+          Some(
+            refCountOpt.default(0) +
+              newOpt.maybe(0, (_: void) -> 1) -
+              deadOpt.maybe(0, (_: void) -> 1),
+          )
+        }
+      },
+    );
+    dirOpt = if (toRemove.isEmpty()) None() else {
+      Some(this.removeKeys(toRemove))
+    };
+    !refCountsOpt = if (refCounts.isEmpty()) None() else Some(refCounts);
+    (refCountsOpt, dirOpt)
+  }
+
+  private fun removeKeys(keys: readonly Vector<Key>): this {
     data = this.data;
     for (key in keys) {
       data.maybeGet(key) match {
