@@ -657,12 +657,9 @@ mutable class Context private {
     )
   }
 
-  mutable fun addDirty(dir: EagerDir, key: Key): void {
+  mutable fun addDirty(dir: TEagerDir, key: Key): void {
     dirName = dir.dirName;
-    this.!dirty[dirName] = this.dirty.maybeGet(dirName) match {
-    | None() -> SortedSet[key]
-    | Some(set) -> set.set(key)
-    }
+    this.!dirty[dirName] = dir.addKeyToSetOpt(key, this.dirty.maybeGet(dirName))
   }
 
   mutable fun update(): void {
