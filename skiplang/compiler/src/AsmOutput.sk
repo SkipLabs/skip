@@ -2316,16 +2316,14 @@ private fun llvmWriteCall(
     asm.print("%n = " % call)
   };
   code match {
-  | ConstantFun{value} ->
+  | ConstantFun{
+    value,
+  } if ({
     subf = asm.env().getFunction(value, asm.pos());
-    if (subf.gfunction.id == "SKStore.const_typed_symbol") {
-      Some(SKStore.genSym(0))
-    } else {
-      None()
-    }
-  | _ -> None()
-  } match {
-  | Some(typeId) -> asm.print("add i64 0, %s ;" % typeId)
+    subf.gfunction.id == "SKStore.const_typed_symbol"
+  }) ->
+    typeId = SKStore.genSym(0);
+    asm.print("add i64 0, %s ;" % typeId)
   | _ ->
     asm.print(
       call match {
