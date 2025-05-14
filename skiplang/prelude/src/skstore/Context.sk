@@ -641,38 +641,50 @@ mutable class Context private {
 
     if (this.lazyGets.isEmpty() && deadLazyGets.isEmpty()) return void;
 
-    for (dirName => keys in this.lazyGets) {
-      refCounts = this.lazyGetsRefCount.maybeGet(dirName).default(SortedMap[]);
-      for (key in keys) {
-        !refCounts[key] = refCounts.maybeGet(key).default(0) + 1;
-      };
-      this.!lazyGetsRefCount[dirName] = refCounts;
-    };
-    for (dirName => keys in deadLazyGets) {
-      this.lazyGetsRefCount.maybeGet(dirName) match {
-      | None() ->
-        // Not found, but since the aim is to remove them, we can do nothing.
-        void
-      | Some(refCounts) ->
-        toRemove = SortedSet[];
-        for (key in keys) {
-          refCounts.maybeGet(key) match {
-          | None() ->
-            // Not found, but since the aim is to remove them, we can do nothing.
-            void
-          | Some(refCount) ->
-            !refCount = refCount - 1;
-            if (refCount <= 0) {
-              !refCounts = refCounts.remove(key);
-              !toRemove = toRemove.set(key);
+    this.!lazyGetsRefCount = this.lazyGetsRefCount.mergeWith2(
+      this.lazyGets,
+      deadLazyGets,
+      (dirName, refCountsOpt, newKeysOpt, deadKeysOpt) -> {
+        if (
+          newKeysOpt is None() &&
+          (refCountsOpt is None() || deadKeysOpt is None())
+        ) return refCountsOpt;
+
+        refCounts = refCountsOpt.default(SortedMap[]);
+        newKeys = newKeysOpt.default(SortedSet[]);
+        deadKeys = deadKeysOpt.default(SortedSet[]);
+
+        toRemove = mutable Vector[];
+        !refCounts = refCounts.mergeWith2(
+          newKeys.inner,
+          deadKeys.inner,
+          (key, refCountOpt, newOpt, deadOpt) -> {
+            (refCountOpt, newOpt, deadOpt) match {
+            | (_, None(), None())
+            | (_, Some(void), Some(void)) ->
+              refCountOpt
+            | (None(), None(), Some(void)) ->
+              // Not found, but since the aim is to remove them, we can do nothing.
+              refCountOpt
+            | (Some(1), None(), Some(void)) ->
+              toRemove.push(key);
+              None()
+            | _ ->
+              Some(
+                refCountOpt.default(0) +
+                  newOpt.maybe(0, (_: void) -> 1) -
+                  deadOpt.maybe(0, (_: void) -> 1),
+              )
             }
-          }
+          },
+        );
+        if (!toRemove.isEmpty()) {
+          dir = this.unsafeGetLazyDir(dirName);
+          this.setDir(dir.removeKeys(toRemove))
         };
-        this.!lazyGetsRefCount[dirName] = refCounts;
-        dir = this.unsafeGetLazyDir(dirName);
-        this.setDir(dir.removeKeys(toRemove))
-      };
-    };
+        if (refCounts.isEmpty()) None() else Some(refCounts)
+      },
+    );
     this.!lazyGets = SortedMap[]
   }
 
