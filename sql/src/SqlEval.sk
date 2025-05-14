@@ -2692,7 +2692,14 @@ extension class Context {
     c1: readonly SKStore.Context,
     c2: readonly SKStore.Context,
   ): Bool {
-    unsafeCompareSets(c1.deps.data, c2.deps.data) != 0
+    Deps::unsafeCompare(c1.deps, c2.deps)
   }
 }
+
+extension class Deps {
+  static fun unsafeCompare(d1: Deps, d2: Deps): Bool {
+    unsafeCompareSets(d1.data, d2.data) != 0
+  }
+}
+
 module end;
