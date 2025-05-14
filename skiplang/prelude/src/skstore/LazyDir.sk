@@ -21,10 +21,10 @@ base class LazyDir protected {protected collect: Bool} extends Dir {
   /* Updates the lazyGets ref counts and return as well a potentially updated
     LazyDir in which dead keys have been removed. */
   fun updateLazyGets(
-    refCountsOpt: ?SortedMap<Key, Int>,
-    newKeysOpt: ?SortedSet<Key>,
-    deadKeysOpt: ?SortedSet<Key>,
-  ): (?SortedMap<Key, Int>, ?this);
+    refCountsOpt: ?KeyMap<Int>,
+    newKeysOpt: ?KeySet,
+    deadKeysOpt: ?KeySet,
+  ): (?KeyMap<Int>, ?this);
 
   fun update(
     context: mutable Context,
@@ -39,18 +39,18 @@ class TLazyDir{
   protected lazyFun: (mutable Context, DirName, Key) ~> ?Array<File>,
 } extends LazyDir, TDir {
   fun updateLazyGets(
-    refCountsOpt: ?SortedMap<Key, Int>,
-    newKeysOpt: ?SortedSet<Key>,
-    deadKeysOpt: ?SortedSet<Key>,
-  ): (?SortedMap<Key, Int>, ?this) {
-    refCounts = refCountsOpt.default(SortedMap[]);
-    newKeys = newKeysOpt.default(SortedSet[]);
-    deadKeys = deadKeysOpt.default(SortedSet[]);
+    refCountsOpt: ?KeyMap<Int>,
+    newKeysOpt: ?KeySet,
+    deadKeysOpt: ?KeySet,
+  ): (?KeyMap<Int>, ?this) {
+    refCounts = this.castOrEmptyKeyMap(refCountsOpt);
+    newKeys = this.castOrEmptyKeySet(newKeysOpt);
+    deadKeys = this.castOrEmptyKeySet(deadKeysOpt);
 
     toRemove = mutable Vector[];
     !refCounts = refCounts.mergeWith2(
-      newKeys.inner,
-      deadKeys.inner,
+      newKeys.getInner(),
+      deadKeys.getInner(),
       (key, refCountOpt, newOpt, deadOpt) -> {
         (refCountOpt, newOpt, deadOpt) match {
         | (_, None(), None())
