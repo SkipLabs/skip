@@ -31,6 +31,8 @@ fun instanceOfEntry<K: frozen & Orderable, V: frozen>(entry: Entry): Bool {
   Unsafe.instanceOf(entry, TEntry<K, V>);
 }
 
+value class VBox<U>(v: U)
+
 @test
 fun casts(): void {
   entry1: Entry = TEntry::create("v", Array[0, 1]);
@@ -45,6 +47,9 @@ fun casts(): void {
   T.expectEq(instanceOfEntry<String, Int>(entry3), false);
   T.expectEq(instanceOfEntry<String, Float>(entry3), false);
   T.expectEq(instanceOfEntry<SKStore.IID, SKStore.IntFile>(entry3), true);
+  entry4: Entry = TEntry::create(0, Array[void]);
+  T.expectEq(instanceOfEntry<Int, void>(entry4), true);
+  T.expectEq(instanceOfEntry<Int, VBox<void>>(entry4), false);
 }
 
 module end;
