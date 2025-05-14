@@ -414,6 +414,53 @@ base class .SortedMap<+K: Orderable, +V> uses  //  extends KeyedSequence<K, V>
     maps.foldl((m1, m2) -> m1.merge(m2), SortedMap::create())
   }
 
+  fun mergeWith2<K2: Orderable, U, W, R>[K: K2](
+    other1: SortedMap<K2, U>,
+    other2: SortedMap<K2, W>,
+    f: (K2, ?V, ?U, ?W) -> ?R,
+  ): SortedMap<K2, R> {
+    (this, other1, other2) match {
+    | (Nil(), Nil(), Nil()) -> Nil()
+    | (
+      Node{left => l0, key => k0, value => v0, right => r0, h},
+      _,
+      _,
+    ) if (h >= other1.height() && h >= other2.height()) ->
+      key: K2 = k0;
+      (l1, v1, r1) = other1.split(key);
+      (l2, v2, r2) = other2.split(key);
+      SortedMap::concatOrJoin(
+        key,
+        f(key, Some(v0), v1, v2),
+        l0.mergeWith2(l1, l2, f),
+        r0.mergeWith2(r1, r2, f),
+      )
+    | (
+      _,
+      Node{left => l1, key, value => v1, right => r1, h},
+      _,
+    ) if (h >= this.height() && h >= other2.height()) ->
+      (l0, v0, r0) = this.split(key);
+      (l2, v2, r2) = other2.split(key);
+      SortedMap::concatOrJoin(
+        key,
+        f(key, v0, Some(v1), v2),
+        l0.mergeWith2(l1, l2, f),
+        r0.mergeWith2(r1, r2, f),
+      )
+    | (_, _, Node{left => l2, key, value => v2, right => r2}) ->
+      (l0, v0, r0) = this.split(key);
+      (l1, v1, r1) = other1.split(key);
+      SortedMap::concatOrJoin(
+        key,
+        f(key, v0, v1, Some(v2)),
+        l0.mergeWith2(l1, l2, f),
+        r0.mergeWith2(r1, r2, f),
+      )
+    | _ -> invariant_violation("Nil should have a height smaller than a Node")
+    }
+  }
+
   /* Map and filter */
 
   fun map<V2>(f: (K, V) -> V2): SortedMap<K, V2>
