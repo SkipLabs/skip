@@ -114,13 +114,8 @@ value class Deps private (
   data: SortedMap<Path, SortedSet<ArrowKey>> = SortedMap[],
   private idata: HashMap<DirName, SortedSet<Path>> = HashMap[],
 ) {
-  static fun createFromItems(items: Array<(Path, ArrowKey)>): this {
-    deps = Deps();
-    for (item in items) {
-      (path, arrowKey) = item;
-      !deps[path] = arrowKey;
-    };
-    deps
+  static fun empty(): this {
+    Deps()
   }
 
   fun maybeGet(path: Path): ?SortedSet<ArrowKey> {
@@ -318,7 +313,7 @@ mutable class Context private {
   private mutable tick: Tick = Tick(1),
   private mutable lazyCapacity: Int = 10,
   private mutable toUpdate: SortedMap<(TimeStack, Time), Arrow> = SortedMap[],
-  private mutable deps: Deps = Deps[],
+  private mutable deps: Deps = Deps::empty(),
   mutable debugMode: Bool = debugMode,
   private mutable hasPre: SortedSet<DirName> = SortedSet[],
   mutable newDirs: SortedSet<DirName> = SortedSet[],
