@@ -7,7 +7,9 @@ native fun unsafeCast<T: Downcastable, F: T>(t: T): F;
 trait Downcastable {
   static fun const_type_id(): Int;
 
-  fun type_id(): Int;
+  fun type_id(): Int {
+    static::const_type_id()
+  }
 }
 
 fun cast<T: Downcastable, F: T>(v: T, c: Concrete<F>): F {
