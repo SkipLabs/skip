@@ -65,16 +65,20 @@ base class TDir extends Dir {
     keySetOpt.map(this.castKeySet).default(TKeySet::empty())
   }
 
-  fun addKeyToSetOpt(key: Key, keySetOpt: ?SortedSet<Key>): SortedSet<Key> {
-    keySetOpt.default(SortedSet[]).set(key)
-  }
-
   fun addKeyToKeySetOpt(key: Key, keySetOpt: ?KeySet): KeySet {
     this.castOrEmptyKeySet(keySetOpt).set(key)
   }
 
   fun addReaderKeyToKeySetOpt(arrowKey: ArrowKey, keySetOpt: ?KeySet): KeySet {
     this.addKeyToKeySetOpt(arrowKey.key, keySetOpt)
+  }
+
+  fun castKeyMap<V: frozen>(keyMap: KeyMap<V>): TKeyMap<Key, V> {
+    Unsafe.cast(keyMap, TKeyMap<Key, V>)
+  }
+
+  fun castOrEmptyKeyMap<V: frozen>(keyMapOpt: ?KeyMap<V>): TKeyMap<Key, V> {
+    keyMapOpt.map(this.castKeyMap).default(TKeyMap::empty())
   }
 }
 

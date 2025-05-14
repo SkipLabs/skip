@@ -348,13 +348,11 @@ mutable class Context private {
   > = SortedMap[],
   mutable canReuse: CanReuse = CRIfMatch(),
   private mutable arrowStack: List<(ArrowKey, TimeStack)> = List[],
-  private mutable lazyGets: SortedMap<DirName, SortedSet<Key>> = SortedMap[],
-  private mutable lazyGetsQueue: Queue<
-    SortedMap<DirName, SortedSet<Key>>,
-  > = Queue[],
+  private mutable lazyGets: SortedMap<DirName, KeySet> = SortedMap[],
+  private mutable lazyGetsQueue: Queue<SortedMap<DirName, KeySet>> = Queue[],
   private mutable lazyGetsRefCount: SortedMap<
     DirName,
-    SortedMap<Key, Int>,
+    KeyMap<Int>,
   > = SortedMap[],
   private mutable sessions: SortedMap<Int, Sub> = SortedMap[],
   private mutable postponables: List<Postponable> = List[],
@@ -654,7 +652,7 @@ mutable class Context private {
 
   mutable fun addLazyGet(dir: TLazyDir, key: Key): void {
     dirName = dir.dirName;
-    this.!lazyGets[dirName] = dir.addKeyToSetOpt(
+    this.!lazyGets[dirName] = dir.addKeyToKeySetOpt(
       key,
       this.lazyGets.maybeGet(dirName),
     )
