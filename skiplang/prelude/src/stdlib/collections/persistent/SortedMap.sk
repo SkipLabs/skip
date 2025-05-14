@@ -325,15 +325,18 @@ base class .SortedMap<+K: Orderable, +V> uses  //  extends KeyedSequence<K, V>
     value: V2,
     f: (V2, V2) -> V2,
   ): SortedMap<K2, V2>
-  | Nil() -> SortedMap::node(key, value, Nil(), Nil())
-  | Node _ ->
+  | Nil() -> SortedMap::singleton(key, value)
+  | n @ Node _ ->
     l: SortedMap<K2, V2> = this.left;
     r: SortedMap<K2, V2> = this.right;
     k: K2 = this.key;
     v: V2 = this.value;
     compare(key, this.key) match {
     | LT() -> SortedMap::balance(k, v, l.setWith(key, value, f), r)
-    | EQ() -> SortedMap::node(k, f(v, value), l, r)
+    | EQ() ->
+      newV = f(v, value);
+      node: Node<K2, V2> = n;
+      node with {value => newV}
     | GT() -> SortedMap::balance(k, v, l, r.setWith(key, value, f))
     }
 
@@ -664,6 +667,10 @@ base class .SortedMap<+K: Orderable, +V> uses  //  extends KeyedSequence<K, V>
   | Nil() -> 0
   | Node _ -> this.h
 
+  static fun singleton(k: K, v: V): Node<K, V> {
+    Node{n => 1, h => 1, key => k, value => v, left => Nil(), right => Nil()}
+  }
+
   protected static fun node<K2: Orderable, V2>[K: K2, V: V2](
     k: K2,
     v: V2,
@@ -757,7 +764,7 @@ base class .SortedMap<+K: Orderable, +V> uses  //  extends KeyedSequence<K, V>
     k: K2,
     v: V2,
   ): SortedMap<K2, V2>
-  | Nil() -> SortedMap::node(k, v, Nil(), Nil())
+  | Nil() -> SortedMap::singleton(k, v)
   | Node _ ->
     SortedMap::balance(
       this.key,
@@ -770,12 +777,9 @@ base class .SortedMap<+K: Orderable, +V> uses  //  extends KeyedSequence<K, V>
     k: K2,
     v: V2,
   ): SortedMap<K2, V2>
-  | Nil() ->
-    new_static: Concrete<SortedMap<K2, V2>> = static;
-    new_static::node(k, v, Nil(), Nil())
+  | Nil() -> SortedMap::singleton(k, v)
   | Node _ ->
-    new_static: Concrete<SortedMap<K2, V2>> = static;
-    new_static::balance(
+    SortedMap::balance(
       this.key,
       this.value,
       this.left,
