@@ -25,9 +25,8 @@ fun listSubDirs(
 ): Array<(String, Dir)> {
   context
     .listDirs()
-    .filterMap(kv -> {
-      (key, dir) = kv;
-      keyStr = key.toString();
+    .filterMap(dir -> {
+      keyStr = dir.dirName.toString();
       if (keyStr.startsWith(prefix)) Some((keyStr, dir)) else None()
     })
     .collect(Array);
