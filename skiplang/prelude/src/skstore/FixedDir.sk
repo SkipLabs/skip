@@ -157,8 +157,8 @@ class FixedDir<+T: frozen> extends IFixedDir<T, FixedRow<T>> {
   }
 }
 
-value class CompactRow<T>(
-  values: Array<T>,
+value class CompactRow(
+  values: Array<?SKDB.CValue>,
   repeat: Int,
   tag: TickRange,
   sourceKey: ?Key,
@@ -174,7 +174,7 @@ class FixedDirMetadata{
 // out of the rows themselves.
 class CompactFixedDir protected {
   metadata: FixedDirMetadata,
-} extends IFixedDir<Array<File>, CompactRow<?SKDB.CValue>> {
+} extends IFixedDir<Array<File>, CompactRow> {
   static fun create<V: File>(
     data: mutable Vector<FixedRow<Array<V>>>,
     metadata: FixedDirMetadata,
@@ -190,7 +190,7 @@ class CompactFixedDir protected {
   }
   protected static fun stripMetadata<V: File>(
     row: FixedRow<Array<V>>,
-  ): CompactRow<?SKDB.CValue> {
+  ): CompactRow {
     invariant(row.value.size() == 1);
     sourceKey = if (row.source.baseName != row.key) {
       Some(row.source.baseName)
