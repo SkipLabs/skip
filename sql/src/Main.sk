@@ -447,7 +447,7 @@ fun execSessions(args: Cli.ParseResults, options: SKDB.Options): void {
 fun execCompact(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
   SKDB.runLockedSql(options, context ~> {
-    for ((_dirName, dir) in context.listDirs()) {
+    for (dir in context.listDirs()) {
       dir match {
       | edir @ SKStore.EagerDir _ ->
         !edir = edir.purge(context.getTick());

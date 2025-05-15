@@ -1104,8 +1104,8 @@ mutable class Context private {
     this.persistents.maybeGet(name)
   }
 
-  readonly fun listDirs(): mutable Iterator<(DirName, Dir)> {
-    this.dirs.items()
+  readonly fun listDirs(): mutable Iterator<Dir> {
+    this.dirs.values()
   }
 
   readonly fun getDirsChangesAfter(start: Tick): SortedSet<DirName> {
@@ -1146,8 +1146,8 @@ private class Dirs{private state: DMap<DirName, Dir> = DMap::empty()} {
     | Some(x) -> x
     }
   }
-  fun items(): mutable Iterator<(DirName, Dir)> {
-    this.state.items()
+  fun values(): mutable Iterator<Dir> {
+    this.state.values()
   }
   fun getChangesAfter(start: Tick): SortedSet<DirName> {
     this.state.getChangesAfter(start)

@@ -90,8 +90,8 @@ fun eval(
   makeEnv(context, prog.inputs);
   evalDirs(context, prog.mDirs);
   if (!debug) return void;
-  for (kv in context.listDirs()) {
-    (dirName, dir) = kv;
+  for (dir in context.listDirs()) {
+    dirName = dir.dirName;
     print_string("Dir: " + dirName);
     for (key in dir.keys()) {
       print_string(
@@ -366,8 +366,8 @@ fun compareContext(
   context2: readonly SKStore.Context,
 ): Bool {
   hasError = false;
-  for (kv in context1.listDirs()) {
-    (dirName, dir) = kv;
+  for (dir in context1.listDirs()) {
+    dirName = dir.dirName;
     dirFiles = dir.keys();
     if (dirFiles.isEmpty()) continue;
 
