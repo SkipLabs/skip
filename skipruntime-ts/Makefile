@@ -2,20 +2,31 @@ SHELL := /bin/bash
 
 SKARGO_PROFILE?=release
 NPM_WORKSPACES=$(shell jq --raw-output "[.workspaces[] | select((startswith(\"sql\") or contains(\"examples\")) | not)] | map(\"-w \" + .) | .[]" ../package.json)
-SKIPRUNTIME?=$(realpath $(CURDIR)/..)/build/skipruntime
 
-export SKIPRUNTIME
+.PHONY: default
+default: install
+
+export LDFLAGS=-L$(realpath $(CURDIR)/..)/build/skipruntime/
+export LD_LIBRARY_PATH=$(realpath $(CURDIR)/..)/build/skipruntime/
+
+.PHONY: libskipruntime
+libskipruntime:
+	skargo build --release --lib --manifest-path=skiplang/ffi/Skargo.toml --out-dir=../build/skipruntime/
 
 .PHONY: install
-install:
+install: libskipruntime
 	../bin/cd_sh .. "npm install $(NPM_WORKSPACES)"
 
 .PHONY: install-all
-install-all:
+install-all: libskipruntime
 	../bin/cd_sh .. "npm install"
 
+.PHONY: check-ts
+check-ts: install-all
+	../bin/check-ts.sh
+
 .PHONY: build
-build:
+build: libskipruntime
 	../bin/cd_sh .. "npm run build $(NPM_WORKSPACES) --if-present"
 
 bunrun-%: build

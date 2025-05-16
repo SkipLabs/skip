@@ -11,9 +11,7 @@
       ],
       "cflags!": ["-fno-exceptions"],
       "cflags_cc!": ["-fno-exceptions"],
-      "libraries": [
-        "-L<!(realpath $SKIPRUNTIME) -lskipruntime -Wl,--require-defined=SKIP_new_Obstack"
-      ]
+      "libraries": ["-lskipruntime -Wl,--require-defined=SKIP_new_Obstack"]
     }
   ]
 }
