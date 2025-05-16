@@ -22,32 +22,6 @@ class LazyDir protected {
   private lazyFun: (mutable Context, DirName, Key) ~> ?Array<File>,
   private collect: Bool,
 } extends TDir {
-  static fun create(
-    context: mutable Context,
-    dirName: DirName,
-    lazyFun: (mutable Context, DirName, Key) ~> ?Array<File>,
-    collect: Bool = true,
-  ): Dir {
-    context.maybeGetLazyDir(dirName) match {
-    | Some(ldir) if (native_eq(ldir.lazyFun, lazyFun) == 0) ->
-      if (context.debugMode) {
-        print_string(`REUSING: ${dirName}`);
-      };
-      ldir
-    | _ ->
-      time = context.timeStamp();
-      newDir = LazyDir{
-        timeStack => TimeStack::create(context, time),
-        dirName,
-        lazyFun,
-        collect,
-      };
-      context.updateDirtyReaders(Path::dirTag(dirName));
-      context.setDir(newDir);
-      newDir
-    }
-  }
-
   /* Updates the lazyGets ref counts and return as well a potentially updated
     LazyDir in which dead keys have been removed. */
   fun updateLazyGets(
@@ -229,6 +203,32 @@ class LazyDir protected {
 
   fun getIter(context: mutable Context, key: Key): mutable Iterator<File> {
     this.getArray(context, key).iterator()
+  }
+
+  static fun create(
+    context: mutable Context,
+    dirName: DirName,
+    lazyFun: (mutable Context, DirName, Key) ~> ?Array<File>,
+    collect: Bool = true,
+  ): Dir {
+    context.maybeGetLazyDir(dirName) match {
+    | Some(ldir) if (native_eq(ldir.lazyFun, lazyFun) == 0) ->
+      if (context.debugMode) {
+        print_string(`REUSING: ${dirName}`);
+      };
+      ldir
+    | _ ->
+      time = context.timeStamp();
+      newDir = LazyDir{
+        timeStack => TimeStack::create(context, time),
+        dirName,
+        lazyFun,
+        collect,
+      };
+      context.updateDirtyReaders(Path::dirTag(dirName));
+      context.setDir(newDir);
+      newDir
+    }
   }
 }
 
