@@ -692,29 +692,6 @@ class EagerDir protected {
   protected tombLimit: ?Tick = None(),
   optOnDelete: ?Postponable = None(),
 } extends TDir {
-  static fun create{
-    timeStack: TimeStack,
-    created: Tick,
-    dirName: DirName,
-    input: Bool,
-    fixedData: FixedDataMap<Key, File> = FixedDataMap::create(),
-    creator: ?ArrowKey,
-    data: DataMap<Key> = DataMap::empty(),
-    optOnDelete: ?Postponable = None(),
-  }: this {
-    static{
-      timeStack,
-      created,
-      dirName,
-      input,
-      fixedData,
-      totalSize => fixedData.data.size(),
-      creator,
-      data,
-      optOnDelete,
-    }
-  }
-
   protected fun reset(
     context: mutable Context,
     writer: Path,
@@ -2276,6 +2253,29 @@ class EagerDir protected {
         )
       }
     | Some(_) -> invariant_violation("Error import: incompatible dir types")
+    }
+  }
+
+  static fun create{
+    timeStack: TimeStack,
+    created: Tick,
+    dirName: DirName,
+    input: Bool,
+    fixedData: FixedDataMap<Key, File> = FixedDataMap::create(),
+    creator: ?ArrowKey,
+    data: DataMap<Key> = DataMap::empty(),
+    optOnDelete: ?Postponable = None(),
+  }: this {
+    static{
+      timeStack,
+      created,
+      dirName,
+      input,
+      fixedData,
+      totalSize => fixedData.data.size(),
+      creator,
+      data,
+      optOnDelete,
     }
   }
 }
