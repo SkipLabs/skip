@@ -802,10 +802,10 @@ mutable class Context private {
         dirName = dirSub.dirName;
         this.unsafeMaybeGetDir(dirName) match {
         | Some(dir @ EagerDir _) ->
-          (init, changedKeys) = if (changes && start > initTick) {
-            dir.getChangesAfter(start)
-          } else {
-            (true, SortedSet[])
+          startOpt = if (changes && start > initTick) Some(start) else None();
+          (init, changedKeys) = startOpt match {
+          | Some(startTick) -> dir.getChangesAfter(startTick)
+          | None() -> (true, SortedSet[])
           };
           keys = if (init) {
             keys = SortedSet[];
