@@ -225,7 +225,7 @@ fun evalSub(
       (context, writer, localKey, iterator) ~> {
         localSum = sum;
         for (readDirName in readDirs) {
-          readDir = context.unsafeGetDir(readDirName);
+          readDir = context.unsafeGetDir(readDirName).typed();
           read = readDir.getArray(context, localKey).map(x ->
             SKStore.IntFile::type(x)
           );
@@ -275,6 +275,7 @@ fun evalLFun(
     | _ -> T.fail()
     };
     read = dir
+      .typed()
       .getArray(context, SKStore.IID(SKStore.IntFile::type(value).value))
       .map(x -> SKStore.IntFile::type(x));
     !reads = List.Cons(read, reads);
@@ -291,7 +292,9 @@ fun evalLFun(
   | _ -> T.fail()
   };
   if (keyValue > 10) {
-    thisDir = context.unsafeGetLazyDir(SKStore.DirName::create(thisDirName));
+    thisDir = context
+      .unsafeGetLazyDir(SKStore.DirName::create(thisDirName))
+      .typed();
     !result =
       result +
       SKStore.IntFile::type(
@@ -321,7 +324,7 @@ fun evalFun(
 
   reads = List[currentValues];
   for (dirName in readDirs.concat(subDirs)) {
-    dir = context.unsafeGetDir(dirName);
+    dir = context.unsafeGetDir(dirName).typed();
     value = currentValues[0];
     read = dir
       .getArray(context, SKStore.IID(SKStore.IntFile::type(value).value))
