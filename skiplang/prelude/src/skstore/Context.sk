@@ -803,26 +803,7 @@ mutable class Context private {
         this.unsafeMaybeGetDir(dirName) match {
         | Some(dir @ EagerDir _) ->
           startOpt = if (changes && start > initTick) Some(start) else None();
-          (init, changedKeys) = startOpt match {
-          | Some(startTick) -> dir.getChangesAfter(startTick)
-          | None() -> (true, SortedSet[])
-          };
-          keys = if (init) {
-            keys = SortedSet[];
-            // Key can appears multiple times
-            dir.unsafeIterKeys((key) -> !keys = keys.set(key));
-            keys
-          } else {
-            changedKeys
-          };
-          if (init || !keys.isEmpty()) {
-            result = mutable Vector[];
-            for (key in keys) {
-              values = dir.getArrayRaw(key);
-              result.push((key, values))
-            };
-            fn(dirName, result.toArray(), this.tick, !init)
-          }
+          dir.notifySubWatch(startOpt, this.tick, fn)
         | _ -> void
         }
       }
