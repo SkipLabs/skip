@@ -665,7 +665,8 @@ mutable class Context private {
     this.!lazyGets = SortedMap[]
   }
 
-  mutable fun addLazyGet(dirName: DirName, key: Key): void {
+  mutable fun addLazyGet(dir: LazyDir, key: Key): void {
+    dirName = dir.dirName;
     this.!lazyGets[dirName] = this.lazyGets.maybeGet(dirName)
       .default(SortedSet[])
       .set(key)
