@@ -6,9 +6,9 @@ date: 2025-05-16
 authors: hubyrod
 ---
 
-Hello Skippers. Today, we are going to plug a [PostgreSQL](https://www.postgresql.org/) service and our starting point is the following project on GitHub: [Skip Postgres Demo](https://github.com/SkipLabs/postgre_and_skip_poc). We will demonstrate how to use Skip's reactive data streaming with a PostgreSQL backend. This project implements a simple blog post system with real-time updates using Skip's streaming capabilities.
+Hello Skippers. Today, we are going to plug a [PostgreSQL](https://www.postgresql.org/) service and our starting point is the following project on GitHub: [Skip Postgres Demo](https://github.com/SkipLabs/postgres_and_skip_poc). We will demonstrate how to use Skip's reactive data streaming with a PostgreSQL backend. This project implements a simple blog post system with real-time updates using Skip's streaming capabilities.
 
-![PostgreSQL and Skip Service](./assets/postgre_and_skip.png)
+![PostgreSQL and Skip Service](./assets/postgres_and_skip.png)
 
 {/* truncate */}
 
@@ -33,8 +33,8 @@ Before we get too far ahead, two things…(1) what you need and (2) what you wil
 We are starting from a REST server for the simplest blog post system and we are going to add real-time updates features to it.
 Let's check out the project: 
 ```bash
-git clone https://github.com/SkipLabs/postgre_and_skip_poc.git
-cd postgre_and_skip_poc/
+git clone https://github.com/SkipLabs/postgres_and_skip_poc.git
+cd postgres_and_skip_poc/
 git checkout $(git rev-list --max-parents=0 main)
 ```
 
@@ -101,13 +101,13 @@ pnpm add @skip-adapter/postgres
 
 A Skip service has collections as inputs and mappers to transform them into resources as outputs. 
 
-In our case, in file [`skipservice.ts`](https://github.com/SkipLabs/postgre_and_skip_poc/blob/main/src/skipservice.ts) you will find: 
+In our case, in file [`skipservice.ts`](https://github.com/SkipLabs/postgres_and_skip_poc/blob/main/src/skipservice.ts) you will find: 
 
-1. A type you want to be notified about: [`PostWithAuthor`](https://github.com/SkipLabs/postgre_and_skip_poc/blob/main/src/skipservice.ts#L16-L29) which contains information from two tables: Users and Posts (see [`schema.sql`](https://github.com/SkipLabs/postgre_and_skip_poc/blob/main/src/db/schema.sql)).
+1. A type you want to be notified about: [`PostWithAuthor`](https://github.com/SkipLabs/postgres_and_skip_poc/blob/main/src/skipservice.ts#L16-L29) which contains information from two tables: Users and Posts (see [`schema.sql`](https://github.com/SkipLabs/postgres_and_skip_poc/blob/main/src/db/schema.sql)).
 
-2. A mapper [`PostMapper`](https://github.com/SkipLabs/postgre_and_skip_poc/blob/main/src/skipservice.ts#L32-L65) which creates instances of this type from an `EagerCollection` (an `EagerCollection` is always kept up-to-date).
+2. A mapper [`PostMapper`](https://github.com/SkipLabs/postgres_and_skip_poc/blob/main/src/skipservice.ts#L32-L65) which creates instances of this type from an `EagerCollection` (an `EagerCollection` is always kept up-to-date).
 
-3. A resource [`PostResource`](https://github.com/SkipLabs/postgre_and_skip_poc/blob/main/src/skipservice.ts#L73-L85) which implements a function from a [`PostsResourceInputs`](https://github.com/SkipLabs/postgre_and_skip_poc/blob/main/src/skipservice.ts#L67-L69) to an `EagerCollection<number, PostWithAuthor>`
+3. A resource [`PostResource`](https://github.com/SkipLabs/postgres_and_skip_poc/blob/main/src/skipservice.ts#L73-L85) which implements a function from a [`PostsResourceInputs`](https://github.com/SkipLabs/postgres_and_skip_poc/blob/main/src/skipservice.ts#L67-L69) to an `EagerCollection<number, PostWithAuthor>`
 
 And it is when we instantiate our service that we plug it to the PostgreSQL, when we define an instance of [`SkipService`](https://github.com/SkipLabs/reactive_social_network_service_poc/blob/main/src/skipservice.mts#L10-L19), we receive a context as input. This context provides a method `useExternalResource`. 
 
@@ -133,7 +133,7 @@ app.get(
 );
 ```
 
-You can find these lines in [`src/index.ts#L65-L80`](https://github.com/SkipLabs/postgre_and_skip_poc/blob/main/src/index.ts#L65-L80)
+You can find these lines in [`src/index.ts#L65-L80`](https://github.com/SkipLabs/postgres_and_skip_poc/blob/main/src/index.ts#L65-L80)
 
 We are adding two endpoints:
 - `/streams/posts/:uid` which is a stream of changes for a given post of id uid
