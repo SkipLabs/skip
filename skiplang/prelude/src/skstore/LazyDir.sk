@@ -18,9 +18,9 @@ base class LazyResult<F> {
 }
 
 class LazyDir protected {
-  private data: SortedMap<Key, LazyResult<File>> = SortedMap[],
-  private lazyFun: (mutable Context, DirName, Key) ~> ?Array<File>,
-  private collect: Bool,
+  protected data: SortedMap<Key, LazyResult<File>> = SortedMap[],
+  protected lazyFun: (mutable Context, DirName, Key) ~> ?Array<File>,
+  protected collect: Bool,
 } extends TDir {
   /* Updates the lazyGets ref counts and return as well a potentially updated
     LazyDir in which dead keys have been removed. */
@@ -64,7 +64,7 @@ class LazyDir protected {
     (refCountsOpt, dirOpt)
   }
 
-  private fun removeKeys(keys: readonly Vector<Key>): this {
+  protected fun removeKeys(keys: readonly Vector<Key>): this {
     data = this.data;
     for (key in keys) {
       data.maybeGet(key) match {
@@ -122,7 +122,7 @@ class LazyDir protected {
     context.setDir(this);
   }
 
-  private fun doGet(context: mutable Context, key: Key): LazyResult<File> {
+  protected fun doGet(context: mutable Context, key: Key): LazyResult<File> {
     dirName = this.dirName;
 
     dir = context.unsafeGetLazyDir(dirName);
