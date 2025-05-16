@@ -2115,6 +2115,33 @@ class EagerDir protected {
   fun remove(context: mutable Context, baseName: Key): void {
     this.writeArray(context, baseName, Array[]);
   }
+
+  fun notifySubWatch(
+    startOpt: ?Tick,
+    tick: Tick,
+    fn: (DirName, Array<(Key, Array<File>)>, Tick, Bool) ~> void,
+  ): void {
+    (init, changedKeys) = startOpt match {
+    | Some(start) -> this.getChangesAfter(start)
+    | None() -> (true, SortedSet[])
+    };
+    keys = if (init) {
+      keys = SortedSet[];
+      // Key can appears multiple times
+      this.unsafeIterKeys((key) -> !keys = keys.set(key));
+      keys
+    } else {
+      changedKeys
+    };
+    if (init || !keys.isEmpty()) {
+      result = mutable Vector[];
+      for (key in keys) {
+        values = this.getArrayRaw(key);
+        result.push((key, values))
+      };
+      fn(this.dirName, result.toArray(), tick, !init)
+    }
+  }
 }
 
 class EagerDirFile(dir: EagerDir) extends File
