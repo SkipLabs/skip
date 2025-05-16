@@ -1,14 +1,14 @@
 ---
-title: Building a Real-time Blog with SKIP and PostgreSQL
+title: Building a Real-time Blog with Skip and PostgreSQL
 description: How to use Skip's reactive data streaming with a PostgreSQL backend
 slug: postgresql_and_skip
 date: 2025-05-16
 authors: hubyrod
 ---
 
-Hello Skippers. Today, we are going to plug a [PostgreSQL](https://www.postgresql.org/) service and our starting point is the following project on GitHub: [Skip Postgres Demo](https://github.com/SkipLabs/postrgre_and_skip_poc). We will demonstrate how to use SKIP's reactive data streaming with a PostgreSQL backend. This project implements a simple blog post system with real-time updates using SKIP's streaming capabilities.
+Hello Skippers. Today, we are going to plug a [PostgreSQL](https://www.postgresql.org/) service and our starting point is the following project on GitHub: [Skip Postgres Demo](https://github.com/SkipLabs/postgre_and_skip_poc). We will demonstrate how to use Skip's reactive data streaming with a PostgreSQL backend. This project implements a simple blog post system with real-time updates using Skip's streaming capabilities.
 
-![PostgreSQL and SKIP Service](./assets/postgre_and_skip.png)
+![PostgreSQL and Skip Service](./assets/postgre_and_skip.png)
 
 
 Before we get too far ahead, two things…(1) what you need and (2) what you will learn: 
@@ -22,7 +22,7 @@ Before we get too far ahead, two things…(1) what you need and (2) what you wil
 
 ## What you will learn:
 
-- Real-time post streaming using SKIP's reactive data system
+- Real-time post streaming using Skip's reactive data system
 - PostgreSQL integration for data persistence
 - RESTful API endpoints for post management
 - Support for streaming data access
@@ -66,7 +66,7 @@ First, let's display one of the articles:
 curl localhost:3000/posts/7 | jq
 ```
 
-Note that here there's an easy shortcut -  I use [`jq`](https://jqlang.org/), 'will make life more convenient 
+Note that here there's an easy shortcut - I use [`jq`](https://jqlang.org/), which will make life more convenient to read JSON output.
 
 As you can see, the article is not published: 
 ```json
@@ -87,16 +87,18 @@ A working REST API.
 
 And now here comes the fun part, let's make it a reactive API
 
-## The SKIP Service
+## The Skip Service
 
-For that, we are going to need some SKIP packages: 
+First of all, kill your running servier.
+We are about to checkout the HEAD of the main branch and install the necessary bits: 
 
 ```bash
+git checkout main
 pnpm add -D @skipruntime/core @skipruntime/helpers @skipruntime/server
 pnpm add @skip-adapter/postgres
 ```
 
-A SKIP service has collections as inputs and mapper(s) to transform them into resources as outputs. 
+A Skip service has collections as inputs and mapper(s) to transform them into resources as outputs. 
 
 In our case, in file [`skipservice.ts`](https://github.com/SkipLabs/postgre_and_skip_poc/blob/main/src/skipservice.ts) you will find: 
 
@@ -108,7 +110,7 @@ In our case, in file [`skipservice.ts`](https://github.com/SkipLabs/postgre_and_
 
 And it is when we instantiate our service that we plug it to the PostgreSQL, when we create the graph with [`createGraph`](https://github.com/SkipLabs/postgre_and_skip_poc/blob/main/src/skipservice.ts#L93-L109), we receive a context as input. This context provides a method `useExternalResource`. 
 
-Remember that in SKIP, Resources are the outputs of your service that clients can subscribe to, while Collections are the inputs that feed data into your service. When you create a graph using `createGraph`, you define how these Collections are transformed into Resources. Once you've set up your graph and connected it to your external services (like PostgreSQL in our case), you just need a few lines of code in your server to expose these Resources to clients: 
+Remember that in Skip, Resources are the outputs of your service that clients can subscribe to, while Collections are the inputs that feed data into your service. When you create a graph using `createGraph`, you define how these Collections are transformed into Resources. Once you've set up your graph and connected it to your external services (like PostgreSQL in our case), you just need a few lines of code in your server to expose these Resources to clients: 
 
 ```typescript
 app.get(
@@ -133,8 +135,8 @@ app.get(
 You can find these lines in [`src/index.ts#L65-L80`](https://github.com/SkipLabs/postgre_and_skip_poc/blob/main/src/index.ts#L65-L80)
 
 We are adding two endpoints:
-- `/stream/posts/:uid` which is a stream of changes for a given post of id uid
-- `/stream/posts` which is a stream of changes for the entire posts table
+- `/streams/posts/:uid` which is a stream of changes for a given post of id uid
+- `/streams/posts` which is a stream of changes for the entire posts table
 
 Let's play with it, in three terminals: 
 
@@ -169,14 +171,14 @@ Watch Terminal 2 while you run these commands in Terminal 3 - you'll see the rea
 
 ## Wrap-up
 
-In our [previous blog post](https://skiplabs.io/blog/reactive_social_network_service_poc), we have walked you through how to create a skip SKIP service for a reactive social network, with code! Check it out ! [Reactive Social Network Service (Proof of Concept)](https://github.com/SkipLabs/reactive_social_network_service_poc). 
+In our [previous blog post](https://skiplabs.io/blog/reactive_social_network_service_poc), we have walked you through how to create a Skip service for a reactive social network, with code! Check it out here: [Reactive Social Network Service (Proof of Concept)](https://github.com/SkipLabs/reactive_social_network_service_poc). 
 
-Now we have learned how to plug a PostgreSQL service using SKIP! 
+Now we have learned how to plug a PostgreSQL service using Skip! 
 
 ## What's Next?
 
-For the next SKIP article, what should I tackle first? You tell me!
-- Scaling your SKIP service horizontally?
+For the next Skip article, what should I tackle first? You tell me!
+- Scaling your Skip service horizontally?
 - Integrating with frontend frameworks like React?
 - Managing authorization and privacy per user?
 - What else would be most useful to you NOW? 
