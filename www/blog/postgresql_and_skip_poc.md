@@ -10,6 +10,7 @@ Hello Skippers. Today, we are going to plug a [PostgreSQL](https://www.postgresq
 
 ![PostgreSQL and Skip Service](./assets/postgre_and_skip.png)
 
+{/* truncate */}
 
 Before we get too far ahead, two things…(1) what you need and (2) what you will learn: 
 
@@ -37,10 +38,10 @@ cd postgre_and_skip_poc/
 git checkout $(git rev-list --max-parents=0 main)
 ```
 
-And yes, you are right we are not starting on HEAD of the main branch, but don't worry we'll get there in no time.
+And yes, you are right we are not starting on top of the main branch, but don't worry we'll get there in no time.
 
 
-Run the `init_and_start_server.sh` script, it will start a PostgreSQL database in a Docker container and fill it in with some data. It will then install and build the whole project with pnpm to finally start it! 
+Run the `init_and_start_server.sh` script, it will start a PostgreSQL database in a Docker container and fill it in with some data. It will then install and build the whole project with `pnpm` to finally start it! 
 
 ```bash
 ./init_and_start_server.sh
@@ -89,8 +90,8 @@ And now here comes the fun part, let's make it a reactive API
 
 ## The Skip Service
 
-First of all, kill your running servier.
-We are about to checkout the HEAD of the main branch and install the necessary bits: 
+First of all, kill your running server.
+We are about to checkout the top of the main branch and install the necessary bits: 
 
 ```bash
 git checkout main
@@ -98,7 +99,7 @@ pnpm add -D @skipruntime/core @skipruntime/helpers @skipruntime/server
 pnpm add @skip-adapter/postgres
 ```
 
-A Skip service has collections as inputs and mapper(s) to transform them into resources as outputs. 
+A Skip service has collections as inputs and mappers to transform them into resources as outputs. 
 
 In our case, in file [`skipservice.ts`](https://github.com/SkipLabs/postgre_and_skip_poc/blob/main/src/skipservice.ts) you will find: 
 
@@ -108,7 +109,7 @@ In our case, in file [`skipservice.ts`](https://github.com/SkipLabs/postgre_and_
 
 3. A resource [`PostResource`](https://github.com/SkipLabs/postgre_and_skip_poc/blob/main/src/skipservice.ts#L73-L85) which implements a function from a [`PostsResourceInputs`](https://github.com/SkipLabs/postgre_and_skip_poc/blob/main/src/skipservice.ts#L67-L69) to an `EagerCollection<number, PostWithAuthor>`
 
-And it is when we instantiate our service that we plug it to the PostgreSQL, when we create the graph with [`createGraph`](https://github.com/SkipLabs/postgre_and_skip_poc/blob/main/src/skipservice.ts#L93-L109), we receive a context as input. This context provides a method `useExternalResource`. 
+And it is when we instantiate our service that we plug it to the PostgreSQL, when we define an instance of [`SkipService`](https://github.com/SkipLabs/reactive_social_network_service_poc/blob/main/src/skipservice.mts#L10-L19), we receive a context as input. This context provides a method `useExternalResource`. 
 
 Remember that in Skip, Resources are the outputs of your service that clients can subscribe to, while Collections are the inputs that feed data into your service. When you create a graph using `createGraph`, you define how these Collections are transformed into Resources. Once you've set up your graph and connected it to your external services (like PostgreSQL in our case), you just need a few lines of code in your server to expose these Resources to clients: 
 
