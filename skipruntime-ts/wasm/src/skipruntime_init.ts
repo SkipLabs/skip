@@ -26,13 +26,13 @@ async function wasmUrl(): Promise<URL | string> {
   //@ts-expect-error  ImportMeta is incomplete
   if (import.meta.env || import.meta.webpack) {
     const imported = (await import(
-      //@ts-expect-error  Cannot find module './skstore.wasm?url' or its corresponding type declarations.
-      "./libskip-runtime-ts.wasm?url"
+      //@ts-expect-error  Cannot find module './libskipruntime.wasm?url' or its corresponding type declarations.
+      "./libskipruntime.wasm?url"
     )) as Imported;
     return imported.default;
   }
 
-  return new URL("./libskip-runtime-ts.wasm", import.meta.url);
+  return new URL("./libskipruntime.wasm", import.meta.url);
 }
 
 export async function initServiceFor(
