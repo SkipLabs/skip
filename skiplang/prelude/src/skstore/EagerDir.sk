@@ -1276,142 +1276,6 @@ class EagerDir protected {
     static::applyMany(context, parents, childName, reducerOpt, unsafeSkipInit);
   }
 
-  static fun applyMany(
-    context: mutable Context,
-    parents: FixedSingle<
-      DirName,
-      Array<
-        (
-          MapFun<Key, File>,
-          ?Array<KeyRange<Key>>,
-          ?((mutable Context, SortedSet<Key>) ~> void),
-        ),
-      >,
-    >,
-    childName: DirName,
-    reducerOpt: ?IReducer<File> = None(),
-    unsafeSkipInit: Bool = false,
-  ): void {
-    context.unsafeMaybeGetEagerDir(childName) match {
-    | Some(child) ->
-      if (static::isReusable(context, child, parents)) {
-        static::reuseDir(context, childName);
-        return void
-      }
-    | None() -> void
-    };
-
-    if (context.newDirs.contains(childName)) {
-      error(`Error: directory ${childName} already exists`);
-    };
-
-    context.currentArrow().each(a -> {
-      context.unsafeMaybeGetDir(a.childName) match {
-      | Some(LazyDir _) ->
-        error(
-          `Error: eager directory ${childName} cannot be created into ${
-            a.childName
-          } lazy directory.`,
-        )
-      | _ -> void
-      }
-    });
-
-    globalName = "PRE_COMPUTED_" + childName;
-
-    dir = context.getGlobal(globalName) match {
-    | Some(EagerDirFile(x)) ->
-      invariant(x.creator == context.currentArrow());
-      context.removeGlobal(globalName);
-      x
-    | _ ->
-      context.!newDirs = context.newDirs.add(childName);
-
-      acc = mutable Vector[];
-      oldVec = mutable Vector[];
-
-      time = context.timeStamp();
-      timeStack = TimeStack::create(context, time);
-
-      if (!unsafeSkipInit) {
-        for (parentName => parentData in parents) {
-          for (p in parentData) {
-            (f, rangeOpt, _) = p;
-            parent = context.unsafeGetEagerDir(parentName);
-            rangeOpt match {
-            | None() ->
-              static::mapData(
-                context,
-                oldVec,
-                parent,
-                childName,
-                timeStack,
-                f,
-                acc,
-                None(),
-              )
-            | Some(ranges) ->
-              for (range in ranges) {
-                static::mapData(
-                  context,
-                  oldVec,
-                  parent,
-                  childName,
-                  timeStack,
-                  f,
-                  acc,
-                  Some(range),
-                );
-              }
-            }
-          }
-        }
-      };
-
-      fixedData = FixedDataMap::create(acc);
-      totalSize = acc.size();
-      reducer = reducerOpt.map(ireducer ->
-        Reducer::create(fixedData.data, ireducer)
-      );
-
-      if (context.debugMode) {
-        parentNames = parents
-          .items()
-          .map(x -> (x.i0, x.i1.map(p -> p.i1)))
-          .collect(Array);
-        print_string(
-          `CREATED:  ${childName} (time: ${time}, parents: ${parentNames})`,
-        );
-      };
-
-      data = DataMap::empty();
-      fixedOld = FixedSourceMap::create(oldVec, true);
-
-      EagerDir{
-        timeStack,
-        created => context.getTick(),
-        dirName => childName,
-        input => false,
-        parents,
-        fixedData,
-        data,
-        totalSize,
-        creator => context.currentArrow(),
-        fixedOld,
-        childDirs => SortedSet[],
-        reducer,
-      }
-    };
-    context.updateDirtyReaders(Path::dirTag(childName));
-    context.setDir(dir);
-    for (parentName => parentData in parents) {
-      for (p in parentData) {
-        (_, rangeOpt, _) = p;
-        static::addChildToParent(context, parentName, childName, rangeOpt);
-      }
-    };
-  }
-
   protected static fun addChildToParent(
     context: mutable Context,
     parentName: DirName,
@@ -2277,6 +2141,142 @@ class EagerDir protected {
       data,
       optOnDelete,
     }
+  }
+
+  static fun applyMany(
+    context: mutable Context,
+    parents: FixedSingle<
+      DirName,
+      Array<
+        (
+          MapFun<Key, File>,
+          ?Array<KeyRange<Key>>,
+          ?((mutable Context, SortedSet<Key>) ~> void),
+        ),
+      >,
+    >,
+    childName: DirName,
+    reducerOpt: ?IReducer<File> = None(),
+    unsafeSkipInit: Bool = false,
+  ): void {
+    context.unsafeMaybeGetEagerDir(childName) match {
+    | Some(child) ->
+      if (static::isReusable(context, child, parents)) {
+        static::reuseDir(context, childName);
+        return void
+      }
+    | None() -> void
+    };
+
+    if (context.newDirs.contains(childName)) {
+      error(`Error: directory ${childName} already exists`);
+    };
+
+    context.currentArrow().each(a -> {
+      context.unsafeMaybeGetDir(a.childName) match {
+      | Some(LazyDir _) ->
+        error(
+          `Error: eager directory ${childName} cannot be created into ${
+            a.childName
+          } lazy directory.`,
+        )
+      | _ -> void
+      }
+    });
+
+    globalName = "PRE_COMPUTED_" + childName;
+
+    dir = context.getGlobal(globalName) match {
+    | Some(EagerDirFile(x)) ->
+      invariant(x.creator == context.currentArrow());
+      context.removeGlobal(globalName);
+      x
+    | _ ->
+      context.!newDirs = context.newDirs.add(childName);
+
+      acc = mutable Vector[];
+      oldVec = mutable Vector[];
+
+      time = context.timeStamp();
+      timeStack = TimeStack::create(context, time);
+
+      if (!unsafeSkipInit) {
+        for (parentName => parentData in parents) {
+          for (p in parentData) {
+            (f, rangeOpt, _) = p;
+            parent = context.unsafeGetEagerDir(parentName);
+            rangeOpt match {
+            | None() ->
+              static::mapData(
+                context,
+                oldVec,
+                parent,
+                childName,
+                timeStack,
+                f,
+                acc,
+                None(),
+              )
+            | Some(ranges) ->
+              for (range in ranges) {
+                static::mapData(
+                  context,
+                  oldVec,
+                  parent,
+                  childName,
+                  timeStack,
+                  f,
+                  acc,
+                  Some(range),
+                );
+              }
+            }
+          }
+        }
+      };
+
+      fixedData = FixedDataMap::create(acc);
+      totalSize = acc.size();
+      reducer = reducerOpt.map(ireducer ->
+        Reducer::create(fixedData.data, ireducer)
+      );
+
+      if (context.debugMode) {
+        parentNames = parents
+          .items()
+          .map(x -> (x.i0, x.i1.map(p -> p.i1)))
+          .collect(Array);
+        print_string(
+          `CREATED:  ${childName} (time: ${time}, parents: ${parentNames})`,
+        );
+      };
+
+      data = DataMap::empty();
+      fixedOld = FixedSourceMap::create(oldVec, true);
+
+      EagerDir{
+        timeStack,
+        created => context.getTick(),
+        dirName => childName,
+        input => false,
+        parents,
+        fixedData,
+        data,
+        totalSize,
+        creator => context.currentArrow(),
+        fixedOld,
+        childDirs => SortedSet[],
+        reducer,
+      }
+    };
+    context.updateDirtyReaders(Path::dirTag(childName));
+    context.setDir(dir);
+    for (parentName => parentData in parents) {
+      for (p in parentData) {
+        (_, rangeOpt, _) = p;
+        static::addChildToParent(context, parentName, childName, rangeOpt);
+      }
+    };
   }
 }
 
