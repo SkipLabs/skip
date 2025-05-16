@@ -132,7 +132,7 @@ fun eval(env: mutable CmdEnv, cmd: String): void {
         tDir = dir.typed();
         files = tDir.keys();
         for (file in files) {
-          if (dir.getArrayRaw(file).size() > 0) {
+          if (tDir.getArrayRaw(file).size() > 0) {
             result.insert(file.toString());
           }
         }
@@ -172,7 +172,7 @@ fun eval(env: mutable CmdEnv, cmd: String): void {
       env.context.maybeGetDir(dirName) match {
       | None() -> print_string(`<EMPTY:${dirName}${key}>`)
       | Some(dir) ->
-        arr = dir.getArrayRaw(key);
+        arr = dir.typed().getArrayRaw(key);
         if (arr.size() == 0) {
           print_string(`<EMPTY:${dirName}${key}>`)
         } else if (arr.size() == 1) {

@@ -99,7 +99,7 @@ fun eval(
         "  " +
           key +
           " => " +
-          dir.getArrayRaw(key).map(x ->
+          tDir.getArrayRaw(key).map(x ->
             SKStore.IntFile::type(x).value.toString()
           ),
       );
@@ -383,9 +383,10 @@ fun compareContext(
       continue
     | Some(d) -> d
     };
+    tDir2 = dir2.typed();
     for (key in dirFiles) {
-      values1 = dir.getArrayRaw(key).map(x -> SKStore.IntFile::type(x));
-      values2 = dir2.getArrayRaw(key).map(x -> SKStore.IntFile::type(x));
+      values1 = tDir.getArrayRaw(key).map(x -> SKStore.IntFile::type(x));
+      values2 = tDir2.getArrayRaw(key).map(x -> SKStore.IntFile::type(x));
       if (values1 != values2) {
         if (
           dir2 is SKStore.LazyDir _ &&
@@ -396,8 +397,8 @@ fun compareContext(
         !hasError = true;
         print_string(`Error: values differ for ${dirName}${key}`);
         print_string(`       ${values1}`);
-        dir match {
-        | lazyDir @ SKStore.LazyDir _ ->
+        tDir match {
+        | lazyDir @ SKStore.TLazyDir _ ->
           files = lazyDir.getArrayRaw(key);
           if (files.isEmpty()) {
             print_string("EMPTY DATA")
