@@ -18,12 +18,6 @@ base class Dir protected {timeStack: TimeStack, dirName: DirName} {
   fun getIter(context: mutable Context, key: Key): mutable Iterator<File>;
 
   /**
-   * Same as getArray but does not create a dependency, which will break in
-   * incremental mode. This should only be used for testing.
-   */
-  fun getArrayRaw(key: Key): Array<File>;
-
-  /**
    * Returns the directory name
    */
   fun getDirName(): DirName {
@@ -49,6 +43,12 @@ base class Dir protected {timeStack: TimeStack, dirName: DirName} {
 
 base class TDir extends Dir {
   fun typed(): this;
+
+  /**
+   * Same as getArray but does not create a dependency, which will break in
+   * incremental mode. This should only be used for testing.
+   */
+  fun getArrayRaw(key: Key): Array<File>;
 
   /**
    * Returns the list of files in a directory. Should only be used for testing.
