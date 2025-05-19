@@ -904,7 +904,7 @@ mutable class Context private {
         this.!newDirs = this.newDirs.add(dirName);
         return EHandle(convKey, convValue, dirName)
       }
-    | _ -> void
+    | None() -> void
     };
     this.currentArrow().each(a -> {
       this.unsafeMaybeGetDir(a.childName) match {
@@ -1001,7 +1001,8 @@ mutable class Context private {
     | Some(DeletedDir _) ->
       None()
     | Some(d @ EagerDir _) -> Some(d)
-    | _ -> invariant_violation("unsafeMaybeGetEagerDir: Was expecting EagerDir")
+    | Some(LazyDir _) ->
+      invariant_violation("unsafeMaybeGetEagerDir: Was expecting EagerDir")
     }
   }
 
@@ -1018,7 +1019,8 @@ mutable class Context private {
     | Some(DeletedDir _) ->
       None()
     | Some(d @ LazyDir _) -> Some(d)
-    | _ -> invariant_violation("maybeGetLazyDir: Was expecting LazyDir")
+    | Some(EagerDir _) ->
+      invariant_violation("maybeGetLazyDir: Was expecting LazyDir")
     }
   }
 
@@ -1028,7 +1030,8 @@ mutable class Context private {
     | Some(DeletedDir _) ->
       None()
     | Some(d @ EagerDir _) -> Some(d)
-    | _ -> invariant_violation("maybeGetEagerDir: Was expecting EagerDir")
+    | Some(LazyDir _) ->
+      invariant_violation("maybeGetEagerDir: Was expecting EagerDir")
     }
   }
 
@@ -1242,7 +1245,7 @@ fun resolveContext(
     | exn -> Some(exn)
     } match {
     | Some(exn) -> return cloneContextWithError(root, exn)
-    | _ -> void
+    | None() -> void
     };
 
     newRoot = root.mclone();
@@ -1256,7 +1259,7 @@ fun resolveContext(
     | exn -> Some(exn)
     } match {
     | Some(exn) -> return cloneContextWithError(root, exn)
-    | _ -> void
+    | None() -> void
     };
 
     lockF match {
@@ -1273,7 +1276,7 @@ fun resolveContext(
       | exn -> Some(exn)
       } match {
       | Some(exn) -> return cloneContextWithError(root, exn)
-      | _ -> void
+      | None() -> void
       }
     };
     if (!hasVersioning) {
@@ -1677,7 +1680,7 @@ fun withRegion<T>(
       cexn = destroyObstackWithValue(saved, exn);
       replaceExn(cexn);
       throw cexn
-    | _ -> throw exn
+    | None() -> throw exn
     }
   }
 }
@@ -1695,7 +1698,7 @@ fun withRegionVoid<T>(f: () ~> void): void {
       cexn = destroyObstackWithValue(saved, exn);
       replaceExn(cexn);
       throw cexn
-    | _ -> throw exn
+    | None() -> throw exn
     }
   }
 }
@@ -1713,7 +1716,7 @@ fun withRegionValue<T>(f: () ~> T): T {
       cexn = destroyObstackWithValue(saved, exn);
       replaceExn(cexn);
       throw cexn
-    | _ -> throw exn
+    | None() -> throw exn
     }
   }
 }
@@ -1768,12 +1771,12 @@ fun readOnlyWithRegionFold<K, T>(
           !valueInRegion = destroyObstackWithValue(saved, valueInRegion);
           !optSaved = Some(newObstack());
         }
-      | _ -> break void
+      | None() -> break void
       }
     };
     optSaved match {
     | Some(saved) -> destroyObstackWithValue(saved, valueInRegion)
-    | _ -> value
+    | None() -> value
     }
   } catch {
   | exn ->
@@ -1782,7 +1785,7 @@ fun readOnlyWithRegionFold<K, T>(
       cexn = destroyObstackWithValue(saved, exn);
       replaceExn(cexn);
       throw cexn
-    | _ -> throw exn
+    | None() -> throw exn
     }
   }
 }
@@ -1810,13 +1813,13 @@ fun withRegionFold<K, T>(
           );
           !optSaved = Some(newObstack());
         }
-      | _ -> break void
+      | None() -> break void
       }
     };
     optSaved match {
     | Some(saved) ->
       destroyObstackWithValueCheckContext(contextOpt, valueInRegion, saved)
-    | _ -> value
+    | None() -> value
     }
   } catch {
   | exn ->
@@ -1825,7 +1828,7 @@ fun withRegionFold<K, T>(
       cexn = destroyObstackWithValue(saved, exn);
       replaceExn(cexn);
       throw cexn
-    | _ -> throw exn
+    | None() -> throw exn
     }
   }
 }
@@ -1892,14 +1895,14 @@ fun withRegionFoldRecHelp<K, T>(
             break void
           };
         }
-      | _ -> break void
+      | None() -> break void
       };
       !i = i + 1;
     };
     optSaved match {
     | Some(saved) ->
       destroyObstackWithValueCheckContext(contextOpt, valueInRegion, saved)
-    | _ -> value
+    | None() -> value
     }
   } catch {
   | exn ->
@@ -1908,7 +1911,7 @@ fun withRegionFoldRecHelp<K, T>(
       cexn = destroyObstackWithValue(saved, exn);
       replaceExn(cexn);
       throw cexn
-    | _ -> throw exn
+    | None() -> throw exn
     }
   }
 }
