@@ -2142,6 +2142,33 @@ class EagerDir protected {
       fn(this.dirName, result.toArray(), tick, !init)
     }
   }
+
+  fun notifySubUpdates(
+    startOpt: ?Tick,
+    writer: mutable Debug.BufferedWriter,
+    entity: String,
+    format: OutputFormat,
+    filter: (Key -> Bool),
+    destinationTime: ?Tick,
+  ): Bool {
+    (shouldRebuild, changes) = startOpt match {
+    | Some(start) ->
+      (shouldRebuild, changes) = this.getChangesAfter(start);
+      (shouldRebuild, changes.iterator())
+    | None() ->
+      (false, this.unsafeGetFileIterNoReducer(None()).map(pair -> pair.i0))
+    };
+    producedOutput = this.writeDiff(
+      shouldRebuild,
+      changes,
+      writer,
+      entity,
+      format,
+      filter,
+      destinationTime,
+    );
+    producedOutput
+  }
 }
 
 class EagerDirFile(dir: EagerDir) extends File
