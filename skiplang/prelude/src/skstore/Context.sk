@@ -767,16 +767,8 @@ mutable class Context private {
         this.unsafeMaybeGetDir(dirName) match {
         | Some(dir @ EagerDir _) ->
           startOpt = if (start.value > 0) Some(start) else None();
-          (shouldRebuild, changes) = startOpt match {
-          | Some(startTick) ->
-            (shouldRebuild, changes) = dir.getChangesAfter(startTick);
-            (shouldRebuild, changes.iterator())
-          | None() ->
-            (false, dir.unsafeGetFileIterNoReducer(None()).map(pair -> pair.i0))
-          };
-          producedOutput = dir.writeDiff(
-            shouldRebuild,
-            changes,
+          producedOutput = dir.notifySubUpdates(
+            startOpt,
             writer,
             dirSub.entity,
             dirSub.format,
