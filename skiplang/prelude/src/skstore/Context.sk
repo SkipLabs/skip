@@ -558,7 +558,7 @@ mutable class Context private {
             dirName => preDirName,
             creator => this.currentArrow(),
           };
-          dir.unsafeIterKeys((key, _time) -> {
+          dir.unsafeIterKeys((key) -> {
             values = dir.getArrayRaw(key);
             !withChange = true;
             source = Path::create(preDir.dirName, key);
@@ -810,7 +810,7 @@ mutable class Context private {
           keys = if (init) {
             keys = SortedSet[];
             // Key can appears multiple times
-            dir.unsafeIterKeys((key, _time) -> !keys = keys.set(key));
+            dir.unsafeIterKeys((key) -> !keys = keys.set(key));
             keys
           } else {
             changedKeys
