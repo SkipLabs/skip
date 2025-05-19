@@ -115,13 +115,6 @@ base class DMap<K: Orderable, +V> {
     }
   }
 
-  fun eachWithTick(f: (K, Tick) -> void): void
-  | Nil() -> void
-  | Node{key, tick, left, right} ->
-    left.eachWithTick(f);
-    f(key, tick.current);
-    right.eachWithTick(f)
-
   fun getMaxTick(): Tick
   | Nil() -> Tick(0)
   | Node{tick} -> tick.max
