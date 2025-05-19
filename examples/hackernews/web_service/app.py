@@ -21,8 +21,7 @@ app = Flask(__name__)
 
 app.secret_key = b"53cr37_changeme"
 
-
-SKIP_CONTROL_URL = "http://haproxy:8081/v1"
+SKIP_CONTROL_URL = os.environ.get("SKIP_CONTROL_URL")
 
 
 @app.before_request
