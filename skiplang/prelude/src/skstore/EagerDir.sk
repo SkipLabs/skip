@@ -1862,20 +1862,20 @@ class EagerDir protected {
     slices
   }
 
-  fun unsafeIterKeys(f: (Key, Tick) -> void): void {
+  fun unsafeIterKeys(f: (Key) -> void): void {
     fixedData = this.fixedData.data;
     current = 0;
-    this.data.eachWithTick((newKey, tick) -> {
+    this.data.eachWithTick((newKey, _tick) -> {
       while (current < fixedData.size() && fixedData[current].key < newKey) {
         row = fixedData[current];
-        f(row.key, Tick(0));
+        f(row.key);
         !current = current + 1;
       };
-      f(newKey, tick);
+      f(newKey);
     });
     while (current < fixedData.size()) {
       row = fixedData[current];
-      f(row.key, Tick(0));
+      f(row.key);
       !current = current + 1;
     };
   }
