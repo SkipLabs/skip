@@ -154,7 +154,7 @@ mutable class TWriter<K: Key, V: File> private {
   mutable fun append(key: K, value: V): void {
     this.writes.maybeGet(key) match {
     | Some(values) -> this.!writes[key] = values.concat(Array[value])
-    | _ -> this.!writes[key] = Array[value]
+    | None() -> this.!writes[key] = Array[value]
     }
   }
 
