@@ -1,8 +1,8 @@
 # this builds the artifacts of this repository, orchestrating the
 # various build systems
 
-.PHONY: all
-all: npm build/skdb build/init.sql
+.PHONY: default
+default: check check-ts
 
 PRETTIER_LOG_LEVEL?=warn
 
@@ -11,6 +11,9 @@ SKARGO_PROFILE?=release
 SKDB_WASM=sql/target/wasm32-unknown-unknown/$(SKARGO_PROFILE)/skdb.wasm
 SKDB_BIN=sql/target/host/$(SKARGO_PROFILE)/skdb
 SDKMAN_DIR?=$(HOME)/.sdkman
+
+.PHONY: skdb
+skdb: npm build/skdb build/init.sql
 
 ################################################################################
 # skdb wasm + js client
