@@ -23,7 +23,7 @@ services:
         condition: service_healthy
     environment:
       DISTRIBUTED_MODE: true
-
+      SKIP_CONTROL_URL: "http://haproxy:8081/v1"
   # SQL database
   db:
     image: reactive-hackernews/db
@@ -44,10 +44,6 @@ services:
   skip_follower1: &follower
     image: reactive-hackernews/reactive-service
     build: ./reactive_service
-    networks:
-      default:
-        aliases:
-          - skip_followers
     depends_on:
       skip_leader:
         condition: service_healthy
