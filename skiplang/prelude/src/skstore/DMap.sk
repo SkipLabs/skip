@@ -21,7 +21,7 @@ base class Boundary<T> {
   | Exclusive(T)
 }
 
-base class DMap<K: Orderable, V> {
+base class DMap<K: Orderable, +V> {
   children =
   | Nil()
   | Node{
@@ -168,23 +168,23 @@ base class DMap<K: Orderable, V> {
     }
   }
 
-  fun getChangesRangeAcc(
+  protected fun getChangesRangeAcc(
     tickStart: Tick,
     tickEnd: Tick,
-    acc: mutable Vector<(K, V)>,
+    push: ((K, V)) -> void,
   ): void
   | Nil() -> void
   | Node{tick, key, value, left, right} ->
     if (tick.max < tickStart) return void;
     if (tick.current >= tickStart && tick.current < tickEnd) {
-      acc.push((key, value));
+      push((key, value));
     };
-    left.getChangesRangeAcc(tickStart, tickEnd, acc);
-    right.getChangesRangeAcc(tickStart, tickEnd, acc)
+    left.getChangesRangeAcc(tickStart, tickEnd, push);
+    right.getChangesRangeAcc(tickStart, tickEnd, push)
 
   fun getChangesRange(tickStart: Tick, tickEnd: Tick): Vector<(K, V)> {
     acc = mutable Vector[];
-    this.getChangesRangeAcc(tickStart, tickEnd, acc);
+    this.getChangesRangeAcc(tickStart, tickEnd, acc.push);
     unsafe_chill_trust_me(acc)
   }
 
@@ -200,19 +200,23 @@ base class DMap<K: Orderable, V> {
     Node{tick, height, key, value, left, right}
   }
 
-  fun set(tick: Tick, key: K, value: V): DMap<K, V> {
+  fun set<V2>[V: V2](tick: Tick, key: K, value: V2): DMap<K, V2> {
     this.set_(TickRange::create(tick), key, value)
   }
 
-  protected fun set_(tick: TickRange, key: K, value: V): DMap<K, V>
-  | Nil() -> static::node(tick, key, value, Nil(), Nil())
+  protected fun set_<V2>[V: V2](
+    tick: TickRange,
+    key: K,
+    value: V2,
+  ): DMap<K, V2>
+  | Nil() -> DMap::node(tick, key, value, Nil(), Nil())
   | Node{tick => t, left => l, right => r, key => k, value => v} ->
     !t.max = max(tick.max, t.max);
     !tick.max = t.max;
     compare(key, this.key) match {
-    | LT() -> static::balance(t, k, v, l.set_(tick, key, value), r)
-    | EQ() -> static::node(tick, k, value, l, r)
-    | GT() -> static::balance(t, k, v, l, r.set_(tick, key, value))
+    | LT() -> DMap::balance(t, k, v, l.set_(tick, key, value), r)
+    | EQ() -> DMap::node(tick, k, value, l, r)
+    | GT() -> DMap::balance(t, k, v, l, r.set_(tick, key, value))
     }
 
   fun containsKey(k: K): Bool
