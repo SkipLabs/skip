@@ -407,7 +407,7 @@ class DataMap private {
     }
   }
 
-  fun eachWithTick(f: (Key, Tick) -> void): void {
+  fun each(f: (Key) -> void): void {
     dataIter = this.data.itemsWithTick();
     tombsIter = this.tombs.itemsWithTick();
     left = dataIter.next();
@@ -415,21 +415,21 @@ class DataMap private {
     loop {
       (left, right) match {
       | (None(), None()) -> break void
-      | (Some((k, _, tick)), None()) ->
-        f(k, tick.current);
+      | (Some((k, _, _)), None()) ->
+        f(k);
         !left = dataIter.next()
-      | (None(), Some((k, _, tick))) ->
-        f(k, tick.current);
+      | (None(), Some((k, _, _))) ->
+        f(k);
         !right = tombsIter.next()
-      | (Some((k1, _, tick)), Some((k2, _, _))) if (k1 < k2) ->
-        f(k1, tick.current);
+      | (Some((k1, _, _)), Some((k2, _, _))) if (k1 < k2) ->
+        f(k1);
         !left = dataIter.next()
-      | (Some((k1, _, _)), Some((k2, _, tick))) if (k1 > k2) ->
-        f(k2, tick.current);
+      | (Some((k1, _, _)), Some((k2, _, _))) if (k1 > k2) ->
+        f(k2);
         !right = tombsIter.next()
       | (Some((k, _, tick1)), Some((_, _, tick2))) ->
         invariant(tick1.current == tick2.current);
-        f(k, tick1.current);
+        f(k);
         !left = dataIter.next();
         !right = tombsIter.next()
       }
@@ -1865,7 +1865,7 @@ class EagerDir protected {
   fun unsafeIterKeys(f: (Key) -> void): void {
     fixedData = this.fixedData.data;
     current = 0;
-    this.data.eachWithTick((newKey, _tick) -> {
+    this.data.each((newKey) -> {
       while (current < fixedData.size() && fixedData[current].key < newKey) {
         row = fixedData[current];
         f(row.key);
