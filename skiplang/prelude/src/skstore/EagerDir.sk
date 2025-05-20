@@ -2207,6 +2207,38 @@ class EagerDir protected {
     };
     withChange
   }
+
+  fun import{targetCtx: mutable Context, tick: Tick}: void {
+    if (!this.input || this.creator is Some _) {
+      return void
+    };
+
+    (isReset, changedKeys) = this.getChangesAfter(tick);
+    targetCtx.unsafeMaybeGetDir(this.dirName) match {
+    | None() -> void
+    | Some(EagerDir{input => true}) ->
+      entries = mutable Vector[];
+      for (key in changedKeys) {
+        for (srcValue in this.unsafeGetAllDataIterAfter(tick, key)) {
+          (_, source, writer, values) = srcValue;
+          entries.push((key, (source, writer, values)));
+        }
+      };
+      targetCtx.unsafeMaybeGetEagerDir(this.dirName) match {
+      | None() ->
+        if (this.creator is None()) {
+          targetCtx.setDir(this);
+        }
+      | Some(inputDir) ->
+        inputDir.writeArraySourceMany(
+          targetCtx,
+          entries.iterator(),
+          if (isReset) Some((this.dirName, changedKeys)) else None(),
+        )
+      }
+    | Some(_) -> invariant_violation("Error import: incompatible dir types")
+    }
+  }
 }
 
 class EagerDirFile(dir: EagerDir) extends File
