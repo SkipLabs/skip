@@ -546,39 +546,9 @@ mutable class Context private {
     };
     withChange = false;
     this.hasPre.each(dirName -> {
-      preDirName = dirName.pre();
       this.unsafeMaybeGetEagerDir(dirName).each(dir -> {
-        this.unsafeMaybeGetEagerDir(preDirName) match {
-        | None() ->
-          this.!newDirs = this.newDirs.add(preDirName);
-          time = this.timeStamp();
-          preDir = EagerDir::create{
-            input => false,
-            timeStack => TimeStack::createInput(time),
-            dirName => preDirName,
-            creator => this.currentArrow(),
-          };
-          dir.unsafeIterKeys((key) -> {
-            values = dir.getArrayRaw(key);
-            !withChange = true;
-            source = Path::create(preDir.dirName, key);
-            !preDir = preDir.writeEntry(this, source, source, key, values);
-          });
-          this.setDir(preDir);
-          this.updateDirtyReaders(Path::dirTag(preDirName))
-        | Some(preDir) ->
-          (isReset, changes) = dir.getChangesAfter(this.tick.prev());
-          for (key in changes) {
-            values = dir.getArrayRaw(key);
-            !withChange = true;
-            source = Path::create(preDir.dirName, key);
-            !preDir = preDir.writeEntry(this, source, source, key, values);
-          };
-          if (isReset) {
-            writerPath = Path::gen(preDir.dirName);
-            !preDir = preDir.reset(this, writerPath, changes);
-          };
-          this.setDir(preDir)
+        if (dir.updatePre(this)) {
+          !withChange = true
         }
       })
     });
