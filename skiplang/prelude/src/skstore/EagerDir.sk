@@ -2169,6 +2169,44 @@ class EagerDir protected {
     );
     producedOutput
   }
+
+  fun updatePre(context: mutable Context): Bool {
+    withChange = false;
+    preDirName = this.dirName.pre();
+    context.unsafeMaybeGetEagerDir(preDirName) match {
+    | None() ->
+      context.!newDirs = context.newDirs.add(preDirName);
+      time = context.timeStamp();
+      preDir = EagerDir::create{
+        input => false,
+        timeStack => TimeStack::createInput(time),
+        dirName => preDirName,
+        creator => context.currentArrow(),
+      };
+      this.unsafeIterKeys((key) -> {
+        values = this.getArrayRaw(key);
+        !withChange = true;
+        source = Path::create(preDir.dirName, key);
+        !preDir = preDir.writeEntry(context, source, source, key, values);
+      });
+      context.setDir(preDir);
+      context.updateDirtyReaders(Path::dirTag(preDirName))
+    | Some(preDir) ->
+      (isReset, changes) = this.getChangesAfter(context.getTick().prev());
+      for (key in changes) {
+        values = this.getArrayRaw(key);
+        !withChange = true;
+        source = Path::create(preDir.dirName, key);
+        !preDir = preDir.writeEntry(context, source, source, key, values);
+      };
+      if (isReset) {
+        writerPath = Path::gen(preDir.dirName);
+        !preDir = preDir.reset(context, writerPath, changes);
+      };
+      context.setDir(preDir)
+    };
+    withChange
+  }
 }
 
 class EagerDirFile(dir: EagerDir) extends File
