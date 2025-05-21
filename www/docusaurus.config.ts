@@ -53,6 +53,7 @@ const config: Config = {
       logo: {
         alt: "Skip Logo",
         src: "img/logo.svg",
+        href: "https://skiplabs.io/",
       },
       items: [
         {
