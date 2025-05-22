@@ -1001,10 +1001,10 @@ class Collection(hdl: SKStore.EHandle<JSONID, JSONFile>) {
   ): void {
     context.subscribe(
       session,
-      SKStore.NWatch(
+      SKStore.NWatch{
         identifier,
         from,
-        (values, tick, update) ~> {
+        fn => (values, tick, update) ~> {
           notify(
             values.map(v ->
               (
@@ -1017,7 +1017,7 @@ class Collection(hdl: SKStore.EHandle<JSONID, JSONFile>) {
           )
         },
         close,
-      ),
+      },
       None(),
       Array[
         SKStore.DirSub(this.hdl.dirName, "", SKStore.OJSON(Array[]), (__) ~>
@@ -1284,7 +1284,7 @@ fun destroyReactiveResource(
     session = subId.value;
     context.getSession(session).each(sub -> {
       close = sub.cmd match {
-      | SKStore.NWatch(_, _, _, close) -> close
+      | SKStore.NWatch{close} -> close
       | _ -> invariant_violation("Not manage session kind")
       };
       context.removePersistent(`subscription.${sid}`);
@@ -1389,7 +1389,7 @@ fun unsubscribe(
 ): void {
   context.getSession(session).each(sub -> {
     (identifier, close) = sub.cmd match {
-    | SKStore.NWatch(identifier, _, _, close) -> (identifier, close)
+    | SKStore.NWatch{identifier, close} -> (identifier, close)
     | _ -> invariant_violation("Not manage session kind")
     };
     context.removePersistent(`subscription.${identifier}`);
