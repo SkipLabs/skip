@@ -21,7 +21,7 @@ base class Postponable {
 
 base class CmdKind {
   children =
-  | NUpdates(String)
+  | NUpdates{fileName: String}
   | NNotify(String)
   | NTail()
   | NWatch{
@@ -717,9 +717,9 @@ mutable class Context private {
     lock = unfreezeLock(sub.lock);
     mutexLock(lock);
     sub.cmd match {
-    | NUpdates(filename) ->
+    | NUpdates{fileName} ->
       file = IO.File::open(
-        filename,
+        fileName,
         IO.OpenOptions{
           write => true,
           create => true,
