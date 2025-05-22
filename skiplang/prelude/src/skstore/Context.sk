@@ -29,7 +29,6 @@ base class CmdKind {
     start: Tick,
     (DirName, Array<(Key, Array<File>)>, Tick, Bool) ~> void,
     () ~> void,
-    changes: Bool,
   )
 }
 
@@ -761,12 +760,12 @@ mutable class Context private {
     | NTail() ->
       cond = unfreezeCond(sub.cond);
       _ = condBroadcast(cond)
-    | NWatch(_, initTick, fn, _, changes) ->
+    | NWatch(_, initTick, fn, _) ->
       for (dirSub in sub.dirSubs) {
         dirName = dirSub.dirName;
         this.unsafeMaybeGetDir(dirName) match {
         | Some(dir @ EagerDir _) ->
-          startOpt = if (changes && start > initTick) Some(start) else None();
+          startOpt = if (start > initTick) Some(start) else None();
           dir.notifySubWatch(startOpt, this.tick, fn)
         | _ -> void
         }
