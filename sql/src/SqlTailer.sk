@@ -182,60 +182,58 @@ fun tailSub(
       skipExit(2)
     | Some(sub) ->
       dirDescrs = getDirDescrs(gContext);
-      sub with {
-        dirSubs => sub.dirSubs.map(dirSub -> {
-          table = getSqlTableName(dirSub.dirName);
-          tableName = P.Name::create(table);
-          tailSpec = spec(tableName);
+      sub.mapDirSubs(dirSub -> {
+        table = getSqlTableName(dirSub.dirName);
+        tableName = P.Name::create(table);
+        tailSpec = spec(tableName);
 
-          dirDescr = dirDescrs.maybeGet(tableName) match {
-          | Some(descr) ->
-            requiresLegacySchema = tailSpec.columns match {
-            | None() -> false
-            | Some(cols) -> cols.any(col -> !descr.schema.contains(col))
-            };
-            if (requiresLegacySchema) {
-              mCtx = gContext.mclone();
-              getLegacyViewsDir(mCtx)
-                .maybeGet(mCtx, SKStore.SID::create(tableName.lower))
-                .flatMap(lvFile -> {
-                  !legacyTableNames = legacyTableNames.set(
-                    lvFile.legacyView,
-                    tableName,
-                  );
-                  dirDescrs.maybeGet(lvFile.legacyView)
-                }) match {
-              | None() ->
-                print_error(`Error: incompatible schema for ${tableName}`);
-                skipExit(2)
-              | Some(dd) -> dd
-              }
-            } else {
-              descr
-            }
-          | None _ ->
-            print_error(`Error: '${tableName}' not found`);
-            skipExit(2)
+        dirDescr = dirDescrs.maybeGet(tableName) match {
+        | Some(descr) ->
+          requiresLegacySchema = tailSpec.columns match {
+          | None() -> false
+          | Some(cols) -> cols.any(col -> !descr.schema.contains(col))
           };
-
-          dirSub with {
-            dirName => dirDescr.dirName,
-            filter => buildTailFilter(
-              gContext,
-              options,
-              dirSub.filter,
-              userIDOpt,
-              tailSpec,
-              dirDescr,
-            ),
-            format => options.format match {
-            | SKDB.OFK_CSV() -> buildCSVSchemaTransform(dirDescr, tailSpec)
-            | _ -> dirSub.format
-            },
+          if (requiresLegacySchema) {
+            mCtx = gContext.mclone();
+            getLegacyViewsDir(mCtx)
+              .maybeGet(mCtx, SKStore.SID::create(tableName.lower))
+              .flatMap(lvFile -> {
+                !legacyTableNames = legacyTableNames.set(
+                  lvFile.legacyView,
+                  tableName,
+                );
+                dirDescrs.maybeGet(lvFile.legacyView)
+              }) match {
+            | None() ->
+              print_error(`Error: incompatible schema for ${tableName}`);
+              skipExit(2)
+            | Some(dd) -> dd
+            }
+          } else {
+            descr
           }
-        }),
-      }
-    };
+        | None _ ->
+          print_error(`Error: '${tableName}' not found`);
+          skipExit(2)
+        };
+
+        dirSub with {
+          dirName => dirDescr.dirName,
+          filter => buildTailFilter(
+            gContext,
+            options,
+            dirSub.filter,
+            userIDOpt,
+            tailSpec,
+            dirDescr,
+          ),
+          format => options.format match {
+          | SKDB.OFK_CSV() -> buildCSVSchemaTransform(dirDescr, tailSpec)
+          | _ -> dirSub.format
+          },
+        }
+      })
+    }
   });
 
   tailWatermark: ?Int = None();
@@ -422,6 +420,16 @@ fun tailSub(
     if (!follow) {
       break true
     }
+  }
+}
+
+module end;
+
+module SKStore;
+
+extension class Sub {
+  fun mapDirSubs(f: DirSub -> DirSub): this {
+    this with {dirSubs => this.dirSubs.map(f)}
   }
 }
 
