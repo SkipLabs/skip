@@ -19,14 +19,16 @@ base class Postponable {
 /* Sessions. */
 /*****************************************************************************/
 
-base class CmdKind
-
-base class CmdMultipleDirs extends CmdKind {
+base class CmdMultipleDirs {
   children =
   | NUpdates{fileName: String}
   | NNotify{fileName: String}
   | NTail()
 }
+
+base class CmdKind
+
+class NMultipleDirs(CmdMultipleDirs, Array<DirSub>) extends CmdKind
 
 class NWatch{
   dirName: DirName,
@@ -41,12 +43,12 @@ value class Sub(
   cond: Condition,
   cmd: CmdKind,
   destinationSource: ?Int,
-  dirSubs: Array<DirSub>,
 ) {
   fun dirNames(): mutable Iterator<DirName> {
     this.cmd match {
     | NWatch{dirName} -> Some(dirName).iterator()
-    | CmdMultipleDirs _ -> this.dirSubs.iterator().map(dirSub -> dirSub.dirName)
+    | NMultipleDirs(_, dirSubs) ->
+      dirSubs.iterator().map(dirSub -> dirSub.dirName)
     }
   }
 }
@@ -421,10 +423,9 @@ mutable class Context private {
     sessionId: Int,
     cmd: CmdKind,
     destinationSource: ?Int,
-    dirSubs: Array<DirSub>,
     init: ?Tick = None(),
   ): void {
-    sub = Sub(mutexCreate(), condCreate(), cmd, destinationSource, dirSubs);
+    sub = Sub(mutexCreate(), condCreate(), cmd, destinationSource);
     init.each(tick -> this.notifySub(sub, tick));
     this.!sessions[sessionId] = sub;
   }
@@ -728,7 +729,7 @@ mutable class Context private {
     lock = unfreezeLock(sub.lock);
     mutexLock(lock);
     sub.cmd match {
-    | NUpdates{fileName} ->
+    | NMultipleDirs(NUpdates{fileName}, dirSubs) ->
       file = IO.File::open(
         fileName,
         IO.OpenOptions{
@@ -742,7 +743,7 @@ mutable class Context private {
       writer = mutable Debug.BufferedWriter(o, 4096);
 
       producedAnyOutput = false;
-      for (dirSub in sub.dirSubs) {
+      for (dirSub in dirSubs) {
         dirName = dirSub.dirName;
         this.unsafeMaybeGetDir(dirName) match {
         | Some(dir @ EagerDir _) ->
@@ -767,9 +768,9 @@ mutable class Context private {
       };
 
       file.close()
-    | NNotify{fileName} ->
+    | NMultipleDirs(NNotify{fileName}, _) ->
       _ = unixNotify(fileName, Int32::truncate(start.value))
-    | NTail() ->
+    | NMultipleDirs(NTail(), _) ->
       cond = unfreezeCond(sub.cond);
       _ = condBroadcast(cond)
     | NWatch{dirName, from, fn} ->

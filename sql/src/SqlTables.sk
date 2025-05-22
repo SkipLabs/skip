@@ -499,11 +499,12 @@ fun getSubsDirs(
         )
       });
 
+      cmd = SKStore.NMultipleDirs(request.cmd, dirSubs);
+
       context.subscribe(
         request.sessionID,
-        request.cmd,
+        cmd,
         request.destinationSource,
-        dirSubs,
         if (request.init) Some(SKStore.Tick(0)) else None(),
       );
       writer.set(key, SKStore.IntFile(request.sessionID))

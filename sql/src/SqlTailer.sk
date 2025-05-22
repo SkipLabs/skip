@@ -289,7 +289,7 @@ fun tailSub(
       couldFollowChanges = true; // assume we can
       chunkingDisabled = false;
 
-      for (dirSub in sub.dirSubs) {
+      for (dirSub in sub.dirSubs()) {
         dirName = dirSub.dirName;
         edir = context.unsafeGetEagerDir(dirName);
         format = options.format match {
@@ -428,8 +428,19 @@ module end;
 module SKStore;
 
 extension class Sub {
+  fun dirSubs(): Array<DirSub> {
+    this.cmd match {
+    | NWatch _ -> Array[]
+    | NMultipleDirs(_, dirSubs) -> dirSubs
+    }
+  }
+
   fun mapDirSubs(f: DirSub -> DirSub): this {
-    this with {dirSubs => this.dirSubs.map(f)}
+    this.cmd match {
+    | NWatch _ -> this
+    | NMultipleDirs(c, dirSubs) ->
+      this with {cmd => NMultipleDirs(c, dirSubs.map(f))}
+    }
   }
 }
 
