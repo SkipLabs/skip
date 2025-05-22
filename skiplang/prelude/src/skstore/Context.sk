@@ -787,11 +787,9 @@ mutable class Context private {
       this.sessions.values(),
       void,
       (ctx, sub, _) ~> {
-        affected = for (dirSub in sub.dirSubs) {
-          if (changedDirNames.contains(dirSub.dirName)) break true
-        } else {
-          false
-        };
+        affected = sub.dirSubs.any(dirSub ->
+          changedDirNames.contains(dirSub.dirName)
+        );
         if (!affected) return void;
         ctx.fromSome().notifySub(sub, start);
       },
