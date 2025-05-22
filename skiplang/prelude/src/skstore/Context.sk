@@ -22,7 +22,7 @@ base class Postponable {
 base class CmdKind {
   children =
   | NUpdates{fileName: String}
-  | NNotify(String)
+  | NNotify{fileName: String}
   | NTail()
   | NWatch{
     identifier: String,
@@ -756,7 +756,8 @@ mutable class Context private {
       };
 
       file.close()
-    | NNotify(file) -> _ = unixNotify(file, Int32::truncate(start.value))
+    | NNotify{fileName} ->
+      _ = unixNotify(fileName, Int32::truncate(start.value))
     | NTail() ->
       cond = unfreezeCond(sub.cond);
       _ = condBroadcast(cond)

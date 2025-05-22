@@ -711,7 +711,7 @@ fun execSubscribe(args: Cli.ParseResults, options: SKDB.Options): void {
       print_error("Cannot have both --updates and --notify");
       skipExit(4)
     | (Some(fileName), _) -> SKStore.NUpdates{fileName}
-    | (_, Some(f)) -> SKStore.NNotify(f)
+    | (_, Some(fileName)) -> SKStore.NNotify{fileName}
     | _ -> SKStore.NTail()
     };
     (input, output) = SKDB.getSubsDirs(context);
