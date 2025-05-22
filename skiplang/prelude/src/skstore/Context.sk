@@ -19,19 +19,22 @@ base class Postponable {
 /* Sessions. */
 /*****************************************************************************/
 
-base class CmdKind {
+base class CmdKind
+
+base class CmdMultipleDirs extends CmdKind {
   children =
   | NUpdates{fileName: String}
   | NNotify{fileName: String}
   | NTail()
-  | NWatch{
-    dirName: DirName,
-    identifier: String,
-    from: Tick,
-    fn: (Array<(Key, Array<File>)>, Tick, Bool) ~> void,
-    close: () ~> void,
-  }
 }
+
+class NWatch{
+  dirName: DirName,
+  identifier: String,
+  from: Tick,
+  fn: (Array<(Key, Array<File>)>, Tick, Bool) ~> void,
+  close: () ~> void,
+} extends CmdKind
 
 value class Sub(
   lock: Mutex,
@@ -43,7 +46,7 @@ value class Sub(
   fun dirNames(): mutable Iterator<DirName> {
     this.cmd match {
     | NWatch{dirName} -> Some(dirName).iterator()
-    | _ -> this.dirSubs.iterator().map(dirSub -> dirSub.dirName)
+    | CmdMultipleDirs _ -> this.dirSubs.iterator().map(dirSub -> dirSub.dirName)
     }
   }
 }
