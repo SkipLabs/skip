@@ -144,14 +144,12 @@ fun errorAllExistingSubs(
   dir: SKStore.DirName,
 ): void {
   context.getSessions().values().each(sub ->
-    if (sub.destinationSource is Some _) {
+    sub.destinationSource match {
+    | None() -> void
+    | Some(destSource) ->
       for (dirSub in sub.dirSubs) {
         if (dirSub.dirName == dir) {
-          setReplicationState(
-            context,
-            sub.destinationSource.fromSome(),
-            RSError(),
-          );
+          setReplicationState(context, destSource, RSError());
           lock = SKStore.unfreezeLock(sub.lock);
           SKStore.mutexLock(lock);
           cond = SKStore.unfreezeCond(sub.cond);
