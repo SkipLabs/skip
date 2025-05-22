@@ -147,16 +147,13 @@ fun errorAllExistingSubs(
     sub.destinationSource match {
     | None() -> void
     | Some(destSource) ->
-      for (dirSub in sub.dirSubs) {
-        if (dirSub.dirName == dir) {
-          setReplicationState(context, destSource, RSError());
-          lock = SKStore.unfreezeLock(sub.lock);
-          SKStore.mutexLock(lock);
-          cond = SKStore.unfreezeCond(sub.cond);
-          _ = SKStore.condBroadcast(cond);
-          SKStore.mutexUnlock(lock);
-          return void
-        }
+      if (sub.dirSubs.any(dirSub -> dirSub.dirName == dir)) {
+        setReplicationState(context, destSource, RSError());
+        lock = SKStore.unfreezeLock(sub.lock);
+        SKStore.mutexLock(lock);
+        cond = SKStore.unfreezeCond(sub.cond);
+        _ = SKStore.condBroadcast(cond);
+        SKStore.mutexUnlock(lock);
       }
     }
   )
