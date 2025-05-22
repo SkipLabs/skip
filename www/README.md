@@ -102,3 +102,4 @@ You can get it from the skip repository:
 ```bash
 git rev-parse --short HEAD # supposingly it is the last commit of the branch
 ```
+
