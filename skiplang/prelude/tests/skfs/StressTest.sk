@@ -90,8 +90,8 @@ fun eval(
   makeEnv(context, prog.inputs);
   evalDirs(context, prog.mDirs);
   if (!debug) return void;
-  for (kv in context.listDirs()) {
-    (dirName, dir) = kv;
+  for (dir in context.listDirs()) {
+    dirName = dir.dirName;
     print_string("Dir: " + dirName);
     for (key in dir.keys()) {
       print_string(
@@ -366,43 +366,34 @@ fun compareContext(
   context2: readonly SKStore.Context,
 ): Bool {
   hasError = false;
-  for (kv in context1.listDirs()) {
-    (dirName, dir) = kv;
+  for (dir in context1.listDirs()) {
+    dirName = dir.dirName;
     dirFiles = dir.keys();
     if (dirFiles.isEmpty()) continue;
 
-    if (context2.unsafeMaybeGetDir(dirName) is None _) {
+    dir2 = context2.unsafeMaybeGetDir(dirName) match {
+    | None() ->
       if (dirName.toString().contains("LAZY")) continue;
       if (dir is SKStore.DeletedDir _) {
         print_error(`missing directory ${dirName}`);
         T.fail();
       };
-      continue;
+      continue
+    | Some(d) -> d
     };
-    dir2 = context2.unsafeGetDir(dirName);
-    isLazy = dir2.getDirName().toString().contains("LAZY");
     for (key in dirFiles) {
       values1 = dir.getArrayRaw(key).map(x -> SKStore.IntFile::type(x));
       values2 = dir2.getArrayRaw(key).map(x -> SKStore.IntFile::type(x));
-      if (dir2 is SKStore.LazyDir _) {
-        if (values1 == Array[] || values2 == Array[]) continue;
-      };
       if (values1 != values2) {
-        if (isLazy && (values1.isEmpty() || values2.isEmpty())) {
+        if (
+          dir2 is SKStore.LazyDir _ &&
+          (values1.isEmpty() || values2.isEmpty())
+        ) {
           continue
         };
         !hasError = true;
         print_string(`Error: values differ for ${dirName}${key}`);
         print_string(`       ${values1}`);
-        dir match {
-        | eagerDir @ SKStore.EagerDir _ ->
-          for (fixed in eagerDir.unsafeGetAllDataIter(key)) {
-            (_, k, _, files) = fixed;
-            intFiles = files.map(file -> SKStore.IntFile::type(file));
-            print_string(`FIXED  ${k} => ${intFiles}`)
-          }
-        | _ -> void
-        };
         dir match {
         | lazyDir @ SKStore.LazyDir _ ->
           files = lazyDir.getArrayRaw(key);
@@ -412,7 +403,12 @@ fun compareContext(
             intFiles = files.map(file -> SKStore.IntFile::type(file));
             print_string(`       ${intFiles}`)
           }
-        | SKStore.EagerDir{data} ->
+        | eagerDir @ SKStore.EagerDir{data} ->
+          for (fixed in eagerDir.unsafeGetAllDataIter(key)) {
+            (_, k, _, files) = fixed;
+            intFiles = files.map(file -> SKStore.IntFile::type(file));
+            print_string(`FIXED  ${k} => ${intFiles}`)
+          };
           data.maybeGet(key) match {
           | None() -> print_string("EMPTY DATA")
           | Some(sources) ->
@@ -422,7 +418,7 @@ fun compareContext(
               print_string(`       ${k} => ${intFiles}`)
             }
           }
-        | _ -> void
+        | SKStore.DeletedDir _ -> void
         };
         print_string("");
         print_string(`       ${values2}`);

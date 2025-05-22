@@ -60,7 +60,7 @@ base class .RangeMap<+K: Orderable, +V: Orderable> {
 
   fun isEmpty(): Bool
   | Nil() -> true
-  | _ -> false
+  | Node _ -> false
 
   fun min(): ?K
   | Nil() -> None()
@@ -135,7 +135,7 @@ base class .RangeMap<+K: Orderable, +V: Orderable> {
           l,
           r.addSet(key1, key2, values),
         )
-      | _ ->
+      | LT() ->
         (key1.compare(this.key1), key2.compare(this.key2)) match {
         | (EQ(), EQ()) ->
           static::node(this.key1, this.key2, values.union(v), l, r)
