@@ -274,17 +274,10 @@ fun tailSub(
         since = tailFrom(lookupSpec, ds, tailWatermark);
         since.value > 0
       });
-      oldestSubSince = sub.dirSubs.reduce(
-        (acc, ds) -> {
-          since = tailFrom(lookupSpec, ds, tailWatermark);
-          if (since < acc) {
-            since
-          } else {
-            acc
-          }
-        },
-        SKStore.Tick(Int::max),
-      );
+      oldestSubSince = sub.dirSubs
+        .iterator()
+        .map(ds -> tailFrom(lookupSpec, ds, tailWatermark))
+        .min{default => SKStore.Tick(Int::max)};
       forceCompleteRebuild =
         !requestToRebuildEverything &&
         SKDB.userPrivacyChanged(
