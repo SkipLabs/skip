@@ -6,7 +6,7 @@ date: 2025-05-23
 authors: hubyrod
 ---
 
-Hello Skippers. Today, we are excited to announce the release of `create-skip-service`: A CLI Tool for Skip Service Development. It aims to simplify the development workflow by providing a standardized way to bootstrap new Skip service projects.
+Hello Skippers. Today, we are excited to announce the release of `create-skip-service`: A CLI Tool for Skip Service Development. It aims to simplify the development workflow by providing a convenient way to bootstrap new Skip services.
 
 ```bash
 npx create-skip-service <project-name> <options>
@@ -16,7 +16,7 @@ npx create-skip-service <project-name> <options>
 
 ## What are we talking about?
 
-`create-skip-service` is a CLI tool that helps developers quickly set up new Skip service projects with customizable templates. The idea is to merely remove the time you'd need to write boilerplate code. It's designed to follow best practices and provide a consistent starting point for all Skip service development. You can't go wrong with that!
+`create-skip-service` is a CLI tool that helps developers quickly set up new Skip service projects with customizable templates, saving the time you'd need to write boilerplate code. It's designed to follow best practices and provide a consistent starting point for all Skip service development.
 
 ## Key Features
 
@@ -28,7 +28,7 @@ npx create-skip-service <project-name> <options>
 
 ## Getting Started
 
-[KISS](https://en.wikipedia.org/wiki/KISS_principle), so here is the one-liner to get started:
+[KISS](https://en.wikipedia.org/wiki/KISS_principle) - here is the one-liner to get started:
 
 ```bash
 npx create-skip-service my-service
@@ -46,13 +46,10 @@ npx create-skip-service my-service
 npx create-skip-service my-service --template with_postgres
 
 # Create a service without Git initialization
-npx create-skip-service my-service --no-git
+npx create-skip-service my-service --nogit
 
 # Run with verbose logging
 npx create-skip-service my-service --verbose
-
-# Run and do NOT use git
-npx create-skip-service my-service --nogit
 ```
 
 ## Available Options
@@ -67,10 +64,9 @@ npx create-skip-service my-service --nogit
 
 We created this tool to address several common challenges in Skip service development:
 
-1. **Consistency**: Ensure all Skip services follow the same project structure and best practices
-2. **Efficiency**: Reduce the time spent on project setup and configuration
-3. **Standardization**: Provide a unified way to create and manage Skip services
-4. **Flexibility**: Support different templates and configurations while maintaining consistency
+1. **Efficiency**: Reduce the time spent on project setup and configuration
+2. **Standardization**: Provide a unified way to create and manage Skip services
+3. **Flexibility**: Support different templates and configurations while maintaining consistency
 
 ## Contributing
 
@@ -98,7 +94,7 @@ npx create-skip-service my-service
 
 ## Wrapping Up
 
-`create-skip-service` represents our commitment to making Skip service development more efficient and enjoyable. We believe this tool will help developers focus on what matters most - building great services - while handling the boilerplate setup automagically[^1].
+`create-skip-service` represents our commitment to making Skip service development more efficient and enjoyable. By handling the boilerplate setup automagically[^1], we believe this tool will help developers focus on what matters most - building great services.
 
 As of today, we are already on our way to improving and augmenting the number of options and templates. Come back and help us sort priorities!
 
@@ -112,5 +108,5 @@ For the next Skip article, what should I tackle first? You tell me!
 - Scaling your Skip service horizontally?
 - Integrating with frontend frameworks like React?
 - Managing authorization and privacy per user?
-- What else would be most useful to you NOW?
+- What else would be most useful to you *now*?
 
