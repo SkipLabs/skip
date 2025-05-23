@@ -32,6 +32,11 @@ make docs-run       # Run the docs site locally
 make docs           # Regenerate API documentation
 ```
 
+A faster but not robust way to regenerate the api docs is:
+```bash
+cd /path/to/repo/root/www && npx docusaurus generate-typedoc
+```
+
 ### Publishing Documentation
 
 Before, commit your changes and send them for review
@@ -41,24 +46,19 @@ git commit -m '<some message>'
 gh pr create # if you use the GitHub CLI
 ```
 
-When reviewed and mereged, rebase and clean up your repository:
-```bash
-git pull --rebase
-git clean -Xdn # -n for a dry-run and double-check what's to be cleaned out
-git clean -Xdf # the actual cleaning
-```
-
-
-To publish documentation to the live site:
+When reviewed and mereged, you are ready to publish documentation to the live site:
 ```bash
 # From repository root INSIDE your Docker instance
 make docs-publish
 ```
 
-Note the the hash of your commit: 
+You should eventually read: 
 ```bash
-git rev-parse --short HEAD # supposingly it is the last commit of the branch
+Test locally: make docs-serve
+Push to live site: cd www/docs_site/; git add -A; git commit -m 'update to <commit>'; git push; cd -
 ```
+
+The commit hash in the last line should be the hash of your commit in the skip repository. 
 
 This will suggest running:
 ```bash
@@ -83,4 +83,22 @@ cd -
 
 ## TypeDoc Tags
 
-For a complete reference of TypeDoc tags, see the [official documentation](https://typedoc.org/guides/tags/).
+You may refer to the [official documentation](https://typedoc.org/guides/tags/) of TypeDoc tags for more information.
+
+
+## FAQ
+
+### What if my `docs_site` is not on the `main` branch ?
+Clean up your repository is good idea at this point and then start the process again:
+```bash
+```bash
+git pull --rebase
+git clean -Xdn # -n for a dry-run and double-check what's to be cleaned out
+git clean -Xdf # the actual cleaning
+```
+
+### What if the hash is not in the commit message suggested along the process ? 
+You can get it from the skip repository: 
+```bash
+git rev-parse --short HEAD # supposingly it is the last commit of the branch
+```
