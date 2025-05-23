@@ -38,7 +38,11 @@ value class Sub(
   cmd: CmdKind,
   destinationSource: ?Int,
   dirSubs: Array<DirSub>,
-)
+) {
+  fun dirNames(): mutable Iterator<DirName> {
+    this.dirSubs.iterator().map(dirSub -> dirSub.dirName)
+  }
+}
 
 class DirSub(
   dirName: DirName,
@@ -787,8 +791,8 @@ mutable class Context private {
       this.sessions.values(),
       void,
       (ctx, sub, _) ~> {
-        affected = sub.dirSubs.any(dirSub ->
-          changedDirNames.contains(dirSub.dirName)
+        affected = sub.dirNames().any(dirName ->
+          changedDirNames.contains(dirName)
         );
         if (!affected) return void;
         ctx.fromSome().notifySub(sub, start);

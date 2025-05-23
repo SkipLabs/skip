@@ -139,8 +139,8 @@ fun tailShouldWake(
     return true
   };
 
-  for (dirSub in sub.dirSubs) {
-    context.unsafeMaybeGetEagerDir(dirSub.dirName) match {
+  for (dirName in sub.dirNames()) {
+    context.unsafeMaybeGetEagerDir(dirName) match {
     | None() -> void
     | Some(dir) ->
       (isReset, changes) = dir.getChangesAfter(tick);
@@ -270,13 +270,13 @@ fun tailSub(
 
       writer = mutable Debug.BufferedWriter(print_raw, 4096);
 
-      requestToRebuildEverything = !sub.dirSubs.any(ds -> {
-        since = tailFrom(lookupSpec, ds.dirName, tailWatermark);
+      requestToRebuildEverything = !sub.dirNames().any(dirName -> {
+        since = tailFrom(lookupSpec, dirName, tailWatermark);
         since.value > 0
       });
-      oldestSubSince = sub.dirSubs
-        .iterator()
-        .map(ds -> tailFrom(lookupSpec, ds.dirName, tailWatermark))
+      oldestSubSince = sub
+        .dirNames()
+        .map(dirName -> tailFrom(lookupSpec, dirName, tailWatermark))
         .min{default => SKStore.Tick(Int::max)};
       forceCompleteRebuild =
         !requestToRebuildEverything &&

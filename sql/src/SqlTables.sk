@@ -147,7 +147,7 @@ fun errorAllExistingSubs(
     sub.destinationSource match {
     | None() -> void
     | Some(destSource) ->
-      if (sub.dirSubs.any(dirSub -> dirSub.dirName == dir)) {
+      if (sub.dirNames().any(dirName -> dirName == dir)) {
         setReplicationState(context, destSource, RSError());
         lock = SKStore.unfreezeLock(sub.lock);
         SKStore.mutexLock(lock);
