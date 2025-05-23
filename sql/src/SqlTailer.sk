@@ -154,14 +154,14 @@ fun tailShouldWake(
 
 fun tailFrom(
   spec: (P.Name -> TailSpec),
-  dirSub: SKStore.DirSub,
+  dirName: SKStore.DirName,
   tailWatermark: ?Int,
 ): SKStore.Tick {
   tailWatermark match {
   | Some(tick) -> SKStore.Tick(tick)
   | None() ->
     // we haven't caught up yet so honour the requested since value per table
-    tableName = P.Name::create(getSqlTableName(dirSub.dirName));
+    tableName = P.Name::create(getSqlTableName(dirName));
     SKStore.Tick(spec(tableName).since)
   }
 }
@@ -271,12 +271,12 @@ fun tailSub(
       writer = mutable Debug.BufferedWriter(print_raw, 4096);
 
       requestToRebuildEverything = !sub.dirSubs.any(ds -> {
-        since = tailFrom(lookupSpec, ds, tailWatermark);
+        since = tailFrom(lookupSpec, ds.dirName, tailWatermark);
         since.value > 0
       });
       oldestSubSince = sub.dirSubs
         .iterator()
-        .map(ds -> tailFrom(lookupSpec, ds, tailWatermark))
+        .map(ds -> tailFrom(lookupSpec, ds.dirName, tailWatermark))
         .min{default => SKStore.Tick(Int::max)};
       forceCompleteRebuild =
         !requestToRebuildEverything &&
@@ -303,7 +303,7 @@ fun tailSub(
         | SKDB.OFK_JS() -> SKStore.OJS(getFieldNames(context, dirName))
         | SKDB.OFK_Table() -> SKStore.OTable(getFieldNames(context, dirName))
         };
-        since = tailFrom(lookupSpec, dirSub, tailWatermark);
+        since = tailFrom(lookupSpec, dirName, tailWatermark);
 
         (shouldRebuild, changes) = if (forceCompleteRebuild) {
           (true, Array[].iterator())
