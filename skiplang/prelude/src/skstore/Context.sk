@@ -41,7 +41,10 @@ value class Sub(
   dirSubs: Array<DirSub>,
 ) {
   fun dirNames(): mutable Iterator<DirName> {
-    this.dirSubs.iterator().map(dirSub -> dirSub.dirName)
+    this.cmd match {
+    | NWatch{dirName} -> Some(dirName).iterator()
+    | _ -> this.dirSubs.iterator().map(dirSub -> dirSub.dirName)
+    }
   }
 }
 
