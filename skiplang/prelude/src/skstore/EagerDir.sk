@@ -407,7 +407,7 @@ class DataMap private {
     }
   }
 
-  fun eachWithTick(f: (Key, Tick) -> void): void {
+  fun each(f: (Key) -> void): void {
     dataIter = this.data.itemsWithTick();
     tombsIter = this.tombs.itemsWithTick();
     left = dataIter.next();
@@ -415,21 +415,21 @@ class DataMap private {
     loop {
       (left, right) match {
       | (None(), None()) -> break void
-      | (Some((k, _, tick)), None()) ->
-        f(k, tick.current);
+      | (Some((k, _, _)), None()) ->
+        f(k);
         !left = dataIter.next()
-      | (None(), Some((k, _, tick))) ->
-        f(k, tick.current);
+      | (None(), Some((k, _, _))) ->
+        f(k);
         !right = tombsIter.next()
-      | (Some((k1, _, tick)), Some((k2, _, _))) if (k1 < k2) ->
-        f(k1, tick.current);
+      | (Some((k1, _, _)), Some((k2, _, _))) if (k1 < k2) ->
+        f(k1);
         !left = dataIter.next()
-      | (Some((k1, _, _)), Some((k2, _, tick))) if (k1 > k2) ->
-        f(k2, tick.current);
+      | (Some((k1, _, _)), Some((k2, _, _))) if (k1 > k2) ->
+        f(k2);
         !right = tombsIter.next()
       | (Some((k, _, tick1)), Some((_, _, tick2))) ->
         invariant(tick1.current == tick2.current);
-        f(k, tick1.current);
+        f(k);
         !left = dataIter.next();
         !right = tombsIter.next()
       }
@@ -1287,7 +1287,7 @@ class EagerDir protected {
         static::reuseDir(context, childName);
         return void
       }
-    | _ -> void
+    | None() -> void
     };
 
     if (context.newDirs.contains(childName)) {
@@ -1768,7 +1768,7 @@ class EagerDir protected {
       Some(cdata)
     };
 
-    context.addDirty(this.dirName, k);
+    context.addDirty(this, k);
     path = Path::create(this.dirName, k);
 
     if (this.totalSize != totalSize) {
@@ -1862,20 +1862,20 @@ class EagerDir protected {
     slices
   }
 
-  fun unsafeIterKeys(f: (Key, Tick) -> void): void {
+  fun unsafeIterKeys(f: (Key) -> void): void {
     fixedData = this.fixedData.data;
     current = 0;
-    this.data.eachWithTick((newKey, tick) -> {
+    this.data.each((newKey) -> {
       while (current < fixedData.size() && fixedData[current].key < newKey) {
         row = fixedData[current];
-        f(row.key, Tick(0));
+        f(row.key);
         !current = current + 1;
       };
-      f(newKey, tick);
+      f(newKey);
     });
     while (current < fixedData.size()) {
       row = fixedData[current];
-      f(row.key, Tick(0));
+      f(row.key);
       !current = current + 1;
     };
   }
@@ -2114,6 +2114,130 @@ class EagerDir protected {
 
   fun remove(context: mutable Context, baseName: Key): void {
     this.writeArray(context, baseName, Array[]);
+  }
+
+  fun notifySubWatch(
+    startOpt: ?Tick,
+    tick: Tick,
+    fn: (DirName, Array<(Key, Array<File>)>, Tick, Bool) ~> void,
+  ): void {
+    (init, changedKeys) = startOpt match {
+    | Some(start) -> this.getChangesAfter(start)
+    | None() -> (true, SortedSet[])
+    };
+    keys = if (init) {
+      keys = SortedSet[];
+      // Key can appears multiple times
+      this.unsafeIterKeys((key) -> !keys = keys.set(key));
+      keys
+    } else {
+      changedKeys
+    };
+    if (init || !keys.isEmpty()) {
+      result = mutable Vector[];
+      for (key in keys) {
+        values = this.getArrayRaw(key);
+        result.push((key, values))
+      };
+      fn(this.dirName, result.toArray(), tick, !init)
+    }
+  }
+
+  fun notifySubUpdates(
+    startOpt: ?Tick,
+    writer: mutable Debug.BufferedWriter,
+    entity: String,
+    format: OutputFormat,
+    filter: (Key -> Bool),
+    destinationTime: ?Tick,
+  ): Bool {
+    (shouldRebuild, changes) = startOpt match {
+    | Some(start) ->
+      (shouldRebuild, changes) = this.getChangesAfter(start);
+      (shouldRebuild, changes.iterator())
+    | None() ->
+      (false, this.unsafeGetFileIterNoReducer(None()).map(pair -> pair.i0))
+    };
+    producedOutput = this.writeDiff(
+      shouldRebuild,
+      changes,
+      writer,
+      entity,
+      format,
+      filter,
+      destinationTime,
+    );
+    producedOutput
+  }
+
+  fun updatePre(context: mutable Context): Bool {
+    withChange = false;
+    preDirName = this.dirName.pre();
+    context.unsafeMaybeGetEagerDir(preDirName) match {
+    | None() ->
+      context.!newDirs = context.newDirs.add(preDirName);
+      time = context.timeStamp();
+      preDir = EagerDir::create{
+        input => false,
+        timeStack => TimeStack::createInput(time),
+        dirName => preDirName,
+        creator => context.currentArrow(),
+      };
+      this.unsafeIterKeys((key) -> {
+        values = this.getArrayRaw(key);
+        !withChange = true;
+        source = Path::create(preDir.dirName, key);
+        !preDir = preDir.writeEntry(context, source, source, key, values);
+      });
+      context.setDir(preDir);
+      context.updateDirtyReaders(Path::dirTag(preDirName))
+    | Some(preDir) ->
+      (isReset, changes) = this.getChangesAfter(context.getTick().prev());
+      for (key in changes) {
+        values = this.getArrayRaw(key);
+        !withChange = true;
+        source = Path::create(preDir.dirName, key);
+        !preDir = preDir.writeEntry(context, source, source, key, values);
+      };
+      if (isReset) {
+        writerPath = Path::gen(preDir.dirName);
+        !preDir = preDir.reset(context, writerPath, changes);
+      };
+      context.setDir(preDir)
+    };
+    withChange
+  }
+
+  fun import{targetCtx: mutable Context, tick: Tick}: void {
+    if (!this.input || this.creator is Some _) {
+      return void
+    };
+
+    (isReset, changedKeys) = this.getChangesAfter(tick);
+    targetCtx.unsafeMaybeGetDir(this.dirName) match {
+    | None() -> void
+    | Some(EagerDir{input => true}) ->
+      entries = mutable Vector[];
+      for (key in changedKeys) {
+        for (srcValue in this.unsafeGetAllDataIterAfter(tick, key)) {
+          (_, source, writer, values) = srcValue;
+          entries.push((key, (source, writer, values)));
+        }
+      };
+      targetCtx.unsafeMaybeGetEagerDir(this.dirName) match {
+      | None() ->
+        if (this.creator is None()) {
+          targetCtx.setDir(this);
+        }
+      | Some(inputDir) ->
+        inputDir.writeArraySourceMany(
+          targetCtx,
+          entries.iterator(),
+          if (isReset) Some((this.dirName, changedKeys)) else None(),
+        )
+      }
+    | Some(_) -> invariant_violation("Error import: incompatible dir types")
+    }
   }
 }
 

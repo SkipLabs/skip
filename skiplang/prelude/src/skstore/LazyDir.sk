@@ -3,7 +3,7 @@
 /*****************************************************************************/
 module SKStore;
 
-class CyclicExn(Key) extends Exception, File {
+class CyclicExn(Key) extends Exception {
   fun toString(): String {
     inspect(this).toString()
   }
@@ -194,7 +194,7 @@ class LazyDir protected {
 
   fun unsafeGetArray(context: mutable Context, key: Key): Array<File> {
     if (this.collect) {
-      context.addLazyGet(this.dirName, key)
+      context.addLazyGet(this, key)
     };
     lazyResult = this.data.maybeGet(key) match {
     | Some(LCycle()) -> throw CyclicExn(key)
