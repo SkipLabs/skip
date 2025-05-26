@@ -2177,9 +2177,7 @@ class EagerDir protected {
         values = this.getArrayRaw(key);
         result.push((key, values))
       };
-      fn = nWatch match {
-      | TNWatch{fn} -> fn
-      };
+      fn = Unsafe.cast(nWatch, TNWatch<Key>).fn;
       fn(result.toArray(), tick, !init)
     }
   }
