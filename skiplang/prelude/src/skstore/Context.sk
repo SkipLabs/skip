@@ -775,11 +775,11 @@ mutable class Context private {
     | NMultipleDirs(NTail(), _) ->
       cond = unfreezeCond(sub.cond);
       _ = condBroadcast(cond)
-    | NWatch{dirName, from, fn} ->
+    | nWatch @ NWatch{dirName, from} ->
       this.unsafeMaybeGetDir(dirName) match {
       | Some(dir @ EagerDir _) ->
         startOpt = if (start > from) Some(start) else None();
-        dir.notifySubWatch(startOpt, this.tick, fn)
+        dir.notifySubWatch(startOpt, this.tick, nWatch)
       | _ -> void
       }
     };

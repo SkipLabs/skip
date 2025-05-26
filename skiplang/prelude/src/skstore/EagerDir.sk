@@ -2158,11 +2158,7 @@ class EagerDir protected {
     this.writeArray(context, baseName, Array[]);
   }
 
-  fun notifySubWatch(
-    startOpt: ?Tick,
-    tick: Tick,
-    fn: (Array<(Key, Array<File>)>, Tick, Bool) ~> void,
-  ): void {
+  fun notifySubWatch(startOpt: ?Tick, tick: Tick, nWatch: NWatch): void {
     (init, changedKeys) = startOpt match {
     | Some(start) -> this.getChangesAfter(start)
     | None() -> (true, SortedSet[])
@@ -2181,6 +2177,7 @@ class EagerDir protected {
         values = this.getArrayRaw(key);
         result.push((key, values))
       };
+      fn = nWatch.fn;
       fn(result.toArray(), tick, !init)
     }
   }
