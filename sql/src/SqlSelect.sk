@@ -281,16 +281,17 @@ class SelectEvaluator{
   }
 
   fun evalSelectLimit(context: mutable SKStore.Context, limit: Int): SelectDir {
-    invariant(!this.select.directMode);
+    select = this.select;
+    invariant(!select.directMode);
     childName = this.selectName2;
     if (
-      this.select.sets.size() != 0 ||
-      this.select.aggr is Some _ ||
-      this.select.from.size() != 1 ||
-      this.select.groupBy is Some _ ||
-      this.select.having is Some _ ||
-      this.select.orderBy is Some _ ||
-      !this.select.rest.isEmpty() ||
+      select.sets.size() != 0 ||
+      select.aggr is Some _ ||
+      select.from.size() != 1 ||
+      select.groupBy is Some _ ||
+      select.having is Some _ ||
+      select.orderBy is Some _ ||
+      !select.rest.isEmpty() ||
       this.up is Some _
     ) {
       !this.select.limit = None();
@@ -319,9 +320,8 @@ class SelectEvaluator{
       handle = SKStore.EHandle(
         x ~> x, // contains RowKey and UnitID
         RowValues::type,
-        this.select.from[0].i0.dirName,
+        select.from[0].i0.dirName,
       );
-      select = this.select;
       up = this.up;
       invariant(up is None());
       filtered = handle.filter(
@@ -346,7 +346,7 @@ class SelectEvaluator{
           !value = value.setRepeat(value.repeat - n);
           value
         },
-        this.select.from[0].i1,
+        select.from[0].i1,
       );
       kinds = this.kinds;
       _ = filtered.map(
