@@ -303,7 +303,7 @@ class SelectEvaluator{
         RowValues::type,
         result.dirName,
       );
-      filtered = handle.filter(
+      _filtered = handle.filter(
         context,
         childName,
         limit,
@@ -314,8 +314,7 @@ class SelectEvaluator{
           value
         },
         None(),
-      );
-      SelectDir(filtered.dirName, this.types)
+      )
     } else {
       invariant(this.up is None());
       handle = SKStore.EHandle(
@@ -376,9 +375,9 @@ class SelectEvaluator{
           };
           writer.set(RowKey::create(row, kinds), row)
         },
-      );
-      SelectDir(childName, this.types)
-    }
+      )
+    };
+    SelectDir(childName, this.types)
   }
 
   static fun evalSubTask(
