@@ -280,6 +280,75 @@ class SelectEvaluator{
     }
   }
 
+  private fun evalSelectLimitInternal<K: SKStore.Key>(
+    context: mutable SKStore.Context,
+    limit: Int,
+    keyType: SKStore.Key ~> K,
+    rangesOpt: ?Array<SKStore.KeyRange<K>>,
+  ): void {
+    select = this.select;
+    childName = this.selectName2;
+    handle = SKStore.EHandle(
+      keyType,
+      RowValues::type,
+      select.from[0].i0.dirName,
+    );
+    filtered = handle.filter(
+      context,
+      childName.sub("noparams"),
+      limit,
+      (context, _key, value) ~> {
+        evaluator = ExprEvaluator(Array[value], select.from, None());
+        whereVal = evaluator.evalWhere(context, select.where);
+        whereVal match {
+        | ASuccess() -> unexpectedSideEffect()
+        | ANull()
+        | ADef(0) ->
+          false
+        | AUndef()
+        | ADef(_) ->
+          true
+        }
+      },
+      value ~> value.repeat,
+      (value, n) ~> {
+        !value = value.setRepeat(value.repeat - n);
+        value
+      },
+      rangesOpt,
+    );
+    kinds = this.kinds;
+    _ = filtered.map(
+      RowKey::keyType,
+      RowValues::type,
+      context,
+      childName,
+      (context, writer, _key, fileIter) ~> {
+        entry = fileIter.first;
+        repeat = 0;
+        for (file in fileIter) {
+          !repeat = repeat + file.repeat;
+        };
+        if (repeat != entry.repeat) {
+          !entry = entry.setRepeat(repeat);
+        };
+        evaluator = ExprEvaluator(Array[entry], select.from, None());
+        rowOpt = static::evalRow(
+          context,
+          evaluator,
+          select.params,
+          select.effects,
+          repeat,
+        );
+        row = rowOpt match {
+        | Some(row) -> row
+        | None() -> return void
+        };
+        writer.set(RowKey::create(row, kinds), row)
+      },
+    )
+  }
+
   fun evalSelectLimit(context: mutable SKStore.Context, limit: Int): SelectDir {
     select = this.select;
     invariant(!select.directMode);
@@ -317,65 +386,17 @@ class SelectEvaluator{
       )
     } else {
       invariant(this.up is None());
-      handle = SKStore.EHandle(
-        x ~> x, // contains RowKey and UnitID
-        RowValues::type,
-        select.from[0].i0.dirName,
-      );
-      filtered = handle.filter(
-        context,
-        childName.sub("noparams"),
-        limit,
-        (context, _key, value) ~> {
-          evaluator = ExprEvaluator(Array[value], select.from, None());
-          whereVal = evaluator.evalWhere(context, select.where);
-          whereVal match {
-          | ASuccess() -> unexpectedSideEffect()
-          | ANull()
-          | ADef(0) ->
-            false
-          | AUndef()
-          | ADef(_) ->
-            true
-          }
-        },
-        value ~> value.repeat,
-        (value, n) ~> {
-          !value = value.setRepeat(value.repeat - n);
-          value
-        },
-        select.from[0].i1,
-      );
-      kinds = this.kinds;
-      _ = filtered.map(
-        RowKey::keyType,
-        RowValues::type,
-        context,
-        childName,
-        (context, writer, _key, fileIter) ~> {
-          entry = fileIter.first;
-          repeat = 0;
-          for (file in fileIter) {
-            !repeat = repeat + file.repeat;
-          };
-          if (repeat != entry.repeat) {
-            !entry = entry.setRepeat(repeat);
-          };
-          evaluator = ExprEvaluator(Array[entry], select.from, None());
-          rowOpt = static::evalRow(
-            context,
-            evaluator,
-            select.params,
-            select.effects,
-            repeat,
-          );
-          row = rowOpt match {
-          | Some(row) -> row
-          | None() -> return void
-          };
-          writer.set(RowKey::create(row, kinds), row)
-        },
-      )
+      select.from[0].i1 match {
+      | None() ->
+        this.evalSelectLimitInternal(context, limit, x ~> x, None()) // may contain RowKey and UnitID
+      | someRanges @ Some _ ->
+        this.evalSelectLimitInternal(
+          context,
+          limit,
+          RowKey::keyType,
+          someRanges,
+        )
+      }
     };
     SelectDir(childName, this.types)
   }
