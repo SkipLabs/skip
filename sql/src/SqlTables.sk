@@ -144,21 +144,16 @@ fun errorAllExistingSubs(
   dir: SKStore.DirName,
 ): void {
   context.getSessions().values().each(sub ->
-    if (sub.destinationSource is Some _) {
-      for (dirSub in sub.dirSubs) {
-        if (dirSub.dirName == dir) {
-          setReplicationState(
-            context,
-            sub.destinationSource.fromSome(),
-            RSError(),
-          );
-          lock = SKStore.unfreezeLock(sub.lock);
-          SKStore.mutexLock(lock);
-          cond = SKStore.unfreezeCond(sub.cond);
-          _ = SKStore.condBroadcast(cond);
-          SKStore.mutexUnlock(lock);
-          return void
-        }
+    sub.destinationSource match {
+    | None() -> void
+    | Some(destSource) ->
+      if (sub.dirNames().any(dirName -> dirName == dir)) {
+        setReplicationState(context, destSource, RSError());
+        lock = SKStore.unfreezeLock(sub.lock);
+        SKStore.mutexLock(lock);
+        cond = SKStore.unfreezeCond(sub.cond);
+        _ = SKStore.condBroadcast(cond);
+        SKStore.mutexUnlock(lock);
       }
     }
   )
@@ -401,7 +396,7 @@ class SubRequestFile(
   viewNames: Array<String>,
   format: OutputFormatKind,
   init: Bool,
-  cmd: SKStore.CmdKind,
+  cmd: SKStore.CmdMultipleDirs,
   sessionID: Int,
   destinationSource: ?Int,
 ) extends SKStore.File
@@ -504,11 +499,12 @@ fun getSubsDirs(
         )
       });
 
+      cmd = SKStore.NMultipleDirs(request.cmd, dirSubs);
+
       context.subscribe(
         request.sessionID,
-        request.cmd,
+        cmd,
         request.destinationSource,
-        dirSubs,
         if (request.init) Some(SKStore.Tick(0)) else None(),
       );
       writer.set(key, SKStore.IntFile(request.sessionID))

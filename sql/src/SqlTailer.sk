@@ -139,8 +139,8 @@ fun tailShouldWake(
     return true
   };
 
-  for (dirSub in sub.dirSubs) {
-    context.unsafeMaybeGetEagerDir(dirSub.dirName) match {
+  for (dirName in sub.dirNames()) {
+    context.unsafeMaybeGetEagerDir(dirName) match {
     | None() -> void
     | Some(dir) ->
       (isReset, changes) = dir.getChangesAfter(tick);
@@ -154,14 +154,14 @@ fun tailShouldWake(
 
 fun tailFrom(
   spec: (P.Name -> TailSpec),
-  dirSub: SKStore.DirSub,
+  dirName: SKStore.DirName,
   tailWatermark: ?Int,
 ): SKStore.Tick {
   tailWatermark match {
   | Some(tick) -> SKStore.Tick(tick)
   | None() ->
     // we haven't caught up yet so honour the requested since value per table
-    tableName = P.Name::create(getSqlTableName(dirSub.dirName));
+    tableName = P.Name::create(getSqlTableName(dirName));
     SKStore.Tick(spec(tableName).since)
   }
 }
@@ -182,60 +182,58 @@ fun tailSub(
       skipExit(2)
     | Some(sub) ->
       dirDescrs = getDirDescrs(gContext);
-      sub with {
-        dirSubs => sub.dirSubs.map(dirSub -> {
-          table = getSqlTableName(dirSub.dirName);
-          tableName = P.Name::create(table);
-          tailSpec = spec(tableName);
+      sub.mapDirSubs(dirSub -> {
+        table = getSqlTableName(dirSub.dirName);
+        tableName = P.Name::create(table);
+        tailSpec = spec(tableName);
 
-          dirDescr = dirDescrs.maybeGet(tableName) match {
-          | Some(descr) ->
-            requiresLegacySchema = tailSpec.columns match {
-            | None() -> false
-            | Some(cols) -> cols.any(col -> !descr.schema.contains(col))
-            };
-            if (requiresLegacySchema) {
-              mCtx = gContext.mclone();
-              getLegacyViewsDir(mCtx)
-                .maybeGet(mCtx, SKStore.SID::create(tableName.lower))
-                .flatMap(lvFile -> {
-                  !legacyTableNames = legacyTableNames.set(
-                    lvFile.legacyView,
-                    tableName,
-                  );
-                  dirDescrs.maybeGet(lvFile.legacyView)
-                }) match {
-              | None() ->
-                print_error(`Error: incompatible schema for ${tableName}`);
-                skipExit(2)
-              | Some(dd) -> dd
-              }
-            } else {
-              descr
-            }
-          | None _ ->
-            print_error(`Error: '${tableName}' not found`);
-            skipExit(2)
+        dirDescr = dirDescrs.maybeGet(tableName) match {
+        | Some(descr) ->
+          requiresLegacySchema = tailSpec.columns match {
+          | None() -> false
+          | Some(cols) -> cols.any(col -> !descr.schema.contains(col))
           };
-
-          dirSub with {
-            dirName => dirDescr.dirName,
-            filter => buildTailFilter(
-              gContext,
-              options,
-              dirSub.filter,
-              userIDOpt,
-              tailSpec,
-              dirDescr,
-            ),
-            format => options.format match {
-            | SKDB.OFK_CSV() -> buildCSVSchemaTransform(dirDescr, tailSpec)
-            | _ -> dirSub.format
-            },
+          if (requiresLegacySchema) {
+            mCtx = gContext.mclone();
+            getLegacyViewsDir(mCtx)
+              .maybeGet(mCtx, SKStore.SID::create(tableName.lower))
+              .flatMap(lvFile -> {
+                !legacyTableNames = legacyTableNames.set(
+                  lvFile.legacyView,
+                  tableName,
+                );
+                dirDescrs.maybeGet(lvFile.legacyView)
+              }) match {
+            | None() ->
+              print_error(`Error: incompatible schema for ${tableName}`);
+              skipExit(2)
+            | Some(dd) -> dd
+            }
+          } else {
+            descr
           }
-        }),
-      }
-    };
+        | None _ ->
+          print_error(`Error: '${tableName}' not found`);
+          skipExit(2)
+        };
+
+        dirSub with {
+          dirName => dirDescr.dirName,
+          filter => buildTailFilter(
+            gContext,
+            options,
+            dirSub.filter,
+            userIDOpt,
+            tailSpec,
+            dirDescr,
+          ),
+          format => options.format match {
+          | SKDB.OFK_CSV() -> buildCSVSchemaTransform(dirDescr, tailSpec)
+          | _ -> dirSub.format
+          },
+        }
+      })
+    }
   });
 
   tailWatermark: ?Int = None();
@@ -270,21 +268,14 @@ fun tailSub(
 
       writer = mutable Debug.BufferedWriter(print_raw, 4096);
 
-      requestToRebuildEverything = !sub.dirSubs.any(ds -> {
-        since = tailFrom(lookupSpec, ds, tailWatermark);
+      requestToRebuildEverything = !sub.dirNames().any(dirName -> {
+        since = tailFrom(lookupSpec, dirName, tailWatermark);
         since.value > 0
       });
-      oldestSubSince = sub.dirSubs.reduce(
-        (acc, ds) -> {
-          since = tailFrom(lookupSpec, ds, tailWatermark);
-          if (since < acc) {
-            since
-          } else {
-            acc
-          }
-        },
-        SKStore.Tick(Int::max),
-      );
+      oldestSubSince = sub
+        .dirNames()
+        .map(dirName -> tailFrom(lookupSpec, dirName, tailWatermark))
+        .min{default => SKStore.Tick(Int::max)};
       forceCompleteRebuild =
         !requestToRebuildEverything &&
         SKDB.userPrivacyChanged(
@@ -298,7 +289,7 @@ fun tailSub(
       couldFollowChanges = true; // assume we can
       chunkingDisabled = false;
 
-      for (dirSub in sub.dirSubs) {
+      for (dirSub in sub.dirSubs()) {
         dirName = dirSub.dirName;
         edir = context.unsafeGetEagerDir(dirName);
         format = options.format match {
@@ -310,7 +301,7 @@ fun tailSub(
         | SKDB.OFK_JS() -> SKStore.OJS(getFieldNames(context, dirName))
         | SKDB.OFK_Table() -> SKStore.OTable(getFieldNames(context, dirName))
         };
-        since = tailFrom(lookupSpec, dirSub, tailWatermark);
+        since = tailFrom(lookupSpec, dirName, tailWatermark);
 
         (shouldRebuild, changes) = if (forceCompleteRebuild) {
           (true, Array[].iterator())
@@ -428,6 +419,27 @@ fun tailSub(
     SKStore.destroyObstack(localObstack);
     if (!follow) {
       break true
+    }
+  }
+}
+
+module end;
+
+module SKStore;
+
+extension class Sub {
+  fun dirSubs(): Array<DirSub> {
+    this.cmd match {
+    | NWatch _ -> Array[]
+    | NMultipleDirs(_, dirSubs) -> dirSubs
+    }
+  }
+
+  fun mapDirSubs(f: DirSub -> DirSub): this {
+    this.cmd match {
+    | NWatch _ -> this
+    | NMultipleDirs(c, dirSubs) ->
+      this with {cmd => NMultipleDirs(c, dirSubs.map(f))}
     }
   }
 }

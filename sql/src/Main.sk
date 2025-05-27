@@ -437,7 +437,7 @@ fun execSessions(args: Cli.ParseResults, options: SKDB.Options): void {
   SKDB.runSql(options, context ~> {
     for (id => sub in context.getSessions()) {
       print_string(
-        id.toString() + "\t" + sub.dirSubs.map(d -> d.entity).join(","),
+        id.toString() + "\t" + sub.dirSubs().map(d -> d.entity).join(","),
       );
     };
     SKStore.CStop(None())
@@ -571,7 +571,7 @@ fun execDiff(args: Cli.ParseResults, options: SKDB.Options): void {
 
     diffSpec = mutable Vector[];
 
-    for (dirSub in sub.dirSubs) {
+    for (dirSub in sub.dirSubs()) {
       tableName = P.Name::create(
         dirSub.dirName.toString().stripPrefix("/").stripSuffix("/"),
       );
@@ -710,8 +710,8 @@ fun execSubscribe(args: Cli.ParseResults, options: SKDB.Options): void {
     | (Some(_), Some(_)) ->
       print_error("Cannot have both --updates and --notify");
       skipExit(4)
-    | (Some(f), _) -> SKStore.NUpdates(f)
-    | (_, Some(f)) -> SKStore.NNotify(f)
+    | (Some(fileName), _) -> SKStore.NUpdates{fileName}
+    | (_, Some(fileName)) -> SKStore.NNotify{fileName}
     | _ -> SKStore.NTail()
     };
     (input, output) = SKDB.getSubsDirs(context);

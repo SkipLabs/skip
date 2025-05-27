@@ -19,27 +19,39 @@ base class Postponable {
 /* Sessions. */
 /*****************************************************************************/
 
-base class CmdKind {
+base class CmdMultipleDirs {
   children =
-  | NUpdates(String)
-  | NNotify(String)
+  | NUpdates{fileName: String}
+  | NNotify{fileName: String}
   | NTail()
-  | NWatch(
-    identifier: String,
-    start: Tick,
-    (DirName, Array<(Key, Array<File>)>, Tick, Bool) ~> void,
-    () ~> void,
-    changes: Bool,
-  )
 }
+
+base class CmdKind
+
+class NMultipleDirs(CmdMultipleDirs, Array<DirSub>) extends CmdKind
+
+class NWatch{
+  dirName: DirName,
+  identifier: String,
+  from: Tick,
+  fn: (Array<(Key, Array<File>)>, Tick, Bool) ~> void,
+  close: () ~> void,
+} extends CmdKind
 
 value class Sub(
   lock: Mutex,
   cond: Condition,
   cmd: CmdKind,
   destinationSource: ?Int,
-  dirSubs: Array<DirSub>,
-)
+) {
+  fun dirNames(): mutable Iterator<DirName> {
+    this.cmd match {
+    | NWatch{dirName} -> Some(dirName).iterator()
+    | NMultipleDirs(_, dirSubs) ->
+      dirSubs.iterator().map(dirSub -> dirSub.dirName)
+    }
+  }
+}
 
 class DirSub(
   dirName: DirName,
@@ -411,10 +423,9 @@ mutable class Context private {
     sessionId: Int,
     cmd: CmdKind,
     destinationSource: ?Int,
-    dirSubs: Array<DirSub>,
     init: ?Tick = None(),
   ): void {
-    sub = Sub(mutexCreate(), condCreate(), cmd, destinationSource, dirSubs);
+    sub = Sub(mutexCreate(), condCreate(), cmd, destinationSource);
     init.each(tick -> this.notifySub(sub, tick));
     this.!sessions[sessionId] = sub;
   }
@@ -718,9 +729,9 @@ mutable class Context private {
     lock = unfreezeLock(sub.lock);
     mutexLock(lock);
     sub.cmd match {
-    | NUpdates(filename) ->
+    | NMultipleDirs(NUpdates{fileName}, dirSubs) ->
       file = IO.File::open(
-        filename,
+        fileName,
         IO.OpenOptions{
           write => true,
           create => true,
@@ -732,7 +743,7 @@ mutable class Context private {
       writer = mutable Debug.BufferedWriter(o, 4096);
 
       producedAnyOutput = false;
-      for (dirSub in sub.dirSubs) {
+      for (dirSub in dirSubs) {
         dirName = dirSub.dirName;
         this.unsafeMaybeGetDir(dirName) match {
         | Some(dir @ EagerDir _) ->
@@ -757,19 +768,17 @@ mutable class Context private {
       };
 
       file.close()
-    | NNotify(file) -> _ = unixNotify(file, Int32::truncate(start.value))
-    | NTail() ->
+    | NMultipleDirs(NNotify{fileName}, _) ->
+      _ = unixNotify(fileName, Int32::truncate(start.value))
+    | NMultipleDirs(NTail(), _) ->
       cond = unfreezeCond(sub.cond);
       _ = condBroadcast(cond)
-    | NWatch(_, initTick, fn, _, changes) ->
-      for (dirSub in sub.dirSubs) {
-        dirName = dirSub.dirName;
-        this.unsafeMaybeGetDir(dirName) match {
-        | Some(dir @ EagerDir _) ->
-          startOpt = if (changes && start > initTick) Some(start) else None();
-          dir.notifySubWatch(startOpt, this.tick, fn)
-        | _ -> void
-        }
+    | NWatch{dirName, from, fn} ->
+      this.unsafeMaybeGetDir(dirName) match {
+      | Some(dir @ EagerDir _) ->
+        startOpt = if (start > from) Some(start) else None();
+        dir.notifySubWatch(startOpt, this.tick, fn)
+      | _ -> void
       }
     };
     mutexUnlock(lock)
@@ -787,11 +796,9 @@ mutable class Context private {
       this.sessions.values(),
       void,
       (ctx, sub, _) ~> {
-        affected = for (dirSub in sub.dirSubs) {
-          if (changedDirNames.contains(dirSub.dirName)) break true
-        } else {
-          false
-        };
+        affected = sub.dirNames().any(dirName ->
+          changedDirNames.contains(dirName)
+        );
         if (!affected) return void;
         ctx.fromSome().notifySub(sub, start);
       },
@@ -1253,20 +1260,12 @@ fun condCreate(): Condition {
 }
 
 @debug
-@cpp_extern("SKIP_cond_wait")
-native fun condWait(mutable Condition, mutable Mutex): Int32;
-
-@debug
 @cpp_extern("SKIP_cond_timedwait")
 native fun condTimedWait(mutable Condition, mutable Mutex, UInt32): Int32;
 
 @debug
 @cpp_extern("SKIP_cond_broadcast")
 native fun condBroadcast(mutable Condition): Int32;
-
-@debug
-@cpp_extern("pthread_cond_signal")
-native fun condSignal(mutable Condition): Int32;
 
 @cpp_extern("SKIP_freeze_lock")
 native fun freezeLock(lock: mutable Mutex): Mutex;
