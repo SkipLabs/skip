@@ -139,7 +139,10 @@ class RepeatFile(
 // we are checking against something that is correct.
 /*****************************************************************************/
 
-fun isInRange(k: SKStore.Key, ranges: ?Array<SKStore.KeyRange>): Bool {
+fun isInRange(
+  k: SKStore.Key,
+  ranges: ?Array<SKStore.KeyRange<SKStore.Key>>,
+): Bool {
   ranges match {
   | None() -> true
   | Some(keyRanges) ->
@@ -160,7 +163,7 @@ fun limitFromScratch(
   context: mutable SKStore.Context,
   dirName: SKStore.DirName,
   capacity: Int,
-  ranges: ?Array<SKStore.KeyRange>,
+  ranges: ?Array<SKStore.KeyRange<SKStore.Key>>,
 ): (Array<(SKStore.Key, RepeatFile)>, Int) {
   n = capacity;
   result = mutable Vector[];
@@ -224,7 +227,7 @@ fun writeAndUpdate(
   inputDir: SKStore.EHandle<SKStore.IID, RepeatFile>,
   filteredDir: SKStore.EHandle<SKStore.IID, RepeatFile>,
   capacity: Int,
-  ranges: ?Array<SKStore.KeyRange>,
+  ranges: ?Array<SKStore.KeyRange<SKStore.Key>>,
 ): Bool {
   size = 0;
   for (_ in Range(0, config.numberOfWritesPerRound)) {
@@ -285,7 +288,7 @@ fun writeAndUpdate(
 fun genRanges(
   config: FilterTestConfig,
   rand: mutable Random,
-): Array<SKStore.KeyRange> {
+): Array<SKStore.KeyRange<SKStore.IID>> {
   ranges = mutable Vector[];
   rangesSize = rand.random(1, config.maxRangeWidth);
   for (_ in Range(0, rangesSize)) {

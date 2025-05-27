@@ -170,14 +170,48 @@ mutable class IntRef(mutable value: Int) {
 /* Ranges. */
 /*****************************************************************************/
 
-value class KeyRange private {start: Key, end: Key} uses Orderable, Show {
-  static fun create(start: Key, end: Key): this {
+value class KeyRange<+K: Show & Orderable> private {
+  start: K,
+  end: K,
+} uses Orderable, Show {
+  static fun create(start: K, end: K): this {
     invariant(start <= end);
     static{start, end}
   }
 
   fun toString(): String {
     `[${this.start}, ${this.end}]`
+  }
+
+  fun compare<K2: Show & Orderable>[K: K2](other: KeyRange<K2>): Order {
+    this.start.compare(other.start) match {
+    | EQ() -> this.end.compare(other.end)
+    | neq -> neq
+    }
+  }
+
+  fun ==<K2: Show & Orderable>[K: K2](other: KeyRange<K2>): Bool {
+    this.compare(other) == EQ()
+  }
+
+  fun !=<K2: Show & Orderable>[K: K2](other: KeyRange<K2>): Bool {
+    this.compare(other) != EQ()
+  }
+
+  fun <<K2: Show & Orderable>[K: K2](other: KeyRange<K2>): Bool {
+    this.compare(other) == LT()
+  }
+
+  fun <=<K2: Show & Orderable>[K: K2](other: KeyRange<K2>): Bool {
+    this.compare(other) != GT()
+  }
+
+  fun ><K2: Show & Orderable>[K: K2](other: KeyRange<K2>): Bool {
+    this.compare(other) == GT()
+  }
+
+  fun >=<K2: Show & Orderable>[K: K2](other: KeyRange<K2>): Bool {
+    this.compare(other) != LT()
   }
 }
 
@@ -630,7 +664,11 @@ class EagerDir protected {
   parents: FixedSingle<
     DirName,
     Array<
-      (MapFun, ?Array<KeyRange>, ?((mutable Context, SortedSet<Key>) ~> void)),
+      (
+        MapFun,
+        ?Array<KeyRange<Key>>,
+        ?((mutable Context, SortedSet<Key>) ~> void),
+      ),
     >,
   > = FixedSingle::empty(),
   childDirs: SortedSet<DirName> = SortedSet[],
@@ -1080,7 +1118,7 @@ class EagerDir protected {
     timeStack: TimeStack,
     f: MapFun,
     acc: mutable Vector<FixedRow<Array<File>>>,
-    rangeOpt: ?KeyRange,
+    rangeOpt: ?KeyRange<Key>,
   ): void {
     last: ?Boundary<Key> = rangeOpt.map(range -> Inclusive(range.start));
     current = rangeOpt match {
@@ -1199,7 +1237,7 @@ class EagerDir protected {
       Array<
         (
           MapFun,
-          ?Array<KeyRange>,
+          ?Array<KeyRange<Key>>,
           ?((mutable Context, SortedSet<Key>) ~> void),
         ),
       >,
@@ -1255,7 +1293,7 @@ class EagerDir protected {
     childName: DirName,
     f: MapFun,
     reducerOpt: ?IReducer = None(),
-    rangeOpt: ?Array<KeyRange> = None(),
+    rangeOpt: ?Array<KeyRange<Key>> = None(),
     onUpdate: ?((mutable Context, SortedSet<Key>) ~> void) = None(),
     unsafeSkipInit: Bool = false,
   ): void {
@@ -1272,7 +1310,7 @@ class EagerDir protected {
       Array<
         (
           MapFun,
-          ?Array<KeyRange>,
+          ?Array<KeyRange<Key>>,
           ?((mutable Context, SortedSet<Key>) ~> void),
         ),
       >,
@@ -1404,7 +1442,7 @@ class EagerDir protected {
     context: mutable Context,
     parentName: DirName,
     childName: DirName,
-    rangeOpt: ?Array<KeyRange>,
+    rangeOpt: ?Array<KeyRange<Key>>,
   ): void {
     parent = context.unsafeGetEagerDir(parentName);
     rangeOpt match {
@@ -1541,7 +1579,11 @@ class EagerDir protected {
     contextDirtyReadersOpt: ?SortedMap<DirName, SortedSet<Key>>,
     parentName: DirName,
     parentMaps: Array<
-      (MapFun, ?Array<KeyRange>, ?((mutable Context, SortedSet<Key>) ~> void)),
+      (
+        MapFun,
+        ?Array<KeyRange<Key>>,
+        ?((mutable Context, SortedSet<Key>) ~> void),
+      ),
     >,
     childRef: EagerDir,
   ): void {

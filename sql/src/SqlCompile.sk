@@ -12,7 +12,7 @@ module SKDB;
 
 fun isNoopParams(
   params: Array<CGExpr>,
-  from: Array<(DirDescr, ?Array<SKStore.KeyRange>)>,
+  from: Array<(DirDescr, ?Array<SKStore.KeyRange<RowKey>>)>,
 ): Bool {
   if (from.size() != 1) return false;
   kinds = from[0].i0.kinds;
@@ -28,7 +28,9 @@ fun isNoopParams(
   true
 }
 
-fun noRangeFrom(from: Array<(DirDescr, ?Array<SKStore.KeyRange>)>): Bool {
+fun noRangeFrom(
+  from: Array<(DirDescr, ?Array<SKStore.KeyRange<RowKey>>)>,
+): Bool {
   for (tableRange in from) {
     if (tableRange.i1 is Some _) return false;
   };
@@ -104,13 +106,13 @@ fun minWindowSize(x: ?Int, y: ?Int): ?Int {
 class JTable{
   name: P.Name,
   dirName: SKStore.DirName,
-  ranges: ?Array<SKStore.KeyRange>,
+  ranges: ?Array<SKStore.KeyRange<RowKey>>,
   schema: Array<P.ColumnDefinition>,
   alias: ?P.Name,
 } {
   static fun fromDirDescr(
     dirDescr: DirDescr,
-    ranges: ?Array<SKStore.KeyRange>,
+    ranges: ?Array<SKStore.KeyRange<RowKey>>,
   ): this {
     JTable{
       name => dirDescr.name,
@@ -725,7 +727,7 @@ mutable class Compiler{
   static fun getCols(
     context: mutable SKStore.Context,
     params: Array<P.SelectResult>,
-    from: Array<(DirDescr, ?Array<SKStore.KeyRange>)>,
+    from: Array<(DirDescr, ?Array<SKStore.KeyRange<RowKey>>)>,
   ): (SortedMap<P.Name, Int>, readonly Map<Int, P.Name>) {
     cols = SortedMap[];
     invCols = mutable Map[];
@@ -793,7 +795,7 @@ mutable class Compiler{
   static fun getSchema(
     context: mutable SKStore.Context,
     params: Array<P.SelectResult>,
-    from: Array<(DirDescr, ?Array<SKStore.KeyRange>)>,
+    from: Array<(DirDescr, ?Array<SKStore.KeyRange<RowKey>>)>,
     cparams: Array<CGExpr>,
   ): Array<P.ColumnDefinition> {
     (cols, invCols) = static::getCols(context, params, from);
@@ -815,7 +817,7 @@ mutable class Compiler{
   static fun getDirDescr(
     context: mutable SKStore.Context,
     params: Array<P.SelectResult>,
-    from: Array<(DirDescr, ?Array<SKStore.KeyRange>)>,
+    from: Array<(DirDescr, ?Array<SKStore.KeyRange<RowKey>>)>,
     cparams: Array<CGExpr>,
     selectId: P.Name,
     dirName: SKStore.DirName,
@@ -972,7 +974,7 @@ mutable class Compiler{
   mutable fun compileOrderBy(
     context: mutable SKStore.Context,
     params: Array<P.SelectResult>,
-    from: Array<(SKDB.DirDescr, ?Array<SKStore.KeyRange>)>,
+    from: Array<(SKDB.DirDescr, ?Array<SKStore.KeyRange<RowKey>>)>,
     orderByOpt: ?Array<(P.Expr, P.IKind)>,
   ): ?Array<(Int, P.IKind)> {
     orderByOpt match {
@@ -2041,7 +2043,7 @@ mutable class Compiler{
     context: mutable SKStore.Context,
     origFrom: Array<DirDescr>,
     where: ?P.Expr,
-  ): (?P.Expr, Array<(SKDB.DirDescr, ?Array<SKStore.KeyRange>)>) {
+  ): (?P.Expr, Array<(SKDB.DirDescr, ?Array<SKStore.KeyRange<RowKey>>)>) {
     where match {
     | None() ->
       if (origFrom.size() > 1) {
@@ -2074,9 +2076,9 @@ mutable class Compiler{
   }
 
   mutable fun compileMerge(
-    from: Array<(SKDB.DirDescr, ?Array<SKStore.KeyRange>)>,
+    from: Array<(SKDB.DirDescr, ?Array<SKStore.KeyRange<RowKey>>)>,
     cond: P.Expr,
-  ): (P.Expr, Array<(SKDB.DirDescr, ?Array<SKStore.KeyRange>)>) {
+  ): (P.Expr, Array<(SKDB.DirDescr, ?Array<SKStore.KeyRange<RowKey>>)>) {
     tables = mutable Vector<?JTable>[];
     newFrom = mutable Vector[];
     moveMap = mutable Map[];
@@ -2261,7 +2263,7 @@ mutable class Compiler{
     context: mutable SKStore.Context,
     from: Array<DirDescr>,
     cond: P.Expr,
-  ): Array<(SKDB.DirDescr, ?Array<SKStore.KeyRange>)> {
+  ): Array<(SKDB.DirDescr, ?Array<SKStore.KeyRange<RowKey>>)> {
     tables = mutable Vector[];
     for (dirDescr in from) {
       tables.push(JTable::fromDirDescr(dirDescr, None()));
