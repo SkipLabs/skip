@@ -1,5 +1,6 @@
 FROM node:lts-alpine3.19
 WORKDIR /app
+RUN apk add --no-cache bash
 COPY package.json package.json
 RUN npm install
 COPY . .
