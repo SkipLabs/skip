@@ -43,17 +43,17 @@ To run the application:
 The frontend will be available at http://localhost:5173
 ```
 
-This will hardly ever be simpler :-p
+This could hardly ever be simpler :-p
 
 ## If you open the project directory
 
-In both subprojects, `frontend` and `reactive_service`, we've hardcoded some values, and taken shortcuts here and there in order to be straight to the point: making reactive programming easy to get, easy to grasp, easy to adopt, easy to embrass. easy to marry... ok, one step too far. 
+In both subprojects, `frontend` and `reactive_service`, we've hardcoded some values, and taken shortcuts here and there in order to be straight to the point: making reactive programming easy to get, easy to grasp, easy to adopt, easy to embrace. easy to marry... ok, one step too far. 
 
-One or two cool thing you want to try:
- - plugging a DB behind, we can give you some help : [Building a Real-time Blog with Skip and PostgreSQL](https://skiplabs.io/blog/postgresql_and_skip)
+One or two cool things you will want to try:
+ - plugging into a DB from the backend, we can give you some help : [Building a Real-time Blog with Skip and PostgreSQL](https://skiplabs.io/blog/postgresql_and_skip)
  - having several conversations on screen, one per tab
  - integrating your user-management system
- - integrating an AI agent to discuss in the chat
+ - integrating an AI agent to discuss into the chat
 
 We have a [Discord server](https://discord.com/channels/1093901946441703434/1093901946441703437), why don't you swing by and say hi, ask a question or two?
 
