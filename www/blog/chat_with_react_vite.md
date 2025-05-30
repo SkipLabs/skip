@@ -1,5 +1,5 @@
 ---
-title: React + Vite in front of a Skip Service: the template
+title: React + Vite in front of a Skip Service - the template
 description: Build a modern chat app with real-time updates using Skip's reactive data system, React, and Vite
 slug: skip_with_react_vite
 date: 2025-05-30
