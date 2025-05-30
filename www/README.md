@@ -89,9 +89,9 @@ You may refer to the [official documentation](https://typedoc.org/guides/tags/) 
 ### What if my `docs_site` is not on the `main` branch ?
 Clean up your repository is good idea at this point and then start the process again:
 ```bash
-git pull --rebase
-git clean -Xdn # -n for a dry-run and double-check what's to be cleaned out
-git clean -Xdf # the actual cleaning
+git pull --rebase  # ensure that your local docs_site submodule is up-to-date
+git clean -Xdn     # -n for a dry-run and double-check what's to be cleaned out
+git clean -Xdf     # the actual cleaning
 ```
 
 ### What if the hash is not in the commit message suggested along the process ? 
