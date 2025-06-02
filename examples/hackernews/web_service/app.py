@@ -6,22 +6,28 @@ import random
 import time
 import os
 
+SKIP_CONTROL_URL = os.environ.get("SKIP_CONTROL_URL")
+
+PG_HOST = os.environ.get("PG_HOST", "db")
+PG_PORT = int(os.environ.get("PG_PORT", 5432))
+PG_DATABASE = os.environ.get("PG_DATABASE", "postgres")
+PG_USER = os.environ.get("PG_USER", "postgres")
+PG_PASSWORD = os.environ.get("PG_PASSWORD", "change_me")
+
 
 def get_db():
     conn = psycopg2.connect(
-        host="db",
-        user="postgres",
-        password="change_me",
+        host=PG_HOST,
+        port=PG_PORT,
+        user=PG_USER,
+        password=PG_PASSWORD,
+        dbname=PG_DATABASE,
     )
-
     return conn
 
 
 app = Flask(__name__)
-
 app.secret_key = b"53cr37_changeme"
-
-SKIP_CONTROL_URL = os.environ.get("SKIP_CONTROL_URL")
 
 
 @app.before_request
