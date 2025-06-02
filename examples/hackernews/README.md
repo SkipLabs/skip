@@ -65,7 +65,7 @@ done
    service(s).
 ```
 kubectl create configmap haproxy-auxiliary-configmap --from-file kubernetes/haproxy-aux.cfg
-helm install haproxy haproxytech/kubernetes-ingress -f kubernetes/haproxy-aux-config.yaml
+helm install haproxy haproxytech/kubernetes-ingress -f reverse_proxy/kubernetes.yaml
 ```
 
 6. `minikube service haproxy-kubernetes-ingress` to open a tunnel to the
