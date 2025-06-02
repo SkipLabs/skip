@@ -44,12 +44,21 @@ spec:
           # - index >= 1 is follower, using that number in resource prefix
           [[ $HOSTNAME =~ -([0-9]+)$ ]] || exit 1
           id=${BASH_REMATCH[1]}
+          ip=$(hostname -i)
+
           if [[ $id -eq 0 ]]; then
             export SKIP_LEADER=true
+            echo "set server skip_control/leader addr $ip:8081 ; enable server skip_control/leader" | socat stdio tcp4-connect:haproxy-kubernetes-ingress:9999
           else
             export SKIP_FOLLOWER=true
             export SKIP_RESOURCE_PREFIX=follower$id
             export SKIP_LEADER_HOST=rhn-skip-0.rhn-skip.default.svc.cluster.local
+            echo "\
+            add server skip_control/follower$id $ip:8081 ;\
+            enable server skip_control/follower$id ;\
+            add server skip_stream/follower$id $ip:8080 ;\
+            enable server skip_stream/follower$id\
+            " | socat stdio tcp4-connect:haproxy-kubernetes-ingress:9999
           fi
           npm start
         ports:
