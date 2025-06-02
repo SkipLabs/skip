@@ -1,13 +1,15 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: haproxy-kubernetes-ingress
+  name: rhn-haproxy-config
 data:
   syslog-server: "address:stdout, format: raw, facility:daemon"
   frontend-config-snippet: |
      http-request set-header Follower-Prefix %[path,field(3,/)] if { path_beg -i /streams/ }
      use_backend skip_stream if { path_beg -i /streams/ }
      use_backend skip_control if { path_beg -i /control/ }
+  global-config-snippet: |
+    stats socket ipv4@*:9999 level admin expose-fd listeners
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
