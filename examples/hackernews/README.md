@@ -63,11 +63,7 @@ done
 
 5. Configure and run HAProxy as a Kubernetes ingress controller, mediating
    external traffic ("ingress") and distributing it to the relevant Kubernetes
-   service(s).
-```bash
-kubectl create configmap haproxy-auxiliary-configmap --from-file kubernetes/haproxy-aux.cfg
-helm install haproxy haproxytech/kubernetes-ingress -f reverse_proxy/kubernetes.yaml
-```
+   service(s): `helm install haproxy haproxytech/kubernetes-ingress`.
 
 6. `minikube service haproxy-kubernetes-ingress` to open a tunnel to the
    now-running ingress service, and point your browser at the output host/port
