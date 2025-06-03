@@ -9,7 +9,9 @@
       </nav>
       <div class="login">
         <template v-if="session">
-          <span class="user-info">Hello, {{ session.name || session.email }}</span>
+          <span class="user-info"
+            >Hello, {{ session.name || session.email }}</span
+          >
           <button @click="logout">Logout</button>
         </template>
         <template v-else>
@@ -72,8 +74,9 @@ export default defineComponent({
 /* Base Styles */
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
-    Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+    Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
   color: var(--color-text);
   line-height: 1.6;
   background-color: var(--color-background);

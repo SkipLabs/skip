@@ -43,7 +43,7 @@ export default defineComponent({
       evSource.addEventListener("init", (e: Event) => {
         const data = JSON.parse((e as MessageEvent<string>).data) as [
           number,
-          any[]
+          any[],
         ][];
         posts.value = data.map(([post_id, values]) => ({
           ...values[0],
@@ -64,7 +64,7 @@ export default defineComponent({
         }
 
         posts.value = updatedPosts.concat(
-          posts.value.filter((post) => !modifiedPosts.includes(post.id))
+          posts.value.filter((post) => !modifiedPosts.includes(post.id)),
         );
       });
 

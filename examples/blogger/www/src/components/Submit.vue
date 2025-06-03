@@ -20,7 +20,7 @@
             <option value="published">Publish Now</option>
           </select>
           <button type="submit">
-            {{ newPost.status === 'draft' ? 'Save Draft' : 'Publish Post' }}
+            {{ newPost.status === "draft" ? "Save Draft" : "Publish Post" }}
           </button>
         </form>
       </div>
