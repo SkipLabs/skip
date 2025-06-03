@@ -7,14 +7,15 @@ reverse-proxy (in `reverse_proxy/`), and a PostgreSQL database (in `db/`).
 We provide configurations to run it using either Docker Compose or Kubernetes.
 The Docker Compose version is simpler and easier if you just want to get
 started with as few dependencies as possible; the Kubernetes version may be
-useful for users already using Kubernetes for other deployments.
+useful for users who are either already using Kubernetes for other deployments
+or require elastic horizontal scaling of their Skip service.
 
 ## Docker Compose
 
 To build and run the application using Docker Compose, first install and run
 Docker on your system, then run:
 
-```
+```bash
 $ docker compose up --build
 ```
 
@@ -26,7 +27,7 @@ of computing and maintaining resources in a round-robin fashion.
 
 This distributed configuration requires only configuration changes, is
 transparent to clients, and can be run with:
-```
+```bash
 $ docker compose -f compose.distributed.yml up --build
 ```
 
@@ -50,7 +51,7 @@ configuration) to a local Kubernetes cluster.
 
 3. Build docker images for each component of this example, then tag and publish
    each one to the `minikube` registry:
-```
+```bash
 docker compose -f kubernetes/compose.distributed.yml build
 for image in web-service reactive-service www db ; do
   docker tag reactive-hackernews/$image localhost:5000/$image;
@@ -63,7 +64,7 @@ done
 5. Configure and run HAProxy as a Kubernetes ingress controller, mediating
    external traffic ("ingress") and distributing it to the relevant Kubernetes
    service(s).
-```
+```bash
 kubectl create configmap haproxy-auxiliary-configmap --from-file kubernetes/haproxy-aux.cfg
 helm install haproxy haproxytech/kubernetes-ingress -f reverse_proxy/kubernetes.yaml
 ```
