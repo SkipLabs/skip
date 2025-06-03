@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: rhn-web
+  labels:
+    app.kubernetes.io/name: rhn-web
+  annotations:
+    haproxy.org/backend-config-snippet: |
+      http-request set-path %[path,regsub(^/api/,/)]
+spec:
+  ports:
+    - port: 3031
+      name: api
+  selector:
+    app.kubernetes.io/name: rhn-web
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rhn-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rhn-web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rhn-web
+    spec:
+      containers:
+      - name: rhn-web
+        image: localhost:5000/web-service
+        ports:
+        - containerPort: 3031
+        env:
+        - name: SKIP_CONTROL_URL
+          value:
+            "http://haproxy-kubernetes-ingress.default.svc.cluster.local/control"
+        - name: PG_HOST
+          value: "rhn-pg.default.svc.cluster.local"

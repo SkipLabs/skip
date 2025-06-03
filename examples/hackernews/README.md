@@ -4,8 +4,18 @@ This example is made of a Skip reactive service (in `reactive_service/`), a
 Flask web service (in `web_service/`), a React front-end (in `www/`), a HAProxy
 reverse-proxy (in `reverse_proxy/`), and a PostgreSQL database (in `db/`).
 
-In order to run it, do:
-```
+We provide configurations to run it using either Docker Compose or Kubernetes.
+The Docker Compose version is simpler and easier if you just want to get
+started with as few dependencies as possible; the Kubernetes version may be
+useful for users who are either already using Kubernetes for other deployments
+or require elastic horizontal scaling of their Skip service.
+
+## Docker Compose
+
+To build and run the application using Docker Compose, first install and run
+Docker on your system, then run:
+
+```bash
 $ docker compose up --build
 ```
 
@@ -17,9 +27,51 @@ of computing and maintaining resources in a round-robin fashion.
 
 This distributed configuration requires only configuration changes, is
 transparent to clients, and can be run with:
-```
+```bash
 $ docker compose -f compose.distributed.yml up --build
 ```
+
+## Kubernetes
+
+To run the application in a local Kubernetes cluster, you'll need several other
+prerequisites in addition to Docker.  Perform the following steps, which will
+run and deploy the full application (in a distributed leader-follower
+configuration) to a local Kubernetes cluster.
+
+1. Install [`kubectl`](https://kubernetes.io/docs/tasks/tools/#kubectl)
+   (configuration tool to talk to a running cluster),
+   [`helm`](https://helm.sh/docs/intro/install/) (Kubernetes package manager)
+   and [`minikube`](https://minikube.sigs.k8s.io/docs/start) (local Kubernetes
+   cluster), and initialize a cluster with `minikube start`.
+
+2. Enable the local Docker `registry` addon for `minikube` to use
+   locally-built images : `minkube addons enable registry` and expose its port
+   5000: `docker run --rm -it --network=host alpine ash -c "apk add socat &&
+   socat TCP-LISTEN:5000,reuseaddr,fork TCP:$(minikube ip):5000" &`
+
+3. Build docker images for each component of this example, then tag and publish
+   each one to the `minikube` registry:
+```bash
+docker compose -f kubernetes/compose.distributed.yml build
+for image in web-service reactive-service www db ; do
+  docker tag reactive-hackernews/$image localhost:5000/$image;
+  docker push localhost:5000/$image;
+done
+```
+
+4. Deploy these images to your local Kubernetes cluster: `kubectl apply -f 'kubernetes/*.yaml'`
+
+5. Configure and run HAProxy as a Kubernetes ingress controller, mediating
+   external traffic ("ingress") and distributing it to the relevant Kubernetes
+   service(s).
+```bash
+kubectl create configmap haproxy-auxiliary-configmap --from-file kubernetes/haproxy-aux.cfg
+helm install haproxy haproxytech/kubernetes-ingress -f reverse_proxy/kubernetes.yaml
+```
+
+6. `minikube service haproxy-kubernetes-ingress` to open a tunnel to the
+   now-running ingress service, and point your browser at the output host/port
+   to see the service up and running!
 
 ### Overall System Design with optional leader/followers
 

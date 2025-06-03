@@ -1,0 +1,17 @@
+controller:
+  replicaCount: 1
+  service:
+    tcpPorts:
+      - name: runtime
+        port: 9999
+        targetPort: 9999
+  extraVolumes:
+  - name: haproxy-auxiliary-volume
+    configMap:
+      name: haproxy-auxiliary-configmap
+  extraVolumeMounts:
+  - name: haproxy-auxiliary-volume
+    mountPath: /usr/local/etc/haproxy/haproxy-aux.cfg
+    subPath: haproxy-aux.cfg
+  extraArgs:
+    - --configmap=default/rhn-haproxy-config
