@@ -5,12 +5,18 @@
       <div class="title">Blogger</div>
       <nav class="menu">
         <router-link to="/">Home</router-link>
-        <router-link to="/submit">Submit</router-link>
+        <router-link v-if="session" to="/submit">Submit</router-link>
       </nav>
       <div class="login">
-        <router-link to="/login">
-          <button>Login</button>
-        </router-link>
+        <template v-if="session">
+          <span class="user-info">Hello, {{ session.name || session.email }}</span>
+          <button @click="logout">Logout</button>
+        </template>
+        <template v-else>
+          <router-link to="/login">
+            <button>Login</button>
+          </router-link>
+        </template>
       </div>
     </header>
 
@@ -22,9 +28,14 @@
 
 <script lang="ts">
 import { defineComponent } from "vue";
+import { useAuth } from "./composables/useAuth";
 
 export default defineComponent({
   name: "App",
+  setup() {
+    const { session, logout } = useAuth();
+    return { session, logout };
+  },
 });
 </script>
 
@@ -52,7 +63,7 @@ export default defineComponent({
   --color-border: #e2e8f0; /* Light Gray */
 
   /* Error Colors */
-  --color-error: #e6f3ff; /* Light Sky Blue */
+  --color-error: #e74c3c; /* Light Red */
 
   /* Shadow Colors */
   --shadow-color: rgba(44, 62, 80, 0.05);
@@ -137,5 +148,11 @@ body {
 
 .logo:hover {
   transform: rotate(180deg);
+}
+
+.user-info {
+  margin-right: 1rem;
+  font-weight: 500;
+  color: var(--color-text);
 }
 </style>

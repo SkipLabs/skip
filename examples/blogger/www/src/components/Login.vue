@@ -35,6 +35,7 @@
 <script lang="ts">
 import { defineComponent, ref } from "vue";
 import { useRouter } from "vue-router";
+import { useAuth } from "../composables/useAuth";
 
 export default defineComponent({
   name: "Login",
@@ -43,28 +44,15 @@ export default defineComponent({
     const username = ref("");
     const password = ref("");
     const error = ref("");
+    const { login } = useAuth();
 
     const handleLogin = async () => {
+      error.value = "";
       try {
-        const response = await fetch("/api/login", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            username: username.value,
-            password: password.value,
-          }),
-        });
-
-        if (response.ok) {
-          router.push("/");
-        } else {
-          error.value = "Invalid username or password";
-        }
-      } catch (err) {
-        error.value = "An error occurred during login";
-        console.error("Login error:", err);
+        await login(username.value, password.value);
+        router.push("/");
+      } catch (err: any) {
+        error.value = err?.message || "Invalid username or password";
       }
     };
 
