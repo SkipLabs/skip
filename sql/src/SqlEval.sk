@@ -2064,32 +2064,7 @@ fun importNext(
   };
   for (targetDirName => src in updates) {
     (_version, dir) = src;
-    (isReset, changedKeys) = dir.getChangesAfter(tick);
-    inputDir = targetCtx.unsafeMaybeGetEagerDir(targetDirName) match {
-    | None() ->
-      time = targetCtx.timeStamp();
-      targetDir = SKStore.EagerDir::create{
-        timeStack => SKStore.TimeStack::createInput(time),
-        input => true,
-        dirName => targetDirName,
-        creator => None(),
-      };
-      targetCtx.setDir(targetDir);
-      targetDir
-    | Some(d) -> d
-    };
-    entries = mutable Vector[];
-    for (key in changedKeys) {
-      for (srcValue in dir.unsafeGetAllDataIterAfter(tick, key)) {
-        (_, source, writer, values) = srcValue;
-        entries.push((key, (source, writer, values)));
-      }
-    };
-    inputDir.writeArraySourceMany(
-      targetCtx,
-      entries.iterator(),
-      if (isReset) Some((dir.dirName, changedKeys)) else None(),
-    )
+    dir.importNext{targetCtx, tick, targetDirName}
   };
   hasMultipleVersions
 }
@@ -2674,6 +2649,39 @@ extension class EagerDir {
   fun timeMaxMinus(): this {
     !this.timeStack = this.timeStack.maxMinus();
     this
+  }
+
+  fun importNext{
+    targetCtx: mutable Context,
+    tick: Tick,
+    targetDirName: DirName,
+  }: void {
+    (isReset, changedKeys) = this.getChangesAfter(tick);
+    inputDir = targetCtx.unsafeMaybeGetEagerDir(targetDirName) match {
+    | None() ->
+      time = targetCtx.timeStamp();
+      targetDir = EagerDir::create{
+        timeStack => TimeStack::createInput(time),
+        input => true,
+        dirName => targetDirName,
+        creator => None(),
+      };
+      targetCtx.setDir(targetDir);
+      targetDir
+    | Some(d) -> d
+    };
+    entries = mutable Vector[];
+    for (key in changedKeys) {
+      for (srcValue in this.unsafeGetAllDataIterAfter(tick, key)) {
+        (_, source, writer, values) = srcValue;
+        entries.push((key, (source, writer, values)));
+      }
+    };
+    inputDir.writeArraySourceMany(
+      targetCtx,
+      entries.iterator(),
+      if (isReset) Some((this.dirName, changedKeys)) else None(),
+    )
   }
 }
 
