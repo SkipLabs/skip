@@ -1,7 +1,7 @@
 # Reactive Blogger example
 
 This example is made of a Skip reactive service (in `reactive_service/`), a
-Flask web service (in `web_service/`), a React front-end (in `www/`), a HAProxy
+Flask web service (in `web_service/`), a Vue front-end (in `www/`), a HAProxy
 reverse-proxy (in `reverse_proxy/`), and a PostgreSQL database (in `db/`).
 
 In order to run it, do:
