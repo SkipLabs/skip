@@ -52,8 +52,8 @@ def login():
     with get_db() as db:
         with db.cursor() as cur:
             res = cur.execute(
-                "SELECT id, name, email FROM users WHERE LOWER(email) = LOWER(%s)",
-                (request.json["email"],),
+                "SELECT id, name, email FROM users WHERE LOWER(name) = LOWER(%s)",
+                (request.json["username"],),
             )
             if cur.rowcount < 1:
                 return "Unauthorized", 401
