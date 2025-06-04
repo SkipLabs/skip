@@ -2056,7 +2056,7 @@ fun importNext(
       (targetDirName, version) = makeInputDirName(dirName);
       !hasMultipleVersions = hasMultipleVersions || version != 0;
       updates.maybeGet(targetDirName) match {
-      | Some((_, _, _, iversion, _)) if (iversion > version) -> void
+      | Some((iversion, _)) if (iversion > version) -> void
       | _ ->
         (isReset, changedKeys) = dir.getChangesAfter(tick);
         targetCtx.unsafeMaybeGetDir(targetDirName) match {
@@ -2078,13 +2078,16 @@ fun importNext(
             entries.push((key, (source, writer, values)));
           }
         };
-        updates![targetDirName] = (isReset, changedKeys, dir, version, entries)
+        updates![targetDirName] = (
+          version,
+          (isReset, changedKeys, dir, entries),
+        )
       }
     | _ -> void
     }
   };
   for (targetDirName => src in updates) {
-    (isReset, changedKeys, dir, _, entries) = src;
+    (_, (isReset, changedKeys, dir, entries)) = src;
     targetCtx.unsafeMaybeGetEagerDir(targetDirName) match {
     | None() -> invariant_violation("Directory should have been created")
     | Some(inputDir) ->
