@@ -21,8 +21,11 @@ module SKStore;
 
 class MaxKeyFile(key: Key) extends File
 
-value class FilterRange private (ranges: Array<KeyRange<Key>>, max: Key) {
-  static fun create(rangesOpt: ?Array<KeyRange<Key>>): ?this {
+value class FilterRange<+K: Orderable> private (
+  ranges: Array<KeyRange<K>>,
+  max: K,
+) {
+  static fun create(rangesOpt: ?Array<KeyRange<K>>): ?this {
     rangesOpt match {
     | None() -> None()
     | Some(ranges) ->
@@ -70,7 +73,7 @@ class EagerFilter private {
 
   private fun bindDirectories(
     context: mutable Context,
-    rangesOpt: ?FilterRange,
+    rangesOpt: ?FilterRange<Key>,
   ): void {
     sinkName = this.childName.sub("filter-sink").sub(genSym(0).toString());
     EagerDir::apply(
@@ -111,7 +114,7 @@ class EagerFilter private {
   private fun syncData(
     context: mutable Context,
     changedKeysOpt: ?SortedSet<Key>,
-    rangesOpt: ?FilterRange,
+    rangesOpt: ?FilterRange<Key>,
   ): void {
     startKeyOpt = changedKeysOpt match {
     | None() -> None()
