@@ -143,8 +143,7 @@ fun tailShouldWake(
     context.unsafeMaybeGetEagerDir(dirName) match {
     | None() -> void
     | Some(dir) ->
-      (isReset, changes) = dir.getChangesAfter(tick);
-      if (isReset || !changes.isEmpty()) {
+      if (dir.changesAfterIsResetOrNonEmpty(tick)) {
         return true
       }
     }
@@ -441,6 +440,13 @@ extension class Sub {
     | NMultipleDirs(c, dirSubs) ->
       this with {cmd => NMultipleDirs(c, dirSubs.map(f))}
     }
+  }
+}
+
+extension class EagerDir {
+  fun changesAfterIsResetOrNonEmpty(tick: Tick): Bool {
+    (isReset, changes) = this.getChangesAfter(tick);
+    isReset || !changes.isEmpty()
   }
 }
 
