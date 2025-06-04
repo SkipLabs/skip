@@ -44,7 +44,7 @@ git commit -m '<some message>'
 gh pr create # if you use the GitHub CLI
 ```
 
-When reviewed and mereged, you are ready to publish documentation to the live site:
+When reviewed and merged, you are ready to publish documentation to the live site:
 ```bash
 # From repository root INSIDE your Docker instance
 make docs-publish
@@ -57,19 +57,6 @@ Push to live site: cd www/docs_site/; git add -A; git commit -m 'update to <comm
 ```
 
 The commit hash in the last line should be the hash of your commit in the skip repository. 
-
-This will suggest running:
-```bash
-# Test locally
-make docs-serve
-
-# Push to live site
-cd www/docs_site/
-git add -A
-git commit -m 'update to <hash_of_your_commit>'
-git push
-cd -
-```
 
 > **Note**: If `make docs-publish` is run from a commit that is not (an ancestor of) `main`, the docs_site commit messages will contain incorrect commit hashes.
 
@@ -94,9 +81,8 @@ git clean -Xdn     # -n for a dry-run and double-check what's to be cleaned out
 git clean -Xdf     # the actual cleaning
 ```
 
-### What if the hash is not in the commit message suggested along the process ? 
+### What if the hash in the suggested commit message is not the hash of your commit? 
 You can get it from the skip repository: 
 ```bash
 git rev-parse --short HEAD # supposingly it is the last commit of the branch
 ```
-
