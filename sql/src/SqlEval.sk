@@ -2065,7 +2065,7 @@ fun importNext(
   for (targetDirName => src in updates) {
     (_version, dir) = src;
     (isReset, changedKeys) = dir.getChangesAfter(tick);
-    targetCtx.unsafeMaybeGetDir(targetDirName) match {
+    inputDir = targetCtx.unsafeMaybeGetEagerDir(targetDirName) match {
     | None() ->
       time = targetCtx.timeStamp();
       targetDir = SKStore.EagerDir::create{
@@ -2074,8 +2074,9 @@ fun importNext(
         dirName => targetDirName,
         creator => None(),
       };
-      targetCtx.setDir(targetDir)
-    | Some(_) -> void
+      targetCtx.setDir(targetDir);
+      targetDir
+    | Some(d) -> d
     };
     entries = mutable Vector[];
     for (key in changedKeys) {
@@ -2084,15 +2085,11 @@ fun importNext(
         entries.push((key, (source, writer, values)));
       }
     };
-    targetCtx.unsafeMaybeGetEagerDir(targetDirName) match {
-    | None() -> invariant_violation("Directory should have been created")
-    | Some(inputDir) ->
-      inputDir.writeArraySourceMany(
-        targetCtx,
-        entries.iterator(),
-        if (isReset) Some((dir.dirName, changedKeys)) else None(),
-      )
-    }
+    inputDir.writeArraySourceMany(
+      targetCtx,
+      entries.iterator(),
+      if (isReset) Some((dir.dirName, changedKeys)) else None(),
+    )
   };
   hasMultipleVersions
 }
