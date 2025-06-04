@@ -2057,37 +2057,33 @@ fun importNext(
       !hasMultipleVersions = hasMultipleVersions || version != 0;
       updates.maybeGet(targetDirName) match {
       | Some((iversion, _)) if (iversion > version) -> void
-      | _ ->
-        (isReset, changedKeys) = dir.getChangesAfter(tick);
-        targetCtx.unsafeMaybeGetDir(targetDirName) match {
-        | None() ->
-          time = targetCtx.timeStamp();
-          targetDir = SKStore.EagerDir::create{
-            timeStack => SKStore.TimeStack::createInput(time),
-            input => true,
-            dirName => targetDirName,
-            creator => None(),
-          };
-          targetCtx.setDir(targetDir)
-        | Some(_) -> void
-        };
-        entries = mutable Vector[];
-        for (key in changedKeys) {
-          for (srcValue in dir.unsafeGetAllDataIterAfter(tick, key)) {
-            (_, source, writer, values) = srcValue;
-            entries.push((key, (source, writer, values)));
-          }
-        };
-        updates![targetDirName] = (
-          version,
-          (isReset, changedKeys, dir, entries),
-        )
+      | _ -> updates![targetDirName] = (version, dir)
       }
     | _ -> void
     }
   };
   for (targetDirName => src in updates) {
-    (_, (isReset, changedKeys, dir, entries)) = src;
+    (_version, dir) = src;
+    (isReset, changedKeys) = dir.getChangesAfter(tick);
+    targetCtx.unsafeMaybeGetDir(targetDirName) match {
+    | None() ->
+      time = targetCtx.timeStamp();
+      targetDir = SKStore.EagerDir::create{
+        timeStack => SKStore.TimeStack::createInput(time),
+        input => true,
+        dirName => targetDirName,
+        creator => None(),
+      };
+      targetCtx.setDir(targetDir)
+    | Some(_) -> void
+    };
+    entries = mutable Vector[];
+    for (key in changedKeys) {
+      for (srcValue in dir.unsafeGetAllDataIterAfter(tick, key)) {
+        (_, source, writer, values) = srcValue;
+        entries.push((key, (source, writer, values)));
+      }
+    };
     targetCtx.unsafeMaybeGetEagerDir(targetDirName) match {
     | None() -> invariant_violation("Directory should have been created")
     | Some(inputDir) ->
