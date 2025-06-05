@@ -3,16 +3,16 @@ import { useNavigate } from "react-router-dom";
 import Header from "./Header.jsx";
 
 function Login() {
-  const [email, setEmail] = useState<string>("");
+  const [username, setUsername] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [loginError, setLoginError] = useState<string | null>();
   const navigate = useNavigate();
-  function login(email: string, _password: string) {
+  function login(username: string, _password: string) {
     fetch("/api/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        email,
+        username,
         password,
       }),
     })
@@ -30,18 +30,23 @@ function Login() {
     <>
       <Header session={null} />
       {loginError !== null && <p style={{ color: "red" }}>{loginError}</p>}
+      <p className="login-explanation">
+        You can log in as any of these SkipLabs team members to experience the
+        voting system: Benno, Charles, Daniel, Hugo, Josh, Julien, Laure, Lucas,
+        Mehdi
+      </p>
       <form
         onSubmit={(e) => {
           e.preventDefault();
           setLoginError(null);
-          login(email, password);
+          login(username, password);
         }}
       >
         <input
           type="text"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
         />
         <input
           type="password"
