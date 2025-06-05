@@ -68,6 +68,16 @@ GUI/dashboard equivalent if you prefer or are running on a hosted platform)
 without breaking any clients or requiring any changes in your reactive service
 or other backend components.
 
+:::note
+
+Try it yourself! If you're running the example linked above, try running
+`kubectl scale --replicas=$REPLICAS statefulset rhn-skip` with varying number of
+`REPLICAS` (at least 2, for one leader and one follower) and see your Skip
+service scale up and down without downtime.
+
+:::
+
+
 The core idea is simple: your reactive Skip service is a Kubernetes
 "StatefulSet", giving each pod a stable and unique network identity.  When a new
 pod is added (either at startup or when scaling up), it registers itself with
