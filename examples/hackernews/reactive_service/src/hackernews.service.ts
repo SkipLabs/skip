@@ -8,52 +8,35 @@ import type {
 } from "@skipruntime/core";
 
 import { PostgresExternalService } from "@skip-adapter/postgres";
+import type {
+  Post,
+  PostWithUpvoteIds,
+  PostWithUpvoteCount,
+  PostsServiceInputs,
+  SessionsResourceInputs,
+  PostsResourceInputs,
+  PostsResourceParams,
+  Session,
+  Upvote,
+  User,
+} from "./types.js";
 
-type Post = {
-  author_id: number;
-  title: string;
-  url: string;
-  body: string;
-  date: number;
-};
-
-type User = {
-  name: string;
-  email: string;
-};
+// Default user for posts where the author is not found
 const unknownUser: User = { name: "unknown author", email: "unknown email" };
 
-type Upvote = {
-  post_id: number;
-  user_id: number;
-};
-
-type PostWithUpvoteIds = Post & { upvotes: number[]; author: User };
-
-type PostWithUpvoteCount = Omit<Post, "author_id"> & {
-  upvotes: number;
-  upvoted: boolean;
-  author: User;
-};
-
-type Session = User & {
-  user_id: number;
-};
-
-const host: string = process.env["PG_HOST"] || "db";
-const port: number = Number(process.env["PG_PORT"]) || 5432;
-const database: string = process.env["PG_DATABASE"] || "postgres";
-const user: string = process.env["PG_USER"] || "postgres";
-const password: string = process.env["PG_PASSWORD"] || "change_me";
-
+// Initialize PostgreSQL connection
 const postgres = new PostgresExternalService({
-  host,
-  port,
-  database,
-  user,
-  password,
+  host: process.env["PG_HOST"] || "db",
+  port: Number(process.env["PG_PORT"]) || 5432,
+  database: process.env["PG_DATABASE"] || "postgres",
+  user: process.env["PG_USER"] || "postgres",
+  password: process.env["PG_PASSWORD"] || "change_me",
 });
 
+/**
+ * Maps upvote entries to post_id and user_id pairs
+ * Used to track which users have upvoted which posts
+ */
 class UpvotesMapper {
   mapEntry(_key: number, values: Values<Upvote>): Iterable<[number, number]> {
     const upvote: Upvote = values.getUnique();
@@ -61,6 +44,10 @@ class UpvotesMapper {
   }
 }
 
+/**
+ * Maps post entries to include author information and upvote IDs
+ * Combines post data with user data and upvote information
+ */
 class PostsMapper {
   constructor(
     private users: EagerCollection<number, User>,
@@ -79,10 +66,15 @@ class PostsMapper {
     } catch {
       author = unknownUser;
     }
+    // Sort by upvote count (negative for descending order) and post ID
     return [[[-upvotes.length, key], { ...post, upvotes, author }]];
   }
 }
 
+/**
+ * Cleans up post data for client consumption
+ * Adds upvote count and upvoted status for the current session
+ */
 class CleanupMapper {
   constructor(private readonly session: Session | null) {}
 
@@ -91,6 +83,7 @@ class CleanupMapper {
     values: Values<PostWithUpvoteIds>,
   ): Iterable<[number, PostWithUpvoteCount]> {
     const post = values.getUnique();
+    // Check if the current user has upvoted this post
     let upvoted;
     if (this.session === null) upvoted = false;
     else upvoted = post.upvotes.includes(this.session.user_id);
@@ -112,19 +105,17 @@ class CleanupMapper {
   }
 }
 
-type PostsResourceInputs = {
-  postsWithUpvotes: EagerCollection<[number, number], PostWithUpvoteIds>;
-  sessions: EagerCollection<string, Session>;
-};
-
-type PostsResourceParams = { limit?: number; session_id?: string };
-
+/**
+ * Resource handler for posts
+ * Manages post retrieval with pagination and session context
+ */
 class PostsResource implements Resource<PostsResourceInputs> {
   private limit: number;
   private session_id: string;
 
   constructor(jsonParams: Json) {
     const params = jsonParams as PostsResourceParams;
+    // Default to 25 posts if limit not specified
     if (params.limit === undefined) this.limit = 25;
     else this.limit = params.limit;
     if (params.session_id === undefined)
@@ -135,18 +126,23 @@ class PostsResource implements Resource<PostsResourceInputs> {
   instantiate(
     collections: PostsResourceInputs,
   ): EagerCollection<number, PostWithUpvoteCount> {
+    // Get current session or null if not logged in
     let session;
     try {
       session = collections.sessions.getUnique(this.session_id);
     } catch {
       session = null;
     }
+    // Apply limit and cleanup for client consumption
     return collections.postsWithUpvotes
       .take(this.limit)
       .map(CleanupMapper, session);
   }
 }
 
+/**
+ * Filters sessions to only return the current user's session
+ */
 class FilterSessionMapper {
   constructor(private session_id: string) {}
 
@@ -158,10 +154,10 @@ class FilterSessionMapper {
   }
 }
 
-type SessionsResourceInputs = {
-  sessions: EagerCollection<string, Session>;
-};
-
+/**
+ * Resource handler for sessions
+ * Manages user session data
+ */
 class SessionsResource implements Resource<SessionsResourceInputs> {
   private session_id: string;
 
@@ -179,10 +175,10 @@ class SessionsResource implements Resource<SessionsResourceInputs> {
   }
 }
 
-type PostsServiceInputs = {
-  sessions: EagerCollection<string, Session>;
-};
-
+/**
+ * Main service definition
+ * Configures resources, external services, and data flow
+ */
 export const service: SkipService<PostsServiceInputs, PostsResourceInputs> = {
   initialData: {
     sessions: [],
@@ -193,6 +189,7 @@ export const service: SkipService<PostsServiceInputs, PostsResourceInputs> = {
     inputs: PostsServiceInputs,
     context: Context,
   ): PostsResourceInputs {
+    // Configure database resources with serial ID keys
     const serialIDKey = { key: { col: "id", type: "SERIAL" } };
     const posts = context.useExternalResource<number, Post>({
       service: "postgres",
