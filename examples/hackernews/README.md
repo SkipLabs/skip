@@ -35,8 +35,7 @@ $ docker compose -f compose.distributed.yml up --build
 
 To run the application in a local Kubernetes cluster, you'll need several other
 prerequisites in addition to Docker.  Perform the following steps, which will
-run and deploy the full application (in a distributed leader-follower
-configuration) to a local Kubernetes cluster.
+run and deploy the full application to a local Kubernetes cluster.
 
 1. Install [`kubectl`](https://kubernetes.io/docs/tasks/tools/#kubectl)
    (configuration tool to talk to a running cluster),
@@ -63,17 +62,31 @@ done
 
 5. Configure and run HAProxy as a Kubernetes ingress controller, mediating
    external traffic ("ingress") and distributing it to the relevant Kubernetes
-   service(s).
-```bash
-kubectl create configmap haproxy-auxiliary-configmap --from-file kubernetes/haproxy-aux.cfg
-helm install haproxy haproxytech/kubernetes-ingress -f reverse_proxy/kubernetes.yaml
-```
+   service(s): `helm install haproxy haproxytech/kubernetes-ingress`.
 
 6. `minikube service haproxy-kubernetes-ingress` to open a tunnel to the
    now-running ingress service, and point your browser at the output host/port
    to see the service up and running!
 
-### Overall System Design with optional leader/followers
+To run the application with its Skip service in a distributed leader-follower
+architecture, replace steps 4 and 5 with the following commands, which perform
+the same basic operations but use additional/modified configurations for the
+distributed architecture, found in `./kubernetes/distributed_skip`:
+
+```bash
+kubectl apply -f 'kubernetes/distributed_skip/*.yaml'
+kubectl create configmap haproxy-auxiliary-configmap --from-file kubernetes/distributed_skip/haproxy-aux.cfg
+helm install haproxy haproxytech/kubernetes-ingress -f kubernetes/distributed_skip/haproxy-helm-config
+```
+
+Once up and running, you can now dynamically scale the Skip service with
+`kubectl scale --replicas=$NUM_SKIP_INSTANCES statefulset rhn-skip` or the
+GUI/dashboard equivalent for your cluster, with `NUM_SKIP_INSTANCES` >= 2 (since
+the leader _is included_ in the number of replicas and the application requires
+at least one leader and one follower to function correctly).
+
+
+## Overall System Design with optional leader/followers
 
 ```mermaid
 graph TD
