@@ -26,26 +26,58 @@ We've recently built out some capabilities to make this easy, using a
 distributed leader/follower architecture to dramatically increase the number of
 concurrent resource instances that a Skip service can support.
 
-# What
+## Leader/Follower architecture
 
-- we've built out some infra and configs to make this easy, using a
-  leader/follower architecture to spread requested resources out 
-  
-  < diagram here >
-  
-- Using this design and standard tools, you can now just run `kubectl scale
-  --replicas=$X` (or the GUI/dashboard equivalent from your provider/host) to
-  allocate more resources
-  
-# How
+A single Skip service consists of:
 
-- stick a reverse proxy ingress controller in front of your kubernetes cluster
+    * a **shared computation graph** representing the portion of that service's
+	computations that is common among all of its clients: some data structures,
+	aggregations, partially-computed results, or the like that are always
+	maintained up-to-date regardless of client requests, and
 
-- key thing is idempotent self-registration of skip instances with the reverse
-  proxy (make sure you don't expose this port publicly!)
+    * one or more **resources** which can be instantiated by clients, dynamically
+	extending the computation graph as needed to produce data streams customized
+	by user-specific context or request parameters.
 
-- Your application can now scale up and down with traffic spikes!
+In practice, the work of maintaining the shared computation graph should not
+massively increase under spiking load, but the work of maintaining resource
+instances and serving their data streams _will_ increase in proportion to the
+number of concurrent clients.
 
+This dynamic affords an opportunity for **horizontal scaling**: we can maintain the
+shared computation graph just once on a _"leader"_ and mirror it to each of any
+number of _"followers"_, among which resource instances are evenly distributed.
+
+To see this in action, refer to the
+[documentation](https://github.com/SkipLabs/skip/tree/main/examples/hackernews/README.md)
+and follow the steps there to run the example application in its distributed
+configuration.
+
+## Kubernetes
+
+Running a distributed reactive service is a great way to handle larger amounts
+of traffic and/or more complex reactive computations, but what's really
+important is to be able to easily scale your reactive system up and down when
+your product goes viral, traffic spikes, and your pager goes off in the middle
+of the night.
+
+We've recently built out some Kubernetes
+[configuration](https://github.com/SkipLabs/skip/tree/main/examples/hackernews/kubernetes/distributed_skip)
+to make this as easy as running `kubectl scale --replicas=$X ...` (or the
+GUI/dashboard equivalent if you prefer or are running on a hosted platform)
+without breaking any clients or requiring any changes in your reactive service
+or other backend components.
+
+The core idea is simple: your reactive Skip service is a Kubernetes
+"StatefulSet", giving each pod a stable and unique network identity.  When a new
+pod is added (either at startup or when scaling up), it registers itself with
+the cluster's ingress load balancer.
+
+When a resource is instantiated, the resulting data stream's identifier encodes
+the follower hosting the stream, allowing the load balancer to route external
+traffic to the proper Skip instance.  When traffic subsides and the deployment
+scales down, the pod is taken out of rotation by the load balancer, until a
+subsequent scale-up brings it back into use.
 
 ## Wrap-up
 
