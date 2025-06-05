@@ -47,8 +47,12 @@ concurrent resource instances that a Skip service can support.
 - Your application can now scale up and down with traffic spikes!
 
 
-# Wrap-up
+## Wrap-up
 
- - show us what you're doing!
- - what else would be useful for you?
+Everyone's infrastructure and application are different, so let us know if there
+are other frameworks or tools you'd like to see supported or used in our
+examples and demos!
 
+We're also happy to help you scale out your reactive service using Skip, either
+by adapting these tools to your environment or advising on your setup.  Reach
+out and show us what you're building!
