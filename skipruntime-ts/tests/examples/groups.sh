@@ -14,7 +14,7 @@ fi
 
 if [ "$3" = "native" ]; then
     echo "Running 'groups' example on @skipruntime/native"
-    LD_LIBRARY_PATH=$(realpath ../../build/skipruntime) SKIP_PLATFORM="native" node dist/groups.js >/dev/null &
+    SKIP_PLATFORM="native" node dist/groups.js >/dev/null &
 else
     echo "Running 'groups' example on @skipruntime/wasm"
     node dist/groups.js >/dev/null &
