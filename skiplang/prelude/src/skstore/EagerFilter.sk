@@ -19,7 +19,16 @@
 /*****************************************************************************/
 module SKStore;
 
-class MaxKeyFile(key: Key) extends File
+base class IMaxKeyFile extends File uses Unsafe.Downcastable
+
+class MaxKeyFile<+K: frozen>(key: K) extends IMaxKeyFile {
+  static fun type(obj: File): this {
+    obj match {
+    | x @ IMaxKeyFile _ -> Unsafe.cast(x, static)
+    | _ -> invariant_violation("Expected MaxKeyFile")
+    }
+  }
+}
 
 value class FilterRange<+K: Orderable> private (
   ranges: Array<KeyRange<K>>,
@@ -39,7 +48,11 @@ value class FilterRange<+K: Orderable> private (
   }
 }
 
-class EagerFilter private {
+class EagerFilter<K: Key, F: File> private {
+  keyType: Key ~> K,
+
+  type: File ~> F,
+
   // The name of the parent directory
   parentName: DirName,
 
@@ -53,17 +66,17 @@ class EagerFilter private {
   capacity: Int,
 
   // The function that returns the size of a file
-  fileSize: File ~> Int,
+  fileSize: F ~> Int,
 
   // Given a file of a size > 1, returns the same version of the file
   // where N elements have been removed from the file
-  removeFromFile: (File, Int) ~> File,
+  removeFromFile: (F, Int) ~> F,
 
   // The filtering function (on the parent's files)
-  filter: (mutable Context, Key, File) ~> Bool,
+  filter: (mutable Context, K, F) ~> Bool,
 } {
   // Returns the size of an entire array
-  private fun arraySize(array: Array<File>): Int {
+  private fun arraySize(array: Array<F>): Int {
     count = 0;
     for (file in array) {
       !count = count + this.fileSize(file);
@@ -73,7 +86,7 @@ class EagerFilter private {
 
   private fun bindDirectories(
     context: mutable Context,
-    rangesOpt: ?FilterRange<Key>,
+    rangesOpt: ?FilterRange<K>,
   ): void {
     sinkName = this.childName.sub("filter-sink").sub(genSym(0).toString());
     EagerDir::apply(
@@ -114,9 +127,9 @@ class EagerFilter private {
   private fun syncData(
     context: mutable Context,
     changedKeysOpt: ?SortedSet<Key>,
-    rangesOpt: ?FilterRange<Key>,
+    rangesOpt: ?FilterRange<K>,
   ): void {
-    startKeyOpt = changedKeysOpt match {
+    startKeyOpt: ?K = changedKeysOpt match {
     | None() -> None()
     | Some(changedKeys) ->
       rangesOpt match {
@@ -124,16 +137,19 @@ class EagerFilter private {
       | Some(FilterRange(ranges, largestKey)) ->
         invariant(ranges.size() > 0);
         changedKeys.min() match {
-        | Some(minChangedKey) if (minChangedKey > largestKey) -> return void
+        | Some(minChangedKey) if (this.keyType(minChangedKey) > largestKey) ->
+          return void
         | _ -> void
         };
         changedKeys.max() match {
-        | Some(maxChangedKey) if (maxChangedKey < ranges[0].start) ->
+        | Some(
+          maxChangedKey,
+        ) if (this.keyType(maxChangedKey) < ranges[0].start) ->
           return void
         | _ -> void
         }
       };
-      changedKeys.min()
+      changedKeys.min().map(this.keyType)
     };
     parentDir = context.unsafeGetEagerDir(this.parentName);
     childDir = context.unsafeGetEagerDir(this.childName);
@@ -147,7 +163,7 @@ class EagerFilter private {
       arr = context
         .unsafeGetEagerDir(this.fullName)
         .getArrayRaw(this.childName);
-      if (arr.size() > 0 && MaxKeyFile::type(arr[0]).key < startKey) {
+      if (arr.size() > 0 && MaxKeyFile<K>::type(arr[0]).key < startKey) {
         return void;
       }
     };
@@ -159,9 +175,9 @@ class EagerFilter private {
     | Some(startKey) ->
       for (kv in childDir.unsafeGetFileIter(None())) {
         (key, files) = kv;
-        if (startKey <= key) break void;
+        if (startKey <= this.keyType(key)) break void;
         for (file in files) {
-          !size = this.fileSize(file) + size;
+          !size = this.fileSize(this.type(file)) + size;
         };
       }
     };
@@ -174,9 +190,11 @@ class EagerFilter private {
     rangeIndex = 0;
 
     for (kv in parentDir.unsafeGetFileIter(startKeyOpt)) {
-      (key, files) = kv;
+      (untypedKey, files) = kv;
+      key = this.keyType(untypedKey);
       vec = mutable Vector[];
-      for (file in files) {
+      for (untypedFile in files) {
+        file = this.type(untypedFile);
         if (!this.filter(context, key, file)) continue;
         rangesOpt match {
         | None() -> void
@@ -218,7 +236,9 @@ class EagerFilter private {
       !childDir = childDir.writeEntry(context, source, source, key, Array[]);
     };
 
-    fullFiles = if (toAdd == 0) Array[MaxKeyFile(keys.max().fromSome())] else {
+    fullFiles = if (toAdd == 0) {
+      Array[MaxKeyFile<K>(keys.max().fromSome())]
+    } else {
       Array[]
     };
 
@@ -237,19 +257,23 @@ class EagerFilter private {
   }
 
   static fun create(
+    keyType: Key ~> K,
+    type: File ~> F,
     context: mutable Context,
     parentName: DirName,
     childName: DirName,
     capacity: Int,
-    fileSize: File ~> Int,
-    removeFromFile: (File, Int) ~> File,
-    filter: (mutable Context, Key, File) ~> Bool,
-    rangesOpt: ?Array<KeyRange<Key>>,
+    fileSize: F ~> Int,
+    removeFromFile: (F, Int) ~> F,
+    filter: (mutable Context, K, F) ~> Bool,
+    rangesOpt: ?Array<KeyRange<K>>,
   ): void {
     filterRange = FilterRange::create(rangesOpt);
     _ = static::mkDir(context, childName, None());
     fullName = static::mkDir(context, childName, Some("full"));
     result = static{
+      keyType,
+      type,
       parentName,
       childName,
       fullName,
