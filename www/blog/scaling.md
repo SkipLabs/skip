@@ -49,7 +49,21 @@ shared computation graph just once on a
 [_leader_](https://skiplabs.io/docs/api/helpers/functions/asLeader) and mirror
 it to each of any number of
 [_followers_](https://skiplabs.io/docs/api/helpers/functions/asFollower),
-among which resource instances are evenly distributed.
+among which resource instances are evenly distributed, as illustrated in the
+following diagram:
+
+![Leader-follower architecture](./assets/leader_follower_arch.png)
+
+This diagram shows the structure of a distributed Skip service and the data flow
+for a single client request. When client A requests a live data stream, a
+reverse proxy forwards that to an available follower, selecting follower 2 in
+this example. That follower then sets up a reactive compute graph to maintain
+the requested data, incorporating user context and query parameters from client
+A as well as any shared inputs from the leader.
+
+This design allows to instantiate many more resources for many more clients than
+a single Skip service could handle alone, while maintaining the clean/simple
+semantics and low latency of a single-service deployment.
 
 To see this in action, you can pull our example, run it locally, and navigate to
 `localhost` in your browser:
