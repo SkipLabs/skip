@@ -45,13 +45,24 @@ instances and serving their data streams _will_ increase in proportion to the
 number of concurrent clients.
 
 This dynamic affords an opportunity for **horizontal scaling**: we can maintain the
-shared computation graph just once on a _"leader"_ and mirror it to each of any
-number of _"followers"_, among which resource instances are evenly distributed.
+shared computation graph just once on a
+[_leader_](https://skiplabs.io/docs/api/helpers/functions/asLeader) and mirror
+it to each of any number of
+[_followers_](https://skiplabs.io/docs/api/helpers/functions/asFollower),
+among which resource instances are evenly distributed.
 
-To see this in action, refer to the
-[documentation](https://github.com/SkipLabs/skip/tree/main/examples/hackernews/README.md)
-and follow the steps there to run the example application in its distributed
-configuration.
+To see this in action, you can pull our example, run it locally, and navigate to
+`localhost` in your browser:
+
+```bash
+npx create-skip-service hackernews --example hackernews --verbose
+docker compose -f hackernews/compose.distributed.yml up --build
+```
+
+To see more options or run the application in alternative configurations,
+consult the `README.md`
+[online](https://github.com/SkipLabs/skip/tree/main/examples/hackernews/README.md)
+or in the `hackernews` directory created by `create-skip-service`.
 
 ## Kubernetes
 
@@ -70,18 +81,19 @@ or other backend components.
 
 :::note
 
-Try it yourself! If you're running the example linked above, try running
-`kubectl scale --replicas=$REPLICAS statefulset rhn-skip` with varying number of
-`REPLICAS` (at least 2, for one leader and one follower) and see your Skip
-service scale up and down without downtime.
+Try it yourself! Run the hackernews example linked above using its Kubernetes
+configuration, then try running `kubectl scale --replicas=$REPLICAS statefulset
+rhn-skip` with varying number of `REPLICAS` (at least 2, for one leader and one
+follower) and see your Skip service scale up and down without downtime.
 
 :::
 
 
 The core idea is simple: your reactive Skip service is a Kubernetes
-"StatefulSet", giving each pod a stable and unique network identity.  When a new
-pod is added (either at startup or when scaling up), it registers itself with
-the cluster's ingress load balancer.
+[StatefulSet](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/),
+giving each pod a stable and unique network identity.  When a new pod is added
+(either at startup or when scaling up), it registers itself with the cluster's
+ingress load balancer.
 
 When a resource is instantiated, the resulting data stream's identifier encodes
 the follower hosting the stream, allowing the load balancer to route external
@@ -97,4 +109,5 @@ examples and demos!
 
 We're also happy to help you scale out your reactive service using Skip, either
 by adapting these tools to your environment or advising on your setup.  Reach
-out and show us what you're building!
+out and show us what you're building, or come join the
+[Discord](https://discord.gg/rby6YUqGxQ)!
