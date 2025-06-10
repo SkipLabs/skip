@@ -1292,8 +1292,9 @@ class EagerDir protected {
     onUpdate: ?((mutable Context, SortedSet<Key>) ~> void) = None(),
     unsafeSkipInit: Bool = false,
   ): void {
-    parents = FixedSingle::create(
-      mutable Vector[(parentName, Array[(f, rangeOpt, onUpdate)])],
+    parents = FixedSingle::singleton(
+      parentName,
+      Array[(f, rangeOpt, onUpdate)],
     );
     static::applyMany(context, parents, childName, reducerOpt, unsafeSkipInit);
   }
