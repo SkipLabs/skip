@@ -1570,11 +1570,11 @@ class EagerDir protected {
     }
   }
 
-  static fun update(
+  fun update(
+    /* this is the parent */
     context: mutable Context,
     parentDirtyOpt: ?SortedSet<Key>,
     contextDirtyReadersOpt: ?SortedMap<DirName, SortedSet<Key>>,
-    parentName: DirName,
     parentMaps: Array<
       (
         MapFun,
@@ -1584,7 +1584,8 @@ class EagerDir protected {
     >,
     childRef: EagerDir,
   ): void {
-    parent = context.unsafeGetEagerDir(parentName);
+    parent = this;
+    parentName = parent.dirName;
     childName = childRef.dirName;
     timeStack = childRef.timeStack;
 

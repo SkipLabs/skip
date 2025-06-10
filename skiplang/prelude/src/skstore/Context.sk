@@ -706,11 +706,11 @@ mutable class Context private {
           | None() -> invariant_violation("Could not find parent")
           | Some(f) -> f
           };
-          EagerDir::update(
+          parent = this.unsafeGetEagerDir(parentName);
+          parent.update(
             this,
             this.dirty.maybeGet(parentName),
             this.dirtyReaders.maybeGet(parentName),
-            parentName,
             parentMaps,
             child,
           )
