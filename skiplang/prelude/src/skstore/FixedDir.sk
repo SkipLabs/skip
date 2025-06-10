@@ -448,6 +448,10 @@ class FixedSingle<K: Orderable, +V: frozen> private (
     this.data.iterator()
   }
 
+  static fun createFromIterator(it: mutable Iterator<(K, V)>): this {
+    static::create(Vector::mcreateFromIterator(it))
+  }
+
   static fun create(
     data: mutable Vector<(K, V)>,
     allowDuplicates: Bool = false,
