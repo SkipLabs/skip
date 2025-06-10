@@ -339,7 +339,7 @@ base class IFixedDir<
 
   private fun getChangesAcc(
     after: Tick,
-    acc: mutable Vector<K>,
+    push: (K) -> void,
     i: Int,
     j: Int,
   ): void {
@@ -351,15 +351,15 @@ base class IFixedDir<
     tick = elt.tag;
     if (tick.max < after) return void;
     if (tick.current >= after) {
-      acc.push(elt.key);
+      push(elt.key);
     };
-    this.getChangesAcc(after, acc, i, pivot - 1);
-    this.getChangesAcc(after, acc, pivot + 1, j);
+    this.getChangesAcc(after, push, i, pivot - 1);
+    this.getChangesAcc(after, push, pivot + 1, j);
   }
 
   fun getChangesAfter(tick: Tick): SortedSet<K> {
     acc = mutable Vector[];
-    this.getChangesAcc(tick, acc, 0, this.data.size() - 1);
+    this.getChangesAcc(tick, acc.push, 0, this.data.size() - 1);
     result = SortedSet[];
     for (elt in acc) {
       !result = result.set(elt);
