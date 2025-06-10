@@ -436,11 +436,9 @@ class SelectEvaluator{
 
       SKStore.EagerDir::applyMany(
         context,
-        SKStore.FixedSingle::create(
-          mutable Vector[
-            (leftHandle.dirName, Array[(noop, leftRanges, None())]),
-            (shardsDirName, Array[(noop, None(), None())]),
-          ],
+        SKStore.FixedSingle::pair(
+          (leftHandle.dirName, Array[(noop, leftRanges, None())]),
+          (shardsDirName, Array[(noop, None(), None())]),
         ),
         projLeftName,
       );
@@ -449,11 +447,9 @@ class SelectEvaluator{
 
       SKStore.EagerDir::applyMany(
         context,
-        SKStore.FixedSingle::create(
-          mutable Vector[
-            (rightHandle.dirName, Array[(noop, rightRanges, None())]),
-            (shardsDirName, Array[(noop, None(), None())]),
-          ],
+        SKStore.FixedSingle::pair(
+          (rightHandle.dirName, Array[(noop, rightRanges, None())]),
+          (shardsDirName, Array[(noop, None(), None())]),
         ),
         projRightName,
       );
@@ -494,11 +490,9 @@ class SelectEvaluator{
 
       SKStore.EagerDir::applyMany(
         context,
-        SKStore.FixedSingle::create(
-          mutable Vector[
-            (projLeftName, Array[(projLeftFun, None(), None())]),
-            (projRightName, Array[(projRightFun, None(), None())]),
-          ],
+        SKStore.FixedSingle::pair(
+          (projLeftName, Array[(projLeftFun, None(), None())]),
+          (projRightName, Array[(projRightFun, None(), None())]),
         ),
         projName,
       );
@@ -708,37 +702,35 @@ class SelectEvaluator{
 
         SKStore.EagerDir::applyMany(
           context,
-          SKStore.FixedSingle::create(
-            mutable Vector[
-              (
-                selectName1Empty,
-                Array[
-                  (
-                    (context, writer, key, values) ~> {
-                      dataDir = context.unsafeGetEagerDir(dataName);
-                      if (dataDir.isEmpty(context)) {
-                        writer.setArray(key, values.collect(Array))
-                      }
-                    },
-                    None(),
-                    None(),
-                  ),
-                ],
-              ),
-              (
-                dataName,
-                Array[
-                  (
-                    (_context, writer, key, values) ~> {
-                      arr = values.collect(Array);
-                      writer.setArray(key, arr)
-                    },
-                    None(),
-                    None(),
-                  ),
-                ],
-              ),
-            ],
+          SKStore.FixedSingle::pair(
+            (
+              selectName1Empty,
+              Array[
+                (
+                  (context, writer, key, values) ~> {
+                    dataDir = context.unsafeGetEagerDir(dataName);
+                    if (dataDir.isEmpty(context)) {
+                      writer.setArray(key, values.collect(Array))
+                    }
+                  },
+                  None(),
+                  None(),
+                ),
+              ],
+            ),
+            (
+              dataName,
+              Array[
+                (
+                  (_context, writer, key, values) ~> {
+                    arr = values.collect(Array);
+                    writer.setArray(key, arr)
+                  },
+                  None(),
+                  None(),
+                ),
+              ],
+            ),
           ),
           this.selectName1,
         )
