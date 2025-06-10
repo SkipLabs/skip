@@ -20,7 +20,7 @@
 /*****************************************************************************/
 module SKStore;
 
-value class FixedRow<K: Orderable, +T>(
+value class FixedRow<+K: Orderable, +T>(
   key: K,
   value: T,
   source: Path,
@@ -31,31 +31,31 @@ value class FixedRow<K: Orderable, +T>(
     this
   }
 
-  fun compare<U>(other: FixedRow<K, U>): Order {
+  fun compare<L: Orderable, U>[K: L](other: FixedRow<L, U>): Order {
     (this.key, this.source).compare((other.key, other.source))
   }
 
-  fun <<U>(other: FixedRow<K, U>): Bool {
+  fun <<L: Orderable, U>[K: L](other: FixedRow<L, U>): Bool {
     this.compare(other) == LT()
   }
 
-  fun <=<U>(other: FixedRow<K, U>): Bool {
+  fun <=<L: Orderable, U>[K: L](other: FixedRow<L, U>): Bool {
     this.compare(other) != GT()
   }
 
-  fun ><U>(other: FixedRow<K, U>): Bool {
+  fun ><L: Orderable, U>[K: L](other: FixedRow<L, U>): Bool {
     this.compare(other) == GT()
   }
 
-  fun >=<U>(other: FixedRow<K, U>): Bool {
+  fun >=<L: Orderable, U>[K: L](other: FixedRow<L, U>): Bool {
     this.compare(other) != LT()
   }
 
-  fun ==<U>(other: FixedRow<K, U>): Bool {
+  fun ==<L: Orderable, U>[K: L](other: FixedRow<L, U>): Bool {
     this.compare(other) == EQ()
   }
 
-  fun !=<U>(other: FixedRow<K, U>): Bool {
+  fun !=<L: Orderable, U>[K: L](other: FixedRow<L, U>): Bool {
     this.compare(other) != EQ()
   }
 }
