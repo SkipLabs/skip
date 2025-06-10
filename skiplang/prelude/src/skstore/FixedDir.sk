@@ -444,6 +444,10 @@ class FixedSingle<K: Orderable, +V: frozen> private (
     static(Array[(k, v)])
   }
 
+  static fun pair(kv1: (K, V), kv2: (K, V)): this {
+    static::create(mutable Vector[kv1, kv2])
+  }
+
   fun items(): mutable Iterator<(K, V)> {
     this.data.iterator()
   }
