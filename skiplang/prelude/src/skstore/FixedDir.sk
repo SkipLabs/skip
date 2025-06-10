@@ -60,15 +60,21 @@ value class FixedRow<+K: Orderable, +T>(
   }
 }
 
-base class FixedData<K: Orderable, +T> {
+base class FixedData<+K: Orderable, +T> {
   fun size(): Int;
   fun get(idx: Int): FixedRow<K, T>;
-  fun getPos(key: K): Int;
-  fun getArray(key: K): Array<T>;
-  fun getIter(key: K): mutable Iterator<(Tick, Path, T)>;
-  fun getIterAfter(tick: Tick, key: K): mutable Iterator<(Tick, Path, T)>;
-  fun getArraySourceKey(source: Path, key: K): Array<T>;
-  fun getIterSourceKey(source: Path, key: K): mutable Iterator<T>;
+  fun getPos<L: Orderable>[L: K](key: L): Int;
+  fun getArray<L: Orderable>[L: K](key: L): Array<T>;
+  fun getIter<L: Orderable>[L: K](key: L): mutable Iterator<(Tick, Path, T)>;
+  fun getIterAfter<L: Orderable>[L: K](
+    tick: Tick,
+    key: L,
+  ): mutable Iterator<(Tick, Path, T)>;
+  fun getArraySourceKey<L: Orderable>[L: K](source: Path, key: L): Array<T>;
+  fun getIterSourceKey<L: Orderable>[L: K](
+    source: Path,
+    key: L,
+  ): mutable Iterator<T>;
   fun getChangesAfter(tick: Tick): SortedSet<K>;
   fun iterator(): mutable Iterator<FixedRow<K, T>>;
 }
