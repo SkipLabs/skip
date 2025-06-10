@@ -41,11 +41,11 @@ mutable class Writer{
 /* The signature of a function used by apply. */
 /*****************************************************************************/
 
-type MapFun = (
+type MapFun<K, F> = (
   mutable Context,
   mutable Writer,
-  Key,
-  mutable Iterator<File>,
+  K,
+  mutable Iterator<F>,
 ) ~> void;
 
 /*****************************************************************************/
@@ -679,7 +679,7 @@ class EagerDir protected {
     DirName,
     Array<
       (
-        MapFun,
+        MapFun<Key, File>,
         ?Array<KeyRange<Key>>,
         ?((mutable Context, SortedSet<Key>) ~> void),
       ),
@@ -960,7 +960,7 @@ class EagerDir protected {
     parent: EagerDir,
     childName: DirName,
     timeStack: TimeStack,
-    f: MapFun,
+    f: MapFun<Key, File>,
     acc: mutable Vector<FixedRow<Key, Array<File>>>,
     current: mutable IntRef,
   ): void {
@@ -1020,7 +1020,7 @@ class EagerDir protected {
     parent: EagerDir,
     childName: DirName,
     timeStack: TimeStack,
-    f: MapFun,
+    f: MapFun<Key, File>,
     currentStart: Int,
     currentEnd: Int,
     start: ?Boundary<Key>,
@@ -1111,7 +1111,7 @@ class EagerDir protected {
     parent: EagerDir,
     childName: DirName,
     timeStack: TimeStack,
-    f: MapFun,
+    f: MapFun<Key, File>,
     acc: mutable Vector<FixedRow<Key, Array<File>>>,
     rangeOpt: ?KeyRange<Key>,
   ): void {
@@ -1175,7 +1175,7 @@ class EagerDir protected {
     timeStack: TimeStack,
     key: Key,
     valueIter: mutable Iterator<File>,
-    f: MapFun,
+    f: MapFun<Key, File>,
   ): void {
     arrow = ArrowKey::create{parentName, childName, key};
     context.enter(arrow, timeStack);
@@ -1231,7 +1231,7 @@ class EagerDir protected {
       DirName,
       Array<
         (
-          MapFun,
+          MapFun<Key, File>,
           ?Array<KeyRange<Key>>,
           ?((mutable Context, SortedSet<Key>) ~> void),
         ),
@@ -1286,7 +1286,7 @@ class EagerDir protected {
     context: mutable Context,
     parentName: DirName,
     childName: DirName,
-    f: MapFun,
+    f: MapFun<Key, File>,
     reducerOpt: ?IReducer<File> = None(),
     rangeOpt: ?Array<KeyRange<Key>> = None(),
     onUpdate: ?((mutable Context, SortedSet<Key>) ~> void) = None(),
@@ -1305,7 +1305,7 @@ class EagerDir protected {
       DirName,
       Array<
         (
-          MapFun,
+          MapFun<Key, File>,
           ?Array<KeyRange<Key>>,
           ?((mutable Context, SortedSet<Key>) ~> void),
         ),
@@ -1577,7 +1577,7 @@ class EagerDir protected {
     contextDirtyReadersOpt: ?SortedMap<DirName, SortedSet<Key>>,
     parentMaps: Array<
       (
-        MapFun,
+        MapFun<Key, File>,
         ?Array<KeyRange<Key>>,
         ?((mutable Context, SortedSet<Key>) ~> void),
       ),
