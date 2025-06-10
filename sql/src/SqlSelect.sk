@@ -504,17 +504,13 @@ class SelectEvaluator{
       );
       SKStore.EagerDir::applyMany(
         context,
-        SKStore.FixedSingle::create(
-          mutable Vector[
+        SKStore.FixedSingle::singleton(
+          projName,
+          Array[
             (
-              projName,
-              Array[
-                (
-                  makeJoinReducer(shards, joinKind, kinds, onlyLeftValues),
-                  None(),
-                  None(),
-                ),
-              ],
+              makeJoinReducer(shards, joinKind, kinds, onlyLeftValues),
+              None(),
+              None(),
             ),
           ],
         ),
