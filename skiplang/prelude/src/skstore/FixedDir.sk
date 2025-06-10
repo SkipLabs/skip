@@ -234,7 +234,7 @@ class CompactFixedDir protected {
 //Defines the public interface of a FixedDir, allowing for some alternative
 // internal RowRepresentation of conceptually-FixedRow<K, T> rows.
 base class IFixedDir<
-  K: Orderable,
+  +K: Orderable,
   +T: frozen,
   RowRepresentation: frozen,
 > protected {
@@ -276,15 +276,18 @@ base class IFixedDir<
     this.data.size()
   }
 
-  fun getPos(key: K): Int {
-    binSearch(i ~> this.get(i).key, key, 0, this.size() - 1)
+  fun getPos<L: Orderable>[L: K](key: L): Int {
+    binSearch<K>(i ~> this.get(i).key, key, 0, this.size() - 1)
   }
 
-  fun getAll(key: K): mutable Iterator<Int> {
-    findAll(i ~> this.get(i).key, key, 0, this.size() - 1)
+  fun getAll<L: Orderable>[L: K](key: L): mutable Iterator<Int> {
+    findAll<K>(i ~> this.get(i).key, key, 0, this.size() - 1)
   }
 
-  fun getAllSourceKey(source: Path, key: K): mutable Iterator<Int> {
+  fun getAllSourceKey<L: Orderable>[L: K](
+    source: Path,
+    key: L,
+  ): mutable Iterator<Int> {
     delta = i ~> {
       entry = this.get(i);
       c = key.compare(entry.key);
@@ -294,22 +297,25 @@ base class IFixedDir<
     findAllBy(delta, 0, this.size() - 1)
   }
 
-  fun getArray(key: K): Array<T> {
+  fun getArray<L: Orderable>[L: K](key: L): Array<T> {
     this.getAll(key).map(i ~> this.get(i).value).collect(Array)
   }
 
-  fun getIter(key: K): mutable Iterator<(Tick, Path, T)> {
+  fun getIter<L: Orderable>[L: K](key: L): mutable Iterator<(Tick, Path, T)> {
     this.getAll(key).map(i -> {
       elt = this.get(i);
       (elt.tag.current, elt.source, elt.value)
     })
   }
 
-  fun getIterSourceKey(source: Path, key: K): mutable Iterator<T> {
+  fun getIterSourceKey<L: Orderable>[L: K](
+    source: Path,
+    key: L,
+  ): mutable Iterator<T> {
     this.getAllSourceKey(source, key).map(i -> this.get(i).value)
   }
 
-  fun getArraySourceKey(source: Path, key: K): Array<T> {
+  fun getArraySourceKey<L: Orderable>[L: K](source: Path, key: L): Array<T> {
     this.getIterSourceKey(source, key).collect(Array)
   }
 
@@ -367,9 +373,9 @@ base class IFixedDir<
     result
   }
 
-  private fun getKeyChangesAfter(
+  private fun getKeyChangesAfter<L: Orderable>[L: K](
     after: Tick,
-    key: K,
+    key: L,
     i: Int,
     j: Int,
     push: ((Tick, Path, T)) -> void,
@@ -394,7 +400,10 @@ base class IFixedDir<
     }
   }
 
-  fun getIterAfter(limit: Tick, key: K): mutable Iterator<(Tick, Path, T)> {
+  fun getIterAfter<L: Orderable>[L: K](
+    limit: Tick,
+    key: L,
+  ): mutable Iterator<(Tick, Path, T)> {
     acc = mutable Vector[];
     this.getKeyChangesAfter(limit, key, 0, this.data.size() - 1, acc.push);
     acc.iterator()
