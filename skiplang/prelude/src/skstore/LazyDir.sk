@@ -17,11 +17,7 @@ base class LazyResult<F> {
   | LAbsent()
 }
 
-base class LazyDir protected {
-  protected data: SortedMap<Key, LazyResult<File>> = SortedMap[],
-  protected lazyFun: (mutable Context, DirName, Key) ~> ?Array<File>,
-  protected collect: Bool,
-} extends TDir {
+base class LazyDir protected {protected collect: Bool} extends Dir {
   /* Updates the lazyGets ref counts and return as well a potentially updated
     LazyDir in which dead keys have been removed. */
   fun updateLazyGets(
@@ -38,7 +34,10 @@ base class LazyDir protected {
   fun typed(): TLazyDir;
 }
 
-class TLazyDir extends LazyDir, TDir {
+class TLazyDir{
+  protected data: SortedMap<Key, LazyResult<File>> = SortedMap[],
+  protected lazyFun: (mutable Context, DirName, Key) ~> ?Array<File>,
+} extends LazyDir, TDir {
   fun updateLazyGets(
     refCountsOpt: ?SortedMap<Key, Int>,
     newKeysOpt: ?SortedSet<Key>,
