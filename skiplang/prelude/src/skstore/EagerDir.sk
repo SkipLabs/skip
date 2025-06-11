@@ -52,14 +52,14 @@ type MapFun = (
 /* Compaction types and helpers. */
 /*****************************************************************************/
 
-class Reducer{
-  reducer: IReducer,
-  private fixed: Array<(Key, Array<File>)>,
-  modified: SortedMap<Key, Array<File>>,
+class Reducer<K: Orderable, F: frozen>{
+  reducer: IReducer<F>,
+  private fixed: Array<(K, Array<F>)>,
+  modified: SortedMap<K, Array<F>>,
 } {
   static fun create(
-    fixedData: FixedData<Array<File>>,
-    reducer: IReducer,
+    fixedData: FixedData<K, Array<F>>,
+    reducer: IReducer<F>,
   ): this {
     acc = mutable Vector[];
     modified = SortedMap[];
@@ -78,8 +78,8 @@ class Reducer{
   }
 
   fun unsafeIter(
-    start: ?Key = None(),
-  ): mutable Iterator<(Key, mutable Iterator<File>)> {
+    start: ?K = None(),
+  ): mutable Iterator<(K, mutable Iterator<F>)> {
     current = mutable IntRef(
       start match {
       | None() -> 0
@@ -114,10 +114,10 @@ class Reducer{
   }
 
   private static fun makeCompactKeyIterator(
-    fixedData: FixedData<Array<File>>,
-    key: Key,
+    fixedData: FixedData<K, Array<F>>,
+    key: K,
     current: mutable IntRef,
-  ): readonly Vector<File> {
+  ): readonly Vector<F> {
     result = mutable Vector[];
     while (
       current.value < fixedData.size() &&
@@ -131,14 +131,14 @@ class Reducer{
     result
   }
 
-  fun getArray(key: Key): Array<File> {
+  fun getArray(key: K): Array<F> {
     this.modified.maybeGet(key) match {
     | None() -> this.getFixedij(key, 0, this.fixed.size() - 1)
     | Some(values) -> values
     }
   }
 
-  private fun getFixedij(key: Key, i: Int, j: Int): Array<File> {
+  private fun getFixedij(key: K, i: Int, j: Int): Array<F> {
     if (i > j) {
       return Array[];
     };
@@ -150,14 +150,14 @@ class Reducer{
     }
   }
 
-  fun getFixed(key: Key): Array<File> {
+  fun getFixed(key: K): Array<F> {
     this.getFixedij(key, 0, this.fixed.size() - 1)
   }
 }
 
-class IReducer{
-  init: (mutable Iterator<File> ~> Array<File>),
-  update: (Array<File>, Array<File>, Array<File>) ~> ?Array<File>,
+class IReducer<F>{
+  init: (mutable Iterator<F> ~> Array<F>),
+  update: (Array<F>, Array<F>, Array<F>) ~> ?Array<F>,
 }
 
 mutable class IntRef(mutable value: Int) {
@@ -399,16 +399,16 @@ class DataMapValue{
   }
 }
 
-class DataMap private {
-  data: DMap<Key, DMap<Path, (Path, Array<File>)>> = Nil(),
-  tombs: DMap<Key, DMap<Path, Path>> = Nil(),
+class DataMap<K: Orderable> private {
+  data: DMap<K, DMap<Path, (Path, Array<File>)>> = Nil(),
+  tombs: DMap<K, DMap<Path, Path>> = Nil(),
   nbrEntries: Int = 0,
 } {
   static fun empty(): this {
-    DataMap{}
+    static{}
   }
 
-  fun set(tick: Tick, key: Key, value: DataMapValue): this {
+  fun set(tick: Tick, key: K, value: DataMapValue): this {
     if (value.map.isEmpty()) {
       if (this.data.containsKey(key)) {
         !this.data = this.data.remove(key)
@@ -432,7 +432,7 @@ class DataMap private {
     this
   }
 
-  fun maybeGet(k: Key): ?DataMapValue {
+  fun maybeGet(k: K): ?DataMapValue {
     (this.data.maybeGet(k), this.tombs.maybeGet(k)) match {
     | (None(), None()) -> None()
     | (Some(map), None()) -> Some(DataMapValue{map, tombs => DMap::empty()})
@@ -441,7 +441,7 @@ class DataMap private {
     }
   }
 
-  fun each(f: (Key) -> void): void {
+  fun each(f: (K) -> void): void {
     dataIter = this.data.itemsWithTick();
     tombsIter = this.tombs.itemsWithTick();
     left = dataIter.next();
@@ -470,11 +470,11 @@ class DataMap private {
     }
   }
 
-  fun getChangesAfter(tick: Tick): SortedSet<Key> {
+  fun getChangesAfter(tick: Tick): SortedSet<K> {
     this.data.getChangesAfter(tick).union(this.tombs.getChangesAfter(tick))
   }
 
-  fun items(): mutable Iterator<(Key, DataMapValue)> {
+  fun items(): mutable Iterator<(K, DataMapValue)> {
     dataIter = this.data.itemsWithTick();
     tombsIter = this.tombs.itemsWithTick();
     left = dataIter.next();
@@ -502,7 +502,7 @@ class DataMap private {
     }
   }
 
-  fun keysAfter(lastSkippedOpt: ?Boundary<Key>): mutable Iterator<Key> {
+  fun keysAfter(lastSkippedOpt: ?Boundary<K>): mutable Iterator<K> {
     this.data.keysAfter(lastSkippedOpt)
   }
 
@@ -510,20 +510,23 @@ class DataMap private {
     this.data.getHeight()
   }
 
-  fun remove(k: Key): this {
+  fun remove(k: K): this {
     !this.data = this.data.remove(k);
     !this.tombs = this.tombs.remove(k);
     this
   }
 }
 
-class FixedDataMap{data: FixedData<Array<File>>, tombs: FixedDir<Path>} {
+class FixedDataMap{
+  data: FixedData<Key, Array<File>>,
+  tombs: FixedDir<Key, Path>,
+} {
   static fun create<V: File>(
-    vec: mutable Vector<FixedRow<Array<V>>> = mutable Vector[],
-    tombs: mutable Vector<FixedRow<Path>> = mutable Vector[],
+    vec: mutable Vector<FixedRow<Key, Array<V>>> = mutable Vector[],
+    tombs: mutable Vector<FixedRow<Key, Path>> = mutable Vector[],
   ): this {
     data = IFixedDir::getMetadata(vec) match {
-    | None() -> FixedDir<Array<File>>::create(vec)
+    | None() -> FixedDir<Key, Array<File>>::create(vec)
     | Some(metadata) -> CompactFixedDir::create(vec, metadata)
     };
     static{data, tombs => FixedDir::create(tombs)}
@@ -659,7 +662,7 @@ class EagerDir protected {
   private totalSize: Int,
   creator: ?ArrowKey,
   private fixedOld: FixedSourceMap = FixedSourceMap::empty(),
-  data: DataMap,
+  data: DataMap<Key>,
   private old: SortedMap<Path, MInfo> = SortedMap[],
   parents: FixedSingle<
     DirName,
@@ -673,7 +676,7 @@ class EagerDir protected {
   > = FixedSingle::empty(),
   childDirs: SortedSet<DirName> = SortedSet[],
   private slices: RangeMapList<Key, DirName> = RangeMapList[],
-  private reducer: ?Reducer = None(),
+  private reducer: ?Reducer<Key, File> = None(),
   private purgeCount: Int = 0,
   private tombLimit: ?Tick = None(),
   optOnDelete: ?Postponable = None(),
@@ -684,7 +687,7 @@ class EagerDir protected {
     input: Bool,
     fixedData: FixedDataMap = FixedDataMap::create(),
     creator: ?ArrowKey,
-    data: DataMap = DataMap::empty(),
+    data: DataMap<Key> = DataMap::empty(),
     optOnDelete: ?Postponable = None(),
   }: this {
     static{
@@ -966,7 +969,7 @@ class EagerDir protected {
     childName: DirName,
     timeStack: TimeStack,
     f: MapFun,
-    acc: mutable Vector<FixedRow<Array<File>>>,
+    acc: mutable Vector<FixedRow<Key, Array<File>>>,
     current: mutable IntRef,
   ): void {
     key = parent.fixedData.data[current.value].key;
@@ -1031,7 +1034,7 @@ class EagerDir protected {
     start: ?Boundary<Key>,
     end: ?Key,
   ): (
-    readonly Vector<FixedRow<Array<File>>>,
+    readonly Vector<FixedRow<Key, Array<File>>>,
     readonly Vector<(Path, MInfo)>,
     ?Key,
     Int,
@@ -1117,7 +1120,7 @@ class EagerDir protected {
     childName: DirName,
     timeStack: TimeStack,
     f: MapFun,
-    acc: mutable Vector<FixedRow<Array<File>>>,
+    acc: mutable Vector<FixedRow<Key, Array<File>>>,
     rangeOpt: ?KeyRange<Key>,
   ): void {
     last: ?Boundary<Key> = rangeOpt.map(range -> Inclusive(range.start));
@@ -1173,7 +1176,7 @@ class EagerDir protected {
 
   private static fun mapRow(
     context: mutable Context,
-    acc: mutable Vector<FixedRow<Array<File>>>,
+    acc: mutable Vector<FixedRow<Key, Array<File>>>,
     oldVec: mutable Vector<(Path, MInfo)>,
     parentName: DirName,
     childName: DirName,
@@ -1292,7 +1295,7 @@ class EagerDir protected {
     parentName: DirName,
     childName: DirName,
     f: MapFun,
-    reducerOpt: ?IReducer = None(),
+    reducerOpt: ?IReducer<File> = None(),
     rangeOpt: ?Array<KeyRange<Key>> = None(),
     onUpdate: ?((mutable Context, SortedSet<Key>) ~> void) = None(),
     unsafeSkipInit: Bool = false,
@@ -1316,7 +1319,7 @@ class EagerDir protected {
       >,
     >,
     childName: DirName,
-    reducerOpt: ?IReducer = None(),
+    reducerOpt: ?IReducer<File> = None(),
     unsafeSkipInit: Bool = false,
   ): void {
     context.unsafeMaybeGetEagerDir(childName) match {
