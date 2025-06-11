@@ -247,6 +247,59 @@ class SID(value: String) extends Key {
   }
 }
 
+base class KeySet uses Unsafe.Downcastable
+
+class TKeySet<+K: Orderable> private (inner: SortedSet<K>) extends KeySet {
+  static fun empty(): this {
+    static(SortedSet[])
+  }
+
+  fun set<K2: Orderable>[K: K2](key: K2): TKeySet<K2> {
+    TKeySet(this.inner.set(key))
+  }
+
+  fun values(): mutable Iterator<K> {
+    this.inner.values()
+  }
+
+  fun getInner(): TKeyMap<K, void> {
+    TKeyMap<K, void>::ofKeySet(this)
+  }
+}
+
+base class KeyMap<+V> uses Unsafe.Downcastable
+
+class TKeyMap<+K: Orderable, +V: frozen> private (
+  inner: SortedMap<K, V>,
+) extends KeyMap<V> {
+  static fun empty(): this {
+    static(SortedMap[])
+  }
+
+  static fun ofKeySet[V: void](set: TKeySet<K>): TKeyMap<K, void> {
+    TKeyMap<K, void>(set.inner.inner)
+  }
+
+  fun isEmpty(): Bool {
+    this.inner.isEmpty()
+  }
+
+  fun set<K2: Orderable, V2: frozen>[K: K2, V: V2](
+    key: K2,
+    value: V2,
+  ): TKeyMap<K2, V2> {
+    TKeyMap(this.inner.set(key, value))
+  }
+
+  fun mergeWith2<K2: Orderable, U: frozen, W: frozen, R: frozen>[K: K2](
+    other1: TKeyMap<K2, U>,
+    other2: TKeyMap<K2, W>,
+    f: (K2, ?V, ?U, ?W) -> ?R,
+  ): TKeyMap<K2, R> {
+    TKeyMap(this.inner.mergeWith2(other1.inner, other2.inner, f))
+  }
+}
+
 base class Exception extends .Exception uses Show
 
 fun error<T>(msg: String): T {
