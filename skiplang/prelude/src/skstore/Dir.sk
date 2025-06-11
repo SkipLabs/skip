@@ -6,6 +6,33 @@ module SKStore;
 
 base class Dir protected {timeStack: TimeStack, dirName: DirName} {
   /**
+   * Returns the directory name
+   */
+  fun getDirName(): DirName {
+    this.dirName
+  }
+
+  /**
+   * Returns the creation time of that directory.
+   */
+  fun getTime(): Time {
+    this.timeStack.getLast()
+  }
+
+  /**
+   * Returns the creation time of that directory and all of its ancestors
+   */
+  fun getTimeStack(): TimeStack {
+    this.timeStack
+  }
+
+  fun typed(): TDir;
+}
+
+base class TDir extends Dir {
+  fun typed(): this;
+
+  /**
    * Returns an array of files associated with a key.
    * The array is empty if the key does not exist.
    */
@@ -27,27 +54,6 @@ base class Dir protected {timeStack: TimeStack, dirName: DirName} {
    * Returns the list of files in a directory. Should only be used for testing.
    */
   fun keys(): SortedSet<Key>;
-
-  /**
-   * Returns the directory name
-   */
-  fun getDirName(): DirName {
-    this.dirName
-  }
-
-  /**
-   * Returns the creation time of that directory.
-   */
-  fun getTime(): Time {
-    this.timeStack.getLast()
-  }
-
-  /**
-   * Returns the creation time of that directory and all of its ancestors
-   */
-  fun getTimeStack(): TimeStack {
-    this.timeStack
-  }
 }
 
 /*****************************************************************************/
