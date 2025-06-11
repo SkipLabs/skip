@@ -28,6 +28,21 @@ base class LazyDir protected {
     refCountsOpt: ?SortedMap<Key, Int>,
     newKeysOpt: ?SortedSet<Key>,
     deadKeysOpt: ?SortedSet<Key>,
+  ): (?SortedMap<Key, Int>, ?this);
+
+  fun update(
+    context: mutable Context,
+    dirtyReadersOpt: ?SortedMap<DirName, SortedSet<Key>>,
+  ): void;
+
+  fun typed(): TLazyDir;
+}
+
+class TLazyDir extends LazyDir, TDir {
+  fun updateLazyGets(
+    refCountsOpt: ?SortedMap<Key, Int>,
+    newKeysOpt: ?SortedSet<Key>,
+    deadKeysOpt: ?SortedSet<Key>,
   ): (?SortedMap<Key, Int>, ?this) {
     refCounts = refCountsOpt.default(SortedMap[]);
     newKeys = newKeysOpt.default(SortedSet[]);
@@ -205,10 +220,6 @@ base class LazyDir protected {
     this.getArray(context, key).iterator()
   }
 
-  fun typed(): TLazyDir;
-}
-
-class TLazyDir extends LazyDir, TDir {
   fun typed(): this {
     this
   }
