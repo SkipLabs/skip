@@ -935,7 +935,6 @@ class GClassFile(value: GClass) extends SKStore.File
 // Manages the overall conversion from OuterIst to IR.
 class Converter private (
   program: I.Program,
-  private funs: SKStore.LHandle<LazyGFunKey, GFunctionFile>,
   private classes: SKStore.LHandle<LazyGClassKey, GClassFile>,
   lower: SKStore.LHandle<I.CallableDefFile, I.CallableDefFile>,
 ) {
@@ -952,12 +951,6 @@ class Converter private (
     name: SKStore.DirName,
     program: I.Program,
   ): this {
-    funDirName = name.sub("funs");
-    funs = SKStore.LHandle(
-      LazyGFunKey::keyType,
-      GFunctionFile::type,
-      funDirName,
-    );
     classDirName = name.sub("classes");
     classes = SKStore.LHandle(
       LazyGClassKey::keyType,
@@ -970,15 +963,7 @@ class Converter private (
       I.CallableDefFile::type,
       lowerDirName,
     );
-    converter = static(program, funs, classes, lower);
-    _ = SKStore.LHandle::create(
-      LazyGFunKey::keyType,
-      GFunctionFile::type,
-      context,
-      funDirName,
-      converter.getGFunctionFun,
-      false,
-    );
+    converter = static(program, classes, lower);
     _ = SKStore.LHandle::create(
       LazyGClassKey::keyType,
       GClassFile::type,
@@ -1014,12 +999,11 @@ class Converter private (
     context: mutable SKStore.Context,
     lazy: LazyGFun,
   ): GFunction {
-    this.getGFunctionFun(context, this.funs, LazyGFunKey(lazy))[0].value
+    this.getGFunctionFun(context, LazyGFunKey(lazy))[0].value
   }
 
   private fun getGFunctionFun(
     context: mutable SKStore.Context,
-    _self: SKStore.LHandle<LazyGFunKey, GFunctionFile>,
     key: LazyGFunKey,
   ): Array<GFunctionFile> {
     file = GFunctionFile(key.value.compile(context, this));
