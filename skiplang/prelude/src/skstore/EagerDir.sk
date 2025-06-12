@@ -525,10 +525,7 @@ class FixedDataMap{
     vec: mutable Vector<FixedRow<Key, Array<V>>> = mutable Vector[],
     tombs: mutable Vector<FixedRow<Key, Path>> = mutable Vector[],
   ): this {
-    data = IFixedDir::getMetadata(vec) match {
-    | None() -> FixedDir<Key, Array<File>>::create(vec)
-    | Some(metadata) -> CompactFixedDir::createWithMetadata(vec, metadata)
-    };
+    data = CompactFixedDir::create(vec);
     static{data, tombs => FixedDir::create(tombs)}
   }
 
