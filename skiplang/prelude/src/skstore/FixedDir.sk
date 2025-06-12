@@ -186,10 +186,36 @@ class CompactFixedDir protected {
   static fun create<V: File>(
     vec: mutable Vector<FixedRow<Key, Array<V>>> = mutable Vector[],
   ): FixedData<Key, Array<File>> {
-    IFixedDir::getMetadata(vec) match {
+    static::getMetadata(vec) match {
     | None() -> FixedDir<Key, Array<File>>::create(vec)
     | Some(metadata) -> static::createWithMetadata(vec, metadata)
     }
+  }
+
+  private static fun getMetadata(
+    data: readonly Vector<FixedRow<Key, Array<File>>>,
+  ): ?FixedDirMetadata {
+    possibleResult: ?FixedDirMetadata = None();
+
+    for (elt in data) {
+      if (elt.value.size() != 1) return None();
+      (elt.key, elt.value[0]) match {
+      | (SKDB.RowKey(row1, k), row2 @ SKDB.RowValues _) ->
+        possibleResult match {
+        | None() ->
+          !possibleResult = Some(
+            FixedDirMetadata{sourceDir => elt.source.dirName, kinds => k},
+          )
+        | Some(FixedDirMetadata{sourceDir, kinds}) ->
+          if (k != kinds || elt.source.dirName != sourceDir) {
+            return None()
+          }
+        };
+        if (row1 != row2) return None()
+      | _ -> return None()
+      }
+    };
+    possibleResult
   }
 
   static fun createWithMetadata<K: Key, V: File>(
@@ -252,32 +278,6 @@ base class IFixedDir<
 
   fun iterator(): mutable Iterator<FixedRow<K, T>> {
     this.data.keys().map(i -> this[i])
-  }
-
-  static fun getMetadata(
-    data: readonly Vector<FixedRow<Key, Array<File>>>,
-  ): ?FixedDirMetadata {
-    possibleResult: ?FixedDirMetadata = None();
-
-    for (elt in data) {
-      if (elt.value.size() != 1) return None();
-      (elt.key, elt.value[0]) match {
-      | (SKDB.RowKey(row1, k), row2 @ SKDB.RowValues _) ->
-        possibleResult match {
-        | None() ->
-          !possibleResult = Some(
-            FixedDirMetadata{sourceDir => elt.source.dirName, kinds => k},
-          )
-        | Some(FixedDirMetadata{sourceDir, kinds}) ->
-          if (k != kinds || elt.source.dirName != sourceDir) {
-            return None()
-          }
-        };
-        if (row1 != row2) return None()
-      | _ -> return None()
-      }
-    };
-    possibleResult
   }
 
   fun size(): Int {
