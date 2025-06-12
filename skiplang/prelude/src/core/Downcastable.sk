@@ -2,6 +2,10 @@ module Unsafe;
 
 @debug
 @cpp_extern("SKIP_unsafe_cast")
+native fun unsafeGenericCast<T, U>(t: T): U;
+
+@debug
+@cpp_extern("SKIP_unsafe_cast")
 native fun unsafeCast<T: Downcastable, F: T>(t: T): F;
 
 trait Downcastable {
@@ -26,6 +30,25 @@ fun cast<T: Downcastable, F: T>(v: T, c: Concrete<F>): F {
 
 fun instanceOf<T: Downcastable, F: T>(v: T, c: Concrete<F>): Bool {
   v.type_id() == c::const_type_id()
+}
+
+fun unsafeSpecializeFactory<
+  Static: Downcastable,
+  Special: Downcastable,
+  Factory,
+  SpecialFactory,
+  DefaultFactory: Factory,
+>(
+  static_: Concrete<Static>,
+  special: Concrete<Special>,
+  specialFactory: Concrete<SpecialFactory>,
+  defaultFactory: Concrete<DefaultFactory>,
+): Concrete<Factory> {
+  if (static_::const_type_id() == special::const_type_id()) {
+    unsafeGenericCast(specialFactory)
+  } else {
+    defaultFactory
+  }
 }
 
 module end;
