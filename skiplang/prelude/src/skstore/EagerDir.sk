@@ -524,7 +524,12 @@ class FixedDataMap<K: Orderable, F: frozen>{
   private static fun fixedDataFactory(): Concrete<
     FixedDataFactory<K, Array<F>>,
   > {
-    FixedDir
+    Unsafe.unsafeSpecializeFactory(
+      static,
+      FixedDataMap<Key, File>,
+      CompactFixedDir,
+      FixedDir,
+    )
   }
 
   static fun create(
