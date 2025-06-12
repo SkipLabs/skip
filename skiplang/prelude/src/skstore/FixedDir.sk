@@ -183,14 +183,14 @@ class FixedDirMetadata{
 class CompactFixedDir protected {
   metadata: FixedDirMetadata,
 } extends IFixedDir<Key, Array<File>, CompactRow> {
-  static fun create<V: File>(
-    data: mutable Vector<FixedRow<Key, Array<V>>>,
+  static fun create<K: Key, V: File>(
+    data: mutable Vector<FixedRow<K, Array<V>>>,
     metadata: FixedDirMetadata,
   ): this {
     if (!data.isSorted()) {
       data.sort();
     };
-    static::computeTags(data);
+    IFixedDir::computeTags(data);
     static{
       data => data.map(static::stripMetadata).toArray(),
       metadata => metadata,
