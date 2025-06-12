@@ -79,6 +79,12 @@ base class FixedData<+K: Orderable, +T> {
   fun iterator(): mutable Iterator<FixedRow<K, T>>;
 }
 
+base class FixedDataFactory<+K: Orderable, +F> {
+  static fun create<L: K, V: F>(
+    vec: mutable Vector<FixedRow<L, V>> = mutable Vector[],
+  ): FixedData<K, F>;
+}
+
 // Assuming delta is monotone, that is, i <= j implies delta(i) <= delta(j),
 // findFirstBy(delta, l, u) is the least m where l <= m <= u such that
 // delta(m) == EQ(). If there is no such m, then l <= m <= u+1 but otherwise
@@ -149,6 +155,7 @@ fun assertUnique<T, U: Orderable>(
 
 class FixedDir<+K: Orderable, +T: frozen> extends
   IFixedDir<K, T, FixedRow<K, T>>,
+  FixedDataFactory<K, T>,
 {
   static fun create<L: K, U: T>(
     data: mutable Vector<FixedRow<L, U>> = mutable Vector[],
@@ -182,7 +189,10 @@ class FixedDirMetadata{
 // out of the rows themselves.
 class CompactFixedDir protected {
   metadata: FixedDirMetadata,
-} extends IFixedDir<Key, Array<File>, CompactRow> {
+} extends
+  IFixedDir<Key, Array<File>, CompactRow>,
+  FixedDataFactory<Key, Array<File>>,
+{
   static fun create<L: Key, V: Array<File>>(
     vec: mutable Vector<FixedRow<L, V>> = mutable Vector[],
   ): FixedData<Key, Array<File>> {
