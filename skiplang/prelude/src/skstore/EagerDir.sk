@@ -524,7 +524,12 @@ class FixedDataMap<K: Orderable, F: frozen>{
   private static fun fixedDataFactory(): Concrete<
     FixedDataFactory<K, Array<F>>,
   > {
-    FixedDir
+    Unsafe.unsafeSpecializeFactory(
+      static,
+      FixedDataMap<SKDB.RowKey, SKDB.RowValues>,
+      CompactFixedDir,
+      FixedDir,
+    )
   }
 
   static fun create(
