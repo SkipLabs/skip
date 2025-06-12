@@ -183,8 +183,8 @@ class FixedDirMetadata{
 class CompactFixedDir protected {
   metadata: FixedDirMetadata,
 } extends IFixedDir<Key, Array<File>, CompactRow> {
-  static fun create<L: Key, V: File>(
-    vec: mutable Vector<FixedRow<L, Array<V>>> = mutable Vector[],
+  static fun create<L: Key, V: Array<File>>(
+    vec: mutable Vector<FixedRow<L, V>> = mutable Vector[],
   ): FixedData<Key, Array<File>> {
     static::getMetadata(vec) match {
     | None() -> FixedDir<Key, Array<File>>::create(vec)
@@ -218,8 +218,8 @@ class CompactFixedDir protected {
     possibleResult
   }
 
-  static fun createWithMetadata<K: Key, V: File>(
-    data: mutable Vector<FixedRow<K, Array<V>>>,
+  static fun createWithMetadata<K: Key, V: Array<File>>(
+    data: mutable Vector<FixedRow<K, V>>,
     metadata: FixedDirMetadata,
   ): this {
     if (!data.isSorted()) {
