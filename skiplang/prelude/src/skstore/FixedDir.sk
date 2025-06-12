@@ -191,13 +191,13 @@ class CompactFixedDir protected {
   metadata: FixedDirMetadata,
 } extends
   IFixedDir<SKDB.RowKey, Array<SKDB.RowValues>, CompactRow>,
-  FixedDataFactory<Key, Array<File>>,
+  FixedDataFactory<SKDB.RowKey, Array<SKDB.RowValues>>,
 {
-  static fun create<L: Key, V: Array<File>>(
+  static fun create<L: SKDB.RowKey, V: Array<SKDB.RowValues>>(
     vec: mutable Vector<FixedRow<L, V>> = mutable Vector[],
-  ): FixedData<Key, Array<File>> {
+  ): FixedData<SKDB.RowKey, Array<SKDB.RowValues>> {
     static::getMetadata(vec) match {
-    | None() -> FixedDir<Key, Array<File>>::create(vec)
+    | None() -> FixedDir::create(vec)
     | Some(metadata) -> static::createWithMetadata(vec, metadata)
     }
   }
