@@ -521,11 +521,17 @@ class FixedDataMap{
   data: FixedData<Key, Array<File>>,
   tombs: FixedDir<Key, Path>,
 } {
+  private static fun fixedDataFactory(): Concrete<
+    FixedDataFactory<Key, Array<File>>,
+  > {
+    CompactFixedDir
+  }
+
   static fun create<V: File>(
     vec: mutable Vector<FixedRow<Key, Array<V>>> = mutable Vector[],
     tombs: mutable Vector<FixedRow<Key, Path>> = mutable Vector[],
   ): this {
-    data = CompactFixedDir::create(vec);
+    data = static::fixedDataFactory()::create(vec);
     static{data, tombs => FixedDir::create(tombs)}
   }
 
