@@ -80,8 +80,8 @@ base class FixedData<+K: Orderable, +T> {
 }
 
 base class FixedDataFactory<+K: Orderable, +F> {
-  static fun create<L: K, V: F>(
-    vec: mutable Vector<FixedRow<L, V>> = mutable Vector[],
+  static fun create(
+    vec: mutable Vector<FixedRow<K, F>> = mutable Vector[],
   ): FixedData<K, F>;
 }
 
@@ -157,8 +157,8 @@ class FixedDir<+K: Orderable, +T: frozen> extends
   IFixedDir<K, T, FixedRow<K, T>>,
   FixedDataFactory<K, T>,
 {
-  static fun create<L: K, U: T>(
-    data: mutable Vector<FixedRow<L, U>> = mutable Vector[],
+  static fun create(
+    data: mutable Vector<FixedRow<K, T>> = mutable Vector[],
   ): this {
     if (!data.isSorted()) {
       data.sort();
@@ -193,8 +193,8 @@ class CompactFixedDir protected {
   IFixedDir<Key, Array<File>, CompactRow>,
   FixedDataFactory<Key, Array<File>>,
 {
-  static fun create<L: Key, V: Array<File>>(
-    vec: mutable Vector<FixedRow<L, V>> = mutable Vector[],
+  static fun create(
+    vec: mutable Vector<FixedRow<Key, Array<File>>> = mutable Vector[],
   ): FixedData<Key, Array<File>> {
     static::getMetadata(vec) match {
     | None() -> FixedDir<Key, Array<File>>::create(vec)
