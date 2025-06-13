@@ -574,28 +574,6 @@ mutable class Specializer{
     this.sclasses.map((_, info) -> info.sclass)
   }
 
-  // If t is Awaitable<T>, returns Some(T), else None().
-  readonly fun awaitableType(t: Tclass): ?Tclass {
-    // Get the SClassInfo for the "Awaitable" type (maybe a base class).
-    info = this.untrackedSClassGet(t.sclassID);
-    baseInfo = if (info.sclass.gclassName == GClassName("Awaitable")) {
-      info
-    } else {
-      // NOTE: Awaitable and its machine-generated subclasses (via
-      // createAwaitableClass)
-      // TODO: Warn against user created ones
-      info.extends_.maybeGet(FrontEndLazyGClass("Awaitable")) match {
-      | Some(id) -> this.untrackedSClassGet(id)
-      | _ -> return None()
-      }
-    };
-
-    // Return the type of awaitable.value.value.
-    rawType = baseInfo.getUnscalarizedField("value", info.sclass.pos).typ;
-    rawInfo = this.untrackedSClassGet(rawType.sclassID);
-    Some(rawInfo.getUnscalarizedField("value", rawInfo.sclass.pos).typ)
-  }
-
   mutable fun getTargs(tc: Tclass): Array<Tclass> {
     this.sclassGet(tc.sclassID).sclass.superposition.id
   }

@@ -689,15 +689,6 @@ class CustomLazyGFun{
   }
 }
 
-// Extract the T from Awaitable<T>.
-private fun extractAwaitableType(gt: GType, pos: Pos): GType {
-  gta = gt.asGTapply(pos);
-  if (gta.generic != FrontEndLazyGClass("Awaitable")) {
-    pos.die(`Expected Awaitable, not ${gt}`)
-  };
-  gta.targs[0]
-}
-
 // functions and methods backed by an OuterIst def
 class DefLazyGFun{def: I.CallableDef} extends BodyProvidingLazyGFun {
   static fun make{
