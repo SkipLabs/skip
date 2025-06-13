@@ -32,7 +32,6 @@ private fun isSimpleTerminator(
   | IntSwitch{value} -> optinfo.getInstr(remap(value)).isConstant()
   | StringSwitch{value} -> optinfo.getInstr(remap(value)).isConstant()
 
-  | AsyncReturn _
   | IndirectJump _
   | InvokeFunction _
   | InvokeMethod _
@@ -786,7 +785,6 @@ mutable class .Control{
         | x @ Jump _ -> this.optimizeJump(x)
         | x @ StringSwitch _ -> this.optimizeStringSwitch(x)
         | x @ TypeSwitch _ -> this.optimizeTypeSwitch(x)
-        | AsyncReturn _
         | IndirectJump _
         | InvokeFunction _
         | InvokeMethod _

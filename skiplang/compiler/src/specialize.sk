@@ -823,7 +823,6 @@ mutable class Specializer{
         | obj @ GObject _ -> noteType(obj.getType(), true)
 
         // These do not cause any additional types or code to be needed.
-        | GAsyncReturn _
         | GCast _
         | GEArray _
         | GFreeze _
@@ -3595,8 +3594,6 @@ mutable class FunSpecializer{
           typ = this.specializeType(context, instr.getType());
 
           instr match {
-          | r @ GAsyncReturn _ ->
-            _ = this.emitAsyncReturn{pos, prettyName => r.prettyName}
           | call @ GInvokeFunction _ ->
             _ = this.emitGCallFunction(
               context,

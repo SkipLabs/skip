@@ -483,9 +483,7 @@ base class Instr{
   | ArrayClone{value} ->
     f(value)
   | ObstackShallowClone{byteSize} -> f(byteSize)
-  | Alloca _
-  | AsyncReturn _ ->
-    void
+  | Alloca _ -> void
   | BinOp{lhs, rhs} ->
     f(lhs);
     f(rhs)
@@ -917,7 +915,6 @@ base class Stmt extends InstrWithPos {
       successors => remapSuccessors(newSuccessors, successors, remap),
     }
   | Alloca _ -> this with {id, typ}
-  | x @ AsyncReturn _ -> x with {id, typ}
   | BytePointerAdd{addr, offset} ->
     this with {id, typ, addr => remap(addr), offset => remap(offset)}
   | Freeze{value} -> this with {id, typ, value => remap(value)}
@@ -1290,7 +1287,6 @@ base class Terminator{
   successors: Array<BlockSuccessor> = Array[],
 } extends Stmt {
   children =
-  | AsyncReturn{}
   | If{predicate: InstrID}
   | IndirectJump{label: InstrID, tag: String}
   | Jump{}
