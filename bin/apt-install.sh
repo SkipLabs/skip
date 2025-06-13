@@ -3,7 +3,7 @@
 set -e
 
 default_steps=(skiplang-build-deps skipruntime-deps)
-LLVM_VERSION=15
+LLVM_VERSION=19
 PRIORITY=101
 
 usage() {
