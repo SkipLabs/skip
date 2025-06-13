@@ -23,11 +23,6 @@ declare i32 @__gxx_personality_v0(...)
 declare ptr @__cxa_begin_catch(ptr)
 declare void @__cxa_end_catch()
 
-; Function Attrs: alwaysinline nounwind uwtable
-define void @SKIP_debug_break() {
-  ret void
-}
-
 ; Obstack
 
 declare ptr @SKIP_Obstack_alloc(i32)
