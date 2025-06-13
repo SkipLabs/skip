@@ -232,10 +232,6 @@ fun type__(o: mutable BufferedPrinter.Out, ty: N.Type__): void {
       interl,
     );
     o.out("}")
-  | N.Tawaitable(var, inner) ->
-    variance(o, var);
-    o.out("^");
-    type(o, inner)
   }
 }
 
@@ -651,9 +647,6 @@ fun expr(o: mutable BufferedPrinter.Out, ex: N.Expr): void {
     o.out(";");
     o.newline();
     expr(o, e1)
-  | N.Await(e1) ->
-    o.out("await ");
-    expr(o, e1)
   | N.Return(e1) ->
     o.out("return ");
     expr(o, e1)
@@ -661,13 +654,6 @@ fun expr(o: mutable BufferedPrinter.Out, ex: N.Expr): void {
     o.out("yield ");
     expr(o, e1)
   | N.YieldBreak() -> o.out("yield break")
-  | N.Async(fv, e1) ->
-    o.out("async ");
-    lambda_freevars(o, fv);
-    o.out("{");
-    o.newline();
-    expr(o, e1);
-    o.out("}")
   | N.Throw(e1) ->
     o.out("throw ");
     expr(o, e1)

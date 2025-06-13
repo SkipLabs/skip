@@ -175,12 +175,7 @@ fun pl_expr_(
     !fvs = pl_rekey_bindings(names, fvs);
     env.captured.extend(fvs.keys().collect(Set));
     T.Lambda(params1, fvs, e1, yields)
-  | T.Await(e) -> T.Await(pl_expr(env, next_id, names, e))
   | T.Return(e) -> T.Return(pl_expr(env, next_id, names, e))
-  | T.Async(fvs, e) ->
-    !fvs = pl_rekey_bindings(names, fvs);
-    env.captured.extend(fvs.keys().collect(Set));
-    T.Async(fvs, pl_expr(env, next_id, names, e))
   | T.Throw(e) -> T.Throw(pl_expr(env, next_id, names, e))
   | T.Array(el) -> T.Array(el.map(cur1 -> pl_expr(env, next_id, names, cur1)))
   | T.Freeze(e) -> T.Freeze(pl_expr(env, next_id, names, e))
@@ -475,12 +470,7 @@ fun sbr_expr_(env: mutable LocalsInfo, ex: T.Expr): T.Expr {
       | N.Efrozen() -> check_captured_locals(fvs, "Pure lambda ")
       };
       T.Lambda(sbr_frozen_params(env, params), fvs, sbr_expr(env, e1), yields)
-    | T.Await(e1) -> T.Await(sbr_expr(env, e1))
     | T.Return(e1) -> T.Return(sbr_expr(env, e1))
-    | T.Async(fvs, e1) ->
-      !fvs = fvs.map((_, b) -> sbr_binding(env, b));
-      check_captured_locals(fvs, "Async blocks ");
-      T.Async(fvs, sbr_expr(env, e1))
     | T.Throw(e1) -> T.Throw(sbr_expr(env, e1))
     | T.Array(el) -> T.Array(el.map(cur1 -> sbr_expr(env, cur1)))
     | T.Freeze(e1) -> T.Freeze(sbr_expr(env, e1))

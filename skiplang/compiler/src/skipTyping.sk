@@ -224,7 +224,6 @@ fun makeEnv(): TUtils.Env {
     kind => None(),
     return_type => TUtils.RNotAllowed(""),
     yield_type => TUtils.YNotAllowed(""),
-    sk_async => None(),
     break_type => None(),
   }
 }
@@ -890,7 +889,6 @@ fun named_fun_def(
   next_id = sk_create_counter();
   acc = TUtils.empty_acc;
   native_ = fd.native_;
-  async_ = fd.async_;
   untracked_ = fd.untracked_;
   visibility = fd.visibility;
   annotations = fd.annotations;
@@ -908,10 +906,7 @@ fun named_fun_def(
     next_id,
     env,
     acc,
-    async_,
     untracked_,
-    None(),
-    params2,
     return_,
     body,
     fd.yields,
@@ -919,7 +914,6 @@ fun named_fun_def(
   res = SkipTypedAstRename.fun_def(
     TAst.Fun_def{
       native_,
-      async_,
       untracked_,
       visibility,
       annotations,
@@ -986,56 +980,24 @@ fun method_body(
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
-  sk_async: ?FileRange,
   sk_untracked: ?FileRange,
-  sk_deferred: ?FileRange,
-  params: Parameters<TAst.Parameter>,
   return_ty: N.Type_,
   x: N.Expr_body,
   yields: ?FileRange,
 ): TAst.Expr_body {
   !env = setReturnType(context, next_id, env, acc, return_ty, yields);
 
-  /* Check for invalid async functions with mutable types */
-  is_untracked = sk_untracked is Some _;
-  is_deferred = sk_deferred is Some _;
-  sk_async match {
-  | Some(pos) if (!is_untracked && !is_deferred) ->
-    params.each(p ->
-      assert_frozen_type(
-        env,
-        acc,
-        pos,
-        "async",
-        p.type.i0,
-        "Invalid parameter. All parameters to a '",
-        p.type,
-        true,
-      )
-    )
-
-  | _ -> void
-  };
   /* Handle the method body */
   x match {
   | N.Native() ->
-    check_return_ty(context, next_id, env, acc, sk_async, return_ty);
+    check_return_ty(context, next_id, env, acc, return_ty);
     TAst.Native()
   | N.Abstract() ->
-    check_return_ty(context, next_id, env, acc, sk_async, return_ty);
+    check_return_ty(context, next_id, env, acc, return_ty);
     TAst.Abstract()
   | N.Implemented(body) ->
     TAst.Implemented(
-      method_body_(
-        context,
-        next_id,
-        env,
-        acc,
-        sk_async,
-        sk_untracked,
-        return_ty,
-        body,
-      ),
+      method_body_(context, next_id, env, acc, sk_untracked, return_ty, body),
     )
   }
 }
@@ -1099,16 +1061,15 @@ fun method_body_(
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
-  sk_async: ?FileRange,
   sk_untracked: ?FileRange,
   return_ty: N.Type_,
   body: N.Expr,
 ): TAst.Expr {
-  env1 = env with {sk_async, tracked_context => !sk_untracked.isSome()};
+  env1 = env with {tracked_context => !sk_untracked.isSome()};
   (pos, _) = body;
   (acc1, fun_body) = expr(context, next_id, env1, acc, body);
   body_ty = TAstUtils.get_type(fun_body);
-  body_ty1 = make_return_type(env1, body_ty);
+  body_ty1 = body_ty;
   (!acc, return_ty1) = TUtils.instantiate(
     context,
     next_id,
@@ -1140,7 +1101,6 @@ fun check_return_ty(
   next_id: () -> Int,
   env: TUtils.Env,
   acc: TUtils.Acc,
-  _sk_async: ?FileRange,
   return_ty: N.Type_,
 ): void {
   (!acc, _return_ty) = TUtils.instantiate(
@@ -1184,7 +1144,6 @@ fun method_def_(
   visibility = met.visibility;
   annotations = met.annotations;
   overridable_ = met.overridable_;
-  async_ = met.async_;
   untracked_ = met.untracked_;
   kind = met.kind;
   native_ = met.native_;
@@ -1233,21 +1192,13 @@ fun method_def_(
     next_id,
     env,
     acc,
-    async_,
     untracked_,
-    deferred_,
-    params2,
     return_,
     body,
     met.yields,
   );
   whenparams = met.whenparams;
   this_type = TUtils.bind_this_type(context, kind, env, cd);
-  this_type match {
-  | None() -> void
-  | Some _ if (untracked_.isSome()) -> void
-  | Some(this_ty) -> check_async_memo_mut(acc, async_, this_ty)
-  };
   implicit_param = {
     this_type match {
     | Some(ty) ->
@@ -1273,7 +1224,6 @@ fun method_def_(
     visibility,
     annotations,
     overridable_,
-    async_,
     native_,
     untracked_,
     kind,
@@ -1290,38 +1240,6 @@ fun method_def_(
     deferred_,
     generic_mapping => SortedMap[],
     yields => met.yields,
-  }
-}
-
-fun make_return_type(env: TUtils.Env, ty: TAst.Type_): N.Type_ {
-  env.sk_async match {
-  | None() -> ty
-  | Some(pos) -> (pos, N.Tawaitable(Ast.Vplus(), ty))
-  }
-}
-
-fun check_async_memo_mut(
-  acc: TUtils.Acc,
-  async_: ?FileRange,
-  this_ty: N.Type_,
-): void {
-  case_pos = async_ match {
-  | None() -> return void
-  | Some(pos) -> pos
-  };
-
-  TUtils.is_mutable(acc, this_ty, async_.isSome()) match {
-  | N.Efrozen() -> void
-  | N.EffectiveNotFrozen(fr) ->
-    SkipError.errorl(
-      List[
-        (
-          case_pos,
-          "async methods cannot take mutable inputs. This method much be marked 'frozen' to make 'this' frozen",
-        ),
-        (fr, "this was not 'frozen' because of the type at this position"),
-      ],
-    )
   }
 }
 
@@ -1573,7 +1491,6 @@ fun inner_type_for_class_opt(acc: TUtils.Acc, ty: N.Type_): ?N.Type_ {
   | N.TnonNullable _
   | N.Tanything()
   | N.Tfun _
-  | N.Tawaitable _
   | N.Tlambda _ ->
     None()
 
@@ -1608,7 +1525,6 @@ fun inner_type_for_class_add_outer_frozen(
   | (_, N.Tfrozen _)
   | (_, N.TnonNullable _)
   | (_, N.Tanything())
-  | (_, N.Tawaitable _)
   | (_, N.Tfun _)
   | (_, N.Tlambda _) ->
     invariant_violation(
@@ -2689,22 +2605,6 @@ fun expr_(
     ty = TUtils.make_tvoid(pos, Ast.Vplus());
     e1 = (pos, TAst.Assign((lvalue_ty1, name), rvalue1));
     (acc2, (ty, e1))
-  | N.Await(e1 @ (e_pos, _)) ->
-    (acc1, e2) = expr(context, next_id, env, acc, e1);
-    e_ty = TAstUtils.get_type(e2);
-    tv = TUtils.fresh(next_id, (pos, void));
-    obs = (e_pos, N.Tawaitable(Ast.Vplus(), tv));
-    (acc2, _) = TUtils.join(
-      context,
-      next_id,
-      env,
-      pos,
-      "Expected an awaitable type. That is a type prefixed by: ^",
-      acc1,
-      e_ty,
-      obs,
-    );
-    (acc2, (tv, (pos, TAst.Await(e2))))
   | N.Return(ret_expr) ->
     env.return_type match {
     | TUtils.RNotAllowed(msg) ->
@@ -2712,7 +2612,7 @@ fun expr_(
     | TUtils.RType(expected_ty) ->
       (!acc, typed_ret_expr) = expr(context, next_id, env, acc, ret_expr);
       e_ty = TAstUtils.get_type(typed_ret_expr);
-      ret_ty = make_return_type(env, e_ty);
+      ret_ty = e_ty;
       !expected_ty = TUtils.contra_promote(context, env, acc, expected_ty);
       (!acc, _) = TUtils.join(
         context,
@@ -2884,29 +2784,6 @@ fun expr_(
     );
     ret_ty = (pos, N.Tanything());
     (acc2, (ret_ty, (pos, TAst.Throw(e2))))
-  | N.Async(fvs, async_block) ->
-    block_type = TUtils.fresh(next_id, (pos, void));
-    !env = env with {
-      return_type => TUtils.RType(block_type),
-      break_type => None(),
-      yield_type => TUtils.YNotAllowed("Yield not allowed in an async block"),
-      frozen_level => TUtils.LAsyncBlock(pos, acc.level),
-    };
-    (!acc, typed_block) = expr(context, next_id, env, acc, async_block);
-    ty = TAstUtils.get_type(typed_block);
-    (!acc, !ty) = TUtils.join(
-      context,
-      next_id,
-      env,
-      pos,
-      "Invalid async",
-      acc,
-      ty,
-      block_type,
-    );
-    !ty = (pos, N.Tawaitable(Ast.Vnone(), ty));
-    bindings = add_binding_info(env, fvs);
-    (acc, (ty, (pos, TAst.Async(bindings, typed_block))))
   | N.Unop((upos, uop), e1) ->
     uop match {
     | N.Not() ->
@@ -4433,7 +4310,6 @@ fun check_concrete_pat_type(
   | N.Tanything()
   | N.Tlambda _
   | N.Tfun _
-  | N.Tawaitable _
   // Concrete types
   // Don't need to check for traits since if our ety is a trait we must be in a
   // trait class, and in that case it won't have a valid child

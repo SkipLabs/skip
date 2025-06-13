@@ -330,7 +330,6 @@ fun to_string_(nthis: ?N.Name, subst: IMap<N.Type_>, x: N.Type__): String {
       " : " +
       to_string(nthis, subst, ty) +
       ")"
-  | N.Tawaitable(_, ty) -> "^" + to_string(nthis, subst, ty)
   | N.Tlambda(_, _, _, ty)
   | N.Tdefault(ty) ->
     to_string(nthis, subst, ty)
@@ -541,7 +540,6 @@ fun freeze_(
       class_name,
       freeze_list(caller_pos, subst, bounds, tyl),
     )
-  | N.Tawaitable _ -> error_freeze_awaitable(caller_pos, pos)
   | N.Tfun(variance, modifiers, targs, params, rty) ->
     freeze_modifiers(caller_pos, pos, modifiers.i0);
     N.Tfun(variance, modifiers, targs, params, rty)
@@ -669,7 +667,6 @@ fun verify_freezable_type_(
   | N.Tlambda(_, _, modifiers, _)
   | N.Tfun(_, modifiers, _, _, _) ->
     freeze_modifiers(caller_pos, ty.i0, modifiers.i0)
-  | N.Tawaitable _ -> error_freeze_awaitable(caller_pos, ty.i0)
   | _ -> void
   }
 }
@@ -723,7 +720,6 @@ fun chill_(
       class_name,
       chill_list(caller_pos, subst, bounds, tyl),
     )
-  | N.Tawaitable _ -> error_chill_awaitable(caller_pos, pos)
   | N.Tfun(variance, modifiers, targs, params, rty) ->
     chill_modifiers(caller_pos, pos, modifiers.i0);
     N.Tfun(variance, modifiers, targs, params, rty)
@@ -894,7 +890,6 @@ fun to_readonly_exn(
   | (_, N.TnonNullable _) ->
     x
 
-  | (fr, N.Tawaitable _) -> error_readonly_awaitable(caller_pos, fr)
   | (fr, N.Tfun(variance, modifiers, targs, params, rty)) ->
     to_readonly_modifiers(caller_pos, fr, modifiers.i0);
     (fr, N.Tfun(variance, modifiers, targs, params, rty))
@@ -1036,7 +1031,6 @@ fun verify_readonly_type_(
   | N.Tlambda(_, _, modifiers, _)
   | N.Tfun(_, modifiers, _, _, _) ->
     to_readonly_modifiers(caller_pos, ty.i0, modifiers.i0)
-  | N.Tawaitable _ -> error_readonly_awaitable(caller_pos, ty.i0)
   | _ -> void
   }
 }
@@ -1121,9 +1115,6 @@ fun promote(
     ml1 = promote_tfun_modifiers(ml);
     ty1 = promote(context, env, variance, subst, ty);
     (pos, N.Tlambda(variance, id, ml1, ty1))
-  | (pos, N.Tawaitable(_, ty)) ->
-    ty1 = promote(context, env, variance, subst, ty);
-    (pos, N.Tawaitable(variance, ty1))
   | (pos, N.Tdefault(ty)) ->
     ty1 = promote(context, env, variance, subst, ty);
     (pos, N.Tdefault(ty1))
@@ -1609,11 +1600,6 @@ fun join_(
       freeze_upper,
       tyl,
     )
-  /* Awaitable */
-  | ((fr, N.Tawaitable(v1, inner1)), (_, N.Tawaitable(v2, inner2))) ->
-    var = join_variance(v1, v2);
-    (!acc, inner) = join(context, next_id, env, acc, inner1, inner2);
-    (acc, (fr, N.Tawaitable(var, inner)))
   /* Object types */
   | ((_, N.Tset(_, _, _, elts)), _)
   | (_, (_, N.Tset(_, _, _, elts))) if (elts.isEmpty()) ->
@@ -2872,7 +2858,6 @@ fun is_not_nullable(env: Env, ty_: N.Type_): Bool {
   | N.Tvar _ ->
     invariant_violation("should already be handled")
   | N.TnonNullable _
-  | N.Tawaitable _
   | N.Tfun _
   | N.Tset _
   | N.Tpromoted _
@@ -3139,8 +3124,6 @@ private fun is_frozen_map(
   | N.TnonNullable _ ->
     None()
 
-  | N.Tawaitable _ -> None()
-
   | N.Tpromoted(_, N.MnotFrozen _, _, _, _, _)
   | N.Tapply(N.MnotFrozen _, _, _)
   | N.Tset(_, N.MnotFrozen _, _, _) ->
@@ -3315,7 +3298,6 @@ fun has_unresolved_(subst: IMap<N.Type_>, x: N.Type__): Bool {
     | None() -> true
     | Some(ty) -> has_unresolved(subst, ty)
     }
-  | N.Tawaitable(_, ty)
   | N.Tlambda(_, _, _, ty)
   | N.Tdefault(ty)
   | N.Tnamed(_, ty) ->

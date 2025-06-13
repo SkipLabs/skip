@@ -1440,8 +1440,6 @@ class Converter{file: FileCache.InputSource} {
         )
       }
     | TokenKind.MUTABLE() -> SkipAst.Mutable(this.convertExpression(operand))
-    | TokenKind.AWAIT() -> SkipAst.Await(this.convertExpression(operand))
-    | TokenKind.ASYNC() -> SkipAst.Async(this.convertExpression(operand))
     | _ ->
       invariant_violation(
         "Unexpected unary expression: " + this.treeToString(operand),
@@ -1910,7 +1908,6 @@ class Converter{file: FileCache.InputSource} {
       SkipAst.Fun_def{
         annotations => this.convertAnnotations(modifiers),
         native_ => this.convertModifier(modifiers, TokenKind.NATIVE()),
-        async_ => this.convertModifier(modifiers, TokenKind.ASYNC()),
         untracked_ => this.convertModifier(modifiers, TokenKind.UNTRACKED()),
         fun_private => this.convertModifier(modifiers, TokenKind.PRIVATE()),
         name => this.convertGlobalName(name),
@@ -2320,7 +2317,6 @@ class Converter{file: FileCache.InputSource} {
         visibility => this.convertVisibility(modifiers),
         annotations => this.convertAnnotations(modifiers),
         macro_ => this.convertModifier(modifiers, TokenKind.MACRO()),
-        async_ => this.convertModifier(modifiers, TokenKind.ASYNC()),
         static_ => this.convertModifier(modifiers, TokenKind.STATIC()),
         mutable_ => this.convertModifier(modifiers, TokenKind.MUTABLE()),
         readonly_ => this.convertModifier(modifiers, TokenKind.READONLY()),

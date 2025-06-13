@@ -192,28 +192,6 @@ mutable base class Visitor {
     this.eVectorChildren(v)
   }
 
-  mutable fun awaitChildren(a: O.Await): (Bool, O.Await) {
-    this.expr(a.expr) match {
-    | (false, _) -> (false, a)
-    | (_, e) -> (true, O.Await(e))
-    }
-  }
-
-  overridable mutable fun await_(a: O.Await): (Bool, O.Expr_) {
-    this.awaitChildren(a)
-  }
-
-  mutable fun asyncChildren(a: O.Async): (Bool, O.Async) {
-    (this.stmt(a.stmt), this.expr(a.expr)) match {
-    | ((false, _), (false, _)) -> (false, a)
-    | ((_, stmt), (_, expr)) -> (true, O.Async(stmt, expr))
-    }
-  }
-
-  overridable mutable fun async_(a: O.Async): (Bool, O.Expr_) {
-    this.asyncChildren(a)
-  }
-
   mutable fun freezeChildren(f: O.Freeze): (Bool, O.Freeze) {
     this.expr(f.expr) match {
     | (false, _) -> (false, f)
@@ -298,8 +276,6 @@ mutable base class Visitor {
     | sd @ O.StaticDot _ -> this.staticDot(sd)
     | lam @ O.Lambda _ -> this.lambda(lam)
     | ev @ O.EArray _ -> this.eVector(ev)
-    | a @ O.Await _ -> this.await_(a)
-    | a @ O.Async _ -> this.async_(a)
     | f @ O.Freeze _ -> this.freeze_(f)
     | gc @ O.GetClass _ -> this.getClass(gc)
     | cn @ O.Classname _ -> this.classname(cn)
@@ -982,8 +958,6 @@ fun make_expr___map(
     | O.Lambda(params, ty, bindings, s, yields) ->
       O.Lambda(params, ty, bindings, map_stmt(s), yields)
     | O.EArray(es) -> O.EArray(es.map(map_expr))
-    | O.Await(e) -> O.Await(map_expr(e))
-    | O.Async(s, e) -> O.Async(map_stmt(s), map_expr(e))
     | O.Freeze(e) -> O.Freeze(map_expr(e))
     | O.GetClass(e) -> O.GetClass(map_expr(e))
     | O.Classname _ -> expr
@@ -1463,8 +1437,6 @@ fun rename_binds_expr(
   | O.Lambda(params, ty, bindings, s, yields) ->
     O.Lambda(params, ty, bindings, map_stmt(s), yields)
   | O.EArray(es) -> O.EArray(es.map(map_expr))
-  | O.Await(e) -> O.Await(map_expr(e))
-  | O.Async(s, e) -> O.Async(map_stmt(s), map_expr(e))
   | O.Freeze(e) -> O.Freeze(map_expr(e))
   | O.GetClass(e) -> O.GetClass(map_expr(e))
   | O.Classname _ -> expr__
@@ -2125,8 +2097,6 @@ fun iterate_expression(
     | O.StaticDot(dot_info) -> iterate_dot_info(dot_info)
     | O.Lambda(_, _, _, s, _) -> iter_s(s)
     | O.EArray(es) -> iterate_exprs(es)
-    | O.Await(e1) -> iter_e(e1)
-    | O.Async(s, e1) -> iter_s(s) || iter_e(e1)
     | O.Freeze(e1) -> iter_e(e1)
     | O.GetClass(e1) -> iter_e(e1)
     | O.Classname _ -> false

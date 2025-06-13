@@ -1330,7 +1330,6 @@ fun replace_inst_type_(cd: A.Class_def, t: A.Type__): A.Type__ {
     A.Tfun(fkind, tparams1, tbody1)
   | A.Tmutable(ty) -> A.Tmutable(replace_inst_type(cd, ty))
   | A.Treadonly(ty) -> A.Treadonly(replace_inst_type(cd, ty))
-  | A.Tawaitable(ty) -> A.Tawaitable(replace_inst_type(cd, ty))
   }
 }
 
@@ -1435,11 +1434,9 @@ fun replace_inst_expr__(cd: A.Class_def, e_: A.Expr_): A.Expr_ {
   | A.Tuple(el) -> A.Tuple(el.map(k))
   | A.TemplateLiteral(ep) -> A.TemplateLiteral(k_params(ep))
   | A.Try(e, mbl) -> A.Try(k(e), replace_inst_match_branches(cd, mbl))
-  | A.Await(e) -> A.Await(k(e))
   | A.Return(e) -> A.Return(k(e))
   | A.Yield(e) -> A.Yield(k(e))
   | A.YieldBreak() -> A.YieldBreak()
-  | A.Async(e) -> A.Async(k(e))
   | A.Throw(e) -> A.Throw(k(e))
   | A.With(e, updates) ->
     A.With(
@@ -2091,7 +2088,6 @@ fun method_(subst: SMap<A.Type_>, met: A.Method_def): A.Method_def {
   visibility = met.visibility;
   macro_ = met.macro_;
   mutable_ = met.mutable_;
-  async_ = met.async_;
   static_ = met.static_;
   annotations = met.annotations;
   overridable_ = met.overridable_;
@@ -2116,7 +2112,6 @@ fun method_(subst: SMap<A.Type_>, met: A.Method_def): A.Method_def {
     visibility,
     macro_,
     mutable_,
-    async_,
     static_,
     annotations,
     overridable_,

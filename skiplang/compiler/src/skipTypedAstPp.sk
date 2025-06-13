@@ -420,19 +420,9 @@ fun expr_(ty: T.Type_, o: mutable BufferedPrinter.Out, e: T.Expr__): void {
     o.out(" in");
     o.newline();
     expr(o, e1)
-  | T.Await(e1) ->
-    o.out("await ");
-    expr(o, e1)
   | T.Return(e1) ->
     o.out("return ");
     expr(o, e1)
-  | T.Async(fvs, e1) ->
-    o.out("async ");
-    lambda_freevars(o, fvs);
-    o.out("{");
-    o.newline();
-    expr(o, e1);
-    o.out("}")
   | T.Throw(e1) ->
     o.out("throw ");
     expr(o, e1)

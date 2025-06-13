@@ -551,15 +551,6 @@ fun expr(o: mutable BufferedPrinter.Out, ex: O.Expr): void {
     lambda_params(o, lp);
     o.out(" ->");
     indent_stmt(o, e1)
-  | O.Await(e1) ->
-    o.out("await ");
-    expr(o, e1)
-  | O.Async(s, e1) ->
-    o.out("async {");
-    o.newline();
-    stmt(o, s);
-    expr(o, e1);
-    o.out("}")
   | O.With(e1, updates) ->
     expr(o, e1);
     o.out(" with {");

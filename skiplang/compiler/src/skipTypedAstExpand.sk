@@ -83,7 +83,6 @@ fun type__(
       };
       N.Tset(var, mode, tparams, Array[elt])
     }
-  | N.Tawaitable(var, ty) -> N.Tawaitable(var, inner(ty))
   | N.Tfun(variance, mods, _, params, ty) ->
     N.Tfun(
       variance,
@@ -359,11 +358,7 @@ fun expr_(
     fv1 = fv.map((_, p) -> binding(context, env, subst, p));
     e2 = inner(e1);
     (ty, (pos, T.Lambda(np1, fv1, e2, yields)))
-  | T.Await(e1) -> (ty, (pos, T.Await(inner(e1))))
   | T.Return(e1) -> (ty, (pos, T.Return(inner(e1))))
-  | T.Async(fv, e1) ->
-    fv1 = fv.map((_, p) -> binding(context, env, subst, p));
-    (ty, (pos, T.Async(fv1, inner(e1))))
   | T.Throw(e1) -> (ty, (pos, T.Throw(inner(e1))))
   | T.Array(el) -> (ty, (pos, T.Array(el.map(inner))))
   | T.Freeze(e1) -> (ty, (pos, T.Freeze(inner(e1))))

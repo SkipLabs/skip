@@ -778,17 +778,9 @@ fun expr(o: mutable BufferedPrinter.Out, e: SkipAst.Expr): void {
     o.out(";");
     o.newline();
     expr(o, e2)
-  | SkipAst.Await(e2) ->
-    o.out("await ");
-    expr(o, e2)
   | SkipAst.Return(e2) ->
     o.out("return ");
     expr(o, e2)
-  | SkipAst.Async(e2) ->
-    o.out("async {");
-    o.newline();
-    expr(o, e2);
-    o.out("}")
   | SkipAst.Throw(e2) ->
     o.out("throw ");
     expr(o, e2)

@@ -221,7 +221,6 @@ mutable class SkipParser{
     | TokenKind.NATIVE()
     | TokenKind.PRIVATE()
     // function declarations
-    | TokenKind.ASYNC()
     | TokenKind.UNTRACKED()
     | TokenKind.FUN()
     // global constant
@@ -945,7 +944,6 @@ mutable class SkipParser{
     this.peek() match {
     | TokenKind.NATIVE()
     | TokenKind.PRIVATE()
-    | TokenKind.ASYNC()
     | TokenKind.UNTRACKED()
     | TokenKind.DEFERRED()
     | TokenKind.MUTABLE()
@@ -1516,7 +1514,6 @@ mutable class SkipParser{
     | TokenKind.PROTECTED()
     // function declarations
     | TokenKind.NATIVE()
-    | TokenKind.ASYNC()
     | TokenKind.MACRO()
     | TokenKind.MUTABLE()
     | TokenKind.STATIC()
@@ -1541,7 +1538,6 @@ mutable class SkipParser{
     | TokenKind.PROTECTED()
     // function declarations
     | TokenKind.NATIVE()
-    | TokenKind.ASYNC()
     | TokenKind.MACRO()
     | TokenKind.MUTABLE()
     | TokenKind.STATIC()
@@ -1873,7 +1869,6 @@ mutable class SkipParser{
   //
   // method-declaration-modifier:
   //    annotation
-  //    async
   //    static
   //    macro
   //    mutable
@@ -1889,7 +1884,6 @@ mutable class SkipParser{
     this.validateModifiers(
       modifiers,
       List<String>[
-        Keywords.kw_async,
         Keywords.kw_static,
         Keywords.kw_macro,
         Keywords.kw_mutable,
@@ -2420,7 +2414,6 @@ mutable class SkipParser{
   // function-modifier:
   //    annotation
   //    native
-  //    async
   //    untracked
   //    private
   mutable fun parseFunction(modifiers: ParseTree): ParseTree {
@@ -2428,7 +2421,6 @@ mutable class SkipParser{
       modifiers,
       List<String>[
         Keywords.kw_native,
-        Keywords.kw_async,
         Keywords.kw_untracked,
         Keywords.kw_private,
       ],
@@ -3879,8 +3871,6 @@ mutable class SkipParser{
   //    postfix-expression
   //    !  unary-expression
   //    -  unary-expression
-  //    await  unary-expression
-  //    async  unary-expression
   //    mutable  unary-expression
   mutable fun peekUnaryOperator(): Bool {
     this.peek().isUnaryOperator();
@@ -4480,7 +4470,6 @@ mutable class SkipParser{
     | TokenKind.BANG()
     | TokenKind.MINUS()
     | TokenKind.RETURN()
-    | TokenKind.AWAIT()
     | TokenKind.BACK_TICK()
     | TokenKind.DO()
     | TokenKind.LOOP()
@@ -4494,11 +4483,10 @@ mutable class SkipParser{
     | TokenKind.LOG()
     | TokenKind.ENV() ->
       true
-    // async, untracked, mutable, static and class can start a declaration, so must disambiguate after functions
+    // untracked, mutable, static and class can start a declaration, so must disambiguate after functions
     // which have pattern branch lists as bodies
     | TokenKind.MUTABLE()
-    | TokenKind.UNTRACKED()
-    | TokenKind.ASYNC() ->
+    | TokenKind.UNTRACKED() ->
       peekParser = this.createPeekParser();
       _ = peekParser.advance();
       peekParser.peekExpression()

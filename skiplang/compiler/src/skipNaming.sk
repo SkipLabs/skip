@@ -130,8 +130,6 @@ class TypeNameMacro{value: A.Tclass} extends MacroDefinition {
 class Env{
   /* Overrides 'this' when unrolling const types */
   const_type_this: ?A.Class_def,
-  /* Set to true when we're in an async function or method */
-  in_async: ?FileRange,
   in_class_const_expr: Bool,
   /* Set to true when checking constants */
   in_consts_type_annot: Bool,
@@ -284,7 +282,6 @@ fun checkNoReturn(posBody: N.Expr): void {
       checkNoReturn(action)
     }
   | N.Lambda(_, _, _, body, _) -> checkNoReturn(body)
-  | N.Await _ -> void
   | N.Return _ ->
     SkipError.error(
       pos,
@@ -293,7 +290,6 @@ fun checkNoReturn(posBody: N.Expr): void {
   | N.Yield _
   | N.YieldBreak _ ->
     void
-  | N.Async(_, body) -> checkNoReturn(body)
   | N.Throw _ -> void
   | N.Concurrent(exprs) -> exprs.each(checkNoReturn)
   | N.Array _
@@ -459,7 +455,6 @@ fun bind_pattern_params(
 /*****************************************************************************/
 fun make_env(): Env {
   Env{
-    in_async => None(),
     in_tabstract => Not_tabstract(),
     is_constraint_position => false,
     in_consts_type_annot => false,
@@ -566,9 +561,6 @@ fun tunder_type_(
   | A.Treadonly(ty1) ->
     (acc1, ty2) = inner(params, ty1);
     (acc1, A.Treadonly(ty2))
-  | A.Tawaitable(ty1) ->
-    (acc1, ty2) = inner(params, ty1);
-    (acc1, A.Tawaitable(ty2))
   }
 }
 
@@ -741,9 +733,6 @@ fun check_locals_(bound: Bound, ex: N.Expr): (Free, Bool, N.Expr) {
   | N.StaticDot(e1, field) ->
     (f1, c1, !e1) = check_locals(bound, e1);
     (f1, c1, if (c1) (fr, N.StaticDot(e1, field)) else ex)
-  | N.Await(e1) ->
-    (f1, c1, !e1) = check_locals(bound, e1);
-    (f1, c1, if (c1) (fr, N.Await(e1)) else ex)
   | N.Return(e1) ->
     (f1, c1, !e1) = check_locals(bound, e1);
     (f1, c1, if (c1) (fr, N.Return(e1)) else ex)
@@ -751,11 +740,6 @@ fun check_locals_(bound: Bound, ex: N.Expr): (Free, Bool, N.Expr) {
     (f1, c1, !e1) = check_locals(bound, e1);
     (f1, c1, if (c1) (fr, N.Yield(e1)) else ex)
   | N.YieldBreak() -> (empty_free, false, ex)
-  | N.Async(_, e1) ->
-    (f1, c1, !e1) = check_locals(bound, e1);
-    fv = f1.m;
-    changed = c1 || !fv.isEmpty();
-    (f1, changed, if (changed) (fr, N.Async(fv, e1)) else ex)
   | N.Throw(e1) ->
     (f1, c1, !e1) = check_locals(bound, e1);
     (f1, c1, if (c1) (fr, N.Throw(e1)) else ex)
@@ -1785,7 +1769,6 @@ fun method_def(
   );
   cd = env1.sk_this.fromSome();
   env2 = env1 with {
-    in_async => met.async_,
     macro_ => met.macro_,
     macros => makeMethodMacros(env, met.macro_),
   };
@@ -1817,11 +1800,9 @@ fun method_def(
   return_1 = type(context, classAcc, env2, return_);
   (tparams3, whenparams1) = infer_met_tparams_frozen(
     met.frozen_,
-    met.async_,
     cla_tparams,
     whenparams,
     tparams2,
-    params2,
   );
   if (cd.isChilledOnly()) {
     (met.readonly_, met.mutable_) match {
@@ -1861,7 +1842,6 @@ fun method_def(
     visibility => visibility(met.visibility),
     annotations => met.annotations,
     overridable_ => met.overridable_,
-    async_ => met.async_,
     macro_ => met.macro_,
     deferred_ => met.deferred_,
     untracked_ => met.untracked_,
@@ -2162,7 +2142,7 @@ fun fun_def(
   type_param_with_acc = (env, tparam) ->
     type_parameter(context, classAcc, env, tparam);
   (env1, tparams2) = tparams1.mapAcc(type_param_with_acc, env);
-  env2 = env1 with {in_async => fd.async_};
+  env2 = env1;
   check_predefined(fd.name);
   if (fd.body.isNone() && fd.native_.isNone()) {
     SkipError.error(fd.name.i0, "Expected a function body")
@@ -2170,7 +2150,7 @@ fun fun_def(
   check_default_last(params);
   params1 = params.map(p -> parameter(context, acc, env2, p));
   return_1 = type(context, classAcc, env2, return_);
-  tparams3 = infer_fun_tparams_frozen(fd.async_, tparams2, params1);
+  tparams3 = tparams2;
   (bound, params2) = check_locals_fun_parameters(empty_bound, params1);
 
   (localsErrors, body) = body(
@@ -2186,7 +2166,6 @@ fun fun_def(
 
   result = N.Fun_def{
     native_ => fd.native_,
-    async_ => fd.async_,
     untracked_ => fd.untracked_,
     visibility => fd.fun_private,
     annotations => fd.annotations,
@@ -2286,7 +2265,6 @@ fun enforce_no_this(ty_: A.Type_): void {
     params.each(enforce_no_this);
     enforce_no_this(ty1)
   | A.Tabstract _ -> void
-  | A.Tawaitable(ty1)
   | A.Tmutable(ty1)
   | A.Treadonly(ty1) ->
     enforce_no_this(ty1)
@@ -2437,17 +2415,6 @@ fun check_class_parameter_type(
           error_fr,
           "Try switching to '~>' or add a 'mutable' modifier to the class declaration here",
         ),
-      ],
-    )
-  | N.Tawaitable _ ->
-    SkipError.errorl(
-      List[
-        (par_fr, "Invalid '^' typed parameter"),
-        (
-          ty.i0,
-          "Your class must be declared as 'mutable' to take advantage of parameters with awaitable types.",
-        ),
-        (error_fr, "Add a 'mutable' modifier to the class declaration here"),
       ],
     )
   // recurse through wrappers
@@ -2640,8 +2607,6 @@ fun type(
     add_mutability_mode(N.Mmutable(fr), type(context, acc, env, inner))
   | A.Treadonly(inner) ->
     add_mutability_mode(N.Mreadonly(fr), type(context, acc, env, inner))
-  | A.Tawaitable(inner) ->
-    (fr, N.Tawaitable(A.Vnone(), type(context, acc, env, inner)))
   }
 }
 
@@ -2994,56 +2959,17 @@ fun make_this_targs(sk_this: A.Class_def): Array<N.Type_> {
 /* Infering mutability */
 /*****************************************************************************/
 
-/* We add ': frozen' constraints to tparams when the compiler would error
- * if the constraint wasn't there.
- * This sort of propogation of constraints is only for simple cases
- * and does not consider the constraints of another class
- * For example
- *
- * async fun doit<T>(T): ^ void ;
- * class Foo<R: frozen>(...)
- * fun no<V>(Foo<V>): void;
- *
- * T will get the constraint 'frozen' since its required for async contexts
- * V will NOT get 'frozen' even though its required for 'Foo'
- *
- * Function level tparams will have their constraint list modified
- * Class level tparams will have a conditional constraint added
- *
- * base class Foo<V> {
- *  async fun doit<T>(T, V): ^void ;
- * }
- *
- * becomes
- *
- * base class Foo<V> {
- *  async fun doit<T: frozen>[V: frozen](T, V): ^void ;
- * }
- */
-fun infer_fun_tparams_frozen(
-  sk_async: ?FileRange,
-  tparams: Array<N.Type_parameter>,
-  params: Parameters<N.Parameter>,
-): Array<N.Type_parameter> {
-  if (sk_async.isNone()) return tparams;
-
-  final_map = infer_param_ret_frozen(sk_async, params);
-  add_frozen_constraints(final_map, tparams)
-}
-
 fun infer_met_tparams_frozen(
   frozen_: ?FileRange,
-  sk_async: ?FileRange,
   cla_tparams: Array<N.Type_parameter>,
   whenparams: Array<N.Whenclause>,
   tparams: Array<N.Type_parameter>,
-  params: Parameters<N.Parameter>,
 ): (Array<N.Type_parameter>, Array<N.Whenclause>) {
-  if (frozen_.isNone() && sk_async.isNone()) {
+  if (frozen_.isNone()) {
     return (tparams, whenparams)
   };
 
-  after_fun = infer_param_ret_frozen(sk_async, params);
+  after_fun = SortedMap[];
   final_map = frozen_ match {
   | None() -> after_fun
   | Some _ ->
@@ -3060,17 +2986,6 @@ fun infer_met_tparams_frozen(
     whenparams,
   );
   (new_tparams, new_whenparams)
-}
-
-fun infer_param_ret_frozen(
-  sk_async: ?FileRange,
-  params: Parameters<N.Parameter>,
-): SMap<FileRange> {
-  frozen_map = SortedMap[];
-
-  if (sk_async.isNone()) return frozen_map;
-
-  params.foldl(infer_tparams_frozen_parameter, frozen_map)
 }
 
 fun infer_tparams_frozen_type_parameter(
@@ -3127,9 +3042,6 @@ fun infer_frozen_type_(
     };
     infer_frozen_type_list(new_frozen, frozen_map, tyl)
 
-  | N.Tawaitable(_, ty) ->
-    // needs to be frozen inside it
-    infer_frozen_type_(Some(pos), frozen_map, ty)
   | N.Tparam(_, _, i, _) -> update_frozen_opt(frozen_map, i, frozen_status)
   | N.Tdefault(ty) -> infer_frozen_type_(frozen_status, frozen_map, ty)
   }
@@ -3998,7 +3910,6 @@ fun expr_(
         ),
       ),
     )
-  | A.Await(e) -> sk_await(context, acc, env, pos, e)
   | A.Return(e) ->
     if (env.return_forbidden) {
       SkipError.error(
@@ -4017,7 +3928,6 @@ fun expr_(
   | A.YieldBreak() ->
     acc.setYields(pos);
     N.YieldBreak()
-  | A.Async(e) -> sk_async(context, acc, env, pos, e)
   | A.Throw(e) -> N.Throw(expr(context, acc, env, e))
   | A.With(e, updates) ->
     N.With(
@@ -4144,35 +4054,10 @@ fun lambda(
   acc = mutable Acc{classAcc => containingAcc.classAcc};
   mods1 = lambda_modifiers(mods);
   nparams1 = lambda_parameters(context, acc, env, nparams);
-  env1 = env with {in_async => None()};
+  env1 = env;
   e1 = expr(context, acc, env1, e);
   e2 = if (acc.yields.isSome()) appendYieldBreak(e1) else e1;
   N.Lambda(mods1, nparams1, SortedMap[], e2, acc.yields);
-}
-
-fun sk_async(
-  context: mutable SKStore.Context,
-  acc: mutable Acc,
-  env: Env,
-  pos: FileRange,
-  e: A.Expr,
-): N.Expr_ {
-  env1 = env with {in_async => Some(pos)};
-  N.Async(SortedMap[], expr(context, acc, env1, e))
-}
-
-fun sk_await(
-  context: mutable SKStore.Context,
-  acc: mutable Acc,
-  env: Env,
-  pos: FileRange,
-  e: A.Expr,
-): N.Expr_ {
-  if (env.in_async.isSome()) {
-    N.Await(expr(context, acc, env, e))
-  } else {
-    SkipError.error(pos, "Cannot await outside an async context")
-  }
 }
 
 fun call_from_items(

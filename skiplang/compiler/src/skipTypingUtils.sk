@@ -108,7 +108,6 @@ class Env{
   tracked_context: Bool,
   return_type: ReturnCase,
   yield_type: YieldCase,
-  sk_async: ?FileRange,
   break_type: ?N.Type_,
 }
 
@@ -1409,8 +1408,6 @@ fun is_mutable(acc: Acc, x: N.Type_, for_async: Bool): N.EffectiveMode {
           },
         mutable_default,
       )
-  | N.Tawaitable(_, inner) ->
-    if (for_async) is_mutable(acc, inner, true) else N.Mmutable(pos)
   | N.Tlambda(_, _, mods, _)
   | N.Tfun(_, mods, _, _, _) ->
     if (Types.is_frozen_tfun_modifiers(mods)) N.Efrozen() else N.Mmutable(pos)
@@ -1526,7 +1523,6 @@ private fun is_readonly(acc: Acc, x: N.Type_): N.EffectiveMode {
           },
         readonly_default,
       )
-  | N.Tawaitable _ -> N.Mmutable(pos)
   | N.Tlambda(_, _, mods, _)
   | N.Tfun(_, mods, _, _, _) ->
     if (Types.is_frozen_tfun_modifiers(mods)) N.Efrozen() else N.Mmutable(pos)
@@ -1592,7 +1588,6 @@ private fun pat_object_mode(acc: Acc, x: N.Type_): N.Modality {
   | N.TnonNullable _
   | N.Tfrozen _ ->
     N.Mchilled()
-  | N.Tawaitable _ -> N.Mmutable(pos)
   | N.Tlambda(_, _, mods, _)
   | N.Tfun(_, mods, _, _, _) ->
     if (Types.is_frozen_tfun_modifiers(mods)) N.Mchilled() else N.Mmutable(pos)
@@ -1627,7 +1622,6 @@ private fun has_pat_object_mode(acc: Acc, x: N.Type_): Bool {
   | N.Tanything()
   | N.TnonNullable _
   | N.Tfrozen _
-  | N.Tawaitable _
   | N.Tlambda _
   | N.Tfun _ ->
     false
@@ -2293,7 +2287,6 @@ value class TparamConstraints private {
       uppers = static::appendUppers(tparam_id, Array[ty], this.uppers);
       this with {uppers}
 
-    | N.Tawaitable(v, _)
     | N.Tfrozen(v)
     | N.TnonNullable(v)
     | N.Tfun(v, _, _, _, _)
@@ -3078,9 +3071,6 @@ fun instantiate_type_(
       tyl,
     );
     (acc1, N.Tpromoted(seen, mode, var, tparams, x1, targs))
-  | N.Tawaitable(var, ty) ->
-    (acc1, ty1) = instantiate_(context, next_id, caller_pos, env, acc, ty);
-    (acc1, N.Tawaitable(var, ty1))
   | N.Tfun(variance, ml, _, params, rty) ->
     (acc1, params1) = params.map_foldl(
       (p1, p2) -> instantiate_(context, next_id, caller_pos, env, p1, p2),
@@ -4000,7 +3990,6 @@ fun may_have_children(acc: Acc, x: N.Type_): Bool {
   | N.Tfrozen _
   | N.TnonNullable _
   | N.Tanything()
-  | N.Tawaitable _
   | N.Tfun _ ->
     false
   }
@@ -4078,7 +4067,6 @@ fun has_concrete_type_for_matching(
   | N.Tanything() ->
     Some(false)
 
-  | N.Tawaitable _
   | N.Tlambda _
   | N.Tfun _ ->
     None()

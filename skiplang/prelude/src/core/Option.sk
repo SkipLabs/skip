@@ -140,14 +140,6 @@ base class Option<+T> uses
   | None() -> "None()"
   | Some(x) -> `Some(${x.toString()})`
 
-  async frozen fun genMap<U>(f: T ~> ^U): ^?U
-  | None() -> None()
-  | Some(x) -> Some(await f(x))
-
-  async frozen fun genFilter(p: T ~> ^Bool): ^?T
-  | None() -> None()
-  | option @ Some(x) -> if (await p(x)) option else None()
-
   fun iterator(): mutable Iterator<T> {
     this match {
     | None() -> void

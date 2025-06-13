@@ -185,7 +185,6 @@ class Field_type{
 
 base class Callable_def{
   annotations: SSet,
-  async_: ?FileRange,
   body: Expr_body,
   name: Name,
   native_: ?FileRange,
@@ -278,7 +277,6 @@ base class Type__ uses Hashable, Equality {
     tparam_set: SMap<String>,
     elts: .Array<InterElt>,
   )
-  | Tawaitable(Variance, Type_)
 
   fun ==(other: Type__): Bool
   | Tanything() -> other is Tanything _
@@ -358,11 +356,6 @@ base class Type__ uses Hashable, Equality {
       v1 == v2 && m1 == m2 && ts1.eqBy(ts2, (_, _) ~> true) && elts1 == elts2
     | _ -> false
     }
-  | Tawaitable(v1, ty1) ->
-    other match {
-    | Tawaitable(v2, ty2) -> v1 == v2 && eqType(ty1, ty2)
-    | _ -> false
-    }
 
   fun hash(): Int
   | Tanything() -> "%Tanything".hash()
@@ -399,7 +392,6 @@ base class Type__ uses Hashable, Equality {
   | Tset(v, m, ts, elts) ->
     cur = ("%Tset", v, m, ts.keys().collect(Set)).hash();
     elts.foldl((i, elt) -> (i, elt).hash(), cur)
-  | Tawaitable(v, ty) -> ("%^", v, ty.i1).hash()
 }
 
 /* Object types can have 3 modes
@@ -615,11 +607,9 @@ base class Expr_ {
     yields: ?FileRange,
   )
   | Try(expr: Expr, branches: List<Match_branch>, l1: Expr, l2: Expr)
-  | Await(expr: Expr)
   | Return(expr: Expr)
   | Yield(expr: Expr)
   | YieldBreak()
-  | Async(captured: SMap<FileRange>, expr: Expr)
   | Throw(expr: Expr)
   | Concurrent(exprs: List<Expr>)
   | Array(mut: ?FileRange, targs: .Array<Type_>, args: .Array<Expr>)
@@ -949,7 +939,6 @@ fun get_variance(x: Type_): ?A.Variance {
   | Tapply _ ->
     None()
 
-  | Tawaitable(v, _)
   | Tfrozen(v)
   | TnonNullable(v)
   | Tfun(v, _, _, _, _)
@@ -1017,9 +1006,6 @@ fun type__<Ta, Tb>(
   | Tnamed(cnl, ty) ->
     (acc1, ty1) = type(f, env, acc, ty);
     (acc1, Tnamed(cnl, ty1))
-  | Tawaitable(var, ty) ->
-    (acc1, ty1) = type(f, env, acc, ty);
-    (acc1, Tawaitable(var, ty1))
   }
 }
 
@@ -1200,9 +1186,6 @@ fun expr_<TEnv, TAcc>(
     (acc4, l11) = expr(f, env, acc2, l1);
     (acc5, l12) = expr(f, env, acc4, l2);
     (acc5, Try(e1, mbl1, l11, l12))
-  | Await(e) ->
-    (acc1, e1) = expr(f, env, acc, e);
-    (acc1, Await(e1))
   | Return(e) ->
     (acc1, e1) = expr(f, env, acc, e);
     (acc1, Return(e1))
@@ -1210,9 +1193,6 @@ fun expr_<TEnv, TAcc>(
     (acc1, e1) = expr(f, env, acc, e);
     (acc1, Yield(e1))
   | YieldBreak() -> (acc, x)
-  | Async(fv, e) ->
-    (acc1, e1) = expr(f, env, acc, e);
-    (acc1, Async(fv, e1))
   | Throw(e) ->
     (acc1, e1) = expr(f, env, acc, e);
     (acc1, Throw(e1))

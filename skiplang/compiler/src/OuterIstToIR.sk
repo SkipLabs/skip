@@ -796,17 +796,7 @@ class DefLazyGFun{def: I.CallableDef} extends BodyProvidingLazyGFun {
     params: Array<ParameterInfo>,
     useOptionalMask: Bool,
   }: LazyGFun {
-    d = DefLazyGFun{funInfo, def, params, useOptionalMask};
-    if (funInfo.isAsync) {
-      AsyncCoroutineLazyGFun{
-        funInfo,
-        params,
-        useOptionalMask,
-        bodyProvider => d,
-      }
-    } else {
-      d
-    }
+    DefLazyGFun{funInfo, def, params, useOptionalMask};
   }
 
   private fun getLoweredDef(
@@ -1562,7 +1552,6 @@ class Converter private (
       visibility => (pos, I.VPublic()),
       annotations => SSet[],
       overridable_ => None(),
-      async_ => None(),
       kind => SkipNamedAst.FKStatic(pos),
       native_ => None(),
       untracked_ => None(),
@@ -1690,7 +1679,6 @@ class Converter private (
           )
         ),
         annotations => SSet[],
-        async_ => None(),
         met_class => cd.name,
         from_ => constDef.from_.default(cd.name),
         implicit_param => staticThisBinding(constPos),
@@ -2410,7 +2398,6 @@ class Converter private (
       pos,
       tparams,
       isNative,
-      isAsync => in_.async_.isSome(),
       isGenerator => in_.yields.isSome(),
       annotations => in_.annotations,
       className => None(),
@@ -2529,7 +2516,6 @@ class Converter private (
       isNative,
       isGenerator => in_.yields.isSome(),
       className => Some(logicalClassName),
-      isAsync => in_.async_.isSome(),
       annotations => in_.annotations,
       tparams,
       funType,
@@ -2786,123 +2772,6 @@ class Converter private (
       yieldedTargs.concat(funInfo.tparams),
     )
   }
-
-  // Every awaitable gets its own subclass of AwaitableBase to hold its
-  // particular coroutine state. This produces a new such class
-  // for the generator function described by funInfo.
-  fun createAwaitableClass(
-    context: mutable SKStore.Context,
-    funInfo: GFunInfo,
-  ): GTapply {
-    // We start with Iterator.Generator as a basic template
-    // for the custom class we want to create, then tweak it.
-    pos = funInfo.pos;
-
-    // Computes Array[XX] for the return type "mutable Awaitable<XX>".
-    awaitableTargs = funInfo.funType.returnType match {
-    | GTapply(
-      FrontEndLazyGClass("Awaitable"),
-      Mutable(),
-      t,
-    ) if (t.size() == 1) ->
-      t
-    | bad -> funInfo.die(`Expected mutable Awaitable return type, got ${bad}`)
-    };
-
-    // Change the return type of the generator from Iterator<XX> to
-    // the specific concrete awaitable type we are creating here.
-    // In addition to conveying types more accurately, this gives the
-    // coroutine a way to find its "next" method later.
-    awaitableFunTargs = awaitableTargs.concat(funInfo.tparams);
-
-    templateID = FrontEndLazyGClass("Awaitable.AwaitableTemplate");
-    template = this.getGClass(context, templateID, pos);
-
-    // This class takes as tparams all of the tparams in the environment
-    // where the async function body appears, since that body might
-    // reference them. Additionally it takes the T for AwaitableTemplate<T>
-    // so that any fields etc. that it inherits can be resolved in terms
-    // of that T.
-    tparams = template.tparams.concat(funInfo.tparams);
-
-    awaitableGClass = template with {
-      name => GClassName(funInfo.gfunction.id + "::Awaitable"),
-      isFrontEndClass => false,
-      tparams,
-
-      // Replace "extends Awaitable<T>" with "extends Awaitable<XX>" where
-      // "mutable Awaitable<XX>" is the declared return type of the
-      // function containing the yield.
-      extends_ => {
-        found = false;
-        ext = template.extends_.map(ext -> {
-          if (ext.generic != FrontEndLazyGClass("Awaitable")) {
-            ext
-          } else {
-            !found = true;
-            ext with {targs => awaitableTargs}
-          }
-        });
-        pos.invariant(found, "Expected Awaitable base class");
-        ext
-      },
-
-      methods => template.methods
-        .filter((name, _) -> name != kInspectMethodName)
-        .map((name, methodDef) -> {
-          if (name != "next") {
-            methodDef
-          } else {
-            function = (_context, receiver) ~> {
-              // Produce a skeleton for the "next" method. The body will
-              // be filled in for real much later, once the ramp up function
-              // has been optimized and gets split in two.
-              awaitableType = GTapply(receiver, Mutable(), awaitableFunTargs);
-
-              DoneLazyGFun{
-                function => GFunction{
-                  funInfo => GFunInfo{
-                    gfunction => GFunctionName(receiver.nameStr() + "::next"),
-                    funType => GFunType{
-                      isMutable => false,
-                      isTracked => funInfo.funType.isTracked,
-                      params => Array[awaitableType],
-                      returnType => gtVoid,
-                    },
-                    tparams,
-                    pos,
-                    className => Some(receiver.name()),
-                    annotations => funInfo.annotations,
-                  },
-                  params => Array[GFunParam{typ => awaitableType, pos}],
-                  blocks => Array[
-                    // Dummy body for now.
-                    GBlock{
-                      id => GBlockID(0),
-                      pos,
-                      instrs => Vector[
-                        GUnreachable{
-                          why => "incomplete Awaitable 'next' method",
-                          pos,
-                        },
-                      ],
-                    },
-                  ],
-                  coroutineInfo => Some(GUnfinishedNext(funInfo)),
-                },
-              }
-            };
-
-            GMethodDef{function => Some(function), tparams => Array[], pos}
-          }
-        }),
-    };
-
-    // We aren't smart enough to handle static methods on special classes yet.
-    this.assertNoStaticMethods(context, templateID, template);
-
-    GTapply(LiteralLazyGClass(awaitableGClass), Mutable(), awaitableFunTargs);
-  }
 }
 
 class TryInfo{
@@ -2949,11 +2818,6 @@ mutable class OuterIstEmitter{
     funInfo = lazy.funInfo;
     if (funInfo.isGenerator) {
       !funInfo.funType.returnType = converter.createGeneratorClass(
-        context,
-        funInfo,
-      )
-    } else if (funInfo.isAsync) {
-      !funInfo.funType.returnType = converter.createAwaitableClass(
         context,
         funInfo,
       )
@@ -3398,34 +3262,29 @@ mutable class OuterIstEmitter{
     typ: GType,
     pos: FileRange,
   ): GInstr {
-    if (name == FrontEndLazyGFun{frontEndName => "awaitSynchronously"}) {
-      // This intrinsic is pretty messy to do later, so expand it now.
-      this.emitAwaitSynchronously(args, typ, pos)
-    } else {
-      this.tryInfo match {
-      | None() ->
-        // A normal call (not inside a "try").
-        this.emitInstr(GCallFunction{typ, pos, name, args, targs})
-      | Some(tryInfo) ->
-        // A "call" lexically inside a "try" becomes an "invoke",
-        // possibly transferring control to the "catch" landing pad.
-        nextBlockIfNoThrow = this.newBlock(pos, "try_no_throw");
+    this.tryInfo match {
+    | None() ->
+      // A normal call (not inside a "try").
+      this.emitInstr(GCallFunction{typ, pos, name, args, targs})
+    | Some(tryInfo) ->
+      // A "call" lexically inside a "try" becomes an "invoke",
+      // possibly transferring control to the "catch" landing pad.
+      nextBlockIfNoThrow = this.newBlock(pos, "try_no_throw");
 
-        invoke = this.emitInstr(
-          GInvokeFunction{
-            typ,
-            pos,
-            name,
-            args,
-            targs,
-            successors => Array[nextBlockIfNoThrow.id, tryInfo.llvmLandingPad],
-          },
-        );
+      invoke = this.emitInstr(
+        GInvokeFunction{
+          typ,
+          pos,
+          name,
+          args,
+          targs,
+          successors => Array[nextBlockIfNoThrow.id, tryInfo.llvmLandingPad],
+        },
+      );
 
-        this.startBlock(nextBlockIfNoThrow);
+      this.startBlock(nextBlockIfNoThrow);
 
-        invoke
-      }
+      invoke
     }
   }
 
@@ -3526,173 +3385,6 @@ mutable class OuterIstEmitter{
     };
 
     this.emitMethodCall(context, info, params, false, pos)
-  }
-
-  // Handle an "async" block. The strategy is to create a global async
-  // function that takes as parameters every value captured by this
-  // async block, with the same body as this async block, and call it.
-  private mutable fun emitAsync(
-    body: I.Stmt,
-    value: I.Expr,
-    typ: GType,
-    pos: FileRange,
-  ): GInstr {
-    // Find all local variables mentioned in the async block.
-    vars = UnorderedSet::mcreateFromIterator(
-      SkipOptimizeLocals.reads_of_stmt(body).values(),
-    );
-    cap1 = SkipOuterIstUtils.captured_locals_of_statement(body);
-    cap1.keys().each(vars.insert);
-
-    SkipOptimizeLocals.reads_of_expr(value).each(vars.insert);
-    cap2 = SkipOuterIstUtils.captured_locals_of_statement(I.SingleExpr(value));
-    cap2.keys().each(vars.insert);
-
-    // Ignore the rest (which must be declared inside the "async" block).
-    capturesBuf = mutable Vector[];
-    for (varName in vars) {
-      if (this.locals.containsKey(varName)) {
-        capturesBuf.push((varName, this.getLocal(varName, pos)))
-      }
-    };
-    capturesBuf.sortBy(a ~> a.i0);
-    captures = capturesBuf.toArray();
-
-    // We know these values can't be assigned, as async blocks don't allow
-    // such side effects. We don't care if "captured" is correct so we
-    // leave it as false, and assume "read" is true.
-    info = SkipOuterIstUtils.const_binding_info;
-
-    bodyWithReturn = I.Seq(List[body, I.Return(value)]);
-    params = captures.mapWithIndex((i, arg) -> {
-      ParameterInfo{name => arg.i0, value => None(), info, index => i + 1, pos}
-    });
-    args = captures.map(arg -> arg.i1);
-
-    funType = GFunType{
-      isMutable => false,
-      isTracked => this.funInfo.funType.isTracked,
-      params => args.map(g -> g.getType()),
-      returnType => typ,
-    };
-
-    funInfo = GFunInfo{
-      gfunction => GFunctionName(
-        this.funInfo.gfunction.id +
-          "::asyncCoroutine" +
-          this.getNextClosureID(),
-      ),
-      pos,
-      tparams => this.funInfo.tparams,
-      funType,
-      className => None(),
-      isAsync => true,
-    };
-
-    bodyProvider = NormalLazyGFun{
-      params,
-      useOptionalMask => false,
-      funInfo,
-      body => bodyWithReturn,
-    };
-
-    lazy = AsyncCoroutineLazyGFun{
-      params,
-      useOptionalMask => false,
-      funInfo,
-      bodyProvider,
-    };
-
-    // Call the exlined async body to produce the Awaitable.
-    this.emitInstr(
-      GCallFunction{
-        typ,
-        pos,
-        name => lazy,
-        args,
-        targs => this.funInfo.tparams,
-      },
-    )
-  }
-
-  mutable fun emitAwait(
-    context: mutable SKStore.Context,
-    expr: I.Expr,
-    typ: GType,
-    pos: FileRange,
-  ): GInstr {
-    awaitable = this.emitExpr(context, expr);
-
-    // See if the awaitable is ready.
-    //
-    // TODO: We could tune this more for the "value is ready" case by
-    // checking for kAwaitableValueMarker and dumping both the exception and
-    // suspend cases off to a slow path.
-    ready = this.emitCallFunction(
-      FrontEndLazyGFun{frontEndName => "Awaitable.awaitableReadyOrThrow"},
-      Array[awaitable],
-      Array[],
-      gtBool,
-      pos,
-    );
-
-    lineStr = getLineStr(pos);
-    suspendBlock = this.newBlock(pos, "suspend_" + lineStr);
-    joinBlock = this.newBlock(pos, "join_suspend_" + lineStr);
-
-    _ = this.emitInstr(
-      GIf{
-        pos,
-        predicate => ready,
-        successors => Array[joinBlock.id, suspendBlock.id],
-      },
-    );
-
-    this.startBlock(suspendBlock);
-
-    // It's not ready, so suspend until it is.
-    _ = this.emitInstr(GSuspend{awaitable, pos});
-    this.maybeEmitJump(joinBlock.id, pos);
-
-    this.startBlock(joinBlock);
-
-    // Load the value from the Awaitable object.
-    this.emitInstr(
-      GCallMethod{
-        typ,
-        pos,
-        method => "unsafeGetValue",
-        source => FrontEndLazyGClass("Awaitable"),
-        args => Array[awaitable],
-      },
-    )
-  }
-
-  mutable fun emitAwaitSynchronously(
-    args: Array<GInstr>,
-    typ: GType,
-    pos: FileRange,
-  ): GInstr {
-    pos.invariant(args.size() == 1, "Expected a single Awaitable");
-
-    _ = this.emitCallFunction(
-      FrontEndLazyGFun{frontEndName => "Awaitable.awaitableSyncOrThrow"},
-      args,
-      Array[],
-      gtVoid,
-      pos,
-    );
-
-    // Load the value from the Awaitable object.
-    this.emitInstr(
-      GCallMethod{
-        typ,
-        pos,
-        method => "unsafeGetValue",
-        source => FrontEndLazyGClass("Awaitable"),
-        args,
-      },
-    )
   }
 
   private mutable fun getNextClosureID(): Int {
@@ -4071,8 +3763,6 @@ mutable class OuterIstEmitter{
       this.emitInstr(
         GEArray{typ, pos, args => exprs.map(e -> this.emitExpr(context, e))},
       )
-    | I.Async(stmt, expr) -> this.emitAsync(stmt, expr, typ, pos)
-    | I.Await(expr) -> this.emitAwait(context, expr, typ, pos)
     | I.Freeze(expr) ->
       this.emitInstr(GFreeze{typ, pos, obj => this.emitExpr(context, expr)})
     | I.GetClass(expr) ->
