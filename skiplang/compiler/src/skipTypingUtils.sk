@@ -77,7 +77,6 @@ class LIfBlock(fr: FileRange, level: Level) extends FrozenLevel
 
 base class NoMutableFrozenLevel extends FrozenLevel
 class LPureLambda(fr: FileRange, level: Level) extends NoMutableFrozenLevel
-class LAsyncBlock(fr: FileRange, level: Level) extends NoMutableFrozenLevel
 
 base class ReturnCase {
   children =
@@ -823,7 +822,6 @@ class LocalMutableConstraint(
     acc: Acc,
   ): Acc {
     mode = this.level match {
-    | LAsyncBlock _ -> is_mutable(acc, this.ty, true)
     | LPureLambda _ -> is_mutable(acc, this.ty, false)
     };
     mode match {
@@ -853,20 +851,12 @@ class LocalMutableConstraint(
       emsg =
         "Because this closure was declared as pure (~>)" + "\nTry '->' instead";
       SkipError.errorl(List[local_msg, mut_msg, (pos_closure, emsg)])
-    | LAsyncBlock(pos_block, _) ->
-      local_msg = (this.fr, check_mutable_local_msg);
-      mut_msg = (mutability.fr, check_mutable_error_msg(mutability));
-      emsg =
-        "Because of this `async` block." +
-        "\nInside, locals cannot be modified and mutables cannot be captured";
-      SkipError.errorl(List[local_msg, mut_msg, (pos_block, emsg)])
     }
   }
 
   fun toString(): String {
     "captured in " +
       this.level match {
-      | LAsyncBlock _ -> "async: "
       | LPureLambda _ -> "pure: "
       } +
       BufferedPrinter.pp_to_string(SkipNamedAstPp.type, this.ty)

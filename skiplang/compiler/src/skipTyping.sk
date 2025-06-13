@@ -3508,11 +3508,6 @@ fun check_local_assign(
   ) if (local_level < lambda_level) ->
     emsg = "Because this closure was declared as pure (~>)\nTry '->' instead";
     SkipError.errorl(List[local_msg, (pos_closure, emsg)])
-  | TUtils.LAsyncBlock(pos_block, block_level) if (local_level < block_level) ->
-    emsg =
-      "Because of this `async` block." +
-      "\nInside, locals cannot be modified and mutables cannot be captured";
-    SkipError.errorl(List[local_msg, (pos_block, emsg)])
   | TUtils.LIfBlock(pos_block, block_level) if (local_level < block_level) ->
     emsg =
       "Because of this `when` block." +
@@ -3532,7 +3527,6 @@ private fun check_local_mutable(
   mode = env.frozen_level match {
   | TUtils.LNone() ->
     N.Efrozen() // bypass the check
-  | TUtils.LAsyncBlock _ -> TUtils.is_mutable(acc, ty, true)
   | _ -> TUtils.is_mutable(acc, ty, false)
   };
   (env.frozen_level, mode) match {
@@ -3561,11 +3555,7 @@ private fun check_local_mutable_add_constraint(
   ty: N.Type_,
 ): TUtils.Acc {
   flevel match {
-  | TUtils.LAsyncBlock(_, block_level)
-  | TUtils.LPureLambda(
-    _,
-    block_level,
-  ) if (local_level < block_level) ->
+  | TUtils.LPureLambda(_, block_level) if (local_level < block_level) ->
     !acc.constraints = acc.constraints.add_local_check(flevel, pos_local, ty);
     acc
   | _ -> acc
