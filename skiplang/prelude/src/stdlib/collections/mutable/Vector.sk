@@ -947,66 +947,6 @@ mutable class .Vector<+T> private (
 
   // # Transforming To Different Sequence Types
 
-  // # Async
-
-  async fun gen<U: frozen>[T: ^U](): ^Vector<U> {
-    sz = this.sz;
-    inner = this.inner;
-    handles = List::tabulate(sz, index ->
-      async {
-        x = await unsafeGet(inner, index);
-        Unsafe.RawStorage::make(x)
-      }
-    );
-    nextInner = Array::mcreateFromItems(await handles.genReverse());
-    nextInner.reverse();
-    Vector(unsafe_chill_trust_me(nextInner), sz)
-  }
-
-  async frozen fun genMap<U: frozen>(s: T ~> ^U): ^Vector<U> {
-    sz = this.sz;
-    inner = this.inner;
-    nextInner = await ASIO.genFillBy(sz, index ~>
-      async {
-        awaitable_x = s(unsafeGet(inner, index));
-        x = await awaitable_x;
-        Unsafe.RawStorage::make(x)
-      }
-    );
-    Vector(nextInner, sz)
-  }
-
-  async frozen fun genFilter(p: T ~> ^Bool): ^Vector<T> {
-    // Asynchronously map each item to whether it passes the predicate or not
-    sz = this.sz;
-    inner = this.inner;
-    predicates = await ASIO.genFillBy(sz, index ~> p(unsafeGet(inner, index)));
-    // Count the number of matching items to allocate a single exactly sized Array
-    nextSz = predicates.reduce(
-      (sum, predicate) -> if (predicate) sum + 1 else sum,
-      0,
-    );
-    // Insert items into a return Array for which the predicate returned true
-    nextInner = unsafeMake(nextSz);
-    fromIndex = 0;
-    toIndex = 0;
-    // NOTE: The check for `fromIndex.ult(sz)` is skipped here because there
-    // are guaranteed to be `nextSz` items in `inner` for which the predicate
-    // passes and that cause `toIndex` to be incremented.
-    while (toIndex.ult(nextSz)) {
-      if (unsafeGetRaw(predicates, fromIndex)) {
-        unsafeSet(nextInner, toIndex, unsafeGet(inner, fromIndex));
-        !toIndex = toIndex + 1;
-      };
-      !fromIndex = fromIndex + 1;
-    };
-    Vector(unsafe_chill_trust_me(nextInner), nextSz)
-  }
-
-  async frozen fun genFind(p: T ~> ^Bool): ^?T {
-    await this.genFindLoop(this.inner, p, 0);
-  }
-
   // # Extension Methods
   // Methods unique to Vector and not inherited from Seq/IndexedSequence.
 
@@ -1187,23 +1127,6 @@ mutable class .Vector<+T> private (
     } else {
       this.eqLoop(i + 1, size, inner, other)
     }
-  }
-
-  private async frozen fun genFindLoop<U>[T: U](
-    inner: .Array<Unsafe.RawStorage<U>>,
-    p: U ~> ^Bool,
-    index: Int,
-  ): ^?U {
-    if (index == this.sz) {
-      None();
-    } else {
-      item = unsafeGet(inner, index);
-      if (await p(item)) {
-        Some(item);
-      } else {
-        await this.genFindLoop(inner, p, index + 1);
-      };
-    };
   }
 
   // Increase the internal storage to accommodate the given capacity. The

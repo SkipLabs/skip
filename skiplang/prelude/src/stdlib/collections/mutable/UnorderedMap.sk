@@ -329,68 +329,6 @@ mutable class .UnorderedMap<+K: Hashable & Equality, +V>(
     unsafe_chill_trust_me(result)
   }
 
-  // # Async
-
-  // async frozen fun gen<V2>[K: Orderable, V: ^V2](): ^Map<K, V2> {
-  //   await this.genMap((_, v) ~> v)
-  // }
-
-  async frozen fun genMap<V2: frozen>[K: Orderable](
-    s: (K, V) ~> ^V2,
-  ): ^UnorderedMap<K, V2> {
-    slots = this.slots;
-    nextSlots = await ASIO.genFillBy(slots.size(), index ~>
-      async {
-        slot = Unsafe.array_get(slots, index);
-        if (slot.isEmpty()) {
-          UnorderedMapSlot<K, V2>::empty(slot.hash)
-        } else {
-          key = slot.key();
-          value = await s(key, slot.value());
-          UnorderedMapSlot::create(slot.hash, key, value)
-        }
-      }
-    );
-    UnorderedMap(nextSlots, this.sz, this.shift, 0)
-  }
-
-  async frozen fun genFilter<V2>[K: Orderable](
-    p: (K, V) ~> ^Bool,
-  ): ^UnorderedMap<K, V> {
-    slots = this.slots;
-    // Asynchronously map each item to whether it passes the predicate or not
-    predicates = await ASIO.genFillBy(slots.size(), index ~>
-      async {
-        slot = Unsafe.array_get(slots, index);
-        !slot.isEmpty() && await p(slot.key(), slot.value())
-      }
-    );
-    // Count the number of matching items to allocate a single exactly sized result
-    nextSz = predicates.reduce(
-      (sum, predicate) -> if (predicate) sum + 1 else sum,
-      0,
-    );
-    if (nextSz == this.sz) {
-      this
-    } else {
-      // Insert slots for which the predicate returned true
-      result = UnorderedMap::mcreate(nextSz);
-      toIndex = 0;
-      fromIndex = 0;
-      while (toIndex.ult(nextSz)) {
-        if (Unsafe.array_get(predicates, fromIndex)) {
-          // if predicate passed than the corresponding slot must be non-empty
-          slot = Unsafe.array_get(slots, fromIndex);
-          h = slot.hash;
-          result.setLoop(h, slot.key(), slot.value());
-          !toIndex = toIndex + 1
-        };
-        !fromIndex = fromIndex + 1;
-      };
-      unsafe_chill_trust_me(result)
-    }
-  }
-
   // # Trait Implementations
 
   readonly fun toString[K: readonly Show, V: readonly Show](): String {

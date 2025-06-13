@@ -79,26 +79,6 @@ class .Range(start: Int, end: Int) extends Sequence<Int> uses Equality, Show {
     this.foldl((_, pos) -> f(pos), void)
   }
 
-  async fun genIter(f: Int ~> ^void): ^void {
-    await this.genFoldl((_, pos) ~> f(pos), void)
-  }
-
-  private async fun genFoldlLoop<R: frozen>(
-    pos: Int,
-    f: (R, Int) ~> ^R,
-    state: R,
-  ): ^R {
-    if (pos < this.end) {
-      await this.genFoldlLoop(pos + 1, f, await f(state, pos))
-    } else {
-      state
-    }
-  }
-
-  async fun genFoldl<R: frozen>(f: (R, Int) ~> ^R, init: R): ^R {
-    await this.genFoldlLoop(this.start, f, init)
-  }
-
   private fun foldlLoop<R>(pos: Int, f: (R, Int) -> R, state: R): R {
     if (pos < this.end) this.foldlLoop(pos + 1, f, f(state, pos)) else state
   }
