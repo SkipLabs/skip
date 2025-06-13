@@ -16,8 +16,11 @@ choose to release either or both of the `latest` and `quickstart` tags.
 
 We keep all **public** NPM packages (i.e. `@skipruntime/*`, `@skiplabs/skip`,
 and `@skip-adapter/*`) at the same version so as to keep updates, documentation,
-and version management simple.  To update from version `$OLD` to version `$NEW`,
-perform the following steps:
+and version management simple.  (Note that the build script of the native addon
+relies on this convention since it links to the skipruntime library with the same
+version as the addon package, so whenever anything in the skipruntime library
+changes, the addon package version must be bumped.)  To update from version
+`$OLD` to version `$NEW`, perform the following steps:
 
 1. Check out `main` and make sure your working copy is clean
 
@@ -27,7 +30,7 @@ perform the following steps:
 
 3. Bump _all_ `./skipruntime-ts/**/package.json` version strings and
    inter-dependencies from `$OLD` to `$NEW`, e.g. by running `sed -i ''
-   's/$OLD/$NEW/g' $(g grep -l $OLD skipruntime-ts/**/package.json)`.
+   's/$OLD/$NEW/g' $(git grep -l $OLD skipruntime-ts/**/package.json)`.
 
 4. Build and test with `make -C skipruntime-ts build test`.
 

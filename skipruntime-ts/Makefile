@@ -6,8 +6,12 @@ NPM_WORKSPACES=$(shell jq --raw-output "[.workspaces[] | select((startswith(\"sq
 .PHONY: default
 default: install
 
+# tell skipruntime-ts/addon build script to link unversioned libskipruntime.so
+export SKIPRUNTIME_VERSION=dev
+# config linker to find libskipruntime.so
 export LDFLAGS=-L$(realpath $(CURDIR)/..)/build/skipruntime/
 export LD_LIBRARY_PATH=$(realpath $(CURDIR)/..)/build/skipruntime/
+
 
 .PHONY: libskipruntime
 libskipruntime:

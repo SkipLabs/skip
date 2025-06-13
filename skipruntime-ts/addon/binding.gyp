@@ -11,7 +11,10 @@
       ],
       "cflags!": ["-fno-exceptions"],
       "cflags_cc!": ["-fno-exceptions"],
-      "libraries": ["-lskipruntime -Wl,--require-defined=SKIP_new_Obstack"]
+      "libraries": [
+        "-lskipruntime<!(echo $VERSION)",
+        "-Wl,--require-defined=SKIP_new_Obstack"
+      ]
     }
   ]
 }
