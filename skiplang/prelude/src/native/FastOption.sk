@@ -138,29 +138,6 @@ private trait FastOptionCommonTrait<+T> extends FastOptionTrait<T> {
     }
   }
 
-  // async frozen fun gen<U>[T: ^U](): ^?U
-  // | None() -> None()
-  // | Some(x) -> Some(await x)
-
-  async frozen fun genMap<U>(f: T ~> ^U): ^?U {
-    if (this.isSome()) {
-      Some(await f(this.unsafeFromSome()))
-    } else {
-      None()
-    }
-  }
-
-  async frozen fun genFilter(p: T ~> ^Bool): ^?T {
-    if (this.isSome()) {
-      x = this.unsafeFromSome();
-      if (await (p(x))) {
-        return Some(x)
-      }
-    };
-
-    None()
-  }
-
   fun inspect(): Inspect {
     if (this.isSome()) {
       InspectCall("Some", Array[inspect(this.unsafeFromSome())])

@@ -189,7 +189,6 @@ mutable class GFunInfo{
   // be the original class, not the metaclass that actually hosts them.
   className: ?GClassName,
   tparams: Array<GTparam>,
-  isAsync: Bool = false,
   isGenerator: Bool = false,
 } extends FunInfoCommon, HasFileRange uses Hashable
 
@@ -529,7 +528,6 @@ base class GStmt extends GNonConstantInstr
 base class GVoidStmt extends GStmt {
   children =
   | GSetField{obj: GInstr, field: String, value: GInstr}
-  | GSuspend{awaitable: GInstr}
   | GYield{value: GInstr, none: GInstr}
 }
 
@@ -539,7 +537,6 @@ base class GTypedStmt{typ: GType} extends GStmt {
   | GEArray{args: Array<GInstr>}
   | GFreeze{obj: GInstr}
   | GGetConst{name: ConstID}
-  | GGetCurrentAwaitable{}
   | GGetField{obj: GInstr, field: String}
   // TODO: Delete forceCanInstantiate once T25379806 is fixed.
   | GObject{args: Array<GInstr>, forceCanInstantiate: Bool = false}
@@ -553,7 +550,6 @@ base class GTerminator{
   successors: Array<GBlockID> = Array[],
 } extends GVoidStmt {
   children =
-  | GAsyncReturn{}
   | GIntSwitch{value: GInstr, cases: Array<Int>}
   | GStringSwitch{value: GInstr, cases: Array<GConstantString>}
   | GIf{predicate: GInstr}

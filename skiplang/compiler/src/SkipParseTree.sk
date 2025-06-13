@@ -417,43 +417,6 @@ class AtPatternTree{
   }
 }
 
-class AwaitableTypeSpecifierTree{
-  caret: ParseTree.ParseTree,
-  elementType: ParseTree.ParseTree,
-} extends ParseTree.ParseTree {
-  fun getNamedFields(): List<(String, ParseTree.ParseTree)> {
-    List<(String, ParseTree.ParseTree)>[
-      ("caret", this.caret),
-      ("elementType", this.elementType),
-    ];
-  }
-
-  fun getKind(): String {
-    "AwaitableTypeSpecifier";
-  }
-
-  fun getChildren(): mutable Iterator<ParseTree.ParseTree> {
-    yield this.caret;
-    yield this.elementType;
-    yield break;
-  }
-
-  fun transform(
-    codemod: mutable CodeMod,
-  ): (ParseTree.ParseTree, Vector<Subst>) {
-    tx_caret = codemod.transform(this.caret);
-    tx_elementType = codemod.transform(this.elementType);
-    (
-      AwaitableTypeSpecifierTree{
-        range => this.range,
-        caret => tx_caret.i0,
-        elementType => tx_elementType.i0,
-      },
-      Vector[tx_caret.i1, tx_elementType.i1].flatten(),
-    );
-  }
-}
-
 class BinaryExpressionTree{
   left: ParseTree.ParseTree,
   operator: ParseTree.ParseTree,

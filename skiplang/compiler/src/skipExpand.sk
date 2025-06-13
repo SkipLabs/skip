@@ -1781,11 +1781,9 @@ fun malias_expr_(
   | A.TemplateLiteral(ep) ->
     A.TemplateLiteral(malias_call_args(context, env, ep))
   | A.Try(e1, mbl) -> A.Try(k(e1), malias_match_branches(context, env, mbl))
-  | A.Await(e1) -> A.Await(k(e1))
   | A.Return(e1) -> A.Return(k(e1))
   | A.Yield(e1) -> A.Yield(k(e1))
   | A.YieldBreak() -> A.YieldBreak()
-  | A.Async(e1) -> A.Async(k(e1))
   | A.Throw(e1) -> A.Throw(k(e1))
   | A.With(e1, args) ->
     A.With(
@@ -2261,11 +2259,9 @@ fun ext_class_tparams_expr_(
   | A.TemplateLiteral(ep) ->
     A.TemplateLiteral(ext_class_tparams_call_args(subst, ep))
   | A.Try(e1, mbl) -> A.Try(k(e1), ext_class_tparams_match_branches(subst, mbl))
-  | A.Await(e1) -> A.Await(k(e1))
   | A.Return(e1) -> A.Return(k(e1))
   | A.Yield(e1) -> A.Yield(k(e1))
   | A.YieldBreak() -> A.YieldBreak()
-  | A.Async(e1) -> A.Async(k(e1))
   | A.Throw(e1) -> A.Throw(k(e1))
   | A.With(e1, args) ->
     A.With(
@@ -2497,7 +2493,6 @@ fun fun_def(
 ): A.Fun_def {
   t__ = fd;
   native_ = t__.native_;
-  async_ = t__.async_;
   untracked_ = t__.untracked_;
   fun_private = t__.fun_private;
   annotations = t__.annotations;
@@ -2515,7 +2510,6 @@ fun fun_def(
   A.Fun_def{
     annotations,
     native_,
-    async_,
     untracked_,
     fun_private,
     name => name1,
@@ -3080,7 +3074,6 @@ fun method_def(
   visibility = met.visibility;
   macro_ = met.macro_;
   mutable_ = met.mutable_;
-  async_ = met.async_;
   static_ = met.static_;
   annotations = met.annotations;
   overridable_ = met.overridable_;
@@ -3123,7 +3116,6 @@ fun method_def(
     visibility,
     macro_,
     mutable_,
-    async_,
     static_,
     annotations,
     overridable_,
@@ -3375,11 +3367,9 @@ fun expr_(
       expr(context, env, e),
       mbl.map(cur1 -> match_branch(context, env, cur1)),
     )
-  | A.Await(e) -> A.Await(expr(context, env, e))
   | A.Return(e) -> A.Return(expr(context, env, e))
   | A.Yield(e) -> A.Yield(expr(context, env, e))
   | A.YieldBreak() -> A.YieldBreak()
-  | A.Async(e) -> A.Async(expr(context, env, e))
   | A.Throw(e) -> A.Throw(expr(context, env, e))
   | A.With(e, updates) ->
     A.With(

@@ -516,45 +516,6 @@ mutable native class .Array<+T>
     (this.take(num), this.drop(num))
   }
 
-  // # Async
-
-  async fun gen<U: frozen>[T: ^U](): ^Array<U> {
-    handles = List::tabulate(this.size(), index -> this.unsafe_get(index));
-    result = Array::mcreateFromItems(await handles.genReverse());
-    result.reverse();
-    unsafe_chill_trust_me(result)
-  }
-
-  async frozen fun genMap<U: frozen>(s: T ~> ^U): ^Array<U> {
-    await ASIO.genFillBy(this.size(), index ~> s(this.unsafe_get(index)));
-  }
-
-  async frozen fun genFilter(p: T ~> ^Bool): ^Array<T> {
-    // Asynchronously map each item to whether it passes the predicate or not
-    sz = this.size();
-    predicates = await ASIO.genFillBy(sz, index ~> p(this.unsafe_get(index)));
-    // Count the number of matching items to allocate a single exactly sized Array
-    nextSz = predicates.reduce(
-      (sum, predicate) -> if (predicate) sum + 1 else sum,
-      0,
-    );
-    // Insert items into a return Array for which the predicate returned true
-    result = Unsafe.array_make(nextSz);
-    fromIndex = 0;
-    toIndex = 0;
-    // NOTE: The check for `fromIndex.ult(sz)` is skipped here because there
-    // are guaranteed to be `nextSz` items in `inner` for which the predicate
-    // passes and that cause `toIndex` to be incremented.
-    while (toIndex.ult(nextSz)) {
-      if (predicates.unsafe_get(fromIndex)) {
-        result.unsafe_set(toIndex, this.unsafe_get(fromIndex));
-        !toIndex = toIndex + 1;
-      };
-      !fromIndex = fromIndex + 1;
-    };
-    unsafe_chill_trust_me(result)
-  }
-
   // # Iteration
 
   readonly fun each(f: T -> void): void {

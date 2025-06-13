@@ -103,10 +103,6 @@ fun type__<Tenv: frozen, Tacc>(
   | Ast.Treadonly(ty) ->
     (acc2, ty2) = type(f, env, acc, ty);
     (acc2, Ast.Treadonly(ty2))
-
-  | Ast.Tawaitable(ty) ->
-    (acc2, ty2) = type(f, env, acc, ty);
-    (acc2, Ast.Tawaitable(ty2))
   }
 }
 
@@ -279,10 +275,6 @@ fun expr_<Tenv: frozen, Tacc>(
     );
     (acc3, Ast.Try(e2, mbl2))
 
-  | Ast.Await(e) ->
-    (acc2, e2) = expr(f, env, acc, e);
-    (acc2, Ast.Await(e2))
-
   | Ast.Return(e) ->
     (acc2, e2) = expr(f, env, acc, e);
     (acc2, Ast.Return(e2))
@@ -292,10 +284,6 @@ fun expr_<Tenv: frozen, Tacc>(
     (acc2, Ast.Yield(e2))
 
   | Ast.YieldBreak() -> (acc, Ast.YieldBreak())
-
-  | Ast.Async(e) ->
-    (acc2, e2) = expr(f, env, acc, e);
-    (acc2, Ast.Async(e2))
 
   | Ast.Throw(e) ->
     (acc2, e2) = k(f, env, acc, e);

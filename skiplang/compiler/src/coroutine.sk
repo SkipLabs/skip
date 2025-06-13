@@ -175,9 +175,6 @@ private mutable class .LowerCoroutine{
   // Which coroutine state field is used to save/restore each saved Instr.
   saveField: mutable Map<InstrID, SField> = mutable Map[],
 
-  // Is this a generator, rather than an async/await function?
-  isGenerator: Bool,
-
   // Maps resumeState -> Block that handles it.
   resumeBlocks: mutable Vector<BlockID> = mutable Vector[],
 
@@ -218,7 +215,6 @@ private mutable class .LowerCoroutine{
         pos,
       ),
       returnNoneValues => info.none,
-      isGenerator => info.isGenerator,
       coroutineStateSClass,
     };
 
@@ -233,9 +229,7 @@ private mutable class .LowerCoroutine{
   // Should we treat this instruction as a safepoint?
   protected readonly fun isSafepoint(instr: Instr): Bool {
     instr match {
-    | Suspend _
-    | Yield _ ->
-      true
+    | Yield _ -> true
     | _ -> false
     }
   }
@@ -435,13 +429,11 @@ private mutable class .LowerCoroutine{
     );
     resumeBlocks.push(this.newBlockID());
 
-    if (this.isGenerator) {
-      this.pos.invariant(
-        resumeBlocks.size() == kCoroutineDoneResumeStateNumber,
-        "Wrong resume index",
-      );
-      resumeBlocks.push(this.newBlockID());
-    };
+    this.pos.invariant(
+      resumeBlocks.size() == kCoroutineDoneResumeStateNumber,
+      "Wrong resume index",
+    );
+    resumeBlocks.push(this.newBlockID());
 
     // Hand out states in the order in which the safepoints appear in
     // the function. The order doesn't actually matter but it's "pretty".
@@ -560,13 +552,11 @@ private mutable class .LowerCoroutine{
         }.id,
       };
 
-      if (this.isGenerator) {
-        // Default the resume state to end-of-iteration exit block in case there
-        // is a throw or (worse) the user tries to reentrantly enter the next()
-        // method. If the user reaches a yield this will be overwritten with
-        // that yield's resume state.
-        this.emitStoreResumeState(kCoroutineDoneResumeStateNumber, pos)
-      };
+      // Default the resume state to end-of-iteration exit block in case there
+      // is a throw or (worse) the user tries to reentrantly enter the next()
+      // method. If the user reaches a yield this will be overwritten with
+      // that yield's resume state.
+      this.emitStoreResumeState(kCoroutineDoneResumeStateNumber, pos);
 
       unreachableBlock = this.newBlockID();
 
@@ -591,15 +581,13 @@ private mutable class .LowerCoroutine{
       this.startNewBlock(unreachableBlock);
       this.emitUnreachable{why => "Impossible coroutine resume state", pos};
 
-      if (this.isGenerator) {
-        this.startNewBlock(this.resumeBlocks[kCoroutineDoneResumeStateNumber]);
+      this.startNewBlock(this.resumeBlocks[kCoroutineDoneResumeStateNumber]);
 
-        this.emitReturn{
-          values => this.returnNoneValues.map(v ->
-            this.getConstant(v with {id => this.iid()}).id
-          ),
-          pos,
-        }
+      this.emitReturn{
+        values => this.returnNoneValues.map(v ->
+          this.getConstant(v with {id => this.iid()}).id
+        ),
+        pos,
       };
 
       this.startNewBlock(this.resumeBlocks[0]);
@@ -620,15 +608,6 @@ private mutable class .LowerCoroutine{
     remap = x -> cur.maybeGet(x).default(x);
 
     instr match {
-    | AsyncReturn{pos} ->
-      _ = this.emitReturn{values => Array[], pos};
-      true
-
-    | GetCurrentAwaitable{id} ->
-      this.optinfo.idToInstr.set(id, this.getInstr(this.coroutineObj));
-      true
-
-    | Suspend{id, pos}
     | Yield{id, pos} ->
       // This does three steps:
       // 1) Store values needed when we later resume.
@@ -648,19 +627,7 @@ private mutable class .LowerCoroutine{
       };
 
       instr match {
-      | Yield{values} ->
-        pos.invariant(this.isGenerator, "Unexpected Yield");
-        this.emitReturn{id, pos, values => values.map(remap)}
-      | Suspend{value} ->
-        pos.invariant(!this.isGenerator, "Unexpected Suspend");
-        _ = this.emitCallFunction{
-          name => this.env.runtimeFunctions["Awaitable.awaitableSuspend"],
-          typ => tVoid,
-          pos,
-          args => Array[this.coroutineObj, remap(value)],
-          smap => kNonParametricFunSmap,
-        };
-        this.emitReturn{id, pos, values => Array[]}
+      | Yield{values} -> this.emitReturn{id, pos, values => values.map(remap)}
       | _ -> pos.die("Impossible case")
       };
 
@@ -678,7 +645,6 @@ private mutable class .LowerCoroutine{
       true
 
     | YieldBreak{id, pos} ->
-      pos.invariant(this.isGenerator, "Unexpected YieldBreak");
       this.emitJump{
         id,
         pos,
@@ -774,18 +740,6 @@ private mutable class .LowerCoroutine{
       }),
       typ => coroutineStateType,
       pos,
-    };
-
-    if (!this.isGenerator) {
-      // Start async functions running right away by running "next".
-      _ = emitter.emitCallMethod{
-        args => Array[coroutineState.id],
-        method => "next",
-        smap => kNonParametricMethodSmap,
-        typ => tVoid,
-        pos,
-        prettyName => "startAsyncRunning",
-      }
     };
 
     emitter.emitReturn{values => Array[coroutineState.id], pos};
