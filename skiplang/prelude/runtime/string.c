@@ -55,10 +55,6 @@ char* sk_string_create(const char* buffer, uint32_t size) {
   return result;
 }
 
-char* SKIP_getBuildVersion() {
-  return sk_string_create("1", 1);
-}
-
 char* SKIP_String__fromUtf8(char* /* class */, char* array) {
   uint32_t size = SKIP_getArraySize(array);
   return sk_string_create(array, size);
