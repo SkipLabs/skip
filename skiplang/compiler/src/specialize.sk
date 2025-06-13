@@ -828,7 +828,6 @@ mutable class Specializer{
         | GEArray _
         | GFreeze _
         | GGetConst _
-        | GGetCurrentAwaitable _
         | GGetField _
         | GIf _
         | GIntSwitch _
@@ -3278,19 +3277,6 @@ mutable class FunSpecializer{
     this.setValue(o, val)
   }
 
-  private mutable fun emitGGetCurrentAwaitable(
-    r: GGetCurrentAwaitable,
-    typ: Type,
-    pos: Pos,
-  ): void {
-    awaitable = this.emitGetCurrentAwaitable{
-      pos,
-      typ,
-      prettyName => r.prettyName,
-    };
-    this.setValue(r, Exists(InstrLeaf(awaitable.id)))
-  }
-
   private mutable fun emitGReturn(
     context: mutable SKStore.Context,
     r: GReturn,
@@ -3627,8 +3613,6 @@ mutable class FunSpecializer{
             this.emitGCastOrReinterpret(context, c, Cast, c.value, typ, pos)
           | ev @ GEArray _ -> this.emitGEArray(context, ev, typ, pos)
           | frz @ GFreeze _ -> this.emitGFreeze(context, frz, pos)
-          | r @ GGetCurrentAwaitable _ ->
-            this.emitGGetCurrentAwaitable(r, typ, pos)
           | g @ GGetConst _ -> this.emitGGetConst(g, typ, pos)
           | gf @ GGetField _ -> this.emitGGetField(context, gf, typ, pos)
           | GIf{predicate, successors, prettyName} ->
