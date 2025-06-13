@@ -361,19 +361,6 @@ mutable class SkipParser{
     };
   }
 
-  // reactive-type:
-  //    ^  type-specifier
-  mutable fun parseReactTypeSpecifier(): ParseTree {
-    start = this.mark();
-    caret = this.eatTree(TokenKind.CARET());
-    elementType = this.parseTypeSpecifier();
-    ParseTree.AwaitableTypeSpecifierTree{
-      range => this.createRange(start),
-      caret,
-      elementType,
-    };
-  }
-
   // relative-qualified-type-name:
   //    type-identifier
   //    qualified-type-name  .  type-identifier
@@ -580,8 +567,6 @@ mutable class SkipParser{
     | TokenKind.READONLY()
     // option-type
     | TokenKind.QUESTION()
-    // reactive type
-    | TokenKind.CARET()
     // void
     | TokenKind.VOID()
     // this
@@ -706,8 +691,6 @@ mutable class SkipParser{
     | TokenKind.OPEN_CURLY() -> this.parseLambdaTypeWithNamedParameters()
     // option-type
     | TokenKind.QUESTION() -> this.parseOptionTypeSpecifier()
-    // react type
-    | TokenKind.CARET() -> this.parseReactTypeSpecifier()
     // void
     | TokenKind.VOID() -> this.parseVoid()
     // this
