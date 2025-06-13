@@ -1,17 +1,17 @@
 # this builds the artifacts of this repository, orchestrating the
 # various build systems
 
-.PHONY: all
-all: npm build/skdb build/init.sql
+.PHONY: default
+default: check check-ts
 
 PLAYWRIGHT_REPORTER?="line"
 SKARGO_PROFILE?=release
 SKDB_WASM=sql/target/wasm32-unknown-unknown/$(SKARGO_PROFILE)/skdb.wasm
 SKDB_BIN=sql/target/host/$(SKARGO_PROFILE)/skdb
 SDKMAN_DIR?=$(HOME)/.sdkman
-SKIPRUNTIME?=$(CURDIR)/build/skipruntime
 
-export SKIPRUNTIME
+.PHONY: skdb
+skdb: npm build/skdb build/init.sql
 
 ################################################################################
 # skdb wasm + js client
@@ -73,9 +73,9 @@ check:
 	find * -name Skargo.toml -exec sh -c 'bin/cd_sh $$(dirname {}) "skargo check"' \;
 
 .PHONY: check-ts
-check-ts:
-	npm install
-	bin/check-ts.sh
+check-ts:	
+#	delegate to pick up build-time config for libskipruntime
+	${MAKE} -C skipruntime-ts check-ts
 
 .PHONY: check-sh
 check-sh:
