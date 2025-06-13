@@ -3597,13 +3597,6 @@ private fun check_if_block_mutable(
         "Because of this 'if' block." +
         "\nInside mutable locals are viewed as readonly, but mutable lambdas cannot be made readonly";
       SkipError.errorl(List[local_msg, mut_msg, (ifblock.fr, emsg)])
-    | Types.AwaitableToReadonly _ ->
-      local_msg = (pos_local, TUtils.check_mutable_local_msg);
-      mut_msg = (mutability.fr, TUtils.check_mutable_error_msg(mutability));
-      emsg =
-        "Because of this 'if' block." +
-        "\nInside mutable locals are viewed as readonly, but awaitables cannot be made readonly\nTry using 'await' in an async context to remove the awaitable";
-      SkipError.errorl(List[local_msg, mut_msg, (ifblock.fr, emsg)])
     | exn -> throw exn
     }
   }

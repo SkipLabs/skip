@@ -40,7 +40,7 @@ class MutPreservation(
 // Cannot convert certain types to readonly/frozen
 base class InvalidToReadonly(List<(FileRange, String)>) extends .Exception
 class MutLambdaToReadonly extends InvalidToReadonly
-class AwaitableToReadonly extends InvalidToReadonly
+
 /*****************************************************************************/
 /* Environment */
 /*****************************************************************************/
@@ -932,21 +932,6 @@ fun to_readonly_modifiers(
       ],
     )
   }
-}
-
-fun error_readonly_awaitable<T>(
-  caller_fr: FileRange,
-  awaitable_fr: FileRange,
-): T {
-  throw AwaitableToReadonly(
-    List[
-      (caller_fr, "Cannot take a readonly view of any awaitable type"),
-      (
-        awaitable_fr,
-        "If you need a non-mutable version of this type, try using 'await' in an async context to remove the awaitable",
-      ),
-    ],
-  )
 }
 
 fun to_readonly_list(
