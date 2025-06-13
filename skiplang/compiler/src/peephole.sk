@@ -97,7 +97,6 @@ mutable class .Peephole{
     | RawCallBase _
     | SetField _
     | Store _
-    | Suspend _
     | ArrayClone _
     | ArrayUnsafeGet _
     | ArrayUnsafeSet _
@@ -502,9 +501,6 @@ private fun canModifyExistingMemory(
   // invisible to other optimizations.
   | LocalGC _ -> false
 
-  // Suspend can record a continuation in the Awaitable, which is a mem write.
-  | Suspend _ -> true
-
   | AsyncReturn _
   | NamedCall _
   | Store _
@@ -610,7 +606,6 @@ private fun canCSE(
   | RawCallBase _
   | Store _
   | SetField _
-  | Suspend _
   | ArrayAlloc _
   | ArrayClone _
   | ArrayUnsafeSet _

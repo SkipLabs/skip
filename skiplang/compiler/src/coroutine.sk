@@ -233,9 +233,7 @@ private mutable class .LowerCoroutine{
   // Should we treat this instruction as a safepoint?
   protected readonly fun isSafepoint(instr: Instr): Bool {
     instr match {
-    | Suspend _
-    | Yield _ ->
-      true
+    | Yield _ -> true
     | _ -> false
     }
   }
@@ -628,7 +626,6 @@ private mutable class .LowerCoroutine{
       this.optinfo.idToInstr.set(id, this.getInstr(this.coroutineObj));
       true
 
-    | Suspend{id, pos}
     | Yield{id, pos} ->
       // This does three steps:
       // 1) Store values needed when we later resume.
@@ -651,16 +648,6 @@ private mutable class .LowerCoroutine{
       | Yield{values} ->
         pos.invariant(this.isGenerator, "Unexpected Yield");
         this.emitReturn{id, pos, values => values.map(remap)}
-      | Suspend{value} ->
-        pos.invariant(!this.isGenerator, "Unexpected Suspend");
-        _ = this.emitCallFunction{
-          name => this.env.runtimeFunctions["Awaitable.awaitableSuspend"],
-          typ => tVoid,
-          pos,
-          args => Array[this.coroutineObj, remap(value)],
-          smap => kNonParametricFunSmap,
-        };
-        this.emitReturn{id, pos, values => Array[]}
       | _ -> pos.die("Impossible case")
       };
 

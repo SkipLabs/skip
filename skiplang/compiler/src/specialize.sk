@@ -859,7 +859,6 @@ mutable class Specializer{
         | GReturn _
         | GSetField _
         | GStringSwitch _
-        | GSuspend _
         | GThrow _
         | GUnreachable _
         | GWith _
@@ -2500,20 +2499,6 @@ mutable class FunSpecializer{
     }
   }
 
-  private mutable fun emitGSuspend(
-    context: mutable SKStore.Context,
-    a: GSuspend,
-    pos: Pos,
-  ): void {
-    this.flattenArgs(Array[this.getValue(context, a.awaitable)]) match {
-    | NotExists(why) -> _ = this.unreachable(pos, why)
-    | Exists(values) ->
-      pos.invariant(values.size() == 1, "Expected one awaitable");
-
-      _ = this.emitSuspend{pos, value => values[0], prettyName => a.prettyName}
-    }
-  }
-
   // Given the raw InstrID for a call instruction, produce a NamedTree
   // value for its result by using a separate TupleExtract to get each piece.
   mutable fun reassembleCall(
@@ -3736,7 +3721,6 @@ mutable class FunSpecializer{
               }
             | _ -> pos.die("Expected String")
             }
-          | s @ GSuspend _ -> this.emitGSuspend(context, s, pos)
           | GThrow{prettyName, exception} ->
             this.getValue(context, exception) match {
             | NotExists(why) -> _ = this.unreachable(pos, why)
