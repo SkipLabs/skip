@@ -22,14 +22,6 @@ declare i32 @__gxx_personality_v0(...)
 declare ptr @__cxa_begin_catch(ptr)
 declare void @__cxa_end_catch()
 
-declare void @llvm.debugtrap() nounwind
-
-; Function Attrs: alwaysinline nounwind uwtable
-define void @SKIP_debug_break() {
-  tail call void @llvm.debugtrap()
-  ret void
-}
-
 ; Awaitable
 
 define void @SKIP_awaitableNotifyWaitersValueIsReady(ptr) {
