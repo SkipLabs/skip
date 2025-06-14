@@ -260,7 +260,7 @@ value class PrettyDefID() uses TypeSafeID<Int>, PrettyFormattable {
       out.print("getelementptr (i8, ptr ");
     };
 
-    out.print("bitcast (%N to ptr)" / this);
+    out.print("%n" / this);
 
     if (byteOffset != 0) {
       out.print(", i64 %d)" / byteOffset)
@@ -1786,7 +1786,7 @@ private fun prettyWriteTypeAndName(
     }
   | ConstantFun{value} ->
     subf = out.env().getFunction(value, out.pos());
-    out.print("ptr bitcast (%N to ptr)" / subf)
+    out.print("%N" / subf)
   | ConstantVoid _ -> out.print("void")
   | _ -> out.print("%t %n" / instr / instr)
   }

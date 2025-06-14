@@ -252,7 +252,7 @@ value class AsmDefID() uses TypeSafeID<Int>, AsmFormattable {
       asm.print("getelementptr (i8, ptr ");
     };
 
-    asm.print("bitcast (%N to ptr)" % this);
+    asm.print("%n" % this);
 
     if (byteOffset != 0) {
       asm.print(", i64 %d)" % byteOffset)
@@ -1998,7 +1998,7 @@ mutable class .AsmOutput{
       }
     });
 
-    asm.print("ptr bitcast (%N to ptr)" % id)
+    asm.print("%N" % id)
   }
 
   // Static strings always take a multiple of 8 bytes and have a trailing '\0'
@@ -2273,19 +2273,6 @@ private fun llvmWriteCall(
 
   code = optinfo.getInstr(call.code);
 
-  codeTemp = if (code.isConstant()) {
-    ""
-  } else {
-    // We are calling a raw function pointer, which is not expressible as a
-    // Skip type. We need to cast this to the right LLVM function pointer
-    // type, which we infer from the parameters.
-    tmp = asm.llvmIdentifier("methodCode");
-
-    asm.print("  %%%s = bitcast ptr %n to ptr, %D\n" % tmp % code % call);
-
-    tmp
-  };
-
   asm.print("  ");
   if (call.typ != tVoid) {
     asm.print("%n = " % call)
@@ -2311,11 +2298,7 @@ private fun llvmWriteCall(
 
     // Write function.
     asm.print(" %t " % call);
-    if (codeTemp == "") {
-      asm.print("%n" % code);
-    } else {
-      asm.print("%%%s" % codeTemp);
-    };
+    asm.print("%n" % code);
     llvmWriteArgs(asm, call.args);
 
     if (!call.returns) {
@@ -2617,7 +2600,7 @@ private fun llvmWriteTypeAndName(
     }
   | ConstantFun{value} ->
     subf = asm.env().getFunction(value, asm.pos());
-    asm.print("ptr bitcast (%N to ptr)" % subf)
+    asm.print("%N" % subf)
   | ConstantVoid _ -> asm.print("void")
   | _ -> asm.print("%t %n" % instr % instr)
   }
@@ -2751,8 +2734,8 @@ private fun llvmGetAddr(
   };
 
   // Compute the raw address to be loaded.
-  rawAddr = asm.llvmIdentifier();
-  asm.print("  %%%s = getelementptr inbounds " % rawAddr);
+  addr = asm.llvmIdentifier();
+  asm.print("  %%%s = getelementptr inbounds " % addr);
 
   optinfo.getInstr(instr.addr) match {
   | g @ ConstantGlobalSingleton _ ->
@@ -2762,10 +2745,6 @@ private fun llvmGetAddr(
   };
 
   asm.print(", i64 %s, %D\n" % firstByteOffset % instr);
-
-  // Bitcast it to the right type.
-  addr = asm.llvmIdentifier();
-  asm.print("  %%%s = bitcast ptr %%%s to ptr, %D\n" % addr % rawAddr % instr);
 
   // Compute what we know about the alignment, by taking the lowest bit that
   // could possibly be set in the address.
@@ -2860,10 +2839,8 @@ private fun llvmWriteStore(
 
   if (!isBitfield) {
     if (asm.common.config.asan) {
-      tmp = asm.llvmIdentifier();
-      asm.print("  %%%s = bitcast ptr %%%s to ptr, %D\n" % tmp % addr % pos);
       asm.print(
-        "  call void @SKIP_Obstack_verifyStore(ptr %%%s), %D\n" % tmp % pos,
+        "  call void @SKIP_Obstack_verifyStore(ptr %%%s), %D\n" % addr % pos,
       );
     };
 
@@ -3083,8 +3060,7 @@ private fun llvmWriteSkipLandingPad(
 ): void {
   excPair = asm.llvmIdentifier("excpair");
   asm.print(
-    ("  %%%s = landingpad { ptr, i32 }\n" +
-      "          catch ptr bitcast (ptr @%s to ptr), %D\n") %
+    "  %%%s = landingpad { ptr, i32 }\n          catch ptr @%s, %D\n" %
       excPair %
       skipExceptionTypeInfo %
       pos,
@@ -3097,9 +3073,7 @@ private fun llvmWriteSkipLandingPad(
 
   expectedID = asm.llvmIdentifier("expected_type_id");
   asm.print(
-    ("  %%%s = tail call i32 @llvm.eh.typeid.for(ptr nonnull " +
-      "bitcast (ptr @%s to ptr)) " +
-      "nounwind, %D\n") %
+    "  %%%s = tail call i32 @llvm.eh.typeid.for(ptr nonnull @%s) nounwind, %D\n" %
       expectedID %
       skipExceptionTypeInfo %
       pos,
@@ -3148,12 +3122,10 @@ private fun llvmWriteSkipLandingPad(
       cppExc %
       pos,
   );
-  addr2 = asm.llvmIdentifier("exc_field_addr2");
-  asm.print("  %%%s = bitcast ptr %%%s to ptr, %D\n" % addr2 % addr1 % pos);
 
   asm.print("  ");
   writeExcPtr();
-  asm.print(" = load ptr, ptr %%%s, align 8, %D\n" % addr2 % pos);
+  asm.print(" = load ptr, ptr %%%s, align 8, %D\n" % addr1 % pos);
 
   asm.print("  tail call void @__cxa_end_catch(), %D\n" % pos);
 }
@@ -3410,15 +3382,11 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
       );
 
       // Tell LLVM its lifetime starts here.
-      lifetimeVar = asm.llvmIdentifier("%strcat.lifetime_arg");
-      asm.print(
-        "  %s = bitcast ptr %s to ptr, %D\n" % lifetimeVar % bufVar % instr,
-      );
       lifetimeArgs = (
         "(i64 " +
         (common.config.ptrByteSize * args.size()) +
         ", ptr " +
-        lifetimeVar +
+        bufVar +
         ")"
       );
       asm.print(
@@ -3496,16 +3464,12 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
       );
 
       // Load the string header.
-      rawHdrPtr = asm.llvmIdentifier("%stringswitch.rawhdrptr");
-      asm.print(
-        "  %s = getelementptr inbounds i8, %N, i64 -8, %D\n" %
-          rawHdrPtr %
-          valueInstr %
-          instr,
-      );
       hdrPtr = asm.llvmIdentifier("%stringswitch.hdrptr");
       asm.print(
-        "  %s = bitcast ptr %s to ptr, %D\n" % hdrPtr % rawHdrPtr % instr,
+        "  %s = getelementptr inbounds i8, %N, i64 -8, %D\n" %
+          hdrPtr %
+          valueInstr %
+          instr,
       );
       hdr = asm.llvmIdentifier("%stringswitch.hdr");
       asm.print(
@@ -3948,10 +3912,7 @@ fun llvmWriteFunctionDefinition(
   );
   asm.declarationText.writeChar('\n');
 
-  asm.print(
-    (" uwtable personality ptr bitcast " +
-      "(ptr @__gxx_personality_v0 to ptr) %D {\n") % f,
-  );
+  asm.print((" uwtable personality ptr @__gxx_personality_v0 %D {\n") % f);
 
   for (b in f.blocks) llvmWriteBlock(b, asm);
   asm.print("}\n");
