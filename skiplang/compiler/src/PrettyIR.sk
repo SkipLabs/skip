@@ -257,10 +257,10 @@ value class PrettyDefID() uses TypeSafeID<Int>, PrettyFormattable {
 
   fun writeGetPointer(out: mutable PrettyDefBuilder, byteOffset: Int): void {
     if (byteOffset != 0) {
-      out.print("getelementptr (i8, i8* ");
+      out.print("getelementptr (i8, ptr ");
     };
 
-    out.print("bitcast (%N to i8*)" / this);
+    out.print("bitcast (%N to ptr)" / this);
 
     if (byteOffset != 0) {
       out.print(", i64 %d)" / byteOffset)
@@ -1088,12 +1088,12 @@ private type InlinedAt = DILocation;
 //
 //   !dbg attachment points at wrong subprogram for function
 //   !105 = distinct !DISubprogram(name: "<generic_function:Vector::push>", scope: !3, file: !3, line: 78, type: !55, isLocal: false, isDefinition: true, isOptimized: false, unit: !2)
-//   void (i8*, i8*)* @"sk.Vector::push.q2"
-//     %r45 = getelementptr inbounds i8, i8* %this.0, i64 8, !dbg !84
+//   void ptr @"sk.Vector::push.q2"
+//     %r45 = getelementptr inbounds i8, ptr %this.0, i64 8, !dbg !84
 //
 // may have actually originally been written as (note the different !dbg label):
 //
-//     %r45 = getelementptr inbounds i8, i8* %this.0, i64 8, !dbg !56
+//     %r45 = getelementptr inbounds i8, ptr %this.0, i64 8, !dbg !56
 mutable class Metadata{
   // List of LLVM metadata
   metadata: mutable Vector<String> = mutable Vector[],
@@ -1625,7 +1625,7 @@ private fun prettyWriteName(instr: Instr, out: mutable PrettyDefBuilder): void {
       out.print("null")
     } else {
       out.print(
-        "inttoptr (i%s %s to i8*)" / out.common.config.ptrBitSize / value,
+        "inttoptr (i%s %s to ptr)" / out.common.config.ptrBitSize / value,
       )
     }
   | obj @ ConstantObject _ -> out.common.prettyWriteConstantObject(out, obj)
@@ -1757,7 +1757,7 @@ private fun prettyWriteTypeAndName(
       !f.blocks.any(b -> {
         b.terminator() match {
         | ijump @ IndirectJump{successors} if (tag == ijump.tag) ->
-          out.print("i8* blockaddress(%n, " / f);
+          out.print("ptr blockaddress(%n, " / f);
           target = successors[case].target;
           if (
             !f.blocks.any(b2 -> {
@@ -1782,13 +1782,11 @@ private fun prettyWriteTypeAndName(
     ) {
       // Weird -- it seems that the indirect jump that wanted this
       // entry has been optimized away after the vtables were set up?
-      out.print("i8* null")
+      out.print("ptr null")
     }
   | ConstantFun{value} ->
-    // Currently, anyone calling this function expects an i8* rather
-    // than a function type so we must introduce a cast.
     subf = out.env().getFunction(value, out.pos());
-    out.print("i8* bitcast (%N to i8*)" / subf)
+    out.print("ptr bitcast (%N to ptr)" / subf)
   | ConstantVoid _ -> out.print("void")
   | _ -> out.print("%t %n" / instr / instr)
   }
