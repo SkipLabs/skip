@@ -2339,18 +2339,6 @@ private fun llvmWriteNamedCall(
 ): void {
   optinfo = asm.optinfo();
 
-  // Cast arguments as needed.
-  castArgs = call.casts.mapWithIndex((i, cast) -> {
-    if (cast == "") {
-      ""
-    } else {
-      arg = optinfo.getInstr(call.args[i]);
-      castVar = asm.llvmIdentifier("%cast");
-      asm.print("  %s = bitcast %N to %s, %D\n" % castVar % arg % cast % call);
-      cast + " " + castVar
-    }
-  });
-
   retSrc = "";
   asm.print("  ");
   if (call.typ != tVoid) {
@@ -2374,11 +2362,7 @@ private fun llvmWriteNamedCall(
   call.args.eachWithIndex((i, input) -> {
     if (i > 0) asm.print(", ");
     arg = optinfo.getInstr(input);
-
-    castArgs.maybeGet(i) match {
-    | Some(castVar) if (castVar != "") -> asm.print(castVar)
-    | _ -> asm.print("%N" % arg)
-    }
+    asm.print("%N" % arg)
   });
   asm.print("), %D\n" % call);
 
