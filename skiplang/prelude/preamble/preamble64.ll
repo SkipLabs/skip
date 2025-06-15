@@ -30,20 +30,6 @@ define void @SKIP_debug_break() {
   ret void
 }
 
-; Awaitable
-
-define void @SKIP_awaitableNotifyWaitersValueIsReady(ptr) {
-  ret void
-}
-
-define void @SKIP_awaitableSyncOrThrow(ptr) {
-  ret void
-}
-
-define void @SKIP_awaitableThrow(ptr, ptr) {
-  ret void
-}
-
 ; Obstack
 
 declare ptr @SKIP_Obstack_alloc(i64)

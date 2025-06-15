@@ -176,14 +176,6 @@ mutable base class .RewriteBase{
     )
   }
 
-  mutable fun emitAsyncReturn{
-    pos: Pos,
-    id: InstrID = this.iid(),
-    prettyName: String = "",
-  }: void {
-    _ = this.emitStmt(AsyncReturn{id, pos, typ => tVoid, prettyName})
-  }
-
   mutable fun emitBoolCmpEq{
     lhs: InstrID,
     rhs: InstrID,
@@ -310,15 +302,6 @@ mutable base class .RewriteBase{
     this.emitStmt(FloatToString{value, typ, pos, id, prettyName})
   }
 
-  mutable fun emitGetCurrentAwaitable{
-    pos: Pos,
-    typ: Type,
-    id: InstrID = this.iid(),
-    prettyName: String = "",
-  }: GetCurrentAwaitable {
-    this.emitStmt(GetCurrentAwaitable{id, pos, typ, prettyName})
-  }
-
   mutable fun emitIntClz{
     value: InstrID,
     typ: Type,
@@ -404,15 +387,6 @@ mutable base class .RewriteBase{
     prettyName: String = "",
   }: StringHash {
     this.emitStmt(StringHash{value, typ, pos, id, prettyName})
-  }
-
-  mutable fun emitSuspend{
-    value: InstrID,
-    pos: Pos,
-    id: InstrID = this.iid(),
-    prettyName: String = "",
-  }: Suspend {
-    this.emitStmt(Suspend{value, typ => tVoid, pos, id, prettyName})
   }
 
   mutable fun emitArrayClone{

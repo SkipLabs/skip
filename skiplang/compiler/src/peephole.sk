@@ -85,7 +85,6 @@ mutable class .Peephole{
     | Constant _
     | FunParam _
     | GetConst _ // Handled by inliner
-    | GetCurrentAwaitable _
     | Load _
     | LoadVTableEntry _
     | LocalGC _
@@ -97,7 +96,6 @@ mutable class .Peephole{
     | RawCallBase _
     | SetField _
     | Store _
-    | Suspend _
     | ArrayClone _
     | ArrayUnsafeGet _
     | ArrayUnsafeSet _
@@ -439,7 +437,6 @@ private fun canModifyExistingMemory(
   | FloatToString _
   | Freeze _
   | GetConst _
-  | GetCurrentAwaitable _
   | GetField _
   | If _
   | IndirectJump _
@@ -502,10 +499,6 @@ private fun canModifyExistingMemory(
   // invisible to other optimizations.
   | LocalGC _ -> false
 
-  // Suspend can record a continuation in the Awaitable, which is a mem write.
-  | Suspend _ -> true
-
-  | AsyncReturn _
   | NamedCall _
   | Store _
   | SetField _
@@ -547,7 +540,6 @@ private fun canCSE(
   | FloatToInt _
   | FloatToString _
   | GetConst _
-  | GetCurrentAwaitable _
   | IntAdd _
   | IntAnd _
   | IntClz _
@@ -610,7 +602,6 @@ private fun canCSE(
   | RawCallBase _
   | Store _
   | SetField _
-  | Suspend _
   | ArrayAlloc _
   | ArrayClone _
   | ArrayUnsafeSet _

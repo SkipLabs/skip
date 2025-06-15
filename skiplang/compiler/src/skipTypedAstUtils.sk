@@ -275,8 +275,6 @@ mutable class Visitor<State>{
     | N.Tset(x0, x1, x2, x3) ->
       N.Tset(x0, x1, x2, visitArray(this.visitInterElt, x3))
 
-    | N.Tawaitable(var, ty) -> N.Tawaitable(var, this.visitType_(ty))
-
     | N.Tpromoted _ -> invariant_violation("Should have been compiled")
     | N.Tvar _ -> invariant_violation("Should have been compiled")
     }
@@ -388,10 +386,8 @@ mutable class Visitor<State>{
       )
 
     | LazyLambda _ -> invariant_violation("Should have been expanded")
-    | Async(c, e) -> Async(c, this.visitExpr(e))
     | Concurrent _ -> invariant_violation("Not supported")
     | Freeze _ -> invariant_violation("Not supported")
-    | Await(e) -> Await(this.visitExpr(e))
     | Yield(e) -> Yield(this.visitExpr(e))
     | YieldBreak() -> YieldBreak()
     }

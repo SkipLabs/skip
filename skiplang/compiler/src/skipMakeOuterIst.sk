@@ -279,7 +279,6 @@ fun method_def(met: TAst.Method_def, cd: TAst.Class_def): O.MethodDef {
     visibility => visibility(met.visibility),
     overridable_ => met.overridable_,
     annotations => met.annotations,
-    async_ => met.async_,
     native_ => met.native_,
     kind => met.kind,
     untracked_ => met.untracked_,
@@ -351,7 +350,6 @@ fun fun_def(fd: TAst.Fun_def): O.FunDef {
   f = O.FunDef{
     annotations => fd.annotations,
     native_ => fd.native_,
-    async_ => fd.async_,
     untracked_ => fd.untracked_,
     origName => fd.name.i1,
     name => O.funName(fd.name),
@@ -449,16 +447,6 @@ fun type__(remove_aliases: Bool, pos: FileRange, x: NAst.Type__): O.Type {
       };
       O.Type(pos, O.Tnamed(nl, type(remove_aliases, ty)))
     }
-  | NAst.Tawaitable(_, ty) ->
-    O.Type(
-      pos,
-      O.Tmutable(
-        O.Type(
-          pos,
-          O.Tapply(O.Name(pos, "Awaitable"), Array[type(remove_aliases, ty)]),
-        ),
-      ),
-    )
   | NAst.Tapply(mode, x1, tyl) ->
     tapply = O.Type(
       pos,
@@ -824,17 +812,10 @@ fun expr_(
     np1 = np.map(binding);
     fvs1 = fvs.map((_, x) -> binding(x));
     (acc, O.Expr(ty, pos, O.Lambda(np1, ret_ty, fvs1, stbody, yields)))
-  | TAst.Await(e1) ->
-    (acc1, e2) = expr(new_id, env, acc, e1);
-    (acc1, O.Expr(ty, pos, O.Await(e2)))
   | TAst.Return(e1) ->
     (acc1, e2) = expr(new_id, env, acc, e1);
     acc2 = List.Cons(O.Return(e2), acc1);
     (acc2, OU.make_void(pos))
-  | TAst.Async(_, e1) ->
-    (acc2, e2) = expr(new_id, EMPTY_ENV, List[], e1);
-    s = make_seq(acc2);
-    (acc, O.Expr(ty, pos, O.Async(s, e2)))
   | TAst.Throw(e1) ->
     (acc1, e2) = expr(new_id, env, acc, e1);
     acc2 = List.Cons(O.Throw(e2), acc1);
@@ -1411,7 +1392,6 @@ fun oist_needs_binding(e: O.Expr): Bool {
   | O.Dot(dot) ->
     e1 = dot.obj_expr;
     oist_needs_binding(e1)
-  | O.Await(e1)
   | O.Freeze(e1)
   | O.GetClass(e1)
   | O.Cast(_, e1) ->
@@ -1428,8 +1408,7 @@ fun oist_needs_binding(e: O.Expr): Bool {
   | O.FunCall _
   | O.MethodCall _
   | O.StaticCall _
-  | O.Local _
-  | O.Async _ ->
+  | O.Local _ ->
     true
   }
 }

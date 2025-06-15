@@ -531,44 +531,12 @@ base class .SortedMap<+K: Orderable, +V> uses  //  extends KeyedSequence<K, V>
     }
   */
 
-  frozen async fun genMap<V2: frozen>(f: V ~> ^V2): ^SortedMap<K, V2>
-  | Nil() -> Nil()
-  | Node _ ->
-    (left, value, right) = await ASIO.join3(
-      this.left.genMap(f),
-      f(this.value),
-      this.right.genMap(f),
-    );
-    Node{left, key => this.key, value, right, h => this.h, n => this.n}
-
   fun filter(f: (K, V) -> Bool): SortedMap<K, V>
   | Nil() -> this
   | Node _ ->
     l2 = this.left.filter(f);
     r2 = this.right.filter(f);
     if (f(this.key, this.value)) {
-      static::balance(this.key, this.value, l2, r2)
-    } else {
-      static::concat(l2, r2)
-    }
-
-  frozen async fun genFilter(f: V ~> ^Bool): ^SortedMap<K, V>
-  | Nil() -> this
-  | Node _ ->
-    l2 = await this.left.genFilter(f);
-    r2 = await this.right.genFilter(f);
-    if (await f(this.value)) {
-      static::balance(this.key, this.value, l2, r2)
-    } else {
-      static::concat(l2, r2)
-    }
-
-  frozen async fun genFilterWithKey(f: (K, V) ~> ^Bool): ^SortedMap<K, V>
-  | Nil() -> this
-  | Node _ ->
-    l2 = await this.left.genFilterWithKey(f);
-    r2 = await this.right.genFilterWithKey(f);
-    if (await f(this.key, this.value)) {
       static::balance(this.key, this.value, l2, r2)
     } else {
       static::concat(l2, r2)

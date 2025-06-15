@@ -527,18 +527,6 @@ mutable base class .List<+T>
     this.collect(Array).join(separator)
   }
 
-  async fun genReverse<U: frozen>[T: ^U](): ^List<U> {
-    await this.genReverseHelp(Nil())
-  }
-
-  protected async fun genReverseHelp<U: frozen>[T: ^U](tl: List<U>): ^List<U>
-  | Cons(x, rest) -> await rest.genReverseHelp(Cons(await x, tl))
-  | Nil() -> tl
-
-  frozen async fun genFoldl<R>(f: (R, T) ~> ^R, init: R): ^R
-  | Cons(x, rest) -> await rest.genFoldl(f, await f(init, x))
-  | Nil() -> init
-
   // reverse map
   protected static fun mapRev<T2>(
     f: T -> T2,

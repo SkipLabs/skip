@@ -483,10 +483,7 @@ base class Instr{
   | ArrayClone{value} ->
     f(value)
   | ObstackShallowClone{byteSize} -> f(byteSize)
-  | Alloca _
-  | AsyncReturn _
-  | GetCurrentAwaitable _ ->
-    void
+  | Alloca _ -> void
   | BinOp{lhs, rhs} ->
     f(lhs);
     f(rhs)
@@ -918,12 +915,10 @@ base class Stmt extends InstrWithPos {
       successors => remapSuccessors(newSuccessors, successors, remap),
     }
   | Alloca _ -> this with {id, typ}
-  | x @ AsyncReturn _ -> x with {id, typ}
   | BytePointerAdd{addr, offset} ->
     this with {id, typ, addr => remap(addr), offset => remap(offset)}
   | Freeze{value} -> this with {id, typ, value => remap(value)}
   | GetConst _ -> this with {id, typ}
-  | x @ GetCurrentAwaitable _ -> x with {id, typ}
   | GetField{obj} -> this with {id, typ, obj => remap(obj)}
   | If{predicate, successors} ->
     this with {
@@ -1077,7 +1072,6 @@ base class SimpleUnaryStmt final {value: InstrID} extends Stmt {
   | IntPopcount
   | Reinterpret
   | StringHash
-  | Suspend
   | ArrayClone
   | ArraySize
 }
@@ -1090,11 +1084,6 @@ class ZeroExtend extends ExtendBase
 class SignExtend extends ExtendBase
 
 class Freeze{value: InstrID, nop: Bool = false} extends Stmt
-
-// This is a temporary placeholder Instr that produces the Awaitable object
-// being processed by the current async function. It gets lowered away by
-// LowerCoroutine.
-class GetCurrentAwaitable{} extends Stmt
 
 class Alloca{byteSize: Int, byteAlignment: Int, zero: Bool} extends Stmt
 
@@ -1298,7 +1287,6 @@ base class Terminator{
   successors: Array<BlockSuccessor> = Array[],
 } extends Stmt {
   children =
-  | AsyncReturn{}
   | If{predicate: InstrID}
   | IndirectJump{label: InstrID, tag: String}
   | Jump{}
