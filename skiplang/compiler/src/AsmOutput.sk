@@ -235,17 +235,7 @@ extension class .Function uses AsmFormattable {
       // AsmDefID uses the same numbers for all existing SFunctionID
       asm.print('@');
       asm.writeRef(this.getAsmDefID())
-    | 't' ->
-      t = this.funType;
-
-      // NOTE: LLVM function types cannot have parameter/return attributes.
-      llvmWriteReturnTypeName(asm, t.returnType, false);
-      asm.print(" (");
-      t.params.eachWithIndex((i, p) -> {
-        if (i > 0) asm.print(", ");
-        llvmWriteTypeName(asm, p)
-      });
-      asm.print(") *")
+    | 't' -> asm.print("ptr")
     | 'N' -> asm.print("%t %n" % this % this)
     | _ -> asm.die(`Bad format for Function: "${spec}"`)
     }
@@ -259,10 +249,10 @@ value class AsmDefID() uses TypeSafeID<Int>, AsmFormattable {
 
   fun writeGetPointer(asm: mutable AsmDefBuilder, byteOffset: Int): void {
     if (byteOffset != 0) {
-      asm.print("getelementptr (i8, i8* ");
+      asm.print("getelementptr (i8, ptr ");
     };
 
-    asm.print("bitcast (%N to i8*)" % this);
+    asm.print("%n" % this);
 
     if (byteOffset != 0) {
       asm.print(", i64 %d)" % byteOffset)
@@ -315,7 +305,7 @@ mutable private base class AsmDefBase{
     | _ -> asm.die(`Bad format for AsmDef: "${spec}"`)
     };
 
-    if (spec == 't' || spec == 'T' || spec == 'N') {
+    if (spec == 'T') {
       (this.typeString, this.typeRef) match {
       | (Some(str), None()) -> asm.print(str)
       | (None(), Some(ref)) ->
@@ -323,11 +313,9 @@ mutable private base class AsmDefBase{
         asm.writeRef(ref)
       | _ -> asm.die("AsmBuilder has no type to emit")
       };
-
-      if (spec != 'T') {
-        // The type of a global is always a pointer.
-        asm.print("*")
-      }
+    } else if (spec == 't' || spec == 'N') {
+      // The type of a global is always a pointer.
+      asm.print("ptr")
     };
 
     if (spec == 'N') {
@@ -1636,12 +1624,12 @@ private type InlinedAt = DILocation;
 //
 //   !dbg attachment points at wrong subprogram for function
 //   !105 = distinct !DISubprogram(name: "<generic_function:Vector::push>", scope: !3, file: !3, line: 78, type: !55, isLocal: false, isDefinition: true, isOptimized: false, unit: !2)
-//   void (i8*, i8*)* @"sk.Vector::push.q2"
-//     %r45 = getelementptr inbounds i8, i8* %this.0, i64 8, !dbg !84
+//   void ptr @"sk.Vector::push.q2"
+//     %r45 = getelementptr inbounds i8, ptr %this.0, i64 8, !dbg !84
 //
 // may have actually originally been written as (note the different !dbg label):
 //
-//     %r45 = getelementptr inbounds i8, i8* %this.0, i64 8, !dbg !56
+//     %r45 = getelementptr inbounds i8, ptr %this.0, i64 8, !dbg !56
 mutable class Metadata{
   // List of LLVM metadata
   metadata: mutable Vector<String> = mutable Vector[],
@@ -2010,7 +1998,7 @@ mutable class .AsmOutput{
       }
     });
 
-    asm.print("i8* bitcast (%N to i8*)" % id)
+    asm.print("%N" % id)
   }
 
   // Static strings always take a multiple of 8 bytes and have a trailing '\0'
@@ -2212,7 +2200,7 @@ mutable class .AsmOutput{
       canShare => false,
       symbol => "skip.globals",
       common => this,
-      typeString => Some(`${this.llvmGlobalsType()}*`),
+      typeString => Some("ptr"),
       typeRef => None(),
     };
 
@@ -2285,29 +2273,6 @@ private fun llvmWriteCall(
 
   code = optinfo.getInstr(call.code);
 
-  codeTemp = if (code.isConstant()) {
-    ""
-  } else {
-    // We are calling a raw function pointer, which is not expressible as a
-    // Skip type. We need to cast this to the right LLVM function pointer
-    // type, which we infer from the parameters.
-    tmp = asm.llvmIdentifier("methodCode");
-
-    asm.print("  %%%s = bitcast %N to %t(" % tmp % code % call);
-    call.args.eachWithIndex((i, t) -> {
-      if (i > 0) asm.print(", ");
-      typ = optinfo.getInstr(t).typ;
-      llvmWriteTypeName(asm, typ)
-      // LLVM disallows attributes in the function type, which is weird --
-      // the calling convention is not part of the function type.
-      //   llvmWriteTypeCallAttribute(asm, typ, true, false);
-    });
-
-    asm.print(") *, %D\n" % call);
-
-    tmp
-  };
-
   asm.print("  ");
   if (call.typ != tVoid) {
     asm.print("%n = " % call)
@@ -2333,11 +2298,7 @@ private fun llvmWriteCall(
 
     // Write function.
     asm.print(" %t " % call);
-    if (codeTemp == "") {
-      asm.print("%n" % code);
-    } else {
-      asm.print("%%%s" % codeTemp);
-    };
+    asm.print("%n" % code);
     llvmWriteArgs(asm, call.args);
 
     if (!call.returns) {
@@ -2378,18 +2339,6 @@ private fun llvmWriteNamedCall(
 ): void {
   optinfo = asm.optinfo();
 
-  // Cast arguments as needed.
-  castArgs = call.casts.mapWithIndex((i, cast) -> {
-    if (cast == "") {
-      ""
-    } else {
-      arg = optinfo.getInstr(call.args[i]);
-      castVar = asm.llvmIdentifier("%cast");
-      asm.print("  %s = bitcast %N to %s, %D\n" % castVar % arg % cast % call);
-      cast + " " + castVar
-    }
-  });
-
   retSrc = "";
   asm.print("  ");
   if (call.typ != tVoid) {
@@ -2413,11 +2362,7 @@ private fun llvmWriteNamedCall(
   call.args.eachWithIndex((i, input) -> {
     if (i > 0) asm.print(", ");
     arg = optinfo.getInstr(input);
-
-    castArgs.maybeGet(i) match {
-    | Some(castVar) if (castVar != "") -> asm.print(castVar)
-    | _ -> asm.print("%N" % arg)
-    }
+    asm.print("%N" % arg)
   });
   asm.print("), %D\n" % call);
 
@@ -2479,7 +2424,7 @@ private fun llvmWriteName(instr: Instr, asm: mutable AsmDefBuilder): void {
       asm.print("null")
     } else {
       asm.print(
-        "inttoptr (i%s %s to i8*)" % asm.common.config.ptrBitSize % value,
+        "inttoptr (i%s %s to ptr)" % asm.common.config.ptrBitSize % value,
       )
     }
   | obj @ ConstantObject _ -> asm.common.llvmWriteConstantObject(asm, obj)
@@ -2610,7 +2555,7 @@ private fun llvmWriteTypeAndName(
       !f.blocks.any(b -> {
         b.terminator() match {
         | ijump @ IndirectJump{successors} if (tag == ijump.tag) ->
-          asm.print("i8* blockaddress(%n, " % f);
+          asm.print("ptr blockaddress(%n, " % f);
           target = successors[case].target;
           if (
             !f.blocks.any(b2 -> {
@@ -2635,13 +2580,11 @@ private fun llvmWriteTypeAndName(
     ) {
       // Weird -- it seems that the indirect jump that wanted this
       // entry has been optimized away after the vtables were set up?
-      asm.print("i8* null")
+      asm.print("ptr null")
     }
   | ConstantFun{value} ->
-    // Currently, anyone calling this function expects an i8* rather
-    // than a function type so we must introduce a cast.
     subf = asm.env().getFunction(value, asm.pos());
-    asm.print("i8* bitcast (%N to i8*)" % subf)
+    asm.print("%N" % subf)
   | ConstantVoid _ -> asm.print("void")
   | _ -> asm.print("%t %n" % instr % instr)
   }
@@ -2775,27 +2718,17 @@ private fun llvmGetAddr(
   };
 
   // Compute the raw address to be loaded.
-  rawAddr = asm.llvmIdentifier();
-  asm.print("  %%%s = getelementptr inbounds " % rawAddr);
+  addr = asm.llvmIdentifier();
+  asm.print("  %%%s = getelementptr inbounds " % addr);
 
   optinfo.getInstr(instr.addr) match {
   | g @ ConstantGlobalSingleton _ ->
     globalsType = asm.common.llvmGlobalsType();
-    asm.print("%s, %s* @%n, i64 0" % globalsType % globalsType % g)
+    asm.print("%s, ptr @%n, i64 0" % globalsType % g)
   | base -> asm.print("i8, %N" % base)
   };
 
   asm.print(", i64 %s, %D\n" % firstByteOffset % instr);
-
-  // Bitcast it to the right type.
-  addr = asm.llvmIdentifier();
-  asm.print(
-    "  %%%s = bitcast i8* %%%s to %s*, %D\n" %
-      addr %
-      rawAddr %
-      loadTypeName %
-      instr,
-  );
 
   // Compute what we know about the alignment, by taking the lowest bit that
   // could possibly be set in the address.
@@ -2818,9 +2751,8 @@ private fun llvmWriteLoad(load: Load, asm: mutable FunAsmDefBuilder): void {
   if (!isBitfield) {
     // Normal aligned load.
     asm.print(
-      "  %n = load %s, %s* %%%s, align %s, %D\n" %
+      "  %n = load %s, ptr %%%s, align %s, %D\n" %
         load %
-        t.llvmTypeName %
         t.llvmTypeName %
         addr %
         memByteAlignment %
@@ -2830,9 +2762,8 @@ private fun llvmWriteLoad(load: Load, asm: mutable FunAsmDefBuilder): void {
     // Load the bits.
     memValueTmp = asm.llvmIdentifier();
     asm.print(
-      "  %%%s = load %s, %s* %%%s, align %s" %
+      "  %%%s = load %s, ptr %%%s, align %s" %
         memValueTmp %
-        loadTypeName %
         loadTypeName %
         addr %
         memByteAlignment,
@@ -2892,16 +2823,8 @@ private fun llvmWriteStore(
 
   if (!isBitfield) {
     if (asm.common.config.asan) {
-      tmp = asm.llvmIdentifier();
       asm.print(
-        "  %%%s = bitcast %s* %%%s to i8*, %D\n" %
-          tmp %
-          memTypeName %
-          addr %
-          pos,
-      );
-      asm.print(
-        "  call void @SKIP_Obstack_verifyStore(i8* %%%s), %D\n" % tmp % pos,
+        "  call void @SKIP_Obstack_verifyStore(ptr %%%s), %D\n" % addr % pos,
       );
     };
 
@@ -2916,22 +2839,20 @@ private fun llvmWriteStore(
     | (ObstackStore _, GCPointerScalarKind _, false)
     | (ArrayUnsafeSet _, GCPointerScalarKind _, false) ->
       asm.print(
-        "  call void @%s(%s* %%%s, %N), %D\n" %
+        "  call void @%s(ptr %%%s, %N), %D\n" %
           orig match {
           | ObstackStore _ -> "SKIP_Obstack_store"
           | ArrayUnsafeSet _ -> "SKIP_Obstack_vectorUnsafeSet"
           | _ -> ""
           } %
-          memTypeName %
           addr %
           storeValue %
           pos,
       )
     | (_, _, _) ->
       asm.print(
-        "  store %N, %s* %%%s, align %s, %D\n" %
+        "  store %N, ptr %%%s, align %s, %D\n" %
           storeValue %
-          t.llvmTypeName %
           addr %
           memByteAlignment %
           pos,
@@ -2941,9 +2862,8 @@ private fun llvmWriteStore(
     // Load the bits.
     memValueTmp = asm.llvmIdentifier();
     asm.print(
-      "  %%%s = load %s, %s* %%%s, align %s, %D\n" %
+      "  %%%s = load %s, ptr %%%s, align %s, %D\n" %
         memValueTmp %
-        memTypeName %
         memTypeName %
         addr %
         memByteAlignment %
@@ -3039,10 +2959,9 @@ private fun llvmWriteStore(
 
     // Store back the final bits.
     asm.print(
-      "  store %s %%%s, %s* %%%s, align %s, %D\n" %
+      "  store %s %%%s, ptr %%%s, align %s, %D\n" %
         memTypeName %
         setBitsTmp %
-        memTypeName %
         addr %
         memByteAlignment %
         pos,
@@ -3125,9 +3044,7 @@ private fun llvmWriteSkipLandingPad(
 ): void {
   excPair = asm.llvmIdentifier("excpair");
   asm.print(
-    ("  %%%s = landingpad { i8*, i32 }\n" +
-      "          catch i8* bitcast ({ i8*, i8*, i8* }* " +
-      "@%s to i8*), %D\n") %
+    ("  %%%s = landingpad { ptr, i32 }\n          catch ptr @%s, %D\n") %
       excPair %
       skipExceptionTypeInfo %
       pos,
@@ -3135,14 +3052,12 @@ private fun llvmWriteSkipLandingPad(
 
   typeID = asm.llvmIdentifier("caught_type_id");
   asm.print(
-    "  %%%s = extractvalue { i8*, i32 } %%%s, 1, %D\n" % typeID % excPair % pos,
+    "  %%%s = extractvalue { ptr, i32 } %%%s, 1, %D\n" % typeID % excPair % pos,
   );
 
   expectedID = asm.llvmIdentifier("expected_type_id");
   asm.print(
-    ("  %%%s = tail call i32 @llvm.eh.typeid.for(i8* nonnull " +
-      "bitcast ({ i8*, i8*, i8* }* @%s to i8*)) " +
-      "nounwind, %D\n") %
+    ("  %%%s = tail call i32 @llvm.eh.typeid.for(ptr nonnull @%s) nounwind, %D\n") %
       expectedID %
       skipExceptionTypeInfo %
       pos,
@@ -3162,7 +3077,7 @@ private fun llvmWriteSkipLandingPad(
   // If not, just "resume".
   asm.print("%s:\n" % no);
   writeResume();
-  asm.print("  resume { i8*, i32 } %%%s, %D\n" % excPair % pos);
+  asm.print("  resume { ptr, i32 } %%%s, %D\n" % excPair % pos);
 
   // This is the exception we wanted.
   asm.print("%s:\n" % yes);
@@ -3170,12 +3085,12 @@ private fun llvmWriteSkipLandingPad(
   // Grab the C++ exception.
   cpp1 = asm.llvmIdentifier("");
   asm.print(
-    "  %%%s = extractvalue { i8*, i32 } %%%s, 0, %D\n" % cpp1 % excPair % pos,
+    "  %%%s = extractvalue { ptr, i32 } %%%s, 0, %D\n" % cpp1 % excPair % pos,
   );
 
   cppExc = asm.llvmIdentifier("cpp_exc");
   asm.print(
-    ("  %%%s = tail call i8* @__cxa_begin_catch(i8* %%%s) " +
+    ("  %%%s = tail call ptr @__cxa_begin_catch(ptr %%%s) " +
       "nounwind, %D\n") %
       cppExc %
       cpp1 %
@@ -3186,17 +3101,15 @@ private fun llvmWriteSkipLandingPad(
   // (no easy way to check this here...)
   addr1 = asm.llvmIdentifier("exc_field_addr1");
   asm.print(
-    "  %%%s = getelementptr inbounds i8, i8* %%%s, i64 8, %D\n" %
+    "  %%%s = getelementptr inbounds i8, ptr %%%s, i64 8, %D\n" %
       addr1 %
       cppExc %
       pos,
   );
-  addr2 = asm.llvmIdentifier("exc_field_addr2");
-  asm.print("  %%%s = bitcast i8* %%%s to i8**, %D\n" % addr2 % addr1 % pos);
 
   asm.print("  ");
   writeExcPtr();
-  asm.print(" = load i8*, i8** %%%s, align 8, %D\n" % addr2 % pos);
+  asm.print(" = load ptr, ptr %%%s, align 8, %D\n" % addr1 % pos);
 
   asm.print("  tail call void @__cxa_end_catch(), %D\n" % pos);
 }
@@ -3280,9 +3193,8 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
       "  %s = alloca %s, align %s, %D\n" % tmp % t % byteAlignment % instr,
     );
     asm.print(
-      "  %n = getelementptr inbounds %s, %s* %s, i64 0, i64 0, %D\n" %
+      "  %n = getelementptr inbounds %s, ptr %s, i64 0, i64 0, %D\n" %
         instr %
-        t %
         t %
         tmp %
         instr,
@@ -3298,7 +3210,7 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
     }
   | BytePointerAdd{addr, offset} ->
     asm.print(
-      "  %n = getelementptr inbounds i8, i8* %n, %N, %D\n" %
+      "  %n = getelementptr inbounds i8, ptr %n, %N, %D\n" %
         instr %
         addr %
         offset %
@@ -3443,7 +3355,7 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
       llvmWriteIntrinsicCall(asm, v, runtimeFunName, args)
     } else {
       // Allocate a stack array to hold the arguments.
-      bufType = "[" + args.size() + " x i8*]";
+      bufType = "[" + args.size() + " x ptr]";
       bufVar = asm.llvmIdentifier("%strcat.args");
       asm.print(
         "  %s = alloca %s, align %s, %D\n" %
@@ -3454,19 +3366,11 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
       );
 
       // Tell LLVM its lifetime starts here.
-      lifetimeVar = asm.llvmIdentifier("%strcat.lifetime_arg");
-      asm.print(
-        "  %s = bitcast %s* %s to i8*, %D\n" %
-          lifetimeVar %
-          bufType %
-          bufVar %
-          instr,
-      );
       lifetimeArgs = (
         "(i64 " +
         (common.config.ptrByteSize * args.size()) +
-        ", i8* " +
-        lifetimeVar +
+        ", ptr " +
+        bufVar +
         ")"
       );
       asm.print(
@@ -3483,9 +3387,8 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
         };
 
         asm.print(
-          "  %s = getelementptr inbounds %s, %s* %s, i64 0, i64 %s, %D\n" %
+          "  %s = getelementptr inbounds %s, ptr %s, i64 0, i64 %s, %D\n" %
             refVar %
-            bufType %
             bufType %
             bufVar %
             i %
@@ -3493,12 +3396,12 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
         );
         // Could use StackStore wb for completeness, but it's unlikely to
         // ever be worth the cost, assuming stack access is hottest kind.
-        asm.print("  store %N, i8** %s, align 8, %D\n" % arg % refVar % instr)
+        asm.print("  store %N, ptr %s, align 8, %D\n" % arg % refVar % instr)
       });
 
       // Call the runtime.
       asm.print(
-        "  %n = call i8* @%s(i8** %s, i64 %s), %D\n" %
+        "  %n = call ptr @%s(ptr %s, i64 %s), %D\n" %
           instr %
           runtimeFunName %
           bufferStartAddress %
@@ -3545,20 +3448,16 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
       );
 
       // Load the string header.
-      rawHdrPtr = asm.llvmIdentifier("%stringswitch.rawhdrptr");
+      hdrPtr = asm.llvmIdentifier("%stringswitch.hdrptr");
       asm.print(
         "  %s = getelementptr inbounds i8, %N, i64 -8, %D\n" %
-          rawHdrPtr %
+          hdrPtr %
           valueInstr %
           instr,
       );
-      hdrPtr = asm.llvmIdentifier("%stringswitch.hdrptr");
-      asm.print(
-        "  %s = bitcast i8* %s to i64*, %D\n" % hdrPtr % rawHdrPtr % instr,
-      );
       hdr = asm.llvmIdentifier("%stringswitch.hdr");
       asm.print(
-        "  %s = load i64, i64* %s, align 8, %D\n" % hdr % hdrPtr % instr,
+        "  %s = load i64, ptr %s, align 8, %D\n" % hdr % hdrPtr % instr,
       );
 
       // Write out the string switch statement.
@@ -3997,10 +3896,7 @@ fun llvmWriteFunctionDefinition(
   );
   asm.declarationText.writeChar('\n');
 
-  asm.print(
-    (" uwtable personality i8* bitcast " +
-      "(i32 (...)* @__gxx_personality_v0 to i8*) %D {\n") % f,
-  );
+  asm.print((" uwtable personality ptr @__gxx_personality_v0 %D {\n") % f);
 
   for (b in f.blocks) llvmWriteBlock(b, asm);
   asm.print("}\n");
