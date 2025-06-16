@@ -52,7 +52,7 @@ run and deploy the full application to a local Kubernetes cluster.
    each one to the `minikube` registry:
 ```bash
 docker compose -f kubernetes/compose.distributed.yml build
-for image in web-service reactive-service www db ; do
+for image in web_service reactive_service www db ; do
   docker tag reactive-hackernews/$image localhost:5000/$image;
   docker push localhost:5000/$image;
 done
