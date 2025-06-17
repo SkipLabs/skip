@@ -6,8 +6,6 @@ The following CLI utilities are required:
  - `kubectl`
  - `eksctl`
 
-Also, throughout this section, you 
-
 # Steps
 
 	0. Set some environment variables to simplify steps to follow:
@@ -37,4 +35,31 @@ for image in web_service reactive_service www db reverse_proxy ; do
   docker tag rhn-$image-aws $ECR:$image;
   docker push $ECR:$image;
 done
+```
+
+	4. Set up permissions for your EKS cluster to pull those docker images from ECR
+
+```bash
+TOKEN=$(aws ecr --region=eu-north-1 get-authorization-token \
+	    --output text --query authorizationData\[\].authorizationToken \
+		| base64 -d | cut -d: -f2 )
+kubectl create secret docker-registry rhn-skip-ecr-registry \
+  --docker-server=https://$ECR --docker-username=AWS \
+  --docker-password="${TOKEN}" --docker-email=user@example.com
+```
+
+
+
+```bash
+for f in kubernetes/eks/*.yaml ; do
+	sed <$f s%__ECR__%$ECR% | kubectl apply -f - ;
+done
+
+kubectl create configmap haproxy-auxiliary-configmap \
+    --from-file kubernetes/distributed_skip/haproxy-aux.cfg
+helm repo add haproxytech https://haproxytech.github.io/helm-charts
+helm repo update
+helm install haproxy haproxytech/kubernetes-ingress \
+	-f kubernetes/distributed_skip/haproxy-helm-config \
+	--set controller.service.type=LoadBalancer
 ```
