@@ -76,6 +76,8 @@ distributed architecture, found in `./kubernetes/distributed_skip`:
 ```bash
 kubectl apply -f 'kubernetes/distributed_skip/*.yaml'
 kubectl create configmap haproxy-auxiliary-configmap --from-file kubernetes/distributed_skip/haproxy-aux.cfg
+helm repo add haproxytech https://haproxytech.github.io/helm-charts
+helm repo update
 helm install haproxy haproxytech/kubernetes-ingress -f kubernetes/distributed_skip/haproxy-helm-config
 ```
 
