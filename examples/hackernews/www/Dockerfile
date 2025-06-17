@@ -1,9 +1,10 @@
 FROM node:lts-alpine3.19 AS build
+RUN npm install -g pnpm
 WORKDIR /build
-COPY package.json package.json
-RUN npm install
+COPY package.json pnpm-lock.yaml* ./
+RUN pnpm install --frozen-lockfile
 COPY . .
-RUN npm run build
+RUN pnpm run build
 
 FROM nginx:alpine
 WORKDIR /app
