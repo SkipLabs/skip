@@ -9,6 +9,7 @@ event-store serving as the primary data source-of-truth and a Skip reactive
 service providing reactive computations and real-time streaming to clients.
 
 In order to run it, do:
+
 ```
 $ docker compose build
 $ docker compose up
