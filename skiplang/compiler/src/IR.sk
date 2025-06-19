@@ -1160,6 +1160,12 @@ class NamedCall{
   // for example, that it's illegal to batch ObstackAlloc calls across such
   // a call.
   mayRelocatePointers: Bool = false,
+  // Normally we assume each argument is already the expected type, but
+  // sometimes they won't be, e.g. a C runtime function might want i8**
+  // but we call it i8*. In those cases you can specify the callee's type
+  // for each parameter here. Arguments whose indices are past the end of
+  // the casts array, or whose entry is "", will not receive any casts.
+  casts: Array<String> = Array[],
   // Interprocedural results are normally stashed in an OptDone in
   // Function.status. These are here because there is no target Function.
   canThrow: Bool,
