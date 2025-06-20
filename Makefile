@@ -4,6 +4,8 @@
 .PHONY: all
 all: npm build/skdb build/init.sql
 
+PRETTIER_LOG_LEVEL?=warn
+
 PLAYWRIGHT_REPORTER?="line"
 SKARGO_PROFILE?=release
 SKDB_WASM=sql/target/wasm32-unknown-unknown/$(SKARGO_PROFILE)/skdb.wasm
@@ -104,7 +106,9 @@ fmt-c: # Keep in sync with bin/git_hooks/check_format.sh
 
 .PHONY: fmt-js
 fmt-js: # Keep in sync with bin/git_hooks/check_format.sh
-	npx prettier --log-level debug --write .
+	npx prettier --log-level $(PRETTIER_LOG_LEVEL) --write .
+	npx prettier --log-level $(PRETTIER_LOG_LEVEL) --write --parser=json skipruntime-ts/addon/binding.gyp
+
 
 .PHONY: fmt-py
 fmt-py: # Keep in sync with bin/git_hooks/check_format.sh
@@ -114,7 +118,8 @@ fmt-py: # Keep in sync with bin/git_hooks/check_format.sh
 fmt: fmt-sk fmt-c fmt-js fmt-py # Keep in sync with bin/git_hooks/check_format.sh
 
 .PHONY: check-fmt
-check-fmt: fmt
+check-fmt:
+	PRETTIER_LOG_LEVEL=debug ${MAKE} fmt
 	if ! git diff --quiet --exit-code; then echo "make fmt changed some files:"; git status --porcelain; exit 1; fi
 
 # regenerate api docs served by docs-run from ts sources

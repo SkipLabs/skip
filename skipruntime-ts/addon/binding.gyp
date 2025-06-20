@@ -7,11 +7,13 @@
         "src/cjson.cc",
         "src/tojs.cc",
         "src/fromjs.cc",
-        "src/main.cc",
+        "src/main.cc"
       ],
       "cflags!": ["-fno-exceptions"],
       "cflags_cc!": ["-fno-exceptions"],
-      "libraries": ["-L<!(realpath $SKIPRUNTIME) -lskip-runtime-ts -Wl,--require-defined=SKIP_new_Obstack"],
+      "libraries": [
+        "-L<!(realpath $SKIPRUNTIME) -lskip-runtime-ts -Wl,--require-defined=SKIP_new_Obstack"
+      ]
     }
   ]
 }
