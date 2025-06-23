@@ -87,6 +87,13 @@ GUI/dashboard equivalent for your cluster, with `NUM_SKIP_INSTANCES` >= 2 (since
 the leader _is included_ in the number of replicas and the application requires
 at least one leader and one follower to function correctly).
 
+### Elastic Kubernetes Service
+
+You can also run the example application on a hosted Kubernetes cluster such as
+Amazon's Elastic Kubernetes Service (EKS).  The steps are similar to those for a
+local `minikube` cluster and can be adapted to other providers as needed.
+
+Step-by-step instructions can be found [here](./kubernetes/eks/guide.md).
 
 ## Overall System Design with optional leader/followers
 
