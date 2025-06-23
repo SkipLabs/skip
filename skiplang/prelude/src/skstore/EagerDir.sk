@@ -524,7 +524,14 @@ class FixedDataMap{
   private static fun fixedDataFactory(): Concrete<
     FixedDataFactory<Key, Array<File>>,
   > {
-    CompactFixedDir
+    // Does not work as expected if types are not explicitly given
+    Unsafe.unsafeSpecializeFactory<
+      FixedDataMap,
+      FixedDataMap,
+      FixedDataFactory<Key, Array<File>>,
+      CompactFixedDir,
+      FixedDir<Key, Array<File>>,
+    >(static, FixedDataMap, CompactFixedDir, FixedDir<Key, Array<File>>)
   }
 
   static fun create<V: File>(
