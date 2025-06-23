@@ -1,4 +1,4 @@
-# Prereqs
+# Prerequisites
 
 The following CLI utilities are required:
  - `docker`
@@ -48,7 +48,10 @@ kubectl create secret docker-registry rhn-skip-ecr-registry \
   --docker-password="${TOKEN}" --docker-email=user@example.com
 ```
 
-
+	5. Apply Kubernetes manifests and install HAProxy Helm chart.  Note that
+	we're substituting the $ECR environment variable into those Kubernetes
+	manifests, so be sure that it is set as in step 0 before running these
+	commands.
 
 ```bash
 for f in kubernetes/eks/*.yaml ; do
@@ -60,6 +63,9 @@ kubectl create configmap haproxy-auxiliary-configmap \
 helm repo add haproxytech https://haproxytech.github.io/helm-charts
 helm repo update
 helm install haproxy haproxytech/kubernetes-ingress \
-	-f kubernetes/distributed_skip/haproxy-helm-config \
-	--set controller.service.type=LoadBalancer
+	-f kubernetes/distributed_skip/haproxy-helm-config
 ```
+
+	6. Run `kubectl get services` to see all of your services up and running,
+       and navigate to the `haproxy-kubernetes-ingress`'s external web address
+       in your browser.
