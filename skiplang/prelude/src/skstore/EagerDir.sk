@@ -712,28 +712,10 @@ class EagerDir protected {
     }
   }
 
-  fun copy{
-    timeStack: TimeStack,
-    dirName: DirName,
-    input: Bool,
-    creator: ?ArrowKey,
-  }: this {
-    static{
-      timeStack,
-      dirName,
-      input,
-      creator,
-      fixedData => this.fixedData,
-      data => this.data,
-      totalSize => this.totalSize,
-    }
-  }
-
-  fun reset(
+  protected fun reset(
     context: mutable Context,
     writer: Path,
     keep: SortedSet<Key>,
-    wasSeen: (Tick, Path) ~> Bool = (_, _) ~> true,
   ): this {
     this.unsafeGetFileIter().each(kv -> {
       (key, valueIter) = kv;
@@ -742,18 +724,15 @@ class EagerDir protected {
         | None() -> void
         | Some _ ->
           this.unsafeGetDataIterWithoutTombs(key).each(kv -> {
-            (tick, source, _values) = kv;
-            // do not wipe out data that has not yet been seen
-            if (wasSeen(tick, source)) {
-              !this = this.writeEntry(
-                context,
-                source,
-                writer,
-                key,
-                Array[],
-                true, // force: reset is low-level and we wish to ignore any safeguards
-              )
-            }
+            (_tick, source, _values) = kv;
+            !this = this.writeEntry(
+              context,
+              source,
+              writer,
+              key,
+              Array[],
+              true, // force: reset is low-level and we wish to ignore any safeguards
+            )
           })
         }
       }
@@ -762,7 +741,7 @@ class EagerDir protected {
     this
   }
 
-  fun writeDiff(
+  protected fun writeDiff(
     isReset: Bool,
     changes: mutable Iterator<Key>,
     writer: mutable Debug.BufferedWriter,
