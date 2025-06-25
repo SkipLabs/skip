@@ -47,7 +47,7 @@ const config: Config = {
 
   themeConfig: {
     // Replace with your project's social card
-    image: "img/skiplabs.svg",
+    image: "img/skip.png",
     navbar: {
       title: "",
       logo: {
