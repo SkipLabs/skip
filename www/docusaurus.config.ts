@@ -48,6 +48,7 @@ const config: Config = {
   themeConfig: {
     // Replace with your project's social card
     image: "img/skip.png",
+    metadata: [{ name: "twitter:card", content: "summary" }],
     navbar: {
       title: "",
       logo: {
