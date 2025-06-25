@@ -17,7 +17,9 @@ I joined SkipLabs in November 2022, so it's been a little over two and a half ye
 ## In a few words, what do you do at SkipLabs?
 
 At SkipLabs, we develop tools focused on reactive programming. Our goal is to solve complex data synchronization problems while making this approach accessible and cost-effective in terms of infrastructure.
+
 In practical terms, reactive programming is a declarative way of expressing computations: instead of manually handling state transitions, you simply describe state as a function of multiple inputs.
+
 To make this approach tangible and usable on a daily basis, we created the Skip Framework—a reactive programming framework designed to be both powerful and easy to adopt.
 
 ## How would you describe the engineering culture at SkipLabs?
