@@ -79,6 +79,12 @@ base class FixedData<+K: Orderable, +T> {
   fun iterator(): mutable Iterator<FixedRow<K, T>>;
 }
 
+base class FixedDataFactory<+K: Orderable, +F> {
+  static fun create(
+    vec: mutable Vector<FixedRow<K, F>> = mutable Vector[],
+  ): FixedData<K, F>;
+}
+
 // Assuming delta is monotone, that is, i <= j implies delta(i) <= delta(j),
 // findFirstBy(delta, l, u) is the least m where l <= m <= u such that
 // delta(m) == EQ(). If there is no such m, then l <= m <= u+1 but otherwise
@@ -149,9 +155,10 @@ fun assertUnique<T, U: Orderable>(
 
 class FixedDir<+K: Orderable, +T: frozen> extends
   IFixedDir<K, T, FixedRow<K, T>>,
+  FixedDataFactory<K, T>,
 {
-  static fun create<U: T>(
-    data: mutable Vector<FixedRow<K, U>> = mutable Vector[],
+  static fun create(
+    data: mutable Vector<FixedRow<K, T>> = mutable Vector[],
   ): this {
     if (!data.isSorted()) {
       data.sort();
@@ -182,15 +189,53 @@ class FixedDirMetadata{
 // out of the rows themselves.
 class CompactFixedDir protected {
   metadata: FixedDirMetadata,
-} extends IFixedDir<Key, Array<File>, CompactRow> {
-  static fun create<V: File>(
-    data: mutable Vector<FixedRow<Key, Array<V>>>,
+} extends
+  IFixedDir<Key, Array<File>, CompactRow>,
+  FixedDataFactory<Key, Array<File>>,
+{
+  static fun create(
+    vec: mutable Vector<FixedRow<Key, Array<File>>> = mutable Vector[],
+  ): FixedData<Key, Array<File>> {
+    static::getMetadata(vec) match {
+    | None() -> FixedDir<Key, Array<File>>::create(vec)
+    | Some(metadata) -> static::createWithMetadata(vec, metadata)
+    }
+  }
+
+  private static fun getMetadata(
+    data: readonly Vector<FixedRow<Key, Array<File>>>,
+  ): ?FixedDirMetadata {
+    possibleResult: ?FixedDirMetadata = None();
+
+    for (elt in data) {
+      if (elt.value.size() != 1) return None();
+      (elt.key, elt.value[0]) match {
+      | (SKDB.RowKey(row1, k), row2 @ SKDB.RowValues _) ->
+        possibleResult match {
+        | None() ->
+          !possibleResult = Some(
+            FixedDirMetadata{sourceDir => elt.source.dirName, kinds => k},
+          )
+        | Some(FixedDirMetadata{sourceDir, kinds}) ->
+          if (k != kinds || elt.source.dirName != sourceDir) {
+            return None()
+          }
+        };
+        if (row1 != row2) return None()
+      | _ -> return None()
+      }
+    };
+    possibleResult
+  }
+
+  static fun createWithMetadata<K: Key, V: Array<File>>(
+    data: mutable Vector<FixedRow<K, V>>,
     metadata: FixedDirMetadata,
   ): this {
     if (!data.isSorted()) {
       data.sort();
     };
-    static::computeTags(data);
+    IFixedDir::computeTags(data);
     static{
       data => data.map(static::stripMetadata).toArray(),
       metadata => metadata,
@@ -245,32 +290,6 @@ base class IFixedDir<
     this.data.keys().map(i -> this[i])
   }
 
-  static fun getMetadata(
-    data: readonly Vector<FixedRow<Key, Array<File>>>,
-  ): ?FixedDirMetadata {
-    possibleResult: ?FixedDirMetadata = None();
-
-    for (elt in data) {
-      if (elt.value.size() != 1) return None();
-      (elt.key, elt.value[0]) match {
-      | (SKDB.RowKey(row1, k), row2 @ SKDB.RowValues _) ->
-        possibleResult match {
-        | None() ->
-          !possibleResult = Some(
-            FixedDirMetadata{sourceDir => elt.source.dirName, kinds => k},
-          )
-        | Some(FixedDirMetadata{sourceDir, kinds}) ->
-          if (k != kinds || elt.source.dirName != sourceDir) {
-            return None()
-          }
-        };
-        if (row1 != row2) return None()
-      | _ -> return None()
-      }
-    };
-    possibleResult
-  }
-
   fun size(): Int {
     this.data.size()
   }
@@ -318,14 +337,14 @@ base class IFixedDir<
     this.getIterSourceKey(source, key).collect(Array)
   }
 
-  protected static fun computeTags<U: T>(
-    array: mutable Vector<FixedRow<K, U>>,
+  protected static fun computeTags(
+    array: mutable Vector<FixedRow<K, T>>,
   ): void {
     _: TickRange = static::computeTags_(array, 0, array.size() - 1);
   }
 
-  private static fun computeTags_<U: T>(
-    array: mutable Vector<FixedRow<K, U>>,
+  private static fun computeTags_(
+    array: mutable Vector<FixedRow<K, T>>,
     i: Int,
     j: Int,
   ): TickRange {
