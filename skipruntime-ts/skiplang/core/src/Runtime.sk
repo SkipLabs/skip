@@ -197,7 +197,6 @@ fun buildResourcesGraph(
   servicesHdl: SKStore.EHandle<SKStore.SID, ServiceFile>,
 ): void {
   dirname = kResourceSessionDir;
-  dDirname = dirname.sub("data");
   resourcesHdl = context.mkdir(
     SKStore.SID::keyType,
     ResourceDef::type,
@@ -271,11 +270,11 @@ fun buildResourcesGraph(
       writer.set(key, SKStore.StringFile(statusRef.toString()));
     },
   );
-  instancesHdl = statusesHdl.map(
+  _ = statusesHdl.map(
     ResourceDef::keyType,
     ResourceInfo::type,
     context,
-    kResourceInstancesDir,
+    kResourceCollectionsDir,
     (context, writer, key, it) ~> {
       resourceId = toResourceId(key.name, key.params);
       statusRef = SKStore.DirName::create(it.first.value);
@@ -300,52 +299,7 @@ fun buildResourcesGraph(
         throw ex
       }
     },
-  );
-  // Copy the computed collection
-  //   - Ensure the name of the resource result
-  //   - Avoid destruction in case of graph recompute.
-  instancesCopyHdl = statusesHdl.map(
-    ResourceDef::keyType,
-    Handle::type,
-    context,
-    kResourceInstancesDir.sub("copy"),
-    (context, writer, key, it) ~> {
-      resourceId = toResourceId(key.name, key.params);
-      obsName = dDirname.sub(resourceId);
-      hdl = context
-        .mkdir(
-          ResourceDef::keyType,
-          SKStore.StringFile::type,
-          kResourceInstancesDir.sub("copy").sub(resourceId),
-          it.toArray().map(v -> (key, v)),
-        )
-        .map(
-          JSONID::keyType,
-          JSONFile::type,
-          context,
-          obsName,
-          (context, writer, key, _it) ~> {
-            info = instancesHdl.get(context, key);
-            info.collection.items(context).each((kv) -> {
-              writer.setArray(kv.i0, kv.i1.collect(Array))
-            });
-          },
-        );
-      writer.set(key, Handle(hdl))
-    },
-  );
-  _ = instancesHdl.map(
-    ResourceDef::keyType,
-    ResourceInfo::type,
-    context,
-    kResourceCollectionsDir,
-    (context, writer, key, it) ~> {
-      info = it.first;
-      resourceData = instancesCopyHdl.get(context, key).value;
-      !info.collection.hdl = resourceData;
-      writer.set(key, info)
-    },
-  );
+  )
 }
 
 fun initService(
@@ -987,43 +941,6 @@ class Collection(hdl: SKStore.EHandle<JSONID, JSONFile>) {
     this.hdl.items(context)
   }
 
-  fun subscribe(
-    context: mutable SKStore.Context,
-    identifier: String,
-    session: Int,
-    from: SKStore.Tick,
-    notify: (
-      Array<(SKJSON.CJSON, Array<SKJSON.CJSON>)>,
-      SKStore.Tick,
-      Bool,
-    ) ~> void,
-    close: () ~> void,
-  ): void {
-    context.subscribe(
-      session,
-      SKStore.TNWatch<SKStore.Key, SKStore.File>{
-        dirName => this.hdl.dirName,
-        identifier,
-        from,
-        fn => (values, tick, update) ~> {
-          notify(
-            values.map(v ->
-              (
-                JSONID::keyType(v.i0).json,
-                v.i1.map(x -> JSONFile::type(x).json),
-              )
-            ),
-            tick,
-            update,
-          )
-        },
-        close,
-      },
-      None(),
-      Some(from),
-    )
-  }
-
   private fun map_(
     mapperOpt: ?Mapper,
     rangeOpt: ?Array<(SKJSON.CJSON, SKJSON.CJSON)> = None(),
@@ -1351,21 +1268,39 @@ fun subscribe(
   | Some(definition) ->
     info = resourcesCollectionsHdl.get(context, definition);
     start = `${info.session}/`;
-    from = optWatermark match {
-    | Some(watermark) if (watermark.startsWith(start)) ->
-      watermark.stripPrefix(start).toInt()
-    | _ -> 0
-    };
-    notifier.subscribed();
-    info.collection.subscribe(
-      context,
-      identifier,
-      session,
-      SKStore.Tick(from),
-      (values, tick, update) ~> {
-        notifier.notify(values, `${info.session}/${tick}`, update)
+    from = SKStore.Tick(
+      optWatermark match {
+      | Some(watermark) if (watermark.startsWith(start)) ->
+        watermark.stripPrefix(start).toInt()
+      | _ -> 0
       },
-      notifier.close,
+    );
+    notifier.subscribed();
+    context.subscribe(
+      session,
+      SKStore.TNWatch<SKStore.Key, SKStore.File>{
+        dirNameGetter => ctx ~> {
+          resourcesCollectionsHdl.unsafeGet(ctx, definition).collection.hdl
+            .dirName
+        },
+        identifier,
+        from,
+        fn => (values, tick, update) ~> {
+          notifier.notify(
+            values.map(v ->
+              (
+                JSONID::keyType(v.i0).json,
+                v.i1.map(x -> JSONFile::type(x).json),
+              )
+            ),
+            `${info.session}/${tick}`,
+            update,
+          )
+        },
+        close => notifier.close,
+      },
+      None(),
+      Some(from),
     );
     context.setPersistent(subId, SKStore.IntFile(session));
     if (garbageHdl.maybeGet(context, sid).isSome()) {
