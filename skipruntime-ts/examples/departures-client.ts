@@ -40,5 +40,5 @@ await service.update("config", [
   ["resettlement", [["NOR", "USA"]]],
 ]);
 await sleep(remote_delay);
-console.log(await service.getAll("departures", {}));
+console.log(JSON.stringify(await service.getAll("departures", {})));
 closable.close();
