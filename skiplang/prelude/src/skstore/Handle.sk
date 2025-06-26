@@ -410,10 +410,8 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
       };
       dynParents[parentName].push((dynamicMapFun, rangeOpt, None()))
     };
-    fixedParents = FixedSingle::create(
-      Vector::mcreateFromIterator(
-        dynParents.items().map(kv -> (kv.i0, kv.i1.toArray())),
-      ),
+    fixedParents = FixedSingle::createFromIterator(
+      dynParents.items().map(kv -> (kv.i0, kv.i1.toArray())),
     );
     EagerDir::applyMany(context, fixedParents, dirName, reducerOpt);
     EHandle(typeOutputKey, typeOutput, dirName)
