@@ -4,6 +4,7 @@ description: A technical exploration of how reactive systems can solve backend p
 slug: backend_pressure
 date: 2025-06-20
 authors: hubyrod
+image: /img/skip.png
 ---
 
 Backend systems face constant pressure from multiple directions: user requests demanding instant responses, databases struggling under query loads, and servers managing finite computational resources. This backend pressure—the cumulative stress of handling concurrent requests while maintaining performance and resource constraints—manifests in bottlenecks, latency spikes, and system instability. Traditional approaches often treat these pressures as isolated problems—adding a cache here, optimizing a query there—resulting in complex patches that fix symptoms but ignore deeper architectural issues.

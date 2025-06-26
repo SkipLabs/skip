@@ -7,6 +7,7 @@ authors: jverlaguet
 ---
 
 **Skip After Meta**
+image: /img/skip.png
 
 Facebook allowed us to open source both Hack and Skiplang so we could share both with the larger engineering community.  I eventually decided to leave Facebook (now Meta) to build on the work of Hack and Skiplang and develop technologies that would address the same challenges we had at Facebook but for engineers generally.  To do this, SkipLabs needed to incorporate two new technologies to make the work we did at Facebook usable in a normal engineering context.
 
