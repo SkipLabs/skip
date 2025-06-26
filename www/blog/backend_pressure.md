@@ -15,7 +15,7 @@ The conventional solution? Event-driven architectures and streaming systems. But
 
 Think of a financial portfolio app: instead of calculating portfolio performance each time a user loads their dashboard, the server maintains continuous streams where position changes flow through pricing calculations, which flow through performance metrics, which flow through sector aggregations. Or an e-commerce site where product price changes automatically update product views, category aggregations, search indices, and recommendation scores in real-time. Rather than computing results on demand, reactive systems keep computational pipelines running continuously, so the answers are always up-to-date and ready for immediate use—reducing latency and spreading load over time instead of spiking under demand.
 
-{/* trunctate */}
+{/* truncate */}
 
 ## Precomputed Reactive Structures
 

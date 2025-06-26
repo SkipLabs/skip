@@ -13,7 +13,7 @@ Hello skippers. Today, we are introducing a new template to our collection: Reac
 npx create-skip-service my-skip-chat --template with_react_vite
 ```
 
-{/* trunctate */}
+{/* truncate */}
 
 ## What's Inside the Template?
 
