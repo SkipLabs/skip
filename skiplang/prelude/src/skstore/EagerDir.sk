@@ -668,6 +668,7 @@ mutable class FixedDataMapIterator<T> private {
 
 class EagerDir protected {
   input: Bool,
+  private created: Tick,
   private fixedData: FixedDataMap<Key, File>,
   private totalSize: Int,
   creator: ?ArrowKey,
@@ -693,6 +694,7 @@ class EagerDir protected {
 } extends Dir {
   static fun create{
     timeStack: TimeStack,
+    created: Tick,
     dirName: DirName,
     input: Bool,
     fixedData: FixedDataMap<Key, File> = FixedDataMap::create(),
@@ -702,6 +704,7 @@ class EagerDir protected {
   }: this {
     static{
       timeStack,
+      created,
       dirName,
       input,
       fixedData,
@@ -1408,6 +1411,7 @@ class EagerDir protected {
 
       EagerDir{
         timeStack,
+        created => context.getTick(),
         dirName => childName,
         input => false,
         parents,
@@ -2150,10 +2154,11 @@ class EagerDir protected {
     this.writeArray(context, baseName, Array[]);
   }
 
-  fun notifySubWatch(startOpt: ?Tick, tick: Tick, nWatch: NWatch): void {
-    (init, changedKeys) = startOpt match {
-    | Some(start) -> this.getChangesAfter(start)
-    | None() -> (true, SortedSet[])
+  fun notifySubWatch(start: Tick, tick: Tick, nWatch: NWatch): void {
+    (init, changedKeys) = if (this.created >= start || start <= nWatch.from) {
+      (true, SortedSet[])
+    } else {
+      this.getChangesAfter(start)
     };
     keys = if (init) {
       keys = SortedSet[];
@@ -2210,6 +2215,7 @@ class EagerDir protected {
       time = context.timeStamp();
       preDir = EagerDir::create{
         input => false,
+        created => context.getTick(),
         timeStack => TimeStack::createInput(time),
         dirName => preDirName,
         creator => context.currentArrow(),

@@ -147,7 +147,7 @@ fun errorAllExistingSubs(
     sub.destinationSource match {
     | None() -> void
     | Some(destSource) ->
-      if (sub.dirNames().any(dirName -> dirName == dir)) {
+      if (sub.dirNames(context).any(dirName -> dirName == dir)) {
         setReplicationState(context, destSource, RSError());
         lock = SKStore.unfreezeLock(sub.lock);
         SKStore.mutexLock(lock);
@@ -292,6 +292,7 @@ fun dirDescrCopy(
   time = context.timeStamp();
   dir = oldDir.copy{
     timeStack => SKStore.TimeStack::createInput(time),
+    created => context.getTick(),
     dirName => nextName,
     input => true,
     creator => context.currentArrow(),
@@ -1003,6 +1004,7 @@ module SKStore;
 
 extension class EagerDir {
   fun copy{
+    created: Tick,
     timeStack: TimeStack,
     dirName: DirName,
     input: Bool,
@@ -1010,6 +1012,7 @@ extension class EagerDir {
   }: this {
     static{
       timeStack,
+      created,
       dirName,
       input,
       creator,

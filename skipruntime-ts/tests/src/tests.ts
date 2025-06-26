@@ -1790,13 +1790,13 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
       const notifier = new Notifier(service, instanceId);
       notifier.checkInit([[1, [1]]]);
       await service.update("input1", [[1, [1]]]);
-      notifier.checkEmpty();
+      notifier.checkInit([[1, [1]]]);
       await service.update("input1", [[1, []]]);
-      notifier.checkUpdate([[1, []]]);
+      notifier.checkInit([]);
       await service.update("input1", [[1, [2]]]);
-      notifier.checkEmpty();
+      notifier.checkInit([]);
       await service.update("input1", [[1, [1, 2]]]);
-      notifier.checkUpdate([[1, [1]]]);
+      notifier.checkInit([[1, [1]]]);
       service.closeResourceInstance(instanceId);
     } finally {
       if (service) await service.close();

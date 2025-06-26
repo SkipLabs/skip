@@ -31,7 +31,7 @@ base class CmdKind
 class NMultipleDirs(CmdMultipleDirs, Array<DirSub>) extends CmdKind
 
 base class NWatch{
-  dirName: DirName,
+  dirNameGetter: readonly Context ~> DirName,
   identifier: String,
   from: Tick,
   close: () ~> void,
@@ -47,9 +47,9 @@ value class Sub(
   cmd: CmdKind,
   destinationSource: ?Int,
 ) {
-  fun dirNames(): mutable Iterator<DirName> {
+  fun dirNames(context: readonly Context): mutable Iterator<DirName> {
     this.cmd match {
-    | NWatch{dirName} -> Some(dirName).iterator()
+    | NWatch{dirNameGetter} -> Some(dirNameGetter(context)).iterator()
     | NMultipleDirs(_, dirSubs) ->
       dirSubs.iterator().map(dirSub -> dirSub.dirName)
     }
@@ -776,11 +776,9 @@ mutable class Context private {
     | NMultipleDirs(NTail(), _) ->
       cond = unfreezeCond(sub.cond);
       _ = condBroadcast(cond)
-    | nWatch @ NWatch{dirName, from} ->
-      this.unsafeMaybeGetDir(dirName) match {
-      | Some(dir @ EagerDir _) ->
-        startOpt = if (start > from) Some(start) else None();
-        dir.notifySubWatch(startOpt, this.tick, nWatch)
+    | nWatch @ NWatch{dirNameGetter} ->
+      this.unsafeMaybeGetDir(dirNameGetter(this)) match {
+      | Some(dir @ EagerDir _) -> dir.notifySubWatch(start, this.tick, nWatch)
       | _ -> void
       }
     };
@@ -799,7 +797,7 @@ mutable class Context private {
       this.sessions.values(),
       void,
       (ctx, sub, _) ~> {
-        affected = sub.dirNames().any(dirName ->
+        affected = sub.dirNames(ctx.fromSome()).any(dirName ->
           changedDirNames.contains(dirName)
         );
         if (!affected) return void;
@@ -901,6 +899,7 @@ mutable class Context private {
     time = this.timeStamp();
     dir = EagerDir::create{
       timeStack => TimeStack::create(this, time),
+      created => this.getTick(),
       input => true,
       dirName,
       fixedData,
