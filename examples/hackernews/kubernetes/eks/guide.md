@@ -1,20 +1,21 @@
 # Prerequisites
 
 The following CLI utilities are required:
- - `docker`
- - `aws` (configured with your AWS credentials)
- - `kubectl`
- - `eksctl`
+ - [`docker`](https://www.docker.com/)
+ - [`kubectl`](https://kubernetes.io/docs/tasks/tools/#kubectl)
+ - [`aws`](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html#getting-started-install-instructions) (configured with your AWS credentials)
+ - [`eksctl`](https://eksctl.io/installation/)
+ - [`helm`](https://helm.sh/docs/intro/install/)
 
-# Steps
 
 	0. Set some environment variables to simplify steps to follow:
-
 ```bash
 export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-export AWS_REGION=<your choice of AWS region here>
+export AWS_REGION=us-east-1 # Or choose whichever region you prefer
 export ECR=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/rhn-skip-example
 ```
+
+# Steps
 
 	1. Create a cluster using EKS auto-mode: `eksctl create cluster
 	--enable-auto-mode --name skip-quickstart --region $AWS_REGION`. Note that
