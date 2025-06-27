@@ -44,13 +44,12 @@ wait_for_user() {
 }
 
 print_status "Starting EKS Reactive HackerNews Setup"
-echo
 
 # Step 0: Check prerequisites
 print_status "Checking prerequisites..."
 
 missing_tools=()
-for tool in docker aws kubectl eksctl; do
+for tool in docker aws kubectl eksctl helm; do
     if ! command_exists $tool; then
         missing_tools+=("$tool")
     fi
@@ -72,6 +71,9 @@ if [ ${#missing_tools[@]} -ne 0 ]; then
             eksctl)
                 echo "  - $tool - Install from: https://eksctl.io/installation/"
                 ;;
+            helm)
+                echo "  - $tool - Install from: https://helm.sh/docs/intro/install/"
+                ;;
             *)
                 echo "  - $tool"
                 ;;
@@ -83,7 +85,6 @@ if [ ${#missing_tools[@]} -ne 0 ]; then
 fi
 
 print_success "All required tools are installed"
-echo
 
 # Check AWS credentials
 print_status "Checking AWS credentials..."
@@ -93,25 +94,19 @@ if ! aws sts get-caller-identity >/dev/null 2>&1; then
 fi
 
 print_success "AWS credentials are configured"
-echo
-
-# Step 1: Set environment variables
-print_status "Setting up environment variables..."
 
 AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-export AWS_ACCOUNT_ID
 print_success "AWS Account ID: $AWS_ACCOUNT_ID"
 
 echo "Select AWS region:"
-echo "1) us-east-1 (N. Virginia) [default]"
-echo "2) us-west-2 (Oregon)"
-echo "3) eu-west-1 (Ireland)"
-echo "4) eu-north-1 (Stockholm)"
-echo "5) ap-southeast-1 (Singapore)"
-echo "6) Other (enter manually)"
-echo
+echo "  1) us-east-1 (N. Virginia) [default]"
+echo "  2) us-west-2 (Oregon)"
+echo "  3) eu-west-1 (Ireland)"
+echo "  4) eu-north-1 (Stockholm)"
+echo "  5) ap-southeast-1 (Singapore)"
+echo "  6) Other (enter manually)"
 
-read -r -p "Enter your choice (1-6) [1]: " region_choice
+read -r -p "Enter a choice (1-6) [default 1]: " region_choice
 
 case $region_choice in
     2) AWS_REGION="us-west-2" ;;
@@ -122,26 +117,17 @@ case $region_choice in
     *) AWS_REGION="us-east-1" ;;
 esac
 
-export AWS_REGION
-
 if [ -z "$AWS_REGION" ]; then
     print_error "AWS region is required"
     exit 1
 fi
 
-export ECR=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/rhn-skip-example
+ECR=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/rhn-skip-example
 
-print_success "Environment variables set:"
-echo "  AWS_ACCOUNT_ID: $AWS_ACCOUNT_ID"
-echo "  AWS_REGION: $AWS_REGION"
-echo "  ECR: $ECR"
-echo
-
-# Step 2: Create EKS cluster
+# Step 1: Create EKS cluster
 print_status "Step 1: Creating EKS cluster..."
 echo "This will create a cluster named 'skip-quickstart' using EKS auto-mode."
 echo "Note: This can take 10-15 minutes to complete."
-echo
 
 if confirm "Do you want to create the EKS cluster?"; then
     print_status "Creating EKS cluster (this may take a while)..."
@@ -152,7 +138,7 @@ else
 fi
 echo
 
-# Step 3: Create ECR repository
+# Step 2: Create ECR repository
 print_status "Step 2: Creating ECR repository..."
 echo "This will create an ECR repository named 'rhn-skip-example'."
 echo
@@ -169,10 +155,9 @@ else
 fi
 echo
 
-# Step 4: Build and push Docker images
+# Step 3: Build and push Docker images
 print_status "Step 3: Building and pushing Docker images..."
 echo "This will build and push images for: web_service, reactive_service, www, db, reverse_proxy"
-echo "Note: This requires the docker images to be built for linux/amd64 platform."
 echo
 
 if confirm "Do you want to build and push Docker images?"; then
@@ -197,7 +182,7 @@ else
 fi
 echo
 
-# Step 5: Set up ECR permissions
+# Step 4: Set up ECR permissions
 print_status "Step 4: Setting up ECR permissions for EKS..."
 echo "This will create a Kubernetes secret for ECR access."
 echo
@@ -218,7 +203,7 @@ else
 fi
 echo
 
-# Step 6: Apply Kubernetes manifests
+# Step 5: Apply Kubernetes manifests
 print_status "Step 5: Applying Kubernetes manifests and installing HAProxy..."
 echo "This will apply all Kubernetes manifests and install HAProxy Helm chart."
 echo
@@ -253,7 +238,7 @@ else
 fi
 echo
 
-# Step 7: Show services
+# Step 6: Show services
 print_status "Step 6: Checking services..."
 echo "Getting all services..."
 echo
