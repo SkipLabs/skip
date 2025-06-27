@@ -17,13 +17,27 @@ base class LazyResult<F> {
   | LAbsent()
 }
 
-base class LazyDir protected {
-  protected data: SortedMap<Key, LazyResult<File>> = SortedMap[],
-  protected lazyFun: (mutable Context, DirName, Key) ~> ?Array<File>,
-  protected collect: Bool,
-} extends TDir {
+base class LazyDir protected {protected collect: Bool} extends Dir {
   /* Updates the lazyGets ref counts and return as well a potentially updated
     LazyDir in which dead keys have been removed. */
+  fun updateLazyGets(
+    refCountsOpt: ?SortedMap<Key, Int>,
+    newKeysOpt: ?SortedSet<Key>,
+    deadKeysOpt: ?SortedSet<Key>,
+  ): (?SortedMap<Key, Int>, ?this);
+
+  fun update(
+    context: mutable Context,
+    dirtyReadersOpt: ?SortedMap<DirName, SortedSet<Key>>,
+  ): void;
+
+  fun typed(): TLazyDir;
+}
+
+class TLazyDir{
+  protected data: SortedMap<Key, LazyResult<File>> = SortedMap[],
+  protected lazyFun: (mutable Context, DirName, Key) ~> ?Array<File>,
+} extends LazyDir, TDir {
   fun updateLazyGets(
     refCountsOpt: ?SortedMap<Key, Int>,
     newKeysOpt: ?SortedSet<Key>,
@@ -125,7 +139,7 @@ base class LazyDir protected {
   protected fun doGet(context: mutable Context, key: Key): LazyResult<File> {
     dirName = this.dirName;
 
-    dir = context.unsafeGetLazyDir(dirName);
+    dir = context.unsafeGetLazyDir(dirName).typed();
     !dir.data[key] = LCycle();
     context.setDir(dir);
 
@@ -136,7 +150,7 @@ base class LazyDir protected {
       this.lazyFun(context, dirName, key)
     } catch {
     | exn ->
-      !dir = context.unsafeGetLazyDir(dirName);
+      !dir = context.unsafeGetLazyDir(dirName).typed();
       !dir.data[key] = LAbsent();
       context.setDir(dir);
       context.!reads = readsCopy;
@@ -155,7 +169,7 @@ base class LazyDir protected {
     };
     context.updateNewDeps(arrowKey, context.reads);
 
-    !dir = context.unsafeGetLazyDir(dirName);
+    !dir = context.unsafeGetLazyDir(dirName).typed();
     !dir.data[key] = result;
     context.setDir(dir);
 
@@ -205,10 +219,6 @@ base class LazyDir protected {
     this.getArray(context, key).iterator()
   }
 
-  fun typed(): TLazyDir;
-}
-
-class TLazyDir extends LazyDir, TDir {
   fun typed(): this {
     this
   }
@@ -220,7 +230,7 @@ class TLazyDir extends LazyDir, TDir {
     collect: Bool = true,
   ): Dir {
     context.maybeGetLazyDir(dirName) match {
-    | Some(ldir) if (native_eq(ldir.lazyFun, lazyFun) == 0) ->
+    | Some(ldir) if (native_eq(ldir.typed().lazyFun, lazyFun) == 0) ->
       if (context.debugMode) {
         print_string(`REUSING: ${dirName}`);
       };

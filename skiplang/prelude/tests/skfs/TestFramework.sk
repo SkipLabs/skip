@@ -18,7 +18,7 @@ fun getData(
   | SKStore.DeletedDir _ ->
     invariant_violation("Trying to write to an empty directory")
   | edir @ SKStore.EagerDir _ -> edir.getArrayRaw(key)
-  | ldir @ SKStore.LazyDir _ -> ldir.unsafeGetArray(context, key)
+  | ldir @ SKStore.LazyDir _ -> ldir.typed().unsafeGetArray(context, key)
   }
 }
 
