@@ -93,7 +93,8 @@ You can also run the example application on a hosted Kubernetes cluster such as
 Amazon's Elastic Kubernetes Service (EKS).  The steps are similar to those for a
 local `minikube` cluster and can be adapted to other providers as needed.
 
-Step-by-step instructions can be found [here](./kubernetes/eks/guide.md).
+Step-by-step instructions can be found [here](./kubernetes/eks/guide.md), or in
+the form of an [interactive script](./kubernetes/eks/setup.sh).
 
 ## Overall System Design with optional leader/followers
 

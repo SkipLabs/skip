@@ -1,3 +1,7 @@
+This guide walks you through the process of deploying this Skip service to an
+EKS managed Kubernetes cluster.  If you prefer to just run the steps
+automatically, run the interactive `setup.sh` script instead.
+
 # Prerequisites
 
 The following CLI utilities are required:
