@@ -40,7 +40,7 @@ confirm() {
 
 # Function to wait for user input
 wait_for_user() {
-    read -p "Press Enter to continue..."
+    read -r -p "Press Enter to continue..."
 }
 
 print_status "Starting EKS Reactive HackerNews Setup"
@@ -52,7 +52,7 @@ print_status "Checking prerequisites..."
 missing_tools=()
 for tool in docker aws kubectl eksctl; do
     if ! command_exists $tool; then
-        missing_tools+=($tool)
+        missing_tools+=("$tool")
     fi
 done
 
@@ -98,7 +98,8 @@ echo
 # Step 1: Set environment variables
 print_status "Setting up environment variables..."
 
-export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+export AWS_ACCOUNT_ID
 print_success "AWS Account ID: $AWS_ACCOUNT_ID"
 
 echo "Select AWS region:"
@@ -110,14 +111,14 @@ echo "5) ap-southeast-1 (Singapore)"
 echo "6) Other (enter manually)"
 echo
 
-read -p "Enter your choice (1-6) [1]: " region_choice
+read -r -p "Enter your choice (1-6) [1]: " region_choice
 
 case $region_choice in
     2) AWS_REGION="us-west-2" ;;
     3) AWS_REGION="eu-west-1" ;;
     4) AWS_REGION="eu-north-1" ;;
     5) AWS_REGION="ap-southeast-1" ;;
-    6) read -p "Enter AWS region: " AWS_REGION ;;
+    6) read -r -p "Enter AWS region: " AWS_REGION ;;
     *) AWS_REGION="us-east-1" ;;
 esac
 
@@ -144,7 +145,7 @@ echo
 
 if confirm "Do you want to create the EKS cluster?"; then
     print_status "Creating EKS cluster (this may take a while)..."
-    eksctl create cluster --enable-auto-mode --name skip-quickstart --region $AWS_REGION
+    eksctl create cluster --enable-auto-mode --name skip-quickstart --region "$AWS_REGION"
     print_success "EKS cluster created successfully"
 else
     print_warning "Skipping EKS cluster creation"
@@ -158,10 +159,10 @@ echo
 
 if confirm "Do you want to create the ECR repository?"; then
     print_status "Creating ECR repository..."
-    aws ecr create-repository --repository-name rhn-skip-example --region $AWS_REGION || true
+    aws ecr create-repository --repository-name rhn-skip-example --region "$AWS_REGION" || true
     
     print_status "Authenticating Docker with ECR..."
-    aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR
+    aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR"
     print_success "ECR repository created and Docker authenticated"
 else
     print_warning "Skipping ECR repository creation"
@@ -186,8 +187,8 @@ if confirm "Do you want to build and push Docker images?"; then
     for image in web_service reactive_service www db reverse_proxy; do
         print_status "Building $image..."
         docker build --platform linux/amd64 --tag rhn-$image-aws $image
-        docker tag rhn-$image-aws $ECR:$image
-        docker push $ECR:$image
+        docker tag rhn-$image-aws "$ECR":$image
+        docker push "$ECR":$image
         print_success "Pushed $image"
     done
     print_success "All Docker images built and pushed"
@@ -203,12 +204,12 @@ echo
 
 if confirm "Do you want to set up ECR permissions?"; then
     print_status "Creating ECR access secret..."
-    TOKEN=$(aws ecr --region=$AWS_REGION get-authorization-token \
+    TOKEN=$(aws ecr --region="$AWS_REGION" get-authorization-token \
         --output text --query authorizationData[].authorizationToken \
         | base64 -d | cut -d: -f2)
     
     kubectl create secret docker-registry rhn-skip-ecr-registry \
-        --docker-server=https://$ECR --docker-username=AWS \
+        --docker-server=https://"$ECR" --docker-username=AWS \
         --docker-password="${TOKEN}" --docker-email=user@example.com || true
     
     print_success "ECR permissions configured"
@@ -233,7 +234,7 @@ if confirm "Do you want to apply Kubernetes manifests?"; then
     
     for f in kubernetes/eks/*.yaml; do
         print_status "Applying $f..."
-        sed <$f s%__ECR__%$ECR% | kubectl apply -f -
+        sed <"$f" s%__ECR__%"$ECR"% | kubectl apply -f -
     done
     
     print_status "Creating HAProxy config map..."
