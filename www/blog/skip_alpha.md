@@ -4,6 +4,7 @@ description: Announce the alpha release of Skip
 slug: skip-alpha
 date: 2024-12-24
 authors: skiplabsteam
+image: /img/skip.png
 ---
 
 We’re pleased to share the alpha release of the [Skip Framework](https://github.com/SkipLabs/skip), an open source (MIT license) system for building and running reactive backend services.

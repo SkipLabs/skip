@@ -4,6 +4,7 @@ description: How to horizontally scale Skip services with Kubernetes
 slug: horizontal-scaling
 date: 2025-06-06
 authors: benno
+image: /img/skip.png
 ---
 
 Skip makes it fast and easy to build reactive services which efficiently update

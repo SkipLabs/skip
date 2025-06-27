@@ -4,6 +4,7 @@ description: Build a modern chat app with real-time updates using Skip's reactiv
 slug: skip_with_react_vite
 date: 2025-05-30
 authors: hubyrod
+image: /img/skip.png
 ---
 
 Hello skippers. Today, we are introducing a new template to our collection: React + Vite. While our previous blog posts focused on building skip services, this new template represents our first step into the frontend, bringing together the best of both worlds: front and back.
@@ -12,7 +13,7 @@ Hello skippers. Today, we are introducing a new template to our collection: Reac
 npx create-skip-service my-skip-chat --template with_react_vite
 ```
 
-{/* trunctate */}
+{/* truncate */}
 
 ## What's Inside the Template?
 

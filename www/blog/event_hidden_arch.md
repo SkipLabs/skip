@@ -4,6 +4,7 @@ description: Interactive features without events
 slug: event-hidden-arch
 date: 2025-04-21
 authors: charles
+image: /img/skip.png
 ---
 
 ## Event-Hidden Architectures

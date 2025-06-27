@@ -4,6 +4,7 @@ description: A CLI designed to streamline the creation and initialization of Ski
 slug: announcing_create_skip_service_cli
 date: 2025-05-23
 authors: hubyrod
+image: /img/skip.png
 ---
 
 Hello Skippers. Today, we are excited to announce the release of `create-skip-service`: A CLI Tool for Skip Service Development. It aims to simplify the development workflow by providing a convenient way to bootstrap new Skip services.
