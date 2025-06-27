@@ -29,7 +29,7 @@ fun getWatermark(
     | None() -> None()
     | Some(d) ->
       key = SKStore.SID::create(`${tableName}_${source}`);
-      arr = d.getArrayRaw(key);
+      arr = d.typed().getArrayRaw(key);
       if (arr.size() > 0) Some(SKStore.TickFile::type(arr[0]).value) else {
         None()
       }
@@ -100,7 +100,7 @@ fun getReplicationState(
     | None() -> None()
     | Some(d) ->
       key = SKStore.IID(source);
-      arr = d.getArrayRaw(key);
+      arr = d.typed().getArrayRaw(key);
       if (arr.size() > 0) {
         Some(ReplicationStateFile::type(arr[0]).state)
       } else {
@@ -1002,7 +1002,17 @@ module end;
 
 module SKStore;
 
-extension class EagerDir {
+extension base class EagerDir {
+  fun copy{
+    created: Tick,
+    timeStack: TimeStack,
+    dirName: DirName,
+    input: Bool,
+    creator: ?ArrowKey,
+  }: this;
+}
+
+extension class TEagerDir {
   fun copy{
     created: Tick,
     timeStack: TimeStack,

@@ -290,7 +290,7 @@ base class Handle<K: Key, +V: File>(
   dirName: DirName,
 ) {
   fun getArray(context: mutable Context, key: K): Array<V> {
-    dir = context.unsafeGetDir(this.dirName);
+    dir = context.unsafeGetDir(this.dirName).typed();
     dir.getArray(context, key).map(this.type)
   }
 
@@ -316,7 +316,7 @@ base class Handle<K: Key, +V: File>(
   }
 
   fun unsafeGetArray(context: readonly Context, key: K): Array<V> {
-    dir = context.unsafeGetDir(this.dirName);
+    dir = context.unsafeGetDir(this.dirName).typed();
     dir.getArrayRaw(key).map(this.type)
   }
 
@@ -348,7 +348,7 @@ class LHandle<K: Key, +V: File> extends Handle<K, V> {
     f: (mutable Context, LHandle<K, V>, K) ~> Array<V>,
     collect: Bool = true,
   ): LHandle<K, V> {
-    dir = LazyDir::create(
+    dir = TLazyDir::create(
       context,
       dirName,
       (context, dirName, key) ~> {
@@ -413,7 +413,7 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
     fixedParents = FixedSingle::createFromIterator(
       dynParents.items().map(kv -> (kv.i0, kv.i1.toArray())),
     );
-    EagerDir::applyMany(context, fixedParents, dirName, reducerOpt);
+    TEagerDir::applyMany(context, fixedParents, dirName, reducerOpt);
     EHandle(typeOutputKey, typeOutput, dirName)
   }
 
@@ -555,7 +555,7 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
   }
 
   fun getIter(context: mutable Context, key: K): mutable Iterator<V> {
-    dir = context.unsafeGetDir(this.dirName);
+    dir = context.unsafeGetDir(this.dirName).typed();
     dir.getIter(context, key).map(this.type)
   }
 
