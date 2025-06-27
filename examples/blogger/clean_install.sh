@@ -22,14 +22,14 @@ process_directory() {
         
         # Clean and install
         echo -e "${YELLOW}Cleaning $dir...${NC}"
-        if ! npm run clean; then
+        if ! pnpm clean; then
             echo -e "${RED}Error: Clean failed in $dir${NC}"
             cd - || return 1
             return 1
         fi
         
         echo -e "${YELLOW}Installing dependencies in $dir...${NC}"
-        if ! npm install; then
+        if ! pnpm install; then
             echo -e "${RED}Error: Install failed in $dir${NC}"
             cd - || return 1
             return 1
