@@ -4,6 +4,7 @@ description: Build step by step a skip service
 slug: reactive_social_network_service_poc
 date: 2025-04-30
 authors: hubyrod
+image: /img/skip.png
 ---
 
 Reactive programming often sounds complex—but it doesn't have to be. What if you could actually see how data responds to change, in real time, right from your terminal?

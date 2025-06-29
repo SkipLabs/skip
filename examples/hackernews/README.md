@@ -52,7 +52,7 @@ run and deploy the full application to a local Kubernetes cluster.
    each one to the `minikube` registry:
 ```bash
 docker compose -f kubernetes/compose.distributed.yml build
-for image in web-service reactive-service www db ; do
+for image in web_service reactive_service www db ; do
   docker tag reactive-hackernews/$image localhost:5000/$image;
   docker push localhost:5000/$image;
 done
@@ -76,6 +76,8 @@ distributed architecture, found in `./kubernetes/distributed_skip`:
 ```bash
 kubectl apply -f 'kubernetes/distributed_skip/*.yaml'
 kubectl create configmap haproxy-auxiliary-configmap --from-file kubernetes/distributed_skip/haproxy-aux.cfg
+helm repo add haproxytech https://haproxytech.github.io/helm-charts
+helm repo update
 helm install haproxy haproxytech/kubernetes-ingress -f kubernetes/distributed_skip/haproxy-helm-config
 ```
 
@@ -85,6 +87,14 @@ GUI/dashboard equivalent for your cluster, with `NUM_SKIP_INSTANCES` >= 2 (since
 the leader _is included_ in the number of replicas and the application requires
 at least one leader and one follower to function correctly).
 
+### Elastic Kubernetes Service
+
+You can also run the example application on a hosted Kubernetes cluster such as
+Amazon's Elastic Kubernetes Service (EKS).  The steps are similar to those for a
+local `minikube` cluster and can be adapted to other providers as needed.
+
+Step-by-step instructions can be found [here](./kubernetes/eks/guide.md), or in
+the form of an [interactive script](./kubernetes/eks/setup.sh).
 
 ## Overall System Design with optional leader/followers
 

@@ -4,6 +4,7 @@ description: How to make Postgres and Kafka-backed reactive services
 slug: non-reactive-dependencies
 date: 2025-04-14
 authors: benno
+image: /img/skip.png
 ---
 
 The Skip framework is a system for building and running incremental backend services, simplifying the challenges of engineering complex reactive systems.

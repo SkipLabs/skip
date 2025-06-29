@@ -624,7 +624,7 @@ fun applyDiffStrategy(
     isEligibleForTomb = (tick, source) ~>
       tick.value < snapshot.default(0) || source == writer;
 
-    !dir = dir.reset(newRoot, writer, SortedSet[], isEligibleForTomb);
+    !dir = dir.resetForRebuild(newRoot, writer, isEligibleForTomb);
 
     SKDB.resetWatermark(newRoot, table.name.lower, identity);
 
@@ -1022,6 +1022,42 @@ fun replayStdin(): Map<String, (Int, Int)> {
     value = line.sub(iter, line.length() - chars.size() - 1);
     tx![value] = (txNbr, repeat);
     !lineNbr = lineNbr + 1;
+  }
+}
+
+module end;
+
+module SKStore;
+
+extension base class EagerDir {
+  fun resetForRebuild(
+    context: mutable Context,
+    writer: Path,
+    wasSeen: (Tick, Path) ~> Bool,
+  ): this {
+    this.unsafeGetFileIter().each(kv -> {
+      (key, valueIter) = kv;
+      valueIter.next() match {
+      | None() -> void
+      | Some _ ->
+        this.unsafeGetDataIterWithoutTombs(key).each(kv -> {
+          (tick, source, _values) = kv;
+          // do not wipe out data that has not yet been seen
+          if (wasSeen(tick, source)) {
+            !this = this.writeEntry(
+              context,
+              source,
+              writer,
+              key,
+              Array[],
+              true, // force: reset is low-level and we wish to ignore any safeguards
+            )
+          }
+        })
+      }
+    });
+
+    this
   }
 }
 

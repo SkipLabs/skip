@@ -4,6 +4,7 @@ description: Describe the origins of the Skip framework and programming language
 slug: skips-origins
 date: 2025-02-11T12:00:00Z
 authors: jverlaguet
+image: /img/skip.png
 ---
 
 **Coping with success**

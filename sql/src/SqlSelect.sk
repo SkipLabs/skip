@@ -434,26 +434,22 @@ class SelectEvaluator{
 
       projLeftName = projName.sub("left");
 
-      SKStore.EagerDir::applyMany(
+      SKStore.TEagerDir::applyMany(
         context,
-        SKStore.FixedSingle::create(
-          mutable Vector[
-            (leftHandle.dirName, Array[(noop, leftRanges, None())]),
-            (shardsDirName, Array[(noop, None(), None())]),
-          ],
+        SKStore.FixedSingle::pair(
+          (leftHandle.dirName, Array[(noop, leftRanges, None())]),
+          (shardsDirName, Array[(noop, None(), None())]),
         ),
         projLeftName,
       );
 
       projRightName = projName.sub("right");
 
-      SKStore.EagerDir::applyMany(
+      SKStore.TEagerDir::applyMany(
         context,
-        SKStore.FixedSingle::create(
-          mutable Vector[
-            (rightHandle.dirName, Array[(noop, rightRanges, None())]),
-            (shardsDirName, Array[(noop, None(), None())]),
-          ],
+        SKStore.FixedSingle::pair(
+          (rightHandle.dirName, Array[(noop, rightRanges, None())]),
+          (shardsDirName, Array[(noop, None(), None())]),
         ),
         projRightName,
       );
@@ -492,29 +488,23 @@ class SelectEvaluator{
         }
       };
 
-      SKStore.EagerDir::applyMany(
+      SKStore.TEagerDir::applyMany(
         context,
-        SKStore.FixedSingle::create(
-          mutable Vector[
-            (projLeftName, Array[(projLeftFun, None(), None())]),
-            (projRightName, Array[(projRightFun, None(), None())]),
-          ],
+        SKStore.FixedSingle::pair(
+          (projLeftName, Array[(projLeftFun, None(), None())]),
+          (projRightName, Array[(projRightFun, None(), None())]),
         ),
         projName,
       );
-      SKStore.EagerDir::applyMany(
+      SKStore.TEagerDir::applyMany(
         context,
-        SKStore.FixedSingle::create(
-          mutable Vector[
+        SKStore.FixedSingle::singleton(
+          projName,
+          Array[
             (
-              projName,
-              Array[
-                (
-                  makeJoinReducer(shards, joinKind, kinds, onlyLeftValues),
-                  None(),
-                  None(),
-                ),
-              ],
+              makeJoinReducer(shards, joinKind, kinds, onlyLeftValues),
+              None(),
+              None(),
             ),
           ],
         ),
@@ -710,39 +700,37 @@ class SelectEvaluator{
           context.!newDirs = context.newDirs.set(selectName1Empty);
         };
 
-        SKStore.EagerDir::applyMany(
+        SKStore.TEagerDir::applyMany(
           context,
-          SKStore.FixedSingle::create(
-            mutable Vector[
-              (
-                selectName1Empty,
-                Array[
-                  (
-                    (context, writer, key, values) ~> {
-                      dataDir = context.unsafeGetEagerDir(dataName);
-                      if (dataDir.isEmpty(context)) {
-                        writer.setArray(key, values.collect(Array))
-                      }
-                    },
-                    None(),
-                    None(),
-                  ),
-                ],
-              ),
-              (
-                dataName,
-                Array[
-                  (
-                    (_context, writer, key, values) ~> {
-                      arr = values.collect(Array);
-                      writer.setArray(key, arr)
-                    },
-                    None(),
-                    None(),
-                  ),
-                ],
-              ),
-            ],
+          SKStore.FixedSingle::pair(
+            (
+              selectName1Empty,
+              Array[
+                (
+                  (context, writer, key, values) ~> {
+                    dataDir = context.unsafeGetEagerDir(dataName);
+                    if (dataDir.isEmpty(context)) {
+                      writer.setArray(key, values.collect(Array))
+                    }
+                  },
+                  None(),
+                  None(),
+                ),
+              ],
+            ),
+            (
+              dataName,
+              Array[
+                (
+                  (_context, writer, key, values) ~> {
+                    arr = values.collect(Array);
+                    writer.setArray(key, arr)
+                  },
+                  None(),
+                  None(),
+                ),
+              ],
+            ),
           ),
           this.selectName1,
         )
@@ -1611,7 +1599,7 @@ fun makeJoinReducer(
   joinKind: P.JoinKind,
   kinds: Array<(Int, P.IKind, P.Type)>,
   onlyLeftValues: Bool,
-): SKStore.MapFun {
+): SKStore.MapFun<SKStore.Key, SKStore.File> {
   (context, writer, _, files) ~> {
     leftRows = mutable Vector[];
     rightRows = mutable Vector[];

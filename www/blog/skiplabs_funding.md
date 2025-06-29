@@ -4,6 +4,7 @@ description: SkipLabs raises $8M in seed funding
 slug: skiplabs-funding
 date: 2025-03-25
 authors: jverlaguet
+image: /img/skip.png
 ---
 
 **The News**

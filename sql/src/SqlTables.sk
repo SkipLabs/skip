@@ -29,7 +29,7 @@ fun getWatermark(
     | None() -> None()
     | Some(d) ->
       key = SKStore.SID::create(`${tableName}_${source}`);
-      arr = d.getArrayRaw(key);
+      arr = d.typed().getArrayRaw(key);
       if (arr.size() > 0) Some(SKStore.TickFile::type(arr[0]).value) else {
         None()
       }
@@ -100,7 +100,7 @@ fun getReplicationState(
     | None() -> None()
     | Some(d) ->
       key = SKStore.IID(source);
-      arr = d.getArrayRaw(key);
+      arr = d.typed().getArrayRaw(key);
       if (arr.size() > 0) {
         Some(ReplicationStateFile::type(arr[0]).state)
       } else {
@@ -147,7 +147,7 @@ fun errorAllExistingSubs(
     sub.destinationSource match {
     | None() -> void
     | Some(destSource) ->
-      if (sub.dirNames().any(dirName -> dirName == dir)) {
+      if (sub.dirNames(context).any(dirName -> dirName == dir)) {
         setReplicationState(context, destSource, RSError());
         lock = SKStore.unfreezeLock(sub.lock);
         SKStore.mutexLock(lock);
@@ -292,6 +292,7 @@ fun dirDescrCopy(
   time = context.timeStamp();
   dir = oldDir.copy{
     timeStack => SKStore.TimeStack::createInput(time),
+    created => context.getTick(),
     dirName => nextName,
     input => true,
     creator => context.currentArrow(),
@@ -994,6 +995,41 @@ class NamedIDs(
   }
   fun maybeGet(var: String): ?String {
     this.map.maybeGet(var)
+  }
+}
+
+module end;
+
+module SKStore;
+
+extension base class EagerDir {
+  fun copy{
+    created: Tick,
+    timeStack: TimeStack,
+    dirName: DirName,
+    input: Bool,
+    creator: ?ArrowKey,
+  }: this;
+}
+
+extension class TEagerDir {
+  fun copy{
+    created: Tick,
+    timeStack: TimeStack,
+    dirName: DirName,
+    input: Bool,
+    creator: ?ArrowKey,
+  }: this {
+    static{
+      timeStack,
+      created,
+      dirName,
+      input,
+      creator,
+      fixedData => this.fixedData,
+      data => this.data,
+      totalSize => this.totalSize,
+    }
   }
 }
 

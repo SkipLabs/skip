@@ -139,12 +139,11 @@ fun tailShouldWake(
     return true
   };
 
-  for (dirName in sub.dirNames()) {
+  for (dirName in sub.dirNames(context)) {
     context.unsafeMaybeGetEagerDir(dirName) match {
     | None() -> void
     | Some(dir) ->
-      (isReset, changes) = dir.getChangesAfter(tick);
-      if (isReset || !changes.isEmpty()) {
+      if (dir.changesAfterIsResetOrNonEmpty(tick)) {
         return true
       }
     }
@@ -268,12 +267,12 @@ fun tailSub(
 
       writer = mutable Debug.BufferedWriter(print_raw, 4096);
 
-      requestToRebuildEverything = !sub.dirNames().any(dirName -> {
+      requestToRebuildEverything = !sub.dirNames(context).any(dirName -> {
         since = tailFrom(lookupSpec, dirName, tailWatermark);
         since.value > 0
       });
       oldestSubSince = sub
-        .dirNames()
+        .dirNames(context)
         .map(dirName -> tailFrom(lookupSpec, dirName, tailWatermark))
         .min{default => SKStore.Tick(Int::max)};
       forceCompleteRebuild =
@@ -291,7 +290,6 @@ fun tailSub(
 
       for (dirSub in sub.dirSubs()) {
         dirName = dirSub.dirName;
-        edir = context.unsafeGetEagerDir(dirName);
         format = options.format match {
         | SKDB.OFK_CSV() ->
           assert(dirSub.format is SKStore.OCSV(_));
@@ -303,52 +301,22 @@ fun tailSub(
         };
         since = tailFrom(lookupSpec, dirName, tailWatermark);
 
-        (shouldRebuild, changes) = if (forceCompleteRebuild) {
-          (true, Array[].iterator())
-        } else if (since.value <= 0) {
-          // if since is zero, the receiver is specifying that they
-          // have no data to tail since. to avoid a likely rebuild and
-          // allow chunking, we stream the current state of the table
-          // and begin tailing from here.
-          (false, edir.unsafeGetFileIterNoReducer(None()).map(pair -> pair.i0))
-        } else if (since.value > 1 && !established) {
-          // we have a client that we've never seen before asking to
-          // tail from a point in time that they cannot understand, as
-          // they have no reference for our clock. we assume that this
-          // indicates they've moved from a different server to us and
-          // so need to reset their concept of the server's time.
-          (true, Array[].iterator())
-        } else {
-          // we can only chunk while tables are since 0 as we'll emit
-          // zero checkpoints. once a nonzero request is handled, we must
-          // make sure that it doesn't ultimately get sent back as part of a
-          // zero-checkpoint chunk - otherwise it won't be applied
-          // TODO: optimisation, request all 0 tables first
-          !chunkingDisabled = true;
-          (shouldRebuild, changes) = edir.getChangesAfter(since);
-          (shouldRebuild, changes.iterator())
-        };
-
-        // Write checkpoints out at least every `checkpointInterval` rows during
-        // initialization, so that the client can start processing without waiting
-        // for the full changeset.
-        // this value is chosen based on some unscientific local testing
-        checkpointInterval = if (since.value == 0 && !chunkingDisabled) {
-          512
-        } else {
-          Int::max
-        };
-
-        producedOutput = edir.writeDiff(
+        edir = context.unsafeGetEagerDir(dirName);
+        (
+          producedOutput,
           shouldRebuild,
-          changes,
+          !chunkingDisabled,
+        ) = edir.writeChangesTailSub{
+          context,
+          dirSub,
+          since,
           writer,
-          dirSub.entity,
           format,
-          dirSub.filter(context, since.value < 1, dirName), //send everything if client has nothing, i.e. since.value == 0
-          dirSub.getDestinationWatermark(context),
-          checkpointInterval,
-        );
+          forceCompleteRebuild,
+          established,
+          chunkingDisabled,
+        };
+
         !producedAnyOutput = producedAnyOutput || producedOutput;
         !couldFollowChanges = couldFollowChanges && !shouldRebuild;
       };
@@ -441,6 +409,72 @@ extension class Sub {
     | NMultipleDirs(c, dirSubs) ->
       this with {cmd => NMultipleDirs(c, dirSubs.map(f))}
     }
+  }
+}
+
+extension base class EagerDir {
+  fun changesAfterIsResetOrNonEmpty(tick: Tick): Bool {
+    (isReset, changes) = this.getChangesAfter(tick);
+    isReset || !changes.isEmpty()
+  }
+
+  fun writeChangesTailSub{
+    context: readonly Context,
+    dirSub: DirSub,
+    since: SKStore.Tick,
+    writer: mutable Debug.BufferedWriter,
+    format: OutputFormat,
+    forceCompleteRebuild: Bool,
+    established: Bool,
+    chunkingDisabled: Bool,
+  }: (Bool, Bool, Bool) {
+    (shouldRebuild, changes) = if (forceCompleteRebuild) {
+      (true, Array[].iterator())
+    } else if (since.value <= 0) {
+      // if since is zero, the receiver is specifying that they
+      // have no data to tail since. to avoid a likely rebuild and
+      // allow chunking, we stream the current state of the table
+      // and begin tailing from here.
+      (false, this.unsafeGetFileIterNoReducer(None()).map(pair -> pair.i0))
+    } else if (since.value > 1 && !established) {
+      // we have a client that we've never seen before asking to
+      // tail from a point in time that they cannot understand, as
+      // they have no reference for our clock. we assume that this
+      // indicates they've moved from a different server to us and
+      // so need to reset their concept of the server's time.
+      (true, Array[].iterator())
+    } else {
+      // we can only chunk while tables are since 0 as we'll emit
+      // zero checkpoints. once a nonzero request is handled, we must
+      // make sure that it doesn't ultimately get sent back as part of a
+      // zero-checkpoint chunk - otherwise it won't be applied
+      // TODO: optimisation, request all 0 tables first
+      !chunkingDisabled = true;
+      (shouldRebuild, changes) = this.getChangesAfter(since);
+      (shouldRebuild, changes.iterator())
+    };
+
+    // Write checkpoints out at least every `checkpointInterval` rows during
+    // initialization, so that the client can start processing without waiting
+    // for the full changeset.
+    // this value is chosen based on some unscientific local testing
+    checkpointInterval = if (since.value == 0 && !chunkingDisabled) {
+      512
+    } else {
+      Int::max
+    };
+
+    producedOutput = this.writeDiff(
+      shouldRebuild,
+      changes,
+      writer,
+      dirSub.entity,
+      format,
+      dirSub.filter(context, since.value < 1, this.dirName), //send everything if client has nothing, i.e. since.value == 0
+      dirSub.getDestinationWatermark(context),
+      checkpointInterval,
+    );
+    (producedOutput, shouldRebuild, chunkingDisabled)
   }
 }
 

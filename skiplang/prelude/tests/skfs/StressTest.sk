@@ -93,12 +93,13 @@ fun eval(
   for (dir in context.listDirs()) {
     dirName = dir.dirName;
     print_string("Dir: " + dirName);
-    for (key in dir.keys()) {
+    tDir = dir.typed();
+    for (key in tDir.keys()) {
       print_string(
         "  " +
           key +
           " => " +
-          dir.getArrayRaw(key).map(x ->
+          tDir.getArrayRaw(key).map(x ->
             SKStore.IntFile::type(x).value.toString()
           ),
       );
@@ -162,7 +163,7 @@ fun evalMDir(context: mutable SKStore.Context, dir: MDir): void {
       ),
     )
   };
-  SKStore.EagerDir::applyMany(
+  SKStore.TEagerDir::applyMany(
     context,
     SKStore.FixedSingle::create(parents),
     SKStore.DirName::create(name),
@@ -170,7 +171,7 @@ fun evalMDir(context: mutable SKStore.Context, dir: MDir): void {
 }
 
 fun evalLDir(context: mutable SKStore.Context, dir: LDir): void {
-  _ = SKStore.LazyDir::create(
+  _ = SKStore.TLazyDir::create(
     context,
     SKStore.DirName::create(dir.name),
     (context, _self, key) ~> {
@@ -224,7 +225,7 @@ fun evalSub(
       (context, writer, localKey, iterator) ~> {
         localSum = sum;
         for (readDirName in readDirs) {
-          readDir = context.unsafeGetDir(readDirName);
+          readDir = context.unsafeGetDir(readDirName).typed();
           read = readDir.getArray(context, localKey).map(x ->
             SKStore.IntFile::type(x)
           );
@@ -274,6 +275,7 @@ fun evalLFun(
     | _ -> T.fail()
     };
     read = dir
+      .typed()
       .getArray(context, SKStore.IID(SKStore.IntFile::type(value).value))
       .map(x -> SKStore.IntFile::type(x));
     !reads = List.Cons(read, reads);
@@ -290,7 +292,9 @@ fun evalLFun(
   | _ -> T.fail()
   };
   if (keyValue > 10) {
-    thisDir = context.unsafeGetLazyDir(SKStore.DirName::create(thisDirName));
+    thisDir = context
+      .unsafeGetLazyDir(SKStore.DirName::create(thisDirName))
+      .typed();
     !result =
       result +
       SKStore.IntFile::type(
@@ -320,7 +324,7 @@ fun evalFun(
 
   reads = List[currentValues];
   for (dirName in readDirs.concat(subDirs)) {
-    dir = context.unsafeGetDir(dirName);
+    dir = context.unsafeGetDir(dirName).typed();
     value = currentValues[0];
     read = dir
       .getArray(context, SKStore.IID(SKStore.IntFile::type(value).value))
@@ -368,7 +372,8 @@ fun compareContext(
   hasError = false;
   for (dir in context1.listDirs()) {
     dirName = dir.dirName;
-    dirFiles = dir.keys();
+    tDir = dir.typed();
+    dirFiles = tDir.keys();
     if (dirFiles.isEmpty()) continue;
 
     dir2 = context2.unsafeMaybeGetDir(dirName) match {
@@ -381,9 +386,10 @@ fun compareContext(
       continue
     | Some(d) -> d
     };
+    tDir2 = dir2.typed();
     for (key in dirFiles) {
-      values1 = dir.getArrayRaw(key).map(x -> SKStore.IntFile::type(x));
-      values2 = dir2.getArrayRaw(key).map(x -> SKStore.IntFile::type(x));
+      values1 = tDir.getArrayRaw(key).map(x -> SKStore.IntFile::type(x));
+      values2 = tDir2.getArrayRaw(key).map(x -> SKStore.IntFile::type(x));
       if (values1 != values2) {
         if (
           dir2 is SKStore.LazyDir _ &&
@@ -394,8 +400,8 @@ fun compareContext(
         !hasError = true;
         print_string(`Error: values differ for ${dirName}${key}`);
         print_string(`       ${values1}`);
-        dir match {
-        | lazyDir @ SKStore.LazyDir _ ->
+        tDir match {
+        | lazyDir @ SKStore.TLazyDir _ ->
           files = lazyDir.getArrayRaw(key);
           if (files.isEmpty()) {
             print_string("EMPTY DATA")

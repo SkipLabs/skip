@@ -17,52 +17,40 @@ base class LazyResult<F> {
   | LAbsent()
 }
 
-class LazyDir protected {
-  private data: SortedMap<Key, LazyResult<File>> = SortedMap[],
-  private lazyFun: (mutable Context, DirName, Key) ~> ?Array<File>,
-  private collect: Bool,
-} extends Dir {
-  static fun create(
-    context: mutable Context,
-    dirName: DirName,
-    lazyFun: (mutable Context, DirName, Key) ~> ?Array<File>,
-    collect: Bool = true,
-  ): Dir {
-    context.maybeGetLazyDir(dirName) match {
-    | Some(ldir) if (native_eq(ldir.lazyFun, lazyFun) == 0) ->
-      if (context.debugMode) {
-        print_string(`REUSING: ${dirName}`);
-      };
-      ldir
-    | _ ->
-      time = context.timeStamp();
-      newDir = LazyDir{
-        timeStack => TimeStack::create(context, time),
-        dirName,
-        lazyFun,
-        collect,
-      };
-      context.updateDirtyReaders(Path::dirTag(dirName));
-      context.setDir(newDir);
-      newDir
-    }
-  }
-
+base class LazyDir protected {protected collect: Bool} extends Dir {
   /* Updates the lazyGets ref counts and return as well a potentially updated
     LazyDir in which dead keys have been removed. */
   fun updateLazyGets(
-    refCountsOpt: ?SortedMap<Key, Int>,
-    newKeysOpt: ?SortedSet<Key>,
-    deadKeysOpt: ?SortedSet<Key>,
-  ): (?SortedMap<Key, Int>, ?this) {
-    refCounts = refCountsOpt.default(SortedMap[]);
-    newKeys = newKeysOpt.default(SortedSet[]);
-    deadKeys = deadKeysOpt.default(SortedSet[]);
+    refCountsOpt: ?KeyMap<Int>,
+    newKeysOpt: ?KeySet,
+    deadKeysOpt: ?KeySet,
+  ): (?KeyMap<Int>, ?this);
+
+  fun update(
+    context: mutable Context,
+    dirtyReadersOpt: ?SortedMap<DirName, KeySet>,
+  ): void;
+
+  fun typed(): TLazyDir;
+}
+
+class TLazyDir{
+  protected data: SortedMap<Key, LazyResult<File>> = SortedMap[],
+  protected lazyFun: (mutable Context, DirName, Key) ~> ?Array<File>,
+} extends LazyDir, TDir {
+  fun updateLazyGets(
+    refCountsOpt: ?KeyMap<Int>,
+    newKeysOpt: ?KeySet,
+    deadKeysOpt: ?KeySet,
+  ): (?KeyMap<Int>, ?this) {
+    refCounts = this.castOrEmptyKeyMap(refCountsOpt);
+    newKeys = this.castOrEmptyKeySet(newKeysOpt);
+    deadKeys = this.castOrEmptyKeySet(deadKeysOpt);
 
     toRemove = mutable Vector[];
     !refCounts = refCounts.mergeWith2(
-      newKeys.inner,
-      deadKeys.inner,
+      newKeys.getInner(),
+      deadKeys.getInner(),
       (key, refCountOpt, newOpt, deadOpt) -> {
         (refCountOpt, newOpt, deadOpt) match {
         | (_, None(), None())
@@ -90,7 +78,7 @@ class LazyDir protected {
     (refCountsOpt, dirOpt)
   }
 
-  private fun removeKeys(keys: readonly Vector<Key>): this {
+  protected fun removeKeys(keys: readonly Vector<Key>): this {
     data = this.data;
     for (key in keys) {
       data.maybeGet(key) match {
@@ -120,13 +108,13 @@ class LazyDir protected {
 
   fun update(
     context: mutable Context,
-    dirtyReadersOpt: ?SortedMap<DirName, SortedSet<Key>>,
+    dirtyReadersOpt: ?SortedMap<DirName, KeySet>,
   ): void {
     dirtyReadersOpt match {
     | None() -> void
     | Some(dirtyReaders) ->
       for (dirtyReaderDirName => dirtyReaderKeys in dirtyReaders) {
-        for (key in dirtyReaderKeys) {
+        for (key in this.castKeySet(dirtyReaderKeys)) {
           oldValue = this.data.maybeGet(key);
           !this.data = this.data.remove(key);
           context.updateDirtyReaders(Path::create(dirtyReaderDirName, key));
@@ -148,10 +136,10 @@ class LazyDir protected {
     context.setDir(this);
   }
 
-  private fun doGet(context: mutable Context, key: Key): LazyResult<File> {
+  protected fun doGet(context: mutable Context, key: Key): LazyResult<File> {
     dirName = this.dirName;
 
-    dir = context.unsafeGetLazyDir(dirName);
+    dir = context.unsafeGetLazyDir(dirName).typed();
     !dir.data[key] = LCycle();
     context.setDir(dir);
 
@@ -162,7 +150,7 @@ class LazyDir protected {
       this.lazyFun(context, dirName, key)
     } catch {
     | exn ->
-      !dir = context.unsafeGetLazyDir(dirName);
+      !dir = context.unsafeGetLazyDir(dirName).typed();
       !dir.data[key] = LAbsent();
       context.setDir(dir);
       context.!reads = readsCopy;
@@ -181,7 +169,7 @@ class LazyDir protected {
     };
     context.updateNewDeps(arrowKey, context.reads);
 
-    !dir = context.unsafeGetLazyDir(dirName);
+    !dir = context.unsafeGetLazyDir(dirName).typed();
     !dir.data[key] = result;
     context.setDir(dir);
 
@@ -229,6 +217,36 @@ class LazyDir protected {
 
   fun getIter(context: mutable Context, key: Key): mutable Iterator<File> {
     this.getArray(context, key).iterator()
+  }
+
+  fun typed(): this {
+    this
+  }
+
+  static fun create(
+    context: mutable Context,
+    dirName: DirName,
+    lazyFun: (mutable Context, DirName, Key) ~> ?Array<File>,
+    collect: Bool = true,
+  ): Dir {
+    context.maybeGetLazyDir(dirName) match {
+    | Some(ldir) if (native_eq(ldir.typed().lazyFun, lazyFun) == 0) ->
+      if (context.debugMode) {
+        print_string(`REUSING: ${dirName}`);
+      };
+      ldir
+    | _ ->
+      time = context.timeStamp();
+      newDir = static{
+        timeStack => TimeStack::create(context, time),
+        dirName,
+        lazyFun,
+        collect,
+      };
+      context.updateDirtyReaders(Path::dirTag(dirName));
+      context.setDir(newDir);
+      newDir
+    }
   }
 }
 

@@ -2056,44 +2056,15 @@ fun importNext(
       (targetDirName, version) = makeInputDirName(dirName);
       !hasMultipleVersions = hasMultipleVersions || version != 0;
       updates.maybeGet(targetDirName) match {
-      | Some((_, _, _, iversion, _)) if (iversion > version) -> void
-      | _ ->
-        (isReset, changedKeys) = dir.getChangesAfter(tick);
-        targetCtx.unsafeMaybeGetDir(targetDirName) match {
-        | None() ->
-          time = targetCtx.timeStamp();
-          targetDir = SKStore.EagerDir::create{
-            timeStack => SKStore.TimeStack::createInput(time),
-            input => true,
-            dirName => targetDirName,
-            creator => None(),
-          };
-          targetCtx.setDir(targetDir)
-        | Some(_) -> void
-        };
-        entries = mutable Vector[];
-        for (key in changedKeys) {
-          for (srcValue in dir.unsafeGetAllDataIterAfter(tick, key)) {
-            (_, source, writer, values) = srcValue;
-            entries.push((key, (source, writer, values)));
-          }
-        };
-        updates![targetDirName] = (isReset, changedKeys, dir, version, entries)
+      | Some((iversion, _)) if (iversion > version) -> void
+      | _ -> updates![targetDirName] = (version, dir)
       }
     | _ -> void
     }
   };
   for (targetDirName => src in updates) {
-    (isReset, changedKeys, dir, _, entries) = src;
-    targetCtx.unsafeMaybeGetEagerDir(targetDirName) match {
-    | None() -> invariant_violation("Directory should have been created")
-    | Some(inputDir) ->
-      inputDir.writeArraySourceMany(
-        targetCtx,
-        entries.iterator(),
-        if (isReset) Some((dir.dirName, changedKeys)) else None(),
-      )
-    }
+    (_version, dir) = src;
+    dir.importNext{targetCtx, tick, targetDirName}
   };
   hasMultipleVersions
 }
@@ -2211,16 +2182,7 @@ fun printContext(context: mutable SKStore.Context): void {
     producedAnyOutput = false;
     for ((dirsub, tick) in spec) {
       edir = context.unsafeGetEagerDir(dirsub.dirName);
-      (shouldRebuild, changes) = edir.getChangesAfter(tick);
-      producedOutput = edir.writeDiff(
-        shouldRebuild,
-        changes.iterator(),
-        writer,
-        dirsub.entity,
-        dirsub.format,
-        dirsub.filter(context.clone(), false, dirsub.dirName),
-        dirsub.getDestinationWatermark(context),
-      );
+      producedOutput = edir.writeChangesAfter(context, dirsub, tick, writer);
       !producedAnyOutput = producedAnyOutput || producedOutput
     };
     if (producedAnyOutput) {
@@ -2674,10 +2636,63 @@ extension class TimeStack {
   }
 }
 
-extension class EagerDir {
+extension base class EagerDir {
   fun timeMaxMinus(): this {
     !this.timeStack = this.timeStack.maxMinus();
     this
+  }
+
+  fun importNext{
+    targetCtx: mutable Context,
+    tick: Tick,
+    targetDirName: DirName,
+  }: void {
+    (isReset, changedKeys) = this.getChangesAfter(tick);
+    inputDir = targetCtx.unsafeMaybeGetEagerDir(targetDirName) match {
+    | None() ->
+      time = targetCtx.timeStamp();
+      targetDir = TEagerDir::create{
+        timeStack => TimeStack::createInput(time),
+        created => targetCtx.getTick(),
+        input => true,
+        dirName => targetDirName,
+        creator => None(),
+      };
+      targetCtx.setDir(targetDir);
+      targetDir
+    | Some(d) -> d
+    };
+    entries = mutable Vector[];
+    for (key in changedKeys) {
+      for (srcValue in this.unsafeGetAllDataIterAfter(tick, key)) {
+        (_, source, writer, values) = srcValue;
+        entries.push((key, (source, writer, values)));
+      }
+    };
+    inputDir.writeArraySourceMany(
+      targetCtx,
+      entries.iterator(),
+      if (isReset) Some((this.dirName, changedKeys)) else None(),
+    )
+  }
+
+  fun writeChangesAfter(
+    context: readonly Context,
+    dirsub: DirSub,
+    tick: SKStore.Tick,
+    writer: mutable Debug.BufferedWriter,
+  ): Bool {
+    (shouldRebuild, changes) = this.getChangesAfter(tick);
+    producedOutput = this.writeDiff(
+      shouldRebuild,
+      changes.iterator(),
+      writer,
+      dirsub.entity,
+      dirsub.format,
+      dirsub.filter(context, false, dirsub.dirName),
+      dirsub.getDestinationWatermark(context),
+    );
+    producedOutput
   }
 }
 

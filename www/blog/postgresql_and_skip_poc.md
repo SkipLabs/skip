@@ -4,6 +4,7 @@ description: How to use Skip's reactive data streaming with a PostgreSQL backend
 slug: postgresql_and_skip
 date: 2025-05-16
 authors: hubyrod
+image: /img/skip.png
 ---
 
 Hello Skippers. Today, we are going to plug a [PostgreSQL](https://www.postgresql.org/) service and our starting point is the following project on GitHub: [Skip Postgres Demo](https://github.com/SkipLabs/postgres_and_skip_poc). We will demonstrate how to use Skip's reactive data streaming with a PostgreSQL backend. This project implements a simple blog post system with real-time updates using Skip's streaming capabilities.

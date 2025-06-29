@@ -4,6 +4,7 @@ description: A technical exploration of how reactive systems can solve backend p
 slug: backend_pressure
 date: 2025-06-20
 authors: hubyrod
+image: /img/skip.png
 ---
 
 Backend systems face constant pressure from multiple directions: user requests demanding instant responses, databases struggling under query loads, and servers managing finite computational resources. This backend pressure—the cumulative stress of handling concurrent requests while maintaining performance and resource constraints—manifests in bottlenecks, latency spikes, and system instability. Traditional approaches often treat these pressures as isolated problems—adding a cache here, optimizing a query there—resulting in complex patches that fix symptoms but ignore deeper architectural issues.
@@ -14,7 +15,7 @@ The conventional solution? Event-driven architectures and streaming systems. But
 
 Think of a financial portfolio app: instead of calculating portfolio performance each time a user loads their dashboard, the server maintains continuous streams where position changes flow through pricing calculations, which flow through performance metrics, which flow through sector aggregations. Or an e-commerce site where product price changes automatically update product views, category aggregations, search indices, and recommendation scores in real-time. Rather than computing results on demand, reactive systems keep computational pipelines running continuously, so the answers are always up-to-date and ready for immediate use—reducing latency and spreading load over time instead of spiking under demand.
 
-{/* trunctate */}
+{/* truncate */}
 
 ## Precomputed Reactive Structures
 
