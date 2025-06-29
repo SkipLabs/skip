@@ -27,6 +27,8 @@ base class Dir protected {timeStack: TimeStack, dirName: DirName} {
   }
 
   fun typed(): TDir;
+
+  fun addReaderKeyToKeySetOpt(arrowKey: ArrowKey, keySetOpt: ?KeySet): KeySet;
 }
 
 base class TDir extends Dir {
@@ -54,6 +56,30 @@ base class TDir extends Dir {
    * Returns the list of files in a directory. Should only be used for testing.
    */
   fun keys(): SortedSet<Key>;
+
+  fun castKeySet(keySet: KeySet): TKeySet<Key> {
+    Unsafe.cast(keySet, TKeySet<Key>)
+  }
+
+  fun castOrEmptyKeySet(keySetOpt: ?KeySet): TKeySet<Key> {
+    keySetOpt.map(this.castKeySet).default(TKeySet::empty())
+  }
+
+  fun addKeyToKeySetOpt(key: Key, keySetOpt: ?KeySet): KeySet {
+    this.castOrEmptyKeySet(keySetOpt).set(key)
+  }
+
+  fun addReaderKeyToKeySetOpt(arrowKey: ArrowKey, keySetOpt: ?KeySet): KeySet {
+    this.addKeyToKeySetOpt(arrowKey.key, keySetOpt)
+  }
+
+  fun castKeyMap<V: frozen>(keyMap: KeyMap<V>): TKeyMap<Key, V> {
+    Unsafe.cast(keyMap, TKeyMap<Key, V>)
+  }
+
+  fun castOrEmptyKeyMap<V: frozen>(keyMapOpt: ?KeyMap<V>): TKeyMap<Key, V> {
+    keyMapOpt.map(this.castKeyMap).default(TKeyMap::empty())
+  }
 }
 
 /*****************************************************************************/

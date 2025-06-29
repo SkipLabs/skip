@@ -1420,8 +1420,8 @@ base class EagerDir protected {
   fun update(
     /* this is the parent */
     context: mutable Context,
-    parentDirtyOpt: ?SortedSet<Key>,
-    contextDirtyReadersOpt: ?SortedMap<DirName, SortedSet<Key>>,
+    parentDirtyOpt: ?KeySet,
+    contextDirtyReadersOpt: ?SortedMap<DirName, KeySet>,
     parentMaps: Array<
       (
         MapFun<Key, File>,
@@ -1443,7 +1443,7 @@ base class EagerDir protected {
       contextDirtyReaders.maybeGet(childName) match {
       | None() -> void
       | Some(dirtyKeys) ->
-        keys = dirtyKeys.values();
+        keys = parent.typed().castKeySet(dirtyKeys).values();
         !dirty = withRegionFold(None(), keys, dirty, (_, key, dirtyInRegion) ~> {
           for (p in parentMaps) {
             (_, rangeOpt, _) = p;
@@ -1464,7 +1464,7 @@ base class EagerDir protected {
     parentDirtyOpt match {
     | None() -> void
     | Some(dirtyKeys) ->
-      keys = dirtyKeys.values();
+      keys = parent.typed().castKeySet(dirtyKeys).values();
       !dirty = withRegionFold(None(), keys, dirty, (_, key, dirtyInRegion) ~> {
         for (p in parentMaps) {
           (_, rangeOpt, _) = p;
@@ -1655,7 +1655,7 @@ base class EagerDir protected {
       Some(cdata)
     };
 
-    context.addDirty(this, k);
+    context.addDirty(this.typed(), k);
     path = Path::create(this.dirName, k);
 
     if (this.totalSize != totalSize) {
