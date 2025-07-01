@@ -91,19 +91,18 @@ define i1 @SKIP_String_eq(ptr %0, ptr %1) {
 
 declare void @SKIP_saveExn(ptr)
 
-define void @SKIP_etry(ptr %f.0, ptr %onError.1) unnamed_addr uwtable personality ptr bitcast (i32 (...)* @__gxx_personality_v0 to ptr) {
+define void @SKIP_etry(ptr %f.0, ptr %onError.1) unnamed_addr uwtable personality ptr @__gxx_personality_v0 {
 b0.entry:
   %r20 = getelementptr inbounds i8, ptr %f.0, i64 -8
   %r2 = load ptr, ptr %r20, align 8
   %r22 = getelementptr inbounds i8, ptr %r2, i64 0
   %r3 = load ptr, ptr %r22, align 8
-  %methodCode.24 = bitcast ptr %r3 to void(ptr) *
-  invoke void %methodCode.24(ptr %f.0) to label %b6.exit unwind label %b1.rawcatch_5
+  invoke void %r3(ptr %f.0) to label %b6.exit unwind label %b1.rawcatch_5
 b1.rawcatch_5:
   %excpair.25 = landingpad { ptr, i32 }
-          catch ptr bitcast ({ ptr, ptr, ptr }* @_ZTIN4skip13SkipExceptionE to ptr)
+          catch ptr @_ZTIN4skip13SkipExceptionE
   %caught_type_id.26 = extractvalue { ptr, i32 } %excpair.25, 1
-  %expected_type_id.27 = tail call i32 @llvm.eh.typeid.for(ptr nonnull bitcast ({ ptr, ptr, ptr }* @_ZTIN4skip13SkipExceptionE to ptr)) nounwind
+  %expected_type_id.27 = tail call i32 @llvm.eh.typeid.for(ptr nonnull @_ZTIN4skip13SkipExceptionE) nounwind
   %eq_type_id.28 = icmp eq i32 %caught_type_id.26, %expected_type_id.27
   br i1 %eq_type_id.28, label %catch.29, label %no_catch.30
 no_catch.30:
@@ -121,8 +120,7 @@ b2.record_exc_5:
   %r6 = load ptr, ptr %r35, align 8
   %r37 = getelementptr inbounds i8, ptr %r6, i64 0
   %r9 = load ptr, ptr %r37, align 8
-  %methodCode.39 = bitcast ptr %r9 to void(ptr) *
-  tail call void %methodCode.39(ptr %onError.1)
+  tail call void %r9(ptr %onError.1)
   ret void
 b6.exit:
   ret void
