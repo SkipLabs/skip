@@ -35,7 +35,7 @@ We use this language today. It has its own compiler, written in SkipLang itself,
 
 For me, scalability starts with the ability to accurately measure performance. Before even thinking about optimization, you need reliable metrics—and ideally, with minimal manual intervention. Manual handling quickly becomes a source of errors, especially in systems as complex as ours.
 
-It’s crucial to measure what you actually want to observe—not just loosely correlated metrics. Once you have a solid measurement foundation, you can start large-scale analysis, deep profiling, pinpoint real bottlenecks, and invest where it really matters. Right now, we’re specifically working on load testing SkipLang to better understand how our system behaves under different loads, and to validate our horizontal scalability. It’s a progressive process, but essential to ensuring strong performance in varied environments.
+It’s crucial to measure what you actually want to observe—not just loosely correlated metrics. Once you have a solid measurement foundation, you can start large-scale analysis, deep profiling, pinpoint real bottlenecks, and invest where it really matters. Right now, we’re specifically working on load testing Skip to better understand how our system behaves under different loads, and to validate our horizontal scalability. It’s a progressive process, but essential to ensuring strong performance in varied environments.
 
 ## And in your latest tests, what were the main bottlenecks you identified?
 
@@ -52,7 +52,7 @@ Once we’ve defined what counts as an acceptable client-side response time, we 
 
 ## And on the server side, what do you measure?
 
-There, we focus on how well we’re using available resources. For example: how many server instances can we run efficiently on a given machine? Are we fully utilizing RAM, CPU cores, I/O? There’s no point in paying for unused capacity. We complement that with regular profiling to ensure there are no avoidable bottlenecks in our server stack. It’s an ongoing effort, but it gives us real visibility into the system’s actual performance.
+There, we focus on how well we’re using available resources. For example: how many server instances can we run efficiently on a given machine? Are we fully utilizing RAM, CPU cores? There’s no point in paying for unused capacity. We complement that with regular profiling to ensure there are no avoidable bottlenecks in our server stack. It’s an ongoing effort, but it gives us real visibility into the system’s actual performance.
 
 ## Beyond technical challenges, what do you see as the bigger issues in this field?
 
