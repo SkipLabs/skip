@@ -7,31 +7,31 @@ authors: hubyrod
 image: /img/skip.png
 ---
 
-Phil Karlton famously said there are only two hard things in computer science: cache invalidation and naming things. While naming things may be subjective, cache invalidation is a problem that only gets harder as our systems grow more complex. As applications scale and users expect real-time data everywhere, traditional approaches to cache management crack under pressure.
+Phil Karlton famously said *there are only two hard things in computer science: cache invalidation and naming things*. While naming things may be subjective, [cache invalidation](https://en.wikipedia.org/wiki/Cache_invalidation) is a problem that only gets harder as our systems grow more complex. As applications scale and users expect real-time data everywhere, traditional approaches to cache management crack under pressure.
 
-Here's the thing about cache invalidation: it sits right at the center of the classic performance versus consistency trade-off. Mess it up, and your users are stuck looking at stale data. Maybe they see yesterday's stock prices, or worse, they're making business decisions based on outdated metrics. But nail the consistency part while implementing it poorly, and you've just thrown away all the performance benefits that made you add caching in the first place. This fundamental tension has been driving innovation in caching strategies for decades, from simple TTL expiration to increasingly complex dependency tracking systems.
+Here's the thing about cache invalidation: it sits right at the center of the classic performance versus consistency trade-off. Mess it up, and your users are stuck looking at stale data. Maybe they see yesterday's stock prices, or worse, they're making business decisions based on outdated metrics. But nail the consistency part while implementing it poorly, and you've just thrown away all the performance benefits that made you add caching in the first place. This fundamental tension has been driving innovation in caching strategies for decades, from simple [Time-to-live (TTL)](https://en.wikipedia.org/wiki/Time_to_live) expiration to increasingly complex dependency tracking systems.
 
 {/* truncate */}
 
 ## The Infrastructure Caching Challenge
 
-Modern applications don't just cache in one place, they cache everywhere. From CPU L1 and L2 caches at the hardware level to CDN edge caches serving your static assets, application-level caches storing database query results, and everything in between -- each layer brings its own invalidation headaches, and the challenge gets exponentially worse when these caches are distributed across multiple servers, data centers, or continents.
+Modern applications don't just cache in one place, they cache everywhere. From [CPU L1 and L2 caches](https://en.wikipedia.org/wiki/CPU_cache) at the hardware level to [CDN](https://en.wikipedia.org/wiki/Content_delivery_network) edge caches serving your static assets, application-level caches storing database query results, and everything in between -- each layer brings its own invalidation headaches, and the challenge gets exponentially worse when these caches are distributed across multiple servers, data centers, or continents.
 
-You've probably dealt with the classic cache invalidation strategies, and you know they all suck in their own special ways. Time-based expiration (TTL) is dead simple to implement, but you're constantly choosing between stale data and unnecessary cache misses. Manual invalidation gives you precision, but good luck correctly identifying all cache dependencies as your application grows. And event-driven invalidation? Sure, it's more accurate, but now your business logic is tightly coupled to your caching infrastructure.
+You've probably dealt with the classic cache invalidation strategies, and you know they all suck in their own special ways. [Time-based expiration (TTL)](https://en.wikipedia.org/wiki/Time_to_live) is dead simple to implement, but you're constantly choosing between stale data and unnecessary cache misses. Manual invalidation gives you precision, but good luck correctly identifying all cache dependencies as your application grows. And event-driven invalidation? Sure, it's more accurate, but now your business logic is tightly coupled to your caching infrastructure.
 
 ![TTL Caching: When Stale Data Breaks User Experience](./assets/ttl_cache.png)
 
-Then there's the distributed systems reality check. Network partitions happen, clocks drift, and eventual consistency models mean that even your best-designed invalidation strategies can fail spectacularly. Your invalidation message gets delayed, lost, or arrives out of order, and suddenly half your cache nodes are serving stale data while the other half got the memo. These edge cases are the worst: they're nearly impossible to test properly and usually only surface when you're already under production load.
+Then there's the distributed systems reality check. [Network partitions](https://en.wikipedia.org/wiki/Network_partition) happen, clocks drift, and eventual consistency models mean that even your best-designed invalidation strategies can fail spectacularly. Your invalidation message gets delayed, lost, or arrives out of order, and suddenly half your cache nodes are serving stale data while the other half got the memo. These edge cases are the worst: they're nearly impossible to test properly and usually only surface when you're already under production load.
 
-If you're running database-backed applications, you're dealing with multiple cache layers between your data store and your users. A single database update might need to invalidate entries in Redis, Memcached, your application's memory cache, and your CDN caches. Coordinating this invalidation across all these different systems while maintaining performance and consistency? That's the kind of engineering challenge that makes you question your career choices.
+If you're running database-backed applications, you're dealing with multiple cache layers between your data store and your users. A single database update might need to invalidate entries in [Redis](https://en.wikipedia.org/wiki/Redis), [Memcached](https://en.wikipedia.org/wiki/Memcached), your application's memory cache, and your CDN caches. Coordinating this invalidation across all these different systems while maintaining performance and consistency? That's the kind of engineering challenge that makes you question your career choices.
 
 Ok, I may be a little dramatic here, but now that we agree on the problem we're talking about...
 
 ## SkipLabs: A Reactive Approach to Cache Invalidation
 
-At SkipLabs, we take a different approach to the cache invalidation problem through reactive backend architecture. Instead of treating caching as a separate concern requiring manual coordination, SkipLabs builds reactivity right into the core of your data processing pipeline. When your underlying data changes, all dependent computations and cached results automatically update in a cascading fashion.
+At [SkipLabs](https://skiplabs.io/), we take a different approach to the cache invalidation problem through reactive backend architecture. Instead of treating caching as a separate concern requiring manual coordination, SkipLabs builds reactivity right into the core of your data processing pipeline. When your underlying data changes, all dependent computations and cached results automatically update in a cascading fashion.
 
-The reactive model that SkipLabs uses draws from functional reactive programming and incremental computation research. When data changes, the system automatically figures out which computations depend on that data and updates them incrementally. You don't need manual cache invalidation because the "cache" is always in sync with the underlying data through the reactive dependency graph.
+The reactive model that SkipLabs uses draws from functional reactive programming and incremental computation research. When data changes, the system automatically figures out which computations depend on that data and updates them incrementally. You don't need manual cache invalidation because the *cache* is always in sync with the underlying data through the reactive dependency graph.
 
 ![Automatic Cache Updates with SkipLabs](./assets/reactive_cache_skip.png)
 
@@ -55,7 +55,7 @@ The reactive model also puts constraints on how you can structure your applicati
 
 ## Wrap-up
 
-Cache invalidation continues to be one of the most challenging problems in distributed systems, with traditional approaches forcing difficult trade-offs between performance, consistency, and complexity. The reactive approach that platforms like SkipLabs are pioneering offers a promising alternative that could fundamentally change how we think about caching and data consistency.
+Cache invalidation continues to be one of the most challenging problems in software engineering, with traditional approaches forcing difficult trade-offs between performance, consistency, and complexity. The reactive approach that platforms like SkipLabs are pioneering offers a promising alternative that could fundamentally change how we think about caching and data consistency.
 
 Reactive systems aren't a silver bullet, they come with their own complexities and trade-offs. But they represent an important evolution in how we build data-intensive applications. As the technology matures and developer tooling improves, reactive backends may become viable for a much broader range of applications.
 
