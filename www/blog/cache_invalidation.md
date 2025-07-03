@@ -49,7 +49,7 @@ The consistency guarantees are typically stronger than what you get with eventua
 
 But let's be real about the trade-offs. The complexity doesn't disappear, it just moves from your application code into the runtime system. This can make debugging and performance tuning more challenging when things go wrong. You need to understand the reactive model and how your code will execute within it, which represents a significant learning curve for you and your team.
 
-Resource overhead can be substantial, especially for applications with large or frequently changing datasets. Maintaining that dependency graph and performing incremental updates requires additional memory and CPU compared to simpler caching strategies. For applications with straightforward caching needs, this overhead might not be worth it.
+Converting existing code to the Skip runtime without properly structuring and decomposing its dependency structure can incur more resource overhead than it saves through incrementality. The benefits of reactive systems shine when computations are well-structured for incremental updates, but poorly designed dependency graphs can actually hurt performance compared to simpler caching strategies.
 
 The reactive model also puts constraints on how you can structure your applications and access data. Not every existing codebase can be easily adapted to work within a reactive framework, you might need significant architectural changes to realize the benefits. To me, this is the hardest problem to solve.
 
