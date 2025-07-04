@@ -388,26 +388,32 @@ mutable class BuildRunner(
 
     skc.args(unit.target.srcs);
 
-    if (!unit.target.is_build_script()) {
-      // TODO: Once we have namespaced packages, we can share the state.db
-      // across architectures.
-      state_db_path = Path.join(
-        this.layout_for(unit).build,
-        // FIXME: This is a dirty hack that splits out the state.db between pic
-        // and static, which is required until `skc` namespaces packages.
-        `${unit.build_opts.relocation_model}_state.db`,
-      );
-      skc.args(
-        Array[
-          if (FileSystem.exists(state_db_path)) {
-            "--data"
-          } else {
-            "--init"
-          },
-          state_db_path,
-        ],
-      )
+    // TODO: Once we have namespaced packages, we can share the state.db
+    // across architectures.
+
+    // Separate state databases for build dependencies and regular dependencies
+    state_suffix = if (
+      unit.target.is_build_script() ||
+      this.is_build_dependency(unit)
+    ) "_build" else {
+      ""
     };
+    state_db_path = Path.join(
+      this.layout_for(unit).build,
+      // FIXME: This is a dirty hack that splits out the state.db between pic
+      // and static, which is required until `skc` namespaces packages.
+      `${unit.build_opts.relocation_model}${state_suffix}_state.db`,
+    );
+    skc.args(
+      Array[
+        if (FileSystem.exists(state_db_path)) {
+          "--data"
+        } else {
+          "--init"
+        },
+        state_db_path,
+      ],
+    );
 
     unit.target.kind match {
     | LibTarget(LibraryTypeSklib()) ->
@@ -580,6 +586,21 @@ mutable class BuildRunner(
     hash = this.hashes[unit].toStringHex();
 
     Path.join(this.fingerprint_dir, `${name}-${hash}`)
+  }
+
+  private readonly fun is_build_dependency(unit: Unit): Bool {
+    // Check if this unit is used as a build dependency by looking at its reverse dependencies
+    for (u in this.bctx.unit_graph.keys()) {
+      for (dep in this.bctx.unit_graph[u]) {
+        if (dep == unit) {
+          // If the parent unit is a CustomBuildTarget, then this unit is a build dependency
+          if (u.target.kind is CustomBuildTarget _) {
+            return true
+          }
+        }
+      }
+    };
+    false
   }
 }
 
