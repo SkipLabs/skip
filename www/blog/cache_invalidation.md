@@ -15,9 +15,7 @@ Here's the thing about cache invalidation: it sits right at the center of the cl
 
 ## The Infrastructure Caching Challenge
 
-Modern applications don't just cache in one place, they cache everywhere. From [CPU L1 and L2 caches](https://en.wikipedia.org/wiki/CPU_cache) at the hardware level to [CDN](https://en.wikipedia.org/wiki/Content_delivery_network) edge caches serving your static assets, application-level caches storing database query results, and everything in between -- each layer brings its own invalidation headaches, and the challenge gets exponentially worse when these caches are distributed across multiple servers, data centers, or continents.
-
-You've probably dealt with the classic cache invalidation strategies, and you know they all suck in their own special ways. [Time-based expiration (TTL)](https://en.wikipedia.org/wiki/Time_to_live) is dead simple to implement, but you're constantly choosing between stale data and unnecessary cache misses. Manual invalidation gives you precision, but good luck correctly identifying all cache dependencies as your application grows. And event-driven invalidation? Sure, it's more accurate, but now your business logic is tightly coupled to your caching infrastructure.
+Modern applications cache everywhere, from [CPU L1/L2 caches](https://en.wikipedia.org/wiki/CPU_cache) to [CDN edge caches](https://en.wikipedia.org/wiki/Content_delivery_network) to application-level query caches, and each layer brings its own invalidation headaches that get exponentially worse across distributed systems. You've probably dealt with the classic cache invalidation strategies, and you know they all suck in their own special ways: TTL forces you to choose between stale data and cache misses, manual invalidation becomes impossible to maintain as dependencies grow, and event-driven invalidation couples your business logic to caching infrastructure.
 
 ![TTL Caching: When Stale Data Breaks User Experience](./assets/ttl_cache.png)
 
