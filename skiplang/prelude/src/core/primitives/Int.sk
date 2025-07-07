@@ -183,60 +183,25 @@ native value class Int uses Number, Integral {
   }
 
   // Returns number of leading zeroes (MSB), or 64 if the value is 0.
-  // NOTE: Overridden in some back ends with a faster version.
   fun clz(): Int {
     this.clzImpl()
   }
   @intrinsic
-  private fun clzImpl(): Int {
-    if (this == 0) {
-      64
-    } else {
-      n = 0;
-      x = this;
-      while (x > 0) {
-        !n = n + 1;
-        !x = x.shl(1)
-      };
-      n
-    }
-  }
+  private native fun clzImpl(): Int;
 
   // Returns number of trailing zeroes (LSB), or 64 if the value is 0.
-  // NOTE: Overridden in some back ends with a faster version.
   fun ctz(): Int {
     this.ctzImpl()
   }
   @intrinsic
-  private fun ctzImpl(): Int {
-    if (this == 0) {
-      64
-    } else {
-      n = 0;
-      x = this;
-      while (x.and(1) == 0) {
-        !n = n + 1;
-        !x = x.ushr(1)
-      };
-      n
-    }
-  }
+  private native fun ctzImpl(): Int;
 
   // Returns the number of "one" bits in the value.
-  // NOTE: Overridden in some back ends with a faster version.
   fun popcount(): Int {
     this.popcountImpl()
   }
   @intrinsic
-  private fun popcountImpl(): Int {
-    n = 0;
-    x = this;
-    while (x != 0) {
-      !n = n + 1;
-      !x = x.and(x - 1)
-    };
-    n
-  }
+  private native fun popcountImpl(): Int;
 
   const max: Int = 0x7FFFFFFFFFFFFFFF;
   const min: Int = 0x8000000000000000;
