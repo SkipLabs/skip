@@ -24,25 +24,8 @@ make
 
 ### Installing the toolchain
 
-```make install prefix=<instalation_dir_prefix>```
+```make install prefix=<installation_dir_prefix>```
 
-`<instalation_dir_prefix>/bin` and `<instalation_dir_prefix>/lib` directories will be created.
+`<installation_dir_prefix>/bin` and `<installation_dir_prefix>/lib` directories will be created.
 
-Then make sure <instalation_dir_prefix>/bin is available in $PATH.
-
-## Native Skip runtime
-
-The native runtime is currently only available for Node.
-
-### Building the native runtime
-
-To build the native Skip runtime, you need the Skiplang toolchain. You can install the tool chain by following the instructions above.
-
-```sh
-cd skip
-skargo b -r --manifest-path=skipruntime-ts/native/Skargo.toml --lib --out-dir=<target_dir>
-```
-
-### Installing the `@skipruntime/native` package
-
-```SKIPRUNTIME=<target_dir> npm install @skipruntime/native```
+Then make sure <installation_dir_prefix>/bin is available in `$PATH`.
