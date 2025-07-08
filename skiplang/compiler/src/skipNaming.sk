@@ -3660,6 +3660,37 @@ fun expandForEachMacro(
   N.Bind(iteratorn, getIterator, flagged)
 }
 
+fun expandEnvMacro(context: mutable SKStore.Context, varName: A.Name): N.Expr_ {
+  (pos, name) = varName;
+  pkg_env = SKStore.EHandle(
+    SKStore.SID::keyType,
+    SKStore.StringFile::type,
+    // FIXME: Ensure package names cannot start with an underscore to avoid clash with `_default`.
+    SKStore.DirName::create(
+      `/packageEnv/${pos.file.pkg_opt.default("_default")}/`,
+    ),
+  );
+  value = pkg_env.maybeGet(context, SKStore.SID(name)) match {
+  | None() -> SkipError.error(pos, `Environment variable ${name} is not set.`)
+  | Some(v) -> v.value
+  };
+  // Record access to env variable.
+  cur_env_map = context.getGlobal(FileCache.kEnvAccessGlobal) match {
+  | None() -> SortedMap[]
+  | Some(envMapFile) -> FileCache.EnvMapFile::type(envMapFile).value
+  };
+  context.setGlobal(
+    FileCache.kEnvAccessGlobal,
+    FileCache.EnvMapFile(
+      cur_env_map.set(
+        pos.file.pkg_opt,
+        cur_env_map.maybeGet(pos.file.pkg_opt).default(SortedSet[]).set(name),
+      ),
+    ),
+  );
+  N.Literal(A.StringLiteral(value))
+}
+
 fun reportDuplicateMacro(
   pos: FileRange,
   id: String,
@@ -3816,9 +3847,8 @@ fun expr_(
   | A.Literal(l) -> N.Literal(l)
   | A.Var(n) -> N.Var(n)
   | A.MacroVar(n) -> expandExpressionMacro(env, n)
-  | A.Seq _
-  | A.EnvMacro _ ->
-    invariant_violation("assert false")
+  | A.Seq _ -> invariant_violation("assert false")
+  | A.EnvMacro(n) -> expandEnvMacro(context, n)
   | A.If(e1, e2, e3) ->
     N.If(
       expr(context, acc, env, e1),
