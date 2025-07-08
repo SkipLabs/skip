@@ -137,8 +137,8 @@ const service = {
   initialData,
   resources: {},
   createGraph(input: ServiceInputs): ResourceInputs {
-    const activeMembers = input.groups.map(ActiveMembers, users);
-    return { users: input.users, input.activeMembers };
+    const activeMembers = input.groups.map(ActiveMembers, input.users);
+    return { users: input.users, activeMembers };
   },
 };
 await runService(service);
