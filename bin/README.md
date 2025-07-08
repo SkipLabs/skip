@@ -44,3 +44,35 @@ changes, the addon package version must be bumped.)  To update from version
    building/running with the new versions, add those changes to your PR, and
    land it!
 
+8. Release the Skip runtime binaries, as below.
+
+## Release Skip runtime binaries
+
+The `@skipruntime/native` node addon dynamically links to a native library
+containing the Skip runtime. The versions of the NPM package and binary
+release must match. Therefore whenever NPM packages are released the binary
+runtime release must be as well. The installation scripts download the
+binary runtime library from a github release tagged with `vM.N.O` where
+`M.N.O` is the version of the NPM packages.
+
+The release procedure for the runtime library binary is:
+
+1. Run `bin/build_runtime.sh` from a clean repo with HEAD at the commit that
+   was/will be used for version `M.N.O` of the NPM packages. This leaves
+   `libskipruntime.so-<OS>-<ARCH>` files in the `build` directory.
+
+2. Visit https://github.com/skiplabs/skip/releases/new
+
+3. Click "Choose a tag"
+
+4. Enter `vM.N.O` as the tag name
+
+5. Click "Create new tag...on publish"
+
+6. Enter a release title and description
+
+7. Attach `build/libskipruntime.so-linux-arm64` and `build/libskipruntime.so-linux-amd64`
+
+8. Click "Publish release"
+
+9. Test the new release by running `cd skipruntime-ts/tests/native_addon/ ; ./run.sh`
