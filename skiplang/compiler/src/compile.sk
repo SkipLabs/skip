@@ -250,28 +250,7 @@ fun getOrInitializeBackend(context: mutable SKStore.Context): SKStore.EagerDir {
       };
 
       if (conf.emit == "sklib") {
-        accessed_env_vars = context.getGlobal(
-          FileCache.kEnvAccessGlobal,
-        ) match {
-        | None() -> SortedSet[]
-        | Some(envMapFile) ->
-          FileCache.EnvMapFile::type(envMapFile)
-            .value.maybeGet(conf.lib_name)
-            .default(SortedSet[])
-        };
-        env_dir = SKStore.EHandle(
-          SKStore.SID::keyType,
-          SKStore.StringFile::type,
-          SKStore.DirName::create(
-            `/packageEnv/${conf.lib_name.default("_default")}/`,
-          ),
-        );
-        env = SortedMap::createFromIterator(
-          accessed_env_vars
-            .map(v -> (v, env_dir.unsafeGet(context, SKStore.SID(v)).value))
-            .iterator(),
-        );
-        compile_sklib(conf, env);
+        compile_sklib(context, conf);
         return void
       };
 
@@ -428,11 +407,21 @@ fun compile_binary(
   })
 }
 
-fun compile_sklib(
-  conf: Config.Config,
-  env_vars: SortedMap<String, String>,
-): void {
+fun compile_sklib(context: mutable SKStore.Context, conf: Config.Config): void {
   runCompilerPhase("native/write_sklib", () -> {
+    accessed_env_vars = SortedSet::createFromItems(
+      FileCache.packageEnvAccessDir.getArray(
+        context,
+        SKStore.SID(conf.lib_name.fromSome()),
+      ).map(v -> v.value),
+    );
+    env_dir = FileCache.packageEnvDir(conf.lib_name);
+    env_vars = SortedMap::createFromIterator(
+      accessed_env_vars
+        .map(v -> (v, env_dir.unsafeGet(context, SKStore.SID(v)).value))
+        .iterator(),
+    );
+
     // NOTE: Static libraries (`.a` archives) provided as input files are
     // bundled into the `sklib`.
     sklib = mutable SklibBuilder(

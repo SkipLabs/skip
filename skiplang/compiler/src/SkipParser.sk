@@ -33,6 +33,7 @@ mutable class SkipParser{
   lazy: Bool,
   tokenLexer: mutable SkipLexer.SkipCoreLexer,
   templateLexer: mutable SkipLexer.TemplateLexer,
+  accessedEnvVars: mutable Set<String> = mutable Set[],
 } extends Parser.Parser {
   static fun create(source: String, lazy: Bool): mutable this {
     lexingPosition = Lexer.LexingPosition::create(source);
@@ -52,6 +53,10 @@ mutable class SkipParser{
       tokenLexer,
       templateLexer,
     };
+  }
+
+  readonly fun getAccessedEnvVars(): SortedSet<String> {
+    SortedSet::createFromIterator(this.accessedEnvVars.values())
   }
 
   mutable fun createPeekParser(): mutable this {
@@ -4791,6 +4796,8 @@ mutable class SkipParser{
     };
     closeParen = this.eatTree(TokenKind.CLOSE_PAREN());
 
+    this.accessedEnvVars.insert(varName.getToken().stringLiteralValue());
+
     ParseTree.EnvMacroTree{
       range => this.createRange(start),
       envKeyword,
@@ -5108,7 +5115,7 @@ fun parseSource(
   source: String,
   isLazy: Bool,
   filename: String = "",
-): Parser.ParseResults {
+): (Parser.ParseResults, SortedSet<String>) {
   parser = SkipParser::create(source, isLazy);
   tree = parser.parseSourceUnit();
   allErrors = parser.getErrors();
@@ -5124,7 +5131,11 @@ fun parseSource(
   if (errors.isEmpty() && !isLazy) {
     Parser.validateParse(tokens, tree, filename);
   };
-  Parser.ParseResults{tokens, comments => parser.getComments(), tree, errors};
+
+  (
+    Parser.ParseResults{tokens, comments => parser.getComments(), tree, errors},
+    parser.getAccessedEnvVars(),
+  )
 }
 
 fun getNamedParameterDefaultValue(tree: ParseTree): ParseTree {

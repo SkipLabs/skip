@@ -68,6 +68,18 @@ const packageDir: SKStore.EHandle<
   packageDirName,
 );
 
+const packageEnvAccessDirName: SKStore.DirName = SKStore.DirName::create(
+  "/packageEnvAccess/",
+);
+const packageEnvAccessDir: SKStore.EHandle<
+  SKStore.SID,
+  SKStore.StringFile,
+> = SKStore.EHandle(
+  SKStore.SID::keyType,
+  SKStore.StringFile::type,
+  packageEnvAccessDirName,
+);
+
 fun pkgDelta(
   old_pkg: InputPackageFiles,
   new_pkg: InputPackageFiles,
@@ -205,17 +217,33 @@ fun writeFiles(
   }
 }
 
+// FIXME: Ensure package names cannot start with an underscore to avoid clash with `_anonymous`.
+const kAnonymousPackageName: String = "_anonymous";
+
+fun packageEnvDirName(pkg_opt: ?String): SKStore.DirName {
+  SKStore.DirName::create(
+    `/packageEnv/${pkg_opt.default(kAnonymousPackageName)}/`,
+  )
+}
+
+fun packageEnvDir(
+  pkg_opt: ?String,
+): SKStore.EHandle<SKStore.SID, SKStore.StringFile> {
+  SKStore.EHandle(
+    SKStore.SID::keyType,
+    SKStore.StringFile::type,
+    packageEnvDirName(pkg_opt),
+  )
+}
+
 fun updatePackageEnv(
   context: mutable SKStore.Context,
   pkg_opt: ?String,
   env: Array<(String, String)>,
 ): void {
-  envDirName = SKStore.DirName::create(
-    `/packageEnv/${pkg_opt.default("_default")}/`,
-  );
+  envDirName = packageEnvDirName(pkg_opt);
   envDir = context.unsafeMaybeGetEagerDir(envDirName) match {
-  | Some _ ->
-    SKStore.EHandle(SKStore.SID::keyType, SKStore.StringFile::type, envDirName)
+  | Some _ -> packageEnvDir(pkg_opt)
   | None _ ->
     context.mkdir(SKStore.SID::keyType, SKStore.StringFile::type, envDirName)
   };
@@ -236,12 +264,6 @@ fun updatePackageEnv(
   };
 }
 
-const kEnvAccessGlobal: String = "ACCESSED_ENV_MAP";
-
-class EnvMapFile(
-  value: SortedMap<?String, SortedSet<String>>,
-) extends SKStore.File
-
 module end;
 
 module SkipParse;
@@ -254,11 +276,18 @@ const astDir: SKStore.EHandle<SKStore.SID, DefsFile> = SKStore.EHandle(
 );
 
 class DefsFile(value: List<SkipAst.Definition>) extends SKStore.File
+class DefsWithAccessedEnvVarsFile(
+  defs: List<SkipAst.Definition>,
+  accessed_env_vars: SortedSet<String>,
+) extends SKStore.File
 
-fun parseFile(file: FileCache.InputSource, source: String): DefsFile {
-  fileResult = SkipParser.parseSource(source, true);
-  ast = parseToAst(file, fileResult);
-  DefsFile(ast)
+fun parseFile(
+  file: FileCache.InputSource,
+  source: String,
+): DefsWithAccessedEnvVarsFile {
+  (fileResult, accessed_env_vars) = SkipParser.parseSource(source, true);
+  defs = parseToAst(file, fileResult);
+  DefsWithAccessedEnvVarsFile(defs, accessed_env_vars)
 }
 
 fun parseToAst(

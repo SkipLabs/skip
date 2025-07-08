@@ -15,9 +15,9 @@ fun type_program(
 ): SKStore.EHandle<SKStore.SID, SkipTyping.DefFile> {
   parsed_program = FileCache.fileDir.map(
     FileCache.InputSource::keyType,
-    SkipParse.DefsFile::type,
+    SkipParse.DefsWithAccessedEnvVarsFile::type,
     context,
-    SkipParse.astDirName,
+    SKStore.DirName::create("/astAndAccessedEnvVarsCache/"),
     (context, writer, key, sources) ~> {
       source = sources.first;
       SkipError.catchErrors(0, context, () -> {
@@ -26,7 +26,35 @@ fun type_program(
     },
   );
 
-  (defsDir, childDir) = SkipExpand.program(context, parsed_program);
+  _ = parsed_program.map(
+    SKStore.SID::keyType,
+    SKStore.StringFile::type,
+    context,
+    FileCache.packageEnvAccessDirName,
+    (_context, writer, key, values) ~> {
+      writer.setArray(
+        SKStore.SID(key.pkg_opt.default(FileCache.kAnonymousPackageName)),
+        values
+          .getUnique()
+          .fromSome()
+          .accessed_env_vars.values()
+          .map(v -> SKStore.StringFile(v))
+          .collect(Array),
+      )
+    },
+  );
+
+  ast = parsed_program.map(
+    FileCache.InputSource::keyType,
+    SkipParse.DefsFile::type,
+    context,
+    SkipParse.astDirName,
+    (_context, writer, key, values) ~> {
+      writer.set(key, SkipParse.DefsFile(values.getUnique().fromSome().defs))
+    },
+  );
+
+  (defsDir, childDir) = SkipExpand.program(context, ast);
   inhDir = SkipInherit.populateClassesDir(context);
   SkipNaming.populateClasses(context, defsDir, inhDir, childDir);
   SkipNaming.populateFuns(context, defsDir);
