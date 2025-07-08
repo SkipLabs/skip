@@ -189,7 +189,6 @@ class Manifest(
   package_id: PackageId,
   dependencies: Array<Dependency>,
   targets: Array<Target>,
-  original: TomlManifest,
 ) {
   static fun read(path: String): Manifest {
     static::fromTomlManifest(TomlManifest::read(path), path)
@@ -206,32 +205,21 @@ class Manifest(
       Semver.Version::fromString(manifest.version),
       source_id,
     );
-    dependencies = manifest.dependencies
-      .map((toml_name, toml_dep) ->
-        Dependency::fromTomlDependency(toml_name, toml_dep, NormalDep())
-      )
-      .values()
-      .collect(Array);
-    dev_dependencies = manifest.dev_dependencies
-      .map((toml_name, toml_dep) ->
-        Dependency::fromTomlDependency(toml_name, toml_dep, DevelopmentDep())
-      )
-      .values()
-      .collect(Array);
-    build_dependencies = manifest.build_dependencies
-      .map((toml_name, toml_dep) ->
-        Dependency::fromTomlDependency(toml_name, toml_dep, BuildDep())
-      )
-      .values()
-      .collect(Array);
+    dependencies = Array[
+      (manifest.dependencies, NormalDep()),
+      (manifest.dev_dependencies, DevelopmentDep()),
+      (manifest.build_dependencies, BuildDep()),
+    ].flatMap((deps) ->
+      deps.i0
+        .map((toml_name, toml_dep) ->
+          Dependency::fromTomlDependency(toml_name, toml_dep, deps.i1)
+        )
+        .values()
+        .collect(Array)
+    );
     targets = manifest_targets(manifest, package_root);
 
-    Manifest(
-      package_id,
-      dependencies.concat(dev_dependencies).concat(build_dependencies),
-      targets,
-      manifest,
-    )
+    Manifest(package_id, dependencies, targets)
   }
 
   fun lib_target(): ?Target {
