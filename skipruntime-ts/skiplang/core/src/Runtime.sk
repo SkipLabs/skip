@@ -1031,7 +1031,7 @@ private fun resourceId(
   dir.creator match {
   | Some(arrow) ->
     if (isResourceDir(arrow.parentName)) {
-      Some(ResourceDef::keyType(arrow.key))
+      Some(ResourceDef::keyType(SKStore.TEagerDir::staticKeyOfArrowKey(arrow)))
     } else {
       context.unsafeMaybeGetEagerDir(arrow.parentName) match {
       | Some(sdir) -> resourceId(context, sdir)
