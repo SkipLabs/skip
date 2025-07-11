@@ -231,8 +231,7 @@ char* SKIP_getArgN(int64_t n) {
 
 int64_t SKIP_get_envc() {
   char** p = nullptr;
-  for (p = environ; *p != nullptr; ++p)
-    ;
+  for (p = environ; *p != nullptr; ++p);
   return (int)(p - environ);
 }
 
