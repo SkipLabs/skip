@@ -9,13 +9,19 @@ declare ptr @SKIP_llvm_memcpy(ptr, ptr, i64)
 
 ; LLVM intrinsics
 
-declare void @llvm.lifetime.start(i64, ptr nocapture) argmemonly nounwind
-declare void @llvm.lifetime.end(i64, ptr nocapture) argmemonly nounwind
+; Function Attrs: mustprogress nocallback nofree nosync nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.lifetime.start(i64 immarg, ptr nocapture)
+; Function Attrs: mustprogress nocallback nofree nosync nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.lifetime.end(i64 immarg, ptr nocapture)
 
-declare i32 @llvm.eh.typeid.for(ptr) nounwind readnone
+; Function Attrs: nounwind readnone
+declare i32 @llvm.eh.typeid.for(ptr)
 
+; Function Attrs: nounwind readnone
 declare i64 @llvm.ctlz.i64(i64, i1)
+; Function Attrs: nounwind readnone
 declare i64 @llvm.cttz.i64(i64, i1)
+; Function Attrs: nounwind readnone
 declare i64 @llvm.ctpop.i64(i64)
 
 declare i32 @__gxx_personality_v0(...)
