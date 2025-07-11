@@ -6,7 +6,7 @@ date: 2025-07-11
 authors: hubyrod
 ---
 
-Ever wondered what it's like to work on cutting-edge reactive programming? This chat with a Lucas, SkipLabs engineer, gives you the inside scoop on building tools that tackle gnarly data synchronization problems. We have created something called the Skip Framework, which runs on our own programming language, SkipLang, pretty cool stuff. What makes this interview particularly interesting is how it bounces between the nuts and bolts of performance testing (like figuring out why stream creation was too slow) and the bigger picture of where tech is headed. You'll get a feel for SkipLabs' laid-back engineering culture where people work independently but always have each other's backs, plus some thoughtful takes on everything from open source development to why we still edit code like it's 1995. Whether you're into the technical weeds of load testing or curious about how small teams tackle ambitious projects, there's something here for you.
+Ever wondered what it's like to work on cutting-edge reactive programming? This chat with a Lucas, a SkipLabs engineer, gives you the inside scoop on building tools that tackle gnarly data synchronization problems. We have created something called the Skip Framework, which runs on our own programming language, SkipLang, pretty cool stuff. What makes this interview particularly interesting is how it bounces between the nuts and bolts of performance testing (like figuring out why stream creation was too slow) and the bigger picture of where tech is headed. You'll get a feel for SkipLabs' laid-back engineering culture where people work independently but always have each other's backs, plus some thoughtful takes on everything from open source development to why we still edit code like it's 1995. Whether you're into the technical weeds of load testing or curious about how small teams tackle ambitious projects, there's something here for you.
 
 {/* trunctate */}
 
@@ -47,7 +47,7 @@ This kind of issue really shows how important fine-grained, automated tracing is
 
 There are several, but the most important is: how many users can we serve under acceptable conditions for a given budget? We aim to stay close to real-world use cases. Depending on the services being tested, some loads involve heavy writing, others are mostly read-heavy. Some may involve lots of shared data, others significant server-side computation before results are pushed out.
 
-The key metric is replication time: when a client writes data, how long does it take for that data to be visible to all other affected clients? This delay depends on the associated computation graph, so it can vary a lot—but it’s an essential metric for us.
+One key metric is replication time: when a client writes data, how long does it take for that data to be visible to all other affected clients? This delay depends on the associated computation graph, so it can vary a lot—but it’s an essential metric for us.
 Once we’ve defined what counts as an acceptable client-side response time, we check how many clients we can serve with a single instance. Then we measure how that capacity scales when adding more servers—that’s our horizontal scalability curve.
 
 ## And on the server side, what do you measure?
