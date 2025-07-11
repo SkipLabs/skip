@@ -2,7 +2,7 @@
 title: Discussion with Lucas, a SkipLabs engineer
 description: An in-depth conversation with a SkipLabs engineer about reactive programming, performance optimization, and the technical challenges of building scalable data synchronization tools.
 slug: interview_lucas
-date: 2025-06-21
+date: 2025-07-11
 authors: hubyrod
 ---
 
