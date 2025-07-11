@@ -173,7 +173,7 @@ fun runShell(args: Array<String>, verbose: Bool = false): void {
 }
 
 fun ensureCompatibleLLVMVersion(): void {
-  kLLVMVersion = "15.";
+  kLLVMVersion = "20.";
 
   p = System.subprocess(Array["llvm-config", "--version"]).fromSuccess();
   if (!p.success()) {
@@ -181,7 +181,7 @@ fun ensureCompatibleLLVMVersion(): void {
     skipExit(1)
   } else if (!p.stdout.startsWith(kLLVMVersion)) {
     print_error(
-      `Incompatible llvm version ${p.stdout}, expected LLVM ${kLLVMVersion}`,
+      `Incompatible LLVM version ${p.stdout.trimRight()}, expected LLVM ${kLLVMVersion}`,
     );
     skipExit(1)
   }

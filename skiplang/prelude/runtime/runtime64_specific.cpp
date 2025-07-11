@@ -285,26 +285,6 @@ void sk_init(int pargc, char** pargv) {
   SKIP_destroy_Obstack(saved);
 }
 
-#ifdef SKIP_LIBRARY
-__attribute__((constructor)) static void lib_init() {
-  argc = 1;
-  char* argv0 = strdup("library");
-  argv = (char**)malloc(2 * sizeof(char*));
-  argv[0] = argv0;
-  argv[1] = NULL;
-  sk_init(argc, argv);
-}
-#else
-int main(int pargc, char** pargv) {
-  std::set_terminate(terminate);
-  // TODO: Make memory initialization read state.db path from the environment
-  // rather than command line arguments, and let the above constructor handle
-  // it.
-  sk_init(pargc, pargv);
-  skip_main();
-}
-#endif  // SKIP_LIBRARY
-
 static void print(FILE* descr, char* str) {
   size_t size = SKIP_String_byteSize((char*)str);
   fwrite(str, size, 1, descr);
@@ -638,3 +618,23 @@ void SKIP_js_delete_fun() {
   // Not implemented
 }
 }
+
+#ifdef SKIP_LIBRARY
+__attribute__((constructor)) static void lib_init() {
+  argc = 1;
+  char* argv0 = strdup("library");
+  argv = (char**)malloc(2 * sizeof(char*));
+  argv[0] = argv0;
+  argv[1] = NULL;
+  sk_init(argc, argv);
+}
+#else
+int main(int pargc, char** pargv) {
+  std::set_terminate(terminate);
+  // TODO: Make memory initialization read state.db path from the environment
+  // rather than command line arguments, and let the above constructor handle
+  // it.
+  sk_init(pargc, pargv);
+  skip_main();
+}
+#endif  // SKIP_LIBRARY
