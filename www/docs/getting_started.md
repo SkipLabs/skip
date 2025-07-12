@@ -22,7 +22,7 @@ The Wasm runtime works with both `node` and `bun`, but is limited to Wasm's 32-b
 The native runtime does not have this limitation, but it is currently only available for Node and is a bit more involved to install.
 
 The Wasm runtime is installed by default, but a package using Skip can choose to explicitly depend on only `@skipruntime/core`, `@skipruntime/server`, and `@skipruntime/native` to reduce weight.
-The Wasm runtime can be installed separately with `npm install @skipruntime/wasm` and the native runtime by following the [instructions](https://github.com/SkipLabs/skip/blob/main/INSTALL.md).
+The Wasm runtime can be installed separately with `npm install @skipruntime/wasm` and the native runtime by following the [instructions](https://github.com/SkipLabs/skip/blob/main/skipruntime-ts/addon/README.md#installation).
 
 ## Introduction
 

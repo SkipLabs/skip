@@ -5,18 +5,33 @@ _Either_ this package or its WebAssembly analogue
 [`@skipruntime/wasm`](https://www.npmjs.com/package/@skipruntime/wasm) is
 required to run a Skip reactive service.
 
-See the [docs](https://skiplabs.io/docs) for more details.
+See the [docs](https://skiplabs.io/docs/getting_started#installation) for more details.
 
 ## Installation
 
-Install directly using npm (`npm i @skipruntime/native`)
+Installing the native add-on version of the Skip runtime is done in two steps:
+1. Install the `libskipruntime` native library; and then
+2. Install the `@skipruntime/native` npm package.
+The versions of the two *must* match.
 
-Note that, if this package is installed alongside the
-[`@skiplabs/skip`](https://www.npmjs.com/package/@skiplabs/skip) meta-package,
-you will pull in both this native add-on _and_ the WebAssembly
-[runtime](https://www.npmjs.com/package/@skipruntime/wasm); if a minimal
-installation is required, then specify exactly the component packages that you
-need and avoid `@skiplabs/skip`.
+Installation can be performed by executing:
+```bash
+   npm install @skipruntime/core --ignore-scripts \
+&& VERSION=$(npm list @skipruntime/core --depth=0 | grep @skipruntime/core | sed 's/.*@//') \
+&& curl --fail --silent --show-error --location \
+     https://raw.githubusercontent.com/skiplabs/skip/refs/tags/v${VERSION}/bin/install_runtime.sh \
+ | bash - \
+&& npm install @skipruntime/native
+```
+This command first installs `@skipruntime/core` and then queries its version to determine the correct version of the runtime to install, but any mechanism that ensures the versions match will suffice.
+If the versions of the npm package and binary runtime do not match, `npm install @skipruntime/native` will fail with an error such as:
+```
+npm error /usr/bin/ld: cannot find -lskipruntime-1.0.0: No such file or directory
+```
+
+It may be helpful to consult the small [Dockerfile](https://github.com/skiplabs/skip/blob/main/skipruntime-ts/tests/native_addon/Dockerfile) that installs the native node addon and runs a trivial Skip service.
+
+Note that, if this package is installed alongside the [`@skiplabs/skip`](https://www.npmjs.com/package/@skiplabs/skip) meta-package, you will pull in both this native add-on _and_ the WebAssembly [runtime](https://www.npmjs.com/package/@skipruntime/wasm); if a minimal installation is required, then specify exactly the component packages that you need and avoid `@skiplabs/skip`.
 
 ## Support
 
