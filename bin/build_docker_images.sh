@@ -16,6 +16,10 @@ fi
 
 cd "$REPO"
 
+git submodule foreach \
+  "[ \"\$(git rev-parse HEAD)\" = \"\$sha1\" ] || \
+   (echo \"Submodule \$name needs update\" && exit 1)"
+
 git clean -xd --dry-run | sed 's|Would remove |/|g' >> .dockerignore
 echo ".git" >> .dockerignore
 
