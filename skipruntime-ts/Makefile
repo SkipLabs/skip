@@ -1,14 +1,15 @@
 SHELL := /bin/bash
 
 SKARGO_PROFILE?=release
-NPM_WORKSPACES=$(shell jq --raw-output "[.workspaces[] | select((startswith(\"sql\") or contains(\"examples\")) | not)] | map(\"-w \" + .) | .[]" ../package.json)
+# For pnpm, use filter patterns instead of individual -w flags
+PNPM_SKIPRUNTIME_FILTER=--filter="skipruntime-ts/*" --filter="skiplang/*/ts/*" --filter="eslint-config" --filter="tsconfig"
 SKIPRUNTIME?=$(realpath $(CURDIR)/..)/build/skipruntime
 
 export SKIPRUNTIME
 
 .PHONY: install
 install:
-	../bin/cd_sh .. "pnpm install $(NPM_WORKSPACES)"
+	../bin/cd_sh .. "pnpm install $(PNPM_SKIPRUNTIME_FILTER)"
 
 .PHONY: install-all
 install-all:
@@ -16,7 +17,7 @@ install-all:
 
 .PHONY: build
 build:
-	../bin/cd_sh .. "pnpm run build $(NPM_WORKSPACES) --if-present"
+	../bin/cd_sh .. "pnpm run build $(PNPM_SKIPRUNTIME_FILTER) --if-present"
 
 bunrun-%: build
 	bun run examples/$*.ts
@@ -51,7 +52,7 @@ test: install build run-test
 
 .PHONY: build-examples
 build-examples: build
-	../bin/cd_sh examples "pnpm run build -w skipruntime-examples"
+	../bin/cd_sh examples "pnpm run build --filter=skipruntime-examples"
 
 test-example-%:
 	../bin/cd_sh tests/examples "./$*.sh /tmp/$*.out /tmp/$*.err"
