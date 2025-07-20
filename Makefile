@@ -20,15 +20,9 @@ export SKIPRUNTIME
 ################################################################################
 
 .PHONY: npm
-npm: $(SKDB_WASM) build/package/skdb build/package/package.json
-	cd build/package && npm install
+npm:
+	npm install && npm run build
 
-build/package/package.json:
-	@echo "{" > build/package/package.json
-	@echo "  \"dependencies\": {" >> build/package/package.json
-	@echo "      \"skdb\": \"file:skdb\"" >> build/package/package.json
-	@echo "  }" >> build/package/package.json
-	@echo "}" >> build/package/package.json
 
 sql/target/wasm32-unknown-unknown/dev/skdb.wasm: sql/src/*
 	cd sql && skargo build --target wasm32-unknown-unknown --bin skdb
