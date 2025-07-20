@@ -9,18 +9,18 @@ export SKIPRUNTIME
 
 .PHONY: check-src
 check-src: build
-	../bin/cd_sh .. "pnpm run lint -w skdb"
+	../bin/cd_sh .. "pnpm run lint --filter=skdb"
 
 .PHONY: check-tests
 check-tests: build
-	../bin/cd_sh .. "pnpm run lint -w skdb-tests"
+	../bin/cd_sh .. "pnpm run lint --filter=skdb-tests"
 
 .PHONY: check-all
 check-all: check-src check-tests
 
 .PHONY: build
 build:
-	../bin/cd_sh .. "pnpm install && pnpm run build -w skdb -w skdb-tests"
+	../bin/cd_sh .. "pnpm install && pnpm run build --filter=skdb --filter=skdb-tests"
 
 .PHONY: clean
 clean:
