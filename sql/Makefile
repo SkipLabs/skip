@@ -20,7 +20,7 @@ check-all: check-src check-tests
 
 .PHONY: build
 build:
-	../bin/cd_sh .. "pnpm install && pnpm run build --filter=skdb --filter=skdb-tests"
+	../bin/cd_sh .. "pnpm install && pnpm --filter=skdb --filter=skdb-tests run build"
 
 .PHONY: clean
 clean:
