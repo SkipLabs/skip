@@ -8,15 +8,15 @@ export SKIPRUNTIME
 
 .PHONY: install
 install:
-	../bin/cd_sh .. "npm install $(NPM_WORKSPACES)"
+	../bin/cd_sh .. "pnpm install $(NPM_WORKSPACES)"
 
 .PHONY: install-all
 install-all:
-	../bin/cd_sh .. "npm install"
+	../bin/cd_sh .. "pnpm install"
 
 .PHONY: build
 build:
-	../bin/cd_sh .. "npm run build $(NPM_WORKSPACES) --if-present"
+	../bin/cd_sh .. "pnpm run build $(NPM_WORKSPACES) --if-present"
 
 bunrun-%: build
 	bun run examples/$*.ts
@@ -44,14 +44,14 @@ clean:
 
 .PHONY: run-test
 run-test:
-	../bin/cd_sh tests "npm run test"
+	../bin/cd_sh tests "pnpm run test"
 
 .PHONY: test
 test: install build run-test
 
 .PHONY: build-examples
 build-examples: build
-	../bin/cd_sh examples "npm run build -w skipruntime-examples"
+	../bin/cd_sh examples "pnpm run build -w skipruntime-examples"
 
 test-example-%:
 	../bin/cd_sh tests/examples "./$*.sh /tmp/$*.out /tmp/$*.err"

@@ -54,8 +54,11 @@ jobs:
       - custom-checkout:
           submodules: true
       - run:
+          name: Install pnpm
+          command: npm install -g pnpm
+      - run:
           name: Typecheck and lint typescript sources
-          command: SKIPRUNTIME=$(pwd)/build/skipruntime npm install && npm run build && npm run lint
+          command: SKIPRUNTIME=$(pwd)/build/skipruntime pnpm install && pnpm run build && pnpm run lint
 
   compiler:
     docker:
@@ -91,6 +94,9 @@ jobs:
     steps:
       - custom-checkout:
           submodules: true
+      - run:
+          name: Install pnpm
+          command: npm install -g pnpm
       - run:
           name: Run wasm skdb tests
           no_output_timeout: 15m
@@ -155,6 +161,9 @@ jobs:
     steps:
       - custom-checkout:
           submodules: true
+      - run:
+          name: Install pnpm
+          command: npm install -g pnpm
       - run:
           name: Run wasm skip runtime tests
           no_output_timeout: 10m

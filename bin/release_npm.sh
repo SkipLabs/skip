@@ -14,9 +14,9 @@ fi
 
 cd "$(dirname "$2")"
 
-npm run build --if-present
+pnpm run build --if-present
 
-npm run test --if-present
+pnpm run test --if-present
 
 if [[ "$3" =~ ^([0-9]{6})$ ]];
 then

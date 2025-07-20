@@ -12,5 +12,5 @@ DIRS=$( jq --raw-output ".workspaces[]" package.json )
 
 for dir in $DIRS
 do
-    "$SCRIPT_DIR"/cd_sh "$dir" "npm run build --if-present && npm run lint --if-present"
+    "$SCRIPT_DIR"/cd_sh "$dir" "pnpm run build --if-present && pnpm run lint --if-present"
 done

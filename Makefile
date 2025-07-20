@@ -2,7 +2,7 @@
 # various build systems
 
 .PHONY: all
-all: npm build/skdb build/init.sql
+all: pnpm build/skdb build/init.sql
 
 PRETTIER_LOG_LEVEL?=warn
 
@@ -19,9 +19,9 @@ export SKIPRUNTIME
 # skdb wasm + js client
 ################################################################################
 
-.PHONY: npm
-npm:
-	npm install && npm run build
+.PHONY: pnpm
+pnpm:
+	pnpm install && pnpm build
 
 
 sql/target/wasm32-unknown-unknown/dev/skdb.wasm: sql/src/*
@@ -70,7 +70,7 @@ check:
 
 .PHONY: check-ts
 check-ts:
-	npm install
+	pnpm install
 	bin/check-ts.sh
 
 .PHONY: check-sh
@@ -84,7 +84,7 @@ check-sh:
 clean:
 	rm -Rf build
 	find . -name 'Skargo.toml' -print0 | sed 's|Skargo.toml|target|g' | xargs -0 rm -rf
-	npm run clean
+	pnpm clean
 
 .PHONY: clean-all
 clean-all: clean
@@ -119,23 +119,23 @@ check-fmt:
 # regenerate api docs served by docs-run from ts sources
 .PHONY: docs
 docs:
-	npm install && npm run build
-	cd www && rm -rf docs/api && npm install && npx docusaurus generate-typedoc
+	pnpm install && pnpm build
+	cd www && rm -rf docs/api && pnpm install && npx docusaurus generate-typedoc
 
 # run the docs site locally at http://localhost:3000
 .PHONY: docs-run
 docs-run: # depends on docs, but can't be tracked reliably
-	cd www && npm run start
+	cd www && pnpm start
 
 # generate the docs site as static files
 .PHONY: docs-build
 docs-build: docs
-	cd www && rm -rf build && npm run build
+	cd www && rm -rf build && pnpm build
 
 # run the static docs site locally
 .PHONY: docs-serve
 docs-serve: # depends on docs-build, but can't be tracked reliably
-	cd www && npm run serve
+	cd www && pnpm serve
 
 # update the static docs site repo
 .PHONY: docs-publish
@@ -223,18 +223,18 @@ build/index.html: sql/js/index.html
 	cp $^ $@
 
 .PHONY: check-vite
-check-vite: npm
+check-vite: pnpm
 	rm -rf build/vitejs
 	cp -r sql/ts/vitejs build/vitejs
-	cd build/vitejs && npm install;
+	cd build/vitejs && pnpm install;
 	rm -r build/vitejs/node_modules/skdb
 	cp -r build/package/skdb build/vitejs/node_modules/
-	cd build/vitejs && npm run build
+	cd build/vitejs && pnpm build
 	cd build/vitejs && node server.js
-	cd build/vitejs && npm run dev
+	cd build/vitejs && pnpm dev
 
 .PHONY: test-bun
-test-bun: npm
+test-bun: pnpm
 	rm -rf build/bun
 	cp -r sql/ts/bun build/bun
 	cd build/bun && bun install;
