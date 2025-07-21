@@ -14,7 +14,7 @@ fi
 
 cd "$SCRIPT_DIR/../" || exit
 
-make npm
+make pnpm
 
 make test-wasm
 

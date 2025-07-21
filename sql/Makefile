@@ -9,18 +9,18 @@ export SKIPRUNTIME
 
 .PHONY: check-src
 check-src: build
-	../bin/cd_sh .. "npm run lint -w skdb"
+	../bin/cd_sh .. "pnpm run lint --filter=skdb"
 
 .PHONY: check-tests
 check-tests: build
-	../bin/cd_sh .. "npm run lint -w skdb-tests"
+	../bin/cd_sh .. "pnpm run lint --filter=skdb-tests"
 
 .PHONY: check-all
 check-all: check-src check-tests
 
 .PHONY: build
 build:
-	../bin/cd_sh .. "npm install && npm run build -w skdb -w skdb-tests"
+	../bin/cd_sh .. "pnpm install && pnpm --filter=skdb --filter=skdb-tests run build"
 
 .PHONY: clean
 clean:
@@ -29,7 +29,7 @@ clean:
 
 .PHONY: install-test
 install-test: build
-	cd ts/tests && npx playwright install
+	cd ts/tests && pnpm install && pnpm exec playwright install
 
 
 .PHONY: run-test
@@ -37,43 +37,43 @@ run-test:
 	cd ts/tests && make ROOT_DIR=${SCRIPT_DIR} -f service_common.mk
 	cd ts/tests && make ROOT_DIR=${SCRIPT_DIR} -f service_server.mk
 	cd ts/tests && make ROOT_DIR=${SCRIPT_DIR} -f service_mux.mk
-	cd ts/tests && npx playwright test --reporter=line
+	cd ts/tests && pnpm exec playwright test --reporter=line
 
 .PHONY: test
 test: install-test run-test
 
 .PHONY: test-client-node
 test-client-node: install-test
-	cd ts/tests && npx playwright test --reporter=line node.play.ts
+	cd ts/tests && pnpm exec playwright test --reporter=line node.play.ts
 
 .PHONY: test-client-browser
 test-client-browser: install-test
-	cd ts/tests && npx playwright test --reporter=line browser.play.ts
+	cd ts/tests && pnpm exec playwright test --reporter=line browser.play.ts
 
 .PHONY: test-client
 test-client: install-test
-	cd ts/tests && npx playwright test --reporter=line browser.play.ts node.play.ts
+	cd ts/tests && pnpm exec playwright test --reporter=line browser.play.ts node.play.ts
 
 .PHONY: test-server
 test-server: install-test
 	cd ts/tests && make ROOT_DIR=${SCRIPT_DIR} -f service_common.mk
 	cd ts/tests && make ROOT_DIR=${SCRIPT_DIR} -f service_server.mk
-	cd ts/tests && npx playwright test --reporter=line --timeout=60000 node.play.server.ts
+	cd ts/tests && pnpm exec playwright test --reporter=line --timeout=60000 node.play.server.ts
 
 .PHONY: test-mux-node
 test-mux-node: install-test
 	cd ts/tests && make ROOT_DIR=${SCRIPT_DIR} -f service_common.mk
 	cd ts/tests && make ROOT_DIR=${SCRIPT_DIR} -f service_mux.mk
-	cd ts/tests && npx playwright test --reporter=line node.play.mux.ts
+	cd ts/tests && pnpm exec playwright test --reporter=line node.play.mux.ts
 
 .PHONY: test-mux-browser
 test-mux-browser: install-test
 	cd ts/tests && make ROOT_DIR=${SCRIPT_DIR} -f service_common.mk
 	cd ts/tests && make ROOT_DIR=${SCRIPT_DIR} -f service_mux.mk
-	cd ts/tests && npx playwright test --reporter=line browser.play.mux.ts
+	cd ts/tests && pnpm exec playwright test --reporter=line browser.play.mux.ts
 
 .PHONY: test-mux
 test-mux: install-test
 	cd ts/tests && make ROOT_DIR=${SCRIPT_DIR} -f service_common.mk
 	cd ts/tests && make ROOT_DIR=${SCRIPT_DIR} -f service_mux.mk
-	cd ts/tests && npx playwright test --reporter=line browser.play.mux.ts node.play.mux.ts
+	cd ts/tests && pnpm exec playwright test --reporter=line browser.play.mux.ts node.play.mux.ts
