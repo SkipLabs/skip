@@ -22,7 +22,8 @@ void InitToBinding(const v8::FunctionCallbackInfo<v8::Value>& args) {
   skipruntime::SetFromJSBinding(isolate, binding);
 }
 
-void Initialize(v8::Local<v8::Object> exports) {
+void Initialize(v8::Local<v8::Object> exports, v8::Local<v8::Value> module,
+                void* context) {
   NODE_SET_METHOD(exports, "runWithGC", skbinding::RunWithGC);
   NODE_SET_METHOD(exports, "getErrorObject", skbinding::GetErrorObject);
   NODE_SET_METHOD(exports, "getJsonBinding", skjson::GetBinding);

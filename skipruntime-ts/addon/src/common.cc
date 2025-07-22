@@ -138,7 +138,8 @@ void SKTryCatchVoid(Isolate* isolate, Local<Function> fn, Local<Value> recv,
                     std::function<void(Isolate*)> failure) {
   Local<Context> context = isolate->GetCurrentContext();
   TryCatch tryCatch(isolate);
-  (void)fn->Call(context, recv, argc, argv);
+  auto result = fn->Call(context, recv, argc, argv);
+  (void)result;
   if (!tryCatch.HasCaught()) {
     success(isolate);
   } else {
