@@ -231,6 +231,9 @@ export interface FromBinding {
 
   // closeClose
   SkipRuntime_closeService(): Pointer<Internal.CJSON>;
+  SkipRuntime_invalidateCollections(
+    collections: Pointer<Internal.CJArray<Internal.CJSON>>,
+  ): Handle<Error>;
 
   // Context
 
