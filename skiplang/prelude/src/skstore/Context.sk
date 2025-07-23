@@ -597,34 +597,33 @@ mutable class Context private {
   /*****************************************************************************/
   mutable fun updateDirtyReaders(path: Path): void {
     for (reader in this.getDeps(path)) {
-      child = this.unsafeMaybeGetDir(reader.childName) match {
-      | None() -> continue
-      | Some(x) -> x
-      };
-      parent = this.unsafeMaybeGetDir(reader.parentName) match {
-      | None() -> continue
-      | Some(x) -> x
-      };
-      this.!dirtyReaders[reader.parentName] = {
-        map = this.dirtyReaders.maybeGet(reader.parentName).default(
-          SortedMap[],
-        );
-        map.set(
-          reader.childName,
-          parent.addReaderKeyToKeySetOpt(
-            reader,
-            map.maybeGet(reader.childName),
-          ),
-        )
-      };
-      time = if (reader.parentName == reader.childName) {
-        -child.getTimeStack()
-      } else {
-        child.getTimeStack()
-      };
-      arrow = Arrow(reader.parentName, reader.childName);
-      this.addToUpdate(time, parent.getTime(), arrow);
+      this.updateDirtyReader(reader)
     };
+  }
+
+  mutable fun updateDirtyReader(reader: ArrowKey): void {
+    child = this.unsafeMaybeGetDir(reader.childName) match {
+    | None() -> return void
+    | Some(x) -> x
+    };
+    parent = this.unsafeMaybeGetDir(reader.parentName) match {
+    | None() -> return void
+    | Some(x) -> x
+    };
+    this.!dirtyReaders[reader.parentName] = {
+      map = this.dirtyReaders.maybeGet(reader.parentName).default(SortedMap[]);
+      map.set(
+        reader.childName,
+        parent.addReaderKeyToKeySetOpt(reader, map.maybeGet(reader.childName)),
+      )
+    };
+    time = if (reader.parentName == reader.childName) {
+      -child.getTimeStack()
+    } else {
+      child.getTimeStack()
+    };
+    arrow = Arrow(reader.parentName, reader.childName);
+    this.addToUpdate(time, parent.getTime(), arrow);
   }
 
   private mutable fun checkPostponables(): Bool {
