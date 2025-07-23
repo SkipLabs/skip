@@ -17,6 +17,7 @@ import type {
   NamedCollections,
   SubscriptionID,
   Nullable,
+  Reducer,
 } from "@skipruntime/core";
 
 import { Count, Sum } from "@skipruntime/helpers";
@@ -381,6 +382,34 @@ class MapReduceResource implements Resource<Input_NN> {
 const mapReduceService: SkipService<Input_NN, Input_NN> = {
   initialData: { input: [] },
   resources: { mapReduce: MapReduceResource },
+
+  createGraph(inputCollections: Input_NN) {
+    return inputCollections;
+  },
+};
+
+//// testUserMapReduce
+class UserSum implements Reducer<number, number> {
+  initial = 0;
+
+  add(accum: Nullable<number>, value: number): number {
+    return (accum ?? 0) + value;
+  }
+
+  remove(accum: number, value: number): Nullable<number> {
+    return accum - value;
+  }
+}
+
+class UserMapReduceResource implements Resource<Input_NN> {
+  instantiate(cs: Input_NN): EagerCollection<number, number> {
+    return cs.input.mapReduce(TestOddEven)(UserSum);
+  }
+}
+
+const userMapReduceService: SkipService<Input_NN, Input_NN> = {
+  initialData: { input: [] },
+  resources: { userMapReduce: UserMapReduceResource },
 
   createGraph(inputCollections: Input_NN) {
     return inputCollections;
@@ -1200,6 +1229,39 @@ export function initTests(
   it("testMapReduce", async () => {
     const service = await initService(mapReduceService);
     const resource = "mapReduce";
+    await service.update("input", [
+      [0, [1]],
+      [1, [1]],
+      [2, [1]],
+    ]);
+    expect(await service.getAll(resource)).toEqual([
+      [0, [2]],
+      [1, [1]],
+    ]);
+    await service.update("input", [[3, [2]]]);
+    expect(await service.getAll(resource)).toEqual([
+      [0, [2]],
+      [1, [3]],
+    ]);
+    await service.update("input", [
+      [0, [2]],
+      [1, [2]],
+    ]);
+    expect(await service.getAll(resource)).toEqual([
+      [0, [3]],
+      [1, [4]],
+    ]);
+
+    await service.update("input", [[3, []]]);
+    expect(await service.getAll(resource)).toEqual([
+      [0, [3]],
+      [1, [2]],
+    ]);
+  });
+
+  it("testUserMapReduce", async () => {
+    const service = await initService(userMapReduceService);
+    const resource = "userMapReduce";
     await service.update("input", [
       [0, [1]],
       [1, [1]],
