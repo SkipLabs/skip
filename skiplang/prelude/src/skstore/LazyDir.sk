@@ -136,6 +136,16 @@ class TLazyDir{
     context.setDir(this);
   }
 
+  fun invalidate(context: mutable Context): void {
+    data = this.data;
+    this.keys().each(key -> {
+      !data[key] = LAbsent();
+      path = Path::create(this.dirName, key);
+      context.updateDirtyReaders(path);
+    });
+    context.setDir(this with {data});
+  }
+
   protected fun doGet(context: mutable Context, key: Key): LazyResult<File> {
     dirName = this.dirName;
 

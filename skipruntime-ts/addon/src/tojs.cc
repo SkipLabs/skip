@@ -42,6 +42,7 @@ SKReducer SkipRuntime_createReducer(int32_t ref, CJSON json);
 
 double SkipRuntime_initService(SKService service, SKExecutor executor);
 CJSON SkipRuntime_closeService();
+double SkipRuntime_invalidateCollections(CJArray collections);
 
 CJArray SkipRuntime_Collection__getArray(char* collection, CJSON key);
 char* SkipRuntime_Collection__map(char* collection, SKMapper mapper);
@@ -579,6 +580,27 @@ void CloseService(const FunctionCallbackInfo<Value>& args) {
   });
 }
 
+void InvalidateCollections(const FunctionCallbackInfo<Value>& args) {
+  Isolate* isolate = args.GetIsolate();
+  if (args.Length() != 1) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(
+        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
+    return;
+  }
+  if (!args[0]->IsExternal()) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(Exception::TypeError(
+        FromUtf8(isolate, "The first parameter must be a pointer.")));
+    return;
+  }
+  NatTryCatch(isolate, [&args](Isolate* isolate) {
+    CJArray skcollections = args[0].As<External>()->Value();
+    double skresult = SkipRuntime_invalidateCollections(skcollections);
+    args.GetReturnValue().Set(Number::New(isolate, skresult));
+  });
+}
+
 void GetArrayOfEagerCollection(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
   if (args.Length() != 2) {
@@ -596,7 +618,7 @@ void GetArrayOfEagerCollection(const FunctionCallbackInfo<Value>& args) {
   if (!args[1]->IsExternal()) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a pointer.")));
+        FromUtf8(isolate, "The second parameter must be a pointer.")));
     return;
   }
   NatTryCatch(isolate, [&args](Isolate* isolate) {
@@ -1120,6 +1142,8 @@ void GetToJSBinding(const FunctionCallbackInfo<Value>& args) {
   //
   AddFunction(isolate, binding, "SkipRuntime_initService", InitService);
   AddFunction(isolate, binding, "SkipRuntime_closeService", CloseService);
+  AddFunction(isolate, binding, "SkipRuntime_invalidateCollections",
+              InvalidateCollections);
   //
   AddFunction(isolate, binding, "SkipRuntime_Collection__getArray",
               GetArrayOfEagerCollection);

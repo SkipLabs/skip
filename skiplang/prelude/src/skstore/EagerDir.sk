@@ -397,6 +397,10 @@ class DataMapValue{
     | Some(x) -> Some(x.i1)
     }
   }
+
+  fun sources(): Array<Path> {
+    this.map.keys().collect(Array)
+  }
 }
 
 class DataMap<K: Orderable> private {
@@ -2291,6 +2295,29 @@ class TEagerDir extends EagerDir, TDir {
         static::addChildToParent(context, parentName, childName, rangeOpt);
       }
     };
+  }
+
+  fun invalidate(context: mutable Context): void {
+    parents = SortedSet::createFromIterator(
+      this.parents.items().map(v -> v.i0),
+    );
+    this.keys().each(key -> {
+      sources = this.data.maybeGet(key) match {
+      | None() -> this.fixedData.data.getIter(key).map(v -> v.i1).collect(Array)
+      | Some(modified) -> modified.sources()
+      };
+      for (source in sources) {
+        if (parents.contains(source.dirName)) {
+          context.updateDirtyReader(
+            TArrowKey::create{
+              parentName => source.dirName,
+              childName => this.dirName,
+              key => source.baseName,
+            },
+          )
+        }
+      }
+    });
   }
 }
 

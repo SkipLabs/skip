@@ -64,15 +64,26 @@ export type HandlerInfo<P> = {
   object: P;
   name: string;
   params: DepSafe[];
+  what: string;
 };
 
 function instantiateUserObject<Params extends DepSafe[], Result extends object>(
   what: string,
   ctor: new (...params: Params) => Result,
   params: Params,
+  ctors: (name: string) => (new (...params: Params) => Result) | undefined = (
+    _name,
+  ) => undefined,
 ): HandlerInfo<Result> {
+  if (!("name" in ctor)) {
+    throw new SkipClassNameError(
+      `${what} classes must be defined at top-level.`,
+    );
+  }
+  const altctor = ctors(ctor.name);
+  const fctor = altctor ?? ctor;
   const checkedParams = params.map(checkOrCloneParam) as Params;
-  const obj = new ctor(...checkedParams);
+  const obj = new fctor(...checkedParams);
   Object.freeze(obj);
   if (!obj.constructor.name) {
     throw new SkipClassNameError(
@@ -83,6 +94,7 @@ function instantiateUserObject<Params extends DepSafe[], Result extends object>(
     object: obj,
     name: obj.constructor.name,
     params: checkedParams,
+    what,
   };
 }
 
@@ -90,7 +102,10 @@ class Handles {
   private nextID: number = 1;
   private readonly objects: any[] = [];
   private readonly freeIDs: number[] = [];
+  /** Index to get all mapper handles from a class name */
   private readonly links = new Map<string, Map<number, string>>();
+  /** To access to a replaced constructor from a class name */
+  private readonly ctors = new Map<string, any>();
 
   register<T>(v: T): Handle<T> {
     const freeID = this.freeIDs.pop();
@@ -117,7 +132,8 @@ class Handles {
       typeof current == "object" &&
       "object" in current &&
       "name" in current &&
-      "params" in current
+      "params" in current &&
+      "what" in current
     ) {
       const name = current.name as string;
       const map = this.links.get(name);
@@ -131,6 +147,10 @@ class Handles {
     return current;
   }
 
+  replace<T>(id: Handle<T>, v: T): void {
+    this.objects[id] = v;
+  }
+
   registerLink<T>(name: string, ref: string, handle: Handle<T>): void {
     let map = this.links.get(name);
     if (!map) {
@@ -138,6 +158,25 @@ class Handles {
       this.links.set(name, map);
     }
     map.set(handle, ref);
+  }
+
+  getLinks(name: string): Nullable<Map<number, string>> {
+    return this.links.get(name) ?? null;
+  }
+
+  registerConstructor<Params extends DepSafe[], Result extends object>(
+    name: string,
+    ctor: new (...params: Params) => Result,
+  ): void {
+    this.ctors.set(name, ctor);
+  }
+
+  getConstructor<Params extends DepSafe[], Result extends object>(
+    name: string,
+  ): (new (...params: Params) => Result) | undefined {
+    const ctor = this.ctors.get(name);
+    if (ctor) return ctor as new (...params: Params) => Result;
+    return undefined;
   }
 }
 
@@ -269,7 +308,9 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
     ...params: Params
   ): EagerCollection<K2, V2> {
-    const mapperObj = instantiateUserObject("Mapper", mapper, params);
+    const mapperObj = instantiateUserObject("Mapper", mapper, params, (name) =>
+      this.refs.handles.getConstructor(name),
+    );
     const mapperHdl = this.refs.handles.register(mapperObj);
     const skmapper = this.refs.binding.SkipRuntime_createMapper(mapperHdl);
     const mapped = this.refs.binding.SkipRuntime_Collection__map(
@@ -288,11 +329,17 @@ class EagerCollectionImpl<K extends Json, V extends Json>
       reducer: new (...params: ReducerParams) => Reducer<V2, Accum>,
       ...reducerParams: ReducerParams
     ) => {
-      const mapperObj = instantiateUserObject("Mapper", mapper, mapperParams);
+      const mapperObj = instantiateUserObject(
+        "Mapper",
+        mapper,
+        mapperParams,
+        (name) => this.refs.handles.getConstructor(name),
+      );
       const reducerObj = instantiateUserObject(
         "Reducer",
         reducer,
         reducerParams,
+        (name) => this.refs.handles.getConstructor(name),
       );
       const mapperHdl = this.refs.handles.register(mapperObj);
       const skmapper = this.refs.binding.SkipRuntime_createMapper(mapperHdl);
@@ -330,7 +377,12 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     reducer: new (...params: Params) => Reducer<V, Accum>,
     ...params: Params
   ): EagerCollection<K, Accum> {
-    const reducerObj = instantiateUserObject("Reducer", reducer, params);
+    const reducerObj = instantiateUserObject(
+      "Reducer",
+      reducer,
+      params,
+      (name) => this.refs.handles.getConstructor(name),
+    );
     if (
       sknative in reducerObj.object &&
       typeof reducerObj.object[sknative] == "string"
@@ -455,7 +507,12 @@ class ContextImpl implements Context {
     compute: new (...params: Params) => LazyCompute<K, V>,
     ...params: Params
   ): LazyCollection<K, V> {
-    const computeObj = instantiateUserObject("LazyCompute", compute, params);
+    const computeObj = instantiateUserObject(
+      "LazyCompute",
+      compute,
+      params,
+      (name) => this.refs.handles.getConstructor(name),
+    );
     const skcompute = this.refs.binding.SkipRuntime_createLazyCompute(
       this.refs.handles.register(computeObj),
     );
@@ -721,6 +778,86 @@ export class ServiceInstance {
       const errorHdl = result as Handle<Error>;
       return Promise.reject(this.refs.handles.deleteHandle(errorHdl));
     }
+  }
+
+  reload(ctors: (new (...args: any[]) => any)[]) {
+    const collections = new Set<string>();
+    for (const ctor of ctors) {
+      if (!("name" in ctor)) continue;
+      this.refs.handles.registerConstructor(ctor.name, ctor);
+      if (
+        this.instanceOfMapper(ctor) ||
+        this.instanceOfReducer(ctor) ||
+        this.instanceOfLazyCompute(ctor)
+      ) {
+        const links = this.refs.handles.getLinks(ctor.name);
+        if (!links) continue;
+        for (const [handle, collection] of links.entries()) {
+          collections.add(collection);
+          const info = this.refs.handles.get<unknown>(
+            handle as Handle<unknown>,
+          );
+          if (
+            info &&
+            typeof info == "object" &&
+            "object" in info &&
+            "name" in info &&
+            "params" in info &&
+            "what" in info
+          ) {
+            const newObj = instantiateUserObject(
+              info.what as string,
+              ctor,
+              info.params as DepSafe[],
+            );
+            this.refs.handles.replace(
+              handle as Handle<HandlerInfo<object>>,
+              newObj,
+            );
+          } else {
+            throw new Error("Only mappers en reducers can be replaced");
+          }
+        }
+      }
+    }
+    if (collections.size > 0) {
+      const errorHdl = this.refs.runWithGC(() => {
+        const skcollections = this.refs.skjson.exportJSON(
+          Array.from(collections),
+        );
+        return this.refs.binding.SkipRuntime_invalidateCollections(
+          skcollections,
+        );
+      });
+      if (errorHdl) throw this.refs.handles.deleteHandle(errorHdl);
+    }
+  }
+
+  private validateInstance(
+    constructor: new (...args: any[]) => any,
+    requiredMethods: string[],
+  ): boolean {
+    const prototype = constructor.prototype;
+
+    for (const method of requiredMethods) {
+      if (typeof prototype[method] !== "function") {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  private instanceOfMapper(constructor: new (...args: any[]) => any) {
+    return this.validateInstance(constructor, ["mapEntry"]);
+  }
+
+  private instanceOfReducer(constructor: new (...args: any[]) => any) {
+    return this.validateInstance(constructor, ["add", "remove"]);
+  }
+
+  private instanceOfLazyCompute(constructor: new (...args: any[]) => any) {
+    return this.validateInstance(constructor, ["compute"]);
   }
 }
 

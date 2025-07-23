@@ -448,6 +448,21 @@ fun closeService(): Result<Array<Float>, .Exception> {
   SKStore.runWithResult(ctx ~> closeService_(ctx))
 }
 
+fun invalidateCollections(
+  jsonCollections: SKJSON.CJArray,
+): Result<void, .Exception> {
+  SKStore.runWithResult(context ~> {
+    collections = SKJSON.expectArray(jsonCollections).map(SKJSON.asString);
+    collections.each(collection -> {
+      context.maybeGetDir(SKStore.DirName::create(collection)) match {
+      | Some(dir) -> dir.invalidate(context)
+      | _ -> void
+      }
+    });
+    updateContext(context);
+  })
+}
+
 class LinkToResource(
   supplier: ExternalService,
   instance: String,
