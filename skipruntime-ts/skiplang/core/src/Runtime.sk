@@ -52,6 +52,10 @@ class ConvReducer(
     JSONFile::type
   }
 
+  fun init(): JSONFile {
+    JSONFile(this.reducer.init());
+  }
+
   fun add(acc: JSONFile, value: JSONFile): JSONFile {
     JSONFile(this.reducer.add(acc.json, value.json));
   }
@@ -732,7 +736,7 @@ class Collection(hdl: SKStore.EHandle<JSONID, JSONFile>) {
         context,
         dirName,
         mapper,
-        accReducer(ConvReducer(reducer, JSONFile(reducer.initial))),
+        accReducer(ConvReducer(reducer)),
       );
       Collection(hdl)
     | _ -> invariant_violation("Store context must be specified.")

@@ -992,6 +992,14 @@ export class ToBinding {
 
   // Reducer
 
+  SkipRuntime_Reducer__init(
+    skreducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
+  ): Pointer<Internal.CJSON> {
+    const skjson = this.getJsonConverter();
+    const reducer = this.handles.get(skreducer);
+    return skjson.exportJSON(reducer.object.initial);
+  }
+
   SkipRuntime_Reducer__add(
     skreducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
     skacc: Nullable<Pointer<Internal.CJSON>>,

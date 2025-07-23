@@ -528,13 +528,17 @@ native fun removeOfReducer(
   value: SKJSON.CJSON,
 ): ?SKJSON.CJSON;
 
+@cpp_extern("SkipRuntime_Reducer__init")
+@debug
+native fun initOfReducer(reducer: UInt32): SKJSON.CJSON;
+
 @cpp_extern("SkipRuntime_deleteReducer")
 @debug
 native fun deleteReducer(reducer: UInt32): void;
 
 @export("SkipRuntime_createReducer")
-fun createReducer(reducer: UInt32, initial: SKJSON.CJSON): JSONReducer {
-  JSONReducer(SKStore.ExternalPointer::create(reducer, deleteReducer), initial)
+fun createReducer(reducer: UInt32): JSONReducer {
+  JSONReducer(SKStore.ExternalPointer::create(reducer, deleteReducer))
 }
 
 class JSONReducer(
@@ -542,6 +546,10 @@ class JSONReducer(
 ) extends Reducer<SKJSON.CJSON, SKJSON.CJSON> {
   fun getType(): SKStore.File ~> SKJSON.CJSON {
     f ~> JSONFile::type(f).json
+  }
+
+  fun init(): SKJSON.CJSON {
+    initOfReducer(this.eptr.value)
   }
 
   fun add(acc: SKJSON.CJSON, value: SKJSON.CJSON): SKJSON.CJSON {
