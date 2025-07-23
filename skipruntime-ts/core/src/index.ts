@@ -90,6 +90,7 @@ class Handles {
   private nextID: number = 1;
   private readonly objects: any[] = [];
   private readonly freeIDs: number[] = [];
+  private readonly links = new Map<string, Map<number, string>>();
 
   register<T>(v: T): Handle<T> {
     const freeID = this.freeIDs.pop();
@@ -111,7 +112,32 @@ class Handles {
     const current = this.get(id);
     this.objects[id] = null;
     this.freeIDs.push(id);
+    if (
+      current &&
+      typeof current == "object" &&
+      "object" in current &&
+      "name" in current &&
+      "params" in current
+    ) {
+      const name = current.name as string;
+      const map = this.links.get(name);
+      if (map) {
+        map.delete(id);
+        if (map.size == 0) {
+          this.links.delete(name);
+        }
+      }
+    }
     return current;
+  }
+
+  registerLink<T>(name: string, ref: string, handle: Handle<T>): void {
+    let map = this.links.get(name);
+    if (!map) {
+      map = new Map();
+      this.links.set(name, map);
+    }
+    map.set(handle, ref);
   }
 }
 
@@ -244,13 +270,13 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     ...params: Params
   ): EagerCollection<K2, V2> {
     const mapperObj = instantiateUserObject("Mapper", mapper, params);
-    const skmapper = this.refs.binding.SkipRuntime_createMapper(
-      this.refs.handles.register(mapperObj),
-    );
+    const mapperHdl = this.refs.handles.register(mapperObj);
+    const skmapper = this.refs.binding.SkipRuntime_createMapper(mapperHdl);
     const mapped = this.refs.binding.SkipRuntime_Collection__map(
       this.collection,
       skmapper,
     );
+    this.refs.handles.registerLink(mapperObj.name, mapped, mapperHdl);
     return this.derive<K2, V2>(mapped);
   }
 
@@ -268,34 +294,34 @@ class EagerCollectionImpl<K extends Json, V extends Json>
         reducer,
         reducerParams,
       );
-
-      const skmapper = this.refs.binding.SkipRuntime_createMapper(
-        this.refs.handles.register(mapperObj),
-      );
-
+      const mapperHdl = this.refs.handles.register(mapperObj);
+      const skmapper = this.refs.binding.SkipRuntime_createMapper(mapperHdl);
       if (
         sknative in reducerObj.object &&
         typeof reducerObj.object[sknative] == "string"
       ) {
-        return this.derive<K2, Accum>(
+        const mapped =
           this.refs.binding.SkipRuntime_Collection__nativeMapReduce(
             this.collection,
             skmapper,
             reducerObj.object[sknative],
-          ),
-        );
+          );
+        this.refs.handles.registerLink(mapperObj.name, mapped, mapperHdl);
+        return this.derive<K2, Accum>(mapped);
       } else {
+        const reducerHdl = this.refs.handles.register(reducerObj);
         const skreducer = this.refs.binding.SkipRuntime_createReducer(
-          this.refs.handles.register(reducerObj),
+          reducerHdl,
           this.refs.skjson.exportJSON(reducerObj.object.initial),
         );
-        return this.derive<K2, Accum>(
-          this.refs.binding.SkipRuntime_Collection__mapReduce(
-            this.collection,
-            skmapper,
-            skreducer,
-          ),
+        const mapped = this.refs.binding.SkipRuntime_Collection__mapReduce(
+          this.collection,
+          skmapper,
+          skreducer,
         );
+        this.refs.handles.registerLink(mapperObj.name, mapped, mapperHdl);
+        this.refs.handles.registerLink(reducerObj.name, mapped, reducerHdl);
+        return this.derive<K2, Accum>(mapped);
       }
     };
   }
@@ -316,16 +342,17 @@ class EagerCollectionImpl<K extends Json, V extends Json>
         ),
       );
     } else {
+      const reducerHdl = this.refs.handles.register(reducerObj);
       const skreducer = this.refs.binding.SkipRuntime_createReducer(
-        this.refs.handles.register(reducerObj),
+        reducerHdl,
         this.refs.skjson.exportJSON(reducerObj.object.initial),
       );
-      return this.derive<K, Accum>(
-        this.refs.binding.SkipRuntime_Collection__reduce(
-          this.collection,
-          skreducer,
-        ),
+      const mapped = this.refs.binding.SkipRuntime_Collection__reduce(
+        this.collection,
+        skreducer,
       );
+      this.refs.handles.registerLink(reducerObj.name, mapped, reducerHdl);
+      return this.derive<K, Accum>(mapped);
     }
   }
 
