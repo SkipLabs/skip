@@ -364,6 +364,10 @@ interface ToWasm {
 
   // Reducer
 
+  SkipRuntime_Reducer__init(
+    reducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
+  ): ptr<Internal.CJSON>;
+
   SkipRuntime_Reducer__add(
     reducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
     acc: ptr<Internal.CJSON>,
@@ -950,6 +954,10 @@ class LinksImpl implements Links {
 
   // Reducer
 
+  initOfReducer(skreducer: Handle<HandlerInfo<Reducer<Json, Json>>>) {
+    return toPtr(this.tobinding.SkipRuntime_Reducer__init(skreducer));
+  }
+
   addOfReducer(
     skreducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
     skacc: ptr<Internal.CJSON>,
@@ -1104,6 +1112,7 @@ class Manager implements ToWasmManager {
 
     // Reducer
 
+    toWasm.SkipRuntime_Reducer__init = links.initOfReducer.bind(links);
     toWasm.SkipRuntime_Reducer__add = links.addOfReducer.bind(links);
     toWasm.SkipRuntime_Reducer__remove = links.removeOfReducer.bind(links);
     toWasm.SkipRuntime_deleteReducer = links.deleteReducer.bind(links);
