@@ -1,6 +1,6 @@
 MEMSIZE32=1073741824
 
-CFLAGS += -Werror -Wall -Wextra -Wno-sign-conversion -Wno-sometimes-uninitialized -Wno-c2x-extensions -Wsign-compare -Wextra-semi-stmt
+CFLAGS += -Werror -Wall -Wextra -Wno-sign-conversion -Wno-sometimes-uninitialized -Wno-c2x-extensions -Wsign-compare -Wextra-semi-stmt -fstrict-flex-arrays=3
 # To add: -Wcast-align -Wcast-qual -Wimplicit-int-conversion -Wmissing-noreturn -Wpadded -Wreserved-identifier -Wshorten-64-to-32 -Wtautological-unsigned-zero-compare
 # -Watomic-implicit-seq-cst ?
 # If using -Weverything, you may want to add -Wno-declaration-after-statement -Wno-missing-prototypes -Wno-missing-variable-declarations -Wno-shadow -Wno-strict-prototypes -Wno-zero-length-array -Wno-unreachable-code-break -Wno-unreachable-code-return
