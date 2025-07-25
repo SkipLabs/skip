@@ -1,0 +1,45 @@
+services:
+  # Reverse proxy for cache distribution
+  invalidation_proxy:
+    image: auto-cache-invalidation/reverse_proxy
+    build: ./reverse_proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      invalidation_frontend:
+        condition: service_healthy
+      invalidation_cache:
+        condition: service_healthy
+
+  # Web service that triggers cache invalidation
+  invalidation_api:
+    image: auto-cache-invalidation/api-service
+    build: ./web_service
+    depends_on:
+      invalidation_db:
+        condition: service_healthy
+
+  # SQL database - source of truth for automatic cache invalidation
+  invalidation_db:
+    image: auto-cache-invalidation/database
+    build: ./db
+    restart: always
+    volumes:
+      - invalidation_pgdata:/var/lib/postgresql/data
+
+  # Skip cache service with automated invalidation
+  invalidation_cache:
+    image: auto-cache-invalidation/skip-cache
+    build: ./edge_service
+    depends_on:
+      invalidation_db:
+        condition: service_healthy
+
+  # Frontend displaying real-time cache updates
+  invalidation_frontend:
+    image: auto-cache-invalidation/frontend
+    build: ./www
+
+volumes:
+  invalidation_pgdata:
