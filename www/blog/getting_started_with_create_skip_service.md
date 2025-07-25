@@ -1,6 +1,6 @@
 ---
-title: Getting Started with create-skip-service: From Zero to Running Service
-description: A practical walkthrough of using create-skip-service to quickly bootstrap a Skip service with the cache invalidation example
+title: From Zero to Running Service to Demonstrate Cache Invalidation
+description: A practical walkthrough with create-skip-service to quickly bootstrap a Skip service using cache invalidation
 slug: getting_started_with_create_skip_service
 date: 2025-07-25
 authors: hubyrod
@@ -82,11 +82,11 @@ A user-friendly frontend where you can:
 ### Infrastructure Components
 - **Reverse proxy**: Routes traffic between your frontend and backend services
 - **Container networking**: Everything configured to work together seamlessly
-- **Volume persistence**: Your database data persists between container restarts
+- **Volume persistence**: Your database persists between container restarts
 
 ## Seeing Reactivity in Action
 
-Once your system is running, you can observe the reactive caching behavior that makes Skip special:
+Once your system is running, you can observe Skips unique reactive caching behavior:
 
 1. **Make a change** in the database through the web interface
 2. **Watch as computed results update automatically** without any manual cache invalidation
@@ -161,7 +161,7 @@ The journey from zero to a running reactive service doesn't have to be complicat
 
 More importantly, you get to experience firsthand how reactive systems solve the cache invalidation challenges that plague traditional architectures. Instead of reading about the benefits of automatic cache updates, you can see them working in your own environment.
 
-Give it a try, and let us know what you build! The reactive paradigm opens up new possibilities for how we think about data consistency and performance in distributed systems.
+Give it a try, and let us know what you build! The reactive paradigm unlocks new perspectives for how we think about data consistency and performance in distributed systems.
 
 ## What Would You Like to See Next?
 
