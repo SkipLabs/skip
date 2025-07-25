@@ -33,6 +33,11 @@ check-ts: install-all
 build: libskipruntime
 	../bin/cd_sh .. "npm run build $(NPM_WORKSPACES) --if-present"
 
+.PHONY: docs
+docs: libskipruntime
+	../bin/cd_sh .. "npm install && npm run build"
+	../bin/cd_sh ../www "rm -rf docs/api && npm install && npx docusaurus generate-typedoc"
+
 bunrun-%: build
 	bun run examples/$*.ts
 

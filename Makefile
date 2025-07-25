@@ -124,9 +124,9 @@ check-fmt:
 
 # regenerate api docs served by docs-run from ts sources
 .PHONY: docs
-docs:
-	npm install && npm run build
-	cd www && rm -rf docs/api && npm install && npx docusaurus generate-typedoc
+docs:	
+#	delegate to pick up build-time config for libskipruntime
+	${MAKE} -C skipruntime-ts docs
 
 # run the docs site locally at http://localhost:3000
 .PHONY: docs-run
