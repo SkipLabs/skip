@@ -3,9 +3,6 @@ SHELL := /bin/bash
 SKARGO_PROFILE?=release
 
 SCRIPT_DIR=$(shell dirname $(shell realpath $(firstword $(MAKEFILE_LIST))))
-SKIPRUNTIME?=$(realpath $(SCRIPT_DIR)/..)/build/skipruntime
-
-export SKIPRUNTIME
 
 .PHONY: check-src
 check-src: build
@@ -20,7 +17,8 @@ check-all: check-src check-tests
 
 .PHONY: build
 build:
-	../bin/cd_sh .. "npm install && npm run build -w skdb -w skdb-tests"
+	${MAKE} -C ../skipruntime-ts install-all
+	../bin/cd_sh .. "npm run build -w skdb -w skdb-tests"
 
 .PHONY: clean
 clean:

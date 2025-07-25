@@ -55,7 +55,7 @@ jobs:
           submodules: true
       - run:
           name: Typecheck and lint typescript sources
-          command: SKIPRUNTIME=$(pwd)/build/skipruntime npm install && npm run build && npm run lint
+          command: make check-ts
 
   compiler:
     docker:
@@ -152,15 +152,23 @@ jobs:
           KAFKA_CFG_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093"
           KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "0@localhost:9093"
           KAFKA_CFG_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+    resource_class: xlarge
     steps:
       - custom-checkout:
           submodules: true
+      - setup_remote_docker
       - run:
           name: Run wasm skip runtime tests
           no_output_timeout: 10m
           command: |
             mkdir -p ~/test-results
             make test-skipruntime-ts
+      - run:
+          name: Run native addon unreleased test
+          no_output_timeout: 10m
+          command: |
+            cd skipruntime-ts/tests/native_addon_unreleased
+            ./run.sh
       - store_test_results:
           path: ~/test-results/skipruntime.xml
 

@@ -5,4 +5,4 @@
 set -e
 set -x
 
-"$(dirname -- "${BASH_SOURCE[0]}")"/release_docker.sh skiplang skip skdb-base
+"$(dirname -- "${BASH_SOURCE[0]}")"/release_docker.sh skiplang skiplang-bin-builder skip skdb-base

@@ -13,8 +13,11 @@ clone, you can run `release_docker_ci_images.sh`.
 
 We keep all **public** NPM packages (i.e. `@skipruntime/*`, `@skiplabs/skip`,
 and `@skip-adapter/*`) at the same version so as to keep updates, documentation,
-and version management simple.  To update from version `$OLD` to version `$NEW`,
-perform the following steps:
+and version management simple.  (Note that the build script of the native addon
+relies on this convention since it links to the skipruntime library with the same
+version as the addon package, so whenever anything in the skipruntime library
+changes, the addon package version must be bumped.)  To update from version
+`$OLD` to version `$NEW`, perform the following steps:
 
 1. Check out `main` and make sure your working copy is clean
 
@@ -24,7 +27,7 @@ perform the following steps:
 
 3. Bump _all_ `./skipruntime-ts/**/package.json` version strings and
    inter-dependencies from `$OLD` to `$NEW`, e.g. by running `sed -i ''
-   's/$OLD/$NEW/g' $(g grep -l $OLD skipruntime-ts/**/package.json)`.
+   's/$OLD/$NEW/g' $(git grep -l $OLD skipruntime-ts/**/package.json)`.
 
 4. Build and test with `make -C skipruntime-ts build test`.
 
@@ -41,3 +44,35 @@ perform the following steps:
    building/running with the new versions, add those changes to your PR, and
    land it!
 
+8. Release the Skip runtime binaries, as below.
+
+## Release Skip runtime binaries
+
+The `@skipruntime/native` node addon dynamically links to a native library
+containing the Skip runtime. The versions of the NPM package and binary
+release must match. Therefore whenever NPM packages are released the binary
+runtime release must be as well. The installation scripts download the
+binary runtime library from a github release tagged with `vM.N.O` where
+`M.N.O` is the version of the NPM packages.
+
+The release procedure for the runtime library binary is:
+
+1. Run `bin/build_runtime.sh` from a clean repo with HEAD at the commit that
+   was/will be used for version `M.N.O` of the NPM packages. This leaves
+   `libskipruntime.so-<OS>-<ARCH>` files in the `build` directory.
+
+2. Visit https://github.com/skiplabs/skip/releases/new
+
+3. Click "Choose a tag"
+
+4. Enter `vM.N.O` as the tag name
+
+5. Click "Create new tag...on publish"
+
+6. Enter a release title and description
+
+7. Attach `build/libskipruntime.so-linux-arm64` and `build/libskipruntime.so-linux-amd64`
+
+8. Click "Publish release"
+
+9. Test the new release by running `cd skipruntime-ts/tests/native_addon/ ; ./run.sh`

@@ -14,6 +14,7 @@ usage() {
     echo "Usage: $0 NAME:TAG+"
     echo "  where NAME:TAG is one of"
     echo "    skiplang:latest"
+    echo "    skiplang-bin-builder:latest"
     echo "    skip:latest"
     echo "    skdb:latest"
     echo "    skdb-base:latest"
@@ -30,6 +31,9 @@ for name_tag in "$@"; do
   case "${name_tag%:latest}" in
     skiplang)
       BUILD_SKIPLANG=true
+      ;;
+    skiplang-bin-builder)
+      BUILD_SKIPLANG_BIN_BUILDER=true
       ;;
     skip)
       BUILD_SKIP=true
@@ -71,6 +75,10 @@ dockerbuild () {
 
 if ${BUILD_SKIPLANG:-false}; then
   dockerbuild --file Dockerfile --target skiplang --tag skiplabs/skiplang:latest
+fi
+
+if ${BUILD_SKIPLANG_BIN_BUILDER:-false}; then
+  dockerbuild --file skiplang/Dockerfile --tag skiplabs/skiplang-bin-builder:latest
 fi
 
 if ${BUILD_SKIP:-false}; then
