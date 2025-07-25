@@ -1,6 +1,6 @@
 /**
  * Automated Cache Invalidation Service
- * 
+ *
  * This service demonstrates Skip's automatic cache invalidation capabilities:
  * - Database changes are automatically detected
  * - Cache entries are invalidated without manual intervention
@@ -128,7 +128,7 @@ export const service: SkipService<PostsServiceInputs, PostsResourceInputs> = {
     context: Context,
   ): PostsResourceInputs {
     const serialIDKey = { key: { col: "id", type: "SERIAL" } };
-    
+
     // useExternalResource automatically monitors the PostgreSQL tables
     // Any INSERT, UPDATE, or DELETE triggers automatic cache invalidation
     const posts = context.useExternalResource<number, Post>({
@@ -141,7 +141,7 @@ export const service: SkipService<PostsServiceInputs, PostsResourceInputs> = {
       identifier: "users",
       params: serialIDKey,
     });
-    
+
     // The map operation creates reactive dependencies:
     // - Changes to posts invalidate the specific post cache entry
     // - Changes to users invalidate all posts by that user
