@@ -6,11 +6,8 @@ and NPM artifacts.
 
 ## Release Docker images
 
-In order to update `skiplabs/skdb-base`, `skiplabs/skdb`, or
-`skiplabs/skdb-dev-server` to the current state of your git clone, you can run
-`release_docker_skdb_base.sh`, `release_docker_skdb.sh`, or
-`release_docker_skdb_dev_server.sh` respectively. For the `dev-server`, you can
-choose to release either or both of the `latest` and `quickstart` tags.
+In order to update the images used in CI to the current state of your git
+clone, you can run `release_docker_ci_images.sh`.
 
 ## Release NPM packages
 
