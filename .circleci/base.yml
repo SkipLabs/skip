@@ -224,3 +224,18 @@ jobs:
           name: Tear down blogger example
           working_directory: ~/project/examples/blogger
           command: docker compose down
+      - run:
+          name: Build cache invalidation docker images
+          working_directory: ~/project/examples/cache_invalidation
+          command: docker compose build
+      - run:
+          name: Start cache invalidation services
+          working_directory: ~/project/examples/cache_invalidation
+          command: docker compose up --wait
+      - run:
+          name: Test cache invalidation back end health
+          command: (docker run --network cache_invalidation_default -it cimg/base:2025.01 curl --silent --max-time 5 --insecure --location https://cache_invalidation_haproxy/api/posts || true) | grep --quiet "event:"
+      - run:
+          name: Tear down cache invalidation example
+          working_directory: ~/project/examples/cache_invalidation
+          command: docker compose down
