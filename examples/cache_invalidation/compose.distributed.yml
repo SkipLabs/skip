@@ -1,7 +1,7 @@
 services:
   # Reverse proxy for distributed cache invalidation
   invalidation_proxy:
-    image: auto-cache-invalidation/reverse_proxy
+    image: invalidation_reverse_proxy
     build:
       context: ./reverse_proxy
       dockerfile: ./Dockerfile.distributed
@@ -16,7 +16,7 @@ services:
 
   # Web service triggering distributed cache invalidation
   invalidation_api:
-    image: auto-cache-invalidation/api-service
+    image: invalidation_api_service
     build: ./web_service
     depends_on:
       invalidation_db:
@@ -26,7 +26,7 @@ services:
 
   # SQL database - triggers distributed cache invalidation
   invalidation_db:
-    image: auto-cache-invalidation/database
+    image: invalidation_database
     build: ./db
     restart: always
     volumes:
@@ -34,7 +34,7 @@ services:
 
   # Skip leader - coordinates automated cache invalidation
   invalidation_leader:
-    image: auto-cache-invalidation/skip-cache
+    image: invalidation_skip_cache
     build: ./edge_service
     depends_on:
       invalidation_db:
@@ -42,7 +42,7 @@ services:
     environment:
       SKIP_LEADER: true
   invalidation_follower1: &follower
-    image: auto-cache-invalidation/skip-cache
+    image: invalidation_skip_cache
     build: ./edge_service
     networks:
       default:
@@ -67,7 +67,7 @@ services:
 
   # Frontend observing real-time cache invalidation
   invalidation_frontend:
-    image: auto-cache-invalidation/frontend
+    image: invalidation_frontend
     build: ./www
 
 volumes:

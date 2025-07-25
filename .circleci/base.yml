@@ -234,7 +234,7 @@ jobs:
           command: docker compose up --wait
       - run:
           name: Test cache invalidation back end health
-          command: (docker run --network cache_invalidation_default -it cimg/base:2025.01 curl --silent --max-time 5 --insecure --location https://cache_invalidation_haproxy/api/posts || true) | grep --quiet "event:"
+          command: (docker run --network cache_invalidation_default -it cimg/base:2025.01 curl --silent --max-time 5 --insecure --location https://invalidation_proxy/api/posts || true) | grep --quiet "event:"
       - run:
           name: Tear down cache invalidation example
           working_directory: ~/project/examples/cache_invalidation
