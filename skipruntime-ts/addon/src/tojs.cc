@@ -15,14 +15,6 @@ double SkipRuntime_CollectionWriter__update(char* collection, CJArray values,
 double SkipRuntime_CollectionWriter__initialized(char* collection, CJSON error);
 double SkipRuntime_CollectionWriter__error(char* collection, CJSON error);
 
-SKResourceBuilderMap SkipRuntime_ResourceBuilderMap__create();
-void SkipRuntime_ResourceBuilderMap__add(SKResourceBuilderMap builders,
-                                         char* name, SKResourceBuilder builder);
-
-SKExternalServiceMap SkipRuntime_ExternalServiceMap__create();
-void SkipRuntime_ExternalServiceMap__add(SKExternalServiceMap services,
-                                         char* name, SKExternalService service);
-
 char* SkipRuntime_Context__createLazyCollection(SKLazyCompute lazyCompute);
 CJArray SkipRuntime_Context__jsonExtract(CJObject json, char* pattern);
 char* SkipRuntime_Context__useExternalResource(char* service, char* identifier,
@@ -30,18 +22,14 @@ char* SkipRuntime_Context__useExternalResource(char* service, char* identifier,
 
 SKMapper SkipRuntime_createMapper(int32_t ref);
 SKLazyCompute SkipRuntime_createLazyCompute(int32_t ref);
-SKExternalService SkipRuntime_createExternalService(int32_t ref);
 SKResource SkipRuntime_createResource(int32_t ref);
-SKResourceBuilder SkipRuntime_createResourceBuilder(int32_t ref);
 SKExecutor SkipRuntime_createExecutor(int32_t ref);
-SKService SkipRuntime_createService(int32_t ref, CJObject inputs,
-                                    SKResourceBuilderMap resources,
-                                    SKExternalServiceMap exservices);
+SKService SkipRuntime_createService(int32_t ref);
 SKNotifier SkipRuntime_createNotifier(int32_t ref);
 SKReducer SkipRuntime_createReducer(int32_t ref, CJSON json);
 
 double SkipRuntime_initService(SKService service, SKExecutor executor);
-CJSON SkipRuntime_closeService();
+double SkipRuntime_closeService();
 double SkipRuntime_invalidateCollections(CJArray collections);
 
 CJArray SkipRuntime_Collection__getArray(char* collection, CJSON key);
@@ -194,90 +182,6 @@ void ErrorOfCollectionWriter(const FunctionCallbackInfo<Value>& args) {
   });
 }
 
-void CreateOfResourceBuilderMap(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    SKResourceBuilderMap skmap = SkipRuntime_ResourceBuilderMap__create();
-    args.GetReturnValue().Set(External::New(isolate, skmap));
-  });
-}
-
-void AddOfResourceBuilderMap(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  if (args.Length() != 3) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have three parameters.")));
-    return;
-  };
-  if (!args[0]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a pointer.")));
-    return;
-  }
-  if (!args[1]->IsString()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The second parameter must be a string.")));
-    return;
-  }
-  if (!args[2]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The third parameter must be a pointer.")));
-    return;
-  }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    SkipRuntime_ResourceBuilderMap__add(
-        args[0].As<External>()->Value(),
-        ToSKString(isolate, args[1].As<String>()),
-        args[2].As<External>()->Value());
-  });
-}
-
-void CreateOfExternalServiceMap(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    SKExternalServiceMap skmap = SkipRuntime_ExternalServiceMap__create();
-    args.GetReturnValue().Set(External::New(isolate, skmap));
-  });
-}
-
-void AddOfExternalServiceMap(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  if (args.Length() != 3) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have three parameters.")));
-    return;
-  };
-  if (!args[0]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a pointer.")));
-    return;
-  }
-  if (!args[1]->IsString()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The second parameter must be a string.")));
-    return;
-  }
-  if (!args[2]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The third parameter must be a pointer.")));
-    return;
-  }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    SkipRuntime_ExternalServiceMap__add(
-        args[0].As<External>()->Value(),
-        ToSKString(isolate, args[1].As<String>()),
-        args[2].As<External>()->Value());
-  });
-}
-
 void CreateLazyCollectionOfContext(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
   if (!args[0]->IsExternal()) {
@@ -390,27 +294,6 @@ void CreateLazyCompute(const FunctionCallbackInfo<Value>& args) {
   });
 }
 
-void CreateExternalService(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
-    return;
-  };
-  if (!args[0]->IsNumber()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a number.")));
-    return;
-  }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    SKExternalService skexternalService =
-        SkipRuntime_createExternalService(args[0].As<Int32>()->Value());
-    args.GetReturnValue().Set(External::New(isolate, skexternalService));
-  });
-}
-
 void CreateResource(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
   if (args.Length() != 1) {
@@ -429,27 +312,6 @@ void CreateResource(const FunctionCallbackInfo<Value>& args) {
     SKResource skResource =
         SkipRuntime_createResource(args[0].As<Int32>()->Value());
     args.GetReturnValue().Set(External::New(isolate, skResource));
-  });
-}
-
-void CreateResourceBuilder(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
-    return;
-  };
-  if (!args[0]->IsNumber()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a number.")));
-    return;
-  }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    SKResourceBuilder skResourceBuilder =
-        SkipRuntime_createResourceBuilder(args[0].As<Int32>()->Value());
-    args.GetReturnValue().Set(External::New(isolate, skResourceBuilder));
   });
 }
 
@@ -476,10 +338,10 @@ void CreateExecutor(const FunctionCallbackInfo<Value>& args) {
 
 void CreateService(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
-  if (args.Length() != 4) {
+  if (args.Length() != 1) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have four parameters.")));
+        Exception::TypeError(FromUtf8(isolate, "Must have one parameters.")));
     return;
   };
   if (!args[0]->IsNumber()) {
@@ -488,17 +350,9 @@ void CreateService(const FunctionCallbackInfo<Value>& args) {
         FromUtf8(isolate, "The parameter must be a number.")));
     return;
   }
-  if (!args[1]->IsExternal() || !args[2]->IsExternal() ||
-      !args[3]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Invalid parameter types.")));
-    return;
-  }
   NatTryCatch(isolate, [&args](Isolate* isolate) {
-    SKService skService = SkipRuntime_createService(
-        args[0].As<Int32>()->Value(), args[1].As<External>()->Value(),
-        args[2].As<External>()->Value(), args[3].As<External>()->Value());
+    SKService skService =
+        SkipRuntime_createService(args[0].As<Int32>()->Value());
     args.GetReturnValue().Set(External::New(isolate, skService));
   });
 }
@@ -575,8 +429,8 @@ void InitService(const FunctionCallbackInfo<Value>& args) {
 void CloseService(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
   NatTryCatch(isolate, [&args](Isolate* isolate) {
-    CJSON skresult = SkipRuntime_closeService();
-    args.GetReturnValue().Set(External::New(isolate, skresult));
+    double skresult = SkipRuntime_closeService();
+    args.GetReturnValue().Set(Number::New(isolate, skresult));
   });
 }
 
@@ -1110,16 +964,6 @@ void GetToJSBinding(const FunctionCallbackInfo<Value>& args) {
   AddFunction(isolate, binding, "SkipRuntime_CollectionWriter__error",
               ErrorOfCollectionWriter);
   //
-  AddFunction(isolate, binding, "SkipRuntime_ResourceBuilderMap__create",
-              CreateOfResourceBuilderMap);
-  AddFunction(isolate, binding, "SkipRuntime_ResourceBuilderMap__add",
-              AddOfResourceBuilderMap);
-  //
-  AddFunction(isolate, binding, "SkipRuntime_ExternalServiceMap__create",
-              CreateOfExternalServiceMap);
-  AddFunction(isolate, binding, "SkipRuntime_ExternalServiceMap__add",
-              AddOfExternalServiceMap);
-  //
   AddFunction(isolate, binding, "SkipRuntime_Context__createLazyCollection",
               CreateLazyCollectionOfContext);
   AddFunction(isolate, binding, "SkipRuntime_Context__jsonExtract",
@@ -1130,11 +974,7 @@ void GetToJSBinding(const FunctionCallbackInfo<Value>& args) {
   AddFunction(isolate, binding, "SkipRuntime_createMapper", CreateMapper);
   AddFunction(isolate, binding, "SkipRuntime_createLazyCompute",
               CreateLazyCompute);
-  AddFunction(isolate, binding, "SkipRuntime_createExternalService",
-              CreateExternalService);
   AddFunction(isolate, binding, "SkipRuntime_createResource", CreateResource);
-  AddFunction(isolate, binding, "SkipRuntime_createResourceBuilder",
-              CreateResourceBuilder);
   AddFunction(isolate, binding, "SkipRuntime_createExecutor", CreateExecutor);
   AddFunction(isolate, binding, "SkipRuntime_createService", CreateService);
   AddFunction(isolate, binding, "SkipRuntime_createNotifier", CreateNotifier);

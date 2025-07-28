@@ -8,9 +8,8 @@ import {
   type Mapper,
   type Reducer,
   type Resource,
-  type SkipService,
 } from "./api.js";
-import type { HandlerInfo } from "./index.js";
+import type { HandlerInfo, ServiceDefinition } from "./index.js";
 
 export type Handle<T> = Internal.Opaque<number, { handle_for: T }>;
 
@@ -84,42 +83,15 @@ export interface FromBinding {
     name: string,
     error: Pointer<Internal.CJSON>,
   ): Handle<Error>;
-
   // Resource
 
   SkipRuntime_createResource(ref: Handle<Resource>): Pointer<Internal.Resource>;
 
-  // ResourceBuilder
-  SkipRuntime_createResourceBuilder(
-    ref: Handle<ResourceBuilder>,
-  ): Pointer<Internal.ResourceBuilder>;
+  // Service
 
-  // ResourceBuilder
   SkipRuntime_createService(
-    ref: Handle<SkipService>,
-    jsInputs: Pointer<Internal.CJObject>,
-    resources: Pointer<Internal.ResourceBuilderMap>,
-    remotes: Pointer<Internal.ExternalServiceMap>,
+    ref: Handle<ServiceDefinition>,
   ): Pointer<Internal.Service>;
-
-  // ResourceBuilderMap
-
-  SkipRuntime_ResourceBuilderMap__create(): Pointer<Internal.ResourceBuilderMap>;
-
-  SkipRuntime_ResourceBuilderMap__add(
-    map: Pointer<Internal.ResourceBuilderMap>,
-    key: string,
-    collection: Pointer<Internal.ResourceBuilder>,
-  ): void;
-
-  // ExternalServiceMap
-
-  SkipRuntime_ExternalServiceMap__create(): Pointer<Internal.ExternalServiceMap>;
-  SkipRuntime_ExternalServiceMap__add(
-    map: Pointer<Internal.ExternalServiceMap>,
-    key: string,
-    collection: Pointer<Internal.ExternalService>,
-  ): void;
 
   // Collection
 
@@ -230,7 +202,7 @@ export interface FromBinding {
   ): Handle<Error>;
 
   // closeClose
-  SkipRuntime_closeService(): Pointer<Internal.CJSON>;
+  SkipRuntime_closeService(): Handle<Error> | Handle<Promise<unknown>>;
   SkipRuntime_invalidateCollections(
     collections: Pointer<Internal.CJArray<Internal.CJSON>>,
   ): Handle<Error>;
