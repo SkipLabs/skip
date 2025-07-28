@@ -62,10 +62,6 @@ struct SkipException : std::exception {
 #define SKContext void*
 #define SKNonEmptyIterator void*
 #define SKResource void*
-#define SKResourceBuilderMap void*
-#define SKResourceBuilder void*
-#define SKExternalServiceMap void*
-#define SKExternalService void*
 #define SKLazyCompute void*
 #define SKChecker void*
 #define SKExecutor void*
