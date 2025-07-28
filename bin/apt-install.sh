@@ -39,6 +39,7 @@ for step in "${steps[@]}"; do
                 --slave /usr/bin/llvm-ar llvm-ar /usr/bin/llvm-ar-$LLVM_VERSION \
                 --slave /usr/bin/llvm-config llvm-config /usr/bin/llvm-config-$LLVM_VERSION \
                 --slave /usr/bin/llvm-link llvm-link /usr/bin/llvm-link-$LLVM_VERSION \
+                --slave /usr/bin/opt opt /usr/bin/opt-$LLVM_VERSION \
                 --slave /usr/bin/wasm-ld wasm-ld /usr/bin/wasm-ld-$LLVM_VERSION
             ;;
         skipruntime-deps)
