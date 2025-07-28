@@ -51,6 +51,7 @@ using v8::Function;
 using v8::FunctionCallback;
 using v8::FunctionCallbackInfo;
 using v8::FunctionTemplate;
+using v8::HandleScope;
 using v8::Int32;
 using v8::Isolate;
 using v8::Local;
@@ -66,6 +67,7 @@ using v8::Value;
 
 void StartCJObject(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   NatTryCatch(isolate, [&args](Isolate* isolate) {
     PartialCJObj skobject = SKIP_SKJSON_startCJObject();
     args.GetReturnValue().Set(External::New(isolate, skobject));
@@ -74,6 +76,7 @@ void StartCJObject(const FunctionCallbackInfo<Value>& args) {
 
 void AddToCJObject(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 3) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -107,6 +110,7 @@ void AddToCJObject(const FunctionCallbackInfo<Value>& args) {
 
 void EndCJObject(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 1) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -128,6 +132,7 @@ void EndCJObject(const FunctionCallbackInfo<Value>& args) {
 
 void StartCJArray(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   NatTryCatch(isolate, [&args](Isolate* isolate) {
     PartialCJArr skarray = SKIP_SKJSON_startCJArray();
     args.GetReturnValue().Set(External::New(isolate, skarray));
@@ -136,6 +141,7 @@ void StartCJArray(const FunctionCallbackInfo<Value>& args) {
 
 void AddToCJArray(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 2) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -162,6 +168,7 @@ void AddToCJArray(const FunctionCallbackInfo<Value>& args) {
 
 void EndCJArray(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 1) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -182,6 +189,7 @@ void EndCJArray(const FunctionCallbackInfo<Value>& args) {
 
 void CreateCJNull(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   NatTryCatch(isolate, [&args](Isolate* isolate) {
     CJSON sknull = SKIP_SKJSON_createCJNull();
     args.GetReturnValue().Set(External::New(isolate, sknull));
@@ -190,6 +198,7 @@ void CreateCJNull(const FunctionCallbackInfo<Value>& args) {
 
 void CreateCJInt(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 1) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -216,6 +225,7 @@ void CreateCJInt(const FunctionCallbackInfo<Value>& args) {
 
 void CreateCJFloat(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 1) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -237,6 +247,7 @@ void CreateCJFloat(const FunctionCallbackInfo<Value>& args) {
 
 void CreateCJString(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 1) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -258,6 +269,7 @@ void CreateCJString(const FunctionCallbackInfo<Value>& args) {
 
 void CreateCJBool(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 1) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -279,6 +291,7 @@ void CreateCJBool(const FunctionCallbackInfo<Value>& args) {
 
 void TypeOf(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 1) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -299,6 +312,7 @@ void TypeOf(const FunctionCallbackInfo<Value>& args) {
 
 void AsNumber(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 1) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -319,6 +333,7 @@ void AsNumber(const FunctionCallbackInfo<Value>& args) {
 
 void AsBoolean(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 1) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -339,6 +354,7 @@ void AsBoolean(const FunctionCallbackInfo<Value>& args) {
 
 void AsString(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 1) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -359,6 +375,7 @@ void AsString(const FunctionCallbackInfo<Value>& args) {
 
 void AsObject(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 1) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -379,6 +396,7 @@ void AsObject(const FunctionCallbackInfo<Value>& args) {
 
 void AsArray(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 1) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -399,6 +417,7 @@ void AsArray(const FunctionCallbackInfo<Value>& args) {
 
 void FieldAt(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 2) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -426,6 +445,7 @@ void FieldAt(const FunctionCallbackInfo<Value>& args) {
 
 void Get(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 2) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -453,6 +473,7 @@ void Get(const FunctionCallbackInfo<Value>& args) {
 
 void At(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 2) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -480,6 +501,7 @@ void At(const FunctionCallbackInfo<Value>& args) {
 
 void ObjectSize(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 1) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -500,6 +522,7 @@ void ObjectSize(const FunctionCallbackInfo<Value>& args) {
 
 void ArraySize(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 1) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -520,6 +543,7 @@ void ArraySize(const FunctionCallbackInfo<Value>& args) {
 
 void GetBinding(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   Local<Object> binding = Object::New(isolate);
   AddFunction(isolate, binding, "SKIP_SKJSON_startCJObject", StartCJObject);
   AddFunction(isolate, binding, "SKIP_SKJSON_addToCJObject", AddToCJObject);
