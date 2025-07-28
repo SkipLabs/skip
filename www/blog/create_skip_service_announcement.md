@@ -101,7 +101,7 @@ As of today, we are already on our way to improving and augmenting the number of
 
 [^1]: not a typo ;-)
 
-We have a [Discord server](https://discord.com/channels/1093901946441703434/1093901946441703437), why don't you swing by and say hi?
+We have a [Discord server](https://discord.gg/2nzP2PZj), why don't you swing by and say hi?
 
 ## What's Next?
 

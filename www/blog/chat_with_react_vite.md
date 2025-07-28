@@ -56,7 +56,7 @@ One or two cool things you will want to try:
  - integrating your user-management system
  - integrating an AI agent to discuss into the chat
 
-We have a [Discord server](https://discord.com/channels/1093901946441703434/1093901946441703437), why don't you swing by and say hi, ask a question or two?
+We have a [Discord server](https://discord.gg/2nzP2PZj), why don't you swing by and say hi, ask a question or two?
 
 
 ## What's Next?
