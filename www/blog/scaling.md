@@ -125,4 +125,4 @@ examples and demos!
 We're also happy to help you scale out your reactive service using Skip, either
 by adapting these tools to your environment or advising on your setup.  Reach
 out and show us what you're building, or come join the
-[Discord](https://discord.gg/rby6YUqGxQ)!
+[Discord](https://discord.gg/2nzP2PZj)!
