@@ -176,10 +176,6 @@ class RequestStatuses(statuses: Array<ResourceStatus>) extends SKStore.File {
   }
 }
 
-class RemoteSpecifiers(
-  value: Map<String, ExternalService>,
-) extends SKStore.File
-
 class StatusRef(
   resourceId: String,
   statusRef: SKStore.DirName,
@@ -302,17 +298,16 @@ fun buildResourcesGraph(
     (context, writer, key, it) ~> {
       resourceId = it.first.resourceId;
       statusRef = it.first.statusRef;
-      (runId, resources) = definitionHdl.maybeGet(
+      (runId, service) = definitionHdl.maybeGet(
         context,
         SKStore.UnitID::singleton,
       ) match {
-      | Some(definition) -> (definition.runId, definition.service.resources)
+      | Some(definition) -> (definition.runId, definition.service)
       | _ -> return void
       };
       pushContext(context);
       try {
-        resourceBuilder = resources.get(key.name);
-        resource = resourceBuilder.build(key.params);
+        resource = service.buildResource(key.name, key.params);
         collections = servicesHdl.get(context, SKStore.SID(runId)).value;
         collection = resource.instantiate(collections);
         writer.set(key, ResourceInfo(resourceId, collection, statusRef, runId));
@@ -356,17 +351,16 @@ fun initService(
           (ctx, writer, _key, it) ~> {
             serviceDef = it.first;
             mInputs = mutable Map<String, Collection>[];
-            serviceDef.service.initialData.each(input -> {
-              iDirName = SKStore.DirName::create(`/${input.name}/`);
+            serviceDef.service.inputs().each(input -> {
+              iDirName = SKStore.DirName::create(`/${input}/`);
+              values = serviceDef.service.initialData(input);
               iHdl = ctx.mkdirMulti(
                 JSONID::keyType,
                 JSONFile::type,
                 iDirName,
-                input.values.map(v ->
-                  (JSONID(v.i0), v.i1.map(x -> JSONFile(x)))
-                ),
+                values.map(v -> (JSONID(v.i0), v.i1.map(x -> JSONFile(x)))),
               );
-              mInputs.add(input.name, Collection(iHdl))
+              mInputs.add(input, Collection(iHdl))
             });
             writer.set(
               SKStore.SID(serviceDef.runId),
@@ -451,7 +445,7 @@ fun initService(
 fun closeService_(
   context: mutable SKStore.Context,
   update: Bool = true,
-): Array<Float> {
+): Float {
   resourceHdl = SKStore.EHandle(
     SKStore.SID::keyType,
     ResourceDef::type,
@@ -476,18 +470,14 @@ fun closeService_(
     kSessionDir,
   );
   handles = sessionHdl.maybeGet(context, SKStore.UnitID::singleton) match {
-  | Some(def) ->
-    def.service.remoteCollections
-      .values()
-      .map(es -> es.shutdown())
-      .collect(Array)
-  | _ -> Array[]
+  | Some(def) -> def.service.shutdown()
+  | _ -> 0.0
   };
   if (update) context.update();
   handles;
 }
 
-fun closeService(): Result<Array<Float>, .Exception> {
+fun closeService(): Result<Float, .Exception> {
   SKStore.runWithResult(ctx ~> closeService_(ctx))
 }
 
@@ -507,7 +497,8 @@ fun invalidateCollections(
 }
 
 class LinkToResource(
-  supplier: ExternalService,
+  service: Service,
+  supplier: String,
   instance: String,
   writer: CollectionWriter,
   name: String,
@@ -517,14 +508,21 @@ class LinkToResource(
   fun perform(context: mutable SKStore.Context): void {
     this.writer.status(context, Status::create());
     pushContext(context);
-    this.supplier.subscribe(this.instance, this.writer, this.name, this.params);
+    this.service.subscribe(
+      this.supplier,
+      this.instance,
+      this.writer,
+      this.name,
+      this.params,
+    );
     popContext();
     addSubscription(context, this.writer.dirName);
   }
 }
 
 class CloseExternalService(
-  supplier: ExternalService,
+  service: Service,
+  supplier: String,
   instance: String,
   dirName: SKStore.DirName,
   definition: ExternalServiceDef,
@@ -549,7 +547,7 @@ class CloseExternalService(
     | _ -> void
     };
     pushContext(context);
-    this.supplier.unsubscribe(this.instance);
+    this.service.unsubscribe(this.supplier, this.instance);
     popContext();
     addClosed(context, this.definition);
   }
@@ -626,11 +624,7 @@ fun useExternalCollection(
       ServiceDefinition::type,
       kSessionDir,
     );
-    remoteCollections = sessionHdl.get(
-      context,
-      SKStore.UnitID::singleton,
-    ).service.remoteCollections;
-    externalSupplier = remoteCollections.get(supplier);
+    service = sessionHdl.get(context, SKStore.UnitID::singleton).service;
     collectionId = toSuppliedResourceId(supplier, resource, params);
     dirName = subDirName(context, collectionId);
     paramsDir = dirName.sub("params");
@@ -659,7 +653,8 @@ fun useExternalCollection(
           (
             Some(
               LinkToResource(
-                externalSupplier,
+                service,
+                supplier,
                 instance,
                 CollectionWriter(storeDir),
                 resource,
@@ -667,7 +662,8 @@ fun useExternalCollection(
               ),
             ),
             CloseExternalService(
-              externalSupplier,
+              service,
+              supplier,
               instance,
               storeDir,
               definition,

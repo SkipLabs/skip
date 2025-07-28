@@ -26,32 +26,31 @@ base class LazyCompute {
   fun compute(self: LazyCollection, key: SKJSON.CJSON): Array<SKJSON.CJSON>;
 }
 
-base class ExternalService {
+base class Resource {
+  fun instantiate(collections: Map<String, Collection>): Collection;
+}
+
+base class Service {
+  fun inputs(): Array<String>;
+
+  fun initialData(name: String): Array<(SKJSON.CJSON, Array<SKJSON.CJSON>)>;
+
+  fun resources(): Array<String>;
+
+  fun buildResource(name: String, parameters: SKJSON.CJSON): Resource;
+
   fun subscribe(
+    external: String,
     instance: String,
     collection: CollectionWriter,
     resource: String,
     params: SKJSON.CJSON,
   ): void;
 
-  fun unsubscribe(instance: String): void;
+  fun unsubscribe(external: String, instance: String): void;
 
   fun shutdown(): Float;
-}
 
-base class Resource {
-  fun instantiate(collections: Map<String, Collection>): Collection;
-}
-
-base class ResourceBuilder {
-  fun build(parameters: SKJSON.CJSON): Resource;
-}
-
-base class Service(
-  initialData: Array<Input>,
-  resources: Map<String, ResourceBuilder>,
-  remoteCollections: Map<String, ExternalService> = Map[],
-) {
   fun createGraph(
     inputCollections: Map<String, Collection>,
   ): Map<String, Collection>;
