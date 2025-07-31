@@ -99,13 +99,15 @@ function instantiateUserObject<Params extends DepSafe[], Result extends object>(
 }
 
 class Handles {
-  private nextID: number = 1;
-  private readonly objects: any[] = [];
-  private readonly freeIDs: number[] = [];
-  /** Index to get all mapper handles from a class name */
-  private readonly links = new Map<string, Map<number, string>>();
-  /** To access to a replaced constructor from a class name */
-  private readonly ctors = new Map<string, any>();
+  constructor(
+    private nextID: number = 1,
+    private readonly objects: any[] = [],
+    private readonly freeIDs: number[] = [],
+    /** Index to get all mapper handles from a class name */
+    private readonly links = new Map<string, Map<number, string>>(),
+    /** To access to a replaced constructor from a class name */
+    private readonly ctors = new Map<string, any>(),
+  ) {}
 
   register<T>(v: T): Handle<T> {
     const freeID = this.freeIDs.pop();
@@ -177,6 +179,38 @@ class Handles {
     const ctor = this.ctors.get(name);
     if (ctor) return ctor as new (...params: Params) => Result;
     return undefined;
+  }
+
+  clone(): Handles {
+    return new Handles(
+      this.nextID,
+      [...this.objects],
+      [...this.freeIDs],
+      /** Index to get all mapper handles from a class name */
+      new Map<string, Map<number, string>>(this.links),
+      /** To access to a replaced constructor from a class name */
+      new Map<string, Map<number, string>>(this.ctors),
+    );
+  }
+
+  reset(handles: Handles) {
+    this.nextID = handles.nextID;
+    this.resetArray(this.objects, handles.objects);
+    this.resetArray(this.freeIDs, handles.freeIDs);
+    this.resetMap(this.links, handles.links);
+    this.resetMap(this.ctors, handles.ctors);
+  }
+
+  private resetArray<T>(arr: T[], w: T[]): void {
+    arr.length = 0;
+    for (const v of w) {
+      arr.push(v);
+    }
+  }
+
+  private resetMap<K, V>(map: Map<K, V>, w: Map<K, V>): void {
+    map.clear();
+    w.forEach((value, key) => map.set(key, value));
   }
 }
 
@@ -781,55 +815,63 @@ export class ServiceInstance {
   }
 
   reload(ctors: (new (...args: any[]) => any)[]) {
-    const collections = new Set<string>();
-    for (const ctor of ctors) {
-      if (!("name" in ctor)) continue;
-      this.refs.handles.registerConstructor(ctor.name, ctor);
-      if (
-        this.instanceOfMapper(ctor) ||
-        this.instanceOfReducer(ctor) ||
-        this.instanceOfLazyCompute(ctor)
-      ) {
-        const links = this.refs.handles.getLinks(ctor.name);
-        if (!links) continue;
-        for (const [handle, collection] of links.entries()) {
-          collections.add(collection);
-          const info = this.refs.handles.get<unknown>(
-            handle as Handle<unknown>,
-          );
-          if (
-            info &&
-            typeof info == "object" &&
-            "object" in info &&
-            "name" in info &&
-            "params" in info &&
-            "what" in info
-          ) {
-            const newObj = instantiateUserObject(
-              info.what as string,
-              ctor,
-              info.params as DepSafe[],
+    const oldHandles = this.refs.handles.clone();
+    try {
+      const collections = new Set<string>();
+      for (const ctor of ctors) {
+        if (!("name" in ctor)) continue;
+        this.refs.handles.registerConstructor(ctor.name, ctor);
+        if (
+          this.instanceOfMapper(ctor) ||
+          this.instanceOfReducer(ctor) ||
+          this.instanceOfLazyCompute(ctor)
+        ) {
+          const links = this.refs.handles.getLinks(ctor.name);
+          if (!links) continue;
+          for (const [handle, collection] of links.entries()) {
+            collections.add(collection);
+            const info = this.refs.handles.get<unknown>(
+              handle as Handle<unknown>,
             );
-            this.refs.handles.replace(
-              handle as Handle<HandlerInfo<object>>,
-              newObj,
-            );
-          } else {
-            throw new Error("Only mappers en reducers can be replaced");
+            if (
+              info &&
+              typeof info == "object" &&
+              "object" in info &&
+              "name" in info &&
+              "params" in info &&
+              "what" in info
+            ) {
+              const newObj = instantiateUserObject(
+                info.what as string,
+                ctor,
+                info.params as DepSafe[],
+              );
+              this.refs.handles.replace(
+                handle as Handle<HandlerInfo<object>>,
+                newObj,
+              );
+            } else {
+              throw new Error("Only mappers en reducers can be replaced");
+            }
           }
+        } else if (this.instanceOfResource(ctor)) {
+          throw new Error("TODO: manage Resource reload");
         }
       }
-    }
-    if (collections.size > 0) {
-      const errorHdl = this.refs.runWithGC(() => {
-        const skcollections = this.refs.skjson.exportJSON(
-          Array.from(collections),
-        );
-        return this.refs.binding.SkipRuntime_invalidateCollections(
-          skcollections,
-        );
-      });
-      if (errorHdl) throw this.refs.handles.deleteHandle(errorHdl);
+      if (collections.size > 0) {
+        const errorHdl = this.refs.runWithGC(() => {
+          const skcollections = this.refs.skjson.exportJSON(
+            Array.from(collections),
+          );
+          return this.refs.binding.SkipRuntime_invalidateCollections(
+            skcollections,
+          );
+        });
+        if (errorHdl) throw this.refs.handles.deleteHandle(errorHdl);
+      }
+    } catch (e: unknown) {
+      this.refs.handles.reset(oldHandles);
+      throw e;
     }
   }
 
