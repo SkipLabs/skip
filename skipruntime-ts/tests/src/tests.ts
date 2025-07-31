@@ -1899,5 +1899,26 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
     const reload = await import("./for-reload.js");
     service.reload([reload.ReloadMapper]);
     expect((await service.getArray(resource, 0)).sort()).toEqual([4, 7]);
+    await service.update("input", [
+      [1, [3]],
+      [2, [4]],
+    ]);
+    expect((await service.getArray(resource, 0)).sort()).toEqual([5, 8]);
+    const werror = await import("./with-error.js");
+    try {
+      service.reload([werror.ReloadMapper]);
+      throw new Error("Error was not thrown");
+    } catch (e: unknown) {
+      expect(e).toBeA(Error);
+      expect((e as Error).message).toMatchRegex(
+        new RegExp(/^(?:Error: )?Something goes wrong.$/),
+      );
+    }
+    // The wrong mapper should not be taken into account
+    await service.update("input", [
+      [1, [2]],
+      [2, [3]],
+    ]);
+    expect((await service.getArray(resource, 0)).sort()).toEqual([4, 7]);
   });
 }
