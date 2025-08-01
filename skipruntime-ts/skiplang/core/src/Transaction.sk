@@ -293,8 +293,7 @@ private fun checkResourceInstanceSubcriptions(
   instance: String,
   executor: Executor,
 ): void {
-  resourceId = toResourceId(resource.name, resource.params);
-  key = `${kInitializationsKey}.${resourceId}`;
+  key = `${kInitializationsKey}.${resource.toId()}`;
   subcriptions = getSubscriptions(context);
   context.getPersistent(key).map(ResourceInitialization::type) match {
   | Some(init) ->
@@ -359,9 +358,7 @@ private fun checkInitialization(
   resource: ?ResourceDef,
 ): void {
   key = resource match {
-  | Some(def) ->
-    resourceId = toResourceId(def.name, def.params);
-    `${kInitializationsKey}.${resourceId}`
+  | Some(def) -> `${kInitializationsKey}.${def.toId()}`
   | _ -> kInitializationsKey
   };
   context.getPersistent(key).map(f ~> f as InitializationFile _) match {
@@ -394,8 +391,7 @@ private fun checkInitialization(
       };
       resource match {
       | Some(def) ->
-        resourceId = toResourceId(def.name, def.params);
-        context.removePersistent(`${kInitializationsKey}.${resourceId}`)
+        context.removePersistent(`${kInitializationsKey}.${def.toId()}`)
       | _ -> context.removePersistent(kInitializationsKey)
       }
     | _ -> void
