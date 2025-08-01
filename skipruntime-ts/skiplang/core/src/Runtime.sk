@@ -70,10 +70,15 @@ class ResourceCollection(value: Collection) extends SKStore.File
 class ResourceDef(
   name: String,
   params: SKJSON.CJSON,
+  instance: Int = 0,
 ) extends SKStore.File, SKStore.Key {
   //
   fun toString(): String {
-    `${this.name}:${this.params.prettyPrint()}`
+    `${this.name}:${this.params.prettyPrint()}:${this.instance}`
+  }
+
+  fun toId(): String {
+    `${toResourceId(this.name, this.params)}_${this.instance}`
   }
 }
 
@@ -170,6 +175,11 @@ class RemoteSpecifiers(
   value: Map<String, ExternalService>,
 ) extends SKStore.File
 
+class StatusRef(
+  resourceId: String,
+  statusRef: SKStore.DirName,
+) extends SKStore.File
+
 class ResourceInfo(
   name: String,
   collection: Collection,
@@ -233,11 +243,11 @@ fun buildResourcesGraph(
   );
   statusesHdl = availablesHdl.map(
     ResourceDef::keyType,
-    SKStore.StringFile::type,
+    StatusRef::type,
     context,
     kResourceStatusDir,
     (context, writer, key, _it) ~> {
-      resourceId = toResourceId(key.name, key.params);
+      resourceId = `${key.toId()}`;
       statusRef = dirname.sub(resourceId);
       // Status graph
       sStatusHdl = context
@@ -271,7 +281,7 @@ fun buildResourcesGraph(
           writer.set(key, requestStatuses);
         },
       );
-      writer.set(key, SKStore.StringFile(statusRef.toString()));
+      writer.set(key, StatusRef(resourceId, statusRef));
     },
   );
   _ = statusesHdl.map(
@@ -280,8 +290,8 @@ fun buildResourcesGraph(
     context,
     kResourceCollectionsDir,
     (context, writer, key, it) ~> {
-      resourceId = toResourceId(key.name, key.params);
-      statusRef = SKStore.DirName::create(it.first.value);
+      resourceId = it.first.resourceId;
+      statusRef = it.first.statusRef;
       (runId, resources) = definitionHdl.maybeGet(
         context,
         SKStore.UnitID::singleton,
@@ -1065,7 +1075,7 @@ private fun sessionId(
   context: readonly SKStore.Context,
   dir: SKStore.EagerDir,
 ): ?String {
-  resourceId(context, dir).map(def -> toResourceId(def.name, def.params))
+  resourceId(context, dir).map(def -> def.toId())
 }
 
 private fun isResourceDir(dirName: SKStore.DirName): Bool {
@@ -1129,10 +1139,7 @@ class CollectionWriter(dirName: SKStore.DirName) {
     | Some(dir) ->
       optResource = resourceId(context, dir);
       dirname = optResource match {
-      | Some(def) ->
-        kResourceSessionDir
-          .sub(toResourceId(def.name, def.params))
-          .sub("status")
+      | Some(def) -> kResourceSessionDir.sub(`${def.toId()}`).sub("status")
       | _ -> kSessionDir.sub("status")
       };
       shdl = SKStore.EHandle(
