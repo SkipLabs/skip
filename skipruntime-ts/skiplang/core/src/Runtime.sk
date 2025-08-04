@@ -217,6 +217,11 @@ fun buildResourcesGraph(
     dirname,
   );
   _ = context.mkdir(
+    ResourceDef::keyType,
+    SKStore.IntFile::type,
+    dirname.sub("active"),
+  );
+  _ = context.mkdir(
     SKStore.SID::keyType,
     SKStore.IntFile::type,
     kResourceGarbageDir,
@@ -432,11 +437,19 @@ fun closeService_(
     ResourceDef::type,
     kResourceSessionDir,
   );
+  activeHdl = SKStore.EHandle(
+    ResourceDef::keyType,
+    SKStore.IntFile::type,
+    kResourceSessionDir.sub("active"),
+  );
   todestroy = mutable Vector[];
   resourceHdl.items(context).each(kf -> {
     kf.i1.next().each(_f -> todestroy.push(kf.i0))
   });
-  todestroy.each(key -> destroyReactiveResource(context, key));
+  todestroy.each(key -> _ = destroyReactiveResource(context, key));
+  activeHdl.items(context).each(kf ->
+    activeHdl.writeArray(context, kf.i0, Array[])
+  );
   sessionHdl = SKStore.EHandle(
     SKStore.UnitID::keyType,
     ServiceDefinition::type,
@@ -1177,13 +1190,7 @@ fun getAll(
   resourceName: String,
   params: SKJSON.CJSON,
 ): GetResult<Values> {
-  graphHdl = SKStore.EHandle(
-    ResourceDef::keyType,
-    ResourceInfo::type,
-    kResourceCollectionsDir,
-  );
-  resourceID = ResourceDef(resourceName, params);
-  resource = graphHdl.get(context, resourceID);
+  resource = getResourceInfo(context, resourceName, params);
   resource.getResult(
     context,
     Values(
@@ -1199,13 +1206,7 @@ fun getForKey(
   params: SKJSON.CJSON,
   key: SKJSON.CJSON,
 ): GetResult<Array<SKJSON.CJSON>> {
-  graphHdl = SKStore.EHandle(
-    ResourceDef::keyType,
-    ResourceInfo::type,
-    kResourceCollectionsDir,
-  );
-  resourceID = ResourceDef(resourceName, params);
-  resource = graphHdl.get(context, resourceID);
+  resource = getResourceInfo(context, resourceName, params);
   pushContext(context);
   values = resource.collection.getArray(key);
   popContext();
@@ -1215,7 +1216,7 @@ fun getForKey(
 fun destroyReactiveResource(
   context: mutable SKStore.Context,
   sid: SKStore.SID,
-): void {
+): ResourceDef {
   context
     .getPersistent(`subscription.${sid}`)
     .map(SKStore.IntFile::type) match {
@@ -1232,12 +1233,14 @@ fun destroyReactiveResource(
     })
   | _ -> void
   };
-  resourceHdl = SKStore.EHandle(
+  resourcesHdl = SKStore.EHandle(
     SKStore.SID::keyType,
     ResourceDef::type,
     kResourceSessionDir,
   );
-  resourceHdl.writeArray(context, sid, Array[]);
+  defintion = resourcesHdl.get(context, sid);
+  resourcesHdl.writeArray(context, sid, Array[]);
+  defintion
 }
 
 fun closeReactiveResource(
@@ -1276,23 +1279,12 @@ fun subscribe(
   );
   sid = SKStore.SID(identifier);
   session = SKStore.genSym(0);
-  resourceHdl = SKStore.EHandle(
-    SKStore.SID::keyType,
-    ResourceDef::type,
-    kResourceSessionDir,
-  );
-  resourcesCollectionsHdl = SKStore.EHandle(
-    ResourceDef::keyType,
-    ResourceInfo::type,
-    kResourceCollectionsDir,
-  );
   subId = `subscription.${identifier}`;
   if (context.getPersistent(subId).isSome()) {
     return -2
   };
-  resourceHdl.maybeGet(context, sid) match {
-  | Some(definition) ->
-    info = resourcesCollectionsHdl.get(context, definition);
+  maybeGetReactiveResource(context, identifier) match {
+  | Some(info) ->
     start = `${info.session}/`;
     from = SKStore.Tick(
       optWatermark match {
@@ -1306,8 +1298,7 @@ fun subscribe(
       session,
       SKStore.TNWatch<SKStore.Key, SKStore.File>{
         dirNameGetter => ctx ~> {
-          resourcesCollectionsHdl.unsafeGet(ctx, definition).collection.hdl
-            .dirName
+          unsafeGetReactiveResource(ctx, identifier).collection.hdl.dirName
         },
         identifier,
         from,
@@ -1451,41 +1442,106 @@ fun createReactiveResource(
     ResourceDef::type,
     kResourceSessionDir,
   );
-  graphHdl = SKStore.EHandle(
+  activeKey = ResourceDef(resource, params);
+  activeHdl = SKStore.EHandle(
     ResourceDef::keyType,
-    ResourceInfo::type,
-    kResourceCollectionsDir,
+    SKStore.IntFile::type,
+    kResourceSessionDir.sub("active"),
   );
   key = SKStore.SID(identifier);
   resourceHdl.maybeGet(context, key) match {
   | Some _ -> throw ExistingResourceException()
   | _ -> void
   };
-  definition = ResourceDef(resource, params);
-  resourceHdl.writeArray(context, key, Array[definition]);
-  context.update();
+  definition = activeHdl.maybeGet(context, activeKey) match {
+  | Some(activeFile) ->
+    // Add the instance for corresponding active resource
+    definition = ResourceDef(resource, params, activeFile.value);
+    resourceHdl.writeArray(context, key, Array[definition]);
+    context.update();
+    definition
+  | _ ->
+    active = SKStore.genSym(0);
+    definition = ResourceDef(resource, params, active);
+    activeHdl.writeArray(context, activeKey, Array[SKStore.IntFile(active)]);
+    resourceHdl.writeArray(context, key, Array[definition]);
+    context.update();
+    definition
+  };
   checkResourceInstanceSubcriptions(context, definition, identifier, executor);
   checkGarbage(context);
-  graphHdl.get(context, definition);
+  SKStore.EHandle(
+    ResourceDef::keyType,
+    ResourceInfo::type,
+    kResourceCollectionsDir,
+  ).get(context, definition);
 }
 
 fun getReactiveResource(
   context: mutable SKStore.Context,
   identifier: String,
 ): ResourceInfo {
-  resourceHdl = SKStore.EHandle(
-    SKStore.SID::keyType,
-    ResourceDef::type,
-    kResourceSessionDir,
-  );
+  maybeGetReactiveResource(context, identifier) match {
+  | Some(ri) -> ri
+  | _ ->
+    invariant_violation(`Reactive resource ${identifier} should be defined.`)
+  }
+}
+
+fun maybeGetReactiveResource(
+  context: mutable SKStore.Context,
+  identifier: String,
+): ?ResourceInfo {
   graphHdl = SKStore.EHandle(
     ResourceDef::keyType,
     ResourceInfo::type,
     kResourceCollectionsDir,
   );
-  key = SKStore.SID(identifier);
-  definition = resourceHdl.get(context, key);
-  graphHdl.get(context, definition);
+  SKStore.EHandle(SKStore.SID::keyType, ResourceDef::type, kResourceSessionDir)
+    .maybeGet(context, SKStore.SID(identifier))
+    .map(definition -> graphHdl.get(context, definition))
+}
+
+fun unsafeMaybeGetReactiveResource(
+  context: readonly SKStore.Context,
+  identifier: String,
+): ?ResourceInfo {
+  graphHdl = SKStore.EHandle(
+    ResourceDef::keyType,
+    ResourceInfo::type,
+    kResourceCollectionsDir,
+  );
+  SKStore.EHandle(SKStore.SID::keyType, ResourceDef::type, kResourceSessionDir)
+    .unsafeMaybeGet(context, SKStore.SID(identifier))
+    .map(definition -> graphHdl.unsafeGet(context, definition))
+}
+
+fun unsafeGetReactiveResource(
+  context: readonly SKStore.Context,
+  identifier: String,
+): ResourceInfo {
+  unsafeMaybeGetReactiveResource(context, identifier) match {
+  | Some(ri) -> ri
+  | _ ->
+    invariant_violation(`Reactive resource ${identifier} should be defined.`)
+  }
+}
+
+fun getResourceInfo(
+  context: mutable SKStore.Context,
+  resource: String,
+  params: SKJSON.CJSON,
+): ResourceInfo {
+  activeFile = SKStore.EHandle(
+    ResourceDef::keyType,
+    SKStore.IntFile::type,
+    kResourceSessionDir.sub("active"),
+  ).get(context, ResourceDef(resource, params));
+  SKStore.EHandle(
+    ResourceDef::keyType,
+    ResourceInfo::type,
+    kResourceCollectionsDir,
+  ).get(context, ResourceDef(resource, params, activeFile.value));
 }
 
 fun checkGarbage(context: mutable SKStore.Context): void {
@@ -1501,18 +1557,57 @@ fun checkGarbage(context: mutable SKStore.Context): void {
   );
   time = Time.time_ms();
   destroyed = mutable Vector[];
+  resources = SortedSet[];
   garbageHdl.items(context).each(kf -> {
     kf.i1.next().each(f -> {
       suppressed = f.value;
       if (time - suppressed > kGarbageMillis) {
         key = kf.i0;
+        !resources = resources.set(resourceHdl.get(context, key));
         destroyed.push(key);
         resourceHdl.writeArray(context, key, Array[]);
       }
     })
   });
   destroyed.each(key -> garbageHdl.writeArray(context, key, Array[]));
-  if (!destroyed.isEmpty()) context.update();
+  if (!destroyed.isEmpty()) {
+    context.update();
+    if (checkResources(context, resources)) context.update();
+  }
+}
+
+fun checkResources(
+  context: mutable SKStore.Context,
+  resources: SortedSet<ResourceDef>,
+): Bool {
+  idbyresourceHdl = SKStore.EHandle(
+    ResourceDef::keyType,
+    SKStore.StringFile::type,
+    kResourceSessionDir.sub("idbyresource"),
+  );
+  activeHdl = SKStore.EHandle(
+    ResourceDef::keyType,
+    SKStore.IntFile::type,
+    kResourceSessionDir.sub("active"),
+  );
+  availablesHdl = SKStore.EHandle(
+    ResourceDef::keyType,
+    SKStore.IntFile::type,
+    kResourceAvailablesDir,
+  );
+  hasDestruction = false;
+  for (resource in resources) {
+    values = idbyresourceHdl.getArray(context, resource);
+    if (values.isEmpty()) {
+      !hasDestruction = true;
+      activeKey = resource with {instance => 0};
+      activeHdl.maybeGet(context, activeKey).each(_ -> {
+        activeHdl.writeArray(context, activeKey, Array[]);
+      });
+      availablesHdl.writeArray(context, resource, Array[]);
+    }
+  };
+  hasDestruction
 }
 
 fun updateContext(context: mutable SKStore.Context): void {
