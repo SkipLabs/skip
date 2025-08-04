@@ -382,10 +382,15 @@ private fun checkInitialization(
           | _ -> void
           }
         | (ResourceInitialization(instances, _), Some _) ->
-          instances.each(info -> {
-            info.i1.reject(ResourceInstanceInitFailed(errors));
-            destroyReactiveResource(context, SKStore.SID(info.i0))
-          })
+          resources = SortedSet::createFromItems(
+            instances.map(info -> {
+              info.i1.reject(ResourceInstanceInitFailed(errors));
+              destroyReactiveResource(context, SKStore.SID(info.i0))
+            }),
+          );
+          context.update();
+          if (checkResources(context, resources)) context.update()
+
         | _ -> invariant_violation("Invalid initialisation state.")
         }
       };
