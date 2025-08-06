@@ -24,6 +24,7 @@ SKMapper SkipRuntime_createMapper(int32_t ref);
 SKLazyCompute SkipRuntime_createLazyCompute(int32_t ref);
 SKResource SkipRuntime_createResource(int32_t ref);
 SKExecutor SkipRuntime_createExecutor(int32_t ref);
+SKExecutor SkipRuntime_createIntExecutor(int32_t ref);
 SKService SkipRuntime_createService(int32_t ref);
 SKNotifier SkipRuntime_createNotifier(int32_t ref);
 SKReducer SkipRuntime_createReducer(int32_t ref, CJSON json);
@@ -53,6 +54,12 @@ double SkipRuntime_Runtime__createResource(char* identifier, char* resource,
                                            CJObject jsonParams,
                                            SKExecutor executor);
 double SkipRuntime_Runtime__closeResource(char* identifier);
+CJArray SkipRuntime_Runtime__resourceInstances(CJArray resources);
+double SkipRuntime_Runtime__reloadResource(char* resource, CJObject jsonParams,
+                                           SKExecutor executor);
+double SkipRuntime_Runtime__replaceActiveResources(CJArray resources);
+double SkipRuntime_Runtime__destroyResources(CJArray resources);
+
 int64_t SkipRuntime_Runtime__subscribe(char* reactiveId, SKNotifier notifier,
                                        char* watermark);
 double SkipRuntime_Runtime__unsubscribe(int64_t id);
@@ -332,6 +339,27 @@ void CreateExecutor(const FunctionCallbackInfo<Value>& args) {
   NatTryCatch(isolate, [&args](Isolate* isolate) {
     SKExecutor skExecutor =
         SkipRuntime_createExecutor(args[0].As<Int32>()->Value());
+    args.GetReturnValue().Set(External::New(isolate, skExecutor));
+  });
+}
+
+void CreateIntExecutor(const FunctionCallbackInfo<Value>& args) {
+  Isolate* isolate = args.GetIsolate();
+  if (args.Length() != 1) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(
+        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
+    return;
+  };
+  if (!args[0]->IsNumber()) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(Exception::TypeError(
+        FromUtf8(isolate, "The parameter must be a number.")));
+    return;
+  }
+  NatTryCatch(isolate, [&args](Isolate* isolate) {
+    SKExecutor skExecutor =
+        SkipRuntime_createIntExecutor(args[0].As<Int32>()->Value());
     args.GetReturnValue().Set(External::New(isolate, skExecutor));
   });
 }
@@ -826,6 +854,76 @@ void CloseResourceOfRuntime(const FunctionCallbackInfo<Value>& args) {
   });
 }
 
+void ResourceInstancesOfRuntime(const FunctionCallbackInfo<Value>& args) {
+  Isolate* isolate = args.GetIsolate();
+  if (args.Length() != 1 || !args[0]->IsExternal()) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(Exception::TypeError(
+        FromUtf8(isolate, "The parameter must be a pointer.")));
+    return;
+  }
+  NatTryCatch(isolate, [&args](Isolate* isolate) {
+    CJArray skresources = args[0].As<External>()->Value();
+    CJArray skinstances = SkipRuntime_Runtime__resourceInstances(skresources);
+    args.GetReturnValue().Set(External::New(isolate, skinstances));
+  });
+}
+
+void ReloadResourceOfRuntime(const FunctionCallbackInfo<Value>& args) {
+  Isolate* isolate = args.GetIsolate();
+  if (args.Length() != 3) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(
+        Exception::TypeError(FromUtf8(isolate, "Must have four parameters.")));
+    return;
+  }
+  if (!args[0]->IsString() || !args[1]->IsExternal() ||
+      !args[2]->IsExternal()) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(
+        Exception::TypeError(FromUtf8(isolate, "Invalid parameters.")));
+    return;
+  }
+  NatTryCatch(isolate, [&args](Isolate* isolate) {
+    char* skresource = ToSKString(isolate, args[0].As<String>());
+    CJObject skparams = args[1].As<External>()->Value();
+    CJObject skexecutor = args[2].As<External>()->Value();
+    double skerror =
+        SkipRuntime_Runtime__reloadResource(skresource, skparams, skexecutor);
+    args.GetReturnValue().Set(Number::New(isolate, skerror));
+  });
+}
+
+void ReplaceActiveResourcesOfRuntime(const FunctionCallbackInfo<Value>& args) {
+  Isolate* isolate = args.GetIsolate();
+  if (args.Length() != 1 || !args[0]->IsExternal()) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(Exception::TypeError(
+        FromUtf8(isolate, "The parameter must be a pointer.")));
+    return;
+  }
+  NatTryCatch(isolate, [&args](Isolate* isolate) {
+    CJArray skresources = args[0].As<External>()->Value();
+    double skerror = SkipRuntime_Runtime__replaceActiveResources(skresources);
+    args.GetReturnValue().Set(Number::New(isolate, skerror));
+  });
+}
+
+void DestroyResourcesOfRuntime(const FunctionCallbackInfo<Value>& args) {
+  Isolate* isolate = args.GetIsolate();
+  if (args.Length() != 1 || !args[0]->IsExternal()) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(Exception::TypeError(
+        FromUtf8(isolate, "The parameter must be a pointer.")));
+    return;
+  }
+  NatTryCatch(isolate, [&args](Isolate* isolate) {
+    CJArray skresources = args[0].As<External>()->Value();
+    double skerror = SkipRuntime_Runtime__destroyResources(skresources);
+    args.GetReturnValue().Set(Number::New(isolate, skerror));
+  });
+}
+
 void UnsubscribeOfRuntime(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
   if (!args[0]->IsNumber() && !args[0]->IsBigInt()) {
@@ -976,6 +1074,8 @@ void GetToJSBinding(const FunctionCallbackInfo<Value>& args) {
               CreateLazyCompute);
   AddFunction(isolate, binding, "SkipRuntime_createResource", CreateResource);
   AddFunction(isolate, binding, "SkipRuntime_createExecutor", CreateExecutor);
+  AddFunction(isolate, binding, "SkipRuntime_createIntExecutor",
+              CreateIntExecutor);
   AddFunction(isolate, binding, "SkipRuntime_createService", CreateService);
   AddFunction(isolate, binding, "SkipRuntime_createNotifier", CreateNotifier);
   AddFunction(isolate, binding, "SkipRuntime_createReducer", CreateReducer);
@@ -1024,7 +1124,14 @@ void GetToJSBinding(const FunctionCallbackInfo<Value>& args) {
   AddFunction(isolate, binding, "SkipRuntime_Runtime__getForKey",
               GetForKeyOfRuntime);
   AddFunction(isolate, binding, "SkipRuntime_Runtime__update", UpdateOfRuntime);
-
+  AddFunction(isolate, binding, "SkipRuntime_Runtime__resourceInstances",
+              ResourceInstancesOfRuntime);
+  AddFunction(isolate, binding, "SkipRuntime_Runtime__reloadResource",
+              ReloadResourceOfRuntime);
+  AddFunction(isolate, binding, "SkipRuntime_Runtime__replaceActiveResources",
+              ReplaceActiveResourcesOfRuntime);
+  AddFunction(isolate, binding, "SkipRuntime_Runtime__destroyResources",
+              DestroyResourcesOfRuntime);
   args.GetReturnValue().Set(binding);
 }
 
