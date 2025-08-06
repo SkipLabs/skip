@@ -91,11 +91,11 @@ class Notifier {
 
   checkInit<K extends Json, V extends Json>(values: Entry<K, V>[]) {
     this.check((updates) => {
+      expect(updates.length).toEqual(1);
       expect([
-        updates.length,
         updates[0]!.isInitial ? true : false,
         updates[0]!.values,
-      ]).toEqual([1, true, values]);
+      ]).toEqual([true, values]);
     });
   }
 
@@ -1098,7 +1098,7 @@ const resourceRecomputeNotificationsService: SkipService<
   },
 };
 
-// testReloadMapper
+// testReload
 
 class ReloadMapper implements Mapper<number, number, number, number> {
   mapEntry(key: number, values: Values<number>): Iterable<[number, number]> {
@@ -1112,14 +1112,16 @@ class ReloadResource implements Resource<Input_NN> {
   }
 }
 
-const reloadMapService: SkipService<Input_NN, Input_NN> = {
-  initialData: { input: [] },
-  resources: { "reload-map": ReloadResource },
+function reloadService(): SkipService<Input_NN, Input_NN> {
+  return {
+    initialData: { input: [] },
+    resources: { "reload-map": ReloadResource },
 
-  createGraph(inputCollections: Input_NN) {
-    return inputCollections;
-  },
-};
+    createGraph(inputCollections: Input_NN) {
+      return inputCollections;
+    },
+  };
+}
 
 export function initTests(
   category: string,
@@ -1888,37 +1890,75 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
     }
   });
 
-  it("testReloadMap", async () => {
-    const service = await initService(reloadMapService);
-    const resource = "reload-map";
-    await service.update("input", [
-      [1, [2]],
-      [2, [3]],
-    ]);
-    expect((await service.getArray(resource, 0)).sort()).toEqual([3, 5]);
-    const reload = await import("./for-reload.js");
-    service.reload([reload.ReloadMapper]);
-    expect((await service.getArray(resource, 0)).sort()).toEqual([4, 7]);
-    await service.update("input", [
-      [1, [3]],
-      [2, [4]],
-    ]);
-    expect((await service.getArray(resource, 0)).sort()).toEqual([5, 8]);
-    const werror = await import("./with-error.js");
+  it("testReload", async () => {
+    const service = await initService(reloadService());
+    const instanceId = "unsafe.fixed.resource.ident.1";
+    let notifier: Nullable<Notifier> = null;
     try {
-      service.reload([werror.ReloadMapper]);
-      throw new Error("Error was not thrown");
-    } catch (e: unknown) {
-      expect(e).toBeA(Error);
-      expect((e as Error).message).toMatchRegex(
-        new RegExp(/^(?:Error: )?Something goes wrong.$/),
-      );
+      const resource = "reload-map";
+      await service.instantiateResource(instanceId, resource, {});
+      notifier = new Notifier(service, instanceId);
+      notifier.checkInit([]);
+      await service.update("input", [
+        [1, [2]],
+        [2, [3]],
+      ]);
+      expect((await service.getArray(resource, 0)).sort()).toEqual([3, 5]);
+      notifier.checkUpdate([[0, [3, 5]]]);
+      const reload = await import("./for-reload.js");
+      service.reload([reload.ReloadMapper]);
+      expect((await service.getArray(resource, 0)).sort()).toEqual([4, 7]);
+      notifier.checkUpdate([[0, [4, 7]]]);
+      await service.update("input", [
+        [1, [3]],
+        [2, [4]],
+      ]);
+      expect((await service.getArray(resource, 0)).sort()).toEqual([5, 8]);
+      notifier.checkUpdate([[0, [5, 8]]]);
+      const werror = await import("./with-error.js");
+      try {
+        service.reload([werror.ReloadMapper]);
+        throw new Error("Error was not thrown");
+      } catch (e: unknown) {
+        expect(e).toBeA(Error);
+        expect((e as Error).message).toMatchRegex(
+          new RegExp(/^(?:Error: )?Something goes wrong.$/),
+        );
+      }
+      // The wrong mapper should not be taken into account
+      expect((await service.getArray(resource, 0)).sort()).toEqual([5, 8]);
+      notifier.checkEmpty();
+      await service.update("input", [
+        [1, [2]],
+        [2, [3]],
+      ]);
+      expect((await service.getArray(resource, 0)).sort()).toEqual([4, 7]);
+      notifier.checkUpdate([[0, [4, 7]]]);
+      await service.reloadResources([reload.ReloadResource]);
+      notifier.checkInit([[1, [5, 8]]]);
+      expect(await service.getArray(resource, 0)).toEqual([]);
+      expect((await service.getArray(resource, 1)).sort()).toEqual([5, 8]);
+      try {
+        await service.reloadResources([werror.ReloadResource]);
+        throw new Error("Error was not thrown");
+      } catch (e: unknown) {
+        expect(e).toBeA(Error);
+        expect((e as Error).message).toMatchRegex(
+          new RegExp(/^(?:Error: )?Something goes wrong.$/),
+        );
+      }
+      // The wrong resource should not be taken into account
+      expect((await service.getArray(resource, 1)).sort()).toEqual([5, 8]);
+      notifier.checkEmpty();
+      await service.update("input", [
+        [1, [3]],
+        [2, [4]],
+      ]);
+      expect((await service.getArray(resource, 1)).sort()).toEqual([6, 9]);
+      notifier.checkUpdate([[1, [6, 9]]]);
+    } finally {
+      if (notifier) notifier.close();
+      await service.close();
     }
-    // The wrong mapper should not be taken into account
-    await service.update("input", [
-      [1, [2]],
-      [2, [3]],
-    ]);
-    expect((await service.getArray(resource, 0)).sort()).toEqual([4, 7]);
   });
 }
