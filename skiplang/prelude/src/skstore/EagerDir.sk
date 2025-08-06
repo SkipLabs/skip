@@ -725,6 +725,12 @@ base class EagerDir protected {
     this
   }
 
+  // renew creation time to force notification
+  fun renew(context: mutable Context): void {
+    !this.created = context.getTick();
+    context.setDir(this);
+  }
+
   protected fun writeDiff(
     isReset: Bool,
     changes: mutable Iterator<Key>,

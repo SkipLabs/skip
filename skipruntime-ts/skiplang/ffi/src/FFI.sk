@@ -191,6 +191,25 @@ class ExternExecutor(eptr: SKStore.ExternalPointer) extends Executor {
   }
 }
 
+@cpp_extern("SkipRuntime_IntExecutor__resolve")
+@debug
+native fun resolveOfIntExecutor(executor: UInt32, value: Int): void;
+
+@export("SkipRuntime_createIntExecutor")
+fun createIntExecutor(executor: UInt32): ExternIntExecutor {
+  ExternIntExecutor(SKStore.ExternalPointer::create(executor, deleteExecutor))
+}
+
+class ExternIntExecutor(eptr: SKStore.ExternalPointer) extends IntExecutor {
+  fun resolve(value: Int): void {
+    resolveOfIntExecutor(this.eptr.value, value)
+  }
+
+  fun reject(exc: .Exception): void {
+    rejectOfExecutor(this.eptr.value, getErrorHdl(exc))
+  }
+}
+
 /************  Service ****************/
 
 @export("SkipRuntime_createService")
@@ -514,6 +533,87 @@ fun createResourceOfRuntime(
 ): Float {
   SKStore.runWithResult(context ~> {
     createReactiveResource(context, identifier, resource, params, executor)
+  }) match {
+  | Success _ -> 0.0
+  | Failure(err) -> getErrorHdl(err)
+  };
+}
+
+@export("SkipRuntime_Runtime__resourceInstances")
+fun resourceInstancesOfRuntime(jsResources: SKJSON.CJSON): SKJSON.CJArray {
+  SKStore.runWithResult(context ~> {
+    resources = SKJSON.expectArray(jsResources).map(SKJSON.asString);
+    instances = resourceInstances(
+      context,
+      SortedSet::createFromItems(resources),
+    );
+    SKJSON.CJArray(
+      instances.map(def -> {
+        SKJSON.CJObject(
+          SKJSON.CJFields::create(
+            Array<(String, SKJSON.CJSON)>[
+              ("resource", SKJSON.CJString(def.name)),
+              ("params", def.params),
+            ],
+            x -> x,
+          ),
+        )
+      }),
+    )
+  }) match {
+  | Success(arr) -> arr
+  | Failure(err) -> throw err
+  };
+}
+
+@export("SkipRuntime_Runtime__reloadResource")
+fun reloadResourceOfRuntime(
+  resource: String,
+  params: SKJSON.CJSON,
+  executor: IntExecutor,
+): Float {
+  SKStore.runWithResult(context ~> {
+    reloadResource(context, resource, params, executor)
+  }) match {
+  | Success _ -> 0.0
+  | Failure(err) -> getErrorHdl(err)
+  };
+}
+
+@export("SkipRuntime_Runtime__replaceActiveResources")
+fun replaceActiveResourcesOfRuntime(jsResources: SKJSON.CJSON): Float {
+  SKStore.runWithResult(context ~> {
+    resources = SKJSON.expectArray(jsResources).map(jsvalue -> {
+      obj = SKJSON.asObject(jsvalue);
+      ResourceDef(
+        SKJSON.getString(obj, "resource").fromSome("resource must be defined."),
+        SKJSON.getValue(obj, "params").fromSome("params must be defined."),
+        SKJSON.getValue(obj, "instance")
+          .map(v -> SKJSON.asNumber(v).toInt())
+          .fromSome("instance must be defined."),
+      )
+    });
+    replaceActiveResources(context, resources)
+  }) match {
+  | Success _ -> 0.0
+  | Failure(err) -> getErrorHdl(err)
+  };
+}
+
+@export("SkipRuntime_Runtime__destroyResources")
+fun destroyResourcesOfRuntime(jsResources: SKJSON.CJSON): Float {
+  SKStore.runWithResult(context ~> {
+    resources = SKJSON.expectArray(jsResources).map(jsvalue -> {
+      obj = SKJSON.asObject(jsvalue);
+      ResourceDef(
+        SKJSON.getString(obj, "resource").fromSome("resource must be defined."),
+        SKJSON.getValue(obj, "params").fromSome("params must be defined."),
+        SKJSON.getValue(obj, "instance")
+          .map(v -> SKJSON.asNumber(v).toInt())
+          .fromSome("instance must be defined."),
+      )
+    });
+    destroyResources(context, resources)
   }) match {
   | Success _ -> 0.0
   | Failure(err) -> getErrorHdl(err)

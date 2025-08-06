@@ -85,6 +85,11 @@ class ResourceDef(
   fun toId(): String {
     `${toResourceId(this.name, this.params)}_${this.instance}`
   }
+
+  fun derive(instance: Int = 0): ResourceDef {
+    !this.instance = instance;
+    this;
+  }
 }
 
 class ResourceStatus(
@@ -1491,6 +1496,124 @@ fun createReactiveResource(
     ResourceInfo::type,
     kResourceCollectionsDir,
   ).get(context, definition);
+}
+
+class ReloadExecutor(executor: IntExecutor, id: Int) extends Executor {
+  fun resolve(): void {
+    this.executor.resolve(this.id)
+  }
+
+  fun reject(exc: .Exception): void {
+    this.executor.reject(exc)
+  }
+}
+
+fun resourceInstances(
+  context: mutable SKStore.Context,
+  resources: SortedSet<String>,
+): Array<ResourceDef> {
+  activeHdl = SKStore.EHandle(
+    ResourceDef::keyType,
+    SKStore.IntFile::type,
+    kResourceSessionDir.sub("active"),
+  );
+  instances = mutable Vector[];
+  activeHdl.items(context).each(kf ->
+    if (resources.contains(kf.i0.name)) instances.push(kf.i0)
+  );
+  instances.toArray()
+}
+
+fun reloadResource(
+  context: mutable SKStore.Context,
+  resource: String,
+  params: SKJSON.CJSON,
+  executor: IntExecutor,
+): void {
+  reloadId = Ksuid::create().toString();
+  resourceHdl = SKStore.EHandle(
+    SKStore.SID::keyType,
+    ResourceDef::type,
+    kResourceSessionDir,
+  );
+  definition = ResourceDef(resource, params, SKStore.genSym(0));
+  resourceHdl.writeArray(context, SKStore.SID(reloadId), Array[definition]);
+  context.update();
+  checkResourceInstanceSubcriptions(
+    context,
+    definition,
+    reloadId,
+    ReloadExecutor(executor, definition.instance),
+  );
+}
+
+fun replaceActiveResources(
+  context: mutable SKStore.Context,
+  definitions: Array<ResourceDef>,
+): void {
+  resourceHdl = SKStore.EHandle(
+    SKStore.SID::keyType,
+    ResourceDef::type,
+    kResourceSessionDir,
+  );
+  activeHdl = SKStore.EHandle(
+    ResourceDef::keyType,
+    SKStore.IntFile::type,
+    kResourceSessionDir.sub("active"),
+  );
+  idbyresourceHdl = SKStore.EHandle(
+    ResourceDef::keyType,
+    SKStore.StringFile::type,
+    kResourceSessionDir.sub("idbyresource"),
+  );
+  definitions.each(d -> {
+    activeKey = d.derive();
+    activeInstance = activeHdl.get(context, activeKey).value;
+    activeDef = d.derive(activeInstance);
+    // remove reload id
+    idbyresourceHdl.getArray(context, d).each(sidf -> {
+      resourceHdl.writeArray(context, SKStore.SID(sidf.value), Array[])
+    });
+    // replace active def id
+    idbyresourceHdl.getArray(context, activeDef).each(sidf -> {
+      resourceHdl.writeArray(context, SKStore.SID(sidf.value), Array[d])
+    });
+    activeHdl.writeArray(
+      context,
+      activeKey,
+      Array[SKStore.IntFile(d.instance)],
+    );
+  });
+  // Force the notification of replaced resources
+  graphHdl = SKStore.EHandle(
+    ResourceDef::keyType,
+    ResourceInfo::type,
+    kResourceCollectionsDir,
+  );
+  definitions.each(d -> graphHdl.get(context, d).collection.hdl.renew(context));
+  updateContext(context);
+}
+
+fun destroyResources(
+  context: mutable SKStore.Context,
+  definitions: Array<ResourceDef>,
+): void {
+  resourceHdl = SKStore.EHandle(
+    SKStore.SID::keyType,
+    ResourceDef::type,
+    kResourceSessionDir,
+  );
+  idbyresourceHdl = SKStore.EHandle(
+    ResourceDef::keyType,
+    SKStore.StringFile::type,
+    kResourceSessionDir.sub("idbyresource"),
+  );
+  definitions.each(d -> {
+    idbyresourceHdl.getArray(context, d).each(sidf -> {
+      resourceHdl.writeArray(context, SKStore.SID(sidf.value), Array[])
+    })
+  });
+  updateContext(context);
 }
 
 fun getReactiveResource(

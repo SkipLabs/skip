@@ -12,6 +12,7 @@ using skbinding::CallJSStringFunction;
 using skbinding::CallJSVoidFunction;
 using skbinding::FromUtf8;
 
+using v8::BigInt;
 using v8::External;
 using v8::Isolate;
 using v8::Local;
@@ -128,6 +129,15 @@ void SkipRuntime_Executor__resolve(uint32_t checkerId) {
   Local<Value> argv[1] = {Number::New(isolate, checkerId)};
   CallJSVoidFunction(isolate, externFunctions, "SkipRuntime_Executor__resolve",
                      1, argv);
+}
+
+void SkipRuntime_IntExecutor__resolve(uint32_t checkerId, int64_t instance) {
+  Isolate* isolate = Isolate::GetCurrent();
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[2] = {Number::New(isolate, checkerId),
+                          BigInt::New(isolate, instance)};
+  CallJSVoidFunction(isolate, externFunctions,
+                     "SkipRuntime_IntExecutor__resolve", 2, argv);
 }
 
 void SkipRuntime_Executor__reject(uint32_t checkerId, double handle) {

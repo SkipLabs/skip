@@ -32,6 +32,7 @@ import type {
   Handle,
   Notifier,
   Executor,
+  IntExecutor,
 } from "@skipruntime/core/binding.js";
 
 import type { Json } from "@skipruntime/core/json.js";
@@ -170,6 +171,24 @@ export interface FromWasm {
     executor: ptr<Internal.Executor>,
   ): Handle<Error>;
 
+  SkipRuntime_Runtime__resourceInstances(
+    resources: ptr<Internal.CJArray<Internal.CJString>>,
+  ): ptr<Internal.CJArray<Internal.CJObject>>;
+
+  SkipRuntime_Runtime__reloadResource(
+    resource: ptr<Internal.String>,
+    jsonParams: ptr<Internal.CJObject>,
+    executor: ptr<Internal.Executor>,
+  ): Handle<Error>;
+
+  SkipRuntime_Runtime__replaceActiveResources(
+    resources: ptr<Internal.CJArray<Internal.CJObject>>,
+  ): Handle<Error>;
+
+  SkipRuntime_Runtime__destroyResources(
+    resources: ptr<Internal.CJArray<Internal.CJObject>>,
+  ): Handle<Error>;
+
   SkipRuntime_Runtime__getAll(
     resource: ptr<Internal.String>,
     params: ptr<Internal.CJSON>,
@@ -238,6 +257,9 @@ export interface FromWasm {
   // Executor
 
   SkipRuntime_createExecutor(ref: Handle<Executor>): ptr<Internal.Executor>;
+  SkipRuntime_createIntExecutor(
+    ref: Handle<IntExecutor>,
+  ): ptr<Internal.Executor>;
 }
 
 interface ToWasm {
@@ -372,6 +394,10 @@ interface ToWasm {
   // Executor
 
   SkipRuntime_Executor__resolve(skexecutor: Handle<Executor>): void;
+  SkipRuntime_IntExecutor__resolve(
+    skexecutor: Handle<IntExecutor>,
+    value: bigint,
+  ): void;
 
   SkipRuntime_Executor__reject(
     skexecutor: Handle<Executor>,
@@ -607,6 +633,42 @@ export class WasmFromBinding implements FromBinding {
     );
   }
 
+  SkipRuntime_Runtime__resourceInstances(
+    resources: ptr<Internal.CJArray<Internal.CJString>>,
+  ): ptr<Internal.CJArray<Internal.CJObject>> {
+    return this.fromWasm.SkipRuntime_Runtime__resourceInstances(
+      toPtr(resources),
+    );
+  }
+
+  SkipRuntime_Runtime__reloadResource(
+    resource: string,
+    params: ptr<Internal.CJObject>,
+    executor: ptr<Internal.Executor>,
+  ): Handle<Error> {
+    return this.fromWasm.SkipRuntime_Runtime__reloadResource(
+      this.utils.exportString(resource),
+      toPtr(params),
+      toPtr(executor),
+    );
+  }
+
+  SkipRuntime_Runtime__replaceActiveResources(
+    resources: ptr<Internal.CJArray<Internal.CJObject>>,
+  ): Handle<Error> {
+    return this.fromWasm.SkipRuntime_Runtime__replaceActiveResources(
+      toPtr(resources),
+    );
+  }
+
+  SkipRuntime_Runtime__destroyResources(
+    resources: ptr<Internal.CJArray<Internal.CJObject>>,
+  ): Handle<Error> {
+    return this.fromWasm.SkipRuntime_Runtime__destroyResources(
+      toPtr(resources),
+    );
+  }
+
   SkipRuntime_Runtime__getAll(
     resource: string,
     params: Pointer<Internal.CJSON>,
@@ -726,6 +788,12 @@ export class WasmFromBinding implements FromBinding {
     ref: Handle<Executor>,
   ): Pointer<Internal.Executor> {
     return this.fromWasm.SkipRuntime_createExecutor(ref);
+  }
+
+  SkipRuntime_createIntExecutor(
+    ref: Handle<IntExecutor>,
+  ): Pointer<Internal.Executor> {
+    return this.fromWasm.SkipRuntime_createIntExecutor(ref);
   }
 }
 
@@ -989,6 +1057,10 @@ class LinksImpl implements Links {
     this.tobinding.SkipRuntime_Executor__resolve(skexecutor);
   }
 
+  resolveOfIntExecutor(skexecutor: Handle<IntExecutor>, value: bigint) {
+    this.tobinding.SkipRuntime_IntExecutor__resolve(skexecutor, value);
+  }
+
   rejectOfExecutor(skexecutor: Handle<Executor>, error: Handle<Error>) {
     this.tobinding.SkipRuntime_Executor__reject(skexecutor, error);
   }
@@ -1082,6 +1154,8 @@ class Manager implements ToWasmManager {
     // Executor
 
     toWasm.SkipRuntime_Executor__resolve = links.resolveOfExecutor.bind(links);
+    toWasm.SkipRuntime_IntExecutor__resolve =
+      links.resolveOfIntExecutor.bind(links);
     toWasm.SkipRuntime_Executor__reject = links.rejectOfExecutor.bind(links);
     toWasm.SkipRuntime_deleteExecutor = links.deleteExecutor.bind(links);
 
