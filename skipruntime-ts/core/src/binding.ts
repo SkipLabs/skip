@@ -37,6 +37,11 @@ export type Executor = {
   reject: (reason: Error) => void;
 };
 
+export type IntExecutor = {
+  resolve: (value: bigint) => void;
+  reject: (reason: Error) => void;
+};
+
 export interface FromBinding {
   // NonEmptyIterator
   SkipRuntime_NonEmptyIterator__next(
@@ -161,6 +166,24 @@ export interface FromBinding {
     executor: Pointer<Internal.Executor>,
   ): Handle<Error>;
 
+  SkipRuntime_Runtime__resourceInstances(
+    resources: Pointer<Internal.CJArray<Internal.CJString>>,
+  ): Pointer<Internal.CJArray<Internal.CJObject>>;
+
+  SkipRuntime_Runtime__reloadResource(
+    resource: string,
+    jsonParams: Pointer<Internal.CJObject>,
+    executor: Pointer<Internal.Executor>,
+  ): Handle<Error>;
+
+  SkipRuntime_Runtime__replaceActiveResources(
+    resources: Pointer<Internal.CJArray<Internal.CJObject>>,
+  ): Handle<Error>;
+
+  SkipRuntime_Runtime__destroyResources(
+    resources: Pointer<Internal.CJArray<Internal.CJObject>>,
+  ): Handle<Error>;
+
   SkipRuntime_Runtime__getAll(
     resource: string,
     jsonParams: Pointer<Internal.CJObject>,
@@ -227,4 +250,7 @@ export interface FromBinding {
   // Executor
 
   SkipRuntime_createExecutor(ref: Handle<Executor>): Pointer<Internal.Executor>;
+  SkipRuntime_createIntExecutor(
+    ref: Handle<IntExecutor>,
+  ): Pointer<Internal.Executor>;
 }
