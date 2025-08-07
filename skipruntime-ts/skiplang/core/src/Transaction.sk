@@ -189,7 +189,7 @@ base class InitializationFile(
   services: SortedSet<SKStore.DirName>,
 ) extends SKStore.File {
   children =
-  | ServiceInitialization(executor: Executor)
+  | ServiceInitialization(service: String, executor: Executor)
   | ResourceInitialization(instances: List<(String, Executor)>)
 }
 
@@ -320,6 +320,7 @@ private fun checkResourceInstanceSubcriptions(
 
 private fun checkSubcriptions(
   context: mutable SKStore.Context,
+  identifier: String,
   executor: Executor,
 ): void {
   subcriptions = getSubscriptions(context);
@@ -328,7 +329,7 @@ private fun checkSubcriptions(
   } else {
     context.setPersistent(
       kInitializationsKey,
-      ServiceInitialization(executor, subcriptions),
+      ServiceInitialization(identifier, executor, subcriptions),
     )
   };
 }
@@ -367,18 +368,18 @@ private fun checkInitialization(
     | Some(errors) ->
       if (errors.isEmpty()) {
         init match {
-        | ServiceInitialization(executor, _) -> executor.resolve()
+        | ServiceInitialization(_, executor, _) -> executor.resolve()
         | ResourceInitialization(instances, _) ->
           instances.each(info -> info.i1.resolve())
         }
       } else {
         (init, resource) match {
-        | (ServiceInitialization(executor, _), None()) ->
+        | (ServiceInitialization(service, executor, _), None()) ->
           executor.reject(ServiceInstanceInitFailed(errors));
           context.getPersistent(kTransactionIdKey).map(f ->
             SKStore.StringFile::type(f).value
           ) match {
-          | None() -> _ = closeService_(context, false)
+          | None() -> _ = closeService_(context, service, false)
           | _ -> void
           }
         | (ResourceInitialization(instances, _), Some _) ->
