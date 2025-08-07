@@ -160,6 +160,7 @@ export interface FromBinding {
   // Runtime
 
   SkipRuntime_Runtime__createResource(
+    service: string,
     identifier: string,
     resource: string,
     jsonParams: Pointer<Internal.CJObject>,
@@ -171,6 +172,7 @@ export interface FromBinding {
   ): Pointer<Internal.CJArray<Internal.CJObject>>;
 
   SkipRuntime_Runtime__reloadResource(
+    service: string,
     resource: string,
     jsonParams: Pointer<Internal.CJObject>,
     executor: Pointer<Internal.Executor>,
@@ -185,11 +187,13 @@ export interface FromBinding {
   ): Handle<Error>;
 
   SkipRuntime_Runtime__getAll(
+    service: string,
     resource: string,
     jsonParams: Pointer<Internal.CJObject>,
   ): Pointer<Internal.CJObject | Internal.CJFloat>;
 
   SkipRuntime_Runtime__getForKey(
+    service: string,
     resource: string,
     jsonParams: Pointer<Internal.CJObject>,
     key: Pointer<Internal.CJSON>,
@@ -206,6 +210,7 @@ export interface FromBinding {
   SkipRuntime_Runtime__unsubscribe(id: bigint): Handle<Error>;
 
   SkipRuntime_Runtime__update(
+    service: string,
     input: string,
     values: Pointer<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
     executor: Pointer<Internal.Executor>,
@@ -220,12 +225,15 @@ export interface FromBinding {
 
   // initService
   SkipRuntime_initService(
+    identifier: string,
     service: Pointer<Internal.Service>,
     executor: Pointer<Internal.Executor>,
   ): Handle<Error>;
 
   // closeClose
-  SkipRuntime_closeService(): Handle<Error> | Handle<Promise<unknown>>;
+  SkipRuntime_closeService(
+    identifier: string,
+  ): Handle<Error> | Handle<Promise<unknown>>;
   SkipRuntime_invalidateCollections(
     collections: Pointer<Internal.CJArray<Internal.CJSON>>,
   ): Handle<Error>;
@@ -242,7 +250,7 @@ export interface FromBinding {
   ): Pointer<Internal.CJArray>;
 
   SkipRuntime_Context__useExternalResource(
-    service: string,
+    extservice: string,
     identifier: string,
     params: Pointer<Internal.CJObject>,
   ): string;

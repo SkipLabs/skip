@@ -526,13 +526,21 @@ class JSONReducer(
 
 @export("SkipRuntime_Runtime__createResource")
 fun createResourceOfRuntime(
+  service: String,
   identifier: String,
   resource: String,
   params: SKJSON.CJSON,
   executor: Executor,
 ): Float {
   SKStore.runWithResult(context ~> {
-    createReactiveResource(context, identifier, resource, params, executor)
+    createReactiveResource(
+      context,
+      service,
+      identifier,
+      resource,
+      params,
+      executor,
+    )
   }) match {
   | Success _ -> 0.0
   | Failure(err) -> getErrorHdl(err)
@@ -552,6 +560,7 @@ fun resourceInstancesOfRuntime(jsResources: SKJSON.CJSON): SKJSON.CJArray {
         SKJSON.CJObject(
           SKJSON.CJFields::create(
             Array<(String, SKJSON.CJSON)>[
+              ("service", SKJSON.CJString(def.service)),
               ("resource", SKJSON.CJString(def.name)),
               ("params", def.params),
             ],
@@ -568,12 +577,13 @@ fun resourceInstancesOfRuntime(jsResources: SKJSON.CJSON): SKJSON.CJArray {
 
 @export("SkipRuntime_Runtime__reloadResource")
 fun reloadResourceOfRuntime(
+  service: String,
   resource: String,
   params: SKJSON.CJSON,
   executor: IntExecutor,
 ): Float {
   SKStore.runWithResult(context ~> {
-    reloadResource(context, resource, params, executor)
+    reloadResource(context, service, resource, params, executor)
   }) match {
   | Success _ -> 0.0
   | Failure(err) -> getErrorHdl(err)
@@ -586,6 +596,7 @@ fun replaceActiveResourcesOfRuntime(jsResources: SKJSON.CJSON): Float {
     resources = SKJSON.expectArray(jsResources).map(jsvalue -> {
       obj = SKJSON.asObject(jsvalue);
       ResourceDef(
+        SKJSON.getString(obj, "service").fromSome("service must be defined."),
         SKJSON.getString(obj, "resource").fromSome("resource must be defined."),
         SKJSON.getValue(obj, "params").fromSome("params must be defined."),
         SKJSON.getValue(obj, "instance")
@@ -606,6 +617,7 @@ fun destroyResourcesOfRuntime(jsResources: SKJSON.CJSON): Float {
     resources = SKJSON.expectArray(jsResources).map(jsvalue -> {
       obj = SKJSON.asObject(jsvalue);
       ResourceDef(
+        SKJSON.getString(obj, "service").fromSome("service must be defined."),
         SKJSON.getString(obj, "resource").fromSome("resource must be defined."),
         SKJSON.getValue(obj, "params").fromSome("params must be defined."),
         SKJSON.getValue(obj, "instance")
@@ -621,9 +633,13 @@ fun destroyResourcesOfRuntime(jsResources: SKJSON.CJSON): Float {
 }
 
 @export("SkipRuntime_Runtime__getAll")
-fun getAllOfRuntime(resource: String, params: SKJSON.CJSON): SKJSON.CJSON {
+fun getAllOfRuntime(
+  service: String,
+  resource: String,
+  params: SKJSON.CJSON,
+): SKJSON.CJSON {
   SKStore.runWithResult(context ~> {
-    res = getAll(context, resource, params);
+    res = getAll(context, service, resource, params);
     /* Ensure all resources closed at right time */
     updateContext(context);
     res
@@ -649,12 +665,13 @@ fun getAllOfRuntime(resource: String, params: SKJSON.CJSON): SKJSON.CJSON {
 
 @export("SkipRuntime_Runtime__getForKey")
 fun getForKeyOfRuntime(
+  service: String,
   resource: String,
   params: SKJSON.CJSON,
   key: SKJSON.CJSON,
 ): SKJSON.CJSON {
   SKStore.runWithResult(context ~> {
-    res = getForKey(context, resource, params, key);
+    res = getForKey(context, service, resource, params, key);
     /* Ensure all resources closed at right time */
     updateContext(context);
     res
@@ -707,6 +724,7 @@ fun unsubscribeOfRuntime(session: Int): Float {
 
 @export("SkipRuntime_Runtime__update")
 fun updateOfRuntime(
+  service: String,
   input: String,
   values: SKJSON.CJArray,
   executor: Executor,
@@ -714,6 +732,7 @@ fun updateOfRuntime(
   SKStore.runWithResult(context ~> {
     update(
       context,
+      service,
       input,
       values match {
       | SKJSON.CJArray(vs) ->
@@ -757,8 +776,12 @@ fun useExternalResource(
 /************ initService ****************/
 
 @export("SkipRuntime_initService")
-fun initSkipRuntimeService(service: Service, executor: Executor): Float {
-  initService(service, executor) match {
+fun initSkipRuntimeService(
+  identifier: String,
+  service: Service,
+  executor: Executor,
+): Float {
+  initService(identifier, service, executor) match {
   | Success _ -> 0.0
   | Failure(err) -> getErrorHdl(err)
   };
@@ -767,8 +790,8 @@ fun initSkipRuntimeService(service: Service, executor: Executor): Float {
 /************ closeService ****************/
 
 @export("SkipRuntime_closeService")
-fun closeSkipRuntimeService(): Float {
-  closeService() match {
+fun closeSkipRuntimeService(identifier: String): Float {
+  closeService(identifier) match {
   | Success(handle) -> handle
   | Failure(err) -> -getErrorHdl(err)
   };
