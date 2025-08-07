@@ -38,7 +38,7 @@ base class NWatch{
 } extends CmdKind uses Unsafe.Downcastable
 
 class TNWatch<K: Key, F: File>{
-  fn: (Array<(K, Array<F>)>, Tick, Bool) ~> void,
+  fn: (readonly Context, Array<(K, Array<F>)>, Tick, Bool) ~> void,
 } extends NWatch
 
 value class Sub(
@@ -799,7 +799,8 @@ mutable class Context private {
       _ = condBroadcast(cond)
     | nWatch @ NWatch{dirNameGetter} ->
       this.unsafeMaybeGetDir(dirNameGetter(this)) match {
-      | Some(dir @ EagerDir _) -> dir.notifySubWatch(start, this.tick, nWatch)
+      | Some(dir @ EagerDir _) ->
+        dir.notifySubWatch(this, start, this.tick, nWatch)
       | _ -> void
       }
     };

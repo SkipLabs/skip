@@ -165,6 +165,7 @@ export interface FromWasm {
   // Runtime
 
   SkipRuntime_Runtime__createResource(
+    service: ptr<Internal.String>,
     identifier: ptr<Internal.String>,
     resource: ptr<Internal.String>,
     params: ptr<Internal.CJSON>,
@@ -176,6 +177,7 @@ export interface FromWasm {
   ): ptr<Internal.CJArray<Internal.CJObject>>;
 
   SkipRuntime_Runtime__reloadResource(
+    service: ptr<Internal.String>,
     resource: ptr<Internal.String>,
     jsonParams: ptr<Internal.CJObject>,
     executor: ptr<Internal.Executor>,
@@ -190,11 +192,13 @@ export interface FromWasm {
   ): Handle<Error>;
 
   SkipRuntime_Runtime__getAll(
+    service: ptr<Internal.String>,
     resource: ptr<Internal.String>,
     params: ptr<Internal.CJSON>,
   ): ptr<Internal.CJObject | Internal.CJFloat>;
 
   SkipRuntime_Runtime__getForKey(
+    service: ptr<Internal.String>,
     resource: ptr<Internal.String>,
     params: ptr<Internal.CJSON>,
     key: ptr<Internal.CJSON>,
@@ -213,6 +217,7 @@ export interface FromWasm {
   SkipRuntime_Runtime__unsubscribe(id: bigint): Handle<Error>;
 
   SkipRuntime_Runtime__update(
+    service: ptr<Internal.String>,
     input: ptr<Internal.String>,
     values: ptr<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
     executor: ptr<Internal.Executor>,
@@ -227,12 +232,15 @@ export interface FromWasm {
 
   // initService
   SkipRuntime_initService(
+    identifier: ptr<Internal.String>,
     service: ptr<Internal.Service>,
     executor: ptr<Internal.Executor>,
   ): Handle<Error>;
 
   // closeClose
-  SkipRuntime_closeService(): Handle<Error> | Handle<Promise<unknown>>;
+  SkipRuntime_closeService(
+    service: ptr<Internal.String>,
+  ): Handle<Error> | Handle<Promise<unknown>>;
   SkipRuntime_invalidateCollections(
     collections: ptr<Internal.CJArray<Internal.CJSON>>,
   ): Handle<Error>;
@@ -620,12 +628,14 @@ export class WasmFromBinding implements FromBinding {
   }
 
   SkipRuntime_Runtime__createResource(
+    service: string,
     identifier: string,
     resource: string,
     params: Pointer<Internal.CJSON>,
     executor: Pointer<Internal.Executor>,
   ): Handle<Error> {
     return this.fromWasm.SkipRuntime_Runtime__createResource(
+      this.utils.exportString(service),
       this.utils.exportString(identifier),
       this.utils.exportString(resource),
       toPtr(params),
@@ -642,11 +652,13 @@ export class WasmFromBinding implements FromBinding {
   }
 
   SkipRuntime_Runtime__reloadResource(
+    service: string,
     resource: string,
     params: ptr<Internal.CJObject>,
     executor: ptr<Internal.Executor>,
   ): Handle<Error> {
     return this.fromWasm.SkipRuntime_Runtime__reloadResource(
+      this.utils.exportString(service),
       this.utils.exportString(resource),
       toPtr(params),
       toPtr(executor),
@@ -670,21 +682,25 @@ export class WasmFromBinding implements FromBinding {
   }
 
   SkipRuntime_Runtime__getAll(
+    service: string,
     resource: string,
     params: Pointer<Internal.CJSON>,
   ): Pointer<Internal.CJObject | Internal.CJFloat> {
     return this.fromWasm.SkipRuntime_Runtime__getAll(
+      this.utils.exportString(service),
       this.utils.exportString(resource),
       toPtr(params),
     );
   }
 
   SkipRuntime_Runtime__getForKey(
+    service: string,
     resource: string,
     params: Pointer<Internal.CJSON>,
     key: Pointer<Internal.CJSON>,
   ): Pointer<Internal.CJObject | Internal.CJFloat> {
     return this.fromWasm.SkipRuntime_Runtime__getForKey(
+      this.utils.exportString(service),
       this.utils.exportString(resource),
       toPtr(params),
       toPtr(key),
@@ -714,11 +730,13 @@ export class WasmFromBinding implements FromBinding {
   }
 
   SkipRuntime_Runtime__update(
+    service: string,
     input: string,
     values: Pointer<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
     executor: Pointer<Internal.Executor>,
   ): Handle<Error> {
     return this.fromWasm.SkipRuntime_Runtime__update(
+      this.utils.exportString(service),
       this.utils.exportString(input),
       toPtr(values),
       toPtr(executor),
@@ -733,17 +751,23 @@ export class WasmFromBinding implements FromBinding {
   }
 
   SkipRuntime_initService(
+    identifier: string,
     service: Pointer<Internal.Service>,
-    executor: ptr<Internal.Executor>,
+    executor: Pointer<Internal.Executor>,
   ): Handle<Error> {
     return this.fromWasm.SkipRuntime_initService(
+      this.utils.exportString(identifier),
       toPtr(service),
       toPtr(executor),
     );
   }
 
-  SkipRuntime_closeService(): Handle<Error> | Handle<Promise<unknown>> {
-    return this.fromWasm.SkipRuntime_closeService();
+  SkipRuntime_closeService(
+    identifier: string,
+  ): Handle<Error> | Handle<Promise<unknown>> {
+    return this.fromWasm.SkipRuntime_closeService(
+      this.utils.exportString(identifier),
+    );
   }
 
   SkipRuntime_invalidateCollections(

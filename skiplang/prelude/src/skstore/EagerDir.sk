@@ -2013,7 +2013,12 @@ base class EagerDir protected {
     this.writeArray(context, baseName, Array[]);
   }
 
-  fun notifySubWatch(start: Tick, tick: Tick, nWatch: NWatch): void {
+  fun notifySubWatch(
+    context: readonly Context,
+    start: Tick,
+    tick: Tick,
+    nWatch: NWatch,
+  ): void {
     (init, changedKeys) = if (this.created >= start || start <= nWatch.from) {
       (true, SortedSet[])
     } else {
@@ -2034,7 +2039,7 @@ base class EagerDir protected {
         result.push((key, values))
       };
       fn = Unsafe.cast(nWatch, TNWatch<Key, File>).fn;
-      fn(result.toArray(), tick, !init)
+      fn(context, result.toArray(), tick, !init)
     }
   }
 
