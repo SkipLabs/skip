@@ -530,7 +530,7 @@ fun createResourceOfRuntime(
   identifier: String,
   resource: String,
   params: SKJSON.CJSON,
-  executor: Executor,
+  executor: IntExecutor,
 ): Float {
   SKStore.runWithResult(context ~> {
     createReactiveResource(
@@ -591,7 +591,10 @@ fun reloadResourceOfRuntime(
 }
 
 @export("SkipRuntime_Runtime__replaceActiveResources")
-fun replaceActiveResourcesOfRuntime(jsResources: SKJSON.CJSON): Float {
+fun replaceActiveResourcesOfRuntime(
+  service: String,
+  jsResources: SKJSON.CJSON,
+): Float {
   SKStore.runWithResult(context ~> {
     resources = SKJSON.expectArray(jsResources).map(jsvalue -> {
       obj = SKJSON.asObject(jsvalue);
@@ -604,7 +607,7 @@ fun replaceActiveResourcesOfRuntime(jsResources: SKJSON.CJSON): Float {
           .fromSome("instance must be defined."),
       )
     });
-    replaceActiveResources(context, resources)
+    replaceActiveResources(context, service, resources)
   }) match {
   | Success _ -> 0.0
   | Failure(err) -> getErrorHdl(err)

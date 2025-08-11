@@ -184,6 +184,7 @@ export interface FromWasm {
   ): Handle<Error>;
 
   SkipRuntime_Runtime__replaceActiveResources(
+    service: ptr<Internal.String>,
     resources: ptr<Internal.CJArray<Internal.CJObject>>,
   ): Handle<Error>;
 
@@ -644,7 +645,7 @@ export class WasmFromBinding implements FromBinding {
   }
 
   SkipRuntime_Runtime__resourceInstances(
-    resources: ptr<Internal.CJArray<Internal.CJString>>,
+    resources: Pointer<Internal.CJArray<Internal.CJString>>,
   ): ptr<Internal.CJArray<Internal.CJObject>> {
     return this.fromWasm.SkipRuntime_Runtime__resourceInstances(
       toPtr(resources),
@@ -654,8 +655,8 @@ export class WasmFromBinding implements FromBinding {
   SkipRuntime_Runtime__reloadResource(
     service: string,
     resource: string,
-    params: ptr<Internal.CJObject>,
-    executor: ptr<Internal.Executor>,
+    params: Pointer<Internal.CJObject>,
+    executor: Pointer<Internal.Executor>,
   ): Handle<Error> {
     return this.fromWasm.SkipRuntime_Runtime__reloadResource(
       this.utils.exportString(service),
@@ -666,15 +667,17 @@ export class WasmFromBinding implements FromBinding {
   }
 
   SkipRuntime_Runtime__replaceActiveResources(
-    resources: ptr<Internal.CJArray<Internal.CJObject>>,
+    service: string,
+    resources: Pointer<Internal.CJArray<Internal.CJObject>>,
   ): Handle<Error> {
     return this.fromWasm.SkipRuntime_Runtime__replaceActiveResources(
+      this.utils.exportString(service),
       toPtr(resources),
     );
   }
 
   SkipRuntime_Runtime__destroyResources(
-    resources: ptr<Internal.CJArray<Internal.CJObject>>,
+    resources: Pointer<Internal.CJArray<Internal.CJObject>>,
   ): Handle<Error> {
     return this.fromWasm.SkipRuntime_Runtime__destroyResources(
       toPtr(resources),

@@ -179,6 +179,7 @@ export interface FromBinding {
   ): Handle<Error>;
 
   SkipRuntime_Runtime__replaceActiveResources(
+    service: string,
     resources: Pointer<Internal.CJArray<Internal.CJObject>>,
   ): Handle<Error>;
 
