@@ -1982,4 +1982,41 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
       await service.close();
     }
   });
+
+  it("testMultipleService", async () => {
+    let service1: Nullable<ServiceInstance> = null;
+    let service2: Nullable<ServiceInstance> = null;
+    let service3: Nullable<ServiceInstance> = null;
+    let service4: Nullable<ServiceInstance> = null;
+
+    try {
+      service1 = await initService(map1Service);
+      service2 = await initService(map1Service);
+      service3 = await initService(testExternalService());
+      service4 = await initService(testExternalService());
+      await service1.update("input", [["1", [10]]]);
+      await service2.update("input", [["2", [10]]]);
+      expect(await service1.getArray("map1", "1")).toEqual([12]);
+      expect(await service1.getArray("map1", "2")).toEqual([]);
+      expect(await service2.getArray("map1", "1")).toEqual([]);
+      expect(await service2.getArray("map1", "2")).toEqual([12]);
+      await service3.update("input1", [[0, [10]]]);
+      await service3.update("input2", [
+        [0, [5]],
+        [1, [10]],
+      ]);
+      await service4.update("input1", [[1, [20]]]);
+      await service4.update("input2", [
+        [0, [1]],
+        [1, [2]],
+      ]);
+      expect(await service3.getAll("external")).toEqual([[0, [[10, 15]]]]);
+      expect(await service4.getAll("external")).toEqual([[1, [[20, 22]]]]);
+    } finally {
+      if (service1) await service1.close();
+      if (service2) await service2.close();
+      if (service3) await service3.close();
+      if (service4) await service4.close();
+    }
+  });
 }
