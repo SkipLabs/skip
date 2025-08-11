@@ -212,7 +212,7 @@ class Handles {
     private readonly links = new Map<string, Map<number, string>>(),
     /** To access to a replaced constructor from a class name */
     private readonly ctors = new Map<string, any>(),
-    private service?: Handle<ServiceDefinition>,
+    private services = new Map<string, Handle<ServiceDefinition>>(),
   ) {}
 
   register<T>(v: T): Handle<T> {
@@ -233,22 +233,23 @@ class Handles {
 
   deleteHandle<T>(id: Handle<T>): T {
     const current = this.get(id);
-    this.objects[id] = null;
-    this.freeIDs.push(id);
-    if (
-      current &&
-      typeof current == "object" &&
-      "object" in current &&
-      "name" in current &&
-      "params" in current &&
-      "what" in current
-    ) {
-      const name = current.name as string;
-      const map = this.links.get(name);
-      if (map) {
-        map.delete(id);
-        if (map.size == 0) {
-          this.links.delete(name);
+    if (current) {
+      this.objects[id] = null;
+      this.freeIDs.push(id);
+      if (
+        typeof current == "object" &&
+        "object" in current &&
+        "name" in current &&
+        "params" in current &&
+        "what" in current
+      ) {
+        const name = current.name as string;
+        const map = this.links.get(name);
+        if (map) {
+          map.delete(id);
+          if (map.size == 0) {
+            this.links.delete(name);
+          }
         }
       }
     }
@@ -287,13 +288,22 @@ class Handles {
     return undefined;
   }
 
-  registerService(service: Handle<ServiceDefinition>) {
-    this.service = service;
+  clearConstrutors() {
+    this.ctors.clear();
   }
 
-  getService(): ServiceDefinition {
-    if (!this.service) throw new Error("Skip service is not defined");
-    return this.get(this.service);
+  registerService(id: string, service: Handle<ServiceDefinition>) {
+    this.services.set(id, service);
+  }
+
+  unregisterService(id: string) {
+    this.services.delete(id);
+  }
+
+  getService(id: string): ServiceDefinition {
+    const service = this.services.get(id);
+    if (!service) throw new Error("Skip service is not defined");
+    return this.get(service);
   }
 
   clone(): Handles {
@@ -353,6 +363,7 @@ export class Refs {
     public readonly handles: Handles,
     public readonly needGC: () => boolean,
     public readonly runWithGC: <T>(fn: () => T) => T,
+    public readonly init: (service: SkipService) => Promise<ServiceInstance>,
   ) {}
 }
 
@@ -715,7 +726,7 @@ export type SubscriptionID = Opaque<bigint, "subscription">;
  */
 export class ServiceInstance {
   constructor(
-    private readonly identifier: string,
+    private identifier: string,
     private readonly refs: Refs,
   ) {}
 
@@ -724,16 +735,24 @@ export class ServiceInstance {
    * @param identifier - The resource instance identifier
    * @param resource - A resource name, which must correspond to a key in this `SkipService`'s `resources` field
    * @param params - Resource parameters, which will be passed to the resource constructor specified in this `SkipService`'s `resources` field
+   * @returns The instantied resource definition
    */
   instantiateResource(
     identifier: string,
     resource: string,
     params: Json,
-  ): Promise<void> {
+  ): Promise<ResourceDef> {
     return new Promise((resolve, reject) => {
       const errorHdl = this.refs.runWithGC(() => {
         const exHdl = this.refs.handles.register({
-          resolve,
+          resolve: (instance: bigint) => {
+            resolve({
+              service: this.identifier,
+              resource,
+              params,
+              instance: Number(instance),
+            });
+          },
           reject: (ex: Error) => reject(ex),
         });
         return this.refs.binding.SkipRuntime_Runtime__createResource(
@@ -741,7 +760,7 @@ export class ServiceInstance {
           identifier,
           resource,
           this.refs.skjson.exportJSON(params),
-          this.refs.binding.SkipRuntime_createExecutor(exHdl),
+          this.refs.binding.SkipRuntime_createIntExecutor(exHdl),
         );
       });
       if (errorHdl) reject(this.refs.handles.deleteHandle(errorHdl));
@@ -971,8 +990,6 @@ export class ServiceInstance {
               throw new Error("Only mappers en reducers can be replaced");
             }
           }
-        } else if (this.instanceOfResource(ctor)) {
-          throw new Error("TODO: manage Resource reload");
         }
       }
       if (collections.size > 0) {
@@ -1000,19 +1017,12 @@ export class ServiceInstance {
       const resourcesSet = new Set<string>();
       for (const ctor of resourcesCtors) {
         this.refs.handles
-          .getService()
+          .getService(this.identifier)
           .replaceResource(ctor)
           .forEach(resourcesSet.add.bind(resourcesSet));
       }
       const resources = Array.from(resourcesSet);
-      const instances = this.refs.runWithGC(() => {
-        return this.refs.skjson.importJSON(
-          this.refs.binding.SkipRuntime_Runtime__resourceInstances(
-            this.refs.skjson.exportJSON(resources),
-          ),
-          true,
-        ) as ResourceDef[];
-      });
+      const instances = this.resourceInstances(resources);
       const promises = instances.map((def) =>
         this.reloadResource(def).then((instanceId) => {
           return { ...def, instance: Number(instanceId) };
@@ -1031,20 +1041,50 @@ export class ServiceInstance {
         }
       }
       if (failed.length > 0) {
-        if (successful.length > 0) {
-          this.refs.runWithGC(() => {
-            this.refs.binding.SkipRuntime_Runtime__destroyResources(
-              this.refs.skjson.exportJSON(successful),
-            );
-          });
-        }
+        this.destroyResources(successful);
         throw new Error(failed.map((e) => e.message).join("\n"));
       }
-      this.refs.runWithGC(() => {
-        this.refs.binding.SkipRuntime_Runtime__replaceActiveResources(
-          this.refs.skjson.exportJSON(successful),
-        );
-      });
+      this.replaceActiveResources(successful);
+    } catch (e: unknown) {
+      this.refs.handles.reset(oldHandles);
+      throw e;
+    }
+  }
+
+  async reloadService(service: SkipService): Promise<void> {
+    const oldHandles = this.refs.handles.clone();
+    try {
+      this.refs.handles.clearConstrutors();
+      const instances = this.resourceInstances([]).filter(
+        (def) =>
+          def.service == this.identifier && service.resources[def.resource],
+      );
+      const reloaded = await this.refs.init(service);
+      const promises = instances.map((def) =>
+        reloaded.instantiateResource(
+          crypto.randomUUID(),
+          def.resource,
+          def.params,
+        ),
+      );
+      const results = await Promise.allSettled(promises);
+      const successful: ResourceDef[] = [];
+      const failed: Error[] = [];
+
+      for (const result of results) {
+        if (result.status === "fulfilled") {
+          successful.push(result.value);
+        } else {
+          failed.push(result.reason as Error);
+        }
+      }
+      if (failed.length > 0) {
+        await reloaded.close();
+        throw new Error(failed.map((e) => e.message).join("\n"));
+      }
+      this.replaceActiveResources(successful);
+      await this.close();
+      this.identifier = reloaded.identifier;
     } catch (e: unknown) {
       this.refs.handles.reset(oldHandles);
       throw e;
@@ -1069,6 +1109,27 @@ export class ServiceInstance {
     });
   }
 
+  private destroyResources(resources: ResourceDef[]): void {
+    if (resources.length > 0) {
+      const errorHdl = this.refs.runWithGC(() => {
+        return this.refs.binding.SkipRuntime_Runtime__destroyResources(
+          this.refs.skjson.exportJSON(resources),
+        );
+      });
+      if (errorHdl) throw this.refs.handles.deleteHandle(errorHdl);
+    }
+  }
+
+  private replaceActiveResources(resources: ResourceDef[]): void {
+    const errorHdl = this.refs.runWithGC(() => {
+      return this.refs.binding.SkipRuntime_Runtime__replaceActiveResources(
+        this.identifier,
+        this.refs.skjson.exportJSON(resources),
+      );
+    });
+    if (errorHdl) throw this.refs.handles.deleteHandle(errorHdl);
+  }
+
   private validateInstance(
     constructor: new (...args: any[]) => any,
     requiredMethods: string[],
@@ -1082,6 +1143,17 @@ export class ServiceInstance {
     }
 
     return true;
+  }
+
+  private resourceInstances(resources: string[]) {
+    return this.refs.runWithGC(() => {
+      return this.refs.skjson.importJSON(
+        this.refs.binding.SkipRuntime_Runtime__resourceInstances(
+          this.refs.skjson.exportJSON(resources),
+        ),
+        true,
+      ) as ResourceDef[];
+    });
   }
 
   private instanceOfMapper(constructor: new (...args: any[]) => any) {
@@ -1371,7 +1443,11 @@ export class ToBinding {
     skservice: Handle<ServiceDefinition>,
   ): Handle<Promise<unknown>> {
     const service = this.handles.get(skservice);
-    return this.handles.register(service.shutdown());
+    return this.handles.register(
+      service
+        .shutdown()
+        .then((_) => this.handles.unregisterService(service.identifier)),
+    );
   }
 
   SkipRuntime_deleteService(service: Handle<ServiceDefinition>): void {
@@ -1500,7 +1576,7 @@ export class ToBinding {
         const skservice = refs.binding.SkipRuntime_createService(skservicehHdl);
         const exHdl = refs.handles.register({
           resolve: () => {
-            refs.handles.registerService(skservicehHdl);
+            refs.handles.registerService(uuid, skservicehHdl);
             resolve(new ServiceInstance(uuid, refs));
           },
           reject: (ex: Error) => reject(ex),
@@ -1534,6 +1610,7 @@ export class ToBinding {
       this.handles,
       this.needGC.bind(this),
       this.runWithGC,
+      this.initService.bind(this),
     );
   }
 }

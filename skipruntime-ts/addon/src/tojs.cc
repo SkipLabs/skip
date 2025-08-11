@@ -59,7 +59,8 @@ CJArray SkipRuntime_Runtime__resourceInstances(CJArray resources);
 double SkipRuntime_Runtime__reloadResource(char* service, char* resource,
                                            CJObject jsonParams,
                                            SKExecutor executor);
-double SkipRuntime_Runtime__replaceActiveResources(CJArray resources);
+double SkipRuntime_Runtime__replaceActiveResources(char* service,
+                                                   CJArray resources);
 double SkipRuntime_Runtime__destroyResources(CJArray resources);
 
 int64_t SkipRuntime_Runtime__subscribe(char* reactiveId, SKNotifier notifier,
@@ -921,15 +922,18 @@ void ReloadResourceOfRuntime(const FunctionCallbackInfo<Value>& args) {
 
 void ReplaceActiveResourcesOfRuntime(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
-  if (args.Length() != 1 || !args[0]->IsExternal()) {
+  if (args.Length() != 2 || !args[0]->IsString() || !args[1]->IsExternal()) {
     // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a pointer.")));
+    isolate->ThrowException(Exception::TypeError(FromUtf8(
+        isolate,
+        "The first parameter must be a string and the second a pointer.")));
     return;
   }
   NatTryCatch(isolate, [&args](Isolate* isolate) {
-    CJArray skresources = args[0].As<External>()->Value();
-    double skerror = SkipRuntime_Runtime__replaceActiveResources(skresources);
+    char* skservice = ToSKString(isolate, args[0].As<String>());
+    CJArray skresources = args[1].As<External>()->Value();
+    double skerror =
+        SkipRuntime_Runtime__replaceActiveResources(skservice, skresources);
     args.GetReturnValue().Set(Number::New(isolate, skerror));
   });
 }

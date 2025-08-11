@@ -454,11 +454,14 @@ fun closeService_(
       kf.i1.next().each(f -> if (f.service == identifier) todestroy.push(kf.i0))
     );
     todestroy.each(key -> _ = destroyReactiveResource(context, key));
-    activeHdl.items(context).each(kf ->
-      if (kf.i0.service == identifier) {
-        activeHdl.writeArray(context, kf.i0, Array[])
-      }
-    );
+    activeHdl.items(context).each(kf -> {
+      kf.i1.next().each(_ ->
+        if (kf.i0.service == identifier) {
+          activeHdl.writeArray(context, kf.i0, Array[])
+        }
+      )
+    });
+    sessionHdl.writeArray(context, SKStore.SID(identifier), Array[]);
     def.service.shutdown()
   | _ -> 0.0
   };
@@ -1485,13 +1488,26 @@ fun delete(
   updateContext(context);
 }
 
+class ResourceExecutor(
+  executor: IntExecutor,
+  definition: ResourceDef,
+) extends Executor {
+  fun resolve(): void {
+    this.executor.resolve(this.definition.instance)
+  }
+
+  fun reject(exc: .Exception): void {
+    this.executor.reject(exc)
+  }
+}
+
 fun createReactiveResource(
   context: mutable SKStore.Context,
   service: String,
   identifier: String,
   resource: String,
   params: SKJSON.CJSON,
-  executor: Executor,
+  executor: IntExecutor,
 ): ResourceInfo {
   resourceHdl = SKStore.EHandle(
     SKStore.SID::keyType,
@@ -1524,7 +1540,12 @@ fun createReactiveResource(
     context.update();
     definition
   };
-  checkResourceInstanceSubcriptions(context, definition, identifier, executor);
+  checkResourceInstanceSubcriptions(
+    context,
+    definition,
+    identifier,
+    ResourceExecutor(executor, definition),
+  );
   checkGarbage(context);
   SKStore.EHandle(
     ResourceDef::keyType,
@@ -1533,20 +1554,11 @@ fun createReactiveResource(
   ).get(context, definition);
 }
 
-class ReloadExecutor(executor: IntExecutor, id: Int) extends Executor {
-  fun resolve(): void {
-    this.executor.resolve(this.id)
-  }
-
-  fun reject(exc: .Exception): void {
-    this.executor.reject(exc)
-  }
-}
-
 fun resourceInstances(
   context: mutable SKStore.Context,
   resources: SortedSet<String>,
 ): Array<ResourceDef> {
+  all = resources.isEmpty();
   activeHdl = SKStore.EHandle(
     ResourceDef::keyType,
     SKStore.IntFile::type,
@@ -1554,7 +1566,9 @@ fun resourceInstances(
   );
   instances = mutable Vector[];
   activeHdl.items(context).each(kf ->
-    if (resources.contains(kf.i0.name)) instances.push(kf.i0)
+    kf.i1.next().each(_ ->
+      if (all || resources.contains(kf.i0.name)) instances.push(kf.i0)
+    )
   );
   instances.toArray()
 }
@@ -1579,12 +1593,13 @@ fun reloadResource(
     context,
     definition,
     reloadId,
-    ReloadExecutor(executor, definition.instance),
+    ResourceExecutor(executor, definition),
   );
 }
 
 fun replaceActiveResources(
   context: mutable SKStore.Context,
+  service: String,
   definitions: Array<ResourceDef>,
 ): void {
   resourceHdl = SKStore.EHandle(
@@ -1603,22 +1618,23 @@ fun replaceActiveResources(
     kResourceSessionDir.sub("idbyresource"),
   );
   definitions.each(d -> {
-    activeKey = d.derive();
+    activeKey = ResourceDef(service, d.name, d.params);
     activeInstance = activeHdl.get(context, activeKey).value;
-    activeDef = d.derive(activeInstance);
+    activeDef = activeKey.derive(activeInstance);
     // remove reload id
     idbyresourceHdl.getArray(context, d).each(sidf -> {
       resourceHdl.writeArray(context, SKStore.SID(sidf.value), Array[])
     });
     // replace active def id
-    idbyresourceHdl.getArray(context, activeDef).each(sidf -> {
+    activeDefinitions = idbyresourceHdl.getArray(context, activeDef);
+    activeDefinitions.each(sidf -> {
       resourceHdl.writeArray(context, SKStore.SID(sidf.value), Array[d])
     });
     activeHdl.writeArray(
       context,
       activeKey,
-      Array[SKStore.IntFile(d.instance)],
-    );
+      if (service == d.service) Array[SKStore.IntFile(d.instance)] else Array[],
+    )
   });
   // Force the notification of replaced resources
   graphHdl = SKStore.EHandle(
