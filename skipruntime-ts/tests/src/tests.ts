@@ -17,6 +17,7 @@ import type {
   NamedCollections,
   SubscriptionID,
   Nullable,
+  Reducer,
 } from "@skipruntime/core";
 
 import { Count, Sum } from "@skipruntime/helpers";
@@ -90,11 +91,11 @@ class Notifier {
 
   checkInit<K extends Json, V extends Json>(values: Entry<K, V>[]) {
     this.check((updates) => {
+      expect(updates.length).toEqual(1);
       expect([
-        updates.length,
         updates[0]!.isInitial ? true : false,
         updates[0]!.values,
-      ]).toEqual([1, true, values]);
+      ]).toEqual([true, values]);
     });
   }
 
@@ -381,6 +382,34 @@ class MapReduceResource implements Resource<Input_NN> {
 const mapReduceService: SkipService<Input_NN, Input_NN> = {
   initialData: { input: [] },
   resources: { mapReduce: MapReduceResource },
+
+  createGraph(inputCollections: Input_NN) {
+    return inputCollections;
+  },
+};
+
+//// testUserMapReduce
+class UserSum implements Reducer<number, number> {
+  initial = 0;
+
+  add(accum: Nullable<number>, value: number): number {
+    return (accum ?? 0) + value;
+  }
+
+  remove(accum: number, value: number): Nullable<number> {
+    return accum - value;
+  }
+}
+
+class UserMapReduceResource implements Resource<Input_NN> {
+  instantiate(cs: Input_NN): EagerCollection<number, number> {
+    return cs.input.mapReduce(TestOddEven)(UserSum);
+  }
+}
+
+const userMapReduceService: SkipService<Input_NN, Input_NN> = {
+  initialData: { input: [] },
+  resources: { userMapReduce: UserMapReduceResource },
 
   createGraph(inputCollections: Input_NN) {
     return inputCollections;
@@ -1069,6 +1098,31 @@ const resourceRecomputeNotificationsService: SkipService<
   },
 };
 
+// testReload
+
+class ReloadMapper implements Mapper<number, number, number, number> {
+  mapEntry(key: number, values: Values<number>): Iterable<[number, number]> {
+    return Array([0, values.getUnique() + key]);
+  }
+}
+
+class ReloadResource implements Resource<Input_NN> {
+  instantiate(collections: Input_NN): EagerCollection<number, number> {
+    return collections.input.map(ReloadMapper);
+  }
+}
+
+function reloadService(): SkipService<Input_NN, Input_NN> {
+  return {
+    initialData: { input: [] },
+    resources: { "reload-map": ReloadResource },
+
+    createGraph(inputCollections: Input_NN) {
+      return inputCollections;
+    },
+  };
+}
+
 export function initTests(
   category: string,
   initService: (service: SkipService) => Promise<ServiceInstance>,
@@ -1080,6 +1134,7 @@ export function initTests(
     const service = await initService(map1Service);
     await service.update("input", [["1", [10]]]);
     expect(await service.getArray("map1", "1")).toEqual([12]);
+    await service.close();
   });
 
   it("testMap2", async () => {
@@ -1094,6 +1149,7 @@ export function initTests(
       ["1", [30]],
       ["2", [10]],
     ]);
+    await service.close();
   });
 
   it("testMap3", async () => {
@@ -1108,6 +1164,7 @@ export function initTests(
       ["1", [36]],
       ["2", [10]],
     ]);
+    await service.close();
   });
 
   it("valueMapper", async () => {
@@ -1125,6 +1182,7 @@ export function initTests(
       [5, [30]],
       [10, [110]],
     ]);
+    await service.close();
   });
 
   it("testSize", async () => {
@@ -1151,6 +1209,7 @@ export function initTests(
       [1, [1]],
       [2, [3]],
     ]);
+    await service.close();
   });
 
   it("testSlicedMap1", async () => {
@@ -1170,6 +1229,7 @@ export function initTests(
       [9, [81]],
       [20, [400]],
     ]);
+    await service.close();
   });
 
   it("testLazy", async () => {
@@ -1194,6 +1254,7 @@ export function initTests(
       [0, [2]],
       [1, [2]],
     ]);
+    await service.close();
   });
 
   it("testMapReduce", async () => {
@@ -1227,6 +1288,41 @@ export function initTests(
       [0, [3]],
       [1, [2]],
     ]);
+    await service.close();
+  });
+
+  it("testUserMapReduce", async () => {
+    const service = await initService(userMapReduceService);
+    const resource = "userMapReduce";
+    await service.update("input", [
+      [0, [1]],
+      [1, [1]],
+      [2, [1]],
+    ]);
+    expect(await service.getAll(resource)).toEqual([
+      [0, [2]],
+      [1, [1]],
+    ]);
+    await service.update("input", [[3, [2]]]);
+    expect(await service.getAll(resource)).toEqual([
+      [0, [2]],
+      [1, [3]],
+    ]);
+    await service.update("input", [
+      [0, [2]],
+      [1, [2]],
+    ]);
+    expect(await service.getAll(resource)).toEqual([
+      [0, [3]],
+      [1, [4]],
+    ]);
+
+    await service.update("input", [[3, []]]);
+    expect(await service.getAll(resource)).toEqual([
+      [0, [3]],
+      [1, [2]],
+    ]);
+    await service.close();
   });
 
   it("testCount", async () => {
@@ -1258,6 +1354,7 @@ export function initTests(
       [2, [2]],
       [3, [0]],
     ]);
+    await service.close();
   });
 
   it("testMerge1", async () => {
@@ -1277,6 +1374,7 @@ export function initTests(
       [1, [20]],
       [2, [3, 7]],
     ]);
+    await service.close();
   });
 
   it("testMergeReduce", async () => {
@@ -1296,6 +1394,7 @@ export function initTests(
       [1, [20]],
       [2, [10]],
     ]);
+    await service.close();
   });
 
   it("testMergeMapReduce", async () => {
@@ -1315,6 +1414,7 @@ export function initTests(
       [1, [25]],
       [2, [20]],
     ]);
+    await service.close();
   });
 
   it("testJSONParams", async () => {
@@ -1341,6 +1441,7 @@ export function initTests(
       [1, [43]],
       [2, [44]],
     ]);
+    await service.close();
   });
 
   it("testJSONExtract", async () => {
@@ -1399,6 +1500,7 @@ export function initTests(
       ],
       [2, [[[{ var: 1 }, { var: 2 }]]]],
     ]);
+    await service.close();
   });
 
   it("testExternal", async () => {
@@ -1522,6 +1624,7 @@ export function initTests(
     expect(await service.getArray("resource1", "1")).toEqual([30]);
     await service.update("input2", [["1", [40]]]);
     expect(await service.getArray("resource2", "1")).toEqual([40]);
+    await service.close();
   });
 
   it("testPostgres", async function () {
@@ -1688,6 +1791,7 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
         ),
       );
     }
+    await service.close();
   });
 
   it("testMapWithException", async () => {
@@ -1708,6 +1812,8 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
       expect((e as Error).message).toMatchRegex(
         new RegExp(/^(?:Error: )?Something goes wrong.$/),
       );
+    } finally {
+      await service.close();
     }
   });
 
@@ -1744,6 +1850,8 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
           /^(?:SkipRuntime\.ResourceInstanceInitFailed: )?Resource instance cannot be initialized:/,
         ),
       );
+    } finally {
+      await service.close();
     }
   });
 
@@ -1800,6 +1908,140 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
       service.closeResourceInstance(instanceId);
     } finally {
       if (service) await service.close();
+    }
+  });
+
+  it("testReload", async () => {
+    const service = await initService(reloadService());
+    const instanceId = "unsafe.fixed.resource.ident.1";
+    let notifier: Nullable<Notifier> = null;
+    try {
+      const resource = "reload-map";
+      await service.instantiateResource(instanceId, resource, {});
+      notifier = new Notifier(service, instanceId);
+      notifier.checkInit([]);
+      await service.update("input", [
+        [1, [2]],
+        [2, [3]],
+      ]);
+      expect((await service.getArray(resource, 0)).sort()).toEqual([3, 5]);
+      notifier.checkUpdate([[0, [3, 5]]]);
+      const reload = await import("./for-reload.js");
+      service.reload([reload.ReloadMapper]);
+      expect((await service.getArray(resource, 0)).sort()).toEqual([4, 7]);
+      notifier.checkUpdate([[0, [4, 7]]]);
+      await service.update("input", [
+        [1, [3]],
+        [2, [4]],
+      ]);
+      expect((await service.getArray(resource, 0)).sort()).toEqual([5, 8]);
+      notifier.checkUpdate([[0, [5, 8]]]);
+      const werror = await import("./with-error.js");
+      try {
+        service.reload([werror.ReloadMapper]);
+        throw new Error("Error was not thrown");
+      } catch (e: unknown) {
+        expect(e).toBeA(Error);
+        expect((e as Error).message).toMatchRegex(
+          new RegExp(/^(?:Error: )?Something goes wrong.$/),
+        );
+      }
+      // The wrong mapper should not be taken into account
+      expect((await service.getArray(resource, 0)).sort()).toEqual([5, 8]);
+      notifier.checkEmpty();
+      await service.update("input", [
+        [1, [2]],
+        [2, [3]],
+      ]);
+      expect((await service.getArray(resource, 0)).sort()).toEqual([4, 7]);
+      notifier.checkUpdate([[0, [4, 7]]]);
+      await service.reloadResources([reload.ReloadResource]);
+      notifier.checkInit([[1, [5, 8]]]);
+      expect(await service.getArray(resource, 0)).toEqual([]);
+      expect((await service.getArray(resource, 1)).sort()).toEqual([5, 8]);
+      try {
+        await service.reloadResources([werror.ReloadResource]);
+        throw new Error("Error was not thrown");
+      } catch (e: unknown) {
+        expect(e).toBeA(Error);
+        expect((e as Error).message).toMatchRegex(
+          new RegExp(/^(?:Error: )?Something goes wrong.$/),
+        );
+      }
+      // The wrong resource should not be taken into account
+      expect((await service.getArray(resource, 1)).sort()).toEqual([5, 8]);
+      notifier.checkEmpty();
+      await service.update("input", [
+        [1, [3]],
+        [2, [4]],
+      ]);
+      expect((await service.getArray(resource, 1)).sort()).toEqual([6, 9]);
+      notifier.checkUpdate([[1, [6, 9]]]);
+      await service.reloadService(reloadService());
+      expect(await service.getAll(resource)).toEqual([]);
+      notifier.checkInit([]);
+      await service.update("input", [
+        [1, [2]],
+        [2, [3]],
+      ]);
+      expect((await service.getArray(resource, 0)).sort()).toEqual([3, 5]);
+      notifier.checkUpdate([[0, [3, 5]]]);
+      try {
+        await service.reloadService(werror.service());
+        throw new Error("Error was not thrown");
+      } catch (e: unknown) {
+        expect(e).toBeA(Error);
+        expect((e as Error).message).toMatchRegex(
+          new RegExp(/^(?:Error: )?Something goes wrong.$/),
+        );
+      }
+      expect((await service.getArray(resource, 0)).sort()).toEqual([3, 5]);
+      notifier.checkEmpty();
+      await service.update("input", [
+        [1, [3]],
+        [2, [4]],
+      ]);
+      expect((await service.getArray(resource, 0)).sort()).toEqual([4, 6]);
+    } finally {
+      if (notifier) notifier.close();
+      await service.close();
+    }
+  });
+
+  it("testMultipleService", async () => {
+    let service1: Nullable<ServiceInstance> = null;
+    let service2: Nullable<ServiceInstance> = null;
+    let service3: Nullable<ServiceInstance> = null;
+    let service4: Nullable<ServiceInstance> = null;
+
+    try {
+      service1 = await initService(map1Service);
+      service2 = await initService(map1Service);
+      service3 = await initService(testExternalService());
+      service4 = await initService(testExternalService());
+      await service1.update("input", [["1", [10]]]);
+      await service2.update("input", [["2", [10]]]);
+      expect(await service1.getArray("map1", "1")).toEqual([12]);
+      expect(await service1.getArray("map1", "2")).toEqual([]);
+      expect(await service2.getArray("map1", "1")).toEqual([]);
+      expect(await service2.getArray("map1", "2")).toEqual([12]);
+      await service3.update("input1", [[0, [10]]]);
+      await service3.update("input2", [
+        [0, [5]],
+        [1, [10]],
+      ]);
+      await service4.update("input1", [[1, [20]]]);
+      await service4.update("input2", [
+        [0, [1]],
+        [1, [2]],
+      ]);
+      expect(await service3.getAll("external")).toEqual([[0, [[10, 15]]]]);
+      expect(await service4.getAll("external")).toEqual([[1, [[20, 22]]]]);
+    } finally {
+      if (service1) await service1.close();
+      if (service2) await service2.close();
+      if (service3) await service3.close();
+      if (service4) await service4.close();
     }
   });
 }
