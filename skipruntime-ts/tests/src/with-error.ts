@@ -18,3 +18,14 @@ export class ReloadResource implements Resource<Input_NN> {
     throw new Error("Something goes wrong.");
   }
 }
+
+export function service() {
+  return {
+    initialData: { input: [] },
+    resources: { "reload-map": ReloadResource },
+
+    createGraph(_cs: Input_NN) {
+      throw new Error("Something goes wrong.");
+    },
+  };
+}
