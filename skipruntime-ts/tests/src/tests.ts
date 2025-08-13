@@ -1977,6 +1977,31 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
       ]);
       expect((await service.getArray(resource, 1)).sort()).toEqual([6, 9]);
       notifier.checkUpdate([[1, [6, 9]]]);
+      await service.reloadService(reloadService());
+      expect(await service.getAll(resource)).toEqual([]);
+      notifier.checkInit([]);
+      await service.update("input", [
+        [1, [2]],
+        [2, [3]],
+      ]);
+      expect((await service.getArray(resource, 0)).sort()).toEqual([3, 5]);
+      notifier.checkUpdate([[0, [3, 5]]]);
+      try {
+        await service.reloadService(werror.service());
+        throw new Error("Error was not thrown");
+      } catch (e: unknown) {
+        expect(e).toBeA(Error);
+        expect((e as Error).message).toMatchRegex(
+          new RegExp(/^(?:Error: )?Something goes wrong.$/),
+        );
+      }
+      expect((await service.getArray(resource, 0)).sort()).toEqual([3, 5]);
+      notifier.checkEmpty();
+      await service.update("input", [
+        [1, [3]],
+        [2, [4]],
+      ]);
+      expect((await service.getArray(resource, 0)).sort()).toEqual([4, 6]);
     } finally {
       if (notifier) notifier.close();
       await service.close();
