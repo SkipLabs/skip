@@ -63,6 +63,11 @@ fun link(
       Array["llvm-link", llFile].concat(Array["-o", bcFile]),
       config.verbose,
     );
+    bcOptFile = output + ".opt.bc";
+    runShell(
+      Array["opt", `-O${config.optLevel}`, bcFile, "-o", bcOptFile],
+      config.verbose,
+    );
     oFile = output + ".o";
     runShell(
       Array[
@@ -70,7 +75,7 @@ fun link(
         "-mtriple=wasm32-unknown-unknown",
         `-O${config.optLevel}`,
         "-filetype=obj",
-        bcFile,
+        bcOptFile,
         "-o",
         oFile,
       ],
