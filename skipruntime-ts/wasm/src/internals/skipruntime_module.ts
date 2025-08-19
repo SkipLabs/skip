@@ -774,7 +774,7 @@ export class WasmFromBinding implements FromBinding {
   }
 
   SkipRuntime_invalidateCollections(
-    collections: Pointer<Internal.CJArray<Internal.CJSON>>,
+    collections: Pointer<Internal.CJArray<Internal.CJString>>,
   ): Handle<Error> {
     return this.fromWasm.SkipRuntime_invalidateCollections(toPtr(collections));
   }

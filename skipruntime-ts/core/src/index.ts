@@ -203,15 +203,17 @@ export class ServiceDefinition {
   }
 }
 
+type NameForHandlerInfo = Map<Handle<HandlerInfo<unknown>>, string>;
+
 class Handles {
   constructor(
     private nextID: number = 1,
-    private readonly objects: any[] = [],
-    private readonly freeIDs: number[] = [],
+    private objects: any[] = [],
+    private freeIDs: number[] = [],
     /** Index to get all mapper handles from a class name */
-    private readonly links = new Map<string, Map<number, string>>(),
+    private links = new Map<string, NameForHandlerInfo>(),
     /** To access to a replaced constructor from a class name */
-    private readonly ctors = new Map<string, any>(),
+    private ctors = new Map<string, any>(),
     private services = new Map<string, Handle<ServiceDefinition>>(),
   ) {}
 
@@ -246,7 +248,7 @@ class Handles {
         const name = current.name as string;
         const map = this.links.get(name);
         if (map) {
-          map.delete(id);
+          map.delete(id as Handle<HandlerInfo<unknown>>);
           if (map.size == 0) {
             this.links.delete(name);
           }
@@ -260,7 +262,11 @@ class Handles {
     this.objects[id] = v;
   }
 
-  registerLink<T>(name: string, ref: string, handle: Handle<T>): void {
+  registerLink<T>(
+    name: string,
+    ref: string,
+    handle: Handle<HandlerInfo<T>>,
+  ): void {
     let map = this.links.get(name);
     if (!map) {
       map = new Map();
@@ -269,7 +275,7 @@ class Handles {
     map.set(handle, ref);
   }
 
-  getLinks(name: string): Nullable<Map<number, string>> {
+  getLinks(name: string): Nullable<NameForHandlerInfo> {
     return this.links.get(name) ?? null;
   }
 
@@ -288,7 +294,7 @@ class Handles {
     return undefined;
   }
 
-  clearConstrutors() {
+  clearConstructors() {
     this.ctors.clear();
   }
 
@@ -307,35 +313,26 @@ class Handles {
   }
 
   clone(): Handles {
+    const newlinks: [string, NameForHandlerInfo][] = Array.from(
+      this.links.entries(),
+    ).map(([key, value]) => [key, new Map(value)]);
     return new Handles(
       this.nextID,
       [...this.objects],
       [...this.freeIDs],
       /** Index to get all mapper handles from a class name */
-      new Map<string, Map<number, string>>(this.links),
+      new Map<string, NameForHandlerInfo>(newlinks),
       /** To access to a replaced constructor from a class name */
-      new Map<string, Map<number, string>>(this.ctors),
+      new Map<string, any>(this.ctors),
     );
   }
 
   reset(handles: Handles) {
     this.nextID = handles.nextID;
-    this.resetArray(this.objects, handles.objects);
-    this.resetArray(this.freeIDs, handles.freeIDs);
-    this.resetMap(this.links, handles.links);
-    this.resetMap(this.ctors, handles.ctors);
-  }
-
-  private resetArray<T>(arr: T[], w: T[]): void {
-    arr.length = 0;
-    for (const v of w) {
-      arr.push(v);
-    }
-  }
-
-  private resetMap<K, V>(map: Map<K, V>, w: Map<K, V>): void {
-    map.clear();
-    w.forEach((value, key) => map.set(key, value));
+    this.objects = handles.objects;
+    this.freeIDs = handles.freeIDs;
+    this.links = handles.links;
+    this.ctors = handles.ctors;
   }
 }
 
@@ -955,7 +952,10 @@ export class ServiceInstance {
     try {
       const collections = new Set<string>();
       for (const ctor of ctors) {
-        if (!("name" in ctor)) continue;
+        if (!("name" in ctor))
+          throw new SkipClassNameError(
+            `Only classes defined at top-level can be reloaded.`,
+          );
         this.refs.handles.registerConstructor(ctor.name, ctor);
         if (
           this.instanceOfMapper(ctor) ||
@@ -987,7 +987,7 @@ export class ServiceInstance {
                 newObj,
               );
             } else {
-              throw new Error("Only mappers en reducers can be replaced");
+              throw new Error("Only mappers and reducers can be replaced");
             }
           }
         }
@@ -1054,7 +1054,7 @@ export class ServiceInstance {
   async reloadService(service: SkipService): Promise<void> {
     const oldHandles = this.refs.handles.clone();
     try {
-      this.refs.handles.clearConstrutors();
+      this.refs.handles.clearConstructors();
       const instances = this.resourceInstances([]).filter(
         (def) =>
           def.service == this.identifier && service.resources[def.resource],

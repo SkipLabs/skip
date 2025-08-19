@@ -235,8 +235,9 @@ export interface FromBinding {
   SkipRuntime_closeService(
     identifier: string,
   ): Handle<Error> | Handle<Promise<unknown>>;
+
   SkipRuntime_invalidateCollections(
-    collections: Pointer<Internal.CJArray<Internal.CJSON>>,
+    collections: Pointer<Internal.CJArray<Internal.CJString>>,
   ): Handle<Error>;
 
   // Context
