@@ -2309,16 +2309,13 @@ class TEagerDir extends EagerDir, TDir {
   }
 
   fun invalidate(context: mutable Context): void {
-    parents = SortedSet::createFromIterator(
-      this.parents.items().map(v -> v.i0),
-    );
     this.keys().each(key -> {
       sources = this.data.maybeGet(key) match {
       | None() -> this.fixedData.data.getIter(key).map(v -> v.i1).collect(Array)
       | Some(modified) -> modified.sources()
       };
       for (source in sources) {
-        if (parents.contains(source.dirName)) {
+        if (this.parents.containsKey(source.dirName)) {
           context.updateDirtyReader(
             TArrowKey::create{
               parentName => source.dirName,
