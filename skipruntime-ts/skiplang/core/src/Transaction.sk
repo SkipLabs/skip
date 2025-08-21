@@ -189,7 +189,7 @@ base class InitializationFile(
   services: SortedSet<SKStore.DirName>,
 ) extends SKStore.File {
   children =
-  | ServiceInitialization(executor: Executor)
+  | ServiceInitialization(service: String, executor: Executor)
   | ResourceInitialization(instances: List<(String, Executor)>)
 }
 
@@ -293,8 +293,7 @@ private fun checkResourceInstanceSubcriptions(
   instance: String,
   executor: Executor,
 ): void {
-  resourceId = toResourceId(resource.name, resource.params);
-  key = `${kInitializationsKey}.${resourceId}`;
+  key = `${kInitializationsKey}.${resource.toId()}`;
   subcriptions = getSubscriptions(context);
   context.getPersistent(key).map(ResourceInitialization::type) match {
   | Some(init) ->
@@ -321,6 +320,7 @@ private fun checkResourceInstanceSubcriptions(
 
 private fun checkSubcriptions(
   context: mutable SKStore.Context,
+  identifier: String,
   executor: Executor,
 ): void {
   subcriptions = getSubscriptions(context);
@@ -329,7 +329,7 @@ private fun checkSubcriptions(
   } else {
     context.setPersistent(
       kInitializationsKey,
-      ServiceInitialization(executor, subcriptions),
+      ServiceInitialization(identifier, executor, subcriptions),
     )
   };
 }
@@ -359,9 +359,7 @@ private fun checkInitialization(
   resource: ?ResourceDef,
 ): void {
   key = resource match {
-  | Some(def) ->
-    resourceId = toResourceId(def.name, def.params);
-    `${kInitializationsKey}.${resourceId}`
+  | Some(def) -> `${kInitializationsKey}.${def.toId()}`
   | _ -> kInitializationsKey
   };
   context.getPersistent(key).map(f ~> f as InitializationFile _) match {
@@ -370,32 +368,36 @@ private fun checkInitialization(
     | Some(errors) ->
       if (errors.isEmpty()) {
         init match {
-        | ServiceInitialization(executor, _) -> executor.resolve()
+        | ServiceInitialization(_, executor, _) -> executor.resolve()
         | ResourceInitialization(instances, _) ->
           instances.each(info -> info.i1.resolve())
         }
       } else {
         (init, resource) match {
-        | (ServiceInitialization(executor, _), None()) ->
+        | (ServiceInitialization(service, executor, _), None()) ->
           executor.reject(ServiceInstanceInitFailed(errors));
           context.getPersistent(kTransactionIdKey).map(f ->
             SKStore.StringFile::type(f).value
           ) match {
-          | None() -> _ = closeService_(context, false)
+          | None() -> _ = closeService_(context, service, false)
           | _ -> void
           }
         | (ResourceInitialization(instances, _), Some _) ->
-          instances.each(info -> {
-            info.i1.reject(ResourceInstanceInitFailed(errors));
-            destroyReactiveResource(context, SKStore.SID(info.i0))
-          })
+          resources = SortedSet::createFromItems(
+            instances.map(info -> {
+              info.i1.reject(ResourceInstanceInitFailed(errors));
+              destroyReactiveResource(context, SKStore.SID(info.i0))
+            }),
+          );
+          context.update();
+          if (checkResources(context, resources)) context.update()
+
         | _ -> invariant_violation("Invalid initialisation state.")
         }
       };
       resource match {
       | Some(def) ->
-        resourceId = toResourceId(def.name, def.params);
-        context.removePersistent(`${kInitializationsKey}.${resourceId}`)
+        context.removePersistent(`${kInitializationsKey}.${def.toId()}`)
       | _ -> context.removePersistent(kInitializationsKey)
       }
     | _ -> void
