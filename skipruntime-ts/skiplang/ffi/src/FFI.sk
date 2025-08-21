@@ -232,6 +232,10 @@ native fun createGraphOfService(
 @debug
 native fun inputsOfService(service: UInt32): SKJSON.CJArray;
 
+@cpp_extern("SkipRuntime_ServiceDefinition__from")
+@debug
+native fun fromOfService(service: UInt32): ?String;
+
 @cpp_extern("SkipRuntime_ServiceDefinition__initialData")
 @debug
 native fun initialDataOfService(service: UInt32, input: String): SKJSON.CJArray;
@@ -275,6 +279,10 @@ class ExternService(eptr: SKStore.ExternalPointer) extends Service {
   //
   fun inputs(): Array<String> {
     SKJSON.expectArray(inputsOfService(this.eptr.value)).map(SKJSON.asString)
+  }
+
+  fun from(): ?String {
+    fromOfService(this.eptr.value)
   }
 
   fun initialData(name: String): Array<(SKJSON.CJSON, Array<SKJSON.CJSON>)> {

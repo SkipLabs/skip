@@ -352,14 +352,34 @@ fun initService(
           (ctx, writer, key, it) ~> {
             serviceDef = it.first;
             mInputs = mutable Map<String, Collection>[];
+            optFrom = serviceDef.service.from();
             serviceDef.service.inputs().each(input -> {
               iDirName = SKStore.DirName::create(`/${base64(key)}/${input}/`);
-              values = serviceDef.service.initialData(input);
+              values = optFrom match {
+              | Some(from) ->
+                fDirName = SKStore.DirName::create(
+                  `/${base64(from)}/${input}/`,
+                );
+                ctx.unsafeMaybeGetEagerDir(fDirName) match {
+                | Some(dir) ->
+                  dir.keys().collect(Array).map(k ->
+                    (JSONID::keyType(k), dir.getArrayRaw(k).map(JSONFile::type))
+                  )
+                | None() ->
+                  serviceDef.service.initialData(input).map(v ->
+                    (JSONID(v.i0), v.i1.map(x -> JSONFile(x)))
+                  )
+                }
+              | _ ->
+                serviceDef.service.initialData(input).map(v ->
+                  (JSONID(v.i0), v.i1.map(x -> JSONFile(x)))
+                )
+              };
               iHdl = ctx.mkdirMulti(
                 JSONID::keyType,
                 JSONFile::type,
                 iDirName,
-                values.map(v -> (JSONID(v.i0), v.i1.map(x -> JSONFile(x)))),
+                values,
               );
               mInputs.add(input, Collection(iHdl))
             });
@@ -420,7 +440,7 @@ fun initService(
         SKStore.SID(identifier),
         Array[ServiceDefinition(service, executor)],
       );
-      context.update();
+      context.update()
     };
     updateContext(context);
     checkSubcriptions(context, identifier, executor);

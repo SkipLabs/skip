@@ -108,6 +108,7 @@ export class ServiceDefinition {
   constructor(
     public identifier: string,
     private service: SkipService,
+    public from: Nullable<string>,
   ) {}
 
   buildResource(name: string, parameters: Json): Resource {
@@ -360,7 +361,10 @@ export class Refs {
     public readonly handles: Handles,
     public readonly needGC: () => boolean,
     public readonly runWithGC: <T>(fn: () => T) => T,
-    public readonly init: (service: SkipService) => Promise<ServiceInstance>,
+    public readonly init: (
+      service: SkipService,
+      from?: string,
+    ) => Promise<ServiceInstance>,
   ) {}
 }
 
@@ -1059,7 +1063,7 @@ export class ServiceInstance {
         (def) =>
           def.service == this.identifier && service.resources[def.resource],
       );
-      const reloaded = await this.refs.init(service);
+      const reloaded = await this.refs.init(service, this.identifier);
       const promises = instances.map((def) =>
         reloaded.instantiateResource(
           crypto.randomUUID(),
@@ -1382,6 +1386,12 @@ export class ToBinding {
     return skjson.exportJSON(service.inputs());
   }
 
+  SkipRuntime_ServiceDefinition__from(
+    skservice: Handle<ServiceDefinition>,
+  ): Nullable<string> {
+    return this.handles.get(skservice).from;
+  }
+
   SkipRuntime_ServiceDefinition__resources(
     skservice: Handle<ServiceDefinition>,
   ): Pointer<Internal.CJArray<Internal.CJSON>> {
@@ -1566,12 +1576,12 @@ export class ToBinding {
     this.handles.deleteHandle(executor);
   }
 
-  initService(service: SkipService): Promise<ServiceInstance> {
+  initService(service: SkipService, from?: string): Promise<ServiceInstance> {
     const uuid = crypto.randomUUID();
     return new Promise((resolve, reject) => {
       const refs = this.refs();
       const errorHdl = refs.runWithGC(() => {
-        const definition = new ServiceDefinition(uuid, service);
+        const definition = new ServiceDefinition(uuid, service, from ?? null);
         const skservicehHdl = refs.handles.register(definition);
         const skservice = refs.binding.SkipRuntime_createService(skservicehHdl);
         const exHdl = refs.handles.register({
