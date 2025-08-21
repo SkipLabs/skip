@@ -10,6 +10,7 @@ using skbinding::CallJSNullableFunction;
 using skbinding::CallJSNumberFunction;
 using skbinding::CallJSStringFunction;
 using skbinding::CallJSVoidFunction;
+using skbinding::CallNullableStringFunction;
 using skbinding::FromUtf8;
 
 using v8::BigInt;
@@ -212,6 +213,16 @@ CJArray SkipRuntime_ServiceDefinition__inputs(uint32_t serviceId) {
   };
   return CallJSFunction(isolate, externFunctions,
                         "SkipRuntime_ServiceDefinition__inputs", 1, argv);
+}
+
+char* SkipRuntime_ServiceDefinition__from(uint32_t serviceId) {
+  Isolate* isolate = Isolate::GetCurrent();
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[1] = {
+      Number::New(isolate, serviceId),
+  };
+  return CallNullableStringFunction(
+      isolate, externFunctions, "SkipRuntime_ServiceDefinition__from", 1, argv);
 }
 
 CJArray SkipRuntime_ServiceDefinition__initialData(uint32_t serviceId,

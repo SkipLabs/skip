@@ -320,6 +320,10 @@ interface ToWasm {
     skservice: Handle<ServiceDefinition>,
   ): ptr<Internal.CJArray<Internal.CJSON>>;
 
+  SkipRuntime_ServiceDefinition__from(
+    skservice: Handle<ServiceDefinition>,
+  ): Nullable<ptr<Internal.String>>;
+
   SkipRuntime_ServiceDefinition__resources(
     skservice: Handle<ServiceDefinition>,
   ): ptr<Internal.CJArray<Internal.CJSON>>;
@@ -942,6 +946,13 @@ class LinksImpl implements Links {
     );
   }
 
+  fromOfServiceDefinition(
+    skservice: Handle<ServiceDefinition>,
+  ): Nullable<ptr<Internal.String>> {
+    const from = this.tobinding.SkipRuntime_ServiceDefinition__from(skservice);
+    return from ? this.utils.exportString(from) : null;
+  }
+
   resourcesOfServiceDefinition(
     skservice: Handle<ServiceDefinition>,
   ): ptr<Internal.CJArray<Internal.CJSON>> {
@@ -1149,6 +1160,8 @@ class Manager implements ToWasmManager {
       links.createGraphOfServiceDefinition.bind(links);
     toWasm.SkipRuntime_ServiceDefinition__inputs =
       links.inputsOfServiceDefinition.bind(links);
+    toWasm.SkipRuntime_ServiceDefinition__from =
+      links.fromOfServiceDefinition.bind(links);
     toWasm.SkipRuntime_ServiceDefinition__resources =
       links.resourcesOfServiceDefinition.bind(links);
     toWasm.SkipRuntime_ServiceDefinition__initialData =

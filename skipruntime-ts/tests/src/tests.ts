@@ -1978,8 +1978,8 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
       expect((await service.getArray(resource, 1)).sort()).toEqual([6, 9]);
       notifier.checkUpdate([[1, [6, 9]]]);
       await service.reloadService(reloadService());
-      expect(await service.getAll(resource)).toEqual([]);
-      notifier.checkInit([]);
+      expect((await service.getArray(resource, 0)).sort()).toEqual([4, 6]);
+      notifier.checkInit([[0, [4, 6]]]);
       await service.update("input", [
         [1, [2]],
         [2, [3]],
