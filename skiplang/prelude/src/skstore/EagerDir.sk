@@ -38,6 +38,14 @@ mutable class Writer{
 }
 
 /*****************************************************************************/
+/* The class handed a function used by apply. */
+/*****************************************************************************/
+
+base class Mapper<K: frozen, F: frozen> uses Unsafe.Downcastable, Equality {
+  fun map(mutable Context, mutable Writer, K, mutable Iterator<F>): void;
+}
+
+/*****************************************************************************/
 /* The signature of a function used by apply. */
 /*****************************************************************************/
 
@@ -47,6 +55,61 @@ type MapFun<K, F> = (
   K,
   mutable Iterator<F>,
 ) ~> void;
+
+class Parent(
+  mapper: Mapper<Key, File>,
+  ranges: ?Array<KeyRange<Key>>,
+  onUpdate: ?((mutable Context, SortedSet<Key>) ~> void),
+) uses Equality {
+  fun ==(other: Parent): Bool {
+    this.mapper == other.mapper &&
+      this.ranges == other.ranges &&
+      (this.onUpdate, other.onUpdate) match {
+      | (None(), None()) -> true
+      | (Some(f1), Some(f2)) -> native_eq(f1, f2) == 0
+      | _ -> false
+      }
+  }
+}
+
+/*****************************************************************************/
+/* A Mapper that used Lambda. */
+/*****************************************************************************/
+
+class LambdaMapper<K: frozen, F: frozen>(
+  lambda: MapFun<K, F>,
+) extends Mapper<K, F> {
+  fun map(
+    context: mutable Context,
+    writer: mutable Writer,
+    key: K,
+    values: mutable Iterator<F>,
+  ): void {
+    this.lambda(context, writer, key, values)
+  }
+
+  fun ==(other: Mapper<K, F>): Bool {
+    Unsafe.maybeCast(other, LambdaMapper<K, F>) match {
+    | Some(o) -> native_eq(this.lambda, o.lambda) == 0
+    | _ -> false
+    }
+  }
+}
+
+/*****************************************************************************/
+/* A no op Mapper. */
+/*****************************************************************************/
+
+class NoopMapper<K: frozen, F: frozen>() extends Mapper<K, F> {
+  fun map(
+    _context: mutable Context,
+    _writer: mutable Writer,
+    _key: K,
+    _values: mutable Iterator<F>,
+  ): void {
+    void
+  }
+}
 
 /*****************************************************************************/
 /* Compaction types and helpers. */
@@ -675,16 +738,7 @@ base class EagerDir protected {
   protected fixedOld: FixedSourceMap = FixedSourceMap::empty(),
   data: DataMap<Key>,
   protected old: SortedMap<Path, MInfo> = SortedMap[],
-  parents: FixedSingle<
-    DirName,
-    Array<
-      (
-        MapFun<Key, File>,
-        ?Array<KeyRange<Key>>,
-        ?((mutable Context, SortedSet<Key>) ~> void),
-      ),
-    >,
-  > = FixedSingle::empty(),
+  parents: FixedSingle<DirName, Array<Parent>> = FixedSingle::empty(),
   childDirs: SortedSet<DirName> = SortedSet[],
   protected slices: RangeMapList<Key, DirName> = RangeMapList[],
   protected reducer: ?Reducer<Key, File> = None(),
@@ -937,7 +991,7 @@ base class EagerDir protected {
     parent: EagerDir,
     childName: DirName,
     timeStack: TimeStack,
-    f: MapFun<Key, File>,
+    f: Mapper<Key, File>,
     acc: mutable Vector<FixedRow<Key, Array<File>>>,
     current: mutable IntRef,
   ): void {
@@ -997,7 +1051,7 @@ base class EagerDir protected {
     parent: EagerDir,
     childName: DirName,
     timeStack: TimeStack,
-    f: MapFun<Key, File>,
+    f: Mapper<Key, File>,
     currentStart: Int,
     currentEnd: Int,
     start: ?Boundary<Key>,
@@ -1088,7 +1142,7 @@ base class EagerDir protected {
     parent: EagerDir,
     childName: DirName,
     timeStack: TimeStack,
-    f: MapFun<Key, File>,
+    f: Mapper<Key, File>,
     acc: mutable Vector<FixedRow<Key, Array<File>>>,
     rangeOpt: ?KeyRange<Key>,
   ): void {
@@ -1152,7 +1206,7 @@ base class EagerDir protected {
     timeStack: TimeStack,
     key: Key,
     valueIter: mutable Iterator<File>,
-    f: MapFun<Key, File>,
+    mapper: Mapper<Key, File>,
   ): void {
     arrow = TArrowKey::create{parentName, childName, key};
     context.enter(arrow, timeStack);
@@ -1168,7 +1222,7 @@ base class EagerDir protected {
     context.!reads = SortedSet[];
 
     writer = mutable Writer{};
-    f(context, writer, key, valueIter);
+    mapper.map(context, writer, key, valueIter);
 
     kvArray = writer.getWrites();
     newDirs = context.newDirs;
@@ -1204,16 +1258,7 @@ base class EagerDir protected {
   protected static fun isReusable(
     context: mutable Context,
     child: EagerDir,
-    parents: FixedSingle<
-      DirName,
-      Array<
-        (
-          MapFun<Key, File>,
-          ?Array<KeyRange<Key>>,
-          ?((mutable Context, SortedSet<Key>) ~> void),
-        ),
-      >,
-    >,
+    parents: FixedSingle<DirName, Array<Parent>>,
     reducerOpt: ?IReducer<File>,
   ): Bool {
     context.canReuse match {
@@ -1231,7 +1276,7 @@ base class EagerDir protected {
     | CRNever() -> false
     | CRIfMatch() ->
       same =
-        (native_eq(parents, child.parents) == 0) &&
+        fsEquals(parents, child.parents) &&
         (native_eq(reducerOpt, child.reducer.map(r -> r.reducer)) == 0);
       parentItems = parents.items();
       tick = context.getTick();
@@ -1314,11 +1359,33 @@ base class EagerDir protected {
     onUpdate: ?((mutable Context, SortedSet<Key>) ~> void) = None(),
     unsafeSkipInit: Bool = false,
   ): void {
+    static::applyFor(
+      context,
+      parentName,
+      childName,
+      LambdaMapper(f),
+      reducerOpt,
+      rangeOpt,
+      onUpdate,
+      unsafeSkipInit,
+    )
+  }
+
+  static fun applyFor(
+    context: mutable Context,
+    parentName: DirName,
+    childName: DirName,
+    mapper: Mapper<Key, File>,
+    reducerOpt: ?IReducer<File> = None(),
+    rangeOpt: ?Array<KeyRange<Key>> = None(),
+    onUpdate: ?((mutable Context, SortedSet<Key>) ~> void) = None(),
+    unsafeSkipInit: Bool = false,
+  ): void {
     parents = FixedSingle::singleton(
       parentName,
-      Array[(f, rangeOpt, onUpdate)],
+      Array[Parent(mapper, rangeOpt, onUpdate)],
     );
-    TEagerDir::applyMany(
+    TEagerDir::applyManyFor(
       context,
       parents,
       childName,
@@ -1467,13 +1534,7 @@ base class EagerDir protected {
     context: mutable Context,
     parentDirtyOpt: ?KeySet,
     contextDirtyReadersOpt: ?SortedMap<DirName, KeySet>,
-    parentMaps: Array<
-      (
-        MapFun<Key, File>,
-        ?Array<KeyRange<Key>>,
-        ?((mutable Context, SortedSet<Key>) ~> void),
-      ),
-    >,
+    parentMaps: Array<Parent>,
     childRef: EagerDir,
   ): void {
     parent = this;
@@ -1491,8 +1552,7 @@ base class EagerDir protected {
         keys = parent.typed().castKeySet(dirtyKeys).values();
         !dirty = withRegionFold(None(), keys, dirty, (_, key, dirtyInRegion) ~> {
           for (p in parentMaps) {
-            (_, rangeOpt, _) = p;
-            rangeOpt match {
+            p.ranges match {
             | Some(
               ranges,
             ) if (
@@ -1512,8 +1572,7 @@ base class EagerDir protected {
       keys = parent.typed().castKeySet(dirtyKeys).values();
       !dirty = withRegionFold(None(), keys, dirty, (_, key, dirtyInRegion) ~> {
         for (p in parentMaps) {
-          (_, rangeOpt, _) = p;
-          rangeOpt match {
+          p.ranges match {
           | Some(
             ranges,
           ) if (!ranges.any(range -> range.start <= key && key <= range.end)) ->
@@ -1547,8 +1606,7 @@ base class EagerDir protected {
 
         for (p in parentMaps) {
           writer = mutable Writer{};
-          (mapFun, _, _) = p;
-          mapFun(ctx, writer, key, parent.getIterRaw(key));
+          p.mapper.map(ctx, writer, key, parent.getIterRaw(key));
           mapped = writer.getWrites();
           for (kv in mapped) {
             (k, rvalues) = kv;
@@ -1608,8 +1666,7 @@ base class EagerDir protected {
     context.setDir(childRef);
 
     for (p in parentMaps) {
-      (_, _, onUpdate) = p;
-      onUpdate match {
+      p.onUpdate match {
       | None() -> void
       | Some(f) -> f(context, dirty)
       }
@@ -1780,7 +1837,7 @@ base class EagerDir protected {
         for (parent in childDir.parents.items()) {
           if (parent.i0 != this.dirName) continue;
           for (p in parent.i1) {
-            p.i1 match {
+            p.ranges match {
             | None() -> continue
             | Some(ranges) ->
               for (range in ranges) {
@@ -2210,6 +2267,22 @@ class TEagerDir extends EagerDir, TDir {
     reducerOpt: ?IReducer<File> = None(),
     unsafeSkipInit: Bool = false,
   ): void {
+    static::applyManyFor(
+      context,
+      parents.map(arr ~> arr.map(t -> Parent(LambdaMapper(t.i0), t.i1, t.i2))),
+      childName,
+      reducerOpt,
+      unsafeSkipInit,
+    )
+  }
+
+  static fun applyManyFor(
+    context: mutable Context,
+    parents: FixedSingle<DirName, Array<Parent>>,
+    childName: DirName,
+    reducerOpt: ?IReducer<File> = None(),
+    unsafeSkipInit: Bool = false,
+  ): void {
     (context.fromContext.flatMap(ctx ->
       ctx.unsafeMaybeGetEagerDir(childName)
     ) match {
@@ -2259,9 +2332,8 @@ class TEagerDir extends EagerDir, TDir {
       if (!unsafeSkipInit) {
         for (parentName => parentData in parents) {
           for (p in parentData) {
-            (f, rangeOpt, _) = p;
             parent = context.unsafeGetEagerDir(parentName);
-            rangeOpt match {
+            p.ranges match {
             | None() ->
               static::mapData(
                 context,
@@ -2269,7 +2341,7 @@ class TEagerDir extends EagerDir, TDir {
                 parent,
                 childName,
                 timeStack,
-                f,
+                p.mapper,
                 acc,
                 None(),
               )
@@ -2281,7 +2353,7 @@ class TEagerDir extends EagerDir, TDir {
                   parent,
                   childName,
                   timeStack,
-                  f,
+                  p.mapper,
                   acc,
                   Some(range),
                 );
@@ -2300,7 +2372,7 @@ class TEagerDir extends EagerDir, TDir {
       if (context.debugMode) {
         parentNames = parents
           .items()
-          .map(x -> (x.i0, x.i1.map(p -> p.i1)))
+          .map(x -> (x.i0, x.i1.map(p -> p.ranges)))
           .collect(Array);
         print_string(
           `CREATED:  ${childName} (time: ${time}, parents: ${parentNames})`,
@@ -2329,8 +2401,7 @@ class TEagerDir extends EagerDir, TDir {
     context.setDir(dir);
     for (parentName => parentData in parents) {
       for (p in parentData) {
-        (_, rangeOpt, _) = p;
-        static::addChildToParent(context, parentName, childName, rangeOpt);
+        static::addChildToParent(context, parentName, childName, p.ranges);
       }
     };
   }

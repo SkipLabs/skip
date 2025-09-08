@@ -486,6 +486,17 @@ class FixedSingle<K: Orderable, +V: frozen> private (
     if (elt.i0 != key) return None();
     Some(elt.i1);
   }
+
+  fun map<U: frozen>(f: V ~> U): FixedSingle<K, U> {
+    FixedSingle(this.data.map(kv -> (kv.i0, f(kv.i1))))
+  }
+}
+
+fun fsEquals<K: Orderable, V: Equality>(
+  first: FixedSingle<K, V>,
+  second: FixedSingle<K, V>,
+): Bool {
+  first.data == second.data
 }
 
 // Mapping from source paths to MInfo
