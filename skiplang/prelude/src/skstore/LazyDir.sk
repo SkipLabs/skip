@@ -17,6 +17,25 @@ base class LazyResult<F> {
   | LAbsent()
 }
 
+base class LazyCompute<K: frozen, F: frozen> uses Unsafe.Downcastable, Equality{
+  fun compute(mutable Context, DirName, K): ?Array<F>;
+}
+
+class LambdaLazyCompute<K: frozen, F: frozen>(
+  lambda: (mutable Context, DirName, K) ~> ?Array<F>,
+) extends LazyCompute<K, F> {
+  fun compute(context: mutable Context, dirname: DirName, key: K): ?Array<F> {
+    this.lambda(context, dirname, key)
+  }
+
+  fun ==(other: LazyCompute<K, F>): Bool {
+    Unsafe.maybeCast(other, LambdaLazyCompute<K, F>) match {
+    | Some(o) -> native_eq(this.lambda, o.lambda) == 0
+    | _ -> false
+    }
+  }
+}
+
 base class LazyDir protected {protected collect: Bool} extends Dir {
   /* Updates the lazyGets ref counts and return as well a potentially updated
     LazyDir in which dead keys have been removed. */
@@ -36,7 +55,7 @@ base class LazyDir protected {protected collect: Bool} extends Dir {
 
 class TLazyDir{
   protected data: SortedMap<Key, LazyResult<File>> = SortedMap[],
-  protected lazyFun: (mutable Context, DirName, Key) ~> ?Array<File>,
+  protected compute: LazyCompute<Key, File>,
 } extends LazyDir, TDir {
   fun updateLazyGets(
     refCountsOpt: ?KeyMap<Int>,
@@ -147,7 +166,7 @@ class TLazyDir{
     context.!reads = SortedSet[];
 
     resultOpt = try {
-      this.lazyFun(context, dirName, key)
+      this.compute.compute(context, dirName, key)
     } catch {
     | exn ->
       !dir = context.unsafeGetLazyDir(dirName).typed();
@@ -229,6 +248,15 @@ class TLazyDir{
     lazyFun: (mutable Context, DirName, Key) ~> ?Array<File>,
     collect: Bool = true,
   ): Dir {
+    static::createFor(context, dirName, LambdaLazyCompute(lazyFun), collect)
+  }
+
+  static fun createFor(
+    context: mutable Context,
+    dirName: DirName,
+    compute: LazyCompute<Key, File>,
+    collect: Bool = true,
+  ): Dir {
     context.addRead(Path::dirTag(dirName));
     (context.fromContext.flatMap(ctx ->
       ctx.unsafeMaybeGetLazyDir(dirName)
@@ -236,7 +264,7 @@ class TLazyDir{
     | d @ Some _ -> d
     | _ -> context.unsafeMaybeGetLazyDir(dirName)
     }) match {
-    | Some(ldir) if (native_eq(ldir.typed().lazyFun, lazyFun) == 0) ->
+    | Some(ldir) if (ldir.typed().compute == compute) ->
       if (context.debugMode) {
         print_string(`REUSING: ${dirName}`);
       };
@@ -247,7 +275,7 @@ class TLazyDir{
       newDir = static{
         timeStack => TimeStack::create(context, time),
         dirName,
-        lazyFun,
+        compute,
         collect,
       };
       context.updateDirtyReaders(Path::dirTag(dirName));
