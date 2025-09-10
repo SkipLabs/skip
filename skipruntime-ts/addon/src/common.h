@@ -31,6 +31,8 @@ double CallJSNumberFunction(v8::Isolate*, v8::Local<v8::Object>, const char*,
                             int, v8::Local<v8::Value>[]);
 char* CallJSStringFunction(v8::Isolate*, v8::Local<v8::Object>, const char*,
                            int, v8::Local<v8::Value>[]);
+char* CallNullableStringFunction(v8::Isolate*, v8::Local<v8::Object>,
+                                 const char*, int, v8::Local<v8::Value>[]);
 void NatTryCatch(v8::Isolate*, std::function<void(v8::Isolate*)>);
 void RunWithGC(const v8::FunctionCallbackInfo<v8::Value>&);
 void GetErrorObject(const v8::FunctionCallbackInfo<v8::Value>&);
@@ -62,10 +64,6 @@ struct SkipException : std::exception {
 #define SKContext void*
 #define SKNonEmptyIterator void*
 #define SKResource void*
-#define SKResourceBuilderMap void*
-#define SKResourceBuilder void*
-#define SKExternalServiceMap void*
-#define SKExternalService void*
 #define SKLazyCompute void*
 #define SKChecker void*
 #define SKExecutor void*

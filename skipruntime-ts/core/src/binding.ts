@@ -8,8 +8,8 @@ import {
   type Mapper,
   type Reducer,
   type Resource,
-  type SkipService,
 } from "./api.js";
+import type { HandlerInfo, ServiceDefinition } from "./index.js";
 
 export type Handle<T> = Internal.Opaque<number, { handle_for: T }>;
 
@@ -37,6 +37,11 @@ export type Executor = {
   reject: (reason: Error) => void;
 };
 
+export type IntExecutor = {
+  resolve: (value: bigint) => void;
+  reject: (reason: Error) => void;
+};
+
 export interface FromBinding {
   // NonEmptyIterator
   SkipRuntime_NonEmptyIterator__next(
@@ -50,13 +55,13 @@ export interface FromBinding {
     K2 extends Json,
     V2 extends Json,
   >(
-    ref: Handle<Mapper<K1, V1, K2, V2>>,
+    ref: Handle<HandlerInfo<Mapper<K1, V1, K2, V2>>>,
   ): Pointer<Internal.Mapper>;
 
   // LazyCompute
 
   SkipRuntime_createLazyCompute<K extends Json, V extends Json>(
-    ref: Handle<LazyCompute<K, V>>,
+    ref: Handle<HandlerInfo<LazyCompute<K, V>>>,
   ): Pointer<Internal.LazyCompute>;
 
   // ExternalService
@@ -83,42 +88,15 @@ export interface FromBinding {
     name: string,
     error: Pointer<Internal.CJSON>,
   ): Handle<Error>;
-
   // Resource
 
   SkipRuntime_createResource(ref: Handle<Resource>): Pointer<Internal.Resource>;
 
-  // ResourceBuilder
-  SkipRuntime_createResourceBuilder(
-    ref: Handle<ResourceBuilder>,
-  ): Pointer<Internal.ResourceBuilder>;
+  // Service
 
-  // ResourceBuilder
   SkipRuntime_createService(
-    ref: Handle<SkipService>,
-    jsInputs: Pointer<Internal.CJObject>,
-    resources: Pointer<Internal.ResourceBuilderMap>,
-    remotes: Pointer<Internal.ExternalServiceMap>,
+    ref: Handle<ServiceDefinition>,
   ): Pointer<Internal.Service>;
-
-  // ResourceBuilderMap
-
-  SkipRuntime_ResourceBuilderMap__create(): Pointer<Internal.ResourceBuilderMap>;
-
-  SkipRuntime_ResourceBuilderMap__add(
-    map: Pointer<Internal.ResourceBuilderMap>,
-    key: string,
-    collection: Pointer<Internal.ResourceBuilder>,
-  ): void;
-
-  // ExternalServiceMap
-
-  SkipRuntime_ExternalServiceMap__create(): Pointer<Internal.ExternalServiceMap>;
-  SkipRuntime_ExternalServiceMap__add(
-    map: Pointer<Internal.ExternalServiceMap>,
-    key: string,
-    collection: Pointer<Internal.ExternalService>,
-  ): void;
 
   // Collection
 
@@ -182,18 +160,41 @@ export interface FromBinding {
   // Runtime
 
   SkipRuntime_Runtime__createResource(
+    service: string,
     identifier: string,
     resource: string,
     jsonParams: Pointer<Internal.CJObject>,
     executor: Pointer<Internal.Executor>,
   ): Handle<Error>;
 
+  SkipRuntime_Runtime__resourceInstances(
+    resources: Pointer<Internal.CJArray<Internal.CJString>>,
+  ): Pointer<Internal.CJArray<Internal.CJObject>>;
+
+  SkipRuntime_Runtime__reloadResource(
+    service: string,
+    resource: string,
+    jsonParams: Pointer<Internal.CJObject>,
+    executor: Pointer<Internal.Executor>,
+  ): Handle<Error>;
+
+  SkipRuntime_Runtime__replaceActiveResources(
+    service: string,
+    resources: Pointer<Internal.CJArray<Internal.CJObject>>,
+  ): Handle<Error>;
+
+  SkipRuntime_Runtime__destroyResources(
+    resources: Pointer<Internal.CJArray<Internal.CJObject>>,
+  ): Handle<Error>;
+
   SkipRuntime_Runtime__getAll(
+    service: string,
     resource: string,
     jsonParams: Pointer<Internal.CJObject>,
   ): Pointer<Internal.CJObject | Internal.CJFloat>;
 
   SkipRuntime_Runtime__getForKey(
+    service: string,
     resource: string,
     jsonParams: Pointer<Internal.CJObject>,
     key: Pointer<Internal.CJSON>,
@@ -210,6 +211,7 @@ export interface FromBinding {
   SkipRuntime_Runtime__unsubscribe(id: bigint): Handle<Error>;
 
   SkipRuntime_Runtime__update(
+    service: string,
     input: string,
     values: Pointer<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
     executor: Pointer<Internal.Executor>,
@@ -218,18 +220,25 @@ export interface FromBinding {
   // Reducer
 
   SkipRuntime_createReducer<K1 extends Json, V1 extends Json>(
-    ref: Handle<Reducer<K1, V1>>,
+    ref: Handle<HandlerInfo<Reducer<K1, V1>>>,
     defaultValue: Pointer<Internal.CJSON>,
   ): Pointer<Internal.Reducer>;
 
   // initService
   SkipRuntime_initService(
+    identifier: string,
     service: Pointer<Internal.Service>,
     executor: Pointer<Internal.Executor>,
   ): Handle<Error>;
 
   // closeClose
-  SkipRuntime_closeService(): Pointer<Internal.CJSON>;
+  SkipRuntime_closeService(
+    identifier: string,
+  ): Handle<Error> | Handle<Promise<unknown>>;
+
+  SkipRuntime_invalidateCollections(
+    collections: Pointer<Internal.CJArray<Internal.CJString>>,
+  ): Handle<Error>;
 
   // Context
 
@@ -243,7 +252,7 @@ export interface FromBinding {
   ): Pointer<Internal.CJArray>;
 
   SkipRuntime_Context__useExternalResource(
-    service: string,
+    extservice: string,
     identifier: string,
     params: Pointer<Internal.CJObject>,
   ): string;
@@ -251,4 +260,7 @@ export interface FromBinding {
   // Executor
 
   SkipRuntime_createExecutor(ref: Handle<Executor>): Pointer<Internal.Executor>;
+  SkipRuntime_createIntExecutor(
+    ref: Handle<IntExecutor>,
+  ): Pointer<Internal.Executor>;
 }
