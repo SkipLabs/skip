@@ -1233,6 +1233,16 @@ base class EagerDir protected {
       same =
         (native_eq(parents, child.parents) == 0) &&
         (native_eq(reducerOpt, child.reducer.map(r -> r.reducer)) == 0);
+      parentItems = parents.items();
+      tick = context.getTick();
+      while (same) {
+        parentItems.next() match {
+        | Some((d, _)) ->
+          pDir = context.unsafeGetEagerDir(d);
+          !same = pDir.created < tick
+        | _ -> break void
+        }
+      };
       if (same && child.creator != context.currentArrow()) {
         invariant_violation(
           `Duplicate subdirectory: ${

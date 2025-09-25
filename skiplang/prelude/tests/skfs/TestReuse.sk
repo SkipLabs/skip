@@ -84,4 +84,82 @@ fun testReuseWithReduce(): void {
   SK.destroyObstack(pos);
 }
 
+@test
+fun testReuseWithIntermediateChange(): void {
+  pos = SK.newObstack();
+  inputsDirName = SK.DirName::create("/inputs/");
+  optionDirName = SK.DirName::create("/option/");
+  mappedDirName = SK.DirName::create("/mapped/");
+  key = v ~> SK.IID(v);
+  val = v ~> SK.IntFile(v);
+  context = SK.Context::create{}.mclone();
+  inputs = context.mkdir(
+    SK.IID::keyType,
+    SK.IntFile::type,
+    inputsDirName,
+    Array[
+      (key(0), val(0)),
+      (key(1), val(1)),
+      (key(2), val(2)),
+      (key(3), val(3)),
+    ],
+  );
+  optionHdl = context.mkdir(
+    SK.IID::keyType,
+    SK.IntFile::type,
+    optionDirName,
+    Array[(key(0), val(0))],
+  );
+  mapped = inputs.map(
+    SK.IID::keyType,
+    Handle::type,
+    context,
+    mappedDirName,
+    (context, writer, k, it) ~> {
+      v = it.first.value;
+      o = optionHdl.get(context, key(0)).value % 2;
+      submap = inputs
+        .map(
+          IIKey::keyType,
+          SK.IntFile::type,
+          context,
+          mappedDirName.sub(`k1${k}`),
+          (_context, writer, sk, sv) ~>
+            writer.set(
+              IIKey(k.value, sk.value),
+              SK.IntFile(o + (sv.first.value * v)),
+            )
+          ,
+        )
+        .map(
+          IIKey::keyType,
+          SK.IntFile::type,
+          context,
+          mappedDirName.sub(`k2${k}`),
+          (_context, writer, key, sv) ~> writer.set(key, sv.first),
+        );
+      writer.set(k, Handle(submap))
+    },
+  );
+  r0 = mapped.get(context, key(1)).v.get(context, IIKey(1, 1)).value;
+  T.expectEq(r0, 1, "Test reuse with intermediate change 0");
+  optionHdl.writeArray(context, key(0), Array[val(1)]);
+  context.update();
+  r1Hdl = mapped.get(context, key(1)).v;
+  r1 = r1Hdl.get(context, IIKey(1, 1)).value;
+  T.expectEq(r1, 2, "Test reuse with intermediate change 1");
+  start = context.getTick();
+  optionHdl.writeArray(context, key(0), Array[val(3)]);
+  context.update();
+  r12Hdl = mapped.get(context, key(1)).v;
+  r12 = r12Hdl.get(context, IIKey(1, 1)).value;
+  T.expectEq(r12, 2, "Test reuse with intermediate change 2");
+  (isReset, changes) = context
+    .unsafeGetEagerDir(r12Hdl.dirName)
+    .getChangesAfter(start);
+  T.expectEq(isReset, false, "Test reuse with intermediate change 3");
+  T.expectEq(changes, SortedSet[], "Test reuse with intermediate change 4");
+  SK.destroyObstack(pos);
+}
+
 module end;
