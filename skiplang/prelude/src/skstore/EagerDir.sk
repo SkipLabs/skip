@@ -1214,6 +1214,7 @@ base class EagerDir protected {
         ),
       >,
     >,
+    reducerOpt: ?IReducer<File>,
   ): Bool {
     context.canReuse match {
     | CRAlways(except) ->
@@ -1229,7 +1230,9 @@ base class EagerDir protected {
       }
     | CRNever() -> false
     | CRIfMatch() ->
-      same = (native_eq(parents, child.parents) == 0);
+      same =
+        (native_eq(parents, child.parents) == 0) &&
+        (native_eq(reducerOpt, child.reducer.map(r -> r.reducer)) == 0);
       if (same && child.creator != context.currentArrow()) {
         invariant_violation(
           `Duplicate subdirectory: ${
@@ -2175,7 +2178,7 @@ class TEagerDir extends EagerDir, TDir {
   ): void {
     context.unsafeMaybeGetEagerDir(childName) match {
     | Some(child) ->
-      if (static::isReusable(context, child, parents)) {
+      if (static::isReusable(context, child, parents, reducerOpt)) {
         static::reuseDir(context, childName);
         return void
       }

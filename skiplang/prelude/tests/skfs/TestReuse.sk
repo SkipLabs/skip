@@ -1,0 +1,87 @@
+module alias T = SKTest;
+module alias SK = SKStore;
+
+module SKStoreTest;
+
+class IIKey(v1: Int, v2: Int) extends SK.Key {
+  fun toString(): String {
+    `${this.v1}:${this.v2}`
+  }
+}
+
+class Handle(v: SK.EHandle<IIKey, SK.IntFile>) extends SK.File
+
+@test
+fun testReuseWithReduce(): void {
+  pos = SK.newObstack();
+  inputsDirName = SK.DirName::create("/inputs/");
+  reducerDirName = SK.DirName::create("/reducer/");
+  mappedDirName = SK.DirName::create("/mapped/");
+  key = v ~> SK.IID(v);
+  val = v ~> SK.IntFile(v);
+  context = SK.Context::create{}.mclone();
+  inputs = context.mkdir(
+    SK.IID::keyType,
+    SK.IntFile::type,
+    inputsDirName,
+    Array[
+      (key(0), val(0)),
+      (key(1), val(1)),
+      (key(2), val(2)),
+      (key(3), val(3)),
+    ],
+  );
+  reducerHdl = context.mkdir(
+    SK.IID::keyType,
+    SK.IntFile::type,
+    reducerDirName,
+    Array[(key(0), val(0))],
+  );
+  mapped = inputs.map(
+    SK.IID::keyType,
+    Handle::type,
+    context,
+    mappedDirName,
+    (context, writer, k, it) ~> {
+      recuder = reducerHdl.maybeGet(context, key(0)) match {
+      | Some(SK.IntFile(0)) -> SK.maxReducer()
+      | _ -> SK.minReducer()
+      };
+      v = it.first.value;
+      supmap = inputs.mapReduce(
+        IIKey::keyType,
+        SK.IntFile::type,
+        context,
+        mappedDirName.sub(`k${k}`),
+        (_context, writer, sk, sv) ~>
+          writer.set(
+            IIKey(k.value, sk.value % 2),
+            SK.IntFile(sv.first.value * v),
+          ),
+        recuder,
+      );
+      writer.set(k, Handle(supmap))
+    },
+  );
+  r0 = mapped.get(context, key(1)).v.get(context, IIKey(1, 1)).value;
+  T.expectEq(r0, 3, "Test reuse with reduce 0");
+  reducerHdl.writeArray(context, key(0), Array[val(1)]);
+  context.update();
+  r1Hdl = mapped.get(context, key(1)).v;
+  r1 = r1Hdl.get(context, IIKey(1, 1)).value;
+  T.expectEq(r1, 1, "Test reuse with reduce 1");
+  start = context.getTick();
+  reducerHdl.writeArray(context, key(0), Array[val(2)]);
+  context.update();
+  r12Hdl = mapped.get(context, key(1)).v;
+  r12 = r12Hdl.get(context, IIKey(1, 1)).value;
+  T.expectEq(r12, 1, "Test reuse with reduce 2");
+  (isReset, changes) = context
+    .unsafeGetEagerDir(r12Hdl.dirName)
+    .getChangesAfter(start);
+  T.expectEq(isReset, false, "Test reuse with reduce 3");
+  T.expectEq(changes, SortedSet[], "Test reuse with reduce 4");
+  SK.destroyObstack(pos);
+}
+
+module end;
