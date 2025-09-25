@@ -89,13 +89,11 @@ class EagerFilter<K: Key, F: File> private {
     rangesOpt: ?FilterRange<K>,
   ): void {
     sinkName = this.childName.sub("filter-sink").sub(genSym(0).toString());
-    EagerDir::apply(
+    EagerDir::applyFor(
       context,
       this.parentName,
       sinkName,
-      (_context, _writer, _key, _fileIter) ~> {
-        void
-      },
+      NoopMapper(),
       None(),
       None(),
       Some((context, keys) ~> this.syncData(context, Some(keys), rangesOpt)),
