@@ -39,17 +39,16 @@ class JSONFile(json: SKJSON.CJSON) extends SKStore.File
 fun accReducer<V1: SKStore.File, V2: SKStore.File>(
   reducer: Reducer<V1, V2>,
 ): SKStore.EReducer<V1, V2> {
-  SKStore.EReducer{
+  SKStore.LambdaReducer{
     type => reducer.getType(),
-    canReset => true,
-    init => iter ~> {
+    init_ => iter ~> {
       acc = reducer.initial;
       for (x in iter) {
         !acc = reducer.add(acc, x)
       };
       Array[acc]
     },
-    update => (state, old, new) ~> {
+    update_ => (state, old, new) ~> {
       acc = state[0];
       for (x in old) {
         reducer.remove(acc, x) match {

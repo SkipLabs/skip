@@ -218,9 +218,9 @@ class Reducer<K: Orderable, F: frozen>{
   }
 }
 
-class IReducer<F>{
-  init: (mutable Iterator<F> ~> Array<F>),
-  update: (Array<F>, Array<F>, Array<F>) ~> ?Array<F>,
+base class IReducer<F> uses Unsafe.Downcastable, Equality {
+  fun init(mutable Iterator<F>): Array<F>;
+  fun update(Array<F>, Array<F>, Array<F>): ?Array<F>;
 }
 
 mutable class IntRef(mutable value: Int) {
@@ -1277,7 +1277,7 @@ base class EagerDir protected {
     | CRIfMatch() ->
       same =
         fsEquals(parents, child.parents) &&
-        (native_eq(reducerOpt, child.reducer.map(r -> r.reducer)) == 0);
+        (reducerOpt == child.reducer.map(r -> r.reducer));
       parentItems = parents.items();
       tick = context.getTick();
       while (same) {

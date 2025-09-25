@@ -167,29 +167,79 @@ mutable class TWriter<K: Key, V: File> private {
 /* Typed version of the Reducer. */
 /*****************************************************************************/
 
-class EReducer<V2, V3: File>{
+base class EReducer<V2: frozen, V3: File>{
   type: File ~> V3,
-  canReset: Bool,
-  init: (mutable Iterator<V2> ~> Array<V3>),
-  update: (Array<V3>, Array<V2>, Array<V2>) ~> ?Array<V3>,
+} uses Unsafe.Downcastable, Equality {
+  fun init(mutable Iterator<V2>): Array<V3>;
+  fun update(Array<V3>, Array<V2>, Array<V2>): ?Array<V3>;
+}
+
+class LambdaReducer<V2: frozen, V3: File>{
+  init_: (mutable Iterator<V2> ~> Array<V3>),
+  update_: (Array<V3>, Array<V2>, Array<V2>) ~> ?Array<V3>,
+} extends EReducer<V2, V3> {
+  fun init(values: mutable Iterator<V2>): Array<V3> {
+    this.init_(values)
+  }
+
+  fun update(state: Array<V3>, old: Array<V2>, new: Array<V2>): ?Array<V3> {
+    this.update_(state, old, new)
+  }
+
+  fun ==(other: EReducer<V2, V3>): Bool {
+    Unsafe.maybeCast(other, LambdaReducer<V2, V3>) match {
+    | Some(o) ->
+      native_eq(this.init_, o.init_) == 0 &&
+        native_eq(this.update_, o.update_) == 0
+    | _ -> false
+    }
+  }
+}
+
+class IEReducer<V2: frozen, V3: File>(
+  reducer: EReducer<V2, V3>,
+  valueType: File ~> V2,
+) extends IReducer<File> {
+  //
+  fun init(values: mutable Iterator<File>): Array<File> {
+    this.reducer.init(values.map(this.valueType));
+  }
+
+  fun update(
+    state: Array<File>,
+    old: Array<File>,
+    new: Array<File>,
+  ): ?Array<File> {
+    this.reducer.update(
+      state.map(this.reducer.type),
+      old.map(this.valueType),
+      new.map(this.valueType),
+    )
+  }
+
+  fun ==(other: IReducer<File>): Bool {
+    Unsafe.maybeCast(other, IEReducer<V2, V3>) match {
+    | Some(o) -> this.reducer == o.reducer
+    | _ -> false
+    }
+  }
 }
 
 /*****************************************************************************/
 /* A few predefined Reducers. */
 /*****************************************************************************/
 
-fun countReducer(): EReducer<_, IntFile> {
-  EReducer{
+fun countReducer<V: frozen>(): EReducer<V, IntFile> {
+  LambdaReducer{
     type => IntFile::type,
-    canReset => false,
-    init => iter ~> {
+    init_ => iter ~> {
       count = 0;
       for (_ in iter) {
         !count = count + 1;
       };
       Array[IntFile(count)]
     },
-    update => (state, old, new) ~> {
+    update_ => (state, old, new) ~> {
       count = state[0].value;
       for (_ in old) {
         !count = count - 1;
@@ -203,17 +253,16 @@ fun countReducer(): EReducer<_, IntFile> {
 }
 
 fun sumReducer(): EReducer<IntFile, IntFile> {
-  EReducer{
+  LambdaReducer{
     type => IntFile::type,
-    canReset => false,
-    init => iter ~> {
+    init_ => iter ~> {
       sum = 0;
       for (x in iter) {
         !sum = sum + x.value;
       };
       Array[IntFile(sum)]
     },
-    update => (state, old, new) ~> {
+    update_ => (state, old, new) ~> {
       sum = state[0].value;
       for (x in old) {
         !sum = sum - x.value;
@@ -227,10 +276,9 @@ fun sumReducer(): EReducer<IntFile, IntFile> {
 }
 
 fun minReducer(): EReducer<IntFile, IntFile> {
-  EReducer{
+  LambdaReducer{
     type => IntFile::type,
-    canReset => true,
-    init => iter ~> {
+    init_ => iter ~> {
       min: ?Int = None();
       for (x in iter) {
         if (min.isNone() || x.value < min.fromSome()) !min = Some(x.value);
@@ -240,7 +288,7 @@ fun minReducer(): EReducer<IntFile, IntFile> {
       | None() -> Array[]
       }
     },
-    update => (state, old, new) ~> {
+    update_ => (state, old, new) ~> {
       min = state[0].value;
       for (x in new) {
         if (x.value < min) !min = x.value;
@@ -254,10 +302,9 @@ fun minReducer(): EReducer<IntFile, IntFile> {
 }
 
 fun maxReducer(): EReducer<IntFile, IntFile> {
-  EReducer{
+  LambdaReducer{
     type => IntFile::type,
-    canReset => true,
-    init => iter ~> {
+    init_ => iter ~> {
       max: ?Int = None();
       for (x in iter) {
         if (max.isNone() || x.value > max.fromSome()) !max = Some(x.value);
@@ -267,7 +314,7 @@ fun maxReducer(): EReducer<IntFile, IntFile> {
       | None() -> Array[]
       }
     },
-    update => (state, old, new) ~> {
+    update_ => (state, old, new) ~> {
       max = state[0].value;
       for (x in new) {
         if (x.value > max) !max = x.value;
@@ -452,17 +499,7 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
       context,
       parents,
       dirName,
-      Some(
-        IReducer{
-          init => files ~> reducer.init(files.map(typeOutput)),
-          update => (state, old, new) ~>
-            reducer.update(
-              state.map(reducer.type),
-              old.map(typeOutput),
-              new.map(typeOutput),
-            ),
-        },
-      ),
+      Some(IEReducer(reducer, typeOutput)),
     )
   }
 

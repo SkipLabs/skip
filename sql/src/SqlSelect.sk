@@ -1182,31 +1182,28 @@ class SelectEvaluator{
     | None() ->
       if (this.select.distinct || this.select.groupBy is Some _) {
         Some(
-          SKStore.EReducer{
+          SKStore.LambdaReducer{
             type => Row::type,
-            canReset => true,
-            init => firstRowAsArrayRepeat1,
-            update => (_, _, _) ~> None(),
+            init_ => firstRowAsArrayRepeat1,
+            update_ => (_, _, _) ~> None(),
           },
         )
       } else {
         Some(
-          SKStore.EReducer{
+          SKStore.LambdaReducer{
             type => Row::type,
-            canReset => false,
-            init => initRepeatRow,
-            update => updateRepeatRow,
+            init_ => initRepeatRow,
+            update_ => updateRepeatRow,
           },
         )
       }
     | Some(aggrs) ->
       aggrKinds = aggrs.map(x -> x.i0);
       Some(
-        SKStore.EReducer{
+        SKStore.LambdaReducer{
           type => Row::type,
-          canReset => true,
-          init => rows ~> reducerInit(aggrKinds, rows),
-          update => (state, old, new) ~>
+          init_ => rows ~> reducerInit(aggrKinds, rows),
+          update_ => (state, old, new) ~>
             reducerUpdate(aggrKinds, state, old, new),
         },
       )
@@ -1215,11 +1212,10 @@ class SelectEvaluator{
     | List.Nil _ -> reducer
     | List.Cons _ ->
       Some(
-        SKStore.EReducer{
+        SKStore.LambdaReducer{
           type => Row::type,
-          canReset => true,
-          init => initUnion,
-          update => (_, _, _) ~> None(),
+          init_ => initUnion,
+          update_ => (_, _, _) ~> None(),
         },
       )
     }
