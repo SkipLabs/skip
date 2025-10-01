@@ -315,6 +315,29 @@ char* CallJSStringFunction(Isolate* isolate, Local<Object> binding,
       [](Isolate* _i) {});
 }
 
+char* CallJSNullableStringFunction(Isolate* isolate, Local<Object> binding,
+                                   const char* name, int argc,
+                                   Local<Value> argv[]) {
+  Local<Function> function = CheckFunction(isolate, binding, name);
+  return (char*)SKTryCatch(
+      isolate, function, binding, argc, argv,
+      [](Isolate* isolate, Local<Value> result) {
+        if (!result->IsString() && !result->IsNull()) {
+          const char* message = "Invalid function return type";
+          char* skempty = sk_string_create("", 0);
+          char* skmessage = sk_string_create(message, strlen(message));
+          SkipRuntime_throwExternalException(skempty, skmessage, skempty);
+        }
+        if (result->IsNull()) {
+          return (char*)nullptr;
+        }
+        String::Utf8Value v8Str(isolate, result.As<String>());
+        std::string cppStr(*v8Str);
+        return sk_string_create(cppStr.c_str(), cppStr.size());
+      },
+      [](Isolate* _i) {});
+}
+
 void NatTryCatch(Isolate* isolate, std::function<void(Isolate*)> run) {
   try {
     run(isolate);

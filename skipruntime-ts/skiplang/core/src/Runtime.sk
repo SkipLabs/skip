@@ -310,7 +310,7 @@ fun initService(
     SKStore.gContextInit(initCtx());
   };
   runId = Ksuid::create().toString();
-  SKStore.runWithResult(context ~> {
+  runWithResult(context ~> {
     if (context.unsafeMaybeGetEagerDir(kSessionDir) is None()) {
       sessionHdl = context.mkdir(
         SKStore.UnitID::keyType,
@@ -441,7 +441,7 @@ fun closeService_(
 }
 
 fun closeService(): Result<Array<Float>, .Exception> {
-  SKStore.runWithResult(ctx ~> closeService_(ctx))
+  runWithResult(ctx ~> closeService_(ctx))
 }
 
 class LinkToResource(

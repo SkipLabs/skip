@@ -7,6 +7,7 @@ namespace skipruntime {
 
 using skbinding::CallJSFunction;
 using skbinding::CallJSNullableFunction;
+using skbinding::CallJSNullableStringFunction;
 using skbinding::CallJSNumberFunction;
 using skbinding::CallJSStringFunction;
 using skbinding::CallJSVoidFunction;
@@ -63,6 +64,14 @@ void* SkipRuntime_getContext() {
   Local<Object> externFunctions = kExternFunctions.Get(isolate);
   return CallJSNullableFunction(isolate, externFunctions,
                                 "SkipRuntime_getContext", 0, nullptr);
+}
+
+void* SkipRuntime_getFork() {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  return CallJSNullableStringFunction(isolate, externFunctions,
+                                      "SkipRuntime_getFork", 0, nullptr);
 }
 
 CJArray SkipRuntime_Mapper__mapEntry(uint32_t mapperId, CJSON key,

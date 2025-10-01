@@ -757,6 +757,7 @@ export class ToBinding {
   private readonly stack: Stack;
   private readonly handles: Handles;
   private skjson?: JsonConverter;
+  private fork?: string;
 
   constructor(
     private binding: FromBinding,
@@ -790,6 +791,10 @@ export class ToBinding {
 
   SkipRuntime_getContext(): Nullable<Pointer<Internal.Context>> {
     return this.stack.get();
+  }
+
+  SkipRuntime_getFork(): Nullable<string> {
+    return this.fork ?? null;
   }
 
   // Mapper

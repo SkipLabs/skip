@@ -269,6 +269,7 @@ interface ToWasm {
   SkipRuntime_pushContext(refs: ptr<Internal.Context>): void;
   SkipRuntime_popContext(): void;
   SkipRuntime_getContext(): Nullable<ptr<Internal.Context>>;
+  SkipRuntime_getFork(): Nullable<ptr<Internal.String>>;
 
   // Mapper
 
@@ -824,6 +825,11 @@ class LinksImpl implements Links {
     return toNullablePtr(this.tobinding.SkipRuntime_getContext());
   }
 
+  getFork() {
+    const fork = this.tobinding.SkipRuntime_getFork();
+    return fork ? this.utils.exportString(fork) : null;
+  }
+
   // Mapper
 
   mapEntryOfMapper(
@@ -1045,6 +1051,7 @@ class Manager implements ToWasmManager {
     toWasm.SkipRuntime_pushContext = links.pushContext.bind(links);
     toWasm.SkipRuntime_popContext = links.popContext.bind(links);
     toWasm.SkipRuntime_getContext = links.getContext.bind(links);
+    toWasm.SkipRuntime_getFork = links.getFork.bind(links);
 
     // Mapper
 

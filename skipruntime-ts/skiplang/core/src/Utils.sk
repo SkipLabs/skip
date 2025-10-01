@@ -138,4 +138,8 @@ fun collectionsByName(collections: Map<String, Collection>): SKJSON.CJObject {
   SKJSON.CJObject(SKJSON.CJFields::create(fields.toArray(), x -> x));
 }
 
+fun runWithResult<T>(f: mutable SKStore.Context ~> T): Result<T, .Exception> {
+  SKStore.runWithResult(f, None(), false, getFork())
+}
+
 module end;
