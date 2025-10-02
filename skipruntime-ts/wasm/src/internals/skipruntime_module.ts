@@ -225,6 +225,11 @@ export interface FromWasm {
     executor: ptr<Internal.Executor>,
   ): Handle<Error>;
 
+  SkipRuntime_Runtime__fork(name: ptr<Internal.String>): Handle<Error>;
+  SkipRuntime_Runtime__merge(): Handle<Error>;
+  SkipRuntime_Runtime__abortFork(): Handle<Error>;
+  SkipRuntime_Runtime__forkExists(name: ptr<Internal.String>): number;
+
   // Reducer
 
   SkipRuntime_createReducer<K1 extends Json, V1 extends Json>(
@@ -721,6 +726,28 @@ export class WasmFromBinding implements FromBinding {
       toPtr(values),
       toPtr(executor),
     );
+  }
+
+  SkipRuntime_Runtime__fork(name: string): Handle<Error> {
+    return this.fromWasm.SkipRuntime_Runtime__fork(
+      this.utils.exportString(name),
+    );
+  }
+
+  SkipRuntime_Runtime__forkExists(name: string): boolean {
+    return (
+      this.fromWasm.SkipRuntime_Runtime__forkExists(
+        this.utils.exportString(name),
+      ) != 0
+    );
+  }
+
+  SkipRuntime_Runtime__merge(): Handle<Error> {
+    return this.fromWasm.SkipRuntime_Runtime__merge();
+  }
+
+  SkipRuntime_Runtime__abortFork(): Handle<Error> {
+    return this.fromWasm.SkipRuntime_Runtime__abortFork();
   }
 
   SkipRuntime_createReducer<K1 extends Json, V1 extends Json>(

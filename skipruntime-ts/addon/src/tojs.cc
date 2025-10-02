@@ -72,6 +72,10 @@ CJSON SkipRuntime_Runtime__getForKey(char* resource, CJObject jsonParams,
                                      CJSON key);
 double SkipRuntime_Runtime__update(char* input, CJSON values,
                                    SKExecutor executor);
+double SkipRuntime_Runtime__fork(char* input);
+double SkipRuntime_Runtime__merge();
+double SkipRuntime_Runtime__abortFork();
+uint32_t SkipRuntime_Runtime__forkExists(char* input);
 }
 
 using skbinding::AddFunction;
@@ -1119,6 +1123,68 @@ void UpdateOfRuntime(const FunctionCallbackInfo<Value>& args) {
   });
 }
 
+void ForkOfRuntime(const FunctionCallbackInfo<Value>& args) {
+  Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
+  if (args.Length() != 1) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(
+        Exception::TypeError(FromUtf8(isolate, "Must have one parameters.")));
+    return;
+  }
+  if (!args[0]->IsString()) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(Exception::TypeError(
+        FromUtf8(isolate, "The parameter must be a string.")));
+    return;
+  }
+  NatTryCatch(isolate, [&args](Isolate* isolate) {
+    char* skname = ToSKString(isolate, args[0].As<String>());
+    double skerror = SkipRuntime_Runtime__fork(skname);
+    args.GetReturnValue().Set(Number::New(isolate, skerror));
+  });
+}
+
+void MergeOfRuntime(const FunctionCallbackInfo<Value>& args) {
+  Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
+  NatTryCatch(isolate, [&args](Isolate* isolate) {
+    double skerror = SkipRuntime_Runtime__merge();
+    args.GetReturnValue().Set(Number::New(isolate, skerror));
+  });
+}
+
+void AbortForkOfRuntime(const FunctionCallbackInfo<Value>& args) {
+  Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
+  NatTryCatch(isolate, [&args](Isolate* isolate) {
+    double skerror = SkipRuntime_Runtime__abortFork();
+    args.GetReturnValue().Set(Number::New(isolate, skerror));
+  });
+}
+
+void ForkExistsOfRuntime(const FunctionCallbackInfo<Value>& args) {
+  Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
+  if (args.Length() != 1) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(
+        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
+    return;
+  }
+  if (!args[0]->IsString()) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(Exception::TypeError(
+        FromUtf8(isolate, "The parameter must be a string.")));
+    return;
+  }
+  NatTryCatch(isolate, [&args](Isolate* isolate) {
+    char* skname = ToSKString(isolate, args[0].As<String>());
+    uint32_t skexists = SkipRuntime_Runtime__forkExists(skname);
+    args.GetReturnValue().Set(Boolean::New(isolate, skexists != 0));
+  });
+}
+
 void GetToJSBinding(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
   HandleScope scope(isolate);
@@ -1202,7 +1268,12 @@ void GetToJSBinding(const FunctionCallbackInfo<Value>& args) {
   AddFunction(isolate, binding, "SkipRuntime_Runtime__getForKey",
               GetForKeyOfRuntime);
   AddFunction(isolate, binding, "SkipRuntime_Runtime__update", UpdateOfRuntime);
-
+  AddFunction(isolate, binding, "SkipRuntime_Runtime__fork", ForkOfRuntime);
+  AddFunction(isolate, binding, "SkipRuntime_Runtime__merge", MergeOfRuntime);
+  AddFunction(isolate, binding, "SkipRuntime_Runtime__abortFork",
+              AbortForkOfRuntime);
+  AddFunction(isolate, binding, "SkipRuntime_Runtime__forkExists",
+              ForkExistsOfRuntime);
   args.GetReturnValue().Set(binding);
 }
 

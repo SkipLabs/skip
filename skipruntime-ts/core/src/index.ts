@@ -335,12 +335,12 @@ class CollectionWriter<K extends Json, V extends Json> {
   constructor(
     public readonly collection: string,
     private readonly refs: ToBinding,
-    private readonly fork: Nullable<string>,
+    private forkName: Nullable<string>,
   ) {}
 
   async update(values: Entry<K, V>[], isInit: boolean): Promise<void> {
     await new Promise<void>((resolve, reject) => {
-      this.refs.setFork(this.fork);
+      this.refs.setFork(this.getForkName());
       if (!this.refs.needGC()) {
         reject(new SkipError("CollectionWriter.update cannot be performed."));
       }
@@ -361,7 +361,7 @@ class CollectionWriter<K extends Json, V extends Json> {
   }
 
   error(error: unknown): void {
-    this.refs.setFork(this.fork);
+    this.refs.setFork(this.getForkName());
     if (!this.refs.needGC()) {
       throw new SkipError("CollectionWriter.update cannot be performed.");
     }
@@ -375,7 +375,7 @@ class CollectionWriter<K extends Json, V extends Json> {
   }
 
   initialized(error?: unknown): void {
-    this.refs.setFork(this.fork);
+    this.refs.setFork(this.getForkName());
     if (!this.refs.needGC()) {
       throw new SkipError("CollectionWriter.update cannot be performed.");
     }
@@ -396,6 +396,19 @@ class CollectionWriter<K extends Json, V extends Json> {
     return JSON.parse(
       JSON.stringify(error, Object.getOwnPropertyNames(error)),
     ) as Json;
+  }
+
+  private getForkName(): Nullable<string> {
+    const forkName = this.forkName;
+    if (!forkName) return null;
+    if (
+      !this.refs.runWithGC(() =>
+        this.refs.binding.SkipRuntime_Runtime__forkExists(forkName),
+      )
+    ) {
+      this.forkName = null;
+    }
+    return this.forkName;
   }
 }
 
@@ -466,7 +479,7 @@ export type SubscriptionID = Opaque<bigint, "subscription">;
 export class ServiceInstance {
   constructor(
     private readonly refs: ToBinding,
-    private readonly fork: Nullable<string>,
+    readonly forkName: Nullable<string>,
   ) {}
 
   /**
@@ -481,7 +494,7 @@ export class ServiceInstance {
     params: Json,
   ): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.refs.setFork(this.fork);
+      this.refs.setFork(this.forkName);
       const errorHdl = this.refs.runWithGC(() => {
         const exHdl = this.refs.handles.register({
           resolve,
@@ -511,7 +524,7 @@ export class ServiceInstance {
     const uuid = crypto.randomUUID();
     await this.instantiateResource(uuid, resource, params);
     try {
-      this.refs.setFork(this.fork);
+      this.refs.setFork(this.forkName);
       const result = this.refs.runWithGC(() => {
         return this.refs
           .json()
@@ -549,7 +562,7 @@ export class ServiceInstance {
     const uuid = crypto.randomUUID();
     await this.instantiateResource(uuid, resource, params);
     try {
-      this.refs.setFork(this.fork);
+      this.refs.setFork(this.forkName);
       const skjson = this.refs.json();
       const result = this.refs.runWithGC(() => {
         return skjson.importJSON(
@@ -577,7 +590,7 @@ export class ServiceInstance {
    * @param resourceInstanceId - The resource identifier
    */
   closeResourceInstance(resourceInstanceId: string): void {
-    this.refs.setFork(this.fork);
+    this.refs.setFork(this.forkName);
     const errorHdl = this.refs.runWithGC(() => {
       return this.refs.binding.SkipRuntime_Runtime__closeResource(
         resourceInstanceId,
@@ -605,7 +618,7 @@ export class ServiceInstance {
     },
     watermark?: string,
   ): SubscriptionID {
-    this.refs.setFork(this.fork);
+    this.refs.setFork(this.forkName);
     const session = this.refs.runWithGC(() => {
       const sknotifier = this.refs.binding.SkipRuntime_createNotifier(
         this.refs.handles.register(notifier),
@@ -635,7 +648,7 @@ export class ServiceInstance {
    * @param id - The subscription identifier returned by a call to `subscribe`
    */
   unsubscribe(id: SubscriptionID): void {
-    this.refs.setFork(this.fork);
+    this.refs.setFork(this.forkName);
     const errorHdl = this.refs.runWithGC(() => {
       return this.refs.binding.SkipRuntime_Runtime__unsubscribe(id);
     });
@@ -654,7 +667,7 @@ export class ServiceInstance {
     entries: Entry<K, V>[],
   ): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.refs.setFork(this.fork);
+      this.refs.setFork(this.forkName);
       const errorHdl = this.refs.runWithGC(() => {
         const exHdl = this.refs.handles.register({
           resolve,
@@ -676,7 +689,7 @@ export class ServiceInstance {
    * @returns The promise of externals services shutdowns
    */
   close(): Promise<unknown> {
-    this.refs.setFork(this.fork);
+    this.refs.setFork(this.forkName);
     const result = this.refs.runWithGC(() => {
       return this.refs
         .json()
@@ -768,7 +781,7 @@ class ValuesImpl<T> implements Values<T> {
 export class ToBinding {
   private readonly stack: Stack;
   private skjson?: JsonConverter;
-  private fork: Nullable<string>;
+  private forkName: Nullable<string>;
   readonly handles: Handles;
 
   constructor(
@@ -779,7 +792,7 @@ export class ToBinding {
   ) {
     this.stack = new Stack();
     this.handles = new Handles();
-    this.fork = null;
+    this.forkName = null;
   }
 
   register<T>(v: T): Handle<T> {
@@ -807,11 +820,11 @@ export class ToBinding {
   }
 
   SkipRuntime_getFork(): Nullable<string> {
-    return this.fork ?? null;
+    return this.forkName;
   }
 
   setFork(name: Nullable<string>): void {
-    this.fork = name;
+    this.forkName = name;
   }
 
   // Mapper
@@ -1012,7 +1025,7 @@ export class ToBinding {
   ): void {
     const skjson = this.getJsonConverter();
     const supplier = this.handles.get(sksupplier);
-    const writer = new CollectionWriter(writerId, this, this.fork);
+    const writer = new CollectionWriter(writerId, this, this.forkName);
     const params = skjson.importJSON(skparams, true) as Json;
     // Ensure notification is made outside the current context update
     setTimeout(() => {
@@ -1071,8 +1084,8 @@ export class ToBinding {
   }
 
   initService(service: SkipService): Promise<ServiceInstance> {
+    this.setFork(null);
     return new Promise((resolve, reject) => {
-      const fork = this.fork;
       const errorHdl = this.runWithGC(() => {
         const skExternalServices =
           this.binding.SkipRuntime_ExternalServiceMap__create();
@@ -1110,7 +1123,7 @@ export class ToBinding {
         );
         const exHdl = this.handles.register({
           resolve: () => {
-            resolve(new ServiceInstance(this, fork));
+            resolve(new ServiceInstance(this, null));
           },
           reject: (ex: Error) => reject(ex),
         });
