@@ -8,6 +8,7 @@
 
 void InitToBinding(const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
+  v8::HandleScope scope(isolate);
   if (args.Length() != 1) {
     isolate->ThrowException(v8::Exception::TypeError(
         skbinding::FromUtf8(isolate, "Must have one parameters.")));
