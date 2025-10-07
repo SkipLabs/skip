@@ -361,8 +361,7 @@ void RunWithGC(const v8::FunctionCallbackInfo<v8::Value>& args) {
   if (!tryCatch.HasCaught()) {
     args.GetReturnValue().Set(optResult.ToLocalChecked());
   } else {
-    Local<Value> exception = tryCatch.Exception();
-    isolate->ThrowException(exception);
+    tryCatch.ReThrow();
   }
   SKIP_destroy_Obstack(obstack);
 }
