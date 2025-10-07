@@ -18,6 +18,7 @@ using v8::Function;
 using v8::FunctionCallback;
 using v8::FunctionCallbackInfo;
 using v8::FunctionTemplate;
+using v8::HandleScope;
 using v8::Isolate;
 using v8::Local;
 using v8::MaybeLocal;
@@ -341,6 +342,7 @@ void NatTryCatch(Isolate* isolate, std::function<void(Isolate*)> run) {
 
 void RunWithGC(const v8::FunctionCallbackInfo<v8::Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 1) {
     isolate->ThrowException(
         Exception::TypeError(FromUtf8(isolate, "Must have one parameters.")));
@@ -359,14 +361,14 @@ void RunWithGC(const v8::FunctionCallbackInfo<v8::Value>& args) {
   if (!tryCatch.HasCaught()) {
     args.GetReturnValue().Set(optResult.ToLocalChecked());
   } else {
-    Local<Value> exception = tryCatch.Exception();
-    isolate->ThrowException(exception);
+    tryCatch.ReThrow();
   }
   SKIP_destroy_Obstack(obstack);
 }
 
 void GetErrorObject(const v8::FunctionCallbackInfo<v8::Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 1) {
     isolate->ThrowException(
         Exception::TypeError(FromUtf8(isolate, "Must have one parameters.")));

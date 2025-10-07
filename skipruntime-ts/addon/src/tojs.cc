@@ -84,6 +84,7 @@ using v8::Boolean;
 using v8::Exception;
 using v8::External;
 using v8::FunctionCallbackInfo;
+using v8::HandleScope;
 using v8::Int32;
 using v8::Isolate;
 using v8::Local;
@@ -95,6 +96,7 @@ using v8::Value;
 
 void UpdateOfCollectionWriter(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 4) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -138,6 +140,7 @@ void UpdateOfCollectionWriter(const FunctionCallbackInfo<Value>& args) {
 
 void InitializedOfCollectionWriter(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 2) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -167,6 +170,7 @@ void InitializedOfCollectionWriter(const FunctionCallbackInfo<Value>& args) {
 
 void ErrorOfCollectionWriter(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 2) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -195,6 +199,7 @@ void ErrorOfCollectionWriter(const FunctionCallbackInfo<Value>& args) {
 
 void CreateOfResourceBuilderMap(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   NatTryCatch(isolate, [&args](Isolate* isolate) {
     SKResourceBuilderMap skmap = SkipRuntime_ResourceBuilderMap__create();
     args.GetReturnValue().Set(External::New(isolate, skmap));
@@ -203,6 +208,7 @@ void CreateOfResourceBuilderMap(const FunctionCallbackInfo<Value>& args) {
 
 void AddOfResourceBuilderMap(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 3) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -237,6 +243,7 @@ void AddOfResourceBuilderMap(const FunctionCallbackInfo<Value>& args) {
 
 void CreateOfExternalServiceMap(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   NatTryCatch(isolate, [&args](Isolate* isolate) {
     SKExternalServiceMap skmap = SkipRuntime_ExternalServiceMap__create();
     args.GetReturnValue().Set(External::New(isolate, skmap));
@@ -245,6 +252,7 @@ void CreateOfExternalServiceMap(const FunctionCallbackInfo<Value>& args) {
 
 void AddOfExternalServiceMap(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 3) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -279,6 +287,7 @@ void AddOfExternalServiceMap(const FunctionCallbackInfo<Value>& args) {
 
 void CreateLazyCollectionOfContext(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (!args[0]->IsExternal()) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(Exception::TypeError(
@@ -294,6 +303,7 @@ void CreateLazyCollectionOfContext(const FunctionCallbackInfo<Value>& args) {
 
 void JSONExtractOfContext(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 2) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -321,6 +331,7 @@ void JSONExtractOfContext(const FunctionCallbackInfo<Value>& args) {
 
 void UseExternalResourceOfContext(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 3) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -350,6 +361,7 @@ void UseExternalResourceOfContext(const FunctionCallbackInfo<Value>& args) {
 
 void CreateMapper(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 1) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -370,6 +382,7 @@ void CreateMapper(const FunctionCallbackInfo<Value>& args) {
 
 void CreateLazyCompute(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 1) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -391,6 +404,7 @@ void CreateLazyCompute(const FunctionCallbackInfo<Value>& args) {
 
 void CreateExternalService(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 1) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -412,6 +426,7 @@ void CreateExternalService(const FunctionCallbackInfo<Value>& args) {
 
 void CreateResource(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 1) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -433,6 +448,7 @@ void CreateResource(const FunctionCallbackInfo<Value>& args) {
 
 void CreateResourceBuilder(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 1) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -454,6 +470,7 @@ void CreateResourceBuilder(const FunctionCallbackInfo<Value>& args) {
 
 void CreateExecutor(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 1) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -475,6 +492,7 @@ void CreateExecutor(const FunctionCallbackInfo<Value>& args) {
 
 void CreateService(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 4) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -504,6 +522,7 @@ void CreateService(const FunctionCallbackInfo<Value>& args) {
 
 void CreateNotifier(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 1) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -525,6 +544,7 @@ void CreateNotifier(const FunctionCallbackInfo<Value>& args) {
 
 void CreateReducer(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 2) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -552,6 +572,7 @@ void CreateReducer(const FunctionCallbackInfo<Value>& args) {
 
 void InitService(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 2) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -573,6 +594,7 @@ void InitService(const FunctionCallbackInfo<Value>& args) {
 
 void CloseService(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   NatTryCatch(isolate, [&args](Isolate* isolate) {
     CJSON skresult = SkipRuntime_closeService();
     args.GetReturnValue().Set(External::New(isolate, skresult));
@@ -581,6 +603,7 @@ void CloseService(const FunctionCallbackInfo<Value>& args) {
 
 void GetArrayOfEagerCollection(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 2) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -609,6 +632,7 @@ void GetArrayOfEagerCollection(const FunctionCallbackInfo<Value>& args) {
 
 void SizeOfEagerCollection(const v8::FunctionCallbackInfo<v8::Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 1) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -630,6 +654,7 @@ void SizeOfEagerCollection(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 void MapOfEagerCollection(const v8::FunctionCallbackInfo<v8::Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 2) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -659,6 +684,7 @@ void MapOfEagerCollection(const v8::FunctionCallbackInfo<v8::Value>& args) {
 void MapReduceOfEagerCollection(
     const v8::FunctionCallbackInfo<v8::Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 3) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -690,6 +716,7 @@ void MapReduceOfEagerCollection(
 void NativeMapReduceOfEagerCollection(
     const v8::FunctionCallbackInfo<v8::Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 3) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -721,6 +748,7 @@ void NativeMapReduceOfEagerCollection(
 
 void ReduceOfEagerCollection(const v8::FunctionCallbackInfo<v8::Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 2) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -749,6 +777,7 @@ void ReduceOfEagerCollection(const v8::FunctionCallbackInfo<v8::Value>& args) {
 void NativeReduceOfEagerCollection(
     const v8::FunctionCallbackInfo<v8::Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 2) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -772,6 +801,7 @@ void NativeReduceOfEagerCollection(
 
 void SliceOfEagerCollection(const v8::FunctionCallbackInfo<v8::Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 2) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -800,6 +830,7 @@ void SliceOfEagerCollection(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 void TakeOfEagerCollection(const v8::FunctionCallbackInfo<v8::Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 2) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -833,6 +864,7 @@ void TakeOfEagerCollection(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 void MergeOfEagerCollection(const v8::FunctionCallbackInfo<v8::Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 2) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -862,6 +894,7 @@ void MergeOfEagerCollection(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 void NextOfNonEmptyIterator(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (!args[0]->IsExternal()) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(Exception::TypeError(
@@ -883,6 +916,7 @@ void NextOfNonEmptyIterator(const FunctionCallbackInfo<Value>& args) {
 
 void GetArrayOfLazyCollection(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 2) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -911,6 +945,7 @@ void GetArrayOfLazyCollection(const FunctionCallbackInfo<Value>& args) {
 
 void CreateResourceOfRuntime(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (args.Length() != 4) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
@@ -937,6 +972,7 @@ void CreateResourceOfRuntime(const FunctionCallbackInfo<Value>& args) {
 
 void CloseResourceOfRuntime(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (!args[0]->IsString()) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(Exception::TypeError(
@@ -952,6 +988,7 @@ void CloseResourceOfRuntime(const FunctionCallbackInfo<Value>& args) {
 
 void UnsubscribeOfRuntime(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (!args[0]->IsNumber() && !args[0]->IsBigInt()) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(Exception::TypeError(
@@ -972,6 +1009,7 @@ void UnsubscribeOfRuntime(const FunctionCallbackInfo<Value>& args) {
 
 void SubscribeOfRuntime(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (!args[0]->IsString()) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(Exception::TypeError(
@@ -1005,6 +1043,7 @@ void SubscribeOfRuntime(const FunctionCallbackInfo<Value>& args) {
 
 void GetAllOfRuntime(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (!args[0]->IsString()) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(Exception::TypeError(
@@ -1027,6 +1066,7 @@ void GetAllOfRuntime(const FunctionCallbackInfo<Value>& args) {
 
 void GetForKeyOfRuntime(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (!args[0]->IsString()) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(Exception::TypeError(
@@ -1051,6 +1091,7 @@ void GetForKeyOfRuntime(const FunctionCallbackInfo<Value>& args) {
 
 void UpdateOfRuntime(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   if (!args[0]->IsString()) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(Exception::TypeError(
@@ -1080,6 +1121,7 @@ void UpdateOfRuntime(const FunctionCallbackInfo<Value>& args) {
 
 void GetToJSBinding(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
   Local<Object> binding = Object::New(isolate);
   AddFunction(isolate, binding, "SkipRuntime_CollectionWriter__update",
               UpdateOfCollectionWriter);
