@@ -66,7 +66,7 @@ int sk_is_static(void* ptr) {
 void sk_staging() {}
 
 void sk_commit(char* new_root, uint32_t /* sync */) {
-  sk_context_set_unsafe(new_root);
+  sk_contexts_set_unsafe(new_root);
 }
 
 char* SKIP_read_file(char* /* filename_obj */) {
@@ -74,33 +74,34 @@ char* SKIP_read_file(char* /* filename_obj */) {
   return (void*)0;
 }
 
-void* context;
+void* contexts;
 
 void sk_global_lock() {}
 
 void sk_global_unlock() {}
 
-uint32_t SKIP_has_context() {
-  return (uint32_t)(context != NULL);
+uint32_t SKIP_has_context(Fork fork) {
+  return (uint32_t)(contexts != NULL ? SKIP_has_fork_context(contexts, fork)
+                                     : 0);
 }
 
-char* SKIP_context_get_unsafe() {
-  if (context != NULL) {
-    sk_incr_ref_count(context);
+Contexts SKIP_contexts_get_unsafe() {
+  if (contexts != NULL) {
+    sk_incr_ref_count(contexts);
   }
-  return context;
+  return contexts;
 }
 
-char* SKIP_context_get() {
-  return SKIP_context_get_unsafe();
+Contexts SKIP_contexts_get() {
+  return SKIP_contexts_get_unsafe();
 }
 
-void sk_context_set(char* obj) {
-  context = obj;
+void sk_contexts_set(Contexts obj) {
+  contexts = obj;
 }
 
-void sk_context_set_unsafe(char* obj) {
-  context = obj;
+void sk_contexts_set_unsafe(Contexts obj) {
+  contexts = obj;
 }
 
 SkipInt SKIP_genSym(SkipInt /* n */) {

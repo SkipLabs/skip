@@ -60,7 +60,7 @@ uint64_t SKIP_genSym(uint64_t largerThan) {
 
 typedef struct ginfo {
   void* ftable[FTABLE_SIZE];
-  void* context;
+  Contexts contexts;
   char* head;
   char* end;
   char* fileName;
@@ -292,26 +292,27 @@ void sk_add_ctx(char* context) {
 /* Global context access primitives. */
 /*****************************************************************************/
 
-char* SKIP_context_get_unsafe() {
-  char* context = ginfo->context;
+Contexts SKIP_contexts_get_unsafe() {
+  Contexts contexts = ginfo->contexts;
 
-  if (context != NULL) {
-    sk_incr_ref_count(context);
+  if (contexts != NULL) {
+    sk_incr_ref_count(contexts);
   }
 
-  return context;
+  return contexts;
 }
 
-uint32_t SKIP_has_context() {
+uint32_t SKIP_has_context(Fork fork) {
   sk_global_lock();
-  char* context = ginfo->context;
-  uint32_t result = context != NULL;
+  Contexts contexts = ginfo->contexts;
+  uint32_t result =
+      contexts != NULL ? SKIP_has_fork_context(contexts, fork) : 0;
   sk_global_unlock();
   return result;
 }
 
 SkipInt SKIP_context_ref_count() {
-  char* context = ginfo->context;
+  char* context = ginfo->contexts;
 
   if (context == NULL) {
     return (SkipInt)0;
@@ -320,24 +321,24 @@ SkipInt SKIP_context_ref_count() {
   }
 }
 
-char* SKIP_context_get() {
+Contexts SKIP_contexts_get() {
   sk_global_lock();
-  char* context = SKIP_context_get_unsafe();
+  Contexts context = SKIP_contexts_get_unsafe();
   sk_global_unlock();
 
   return context;
 }
 
-void sk_context_set_unsafe(char* obj) {
-  ginfo->context = obj;
+void sk_contexts_set_unsafe(Contexts obj) {
+  ginfo->contexts = obj;
 #ifdef CTX_TABLE
   sk_add_ctx(obj);
 #endif
 }
 
-void sk_context_set(char* obj) {
+void sk_contexts_set(Contexts obj) {
   sk_global_lock();
-  ginfo->context = obj;
+  ginfo->contexts = obj;
   sk_global_unlock();
 }
 
@@ -412,9 +413,9 @@ size_t parse_capacity(int argc, char** argv) {
 /* Staging/commit. */
 /*****************************************************************************/
 
-void sk_commit(char* new_root, uint32_t sync) {
+void sk_commit(Contexts new_root, uint32_t sync) {
   if (ginfo->fileName == NULL) {
-    sk_context_set_unsafe(new_root);
+    sk_contexts_set_unsafe(new_root);
     return;
   }
 
@@ -422,7 +423,7 @@ void sk_commit(char* new_root, uint32_t sync) {
   if (sync) {
     msync(BOTTOM_ADDR, *capacity, MS_SYNC);
   }
-  sk_context_set_unsafe(new_root);
+  sk_contexts_set_unsafe(new_root);
   if (sync) {
     msync(BOTTOM_ADDR, *capacity, MS_SYNC);
   }
@@ -516,7 +517,7 @@ void sk_create_mapping(char* fileName, size_t icapacity) {
   ginfo->head = head;
   ginfo->end = end;
   ginfo->fileName = (fileName != NULL) ? persistent_fileName : NULL;
-  ginfo->context = NULL;
+  ginfo->contexts = NULL;
   *gid = 1;
   if (icapacity != DEFAULT_CAPACITY) {
     printf("CAPACITY SET TO: %ld\n", icapacity);

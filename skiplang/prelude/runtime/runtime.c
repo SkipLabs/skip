@@ -57,20 +57,20 @@ void* SKIP_llvm_memcpy(char* dest, char* val, SkipInt len) {
 /* Global context synchronization. */
 /*****************************************************************************/
 
-void SKIP_context_init(char* obj) {
+void SKIP_contexts_init(Contexts obj) {
   sk_global_lock();
-  char* context = SKIP_intern_shared(obj);
-  sk_context_set_unsafe(context);
+  Contexts contexts = SKIP_intern_shared(obj);
+  sk_contexts_set_unsafe(contexts);
   sk_global_unlock();
 }
 
-void SKIP_unsafe_context_incr_ref_count(char* obj) {
+void SKIP_unsafe_contexts_incr_ref_count(Contexts obj) {
   sk_incr_ref_count(obj);
 }
 
-void SKIP_unsafe_free(char* context) {
+void SKIP_unsafe_free(Contexts contexts) {
   sk_global_lock();
-  sk_free_root(context);
+  sk_free_root(contexts);
   sk_global_unlock();
 }
 
@@ -99,16 +99,19 @@ void SKIP_global_unlock() {
 #endif
 }
 
-void* SKIP_context_sync_no_lock(uint64_t txTime, char* old_root, char* delta,
-                                char* synchronizer, uint32_t sync,
-                                char* lockF) {
-  char* root = SKIP_context_get_unsafe();
-  if (root == NULL) {
+Contexts SKIP_context_sync_no_lock(uint64_t txTime, Contexts old_contexts,
+                                   Context delta, char* synchronizer,
+                                   uint32_t sync, char* lockF, Fork fork) {
+  Contexts contexts = SKIP_contexts_get_unsafe();
+  if (contexts == NULL) {
 #ifdef SKIP64
     fprintf(stderr, "Internal error: you forgot to initialize the context");
 #endif
     SKIP_throw_cruntime(ERROR_CONTEXT_NOT_INITIALIZED);
   }
+  Context root = SKIP_get_fork_context(contexts, fork);
+  Context old_root = SKIP_get_fork_context(old_contexts, fork);
+
   if (root == delta || old_root == delta) {
 // INVALID use of sync, the root should be different
 #ifdef SKIP64
@@ -117,24 +120,28 @@ void* SKIP_context_sync_no_lock(uint64_t txTime, char* old_root, char* delta,
     SKIP_throw_cruntime(ERROR_SYNC_SAME_CONTEXT);
   }
   char* rtmp = SKIP_resolve_context(txTime, root, delta, synchronizer, lockF);
-  char* new_root = SKIP_intern_shared(rtmp);
-  sk_commit(new_root, sync);
-  sk_free_root(old_root);
-  sk_free_root(root);
-  sk_free_root(root);
+  char* new_contexts =
+      SKIP_intern_shared(SKIP_set_fork_context(contexts, fork, rtmp));
+  sk_commit(new_contexts, sync);
+  sk_free_root(old_contexts);
+  // free current reference
+  sk_free_root(contexts);
+  // free global reference
+  sk_free_root(contexts);
   sk_free_external_pointers();
 #ifdef CTX_TABLE
   sk_print_ctx_table();
 #endif
-  sk_incr_ref_count(new_root);
-  return new_root;
+  sk_incr_ref_count(new_contexts);
+  return new_contexts;
 }
 
-void* SKIP_context_sync(uint64_t txTime, char* old_root, char* delta,
-                        char* synchronizer, uint32_t sync, char* lockF) {
+void* SKIP_context_sync(uint64_t txTime, Contexts old_contexts, Context delta,
+                        char* synchronizer, uint32_t sync, char* lockF,
+                        Fork fork) {
   sk_global_lock();
-  char* new_root = SKIP_context_sync_no_lock(txTime, old_root, delta,
-                                             synchronizer, sync, lockF);
+  char* new_root = SKIP_context_sync_no_lock(txTime, old_contexts, delta,
+                                             synchronizer, sync, lockF, fork);
   sk_global_unlock();
   SKIP_call_after_unlock(synchronizer, delta);
   return new_root;

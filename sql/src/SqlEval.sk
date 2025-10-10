@@ -1774,21 +1774,27 @@ private mutable class SQLContext(
   synchronizer: SKStore.Synchronizer,
   sync: UInt32,
   mutable globals: SortedMap<String, SKStore.File>,
-  mutable context: SKStore.Context,
+  mutable contexts: SKStore.Contexts,
+  fork: ?String,
 ) {
-  static fun withContext<T>(sync: Bool, f: (mutable SQLContext) ~> T): T {
+  static fun withContext<T>(
+    sync: Bool,
+    f: (mutable SQLContext) ~> T,
+    fork: ?String = None(),
+  ): T {
     initCtx = SKDB.makeSqlContext();
-    if (SKStore.gHasContext() == 0) {
+    if (!SKStore.gHasContext()) {
       SKStore.gContextInit(initCtx)
     };
     ctx = mutable SQLContext(
       SKStore.Synchronizer(importFromRoot, exportToRoot, printContext),
       UInt32::truncate(if (sync) 1 else 0),
       initCtx.globals,
-      SKStore.gUnsafeContextGet(),
+      SKStore.gUnsafeContextsGet(),
+      fork,
     );
     res = f(ctx);
-    SKStore.gUnsafeFree(ctx.context);
+    SKStore.gUnsafeFree(ctx.contexts);
     res
   }
 
@@ -1802,28 +1808,30 @@ private mutable class SQLContext(
       ) ~> void,
     ),
   ): void {
-    startTick = this.context.getTick();
+    context = this.contexts.get(this.fork);
+    startTick = context.getTick();
     pos = SKStore.newObstack();
 
     (newContext, underLockF) = try {
-      f(this.context.withGlobals(this.globals))
+      f(context.withGlobals(this.globals))
     } catch {
     | ex ->
       cexn = SKStore.destroyObstackWithValue(pos, ex);
       throw cexn
     };
 
-    this.!context = SKStore.gContextSync(
+    this.!contexts = SKStore.gContextSync(
       startTick,
-      this.context,
+      this.contexts,
       newContext,
       Some(this.synchronizer),
       this.sync,
       underLockF,
+      this.fork,
     );
-
-    this.context.notifyAll(startTick);
-    this.!globals = this.context.globals;
+    !context = this.contexts.get(this.fork);
+    context.notifyAll(startTick);
+    this.!globals = context.globals;
 
     SKStore.destroyObstack(pos)
   }
