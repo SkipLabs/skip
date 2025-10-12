@@ -110,7 +110,7 @@ value class Arrow(parentName: DirName, childName: DirName) uses Orderable
 base class ArrowKey protected {
   parentName: DirName,
   childName: DirName,
-} uses Orderable, Unsafe.Downcastable {
+} uses Orderable, Unsafe.Downcastable, Show {
   fun getKeyString(): String;
 }
 
@@ -134,6 +134,10 @@ class TArrowKey<K: Orderable & Show>{key: K} extends ArrowKey {
     };
     tOther = Unsafe.cast(other, static);
     this.key.compare(tOther.key)
+  }
+
+  fun toString(): String {
+    `${this.parentName}[${this.getKeyString()}] => ${this.childName}`
   }
 }
 
@@ -173,6 +177,26 @@ value class Deps private (
     !this.data[path] = set;
     !this = this.iset(arrowKey.childName, path);
     this
+  }
+
+  fun maybeGetReads(
+    parent: DirName,
+    child: DirName,
+  ): SortedMap<ArrowKey, SortedSet<Path>> {
+    reads = SortedMap<ArrowKey, SortedSet<Path>>[];
+    this.idata.maybeGet(child).each(paths ->
+      paths.each(path ->
+        this.data.get(path)
+          .filter(ak -> ak.parentName == parent && ak.childName == child)
+          .each(ak ->
+            reads.maybeGet(ak) match {
+            | Some(pSet) -> !reads = reads.set(ak, pSet.set(path))
+            | _ -> !reads = reads.set(ak, SortedSet[path])
+            }
+          )
+      )
+    );
+    reads
   }
 
   private fun iset(dirName: DirName, arrow: Path): this {
@@ -382,6 +406,7 @@ mutable class Context private {
   mutable purgeFrom: (readonly Context, Dir) ~> Tick = (ctx, _) ~>
     Tick(ctx.getTick().value - 1000),
   mutable sourceOverride: ?Path = None(),
+  mutable fromContext: ?Context = None(),
 } {
   static fun create{canReuse: CanReuse = CRIfMatch()}: this {
     static{canReuse}
@@ -393,6 +418,32 @@ mutable class Context private {
 
   fun withGlobals(globals: SortedMap<String, File>): this {
     this with {globals}
+  }
+
+  mutable fun copyDir(from: Context, dirName: DirName): Bool {
+    if (this.unsafeMaybeGetEagerDir(dirName).isSome()) {
+      throw DirAlreadyExists(dirName)
+    };
+    from.unsafeGetDir(dirName) match {
+    | DeletedDir _ -> false
+    | lazy @ LazyDir _ ->
+      this.setDir(lazy);
+      true
+    | eager @ EagerDir _ ->
+      if (eager.input) {
+        this.setDir(eager)
+      } else {
+        _ = EagerDir::importDir(this, from, dirName)
+      };
+      true
+    }
+  }
+
+  readonly fun maybeGetReads(
+    parent: DirName,
+    child: DirName,
+  ): SortedMap<ArrowKey, SortedSet<Path>> {
+    this.deps.maybeGetReads(parent, child)
   }
 
   readonly fun isWithSharedSubDirs(dirName: DirName): Bool {
@@ -498,6 +549,7 @@ mutable class Context private {
       writeChecker => this.writeChecker.map(x -> x.mclone()),
       purgeFrom => this.purgeFrom,
       sourceOverride => this.sourceOverride,
+      fromContext => this.fromContext,
     }
   }
 
@@ -529,6 +581,7 @@ mutable class Context private {
     this.!writeChecker = ctx.writeChecker.map(x -> x.mclone());
     this.!purgeFrom = ctx.purgeFrom;
     this.!sourceOverride = ctx.sourceOverride;
+    this.!fromContext = ctx.fromContext;
   }
 
   readonly fun getReads(): SortedSet<Path> {
@@ -696,14 +749,15 @@ mutable class Context private {
     )
   }
 
-  mutable fun update(): void {
+  mutable fun update(from: ?Context = None()): void {
     withChanges = true;
     while (withChanges) {
-      !withChanges = this.updateWithStatus();
+      !withChanges = this.updateWithStatus(from);
+      !from = None();
     }
   }
 
-  mutable fun updateWithStatus(): Bool {
+  mutable fun updateWithStatus(from: ?Context = None()): Bool {
     invariant(
       this.currentArrow().isNone(),
       "updateWithStatus cannot be called during update.",
@@ -711,7 +765,12 @@ mutable class Context private {
     if (this.debugMode) {
       print_debug(`------------ UPDATE (TICK: ${this.tick}) ------------`);
     };
-
+    this.!fromContext = from;
+    from.each(ctx ->
+      if (ctx.tick > this.tick) {
+        this.!tick = ctx.tick
+      }
+    );
     this.updateLazyGets();
 
     loop {
@@ -723,6 +782,7 @@ mutable class Context private {
         withPre = this.updatePre();
         withChanges = withPostponables || withPre;
         this.!tick = this.tick.next();
+        this.!fromContext = None();
         break withChanges
       | Some((_time, Arrow(parentName, childName), toUpdate)) ->
         this.!toUpdate = toUpdate;
@@ -974,6 +1034,13 @@ mutable class Context private {
     }
   }
 
+  readonly fun unsafeMaybeGetLazyDir(dirName: DirName): ?LazyDir {
+    this.unsafeMaybeGetDir(dirName) match {
+    | Some(d @ LazyDir _) -> Some(d)
+    | _ -> None()
+    }
+  }
+
   readonly fun unsafeGetEagerDir(dirName: DirName): EagerDir {
     this.unsafeGetDir(dirName) match {
     | d @ EagerDir _ -> d
@@ -1045,7 +1112,17 @@ mutable class Context private {
         }
       };
       dir.removeSubDirs(this);
-      dir.optOnDelete.each(this.postpone);
+      // Do not perform deletion if source corresponding dir is already deleted
+      if (
+        this.fromContext match {
+        | Some(from) ->
+          from.unsafeMaybeGetDir(dirName) match {
+          | Some(DeletedDir _) -> false
+          | _ -> true
+          }
+        | _ -> true
+        }
+      ) dir.optOnDelete.each(this.postpone);
 
       this.!deps = this.deps.removeDir(dirName);
       this.!dirsWithSharedSubDirs = this.dirsWithSharedSubDirs.remove(dirName);
