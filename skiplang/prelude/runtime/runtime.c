@@ -64,6 +64,15 @@ void SKIP_contexts_init(Contexts obj) {
   sk_global_unlock();
 }
 
+void SKIP_contexts_replace_unsafe(Contexts new_contexts, uint32_t sync) {
+  Contexts contexts = SKIP_contexts_get_unsafe();
+  sk_commit(SKIP_intern_shared(new_contexts), sync);
+  // free current reference
+  sk_free_root(contexts);
+  // free global reference
+  sk_free_root(contexts);
+}
+
 void SKIP_unsafe_contexts_incr_ref_count(Contexts obj) {
   sk_incr_ref_count(obj);
 }
