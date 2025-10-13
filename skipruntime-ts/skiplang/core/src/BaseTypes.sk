@@ -25,17 +25,19 @@ base class LazyCompute {
   fun compute(self: LazyCollection, key: SKJSON.CJSON): Array<SKJSON.CJSON>;
 }
 
+value class Waitable(value: Float)
+
 base class ExternalService {
   fun subscribe(
     instance: String,
     collection: CollectionWriter,
     resource: String,
     params: SKJSON.CJSON,
-  ): void;
+  ): Waitable;
 
   fun unsubscribe(instance: String): void;
 
-  fun shutdown(): Float;
+  fun shutdown(): Waitable;
 }
 
 base class Resource {
@@ -60,11 +62,6 @@ value class Values(
   values: Array<(SKJSON.CJSON, Array<SKJSON.CJSON>)>,
   watermark: String,
 )
-
-base class Executor {
-  fun resolve(): void;
-  fun reject(exc: .Exception): void;
-}
 
 base class Notifier {
   fun subscribed(): void;

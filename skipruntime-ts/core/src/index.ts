@@ -49,7 +49,6 @@ import {
 import {
   ResourceBuilder,
   type Notifier,
-  type Executor,
   type Handle,
   type FromBinding,
 } from "./binding.js";
@@ -339,25 +338,16 @@ class CollectionWriter<K extends Json, V extends Json> {
   ) {}
 
   async update(values: Entry<K, V>[], isInit: boolean): Promise<void> {
-    await new Promise<void>((resolve, reject) => {
-      this.refs.setFork(this.getForkName());
-      if (!this.refs.needGC()) {
-        reject(new SkipError("CollectionWriter.update cannot be performed."));
-      }
-      const errorHdl = this.refs.runWithGC(() => {
-        const exHdl = this.refs.handles.register({
-          resolve,
-          reject: (ex: Error) => reject(ex),
-        });
-        return this.refs.binding.SkipRuntime_CollectionWriter__update(
-          this.collection,
-          this.refs.json().exportJSON(values),
-          isInit,
-          this.refs.binding.SkipRuntime_createExecutor(exHdl),
-        );
-      });
-      if (errorHdl) reject(this.refs.handles.deleteHandle(errorHdl));
-    });
+    this.refs.setFork(this.forkName);
+    const uuid = crypto.randomUUID();
+    const fork = this.fork(uuid);
+    try {
+      await fork.update_(values, isInit);
+      fork.merge();
+    } catch (ex: unknown) {
+      fork.abortFork();
+      throw ex;
+    }
   }
 
   error(error: unknown): void {
@@ -386,6 +376,38 @@ class CollectionWriter<K extends Json, V extends Json> {
       ),
     );
     if (errorHdl) throw this.refs.handles.deleteHandle(errorHdl);
+  }
+
+  private update_(values: Entry<K, V>[], isInit: boolean): Promise<void> {
+    this.refs.setFork(this.getForkName());
+    if (!this.refs.needGC()) {
+      throw new SkipError("CollectionWriter.update cannot be performed.");
+    }
+    return this.refs.runAsync(() =>
+      this.refs.binding.SkipRuntime_CollectionWriter__update(
+        this.collection,
+        this.refs.json().exportJSON(values),
+        isInit,
+      ),
+    );
+  }
+
+  private fork(name: string): CollectionWriter<K, V> {
+    this.refs.setFork(this.forkName);
+    this.refs.fork(name);
+    return new CollectionWriter(this.collection, this.refs, name);
+  }
+
+  private merge(): void {
+    if (!this.forkName) throw new Error("Unable to merge fork on main.");
+    this.refs.setFork(this.forkName);
+    this.refs.merge();
+  }
+
+  private abortFork(): void {
+    if (!this.forkName) throw new Error("Unable to abord fork on main.");
+    this.refs.setFork(this.forkName);
+    this.refs.abortFork();
   }
 
   private toJSONError(error: unknown): Json {
@@ -487,28 +509,21 @@ export class ServiceInstance {
    * @param identifier - The resource instance identifier
    * @param resource - A resource name, which must correspond to a key in this `SkipService`'s `resources` field
    * @param params - Resource parameters, which will be passed to the resource constructor specified in this `SkipService`'s `resources` field
+   * @returns The resulting promise
    */
   instantiateResource(
     identifier: string,
     resource: string,
     params: Json,
   ): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.refs.setFork(this.forkName);
-      const errorHdl = this.refs.runWithGC(() => {
-        const exHdl = this.refs.handles.register({
-          resolve,
-          reject: (ex: Error) => reject(ex),
-        });
-        return this.refs.binding.SkipRuntime_Runtime__createResource(
-          identifier,
-          resource,
-          this.refs.json().exportJSON(params),
-          this.refs.binding.SkipRuntime_createExecutor(exHdl),
-        );
-      });
-      if (errorHdl) reject(this.refs.handles.deleteHandle(errorHdl));
-    });
+    this.refs.setFork(this.forkName);
+    return this.refs.runAsync(() =>
+      this.refs.binding.SkipRuntime_Runtime__createResource(
+        identifier,
+        resource,
+        this.refs.json().exportJSON(params),
+      ),
+    );
   }
 
   /**
@@ -662,25 +677,45 @@ export class ServiceInstance {
    * @param collection - the name of the input collection to update
    * @param entries - entries to update in the collection.
    */
-  update<K extends Json, V extends Json>(
+  async update<K extends Json, V extends Json>(
     collection: string,
     entries: Entry<K, V>[],
   ): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.refs.setFork(this.forkName);
-      const errorHdl = this.refs.runWithGC(() => {
-        const exHdl = this.refs.handles.register({
-          resolve,
-          reject: (ex: Error) => reject(ex),
-        });
-        return this.refs.binding.SkipRuntime_Runtime__update(
+    this.refs.setFork(this.forkName);
+    const uuid = crypto.randomUUID();
+    const fork = this.fork(uuid);
+    try {
+      await fork.update_(collection, entries);
+      fork.merge();
+    } catch (ex: unknown) {
+      fork.abortFork();
+      throw ex;
+    }
+  }
+
+  private async update_<K extends Json, V extends Json>(
+    collection: string,
+    entries: Entry<K, V>[],
+  ): Promise<void> {
+    this.refs.setFork(this.forkName);
+    const result = this.refs.runWithGC(() => {
+      const json = this.refs.json();
+      return json.importJSON(
+        this.refs.binding.SkipRuntime_Runtime__update(
           collection,
           this.refs.json().exportJSON(entries),
-          this.refs.binding.SkipRuntime_createExecutor(exHdl),
-        );
-      });
-      if (errorHdl) reject(this.refs.handles.deleteHandle(errorHdl));
+        ),
+        true,
+      );
     });
+    if (Array.isArray(result)) {
+      const handles = result as Handle<Promise<void>>[];
+      const promises = handles.map((h) => this.refs.handles.deleteHandle(h));
+      await Promise.all(promises);
+    } else {
+      const errorHdl = result as Handle<Error>;
+      throw this.refs.handles.deleteHandle(errorHdl);
+    }
   }
 
   /**
@@ -703,6 +738,30 @@ export class ServiceInstance {
       const errorHdl = result as Handle<Error>;
       return Promise.reject(this.refs.handles.deleteHandle(errorHdl));
     }
+  }
+
+  /**
+   * Fork the service with current specified name.
+   * @param name - the name of the fork.
+   * @returns The forked ServiceInstance
+   */
+  private fork(name: string): ServiceInstance {
+    if (this.forkName) throw new Error(`Unable to fork ${this.forkName}.`);
+    this.refs.setFork(this.forkName);
+    this.refs.fork(name);
+    return new ServiceInstance(this.refs, name);
+  }
+
+  private merge(): void {
+    if (!this.forkName) throw new Error("Unable to merge fork on main.");
+    this.refs.setFork(this.forkName);
+    this.refs.merge();
+  }
+
+  private abortFork(): void {
+    if (!this.forkName) throw new Error("Unable to abord fork on main.");
+    this.refs.setFork(this.forkName);
+    this.refs.abortFork();
   }
 }
 
@@ -1022,27 +1081,25 @@ export class ToBinding {
     instance: string,
     resource: string,
     skparams: Pointer<Internal.CJObject>,
-  ): void {
+  ): Handle<Promise<void>> {
     const skjson = this.getJsonConverter();
     const supplier = this.handles.get(sksupplier);
     const writer = new CollectionWriter(writerId, this, this.forkName);
     const params = skjson.importJSON(skparams, true) as Json;
     // Ensure notification is made outside the current context update
-    setTimeout(() => {
-      supplier
-        .subscribe(instance, resource, params, {
-          update: writer.update.bind(writer),
-          error: writer.error.bind(writer),
-        })
-        .then(() => writer.initialized())
-        .catch((e: unknown) =>
-          writer.initialized(
-            e instanceof Error
-              ? e.message
-              : JSON.stringify(e, Object.getOwnPropertyNames(e)),
-          ),
-        );
-    }, 0);
+    return this.handles.register(
+      new Promise((resolve, reject) => {
+        setTimeout(() => {
+          supplier
+            .subscribe(instance, resource, params, {
+              update: writer.update.bind(writer),
+              error: writer.error.bind(writer),
+            })
+            .then(resolve)
+            .catch(reject);
+        }, 0);
+      }),
+    );
   }
 
   SkipRuntime_ExternalService__unsubscribe(
@@ -1066,74 +1123,43 @@ export class ToBinding {
 
   // Executor
 
-  SkipRuntime_Executor__resolve(skexecutor: Handle<Executor>): void {
-    const checker = this.handles.get(skexecutor);
-    checker.resolve();
-  }
-
-  SkipRuntime_Executor__reject(
-    skexecutor: Handle<Executor>,
-    error: Handle<Error>,
-  ): void {
-    const checker = this.handles.get(skexecutor);
-    checker.reject(this.handles.deleteHandle(error));
-  }
-
-  SkipRuntime_deleteExecutor(executor: Handle<Executor>): void {
-    this.handles.deleteHandle(executor);
-  }
-
-  initService(service: SkipService): Promise<ServiceInstance> {
+  async initService(service: SkipService): Promise<ServiceInstance> {
     this.setFork(null);
-    return new Promise((resolve, reject) => {
-      const errorHdl = this.runWithGC(() => {
-        const skExternalServices =
-          this.binding.SkipRuntime_ExternalServiceMap__create();
-        if (service.externalServices) {
-          for (const [name, remote] of Object.entries(
-            service.externalServices,
-          )) {
-            const skremote = this.binding.SkipRuntime_createExternalService(
-              this.handles.register(remote),
-            );
-            this.binding.SkipRuntime_ExternalServiceMap__add(
-              skExternalServices,
-              name,
-              skremote,
-            );
-          }
-        }
-        const skresources =
-          this.binding.SkipRuntime_ResourceBuilderMap__create();
-        for (const [name, builder] of Object.entries(service.resources)) {
-          const skbuilder = this.binding.SkipRuntime_createResourceBuilder(
-            this.handles.register(new ResourceBuilder(builder)),
+    await this.runAsync(() => {
+      const skExternalServices =
+        this.binding.SkipRuntime_ExternalServiceMap__create();
+      if (service.externalServices) {
+        for (const [name, remote] of Object.entries(service.externalServices)) {
+          const skremote = this.binding.SkipRuntime_createExternalService(
+            this.handles.register(remote),
           );
-          this.binding.SkipRuntime_ResourceBuilderMap__add(
-            skresources,
+          this.binding.SkipRuntime_ExternalServiceMap__add(
+            skExternalServices,
             name,
-            skbuilder,
+            skremote,
           );
         }
-        const skservice = this.binding.SkipRuntime_createService(
-          this.handles.register(service),
-          this.json().exportJSON(service.initialData ?? {}),
+      }
+      const skresources = this.binding.SkipRuntime_ResourceBuilderMap__create();
+      for (const [name, builder] of Object.entries(service.resources)) {
+        const skbuilder = this.binding.SkipRuntime_createResourceBuilder(
+          this.handles.register(new ResourceBuilder(builder)),
+        );
+        this.binding.SkipRuntime_ResourceBuilderMap__add(
           skresources,
-          skExternalServices,
+          name,
+          skbuilder,
         );
-        const exHdl = this.handles.register({
-          resolve: () => {
-            resolve(new ServiceInstance(this, null));
-          },
-          reject: (ex: Error) => reject(ex),
-        });
-        return this.binding.SkipRuntime_initService(
-          skservice,
-          this.binding.SkipRuntime_createExecutor(exHdl),
-        );
-      });
-      if (errorHdl) reject(this.handles.deleteHandle(errorHdl));
+      }
+      const skservice = this.binding.SkipRuntime_createService(
+        this.handles.register(service),
+        this.json().exportJSON(service.initialData ?? {}),
+        skresources,
+        skExternalServices,
+      );
+      return this.binding.SkipRuntime_initService(skservice);
     });
+    return new ServiceInstance(this, null);
   }
 
   //
@@ -1150,5 +1176,40 @@ export class ToBinding {
 
   public json() {
     return this.getJsonConverter();
+  }
+
+  fork(name: string): void {
+    const errorHdl = this.runWithGC(() =>
+      this.binding.SkipRuntime_Runtime__fork(name),
+    );
+    if (errorHdl) throw this.handles.deleteHandle(errorHdl);
+  }
+
+  merge(): void {
+    const errorHdl = this.runWithGC(() =>
+      this.binding.SkipRuntime_Runtime__merge(),
+    );
+    if (errorHdl) throw this.handles.deleteHandle(errorHdl);
+  }
+
+  abortFork(): void {
+    const errorHdl = this.runWithGC(() =>
+      this.binding.SkipRuntime_Runtime__abortFork(),
+    );
+    if (errorHdl) throw this.handles.deleteHandle(errorHdl);
+  }
+
+  async runAsync(fn: () => Pointer<Internal.CJSON>): Promise<void> {
+    const result = this.runWithGC(() => {
+      return this.json().importJSON(fn(), true);
+    });
+    if (Array.isArray(result)) {
+      const handles = result as Handle<Promise<void>>[];
+      const promises = handles.map((h) => this.handles.deleteHandle(h));
+      await Promise.all(promises);
+    } else {
+      const errorHdl = result as Handle<Error>;
+      throw this.handles.deleteHandle(errorHdl);
+    }
   }
 }

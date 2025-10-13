@@ -50,6 +50,3 @@ export type Reducer = T<typeof reducer>;
 
 declare const notifier: unique symbol;
 export type Notifier = T<typeof notifier>;
-
-declare const executor: unique symbol;
-export type Executor = T<typeof executor>;

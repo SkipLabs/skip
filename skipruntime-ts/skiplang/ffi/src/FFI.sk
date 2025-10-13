@@ -97,7 +97,7 @@ native fun subscribeOfExternalService(
   instance: String,
   resource: String,
   params: SKJSON.CJSON,
-): void;
+): Waitable;
 
 @cpp_extern("SkipRuntime_ExternalService__unsubscribe")
 @debug
@@ -108,7 +108,7 @@ native fun unsubscribeOfExternalService(
 
 @cpp_extern("SkipRuntime_ExternalService__shutdown")
 @debug
-native fun shutdownOfExternalService(externalSupplier: UInt32): Float;
+native fun shutdownOfExternalService(externalSupplier: UInt32): Waitable;
 
 @cpp_extern("SkipRuntime_deleteExternalService")
 @debug
@@ -129,7 +129,7 @@ class ExternExternalService(
     collection: CollectionWriter,
     resource: String,
     params: SKJSON.CJSON,
-  ): void {
+  ): Waitable {
     subscribeOfExternalService(
       this.eptr.value,
       collection.dirName.toString(),
@@ -143,7 +143,7 @@ class ExternExternalService(
     unsubscribeOfExternalService(this.eptr.value, instance)
   }
 
-  fun shutdown(): Float {
+  fun shutdown(): Waitable {
     shutdownOfExternalService(this.eptr.value)
   }
 }
@@ -155,8 +155,7 @@ fun updateOfCollectionWriter(
   collection: String,
   values: SKJSON.CJArray,
   isInit: Int32,
-  executor: Executor,
-): Float {
+): SKJSON.CJSON {
   writer = CollectionWriter(SKStore.DirName::create(collection));
   writer.update(
     values match {
@@ -167,22 +166,10 @@ fun updateOfCollectionWriter(
       })
     },
     isInit != 0,
-    executor,
   ) match {
-  | Success _ -> 0.0
-  | Failure(err) -> getErrorHdl(err)
-  };
-}
-
-@export("SkipRuntime_CollectionWriter__initialized")
-fun initializedOfCollectionWriter(
-  collection: String,
-  error: SKJSON.CJSON,
-): Float {
-  writer = CollectionWriter(SKStore.DirName::create(collection));
-  writer.initialized(error) match {
-  | Success _ -> 0.0
-  | Failure(err) -> getErrorHdl(err)
+  | Success(handles) ->
+    SKJSON.CJArray(handles.map(h -> SKJSON.CJFloat(h.value)))
+  | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
   };
 }
 
@@ -248,35 +235,6 @@ class ExternResourceBuilder(
 ) extends ResourceBuilder {
   fun build(params: SKJSON.CJSON): Resource {
     buildOfResourceBuilder(this.eptr.value, params)
-  }
-}
-
-/************  Executor ****************/
-
-@cpp_extern("SkipRuntime_Executor__resolve")
-@debug
-native fun resolveOfExecutor(executor: UInt32): void;
-
-@cpp_extern("SkipRuntime_Executor__reject")
-@debug
-native fun rejectOfExecutor(executor: UInt32, errorHandle: Float): void;
-
-@cpp_extern("SkipRuntime_deleteExecutor")
-@debug
-native fun deleteExecutor(mapper: UInt32): void;
-
-@export("SkipRuntime_createExecutor")
-fun createExecutor(executor: UInt32): ExternExecutor {
-  ExternExecutor(SKStore.ExternalPointer::create(executor, deleteExecutor))
-}
-
-class ExternExecutor(eptr: SKStore.ExternalPointer) extends Executor {
-  fun resolve(): void {
-    resolveOfExecutor(this.eptr.value)
-  }
-
-  fun reject(exc: .Exception): void {
-    rejectOfExecutor(this.eptr.value, getErrorHdl(exc))
   }
 }
 
@@ -560,14 +518,14 @@ fun createResourceOfRuntime(
   identifier: String,
   resource: String,
   params: SKJSON.CJSON,
-  executor: Executor,
-): Float {
+): SKJSON.CJSON {
   runWithResult(context ~> {
-    createReactiveResource(context, identifier, resource, params, executor)
+    createReactiveResource(context, identifier, resource, params)
   }) match {
-  | Success _ -> 0.0
-  | Failure(err) -> getErrorHdl(err)
-  };
+  | Success(handles) ->
+    SKJSON.CJArray(handles.map(h -> SKJSON.CJFloat(h.value)))
+  | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
+  }
 }
 
 @export("SkipRuntime_Runtime__getAll")
@@ -656,11 +614,7 @@ fun unsubscribeOfRuntime(session: Int): Float {
 }
 
 @export("SkipRuntime_Runtime__update")
-fun updateOfRuntime(
-  input: String,
-  values: SKJSON.CJArray,
-  executor: Executor,
-): Float {
+fun updateOfRuntime(input: String, values: SKJSON.CJArray): SKJSON.CJSON {
   runWithResult(context ~> {
     update(
       context,
@@ -672,12 +626,12 @@ fun updateOfRuntime(
           (e[0], SKJSON.expectArray(e[1]))
         })
       },
-      executor,
     )
   }) match {
-  | Success _ -> 0.0
-  | Failure(err) -> getErrorHdl(err)
-  };
+  | Success(handles) ->
+    SKJSON.CJArray(handles.map(h -> SKJSON.CJFloat(h.value)))
+  | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
+  }
 }
 
 @export("SkipRuntime_Runtime__fork")
@@ -742,10 +696,11 @@ fun useExternalResource(
 /************ initService ****************/
 
 @export("SkipRuntime_initService")
-fun initSkipRuntimeService(service: Service, executor: Executor): Float {
-  initService(service, executor) match {
-  | Success _ -> 0.0
-  | Failure(err) -> getErrorHdl(err)
+fun initSkipRuntimeService(service: Service): SKJSON.CJSON {
+  initService(service) match {
+  | Success(handles) ->
+    SKJSON.CJArray(handles.map(h -> SKJSON.CJFloat(h.value)))
+  | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
   };
 }
 
@@ -754,7 +709,8 @@ fun initSkipRuntimeService(service: Service, executor: Executor): Float {
 @export("SkipRuntime_closeService")
 fun closeSkipRuntimeService(): SKJSON.CJSON {
   closeService() match {
-  | Success(handles) -> SKJSON.CJArray(handles.map(h -> SKJSON.CJFloat(h)))
+  | Success(handles) ->
+    SKJSON.CJArray(handles.map(h -> SKJSON.CJFloat(h.value)))
   | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
   };
 }

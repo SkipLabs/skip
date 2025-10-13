@@ -120,9 +120,9 @@ void SkipRuntime_deleteLazyCompute(uint32_t lazyComputeId) {
                      1, argv);
 }
 
-void SkipRuntime_ExternalService__subscribe(uint32_t externalSupplierId,
-                                            char* collection, char* sessionId,
-                                            char* resource, CJObject params) {
+double SkipRuntime_ExternalService__subscribe(uint32_t externalSupplierId,
+                                              char* collection, char* sessionId,
+                                              char* resource, CJObject params) {
   Isolate* isolate = Isolate::GetCurrent();
   HandleScope scope(isolate);
   Local<Object> externFunctions = kExternFunctions.Get(isolate);
@@ -133,8 +133,9 @@ void SkipRuntime_ExternalService__subscribe(uint32_t externalSupplierId,
       FromUtf8(isolate, resource),
       External::New(isolate, params),
   };
-  return CallJSVoidFunction(isolate, externFunctions,
-                            "SkipRuntime_ExternalService__subscribe", 5, argv);
+  return CallJSNumberFunction(isolate, externFunctions,
+                              "SkipRuntime_ExternalService__subscribe", 5,
+                              argv);
 }
 
 void SkipRuntime_ExternalService__unsubscribe(uint32_t externalSupplierId,
@@ -230,34 +231,6 @@ void SkipRuntime_deleteChecker(uint32_t checkerId) {
   Local<Object> externFunctions = kExternFunctions.Get(isolate);
   Local<Value> argv[1] = {Number::New(isolate, checkerId)};
   CallJSVoidFunction(isolate, externFunctions, "SkipRuntime_deleteChecker", 1,
-                     argv);
-}
-
-void SkipRuntime_Executor__resolve(uint32_t checkerId) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[1] = {Number::New(isolate, checkerId)};
-  CallJSVoidFunction(isolate, externFunctions, "SkipRuntime_Executor__resolve",
-                     1, argv);
-}
-
-void SkipRuntime_Executor__reject(uint32_t checkerId, double handle) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[2] = {Number::New(isolate, checkerId),
-                          Number::New(isolate, handle)};
-  CallJSVoidFunction(isolate, externFunctions, "SkipRuntime_Executor__reject",
-                     2, argv);
-}
-
-void SkipRuntime_deleteExecutor(uint32_t checkerId) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[1] = {Number::New(isolate, checkerId)};
-  CallJSVoidFunction(isolate, externFunctions, "SkipRuntime_deleteExecutor", 1,
                      argv);
 }
 

@@ -31,7 +31,6 @@ import type {
   Handle,
   ResourceBuilder,
   Notifier,
-  Executor,
 } from "@skipruntime/core/binding.js";
 
 import type { Json } from "@skipruntime/core/json.js";
@@ -76,8 +75,7 @@ export interface FromWasm {
     name: ptr<Internal.String>,
     values: ptr<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
     isInit: boolean,
-    executor: ptr<Internal.Executor>,
-  ): Handle<Error>;
+  ): ptr<Internal.CJSON>;
 
   SkipRuntime_CollectionWriter__error(
     name: ptr<Internal.String>,
@@ -193,8 +191,7 @@ export interface FromWasm {
     identifier: ptr<Internal.String>,
     resource: ptr<Internal.String>,
     params: ptr<Internal.CJSON>,
-    executor: ptr<Internal.Executor>,
-  ): Handle<Error>;
+  ): ptr<Internal.CJSON>;
 
   SkipRuntime_Runtime__getAll(
     resource: ptr<Internal.String>,
@@ -222,8 +219,7 @@ export interface FromWasm {
   SkipRuntime_Runtime__update(
     input: ptr<Internal.String>,
     values: ptr<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
-    executor: ptr<Internal.Executor>,
-  ): Handle<Error>;
+  ): ptr<Internal.CJSON>;
 
   SkipRuntime_Runtime__fork(name: ptr<Internal.String>): Handle<Error>;
   SkipRuntime_Runtime__merge(): Handle<Error>;
@@ -238,10 +234,7 @@ export interface FromWasm {
   ): ptr<Internal.Reducer>;
 
   // initService
-  SkipRuntime_initService(
-    service: ptr<Internal.Service>,
-    executor: ptr<Internal.Executor>,
-  ): Handle<Error>;
+  SkipRuntime_initService(service: ptr<Internal.Service>): ptr<Internal.CJSON>;
 
   // closeClose
   SkipRuntime_closeService(): ptr<Internal.CJSON>;
@@ -262,10 +255,6 @@ export interface FromWasm {
     identifier: ptr<Internal.String>,
     params: ptr<Internal.CJSON>,
   ): ptr<Internal.String>;
-
-  // Executor
-
-  SkipRuntime_createExecutor(ref: Handle<Executor>): ptr<Internal.Executor>;
 }
 
 interface ToWasm {
@@ -304,7 +293,7 @@ interface ToWasm {
     instance: ptr<Internal.String>,
     resource: ptr<Internal.String>,
     params: ptr<Internal.CJSON>,
-  ): void;
+  ): Handle<Promise<void>>;
 
   SkipRuntime_ExternalService__unsubscribe(
     supplier: Handle<ExternalService>,
@@ -389,17 +378,6 @@ interface ToWasm {
   ): void;
 
   SkipRuntime_deleteChecker(checker: Handle<Checker>): void;
-
-  // Executor
-
-  SkipRuntime_Executor__resolve(skexecutor: Handle<Executor>): void;
-
-  SkipRuntime_Executor__reject(
-    skexecutor: Handle<Executor>,
-    error: Handle<Error>,
-  ): void;
-
-  SkipRuntime_deleteExecutor(executor: Handle<Executor>): void;
 }
 
 export class WasmFromBinding implements FromBinding {
@@ -441,13 +419,11 @@ export class WasmFromBinding implements FromBinding {
     name: string,
     values: Pointer<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
     isInit: boolean,
-    executor: Pointer<Internal.Executor>,
-  ): Handle<Error> {
+  ): ptr<Internal.CJSON> {
     return this.fromWasm.SkipRuntime_CollectionWriter__update(
       this.utils.exportString(name),
       toPtr(values),
       isInit,
-      toPtr(executor),
     );
   }
 
@@ -662,13 +638,11 @@ export class WasmFromBinding implements FromBinding {
     identifier: string,
     resource: string,
     params: Pointer<Internal.CJSON>,
-    executor: Pointer<Internal.Executor>,
-  ): Handle<Error> {
+  ): ptr<Internal.CJSON> {
     return this.fromWasm.SkipRuntime_Runtime__createResource(
       this.utils.exportString(identifier),
       this.utils.exportString(resource),
       toPtr(params),
-      toPtr(executor),
     );
   }
 
@@ -719,12 +693,10 @@ export class WasmFromBinding implements FromBinding {
   SkipRuntime_Runtime__update(
     input: string,
     values: Pointer<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
-    executor: Pointer<Internal.Executor>,
-  ): Handle<Error> {
+  ): ptr<Internal.CJSON> {
     return this.fromWasm.SkipRuntime_Runtime__update(
       this.utils.exportString(input),
       toPtr(values),
-      toPtr(executor),
     );
   }
 
@@ -759,12 +731,8 @@ export class WasmFromBinding implements FromBinding {
 
   SkipRuntime_initService(
     service: Pointer<Internal.Service>,
-    executor: ptr<Internal.Executor>,
-  ): Handle<Error> {
-    return this.fromWasm.SkipRuntime_initService(
-      toPtr(service),
-      toPtr(executor),
-    );
+  ): ptr<Internal.CJSON> {
+    return this.fromWasm.SkipRuntime_initService(toPtr(service));
   }
 
   SkipRuntime_closeService(): Pointer<Internal.CJSON> {
@@ -801,12 +769,6 @@ export class WasmFromBinding implements FromBinding {
         toPtr(params),
       ),
     );
-  }
-
-  SkipRuntime_createExecutor(
-    ref: Handle<Executor>,
-  ): Pointer<Internal.Executor> {
-    return this.fromWasm.SkipRuntime_createExecutor(ref);
   }
 }
 
@@ -1008,7 +970,7 @@ class LinksImpl implements Links {
     skinstance: ptr<Internal.String>,
     skresource: ptr<Internal.String>,
     skparams: ptr<Internal.CJSON>,
-  ) {
+  ): Handle<Promise<void>> {
     return this.tobinding.SkipRuntime_ExternalService__subscribe(
       sksupplier,
       this.utils.importString(skwriter),
@@ -1034,19 +996,6 @@ class LinksImpl implements Links {
 
   deleteExternalService(supplier: Handle<ExternalService>) {
     this.tobinding.SkipRuntime_deleteExternalService(supplier);
-  }
-
-  // Executor
-  resolveOfExecutor(skexecutor: Handle<Executor>) {
-    this.tobinding.SkipRuntime_Executor__resolve(skexecutor);
-  }
-
-  rejectOfExecutor(skexecutor: Handle<Executor>, error: Handle<Error>) {
-    this.tobinding.SkipRuntime_Executor__reject(skexecutor, error);
-  }
-
-  deleteExecutor(skexecutor: Handle<Executor>) {
-    this.tobinding.SkipRuntime_deleteExecutor(skexecutor);
   }
 }
 
@@ -1134,12 +1083,6 @@ class Manager implements ToWasmManager {
     toWasm.SkipRuntime_Reducer__add = links.addOfReducer.bind(links);
     toWasm.SkipRuntime_Reducer__remove = links.removeOfReducer.bind(links);
     toWasm.SkipRuntime_deleteReducer = links.deleteReducer.bind(links);
-
-    // Executor
-
-    toWasm.SkipRuntime_Executor__resolve = links.resolveOfExecutor.bind(links);
-    toWasm.SkipRuntime_Executor__reject = links.rejectOfExecutor.bind(links);
-    toWasm.SkipRuntime_deleteExecutor = links.deleteExecutor.bind(links);
 
     return links;
   }
