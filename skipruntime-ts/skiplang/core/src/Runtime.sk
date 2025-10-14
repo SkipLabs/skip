@@ -33,11 +33,7 @@ class ResourceCollections(
   value: SKStore.EHandle<SKStore.SID, ResourceInfo>,
 ) extends SKStore.File
 
-class ServiceDefinition(
-  runId: String,
-  service: Service,
-  executor: Executor,
-) extends SKStore.File
+class ServiceDefinition(runId: String, service: Service) extends SKStore.File
 
 class Handle(value: SKStore.EHandle<JSONID, JSONFile>) extends SKStore.File
 
@@ -83,11 +79,7 @@ class ServiceFile(
   inputs: Map<String, Collection>,
 ) extends SKStore.File
 
-base class Status(
-  created: Int,
-  modified: Int,
-  initialiazed: ?SKJSON.CJSON,
-) uses Show {
+base class Status(created: Int, modified: Int) uses Show {
   children =
   | Loading()
   | Error(error: SKJSON.CJSON)
@@ -95,29 +87,23 @@ base class Status(
 
   static fun create(): Status {
     time = Time.time_ms();
-    Loading(time, time, None())
+    Loading(time, time)
   }
 
   fun ok(): Status {
-    Ok(this.created, Time.time_ms(), this.initialiazed)
+    Ok(this.created, Time.time_ms())
   }
 
   fun err(error: SKJSON.CJSON): Status {
-    Error(error, this.created, Time.time_ms(), this.initialiazed)
-  }
-
-  fun init(error: SKJSON.CJSON): Status {
-    !this.initialiazed = Some(error);
-    this
+    Error(error, this.created, Time.time_ms())
   }
 
   fun toString(): String
-  | Loading(created, modified, initialiazed) ->
-    `Loading{created: ${created}, modified: ${modified}, initialiazed: ${initialiazed.isSome()}}`
-  | Error(error, created, modified, initialiazed) ->
-    `Error{error: ${error.toJSON()}, created: ${created}, modified: ${modified}, initialiazed: ${initialiazed.isSome()}}`
-  | Ok(created, modified, initialiazed) ->
-    `Ok{created: ${created}, modified: ${modified}, initialiazed: ${initialiazed.isSome()}}`
+  | Loading(created, modified) ->
+    `Loading{created: ${created}, modified: ${modified}}`
+  | Error(error, created, modified) ->
+    `Error{error: ${error.toJSON()}, created: ${created}, modified: ${modified}}`
+  | Ok(created, modified) -> `Ok{created: ${created}, modified: ${modified}}`
 }
 
 class StatusFile(status: Status) extends SKStore.File
@@ -128,7 +114,7 @@ class RequestStatuses(statuses: Array<ResourceStatus>) extends SKStore.File {
     errors = mutable Vector[];
     for (resourceStatus in this.statuses) {
       resourceStatus.status match {
-      | Error(error, _, _, _) -> errors.push(error)
+      | Error(error, _, _) -> errors.push(error)
       | _ -> void
       }
     };
@@ -152,7 +138,7 @@ class RequestStatuses(statuses: Array<ResourceStatus>) extends SKStore.File {
     errors = mutable Vector[];
     for (resourceStatus in this.statuses) {
       resourceStatus.status match {
-      | Error(error, _, _, _) -> errors.push(error)
+      | Error(error, _, _) -> errors.push(error)
       | Loading _
       | Ok _ ->
         void
@@ -183,6 +169,12 @@ class ResourceInfo(
     }
   }
 }
+
+class ExternalServiceDef(
+  name: String,
+  resource: String,
+  params: SKJSON.CJSON,
+) uses Orderable
 
 fun initCtx(): SKStore.Context {
   SKStore.Context::create{}
@@ -302,26 +294,18 @@ fun buildResourcesGraph(
   )
 }
 
-fun initService(
-  service: Service,
-  executor: Executor,
-): Result<void, .Exception> {
+fun initService(service: Service): Result<Array<Waitable>, .Exception> {
   if (!SKStore.gHasContext()) {
     SKStore.gContextInit(initCtx());
   };
   runId = Ksuid::create().toString();
-  SKStore.runWithResult(context ~> {
+  runWithResult(context ~> {
     if (context.unsafeMaybeGetEagerDir(kSessionDir) is None()) {
       sessionHdl = context.mkdir(
         SKStore.UnitID::keyType,
         ServiceDefinition::type,
         kSessionDir,
-        Array[
-          (
-            SKStore.UnitID::singleton,
-            ServiceDefinition(runId, service, executor),
-          ),
-        ],
+        Array[(SKStore.UnitID::singleton, ServiceDefinition(runId, service))],
       );
       servicesHdl = sessionHdl.map(
         SKStore.SID::keyType,
@@ -401,18 +385,18 @@ fun initService(
       sessionHdl.writeArray(
         context,
         SKStore.UnitID::singleton,
-        Array[ServiceDefinition(runId, service, executor)],
+        Array[ServiceDefinition(runId, service)],
       );
     };
     updateContext(context);
-    checkSubcriptions(context, executor);
+    getSubscriptions(context)
   })
 }
 
 fun closeService_(
   context: mutable SKStore.Context,
   update: Bool = true,
-): Array<Float> {
+): Array<Waitable> {
   resourceHdl = SKStore.EHandle(
     SKStore.SID::keyType,
     ResourceDef::type,
@@ -440,8 +424,8 @@ fun closeService_(
   handles;
 }
 
-fun closeService(): Result<Array<Float>, .Exception> {
-  SKStore.runWithResult(ctx ~> closeService_(ctx))
+fun closeService(): Result<Array<Waitable>, .Exception> {
+  runWithResult(ctx ~> closeService_(ctx))
 }
 
 class LinkToResource(
@@ -455,9 +439,14 @@ class LinkToResource(
   fun perform(context: mutable SKStore.Context): void {
     this.writer.status(context, Status::create());
     pushContext(context);
-    this.supplier.subscribe(this.instance, this.writer, this.name, this.params);
+    waitable = this.supplier.subscribe(
+      this.instance,
+      this.writer,
+      this.name,
+      this.params,
+    );
     popContext();
-    addSubscription(context, this.writer.dirName);
+    addSubscription(context, waitable);
   }
 }
 
@@ -468,9 +457,6 @@ class CloseExternalService(
   definition: ExternalServiceDef,
 ) extends SKStore.Postponable {
   fun perform(context: mutable SKStore.Context): void {
-    if (isClosed(context, this.definition)) {
-      return void;
-    };
     // Clear status
     context.maybeGetEagerDir(this.dirName) match {
     | Some(dir) ->
@@ -489,7 +475,6 @@ class CloseExternalService(
     pushContext(context);
     this.supplier.unsubscribe(this.instance);
     popContext();
-    addClosed(context, this.definition);
   }
 }
 
@@ -586,32 +571,23 @@ fun useExternalCollection(
       dirName,
       (context, writer, key, it) ~> {
         storeDir = dirName.sub("store");
-        (optOnCreate, onDelete) = getCloseExternalService(
-          context,
+        definition = ExternalServiceDef(supplier, resource, params);
+        instance = Ksuid::create().toString();
+        optOnCreate = Some(
+          LinkToResource(
+            externalSupplier,
+            instance,
+            CollectionWriter(storeDir),
+            resource,
+            it.first.json,
+          ),
+        );
+        onDelete = CloseExternalService(
+          externalSupplier,
+          instance,
           storeDir,
-        ) match {
-        | Some(onDelete) -> (None(), onDelete)
-        | _ ->
-          definition = ExternalServiceDef(supplier, resource, params);
-          instance = Ksuid::create().toString();
-          (
-            Some(
-              LinkToResource(
-                externalSupplier,
-                instance,
-                CollectionWriter(storeDir),
-                resource,
-                it.first.json,
-              ),
-            ),
-            CloseExternalService(
-              externalSupplier,
-              instance,
-              storeDir,
-              definition,
-            ),
-          )
-        };
+          definition,
+        );
         store = context.mkdir(
           JSONID::keyType,
           JSONFile::type,
@@ -1058,31 +1034,15 @@ class CollectionWriter(dirName: SKStore.DirName) {
   fun update(
     values: Array<(SKJSON.CJSON, Array<SKJSON.CJSON>)>,
     isInit: Bool,
-    executor: Executor,
-  ): Result<void, .Exception> {
-    performOnTransaction(this.dirName, (root, context) ~>
-      this.update_(root, context, values, isInit, executor)
-    )
+  ): Result<Array<Waitable>, .Exception> {
+    runWithResult(context ~> this.update_(context, values, isInit))
   }
 
   fun error(error: SKJSON.CJSON): Result<void, .Exception> {
-    performOnTransaction(this.dirName, (_root, context) ~> {
+    runWithResult(context ~> {
       _ = this.updateStatus(context, status ~> status.err(error));
       updateContext(context);
     })
-  }
-
-  fun initialized(error: SKJSON.CJSON): Result<void, .Exception> {
-    performOnTransaction(
-      this.dirName,
-      (_root, context) ~> {
-        optResource = this.updateStatus(context, status ~> status.init(error));
-        context.update();
-        checkInitialization(context, optResource);
-        checkGarbage(context);
-      },
-      true,
-    )
   }
 
   fun status(context: mutable SKStore.Context, status: Status): void {
@@ -1129,18 +1089,16 @@ class CollectionWriter(dirName: SKStore.DirName) {
   }
 
   private fun update_(
-    root: mutable SKStore.Context,
     context: mutable SKStore.Context,
     values: Array<(SKJSON.CJSON, Array<SKJSON.CJSON>)>,
     isInit: Bool,
-    executor: Executor,
-  ): void {
+  ): Array<Waitable> {
     context.maybeGetEagerDir(this.dirName) match {
-    | None() -> return void
+    | None() -> return Array[]
     | _ -> void
     };
     _ = this.updateStatus(context, status ~> status.ok());
-    writeInCollection(root, context, this.dirName, values, executor, isInit)
+    writeInCollection(context, this.dirName, values, isInit)
   }
 }
 
@@ -1348,17 +1306,14 @@ fun put(
 }
 
 private fun writeInCollection(
-  root: mutable SKStore.Context,
-  main: mutable SKStore.Context,
+  context: mutable SKStore.Context,
   dirName: SKStore.DirName,
   values: Array<(SKJSON.CJSON, Array<SKJSON.CJSON>)>,
-  executor: Executor,
   isInit: Bool = false,
-): void {
+): Array<Waitable> {
   chdl = SKStore.EHandle(JSONID::keyType, JSONFile::type, dirName);
-  transaction = checkTransaction(main);
   keys = if (isInit) {
-    transaction.context.maybeGetEagerDir(dirName) match {
+    context.maybeGetEagerDir(dirName) match {
     | Some(dir) -> dir.keys().map(JSONID::keyType)
     | _ -> SortedSet<JSONID>[]
     }
@@ -1372,31 +1327,19 @@ private fun writeInCollection(
     toAdd.push((key, fvalues));
     !keys = keys.remove(key);
   });
-  fadded = toAdd.toArray();
-  fremoved = keys;
-  commit = (ctx) ~> {
-    fadded.each(added -> chdl.writeArray(ctx, added.i0, added.i1));
-    fremoved.each(key -> chdl.writeArray(ctx, key, Array[]));
-  };
-  commit(transaction.context);
+  toAdd.each(added -> chdl.writeArray(context, added.i0, added.i1));
+  keys.each(key -> chdl.writeArray(context, key, Array[]));
   // Do not check garbage collection to prevent closing resources
-  transaction.context.update();
-  finalizeTransaction(root, main, transaction, commit, executor);
+  context.update();
+  getSubscriptions(context);
 }
 
 fun update(
   context: mutable SKStore.Context,
   collection: String,
   values: Array<(SKJSON.CJSON, Array<SKJSON.CJSON>)>,
-  executor: Executor,
-): void {
-  writeInCollection(
-    context,
-    context,
-    SKStore.DirName::create(`/${collection}/`),
-    values,
-    executor,
-  )
+): Array<Waitable> {
+  writeInCollection(context, SKStore.DirName::create(`/${collection}/`), values)
 }
 
 fun delete(
@@ -1418,17 +1361,11 @@ fun createReactiveResource(
   identifier: String,
   resource: String,
   params: SKJSON.CJSON,
-  executor: Executor,
-): ResourceInfo {
+): Array<Waitable> {
   resourceHdl = SKStore.EHandle(
     SKStore.SID::keyType,
     ResourceDef::type,
     kResourceSessionDir,
-  );
-  graphHdl = SKStore.EHandle(
-    ResourceDef::keyType,
-    ResourceInfo::type,
-    kResourceCollectionsDir,
   );
   key = SKStore.SID(identifier);
   resourceHdl.maybeGet(context, key) match {
@@ -1438,9 +1375,8 @@ fun createReactiveResource(
   definition = ResourceDef(resource, params);
   resourceHdl.writeArray(context, key, Array[definition]);
   context.update();
-  checkResourceInstanceSubcriptions(context, definition, identifier, executor);
   checkGarbage(context);
-  graphHdl.get(context, definition);
+  getSubscriptions(context);
 }
 
 fun getReactiveResource(

@@ -27,6 +27,10 @@ const kResourceInstance2SubIdDir: SKStore.DirName = SKStore.DirName::create(
   "/sk_prv/resources/instance2subid/",
 );
 
+const kSubscriptionsKey: String = "externals.subscriptions";
+
+class SubscriptionsFile(value: Array<Waitable>) extends SKStore.File
+
 class JSONID(json: SKJSON.CJSON) extends SKStore.Key {
   //
   fun toString(): String {
@@ -136,6 +140,39 @@ fun collectionsByName(collections: Map<String, Collection>): SKJSON.CJObject {
   fields = mutable Vector[];
   collections.each((k, c) -> fields.push((k, SKJSON.CJString(c.getId()))));
   SKJSON.CJObject(SKJSON.CJFields::create(fields.toArray(), x -> x));
+}
+
+fun runWithResult<T>(f: mutable SKStore.Context ~> T): Result<T, .Exception> {
+  SKStore.runWithResult(f, None(), false, getFork())
+}
+
+private fun addSubscription(
+  context: mutable SKStore.Context,
+  waitable: Waitable,
+): void {
+  subscriptions = context
+    .getPersistent(kSubscriptionsKey)
+    .map(SubscriptionsFile::type) match {
+  | Some(subscriptions) -> subscriptions.value
+  | _ -> Array[]
+  };
+  context.setPersistent(
+    kSubscriptionsKey,
+    SubscriptionsFile(subscriptions.concat(Array[waitable])),
+  )
+}
+
+private fun getSubscriptions(
+  context: mutable SKStore.Context,
+): Array<Waitable> {
+  subcriptions = context
+    .getPersistent(kSubscriptionsKey)
+    .map(SubscriptionsFile::type) match {
+  | Some(subscriptions) -> subscriptions.value
+  | _ -> Array[]
+  };
+  context.removePersistent(kSubscriptionsKey);
+  subcriptions
 }
 
 module end;
