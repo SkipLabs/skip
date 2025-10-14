@@ -621,7 +621,7 @@ fun testStress(): void {
   config = Config{};
   print_string("Stress Test Begin");
   origContext = SKStore.Context::create{};
-  _ = SKStore.runWithGcReturnContext(origContext, context ~> {
+  SKStore.runWithGc(origContext, context ~> {
     round = context.getGlobal("ROUND") match {
     | None() -> 0
     | Some(x) -> SKStore.IntFile::type(x).value

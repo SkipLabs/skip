@@ -311,6 +311,10 @@ typedef struct {
 /* Function signatures. */
 /*****************************************************************************/
 
+typedef char* Context;
+typedef char* Contexts;
+typedef char* Fork;
+
 #ifndef __cplusplus
 int(memcmp)(const void* ptr1, const void* ptr2, size_t num);
 void*(memcpy)(void* restrict dst, const void* restrict src, size_t n);
@@ -319,7 +323,6 @@ void*(memset)(void* b, int c, size_t len);
 
 char* SKIP_Obstack_alloc(size_t size);
 uint32_t SKIP_String_byteSize(char* str);
-char* SKIP_context_get();
 void* SKIP_copy_with_pages(void* obj, size_t nbr_pages, sk_cell_t* pages);
 uint32_t SKIP_getArraySize(char*);
 char* SKIP_get_free_slot(uint32_t);
@@ -332,20 +335,25 @@ void SKIP_print_char(uint32_t);
 int32_t SKIP_read_line_fill();
 int32_t SKIP_read_to_end_fill();
 uint32_t SKIP_read_line_get(uint32_t);
-char* SKIP_resolve_context(uint64_t, char* context, char* obj,
-                           char* synchronizer, char* lockedF);
-void SKIP_call_after_unlock(char*, char*);
+Context SKIP_resolve_context(uint64_t, Context context, Context obj,
+                             char* synchronizer, char* lockedF);
+void SKIP_call_after_unlock(char*, Context);
 
 void SKIP_throw(void*);
 __attribute__((noreturn)) void SKIP_throw_cruntime(int32_t);
 
-void sk_commit(char*, uint32_t);
-char* SKIP_context_get_unsafe();
-void sk_context_set(char* obj);
-void sk_context_set_unsafe(char* obj);
+void sk_commit(Contexts, uint32_t);
+Contexts SKIP_contexts_get_unsafe();
+Contexts SKIP_contexts_get();
+void sk_contexts_set(Contexts);
+void sk_contexts_set_unsafe(Contexts);
 uintptr_t sk_decr_ref_count(void*);
 void sk_free_size(void*, size_t);
-void sk_free_root(char* obj);
+void sk_free_root(Contexts);
+Context SKIP_get_fork_context(Contexts, Fork);
+Contexts SKIP_set_fork_context(Contexts, Fork, Context);
+uint32_t SKIP_has_fork_context(Contexts, Fork);
+
 #ifdef SKIP32
 void sk_add_ftable(void*, sk_size_info_t);
 void* sk_get_ftable(sk_size_info_t);
