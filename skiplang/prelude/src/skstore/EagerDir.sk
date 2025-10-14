@@ -668,7 +668,7 @@ mutable class FixedDataMapIterator<T> private {
 
 base class EagerDir protected {
   input: Bool,
-  protected created: Tick,
+  created: Tick,
   protected fixedData: FixedDataMap<Key, File>,
   protected totalSize: Int,
   creator: ?ArrowKey,
@@ -1245,13 +1245,11 @@ base class EagerDir protected {
       };
       if (same && child.creator != context.currentArrow()) {
         invariant_violation(
-          `Duplicate subdirectory: ${
-            child.dirName
+          `Duplicate subdirectory: ${child.dirName}
+           First created: ${
+            child.creator
           }
-           First created: ${inspect(
-            child.creator,
-          )}
-           Then: ${inspect(context.currentArrow())}`,
+           Then: ${context.currentArrow()}`,
         );
       };
       same
@@ -1265,11 +1263,45 @@ base class EagerDir protected {
     if (context.debugMode) {
       print_string(`REUSING: ${childName}`);
     };
-    childDir = context.unsafeGetEagerDir(childName);
+    childDir = context.fromContext match {
+    | Some(from) if (from.unsafeMaybeGetEagerDir(childName).isSome()) ->
+      static::importDir(context, from, childName)
+    | _ -> context.unsafeGetEagerDir(childName)
+    };
     time = context.timeStamp();
     !childDir = childDir with {timeStack => TimeStack::create(context, time)};
     context.setDir(childDir);
     context.!newDirs = context.newDirs.set(childName);
+  }
+
+  static fun importDir(
+    context: mutable Context,
+    from: Context,
+    childName: DirName,
+  ): Dir {
+    dir = from.unsafeGetEagerDir(childName);
+    context.setDir(dir);
+    // Import reads
+    dir.parents.items().each(kv ->
+      // TODO: Import Mapper from 'from' context env
+      from.maybeGetReads(kv.i0, childName).each((arrow, reads) ->
+        context.updateNewDeps(arrow, reads)
+      )
+    );
+    // Import sub dir (shared sub dir)
+    withShared = from.isWithSharedSubDirs(childName);
+    if (withShared) {
+      context.setWithSharedSubDirs(childName)
+    };
+    copyDir = v ->
+      v.getNewDirs().each(dirName ->
+        if (context.copyDir(from, dirName) && withShared) {
+          context.incrRefCount(dirName)
+        }
+      );
+    dir.old.each((_, v) -> copyDir(v));
+    dir.fixedOld.items().each(e -> copyDir(e.i1));
+    dir
   }
 
   static fun apply(
@@ -2017,18 +2049,10 @@ base class EagerDir protected {
   }
 
   fun notifySubWatch(start: Tick, tick: Tick, nWatch: NWatch): void {
-    (init, changedKeys) = if (this.created >= start || start <= nWatch.from) {
-      (true, SortedSet[])
+    (init, keys) = if (this.created >= start || start <= nWatch.from) {
+      (true, this.keys())
     } else {
       this.getChangesAfter(start)
-    };
-    keys = if (init) {
-      keys = SortedSet[];
-      // Key can appears multiple times
-      this.unsafeIterKeys((key) -> !keys = keys.set(key));
-      keys
-    } else {
-      changedKeys
     };
     if (init || !keys.isEmpty()) {
       result = mutable Vector[];
@@ -2186,7 +2210,12 @@ class TEagerDir extends EagerDir, TDir {
     reducerOpt: ?IReducer<File> = None(),
     unsafeSkipInit: Bool = false,
   ): void {
-    context.unsafeMaybeGetEagerDir(childName) match {
+    (context.fromContext.flatMap(ctx ->
+      ctx.unsafeMaybeGetEagerDir(childName)
+    ) match {
+    | d @ Some _ -> d
+    | _ -> context.unsafeMaybeGetEagerDir(childName)
+    }) match {
     | Some(child) ->
       if (static::isReusable(context, child, parents, reducerOpt)) {
         static::reuseDir(context, childName);
