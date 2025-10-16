@@ -173,15 +173,6 @@ fun updateOfCollectionWriter(
   };
 }
 
-@export("SkipRuntime_CollectionWriter__error")
-fun errorOfCollectionWriter(collection: String, error: SKJSON.CJSON): Float {
-  writer = CollectionWriter(SKStore.DirName::create(collection));
-  writer.error(error) match {
-  | Success _ -> 0.0
-  | Failure(err) -> getErrorHdl(err)
-  };
-}
-
 /************  Resource ****************/
 
 @cpp_extern("SkipRuntime_Resource__instantiate")
@@ -536,20 +527,9 @@ fun getAllOfRuntime(resource: String, params: SKJSON.CJSON): SKJSON.CJSON {
     updateContext(context);
     res
   }) match {
-  | Success(result) ->
-    fields = mutable Vector<(String, SKJSON.CJSON)>[
-      (
-        "payload",
-        SKJSON.CJArray(
-          result.values.values.map(v ->
-            SKJSON.CJArray(Array[v.i0, SKJSON.CJArray(v.i1)])
-          ),
-        ),
-      ),
-      ("errors", SKJSON.CJArray(result.errors)),
-    ];
-    SKJSON.CJObject(
-      SKJSON.CJFields::create(fields.sortedBy(x ~> x.i0).toArray(), x -> x),
+  | Success(values) ->
+    SKJSON.CJArray(
+      values.values.map(v -> SKJSON.CJArray(Array[v.i0, SKJSON.CJArray(v.i1)])),
     )
   | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
   }
@@ -567,14 +547,7 @@ fun getForKeyOfRuntime(
     updateContext(context);
     res
   }) match {
-  | Success(result) ->
-    fields = mutable Vector<(String, SKJSON.CJSON)>[
-      ("payload", SKJSON.CJArray(result.values)),
-      ("errors", SKJSON.CJArray(result.errors)),
-    ];
-    SKJSON.CJObject(
-      SKJSON.CJFields::create(fields.sortedBy(x ~> x.i0).toArray(), x -> x),
-    )
+  | Success(values) -> SKJSON.CJArray(values)
   | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
   };
 }

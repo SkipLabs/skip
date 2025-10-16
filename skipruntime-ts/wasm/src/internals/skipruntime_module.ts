@@ -77,16 +77,6 @@ export interface FromWasm {
     isInit: boolean,
   ): ptr<Internal.CJSON>;
 
-  SkipRuntime_CollectionWriter__error(
-    name: ptr<Internal.String>,
-    error: ptr<Internal.CJSON>,
-  ): Handle<Error>;
-
-  SkipRuntime_CollectionWriter__initialized(
-    name: ptr<Internal.String>,
-    error: ptr<Internal.CJSON>,
-  ): Handle<Error>;
-
   // Resource
 
   SkipRuntime_createResource(ref: Handle<Resource>): ptr<Internal.Resource>;
@@ -196,13 +186,13 @@ export interface FromWasm {
   SkipRuntime_Runtime__getAll(
     resource: ptr<Internal.String>,
     params: ptr<Internal.CJSON>,
-  ): ptr<Internal.CJObject | Internal.CJFloat>;
+  ): ptr<Internal.CJArray | Internal.CJFloat>;
 
   SkipRuntime_Runtime__getForKey(
     resource: ptr<Internal.String>,
     params: ptr<Internal.CJSON>,
     key: ptr<Internal.CJSON>,
-  ): ptr<Internal.CJObject | Internal.CJFloat>;
+  ): ptr<Internal.CJArray | Internal.CJFloat>;
 
   SkipRuntime_Runtime__closeResource(
     identifier: ptr<Internal.String>,
@@ -427,26 +417,6 @@ export class WasmFromBinding implements FromBinding {
     );
   }
 
-  SkipRuntime_CollectionWriter__error(
-    name: string,
-    error: Pointer<Internal.CJSON>,
-  ): Handle<Error> {
-    return this.fromWasm.SkipRuntime_CollectionWriter__error(
-      this.utils.exportString(name),
-      toPtr(error),
-    );
-  }
-
-  SkipRuntime_CollectionWriter__initialized(
-    name: string,
-    error: Pointer<Internal.CJSON>,
-  ): Handle<Error> {
-    return this.fromWasm.SkipRuntime_CollectionWriter__initialized(
-      this.utils.exportString(name),
-      toPtr(error),
-    );
-  }
-
   SkipRuntime_createResource(
     ref: Handle<Resource>,
   ): Pointer<Internal.Resource> {
@@ -649,7 +619,7 @@ export class WasmFromBinding implements FromBinding {
   SkipRuntime_Runtime__getAll(
     resource: string,
     params: Pointer<Internal.CJSON>,
-  ): Pointer<Internal.CJObject | Internal.CJFloat> {
+  ): Pointer<Internal.CJArray | Internal.CJFloat> {
     return this.fromWasm.SkipRuntime_Runtime__getAll(
       this.utils.exportString(resource),
       toPtr(params),
@@ -660,7 +630,7 @@ export class WasmFromBinding implements FromBinding {
     resource: string,
     params: Pointer<Internal.CJSON>,
     key: Pointer<Internal.CJSON>,
-  ): Pointer<Internal.CJObject | Internal.CJFloat> {
+  ): Pointer<Internal.CJArray | Internal.CJFloat> {
     return this.fromWasm.SkipRuntime_Runtime__getForKey(
       this.utils.exportString(resource),
       toPtr(params),

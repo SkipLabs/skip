@@ -350,34 +350,6 @@ class CollectionWriter<K extends Json, V extends Json> {
     }
   }
 
-  error(error: unknown): void {
-    this.refs.setFork(this.getForkName());
-    if (!this.refs.needGC()) {
-      throw new SkipError("CollectionWriter.update cannot be performed.");
-    }
-    const errorHdl = this.refs.runWithGC(() =>
-      this.refs.binding.SkipRuntime_CollectionWriter__error(
-        this.collection,
-        this.refs.json().exportJSON(this.toJSONError(error)),
-      ),
-    );
-    if (errorHdl) throw this.refs.handles.deleteHandle(errorHdl);
-  }
-
-  initialized(error?: unknown): void {
-    this.refs.setFork(this.getForkName());
-    if (!this.refs.needGC()) {
-      throw new SkipError("CollectionWriter.update cannot be performed.");
-    }
-    const errorHdl = this.refs.runWithGC(() =>
-      this.refs.binding.SkipRuntime_CollectionWriter__initialized(
-        this.collection,
-        this.refs.json().exportJSON(error ? this.toJSONError(error) : null),
-      ),
-    );
-    if (errorHdl) throw this.refs.handles.deleteHandle(errorHdl);
-  }
-
   private update_(values: Entry<K, V>[], isInit: boolean): Promise<void> {
     this.refs.setFork(this.getForkName());
     if (!this.refs.needGC()) {
@@ -408,16 +380,6 @@ class CollectionWriter<K extends Json, V extends Json> {
     if (!this.forkName) throw new Error("Unable to abord fork on main.");
     this.refs.setFork(this.forkName);
     this.refs.abortFork();
-  }
-
-  private toJSONError(error: unknown): Json {
-    if (error instanceof Error) return error.message;
-    if (typeof error == "number") return error;
-    if (typeof error == "boolean") return error;
-    if (typeof error == "string") return error;
-    return JSON.parse(
-      JSON.stringify(error, Object.getOwnPropertyNames(error)),
-    ) as Json;
   }
 
   private getForkName(): Nullable<string> {
@@ -487,11 +449,6 @@ export class ServiceInstanceFactory {
   }
 }
 
-type GetResult<T> = {
-  payload: T;
-  errors: Json[];
-};
-
 export type SubscriptionID = Opaque<bigint, "subscription">;
 
 /**
@@ -553,10 +510,7 @@ export class ServiceInstance {
       });
       if (typeof result == "number")
         throw this.refs.handles.deleteHandle(result as Handle<Error>);
-      const info = result as GetResult<Entry<K, V>[]>;
-      if (info.errors.length > 0)
-        throw new SkipError(JSON.stringify(info.errors));
-      return info.payload;
+      return result as Entry<K, V>[];
     } finally {
       this.closeResourceInstance(uuid);
     }
@@ -591,10 +545,7 @@ export class ServiceInstance {
       });
       if (typeof result == "number")
         throw this.refs.handles.deleteHandle(result as Handle<Error>);
-      const info = result as GetResult<V[]>;
-      if (info.errors.length > 0)
-        throw new SkipError(JSON.stringify(info.errors));
-      return info.payload;
+      return result as V[];
     } finally {
       this.closeResourceInstance(uuid);
     }
@@ -1093,7 +1044,7 @@ export class ToBinding {
           supplier
             .subscribe(instance, resource, params, {
               update: writer.update.bind(writer),
-              error: writer.error.bind(writer),
+              error: (_) => {},
             })
             .then(resolve)
             .catch(reject);
