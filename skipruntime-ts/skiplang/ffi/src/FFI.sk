@@ -304,6 +304,70 @@ class ExternService(eptr: SKStore.ExternalPointer) extends Service {
   fun shutdown(): Waitable {
     Waitable(shutdownOfService(this.eptr.value))
   }
+
+  fun needResourceReload(name: String): ?Bool {
+    this.getChangeManager().needResourceReload(name)
+  }
+
+  fun needInputReload(name: String): Bool {
+    this.getChangeManager().needInputReload(name)
+  }
+
+  fun needExternalServiceReload(external: String, resource: String): Bool {
+    this.getChangeManager().needExternalServiceReload(external, resource)
+  }
+
+  private fun getChangeManager(): ChangeManager {
+    manager = getChangeManager();
+    invariant(manager != 0, "Change manager must be defined");
+    ChangeManager(manager);
+  }
+}
+
+/************  ChangeManager ****************/
+
+@cpp_extern("SkipRuntime_getChangeManager")
+@debug
+native fun getChangeManager(): UInt32;
+
+@cpp_extern("SkipRuntime_ChangeManager__needResourceReload")
+@debug
+native fun needResourceReloadOfChangeManager(
+  manager: UInt32,
+  name: String,
+): UInt32;
+
+@cpp_extern("SkipRuntime_ChangeManager__needInputReload")
+@debug
+native fun needInputReloadOfChangeManager(
+  manager: UInt32,
+  name: String,
+): UInt32;
+
+@cpp_extern("SkipRuntime_ChangeManager__needExternalServiceReload")
+@debug
+native fun needExternalServiceReloadOfChangeManager(
+  manager: UInt32,
+  name: String,
+  resource: String,
+): UInt32;
+
+class ChangeManager(eptr: UInt32) {
+  fun needResourceReload(name: String): ?Bool {
+    needResourceReloadOfChangeManager(this.eptr, name).toInt() match {
+    | 1 -> Some(true)
+    | 2 -> Some(false)
+    | _ -> None()
+    }
+  }
+
+  fun needInputReload(name: String): Bool {
+    needInputReloadOfChangeManager(this.eptr, name) != 0
+  }
+
+  fun needExternalServiceReload(external: String, resource: String): Bool {
+    needExternalServiceReloadOfChangeManager(this.eptr, external, resource) != 0
+  }
 }
 
 /************  Collection ****************/
@@ -645,12 +709,18 @@ fun forkOfRuntime(name: String): Float {
 }
 
 @export("SkipRuntime_Runtime__merge")
-fun mergeForkForOfRuntime(): Float {
-  try {
-    getFork().each(f -> SKStore.mergeForkNoGc(f));
-    0.0
-  } catch {
-  | err -> getErrorHdl(err)
+fun mergeForkForOfRuntime(streamsToIgnore: SKJSON.CJArray): Float {
+  streamsToIgnore match {
+  | SKJSON.CJArray(values) ->
+    ignore = values.iterator().map(SKJSON.asString).collect(Set);
+    try {
+      getFork().each(f ->
+        SKStore.mergeForkNoGc(f, SKStore.ForkSettings::keepall(ignore))
+      );
+      0.0
+    } catch {
+    | err -> getErrorHdl(err)
+    }
   }
 }
 
@@ -667,6 +737,36 @@ fun abortForkOfRuntime(): Float {
 @export("SkipRuntime_Runtime__forkExists")
 fun forkExistsOfRuntime(name: String): UInt32 {
   UInt32::truncate(if (SKStore.forkExists(name)) 1 else 0);
+}
+
+@export("SkipRuntime_Runtime__reload")
+fun reloadOfRuntime(service: Service): SKJSON.CJSON {
+  reload(service) match {
+  | Success(handles) ->
+    SKJSON.CJArray(
+      Array[
+        SKJSON.CJArray(handles.i0.map(h -> SKJSON.CJFloat(h.value))),
+        SKJSON.CJArray(handles.i1.map(h -> SKJSON.CJString(h))),
+      ],
+    )
+  | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
+  };
+}
+
+@export("SkipRuntime_Runtime__closeResourceStreams")
+fun closeResourceStreamOfRuntime(streams: SKJSON.CJArray): Float {
+  streams match {
+  | SKJSON.CJArray(values) ->
+    runWithResult(context ~> {
+      closeReactiveSessions(
+        context,
+        values.iterator().map(SKJSON.asString).collect(Vector),
+      )
+    }) match {
+    | Success _ -> 0.0
+    | Failure(err) -> getErrorHdl(err)
+    }
+  }
 }
 
 /************ Context ****************/

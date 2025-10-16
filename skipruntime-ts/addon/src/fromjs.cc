@@ -74,6 +74,14 @@ void* SkipRuntime_getFork() {
                                       "SkipRuntime_getFork", 0, nullptr);
 }
 
+u_int32_t SkipRuntime_getChangeManager() {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  return (uint32_t)CallJSNumberFunction(
+      isolate, externFunctions, "SkipRuntime_getChangeManager", 0, nullptr);
+}
+
 CJArray SkipRuntime_Mapper__mapEntry(uint32_t mapperId, CJSON key,
                                      SKNonEmptyIterator values) {
   Isolate* isolate = Isolate::GetCurrent();
@@ -303,6 +311,42 @@ CJObject SkipRuntime_ServiceDefinition__createGraph(uint32_t serviceId,
   };
   return CallJSFunction(isolate, externFunctions,
                         "SkipRuntime_ServiceDefinition__createGraph", 2, argv);
+}
+
+uint32_t SkipRuntime_ChangeManager__needInputReload(uint32_t serviceId,
+                                                    char* name) {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[2] = {Number::New(isolate, serviceId),
+                          FromUtf8(isolate, name)};
+  return CallJSNumberFunction(isolate, externFunctions,
+                              "SkipRuntime_ChangeManager__needInputReload", 2,
+                              argv);
+}
+
+uint32_t SkipRuntime_ChangeManager__needResourceReload(uint32_t serviceId,
+                                                       char* name) {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[2] = {Number::New(isolate, serviceId),
+                          FromUtf8(isolate, name)};
+  return CallJSNumberFunction(isolate, externFunctions,
+                              "SkipRuntime_ChangeManager__needResourceReload",
+                              2, argv);
+}
+
+uint32_t SkipRuntime_ChangeManager__needExternalServiceReload(
+    uint32_t serviceId, char* name, char* resource) {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[3] = {Number::New(isolate, serviceId),
+                          FromUtf8(isolate, name), FromUtf8(isolate, resource)};
+  return CallJSNumberFunction(
+      isolate, externFunctions,
+      "SkipRuntime_ChangeManager__needExternalServiceReload", 3, argv);
 }
 
 void SkipRuntime_Notifier__subscribed(uint32_t notifierId) {

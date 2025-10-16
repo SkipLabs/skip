@@ -172,9 +172,19 @@ export interface FromBinding {
   ): Pointer<Internal.CJSON>;
 
   SkipRuntime_Runtime__fork(name: string): Handle<Error>;
-  SkipRuntime_Runtime__merge(): Handle<Error>;
+  SkipRuntime_Runtime__merge(
+    ignore: Pointer<Internal.CJArray<Internal.CJString>>,
+  ): Handle<Error>;
   SkipRuntime_Runtime__abortFork(): Handle<Error>;
   SkipRuntime_Runtime__forkExists(name: string): boolean;
+
+  SkipRuntime_Runtime__reload(
+    service: Pointer<Internal.Service>,
+  ): Pointer<Internal.CJSON>;
+
+  SkipRuntime_Runtime__closeResourceStreams(
+    streams: Pointer<Internal.CJArray<Internal.CJString>>,
+  ): Handle<Error>;
 
   // Reducer
 

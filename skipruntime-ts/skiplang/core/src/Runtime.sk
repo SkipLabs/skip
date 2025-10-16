@@ -174,13 +174,28 @@ fun initService(service: Service): Result<Array<Waitable>, .Exception> {
             mInputs = mutable Map<String, Collection>[];
             serviceDef.service.inputs().each(input -> {
               iDirName = SKStore.DirName::create(`/${input}/`);
-              values = serviceDef.service.initialData(input);
-              _ = ctx.mkdirMulti(
-                JSONID::keyType,
-                JSONFile::type,
-                iDirName,
-                values.map(v -> (JSONID(v.i0), v.i1.map(x -> JSONFile(x)))),
-              );
+              if (
+                ctx.unsafeMaybeGetEagerDir(iDirName) match {
+                | Some(dir) ->
+                  if (dir.creator != ctx.currentArrow()) {
+                    throw SKStore.DirAlreadyExists(iDirName);
+                  } else if (serviceDef.service.needInputReload(input)) {
+                    ctx.!newDirs = ctx.newDirs.add(iDirName);
+                    false
+                  } else {
+                    true
+                  }
+                | None() -> true
+                }
+              ) {
+                values = serviceDef.service.initialData(input);
+                _ = ctx.mkdirMulti(
+                  JSONID::keyType,
+                  JSONFile::type,
+                  iDirName,
+                  values.map(v -> (JSONID(v.i0), v.i1.map(x -> JSONFile(x)))),
+                );
+              };
               mInputs.add(input, Collection(iDirName))
             });
             writer.set(
@@ -235,6 +250,118 @@ fun initService(service: Service): Result<Array<Waitable>, .Exception> {
   })
 }
 
+mutable class ResourceInstances private (
+  instances: mutable Map<String, mutable Vector<SKJSON.CJSON>> = mutable Map[],
+) {
+  static fun create(
+    context: mutable SKStore.Context,
+  ): readonly ResourceInstances {
+    instances = mutable static();
+    availablesHdl = SKStore.EHandle(
+      ResourceDef::keyType,
+      SKStore.IntFile::type,
+      kResourceAvailablesDir,
+    );
+    availablesHdl.items(context).each(kf -> instances.add(kf.i0));
+    instances;
+  }
+
+  mutable fun add(definition: ResourceDef): void {
+    vector = this.instances.maybeGet(definition.name) match {
+    | Some(v) -> v
+    | _ ->
+      v = mutable Vector<SKJSON.CJSON>[];
+      this.instances.add(definition.name, v);
+      v
+    };
+    vector.push(definition.params)
+  }
+
+  readonly fun resources(): Set<String> {
+    this.instances.keys().collect(Set)
+  }
+
+  readonly fun each(name: String, fn: ResourceDef -> void): void {
+    this.instances.get(name).each(p -> fn(ResourceDef(name, p)))
+  }
+}
+
+fun reload(
+  service: Service,
+): Result<(Array<Waitable>, Array<String>), .Exception> {
+  runWithResult(context ~> {
+    sessionHdl = SKStore.EHandle(
+      SKStore.UnitID::keyType,
+      ServiceDefinition::type,
+      kSessionDir,
+    );
+    idbyresourceHdl = SKStore.EHandle(
+      ResourceDef::keyType,
+      SKStore.StringFile::type,
+      kResourceSessionDir.sub("idbyresource"),
+    );
+    resourcesVersionHdl = SKStore.EHandle(
+      SKStore.SID::keyType,
+      SKStore.IntFile::type,
+      kResourceVersionDir,
+    );
+    sessionHdl.maybeGet(context, SKStore.UnitID::singleton) match {
+    | Some(current) ->
+      instances = ResourceInstances::create(context);
+      toclose = mutable Vector[];
+      instances.resources().each(resource ->
+        service.needResourceReload(resource) match {
+        | Some(true) ->
+          // Change resource version to force recompute corresponding loaded resources
+          resourcesVersionHdl.writeArray(
+            context,
+            SKStore.SID(resource),
+            Array[SKStore.IntFile(context.timeStamp().value)],
+          )
+        | Some(false) ->
+          // nothing todo
+          void
+        | None() ->
+          // The resource types have changed
+          todestroy = mutable Vector[];
+          instances.each(resource, key -> {
+            idbyresourceHdl.getArray(context, key).each(id -> {
+              toclose.push(id.value);
+              todestroy.push(SKStore.SID(id.value))
+            })
+          });
+          destroyReactiveResources(context, todestroy)
+        }
+      );
+      sessionHdl.writeArray(
+        context,
+        SKStore.UnitID::singleton,
+        Array[ServiceDefinition(current.runId, service)],
+      );
+      updateContext(context);
+      (getSubscriptions(context), toclose.toArray())
+    | None() -> invariant_violation("No service loaded")
+    }
+  })
+}
+
+fun closeReactiveSessions(
+  context: mutable SKStore.Context,
+  sessions: Vector<String>,
+): void {
+  // TODO check global lock
+  sessions.each(session -> {
+    context.getSession(session).each(sub -> {
+      close = sub.cmd match {
+      | SKStore.NWatch{close} -> close
+      | _ -> invariant_violation("Not manage session kind")
+      };
+      close();
+      context.unsubscribe(session);
+    })
+  })
+}
+
 fun closeService_(
   context: mutable SKStore.Context,
   update: Bool = true,
@@ -244,11 +371,12 @@ fun closeService_(
     ResourceDef::type,
     kResourceSessionDir,
   );
-  todestroy = mutable Vector[];
+  todestroy = mutable Vector<SKStore.SID>[];
   resourceHdl.items(context).each(kf -> {
     kf.i1.next().each(_f -> todestroy.push(kf.i0))
   });
-  todestroy.each(key -> destroyReactiveResource(context, key));
+  destroyReactiveResources(context, todestroy);
+  closeReactiveSessions(context, todestroy.map(v -> v.value));
   sessionHdl = SKStore.EHandle(
     SKStore.UnitID::keyType,
     ServiceDefinition::type,
@@ -355,66 +483,52 @@ fun useExternalCollection(
     service = sessionHdl.get(context, SKStore.UnitID::singleton).service;
     collectionId = toSuppliedResourceId(supplier, resource, params);
     dirName = subDirName(context, collectionId, None());
-    paramsDir = dirName.sub("params");
-    dataDir = dirName.sub("data");
-    hdl = context.mkdir(
-      SKStore.UnitID::keyType,
-      Params::type,
-      paramsDir,
-      Array[(SKStore.UnitID::singleton, Params(params))],
-    );
-    collectionHdl = hdl.map(
-      SKStore.UnitID::keyType,
-      Handle::type,
-      context,
-      dirName,
-      (context, writer, key, it) ~> {
-        storeDir = dirName.sub("store");
-        definition = ExternalServiceDef(supplier, resource, params);
-        instance = Ksuid::create().toString();
-        optOnCreate = Some(
-          LinkToResource(
-            service,
-            supplier,
-            instance,
-            CollectionWriter(storeDir),
-            resource,
-            it.first.json,
-          ),
-        );
-        onDelete = CloseExternalService(
+    if (
+      context.unsafeMaybeGetEagerDir(dirName) match {
+      | Some(dir) ->
+        if (dir.creator != context.currentArrow()) {
+          throw SKStore.DirAlreadyExists(dirName);
+        } else if (service.needExternalServiceReload(supplier, resource)) {
+          context.!newDirs = context.newDirs.add(dirName);
+          false
+        } else {
+          dir.optOnDelete.each(context.postpone);
+          true
+        }
+      | None() -> true
+      }
+    ) {
+      definition = ExternalServiceDef(supplier, resource, params);
+      instance = Ksuid::create().toString();
+      optOnCreate = Some(
+        LinkToResource(
           service,
           supplier,
           instance,
-          storeDir,
-          definition,
-          context.getTick(),
-        );
-        store = context.mkdir(
-          JSONID::keyType,
-          JSONFile::type,
-          storeDir,
-          Array[],
-          true,
-          optOnCreate,
-          Some(onDelete),
-        );
-        writer.set(key, Handle(store));
-      },
-    );
-    _ = hdl.map(
-      JSONID::keyType,
-      JSONFile::type,
-      context,
-      dataDir,
-      (context, writer, key, _it) ~> {
-        remote = collectionHdl.get(context, key).value;
-        remote.items(context).each(kv -> {
-          writer.setArray(kv.i0, kv.i1.collect(Array))
-        });
-      },
-    );
-    Collection(dataDir)
+          CollectionWriter(dirName),
+          resource,
+          params,
+        ),
+      );
+      onDelete = CloseExternalService(
+        service,
+        supplier,
+        instance,
+        dirName,
+        definition,
+        context.getTick(),
+      );
+      _ = context.mkdir(
+        JSONID::keyType,
+        JSONFile::type,
+        dirName,
+        Array[],
+        false,
+        optOnCreate,
+        Some(onDelete),
+      );
+    };
+    Collection(dirName)
   | _ -> invariant_violation("Store context must be specified.")
   }
 }
@@ -435,7 +549,7 @@ class Collection(dirName: SKStore.DirName) {
   fun getArray(key: SKJSON.CJSON): Array<SKJSON.CJSON> {
     getContext() match {
     | Some(context) ->
-      dir = context.unsafeGetEagerDir(this.dirName);
+      dir = context.getEagerDir(this.dirName);
       if (dir.creator == context.currentArrow()) {
         throw ReadInCreatorException()
       };
@@ -778,24 +892,24 @@ fun getForKey(
   values
 }
 
-fun destroyReactiveResource(
+fun destroyReactiveResources(
   context: mutable SKStore.Context,
-  sid: SKStore.SID,
+  keys: readonly Vector<SKStore.SID>,
 ): void {
-  context.getSession(sid.value).each(sub -> {
-    close = sub.cmd match {
-    | SKStore.NWatch{close} -> close
-    | _ -> invariant_violation("Not manage session kind")
-    };
-    close();
-    context.unsubscribe(sid.value);
-  });
   resourceHdl = SKStore.EHandle(
     SKStore.SID::keyType,
     ResourceDef::type,
     kResourceSessionDir,
   );
-  resourceHdl.writeArray(context, sid, Array[]);
+  garbageHdl = SKStore.EHandle(
+    SKStore.SID::keyType,
+    SKStore.IntFile::type,
+    kResourceGarbageDir,
+  );
+  keys.each(sid -> {
+    resourceHdl.writeArray(context, sid, Array[]);
+    garbageHdl.writeArray(context, sid, Array[]);
+  });
 }
 
 fun closeReactiveResource(

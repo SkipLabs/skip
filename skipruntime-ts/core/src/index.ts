@@ -80,6 +80,21 @@ function instantiateUserObject<Params extends DepSafe[], Result extends object>(
   };
 }
 
+export enum LoadStatus {
+  Incompatible,
+  Changed,
+  Same,
+}
+
+export interface ChangeManager {
+  needInputReload(name: string): boolean;
+  needResourceReload(name: string): LoadStatus;
+  needExternalServiceReload(name: string, resource: string): boolean;
+  needMapperReload(name: string): boolean;
+  needReducerReload(name: string): boolean;
+  needLazyComputeReload(name: string): boolean;
+}
+
 export class ServiceDefinition {
   constructor(private service: SkipService) {}
 
@@ -547,6 +562,7 @@ export class ServiceInstance {
   constructor(
     private readonly refs: ToBinding,
     readonly forkName: Nullable<string>,
+    private definition: ServiceDefinition,
   ) {}
 
   /**
@@ -725,7 +741,7 @@ export class ServiceInstance {
     const fork = this.fork(uuid);
     try {
       await fork.update_(collection, entries);
-      fork.merge();
+      fork.merge([]);
     } catch (ex: unknown) {
       fork.abortFork();
       throw ex;
@@ -775,6 +791,54 @@ export class ServiceInstance {
     }
   }
 
+  async reload(
+    definition: ServiceDefinition,
+    changes: ChangeManager,
+  ): Promise<void> {
+    if (this.forkName) {
+      throw new SkipError("Reload cannot be called in transaction.");
+    }
+    this.refs.setFork(this.forkName);
+    const uuid = crypto.randomUUID();
+    const fork = this.fork(uuid);
+    let merged = false;
+    try {
+      const streamsToClose = await fork._reload(definition, changes);
+      fork.merge(streamsToClose);
+      merged = true;
+      this.closeResourceStreams(streamsToClose);
+    } catch (ex: unknown) {
+      console.error(ex);
+      if (!merged) fork.abortFork();
+      throw ex;
+    }
+  }
+
+  private async _reload(
+    definition: ServiceDefinition,
+    changes: ChangeManager,
+  ): Promise<string[]> {
+    const result = this.refs.runWithGC(() => {
+      this.refs.changes = this.refs.handles.register(changes);
+      const skservicehHdl = this.refs.handles.register(definition);
+      const skservice =
+        this.refs.binding.SkipRuntime_createService(skservicehHdl);
+      const res = this.refs.binding.SkipRuntime_Runtime__reload(skservice);
+      this.refs.handles.deleteHandle(this.refs.changes);
+      this.refs.changes = null;
+      return this.refs.json().importJSON(res, true);
+    });
+    if (Array.isArray(result)) {
+      const [handles, res] = result as [Handle<Promise<void>>[], string[]];
+      const promises = handles.map((h) => this.refs.handles.deleteHandle(h));
+      await Promise.all(promises);
+      return res;
+    } else {
+      const errorHdl = result as Handle<Error>;
+      throw this.refs.handles.deleteHandle(errorHdl);
+    }
+  }
+
   /**
    * Fork the service with current specified name.
    * @param name - the name of the fork.
@@ -784,19 +848,28 @@ export class ServiceInstance {
     if (this.forkName) throw new Error(`Unable to fork ${this.forkName}.`);
     this.refs.setFork(this.forkName);
     this.refs.fork(name);
-    return new ServiceInstance(this.refs, name);
+    return new ServiceInstance(this.refs, name, this.definition);
   }
 
-  private merge(): void {
+  private merge(ignore: string[]): void {
     if (!this.forkName) throw new Error("Unable to merge fork on main.");
     this.refs.setFork(this.forkName);
-    this.refs.merge();
+    this.refs.merge(ignore);
   }
 
   private abortFork(): void {
     if (!this.forkName) throw new Error("Unable to abord fork on main.");
     this.refs.setFork(this.forkName);
     this.refs.abortFork();
+  }
+
+  private closeResourceStreams(streams: string[]): void {
+    const errorHdl = this.refs.runWithGC(() => {
+      return this.refs.binding.SkipRuntime_Runtime__closeResourceStreams(
+        this.refs.json().exportJSON(streams),
+      );
+    });
+    if (errorHdl) throw this.refs.handles.deleteHandle(errorHdl);
   }
 }
 
@@ -877,6 +950,7 @@ export class ToBinding {
   private skjson?: JsonConverter;
   private forkName: Nullable<string>;
   readonly handles: Handles;
+  changes: Nullable<Handle<ChangeManager>>;
 
   constructor(
     public binding: FromBinding,
@@ -887,6 +961,7 @@ export class ToBinding {
     this.stack = new Stack();
     this.handles = new Handles();
     this.forkName = null;
+    this.changes = null;
   }
 
   register<T>(v: T): Handle<T> {
@@ -915,6 +990,10 @@ export class ToBinding {
 
   SkipRuntime_getFork(): Nullable<string> {
     return this.forkName;
+  }
+
+  SkipRuntime_getChangeManager(): number {
+    return this.changes ?? 0;
   }
 
   setFork(name: Nullable<string>): void {
@@ -949,6 +1028,10 @@ export class ToBinding {
     mapper: Handle<HandlerInfo<JSONMapper>>,
     other: Handle<HandlerInfo<JSONMapper>>,
   ): number {
+    const object = this.handles.get(mapper);
+    if (this.getChanges()?.needMapperReload(object.name)) {
+      return 0;
+    }
     return this.isEquals(mapper, other);
   }
 
@@ -984,6 +1067,10 @@ export class ToBinding {
     lazyCompute: Handle<HandlerInfo<JSONLazyCompute>>,
     other: Handle<HandlerInfo<JSONLazyCompute>>,
   ): number {
+    const object = this.handles.get(lazyCompute);
+    if (this.getChanges()?.needLazyComputeReload(object.name)) {
+      return 0;
+    }
     return this.isEquals(lazyCompute, other);
   }
 
@@ -1117,6 +1204,33 @@ export class ToBinding {
     this.handles.deleteHandle(service);
   }
 
+  // Change manager
+
+  SkipRuntime_ChangeManager__needInputReload(
+    skmanager: Handle<ChangeManager>,
+    name: string,
+  ): number {
+    const manager = this.handles.get(skmanager);
+    return manager.needInputReload(name) ? 1 : 0;
+  }
+
+  SkipRuntime_ChangeManager__needResourceReload(
+    skmanager: Handle<ChangeManager>,
+    name: string,
+  ): number {
+    const manager = this.handles.get(skmanager);
+    return manager.needResourceReload(name);
+  }
+
+  SkipRuntime_ChangeManager__needExternalServiceReload(
+    skmanager: Handle<ChangeManager>,
+    name: string,
+    resource: string,
+  ): number {
+    const manager = this.handles.get(skmanager);
+    return manager.needExternalServiceReload(name, resource) ? 1 : 0;
+  }
+
   // Notifier
 
   SkipRuntime_Notifier__subscribed<K extends Json, V extends Json>(
@@ -1200,6 +1314,10 @@ export class ToBinding {
     reducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
     other: Handle<HandlerInfo<Reducer<Json, Json>>>,
   ): number {
+    const object = this.handles.get(reducer);
+    if (this.getChanges()?.needReducerReload(object.name)) {
+      return 0;
+    }
     return this.isEquals(reducer, other);
   }
 
@@ -1221,10 +1339,11 @@ export class ToBinding {
     this.fork(uuid);
     try {
       this.setFork(uuid);
-      await this.initService_(service);
+      const definition = new ServiceDefinition(service);
+      await this.initService_(definition);
       this.setFork(uuid);
       this.merge();
-      return new ServiceInstance(this, null);
+      return new ServiceInstance(this, null, definition);
     } catch (ex: unknown) {
       this.setFork(uuid);
       this.abortFork();
@@ -1232,9 +1351,8 @@ export class ToBinding {
     }
   }
 
-  private initService_(service: SkipService): Promise<void> {
+  private initService_(definition: ServiceDefinition): Promise<void> {
     return this.runAsync(() => {
-      const definition = new ServiceDefinition(service);
       const skservicehHdl = this.handles.register(definition);
       const skservice = this.binding.SkipRuntime_createService(skservicehHdl);
       return this.binding.SkipRuntime_initService(skservice);
@@ -1264,9 +1382,9 @@ export class ToBinding {
     if (errorHdl) throw this.handles.deleteHandle(errorHdl);
   }
 
-  merge(): void {
+  merge(ignore: string[] = []): void {
     const errorHdl = this.runWithGC(() =>
-      this.binding.SkipRuntime_Runtime__merge(),
+      this.binding.SkipRuntime_Runtime__merge(this.json().exportJSON(ignore)),
     );
     if (errorHdl) throw this.handles.deleteHandle(errorHdl);
   }
@@ -1385,5 +1503,9 @@ export class ToBinding {
       }
     }
     return 1;
+  }
+
+  private getChanges(): Nullable<ChangeManager> {
+    return this.changes ? this.handles.get(this.changes) : null;
   }
 }

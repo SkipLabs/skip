@@ -19,6 +19,7 @@ import type {
   Watermark,
   HandlerInfo,
   ServiceDefinition,
+  ChangeManager,
 } from "@skipruntime/core";
 import {
   ServiceInstance,
@@ -186,9 +187,17 @@ export interface FromWasm {
   ): ptr<Internal.CJSON>;
 
   SkipRuntime_Runtime__fork(name: ptr<Internal.String>): Handle<Error>;
-  SkipRuntime_Runtime__merge(): Handle<Error>;
+  SkipRuntime_Runtime__merge(
+    ignore: ptr<Internal.CJArray<Internal.CJString>>,
+  ): Handle<Error>;
   SkipRuntime_Runtime__abortFork(): Handle<Error>;
   SkipRuntime_Runtime__forkExists(name: ptr<Internal.String>): number;
+  SkipRuntime_Runtime__reload(
+    service: ptr<Internal.Service>,
+  ): ptr<Internal.CJArray<Internal.CJFloat>>;
+  SkipRuntime_Runtime__closeResourceStreams(
+    streams: ptr<Internal.CJArray<Internal.CJString>>,
+  ): Handle<Error>;
 
   // Reducer
 
@@ -227,6 +236,7 @@ interface ToWasm {
   SkipRuntime_popContext(): void;
   SkipRuntime_getContext(): Nullable<ptr<Internal.Context>>;
   SkipRuntime_getFork(): Nullable<ptr<Internal.String>>;
+  SkipRuntime_getChangeManager(): number;
 
   // Mapper
 
@@ -324,6 +334,24 @@ interface ToWasm {
   ): Handle<Promise<unknown>>;
 
   SkipRuntime_deleteService(service: Handle<ServiceDefinition>): void;
+
+  // ChangeManager
+
+  SkipRuntime_ChangeManager__needInputReload(
+    skservice: Handle<ChangeManager>,
+    name: ptr<Internal.String>,
+  ): number;
+
+  SkipRuntime_ChangeManager__needResourceReload(
+    skservice: Handle<ChangeManager>,
+    name: ptr<Internal.String>,
+  ): number;
+
+  SkipRuntime_ChangeManager__needExternalServiceReload(
+    skmanager: Handle<ChangeManager>,
+    name: ptr<Internal.String>,
+    resource: ptr<Internal.String>,
+  ): number;
 
   // Notifier
 
@@ -650,12 +678,28 @@ export class WasmFromBinding implements FromBinding {
     );
   }
 
-  SkipRuntime_Runtime__merge(): Handle<Error> {
-    return this.fromWasm.SkipRuntime_Runtime__merge();
+  SkipRuntime_Runtime__merge(
+    ignore: ptr<Internal.CJArray<Internal.CJString>>,
+  ): Handle<Error> {
+    return this.fromWasm.SkipRuntime_Runtime__merge(toPtr(ignore));
   }
 
   SkipRuntime_Runtime__abortFork(): Handle<Error> {
     return this.fromWasm.SkipRuntime_Runtime__abortFork();
+  }
+
+  SkipRuntime_Runtime__reload(
+    service: Pointer<Internal.Service>,
+  ): Pointer<Internal.CJArray<Internal.CJFloat>> {
+    return this.fromWasm.SkipRuntime_Runtime__reload(toPtr(service));
+  }
+
+  SkipRuntime_Runtime__closeResourceStreams(
+    streams: ptr<Internal.CJArray<Internal.CJString>>,
+  ): Handle<Error> {
+    return this.fromWasm.SkipRuntime_Runtime__closeResourceStreams(
+      toPtr(streams),
+    );
   }
 
   SkipRuntime_createReducer<K1 extends Json, V1 extends Json>(
@@ -666,7 +710,7 @@ export class WasmFromBinding implements FromBinding {
 
   SkipRuntime_initService(
     service: Pointer<Internal.Service>,
-  ): ptr<Internal.CJSON> {
+  ): Pointer<Internal.CJSON> {
     return this.fromWasm.SkipRuntime_initService(toPtr(service));
   }
 
@@ -752,6 +796,10 @@ class LinksImpl implements Links {
   getFork() {
     const fork = this.tobinding.SkipRuntime_getFork();
     return fork ? this.utils.exportString(fork) : null;
+  }
+
+  getChangeManager() {
+    return this.tobinding.SkipRuntime_getChangeManager();
   }
 
   // Mapper
@@ -930,6 +978,40 @@ class LinksImpl implements Links {
     this.tobinding.SkipRuntime_deleteService(service);
   }
 
+  // ChangeManager
+
+  needInputReloadOfChangeManager(
+    skmanager: Handle<ChangeManager>,
+    name: ptr<Internal.String>,
+  ): number {
+    return this.tobinding.SkipRuntime_ChangeManager__needInputReload(
+      skmanager,
+      this.utils.importString(name),
+    );
+  }
+
+  needResourceReloadOfChangeManager(
+    skmanager: Handle<ChangeManager>,
+    name: ptr<Internal.String>,
+  ): number {
+    return this.tobinding.SkipRuntime_ChangeManager__needResourceReload(
+      skmanager,
+      this.utils.importString(name),
+    );
+  }
+
+  needExternalServiceReloadOfChangeManager(
+    skmanager: Handle<ChangeManager>,
+    name: ptr<Internal.String>,
+    resource: ptr<Internal.String>,
+  ): number {
+    return this.tobinding.SkipRuntime_ChangeManager__needExternalServiceReload(
+      skmanager,
+      this.utils.importString(name),
+      this.utils.importString(resource),
+    );
+  }
+
   // Notifier
   notifyOfNotifier<K extends Json, V extends Json>(
     sknotifier: Handle<Notifier<K, V>>,
@@ -1036,6 +1118,7 @@ class Manager implements ToWasmManager {
     toWasm.SkipRuntime_popContext = links.popContext.bind(links);
     toWasm.SkipRuntime_getContext = links.getContext.bind(links);
     toWasm.SkipRuntime_getFork = links.getFork.bind(links);
+    toWasm.SkipRuntime_getChangeManager = links.getChangeManager.bind(links);
 
     // Mapper
 
@@ -1079,6 +1162,15 @@ class Manager implements ToWasmManager {
     toWasm.SkipRuntime_ServiceDefinition__shutdown =
       links.shutdownOfServiceDefinition.bind(links);
     toWasm.SkipRuntime_deleteService = links.deleteService.bind(links);
+
+    // ChangeManager
+
+    toWasm.SkipRuntime_ChangeManager__needInputReload =
+      links.needInputReloadOfChangeManager.bind(links);
+    toWasm.SkipRuntime_ChangeManager__needResourceReload =
+      links.needResourceReloadOfChangeManager.bind(links);
+    toWasm.SkipRuntime_ChangeManager__needExternalServiceReload =
+      links.needExternalServiceReloadOfChangeManager.bind(links);
 
     // Notifier
 
