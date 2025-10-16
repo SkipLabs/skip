@@ -167,18 +167,69 @@ mutable class TWriter<K: Key, V: File> private {
 /* Typed version of the Reducer. */
 /*****************************************************************************/
 
-class EReducer<V2, V3: File>{
+base class ReducerBase<V2: frozen, V3: File>{
   type: File ~> V3,
+} uses Unsafe.Downcastable, Equality {
+  fun doinit(mutable Iterator<V2>): Array<V3>;
+  fun doupdate(Array<V3>, Array<V2>, Array<V2>): ?Array<V3>;
+}
+
+class EReducer<V2: frozen, V3: File>{
   canReset: Bool,
   init: (mutable Iterator<V2> ~> Array<V3>),
   update: (Array<V3>, Array<V2>, Array<V2>) ~> ?Array<V3>,
+} extends ReducerBase<V2, V3> {
+  fun doinit(values: mutable Iterator<V2>): Array<V3> {
+    this.init(values)
+  }
+
+  fun doupdate(state: Array<V3>, old: Array<V2>, new: Array<V2>): ?Array<V3> {
+    this.update(state, old, new)
+  }
+
+  fun ==(other: ReducerBase<V2, V3>): Bool {
+    Unsafe.maybeCast(other, EReducer<V2, V3>) match {
+    | Some(o) ->
+      native_eq(this.init, o.init) == 0 && native_eq(this.update, o.update) == 0
+    | _ -> false
+    }
+  }
+}
+
+class IReducerBase<V2: frozen, V3: File>(
+  reducer: ReducerBase<V2, V3>,
+  valueType: File ~> V2,
+) extends IReducer<File> {
+  //
+  fun init(values: mutable Iterator<File>): Array<File> {
+    this.reducer.doinit(values.map(this.valueType));
+  }
+
+  fun update(
+    state: Array<File>,
+    old: Array<File>,
+    new: Array<File>,
+  ): ?Array<File> {
+    this.reducer.doupdate(
+      state.map(this.reducer.type),
+      old.map(this.valueType),
+      new.map(this.valueType),
+    )
+  }
+
+  fun ==(other: IReducer<File>): Bool {
+    Unsafe.maybeCast(other, IReducerBase<V2, V3>) match {
+    | Some(o) -> this.reducer == o.reducer
+    | _ -> false
+    }
+  }
 }
 
 /*****************************************************************************/
 /* A few predefined Reducers. */
 /*****************************************************************************/
 
-fun countReducer(): EReducer<_, IntFile> {
+fun countReducer<V: frozen>(): EReducer<V, IntFile> {
   EReducer{
     type => IntFile::type,
     canReset => false,
@@ -444,7 +495,7 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
       (EHandle<K, V>, (TMapFun<K, V, K2, V2>, ?Array<KeyRange<K>>)),
     >,
     dirName: DirName,
-    reducer: EReducer<V2, V3>,
+    reducer: ReducerBase<V2, V3>,
   ): EHandle<K2, V3> {
     static::genMultiMapReduce(
       typeOutputKey,
@@ -452,17 +503,7 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
       context,
       parents,
       dirName,
-      Some(
-        IReducer{
-          init => files ~> reducer.init(files.map(typeOutput)),
-          update => (state, old, new) ~>
-            reducer.update(
-              state.map(reducer.type),
-              old.map(typeOutput),
-              new.map(typeOutput),
-            ),
-        },
-      ),
+      Some(IReducerBase(reducer, typeOutput)),
     )
   }
 
@@ -489,7 +530,7 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
     context: mutable Context,
     dirName: DirName,
     f: TMapFun<K, V, K2, V2>,
-    reducer: EReducer<V2, V3>,
+    reducer: ReducerBase<V2, V3>,
     rangeOpt: ?Array<KeyRange<K>> = None(),
   ): EHandle<K2, V3> {
     static::multiMapReduce(
