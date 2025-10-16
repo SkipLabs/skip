@@ -68,16 +68,6 @@ export interface FromBinding {
     isInit: boolean,
   ): Pointer<Internal.CJSON>;
 
-  SkipRuntime_CollectionWriter__error(
-    name: string,
-    error: Pointer<Internal.CJSON>,
-  ): Handle<Error>;
-
-  SkipRuntime_CollectionWriter__initialized(
-    name: string,
-    error: Pointer<Internal.CJSON>,
-  ): Handle<Error>;
-
   // Resource
 
   SkipRuntime_createResource(ref: Handle<Resource>): Pointer<Internal.Resource>;
@@ -184,13 +174,13 @@ export interface FromBinding {
   SkipRuntime_Runtime__getAll(
     resource: string,
     jsonParams: Pointer<Internal.CJObject>,
-  ): Pointer<Internal.CJObject | Internal.CJFloat>;
+  ): Pointer<Internal.CJArray | Internal.CJFloat>;
 
   SkipRuntime_Runtime__getForKey(
     resource: string,
     jsonParams: Pointer<Internal.CJObject>,
     key: Pointer<Internal.CJSON>,
-  ): Pointer<Internal.CJObject | Internal.CJFloat>;
+  ): Pointer<Internal.CJArray | Internal.CJFloat>;
 
   SkipRuntime_Runtime__closeResource(identifier: string): Handle<Error>;
 

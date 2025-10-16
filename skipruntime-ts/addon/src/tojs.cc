@@ -11,8 +11,6 @@ namespace skipruntime {
 extern "C" {
 CJSON SkipRuntime_CollectionWriter__update(char* collection, CJArray values,
                                            int32_t isInit);
-double SkipRuntime_CollectionWriter__initialized(char* collection, CJSON error);
-double SkipRuntime_CollectionWriter__error(char* collection, CJSON error);
 
 SKResourceBuilderMap SkipRuntime_ResourceBuilderMap__create();
 void SkipRuntime_ResourceBuilderMap__add(SKResourceBuilderMap builders,
@@ -128,65 +126,6 @@ void UpdateOfCollectionWriter(const FunctionCallbackInfo<Value>& args) {
     CJSON skresult =
         SkipRuntime_CollectionWriter__update(skcollection, skvalues, skisinit);
     args.GetReturnValue().Set(External::New(isolate, skresult));
-  });
-}
-
-void InitializedOfCollectionWriter(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 2) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have two parameters.")));
-    return;
-  };
-  if (!args[0]->IsString()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a string.")));
-    return;
-  }
-  if (!args[1]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The second parameter must be a pointer.")));
-    return;
-  }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    char* skcollection = ToSKString(isolate, args[0].As<String>());
-    CJSON skerr = args[1].As<External>()->Value();
-    double skerror =
-        SkipRuntime_CollectionWriter__initialized(skcollection, skerr);
-    args.GetReturnValue().Set(Number::New(isolate, skerror));
-  });
-}
-
-void ErrorOfCollectionWriter(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 2) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have two parameters.")));
-    return;
-  };
-  if (!args[0]->IsString()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a string.")));
-    return;
-  }
-  if (!args[1]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The second parameter must be a pointer.")));
-    return;
-  }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    char* skcollection = ToSKString(isolate, args[0].As<String>());
-    CJSON skerr = args[1].As<External>()->Value();
-    double skerror = SkipRuntime_CollectionWriter__error(skcollection, skerr);
-    args.GetReturnValue().Set(Number::New(isolate, skerror));
   });
 }
 
@@ -1148,10 +1087,6 @@ void GetToJSBinding(const FunctionCallbackInfo<Value>& args) {
   Local<Object> binding = Object::New(isolate);
   AddFunction(isolate, binding, "SkipRuntime_CollectionWriter__update",
               UpdateOfCollectionWriter);
-  AddFunction(isolate, binding, "SkipRuntime_CollectionWriter__initialized",
-              InitializedOfCollectionWriter);
-  AddFunction(isolate, binding, "SkipRuntime_CollectionWriter__error",
-              ErrorOfCollectionWriter);
   //
   AddFunction(isolate, binding, "SkipRuntime_ResourceBuilderMap__create",
               CreateOfResourceBuilderMap);
