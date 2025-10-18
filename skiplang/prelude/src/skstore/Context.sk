@@ -11,8 +11,23 @@
 
 module SKStore;
 
-base class Postponable {
+base class Postponable
+
+base class UPostponable extends Postponable {
   fun perform(context: mutable Context): void;
+}
+
+base class FPostponable(created: Tick) extends Postponable {
+  protected fun perform(context: Context): void;
+
+  fun check(context: Context, forkStart: ?Tick): ?(() ~> void) {
+    forkStart match {
+    | Some(start) if (start <= this.created) ->
+      Some(() ~> this.perform(context))
+    | None() -> Some(() ~> this.perform(context))
+    | _ -> None()
+    }
+  }
 }
 
 /*****************************************************************************/
@@ -399,7 +414,8 @@ mutable class Context private {
     KeyMap<Int>,
   > = SortedMap[],
   private mutable sessions: SortedMap<Int, Sub> = SortedMap[],
-  private mutable postponables: List<Postponable> = List[],
+  private mutable postponables: Queue<UPostponable> = Queue[],
+  private mutable fpostponables: Queue<FPostponable> = Queue[],
   private mutable dirsWithSharedSubDirs: SortedSet<DirName> = SortedSet[],
   private mutable sharedSubDirsRefCount: SortedMap<DirName, Int> = SortedMap[],
   mutable writeChecker: ?(mutable WriteChecker) = None(),
@@ -472,7 +488,10 @@ mutable class Context private {
   }
 
   mutable fun postpone(postponable: Postponable): void {
-    this.!postponables = List.Cons(postponable, this.postponables);
+    postponable match {
+    | u @ UPostponable _ -> this.!postponables = this.postponables.push(u)
+    | f @ FPostponable _ -> this.!fpostponables = this.fpostponables.push(f)
+    }
   }
 
   mutable fun addToUpdate(
@@ -544,6 +563,7 @@ mutable class Context private {
       lazyGetsRefCount => this.lazyGetsRefCount,
       sessions => this.sessions,
       postponables => this.postponables,
+      fpostponables => this.fpostponables,
       dirsWithSharedSubDirs => this.dirsWithSharedSubDirs,
       sharedSubDirsRefCount => this.sharedSubDirsRefCount,
       writeChecker => this.writeChecker.map(x -> x.mclone()),
@@ -576,6 +596,7 @@ mutable class Context private {
     this.!lazyGetsRefCount = ctx.lazyGetsRefCount;
     this.!sessions = ctx.sessions;
     this.!postponables = ctx.postponables;
+    this.!fpostponables = ctx.fpostponables;
     this.!dirsWithSharedSubDirs = ctx.dirsWithSharedSubDirs;
     this.!sharedSubDirsRefCount = ctx.sharedSubDirsRefCount;
     this.!writeChecker = ctx.writeChecker.map(x -> x.mclone());
@@ -693,11 +714,20 @@ mutable class Context private {
   private mutable fun checkPostponables(): Bool {
     withChange = !this.postponables.isEmpty();
     if (withChange) {
-      postponables = this.postponables.reversed();
-      this.!postponables = List[];
-      this.perform(postponables);
+      this.postponables.values().each(p -> p.perform(this));
+      this.!postponables = Queue[];
     };
     withChange;
+  }
+
+  fun clearForkPostponables(): (Context, Queue<FPostponable>) {
+    if (this.fpostponables.isEmpty()) {
+      (this, this.fpostponables)
+    } else {
+      postponables = this.fpostponables;
+      !this.fpostponables = Queue[];
+      (this, postponables)
+    }
   }
 
   private mutable fun updateLazyGets(): void {
@@ -808,15 +838,6 @@ mutable class Context private {
           )
         }
       }
-    }
-  }
-
-  private mutable fun perform(list: List<Postponable>): void {
-    list match {
-    | List.Nil() -> void
-    | List.Cons(p, rl) ->
-      p.perform(this);
-      this.perform(rl)
     }
   }
 
@@ -1207,6 +1228,39 @@ mutable class Context private {
     };
     this.!toPurge = SortedSet[];
   }
+
+  fun rollback(from: Tick): Vector<() ~> void> {
+    v = mutable Vector[];
+    this.dirs.values().each(dir ->
+      dir match {
+      | eager @ EagerDir _ ->
+        eager.optOnDelete.each(d ->
+          d match {
+          | p @ FPostponable _ -> p.check(this, Some(from)).each(v.push)
+          | _ -> void
+          }
+        )
+      | _ -> void
+      }
+    );
+    unsafe_chill_trust_me(v)
+  }
+}
+
+fun checkForkPostponables(
+  context: Context,
+  todo: mutable Vector<() ~> void>,
+  forkStart: ?Tick,
+  postponables: Queue<FPostponable>,
+  remaining: Queue<FPostponable> = Queue[],
+): Queue<FPostponable> {
+  postponables.values().each(p ->
+    p.check(context, forkStart) match {
+    | Some(fn) -> todo.push(fn)
+    | _ -> !remaining = remaining.push(p)
+    }
+  );
+  remaining
 }
 
 // @cpp_extern("SKIP_print_backtrace")
@@ -1408,7 +1462,13 @@ native fun unfreezeCond(cond: Condition): mutable Condition;
 /* Runtime primitives. */
 /*****************************************************************************/
 
-class Fork(context: Context, from: Tick, update: Tick, fork: ?String = None())
+class Fork(
+  context: Context,
+  from: Tick,
+  update: Tick,
+  fork: ?String = None(),
+  postponables: Queue<FPostponable> = Queue[],
+)
 
 class Contexts(main: Context, forks: SortedMap<String, Fork> = SortedMap[]) {
   //
@@ -1419,15 +1479,33 @@ class Contexts(main: Context, forks: SortedMap<String, Fork> = SortedMap[]) {
     }
   }
 
-  fun set(optName: ?String, context: Context): Contexts {
+  fun check(
+    optName: ?String,
+    context: Context,
+    postponables: Queue<FPostponable> = Queue[],
+  ): ContextsWithActions {
+    startTick = optName.map(f -> this.forks[f].from);
+    (!context, cpostponables) = context.clearForkPostponables();
+    todo = mutable Vector[];
+    remaining = checkForkPostponables(context, todo, startTick, postponables);
+    !remaining = checkForkPostponables(
+      context,
+      todo,
+      startTick,
+      cpostponables,
+      remaining,
+    );
     optName match {
     | Some(name) ->
       fork = this.forks[name];
       !fork.context = context;
+      remaining.each(p -> !fork.postponables = fork.postponables.push(p));
       !this.forks = this.forks.set(name, fork)
-    | _ -> !this.main = context
+    | _ ->
+      invariant(remaining.isEmpty(), "No actions can be postponed on main");
+      !this.main = context
     };
-    this
+    ContextsWithActions(this, unsafe_chill_trust_me(todo))
   }
 
   fun remove(name: String): Contexts {
@@ -1496,7 +1574,7 @@ private native fun gContextSync(
   UInt32,
   ?((mutable Context, mutable Context, Context) ~> void),
   fork: ?String,
-): Contexts;
+): ContextsWithActions;
 
 @debug
 @cpp_extern("SKIP_context_sync_no_lock")
@@ -1508,7 +1586,7 @@ private native fun gContextSyncNoLock(
   UInt32,
   ?((mutable Context, mutable Context, Context) ~> void),
   fork: ?String,
-): Contexts;
+): ContextsWithActions;
 
 @debug
 @cpp_extern("SKIP_global_unlock")
@@ -1580,14 +1658,19 @@ fun getForkContext(contexts: Contexts, fork: ?String): Context {
   contexts.get(fork)
 }
 
+value class ContextsWithActions(
+  contexts: Contexts,
+  actions: Vector<() ~> void>,
+)
+
 @debug
-@export("SKIP_set_fork_context")
+@export("SKIP_check_fork_context")
 fun setForkContext(
   contexts: Contexts,
   fork: ?String,
   context: Context,
-): Contexts {
-  contexts.set(fork, context)
+): ContextsWithActions {
+  contexts.check(fork, context)
 }
 
 @debug
@@ -1666,7 +1749,7 @@ fun runWithGcIntern(
     | CContinue(underLockF) ->
       synchronizer match {
       | None() ->
-        !contexts = gContextSyncNoLock(
+        new = gContextSyncNoLock(
           startTick,
           contexts,
           newContext,
@@ -1675,10 +1758,12 @@ fun runWithGcIntern(
           underLockF,
           fork,
         );
-        contexts.get(fork).notifyAll(startTick);
+        new.contexts.get(fork).notifyAll(startTick);
+        new.actions.each(fn -> fn());
+        !contexts = new.contexts;
         destroyObstack(pos)
       | Some _ ->
-        !contexts = gContextSync(
+        new = gContextSync(
           startTick,
           contexts,
           newContext,
@@ -1687,13 +1772,15 @@ fun runWithGcIntern(
           underLockF,
           fork,
         );
-        contexts.get(fork).notifyAll(startTick);
+        new.contexts.get(fork).notifyAll(startTick);
+        new.actions.each(fn -> fn());
+        !contexts = new.contexts;
         destroyObstack(pos)
       }
     | CStop(underLockF) ->
       synchronizer match {
       | None() ->
-        !contexts = gContextSyncNoLock(
+        new = gContextSyncNoLock(
           startTick,
           contexts,
           newContext,
@@ -1703,12 +1790,14 @@ fun runWithGcIntern(
           fork,
         );
         gGlobalUnlock();
-        contexts.get(fork).notifyAll(startTick);
+        new.contexts.get(fork).notifyAll(startTick);
+        new.actions.each(fn -> fn());
+        !contexts = new.contexts;
         gUnsafeFree(contexts);
         destroyObstack(pos);
         return contexts
       | Some _ ->
-        !contexts = gContextSync(
+        new = gContextSync(
           startTick,
           contexts,
           newContext,
@@ -1717,7 +1806,9 @@ fun runWithGcIntern(
           underLockF,
           fork,
         );
-        contexts.get(fork).notifyAll(startTick);
+        new.contexts.get(fork).notifyAll(startTick);
+        new.actions.each(fn -> fn());
+        !contexts = new.contexts;
         gUnsafeFree(contexts);
         destroyObstack(pos);
         return contexts
@@ -1743,7 +1834,7 @@ fun runLocked(
   start = root.getTick();
   context = root.mclone();
   f(context);
-  newContexts = gContextSyncNoLock(
+  new = gContextSyncNoLock(
     start,
     contexts,
     context.clone(),
@@ -1753,8 +1844,9 @@ fun runLocked(
     fork,
   );
   gGlobalUnlock();
-  newContexts.get(fork).notifyAll(start);
-  gUnsafeFree(newContexts);
+  new.contexts.get(fork).notifyAll(start);
+  new.actions.each(fn -> fn());
+  gUnsafeFree(new.contexts);
 }
 
 @cpp_noinline
@@ -2060,9 +2152,9 @@ fun runWithResult<T>(
     context = current.mclone();
     res = f(context);
     startTick = current.getTick();
-    synchronizer match {
+    new = synchronizer match {
     | None() ->
-      !contexts = gContextSyncNoLock(
+      new = gContextSyncNoLock(
         startTick,
         contexts,
         context.clone(),
@@ -2071,9 +2163,10 @@ fun runWithResult<T>(
         None(),
         fork,
       );
-      gGlobalUnlock()
+      gGlobalUnlock();
+      new
     | Some _ ->
-      !contexts = gContextSync(
+      gContextSync(
         startTick,
         contexts,
         context.clone(),
@@ -2083,8 +2176,9 @@ fun runWithResult<T>(
         fork,
       )
     };
-    contexts.get(fork).notifyAll(startTick);
-    gUnsafeFree(contexts);
+    new.contexts.get(fork).notifyAll(startTick);
+    new.actions.each(fn -> fn());
+    gUnsafeFree(new.contexts);
     Success(res)
   } catch {
   | exn ->
@@ -2230,12 +2324,14 @@ fun mergeForkNoGc(
     new_context.filterSubscriptions(origin, settings.subscriptionsFilter);
     new_context.filterPersistents(origin, settings.persistentsFilter);
     new_context.filterGlobals(origin, settings.globalsFilter);
-    new_contexts = contexts.set(fork.fork, new_context.clone()).remove(name);
+    new = contexts.check(fork.fork, new_context.clone(), fork.postponables);
+    !new.contexts = new.contexts.remove(name);
     SKStore.gUnsafeFree(contexts);
     sync = UInt32::truncate(if (settings.isSync) 1 else 0);
-    SKStore.gContextsReplaceNoLock(new_contexts, sync);
+    SKStore.gContextsReplaceNoLock(new.contexts, sync);
     SKStore.gGlobalUnlock();
-    new_contexts.get(fork.fork).notifyAll(start)
+    new.contexts.get(fork.fork).notifyAll(start);
+    new.actions.each(fn -> fn())
   | Failure(ex) ->
     SKStore.gUnsafeFree(contexts);
     SKStore.gGlobalUnlock();
@@ -2251,11 +2347,14 @@ fun removeForkNoGc(name: String, isSync: Bool = false): void {
     gGlobalUnlock();
     invariant_violation(`Fork with name '${name}' doesn't exist.`)
   };
+  fork = contexts.forks[name];
+  todo = fork.context.rollback(fork.from);
   new_contexts = contexts.remove(name);
   gUnsafeFree(contexts);
   sync = UInt32::truncate(if (isSync) 1 else 0);
   gContextsReplaceNoLock(new_contexts, sync);
   gGlobalUnlock();
+  todo.each(fn -> fn())
 }
 
 fun fork(
@@ -2348,6 +2447,20 @@ fun removeFork(name: String, isSync: Bool = false): void {
 
 fun forkExists(name: String): Bool {
   gUnsafeContextsGet().forks.containsKey(name)
+}
+
+// Allow to match with UPostponable
+class DummyUPostponable() extends UPostponable {
+  fun perform(_context: mutable Context): void {
+    invariant_violation("dummy")
+  }
+}
+
+// Allow to match with FPostponable
+class DummyFPostponable extends FPostponable {
+  protected fun perform(_context: readonly Context): void {
+    invariant_violation("dummy")
+  }
 }
 
 module end;

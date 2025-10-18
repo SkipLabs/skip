@@ -1819,8 +1819,7 @@ private mutable class SQLContext(
       cexn = SKStore.destroyObstackWithValue(pos, ex);
       throw cexn
     };
-
-    this.!contexts = SKStore.gContextSync(
+    new = SKStore.gContextSync(
       startTick,
       this.contexts,
       newContext,
@@ -1829,8 +1828,10 @@ private mutable class SQLContext(
       underLockF,
       this.fork,
     );
+    this.!contexts = new.contexts;
     !context = this.contexts.get(this.fork);
     context.notifyAll(startTick);
+    new.actions.each(fn -> fn());
     this.!globals = context.globals;
 
     SKStore.destroyObstack(pos)
