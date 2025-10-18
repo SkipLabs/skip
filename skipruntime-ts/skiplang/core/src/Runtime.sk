@@ -287,7 +287,7 @@ class LinkToResource(
   writer: CollectionWriter,
   name: String,
   params: SKJSON.CJSON,
-) extends SKStore.Postponable {
+) extends SKStore.UPostponable {
   //
   fun perform(context: mutable SKStore.Context): void {
     pushContext(context);
@@ -307,11 +307,9 @@ class CloseExternalService(
   instance: String,
   dirName: SKStore.DirName,
   definition: ExternalServiceDef,
-) extends SKStore.Postponable {
-  fun perform(context: mutable SKStore.Context): void {
-    pushContext(context);
+) extends SKStore.FPostponable {
+  protected fun perform(_context: readonly SKStore.Context): void {
     this.supplier.unsubscribe(this.instance);
-    popContext();
   }
 }
 
@@ -424,6 +422,7 @@ fun useExternalCollection(
           instance,
           storeDir,
           definition,
+          context.getTick(),
         );
         store = context.mkdir(
           JSONID::keyType,
