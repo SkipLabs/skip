@@ -581,6 +581,7 @@ class MockExternalCheck implements Mapper<number, number, number, number[]> {
   mapEntry(key: number, values: Values<number>): Iterable<[number, number[]]> {
     const result = this.external.getUnique(key, { ifNone: NaN });
     if (Number.isNaN(result)) return [[key, values.toArray()]];
+    if (result == 5) throw new Error("Something goes wrong.");
     return [[key, [...values, result]]];
   }
 }
@@ -1454,6 +1455,25 @@ export function initTests(
           [1, [[20, 31]]],
         ],
       ]);
+      const subscribed = [...mockExternal.subscribed];
+      const unsubscribed = [...mockExternal.unsubscribed];
+      try {
+        await service.update("input2", [
+          [0, [-5]],
+          [1, [0]],
+        ]);
+        throw new Error("Error was not thrown");
+      } catch (e: unknown) {
+        expect(e).toBeA(Error);
+        expect((e as Error).message).toMatchRegex(
+          new RegExp(/^(?:Error: )?Something goes wrong.$/),
+        );
+      }
+      const set = new Set(subscribed);
+      for (const s of mockExternal.subscribed) {
+        if (!set.has(s)) unsubscribed.push(s);
+      }
+      expect(unsubscribed.sort()).toEqual(mockExternal.unsubscribed.sort());
     } finally {
       service.unsubscribe(sid);
       service.closeResourceInstance(constantResourceId1);
