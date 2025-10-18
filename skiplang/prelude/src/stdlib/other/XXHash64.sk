@@ -1,0 +1,339 @@
+/***************************************************************************/
+// XXHash64 implementation
+/***************************************************************************/
+
+// Introducing a value class to make sure we never mix Hashable and XXHashable
+value class XXHash(value: Int) uses Orderable
+
+module FastOption;
+extension class SentinelOption uses XXHashable[T: XXHashable] {
+  fun xxhash[T: XXHashable](ignorePos: Bool = false): XXHash {
+    XXHash(
+      if (this.isSome()) {
+        this.unsafeFromSome().xxhash(ignorePos).value + 1
+      } else {
+        // Arbitrary hash value for None(), copied from Option.sk.
+        1027410261
+      },
+    )
+  }
+}
+
+module end;
+
+module XXHash64;
+
+extension class .Int uses XXHashable {
+  fun xxhash(_ignorePos: Bool = false): XXHash {
+    XXHash(this)
+  }
+}
+extension class .Bool uses XXHashable {
+  fun xxhash(_ignorePos: Bool = false): XXHash {
+    XXHash(this.hash())
+  }
+}
+extension class .String uses XXHashable {
+  fun xxhash(_ignorePos: Bool = false): XXHash {
+    XXHash(xxHash64String(this))
+  }
+}
+extension class .Void uses XXHashable {
+  fun xxhash(_ignorePos: Bool = false): XXHash {
+    XXHash(this.hash())
+  }
+}
+extension base class .Option uses XXHashable[T: XXHashable] {
+  fun xxhash[T: XXHashable](ignorePos: Bool = false): XXHash {
+    XXHash(
+      if (this.isSome()) {
+        this.fromSome().xxhash(ignorePos).value + 1
+      } else {
+        // Arbitrary hash value for None(), copied from Option.sk.
+        1027410261
+      },
+    )
+  }
+}
+extension class .Vector uses XXHashable[T: XXHashable] {
+  readonly fun xxhash[T: XXHashable](ignorePos: Bool = false): XXHash {
+    XXHash(
+      this.foldl((seed, v) -> xxHash64(seed, v.xxhash(ignorePos).value), -1),
+    )
+  }
+}
+extension class .Array uses XXHashable[T: XXHashable] {
+  readonly fun xxhash[T: XXHashable](ignorePos: Bool = false): XXHash {
+    XXHash(
+      this.foldl((seed, v) -> xxHash64(seed, v.xxhash(ignorePos).value), -1),
+    )
+  }
+}
+
+extension class .Map uses XXHashable[K: XXHashable, V: XXHashable] {
+  readonly fun xxhash[K: XXHashable, V: XXHashable](
+    ignorePos: Bool = false,
+  ): XXHash {
+    XXHash(
+      this.items().foldl(
+        (seed, kv) -> {
+          k = kv.i0.xxhash(ignorePos).value;
+          v = kv.i1.xxhash(ignorePos).value;
+          xxHash64(xxHash64(seed, k), v)
+        },
+        -1,
+      ),
+    )
+  }
+}
+
+extension class .Tuple2 uses XXHashable[T0: XXHashable, T1: XXHashable]
+extension class .Tuple3 uses
+  XXHashable[T0: XXHashable, T1: XXHashable, T2: XXHashable],
+
+
+extension class .Tuple4 uses
+  XXHashable[T0: XXHashable, T1: XXHashable, T2: XXHashable, T3: XXHashable],
+
+
+extension class .Tuple5 uses
+  XXHashable[
+    T0: XXHashable,
+    T1: XXHashable,
+    T2: XXHashable,
+    T3: XXHashable,
+    T4: XXHashable,
+  ],
+
+
+extension class .Tuple6 uses
+  XXHashable[
+    T0: XXHashable,
+    T1: XXHashable,
+    T2: XXHashable,
+    T3: XXHashable,
+    T4: XXHashable,
+    T5: XXHashable,
+  ],
+
+
+extension class .Tuple7 uses
+  XXHashable[
+    T0: XXHashable,
+    T1: XXHashable,
+    T2: XXHashable,
+    T3: XXHashable,
+    T4: XXHashable,
+    T5: XXHashable,
+    T6: XXHashable,
+  ],
+
+
+extension class .Tuple8 uses
+  XXHashable[
+    T0: XXHashable,
+    T1: XXHashable,
+    T2: XXHashable,
+    T3: XXHashable,
+    T4: XXHashable,
+    T5: XXHashable,
+    T6: XXHashable,
+    T7: XXHashable,
+  ],
+
+
+extension class .Tuple9 uses
+  XXHashable[
+    T0: XXHashable,
+    T1: XXHashable,
+    T2: XXHashable,
+    T3: XXHashable,
+    T4: XXHashable,
+    T5: XXHashable,
+    T6: XXHashable,
+    T7: XXHashable,
+    T8: XXHashable,
+  ],
+
+
+extension class .Tuple10 uses
+  XXHashable[
+    T0: XXHashable,
+    T1: XXHashable,
+    T2: XXHashable,
+    T3: XXHashable,
+    T4: XXHashable,
+    T5: XXHashable,
+    T6: XXHashable,
+    T7: XXHashable,
+    T8: XXHashable,
+    T9: XXHashable,
+  ],
+
+
+trait .XXHashable {
+  // The hash method should return a 64-bit hash value. The bits do not
+  // need to be scrambled, that is the responsibility of the user of this
+  // method.
+  overridable macro fun xxhash(ignorePos: Bool = false): XXHash {
+    h = #thisClassName.xxhash(ignorePos);
+    #forEachField (#field, #fieldName) {
+      !h = XXHash(xxHash64(h.value, this.#field.xxhash(ignorePos).value))
+    };
+    h
+  }
+}
+
+const prime1: Int = -7046029254386353131; // 0x9E3779B185EBCA87
+const prime2: Int = -4417276706812531889; // 0xC2B2AE3D27D4EB4F
+const prime3: Int = 1609587929392839161; // 0x165667B19E3779F9
+const prime4: Int = -8796714831421723037; // 0x85EBCA77C2B2AE63
+const prime5: Int = 2870177450012600261; // 0x27D4EB2F165667C5
+
+fun xxHash64(data: Int, seed: Int = 0): Int {
+  // For a single Int (8 bytes), we don't have enough data for a full block
+  // So we use the simplified path for small inputs
+  length = 8;
+  hash = seed + prime5;
+  !hash = hash + length;
+
+  // Process the single 8-byte integer
+  !hash = hash.xor(round(0, data));
+  !hash = rotateLeft(hash, 27) * prime1 + prime4;
+
+  // Final mix
+  !hash = hash.xor(hash.ushr(33));
+  !hash = hash * prime2;
+  !hash = hash.xor(hash.ushr(29));
+  !hash = hash * prime3;
+  !hash = hash.xor(hash.ushr(32));
+
+  hash
+}
+
+fun xxHash64String(data: String, seed: Int = 0): Int {
+  // Convert string to bytes and process them
+  bytes = data.bytes();
+  length = bytes.size();
+
+  if (length >= 32) {
+    // For large strings, use the full xxHash64 algorithm
+    xxHash64StringLarge(bytes, seed)
+  } else {
+    // For small strings, use simplified processing
+    xxHash64StringSmall(bytes, seed)
+  }
+}
+
+fun xxHash64StringSmall(bytes: readonly Bytes, seed: Int): Int {
+  length = bytes.size();
+  hash = seed + prime5 + length;
+
+  // Process 8-byte chunks
+  i = 0;
+  while (i + 8 <= length) {
+    // Combine 8 bytes into a single Int (little-endian)
+    value = 0;
+    for (j in Range(0, 8)) {
+      !value = value.or(bytes[i + j].toInt().shl(j * 8));
+    };
+    !hash = hash.xor(round(0, value));
+    !hash = rotateLeft(hash, 27) * prime1 + prime4;
+    !i = i + 8;
+  };
+
+  // Process remaining bytes
+  while (i < length) {
+    !hash = hash.xor(bytes[i].toInt() * prime5);
+    !hash = rotateLeft(hash, 11) * prime1;
+    !i = i + 1;
+  };
+
+  // Final mix
+  !hash = hash.xor(hash.ushr(33));
+  !hash = hash * prime2;
+  !hash = hash.xor(hash.ushr(29));
+  !hash = hash * prime3;
+  !hash = hash.xor(hash.ushr(32));
+
+  hash
+}
+
+fun xxHash64StringLarge(bytes: readonly Bytes, seed: Int): Int {
+  length = bytes.size();
+
+  // Initialize accumulators
+  acc1 = seed + prime1 + prime2;
+  acc2 = seed + prime2;
+  acc3 = seed;
+  acc4 = seed - prime1;
+
+  // Process 32-byte blocks
+  i = 0;
+  while (i + 32 <= length) {
+    // Process 4 x 8-byte chunks
+    for (j in Range(0, 4)) {
+      value = 0;
+      for (k in Range(0, 8)) {
+        !value = value.or(bytes[i + j * 8 + k].toInt().shl(k * 8));
+      };
+      if (j == 0) !acc1 = round(acc1, value);
+      if (j == 1) !acc2 = round(acc2, value);
+      if (j == 2) !acc3 = round(acc3, value);
+      if (j == 3) !acc4 = round(acc4, value);
+    };
+    !i = i + 32;
+  };
+
+  // Merge accumulators
+  hash =
+    rotateLeft(acc1, 1) +
+    rotateLeft(acc2, 7) +
+    rotateLeft(acc3, 12) +
+    rotateLeft(acc4, 18);
+  !hash = (hash.xor(round(0, acc1)) * prime1 + prime4);
+  !hash = (hash.xor(round(0, acc2)) * prime1 + prime4);
+  !hash = (hash.xor(round(0, acc3)) * prime1 + prime4);
+  !hash = (hash.xor(round(0, acc4)) * prime1 + prime4);
+
+  !hash = hash + length;
+
+  // Process remaining bytes (similar to small version)
+  while (i + 8 <= length) {
+    value = 0;
+    for (j in Range(0, 8)) {
+      !value = value.or(bytes[i + j].toInt().shl(j * 8));
+    };
+    !hash = hash.xor(round(0, value));
+    !hash = rotateLeft(hash, 27) * prime1 + prime4;
+    !i = i + 8;
+  };
+
+  while (i < length) {
+    !hash = hash.xor(bytes[i].toInt() * prime5);
+    !hash = rotateLeft(hash, 11) * prime1;
+    !i = i + 1;
+  };
+
+  // Final mix
+  !hash = hash.xor(hash.ushr(33));
+  !hash = hash * prime2;
+  !hash = hash.xor(hash.ushr(29));
+  !hash = hash * prime3;
+  !hash = hash.xor(hash.ushr(32));
+
+  hash
+}
+
+// Helper functions for xxHash64
+fun rotateLeft(value: Int, bits: Int): Int {
+  (value.shl(bits)).or(value.ushr(64 - bits))
+}
+
+fun round(acc: Int, value: Int): Int {
+  acc2 = acc + value * prime2;
+  acc3 = rotateLeft(acc2, 31);
+  acc3 * prime1
+}
+
+module end;
