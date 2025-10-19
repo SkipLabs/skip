@@ -58,6 +58,7 @@ export * from "./errors.js";
 
 export type JSONMapper = Mapper<Json, Json, Json, Json>;
 export type JSONLazyCompute = LazyCompute<Json, Json>;
+export type JSONOperator = JSONMapper | JSONLazyCompute | Reducer<Json, Json>;
 
 export type HandlerInfo<P> = {
   object: P;
@@ -136,7 +137,7 @@ class LazyCollectionImpl<K extends Json, V extends Json>
   implements LazyCollection<K, V>
 {
   constructor(
-    private readonly lazyCollection: string,
+    readonly lazyCollection: string,
     private readonly refs: ToBinding,
   ) {
     super();
@@ -869,6 +870,19 @@ export class ToBinding {
     return skjson.exportJSON(Array.from(result));
   }
 
+  SkipRuntime_Mapper__getInfo(
+    skmapper: Handle<HandlerInfo<JSONMapper>>,
+  ): Pointer<Internal.CJObject> {
+    return this.getInfo(skmapper);
+  }
+
+  SkipRuntime_Mapper__isEquals(
+    mapper: Handle<HandlerInfo<JSONMapper>>,
+    other: Handle<HandlerInfo<JSONMapper>>,
+  ): number {
+    return this.isEquals(mapper, other);
+  }
+
   SkipRuntime_deleteMapper(mapper: Handle<HandlerInfo<JSONMapper>>): void {
     this.handles.deleteHandle(mapper);
   }
@@ -889,6 +903,19 @@ export class ToBinding {
       context,
     );
     return skjson.exportJSON(Array.from(result));
+  }
+
+  SkipRuntime_LazyCompute__getInfo(
+    lazyCompute: Handle<HandlerInfo<JSONLazyCompute>>,
+  ): Pointer<Internal.CJObject> {
+    return this.getInfo(lazyCompute);
+  }
+
+  SkipRuntime_LazyCompute__isEquals(
+    lazyCompute: Handle<HandlerInfo<JSONLazyCompute>>,
+    other: Handle<HandlerInfo<JSONLazyCompute>>,
+  ): number {
+    return this.isEquals(lazyCompute, other);
   }
 
   SkipRuntime_deleteLazyCompute(
@@ -1044,6 +1071,19 @@ export class ToBinding {
     );
   }
 
+  SkipRuntime_Reducer__isEquals(
+    reducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
+    other: Handle<HandlerInfo<Reducer<Json, Json>>>,
+  ): number {
+    return this.isEquals(reducer, other);
+  }
+
+  SkipRuntime_Reducer__getInfo(
+    reducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
+  ): Pointer<Internal.CJObject> {
+    return this.getInfo(reducer);
+  }
+
   SkipRuntime_deleteReducer(
     reducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
   ): void {
@@ -1188,5 +1228,100 @@ export class ToBinding {
       const errorHdl = result as Handle<Error>;
       throw this.handles.deleteHandle(errorHdl);
     }
+  }
+
+  private deepEquals(a: Nullable<Json>, b: Nullable<Json>) {
+    // Same reference or both NaN
+    if (a === b) return true;
+    if (a !== a && b !== b) return true; // NaN check
+
+    // Different types or one is null
+    if (typeof a !== typeof b || a === null || b === null) return false;
+
+    // Primitives already checked by ===
+    if (typeof a !== "object" || typeof b !== "object") return false;
+
+    // Arrays
+    if (Array.isArray(a)) {
+      if (!Array.isArray(b) || a.length !== b.length) return false;
+      for (let i = 0; i < a.length; i++) {
+        if (!this.deepEquals(a[i]!, b[i]!)) return false;
+      }
+      return true;
+    }
+
+    // Different array status
+    if (Array.isArray(b)) return false;
+
+    // Objects
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+
+    if (keysA.length !== keysB.length) return false;
+
+    for (const key of keysA) {
+      if (
+        !Object.prototype.hasOwnProperty.call(b, key) ||
+        !this.deepEquals(a[key]!, b[key]!)
+      )
+        return false;
+    }
+
+    return true;
+  }
+
+  private getInfo<T>(
+    skmapper: Handle<HandlerInfo<T>>,
+  ): Pointer<Internal.CJObject> {
+    const skjson = this.getJsonConverter();
+    const object = this.handles.get(skmapper);
+    const name = object.name;
+    const parameters = object.params.map((v) => {
+      if (v instanceof EagerCollectionImpl) {
+        return {
+          type: "collection",
+          value: v.collection,
+        };
+      }
+      if (v instanceof LazyCollectionImpl) {
+        return {
+          type: "collection",
+          value: v.lazyCollection,
+        };
+      }
+      return { type: "data", value: v as Json };
+    });
+    return skjson.exportJSON({ name, parameters });
+  }
+
+  private isEquals<T extends JSONOperator>(
+    mapper: Handle<HandlerInfo<T>>,
+    other: Handle<HandlerInfo<T>>,
+  ): number {
+    const object = this.handles.get(mapper);
+    const oobject = this.handles.get(other);
+    if (object.object.constructor != oobject.object.constructor) {
+      return 0;
+    }
+    if (object.params.length != oobject.params.length) return 0;
+    for (const [i, param] of object.params.entries()) {
+      const oparam = oobject.params[i];
+      if (param instanceof EagerCollectionImpl) {
+        if (oparam instanceof EagerCollectionImpl) {
+          if (param.collection != oparam.collection) return 0;
+        } else {
+          return 0;
+        }
+      } else if (param instanceof LazyCollectionImpl) {
+        if (oparam instanceof LazyCollectionImpl) {
+          if (param.lazyCollection != oparam.lazyCollection) return 0;
+        } else {
+          return 0;
+        }
+      } else if (!this.deepEquals(param as Json, oparam as Json)) {
+        return 0;
+      }
+    }
+    return 1;
   }
 }

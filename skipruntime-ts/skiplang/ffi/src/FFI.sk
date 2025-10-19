@@ -23,6 +23,14 @@ native fun mapEntryOfMapper(
   values: mutable SKStore.NonEmptyIterator<SKJSON.CJSON>,
 ): SKJSON.CJArray;
 
+@cpp_extern("SkipRuntime_Mapper__getInfo")
+@debug
+native fun getInfoOfMapper(mapper: UInt32): SKJSON.CJObject;
+
+@cpp_extern("SkipRuntime_Mapper__isEquals")
+@debug
+native fun isEqualsOfMapper(mapper: UInt32, other: UInt32): UInt32;
+
 @cpp_extern("SkipRuntime_deleteMapper")
 @debug
 native fun deleteMapper(mapper: UInt32): void;
@@ -58,13 +66,15 @@ class ExternMapper(eptr: SKStore.ExternalPointer) extends Mapper {
 
   fun ==(other: SKStore.Mapper<SKStore.Key, SKStore.File>): Bool {
     other match {
-    | ExternMapper(eptr) -> this.eptr.value == eptr.value
+    | ExternMapper(eptr) -> isEqualsOfMapper(this.eptr.value, eptr.value) != 0
     | _ -> false
     }
   }
 
   fun getName(): String {
-    `collection_${SKStore.genSym(0)}`
+    `xx_${XXHash64.xxHash64String(
+      getInfoOfMapper(this.eptr.value).prettyPrint(),
+    )}`
   }
 }
 
@@ -77,6 +87,14 @@ native fun computeOfLazyCompute(
   self: String,
   key: SKJSON.CJSON,
 ): SKJSON.CJSON;
+
+@cpp_extern("SkipRuntime_LazyCompute__getInfo")
+@debug
+native fun getInfoOfLazyCompute(lazyCompute: UInt32): SKJSON.CJObject;
+
+@cpp_extern("SkipRuntime_LazyCompute__isEquals")
+@debug
+native fun isEqualsOfLazyCompute(lazyCompute: UInt32, other: UInt32): UInt32;
 
 @cpp_extern("SkipRuntime_deleteLazyCompute")
 @debug
@@ -99,13 +117,16 @@ class ExternLazyCompute(eptr: SKStore.ExternalPointer) extends LazyCompute {
 
   fun ==(other: SKStore.LazyCompute<SKStore.Key, SKStore.File>): Bool {
     other match {
-    | ExternLazyCompute(eptr) -> this.eptr.value == eptr.value
+    | ExternLazyCompute(eptr) ->
+      isEqualsOfLazyCompute(this.eptr.value, eptr.value) != 0
     | _ -> false
     }
   }
 
   fun getName(): String {
-    `collection_${SKStore.genSym(0)}`
+    `xx_${XXHash64.xxHash64String(
+      getInfoOfLazyCompute(this.eptr.value).prettyPrint(),
+    )}`
   }
 }
 
@@ -503,6 +524,14 @@ native fun removeOfReducer(
   value: SKJSON.CJSON,
 ): ?SKJSON.CJSON;
 
+@cpp_extern("SkipRuntime_Reducer__getInfo")
+@debug
+native fun getInfoOfReducer(mapper: UInt32): SKJSON.CJObject;
+
+@cpp_extern("SkipRuntime_Reducer__isEquals")
+@debug
+native fun isEqualsOfReducer(reducer: UInt32, other: UInt32): UInt32;
+
 @cpp_extern("SkipRuntime_deleteReducer")
 @debug
 native fun deleteReducer(reducer: UInt32): void;
@@ -541,13 +570,15 @@ class JSONReducer(
 
   fun ==(other: SKStore.IReducer<SKStore.File>): Bool {
     other match {
-    | JSONReducer(eptr) -> this.eptr.value == eptr.value
+    | JSONReducer(eptr) -> isEqualsOfReducer(this.eptr.value, eptr.value) != 0
     | _ -> false
     }
   }
 
   fun getName(): String {
-    `reducer_${SKStore.genSym(0)}`
+    `xx_${XXHash64.xxHash64String(
+      getInfoOfReducer(this.eptr.value).prettyPrint(),
+    )}`
   }
 }
 

@@ -263,6 +263,15 @@ interface ToWasm {
     values: ptr<Internal.NonEmptyIterator>,
   ): ptr<Internal.CJArray>;
 
+  SkipRuntime_Mapper__getInfo(
+    mapper: Handle<HandlerInfo<JSONMapper>>,
+  ): ptr<Internal.CJObject>;
+
+  SkipRuntime_Mapper__isEquals(
+    mapper: Handle<HandlerInfo<JSONMapper>>,
+    other: Handle<HandlerInfo<JSONMapper>>,
+  ): number;
+
   SkipRuntime_deleteMapper(mapper: Handle<HandlerInfo<JSONMapper>>): void;
 
   // LazyCompute
@@ -272,6 +281,15 @@ interface ToWasm {
     self: ptr<Internal.String>,
     key: ptr<Internal.CJSON>,
   ): ptr<Internal.CJArray>;
+
+  SkipRuntime_LazyCompute__getInfo(
+    mapper: Handle<HandlerInfo<JSONLazyCompute>>,
+  ): ptr<Internal.CJObject>;
+
+  SkipRuntime_LazyCompute__isEquals(
+    mapper: Handle<HandlerInfo<JSONLazyCompute>>,
+    other: Handle<HandlerInfo<JSONLazyCompute>>,
+  ): number;
 
   SkipRuntime_deleteLazyCompute(
     mapper: Handle<HandlerInfo<JSONLazyCompute>>,
@@ -346,6 +364,8 @@ interface ToWasm {
     notifier: Handle<Notifier<K, V>>,
   ): void;
 
+  // Reducer
+
   SkipRuntime_Reducer__init(
     reducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
   ): ptr<Internal.CJSON>;
@@ -361,6 +381,15 @@ interface ToWasm {
     acc: ptr<Internal.CJSON>,
     value: ptr<Internal.CJSON>,
   ): Nullable<ptr<Internal.CJSON>>;
+
+  SkipRuntime_Reducer__isEquals(
+    reducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
+    other: Handle<HandlerInfo<Reducer<Json, Json>>>,
+  ): number;
+
+  SkipRuntime_Reducer__getInfo(
+    reducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
+  ): ptr<Internal.CJObject>;
 
   SkipRuntime_deleteReducer(
     reducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
@@ -810,6 +839,19 @@ class LinksImpl implements Links {
     );
   }
 
+  getInfoOfMapper(
+    skmapper: Handle<HandlerInfo<JSONMapper>>,
+  ): ptr<Internal.CJObject> {
+    return toPtr(this.tobinding.SkipRuntime_Mapper__getInfo(skmapper));
+  }
+
+  isEqualsOfMapper(
+    mapper: Handle<HandlerInfo<JSONMapper>>,
+    other: Handle<HandlerInfo<JSONMapper>>,
+  ): number {
+    return this.tobinding.SkipRuntime_Mapper__isEquals(mapper, other);
+  }
+
   deleteMapper(mapper: Handle<HandlerInfo<JSONMapper>>) {
     this.tobinding.SkipRuntime_deleteMapper(mapper);
   }
@@ -828,6 +870,19 @@ class LinksImpl implements Links {
         skkey,
       ),
     );
+  }
+
+  getInfoOfLazyCompute(
+    lc: Handle<HandlerInfo<JSONLazyCompute>>,
+  ): ptr<Internal.CJObject> {
+    return toPtr(this.tobinding.SkipRuntime_LazyCompute__getInfo(lc));
+  }
+
+  isEqualsOfLazyCompute(
+    lc: Handle<HandlerInfo<JSONLazyCompute>>,
+    other: Handle<HandlerInfo<JSONLazyCompute>>,
+  ): number {
+    return this.tobinding.SkipRuntime_LazyCompute__isEquals(lc, other);
   }
 
   deleteLazyCompute(lazyCompute: Handle<HandlerInfo<JSONLazyCompute>>) {
@@ -941,6 +996,19 @@ class LinksImpl implements Links {
     );
   }
 
+  isEqualsOfReducer(
+    reducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
+    other: Handle<HandlerInfo<Reducer<Json, Json>>>,
+  ): number {
+    return this.tobinding.SkipRuntime_Reducer__isEquals(reducer, other);
+  }
+
+  getInfoOfReducer(
+    reducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
+  ): ptr<Internal.CJSON> {
+    return toPtr(this.tobinding.SkipRuntime_Reducer__getInfo(reducer));
+  }
+
   deleteReducer(reducer: Handle<HandlerInfo<Reducer<Json, Json>>>) {
     this.tobinding.SkipRuntime_deleteReducer(reducer);
   }
@@ -1015,12 +1083,18 @@ class Manager implements ToWasmManager {
     // Mapper
 
     toWasm.SkipRuntime_Mapper__mapEntry = links.mapEntryOfMapper.bind(links);
+    toWasm.SkipRuntime_Mapper__getInfo = links.getInfoOfMapper.bind(links);
+    toWasm.SkipRuntime_Mapper__isEquals = links.isEqualsOfMapper.bind(links);
     toWasm.SkipRuntime_deleteMapper = links.deleteMapper.bind(links);
 
     // LazyCompute
 
     toWasm.SkipRuntime_LazyCompute__compute =
       links.computeOfLazyCompute.bind(links);
+    toWasm.SkipRuntime_LazyCompute__getInfo =
+      links.getInfoOfLazyCompute.bind(links);
+    toWasm.SkipRuntime_LazyCompute__isEquals =
+      links.isEqualsOfLazyCompute.bind(links);
     toWasm.SkipRuntime_deleteLazyCompute = links.deleteLazyCompute.bind(links);
 
     // ExternalService
@@ -1066,6 +1140,8 @@ class Manager implements ToWasmManager {
     toWasm.SkipRuntime_Reducer__init = links.initOfReducer.bind(links);
     toWasm.SkipRuntime_Reducer__add = links.addOfReducer.bind(links);
     toWasm.SkipRuntime_Reducer__remove = links.removeOfReducer.bind(links);
+    toWasm.SkipRuntime_Reducer__isEquals = links.isEqualsOfReducer.bind(links);
+    toWasm.SkipRuntime_Reducer__getInfo = links.getInfoOfReducer.bind(links);
     toWasm.SkipRuntime_deleteReducer = links.deleteReducer.bind(links);
 
     return links;

@@ -88,6 +88,29 @@ CJArray SkipRuntime_Mapper__mapEntry(uint32_t mapperId, CJSON key,
                         "SkipRuntime_Mapper__mapEntry", 3, argv);
 }
 
+CJObject SkipRuntime_Mapper__getInfo(uint32_t mapperId) {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[1] = {
+      Number::New(isolate, mapperId),
+  };
+  return CallJSFunction(isolate, externFunctions, "SkipRuntime_Mapper__getInfo",
+                        1, argv);
+}
+
+uint32_t SkipRuntime_Mapper__isEquals(uint32_t mapperId, uint32_t otherId) {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[2] = {
+      Number::New(isolate, mapperId),
+      Number::New(isolate, otherId),
+  };
+  return (uint32_t)CallJSNumberFunction(
+      isolate, externFunctions, "SkipRuntime_Mapper__isEquals", 2, argv);
+}
+
 void SkipRuntime_deleteMapper(uint32_t mapperId) {
   Isolate* isolate = Isolate::GetCurrent();
   HandleScope scope(isolate);
@@ -109,6 +132,30 @@ CJSON SkipRuntime_LazyCompute__compute(uint32_t lazyComputeId, char* self,
   };
   return CallJSFunction(isolate, externFunctions,
                         "SkipRuntime_LazyCompute__compute", 3, argv);
+}
+
+CJObject SkipRuntime_LazyCompute__getInfo(uint32_t mapperId) {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[1] = {
+      Number::New(isolate, mapperId),
+  };
+  return CallJSFunction(isolate, externFunctions,
+                        "SkipRuntime_LazyCompute__getInfo", 1, argv);
+}
+
+uint32_t SkipRuntime_LazyCompute__isEquals(uint32_t mapperId,
+                                           uint32_t otherId) {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[2] = {
+      Number::New(isolate, mapperId),
+      Number::New(isolate, otherId),
+  };
+  return (uint32_t)CallJSNumberFunction(
+      isolate, externFunctions, "SkipRuntime_LazyCompute__isEquals", 2, argv);
 }
 
 void SkipRuntime_deleteLazyCompute(uint32_t lazyComputeId) {
@@ -333,6 +380,29 @@ CJSON SkipRuntime_Reducer__remove(uint32_t reducerId, CJSON acc, CJSON value) {
   };
   return CallJSNullableFunction(isolate, externFunctions,
                                 "SkipRuntime_Reducer__remove", 3, argv);
+}
+
+uint32_t SkipRuntime_Reducer__isEquals(uint32_t reducerId, uint32_t otherId) {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[2] = {
+      Number::New(isolate, reducerId),
+      Number::New(isolate, otherId),
+  };
+  return (uint32_t)CallJSNumberFunction(
+      isolate, externFunctions, "SkipRuntime_Reducer__isEquals", 2, argv);
+}
+
+CJObject SkipRuntime_Reducer__getInfo(uint32_t reducerId) {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[1] = {
+      Number::New(isolate, reducerId),
+  };
+  return CallJSFunction(isolate, externFunctions,
+                        "SkipRuntime_Reducer__getInfo", 1, argv);
 }
 
 void SkipRuntime_deleteReducer(uint32_t reducerId) {
