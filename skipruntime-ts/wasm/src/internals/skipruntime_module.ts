@@ -204,7 +204,7 @@ export interface FromWasm {
     watermark: Nullable<ptr<Internal.String>>,
   ): bigint;
 
-  SkipRuntime_Runtime__unsubscribe(id: bigint): Handle<Error>;
+  SkipRuntime_Runtime__unsubscribe(id: ptr<Internal.String>): Handle<Error>;
 
   SkipRuntime_Runtime__update(
     input: ptr<Internal.String>,
@@ -656,8 +656,10 @@ export class WasmFromBinding implements FromBinding {
     );
   }
 
-  SkipRuntime_Runtime__unsubscribe(id: bigint): Handle<Error> {
-    return this.fromWasm.SkipRuntime_Runtime__unsubscribe(id);
+  SkipRuntime_Runtime__unsubscribe(id: string): Handle<Error> {
+    return this.fromWasm.SkipRuntime_Runtime__unsubscribe(
+      this.utils.exportString(id),
+    );
   }
 
   SkipRuntime_Runtime__update(

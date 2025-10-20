@@ -899,22 +899,14 @@ fun destroyReactiveResource(
   context: mutable SKStore.Context,
   sid: SKStore.SID,
 ): void {
-  context
-    .getPersistent(`subscription.${sid}`)
-    .map(SKStore.IntFile::type) match {
-  | Some(subId) ->
-    session = subId.value;
-    context.getSession(session).each(sub -> {
-      close = sub.cmd match {
-      | SKStore.NWatch{close} -> close
-      | _ -> invariant_violation("Not manage session kind")
-      };
-      context.removePersistent(`subscription.${sid}`);
-      close();
-      context.unsubscribe(session);
-    })
-  | _ -> void
-  };
+  context.getSession(sid.value).each(sub -> {
+    close = sub.cmd match {
+    | SKStore.NWatch{close} -> close
+    | _ -> invariant_violation("Not manage session kind")
+    };
+    close();
+    context.unsubscribe(sid.value);
+  });
   resourceHdl = SKStore.EHandle(
     SKStore.SID::keyType,
     ResourceDef::type,
@@ -928,11 +920,9 @@ fun closeReactiveResource(
   identifier: String,
   update: Bool = true,
 ): void {
-  context
-    .getPersistent(`subscription.${identifier}`)
-    .map(SKStore.IntFile::type) match {
-  | Some(subId) -> unsubscribe(context, subId.value, update)
-  | _ ->
+  if (context.getSession(identifier).isSome()) {
+    unsubscribe(context, identifier, update)
+  } else {
     garbageHdl = SKStore.EHandle(
       SKStore.SID::keyType,
       SKStore.IntFile::type,
@@ -943,7 +933,7 @@ fun closeReactiveResource(
     time = Time.time_ms();
     garbageHdl.writeArray(context, sid, Array[SKStore.IntFile(time)]);
     if (update) updateContext(context)
-  };
+  }
 }
 
 fun subscribe(
@@ -958,7 +948,6 @@ fun subscribe(
     kResourceGarbageDir,
   );
   sid = SKStore.SID(identifier);
-  session = SKStore.genSym(0);
   resourceHdl = SKStore.EHandle(
     SKStore.SID::keyType,
     ResourceDef::type,
@@ -969,8 +958,7 @@ fun subscribe(
     ResourceInfo::type,
     kResourceCollectionsDir,
   );
-  subId = `subscription.${identifier}`;
-  if (context.getPersistent(subId).isSome()) {
+  if (context.getSession(identifier).isSome()) {
     return -2
   };
   resourceHdl.maybeGet(context, sid) match {
@@ -986,13 +974,12 @@ fun subscribe(
     );
     notifier.subscribed();
     context.subscribe(
-      session,
+      identifier,
       SKStore.TNWatch<SKStore.Key, SKStore.File>{
         dirNameGetter => ctx ~> {
           resourcesCollectionsHdl.unsafeGet(ctx, definition).collection.hdl
             .dirName
         },
-        identifier,
         from,
         fn => (values, tick, update) ~> {
           notifier.notify(
@@ -1011,31 +998,29 @@ fun subscribe(
       None(),
       Some(from),
     );
-    context.setPersistent(subId, SKStore.IntFile(session));
     if (garbageHdl.maybeGet(context, sid).isSome()) {
       garbageHdl.writeArray(context, sid, Array[]);
       context.update();
     };
     checkGarbage(context);
-    session
+    0
   | _ -> -1
   }
 }
 
 fun unsubscribe(
   context: mutable SKStore.Context,
-  session: Int,
+  session: String,
   update: Bool = true,
 ): void {
   context.getSession(session).each(sub -> {
-    (identifier, close) = sub.cmd match {
-    | SKStore.NWatch{identifier, close} -> (identifier, close)
+    close = sub.cmd match {
+    | SKStore.NWatch{close} -> close
     | _ -> invariant_violation("Not manage session kind")
     };
-    context.removePersistent(`subscription.${identifier}`);
     close();
     context.unsubscribe(session);
-    closeReactiveResource(context, identifier, update);
+    closeReactiveResource(context, session, update);
   });
 }
 

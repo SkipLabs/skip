@@ -398,7 +398,7 @@ class SubRequestFile(
   format: OutputFormatKind,
   init: Bool,
   cmd: SKStore.CmdMultipleDirs,
-  sessionID: Int,
+  sessionID: String,
   destinationSource: ?Int,
 ) extends SKStore.File
 
@@ -406,7 +406,7 @@ fun getSubsDirs(
   context: mutable SKStore.Context,
 ): (
   SKStore.EHandle<SKStore.SID, SubRequestFile>,
-  SKStore.EHandle<SKStore.SID, SKStore.IntFile>,
+  SKStore.EHandle<SKStore.SID, SKStore.StringFile>,
 ) {
   if (context.unsafeMaybeGetEagerDir(subsInput) is Some _) {
     input = SKStore.EHandle(
@@ -416,7 +416,7 @@ fun getSubsDirs(
     );
     output = SKStore.EHandle(
       SKStore.SID::keyType,
-      SKStore.IntFile::type,
+      SKStore.StringFile::type,
       subsOutput,
     );
     return (input, output)
@@ -424,7 +424,7 @@ fun getSubsDirs(
   input = context.mkdir(SKStore.SID::keyType, SubRequestFile::type, subsInput);
   output = input.map(
     SKStore.SID::keyType,
-    SKStore.IntFile::type,
+    SKStore.StringFile::type,
     context,
     subsOutput,
     (context, writer, key, values) ~> {
@@ -508,7 +508,7 @@ fun getSubsDirs(
         request.destinationSource,
         if (request.init) Some(SKStore.Tick(0)) else None(),
       );
-      writer.set(key, SKStore.IntFile(request.sessionID))
+      writer.set(key, SKStore.StringFile(request.sessionID))
     },
   );
   (input, output)

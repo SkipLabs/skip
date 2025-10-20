@@ -61,7 +61,7 @@ CJSON SkipRuntime_Runtime__createResource(char* identifier, char* resource,
 double SkipRuntime_Runtime__closeResource(char* identifier);
 int64_t SkipRuntime_Runtime__subscribe(char* reactiveId, SKNotifier notifier,
                                        char* watermark);
-double SkipRuntime_Runtime__unsubscribe(int64_t id);
+double SkipRuntime_Runtime__unsubscribe(char* identifier);
 CJSON SkipRuntime_Runtime__getAll(char* resource, CJObject jsonParams);
 CJSON SkipRuntime_Runtime__getForKey(char* resource, CJObject jsonParams,
                                      CJSON key);
@@ -896,19 +896,14 @@ void CloseResourceOfRuntime(const FunctionCallbackInfo<Value>& args) {
 void UnsubscribeOfRuntime(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
   HandleScope scope(isolate);
-  if (!args[0]->IsNumber() && !args[0]->IsBigInt()) {
+  if (!args[0]->IsString()) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a number or a bigint.")));
+        FromUtf8(isolate, "The parameter must be a string.")));
     return;
   };
   NatTryCatch(isolate, [&args](Isolate* isolate) {
-    int64_t sksession;
-    if (args[0]->IsNumber()) {
-      sksession = (int64_t)args[0].As<Number>()->Value();
-    } else {
-      sksession = args[0].As<BigInt>()->Int64Value();
-    }
+    char* sksession = ToSKString(isolate, args[0].As<String>());
     double skerror = SkipRuntime_Runtime__unsubscribe(sksession);
     args.GetReturnValue().Set(Number::New(isolate, skerror));
   });
