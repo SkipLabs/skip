@@ -34,7 +34,7 @@ SKService SkipRuntime_createService(int32_t ref, CJObject inputs,
                                     SKResourceBuilderMap resources,
                                     SKExternalServiceMap exservices);
 SKNotifier SkipRuntime_createNotifier(int32_t ref);
-SKReducer SkipRuntime_createReducer(int32_t ref, CJSON json);
+SKReducer SkipRuntime_createReducer(int32_t ref);
 
 CJSON SkipRuntime_initService(SKService service);
 CJSON SkipRuntime_closeService();
@@ -455,10 +455,10 @@ void CreateNotifier(const FunctionCallbackInfo<Value>& args) {
 void CreateReducer(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
   HandleScope scope(isolate);
-  if (args.Length() != 2) {
+  if (args.Length() != 1) {
     // Throw an Error that is passed back to JavaScript
     isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have two parameters.")));
+        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
     return;
   };
   if (!args[0]->IsNumber()) {
@@ -467,15 +467,9 @@ void CreateReducer(const FunctionCallbackInfo<Value>& args) {
         FromUtf8(isolate, "The first parameter must be a number.")));
     return;
   }
-  if (!args[1]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The second parameter must be a pointer.")));
-    return;
-  }
   NatTryCatch(isolate, [&args](Isolate* isolate) {
-    SKReducer skReducer = SkipRuntime_createReducer(
-        args[0].As<Int32>()->Value(), args[1].As<External>()->Value());
+    SKReducer skReducer =
+        SkipRuntime_createReducer(args[0].As<Int32>()->Value());
     args.GetReturnValue().Set(External::New(isolate, skReducer));
   });
 }

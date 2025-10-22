@@ -280,7 +280,6 @@ class EagerCollectionImpl<K extends Json, V extends Json>
       } else {
         const skreducer = this.refs.binding.SkipRuntime_createReducer(
           this.refs.handles.register(reducerObj),
-          this.refs.json().exportJSON(reducerObj.object.initial),
         );
         return this.derive<K2, Accum>(
           this.refs.binding.SkipRuntime_Collection__mapReduce(
@@ -311,7 +310,6 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     } else {
       const skreducer = this.refs.binding.SkipRuntime_createReducer(
         this.refs.handles.register(reducerObj),
-        this.refs.json().exportJSON(reducerObj.object.initial),
       );
       return this.derive<K, Accum>(
         this.refs.binding.SkipRuntime_Collection__reduce(
@@ -1007,6 +1005,14 @@ export class ToBinding {
   }
 
   // Reducer
+
+  SkipRuntime_Reducer__init(
+    skreducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
+  ): Pointer<Internal.CJSON> {
+    const skjson = this.getJsonConverter();
+    const reducer = this.handles.get(skreducer);
+    return skjson.exportJSON(reducer.object.initial);
+  }
 
   SkipRuntime_Reducer__add(
     skreducer: Handle<HandlerInfo<Reducer<Json, Json>>>,

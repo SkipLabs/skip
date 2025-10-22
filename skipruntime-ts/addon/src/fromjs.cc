@@ -298,6 +298,17 @@ void SkipRuntime_deleteNotifier(uint32_t notifierId) {
                      argv);
 }
 
+CJSON SkipRuntime_Reducer__init(uint32_t reducerId) {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[1] = {
+      Number::New(isolate, reducerId),
+  };
+  return CallJSFunction(isolate, externFunctions, "SkipRuntime_Reducer__init",
+                        1, argv);
+}
+
 CJSON SkipRuntime_Reducer__add(uint32_t reducerId, CJSON acc, CJSON value) {
   Isolate* isolate = Isolate::GetCurrent();
   HandleScope scope(isolate);

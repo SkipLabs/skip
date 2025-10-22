@@ -207,7 +207,6 @@ export interface FromBinding {
 
   SkipRuntime_createReducer<K1 extends Json, V1 extends Json>(
     ref: Handle<HandlerInfo<Reducer<K1, V1>>>,
-    defaultValue: Pointer<Internal.CJSON>,
   ): Pointer<Internal.Reducer>;
 
   // initService

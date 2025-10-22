@@ -55,6 +55,17 @@ class ExternMapper(eptr: SKStore.ExternalPointer) extends Mapper {
         .iterator()
     }
   }
+
+  fun ==(other: SKStore.Mapper<SKStore.Key, SKStore.File>): Bool {
+    other match {
+    | ExternMapper(eptr) -> this.eptr.value == eptr.value
+    | _ -> false
+    }
+  }
+
+  fun getName(): String {
+    `collection_${SKStore.genSym(0)}`
+  }
 }
 
 /************  LazyCompute ****************/
@@ -79,11 +90,22 @@ fun createLazyCompute(lazyCompute: UInt32): ExternLazyCompute {
 }
 
 class ExternLazyCompute(eptr: SKStore.ExternalPointer) extends LazyCompute {
-  fun compute(self: LazyCollection, key: SKJSON.CJSON): Array<SKJSON.CJSON> {
+  fun computeFor(self: LazyCollection, key: SKJSON.CJSON): Array<SKJSON.CJSON> {
     computeOfLazyCompute(this.eptr.value, self.getId(), key) match {
     | SKJSON.CJArray(value) -> value
     | _ -> invariant_violation("Invalid computed value.")
     }
+  }
+
+  fun ==(other: SKStore.LazyCompute<SKStore.Key, SKStore.File>): Bool {
+    other match {
+    | ExternLazyCompute(eptr) -> this.eptr.value == eptr.value
+    | _ -> false
+    }
+  }
+
+  fun getName(): String {
+    `collection_${SKStore.genSym(0)}`
   }
 }
 
@@ -461,6 +483,10 @@ class ExternNotifier(eptr: SKStore.ExternalPointer) extends Notifier {
 
 /************  Reducer ****************/
 
+@cpp_extern("SkipRuntime_Reducer__init")
+@debug
+native fun initOfReducer(reducer: UInt32): SKJSON.CJSON;
+
 @cpp_extern("SkipRuntime_Reducer__add")
 @debug
 native fun addOfReducer(
@@ -482,15 +508,27 @@ native fun removeOfReducer(
 native fun deleteReducer(reducer: UInt32): void;
 
 @export("SkipRuntime_createReducer")
-fun createReducer(reducer: UInt32, initial: SKJSON.CJSON): JSONReducer {
-  JSONReducer(SKStore.ExternalPointer::create(reducer, deleteReducer), initial)
+fun createReducer(reducer: UInt32): JSONReducer {
+  JSONReducer(SKStore.ExternalPointer::create(reducer, deleteReducer))
 }
 
 class JSONReducer(
   eptr: SKStore.ExternalPointer,
 ) extends Reducer<SKJSON.CJSON, SKJSON.CJSON> {
+  //
+  fun getInit(): SKJSON.CJSON {
+    initOfReducer(this.eptr.value)
+  }
+
   fun getType(): SKStore.File ~> SKJSON.CJSON {
     f ~> JSONFile::type(f).json
+  }
+
+  fun getAccType(): (
+    SKStore.File ~> SKJSON.CJSON,
+    SKJSON.CJSON ~> SKStore.File,
+  ) {
+    (f ~> JSONFile::type(f).json, v ~> JSONFile(v))
   }
 
   fun add(acc: SKJSON.CJSON, value: SKJSON.CJSON): SKJSON.CJSON {
@@ -499,6 +537,17 @@ class JSONReducer(
 
   fun remove(acc: SKJSON.CJSON, value: SKJSON.CJSON): ?SKJSON.CJSON {
     removeOfReducer(this.eptr.value, acc, value)
+  }
+
+  fun ==(other: SKStore.IReducer<SKStore.File>): Bool {
+    other match {
+    | JSONReducer(eptr) -> this.eptr.value == eptr.value
+    | _ -> false
+    }
+  }
+
+  fun getName(): String {
+    `reducer_${SKStore.genSym(0)}`
   }
 }
 

@@ -39,44 +39,6 @@ class JSONID(json: SKJSON.CJSON) extends SKStore.Key {
 
 class JSONFile(json: SKJSON.CJSON) extends SKStore.File
 
-fun accReducer<V1: SKStore.File, V2: SKStore.File>(
-  reducer: Reducer<V1, V2>,
-): SKStore.EReducer<V1, V2> {
-  SKStore.EReducer{
-    type => reducer.getType(),
-    canReset => true,
-    init => iter ~> {
-      acc = reducer.initial;
-      for (x in iter) {
-        !acc = reducer.add(acc, x)
-      };
-      Array[acc]
-    },
-    update => (state, old, new) ~> {
-      acc = state[0];
-      for (x in old) {
-        reducer.remove(acc, x) match {
-        | Some(v) -> !acc = v
-        | _ -> return None()
-        }
-      };
-      for (x in new) {
-        !acc = reducer.add(acc, x)
-      };
-      Some(Array[acc])
-    },
-  }
-}
-
-fun identityMap<K: SKStore.Key, V: SKStore.File>(
-  _context: mutable SKStore.Context,
-  writer: mutable SKStore.TWriter<K, V>,
-  key: K,
-  it: mutable SKStore.NonEmptyIterator<V>,
-): void {
-  writer.setArray(key, Array::createFromIterator(it.values())); // TODO: use it.toArray()
-}
-
 fun noFilter<K: SKStore.Key, V: SKStore.File>(
   _context: readonly SKStore.Context,
   _key: K,
@@ -94,29 +56,24 @@ fun removeElementAsOne<V: SKStore.File>(_value: V, _toRemove: Int): V {
 }
 
 fun subDirName(
-  context: mutable SKStore.Context,
+  context: readonly SKStore.Context,
   name: String,
+  parent: ?SKStore.DirName,
 ): SKStore.DirName {
+  p = parent.map(v -> `${xxHash(v)}/`).default("");
   path = context.currentArrow() match {
-  | Some(arrow) ->
-    b64 = base64(arrow.getKeyString());
-    `${arrow.childName}${b64}/${name}/`
-  | None() -> `/sk/${name}/`
+  | Some(arrow) -> `/${xxHash(arrow)}/${p}${name}/`
+  | None() -> `/sk/${p}${name}/`
   };
   SKStore.DirName::create(path)
 }
 
-fun base64<T: Show>(toEncode: T): String {
-  encoded = `b64_${Base64.encodeString(toEncode.toString(), true)}`;
-  encoded.searchRight(ch ~> ch != '=') match {
-  | Some(i) ->
-    _ = i.next();
-    encoded.getIter().substring(i)
-  | None() -> ""
-  }
+fun xxHash<T: Show>(toEncode: T): String {
+  `xx_${XXHash64.xxHash64String(toEncode.toString())}`
 }
+
 fun toResourceId(resource: String, params: SKJSON.CJSON): String {
-  `${resource}_${base64(params.prettyPrint())}`
+  `${resource}_${xxHash(params.prettyPrint())}`
 }
 
 fun toSuppliedResourceId(
