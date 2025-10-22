@@ -93,6 +93,11 @@ fun buildResourcesGraph(
     SKStore.IntFile::type,
     kResourceGarbageDir,
   );
+  resourcesVersionHdl = context.mkdir(
+    SKStore.SID::keyType,
+    SKStore.IntFile::type,
+    kResourceVersionDir,
+  );
   idbyresourceHdl = resourcesHdl.map(
     ResourceDef::keyType,
     SKStore.StringFile::type,
@@ -119,6 +124,8 @@ fun buildResourcesGraph(
     context,
     kResourceCollectionsDir,
     (context, writer, key, _) ~> {
+      // Allow to reload the resource in case of change
+      _ = resourcesVersionHdl.maybeGet(context, SKStore.SID(key.name));
       resourceId = toResourceId(key.name, key.params);
       (runId, resources) = definitionHdl.maybeGet(
         context,
