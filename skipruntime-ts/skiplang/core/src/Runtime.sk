@@ -179,7 +179,7 @@ fun initService(service: Service): Result<Array<Waitable>, .Exception> {
                 | Some(dir) ->
                   if (dir.creator != ctx.currentArrow()) {
                     throw SKStore.DirAlreadyExists(iDirName);
-                  } else if (serviceDef.service.needInputReload(input)) {
+                  } else if (!serviceDef.service.needInputReload(input)) {
                     ctx.!newDirs = ctx.newDirs.add(iDirName);
                     false
                   } else {
@@ -488,7 +488,7 @@ fun useExternalCollection(
       | Some(dir) ->
         if (dir.creator != context.currentArrow()) {
           throw SKStore.DirAlreadyExists(dirName);
-        } else if (service.needExternalServiceReload(supplier, resource)) {
+        } else if (!service.needExternalServiceReload(supplier, resource)) {
           context.!newDirs = context.newDirs.add(dirName);
           false
         } else {

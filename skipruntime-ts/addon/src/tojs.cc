@@ -1048,6 +1048,8 @@ void GetToJSBinding(const FunctionCallbackInfo<Value>& args) {
   AddFunction(isolate, binding, "SkipRuntime_Runtime__forkExists",
               ForkExistsOfRuntime);
   AddFunction(isolate, binding, "SkipRuntime_Runtime__reload", ReloadOfRuntime);
+  AddFunction(isolate, binding, "SkipRuntime_Runtime__closeResourceStreams",
+              CloseResourceStreamsOfRuntime);
 
   args.GetReturnValue().Set(binding);
 }

@@ -805,10 +805,7 @@ export class ServiceInstance {
     }
   }
 
-  async reload(
-    definition: ServiceDefinition,
-    changes: ChangeManager,
-  ): Promise<void> {
+  async reload(service: SkipService, changes: ChangeManager): Promise<void> {
     if (this.forkName) {
       throw new SkipError("Reload cannot be called in transaction.");
     }
@@ -834,6 +831,7 @@ export class ServiceInstance {
     definition: ServiceDefinition,
     changes: ChangeManager,
   ): Promise<string[]> {
+    this.refs.setFork(this.forkName);
     const result = this.refs.runWithGC(() => {
       this.refs.changes = this.refs.handles.register(changes);
       const skservicehHdl = this.refs.handles.register(definition);
@@ -880,6 +878,7 @@ export class ServiceInstance {
   }
 
   private closeResourceStreams(streams: string[]): void {
+    this.refs.setFork(this.forkName);
     const errorHdl = this.refs.runWithGC(() => {
       return this.refs.binding.SkipRuntime_Runtime__closeResourceStreams(
         this.refs.json().exportJSON(streams),

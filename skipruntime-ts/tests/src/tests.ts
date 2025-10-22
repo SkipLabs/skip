@@ -18,8 +18,9 @@ import type {
   SubscriptionID,
   Nullable,
   Reducer,
+  ChangeManager,
 } from "@skipruntime/core";
-
+import { LoadStatus } from "@skipruntime/core";
 import { Count, Sum } from "@skipruntime/helpers";
 
 import { it as mit, type AsyncFunc } from "mocha";
@@ -64,6 +65,7 @@ class Notifier {
   private updates: CollectionUpdate<Json, Json>[] = [];
   private sid: SubscriptionID;
   private resolver: Nullable<() => void> = null;
+  closed: boolean = false;
 
   constructor(
     private service: ServiceInstance,
@@ -77,7 +79,10 @@ class Notifier {
         this.updates.push(update);
         if (this.resolver) this.resolver();
       },
-      close: () => {},
+      close: () => {
+        if (this.log) console.log("CLOSED");
+        this.closed = true;
+      },
     });
   }
 
@@ -1099,6 +1104,71 @@ const resourceRecomputeNotificationsService: SkipService<
   },
 };
 
+class NoChanges implements ChangeManager {
+  needInputReload(_name: string): boolean {
+    return false;
+  }
+
+  needResourceReload(_name: string): LoadStatus {
+    return LoadStatus.Same;
+  }
+
+  needExternalServiceReload(_name: string, _resource: string): boolean {
+    return false;
+  }
+
+  needMapperReload(_name: string): boolean {
+    return false;
+  }
+
+  needReducerReload(_name: string): boolean {
+    return false;
+  }
+
+  needLazyComputeReload(_name: string): boolean {
+    return false;
+  }
+}
+
+type Changed = {
+  inputs?: Set<string>;
+  resources?: Map<string, LoadStatus>;
+  mappers?: Set<string>;
+  reducers?: Set<string>;
+  lazyComputes?: Set<string>;
+  externalService?: Set<string>;
+};
+
+class WithChanges implements ChangeManager {
+  constructor(private readonly changes: Changed) {}
+
+  needInputReload(name: string): boolean {
+    return this.changes.inputs?.has(name) ?? false;
+  }
+
+  needResourceReload(name: string): LoadStatus {
+    return this.changes.resources?.get(name) ?? LoadStatus.Same;
+  }
+
+  needExternalServiceReload(name: string, resource: string): boolean {
+    const needReload = this.changes.externalService?.has(name);
+    if (needReload !== undefined) return needReload;
+    return this.changes.externalService?.has(`${name}/${resource}`) ?? false;
+  }
+
+  needMapperReload(name: string): boolean {
+    return this.changes.mappers?.has(name) ?? false;
+  }
+
+  needReducerReload(name: string): boolean {
+    return this.changes.reducers?.has(name) ?? false;
+  }
+
+  needLazyComputeReload(name: string): boolean {
+    return this.changes.lazyComputes?.has(name) ?? false;
+  }
+}
+
 export function initTests(
   category: string,
   initService: (service: SkipService) => Promise<ServiceInstance>,
@@ -1900,5 +1970,104 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
     } finally {
       if (service) await service.close();
     }
+  });
+
+  it("testReload1", async () => {
+    const service = await initService(map1Service);
+    const resource = "map1";
+    await service.update("input", [
+      ["1", [10]],
+      ["2", [1]],
+    ]);
+    expect(await service.getArray(resource, "1")).toEqual([12]);
+    expect(await service.getArray(resource, "2")).toEqual([3]);
+    const instanceId = "unsafe.fixed.resource.ident.1";
+    await service.instantiateResource(instanceId, resource, 1);
+    const notifier = new Notifier(service, instanceId);
+    notifier.checkInit([
+      ["1", [12]],
+      ["2", [3]],
+    ]);
+    await service.reload(map1Service, new NoChanges());
+    notifier.checkEmpty();
+    expect(await service.getArray(resource, "1")).toEqual([12]);
+    expect(await service.getArray(resource, "2")).toEqual([3]);
+    await service.reload(
+      map1Service,
+      new WithChanges({ mappers: new Set(["Map1"]) }),
+    );
+    notifier.checkInit([
+      ["1", [12]],
+      ["2", [3]],
+    ]);
+    expect(await service.getArray(resource, "1")).toEqual([12]);
+    expect(await service.getArray(resource, "2")).toEqual([3]);
+    await service.reload(
+      map1Service,
+      new WithChanges({ resources: new Map([[resource, LoadStatus.Changed]]) }),
+    );
+    notifier.checkEmpty();
+    expect(await service.getArray(resource, "1")).toEqual([12]);
+    expect(await service.getArray(resource, "2")).toEqual([3]);
+    await service.reload(
+      map1Service,
+      new WithChanges({
+        resources: new Map([[resource, LoadStatus.Incompatible]]),
+      }),
+    );
+    expect(notifier.closed).toBeTruthy();
+    expect(await service.getArray(resource, "1")).toEqual([12]);
+    expect(await service.getArray(resource, "2")).toEqual([3]);
+    await service.close();
+  });
+  it("testReload2", async () => {
+    const serviceDef = testExternalService();
+    const mockExternal = serviceDef.externalServices![
+      "external"
+    ] as MockExternal;
+    const resource = "external";
+    const service = await initService(serviceDef);
+    await service.update("input1", [
+      [0, [10]],
+      [1, [20]],
+    ]);
+    await service.update("input2", [
+      [0, [5]],
+      [1, [10]],
+    ]);
+    expect(await service.getAll(resource)).toEqual([
+      [0, [[10, 15]]],
+      [1, [[20, 30]]],
+    ]);
+    const instanceId = "unsafe.fixed.resource.ident.1";
+    await service.instantiateResource(instanceId, resource, {});
+    const notifier = new Notifier(service, instanceId);
+    notifier.checkInit([
+      [0, [[10, 15]]],
+      [1, [[20, 30]]],
+    ]);
+    await service.reload(serviceDef, new NoChanges());
+    notifier.checkEmpty();
+    expect(await service.getAll(resource)).toEqual([
+      [0, [[10, 15]]],
+      [1, [[20, 30]]],
+    ]);
+    const subscribed = [...mockExternal.subscribed];
+    await service.reload(
+      serviceDef,
+      new WithChanges({
+        externalService: new Set(["external"]),
+      }),
+    );
+    expect(mockExternal.unsubscribed).toEqual(subscribed);
+    notifier.checkUpdate([
+      [0, [[10, 15]]],
+      [1, [[20, 30]]],
+    ]);
+    expect(await service.getAll(resource)).toEqual([
+      [0, [[10, 15]]],
+      [1, [[20, 30]]],
+    ]);
+    await service.close();
   });
 }
