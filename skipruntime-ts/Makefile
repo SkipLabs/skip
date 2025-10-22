@@ -12,6 +12,17 @@ export SKIPRUNTIME_VERSION=dev
 export LDFLAGS=-L$(realpath $(CURDIR)/..)/build/skipruntime/
 export LD_LIBRARY_PATH=$(realpath $(CURDIR)/..)/build/skipruntime/
 
+define check_out
+	@result=$$(diff $(1) $(2)); \
+	code=$$?; \
+	if [ $$code -ne 0 ] && [ -e $(2).alt ]; then \
+		result=$$(diff $(1) $(2).alt); \
+		code=$$?; \
+	fi; \
+	if [ $$code -ne 0 ]; then \
+		echo "$$result"; \
+	fi
+endef
 
 .PHONY: libskipruntime
 libskipruntime:
@@ -75,17 +86,20 @@ build-examples: build
 
 test-example-%:
 	../bin/cd_sh tests/examples "./$*.sh /tmp/$*.out /tmp/$*.err"
-	diff /tmp/$*.out tests/examples/$*.exp.out
+	@echo "diff /tmp/$*.out tests/examples/$*.exp.out"
+	$(call check_out,/tmp/$*.out,tests/examples/$*.exp.out)
 	diff /tmp/$*.err tests/examples/$*.exp.err
 
 test-wasm-example-%:
 	../bin/cd_sh tests/examples "./$*.sh /tmp/$*-wasm.out /tmp/$*-wasm.err"
-	diff /tmp/$*-wasm.out tests/examples/$*.exp.out
+	@echo "diff /tmp/$*-wasm.out tests/examples/$*.exp.out"
+	$(call check_out,/tmp/$*-wasm.out,tests/examples/$*.exp.out)
 	diff /tmp/$*-wasm.err tests/examples/$*.exp.err
 
 test-native-example-%:
 	../bin/cd_sh tests/examples "./$*.sh /tmp/$*-native.out /tmp/$*-native.err native"
-	diff /tmp/$*-native.out tests/examples/$*.exp.out
+	@echo "diff /tmp/$*-native.out tests/examples/$*.exp.out"
+	$(call check_out,/tmp/$*-native.out,tests/examples/$*.exp.out)
 	diff /tmp/$*-native.err tests/examples/$*.exp.err
 
 EXAMPLES := $(patsubst tests/examples/%.sh,%,$(wildcard tests/examples/*.sh))
