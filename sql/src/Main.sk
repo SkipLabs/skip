@@ -550,7 +550,7 @@ fun execSize(args: Cli.ParseResults, options: SKDB.Options): void {
 
 fun execDiff(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
-  sessionID = args.getString("session-id").toInt();
+  sessionID = args.getString("session-id");
   since = args.maybeGetString("since").map(v -> v.toInt());
   SKDB.runSql(options, origContext ~> {
     context = origContext.mclone();
@@ -588,7 +588,7 @@ fun execDiff(args: Cli.ParseResults, options: SKDB.Options): void {
 
 fun execDisconnect(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
-  sessionID = args.getString("session-id").toInt();
+  sessionID = args.getString("session-id");
   SKDB.runLockedSql(options, context ~> {
     context.getSession(sessionID) match {
     | None() ->
@@ -601,7 +601,7 @@ fun execDisconnect(args: Cli.ParseResults, options: SKDB.Options): void {
 
 fun execTail(args: Cli.ParseResults, options: SKDB.Options): void {
   ensureContext(args);
-  sessionID = args.getString("session-id").toInt();
+  sessionID = args.getString("session-id");
   followMode = args.getBool("follow");
 
   defaultSince = args.maybeGetString("since") match {
@@ -719,7 +719,7 @@ fun execSubscribe(args: Cli.ParseResults, options: SKDB.Options): void {
       views.maybeGet(0).fromSome("Must specify at least one view or table"),
     );
     inputDir = context.unsafeGetEagerDir(input.dirName);
-    sessionID = SKStore.genSym(0);
+    sessionID = SKStore.genSym(0).toString();
     request = SKDB.SubRequestFile(
       views,
       options.format,
@@ -732,7 +732,7 @@ fun execSubscribe(args: Cli.ParseResults, options: SKDB.Options): void {
     context.update();
     outputDir = context.unsafeGetEagerDir(output.dirName);
     file = outputDir.getArrayRaw(viewKey)[0];
-    invariant(sessionID == SKStore.IntFile::type(file).value);
+    invariant(sessionID == SKStore.StringFile::type(file).value);
     print_string(sessionID.toString());
   })
 }

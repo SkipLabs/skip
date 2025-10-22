@@ -449,7 +449,7 @@ export class ServiceInstanceFactory {
   }
 }
 
-export type SubscriptionID = Opaque<bigint, "subscription">;
+export type SubscriptionID = Opaque<string, "subscription">;
 
 /**
  * A `ServiceInstance` is a running instance of a `SkipService`, providing access to its resources
@@ -606,7 +606,7 @@ export class ServiceInstance {
     } else if (session < 0n) {
       throw this.refs.handles.deleteHandle(Number(-session) as Handle<Error>);
     }
-    return session as SubscriptionID;
+    return resourceInstanceId as SubscriptionID;
   }
 
   /**

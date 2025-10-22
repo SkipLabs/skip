@@ -190,7 +190,7 @@ export interface FromBinding {
     watermark: Nullable<string>,
   ): bigint;
 
-  SkipRuntime_Runtime__unsubscribe(id: bigint): Handle<Error>;
+  SkipRuntime_Runtime__unsubscribe(id: string): Handle<Error>;
 
   SkipRuntime_Runtime__update(
     input: string,

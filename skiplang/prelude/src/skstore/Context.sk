@@ -47,7 +47,6 @@ class NMultipleDirs(CmdMultipleDirs, Array<DirSub>) extends CmdKind
 
 base class NWatch{
   dirNameGetter: readonly Context ~> DirName,
-  identifier: String,
   from: Tick,
   close: () ~> void,
 } extends CmdKind uses Unsafe.Downcastable
@@ -413,7 +412,7 @@ mutable class Context private {
     DirName,
     KeyMap<Int>,
   > = SortedMap[],
-  private mutable sessions: SortedMap<Int, Sub> = SortedMap[],
+  private mutable sessions: SortedMap<String, Sub> = SortedMap[],
   private mutable postponables: Queue<UPostponable> = Queue[],
   private mutable fpostponables: Queue<FPostponable> = Queue[],
   private mutable dirsWithSharedSubDirs: SortedSet<DirName> = SortedSet[],
@@ -502,32 +501,36 @@ mutable class Context private {
     this.!toUpdate = this.toUpdate.set((timeStack, parentTime), arrow);
   }
 
-  readonly fun getSession(sessionId: Int): ?Sub {
+  readonly fun getSession(sessionId: String): ?Sub {
     this.sessions.maybeGet(sessionId)
   }
 
-  readonly fun getSessions(): SortedMap<Int, Sub> {
+  readonly fun getSessions(): SortedMap<String, Sub> {
     this.sessions
   }
 
   mutable fun subscribe(
-    sessionId: Int,
+    sessionId: String,
     cmd: CmdKind,
     destinationSource: ?Int,
     init: ?Tick = None(),
   ): void {
+    invariant(
+      !this.sessions.containsKey(sessionId),
+      "Session with same id already exists.",
+    );
     sub = Sub(mutexCreate(), condCreate(), cmd, destinationSource);
     init.each(tick -> this.notifySub(sub, tick));
     this.!sessions[sessionId] = sub;
   }
 
-  mutable fun unsubscribe(sessionId: Int): void {
+  mutable fun unsubscribe(sessionId: String): void {
     this.!sessions = this.sessions.remove(sessionId)
   }
 
   mutable fun filterSubscriptions(
     context: readonly Context,
-    filter: (Int, Sub, Tick) ~> ?Sub,
+    filter: (String, Sub, Tick) ~> ?Sub,
   ): void {
     tick = this.tick;
     this.!sessions = context.sessions
@@ -2192,7 +2195,7 @@ fun runWithResult<T>(
 /*****************************************************************************/
 
 class ForkSettings(
-  subscriptionsFilter: (Int, Sub, Tick) ~> ?Sub = (_, _, _) ~> None(),
+  subscriptionsFilter: (String, Sub, Tick) ~> ?Sub = (_, _, _) ~> None(),
   persistentsFilter: (String, File) ~> ?File = (_, _) ~> None(),
   globalsFilter: (String, File) ~> ?File = (_, _) ~> None(),
   isSync: Bool = false,
