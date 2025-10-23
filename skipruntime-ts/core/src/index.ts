@@ -36,6 +36,7 @@ import {
   type Resource,
   type SkipService,
   type Watermark,
+  type ExternalService,
 } from "./api.js";
 
 import {
@@ -96,7 +97,10 @@ export interface ChangeManager {
 }
 
 export class ServiceDefinition {
-  constructor(private service: SkipService) {}
+  constructor(
+    private service: SkipService,
+    private readonly externals: Map<string, ExternalService> = new Map(),
+  ) {}
 
   buildResource(name: string, parameters: Json): Resource {
     const builder = this.service.resources[name];
@@ -140,6 +144,7 @@ export class ServiceDefinition {
     const supplier = this.service.externalServices[external];
     if (!supplier)
       throw new Error(`External services '${external}' not exist.`);
+    this.externals.set(`${external}/${instance}`, supplier);
     // Ensure notification is made outside the current context update
     return new Promise((resolve, reject) => {
       setTimeout(() => {
@@ -157,20 +162,29 @@ export class ServiceDefinition {
   unsubscribe(external: string, instance: string) {
     if (!this.service.externalServices)
       throw new Error(`No external services defined.`);
-    const supplier = this.service.externalServices[external];
+    const supplier = this.externals.get(`${external}/${instance}`);
     if (!supplier)
-      throw new Error(`External services '${external}' not exist.`);
+      throw new Error(`External services '${external}/${instance}' not exist.`);
     supplier.unsubscribe(instance);
+    this.externals.delete(`${external}/${instance}`);
   }
 
   async shutdown(): Promise<void> {
     const promises: Promise<void>[] = [];
+    const uniqueServices = new Set(this.externals.values());
     if (this.service.externalServices) {
       for (const es of Object.values(this.service.externalServices)) {
-        promises.push(es.shutdown());
+        uniqueServices.add(es);
       }
     }
+    for (const es of uniqueServices) {
+      promises.push(es.shutdown());
+    }
     await Promise.all(promises);
+  }
+
+  derive(service: SkipService): ServiceDefinition {
+    return new ServiceDefinition(service, new Map(this.externals));
   }
 }
 
@@ -798,6 +812,7 @@ export class ServiceInstance {
     if (this.forkName) {
       throw new SkipError("Reload cannot be called in transaction.");
     }
+    const definition = this.definition.derive(service);
     this.refs.setFork(this.forkName);
     const uuid = crypto.randomUUID();
     const fork = this.fork(uuid);
@@ -807,6 +822,7 @@ export class ServiceInstance {
       fork.merge(streamsToClose);
       merged = true;
       this.closeResourceStreams(streamsToClose);
+      this.definition = definition;
     } catch (ex: unknown) {
       console.error(ex);
       if (!merged) fork.abortFork();
