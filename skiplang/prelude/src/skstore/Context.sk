@@ -963,7 +963,7 @@ mutable class Context private {
     optOnCreate: ?Postponable = None(),
     optOnDelete: ?Postponable = None(),
   ): EHandle<K, V> {
-    this.unsafeMaybeGetEagerDir(dirName) match {
+    update = this.unsafeMaybeGetEagerDir(dirName) match {
     | Some(dir) ->
       if (dir.creator != this.currentArrow()) {
         // In eager dir, if several properties are invalidated in same tick
@@ -972,8 +972,9 @@ mutable class Context private {
       } else if (ignoreIfExists) {
         this.!newDirs = this.newDirs.add(dirName);
         return EHandle(convKey, convValue, dirName)
-      }
-    | None() -> void
+      };
+      true
+    | None() -> false
     };
     this.currentArrow().each(a -> {
       this.unsafeMaybeGetDir(a.childName) match {
@@ -1022,6 +1023,7 @@ mutable class Context private {
       creator,
       optOnDelete,
     };
+    if (update) this.updateDirtyReaders(Path::dirTag(dirName));
     this.setDir(dir);
     this.!newDirs = this.newDirs.add(dirName);
     optOnCreate.each(this.postpone);
@@ -1033,7 +1035,7 @@ mutable class Context private {
     this.!dirs = this.dirs.set(this.tick, dirName, dir);
   }
 
-  private mutable fun getDir(dirName: DirName): Dir {
+  mutable fun getDir(dirName: DirName): Dir {
     this.addRead(Path::dirTag(dirName));
     this.dirs.get(dirName);
   }
