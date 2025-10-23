@@ -127,17 +127,16 @@ fun buildResourcesGraph(
       // Allow to reload the resource in case of change
       _ = resourcesVersionHdl.maybeGet(context, SKStore.SID(key.name));
       resourceId = toResourceId(key.name, key.params);
-      (runId, resources) = definitionHdl.maybeGet(
+      (runId, service) = definitionHdl.maybeGet(
         context,
         SKStore.UnitID::singleton,
       ) match {
-      | Some(definition) -> (definition.runId, definition.service.resources)
+      | Some(definition) -> (definition.runId, definition.service)
       | _ -> return void
       };
       pushContext(context);
       try {
-        resourceBuilder = resources.get(key.name);
-        resource = resourceBuilder.build(key.params);
+        resource = service.buildResource(key.name, key.params);
         collections = servicesHdl.get(context, SKStore.SID(runId)).value;
         collection = resource.instantiate(collections);
         writer.set(key, ResourceInfo(resourceId, collection, runId));
@@ -173,17 +172,16 @@ fun initService(service: Service): Result<Array<Waitable>, .Exception> {
           (ctx, writer, _key, it) ~> {
             serviceDef = it.first;
             mInputs = mutable Map<String, Collection>[];
-            serviceDef.service.initialData.each(input -> {
-              iDirName = SKStore.DirName::create(`/${input.name}/`);
+            serviceDef.service.inputs().each(input -> {
+              iDirName = SKStore.DirName::create(`/${input}/`);
+              values = serviceDef.service.initialData(input);
               _ = ctx.mkdirMulti(
                 JSONID::keyType,
                 JSONFile::type,
                 iDirName,
-                input.values.map(v ->
-                  (JSONID(v.i0), v.i1.map(x -> JSONFile(x)))
-                ),
+                values.map(v -> (JSONID(v.i0), v.i1.map(x -> JSONFile(x)))),
               );
-              mInputs.add(input.name, Collection(iDirName))
+              mInputs.add(input, Collection(iDirName))
             });
             writer.set(
               SKStore.SID(serviceDef.runId),
@@ -217,15 +215,15 @@ fun initService(service: Service): Result<Array<Waitable>, .Exception> {
         );
       buildResourcesGraph(context, sessionHdl, servicesHdl)
     } else {
-      // Can be done because it's only used on test, we can add a environment variable or some way to protect that usage
-      _ = closeService_(context);
       sessionHdl = SKStore.EHandle(
         SKStore.UnitID::keyType,
         ServiceDefinition::type,
         kSessionDir,
       );
-      sessionHdl.writeArray(context, SKStore.UnitID::singleton, Array[]);
-      context.update();
+      invariant(
+        sessionHdl.maybeGet(context, SKStore.UnitID::singleton).isNone(),
+        "Service already loaded",
+      );
       sessionHdl.writeArray(
         context,
         SKStore.UnitID::singleton,
@@ -240,7 +238,7 @@ fun initService(service: Service): Result<Array<Waitable>, .Exception> {
 fun closeService_(
   context: mutable SKStore.Context,
   update: Bool = true,
-): Array<Waitable> {
+): Waitable {
   resourceHdl = SKStore.EHandle(
     SKStore.SID::keyType,
     ResourceDef::type,
@@ -256,24 +254,22 @@ fun closeService_(
     ServiceDefinition::type,
     kSessionDir,
   );
-  handles = sessionHdl.maybeGet(context, SKStore.UnitID::singleton) match {
-  | Some(def) ->
-    def.service.remoteCollections
-      .values()
-      .map(es -> es.shutdown())
-      .collect(Array)
-  | _ -> Array[]
+  res = sessionHdl.maybeGet(context, SKStore.UnitID::singleton) match {
+  | Some(def) -> def.service.shutdown()
+  | _ -> Waitable(0.0)
   };
+  sessionHdl.writeArray(context, SKStore.UnitID::singleton, Array[]);
   if (update) context.update();
-  handles;
+  res;
 }
 
-fun closeService(): Result<Array<Waitable>, .Exception> {
+fun closeService(): Result<Waitable, .Exception> {
   runWithResult(ctx ~> closeService_(ctx))
 }
 
 class LinkToResource(
-  supplier: ExternalService,
+  service: Service,
+  supplier: String,
   instance: String,
   writer: CollectionWriter,
   name: String,
@@ -282,7 +278,8 @@ class LinkToResource(
   //
   fun perform(context: mutable SKStore.Context): void {
     pushContext(context);
-    waitable = this.supplier.subscribe(
+    waitable = this.service.subscribe(
+      this.supplier,
       this.instance,
       this.writer,
       this.name,
@@ -294,13 +291,14 @@ class LinkToResource(
 }
 
 class CloseExternalService(
-  supplier: ExternalService,
+  service: Service,
+  supplier: String,
   instance: String,
   dirName: SKStore.DirName,
   definition: ExternalServiceDef,
 ) extends SKStore.FPostponable {
   protected fun perform(_context: readonly SKStore.Context): void {
-    this.supplier.unsubscribe(this.instance);
+    this.service.unsubscribe(this.supplier, this.instance);
   }
 }
 
@@ -354,11 +352,7 @@ fun useExternalCollection(
       ServiceDefinition::type,
       kSessionDir,
     );
-    remoteCollections = sessionHdl.get(
-      context,
-      SKStore.UnitID::singleton,
-    ).service.remoteCollections;
-    externalSupplier = remoteCollections.get(supplier);
+    service = sessionHdl.get(context, SKStore.UnitID::singleton).service;
     collectionId = toSuppliedResourceId(supplier, resource, params);
     dirName = subDirName(context, collectionId, None());
     paramsDir = dirName.sub("params");
@@ -380,7 +374,8 @@ fun useExternalCollection(
         instance = Ksuid::create().toString();
         optOnCreate = Some(
           LinkToResource(
-            externalSupplier,
+            service,
+            supplier,
             instance,
             CollectionWriter(storeDir),
             resource,
@@ -388,7 +383,8 @@ fun useExternalCollection(
           ),
         );
         onDelete = CloseExternalService(
-          externalSupplier,
+          service,
+          supplier,
           instance,
           storeDir,
           definition,

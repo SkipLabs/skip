@@ -18,6 +18,7 @@ import type {
   Resource,
   Watermark,
   HandlerInfo,
+  ServiceDefinition,
 } from "@skipruntime/core";
 import {
   ServiceInstance,
@@ -27,10 +28,8 @@ import {
 } from "@skipruntime/core";
 
 import type {
-  Checker,
   FromBinding,
   Handle,
-  ResourceBuilder,
   Notifier,
 } from "@skipruntime/core/binding.js";
 
@@ -82,37 +81,11 @@ export interface FromWasm {
 
   SkipRuntime_createResource(ref: Handle<Resource>): ptr<Internal.Resource>;
 
-  // ResourceBuilder
-  SkipRuntime_createResourceBuilder(
-    ref: Handle<ResourceBuilder>,
-  ): ptr<Internal.ResourceBuilder>;
+  // Service
 
-  // ResourceBuilder
   SkipRuntime_createService(
-    ref: Handle<SkipService>,
-    jsInputs: ptr<Internal.CJObject>,
-    resources: ptr<Internal.ResourceBuilderMap>,
-    remotes: ptr<Internal.ExternalServiceMap>,
+    ref: Handle<ServiceDefinition>,
   ): ptr<Internal.Service>;
-
-  // ResourceBuilderMap
-
-  SkipRuntime_ResourceBuilderMap__create(): ptr<Internal.ResourceBuilderMap>;
-
-  SkipRuntime_ResourceBuilderMap__add(
-    map: ptr<Internal.ResourceBuilderMap>,
-    key: ptr<Internal.String>,
-    collection: ptr<Internal.ResourceBuilder>,
-  ): void;
-
-  // ExternalServiceMap
-
-  SkipRuntime_ExternalServiceMap__create(): ptr<Internal.ExternalServiceMap>;
-  SkipRuntime_ExternalServiceMap__add(
-    map: ptr<Internal.ExternalServiceMap>,
-    key: ptr<Internal.String>,
-    collection: ptr<Internal.ExternalService>,
-  ): void;
 
   // Collection
 
@@ -227,7 +200,7 @@ export interface FromWasm {
   SkipRuntime_initService(service: ptr<Internal.Service>): ptr<Internal.CJSON>;
 
   // closeClose
-  SkipRuntime_closeService(): ptr<Internal.CJSON>;
+  SkipRuntime_closeService(): Handle<Error> | Handle<Promise<void>>;
 
   // Context
 
@@ -295,27 +268,6 @@ interface ToWasm {
     mapper: Handle<HandlerInfo<JSONLazyCompute>>,
   ): void;
 
-  // ExternalService
-
-  SkipRuntime_ExternalService__subscribe(
-    supplier: Handle<ExternalService>,
-    collection: ptr<Internal.String>,
-    instance: ptr<Internal.String>,
-    resource: ptr<Internal.String>,
-    params: ptr<Internal.CJSON>,
-  ): Handle<Promise<void>>;
-
-  SkipRuntime_ExternalService__unsubscribe(
-    supplier: Handle<ExternalService>,
-    instance: ptr<Internal.String>,
-  ): void;
-
-  SkipRuntime_ExternalService__shutdown(
-    supplier: Handle<ExternalService>,
-  ): Handle<Promise<void>>;
-
-  SkipRuntime_deleteExternalService(supplier: Handle<ExternalService>): void;
-
   // Resource
 
   SkipRuntime_Resource__instantiate(
@@ -325,23 +277,53 @@ interface ToWasm {
 
   SkipRuntime_deleteResource(resource: Handle<Resource>): void;
 
-  // ResourceBuilder
+  // ServiceDefinition
 
-  SkipRuntime_ResourceBuilder__build(
-    builder: Handle<ResourceBuilder>,
-    params: ptr<Internal.CJSON>,
-  ): ptr<Internal.Resource>;
-
-  SkipRuntime_deleteResourceBuilder(builder: Handle<ResourceBuilder>): void;
-
-  // Service
-
-  SkipRuntime_Service__createGraph(
-    resource: Handle<SkipService>,
+  SkipRuntime_ServiceDefinition__createGraph(
+    resource: Handle<ServiceDefinition>,
     collections: ptr<Internal.CJObject>,
   ): ptr<Internal.CJObject>;
 
-  SkipRuntime_deleteService(service: Handle<SkipService>): void;
+  SkipRuntime_ServiceDefinition__inputs(
+    skservice: Handle<ServiceDefinition>,
+  ): ptr<Internal.CJArray<Internal.CJSON>>;
+
+  SkipRuntime_ServiceDefinition__resources(
+    skservice: Handle<ServiceDefinition>,
+  ): ptr<Internal.CJArray<Internal.CJSON>>;
+
+  SkipRuntime_ServiceDefinition__initialData(
+    skservice: Handle<ServiceDefinition>,
+    name: ptr<Internal.String>,
+  ): ptr<Internal.CJArray<Internal.CJSON>>;
+
+  SkipRuntime_ServiceDefinition__buildResource(
+    skservice: Handle<ServiceDefinition>,
+    name: ptr<Internal.String>,
+    skparams: ptr<Internal.CJObject>,
+  ): ptr<Internal.Resource>;
+
+  SkipRuntime_ServiceDefinition__subscribe(
+    skservice: Handle<ServiceDefinition>,
+    external: ptr<Internal.String>,
+    writerId: ptr<Internal.String>,
+    instance: ptr<Internal.String>,
+    resource: ptr<Internal.String>,
+    skparams: ptr<Internal.CJObject>,
+  ): Handle<Promise<void>>;
+
+  SkipRuntime_ServiceDefinition__unsubscribe(
+    skservice: Handle<ServiceDefinition>,
+    external: ptr<Internal.String>,
+    instance: ptr<Internal.String>,
+  ): void;
+
+  SkipRuntime_ServiceDefinition__shutdown(
+    skservice: Handle<ServiceDefinition>,
+    external: ptr<Internal.String>,
+  ): Handle<Promise<unknown>>;
+
+  SkipRuntime_deleteService(service: Handle<ServiceDefinition>): void;
 
   // Notifier
 
@@ -394,15 +376,6 @@ interface ToWasm {
   SkipRuntime_deleteReducer(
     reducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
   ): void;
-
-  // Checker
-
-  SkipRuntime_Checker__check(
-    checker: Handle<Checker>,
-    request: ptr<Internal.String>,
-  ): void;
-
-  SkipRuntime_deleteChecker(checker: Handle<Checker>): void;
 }
 
 export class WasmFromBinding implements FromBinding {
@@ -460,56 +433,10 @@ export class WasmFromBinding implements FromBinding {
     return this.fromWasm.SkipRuntime_createResource(ref);
   }
 
-  SkipRuntime_createResourceBuilder(
-    ref: Handle<ResourceBuilder>,
-  ): Pointer<Internal.ResourceBuilder> {
-    return this.fromWasm.SkipRuntime_createResourceBuilder(ref);
-  }
-
   SkipRuntime_createService(
-    ref: Handle<SkipService>,
-    jsInputs: Pointer<Internal.CJObject>,
-    resources: Pointer<Internal.ResourceBuilderMap>,
-    remotes: Pointer<Internal.ExternalServiceMap>,
+    ref: Handle<ServiceDefinition>,
   ): Pointer<Internal.Service> {
-    return this.fromWasm.SkipRuntime_createService(
-      ref,
-      toPtr(jsInputs),
-      toPtr(resources),
-      toPtr(remotes),
-    );
-  }
-
-  SkipRuntime_ResourceBuilderMap__create(): Pointer<Internal.ResourceBuilderMap> {
-    return this.fromWasm.SkipRuntime_ResourceBuilderMap__create();
-  }
-
-  SkipRuntime_ResourceBuilderMap__add(
-    map: Pointer<Internal.ResourceBuilderMap>,
-    key: string,
-    collection: Pointer<Internal.ResourceBuilder>,
-  ): void {
-    this.fromWasm.SkipRuntime_ResourceBuilderMap__add(
-      toPtr(map),
-      this.utils.exportString(key),
-      toPtr(collection),
-    );
-  }
-
-  SkipRuntime_ExternalServiceMap__create(): Pointer<Internal.ExternalServiceMap> {
-    return this.fromWasm.SkipRuntime_ExternalServiceMap__create();
-  }
-
-  SkipRuntime_ExternalServiceMap__add(
-    map: Pointer<Internal.ExternalServiceMap>,
-    key: string,
-    collection: Pointer<Internal.ExternalService>,
-  ): void {
-    this.fromWasm.SkipRuntime_ExternalServiceMap__add(
-      toPtr(map),
-      this.utils.exportString(key),
-      toPtr(collection),
-    );
+    return this.fromWasm.SkipRuntime_createService(ref);
   }
 
   SkipRuntime_Collection__getArray(
@@ -743,7 +670,7 @@ export class WasmFromBinding implements FromBinding {
     return this.fromWasm.SkipRuntime_initService(toPtr(service));
   }
 
-  SkipRuntime_closeService(): Pointer<Internal.CJSON> {
+  SkipRuntime_closeService(): Handle<Error> | Handle<Promise<void>> {
     return this.fromWasm.SkipRuntime_closeService();
   }
 
@@ -907,33 +834,99 @@ class LinksImpl implements Links {
     this.tobinding.SkipRuntime_deleteResource(resource);
   }
 
-  // ResourceBuilder
+  // ServiceDefinition
 
-  buildOfResourceBuilder(
-    skbuilder: Handle<ResourceBuilder>,
-    skparams: ptr<Internal.CJSON>,
-  ): ptr<Internal.Resource> {
-    return toPtr(
-      this.tobinding.SkipRuntime_ResourceBuilder__build(skbuilder, skparams),
-    );
-  }
-
-  deleteResourceBuilder(builder: Handle<ResourceBuilder>) {
-    this.tobinding.SkipRuntime_deleteResourceBuilder(builder);
-  }
-
-  // Service
-
-  createGraphOfService(
-    skservice: Handle<SkipService>,
+  createGraphOfServiceDefinition(
+    skservice: Handle<ServiceDefinition>,
     skcollections: ptr<Internal.CJObject>,
   ) {
     return toPtr(
-      this.tobinding.SkipRuntime_Service__createGraph(skservice, skcollections),
+      this.tobinding.SkipRuntime_ServiceDefinition__createGraph(
+        skservice,
+        skcollections,
+      ),
     );
   }
 
-  deleteService(service: Handle<SkipService>) {
+  inputsOfServiceDefinition(
+    skservice: Handle<ServiceDefinition>,
+  ): ptr<Internal.CJArray<Internal.CJSON>> {
+    return toPtr(
+      this.tobinding.SkipRuntime_ServiceDefinition__inputs(skservice),
+    );
+  }
+
+  resourcesOfServiceDefinition(
+    skservice: Handle<ServiceDefinition>,
+  ): ptr<Internal.CJArray<Internal.CJSON>> {
+    return toPtr(
+      this.tobinding.SkipRuntime_ServiceDefinition__resources(skservice),
+    );
+  }
+
+  initialDataOfServiceDefinition(
+    skservice: Handle<ServiceDefinition>,
+    name: ptr<Internal.String>,
+  ): ptr<Internal.CJArray<Internal.CJSON>> {
+    return toPtr(
+      this.tobinding.SkipRuntime_ServiceDefinition__initialData(
+        skservice,
+        this.utils.importString(name),
+      ),
+    );
+  }
+
+  buildResourceOfServiceDefinition(
+    skservice: Handle<ServiceDefinition>,
+    name: ptr<Internal.String>,
+    skparams: ptr<Internal.CJObject>,
+  ): ptr<Internal.Resource> {
+    return toPtr(
+      this.tobinding.SkipRuntime_ServiceDefinition__buildResource(
+        skservice,
+        this.utils.importString(name),
+        skparams,
+      ),
+    );
+  }
+
+  subscribeOfServiceDefinition(
+    skservice: Handle<ServiceDefinition>,
+    external: ptr<Internal.String>,
+    writerId: ptr<Internal.String>,
+    instance: ptr<Internal.String>,
+    resource: ptr<Internal.String>,
+    skparams: ptr<Internal.CJObject>,
+  ): Handle<Promise<void>> {
+    return this.tobinding.SkipRuntime_ServiceDefinition__subscribe(
+      skservice,
+      this.utils.importString(external),
+      this.utils.importString(writerId),
+      this.utils.importString(instance),
+      this.utils.importString(resource),
+      skparams,
+    );
+  }
+
+  unsubscribeOfServiceDefinition(
+    skservice: Handle<ServiceDefinition>,
+    external: ptr<Internal.String>,
+    instance: ptr<Internal.String>,
+  ): void {
+    this.tobinding.SkipRuntime_ServiceDefinition__unsubscribe(
+      skservice,
+      this.utils.importString(external),
+      this.utils.importString(instance),
+    );
+  }
+
+  shutdownOfServiceDefinition(
+    skservice: Handle<ServiceDefinition>,
+  ): Handle<Promise<unknown>> {
+    return this.tobinding.SkipRuntime_ServiceDefinition__shutdown(skservice);
+  }
+
+  deleteService(service: Handle<ServiceDefinition>) {
     this.tobinding.SkipRuntime_deleteService(service);
   }
 
@@ -1012,42 +1005,6 @@ class LinksImpl implements Links {
   deleteReducer(reducer: Handle<HandlerInfo<Reducer<Json, Json>>>) {
     this.tobinding.SkipRuntime_deleteReducer(reducer);
   }
-
-  // ExternalService
-
-  subscribeOfExternalService(
-    sksupplier: Handle<ExternalService>,
-    skwriter: ptr<Internal.String>,
-    skinstance: ptr<Internal.String>,
-    skresource: ptr<Internal.String>,
-    skparams: ptr<Internal.CJSON>,
-  ): Handle<Promise<void>> {
-    return this.tobinding.SkipRuntime_ExternalService__subscribe(
-      sksupplier,
-      this.utils.importString(skwriter),
-      this.utils.importString(skinstance),
-      this.utils.importString(skresource),
-      skparams,
-    );
-  }
-
-  unsubscribeOfExternalService(
-    sksupplier: Handle<ExternalService>,
-    skinstance: ptr<Internal.String>,
-  ) {
-    this.tobinding.SkipRuntime_ExternalService__unsubscribe(
-      sksupplier,
-      this.utils.importString(skinstance),
-    );
-  }
-
-  shutdownOfExternalService(sksupplier: Handle<ExternalService>) {
-    return this.tobinding.SkipRuntime_ExternalService__shutdown(sksupplier);
-  }
-
-  deleteExternalService(supplier: Handle<ExternalService>) {
-    this.tobinding.SkipRuntime_deleteExternalService(supplier);
-  }
 }
 
 export class ServiceInstanceFactory implements Shared {
@@ -1097,34 +1054,30 @@ class Manager implements ToWasmManager {
       links.isEqualsOfLazyCompute.bind(links);
     toWasm.SkipRuntime_deleteLazyCompute = links.deleteLazyCompute.bind(links);
 
-    // ExternalService
-
-    toWasm.SkipRuntime_ExternalService__unsubscribe =
-      links.unsubscribeOfExternalService.bind(links);
-    toWasm.SkipRuntime_ExternalService__subscribe =
-      links.subscribeOfExternalService.bind(links);
-    toWasm.SkipRuntime_ExternalService__shutdown =
-      links.shutdownOfExternalService.bind(links);
-    toWasm.SkipRuntime_deleteExternalService =
-      links.deleteExternalService.bind(links);
-
     // Resource
 
     toWasm.SkipRuntime_Resource__instantiate =
       links.instantiateOfResource.bind(links);
     toWasm.SkipRuntime_deleteResource = links.deleteResource.bind(links);
 
-    // ResourceBuilder
+    // ServiceDefinition
 
-    toWasm.SkipRuntime_ResourceBuilder__build =
-      links.buildOfResourceBuilder.bind(links);
-    toWasm.SkipRuntime_deleteResourceBuilder =
-      links.deleteResourceBuilder.bind(links);
-
-    // Service
-
-    toWasm.SkipRuntime_Service__createGraph =
-      links.createGraphOfService.bind(links);
+    toWasm.SkipRuntime_ServiceDefinition__createGraph =
+      links.createGraphOfServiceDefinition.bind(links);
+    toWasm.SkipRuntime_ServiceDefinition__inputs =
+      links.inputsOfServiceDefinition.bind(links);
+    toWasm.SkipRuntime_ServiceDefinition__resources =
+      links.resourcesOfServiceDefinition.bind(links);
+    toWasm.SkipRuntime_ServiceDefinition__initialData =
+      links.initialDataOfServiceDefinition.bind(links);
+    toWasm.SkipRuntime_ServiceDefinition__buildResource =
+      links.buildResourceOfServiceDefinition.bind(links);
+    toWasm.SkipRuntime_ServiceDefinition__subscribe =
+      links.subscribeOfServiceDefinition.bind(links);
+    toWasm.SkipRuntime_ServiceDefinition__unsubscribe =
+      links.unsubscribeOfServiceDefinition.bind(links);
+    toWasm.SkipRuntime_ServiceDefinition__shutdown =
+      links.shutdownOfServiceDefinition.bind(links);
     toWasm.SkipRuntime_deleteService = links.deleteService.bind(links);
 
     // Notifier

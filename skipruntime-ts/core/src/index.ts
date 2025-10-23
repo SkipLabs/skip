@@ -26,7 +26,6 @@ import {
   type Context,
   type EagerCollection,
   type Entry,
-  type ExternalService,
   type LazyCollection,
   type LazyCompute,
   type Mapper,
@@ -46,12 +45,7 @@ import {
   SkipResourceInstanceInUseError,
   SkipUnknownCollectionError,
 } from "./errors.js";
-import {
-  ResourceBuilder,
-  type Notifier,
-  type Handle,
-  type FromBinding,
-} from "./binding.js";
+import { type Notifier, type Handle, type FromBinding } from "./binding.js";
 
 export * from "./api.js";
 export * from "./errors.js";
@@ -84,6 +78,85 @@ function instantiateUserObject<Params extends DepSafe[], Result extends object>(
     name: obj.constructor.name,
     params: checkedParams,
   };
+}
+
+export class ServiceDefinition {
+  constructor(private service: SkipService) {}
+
+  buildResource(name: string, parameters: Json): Resource {
+    const builder = this.service.resources[name];
+    if (!builder) throw new Error(`Resource '${name}' not exist.`);
+    return new builder(parameters);
+  }
+
+  inputs(): string[] {
+    return this.service.initialData
+      ? Object.keys(this.service.initialData)
+      : [];
+  }
+
+  resources(): string[] {
+    return Object.keys(this.service.resources);
+  }
+
+  initialData(name: string): Entry<Json, Json>[] {
+    if (!this.service.initialData) throw new Error(`No initial data defined.`);
+    const data = this.service.initialData[name];
+    if (!data) throw new Error(`Initial data '${name}' not exist.`);
+    return data;
+  }
+
+  createGraph(
+    inputCollections: NamedCollections,
+    context: Context,
+  ): NamedCollections {
+    return this.service.createGraph(inputCollections, context);
+  }
+
+  subscribe(
+    external: string,
+    writer: CollectionWriter<Json, Json>,
+    instance: string,
+    resource: string,
+    params: Json,
+  ): Promise<void> {
+    if (!this.service.externalServices)
+      throw new Error(`No external services defined.`);
+    const supplier = this.service.externalServices[external];
+    if (!supplier)
+      throw new Error(`External services '${external}' not exist.`);
+    // Ensure notification is made outside the current context update
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        supplier
+          .subscribe(instance, resource, params, {
+            update: writer.update.bind(writer),
+            error: (_) => {},
+          })
+          .then(resolve)
+          .catch(reject);
+      }, 0);
+    });
+  }
+
+  unsubscribe(external: string, instance: string) {
+    if (!this.service.externalServices)
+      throw new Error(`No external services defined.`);
+    const supplier = this.service.externalServices[external];
+    if (!supplier)
+      throw new Error(`External services '${external}' not exist.`);
+    supplier.unsubscribe(instance);
+  }
+
+  async shutdown(): Promise<void> {
+    const promises: Promise<void>[] = [];
+    if (this.service.externalServices) {
+      for (const es of Object.values(this.service.externalServices)) {
+        promises.push(es.shutdown());
+      }
+    }
+    await Promise.all(promises);
+  }
 }
 
 class Handles {
@@ -692,16 +765,12 @@ export class ServiceInstance {
   close(): Promise<unknown> {
     this.refs.setFork(this.forkName);
     const result = this.refs.runWithGC(() => {
-      return this.refs
-        .json()
-        .importJSON(this.refs.binding.SkipRuntime_closeService(), true);
+      return this.refs.binding.SkipRuntime_closeService();
     });
-    if (Array.isArray(result)) {
-      const handles = result as Handle<Promise<void>>[];
-      const promises = handles.map((h) => this.refs.handles.deleteHandle(h));
-      return Promise.all(promises);
+    if (result >= 0) {
+      return this.refs.handles.deleteHandle(result as Handle<Promise<unknown>>);
     } else {
-      const errorHdl = result as Handle<Error>;
+      const errorHdl = -(result as number) as Handle<Error>;
       return Promise.reject(this.refs.handles.deleteHandle(errorHdl));
     }
   }
@@ -947,28 +1016,10 @@ export class ToBinding {
     this.handles.deleteHandle(resource);
   }
 
-  // ResourceBuilder
+  // ServiceDefinition
 
-  SkipRuntime_ResourceBuilder__build(
-    skbuilder: Handle<ResourceBuilder>,
-    skparams: Pointer<Internal.CJObject>,
-  ): Pointer<Internal.Resource> {
-    const skjson = this.getJsonConverter();
-    const builder = this.handles.get(skbuilder);
-    const resource = builder.build(skjson.importJSON(skparams) as Json);
-    return this.binding.SkipRuntime_createResource(
-      this.handles.register(resource),
-    );
-  }
-
-  SkipRuntime_deleteResourceBuilder(builder: Handle<ResourceBuilder>): void {
-    this.handles.deleteHandle(builder);
-  }
-
-  // Service
-
-  SkipRuntime_Service__createGraph(
-    skservice: Handle<SkipService>,
+  SkipRuntime_ServiceDefinition__createGraph(
+    skservice: Handle<ServiceDefinition>,
     skcollections: Pointer<Internal.CJObject>,
   ): Pointer<Internal.CJObject> {
     const skjson = this.getJsonConverter();
@@ -988,7 +1039,81 @@ export class ToBinding {
     return skjson.exportJSON(collectionsNames);
   }
 
-  SkipRuntime_deleteService(service: Handle<SkipService>): void {
+  SkipRuntime_ServiceDefinition__inputs(
+    skservice: Handle<ServiceDefinition>,
+  ): Pointer<Internal.CJArray<Internal.CJSON>> {
+    const skjson = this.getJsonConverter();
+    const service = this.handles.get(skservice);
+    return skjson.exportJSON(service.inputs());
+  }
+
+  SkipRuntime_ServiceDefinition__resources(
+    skservice: Handle<ServiceDefinition>,
+  ): Pointer<Internal.CJArray<Internal.CJSON>> {
+    const skjson = this.getJsonConverter();
+    const service = this.handles.get(skservice);
+    return skjson.exportJSON(service.resources());
+  }
+
+  SkipRuntime_ServiceDefinition__initialData(
+    skservice: Handle<ServiceDefinition>,
+    name: string,
+  ): Pointer<Internal.CJArray<Internal.CJSON>> {
+    const skjson = this.getJsonConverter();
+    const service = this.handles.get(skservice);
+    return skjson.exportJSON(service.initialData(name));
+  }
+
+  SkipRuntime_ServiceDefinition__buildResource(
+    skservice: Handle<ServiceDefinition>,
+    name: string,
+    skparams: Pointer<Internal.CJObject>,
+  ): Pointer<Internal.Resource> {
+    const skjson = this.getJsonConverter();
+    const service = this.handles.get(skservice);
+    const resource = service.buildResource(
+      name,
+      skjson.importJSON(skparams) as Json,
+    );
+    return this.binding.SkipRuntime_createResource(
+      this.handles.register(resource),
+    );
+  }
+
+  SkipRuntime_ServiceDefinition__subscribe(
+    skservice: Handle<ServiceDefinition>,
+    external: string,
+    writerId: string,
+    instance: string,
+    resource: string,
+    skparams: Pointer<Internal.CJObject>,
+  ): Handle<Promise<void>> {
+    const skjson = this.getJsonConverter();
+    const service = this.handles.get(skservice);
+    const writer = new CollectionWriter(writerId, this, this.forkName);
+    const params = skjson.importJSON(skparams, true) as Json;
+    return this.handles.register(
+      service.subscribe(external, writer, instance, resource, params),
+    );
+  }
+
+  SkipRuntime_ServiceDefinition__unsubscribe(
+    skservice: Handle<ServiceDefinition>,
+    external: string,
+    instance: string,
+  ): void {
+    const service = this.handles.get(skservice);
+    service.unsubscribe(external, instance);
+  }
+
+  SkipRuntime_ServiceDefinition__shutdown(
+    skservice: Handle<ServiceDefinition>,
+  ): Handle<Promise<unknown>> {
+    const service = this.handles.get(skservice);
+    return this.handles.register(service.shutdown());
+  }
+
+  SkipRuntime_deleteService(service: Handle<ServiceDefinition>): void {
     this.handles.deleteHandle(service);
   }
 
@@ -1090,93 +1215,30 @@ export class ToBinding {
     this.handles.deleteHandle(reducer);
   }
 
-  // ExternalService
-
-  SkipRuntime_ExternalService__subscribe(
-    sksupplier: Handle<ExternalService>,
-    writerId: string,
-    instance: string,
-    resource: string,
-    skparams: Pointer<Internal.CJObject>,
-  ): Handle<Promise<void>> {
-    const skjson = this.getJsonConverter();
-    const supplier = this.handles.get(sksupplier);
-    const writer = new CollectionWriter(writerId, this, this.forkName);
-    const params = skjson.importJSON(skparams, true) as Json;
-    // Ensure notification is made outside the current context update
-    return this.handles.register(
-      new Promise((resolve, reject) => {
-        setTimeout(() => {
-          supplier
-            .subscribe(instance, resource, params, {
-              update: writer.update.bind(writer),
-              error: (_) => {},
-            })
-            .then(resolve)
-            .catch(reject);
-        }, 0);
-      }),
-    );
-  }
-
-  SkipRuntime_ExternalService__unsubscribe(
-    sksupplier: Handle<ExternalService>,
-    instance: string,
-  ): void {
-    const supplier = this.handles.get(sksupplier);
-    supplier.unsubscribe(instance);
-  }
-
-  SkipRuntime_ExternalService__shutdown(
-    sksupplier: Handle<ExternalService>,
-  ): Handle<Promise<void>> {
-    const supplier = this.handles.get(sksupplier);
-    return this.handles.register(supplier.shutdown());
-  }
-
-  SkipRuntime_deleteExternalService(supplier: Handle<ExternalService>): void {
-    this.handles.deleteHandle(supplier);
-  }
-
-  // Executor
-
   async initService(service: SkipService): Promise<ServiceInstance> {
     this.setFork(null);
-    await this.runAsync(() => {
-      const skExternalServices =
-        this.binding.SkipRuntime_ExternalServiceMap__create();
-      if (service.externalServices) {
-        for (const [name, remote] of Object.entries(service.externalServices)) {
-          const skremote = this.binding.SkipRuntime_createExternalService(
-            this.handles.register(remote),
-          );
-          this.binding.SkipRuntime_ExternalServiceMap__add(
-            skExternalServices,
-            name,
-            skremote,
-          );
-        }
-      }
-      const skresources = this.binding.SkipRuntime_ResourceBuilderMap__create();
-      for (const [name, builder] of Object.entries(service.resources)) {
-        const skbuilder = this.binding.SkipRuntime_createResourceBuilder(
-          this.handles.register(new ResourceBuilder(builder)),
-        );
-        this.binding.SkipRuntime_ResourceBuilderMap__add(
-          skresources,
-          name,
-          skbuilder,
-        );
-      }
-      const skservice = this.binding.SkipRuntime_createService(
-        this.handles.register(service),
-        this.json().exportJSON(service.initialData ?? {}),
-        skresources,
-        skExternalServices,
-      );
+    const uuid = crypto.randomUUID();
+    this.fork(uuid);
+    try {
+      this.setFork(uuid);
+      await this.initService_(service);
+      this.setFork(uuid);
+      this.merge();
+      return new ServiceInstance(this, null);
+    } catch (ex: unknown) {
+      this.setFork(uuid);
+      this.abortFork();
+      throw ex;
+    }
+  }
+
+  private initService_(service: SkipService): Promise<void> {
+    return this.runAsync(() => {
+      const definition = new ServiceDefinition(service);
+      const skservicehHdl = this.handles.register(definition);
+      const skservice = this.binding.SkipRuntime_createService(skservicehHdl);
       return this.binding.SkipRuntime_initService(skservice);
     });
-    return new ServiceInstance(this, null);
   }
 
   //

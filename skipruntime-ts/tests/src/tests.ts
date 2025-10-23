@@ -1110,6 +1110,7 @@ export function initTests(
     const service = await initService(map1Service);
     await service.update("input", [["1", [10]]]);
     expect(await service.getArray("map1", "1")).toEqual([12]);
+    await service.close();
   });
 
   it("testMap2", async () => {
@@ -1124,6 +1125,7 @@ export function initTests(
       ["1", [30]],
       ["2", [10]],
     ]);
+    await service.close();
   });
 
   it("testMap3", async () => {
@@ -1138,6 +1140,7 @@ export function initTests(
       ["1", [36]],
       ["2", [10]],
     ]);
+    await service.close();
   });
 
   it("valueMapper", async () => {
@@ -1155,6 +1158,7 @@ export function initTests(
       [5, [30]],
       [10, [110]],
     ]);
+    await service.close();
   });
 
   it("testSize", async () => {
@@ -1181,6 +1185,7 @@ export function initTests(
       [1, [1]],
       [2, [3]],
     ]);
+    await service.close();
   });
 
   it("testSlicedMap1", async () => {
@@ -1200,6 +1205,7 @@ export function initTests(
       [9, [81]],
       [20, [400]],
     ]);
+    await service.close();
   });
 
   it("testLazy", async () => {
@@ -1224,6 +1230,7 @@ export function initTests(
       [0, [2]],
       [1, [2]],
     ]);
+    await service.close();
   });
 
   it("testMapReduce", async () => {
@@ -1257,6 +1264,7 @@ export function initTests(
       [0, [3]],
       [1, [2]],
     ]);
+    await service.close();
   });
 
   it("testUserMapReduce", async () => {
@@ -1290,6 +1298,7 @@ export function initTests(
       [0, [3]],
       [1, [2]],
     ]);
+    await service.close();
   });
 
   it("testCount", async () => {
@@ -1321,6 +1330,7 @@ export function initTests(
       [2, [2]],
       [3, [0]],
     ]);
+    await service.close();
   });
 
   it("testMerge1", async () => {
@@ -1340,6 +1350,7 @@ export function initTests(
       [1, [20]],
       [2, [3, 7]],
     ]);
+    await service.close();
   });
 
   it("testMergeReduce", async () => {
@@ -1359,6 +1370,7 @@ export function initTests(
       [1, [20]],
       [2, [10]],
     ]);
+    await service.close();
   });
 
   it("testMergeMapReduce", async () => {
@@ -1378,6 +1390,7 @@ export function initTests(
       [1, [25]],
       [2, [20]],
     ]);
+    await service.close();
   });
 
   it("testJSONParams", async () => {
@@ -1404,6 +1417,7 @@ export function initTests(
       [1, [43]],
       [2, [44]],
     ]);
+    await service.close();
   });
 
   it("testJSONExtract", async () => {
@@ -1462,6 +1476,7 @@ export function initTests(
       ],
       [2, [[[{ var: 1 }, { var: 2 }]]]],
     ]);
+    await service.close();
   });
 
   it("testExternal", async () => {
@@ -1604,6 +1619,7 @@ export function initTests(
     expect(await service.getArray("resource1", "1")).toEqual([30]);
     await service.update("input2", [["1", [40]]]);
     expect(await service.getArray("resource2", "1")).toEqual([40]);
+    await service.close();
   });
 
   it("testPostgres", async function () {
@@ -1770,6 +1786,7 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
         ),
       );
     }
+    await service.close();
   });
 
   it("testMapWithException", async () => {
@@ -1790,21 +1807,23 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
       expect((e as Error).message).toMatchRegex(
         new RegExp(/^(?:Error: )?Something goes wrong.$/),
       );
+    } finally {
+      await service.close();
     }
   });
 
   it("testInitServiceWithExternalServiceFailure", async () => {
-    let service;
     try {
-      service = await initService(initServiceWithExternalServiceFailure());
+      const service = await initService(
+        initServiceWithExternalServiceFailure(),
+      );
+      await service.close();
       throw new Error("Error was not thrown");
     } catch (e: unknown) {
       expect(e).toBeA(Error);
       expect((e as Error).message).toMatchRegex(
         new RegExp(/^(?:Error: )?Something goes wrong.$/),
       );
-    } finally {
-      if (service) await service.close();
     }
   });
 
@@ -1822,6 +1841,8 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
       expect((e as Error).message).toMatchRegex(
         new RegExp(/^(?:Error: )?Something goes wrong.$/),
       );
+    } finally {
+      await service.close();
     }
   });
 
