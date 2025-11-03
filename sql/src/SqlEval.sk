@@ -504,7 +504,7 @@ class Evaluator{options: Options, user: ?UserFile} {
     key: SKStore.Key,
     value: SKStore.File,
   ): void {
-    context.getEagerDir(dirName).write(context, key, value);
+    context.getEagerDir(dirName).unsafeWrite(context, key, value);
   }
 
   fun writeArray(
@@ -513,7 +513,7 @@ class Evaluator{options: Options, user: ?UserFile} {
     key: SKStore.Key,
     values: Array<SKStore.File>,
   ): void {
-    context.getEagerDir(dirName).writeArray(context, key, values);
+    context.getEagerDir(dirName).unsafeWriteArray(context, key, values);
   }
 
   fun stmt(
@@ -700,7 +700,7 @@ class Evaluator{options: Options, user: ?UserFile} {
               .collect(Array);
             entries = Vector[(key, (src, src, rows))];
             inputDir = context.unsafeGetEagerDir(dir.dirName);
-            inputDir.writeArraySourceMany(context, entries.iterator());
+            inputDir.unsafeWriteArraySourceMany(context, entries.iterator());
           },
         );
         None()
@@ -1298,7 +1298,7 @@ class Evaluator{options: Options, user: ?UserFile} {
           src = SKStore.Path::create(deleteDir, key);
           entries = Vector[(key, (src, src, valueIter.collect(Array)))];
           inputDir = context.unsafeGetEagerDir(dir.dirName);
-          inputDir.writeArraySourceMany(context, entries.iterator());
+          inputDir.unsafeWriteArraySourceMany(context, entries.iterator());
         },
       );
       None()
@@ -1395,7 +1395,7 @@ class Evaluator{options: Options, user: ?UserFile} {
         for ((_, source, _) in dir.getDataIterWithoutTombs(context, key)) {
           entries.push((key, (source, writerPath, Array<SKStore.File>[])));
         };
-        dir.writeArraySourceMany(context, entries.iterator());
+        dir.unsafeWriteArraySourceMany(context, entries.iterator());
         if (select.sets.isEmpty()) return void;
 
         row = rowIter.next() match {
@@ -1547,7 +1547,7 @@ class Evaluator{options: Options, user: ?UserFile} {
                     );
                   };
                 };
-                dir.writeArraySourceMany(context, entries.iterator());
+                dir.unsafeWriteArraySourceMany(context, entries.iterator());
                 context.update();
                 true
               }
@@ -2678,7 +2678,7 @@ extension base class EagerDir {
         entries.push((key, (source, writer, values)));
       }
     };
-    inputDir.writeArraySourceMany(
+    inputDir.unsafeWriteArraySourceMany(
       targetCtx,
       entries.iterator(),
       if (isReset) Some((this.dirName, changedKeys)) else None(),

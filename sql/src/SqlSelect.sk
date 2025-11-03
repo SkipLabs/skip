@@ -813,7 +813,7 @@ class SelectEvaluator{
         },
       )
     | Some(dir) ->
-      dir.writeArray(
+      dir.unsafeWriteArray(
         context,
         SKStore.UnitID::singleton,
         rowOpt match {
@@ -1636,11 +1636,11 @@ fun makeJoinReducer(
         };
         for (kv in leftRows) {
           (key, _) = kv;
-          shardTable.writeArray(context, key, Array[stats]);
+          shardTable.unsafeWriteArray(context, key, Array[stats]);
         };
         for (kv in rightRows) {
           (key, _) = kv;
-          shardTable.writeArray(context, key, Array[stats]);
+          shardTable.unsafeWriteArray(context, key, Array[stats]);
         }
       }
     };
