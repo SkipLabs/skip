@@ -98,7 +98,11 @@ fun internCString(context: mutable SKStore.Context, string: String): ?CString {
   for (file in internedCStringsDir.unsafeGetArray(context, key)) {
     return file.value;
   };
-  internedCStringsDir.writeArray(context, key, Array[CStringFile(cstring)]);
+  internedCStringsDir.unsafeWriteArray(
+    context,
+    key,
+    Array[CStringFile(cstring)],
+  );
   cstring
 }
 
@@ -142,7 +146,11 @@ fun internFieldNames(
       return file.value;
     }
   };
-  internedFieldsDir.writeArray(context, key, Array[FieldNamesFile(fieldNames)]);
+  internedFieldsDir.unsafeWriteArray(
+    context,
+    key,
+    Array[FieldNamesFile(fieldNames)],
+  );
   fieldNames
 }
 

@@ -583,7 +583,16 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
 
   fun writeArray(context: mutable Context, key: K, values: Array<V>): void {
     dir = context.unsafeGetEagerDir(this.dirName);
-    dir.writeArray(context, key, values);
+    dir.writeArray(context, key, values)
+  }
+
+  fun unsafeWriteArray(
+    context: mutable Context,
+    key: K,
+    values: Array<V>,
+  ): void {
+    dir = context.unsafeGetEagerDir(this.dirName);
+    dir.unsafeWriteArray(context, key, values);
   }
 
   fun items(
