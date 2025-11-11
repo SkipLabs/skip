@@ -26,7 +26,6 @@ import {
   type Context,
   type EagerCollection,
   type Entry,
-  type ExternalService,
   type LazyCollection,
   type LazyCompute,
   type Mapper,
@@ -37,6 +36,7 @@ import {
   type Resource,
   type SkipService,
   type Watermark,
+  type ExternalService,
 } from "./api.js";
 
 import {
@@ -46,24 +46,26 @@ import {
   SkipResourceInstanceInUseError,
   SkipUnknownCollectionError,
 } from "./errors.js";
-import {
-  ResourceBuilder,
-  type Notifier,
-  type Handle,
-  type FromBinding,
-} from "./binding.js";
+import { type Notifier, type Handle, type FromBinding } from "./binding.js";
 
 export * from "./api.js";
 export * from "./errors.js";
 
 export type JSONMapper = Mapper<Json, Json, Json, Json>;
 export type JSONLazyCompute = LazyCompute<Json, Json>;
+export type JSONOperator = JSONMapper | JSONLazyCompute | Reducer<Json, Json>;
+
+export type HandlerInfo<P> = {
+  object: P;
+  name: string;
+  params: DepSafe[];
+};
 
 function instantiateUserObject<Params extends DepSafe[], Result extends object>(
   what: string,
   ctor: new (...params: Params) => Result,
   params: Params,
-): Result {
+): HandlerInfo<Result> {
   const checkedParams = params.map(checkOrCloneParam) as Params;
   const obj = new ctor(...checkedParams);
   Object.freeze(obj);
@@ -72,7 +74,118 @@ function instantiateUserObject<Params extends DepSafe[], Result extends object>(
       `${what} classes must be defined at top-level.`,
     );
   }
-  return obj;
+  return {
+    object: obj,
+    name: obj.constructor.name,
+    params: checkedParams,
+  };
+}
+
+export enum LoadStatus {
+  Incompatible,
+  Changed,
+  Same,
+}
+
+export interface ChangeManager {
+  needInputReload(name: string): boolean;
+  needResourceReload(name: string): LoadStatus;
+  needExternalServiceReload(name: string, resource: string): boolean;
+  needMapperReload(name: string): boolean;
+  needReducerReload(name: string): boolean;
+  needLazyComputeReload(name: string): boolean;
+}
+
+export class ServiceDefinition {
+  constructor(
+    private service: SkipService,
+    private readonly externals: Map<string, ExternalService> = new Map(),
+  ) {}
+
+  buildResource(name: string, parameters: Json): Resource {
+    const builder = this.service.resources[name];
+    if (!builder) throw new Error(`Resource '${name}' not exist.`);
+    return new builder(parameters);
+  }
+
+  inputs(): string[] {
+    return this.service.initialData
+      ? Object.keys(this.service.initialData)
+      : [];
+  }
+
+  resources(): string[] {
+    return Object.keys(this.service.resources);
+  }
+
+  initialData(name: string): Entry<Json, Json>[] {
+    if (!this.service.initialData) throw new Error(`No initial data defined.`);
+    const data = this.service.initialData[name];
+    if (!data) throw new Error(`Initial data '${name}' not exist.`);
+    return data;
+  }
+
+  createGraph(
+    inputCollections: NamedCollections,
+    context: Context,
+  ): NamedCollections {
+    return this.service.createGraph(inputCollections, context);
+  }
+
+  subscribe(
+    external: string,
+    writer: CollectionWriter<Json, Json>,
+    instance: string,
+    resource: string,
+    params: Json,
+  ): Promise<void> {
+    if (!this.service.externalServices)
+      throw new Error(`No external services defined.`);
+    const supplier = this.service.externalServices[external];
+    if (!supplier)
+      throw new Error(`External services '${external}' not exist.`);
+    this.externals.set(`${external}/${instance}`, supplier);
+    // Ensure notification is made outside the current context update
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        supplier
+          .subscribe(instance, resource, params, {
+            update: writer.update.bind(writer),
+            error: (_) => {},
+          })
+          .then(resolve)
+          .catch(reject);
+      }, 0);
+    });
+  }
+
+  unsubscribe(external: string, instance: string) {
+    if (!this.service.externalServices)
+      throw new Error(`No external services defined.`);
+    const supplier = this.externals.get(`${external}/${instance}`);
+    if (!supplier)
+      throw new Error(`External services '${external}/${instance}' not exist.`);
+    supplier.unsubscribe(instance);
+    this.externals.delete(`${external}/${instance}`);
+  }
+
+  async shutdown(): Promise<void> {
+    const promises: Promise<void>[] = [];
+    const uniqueServices = new Set(this.externals.values());
+    if (this.service.externalServices) {
+      for (const es of Object.values(this.service.externalServices)) {
+        uniqueServices.add(es);
+      }
+    }
+    for (const es of uniqueServices) {
+      promises.push(es.shutdown());
+    }
+    await Promise.all(promises);
+  }
+
+  derive(service: SkipService): ServiceDefinition {
+    return new ServiceDefinition(service, new Map(this.externals));
+  }
 }
 
 class Handles {
@@ -126,7 +239,7 @@ class LazyCollectionImpl<K extends Json, V extends Json>
   implements LazyCollection<K, V>
 {
   constructor(
-    private readonly lazyCollection: string,
+    readonly lazyCollection: string,
     private readonly refs: ToBinding,
   ) {
     super();
@@ -256,18 +369,20 @@ class EagerCollectionImpl<K extends Json, V extends Json>
         this.refs.handles.register(mapperObj),
       );
 
-      if (sknative in reducerObj && typeof reducerObj[sknative] == "string") {
+      if (
+        sknative in reducerObj.object &&
+        typeof reducerObj.object[sknative] == "string"
+      ) {
         return this.derive<K2, Accum>(
           this.refs.binding.SkipRuntime_Collection__nativeMapReduce(
             this.collection,
             skmapper,
-            reducerObj[sknative],
+            reducerObj.object[sknative],
           ),
         );
       } else {
         const skreducer = this.refs.binding.SkipRuntime_createReducer(
           this.refs.handles.register(reducerObj),
-          this.refs.json().exportJSON(reducerObj.initial),
         );
         return this.derive<K2, Accum>(
           this.refs.binding.SkipRuntime_Collection__mapReduce(
@@ -285,17 +400,19 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     ...params: Params
   ): EagerCollection<K, Accum> {
     const reducerObj = instantiateUserObject("Reducer", reducer, params);
-    if (sknative in reducerObj && typeof reducerObj[sknative] == "string") {
+    if (
+      sknative in reducerObj.object &&
+      typeof reducerObj.object[sknative] == "string"
+    ) {
       return this.derive<K, Accum>(
         this.refs.binding.SkipRuntime_Collection__nativeReduce(
           this.collection,
-          reducerObj[sknative],
+          reducerObj.object[sknative],
         ),
       );
     } else {
       const skreducer = this.refs.binding.SkipRuntime_createReducer(
         this.refs.handles.register(reducerObj),
-        this.refs.json().exportJSON(reducerObj.initial),
       );
       return this.derive<K, Accum>(
         this.refs.binding.SkipRuntime_Collection__reduce(
@@ -459,6 +576,7 @@ export class ServiceInstance {
   constructor(
     private readonly refs: ToBinding,
     readonly forkName: Nullable<string>,
+    private definition: ServiceDefinition,
   ) {}
 
   /**
@@ -637,7 +755,7 @@ export class ServiceInstance {
     const fork = this.fork(uuid);
     try {
       await fork.update_(collection, entries);
-      fork.merge();
+      fork.merge([]);
     } catch (ex: unknown) {
       fork.abortFork();
       throw ex;
@@ -677,17 +795,61 @@ export class ServiceInstance {
   close(): Promise<unknown> {
     this.refs.setFork(this.forkName);
     const result = this.refs.runWithGC(() => {
-      return this.refs
-        .json()
-        .importJSON(this.refs.binding.SkipRuntime_closeService(), true);
+      return this.refs.binding.SkipRuntime_closeService();
+    });
+    if (result >= 0) {
+      return this.refs.handles.deleteHandle(result as Handle<Promise<unknown>>);
+    } else {
+      const errorHdl = -(result as number) as Handle<Error>;
+      return Promise.reject(this.refs.handles.deleteHandle(errorHdl));
+    }
+  }
+
+  async reload(service: SkipService, changes: ChangeManager): Promise<void> {
+    if (this.forkName) {
+      throw new SkipError("Reload cannot be called in transaction.");
+    }
+    const definition = this.definition.derive(service);
+    this.refs.setFork(this.forkName);
+    const uuid = crypto.randomUUID();
+    const fork = this.fork(uuid);
+    let merged = false;
+    try {
+      const streamsToClose = await fork._reload(definition, changes);
+      fork.merge(streamsToClose);
+      merged = true;
+      this.closeResourceStreams(streamsToClose);
+      this.definition = definition;
+    } catch (ex: unknown) {
+      console.error(ex);
+      if (!merged) fork.abortFork();
+      throw ex;
+    }
+  }
+
+  private async _reload(
+    definition: ServiceDefinition,
+    changes: ChangeManager,
+  ): Promise<string[]> {
+    this.refs.setFork(this.forkName);
+    const result = this.refs.runWithGC(() => {
+      this.refs.changes = this.refs.handles.register(changes);
+      const skservicehHdl = this.refs.handles.register(definition);
+      const skservice =
+        this.refs.binding.SkipRuntime_createService(skservicehHdl);
+      const res = this.refs.binding.SkipRuntime_Runtime__reload(skservice);
+      this.refs.handles.deleteHandle(this.refs.changes);
+      this.refs.changes = null;
+      return this.refs.json().importJSON(res, true);
     });
     if (Array.isArray(result)) {
-      const handles = result as Handle<Promise<void>>[];
+      const [handles, res] = result as [Handle<Promise<void>>[], string[]];
       const promises = handles.map((h) => this.refs.handles.deleteHandle(h));
-      return Promise.all(promises);
+      await Promise.all(promises);
+      return res;
     } else {
       const errorHdl = result as Handle<Error>;
-      return Promise.reject(this.refs.handles.deleteHandle(errorHdl));
+      throw this.refs.handles.deleteHandle(errorHdl);
     }
   }
 
@@ -700,19 +862,29 @@ export class ServiceInstance {
     if (this.forkName) throw new Error(`Unable to fork ${this.forkName}.`);
     this.refs.setFork(this.forkName);
     this.refs.fork(name);
-    return new ServiceInstance(this.refs, name);
+    return new ServiceInstance(this.refs, name, this.definition);
   }
 
-  private merge(): void {
+  private merge(ignore: string[]): void {
     if (!this.forkName) throw new Error("Unable to merge fork on main.");
     this.refs.setFork(this.forkName);
-    this.refs.merge();
+    this.refs.merge(ignore);
   }
 
   private abortFork(): void {
     if (!this.forkName) throw new Error("Unable to abord fork on main.");
     this.refs.setFork(this.forkName);
     this.refs.abortFork();
+  }
+
+  private closeResourceStreams(streams: string[]): void {
+    this.refs.setFork(this.forkName);
+    const errorHdl = this.refs.runWithGC(() => {
+      return this.refs.binding.SkipRuntime_Runtime__closeResourceStreams(
+        this.refs.json().exportJSON(streams),
+      );
+    });
+    if (errorHdl) throw this.refs.handles.deleteHandle(errorHdl);
   }
 }
 
@@ -793,6 +965,7 @@ export class ToBinding {
   private skjson?: JsonConverter;
   private forkName: Nullable<string>;
   readonly handles: Handles;
+  changes: Nullable<Handle<ChangeManager>>;
 
   constructor(
     public binding: FromBinding,
@@ -803,6 +976,7 @@ export class ToBinding {
     this.stack = new Stack();
     this.handles = new Handles();
     this.forkName = null;
+    this.changes = null;
   }
 
   register<T>(v: T): Handle<T> {
@@ -833,6 +1007,10 @@ export class ToBinding {
     return this.forkName;
   }
 
+  SkipRuntime_getChangeManager(): number {
+    return this.changes ?? 0;
+  }
+
   setFork(name: Nullable<string>): void {
     this.forkName = name;
   }
@@ -840,14 +1018,14 @@ export class ToBinding {
   // Mapper
 
   SkipRuntime_Mapper__mapEntry(
-    skmapper: Handle<JSONMapper>,
+    skmapper: Handle<HandlerInfo<JSONMapper>>,
     key: Pointer<Internal.CJSON>,
     values: Pointer<Internal.NonEmptyIterator>,
   ): Pointer<Internal.CJArray> {
     const skjson = this.getJsonConverter();
     const mapper = this.handles.get(skmapper);
     const context = new ContextImpl(this);
-    const result = mapper.mapEntry(
+    const result = mapper.object.mapEntry(
       skjson.importJSON(key) as Json,
       new ValuesImpl<Json>(skjson, this.binding, values),
       context,
@@ -855,21 +1033,38 @@ export class ToBinding {
     return skjson.exportJSON(Array.from(result));
   }
 
-  SkipRuntime_deleteMapper(mapper: Handle<JSONMapper>): void {
+  SkipRuntime_Mapper__getInfo(
+    skmapper: Handle<HandlerInfo<JSONMapper>>,
+  ): Pointer<Internal.CJObject> {
+    return this.getInfo(skmapper);
+  }
+
+  SkipRuntime_Mapper__isEquals(
+    mapper: Handle<HandlerInfo<JSONMapper>>,
+    other: Handle<HandlerInfo<JSONMapper>>,
+  ): number {
+    const object = this.handles.get(mapper);
+    if (this.getChanges()?.needMapperReload(object.name)) {
+      return 0;
+    }
+    return this.isEquals(mapper, other);
+  }
+
+  SkipRuntime_deleteMapper(mapper: Handle<HandlerInfo<JSONMapper>>): void {
     this.handles.deleteHandle(mapper);
   }
 
   // LazyCompute
 
   SkipRuntime_LazyCompute__compute(
-    sklazyCompute: Handle<JSONLazyCompute>,
+    sklazyCompute: Handle<HandlerInfo<JSONLazyCompute>>,
     self: string,
     skkey: Pointer<Internal.CJSON>,
   ): Pointer<Internal.CJArray> {
     const skjson = this.getJsonConverter();
     const lazyCompute = this.handles.get(sklazyCompute);
     const context = new ContextImpl(this);
-    const result = lazyCompute.compute(
+    const result = lazyCompute.object.compute(
       new LazyCollectionImpl<Json, Json>(self, this),
       skjson.importJSON(skkey) as Json,
       context,
@@ -877,7 +1072,26 @@ export class ToBinding {
     return skjson.exportJSON(Array.from(result));
   }
 
-  SkipRuntime_deleteLazyCompute(lazyCompute: Handle<JSONLazyCompute>): void {
+  SkipRuntime_LazyCompute__getInfo(
+    lazyCompute: Handle<HandlerInfo<JSONLazyCompute>>,
+  ): Pointer<Internal.CJObject> {
+    return this.getInfo(lazyCompute);
+  }
+
+  SkipRuntime_LazyCompute__isEquals(
+    lazyCompute: Handle<HandlerInfo<JSONLazyCompute>>,
+    other: Handle<HandlerInfo<JSONLazyCompute>>,
+  ): number {
+    const object = this.handles.get(lazyCompute);
+    if (this.getChanges()?.needLazyComputeReload(object.name)) {
+      return 0;
+    }
+    return this.isEquals(lazyCompute, other);
+  }
+
+  SkipRuntime_deleteLazyCompute(
+    lazyCompute: Handle<HandlerInfo<JSONLazyCompute>>,
+  ): void {
     this.handles.deleteHandle(lazyCompute);
   }
 
@@ -904,28 +1118,10 @@ export class ToBinding {
     this.handles.deleteHandle(resource);
   }
 
-  // ResourceBuilder
+  // ServiceDefinition
 
-  SkipRuntime_ResourceBuilder__build(
-    skbuilder: Handle<ResourceBuilder>,
-    skparams: Pointer<Internal.CJObject>,
-  ): Pointer<Internal.Resource> {
-    const skjson = this.getJsonConverter();
-    const builder = this.handles.get(skbuilder);
-    const resource = builder.build(skjson.importJSON(skparams) as Json);
-    return this.binding.SkipRuntime_createResource(
-      this.handles.register(resource),
-    );
-  }
-
-  SkipRuntime_deleteResourceBuilder(builder: Handle<ResourceBuilder>): void {
-    this.handles.deleteHandle(builder);
-  }
-
-  // Service
-
-  SkipRuntime_Service__createGraph(
-    skservice: Handle<SkipService>,
+  SkipRuntime_ServiceDefinition__createGraph(
+    skservice: Handle<ServiceDefinition>,
     skcollections: Pointer<Internal.CJObject>,
   ): Pointer<Internal.CJObject> {
     const skjson = this.getJsonConverter();
@@ -945,8 +1141,109 @@ export class ToBinding {
     return skjson.exportJSON(collectionsNames);
   }
 
-  SkipRuntime_deleteService(service: Handle<SkipService>): void {
+  SkipRuntime_ServiceDefinition__inputs(
+    skservice: Handle<ServiceDefinition>,
+  ): Pointer<Internal.CJArray<Internal.CJSON>> {
+    const skjson = this.getJsonConverter();
+    const service = this.handles.get(skservice);
+    return skjson.exportJSON(service.inputs());
+  }
+
+  SkipRuntime_ServiceDefinition__resources(
+    skservice: Handle<ServiceDefinition>,
+  ): Pointer<Internal.CJArray<Internal.CJSON>> {
+    const skjson = this.getJsonConverter();
+    const service = this.handles.get(skservice);
+    return skjson.exportJSON(service.resources());
+  }
+
+  SkipRuntime_ServiceDefinition__initialData(
+    skservice: Handle<ServiceDefinition>,
+    name: string,
+  ): Pointer<Internal.CJArray<Internal.CJSON>> {
+    const skjson = this.getJsonConverter();
+    const service = this.handles.get(skservice);
+    return skjson.exportJSON(service.initialData(name));
+  }
+
+  SkipRuntime_ServiceDefinition__buildResource(
+    skservice: Handle<ServiceDefinition>,
+    name: string,
+    skparams: Pointer<Internal.CJObject>,
+  ): Pointer<Internal.Resource> {
+    const skjson = this.getJsonConverter();
+    const service = this.handles.get(skservice);
+    const resource = service.buildResource(
+      name,
+      skjson.importJSON(skparams) as Json,
+    );
+    return this.binding.SkipRuntime_createResource(
+      this.handles.register(resource),
+    );
+  }
+
+  SkipRuntime_ServiceDefinition__subscribe(
+    skservice: Handle<ServiceDefinition>,
+    external: string,
+    writerId: string,
+    instance: string,
+    resource: string,
+    skparams: Pointer<Internal.CJObject>,
+  ): Handle<Promise<void>> {
+    const skjson = this.getJsonConverter();
+    const service = this.handles.get(skservice);
+    const writer = new CollectionWriter(writerId, this, this.forkName);
+    const params = skjson.importJSON(skparams, true) as Json;
+    return this.handles.register(
+      service.subscribe(external, writer, instance, resource, params),
+    );
+  }
+
+  SkipRuntime_ServiceDefinition__unsubscribe(
+    skservice: Handle<ServiceDefinition>,
+    external: string,
+    instance: string,
+  ): void {
+    const service = this.handles.get(skservice);
+    service.unsubscribe(external, instance);
+  }
+
+  SkipRuntime_ServiceDefinition__shutdown(
+    skservice: Handle<ServiceDefinition>,
+  ): Handle<Promise<unknown>> {
+    const service = this.handles.get(skservice);
+    return this.handles.register(service.shutdown());
+  }
+
+  SkipRuntime_deleteService(service: Handle<ServiceDefinition>): void {
     this.handles.deleteHandle(service);
+  }
+
+  // Change manager
+
+  SkipRuntime_ChangeManager__needInputReload(
+    skmanager: Handle<ChangeManager>,
+    name: string,
+  ): number {
+    const manager = this.handles.get(skmanager);
+    return manager.needInputReload(name) ? 1 : 0;
+  }
+
+  SkipRuntime_ChangeManager__needResourceReload(
+    skmanager: Handle<ChangeManager>,
+    name: string,
+  ): number {
+    const manager = this.handles.get(skmanager);
+    return manager.needResourceReload(name);
+  }
+
+  SkipRuntime_ChangeManager__needExternalServiceReload(
+    skmanager: Handle<ChangeManager>,
+    name: string,
+    resource: string,
+  ): number {
+    const manager = this.handles.get(skmanager);
+    return manager.needExternalServiceReload(name, resource) ? 1 : 0;
   }
 
   // Notifier
@@ -990,15 +1287,23 @@ export class ToBinding {
 
   // Reducer
 
+  SkipRuntime_Reducer__init(
+    skreducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
+  ): Pointer<Internal.CJSON> {
+    const skjson = this.getJsonConverter();
+    const reducer = this.handles.get(skreducer);
+    return skjson.exportJSON(reducer.object.initial);
+  }
+
   SkipRuntime_Reducer__add(
-    skreducer: Handle<Reducer<Json, Json>>,
+    skreducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
     skacc: Nullable<Pointer<Internal.CJSON>>,
     skvalue: Pointer<Internal.CJSON>,
   ): Pointer<Internal.CJSON> {
     const skjson = this.getJsonConverter();
     const reducer = this.handles.get(skreducer);
     return skjson.exportJSON(
-      reducer.add(
+      reducer.object.add(
         skacc ? (skjson.importJSON(skacc) as Json) : null,
         skjson.importJSON(skvalue) as Json & DepSafe,
       ),
@@ -1006,111 +1311,67 @@ export class ToBinding {
   }
 
   SkipRuntime_Reducer__remove(
-    skreducer: Handle<Reducer<Json, Json>>,
+    skreducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
     skacc: Pointer<Internal.CJSON>,
     skvalue: Pointer<Internal.CJSON>,
   ): Nullable<Pointer<Internal.CJSON>> {
     const skjson = this.getJsonConverter();
     const reducer = this.handles.get(skreducer);
     return skjson.exportJSON(
-      reducer.remove(
+      reducer.object.remove(
         skjson.importJSON(skacc) as Json,
         skjson.importJSON(skvalue) as Json & DepSafe,
       ),
     );
   }
 
-  SkipRuntime_deleteReducer(reducer: Handle<Reducer<Json, Json>>): void {
+  SkipRuntime_Reducer__isEquals(
+    reducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
+    other: Handle<HandlerInfo<Reducer<Json, Json>>>,
+  ): number {
+    const object = this.handles.get(reducer);
+    if (this.getChanges()?.needReducerReload(object.name)) {
+      return 0;
+    }
+    return this.isEquals(reducer, other);
+  }
+
+  SkipRuntime_Reducer__getInfo(
+    reducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
+  ): Pointer<Internal.CJObject> {
+    return this.getInfo(reducer);
+  }
+
+  SkipRuntime_deleteReducer(
+    reducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
+  ): void {
     this.handles.deleteHandle(reducer);
   }
 
-  // ExternalService
-
-  SkipRuntime_ExternalService__subscribe(
-    sksupplier: Handle<ExternalService>,
-    writerId: string,
-    instance: string,
-    resource: string,
-    skparams: Pointer<Internal.CJObject>,
-  ): Handle<Promise<void>> {
-    const skjson = this.getJsonConverter();
-    const supplier = this.handles.get(sksupplier);
-    const writer = new CollectionWriter(writerId, this, this.forkName);
-    const params = skjson.importJSON(skparams, true) as Json;
-    // Ensure notification is made outside the current context update
-    return this.handles.register(
-      new Promise((resolve, reject) => {
-        setTimeout(() => {
-          supplier
-            .subscribe(instance, resource, params, {
-              update: writer.update.bind(writer),
-              error: (_) => {},
-            })
-            .then(resolve)
-            .catch(reject);
-        }, 0);
-      }),
-    );
-  }
-
-  SkipRuntime_ExternalService__unsubscribe(
-    sksupplier: Handle<ExternalService>,
-    instance: string,
-  ): void {
-    const supplier = this.handles.get(sksupplier);
-    supplier.unsubscribe(instance);
-  }
-
-  SkipRuntime_ExternalService__shutdown(
-    sksupplier: Handle<ExternalService>,
-  ): Handle<Promise<void>> {
-    const supplier = this.handles.get(sksupplier);
-    return this.handles.register(supplier.shutdown());
-  }
-
-  SkipRuntime_deleteExternalService(supplier: Handle<ExternalService>): void {
-    this.handles.deleteHandle(supplier);
-  }
-
-  // Executor
-
   async initService(service: SkipService): Promise<ServiceInstance> {
     this.setFork(null);
-    await this.runAsync(() => {
-      const skExternalServices =
-        this.binding.SkipRuntime_ExternalServiceMap__create();
-      if (service.externalServices) {
-        for (const [name, remote] of Object.entries(service.externalServices)) {
-          const skremote = this.binding.SkipRuntime_createExternalService(
-            this.handles.register(remote),
-          );
-          this.binding.SkipRuntime_ExternalServiceMap__add(
-            skExternalServices,
-            name,
-            skremote,
-          );
-        }
-      }
-      const skresources = this.binding.SkipRuntime_ResourceBuilderMap__create();
-      for (const [name, builder] of Object.entries(service.resources)) {
-        const skbuilder = this.binding.SkipRuntime_createResourceBuilder(
-          this.handles.register(new ResourceBuilder(builder)),
-        );
-        this.binding.SkipRuntime_ResourceBuilderMap__add(
-          skresources,
-          name,
-          skbuilder,
-        );
-      }
-      const skservice = this.binding.SkipRuntime_createService(
-        this.handles.register(service),
-        this.json().exportJSON(service.initialData ?? {}),
-        skresources,
-        skExternalServices,
-      );
+    const uuid = crypto.randomUUID();
+    this.fork(uuid);
+    try {
+      this.setFork(uuid);
+      const definition = new ServiceDefinition(service);
+      await this.initService_(definition);
+      this.setFork(uuid);
+      this.merge();
+      return new ServiceInstance(this, null, definition);
+    } catch (ex: unknown) {
+      this.setFork(uuid);
+      this.abortFork();
+      throw ex;
+    }
+  }
+
+  private initService_(definition: ServiceDefinition): Promise<void> {
+    return this.runAsync(() => {
+      const skservicehHdl = this.handles.register(definition);
+      const skservice = this.binding.SkipRuntime_createService(skservicehHdl);
       return this.binding.SkipRuntime_initService(skservice);
     });
-    return new ServiceInstance(this, null);
   }
 
   //
@@ -1136,9 +1397,9 @@ export class ToBinding {
     if (errorHdl) throw this.handles.deleteHandle(errorHdl);
   }
 
-  merge(): void {
+  merge(ignore: string[] = []): void {
     const errorHdl = this.runWithGC(() =>
-      this.binding.SkipRuntime_Runtime__merge(),
+      this.binding.SkipRuntime_Runtime__merge(this.json().exportJSON(ignore)),
     );
     if (errorHdl) throw this.handles.deleteHandle(errorHdl);
   }
@@ -1162,5 +1423,104 @@ export class ToBinding {
       const errorHdl = result as Handle<Error>;
       throw this.handles.deleteHandle(errorHdl);
     }
+  }
+
+  private deepEquals(a: Nullable<Json>, b: Nullable<Json>) {
+    // Same reference or both NaN
+    if (a === b) return true;
+    if (a !== a && b !== b) return true; // NaN check
+
+    // Different types or one is null
+    if (typeof a !== typeof b || a === null || b === null) return false;
+
+    // Primitives already checked by ===
+    if (typeof a !== "object" || typeof b !== "object") return false;
+
+    // Arrays
+    if (Array.isArray(a)) {
+      if (!Array.isArray(b) || a.length !== b.length) return false;
+      for (let i = 0; i < a.length; i++) {
+        if (!this.deepEquals(a[i]!, b[i]!)) return false;
+      }
+      return true;
+    }
+
+    // Different array status
+    if (Array.isArray(b)) return false;
+
+    // Objects
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+
+    if (keysA.length !== keysB.length) return false;
+
+    for (const key of keysA) {
+      if (
+        !Object.prototype.hasOwnProperty.call(b, key) ||
+        !this.deepEquals(a[key]!, b[key]!)
+      )
+        return false;
+    }
+
+    return true;
+  }
+
+  private getInfo<T>(
+    skmapper: Handle<HandlerInfo<T>>,
+  ): Pointer<Internal.CJObject> {
+    const skjson = this.getJsonConverter();
+    const object = this.handles.get(skmapper);
+    const name = object.name;
+    const parameters = object.params.map((v) => {
+      if (v instanceof EagerCollectionImpl) {
+        return {
+          type: "collection",
+          value: v.collection,
+        };
+      }
+      if (v instanceof LazyCollectionImpl) {
+        return {
+          type: "collection",
+          value: v.lazyCollection,
+        };
+      }
+      return { type: "data", value: v as Json };
+    });
+    return skjson.exportJSON({ name, parameters });
+  }
+
+  private isEquals<T extends JSONOperator>(
+    mapper: Handle<HandlerInfo<T>>,
+    other: Handle<HandlerInfo<T>>,
+  ): number {
+    const object = this.handles.get(mapper);
+    const oobject = this.handles.get(other);
+    if (object.object.constructor != oobject.object.constructor) {
+      return 0;
+    }
+    if (object.params.length != oobject.params.length) return 0;
+    for (const [i, param] of object.params.entries()) {
+      const oparam = oobject.params[i];
+      if (param instanceof EagerCollectionImpl) {
+        if (oparam instanceof EagerCollectionImpl) {
+          if (param.collection != oparam.collection) return 0;
+        } else {
+          return 0;
+        }
+      } else if (param instanceof LazyCollectionImpl) {
+        if (oparam instanceof LazyCollectionImpl) {
+          if (param.lazyCollection != oparam.lazyCollection) return 0;
+        } else {
+          return 0;
+        }
+      } else if (!this.deepEquals(param as Json, oparam as Json)) {
+        return 0;
+      }
+    }
+    return 1;
+  }
+
+  private getChanges(): Nullable<ChangeManager> {
+    return this.changes ? this.handles.get(this.changes) : null;
   }
 }

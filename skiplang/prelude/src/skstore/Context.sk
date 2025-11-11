@@ -901,7 +901,10 @@ mutable class Context private {
     mutexUnlock(lock)
   }
 
-  readonly fun notifyAll(start: Tick): void {
+  readonly fun notifyAll(
+    start: Tick,
+    ignoredSessions: Set<String> = Set[],
+  ): void {
     changedDirNames = this.getGlobal("CHANGED_DIRS") match {
     | None() -> this.getDirsChangesAfter(start)
     | Some(x @ ChangedDirs _) -> x.value
@@ -910,7 +913,7 @@ mutable class Context private {
     if (this.tick == start) return void;
     readOnlyWithRegionFold(
       Some(this),
-      this.sessions.values(),
+      this.sessions.filter((k, _) -> !ignoredSessions.contains(k)).values(),
       void,
       (ctx, sub, _) ~> {
         affected = sub.dirNames(ctx.fromSome()).any(dirName ->
@@ -2200,13 +2203,18 @@ class ForkSettings(
   subscriptionsFilter: (String, Sub, Tick) ~> ?Sub = (_, _, _) ~> None(),
   persistentsFilter: (String, File) ~> ?File = (_, _) ~> None(),
   globalsFilter: (String, File) ~> ?File = (_, _) ~> None(),
+  ignoredSessions: Set<String> = Set[],
   isSync: Bool = false,
 ) {
-  static fun keepall(isSync: Bool = false): ForkSettings {
+  static fun keepall(
+    ignoredSessions: Set<String> = Set[],
+    isSync: Bool = false,
+  ): ForkSettings {
     ForkSettings(
       (_, sub, _) ~> Some(sub),
       (_, v) ~> Some(v),
       (_, v) ~> Some(v),
+      ignoredSessions,
       isSync,
     )
   }
@@ -2335,7 +2343,7 @@ fun mergeForkNoGc(
     sync = UInt32::truncate(if (settings.isSync) 1 else 0);
     SKStore.gContextsReplaceNoLock(new.contexts, sync);
     SKStore.gGlobalUnlock();
-    new.contexts.get(fork.fork).notifyAll(start);
+    new.contexts.get(fork.fork).notifyAll(start, settings.ignoredSessions);
     new.actions.each(fn -> fn())
   | Failure(ex) ->
     SKStore.gUnsafeFree(contexts);

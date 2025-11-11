@@ -38,6 +38,13 @@ mutable class Writer{
     this.!writes[key] = Array[];
   }
 
+  mutable fun append(key: Key, value: File): void {
+    this.writes.maybeGet(key) match {
+    | Some(values) -> this.!writes[key] = values.concat(Array[value])
+    | None() -> this.!writes[key] = Array[value]
+    }
+  }
+
   readonly fun getWrites(): Array<(Key, Array<File>)> {
     result = mutable Vector[];
     for (key => values in this.writes) {
@@ -118,6 +125,17 @@ class NoopMapper<K: frozen, F: frozen>() extends Mapper<K, F> {
     _values: mutable Iterator<F>,
   ): void {
     void
+  }
+}
+
+class IdentityMapper<K: Key, F: File>() extends Mapper<K, F> {
+  fun map(
+    _context: mutable Context,
+    writer: mutable Writer,
+    key: K,
+    values: mutable Iterator<F>,
+  ): void {
+    writer.setArray(key, values.collect(Array))
   }
 }
 

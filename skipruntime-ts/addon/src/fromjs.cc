@@ -74,6 +74,14 @@ void* SkipRuntime_getFork() {
                                       "SkipRuntime_getFork", 0, nullptr);
 }
 
+u_int32_t SkipRuntime_getChangeManager() {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  return (uint32_t)CallJSNumberFunction(
+      isolate, externFunctions, "SkipRuntime_getChangeManager", 0, nullptr);
+}
+
 CJArray SkipRuntime_Mapper__mapEntry(uint32_t mapperId, CJSON key,
                                      SKNonEmptyIterator values) {
   Isolate* isolate = Isolate::GetCurrent();
@@ -86,6 +94,29 @@ CJArray SkipRuntime_Mapper__mapEntry(uint32_t mapperId, CJSON key,
   };
   return CallJSFunction(isolate, externFunctions,
                         "SkipRuntime_Mapper__mapEntry", 3, argv);
+}
+
+CJObject SkipRuntime_Mapper__getInfo(uint32_t mapperId) {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[1] = {
+      Number::New(isolate, mapperId),
+  };
+  return CallJSFunction(isolate, externFunctions, "SkipRuntime_Mapper__getInfo",
+                        1, argv);
+}
+
+uint32_t SkipRuntime_Mapper__isEquals(uint32_t mapperId, uint32_t otherId) {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[2] = {
+      Number::New(isolate, mapperId),
+      Number::New(isolate, otherId),
+  };
+  return (uint32_t)CallJSNumberFunction(
+      isolate, externFunctions, "SkipRuntime_Mapper__isEquals", 2, argv);
 }
 
 void SkipRuntime_deleteMapper(uint32_t mapperId) {
@@ -111,6 +142,30 @@ CJSON SkipRuntime_LazyCompute__compute(uint32_t lazyComputeId, char* self,
                         "SkipRuntime_LazyCompute__compute", 3, argv);
 }
 
+CJObject SkipRuntime_LazyCompute__getInfo(uint32_t mapperId) {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[1] = {
+      Number::New(isolate, mapperId),
+  };
+  return CallJSFunction(isolate, externFunctions,
+                        "SkipRuntime_LazyCompute__getInfo", 1, argv);
+}
+
+uint32_t SkipRuntime_LazyCompute__isEquals(uint32_t mapperId,
+                                           uint32_t otherId) {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[2] = {
+      Number::New(isolate, mapperId),
+      Number::New(isolate, otherId),
+  };
+  return (uint32_t)CallJSNumberFunction(
+      isolate, externFunctions, "SkipRuntime_LazyCompute__isEquals", 2, argv);
+}
+
 void SkipRuntime_deleteLazyCompute(uint32_t lazyComputeId) {
   Isolate* isolate = Isolate::GetCurrent();
   HandleScope scope(isolate);
@@ -118,55 +173,6 @@ void SkipRuntime_deleteLazyCompute(uint32_t lazyComputeId) {
   Local<Value> argv[1] = {Number::New(isolate, lazyComputeId)};
   CallJSVoidFunction(isolate, externFunctions, "SkipRuntime_deleteLazyCompute",
                      1, argv);
-}
-
-double SkipRuntime_ExternalService__subscribe(uint32_t externalSupplierId,
-                                              char* collection, char* sessionId,
-                                              char* resource, CJObject params) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[5] = {
-      Number::New(isolate, externalSupplierId),
-      FromUtf8(isolate, collection),
-      FromUtf8(isolate, sessionId),
-      FromUtf8(isolate, resource),
-      External::New(isolate, params),
-  };
-  return CallJSNumberFunction(isolate, externFunctions,
-                              "SkipRuntime_ExternalService__subscribe", 5,
-                              argv);
-}
-
-void SkipRuntime_ExternalService__unsubscribe(uint32_t externalSupplierId,
-                                              char* sessionId) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[2] = {
-      Number::New(isolate, externalSupplierId),
-      FromUtf8(isolate, sessionId),
-  };
-  CallJSVoidFunction(isolate, externFunctions,
-                     "SkipRuntime_ExternalService__unsubscribe", 2, argv);
-}
-
-double SkipRuntime_ExternalService__shutdown(uint32_t externalSupplierId) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[1] = {Number::New(isolate, externalSupplierId)};
-  return CallJSNumberFunction(isolate, externFunctions,
-                              "SkipRuntime_ExternalService__shutdown", 1, argv);
-}
-
-void SkipRuntime_deleteExternalService(uint32_t externalSupplierId) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[1] = {Number::New(isolate, externalSupplierId)};
-  CallJSVoidFunction(isolate, externFunctions,
-                     "SkipRuntime_deleteExternalService", 1, argv);
 }
 
 char* SkipRuntime_Resource__instantiate(uint32_t resourceId,
@@ -191,49 +197,6 @@ void SkipRuntime_deleteResource(uint32_t resourceId) {
                      argv);
 }
 
-SKResource SkipRuntime_ResourceBuilder__build(uint32_t builderId,
-                                              CJObject params) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[2] = {
-      Number::New(isolate, builderId),
-      External::New(isolate, params),
-  };
-  return CallJSFunction(isolate, externFunctions,
-                        "SkipRuntime_ResourceBuilder__build", 2, argv);
-}
-
-void SkipRuntime_deleteResourceBuilder(uint32_t resourceBuilderId) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[1] = {Number::New(isolate, resourceBuilderId)};
-  CallJSVoidFunction(isolate, externFunctions,
-                     "SkipRuntime_deleteResourceBuilder", 1, argv);
-}
-
-void SkipRuntime_Checker__check(uint32_t executorId, char* request) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[2] = {
-      Number::New(isolate, executorId),
-      FromUtf8(isolate, request),
-  };
-  CallJSVoidFunction(isolate, externFunctions, "SkipRuntime_Checker__check", 2,
-                     argv);
-}
-
-void SkipRuntime_deleteChecker(uint32_t checkerId) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[1] = {Number::New(isolate, checkerId)};
-  CallJSVoidFunction(isolate, externFunctions, "SkipRuntime_deleteChecker", 1,
-                     argv);
-}
-
 void SkipRuntime_deleteService(uint32_t serviceId) {
   Isolate* isolate = Isolate::GetCurrent();
   HandleScope scope(isolate);
@@ -243,8 +206,102 @@ void SkipRuntime_deleteService(uint32_t serviceId) {
                      argv);
 }
 
-CJObject SkipRuntime_Service__createGraph(uint32_t serviceId,
-                                          CJObject collections) {
+double SkipRuntime_ServiceDefinition__subscribe(uint32_t serviceId,
+                                                char* collection,
+                                                char* supplier, char* sessionId,
+                                                char* resource,
+                                                CJObject params) {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[6] = {
+      Number::New(isolate, serviceId), FromUtf8(isolate, collection),
+      FromUtf8(isolate, supplier),     FromUtf8(isolate, sessionId),
+      FromUtf8(isolate, resource),     External::New(isolate, params),
+  };
+  return CallJSNumberFunction(isolate, externFunctions,
+                              "SkipRuntime_ServiceDefinition__subscribe", 6,
+                              argv);
+}
+
+void SkipRuntime_ServiceDefinition__unsubscribe(uint32_t serviceId,
+                                                char* supplier,
+                                                char* sessionId) {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[3] = {
+      Number::New(isolate, serviceId),
+      FromUtf8(isolate, supplier),
+      FromUtf8(isolate, sessionId),
+  };
+  CallJSVoidFunction(isolate, externFunctions,
+                     "SkipRuntime_ServiceDefinition__unsubscribe", 3, argv);
+}
+
+double SkipRuntime_ServiceDefinition__shutdown(uint32_t serviceId) {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[1] = {Number::New(isolate, serviceId)};
+  return CallJSNumberFunction(isolate, externFunctions,
+                              "SkipRuntime_ServiceDefinition__shutdown", 1,
+                              argv);
+}
+
+CJArray SkipRuntime_ServiceDefinition__inputs(uint32_t serviceId) {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[1] = {
+      Number::New(isolate, serviceId),
+  };
+  return CallJSFunction(isolate, externFunctions,
+                        "SkipRuntime_ServiceDefinition__inputs", 1, argv);
+}
+
+CJArray SkipRuntime_ServiceDefinition__initialData(uint32_t serviceId,
+                                                   char* input) {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[2] = {
+      Number::New(isolate, serviceId),
+      FromUtf8(isolate, input),
+  };
+  return CallJSFunction(isolate, externFunctions,
+                        "SkipRuntime_ServiceDefinition__initialData", 2, argv);
+}
+
+CJArray SkipRuntime_ServiceDefinition__resources(uint32_t serviceId) {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[1] = {
+      Number::New(isolate, serviceId),
+  };
+  return CallJSFunction(isolate, externFunctions,
+                        "SkipRuntime_ServiceDefinition__resources", 1, argv);
+}
+
+SKResource SkipRuntime_ServiceDefinition__buildResource(uint32_t serviceId,
+                                                        char* resource,
+                                                        CJObject params) {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[3] = {
+      Number::New(isolate, serviceId),
+      FromUtf8(isolate, resource),
+      External::New(isolate, params),
+  };
+  return CallJSFunction(isolate, externFunctions,
+                        "SkipRuntime_ServiceDefinition__buildResource", 3,
+                        argv);
+}
+
+CJObject SkipRuntime_ServiceDefinition__createGraph(uint32_t serviceId,
+                                                    CJObject collections) {
   Isolate* isolate = Isolate::GetCurrent();
   HandleScope scope(isolate);
   Local<Object> externFunctions = kExternFunctions.Get(isolate);
@@ -253,7 +310,43 @@ CJObject SkipRuntime_Service__createGraph(uint32_t serviceId,
       External::New(isolate, collections),
   };
   return CallJSFunction(isolate, externFunctions,
-                        "SkipRuntime_Service__createGraph", 2, argv);
+                        "SkipRuntime_ServiceDefinition__createGraph", 2, argv);
+}
+
+uint32_t SkipRuntime_ChangeManager__needInputReload(uint32_t serviceId,
+                                                    char* name) {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[2] = {Number::New(isolate, serviceId),
+                          FromUtf8(isolate, name)};
+  return CallJSNumberFunction(isolate, externFunctions,
+                              "SkipRuntime_ChangeManager__needInputReload", 2,
+                              argv);
+}
+
+uint32_t SkipRuntime_ChangeManager__needResourceReload(uint32_t serviceId,
+                                                       char* name) {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[2] = {Number::New(isolate, serviceId),
+                          FromUtf8(isolate, name)};
+  return CallJSNumberFunction(isolate, externFunctions,
+                              "SkipRuntime_ChangeManager__needResourceReload",
+                              2, argv);
+}
+
+uint32_t SkipRuntime_ChangeManager__needExternalServiceReload(
+    uint32_t serviceId, char* name, char* resource) {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[3] = {Number::New(isolate, serviceId),
+                          FromUtf8(isolate, name), FromUtf8(isolate, resource)};
+  return CallJSNumberFunction(
+      isolate, externFunctions,
+      "SkipRuntime_ChangeManager__needExternalServiceReload", 3, argv);
 }
 
 void SkipRuntime_Notifier__subscribed(uint32_t notifierId) {
@@ -298,6 +391,17 @@ void SkipRuntime_deleteNotifier(uint32_t notifierId) {
                      argv);
 }
 
+CJSON SkipRuntime_Reducer__init(uint32_t reducerId) {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[1] = {
+      Number::New(isolate, reducerId),
+  };
+  return CallJSFunction(isolate, externFunctions, "SkipRuntime_Reducer__init",
+                        1, argv);
+}
+
 CJSON SkipRuntime_Reducer__add(uint32_t reducerId, CJSON acc, CJSON value) {
   Isolate* isolate = Isolate::GetCurrent();
   HandleScope scope(isolate);
@@ -322,6 +426,29 @@ CJSON SkipRuntime_Reducer__remove(uint32_t reducerId, CJSON acc, CJSON value) {
   };
   return CallJSNullableFunction(isolate, externFunctions,
                                 "SkipRuntime_Reducer__remove", 3, argv);
+}
+
+uint32_t SkipRuntime_Reducer__isEquals(uint32_t reducerId, uint32_t otherId) {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[2] = {
+      Number::New(isolate, reducerId),
+      Number::New(isolate, otherId),
+  };
+  return (uint32_t)CallJSNumberFunction(
+      isolate, externFunctions, "SkipRuntime_Reducer__isEquals", 2, argv);
+}
+
+CJObject SkipRuntime_Reducer__getInfo(uint32_t reducerId) {
+  Isolate* isolate = Isolate::GetCurrent();
+  HandleScope scope(isolate);
+  Local<Object> externFunctions = kExternFunctions.Get(isolate);
+  Local<Value> argv[1] = {
+      Number::New(isolate, reducerId),
+  };
+  return CallJSFunction(isolate, externFunctions,
+                        "SkipRuntime_Reducer__getInfo", 1, argv);
 }
 
 void SkipRuntime_deleteReducer(uint32_t reducerId) {

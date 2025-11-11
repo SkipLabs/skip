@@ -1,9 +1,44 @@
 module SkipRuntime;
 
-base class Reducer<V1: frozen, V2: frozen>(initial: V2) {
-  fun getType(): SKStore.File ~> V2;
+base class Reducer<V1: frozen, V2: frozen> extends
+  SKStore.IReducer<SKStore.File>,
+{
+  fun getInit(): V2;
+  fun getType(): SKStore.File ~> V1;
+  fun getAccType(): (SKStore.File ~> V2, V2 ~> SKStore.File);
   fun add(acc: V2, value: V1): V2;
   fun remove(acc: V2, value: V1): ?V2;
+  fun getName(): String;
+
+  fun init(iter: mutable Iterator<SKStore.File>): Array<SKStore.File> {
+    (_, accToFile) = this.getAccType();
+    vFromFile = this.getType();
+    acc = this.getInit();
+    for (x in iter) {
+      !acc = this.add(acc, vFromFile(x))
+    };
+    Array[accToFile(acc)]
+  }
+
+  fun update(
+    state: Array<SKStore.File>,
+    old: Array<SKStore.File>,
+    new: Array<SKStore.File>,
+  ): ?Array<SKStore.File> {
+    (accFromFile, accToFile) = this.getAccType();
+    vFromFile = this.getType();
+    acc = accFromFile(state[0]);
+    for (x in old) {
+      this.remove(acc, vFromFile(x)) match {
+      | Some(v) -> !acc = v
+      | _ -> return None()
+      }
+    };
+    for (x in new) {
+      !acc = this.add(acc, vFromFile(x))
+    };
+    Some(Array[accToFile(acc)])
+  }
 }
 
 /**
@@ -14,48 +49,100 @@ base class Reducer<V1: frozen, V2: frozen>(initial: V2) {
  * @param values - the values mapped to by `key` in the input collection
  * @returns an iterable of key/value pairs to output for the given input(s)
  */
-base class Mapper {
+base class Mapper extends SKStore.Mapper<SKStore.Key, SKStore.File> {
   fun mapEntry(
     key: SKJSON.CJSON,
     values: mutable SKStore.NonEmptyIterator<SKJSON.CJSON>,
   ): mutable Iterator<(SKJSON.CJSON, SKJSON.CJSON)>;
+
+  fun map(
+    context: mutable SKStore.Context,
+    writer: mutable SKStore.Writer,
+    key: SKStore.Key,
+    values: mutable Iterator<SKStore.File>,
+  ): void {
+    SKStore.FileIterator::create(
+      values.map(x -> JSONFile::type(x).json),
+    ) match {
+    | SKStore.EmptyFileIterator _ -> void
+    | iter @ SKStore.NonEmptyIterator _ ->
+      pushContext(context);
+      try {
+        for (entry in this.mapEntry(JSONID::keyType(key).json, iter)) {
+          writer.append(JSONID(entry.i0), JSONFile(entry.i1))
+        };
+        popContext();
+      } catch {
+      | ex ->
+        popContext();
+        throw ex
+      }
+    }
+  }
+
+  fun getName(): String;
 }
 
-base class LazyCompute {
-  fun compute(self: LazyCollection, key: SKJSON.CJSON): Array<SKJSON.CJSON>;
+base class LazyCompute extends SKStore.LazyCompute<SKStore.Key, SKStore.File> {
+  fun computeFor(self: LazyCollection, key: SKJSON.CJSON): Array<SKJSON.CJSON>;
+
+  fun compute(
+    context: mutable SKStore.Context,
+    self: SKStore.DirName,
+    key: SKStore.Key,
+  ): ?Array<SKStore.File> {
+    pushContext(context);
+    try {
+      res = this.computeFor(
+        LazyCollection(self),
+        JSONID::keyType(key).json,
+      ).map(json -> JSONFile(json));
+      popContext();
+      Some(res)
+    } catch {
+    | ex ->
+      popContext();
+      throw ex
+    }
+  }
+
+  fun getName(): String;
 }
 
 value class Waitable(value: Float)
 
-base class ExternalService {
+base class Resource {
+  fun instantiate(collections: Map<String, Collection>): Collection;
+}
+
+base class Service {
+  fun inputs(): Array<String>;
+
+  fun initialData(name: String): Array<(SKJSON.CJSON, Array<SKJSON.CJSON>)>;
+
+  fun resources(): Array<String>;
+
+  fun buildResource(name: String, parameters: SKJSON.CJSON): Resource;
+
   fun subscribe(
+    external: String,
     instance: String,
     collection: CollectionWriter,
     resource: String,
     params: SKJSON.CJSON,
   ): Waitable;
 
-  fun unsubscribe(instance: String): void;
+  fun unsubscribe(external: String, instance: String): void;
 
   fun shutdown(): Waitable;
-}
 
-base class Resource {
-  fun instantiate(collections: Map<String, Collection>): Collection;
-}
-
-base class ResourceBuilder {
-  fun build(parameters: SKJSON.CJSON): Resource;
-}
-
-base class Service(
-  initialData: Array<Input>,
-  resources: Map<String, ResourceBuilder>,
-  remoteCollections: Map<String, ExternalService> = Map[],
-) {
   fun createGraph(
     inputCollections: Map<String, Collection>,
   ): Map<String, Collection>;
+
+  fun needResourceReload(name: String): ?Bool;
+  fun needInputReload(name: String): Bool;
+  fun needExternalServiceReload(external: String, resource: String): Bool;
 }
 
 value class Values(

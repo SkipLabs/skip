@@ -17,8 +17,10 @@ import type {
   NamedCollections,
   SubscriptionID,
   Nullable,
+  Reducer,
+  ChangeManager,
 } from "@skipruntime/core";
-
+import { LoadStatus } from "@skipruntime/core";
 import { Count, Sum } from "@skipruntime/helpers";
 
 import { it as mit, type AsyncFunc } from "mocha";
@@ -63,6 +65,7 @@ class Notifier {
   private updates: CollectionUpdate<Json, Json>[] = [];
   private sid: SubscriptionID;
   private resolver: Nullable<() => void> = null;
+  closed: boolean = false;
 
   constructor(
     private service: ServiceInstance,
@@ -76,7 +79,10 @@ class Notifier {
         this.updates.push(update);
         if (this.resolver) this.resolver();
       },
-      close: () => {},
+      close: () => {
+        if (this.log) console.log("CLOSED");
+        this.closed = true;
+      },
     });
   }
 
@@ -381,6 +387,34 @@ class MapReduceResource implements Resource<Input_NN> {
 const mapReduceService: SkipService<Input_NN, Input_NN> = {
   initialData: { input: [] },
   resources: { mapReduce: MapReduceResource },
+
+  createGraph(inputCollections: Input_NN) {
+    return inputCollections;
+  },
+};
+
+//// testUserMapReduce
+class UserSum implements Reducer<number, number> {
+  initial = 0;
+
+  add(accum: Nullable<number>, value: number): number {
+    return (accum ?? 0) + value;
+  }
+
+  remove(accum: number, value: number): Nullable<number> {
+    return accum - value;
+  }
+}
+
+class UserMapReduceResource implements Resource<Input_NN> {
+  instantiate(cs: Input_NN): EagerCollection<number, number> {
+    return cs.input.mapReduce(TestOddEven)(UserSum);
+  }
+}
+
+const userMapReduceService: SkipService<Input_NN, Input_NN> = {
+  initialData: { input: [] },
+  resources: { userMapReduce: UserMapReduceResource },
 
   createGraph(inputCollections: Input_NN) {
     return inputCollections;
@@ -1070,6 +1104,71 @@ const resourceRecomputeNotificationsService: SkipService<
   },
 };
 
+class NoChanges implements ChangeManager {
+  needInputReload(_name: string): boolean {
+    return false;
+  }
+
+  needResourceReload(_name: string): LoadStatus {
+    return LoadStatus.Same;
+  }
+
+  needExternalServiceReload(_name: string, _resource: string): boolean {
+    return false;
+  }
+
+  needMapperReload(_name: string): boolean {
+    return false;
+  }
+
+  needReducerReload(_name: string): boolean {
+    return false;
+  }
+
+  needLazyComputeReload(_name: string): boolean {
+    return false;
+  }
+}
+
+type Changed = {
+  inputs?: Set<string>;
+  resources?: Map<string, LoadStatus>;
+  mappers?: Set<string>;
+  reducers?: Set<string>;
+  lazyComputes?: Set<string>;
+  externalService?: Set<string>;
+};
+
+class WithChanges implements ChangeManager {
+  constructor(private readonly changes: Changed) {}
+
+  needInputReload(name: string): boolean {
+    return this.changes.inputs?.has(name) ?? false;
+  }
+
+  needResourceReload(name: string): LoadStatus {
+    return this.changes.resources?.get(name) ?? LoadStatus.Same;
+  }
+
+  needExternalServiceReload(name: string, resource: string): boolean {
+    const needReload = this.changes.externalService?.has(name);
+    if (needReload !== undefined) return needReload;
+    return this.changes.externalService?.has(`${name}/${resource}`) ?? false;
+  }
+
+  needMapperReload(name: string): boolean {
+    return this.changes.mappers?.has(name) ?? false;
+  }
+
+  needReducerReload(name: string): boolean {
+    return this.changes.reducers?.has(name) ?? false;
+  }
+
+  needLazyComputeReload(name: string): boolean {
+    return this.changes.lazyComputes?.has(name) ?? false;
+  }
+}
+
 export function initTests(
   category: string,
   initService: (service: SkipService) => Promise<ServiceInstance>,
@@ -1081,6 +1180,7 @@ export function initTests(
     const service = await initService(map1Service);
     await service.update("input", [["1", [10]]]);
     expect(await service.getArray("map1", "1")).toEqual([12]);
+    await service.close();
   });
 
   it("testMap2", async () => {
@@ -1095,6 +1195,7 @@ export function initTests(
       ["1", [30]],
       ["2", [10]],
     ]);
+    await service.close();
   });
 
   it("testMap3", async () => {
@@ -1109,6 +1210,7 @@ export function initTests(
       ["1", [36]],
       ["2", [10]],
     ]);
+    await service.close();
   });
 
   it("valueMapper", async () => {
@@ -1126,6 +1228,7 @@ export function initTests(
       [5, [30]],
       [10, [110]],
     ]);
+    await service.close();
   });
 
   it("testSize", async () => {
@@ -1152,6 +1255,7 @@ export function initTests(
       [1, [1]],
       [2, [3]],
     ]);
+    await service.close();
   });
 
   it("testSlicedMap1", async () => {
@@ -1171,6 +1275,7 @@ export function initTests(
       [9, [81]],
       [20, [400]],
     ]);
+    await service.close();
   });
 
   it("testLazy", async () => {
@@ -1195,6 +1300,7 @@ export function initTests(
       [0, [2]],
       [1, [2]],
     ]);
+    await service.close();
   });
 
   it("testMapReduce", async () => {
@@ -1228,6 +1334,41 @@ export function initTests(
       [0, [3]],
       [1, [2]],
     ]);
+    await service.close();
+  });
+
+  it("testUserMapReduce", async () => {
+    const service = await initService(userMapReduceService);
+    const resource = "userMapReduce";
+    await service.update("input", [
+      [0, [1]],
+      [1, [1]],
+      [2, [1]],
+    ]);
+    expect(await service.getAll(resource)).toEqual([
+      [0, [2]],
+      [1, [1]],
+    ]);
+    await service.update("input", [[3, [2]]]);
+    expect(await service.getAll(resource)).toEqual([
+      [0, [2]],
+      [1, [3]],
+    ]);
+    await service.update("input", [
+      [0, [2]],
+      [1, [2]],
+    ]);
+    expect(await service.getAll(resource)).toEqual([
+      [0, [3]],
+      [1, [4]],
+    ]);
+
+    await service.update("input", [[3, []]]);
+    expect(await service.getAll(resource)).toEqual([
+      [0, [3]],
+      [1, [2]],
+    ]);
+    await service.close();
   });
 
   it("testCount", async () => {
@@ -1259,6 +1400,7 @@ export function initTests(
       [2, [2]],
       [3, [0]],
     ]);
+    await service.close();
   });
 
   it("testMerge1", async () => {
@@ -1278,6 +1420,7 @@ export function initTests(
       [1, [20]],
       [2, [3, 7]],
     ]);
+    await service.close();
   });
 
   it("testMergeReduce", async () => {
@@ -1297,6 +1440,7 @@ export function initTests(
       [1, [20]],
       [2, [10]],
     ]);
+    await service.close();
   });
 
   it("testMergeMapReduce", async () => {
@@ -1316,6 +1460,7 @@ export function initTests(
       [1, [25]],
       [2, [20]],
     ]);
+    await service.close();
   });
 
   it("testJSONParams", async () => {
@@ -1342,6 +1487,7 @@ export function initTests(
       [1, [43]],
       [2, [44]],
     ]);
+    await service.close();
   });
 
   it("testJSONExtract", async () => {
@@ -1400,6 +1546,7 @@ export function initTests(
       ],
       [2, [[[{ var: 1 }, { var: 2 }]]]],
     ]);
+    await service.close();
   });
 
   it("testExternal", async () => {
@@ -1542,6 +1689,7 @@ export function initTests(
     expect(await service.getArray("resource1", "1")).toEqual([30]);
     await service.update("input2", [["1", [40]]]);
     expect(await service.getArray("resource2", "1")).toEqual([40]);
+    await service.close();
   });
 
   it("testPostgres", async function () {
@@ -1708,6 +1856,7 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
         ),
       );
     }
+    await service.close();
   });
 
   it("testMapWithException", async () => {
@@ -1728,21 +1877,23 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
       expect((e as Error).message).toMatchRegex(
         new RegExp(/^(?:Error: )?Something goes wrong.$/),
       );
+    } finally {
+      await service.close();
     }
   });
 
   it("testInitServiceWithExternalServiceFailure", async () => {
-    let service;
     try {
-      service = await initService(initServiceWithExternalServiceFailure());
+      const service = await initService(
+        initServiceWithExternalServiceFailure(),
+      );
+      await service.close();
       throw new Error("Error was not thrown");
     } catch (e: unknown) {
       expect(e).toBeA(Error);
       expect((e as Error).message).toMatchRegex(
         new RegExp(/^(?:Error: )?Something goes wrong.$/),
       );
-    } finally {
-      if (service) await service.close();
     }
   });
 
@@ -1760,6 +1911,8 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
       expect((e as Error).message).toMatchRegex(
         new RegExp(/^(?:Error: )?Something goes wrong.$/),
       );
+    } finally {
+      await service.close();
     }
   });
 
@@ -1817,5 +1970,104 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
     } finally {
       if (service) await service.close();
     }
+  });
+
+  it("testReload1", async () => {
+    const service = await initService(map1Service);
+    const resource = "map1";
+    await service.update("input", [
+      ["1", [10]],
+      ["2", [1]],
+    ]);
+    expect(await service.getArray(resource, "1")).toEqual([12]);
+    expect(await service.getArray(resource, "2")).toEqual([3]);
+    const instanceId = "unsafe.fixed.resource.ident.1";
+    await service.instantiateResource(instanceId, resource, 1);
+    const notifier = new Notifier(service, instanceId);
+    notifier.checkInit([
+      ["1", [12]],
+      ["2", [3]],
+    ]);
+    await service.reload(map1Service, new NoChanges());
+    notifier.checkEmpty();
+    expect(await service.getArray(resource, "1")).toEqual([12]);
+    expect(await service.getArray(resource, "2")).toEqual([3]);
+    await service.reload(
+      map1Service,
+      new WithChanges({ mappers: new Set(["Map1"]) }),
+    );
+    notifier.checkInit([
+      ["1", [12]],
+      ["2", [3]],
+    ]);
+    expect(await service.getArray(resource, "1")).toEqual([12]);
+    expect(await service.getArray(resource, "2")).toEqual([3]);
+    await service.reload(
+      map1Service,
+      new WithChanges({ resources: new Map([[resource, LoadStatus.Changed]]) }),
+    );
+    notifier.checkEmpty();
+    expect(await service.getArray(resource, "1")).toEqual([12]);
+    expect(await service.getArray(resource, "2")).toEqual([3]);
+    await service.reload(
+      map1Service,
+      new WithChanges({
+        resources: new Map([[resource, LoadStatus.Incompatible]]),
+      }),
+    );
+    expect(notifier.closed).toBeTruthy();
+    expect(await service.getArray(resource, "1")).toEqual([12]);
+    expect(await service.getArray(resource, "2")).toEqual([3]);
+    await service.close();
+  });
+  it("testReload2", async () => {
+    const serviceDef = testExternalService();
+    const mockExternal = serviceDef.externalServices![
+      "external"
+    ] as MockExternal;
+    const resource = "external";
+    const service = await initService(serviceDef);
+    await service.update("input1", [
+      [0, [10]],
+      [1, [20]],
+    ]);
+    await service.update("input2", [
+      [0, [5]],
+      [1, [10]],
+    ]);
+    expect(await service.getAll(resource)).toEqual([
+      [0, [[10, 15]]],
+      [1, [[20, 30]]],
+    ]);
+    const instanceId = "unsafe.fixed.resource.ident.1";
+    await service.instantiateResource(instanceId, resource, {});
+    const notifier = new Notifier(service, instanceId);
+    notifier.checkInit([
+      [0, [[10, 15]]],
+      [1, [[20, 30]]],
+    ]);
+    await service.reload(serviceDef, new NoChanges());
+    notifier.checkEmpty();
+    expect(await service.getAll(resource)).toEqual([
+      [0, [[10, 15]]],
+      [1, [[20, 30]]],
+    ]);
+    const subscribed = [...mockExternal.subscribed];
+    await service.reload(
+      serviceDef,
+      new WithChanges({
+        externalService: new Set(["external"]),
+      }),
+    );
+    expect(mockExternal.unsubscribed).toEqual(subscribed);
+    notifier.checkUpdate([
+      [0, [[10, 15]]],
+      [1, [[20, 30]]],
+    ]);
+    expect(await service.getAll(resource)).toEqual([
+      [0, [[10, 15]]],
+      [1, [[20, 30]]],
+    ]);
+    await service.close();
   });
 }
