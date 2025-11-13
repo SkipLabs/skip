@@ -15,11 +15,12 @@ COPY package.json test.ts /work/
 WORKDIR /work
 
 # calculate the version of the skipruntime
+#   use `npm install --dry-run` (instead of e.g. `npm view`) to respect any version constraints in package.json
 RUN VERSION=$(npm install --dry-run @skipruntime/native | grep native | cut -d' ' -f3) \
 # install the skipruntime binary release
  && wget --quiet --output-document=- \
       https://raw.githubusercontent.com/skiplabs/skip/refs/tags/v${VERSION}/bin/install_runtime.sh \
-  | bash - \
+  | VERSION=${VERSION} bash - \
 # install the skipruntime native node addon package
  && npm install @skipruntime/native
 
