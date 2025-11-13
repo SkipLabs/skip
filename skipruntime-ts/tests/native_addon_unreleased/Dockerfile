@@ -20,7 +20,7 @@ WORKDIR /work
 # calculate the version of the skipruntime
 RUN VERSION=$(npm install --dry-run @skipruntime/native | grep native | cut -d' ' -f3) \
 # specify to obtain the binary release from a local directory
- && SOURCE="file:///work/build" \
+    SOURCE="file:///work/build" \
 # install the skipruntime binary release
     build/install_runtime.sh \
 # install the skipruntime native node addon package
