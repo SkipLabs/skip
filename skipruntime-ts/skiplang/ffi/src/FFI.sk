@@ -306,21 +306,24 @@ class ExternService(eptr: SKStore.ExternalPointer) extends Service {
   }
 
   fun needResourceReload(name: String): ?Bool {
-    this.getChangeManager().needResourceReload(name)
+    this.getChangeManager()
+      .map(m -> m.needResourceReload(name))
+      .default(Some(false));
   }
 
   fun needInputReload(name: String): Bool {
-    this.getChangeManager().needInputReload(name)
+    this.getChangeManager().map(m -> m.needInputReload(name)).default(false)
   }
 
   fun needExternalServiceReload(external: String, resource: String): Bool {
-    this.getChangeManager().needExternalServiceReload(external, resource)
+    this.getChangeManager()
+      .map(m -> m.needExternalServiceReload(external, resource))
+      .default(false);
   }
 
-  private fun getChangeManager(): ChangeManager {
+  private fun getChangeManager(): ?ChangeManager {
     manager = getChangeManager();
-    invariant(manager != 0, "Change manager must be defined");
-    ChangeManager(manager);
+    if (manager != 0) Some(ChangeManager(manager)) else None()
   }
 }
 
