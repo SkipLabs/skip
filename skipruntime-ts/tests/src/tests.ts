@@ -761,6 +761,12 @@ class PostgresResource implements Resource<Input_NN> {
   }
 }
 
+class InputResource implements Resource<Input_NN> {
+  instantiate(collections: Input_NN): EagerCollection<number, number> {
+    return collections.input;
+  }
+}
+
 class PostgresResourceWithException implements Resource<Input_NN> {
   instantiate(
     _collections: Input_NN,
@@ -891,9 +897,9 @@ function kafkaService(): SkipService<Input_NN, Input_NN> {
 // Wrap service instantiation in a function so that the WASM and Native tests get ahold
 // of separate DB clients and manage their lifecycle properly; normally you'd just
 // construct a service object like the other tests in this file.
-const postgresService: () => Promise<
-  SkipService<Input_NN, Input_NN>
-> = async () => {
+const postgresService: (
+  inresource: boolean,
+) => Promise<SkipService<Input_NN, Input_NN>> = async (inresource) => {
   const postgres = new PostgresExternalService(pg_config);
   await withAlternateConsoleError(
     () => {},
@@ -916,13 +922,32 @@ const postgresService: () => Promise<
       ],
     },
     resources: {
-      resource: PostgresResource,
+      resource: inresource ? PostgresResource : InputResource,
       resourceWithException: PostgresResourceWithException,
       streamingResource: StreamingPostgresResource,
     },
     externalServices: { postgres },
-    createGraph(inputs: Input_NN) {
-      return inputs;
+    createGraph(inputs: Input_NN, context) {
+      if (inresource) return inputs;
+      const pg_data: EagerCollection<number, number> = context
+        .useExternalResource<number, PostgresRow>({
+          service: "postgres",
+          identifier: "skip_test",
+          params: { key: { col: "id", type: "INTEGER" } },
+        })
+        .map(PostgresRowExtract);
+      const pg_data2: EagerCollection<number, number> = context
+        .useExternalResource<number, PostgresRow>({
+          service: "postgres",
+          identifier: "skip_test2",
+          params: { key: { col: "id", type: "INTEGER" } },
+        })
+        .map(PostgresRowExtract);
+      return {
+        input: inputs.input
+          .map(PointwiseSum, pg_data)
+          .map(PointwiseSum, pg_data2),
+      };
     },
   };
 };
@@ -1692,11 +1717,14 @@ export function initTests(
     await service.close();
   });
 
-  it("testPostgres", async function () {
+  const testPostgres = async function (
+    ctx: Mocha.Context,
+    inresource: boolean,
+  ) {
     let service;
     const pgClient = new pg.Client(pg_config);
     try {
-      service = await initService(await postgresService());
+      service = await initService(await postgresService(inresource));
       await pgClient.connect();
     } catch {
       if ("CIRCLECI" in process.env) {
@@ -1710,7 +1738,7 @@ export function initTests(
       console.warn(
         "\tdocker run --name skip-postgres-container -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=secret -p 5432:5432 -d postgres",
       );
-      this.skip();
+      ctx.skip();
     }
     try {
       const resource = "resource";
@@ -1783,6 +1811,14 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
       await pgClient.end();
       await service.close();
     }
+  };
+
+  it("testPostgresInResource", async function () {
+    await testPostgres(this, true);
+  });
+
+  it("testPostgresInService", async function () {
+    await testPostgres(this, false);
   });
 
   it("testKafka", async function () {
@@ -1822,6 +1858,7 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
         return { key: String(noise), value: String(1 + (noise % 5)) };
       });
       await producer.send({ topic: "skip-test-topic", messages });
+      await producer.send({ topic: "skip-test-topic2", messages });
       await withRetries(async () => {
         for (const { key, value } of messages) {
           const expected = 10 * Number(value) ** 2;

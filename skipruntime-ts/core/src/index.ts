@@ -455,7 +455,7 @@ class CollectionWriter<K extends Json, V extends Json> {
   ) {}
 
   async update(values: Entry<K, V>[], isInit: boolean): Promise<void> {
-    this.refs.setFork(this.forkName);
+    this.refs.setFork(this.getForkName());
     const uuid = crypto.randomUUID();
     const fork = this.fork(uuid);
     try {
@@ -468,7 +468,7 @@ class CollectionWriter<K extends Json, V extends Json> {
   }
 
   private update_(values: Entry<K, V>[], isInit: boolean): Promise<void> {
-    this.refs.setFork(this.getForkName());
+    this.refs.setFork(this.forkName);
     if (!this.refs.needGC()) {
       throw new SkipError("CollectionWriter.update cannot be performed.");
     }
