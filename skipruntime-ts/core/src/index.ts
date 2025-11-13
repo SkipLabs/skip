@@ -821,7 +821,6 @@ export class ServiceInstance {
       this.closeResourceStreams(streamsToClose);
       this.definition = definition;
     } catch (ex: unknown) {
-      console.error(ex);
       if (!merged) fork.abortFork();
       throw ex;
     }
