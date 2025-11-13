@@ -135,7 +135,12 @@ export function streamingService(service: ServiceInstance): express.Express {
           res.end();
         },
       });
+      const heartbeat = setInterval(() => {
+        res.write("event: update\ndata:[]\n\n");
+      }, 30000);
+
       req.on("close", () => {
+        clearInterval(heartbeat);
         service.unsubscribe(subscriptionID);
       });
     } catch (e: unknown) {
