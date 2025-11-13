@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.17] - 2025-11-13
+
+### Added
+ - Streams now regularly (every 30 seconds) send a empty message to avoid some
+   timeouts in backend deployments (#1018)
+
 ## [0.0.16] - 2025-04-30
 
 ### Fixed
