@@ -372,7 +372,6 @@ export class Utils {
   importString = (strPtr: ptr<Internal.String>) => {
     const size = this.exports.SKIP_String_byteSize(strPtr);
     const utf8 = new Uint8Array(this.exports.memory.buffer, strPtr, size);
-
     return this.env.decodeUTF8(utf8);
   };
   exportString = (s: string): ptr<Internal.String> => {
