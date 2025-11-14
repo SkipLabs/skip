@@ -8,7 +8,7 @@ class Env implements Environment {
   fileSystem: MemFS;
   system: MemSys;
   timestamp: () => float;
-  decodeUTF8: (utf8: ArrayBuffer) => string;
+  decodeUTF8: (utf8: ArrayBuffer | Uint8Array) => string;
   encodeUTF8: (str: string) => Uint8Array;
   storage: () => Storage;
   onException: () => void;
