@@ -56,6 +56,10 @@ CJSON SkipRuntime_Runtime__getForKey(char* resource, CJObject jsonParams,
 CJSON SkipRuntime_Runtime__update(char* input, CJSON values);
 double SkipRuntime_Runtime__fork(char* input);
 double SkipRuntime_Runtime__merge(CJArray);
+SKMergeState SkipRuntime_Runtime__startMerge(CJArray);
+double SkipRuntime_Runtime__endMerge(SKMergeState);
+double SkipRuntime_Runtime__abortMerge(SKMergeState);
+
 double SkipRuntime_Runtime__abortFork();
 uint32_t SkipRuntime_Runtime__forkExists(char* input);
 CJSON SkipRuntime_Runtime__reload(SKService service);
@@ -902,6 +906,72 @@ void MergeOfRuntime(const FunctionCallbackInfo<Value>& args) {
   });
 }
 
+void StartMergeOfRuntime(const FunctionCallbackInfo<Value>& args) {
+  Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
+  if (args.Length() != 1) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(
+        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
+    return;
+  };
+  if (!args[0]->IsExternal()) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(Exception::TypeError(
+        FromUtf8(isolate, "The parameter must be a pointer.")));
+    return;
+  };
+  NatTryCatch(isolate, [&args](Isolate* isolate) {
+    SKMergeState skstate =
+        SkipRuntime_Runtime__startMerge(args[0].As<External>()->Value());
+    args.GetReturnValue().Set(External::New(isolate, skstate));
+  });
+}
+
+void EndMergeOfRuntime(const FunctionCallbackInfo<Value>& args) {
+  Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
+  if (args.Length() != 1) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(
+        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
+    return;
+  };
+  if (!args[0]->IsExternal()) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(Exception::TypeError(
+        FromUtf8(isolate, "The parameter must be a pointer.")));
+    return;
+  };
+  NatTryCatch(isolate, [&args](Isolate* isolate) {
+    double skerror =
+        SkipRuntime_Runtime__endMerge(args[0].As<External>()->Value());
+    args.GetReturnValue().Set(Number::New(isolate, skerror));
+  });
+}
+
+void AbortMergeOfRuntime(const FunctionCallbackInfo<Value>& args) {
+  Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
+  if (args.Length() != 1) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(
+        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
+    return;
+  };
+  if (!args[0]->IsExternal()) {
+    // Throw an Error that is passed back to JavaScript
+    isolate->ThrowException(Exception::TypeError(
+        FromUtf8(isolate, "The parameter must be a pointer.")));
+    return;
+  };
+  NatTryCatch(isolate, [&args](Isolate* isolate) {
+    double skerror =
+        SkipRuntime_Runtime__abortMerge(args[0].As<External>()->Value());
+    args.GetReturnValue().Set(Number::New(isolate, skerror));
+  });
+}
+
 void AbortForkOfRuntime(const FunctionCallbackInfo<Value>& args) {
   Isolate* isolate = args.GetIsolate();
   HandleScope scope(isolate);
@@ -1043,6 +1113,12 @@ void GetToJSBinding(const FunctionCallbackInfo<Value>& args) {
   AddFunction(isolate, binding, "SkipRuntime_Runtime__update", UpdateOfRuntime);
   AddFunction(isolate, binding, "SkipRuntime_Runtime__fork", ForkOfRuntime);
   AddFunction(isolate, binding, "SkipRuntime_Runtime__merge", MergeOfRuntime);
+  AddFunction(isolate, binding, "SkipRuntime_Runtime__startMerge",
+              StartMergeOfRuntime);
+  AddFunction(isolate, binding, "SkipRuntime_Runtime__endMerge",
+              EndMergeOfRuntime);
+  AddFunction(isolate, binding, "SkipRuntime_Runtime__abortMerge",
+              AbortMergeOfRuntime);
   AddFunction(isolate, binding, "SkipRuntime_Runtime__abortFork",
               AbortForkOfRuntime);
   AddFunction(isolate, binding, "SkipRuntime_Runtime__forkExists",

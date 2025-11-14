@@ -175,6 +175,15 @@ export interface FromBinding {
   SkipRuntime_Runtime__merge(
     ignore: Pointer<Internal.CJArray<Internal.CJString>>,
   ): Handle<Error>;
+  SkipRuntime_Runtime__startMerge(
+    ignore: Pointer<Internal.CJArray<Internal.CJString>>,
+  ): Pointer<Internal.MergeState>;
+  SkipRuntime_Runtime__endMerge(
+    state: Pointer<Internal.MergeState>,
+  ): Handle<Error>;
+  SkipRuntime_Runtime__abortMerge(
+    state: Pointer<Internal.MergeState>,
+  ): Handle<Error>;
   SkipRuntime_Runtime__abortFork(): Handle<Error>;
   SkipRuntime_Runtime__forkExists(name: string): boolean;
 
