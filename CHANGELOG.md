@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+ - Healthcheck endpoint in the streaming service.
+
 ## [0.0.17] - 2025-11-13
 
 ### Added
@@ -70,7 +73,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.0.10] - 2025-02-05
 
-[unreleased]: https://github.com/skiplabs/skip/compare/v0.0.16...HEAD
+[unreleased]: https://github.com/skiplabs/skip/compare/v0.0.17...HEAD
+[0.0.17]: https://github.com/skiplabs/skip/compare/v0.0.16...v0.0.17
 [0.0.16]: https://github.com/skiplabs/skip/compare/v0.0.15...v0.0.16
 [0.0.15]: https://github.com/skiplabs/skip/compare/v0.0.14...v0.0.15
 [0.0.14]: https://github.com/skiplabs/skip/compare/v0.0.13...v0.0.14
