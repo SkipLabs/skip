@@ -17,7 +17,7 @@ class Env implements Environment {
   disableWarnings: boolean = false;
   system: MemSys;
   timestamp: () => float;
-  decodeUTF8: (utf8: ArrayBuffer) => string;
+  decodeUTF8: (utf8: ArrayBuffer | Uint8Array) => string;
   encodeUTF8: (str: string) => Uint8Array;
   base64Decode: (base64: string) => Uint8Array;
   base64Encode: (toEncode: string, url?: boolean) => string;

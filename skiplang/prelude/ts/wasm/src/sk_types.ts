@@ -150,7 +150,7 @@ export interface Environment {
   disableWarnings: boolean;
   environment: string[];
   timestamp: () => float;
-  decodeUTF8: (utf8: ArrayBuffer) => string;
+  decodeUTF8: (utf8: ArrayBuffer | Uint8Array) => string;
   encodeUTF8: (str: string) => Uint8Array;
   onException: () => void;
   base64Decode: (base64: string) => Uint8Array;
@@ -734,7 +734,7 @@ export function humanSize(bytes: int) {
 }
 
 export function loadWasm(
-  buffer: ArrayBuffer,
+  buffer: ArrayBuffer | Uint8Array,
   managers: ToWasmManager[],
   environment: Environment,
   main?: string,
