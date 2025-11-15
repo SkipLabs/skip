@@ -97,7 +97,7 @@ export function controlService(service: ServiceInstance): express.Express {
       });
   });
 
-  app.get("/v1/healthcheck", (_, res) => {
+  app.get("/healthz", (_, res) => {
     res.sendStatus(200);
   });
 
@@ -155,7 +155,7 @@ export function streamingService(service: ServiceInstance): express.Express {
     }
   });
 
-  app.get("/v1/healthcheck", (_, res) => {
+  app.get("/healthz", (_, res) => {
     res.sendStatus(200);
   });
 
