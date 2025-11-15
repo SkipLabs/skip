@@ -5,8 +5,11 @@
  */
 
 import type { SkipService } from "@skipruntime/core";
-import { controlService, streamingService } from "./rest.js";
-import type { Express, Request, Response, NextFunction } from "express";
+import {
+  registerControlServiceRoutes,
+  registerStreamingServiceRoutes,
+} from "./rest.js";
+import type { Request, Response, NextFunction } from "express";
 import express from "express";
 
 /**
@@ -134,21 +137,24 @@ export async function runService(
     }
   }
   const instance = await runtime.initService(service);
-  const controlHttpServer = controlService(instance).listen(
-    options.control_port,
-    () => {
-      console.log(
-        `Skip control service listening on port ${options.control_port.toString()}`,
-      );
-    },
-  );
-  const wrapMiddleware = (app: Express) => {
-    if (options.no_cors) {
-      return express().use(no_cors).use(app);
-    }
-    return app;
-  };
-  const streamingHttpServer = wrapMiddleware(streamingService(instance)).listen(
+
+  const controlApp = express();
+  controlApp.use(logger_middleware);
+  registerControlServiceRoutes(controlApp, instance);
+  const controlHttpServer = controlApp.listen(options.control_port, () => {
+    console.log(
+      `Skip control service listening on port ${options.control_port.toString()}`,
+    );
+  });
+
+  const streamingApp = express();
+  streamingApp.use(logger_middleware);
+  if (options.no_cors) {
+    streamingApp.use(no_cors);
+  }
+  registerStreamingServiceRoutes(streamingApp, instance);
+
+  const streamingHttpServer = streamingApp.listen(
     options.streaming_port,
     () => {
       console.log(
@@ -177,4 +183,29 @@ function no_cors(req: Request, res: Response, next: NextFunction) {
   } else {
     next();
   }
+}
+
+function logger_middleware(req: Request, res: Response, next: NextFunction) {
+  const start = Date.now();
+  console.log(
+    JSON.stringify({
+      event: "request",
+      host: req.headers.host,
+      method: req.method,
+      path: req.originalUrl,
+    }),
+  );
+  res.on("finish", () => {
+    console.log(
+      JSON.stringify({
+        event: "response",
+        host: req.headers.host,
+        method: req.method,
+        path: req.originalUrl,
+        status: res.statusCode,
+        duration_ms: Date.now() - start,
+      }),
+    );
+  });
+  next();
 }

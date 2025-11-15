@@ -1,4 +1,5 @@
 import express from "express";
+import type { Express } from "express";
 import {
   ServiceInstance,
   SkipUnknownCollectionError,
@@ -7,8 +8,10 @@ import {
 } from "@skipruntime/core";
 import type { CollectionUpdate, Entry, Json } from "@skipruntime/core";
 
-export function controlService(service: ServiceInstance): express.Express {
-  const app = express();
+export function registerControlServiceRoutes(
+  app: Express,
+  service: ServiceInstance,
+) {
   app.use(express.json({ strict: false }));
 
   // Streaming control API.
@@ -100,13 +103,12 @@ export function controlService(service: ServiceInstance): express.Express {
   app.get("/healthz", (_, res) => {
     res.sendStatus(200);
   });
-
-  return app;
 }
 
-export function streamingService(service: ServiceInstance): express.Express {
-  const app = express();
-
+export function registerStreamingServiceRoutes(
+  app: Express,
+  service: ServiceInstance,
+) {
   app.get("/v1/streams/:uuid", (req, res) => {
     if (!req.accepts("text/event-stream")) {
       res.sendStatus(406);
@@ -158,6 +160,4 @@ export function streamingService(service: ServiceInstance): express.Express {
   app.get("/healthz", (_, res) => {
     res.sendStatus(200);
   });
-
-  return app;
 }

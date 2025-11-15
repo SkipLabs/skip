@@ -7,8 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+ - Logging middleware in both control and streaming servers (#1032)
+
 ### Changed
- - Update healthcheck routes from `/v1/healthcheck` to `/healthz`
+ - Update healthcheck routes from `/v1/healthcheck` to `/healthz` (#1031)
 
 ## [0.0.18] - 2025-11-14
 
