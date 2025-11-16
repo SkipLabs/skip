@@ -1738,6 +1738,7 @@ export function initTests(
       console.warn(
         "\tdocker run --name skip-postgres-container -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=secret -p 5432:5432 -d postgres",
       );
+      if (service) await service.close();
       ctx.skip();
     }
     try {
@@ -1847,6 +1848,7 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
       console.warn(
         "\tdocker exec -ti skip-kafka-container /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --if-not-exists --topic skip-test-topic",
       );
+      if (service) await service.close();
       this.skip();
     }
     try {
