@@ -963,6 +963,7 @@ export class ToBinding {
   private readonly stack: Stack;
   private skjson?: JsonConverter;
   private forkName: Nullable<string>;
+  private initializing: boolean;
   readonly handles: Handles;
   changes: Nullable<Handle<ChangeManager>>;
 
@@ -976,6 +977,7 @@ export class ToBinding {
     this.handles = new Handles();
     this.forkName = null;
     this.changes = null;
+    this.initializing = false;
   }
 
   register<T>(v: T): Handle<T> {
@@ -1215,7 +1217,7 @@ export class ToBinding {
   }
 
   SkipRuntime_deleteService(service: Handle<ServiceDefinition>): void {
-    this.handles.deleteHandle(service);
+    if (!this.initializing) this.handles.deleteHandle(service);
   }
 
   // Change manager
@@ -1351,26 +1353,26 @@ export class ToBinding {
     this.setFork(null);
     const uuid = crypto.randomUUID();
     this.fork(uuid);
+    const definition = new ServiceDefinition(service);
+    const skservicehHdl = this.handles.register(definition);
     try {
+      this.initializing = true;
       this.setFork(uuid);
-      const definition = new ServiceDefinition(service);
-      await this.initService_(definition);
+      await this.runAsync(() => {
+        const skservice = this.binding.SkipRuntime_createService(skservicehHdl);
+        return this.binding.SkipRuntime_initService(skservice);
+      });
       this.setFork(uuid);
       this.merge();
       return new ServiceInstance(this, null, definition);
     } catch (ex: unknown) {
       this.setFork(uuid);
       this.abortFork();
+      this.handles.deleteHandle(skservicehHdl);
       throw ex;
+    } finally {
+      this.initializing = false;
     }
-  }
-
-  private initService_(definition: ServiceDefinition): Promise<void> {
-    return this.runAsync(() => {
-      const skservicehHdl = this.handles.register(definition);
-      const skservice = this.binding.SkipRuntime_createService(skservicehHdl);
-      return this.binding.SkipRuntime_initService(skservice);
-    });
   }
 
   //

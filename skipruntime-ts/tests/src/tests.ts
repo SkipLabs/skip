@@ -580,6 +580,9 @@ class MockExternal implements ExternalService {
       error: (error: unknown) => void;
     },
   ): Promise<void> {
+    if (params.v1 === "error") {
+      throw new Error(params.v2);
+    }
     this.subscribed.push(instance);
     if (resource == "mock") {
       await this.mock(params, callbacks.update);
@@ -1073,6 +1076,30 @@ function initServiceWithExternalServiceFailure(): SkipService<
           params: { v1: 32, v2: 20 },
         })
         .map(NMapWithException);
+      return {
+        input: external,
+      };
+    },
+  };
+}
+
+function initServiceWithFaillingExternalService(): SkipService<
+  NamedCollections,
+  Input_NN
+> {
+  return {
+    initialData: {},
+    resources: { display: NNResource },
+    externalServices: { external: new MockExternal() },
+
+    createGraph(_is: NamedCollections, context: Context) {
+      const external = context
+        .useExternalResource<number, number>({
+          service: "external",
+          identifier: "mock",
+          params: { v1: "error", v2: "Something goes wrong." },
+        })
+        .map(SquareValues);
       return {
         input: external,
       };
@@ -2108,5 +2135,20 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
       [1, [[20, 30]]],
     ]);
     await service.close();
+  });
+
+  it("testInitServiceWithFaillingExternalService", async () => {
+    try {
+      const service = await initService(
+        initServiceWithFaillingExternalService(),
+      );
+      await service.close();
+      throw new Error("Error was not thrown");
+    } catch (e: unknown) {
+      expect(e).toBeA(Error);
+      expect((e as Error).message).toMatchRegex(
+        new RegExp(/^(?:Error: )?Something goes wrong.$/),
+      );
+    }
   });
 }
