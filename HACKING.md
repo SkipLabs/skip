@@ -2,6 +2,12 @@
 
 This document is a perpetually under construction collection of tips and potentially useful information for people hacking on the skip implementation.
 
+### Developer workflow
+
+TL;DR: During development, do not invoke `npm` commands directly, use the `make` targets.
+
+The npm package configuration files are set up to optimize the end-user scenario, where the native addon uses a binary release of the skipruntime. In contrast, during development it is generally desired to use the currently unreleased version of the skipruntime. To support both of these scenarios, directly invoked `npm` commands follow code paths that lead to using released skipruntime binaries, and `npm` commands invoked by `make` follow code paths that lead to building the current skipruntime sources and using that. In particular, `skipruntime-ts/Makefile` sets `SKIPRUNTIME_VERSION`, `LDFLAGS`, and `LD_LIBRARY_PATH` environment variables.
+
 ### Code formatting
 
 There is a CI job that checks that code is auto-formatted by running `make check-fmt`.
