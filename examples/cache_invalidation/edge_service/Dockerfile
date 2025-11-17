@@ -5,5 +5,5 @@ RUN npm install
 COPY . .
 RUN npm run build
 EXPOSE 8080 8081
-HEALTHCHECK --interval=10s --timeout=1s --retries=10 CMD wget --spider http://localhost:8081/v1/healthcheck
+HEALTHCHECK --interval=10s --timeout=1s --retries=10 CMD wget --spider http://localhost:8081/healthz
 CMD ["npm", "start"]

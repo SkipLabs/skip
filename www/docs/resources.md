@@ -121,7 +121,7 @@ For example, with `string` keys and `number` values, a request body of `[["key1"
 Finally, clients can check that the service is running normally:
 
 ```
-GET /v1/healthcheck
+GET /healthz
 ```
 
 This route will return HTTP 200 if the service is healthy.
