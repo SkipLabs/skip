@@ -29,7 +29,7 @@ changes, the addon package version must be bumped.)  To update from version
    inter-dependencies from `$OLD` to `$NEW`, e.g. by running `sed -i ''
    's/$OLD/$NEW/g' $(git grep -l $OLD skipruntime-ts/**/package.json)`.
 
-4. Build and test with `make -C skipruntime-ts build test`.
+4. Build and test with `make -C skipruntime-ts test`.
 
 5. Check that tests pass and changes to `package-lock.json` and
    `**/package.json` files look reasonable, then git-commit with a message like `NPM

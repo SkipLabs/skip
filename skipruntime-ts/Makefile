@@ -41,12 +41,11 @@ check-ts: install-all
 	../bin/check-ts.sh
 
 .PHONY: build
-build: libskipruntime
+build: install
 	../bin/cd_sh .. "npm run build $(NPM_WORKSPACES) --if-present"
 
 .PHONY: docs
-docs: libskipruntime
-	../bin/cd_sh .. "npm install && npm run build"
+docs: build
 	../bin/cd_sh ../www "rm -rf docs/api && npm install && npx docusaurus generate-typedoc"
 
 bunrun-%: build
@@ -73,12 +72,9 @@ nodeserver-%:
 clean:
 	make -C .. clean
 
-.PHONY: run-test
-run-test:
-	../bin/cd_sh tests "npm run test"
-
 .PHONY: test
-test: install build run-test
+test: build
+	../bin/cd_sh tests "npm run test"
 
 .PHONY: build-examples
 build-examples: build
@@ -120,7 +116,7 @@ test-error-types: # Best-effort check that we don't throw generic JS errors; pre
 	--exclude-dir tests
 
 .PHONY: test-all
-test-all: install-all build-examples run-test test-wasm-examples test-native-examples test-error-types
+test-all: install-all test build-examples test-wasm-examples test-native-examples test-error-types
 
 regen-%:
 	cd tests/examples && ./$*.sh ../tests/examples/$*.exp.out ../tests/examples/$*.exp.err
