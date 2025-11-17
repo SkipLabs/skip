@@ -21,11 +21,11 @@ Installation can be performed by executing:
 # install the skipruntime binary release
 && wget --quiet --output-document=- \
       https://raw.githubusercontent.com/skiplabs/skip/refs/tags/v${VERSION}/bin/install_runtime.sh \
-  | bash - \
+  | VERSION=${VERSION} bash - \
 # install the skipruntime native node addon package
 && npm install @skipruntime/native
 ```
-This command uses `npm install --dry-run` to determine the version of the runtime to install, but any mechanism that ensures the versions match will suffice.
+This command uses `npm install --dry-run` to determine the version of the runtime to install in order to respect any version constraints in `package.json`, but any mechanism that ensures the versions match will suffice.
 If the versions of the npm package and binary runtime do not match, `npm install @skipruntime/native` will fail with an error such as:
 ```
 npm error /usr/bin/ld: cannot find -lskipruntime-1.0.0: No such file or directory
