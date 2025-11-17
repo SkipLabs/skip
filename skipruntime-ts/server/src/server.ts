@@ -69,7 +69,7 @@ export type SkipServer = {
  *   Destroys the resource instance identified by `uuid`.
  *   Under normal circumstances, resource instances are deleted automatically after some period of inactivity; this interface enables immediately deleting live streams under exceptional circumstances.
  *
- * - `GET /healthz
+ * - `GET /healthz`
  *   Check that the Skip service is running normally.
  *   Returns HTTP 200 if the service is healthy, for use in monitoring, deployments, and the like.
  *
@@ -88,7 +88,7 @@ export type SkipServer = {
  *     data: <values>\n\n
  * ```
  *
- * - `GET /healthz
+ * - `GET /healthz`
  *   Check that the Skip service is running normally.
  *   Returns HTTP 200 if the service is healthy, for use in monitoring, deployments, and the like.
  *
