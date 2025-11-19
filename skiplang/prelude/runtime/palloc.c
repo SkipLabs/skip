@@ -633,25 +633,60 @@ void* sk_get_ftable(slot_t slot) {
 typedef struct {
   ginfo_t ginfo_data;
   uint64_t gid;
+  size_t capacity;
   void** pconsts;
+  void* heap_region;
 } no_file_t;
 
 #ifdef __APPLE__
 static void sk_init_no_file() {
-  no_file_t* no_file = malloc(sizeof(no_file_t));
+  static const size_t kFallbackCapacities[] = {
+      DEFAULT_CAPACITY,
+      4ULL * 1024 * 1024 * 1024,
+      2ULL * 1024 * 1024 * 1024,
+      1ULL * 1024 * 1024 * 1024,
+      512ULL * 1024 * 1024,
+  };
+
+  no_file_t* no_file = calloc(1, sizeof(no_file_t));
   if (no_file == NULL) {
     perror("malloc");
     exit(1);
   }
+
+  void* region = MAP_FAILED;
+  size_t selected_capacity = 0;
+  for (size_t i = 0; i < sizeof(kFallbackCapacities) / sizeof(size_t); i++) {
+    size_t candidate = kFallbackCapacities[i];
+    region =
+        mmap(NULL, candidate, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+    if (region != MAP_FAILED) {
+      selected_capacity = candidate;
+      break;
+    }
+  }
+
+  if (region == MAP_FAILED) {
+    perror("mmap");
+    exit(1);
+  }
+
   ginfo = &no_file->ginfo_data;
   ginfo->total_palloc_size = 0;
   ginfo->fileName = NULL;
-  ginfo->context = NULL;
+  ginfo->contexts = NULL;
+  memset(ginfo->ftable, 0, sizeof(ginfo->ftable));
+  ginfo->head = region;
+  ginfo->end = (char*)region + selected_capacity;
+
   gmutex = NULL;
   gid = &no_file->gid;
+  capacity = &no_file->capacity;
   pconsts = &no_file->pconsts;
+  *capacity = selected_capacity;
   *gid = 1;
   *pconsts = NULL;
+  no_file->heap_region = region;
 }
 #endif
 
@@ -675,9 +710,6 @@ void SKIP_memory_init(int argc, char** argv) {
             "Persistent allocation not supported on this platform. "
             "Disregarding %s.\n",
             fileName);
-  }
-  if (is_create) {
-    exit(EXIT_SUCCESS);
   }
   sk_init_no_file();
 

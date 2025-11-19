@@ -159,9 +159,13 @@ private class Config{
 
     link_args = results
       .maybeGetString("link-args")
-      .default("")
-      .split(" ")
-      .collect(Array);
+      .map(args ->
+        args
+          .split(" ")
+          .filter(s -> !s.isEmpty())
+          .collect(Array)
+      )
+      .default(Array[]);
 
     disasmAll = results.getBool("disasm-all");
     disasmAnnotated = results.getBool("disasm-annotated");

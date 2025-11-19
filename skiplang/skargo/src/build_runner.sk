@@ -205,6 +205,27 @@ mutable class BuildRunner(
             this.bctx.gctx.console.status("Compiling", unit_name);
             this.skc(unit)
           };
+        if (Environ.varOpt("SKARGO_DEBUG_OUTPUT").isSome()) {
+          for (output in this.outputs_for(unit)) {
+            exists = FileSystem.exists(output.path);
+            this.bctx.gctx.console.status(
+              "Debug",
+              `after skc: ${output.path} exists=${exists}`,
+            );
+            if (!exists) {
+              parent = Path.dirname(output.path);
+              entries = if (FileSystem.exists(parent)) {
+                FileSystem.readDirectory(parent).join(", ")
+              } else {
+                "<missing>"
+              };
+              this.bctx.gctx.console.status(
+                "Debug",
+                `parent dir ${parent} entries: ${entries}`,
+              )
+            }
+          }
+        };
           this.link_targets(unit);
           FileSystem.writeTextFile(
             this.fingerprint_file_for(unit),

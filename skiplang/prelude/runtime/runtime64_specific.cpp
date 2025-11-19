@@ -555,6 +555,7 @@ char* SKIP_realpath(char* path) {
   char* rv = realpath(path, res);
   if (rv == NULL) {
     perror("realpath");
+    fprintf(stderr, "realpath failed for: %s\n", path);
     // TODO: Ideally, this function would return a ?String instead.
     return sk_string_create("", 0);
   }

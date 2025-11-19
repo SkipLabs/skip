@@ -3,8 +3,13 @@ fun main(): void {
   host = Environ.var("HOST");
   out_dir = Environ.var("OUT_DIR");
   pic = (Environ.var("RELOCATION_MODEL") == "pic");
+  print_error_ln(`build.sk: TARGET=${target}`);
+  print_error_ln(`build.sk: HOST=${host}`);
+  print_error_ln(`build.sk: OUT_DIR=${out_dir}`);
+  print_error_ln(`build.sk: PIC=${pic}`);
 
   magic_c = Path.join(out_dir, "magic.c");
+  print_error_ln(`build.sk: writing magic.c to ${magic_c}`);
   FileSystem.writeTextFile(
     magic_c,
     `int SKIP_get_version() { return (int)${Time.time_ms()}; }`,
@@ -40,9 +45,13 @@ fun main(): void {
     wasm_srcs = Array["runtime/runtime32_specific.c"];
     wasm_srcs.each(f -> print_string(`skargo:rerun-if-changed=${f}`));
     cfg
+      .flags(Array[
+        "--target=wasm32",
+        "-emit-llvm",
+        "-nostdlibinc",
+      ])
       .define("SKIP32")
       .files(wasm_srcs)
-      .flags(Array["--target=wasm32", "-emit-llvm", "-nostdlibinc"])
       .compile("skip_runtime");
     print_string("skargo:skc-preamble=preamble/preamble32.ll");
     print_string("skargo:rerun-if-changed=preamble/preamble32.ll")
@@ -82,6 +91,9 @@ fun build_libbacktrace(
   host_is_target: Bool,
   pic: Bool,
 ): String {
+  print_error_ln(
+    `build_libbacktrace: out_dir=${out_dir} host_is_target=${host_is_target} pic=${pic}`,
+  );
   if (host_is_target && !pic) {
     // Try using system installed libbacktrace.
     PkgConfig.Config().skargo_metadata(true).probe("libbacktrace") match {
@@ -101,6 +113,7 @@ fun build_libbacktrace(
     stderr => print_error_raw,
     cwd => Some("./libbacktrace"),
   }.fromSuccess();
+  print_error_ln(`build_libbacktrace: configure exited ${p.exitcode()}`);
   if (!p.success()) {
     skipExit(1)
   };
@@ -111,6 +124,7 @@ fun build_libbacktrace(
     stderr => print_error_raw,
     cwd => Some("./libbacktrace"),
   }.fromSuccess();
+  print_error_ln(`build_libbacktrace: make install exited ${p.exitcode()}`);
   if (!p.success()) {
     skipExit(1)
   };

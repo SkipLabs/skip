@@ -49,6 +49,37 @@ fun link(
   linker_args = config.link_args.concat(
     config.dependencies.values().collect(Array).flatMap(x -> x.i1.links),
   );
+  if (!config.isWasm()) {
+    link_vec = mutable Vector[];
+    linker_args.each(link_vec.push);
+    default_links = mutable Vector["-lpthread"];
+    sysroot_lib =
+      if (
+        FileSystem.exists(config.sysroot)
+        && FileSystem.isDirectory(config.sysroot)
+      ) {
+        config.sysroot
+      } else {
+        Path.join(config.sysroot, "lib")
+      };
+    if (FileSystem.exists(sysroot_lib)) {
+      if (
+        FileSystem.exists(Path.join(sysroot_lib, "libskip_runtime64.a"))
+      ) {
+        default_links.push(`-L${sysroot_lib}`);
+        default_links.push("-lskip_runtime64");
+        if (FileSystem.exists(Path.join(sysroot_lib, "libbacktrace.a"))) {
+          default_links.push("-lbacktrace");
+        }
+      }
+    };
+    default_links.each(flag -> {
+      if (!link_vec.contains(flag)) {
+        link_vec.push(flag)
+      }
+    });
+    !linker_args = link_vec.collect(Array);
+  };
   static_libs = config.static_libraries.concat(
     config.dependencies
       .values()
@@ -432,6 +463,12 @@ fun compile_sklib(
   conf: Config.Config,
   env_vars: SortedMap<String, String>,
 ): void {
+  debug_sklib = Environ.varOpt("SKARGO_DEBUG_SKLIB").isSome();
+  if (debug_sklib) {
+    print_error(
+      `DEBUG[sklib]: writing ${conf.output} (dir exists: ${FileSystem.exists(Path.dirname(conf.output))})`,
+    );
+  };
   runCompilerPhase("native/write_sklib", () -> {
     // NOTE: Static libraries (`.a` archives) provided as input files are
     // bundled into the `sklib`.
@@ -449,6 +486,35 @@ fun compile_sklib(
     conf.preambles.each(sklib.add_preamble);
     conf.input_files.each(sklib.add_source);
 
+    if (!conf.isWasm()) {
+      default_links = mutable Vector["-lpthread"];
+      sysroot_lib =
+        if (
+          FileSystem.exists(conf.sysroot)
+          && FileSystem.isDirectory(conf.sysroot)
+        ) {
+          conf.sysroot
+        } else {
+          Path.join(conf.sysroot, "lib")
+        };
+      if (FileSystem.exists(sysroot_lib)) {
+        if (
+          FileSystem.exists(Path.join(sysroot_lib, "libskip_runtime64.a"))
+        ) {
+          default_links.push(`-L${sysroot_lib}`);
+          default_links.push("-lskip_runtime64");
+          if (FileSystem.exists(Path.join(sysroot_lib, "libbacktrace.a"))) {
+            default_links.push("-lbacktrace");
+          }
+        }
+      };
+      default_links.each(flag -> {
+        if (!sklib.links.contains(flag)) {
+          sklib.add_link_arg(flag)
+        }
+      });
+    };
+
     ar_file = IO.File::open(
       conf.output,
       IO.OpenOptions{write => true, create => true, truncate => true},
@@ -457,15 +523,25 @@ fun compile_sklib(
     | Success _ -> void
     | Failure(err) ->
       print_error(`Could not write ${conf.output}: ${err}`);
-      skipExit(3)
+      skipExit(3);
     };
     ar_file.close();
+    if (debug_sklib) {
+      print_error(
+        `DEBUG[sklib]: after write exists=${FileSystem.exists(conf.output)}`,
+      );
+    };
 
     p = System.subprocess(Array["llvm-ar", "s", conf.output]).fromSuccess();
     if (!p.success()) {
       print_error(`ranlib failed: ${p.stdout} ${p.stderr}`);
-      skipExit(3)
-    }
+      skipExit(3);
+    };
+    if (debug_sklib) {
+      print_error(
+        `DEBUG[sklib]: after llvm-ar exists=${FileSystem.exists(conf.output)}`,
+      );
+    };
   })
 }
 
