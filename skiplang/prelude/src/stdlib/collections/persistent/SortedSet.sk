@@ -16,6 +16,7 @@ class .SortedSet<+T: Orderable>(
   Show[T: readonly Show],
   Hashable[T: Hashable],
   Equality,
+  Orderable,
 {
   fun isEmpty(): Bool {
     this.inner.isEmpty()
@@ -58,12 +59,32 @@ class .SortedSet<+T: Orderable>(
     static(items.foldl((map, i) -> map.set(i, void), SortedMap[]))
   }
 
+  fun compare<U: Orderable>[T: U](other: readonly SortedSet<U>): Order {
+    this.inner.compare(other.inner)
+  }
+
   fun ==<U: Orderable>[T: U](other: readonly SortedSet<U>): Bool {
     this.inner == other.inner
   }
 
   fun !=<U: Orderable>[T: U](other: readonly SortedSet<U>): Bool {
     this.inner != other.inner
+  }
+
+  fun <<U: Orderable>[T: U](other: readonly SortedSet<U>): Bool {
+    this.inner < other.inner
+  }
+
+  fun ><U: Orderable>[T: U](other: readonly SortedSet<U>): Bool {
+    this.inner > other.inner
+  }
+
+  fun <=<U: Orderable>[T: U](other: readonly SortedSet<U>): Bool {
+    this.inner <= other.inner
+  }
+
+  fun >=<U: Orderable>[T: U](other: readonly SortedSet<U>): Bool {
+    this.inner >= other.inner
   }
 
   fun toString[T: readonly Show](): String {
