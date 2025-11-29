@@ -768,12 +768,10 @@ class Collection(dirName: SKStore.DirName) {
     dir = context.unsafeGetEagerDir(this.dirName);
     for (kv in dir.unsafeGetFileIter()) {
       (key, files) = kv;
-      values.push(
-        (
-          JSONID::keyType(key).json,
-          files.collect(Array).map(x -> JSONFile::type(x).json),
-        ),
-      );
+      vs = files.collect(Array).map(x -> JSONFile::type(x).json);
+      if (!vs.isEmpty()) {
+        values.push((JSONID::keyType(key).json, vs))
+      }
     };
     values.toArray();
   }
