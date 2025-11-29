@@ -1230,375 +1230,427 @@ export function initTests(
 
   it("testMap1", async () => {
     const service = await initService(map1Service);
-    await service.update("input", [["1", [10]]]);
-    expect(await service.getArray("map1", "1")).toEqual([12]);
-    await service.close();
+    try {
+      await service.update("input", [["1", [10]]]);
+      expect(await service.getArray("map1", "1")).toEqual([12]);
+    } finally {
+      await service.close();
+    }
   });
 
   it("testMap2", async () => {
     const service = await initService(map2Service);
-    const resource = "map2";
-    await service.update("input1", [["1", [10]]]);
-    await service.update("input2", [["1", [20]]]);
-    expect(await service.getArray(resource, "1")).toEqual([30]);
-    await service.update("input1", [["2", [3]]]);
-    await service.update("input2", [["2", [7]]]);
-    expect(await service.getAll(resource)).toEqual([
-      ["1", [30]],
-      ["2", [10]],
-    ]);
-    await service.close();
+    try {
+      const resource = "map2";
+      await service.update("input1", [["1", [10]]]);
+      await service.update("input2", [["1", [20]]]);
+      expect(await service.getArray(resource, "1")).toEqual([30]);
+      await service.update("input1", [["2", [3]]]);
+      await service.update("input2", [["2", [7]]]);
+      expect(await service.getAll(resource)).toEqual([
+        ["1", [30]],
+        ["2", [10]],
+      ]);
+    } finally {
+      await service.close();
+    }
   });
 
   it("testMap3", async () => {
     const service = await initService(map3Service);
-    const resource = "map3";
-    await service.update("input1", [["1", [1, 2, 3]]]);
-    await service.update("input2", [["1", [10]]]);
-    expect(await service.getArray(resource, "1")).toEqual([36]);
-    await service.update("input1", [["2", [3]]]);
-    await service.update("input2", [["2", [7]]]);
-    expect(await service.getAll(resource)).toEqual([
-      ["1", [36]],
-      ["2", [10]],
-    ]);
-    await service.close();
+    try {
+      const resource = "map3";
+      await service.update("input1", [["1", [1, 2, 3]]]);
+      await service.update("input2", [["1", [10]]]);
+      expect(await service.getArray(resource, "1")).toEqual([36]);
+      await service.update("input1", [["2", [3]]]);
+      await service.update("input2", [["2", [7]]]);
+      expect(await service.getAll(resource)).toEqual([
+        ["1", [36]],
+        ["2", [10]],
+      ]);
+    } finally {
+      await service.close();
+    }
   });
 
   it("valueMapper", async () => {
     const service = await initService(oneToOneMapperService);
-    const resource = "valueMapper";
-    await service.update("input", [
-      [1, [1]],
-      [2, [2]],
-      [5, [5]],
-      [10, [10]],
-    ]);
-    expect(await service.getAll(resource)).toEqual([
-      [1, [2]],
-      [2, [6]],
-      [5, [30]],
-      [10, [110]],
-    ]);
-    await service.close();
+    try {
+      const resource = "valueMapper";
+      await service.update("input", [
+        [1, [1]],
+        [2, [2]],
+        [5, [5]],
+        [10, [10]],
+      ]);
+      expect(await service.getAll(resource)).toEqual([
+        [1, [2]],
+        [2, [6]],
+        [5, [30]],
+        [10, [110]],
+      ]);
+    } finally {
+      await service.close();
+    }
   });
 
   it("testSize", async () => {
     const service = await initService(sizeService);
-    const resource = "size";
-    await service.update("input1", [
-      [1, [0]],
-      [2, [2]],
-    ]);
-    expect(await service.getAll(resource)).toEqual([
-      [1, [0]],
-      [2, [2]],
-    ]);
-    await service.update("input2", [
-      [1, [10]],
-      [2, [5]],
-    ]);
-    expect(await service.getAll(resource)).toEqual([
-      [1, [2]],
-      [2, [4]],
-    ]);
-    await service.update("input2", [[1, []]]);
-    expect(await service.getAll(resource)).toEqual([
-      [1, [1]],
-      [2, [3]],
-    ]);
-    await service.close();
+    try {
+      const resource = "size";
+      await service.update("input1", [
+        [1, [0]],
+        [2, [2]],
+      ]);
+      expect(await service.getAll(resource)).toEqual([
+        [1, [0]],
+        [2, [2]],
+      ]);
+      await service.update("input2", [
+        [1, [10]],
+        [2, [5]],
+      ]);
+      expect(await service.getAll(resource)).toEqual([
+        [1, [2]],
+        [2, [4]],
+      ]);
+      await service.update("input2", [[1, []]]);
+      expect(await service.getAll(resource)).toEqual([
+        [1, [1]],
+        [2, [3]],
+      ]);
+    } finally {
+      await service.close();
+    }
   });
 
   it("testSlicedMap1", async () => {
     const service = await initService(slicedMap1Service);
-    const resource = "slice";
-    // Inserts [[0, 0], ..., [30, 30]
-    const values = Array.from({ length: 31 }, (_, i): Entry<number, number> => {
-      return [i, [i]];
-    });
-    await service.update("input", values);
-    expect(await service.getAll(resource)).toEqual([
-      [1, [1]],
-      [3, [9]],
-      [4, [16]],
-      [7, [49]],
-      [8, [64]],
-      [9, [81]],
-      [20, [400]],
-    ]);
-    await service.close();
+    try {
+      const resource = "slice";
+      // Inserts [[0, 0], ..., [30, 30]
+      const values = Array.from(
+        { length: 31 },
+        (_, i): Entry<number, number> => {
+          return [i, [i]];
+        },
+      );
+      await service.update("input", values);
+      expect(await service.getAll(resource)).toEqual([
+        [1, [1]],
+        [3, [9]],
+        [4, [16]],
+        [7, [49]],
+        [8, [64]],
+        [9, [81]],
+        [20, [400]],
+      ]);
+    } finally {
+      await service.close();
+    }
   });
 
   it("testLazy", async () => {
     const service = await initService(lazyService);
-    const resource = "lazy";
-    await service.update("input", [
-      [0, [10]],
-      [1, [20]],
-    ]);
-    expect(await service.getAll(resource)).toEqual([
-      [0, [2]],
-      [1, [2]],
-    ]);
-    await service.update("input", [[2, [4]]]);
-    expect(await service.getAll(resource)).toEqual([
-      [0, [2]],
-      [1, [2]],
-      [2, [2]],
-    ]);
-    await service.update("input", [[2, []]]);
-    expect(await service.getAll(resource)).toEqual([
-      [0, [2]],
-      [1, [2]],
-    ]);
-    await service.close();
+    try {
+      const resource = "lazy";
+      await service.update("input", [
+        [0, [10]],
+        [1, [20]],
+      ]);
+      expect(await service.getAll(resource)).toEqual([
+        [0, [2]],
+        [1, [2]],
+      ]);
+      await service.update("input", [[2, [4]]]);
+      expect(await service.getAll(resource)).toEqual([
+        [0, [2]],
+        [1, [2]],
+        [2, [2]],
+      ]);
+      await service.update("input", [[2, []]]);
+      expect(await service.getAll(resource)).toEqual([
+        [0, [2]],
+        [1, [2]],
+      ]);
+    } finally {
+      await service.close();
+    }
   });
 
   it("testMapReduce", async () => {
     const service = await initService(mapReduceService);
-    const resource = "mapReduce";
-    await service.update("input", [
-      [0, [1]],
-      [1, [1]],
-      [2, [1]],
-    ]);
-    expect(await service.getAll(resource)).toEqual([
-      [0, [2]],
-      [1, [1]],
-    ]);
-    await service.update("input", [[3, [2]]]);
-    expect(await service.getAll(resource)).toEqual([
-      [0, [2]],
-      [1, [3]],
-    ]);
-    await service.update("input", [
-      [0, [2]],
-      [1, [2]],
-    ]);
-    expect(await service.getAll(resource)).toEqual([
-      [0, [3]],
-      [1, [4]],
-    ]);
+    try {
+      const resource = "mapReduce";
+      await service.update("input", [
+        [0, [1]],
+        [1, [1]],
+        [2, [1]],
+      ]);
+      expect(await service.getAll(resource)).toEqual([
+        [0, [2]],
+        [1, [1]],
+      ]);
+      await service.update("input", [[3, [2]]]);
+      expect(await service.getAll(resource)).toEqual([
+        [0, [2]],
+        [1, [3]],
+      ]);
+      await service.update("input", [
+        [0, [2]],
+        [1, [2]],
+      ]);
+      expect(await service.getAll(resource)).toEqual([
+        [0, [3]],
+        [1, [4]],
+      ]);
 
-    await service.update("input", [[3, []]]);
-    expect(await service.getAll(resource)).toEqual([
-      [0, [3]],
-      [1, [2]],
-    ]);
-    await service.close();
+      await service.update("input", [[3, []]]);
+      expect(await service.getAll(resource)).toEqual([
+        [0, [3]],
+        [1, [2]],
+      ]);
+    } finally {
+      await service.close();
+    }
   });
 
   it("testUserMapReduce", async () => {
     const service = await initService(userMapReduceService);
-    const resource = "userMapReduce";
-    await service.update("input", [
-      [0, [1]],
-      [1, [1]],
-      [2, [1]],
-    ]);
-    expect(await service.getAll(resource)).toEqual([
-      [0, [2]],
-      [1, [1]],
-    ]);
-    await service.update("input", [[3, [2]]]);
-    expect(await service.getAll(resource)).toEqual([
-      [0, [2]],
-      [1, [3]],
-    ]);
-    await service.update("input", [
-      [0, [2]],
-      [1, [2]],
-    ]);
-    expect(await service.getAll(resource)).toEqual([
-      [0, [3]],
-      [1, [4]],
-    ]);
+    try {
+      const resource = "userMapReduce";
+      await service.update("input", [
+        [0, [1]],
+        [1, [1]],
+        [2, [1]],
+      ]);
+      expect(await service.getAll(resource)).toEqual([
+        [0, [2]],
+        [1, [1]],
+      ]);
+      await service.update("input", [[3, [2]]]);
+      expect(await service.getAll(resource)).toEqual([
+        [0, [2]],
+        [1, [3]],
+      ]);
+      await service.update("input", [
+        [0, [2]],
+        [1, [2]],
+      ]);
+      expect(await service.getAll(resource)).toEqual([
+        [0, [3]],
+        [1, [4]],
+      ]);
 
-    await service.update("input", [[3, []]]);
-    expect(await service.getAll(resource)).toEqual([
-      [0, [3]],
-      [1, [2]],
-    ]);
-    await service.close();
+      await service.update("input", [[3, []]]);
+      expect(await service.getAll(resource)).toEqual([
+        [0, [3]],
+        [1, [2]],
+      ]);
+    } finally {
+      await service.close();
+    }
   });
 
   it("testCount", async () => {
     const service = await initService(countService);
-    const resource = "count";
-    await service.update("input", [
-      [0, []],
-      [1, [1]],
-      [2, [1, 2]],
-    ]);
-    expect(await service.getAll(resource)).toEqual([
-      [1, [1]],
-      [2, [2]],
-    ]);
-    await service.update("input", [[3, [1, 2, 3]]]);
-    expect(await service.getAll(resource)).toEqual([
-      [1, [1]],
-      [2, [2]],
-      [3, [3]],
-    ]);
-    await service.update("input", [
-      [0, [5]],
-      [1, [5, 6]],
-      [3, []],
-    ]);
-    expect(await service.getAll(resource)).toEqual([
-      [0, [1]],
-      [1, [2]],
-      [2, [2]],
-      [3, [0]],
-    ]);
-    await service.close();
+    try {
+      const resource = "count";
+      await service.update("input", [
+        [0, []],
+        [1, [1]],
+        [2, [1, 2]],
+      ]);
+      expect(await service.getAll(resource)).toEqual([
+        [1, [1]],
+        [2, [2]],
+      ]);
+      await service.update("input", [[3, [1, 2, 3]]]);
+      expect(await service.getAll(resource)).toEqual([
+        [1, [1]],
+        [2, [2]],
+        [3, [3]],
+      ]);
+      await service.update("input", [
+        [0, [5]],
+        [1, [5, 6]],
+        [3, []],
+      ]);
+      expect(await service.getAll(resource)).toEqual([
+        [0, [1]],
+        [1, [2]],
+        [2, [2]],
+        [3, [0]],
+      ]);
+    } finally {
+      await service.close();
+    }
   });
 
   it("testMerge1", async () => {
     const service = await initService(merge1Service);
-    const resource = "merge1";
-    await service.update("input1", [[1, [10]]]);
-    await service.update("input2", [[1, [20]]]);
-    expect(sorted(await service.getAll(resource))).toEqual([[1, [10, 20]]]);
-    await service.update("input1", [[2, [3]]]);
-    await service.update("input2", [[2, [7]]]);
-    expect(sorted(await service.getAll(resource))).toEqual([
-      [1, [10, 20]],
-      [2, [3, 7]],
-    ]);
-    await service.update("input1", [[1, []]]);
-    expect(sorted(await service.getAll(resource))).toEqual([
-      [1, [20]],
-      [2, [3, 7]],
-    ]);
-    await service.close();
+    try {
+      const resource = "merge1";
+      await service.update("input1", [[1, [10]]]);
+      await service.update("input2", [[1, [20]]]);
+      expect(sorted(await service.getAll(resource))).toEqual([[1, [10, 20]]]);
+      await service.update("input1", [[2, [3]]]);
+      await service.update("input2", [[2, [7]]]);
+      expect(sorted(await service.getAll(resource))).toEqual([
+        [1, [10, 20]],
+        [2, [3, 7]],
+      ]);
+      await service.update("input1", [[1, []]]);
+      expect(sorted(await service.getAll(resource))).toEqual([
+        [1, [20]],
+        [2, [3, 7]],
+      ]);
+    } finally {
+      await service.close();
+    }
   });
 
   it("testMergeReduce", async () => {
     const service = await initService(mergeReduceService);
-    const resource = "mergeReduce";
-    await service.update("input1", [[1, [10]]]);
-    await service.update("input2", [[1, [20]]]);
-    expect(await service.getAll(resource)).toEqual([[1, [30]]]);
-    await service.update("input1", [[2, [3]]]);
-    await service.update("input2", [[2, [7]]]);
-    expect(await service.getAll(resource)).toEqual([
-      [1, [30]],
-      [2, [10]],
-    ]);
-    await service.update("input1", [[1, []]]);
-    expect(await service.getAll(resource)).toEqual([
-      [1, [20]],
-      [2, [10]],
-    ]);
-    await service.close();
+    try {
+      const resource = "mergeReduce";
+      await service.update("input1", [[1, [10]]]);
+      await service.update("input2", [[1, [20]]]);
+      expect(await service.getAll(resource)).toEqual([[1, [30]]]);
+      await service.update("input1", [[2, [3]]]);
+      await service.update("input2", [[2, [7]]]);
+      expect(await service.getAll(resource)).toEqual([
+        [1, [30]],
+        [2, [10]],
+      ]);
+      await service.update("input1", [[1, []]]);
+      expect(await service.getAll(resource)).toEqual([
+        [1, [20]],
+        [2, [10]],
+      ]);
+    } finally {
+      await service.close();
+    }
   });
 
   it("testMergeMapReduce", async () => {
     const service = await initService(mergeReduceService);
-    const resource = "mergeMapReduce";
-    await service.update("input1", [[1, [10]]]);
-    await service.update("input2", [[1, [20]]]);
-    expect(await service.getAll(resource)).toEqual([[1, [40]]]);
-    await service.update("input1", [[2, [3]]]);
-    await service.update("input2", [[2, [7]]]);
-    expect(await service.getAll(resource)).toEqual([
-      [1, [40]],
-      [2, [20]],
-    ]);
-    await service.update("input1", [[1, []]]);
-    expect(await service.getAll(resource)).toEqual([
-      [1, [25]],
-      [2, [20]],
-    ]);
-    await service.close();
+    try {
+      const resource = "mergeMapReduce";
+      await service.update("input1", [[1, [10]]]);
+      await service.update("input2", [[1, [20]]]);
+      expect(await service.getAll(resource)).toEqual([[1, [40]]]);
+      await service.update("input1", [[2, [3]]]);
+      await service.update("input2", [[2, [7]]]);
+      expect(await service.getAll(resource)).toEqual([
+        [1, [40]],
+        [2, [20]],
+      ]);
+      await service.update("input1", [[1, []]]);
+      expect(await service.getAll(resource)).toEqual([
+        [1, [25]],
+        [2, [20]],
+      ]);
+    } finally {
+      await service.close();
+    }
   });
 
   it("testJSONParams", async () => {
     const service = await initService(jsonParamsService);
-    const resource = "jsonParams";
-    const plus15_params = { x: 1, y: { a: 2, bs: [3, 4, 5] } };
-    const plus42_params = {
-      x: 7,
-      y: { a: 7, bs: [14, 14], extra_garbage: "not used by resource" },
-    };
-    await service.update("input", [[1, [1]]]);
-    expect(await service.getAll(resource, { offsets: plus15_params })).toEqual([
-      [1, [16]],
-    ]);
-    expect(await service.getAll(resource, { offsets: plus42_params })).toEqual([
-      [1, [43]],
-    ]);
-    await service.update("input", [[2, [2]]]);
-    expect(await service.getAll(resource, { offsets: plus15_params })).toEqual([
-      [1, [16]],
-      [2, [17]],
-    ]);
-    expect(await service.getAll(resource, { offsets: plus42_params })).toEqual([
-      [1, [43]],
-      [2, [44]],
-    ]);
-    await service.close();
+    try {
+      const resource = "jsonParams";
+      const plus15_params = { x: 1, y: { a: 2, bs: [3, 4, 5] } };
+      const plus42_params = {
+        x: 7,
+        y: { a: 7, bs: [14, 14], extra_garbage: "not used by resource" },
+      };
+      await service.update("input", [[1, [1]]]);
+      expect(
+        await service.getAll(resource, { offsets: plus15_params }),
+      ).toEqual([[1, [16]]]);
+      expect(
+        await service.getAll(resource, { offsets: plus42_params }),
+      ).toEqual([[1, [43]]]);
+      await service.update("input", [[2, [2]]]);
+      expect(
+        await service.getAll(resource, { offsets: plus15_params }),
+      ).toEqual([
+        [1, [16]],
+        [2, [17]],
+      ]);
+      expect(
+        await service.getAll(resource, { offsets: plus42_params }),
+      ).toEqual([
+        [1, [43]],
+        [2, [44]],
+      ]);
+    } finally {
+      await service.close();
+    }
   });
 
   it("testJSONExtract", async () => {
     const service = await initService(jsonExtractService);
-    const resource = "jsonExtract";
-    await service.update("input", [
-      [
-        0,
+    try {
+      const resource = "jsonExtract";
+      await service.update("input", [
         [
-          {
-            value: { x: [1, 2, 3], "y[0]": [4, 5, 6, null] },
-            pattern: '{x[]: var1, ?"y[0]": var2}',
-          },
-        ],
-      ],
-      [
-        1,
-        [
-          {
-            value: { x: [1, 2, 3], y: [4, 5, 6, null] },
-            pattern: "{x[]: var1, ?y[0]: var2}",
-          },
-        ],
-      ],
-      [
-        2,
-        [
-          {
-            value: { x: 1, y: 2 },
-            pattern: "{%: var, x:var<int>}",
-          },
-        ],
-      ],
-    ]);
-    //
-    expect(await service.getAll(resource)).toEqual([
-      [
-        0,
-        [
+          0,
           [
-            [{ var2: [4, 5, 6, null] }, { var1: 1 }],
-            [{ var2: [4, 5, 6, null] }, { var1: 2 }],
-            [{ var2: [4, 5, 6, null] }, { var1: 3 }],
+            {
+              value: { x: [1, 2, 3], "y[0]": [4, 5, 6, null] },
+              pattern: '{x[]: var1, ?"y[0]": var2}',
+            },
           ],
         ],
-      ],
-      [
-        1,
         [
+          1,
           [
-            [{ var2: 4 }, { var1: 1 }],
-            [{ var2: 4 }, { var1: 2 }],
-            [{ var2: 4 }, { var1: 3 }],
+            {
+              value: { x: [1, 2, 3], y: [4, 5, 6, null] },
+              pattern: "{x[]: var1, ?y[0]: var2}",
+            },
           ],
         ],
-      ],
-      [2, [[[{ var: 1 }, { var: 2 }]]]],
-    ]);
-    await service.close();
+        [
+          2,
+          [
+            {
+              value: { x: 1, y: 2 },
+              pattern: "{%: var, x:var<int>}",
+            },
+          ],
+        ],
+      ]);
+      //
+      expect(await service.getAll(resource)).toEqual([
+        [
+          0,
+          [
+            [
+              [{ var2: [4, 5, 6, null] }, { var1: 1 }],
+              [{ var2: [4, 5, 6, null] }, { var1: 2 }],
+              [{ var2: [4, 5, 6, null] }, { var1: 3 }],
+            ],
+          ],
+        ],
+        [
+          1,
+          [
+            [
+              [{ var2: 4 }, { var1: 1 }],
+              [{ var2: 4 }, { var1: 2 }],
+              [{ var2: 4 }, { var1: 3 }],
+            ],
+          ],
+        ],
+        [2, [[[{ var: 1 }, { var: 2 }]]]],
+      ]);
+    } finally {
+      await service.close();
+    }
   });
 
   it("testExternal", async () => {
@@ -1608,140 +1660,149 @@ export function initTests(
     ] as MockExternal;
     const resource = "external";
     const service = await initService(serviceDef);
-    await service.update("input1", [
-      [0, [10]],
-      [1, [20]],
-    ]);
-    await service.update("input2", [
-      [0, [5]],
-      [1, [10]],
-    ]);
-    const constantResourceId1 = "unsafe.identifier.1";
-    await service.instantiateResource(constantResourceId1, resource, {});
-    const updates: CollectionUpdate<Json, Json>[] = [];
-    const sid = service.subscribe(constantResourceId1, {
-      subscribed: () => {},
-      notify: (update) => {
-        updates.push(update);
-      },
-      close: () => {},
-    });
-    const constantResourceId2 = "unsafe.identifier.2";
-    await service.instantiateResource(constantResourceId2, resource, {});
     try {
-      expect(mockExternal.subscribed.length).toEqual(1);
-      expect(mockExternal.initialized).toEqual(mockExternal.subscribed);
-      expect(await service.getAll(resource)).toEqual([
-        [0, [[10, 15]]],
-        [1, [[20, 30]]],
+      await service.update("input1", [
+        [0, [10]],
+        [1, [20]],
       ]);
       await service.update("input2", [
-        [0, [6]],
-        [1, [11]],
+        [0, [5]],
+        [1, [10]],
       ]);
-      expect(mockExternal.initialized).toEqual(mockExternal.subscribed);
-      expect(await service.getAll(resource)).toEqual([
-        [0, [[10, 16]]],
-        [1, [[20, 31]]],
-      ]);
-      expect(updates.map((update) => update.values)).toEqual([
-        [
+      const constantResourceId1 = "unsafe.identifier.1";
+      await service.instantiateResource(constantResourceId1, resource, {});
+      const updates: CollectionUpdate<Json, Json>[] = [];
+      const sid = service.subscribe(constantResourceId1, {
+        subscribed: () => {},
+        notify: (update) => {
+          updates.push(update);
+        },
+        close: () => {},
+      });
+      const constantResourceId2 = "unsafe.identifier.2";
+      await service.instantiateResource(constantResourceId2, resource, {});
+      try {
+        expect(mockExternal.subscribed.length).toEqual(1);
+        expect(mockExternal.initialized).toEqual(mockExternal.subscribed);
+        expect(await service.getAll(resource)).toEqual([
           [0, [[10, 15]]],
           [1, [[20, 30]]],
-        ],
-        [
+        ]);
+        await service.update("input2", [
+          [0, [6]],
+          [1, [11]],
+        ]);
+        expect(mockExternal.initialized).toEqual(mockExternal.subscribed);
+        expect(await service.getAll(resource)).toEqual([
           [0, [[10, 16]]],
           [1, [[20, 31]]],
-        ],
-      ]);
-      const subscribed = [...mockExternal.subscribed];
-      const unsubscribed = [...mockExternal.unsubscribed];
-      try {
-        await service.update("input2", [
-          [0, [-5]],
-          [1, [0]],
         ]);
-        throw new Error("Error was not thrown");
-      } catch (e: unknown) {
-        expect(e).toBeA(Error);
-        expect((e as Error).message).toMatchRegex(
-          new RegExp(/^(?:Error: )?Something goes wrong.$/),
-        );
+        expect(updates.map((update) => update.values)).toEqual([
+          [
+            [0, [[10, 15]]],
+            [1, [[20, 30]]],
+          ],
+          [
+            [0, [[10, 16]]],
+            [1, [[20, 31]]],
+          ],
+        ]);
+        const subscribed = [...mockExternal.subscribed];
+        const unsubscribed = [...mockExternal.unsubscribed];
+        try {
+          await service.update("input2", [
+            [0, [-5]],
+            [1, [0]],
+          ]);
+          throw new Error("Error was not thrown");
+        } catch (e: unknown) {
+          expect(e).toBeA(Error);
+          expect((e as Error).message).toMatchRegex(
+            new RegExp(/^(?:Error: )?Something goes wrong.$/),
+          );
+        }
+        const set = new Set(subscribed);
+        for (const s of mockExternal.subscribed) {
+          if (!set.has(s)) unsubscribed.push(s);
+        }
+        expect(unsubscribed.sort()).toEqual(mockExternal.unsubscribed.sort());
+      } finally {
+        service.unsubscribe(sid);
+        service.closeResourceInstance(constantResourceId1);
+        service.closeResourceInstance(constantResourceId2);
       }
-      const set = new Set(subscribed);
-      for (const s of mockExternal.subscribed) {
-        if (!set.has(s)) unsubscribed.push(s);
-      }
-      expect(unsubscribed.sort()).toEqual(mockExternal.unsubscribed.sort());
     } finally {
-      service.unsubscribe(sid);
-      service.closeResourceInstance(constantResourceId1);
-      service.closeResourceInstance(constantResourceId2);
       await service.close();
+      expect(mockExternal.unsubscribed.sort()).toEqual(
+        mockExternal.subscribed.sort(),
+      );
     }
-    expect(mockExternal.unsubscribed.sort()).toEqual(
-      mockExternal.subscribed.sort(),
-    );
   });
 
   it("testInitServiceWithExternalService", async () => {
     const resource = "display";
     const service = await initService(initServiceWithExternalService);
-    await service.update("input", [
-      [0, [10]],
-      [1, [20]],
-    ]);
-    const constantResourceId = "unsafe.identifier";
-    await service.instantiateResource(constantResourceId, resource, {});
-    const updates: CollectionUpdate<Json, Json>[] = [];
-    const sid = service.subscribe(constantResourceId, {
-      subscribed: () => {},
-      notify: (update) => {
-        updates.push(update);
-      },
-      close: () => {},
-    });
     try {
-      expect(await service.getAll(resource)).toEqual([
-        [0, [[10, 15]]],
-        [1, [[20, 30]]],
-      ]);
       await service.update("input", [
-        [0, [20]],
-        [1, [30]],
+        [0, [10]],
+        [1, [20]],
       ]);
-      expect(await service.getAll(resource)).toEqual([
-        [0, [[20, 15]]],
-        [1, [[30, 30]]],
-      ]);
-      expect(updates.map((update) => update.values)).toEqual([
-        [
+      const constantResourceId = "unsafe.identifier";
+      await service.instantiateResource(constantResourceId, resource, {});
+      const updates: CollectionUpdate<Json, Json>[] = [];
+      const sid = service.subscribe(constantResourceId, {
+        subscribed: () => {},
+        notify: (update) => {
+          updates.push(update);
+        },
+        close: () => {},
+      });
+      try {
+        expect(await service.getAll(resource)).toEqual([
           [0, [[10, 15]]],
           [1, [[20, 30]]],
-        ],
-        [
+        ]);
+        await service.update("input", [
+          [0, [20]],
+          [1, [30]],
+        ]);
+        expect(await service.getAll(resource)).toEqual([
           [0, [[20, 15]]],
           [1, [[30, 30]]],
-        ],
-      ]);
+        ]);
+        expect(updates.map((update) => update.values)).toEqual([
+          [
+            [0, [[10, 15]]],
+            [1, [[20, 30]]],
+          ],
+          [
+            [0, [[20, 15]]],
+            [1, [[30, 30]]],
+          ],
+        ]);
+      } finally {
+        service.unsubscribe(sid);
+        service.closeResourceInstance(constantResourceId);
+      }
     } finally {
-      service.unsubscribe(sid);
-      service.closeResourceInstance(constantResourceId);
       await service.close();
     }
   });
 
   it("testMultipleResources", async () => {
     const service = await initService(multipleResourcesService);
-    await service.update("input1", [["1", [10]]]);
-    expect(await service.getArray("resource1", "1")).toEqual([10]);
-    await service.update("input2", [["1", [20]]]);
-    expect(await service.getArray("resource2", "1")).toEqual([20]);
-    await service.update("input1", [["1", [30]]]);
-    expect(await service.getArray("resource1", "1")).toEqual([30]);
-    await service.update("input2", [["1", [40]]]);
-    expect(await service.getArray("resource2", "1")).toEqual([40]);
-    await service.close();
+    try {
+      await service.update("input1", [["1", [10]]]);
+      expect(await service.getArray("resource1", "1")).toEqual([10]);
+      await service.update("input2", [["1", [20]]]);
+      expect(await service.getArray("resource2", "1")).toEqual([20]);
+      await service.update("input1", [["1", [30]]]);
+      expect(await service.getArray("resource1", "1")).toEqual([30]);
+      await service.update("input2", [["1", [40]]]);
+      expect(await service.getArray("resource2", "1")).toEqual([40]);
+    } finally {
+      await service.close();
+    }
   });
 
   const testPostgres = async function (
@@ -1903,46 +1964,53 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
 
   it("testLazyWithUseExternalService", async () => {
     const service = await initService(lazyWithUseExternalServiceService());
-    await service.instantiateResource(
-      "unsafe.fixed.resource.ident",
-      "lazy",
-      {},
-    );
     try {
-      await service.update("input", [
-        [0, [10]],
-        [1, [20]],
-      ]);
-      throw new Error("Error was not thrown");
-    } catch (e: unknown) {
-      expect(e).toBeA(Error);
-      expect((e as Error).message).toMatchRegex(
-        new RegExp(
-          /^(?:Error: )?useExternalResource is not allowed in a lazy computation graph.$/,
-        ),
+      await service.instantiateResource(
+        "unsafe.fixed.resource.ident",
+        "lazy",
+        {},
       );
+      try {
+        await service.update("input", [
+          [0, [10]],
+          [1, [20]],
+        ]);
+        throw new Error("Error was not thrown");
+      } catch (e: unknown) {
+        expect(e).toBeA(Error);
+        expect((e as Error).message).toMatchRegex(
+          new RegExp(
+            /^(?:Error: )?useExternalResource is not allowed in a lazy computation graph.$/,
+          ),
+        );
+      }
+    } finally {
+      await service.close();
     }
-    await service.close();
   });
 
   it("testMapWithException", async () => {
     const service = await initService(mapWithExceptionService);
-    await service.instantiateResource(
-      "unsafe.fixed.resource.ident",
-      "mapWithException",
-      {},
-    );
     try {
-      await service.update("input", [
-        [0, [10]],
-        [1, [20]],
-      ]);
-      throw new Error("Error was not thrown");
-    } catch (e: unknown) {
-      expect(e).toBeA(Error);
-      expect((e as Error).message).toMatchRegex(
-        new RegExp(/^(?:Error: )?Something goes wrong.$/),
+      await service.instantiateResource(
+        "unsafe.fixed.resource.ident",
+        "mapWithException",
+        {},
       );
+      try {
+        await service.update("input", [
+          [0, [10]],
+          [1, [20]],
+        ]);
+        throw new Error("Error was not thrown");
+      } catch (e: unknown) {
+        expect(e).toBeA(Error);
+        expect((e as Error).message).toMatchRegex(
+          new RegExp(/^(?:Error: )?Something goes wrong.$/),
+        );
+      } finally {
+        await service.close();
+      }
     } finally {
       await service.close();
     }
@@ -2040,51 +2108,56 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
 
   it("testReload1", async () => {
     const service = await initService(map1Service);
-    const resource = "map1";
-    await service.update("input", [
-      ["1", [10]],
-      ["2", [1]],
-    ]);
-    expect(await service.getArray(resource, "1")).toEqual([12]);
-    expect(await service.getArray(resource, "2")).toEqual([3]);
-    const instanceId = "unsafe.fixed.resource.ident.1";
-    await service.instantiateResource(instanceId, resource, 1);
-    const notifier = new Notifier(service, instanceId);
-    notifier.checkInit([
-      ["1", [12]],
-      ["2", [3]],
-    ]);
-    await service.reload(map1Service, new NoChanges());
-    notifier.checkEmpty();
-    expect(await service.getArray(resource, "1")).toEqual([12]);
-    expect(await service.getArray(resource, "2")).toEqual([3]);
-    await service.reload(
-      map1Service,
-      new WithChanges({ mappers: new Set(["Map1"]) }),
-    );
-    notifier.checkInit([
-      ["1", [12]],
-      ["2", [3]],
-    ]);
-    expect(await service.getArray(resource, "1")).toEqual([12]);
-    expect(await service.getArray(resource, "2")).toEqual([3]);
-    await service.reload(
-      map1Service,
-      new WithChanges({ resources: new Map([[resource, LoadStatus.Changed]]) }),
-    );
-    notifier.checkEmpty();
-    expect(await service.getArray(resource, "1")).toEqual([12]);
-    expect(await service.getArray(resource, "2")).toEqual([3]);
-    await service.reload(
-      map1Service,
-      new WithChanges({
-        resources: new Map([[resource, LoadStatus.Incompatible]]),
-      }),
-    );
-    expect(notifier.closed).toBeTruthy();
-    expect(await service.getArray(resource, "1")).toEqual([12]);
-    expect(await service.getArray(resource, "2")).toEqual([3]);
-    await service.close();
+    try {
+      const resource = "map1";
+      await service.update("input", [
+        ["1", [10]],
+        ["2", [1]],
+      ]);
+      expect(await service.getArray(resource, "1")).toEqual([12]);
+      expect(await service.getArray(resource, "2")).toEqual([3]);
+      const instanceId = "unsafe.fixed.resource.ident.1";
+      await service.instantiateResource(instanceId, resource, 1);
+      const notifier = new Notifier(service, instanceId);
+      notifier.checkInit([
+        ["1", [12]],
+        ["2", [3]],
+      ]);
+      await service.reload(map1Service, new NoChanges());
+      notifier.checkEmpty();
+      expect(await service.getArray(resource, "1")).toEqual([12]);
+      expect(await service.getArray(resource, "2")).toEqual([3]);
+      await service.reload(
+        map1Service,
+        new WithChanges({ mappers: new Set(["Map1"]) }),
+      );
+      notifier.checkInit([
+        ["1", [12]],
+        ["2", [3]],
+      ]);
+      expect(await service.getArray(resource, "1")).toEqual([12]);
+      expect(await service.getArray(resource, "2")).toEqual([3]);
+      await service.reload(
+        map1Service,
+        new WithChanges({
+          resources: new Map([[resource, LoadStatus.Changed]]),
+        }),
+      );
+      notifier.checkEmpty();
+      expect(await service.getArray(resource, "1")).toEqual([12]);
+      expect(await service.getArray(resource, "2")).toEqual([3]);
+      await service.reload(
+        map1Service,
+        new WithChanges({
+          resources: new Map([[resource, LoadStatus.Incompatible]]),
+        }),
+      );
+      expect(notifier.closed).toBeTruthy();
+      expect(await service.getArray(resource, "1")).toEqual([12]);
+      expect(await service.getArray(resource, "2")).toEqual([3]);
+    } finally {
+      await service.close();
+    }
   });
   it("testReload2", async () => {
     const serviceDef = testExternalService();
@@ -2093,48 +2166,51 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
     ] as MockExternal;
     const resource = "external";
     const service = await initService(serviceDef);
-    await service.update("input1", [
-      [0, [10]],
-      [1, [20]],
-    ]);
-    await service.update("input2", [
-      [0, [5]],
-      [1, [10]],
-    ]);
-    expect(await service.getAll(resource)).toEqual([
-      [0, [[10, 15]]],
-      [1, [[20, 30]]],
-    ]);
-    const instanceId = "unsafe.fixed.resource.ident.1";
-    await service.instantiateResource(instanceId, resource, {});
-    const notifier = new Notifier(service, instanceId);
-    notifier.checkInit([
-      [0, [[10, 15]]],
-      [1, [[20, 30]]],
-    ]);
-    await service.reload(serviceDef, new NoChanges());
-    notifier.checkEmpty();
-    expect(await service.getAll(resource)).toEqual([
-      [0, [[10, 15]]],
-      [1, [[20, 30]]],
-    ]);
-    const subscribed = [...mockExternal.subscribed];
-    await service.reload(
-      serviceDef,
-      new WithChanges({
-        externalService: new Set(["external"]),
-      }),
-    );
-    expect(mockExternal.unsubscribed).toEqual(subscribed);
-    notifier.checkUpdate([
-      [0, [[10, 15]]],
-      [1, [[20, 30]]],
-    ]);
-    expect(await service.getAll(resource)).toEqual([
-      [0, [[10, 15]]],
-      [1, [[20, 30]]],
-    ]);
-    await service.close();
+    try {
+      await service.update("input1", [
+        [0, [10]],
+        [1, [20]],
+      ]);
+      await service.update("input2", [
+        [0, [5]],
+        [1, [10]],
+      ]);
+      expect(await service.getAll(resource)).toEqual([
+        [0, [[10, 15]]],
+        [1, [[20, 30]]],
+      ]);
+      const instanceId = "unsafe.fixed.resource.ident.1";
+      await service.instantiateResource(instanceId, resource, {});
+      const notifier = new Notifier(service, instanceId);
+      notifier.checkInit([
+        [0, [[10, 15]]],
+        [1, [[20, 30]]],
+      ]);
+      await service.reload(serviceDef, new NoChanges());
+      notifier.checkEmpty();
+      expect(await service.getAll(resource)).toEqual([
+        [0, [[10, 15]]],
+        [1, [[20, 30]]],
+      ]);
+      const subscribed = [...mockExternal.subscribed];
+      await service.reload(
+        serviceDef,
+        new WithChanges({
+          externalService: new Set(["external"]),
+        }),
+      );
+      expect(mockExternal.unsubscribed).toEqual(subscribed);
+      notifier.checkUpdate([
+        [0, [[10, 15]]],
+        [1, [[20, 30]]],
+      ]);
+      expect(await service.getAll(resource)).toEqual([
+        [0, [[10, 15]]],
+        [1, [[20, 30]]],
+      ]);
+    } finally {
+      await service.close();
+    }
   });
 
   it("testInitServiceWithFaillingExternalService", async () => {
