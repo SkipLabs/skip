@@ -1318,12 +1318,12 @@ export class ToBinding {
   ): Nullable<Pointer<Internal.CJSON>> {
     const skjson = this.getJsonConverter();
     const reducer = this.handles.get(skreducer);
-    return skjson.exportJSON(
-      reducer.object.remove(
-        skjson.importJSON(skacc) as Json,
-        skjson.importJSON(skvalue) as Json & DepSafe,
-      ),
+    const result = reducer.object.remove(
+      skjson.importJSON(skacc) as Json,
+      skjson.importJSON(skvalue) as Json & DepSafe,
     );
+    if (result === null) return null;
+    return skjson.exportJSON(result);
   }
 
   SkipRuntime_Reducer__isEquals(
