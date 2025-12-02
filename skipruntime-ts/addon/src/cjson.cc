@@ -284,7 +284,7 @@ void CreateCJBool(const FunctionCallbackInfo<Value>& args) {
   };
   NatTryCatch(isolate, [&args](Isolate* isolate) {
     bool skvalue = args[0].As<Boolean>()->Value();
-    CJSON skbool = SKIP_SKJSON_createCJFloat(skvalue);
+    CJSON skbool = SKIP_SKJSON_createCJBool(skvalue);
     args.GetReturnValue().Set(External::New(isolate, skbool));
   });
 }
