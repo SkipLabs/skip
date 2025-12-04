@@ -560,6 +560,25 @@ const jsonExtractService: SkipService<Input_NJP, Input_NJP> = {
   },
 };
 
+// testBooleanRoundtrip - verifies boolean keys/values are not converted to numbers
+
+type Input_BS = { input: EagerCollection<boolean, string> };
+
+class BooleanKeyResource implements Resource<Input_BS> {
+  instantiate(cs: Input_BS): EagerCollection<boolean, string> {
+    return cs.input;
+  }
+}
+
+const booleanRoundtripService: SkipService<Input_BS, Input_BS> = {
+  initialData: { input: [] },
+  resources: { booleanKey: BooleanKeyResource },
+
+  createGraph(inputCollections: Input_BS) {
+    return inputCollections;
+  },
+};
+
 //// testExternalService
 
 async function timeout(ms: number) {
@@ -1651,6 +1670,31 @@ export function initTests(
     } finally {
       await service.close();
     }
+  });
+
+  it("testBooleanRoundtrip", async () => {
+    const service = await initService(booleanRoundtripService);
+    const resource = "booleanKey";
+    // Store entries with boolean keys
+    await service.update("input", [
+      [false, ["value-for-false"]],
+      [true, ["value-for-true"]],
+    ]);
+    const entries = await service.getAll(resource);
+    // Verify we get exactly 2 entries
+    expect(entries.length).toEqual(2);
+    // Verify that keys are actual booleans, not numbers (0/1)
+    for (const [key, values] of entries) {
+      expect(typeof key).toEqual("boolean");
+      expect(key === false || key === true).toEqual(true);
+      // Verify the values are correct
+      if (key === false) {
+        expect(values).toEqual(["value-for-false"]);
+      } else {
+        expect(values).toEqual(["value-for-true"]);
+      }
+    }
+    await service.close();
   });
 
   it("testExternal", async () => {

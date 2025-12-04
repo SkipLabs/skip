@@ -22,7 +22,6 @@ CJSON SKIP_SKJSON_createCJBool(bool v);
 
 double SKIP_SKJSON_typeOf(CJSON json);
 double SKIP_SKJSON_asNumber(CJSON json);
-int32_t SKIP_SKJSON_asBoolean(CJSON json);
 char* SKIP_SKJSON_asString(CJSON json);
 CJObject SKIP_SKJSON_asObject(CJSON json);
 CJArray SKIP_SKJSON_asArray(CJSON json);
@@ -284,7 +283,7 @@ void CreateCJBool(const FunctionCallbackInfo<Value>& args) {
   };
   NatTryCatch(isolate, [&args](Isolate* isolate) {
     bool skvalue = args[0].As<Boolean>()->Value();
-    CJSON skbool = SKIP_SKJSON_createCJFloat(skvalue);
+    CJSON skbool = SKIP_SKJSON_createCJBool(skvalue);
     args.GetReturnValue().Set(External::New(isolate, skbool));
   });
 }
@@ -328,27 +327,6 @@ void AsNumber(const FunctionCallbackInfo<Value>& args) {
   NatTryCatch(isolate, [&args](Isolate* isolate) {
     double skvalue = SKIP_SKJSON_asNumber(args[0].As<External>()->Value());
     args.GetReturnValue().Set(Number::New(isolate, skvalue));
-  });
-}
-
-void AsBoolean(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
-    return;
-  };
-  if (!args[0]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a pointer.")));
-    return;
-  };
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    int32_t skvalue = SKIP_SKJSON_asBoolean(args[0].As<External>()->Value());
-    args.GetReturnValue().Set(Boolean::New(isolate, (bool)skvalue));
   });
 }
 
@@ -561,7 +539,6 @@ void GetBinding(const FunctionCallbackInfo<Value>& args) {
 
   AddFunction(isolate, binding, "SKIP_SKJSON_typeOf", TypeOf);
   AddFunction(isolate, binding, "SKIP_SKJSON_asNumber", AsNumber);
-  AddFunction(isolate, binding, "SKIP_SKJSON_asBoolean", AsBoolean);
   AddFunction(isolate, binding, "SKIP_SKJSON_asString", AsString);
   AddFunction(isolate, binding, "SKIP_SKJSON_asObject", AsObject);
   AddFunction(isolate, binding, "SKIP_SKJSON_asArray", AsArray);
