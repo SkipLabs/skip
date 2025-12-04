@@ -253,7 +253,7 @@ function interpretPointer<T extends Internal.CJSON>(
     case Type.Null:
       return null;
     case Type.Boolean:
-      return binding.SKIP_SKJSON_asBoolean(pointer);
+      return binding.SKIP_SKJSON_asNumber(pointer) !== 0;
     case Type.Int:
     case Type.Float:
       return binding.SKIP_SKJSON_asNumber(pointer);

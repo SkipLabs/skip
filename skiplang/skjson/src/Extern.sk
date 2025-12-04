@@ -27,17 +27,10 @@ fun asNumber(json: CJSON): Float {
   json match {
   | CJInt(v) -> v.toFloat()
   | CJFloat(v) -> v
+  | CJBool(v) -> if (v) 1.0 else 0.0
   | _ -> invariant_violation("Must be an Int value.")
   }
 }
-@export("SKIP_SKJSON_asBoolean")
-fun asBoolean(json: CJSON): Int32 {
-  json match {
-  | CJBool(v) -> Int32::truncate(if (v) 1 else 0)
-  | _ -> invariant_violation("Must be a Boolean value.")
-  }
-}
-
 @export("SKIP_SKJSON_asString")
 fun asString(json: CJSON): String {
   json match {

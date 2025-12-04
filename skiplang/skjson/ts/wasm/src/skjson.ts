@@ -29,8 +29,6 @@ export {
 interface WasmAccess {
   SKIP_SKJSON_typeOf: (json: ptr<Internal.CJSON>) => Type;
   SKIP_SKJSON_asNumber: (json: ptr<Internal.CJSON>) => number;
-  // WASM returns i32 (0 or 1), not boolean - conversion happens in WasmBinding
-  SKIP_SKJSON_asBoolean: (json: ptr<Internal.CJSON>) => number;
   SKIP_SKJSON_asString: (json: ptr<Internal.CJSON>) => ptr<Internal.String>;
   SKIP_SKJSON_asArray: (json: ptr<Internal.CJSON>) => ptr<Internal.CJArray>;
   SKIP_SKJSON_asObject: (json: ptr<Internal.CJSON>) => ptr<Internal.CJObject>;
@@ -98,10 +96,6 @@ class WasmBinding implements Binding {
 
   SKIP_SKJSON_asNumber(json: Pointer<Internal.CJSON>): number {
     return this.fromWasm.SKIP_SKJSON_asNumber(toPtr(json));
-  }
-
-  SKIP_SKJSON_asBoolean(json: Pointer<Internal.CJSON>): boolean {
-    return this.fromWasm.SKIP_SKJSON_asBoolean(toPtr(json)) !== 0;
   }
 
   SKIP_SKJSON_asString(json: Pointer<Internal.CJSON>): string {
