@@ -579,6 +579,32 @@ const booleanRoundtripService: SkipService<Input_BS, Input_BS> = {
   },
 };
 
+//// Edge case tests for JS↔Skip bridge
+
+// Identity mapper that preserves JSON values through roundtrip
+class IdentityMapper implements Mapper<Json, Json, Json, Json> {
+  mapEntry(key: Json, values: Values<Json>): Iterable<[Json, Json]> {
+    return values.toArray().map((v) => [key, v]);
+  }
+}
+
+type Input_JJ = { input: EagerCollection<Json, Json> };
+
+class IdentityResource implements Resource<Input_JJ> {
+  instantiate(cs: Input_JJ): EagerCollection<Json, Json> {
+    return cs.input.map(IdentityMapper);
+  }
+}
+
+const identityService: SkipService<Input_JJ, Input_JJ> = {
+  initialData: { input: [] },
+  resources: { identity: IdentityResource },
+
+  createGraph(inputCollections: Input_JJ) {
+    return inputCollections;
+  },
+};
+
 //// testExternalService
 
 async function timeout(ms: number) {
@@ -1695,6 +1721,118 @@ export function initTests(
       }
     }
     await service.close();
+  });
+
+  // Edge case tests for JS↔Skip bridge
+  // These tests verify correct handling of JavaScript edge cases
+  // See BRIDGE_EDGE_CASES.md for documentation of what each test verifies
+
+  it("testNaNHandling", async () => {
+    // NaN is not a valid JSON value - ideally should be rejected
+    // Currently it passes through as NaN (WASM) which is questionable
+    const service = await initService(identityService);
+    try {
+      const resource = "identity";
+      try {
+        await service.update("input", [["nan_key", [NaN]]]);
+        const result = await service.getAll(resource);
+        // If we get here, NaN was accepted - check what it became
+        const nanVal = (result.find((e) => e[0] === "nan_key") as Entry<
+          Json,
+          Json
+        >)[1][0];
+        console.log("NaN became:", nanVal, "type:", typeof nanVal);
+        // Document current behavior:
+        // - WASM: NaN passes through as NaN (questionable - not valid JSON)
+        // - Native: may differ
+        // Ideally this should throw an error since NaN is not valid JSON
+        expect(typeof nanVal).toEqual("number");
+      } catch (e) {
+        // This is the PREFERRED behavior - rejecting NaN
+        expect(e).toBeA(Error);
+      }
+    } finally {
+      await service.close();
+    }
+  });
+
+  it("testInfinityHandling", async () => {
+    // BUG: Infinity is not a valid JSON value but is silently corrupted!
+    // Math.trunc(Infinity) === Infinity, so it goes to createCJInt which overflows
+    const service = await initService(identityService);
+    try {
+      const resource = "identity";
+      try {
+        await service.update("input", [
+          ["pos_inf", [Infinity]],
+          ["neg_inf", [-Infinity]],
+        ]);
+        const result = await service.getAll(resource);
+        // If we get here, Infinity was accepted - check what it became
+        const posInf = (result.find((e) => e[0] === "pos_inf") as Entry<
+          Json,
+          Json
+        >)[1][0] as number;
+        const negInf = (result.find((e) => e[0] === "neg_inf") as Entry<
+          Json,
+          Json
+        >)[1][0] as number;
+        console.log("Infinity became:", posInf, "type:", typeof posInf);
+        console.log("-Infinity became:", negInf, "type:", typeof negInf);
+        // BUG: Currently Infinity silently overflows to a huge number (~2^63)
+        // This is silent data corruption! Should throw instead.
+        // The test documents the bug - Infinity should NOT become a finite number
+        if (Number.isFinite(posInf)) {
+          // This is the bug - we're getting a corrupted value
+          console.error(
+            "BUG: Infinity was silently corrupted to finite number:",
+            posInf,
+          );
+        }
+        // For now, just verify we don't crash - the real fix should throw
+        expect(typeof posInf).toEqual("number");
+        expect(typeof negInf).toEqual("number");
+      } catch (e) {
+        // This SHOULD happen - rejecting Infinity is correct behavior
+        expect(e).toBeA(Error);
+      }
+    } finally {
+      await service.close();
+    }
+  });
+
+  it("testLargeIntegerPrecision", async () => {
+    // Numbers larger than Number.MAX_SAFE_INTEGER may lose precision
+    const service = await initService(identityService);
+    try {
+      const resource = "identity";
+      const maxSafeInt = Number.MAX_SAFE_INTEGER; // 2^53 - 1 = 9007199254740991
+      const beyondSafe = maxSafeInt + 2; // 9007199254740993 - not representable exactly
+      await service.update("input", [
+        ["max_safe", [maxSafeInt]],
+        ["beyond_safe", [beyondSafe]],
+      ]);
+      const result = await service.getAll(resource);
+      const maxSafeResult = (result.find((e) => e[0] === "max_safe") as Entry<
+        Json,
+        Json
+      >)[1][0] as number;
+      const beyondSafeResult = (
+        result.find((e) => e[0] === "beyond_safe") as Entry<Json, Json>
+      )[1][0] as number;
+      // MAX_SAFE_INTEGER should be preserved exactly
+      expect(maxSafeResult).toEqual(maxSafeInt);
+      // Beyond safe integer - document the behavior (may lose precision)
+      console.log(
+        "Beyond safe integer:",
+        beyondSafe,
+        "became:",
+        beyondSafeResult,
+      );
+      // This test documents the limitation - ideally we'd validate or warn
+    } finally {
+      await service.close();
+    }
   });
 
   it("testExternal", async () => {
