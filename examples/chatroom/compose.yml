@@ -35,22 +35,24 @@
 
   # Kafka event store
   kafka:
-    image: bitnamilegacy/kafka:latest
-    command: sh -c "((sleep 5 && /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --create --topic skip-chatroom-messages && /opt/bitnami/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --create --topic skip-chatroom-likes)&) && touch /opt/bitnami/kafka/config/log4j.properties && sed -i 's/INFO/WARN/g' /opt/bitnami/kafka/config/log4j.properties && /opt/bitnami/scripts/kafka/run.sh"
+    image: apache/kafka:4.1.1
+    command: sh -c "((sleep 5 && /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --create --topic skip-chatroom-messages && /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --create --topic skip-chatroom-likes)&) && touch /opt/kafka/config/log4j.properties && sed -i 's/INFO/WARN/g' /opt/kafka/config/log4j.properties && /etc/kafka/docker/run"
     ports:
       - "19092:19092"
     environment:
-      KAFKA_CFG_PROCESS_ROLES: controller,broker
-      KAFKA_CFG_NODE_ID: 0
-      KAFKA_CFG_BROKER_ID: 0
-      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
-      KAFKA_CFG_LISTENERS: "PLAINTEXT://:19092,CONTROLLER://:19093"
-      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "0@kafka:19093"
-      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_PROCESS_ROLES: controller,broker
+      KAFKA_NODE_ID: 0
+      KAFKA_BROKER_ID: 0
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_LISTENERS: "PLAINTEXT://:19092,CONTROLLER://:19093"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "0@kafka:19093"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
       KAFKA_ADVERTISED_HOST_NAME: kafka
-      KAFKA_CFG_ADVERTISED_HOST_NAME: kafka
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
     healthcheck:
-      test: /opt/bitnami/kafka/bin/kafka-topics.sh --list --bootstrap-server kafka:19092 | wc -l | xargs -I{} test {} -ge 2 || exit 1
+      test: /opt/kafka/bin/kafka-topics.sh --list --bootstrap-server kafka:19092 | wc -l | xargs -I{} test {} -ge 2 || exit 1
       interval: 1s
       timeout: 10s
       retries: 10
