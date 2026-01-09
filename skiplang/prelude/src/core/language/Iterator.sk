@@ -461,9 +461,21 @@ private mutable class ZipSortedIterator<K: Orderable, T> private (
 
   mutable fun next(): ?(?T, ?T) {
     none: ?T = None();
+    advance = (curr, tail, setHead) -> {
+      curr.each(old -> {
+        newHead = tail.next();
+        newHead.each(new ->
+          invariant(
+            this.project(old) < this.project(new),
+            "Iterator#zipSorted(): iterator not sorted",
+          )
+        );
+        setHead(newHead);
+      });
+    };
     go = (x, y) -> {
-      if (x.isSome()) this.!head1 = this.tail1.next();
-      if (y.isSome()) this.!head2 = this.tail2.next();
+      advance(x, this.tail1, h -> this.!head1 = h);
+      advance(y, this.tail2, h -> this.!head2 = h);
       Some((x, y))
     };
     (this.head1, this.head2) match {
