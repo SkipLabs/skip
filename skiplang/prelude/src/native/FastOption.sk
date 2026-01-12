@@ -132,6 +132,14 @@ private trait FastOptionCommonTrait<+T> extends FastOptionTrait<T> {
     }
   }
 
+  fun failureOr<U>(default: U): Result<U, T> {
+    if (this.isSome()) {
+      Failure(this.unsafeFromSome())
+    } else {
+      Success(default)
+    }
+  }
+
   untracked fun eachUntracked(f: untracked T -> void): void {
     if (this.isSome()) {
       f(this.unsafeFromSome())

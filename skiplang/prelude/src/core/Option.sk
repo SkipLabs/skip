@@ -90,6 +90,10 @@ base class Option<+T> uses
   | None() -> void
   | Some(value) -> f(value)
 
+  fun failureOr<U>(default: U): Result<U, T>
+  | None() -> Success(default)
+  | Some(err) -> Failure(err)
+
   untracked fun eachUntracked(f: untracked T -> void): void
   | None() -> void
   | Some(value) -> f(value)
