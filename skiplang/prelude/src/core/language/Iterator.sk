@@ -163,6 +163,24 @@ mutable base class .Iterator<+T> {
     mutable ZipWithIterator(this, other, f)
   }
 
+  // Merges two iterators assumed to be sorted.
+  // Yields (Some(x), None) for left-only, (None, Some(y)) for right-only,
+  // and (Some(x), Some(y)) for elements present in both.
+  overridable mutable fun zipSorted[T: Orderable](
+    other: mutable Iterator<T>,
+  ): mutable Iterator<(?T, ?T)> {
+    ZipSortedIterator::create(this, other, id)
+  }
+
+  // Merges two iterators assumed to be sorted by their `project`ed keys.
+  // Yields (Some(x), None) for left-only, (None, Some(y)) for right-only,
+  // and (Some(x), Some(y)) for elements present in both.
+  overridable mutable fun zipSortedBy<K: Orderable>[T: Projectable<K>](
+    other: mutable Iterator<T>,
+  ): mutable Iterator<(?T, ?T)> {
+    ZipSortedIterator::create(this, other, x ~> x.project())
+  }
+
   // Returns a new iterator representing the elements of this iterator after the
   // nth element.
   overridable mutable fun drop(n: Int): mutable Iterator<T> {
@@ -408,6 +426,68 @@ mutable class ZipWithIterator<T, U, +V>(
     (this.left.next(), this.right.next()) match {
     | (Some(l), Some(r)) -> Some(this.f(l, r))
     | _ -> None()
+    }
+  }
+}
+
+// See Iterator#zipSorted() and Iterator#zipSortedBy()
+// Merges two sorted iterators, comparing elements via a projection function.
+// Yields (Some(x), None) for left-only, (None, Some(y)) for right-only,
+// and (Some(x), Some(y)) for elements present in both.
+private mutable class ZipSortedIterator<K: Orderable, T> private (
+  private mutable head1: ?T,
+  private tail1: mutable Iterator<T>,
+  private mutable head2: ?T,
+  private tail2: mutable Iterator<T>,
+  private project: T ~> K,
+) extends Iterator<(?T, ?T)> {
+  static fun create(
+    iter1: mutable Iterator<T>,
+    iter2: mutable Iterator<T>,
+    project: T ~> K,
+  ): mutable Iterator<(?T, ?T)> {
+    head1 = iter1.next();
+    head2 = iter2.next();
+    mutable static(head1, iter1, head2, iter2, project)
+  }
+
+  readonly fun sizeHint(): ?Int {
+    (this.head1, this.head2) match {
+    | (Some(_), None()) -> this.tail1.sizeHint().map(n -> n + 1)
+    | (None(), Some(_)) -> this.tail2.sizeHint().map(n -> n + 1)
+    | _ -> None()
+    }
+  }
+
+  mutable fun next(): ?(?T, ?T) {
+    none: ?T = None();
+    advance = (curr, tail, setHead) -> {
+      curr.each(old -> {
+        newHead = tail.next();
+        newHead.each(new ->
+          invariant(
+            this.project(old) < this.project(new),
+            "Iterator#zipSorted(): iterator not sorted",
+          )
+        );
+        setHead(newHead);
+      });
+    };
+    go = (x, y) -> {
+      advance(x, this.tail1, h -> this.!head1 = h);
+      advance(y, this.tail2, h -> this.!head2 = h);
+      Some((x, y))
+    };
+    (this.head1, this.head2) match {
+    | (None(), None()) -> None()
+    | (None(), Some(_)) -> go(none, this.head2)
+    | (Some(_), None()) -> go(this.head1, none)
+    | (Some(x), Some(y)) ->
+      this.project(x).compare(this.project(y)) match {
+      | LT() -> go(this.head1, none)
+      | EQ() -> go(this.head1, this.head2)
+      | GT() -> go(none, this.head2)
+      }
     }
   }
 }
