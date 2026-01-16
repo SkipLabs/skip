@@ -12,12 +12,12 @@ module Iterator;
 // more items or None() when there are no more items. An iterator cannot be
 // reset: mutable methods will, in general, advance the iterator.
 mutable base class .Iterator<+T> {
-  // Returns a hint of the number of items that this Iterator may yield:
-  // - Returns Some(n) if the exact number of items is known. Examples:
-  //   iterators over concrete collections, 1:1 transform operations
-  //   (e.g. map()).
-  // - Otherwise returns None(). Examples: transform operations that may
-  //   not be 1:1, such as filter(), flatMap(), takeWhile(), etc.
+  // Returns a hint of the number of items that this Iterator may yield.
+  // This is used for capacity pre-allocation and is not guaranteed to be exact.
+  // - Returns Some(n) as an estimate. For concrete collections this is exact;
+  //   for transforms like filter() it may be an upper bound.
+  // - Returns None() if no useful estimate is available.
+  // Consumers must handle cases where the actual count differs from the hint.
   overridable readonly fun sizeHint(): ?Int {
     None()
   }
@@ -397,7 +397,9 @@ mutable class ZipIterator<+T, +U>(
   readonly fun sizeHint(): ?Int {
     (this.left.sizeHint(), this.right.sizeHint()) match {
     | (Some(left), Some(right)) -> Some(min(left, right))
-    | _ -> None()
+    | (Some(left), None()) -> Some(left)
+    | (None(), Some(right)) -> Some(right)
+    | (None(), None()) -> None()
     }
   }
 
@@ -418,7 +420,9 @@ mutable class ZipWithIterator<T, U, +V>(
   readonly fun sizeHint(): ?Int {
     (this.left.sizeHint(), this.right.sizeHint()) match {
     | (Some(left), Some(right)) -> Some(min(left, right))
-    | _ -> None()
+    | (Some(left), None()) -> Some(left)
+    | (None(), Some(right)) -> Some(right)
+    | (None(), None()) -> None()
     }
   }
 
@@ -452,10 +456,18 @@ private mutable class ZipSortedIterator<K: Orderable, T> private (
   }
 
   readonly fun sizeHint(): ?Int {
-    (this.head1, this.head2) match {
-    | (Some(_), None()) -> this.tail1.sizeHint().map(n -> n + 1)
-    | (None(), Some(_)) -> this.tail2.sizeHint().map(n -> n + 1)
-    | _ -> None()
+    size1 = this.tail1.sizeHint().map(n ->
+      if (this.head1.isSome()) n + 1 else n
+    );
+    size2 = this.tail2.sizeHint().map(n ->
+      if (this.head2.isSome()) n + 1 else n
+    );
+    (size1, size2) match {
+    | (Some(s1), Some(s2)) -> Some(s1 + s2)
+    | (Some(s), None())
+    | (None(), Some(s)) ->
+      Some(s)
+    | (None(), None()) -> None()
     }
   }
 

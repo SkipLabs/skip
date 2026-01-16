@@ -99,32 +99,51 @@ mutable class .Vector<+T> private (
   static fun mreverseFromIterator<I: mutable Iterator<T>>(
     items: I,
   ): mutable this {
-    items.sizeHint() match {
-    | Some(size) ->
-      invariant(
-        size >= 0,
-        "Vector::mreverseFromIterator(): Expected items sizeHint() to be nonnegative.",
-      );
-      inner = unsafeMake(size);
-      index = size;
+    hint = items.sizeHint().default(0);
+    if (hint > 0) {
+      // Optimistically try fast path using hint
+      inner = unsafeMake(hint);
+      index = hint;
+      overflow = mutable Vector[];
       items.each(value -> {
-        !index = index - 1;
-        invariant(
-          index.uge(0),
-          "Vector::mreverseFromIterator(): Invalid iterator, expected each() to yield sizeHint() items.",
-        );
-        unsafeSet(inner, index, value);
+        if (index > 0) {
+          !index = index - 1;
+          unsafeSet(inner, index, value);
+        } else {
+          // More items than hint - collect overflow
+          overflow.push(value);
+        }
       });
-      invariant(
-        index == 0,
-        "Vector::mreverseFromIterator(): Invalid iterator, expected each() to yield sizeHint() items.",
-      );
-      mutable Vector(inner, size)
-    | None() ->
-      result = Vector::mcreateFromIterator(items);
+      overflowSize = overflow.size();
+      filledStart = index;
+      if (overflowSize == 0) {
+        if (filledStart == 0) {
+          // Hint was exact
+          mutable Vector(inner, hint)
+        } else {
+          // Hint was too large: extract only the filled portion
+          filledSize = hint - index;
+          result = unsafeMake(filledSize);
+          unsafeMoveSlice(inner, filledStart, hint, result, 0);
+          mutable Vector(result, filledSize)
+        }
+      } else {
+        // Hint was too small: combine reverse(overflow) + inner
+        totalSize = hint + overflowSize;
+        result = unsafeMake(totalSize);
+        // Copy overflow in reverse order
+        for (i in Range(0, overflowSize)) {
+          unsafeSet(result, i, overflow[overflowSize - 1 - i]);
+        };
+        // Copy inner (already in reversed order)
+        unsafeMoveSlice(inner, 0, hint, result, overflowSize);
+        mutable Vector(result, totalSize)
+      };
+    } else {
+      result = static::mcreateFromIterator(items);
       result.reverse();
-      result
-    }
+      result;
+    };
   }
 
   // Create a vector of the given size with all indices set to the given value.
