@@ -1,0 +1,106 @@
+// Represents a value that is either A, B, or both (inclusive or).
+// Left(A) contains only the first value.
+// Right(B) contains only the second value.
+// Both(A, B) contains both values.
+//
+base class InclusiveOr<+A, +B> {
+  children =
+  | Left(value: A)
+  | Right(value: B)
+  | Both(left: A, right: B)
+
+  // # Introspection
+
+  // true iff this is a Left()
+  fun isLeft(): Bool
+  | Left _ -> true
+  | _ -> false
+
+  // true iff this is a Right()
+  fun isRight(): Bool
+  | Right _ -> true
+  | _ -> false
+
+  // true iff this is a Both()
+  fun isBoth(): Bool
+  | Both _ -> true
+  | _ -> false
+
+  // # Extraction
+
+  // The value if this is a Left(), otherwise throws.
+  fun fromLeft(message: String = "fromLeft() called on non-Left"): A
+  | Left(value) -> value
+  | _ -> invariant_violation(message)
+
+  // The value if this is a Right(), otherwise throws.
+  fun fromRight(message: String = "fromRight() called on non-Right"): B
+  | Right(value) -> value
+  | _ -> invariant_violation(message)
+
+  // Both values if this is a Both(), otherwise throws.
+  fun fromBoth(message: String = "fromBoth() called on non-Both"): (A, B)
+  | Both(l, r) -> (l, r)
+  | _ -> invariant_violation(message)
+
+  // # Transforming to Different Types
+
+  // Some(value) if this is a Left(), otherwise None()
+  fun maybeLeft(): ?A
+  | Left(value) -> Some(value)
+  | _ -> None()
+
+  // Some(value) if this is a Right(), otherwise None()
+  fun maybeRight(): ?B
+  | Right(value) -> Some(value)
+  | _ -> None()
+
+  // Some((left, right)) if this is a Both(), otherwise None()
+  fun maybeBoth(): ?(A, B)
+  | Both(l, r) -> Some((l, r))
+  | _ -> None()
+
+  // # Trait Implementations
+
+  fun ==<A2: Equality, B2: Equality>[A: A2, B: B2](
+    that: InclusiveOr<A2, B2>,
+  ): Bool {
+    (this, that) match {
+    | (Left(v1), Left(v2)) -> v1 == v2
+    | (Right(v1), Right(v2)) -> v1 == v2
+    | (Both(a1, b1), Both(a2, b2)) -> a1 == a2 && b1 == b2
+    | _ -> false
+    }
+  }
+
+  fun !=<A2: Equality, B2: Equality>[A: A2, B: B2](
+    that: InclusiveOr<A2, B2>,
+  ): Bool {
+    !(this == that)
+  }
+
+  // Left() < Right() < Both()
+  fun compare<A2: Orderable, B2: Orderable>[A: A2, B: B2](
+    that: InclusiveOr<A2, B2>,
+  ): Order
+  | Left(v1) ->
+    that match {
+    | Left(v2) -> compare(v1, v2)
+    | _ -> LT()
+    }
+  | Right(v1) ->
+    that match {
+    | Left _ -> GT()
+    | Right(v2) -> compare(v1, v2)
+    | Both _ -> LT()
+    }
+  | Both(a1, b1) ->
+    that match {
+    | Both(a2, b2) ->
+      compare(a1, a2) match {
+      | EQ() -> compare(b1, b2)
+      | ord -> ord
+      }
+    | _ -> GT()
+    }
+}

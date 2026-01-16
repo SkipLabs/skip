@@ -164,20 +164,20 @@ mutable base class .Iterator<+T> {
   }
 
   // Merges two iterators assumed to be sorted.
-  // Yields (Some(x), None) for left-only, (None, Some(y)) for right-only,
-  // and (Some(x), Some(y)) for elements present in both.
+  // Yields Left(x) for left-only, Right(y) for right-only, and Both(x, y)
+  // for elements present in both.
   overridable mutable fun zipSorted[T: Orderable](
     other: mutable Iterator<T>,
-  ): mutable Iterator<(?T, ?T)> {
+  ): mutable Iterator<InclusiveOr<T, T>> {
     ZipSortedIterator::create(this, other, id)
   }
 
   // Merges two iterators assumed to be sorted by their `project`ed keys.
-  // Yields (Some(x), None) for left-only, (None, Some(y)) for right-only,
-  // and (Some(x), Some(y)) for elements present in both.
+  // Yields Left(x) for left-only, Right(y) for right-only, and Both(x, y)
+  // for elements present in both.
   overridable mutable fun zipSortedBy<K: Orderable>[T: Projectable<K>](
     other: mutable Iterator<T>,
-  ): mutable Iterator<(?T, ?T)> {
+  ): mutable Iterator<InclusiveOr<T, T>> {
     ZipSortedIterator::create(this, other, x ~> x.project())
   }
 
@@ -432,20 +432,20 @@ mutable class ZipWithIterator<T, U, +V>(
 
 // See Iterator#zipSorted() and Iterator#zipSortedBy()
 // Merges two sorted iterators, comparing elements via a projection function.
-// Yields (Some(x), None) for left-only, (None, Some(y)) for right-only,
-// and (Some(x), Some(y)) for elements present in both.
+// Yields Left(x) for left-only, Right(y) for right-only, and Both(x, y) for
+// elements present in both.
 private mutable class ZipSortedIterator<K: Orderable, T> private (
   private mutable head1: ?T,
   private tail1: mutable Iterator<T>,
   private mutable head2: ?T,
   private tail2: mutable Iterator<T>,
   private project: T ~> K,
-) extends Iterator<(?T, ?T)> {
+) extends Iterator<InclusiveOr<T, T>> {
   static fun create(
     iter1: mutable Iterator<T>,
     iter2: mutable Iterator<T>,
     project: T ~> K,
-  ): mutable Iterator<(?T, ?T)> {
+  ): mutable Iterator<InclusiveOr<T, T>> {
     head1 = iter1.next();
     head2 = iter2.next();
     mutable static(head1, iter1, head2, iter2, project)
@@ -459,34 +459,39 @@ private mutable class ZipSortedIterator<K: Orderable, T> private (
     }
   }
 
-  mutable fun next(): ?(?T, ?T) {
-    none: ?T = None();
-    advance = (curr, tail, setHead) -> {
-      curr.each(old -> {
-        newHead = tail.next();
-        newHead.each(new ->
-          invariant(
-            this.project(old) < this.project(new),
-            "Iterator#zipSorted(): iterator not sorted",
-          )
-        );
-        setHead(newHead);
-      });
+  mutable fun next(): ?InclusiveOr<T, T> {
+    advance = (old, tail) -> {
+      newHead = tail.next();
+      newHead.each(new ->
+        invariant(
+          this.project(old) < this.project(new),
+          "Iterator#zipSorted(): iterator not sorted",
+        )
+      );
+      newHead;
     };
-    go = (x, y) -> {
-      advance(x, this.tail1, h -> this.!head1 = h);
-      advance(y, this.tail2, h -> this.!head2 = h);
-      Some((x, y))
-    };
+    advanceLeft = (x) -> this.!head1 = advance(x, this.tail1);
+    advanceRight = (y) -> this.!head2 = advance(y, this.tail2);
     (this.head1, this.head2) match {
     | (None(), None()) -> None()
-    | (None(), Some(_)) -> go(none, this.head2)
-    | (Some(_), None()) -> go(this.head1, none)
+    | (None(), Some(y)) ->
+      advanceRight(y);
+      Some(Right(y))
+    | (Some(x), None()) ->
+      advanceLeft(x);
+      Some(Left(x))
     | (Some(x), Some(y)) ->
       this.project(x).compare(this.project(y)) match {
-      | LT() -> go(this.head1, none)
-      | EQ() -> go(this.head1, this.head2)
-      | GT() -> go(none, this.head2)
+      | LT() ->
+        advanceLeft(x);
+        Some(Left(x))
+      | EQ() ->
+        advanceLeft(x);
+        advanceRight(y);
+        Some(Both(x, y))
+      | GT() ->
+        advanceRight(y);
+        Some(Right(y))
       }
     }
   }
