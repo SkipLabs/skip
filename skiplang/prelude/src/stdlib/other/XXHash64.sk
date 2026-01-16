@@ -7,10 +7,10 @@ value class XXHash(value: Int) uses Orderable
 
 module FastOption;
 extension class SentinelOption uses XXHashable[T: XXHashable] {
-  fun xxhash[T: XXHashable](ignorePos: Bool = false): XXHash {
+  fun xxhash[T: XXHashable](): XXHash {
     XXHash(
       if (this.isSome()) {
-        this.unsafeFromSome().xxhash(ignorePos).value + 1
+        this.unsafeFromSome().xxhash().value + 1
       } else {
         // Arbitrary hash value for None(), copied from Option.sk.
         1027410261
@@ -24,30 +24,30 @@ module end;
 module XXHash64;
 
 extension class .Int uses XXHashable {
-  fun xxhash(_ignorePos: Bool = false): XXHash {
+  fun xxhash(): XXHash {
     XXHash(this)
   }
 }
 extension class .Bool uses XXHashable {
-  fun xxhash(_ignorePos: Bool = false): XXHash {
+  fun xxhash(): XXHash {
     XXHash(this.hash())
   }
 }
 extension class .String uses XXHashable {
-  fun xxhash(_ignorePos: Bool = false): XXHash {
+  fun xxhash(): XXHash {
     XXHash(xxHash64String(this))
   }
 }
 extension class .Void uses XXHashable {
-  fun xxhash(_ignorePos: Bool = false): XXHash {
+  fun xxhash(): XXHash {
     XXHash(this.hash())
   }
 }
 extension base class .Option uses XXHashable[T: XXHashable] {
-  fun xxhash[T: XXHashable](ignorePos: Bool = false): XXHash {
+  fun xxhash[T: XXHashable](): XXHash {
     XXHash(
       if (this.isSome()) {
-        this.fromSome().xxhash(ignorePos).value + 1
+        this.fromSome().xxhash().value + 1
       } else {
         // Arbitrary hash value for None(), copied from Option.sk.
         1027410261
@@ -56,29 +56,23 @@ extension base class .Option uses XXHashable[T: XXHashable] {
   }
 }
 extension class .Vector uses XXHashable[T: XXHashable] {
-  readonly fun xxhash[T: XXHashable](ignorePos: Bool = false): XXHash {
-    XXHash(
-      this.foldl((seed, v) -> xxHash64(seed, v.xxhash(ignorePos).value), -1),
-    )
+  readonly fun xxhash[T: XXHashable](): XXHash {
+    XXHash(this.foldl((seed, v) -> xxHash64(seed, v.xxhash().value), -1))
   }
 }
 extension class .Array uses XXHashable[T: XXHashable] {
-  readonly fun xxhash[T: XXHashable](ignorePos: Bool = false): XXHash {
-    XXHash(
-      this.foldl((seed, v) -> xxHash64(seed, v.xxhash(ignorePos).value), -1),
-    )
+  readonly fun xxhash[T: XXHashable](): XXHash {
+    XXHash(this.foldl((seed, v) -> xxHash64(seed, v.xxhash().value), -1))
   }
 }
 
 extension class .Map uses XXHashable[K: XXHashable, V: XXHashable] {
-  readonly fun xxhash[K: XXHashable, V: XXHashable](
-    ignorePos: Bool = false,
-  ): XXHash {
+  readonly fun xxhash[K: XXHashable, V: XXHashable](): XXHash {
     XXHash(
       this.items().foldl(
         (seed, kv) -> {
-          k = kv.i0.xxhash(ignorePos).value;
-          v = kv.i1.xxhash(ignorePos).value;
+          k = kv.i0.xxhash().value;
+          v = kv.i1.xxhash().value;
           xxHash64(xxHash64(seed, k), v)
         },
         -1,
@@ -175,10 +169,10 @@ trait .XXHashable {
   // The hash method should return a 64-bit hash value. The bits do not
   // need to be scrambled, that is the responsibility of the user of this
   // method.
-  overridable macro fun xxhash(ignorePos: Bool = false): XXHash {
-    h = #thisClassName.xxhash(ignorePos);
+  overridable macro fun xxhash(): XXHash {
+    h = #thisClassName.xxhash();
     #forEachField (#field, #fieldName) {
-      !h = XXHash(xxHash64(h.value, this.#field.xxhash(ignorePos).value))
+      !h = XXHash(xxHash64(h.value, this.#field.xxhash().value))
     };
     h
   }
