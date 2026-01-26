@@ -455,14 +455,12 @@ mutable class .Vector<+T> private (
   @synonym("retain")
   mutable fun keepWhere(p: T -> Bool): void {
     inner = this.inner;
-    from = 0;
     to = 0;
     this.each(value -> {
       if (p(value)) {
         unsafeSet(inner, to, value);
         !to = to + 1
-      };
-      !from = from + 1;
+      }
     });
     if (to.ult(this.sz)) {
       unsafeFreeSlice(inner, to, this.sz);
