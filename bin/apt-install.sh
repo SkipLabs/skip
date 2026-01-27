@@ -52,7 +52,6 @@ for step in "${steps[@]}"; do
             # Assumes other steps have been run before
             apt-get install -q -y clang-format-$LLVM_VERSION docker.io docker-buildx parallel pip shellcheck
             pip install black
-            npm install -g prettier
             update-alternatives --auto clang
             ;;
         other-dev-tools)
