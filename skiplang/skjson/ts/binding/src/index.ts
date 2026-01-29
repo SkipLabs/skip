@@ -139,6 +139,13 @@ export function deepFreeze<T>(value: T): T & DepSafe {
   }
 }
 
+/* Fix to get Array.isArray narrow readonly arrays */
+declare global {
+  interface ArrayConstructor {
+    isArray(arg: any): arg is any[] | readonly any[];
+  }
+}
+
 /**
  * JSON-serializable values.
  *
@@ -150,12 +157,17 @@ export function deepFreeze<T>(value: T): T & DepSafe {
  * - arrays are compared lexicographically
  * - objects are compared lexicographically based on their key-value pairs ordered by keys
  */
-export type Json = boolean | number | string | (Json | null)[] | JsonObject;
+export type Json =
+  | boolean
+  | number
+  | string
+  | readonly (Json | null)[]
+  | JsonObject;
 
 /**
  * Objects containing `Json` values.
  */
-export type JsonObject = { [key: string]: Json | null };
+export type JsonObject = { readonly [key: string]: Json | null };
 
 export type Exportable =
   | null
