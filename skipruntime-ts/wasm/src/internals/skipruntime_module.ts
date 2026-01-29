@@ -190,6 +190,13 @@ export interface FromWasm {
   SkipRuntime_Runtime__merge(
     ignore: ptr<Internal.CJArray<Internal.CJString>>,
   ): Handle<Error>;
+  SkipRuntime_Runtime__startMerge(
+    ignore: ptr<Internal.CJArray<Internal.CJString>>,
+  ): ptr<Internal.MergeState>;
+  SkipRuntime_Runtime__endMerge(state: ptr<Internal.MergeState>): Handle<Error>;
+  SkipRuntime_Runtime__abortMerge(
+    state: ptr<Internal.MergeState>,
+  ): Handle<Error>;
   SkipRuntime_Runtime__abortFork(): Handle<Error>;
   SkipRuntime_Runtime__forkExists(name: ptr<Internal.String>): number;
   SkipRuntime_Runtime__reload(
@@ -684,6 +691,24 @@ export class WasmFromBinding implements FromBinding {
     return this.fromWasm.SkipRuntime_Runtime__merge(toPtr(ignore));
   }
 
+  SkipRuntime_Runtime__startMerge(
+    ignore: ptr<Internal.CJArray<Internal.CJString>>,
+  ): ptr<Internal.MergeState> {
+    return this.fromWasm.SkipRuntime_Runtime__startMerge(toPtr(ignore));
+  }
+
+  SkipRuntime_Runtime__endMerge(
+    state: ptr<Internal.MergeState>,
+  ): Handle<Error> {
+    return this.fromWasm.SkipRuntime_Runtime__endMerge(toPtr(state));
+  }
+
+  SkipRuntime_Runtime__abortMerge(
+    state: ptr<Internal.MergeState>,
+  ): Handle<Error> {
+    return this.fromWasm.SkipRuntime_Runtime__abortMerge(toPtr(state));
+  }
+
   SkipRuntime_Runtime__abortFork(): Handle<Error> {
     return this.fromWasm.SkipRuntime_Runtime__abortFork();
   }
@@ -763,6 +788,7 @@ class LinksImpl implements Links {
     this.tobinding = new ToBinding(
       fromBinding,
       utils.runWithGc.bind(utils),
+      utils.unsafeAsyncWithGc.bind(utils),
       () => (this.env.shared.get("SKJSON")! as SKJSONShared).converter,
       (skExc: Pointer<Internal.Exception>) =>
         this.utils.getErrorObject(toPtr(skExc)),

@@ -37,6 +37,7 @@ import {
   type SkipService,
   type Watermark,
   type ExternalService,
+  type Store,
 } from "./api.js";
 
 import {
@@ -122,7 +123,14 @@ export class ServiceDefinition {
     if (!this.service.initialData) throw new Error(`No initial data defined.`);
     const data = this.service.initialData[name];
     if (!data) throw new Error(`Initial data '${name}' not exist.`);
-    return data;
+    return Array.isArray(data) ? data : Array.of();
+  }
+
+  getStore(name: string): Nullable<Store<Json, Json>> {
+    if (!this.service.initialData) throw new Error(`No initial data defined.`);
+    const data = this.service.initialData[name];
+    if (!data) throw new Error(`Initial data '${name}' not exist.`);
+    return !Array.isArray(data) ? data : null;
   }
 
   createGraph(
@@ -754,8 +762,25 @@ export class ServiceInstance {
     const uuid = crypto.randomUUID();
     const fork = this.fork(uuid);
     try {
+      const normalized = entries;
       await fork.update_(collection, entries);
-      fork.merge([]);
+      if (!this.forkName) {
+        const store = this.definition.getStore(collection);
+        if (store) {
+          await this.refs.unsafeAsyncRunWithGC(async () => {
+            const state = this.refs.binding.SkipRuntime_Runtime__startMerge(
+              this.refs.json().exportJSON([]),
+            );
+            try {
+              await store.save(normalized);
+              this.refs.binding.SkipRuntime_Runtime__endMerge(state);
+            } catch (ex: unknown) {
+              this.refs.binding.SkipRuntime_Runtime__abortMerge(state);
+              throw ex;
+            }
+          });
+        } else fork.merge([]);
+      } else fork.merge([]);
     } catch (ex: unknown) {
       fork.abortFork();
       throw ex;
@@ -858,7 +883,6 @@ export class ServiceInstance {
    * @returns The forked ServiceInstance
    */
   private fork(name: string): ServiceInstance {
-    if (this.forkName) throw new Error(`Unable to fork ${this.forkName}.`);
     this.refs.setFork(this.forkName);
     this.refs.fork(name);
     return new ServiceInstance(this.refs, name, this.definition);
@@ -970,6 +994,7 @@ export class ToBinding {
   constructor(
     public binding: FromBinding,
     public runWithGC: <T>(fn: () => T) => T,
+    public unsafeAsyncRunWithGC: <T>(fn: () => Promise<T>) => Promise<T>,
     private getConverter: () => JsonConverter,
     private getError: (skExc: Pointer<Internal.Exception>) => Error,
   ) {
@@ -1362,6 +1387,14 @@ export class ToBinding {
         const skservice = this.binding.SkipRuntime_createService(skservicehHdl);
         return this.binding.SkipRuntime_initService(skservice);
       });
+      const instance = new ServiceInstance(this, uuid, definition);
+      if (service.initialData) {
+        for (const [name, store] of Object.entries(service.initialData)) {
+          if (!Array.isArray(store)) {
+            await instance.update(name, await store.load());
+          }
+        }
+      }
       this.setFork(uuid);
       this.merge();
       return new ServiceInstance(this, null, definition);
