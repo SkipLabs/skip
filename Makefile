@@ -5,6 +5,7 @@
 default: check check-ts
 
 PRETTIER_LOG_LEVEL?=warn
+PRETTIER_VERSION:=$(shell jq -r '.devDependencies.prettier' package.json)
 
 PLAYWRIGHT_REPORTER?="line"
 SKARGO_PROFILE?=release
@@ -106,8 +107,8 @@ fmt-c: # Keep in sync with bin/git_hooks/check_format.sh
 
 .PHONY: fmt-js
 fmt-js: # Keep in sync with bin/git_hooks/check_format.sh
-	npx prettier --log-level $(PRETTIER_LOG_LEVEL) --write .
-	npx prettier --log-level $(PRETTIER_LOG_LEVEL) --write --parser=json skipruntime-ts/addon/binding.gyp
+	npx prettier@$(PRETTIER_VERSION) --log-level $(PRETTIER_LOG_LEVEL) --write .
+	npx prettier@$(PRETTIER_VERSION) --log-level $(PRETTIER_LOG_LEVEL) --write --parser=json skipruntime-ts/addon/binding.gyp
 
 
 .PHONY: fmt-py
