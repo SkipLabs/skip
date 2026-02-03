@@ -107,8 +107,8 @@ fmt-c: # Keep in sync with bin/git_hooks/check_format.sh
 
 .PHONY: fmt-js
 fmt-js: # Keep in sync with bin/git_hooks/check_format.sh
-	npx prettier@$(PRETTIER_VERSION) --log-level $(PRETTIER_LOG_LEVEL) --write .
-	npx prettier@$(PRETTIER_VERSION) --log-level $(PRETTIER_LOG_LEVEL) --write --parser=json skipruntime-ts/addon/binding.gyp
+	npx -y prettier@$(PRETTIER_VERSION) --log-level $(PRETTIER_LOG_LEVEL) --write .
+	npx -y prettier@$(PRETTIER_VERSION) --log-level $(PRETTIER_LOG_LEVEL) --write --parser=json skipruntime-ts/addon/binding.gyp
 
 
 .PHONY: fmt-py
