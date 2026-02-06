@@ -3156,32 +3156,41 @@ mutable class FunSpecializer{
     typ: Type,
     pos: Pos,
   ): void {
-    val = (this.canInstantiate(typ), this.getValue(context, gf.obj)) match {
-    | (_, NotExists(why)) -> this.unreachable(pos, why)
-    | (false, _) ->
-      this.unreachable(
-        pos,
-        `Attempt to read field ${gf.obj.getType()}.${gf.field} of ` +
-          `type ${typ} that cannot be instantiated`,
-      )
-    | (true, Exists(obj @ NamedLeaf _)) ->
-      // Loading from a normal reference class.
-      shape = this.scalarize(typ);
-      Exists(
-        shape.map(
-          (name, ftype) -> {
-            this.emitGetField{
-              typ => ftype,
-              pos,
-              field => name,
-              obj => obj.value,
-              prettyName => gf.prettyName,
-            }.id
-          },
-          gf.field,
-        ),
-      )
-    | (true, Exists(cv @ NamedInner _)) ->
+    val = this.getValue(context, gf.obj) match {
+    | NotExists(why) -> this.unreachable(pos, why)
+    | Exists(obj @ NamedLeaf _) ->
+      // Loading from a normal reference class requires scalarizing the type,
+      // which requires the type to be instantiable.
+      if (!this.canInstantiate(typ)) {
+        this.unreachable(
+          pos,
+          `Attempt to read field ${gf.obj.getType()}.${gf.field} of ` +
+            `type ${typ} that cannot be instantiated`,
+        )
+      } else {
+        shape = this.scalarize(typ);
+        Exists(
+          shape.map(
+            (name, ftype) -> {
+              this.emitGetField{
+                typ => ftype,
+                pos,
+                field => name,
+                obj => obj.value,
+                prettyName => gf.prettyName,
+              }.id
+            },
+            gf.field,
+          ),
+        )
+      }
+    | Exists(cv @ NamedInner _) ->
+      // Loading from a value class generates no code, just bookkeeping.
+      // Note: We don't check canInstantiate(typ) here because value class
+      // field access doesn't require scalarizing the type - it's just
+      // bookkeeping. This allows accessing fields like Some<T>.value where
+      // T might appear as unresolved type _ during compilation.
+      // See issue #769 for the iterator compilation bug this fixes.
       if (
         gf.field == "value" &&
         this.getOptionStyle(context, gf.obj.getType()).isSome()
@@ -3191,7 +3200,6 @@ mutable class FunSpecializer{
         !cv = cv.getField("valueIfSome", pos).asInner(pos)
       };
 
-      // Loading from a value class generates no code, just bookkeeping.
       Exists(cv.getField(gf.field, pos))
     };
 
