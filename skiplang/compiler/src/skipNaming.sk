@@ -439,9 +439,8 @@ fun pattern_bindings(acc: UMap<void>, pat: A.Pattern): UMap<void> {
   }
 }
 
-// TODO consider !name.i1.startsWith("_")
 fun bind_pattern_name(acc: UMap<void>, name: A.Name): UMap<void> {
-  if (name.i1 != "_") acc.add(name, void) else acc
+  if (!name.i1.startsWith("_")) acc.add(name, void) else acc
 }
 
 fun bind_pattern_params(
@@ -940,14 +939,15 @@ fun check_locals_pattern(bound: Bound, pat: N.Pattern): Bound {
   | N.Pat_const _
   | N.Pat_literal _ ->
     bound
-  | N.Pat_var(var_name) -> bound.bind(var_name)
+  | N.Pat_var(var_name) ->
+    if (is_wildcard_name(var_name)) bound else bound.bind(var_name)
   | N.Pat_type(_, obj_params, _) ->
     obj_params match {
     | None() -> bound
     | Some(params) -> params.foldl(check_locals_pattern, bound)
     }
   | N.Pat_as(p, var_name) ->
-    !bound = bound.bind(var_name);
+    !bound = if (is_wildcard_name(var_name)) bound else bound.bind(var_name);
     check_locals_pattern(bound, p)
   }
 }
