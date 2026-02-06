@@ -16,17 +16,14 @@ private fun resetReactiveViews(
   options: Options,
 ): void {
   viewsDir = context.unsafeGetEagerDir(getViewsDir(context).dirName);
-  viewsToReset = viewsDir
-    .unsafeGetFileIter()
-    .flatMap((key_fileiter) -> {
-      (_key, fileiter) = key_fileiter;
-      fileiter.filter((file) ->
-        SelectFile::type(file).cselect.from.any((from) ->
-          alteredDirs.contains(from.i0.name)
-        )
+  viewsToReset = viewsDir.unsafeGetFileIter().flatMap((key_fileiter) -> {
+    (_key, fileiter) = key_fileiter;
+    fileiter.filter((file) ->
+      SelectFile::type(file).cselect.from.any((from) ->
+        alteredDirs.contains(from.i0.name)
       )
-    })
-    .collect(Array); // TODO #769: removing this collect leads to a runtime error
+    )
+  });
 
   for (childView in viewsToReset) {
     selectFile = SelectFile::type(childView);
