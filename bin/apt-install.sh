@@ -51,7 +51,9 @@ for step in "${steps[@]}"; do
         other-CI-tools)
             # Assumes other steps have been run before
             apt-get install -q -y clang-format-$LLVM_VERSION docker.io docker-buildx parallel pip shellcheck
-            pip install black==26.1.0
+            # Version from requirements-dev.txt (check repo root, then /tmp for docker builds)
+            BLACK_VERSION=$(grep '^black==' requirements-dev.txt /tmp/requirements-dev.txt 2>/dev/null | head -1 | cut -d'=' -f3)
+            pip install black==${BLACK_VERSION:-26.1.0}
             update-alternatives --auto clang
             ;;
         other-dev-tools)
