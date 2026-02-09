@@ -5,6 +5,13 @@
 exec 1>&2
 
 PRETTIER_VERSION=$(jq -r '.devDependencies.prettier' package.json)
+BLACK_VERSION=$(grep '^black==' requirements-dev.txt | cut -d'=' -f3)
+
+# Check black version (run `pip install -r requirements-dev.txt` if wrong version)
+if ! black --version 2>/dev/null | grep -q "$BLACK_VERSION"; then
+    echo "Error: black==$BLACK_VERSION required. Run: pip install -r requirements-dev.txt"
+    exit 1
+fi
 
 # check that a single staged file is well-formatted
 check-file () {

@@ -22,4 +22,5 @@ COPY --from=bootstrap /work/compiler/stage0/lib/ /usr/lib/
 FROM skiplang AS skip
 
 RUN --mount=type=bind,source=./bin/apt-install.sh,target=/tmp/apt-install.sh \
+    --mount=type=bind,source=./requirements-dev.txt,target=/tmp/requirements-dev.txt \
     /tmp/apt-install.sh skipruntime-deps other-CI-tools other-dev-tools

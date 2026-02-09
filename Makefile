@@ -6,6 +6,7 @@ default: check check-ts
 
 PRETTIER_LOG_LEVEL?=warn
 PRETTIER_VERSION:=$(shell jq -r '.devDependencies.prettier' package.json)
+BLACK_VERSION:=$(shell grep '^black==' requirements-dev.txt | cut -d'=' -f3)
 
 PLAYWRIGHT_REPORTER?="line"
 SKARGO_PROFILE?=release
@@ -113,7 +114,7 @@ fmt-js: # Keep in sync with bin/git_hooks/check_format.sh
 
 .PHONY: fmt-py
 fmt-py: # Keep in sync with bin/git_hooks/check_format.sh
-	black --quiet --line-length 80 .
+	pip install -q black==$(BLACK_VERSION) && black --quiet --line-length 80 .
 
 .PHONY: fmt
 fmt: fmt-sk fmt-c fmt-js fmt-py # Keep in sync with bin/git_hooks/check_format.sh

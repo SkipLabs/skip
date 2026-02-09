@@ -28,7 +28,7 @@ for arch in ${ARCH//,/ }; do
             --progress=plain \
             --platform="linux/$arch" \
             --file=skipruntime-ts/Dockerfile \
-            --output=type=local,dest=build/linux_$arch \
+            --output=type=local,dest=build/linux_"$arch" \
             .
     } > "build_$arch.log" 2>&1 &
 done

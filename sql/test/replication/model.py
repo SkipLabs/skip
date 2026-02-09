@@ -90,7 +90,7 @@ def runQuery(dbkey, query):
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
         )
-        (out, _) = await proc.communicate(query.encode())
+        out, _ = await proc.communicate(query.encode())
         if proc.returncode is None or proc.returncode > 0:
             raise RuntimeError(f"running '{query}' exited non-zero")
 
@@ -114,7 +114,7 @@ def compact(dbkey):
             "--sync",
             stderr=asyncio.subprocess.PIPE,
         )
-        (_, err) = await proc.communicate()
+        _, err = await proc.communicate()
         schedule.debug(err.decode().rstrip())
         if proc.returncode is None or proc.returncode > 0:
             raise RuntimeError(f"running 'compact' exited non-zero")
@@ -141,7 +141,7 @@ def subscribe(dbkey, subkey, table, user, dest, peerId):
             # "--peer-id", peerId,  # for multi-peer
             stdout=asyncio.subprocess.PIPE,
         )
-        (out, _) = await proc.communicate()
+        out, _ = await proc.communicate()
         session = out.decode().rstrip()
         schedule.storeScheduleLocal(subkey, session)
         return session
@@ -163,7 +163,7 @@ async def tail(db, session, peerId, spec):
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
-    (out, err) = await proc.communicate(json.dumps(spec).encode())
+    out, err = await proc.communicate(json.dumps(spec).encode())
     return out, err, proc.returncode
 
 
