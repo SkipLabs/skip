@@ -28,6 +28,9 @@ java { toolchain { languageVersion.set(JavaLanguageVersion.of(20)) } }
 
 spotless { kotlin { ktfmt("0.49") } }
 
+// The test sources in this project are for manual testing (see "replication" task), not JUnit
+tasks.withType<Test> { enabled = false }
+
 task("replication", JavaExec::class) {
   mainClass.set("io.skiplabs.skdb.pg.RepliTestKt")
   classpath = sourceSets["test"].runtimeClasspath
