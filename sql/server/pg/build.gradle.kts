@@ -8,7 +8,7 @@
 
 plugins {
   id("org.jetbrains.kotlin.jvm")
-  id("com.diffplug.spotless") version "6.12.1"
+  id("com.diffplug.spotless") version "7.0.0"
 
   `java-library`
 }

@@ -1,6 +1,6 @@
 plugins {
   id("org.jetbrains.kotlin.jvm")
-  id("com.diffplug.spotless") version "6.12.1"
+  id("com.diffplug.spotless") version "7.0.0"
   application
   java
 }
@@ -17,7 +17,7 @@ dependencies {
   implementation("io.undertow:undertow-core:2.3.9.Final")
 
   // coroutines
-  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.1")
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
 
   implementation(project(":core"))
 }
