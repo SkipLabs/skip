@@ -26,9 +26,8 @@ application {
   mainClass.set("io.skiplabs.skdb.server.ServiceKt")
 }
 
-tasks.named<Test>("test") {
-  useJUnitPlatform()
-}
+// The test sources in this project are for manual testing (see runMuxTest* tasks), not JUnit
+tasks.withType<Test> { enabled = false }
 
 task("runMuxTestServer", JavaExec::class) {
   mainClass.set("io.skiplabs.skdb.test.MuxTestServerKt")
