@@ -96,7 +96,9 @@ fun lazyForName(name: String): LazyCollection {
   LazyCollection::forName(name)
 }
 
-fun collectionsByName(collections: Map<String, Collection>): SKJSON.CJObject {
+fun collectionsByName(
+  collections: Map<String, CollectionBase>,
+): SKJSON.CJObject {
   fields = mutable Vector[];
   collections.each((k, c) -> fields.push((k, SKJSON.CJString(c.getId()))));
   SKJSON.CJObject(SKJSON.CJFields::create(fields.toArray(), x -> x));

@@ -174,7 +174,7 @@ fun createResource(resource: UInt32): ExternResource {
 }
 
 class ExternResource(eptr: SKStore.ExternalPointer) extends Resource {
-  fun instantiate(collections: Map<String, Collection>): Collection {
+  fun instantiate(collections: Map<String, CollectionBase>): Collection {
     collectionName = instantiateOfResource(
       this.eptr.value,
       collectionsByName(collections),
@@ -266,7 +266,9 @@ class ExternService(eptr: SKStore.ExternalPointer) extends Service {
     buildResourceOfService(this.eptr.value, name, parameters)
   }
 
-  fun createGraph(inputs: Map<String, Collection>): Map<String, Collection> {
+  fun createGraph(
+    inputs: Map<String, Collection>,
+  ): Map<String, CollectionBase> {
     names = createGraphOfService(this.eptr.value, collectionsByName(inputs));
     map = mutable Map[];
     names match {

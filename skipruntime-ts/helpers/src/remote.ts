@@ -2,16 +2,20 @@
 // in nodejs LTS.
 import { EventSource } from "eventsource";
 
-import type {
+import {
   AbstractEagerCollection,
-  Context,
-  Entry,
-  ExternalService,
-  Json,
-  NamedEagerCollections,
-  NamedInputDefinitions,
-  Resource,
-  SkipService,
+  AbstractLazyCollection,
+  type Context,
+  type DepSafe,
+  type Entry,
+  type ExternalService,
+  type Json,
+  type LazyCompute,
+  type NamedEagerCollections,
+  type NamedInputDefinitions,
+  type Resource,
+  type SharedCollections,
+  type SkipService,
 } from "@skipruntime/core";
 import { SkipError } from "@skipruntime/core";
 
@@ -161,12 +165,19 @@ export function asLeader<
  */
 export function asFollower<
   Inputs extends NamedEagerCollections,
-  ResourceInputs extends NamedEagerCollections,
+  ResourceInputs extends SharedCollections,
+  Params extends readonly DepSafe[],
 >(
   service: SkipService<Record<string, never>, Inputs, ResourceInputs>,
   leader: {
     leader: { host: string; streaming_port: number; control_port: number };
-    collections: string[];
+    eagers: string[];
+    lazies?: {
+      [name: string]: {
+        compute: new (...params: Params) => LazyCompute<Json, Json>;
+        params: Params;
+      };
+    };
   },
 ): SkipService<Record<string, never>, Inputs, ResourceInputs> {
   return {
@@ -176,15 +187,26 @@ export function asFollower<
       ...service.externalServices,
       __skip_leader: SkipExternalService.direct(leader.leader),
     },
-    createGraph(_inputs: object, context: Context): ResourceInputs {
-      const mirroredCollections: { [name: string]: AbstractEagerCollection } =
-        {};
-      for (const collection of leader.collections) {
+    createGraph(_inputs: Inputs, context: Context): ResourceInputs {
+      const mirroredCollections: {
+        [name: string]: AbstractEagerCollection | AbstractLazyCollection;
+      } = {};
+      for (const collection of leader.eagers) {
         mirroredCollections[collection] = context.useExternalResource({
           service: "__skip_leader",
           identifier: "leader",
           params: collection,
         });
+      }
+      if (leader.lazies) {
+        for (const collection of Object.keys(leader.lazies)) {
+          const lCollection = leader.lazies[collection]!;
+          const lazy: AbstractLazyCollection = context.createLazyCollection(
+            lCollection.compute,
+            ...lCollection.params,
+          );
+          mirroredCollections[collection] = lazy;
+        }
       }
       return mirroredCollections as ResourceInputs;
     },
