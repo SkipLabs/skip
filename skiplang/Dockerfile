@@ -3,7 +3,7 @@
 
 # aim to start from an image with a version of glibc that is as widely
 # compatible as possible while still receiving security updates
-FROM debian:stable-slim AS base
+FROM debian:bookworm-20250113-slim AS base
 
 ARG LLVM_VERSION=20
 
