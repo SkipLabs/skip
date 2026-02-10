@@ -1,10 +1,10 @@
 FROM skiplabs/skip AS base
 
 RUN apt-get update && apt-get install -q -y curl sqlite3 unzip zip && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
-RUN npm install -g bun && npm cache clean --force
-RUN npx playwright install-deps && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+    npm install -g bun && \
+    npx playwright install-deps && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* && \
+    npm cache clean --force
 
 RUN sh -c 'curl -s "https://get.sdkman.io?rcupdate=false" | bash'
 RUN bash -c "source $HOME/.sdkman/bin/sdkman-init.sh && \
