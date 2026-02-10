@@ -1,4 +1,4 @@
-FROM node:lts-alpine3.19 AS build
+FROM node:22.13.1-alpine3.21 AS build
 WORKDIR /build
 COPY package.json package.json
 RUN npm install
