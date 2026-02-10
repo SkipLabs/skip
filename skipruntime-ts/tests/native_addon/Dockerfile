@@ -7,7 +7,8 @@ RUN apt-get update --quiet \
  && apt-get install --quiet --yes nodejs \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/* \
- && npm install --global typescript
+ && npm install --global typescript \
+ && npm cache clean --force
 
 # copy the test code
 COPY package.json test.ts /work/
@@ -29,7 +30,8 @@ RUN VERSION=$(npm install --dry-run @skipruntime/native | grep native | cut -d' 
 
 # build the test
 RUN npm install \
- && tsc --module node16 test.ts
+ && tsc --module node16 test.ts \
+ && npm cache clean --force
 
 # set LD_LIBRARY_PATH so node can find the native addon's shared object file
 ENV LD_LIBRARY_PATH=${PREFIX}/lib
