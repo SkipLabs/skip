@@ -8,7 +8,7 @@
 
 plugins {
   id("org.jetbrains.kotlin.jvm")
-  id("com.diffplug.spotless") version "6.12.1"
+  id("com.diffplug.spotless") version "7.0.0"
 
   `java-library`
 }
@@ -20,7 +20,7 @@ repositories {
 
 dependencies {
   implementation("io.undertow:undertow-core:2.3.2.Final") // http/ws
-  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.1")
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
   implementation("org.java-websocket:Java-WebSocket:1.5.3")
 
   implementation("com.fasterxml.jackson.core:jackson-databind:2.16.1") // json
