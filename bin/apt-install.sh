@@ -46,7 +46,7 @@ for step in "${steps[@]}"; do
             wget -O - https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | apt-key add -
             echo "deb https://deb.nodesource.com/node_22.x nodistro main" >> /etc/apt/sources.list.d/nodejs.list
             apt-get update
-            apt-get install -q -y --no-install-recommends nodejs jq
+            apt-get install -q -y --no-install-recommends nodejs npm jq
             ;;
         other-CI-tools)
             # Assumes other steps have been run before
