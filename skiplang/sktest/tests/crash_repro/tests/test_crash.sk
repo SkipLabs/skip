@@ -1,0 +1,22 @@
+module alias T = SKTest;
+
+module CrashTests;
+
+@test
+fun test_before_crash(): void {
+  T.expectTrue(true)
+}
+
+@test
+fun test_crash(): void {
+  // exit(1) bypasses the exception handler and kills the subprocess,
+  // simulating a hard crash (same effect as SIGSEGV on result reporting).
+  exit(1)
+}
+
+@test
+fun test_after_crash(): void {
+  T.expectTrue(true)
+}
+
+module end;
