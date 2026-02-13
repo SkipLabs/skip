@@ -1,5 +1,12 @@
 module SKTest;
 
+fun signal_name(code: Int): String {
+  Posix.Signal::fromCode(code) match {
+  | Some(sig) -> sig.toString()
+  | None() -> `signal ${code}`
+  }
+}
+
 fun each_assigned_test(
   tests: readonly Map<String, readonly Sequence<Test>>,
   filter: String,
@@ -16,6 +23,18 @@ fun each_assigned_test(
       f(i % njobs, testSuite, test)
     }
   }
+}
+
+fun assign_all_tests(
+  tests: readonly Map<String, readonly Sequence<Test>>,
+  filter: String,
+  njobs: Int,
+): Array<Array<(String, Test)>> {
+  assigned = Array::fillBy(njobs, _ -> mutable Vector[]);
+  each_assigned_test(tests, filter, njobs, (rank, testSuite, test) -> {
+    assigned[rank].push((testSuite, test))
+  });
+  assigned.map(v -> v.toArray())
 }
 
 fun test_job(
@@ -53,7 +72,7 @@ fun test_job(
       stdout_file.close();
       stderr_file.close();
 
-      stdout.write_all(`${res.toJSON()}\n`.bytes()).fromSuccess();
+      stdout.write_all((res.toJSON() + "\n").bytes()).fromSuccess();
     }
   });
   skipExit(0)
@@ -107,7 +126,9 @@ fun test_harness(tests: readonly Map<String, readonly Sequence<Test>>): void {
   );
 
   njobs = args.getInt("jobs");
-  procs = Range(0, njobs).map(rank -> {
+  expected_tests = assign_all_tests(tests, filter, njobs);
+
+  procs = Array::fillBy(njobs, rank -> {
     Posix.Popen::create{
       args => Array[Environ.current_exe()],
       env => Map[
@@ -119,12 +140,11 @@ fun test_harness(tests: readonly Map<String, readonly Sequence<Test>>): void {
       stderr => true,
     }.fromSuccess()
   });
-  readers = Array::createFromItems(
-    procs.map(p -> mutable IO.BufferedReader(p.stdout.fromSome())),
-  );
+  readers = procs.map(p -> mutable IO.BufferedReader(p.stdout.fromSome()));
   pollfds = Array::mcreateFromItems(
     procs.map(p -> Posix.Pollfd::create(p.stdout.fromSome().fileno)),
   );
+  reported_tests = Array::fillBy(njobs, _ -> mutable Set[]);
   open_fds = procs.size();
   success = true;
   while (open_fds > 0) {
@@ -142,6 +162,7 @@ fun test_harness(tests: readonly Map<String, readonly Sequence<Test>>): void {
           | Success(line) -> line
           };
           res = TestResult::fromJSON(line);
+          reported_tests[i].insert(`${res.suite}.${res.name}`);
           if (res.result != "success") {
             !success = false
           };
@@ -156,7 +177,67 @@ fun test_harness(tests: readonly Map<String, readonly Sequence<Test>>): void {
       }
     }
   };
-  procs.each(p -> _ = p.wait());
+
+  for (rank in Range(0, procs.size())) {
+    p = procs[rank];
+    // Read stderr before wait() which calls closefds().
+    stderr_output = p.stderr match {
+    | Some(f) ->
+      f.read_to_string() match {
+      | Success(s) -> s
+      | Failure(_) -> ""
+      }
+    | None() -> ""
+    };
+
+    exitstatus = p.wait();
+
+    if (!exitstatus.success()) {
+      !success = false;
+      reason = exitstatus match {
+      | Posix.WSignaled(sig) -> `killed by ${signal_name(sig)}`
+      | Posix.WExited(code) -> `exited with code ${code}`
+      | Posix.WStopped(sig) -> `stopped by ${signal_name(sig)}`
+      };
+      crash_desc = `subprocess ${rank} ${reason}`;
+
+      unreported = 0;
+      for ((testSuite, test) in expected_tests[rank]) {
+        key = `${testSuite}.${test.name}`;
+        if (!reported_tests[rank].contains(key)) {
+          !unreported = unreported + 1;
+          res = TestResult{
+            name => test.name,
+            suite => testSuite,
+            file => test.file,
+            line => test.lineno,
+            result => "error",
+            failure_type => "SubprocessCrash",
+            failure_message => crash_desc,
+            stderr => stderr_output,
+          };
+          reporters.each(x -> x.report(res))
+        }
+      };
+
+      // If all tests were reported but the process still crashed,
+      // report a standalone crash error.
+      if (unreported == 0) {
+        res = TestResult{
+          name => "(subprocess crash)",
+          suite => "(harness)",
+          file => "",
+          line => 0,
+          result => "error",
+          failure_type => "SubprocessCrash",
+          failure_message => `${crash_desc} (all tests completed before crash)`,
+          stderr => stderr_output,
+        };
+        reporters.each(x -> x.report(res))
+      }
+    }
+  };
+
   reporters.each(r -> r.finish());
 
   if (!success) {
