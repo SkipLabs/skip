@@ -1,6 +1,7 @@
-#! /bin/bash
+#!/bin/bash
 
-set -e
-set -x
+# Build production SKDB images locally (linux/amd64)
 
-"$(dirname -- "${BASH_SOURCE[0]}")"/build_docker_images.sh --prod
+set -euo pipefail
+
+exec "$(dirname -- "${BASH_SOURCE[0]}")"/docker_build.sh --prod
