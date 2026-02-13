@@ -1,8 +1,10 @@
 FROM ubuntu:latest
 
+ARG TARGETARCH
+
 # install dependencies needed to build the node addon
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+RUN --mount=type=cache,id=apt-cache-$TARGETARCH,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-$TARGETARCH,target=/var/lib/apt/lists,sharing=locked \
     --mount=type=cache,target=/root/.npm,sharing=locked \
     apt-get update --quiet \
  && apt-get install --quiet --yes --no-install-recommends ca-certificates g++ make python3 wget \
