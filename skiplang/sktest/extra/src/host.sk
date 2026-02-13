@@ -1,5 +1,23 @@
 module SKTest;
 
+fun each_assigned_test(
+  tests: readonly Map<String, readonly Sequence<Test>>,
+  filter: String,
+  njobs: Int,
+  f: (Int, String, Test) -> void,
+): void {
+  i = 0;
+  for (testSuite in tests.keys()) {
+    for (test in tests[testSuite]) {
+      if (!`${testSuite}.${test.name}`.contains(filter)) {
+        continue
+      };
+      !i = i + 1;
+      f(i % njobs, testSuite, test)
+    }
+  }
+}
+
 fun test_job(
   tests: readonly Map<String, readonly Sequence<Test>>,
   filter: String,
@@ -7,17 +25,8 @@ fun test_job(
   rank: Int,
 ): void {
   stdout = mutable IO.File(Posix.dup(IO.stdout().fileno));
-  i = 0;
-  for (testSuite in tests.keys()) {
-    for (test in tests[testSuite]) {
-      if (!(testSuite + "." + test.name).contains(filter)) {
-        continue
-      };
-      !i = i + 1;
-      if (i % njobs != rank) {
-        continue
-      };
-
+  each_assigned_test(tests, filter, njobs, (r, testSuite, test) -> {
+    if (r == rank) {
       stdout_file = Posix.mkstemp(Path.join(Environ.temp_dir(), "XXXXXX"));
       Posix.dup2(stdout_file.fileno, IO.stdout().fileno);
       stderr_file = Posix.mkstemp(Path.join(Environ.temp_dir(), "XXXXXX"));
@@ -44,9 +53,9 @@ fun test_job(
       stdout_file.close();
       stderr_file.close();
 
-      stdout.write_all((res.toJSON() + "\n").bytes()).fromSuccess();
+      stdout.write_all(`${res.toJSON()}\n`.bytes()).fromSuccess();
     }
-  };
+  });
   skipExit(0)
 }
 
