@@ -7,7 +7,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get update --quiet \
  && apt-get install --quiet --yes --no-install-recommends g++ make python3 wget \
  && wget --quiet --output-document=- https://deb.nodesource.com/setup_22.x | bash - \
- && apt-get install --quiet --yes --no-install-recommends nodejs npm \
+ && apt-get install --quiet --yes --no-install-recommends nodejs \
  && npm install --global typescript
 
 # copy the npm pack archives, libskipruntime.so files, and install_runtime.sh
