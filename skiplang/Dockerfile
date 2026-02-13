@@ -42,5 +42,5 @@ RUN make clean && make STAGE=0
 
 FROM base AS final
 
-COPY --from=skiplang /work/skiplang/compiler/stage0/bin/ /usr/bin/
-COPY --from=skiplang /work/skiplang/compiler/stage0/lib/ /usr/lib/
+COPY --link --from=skiplang /work/skiplang/compiler/stage0/bin/ /usr/bin/
+COPY --link --from=skiplang /work/skiplang/compiler/stage0/lib/ /usr/lib/

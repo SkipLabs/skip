@@ -30,8 +30,8 @@ FROM eclipse-temurin:20 AS dev
 
 WORKDIR /skdb
 
-COPY --from=skdb /skdb/build ./build
-COPY --from=skgw /skdb/sql/server/dev/build/libs/dev.jar /skdb/build/server.jar
-COPY --from=skgw /skdb/sql/server/dev/start_dev.sh /skdb/build/start.sh
+COPY --link --from=skdb /skdb/build ./build
+COPY --link --from=skgw /skdb/sql/server/dev/build/libs/dev.jar /skdb/build/server.jar
+COPY --link --from=skgw /skdb/sql/server/dev/start_dev.sh /skdb/build/start.sh
 
 ENTRYPOINT ["/skdb/build/start.sh"]
