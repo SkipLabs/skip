@@ -5,7 +5,9 @@ development and to build and release our Docker Hub and NPM artifacts.
 
 ## Build Docker images
 
-The unified `docker_build.sh` script handles both local builds and releases:
+The unified `docker_build.sh` script handles both local builds and releases.
+Image definitions and dependencies live in `docker-bake.hcl`; BuildKit
+automatically parallelizes independent targets.
 
 ```
 docker_build.sh [--push] [--prod] [IMAGE...]

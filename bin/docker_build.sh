@@ -21,8 +21,11 @@
 #   skip                 Dockerfile (full)
 #   skdb-base            sql/Dockerfile --target base
 #   skdb                 sql/Dockerfile
-#   server-core          sql/server/core/Dockerfile (local --prod only)
+#   server-core          sql/server/core/Dockerfile (local/prod only)
 #   skdb-dev-server      sql/server/dev/Dockerfile
+#
+# Build definitions live in docker-bake.hcl.  Independent targets are built
+# in parallel automatically by BuildKit.
 
 set -euo pipefail
 
@@ -101,99 +104,62 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Set up build command based on mode
+# Assemble bake arguments
+BAKE_ARGS=(--no-cache --progress=plain -f docker-bake.hcl)
+
 if $PUSH; then
     BUILDX_BUILDER=$(docker buildx create --use)
-
-    dockerbuild() {
-        docker buildx build \
-            . \
-            --no-cache \
-            --progress=plain \
-            --platform linux/amd64,linux/arm64 \
-            --push \
-            "$@"
-    }
+    BAKE_ARGS+=(--push --set '*.platform=linux/amd64,linux/arm64')
+elif $PROD; then
+    BAKE_ARGS+=(--load --set '*.platform=linux/amd64')
 else
-    PLATFORM_ARGS=()
-    if $PROD; then
-        PLATFORM_ARGS=(--platform=linux/amd64)
-    fi
-
-    dockerbuild() {
-        docker build . --no-cache --progress=plain "${PLATFORM_ARGS[@]}" "$@"
-    }
+    BAKE_ARGS+=(--load)
 fi
 
-# Helper to check if an image should be built
-should_build() {
-    local name="$1"
-    # If no images specified, build all
-    [[ ${#IMAGES[@]} -eq 0 ]] && return 0
-    # Check if this image is in the list
-    for img in "${IMAGES[@]}"; do
-        [[ "${img%:latest}" = "$name" || "$img" = "$name:"* ]] && return 0
-    done
-    return 1
-}
+# Determine which bake targets to build
+BAKE_TARGETS=()
 
-# Collect extra tags for skdb-dev-server (supports :latest and :quickstart)
-DEV_SERVER_TAGS=()
-for img in "${IMAGES[@]}"; do
-    case "$img" in
-        skdb-dev-server|skdb-dev-server:latest)
-            DEV_SERVER_TAGS+=(--tag skiplabs/skdb-dev-server:latest) ;;
-        skdb-dev-server:quickstart)
-            DEV_SERVER_TAGS+=(--tag skiplabs/skdb-dev-server:quickstart) ;;
-    esac
-done
-# Default to :latest if building all
-if [[ ${#IMAGES[@]} -eq 0 ]]; then
-    DEV_SERVER_TAGS=(--tag skiplabs/skdb-dev-server:latest)
+if [[ ${#IMAGES[@]} -gt 0 ]]; then
+    for img in "${IMAGES[@]}"; do
+        case "$img" in
+            skdb-dev-server:quickstart)
+                BAKE_ARGS+=(--set "skdb-dev-server.tags=skiplabs/skdb-dev-server:quickstart")
+                BAKE_TARGETS+=(skdb-dev-server)
+                ;;
+            *)
+                target="${img%%:*}"
+                if $PUSH && [[ "$target" = "server-core" ]]; then
+                    echo "Warning: server-core is not published, skipping" >&2
+                    continue
+                fi
+                BAKE_TARGETS+=("$target")
+                ;;
+        esac
+    done
+    if [[ ${#BAKE_TARGETS[@]} -eq 0 ]]; then
+        echo "Nothing to build." >&2
+        exit 0
+    fi
+else
+    # No images specified: build the appropriate group
+    if $PUSH; then
+        BAKE_TARGETS=(default)
+    else
+        BAKE_TARGETS=(local)
+    fi
 fi
 
 set -x
 
-# Build images
-if should_build skiplang; then
-    dockerbuild --file Dockerfile --target skiplang --tag skiplabs/skiplang:latest
-fi
+docker buildx bake "${BAKE_ARGS[@]}" "${BAKE_TARGETS[@]}"
 
-if should_build skiplang-bin-builder; then
-    dockerbuild --file skiplang/Dockerfile --tag skiplabs/skiplang-bin-builder:latest
-fi
-
-if should_build skip; then
-    dockerbuild --file Dockerfile --tag skiplabs/skip:latest
-fi
-
-if should_build skdb-base; then
-    dockerbuild --file sql/Dockerfile --target base --tag skiplabs/skdb-base:latest
-fi
-
-if should_build skdb; then
-    dockerbuild --file sql/Dockerfile --tag skiplabs/skdb:latest
-fi
-
-if should_build server-core; then
-    if $PUSH; then
-        echo "Warning: server-core is not published, skipping" >&2
-    else
-        dockerbuild --file sql/server/core/Dockerfile --tag skiplabs/server-core:latest
-    fi
-fi
-
-if should_build skdb-dev-server; then
-    if $PUSH; then
-        dockerbuild --file sql/server/dev/Dockerfile "${DEV_SERVER_TAGS[@]}"
-    else
-        dockerbuild --file sql/server/dev/Dockerfile --tag skiplabs/skdb-dev-server:latest
-    fi
-fi
+{ set +x; } 2>/dev/null
 
 # Local build: also build user Dockerfile if present
 if ! $PUSH && ! $PROD && [[ ${#IMAGES[@]} -eq 0 ]] && [[ -f "$USER/Dockerfile" ]]; then
-    dockerbuild --file "$USER/Dockerfile" --tag "$USER-skdb"
+    set -x
+    docker build . --no-cache --progress=plain --file "$USER/Dockerfile" --tag "$USER-skdb"
+    { set +x; } 2>/dev/null
 fi
 
 if ! $PUSH; then
