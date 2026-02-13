@@ -147,7 +147,35 @@ fun test_harness(tests: readonly Map<String, readonly Sequence<Test>>): void {
       }
     }
   };
-  procs.each(p -> _ = p.wait());
+  procs.eachWithIndex((i, p) -> {
+    exitStatus = p.wait();
+    if (!exitStatus.success()) {
+      !success = false;
+      (errorMsg, failureType) = exitStatus match {
+      | Posix.WExited(code) ->
+        (`Test worker ${i} exited with code ${code}`, "ProcessExitError")
+      | Posix.WSignaled(sig) ->
+        (
+          `Test worker ${i} was terminated by signal ${sig} (likely segfault or crash)`,
+          "ProcessSignaled",
+        )
+      | Posix.WStopped(sig) ->
+        (`Test worker ${i} was stopped by signal ${sig}`, "ProcessStopped")
+      };
+      // Report as a test failure so it shows up in the summary
+      syntheticFailure = TestResult{
+        name => `worker-${i}`,
+        suite => "TestRunner",
+        file => "",
+        line => 0,
+        result => "error",
+        time => 0.0,
+        failure_type => failureType,
+        failure_message => errorMsg,
+      };
+      reporters.each(r -> r.report(syntheticFailure))
+    }
+  });
   reporters.each(r -> r.finish());
 
   if (!success) {
