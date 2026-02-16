@@ -9,8 +9,10 @@ RUN --mount=type=cache,id=apt-cache-$TARGETARCH,target=/var/cache/apt,sharing=lo
     npm install -g bun && \
     npx playwright install-deps
 
-RUN --mount=type=cache,id=sdkman-$TARGETARCH,target=/root/.sdkman/archives,sharing=locked \
+# Cache mount at /tmp to avoid creating /root/.sdkman/ before the installer runs
+RUN --mount=type=cache,id=sdkman-$TARGETARCH,target=/tmp/sdkman-archives,sharing=locked \
     sh -c 'curl -s "https://get.sdkman.io?rcupdate=false" | bash' && \
+    ln -snf /tmp/sdkman-archives /root/.sdkman/archives && \
     bash -c "source $HOME/.sdkman/bin/sdkman-init.sh && \
     sdk install gradle && \
     sdk install java 20.0.2-tem"
