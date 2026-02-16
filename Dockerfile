@@ -20,8 +20,8 @@ RUN make clean && make STAGE=0
 
 FROM skiplang-base AS skiplang
 
-COPY --from=bootstrap /work/compiler/stage0/bin/ /usr/bin/
-COPY --from=bootstrap /work/compiler/stage0/lib/ /usr/lib/
+COPY --link --from=bootstrap /work/compiler/stage0/bin/ /usr/bin/
+COPY --link --from=bootstrap /work/compiler/stage0/lib/ /usr/lib/
 
 FROM skiplang AS skip
 
