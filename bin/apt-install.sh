@@ -6,6 +6,16 @@ default_steps=(skiplang-build-deps skipruntime-deps)
 LLVM_VERSION=20
 PRIORITY=101
 
+# Install ca-certificates and wget if not already present.
+# Called by steps that need to fetch GPG keys from HTTPS URLs.
+_ensure_base_deps() {
+    if ! command -v wget &>/dev/null || ! dpkg -s ca-certificates &>/dev/null; then
+        apt-get update
+        apt-get install -q -y --no-install-recommends ca-certificates wget
+    fi
+    mkdir -p /etc/apt/keyrings
+}
+
 usage() {
     echo "Usage: $0 step*"
     echo "  step is one of"
@@ -24,9 +34,7 @@ fi
 for step in "${steps[@]}"; do
     case "$step" in
         skiplang-build-deps)
-            apt-get update
-            apt-get install -q -y --no-install-recommends ca-certificates wget
-            mkdir -p /etc/apt/keyrings
+            _ensure_base_deps
             wget -qO /etc/apt/keyrings/llvm.asc https://apt.llvm.org/llvm-snapshot.gpg.key
             echo "deb [signed-by=/etc/apt/keyrings/llvm.asc] http://apt.llvm.org/jammy/ llvm-toolchain-jammy-$LLVM_VERSION main" >> /etc/apt/sources.list.d/llvm.list
             apt-get update
@@ -43,9 +51,7 @@ for step in "${steps[@]}"; do
                 --slave /usr/bin/wasm-ld wasm-ld /usr/bin/wasm-ld-$LLVM_VERSION
             ;;
         skipruntime-deps)
-            apt-get update
-            apt-get install -q -y --no-install-recommends ca-certificates wget
-            mkdir -p /etc/apt/keyrings
+            _ensure_base_deps
             wget -qO /etc/apt/keyrings/nodesource.asc https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key
             echo "deb [signed-by=/etc/apt/keyrings/nodesource.asc] https://deb.nodesource.com/node_22.x nodistro main" >> /etc/apt/sources.list.d/nodejs.list
             apt-get update
