@@ -1,8 +1,22 @@
-#! /bin/bash
+#!/bin/bash
 
-# build and push docker images used in CI
+# Build and push Docker images used in CI.
+# Image names are extracted from .circleci/base.yml so the two stay in sync.
 
-set -e
+set -euo pipefail
+
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+REPO="$SCRIPT_DIR/.."
+
+# Extract unique skiplabs/ image names from CI config
+mapfile -t images < <(
+    grep -oP 'image:\s+skiplabs/\K[^:\s]+' "$REPO/.circleci/base.yml" | sort -u
+)
+
+if [[ ${#images[@]} -eq 0 ]]; then
+    echo "Error: no skiplabs/ images found in .circleci/base.yml" >&2
+    exit 1
+fi
+
 set -x
-
-"$(dirname -- "${BASH_SOURCE[0]}")"/release_docker.sh skiplang skiplang-bin-builder skip skdb-base
+"$SCRIPT_DIR"/release_docker.sh "${images[@]}"

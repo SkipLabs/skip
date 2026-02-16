@@ -1,13 +1,29 @@
 # Releasing Docker and NPM artifacts
 
 The scripts in this directory are used to build docker images for local
-development (`build_docker_images.sh`) and to build and release our Docker Hub
-and NPM artifacts.
+development and to build and release our Docker Hub and NPM artifacts.
 
-## Release Docker images
+## Build Docker images
 
-In order to update the images used in CI to the current state of your git
-clone, you can run `release_docker_ci_images.sh`.
+The unified `docker_build.sh` script handles both local builds and releases.
+Image definitions and dependencies live in `docker-bake.hcl`; BuildKit
+automatically parallelizes independent targets.
+
+```
+docker_build.sh [--push] [--prod] [IMAGE...]
+```
+
+- **Local build** (default): `docker_build.sh` builds all images for the native architecture
+- **Production build**: `docker_build.sh --prod` forces `linux/amd64`
+- **Release to Docker Hub**: `docker_build.sh --push IMAGE...` builds multi-arch and pushes
+
+Convenience wrappers are provided for common workflows:
+
+- `build_docker_images.sh` — local build of all images
+- `build_prod_skdb_images.sh` — local production build (`--prod`)
+- `release_docker_ci_images.sh` — push CI images to Docker Hub
+- `release_docker_skdb.sh` — push skdb image
+- `release_docker_skdb_dev_server.sh` — interactive push of dev server
 
 ## Release NPM packages
 
