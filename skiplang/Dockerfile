@@ -6,19 +6,21 @@
 FROM debian:bookworm-20250113-slim AS base
 
 ARG LLVM_VERSION=20
+ARG TARGETARCH
 
 # Install LLVM via apt repository directly
 # Note: [trusted=yes] is needed because apt.llvm.org's GPG key uses SHA1 signatures
 # which modern Debian rejects since Feb 2026. This is an upstream LLVM issue.
-RUN apt-get update --quiet && \
-    apt-get install --quiet --yes make wget && \
+RUN --mount=type=cache,id=apt-cache-$TARGETARCH,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-$TARGETARCH,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update --quiet && \
+    apt-get install --quiet --yes --no-install-recommends ca-certificates make wget && \
     echo "deb [trusted=yes] http://apt.llvm.org/bookworm/ llvm-toolchain-bookworm-${LLVM_VERSION} main" > /etc/apt/sources.list.d/llvm.list && \
     apt-get update --quiet && \
-    apt-get install --quiet --yes \
+    apt-get install --quiet --yes --no-install-recommends \
         clang-${LLVM_VERSION} \
         llvm-${LLVM_VERSION} \
         lld-${LLVM_VERSION} && \
-    apt-get clean && rm -rf /var/lib/apt/lists/* && \
     update-alternatives \
       --install /usr/bin/clang clang /usr/bin/clang-${LLVM_VERSION} 101 \
       --slave /usr/bin/clang++ clang++ /usr/bin/clang++-${LLVM_VERSION} \

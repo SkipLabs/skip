@@ -1,14 +1,16 @@
 FROM ubuntu:latest
 
+ARG TARGETARCH
+
 # install dependencies needed to build the node addon
-RUN apt-get update --quiet \
- && apt-get install --quiet --yes g++ make python3 wget \
+RUN --mount=type=cache,id=apt-cache-$TARGETARCH,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-$TARGETARCH,target=/var/lib/apt/lists,sharing=locked \
+    --mount=type=cache,target=/root/.npm,sharing=locked \
+    apt-get update --quiet \
+ && apt-get install --quiet --yes --no-install-recommends ca-certificates g++ make python3 wget \
  && wget --quiet --output-document=- https://deb.nodesource.com/setup_22.x | bash - \
- && apt-get install --quiet --yes nodejs \
- && apt-get clean \
- && rm -rf /var/lib/apt/lists/* \
- && npm install --global typescript \
- && npm cache clean --force
+ && apt-get install --quiet --yes --no-install-recommends nodejs \
+ && npm install --global typescript
 
 # copy the test code
 COPY package.json test.ts /work/
@@ -29,9 +31,9 @@ RUN VERSION=$(npm install --dry-run @skipruntime/native | grep native | cut -d' 
  && npm install @skipruntime/native
 
 # build the test
-RUN npm install \
- && tsc --module node16 test.ts \
- && npm cache clean --force
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+    npm install \
+ && tsc --module node16 test.ts
 
 # set LD_LIBRARY_PATH so node can find the native addon's shared object file
 ENV LD_LIBRARY_PATH=${PREFIX}/lib
