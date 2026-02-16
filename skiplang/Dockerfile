@@ -8,14 +8,14 @@ FROM debian:bookworm-20250113-slim AS base
 ARG LLVM_VERSION=20
 ARG TARGETARCH
 
-# Install LLVM via apt repository directly
-# Note: [trusted=yes] is needed because apt.llvm.org's GPG key uses SHA1 signatures
-# which modern Debian rejects since Feb 2026. This is an upstream LLVM issue.
+# Install LLVM via apt repository with signed GPG key
 RUN --mount=type=cache,id=apt-cache-$TARGETARCH,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lists-$TARGETARCH,target=/var/lib/apt/lists,sharing=locked \
     apt-get update --quiet && \
     apt-get install --quiet --yes --no-install-recommends ca-certificates make wget && \
-    echo "deb [trusted=yes] http://apt.llvm.org/bookworm/ llvm-toolchain-bookworm-${LLVM_VERSION} main" > /etc/apt/sources.list.d/llvm.list && \
+    mkdir -p /etc/apt/keyrings && \
+    wget -qO /etc/apt/keyrings/llvm.asc https://apt.llvm.org/llvm-snapshot.gpg.key && \
+    echo "deb [signed-by=/etc/apt/keyrings/llvm.asc] http://apt.llvm.org/bookworm/ llvm-toolchain-bookworm-${LLVM_VERSION} main" > /etc/apt/sources.list.d/llvm.list && \
     apt-get update --quiet && \
     apt-get install --quiet --yes --no-install-recommends \
         clang-${LLVM_VERSION} \

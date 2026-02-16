@@ -25,10 +25,10 @@ for step in "${steps[@]}"; do
     case "$step" in
         skiplang-build-deps)
             apt-get update
-            apt-get install -q -y --no-install-recommends wget gnupg
-            wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
-            echo "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-$LLVM_VERSION main" >> /etc/apt/sources.list.d/llvm.list
-            echo "deb-src http://apt.llvm.org/jammy/ llvm-toolchain-jammy-$LLVM_VERSION main" >> /etc/apt/sources.list.d/llvm.list
+            apt-get install -q -y --no-install-recommends ca-certificates wget
+            mkdir -p /etc/apt/keyrings
+            wget -qO /etc/apt/keyrings/llvm.asc https://apt.llvm.org/llvm-snapshot.gpg.key
+            echo "deb [signed-by=/etc/apt/keyrings/llvm.asc] http://apt.llvm.org/jammy/ llvm-toolchain-jammy-$LLVM_VERSION main" >> /etc/apt/sources.list.d/llvm.list
             apt-get update
             apt-get install -q -y --no-install-recommends automake clang-$LLVM_VERSION file gawk git lld-$LLVM_VERSION llvm-$LLVM_VERSION make
 
@@ -43,10 +43,13 @@ for step in "${steps[@]}"; do
                 --slave /usr/bin/wasm-ld wasm-ld /usr/bin/wasm-ld-$LLVM_VERSION
             ;;
         skipruntime-deps)
-            wget -O - https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | apt-key add -
-            echo "deb https://deb.nodesource.com/node_22.x nodistro main" >> /etc/apt/sources.list.d/nodejs.list
             apt-get update
-            apt-get install -q -y --no-install-recommends nodejs npm jq
+            apt-get install -q -y --no-install-recommends ca-certificates wget
+            mkdir -p /etc/apt/keyrings
+            wget -qO /etc/apt/keyrings/nodesource.asc https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key
+            echo "deb [signed-by=/etc/apt/keyrings/nodesource.asc] https://deb.nodesource.com/node_22.x nodistro main" >> /etc/apt/sources.list.d/nodejs.list
+            apt-get update
+            apt-get install -q -y --no-install-recommends nodejs jq
             ;;
         other-CI-tools)
             # Assumes other steps have been run before
