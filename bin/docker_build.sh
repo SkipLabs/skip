@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Unified Docker image build script
-# Usage: docker_build.sh [--push] [--prod] [IMAGE...]
+# Usage: docker_build.sh [--push] [--prod] [--dry-run] [IMAGE...]
 #
 # If hitting space issues, try:
 #   docker system df
@@ -14,6 +14,7 @@
 #   (default)    Local build, native architecture, no push
 #   --push       Multi-arch (amd64+arm64) build and push to Docker Hub
 #   --prod       Local build forced to linux/amd64
+#   --dry-run    Modifier: build without actually pushing/loading (for testing)
 #
 # Images (if none specified, builds all applicable images):
 #   skiplang             Dockerfile --target skiplang
@@ -43,12 +44,14 @@ fi
 
 # Parse flags
 PUSH=false
+DRY_RUN=false
 PROD=false
 IMAGES=()
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --push) PUSH=true; shift ;;
+        --dry-run) DRY_RUN=true; shift ;;
         --prod) PROD=true; shift ;;
         *) IMAGES+=("$1"); shift ;;
     esac
@@ -109,10 +112,13 @@ BAKE_ARGS=(--no-cache --progress=plain -f docker-bake.hcl)
 
 if $PUSH; then
     BUILDX_BUILDER=$(docker buildx create --use)
-    BAKE_ARGS+=(--push --set '*.platform=linux/amd64,linux/arm64')
+    BAKE_ARGS+=(--set '*.platform=linux/amd64,linux/arm64')
+    if ! $DRY_RUN; then
+        BAKE_ARGS+=(--push)
+    fi
 elif $PROD; then
     BAKE_ARGS+=(--load --set '*.platform=linux/amd64')
-else
+elif ! $DRY_RUN; then
     BAKE_ARGS+=(--load)
 fi
 
