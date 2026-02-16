@@ -318,7 +318,9 @@ fun boolArgsFromEnv(): void {
   cmd = Cli.Command("foo")
     .arg(Cli.Arg::bool("bar").negatable().env("BAR"))
     .arg(Cli.Arg::bool("baz").env("BAZ"));
-  Environ.vars().each(v -> Environ.remove_var(v.i0));
+  // Snapshot names before removing: vars() caches the count upfront,
+  // so calling remove_var() during iteration shrinks environ and SIGSEGVs.
+  Environ.vars().map(v -> v.i0).collect(Array).each(Environ.remove_var);
   Environ.set_var("BAR", "y");
   Environ.set_var("BAZ", "1");
   args = Cli.parseArgsFrom(cmd, Array["--no-bar"]);
@@ -333,7 +335,9 @@ fun intArgsFromEnv(): void {
     .arg(Cli.Arg::int("foo").env("FOO"))
     .arg(Cli.Arg::int("bar").default(123).env("BAR"))
     .arg(Cli.Arg::int("baz").env("BAZ"));
-  Environ.vars().each(v -> Environ.remove_var(v.i0));
+  // Snapshot names before removing: vars() caches the count upfront,
+  // so calling remove_var() during iteration shrinks environ and SIGSEGVs.
+  Environ.vars().map(v -> v.i0).collect(Array).each(Environ.remove_var);
   Environ.set_var("BAR", "456");
   Environ.set_var("BAZ", "42");
   args = Cli.parseArgsFrom(cmd, Array["--foo=1"]);
