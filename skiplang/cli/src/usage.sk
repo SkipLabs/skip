@@ -85,11 +85,11 @@ private fun usageOptions(options: Sequence<Cli.Arg>): String {
       | _ -> `    --${arg.name}`
       };
       optFlags = arg match {
-      | Cli.ValuedArg{_value_name} ->
+      | Cli.ValuedArg{_value_name => value_name} ->
         if (arg._repeatable) {
-          `${baseOptFlags} [<${_value_name}>]`
+          `${baseOptFlags} [<${value_name}>]`
         } else {
-          `${baseOptFlags} <${_value_name}>`
+          `${baseOptFlags} <${value_name}>`
         }
       | _ if (arg._repeatable) -> `${baseOptFlags}...`
       | _ -> baseOptFlags
@@ -144,8 +144,11 @@ fun usage(
   values = cmd._args.filterMap(
     (arg ->
       (arg match {
-      | ValuedArg{_value_name, _value_about} if (_value_about.size() > 0) ->
-        Some((_value_name, _value_about))
+      | ValuedArg{
+        _value_name => value_name,
+        _value_about => value_about,
+      } if (value_about.size() > 0) ->
+        Some((value_name, value_about))
       | _ -> None()
       })),
   );
