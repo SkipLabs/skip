@@ -2,6 +2,7 @@
 
 # Build and push Docker images used in CI.
 # Image names are extracted from .circleci/base.yml so the two stay in sync.
+# Usage: release_docker_ci_images.sh [--dry-run]
 
 set -euo pipefail
 
@@ -19,4 +20,4 @@ if [[ ${#images[@]} -eq 0 ]]; then
 fi
 
 set -x
-"$SCRIPT_DIR"/release_docker.sh "${images[@]}"
+"$SCRIPT_DIR"/release_docker.sh "$@" "${images[@]}"
