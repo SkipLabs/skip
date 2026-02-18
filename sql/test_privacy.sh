@@ -111,6 +111,13 @@ else
     fail "GROUP PERMISSIONS3"
 fi
 
+# DEBUG: Check locale and tail output
+echo "DEBUG LOCALE: LANG=$LANG LC_ALL=$LC_ALL LC_CTYPE=$(locale 2>/dev/null | grep LC_CTYPE || echo unknown)" >&2
+echo "DEBUG TAIL OUTPUT:" >&2
+$SKDB tail "$subt1" --user ID2 2>&1 | tee /dev/stderr | od -c | head -5 >&2
+echo "DEBUG SELECT OUTPUT:" >&2
+echo "select * from t1;" | $SKDB --data $DBFILE 2>&1 | tee /dev/stderr | od -c | head -5 >&2
+
 # Let's check that user2 can read
 if $SKDB tail "$subt1" --user ID2 2>&1 | grep -q "238|\"ID22\""; then
     pass "GROUP PERMISSIONS4"
