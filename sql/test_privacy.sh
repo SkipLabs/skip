@@ -1,4 +1,5 @@
 #!/bin/bash
+# CI test: verify GROUP PERMISSIONS 4,7,11 status
 
 pass() { printf "%-32s OK\n" "TEST $1:"; }
 fail() { printf "%-32s FAILED\n" "TEST $1:"; }
