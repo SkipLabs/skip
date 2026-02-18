@@ -111,30 +111,30 @@ for img in "${IMAGES[@]}"; do
     fi
 done
 
-# --push-only reuses an existing builder and doesn't build, so skip
-# submodule validation and .dockerignore manipulation.
-if ! $PUSH_ONLY; then
-    # The script appends to .dockerignore and restores it with `git restore`
-    # on exit, which would silently discard uncommitted changes to that file.
-    if ! git diff --quiet -- .dockerignore || ! git diff --cached --quiet -- .dockerignore; then
-        echo "Error: .dockerignore has uncommitted changes" >&2
-        echo "       (this script modifies it and restores it with git restore)" >&2
-        exit 1
-    fi
+# The script appends to .dockerignore and restores it with `git restore`
+# on exit, which would silently discard uncommitted changes to that file.
+if ! git diff --quiet -- .dockerignore || ! git diff --cached --quiet -- .dockerignore; then
+    echo "Error: .dockerignore has uncommitted changes" >&2
+    echo "       (this script modifies it and restores it with git restore)" >&2
+    exit 1
+fi
 
-    # Validate submodules
+# --push-only reuses an existing builder and doesn't build, so skip
+# submodule validation.
+if ! $PUSH_ONLY; then
     # shellcheck disable=SC2016  # single quotes intentional: expanded by subshell
     git submodule foreach \
         '[ "$(git rev-parse HEAD)" = "$sha1" ] || \
          (echo "Submodule $name needs update" && exit 1)'
-
-    # Prepare .dockerignore
-    git clean -xd --dry-run | sed 's|Would remove |/|g' >> .dockerignore
-    echo ".git" >> .dockerignore
 fi
 
-# Clean up on exit: restore .dockerignore (unless --push-only) and tear down
-# the buildx builder when appropriate.
+# Prepare .dockerignore — always needed for consistent build context
+# (--push-only must send the same context as the dry-run for cache hits)
+git clean -xd --dry-run | sed 's|Would remove |/|g' >> .dockerignore
+echo ".git" >> .dockerignore
+
+# Clean up on exit: restore .dockerignore and tear down the buildx builder
+# when appropriate.
 NAMED_BUILDER="skip-builder"
 BUILDX_BUILDER=""
 cleanup() {
@@ -142,9 +142,7 @@ cleanup() {
         docker buildx stop "$BUILDX_BUILDER"
         docker buildx rm "$BUILDX_BUILDER"
     fi
-    if ! $PUSH_ONLY; then
-        git restore .dockerignore
-    fi
+    git restore .dockerignore
 }
 trap cleanup EXIT
 
