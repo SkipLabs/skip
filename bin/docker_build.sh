@@ -51,8 +51,8 @@ while [[ $# -gt 0 ]]; do
         --push-only) PUSH_ONLY=true; shift ;;
         --dry-run) DRY_RUN=true; shift ;;
         --prod) PROD=true; shift ;;
-        --arch) ARCH="$2"; shift 2 ;;
-        --arch=*) ARCH="${1#--arch=}"; shift ;;
+        --arch) ARCH="${ARCH:+$ARCH,}$2"; shift 2 ;;
+        --arch=*) ARCH="${ARCH:+$ARCH,}${1#--arch=}"; shift ;;
         *) IMAGES+=("$1"); shift ;;
     esac
 done
