@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Unified Docker image build script
-# Usage: docker_build.sh [--push] [--push-only] [--prod] [--dry-run] [IMAGE...]
+# Usage: docker_build.sh [--push] [--push-only] [--prod] [--dry-run] [--arch PLATFORMS] [IMAGE...]
 #
 # If hitting space issues, try:
 #   docker system df
@@ -16,6 +16,8 @@
 #   --push-only  Push previously built images (from --push --dry-run) without rebuilding
 #   --prod       Local build forced to linux/amd64
 #   --dry-run    Modifier: build without actually pushing/loading (for testing)
+#   --arch PLAT  Override platform(s). Shorthands: amd, amd64, arm, arm64.
+#                Comma-separated for multiple. Default depends on mode.
 #
 # Images (if none specified, builds all applicable images):
 #   skiplang             Dockerfile --target skiplang
@@ -40,6 +42,7 @@ PUSH=false
 PUSH_ONLY=false
 DRY_RUN=false
 PROD=false
+ARCH=""
 IMAGES=()
 
 while [[ $# -gt 0 ]]; do
@@ -48,9 +51,26 @@ while [[ $# -gt 0 ]]; do
         --push-only) PUSH_ONLY=true; shift ;;
         --dry-run) DRY_RUN=true; shift ;;
         --prod) PROD=true; shift ;;
+        --arch) ARCH="$2"; shift 2 ;;
+        --arch=*) ARCH="${1#--arch=}"; shift ;;
         *) IMAGES+=("$1"); shift ;;
     esac
 done
+
+# Normalize --arch shorthands
+if [[ -n "$ARCH" ]]; then
+    normalized=()
+    IFS=',' read -ra parts <<< "$ARCH"
+    for p in "${parts[@]}"; do
+        case "$p" in
+            amd|amd64)       normalized+=(linux/amd64) ;;
+            arm|arm64)       normalized+=(linux/arm64) ;;
+            linux/amd64|linux/arm64) normalized+=("$p") ;;
+            *) echo "Error: unknown architecture '$p'" >&2; exit 1 ;;
+        esac
+    done
+    ARCH=$(IFS=,; echo "${normalized[*]}")
+fi
 
 # Validate flag combinations
 if $PUSH && $PROD; then
@@ -148,7 +168,7 @@ fi
 BAKE_ARGS=(--progress=plain -f docker-bake.hcl)
 
 if $PUSH || $PUSH_ONLY; then
-    BAKE_ARGS+=(--set '*.platform=linux/amd64,linux/arm64')
+    BAKE_ARGS+=(--set "*.platform=${ARCH:-linux/amd64,linux/arm64}")
 fi
 
 if $PUSH_ONLY; then
@@ -160,9 +180,12 @@ elif $PUSH; then
         BAKE_ARGS+=(--push)
     fi
 elif $PROD; then
-    BAKE_ARGS+=(--no-cache --load --set '*.platform=linux/amd64')
+    BAKE_ARGS+=(--no-cache --load --set "*.platform=${ARCH:-linux/amd64}")
 else
     BAKE_ARGS+=(--no-cache)
+    if [[ -n "$ARCH" ]]; then
+        BAKE_ARGS+=(--set "*.platform=$ARCH")
+    fi
     if ! $DRY_RUN; then
         BAKE_ARGS+=(--load)
     fi
