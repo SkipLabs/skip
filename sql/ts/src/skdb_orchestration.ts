@@ -1896,7 +1896,7 @@ class SKDBServer implements RemoteSKDB {
       type: "createDatabase",
       name: dbName,
     }).then((result) => {
-      if (result === null || result.type !== "credentials") {
+      if (result?.type !== "credentials") {
         throw new Error("Unexpected response.");
       }
       return result;
@@ -1907,7 +1907,7 @@ class SKDBServer implements RemoteSKDB {
     return this.makeRequest({
       type: "createUser",
     }).then((result) => {
-      if (result === null || result.type !== "credentials") {
+      if (result?.type !== "credentials") {
         throw new Error("Unexpected response.");
       }
       return result;
