@@ -19,6 +19,10 @@
 #   --arch PLAT  Override platform(s). Shorthands: amd, amd64, arm, arm64.
 #                Comma-separated for multiple. Default depends on mode.
 #
+# Environment variables:
+#   STAGE        Compiler bootstrap stage (default: 0). Passed as STAGE build
+#                arg to the root Dockerfile (skiplang/skip targets).
+#
 # Images (if none specified, builds all applicable images):
 #   skiplang             Dockerfile --target skiplang
 #   skiplang-bin-builder skiplang/Dockerfile
@@ -187,6 +191,11 @@ else
     if ! $DRY_RUN; then
         BAKE_ARGS+=(--load)
     fi
+fi
+
+# Pass STAGE build arg to targets using the root Dockerfile
+if [[ -n "${STAGE:-}" ]]; then
+    BAKE_ARGS+=(--set "skiplang.args.STAGE=$STAGE" --set "skip.args.STAGE=$STAGE")
 fi
 
 # Determine which bake targets to build
