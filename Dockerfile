@@ -13,15 +13,17 @@ ENV CXX=clang++
 
 FROM skiplang-base AS bootstrap
 
+ARG STAGE=0
 COPY ./skiplang /work
 
 WORKDIR /work/compiler
-RUN make clean && make STAGE=0
+RUN make clean && make STAGE=$STAGE
 
 FROM skiplang-base AS skiplang
 
-COPY --link --from=bootstrap /work/compiler/stage0/bin/ /usr/bin/
-COPY --link --from=bootstrap /work/compiler/stage0/lib/ /usr/lib/
+ARG STAGE=0
+COPY --link --from=bootstrap /work/compiler/stage${STAGE}/bin/ /usr/bin/
+COPY --link --from=bootstrap /work/compiler/stage${STAGE}/lib/ /usr/lib/
 
 FROM skiplang AS skip
 
