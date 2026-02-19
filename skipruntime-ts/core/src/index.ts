@@ -1,5 +1,5 @@
 /**
- * The @skipruntime/core package contains internal implementation detail for the Skip Framework and should not need to be used directly. See the public API exposed by the @skipruntime/helpers package.
+ * The `@skipruntime/core` package contains internal implementation detail for the Skip Framework and should not need to be used directly. See the public API exposed by the `@skipruntime/helpers` package.
  *
  * @packageDocumentation
  */
@@ -1377,9 +1377,7 @@ export class ToBinding {
 
   //
   public getJsonConverter() {
-    if (this.skjson == undefined) {
-      this.skjson = this.getConverter();
-    }
+    this.skjson ??= this.getConverter();
     return this.skjson;
   }
 
