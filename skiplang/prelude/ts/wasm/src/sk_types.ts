@@ -86,7 +86,7 @@ export class Options {
   }
 
   toFlags() {
-    let res = 0;
+    let res: number;
     if (this.read && this.write) {
       res = O_RDWR;
     } else if (this.read) {
@@ -251,7 +251,7 @@ export class Utils {
     this.mainFn = mainFn;
   }
   log = (str: string, kind?: Stream, newLine: boolean = false) => {
-    kind = kind ? kind : Stream.OUT;
+    kind = kind ?? Stream.OUT;
     str += newLine ? "\n" : "";
     if (kind == Stream.DEBUG) {
       // Flush buffered this.stddebug output at newlines

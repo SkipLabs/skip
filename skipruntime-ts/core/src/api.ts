@@ -92,7 +92,7 @@ export interface Values<T> extends Iterable<T & DepSafe> {
    * Return the first value, if there is exactly one.
    * @param _default
    * @param _default.ifMany - Default value to use instead of throwing if there are multiple values.
-   * @throws {@link SkipNonUniqueValueError} if this iterable contains multiple values.
+   * @throws {SkipNonUniqueValueError} if this iterable contains multiple values.
    */
   getUnique(_default?: { ifMany?: T }): T & DepSafe;
 
@@ -130,7 +130,7 @@ export interface LazyCollection<K extends Json, V extends Json>
    * @param _default.ifNone - Default value for the case where **zero** values are associated to the given key
    * @param _default.ifMany - Default value for the case where **multiple** values are associated to the given key
    * @returns The value associated to `key`.
-   * @throws {@link SkipNonUniqueValueError} if `key` is associated to either zero or multiple values and no suitable default is provided.
+   * @throws {SkipNonUniqueValueError} if `key` is associated to either zero or multiple values and no suitable default is provided.
    */
   getUnique(key: K, _default?: { ifNone?: V; ifMany?: V }): V & DepSafe;
 }
@@ -163,7 +163,7 @@ export interface EagerCollection<K extends Json, V extends Json>
    * @param _default.ifNone - Default value for the case where **zero** values are associated to the given key
    * @param _default.ifMany - Default value for the case where **multiple** values are associated to the given key
    * @returns The value associated to `key`.
-   * @throws {@link SkipNonUniqueValueError} if `key` is associated to either zero or multiple values and no suitable default is provided.
+   * @throws {SkipNonUniqueValueError} if `key` is associated to either zero or multiple values and no suitable default is provided.
    */
   getUnique(key: K, _default?: { ifNone?: V; ifMany?: V }): V & DepSafe;
 

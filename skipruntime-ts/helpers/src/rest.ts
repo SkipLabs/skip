@@ -160,7 +160,7 @@ export class SkipServiceBroker {
    * @param params - Resource instance parameters.
    * @param key - Key to read.
    * @returns The value associated to the key.
-   * @throws `SkipNonUniqueValueError` when the key is associated to either zero or multiple values.
+   * @throws {SkipNonUniqueValueError} when the key is associated to either zero or multiple values.
    */
   async getUnique<K extends Json, V extends Json>(
     resource: string,
