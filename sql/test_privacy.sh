@@ -111,7 +111,7 @@ else
 fi
 
 # Let's check that user2 can read
-if $SKDB tail "$subt1" --user ID2 2>&1 | grep -q "238|\"ID22\""; then
+if $SKDB tail "$subt1" --format=table --user ID2 2>&1 | grep -q "238|\"ID22\""; then
     pass "GROUP PERMISSIONS4"
 else
     fail "GROUP PERMISSIONS4"
@@ -121,7 +121,7 @@ fi
 echo "insert into skdb_user_permissions values ('ID2', skdb_permission(''), 'root')" | $SKDB
 
 # Let's check that user2 cannot read
-if $SKDB tail "$subt1" --user ID2 2>&1 | grep -q "238|\"ID22\""; then
+if $SKDB tail "$subt1" --format=table --user ID2 2>&1 | grep -q "238|\"ID22\""; then
     fail "GROUP PERMISSIONS6"
 else
     pass "GROUP PERMISSIONS6"
@@ -130,7 +130,7 @@ fi
 echo "delete from skdb_user_permissions where userID='ID2';" | $SKDB
 
 # Let's check that user2 can read again
-if $SKDB tail "$subt1" --user ID2 2>&1 | grep -q "238|\"ID22\""; then
+if $SKDB tail "$subt1" --format=table --user ID2 2>&1 | grep -q "238|\"ID22\""; then
     pass "GROUP PERMISSIONS7"
 else
     fail "GROUP PERMISSIONS7"
@@ -140,7 +140,7 @@ fi
 echo "delete from skdb_group_permissions where groupID='ID22' and userID='ID2';" | $SKDB
 
 # Let's check that user2 cannot read (after being kicked out)
-if $SKDB tail "$subt1" --user ID2 2>&1 | grep -q "238|\"ID22\""; then
+if $SKDB tail "$subt1" --format=table --user ID2 2>&1 | grep -q "238|\"ID22\""; then
     fail "GROUP PERMISSIONS8"
 else
     pass "GROUP PERMISSIONS8"
@@ -172,7 +172,7 @@ else
 fi
 
 # Let's check that user1 can read
-if $SKDB tail "$subt1" --user ID1 2>&1 | grep -q "240|\"ID23\""; then
+if $SKDB tail "$subt1" --format=table --user ID1 2>&1 | grep -q "240|\"ID23\""; then
     pass "GROUP PERMISSIONS11"
 else
     fail "GROUP PERMISSIONS11"
