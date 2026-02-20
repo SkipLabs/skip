@@ -6158,11 +6158,21 @@ fun check_deferred_call(
       // abstract method on concrete
       void
     | (_, Some(deferred_pos), _) ->
+      context_hint = tobject match {
+      | "Base" ->
+        ". Note: deferred methods cannot be called on base classes" +
+          " — use a concrete subclass instead, or provide a manual" +
+          " implementation"
+      | _ -> ""
+      };
       msg2 =
         "'" +
         field_str +
         "' was declared as 'deferred'. It can" +
-        " be used only from 'static', in instance methods or deferred static methods. Or from a Concrete<_> object in a 'deferred' method";
+        " be used only from 'static', in instance methods or" +
+        " deferred static methods. Or from a Concrete<_> object" +
+        " in a 'deferred' method" +
+        context_hint;
       SkipError.errorl(
         List[(pos, "Invalid deferred call"), (deferred_pos, msg2)],
       )
