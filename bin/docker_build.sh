@@ -11,12 +11,12 @@
 #   docker image rm $(docker image ls -qf dangling=true)
 #
 # Modes:
-#   (default)    Local build, native architecture, no push
-#   --push       Multi-arch (amd64+arm64) build and push to Docker Hub
-#   --push-only  Push previously built images (from --push --dry-run) without rebuilding
-#   --dry-run    Modifier: build without actually pushing/loading (for testing)
+#   (default)    Local build, loads into Docker daemon
+#   --push       Build and push to Docker Hub
+#   --push-only  Push previously built images (from --dry-run) without rebuilding
+#   --dry-run    Build without pushing or loading (for testing)
 #   --arch PLAT  Override platform(s). Shorthands: amd, amd64, arm, arm64.
-#                Comma-separated for multiple. Default depends on mode.
+#                Comma-separated for multiple. Default: native architecture.
 #
 # Environment variables:
 #   STAGE        Compiler bootstrap stage (default: 0). Passed as STAGE build
@@ -139,8 +139,11 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Set up named builder for --push flows (persists between dry-run and push-only)
-if $PUSH || $PUSH_ONLY; then
+# Native architecture for --load fallback
+NATIVE_ARCH="linux/$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
+
+# Set up named builder for multi-arch or push flows
+if $PUSH || $PUSH_ONLY || [[ "$ARCH" == *,* ]]; then
     if ! docker buildx inspect "$NAMED_BUILDER" &>/dev/null; then
         if $PUSH_ONLY; then
             echo "Error: no builder '$NAMED_BUILDER' found. Run --push --dry-run first." >&2
@@ -158,10 +161,12 @@ fi
 # Assemble bake arguments
 BAKE_ARGS=(--progress=plain -f docker-bake.hcl)
 
-if $PUSH || $PUSH_ONLY; then
-    BAKE_ARGS+=(--set "*.platform=${ARCH:-linux/amd64,linux/arm64}")
+# Platform — uniform for all modes
+if [[ -n "$ARCH" ]]; then
+    BAKE_ARGS+=(--set "*.platform=$ARCH")
 fi
 
+# Output mode
 if $PUSH_ONLY; then
     # Push existing layers — no --no-cache so BuildKit finds them in the builder
     BAKE_ARGS+=(--push)
@@ -172,10 +177,8 @@ elif $PUSH; then
     fi
 else
     BAKE_ARGS+=(--no-cache)
-    if [[ -n "$ARCH" ]]; then
-        BAKE_ARGS+=(--set "*.platform=$ARCH")
-    fi
-    if ! $DRY_RUN; then
+    if ! $DRY_RUN && [[ "$ARCH" != *,* ]]; then
+        # --load doesn't support multi-platform; handled after bake call
         BAKE_ARGS+=(--load)
     fi
 fi
@@ -221,6 +224,12 @@ fi
 set -x
 
 docker buildx bake "${BAKE_ARGS[@]}" "${BAKE_TARGETS[@]}"
+
+# For local multi-arch builds: load native image from cache
+if ! $PUSH && ! $PUSH_ONLY && ! $DRY_RUN && [[ "$ARCH" == *,* ]]; then
+    docker buildx bake --progress=plain -f docker-bake.hcl \
+        --load --set "*.platform=$NATIVE_ARCH" "${BAKE_TARGETS[@]}"
+fi
 
 { set +x; } 2>/dev/null
 
