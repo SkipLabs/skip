@@ -11,7 +11,6 @@ if [ -z "$file_path" ]; then
 fi
 
 PRETTIER_VERSION=$(jq -r '.devDependencies.prettier' "$CLAUDE_PROJECT_DIR/package.json")
-BLACK_VERSION=$(grep '^black==' "$CLAUDE_PROJECT_DIR/requirements-dev.txt" | cut -d'=' -f3)
 
 case "$file_path" in
     *.sk)
