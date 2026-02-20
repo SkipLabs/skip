@@ -93,6 +93,13 @@ fun build_libbacktrace(
   };
 
   // Resort to building libbacktrace from source.
+  if (!FileSystem.exists("./libbacktrace/configure")) {
+    print_error(
+      "Error: libbacktrace submodule is not initialized.\n" +
+        "Run: git submodule update --init skiplang/prelude/libbacktrace\n",
+    );
+    skipExit(1)
+  };
   p = System.popen{
     args => Array["./configure", "--prefix", out_dir].concat(
       if (pic) Array["--with-pic"] else Array[],
