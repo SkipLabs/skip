@@ -80,10 +80,9 @@ if [[ -n "$ARCH" ]]; then
     ARCH=$(IFS=,; echo "${normalized[*]}")
 fi
 
-# Validate flag combinations
-if $PUSH_ONLY && $PUSH; then
-    echo "Error: --push-only and --push are mutually exclusive" >&2
-    exit 1
+# Validate flag combinations (--push-only overrides --push for caller convenience)
+if $PUSH_ONLY; then
+    PUSH=false
 fi
 if $PUSH_ONLY && $DRY_RUN; then
     echo "Error: --push-only and --dry-run are mutually exclusive" >&2
