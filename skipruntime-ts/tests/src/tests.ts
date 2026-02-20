@@ -19,6 +19,7 @@ import type {
   Nullable,
   Reducer,
   ChangeManager,
+  Store,
 } from "@skipruntime/core";
 import { LoadStatus } from "@skipruntime/core";
 import { Count, Sum } from "@skipruntime/helpers";
@@ -1240,6 +1241,40 @@ class WithChanges implements ChangeManager {
   }
 }
 
+export class MockStore implements Store<string, number> {
+  constructor(private data: Map<string, number[]>) {}
+
+  load(): Promise<Entry<string, number>[]> {
+    return Promise.resolve(Array.from(this.data.entries()));
+  }
+
+  save(data: Entry<string, number>[]): Promise<void> {
+    if (data.filter((entry) => entry[0] === "error").length > 0) {
+      return Promise.reject(new Error("Something goes wrong."));
+    }
+    data.forEach((item) => this.data.set(item[0], item[1]));
+    return Promise.resolve();
+  }
+}
+
+function mapWithStoreService(): SkipService<Input_SN, Input_SN> {
+  return {
+    initialData: {
+      input: new MockStore(
+        new Map([
+          ["v1", [3]],
+          ["v2", [5]],
+        ]),
+      ),
+    },
+    resources: { map1: Map1Resource },
+
+    createGraph(inputCollections: Input_SN) {
+      return inputCollections;
+    },
+  };
+}
+
 export function initTests(
   category: string,
   initService: (service: SkipService) => Promise<ServiceInstance>,
@@ -2270,5 +2305,37 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
         new RegExp(/^(?:Error: )?Something goes wrong.$/),
       );
     }
+  });
+
+  it("testMapWithStore", async () => {
+    const resource = "map1";
+    const skipservice = mapWithStoreService();
+    const service = await initService(skipservice);
+    expect(await service.getAll(resource)).toEqual([
+      ["v1", [5]],
+      ["v2", [7]],
+    ]);
+    await service.update("input", [["v3", [10]]]);
+    expect(
+      await (skipservice.initialData!.input as Store<Json, Json>).load(),
+    ).toEqual([
+      ["v1", [3]],
+      ["v2", [5]],
+      ["v3", [10]],
+    ]);
+    expect(await service.getArray("map1", "v3")).toEqual([12]);
+    try {
+      await service.update("input", [
+        ["error", [-5]],
+        ["v3", [50]],
+      ]);
+      throw new Error("Error was not thrown");
+    } catch (e: unknown) {
+      expect(e).toBeA(Error);
+      expect((e as Error).message).toMatchRegex(
+        new RegExp(/^(?:Error: )?Something goes wrong.$/),
+      );
+    }
+    await service.close();
   });
 }

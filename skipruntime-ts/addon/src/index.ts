@@ -14,6 +14,7 @@ type AddOn = {
   getSkipRuntimeFromBinding: () => SkipRuntimeFromBinding;
   initSkipRuntimeToBinding: (binding: ToBinding) => void;
   runWithGC: <T>(fn: () => T) => T;
+  unsafeAsyncRunWithGC: <T>(fn: () => Promise<T>) => Promise<T>;
   getErrorObject: (skExc: Pointer<IException>) => Error;
 };
 
@@ -27,6 +28,7 @@ const fromBinding = skip_runtime.getSkipRuntimeFromBinding();
 const tobinding = new ToBinding(
   fromBinding,
   skip_runtime.runWithGC,
+  skip_runtime.unsafeAsyncRunWithGC,
   () => jsonConverter,
   skip_runtime.getErrorObject,
 );

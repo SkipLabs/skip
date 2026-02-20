@@ -668,6 +668,25 @@ export class Utils {
     }
   };
 
+  async unsafeAsyncWithGc<T>(fn: () => Promise<T>): Promise<T> {
+    this.stddebug = [];
+    const obsPos = this.exports.SKIP_new_Obstack();
+    try {
+      const value = await fn();
+      // clone must be done before SKIP_destroy_Obstack
+      const res = cloneIfProxy(value);
+      this.exports.SKIP_destroy_Obstack(obsPos);
+      return res;
+    } catch (ex) {
+      this.exports.SKIP_destroy_Obstack(obsPos);
+      throw ex;
+    } finally {
+      if (this.stddebug.length > 0) {
+        console.log(this.stddebug.join(""));
+      }
+    }
+  }
+
   getState<T>(name: string, create: () => T): T {
     let state = this.states.get(name);
     if (state == undefined) {
