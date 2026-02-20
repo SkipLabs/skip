@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Unified Docker image build script
-# Usage: docker_build.sh [--push] [--push-only] [--dry-run] [--arch PLATFORMS] [IMAGE...]
+# Usage: docker_build.sh [--push] [--push-only] [--dry-run] [--arch PLATFORMS] [IMAGE...] [-- BAKE_ARGS...]
 #
 # If hitting space issues, try:
 #   docker system df
@@ -17,6 +17,7 @@
 #   --dry-run    Build without pushing or loading (for testing)
 #   --arch PLAT  Override platform(s). Shorthands: amd, amd64, arm, arm64.
 #                Comma-separated for multiple. Default: native architecture.
+#   -- ARGS      Pass remaining arguments directly to docker buildx bake.
 #
 # Environment variables:
 #   STAGE              Compiler bootstrap stage (default: 0). Passed as STAGE
@@ -32,6 +33,7 @@
 #   skdb                 sql/Dockerfile
 #   server-core          sql/server/core/Dockerfile (local only)
 #   skdb-dev-server      sql/server/dev/Dockerfile
+#   skipruntime          skipruntime-ts/Dockerfile (libskipruntime.so)
 #
 # Build definitions live in docker-bake.hcl.  Independent targets are built
 # in parallel automatically by BuildKit.
@@ -48,6 +50,7 @@ PUSH_ONLY=false
 DRY_RUN=false
 ARCH=""
 IMAGES=()
+EXTRA_BAKE_ARGS=()
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -56,6 +59,7 @@ while [[ $# -gt 0 ]]; do
         --dry-run) DRY_RUN=true; shift ;;
         --arch) ARCH="${ARCH:+$ARCH,}$2"; shift 2 ;;
         --arch=*) ARCH="${ARCH:+$ARCH,}${1#--arch=}"; shift ;;
+        --) shift; EXTRA_BAKE_ARGS+=("$@"); break ;;
         *) IMAGES+=("$1"); shift ;;
     esac
 done
@@ -96,7 +100,7 @@ if ($PUSH || $PUSH_ONLY) && [[ ${#IMAGES[@]} -eq 0 ]]; then
 fi
 
 # Validate image names
-KNOWN_IMAGES=(skiplang skiplang-bin-builder skip skdb-base skdb server-core skdb-dev-server)
+KNOWN_IMAGES=(skiplang skiplang-bin-builder skip skdb-base skdb server-core skdb-dev-server skipruntime)
 for img in "${IMAGES[@]}"; do
     name="${img%%:*}"
     found=false
@@ -229,7 +233,7 @@ fi
 
 set -x
 
-docker buildx bake "${BAKE_ARGS[@]}" "${BAKE_TARGETS[@]}"
+docker buildx bake "${BAKE_ARGS[@]}" "${BAKE_TARGETS[@]}" "${EXTRA_BAKE_ARGS[@]}"
 
 # For local multi-arch builds: load native image from cache
 if ! $PUSH && ! $PUSH_ONLY && ! $DRY_RUN && [[ "$ARCH" == *,* ]]; then
