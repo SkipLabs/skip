@@ -16,6 +16,7 @@ export function defaultParamEncoder(params: Json): string {
   if (typeof params == "object") {
     const queryParams: { [param: string]: string } = {};
     for (const [key, value] of Object.entries(params)) {
+      if (value === undefined) continue;
       if (typeof value == "object") queryParams[key] = JSON.stringify(value);
       else queryParams[key] = value.toString();
     }
