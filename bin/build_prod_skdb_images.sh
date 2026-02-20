@@ -4,4 +4,4 @@
 
 set -euo pipefail
 
-exec "$(dirname -- "${BASH_SOURCE[0]}")"/docker_build.sh --prod
+exec "$(dirname -- "${BASH_SOURCE[0]}")"/docker_build.sh --arch amd64

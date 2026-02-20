@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Unified Docker image build script
-# Usage: docker_build.sh [--push] [--push-only] [--prod] [--dry-run] [--arch PLATFORMS] [IMAGE...]
+# Usage: docker_build.sh [--push] [--push-only] [--dry-run] [--arch PLATFORMS] [IMAGE...]
 #
 # If hitting space issues, try:
 #   docker system df
@@ -14,7 +14,6 @@
 #   (default)    Local build, native architecture, no push
 #   --push       Multi-arch (amd64+arm64) build and push to Docker Hub
 #   --push-only  Push previously built images (from --push --dry-run) without rebuilding
-#   --prod       Local build forced to linux/amd64
 #   --dry-run    Modifier: build without actually pushing/loading (for testing)
 #   --arch PLAT  Override platform(s). Shorthands: amd, amd64, arm, arm64.
 #                Comma-separated for multiple. Default depends on mode.
@@ -29,7 +28,7 @@
 #   skip                 Dockerfile (full)
 #   skdb-base            sql/Dockerfile --target base
 #   skdb                 sql/Dockerfile
-#   server-core          sql/server/core/Dockerfile (local/prod only)
+#   server-core          sql/server/core/Dockerfile (local only)
 #   skdb-dev-server      sql/server/dev/Dockerfile
 #
 # Build definitions live in docker-bake.hcl.  Independent targets are built
@@ -45,7 +44,6 @@ cd "$REPO"
 PUSH=false
 PUSH_ONLY=false
 DRY_RUN=false
-PROD=false
 ARCH=""
 IMAGES=()
 
@@ -54,7 +52,6 @@ while [[ $# -gt 0 ]]; do
         --push) PUSH=true; shift ;;
         --push-only) PUSH_ONLY=true; shift ;;
         --dry-run) DRY_RUN=true; shift ;;
-        --prod) PROD=true; shift ;;
         --arch) ARCH="${ARCH:+$ARCH,}$2"; shift 2 ;;
         --arch=*) ARCH="${ARCH:+$ARCH,}${1#--arch=}"; shift ;;
         *) IMAGES+=("$1"); shift ;;
@@ -77,16 +74,8 @@ if [[ -n "$ARCH" ]]; then
 fi
 
 # Validate flag combinations
-if $PUSH && $PROD; then
-    echo "Error: --push and --prod are mutually exclusive" >&2
-    exit 1
-fi
 if $PUSH_ONLY && $PUSH; then
     echo "Error: --push-only and --push are mutually exclusive" >&2
-    exit 1
-fi
-if $PUSH_ONLY && $PROD; then
-    echo "Error: --push-only and --prod are mutually exclusive" >&2
     exit 1
 fi
 if $PUSH_ONLY && $DRY_RUN; then
@@ -181,8 +170,6 @@ elif $PUSH; then
     if ! $DRY_RUN; then
         BAKE_ARGS+=(--push)
     fi
-elif $PROD; then
-    BAKE_ARGS+=(--no-cache --load --set "*.platform=${ARCH:-linux/amd64}")
 else
     BAKE_ARGS+=(--no-cache)
     if [[ -n "$ARCH" ]]; then
@@ -238,7 +225,7 @@ docker buildx bake "${BAKE_ARGS[@]}" "${BAKE_TARGETS[@]}"
 { set +x; } 2>/dev/null
 
 # Local build: also build user Dockerfile if present
-if ! $PUSH && ! $PUSH_ONLY && ! $PROD && [[ ${#IMAGES[@]} -eq 0 ]] && [[ -f "$USER/Dockerfile" ]]; then
+if ! $PUSH && ! $PUSH_ONLY && [[ ${#IMAGES[@]} -eq 0 ]] && [[ -f "$USER/Dockerfile" ]]; then
     set -x
     docker build . --no-cache --progress=plain --file "$USER/Dockerfile" --tag "$USER-skdb"
     { set +x; } 2>/dev/null
