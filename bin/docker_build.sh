@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Unified Docker image build script
-# Usage: docker_build.sh [--push] [--push-only] [--prod] [--dry-run] [--arch PLATFORMS] [IMAGE...]
+# Usage: docker_build.sh [--push] [--push-only] [--dry-run] [--arch PLATFORMS] [IMAGE...] [-- BAKE_ARGS...]
 #
 # If hitting space issues, try:
 #   docker system df
@@ -11,17 +11,19 @@
 #   docker image rm $(docker image ls -qf dangling=true)
 #
 # Modes:
-#   (default)    Local build, native architecture, no push
-#   --push       Multi-arch (amd64+arm64) build and push to Docker Hub
-#   --push-only  Push previously built images (from --push --dry-run) without rebuilding
-#   --prod       Local build forced to linux/amd64
-#   --dry-run    Modifier: build without actually pushing/loading (for testing)
+#   (default)    Local build, loads into Docker daemon
+#   --push       Build and push to Docker Hub
+#   --push-only  Push previously built images (from --dry-run) without rebuilding
+#   --dry-run    Build without pushing or loading (for testing)
 #   --arch PLAT  Override platform(s). Shorthands: amd, amd64, arm, arm64.
-#                Comma-separated for multiple. Default depends on mode.
+#                Comma-separated for multiple. Default: native architecture.
+#   -- ARGS      Pass remaining arguments directly to docker buildx bake.
 #
 # Environment variables:
-#   STAGE        Compiler bootstrap stage (default: 0). Passed as STAGE build
-#                arg to the root Dockerfile (skiplang/skip targets).
+#   STAGE              Compiler bootstrap stage (default: 0). Passed as STAGE
+#                      build arg to the root Dockerfile (skiplang/skip targets).
+#   DOCKER_DEFAULT_ARCH  Default platform(s) when --arch is not given.
+#                        Supports same shorthands as --arch.
 #
 # Images (if none specified, builds all applicable images):
 #   skiplang             Dockerfile --target skiplang
@@ -29,8 +31,9 @@
 #   skip                 Dockerfile (full)
 #   skdb-base            sql/Dockerfile --target base
 #   skdb                 sql/Dockerfile
-#   server-core          sql/server/core/Dockerfile (local/prod only)
+#   server-core          sql/server/core/Dockerfile (local only)
 #   skdb-dev-server      sql/server/dev/Dockerfile
+#   skipruntime          skipruntime-ts/Dockerfile (libskipruntime.so)
 #
 # Build definitions live in docker-bake.hcl.  Independent targets are built
 # in parallel automatically by BuildKit.
@@ -45,21 +48,26 @@ cd "$REPO"
 PUSH=false
 PUSH_ONLY=false
 DRY_RUN=false
-PROD=false
 ARCH=""
 IMAGES=()
+EXTRA_BAKE_ARGS=()
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --push) PUSH=true; shift ;;
         --push-only) PUSH_ONLY=true; shift ;;
         --dry-run) DRY_RUN=true; shift ;;
-        --prod) PROD=true; shift ;;
         --arch) ARCH="${ARCH:+$ARCH,}$2"; shift 2 ;;
         --arch=*) ARCH="${ARCH:+$ARCH,}${1#--arch=}"; shift ;;
+        --) shift; EXTRA_BAKE_ARGS+=("$@"); break ;;
         *) IMAGES+=("$1"); shift ;;
     esac
 done
+
+# Apply default arch from environment if no --arch was given
+if [[ -z "$ARCH" && -n "${DOCKER_DEFAULT_ARCH:-}" ]]; then
+    ARCH="$DOCKER_DEFAULT_ARCH"
+fi
 
 # Normalize --arch shorthands
 if [[ -n "$ARCH" ]]; then
@@ -76,18 +84,9 @@ if [[ -n "$ARCH" ]]; then
     ARCH=$(IFS=,; echo "${normalized[*]}")
 fi
 
-# Validate flag combinations
-if $PUSH && $PROD; then
-    echo "Error: --push and --prod are mutually exclusive" >&2
-    exit 1
-fi
-if $PUSH_ONLY && $PUSH; then
-    echo "Error: --push-only and --push are mutually exclusive" >&2
-    exit 1
-fi
-if $PUSH_ONLY && $PROD; then
-    echo "Error: --push-only and --prod are mutually exclusive" >&2
-    exit 1
+# Validate flag combinations (--push-only overrides --push for caller convenience)
+if $PUSH_ONLY; then
+    PUSH=false
 fi
 if $PUSH_ONLY && $DRY_RUN; then
     echo "Error: --push-only and --dry-run are mutually exclusive" >&2
@@ -101,7 +100,7 @@ if ($PUSH || $PUSH_ONLY) && [[ ${#IMAGES[@]} -eq 0 ]]; then
 fi
 
 # Validate image names
-KNOWN_IMAGES=(skiplang skiplang-bin-builder skip skdb-base skdb server-core skdb-dev-server)
+KNOWN_IMAGES=(skiplang skiplang-bin-builder skip skdb-base skdb server-core skdb-dev-server skipruntime)
 for img in "${IMAGES[@]}"; do
     name="${img%%:*}"
     found=false
@@ -150,8 +149,11 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Set up named builder for --push flows (persists between dry-run and push-only)
-if $PUSH || $PUSH_ONLY; then
+# Native architecture for --load fallback
+NATIVE_ARCH="linux/$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
+
+# Set up named builder for multi-arch or push flows
+if $PUSH || $PUSH_ONLY || [[ "$ARCH" == *,* ]]; then
     if ! docker buildx inspect "$NAMED_BUILDER" &>/dev/null; then
         if $PUSH_ONLY; then
             echo "Error: no builder '$NAMED_BUILDER' found. Run --push --dry-run first." >&2
@@ -169,10 +171,12 @@ fi
 # Assemble bake arguments
 BAKE_ARGS=(--progress=plain -f docker-bake.hcl)
 
-if $PUSH || $PUSH_ONLY; then
-    BAKE_ARGS+=(--set "*.platform=${ARCH:-linux/amd64,linux/arm64}")
+# Platform — uniform for all modes
+if [[ -n "$ARCH" ]]; then
+    BAKE_ARGS+=(--set "*.platform=$ARCH")
 fi
 
+# Output mode
 if $PUSH_ONLY; then
     # Push existing layers — no --no-cache so BuildKit finds them in the builder
     BAKE_ARGS+=(--push)
@@ -181,14 +185,10 @@ elif $PUSH; then
     if ! $DRY_RUN; then
         BAKE_ARGS+=(--push)
     fi
-elif $PROD; then
-    BAKE_ARGS+=(--no-cache --load --set "*.platform=${ARCH:-linux/amd64}")
 else
     BAKE_ARGS+=(--no-cache)
-    if [[ -n "$ARCH" ]]; then
-        BAKE_ARGS+=(--set "*.platform=$ARCH")
-    fi
-    if ! $DRY_RUN; then
+    if ! $DRY_RUN && [[ "$ARCH" != *,* ]]; then
+        # --load doesn't support multi-platform; handled after bake call
         BAKE_ARGS+=(--load)
     fi
 fi
@@ -233,12 +233,18 @@ fi
 
 set -x
 
-docker buildx bake "${BAKE_ARGS[@]}" "${BAKE_TARGETS[@]}"
+docker buildx bake "${BAKE_ARGS[@]}" "${BAKE_TARGETS[@]}" "${EXTRA_BAKE_ARGS[@]}"
+
+# For local multi-arch builds: load native image from cache
+if ! $PUSH && ! $PUSH_ONLY && ! $DRY_RUN && [[ "$ARCH" == *,* ]]; then
+    docker buildx bake --progress=plain -f docker-bake.hcl \
+        --load --set "*.platform=$NATIVE_ARCH" "${BAKE_TARGETS[@]}"
+fi
 
 { set +x; } 2>/dev/null
 
 # Local build: also build user Dockerfile if present
-if ! $PUSH && ! $PUSH_ONLY && ! $PROD && [[ ${#IMAGES[@]} -eq 0 ]] && [[ -f "$USER/Dockerfile" ]]; then
+if ! $PUSH && ! $PUSH_ONLY && [[ ${#IMAGES[@]} -eq 0 ]] && [[ -f "$USER/Dockerfile" ]]; then
     set -x
     docker build . --no-cache --progress=plain --file "$USER/Dockerfile" --tag "$USER-skdb"
     { set +x; } 2>/dev/null

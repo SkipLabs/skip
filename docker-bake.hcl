@@ -78,3 +78,9 @@ target "skdb-dev-server" {
   tags       = ["skiplabs/skdb-dev-server:latest"]
   contexts   = { "skiplabs/skdb" = "target:skdb" }
 }
+
+# Native shared library for Skip runtime (opt-in, not in any group)
+target "skipruntime" {
+  dockerfile = "skipruntime-ts/Dockerfile"
+  contexts   = { "skiplabs/skiplang-bin-builder" = "target:skiplang-bin-builder" }
+}

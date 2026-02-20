@@ -2,12 +2,15 @@
 
 # Build and push Docker images used in CI.
 # Image names are extracted from .circleci/base.yml so the two stay in sync.
-# Usage: release_docker_ci_images.sh [--dry-run]
+# Defaults to amd64 only; use --arch to override (e.g. --arch amd64,arm64).
+# Usage: release_docker_ci_images.sh [--dry-run] [--arch PLATFORMS]
 
 set -euo pipefail
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 REPO="$SCRIPT_DIR/.."
+
+export DOCKER_DEFAULT_ARCH="${DOCKER_DEFAULT_ARCH:-amd64}"
 
 # Extract unique skiplabs/ image names from CI config
 mapfile -t images < <(
