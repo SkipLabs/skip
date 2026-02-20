@@ -10,14 +10,7 @@ set -euo pipefail
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 REPO="$SCRIPT_DIR/.."
 
-# Default to amd64 for CI images (override with --arch)
-has_arch=false
-for arg in "$@"; do
-    [[ "$arg" = "--arch" || "$arg" == --arch=* ]] && has_arch=true
-done
-if ! $has_arch; then
-    set -- --arch amd64 "$@"
-fi
+export DOCKER_DEFAULT_ARCH="${DOCKER_DEFAULT_ARCH:-amd64}"
 
 # Extract unique skiplabs/ image names from CI config
 mapfile -t images < <(

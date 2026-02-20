@@ -7,14 +7,7 @@ set -euo pipefail
 
 SCRIPT_DIR=$(dirname -- "${BASH_SOURCE[0]}")
 
-# Default to both architectures (override with --arch)
-has_arch=false
-for arg in "$@"; do
-    [[ "$arg" = "--arch" || "$arg" == --arch=* ]] && has_arch=true
-done
-if ! $has_arch; then
-    set -- --arch amd64,arm64 "$@"
-fi
+export DOCKER_DEFAULT_ARCH="${DOCKER_DEFAULT_ARCH:-amd64,arm64}"
 
 # --push-only replaces --push (they are mutually exclusive in docker_build.sh)
 for arg in "$@"; do

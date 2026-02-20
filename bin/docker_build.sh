@@ -19,8 +19,10 @@
 #                Comma-separated for multiple. Default: native architecture.
 #
 # Environment variables:
-#   STAGE        Compiler bootstrap stage (default: 0). Passed as STAGE build
-#                arg to the root Dockerfile (skiplang/skip targets).
+#   STAGE              Compiler bootstrap stage (default: 0). Passed as STAGE
+#                      build arg to the root Dockerfile (skiplang/skip targets).
+#   DOCKER_DEFAULT_ARCH  Default platform(s) when --arch is not given.
+#                        Supports same shorthands as --arch.
 #
 # Images (if none specified, builds all applicable images):
 #   skiplang             Dockerfile --target skiplang
@@ -57,6 +59,11 @@ while [[ $# -gt 0 ]]; do
         *) IMAGES+=("$1"); shift ;;
     esac
 done
+
+# Apply default arch from environment if no --arch was given
+if [[ -z "$ARCH" && -n "${DOCKER_DEFAULT_ARCH:-}" ]]; then
+    ARCH="$DOCKER_DEFAULT_ARCH"
+fi
 
 # Normalize --arch shorthands
 if [[ -n "$ARCH" ]]; then
