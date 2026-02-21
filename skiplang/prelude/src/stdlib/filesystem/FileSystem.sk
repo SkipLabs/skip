@@ -12,6 +12,48 @@
 @may_alloc
 native fun getcwd(): String;
 
+base class FileKind uses Orderable {
+  children =
+  | FKRegular()
+  | FKDirectory()
+  | FKSymlink()
+  | FKCharDevice()
+  | FKBlockDevice()
+  | FKFifo()
+  | FKSocket()
+  | FKUnknown()
+}
+
+// Layout must match sk_file_stat_t in runtime64_specific.cpp.
+// mode is the full st_mode (file type + permissions).
+// Could be extended with: dev, ino, nlink, uid, gid, rdev, blksize, blocks.
+mutable class FileStat(
+  mutable mode: Int,
+  mutable size: Int,
+  mutable mtime: Int,
+  mutable atime: Int,
+  mutable ctime: Int,
+) {
+  // Extract file type from mode.
+  fun kind(): FileKind {
+    this.mode.and(0o170000) match {
+    | 0o140000 -> FKSocket()
+    | 0o120000 -> FKSymlink()
+    | 0o100000 -> FKRegular()
+    | 0o060000 -> FKBlockDevice()
+    | 0o040000 -> FKDirectory()
+    | 0o020000 -> FKCharDevice()
+    | 0o010000 -> FKFifo()
+    | _ -> FKUnknown()
+    }
+  }
+
+  // Extract permission bits (lower 9 bits of mode).
+  fun permissions(): Int {
+    this.mode.and(0o777)
+  }
+}
+
 module FileSystem;
 
 // This is really broken - you can't read a file into a String without an
@@ -99,6 +141,15 @@ fun readFilesRecursive(
 
   result.chill();
 }
+
+fun stat(path: String): ?FileStat {
+  result = mutable FileStat(0, 0, 0, 0, 0);
+  rc = fillStat(result, path);
+  if (rc < 0) None() else Some(unsafe_chill_trust_me(result))
+}
+
+@cpp_extern("SKIP_file_stat")
+private native fun fillStat(result: mutable FileStat, path: String): Int;
 
 // TODO: Rename the C++ entrypoints and merge these into the
 // public API above.
