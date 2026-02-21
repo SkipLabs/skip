@@ -514,6 +514,28 @@ bool SKIP_is_directory(char* path) {
   return st.st_mode & S_IFDIR;
 }
 
+// Must match FileStat field layout: mode, size, mtime, atime, ctime
+typedef struct {
+  int64_t mode;
+  int64_t size;
+  int64_t mtime;
+  int64_t atime;
+  int64_t ctime;
+} sk_file_stat_t;
+
+void SKIP_file_stat(sk_file_stat_t* result, char* path) {
+  struct stat st;
+  if (stat(path, &st) < 0) {
+    result->mode = 0;
+    return;
+  }
+  result->mode = st.st_mode;
+  result->size = st.st_size;
+  result->mtime = st.st_mtime;
+  result->atime = st.st_atime;
+  result->ctime = st.st_ctime;
+}
+
 int64_t SKIP_system(char* cmd) {
   sk_string_check_c_safe(cmd);
   int64_t res = system(cmd);
