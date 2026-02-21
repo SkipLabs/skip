@@ -1,4 +1,3 @@
-/* eslint-env node */
 import { runService } from "@skipruntime/server";
 import { asFollower, asLeader } from "@skipruntime/helpers";
 import { service } from "./dist/blogger.service.js";

@@ -160,9 +160,7 @@ export class SKDBSyncImpl implements SKDBSync {
     privateKey: CryptoKey,
     endpoint?: string,
   ): Promise<void> {
-    if (!endpoint) {
-      endpoint = "wss://api.skiplabs.io";
-    }
+    endpoint ??= "wss://api.skiplabs.io";
 
     const creds = {
       accessKey: accessKey,

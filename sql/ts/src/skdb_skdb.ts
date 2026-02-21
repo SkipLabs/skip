@@ -258,11 +258,9 @@ class LinksImpl implements Links, ToWasm {
   complete = (utils: Utils, exports: object) => {
     const exported = exports as Exported;
     const skjson = () => {
-      if (this.skjson == undefined) {
-        this.skjson = (
-          this.environment.shared.get("SKJSON")! as SKJSONShared
-        ).converter;
-      }
+      this.skjson ??= (
+        this.environment.shared.get("SKJSON")! as SKJSONShared
+      ).converter;
       return this.skjson;
     };
     this.notifyAllJS = () => {
