@@ -41,11 +41,13 @@ fun createOptimizedFunctions(
   env
 }
 
-fun link(
+// Returns the link command for the native (non-WASM) case.
+// For WASM, runs the multi-step toolchain directly and returns None().
+fun getLinkArgs(
   llFile: String,
   config: Config.Config,
   exports: Array<String> = Array[],
-): void {
+): ?LinkCommandFile {
   linker_args = config.link_args.concat(
     config.dependencies.values().collect(Array).flatMap(x -> x.i1.links),
   );
@@ -128,6 +130,7 @@ fun link(
         .concat(static_libs),
       config.verbose,
     );
+    None()
   } else {
     flags = if (config.emit == "cdylib") {
       Array["-fPIC", "-shared"]
@@ -135,18 +138,19 @@ fun link(
       Array["-no-pie"]
     };
 
-    runShell(
-      Array[
-        "clang++",
-        `-O${config.optLevel}`,
-        "-o",
-        config.output,
-        llFile,
-      ].concat(flags)
-        .concat(linker_args)
-        .concat(static_libs),
-      config.verbose,
-    );
+    Some(
+      LinkCommandFile(
+        Array[
+          "clang++",
+          `-O${config.optLevel}`,
+          "-o",
+          config.output,
+          llFile,
+        ].concat(flags)
+          .concat(linker_args)
+          .concat(static_libs),
+      ),
+    )
   }
 }
 
@@ -191,6 +195,11 @@ fun ensureCompatibleLLVMVersion(): void {
 }
 
 class TickConfigFile(value: (Int, Config.Config)) extends SKStore.File
+class LinkCommandFile(value: Array<String>) extends SKStore.File
+
+const backendSinkDirName: SKStore.DirName = SKStore.DirName::create(
+  "/backendSink/",
+);
 
 fun getOrInitializeBackend(context: mutable SKStore.Context): SKStore.EagerDir {
   backendDirName = SKStore.DirName::create("/backend/");
@@ -227,11 +236,11 @@ fun getOrInitializeBackend(context: mutable SKStore.Context): SKStore.EagerDir {
   );
 
   _ = backendDir.map(
-    SKStore.SID::keyType,
-    TickConfigFile::type,
+    SKStore.UnitID::keyType,
+    LinkCommandFile::type,
     context,
-    SKStore.DirName::create("/backendSink/"),
-    (context, _writer, _key, values) ~> {
+    backendSinkDirName,
+    (context, writer, _key, values) ~> {
       (_, conf) = values.first.value;
 
       context.getGlobal("ERRORS") match {
@@ -355,7 +364,9 @@ fun getOrInitializeBackend(context: mutable SKStore.Context): SKStore.EagerDir {
               ).isSome()
           )
           .map(exportName);
-        compile_binary(defs, conf, wasm_exports)
+        compile_binary(defs, conf, wasm_exports).each(linkCmd ->
+          writer.set(SKStore.UnitID::singleton, linkCmd)
+        )
       | "sklib" ->
         invariant_violation("--emit=sklib should have been handled earlier")
       | _ -> invariant_violation("Unsupported value for `--emit`: " + conf.emit)
@@ -370,7 +381,7 @@ fun compile(
   config: Config.Config,
   context: mutable SKStore.Context,
   fileNames: Array<String>,
-): void {
+): ?LinkCommandFile {
   if (fileNames.isEmpty() && config.dependencies.isEmpty()) {
     print_error("fatal error: no input files\n");
     skipExit(4); // Exit code used by g++ for no input files
@@ -400,7 +411,13 @@ fun compile(
     make_input_source_path,
   );
 
-  context.update()
+  context.update();
+
+  // Return deferred link command (if any) written by the mapper to the sink.
+  linkArgs = context
+    .unsafeGetEagerDir(backendSinkDirName)
+    .getArrayRaw(SKStore.UnitID::singleton);
+  if (linkArgs.isEmpty()) None() else Some(LinkCommandFile::type(linkArgs[0]))
 }
 
 fun compile_llvm_ir(
@@ -412,11 +429,13 @@ fun compile_llvm_ir(
   })
 }
 
+// Returns the deferred link command (for native), or None (for WASM,
+// where linking is done inline via multiple sequential tools).
 fun compile_binary(
   defs: readonly AsmOutput.AsmDefIDToAsmDef,
   conf: Config.Config,
   exports: Array<String>,
-): void {
+): ?LinkCommandFile {
   // TODO: Use `mkstemp()` instead.
   llFile = conf.output + ".ll";
   runCompilerPhase("native/write_asm_files", () -> {
@@ -424,7 +443,7 @@ fun compile_binary(
   });
 
   runCompilerPhase("native/link", () -> {
-    link(llFile, conf, exports)
+    getLinkArgs(llFile, conf, exports)
   })
 }
 

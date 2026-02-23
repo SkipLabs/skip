@@ -108,25 +108,27 @@ fun main(): void {
 
   config = Config.Config::make(results);
 
-  isInit = results.maybeGetString("init").isSome();
-  if (isInit) {
+  if (!SKStore.gHasContext()) {
     _ = SKStore.gContextInit(SKStore.Context::create{});
   };
-  SKStore.runWithGc(
-    SKStore.Context::create{},
-    _context ~> {
-      SKStore.CStop(
-        Some((context, _, _) ~> {
-          try {
-            compile(config, context, config.input_files)
-          } catch {
-          | exn ->
-            print_error(exn.getMessage());
-            skipExit(2)
-          }
-        }),
-      )
+  SKStore.runWithResult(
+    context ~> {
+      compile(config, context, config.input_files)
     },
     Some(SKStore.Synchronizer(SKStore.import, SKStore.export, _ ~> void)),
-  )
+  ) match {
+  | Success(Some(linkCmd)) ->
+    // After all SKStore work is done, exec into clang.
+    // This replaces the skc process, avoiding the memory overlap
+    // where both skc and clang coexist.
+    args = linkCmd.value;
+    if (config.verbose) {
+      print_error(">> " + args.join(" "))
+    };
+    Posix.execvp(args)
+  | Success(None()) -> void
+  | Failure(exn) ->
+    print_error(exn.getMessage());
+    skipExit(2)
+  }
 }
