@@ -8,6 +8,9 @@
 set -euo pipefail
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+REPO="$SCRIPT_DIR/.."
+cd "$REPO"
+
 ARCH="${1:-arm64,amd64}"
 
 for arch in ${ARCH//,/ }; do
