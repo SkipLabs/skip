@@ -1,0 +1,42 @@
+module alias StdTime = Time;
+
+module SKWorld;
+
+// Snapshot of the current time, updated on World.signalRefresh.
+// Returns the same value between refreshes — not a live clock.
+class Time private {
+  private snapshotDir: SKStore.EHandle<SKStore.UnitID, SKStore.IntFile>,
+} {
+  static fun create(
+    context: mutable SKStore.Context,
+    baseName: SKStore.DirName,
+  ): Time {
+    snapshotDir = context.mkdir(
+      SKStore.UnitID::keyType,
+      SKStore.IntFile::type,
+      baseName.sub("snapshot"),
+      Array[],
+      true, // ignoreIfExists
+    );
+    result = Time{snapshotDir};
+    result.refresh(context);
+    result
+  }
+
+  // Re-capture current time.
+  // Does NOT call context.update(); the caller (World.signalRefresh) does that.
+  fun refresh(context: mutable SKStore.Context): void {
+    this.snapshotDir.writeArray(
+      context,
+      SKStore.UnitID::singleton,
+      Array[SKStore.IntFile(StdTime.time_ms())],
+    );
+  }
+
+  // Milliseconds since epoch at last refresh.
+  fun nowSnapshot(context: mutable SKStore.Context): Int {
+    this.snapshotDir.getArray(context, SKStore.UnitID::singleton).first().value
+  }
+}
+
+module end;

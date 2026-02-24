@@ -1,0 +1,282 @@
+module alias StdEnviron = Environ;
+
+module SKWorld;
+
+// File wrapper for Cli.ParseResults.
+class ParseResultsFile(value: Cli.ParseResults) extends SKStore.File {
+  static fun type(f: SKStore.File): ParseResultsFile {
+    f match {
+    | x @ ParseResultsFile _ -> x
+    | _ -> invariant_violation("Expected ParseResultsFile")
+    }
+  }
+}
+
+// File wrapper for individual Cli.Value entries.
+class CliValueFile(value: Cli.Value) extends SKStore.File {
+  static fun type(f: SKStore.File): CliValueFile {
+    f match {
+    | x @ CliValueFile _ -> x
+    | _ -> invariant_violation("Expected CliValueFile")
+    }
+  }
+}
+
+// Reactive command-line arguments.
+// Stores raw args and optionally parsed results in eager dirs so
+// SKStore computations can depend on them.
+//
+// Parsed results are stored both as a blob (for subcommand/extra access)
+// and as individual values keyed by arg name (for fine-grained dependency
+// tracking — a computation reading --verbose won't depend on --jobs).
+//
+// Three creation modes:
+//   World::create(context)                       — raw args only
+//   World::createFromCommand(context, cmd)       — parse with Command
+//   World::createFromParsed(context, result)     — use pre-parsed results
+//
+// Typical flow with -C (change directory):
+//   result = cmd.parseArgs();
+//   if (result.maybeGetString("C").isSome()) chdir(...);
+//   world = World::createFromParsed(context, result);
+class Args private {
+  private rawDir: SKStore.EHandle<SKStore.UnitID, SKStore.ArrayStringFile>,
+  private parsedDir: ?SKStore.EHandle<SKStore.UnitID, ParseResultsFile>,
+  private valuesDir: ?SKStore.EHandle<SKStore.SID, CliValueFile>,
+} {
+  private static fun makeRawDir(
+    context: mutable SKStore.Context,
+    baseName: SKStore.DirName,
+  ): SKStore.EHandle<SKStore.UnitID, SKStore.ArrayStringFile> {
+    raw = StdEnviron.args().collect(Array);
+    rawDir = context.mkdir(
+      SKStore.UnitID::keyType,
+      SKStore.ArrayStringFile::type,
+      baseName.sub("raw"),
+      Array[],
+      true, // ignoreIfExists
+    );
+    rawDir.writeArray(
+      context,
+      SKStore.UnitID::singleton,
+      Array[SKStore.ArrayStringFile(raw)],
+    );
+    rawDir
+  }
+
+  // Raw args only, no parsing.
+  static fun create(
+    context: mutable SKStore.Context,
+    baseName: SKStore.DirName,
+  ): Args {
+    rawDir = Args::makeRawDir(context, baseName);
+    parsedDir: ?SKStore.EHandle<SKStore.UnitID, ParseResultsFile> = None();
+    valuesDir: ?SKStore.EHandle<SKStore.SID, CliValueFile> = None();
+    Args{rawDir, parsedDir, valuesDir}
+  }
+
+  // Parse args using the given command definition.
+  // Maps rawDir through the command to produce parsedDir reactively.
+  static fun fromCommand(
+    context: mutable SKStore.Context,
+    cmd: Cli.Command,
+    baseName: SKStore.DirName,
+  ): Args {
+    rawDir = Args::makeRawDir(context, baseName);
+    pDir = rawDir.map(
+      SKStore.UnitID::keyType,
+      ParseResultsFile::type,
+      context,
+      baseName.sub("parsed"),
+      (_context, writer, key, iter) ~> {
+        argv = iter.first.value;
+        result = Cli.parseArgsFrom(cmd, argv);
+        writer.set(key, ParseResultsFile(result));
+      },
+    );
+    parsedDir: ?SKStore.EHandle<SKStore.UnitID, ParseResultsFile> = Some(pDir);
+    valuesDir = Some(Args::mapValues(pDir, context, baseName));
+    Args{rawDir, parsedDir, valuesDir}
+  }
+
+  // Use pre-parsed results (e.g. after handling -C).
+  static fun fromParsed(
+    context: mutable SKStore.Context,
+    result: Cli.ParseResults,
+    baseName: SKStore.DirName,
+  ): Args {
+    rawDir = Args::makeRawDir(context, baseName);
+    pDir = context.mkdir(
+      SKStore.UnitID::keyType,
+      ParseResultsFile::type,
+      baseName.sub("parsed"),
+      Array[],
+      true, // ignoreIfExists
+    );
+    pDir.writeArray(
+      context,
+      SKStore.UnitID::singleton,
+      Array[ParseResultsFile(result)],
+    );
+    parsedDir: ?SKStore.EHandle<SKStore.UnitID, ParseResultsFile> = Some(pDir);
+    valuesDir = Some(Args::mapValues(pDir, context, baseName));
+    Args{rawDir, parsedDir, valuesDir}
+  }
+
+  // Map ParseResultsFile → individual CliValueFile entries keyed by arg name.
+  private static fun mapValues(
+    pDir: SKStore.EHandle<SKStore.UnitID, ParseResultsFile>,
+    context: mutable SKStore.Context,
+    baseName: SKStore.DirName,
+  ): SKStore.EHandle<SKStore.SID, CliValueFile> {
+    pDir.map(
+      SKStore.SID::keyType,
+      CliValueFile::type,
+      context,
+      baseName.sub("values"),
+      (_context, writer, _key, iter) ~> {
+        results = iter.first.value;
+        results.values.each((name, value) -> {
+          if (!(value is Cli.MissingValue _)) {
+            writer.set(SKStore.SID(name), CliValueFile(value));
+          }
+        });
+      },
+    )
+  }
+
+  // Get raw args.
+  fun raw(context: mutable SKStore.Context): Array<String> {
+    this.rawDir.getArray(context, SKStore.UnitID::singleton).first().value
+  }
+
+  // Get parsed results. Crashes if Args was created without parsing.
+  fun parsed(context: mutable SKStore.Context): Cli.ParseResults {
+    this.parsedDir match {
+    | Some(d) -> d.getArray(context, SKStore.UnitID::singleton).first().value
+    | None() ->
+      invariant_violation("Args were not parsed; use fromCommand or fromParsed")
+    }
+  }
+
+  // Get a single parsed value by name. Fine-grained: only depends on this arg.
+  private fun getValue(
+    context: mutable SKStore.Context,
+    name: String,
+  ): ?Cli.Value {
+    this.valuesDir match {
+    | Some(d) ->
+      d.maybeGet(context, SKStore.SID(name)) match {
+      | Some(f) -> Some(f.value)
+      | None() -> None()
+      }
+    | None() ->
+      invariant_violation("Args were not parsed; use fromCommand or fromParsed")
+    }
+  }
+
+  fun getBool(
+    context: mutable SKStore.Context,
+    name: String,
+    default: ?Bool = None(),
+  ): Bool {
+    this.getValue(context, name) match {
+    | Some(Cli.BoolValue(v)) -> v
+    | None() ->
+      default match {
+      | Some(d) -> d
+      | None() -> invariant_violation(`Argument ${name} is missing`)
+      }
+    | _ -> invariant_violation(`Argument ${name} is not boolean`)
+    }
+  }
+
+  fun maybeGetBool(context: mutable SKStore.Context, name: String): ?Bool {
+    this.getValue(context, name) match {
+    | Some(Cli.BoolValue(v)) -> Some(v)
+    | None() -> None()
+    | _ -> invariant_violation(`Argument ${name} is not boolean`)
+    }
+  }
+
+  fun getString(
+    context: mutable SKStore.Context,
+    name: String,
+    default: ?String = None(),
+  ): String {
+    this.getValue(context, name) match {
+    | Some(Cli.StringValue(v)) -> v
+    | None() ->
+      default match {
+      | Some(d) -> d
+      | None() -> invariant_violation(`Argument ${name} is missing`)
+      }
+    | _ -> invariant_violation(`Argument ${name} is not a string`)
+    }
+  }
+
+  fun maybeGetString(context: mutable SKStore.Context, name: String): ?String {
+    this.getValue(context, name) match {
+    | Some(Cli.StringValue(v)) -> Some(v)
+    | None() -> None()
+    | _ -> invariant_violation(`Argument ${name} is not a string`)
+    }
+  }
+
+  fun getInt(
+    context: mutable SKStore.Context,
+    name: String,
+    default: ?Int = None(),
+  ): Int {
+    this.getValue(context, name) match {
+    | Some(Cli.IntValue(v)) -> v
+    | None() ->
+      default match {
+      | Some(d) -> d
+      | None() -> invariant_violation(`Argument ${name} is missing`)
+      }
+    | _ -> invariant_violation(`Argument ${name} is not an integer`)
+    }
+  }
+
+  fun maybeGetInt(context: mutable SKStore.Context, name: String): ?Int {
+    this.getValue(context, name) match {
+    | Some(Cli.IntValue(v)) -> Some(v)
+    | None() -> None()
+    | _ -> invariant_violation(`Argument ${name} is not an integer`)
+    }
+  }
+
+  fun getArray(
+    context: mutable SKStore.Context,
+    name: String,
+    default: ?Array<String> = None(),
+  ): Array<String> {
+    this.getValue(context, name) match {
+    | Some(Cli.ArrayValue(v)) -> v
+    | None() ->
+      default match {
+      | Some(d) -> d
+      | None() -> invariant_violation(`Argument ${name} is missing`)
+      }
+    | _ -> invariant_violation(`Argument ${name} is not an array`)
+    }
+  }
+
+  fun maybeGetArray(
+    context: mutable SKStore.Context,
+    name: String,
+  ): ?Array<String> {
+    this.getValue(context, name) match {
+    | Some(Cli.ArrayValue(v)) -> Some(v)
+    | None() -> None()
+    | _ -> invariant_violation(`Argument ${name} is not an array`)
+    }
+  }
+
+  fun maybeGetSubcommand(context: mutable SKStore.Context): ?String {
+    this.parsed(context).maybeGetSubcommand()
+  }
+}
+
+module end;

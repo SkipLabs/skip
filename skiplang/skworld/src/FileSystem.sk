@@ -1,0 +1,233 @@
+module alias StdFileSystem = FileSystem;
+module alias StdPath = Path;
+
+module SKWorld;
+
+// Stat info for a filesystem path.
+// FSStatNotFound is a real tracked value (not LAbsent), so dependencies
+// are properly recorded for paths that don't exist yet.
+base class FSStat extends SKStore.File {
+  children =
+  | FSStatFound(FileStat)
+  | FSStatNotFound()
+
+  static overridable fun type(f: SKStore.File): FSStat {
+    f match {
+    | x @ FSStat _ -> x
+    | _ -> invariant_violation("Expected FSStat")
+    }
+  }
+}
+
+// Reactive filesystem mirror.
+// Uses the "combo trick": an input signal dir + lazy dirs.
+// Signal dir holds a single counter; bumping it invalidates stat entries.
+// Content and listing dirs depend on stat, so they are only recomputed
+// when the file's mtime actually changes.
+class FileSystem private {
+  private path: Path,
+  private statDir: SKStore.LHandle<SKStore.SID, FSStat>,
+  private contentDir: SKStore.LHandle<SKStore.SID, SKStore.StringFile>,
+  private listDir: SKStore.LHandle<SKStore.SID, SKStore.ArrayStringFile>,
+  private realpathDir: SKStore.LHandle<SKStore.SID, SKStore.StringFile>,
+} {
+  /* CREATION */
+
+  static fun create(
+    context: mutable SKStore.Context,
+    path: Path,
+    signalDir: SKStore.EHandle<SKStore.UnitID, SKStore.IntFile>,
+    baseName: SKStore.DirName = SKStore.DirName::create("/fs/"),
+  ): FileSystem {
+    statDir = SKStore.LHandle::create(
+      SKStore.SID::keyType,
+      FSStat::type,
+      context,
+      baseName.sub("stat"),
+      (context, _self, key) ~> {
+        // Read signal to establish dependency
+        _ = signalDir.getArray(context, SKStore.UnitID::singleton);
+        StdFileSystem.stat(key.value) match {
+        | Some(fs) -> Array[FSStatFound(fs)]
+        | None() -> Array[FSStatNotFound()]
+        }
+      },
+    );
+
+    contentDir = SKStore.LHandle::create(
+      SKStore.SID::keyType,
+      SKStore.StringFile::type,
+      context,
+      baseName.sub("content"),
+      (context, _self, key) ~> {
+        _ = statDir.get(context, key);
+        Array[SKStore.StringFile(StdFileSystem.readTextFile(key.value))]
+      },
+    );
+
+    listDir = SKStore.LHandle::create(
+      SKStore.SID::keyType,
+      SKStore.ArrayStringFile::type,
+      context,
+      baseName.sub("list"),
+      (context, _self, key) ~> {
+        _ = statDir.get(context, key);
+        Array[SKStore.ArrayStringFile(StdFileSystem.readDirectory(key.value))]
+      },
+    );
+
+    realpathDir = SKStore.LHandle::create(
+      SKStore.SID::keyType,
+      SKStore.StringFile::type,
+      context,
+      baseName.sub("realpath"),
+      (context, _self, key) ~> {
+        normalized = StdPath.normalize(key.value);
+        // Stat every prefix of the path to establish dependencies on
+        // all intermediate components (including symlinks).
+        prefix = "";
+        for (part in normalized.split("/")) {
+          if (!part.isEmpty()) {
+            !prefix = prefix + "/" + part;
+            _ = statDir.get(context, SKStore.SID(prefix));
+          }
+        };
+        Array[SKStore.StringFile(StdFileSystem.realpath(key.value))]
+      },
+    );
+
+    FileSystem{path, statDir, contentDir, listDir, realpathDir}
+  }
+
+  /* FileSystem-equivalent API */
+
+  // Convert a path to an absolute SID. Relative paths are resolved
+  // against the reactive cwd so that dir keys are always absolute.
+  private fun absKey(
+    context: mutable SKStore.Context,
+    path: String,
+  ): SKStore.SID {
+    SKStore.SID(this.path.resolve(context, path))
+  }
+
+  // Get stat info for a path. Always returns a value:
+  // FSStatFound(fileStat) if the path exists, FSStatNotFound() otherwise.
+  fun stat(context: mutable SKStore.Context, path: String): FSStat {
+    this.statDir.get(context, this.absKey(context, path))
+  }
+
+  fun exists(context: mutable SKStore.Context, path: String): Bool {
+    this.stat(context, path) is FSStatFound _
+  }
+
+  fun isDirectory(context: mutable SKStore.Context, path: String): Bool {
+    this.stat(context, path) match {
+    | FSStatFound(fs) -> fs.kind() is FKDirectory _
+    | FSStatNotFound() -> false
+    }
+  }
+
+  fun isFile(context: mutable SKStore.Context, path: String): Bool {
+    this.stat(context, path) match {
+    | FSStatFound(fs) -> fs.kind() is FKRegular _
+    | FSStatNotFound() -> false
+    }
+  }
+
+  fun getFileSize(context: mutable SKStore.Context, path: String): Int {
+    this.stat(context, path) match {
+    | FSStatFound(fs) -> fs.size
+    | FSStatNotFound() -> -1
+    }
+  }
+
+  fun getLastModificationTime(
+    context: mutable SKStore.Context,
+    path: String,
+  ): Int {
+    this.stat(context, path) match {
+    | FSStatFound(fs) -> fs.mtime
+    | FSStatNotFound() -> 0
+    }
+  }
+
+  // Read file contents. Crashes if path doesn't exist.
+  fun readTextFile(context: mutable SKStore.Context, path: String): String {
+    this.contentDir.get(context, this.absKey(context, path)).value
+  }
+
+  // List directory entries. Crashes if path doesn't exist or isn't a directory.
+  fun readDirectory(
+    context: mutable SKStore.Context,
+    path: String,
+  ): Array<String> {
+    this.listDir.get(context, this.absKey(context, path)).value
+  }
+
+  // Search for a file named filename in dirname, then in parent directories.
+  // Returns the directory containing the file, or None() if not found.
+  fun findNearestFile(
+    context: mutable SKStore.Context,
+    dirname: String,
+    filename: String,
+  ): ?String {
+    if (this.exists(context, StdPath.join(dirname, filename))) {
+      Some(dirname)
+    } else if (StdPath.isRoot(dirname)) {
+      None()
+    } else {
+      this.findNearestFile(context, StdPath.dirname(dirname), filename)
+    }
+  }
+
+  // Returns all files in dirname recursively. Does not return directories.
+  fun readFilesRecursive(
+    context: mutable SKStore.Context,
+    dirname: String,
+    fileFilter: String ~> Bool = _ ~> true,
+    directoryFilter: String ~> Bool = _ ~> true,
+  ): Array<String> {
+    result: mutable Vector<String> = mutable Vector[];
+    this.readFilesRecursiveHelper(
+      context,
+      this.path.resolve(context, dirname),
+      fileFilter,
+      directoryFilter,
+      result,
+    );
+    result.toArray()
+  }
+
+  private fun readFilesRecursiveHelper(
+    context: mutable SKStore.Context,
+    dir: String,
+    fileFilter: String ~> Bool,
+    directoryFilter: String ~> Bool,
+    result: mutable Vector<String>,
+  ): void {
+    for (entry in this.readDirectory(context, dir)) {
+      entryPath = StdPath.join(dir, entry);
+      if (this.isDirectory(context, entryPath)) {
+        if (directoryFilter(entryPath)) {
+          this.readFilesRecursiveHelper(
+            context,
+            entryPath,
+            fileFilter,
+            directoryFilter,
+            result,
+          )
+        }
+      } else if (fileFilter(entryPath)) {
+        result.push(entryPath)
+      }
+    }
+  }
+
+  // Resolve a path to its absolute canonical form, following symlinks.
+  // Crashes if the path doesn't exist.
+  fun realpath(context: mutable SKStore.Context, path: String): String {
+    this.realpathDir.get(context, this.absKey(context, path)).value
+  }
+}
+
+module end;

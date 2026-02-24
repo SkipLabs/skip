@@ -1,0 +1,82 @@
+module alias StdPath = Path;
+
+module SKWorld;
+
+// Reactive path resolution.
+// Captures cwd at creation time and can be refreshed.
+class Path private {
+  private cwdDir: SKStore.EHandle<SKStore.UnitID, SKStore.StringFile>,
+} {
+  static fun create(
+    context: mutable SKStore.Context,
+    baseName: SKStore.DirName,
+  ): Path {
+    cwdDir = context.mkdir(
+      SKStore.UnitID::keyType,
+      SKStore.StringFile::type,
+      baseName.sub("cwd"),
+      Array[],
+      true, // ignoreIfExists
+    );
+    result = Path{cwdDir};
+    result.refresh(context);
+    result
+  }
+
+  // Re-read the current working directory from the process.
+  // Does NOT call context.update(); the caller (World.refresh) does that once.
+  fun refresh(context: mutable SKStore.Context): void {
+    this.cwdDir.writeArray(
+      context,
+      SKStore.UnitID::singleton,
+      Array[SKStore.StringFile(getcwd())],
+    );
+  }
+
+  // Get the current working directory.
+  fun getcwd(context: mutable SKStore.Context): String {
+    this.cwdDir.getArray(context, SKStore.UnitID::singleton).first().value
+  }
+
+  // Resolves a sequence of paths into a normalized absolute path.
+  // Paths are processed right to left. If the current path is absolute,
+  // it is normalized and returned. Otherwise, the previous path is prepended.
+  // If no absolute path is found, cwd is prepended.
+  // Empty paths are ignored.
+  private fun resolve1(context: mutable SKStore.Context, path: String): String {
+    StdPath.normalize(
+      if (StdPath.isAbsolute(path)) path else {
+        StdPath.join(this.getcwd(context), path)
+      },
+    )
+  }
+
+  private fun resolve2(
+    context: mutable SKStore.Context,
+    path1: String,
+    path2: String,
+  ): String {
+    if (path2.isEmpty()) {
+      this.resolve1(context, path1)
+    } else if (StdPath.isAbsolute(path2)) {
+      StdPath.normalize(path2)
+    } else {
+      StdPath.join(this.resolve1(context, path1), path2)
+    }
+  }
+
+  fun resolve(
+    context: mutable SKStore.Context,
+    path1: String = "",
+    path2: String = "",
+    path3: String = "",
+  ): String {
+    if (path3.isEmpty()) {
+      this.resolve2(context, path1, path2)
+    } else {
+      this.resolve2(context, this.resolve2(context, path1, path2), path3)
+    }
+  }
+}
+
+module end;

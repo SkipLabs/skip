@@ -1,0 +1,976 @@
+module alias T = SKTest;
+
+module SKWorldTest;
+
+fun run(cmd: String): void {
+  _ = system(cmd);
+}
+
+// Unique temp dir per test to avoid collisions when tests run in parallel.
+fun tmpDir(name: String): String {
+  `/tmp/skworld_${name}_${Time.time_ms()}`
+}
+
+@test
+fun testStat(): void {
+  tmpPath = tmpDir("stat");
+
+  // Setup: create temp directory and file
+  run(`mkdir -p ${tmpPath}`);
+  run(`echo -n hello > ${tmpPath}/file.txt`);
+  run(`mkdir ${tmpPath}/subdir`);
+
+  SKStore.runWithGc(SKStore.Context::create{}, context ~> {
+    world = SKWorld.World::create(context);
+
+    // Test stat on a file
+    fileStat = world.fs.stat(context, `${tmpPath}/file.txt`);
+    fileStat match {
+    | SKWorld.FSStatFound(s) ->
+      T.expectEq(s.kind(), FKRegular(), "file kind");
+      T.expectTrue(s.mtime > 0, "file mtime > 0");
+      T.expectEq(s.size, 5, "file size")
+    | _ -> T.fail("Expected FSStatFound for file")
+    };
+
+    // Test stat on a directory
+    dirStat = world.fs.stat(context, `${tmpPath}/subdir`);
+    dirStat match {
+    | SKWorld.FSStatFound(s) -> T.expectEq(s.kind(), FKDirectory(), "dir kind")
+    | _ -> T.fail("Expected FSStatFound for directory")
+    };
+
+    // Test stat on non-existent path
+    missingStat = world.fs.stat(context, `${tmpPath}/nonexistent`);
+    T.expectTrue(
+      missingStat is SKWorld.FSStatNotFound _,
+      "missing is FSStatNotFound",
+    );
+
+    SKStore.CStop(None())
+  });
+
+  run(`rm -rf ${tmpPath}`);
+}
+
+@test
+fun testReadTextFile(): void {
+  tmpPath = tmpDir("read");
+
+  run(`mkdir -p ${tmpPath}`);
+  run(`echo -n hello > ${tmpPath}/file.txt`);
+
+  SKStore.runWithGc(SKStore.Context::create{}, context ~> {
+    world = SKWorld.World::create(context, SKStore.DirName::create("/world2/"));
+
+    content = world.fs.readTextFile(context, `${tmpPath}/file.txt`);
+    T.expectEq(content, "hello", "read file content");
+
+    SKStore.CStop(None())
+  });
+
+  run(`rm -rf ${tmpPath}`);
+}
+
+@test
+fun testReadDirectory(): void {
+  tmpPath = tmpDir("readdir");
+
+  run(`mkdir -p ${tmpPath}`);
+  run(`echo -n a > ${tmpPath}/a.txt`);
+  run(`echo -n b > ${tmpPath}/b.txt`);
+  run(`mkdir ${tmpPath}/c`);
+
+  SKStore.runWithGc(SKStore.Context::create{}, context ~> {
+    world = SKWorld.World::create(context, SKStore.DirName::create("/world3/"));
+
+    entries = world.fs.readDirectory(context, tmpPath);
+    T.expectEq(entries, Array["a.txt", "b.txt", "c"], "directory listing");
+
+    SKStore.CStop(None())
+  });
+
+  run(`rm -rf ${tmpPath}`);
+}
+
+@test
+fun testRefresh(): void {
+  tmpPath = tmpDir("refresh");
+
+  run(`mkdir -p ${tmpPath}`);
+  run(`echo -n original > ${tmpPath}/file.txt`);
+
+  SKStore.runWithGc(SKStore.Context::create{}, context ~> {
+    world = SKWorld.World::create(context, SKStore.DirName::create("/world4/"));
+
+    // Create an input dir with a file path
+    pathsDir = context.mkdir(
+      SKStore.SID::keyType,
+      SKStore.StringFile::type,
+      SKStore.DirName::create("/paths/"),
+      Array[(SKStore.SID("a"), SKStore.StringFile(`${tmpPath}/file.txt`))],
+    );
+
+    // Map file paths to their contents via eager dir
+    _contentsDir = pathsDir.map(
+      SKStore.SID::keyType,
+      SKStore.StringFile::type,
+      context,
+      SKStore.DirName::create("/contents/"),
+      (context, writer, key, pathIter) ~> {
+        filePath = pathIter.first.value;
+        content = world.fs.readTextFile(context, filePath);
+        writer.set(key, SKStore.StringFile(content));
+      },
+    );
+
+    // Verify initial content
+    contentsDir = SKStore.DirName::create("/contents/");
+    initial = context
+      .unsafeGetDir(contentsDir)
+      .typed()
+      .getArrayRaw(SKStore.SID("a"));
+    T.expectEq(
+      initial.map(SKStore.StringFile::type).map(f -> f.value),
+      Array["original"],
+      "initial content",
+    );
+
+    // Modify file on disk
+    run(`echo -n modified > ${tmpPath}/file.txt`);
+
+    // Refresh and verify content updated
+    world.signalRefresh(context);
+    context.update();
+
+    updated = context
+      .unsafeGetDir(contentsDir)
+      .typed()
+      .getArrayRaw(SKStore.SID("a"));
+    T.expectEq(
+      updated.map(SKStore.StringFile::type).map(f -> f.value),
+      Array["modified"],
+      "content after refresh",
+    );
+
+    SKStore.CStop(None())
+  });
+
+  run(`rm -rf ${tmpPath}`);
+}
+
+@test
+fun testWorld(): void {
+  tmpPath = tmpDir("world");
+
+  run(`mkdir -p ${tmpPath}`);
+  run(`echo -n world > ${tmpPath}/file.txt`);
+
+  SKStore.runWithGc(SKStore.Context::create{}, context ~> {
+    world = SKWorld.World::create(context, SKStore.DirName::create("/world5/"));
+
+    // Access filesystem through World facade
+    content = world.fs.readTextFile(context, `${tmpPath}/file.txt`);
+    T.expectEq(content, "world", "read via World facade");
+
+    // Modify file and refresh via World
+    run(`echo -n updated > ${tmpPath}/file.txt`);
+    world.signalRefresh(context);
+    context.update();
+
+    updated = world.fs.readTextFile(context, `${tmpPath}/file.txt`);
+    T.expectEq(updated, "updated", "read after World.refresh");
+
+    SKStore.CStop(None())
+  });
+
+  run(`rm -rf ${tmpPath}`);
+}
+
+@test
+fun testPath(): void {
+  SKStore.runWithGc(SKStore.Context::create{}, context ~> {
+    world = SKWorld.World::create(context, SKStore.DirName::create("/world6/"));
+
+    // getcwd should return the actual process cwd
+    cwd = world.path.getcwd(context);
+    T.expectEq(cwd, getcwd(), "cwd matches getcwd()");
+
+    // Resolve absolute path is identity (modulo normalization)
+    T.expectEq(
+      world.path.resolve(context, "/tmp/foo"),
+      "/tmp/foo",
+      "resolve absolute",
+    );
+
+    // Resolve relative path prepends cwd
+    T.expectEq(
+      world.path.resolve(context, "relative/path"),
+      Path.join(getcwd(), "relative/path"),
+      "resolve relative",
+    );
+
+    // Resolve with no args returns cwd
+    T.expectEq(
+      world.path.resolve(context),
+      Path.normalize(getcwd()),
+      "resolve no args",
+    );
+
+    // Resolve two paths
+    T.expectEq(
+      world.path.resolve(context, "/base", "sub"),
+      "/base/sub",
+      "resolve two paths",
+    );
+
+    // Resolve: second absolute path wins
+    T.expectEq(
+      world.path.resolve(context, "/base", "/other"),
+      "/other",
+      "resolve second absolute wins",
+    );
+
+    // Resolve three paths
+    T.expectEq(
+      world.path.resolve(context, "/a", "b", "c"),
+      "/a/b/c",
+      "resolve three paths",
+    );
+
+    SKStore.CStop(None())
+  });
+}
+
+@test
+fun testEnviron(): void {
+  SKStore.runWithGc(SKStore.Context::create{}, context ~> {
+    world = SKWorld.World::create(context, SKStore.DirName::create("/world7/"));
+
+    // Set a test variable and refresh
+    Environ.set_var("SKWORLD_TEST_VAR", "hello");
+    world.signalRefresh(context);
+    context.update();
+
+    // varOpt returns Some for existing var
+    T.expectEq(
+      world.environ.varOpt(context, "SKWORLD_TEST_VAR"),
+      Some("hello"),
+      "varOpt existing",
+    );
+
+    // var returns value for existing var
+    T.expectEq(
+      world.environ.var(context, "SKWORLD_TEST_VAR"),
+      "hello",
+      "var existing",
+    );
+
+    // varOpt returns None for missing var
+    T.expectEq(
+      world.environ.varOpt(context, "SKWORLD_NONEXISTENT_VAR"),
+      None(),
+      "varOpt missing",
+    );
+
+    // Update the variable and refresh
+    Environ.set_var("SKWORLD_TEST_VAR", "updated");
+    world.signalRefresh(context);
+    context.update();
+
+    T.expectEq(
+      world.environ.var(context, "SKWORLD_TEST_VAR"),
+      "updated",
+      "var after refresh",
+    );
+
+    // vars() returns all env vars as key-value pairs
+    allVars = world.environ.vars(context);
+    T.expectTrue(
+      allVars.any(kv -> kv.i0 == "SKWORLD_TEST_VAR" && kv.i1 == "updated"),
+      "vars contains SKWORLD_TEST_VAR",
+    );
+
+    // Clean up
+    Environ.remove_var("SKWORLD_TEST_VAR");
+
+    SKStore.CStop(None())
+  });
+}
+
+@test
+fun testArgs(): void {
+  cmd = Cli.Command("test")
+    .arg(Cli.Arg::bool("verbose").short("v").long("verbose"))
+    .arg(Cli.Arg::string("output").short("o").long("output").default("out.txt"))
+    .arg(Cli.Arg::int("jobs").short("j").long("jobs").default(4));
+
+  SKStore.runWithGc(SKStore.Context::create{}, context ~> {
+    // Test raw args (create)
+    rawArgs = SKWorld.Args::create(context, SKStore.DirName::create("/args1/"));
+    T.expectTrue(rawArgs.raw(context).size() >= 0, "raw args is an array");
+
+    // Test fromParsed with values
+    result = Cli.parseArgsFrom(
+      cmd,
+      Array["--verbose", "-o", "result.txt", "-j", "8"],
+    );
+    args = SKWorld.Args::fromParsed(
+      context,
+      result,
+      SKStore.DirName::create("/args2/"),
+    );
+
+    // Typed getters
+    T.expectEq(args.getBool(context, "verbose"), true, "getBool verbose");
+    T.expectEq(
+      args.getString(context, "output"),
+      "result.txt",
+      "getString output",
+    );
+    T.expectEq(args.getInt(context, "jobs"), 8, "getInt jobs");
+
+    // maybeGet variants
+    T.expectEq(
+      args.maybeGetBool(context, "verbose"),
+      Some(true),
+      "maybeGetBool verbose",
+    );
+    T.expectEq(
+      args.maybeGetString(context, "output"),
+      Some("result.txt"),
+      "maybeGetString",
+    );
+    T.expectEq(args.maybeGetInt(context, "jobs"), Some(8), "maybeGetInt");
+
+    // Defaults
+    defaultResult = Cli.parseArgsFrom(cmd, Array[]);
+    defaultArgs = SKWorld.Args::fromParsed(
+      context,
+      defaultResult,
+      SKStore.DirName::create("/args3/"),
+    );
+    T.expectEq(defaultArgs.getBool(context, "verbose"), false, "default bool");
+    T.expectEq(
+      defaultArgs.getString(context, "output"),
+      "out.txt",
+      "default string",
+    );
+    T.expectEq(defaultArgs.getInt(context, "jobs"), 4, "default int");
+
+    SKStore.CStop(None())
+  });
+}
+
+@test
+fun testArgsInWorld(): void {
+  cmd = Cli.Command("test").arg(Cli.Arg::bool("flag").long("flag"));
+  result = Cli.parseArgsFrom(cmd, Array["--flag"]);
+
+  SKStore.runWithGc(SKStore.Context::create{}, context ~> {
+    world = SKWorld.World::createFromParsed(
+      context,
+      result,
+      SKStore.DirName::create("/world8/"),
+    );
+
+    T.expectEq(world.args.getBool(context, "flag"), true, "args via World");
+
+    SKStore.CStop(None())
+  });
+}
+
+@test
+fun testTime(): void {
+  SKStore.runWithGc(SKStore.Context::create{}, context ~> {
+    world = SKWorld.World::create(context, SKStore.DirName::create("/world9/"));
+
+    // Snapshot should be a reasonable ms timestamp
+    t1 = world.time.nowSnapshot(context);
+    T.expectTrue(t1 > 0, "time is positive");
+
+    // After refresh, snapshot should be >= previous
+    world.signalRefresh(context);
+    context.update();
+
+    t2 = world.time.nowSnapshot(context);
+    T.expectTrue(t2 >= t1, "time after refresh >= before");
+
+    SKStore.CStop(None())
+  });
+}
+
+// Helper: create an eager dir that serves as a round counter.
+// Returns 0 on first creation, then the value written on subsequent rounds.
+fun makeRoundCounter(
+  context: mutable SKStore.Context,
+  name: SKStore.DirName,
+): SKStore.EHandle<SKStore.UnitID, SKStore.IntFile> {
+  context.mkdir(
+    SKStore.UnitID::keyType,
+    SKStore.IntFile::type,
+    name,
+    Array[(SKStore.UnitID::singleton, SKStore.IntFile(0))],
+    true, // ignoreIfExists
+  )
+}
+
+fun getRound(
+  context: mutable SKStore.Context,
+  roundDir: SKStore.EHandle<SKStore.UnitID, SKStore.IntFile>,
+): Int {
+  roundDir.getArray(context, SKStore.UnitID::singleton).first().value
+}
+
+fun advanceRound(
+  context: mutable SKStore.Context,
+  roundDir: SKStore.EHandle<SKStore.UnitID, SKStore.IntFile>,
+  round: Int,
+): void {
+  roundDir.writeArray(
+    context,
+    SKStore.UnitID::singleton,
+    Array[SKStore.IntFile(round + 1)],
+  )
+}
+
+// Multi-round filesystem test: state persists across CContinue (GC) rounds.
+// Round 0: create World, read file, set up derived dir. CContinue.
+// Round 1: modify file, signalRefresh, verify derived dir recomputes.
+//          Delete file, verify exists returns false. CStop.
+@test
+fun testMultiRoundFs(): void {
+  tmpPath = tmpDir("mr_fs");
+  run(`mkdir -p ${tmpPath}`);
+  run(`echo -n original > ${tmpPath}/data.txt`);
+
+  SKStore.runWithGc(SKStore.Context::create{}, context ~> {
+    roundDir = makeRoundCounter(
+      context,
+      SKStore.DirName::create("/mr_fs_round/"),
+    );
+    round = getRound(context, roundDir);
+
+    world = SKWorld.World::create(
+      context,
+      SKStore.DirName::create("/mr_fs_world/"),
+    );
+
+    // Input dir: file paths to track
+    pathsDir = context.mkdir(
+      SKStore.SID::keyType,
+      SKStore.StringFile::type,
+      SKStore.DirName::create("/mr_fs_paths/"),
+      Array[(SKStore.SID("f"), SKStore.StringFile(`${tmpPath}/data.txt`))],
+      true, // ignoreIfExists
+    );
+
+    // Derived dir: maps path → content via reactive filesystem
+    _derived = pathsDir.map(
+      SKStore.SID::keyType,
+      SKStore.StringFile::type,
+      context,
+      SKStore.DirName::create("/mr_fs_contents/"),
+      (context, writer, key, pathIter) ~> {
+        filePath = pathIter.first.value;
+        content = world.fs.readTextFile(context, filePath);
+        writer.set(key, SKStore.StringFile(content));
+      },
+    );
+
+    derivedDirName = SKStore.DirName::create("/mr_fs_contents/");
+
+    if (round == 0) {
+      // Verify initial content through derived dir
+      initial = context
+        .unsafeGetDir(derivedDirName)
+        .typed()
+        .getArrayRaw(SKStore.SID("f"));
+      T.expectEq(
+        initial.map(SKStore.StringFile::type).map(f -> f.value),
+        Array["original"],
+        "mr_fs round 0: initial content",
+      );
+
+      // Modify file for next round
+      run(`echo -n modified > ${tmpPath}/data.txt`);
+
+      advanceRound(context, roundDir, round);
+      SKStore.CContinue(None())
+    } else {
+      // Round 1: verify refresh picks up changes through derived dir
+      world.signalRefresh(context);
+      context.update();
+
+      updated = context
+        .unsafeGetDir(derivedDirName)
+        .typed()
+        .getArrayRaw(SKStore.SID("f"));
+      T.expectEq(
+        updated.map(SKStore.StringFile::type).map(f -> f.value),
+        Array["modified"],
+        "mr_fs round 1: content after refresh",
+      );
+
+      // Verify file properties
+      T.expectTrue(
+        world.fs.exists(context, `${tmpPath}/data.txt`),
+        "mr_fs round 1: file exists",
+      );
+      T.expectTrue(
+        world.fs.isFile(context, `${tmpPath}/data.txt`),
+        "mr_fs round 1: is file",
+      );
+
+      // Delete the file and verify
+      run(`rm ${tmpPath}/data.txt`);
+      world.signalRefresh(context);
+      context.update();
+
+      T.expectFalse(
+        world.fs.exists(context, `${tmpPath}/data.txt`),
+        "mr_fs round 1: deleted file doesn't exist",
+      );
+
+      SKStore.CStop(None())
+    }
+  });
+
+  run(`rm -rf ${tmpPath}`);
+}
+
+// Multi-round environ test: env var changes survive GC rounds.
+// Round 0: set var, verify, CContinue.
+// Round 1: change var, verify update. Remove var, verify gone. CStop.
+@test
+fun testMultiRoundEnviron(): void {
+  Environ.set_var("SKWORLD_MR_ENV", "hello");
+
+  SKStore.runWithGc(SKStore.Context::create{}, context ~> {
+    roundDir = makeRoundCounter(
+      context,
+      SKStore.DirName::create("/mr_env_round/"),
+    );
+    round = getRound(context, roundDir);
+
+    world = SKWorld.World::create(
+      context,
+      SKStore.DirName::create("/mr_env_world/"),
+    );
+
+    if (round == 0) {
+      // Verify initial env var
+      T.expectEq(
+        world.environ.var(context, "SKWORLD_MR_ENV"),
+        "hello",
+        "mr_env round 0: initial value",
+      );
+
+      // Set up for next round
+      Environ.set_var("SKWORLD_MR_ENV", "changed");
+
+      advanceRound(context, roundDir, round);
+      SKStore.CContinue(None())
+    } else {
+      // Round 1: verify refresh picks up env var change
+      world.signalRefresh(context);
+      context.update();
+
+      T.expectEq(
+        world.environ.var(context, "SKWORLD_MR_ENV"),
+        "changed",
+        "mr_env round 1: updated value",
+      );
+
+      // Verify vars() includes the variable
+      allVars = world.environ.vars(context);
+      T.expectTrue(
+        allVars.any(kv -> kv.i0 == "SKWORLD_MR_ENV" && kv.i1 == "changed"),
+        "mr_env round 1: vars() contains updated var",
+      );
+
+      // Remove the var and verify
+      Environ.remove_var("SKWORLD_MR_ENV");
+      world.signalRefresh(context);
+      context.update();
+
+      T.expectEq(
+        world.environ.varOpt(context, "SKWORLD_MR_ENV"),
+        None(),
+        "mr_env round 1: removed var is None",
+      );
+
+      SKStore.CStop(None())
+    }
+  });
+}
+
+// Multi-round derived chain test: config file → data file → content.
+// Round 0: create chain, verify initial values. CContinue.
+// Round 1: modify data file, verify recomputation.
+//          Modify config to point to different data file, verify chain follows.
+//          CStop.
+@test
+fun testMultiRoundDerived(): void {
+  tmpPath = tmpDir("mr_derived");
+  run(`mkdir -p ${tmpPath}`);
+  run(`echo -n ${tmpPath}/data1.txt > ${tmpPath}/config.txt`);
+  run(`echo -n alpha > ${tmpPath}/data1.txt`);
+  run(`echo -n beta > ${tmpPath}/data2.txt`);
+
+  SKStore.runWithGc(SKStore.Context::create{}, context ~> {
+    roundDir = makeRoundCounter(
+      context,
+      SKStore.DirName::create("/mr_derived_round/"),
+    );
+    round = getRound(context, roundDir);
+
+    world = SKWorld.World::create(
+      context,
+      SKStore.DirName::create("/mr_derived_world/"),
+    );
+
+    // Input: which config file to read
+    configPathDir = context.mkdir(
+      SKStore.UnitID::keyType,
+      SKStore.StringFile::type,
+      SKStore.DirName::create("/mr_derived_config_path/"),
+      Array[
+        (
+          SKStore.UnitID::singleton,
+          SKStore.StringFile(`${tmpPath}/config.txt`),
+        ),
+      ],
+      true,
+    );
+
+    // Stage 1: config file → data file path
+    _dataPathDir = configPathDir.map(
+      SKStore.UnitID::keyType,
+      SKStore.StringFile::type,
+      context,
+      SKStore.DirName::create("/mr_derived_data_path/"),
+      (context, writer, key, iter) ~> {
+        configPath = iter.first.value;
+        dataPath = world.fs.readTextFile(context, configPath);
+        writer.set(key, SKStore.StringFile(dataPath));
+      },
+    );
+
+    // Stage 2: data file path → data file content
+    _contentDir = _dataPathDir.map(
+      SKStore.UnitID::keyType,
+      SKStore.StringFile::type,
+      context,
+      SKStore.DirName::create("/mr_derived_content/"),
+      (context, writer, key, iter) ~> {
+        dataPath = iter.first.value;
+        content = world.fs.readTextFile(context, dataPath);
+        writer.set(key, SKStore.StringFile(content));
+      },
+    );
+
+    contentDirName = SKStore.DirName::create("/mr_derived_content/");
+
+    if (round == 0) {
+      // Config points to data1.txt which contains "alpha"
+      result = context
+        .unsafeGetDir(contentDirName)
+        .typed()
+        .getArrayRaw(SKStore.UnitID::singleton);
+      T.expectEq(
+        result.map(SKStore.StringFile::type).map(f -> f.value),
+        Array["alpha"],
+        "mr_derived round 0: initial chain",
+      );
+
+      // Modify data1.txt for next round
+      run(`echo -n alpha_v2 > ${tmpPath}/data1.txt`);
+
+      advanceRound(context, roundDir, round);
+      SKStore.CContinue(None())
+    } else {
+      // Round 1: data1.txt changed, verify chain recomputes
+      world.signalRefresh(context);
+      context.update();
+
+      result1 = context
+        .unsafeGetDir(contentDirName)
+        .typed()
+        .getArrayRaw(SKStore.UnitID::singleton);
+      T.expectEq(
+        result1.map(SKStore.StringFile::type).map(f -> f.value),
+        Array["alpha_v2"],
+        "mr_derived round 1: data file changed",
+      );
+
+      // Now change config to point to data2.txt
+      run(`echo -n ${tmpPath}/data2.txt > ${tmpPath}/config.txt`);
+      world.signalRefresh(context);
+      context.update();
+
+      result2 = context
+        .unsafeGetDir(contentDirName)
+        .typed()
+        .getArrayRaw(SKStore.UnitID::singleton);
+      T.expectEq(
+        result2.map(SKStore.StringFile::type).map(f -> f.value),
+        Array["beta"],
+        "mr_derived round 1: config pointer changed",
+      );
+
+      // Verify time updated across rounds
+      T.expectTrue(
+        world.time.nowSnapshot(context) > 0,
+        "mr_derived round 1: time is valid",
+      );
+
+      SKStore.CStop(None())
+    }
+  });
+
+  run(`rm -rf ${tmpPath}`);
+}
+
+// Verify that signalRefresh with unchanged filesystem does NOT trigger
+// recomputation in derived dirs. Uses getChangesAfter(tick) to detect
+// spurious propagation.
+@test
+fun testNoSpuriousFsRecomputation(): void {
+  tmpPath = tmpDir("nospurious_fs");
+  run(`mkdir -p ${tmpPath}`);
+  run(`echo -n stable > ${tmpPath}/file.txt`);
+
+  SKStore.runWithGc(SKStore.Context::create{}, context ~> {
+    world = SKWorld.World::create(
+      context,
+      SKStore.DirName::create("/nospurious_fs_world/"),
+    );
+
+    // Input dir: file path to track
+    pathsDir = context.mkdir(
+      SKStore.SID::keyType,
+      SKStore.StringFile::type,
+      SKStore.DirName::create("/nospurious_fs_paths/"),
+      Array[(SKStore.SID("f"), SKStore.StringFile(`${tmpPath}/file.txt`))],
+    );
+
+    // Derived dir: path → content
+    derivedDirName = SKStore.DirName::create("/nospurious_fs_derived/");
+    _derived = pathsDir.map(
+      SKStore.SID::keyType,
+      SKStore.StringFile::type,
+      context,
+      derivedDirName,
+      (context, writer, key, pathIter) ~> {
+        filePath = pathIter.first.value;
+        content = world.fs.readTextFile(context, filePath);
+        writer.set(key, SKStore.StringFile(content));
+      },
+    );
+
+    // Sanity: initial content is correct
+    T.expectEq(
+      world.fs.readTextFile(context, `${tmpPath}/file.txt`),
+      "stable",
+      "nospurious_fs: initial content",
+    );
+
+    // Record tick, then refresh WITHOUT changing the file
+    start = context.getTick();
+    world.signalRefresh(context);
+    context.update();
+
+    // Derived dir should have NO changes
+    (isReset, changes) = context
+      .unsafeGetEagerDir(derivedDirName)
+      .getChangesAfter(start);
+    T.expectEq(isReset, false, "nospurious_fs: not reset");
+    T.expectEq(changes, SortedSet[], "nospurious_fs: no changes");
+
+    // Now actually modify the file and verify changes ARE detected
+    run(`echo -n changed > ${tmpPath}/file.txt`);
+    start2 = context.getTick();
+    world.signalRefresh(context);
+    context.update();
+
+    (isReset2, changes2) = context
+      .unsafeGetEagerDir(derivedDirName)
+      .getChangesAfter(start2);
+    T.expectEq(isReset2, false, "nospurious_fs: not reset after change");
+    T.expectTrue(
+      changes2.size() > 0,
+      "nospurious_fs: changes detected after modification",
+    );
+
+    SKStore.CStop(None())
+  });
+
+  run(`rm -rf ${tmpPath}`);
+}
+
+// Verify that signalRefresh with unchanged env vars does NOT trigger
+// recomputation in derived dirs.
+@test
+fun testNoSpuriousEnvironRecomputation(): void {
+  Environ.set_var("SKWORLD_NOSPURIOUS", "fixed");
+
+  SKStore.runWithGc(SKStore.Context::create{}, context ~> {
+    world = SKWorld.World::create(
+      context,
+      SKStore.DirName::create("/nospurious_env_world/"),
+    );
+
+    // Input dir: env var names to track
+    namesDir = context.mkdir(
+      SKStore.SID::keyType,
+      SKStore.StringFile::type,
+      SKStore.DirName::create("/nospurious_env_names/"),
+      Array[(SKStore.SID("v"), SKStore.StringFile("SKWORLD_NOSPURIOUS"))],
+    );
+
+    // Derived dir: var name → var value
+    derivedDirName = SKStore.DirName::create("/nospurious_env_derived/");
+    _derived = namesDir.map(
+      SKStore.SID::keyType,
+      SKStore.StringFile::type,
+      context,
+      derivedDirName,
+      (context, writer, key, nameIter) ~> {
+        varName = nameIter.first.value;
+        value = world.environ.var(context, varName);
+        writer.set(key, SKStore.StringFile(value));
+      },
+    );
+
+    // Sanity: initial value is correct
+    T.expectEq(
+      world.environ.var(context, "SKWORLD_NOSPURIOUS"),
+      "fixed",
+      "nospurious_env: initial value",
+    );
+
+    // Record tick, then refresh WITHOUT changing the var
+    start = context.getTick();
+    world.signalRefresh(context);
+    context.update();
+
+    // Derived dir should have NO changes
+    (isReset, changes) = context
+      .unsafeGetEagerDir(derivedDirName)
+      .getChangesAfter(start);
+    T.expectEq(isReset, false, "nospurious_env: not reset");
+    T.expectEq(changes, SortedSet[], "nospurious_env: no changes");
+
+    // Now actually change the var and verify changes ARE detected
+    Environ.set_var("SKWORLD_NOSPURIOUS", "modified");
+    start2 = context.getTick();
+    world.signalRefresh(context);
+    context.update();
+
+    (isReset2, changes2) = context
+      .unsafeGetEagerDir(derivedDirName)
+      .getChangesAfter(start2);
+    T.expectEq(isReset2, false, "nospurious_env: not reset after change");
+    T.expectTrue(
+      changes2.size() > 0,
+      "nospurious_env: changes detected after modification",
+    );
+
+    // Clean up
+    Environ.remove_var("SKWORLD_NOSPURIOUS");
+
+    SKStore.CStop(None())
+  });
+}
+
+// Verify that when a file's mtime changes but its content stays the same,
+// the content-derived dir does NOT see any changes. The stat dir recomputes
+// (new mtime), the content dir recomputes (reads the file), but because
+// the content is identical, the downstream derived dir is not dirtied.
+@test
+fun testNoSpuriousOnMtimeOnly(): void {
+  tmpPath = tmpDir("mtime_only");
+  run(`mkdir -p ${tmpPath}`);
+  run(`echo -n same > ${tmpPath}/file.txt`);
+
+  SKStore.runWithGc(SKStore.Context::create{}, context ~> {
+    world = SKWorld.World::create(
+      context,
+      SKStore.DirName::create("/mtime_only_world/"),
+    );
+
+    // Input dir: file path to track
+    pathsDir = context.mkdir(
+      SKStore.SID::keyType,
+      SKStore.StringFile::type,
+      SKStore.DirName::create("/mtime_only_paths/"),
+      Array[(SKStore.SID("f"), SKStore.StringFile(`${tmpPath}/file.txt`))],
+    );
+
+    // Derived dir: path → content
+    derivedDirName = SKStore.DirName::create("/mtime_only_derived/");
+    _derived = pathsDir.map(
+      SKStore.SID::keyType,
+      SKStore.StringFile::type,
+      context,
+      derivedDirName,
+      (context, writer, key, pathIter) ~> {
+        filePath = pathIter.first.value;
+        content = world.fs.readTextFile(context, filePath);
+        writer.set(key, SKStore.StringFile(content));
+      },
+    );
+
+    // Sanity: initial content
+    T.expectEq(
+      world.fs.readTextFile(context, `${tmpPath}/file.txt`),
+      "same",
+      "mtime_only: initial content",
+    );
+
+    // Touch the file to bump mtime without changing content.
+    // Sleep briefly to ensure mtime actually differs.
+    run(`sleep 0.1 && touch ${tmpPath}/file.txt`);
+
+    // Record tick, refresh, update
+    start = context.getTick();
+    world.signalRefresh(context);
+    context.update();
+
+    // Content is still "same"
+    T.expectEq(
+      world.fs.readTextFile(context, `${tmpPath}/file.txt`),
+      "same",
+      "mtime_only: content unchanged after touch",
+    );
+
+    // Derived dir should have NO changes — content didn't change
+    (isReset, changes) = context
+      .unsafeGetEagerDir(derivedDirName)
+      .getChangesAfter(start);
+    T.expectEq(isReset, false, "mtime_only: not reset");
+    T.expectEq(changes, SortedSet[], "mtime_only: no spurious changes");
+
+    // Now actually change the content and verify propagation works
+    run(`echo -n different > ${tmpPath}/file.txt`);
+    start2 = context.getTick();
+    world.signalRefresh(context);
+    context.update();
+
+    (isReset2, changes2) = context
+      .unsafeGetEagerDir(derivedDirName)
+      .getChangesAfter(start2);
+    T.expectEq(isReset2, false, "mtime_only: not reset after real change");
+    T.expectTrue(
+      changes2.size() > 0,
+      "mtime_only: changes detected after real modification",
+    );
+
+    SKStore.CStop(None())
+  });
+
+  run(`rm -rf ${tmpPath}`);
+}
+
+module end;

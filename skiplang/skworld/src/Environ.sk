@@ -1,0 +1,72 @@
+module alias StdEnviron = Environ;
+
+module SKWorld;
+
+// Reactive environment variables.
+// Uses an eager dir keyed by var name, refreshed by World.refresh.
+// Each var is an independent entry, so only changed vars trigger recomputation.
+class Environ private {
+  private varDir: SKStore.EHandle<SKStore.SID, SKStore.StringFile>,
+} {
+  static fun create(
+    context: mutable SKStore.Context,
+    baseName: SKStore.DirName,
+  ): Environ {
+    varDir = context.mkdir(
+      SKStore.SID::keyType,
+      SKStore.StringFile::type,
+      baseName.sub("var"),
+      Array[],
+      true, // ignoreIfExists
+    );
+    result = Environ{varDir};
+    // Always write current values — the dir may contain stale data from
+    // a prior execution (e.g. after CContinue or --data reload).
+    result.refresh(context);
+    result
+  }
+
+  // Re-read all environment variables.
+  // Writes current vars and removes stale entries.
+  // Does NOT call context.update(); the caller (World.refresh) does that once.
+  fun refresh(context: mutable SKStore.Context): void {
+    current = mutable Map[];
+    StdEnviron.vars().each(kv -> {
+      current![kv.i0] = kv.i1;
+    });
+    current.each((name, value) -> {
+      this.varDir.writeArray(
+        context,
+        SKStore.SID(name),
+        Array[SKStore.StringFile(value)],
+      );
+    });
+    this.varDir.items(context).each(kv -> {
+      if (!current.containsKey(kv.i0.value)) {
+        this.varDir.writeArray(context, kv.i0, Array[]);
+      }
+    });
+  }
+
+  fun varOpt(context: mutable SKStore.Context, name: String): ?String {
+    this.varDir.maybeGet(context, SKStore.SID(name)) match {
+    | Some(f) -> Some(f.value)
+    | None() -> None()
+    }
+  }
+
+  fun var(context: mutable SKStore.Context, name: String): String {
+    this.varOpt(context, name) match {
+    | Some(v) -> v
+    | None() -> throw StdEnviron.VarError(name)
+    }
+  }
+
+  fun vars(context: mutable SKStore.Context): Array<(String, String)> {
+    this.varDir.items(context)
+      .map(kv -> (kv.i0.value, kv.i1.collect(Array).first().value))
+      .collect(Array)
+  }
+}
+
+module end;

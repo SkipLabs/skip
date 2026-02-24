@@ -1,0 +1,82 @@
+module SKWorld;
+
+// Facade that composes all reactive world components.
+// Provides a single creation point and unified refresh.
+// Owns a shared signal dir that invalidates all lazy caches on refresh.
+class World private {
+  args: Args,
+  path: Path,
+  fs: FileSystem,
+  environ: Environ,
+  time: Time,
+  private signalDir: SKStore.EHandle<SKStore.UnitID, SKStore.IntFile>,
+} {
+  static fun create(
+    context: mutable SKStore.Context,
+    baseName: SKStore.DirName = SKStore.DirName::create("/world/"),
+  ): World {
+    args = Args::create(context, baseName.sub("args"));
+    World::createWith(context, args, baseName)
+  }
+
+  static fun createFromCommand(
+    context: mutable SKStore.Context,
+    cmd: Cli.Command,
+    baseName: SKStore.DirName = SKStore.DirName::create("/world/"),
+  ): World {
+    args = Args::fromCommand(context, cmd, baseName.sub("args"));
+    World::createWith(context, args, baseName)
+  }
+
+  static fun createFromParsed(
+    context: mutable SKStore.Context,
+    result: Cli.ParseResults,
+    baseName: SKStore.DirName = SKStore.DirName::create("/world/"),
+  ): World {
+    args = Args::fromParsed(context, result, baseName.sub("args"));
+    World::createWith(context, args, baseName)
+  }
+
+  private static fun createWith(
+    context: mutable SKStore.Context,
+    args: Args,
+    baseName: SKStore.DirName,
+  ): World {
+    signalDir = context.mkdir(
+      SKStore.UnitID::keyType,
+      SKStore.IntFile::type,
+      baseName.sub("signal"),
+      Array[(SKStore.UnitID::singleton, SKStore.IntFile(0))],
+      true, // ignoreIfExists
+    );
+
+    path = Path::create(context, baseName.sub("path"));
+    fs = FileSystem::create(context, path, signalDir, baseName.sub("fs"));
+    environ = Environ::create(context, baseName.sub("environ"));
+    time = Time::create(context, baseName.sub("time"));
+    World{args, path, fs, environ, time, signalDir}
+  }
+
+  // Re-read external state (cwd, env vars) and bump the signal to
+  // invalidate lazy caches (filesystem). Does NOT call context.update();
+  // the caller is responsible for propagation.
+  fun signalRefresh(context: mutable SKStore.Context): void {
+    this.path.refresh(context);
+    this.environ.refresh(context);
+    this.time.refresh(context);
+    value = this.signalDir.unsafeMaybeGet(
+      context,
+      SKStore.UnitID::singleton,
+    ) match {
+    | Some(v) -> v.value
+    | None() -> 0
+    };
+    this.signalDir.writeArray(
+      context,
+      SKStore.UnitID::singleton,
+      Array[SKStore.IntFile(value + 1)],
+    );
+  }
+}
+
+module end;
