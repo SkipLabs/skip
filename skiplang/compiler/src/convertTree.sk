@@ -2084,10 +2084,19 @@ class Converter{file: FileCache.InputSource} {
 
   fun convertChild(tree: ParseTree): SkipAst.Child {
     tree match {
-    | ParseTree.ChildClassTree{range, annotations, name, constructor} ->
+    | ParseTree.ChildClassTree{
+      range,
+      extension,
+      annotations,
+      name,
+      constructor,
+    } ->
       className = this.convertGlobalName(name);
       SkipAst.Child{
         chi_range => this.convertRange(range),
+        chi_extension => if (extension.isEmpty()) None() else {
+          Some(this.convertRange(extension.range))
+        },
         chi_name => className,
         chi_params => this.convertClassParamsOpt(className, constructor),
         chi_annotations => this.convertAnnotations(annotations),
@@ -2110,8 +2119,22 @@ class Converter{file: FileCache.InputSource} {
       childrenMembers
         .map(childrenList ->
           childrenList match {
-          | ParseTree.ChildrenTree{childClasses} ->
-            this.convertList(childClasses, this.convertChild)
+          | ParseTree.ChildrenTree{modifiers, childClasses} ->
+            blanketExtension = this.convertModifierName(
+              modifiers,
+              PredefinedName.extension,
+            );
+            converted = this.convertList(childClasses, this.convertChild);
+            blanketExtension match {
+            | None() -> converted
+            | Some(extRange) ->
+              converted.map(chi ->
+                chi.chi_extension match {
+                | Some _ -> chi
+                | None() -> chi with {chi_extension => Some(extRange)}
+                }
+              )
+            }
           | _ -> invariant_violation("Unexpected children")
           }
         )

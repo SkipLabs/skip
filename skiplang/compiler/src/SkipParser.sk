@@ -1543,9 +1543,10 @@ mutable class SkipParser{
     | TokenKind.READONLY()
     | TokenKind.UNTRACKED() ->
       true
-    // type constant
+    // type constant or extension children
     | TokenKind.NONTYPE_IDENTIFIER() ->
-      this.peekPredefinedName(PredefinedName.type)
+      this.peekPredefinedName(PredefinedName.type) ||
+        this.peekPredefinedName(PredefinedName.extension)
     | _ -> false
     }
   }
@@ -1570,6 +1571,8 @@ mutable class SkipParser{
     | TokenKind.READONLY()
     | TokenKind.UNTRACKED() ->
       true
+    | TokenKind.NONTYPE_IDENTIFIER() ->
+      this.peekPredefinedName(PredefinedName.extension)
     | _ -> false
     }
   }
@@ -1603,9 +1606,14 @@ mutable class SkipParser{
 
   // 9.4 Child classes
   // child-class:
-  //    annotation-list-opt  type-identifier  constructor-parameters-opt
+  //    extension-opt  annotation-list-opt  type-identifier  constructor-parameters-opt
   mutable fun parseChildClass(): ParseTree {
     start = this.mark();
+    extension = if (this.peekPredefinedName(PredefinedName.extension)) {
+      this.tokenResult()
+    } else {
+      this.createEmptyTreeAfter()
+    };
     annotations = this.parseList(
       parser -> parser.peekAnnotation(),
       parser -> parser.parseAnnotation(),
@@ -1614,6 +1622,7 @@ mutable class SkipParser{
     constructor = this.parseChildrenConstructorOpt();
     ParseTree.ChildClassTree{
       range => this.createRange(start),
+      extension,
       annotations,
       name,
       constructor,
@@ -1621,18 +1630,21 @@ mutable class SkipParser{
   }
 
   // children-declaration:
-  //    children  =  |-opt  child-class-list
+  //    extension-opt  children  =  |-opt  child-class-list
   //
   // child-class-list:
   //    child-class
   //    child-class-list  |  child-class
   mutable fun parseChildClasses(modifiers: ParseTree): ParseTree {
-    if (!modifiers.isEmptyList()) {
-      this.addErrorAtTree(
-        modifiers,
-        errorNoModifiersOnChildren,
-        "Modifiers are not permitted on 'children'",
-      );
+    // Only 'extension' modifier is allowed on 'children'
+    for (modifier in tokenModifiers(modifiers)) {
+      if (modifier.getTokenString() != PredefinedName.extension) {
+        this.addErrorAtTree(
+          modifier,
+          errorNoModifiersOnChildren,
+          "Only 'extension' modifier is permitted on 'children'",
+        );
+      }
     };
     childrenKeyword = this.eatTree(TokenKind.CHILDREN());
     equal = this.eatTree(TokenKind.EQUAL());
@@ -1642,6 +1654,7 @@ mutable class SkipParser{
     );
     ParseTree.ChildrenTree{
       range => createRangeOfModifiers(modifiers, childClasses),
+      modifiers,
       childrenKeyword,
       equal,
       bar,

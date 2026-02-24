@@ -1334,14 +1334,24 @@ fun printTree(ctx: Context, t: ParseTree): Doc {
         ]
       },
     ]
-  | ParseTree.ChildClassTree{annotations, name, constructor} ->
+  | ParseTree.ChildClassTree{extension, annotations, name, constructor} ->
     Doc.Group[
+      if (extension.isEmpty()) Doc.Empty() else {
+        Doc.Concat[print(ctx, extension), Doc.space]
+      },
       printModifiers(ctx, annotations),
       print(ctx, name),
       print(ctx, constructor),
     ]
-  | ParseTree.ChildrenTree{childrenKeyword, equal, bar, childClasses} ->
+  | ParseTree.ChildrenTree{
+    modifiers,
+    childrenKeyword,
+    equal,
+    bar,
+    childClasses,
+  } ->
     Doc.Group[
+      printModifiers(ctx, modifiers),
       print(ctx, childrenKeyword),
       Doc.space,
       print(ctx, equal),
