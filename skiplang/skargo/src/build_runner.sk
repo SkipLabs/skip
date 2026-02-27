@@ -438,7 +438,7 @@ mutable class BuildRunner(
       skc.arg(`--sklib-name=${unit.pkg.name()}`)
     | LibTarget(LibraryTypeCdylib()) -> skc.arg("--emit=cdylib")
     | BinTarget(_) if (merged) ->
-      skc.args(Array["--export-function-as", "SkargoDispatch.main=skip_main"])
+      skc.args(Array["--export-function-as", "__skargo_dispatch=skip_main"])
     | BinTarget(e)
     | TestTarget(e) ->
       skc.args(Array["--export-function-as", `${e}=skip_main`])
@@ -593,16 +593,12 @@ mutable class BuildRunner(
     this.create_dir(dir);
     dispatcher_path = Path.join(dir, "__skargo_dispatch.sk");
     content = Array[
-      "module SkargoDispatch;",
-      "",
-      "fun main(): void {",
+      "fun __skargo_dispatch(): void {",
       `  Environ.varOpt("SKTEST") match {`,
       `  | Some _ -> ${test_entry_point}()`,
       `  | None() -> ${user_entry_point}()`,
       "  }",
       "}",
-      "",
-      "module end;",
     ].join("\n");
     FileSystem.writeTextFile(dispatcher_path, content);
     dispatcher_path
@@ -666,7 +662,8 @@ private fun compute_hash(unit: Unit, dep_hashes: Array<Int>): Int {
 private fun should_merge_tests(unit: Unit): Bool {
   unit.target.kind is BinTarget _ &&
     unit.profile == "dev" &&
-    unit.pkg.manifest.test_target().isSome()
+    unit.pkg.manifest.test_target().isSome() &&
+    unit.pkg.manifest.targets.filter(t -> t.is_bin()).collect(Array).size() == 1
 }
 
 private fun dirname(path: String): String {

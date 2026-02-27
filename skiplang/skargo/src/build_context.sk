@@ -323,6 +323,11 @@ private fun compute_deps(
     | BinTarget _ ->
       unit.profile == "dev" &&
         unit.pkg.manifest.test_target().isSome() &&
+        unit.pkg.manifest.targets
+          .filter(t -> t.is_bin())
+          .collect(Array)
+          .size() ==
+          1 &&
         dep.kind is DevelopmentDep _
     | LibTarget _ -> dep.kind is NormalDep _
     | TestTarget _ -> dep.kind is DevelopmentDep _
