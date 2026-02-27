@@ -318,8 +318,12 @@ private fun compute_deps(
   deps = unit.pkg.manifest.dependencies.filter(dep ->
     unit.target.kind match {
     // Binary targets always depend on the lib target, which pulls in the
-    // dependencies transitively.
-    | BinTarget _ -> false
+    // dependencies transitively. In merged mode (dev profile with tests),
+    // also pull in dev dependencies for test code.
+    | BinTarget _ ->
+      unit.profile == "dev" &&
+        unit.pkg.manifest.test_target().isSome() &&
+        dep.kind is DevelopmentDep _
     | LibTarget _ -> dep.kind is NormalDep _
     | TestTarget _ -> dep.kind is DevelopmentDep _
     | CustomBuildTarget _ -> dep.kind is BuildDep _
