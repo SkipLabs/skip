@@ -151,4 +151,22 @@ fun testRuntime(): void {
   );
 }
 
+@test
+fun testTimeNs(): void {
+  t1 = Time.time_ns();
+  SKTest.expectTrue(t1 > 0, "time_ns: returns positive value");
+  t2 = Time.time_ns();
+  SKTest.expectTrue(t2 >= t1, "time_ns: monotonically non-decreasing");
+}
+
+@test
+fun testSleepMs(): void {
+  before = Time.time_ns();
+  Time.sleep_ms(1);
+  after = Time.time_ns();
+  elapsed = after - before;
+  SKTest.expectTrue(elapsed > 1000000, "sleep_ms: slept at least 1ms");
+  SKTest.expectTrue(elapsed < 10000000, "sleep_ms: slept less than 10ms");
+}
+
 module end;
