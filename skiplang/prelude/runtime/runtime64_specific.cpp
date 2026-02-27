@@ -32,6 +32,7 @@ extern "C" {
 #include <map>
 #include <random>
 #include <string>
+#include <thread>
 #include <vector>
 
 extern "C" {
@@ -440,6 +441,17 @@ uint64_t SKIP_time_ms() {
 
   return duration_cast<milliseconds>(system_clock::now().time_since_epoch())
       .count();
+}
+
+uint64_t SKIP_time_ns() {
+  using namespace std::chrono;
+
+  return duration_cast<nanoseconds>(steady_clock::now().time_since_epoch())
+      .count();
+}
+
+void SKIP_sleep_ms(uint64_t ms) {
+  std::this_thread::sleep_for(std::chrono::milliseconds(ms));
 }
 
 char* SKIP_unix_strftime(char* formatp, char* timep) {
