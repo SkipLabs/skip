@@ -558,6 +558,30 @@ mutable class BuildRunner(
     }
   }
 
+  private mutable fun generate_dispatcher(
+    unit: Unit,
+    user_entry_point: String,
+    test_entry_point: String,
+  ): String {
+    dir = Path.join(this.layout_for(unit).build, "dispatch");
+    this.create_dir(dir);
+    dispatcher_path = Path.join(dir, "__skargo_dispatch.sk");
+    content = Array[
+      "module SkargoDispatch;",
+      "",
+      "fun main(): void {",
+      `  Environ.varOpt("SKTEST") match {`,
+      `  | Some _ -> ${test_entry_point}()`,
+      `  | None() -> ${user_entry_point}()`,
+      "  }",
+      "}",
+      "",
+      "module end;",
+    ].join("\n");
+    FileSystem.writeTextFile(dispatcher_path, content);
+    dispatcher_path
+  }
+
   private readonly fun build_dir_for(unit: Unit): String {
     assert(unit.target.is_build_script());
 
@@ -611,6 +635,12 @@ private fun compute_hash(unit: Unit, dep_hashes: Array<Int>): Int {
     unit.target.kind,
     unit.build_opts,
   ).hash()
+}
+
+private fun should_merge_tests(unit: Unit): Bool {
+  unit.target.kind is BinTarget _ &&
+    unit.profile == "dev" &&
+    unit.pkg.manifest.test_target().isSome()
 }
 
 private fun dirname(path: String): String {
