@@ -3419,34 +3419,7 @@ fun expr_(
       functionName,
       expr(context, env, body),
     )
-  | A.EnvMacro(varName, pkg_opt) ->
-    pkg_env = SKStore.EHandle(
-      SKStore.SID::keyType,
-      SKStore.StringFile::type,
-      // FIXME: Ensure package names cannot start with an underscore to avoid clash with `_default`.
-      SKStore.DirName::create(`/packageEnv/${pkg_opt.default("_default")}/`),
-    );
-    name = varName.i1;
-    value = pkg_env.maybeGet(context, SKStore.SID(name)) match {
-    | None() ->
-      SkipError.error(varName.i0, `Environment variable ${name} is not set.`)
-    | Some(v) -> v.value
-    };
-    // Record access to env variable.
-    cur_env_map = context.getGlobal(FileCache.kEnvAccessGlobal) match {
-    | None() -> SortedMap[]
-    | Some(envMapFile) -> FileCache.EnvMapFile::type(envMapFile).value
-    };
-    context.setGlobal(
-      FileCache.kEnvAccessGlobal,
-      FileCache.EnvMapFile(
-        cur_env_map.set(
-          pkg_opt,
-          cur_env_map.maybeGet(pkg_opt).default(SortedSet[]).set(name),
-        ),
-      ),
-    );
-    A.Literal(A.StringLiteral(value))
+  | A.EnvMacro(varName) -> A.EnvMacro(varName)
   }
 }
 

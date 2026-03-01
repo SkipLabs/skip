@@ -3660,6 +3660,18 @@ fun expandForEachMacro(
   N.Bind(iteratorn, getIterator, flagged)
 }
 
+fun expandEnvMacro(context: mutable SKStore.Context, varName: A.Name): N.Expr_ {
+  (pos, name) = varName;
+  value = FileCache.packageEnvDir(pos.file.pkg_opt).maybeGet(
+    context,
+    SKStore.SID(name),
+  ) match {
+  | None() -> SkipError.error(pos, `Environment variable ${name} is not set.`)
+  | Some(v) -> v.value
+  };
+  N.Literal(A.StringLiteral(value))
+}
+
 fun reportDuplicateMacro(
   pos: FileRange,
   id: String,
@@ -3816,9 +3828,8 @@ fun expr_(
   | A.Literal(l) -> N.Literal(l)
   | A.Var(n) -> N.Var(n)
   | A.MacroVar(n) -> expandExpressionMacro(env, n)
-  | A.Seq _
-  | A.EnvMacro _ ->
-    invariant_violation("assert false")
+  | A.Seq _ -> invariant_violation("assert false")
+  | A.EnvMacro(n) -> expandEnvMacro(context, n)
   | A.If(e1, e2, e3) ->
     N.If(
       expr(context, acc, env, e1),
