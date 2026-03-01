@@ -391,11 +391,16 @@ mutable class BuildRunner(
     if (!unit.target.is_build_script()) {
       // TODO: Once we have namespaced packages, we can share the state.db
       // across architectures.
+      // Also split by unit to avoid cache thrashing between lib and test
+      // targets that share the same build directory.
+      unit_hash = this.hashes[unit].toStringHex();
       state_db_path = Path.join(
         this.layout_for(unit).build,
         // FIXME: This is a dirty hack that splits out the state.db between pic
         // and static, which is required until `skc` namespaces packages.
-        `${unit.build_opts.relocation_model}_state.db`,
+        `${unit.pkg.name()}-${unit_hash}_${
+          unit.build_opts.relocation_model
+        }_state.db`,
       );
       skc.args(
         Array[
