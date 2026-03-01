@@ -132,8 +132,15 @@ mutable class BuildRunner(
 
   private mutable fun fingerprint_for(unit: Unit): Int {
     if (!this.fingerprints.containsKey(unit)) {
+      srcs = unit.target.srcs.concat(
+        if (should_merge_tests(unit)) {
+          unit.pkg.manifest.test_target().fromSome().srcs
+        } else {
+          Array[]
+        },
+      );
       this.fingerprints![unit] = (
-        unit.target.srcs
+        srcs
           .map(f ->
             (
               f,
@@ -388,6 +395,23 @@ mutable class BuildRunner(
 
     skc.args(unit.target.srcs);
 
+    // In merged mode, also compile test sources and dispatcher.
+    merged = should_merge_tests(unit);
+    if (merged) {
+      test_target = unit.pkg.manifest.test_target().fromSome();
+      skc.args(test_target.srcs);
+      test_entry = test_target.kind match {
+      | TestTarget(e) -> e
+      | _ -> invariant_violation("expected TestTarget")
+      };
+      user_entry = unit.target.kind match {
+      | BinTarget(e) -> e
+      | _ -> invariant_violation("expected BinTarget")
+      };
+      dispatcher_path = this.generate_dispatcher(unit, user_entry, test_entry);
+      skc.arg(dispatcher_path)
+    };
+
     if (!unit.target.is_build_script()) {
       // TODO: Once we have namespaced packages, we can share the state.db
       // across architectures.
@@ -413,6 +437,8 @@ mutable class BuildRunner(
     | LibTarget(LibraryTypeSklib()) ->
       skc.arg(`--sklib-name=${unit.pkg.name()}`)
     | LibTarget(LibraryTypeCdylib()) -> skc.arg("--emit=cdylib")
+    | BinTarget(_) if (merged) ->
+      skc.args(Array["--export-function-as", "__skargo_dispatch=skip_main"])
     | BinTarget(e)
     | TestTarget(e) ->
       skc.args(Array["--export-function-as", `${e}=skip_main`])
@@ -558,6 +584,26 @@ mutable class BuildRunner(
     }
   }
 
+  private mutable fun generate_dispatcher(
+    unit: Unit,
+    user_entry_point: String,
+    test_entry_point: String,
+  ): String {
+    dir = Path.join(this.layout_for(unit).build, "dispatch");
+    this.create_dir(dir);
+    dispatcher_path = Path.join(dir, "__skargo_dispatch.sk");
+    content = Array[
+      "fun __skargo_dispatch(): void {",
+      `  Environ.varOpt("SKTEST") match {`,
+      `  | Some _ -> ${test_entry_point}()`,
+      `  | None() -> ${user_entry_point}()`,
+      "  }",
+      "}",
+    ].join("\n");
+    FileSystem.writeTextFile(dispatcher_path, content);
+    dispatcher_path
+  }
+
   private readonly fun build_dir_for(unit: Unit): String {
     assert(unit.target.is_build_script());
 
@@ -611,6 +657,13 @@ private fun compute_hash(unit: Unit, dep_hashes: Array<Int>): Int {
     unit.target.kind,
     unit.build_opts,
   ).hash()
+}
+
+private fun should_merge_tests(unit: Unit): Bool {
+  unit.target.kind is BinTarget _ &&
+    unit.profile == "dev" &&
+    unit.pkg.manifest.test_target().isSome() &&
+    unit.pkg.manifest.targets.filter(t -> t.is_bin()).collect(Array).size() == 1
 }
 
 private fun dirname(path: String): String {
