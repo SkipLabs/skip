@@ -167,7 +167,7 @@ export type Json =
 /**
  * Objects containing `Json` values.
  */
-export type JsonObject = { readonly [key: string]: Json | null };
+export type JsonObject = { readonly [key: string]: Json | null | undefined };
 
 export type Exportable =
   | null
