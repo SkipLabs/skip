@@ -158,6 +158,16 @@ uint64_t SKIP_time_ms() {
   return (((uint64_t)hi) << 32) | ((uint64_t)lo);
 }
 
+uint64_t SKIP_time_ns() {
+  // No nanosecond precision on 32-bit/WASM; fall back to milliseconds * 1e6.
+  return SKIP_time_ms() * 1000000;
+}
+
+void SKIP_sleep_ms(uint64_t ms) {
+  // Not implemented on 32-bit/WASM.
+  (void)ms;
+}
+
 void SKIP_flush_stdout() {
   // Not implemented
 }
