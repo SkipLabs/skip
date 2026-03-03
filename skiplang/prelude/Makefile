@@ -41,16 +41,21 @@ $(OUT_DIR)/libbacktrace.a:
 	@[ -d $(OUT_DIR) ] || mkdir -p $(OUT_DIR)
 	cp $(LIB_DIR)/libbacktrace.a $@
 else
-CFLAGS += -I$(realpath libbacktrace)
+LBT_SOURCE=$(realpath libbacktrace)
+LBT_BUILD=$(OUT_DIR)/libbacktrace-build
 
-libbacktrace/Makefile:
+CFLAGS += -I$(LBT_SOURCE)
+
+$(OUT_DIR)/libbacktrace.a:
 	test -f libbacktrace/configure || (echo "Warning: libbacktrace submodule not initialized" && false)
-	(cd libbacktrace && CC=clang ./configure)
-
-$(OUT_DIR)/libbacktrace.a: libbacktrace/Makefile
+	@rm -f libbacktrace/config.status libbacktrace/config.h libbacktrace/config.log \
+	       libbacktrace/Makefile libbacktrace/libtool libbacktrace/stamp-h1 \
+	       libbacktrace/*.lo libbacktrace/*.o
+	@rm -rf libbacktrace/.libs libbacktrace/.deps
+	@if [ ! -f $(LBT_BUILD)/Makefile ]; then mkdir -p $(LBT_BUILD) && cd $(LBT_BUILD) && CC=clang $(LBT_SOURCE)/configure; fi
 	@[ -d $(OUT_DIR) ] || mkdir -p $(OUT_DIR)
-	$(MAKE) -C libbacktrace
-	cp libbacktrace/.libs/libbacktrace.a $@
+	$(MAKE) -C $(LBT_BUILD)
+	cp $(LBT_BUILD)/.libs/libbacktrace.a $@
 endif
 
 .PHONY: $(OUT_DIR)/libskip_runtime64.a
@@ -76,9 +81,16 @@ $(OUT_DIR)/libskip_runtime32.a: $(OUT_DIR)/libskip_runtime32.o
 $(OUT_DIR)/libstd.sklib: $(OUT_DIR)/libskip_runtime64.a $(OUT_DIR)/libbacktrace.a $(SKIP_SRC)
 	SKC_PREAMBLE=./preamble/preamble64.ll skc -o $@ --sklib-name std --no-std $(OLEVEL) --link-args '-lpthread' $^
 
+.PHONY: libbacktrace
+libbacktrace: $(OUT_DIR)/libbacktrace.a
+
 .PHONY: clean
 clean:
 	rm -f $(OUT_DIR)/libbacktrace.a $(OUT_DIR)/libskip_runtime64.a $(OUT_DIR)/libstd.sklib
+	rm -rf $(OUT_DIR)/libbacktrace-build
 	$(MAKE) -C runtime clean
-	(test ! -f libbacktrace/Makefile && echo "Warning: libbacktrace submodule or Makefile not initialized") || $(MAKE) -C libbacktrace distclean
+	rm -f libbacktrace/config.status libbacktrace/config.h libbacktrace/config.log \
+	      libbacktrace/Makefile libbacktrace/libtool libbacktrace/stamp-h1 \
+	      libbacktrace/*.lo libbacktrace/*.o
+	rm -rf libbacktrace/.libs libbacktrace/.deps
 	find . -name 'Skargo.toml' -print0 | sed 's|Skargo.toml|target|g' | xargs -0 rm -rf
