@@ -101,7 +101,7 @@ fi
 
 # Validate image names
 KNOWN_IMAGES=(skiplang skiplang-bin-builder skip skdb-base skdb server-core skdb-dev-server skipruntime)
-for img in "${IMAGES[@]}"; do
+for img in ${IMAGES[@]+"${IMAGES[@]}"}; do
     name="${img%%:*}"
     found=false
     for known in "${KNOWN_IMAGES[@]}"; do
@@ -233,7 +233,7 @@ fi
 
 set -x
 
-docker buildx bake "${BAKE_ARGS[@]}" "${BAKE_TARGETS[@]}" "${EXTRA_BAKE_ARGS[@]}"
+docker buildx bake "${BAKE_ARGS[@]}" "${BAKE_TARGETS[@]}" ${EXTRA_BAKE_ARGS[@]+"${EXTRA_BAKE_ARGS[@]}"}
 
 # For local multi-arch builds: load native image from cache
 if ! $PUSH && ! $PUSH_ONLY && ! $DRY_RUN && [[ "$ARCH" == *,* ]]; then
