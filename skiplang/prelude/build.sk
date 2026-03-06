@@ -92,6 +92,14 @@ fun build_libbacktrace(
     }
   };
 
+  // Try using Makefile-built libbacktrace (e.g. from `make libbacktrace`).
+  prebuilt = "./build/libbacktrace.a";
+  if (FileSystem.exists(prebuilt)) {
+    prebuilt_abs = FileSystem.realpath(prebuilt);
+    print_string(`skargo:skc-link-lib=${prebuilt_abs}`);
+    return FileSystem.realpath("./libbacktrace")
+  };
+
   // Resort to building libbacktrace from source.
   if (!FileSystem.exists("./libbacktrace/configure")) {
     print_error(
@@ -100,13 +108,18 @@ fun build_libbacktrace(
     );
     skipExit(1)
   };
+  // Build out-of-tree to avoid races when multiple packages build concurrently.
+  source_dir = FileSystem.realpath("./libbacktrace");
+  _ = System.popen{args => Array["mkdir", "-p", out_dir]}.fromSuccess();
   p = System.popen{
-    args => Array["./configure", "--prefix", out_dir].concat(
-      if (pic) Array["--with-pic"] else Array[],
-    ),
+    args => Array[
+      Path.join(source_dir, "configure"),
+      "--prefix",
+      out_dir,
+    ].concat(if (pic) Array["--with-pic"] else Array[]),
     stdout => print_error_raw,
     stderr => print_error_raw,
-    cwd => Some("./libbacktrace"),
+    cwd => Some(out_dir),
   }.fromSuccess();
   if (!p.success()) {
     skipExit(1)
@@ -116,7 +129,7 @@ fun build_libbacktrace(
     args => Array["make", "install"],
     stdout => print_error_raw,
     stderr => print_error_raw,
-    cwd => Some("./libbacktrace"),
+    cwd => Some(out_dir),
   }.fromSuccess();
   if (!p.success()) {
     skipExit(1)

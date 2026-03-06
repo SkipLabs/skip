@@ -72,8 +72,12 @@ build/init.sql: sql/privacy/init.sql
 update-js-deps:
 	find . -name node_modules -not -prune -or -name target -not -prune -or -name package.json -exec sh -c 'cd $$(dirname "$$0"); bun update --latest' {} \;
 
+.PHONY: libbacktrace
+libbacktrace:
+	$(MAKE) -C skiplang/prelude libbacktrace
+
 .PHONY: check
-check:
+check: libbacktrace
 	find * -name Skargo.toml -exec sh -c 'bin/cd_sh $$(dirname {}) "skargo check"' \;
 
 .PHONY: check-ts
@@ -163,7 +167,7 @@ setup-git-hooks: .git/hooks/pre-commit
 # test targets
 
 .PHONY: test
-test:
+test: libbacktrace
 	$(MAKE) --keep-going SKARGO_PROFILE=dev SKDB_WASM=sql/target/wasm32-unknown-unknown/dev/skdb.wasm SKDB_BIN=sql/target/host/dev/skdb test-prelude test-skjson test-skipruntime-ts test-native test-wasm
 
 .PHONY: test-prelude
