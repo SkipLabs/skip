@@ -19,6 +19,19 @@ extension class SentinelOption uses XXHashable[T: XXHashable] {
   }
 }
 
+extension class FlagOption uses XXHashable[T: XXHashable] {
+  fun xxhash[T: XXHashable](): XXHash {
+    XXHash(
+      if (this.isSome()) {
+        this.unsafeFromSome().xxhash().value + 1
+      } else {
+        // Arbitrary hash value for None(), copied from Option.sk.
+        1027410261
+      },
+    )
+  }
+}
+
 module end;
 
 module XXHash64;
