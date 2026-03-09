@@ -16,8 +16,13 @@ fun format(): (Cli.Command, (GlobalContext, Cli.ParseResults) ~> void) {
 fun execFmt(gctx: GlobalContext, args: Cli.ParseResults): void {
   ws = workspace(args, gctx);
 
-  files = FileSystem.readFilesRecursive(ws.package.root(), f ->
-    f.endsWith(".sk")
+  files = FileSystem.readFilesRecursive(
+    ws.package.root(),
+    f -> f.endsWith(".sk"),
+    d -> {
+      base = Path.basename(d);
+      base != "target" && base != "node_modules"
+    },
   ).toArray();
 
   p = System.subprocess(Array["skfmt", "-i"].concat(files)).fromSuccess();
