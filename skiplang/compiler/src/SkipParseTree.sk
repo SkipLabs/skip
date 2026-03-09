@@ -759,12 +759,14 @@ class CatchClauseTree{
 }
 
 class ChildClassTree{
+  extension: ParseTree.ParseTree,
   annotations: ParseTree.ParseTree,
   name: ParseTree.ParseTree,
   constructor: ParseTree.ParseTree,
 } extends ParseTree.ParseTree {
   fun getNamedFields(): List<(String, ParseTree.ParseTree)> {
     List<(String, ParseTree.ParseTree)>[
+      ("extension", this.extension),
       ("annotations", this.annotations),
       ("name", this.name),
       ("constructor", this.constructor),
@@ -776,6 +778,7 @@ class ChildClassTree{
   }
 
   fun getChildren(): mutable Iterator<ParseTree.ParseTree> {
+    yield this.extension;
     yield this.annotations;
     yield this.name;
     yield this.constructor;
@@ -785,22 +788,30 @@ class ChildClassTree{
   fun transform(
     codemod: mutable CodeMod,
   ): (ParseTree.ParseTree, Vector<Subst>) {
+    tx_extension = codemod.transform(this.extension);
     tx_annotations = codemod.transform(this.annotations);
     tx_name = codemod.transform(this.name);
     tx_constructor = codemod.transform(this.constructor);
     (
       ChildClassTree{
         range => this.range,
+        extension => tx_extension.i0,
         annotations => tx_annotations.i0,
         name => tx_name.i0,
         constructor => tx_constructor.i0,
       },
-      Vector[tx_annotations.i1, tx_name.i1, tx_constructor.i1].flatten(),
+      Vector[
+        tx_extension.i1,
+        tx_annotations.i1,
+        tx_name.i1,
+        tx_constructor.i1,
+      ].flatten(),
     );
   }
 }
 
 class ChildrenTree{
+  modifiers: ParseTree.ParseTree,
   childrenKeyword: ParseTree.ParseTree,
   equal: ParseTree.ParseTree,
   bar: ParseTree.ParseTree,
@@ -808,6 +819,7 @@ class ChildrenTree{
 } extends ParseTree.ParseTree {
   fun getNamedFields(): List<(String, ParseTree.ParseTree)> {
     List<(String, ParseTree.ParseTree)>[
+      ("modifiers", this.modifiers),
       ("childrenKeyword", this.childrenKeyword),
       ("equal", this.equal),
       ("bar", this.bar),
@@ -820,6 +832,7 @@ class ChildrenTree{
   }
 
   fun getChildren(): mutable Iterator<ParseTree.ParseTree> {
+    yield this.modifiers;
     yield this.childrenKeyword;
     yield this.equal;
     yield this.bar;
@@ -830,6 +843,7 @@ class ChildrenTree{
   fun transform(
     codemod: mutable CodeMod,
   ): (ParseTree.ParseTree, Vector<Subst>) {
+    tx_modifiers = codemod.transform(this.modifiers);
     tx_childrenKeyword = codemod.transform(this.childrenKeyword);
     tx_equal = codemod.transform(this.equal);
     tx_bar = codemod.transform(this.bar);
@@ -837,12 +851,14 @@ class ChildrenTree{
     (
       ChildrenTree{
         range => this.range,
+        modifiers => tx_modifiers.i0,
         childrenKeyword => tx_childrenKeyword.i0,
         equal => tx_equal.i0,
         bar => tx_bar.i0,
         childClasses => tx_childClasses.i0,
       },
       Vector[
+        tx_modifiers.i1,
         tx_childrenKeyword.i1,
         tx_equal.i1,
         tx_bar.i1,
