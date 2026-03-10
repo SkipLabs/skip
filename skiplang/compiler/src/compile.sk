@@ -385,11 +385,19 @@ fun compile(
   fileNames: Array<String>,
 ): void {
   if (fileNames.isEmpty() && config.dependencies.isEmpty()) {
+    if (config.batch_mode) {
+      throw SkipError.CompileFailureException{
+        message => "fatal error: no input files",
+        exit_code => 4,
+      }
+    };
     print_error("fatal error: no input files\n");
     skipExit(4); // Exit code used by g++ for no input files
   };
 
-  ensureCompatibleLLVMVersion();
+  if (!config.batch_mode) {
+    ensureCompatibleLLVMVersion()
+  };
 
   getOrInitializeBackend(context).writeArray(
     context,
