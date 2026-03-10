@@ -140,6 +140,7 @@ fun link(
       runShell(
         Array["clang++", `-O${config.optLevel}`, "-c", "-o", oFile, llFile],
         config.verbose,
+        config.batch_mode,
       )
     });
 
@@ -155,12 +156,17 @@ fun link(
           .concat(linker_args)
           .concat(static_libs),
         config.verbose,
+        config.batch_mode,
       )
     });
   }
 }
 
-fun runShell(args: Array<String>, verbose: Bool = false): void {
+fun runShell(
+  args: Array<String>,
+  verbose: Bool = false,
+  batch_mode: Bool = false,
+): void {
   if (verbose) {
     print_error(">> " + args.join(" "))
   };
@@ -178,6 +184,12 @@ fun runShell(args: Array<String>, verbose: Bool = false): void {
     },
   ).fromSuccess();
   if (!p.success()) {
+    if (batch_mode) {
+      throw SkipError.CompileFailureException{
+        message => p.stderr,
+        exit_code => 1,
+      }
+    };
     if (!verbose) {
       print_error_raw(p.stderr)
     };
@@ -247,12 +259,22 @@ fun getOrInitializeBackend(context: mutable SKStore.Context): SKStore.EagerDir {
       context.getGlobal("ERRORS") match {
       | None() -> void
       | Some(errors) ->
-        SkipError.printErrorsAndExit(
-          SkipError.ErrorsFile::type(errors).value.reversed().toArray(),
-          file -> {
-            FileCache.fileDir.unsafeGetArray(context, file)[0].value
-          },
-        )
+        // Clear ERRORS to prevent leakage across batch compilations.
+        context.setGlobal("ERRORS", SkipError.ErrorsFile(List[]));
+        get_file = file -> {
+          FileCache.fileDir.unsafeGetArray(context, file)[0].value
+        };
+        if (conf.batch_mode) {
+          SkipError.printErrorsAndThrow(
+            SkipError.ErrorsFile::type(errors).value.reversed().toArray(),
+            get_file,
+          )
+        } else {
+          SkipError.printErrorsAndExit(
+            SkipError.ErrorsFile::type(errors).value.reversed().toArray(),
+            get_file,
+          )
+        }
       };
 
       if (conf.check) {
