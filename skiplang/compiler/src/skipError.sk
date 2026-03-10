@@ -99,6 +99,26 @@ fun printErrorsAndExit<T>(
   skipExit(2)
 }
 
+class CompileFailureException{
+  message: String,
+  exit_code: Int = 2,
+} extends Exception {
+  fun getMessage(): String {
+    this.message
+  }
+}
+
+fun printErrorsAndThrow<T>(
+  errors: Array<SkipErrorException>,
+  get_file: FileCache.InputSource -> String,
+): T {
+  msg = errorsToString(
+    errors.map(x -> x.errors).flatten().collect(Vector),
+    get_file,
+  );
+  throw CompileFailureException{message => msg}
+}
+
 class ErrorsFile(value: List<SkipErrorException>) extends SKStore.File
 
 fun keepErrors(
