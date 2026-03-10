@@ -80,6 +80,7 @@ private class Config{
   preambles: Array<String>,
   canonize_paths: Bool,
   cwd: WorkingDirectory,
+  batch_mode: Bool = false,
 } {
   static fun make(results: Cli.ParseResults): this {
     optConfig = Optimize.Config::make(
@@ -278,6 +279,18 @@ private class Config{
 
   fun isWasm(): Bool {
     this.target.startsWith("wasm32");
+  }
+
+  fun withInputFiles(files: Array<String>): this {
+    this with {input_files => files}
+  }
+
+  fun withOutput(out: String): this {
+    this with {output => out}
+  }
+
+  fun withBatchMode(): this {
+    this with {batch_mode => true}
   }
 }
 
