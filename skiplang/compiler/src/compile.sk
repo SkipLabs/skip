@@ -135,18 +135,28 @@ fun link(
       Array["-no-pie"]
     };
 
-    runShell(
-      Array[
-        "clang++",
-        `-O${config.optLevel}`,
-        "-o",
-        config.output,
-        llFile,
-      ].concat(flags)
-        .concat(linker_args)
-        .concat(static_libs),
-      config.verbose,
-    );
+    oFile = config.output + ".o";
+    runCompilerPhase("llvm", () -> {
+      runShell(
+        Array["clang++", `-O${config.optLevel}`, "-c", "-o", oFile, llFile],
+        config.verbose,
+      )
+    });
+
+    runCompilerPhase("link", () -> {
+      runShell(
+        Array[
+          "clang++",
+          `-O${config.optLevel}`,
+          "-o",
+          config.output,
+          oFile,
+        ].concat(flags)
+          .concat(linker_args)
+          .concat(static_libs),
+        config.verbose,
+      )
+    });
   }
 }
 
@@ -291,16 +301,18 @@ fun getOrInitializeBackend(context: mutable SKStore.Context): SKStore.EagerDir {
                 )))
       );
 
-      env = OuterIstToIR.createIR(
-        context,
-        conf,
-        shouldDisasm,
-        shouldRuntimeExport,
-        outerIst,
-        converter,
-        constsProj,
-        defsProj,
-      );
+      env = runCompilerPhase("frontend+ir", () -> {
+        OuterIstToIR.createIR(
+          context,
+          conf,
+          shouldDisasm,
+          shouldRuntimeExport,
+          outerIst,
+          converter,
+          constsProj,
+          defsProj,
+        )
+      });
 
       !env = createOptimizedFunctions(context, env, conf);
       defs = runCompilerPhase("native/create_asm_graph", () -> {
@@ -402,9 +414,7 @@ fun compile_binary(
     AsmOutput.writeOutputFiles(defs, conf.input_files, llFile, conf)
   });
 
-  runCompilerPhase("native/link", () -> {
-    link(llFile, conf, exports)
-  })
+  link(llFile, conf, exports)
 }
 
 fun compile_sklib(context: mutable SKStore.Context, conf: Config.Config): void {

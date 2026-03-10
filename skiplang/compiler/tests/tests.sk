@@ -17,17 +17,57 @@ private fun compile_cmd(
   ].concat(files.collect(Array))
 }
 
+// Parse "##TIME## <phase> <ms>" lines from skc stderr output.
+private fun parsePhaseTimings(stderr: String): Map<String, Int> {
+  result = mutable Map[];
+  for (line in stderr.split("\n")) {
+    if (line.startsWith("##TIME## ")) {
+      parts = line.stripPrefix("##TIME## ").split(" ");
+      if (parts.size() == 2) {
+        phase = parts[0];
+        ms = parts[1].toIntOption();
+        ms.each(v -> result.set(phase, v))
+      }
+    }
+  };
+  result.chill()
+}
+
+// Format phase timings as a structured line for the reporter.
+private fun emitTimings(
+  compileMs: Int,
+  timings: Map<String, Int>,
+  runMs: Int,
+): void {
+  parts = mutable Vector[];
+  parts.push(`total_compile=${compileMs}`);
+  for ((phase, ms) in timings.items()) {
+    parts.push(`${phase}=${ms}`)
+  };
+  if (runMs >= 0) {
+    parts.push(`run=${runMs}`)
+  };
+  print_string(`##TIMING## ${parts.join(" ")}`)
+}
+
 private fun genValidTest(basename: String): void {
+  compileStart = Time.time_ms();
   p = System.subprocess(
     compile_cmd(Array[basename + ".sk"], basename + ".bin"),
   ).fromSuccess();
+  compileElapsed = Time.time_ms() - compileStart;
+
   if (!p.success()) {
     T.fail(
       `Unexpected compile error\nstdout: ${p.stdout}\nstderr:\n${p.stderr}`,
     );
   };
 
+  timings = parsePhaseTimings(p.stderr);
+
+  runStart = Time.time_ms();
   !p = System.subprocess(Array[basename + ".bin"]).fromSuccess();
+  runElapsed = Time.time_ms() - runStart;
 
   if (!p.success()) {
     T.fail(`Unexpected error\nstdout: ${p.stdout}\nstderr:\n${p.stderr}`);
@@ -36,21 +76,39 @@ private fun genValidTest(basename: String): void {
   actual = p.stdout;
   expected = FileSystem.readTextFile(basename + ".exp");
 
+  // Emit timing data if SKC_TIME_PHASES is set.
+  if (Environ.varOpt("SKC_TIME_PHASES").isSome()) {
+    emitTimings(compileElapsed.toInt(), timings, runElapsed.toInt())
+  };
+
   T.expectEq(actual, expected)
 }
 
 private fun genInvalidTest(basename: String): void {
+  compileStart = Time.time_ms();
   p = System.subprocess(
     compile_cmd(Array[basename + ".sk"], basename + ".bin"),
   ).fromSuccess();
+  compileElapsed = Time.time_ms() - compileStart;
 
   if (p.success()) {
     T.fail("Expected compile error")
   };
 
+  timings = parsePhaseTimings(p.stderr);
+
+  // Emit timing data if SKC_TIME_PHASES is set.
+  if (Environ.varOpt("SKC_TIME_PHASES").isSome()) {
+    emitTimings(compileElapsed.toInt(), timings, -1)
+  };
+
   // NOTE: The `.trim()` is needed because error messages seem to currently
   // have an extra newline.
-  actual = p.stderr.trim();
+  actual = p.stderr
+    .split("\n")
+    .filter(l -> !l.startsWith("##TIME## "))
+    .join("\n")
+    .trim();
   expected = FileSystem.readTextFile(basename + ".exp_err").trim();
 
   T.expectEq(actual, expected)

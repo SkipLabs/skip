@@ -71,38 +71,14 @@ fun shouldDebugSymbol(_symbolName: String): Bool {
 //   value
 // }
 
-fun runCompilerPhase<T>(_phaseName: String, phase: () -> T): T {
-  // if (config.debug || config.profile) {
-  //   reportMemoryStatistics(`${phaseName} start`);
-  //   (elapsedTime, result) = timeOperation(phase);
-  //   reportMemoryStatistics(`${phaseName} end`);
-  //   print_error_ln(
-  //     `Elapsed time (in ms) for phase ${phaseName}: ` + elapsedTime,
-  //   );
-  //   if (config.debug) {
-  //     if (
-  //       config.debugPhase.isNone() ||
-  //       phaseName.contains(config.debugPhase.fromSome())
-  //     ) {
-  //       print_error_ln(`Results of pass: ${phaseName}`);
-  //       debug(result);
-  //     } else if (config.debugPhase.isSome()) {
-  //       print_error_ln(
-  //         `Not printing results of pass: ${phaseName} due to ` +
-  //           `filter ${config.debugPhase.fromSome()}.`,
-  //       );
-  //     }
-  //   };
-  //   result;
-  //
-  // TODO: Add support for exiting after a phase.
-  // } else {
-  //  config.profilePath match {
-  //  | Some(dir) -> recordPhaseRuntime(dir, phaseName, phase)
-  //  | None() -> phase()
-  //  }
-  //  }
-  phase()
+fun runCompilerPhase<T>(phaseName: String, phase: () -> T): T {
+  start = Time.time_ms();
+  result = phase();
+  elapsed = Time.time_ms() - start;
+  if (Environ.varOpt("SKC_TIME_PHASES").isSome()) {
+    print_error(`##TIME## ${phaseName} ${elapsed}`)
+  };
+  result
 }
 
 /*
