@@ -265,10 +265,19 @@ fun getOrInitializeBackend(context: mutable SKStore.Context): SKStore.EagerDir {
           FileCache.fileDir.unsafeGetArray(context, file)[0].value
         };
         if (conf.batch_mode) {
-          SkipError.printErrorsAndThrow(
-            SkipError.ErrorsFile::type(errors).value.reversed().toArray(),
+          // In batch mode, store error message in a global instead of
+          // throwing — throwing from inside a reactive computation leaves
+          // the SKStore context in a broken state.
+          msg = SkipError.errorsToString(
+            SkipError.ErrorsFile::type(errors)
+              .value.reversed()
+              .map(x -> x.errors)
+              .flatten()
+              .collect(Vector),
             get_file,
-          )
+          );
+          context.setGlobal("BATCH_ERROR_MSG", SKStore.StringFile(msg));
+          return void
         } else {
           SkipError.printErrorsAndExit(
             SkipError.ErrorsFile::type(errors).value.reversed().toArray(),
@@ -399,6 +408,10 @@ fun compile(
     ensureCompatibleLLVMVersion()
   };
 
+  if (config.batch_mode) {
+    SkipError.setBatchMode(context)
+  };
+
   getOrInitializeBackend(context).writeArray(
     context,
     SKStore.UnitID::singleton,
@@ -421,7 +434,20 @@ fun compile(
     make_input_source_path,
   );
 
-  context.update()
+  context.update();
+
+  // In batch mode, check if the backend mapper stored a deferred error.
+  if (config.batch_mode) {
+    context.getGlobal("BATCH_ERROR_MSG") match {
+    | Some(msgFile) ->
+      context.setGlobal("BATCH_ERROR_MSG", SKStore.StringFile(""));
+      msg = SKStore.StringFile::type(msgFile).value;
+      if (!msg.isEmpty()) {
+        throw SkipError.CompileFailureException{message => msg}
+      }
+    | None() -> void
+    }
+  }
 }
 
 fun compile_llvm_ir(

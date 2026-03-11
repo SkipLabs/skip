@@ -123,12 +123,21 @@ private fun genInvalidTest(basename: String): void {
 // ---------------------------------------------------------------------------
 
 private fun makeBatchConfig(): Config.Config {
-  results = skcCommand().parseArgs(
+  // Resolve sysroot from the skc binary in PATH, since the test binary's
+  // location differs from skc's and Config::make uses current_exe().
+  skcPath = System.subprocess(Array["which", "skc"])
+    .fromSuccess()
+    .stdout.trimRight();
+  sysroot = Path.join(Path.parentname(Path.dirname(skcPath)), "lib");
+  results = Cli.parseArgsFrom(
+    skcCommand(),
     Array[
       "-O0",
       "--no-inline",
       "--export-function-as",
       "main=skip_main",
+      "--sysroot",
+      sysroot,
       "-o",
       "dummy",
       "dummy.sk",
@@ -175,39 +184,6 @@ private fun batchValidTest(
   T.expectEq(actual, expected)
 }
 
-// Run an invalid test using in-process compilation.
-private fun batchInvalidTest(
-  basename: String,
-  config: Config.Config,
-  context: mutable SKStore.Context,
-): void {
-  conf = config
-    .withInputFiles(Array[basename + ".sk"])
-    .withOutput(basename + ".bin");
-
-  compileStart = Time.time_ms();
-  errorMsg = try {
-    compile(conf, context, conf.input_files);
-    ""
-  } catch {
-  | err @ SkipError.CompileFailureException _ -> err.getMessage()
-  | err -> err.getMessage()
-  };
-  compileElapsed = Time.time_ms() - compileStart;
-
-  if (errorMsg == "") {
-    T.fail("Expected compile error")
-  };
-
-  if (Environ.varOpt("SKC_TIME_PHASES").isSome()) {
-    emitTimings(compileElapsed.toInt(), Map[], -1)
-  };
-
-  actual = errorMsg.trim();
-  expected = FileSystem.readTextFile(basename + ".exp_err").trim();
-  T.expectEq(actual, expected)
-}
-
 // A test entry with its metadata for batch processing.
 private class BatchTest{
   basename: String,
@@ -228,7 +204,9 @@ private fun runBatchTest(
     if (test.isValid) {
       batchValidTest(test.basename, config, context)
     } else {
-      batchInvalidTest(test.basename, config, context)
+      // Invalid tests use subprocess to avoid SKStore state corruption
+      // from failed compilations.
+      genInvalidTest(test.basename)
     };
     SKTest.TestResult{
       name => test.name,
@@ -272,7 +250,8 @@ private fun batchTestJob(
   njobs: Int,
   rank: Int,
 ): void {
-  stdout = mutable IO.File(Posix.dup(IO.stdout().fileno));
+  // Save the original stdout fd as an Int (immutable, capturable by ~>).
+  stdoutFd = Posix.dup(IO.stdout().fileno);
 
   baseConfig = makeBatchConfig();
   ensureCompatibleLLVMVersion();
@@ -316,7 +295,9 @@ private fun batchTestJob(
             stdout_file.close();
             stderr_file.close();
 
-            stdout.write_all((res.toJSON() + "\n").bytes()).fromSuccess();
+            // Write result JSON to original stdout.
+            out = mutable IO.File(stdoutFd);
+            out.write_all((res.toJSON() + "\n").bytes()).fromSuccess();
           }
         }),
       )
