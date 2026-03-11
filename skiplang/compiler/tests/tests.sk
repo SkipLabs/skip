@@ -17,17 +17,57 @@ private fun compile_cmd(
   ].concat(files.collect(Array))
 }
 
+// Parse "##TIME## <phase> <ms>" lines from skc stderr output.
+private fun parsePhaseTimings(stderr: String): Map<String, Int> {
+  result = mutable Map[];
+  for (line in stderr.split("\n")) {
+    if (line.startsWith("##TIME## ")) {
+      parts = line.stripPrefix("##TIME## ").split(" ");
+      if (parts.size() == 2) {
+        phase = parts[0];
+        ms = parts[1].toIntOption();
+        ms.each(v -> result.set(phase, v))
+      }
+    }
+  };
+  result.chill()
+}
+
+// Format phase timings as a structured line for the reporter.
+private fun emitTimings(
+  compileMs: Int,
+  timings: Map<String, Int>,
+  runMs: Int,
+): void {
+  parts = mutable Vector[];
+  parts.push(`total_compile=${compileMs}`);
+  for ((phase, ms) in timings.items()) {
+    parts.push(`${phase}=${ms}`)
+  };
+  if (runMs >= 0) {
+    parts.push(`run=${runMs}`)
+  };
+  print_string(`##TIMING## ${parts.join(" ")}`)
+}
+
 private fun genValidTest(basename: String): void {
+  compileStart = Time.time_ms();
   p = System.subprocess(
     compile_cmd(Array[basename + ".sk"], basename + ".bin"),
   ).fromSuccess();
+  compileElapsed = Time.time_ms() - compileStart;
+
   if (!p.success()) {
     T.fail(
       `Unexpected compile error\nstdout: ${p.stdout}\nstderr:\n${p.stderr}`,
     );
   };
 
+  timings = parsePhaseTimings(p.stderr);
+
+  runStart = Time.time_ms();
   !p = System.subprocess(Array[basename + ".bin"]).fromSuccess();
+  runElapsed = Time.time_ms() - runStart;
 
   if (!p.success()) {
     T.fail(`Unexpected error\nstdout: ${p.stdout}\nstderr:\n${p.stderr}`);
@@ -36,27 +76,294 @@ private fun genValidTest(basename: String): void {
   actual = p.stdout;
   expected = FileSystem.readTextFile(basename + ".exp");
 
+  // Emit timing data if SKC_TIME_PHASES is set.
+  if (Environ.varOpt("SKC_TIME_PHASES").isSome()) {
+    emitTimings(compileElapsed.toInt(), timings, runElapsed.toInt())
+  };
+
   T.expectEq(actual, expected)
 }
 
 private fun genInvalidTest(basename: String): void {
+  compileStart = Time.time_ms();
   p = System.subprocess(
     compile_cmd(Array[basename + ".sk"], basename + ".bin"),
   ).fromSuccess();
+  compileElapsed = Time.time_ms() - compileStart;
 
   if (p.success()) {
     T.fail("Expected compile error")
   };
 
+  timings = parsePhaseTimings(p.stderr);
+
+  // Emit timing data if SKC_TIME_PHASES is set.
+  if (Environ.varOpt("SKC_TIME_PHASES").isSome()) {
+    emitTimings(compileElapsed.toInt(), timings, -1)
+  };
+
   // NOTE: The `.trim()` is needed because error messages seem to currently
   // have an extra newline.
-  actual = p.stderr.trim();
+  actual = p.stderr
+    .split("\n")
+    .filter(l -> !l.startsWith("##TIME## "))
+    .join("\n")
+    .trim();
   expected = FileSystem.readTextFile(basename + ".exp_err").trim();
 
   T.expectEq(actual, expected)
 }
 
+// ---------------------------------------------------------------------------
+// Batch compilation mode (SKC_BATCH=1)
+//
+// Compiles tests in-process using a shared SKStore context, so that
+// the stdlib frontend work is done only once per worker. The non-batch
+// subprocess path remains the default.
+// ---------------------------------------------------------------------------
+
+private fun makeBatchConfig(): Config.Config {
+  // Resolve sysroot from the skc binary in PATH, since the test binary's
+  // location differs from skc's and Config::make uses current_exe().
+  skcPath = System.subprocess(Array["which", "skc"])
+    .fromSuccess()
+    .stdout.trimRight();
+  sysroot = Path.join(Path.parentname(Path.dirname(skcPath)), "lib");
+  results = Cli.parseArgsFrom(
+    skcCommand(),
+    Array[
+      "-O0",
+      "--no-inline",
+      "--export-function-as",
+      "main=skip_main",
+      "--sysroot",
+      sysroot,
+      "-o",
+      "dummy",
+      "dummy.sk",
+    ],
+  );
+  Config.Config::make(results).withBatchMode()
+}
+
+// Run a valid test using in-process compilation.
+private fun batchValidTest(
+  basename: String,
+  config: Config.Config,
+  context: mutable SKStore.Context,
+): void {
+  conf = config
+    .withInputFiles(Array[basename + ".sk"])
+    .withOutput(basename + ".bin");
+
+  compileStart = Time.time_ms();
+  try {
+    compile(conf, context, conf.input_files)
+  } catch {
+  | err @ SkipError.CompileFailureException _ ->
+    T.fail(`Unexpected compile error\n${err.getMessage()}`)
+  | err -> T.fail(`Unexpected compile error\n${err.getMessage()}`)
+  };
+  compileElapsed = Time.time_ms() - compileStart;
+
+  runStart = Time.time_ms();
+  p = System.subprocess(Array[basename + ".bin"]).fromSuccess();
+  runElapsed = Time.time_ms() - runStart;
+
+  if (!p.success()) {
+    T.fail(`Unexpected error\nstdout: ${p.stdout}\nstderr:\n${p.stderr}`);
+  };
+
+  actual = p.stdout;
+  expected = FileSystem.readTextFile(basename + ".exp");
+
+  if (Environ.varOpt("SKC_TIME_PHASES").isSome()) {
+    emitTimings(compileElapsed.toInt(), Map[], runElapsed.toInt())
+  };
+
+  T.expectEq(actual, expected)
+}
+
+// A test entry with its metadata for batch processing.
+private class BatchTest{
+  basename: String,
+  suite: String,
+  name: String,
+  isValid: Bool,
+}
+
+// Run a single test within the SKStore context, handling timing and
+// exceptions the same way as SKTest.run_test.
+private fun runBatchTest(
+  test: BatchTest,
+  config: Config.Config,
+  context: mutable SKStore.Context,
+): SKTest.TestResult {
+  start = Time.time_ms().toFloat() / 1000.0;
+  try {
+    if (test.isValid) {
+      batchValidTest(test.basename, config, context)
+    } else {
+      // Invalid tests use subprocess to avoid SKStore state corruption
+      // from failed compilations.
+      genInvalidTest(test.basename)
+    };
+    SKTest.TestResult{
+      name => test.name,
+      suite => test.suite,
+      file => "unknown",
+      line => -1,
+      result => "success",
+      time => Time.time_ms().toFloat() / 1000.0 - start,
+    }
+  } catch {
+  | exn @ SKTest.ExpectationError _ ->
+    SKTest.TestResult{
+      name => test.name,
+      suite => test.suite,
+      file => "unknown",
+      line => -1,
+      result => "failure",
+      time => Time.time_ms().toFloat() / 1000.0 - start,
+      failure_type => "ExpectationError",
+      failure_message => exn.getMessage(),
+    }
+  | exn ->
+    SKTest.TestResult{
+      name => test.name,
+      suite => test.suite,
+      file => "unknown",
+      line => -1,
+      result => "error",
+      time => Time.time_ms().toFloat() / 1000.0 - start,
+      failure_type => inspect(exn).toString(),
+      failure_message => exn.getMessage(),
+    }
+  }
+}
+
+// Batch test job: replaces the normal test_job when SKC_BATCH is set.
+// Runs all assigned tests within a single SKStore context.
+private fun batchTestJob(
+  batchTests: Array<BatchTest>,
+  filter: String,
+  njobs: Int,
+  rank: Int,
+): void {
+  // Save the original stdout fd as an Int (immutable, capturable by ~>).
+  stdoutFd = Posix.dup(IO.stdout().fileno);
+
+  baseConfig = makeBatchConfig();
+  ensureCompatibleLLVMVersion();
+
+  SKStore.runWithGc(
+    SKStore.Context::create{},
+    _context ~> {
+      SKStore.CStop(
+        Some((context, _, _) ~> {
+          i = 0;
+          for (test in batchTests) {
+            if (!`${test.suite}.${test.name}`.contains(filter)) {
+              continue
+            };
+            if (i % njobs != rank) {
+              !i = i + 1;
+              continue
+            };
+            !i = i + 1;
+
+            // Capture stdout/stderr per test.
+            stdout_file = Posix.mkstemp(
+              Path.join(Environ.temp_dir(), "XXXXXX"),
+            );
+            Posix.dup2(stdout_file.fileno, IO.stdout().fileno);
+            stderr_file = Posix.mkstemp(
+              Path.join(Environ.temp_dir(), "XXXXXX"),
+            );
+            Posix.dup2(stderr_file.fileno, IO.stderr().fileno);
+
+            res = runBatchTest(test, baseConfig, context);
+
+            flushStdout();
+            _ = Posix.lseek(stdout_file.fileno, 0, Posix.SeekSet());
+            _ = Posix.lseek(stderr_file.fileno, 0, Posix.SeekSet());
+            !res = res with {
+              stdout => stdout_file.read_to_string().fromSuccess(),
+              stderr => stderr_file.read_to_string().fromSuccess(),
+            };
+
+            stdout_file.close();
+            stderr_file.close();
+
+            // Write result JSON to original stdout.
+            out = mutable IO.File(stdoutFd);
+            out.write_all((res.toJSON() + "\n").bytes()).fromSuccess();
+          }
+        }),
+      )
+    },
+    Some(SKStore.Synchronizer(SKStore.import, SKStore.export, _ ~> void)),
+  );
+  skipExit(0)
+}
+
+// Collect all test basenames into BatchTest entries.
+private fun collectBatchTests(): Array<BatchTest> {
+  result = mutable Vector[];
+
+  validTests = FileSystem.readFilesRecursive("./tests", fn ->
+    fn.endsWith(".exp") && !fn.contains("invalid/")
+  );
+  for (testFile in validTests) {
+    basename = testFile.stripSuffix(".exp");
+    (testSuite, testName) = basename.stripPrefix("tests/").splitLast("/");
+    result.push(
+      BatchTest{
+        basename,
+        suite => testSuite,
+        name => testName,
+        isValid => true,
+      },
+    )
+  };
+
+  invalidTests = FileSystem.readFilesRecursive("./tests", fn ->
+    fn.endsWith(".exp") && fn.contains("invalid/")
+  );
+  for (testFile in invalidTests) {
+    basename = testFile.stripSuffix(".exp");
+    (testSuite, testName) = basename.stripPrefix("tests/").splitLast("/");
+    result.push(
+      BatchTest{
+        basename,
+        suite => testSuite,
+        name => testName,
+        isValid => false,
+      },
+    )
+  };
+
+  result.toArray()
+}
+
 fun main(): void {
+  isBatch = Environ.varOpt("SKC_BATCH").isSome();
+
+  // In batch mode, when running as a worker subprocess, use batch compilation.
+  if (isBatch) {
+    Environ.varOpt("SKTEST_RANK") match {
+    | Some(rankStr) ->
+      batchTestJob(
+        collectBatchTests(),
+        Environ.var("SKTEST_FILTER"),
+        Environ.var("SKTEST_JOBS").toInt(),
+        rankStr.toInt(),
+      )
+    | None() -> void
+    }
+  };
+
+  // Register tests for the normal harness (both batch parent and non-batch).
   tests = mutable Map[];
 
   validTests = FileSystem.readFilesRecursive("./tests", fn ->

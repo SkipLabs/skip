@@ -1,0 +1,60 @@
+Compiler test timing results (2026-03-10)
+==========================================
+Environment: stageD build (system skc), 8 parallel jobs
+Command: SKC_TIME_PHASES=1 PATH=$(realpath stageD/bin):$PATH skargo test -j8
+
+Failures: 0, successes: 1703 (total: 1703)
+
+--- Timing Summary ---
+
+Per-suite timing:
+Suite                    Tests   Total(s)    Avg(s)
+typechecking/invalid     428     1634.402    3.818
+runtime                  218     1271.433    5.832
+typechecking/exhaustiveness/invalid  84  405.673  4.829
+expand                   53      303.228     5.721
+syntax/invalid           239     173.19      0.724
+native                   23      136.096     5.917
+visibility/invalid       23      44.682      1.942
+runtime/invalid          9       12.659      1.406
+expand/invalid           29      9.86        0.34
+
+Top 20 slowest tests:
+Test                                              Suite               Time(s)
+method_dispatch_deep                              runtime             9.62
+reopen_module                                     expand              9.16
+overridable_algebraic_8                           typechecking        9.082
+module_class_type_constants                       expand              9.065
+lambda_assign3                                    runtime             9.049
+pattern_nested_tuple                              typechecking        9.047
+native_method_inherit_2                           typechecking        9.044
+optimize_unread_if                                runtime             9.026
+back_to_toplevel                                  expand              9.0
+variance_extend_2                                 typechecking        8.931
+class_nested_tuple1                               typechecking/exhaustiveness  8.903
+specialize_unused_tparam                          runtime             8.898
+cross_pattern_binding_2                           typechecking        8.893
+
+Per-component timing (cumulative across all tests):
+Component                     Total(s)    Count   Avg(ms)   %
+frontend                      6951.922    1703    4082      92.967%
+frontend+ir                   120.466     891     135       1.61%
+native/compile                102.247     891     114       1.367%
+native/create_asm_graph       40.888      891     45        0.546%
+native/merge_asm_graph        0.6         891     0         0.008%
+native/create_asm_symbols     0.42        891     0         0.005%
+native/write_asm_files        40.688      891     45        0.544%
+llvm                          146.183     891     164       1.954%
+link                          72.552      891     81        0.97%
+run                           1.814       891     2         0.024%
+
+Notes:
+- "frontend" = total_compile - sum(backend phases). Includes skc process startup,
+  std library loading, SKStore reactive graph initialization, parsing, and typechecking.
+- "frontend+ir" = OuterIstToIR.createIR (includes lazy front-end trigger + IR generation + specialization)
+- "native/compile" = Optimization passes (DCE, inlining, etc.) + lowering
+- "llvm" = clang++ -c (LLVM IR to object code)
+- "link" = clang++ linking (object to binary)
+- "run" = executing the compiled test binary
+- Count=891 for backend phases = only valid tests (218 runtime + others) reach compilation.
+  Count=1703 for frontend = all tests (including invalid ones that fail during front-end).

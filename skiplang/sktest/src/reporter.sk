@@ -61,10 +61,12 @@ mutable class BasicTestReporter{
   color: Bool,
   private mutable successes: Int = 0,
   private mutable failures: Int = 0,
+  private mutable allResults: mutable Vector<TestResult> = mutable Vector[],
 } extends TestReporter {
   const kSeparator: String = "\n==========\n";
 
   mutable fun report(res: TestResult): void {
+    this.allResults.push(res);
     result = if (res.result == "success") {
       this.!successes = this.successes + 1;
       this.success() + ` ${res.suite} ${res.name}`
@@ -90,7 +92,173 @@ mutable class BasicTestReporter{
     this.writeLine(
       `Failures: ${this.failures}, successes: ${this.successes} (total: ${this
         .successes + this.failures})`,
-    )
+    );
+    this.printTimingSummary()
+  }
+
+  private mutable fun printTimingSummary(): void {
+    results = this.allResults;
+    if (results.size() == 0) return void;
+
+    this.writeLine("\n--- Timing Summary ---");
+
+    // Per-suite timing breakdown.
+    suiteCounts = mutable Map<String, Int>[];
+    suiteTimes = mutable Map<String, Float>[];
+    for (res in results) {
+      suiteCounts.set(
+        res.suite,
+        suiteCounts.maybeGet(res.suite).default(0) + 1,
+      );
+      suiteTimes.set(
+        res.suite,
+        suiteTimes.maybeGet(res.suite).default(0.0) + res.time,
+      )
+    };
+    suiteEntries = mutable Vector[];
+    for ((suite, total) in suiteTimes.items()) {
+      count = suiteCounts.maybeGet(suite).default(0);
+      suiteEntries.push((suite, count, total))
+    };
+    suiteEntries.sortBy(e ~> -e.i2);
+
+    this.writeLine("\nPer-suite timing:");
+    this.writeLine(
+      padRight("Suite", 25) +
+        padRight("Tests", 8) +
+        padRight("Total(s)", 12) +
+        "Avg(s)",
+    );
+    for ((suite, count, total) in suiteEntries) {
+      avg = if (count > 0) total / count.toFloat() else 0.0;
+      this.writeLine(
+        padRight(suite, 25) +
+          padRight(count.toString(), 8) +
+          padRight(formatFloat(total), 12) +
+          formatFloat(avg),
+      )
+    };
+
+    // Top 20 slowest tests.
+    sorted = results.sortedBy(r ~> -r.time);
+    n = min(20, sorted.size());
+    this.writeLine(`\nTop ${n} slowest tests:`);
+    this.writeLine(padRight("Test", 50) + padRight("Suite", 20) + "Time(s)");
+    for (i in Range(0, n)) {
+      res = sorted[i];
+      this.writeLine(
+        padRight(res.name, 50) +
+          padRight(res.suite, 20) +
+          formatFloat(res.time),
+      )
+    };
+
+    // Per-component timing (from ##TIMING## lines in stdout).
+    componentTotals = mutable Map<String, Int>[];
+    componentCounts = mutable Map<String, Int>[];
+    hasTimings = false;
+    for (res in results) {
+      for (line in res.stdout.split("\n")) {
+        if (line.startsWith("##TIMING## ")) {
+          !hasTimings = true;
+          parts = line.stripPrefix("##TIMING## ").split(" ");
+          for (part in parts) {
+            kv = part.split("=");
+            if (kv.size() == 2) {
+              phase = kv[0];
+              ms = kv[1].toIntOption();
+              ms.each(v -> {
+                prev = componentTotals.maybeGet(phase).default(0);
+                componentTotals.set(phase, prev + v);
+                prevCount = componentCounts.maybeGet(phase).default(0);
+                componentCounts.set(phase, prevCount + 1)
+              })
+            }
+          }
+        }
+      }
+    };
+
+    if (hasTimings) {
+      // Compute frontend time = total_compile - sum(backend phases).
+      // Backend phases are everything reported by skc's ##TIME## output.
+      backendPhases = Set[
+        "outer/makeOuter",
+        "frontend+ir",
+        "native/compile",
+        "native/create_asm_graph",
+        "native/merge_asm_graph",
+        "native/create_asm_symbols",
+        "native/write_asm_files",
+        "llvm",
+        "link",
+      ];
+      totalCompileMs = componentTotals.maybeGet("total_compile").default(0);
+      totalCompileCount = componentCounts.maybeGet("total_compile").default(0);
+      backendMs = 0;
+      for ((phase, ms) in componentTotals.items()) {
+        if (backendPhases.contains(phase)) {
+          !backendMs = backendMs + ms
+        }
+      };
+      frontendMs = max(0, totalCompileMs - backendMs);
+      if (totalCompileCount > 0) {
+        componentTotals.set("frontend", frontendMs);
+        componentCounts.set("frontend", totalCompileCount)
+      };
+
+      // Sort components in a fixed logical order.
+      phaseOrder = Map[
+        "frontend" => 0,
+        "frontend+ir" => 1,
+        "native/compile" => 2,
+        "native/create_asm_graph" => 3,
+        "native/merge_asm_graph" => 4,
+        "native/create_asm_symbols" => 5,
+        "native/write_asm_files" => 6,
+        "llvm" => 7,
+        "link" => 8,
+        "run" => 9,
+      ];
+      componentEntries = mutable Vector[];
+      for ((phase, totalMs) in componentTotals.items()) {
+        // Skip meta-fields and phases subsumed by "frontend".
+        if (phase == "total_compile" || phase == "outer/makeOuter") {
+          continue
+        };
+        count = componentCounts.maybeGet(phase).default(0);
+        componentEntries.push(
+          (phase, totalMs, count, phaseOrder.maybeGet(phase).default(99)),
+        )
+      };
+      componentEntries.sortBy(e ~> e.i3);
+
+      totalMs = componentEntries.map(e -> e.i1).foldl((a, b) -> a + b, 0);
+      this.writeLine("\nPer-component timing (cumulative across all tests):");
+      this.writeLine(
+        padRight("Component", 30) +
+          padRight("Total(s)", 12) +
+          padRight("Count", 8) +
+          padRight("Avg(ms)", 10) +
+          "%",
+      );
+      for ((phase, ms, count, _) in componentEntries) {
+        avg = if (count > 0) ms.toFloat() / count.toFloat() else 0.0;
+        pct = if (totalMs > 0) {
+          ms.toFloat() * 100.0 / totalMs.toFloat()
+        } else {
+          0.0
+        };
+        this.writeLine(
+          padRight(phase, 30) +
+            padRight(formatFloat(ms.toFloat() / 1000.0), 12) +
+            padRight(count.toString(), 8) +
+            padRight(avg.toInt().toString(), 10) +
+            formatFloat(pct) +
+            "%",
+        )
+      }
+    }
   }
 
   private readonly fun failure(): String {
@@ -113,6 +281,25 @@ mutable class BasicTestReporter{
       "[OK]"
     }
   }
+}
+
+private fun padRight(s: String, width: Int): String {
+  if (s.length() >= width) {
+    s
+  } else {
+    s + String::tabulate(width - s.length(), _ -> ' ')
+  }
+}
+
+private fun formatFloat(f: Float): String {
+  // Format to 3 decimal places.
+  rounded = (f * 1000.0).toInt().toFloat() / 1000.0;
+  s = rounded.toString();
+  // Ensure decimal point is present.
+  if (!s.contains(".")) {
+    !s = s + ".000"
+  };
+  s
 }
 
 mutable class TestSuiteStats(

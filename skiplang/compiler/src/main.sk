@@ -5,8 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-fun main(): void {
-  results = Cli.Command("skc")
+fun skcCommand(): Cli.Command {
+  Cli.Command("skc")
     .about("Skip compiler")
     .help()
     .arg(Cli.Arg::bool("disasm-all"))
@@ -88,7 +88,10 @@ fun main(): void {
       ),
     )
     .arg(Cli.Arg::string("files").positional().repeatable())
-    .parseArgs();
+}
+
+fun main(): void {
+  results = skcCommand().parseArgs();
 
   results.error match {
   | Some(exn) ->

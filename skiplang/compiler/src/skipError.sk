@@ -99,6 +99,26 @@ fun printErrorsAndExit<T>(
   skipExit(2)
 }
 
+class CompileFailureException{
+  message: String,
+  exit_code: Int = 2,
+} extends Exception {
+  fun getMessage(): String {
+    this.message
+  }
+}
+
+fun printErrorsAndThrow<T>(
+  errors: Array<SkipErrorException>,
+  get_file: FileCache.InputSource -> String,
+): T {
+  msg = errorsToString(
+    errors.map(x -> x.errors).flatten().collect(Vector),
+    get_file,
+  );
+  throw CompileFailureException{message => msg}
+}
+
 class ErrorsFile(value: List<SkipErrorException>) extends SKStore.File
 
 fun keepErrors(
@@ -123,10 +143,15 @@ fun keepErrors(
 }
 
 fun catchErrors(
-  _phase: Int,
+  phase: Int,
   context: mutable SKStore.Context,
   f: () -> void,
 ): void {
+  // In batch mode, accumulate errors like keepErrors instead of exiting.
+  if (isBatchMode(context)) {
+    keepErrors(phase, context, f);
+    return void;
+  };
   try {
     f()
   } catch {
@@ -138,6 +163,16 @@ fun catchErrors(
     debug(exn);
     throw exn
   }
+}
+
+const kBatchModeGlobal: String = "BATCH_MODE";
+
+fun setBatchMode(context: mutable SKStore.Context): void {
+  context.setGlobal(kBatchModeGlobal, ErrorsFile(List[]))
+}
+
+fun isBatchMode(context: mutable SKStore.Context): Bool {
+  context.getGlobal(kBatchModeGlobal).isSome()
 }
 
 fun doWithError<T>(f: () -> T): Result<T, Vector<Error>> {
@@ -379,14 +414,17 @@ fun fatalError<T>(
   msg: String,
   fix: ?Fix = None(),
 ): T {
-  printErrorsAndExit(
-    Array[
-      SkipErrorException{
-        errors => Vector[Error{traces => List[(pos, msg)], fix}],
-      },
-    ],
-    file -> FileCache.fileDir.unsafeGetArray(context, file)[0].value,
-  );
+  errors = Array[
+    SkipErrorException{
+      errors => Vector[Error{traces => List[(pos, msg)], fix}],
+    },
+  ];
+  get_file = file -> FileCache.fileDir.unsafeGetArray(context, file)[0].value;
+  if (isBatchMode(context)) {
+    printErrorsAndThrow(errors, get_file)
+  } else {
+    printErrorsAndExit(errors, get_file)
+  };
 }
 
 fun errorl<T>(traces: List<(FileRange, String)>, fix: ?Fix = None()): T {

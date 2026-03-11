@@ -135,22 +135,38 @@ fun link(
       Array["-no-pie"]
     };
 
-    runShell(
-      Array[
-        "clang++",
-        `-O${config.optLevel}`,
-        "-o",
-        config.output,
-        llFile,
-      ].concat(flags)
-        .concat(linker_args)
-        .concat(static_libs),
-      config.verbose,
-    );
+    oFile = config.output + ".o";
+    runCompilerPhase("llvm", () -> {
+      runShell(
+        Array["clang++", `-O${config.optLevel}`, "-c", "-o", oFile, llFile],
+        config.verbose,
+        config.batch_mode,
+      )
+    });
+
+    runCompilerPhase("link", () -> {
+      runShell(
+        Array[
+          "clang++",
+          `-O${config.optLevel}`,
+          "-o",
+          config.output,
+          oFile,
+        ].concat(flags)
+          .concat(linker_args)
+          .concat(static_libs),
+        config.verbose,
+        config.batch_mode,
+      )
+    });
   }
 }
 
-fun runShell(args: Array<String>, verbose: Bool = false): void {
+fun runShell(
+  args: Array<String>,
+  verbose: Bool = false,
+  batch_mode: Bool = false,
+): void {
   if (verbose) {
     print_error(">> " + args.join(" "))
   };
@@ -168,6 +184,12 @@ fun runShell(args: Array<String>, verbose: Bool = false): void {
     },
   ).fromSuccess();
   if (!p.success()) {
+    if (batch_mode) {
+      throw SkipError.CompileFailureException{
+        message => p.stderr,
+        exit_code => 1,
+      }
+    };
     if (!verbose) {
       print_error_raw(p.stderr)
     };
@@ -237,12 +259,31 @@ fun getOrInitializeBackend(context: mutable SKStore.Context): SKStore.EagerDir {
       context.getGlobal("ERRORS") match {
       | None() -> void
       | Some(errors) ->
-        SkipError.printErrorsAndExit(
-          SkipError.ErrorsFile::type(errors).value.reversed().toArray(),
-          file -> {
-            FileCache.fileDir.unsafeGetArray(context, file)[0].value
-          },
-        )
+        // Clear ERRORS to prevent leakage across batch compilations.
+        context.setGlobal("ERRORS", SkipError.ErrorsFile(List[]));
+        get_file = file -> {
+          FileCache.fileDir.unsafeGetArray(context, file)[0].value
+        };
+        if (conf.batch_mode) {
+          // In batch mode, store error message in a global instead of
+          // throwing — throwing from inside a reactive computation leaves
+          // the SKStore context in a broken state.
+          msg = SkipError.errorsToString(
+            SkipError.ErrorsFile::type(errors)
+              .value.reversed()
+              .map(x -> x.errors)
+              .flatten()
+              .collect(Vector),
+            get_file,
+          );
+          context.setGlobal("BATCH_ERROR_MSG", SKStore.StringFile(msg));
+          return void
+        } else {
+          SkipError.printErrorsAndExit(
+            SkipError.ErrorsFile::type(errors).value.reversed().toArray(),
+            get_file,
+          )
+        }
       };
 
       if (conf.check) {
@@ -291,16 +332,18 @@ fun getOrInitializeBackend(context: mutable SKStore.Context): SKStore.EagerDir {
                 )))
       );
 
-      env = OuterIstToIR.createIR(
-        context,
-        conf,
-        shouldDisasm,
-        shouldRuntimeExport,
-        outerIst,
-        converter,
-        constsProj,
-        defsProj,
-      );
+      env = runCompilerPhase("frontend+ir", () -> {
+        OuterIstToIR.createIR(
+          context,
+          conf,
+          shouldDisasm,
+          shouldRuntimeExport,
+          outerIst,
+          converter,
+          constsProj,
+          defsProj,
+        )
+      });
 
       !env = createOptimizedFunctions(context, env, conf);
       defs = runCompilerPhase("native/create_asm_graph", () -> {
@@ -351,11 +394,23 @@ fun compile(
   fileNames: Array<String>,
 ): void {
   if (fileNames.isEmpty() && config.dependencies.isEmpty()) {
+    if (config.batch_mode) {
+      throw SkipError.CompileFailureException{
+        message => "fatal error: no input files",
+        exit_code => 4,
+      }
+    };
     print_error("fatal error: no input files\n");
     skipExit(4); // Exit code used by g++ for no input files
   };
 
-  ensureCompatibleLLVMVersion();
+  if (!config.batch_mode) {
+    ensureCompatibleLLVMVersion()
+  };
+
+  if (config.batch_mode) {
+    SkipError.setBatchMode(context)
+  };
 
   getOrInitializeBackend(context).writeArray(
     context,
@@ -379,7 +434,20 @@ fun compile(
     make_input_source_path,
   );
 
-  context.update()
+  context.update();
+
+  // In batch mode, check if the backend mapper stored a deferred error.
+  if (config.batch_mode) {
+    context.getGlobal("BATCH_ERROR_MSG") match {
+    | Some(msgFile) ->
+      context.setGlobal("BATCH_ERROR_MSG", SKStore.StringFile(""));
+      msg = SKStore.StringFile::type(msgFile).value;
+      if (!msg.isEmpty()) {
+        throw SkipError.CompileFailureException{message => msg}
+      }
+    | None() -> void
+    }
+  }
 }
 
 fun compile_llvm_ir(
@@ -402,9 +470,7 @@ fun compile_binary(
     AsmOutput.writeOutputFiles(defs, conf.input_files, llFile, conf)
   });
 
-  runCompilerPhase("native/link", () -> {
-    link(llFile, conf, exports)
-  })
+  link(llFile, conf, exports)
 }
 
 fun compile_sklib(context: mutable SKStore.Context, conf: Config.Config): void {
