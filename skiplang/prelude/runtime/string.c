@@ -221,6 +221,10 @@ char* SKIP_Float_toString(double origf) {
   return SKIP_floatToString(origf);
 }
 
+double SKIP_Float_negate(double x) {
+  return -x;
+}
+
 #ifdef SKIP32
 #define isdigit(c) (c >= '0' && c <= '9')
 
