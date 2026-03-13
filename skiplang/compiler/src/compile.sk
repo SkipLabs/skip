@@ -405,9 +405,15 @@ fun compile_binary(
   });
 
   runCompilerPhase("native/link", () -> {
-    getLinkArgs(llFile, conf, exports).each(args ->
-      runShell(args, conf.verbose)
-    )
+    getLinkArgs(llFile, conf, exports).each(args -> {
+      if (conf.no_link) {
+        print_string("---LINK_ARGS_BEGIN---");
+        args.each(print_string);
+        print_string("---LINK_ARGS_END---")
+      } else {
+        runShell(args, conf.verbose)
+      }
+    })
   })
 }
 
