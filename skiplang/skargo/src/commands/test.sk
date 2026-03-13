@@ -60,7 +60,23 @@ fun test(): (Cli.Command, (GlobalContext, Cli.ParseResults) ~> void) {
 fun execTest(gctx: GlobalContext, args: Cli.ParseResults): void {
   ws = workspace(args, gctx);
   opts = compile_options(args);
-  !opts.filter = CompileFilter::all_tests();
+
+  // In dev mode, if the package has both a bin and test target, use the
+  // merged binary (bin target includes test code via dispatcher).
+  bins = ws.package.manifest.targets
+    .filter(target -> target.kind is BinTarget _)
+    .collect(Array);
+  merged =
+    opts.build_config.requested_profile == "dev" &&
+    ws.package.manifest.test_target().isSome() &&
+    bins.size() == 1;
+
+  if (merged) {
+    !opts.filter = CompileFilter::single_bin(bins[0].name)
+  } else {
+    !opts.filter = CompileFilter::all_tests()
+  };
+
   bctx = create_bctx(gctx, ws, opts);
   withTimer(
     () -> {
@@ -81,7 +97,21 @@ fun execTest(gctx: GlobalContext, args: Cli.ParseResults): void {
   jobs = args.getInt("jobs");
   list = if (args.getBool("list")) Some("--list") else None();
 
-  optBinary = if (
+  optBinary = if (merged) {
+    unit = bctx.roots.find(r -> r.target.kind is BinTarget _);
+    unit match {
+    | Some(u) ->
+      path = Path.join(
+        ws.target_dir(),
+        "host",
+        opts.build_config.requested_profile,
+      );
+      Some(Path.join(path, u.target.name))
+    | None() ->
+      gctx.console.error("`skargo test` could not find bin target.");
+      skipExit(1)
+    }
+  } else if (
     bctx.roots.size() != 1 ||
     !(bctx.roots[0].target.kind is TestTarget _)
   ) {
@@ -107,6 +137,9 @@ fun execTest(gctx: GlobalContext, args: Cli.ParseResults): void {
         `\`skargo test\` could not find test binary ${binary}.`,
       );
       skipExit(1)
+    };
+    if (merged) {
+      Environ.set_var("SKTEST", "1")
     };
     cmd_args = Array[binary].concat(
       Array[junitxml, filter, list, Some(`-j${jobs}`)].filterNone(),
