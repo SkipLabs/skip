@@ -41,11 +41,13 @@ fun createOptimizedFunctions(
   env
 }
 
-fun link(
+// Returns the link command for the native (non-WASM) case.
+// For WASM, runs the multi-step toolchain directly and returns None().
+fun getLinkArgs(
   llFile: String,
   config: Config.Config,
   exports: Array<String> = Array[],
-): void {
+): ?Array<String> {
   linker_args = config.link_args.concat(
     config.dependencies.values().collect(Array).flatMap(x -> x.i1.links),
   );
@@ -128,6 +130,7 @@ fun link(
         .concat(static_libs),
       config.verbose,
     );
+    None()
   } else {
     flags = if (config.emit == "cdylib") {
       Array["-fPIC", "-shared"]
@@ -135,7 +138,7 @@ fun link(
       Array["-no-pie"]
     };
 
-    runShell(
+    Some(
       Array[
         "clang++",
         `-O${config.optLevel}`,
@@ -145,8 +148,7 @@ fun link(
       ].concat(flags)
         .concat(linker_args)
         .concat(static_libs),
-      config.verbose,
-    );
+    )
   }
 }
 
@@ -403,7 +405,9 @@ fun compile_binary(
   });
 
   runCompilerPhase("native/link", () -> {
-    link(llFile, conf, exports)
+    getLinkArgs(llFile, conf, exports).each(args ->
+      runShell(args, conf.verbose)
+    )
   })
 }
 
