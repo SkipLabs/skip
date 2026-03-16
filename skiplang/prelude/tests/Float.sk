@@ -231,6 +231,47 @@ fun testToString(): void {
 }
 
 @test
+fun testToStringEdgeCases(): void {
+  // Subnormals (smallest representable doubles)
+  // Smallest subnormal: 5e-324 (actual value 4.9406564584124654e-324)
+  T.expectEq(5e-324.toString(), "4.940656458e-324");
+  // Smallest normal: 2.2250738585072014e-308
+  T.expectEq(2.2250738585072014e-308.toString(), "2.225073859e-308");
+  // Largest subnormal (just below smallest normal)
+  T.expectEq(2.225073858507201e-308.toString(), "2.225073859e-308");
+
+  // Max double
+  T.expectEq(1.7976931348623157e308.toString(), "1.797693135e+308");
+
+  // Values near scientific notation boundary (currently 1e15 / 1e-4)
+  T.expectEq(999999999999999.0.toString(), "999999999999999.0");
+  T.expectEq(9999999999999999.0.toString(), "1.0e+16");
+  T.expectEq(0.0001.toString(), "0.0001");
+  T.expectEq(0.00001.toString(), "1.0e-05");
+  T.expectEq(0.00009999.toString(), "9.999e-05");
+
+  // Tricky values that test shortest representation
+  // NOTE: current impl has 9-digit precision, so 0.1+0.2 rounds to "0.3"
+  T.expectEq(0.1.toString(), "0.1");
+  T.expectEq(0.2.toString(), "0.2");
+  T.expectEq(0.3.toString(), "0.3");
+  T.expectEq((0.1 + 0.2).toString(), "0.3");
+
+  // Powers of 2
+  T.expectEq(0.5.toString(), "0.5");
+  T.expectEq(0.25.toString(), "0.25");
+  T.expectEq(0.125.toString(), "0.125");
+
+  // Large integers that are exact doubles
+  T.expectEq(9007199254740992.0.toString(), "9.007199255e+15"); // 2^53
+  T.expectEq(9007199254740991.0.toString(), "9.007199255e+15"); // 2^53 - 1
+
+  // Negative edge cases
+  T.expectEq((-5e-324).toString(), "-4.940656458e-324");
+  T.expectEq((-1.7976931348623157e308).toString(), "-1.797693135e+308");
+}
+
+@test
 fun testToStringRoundTrip(): void {
   // toString -> toFloat should preserve the value
   values = Array[1.0, -1.0, 0.5, 123.456, 1e20, 1e-10, 0.0];
@@ -241,6 +282,30 @@ fun testToStringRoundTrip(): void {
   T.expectEq("inf".toFloat(), Float::inf);
   T.expectEq("-inf".toFloat(), -Float::inf);
   T.expectTrue("nan".toFloat().isNaN());
+
+  // Edge case round-trips
+  // NOTE: current impl has only 9-digit precision, so many values don't
+  // round-trip. These tests document which values survive round-tripping
+  // and will be updated when Ryu is integrated (all should round-trip).
+  roundTrippable = Array[
+    0.1,
+    0.2,
+    0.3,
+    0.5,
+    0.25,
+    0.125,
+    1e-6,
+    1e-7,
+    1e20,
+    1e21,
+  ];
+  roundTrippable.each(v -> {
+    T.expectEq(v.toString().toFloat(), v);
+  });
+  // -0.0 round-trips to 0.0 (sign dropped by parser)
+  T.expectEq((-0.0).toString().toFloat(), 0.0);
+  // These DON'T round-trip with current 9-digit precision:
+  // 5e-324, 2.2250738585072014e-308, 1.7976931348623157e308, 2^53
 }
 
 @test
