@@ -283,6 +283,9 @@ private fun compute_deps(
   unit_deps = mutable Vector[];
 
   unit.target.kind match {
+  | HardlinkTarget _ ->
+    // Hardlink targets have no compilation deps; they just link.
+    return Array[]
   | BinTarget _
   | TestTarget _
   | LibTarget(LibraryTypeCdylib _) ->
@@ -323,6 +326,7 @@ private fun compute_deps(
     | LibTarget _ -> dep.kind is NormalDep _
     | TestTarget _ -> dep.kind is DevelopmentDep _
     | CustomBuildTarget _ -> dep.kind is BuildDep _
+    | HardlinkTarget _ -> false
     }
   );
   for (dep in deps) {
