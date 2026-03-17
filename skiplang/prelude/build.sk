@@ -22,6 +22,7 @@ fun main(): void {
     "runtime/stdlib.c",
     "runtime/stack.c",
     "runtime/string.c",
+    "runtime/ryu/d2s.c",
     "runtime/native_eq.c",
     "runtime/splitmix64.c",
     "runtime/xoroshiro128plus.c",
@@ -30,6 +31,9 @@ fun main(): void {
   cfg = Cc.Build()
     .pic(pic)
     .flags(Cc.kRecommendedCflags)
+    // Lets vendored runtime/ryu/d2s.c resolve its `#include "ryu/ryu.h"`
+    // siblings (upstream builds d2s.c with its repo root on the include path).
+    .include("runtime")
     .files(srcs)
     .file(magic_c);
   srcs.each(f -> print_string(`skargo:rerun-if-changed=${f}`));

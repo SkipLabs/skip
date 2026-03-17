@@ -1,6 +1,8 @@
 MEMSIZE32=1073741824
 
-CFLAGS += -Werror -Wall -Wextra -Wno-sign-conversion -Wno-sometimes-uninitialized -Wno-c2x-extensions -Wsign-compare -Wextra-semi-stmt -fstrict-flex-arrays=3
+# -I. lets vendored ryu/d2s.c resolve its `#include "ryu/ryu.h"` siblings
+# (upstream builds d2s.c with its repo root on the include path).
+CFLAGS += -I. -Werror -Wall -Wextra -Wno-sign-conversion -Wno-sometimes-uninitialized -Wno-c2x-extensions -Wsign-compare -Wextra-semi-stmt -fstrict-flex-arrays=3
 # To add: -Wcast-align -Wcast-qual -Wimplicit-int-conversion -Wmissing-noreturn -Wpadded -Wreserved-identifier -Wshorten-64-to-32 -Wtautological-unsigned-zero-compare
 # -Watomic-implicit-seq-cst ?
 # If using -Weverything, you may want to add -Wno-declaration-after-statement -Wno-missing-prototypes -Wno-missing-variable-declarations -Wno-shadow -Wno-strict-prototypes -Wno-zero-length-array -Wno-unreachable-code-break -Wno-unreachable-code-return
@@ -16,6 +18,7 @@ CFILES=\
 	memory.c \
 	obstack.c \
 	runtime.c \
+	ryu/d2s.c \
 	stdlib.c \
 	stack.c \
 	string.c \
@@ -57,4 +60,4 @@ runtime64_specific.o: runtime64_specific.cpp
 
 .PHONY: clean
 clean:
-	rm -f *.o *.bc magic.c libskip_runtime64.a
+	rm -f *.o *.bc ryu/*.o ryu/*.bc magic.c libskip_runtime64.a
