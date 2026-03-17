@@ -60,7 +60,12 @@ fun test(): (Cli.Command, (GlobalContext, Cli.ParseResults) ~> void) {
 fun execTest(gctx: GlobalContext, args: Cli.ParseResults): void {
   ws = workspace(args, gctx);
   opts = compile_options(args);
-  !opts.filter = CompileFilter::all_tests();
+  // In dev mode with bins, use the default filter to trigger merged mode
+  // (all bins+test->__merged). Otherwise, build just the test target.
+  has_bins = ws.package.manifest.targets.any(t -> t.is_bin());
+  if (opts.build_config.requested_profile != "dev" || !has_bins) {
+    !opts.filter = CompileFilter::all_tests()
+  };
   bctx = create_bctx(gctx, ws, opts);
   withTimer(
     () -> {
@@ -81,14 +86,21 @@ fun execTest(gctx: GlobalContext, args: Cli.ParseResults): void {
   jobs = args.getInt("jobs");
   list = if (args.getBool("list")) Some("--list") else None();
 
-  optBinary = if (
-    bctx.roots.size() != 1 ||
-    !(bctx.roots[0].target.kind is TestTarget _)
-  ) {
+  // Find the test unit: a TestTarget (normal mode) or a HardlinkTarget
+  // named "test" (merged mode).
+  test_unit = bctx.roots.find(r -> r.target.kind is TestTarget _) match {
+  | Some(u) -> Some(u)
+  | None() ->
+    bctx.roots.find(r ->
+      r.target.kind is HardlinkTarget _ && r.target.name == "test"
+    )
+  };
+
+  optBinary = test_unit match {
+  | None() ->
     gctx.console.error("`skargo test` could not find test target.");
     skipExit(1)
-  } else {
-    unit = bctx.roots[0];
+  | Some(unit) ->
     unit.arch match {
     | TargetArchTriple(t) if (t.isWasm32()) -> None()
     | _ -> // TODO: Expose common API with BuildRunner.
@@ -107,6 +119,10 @@ fun execTest(gctx: GlobalContext, args: Cli.ParseResults): void {
         `\`skargo test\` could not find test binary ${binary}.`,
       );
       skipExit(1)
+    };
+    // In merged mode, set SKARGO_BIN=test so the dispatcher routes to tests.
+    if (test_unit.fromSome().target.kind is HardlinkTarget _) {
+      Environ.set_var("SKARGO_BIN", "test")
     };
     cmd_args = Array[binary].concat(
       Array[junitxml, filter, list, Some(`-j${jobs}`)].filterNone(),
