@@ -83,6 +83,21 @@ fun main(): void {
       .push(T.Test{name => testName, func => () ~> genInvalidTest(basename)})
   };
 
+  // Invalid tests in invalid_tests/ directory
+  invalidTests2 = FileSystem.readFilesRecursive("./invalid_tests", fn ->
+    fn.endsWith(".exp_err")
+  );
+
+  for (testFile in invalidTests2) {
+    basename = testFile.stripSuffix(".exp_err");
+    (testSuite, testName) = basename
+      .stripPrefix("invalid_tests/")
+      .splitLast("/");
+    tests
+      .getOrAdd(testSuite, () -> mutable Vector[])
+      .push(T.Test{name => testName, func => () ~> genInvalidTest(basename)})
+  };
+
   SKTest.test_harness(tests)
 }
 
