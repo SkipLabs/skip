@@ -1,15 +1,22 @@
+module ExpandModuleClassConstruct;
 class A()
 
-module M;
+module end;
+
+module ExpandModuleClassConstructM;
 
 class B()
 
 module end;
 
+module ExpandModuleClassConstruct;
+
 fun main(): void {
   _ = A();
-  _ = .A();
-  _ = M.B();
-  _ = .M.B();
+  _ = ExpandModuleClassConstruct.A();
+  _ = ExpandModuleClassConstructM.B();
+  _ = ExpandModuleClassConstructM.B();
   print_string("Pass")
 }
+
+module end;

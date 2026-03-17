@@ -1,17 +1,25 @@
-module alias P = MySuperLongName;
+module alias P = ExpandModuleAlias2MySuperLongName;
 
-module MySuperLongName;
+module ExpandModuleAlias2;
+
+module end;
+
+module ExpandModuleAlias2MySuperLongName;
 fun pass(): String {
   "Pass\n"
 }
 module end;
 
-module M;
+module ExpandModuleAlias2M;
 fun pass(): String {
   P.pass()
 }
 module end;
 
+module ExpandModuleAlias2;
+
 fun main(): void {
-  print_raw(M.pass())
+  print_raw(ExpandModuleAlias2M.pass())
 }
+
+module end;
