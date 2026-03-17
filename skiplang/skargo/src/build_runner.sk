@@ -178,6 +178,14 @@ mutable class BuildRunner(
       unit_name = `${unit.pkg.name()} v${unit.pkg.version()} [${
         unit.target.name
       }] (${unit.pkg.root()})`;
+
+      // Hardlink targets don't compile — just create the link.
+      if (unit.target.kind is HardlinkTarget _) {
+        this.prepare_unit(unit);
+        this.link_targets(unit);
+        continue
+      };
+
       if (this.unit_is_dirty(unit)) {
         if (
           check &&
@@ -416,7 +424,9 @@ mutable class BuildRunner(
     | BinTarget(e)
     | TestTarget(e) ->
       skc.args(Array["--export-function-as", `${e}=skip_main`])
-    | CustomBuildTarget() -> void
+    | CustomBuildTarget()
+    | HardlinkTarget _ ->
+      void
     };
 
     // TODO: Proper Profile class.
@@ -525,6 +535,17 @@ mutable class BuildRunner(
           export_path => export_dir.map(d ->
             Path.join(d, unit.target.name + suffix)
           ),
+        }
+      };
+      res.push(file)
+    | HardlinkTarget(source) ->
+      // Link from the source binary (e.g., __merged) to this target's name.
+      source_path = Path.join(layout.dest, source);
+      file = OutputFile(source_path, None(), None());
+      if (is_root) {
+        !file = file with {
+          hardlink => Some(Path.join(layout.dest, unit.target.name)),
+          export_path => export_dir.map(d -> Path.join(d, unit.target.name)),
         }
       };
       res.push(file)
