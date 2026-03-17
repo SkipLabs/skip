@@ -167,6 +167,33 @@ private fun generate_root_units(
     );
     res.collect(Array)
   };
+  // In dev mode with binaries, merge all bin+test targets into a single
+  // __merged binary. Each original bin/test becomes a HardlinkTarget.
+  !targets = if (
+    build_config.requested_profile == "dev" &&
+    targets.any(t -> t.is_bin())
+  ) {
+    merged = Target(BinTarget("SkipInternal.dispatch"), "__merged", Array[]);
+
+    // Replace bin/test targets with hardlinks; keep lib and others as-is.
+    replaced = targets.map(t ->
+      if (t.is_bin() || t.is_test()) {
+        t with {kind => HardlinkTarget("__merged")}
+      } else {
+        t
+      }
+    );
+
+    // If any hardlink was created, ensure __merged is also a root.
+    if (replaced.any(t -> t.kind is HardlinkTarget _)) {
+      Array[merged].concat(replaced)
+    } else {
+      replaced
+    }
+  } else {
+    targets
+  };
+
   targets
     .map(target -> {
       Unit(
@@ -323,7 +350,11 @@ private fun compute_deps(
     // Binary targets always depend on the lib target, which pulls in the
     // dependencies transitively.
     | BinTarget _ -> false
-    | LibTarget _ -> dep.kind is NormalDep _
+    | LibTarget _ ->
+      dep.kind is NormalDep _ ||
+        (unit.profile == "dev" &&
+          unit.pkg.manifest.targets.any(t -> t.is_bin()) &&
+          dep.kind is DevelopmentDep _)
     | TestTarget _ -> dep.kind is DevelopmentDep _
     | CustomBuildTarget _ -> dep.kind is BuildDep _
     | HardlinkTarget _ -> false
