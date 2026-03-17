@@ -396,6 +396,18 @@ mutable class BuildRunner(
 
     skc.args(unit.target.srcs);
 
+    // In dev mode, the lib includes test sources and the dispatcher so that
+    // __merged (and all hardlinked bins/test) can link against it.
+    if (
+      unit.target.kind is LibTarget(LibraryTypeSklib _) &&
+      unit.profile == "dev" &&
+      unit.pkg.manifest.targets.any(t -> t.is_bin())
+    ) {
+      unit.pkg.manifest.test_target().each(t -> skc.args(t.srcs));
+      dispatcher_path = this.generate_dispatcher(unit);
+      skc.arg(dispatcher_path)
+    };
+
     if (!unit.target.is_build_script()) {
       // TODO: Once we have namespaced packages, we can share the state.db
       // across architectures.
