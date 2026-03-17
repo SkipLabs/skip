@@ -60,7 +60,7 @@ fun main(): void {
   tests = mutable Map[];
 
   validTests = FileSystem.readFilesRecursive("./tests", fn ->
-    fn.endsWith(".exp") && !fn.contains("invalid/")
+    fn.endsWith(".exp")
   );
 
   for (testFile in validTests) {
@@ -71,24 +71,11 @@ fun main(): void {
       .push(T.Test{name => testName, func => () ~> genValidTest(basename)});
   };
 
-  invalidTests = FileSystem.readFilesRecursive("./tests", fn ->
-    fn.endsWith(".exp") && fn.contains("invalid/")
-  );
-
-  for (testFile in invalidTests) {
-    basename = testFile.stripSuffix(".exp");
-    (testSuite, testName) = basename.stripPrefix("tests/").splitLast("/");
-    tests
-      .getOrAdd(testSuite, () -> mutable Vector[])
-      .push(T.Test{name => testName, func => () ~> genInvalidTest(basename)})
-  };
-
-  // Invalid tests in invalid_tests/ directory
-  invalidTests2 = FileSystem.readFilesRecursive("./invalid_tests", fn ->
+  invalidTests = FileSystem.readFilesRecursive("./invalid_tests", fn ->
     fn.endsWith(".exp_err")
   );
 
-  for (testFile in invalidTests2) {
+  for (testFile in invalidTests) {
     basename = testFile.stripSuffix(".exp_err");
     (testSuite, testName) = basename
       .stripPrefix("invalid_tests/")
