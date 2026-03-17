@@ -104,7 +104,7 @@ clean-all: clean
 
 .PHONY: fmt-sk
 fmt-sk: # Keep in sync with bin/git_hooks/check_format.sh
-	find . -path ./skiplang/compiler/tests -not -prune -or -name \*.sk | parallel skfmt -i {}
+	find . \( -path ./skiplang/compiler/tests -o -path ./skiplang/compiler/invalid_tests \) -not -prune -or -name \*.sk | parallel skfmt -i {}
 
 .PHONY: fmt-c
 fmt-c: # Keep in sync with bin/git_hooks/check_format.sh
