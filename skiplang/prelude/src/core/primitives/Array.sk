@@ -294,6 +294,18 @@ mutable native class .Array<+T>
     }
   }
 
+  readonly fun findMap<U>(f: T -> ?U): ?U {
+    for (i in Range(0, this.size())) {
+      x = this.unsafe_get(i);
+      f(x) match {
+      | some @ Some _ -> break some
+      | None() -> void
+      }
+    } else {
+      None()
+    }
+  }
+
   readonly fun all(p: T -> Bool): Bool {
     for (x in this) {
       if (!p(x)) break false

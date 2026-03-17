@@ -687,6 +687,21 @@ mutable class .Vector<+T> private (
     result
   }
 
+  // s.findMap(f) is Some(u) = f(t) for the first t in s where f is Some(_)
+  readonly fun findMap<U>(f: T -> ?U): ?U {
+    result: ?U = None();
+    this.eachWhileImpl(x ->
+      f(x) match {
+      | some @ Some _ ->
+        !result = some;
+        false // break
+      | None() ->
+        true // continue
+      }
+    );
+    result
+  }
+
   readonly fun sumInt[T: Int](): Int {
     sum = 0;
     this.unsafeEach(x -> !sum = sum + x);
