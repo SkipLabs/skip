@@ -600,6 +600,66 @@ mutable class BuildRunner(
     }
   }
 
+  private mutable fun generate_dispatcher(unit: Unit): String {
+    dir = Path.join(this.layout_for(unit).build, "dispatch");
+    this.create_dir(dir);
+    dispatcher_path = Path.join(dir, "__skargo_dispatch.sk");
+
+    bins = unit.pkg.manifest.targets.filter(t -> t.is_bin()).collect(Array);
+    test_entry_opt = unit.pkg.manifest.test_target().map(t ->
+      t.kind match {
+      | TestTarget(e) -> e
+      | _ -> invariant_violation("expected TestTarget")
+      }
+    );
+
+    lines = mutable Vector[];
+    lines.push("module SkipInternal;");
+    lines.push("untracked fun dispatch(): void {");
+    lines.push("  name = Environ.varOpt(\"SKARGO_BIN\") match {");
+    lines.push("  | Some(n) -> n");
+    lines.push("  | None() -> Path.basename(Environ.args().next().fromSome())");
+    lines.push("  };");
+    lines.push("  name match {");
+    for (bin in bins) {
+      bin.kind match {
+      | BinTarget(entry) -> lines.push(`  | "${bin.name}" -> ${entry}()`)
+      | _ -> invariant_violation("expected BinTarget")
+      }
+    };
+    test_entry_opt.each(test_entry ->
+      lines.push(`  | "test" -> ${test_entry}()`)
+    );
+    if (bins.size() == 1 && test_entry_opt.isNone()) {
+      bins[0].kind match {
+      | BinTarget(entry) -> lines.push(`  | _ -> ${entry}()`)
+      | _ -> invariant_violation("expected BinTarget")
+      }
+    } else if (bins.size() == 1) {
+      bins[0].kind match {
+      | BinTarget(entry) -> lines.push(`  | _ -> ${entry}()`)
+      | _ -> invariant_violation("expected BinTarget")
+      }
+    } else {
+      names = bins.map(b -> b.name);
+      if (test_entry_opt.isSome()) !names = names.concat(Array["test"]);
+      lines.push(`  | unknown ->`);
+      lines.push(
+        `    print_error("Unknown binary '" + unknown + "'. Set SKARGO_BIN to one of: ${names.join(
+          ", ",
+        )}");`,
+      );
+      lines.push("    skipExit(1)")
+    };
+    lines.push("  }");
+    lines.push("}");
+    lines.push("module end;");
+
+    content = lines.join("\n");
+    FileSystem.writeTextFile(dispatcher_path, content);
+    dispatcher_path
+  }
+
   private readonly fun build_dir_for(unit: Unit): String {
     assert(unit.target.is_build_script());
 
