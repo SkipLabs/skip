@@ -89,7 +89,7 @@ fun execTest(gctx: GlobalContext, args: Cli.ParseResults): void {
   // Find the test unit: a TestTarget (normal mode) or a HardlinkTarget
   // named "test" (merged mode).
   test_unit = bctx.roots.find(r -> r.target.kind is TestTarget _) match {
-  | Some(u) -> Some(u)
+  | some @ Some _ -> some
   | None() ->
     bctx.roots.find(r ->
       r.target.kind is HardlinkTarget _ && r.target.name == "test"
@@ -109,11 +109,12 @@ fun execTest(gctx: GlobalContext, args: Cli.ParseResults): void {
         "host",
         opts.build_config.requested_profile,
       );
-      Some(Path.join(path, unit.target.name))
+      setSkargoBinEnv = unit.target.kind is HardlinkTarget _;
+      Some((Path.join(path, unit.target.name), setSkargoBinEnv))
     }
   };
   optBinary match {
-  | Some(binary) ->
+  | Some((binary, setSkargoBinEnv)) ->
     if (!FileSystem.exists(binary)) {
       gctx.console.error(
         `\`skargo test\` could not find test binary ${binary}.`,
@@ -121,7 +122,7 @@ fun execTest(gctx: GlobalContext, args: Cli.ParseResults): void {
       skipExit(1)
     };
     // In merged mode, set SKARGO_BIN=test so the dispatcher routes to tests.
-    if (test_unit.fromSome().target.kind is HardlinkTarget _) {
+    if (setSkargoBinEnv) {
       Environ.set_var("SKARGO_BIN", "test")
     };
     cmd_args = Array[binary].concat(
