@@ -1,0 +1,24 @@
+module JSNumber;
+
+/** Converts a Float to its string representation using JavaScript's
+ * Number.prototype.toString() conventions:
+ * - Fixed notation for values in [1e-6, 1e21)
+ * - Exponential notation otherwise (e.g., "1e+21", "1e-7")
+ * - No trailing zeros ("1.5", not "1.50"; "1", not "1.0")
+ * - Special values: "NaN", "Infinity", "-Infinity"
+ * - Negative zero: "0" (sign dropped)
+ * Uses the Ryu algorithm internally for shortest-representation.
+ */
+@cpp_extern("SKIP_JSNumber_toString")
+native fun floatToString(value: Float): String;
+
+/** Parses a string to a Float using strtod. */
+@cpp_extern("SKIP_JSNumber_toFloat")
+native fun toFloat(s: String): Float;
+
+/** Reinterprets the raw IEEE 754 bits as a Float.
+ * Inverse of Float.toBits(). */
+@cpp_extern("SKIP_JSNumber_fromBits")
+native fun fromBits(bits: Int): Float;
+
+module end;

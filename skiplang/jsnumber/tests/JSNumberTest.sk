@@ -1,0 +1,110 @@
+module alias T = SKTest;
+
+module JSNumberTests;
+
+// Helper: construct a Float from its IEEE 754 bit pattern and format it.
+// This avoids the compiler's constant-folding which round-trips floats
+// through the prelude's low-precision Float.toString().
+fun jsFromBits(bits: Int): String {
+  JSNumber.floatToString(JSNumber.fromBits(bits))
+}
+
+@test
+fun testBasicValues(): void {
+  T.expectEq(jsFromBits(0), "0"); // 0.0
+  T.expectEq(jsFromBits(4607182418800017408), "1"); // 1.0
+  T.expectEq(jsFromBits(-4616189618054758400), "-1"); // -1.0
+  T.expectEq(jsFromBits(4602678819172646912), "0.5"); // 0.5
+  T.expectEq(jsFromBits(4609434218613702656), "1.5"); // 1.5
+  T.expectEq(jsFromBits(4612811918334230528), "2.5"); // 2.5
+  T.expectEq(jsFromBits(4636737291354636288), "100"); // 100.0
+  T.expectEq(jsFromBits(4614253070214989087), "3.14"); // 3.14
+}
+
+@test
+fun testShortestRepresentation(): void {
+  T.expectEq(jsFromBits(4591870180066957722), "0.1");
+  T.expectEq(jsFromBits(4599075939470750515), "0.3");
+  // 0.1 + 0.2 is not exactly 0.3 in IEEE 754
+  T.expectEq(jsFromBits(4599075939470750516), "0.30000000000000004");
+  // 1/3
+  T.expectEq(jsFromBits(4599676419421066581), "0.3333333333333333");
+}
+
+@test
+fun testSpecialValues(): void {
+  T.expectEq(jsFromBits(9221120237041090560), "NaN"); // NaN
+  T.expectEq(jsFromBits(9218868437227405312), "Infinity"); // +Infinity
+  T.expectEq(jsFromBits(-4503599627370496), "-Infinity"); // -Infinity
+}
+
+@test
+fun testNegativeZero(): void {
+  T.expectEq(jsFromBits(-9223372036854775808), "0"); // -0.0
+}
+
+@test
+fun testFixedNotationLarge(): void {
+  T.expectEq(jsFromBits(4696837146684686336), "1000000"); // 1e6
+  T.expectEq(jsFromBits(4831355200913801216), "1000000000000000"); // 1e15
+  T.expectEq(jsFromBits(4906019910204099648), "100000000000000000000"); // 1e20
+  // 999999999999999900000.0 (largest fixed-notation value)
+  T.expectEq(jsFromBits(4921056587992461135), "999999999999999900000");
+}
+
+@test
+fun testFixedNotationSmall(): void {
+  T.expectEq(jsFromBits(4517329193108106637), "0.000001"); // 1e-6
+}
+
+@test
+fun testExponentialNotation(): void {
+  // Large values (exponent >= 21)
+  T.expectEq(jsFromBits(4921056587992461136), "1e+21");
+  T.expectEq(jsFromBits(6103021453049119613), "1e+100");
+  // Small values (exponent <= -7)
+  T.expectEq(jsFromBits(4502148214488346440), "1e-7");
+  T.expectEq(jsFromBits(4457293557087583675), "1e-10");
+}
+
+@test
+fun testExtremeValues(): void {
+  // Smallest subnormal: 5e-324
+  T.expectEq(jsFromBits(1), "5e-324");
+  // Largest double: 1.7976931348623157e+308
+  T.expectEq(jsFromBits(9218868437227405311), "1.7976931348623157e+308");
+}
+
+@test
+fun testLargeIntegers(): void {
+  // MAX_SAFE_INTEGER = 9007199254740991
+  T.expectEq(jsFromBits(4845873199050653695), "9007199254740991");
+  // MAX_SAFE_INTEGER + 1 = 9007199254740992
+  T.expectEq(jsFromBits(4845873199050653696), "9007199254740992");
+}
+
+@test
+fun testPi(): void {
+  T.expectEq(jsFromBits(4614256656552045848), "3.141592653589793");
+}
+
+@test
+fun testRoundTrip(): void {
+  bitPatterns = Array[
+    4591870180066957722, // 0.1
+    4596373779694328218, // 0.2
+    4599075939470750515, // 0.3
+    4614253070214989087, // 3.14
+    4457293557087583675, // 1e-10
+    4906019910204099648, // 1e20
+    9218868437227405311, // MAX_DOUBLE
+  ];
+  bitPatterns.each(bits -> {
+    v = JSNumber.fromBits(bits);
+    s = JSNumber.floatToString(v);
+    roundTripped = JSNumber.toFloat(s);
+    T.expectEq(roundTripped.toBits(), v.toBits())
+  });
+}
+
+module end;

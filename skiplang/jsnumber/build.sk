@@ -1,0 +1,14 @@
+fun main(): void {
+  target = Environ.var("TARGET");
+  isWasm32 = target.startsWith("wasm32");
+  if (!isWasm32) {
+    srcs = Array["extern/src/d2s.c", "extern/src/jsnumber_skip.c"];
+    srcs.each(f -> print_string(`skargo:rerun-if-changed=${f}`));
+    Cc.Build()
+      .flags(Cc.kRecommendedCflags)
+      .include("extern/src")
+      .define("NDEBUG")
+      .files(srcs)
+      .compile("jsnumber")
+  }
+}
