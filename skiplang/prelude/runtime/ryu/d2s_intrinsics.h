@@ -17,8 +17,10 @@
 #ifndef RYU_D2S_INTRINSICS_H
 #define RYU_D2S_INTRINSICS_H
 
-#include <assert.h>
 #include <stdint.h>
+#ifndef SKIP32
+#include <assert.h>
+#endif
 
 // Defines RYU_32_BIT_PLATFORM if applicable.
 #include "ryu/common.h"
