@@ -27,13 +27,19 @@
 //     size by about 10x (only one case, and only double) at the cost of some
 //     performance. Currently requires MSVC intrinsics.
 
-#include "ryu/ryu.h"
-
-#include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
+#ifdef SKIP32
+// WASM: no libc. memcpy is a compiler builtin; assert is a no-op.
+void *memcpy(void *, const void *, unsigned long);
+#define assert(x) ((void) 0)
+#else
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#endif
+
+#include "ryu/ryu.h"
 
 #ifdef RYU_DEBUG
 #include <inttypes.h>
@@ -502,8 +508,10 @@ void d2s_buffered(double f, char *result) {
   result[index] = '\0';
 }
 
+#ifndef SKIP32
 char *d2s(double f) {
   char *const result = (char *) malloc(25);
   d2s_buffered(f, result);
   return result;
 }
+#endif

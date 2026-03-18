@@ -21,7 +21,9 @@
 extern "C" {
 #endif
 
+#ifndef SKIP32
 #include <inttypes.h>
+#endif
 
 int d2s_buffered_n(double f, char *result);
 void d2s_buffered(double f, char *result);

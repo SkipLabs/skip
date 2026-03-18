@@ -17,9 +17,13 @@
 #ifndef RYU_COMMON_H
 #define RYU_COMMON_H
 
-#include <assert.h>
 #include <stdint.h>
+#ifdef SKIP32
+#define assert(x) ((void) 0)
+#else
+#include <assert.h>
 #include <string.h>
+#endif
 
 #if defined(_M_IX86) || defined(_M_ARM)
 #define RYU_32_BIT_PLATFORM
