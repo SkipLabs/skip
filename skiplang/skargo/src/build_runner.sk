@@ -181,8 +181,19 @@ mutable class BuildRunner(
 
       // Hardlink targets don't compile — just create the link.
       if (unit.target.kind is HardlinkTarget _) {
-        this.prepare_unit(unit);
-        this.link_targets(unit);
+        if (!check) {
+          this.prepare_unit(unit);
+          this.link_targets(unit)
+        };
+        continue
+      };
+
+      // In check mode, skip bin roots — the lib check covers all code.
+      if (
+        check &&
+        unit.target.kind is BinTarget _ &&
+        this.bctx.roots.contains(unit)
+      ) {
         continue
       };
 
