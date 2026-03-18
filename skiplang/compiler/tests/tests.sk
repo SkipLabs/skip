@@ -2,24 +2,31 @@ module alias T = SKTest;
 
 module SkcTests;
 
+// Convert a test path like "Runtime/Float1" to module name "RuntimeFloat1".
+// Since files are already PascalCase, just concatenate path segments.
+private fun testPathToModuleName(testPath: String): String {
+  testPath.split("/").join("")
+}
+
 private fun compile_cmd(
   files: readonly Sequence<String>,
   output: String,
+  mainFn: String = "main",
 ): Array<String> {
   Array[
     "skc",
     "-O0",
     "--no-inline",
     "--export-function-as",
-    "main=skip_main",
+    mainFn + "=skip_main",
     "-o",
     output,
   ].concat(files.collect(Array))
 }
 
-private fun genValidTest(basename: String): void {
+private fun genValidTest(basename: String, mainFn: String): void {
   p = System.subprocess(
-    compile_cmd(Array[basename + ".sk"], basename + ".bin"),
+    compile_cmd(Array[basename + ".sk"], basename + ".bin", mainFn),
   ).fromSuccess();
   if (!p.success()) {
     T.fail(
@@ -66,9 +73,13 @@ fun main(): void {
   for (testFile in validTests) {
     basename = testFile.stripSuffix(".exp");
     (testSuite, testName) = basename.stripPrefix("tests/").splitLast("/");
+    moduleName = testPathToModuleName(testSuite + "/" + testName);
+    mainFn = moduleName + ".main";
     tests
       .getOrAdd(testSuite, () -> mutable Vector[])
-      .push(T.Test{name => testName, func => () ~> genValidTest(basename)});
+      .push(
+        T.Test{name => testName, func => () ~> genValidTest(basename, mainFn)},
+      );
   };
 
   invalidTests = FileSystem.readFilesRecursive("./invalid_tests", fn ->

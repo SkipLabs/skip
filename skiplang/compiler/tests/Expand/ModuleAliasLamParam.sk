@@ -1,12 +1,20 @@
-module alias A = M;
+module alias A = ExpandModuleAliasLamParamM;
 
-module M;
+module ExpandModuleAliasLamParam;
+
+module end;
+
+module ExpandModuleAliasLamParamM;
 
 class C() {}
 
 module end;
 
+module ExpandModuleAliasLamParam;
+
 fun main(): void {
   f = (_: A.C) -> "Pass\n";
-  print_raw(f(M.C()))
+  print_raw(f(ExpandModuleAliasLamParamM.C()))
 }
+
+module end;

@@ -1,7 +1,7 @@
-module A;
+module ExpandResolveNamesA;
 
 fun foo(): Quux {
-  bar + baz() + Foo().bar() + Foo.baz()
+  bar + baz() + Foo().bar() + ExpandResolveNamesFoo.baz()
 }
 
 const bar: String = "P";
@@ -20,7 +20,7 @@ type Quux = String;
 
 module end;
 
-module Foo;
+module ExpandResolveNamesFoo;
 
 fun baz(): String {
   "s"
@@ -28,6 +28,10 @@ fun baz(): String {
 
 module end;
 
+module ExpandResolveNames;
+
 fun main(): void {
-  print_raw(A.foo() + "\n")
+  print_raw(ExpandResolveNamesA.foo() + "\n")
 }
+
+module end;

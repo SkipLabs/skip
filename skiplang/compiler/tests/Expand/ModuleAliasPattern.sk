@@ -1,15 +1,21 @@
-module alias I = M;
+module alias I = ExpandModuleAliasPatternM;
 
-module M;
+module ExpandModuleAliasPattern;
+
+module end;
+
+module ExpandModuleAliasPatternM;
 
 class A()
 class B(A)
 
 module end;
 
+module ExpandModuleAliasPattern;
+
 fun main(): void {
-  a = M.A();
-  b = M.B(a);
+  a = ExpandModuleAliasPatternM.A();
+  b = ExpandModuleAliasPatternM.B(a);
 
   _ = a match {
   | I.A() -> void
@@ -21,16 +27,19 @@ fun main(): void {
 
   // This does not.
   (a, a) match {
-  | (I.A(), M.A()) -> void
+  | (I.A(), ExpandModuleAliasPatternM.A()) -> void
   };
 
   b match {
-  | I.B(M.A()) -> void
+  | I.B(ExpandModuleAliasPatternM.A()) -> void
   };
 
   (b, b) match {
-  | (I.B(I.A()), M.B(M.A())) -> void
+  | (I.B(I.A()), ExpandModuleAliasPatternM.B(ExpandModuleAliasPatternM.A())) ->
+    void
   };
 
   print_string("Pass")
 }
+
+module end;

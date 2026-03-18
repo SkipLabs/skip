@@ -1,4 +1,4 @@
-module T;
+module RuntimeOverridesT;
 base class List<+T> extends Sequence<T> {
   children =
   | Nil()
@@ -46,10 +46,14 @@ mutable class ListIterator<+T>(
 }
 module end;
 
+module RuntimeOverrides;
+
 fun main(): void {
-  list = T.Cons("Pass", T.Nil());
+  list = RuntimeOverridesT.Cons("Pass", RuntimeOverridesT.Nil());
   list.reversed() match {
-  | T.Cons(r, _) -> print_string(r)
+  | RuntimeOverridesT.Cons(r, _) -> print_string(r)
   | _ -> print_string("fail")
   }
 }
+
+module end;

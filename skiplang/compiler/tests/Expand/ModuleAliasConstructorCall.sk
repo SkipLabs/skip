@@ -1,13 +1,24 @@
-module alias I = M;
+module alias I = ExpandModuleAliasConstructorCallM;
 
-module M;
+module ExpandModuleAliasConstructorCall;
+
+module end;
+
+module ExpandModuleAliasConstructorCallM;
 class C{f1: Bool, f2: Bool}
 module end;
 
-const n: M.C = M.C{f1 => false, f2 => false};
+module ExpandModuleAliasConstructorCall;
+
+const n: ExpandModuleAliasConstructorCallM.C = ExpandModuleAliasConstructorCallM.C{
+  f1 => false,
+  f2 => false,
+};
 
 const j: I.C = I.C{f1 => false, f2 => false};
 
 fun main(): void {
   print_string("Pass")
 }
+
+module end;

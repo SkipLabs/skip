@@ -1,15 +1,23 @@
-module alias B = A;
+module alias B = ExpandModuleAlias3A;
 
-module A;
+module ExpandModuleAlias3;
+
+module end;
+
+module ExpandModuleAlias3A;
 
 class Foo()
 
 module end;
 
+module ExpandModuleAlias3;
+
 fun main(): void {
-  _ = A.Foo();
-  _ = Array<A.Foo>[];
+  _ = ExpandModuleAlias3A.Foo();
+  _ = Array<ExpandModuleAlias3A.Foo>[];
   _ = B.Foo();
   _ = Array<B.Foo>[];
   print_string("Pass")
 }
+
+module end;

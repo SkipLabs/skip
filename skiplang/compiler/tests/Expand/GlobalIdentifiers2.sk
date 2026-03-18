@@ -1,20 +1,27 @@
+module ExpandGlobalIdentifiers2;
 type RealString = String;
 class Foo<T>()
 
-module M;
+module end;
+
+module ExpandGlobalIdentifiers2M;
 
 class String() {}
 
-fun works(): Foo<RealString> {
-  Foo()
+fun works(): ExpandGlobalIdentifiers2.Foo<ExpandGlobalIdentifiers2.RealString> {
+  ExpandGlobalIdentifiers2.Foo()
 }
 
-fun worksToo(): Foo<.String> {
-  Foo()
+fun worksToo(): ExpandGlobalIdentifiers2.Foo<.String> {
+  ExpandGlobalIdentifiers2.Foo()
 }
 
 module end;
 
+module ExpandGlobalIdentifiers2;
+
 fun main(): void {
   print_string("Pass")
 }
+
+module end;

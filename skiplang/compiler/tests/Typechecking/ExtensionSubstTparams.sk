@@ -1,3 +1,4 @@
+module TypecheckingExtensionSubstTparams;
 trait Foo<+T>
 
 trait XIntable {
@@ -10,24 +11,28 @@ class XCIntable() uses XIntable {
   }
 }
 
-module M;
+module end;
+
+module TypecheckingExtensionSubstTparamsM;
 mutable base class .XSeq<+T>(value: T)
 module end;
-mutable class XCSeq<V> extends XSeq<V>
 
-extension base class XSeq uses Foo<T>
-extension base class XSeq uses XIntable[T: XIntable] {
+module TypecheckingExtensionSubstTparams;
+mutable class XCSeq<V> extends .XSeq<V>
+
+extension base class .XSeq uses Foo<T>
+extension base class .XSeq uses XIntable[T: XIntable] {
   fun xintable[T: XIntable](): Int {
     this.value.xintable() + 1
   }
 }
-extension base class XSeq {
+extension base class .XSeq {
   fun addem<T: Int>(x: T, y: T): Int {
     (x : T) + (y : T)
   }
 }
 
-extension base class XSeq {
+extension base class .XSeq {
   fun vecit(): Vector<T> {
     Vector<T>[this.value]
   }
@@ -36,3 +41,5 @@ extension base class XSeq {
 fun main(): void {
   print_string("Pass")
 }
+
+module end;
