@@ -2,7 +2,7 @@ import type {
   Context,
   EagerCollection,
   Mapper,
-  NamedCollections,
+  NamedEagerCollections,
   Resource,
   Values,
 } from "@skipruntime/core";
@@ -33,9 +33,9 @@ class Mult implements Mapper<string, [number, number], string, number> {
   }
 }
 
-class MultResource implements Resource {
+class MultResource implements Resource<NamedEagerCollections> {
   instantiate(
-    _collections: NamedCollections,
+    _collections: NamedEagerCollections,
     context: Context,
   ): EagerCollection<string, number> {
     const sub = context
@@ -54,6 +54,7 @@ class MultResource implements Resource {
   }
 }
 const service = {
+  inputs: {},
   resources: { data: MultResource },
   externalServices: {
     sumexample: SkipExternalService.direct({
@@ -63,7 +64,7 @@ const service = {
     }),
   },
 
-  createGraph(inputCollections: NamedCollections) {
+  createGraph(inputCollections: NamedEagerCollections) {
     return inputCollections;
   },
 };

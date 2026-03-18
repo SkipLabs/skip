@@ -7,6 +7,7 @@ import type {
   Resource,
   Values,
 } from "@skipruntime/core";
+import { InputDefinition } from "@skipruntime/core";
 
 import { runService } from "@skipruntime/server";
 
@@ -84,7 +85,7 @@ class ComputedCells implements Resource<Outputs> {
   }
 }
 const service = {
-  initialData: { cells: [] },
+  inputs: { cells: new InputDefinition() },
   resources: { computed: ComputedCells },
   createGraph(inputCollections: Inputs, context: Context): Outputs {
     const cells = inputCollections.cells;
