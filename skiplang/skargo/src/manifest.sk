@@ -233,6 +233,10 @@ class Manifest(
   fun test_target(): ?Target {
     this.targets.find(t -> t.is_test())
   }
+
+  fun has_bins(): Bool {
+    this.targets.any(t -> t.is_bin())
+  }
 }
 
 class PackageId(
@@ -278,6 +282,7 @@ base class TargetKind uses Equality, Hashable {
   | BinTarget(entry_point: String)
   | TestTarget(entry_point: String)
   | CustomBuildTarget()
+  | HardlinkTarget(source: String)
 }
 
 private fun manifest_targets(

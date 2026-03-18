@@ -93,6 +93,11 @@ private class BuildContext{
   target_data: SkcTargetData,
 }
 
+// In dev mode with bins, all targets are merged into a single binary.
+fun should_merge(profile: String, manifest: Manifest): Bool {
+  profile == "dev" && manifest.has_bins()
+}
+
 // TODO: Return Result<...>
 fun create_bctx(
   gctx: GlobalContext,
@@ -167,6 +172,27 @@ private fun generate_root_units(
     );
     res.collect(Array)
   };
+  // In dev mode with binaries, merge all bin+test targets into a single
+  // __merged binary. Each original bin/test becomes a HardlinkTarget.
+  !targets = if (
+    should_merge(build_config.requested_profile, package.manifest)
+  ) {
+    merged = Target(BinTarget("SkipInternal.dispatch"), "__merged", Array[]);
+
+    // Replace bin/test targets with hardlinks; keep lib and others as-is.
+    replaced = targets.map(t ->
+      if (t.is_bin() || t.is_test()) {
+        t with {kind => HardlinkTarget("__merged")}
+      } else {
+        t
+      }
+    );
+
+    Array[merged].concat(replaced)
+  } else {
+    targets
+  };
+
   targets
     .map(target -> {
       Unit(
@@ -283,6 +309,9 @@ private fun compute_deps(
   unit_deps = mutable Vector[];
 
   unit.target.kind match {
+  | HardlinkTarget _ ->
+    // Hardlink targets have no compilation deps; they just link.
+    return Array[]
   | BinTarget _
   | TestTarget _
   | LibTarget(LibraryTypeCdylib _) ->
@@ -320,9 +349,13 @@ private fun compute_deps(
     // Binary targets always depend on the lib target, which pulls in the
     // dependencies transitively.
     | BinTarget _ -> false
-    | LibTarget _ -> dep.kind is NormalDep _
+    | LibTarget _ ->
+      dep.kind is NormalDep _ ||
+        (should_merge(unit.profile, unit.pkg.manifest) &&
+          dep.kind is DevelopmentDep _)
     | TestTarget _ -> dep.kind is DevelopmentDep _
     | CustomBuildTarget _ -> dep.kind is BuildDep _
+    | HardlinkTarget _ -> false
     }
   );
   for (dep in deps) {
