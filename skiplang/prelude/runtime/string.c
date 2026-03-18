@@ -216,6 +216,128 @@ void* SKIP_String_unsafeSlice(unsigned char* str, SkipInt n1, SkipInt n2) {
   return result;
 }
 
+/**
+ * Format a non-negative, finite double using Ryu shortest representation
+ * with Skip's formatting conventions:
+ *   - Fixed notation for exponents in [-4, 14]
+ *   - Scientific notation otherwise
+ *   - Integer-valued floats get ".0" suffix
+ *   - Exponent format: e+N, e-0N (single digit), e-NN (multi digit)
+ *
+ * Uses Ryu's d2s_buffered_n() which has no libc dependency, so this
+ * works in both SKIP64 (native) and SKIP32 (WASM).
+ */
+#include "ryu/ryu.h"
+int d2s_buffered_n(double f, char* result);
+
+char* SKIP_Float_format17(double value) {
+  if (value == 0.0) return sk_string_create("0.0", 3);
+
+  /* Get Ryu's shortest representation.
+   * Format: digit ['.' digits] 'E' ['-'] digits
+   * Examples: "1E0", "1E-1", "3141592653589793E-15", "1E20" */
+  char ryu_buf[32];
+  int ryu_len = d2s_buffered_n(value, ryu_buf);
+  ryu_buf[ryu_len] = '\0';
+
+  /* Parse: collect mantissa digits and exponent. */
+  int pos = 0;
+  char digits[20];
+  int nd = 0;
+
+  while (ryu_buf[pos] != 'E') {
+    if (ryu_buf[pos] != '.') {
+      digits[nd++] = ryu_buf[pos];
+    }
+    pos++;
+  }
+  pos++; /* skip 'E' */
+
+  int exp_neg = 0;
+  if (ryu_buf[pos] == '-') {
+    exp_neg = 1;
+    pos++;
+  }
+  int ryu_exp = 0;
+  while (pos < ryu_len) {
+    ryu_exp = ryu_exp * 10 + (ryu_buf[pos] - '0');
+    pos++;
+  }
+  if (exp_neg) ryu_exp = -ryu_exp;
+
+  /* dot_pos = ryu_exp + 1 = number of digits before decimal point */
+  int dot_pos = ryu_exp + 1;
+
+  char out[64];
+  int out_len = 0;
+
+  if (dot_pos >= 1 && dot_pos <= 15) {
+    /* Fixed notation, value >= 1 */
+    if (dot_pos <= nd) {
+      memcpy(out, digits, dot_pos);
+      out_len = dot_pos;
+      if (dot_pos < nd) {
+        out[out_len++] = '.';
+        memcpy(out + out_len, digits + dot_pos, nd - dot_pos);
+        out_len += nd - dot_pos;
+      } else {
+        out[out_len++] = '.';
+        out[out_len++] = '0';
+      }
+    } else {
+      /* All digits before decimal, pad with zeros */
+      memcpy(out, digits, nd);
+      out_len = nd;
+      int zeros = dot_pos - nd;
+      for (int i = 0; i < zeros; i++) out[out_len++] = '0';
+      out[out_len++] = '.';
+      out[out_len++] = '0';
+    }
+  } else if (dot_pos <= 0 && dot_pos >= -3) {
+    /* Fixed notation, value < 1: "0." + leading zeros + digits */
+    out[out_len++] = '0';
+    out[out_len++] = '.';
+    for (int i = 0; i < -dot_pos; i++) out[out_len++] = '0';
+    memcpy(out + out_len, digits, nd);
+    out_len += nd;
+  } else {
+    /* Scientific notation */
+    out[out_len++] = digits[0];
+    if (nd > 1) {
+      out[out_len++] = '.';
+      memcpy(out + out_len, digits + 1, nd - 1);
+      out_len += nd - 1;
+    } else {
+      out[out_len++] = '.';
+      out[out_len++] = '0';
+    }
+    /* Format exponent */
+    int e = ryu_exp;
+    if (e < 0) {
+      out[out_len++] = 'e';
+      out[out_len++] = '-';
+      e = -e;
+      if (e < 10) out[out_len++] = '0';
+    } else {
+      out[out_len++] = 'e';
+      out[out_len++] = '+';
+    }
+    if (e >= 100) {
+      out[out_len++] = (char)('0' + e / 100);
+      e %= 100;
+      out[out_len++] = (char)('0' + e / 10);
+      out[out_len++] = (char)('0' + e % 10);
+    } else if (e >= 10) {
+      out[out_len++] = (char)('0' + e / 10);
+      out[out_len++] = (char)('0' + e % 10);
+    } else {
+      out[out_len++] = (char)('0' + e);
+    }
+  }
+
+  return sk_string_create(out, out_len);
+}
+
 extern char* SKIP_floatToString(double origf);
 
 char* SKIP_Float_toString(double origf) {
