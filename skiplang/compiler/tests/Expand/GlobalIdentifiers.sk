@@ -1,25 +1,25 @@
 module ExpandGlobalIdentifiers;
 fun main(): void {
-  _: TInt = x;
-  //  _ : TInt = Y;
-  _ = Foo();
-  _ = BarChild();
-  print_raw(pass())
+  _: GI_TInt = gi_x;
+  //  _ : GI_TInt = gi_Y;
+  _ = GI_Foo();
+  _ = GI_BarChild();
+  print_raw(gi_pass())
 }
 
 module end;
 
 module ExpandGlobalIdentifiersM;
 
-type .TInt = Int;
-const .x: Int = 42;
-const .Y: Int = 0;
-class .Foo()
+type .GI_TInt = Int;
+const .gi_x: Int = 42;
+const .gi_Y: Int = 0;
+class .GI_Foo()
 base class Bar {
   children =
-  | .BarChild()
+  | .GI_BarChild()
 }
-fun .pass(): String {
+fun .gi_pass(): String {
   "Pass\n"
 }
 
