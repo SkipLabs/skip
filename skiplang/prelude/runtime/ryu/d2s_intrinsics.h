@@ -39,7 +39,7 @@ typedef __uint128_t uint128_t;
 
 #include <intrin.h>
 
-static inline uint64_t umul128(const uint64_t a, const uint64_t b, uint64_t* const productHi) {
+static inline uint64_t umul128(const uint64_t a, const uint64_t b, uint64_t *const productHi) {
   return _umul128(a, b, productHi);
 }
 
@@ -61,31 +61,31 @@ static inline uint64_t shiftright128(const uint64_t lo, const uint64_t hi, const
 
 #else // defined(HAS_64_BIT_INTRINSICS)
 
-static inline uint64_t umul128(const uint64_t a, const uint64_t b, uint64_t* const productHi) {
+static inline uint64_t umul128(const uint64_t a, const uint64_t b, uint64_t *const productHi) {
   // The casts here help MSVC to avoid calls to the __allmul library function.
-  const uint32_t aLo = (uint32_t)a;
-  const uint32_t aHi = (uint32_t)(a >> 32);
-  const uint32_t bLo = (uint32_t)b;
-  const uint32_t bHi = (uint32_t)(b >> 32);
+  const uint32_t aLo = (uint32_t) a;
+  const uint32_t aHi = (uint32_t) (a >> 32);
+  const uint32_t bLo = (uint32_t) b;
+  const uint32_t bHi = (uint32_t) (b >> 32);
 
-  const uint64_t b00 = (uint64_t)aLo * bLo;
-  const uint64_t b01 = (uint64_t)aLo * bHi;
-  const uint64_t b10 = (uint64_t)aHi * bLo;
-  const uint64_t b11 = (uint64_t)aHi * bHi;
+  const uint64_t b00 = (uint64_t) aLo * bLo;
+  const uint64_t b01 = (uint64_t) aLo * bHi;
+  const uint64_t b10 = (uint64_t) aHi * bLo;
+  const uint64_t b11 = (uint64_t) aHi * bHi;
 
-  const uint32_t b00Lo = (uint32_t)b00;
-  const uint32_t b00Hi = (uint32_t)(b00 >> 32);
+  const uint32_t b00Lo = (uint32_t) b00;
+  const uint32_t b00Hi = (uint32_t) (b00 >> 32);
 
   const uint64_t mid1 = b10 + b00Hi;
-  const uint32_t mid1Lo = (uint32_t)(mid1);
-  const uint32_t mid1Hi = (uint32_t)(mid1 >> 32);
+  const uint32_t mid1Lo = (uint32_t) (mid1);
+  const uint32_t mid1Hi = (uint32_t) (mid1 >> 32);
 
   const uint64_t mid2 = b01 + mid1Lo;
-  const uint32_t mid2Lo = (uint32_t)(mid2);
-  const uint32_t mid2Hi = (uint32_t)(mid2 >> 32);
+  const uint32_t mid2Lo = (uint32_t) (mid2);
+  const uint32_t mid2Hi = (uint32_t) (mid2 >> 32);
 
   const uint64_t pHi = b11 + mid1Hi + mid2Hi;
-  const uint64_t pLo = ((uint64_t)mid2Lo << 32) | b00Lo;
+  const uint64_t pLo = ((uint64_t) mid2Lo << 32) | b00Lo;
 
   *productHi = pHi;
   return pLo;
@@ -256,26 +256,26 @@ static inline bool multipleOfPowerOf2(const uint64_t value, const uint32_t p) {
 #if defined(HAS_UINT128)
 
 // Best case: use 128-bit type.
-static inline uint64_t mulShift64(const uint64_t m, const uint64_t* const mul, const int32_t j) {
+static inline uint64_t mulShift64(const uint64_t m, const uint64_t *const mul, const int32_t j) {
   const uint128_t b0 = ((uint128_t) m) * mul[0];
   const uint128_t b2 = ((uint128_t) m) * mul[1];
   return (uint64_t) (((b0 >> 64) + b2) >> (j - 64));
 }
 
-static inline uint64_t mulShiftAll64(const uint64_t m, const uint64_t* const mul, const int32_t j,
-  uint64_t* const vp, uint64_t* const vm, const uint32_t mmShift) {
-//  m <<= 2;
-//  uint128_t b0 = ((uint128_t) m) * mul[0]; // 0
-//  uint128_t b2 = ((uint128_t) m) * mul[1]; // 64
-//
-//  uint128_t hi = (b0 >> 64) + b2;
-//  uint128_t lo = b0 & 0xffffffffffffffffull;
-//  uint128_t factor = (((uint128_t) mul[1]) << 64) + mul[0];
-//  uint128_t vpLo = lo + (factor << 1);
-//  *vp = (uint64_t) ((hi + (vpLo >> 64)) >> (j - 64));
-//  uint128_t vmLo = lo - (factor << mmShift);
-//  *vm = (uint64_t) ((hi + (vmLo >> 64) - (((uint128_t) 1ull) << 64)) >> (j - 64));
-//  return (uint64_t) (hi >> (j - 64));
+static inline uint64_t mulShiftAll64(const uint64_t m, const uint64_t *const mul, const int32_t j,
+                                     uint64_t *const vp, uint64_t *const vm, const uint32_t mmShift) {
+  //  m <<= 2;
+  //  uint128_t b0 = ((uint128_t) m) * mul[0]; // 0
+  //  uint128_t b2 = ((uint128_t) m) * mul[1]; // 64
+  //
+  //  uint128_t hi = (b0 >> 64) + b2;
+  //  uint128_t lo = b0 & 0xffffffffffffffffull;
+  //  uint128_t factor = (((uint128_t) mul[1]) << 64) + mul[0];
+  //  uint128_t vpLo = lo + (factor << 1);
+  //  *vp = (uint64_t) ((hi + (vpLo >> 64)) >> (j - 64));
+  //  uint128_t vmLo = lo - (factor << mmShift);
+  //  *vm = (uint64_t) ((hi + (vmLo >> 64) - (((uint128_t) 1ull) << 64)) >> (j - 64));
+  //  return (uint64_t) (hi >> (j - 64));
   *vp = mulShift64(4 * m + 2, mul, j);
   *vm = mulShift64(4 * m - 1 - mmShift, mul, j);
   return mulShift64(4 * m, mul, j);
@@ -283,7 +283,7 @@ static inline uint64_t mulShiftAll64(const uint64_t m, const uint64_t* const mul
 
 #elif defined(HAS_64_BIT_INTRINSICS)
 
-static inline uint64_t mulShift64(const uint64_t m, const uint64_t* const mul, const int32_t j) {
+static inline uint64_t mulShift64(const uint64_t m, const uint64_t *const mul, const int32_t j) {
   // m is maximum 55 bits
   uint64_t high1;                                   // 128
   const uint64_t low1 = umul128(m, mul[1], &high1); // 64
@@ -296,8 +296,8 @@ static inline uint64_t mulShift64(const uint64_t m, const uint64_t* const mul, c
   return shiftright128(sum, high1, j - 64);
 }
 
-static inline uint64_t mulShiftAll64(const uint64_t m, const uint64_t* const mul, const int32_t j,
-  uint64_t* const vp, uint64_t* const vm, const uint32_t mmShift) {
+static inline uint64_t mulShiftAll64(const uint64_t m, const uint64_t *const mul, const int32_t j,
+                                     uint64_t *const vp, uint64_t *const vm, const uint32_t mmShift) {
   *vp = mulShift64(4 * m + 2, mul, j);
   *vm = mulShift64(4 * m - 1 - mmShift, mul, j);
   return mulShift64(4 * m, mul, j);
@@ -305,7 +305,7 @@ static inline uint64_t mulShiftAll64(const uint64_t m, const uint64_t* const mul
 
 #else // !defined(HAS_UINT128) && !defined(HAS_64_BIT_INTRINSICS)
 
-static inline uint64_t mulShift64(const uint64_t m, const uint64_t* const mul, const int32_t j) {
+static inline uint64_t mulShift64(const uint64_t m, const uint64_t *const mul, const int32_t j) {
   // m is maximum 55 bits
   uint64_t high1;                                   // 128
   const uint64_t low1 = umul128(m, mul[1], &high1); // 64
@@ -319,8 +319,8 @@ static inline uint64_t mulShift64(const uint64_t m, const uint64_t* const mul, c
 }
 
 // This is faster if we don't have a 64x64->128-bit multiplication.
-static inline uint64_t mulShiftAll64(uint64_t m, const uint64_t* const mul, const int32_t j,
-  uint64_t* const vp, uint64_t* const vm, const uint32_t mmShift) {
+static inline uint64_t mulShiftAll64(uint64_t m, const uint64_t *const mul, const int32_t j,
+                                     uint64_t *const vp, uint64_t *const vm, const uint32_t mmShift) {
   m <<= 1;
   // m is maximum 55 bits
   uint64_t tmp;
