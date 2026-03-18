@@ -30,12 +30,16 @@ fun check(): (Cli.Command, (GlobalContext, Cli.ParseResults) ~> void) {
 
 fun execCheck(gctx: GlobalContext, args: Cli.ParseResults): void {
   ws = workspace(args, gctx);
-  opts = compile_options(args) with {
-    filter => CompileFilterOnly{
+  opts = compile_options(args);
+  // In dev mode with bins, use the default filter to trigger merged mode.
+  // Otherwise, check lib + tests only.
+  has_bins = ws.package.manifest.targets.any(t -> t.is_bin());
+  if (opts.build_config.requested_profile != "dev" || !has_bins) {
+    !opts.filter = CompileFilterOnly{
       lib => LibRuleTrue(),
       bins => FilterRule::none(),
       tests => FilterRuleAll(),
-    },
+    }
   };
   bctx = create_bctx(gctx, ws, opts);
   withTimer(
