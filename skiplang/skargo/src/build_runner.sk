@@ -396,8 +396,7 @@ mutable class BuildRunner(
     // __merged (and all hardlinked bins/test) can link against it.
     if (
       unit.target.kind is LibTarget(LibraryTypeSklib _) &&
-      unit.profile == "dev" &&
-      unit.pkg.manifest.targets.any(t -> t.is_bin())
+      should_merge(unit.profile, unit.pkg.manifest)
     ) {
       unit.pkg.manifest.test_target().each(t -> skc.args(t.srcs));
       dispatcher_path = this.generate_dispatcher(unit);

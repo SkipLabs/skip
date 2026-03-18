@@ -70,8 +70,8 @@ fun execRun(gctx: GlobalContext, args: Cli.ParseResults): void {
     opts.build_config.requested_profile,
   );
   binary = Path.join(path, bin_name);
-  // In merged mode (dev), set SKARGO_BIN so the dispatcher routes correctly.
-  if (opts.build_config.requested_profile == "dev") {
+  // In merged mode, set SKARGO_BIN so the dispatcher routes correctly.
+  if (should_merge(opts.build_config.requested_profile, ws.package.manifest)) {
     Environ.set_var("SKARGO_BIN", bin_name)
   };
   gctx.console.status("Running", `\`${binary}\``);

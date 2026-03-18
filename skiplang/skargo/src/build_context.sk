@@ -93,6 +93,11 @@ private class BuildContext{
   target_data: SkcTargetData,
 }
 
+// In dev mode with bins, all targets are merged into a single binary.
+fun should_merge(profile: String, manifest: Manifest): Bool {
+  profile == "dev" && manifest.has_bins()
+}
+
 // TODO: Return Result<...>
 fun create_bctx(
   gctx: GlobalContext,
@@ -170,8 +175,7 @@ private fun generate_root_units(
   // In dev mode with binaries, merge all bin+test targets into a single
   // __merged binary. Each original bin/test becomes a HardlinkTarget.
   !targets = if (
-    build_config.requested_profile == "dev" &&
-    targets.any(t -> t.is_bin())
+    should_merge(build_config.requested_profile, package.manifest)
   ) {
     merged = Target(BinTarget("SkipInternal.dispatch"), "__merged", Array[]);
 
@@ -347,8 +351,7 @@ private fun compute_deps(
     | BinTarget _ -> false
     | LibTarget _ ->
       dep.kind is NormalDep _ ||
-        (unit.profile == "dev" &&
-          unit.pkg.manifest.targets.any(t -> t.is_bin()) &&
+        (should_merge(unit.profile, unit.pkg.manifest) &&
           dep.kind is DevelopmentDep _)
     | TestTarget _ -> dep.kind is DevelopmentDep _
     | CustomBuildTarget _ -> dep.kind is BuildDep _

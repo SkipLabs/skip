@@ -33,8 +33,7 @@ fun execCheck(gctx: GlobalContext, args: Cli.ParseResults): void {
   opts = compile_options(args);
   // In dev mode with bins, use the default filter to trigger merged mode.
   // Otherwise, check lib + tests only.
-  has_bins = ws.package.manifest.targets.any(t -> t.is_bin());
-  if (opts.build_config.requested_profile != "dev" || !has_bins) {
+  if (!should_merge(opts.build_config.requested_profile, ws.package.manifest)) {
     !opts.filter = CompileFilterOnly{
       lib => LibRuleTrue(),
       bins => FilterRule::none(),
