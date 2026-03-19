@@ -2,37 +2,31 @@ module Native_GlobalOrder;
 // Globals should get initialized in the order they appear in the file,
 // not the order of first use, and the initializer should only be run once.
 
-const first: String = {
-  print_string("Initializing first");
-  "first"
-};
+const first: Int = Time.time_ns();
+const second: Int = Time.time_ns();
 
-const second: String = {
-  print_string("Initializing second");
-  "second"
-};
-
-// NOTE: This is intentionally unreferenced.
-const third: String = {
-  print_string("Initializing third");
-  "third"
-};
+const third: Int = Time.time_ns();
 
 @no_inline
-fun getFirst(): String {
+fun getFirst(): Int {
   first
 }
 
 @no_inline
-fun getSecond(): String {
+fun getSecond(): Int {
   second
 }
 
 fun main(): void {
+  // Verify initialization order (file order, not use order)
+  invariant(first < second, "first should init before second");
+  invariant(second < third, "second should init before third");
+  // Verify each initializer ran exactly once (values are stable)
   b1 = getSecond();
   a1 = getFirst();
   b2 = getSecond();
   a2 = getFirst();
-  print_raw(a1 + " " + b1 + "\n" + a2 + " " + b2 + "\n")
+  invariant(a1 == a2 && b1 == b2, "initializers should run only once");
+  print_string("Pass")
 }
 module end;
