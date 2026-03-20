@@ -1882,7 +1882,17 @@ fun tfun_call(
   );
   args1 = TUtils.add_default_arguments(add_args, args);
   e = (pos, TAst.Call(f, args1));
-  check_tracking(pos, env, tracking);
+  allowTrackedCall = f.i1.i1 match {
+  | TAst.Fun(name, _) ->
+    SkipNaming.maybeGetFun(context, name.i1) match {
+    | Some(fd) -> annotationsContain(fd.annotations, "@allow_tracked_call", pos)
+    | None() -> false
+    }
+  | _ -> false
+  };
+  if (!allowTrackedCall) {
+    check_tracking(pos, env, tracking);
+  };
   (acc1, (return_ty, e))
 }
 
