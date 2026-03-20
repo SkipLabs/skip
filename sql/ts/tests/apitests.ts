@@ -659,7 +659,7 @@ COMMIT;
     const res = (await waitSynch(
       root,
       "select count(*) from has_constraint where i = 2",
-      (rows) => rows.length > 0,
+      (rows) => rows.scalarValue() === 1,
       {},
       true,
     )) as SKDBTable;
