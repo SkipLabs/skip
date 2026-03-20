@@ -37,7 +37,7 @@ fun assign_all_tests(
   assigned.map(v -> v.toArray())
 }
 
-fun test_job(
+untracked fun test_job(
   tests: readonly Map<String, readonly Sequence<Test>>,
   filter: String,
   njobs: Int,
@@ -78,7 +78,9 @@ fun test_job(
   skipExit(0)
 }
 
-fun test_harness(tests: readonly Map<String, readonly Sequence<Test>>): void {
+untracked fun test_harness(
+  tests: readonly Map<String, readonly Sequence<Test>>,
+): void {
   args = Cli.Command("tests")
     .about("Run tests")
     .arg(

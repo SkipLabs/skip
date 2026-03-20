@@ -2,12 +2,12 @@ module SKTest;
 
 class Test{
   name: String,
-  func: () ~> void,
+  func: untracked () ~> void,
   file: String = "unknown",
   lineno: Int = -1,
 } {}
 
-fun run_test(test: Test, res: TestResult): TestResult {
+untracked fun run_test(test: Test, res: TestResult): TestResult {
   time = () ~> Time.time_ms().toFloat() / 1000.0;
   start = time();
   try {
@@ -31,7 +31,7 @@ fun run_test(test: Test, res: TestResult): TestResult {
   }
 }
 
-fun main(): void {
+untracked fun main(): void {
   tests = mutable Map[];
   #forEachFunction (@test, #function, #functionName) {
     // TODO: Properly handle tests outside of module/suite?
