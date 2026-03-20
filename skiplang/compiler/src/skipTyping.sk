@@ -5312,10 +5312,15 @@ fun lambda(
     ) {
       throw TUtils.Delay()
     } else {
+      (_, lam_tracking) = ml;
+      lam_is_untracked =
+        lam_tracking.size() == 1 &&
+        lam_tracking[0] is N.Funtracked();
       !env = env with {
         break_type => None(),
         frozen_level => lam.lam_frozen_level,
         locals => lam_locals,
+        tracked_context => if (lam_is_untracked) false else env.tracked_context,
       };
       !env = setReturnType(context, next_id, env, acc, rty, lam.yields);
       ordered_args = args.map(t ->
