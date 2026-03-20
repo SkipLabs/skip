@@ -243,25 +243,6 @@ fun join_purity_modifiers(
   join_modifiers(exn, compare_purity_modifiers, v1, p1, v2, p2)
 }
 
-fun compare_tracking_modifiers(
-  l: N.Tracking_modifier,
-  r: N.Tracking_modifier,
-): Order {
-  N.compare_tracking_modifiers(l, r)
-}
-
-// Joins two tracking modifier arrays according to their variance positions.
-// Delegates to the generic join_modifiers with tracking-specific comparison.
-fun join_tracking_modifiers(
-  exn: Exception,
-  v1: A.Variance,
-  t1: Array<N.Tracking_modifier>,
-  v2: A.Variance,
-  t2: Array<N.Tracking_modifier>,
-): Array<N.Tracking_modifier> {
-  join_modifiers(exn, compare_tracking_modifiers, v1, t1, v2, t2)
-}
-
 // Joins two single Tracking_modifier values according to their variance
 // positions. Implements the tracking lattice directly:
 //   Ftracked ≤ Funtracked  (tracked is stricter, i.e. the subtype)
