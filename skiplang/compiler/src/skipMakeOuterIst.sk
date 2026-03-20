@@ -487,17 +487,11 @@ fun type__(remove_aliases: Bool, pos: FileRange, x: NAst.Type__): O.Type {
     | NAst.Mreadonly(rfr) -> O.Type(rfr, O.Treadonly(pelt))
     | NAst.Mmutable(mfr) -> O.Type(mfr, O.Tmutable(pelt))
     }
-  | NAst.Tfun(
-    _,
-    (purity, tracking),
-    _,
-    tparam,
-    ty,
-  ) if (purity.size() == 1 && tracking.size() == 1) ->
+  | NAst.Tfun(_, (purity, tracking), _, tparam, ty) if (purity.size() == 1) ->
     O.Type(
       pos,
       O.Tfun(
-        tfun_modifiers(purity[0], tracking[0]),
+        tfun_modifiers(purity[0], tracking),
         parameters_type(remove_aliases, tparam),
         type(remove_aliases, ty),
       ),
@@ -505,7 +499,7 @@ fun type__(remove_aliases: Bool, pos: FileRange, x: NAst.Type__): O.Type {
   | NAst.Tset _ ->
     print_error(pos.toString());
     invariant_violation(
-      "Nast.Tfun modifiers should have been expanded to have at most one elt",
+      "Nast.Tfun purity modifiers should have been expanded to have at most one elt",
     )
   | NAst.Tfun _ ->
     print_error(pos.toString());

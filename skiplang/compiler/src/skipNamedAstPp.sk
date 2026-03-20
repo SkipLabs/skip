@@ -282,7 +282,7 @@ fun tfun_modifiers(o: mutable BufferedPrinter.Out, p: N.Tfun_modifiers): void {
   o.out("(");
   BufferedPrinter.array_sep(" | ", purity_modifier, o, purity);
   o.out(", ");
-  BufferedPrinter.array_sep(" | ", tracking_modifier, o, tracking);
+  tracking_modifier(o, tracking);
   o.out(")")
 }
 
@@ -293,7 +293,7 @@ fun lambda_modifiers(
   (purity, tracking) = p;
   BufferedPrinter.array_sep(" ", purity_modifier, o, purity);
   o.out(" ");
-  BufferedPrinter.array_sep(" ", tracking_modifier, o, tracking)
+  tracking_modifier(o, tracking)
 }
 
 fun purity_modifier(

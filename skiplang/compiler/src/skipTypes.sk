@@ -318,7 +318,7 @@ fun join_tfun_modifiers(
   (p11, t1) = p1;
   (p21, t2) = p2;
   purity = join_purity_modifiers(exn, v1, p11, v2, p21);
-  tracking = join_tracking_modifiers(exn, v1, t1, v2, t2);
+  tracking = join_tracking(exn, v1, t1, v2, t2);
   (purity, tracking)
 }
 
@@ -494,7 +494,7 @@ fun to_string_params(
 fun fun_is_mutable_is_untracked(x: N.Tfun_modifiers): (Bool, Bool) {
   (purity, tracking) = x;
   is_mutable = purity.size() == 1 && purity[0] is N.Fmutable();
-  is_untracked = tracking.size() == 1 && tracking[0] is N.Funtracked();
+  is_untracked = tracking is N.Funtracked();
   (is_mutable, is_untracked)
 }
 
@@ -1241,15 +1241,9 @@ fun contra_promote(
 // [Fmutable()] stays invariant since it cannot be narrowed to pure. Already-
 // variant (size-2) arrays pass through unchanged.
 //
-// Tracking is intentionally NOT promoted here. The tracking subtyping rule
-// (tracked ≤ untracked) could in principle be encoded the same way with
-// [Ftracked()] → [Ftracked(), Funtracked()], but the variant form carries no
-// more information than [Ftracked()]: every consumer of tracking reads only
-// position [0], and the join machinery handles the covariant/contravariant
-// positions explicitly via variance arguments. Promoting tracking would just
-// grow the array without changing behavior, so tracking is passed through
-// unchanged. This keeps tracking modifiers in a single canonical size-1 form
-// (outside the transient size-0 error state produced by invalid joins).
+// Tracking is NOT handled here — it is a single Tracking_modifier value and
+// its subtyping rule (tracked ≤ untracked) is handled directly by
+// join_tracking. See skipNamedAst.sk / join_tracking for details.
 fun promote_tfun_modifiers(modifiers: N.Tfun_modifiers): N.Tfun_modifiers {
   (purity, tracking) = modifiers;
   !purity = purity.size() match {
@@ -1518,7 +1512,6 @@ fun join_(
     exn = Join(ty1, ty2);
     join_tfun_modifiers(exn, var1, mods1, var2, mods2) match {
     | (purity, _) if (purity.isEmpty()) -> throw exn
-    | (_, tracking) if (tracking.isEmpty()) -> throw exn
     | mods ->
       variance = join_variance(var1, var2);
       (!acc, ty) = join(context, next_id, env, acc, ty11, ty21);
@@ -1575,7 +1568,6 @@ fun join_(
     exn = Join(ty1, ty2);
     join_tfun_modifiers(exn, variance1, mods1, variance2, mods2) match {
     | (purity, _) if (purity.isEmpty()) -> throw exn
-    | (_, tracking) if (tracking.isEmpty()) -> throw exn
     | mods ->
       variance = join_variance(variance1, variance2);
       (acc, (pos, N.Tfun(variance, mods, Array[], params, rty)))
@@ -3224,8 +3216,7 @@ private fun is_frozen_map(
 fun is_frozen_tfun_modifiers(mods: N.Tfun_modifiers): Bool {
   (purity, tracking) = mods;
   invariant(!purity.isEmpty(), "imposible tfun");
-  invariant(!tracking.isEmpty(), "imposible tfun");
-  purity[0] is N.Fpure() && tracking[0] is N.Ftracked()
+  purity[0] is N.Fpure() && tracking is N.Ftracked()
 }
 
 private fun is_frozen_map_tparam(

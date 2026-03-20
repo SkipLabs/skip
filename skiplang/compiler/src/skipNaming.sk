@@ -1673,10 +1673,10 @@ fun make_met_tfun_purity(kind: N.FieldKind): Array<N.Purity_modifier> {
   }
 }
 
-fun make_tfun_tracking(untracked_: ?FileRange): Array<N.Tracking_modifier> {
+fun make_tfun_tracking(untracked_: ?FileRange): N.Tracking_modifier {
   untracked_ match {
-  | None() -> Array[N.Ftracked()]
-  | Some _ -> Array[N.Funtracked()]
+  | None() -> N.Ftracked()
+  | Some _ -> N.Funtracked()
   }
 }
 
@@ -2709,13 +2709,7 @@ fun fun_type(
   ftracked = if (tmodifiers.is_untracked) N.Funtracked() else N.Ftracked();
   tparams1 = fun_tparams(context, acc, env, tparams);
   tbody1 = type(context, acc, env, tbody);
-  N.Tfun(
-    A.Vnone(),
-    (Array[fpurity], Array[ftracked]),
-    Array[],
-    tparams1,
-    tbody1,
-  )
+  N.Tfun(A.Vnone(), (Array[fpurity], ftracked), Array[], tparams1, tbody1)
 }
 
 fun fun_tparams(
@@ -4134,7 +4128,7 @@ fun ordered_expr(
 fun lambda_modifiers(mods: A.Lam_modifier): N.Tfun_modifiers {
   purity = if (mods.is_mutable) N.Fmutable() else N.Fpure();
   tracking = if (mods.is_untracked) N.Funtracked() else N.Ftracked();
-  (Array[purity], Array[tracking])
+  (Array[purity], tracking)
 }
 
 // Every generator ends with an implicit "yield break"; this appends one.

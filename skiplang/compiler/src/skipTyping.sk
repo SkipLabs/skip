@@ -1697,13 +1697,9 @@ fun call_or_constructor_(
 fun check_tracking(
   pos: FileRange,
   env: TUtils.Env,
-  tracking: Array<N.Tracking_modifier>,
+  tracking: N.Tracking_modifier,
 ): void {
-  if (
-    env.tracked_context &&
-    !tracking.isEmpty() &&
-    tracking[0] is N.Funtracked()
-  ) {
+  if (env.tracked_context && tracking is N.Funtracked()) {
     SkipError.error(
       pos,
       "Cannot call an untracked function from a tracked context",
@@ -2820,7 +2816,7 @@ fun expr_(
       pos,
       N.Tfun(
         Ast.Vplus(),
-        (Array[N.Fmutable()], Array[N.Funtracked()]),
+        (Array[N.Fmutable()], N.Funtracked()),
         Array[],
         Positional(Array[ty1]),
         ret_ty,
