@@ -33,6 +33,8 @@ fi
 [ -e "$4/test_chrome.db" ] && rm "$4/test_chrome.db" 1>&2
 [ -e "$4/test_chrome_worker.db" ] && rm "$4/test_chrome_worker.db" 1>&2
 
+skdb_port=3586
+
 # shellcheck disable=SC2034 # value indirectly referenced just below
 while IFS='=' read -r key value
 do
@@ -72,8 +74,6 @@ run_server () {
         return 1
     fi
 }
-
-skdb_port=3586
 
 pid1=""
 i=0
