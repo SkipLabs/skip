@@ -1,11 +1,11 @@
-import type {
-  Context,
-  EagerCollection,
-  Json,
-  Mapper,
-  Resource,
-  SkipService,
-  Values,
+import {
+  type Context,
+  type EagerCollection,
+  type Json,
+  type Mapper,
+  type Resource,
+  type AnySkipService,
+  type Values,
 } from "@skipruntime/core";
 
 import { KafkaExternalService } from "@skip-adapter/kafka";
@@ -78,8 +78,8 @@ class MessagesResource implements Resource<ResourceInputs> {
   }
 }
 
-export const service: SkipService<{}, ResourceInputs> = {
-  initialData: {},
+export const service: AnySkipService = {
+  inputs: {},
   resources: { messages: MessagesResource },
   externalServices: { kafka },
   createGraph(_: {}, context: Context): ResourceInputs {
