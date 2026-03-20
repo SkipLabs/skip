@@ -500,6 +500,24 @@ base class Named_info uses Equality, Hashable {
     l.hashBy(x -> x.i1.hash(), ("%NTydAbstract", n.i1).hash())
 }
 
+// Modifiers for function types: (purity, tracking).
+//
+// Each component is an array encoding a variance-aware modifier set:
+//   Size 1: Invariant — the modifier is the same in all variance positions.
+//     e.g. [Fpure()] = always pure, [Funtracked()] = always untracked.
+//   Size 2: Variant — element [0] is for covariant (+) position,
+//     element [1] is for contravariant (-) position.
+//     e.g. [Fpure(), Fmutable()] = pure in +, mutable in -.
+//     For tracking, the only variant state is [Ftracked(), Funtracked()]
+//     which encodes the subtyping rule: tracked ≤ untracked.
+//   Size 0: Error — the join of two incompatible types produced an empty set.
+//     This is a transient state that immediately triggers a type error.
+//
+// Size-2 arrays are only created by promote_tfun_modifiers (in skipTypes.sk)
+// when a function type appears in a covariant position. The maximum size is
+// strictly 2.
+//
+// See join_modifiers in skipTypes.sk for the variance-based join semantics.
 type Tfun_modifiers = (.Array<Purity_modifier>, .Array<Tracking_modifier>);
 
 base class Purity_modifier uses Equality, Hashable {

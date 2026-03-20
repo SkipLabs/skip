@@ -57,7 +57,8 @@ class Env{
 
 class Acc{subst: IMap<N.Type_>, constraints: TU.Constraints}
 
-// invariant function modifiers
+// Invariant join: both arrays must have the same length and pairwise equal
+// elements. Any mismatch throws. Used when at least one side has Vnone variance.
 fun join_modifiers_inv<Ta>(
   exn: Exception,
   cmp_mods: (Ta, Ta) ~> Order,
@@ -84,7 +85,12 @@ fun join_modifiers_inv<Ta>(
   }
 }
 
-// join minus/plus or plus/minus function modifiers
+// Mixed-variance join: keeps only minus (contravariant) elements that have a
+// matching plus (covariant) element. A minus element without a plus match means
+// the contravariant side requires a modifier the covariant side can't provide,
+// which is a type error. Plus elements without a minus match are simply skipped
+// (the covariant side offers something the contravariant side doesn't need).
+// Both arrays must be sorted by cmp_mods.
 fun join_modifiers_minus_plus<Ta>(
   exn: Exception,
   cmp_mods: (Ta, Ta) ~> Order,
@@ -114,7 +120,8 @@ fun join_modifiers_minus_plus<Ta>(
   }
 }
 
-// join minus/minus function modifiers
+// Contravariant join: set union of both arrays (sorted merge keeping all unique
+// elements). The result contains all modifiers valid in either type.
 fun join_modifiers_minus_minus<Ta>(
   _exn: Exception,
   cmp_mods: (Ta, Ta) ~> Order,
@@ -151,7 +158,9 @@ fun uniq_modifiers<Ta>(cmp_mods: (Ta, Ta) ~> Order, ml: Array<Ta>): Array<Ta> {
   }
 }
 
-// join plus/plus function modifiers
+// Covariant join: set intersection of both arrays (sorted merge keeping only
+// common elements). The result contains modifiers valid in both types.
+// Empty result = incompatible types, throws exn.
 fun join_modifiers_plus_plus<Ta>(
   exn: Exception,
   cmp_mods: (Ta, Ta) ~> Order,
@@ -184,6 +193,12 @@ fun join_modifiers_plus_plus<Ta>(
   result.toArray()
 }
 
+// Joins two modifier arrays based on their variance positions.
+// Dispatches to the appropriate join strategy:
+//   (+, +) -> intersection (covariant: keep modifiers valid in both)
+//   (-, -) -> union (contravariant: keep modifiers valid in either)
+//   (+, -) or (-, +) -> mixed (contra elements must match a co element)
+//   (none, _) or (_, none) -> invariant (must be exactly equal)
 fun join_modifiers<Ta>(
   exn: Exception,
   cmp_mods: (Ta, Ta) ~> Order,
@@ -216,6 +231,8 @@ fun compare_purity_modifiers(
   N.compare_purity_modifiers(l, r)
 }
 
+// Joins two purity modifier arrays according to their variance positions.
+// Delegates to the generic join_modifiers with purity-specific comparison.
 fun join_purity_modifiers(
   exn: Exception,
   v1: A.Variance,
@@ -233,6 +250,8 @@ fun compare_tracking_modifiers(
   N.compare_tracking_modifiers(l, r)
 }
 
+// Joins two tracking modifier arrays according to their variance positions.
+// Delegates to the generic join_modifiers with tracking-specific comparison.
 fun join_tracking_modifiers(
   exn: Exception,
   v1: A.Variance,
@@ -243,6 +262,8 @@ fun join_tracking_modifiers(
   join_modifiers(exn, compare_tracking_modifiers, v1, t1, v2, t2)
 }
 
+// Joins two Tfun_modifiers (purity × tracking) according to their variance
+// positions. Each component is joined independently.
 fun join_tfun_modifiers(
   exn: Exception,
   v1: A.Variance,
@@ -1170,6 +1191,14 @@ fun contra_promote(
   promote(context, env, variance1, subst, ty)
 }
 
+// Expands invariant (size-1) modifiers to variant (size-2) when a function
+// type appears in covariant position. This encodes subtyping:
+//   Purity:   [Fpure()] → [Fpure(), Fmutable()]  (pure ≤ mutable)
+//   Tracking: [Ftracked()] → [Ftracked(), Funtracked()]  (tracked ≤ untracked)
+// The stricter modifier (pure/tracked) can be used where the less strict one
+// (mutable/untracked) is expected. Already-variant (size-2) arrays pass through
+// unchanged. The less strict modifier alone stays invariant since it cannot be
+// narrowed to the stricter one.
 fun promote_tfun_modifiers(modifiers: N.Tfun_modifiers): N.Tfun_modifiers {
   (purity, tracking) = modifiers;
   !purity = purity.size() match {
