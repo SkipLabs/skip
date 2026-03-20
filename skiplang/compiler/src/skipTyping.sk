@@ -2986,6 +2986,8 @@ fun expr_(
         env.frozen_level
       },
       lam_tfun_modifiers => mods,
+      lam_tracked_context => env.tracked_context &&
+        mods.tracking is N.Ftracked(),
       yields,
     };
     lambda_list = List.Cons((lambda_id, lambda), acc1.lambda_list);
@@ -5342,6 +5344,7 @@ fun lambda(
         break_type => None(),
         frozen_level => lam.lam_frozen_level,
         locals => lam_locals,
+        tracked_context => lam.lam_tracked_context,
       };
       !env = setReturnType(context, next_id, env, acc, rty, lam.yields);
       ordered_args = args.map(t ->
