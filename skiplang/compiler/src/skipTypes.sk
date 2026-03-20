@@ -262,6 +262,50 @@ fun join_tracking_modifiers(
   join_modifiers(exn, compare_tracking_modifiers, v1, t1, v2, t2)
 }
 
+// Joins two single Tracking_modifier values according to their variance
+// positions. Implements the tracking lattice directly:
+//   Ftracked ≤ Funtracked  (tracked is stricter, i.e. the subtype)
+//
+// Variance dispatch:
+//   (+, +): LUB — Funtracked if either is Funtracked, else Ftracked.
+//   (-, -): GLB — Ftracked if either is Ftracked, else Funtracked.
+//   (-, +) or (+, -): contra side must be ≥ co side, else type error.
+//   (∅, _) or (_, ∅): invariant — must be equal, else type error.
+fun join_tracking(
+  exn: Exception,
+  v1: A.Variance,
+  t1: N.Tracking_modifier,
+  v2: A.Variance,
+  t2: N.Tracking_modifier,
+): N.Tracking_modifier {
+  (v1, v2) match {
+  | (A.Vplus(), A.Vplus()) ->
+    // LUB: least upper bound — less strict wins
+    if (t1 is N.Funtracked() || t2 is N.Funtracked()) {
+      N.Funtracked()
+    } else {
+      N.Ftracked()
+    }
+  | (A.Vminus(), A.Vminus()) ->
+    // GLB: greatest lower bound — stricter wins
+    if (t1 is N.Ftracked() || t2 is N.Ftracked()) {
+      N.Ftracked()
+    } else {
+      N.Funtracked()
+    }
+  | (A.Vminus(), A.Vplus()) ->
+    // Contra (t1) must be ≥ co (t2): Funtracked ≥ anything, Ftracked ≥ Ftracked only
+    if (t1 is N.Funtracked() || t2 is N.Ftracked()) t1 else throw exn
+  | (A.Vplus(), A.Vminus()) ->
+    // Symmetric: contra (t2) must be ≥ co (t1)
+    if (t2 is N.Funtracked() || t1 is N.Ftracked()) t2 else throw exn
+  | (A.Vnone(), _)
+  | (_, A.Vnone()) ->
+    // Invariant: must be equal
+    if (N.compare_tracking_modifiers(t1, t2) is EQ()) t1 else throw exn
+  }
+}
+
 // Joins two Tfun_modifiers (purity × tracking) according to their variance
 // positions. Each component is joined independently.
 fun join_tfun_modifiers(
