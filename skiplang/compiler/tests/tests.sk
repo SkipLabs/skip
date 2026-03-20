@@ -100,7 +100,15 @@ class ExpTestsDiscovery private () {
 fun main(): void {
   tests = mutable Map[];
 
-  coveredModules = ExpTestsDiscovery::addExpTestFunctions(tests);
+  // Discover @exptest-annotated functions. These are present when all
+  // test .sk files are compiled into this binary (i.e. when `tests` is
+  // not set in Skargo.toml, so Skargo auto-discovers all files in tests/).
+  // Set SKC_SUBPROCESS=1 to force all tests to use subprocess mode.
+  coveredModules = if (Environ.varOpt("SKC_SUBPROCESS").isNone()) {
+    ExpTestsDiscovery::addExpTestFunctions(tests)
+  } else {
+    Set[]
+  };
 
   // Run any valid tests NOT covered by @exptest in subprocess mode.
   validTests = FileSystem.readFilesRecursive("./tests", fn ->
