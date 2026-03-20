@@ -65,6 +65,8 @@ run_server () {
         echo "Gave up waiting for server $pid1 to start at $host" 1>&2;
         echo "Config:" 1>&2
         cat "$2" 1>&2
+        kill $pid1 2>/dev/null
+        return 1
     fi
 
     exists=$(kill -0 $pid1);
