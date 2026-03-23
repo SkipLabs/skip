@@ -1,0 +1,34 @@
+module Expand_GlobalAccessPrivate;
+fun main(): void {
+  _ = gap_x;
+  _ = gap_bar();
+  _: GAP_Tglobal = 42;
+  c = GAP_Cglobal();
+  _ = c.make();
+  print_string("Pass")
+}
+
+module end;
+
+module Expand_GlobalAccessPrivateZ;
+
+private fun foo(): void {
+  void
+}
+const .gap_x: void = void;
+fun .gap_bar(): void {
+  foo()
+}
+
+private type Tpriv = Int;
+type .GAP_Tglobal = Tpriv;
+
+private base class Bpriv
+private class .GAP_Cpriv() extends Bpriv
+class .GAP_Cglobal() extends Bpriv {
+  fun make(): Bpriv {
+    GAP_Cpriv()
+  }
+}
+
+module end;

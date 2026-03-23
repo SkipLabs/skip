@@ -1,0 +1,23 @@
+module Typechecking_UnknownPattern6;
+fun main(): void {
+  print_string("Pass")
+}
+
+module end;
+
+module Typechecking_UnknownPattern6List;
+
+base class .UP6_List_<T> {
+  children =
+  | Nil()
+  | Cell{head: T, tail: UP6_List_<T>}
+}
+
+fun test(x: UP6_List_<_>): Int {
+  x match {
+  | Nil() -> 1
+  | Cell _ -> 0
+  }
+}
+
+module end;

@@ -1,0 +1,21 @@
+module TestList;
+base class .ET2_TestList<T> {
+  children =
+  | TestNil()
+  | TestCons(head: T, tail: ET2_TestList<T>)
+
+  fun getHead(): T
+  | TestCons(value, _) -> value
+  | TestNil() -> invariant_violation("head of empty list")
+}
+
+module end;
+
+module Syntax_ExplicityTargs2;
+
+fun main(): void {
+  l = TestList.TestCons<String>("Pass\n", TestList.TestNil());
+  print_raw(l.getHead())
+}
+
+module end;

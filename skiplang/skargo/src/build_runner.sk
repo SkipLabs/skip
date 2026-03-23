@@ -426,16 +426,37 @@ mutable class BuildRunner(
     | _ -> invariant_violation("unreachable")
     };
 
-    if (check) {
-      skc.arg("--check")
+    separate_link = if (check) {
+      skc.arg("--check");
+      false
     } else {
       outputs = this.outputs_for(unit);
       assert(outputs.size() == 1);
       output_file = outputs[0].path;
       skc.args(Array["-o", output_file]);
+      unit.target.kind is BinTarget _ ||
+        unit.target.kind is TestTarget _ ||
+        unit.target.kind is LibTarget(LibraryTypeCdylib())
     };
 
-    _ = this.run_cmd(skc)
+    if (separate_link) {
+      skc.arg("--no-link")
+    };
+
+    p = this.run_cmd(skc);
+
+    if (separate_link) {
+      (cmd, args) = parse_link_args(p.stdout) match {
+      | Success(v) -> v
+      | Failure(msg) ->
+        this.bctx.gctx.console.error(
+          `Failed to parse link args from skc output: ${msg}`,
+        );
+        skipExit(3)
+      };
+      link_cmd = ProcessBuilder::create{cmd, args};
+      _ = this.run_cmd(link_cmd)
+    }
   }
 
   private readonly fun run_cmd(
@@ -615,6 +636,33 @@ private fun compute_hash(unit: Unit, dep_hashes: Array<Int>): Int {
 
 private fun dirname(path: String): String {
   path.splitLast("/").i0
+}
+
+private fun parse_link_args(
+  stdout: String,
+): Result<(String, Array<String>), String> {
+  linesIt = stdout.splitIterator("\n");
+  loop {
+    linesIt.next() match {
+    | None() -> return Failure("Missing link args")
+    | Some("---LINK_ARGS_BEGIN---") -> break void
+    | _ -> continue
+    }
+  };
+  cmd = linesIt.next() match {
+  | None() -> return Failure("Missing link command")
+  | Some(cmd) -> cmd
+  };
+  args = mutable Vector[];
+  loop {
+    linesIt.next() match {
+    | None() -> return Failure("Unterminated link args")
+    | Some("") -> continue
+    | Some("---LINK_ARGS_END---") -> break void
+    | Some(line) -> args.push(line)
+    }
+  };
+  Success((cmd, args.toArray()))
 }
 
 module end;

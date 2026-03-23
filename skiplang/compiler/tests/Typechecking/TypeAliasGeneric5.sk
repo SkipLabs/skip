@@ -1,0 +1,17 @@
+module Typechecking_TypeAliasGeneric5;
+class MyMap<+K: Orderable, +V>(K, V)
+base class P {
+  children =
+  | L()
+  | R()
+}
+
+type Triple<T0, T1, T2> = (T0, T1, T2);
+type MM<K, V> = MyMap<K, V>;
+
+fun main(): void {
+  _: Triple<Int, String, Bool> = (0, "", false);
+  _: MM<String, P> = MyMap("", L());
+  print_string("Pass")
+}
+module end;

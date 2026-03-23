@@ -1,0 +1,12 @@
+module Typechecking_LambdaMutableArg2;
+fun main(): void {
+  f: (r: mutable Ref<String>, t: String) -> void = (
+    (r, t) -> {
+      r.!value = t
+    }
+  );
+  ref = mutable Ref("");
+  f(ref, "Pass\n");
+  print_raw(ref.value)
+}
+module end;

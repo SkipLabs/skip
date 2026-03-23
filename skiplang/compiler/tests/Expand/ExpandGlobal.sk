@@ -1,0 +1,38 @@
+module Expand_ExpandGlobal;
+class Foo() {
+  fun test(): String {
+    "Pass\n"
+  }
+}
+
+fun foo(): Foo {
+  Foo()
+}
+
+module end;
+
+module Expand_ExpandGlobalA;
+
+class Foo() {
+  fun test(): String {
+    "fail"
+  }
+}
+
+fun foo(): Foo {
+  Foo()
+}
+
+fun bar(): Expand_ExpandGlobal.Foo {
+  Expand_ExpandGlobal.foo()
+}
+
+module end;
+
+module Expand_ExpandGlobal;
+
+fun main(): void {
+  print_raw(Expand_ExpandGlobalA.bar().test())
+}
+
+module end;

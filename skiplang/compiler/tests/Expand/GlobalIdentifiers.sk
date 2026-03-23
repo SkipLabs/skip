@@ -1,0 +1,26 @@
+module Expand_GlobalIdentifiers;
+fun main(): void {
+  _: GI_TInt = gi_x;
+  //  _ : GI_TInt = gi_Y;
+  _ = GI_Foo();
+  _ = GI_BarChild();
+  print_raw(gi_pass())
+}
+
+module end;
+
+module Expand_GlobalIdentifiersM;
+
+type .GI_TInt = Int;
+const .gi_x: Int = 42;
+const .gi_Y: Int = 0;
+class .GI_Foo()
+base class Bar {
+  children =
+  | .GI_BarChild()
+}
+fun .gi_pass(): String {
+  "Pass\n"
+}
+
+module end;

@@ -1,0 +1,22 @@
+module Runtime_MacroThisClassName;
+trait ClassName {
+  macro fun className(): String {
+    #thisClassName
+  }
+}
+module end;
+
+module Runtime_MacroThisClassNameM;
+class C() uses Runtime_MacroThisClassName.ClassName {}
+class .RMTCN_G() uses Runtime_MacroThisClassName.ClassName {}
+module end;
+
+module Runtime_MacroThisClassName;
+value class V() uses ClassName {}
+
+fun main(): void {
+  print_string(Runtime_MacroThisClassNameM.C().className());
+  print_string(.RMTCN_G().className());
+  print_string(V().className());
+}
+module end;

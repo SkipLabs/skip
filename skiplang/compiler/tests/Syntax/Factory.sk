@@ -1,0 +1,23 @@
+module Syntax_Factory;
+fun main(): void {
+  foo = Syntax_FactoryFoo.Factory()[42];
+  print_raw(if (foo.getAttr() == 42) "OK\n" else "FAILED")
+}
+
+module end;
+
+module Syntax_FactoryFoo;
+
+class .SF_Foo{private attr: Int} {
+  fun getAttr(): Int {
+    this.attr
+  }
+}
+
+class Factory() {
+  fun get(attr: Int): SF_Foo {
+    SF_Foo{attr => attr}
+  }
+}
+
+module end;

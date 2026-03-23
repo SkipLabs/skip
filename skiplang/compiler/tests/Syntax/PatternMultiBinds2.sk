@@ -1,0 +1,18 @@
+module Syntax_PatternMultiBinds2;
+base class C {
+  children =
+  | A{x: Int}
+  | B{y: Int}
+}
+
+fun main(): void {
+  print_raw(
+    (A{x => 1} : C) match {
+    | A{x => t}
+    | B{y => t} ->
+      _ = t;
+      "Pass\n"
+    },
+  )
+}
+module end;

@@ -1,0 +1,37 @@
+module Expand_ResolveNamesA;
+
+fun foo(): Quux {
+  bar + baz() + Foo().bar() + Expand_ResolveNamesFoo.baz()
+}
+
+const bar: String = "P";
+
+fun baz(): String {
+  "a"
+}
+
+class Foo() {
+  fun bar(): String {
+    "s"
+  }
+}
+
+type Quux = String;
+
+module end;
+
+module Expand_ResolveNamesFoo;
+
+fun baz(): String {
+  "s"
+}
+
+module end;
+
+module Expand_ResolveNames;
+
+fun main(): void {
+  print_raw(Expand_ResolveNamesA.foo() + "\n")
+}
+
+module end;

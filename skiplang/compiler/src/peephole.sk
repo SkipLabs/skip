@@ -53,6 +53,7 @@ mutable class .Peephole{
     | v @ Cast _ -> peepholeCast(v, this)
     | v @ FloatBinOp _ -> peepholeFloatBinOp(v, this)
     | v @ FloatBits _ -> peepholeFloatBits(v, this)
+    | v @ FloatNeg _ -> peepholeFloatNeg(v, this)
     | v @ FloatToInt _ -> peepholeFloatToInt(v, this)
     | v @ FloatToString _ -> peepholeFloatToString(v, this)
     | v @ Freeze _ -> peepholeFreeze(v, this)
@@ -434,6 +435,7 @@ private fun canModifyExistingMemory(
   | FloatCmpNe _
   | FloatDiv _
   | FloatMul _
+  | FloatNeg _
   | FloatSub _
   | FloatToInt _
   | FloatToString _
@@ -543,6 +545,7 @@ private fun canCSE(
   | FloatCmpNe _
   | FloatDiv _
   | FloatMul _
+  | FloatNeg _
   | FloatSub _
   | FloatToInt _
   | FloatToString _
@@ -1814,6 +1817,15 @@ private fun peepholeArraySize(peep: ArraySize, s: mutable Peephole): Instr {
 private fun peepholeFloatBits(peep: FloatBits, s: mutable Peephole): Instr {
   s.getInstr(peep.value) match {
   | ConstantFloat{value} -> s.constantInt(value.toBits())
+  | _ -> peep
+  }
+}
+
+private fun peepholeFloatNeg(peep: FloatNeg, s: mutable Peephole): Instr {
+  s.getInstr(peep.value) match {
+  | ConstantFloat{value} -> s.constantFloat(-value)
+  | FloatNeg{value} ->
+    s.getInstr(value) // double negation cancels out
   | _ -> peep
   }
 }

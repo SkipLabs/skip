@@ -1,0 +1,12 @@
+module Typechecking_PatternMatchMutableWhen;
+mutable class C(mutable x: String) {}
+
+fun main(): void {
+  c = mutable C("Fail");
+  c match {
+  | C(x) if (x == "Fail") -> c.!x = "Pass\n"
+  | _ -> void
+  };
+  print_raw(c.x)
+}
+module end;

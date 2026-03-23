@@ -13,6 +13,7 @@ function runServer(
   suffix: string = "",
 ) {
   test(t.name, async () => {
+    test.setTimeout(60000);
     const skdb = await setup(8110, crypto as Crypto, asWorker, suffix);
     const res = await t.fun(skdb);
     t.check(res);

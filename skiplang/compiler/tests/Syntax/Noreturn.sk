@@ -1,0 +1,21 @@
+module Syntax_Noreturn;
+fun main(): void {
+  print_raw(
+    try {
+      foo()
+    } catch {
+    | _ -> "Pass\n"
+    }
+  )
+}
+
+class MyException() extends Exception {
+  fun getMessage(): String {
+    "MyException error"
+  }
+}
+
+fun foo<T>(): T {
+  throw MyException()
+}
+module end;

@@ -1,0 +1,17 @@
+module Typechecking_OverridableConst5;
+base class Foo {
+  const x: String = "Pass\n";
+}
+
+base class Bar {
+  overridable const x: String = "Fail";
+}
+
+class Baz() extends Foo, Bar {
+  const x from Foo;
+}
+
+fun main(): void {
+  print_raw(Baz::x)
+}
+module end;

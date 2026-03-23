@@ -1,0 +1,19 @@
+module Runtime_LocalEvalOnCall;
+fun myloop(a: String, b: Int): String {
+  if (b == 0) {
+    a
+  } else {
+    myloop(
+      a,
+      {
+        !a = "FAIL";
+        b - 1
+      },
+    )
+  }
+}
+
+fun main(): void {
+  print_raw(myloop("Pass\n", 10))
+}
+module end;

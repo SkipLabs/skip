@@ -1,0 +1,16 @@
+module Typechecking_Exhaustiveness_NestedNamedParamsRecursiveUpcast1;
+base class F {
+  children =
+  | A{x: Int}
+  | B{x: Int, y: F}
+}
+
+fun main(): void {
+  print_raw(
+    (B{x => 1, y => A{x => 1}} : F) match {
+    | B{x => Int _, y => F _} -> "Pass\n"
+    | A _ -> "Fail\n"
+    },
+  )
+}
+module end;

@@ -1,0 +1,47 @@
+module Runtime_ArgumentEvaluationOrder;
+fun positional(Int, Int): void {
+  void
+}
+fun named{a: Int, b: Int}: void {
+  void
+}
+
+class StringExn(msg: String) extends Exception {
+  fun getMessage(): String {
+    this.msg
+  }
+}
+
+fun main(): void {
+  print_raw(
+    (try {
+      positional(throw StringExn("P"), 1 / 0);
+      "Fail"
+    } catch {
+    | StringExn(s) -> s
+    | _ -> "Fail"
+    }) +
+    (try {
+      named{a => throw StringExn("a"), b => 1 / 0};
+      "Fail"
+    } catch {
+    | StringExn(s) -> s
+    | _ -> "Fail"
+    }) +
+    (try {
+      named{b => throw StringExn("s"), a => 1 / 0};
+      "Fail"
+    } catch {
+    | StringExn(s) -> s
+    | _ -> "Fail"
+    }) +
+    (try {
+      named{b => throw StringExn("s\n"), a => throw StringExn("not me")};
+      "Fail"
+    } catch {
+    | StringExn(s) -> s
+    | _ -> "Fail"
+    }),
+  )
+}
+module end;

@@ -1,0 +1,10 @@
+module Typechecking_AccessReadonly1;
+fun main(): void {
+  print_string("Pass")
+}
+
+mutable class Foo<T>(mutable v: T)
+fun test1(opt: readonly Foo<mutable Foo<Int>>): void {
+  opt.v.!v = 0
+}
+module end;

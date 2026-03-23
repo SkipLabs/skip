@@ -1,0 +1,68 @@
+module Typechecking_MatchScopedConstantsM;
+
+const C: Int = 1;
+
+class MC() {
+  const C: Int = 2;
+}
+
+/*
+TODO: Enable matching on non-overridable class constants.
+fun main(): void {
+  (1, 1, 2, 2, 3, 4) match {
+  | (C, Typechecking_MatchScopedConstantsM.C, MC::C, Typechecking_MatchScopedConstantsM.MC::C, C::C, GC) -> print_string("Pass");
+  | _ -> void;
+  };
+}
+*/
+
+fun main(): void {
+  (1, 1, 1, 4, 4) match {
+  | (
+    C,
+    Typechecking_MatchScopedConstantsM.C,
+    .Typechecking_MatchScopedConstantsM.C,
+    Typechecking_MatchScopedConstants.GC,
+    .Typechecking_MatchScopedConstants.GC,
+  ) ->
+    print_string("Pass")
+  | _ -> void
+  };
+}
+
+module end;
+
+module Typechecking_MatchScopedConstants;
+
+class C() {
+  const C: Int = 3;
+}
+
+const GC: Int = 4;
+
+/*
+TODO: Enable matching on non-overridable class constants.
+fun main(): void {
+  Typechecking_MatchScopedConstantsM.main();
+  (1, 2, 3, 4) match {
+  | (Typechecking_MatchScopedConstantsM.C, Typechecking_MatchScopedConstantsM.MC::C, C::C, GC) -> print_string("Pass");
+  | _ -> void;
+  };
+}
+*/
+
+fun main(): void {
+  Typechecking_MatchScopedConstantsM.main();
+  (1, 1, 4, 4) match {
+  | (
+    Typechecking_MatchScopedConstantsM.C,
+    .Typechecking_MatchScopedConstantsM.C,
+    GC,
+    .Typechecking_MatchScopedConstants.GC,
+  ) ->
+    print_string("Pass")
+  | _ -> void
+  };
+}
+
+module end;

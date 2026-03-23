@@ -1,0 +1,18 @@
+module Typechecking_OverridableAlgebraic8;
+base class P {
+  overridable fun foo(): String
+  | A _ -> "FAIL"
+  | B _ -> "FAIL"
+}
+
+class A() extends P {
+  fun foo(): String {
+    "Pass\n"
+  }
+}
+class B() extends P
+
+fun main(): void {
+  print_raw(A().foo())
+}
+module end;

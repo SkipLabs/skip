@@ -1,0 +1,23 @@
+module Runtime_ModuleConsttypeFoo;
+
+base class Bar {
+  type T;
+  deferred fun hello(): this::T;
+}
+
+class Baz() extends Bar {
+  type T = String;
+  fun hello(): this::T {
+    "Pass\n"
+  }
+}
+
+module end;
+
+module Runtime_ModuleConsttype;
+
+fun main(): void {
+  print_raw(Runtime_ModuleConsttypeFoo.Baz().hello())
+}
+
+module end;

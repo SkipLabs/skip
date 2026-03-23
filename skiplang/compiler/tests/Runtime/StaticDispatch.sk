@@ -1,0 +1,18 @@
+module Runtime_StaticDispatch;
+base class Foo {
+  overridable static fun method(): String {
+    "Fail"
+  }
+}
+
+class Bar() extends Foo {
+  static fun method(): String {
+    "Pass\n"
+  }
+}
+
+fun main(): void {
+  f: Foo = Bar();
+  print_raw(class(f)::method())
+}
+module end;

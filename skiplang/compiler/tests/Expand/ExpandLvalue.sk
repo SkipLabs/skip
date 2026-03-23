@@ -1,0 +1,37 @@
+module alias M = Expand_ExpandLvalueMyModule;
+
+module Expand_ExpandLvalue;
+
+module end;
+
+module Expand_ExpandLvalueMyModule;
+const C: Int = 0;
+module end;
+
+module Expand_ExpandLvalue;
+
+mutable class WeirdRef<+T>(mutable value: T)
+class WeirdObj(k: Int, v: Int) {
+  fun set(k: Int, v: Int): this {
+    WeirdObj(k, v)
+  }
+}
+
+fun main(): void {
+  a = mutable Vector[1, 2, 3];
+  a![Expand_ExpandLvalueMyModule.C] = 10;
+  a![M.C] = 10;
+  (a![Expand_ExpandLvalueMyModule.C], a![M.C]) = (10, 10);
+  ref = mutable Ref(mutable Vector[1, 2, 3]);
+  ref.value![Expand_ExpandLvalueMyModule.C] = 10;
+  ref.value![M.C] = 10;
+
+  weirdo = mutable WeirdRef(WeirdObj(0, 42));
+  weirdo.!value[Expand_ExpandLvalueMyModule.C] = 10;
+  weirdo.!value[M.C] = 10;
+  !weirdo.value[Expand_ExpandLvalueMyModule.C] = 10;
+  !weirdo.value[M.C] = 10;
+  print_string("Pass\n")
+}
+
+module end;

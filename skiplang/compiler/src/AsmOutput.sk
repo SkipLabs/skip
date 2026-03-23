@@ -2468,6 +2468,7 @@ private fun llvmWriteName(instr: Instr, asm: mutable AsmDefBuilder): void {
   | Cast _
   | FloatAdd _
   | FloatBits _
+  | FloatNeg _
   | FloatCmpEq _
   | FloatCmpLe _
   | FloatCmpLt _
@@ -3240,6 +3241,8 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
     asm.print(" to %s, %D\n" % prim.llvmTypeName % instr)
   | FloatBits{value} ->
     asm.print("  %n = bitcast double %n to i64, %D\n" % instr % value % instr)
+  | FloatNeg{value} ->
+    asm.print("  %n = fneg double %n, %D\n" % instr % value % instr)
   | FloatToInt{value} ->
     asm.print("  %n = fptosi double %n to i64, %D\n" % instr % value % instr)
   | FloatToString{value} ->
