@@ -7,7 +7,7 @@ authors: hubyrod
 image: /img/skip.png
 ---
 
-In my last post, I argued that we should treat agent output the way we treat compiler output: not something to be read and reviewed by humans, but something to be verified by process. The framing resonated with a lot of people, but it leaves a deeper question on the table.
+In my [last post](https://skiplabs.io/blog/codegen_as_compiler), I argued that we should treat agent output the way we treat compiler output: not something to be read and reviewed by humans, but something to be verified by process. The framing resonated with a lot of people, but it leaves a deeper question on the table.
 
 If agents are now the primary authors of code, should the tools and languages those agents use still be optimized for humans?
 
@@ -19,7 +19,7 @@ I don't think they should. And the history of programming languages tells us exa
 
 Every major leap forward in programming language design has been, at its core, a leap toward human legibility. Assembly gave way to C because humans could reason about it. C gave way to higher-level languages because abstraction made programs easier to hold in a person's head. And at the far end of that arc, you get Python and Ruby: languages whose defining virtue is that they read almost like English prose.
 
-Python's indentation rules aren't a technical necessity — they're a readability convention enforced by the language itself. Ruby's syntax is deliberately soft, forgiving, close to natural language. The TIOBE index (a widely cited ranking of programming language popularity) doesn't measure what's technically optimal. It measures what engineers want to write and read. For decades, those were the same thing.
+Python's indentation rules aren't a technical necessity — they're a readability convention enforced by the language itself. Ruby's syntax is deliberately soft, forgiving, close to natural language. The [TIOBE index](https://www.tiobe.com/tiobe-index/) (a widely cited ranking of programming language popularity) doesn't measure what's technically optimal. It measures what engineers want to write and read. For decades, those were the same thing.
 
 The tools followed the same logic. Error messages were written for people. Outputs were formatted for terminal reading. Type systems were made optional or loosened to reduce friction for the human author. Everything was, and still is, optimized for the person sitting at the keyboard.
 
