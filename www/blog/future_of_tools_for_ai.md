@@ -1,8 +1,8 @@
 ---
 title: Code Was Never for Machines — Until Now
-description: If agents are now writing code, should our tools still be optimized for humans? Why we'll resist this shift — and why we'll make it anyway.
+description: We spent decades making languages readable. Agents don't care. Why we'll resist this shift — and why we'll embrace it anyway.
 slug: future_of_tools_for_ai
-date: 2026-03-11
+date: 2026-03-23
 authors: hubyrod
 image: /img/skip.png
 ---
