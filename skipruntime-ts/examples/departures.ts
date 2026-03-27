@@ -3,8 +3,9 @@ import type {
   EagerCollection,
   Json,
   Resource,
-  SkipService,
+  AnySkipService,
 } from "@skipruntime/core";
+import { InputDefinition } from "@skipruntime/core";
 import { runService } from "@skipruntime/server";
 import { PolledExternalService } from "@skipruntime/helpers";
 
@@ -51,8 +52,8 @@ class DeparturesResource implements Resource<ResourceInputs> {
   }
 }
 
-const service: SkipService<ResourceInputs, ResourceInputs> = {
-  initialData: { config: [] },
+const service: AnySkipService = {
+  inputs: { config: new InputDefinition() },
   resources: {
     departures: DeparturesResource,
   },
