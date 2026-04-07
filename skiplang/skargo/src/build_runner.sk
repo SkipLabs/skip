@@ -462,9 +462,14 @@ mutable class BuildRunner(
       assert(outputs.size() == 1);
       output_file = outputs[0].path;
       skc.args(Array["-o", output_file]);
-      unit.target.kind is BinTarget _ ||
-        unit.target.kind is TestTarget _ ||
-        unit.target.kind is LibTarget(LibraryTypeCdylib())
+      is_wasm = unit.arch match {
+      | TargetArchTriple(t) -> t.isWasm32()
+      | _ -> false
+      };
+      !is_wasm &&
+        (unit.target.kind is BinTarget _ ||
+          unit.target.kind is TestTarget _ ||
+          unit.target.kind is LibTarget(LibraryTypeCdylib()))
     };
 
     if (separate_link) {
