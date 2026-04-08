@@ -4,7 +4,7 @@
  * @packageDocumentation
  */
 
-import type { SkipService } from "@skipruntime/core";
+import type { AnySkipService } from "@skipruntime/core";
 import {
   registerControlServiceRoutes,
   registerStreamingServiceRoutes,
@@ -103,7 +103,7 @@ export type SkipServer = {
  * @returns Object to manage the running server.
  */
 export async function runService(
-  service: SkipService,
+  service: AnySkipService,
   options: {
     streaming_port: number;
     control_port: number;
