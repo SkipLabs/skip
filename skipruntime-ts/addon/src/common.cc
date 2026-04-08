@@ -389,6 +389,109 @@ void RunWithGC(const v8::FunctionCallbackInfo<v8::Value>& args) {
   SKIP_destroy_Obstack(obstack);
 }
 
+void UnsafeAsyncRunWithGC(const v8::FunctionCallbackInfo<v8::Value>& args) {
+  Isolate* isolate = args.GetIsolate();
+  HandleScope scope(isolate);
+  if (args.Length() != 1) {
+    isolate->ThrowException(
+        Exception::TypeError(FromUtf8(isolate, "Must have one parameters.")));
+    return;
+  };
+  if (!args[0]->IsFunction()) {
+    isolate->ThrowException(Exception::TypeError(
+        FromUtf8(isolate, "The parameter must be a function.")));
+    return;
+  }
+  SKObstack obstack = SKIP_new_Obstack();
+  Local<Context> context = isolate->GetCurrentContext();
+  TryCatch tryCatch(isolate);
+  MaybeLocal<Value> optResult =
+      args[0].As<Function>()->Call(context, Null(isolate), 0, nullptr);
+
+  if (tryCatch.HasCaught()) {
+    SKIP_destroy_Obstack(obstack);
+    tryCatch.ReThrow();
+    return;
+  }
+
+  Local<Value> result = optResult.ToLocalChecked();
+
+  if (result->IsPromise()) {
+    Local<v8::Promise> promise = result.As<v8::Promise>();
+
+    Local<External> obstackData = External::New(isolate, obstack);
+
+    Local<v8::Promise::Resolver> resolver =
+        v8::Promise::Resolver::New(context).ToLocalChecked();
+    Local<v8::Promise> wrapperPromise = resolver->GetPromise();
+
+    // Create handler data array with obstack and resolver
+    Local<Array> handlerData = Array::New(isolate, 2);
+    handlerData->Set(context, 0, obstackData).ToChecked();
+    handlerData->Set(context, 1, resolver).ToChecked();
+
+    // Create success handler that cleans up and resolves
+    Local<Function> onFulfilled =
+        Function::New(
+            context,
+            [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+              Isolate* isolate = info.GetIsolate();
+              HandleScope scope(isolate);
+              Local<Context> context = isolate->GetCurrentContext();
+
+              Local<Array> data = info.Data().As<Array>();
+              SKObstack obstack = data->Get(context, 0)
+                                      .ToLocalChecked()
+                                      .As<External>()
+                                      ->Value();
+              Local<v8::Promise::Resolver> resolver =
+                  data->Get(context, 1)
+                      .ToLocalChecked()
+                      .As<v8::Promise::Resolver>();
+
+              SKIP_destroy_Obstack(obstack);
+
+              Local<Value> value = info[0];
+              resolver->Resolve(context, value).ToChecked();
+            },
+            handlerData)
+            .ToLocalChecked();
+
+    Local<Function> onRejected =
+        Function::New(
+            context,
+            [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+              Isolate* isolate = info.GetIsolate();
+              HandleScope scope(isolate);
+              Local<Context> context = isolate->GetCurrentContext();
+
+              Local<Array> data = info.Data().As<Array>();
+              SKObstack obstack = data->Get(context, 0)
+                                      .ToLocalChecked()
+                                      .As<External>()
+                                      ->Value();
+              Local<v8::Promise::Resolver> resolver =
+                  data->Get(context, 1)
+                      .ToLocalChecked()
+                      .As<v8::Promise::Resolver>();
+
+              SKIP_destroy_Obstack(obstack);
+
+              Local<Value> error = info[0];
+              resolver->Reject(context, error).ToChecked();
+            },
+            handlerData)
+            .ToLocalChecked();
+
+    promise->Then(context, onFulfilled, onRejected).ToLocalChecked();
+
+    args.GetReturnValue().Set(wrapperPromise);
+  } else {
+    SKIP_destroy_Obstack(obstack);
+    args.GetReturnValue().Set(result);
+  }
+}
+
 void GetErrorObject(const v8::FunctionCallbackInfo<v8::Value>& args) {
   Isolate* isolate = args.GetIsolate();
   HandleScope scope(isolate);
