@@ -1,0 +1,27 @@
+module TypecheckingAllowTrackedCall;
+// @allow_tracked_call lets a tracked function call an untracked function
+
+@allow_tracked_call
+untracked fun unsafeUntrackedCall<T>(f: untracked () -> T): T {
+  f()
+}
+
+untracked fun sideEffect(): String {
+  "OK"
+}
+
+// trackedCaller1: wraps sideEffect() in an untracked lambda
+fun trackedCaller1(): String {
+  unsafeUntrackedCall(untracked () -> sideEffect())
+}
+
+// trackedCaller2: calls sideEffect() directly via unsafeUntrackedCall
+fun trackedCaller2(): String {
+  unsafeUntrackedCall(sideEffect)
+}
+
+untracked fun main(): void {
+  print_raw(trackedCaller1());
+  print_raw(trackedCaller2());
+}
+module end;
