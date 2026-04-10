@@ -57,6 +57,21 @@ jobs:
       - run:
           name: Typecheck and lint typescript sources
           command: make check-ts
+      - run:
+          name: Check locked TypeScript version
+          command: |
+            ts_version=$(npx tsc --version | awk '{print $2}')
+            if [[ ! "$ts_version" =~ ^5\.7\. ]]; then
+              echo "ERROR: Locked TypeScript version is $ts_version, expected 5.7.x"
+              echo "Update the additional typecheck steps in this job."
+              exit 1
+            fi
+      - run:
+          name: Typecheck with TypeScript ~5.8.0
+          command: npm install --save-dev typescript@~5.8.0 --ignore-scripts && SKIP_LINT=1 bin/check-ts.sh
+      - run:
+          name: Typecheck with TypeScript ~6.0.0
+          command: npm install --save-dev typescript@~6.0.0 --ignore-scripts && SKIP_LINT=1 bin/check-ts.sh
 
   compiler:
     docker:
