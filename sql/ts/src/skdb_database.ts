@@ -17,7 +17,10 @@ import type { DBEnvironment } from "./skdb_env.js";
 class SKDBMechanismImpl implements SKDBMechanism {
   writeCsv: (payload: string, source: string) => void;
   watermark: (replicationUid: string, table: string) => bigint;
-  watchFile: (fileName: string, fn: (change: ArrayBuffer) => void) => void;
+  watchFile: (
+    fileName: string,
+    fn: (change: ArrayBuffer | Uint8Array) => void,
+  ) => void;
   getReplicationUid: (deviceUuid: string) => string;
   subscribe: (
     replicationUid: string,
@@ -28,7 +31,7 @@ class SKDBMechanismImpl implements SKDBMechanism {
   diff: (
     session: string,
     watermarks: Map<string, bigint>,
-  ) => ArrayBuffer | null;
+  ) => ArrayBuffer | Uint8Array | null;
   assertCanBeMirrored: (table: string, schema: string) => void;
   tableExists: (tableName: string) => boolean;
   exec: (query: string) => SKDBTable;
@@ -55,7 +58,10 @@ class SKDBMechanismImpl implements SKDBMechanism {
         payload + "\n",
       );
     };
-    this.watchFile = (fileName: string, fn: (change: ArrayBuffer) => void) => {
+    this.watchFile = (
+      fileName: string,
+      fn: (change: ArrayBuffer | Uint8Array) => void,
+    ) => {
       fs.watchFile(fileName, (change) => {
         if (change == "") {
           return;

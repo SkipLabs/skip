@@ -73,7 +73,7 @@ type ProtoCtrlMsg =
 
 type ProtoData = {
   type: "data";
-  payload: ArrayBuffer;
+  payload: ArrayBuffer | Uint8Array;
 };
 
 type ProtoResponse = ProtoResponseCreds | ProtoData;
@@ -249,7 +249,7 @@ class ProtoMsgDecoder {
   private bufs: Uint8Array[] = [];
   private readonly msgs: (ProtoMsg | null)[] = [];
 
-  private popBufs(): ArrayBuffer {
+  private popBufs(): ArrayBuffer | Uint8Array {
     if (this.bufs.length == 1) {
       // avoid copying for the common case of single buffer
       const buf = this.bufs.pop();

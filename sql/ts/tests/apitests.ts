@@ -85,9 +85,12 @@ export async function setup(
   });
   {
     const keyData = testUserCreds.privateKey;
+    // Cast: Uint8Array is a BufferSource at runtime but @types/node
+    // generics make TS 6.0 reject it. Do NOT use .buffer — it returns the
+    // full backing ArrayBuffer, not the slice.
     const key = await crypto.subtle.importKey(
       "raw",
-      keyData,
+      keyData as BufferSource,
       { name: "HMAC", hash: "SHA-256" },
       false,
       ["sign"],
@@ -103,9 +106,10 @@ export async function setup(
   });
   {
     const keyData2 = testUserCreds2.privateKey;
+    // Cast: same as above — pass Uint8Array directly, not .buffer.
     const key2 = await crypto.subtle.importKey(
       "raw",
-      keyData2,
+      keyData2 as BufferSource,
       { name: "HMAC", hash: "SHA-256" },
       false,
       ["sign"],

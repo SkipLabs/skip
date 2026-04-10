@@ -284,11 +284,14 @@ export const ms_tests: () => Test[] = () => {
     {
       name: "Auth Short AccessKey",
       fun: async (env: DBEnvironment, mu: Mu) => {
+        // Cast: Uint8Array is a BufferSource at runtime but @types/node
+        // generics make TS 6.0 reject it. Do NOT use .buffer — it may return
+        // a larger backing ArrayBuffer than the typed array view.
         const key = await env
           .crypto()
           .subtle.importKey(
             "raw",
-            env.encodeUTF8("very_secure"),
+            env.encodeUTF8("very_secure") as BufferSource,
             { name: "HMAC", hash: "SHA-256" },
             false,
             ["sign"],
@@ -320,9 +323,10 @@ export const ms_tests: () => Test[] = () => {
     {
       name: "Auth Fail",
       fun: async (env: DBEnvironment, mu: Mu) => {
+        // Cast: same as above — pass Uint8Array directly, not .buffer.
         const key = await env.crypto().subtle.importKey(
           "raw",
-          env.encodeUTF8("this-is-not-correct"), // <--
+          env.encodeUTF8("this-is-not-correct") as BufferSource, // <--
           { name: "HMAC", hash: "SHA-256" },
           false,
           ["sign"],
