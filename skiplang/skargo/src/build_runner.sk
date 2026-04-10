@@ -132,8 +132,17 @@ mutable class BuildRunner(
 
   private mutable fun fingerprint_for(unit: Unit): Int {
     if (!this.fingerprints.containsKey(unit)) {
+      srcs = unit.target.srcs;
+      // In merged mode, test sources are compiled into the lib,
+      // so they must be included in the fingerprint.
+      if (
+        unit.target.kind is LibTarget(LibraryTypeSklib _) &&
+        should_merge(unit.profile, unit.pkg.manifest)
+      ) {
+        unit.pkg.manifest.test_target().each(t -> !srcs = srcs.concat(t.srcs));
+      };
       this.fingerprints![unit] = (
-        unit.target.srcs
+        srcs
           .map(f ->
             (
               f,
@@ -661,9 +670,9 @@ mutable class BuildRunner(
     } else {
       names = bins.map(b -> b.name);
       if (test_entry_opt.isSome()) !names = names.concat(Array["test"]);
-      lines.push(`  | unknown ->`);
+      lines.push(`  | _ ->`);
       lines.push(
-        `    print_error("Unknown binary '\`\${unknown}\`'. Set SKARGO_BIN to one of: ${names.join(
+        `    print_error("Unknown binary '\`\${name}\`'. Set SKARGO_BIN to one of: ${names.join(
           ", ",
         )}");`,
       );
