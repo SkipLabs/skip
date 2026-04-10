@@ -15,7 +15,7 @@ fi
 
 # build and copy the runtime
 ../../../bin/build_runtime.sh "$ARCH"
-VERSION=$(jq --raw-output .version ../../metapackage/package.json)
+VERSION=$(jq --raw-output .version ../../addon/package.json)
 mkdir -p build/v"$VERSION"
 cp ../../../build/libskipruntime.so-* build/v"$VERSION"
 
