@@ -48,11 +48,14 @@ export function toHex(buf: ArrayBuffer) {
 }
 
 export async function connectAndAuth(env: DBEnvironment) {
+  // Cast: Uint8Array is a BufferSource at runtime but @types/node
+  // generics make TS 6.0 reject it. Do NOT use .buffer — it may return
+  // a larger backing ArrayBuffer than the typed array view.
   const key = await env
     .crypto()
     .subtle.importKey(
       "raw",
-      env.encodeUTF8("test"),
+      env.encodeUTF8("test") as BufferSource,
       { name: "HMAC", hash: "SHA-256" },
       false,
       ["sign"],

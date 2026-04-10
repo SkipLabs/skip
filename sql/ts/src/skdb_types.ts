@@ -113,7 +113,10 @@ export interface SKDB {
 export interface SKDBMechanism {
   writeCsv: (payload: string, source: string) => void;
   watermark: (replicationUid: string, table: string) => bigint;
-  watchFile: (fileName: string, fn: (change: ArrayBuffer) => void) => void;
+  watchFile: (
+    fileName: string,
+    fn: (change: ArrayBuffer | Uint8Array) => void,
+  ) => void;
   getReplicationUid: (deviceUuid: string) => string;
   subscribe: (
     replicationUid: string,
@@ -124,7 +127,7 @@ export interface SKDBMechanism {
   diff: (
     session: string,
     watermarks: Map<string, bigint>,
-  ) => ArrayBuffer | null;
+  ) => ArrayBuffer | Uint8Array | null;
   tableExists: (tableName: string) => boolean;
   exec: (query: string) => SKDBTable;
   assertCanBeMirrored: (table: string, schema: string) => void;

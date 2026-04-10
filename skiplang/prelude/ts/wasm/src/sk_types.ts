@@ -4,6 +4,17 @@ import { cloneIfProxy } from "../skiplang-std/index.js";
 
 export type { float, int, Nullable, Pointer };
 
+// Cast: @types/node types Uint8Array.buffer as ArrayBufferLike (= ArrayBuffer |
+// SharedArrayBuffer), but APIs like WebAssembly.instantiate expect ArrayBuffer.
+// Safe because Node's TextEncoder, Buffer, and Uint8Array constructors never use
+// SharedArrayBuffer. Unsafe if buf was constructed over a SharedArrayBuffer.
+// WARNING: Do NOT use on sliced Uint8Arrays (e.g. new Uint8Array(buf, offset, len))
+// — .buffer returns the full backing ArrayBuffer, not the slice.
+// Remove when @types/node narrows Uint8Array.buffer to ArrayBuffer.
+export function toArrayBuffer(buf: Uint8Array): ArrayBuffer {
+  return buf.buffer as ArrayBuffer;
+}
+
 export type ptr<InternalType extends Internal.T<any>> = Internal.Opaque<
   number,
   InternalType
@@ -741,7 +752,8 @@ export function loadWasm(
 ) {
   const wasm = {};
   const links = managers.map((manager) => manager.prepare(wasm));
-  return WebAssembly.instantiate(buffer, { env: wasm }).then((result) => {
+  const bytes = buffer instanceof ArrayBuffer ? buffer : toArrayBuffer(buffer);
+  return WebAssembly.instantiate(bytes, { env: wasm }).then((result) => {
     const instance = result.instance;
     const exports = instance.exports;
     const utils = new Utils(instance.exports, environment, main);

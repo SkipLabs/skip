@@ -54,7 +54,7 @@ class Env implements Environment {
     const global = typeof window == "undefined" ? self : window;
     this.timestamp = () => global.performance.now();
     const decoder = new TextDecoder("utf8");
-    this.decodeUTF8 = (utf8: ArrayBuffer) => decoder.decode(utf8);
+    this.decodeUTF8 = (utf8: ArrayBuffer | Uint8Array) => decoder.decode(utf8);
     const encoder = new TextEncoder(); // always utf-8
     this.encodeUTF8 = (str: string) => encoder.encode(str);
     this.base64Decode = (base64: string) =>
