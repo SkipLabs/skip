@@ -19,7 +19,11 @@ type AddOn = {
 
 const skip_runtime: AddOn = require("../build/Release/skip_runtime.node");
 
-import type { SkipService } from "@skipruntime/core";
+import type {
+  NamedEagerCollections,
+  NamedInputDefinitions,
+  SkipService,
+} from "@skipruntime/core";
 
 const jsonBinding: JsonBinding = skip_runtime.getJsonBinding();
 const jsonConverter = buildJsonConverter(jsonBinding);
@@ -31,7 +35,13 @@ const tobinding = new ToBinding(
   skip_runtime.getErrorObject,
 );
 
-export function initService(service: SkipService): Promise<ServiceInstance> {
+export function initService<
+  InputDefs extends NamedInputDefinitions,
+  Inputs extends NamedEagerCollections,
+  ResourceInputs extends NamedEagerCollections,
+>(
+  service: SkipService<InputDefs, Inputs, ResourceInputs>,
+): Promise<ServiceInstance> {
   skip_runtime.initSkipRuntimeToBinding(tobinding);
   try {
     return Promise.resolve(tobinding.initService(service));

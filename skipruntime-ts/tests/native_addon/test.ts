@@ -1,10 +1,14 @@
 import type { SkipService } from "@skipruntime/core";
 import { initService } from "@skipruntime/native";
 
-const emptyService: SkipService = {
-  initialData: {},
+const emptyService: SkipService<
+  Record<string, never>,
+  Record<string, never>,
+  Record<string, never>
+> = {
+  inputs: {},
   resources: {},
-  createGraph(inputCollections) {
+  createGraph(inputCollections: Record<string, never>) {
     return inputCollections;
   },
 };

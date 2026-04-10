@@ -9,18 +9,14 @@ import {
   type Reducer,
   type Resource,
 } from "./api.js";
-import type { HandlerInfo, ServiceDefinition } from "./index.js";
+import type {
+  HandlerInfo,
+  NamedEagerCollections,
+  NamedInputDefinitions,
+  ServiceDefinition,
+} from "./index.js";
 
 export type Handle<T> = Internal.Opaque<number, { handle_for: T }>;
-
-export class ResourceBuilder {
-  constructor(private readonly builder: new (params: Json) => Resource) {}
-
-  build(parameters: Json): Resource {
-    const builder = this.builder;
-    return new builder(parameters);
-  }
-}
 
 export type Notifier<K extends Json, V extends Json> = {
   subscribed: () => void;
@@ -70,12 +66,18 @@ export interface FromBinding {
 
   // Resource
 
-  SkipRuntime_createResource(ref: Handle<Resource>): Pointer<Internal.Resource>;
+  SkipRuntime_createResource(
+    ref: Handle<Resource<NamedEagerCollections>>,
+  ): Pointer<Internal.Resource>;
 
   // Service
 
-  SkipRuntime_createService(
-    ref: Handle<ServiceDefinition>,
+  SkipRuntime_createService<
+    InputDefs extends NamedInputDefinitions,
+    Inputs extends NamedEagerCollections,
+    ResourceInputs extends NamedEagerCollections,
+  >(
+    ref: Handle<ServiceDefinition<InputDefs, Inputs, ResourceInputs>>,
   ): Pointer<Internal.Service>;
 
   // Collection

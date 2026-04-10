@@ -20,6 +20,8 @@ import type {
   HandlerInfo,
   ServiceDefinition,
   ChangeManager,
+  NamedInputDefinitions,
+  NamedEagerCollections,
 } from "@skipruntime/core";
 import {
   ServiceInstance,
@@ -80,12 +82,18 @@ export interface FromWasm {
 
   // Resource
 
-  SkipRuntime_createResource(ref: Handle<Resource>): ptr<Internal.Resource>;
+  SkipRuntime_createResource(
+    ref: Handle<Resource<NamedEagerCollections>>,
+  ): ptr<Internal.Resource>;
 
   // Service
 
-  SkipRuntime_createService(
-    ref: Handle<ServiceDefinition>,
+  SkipRuntime_createService<
+    InputDefs extends NamedInputDefinitions,
+    Inputs extends NamedEagerCollections,
+    ResourceInputs extends NamedEagerCollections,
+  >(
+    ref: Handle<ServiceDefinition<InputDefs, Inputs, ResourceInputs>>,
   ): ptr<Internal.Service>;
 
   // Collection
@@ -280,41 +288,67 @@ interface ToWasm {
 
   // Resource
 
-  SkipRuntime_Resource__instantiate(
-    resource: Handle<Resource>,
+  SkipRuntime_Resource__instantiate<Collections extends NamedEagerCollections>(
+    resource: Handle<Resource<Collections>>,
     collections: ptr<Internal.CJObject>,
   ): ptr<Internal.String>;
 
-  SkipRuntime_deleteResource(resource: Handle<Resource>): void;
+  SkipRuntime_deleteResource<Collections extends NamedEagerCollections>(
+    resource: Handle<Resource<Collections>>,
+  ): void;
 
   // ServiceDefinition
 
-  SkipRuntime_ServiceDefinition__createGraph(
-    resource: Handle<ServiceDefinition>,
+  SkipRuntime_ServiceDefinition__createGraph<
+    InputDefs extends NamedInputDefinitions,
+    Inputs extends NamedEagerCollections,
+    ResourceInputs extends NamedEagerCollections,
+  >(
+    resource: Handle<ServiceDefinition<InputDefs, Inputs, ResourceInputs>>,
     collections: ptr<Internal.CJObject>,
   ): ptr<Internal.CJObject>;
 
-  SkipRuntime_ServiceDefinition__inputs(
-    skservice: Handle<ServiceDefinition>,
+  SkipRuntime_ServiceDefinition__inputs<
+    InputDefs extends NamedInputDefinitions,
+    Inputs extends NamedEagerCollections,
+    ResourceInputs extends NamedEagerCollections,
+  >(
+    skservice: Handle<ServiceDefinition<InputDefs, Inputs, ResourceInputs>>,
   ): ptr<Internal.CJArray<Internal.CJSON>>;
 
-  SkipRuntime_ServiceDefinition__resources(
-    skservice: Handle<ServiceDefinition>,
+  SkipRuntime_ServiceDefinition__resources<
+    InputDefs extends NamedInputDefinitions,
+    Inputs extends NamedEagerCollections,
+    ResourceInputs extends NamedEagerCollections,
+  >(
+    skservice: Handle<ServiceDefinition<InputDefs, Inputs, ResourceInputs>>,
   ): ptr<Internal.CJArray<Internal.CJSON>>;
 
-  SkipRuntime_ServiceDefinition__initialData(
-    skservice: Handle<ServiceDefinition>,
+  SkipRuntime_ServiceDefinition__initialData<
+    InputDefs extends NamedInputDefinitions,
+    Inputs extends NamedEagerCollections,
+    ResourceInputs extends NamedEagerCollections,
+  >(
+    skservice: Handle<ServiceDefinition<InputDefs, Inputs, ResourceInputs>>,
     name: ptr<Internal.String>,
   ): ptr<Internal.CJArray<Internal.CJSON>>;
 
-  SkipRuntime_ServiceDefinition__buildResource(
-    skservice: Handle<ServiceDefinition>,
+  SkipRuntime_ServiceDefinition__buildResource<
+    InputDefs extends NamedInputDefinitions,
+    Inputs extends NamedEagerCollections,
+    ResourceInputs extends NamedEagerCollections,
+  >(
+    skservice: Handle<ServiceDefinition<InputDefs, Inputs, ResourceInputs>>,
     name: ptr<Internal.String>,
     skparams: ptr<Internal.CJObject>,
   ): ptr<Internal.Resource>;
 
-  SkipRuntime_ServiceDefinition__subscribe(
-    skservice: Handle<ServiceDefinition>,
+  SkipRuntime_ServiceDefinition__subscribe<
+    InputDefs extends NamedInputDefinitions,
+    Inputs extends NamedEagerCollections,
+    ResourceInputs extends NamedEagerCollections,
+  >(
+    skservice: Handle<ServiceDefinition<InputDefs, Inputs, ResourceInputs>>,
     external: ptr<Internal.String>,
     writerId: ptr<Internal.String>,
     instance: ptr<Internal.String>,
@@ -322,18 +356,32 @@ interface ToWasm {
     skparams: ptr<Internal.CJObject>,
   ): Handle<Promise<void>>;
 
-  SkipRuntime_ServiceDefinition__unsubscribe(
-    skservice: Handle<ServiceDefinition>,
+  SkipRuntime_ServiceDefinition__unsubscribe<
+    InputDefs extends NamedInputDefinitions,
+    Inputs extends NamedEagerCollections,
+    ResourceInputs extends NamedEagerCollections,
+  >(
+    skservice: Handle<ServiceDefinition<InputDefs, Inputs, ResourceInputs>>,
     external: ptr<Internal.String>,
     instance: ptr<Internal.String>,
   ): void;
 
-  SkipRuntime_ServiceDefinition__shutdown(
-    skservice: Handle<ServiceDefinition>,
+  SkipRuntime_ServiceDefinition__shutdown<
+    InputDefs extends NamedInputDefinitions,
+    Inputs extends NamedEagerCollections,
+    ResourceInputs extends NamedEagerCollections,
+  >(
+    skservice: Handle<ServiceDefinition<InputDefs, Inputs, ResourceInputs>>,
     external: ptr<Internal.String>,
   ): Handle<Promise<unknown>>;
 
-  SkipRuntime_deleteService(service: Handle<ServiceDefinition>): void;
+  SkipRuntime_deleteService<
+    InputDefs extends NamedInputDefinitions,
+    Inputs extends NamedEagerCollections,
+    ResourceInputs extends NamedEagerCollections,
+  >(
+    service: Handle<ServiceDefinition<InputDefs, Inputs, ResourceInputs>>,
+  ): void;
 
   // ChangeManager
 
@@ -456,13 +504,17 @@ export class WasmFromBinding implements FromBinding {
   }
 
   SkipRuntime_createResource(
-    ref: Handle<Resource>,
+    ref: Handle<Resource<NamedEagerCollections>>,
   ): Pointer<Internal.Resource> {
     return this.fromWasm.SkipRuntime_createResource(ref);
   }
 
-  SkipRuntime_createService(
-    ref: Handle<ServiceDefinition>,
+  SkipRuntime_createService<
+    InputDefs extends NamedInputDefinitions,
+    Inputs extends NamedEagerCollections,
+    ResourceInputs extends NamedEagerCollections,
+  >(
+    ref: Handle<ServiceDefinition<InputDefs, Inputs, ResourceInputs>>,
   ): Pointer<Internal.Service> {
     return this.fromWasm.SkipRuntime_createService(ref);
   }
@@ -866,8 +918,8 @@ class LinksImpl implements Links {
 
   // Resource
 
-  instantiateOfResource(
-    skresource: Handle<Resource>,
+  instantiateOfResource<Collections extends NamedEagerCollections>(
+    skresource: Handle<Resource<Collections>>,
     skcollections: ptr<Internal.CJObject>,
   ): ptr<Internal.String> {
     return this.utils.exportString(
@@ -878,14 +930,20 @@ class LinksImpl implements Links {
     );
   }
 
-  deleteResource(resource: Handle<Resource>) {
+  deleteResource<Collections extends NamedEagerCollections>(
+    resource: Handle<Resource<Collections>>,
+  ) {
     this.tobinding.SkipRuntime_deleteResource(resource);
   }
 
   // ServiceDefinition
 
-  createGraphOfServiceDefinition(
-    skservice: Handle<ServiceDefinition>,
+  createGraphOfServiceDefinition<
+    InputDefs extends NamedInputDefinitions,
+    Inputs extends NamedEagerCollections,
+    ResourceInputs extends NamedEagerCollections,
+  >(
+    skservice: Handle<ServiceDefinition<InputDefs, Inputs, ResourceInputs>>,
     skcollections: ptr<Internal.CJObject>,
   ) {
     return toPtr(
@@ -896,24 +954,36 @@ class LinksImpl implements Links {
     );
   }
 
-  inputsOfServiceDefinition(
-    skservice: Handle<ServiceDefinition>,
+  inputsOfServiceDefinition<
+    InputDefs extends NamedInputDefinitions,
+    Inputs extends NamedEagerCollections,
+    ResourceInputs extends NamedEagerCollections,
+  >(
+    skservice: Handle<ServiceDefinition<InputDefs, Inputs, ResourceInputs>>,
   ): ptr<Internal.CJArray<Internal.CJSON>> {
     return toPtr(
       this.tobinding.SkipRuntime_ServiceDefinition__inputs(skservice),
     );
   }
 
-  resourcesOfServiceDefinition(
-    skservice: Handle<ServiceDefinition>,
+  resourcesOfServiceDefinition<
+    InputDefs extends NamedInputDefinitions,
+    Inputs extends NamedEagerCollections,
+    ResourceInputs extends NamedEagerCollections,
+  >(
+    skservice: Handle<ServiceDefinition<InputDefs, Inputs, ResourceInputs>>,
   ): ptr<Internal.CJArray<Internal.CJSON>> {
     return toPtr(
       this.tobinding.SkipRuntime_ServiceDefinition__resources(skservice),
     );
   }
 
-  initialDataOfServiceDefinition(
-    skservice: Handle<ServiceDefinition>,
+  initialDataOfServiceDefinition<
+    InputDefs extends NamedInputDefinitions,
+    Inputs extends NamedEagerCollections,
+    ResourceInputs extends NamedEagerCollections,
+  >(
+    skservice: Handle<ServiceDefinition<InputDefs, Inputs, ResourceInputs>>,
     name: ptr<Internal.String>,
   ): ptr<Internal.CJArray<Internal.CJSON>> {
     return toPtr(
@@ -924,8 +994,12 @@ class LinksImpl implements Links {
     );
   }
 
-  buildResourceOfServiceDefinition(
-    skservice: Handle<ServiceDefinition>,
+  buildResourceOfServiceDefinition<
+    InputDefs extends NamedInputDefinitions,
+    Inputs extends NamedEagerCollections,
+    ResourceInputs extends NamedEagerCollections,
+  >(
+    skservice: Handle<ServiceDefinition<InputDefs, Inputs, ResourceInputs>>,
     name: ptr<Internal.String>,
     skparams: ptr<Internal.CJObject>,
   ): ptr<Internal.Resource> {
@@ -938,8 +1012,12 @@ class LinksImpl implements Links {
     );
   }
 
-  subscribeOfServiceDefinition(
-    skservice: Handle<ServiceDefinition>,
+  subscribeOfServiceDefinition<
+    InputDefs extends NamedInputDefinitions,
+    Inputs extends NamedEagerCollections,
+    ResourceInputs extends NamedEagerCollections,
+  >(
+    skservice: Handle<ServiceDefinition<InputDefs, Inputs, ResourceInputs>>,
     external: ptr<Internal.String>,
     writerId: ptr<Internal.String>,
     instance: ptr<Internal.String>,
@@ -956,8 +1034,12 @@ class LinksImpl implements Links {
     );
   }
 
-  unsubscribeOfServiceDefinition(
-    skservice: Handle<ServiceDefinition>,
+  unsubscribeOfServiceDefinition<
+    InputDefs extends NamedInputDefinitions,
+    Inputs extends NamedEagerCollections,
+    ResourceInputs extends NamedEagerCollections,
+  >(
+    skservice: Handle<ServiceDefinition<InputDefs, Inputs, ResourceInputs>>,
     external: ptr<Internal.String>,
     instance: ptr<Internal.String>,
   ): void {
@@ -968,13 +1050,21 @@ class LinksImpl implements Links {
     );
   }
 
-  shutdownOfServiceDefinition(
-    skservice: Handle<ServiceDefinition>,
+  shutdownOfServiceDefinition<
+    InputDefs extends NamedInputDefinitions,
+    Inputs extends NamedEagerCollections,
+    ResourceInputs extends NamedEagerCollections,
+  >(
+    skservice: Handle<ServiceDefinition<InputDefs, Inputs, ResourceInputs>>,
   ): Handle<Promise<unknown>> {
     return this.tobinding.SkipRuntime_ServiceDefinition__shutdown(skservice);
   }
 
-  deleteService(service: Handle<ServiceDefinition>) {
+  deleteService<
+    InputDefs extends NamedInputDefinitions,
+    Inputs extends NamedEagerCollections,
+    ResourceInputs extends NamedEagerCollections,
+  >(service: Handle<ServiceDefinition<InputDefs, Inputs, ResourceInputs>>) {
     this.tobinding.SkipRuntime_deleteService(service);
   }
 
@@ -1091,10 +1181,22 @@ class LinksImpl implements Links {
 
 export class ServiceInstanceFactory implements Shared {
   constructor(
-    private readonly init: (service: SkipService) => Promise<ServiceInstance>,
+    private readonly init: <
+      InputDefs extends NamedInputDefinitions,
+      Inputs extends NamedEagerCollections,
+      ResourceInputs extends NamedEagerCollections,
+    >(
+      service: SkipService<InputDefs, Inputs, ResourceInputs>,
+    ) => Promise<ServiceInstance>,
   ) {}
 
-  initService(service: SkipService): Promise<ServiceInstance> {
+  initService<
+    InputDefs extends NamedInputDefinitions,
+    Inputs extends NamedEagerCollections,
+    ResourceInputs extends NamedEagerCollections,
+  >(
+    service: SkipService<InputDefs, Inputs, ResourceInputs>,
+  ): Promise<ServiceInstance> {
     return this.init(service);
   }
 

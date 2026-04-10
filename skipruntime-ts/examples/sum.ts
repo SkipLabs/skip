@@ -1,8 +1,9 @@
-import type {
-  EagerCollection,
-  Mapper,
-  Resource,
-  Values,
+import {
+  InputDefinition,
+  type EagerCollection,
+  type Mapper,
+  type Resource,
+  type Values,
 } from "@skipruntime/core";
 
 import { runService } from "@skipruntime/server";
@@ -60,7 +61,7 @@ class Sub implements Resource<Collections> {
 }
 
 const service = {
-  initialData: { input1: [], input2: [] },
+  inputs: { input1: new InputDefinition([]), input2: new InputDefinition([]) },
   resources: { add: Add, sub: Sub },
   createGraph: (inputs: Collections) => inputs,
 };

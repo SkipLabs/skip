@@ -3,12 +3,13 @@
 import { EventSource } from "eventsource";
 
 import type {
+  AbstractEagerCollection,
   Context,
-  EagerCollection,
   Entry,
   ExternalService,
   Json,
-  NamedCollections,
+  NamedEagerCollections,
+  NamedInputDefinitions,
   Resource,
   SkipService,
 } from "@skipruntime/core";
@@ -111,7 +112,7 @@ export class SkipExternalService implements ExternalService {
   }
 }
 
-class LeaderResource implements Resource {
+class LeaderResource implements Resource<NamedEagerCollections> {
   private collection: string;
 
   constructor(param: Json) {
@@ -122,7 +123,7 @@ class LeaderResource implements Resource {
       );
   }
 
-  instantiate(collections: NamedCollections): EagerCollection<Json, Json> {
+  instantiate(collections: NamedEagerCollections): AbstractEagerCollection {
     if (this.collection in collections) return collections[this.collection]!;
     throw new SkipError(
       `Unknown shared collection in leader: ${this.collection}`,
@@ -137,7 +138,13 @@ class LeaderResource implements Resource {
  *
  * @returns The *leader* component to run `service` in such a configuration.
  */
-export function asLeader(service: SkipService): SkipService {
+export function asLeader<
+  InputDefs extends NamedInputDefinitions,
+  Inputs extends NamedEagerCollections,
+  ResourceInputs extends NamedEagerCollections,
+>(
+  service: SkipService<InputDefs, Inputs, ResourceInputs>,
+): SkipService<InputDefs, Inputs, ResourceInputs> {
   //TODO: add mechanism to split externals between leader/follower
   return {
     ...service,
@@ -152,22 +159,26 @@ export function asLeader(service: SkipService): SkipService {
  *
  * @returns The *follower* component to run `service` in such a configuration, given the leader's address and the names of the shared computation graph collections to be mirrored from it (typically the `ResourceInputs` of `service`).
  */
-export function asFollower(
-  service: SkipService,
+export function asFollower<
+  Inputs extends NamedEagerCollections,
+  ResourceInputs extends NamedEagerCollections,
+>(
+  service: SkipService<Record<string, never>, Inputs, ResourceInputs>,
   leader: {
     leader: { host: string; streaming_port: number; control_port: number };
     collections: string[];
   },
-): SkipService {
+): SkipService<Record<string, never>, Inputs, ResourceInputs> {
   return {
     ...service,
-    initialData: {},
+    inputs: {},
     externalServices: {
       ...service.externalServices,
       __skip_leader: SkipExternalService.direct(leader.leader),
     },
-    createGraph(_inputs: object, context: Context): NamedCollections {
-      const mirroredCollections: NamedCollections = {};
+    createGraph(_inputs: object, context: Context): ResourceInputs {
+      const mirroredCollections: { [name: string]: AbstractEagerCollection } =
+        {};
       for (const collection of leader.collections) {
         mirroredCollections[collection] = context.useExternalResource({
           service: "__skip_leader",
@@ -175,7 +186,7 @@ export function asFollower(
           params: collection,
         });
       }
-      return mirroredCollections;
+      return mirroredCollections as ResourceInputs;
     },
   };
 }

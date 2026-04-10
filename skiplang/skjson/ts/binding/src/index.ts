@@ -15,13 +15,13 @@ export const sk_managed: unique symbol = Symbol.for("Skip.managed");
  *
  * `Managed` values are important because they can be used in code that will be executed by the reactive computation system without introducing the possibility of stale or unreproducible results.
  */
-export type Managed = {
+export interface Managed {
   /**
    * @ignore
    * @hidden
    */
   [sk_managed]: true;
-};
+}
 
 export abstract class Frozen implements Managed {
   // tsc misses that Object.defineProperty in the constructor inits this

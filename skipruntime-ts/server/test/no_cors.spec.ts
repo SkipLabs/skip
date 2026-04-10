@@ -1,5 +1,10 @@
 import { runService, type SkipServer } from "../src/server.js";
-import type { Context, EagerCollection, Resource } from "@skipruntime/core";
+import {
+  InputDefinition,
+  type Context,
+  type EagerCollection,
+  type Resource,
+} from "@skipruntime/core";
 import { expect } from "chai";
 
 type Post = {
@@ -25,7 +30,7 @@ describe("runService({ no_cors: true })", function () {
   before(async function () {
     service = await runService(
       {
-        initialData: { posts: [] },
+        inputs: { posts: new InputDefinition([]) },
         resources: { posts: PostsResource },
         createGraph(
           inputs: { posts: EagerCollection<number, Post> },

@@ -33,14 +33,8 @@ export type ExternalService = T<typeof externalsupplier>;
 declare const resource: unique symbol;
 export type Resource = T<typeof resource>;
 
-declare const resourcebuilder: unique symbol;
-export type ResourceBuilder = T<typeof resourcebuilder>;
-
 declare const service: unique symbol;
 export type Service = T<typeof service>;
-
-declare const resourcebuildermap: unique symbol;
-export type ResourceBuilderMap = T<typeof resourcebuildermap>;
 
 declare const externalsuppliermap: unique symbol;
 export type ExternalServiceMap = T<typeof externalsuppliermap>;

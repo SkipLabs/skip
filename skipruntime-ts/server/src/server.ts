@@ -4,7 +4,11 @@
  * @packageDocumentation
  */
 
-import type { SkipService } from "@skipruntime/core";
+import type {
+  NamedEagerCollections,
+  NamedInputDefinitions,
+  SkipService,
+} from "@skipruntime/core";
 import {
   registerControlServiceRoutes,
   registerStreamingServiceRoutes,
@@ -102,8 +106,12 @@ export type SkipServer = {
  * @param options.no_cors - Disable CORS for the streaming endpoint.
  * @returns Object to manage the running server.
  */
-export async function runService(
-  service: SkipService,
+export async function runService<
+  InputDefs extends NamedInputDefinitions,
+  Inputs extends NamedEagerCollections,
+  ResourceInputs extends NamedEagerCollections,
+>(
+  service: SkipService<InputDefs, Inputs, ResourceInputs>,
   options: {
     streaming_port: number;
     control_port: number;
