@@ -132,8 +132,17 @@ mutable class BuildRunner(
 
   private mutable fun fingerprint_for(unit: Unit): Int {
     if (!this.fingerprints.containsKey(unit)) {
+      srcs = unit.target.srcs;
+      // In merged mode, test sources are compiled into the lib,
+      // so they must be included in the fingerprint.
+      if (
+        unit.target.kind is LibTarget(LibraryTypeSklib _) &&
+        should_merge(unit.profile, unit.pkg.manifest)
+      ) {
+        unit.pkg.manifest.test_target().each(t -> !srcs = srcs.concat(t.srcs));
+      };
       this.fingerprints![unit] = (
-        unit.target.srcs
+        srcs
           .map(f ->
             (
               f,
