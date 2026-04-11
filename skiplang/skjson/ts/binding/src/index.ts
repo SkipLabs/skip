@@ -75,6 +75,7 @@ export type DepSafe =
   | Managed;
 
 export function checkOrCloneParam<T>(value: T): T {
+  if (value === null || value === undefined) return value;
   if (
     typeof value == "boolean" ||
     typeof value == "number" ||
@@ -82,7 +83,6 @@ export function checkOrCloneParam<T>(value: T): T {
   )
     return value;
   if (typeof value == "object") {
-    if (value === null) return value;
     if (isObjectProxy(value)) return value.clone() as T;
     if (isSkManaged(value)) return value;
     throw new Error("Invalid object: must be deep-frozen.");
@@ -129,6 +129,7 @@ export function deepFreeze<T>(value: T): T & DepSafe {
       return Object.freeze(tagSkManaged(value));
     } else {
       for (const val of Object.values(value)) {
+        if (val === undefined) continue;
         deepFreeze(val);
       }
       return Object.freeze(tagSkManaged(value));
@@ -162,12 +163,16 @@ export type Json =
   | number
   | string
   | readonly (Json | null)[]
-  | JsonObject;
+  | JsonObject
+  | JsonPartialObject;
 
 /**
  * Objects containing `Json` values.
  */
 export type JsonObject = { readonly [key: string]: Json | null };
+export type JsonPartialObject = {
+  readonly [key: string]: Json | null | undefined;
+};
 
 export type Exportable =
   | null
@@ -238,7 +243,7 @@ export const reactiveObject = {
 };
 
 export function clone<T>(value: T): T {
-  if (value !== null && typeof value === "object") {
+  if (value && typeof value === "object") {
     if (Array.isArray(value)) {
       return value.map(clone) as T;
     } else if (isObjectProxy(value)) {
@@ -393,6 +398,7 @@ export function exportJSON(
     } else {
       const obj = binding.SKIP_SKJSON_startCJObject();
       Object.entries(value).forEach(([key, val]) => {
+        if (val === undefined) return;
         binding.SKIP_SKJSON_addToCJObject(obj, key, exportJSON(binding, val));
       });
       return binding.SKIP_SKJSON_endCJObject(obj);
