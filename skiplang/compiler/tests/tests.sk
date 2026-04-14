@@ -110,6 +110,27 @@ fun main(): void {
     Set[]
   };
 
+  // In unified mode, verify that the skc on PATH is the same one that
+  // compiled this test binary.
+  if (!coveredModules.isEmpty()) {
+    compiledBy = #env ("GIT_COMMIT_HASH");
+    tests
+      .getOrAdd("Native", () -> mutable Vector[])
+      .push(
+        T.Test{
+          name => "CompilerVersionCheck",
+          func => () ~> {
+            p = System.subprocess(Array["skc", "--version"]).fromSuccess();
+            invariant(
+              p.stdout.contains(compiledBy),
+              `Test binary compiled by skc (${compiledBy}) but PATH skc ` +
+                `reports: ${p.stdout}`,
+            );
+          },
+        },
+      );
+  };
+
   // Run any valid tests NOT covered by @exptest in subprocess mode.
   validTests = FileSystem.readFilesRecursive("./tests", fn ->
     fn.endsWith(".exp")
