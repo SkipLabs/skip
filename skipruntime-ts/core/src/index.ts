@@ -122,7 +122,7 @@ export class ServiceDefinition<
   ): Resource<ResourceInputs> {
     const builder = this.service.resources[name];
     if (!builder) throw new Error(`Resource '${name}' not exist.`);
-    return new builder(parameters);
+    return new builder(parameters as never);
   }
 
   inputs(): string[] {

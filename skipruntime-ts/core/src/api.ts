@@ -537,7 +537,7 @@ export type ResourceClass<
 > = new (params: Params) => Resource<Collections>;
 
 export type NamedResources<ResourceInputs extends SharedCollections> = {
-  readonly [name: string]: ResourceClass<ResourceInputs, Json>;
+  readonly [name: string]: ResourceClass<ResourceInputs, never>;
 };
 
 /**
