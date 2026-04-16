@@ -133,16 +133,17 @@ fun uniq_modifiers<Ta>(cmp_mods: (Ta, Ta) ~> Order, ml: Array<Ta>): Array<Ta> {
   cur1 = iter.next();
   cur2 = iter.next();
   loop {
-    (cur1, cur1) match {
+    (cur1, cur2) match {
     | (None _, Some _) -> invariant_violation("ICE impossible iteration step")
-    | (None(), None()) -> break result.toArray()
+    | (None(), None()) -> invariant_violation("ml is given non-empty")
     | (Some(elt), None()) ->
       result.push(elt);
       break result.toArray()
     | (Some(elt1), Some(elt2)) ->
       cmp_mods(elt1, elt2) match {
       | EQ() -> void
-      | _ -> result.push(elt1)
+      | LT() -> result.push(elt1)
+      | GT() -> invariant_violation("ml is given sorted")
       };
       !cur1 = cur2;
       !cur2 = iter.next()
