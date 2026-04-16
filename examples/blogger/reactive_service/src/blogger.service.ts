@@ -1,10 +1,10 @@
-import type {
-  Context,
-  EagerCollection,
-  Json,
-  Values,
-  Resource,
-  SkipService,
+import {
+  type Context,
+  type EagerCollection,
+  type Json,
+  type Values,
+  type Resource,
+  type AnySkipService,
 } from "@skipruntime/core";
 
 import { PostgresExternalService } from "@skip-adapter/postgres";
@@ -104,8 +104,8 @@ class PostsResource implements Resource<PostsResourceInputs> {
 
 type PostsServiceInputs = Record<string, never>;
 
-export const service: SkipService<PostsServiceInputs, PostsResourceInputs> = {
-  initialData: {},
+export const service: AnySkipService = {
+  inputs: {},
   resources: { posts: PostsResource },
   externalServices: { postgres },
   createGraph(

@@ -1,8 +1,8 @@
-import type { SkipService } from "@skipruntime/core";
+import type { AnySkipService } from "@skipruntime/core";
 import { initService } from "@skipruntime/native";
 
-const emptyService: SkipService = {
-  initialData: {},
+const emptyService: AnySkipService = {
+  inputs: {},
   resources: {},
   createGraph(inputCollections) {
     return inputCollections;
