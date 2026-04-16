@@ -100,4 +100,13 @@ native fun array_set_byte<T>(v: mutable Array<T>, i: Int, b: UInt8): void;
 @cpp_extern
 native fun string_ptr(v: String, i: Int): Runtime.NonGCPointer;
 
+// Calls an untracked function from a tracked context.
+// Use this to perform side effects (e.g., file I/O) inside reactive
+// computations where you take responsibility for correctness and
+// invalidation.
+@allow_tracked_call
+untracked fun unsafe_untracked_call<T>(f: untracked () -> T): T {
+  f()
+}
+
 module end;
