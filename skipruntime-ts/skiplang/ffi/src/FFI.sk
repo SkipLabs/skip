@@ -727,6 +727,39 @@ fun mergeForkForOfRuntime(streamsToIgnore: SKJSON.CJArray): Float {
   }
 }
 
+@export("SkipRuntime_Runtime__startMerge")
+fun startMergeForOfRuntime(
+  streamsToIgnore: SKJSON.CJArray,
+): ?SKStore.MergeState {
+  streamsToIgnore match {
+  | SKJSON.CJArray(values) ->
+    ignore = values.iterator().map(SKJSON.asString).collect(Set);
+    getFork().map(f ->
+      SKStore.startMergeForkNoGc(f, SKStore.ForkSettings::keepall(ignore))
+    )
+  }
+}
+
+@export("SkipRuntime_Runtime__endMerge")
+fun endMergeForOfRuntime(state: ?SKStore.MergeState): Float {
+  try {
+    state.each(s -> SKStore.endMergeForkNoGc(s));
+    0.0
+  } catch {
+  | err -> getErrorHdl(err)
+  }
+}
+
+@export("SkipRuntime_Runtime__abortMerge")
+fun abortMergeForOfRuntime(state: ?SKStore.MergeState): Float {
+  try {
+    state.each(s -> SKStore.abortMergeForkNoGc(s));
+    0.0
+  } catch {
+  | err -> getErrorHdl(err)
+  }
+}
+
 @export("SkipRuntime_Runtime__abortFork")
 fun abortForkOfRuntime(): Float {
   try {
