@@ -508,14 +508,13 @@ base class Named_info uses Equality, Hashable {
 //   Size 2: Variant — element [0] is for covariant (+) position,
 //     element [1] is for contravariant (-) position.
 //     e.g. [Fpure(), Fmutable()] = pure in +, mutable in -.
-//     For tracking, the only variant state is [Ftracked(), Funtracked()]
-//     which encodes the subtyping rule: tracked ≤ untracked.
 //   Size 0: Error — the join of two incompatible types produced an empty set.
 //     This is a transient state that immediately triggers a type error.
 //
-// Size-2 arrays are only created by promote_tfun_modifiers (in skipTypes.sk)
-// when a function type appears in a covariant position. The maximum size is
-// strictly 2.
+// Purity can reach size 2 via promote_tfun_modifiers (in skipTypes.sk) when a
+// function type appears in covariant position. Tracking is never promoted —
+// it stays in canonical size-1 form, because its two-value lattice carries
+// no useful information in the variant encoding. The maximum size is 2.
 //
 // See join_modifiers in skipTypes.sk for the variance-based join semantics.
 type Tfun_modifiers = (.Array<Purity_modifier>, .Array<Tracking_modifier>);

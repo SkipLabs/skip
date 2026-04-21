@@ -1191,14 +1191,21 @@ fun contra_promote(
   promote(context, env, variance1, subst, ty)
 }
 
-// Expands invariant (size-1) modifiers to variant (size-2) when a function
-// type appears in covariant position. This encodes subtyping:
-//   Purity:   [Fpure()] → [Fpure(), Fmutable()]  (pure ≤ mutable)
-//   Tracking: [Ftracked()] → [Ftracked(), Funtracked()]  (tracked ≤ untracked)
-// The stricter modifier (pure/tracked) can be used where the less strict one
-// (mutable/untracked) is expected. Already-variant (size-2) arrays pass through
-// unchanged. The less strict modifier alone stays invariant since it cannot be
-// narrowed to the stricter one.
+// Expands invariant (size-1) purity modifiers to variant (size-2) when a
+// function type appears in covariant position. This encodes purity subtyping:
+//   Purity: [Fpure()] → [Fpure(), Fmutable()]  (pure ≤ mutable)
+// [Fmutable()] stays invariant since it cannot be narrowed to pure. Already-
+// variant (size-2) arrays pass through unchanged.
+//
+// Tracking is intentionally NOT promoted here. The tracking subtyping rule
+// (tracked ≤ untracked) could in principle be encoded the same way with
+// [Ftracked()] → [Ftracked(), Funtracked()], but the variant form carries no
+// more information than [Ftracked()]: every consumer of tracking reads only
+// position [0], and the join machinery handles the covariant/contravariant
+// positions explicitly via variance arguments. Promoting tracking would just
+// grow the array without changing behavior, so tracking is passed through
+// unchanged. This keeps tracking modifiers in a single canonical size-1 form
+// (outside the transient size-0 error state produced by invalid joins).
 fun promote_tfun_modifiers(modifiers: N.Tfun_modifiers): N.Tfun_modifiers {
   (purity, tracking) = modifiers;
   !purity = purity.size() match {
@@ -1214,21 +1221,6 @@ fun promote_tfun_modifiers(modifiers: N.Tfun_modifiers): N.Tfun_modifiers {
       "assert false",
     );
     purity
-  | _ -> invariant_violation("assert false")
-  };
-  !tracking = tracking.size() match {
-  | 0 -> invariant_violation("assert false")
-  | 1 ->
-    tracking[0] match {
-    | N.Ftracked() -> Array[N.Ftracked(), N.Funtracked()]
-    | N.Funtracked() -> tracking
-    }
-  | 2 ->
-    invariant(
-      tracking[0] is N.Ftracked() && tracking[1] is N.Funtracked(),
-      "assert false",
-    );
-    tracking
   | _ -> invariant_violation("assert false")
   };
   (purity, tracking)
