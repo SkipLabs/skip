@@ -287,6 +287,50 @@ fun join_tracking(
   }
 }
 
+// Joins two single Purity_modifier values according to their variance
+// positions. Implements the purity lattice directly:
+//   Fpure ≤ Fmutable  (pure is stricter, i.e. the subtype)
+//
+// Variance dispatch:
+//   (+, +): LUB — Fmutable if either is Fmutable, else Fpure.
+//   (-, -): GLB — Fpure if either is Fpure, else Fmutable.
+//   (-, +) or (+, -): contra side must be ≥ co side, else type error.
+//   (∅, _) or (_, ∅): invariant — must be equal, else type error.
+fun join_purity(
+  exn: Exception,
+  v1: A.Variance,
+  p1: N.Purity_modifier,
+  v2: A.Variance,
+  p2: N.Purity_modifier,
+): N.Purity_modifier {
+  (v1, v2) match {
+  | (A.Vplus(), A.Vplus()) ->
+    // LUB: least upper bound — less strict wins
+    if (p1 is N.Fmutable() || p2 is N.Fmutable()) {
+      N.Fmutable()
+    } else {
+      N.Fpure()
+    }
+  | (A.Vminus(), A.Vminus()) ->
+    // GLB: greatest lower bound — stricter wins
+    if (p1 is N.Fpure() || p2 is N.Fpure()) {
+      N.Fpure()
+    } else {
+      N.Fmutable()
+    }
+  | (A.Vminus(), A.Vplus()) ->
+    // Contra (p1) must be ≥ co (p2): Fmutable ≥ anything, Fpure ≥ Fpure only
+    if (p1 is N.Fmutable() || p2 is N.Fpure()) p1 else throw exn
+  | (A.Vplus(), A.Vminus()) ->
+    // Symmetric: contra (p2) must be ≥ co (p1)
+    if (p2 is N.Fmutable() || p1 is N.Fpure()) p2 else throw exn
+  | (A.Vnone(), _)
+  | (_, A.Vnone()) ->
+    // Invariant: must be equal
+    if (N.compare_purity_modifiers(p1, p2) is EQ()) p1 else throw exn
+  }
+}
+
 // Joins two Tfun_modifiers (purity × tracking) according to their variance
 // positions. Each component is joined independently.
 fun join_tfun_modifiers(
