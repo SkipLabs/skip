@@ -2699,17 +2699,12 @@ fun fun_type(
   tparams: Parameters<A.Type_>,
   tbody: A.Type_,
 ): N.Type__ {
-  fpurity = if (tmodifiers.is_mutable) N.Fmutable() else N.Fpure();
-  ftracked = if (tmodifiers.is_untracked) N.Funtracked() else N.Ftracked();
+  purity = if (tmodifiers.is_mutable) N.Fmutable() else N.Fpure();
+  tracking = if (tmodifiers.is_untracked) N.Funtracked() else N.Ftracked();
+  mods = N.Tfun_modifiers{purity, tracking};
   tparams1 = fun_tparams(context, acc, env, tparams);
   tbody1 = type(context, acc, env, tbody);
-  N.Tfun(
-    A.Vnone(),
-    N.Tfun_modifiers{purity => fpurity, tracking => ftracked},
-    Array[],
-    tparams1,
-    tbody1,
-  )
+  N.Tfun(A.Vnone(), mods, Array[], tparams1, tbody1)
 }
 
 fun fun_tparams(
