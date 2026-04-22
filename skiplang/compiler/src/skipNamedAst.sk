@@ -507,7 +507,15 @@ base class Named_info uses Equality, Hashable {
 value class Tfun_modifiers{
   purity: Purity_modifier,
   tracking: Tracking_modifier,
-} uses Equality, Hashable
+} uses Equality, Hashable {
+  fun isMutable(): Bool {
+    this.purity is Fmutable()
+  }
+
+  fun isUntracked(): Bool {
+    this.tracking is Funtracked()
+  }
+}
 
 base class Purity_modifier uses Equality, Hashable {
   children =

@@ -193,11 +193,10 @@ fun to_string_(nthis: ?N.Name, subst: IMap<N.Type_>, x: N.Type__): String {
   | N.Tapply(mode, n, tyl) ->
     to_string_tapply(nthis, subst, mode, n, tyl)
   | N.Tfun(_, mods, _, params, rty) ->
-    (is_mutable, is_untracked) = fun_is_mutable_is_untracked(mods);
-    (if (is_untracked) "untracked " else "") +
+    (if (mods.isUntracked()) "untracked " else "") +
       "(" +
       to_string_params(nthis, subst, params) +
-      (if (is_mutable) " -> " else " ~> ") +
+      (if (mods.isMutable()) " -> " else " ~> ") +
       to_string(nthis, subst, rty) +
       ")"
   | N.Tparam(None(), _, _, (_, n)) -> n
@@ -323,15 +322,6 @@ fun to_string_params(
         "}",
       )
   }
-}
-
-/*****************************************************************************/
-/* Helper function */
-/*****************************************************************************/
-fun fun_is_mutable_is_untracked(x: N.Tfun_modifiers): (Bool, Bool) {
-  is_mutable = x.purity is N.Fmutable();
-  is_untracked = x.tracking is N.Funtracked();
-  (is_mutable, is_untracked)
 }
 
 /*****************************************************************************/
