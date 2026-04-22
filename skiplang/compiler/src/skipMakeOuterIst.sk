@@ -491,7 +491,7 @@ fun type__(remove_aliases: Bool, pos: FileRange, x: NAst.Type__): O.Type {
     O.Type(
       pos,
       O.Tfun(
-        tfun_modifiers(mods.purity, mods.tracking),
+        tfun_modifiers(mods),
         parameters_type(remove_aliases, tparam),
         type(remove_aliases, ty),
       ),
@@ -521,11 +521,11 @@ fun expr_type_(ty: NAst.Type_): O.Type {
   type(true, ty)
 }
 
-fun tfun_modifiers(
-  purity: NAst.Purity_modifier,
-  tracking: NAst.Tracking_modifier,
-): O.TfunModifiers {
-  O.TfunModifiers(purity_modifier(purity), tracking_modifier(tracking))
+fun tfun_modifiers(mods: NAst.Tfun_modifiers): O.TfunModifiers {
+  O.TfunModifiers(
+    purity_modifier(mods.purity),
+    tracking_modifier(mods.tracking),
+  )
 }
 
 fun purity_modifier(x: NAst.Purity_modifier): O.PurityModifier {
