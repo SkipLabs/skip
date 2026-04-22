@@ -389,9 +389,9 @@ fun expr_(ty: T.Type_, o: mutable BufferedPrinter.Out, e: T.Expr__): void {
     o.newline()
   | T.Lambda(lp, fv, e1, yields) ->
     ty match {
-    | (_, N.Tfun(_, (purity, tracking), _, _, _)) ->
-      if (purity[0] is N.Fmutable()) o.out("mutable ");
-      if (tracking[0] is N.Funtracked()) o.out("untracked ");
+    | (_, N.Tfun(_, mods, _, _, _)) ->
+      if (mods.purity is N.Fmutable()) o.out("mutable ");
+      if (mods.tracking is N.Funtracked()) o.out("untracked ");
       if (yields.isSome()) o.out("yields ")
     | _ -> void
     };

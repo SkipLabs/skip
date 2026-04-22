@@ -1641,7 +1641,7 @@ fun make_method_fields(
       });
       purity = make_met_tfun_purity(met.kind);
       tracking = make_tfun_tracking(met.untracked_);
-      ml = (purity, tracking);
+      ml = N.Tfun_modifiers{purity, tracking};
       fty = (met.name.i0, N.Tfun(A.Vnone(), ml, Array[], params, met.return_));
       abstract = met.body match {
       | N.Abstract() -> Some(met.name.i0)
@@ -1665,18 +1665,18 @@ fun make_method_fields(
   )
 }
 
-fun make_met_tfun_purity(kind: N.FieldKind): Array<N.Purity_modifier> {
+fun make_met_tfun_purity(kind: N.FieldKind): N.Purity_modifier {
   kind match {
-  | N.FKStatic _ -> Array[N.Fpure()]
+  | N.FKStatic _ -> N.Fpure()
   // Is fixed in expr_dot in typing
-  | N.FKDynamic _ -> Array[N.Fmutable()]
+  | N.FKDynamic _ -> N.Fmutable()
   }
 }
 
-fun make_tfun_tracking(untracked_: ?FileRange): Array<N.Tracking_modifier> {
+fun make_tfun_tracking(untracked_: ?FileRange): N.Tracking_modifier {
   untracked_ match {
-  | None() -> Array[N.Ftracked()]
-  | Some _ -> Array[N.Funtracked()]
+  | None() -> N.Ftracked()
+  | Some _ -> N.Funtracked()
   }
 }
 
@@ -2419,13 +2419,7 @@ fun check_class_parameter_type(
         ),
       ],
     )
-  | N.Tfun(
-    _,
-    (purity, _),
-    _,
-    _,
-    _,
-  ) if (!purity.isEmpty() && purity[0] is N.Fmutable()) ->
+  | N.Tfun(_, mods, _, _, _) if (mods.purity is N.Fmutable()) ->
     SkipError.errorl(
       List[
         (par_fr, "Invalid '->' typed parameter"),
@@ -2705,17 +2699,12 @@ fun fun_type(
   tparams: Parameters<A.Type_>,
   tbody: A.Type_,
 ): N.Type__ {
-  fpurity = if (tmodifiers.is_mutable) N.Fmutable() else N.Fpure();
-  ftracked = if (tmodifiers.is_untracked) N.Funtracked() else N.Ftracked();
+  purity = if (tmodifiers.is_mutable) N.Fmutable() else N.Fpure();
+  tracking = if (tmodifiers.is_untracked) N.Funtracked() else N.Ftracked();
+  mods = N.Tfun_modifiers{purity, tracking};
   tparams1 = fun_tparams(context, acc, env, tparams);
   tbody1 = type(context, acc, env, tbody);
-  N.Tfun(
-    A.Vnone(),
-    (Array[fpurity], Array[ftracked]),
-    Array[],
-    tparams1,
-    tbody1,
-  )
+  N.Tfun(A.Vnone(), mods, Array[], tparams1, tbody1)
 }
 
 fun fun_tparams(
@@ -4134,7 +4123,7 @@ fun ordered_expr(
 fun lambda_modifiers(mods: A.Lam_modifier): N.Tfun_modifiers {
   purity = if (mods.is_mutable) N.Fmutable() else N.Fpure();
   tracking = if (mods.is_untracked) N.Funtracked() else N.Ftracked();
-  (Array[purity], Array[tracking])
+  N.Tfun_modifiers{purity, tracking}
 }
 
 // Every generator ends with an implicit "yield break"; this appends one.

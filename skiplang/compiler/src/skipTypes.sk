@@ -57,192 +57,42 @@ class Env{
 
 class Acc{subst: IMap<N.Type_>, constraints: TU.Constraints}
 
-// invariant function modifiers
-fun join_modifiers_inv<Ta>(
+// Joins two values of an Orderable modifier lattice according to their
+// variance positions. The ordering is the subtyping lattice: strict < lax.
+//
+// Variance dispatch:
+//   (+, +): LUB — max (lax wins).
+//   (-, -): GLB — min (strict wins).
+//   (-, +) or (+, -): contra side must be ≥ co side, else type error.
+//   (∅, _) or (_, ∅): invariant — must be equal, else type error.
+//
+// Instances:
+//   purity:   Fpure (strict) < Fmutable (lax)
+//   tracking: Ftracked (strict) < Funtracked (lax)
+fun join_modifier<T: Orderable>(
   exn: Exception,
-  cmp_mods: (Ta, Ta) ~> Order,
-  ml1: Array<Ta>,
-  ml2: Array<Ta>,
-): Array<Ta> {
-  i1 = ml1.values();
-  i2 = ml2.values();
-  result = mutable Vector[];
-  loop {
-    (i1.next(), i2.next()) match {
-    | (None(), None()) -> break result.toArray()
-    | (None(), _)
-    | (_, None()) ->
-      throw exn
-    | (Some(x1), Some(x2)) ->
-      cmp_mods(x1, x2) match {
-      | EQ() ->
-        elt = x1; // arbitary since equal
-        result.push(elt)
-      | _ -> throw exn
-      }
-    }
-  }
-}
-
-// join minus/plus or plus/minus function modifiers
-fun join_modifiers_minus_plus<Ta>(
-  exn: Exception,
-  cmp_mods: (Ta, Ta) ~> Order,
-  ml: Array<Ta>,
-  pl: Array<Ta>,
-): Array<Ta> {
-  mIter = ml.values();
-  pIter = pl.values();
-  mCur = mIter.next();
-  pCur = pIter.next();
-  result = mutable Vector[];
-  loop {
-    (mCur, pCur) match {
-    | (None(), _) -> break result.toArray()
-    | (_, None()) -> throw exn
-    | (Some(mElt), Some(pElt)) ->
-      cmp_mods(mElt, pElt) match {
-      | EQ() ->
-        elt = mElt; // arbitary since equal
-        result.push(elt);
-        !mCur = mIter.next();
-        !pCur = pIter.next()
-      | LT() -> throw exn
-      | GT() -> !pCur = pIter.next()
-      }
-    }
-  }
-}
-
-// join minus/minus function modifiers
-fun join_modifiers_minus_minus<Ta>(
-  _exn: Exception,
-  cmp_mods: (Ta, Ta) ~> Order,
-  ml1: Array<Ta>,
-  ml2: Array<Ta>,
-): Array<Ta> {
-  uniq_modifiers(
-    cmp_mods,
-    ml1.concat(ml2).sortedBy(x ~> Orderable.create(x, cmp_mods)),
-  )
-}
-
-fun uniq_modifiers<Ta>(cmp_mods: (Ta, Ta) ~> Order, ml: Array<Ta>): Array<Ta> {
-  result = mutable Vector[];
-  iter = ml.values();
-  cur1 = iter.next();
-  cur2 = iter.next();
-  loop {
-    (cur1, cur2) match {
-    | (None _, Some _) -> invariant_violation("ICE impossible iteration step")
-    | (None(), None()) -> invariant_violation("ml is given non-empty")
-    | (Some(elt), None()) ->
-      result.push(elt);
-      break result.toArray()
-    | (Some(elt1), Some(elt2)) ->
-      cmp_mods(elt1, elt2) match {
-      | EQ() -> void
-      | LT() -> result.push(elt1)
-      | GT() -> invariant_violation("ml is given sorted")
-      };
-      !cur1 = cur2;
-      !cur2 = iter.next()
-    }
-  }
-}
-
-// join plus/plus function modifiers
-fun join_modifiers_plus_plus<Ta>(
-  exn: Exception,
-  cmp_mods: (Ta, Ta) ~> Order,
-  ml1: Array<Ta>,
-  ml2: Array<Ta>,
-): Array<Ta> {
-  iter1 = ml1.values();
-  iter2 = ml2.values();
-  cur1 = iter1.next();
-  cur2 = iter2.next();
-  result = mutable Vector[];
-  loop {
-    (cur1, cur2) match {
-    | (None(), _)
-    | (_, None()) ->
-      break void
-    | (Some(elt1), Some(elt2)) ->
-      cmp_mods(elt1, elt2) match {
-      | EQ() ->
-        // arbitary since equal
-        result.push(elt1);
-        !cur1 = iter1.next();
-        !cur2 = iter2.next()
-      | LT() -> !cur1 = iter1.next()
-      | GT() -> !cur2 = iter2.next()
-      }
-    }
-  };
-  if (result.isEmpty()) throw exn;
-  result.toArray()
-}
-
-fun join_modifiers<Ta>(
-  exn: Exception,
-  cmp_mods: (Ta, Ta) ~> Order,
-  var1: A.Variance,
-  ml1: Array<Ta>,
-  var2: A.Variance,
-  ml2: Array<Ta>,
-): Array<Ta> {
-  (var1, var2) match {
-  | (A.Vplus(), A.Vplus()) -> join_modifiers_plus_plus(exn, cmp_mods, ml1, ml2)
-  | (A.Vminus(), A.Vminus()) ->
-    join_modifiers_minus_minus(exn, cmp_mods, ml1, ml2)
-  | (A.Vplus(), A.Vminus()) ->
-    join_modifiers_minus_plus(exn, cmp_mods, ml2, ml1)
+  v1: A.Variance,
+  m1: T,
+  v2: A.Variance,
+  m2: T,
+): T {
+  (v1, v2) match {
+  | (A.Vplus(), A.Vplus()) -> max(m1, m2)
+  | (A.Vminus(), A.Vminus()) -> min(m1, m2)
   | (A.Vminus(), A.Vplus()) ->
-    join_modifiers_minus_plus(exn, cmp_mods, ml1, ml2)
-  | (A.Vnone(), A.Vplus())
-  | (A.Vplus(), A.Vnone())
-  | (A.Vnone(), A.Vminus())
-  | (A.Vminus(), A.Vnone())
-  | (A.Vnone(), A.Vnone()) ->
-    join_modifiers_inv(exn, cmp_mods, ml1, ml2)
+    // Contra (m1) must be ≥ co (m2).
+    if (m1 >= m2) m1 else throw exn
+  | (A.Vplus(), A.Vminus()) ->
+    // Symmetric.
+    if (m2 >= m1) m2 else throw exn
+  | (A.Vnone(), _)
+  | (_, A.Vnone()) ->
+    if (m1 == m2) m1 else throw exn
   }
 }
 
-fun compare_purity_modifiers(
-  l: N.Purity_modifier,
-  r: N.Purity_modifier,
-): Order {
-  N.compare_purity_modifiers(l, r)
-}
-
-fun join_purity_modifiers(
-  exn: Exception,
-  v1: A.Variance,
-  p1: Array<N.Purity_modifier>,
-  v2: A.Variance,
-  p2: Array<N.Purity_modifier>,
-): Array<N.Purity_modifier> {
-  join_modifiers(exn, compare_purity_modifiers, v1, p1, v2, p2)
-}
-
-fun compare_tracking_modifiers(
-  l: N.Tracking_modifier,
-  r: N.Tracking_modifier,
-): Order {
-  N.compare_tracking_modifiers(l, r)
-}
-
-fun join_tracking_modifiers(
-  exn: Exception,
-  v1: A.Variance,
-  t1: Array<N.Tracking_modifier>,
-  v2: A.Variance,
-  t2: Array<N.Tracking_modifier>,
-): Array<N.Tracking_modifier> {
-  join_modifiers(exn, compare_tracking_modifiers, v1, t1, v2, t2)
-}
-
+// Joins two Tfun_modifiers (purity × tracking) according to their variance
+// positions. Each component is joined independently.
 fun join_tfun_modifiers(
   exn: Exception,
   v1: A.Variance,
@@ -250,19 +100,17 @@ fun join_tfun_modifiers(
   v2: A.Variance,
   p2: N.Tfun_modifiers,
 ): N.Tfun_modifiers {
-  (p11, t1) = p1;
-  (p21, t2) = p2;
-  purity = join_purity_modifiers(exn, v1, p11, v2, p21);
-  tracking = join_tracking_modifiers(exn, v1, t1, v2, t2);
-  (purity, tracking)
+  purity = join_modifier(exn, v1, p1.purity, v2, p2.purity);
+  tracking = join_modifier(exn, v1, p1.tracking, v2, p2.tracking);
+  N.Tfun_modifiers{purity, tracking}
 }
 
 fun purity_modifiers_for_tfrozen(
   exn: Exception,
   variance: A.Variance,
-  purity: Array<N.Purity_modifier>,
-): Array<N.Purity_modifier> {
-  join_purity_modifiers(exn, variance, purity, A.Vminus(), Array[N.Fpure()])
+  purity: N.Purity_modifier,
+): N.Purity_modifier {
+  join_modifier(exn, variance, purity, A.Vminus(), N.Fpure())
 }
 
 /*****************************************************************************/
@@ -291,11 +139,10 @@ fun to_string_(nthis: ?N.Name, subst: IMap<N.Type_>, x: N.Type__): String {
   | N.Tapply(mode, n, tyl) ->
     to_string_tapply(nthis, subst, mode, n, tyl)
   | N.Tfun(_, mods, _, params, rty) ->
-    (is_mutable, is_untracked) = fun_is_mutable_is_untracked(mods);
-    (if (is_untracked) "untracked " else "") +
+    (if (mods.isUntracked()) "untracked " else "") +
       "(" +
       to_string_params(nthis, subst, params) +
-      (if (is_mutable) " -> " else " ~> ") +
+      (if (mods.isMutable()) " -> " else " ~> ") +
       to_string(nthis, subst, rty) +
       ")"
   | N.Tparam(None(), _, _, (_, n)) -> n
@@ -424,16 +271,6 @@ fun to_string_params(
 }
 
 /*****************************************************************************/
-/* Helper function */
-/*****************************************************************************/
-fun fun_is_mutable_is_untracked(x: N.Tfun_modifiers): (Bool, Bool) {
-  (purity, tracking) = x;
-  is_mutable = purity.size() == 1 && purity[0] is N.Fmutable();
-  is_untracked = tracking.size() == 1 && tracking[0] is N.Funtracked();
-  (is_mutable, is_untracked)
-}
-
-/*****************************************************************************/
 /* Replaces type variables with their "real" type, leaves the type unchanged
  * otherwise.
  */
@@ -544,7 +381,7 @@ fun freeze_(
     )
   | N.Tawaitable _ -> error_freeze_awaitable(caller_pos, pos)
   | N.Tfun(variance, modifiers, targs, params, rty) ->
-    freeze_modifiers(caller_pos, pos, modifiers.i0);
+    freeze_modifiers(caller_pos, pos, modifiers.purity);
     N.Tfun(variance, modifiers, targs, params, rty)
   | N.Tvar _ -> invariant_violation("assert false")
   | N.Tparam(_, var, id, name) ->
@@ -558,7 +395,7 @@ fun freeze_(
       freeze_inter(caller_pos, subst, bounds, interl),
     )
   | N.Tlambda(var, tid, modifiers, ty) ->
-    freeze_modifiers(caller_pos, pos, modifiers.i0);
+    freeze_modifiers(caller_pos, pos, modifiers.purity);
     N.Tlambda(var, tid, modifiers, freeze(caller_pos, subst, bounds, ty))
   | N.Tdefault(ty) -> N.Tdefault(freeze(caller_pos, subst, bounds, ty))
   | N.Tnamed(name, ty) -> N.Tnamed(name, freeze(caller_pos, subst, bounds, ty))
@@ -568,11 +405,9 @@ fun freeze_(
 fun freeze_modifiers(
   caller_pos: FileRange,
   lambda_pos: FileRange,
-  x: Array<N.Purity_modifier>,
+  x: N.Purity_modifier,
 ): void {
-  if (x.isEmpty()) return void;
-
-  x[0] match {
+  x match {
   | N.Fpure() -> void
   | N.Fmutable() ->
     SkipError.errorl(
@@ -669,7 +504,7 @@ fun verify_freezable_type_(
     verify_freezable_tparam(caller_pos, subst, bounds, id)
   | N.Tlambda(_, _, modifiers, _)
   | N.Tfun(_, modifiers, _, _, _) ->
-    freeze_modifiers(caller_pos, ty.i0, modifiers.i0)
+    freeze_modifiers(caller_pos, ty.i0, modifiers.purity)
   | N.Tawaitable _ -> error_freeze_awaitable(caller_pos, ty.i0)
   | _ -> void
   }
@@ -726,7 +561,7 @@ fun chill_(
     )
   | N.Tawaitable _ -> error_chill_awaitable(caller_pos, pos)
   | N.Tfun(variance, modifiers, targs, params, rty) ->
-    chill_modifiers(caller_pos, pos, modifiers.i0);
+    chill_modifiers(caller_pos, pos, modifiers.purity);
     N.Tfun(variance, modifiers, targs, params, rty)
   | N.Tvar _ -> invariant_violation("assert false")
   | N.Tparam(frozen_, var, id, name) -> N.Tparam(frozen_, var, id, name)
@@ -738,7 +573,7 @@ fun chill_(
       chill_inter(caller_pos, subst, bounds, interl),
     )
   | N.Tlambda(var, tid, modifiers, ty) ->
-    chill_modifiers(caller_pos, pos, modifiers.i0);
+    chill_modifiers(caller_pos, pos, modifiers.purity);
     N.Tlambda(var, tid, modifiers, chill(caller_pos, subst, bounds, ty))
   | N.Tdefault(ty) -> N.Tdefault(chill(caller_pos, subst, bounds, ty))
   | N.Tnamed(name, ty) -> N.Tnamed(name, chill(caller_pos, subst, bounds, ty))
@@ -748,10 +583,9 @@ fun chill_(
 fun chill_modifiers(
   caller_pos: FileRange,
   lambda_pos: FileRange,
-  x: Array<N.Purity_modifier>,
+  x: N.Purity_modifier,
 ): void {
-  if (x.isEmpty()) return void;
-  x[0] match {
+  x match {
   | N.Fpure() -> void
   | N.Fmutable() ->
     SkipError.errorl(
@@ -897,7 +731,7 @@ fun to_readonly_exn(
 
   | (fr, N.Tawaitable _) -> error_readonly_awaitable(caller_pos, fr)
   | (fr, N.Tfun(variance, modifiers, targs, params, rty)) ->
-    to_readonly_modifiers(caller_pos, fr, modifiers.i0);
+    to_readonly_modifiers(caller_pos, fr, modifiers.purity);
     (fr, N.Tfun(variance, modifiers, targs, params, rty))
   | (_, N.Tparam(Some _, _, _, _)) ->
     invariant_violation("This was done before subst, how frozen?")
@@ -905,7 +739,7 @@ fun to_readonly_exn(
     verify_readonly_tparam(caller_pos, subst, bounds, id);
     x
   | (fr, N.Tlambda(var, tid, modifiers, ty)) ->
-    to_readonly_modifiers(caller_pos, fr, modifiers.i0);
+    to_readonly_modifiers(caller_pos, fr, modifiers.purity);
     (
       fr,
       N.Tlambda(
@@ -925,10 +759,9 @@ fun to_readonly_exn(
 fun to_readonly_modifiers(
   caller_pos: FileRange,
   lambda_pos: FileRange,
-  x: Array<N.Purity_modifier>,
+  x: N.Purity_modifier,
 ): void {
-  if (x.isEmpty()) return void;
-  x[0] match {
+  x match {
   | N.Fpure() -> void
   | N.Fmutable() ->
     throw MutLambdaToReadonly(
@@ -1036,7 +869,7 @@ fun verify_readonly_type_(
     verify_readonly_tparam(caller_pos, subst, bounds, id)
   | N.Tlambda(_, _, modifiers, _)
   | N.Tfun(_, modifiers, _, _, _) ->
-    to_readonly_modifiers(caller_pos, ty.i0, modifiers.i0)
+    to_readonly_modifiers(caller_pos, ty.i0, modifiers.purity)
   | N.Tawaitable _ -> error_readonly_awaitable(caller_pos, ty.i0)
   | _ -> void
   }
@@ -1112,16 +945,14 @@ fun promote(
     targs1 = promote_targs(context, env, variance, mode, subst, cd, targs);
     (pos, N.Tpromoted(variance, mode, seen, tparams, cname, targs1))
   | (pos, N.Tfun(_, ml, tyl, params, rty)) ->
-    ml1 = promote_tfun_modifiers(ml);
     params1 = params.map(p -> contra_promote(context, env, variance, subst, p));
     rty1 = promote(context, env, variance, subst, rty);
-    (pos, N.Tfun(variance, ml1, tyl, params1, rty1))
+    (pos, N.Tfun(variance, ml, tyl, params1, rty1))
   | (pos, N.Tparam(frozen_, _, id, name)) ->
     (pos, N.Tparam(frozen_, variance, id, name))
   | (pos, N.Tlambda(_, id, ml, ty)) ->
-    ml1 = promote_tfun_modifiers(ml);
     ty1 = promote(context, env, variance, subst, ty);
-    (pos, N.Tlambda(variance, id, ml1, ty1))
+    (pos, N.Tlambda(variance, id, ml, ty1))
   | (pos, N.Tawaitable(_, ty)) ->
     ty1 = promote(context, env, variance, subst, ty);
     (pos, N.Tawaitable(variance, ty1))
@@ -1168,41 +999,6 @@ fun contra_promote(
     }
   };
   promote(context, env, variance1, subst, ty)
-}
-
-fun promote_tfun_modifiers(modifiers: N.Tfun_modifiers): N.Tfun_modifiers {
-  (purity, tracking) = modifiers;
-  !purity = purity.size() match {
-  | 0 -> invariant_violation("assert false")
-  | 1 ->
-    purity[0] match {
-    | N.Fpure() -> Array[N.Fpure(), N.Fmutable()]
-    | N.Fmutable() -> purity
-    }
-  | 2 ->
-    invariant(
-      purity[0] is N.Fpure() && purity[1] is N.Fmutable(),
-      "assert false",
-    );
-    purity
-  | _ -> invariant_violation("assert false")
-  };
-  !tracking = tracking.size() match {
-  | 0 -> invariant_violation("assert false")
-  | 1 ->
-    tracking[0] match {
-    | N.Ftracked() -> Array[N.Ftracked(), N.Funtracked()]
-    | N.Funtracked() -> tracking
-    }
-  | 2 ->
-    invariant(
-      tracking[0] is N.Ftracked() && tracking[1] is N.Funtracked(),
-      "assert false",
-    );
-    tracking
-  | _ -> invariant_violation("assert false")
-  };
-  (purity, tracking)
 }
 
 fun promote_tapply(
@@ -1451,14 +1247,10 @@ fun join_(
     (_, N.Tlambda(var2, _, mods2, ty21)),
   ) ->
     exn = Join(ty1, ty2);
-    join_tfun_modifiers(exn, var1, mods1, var2, mods2) match {
-    | (purity, _) if (purity.isEmpty()) -> throw exn
-    | (_, tracking) if (tracking.isEmpty()) -> throw exn
-    | mods ->
-      variance = join_variance(var1, var2);
-      (!acc, ty) = join(context, next_id, env, acc, ty11, ty21);
-      (acc, (pos, N.Tlambda(variance, id, mods, ty)))
-    }
+    mods = join_tfun_modifiers(exn, var1, mods1, var2, mods2);
+    variance = join_variance(var1, var2);
+    (!acc, ty) = join(context, next_id, env, acc, ty11, ty21);
+    (acc, (pos, N.Tlambda(variance, id, mods, ty)))
   | ((pos, N.Tlambda(var, id, mods, ty11)), ty21)
   | (ty21, (pos, N.Tlambda(var, id, mods, ty11))) ->
     (!acc, ty) = join(context, next_id, env, acc, ty11, ty21);
@@ -1476,16 +1268,15 @@ fun join_(
     (acc, (fr, N.TnonNullable(join_variance(var1, var2))))
   | (
     (_, N.Tfrozen(A.Vminus())),
-    (pos, N.Tfun(variance, (purity, tracking), tyl, params, rty)),
+    (pos, N.Tfun(variance, mods, tyl, params, rty)),
   )
   | (
-    (pos, N.Tfun(variance, (purity, tracking), tyl, params, rty)),
+    (pos, N.Tfun(variance, mods, tyl, params, rty)),
     (_, N.Tfrozen(A.Vminus())),
   ) ->
     exn = Join(ty1, ty2);
-    jpure = purity_modifiers_for_tfrozen(exn, variance, purity);
-    if (jpure.isEmpty()) throw exn;
-    (acc, (pos, N.Tfun(variance, (jpure, tracking), tyl, params, rty)))
+    !mods.purity = purity_modifiers_for_tfrozen(exn, variance, mods.purity);
+    (acc, (pos, N.Tfun(variance, mods, tyl, params, rty)))
   | ((ffr, tfrozen_ @ N.Tfrozen(A.Vminus())), tother)
   | (tother, (ffr, tfrozen_ @ N.Tfrozen(A.Vminus()))) ->
     join_contra_tfrozen(env, acc, (ffr, tfrozen_), tother)
@@ -1508,13 +1299,9 @@ fun join_(
     );
     (!acc, rty) = join(context, next_id, env, acc, rty1, rty2);
     exn = Join(ty1, ty2);
-    join_tfun_modifiers(exn, variance1, mods1, variance2, mods2) match {
-    | (purity, _) if (purity.isEmpty()) -> throw exn
-    | (_, tracking) if (tracking.isEmpty()) -> throw exn
-    | mods ->
-      variance = join_variance(variance1, variance2);
-      (acc, (pos, N.Tfun(variance, mods, Array[], params, rty)))
-    }
+    mods = join_tfun_modifiers(exn, variance1, mods1, variance2, mods2);
+    variance = join_variance(variance1, variance2);
+    (acc, (pos, N.Tfun(variance, mods, Array[], params, rty)))
   | ((tpos, N.Tapply _), _)
   | (_, (tpos, N.Tapply _)) ->
     print_error_ln(tpos.toString());
@@ -3152,15 +2939,8 @@ private fun is_frozen_map(
   | N.Tparam(_, _, id, _) -> is_frozen_map_tparam(tconstraints, subst, id)
 
   | N.Tfun(_, mods, _, _, _) ->
-    if (is_frozen_tfun_modifiers(mods)) Some(SortedMap[]) else None()
+    if (mods.isFrozen()) Some(SortedMap[]) else None()
   }
-}
-
-fun is_frozen_tfun_modifiers(mods: N.Tfun_modifiers): Bool {
-  (purity, tracking) = mods;
-  invariant(!purity.isEmpty(), "imposible tfun");
-  invariant(!tracking.isEmpty(), "imposible tfun");
-  purity[0] is N.Fpure() && tracking[0] is N.Ftracked()
 }
 
 private fun is_frozen_map_tparam(
