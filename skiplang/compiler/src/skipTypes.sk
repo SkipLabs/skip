@@ -1216,33 +1216,20 @@ fun contra_promote(
   promote(context, env, variance1, subst, ty)
 }
 
-// Expands invariant (size-1) purity modifiers to variant (size-2) when a
-// function type appears in covariant position. This encodes purity subtyping:
-//   Purity: [Fpure()] → [Fpure(), Fmutable()]  (pure ≤ mutable)
-// [Fmutable()] stays invariant since it cannot be narrowed to pure. Already-
-// variant (size-2) arrays pass through unchanged.
+// Identity function on Tfun_modifiers.
 //
-// Tracking is NOT handled here — it is a single Tracking_modifier value and
-// its subtyping rule (tracked ≤ untracked) is handled directly by
-// join_tracking. See skipNamedAst.sk / join_tracking for details.
+// Historically this expanded invariant purity modifiers to variant form when a
+// function type appeared in covariant position, encoding the Fpure ≤ Fmutable
+// subtyping rule via [Fpure()] → [Fpure(), Fmutable()]. The variant form
+// carried no information beyond [Fpure()] at position [0] — every consumer
+// reads only [0], and the join machinery handles the covariant/contravariant
+// positions explicitly via variance arguments. Tracking stopped being
+// promoted for the same reason in a prior commit; purity now follows.
+//
+// This function is kept for now at call sites; subsequent commits remove
+// those calls and delete the function entirely.
 fun promote_tfun_modifiers(modifiers: N.Tfun_modifiers): N.Tfun_modifiers {
-  (purity, tracking) = modifiers;
-  !purity = purity.size() match {
-  | 0 -> invariant_violation("assert false")
-  | 1 ->
-    purity[0] match {
-    | N.Fpure() -> Array[N.Fpure(), N.Fmutable()]
-    | N.Fmutable() -> purity
-    }
-  | 2 ->
-    invariant(
-      purity[0] is N.Fpure() && purity[1] is N.Fmutable(),
-      "assert false",
-    );
-    purity
-  | _ -> invariant_violation("assert false")
-  };
-  (purity, tracking)
+  modifiers
 }
 
 fun promote_tapply(
