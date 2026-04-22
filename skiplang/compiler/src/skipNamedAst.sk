@@ -370,7 +370,7 @@ base class Type__ uses Hashable, Equality {
     cur = ("%Tapply", m, n.i1).hash();
     tyl.hashBy(hashType, cur)
   | Tfun(v1, mods, tyl, pty, rety) ->
-    cur = ("%Tfun", v1, rety.i1, mods.purity, mods.tracking).hash();
+    cur = ("%Tfun", v1, rety.i1, mods).hash();
     !cur = tyl.hashBy(hashType, cur);
     pty.foldl((i, ty) -> (i, ty.i1).hash(), cur)
   | Tparam(frz, v, id, _) ->
@@ -384,8 +384,7 @@ base class Type__ uses Hashable, Equality {
       id,
     ).hash()
   | Tvar(id) -> ("%Tvar", id).hash()
-  | Tlambda(v, i, mods, ty) ->
-    ("%Tlambda", v, i, ty.i1, mods.purity, mods.tracking).hash()
+  | Tlambda(v, i, mods, ty) -> ("%Tlambda", v, i, ty.i1, mods).hash()
   | Tdefault(ty) -> ("%Tdefault", ty.i1).hash()
   | Tnamed(ni, ty) -> ("%Tnamed", ni, ty.i1).hash()
   | Tpromoted(v, m, ps, ts, n, tyl) ->
