@@ -1329,20 +1329,8 @@ fun join_(
     (_, N.Tfrozen(A.Vminus())),
   ) ->
     exn = Join(ty1, ty2);
-    jpure = purity_modifiers_for_tfrozen(exn, variance, mods.purity);
-    (
-      acc,
-      (
-        pos,
-        N.Tfun(
-          variance,
-          N.Tfun_modifiers{purity => jpure, tracking => mods.tracking},
-          tyl,
-          params,
-          rty,
-        ),
-      ),
-    )
+    !mods.purity = purity_modifiers_for_tfrozen(exn, variance, mods.purity);
+    (acc, (pos, N.Tfun(variance, mods, tyl, params, rty)))
   | ((ffr, tfrozen_ @ N.Tfrozen(A.Vminus())), tother)
   | (tother, (ffr, tfrozen_ @ N.Tfrozen(A.Vminus()))) ->
     join_contra_tfrozen(env, acc, (ffr, tfrozen_), tother)
