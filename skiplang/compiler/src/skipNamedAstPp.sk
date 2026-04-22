@@ -278,7 +278,8 @@ fun static_name(o: mutable BufferedPrinter.Out, names: Array<N.Name>): void {
 }
 
 fun tfun_modifiers(o: mutable BufferedPrinter.Out, p: N.Tfun_modifiers): void {
-  (purity, tracking) = p;
+  purity = p.purity;
+  tracking = p.tracking;
   o.out("(");
   purity_modifier(o, purity);
   o.out(", ");
@@ -290,7 +291,8 @@ fun lambda_modifiers(
   o: mutable BufferedPrinter.Out,
   p: N.Tfun_modifiers,
 ): void {
-  (purity, tracking) = p;
+  purity = p.purity;
+  tracking = p.tracking;
   purity_modifier(o, purity);
   o.out(" ");
   tracking_modifier(o, tracking)

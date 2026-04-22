@@ -154,11 +154,9 @@ fun join_tfun_modifiers(
   v2: A.Variance,
   p2: N.Tfun_modifiers,
 ): N.Tfun_modifiers {
-  (p11, t1) = p1;
-  (p21, t2) = p2;
-  purity = join_purity(exn, v1, p11, v2, p21);
-  tracking = join_tracking(exn, v1, t1, v2, t2);
-  (purity, tracking)
+  purity = join_purity(exn, v1, p1.purity, v2, p2.purity);
+  tracking = join_tracking(exn, v1, p1.tracking, v2, p2.tracking);
+  N.Tfun_modifiers{purity, tracking}
 }
 
 fun purity_modifiers_for_tfrozen(
@@ -331,9 +329,8 @@ fun to_string_params(
 /* Helper function */
 /*****************************************************************************/
 fun fun_is_mutable_is_untracked(x: N.Tfun_modifiers): (Bool, Bool) {
-  (purity, tracking) = x;
-  is_mutable = purity is N.Fmutable();
-  is_untracked = tracking is N.Funtracked();
+  is_mutable = x.purity is N.Fmutable();
+  is_untracked = x.tracking is N.Funtracked();
   (is_mutable, is_untracked)
 }
 
@@ -448,7 +445,7 @@ fun freeze_(
     )
   | N.Tawaitable _ -> error_freeze_awaitable(caller_pos, pos)
   | N.Tfun(variance, modifiers, targs, params, rty) ->
-    freeze_modifiers(caller_pos, pos, modifiers.i0);
+    freeze_modifiers(caller_pos, pos, modifiers.purity);
     N.Tfun(variance, modifiers, targs, params, rty)
   | N.Tvar _ -> invariant_violation("assert false")
   | N.Tparam(_, var, id, name) ->
@@ -462,7 +459,7 @@ fun freeze_(
       freeze_inter(caller_pos, subst, bounds, interl),
     )
   | N.Tlambda(var, tid, modifiers, ty) ->
-    freeze_modifiers(caller_pos, pos, modifiers.i0);
+    freeze_modifiers(caller_pos, pos, modifiers.purity);
     N.Tlambda(var, tid, modifiers, freeze(caller_pos, subst, bounds, ty))
   | N.Tdefault(ty) -> N.Tdefault(freeze(caller_pos, subst, bounds, ty))
   | N.Tnamed(name, ty) -> N.Tnamed(name, freeze(caller_pos, subst, bounds, ty))
@@ -571,7 +568,7 @@ fun verify_freezable_type_(
     verify_freezable_tparam(caller_pos, subst, bounds, id)
   | N.Tlambda(_, _, modifiers, _)
   | N.Tfun(_, modifiers, _, _, _) ->
-    freeze_modifiers(caller_pos, ty.i0, modifiers.i0)
+    freeze_modifiers(caller_pos, ty.i0, modifiers.purity)
   | N.Tawaitable _ -> error_freeze_awaitable(caller_pos, ty.i0)
   | _ -> void
   }
@@ -628,7 +625,7 @@ fun chill_(
     )
   | N.Tawaitable _ -> error_chill_awaitable(caller_pos, pos)
   | N.Tfun(variance, modifiers, targs, params, rty) ->
-    chill_modifiers(caller_pos, pos, modifiers.i0);
+    chill_modifiers(caller_pos, pos, modifiers.purity);
     N.Tfun(variance, modifiers, targs, params, rty)
   | N.Tvar _ -> invariant_violation("assert false")
   | N.Tparam(frozen_, var, id, name) -> N.Tparam(frozen_, var, id, name)
@@ -640,7 +637,7 @@ fun chill_(
       chill_inter(caller_pos, subst, bounds, interl),
     )
   | N.Tlambda(var, tid, modifiers, ty) ->
-    chill_modifiers(caller_pos, pos, modifiers.i0);
+    chill_modifiers(caller_pos, pos, modifiers.purity);
     N.Tlambda(var, tid, modifiers, chill(caller_pos, subst, bounds, ty))
   | N.Tdefault(ty) -> N.Tdefault(chill(caller_pos, subst, bounds, ty))
   | N.Tnamed(name, ty) -> N.Tnamed(name, chill(caller_pos, subst, bounds, ty))
@@ -798,7 +795,7 @@ fun to_readonly_exn(
 
   | (fr, N.Tawaitable _) -> error_readonly_awaitable(caller_pos, fr)
   | (fr, N.Tfun(variance, modifiers, targs, params, rty)) ->
-    to_readonly_modifiers(caller_pos, fr, modifiers.i0);
+    to_readonly_modifiers(caller_pos, fr, modifiers.purity);
     (fr, N.Tfun(variance, modifiers, targs, params, rty))
   | (_, N.Tparam(Some _, _, _, _)) ->
     invariant_violation("This was done before subst, how frozen?")
@@ -806,7 +803,7 @@ fun to_readonly_exn(
     verify_readonly_tparam(caller_pos, subst, bounds, id);
     x
   | (fr, N.Tlambda(var, tid, modifiers, ty)) ->
-    to_readonly_modifiers(caller_pos, fr, modifiers.i0);
+    to_readonly_modifiers(caller_pos, fr, modifiers.purity);
     (
       fr,
       N.Tlambda(
@@ -936,7 +933,7 @@ fun verify_readonly_type_(
     verify_readonly_tparam(caller_pos, subst, bounds, id)
   | N.Tlambda(_, _, modifiers, _)
   | N.Tfun(_, modifiers, _, _, _) ->
-    to_readonly_modifiers(caller_pos, ty.i0, modifiers.i0)
+    to_readonly_modifiers(caller_pos, ty.i0, modifiers.purity)
   | N.Tawaitable _ -> error_readonly_awaitable(caller_pos, ty.i0)
   | _ -> void
   }
@@ -1335,15 +1332,27 @@ fun join_(
     (acc, (fr, N.TnonNullable(join_variance(var1, var2))))
   | (
     (_, N.Tfrozen(A.Vminus())),
-    (pos, N.Tfun(variance, (purity, tracking), tyl, params, rty)),
+    (pos, N.Tfun(variance, mods, tyl, params, rty)),
   )
   | (
-    (pos, N.Tfun(variance, (purity, tracking), tyl, params, rty)),
+    (pos, N.Tfun(variance, mods, tyl, params, rty)),
     (_, N.Tfrozen(A.Vminus())),
   ) ->
     exn = Join(ty1, ty2);
-    jpure = purity_modifiers_for_tfrozen(exn, variance, purity);
-    (acc, (pos, N.Tfun(variance, (jpure, tracking), tyl, params, rty)))
+    jpure = purity_modifiers_for_tfrozen(exn, variance, mods.purity);
+    (
+      acc,
+      (
+        pos,
+        N.Tfun(
+          variance,
+          N.Tfun_modifiers{purity => jpure, tracking => mods.tracking},
+          tyl,
+          params,
+          rty,
+        ),
+      ),
+    )
   | ((ffr, tfrozen_ @ N.Tfrozen(A.Vminus())), tother)
   | (tother, (ffr, tfrozen_ @ N.Tfrozen(A.Vminus()))) ->
     join_contra_tfrozen(env, acc, (ffr, tfrozen_), tother)
@@ -3011,8 +3020,7 @@ private fun is_frozen_map(
 }
 
 fun is_frozen_tfun_modifiers(mods: N.Tfun_modifiers): Bool {
-  (purity, tracking) = mods;
-  purity is N.Fpure() && tracking is N.Ftracked()
+  mods.purity is N.Fpure() && mods.tracking is N.Ftracked()
 }
 
 private fun is_frozen_map_tparam(

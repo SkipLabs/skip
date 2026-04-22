@@ -1861,8 +1861,8 @@ fun tfun_call(
   args: TAst.Call_args,
 ): (TUtils.Acc, TAst.Expr) {
   (tracking, params_ty, return_ty) = tfun_ty match {
-  | (_, N.Tfun(_, (_, tracking), _targs, params_ty, rty)) ->
-    (tracking, params_ty, rty)
+  | (_, N.Tfun(_, mods, _targs, params_ty, rty)) ->
+    (mods.tracking, params_ty, rty)
   | _ -> invariant_violation("ICE no tfun tfun_call")
   };
   (acc1, add_args) = call(
@@ -2522,7 +2522,13 @@ fun expr_(
         rty = TUtils.type_subst(subst, acc, fd.return_);
         origTy = (
           fd.name.i0,
-          N.Tfun(Ast.Vnone(), (N.Fpure(), tracking), targs, params_ty, rty),
+          N.Tfun(
+            Ast.Vnone(),
+            N.Tfun_modifiers{purity => N.Fpure(), tracking},
+            targs,
+            params_ty,
+            rty,
+          ),
         );
         level = -1;
         (!acc, ty) = check_local_mutable(env, acc, pos1, level, origTy);
@@ -2810,7 +2816,7 @@ fun expr_(
       pos,
       N.Tfun(
         Ast.Vplus(),
-        (N.Fmutable(), N.Funtracked()),
+        N.Tfun_modifiers{purity => N.Fmutable(), tracking => N.Funtracked()},
         Array[],
         Positional(Array[ty1]),
         ret_ty,
@@ -5023,18 +5029,21 @@ fun add_whenparam_constraints(
 fun fix_fdt_tfun_purity_modifiers(mode: N.Modality, type: N.Type_): N.Type_ {
   (pos, type_) = type;
   type_ match {
-  | N.Tfun(
-    var,
-    (npurity, tracking),
-    tyl,
-    paramty,
-    rty,
-  ) if (npurity is N.Fmutable()) ->
+  | N.Tfun(var, mods, tyl, paramty, rty) if (mods.purity is N.Fmutable()) ->
     purity = mode match {
     | N.Mchilled() -> N.Fpure()
     | N.MnotFrozen _ -> N.Fmutable()
     };
-    (pos, N.Tfun(var, (purity, tracking), tyl, paramty, rty))
+    (
+      pos,
+      N.Tfun(
+        var,
+        N.Tfun_modifiers{purity, tracking => mods.tracking},
+        tyl,
+        paramty,
+        rty,
+      ),
+    )
   | N.Tnamed(name, ty) ->
     (pos, N.Tnamed(name, fix_fdt_tfun_purity_modifiers(mode, ty)))
   | _ ->

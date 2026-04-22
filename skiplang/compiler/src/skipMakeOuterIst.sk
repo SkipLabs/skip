@@ -487,11 +487,11 @@ fun type__(remove_aliases: Bool, pos: FileRange, x: NAst.Type__): O.Type {
     | NAst.Mreadonly(rfr) -> O.Type(rfr, O.Treadonly(pelt))
     | NAst.Mmutable(mfr) -> O.Type(mfr, O.Tmutable(pelt))
     }
-  | NAst.Tfun(_, (purity, tracking), _, tparam, ty) ->
+  | NAst.Tfun(_, mods, _, tparam, ty) ->
     O.Type(
       pos,
       O.Tfun(
-        tfun_modifiers(purity, tracking),
+        tfun_modifiers(mods.purity, mods.tracking),
         parameters_type(remove_aliases, tparam),
         type(remove_aliases, ty),
       ),
