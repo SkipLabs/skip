@@ -2804,15 +2804,10 @@ fun expr_(
     ty1 = TAstUtils.get_type(e11);
     ty2 = TAstUtils.get_type(e21);
     ret_ty = TUtils.fresh(next_id, (pos, void));
+    mods = N.Tfun_modifiers{purity => N.Fmutable(), tracking => N.Funtracked()};
     ty_expect = (
       pos,
-      N.Tfun(
-        Ast.Vplus(),
-        N.Tfun_modifiers{purity => N.Fmutable(), tracking => N.Funtracked()},
-        Array[],
-        Positional(Array[ty1]),
-        ret_ty,
-      ),
+      N.Tfun(Ast.Vplus(), mods, Array[], Positional(Array[ty1]), ret_ty),
     );
     (acc3, _) = TUtils.join(
       context,
