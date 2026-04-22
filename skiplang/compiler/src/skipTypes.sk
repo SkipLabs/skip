@@ -77,8 +77,8 @@ fun join_modifier<T: Orderable>(
   m2: T,
 ): T {
   (v1, v2) match {
-  | (A.Vplus(), A.Vplus()) -> if (m1 <= m2) m2 else m1
-  | (A.Vminus(), A.Vminus()) -> if (m1 <= m2) m1 else m2
+  | (A.Vplus(), A.Vplus()) -> max(m1, m2)
+  | (A.Vminus(), A.Vminus()) -> min(m1, m2)
   | (A.Vminus(), A.Vplus()) ->
     // Contra (m1) must be ≥ co (m2).
     if (m1 >= m2) m1 else throw exn
