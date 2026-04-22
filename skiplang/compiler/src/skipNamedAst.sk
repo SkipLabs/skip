@@ -524,16 +524,34 @@ value class Tfun_modifiers{
   }
 }
 
-base class Purity_modifier uses Equality, Hashable {
+// Order reflects the subtyping lattice: strict (sub) < lax (super).
+base class Purity_modifier uses Orderable, Hashable {
   children =
   | Fpure()
   | Fmutable()
+
+  protected fun typeOrder(): Int
+  | Fpure() -> 0
+  | Fmutable() -> 1
+
+  fun compare(other: Purity_modifier): Order {
+    compare(this.typeOrder(), other.typeOrder())
+  }
 }
 
-base class Tracking_modifier uses Equality, Hashable {
+// Order reflects the subtyping lattice: strict (sub) < lax (super).
+base class Tracking_modifier uses Orderable, Hashable {
   children =
   | Ftracked()
   | Funtracked()
+
+  protected fun typeOrder(): Int
+  | Ftracked() -> 0
+  | Funtracked() -> 1
+
+  fun compare(other: Tracking_modifier): Order {
+    compare(this.typeOrder(), other.typeOrder())
+  }
 }
 
 class InterElt{
