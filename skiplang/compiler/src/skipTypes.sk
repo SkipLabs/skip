@@ -3005,12 +3005,8 @@ private fun is_frozen_map(
   | N.Tparam(_, _, id, _) -> is_frozen_map_tparam(tconstraints, subst, id)
 
   | N.Tfun(_, mods, _, _, _) ->
-    if (is_frozen_tfun_modifiers(mods)) Some(SortedMap[]) else None()
+    if (mods.isFrozen()) Some(SortedMap[]) else None()
   }
-}
-
-fun is_frozen_tfun_modifiers(mods: N.Tfun_modifiers): Bool {
-  mods.purity is N.Fpure() && mods.tracking is N.Ftracked()
 }
 
 private fun is_frozen_map_tparam(
