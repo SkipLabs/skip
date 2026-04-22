@@ -1414,39 +1414,6 @@ fun tparam_subst<T>(
   }
 }
 
-fun compare_modifiers<Ta>(to_int: ((Ta) -> Int), m1: Ta, m2: Ta): Order {
-  to_int(m1).compare(to_int(m2))
-}
-
-fun compare_purity_modifiers(l: Purity_modifier, r: Purity_modifier): Order {
-  compare_modifiers(
-    (m -> {
-      m match {
-      | Fpure() -> 0
-      | Fmutable() -> 1
-      }
-    }),
-    l,
-    r,
-  )
-}
-
-fun compare_tracking_modifiers(
-  l: Tracking_modifier,
-  r: Tracking_modifier,
-): Order {
-  compare_modifiers(
-    (t -> {
-      t match {
-      | Ftracked() -> 0
-      | Funtracked() -> 1
-      }
-    }),
-    l,
-    r,
-  )
-}
-
 fun compare_set_elt(l: InterElt, r: InterElt): Order {
   ckind = (l.kind, r.kind) match {
   | (A.KClass(), A.KClass()) -> EQ()
