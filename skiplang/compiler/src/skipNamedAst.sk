@@ -530,12 +530,13 @@ base class Purity_modifier uses Orderable, Hashable {
   | Fpure()
   | Fmutable()
 
-  protected fun typeOrder(): Int
-  | Fpure() -> 0
-  | Fmutable() -> 1
-
   fun compare(other: Purity_modifier): Order {
-    compare(this.typeOrder(), other.typeOrder())
+    (this, other) match {
+    | (Fpure(), Fpure()) -> EQ()
+    | (Fpure(), Fmutable()) -> LT()
+    | (Fmutable(), Fpure()) -> GT()
+    | (Fmutable(), Fmutable()) -> EQ()
+    }
   }
 }
 
@@ -545,12 +546,13 @@ base class Tracking_modifier uses Orderable, Hashable {
   | Ftracked()
   | Funtracked()
 
-  protected fun typeOrder(): Int
-  | Ftracked() -> 0
-  | Funtracked() -> 1
-
   fun compare(other: Tracking_modifier): Order {
-    compare(this.typeOrder(), other.typeOrder())
+    (this, other) match {
+    | (Ftracked(), Ftracked()) -> EQ()
+    | (Ftracked(), Funtracked()) -> LT()
+    | (Funtracked(), Ftracked()) -> GT()
+    | (Funtracked(), Funtracked()) -> EQ()
+    }
   }
 }
 
