@@ -1668,13 +1668,7 @@ fun suggested_frozen_fix(
           "' modifier",
       ),
     ]
-  | N.Tfun(
-    _,
-    (purity, _),
-    _,
-    _,
-    _,
-  ) if (!purity.isEmpty() && purity[0] is N.Fmutable()) ->
+  | N.Tfun(_, (purity, _), _, _, _) if (purity is N.Fmutable()) ->
     List[(pos, preface + "replacing '->' with '~>'")]
   | N.Tparam(_, _, _, (_, tparam)) ->
     List[

@@ -1665,11 +1665,11 @@ fun make_method_fields(
   )
 }
 
-fun make_met_tfun_purity(kind: N.FieldKind): Array<N.Purity_modifier> {
+fun make_met_tfun_purity(kind: N.FieldKind): N.Purity_modifier {
   kind match {
-  | N.FKStatic _ -> Array[N.Fpure()]
+  | N.FKStatic _ -> N.Fpure()
   // Is fixed in expr_dot in typing
-  | N.FKDynamic _ -> Array[N.Fmutable()]
+  | N.FKDynamic _ -> N.Fmutable()
   }
 }
 
@@ -2419,13 +2419,7 @@ fun check_class_parameter_type(
         ),
       ],
     )
-  | N.Tfun(
-    _,
-    (purity, _),
-    _,
-    _,
-    _,
-  ) if (!purity.isEmpty() && purity[0] is N.Fmutable()) ->
+  | N.Tfun(_, (purity, _), _, _, _) if (purity is N.Fmutable()) ->
     SkipError.errorl(
       List[
         (par_fr, "Invalid '->' typed parameter"),
@@ -2709,7 +2703,7 @@ fun fun_type(
   ftracked = if (tmodifiers.is_untracked) N.Funtracked() else N.Ftracked();
   tparams1 = fun_tparams(context, acc, env, tparams);
   tbody1 = type(context, acc, env, tbody);
-  N.Tfun(A.Vnone(), (Array[fpurity], ftracked), Array[], tparams1, tbody1)
+  N.Tfun(A.Vnone(), (fpurity, ftracked), Array[], tparams1, tbody1)
 }
 
 fun fun_tparams(
@@ -4128,7 +4122,7 @@ fun ordered_expr(
 fun lambda_modifiers(mods: A.Lam_modifier): N.Tfun_modifiers {
   purity = if (mods.is_mutable) N.Fmutable() else N.Fpure();
   tracking = if (mods.is_untracked) N.Funtracked() else N.Ftracked();
-  (Array[purity], tracking)
+  (purity, tracking)
 }
 
 // Every generator ends with an implicit "yield break"; this appends one.

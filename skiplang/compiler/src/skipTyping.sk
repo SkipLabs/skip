@@ -2522,13 +2522,7 @@ fun expr_(
         rty = TUtils.type_subst(subst, acc, fd.return_);
         origTy = (
           fd.name.i0,
-          N.Tfun(
-            Ast.Vnone(),
-            (Array[N.Fpure()], tracking),
-            targs,
-            params_ty,
-            rty,
-          ),
+          N.Tfun(Ast.Vnone(), (N.Fpure(), tracking), targs, params_ty, rty),
         );
         level = -1;
         (!acc, ty) = check_local_mutable(env, acc, pos1, level, origTy);
@@ -2816,7 +2810,7 @@ fun expr_(
       pos,
       N.Tfun(
         Ast.Vplus(),
-        (Array[N.Fmutable()], N.Funtracked()),
+        (N.Fmutable(), N.Funtracked()),
         Array[],
         Positional(Array[ty1]),
         ret_ty,
@@ -5035,10 +5029,10 @@ fun fix_fdt_tfun_purity_modifiers(mode: N.Modality, type: N.Type_): N.Type_ {
     tyl,
     paramty,
     rty,
-  ) if (npurity.size() == 1 && npurity[0] is N.Fmutable()) ->
+  ) if (npurity is N.Fmutable()) ->
     purity = mode match {
-    | N.Mchilled() -> Array[N.Fpure()]
-    | N.MnotFrozen _ -> Array[N.Fmutable()]
+    | N.Mchilled() -> N.Fpure()
+    | N.MnotFrozen _ -> N.Fmutable()
     };
     (pos, N.Tfun(var, (purity, tracking), tyl, paramty, rty))
   | N.Tnamed(name, ty) ->

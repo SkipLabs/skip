@@ -342,7 +342,7 @@ fun join_tfun_modifiers(
 ): N.Tfun_modifiers {
   (p11, t1) = p1;
   (p21, t2) = p2;
-  purity = join_purity_modifiers(exn, v1, p11, v2, p21);
+  purity = join_purity(exn, v1, p11, v2, p21);
   tracking = join_tracking(exn, v1, t1, v2, t2);
   (purity, tracking)
 }
@@ -350,9 +350,9 @@ fun join_tfun_modifiers(
 fun purity_modifiers_for_tfrozen(
   exn: Exception,
   variance: A.Variance,
-  purity: Array<N.Purity_modifier>,
-): Array<N.Purity_modifier> {
-  join_purity_modifiers(exn, variance, purity, A.Vminus(), Array[N.Fpure()])
+  purity: N.Purity_modifier,
+): N.Purity_modifier {
+  join_purity(exn, variance, purity, A.Vminus(), N.Fpure())
 }
 
 /*****************************************************************************/
@@ -518,7 +518,7 @@ fun to_string_params(
 /*****************************************************************************/
 fun fun_is_mutable_is_untracked(x: N.Tfun_modifiers): (Bool, Bool) {
   (purity, tracking) = x;
-  is_mutable = purity.size() == 1 && purity[0] is N.Fmutable();
+  is_mutable = purity is N.Fmutable();
   is_untracked = tracking is N.Funtracked();
   (is_mutable, is_untracked)
 }
@@ -658,11 +658,9 @@ fun freeze_(
 fun freeze_modifiers(
   caller_pos: FileRange,
   lambda_pos: FileRange,
-  x: Array<N.Purity_modifier>,
+  x: N.Purity_modifier,
 ): void {
-  if (x.isEmpty()) return void;
-
-  x[0] match {
+  x match {
   | N.Fpure() -> void
   | N.Fmutable() ->
     SkipError.errorl(
@@ -838,10 +836,9 @@ fun chill_(
 fun chill_modifiers(
   caller_pos: FileRange,
   lambda_pos: FileRange,
-  x: Array<N.Purity_modifier>,
+  x: N.Purity_modifier,
 ): void {
-  if (x.isEmpty()) return void;
-  x[0] match {
+  x match {
   | N.Fpure() -> void
   | N.Fmutable() ->
     SkipError.errorl(
@@ -1015,10 +1012,9 @@ fun to_readonly_exn(
 fun to_readonly_modifiers(
   caller_pos: FileRange,
   lambda_pos: FileRange,
-  x: Array<N.Purity_modifier>,
+  x: N.Purity_modifier,
 ): void {
-  if (x.isEmpty()) return void;
-  x[0] match {
+  x match {
   | N.Fpure() -> void
   | N.Fmutable() ->
     throw MutLambdaToReadonly(
@@ -1504,13 +1500,10 @@ fun join_(
     (_, N.Tlambda(var2, _, mods2, ty21)),
   ) ->
     exn = Join(ty1, ty2);
-    join_tfun_modifiers(exn, var1, mods1, var2, mods2) match {
-    | (purity, _) if (purity.isEmpty()) -> throw exn
-    | mods ->
-      variance = join_variance(var1, var2);
-      (!acc, ty) = join(context, next_id, env, acc, ty11, ty21);
-      (acc, (pos, N.Tlambda(variance, id, mods, ty)))
-    }
+    mods = join_tfun_modifiers(exn, var1, mods1, var2, mods2);
+    variance = join_variance(var1, var2);
+    (!acc, ty) = join(context, next_id, env, acc, ty11, ty21);
+    (acc, (pos, N.Tlambda(variance, id, mods, ty)))
   | ((pos, N.Tlambda(var, id, mods, ty11)), ty21)
   | (ty21, (pos, N.Tlambda(var, id, mods, ty11))) ->
     (!acc, ty) = join(context, next_id, env, acc, ty11, ty21);
@@ -1536,7 +1529,6 @@ fun join_(
   ) ->
     exn = Join(ty1, ty2);
     jpure = purity_modifiers_for_tfrozen(exn, variance, purity);
-    if (jpure.isEmpty()) throw exn;
     (acc, (pos, N.Tfun(variance, (jpure, tracking), tyl, params, rty)))
   | ((ffr, tfrozen_ @ N.Tfrozen(A.Vminus())), tother)
   | (tother, (ffr, tfrozen_ @ N.Tfrozen(A.Vminus()))) ->
@@ -1560,12 +1552,9 @@ fun join_(
     );
     (!acc, rty) = join(context, next_id, env, acc, rty1, rty2);
     exn = Join(ty1, ty2);
-    join_tfun_modifiers(exn, variance1, mods1, variance2, mods2) match {
-    | (purity, _) if (purity.isEmpty()) -> throw exn
-    | mods ->
-      variance = join_variance(variance1, variance2);
-      (acc, (pos, N.Tfun(variance, mods, Array[], params, rty)))
-    }
+    mods = join_tfun_modifiers(exn, variance1, mods1, variance2, mods2);
+    variance = join_variance(variance1, variance2);
+    (acc, (pos, N.Tfun(variance, mods, Array[], params, rty)))
   | ((tpos, N.Tapply _), _)
   | (_, (tpos, N.Tapply _)) ->
     print_error_ln(tpos.toString());
@@ -3209,8 +3198,7 @@ private fun is_frozen_map(
 
 fun is_frozen_tfun_modifiers(mods: N.Tfun_modifiers): Bool {
   (purity, tracking) = mods;
-  invariant(!purity.isEmpty(), "imposible tfun");
-  purity[0] is N.Fpure() && tracking is N.Ftracked()
+  purity is N.Fpure() && tracking is N.Ftracked()
 }
 
 private fun is_frozen_map_tparam(

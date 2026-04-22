@@ -502,26 +502,14 @@ base class Named_info uses Equality, Hashable {
 
 // Modifiers for function types: (purity, tracking).
 //
-// Purity uses an array encoding a variance-aware modifier set:
-//   Size 1: Invariant — the modifier is the same in all variance positions.
-//     e.g. [Fpure()] = always pure.
-//   Size 2: Variant — element [0] is for covariant (+) position,
-//     element [1] is for contravariant (-) position.
-//     e.g. [Fpure(), Fmutable()] = pure in +, mutable in -.
-//   Size 0: Error — the join of two incompatible types produced an empty set.
-//     This is a transient state that immediately triggers a type error.
+// Both components are single values:
+//   Purity:   Fpure | Fmutable     (Fpure ≤ Fmutable)
+//   Tracking: Ftracked | Funtracked (Ftracked ≤ Funtracked)
 //
-// Tracking is a single Tracking_modifier value. The subtyping relationship
-// (tracked ≤ untracked) is handled directly by join_tracking in skipTypes.sk.
-//
-// Neither component is promoted anymore. Tracking's subtyping is handled by
-// join_tracking; purity's will be handled by an analogous join_purity in a
-// follow-up commit. Size-2 purity arrays can therefore only arise
-// transiently from join_modifiers contravariant union and are already
-// handled by existing consumers via [0].
-//
-// See join_modifiers in skipTypes.sk for the purity variance-based join semantics.
-type Tfun_modifiers = (.Array<Purity_modifier>, Tracking_modifier);
+// Subtyping is handled directly by join_purity and join_tracking in
+// skipTypes.sk, which dispatch on variance arguments to compute
+// LUB/GLB/compatibility.
+type Tfun_modifiers = (Purity_modifier, Tracking_modifier);
 
 base class Purity_modifier uses Equality, Hashable {
   children =
@@ -1489,14 +1477,8 @@ fun unfold_tnamed(x: Type_): Type_ {
   }
 }
 
-fun is_pure<Ta>(p: (.Array<Purity_modifier>, Ta)): Bool {
-  (kindl, _) = p;
-  kindl.any(x -> {
-    x match {
-    | Fpure() -> true
-    | _ -> false
-    }
-  })
+fun is_pure<Ta>(p: (Purity_modifier, Ta)): Bool {
+  p.i0 is Fpure()
 }
 
 module end;
