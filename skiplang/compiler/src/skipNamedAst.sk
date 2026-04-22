@@ -515,6 +515,10 @@ value class Tfun_modifiers{
   fun isUntracked(): Bool {
     this.tracking is Funtracked()
   }
+
+  fun isPure(): Bool {
+    this.purity is Fpure()
+  }
 }
 
 base class Purity_modifier uses Equality, Hashable {
@@ -1481,10 +1485,6 @@ fun unfold_tnamed(x: Type_): Type_ {
   | (_, Tnamed(_, ty)) -> unfold_tnamed(ty)
   | ty -> ty
   }
-}
-
-fun is_pure(p: Tfun_modifiers): Bool {
-  p.purity is Fpure()
 }
 
 module end;
