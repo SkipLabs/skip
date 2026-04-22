@@ -2520,16 +2520,8 @@ fun expr_(
           fd.params,
         );
         rty = TUtils.type_subst(subst, acc, fd.return_);
-        origTy = (
-          fd.name.i0,
-          N.Tfun(
-            Ast.Vnone(),
-            N.Tfun_modifiers{purity => N.Fpure(), tracking},
-            targs,
-            params_ty,
-            rty,
-          ),
-        );
+        mods = N.Tfun_modifiers{purity => N.Fpure(), tracking};
+        origTy = (fd.name.i0, N.Tfun(Ast.Vnone(), mods, targs, params_ty, rty));
         level = -1;
         (!acc, ty) = check_local_mutable(env, acc, pos1, level, origTy);
         e1 = (pos1, TAst.Fun(n, targs));
