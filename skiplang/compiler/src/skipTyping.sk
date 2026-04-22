@@ -5017,20 +5017,11 @@ fun fix_fdt_tfun_purity_modifiers(mode: N.Modality, type: N.Type_): N.Type_ {
   (pos, type_) = type;
   type_ match {
   | N.Tfun(var, mods, tyl, paramty, rty) if (mods.purity is N.Fmutable()) ->
-    purity = mode match {
+    !mods.purity = mode match {
     | N.Mchilled() -> N.Fpure()
     | N.MnotFrozen _ -> N.Fmutable()
     };
-    (
-      pos,
-      N.Tfun(
-        var,
-        N.Tfun_modifiers{purity, tracking => mods.tracking},
-        tyl,
-        paramty,
-        rty,
-      ),
-    )
+    (pos, N.Tfun(var, mods, tyl, paramty, rty))
   | N.Tnamed(name, ty) ->
     (pos, N.Tnamed(name, fix_fdt_tfun_purity_modifiers(mode, ty)))
   | _ ->
