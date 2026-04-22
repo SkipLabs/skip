@@ -57,91 +57,37 @@ class Env{
 
 class Acc{subst: IMap<N.Type_>, constraints: TU.Constraints}
 
-// Joins two single Tracking_modifier values according to their variance
-// positions. Implements the tracking lattice directly:
-//   Ftracked ≤ Funtracked  (tracked is stricter, i.e. the subtype)
+// Joins two values of an Orderable modifier lattice according to their
+// variance positions. The ordering is the subtyping lattice: strict < lax.
 //
 // Variance dispatch:
-//   (+, +): LUB — Funtracked if either is Funtracked, else Ftracked.
-//   (-, -): GLB — Ftracked if either is Ftracked, else Funtracked.
+//   (+, +): LUB — max (lax wins).
+//   (-, -): GLB — min (strict wins).
 //   (-, +) or (+, -): contra side must be ≥ co side, else type error.
 //   (∅, _) or (_, ∅): invariant — must be equal, else type error.
-fun join_tracking(
-  exn: Exception,
-  v1: A.Variance,
-  t1: N.Tracking_modifier,
-  v2: A.Variance,
-  t2: N.Tracking_modifier,
-): N.Tracking_modifier {
-  (v1, v2) match {
-  | (A.Vplus(), A.Vplus()) ->
-    // LUB: least upper bound — less strict wins
-    if (t1 is N.Funtracked() || t2 is N.Funtracked()) {
-      N.Funtracked()
-    } else {
-      N.Ftracked()
-    }
-  | (A.Vminus(), A.Vminus()) ->
-    // GLB: greatest lower bound — stricter wins
-    if (t1 is N.Ftracked() || t2 is N.Ftracked()) {
-      N.Ftracked()
-    } else {
-      N.Funtracked()
-    }
-  | (A.Vminus(), A.Vplus()) ->
-    // Contra (t1) must be ≥ co (t2): Funtracked ≥ anything, Ftracked ≥ Ftracked only
-    if (t1 is N.Funtracked() || t2 is N.Ftracked()) t1 else throw exn
-  | (A.Vplus(), A.Vminus()) ->
-    // Symmetric: contra (t2) must be ≥ co (t1)
-    if (t2 is N.Funtracked() || t1 is N.Ftracked()) t2 else throw exn
-  | (A.Vnone(), _)
-  | (_, A.Vnone()) ->
-    // Invariant: must be equal
-    if (N.compare_tracking_modifiers(t1, t2) is EQ()) t1 else throw exn
-  }
-}
-
-// Joins two single Purity_modifier values according to their variance
-// positions. Implements the purity lattice directly:
-//   Fpure ≤ Fmutable  (pure is stricter, i.e. the subtype)
 //
-// Variance dispatch:
-//   (+, +): LUB — Fmutable if either is Fmutable, else Fpure.
-//   (-, -): GLB — Fpure if either is Fpure, else Fmutable.
-//   (-, +) or (+, -): contra side must be ≥ co side, else type error.
-//   (∅, _) or (_, ∅): invariant — must be equal, else type error.
-fun join_purity(
+// Instances:
+//   purity:   Fpure (strict) < Fmutable (lax)
+//   tracking: Ftracked (strict) < Funtracked (lax)
+fun join_modifier<T: Orderable>(
   exn: Exception,
   v1: A.Variance,
-  p1: N.Purity_modifier,
+  m1: T,
   v2: A.Variance,
-  p2: N.Purity_modifier,
-): N.Purity_modifier {
+  m2: T,
+): T {
   (v1, v2) match {
-  | (A.Vplus(), A.Vplus()) ->
-    // LUB: least upper bound — less strict wins
-    if (p1 is N.Fmutable() || p2 is N.Fmutable()) {
-      N.Fmutable()
-    } else {
-      N.Fpure()
-    }
-  | (A.Vminus(), A.Vminus()) ->
-    // GLB: greatest lower bound — stricter wins
-    if (p1 is N.Fpure() || p2 is N.Fpure()) {
-      N.Fpure()
-    } else {
-      N.Fmutable()
-    }
+  | (A.Vplus(), A.Vplus()) -> if (m1 <= m2) m2 else m1
+  | (A.Vminus(), A.Vminus()) -> if (m1 <= m2) m1 else m2
   | (A.Vminus(), A.Vplus()) ->
-    // Contra (p1) must be ≥ co (p2): Fmutable ≥ anything, Fpure ≥ Fpure only
-    if (p1 is N.Fmutable() || p2 is N.Fpure()) p1 else throw exn
+    // Contra (m1) must be ≥ co (m2).
+    if (m1 >= m2) m1 else throw exn
   | (A.Vplus(), A.Vminus()) ->
-    // Symmetric: contra (p2) must be ≥ co (p1)
-    if (p2 is N.Fmutable() || p1 is N.Fpure()) p2 else throw exn
+    // Symmetric.
+    if (m2 >= m1) m2 else throw exn
   | (A.Vnone(), _)
   | (_, A.Vnone()) ->
-    // Invariant: must be equal
-    if (N.compare_purity_modifiers(p1, p2) is EQ()) p1 else throw exn
+    if (m1 == m2) m1 else throw exn
   }
 }
 
@@ -154,8 +100,8 @@ fun join_tfun_modifiers(
   v2: A.Variance,
   p2: N.Tfun_modifiers,
 ): N.Tfun_modifiers {
-  purity = join_purity(exn, v1, p1.purity, v2, p2.purity);
-  tracking = join_tracking(exn, v1, p1.tracking, v2, p2.tracking);
+  purity = join_modifier(exn, v1, p1.purity, v2, p2.purity);
+  tracking = join_modifier(exn, v1, p1.tracking, v2, p2.tracking);
   N.Tfun_modifiers{purity, tracking}
 }
 
@@ -164,7 +110,7 @@ fun purity_modifiers_for_tfrozen(
   variance: A.Variance,
   purity: N.Purity_modifier,
 ): N.Purity_modifier {
-  join_purity(exn, variance, purity, A.Vminus(), N.Fpure())
+  join_modifier(exn, variance, purity, A.Vminus(), N.Fpure())
 }
 
 /*****************************************************************************/
