@@ -1158,16 +1158,14 @@ fun promote(
     targs1 = promote_targs(context, env, variance, mode, subst, cd, targs);
     (pos, N.Tpromoted(variance, mode, seen, tparams, cname, targs1))
   | (pos, N.Tfun(_, ml, tyl, params, rty)) ->
-    ml1 = promote_tfun_modifiers(ml);
     params1 = params.map(p -> contra_promote(context, env, variance, subst, p));
     rty1 = promote(context, env, variance, subst, rty);
-    (pos, N.Tfun(variance, ml1, tyl, params1, rty1))
+    (pos, N.Tfun(variance, ml, tyl, params1, rty1))
   | (pos, N.Tparam(frozen_, _, id, name)) ->
     (pos, N.Tparam(frozen_, variance, id, name))
   | (pos, N.Tlambda(_, id, ml, ty)) ->
-    ml1 = promote_tfun_modifiers(ml);
     ty1 = promote(context, env, variance, subst, ty);
-    (pos, N.Tlambda(variance, id, ml1, ty1))
+    (pos, N.Tlambda(variance, id, ml, ty1))
   | (pos, N.Tawaitable(_, ty)) ->
     ty1 = promote(context, env, variance, subst, ty);
     (pos, N.Tawaitable(variance, ty1))
