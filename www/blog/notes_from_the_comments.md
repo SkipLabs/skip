@@ -11,23 +11,23 @@ image: /img/skip.png
 
 That essay argued that the right response to AI-generated code isn't more code review — it's the same trick the industry already pulled with compilers: build the verification *into the process that produces the output*, then stop reviewing each artifact by hand.
 
-The internet had thoughts. Or at least X had thoughts — a lot of them, often in flowery language, haha. We read every one. Most of them landed on three or four arguments worth addressing head-on.
+The internet had thoughts. Or at least X had thoughts... a lot of them, often in flowery language, as you can imagine. I read every one. Most of them landed on three or four arguments worth addressing head-on.
 
-Before we go through them, we want to restate the thesis, because most of the responses were answering a question we didn't ask.
+Before I go through them, I want to restate the thesis, because most of the responses were answering a question I didn't ask.
 
 {/* truncate */}
 
 ## Restating the take
 
-The point of the original piece was not that LLMs *are* compilers. The point was that fifty years of compiler R&D — type systems, static analysis, formal semantics, abstract interpretation, symbolic execution, model checking — is exactly the apparatus we now need to wrap around coding agents.
+The point of the original piece was not that LLMs *are* compilers. The point was that fifty years of compiler R&D — type systems, static analysis, formal semantics, abstract interpretation, symbolic execution, model checking — is exactly the apparatus I now need to wrap around coding agents.
 
 Agents on their own cannot be trusted to ship code. They need a straightjacket. Static analysis is the straightjacket. The compiler community spent five decades building tools that prove things about code *before* it runs. That toolkit is the answer. Agents need it more than humans ever did, not less.
 
 The model is stochastic. The pipe around it isn't.
 
-The analogy isn't "agents are compilers." The analogy is "the R&D tradition that produced the trust apparatus around compilers is the R&D tradition we need to point at agents now."
+The analogy isn't "agents are compilers." The analogy is "the R&D tradition that produced the trust apparatus around compilers is the R&D tradition I need to point at agents now."
 
-With that on the table, let's go through what landed.
+With that on the table, let me go through what landed.
 
 ## What the critics got right
 
@@ -37,9 +37,9 @@ Two objections genuinely move the piece, and both of them make the case for stat
 
 The cleanest version of the point, paraphrased from one of the more direct replies: compilers don't hallucinate, and they don't recommend functions that don't exist.
 
-Right. This is the failure mode that doesn't exist in the compiler world, and we should have addressed it explicitly. A compiler translates a formally specified input into a formally specified output. An LLM produces semantics, sometimes out of thin air.
+Right. This is the failure mode that doesn't exist in the compiler world, and I should have addressed it explicitly. A compiler translates a formally specified input into a formally specified output. An LLM produces semantics, sometimes out of thin air.
 
-But notice what catches a hallucinated function call: a type checker. What catches a wrong arity: a type checker. What catches a reference to a nonexistent symbol: name resolution, which is a static analysis pass that has shipped in every serious compiler since the 1970s. Hallucination is exactly the failure mode mature static analysis was built to catch. The agent will invent a function; a sound type system will reject the program before it runs. That's the apparatus doing its job.
+But notice what catches a hallucinated function call: static analysis. What catches a wrong arity: static analysis. What catches a reference to a nonexistent symbol: static analysis — name resolution and type checking specifically, passes that have shipped in every serious compiler since the 1970s. Hallucination is exactly the failure mode this machinery was built to catch. The agent will invent a function; a sound type system will reject the program before it runs. That's the apparatus doing its job.
 
 ### The reliability gap is real, and it's the entire engineering challenge
 
@@ -53,9 +53,9 @@ Both of these objections are correct. Both of them strengthen the case for treat
 
 A second cluster of objections is technically true and rhetorically beside the point.
 
-**"Compilers have formal specifications. LLMs don't."** True. The analogy is not "LLMs are formally specified like compilers." The analogy is that the apparatus we built around compilers — much of which doesn't depend on the *compiler itself* being formally specified — is what agents need. Type checkers, sanitizers, fuzzers, model checkers: most of this apparatus operates on the *output* program, not on the source-to-machine translation. It would be useful even if the upstream artifact had no spec at all. Which is convenient, because in the agent case the upstream artifact doesn't.
+**"Compilers have formal specifications. LLMs don't."** True. The analogy is not "LLMs are formally specified like compilers." The analogy is that the apparatus I built around compilers — much of which doesn't depend on the *compiler itself* being formally specified — is what agents need. Type checkers, sanitizers, fuzzers, model checkers: most of this apparatus operates on the *output* program, not on the source-to-machine translation. It would be useful even if the upstream artifact had no spec at all. Which is convenient, because in the agent case the upstream artifact doesn't.
 
-**"Humans actually do read compiler output."** Yes — in embedded, GPU, security, and performance-critical contexts. The honest version of the original claim is narrower: *most code shipped in production today is not produced by a human reading the assembly first*, and that's possible because of the apparatus. We should have written the narrower version. But this correction is about scope, not about the structure of the argument.
+**"Humans actually do read compiler output."** Yes — in embedded, GPU, security, and performance-critical contexts. The honest version of the original claim is narrower: *most code shipped in production today is not produced by a human reading the assembly first*, and that's possible because of the apparatus. I should have written the narrower version. But this correction is about scope, not about the structure of the argument.
 
 **"Compilers are extremely reliable. LLMs constantly fail."** Already covered above. Yes — and this is why the apparatus matters more, not less.
 
@@ -75,9 +75,9 @@ The "just use temperature zero" variant of the criticism misses in the other dir
 
 If your response to "build the verification apparatus" is "but LLMs aren't deterministic," you're describing why the apparatus is *harder* to build, not why you shouldn't build it.
 
-Worth noting: since the original post went up, several of the people running the determinism critique have publicly walked it back. The strongest correction came from inside the LLVM community — the observation that real-world compilers are wildly non-deterministic by default. Internal passes use unordered containers keyed on pointer addresses, which shift every run thanks to ASLR. Non-stable sorting algorithms reorder things between invocations. Filesystem inode allocation dictates enumeration order. Reproducible builds are a massive engineering effort precisely because the underlying toolchain is so far from deterministic to begin with. The mathematical theory of a compiler is deterministic. The actual production toolchain is not. This is exactly the distinction the original piece was trying to make, made better by people who initially thought we were wrong about it.
+Worth noting: since the original post went up, several of the people running the determinism critique have publicly walked it back. The strongest correction came from inside the LLVM community — the observation that real-world compilers are wildly non-deterministic by default. Internal passes use unordered containers keyed on pointer addresses, which shift every run thanks to ASLR. Non-stable sorting algorithms reorder things between invocations. Filesystem inode allocation dictates enumeration order. Reproducible builds are a massive engineering effort precisely because the underlying toolchain is so far from deterministic to begin with. The mathematical theory of a compiler is deterministic. The actual production toolchain is not. This is exactly the distinction the original piece was trying to make, made better by people who initially thought I was wrong about it.
 
-The most rigorous version of the rebuttal came from outside the thread entirely. Isaac Van Doren's [*Nondeterminism's not the problem*](https://isaacvando.com/nondeterminisms-not-the-problem) makes the point cleanly: imagine a compiler that picks register assignments by `Math.random` — it would still be useful. Then set an LLM to temperature zero — it's still untrustworthy. Determinism is irrelevant. The real difference is that programming languages have semantics and prompts don't. We agree, and that reframe is the spine of the next section.
+The most rigorous version of the rebuttal came from outside the thread entirely. Isaac Van Doren's [*Nondeterminism's not the problem*](https://isaacvando.com/nondeterminisms-not-the-problem) makes the point cleanly: imagine a compiler that picks register assignments by `Math.random` — it would still be useful. Then set an LLM to temperature zero — it's still untrustworthy. Determinism is irrelevant. The real difference is that programming languages have semantics and prompts don't. I agree, and that reframe is the spine of the next section.
 
 The position the debate has settled into is the right one: compilers are not deterministic, LLMs are *more* non-deterministic than compilers, and the gap is large. That gap is the engineering challenge. It is not a category boundary.
 
@@ -89,7 +89,7 @@ The underlying problem is straightforward: programming languages have semantics;
 
 The honest version is more interesting. Programming languages don't actually specify everything either. Java doesn't tell you when the garbage collector runs. Haskell doesn't tell you what gets evaluated next — that's a function of the runtime, not the language. C doesn't tell you whether a variable lives on the stack or in a register. These languages succeed not because their specifications are exhaustive, but because the apparatus around them — the GC, the runtime, the register allocator — makes the underspecified parts irrelevant to the correctness of your program. The abstraction holds.
 
-That's the move we need for agents. The prompt is underspecified, and at one level it always will be. The apparatus has to make that underspecification stop mattering — to enforce, at the level of the *output program*, the properties the prompt couldn't pin down.
+That's the move I need for agents. The prompt is underspecified, and at one level it always will be. The apparatus has to make that underspecification stop mattering — to enforce, at the level of the *output program*, the properties the prompt couldn't pin down.
 
 You don't need full theorem proving to get most of the way there. The compiler R&D tradition has produced a layered stack of tools that impose semantic guarantees on programs without needing the *prompt* to be specified at all:
 
@@ -99,12 +99,12 @@ You don't need full theorem proving to get most of the way there. The compiler R
 - **Symbolic execution** explores program paths a test suite would never reach, finding inputs that violate assertions.
 - **Bounded model checking** proves the *absence* of specific bug classes, not just their absence in the cases you happened to test.
 
-None of this is speculative. It is what has been shipping in industrial compilers and verifiers for decades — Coverity, Infer, Astrée, KLEE, CBMC, Frama-C, the seL4 verification effort. The agent era is not asking for new science. It is asking us to point existing science at a new producer of code.
+None of this is speculative. It is what has been shipping in industrial compilers and verifiers for decades — Coverity, Infer, Astrée, KLEE, CBMC, Frama-C, the seL4 verification effort. The agent era is not asking for new science. It is asking me to point existing science at a new producer of code.
 
 The semantic ground that the prompt fails to establish gets re-established by analysis of the *output program*. The agent produces; the apparatus verifies; the program ships only if the apparatus signs off.
 
 It's worth being precise about the topology here, because it's the place where the compiler analogy is genuinely loose. In the compiler world, verification is *intricated* in the production pipeline: the type checker runs before codegen, the optimizer is constrained to semantics-preserving transformations, the linker validates symbols. By the time you have an output, the apparatus has already done its work. In the agent world, the agent generates first, and the apparatus enforces immediately downstream. Different topology, same principle: the trust lives in the pipeline, not in the artifact. The asymmetry is real, and it's an argument for tighter integration over time — for static analysis that is no longer a checkpoint after the agent finishes, but a constraint the agent operates under while it's still generating.
 
-This is what we are building at SkipLabs. SKJS is a TypeScript-compatible type checker that is *sound* — it doesn't have the escape hatches that make standard TypeScript ergonomic for humans and unreliable as a verification layer. The reactive runtime enforces explicit dependency contracts that an agent has to satisfy before code runs. This is pedantry that would feel like friction to a human author and is exactly right for an agent that needs to be held accountable for what it generates *before* anything reaches production.
+This is what I am building at SkipLabs. SKJS is a TypeScript-compatible type checker that is *sound* — it doesn't have the escape hatches that make standard TypeScript ergonomic for humans and unreliable as a verification layer. The reactive runtime enforces explicit dependency contracts that an agent has to satisfy before code runs. This is pedantry that would feel like friction to a human author and is exactly right for an agent that needs to be held accountable for what it generates *before* anything reaches production.
 
-The apparatus exists. Some of it ships today. More of it is being ported from the compiler world into the agent world right now. The point of the original piece — and the point we should have made more clearly — is that this is where the engineering work is. Not in scaling code review. Not in waiting for better models. In building the static guarantees that make trust warranted.
+The apparatus exists. Some of it ships today. More of it is being ported from the compiler world into the agent world right now. The point of the original piece — and the point I should have made more clearly — is that this is where the engineering work is. Not in scaling code review. Not in waiting for better models. In building the static guarantees that make trust warranted.
