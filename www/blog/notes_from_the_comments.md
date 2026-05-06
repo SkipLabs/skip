@@ -39,11 +39,11 @@ The cleanest version of the point, paraphrased from one of the more direct repli
 
 Right. This is the failure mode that doesn't exist in the compiler world, and I should have addressed it explicitly. A compiler translates a formally specified input into a formally specified output. An LLM produces semantics, sometimes out of thin air.
 
-But notice what catches a hallucinated function call: static analysis. What catches a wrong arity: static analysis. What catches a reference to a nonexistent symbol: static analysis — name resolution and type checking specifically, passes that have shipped in every serious compiler since the 1970s. Hallucination is exactly the failure mode this machinery was built to catch. The agent will invent a function; a sound type system will reject the program before it runs. That's the apparatus doing its job.
+But notice what catches a hallucinated function call: static analysis. What catches a reference to a nonexistent symbol: type checking and name resolution specifically — passes that have shipped in every serious compiler since the 1970s. Hallucination is exactly the failure mode this machinery was built to catch. The agent will invent a function; a sound type system will reject the program before it runs. That's the apparatus doing its job.
 
 ### The reliability gap is real, and it's the entire engineering challenge
 
-The *failure-rate* gap between a modern C compiler and a frontier LLM isn't 1.5× or 10×. It's many orders of magnitude. Compilers fail rarely enough that the failures get CVE numbers. LLMs fail often enough that "did the model hallucinate" is a routine line item in any agent pipeline.
+The *failure-rate* gap between a modern C compiler and a frontier LLM isn't 1.5× or 10×. It's many orders of magnitude. Compilers fail rarely enough that individual miscompilations are notable events, tracked, and fixed across the toolchain. LLMs fail often enough that "did the model hallucinate" is a routine line item in any agent pipeline.
 
 This is not an argument against the analogy. It is the argument *for* aggressive static guarantees on agent output. When the author fails at parts-per-million, you can get away with light verification. When the author fails at parts-per-hundred, you cannot. The reliability gap is precisely why every tool the compiler community has produced — and several it hasn't yet — needs to be pointed at coding agents now.
 
@@ -87,7 +87,7 @@ That gap is the engineering challenge, it is not a category boundary.
 
 The argument so far is abstract. Here's the concrete version.
 
-The underlying problem is straightforward: programming languages have semantics; prompts don't. The 892 pages of the Java Language Specification tell you exactly what promises the language makes about your code's behavior. A prompt makes no promises. To give a prompt the kind of guarantee a language gives you, you would need an external tool to validate that the output upholds the prompt's intended semantics — and the cost of doing that at the level of full theorem proving is famously prohibitive.
+The underlying problem is straightforward: programming languages have semantics; prompts don't. The nearly 900 pages of the Java Language Specification tell you exactly what promises the language makes about your code's behavior. A prompt makes no promises. To give a prompt the kind of guarantee a language gives you, you would need an external tool to validate that the output upholds the prompt's intended semantics — and the cost of doing that at the level of full theorem proving is famously prohibitive.
 
 The honest version is more interesting. Programming languages don't actually specify everything either. Java doesn't tell you when the garbage collector runs. Haskell doesn't tell you what gets evaluated next — that's a function of the runtime, not the language. C doesn't tell you whether a variable lives on the stack or in a register. These languages succeed not because their specifications are exhaustive, but because the apparatus around them — the GC, the runtime, the register allocator — makes the underspecified parts irrelevant to the correctness of your program. The abstraction holds.
 
@@ -99,7 +99,7 @@ You don't need full theorem proving to get most of the way there. The compiler R
 - **Data-flow analysis** catches uninitialized reads, use-after-free, leaked resources, and a long list of memory and ownership errors that no amount of LLM "review" will reliably find.
 - **Abstract interpretation** proves bounds on values — array indices, integer overflow, null dereference — across all execution paths, not just the ones a test happened to exercise.
 - **Symbolic execution** explores program paths a test suite would never reach, finding inputs that violate assertions.
-- **Bounded model checking** proves the *absence* of specific bug classes, not just their absence in the cases you happened to test.
+- **Bounded model checking** exhaustively explores program behaviors up to a finite bound. Counterexamples it finds are real bugs; the absence of one means any remaining bug has to be deeper than the bound you checked. This is a stronger guarantee than "we tested some inputs," and weaker than full verification.
 
 None of this is speculative. It is what has been shipping in industrial compilers and verifiers for decades — Coverity, Infer, Astrée, KLEE, CBMC, Frama-C, the seL4 verification effort. The agent era is not asking for new science. It is asking us to point existing science at a new producer of code.
 
