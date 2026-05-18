@@ -177,6 +177,33 @@ class Command(
     )
   }
 
+  // Register the flags that the Skip runtime consumes directly from argv
+  // (--data, --init, --capacity) so the Cli parser stops rejecting them.
+  // The values are read by the runtime, not by the user program.
+  fun runtimeArgs(): this {
+    this.args(
+      Array[
+        Cli.Arg::string("data")
+          .long("data")
+          .value_name("FILE")
+          .about("Use the given file as persistent storage (Skip runtime)")
+          .global(),
+        Cli.Arg::string("init")
+          .long("init")
+          .value_name("FILE")
+          .about(
+            "Initialize the given file as persistent storage (Skip runtime)",
+          )
+          .global(),
+        Cli.Arg::string("capacity")
+          .long("capacity")
+          .value_name("SIZE")
+          .about("Override runtime heap capacity (bytes, or with K/M/G suffix)")
+          .global(),
+      ],
+    )
+  }
+
   fun parseArgs(): ParseResults {
     res = parseArgs(this);
 

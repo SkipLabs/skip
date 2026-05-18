@@ -379,33 +379,78 @@ static char* parse_args(int argc, char** argv, int* is_init) {
   }
 }
 
+// Parse a byte count, optionally suffixed with K/M/G (case-insensitive,
+// multipliers 1024, 1024^2, 1024^3). On malformed input or size_t overflow,
+// writes to stderr citing `source` and exits with code 2.
+static size_t parse_capacity_value(const char* str, const char* source) {
+  if (str[0] < '0' || str[0] > '9') {
+    fprintf(stderr,
+            "%s expects an integer (optionally suffixed with K, M, or G)\n",
+            source);
+    exit(2);
+  }
+  size_t value = 0;
+  int j = 0;
+  while (str[j] >= '0' && str[j] <= '9') {
+    size_t digit = (size_t)(str[j] - '0');
+    if (value > (SIZE_MAX - digit) / 10) {
+      fprintf(stderr, "%s: value out of range\n", source);
+      exit(2);
+    }
+    value = value * 10 + digit;
+    j++;
+  }
+  size_t multiplier = 1;
+  if (str[j] != 0) {
+    char c = str[j];
+    if (c >= 'a' && c <= 'z') c = (char)(c - 'a' + 'A');
+    if (c == 'K') {
+      multiplier = 1024L;
+    } else if (c == 'M') {
+      multiplier = 1024L * 1024L;
+    } else if (c == 'G') {
+      multiplier = 1024L * 1024L * 1024L;
+    } else {
+      fprintf(stderr,
+              "%s expects an integer (optionally suffixed with K, M, or G)\n",
+              source);
+      exit(2);
+    }
+    if (str[j + 1] != 0) {
+      fprintf(stderr,
+              "%s expects an integer (optionally suffixed with K, M, or G)\n",
+              source);
+      exit(2);
+    }
+  }
+  if (multiplier > 1 && value > SIZE_MAX / multiplier) {
+    fprintf(stderr, "%s: value out of range\n", source);
+    exit(2);
+  }
+  return value * multiplier;
+}
+
 size_t parse_capacity(int argc, char** argv) {
   int i;
 
   for (i = 1; i < argc; i++) {
     if (strcmp(argv[i], "--capacity") == 0) {
       if (i + 1 < argc) {
-        if (argv[i + 1][0] >= '0' && argv[i + 1][0] <= '9') {
-          int j = 0;
-
-          while (argv[i + 1][j] != 0) {
-            if (argv[i + 1][j] >= '0' && argv[i + 1][j] <= '9') {
-              j++;
-              continue;
-            }
-            fprintf(stderr, "--capacity expects an integer\n");
-            exit(2);
-          }
-          return atol(argv[i + 1]);
-        } else if (argv[i + 1][0] == '-') {
+        // Preserve the existing quirk: `--capacity -<something>` silently
+        // falls back to the default.
+        if (argv[i + 1][0] == '-') {
           return DEFAULT_CAPACITY;
-        } else {
-          fprintf(stderr, "--capacity expects an integer\n");
-          exit(2);
         }
+        return parse_capacity_value(argv[i + 1], "--capacity");
       }
     }
   }
+
+  const char* env = getenv("SKIP_CAPACITY");
+  if (env != NULL && env[0] != '\0') {
+    return parse_capacity_value(env, "SKIP_CAPACITY");
+  }
+
   return DEFAULT_CAPACITY;
 }
 

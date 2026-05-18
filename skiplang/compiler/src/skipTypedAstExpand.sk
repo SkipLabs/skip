@@ -32,11 +32,6 @@ class Env{
   mismatched_variance_bounds: SMap<N.Type_>,
 }
 
-fun prune_tfun_mods<Ta>(x: Array<Ta>): Array<Ta> {
-  invariant(!x.isEmpty(), "ICE empty tfun mods");
-  Array[x[0]]
-}
-
 /*****************************************************************************/
 /* Type expansion. */
 /*****************************************************************************/
@@ -87,7 +82,7 @@ fun type__(
   | N.Tfun(variance, mods, _, params, ty) ->
     N.Tfun(
       variance,
-      tfun_mods(mods),
+      mods,
       Array[],
       type__params(context, env, subst, params),
       inner(ty),
@@ -185,13 +180,6 @@ fun type__params(
   | Positional(l) -> Positional(l.map(ty -> type(context, env, subst, ty)))
   | Named(m) -> Named(m.map((_, ty) -> type(context, env, subst, ty)))
   }
-}
-
-fun tfun_mods(p: N.Tfun_modifiers): N.Tfun_modifiers {
-  (purity, tracking) = p;
-  purity1 = prune_tfun_mods(purity);
-  tracking1 = prune_tfun_mods(tracking);
-  (purity1, tracking1)
 }
 
 fun filter_expanded_tparams(tparams: SMap<String>): SMap<String> {

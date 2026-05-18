@@ -487,29 +487,18 @@ fun type__(remove_aliases: Bool, pos: FileRange, x: NAst.Type__): O.Type {
     | NAst.Mreadonly(rfr) -> O.Type(rfr, O.Treadonly(pelt))
     | NAst.Mmutable(mfr) -> O.Type(mfr, O.Tmutable(pelt))
     }
-  | NAst.Tfun(
-    _,
-    (purity, tracking),
-    _,
-    tparam,
-    ty,
-  ) if (purity.size() == 1 && tracking.size() == 1) ->
+  | NAst.Tfun(_, mods, _, tparam, ty) ->
     O.Type(
       pos,
       O.Tfun(
-        tfun_modifiers(purity[0], tracking[0]),
+        tfun_modifiers(mods),
         parameters_type(remove_aliases, tparam),
         type(remove_aliases, ty),
       ),
     )
   | NAst.Tset _ ->
     print_error(pos.toString());
-    invariant_violation(
-      "Nast.Tfun modifiers should have been expanded to have at most one elt",
-    )
-  | NAst.Tfun _ ->
-    print_error(pos.toString());
-    invariant_violation("Nast.Tfun modifiers should have been expanded")
+    invariant_violation("Nast.Tset should have been expanded")
   | NAst.Tvar _ ->
     print_error(pos.toString());
     invariant_violation("NAst.Tvar should have been expanded")
@@ -532,11 +521,11 @@ fun expr_type_(ty: NAst.Type_): O.Type {
   type(true, ty)
 }
 
-fun tfun_modifiers(
-  purity: NAst.Purity_modifier,
-  tracking: NAst.Tracking_modifier,
-): O.TfunModifiers {
-  O.TfunModifiers(purity_modifier(purity), tracking_modifier(tracking))
+fun tfun_modifiers(mods: NAst.Tfun_modifiers): O.TfunModifiers {
+  O.TfunModifiers(
+    purity_modifier(mods.purity),
+    tracking_modifier(mods.tracking),
+  )
 }
 
 fun purity_modifier(x: NAst.Purity_modifier): O.PurityModifier {

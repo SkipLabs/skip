@@ -298,13 +298,11 @@ base class Type__ uses Hashable, Equality {
       n1.i1 == n2.i1 && m1 == m2 && tyl1.eqBy(tyl2, eqType)
     | _ -> false
     }
-  | Tfun(v1, pltl, tyl1, pty1, rety1) ->
+  | Tfun(v1, mods1, tyl1, pty1, rety1) ->
     other match {
-    | Tfun(v2, (pl2, tl2), tyl2, pty2, rety2) ->
-      (pl1, tl1) = pltl;
+    | Tfun(v2, mods2, tyl2, pty2, rety2) ->
       v1 == v2 &&
-        pl1 == pl2 &&
-        tl1 == tl2 &&
+        mods1 == mods2 &&
         tyl1.eqBy(tyl2, eqType) &&
         pty1.eqBy(pty2, eqType) &&
         eqType(rety1, rety2)
@@ -324,11 +322,10 @@ base class Type__ uses Hashable, Equality {
     | Tvar(id2) -> id1 == id2
     | _ -> false
     }
-  | Tlambda(v1, i1, pltl, ty1) ->
+  | Tlambda(v1, i1, mods1, ty1) ->
     other match {
-    | Tlambda(v2, i2, (pl2, tl2), ty2) ->
-      (pl1, tl1) = pltl;
-      i1 == i2 && v1 == v2 && pl1 == pl2 && tl1 == tl2 && eqType(ty1, ty2)
+    | Tlambda(v2, i2, mods2, ty2) ->
+      i1 == i2 && v1 == v2 && mods1 == mods2 && eqType(ty1, ty2)
     | _ -> false
     }
   | Tdefault(ty1) ->
@@ -372,9 +369,8 @@ base class Type__ uses Hashable, Equality {
     // Does not hash on n.i0
     cur = ("%Tapply", m, n.i1).hash();
     tyl.hashBy(hashType, cur)
-  | Tfun(v1, pltl, tyl, pty, rety) ->
-    (pl, tl) = pltl;
-    cur = ("%Tfun", v1, rety.i1, pl, tl).hash();
+  | Tfun(v1, mods, tyl, pty, rety) ->
+    cur = ("%Tfun", v1, rety.i1, mods).hash();
     !cur = tyl.hashBy(hashType, cur);
     pty.foldl((i, ty) -> (i, ty.i1).hash(), cur)
   | Tparam(frz, v, id, _) ->
@@ -388,9 +384,7 @@ base class Type__ uses Hashable, Equality {
       id,
     ).hash()
   | Tvar(id) -> ("%Tvar", id).hash()
-  | Tlambda(v, i, pltl, ty) ->
-    (pl, tl) = pltl;
-    ("%Tlambda", v, i, ty.i1, pl, tl).hash()
+  | Tlambda(v, i, mods, ty) -> ("%Tlambda", v, i, ty.i1, mods).hash()
   | Tdefault(ty) -> ("%Tdefault", ty.i1).hash()
   | Tnamed(ni, ty) -> ("%Tnamed", ni, ty.i1).hash()
   | Tpromoted(v, m, ps, ts, n, tyl) ->
@@ -500,18 +494,66 @@ base class Named_info uses Equality, Hashable {
     l.hashBy(x -> x.i1.hash(), ("%NTydAbstract", n.i1).hash())
 }
 
-type Tfun_modifiers = (.Array<Purity_modifier>, .Array<Tracking_modifier>);
+// Modifiers for function types.
+//
+// Both components are single values:
+//   Purity:   Fpure | Fmutable     (Fpure ≤ Fmutable)
+//   Tracking: Ftracked | Funtracked (Ftracked ≤ Funtracked)
+//
+// Subtyping is handled directly by join_purity and join_tracking in
+// skipTypes.sk, which dispatch on variance arguments to compute
+// LUB/GLB/compatibility.
+value class Tfun_modifiers{
+  purity: Purity_modifier,
+  tracking: Tracking_modifier,
+} uses Equality, Hashable {
+  fun isMutable(): Bool {
+    this.purity is Fmutable()
+  }
 
-base class Purity_modifier uses Equality, Hashable {
+  fun isUntracked(): Bool {
+    this.tracking is Funtracked()
+  }
+
+  fun isPure(): Bool {
+    this.purity is Fpure()
+  }
+
+  fun isFrozen(): Bool {
+    this.purity is Fpure() && this.tracking is Ftracked()
+  }
+}
+
+// Order reflects the subtyping lattice: strict (sub) < lax (super).
+base class Purity_modifier uses Orderable, Hashable {
   children =
   | Fpure()
   | Fmutable()
+
+  fun compare(other: Purity_modifier): Order {
+    (this, other) match {
+    | (Fpure(), Fpure()) -> EQ()
+    | (Fpure(), Fmutable()) -> LT()
+    | (Fmutable(), Fpure()) -> GT()
+    | (Fmutable(), Fmutable()) -> EQ()
+    }
+  }
 }
 
-base class Tracking_modifier uses Equality, Hashable {
+// Order reflects the subtyping lattice: strict (sub) < lax (super).
+base class Tracking_modifier uses Orderable, Hashable {
   children =
   | Ftracked()
   | Funtracked()
+
+  fun compare(other: Tracking_modifier): Order {
+    (this, other) match {
+    | (Ftracked(), Ftracked()) -> EQ()
+    | (Ftracked(), Funtracked()) -> LT()
+    | (Funtracked(), Ftracked()) -> GT()
+    | (Funtracked(), Funtracked()) -> EQ()
+    }
+  }
 }
 
 class InterElt{
@@ -1374,39 +1416,6 @@ fun tparam_subst<T>(
   }
 }
 
-fun compare_modifiers<Ta>(to_int: ((Ta) -> Int), m1: Ta, m2: Ta): Order {
-  to_int(m1).compare(to_int(m2))
-}
-
-fun compare_purity_modifiers(l: Purity_modifier, r: Purity_modifier): Order {
-  compare_modifiers(
-    (m -> {
-      m match {
-      | Fpure() -> 0
-      | Fmutable() -> 1
-      }
-    }),
-    l,
-    r,
-  )
-}
-
-fun compare_tracking_modifiers(
-  l: Tracking_modifier,
-  r: Tracking_modifier,
-): Order {
-  compare_modifiers(
-    (t -> {
-      t match {
-      | Ftracked() -> 0
-      | Funtracked() -> 1
-      }
-    }),
-    l,
-    r,
-  )
-}
-
 fun compare_set_elt(l: InterElt, r: InterElt): Order {
   ckind = (l.kind, r.kind) match {
   | (A.KClass(), A.KClass()) -> EQ()
@@ -1466,16 +1475,6 @@ fun unfold_tnamed(x: Type_): Type_ {
   | (_, Tnamed(_, ty)) -> unfold_tnamed(ty)
   | ty -> ty
   }
-}
-
-fun is_pure<Ta>(p: (.Array<Purity_modifier>, Ta)): Bool {
-  (kindl, _) = p;
-  kindl.any(x -> {
-    x match {
-    | Fpure() -> true
-    | _ -> false
-    }
-  })
 }
 
 module end;

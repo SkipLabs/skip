@@ -1413,7 +1413,7 @@ fun is_mutable(acc: Acc, x: N.Type_, for_async: Bool): N.EffectiveMode {
     if (for_async) is_mutable(acc, inner, true) else N.Mmutable(pos)
   | N.Tlambda(_, _, mods, _)
   | N.Tfun(_, mods, _, _, _) ->
-    if (Types.is_frozen_tfun_modifiers(mods)) N.Efrozen() else N.Mmutable(pos)
+    if (mods.isFrozen()) N.Efrozen() else N.Mmutable(pos)
   | N.Tdefault(inner) -> is_mutable(acc, inner, for_async)
   }
 }
@@ -1529,7 +1529,7 @@ private fun is_readonly(acc: Acc, x: N.Type_): N.EffectiveMode {
   | N.Tawaitable _ -> N.Mmutable(pos)
   | N.Tlambda(_, _, mods, _)
   | N.Tfun(_, mods, _, _, _) ->
-    if (Types.is_frozen_tfun_modifiers(mods)) N.Efrozen() else N.Mmutable(pos)
+    if (mods.isFrozen()) N.Efrozen() else N.Mmutable(pos)
   | N.Tdefault(inner) -> is_readonly(acc, inner)
   }
 }
@@ -1595,7 +1595,7 @@ private fun pat_object_mode(acc: Acc, x: N.Type_): N.Modality {
   | N.Tawaitable _ -> N.Mmutable(pos)
   | N.Tlambda(_, _, mods, _)
   | N.Tfun(_, mods, _, _, _) ->
-    if (Types.is_frozen_tfun_modifiers(mods)) N.Mchilled() else N.Mmutable(pos)
+    if (mods.isFrozen()) N.Mchilled() else N.Mmutable(pos)
 
   | N.Tdefault(inner) -> pat_object_mode(acc, inner)
 
@@ -1668,13 +1668,7 @@ fun suggested_frozen_fix(
           "' modifier",
       ),
     ]
-  | N.Tfun(
-    _,
-    (purity, _),
-    _,
-    _,
-    _,
-  ) if (!purity.isEmpty() && purity[0] is N.Fmutable()) ->
+  | N.Tfun(_, mods, _, _, _) if (mods.purity is N.Fmutable()) ->
     List[(pos, preface + "replacing '->' with '~>'")]
   | N.Tparam(_, _, _, (_, tparam)) ->
     List[

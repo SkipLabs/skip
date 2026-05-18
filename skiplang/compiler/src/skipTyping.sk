@@ -1697,13 +1697,9 @@ fun call_or_constructor_(
 fun check_tracking(
   pos: FileRange,
   env: TUtils.Env,
-  tracking: Array<N.Tracking_modifier>,
+  tracking: N.Tracking_modifier,
 ): void {
-  if (
-    env.tracked_context &&
-    !tracking.isEmpty() &&
-    tracking[0] is N.Funtracked()
-  ) {
+  if (env.tracked_context && tracking is N.Funtracked()) {
     SkipError.error(
       pos,
       "Cannot call an untracked function from a tracked context",
@@ -1865,8 +1861,8 @@ fun tfun_call(
   args: TAst.Call_args,
 ): (TUtils.Acc, TAst.Expr) {
   (tracking, params_ty, return_ty) = tfun_ty match {
-  | (_, N.Tfun(_, (_, tracking), _targs, params_ty, rty)) ->
-    (tracking, params_ty, rty)
+  | (_, N.Tfun(_, mods, _targs, params_ty, rty)) ->
+    (mods.tracking, params_ty, rty)
   | _ -> invariant_violation("ICE no tfun tfun_call")
   };
   (acc1, add_args) = call(
@@ -2524,16 +2520,8 @@ fun expr_(
           fd.params,
         );
         rty = TUtils.type_subst(subst, acc, fd.return_);
-        origTy = (
-          fd.name.i0,
-          N.Tfun(
-            Ast.Vnone(),
-            (Array[N.Fpure()], tracking),
-            targs,
-            params_ty,
-            rty,
-          ),
-        );
+        mods = N.Tfun_modifiers{purity => N.Fpure(), tracking};
+        origTy = (fd.name.i0, N.Tfun(Ast.Vnone(), mods, targs, params_ty, rty));
         level = -1;
         (!acc, ty) = check_local_mutable(env, acc, pos1, level, origTy);
         e1 = (pos1, TAst.Fun(n, targs));
@@ -2816,15 +2804,10 @@ fun expr_(
     ty1 = TAstUtils.get_type(e11);
     ty2 = TAstUtils.get_type(e21);
     ret_ty = TUtils.fresh(next_id, (pos, void));
+    mods = N.Tfun_modifiers{purity => N.Fmutable(), tracking => N.Funtracked()};
     ty_expect = (
       pos,
-      N.Tfun(
-        Ast.Vplus(),
-        (Array[N.Fmutable()], Array[N.Funtracked()]),
-        Array[],
-        Positional(Array[ty1]),
-        ret_ty,
-      ),
+      N.Tfun(Ast.Vplus(), mods, Array[], Positional(Array[ty1]), ret_ty),
     );
     (acc3, _) = TUtils.join(
       context,
@@ -2927,7 +2910,7 @@ fun expr_(
   | N.Lambda(ml, params, captured, e1, yields) ->
     lambda_id = next_id();
     variance = Ast.Vplus();
-    mods = Types.promote_tfun_modifiers(ml);
+    mods = ml;
     ((explicit_params, acc1), lam_params) = lam_parameters(
       context,
       next_id,
@@ -2948,7 +2931,7 @@ fun expr_(
       lam_params,
       lam_explicit_param_ty => explicit_params,
       lam_body => e1,
-      lam_frozen_level => if (N.is_pure(mods)) {
+      lam_frozen_level => if (mods.isPure()) {
         TUtils.LPureLambda(pos, acc1.level)
       } else {
         env.frozen_level
@@ -5033,18 +5016,12 @@ fun add_whenparam_constraints(
 fun fix_fdt_tfun_purity_modifiers(mode: N.Modality, type: N.Type_): N.Type_ {
   (pos, type_) = type;
   type_ match {
-  | N.Tfun(
-    var,
-    (npurity, tracking),
-    tyl,
-    paramty,
-    rty,
-  ) if (npurity.size() == 1 && npurity[0] is N.Fmutable()) ->
-    purity = mode match {
-    | N.Mchilled() -> Array[N.Fpure()]
-    | N.MnotFrozen _ -> Array[N.Fmutable()]
+  | N.Tfun(var, mods, tyl, paramty, rty) if (mods.purity is N.Fmutable()) ->
+    !mods.purity = mode match {
+    | N.Mchilled() -> N.Fpure()
+    | N.MnotFrozen _ -> N.Fmutable()
     };
-    (pos, N.Tfun(var, (purity, tracking), tyl, paramty, rty))
+    (pos, N.Tfun(var, mods, tyl, paramty, rty))
   | N.Tnamed(name, ty) ->
     (pos, N.Tnamed(name, fix_fdt_tfun_purity_modifiers(mode, ty)))
   | _ ->

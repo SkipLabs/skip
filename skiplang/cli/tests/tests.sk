@@ -460,4 +460,36 @@ fun argDefaultWithUndefinedDefault(): void {
   );
 }
 
+@test
+fun runtimeArgsAccepted(): void {
+  cmd = Cli.Command("foo").runtimeArgs();
+  args = Cli.parseArgsFrom(
+    cmd,
+    Array["--capacity", "8G", "--data", "foo.db", "--init", "bar.db"],
+  );
+
+  T.expectTrue(args.error is None _);
+  T.expectEq(args.getString("capacity"), "8G");
+  T.expectEq(args.getString("data"), "foo.db");
+  T.expectEq(args.getString("init"), "bar.db");
+}
+
+@test
+fun runtimeArgsRejectedWithoutOptIn(): void {
+  cmd = Cli.Command("foo");
+  args = Cli.parseArgsFrom(cmd, Array["--capacity", "8G"]);
+
+  T.expectTrue(args.error is Some(Cli.InvalidArgumentError _));
+}
+
+@test
+fun runtimeArgsAreGlobal(): void {
+  cmd = Cli.Command("foo").runtimeArgs().subcommand(Cli.Command("bar"));
+  args = Cli.parseArgsFrom(cmd, Array["bar", "--capacity", "8G"]);
+
+  T.expectTrue(args.error is None _);
+  T.expectEq(args.subcommand, Some("bar"));
+  T.expectEq(args.getString("capacity"), "8G");
+}
+
 module end;
