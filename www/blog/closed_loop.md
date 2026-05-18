@@ -2,12 +2,12 @@
 title: What a Closed-Loop Coding Agent Actually Is
 description: Closed-loop control requires a feedback signal trustworthy enough to act on. Most AI coding agents close their loops on lossy sensors, tests, unsound types, model judgment, and inherit the instability that follows. Skipper is built on sound signals with SKJS, deterministic execution, and reactive computation.
 slug: closed_loop_coding_agent
-date: 2026-04-24
+date: 2026-05-18
 authors: hubyrod
 image: /img/skip.png
 ---
 
-Skipper is a closed-loop coding agent. That sentence does more work than it looks like. "Closed-loop" got borrowed by the industry without anyone inheriting what it actually means. Most agents called closed-loop aren't. And once you see why, you see what Skipper is doing differently.
+Skipper is a closed-loop coding agent. That label carries more weight than it appears. The industry adopted "closed-loop" without retaining its original meaning, so many tools labeled that way don't truly qualify. Once you understand the distinction, you see what sets Skipper apart.
 
 ## What closed-loop meant before we borrowed it
 
