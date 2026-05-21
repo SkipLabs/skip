@@ -4,6 +4,7 @@
 #include <functional>
 #include <iostream>
 #include <regex>
+#include <sstream>
 
 #define SKCONTEXT void*
 
