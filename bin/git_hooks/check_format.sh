@@ -41,5 +41,5 @@ check-file () {
 }
 export -f check-file
 
-# get list of staged files and check them in parallel
-git diff-index --cached --name-only HEAD | parallel check-file {}
+# get list of staged files (excluding deletions) and check them in parallel
+git diff-index --cached --name-only --diff-filter=d HEAD | parallel check-file {}
