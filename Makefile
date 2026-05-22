@@ -263,36 +263,44 @@ skfmt-%:
 skbuild-%:
 	cd $* && skargo b --profile $(SKARGO_PROFILE)
 
+# Build every workspace package in dependency order. Required before any
+# publish-* target so that downstream packages can see their dependencies'
+# emitted .d.ts and .js (which release_npm.sh's idempotent skip-if-already-
+# published check would otherwise bypass).
+.PHONY: build-all
+build-all:
+	npm run build --workspaces --if-present
+
 .PHONY: publish-core
-publish-core:
+publish-core: build-all
 	bin/release_npm.sh @skipruntime/core skipruntime-ts/core/package.json $(OTP)
 
 .PHONY: publish-helpers
-publish-helpers:
+publish-helpers: build-all
 	bin/release_npm.sh @skipruntime/helpers skipruntime-ts/helpers/package.json $(OTP)
 
 .PHONY: publish-wasm
-publish-wasm:
+publish-wasm: build-all
 	bin/release_npm.sh @skipruntime/wasm skipruntime-ts/wasm/package.json $(OTP)
 
 .PHONY: publish-native
-publish-native:
+publish-native: build-all
 	bin/release_npm.sh @skipruntime/native skipruntime-ts/addon/package.json $(OTP)
 
 .PHONY: publish-server
-publish-server:
+publish-server: build-all
 	bin/release_npm.sh @skipruntime/server skipruntime-ts/server/package.json $(OTP)
 
 .PHONY: publish-postgres-adapter
-publish-postgres-adapter:
+publish-postgres-adapter: build-all
 	bin/release_npm.sh @skip-adapter/postgres skipruntime-ts/adapters/postgres/package.json $(OTP)
 
 .PHONY: publish-kafka-adapter
-publish-kafka-adapter:
+publish-kafka-adapter: build-all
 	bin/release_npm.sh @skip-adapter/kafka skipruntime-ts/adapters/kafka/package.json $(OTP)
 
 .PHONY: publish-metapackage
-publish-metapackage:
+publish-metapackage: build-all
 	bin/release_npm.sh @skiplabs/skip skipruntime-ts/metapackage/package.json $(OTP)
 
 .PHONY: publish-all
