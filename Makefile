@@ -355,11 +355,12 @@ publish-all: clean \
 	publish-kafka-adapter \
 	publish-metapackage
 
-# skdb packages use bespoke release scripts (not bin/release_npm.sh) with
-# different semantics: they ERROR if the version hasn't been bumped (vs.
-# release_npm.sh's silent skip-if-already-published), prompt interactively
-# for OTP, and skdb-{dev,react} validate that their published skdb dep
-# matches the latest published skdb. Run in order; skdb must publish first.
+# skdb itself uses a bespoke release script because the package is assembled
+# by `make npm` into build/packages/skdb rather than being a plain npm
+# workspace, and the version source is sql/npm.json. skdb-{dev,react} are
+# plain npm packages and use release_npm.sh with STRICT_BUMP (error if the
+# version hasn't been bumped) and VALIDATE_PUBLISHED_DEP=skdb (error if
+# their skdb dep doesn't pin the currently-published skdb version).
 
 .PHONY: publish-skdb
 publish-skdb:
@@ -367,11 +368,11 @@ publish-skdb:
 
 .PHONY: publish-skdb-dev
 publish-skdb-dev: publish-skdb
-	bin/release_npm_skdb_dev.sh
+	STRICT_BUMP=1 VALIDATE_PUBLISHED_DEP=skdb bin/release_npm.sh skdb-dev packages/dev/package.json $(OTP)
 
 .PHONY: publish-skdb-react
 publish-skdb-react: publish-skdb
-	bin/release_npm_skdb_react.sh
+	STRICT_BUMP=1 VALIDATE_PUBLISHED_DEP=skdb bin/release_npm.sh skdb-react packages/react/package.json $(OTP)
 
 .PHONY: publish-all-skdb
 publish-all-skdb: publish-skdb publish-skdb-dev publish-skdb-react
