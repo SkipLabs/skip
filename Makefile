@@ -271,6 +271,39 @@ skbuild-%:
 build-all:
 	npm run build --workspaces --if-present
 
+.PHONY: publish-tsconfig
+publish-tsconfig: build-all
+	bin/release_npm.sh @skiplabs/tsconfig tsconfig/package.json $(OTP)
+
+.PHONY: publish-eslint-config
+publish-eslint-config: build-all
+	bin/release_npm.sh @skiplabs/eslint-config eslint-config/package.json $(OTP)
+
+.PHONY: publish-skiplang-std
+publish-skiplang-std: build-all
+	bin/release_npm.sh @skiplang/std skiplang/prelude/ts/binding/package.json $(OTP)
+
+.PHONY: publish-skiplang-json
+publish-skiplang-json: build-all
+	bin/release_npm.sh @skiplang/json skiplang/skjson/ts/binding/package.json $(OTP)
+
+.PHONY: publish-skip-wasm-std
+publish-skip-wasm-std: build-all
+	bin/release_npm.sh @skip-wasm/std skiplang/prelude/ts/wasm/package.json $(OTP)
+
+.PHONY: publish-skip-wasm-worker
+publish-skip-wasm-worker: build-all
+	bin/release_npm.sh @skip-wasm/worker skiplang/prelude/ts/worker/package.json $(OTP)
+
+.PHONY: publish-skip-wasm-json
+publish-skip-wasm-json: build-all
+	bin/release_npm.sh @skip-wasm/json skiplang/skjson/ts/wasm/package.json $(OTP)
+
+# @skip-wasm/date depends on @skip-wasm/std, so publish std first.
+.PHONY: publish-skip-wasm-date
+publish-skip-wasm-date: build-all publish-skip-wasm-std
+	bin/release_npm.sh @skip-wasm/date skiplang/skdate/ts/package.json $(OTP)
+
 .PHONY: publish-core
 publish-core: build-all
 	bin/release_npm.sh @skipruntime/core skipruntime-ts/core/package.json $(OTP)
@@ -304,4 +337,20 @@ publish-metapackage: build-all
 	bin/release_npm.sh @skiplabs/skip skipruntime-ts/metapackage/package.json $(OTP)
 
 .PHONY: publish-all
-publish-all: clean publish-core publish-helpers publish-wasm publish-native publish-server publish-postgres-adapter publish-kafka-adapter publish-metapackage
+publish-all: clean \
+	publish-tsconfig \
+	publish-eslint-config \
+	publish-skiplang-std \
+	publish-skiplang-json \
+	publish-skip-wasm-std \
+	publish-skip-wasm-worker \
+	publish-skip-wasm-json \
+	publish-skip-wasm-date \
+	publish-core \
+	publish-helpers \
+	publish-wasm \
+	publish-native \
+	publish-server \
+	publish-postgres-adapter \
+	publish-kafka-adapter \
+	publish-metapackage
