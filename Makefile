@@ -354,3 +354,24 @@ publish-all: clean \
 	publish-postgres-adapter \
 	publish-kafka-adapter \
 	publish-metapackage
+
+# skdb packages use bespoke release scripts (not bin/release_npm.sh) with
+# different semantics: they ERROR if the version hasn't been bumped (vs.
+# release_npm.sh's silent skip-if-already-published), prompt interactively
+# for OTP, and skdb-{dev,react} validate that their published skdb dep
+# matches the latest published skdb. Run in order; skdb must publish first.
+
+.PHONY: publish-skdb
+publish-skdb:
+	bin/release_npm_skdb.sh
+
+.PHONY: publish-skdb-dev
+publish-skdb-dev: publish-skdb
+	bin/release_npm_skdb_dev.sh
+
+.PHONY: publish-skdb-react
+publish-skdb-react: publish-skdb
+	bin/release_npm_skdb_react.sh
+
+.PHONY: publish-all-skdb
+publish-all-skdb: publish-skdb publish-skdb-dev publish-skdb-react
