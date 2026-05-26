@@ -4,7 +4,7 @@ description: Why our discomfort with AI-generated code reveals exactly what we h
 slug: codegen_as_compiler
 date: 2026-03-09
 authors: hubyrod
-image: /img/skip.png
+image: /img/og/codegen_as_compiler.png
 ---
 
 Philip Su's recent post argues that code reviews are not just impractical in the age of coding agents, they're headed toward being *irresponsible*. He's right on trend. But I think the framing of "lights-out codebases" skips over the more interesting and uncomfortable question: **why does lights-out feel so scary**, and what does that fear actually tell us?

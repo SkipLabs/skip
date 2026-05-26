@@ -4,7 +4,7 @@ description: A technical blog post examining cache invalidation challenges in di
 slug: cache_invalidation
 date: 2025-07-04
 authors: hubyrod
-image: /img/skip.png
+image: /img/og/cache_invalidation.png
 ---
 
 Phil Karlton famously said *there are only two hard things in computer science: cache invalidation and naming things*. While naming things may be subjective, [cache invalidation](https://en.wikipedia.org/wiki/Cache_invalidation) is a problem that only gets harder as our systems grow more complex. As applications scale and users expect real-time data everywhere, traditional approaches to cache management crack under pressure.

@@ -42,6 +42,15 @@ const config: Config = {
           // Remove this to remove the "edit this page" links.
           // editUrl: "",
         },
+        blog: {
+          // Used as the schema.org Blog name (isPartOf) and the blog index title.
+          blogTitle: "Skip Blog",
+          // Emit freshness signals: a populated `lastUpdatedAt` drives the
+          // BlogPosting `dateModified` (JSON-LD) and `article:modified_time`.
+          // Defaults to the file's last git commit time; override per post
+          // with a `last_update: { date: YYYY-MM-DD }` front matter field.
+          showLastUpdateTime: true,
+        },
         theme: {
           customCss: "./src/css/custom.css",
         },
@@ -50,9 +59,18 @@ const config: Config = {
   ],
 
   themeConfig: {
-    // Replace with your project's social card
+    // Default social card, used as a fallback when a page has no `image`.
+    // Blog posts override this with a per-post generated card (see the
+    // og-image-generator plugin) via their `image` front matter.
     image: "img/skip.png",
-    metadata: [{ name: "twitter:card", content: "summary" }],
+    metadata: [
+      // Large image previews on X/Twitter; LinkedIn uses og:image directly.
+      { name: "twitter:card", content: "summary_large_image" },
+      { property: "og:site_name", content: "SkipLabs" },
+      // Site-wide default. Blog posts override this with `og:type=article`
+      // (emitted later in the head by the blog theme, so it wins there).
+      { property: "og:type", content: "website" },
+    ],
     navbar: {
       title: "",
       logo: {
@@ -92,6 +110,9 @@ const config: Config = {
   } satisfies Preset.ThemeConfig,
 
   plugins: [
+    // Generates a per-post Open Graph card into build/img/og/<slug>.png.
+    // Posts reference it via their `image` front matter.
+    "./plugins/og-image-generator",
     [
       "docusaurus-plugin-typedoc",
       {

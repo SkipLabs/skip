@@ -4,6 +4,7 @@ description: Why use the Skip framework?
 slug: why-skip
 date: 2025-02-11T12:00:01Z
 authors: jverlaguet
+image: /img/og/why-skip.png
 ---
 
 **Skip After Meta**
