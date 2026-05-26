@@ -4,7 +4,7 @@ description: Closed-loop control requires a feedback signal trustworthy enough t
 slug: closed_loop_coding_agent
 date: 2026-05-18
 authors: hubyrod
-image: /img/skip.png
+image: /img/og/closed_loop_coding_agent.png
 ---
 
 Skipper is a closed-loop coding agent. That label carries more weight than it appears. The industry adopted "closed-loop" without retaining its original meaning, so many tools labeled that way don't truly qualify. Once you understand the distinction, you see what sets Skipper apart.

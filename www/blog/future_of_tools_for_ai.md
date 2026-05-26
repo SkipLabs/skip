@@ -4,7 +4,7 @@ description: We spent decades making languages readable. Agents don't care. Why 
 slug: future_of_tools_for_ai
 date: 2026-03-23
 authors: hubyrod
-image: /img/skip.png
+image: /img/og/future_of_tools_for_ai.png
 ---
 
 In my [last post](https://skiplabs.io/blog/codegen_as_compiler), I argued that we should treat agent output the way we treat compiler output: not something to be read and reviewed by humans, but something to be verified by process. The framing resonated with a lot of people, but it leaves a deeper question on the table.

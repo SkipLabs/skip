@@ -4,6 +4,7 @@ description: An in-depth conversation with a SkipLabs engineer about reactive pr
 slug: interview_lucas
 date: 2025-07-11
 authors: hubyrod
+image: /img/og/interview_lucas.png
 ---
 
 Ever wondered what it's like to work on cutting-edge reactive programming? This chat with a Lucas, a SkipLabs engineer, gives you the inside scoop on building tools that tackle gnarly data synchronization problems. We have created something called the Skip Framework, which runs on our own programming language, SkipLang, pretty cool stuff. What makes this interview particularly interesting is how it bounces between the nuts and bolts of performance testing (like figuring out why stream creation was too slow) and the bigger picture of where tech is headed. You'll get a feel for SkipLabs' laid-back engineering culture where people work independently but always have each other's backs, plus some thoughtful takes on everything from open source development to why we still edit code like it's 1995. Whether you're into the technical weeds of load testing or curious about how small teams tackle ambitious projects, there's something here for you.

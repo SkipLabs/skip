@@ -4,7 +4,7 @@ description: A follow-up to "Treat Agent Output Like Compiler Output" — addres
 slug: notes_from_the_comments
 date: 2026-05-05
 authors: hubyrod
-image: /img/skip.png
+image: /img/og/notes_from_the_comments.png
 ---
 
 *A follow-up to ["Treat Agent Output Like Compiler Output"](https://skiplabs.io/blog/codegen_as_compiler), published in March.*
