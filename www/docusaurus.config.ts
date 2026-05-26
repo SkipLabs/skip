@@ -110,6 +110,9 @@ const config: Config = {
   } satisfies Preset.ThemeConfig,
 
   plugins: [
+    // Generates a per-post Open Graph card into build/img/og/<slug>.png.
+    // Posts reference it via their `image` front matter.
+    "./plugins/og-image-generator",
     [
       "docusaurus-plugin-typedoc",
       {
