@@ -39,7 +39,7 @@ function withSameAs(author: Author): Author {
 
 export default function BlogPostStructuredData(): ReactNode {
   const { siteConfig } = useDocusaurusContext();
-  const data = useBlogPostStructuredData() as StructuredData;
+  const data = useBlogPostStructuredData() as unknown as StructuredData;
 
   const siteUrl = siteConfig.url.replace(/\/$/, "");
 

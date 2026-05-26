@@ -17,8 +17,11 @@ type Props = WrapperProps<typeof ContentType>;
  */
 export default function ContentWrapper(props: Props): ReactNode {
   const { frontMatter, isBlogPostPage } = useBlogPost();
-  const slug = frontMatter.slug as string | undefined;
-  const tldr = frontMatter.tldr as string | undefined;
+  // `tldr` is a custom front matter field (Docusaurus preserves unknown keys).
+  const { slug, tldr } = frontMatter as typeof frontMatter & {
+    slug?: string;
+    tldr?: string;
+  };
   const series = findSeriesForSlug(slug);
 
   return (
