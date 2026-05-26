@@ -42,6 +42,15 @@ const config: Config = {
           // Remove this to remove the "edit this page" links.
           // editUrl: "",
         },
+        blog: {
+          // Used as the schema.org Blog name (isPartOf) and the blog index title.
+          blogTitle: "Skip Blog",
+          // Emit freshness signals: a populated `lastUpdatedAt` drives the
+          // BlogPosting `dateModified` (JSON-LD) and `article:modified_time`.
+          // Defaults to the file's last git commit time; override per post
+          // with a `last_update: { date: YYYY-MM-DD }` front matter field.
+          showLastUpdateTime: true,
+        },
         theme: {
           customCss: "./src/css/custom.css",
         },
