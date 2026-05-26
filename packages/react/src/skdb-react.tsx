@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { createContext, useContext } from "react";
-import type { SKDB } from "skdb";
+import type { Params, SKDB } from "skdb";
 import { SKDBTable } from "skdb";
-import { Params } from "skdb/dist/skdb_types.js";
 
 export const SKDBContext = createContext<SKDB | undefined>(undefined);
 
