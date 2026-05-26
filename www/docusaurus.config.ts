@@ -50,9 +50,18 @@ const config: Config = {
   ],
 
   themeConfig: {
-    // Replace with your project's social card
+    // Default social card, used as a fallback when a page has no `image`.
+    // Blog posts override this with a per-post generated card (see the
+    // og-image-generator plugin) via their `image` front matter.
     image: "img/skip.png",
-    metadata: [{ name: "twitter:card", content: "summary" }],
+    metadata: [
+      // Large image previews on X/Twitter; LinkedIn uses og:image directly.
+      { name: "twitter:card", content: "summary_large_image" },
+      { property: "og:site_name", content: "SkipLabs" },
+      // Site-wide default. Blog posts override this with `og:type=article`
+      // (emitted later in the head by the blog theme, so it wins there).
+      { property: "og:type", content: "website" },
+    ],
     navbar: {
       title: "",
       logo: {
