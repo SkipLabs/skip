@@ -5,13 +5,17 @@ setup: true
 orbs:
   continuation: circleci/continuation@1.0.0
 
-jobs:
-  setup:
-    executor: continuation/default
-    resource_class: small
+commands:
+  custom-checkout:
+    description: "SSH-authenticated checkout"
+    parameters:
+      with_main:
+        type: boolean
+        default: false
+        description: "Also clone the main branch (needed for diffing against main)"
     steps:
       - run:
-          name: Checkout code (only main and branch)
+          name: Checkout code
           command: |
             if [ -z "$CIRCLE_BRANCH" ] || [ -n "$CIRCLE_TAG" ]; then echo "TODO: handle no-branch or tag-triggered CI"; exit 1; fi
             mkdir -p ~/.ssh
@@ -20,13 +24,26 @@ jobs:
             github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
             ' > ~/.ssh/known_hosts
             cat $CHECKOUT_KEY > ~/.ssh/id_rsa
-            git clone --single-branch --branch main "$CIRCLE_REPOSITORY_URL" .
-            if [[ "$CIRCLE_BRANCH" =~ ^pull\/* ]]; then
-              git fetch --force origin "$CIRCLE_BRANCH/head:remotes/origin/$CIRCLE_BRANCH"
+            if << parameters.with_main >> || [[ "$CIRCLE_BRANCH" =~ ^pull\/* ]]; then
+              # PR branches need a base clone to fetch the PR ref into; with_main also pulls main for diffing.
+              git clone --single-branch --branch main "$CIRCLE_REPOSITORY_URL" .
+              if [[ "$CIRCLE_BRANCH" =~ ^pull\/* ]]; then
+                git fetch --force origin "$CIRCLE_BRANCH/head:remotes/origin/$CIRCLE_BRANCH"
+              else
+                git fetch --force origin "$CIRCLE_BRANCH:remotes/origin/$CIRCLE_BRANCH"
+              fi
             else
-              git fetch --force origin "$CIRCLE_BRANCH:remotes/origin/$CIRCLE_BRANCH"
+              git clone --single-branch --branch "$CIRCLE_BRANCH" "$CIRCLE_REPOSITORY_URL" .
             fi
             git checkout "$CIRCLE_SHA1" -B "$CIRCLE_BRANCH"
+
+jobs:
+  setup:
+    executor: continuation/default
+    resource_class: small
+    steps:
+      - custom-checkout:
+          with_main: true
       - run:
           name: Generate config
           command: |
@@ -43,7 +60,7 @@ jobs:
       - image: skiplabs/skip:latest
     resource_class: small
     steps:
-      - checkout
+      - custom-checkout
       - run:
           name: Check code is formatted
           command: |
