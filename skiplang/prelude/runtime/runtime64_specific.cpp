@@ -501,7 +501,18 @@ int64_t SKIP_numThreads() {
 void SKIP_string_to_file(char* str, char* file) {
   sk_string_check_c_safe(file);
 
-  FILE* out = fopen(file, "w");
+  int fd = open(file, O_WRONLY | O_CREAT | O_TRUNC,
+                S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+  if (fd < 0) {
+    perror("open");
+    exit(EXIT_FAILURE);
+  }
+  FILE* out = fdopen(fd, "w");
+  if (out == NULL) {
+    close(fd);
+    perror("fdopen");
+    exit(EXIT_FAILURE);
+  }
   size_t size = SKIP_String_byteSize(str);
   while (size != 0) {
     size_t written = fwrite(str, 1, size, out);
