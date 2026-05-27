@@ -95,7 +95,7 @@ export function registerControlServiceRoutes(
           res.sendStatus(404);
         } else {
           console.error(e);
-          res.status(500).json(e instanceof Error ? e.message : e);
+          res.status(500).json("Internal server error");
         }
       });
   });
