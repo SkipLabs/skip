@@ -27,6 +27,8 @@ jobs:
           build-mode: manual
         - language: java-kotlin
           build-mode: manual
+        - language: actions
+          build-mode: none
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -63,6 +65,7 @@ jobs:
       with:
         languages: ${{ matrix.language }}
         build-mode: ${{ matrix.build-mode }}
+        queries: security-extended
 
     - name: Build C runtime (manual c-cpp)
       if: matrix.language == 'c-cpp'
