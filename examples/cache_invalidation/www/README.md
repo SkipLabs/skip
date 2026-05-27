@@ -17,10 +17,13 @@ Vue.js 3 frontend for the Reactive Blogger example application, demonstrating re
 pnpm install
 
 # Development server with hot reload
-pnpm run serve
+pnpm run dev
 
 # Build for production
 pnpm run build
+
+# Preview the production build
+pnpm run preview
 
 # Lint and fix files
 pnpm run lint
@@ -56,4 +59,4 @@ eventSource.onmessage = (event) => {
 
 The application is configured to work with the Docker Compose setup. For local development, ensure the Flask API is running on the expected port.
 
-See [Vue CLI Configuration Reference](https://cli.vuejs.org/config/) for build customization options.
+See the [Vite configuration reference](https://vite.dev/config/) for build customization options.
