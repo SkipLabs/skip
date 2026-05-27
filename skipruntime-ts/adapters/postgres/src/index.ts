@@ -67,8 +67,9 @@ export class PostgresExternalService implements ExternalService {
         ].forEach((sig) => process.on(sig, handler));
       },
       (e: unknown) => {
+        const safeDbConfig = { ...db_config, password: "[REDACTED]" };
         console.error(
-          `Error connecting to Postgres at ${JSON.stringify(db_config)}:`,
+          `Error connecting to Postgres at ${JSON.stringify(safeDbConfig)}:`,
         );
         console.error(e);
       },
