@@ -564,9 +564,6 @@ void sk_create_mapping(char* fileName, size_t icapacity) {
   ginfo->fileName = (fileName != NULL) ? persistent_fileName : NULL;
   ginfo->contexts = NULL;
   *gid = 1;
-  if (icapacity != DEFAULT_CAPACITY) {
-    printf("CAPACITY SET TO: %ld\n", icapacity);
-  }
   *capacity = icapacity;
   *pconsts = NULL;
 
