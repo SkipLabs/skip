@@ -52,4 +52,4 @@ You can also join our [Discord](https://discord.gg/bsnXyw2F9P) to ask any questi
 
 ## License
 
-SKDB is [MIT licensed](./LICENSE).
+Skip is [MIT licensed](./LICENSE).

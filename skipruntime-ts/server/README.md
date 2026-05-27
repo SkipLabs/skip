@@ -6,7 +6,7 @@ See the [docs](https://skiplabs.io/docs/api/server) for more details.
 
 ## Installation
 
-Install directly using npm (`npm i @skipruntime/helpers`), or along with other
+Install directly using npm (`npm i @skipruntime/server`), or along with other
 components of the runtime by installing the
 [`@skiplabs/skip`](https://www.npmjs.com/package/@skiplabs/skip) meta-package
 (`npm i @skiplabs/skip`)

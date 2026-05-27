@@ -12,7 +12,6 @@ The way to create a `DirName` is by using the primitive `DirName::create`.
 A directory name must start and finish with a slash; if it doesn't, an exception is thrown.
 The names are not used directly when manipulating directories, however, they come in handy when trying to debug the state that the system is in.
 One can navigate all the reactive values using familiar primitives (such as cd, ls etc ...).
-[comment]: <> (Can they? I've never seen that in the code and wasn't aware of any interactive shell-like thing)
 
 ## Input directories
 

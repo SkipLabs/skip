@@ -16,7 +16,7 @@ Skip is agnostic to your choice of reverse proxy, but it is important that it is
 
 You can build and run your reactive service using Docker Compose and the following `Dockerfile` to expose the necessary ports and initialize the service.
 ```
-FROM node:lts-alpine3.19
+FROM node:lts-alpine
 WORKDIR /app
 COPY package.json package.json
 RUN npm install
