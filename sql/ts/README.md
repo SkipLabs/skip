@@ -3,6 +3,5 @@
 Relative to `/path/to/skdb_repo/sql/ts/` (i.e. the directory with this README
 in):
 
-TO REWRITE
-
-1. Run the CLI: `cd ../../build/packages/skdb && npm run cli -- <args>`
+1. Build: `npm run build`
+2. Run the CLI: `npm run cli -- <args>`
