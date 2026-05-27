@@ -34,6 +34,6 @@ for arch in ${ARCH//,/ }; do
     echo "Testing linux/$arch..."
     TEMP_FILE=$(mktemp)
     docker build --platform="linux/$arch" --iidfile "$TEMP_FILE" .
-    docker run --rm "$(cat "$TEMP_FILE")"
+    docker run --rm -e SKIP_CAPACITY "$(cat "$TEMP_FILE")"
     rm "$TEMP_FILE"
 done
