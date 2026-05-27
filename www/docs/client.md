@@ -64,7 +64,7 @@ useEffect(() => {
   stream.addEventListener("update", (e: MessageEvent<string>) => {
     const updates = JSON.parse(e.data);
     const updatedFoo = ...; // update "foo" using `updates`
-    setFoo(updatedfoo);
+    setFoo(updatedFoo);
   });
   return () => {
     stream.close();
