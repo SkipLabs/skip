@@ -35,9 +35,10 @@ const post = (response, file, errorFile, contentType) => {
 const port = 5154;
 
 const distPath = "./dist";
+const distRoot = path.resolve(distPath);
 
 const requestHandler = (request, response) => {
-  const error = path.join(distPath, "404.html");
+  const error = path.join(distRoot, "404.html");
   if (request.url == "/api/succeed") {
     let message = chalk.green("[OK]") + " Bundled SKDB successfully started.";
     response.setHeader("Content-Type", "text/plain");
@@ -60,12 +61,20 @@ const requestHandler = (request, response) => {
     // @ts-ignore
     process.exit();
   } else {
-    let page;
-    if (request.url?.endsWith("/")) {
-      page = path.join(distPath + request.url, "index.html");
-    } else {
-      page = distPath + request.url;
+    const rawPath = request.url ? request.url.split("?")[0] : "/";
+    const decodedPath = decodeURIComponent(rawPath);
+    let page = path.resolve(distRoot, "." + decodedPath);
+    if (decodedPath.endsWith("/")) {
+      page = path.join(page, "index.html");
     }
+
+    const rel = path.relative(distRoot, page);
+    if (rel.startsWith("..") || path.isAbsolute(rel)) {
+      response.writeHead(403);
+      response.end("Forbidden\n\n");
+      return;
+    }
+
     post(response, page, error, mime.lookup(page));
   }
 };
