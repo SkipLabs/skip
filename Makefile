@@ -25,6 +25,17 @@ skdb: npm build/skdb build/init.sql
 npm: $(SKDB_WASM) build/package/skdb build/package/package.json
 	cd build/package && npm install
 
+# Assemble the publishable skdb layout from sql/ts.  Mirrors what
+# `npm publish` from sql/ts/ would ship (dist/, package.json, README).
+# Consumed by `make check-vite` and `make test-bun` which cp it into a
+# scaffolded node_modules to smoke-test consumer installs.
+build/package/skdb: $(SKDB_WASM)
+	cd sql/ts && npm run build
+	rm -rf $@
+	mkdir -p $@
+	cp -r sql/ts/dist sql/ts/package.json $@/
+	[ -f sql/ts/README.md ] && cp sql/ts/README.md $@/ || true
+
 build/package/package.json:
 	@echo "{" > build/package/package.json
 	@echo "  \"dependencies\": {" >> build/package/package.json
@@ -355,23 +366,23 @@ publish-all: clean \
 	publish-kafka-adapter \
 	publish-metapackage
 
-# skdb packages use bespoke release scripts (not bin/release_npm.sh) with
-# different semantics: they ERROR if the version hasn't been bumped (vs.
-# release_npm.sh's silent skip-if-already-published), prompt interactively
-# for OTP, and skdb-{dev,react} validate that their published skdb dep
-# matches the latest published skdb. Run in order; skdb must publish first.
+# skdb / skdb-dev / skdb-react all use release_npm.sh with STRICT_BUMP
+# (error if the package.json version hasn't been bumped past what's on the
+# registry).  skdb-{dev,react} additionally use VALIDATE_PUBLISHED_DEP=skdb
+# to error if their skdb dep doesn't pin the currently-published skdb
+# version.  Run in order; skdb must publish first.
 
 .PHONY: publish-skdb
 publish-skdb:
-	bin/release_npm_skdb.sh
+	STRICT_BUMP=1 bin/release_npm.sh skdb sql/ts/package.json $(OTP)
 
 .PHONY: publish-skdb-dev
 publish-skdb-dev: publish-skdb
-	bin/release_npm_skdb_dev.sh
+	STRICT_BUMP=1 VALIDATE_PUBLISHED_DEP=skdb bin/release_npm.sh skdb-dev packages/dev/package.json $(OTP)
 
 .PHONY: publish-skdb-react
 publish-skdb-react: publish-skdb
-	bin/release_npm_skdb_react.sh
+	STRICT_BUMP=1 VALIDATE_PUBLISHED_DEP=skdb bin/release_npm.sh skdb-react packages/react/package.json $(OTP)
 
 .PHONY: publish-all-skdb
 publish-all-skdb: publish-skdb publish-skdb-dev publish-skdb-react

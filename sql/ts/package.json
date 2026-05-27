@@ -2,6 +2,9 @@
   "name": "skdb",
   "version": "1.0.2",
   "type": "module",
+  "files": [
+    "dist"
+  ],
   "exports": {
     ".": {
       "node": "./dist/src/node.js",
@@ -11,6 +14,7 @@
   },
   "scripts": {
     "build": "npm run typecheck && skargo build -r --target wasm32-unknown-unknown --lib --manifest-path=../Skargo.toml --out-dir=./dist/src/",
+    "prepack": "rm -f dist/tsconfig.tsbuildinfo",
     "typecheck": "node ../../prebuild.mjs skiplang-std skiplang-json skipwasm-std skipwasm-json skipwasm-date skipwasm-worker && tsc",
     "clean": "rm -rf dist tsconfig.tsbuildinfo skiplang-std skiplang-json skipwasm-std skipwasm-json skipwasm-date skipwasm-worker",
     "lint": "eslint",
