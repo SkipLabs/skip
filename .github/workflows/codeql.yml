@@ -21,18 +21,12 @@ jobs:
         include:
         - language: javascript-typescript
           build-mode: none
-          paths-ignore: |
-            sql/**
         - language: python
           build-mode: none
-          paths-ignore: |
-            sql/**
         - language: c-cpp
           build-mode: manual
-          paths-ignore: ''
         - language: java-kotlin
           build-mode: manual
-          paths-ignore: ''
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -86,4 +80,3 @@ jobs:
       uses: github/codeql-action/analyze@v3
       with:
         category: "/language:${{matrix.language}}"
-        paths-ignore: ${{ matrix.paths-ignore }}
