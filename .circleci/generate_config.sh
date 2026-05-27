@@ -60,12 +60,6 @@ WORKFLOWS=$(mktemp)
 trap 'rm -f "$WORKFLOWS"' EXIT
 
 {
-    cat <<EOF
-  fast-checks:
-    jobs:
-      - fast-checks
-EOF
-
 if $check_ts
 then
     cat <<EOF

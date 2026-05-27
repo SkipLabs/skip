@@ -38,7 +38,23 @@ jobs:
       - continuation/continue:
           configuration_path: generated_config.yml
 
+  fast-checks:
+    docker:
+      - image: skiplabs/skip:latest
+    resource_class: small
+    steps:
+      - checkout
+      - run:
+          name: Check code is formatted
+          command: |
+            make check-fmt
+      - run:
+          name: Check shell scripts
+          command: |
+            make check-sh
+
 workflows:
   setup:
     jobs:
       - setup
+      - fast-checks
