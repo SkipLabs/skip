@@ -1,6 +1,6 @@
 // TODO: Remove once global `EventSource` makes it out of experimental
 // in nodejs LTS.
-import EventSource from "eventsource";
+import { EventSource } from "eventsource";
 
 import type {
   Context,
@@ -88,7 +88,7 @@ export class SkipExternalService implements ExternalService {
         const updates = JSON.parse(e.data) as Entry<Json, Json>[];
         callbacks.update(updates, false).catch(console.error);
       });
-      evSource.addEventListener("error", (e) => {
+      evSource.addEventListener("error", (e: MessageEvent<unknown>) => {
         if (this.resources.has(instance)) callbacks.error(e.data);
         else reject(e.data as Error);
       });
