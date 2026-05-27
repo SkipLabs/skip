@@ -483,6 +483,11 @@ export interface Resource<
   ): EagerCollection<Json, Json>;
 }
 
+export interface Store<K extends Json, V extends Json> {
+  load(): Promise<Entry<K, V>[]>;
+  save(data: Entry<K, V>[]): Promise<void>;
+}
+
 /**
  * Initial data for a service's input collections.
  *
@@ -492,8 +497,8 @@ export interface Resource<
  */
 export type InitialData<Inputs extends NamedCollections> = {
   [Name in keyof Inputs]: Inputs[Name] extends EagerCollection<infer K, infer V>
-    ? Entry<K, V>[]
-    : Entry<Json, Json>[];
+    ? Entry<K, V>[] | Store<K, V>
+    : Entry<Json, Json>[] | Store<Json, Json>;
 };
 
 /**

@@ -2303,11 +2303,18 @@ class ConcurrentFork() extends .Exception {
   }
 }
 
-fun mergeForkNoGc(
+class MergeState(
+  settings: ForkSettings,
+  start: Tick,
+  contexts: ContextsWithActions,
+  fork: ?String,
+)
+
+fun startMergeForkNoGc(
   name: String,
   settings: ForkSettings = ForkSettings::keepall(),
   synchronizer: ?ForkSynchronizer = None(),
-): void {
+): MergeState {
   SKStore.gGlobalLock();
   contexts = SKStore.gContextsGetNoLock();
   if (!contexts.has(Some(name))) {
@@ -2340,16 +2347,36 @@ fun mergeForkNoGc(
     new = contexts.check(fork.fork, new_context.clone(), fork.postponables);
     !new.contexts = new.contexts.remove(name);
     SKStore.gUnsafeFree(contexts);
-    sync = UInt32::truncate(if (settings.isSync) 1 else 0);
-    SKStore.gContextsReplaceNoLock(new.contexts, sync);
-    SKStore.gGlobalUnlock();
-    new.contexts.get(fork.fork).notifyAll(start, settings.ignoredSessions);
-    new.actions.each(fn -> fn())
+    MergeState(settings, start, new, fork.fork)
   | Failure(ex) ->
     SKStore.gUnsafeFree(contexts);
     SKStore.gGlobalUnlock();
     throw ex
   }
+}
+
+fun endMergeForkNoGc(state: MergeState): void {
+  new = state.contexts;
+  sync = UInt32::truncate(if (state.settings.isSync) 1 else 0);
+  SKStore.gContextsReplaceNoLock(new.contexts, sync);
+  SKStore.gGlobalUnlock();
+  new.contexts
+    .get(state.fork)
+    .notifyAll(state.start, state.settings.ignoredSessions);
+  new.actions.each(fn -> fn())
+}
+
+fun abortMergeForkNoGc(_state: MergeState): void {
+  // The unused parameter is here the be call in merge context
+  SKStore.gGlobalUnlock();
+}
+
+fun mergeForkNoGc(
+  name: String,
+  settings: ForkSettings = ForkSettings::keepall(),
+  synchronizer: ?ForkSynchronizer = None(),
+): void {
+  endMergeForkNoGc(startMergeForkNoGc(name, settings, synchronizer))
 }
 
 fun removeForkNoGc(name: String, isSync: Bool = false): void {
