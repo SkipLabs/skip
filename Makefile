@@ -390,3 +390,11 @@ publish-skdb-react: publish-skdb
 
 .PHONY: publish-all-skdb
 publish-all-skdb: publish-skdb publish-skdb-dev publish-skdb-react
+
+
+.PHONY: pack-skipper-skipruntime
+pack-skipper-skipruntime:
+	npm run clean-alt
+	npm run build-alt
+	$(MAKE) -C skipruntime-ts/skipper pack
+	npm run clean-alt

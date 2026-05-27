@@ -7,9 +7,11 @@
     ".": "./dist/index.js"
   },
   "scripts": {
+    "build-alt": "cp -r src ../skipper/native && rm ../skipper/native/src/index.ts && tsc --outDir ../skipper/native/src && cp binding.gyp ../skipper/native",
+    "clean-alt": "rm -rf ../skipper/native/tsconfig.tsbuildinfo ../skipper/native/src ../skipper/native/binding.gyp",
     "build": "tsc",
     "install": "VERSION=$(./calculate_version.sh) node-gyp rebuild",
-    "clean": "rm -rf dist tsconfig.tsbuildinfo && node-gyp clean",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo && node-gyp clean && npm run clean-alt",
     "lint": "eslint"
   },
   "dependencies": {
