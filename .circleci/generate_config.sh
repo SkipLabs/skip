@@ -56,8 +56,10 @@ fi
 
 cat .circleci/base.yml
 
-echo "workflows:"
+WORKFLOWS=$(mktemp)
+trap 'rm -f "$WORKFLOWS"' EXIT
 
+{
     cat <<EOF
   fast-checks:
     jobs:
@@ -136,4 +138,10 @@ then
     jobs:
       - check-examples
 EOF
+fi
+} > "$WORKFLOWS"
+
+if [ -s "$WORKFLOWS" ]; then
+  echo "workflows:"
+  cat "$WORKFLOWS"
 fi
