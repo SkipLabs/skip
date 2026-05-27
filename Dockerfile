@@ -11,6 +11,12 @@ RUN --mount=type=bind,source=./bin/apt-install.sh,target=/tmp/apt-install.sh \
 ENV CC=clang
 ENV CXX=clang++
 
+# Override at build time with --build-arg SKIP_CAPACITY=<value> to fit the
+# build host's memory budget. Empty (the default) preserves the runtime's
+# own 16 GB default for local dev builds.
+ARG SKIP_CAPACITY=
+ENV SKIP_CAPACITY=$SKIP_CAPACITY
+
 FROM skiplang-base AS bootstrap
 
 ARG STAGE=0

@@ -22,6 +22,10 @@
 # Environment variables:
 #   STAGE              Compiler bootstrap stage (default: 0). Passed as STAGE
 #                      build arg to the root Dockerfile (skiplang/skip targets).
+#   SKIP_CAPACITY      If set, forwarded as SKIP_CAPACITY build arg to targets
+#                      that invoke the Skip toolchain at build time, capping
+#                      the runtime's mmap reservation. Required on hosts that
+#                      enforce virtual memory limits (e.g. gen2 CI builders).
 #   DOCKER_DEFAULT_ARCH  Default platform(s) when --arch is not given.
 #                        Supports same shorthands as --arch.
 #
@@ -196,6 +200,18 @@ fi
 # Pass STAGE build arg to targets using the root Dockerfile
 if [[ -n "${STAGE:-}" ]]; then
     BAKE_ARGS+=(--set "skiplang.args.STAGE=$STAGE" --set "skip.args.STAGE=$STAGE")
+fi
+
+# Forward SKIP_CAPACITY to targets that invoke the Skip toolchain at build
+# time. Required on memory-constrained hosts (e.g. gen2 CircleCI builders)
+# where the runtime's 16 GB default mmap would fail.
+if [[ -n "${SKIP_CAPACITY:-}" ]]; then
+    BAKE_ARGS+=(
+        --set "skiplang.args.SKIP_CAPACITY=$SKIP_CAPACITY"
+        --set "skip.args.SKIP_CAPACITY=$SKIP_CAPACITY"
+        --set "skiplang-bin-builder.args.SKIP_CAPACITY=$SKIP_CAPACITY"
+        --set "skipruntime.args.SKIP_CAPACITY=$SKIP_CAPACITY"
+    )
 fi
 
 # Determine which bake targets to build

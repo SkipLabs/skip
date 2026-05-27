@@ -33,6 +33,12 @@ RUN --mount=type=cache,id=apt-cache-$TARGETARCH,target=/var/cache/apt,sharing=lo
 ENV CC=clang
 ENV CXX=clang++
 
+# Override at build time with --build-arg SKIP_CAPACITY=<value> to fit the
+# build host's memory budget. Empty (the default) preserves the runtime's
+# own 16 GB default for local dev builds.
+ARG SKIP_CAPACITY=
+ENV SKIP_CAPACITY=$SKIP_CAPACITY
+
 FROM base AS skiplang
 
 COPY ./skiplang /work/skiplang
