@@ -277,13 +277,19 @@ class Skdb(val name: String, private val dbPath: String) {
       table: String,
       callback: () -> Unit,
   ) {
-    val notifyFile = File.createTempFile("notify", table)
-    // TODO: notifyFile.deleteOnExit() -- need to unsubscribe first
+    val notifyFile = Files.createTempFile("notify", table)
+    // TODO: Files.delete(notifyFile) on shutdown -- need to unsubscribe first
 
     val connection =
         blockingRun(
             ProcessBuilder(
-                ENV.skdbPath, "subscribe", table, "--data", dbPath, "--notify", notifyFile.path))
+                ENV.skdbPath,
+                "subscribe",
+                table,
+                "--data",
+                dbPath,
+                "--notify",
+                notifyFile.toString()))
 
     if (!connection.exitSuccessfully()) {
       throw RuntimeException("Notify failed")
@@ -294,7 +300,7 @@ class Skdb(val name: String, private val dbPath: String) {
     val t =
         Thread({
           while (true) {
-            val now = Files.readString(notifyFile.toPath())
+            val now = Files.readString(notifyFile)
             if (now != tick) {
               tick = now
               callback()
