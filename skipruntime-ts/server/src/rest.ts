@@ -25,7 +25,7 @@ export function registerControlServiceRoutes(
       })
       .catch((e: unknown) => {
         console.log(e);
-        res.status(500).json(e instanceof Error ? e.message : e);
+        res.status(500).json({ error: "Internal server error" });
       });
   });
 
@@ -35,7 +35,7 @@ export function registerControlServiceRoutes(
       res.sendStatus(200);
     } catch (e: unknown) {
       console.log(e);
-      res.status(500).json(e instanceof Error ? e.message : e);
+      res.status(500).json({ error: "Internal server error" });
     }
   });
 
@@ -48,11 +48,12 @@ export function registerControlServiceRoutes(
           res.status(200).json(data);
         })
         .catch((err: unknown) => {
-          res.status(500).json(err instanceof Error ? err.message : err);
+          console.log(err);
+          res.status(500).json({ error: "Internal server error" });
         });
     } catch (e: unknown) {
       console.log(e);
-      res.status(500).json(e instanceof Error ? e.message : e);
+      res.status(500).json({ error: "Internal server error" });
     }
   });
 
@@ -72,11 +73,12 @@ export function registerControlServiceRoutes(
           res.status(200).json(data);
         })
         .catch((err: unknown) => {
-          res.status(500).json(err instanceof Error ? err.message : err);
+          console.log(err);
+          res.status(500).json({ error: "Internal server error" });
         });
     } catch (e: unknown) {
       console.log(e);
-      res.status(500).json(e instanceof Error ? e.message : e);
+      res.status(500).json({ error: "Internal server error" });
     }
   });
 
@@ -95,7 +97,7 @@ export function registerControlServiceRoutes(
           res.sendStatus(404);
         } else {
           console.error(e);
-          res.status(500).json("Internal server error");
+          res.status(500).json({ error: "Internal server error" });
         }
       });
   });
