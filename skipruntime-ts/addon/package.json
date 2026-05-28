@@ -7,7 +7,7 @@
     ".": "./dist/index.js"
   },
   "scripts": {
-    "build-alt": "cp -r src ../skipper/native && rm ../skipper/native/src/index.ts && tsc --outDir ../skipper/native/src && cp binding.gyp ../skipper/native",
+    "build-alt": "cp -r src ../skipper/native && rm ../skipper/native/src/index.ts && tsc --outDir ../skipper/native/src && sed \"s|-lskipruntime<!(echo \\$VERSION)|-lskipruntime-skipper-$(node -p 'require(\"../skipper/native/package.json\").version')|\" binding.gyp > ../skipper/native/binding.gyp",
     "clean-alt": "rm -rf ../skipper/native/tsconfig.tsbuildinfo ../skipper/native/src ../skipper/native/binding.gyp",
     "build": "tsc",
     "install": "VERSION=$(./calculate_version.sh) node-gyp rebuild",
