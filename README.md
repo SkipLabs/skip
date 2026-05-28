@@ -13,13 +13,25 @@
   </p>
 </div>
 
+This repository contains the Skip Framework for building reactive backend services, the Skiplang toolchain that powers its native runtime, and SKDB, a reactive SQL database built on Skip.
+
+## Contents
+
+- [Skip Framework](#skip-framework)
+- [Skiplang toolchain](#skiplang-toolchain)
+- [SKDB](#skdb)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Skip Framework
+
 Skip is an open-source framework for building _reactive_ backend services.
 
 It is based on a custom-built native backend for efficient reactive computation, allowing your system to deliver up-to-date and correct results without requiring any bug-prone manual dependency tracking and updating.
 
 TypeScript interfaces and abstractions are provided so that you can write a reactive service using standard tools while also taking advantage of the Skip framework's abstractions for efficient reactivity.
 
-## Installation
+### Installation
 
 To get started, install the skip NPM package:
 
@@ -34,14 +46,22 @@ The native runtime does not have this limitation, but it is currently only avail
 From there, you're ready to start building a reactive service!
 See the [getting started guide](https://skiplabs.io/docs/getting_started) to walk through some of Skip's core concepts by example and get up to speed.
 
-## Documentation
+### Documentation
 
 See our documentation [here](https://skiplabs.io/docs) for introductions to the core concepts, components, and features of the Skip framework, or dive into the [API docs](https://skiplabs.io/docs/api/core) for comprehensive explanations of our TypeScript interfaces and abstractions.
 
-## Examples
+### Examples
 
 Some small examples of reactive services are [available](./skipruntime-ts/examples), demonstrating patterns of reactive programming.
 Another [example](./examples/hackernews) is designed to serve as an example of how to deploy and configure a reactive service, using Docker compose to package and orchestrate a backend complete with a reactive service, database, backend web service, and reverse proxy.
+
+## Skiplang toolchain
+
+The Skip Framework's native runtime is implemented in Skiplang. The compiler, runtime, and surrounding tools (`skargo`, `sktest`, …) live under [`skiplang/`](./skiplang). See [INSTALL.md](./INSTALL.md) for instructions on building the toolchain from source.
+
+## SKDB
+
+SKDB is a reactive SQL database, part of the Skip ecosystem. The TypeScript client is published as the [`skdb`](https://www.npmjs.com/package/skdb) NPM package; sources for the client, server, and runtime live under [`sql/`](./sql).
 
 ## Contributing
 
