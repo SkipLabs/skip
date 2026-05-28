@@ -20,7 +20,6 @@ This repository contains the Skip Framework for building reactive backend servic
 - [Skip Framework](#skip-framework)
 - [Skiplang toolchain](#skiplang-toolchain)
 - [SKDB](#skdb)
-- [Examples](#examples)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -51,6 +50,11 @@ See the [getting started guide](https://skiplabs.io/docs/getting_started) to wal
 
 See our documentation [here](https://skiplabs.io/docs) for introductions to the core concepts, components, and features of the Skip framework, or dive into the [API docs](https://skiplabs.io/docs/api/core) for comprehensive explanations of our TypeScript interfaces and abstractions.
 
+### Examples
+
+Some small examples of reactive services are [available](./skipruntime-ts/examples), demonstrating patterns of reactive programming.
+Another [example](./examples/hackernews) is designed to serve as an example of how to deploy and configure a reactive service, using Docker compose to package and orchestrate a backend complete with a reactive service, database, backend web service, and reverse proxy.
+
 ## Skiplang toolchain
 
 The Skip Framework's native runtime is implemented in Skiplang. The compiler, runtime, and surrounding tools (`skargo`, `sktest`, …) live under [`skiplang/`](./skiplang). See [INSTALL.md](./INSTALL.md) for instructions on building the toolchain from source.
@@ -58,11 +62,6 @@ The Skip Framework's native runtime is implemented in Skiplang. The compiler, ru
 ## SKDB
 
 SKDB is a reactive SQL database, part of the Skip ecosystem. The TypeScript client is published as the [`skdb`](https://www.npmjs.com/package/skdb) NPM package; sources for the client, server, and runtime live under [`sql/`](./sql).
-
-## Examples
-
-Some small examples of reactive services are [available](./skipruntime-ts/examples), demonstrating patterns of reactive programming.
-Another [example](./examples/hackernews) is designed to serve as an example of how to deploy and configure a reactive service, using Docker compose to package and orchestrate a backend complete with a reactive service, database, backend web service, and reverse proxy.
 
 ## Contributing
 
