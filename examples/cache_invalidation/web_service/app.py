@@ -22,6 +22,13 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+def _safe_log(value):
+    """Strip CR/LF from user-controlled values to prevent log forgery."""
+    if value is None:
+        return None
+    return str(value).replace("\r", "").replace("\n", "")
+
+
 def get_db():
     conn = psycopg2.connect(
         host="invalidation_db",
@@ -76,7 +83,9 @@ def token_required(f):
             auth_header = request.headers["Authorization"]
             if auth_header.startswith("Bearer "):
                 token = auth_header.split(" ")[1]
-                logger.info(f"Token found in request: {token[:10]}...")
+                logger.info(
+                    f"Token found in request: {_safe_log(token[:10])}..."
+                )
 
         if not token:
             logger.warning("No token found in request")
@@ -106,7 +115,7 @@ def token_required(f):
 def login():
     data = request.json
     username = data.get("username")
-    logger.info(f"Login attempt for user: {username}")
+    logger.info(f"Login attempt for user: {_safe_log(username)}")
 
     with get_db() as db:
         with db.cursor() as cur:
@@ -115,7 +124,9 @@ def login():
                 (username, data.get("password")),
             )
             if cur.rowcount < 1:
-                logger.warning(f"Invalid credentials for user: {username}")
+                logger.warning(
+                    f"Invalid credentials for user: {_safe_log(username)}"
+                )
                 return jsonify({"message": "Invalid credentials"}), 401
             user = cur.fetchone()
             logger.info(f"User authenticated: {user[1]}")
