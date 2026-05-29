@@ -11,199 +11,179 @@ using skbinding::CallJSNullableStringFunction;
 using skbinding::CallJSNumberFunction;
 using skbinding::CallJSStringFunction;
 using skbinding::CallJSVoidFunction;
-using skbinding::FromUtf8;
 
-using v8::External;
-using v8::HandleScope;
-using v8::Isolate;
-using v8::Local;
-using v8::MaybeLocal;
-using v8::Number;
-using v8::Object;
-using v8::Persistent;
-using v8::Value;
+/* Persistent reference to the JS object holding all the user's
+   callbacks Skip can invoke from native code. Initialized once at startup
+   via SetFromJSBinding, then used for each Skip -> JS call. */
 
-static Persistent<Object> kExternFunctions;
+static Napi::ObjectReference kExternFunctions;
 
-void SetFromJSBinding(Isolate* isolate, Local<Object> externFunctions) {
-  kExternFunctions.Reset(isolate, externFunctions);
+void SetFromJSBinding(Napi::Env /*env*/, Napi::Object externFunctions) {
+  kExternFunctions = Napi::Persistent(externFunctions);
 }
 
 extern "C" {
 
+/* Error / context plumbing. */
+
 double SkipRuntime_getErrorHdl(SKException exn) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[1] = {External::New(isolate, exn)};
-  double handle = CallJSNumberFunction(isolate, externFunctions,
-                                       "SkipRuntime_getErrorHdl", 1, argv);
-  return handle;
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {Napi::External<void>::New(env, exn)};
+  return CallJSNumberFunction(env, externFunctions, "SkipRuntime_getErrorHdl",
+                              args);
 }
 
 void SkipRuntime_pushContext(SKContext context) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[1] = {External::New(isolate, context)};
-  CallJSVoidFunction(isolate, externFunctions, "SkipRuntime_pushContext", 1,
-                     argv);
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {Napi::External<void>::New(env, context)};
+  CallJSVoidFunction(env, externFunctions, "SkipRuntime_pushContext", args);
 }
 
 void SkipRuntime_popContext() {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  CallJSVoidFunction(isolate, externFunctions, "SkipRuntime_popContext", 0,
-                     nullptr);
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  CallJSVoidFunction(env, externFunctions, "SkipRuntime_popContext", {});
 }
 
 void* SkipRuntime_getContext() {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  return CallJSNullableFunction(isolate, externFunctions,
-                                "SkipRuntime_getContext", 0, nullptr);
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  return CallJSNullableFunction(env, externFunctions, "SkipRuntime_getContext",
+                                {});
 }
 
 void* SkipRuntime_getFork() {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  return CallJSNullableStringFunction(isolate, externFunctions,
-                                      "SkipRuntime_getFork", 0, nullptr);
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  return CallJSNullableStringFunction(env, externFunctions,
+                                      "SkipRuntime_getFork", {});
 }
 
 u_int32_t SkipRuntime_getChangeManager() {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  return (uint32_t)CallJSNumberFunction(
-      isolate, externFunctions, "SkipRuntime_getChangeManager", 0, nullptr);
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  return (uint32_t)CallJSNumberFunction(env, externFunctions,
+                                        "SkipRuntime_getChangeManager", {});
 }
+
+/* Mapper callbacks. */
 
 CJArray SkipRuntime_Mapper__mapEntry(uint32_t mapperId, CJSON key,
                                      SKNonEmptyIterator values) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[3] = {
-      Number::New(isolate, mapperId),
-      External::New(isolate, key),
-      External::New(isolate, values),
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {
+      Napi::Number::New(env, mapperId),
+      Napi::External<void>::New(env, key),
+      Napi::External<void>::New(env, values),
   };
-  return CallJSFunction(isolate, externFunctions,
-                        "SkipRuntime_Mapper__mapEntry", 3, argv);
+  return CallJSFunction(env, externFunctions, "SkipRuntime_Mapper__mapEntry",
+                        args);
 }
 
 CJObject SkipRuntime_Mapper__getInfo(uint32_t mapperId) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[1] = {
-      Number::New(isolate, mapperId),
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {
+      Napi::Number::New(env, mapperId),
   };
-  return CallJSFunction(isolate, externFunctions, "SkipRuntime_Mapper__getInfo",
-                        1, argv);
+  return CallJSFunction(env, externFunctions, "SkipRuntime_Mapper__getInfo",
+                        args);
 }
 
 uint32_t SkipRuntime_Mapper__isEquals(uint32_t mapperId, uint32_t otherId) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[2] = {
-      Number::New(isolate, mapperId),
-      Number::New(isolate, otherId),
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {
+      Napi::Number::New(env, mapperId),
+      Napi::Number::New(env, otherId),
   };
-  return (uint32_t)CallJSNumberFunction(
-      isolate, externFunctions, "SkipRuntime_Mapper__isEquals", 2, argv);
+  return (uint32_t)CallJSNumberFunction(env, externFunctions,
+                                        "SkipRuntime_Mapper__isEquals", args);
 }
 
 void SkipRuntime_deleteMapper(uint32_t mapperId) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[1] = {Number::New(isolate, mapperId)};
-  CallJSVoidFunction(isolate, externFunctions, "SkipRuntime_deleteMapper", 1,
-                     argv);
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {Napi::Number::New(env, mapperId)};
+  CallJSVoidFunction(env, externFunctions, "SkipRuntime_deleteMapper", args);
 }
+
+/* LazyCompute callbacks. */
 
 CJSON SkipRuntime_LazyCompute__compute(uint32_t lazyComputeId, char* self,
                                        CJSON key) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[3] = {
-      Number::New(isolate, lazyComputeId),
-      FromUtf8(isolate, self),
-      External::New(isolate, key),
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {
+      Napi::Number::New(env, lazyComputeId),
+      Napi::String::New(env, self),
+      Napi::External<void>::New(env, key),
   };
-  return CallJSFunction(isolate, externFunctions,
-                        "SkipRuntime_LazyCompute__compute", 3, argv);
+  return CallJSFunction(env, externFunctions,
+                        "SkipRuntime_LazyCompute__compute", args);
 }
 
 CJObject SkipRuntime_LazyCompute__getInfo(uint32_t mapperId) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[1] = {
-      Number::New(isolate, mapperId),
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {
+      Napi::Number::New(env, mapperId),
   };
-  return CallJSFunction(isolate, externFunctions,
-                        "SkipRuntime_LazyCompute__getInfo", 1, argv);
+  return CallJSFunction(env, externFunctions,
+                        "SkipRuntime_LazyCompute__getInfo", args);
 }
 
 uint32_t SkipRuntime_LazyCompute__isEquals(uint32_t mapperId,
                                            uint32_t otherId) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[2] = {
-      Number::New(isolate, mapperId),
-      Number::New(isolate, otherId),
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {
+      Napi::Number::New(env, mapperId),
+      Napi::Number::New(env, otherId),
   };
   return (uint32_t)CallJSNumberFunction(
-      isolate, externFunctions, "SkipRuntime_LazyCompute__isEquals", 2, argv);
+      env, externFunctions, "SkipRuntime_LazyCompute__isEquals", args);
 }
 
 void SkipRuntime_deleteLazyCompute(uint32_t lazyComputeId) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[1] = {Number::New(isolate, lazyComputeId)};
-  CallJSVoidFunction(isolate, externFunctions, "SkipRuntime_deleteLazyCompute",
-                     1, argv);
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {Napi::Number::New(env, lazyComputeId)};
+  CallJSVoidFunction(env, externFunctions, "SkipRuntime_deleteLazyCompute",
+                     args);
 }
+
+/* Resource callbacks. */
 
 char* SkipRuntime_Resource__instantiate(uint32_t resourceId,
                                         CJObject collections) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[2] = {
-      Number::New(isolate, resourceId),
-      External::New(isolate, collections),
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {
+      Napi::Number::New(env, resourceId),
+      Napi::External<void>::New(env, collections),
   };
-  return CallJSStringFunction(isolate, externFunctions,
-                              "SkipRuntime_Resource__instantiate", 2, argv);
+  return CallJSStringFunction(env, externFunctions,
+                              "SkipRuntime_Resource__instantiate", args);
 }
 
 void SkipRuntime_deleteResource(uint32_t resourceId) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[1] = {Number::New(isolate, resourceId)};
-  CallJSVoidFunction(isolate, externFunctions, "SkipRuntime_deleteResource", 1,
-                     argv);
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {Napi::Number::New(env, resourceId)};
+  CallJSVoidFunction(env, externFunctions, "SkipRuntime_deleteResource", args);
 }
 
+/* Service definition callbacks. */
+
 void SkipRuntime_deleteService(uint32_t serviceId) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[1] = {Number::New(isolate, serviceId)};
-  CallJSVoidFunction(isolate, externFunctions, "SkipRuntime_deleteService", 1,
-                     argv);
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {Napi::Number::New(env, serviceId)};
+  CallJSVoidFunction(env, externFunctions, "SkipRuntime_deleteService", args);
 }
 
 double SkipRuntime_ServiceDefinition__subscribe(uint32_t serviceId,
@@ -211,254 +191,249 @@ double SkipRuntime_ServiceDefinition__subscribe(uint32_t serviceId,
                                                 char* supplier, char* sessionId,
                                                 char* resource,
                                                 CJObject params) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[6] = {
-      Number::New(isolate, serviceId), FromUtf8(isolate, collection),
-      FromUtf8(isolate, supplier),     FromUtf8(isolate, sessionId),
-      FromUtf8(isolate, resource),     External::New(isolate, params),
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {
+      Napi::Number::New(env, serviceId), Napi::String::New(env, collection),
+      Napi::String::New(env, supplier),  Napi::String::New(env, sessionId),
+      Napi::String::New(env, resource),  Napi::External<void>::New(env, params),
   };
-  return CallJSNumberFunction(isolate, externFunctions,
-                              "SkipRuntime_ServiceDefinition__subscribe", 6,
-                              argv);
+  return CallJSNumberFunction(env, externFunctions,
+                              "SkipRuntime_ServiceDefinition__subscribe", args);
 }
 
 void SkipRuntime_ServiceDefinition__unsubscribe(uint32_t serviceId,
                                                 char* supplier,
                                                 char* sessionId) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[3] = {
-      Number::New(isolate, serviceId),
-      FromUtf8(isolate, supplier),
-      FromUtf8(isolate, sessionId),
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {
+      Napi::Number::New(env, serviceId),
+      Napi::String::New(env, supplier),
+      Napi::String::New(env, sessionId),
   };
-  CallJSVoidFunction(isolate, externFunctions,
-                     "SkipRuntime_ServiceDefinition__unsubscribe", 3, argv);
+  CallJSVoidFunction(env, externFunctions,
+                     "SkipRuntime_ServiceDefinition__unsubscribe", args);
 }
 
 double SkipRuntime_ServiceDefinition__shutdown(uint32_t serviceId) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[1] = {Number::New(isolate, serviceId)};
-  return CallJSNumberFunction(isolate, externFunctions,
-                              "SkipRuntime_ServiceDefinition__shutdown", 1,
-                              argv);
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {Napi::Number::New(env, serviceId)};
+  return CallJSNumberFunction(env, externFunctions,
+                              "SkipRuntime_ServiceDefinition__shutdown", args);
 }
 
 CJArray SkipRuntime_ServiceDefinition__inputs(uint32_t serviceId) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[1] = {
-      Number::New(isolate, serviceId),
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {
+      Napi::Number::New(env, serviceId),
   };
-  return CallJSFunction(isolate, externFunctions,
-                        "SkipRuntime_ServiceDefinition__inputs", 1, argv);
+  return CallJSFunction(env, externFunctions,
+                        "SkipRuntime_ServiceDefinition__inputs", args);
 }
 
 CJArray SkipRuntime_ServiceDefinition__initialData(uint32_t serviceId,
                                                    char* input) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[2] = {
-      Number::New(isolate, serviceId),
-      FromUtf8(isolate, input),
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {
+      Napi::Number::New(env, serviceId),
+      Napi::String::New(env, input),
   };
-  return CallJSFunction(isolate, externFunctions,
-                        "SkipRuntime_ServiceDefinition__initialData", 2, argv);
+  return CallJSFunction(env, externFunctions,
+                        "SkipRuntime_ServiceDefinition__initialData", args);
 }
 
 CJArray SkipRuntime_ServiceDefinition__resources(uint32_t serviceId) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[1] = {
-      Number::New(isolate, serviceId),
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {
+      Napi::Number::New(env, serviceId),
   };
-  return CallJSFunction(isolate, externFunctions,
-                        "SkipRuntime_ServiceDefinition__resources", 1, argv);
+  return CallJSFunction(env, externFunctions,
+                        "SkipRuntime_ServiceDefinition__resources", args);
 }
 
 SKResource SkipRuntime_ServiceDefinition__buildResource(uint32_t serviceId,
                                                         char* resource,
                                                         CJObject params) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[3] = {
-      Number::New(isolate, serviceId),
-      FromUtf8(isolate, resource),
-      External::New(isolate, params),
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {
+      Napi::Number::New(env, serviceId),
+      Napi::String::New(env, resource),
+      Napi::External<void>::New(env, params),
   };
-  return CallJSFunction(isolate, externFunctions,
-                        "SkipRuntime_ServiceDefinition__buildResource", 3,
-                        argv);
+  return CallJSFunction(env, externFunctions,
+                        "SkipRuntime_ServiceDefinition__buildResource", args);
 }
 
 CJObject SkipRuntime_ServiceDefinition__createGraph(uint32_t serviceId,
                                                     CJObject collections) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[2] = {
-      Number::New(isolate, serviceId),
-      External::New(isolate, collections),
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {
+      Napi::Number::New(env, serviceId),
+      Napi::External<void>::New(env, collections),
   };
-  return CallJSFunction(isolate, externFunctions,
-                        "SkipRuntime_ServiceDefinition__createGraph", 2, argv);
+  return CallJSFunction(env, externFunctions,
+                        "SkipRuntime_ServiceDefinition__createGraph", args);
 }
+
+/* ChangeManager callbacks. */
 
 uint32_t SkipRuntime_ChangeManager__needInputReload(uint32_t serviceId,
                                                     char* name) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[2] = {Number::New(isolate, serviceId),
-                          FromUtf8(isolate, name)};
-  return CallJSNumberFunction(isolate, externFunctions,
-                              "SkipRuntime_ChangeManager__needInputReload", 2,
-                              argv);
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {Napi::Number::New(env, serviceId),
+                                  Napi::String::New(env, name)};
+  return CallJSNumberFunction(
+      env, externFunctions, "SkipRuntime_ChangeManager__needInputReload", args);
 }
 
 uint32_t SkipRuntime_ChangeManager__needResourceReload(uint32_t serviceId,
                                                        char* name) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[2] = {Number::New(isolate, serviceId),
-                          FromUtf8(isolate, name)};
-  return CallJSNumberFunction(isolate, externFunctions,
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {Napi::Number::New(env, serviceId),
+                                  Napi::String::New(env, name)};
+  return CallJSNumberFunction(env, externFunctions,
                               "SkipRuntime_ChangeManager__needResourceReload",
-                              2, argv);
+                              args);
 }
 
 uint32_t SkipRuntime_ChangeManager__needExternalServiceReload(
     uint32_t serviceId, char* name, char* resource) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[3] = {Number::New(isolate, serviceId),
-                          FromUtf8(isolate, name), FromUtf8(isolate, resource)};
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {Napi::Number::New(env, serviceId),
+                                  Napi::String::New(env, name),
+                                  Napi::String::New(env, resource)};
   return CallJSNumberFunction(
-      isolate, externFunctions,
-      "SkipRuntime_ChangeManager__needExternalServiceReload", 3, argv);
+      env, externFunctions,
+      "SkipRuntime_ChangeManager__needExternalServiceReload", args);
 }
 
+/* Notifier callbacks. */
+
 void SkipRuntime_Notifier__subscribed(uint32_t notifierId) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[1] = {Number::New(isolate, notifierId)};
-  CallJSVoidFunction(isolate, externFunctions,
-                     "SkipRuntime_Notifier__subscribed", 1, argv);
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {Napi::Number::New(env, notifierId)};
+  CallJSVoidFunction(env, externFunctions, "SkipRuntime_Notifier__subscribed",
+                     args);
 }
 
 void SkipRuntime_Notifier__notify(uint32_t notifierId, CJArray values,
                                   char* watermark, uint32_t updates) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[4] = {
-      Number::New(isolate, notifierId),
-      External::New(isolate, values),
-      FromUtf8(isolate, watermark),
-      Number::New(isolate, updates),
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {
+      Napi::Number::New(env, notifierId),
+      Napi::External<void>::New(env, values),
+      Napi::String::New(env, watermark),
+      Napi::Number::New(env, updates),
   };
-  CallJSVoidFunction(isolate, externFunctions, "SkipRuntime_Notifier__notify",
-                     4, argv);
+  CallJSVoidFunction(env, externFunctions, "SkipRuntime_Notifier__notify",
+                     args);
 }
 
 void SkipRuntime_Notifier__close(uint32_t notifierId) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[1] = {Number::New(isolate, notifierId)};
-  CallJSVoidFunction(isolate, externFunctions, "SkipRuntime_Notifier__close", 1,
-                     argv);
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {Napi::Number::New(env, notifierId)};
+  CallJSVoidFunction(env, externFunctions, "SkipRuntime_Notifier__close", args);
 }
 
 void SkipRuntime_deleteNotifier(uint32_t notifierId) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[1] = {Number::New(isolate, notifierId)};
-  CallJSVoidFunction(isolate, externFunctions, "SkipRuntime_deleteNotifier", 1,
-                     argv);
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {Napi::Number::New(env, notifierId)};
+  CallJSVoidFunction(env, externFunctions, "SkipRuntime_deleteNotifier", args);
 }
 
+/* Reducer callbacks. */
+
 CJSON SkipRuntime_Reducer__init(uint32_t reducerId) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[1] = {
-      Number::New(isolate, reducerId),
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {
+      Napi::Number::New(env, reducerId),
   };
-  return CallJSFunction(isolate, externFunctions, "SkipRuntime_Reducer__init",
-                        1, argv);
+  return CallJSFunction(env, externFunctions, "SkipRuntime_Reducer__init",
+                        args);
 }
 
 CJSON SkipRuntime_Reducer__add(uint32_t reducerId, CJSON acc, CJSON value) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[3] = {
-      Number::New(isolate, reducerId),
-      External::New(isolate, acc),
-      External::New(isolate, value),
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {
+      Napi::Number::New(env, reducerId),
+      Napi::External<void>::New(env, acc),
+      Napi::External<void>::New(env, value),
   };
-  return CallJSFunction(isolate, externFunctions, "SkipRuntime_Reducer__add", 3,
-                        argv);
+  return CallJSFunction(env, externFunctions, "SkipRuntime_Reducer__add", args);
 }
 
 CJSON SkipRuntime_Reducer__remove(uint32_t reducerId, CJSON acc, CJSON value) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[3] = {
-      Number::New(isolate, reducerId),
-      External::New(isolate, acc),
-      External::New(isolate, value),
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {
+      Napi::Number::New(env, reducerId),
+      Napi::External<void>::New(env, acc),
+      Napi::External<void>::New(env, value),
   };
-  return CallJSNullableFunction(isolate, externFunctions,
-                                "SkipRuntime_Reducer__remove", 3, argv);
+  return CallJSNullableFunction(env, externFunctions,
+                                "SkipRuntime_Reducer__remove", args);
 }
 
 uint32_t SkipRuntime_Reducer__isEquals(uint32_t reducerId, uint32_t otherId) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[2] = {
-      Number::New(isolate, reducerId),
-      Number::New(isolate, otherId),
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {
+      Napi::Number::New(env, reducerId),
+      Napi::Number::New(env, otherId),
   };
-  return (uint32_t)CallJSNumberFunction(
-      isolate, externFunctions, "SkipRuntime_Reducer__isEquals", 2, argv);
+  return (uint32_t)CallJSNumberFunction(env, externFunctions,
+                                        "SkipRuntime_Reducer__isEquals", args);
 }
 
 CJObject SkipRuntime_Reducer__getInfo(uint32_t reducerId) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[1] = {
-      Number::New(isolate, reducerId),
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {
+      Napi::Number::New(env, reducerId),
   };
-  return CallJSFunction(isolate, externFunctions,
-                        "SkipRuntime_Reducer__getInfo", 1, argv);
+  return CallJSFunction(env, externFunctions, "SkipRuntime_Reducer__getInfo",
+                        args);
 }
 
 void SkipRuntime_deleteReducer(uint32_t reducerId) {
-  Isolate* isolate = Isolate::GetCurrent();
-  HandleScope scope(isolate);
-  Local<Object> externFunctions = kExternFunctions.Get(isolate);
-  Local<Value> argv[1] = {Number::New(isolate, reducerId)};
-  CallJSVoidFunction(isolate, externFunctions, "SkipRuntime_deleteReducer", 1,
-                     argv);
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {Napi::Number::New(env, reducerId)};
+  CallJSVoidFunction(env, externFunctions, "SkipRuntime_deleteReducer", args);
 }
+
+/* External service fetch callback. */
+
+double SkipRuntime_ServiceDefinition__fetch(uint32_t serviceId, char* supplier,
+                                            char* dirName, CJSON key) {
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {
+      Napi::Number::New(env, serviceId),
+      Napi::String::New(env, supplier),
+      Napi::String::New(env, dirName),
+      Napi::External<void>::New(env, key),
+  };
+  return CallJSNumberFunction(env, externFunctions,
+                              "SkipRuntime_ServiceDefinition__fetch", args);
+}
+
 }  // extern "C"
 
 }  // namespace skipruntime

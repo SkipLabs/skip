@@ -1,13 +1,13 @@
-
 // tojs.h
+
 #ifndef SK_TOJSBINDING_H
 #define SK_TOJSBINDING_H
 
-#include <node.h>
+#include <napi.h>
 
 namespace skipruntime {
 
-void GetToJSBinding(const v8::FunctionCallbackInfo<v8::Value>&);
+Napi::Value GetToJSBinding(const Napi::CallbackInfo&);
 
 }  // namespace skipruntime
 

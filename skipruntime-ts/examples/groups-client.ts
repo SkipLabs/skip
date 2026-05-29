@@ -16,11 +16,11 @@ console.log("Listening for Bob's active friends in each group...");
 const evSource = new EventSource(`${url}/active_friends/0`);
 evSource.addEventListener("init", (e: MessageEvent<string>) => {
   const initial_data = JSON.parse(e.data);
-  console.log("Initial data: ", initial_data);
+  console.log("Initial data: ", JSON.stringify(initial_data));
 });
 evSource.addEventListener("update", (e: MessageEvent<string>) => {
   const updates = JSON.parse(e.data);
-  console.log("Updated data: ", updates);
+  console.log("Updated data: ", JSON.stringify(updates));
 });
 evSource.onerror = console.error;
 

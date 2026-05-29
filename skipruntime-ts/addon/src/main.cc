@@ -1,36 +1,36 @@
-
-#include <node.h>
+#include <napi.h>
 
 #include "cjson.h"
 #include "common.h"
 #include "fromjs.h"
 #include "tojs.h"
 
-void InitToBinding(const v8::FunctionCallbackInfo<v8::Value>& args) {
-  v8::Isolate* isolate = args.GetIsolate();
-  v8::HandleScope scope(isolate);
-  if (args.Length() != 1) {
-    isolate->ThrowException(v8::Exception::TypeError(
-        skbinding::FromUtf8(isolate, "Must have one parameters.")));
-    return;
-  };
-  if (!args[0]->IsObject()) {
-    isolate->ThrowException(v8::Exception::TypeError(
-        skbinding::FromUtf8(isolate, "The parameter must be an object.")));
-    return;
+Napi::Value InitToBinding(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 1) {
+    throw Napi::TypeError::New(env, "Must have one parameter.");
   }
-  v8::Local<v8::Object> binding = args[0].As<v8::Object>();
-  skipruntime::SetFromJSBinding(isolate, binding);
+  if (!info[0].IsObject()) {
+    throw Napi::TypeError::New(env, "The parameter must be an object.");
+  }
+  Napi::Object binding = info[0].As<Napi::Object>();
+  skipruntime::SetFromJSBinding(env, binding);
+  return env.Undefined();
 }
 
-void Initialize(v8::Local<v8::Object> exports, v8::Local<v8::Value> module,
-                void* context) {
-  NODE_SET_METHOD(exports, "runWithGC", skbinding::RunWithGC);
-  NODE_SET_METHOD(exports, "getErrorObject", skbinding::GetErrorObject);
-  NODE_SET_METHOD(exports, "getJsonBinding", skjson::GetBinding);
-  NODE_SET_METHOD(exports, "getSkipRuntimeFromBinding",
-                  skipruntime::GetToJSBinding);
-  NODE_SET_METHOD(exports, "initSkipRuntimeToBinding", InitToBinding);
+// was void, became Napi::Object because NAPI requires us to explicitely return
+// the now filled `exports` object
+
+Napi::Object Initialize(Napi::Env env, Napi::Object exports) {
+  skbinding::AddFunction(env, exports, "runWithGC", skbinding::RunWithGC);
+  skbinding::AddFunction(env, exports, "getErrorObject",
+                         skbinding::GetErrorObject);
+  skbinding::AddFunction(env, exports, "getJsonBinding", skjson::GetBinding);
+  skbinding::AddFunction(env, exports, "getSkipRuntimeFromBinding",
+                         skipruntime::GetToJSBinding);
+  skbinding::AddFunction(env, exports, "initSkipRuntimeToBinding",
+                         InitToBinding);
+  return exports;
 }
 
-NODE_MODULE(NODE_GYP_MODULE_NAME, Initialize)
+NODE_API_MODULE(NODE_GYP_MODULE_NAME, Initialize)

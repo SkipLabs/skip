@@ -25,17 +25,6 @@ skdb: npm build/skdb build/init.sql
 npm: $(SKDB_WASM) build/package/skdb build/package/package.json
 	cd build/package && npm install
 
-# Assemble the publishable skdb layout from sql/ts.  Mirrors what
-# `npm publish` from sql/ts/ would ship (dist/, package.json, README).
-# Consumed by `make check-vite` and `make test-bun` which cp it into a
-# scaffolded node_modules to smoke-test consumer installs.
-build/package/skdb: $(SKDB_WASM)
-	cd sql/ts && npm run build
-	rm -rf $@
-	mkdir -p $@
-	cp -r sql/ts/dist sql/ts/package.json $@/
-	[ -f sql/ts/README.md ] && cp sql/ts/README.md $@/ || true
-
 build/package/package.json:
 	@echo "{" > build/package/package.json
 	@echo "  \"dependencies\": {" >> build/package/package.json
@@ -193,6 +182,10 @@ test-skjson:
 test-skipruntime-ts:
 	$(MAKE) -C skipruntime-ts test-all
 
+.PHONY: test-skipruntime-ts-bun
+test-skipruntime-ts-bun:
+	$(MAKE) -C skipruntime-ts test-skipruntime-ts-bun
+
 test-%:
 	cd $* && skargo test --profile $(SKARGO_PROFILE)
 
@@ -274,115 +267,37 @@ skfmt-%:
 skbuild-%:
 	cd $* && skargo b --profile $(SKARGO_PROFILE)
 
-# Build every workspace package in dependency order. Required before any
-# publish-* target so that downstream packages can see their dependencies'
-# emitted .d.ts and .js (which release_npm.sh's idempotent skip-if-already-
-# published check would otherwise bypass).
-.PHONY: build-all
-build-all:
-	npm run build --workspaces --if-present
-
-.PHONY: publish-tsconfig
-publish-tsconfig: build-all
-	bin/release_npm.sh @skiplabs/tsconfig tsconfig/package.json $(OTP)
-
-.PHONY: publish-eslint-config
-publish-eslint-config: build-all
-	bin/release_npm.sh @skiplabs/eslint-config eslint-config/package.json $(OTP)
-
-.PHONY: publish-skiplang-std
-publish-skiplang-std: build-all
-	bin/release_npm.sh @skiplang/std skiplang/prelude/ts/binding/package.json $(OTP)
-
-.PHONY: publish-skiplang-json
-publish-skiplang-json: build-all
-	bin/release_npm.sh @skiplang/json skiplang/skjson/ts/binding/package.json $(OTP)
-
-.PHONY: publish-skip-wasm-std
-publish-skip-wasm-std: build-all
-	bin/release_npm.sh @skip-wasm/std skiplang/prelude/ts/wasm/package.json $(OTP)
-
-.PHONY: publish-skip-wasm-worker
-publish-skip-wasm-worker: build-all
-	bin/release_npm.sh @skip-wasm/worker skiplang/prelude/ts/worker/package.json $(OTP)
-
-.PHONY: publish-skip-wasm-json
-publish-skip-wasm-json: build-all
-	bin/release_npm.sh @skip-wasm/json skiplang/skjson/ts/wasm/package.json $(OTP)
-
-# @skip-wasm/date depends on @skip-wasm/std, so publish std first.
-.PHONY: publish-skip-wasm-date
-publish-skip-wasm-date: build-all publish-skip-wasm-std
-	bin/release_npm.sh @skip-wasm/date skiplang/skdate/ts/package.json $(OTP)
-
 .PHONY: publish-core
-publish-core: build-all
+publish-core:
 	bin/release_npm.sh @skipruntime/core skipruntime-ts/core/package.json $(OTP)
 
 .PHONY: publish-helpers
-publish-helpers: build-all
+publish-helpers:
 	bin/release_npm.sh @skipruntime/helpers skipruntime-ts/helpers/package.json $(OTP)
 
 .PHONY: publish-wasm
-publish-wasm: build-all
+publish-wasm:
 	bin/release_npm.sh @skipruntime/wasm skipruntime-ts/wasm/package.json $(OTP)
 
 .PHONY: publish-native
-publish-native: build-all
+publish-native:
 	bin/release_npm.sh @skipruntime/native skipruntime-ts/addon/package.json $(OTP)
 
 .PHONY: publish-server
-publish-server: build-all
+publish-server:
 	bin/release_npm.sh @skipruntime/server skipruntime-ts/server/package.json $(OTP)
 
 .PHONY: publish-postgres-adapter
-publish-postgres-adapter: build-all
+publish-postgres-adapter:
 	bin/release_npm.sh @skip-adapter/postgres skipruntime-ts/adapters/postgres/package.json $(OTP)
 
 .PHONY: publish-kafka-adapter
-publish-kafka-adapter: build-all
+publish-kafka-adapter:
 	bin/release_npm.sh @skip-adapter/kafka skipruntime-ts/adapters/kafka/package.json $(OTP)
 
 .PHONY: publish-metapackage
-publish-metapackage: build-all
+publish-metapackage:
 	bin/release_npm.sh @skiplabs/skip skipruntime-ts/metapackage/package.json $(OTP)
 
 .PHONY: publish-all
-publish-all: clean \
-	publish-tsconfig \
-	publish-eslint-config \
-	publish-skiplang-std \
-	publish-skiplang-json \
-	publish-skip-wasm-std \
-	publish-skip-wasm-worker \
-	publish-skip-wasm-json \
-	publish-skip-wasm-date \
-	publish-core \
-	publish-helpers \
-	publish-wasm \
-	publish-native \
-	publish-server \
-	publish-postgres-adapter \
-	publish-kafka-adapter \
-	publish-metapackage
-
-# skdb / skdb-dev / skdb-react all use release_npm.sh with STRICT_BUMP
-# (error if the package.json version hasn't been bumped past what's on the
-# registry).  skdb-{dev,react} additionally use VALIDATE_PUBLISHED_DEP=skdb
-# to error if their skdb dep doesn't pin the currently-published skdb
-# version.  Run in order; skdb must publish first.
-
-.PHONY: publish-skdb
-publish-skdb:
-	STRICT_BUMP=1 bin/release_npm.sh skdb sql/ts/package.json $(OTP)
-
-.PHONY: publish-skdb-dev
-publish-skdb-dev: publish-skdb
-	STRICT_BUMP=1 VALIDATE_PUBLISHED_DEP=skdb bin/release_npm.sh skdb-dev packages/dev/package.json $(OTP)
-
-.PHONY: publish-skdb-react
-publish-skdb-react: publish-skdb
-	STRICT_BUMP=1 VALIDATE_PUBLISHED_DEP=skdb bin/release_npm.sh skdb-react packages/react/package.json $(OTP)
-
-.PHONY: publish-all-skdb
-publish-all-skdb: publish-skdb publish-skdb-dev publish-skdb-react
+publish-all: clean publish-core publish-helpers publish-wasm publish-native publish-server publish-postgres-adapter publish-kafka-adapter publish-metapackage

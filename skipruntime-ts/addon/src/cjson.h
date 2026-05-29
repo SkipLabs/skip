@@ -1,13 +1,13 @@
-
 // cjson.h
+
 #ifndef SK_CJSON_H
 #define SK_CJSON_H
 
-#include <node.h>
+#include <napi.h>
 
 namespace skjson {
 
-void GetBinding(const v8::FunctionCallbackInfo<v8::Value>&);
+Napi::Value GetBinding(const Napi::CallbackInfo&);
 
 }  // namespace skjson
 

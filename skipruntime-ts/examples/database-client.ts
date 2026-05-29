@@ -34,14 +34,20 @@ await fetchJSON(`${url}/user/123`, "PUT", {
   body: { name: "daniel", country: "UK" },
 });
 
-console.log("Get /user/123", (await fetchJSON(`${url}/user/123`, "GET"))[0]);
+console.log(
+  "Get /user/123",
+  JSON.stringify((await fetchJSON(`${url}/user/123`, "GET"))[0]),
+);
 
 await sleep(1000);
 console.log("Delete /user/123");
 
 await fetchJSON(`${url}/user/123`, "DELETE", {});
 
-console.log("Get /user/123", (await fetchJSON(`${url}/user/123`, "GET"))[0]);
+console.log(
+  "Get /user/123",
+  JSON.stringify((await fetchJSON(`${url}/user/123`, "GET"))[0]),
+);
 
 await sleep(1000);
 evSource.close();

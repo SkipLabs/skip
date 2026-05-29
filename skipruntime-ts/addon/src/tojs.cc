@@ -1,4 +1,3 @@
-
 #include "tojs.h"
 
 #include <iostream>
@@ -26,7 +25,10 @@ SKReducer SkipRuntime_createReducer(int32_t ref);
 
 CJSON SkipRuntime_initService(SKService service);
 double SkipRuntime_closeService();
-
+void SkipRuntime_setLazyCollectionValue(char* dirName, CJSON key,
+                                        CJArray values);
+double SkipRuntime_ServiceDefinition__fetch(int32_t service, char* supplier,
+                                            CJObject key);
 CJArray SkipRuntime_Collection__getArray(char* collection, CJSON key);
 char* SkipRuntime_Collection__map(char* collection, SKMapper mapper);
 char* SkipRuntime_Collection__mapReduce(char* collection, SKMapper mapper,
@@ -63,995 +65,842 @@ double SkipRuntime_Runtime__closeResourceStreams(CJArray streams);
 }
 
 using skbinding::AddFunction;
-using skbinding::FromUtf8;
 using skbinding::NatTryCatch;
 using skbinding::ToSKString;
-using v8::Array;
-using v8::BigInt;
-using v8::Boolean;
-using v8::Exception;
-using v8::External;
-using v8::FunctionCallbackInfo;
-using v8::HandleScope;
-using v8::Int32;
-using v8::Isolate;
-using v8::Local;
-using v8::MaybeLocal;
-using v8::Number;
-using v8::Object;
-using v8::String;
-using v8::Value;
 
-void UpdateOfCollectionWriter(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 3) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have three parameters.")));
-    return;
-  };
-  if (!args[0]->IsString()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a string.")));
-    return;
+/* CollectionWriter operations. */
+
+Napi::Value UpdateOfCollectionWriter(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 3) {
+    throw Napi::TypeError::New(env, "Must have three parameters.");
   }
-  if (!args[1]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The second parameter must be a pointer.")));
-    return;
+  if (!info[0].IsString()) {
+    throw Napi::TypeError::New(env, "The first parameter must be a string.");
   }
-  if (!args[2]->IsBoolean()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The third parameter must be a boolean.")));
-    return;
+  if (!info[1].IsExternal()) {
+    throw Napi::TypeError::New(env, "The second parameter must be a pointer.");
   }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    char* skcollection = ToSKString(isolate, args[0].As<String>());
-    CJArray skvalues = args[1].As<External>()->Value();
-    int32_t skisinit = args[2].As<Boolean>()->Value() ? 1 : 0;
+  if (!info[2].IsBoolean()) {
+    throw Napi::TypeError::New(env, "The third parameter must be a boolean.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    char* skcollection = ToSKString(info[0]);
+    CJArray skvalues = info[1].As<Napi::External<void>>().Data();
+    int32_t skisinit = info[2].As<Napi::Boolean>().Value() ? 1 : 0;
     CJSON skresult =
         SkipRuntime_CollectionWriter__update(skcollection, skvalues, skisinit);
-    args.GetReturnValue().Set(External::New(isolate, skresult));
+    result = Napi::External<void>::New(env, skresult);
   });
+  return result;
 }
 
-void CreateLazyCollectionOfContext(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (!args[0]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a pointer.")));
-    return;
+/* Context operations. */
+
+Napi::Value CreateLazyCollectionOfContext(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (!info[0].IsExternal()) {
+    throw Napi::TypeError::New(env, "The parameter must be a pointer.");
   }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    SKLazyCompute sklazyCompute = args[0].As<External>()->Value();
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    SKLazyCompute sklazyCompute = info[0].As<Napi::External<void>>().Data();
     char* skResult = SkipRuntime_Context__createLazyCollection(sklazyCompute);
-    args.GetReturnValue().Set(FromUtf8(isolate, skResult));
+    result = Napi::String::New(env, skResult);
   });
+  return result;
 }
 
-void JSONExtractOfContext(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 2) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have two parameters.")));
-    return;
-  };
-  if (!args[0]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a pointer.")));
-    return;
+Napi::Value JSONExtractOfContext(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 2) {
+    throw Napi::TypeError::New(env, "Must have two parameters.");
   }
-  if (!args[1]->IsString()) {
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The second parameter must be a string.")));
-    return;
+  if (!info[0].IsExternal()) {
+    throw Napi::TypeError::New(env, "The first parameter must be a pointer.");
   }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
+  if (!info[1].IsString()) {
+    throw Napi::TypeError::New(env, "The second parameter must be a string.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
     CJArray skResult = SkipRuntime_Context__jsonExtract(
-        args[0].As<External>()->Value(),
-        ToSKString(isolate, args[1].As<String>()));
-    args.GetReturnValue().Set(External::New(isolate, skResult));
+        info[0].As<Napi::External<void>>().Data(), ToSKString(info[1]));
+    result = Napi::External<void>::New(env, skResult);
   });
+  return result;
 }
 
-void UseExternalResourceOfContext(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 3) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have three parameters.")));
-    return;
-  };
-  if (!args[0]->IsString() || !args[1]->IsString()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first and second parameters must be string.")));
-    return;
+Napi::Value UseExternalResourceOfContext(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 3) {
+    throw Napi::TypeError::New(env, "Must have three parameters.");
   }
-  if (!args[2]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The third parameter must be pointer.")));
-    return;
+  if (!info[0].IsString() || !info[1].IsString()) {
+    throw Napi::TypeError::New(
+        env, "The first and second parameters must be strings.");
   }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
+  if (!info[2].IsExternal()) {
+    throw Napi::TypeError::New(env, "The third parameter must be a pointer.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
     char* skcollection = SkipRuntime_Context__useExternalResource(
-        ToSKString(isolate, args[0].As<String>()),
-        ToSKString(isolate, args[1].As<String>()),
-        args[2].As<External>()->Value());
-    args.GetReturnValue().Set(FromUtf8(isolate, skcollection));
+        ToSKString(info[0]), ToSKString(info[1]),
+        info[2].As<Napi::External<void>>().Data());
+    result = Napi::String::New(env, skcollection);
   });
+  return result;
 }
 
-void CreateMapper(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
-    return;
-  };
-  if (!args[0]->IsNumber()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a number.")));
-    return;
+/* ServiceDefinition operations. */
+
+Napi::Value FetchOfServiceDefinition(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 3) {
+    throw Napi::TypeError::New(env, "Must have three parameters.");
   }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    SKMapper skMapper = SkipRuntime_createMapper(args[0].As<Int32>()->Value());
-    args.GetReturnValue().Set(External::New(isolate, skMapper));
+  if (!info[0].IsNumber()) {
+    throw Napi::TypeError::New(env, "The first parameter must be a number.");
+  }
+  if (!info[1].IsString()) {
+    throw Napi::TypeError::New(env, "The second parameter must be a string.");
+  }
+  if (!info[2].IsExternal()) {
+    throw Napi::TypeError::New(env, "The third parameter must be a pointer.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    double skresult = SkipRuntime_ServiceDefinition__fetch(
+        info[0].As<Napi::Number>().Int32Value(), ToSKString(info[1]),
+        info[2].As<Napi::External<void>>().Data());
+    result = Napi::Number::New(env, skresult);
   });
+  return result;
 }
 
-void CreateLazyCompute(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
-    return;
-  };
-  if (!args[0]->IsNumber()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a number.")));
-    return;
+/* Lazy collection setter. */
+
+Napi::Value SetLazyCollectionValue(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (!info[0].IsString() || !info[1].IsExternal() || !info[2].IsExternal()) {
+    throw Napi::TypeError::New(env, "Invalid parameters.");
   }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
+  NatTryCatch(env, [&info](Napi::Env) {
+    SkipRuntime_setLazyCollectionValue(
+        ToSKString(info[0]), info[1].As<Napi::External<void>>().Data(),
+        info[2].As<Napi::External<void>>().Data());
+  });
+  return env.Undefined();
+}
+
+/* Object factories: create a Skip-side object from a numeric reference id. */
+
+Napi::Value CreateMapper(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 1) {
+    throw Napi::TypeError::New(env, "Must have one parameter.");
+  }
+  if (!info[0].IsNumber()) {
+    throw Napi::TypeError::New(env, "The parameter must be a number.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    SKMapper skMapper =
+        SkipRuntime_createMapper(info[0].As<Napi::Number>().Int32Value());
+    result = Napi::External<void>::New(env, skMapper);
+  });
+  return result;
+}
+
+Napi::Value CreateLazyCompute(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 1) {
+    throw Napi::TypeError::New(env, "Must have one parameter.");
+  }
+  if (!info[0].IsNumber()) {
+    throw Napi::TypeError::New(env, "The parameter must be a number.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
     SKLazyCompute skLazyCompute =
-        SkipRuntime_createLazyCompute(args[0].As<Int32>()->Value());
-    args.GetReturnValue().Set(External::New(isolate, skLazyCompute));
+        SkipRuntime_createLazyCompute(info[0].As<Napi::Number>().Int32Value());
+    result = Napi::External<void>::New(env, skLazyCompute);
   });
+  return result;
 }
 
-void CreateResource(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
-    return;
-  };
-  if (!args[0]->IsNumber()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a number.")));
-    return;
+Napi::Value CreateResource(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 1) {
+    throw Napi::TypeError::New(env, "Must have one parameter.");
   }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
+  if (!info[0].IsNumber()) {
+    throw Napi::TypeError::New(env, "The parameter must be a number.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
     SKResource skResource =
-        SkipRuntime_createResource(args[0].As<Int32>()->Value());
-    args.GetReturnValue().Set(External::New(isolate, skResource));
+        SkipRuntime_createResource(info[0].As<Napi::Number>().Int32Value());
+    result = Napi::External<void>::New(env, skResource);
   });
+  return result;
 }
 
-void CreateService(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameters.")));
-    return;
-  };
-  if (!args[0]->IsNumber()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a number.")));
-    return;
+Napi::Value CreateService(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 1) {
+    throw Napi::TypeError::New(env, "Must have one parameter.");
   }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
+  if (!info[0].IsNumber()) {
+    throw Napi::TypeError::New(env, "The parameter must be a number.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
     SKService skService =
-        SkipRuntime_createService(args[0].As<Int32>()->Value());
-    args.GetReturnValue().Set(External::New(isolate, skService));
+        SkipRuntime_createService(info[0].As<Napi::Number>().Int32Value());
+    result = Napi::External<void>::New(env, skService);
   });
+  return result;
 }
 
-void CreateNotifier(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
-    return;
-  };
-  if (!args[0]->IsNumber()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a number.")));
-    return;
+Napi::Value CreateNotifier(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 1) {
+    throw Napi::TypeError::New(env, "Must have one parameter.");
   }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
+  if (!info[0].IsNumber()) {
+    throw Napi::TypeError::New(env, "The parameter must be a number.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
     SKNotifier skNotifier =
-        SkipRuntime_createNotifier(args[0].As<Int32>()->Value());
-    args.GetReturnValue().Set(External::New(isolate, skNotifier));
+        SkipRuntime_createNotifier(info[0].As<Napi::Number>().Int32Value());
+    result = Napi::External<void>::New(env, skNotifier);
   });
+  return result;
 }
 
-void CreateReducer(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
-    return;
-  };
-  if (!args[0]->IsNumber()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a number.")));
-    return;
+Napi::Value CreateReducer(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 1) {
+    throw Napi::TypeError::New(env, "Must have one parameter.");
   }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
+  if (!info[0].IsNumber()) {
+    throw Napi::TypeError::New(env, "The parameter must be a number.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
     SKReducer skReducer =
-        SkipRuntime_createReducer(args[0].As<Int32>()->Value());
-    args.GetReturnValue().Set(External::New(isolate, skReducer));
+        SkipRuntime_createReducer(info[0].As<Napi::Number>().Int32Value());
+    result = Napi::External<void>::New(env, skReducer);
   });
+  return result;
 }
 
-void InitService(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
-    return;
-  };
-  if (!args[0]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameters must be pointers.")));
-    return;
+/* Service lifecycle. */
+
+Napi::Value InitService(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 1) {
+    throw Napi::TypeError::New(env, "Must have one parameter.");
   }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    CJSON skresult = SkipRuntime_initService(args[0].As<External>()->Value());
-    args.GetReturnValue().Set(External::New(isolate, skresult));
+  if (!info[0].IsExternal()) {
+    throw Napi::TypeError::New(env, "The parameter must be a pointer.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    CJSON skresult =
+        SkipRuntime_initService(info[0].As<Napi::External<void>>().Data());
+    result = Napi::External<void>::New(env, skresult);
   });
+  return result;
 }
 
-void CloseService(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
+Napi::Value CloseService(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  Napi::Value result;
+  NatTryCatch(env, [&result, env](Napi::Env) {
     double skresult = SkipRuntime_closeService();
-    args.GetReturnValue().Set(Number::New(isolate, skresult));
+    result = Napi::Number::New(env, skresult);
   });
+  return result;
 }
 
-void GetArrayOfEagerCollection(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 2) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have two parameters.")));
-    return;
+/* Eager collection operations. */
+
+Napi::Value GetArrayOfEagerCollection(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 2) {
+    throw Napi::TypeError::New(env, "Must have two parameters.");
   }
-  if (!args[0]->IsString()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a string.")));
-    return;
+  if (!info[0].IsString()) {
+    throw Napi::TypeError::New(env, "The first parameter must be a string.");
   }
-  if (!args[1]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a pointer.")));
-    return;
+  if (!info[1].IsExternal()) {
+    throw Napi::TypeError::New(env, "The second parameter must be a pointer.");
   }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    char* skCollection = ToSKString(isolate, args[0].As<String>());
-    void* skKey = args[1].As<External>()->Value();
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    char* skCollection = ToSKString(info[0]);
+    void* skKey = info[1].As<Napi::External<void>>().Data();
     void* skResult = SkipRuntime_Collection__getArray(skCollection, skKey);
-    args.GetReturnValue().Set(External::New(isolate, skResult));
+    result = Napi::External<void>::New(env, skResult);
   });
+  return result;
 }
 
-void SizeOfEagerCollection(const v8::FunctionCallbackInfo<v8::Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
-    return;
+Napi::Value SizeOfEagerCollection(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 1) {
+    throw Napi::TypeError::New(env, "Must have one parameter.");
   }
-  if (!args[0]->IsString()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a string.")));
-    return;
+  if (!info[0].IsString()) {
+    throw Napi::TypeError::New(env, "The parameter must be a string.");
   }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    char* skCollection = ToSKString(isolate, args[0].As<String>());
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    char* skCollection = ToSKString(info[0]);
     int64_t skResult = SkipRuntime_Collection__size(skCollection);
-    args.GetReturnValue().Set(Number::New(isolate, skResult));
+    result = Napi::Number::New(env, skResult);
   });
+  return result;
 }
 
-void MapOfEagerCollection(const v8::FunctionCallbackInfo<v8::Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 2) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have two parameters.")));
-    return;
+Napi::Value MapOfEagerCollection(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 2) {
+    throw Napi::TypeError::New(env, "Must have two parameters.");
   }
-  if (!args[0]->IsString()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a string.")));
-    return;
+  if (!info[0].IsString()) {
+    throw Napi::TypeError::New(env, "The first parameter must be a string.");
   }
-  if (!args[1]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The second parameter must be a pointer.")));
-    return;
+  if (!info[1].IsExternal()) {
+    throw Napi::TypeError::New(env, "The second parameter must be a pointer.");
   }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    char* skCollection = ToSKString(isolate, args[0].As<String>());
-    SKMapper skmapper = args[1].As<External>()->Value();
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    char* skCollection = ToSKString(info[0]);
+    SKMapper skmapper = info[1].As<Napi::External<void>>().Data();
     char* skResult = SkipRuntime_Collection__map(skCollection, skmapper);
-    args.GetReturnValue().Set(FromUtf8(isolate, skResult));
+    result = Napi::String::New(env, skResult);
   });
+  return result;
 }
 
-void MapReduceOfEagerCollection(
-    const v8::FunctionCallbackInfo<v8::Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 3) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have three parameters.")));
-    return;
+Napi::Value MapReduceOfEagerCollection(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 3) {
+    throw Napi::TypeError::New(env, "Must have three parameters.");
   }
-  if (!args[0]->IsString()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a string.")));
-    return;
+  if (!info[0].IsString()) {
+    throw Napi::TypeError::New(env, "The first parameter must be a string.");
   }
-  if (!args[1]->IsExternal() || !args[2]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The second and third parameter must be pointers.")));
-    return;
+  if (!info[1].IsExternal() || !info[2].IsExternal()) {
+    throw Napi::TypeError::New(
+        env, "The second and third parameters must be pointers.");
   }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    char* skCollection = ToSKString(isolate, args[0].As<String>());
-    SKMapper skmapper = args[1].As<External>()->Value();
-    SKMapper skreducer = args[2].As<External>()->Value();
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    char* skCollection = ToSKString(info[0]);
+    SKMapper skmapper = info[1].As<Napi::External<void>>().Data();
+    SKMapper skreducer = info[2].As<Napi::External<void>>().Data();
     char* skResult =
         SkipRuntime_Collection__mapReduce(skCollection, skmapper, skreducer);
-    args.GetReturnValue().Set(FromUtf8(isolate, skResult));
+    result = Napi::String::New(env, skResult);
   });
+  return result;
 }
 
-void NativeMapReduceOfEagerCollection(
-    const v8::FunctionCallbackInfo<v8::Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 3) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have three parameters.")));
-    return;
+Napi::Value NativeMapReduceOfEagerCollection(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 3) {
+    throw Napi::TypeError::New(env, "Must have three parameters.");
   }
-  if (!args[0]->IsString() || !args[2]->IsString()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first and third parameters must be strings.")));
-    return;
+  if (!info[0].IsString() || !info[2].IsString()) {
+    throw Napi::TypeError::New(
+        env, "The first and third parameters must be strings.");
   }
-  if (!args[1]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The second parameter must be a pointer.")));
-    return;
+  if (!info[1].IsExternal()) {
+    throw Napi::TypeError::New(env, "The second parameter must be a pointer.");
   }
-
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    char* skCollection = ToSKString(isolate, args[0].As<String>());
-    SKMapper skmapper = args[1].As<External>()->Value();
-    char* reducer = ToSKString(isolate, args[2].As<String>());
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    char* skCollection = ToSKString(info[0]);
+    SKMapper skmapper = info[1].As<Napi::External<void>>().Data();
+    char* reducer = ToSKString(info[2]);
     char* skResult = SkipRuntime_Collection__nativeMapReduce(skCollection,
                                                              skmapper, reducer);
-    args.GetReturnValue().Set(FromUtf8(isolate, skResult));
+    result = Napi::String::New(env, skResult);
   });
+  return result;
 }
 
-void ReduceOfEagerCollection(const v8::FunctionCallbackInfo<v8::Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 2) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have three parameters.")));
-    return;
+Napi::Value ReduceOfEagerCollection(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 2) {
+    throw Napi::TypeError::New(env, "Must have two parameters.");
   }
-  if (!args[0]->IsString()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a string.")));
-    return;
+  if (!info[0].IsString()) {
+    throw Napi::TypeError::New(env, "The first parameter must be a string.");
   }
-  if (!args[1]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The second parameter must be pointers.")));
-    return;
+  if (!info[1].IsExternal()) {
+    throw Napi::TypeError::New(env, "The second parameter must be a pointer.");
   }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    char* skCollection = ToSKString(isolate, args[0].As<String>());
-    SKMapper skreducer = args[1].As<External>()->Value();
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    char* skCollection = ToSKString(info[0]);
+    SKMapper skreducer = info[1].As<Napi::External<void>>().Data();
     char* skResult = SkipRuntime_Collection__reduce(skCollection, skreducer);
-    args.GetReturnValue().Set(FromUtf8(isolate, skResult));
+    result = Napi::String::New(env, skResult);
   });
+  return result;
 }
-void NativeReduceOfEagerCollection(
-    const v8::FunctionCallbackInfo<v8::Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 2) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have three parameters.")));
-    return;
+
+Napi::Value NativeReduceOfEagerCollection(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 2) {
+    throw Napi::TypeError::New(env, "Must have two parameters.");
   }
-  if (!args[0]->IsString() || !args[1]->IsString()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "Both parameters must be strings.")));
-    return;
+  if (!info[0].IsString() || !info[1].IsString()) {
+    throw Napi::TypeError::New(env, "Both parameters must be strings.");
   }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    char* skCollection = ToSKString(isolate, args[0].As<String>());
-    char* reducer = ToSKString(isolate, args[1].As<String>());
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    char* skCollection = ToSKString(info[0]);
+    char* reducer = ToSKString(info[1]);
     char* skResult =
         SkipRuntime_Collection__nativeReduce(skCollection, reducer);
-    args.GetReturnValue().Set(FromUtf8(isolate, skResult));
+    result = Napi::String::New(env, skResult);
   });
+  return result;
 }
 
-void SliceOfEagerCollection(const v8::FunctionCallbackInfo<v8::Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 2) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have two parameters.")));
-    return;
+Napi::Value SliceOfEagerCollection(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 2) {
+    throw Napi::TypeError::New(env, "Must have two parameters.");
   }
-  if (!args[0]->IsString()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a string.")));
-    return;
+  if (!info[0].IsString()) {
+    throw Napi::TypeError::New(env, "The first parameter must be a string.");
   }
-  if (!args[1]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a pointer.")));
-    return;
-  };
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    char* skCollection = ToSKString(isolate, args[0].As<String>());
-    CJArray skranges = args[1].As<External>()->Value();
+  if (!info[1].IsExternal()) {
+    throw Napi::TypeError::New(env, "The second parameter must be a pointer.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    char* skCollection = ToSKString(info[0]);
+    CJArray skranges = info[1].As<Napi::External<void>>().Data();
     char* skResult = SkipRuntime_Collection__slice(skCollection, skranges);
-    args.GetReturnValue().Set(FromUtf8(isolate, skResult));
+    result = Napi::String::New(env, skResult);
   });
+  return result;
 }
 
-void TakeOfEagerCollection(const v8::FunctionCallbackInfo<v8::Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 2) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have two parameters.")));
-    return;
+Napi::Value TakeOfEagerCollection(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 2) {
+    throw Napi::TypeError::New(env, "Must have two parameters.");
   }
-  if (!args[0]->IsString()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a string.")));
-    return;
+  if (!info[0].IsString()) {
+    throw Napi::TypeError::New(env, "The first parameter must be a string.");
   }
-  if (!args[1]->IsNumber() && !args[1]->IsBigInt()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(FromUtf8(
-        isolate, "The second parameter must be a number or a bigint.")));
-    return;
-  };
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    char* skCollection = ToSKString(isolate, args[0].As<String>());
+  if (!info[1].IsNumber() && !info[1].IsBigInt()) {
+    throw Napi::TypeError::New(
+        env, "The second parameter must be a number or a bigint.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    char* skCollection = ToSKString(info[0]);
     int64_t sklimit;
-    if (args[1]->IsNumber()) {
-      sklimit = (int64_t)args[1].As<Number>()->Value();
+    if (info[1].IsNumber()) {
+      sklimit = (int64_t)info[1].As<Napi::Number>().DoubleValue();
     } else {
-      sklimit = args[1].As<BigInt>()->Int64Value();
+      bool lossless;
+      sklimit = info[1].As<Napi::BigInt>().Int64Value(&lossless);
     }
     char* skResult = SkipRuntime_Collection__take(skCollection, sklimit);
-    args.GetReturnValue().Set(FromUtf8(isolate, skResult));
+    result = Napi::String::New(env, skResult);
   });
+  return result;
 }
 
-void MergeOfEagerCollection(const v8::FunctionCallbackInfo<v8::Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 2) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have two parameters.")));
-    return;
+Napi::Value MergeOfEagerCollection(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 2) {
+    throw Napi::TypeError::New(env, "Must have two parameters.");
   }
-  if (!args[0]->IsString()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a string.")));
-    return;
+  if (!info[0].IsString()) {
+    throw Napi::TypeError::New(env, "The first parameter must be a string.");
   }
-  if (!args[1]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a pointer.")));
-    return;
-  };
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    char* skCollection = ToSKString(isolate, args[0].As<String>());
-    CJArray skotherCollections = args[1].As<External>()->Value();
+  if (!info[1].IsExternal()) {
+    throw Napi::TypeError::New(env, "The second parameter must be a pointer.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    char* skCollection = ToSKString(info[0]);
+    CJArray skotherCollections = info[1].As<Napi::External<void>>().Data();
     char* skResult =
         SkipRuntime_Collection__merge(skCollection, skotherCollections);
-    args.GetReturnValue().Set(FromUtf8(isolate, skResult));
+    result = Napi::String::New(env, skResult);
   });
+  return result;
 }
 
-void NextOfNonEmptyIterator(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (!args[0]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a pointer.")));
-    return;
+/* NonEmptyIterator: nullable iterator step. */
+
+Napi::Value NextOfNonEmptyIterator(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (!info[0].IsExternal()) {
+    throw Napi::TypeError::New(env, "The first parameter must be a pointer.");
   }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    SKNonEmptyIterator skiterator = args[0].As<External>()->Value();
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    SKNonEmptyIterator skiterator = info[0].As<Napi::External<void>>().Data();
     CJSON skResult = SkipRuntime_NonEmptyIterator__next(skiterator);
-    Local<Value> returnValue;
     if (skResult != nullptr) {
-      returnValue = External::New(isolate, skResult);
+      result = Napi::External<void>::New(env, skResult);
     } else {
-      returnValue = Null(isolate);
+      result = env.Null();
     }
-    args.GetReturnValue().Set(returnValue);
   });
+  return result;
 }
 
-void GetArrayOfLazyCollection(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 2) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have two parameters.")));
-    return;
+/* Lazy collection accessor. */
+
+Napi::Value GetArrayOfLazyCollection(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 2) {
+    throw Napi::TypeError::New(env, "Must have two parameters.");
   }
-  if (!args[0]->IsString()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a string.")));
-    return;
+  if (!info[0].IsString()) {
+    throw Napi::TypeError::New(env, "The first parameter must be a string.");
   }
-  if (!args[1]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a pointer.")));
-    return;
+  if (!info[1].IsExternal()) {
+    throw Napi::TypeError::New(env, "The second parameter must be a pointer.");
   }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    char* skCollection = ToSKString(isolate, args[0].As<String>());
-    void* skKey = args[1].As<External>()->Value();
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    char* skCollection = ToSKString(info[0]);
+    void* skKey = info[1].As<Napi::External<void>>().Data();
     void* skResult = SkipRuntime_LazyCollection__getArray(skCollection, skKey);
-    args.GetReturnValue().Set(External::New(isolate, skResult));
+    result = Napi::External<void>::New(env, skResult);
   });
+  return result;
 }
 
-void CreateResourceOfRuntime(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 3) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have four parameters.")));
-    return;
+/* Runtime operations exposed to JS. */
+
+Napi::Value CreateResourceOfRuntime(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 3) {
+    throw Napi::TypeError::New(env, "Must have three parameters.");
   }
-  if (!args[0]->IsString() || !args[1]->IsString() || !args[2]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Invalid parameters.")));
-    return;
+  if (!info[0].IsString() || !info[1].IsString() || !info[2].IsExternal()) {
+    throw Napi::TypeError::New(env, "Invalid parameters.");
   }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    char* skidentifier = ToSKString(isolate, args[0].As<String>());
-    char* skresource = ToSKString(isolate, args[1].As<String>());
-    CJObject skparams = args[2].As<External>()->Value();
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    char* skidentifier = ToSKString(info[0]);
+    char* skresource = ToSKString(info[1]);
+    CJObject skparams = info[2].As<Napi::External<void>>().Data();
     CJSON skresult =
         SkipRuntime_Runtime__createResource(skidentifier, skresource, skparams);
-    args.GetReturnValue().Set(External::New(isolate, skresult));
+    result = Napi::External<void>::New(env, skresult);
   });
+  return result;
 }
 
-void CloseResourceOfRuntime(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (!args[0]->IsString()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a string.")));
-    return;
+Napi::Value CloseResourceOfRuntime(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (!info[0].IsString()) {
+    throw Napi::TypeError::New(env, "The parameter must be a string.");
   }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    char* skidentifier = ToSKString(isolate, args[0].As<String>());
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    char* skidentifier = ToSKString(info[0]);
     double skerror = SkipRuntime_Runtime__closeResource(skidentifier);
-    args.GetReturnValue().Set(Number::New(isolate, skerror));
+    result = Napi::Number::New(env, skerror);
   });
+  return result;
 }
 
-void UnsubscribeOfRuntime(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (!args[0]->IsString()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a string.")));
-    return;
-  };
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    char* sksession = ToSKString(isolate, args[0].As<String>());
+Napi::Value UnsubscribeOfRuntime(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (!info[0].IsString()) {
+    throw Napi::TypeError::New(env, "The parameter must be a string.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    char* sksession = ToSKString(info[0]);
     double skerror = SkipRuntime_Runtime__unsubscribe(sksession);
-    args.GetReturnValue().Set(Number::New(isolate, skerror));
+    result = Napi::Number::New(env, skerror);
   });
+  return result;
 }
 
-void SubscribeOfRuntime(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (!args[0]->IsString()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a string.")));
-    return;
+/* Subscribe: returns a 64-bit session id wrapped as a JS BigInt. */
+
+Napi::Value SubscribeOfRuntime(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (!info[0].IsString()) {
+    throw Napi::TypeError::New(env, "The first parameter must be a string.");
   }
-  if (!args[1]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The second parameter must be a pointer.")));
-    return;
+  if (!info[1].IsExternal()) {
+    throw Napi::TypeError::New(env, "The second parameter must be a pointer.");
   }
-  if (!args[2]->IsString() && !args[2]->IsNull() && !args[2]->IsUndefined()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(FromUtf8(
-        isolate, "The third parameter must be a string or undefined.")));
-    return;
-  };
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    char* skidentifier = ToSKString(isolate, args[0].As<String>());
-    SKNotifier sknotifier = args[1].As<External>()->Value();
+  if (!info[2].IsString() && !info[2].IsNull() && !info[2].IsUndefined()) {
+    throw Napi::TypeError::New(
+        env, "The third parameter must be a string or undefined.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    char* skidentifier = ToSKString(info[0]);
+    SKNotifier sknotifier = info[1].As<Napi::External<void>>().Data();
     char* skwatermark = nullptr;
-    if (args[2]->IsString()) {
-      skwatermark = ToSKString(isolate, args[2].As<String>());
+    if (info[2].IsString()) {
+      skwatermark = ToSKString(info[2]);
     }
     int64_t session =
         SkipRuntime_Runtime__subscribe(skidentifier, sknotifier, skwatermark);
-    args.GetReturnValue().Set(BigInt::New(isolate, session));
+    result = Napi::BigInt::New(env, session);
   });
+  return result;
 }
 
-void GetAllOfRuntime(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (!args[0]->IsString()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a string.")));
-    return;
+Napi::Value GetAllOfRuntime(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (!info[0].IsString()) {
+    throw Napi::TypeError::New(env, "The first parameter must be a string.");
   }
-  if (!args[1]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The second parameter must be a pointer.")));
-    return;
+  if (!info[1].IsExternal()) {
+    throw Napi::TypeError::New(env, "The second parameter must be a pointer.");
   }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    char* skresource = ToSKString(isolate, args[0].As<String>());
-    CJObject skparams = args[1].As<External>()->Value();
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    char* skresource = ToSKString(info[0]);
+    CJObject skparams = info[1].As<Napi::External<void>>().Data();
     CJSON skresult = SkipRuntime_Runtime__getAll(skresource, skparams);
-    args.GetReturnValue().Set(External::New(isolate, skresult));
+    result = Napi::External<void>::New(env, skresult);
   });
+  return result;
 }
 
-void GetForKeyOfRuntime(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (!args[0]->IsString()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a string.")));
-    return;
+Napi::Value GetForKeyOfRuntime(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (!info[0].IsString()) {
+    throw Napi::TypeError::New(env, "The first parameter must be a string.");
   }
-  if (!args[1]->IsExternal() || !args[2]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(FromUtf8(
-        isolate, "The second and third parameters must be pointers.")));
-    return;
+  if (!info[1].IsExternal() || !info[2].IsExternal()) {
+    throw Napi::TypeError::New(
+        env, "The second and third parameters must be pointers.");
   }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    char* skresource = ToSKString(isolate, args[0].As<String>());
-    CJObject skparams = args[1].As<External>()->Value();
-    CJSON skkey = args[2].As<External>()->Value();
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    char* skresource = ToSKString(info[0]);
+    CJObject skparams = info[1].As<Napi::External<void>>().Data();
+    CJSON skkey = info[2].As<Napi::External<void>>().Data();
     CJSON skresult =
         SkipRuntime_Runtime__getForKey(skresource, skparams, skkey);
-    args.GetReturnValue().Set(External::New(isolate, skresult));
+    result = Napi::External<void>::New(env, skresult);
   });
+  return result;
 }
 
-void UpdateOfRuntime(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (!args[0]->IsString()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a string.")));
-    return;
+Napi::Value UpdateOfRuntime(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (!info[0].IsString()) {
+    throw Napi::TypeError::New(env, "The first parameter must be a string.");
   }
-  if (!args[1]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The second parameter must be a pointer.")));
-    return;
+  if (!info[1].IsExternal()) {
+    throw Napi::TypeError::New(env, "The second parameter must be a pointer.");
   }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    char* skinput = ToSKString(isolate, args[0].As<String>());
-    CJSON skvalues = args[1].As<External>()->Value();
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    char* skinput = ToSKString(info[0]);
+    CJSON skvalues = info[1].As<Napi::External<void>>().Data();
     CJSON skresult = SkipRuntime_Runtime__update(skinput, skvalues);
-    args.GetReturnValue().Set(External::New(isolate, skresult));
+    result = Napi::External<void>::New(env, skresult);
   });
+  return result;
 }
 
-void ForkOfRuntime(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameters.")));
-    return;
+Napi::Value ForkOfRuntime(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 1) {
+    throw Napi::TypeError::New(env, "Must have one parameter.");
   }
-  if (!args[0]->IsString()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a string.")));
-    return;
+  if (!info[0].IsString()) {
+    throw Napi::TypeError::New(env, "The parameter must be a string.");
   }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    char* skname = ToSKString(isolate, args[0].As<String>());
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    char* skname = ToSKString(info[0]);
     double skerror = SkipRuntime_Runtime__fork(skname);
-    args.GetReturnValue().Set(Number::New(isolate, skerror));
+    result = Napi::Number::New(env, skerror);
   });
+  return result;
 }
 
-void MergeOfRuntime(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
-    return;
-  };
-  if (!args[0]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a pointer.")));
-    return;
-  };
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
+Napi::Value MergeOfRuntime(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 1) {
+    throw Napi::TypeError::New(env, "Must have one parameter.");
+  }
+  if (!info[0].IsExternal()) {
+    throw Napi::TypeError::New(env, "The parameter must be a pointer.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
     double skerror =
-        SkipRuntime_Runtime__merge(args[0].As<External>()->Value());
-    args.GetReturnValue().Set(Number::New(isolate, skerror));
+        SkipRuntime_Runtime__merge(info[0].As<Napi::External<void>>().Data());
+    result = Napi::Number::New(env, skerror);
   });
+  return result;
 }
 
-void AbortForkOfRuntime(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
+Napi::Value AbortForkOfRuntime(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  Napi::Value result;
+  NatTryCatch(env, [&result, env](Napi::Env) {
     double skerror = SkipRuntime_Runtime__abortFork();
-    args.GetReturnValue().Set(Number::New(isolate, skerror));
+    result = Napi::Number::New(env, skerror);
   });
+  return result;
 }
 
-void ForkExistsOfRuntime(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
-    return;
+Napi::Value ForkExistsOfRuntime(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 1) {
+    throw Napi::TypeError::New(env, "Must have one parameter.");
   }
-  if (!args[0]->IsString()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a string.")));
-    return;
+  if (!info[0].IsString()) {
+    throw Napi::TypeError::New(env, "The parameter must be a string.");
   }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    char* skname = ToSKString(isolate, args[0].As<String>());
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    char* skname = ToSKString(info[0]);
     uint32_t skexists = SkipRuntime_Runtime__forkExists(skname);
-    args.GetReturnValue().Set(Boolean::New(isolate, skexists != 0));
+    result = Napi::Boolean::New(env, skexists != 0);
   });
+  return result;
 }
 
-void ReloadOfRuntime(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
-    return;
-  };
-  if (!args[0]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameters must be pointer.")));
-    return;
+Napi::Value ReloadOfRuntime(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 1) {
+    throw Napi::TypeError::New(env, "Must have one parameter.");
   }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
+  if (!info[0].IsExternal()) {
+    throw Napi::TypeError::New(env, "The parameter must be a pointer.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
     CJSON skresult =
-        SkipRuntime_Runtime__reload(args[0].As<External>()->Value());
-    args.GetReturnValue().Set(External::New(isolate, skresult));
+        SkipRuntime_Runtime__reload(info[0].As<Napi::External<void>>().Data());
+    result = Napi::External<void>::New(env, skresult);
   });
+  return result;
 }
 
-void CloseResourceStreamsOfRuntime(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
-    return;
-  };
-  if (!args[0]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a pointer.")));
-    return;
-  };
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
+Napi::Value CloseResourceStreamsOfRuntime(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 1) {
+    throw Napi::TypeError::New(env, "Must have one parameter.");
+  }
+  if (!info[0].IsExternal()) {
+    throw Napi::TypeError::New(env, "The parameter must be a pointer.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
     double skerror = SkipRuntime_Runtime__closeResourceStreams(
-        args[0].As<External>()->Value());
-    args.GetReturnValue().Set(Number::New(isolate, skerror));
+        info[0].As<Napi::External<void>>().Data());
+    result = Napi::Number::New(env, skerror);
   });
+  return result;
 }
 
-void GetToJSBinding(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  Local<Object> binding = Object::New(isolate);
-  AddFunction(isolate, binding, "SkipRuntime_CollectionWriter__update",
+/* Assemble the binding object exposed to JS. */
+
+Napi::Value GetToJSBinding(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  Napi::Object binding = Napi::Object::New(env);
+  AddFunction(env, binding, "SkipRuntime_CollectionWriter__update",
               UpdateOfCollectionWriter);
   //
-  AddFunction(isolate, binding, "SkipRuntime_Context__createLazyCollection",
+  AddFunction(env, binding, "SkipRuntime_Context__createLazyCollection",
               CreateLazyCollectionOfContext);
-  AddFunction(isolate, binding, "SkipRuntime_Context__jsonExtract",
+  AddFunction(env, binding, "SkipRuntime_Context__jsonExtract",
               JSONExtractOfContext);
-  AddFunction(isolate, binding, "SkipRuntime_Context__useExternalResource",
+  AddFunction(env, binding, "SkipRuntime_Context__useExternalResource",
               UseExternalResourceOfContext);
+  AddFunction(env, binding, "SkipRuntime_ServiceDefinition__fetch",
+              FetchOfServiceDefinition);
+  AddFunction(env, binding, "SkipRuntime_setLazyCollectionValue",
+              SetLazyCollectionValue);
   //
-  AddFunction(isolate, binding, "SkipRuntime_createMapper", CreateMapper);
-  AddFunction(isolate, binding, "SkipRuntime_createLazyCompute",
-              CreateLazyCompute);
-  AddFunction(isolate, binding, "SkipRuntime_createResource", CreateResource);
-  AddFunction(isolate, binding, "SkipRuntime_createService", CreateService);
-  AddFunction(isolate, binding, "SkipRuntime_createNotifier", CreateNotifier);
-  AddFunction(isolate, binding, "SkipRuntime_createReducer", CreateReducer);
+  AddFunction(env, binding, "SkipRuntime_createMapper", CreateMapper);
+  AddFunction(env, binding, "SkipRuntime_createLazyCompute", CreateLazyCompute);
+  AddFunction(env, binding, "SkipRuntime_createResource", CreateResource);
+  AddFunction(env, binding, "SkipRuntime_createService", CreateService);
+  AddFunction(env, binding, "SkipRuntime_createNotifier", CreateNotifier);
+  AddFunction(env, binding, "SkipRuntime_createReducer", CreateReducer);
   //
-  AddFunction(isolate, binding, "SkipRuntime_initService", InitService);
-  AddFunction(isolate, binding, "SkipRuntime_closeService", CloseService);
+  AddFunction(env, binding, "SkipRuntime_initService", InitService);
+  AddFunction(env, binding, "SkipRuntime_closeService", CloseService);
   //
-  AddFunction(isolate, binding, "SkipRuntime_Collection__getArray",
+  AddFunction(env, binding, "SkipRuntime_Collection__getArray",
               GetArrayOfEagerCollection);
-  AddFunction(isolate, binding, "SkipRuntime_Collection__map",
+  AddFunction(env, binding, "SkipRuntime_Collection__map",
               MapOfEagerCollection);
-  AddFunction(isolate, binding, "SkipRuntime_Collection__mapReduce",
+  AddFunction(env, binding, "SkipRuntime_Collection__mapReduce",
               MapReduceOfEagerCollection);
-  AddFunction(isolate, binding, "SkipRuntime_Collection__nativeMapReduce",
+  AddFunction(env, binding, "SkipRuntime_Collection__nativeMapReduce",
               NativeMapReduceOfEagerCollection);
-  AddFunction(isolate, binding, "SkipRuntime_Collection__reduce",
+  AddFunction(env, binding, "SkipRuntime_Collection__reduce",
               ReduceOfEagerCollection);
-  AddFunction(isolate, binding, "SkipRuntime_Collection__nativeReduce",
+  AddFunction(env, binding, "SkipRuntime_Collection__nativeReduce",
               NativeReduceOfEagerCollection);
-  AddFunction(isolate, binding, "SkipRuntime_Collection__slice",
+  AddFunction(env, binding, "SkipRuntime_Collection__slice",
               SliceOfEagerCollection);
-  AddFunction(isolate, binding, "SkipRuntime_Collection__take",
+  AddFunction(env, binding, "SkipRuntime_Collection__take",
               TakeOfEagerCollection);
-  AddFunction(isolate, binding, "SkipRuntime_Collection__merge",
+  AddFunction(env, binding, "SkipRuntime_Collection__merge",
               MergeOfEagerCollection);
-  AddFunction(isolate, binding, "SkipRuntime_Collection__size",
+  AddFunction(env, binding, "SkipRuntime_Collection__size",
               SizeOfEagerCollection);
   //
-  AddFunction(isolate, binding, "SkipRuntime_NonEmptyIterator__next",
+  AddFunction(env, binding, "SkipRuntime_NonEmptyIterator__next",
               NextOfNonEmptyIterator);
   //
-  AddFunction(isolate, binding, "SkipRuntime_LazyCollection__getArray",
+  AddFunction(env, binding, "SkipRuntime_LazyCollection__getArray",
               GetArrayOfLazyCollection);
   //
-  AddFunction(isolate, binding, "SkipRuntime_Runtime__createResource",
+  AddFunction(env, binding, "SkipRuntime_Runtime__createResource",
               CreateResourceOfRuntime);
-  AddFunction(isolate, binding, "SkipRuntime_Runtime__closeResource",
+  AddFunction(env, binding, "SkipRuntime_Runtime__closeResource",
               CloseResourceOfRuntime);
-  AddFunction(isolate, binding, "SkipRuntime_Runtime__subscribe",
+  AddFunction(env, binding, "SkipRuntime_Runtime__subscribe",
               SubscribeOfRuntime);
-  AddFunction(isolate, binding, "SkipRuntime_Runtime__unsubscribe",
+  AddFunction(env, binding, "SkipRuntime_Runtime__unsubscribe",
               UnsubscribeOfRuntime);
-  AddFunction(isolate, binding, "SkipRuntime_Runtime__getAll", GetAllOfRuntime);
-  AddFunction(isolate, binding, "SkipRuntime_Runtime__getForKey",
+  AddFunction(env, binding, "SkipRuntime_Runtime__getAll", GetAllOfRuntime);
+  AddFunction(env, binding, "SkipRuntime_Runtime__getForKey",
               GetForKeyOfRuntime);
-  AddFunction(isolate, binding, "SkipRuntime_Runtime__update", UpdateOfRuntime);
-  AddFunction(isolate, binding, "SkipRuntime_Runtime__fork", ForkOfRuntime);
-  AddFunction(isolate, binding, "SkipRuntime_Runtime__merge", MergeOfRuntime);
-  AddFunction(isolate, binding, "SkipRuntime_Runtime__abortFork",
+  AddFunction(env, binding, "SkipRuntime_Runtime__update", UpdateOfRuntime);
+  AddFunction(env, binding, "SkipRuntime_Runtime__fork", ForkOfRuntime);
+  AddFunction(env, binding, "SkipRuntime_Runtime__merge", MergeOfRuntime);
+  AddFunction(env, binding, "SkipRuntime_Runtime__abortFork",
               AbortForkOfRuntime);
-  AddFunction(isolate, binding, "SkipRuntime_Runtime__forkExists",
+  AddFunction(env, binding, "SkipRuntime_Runtime__forkExists",
               ForkExistsOfRuntime);
-  AddFunction(isolate, binding, "SkipRuntime_Runtime__reload", ReloadOfRuntime);
-  AddFunction(isolate, binding, "SkipRuntime_Runtime__closeResourceStreams",
+  AddFunction(env, binding, "SkipRuntime_Runtime__reload", ReloadOfRuntime);
+  AddFunction(env, binding, "SkipRuntime_Runtime__closeResourceStreams",
               CloseResourceStreamsOfRuntime);
 
-  args.GetReturnValue().Set(binding);
+  return binding;
 }
 
 }  // namespace skipruntime
