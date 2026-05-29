@@ -33,6 +33,29 @@ case "$ARCH" in
   *) echo "unsupported architecture: $ARCH"; exit 1
 esac
 
+# check glibc version: libskipruntime.so is built against glibc 2.41
+# (Debian 13 / Ubuntu 24.04 / RHEL 10). Older hosts must use @skipruntime/wasm.
+REQUIRED_GLIBC=2.41
+if ! command -v ldd >/dev/null; then
+  echo "warning: cannot detect glibc version (ldd not found); proceeding anyway" >&2
+else
+  GLIBC_VERSION=$(ldd --version 2>&1 | head -1 | grep -oE '[0-9]+\.[0-9]+' | tail -1)
+  if [ -z "$GLIBC_VERSION" ]; then
+    echo "warning: failed to parse glibc version; proceeding anyway" >&2
+  elif [ "$(printf '%s\n%s\n' "$REQUIRED_GLIBC" "$GLIBC_VERSION" | sort -V | head -1)" != "$REQUIRED_GLIBC" ]; then
+    cat >&2 <<EOF
+error: glibc $GLIBC_VERSION is older than required $REQUIRED_GLIBC
+
+libskipruntime.so v${VERSION} requires glibc >= $REQUIRED_GLIBC
+(Debian 13+, Ubuntu 24.04+, RHEL 10+).
+
+If you cannot upgrade your system, install the WebAssembly runtime instead:
+  npm install @skipruntime/wasm
+EOF
+    exit 1
+  fi
+fi
+
 SKIPRUNTIME_BIN="libskipruntime.so-${OS}-${ARCH}"
 SKIPRUNTIME_BIN_URL="${SOURCE}/v${VERSION}/${SKIPRUNTIME_BIN}"
 TMP_BIN="${TMP}/${SKIPRUNTIME_BIN}"
