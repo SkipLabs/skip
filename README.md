@@ -41,7 +41,7 @@ npm install @skiplabs/skip
 
 Two versions of the runtime are available, a Wasm `@skipruntime/wasm` and a native `@skipruntime/native`.
 The Wasm runtime is installed by default. It works with both `node` and `bun`, but is limited to Wasm's 32-bit memory address space.
-The native runtime does not have this limitation, but it is currently only available for Node and is a bit more involved to install (see [instructions](./INSTALL.md)).
+The native runtime does not have this limitation, but it is currently only available for Node on Linux (`amd64` or `arm64`) with glibc ≥ 2.41 (Debian 13+, Ubuntu 24.04+, RHEL 10+), and is a bit more involved to install (see [instructions](./INSTALL.md)).
 
 From there, you're ready to start building a reactive service!
 See the [getting started guide](https://skiplabs.io/docs/getting_started) to walk through some of Skip's core concepts by example and get up to speed.
