@@ -79,12 +79,8 @@ class MessagesResource implements Resource<ResourceInputs> {
   }
 }
 
-export const service: SkipService<
-  Record<string, never>,
-  Record<string, never>,
-  ResourceInputs
-> = {
-  inputs: {},
+export const service: SkipService<Record<string, never>, ResourceInputs> = {
+  initialData: {},
   resources: { messages: MessagesResource },
   externalServices: { kafka },
   createGraph(_: Record<string, never>, context: Context): ResourceInputs {

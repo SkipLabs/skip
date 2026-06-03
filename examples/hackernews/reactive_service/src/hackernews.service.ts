@@ -5,7 +5,6 @@ import {
   type Values,
   type Resource,
   type SkipService,
-  InputDefinition,
 } from "@skipruntime/core";
 
 import { PostgresExternalService } from "@skip-adapter/postgres";
@@ -20,7 +19,6 @@ import type {
   Session,
   Upvote,
   User,
-  PostsServiceInputsDef,
 } from "./types.js";
 
 // Default user for posts where the author is not found
@@ -28,11 +26,11 @@ const unknownUser: User = { name: "unknown author", email: "unknown email" };
 
 // Initialize PostgreSQL connection
 const postgres = new PostgresExternalService({
-  host: process.env["PG_HOST"] || "db",
+  host: process.env["PG_HOST"] ?? "db",
   port: Number(process.env["PG_PORT"]) || 5432,
-  database: process.env["PG_DATABASE"] || "postgres",
-  user: process.env["PG_USER"] || "postgres",
-  password: process.env["PG_PASSWORD"] || "change_me",
+  database: process.env["PG_DATABASE"] ?? "postgres",
+  user: process.env["PG_USER"] ?? "postgres",
+  password: process.env["PG_PASSWORD"] ?? "change_me",
 });
 
 /**
@@ -181,13 +179,9 @@ class SessionsResource implements Resource<SessionsResourceInputs> {
  * Main service definition
  * Configures resources, external services, and data flow
  */
-export const service: SkipService<
-  PostsServiceInputsDef,
-  PostsServiceInputs,
-  PostsResourceInputs
-> = {
-  inputs: {
-    sessions: new InputDefinition([]),
+export const service: SkipService<PostsServiceInputs, PostsResourceInputs> = {
+  initialData: {
+    sessions: [],
   },
   resources: { posts: PostsResource, sessions: SessionsResource },
   externalServices: { postgres },

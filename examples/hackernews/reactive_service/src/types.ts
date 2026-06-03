@@ -1,4 +1,4 @@
-import type { EagerCollection, InputDefinition } from "@skipruntime/core";
+import type { EagerCollection } from "@skipruntime/core";
 
 type Post = {
   author_id: number;
@@ -28,10 +28,6 @@ type PostWithUpvoteCount = Omit<Post, "author_id"> & {
 
 type Session = User & {
   user_id: number;
-};
-
-export type PostsServiceInputsDef = {
-  readonly sessions: InputDefinition<string, Session>;
 };
 
 type PostsServiceInputs = {

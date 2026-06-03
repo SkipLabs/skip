@@ -119,12 +119,8 @@ class PostsResource implements Resource<PostsResourceInputs> {
 
 type PostsServiceInputs = Record<string, never>;
 
-export const service: SkipService<
-  PostsServiceInputs,
-  PostsServiceInputs,
-  PostsResourceInputs
-> = {
-  inputs: {},
+export const service: SkipService<PostsServiceInputs, PostsResourceInputs> = {
+  initialData: {},
   resources: { posts: PostsResource },
   externalServices: { postgres },
   createGraph(
