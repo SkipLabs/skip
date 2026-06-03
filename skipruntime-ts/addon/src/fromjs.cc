@@ -61,7 +61,7 @@ void* SkipRuntime_getFork() {
                                       "SkipRuntime_getFork", {});
 }
 
-u_int32_t SkipRuntime_getChangeManager() {
+uint32_t SkipRuntime_getChangeManager() {
   Napi::Env env = kExternFunctions.Env();
   Napi::Object externFunctions = kExternFunctions.Value();
   return (uint32_t)CallJSNumberFunction(env, externFunctions,
