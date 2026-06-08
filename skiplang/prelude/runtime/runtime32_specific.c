@@ -141,8 +141,8 @@ void SKIP_print_persistent_size() {
   // Not implemented
 }
 
-uint32_t SKIP_get_persistent_size() {
-  return (uint32_t)bump_pointer;
+int64_t SKIP_get_persistent_size() {
+  return (int64_t)bump_pointer;
 }
 
 void SKIP_time() {

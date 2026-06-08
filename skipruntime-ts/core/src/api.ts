@@ -497,6 +497,26 @@ export type InitialData<Inputs extends NamedCollections> = {
 };
 
 /**
+ * Configuration for the resource garbage collector.
+ * Returned by SkipService.gcConfig; all fields are optional and any
+ * unspecified field keeps its current value.
+ */
+export interface GCConfig {
+  enabled?: boolean;
+  /**
+   * How long (ms) a resource may stay queued before collection. 0 collects
+   * almost immediately; a negative value disables time-based eviction.
+   */
+  ttlMillis?: number;
+  /**
+   * Cap on the number of queued entries; oldest are evicted past the cap.
+   * null or a negative value means no cap; 0 evicts the whole queue each sweep.
+   */
+  maxGarbageSize?: number | null;
+  logsEnabled?: boolean;
+}
+
+/**
  * A Skip reactive service encapsulating a reactive computation.
  *
  * A reactive Skip service is defined by a class implementing this `SkipService` interface.
@@ -568,4 +588,9 @@ export interface SkipService<
    * @returns Reactive collections accessible to the resources.
    */
   createGraph(inputCollections: Inputs, context: Context): ResourceInputs;
+  /**
+   * Optional garbage-collection configuration provider.
+   * Called each time the runtime needs the current GC config.
+   */
+  gcConfig?: () => GCConfig;
 }

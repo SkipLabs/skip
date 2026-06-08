@@ -204,6 +204,14 @@ void SkipRuntime_deleteService(uint32_t serviceId) {
   CallJSVoidFunction(env, externFunctions, "SkipRuntime_deleteService", args);
 }
 
+CJObject SkipRuntime_callGCConfigProvider() {
+  Napi::Env env = kExternFunctions.Env();
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {};
+  return CallJSFunction(env, externFunctions,
+                        "SkipRuntime_callGCConfigProvider", args);
+}
+
 double SkipRuntime_ServiceDefinition__subscribe(uint32_t serviceId,
                                                 char* collection,
                                                 char* supplier, char* sessionId,
