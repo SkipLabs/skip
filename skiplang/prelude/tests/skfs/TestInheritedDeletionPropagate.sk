@@ -1,0 +1,47 @@
+module alias T = SKTest;
+module alias SK = SKStore;
+
+module SKStoreTest;
+
+// Confirms the `created < tick` guard does NOT break propagation of a real
+// deletion: an inherited dir (created strictly before the fork) that is
+// deleted and purged is still propagated to a lagging target. This is the
+// counterpart of testImportPreservesLocalDirs — together they show the guard
+// separates inherited dirs (deletable) from local additions (protected).
+@test
+fun testInheritedDeletionPropagates(): void {
+  _ = SK.newObstack();
+  cName = SK.DirName::create("/c/");
+  source = SK.Context::create{}.mclone();
+  _ = source.mkdir(
+    SK.IID::keyType,
+    SK.IntFile::type,
+    cName,
+    Array[(SK.IID(0), SK.IntFile(0))],
+  );
+  source.update();
+  tickFork = source.getTick();
+  // /c/ is inherited with created < tickFork (an update ran after its mkdir).
+  source.unsafeMaybeGetEagerDir(cName) match {
+  | Some(d @ SK.EagerDir _) ->
+    T.expectTrue(d.created.value < tickFork.value, "/c/ created before fork")
+  | _ -> T.fail("/c/ should be an eager dir")
+  };
+  target = source.mclone();
+  // Delete /c/ in source, then purge past tickFork.
+  source.removeDir(cName);
+  source.update();
+  source.update();
+  purged = source.purgeDeletedDirs(source.getTick());
+  T.expectTrue(purged > 0, "Tombstone for /c/ was purged");
+  (isPurged, _, _) = source.getDirsChangesAfter(tickFork);
+  T.expectTrue(isPurged, "purged flag true for tickFork");
+  SK.import(target, tickFork, source);
+  T.expectTrue(
+    target.maybeGetDir(cName) is Some(SK.DeletedDir _),
+    "Inherited /c/ was deleted in source; its deletion must propagate to the " +
+      "lagging target even with the created < tick guard",
+  );
+}
+
+module end;

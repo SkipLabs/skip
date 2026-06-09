@@ -387,6 +387,8 @@ mutable base class WriteChecker {
 mutable class Context private {
   private mutable toPurge: SortedSet<DirName> = SortedSet[],
   private mutable dirs: Dirs = Dirs{},
+  private mutable deletedDirs: SortedSet<DirName> = SortedSet[],
+  private mutable dirsTombLimit: ?Tick = None(),
   mutable reads: SortedSet<Path> = SortedSet[],
   private mutable time: Time = Time(0),
   /* Invariant: tick is only updated at the end of updateWithStatus */
@@ -439,12 +441,13 @@ mutable class Context private {
     if (this.unsafeMaybeGetEagerDir(dirName).isSome()) {
       throw DirAlreadyExists(dirName)
     };
-    from.unsafeGetDir(dirName) match {
-    | DeletedDir _ -> false
-    | lazy @ LazyDir _ ->
+    from.unsafeMaybeGetDir(dirName) match {
+    | None() -> false
+    | Some(DeletedDir _) -> false
+    | Some(lazy @ LazyDir _) ->
       this.setDir(lazy);
       true
-    | eager @ EagerDir _ ->
+    | Some(eager @ EagerDir _) ->
       if (eager.input) {
         this.setDir(eager)
       } else {
@@ -546,6 +549,8 @@ mutable class Context private {
     mutable static{
       toPurge => this.toPurge,
       dirs => this.dirs,
+      deletedDirs => this.deletedDirs,
+      dirsTombLimit => this.dirsTombLimit,
       reads => this.reads,
       time => this.time,
       tick => this.tick,
@@ -579,6 +584,8 @@ mutable class Context private {
   mutable fun replaceFromSaved(ctx: readonly Context): void {
     this.!toPurge = ctx.toPurge;
     this.!dirs = ctx.dirs;
+    this.!deletedDirs = ctx.deletedDirs;
+    this.!dirsTombLimit = ctx.dirsTombLimit;
     this.!reads = ctx.reads;
     this.!time = ctx.time;
     this.!tick = ctx.tick;
@@ -906,7 +913,7 @@ mutable class Context private {
     ignoredSessions: Set<String> = Set[],
   ): void {
     changedDirNames = this.getGlobal("CHANGED_DIRS") match {
-    | None() -> this.getDirsChangesAfter(start)
+    | None() -> this.getDirsChangesAfter(start).i1
     | Some(x @ ChangedDirs _) -> x.value
     | _ -> invariant_violation("Wrong type for CHANGED_DIRS")
     };
@@ -1036,6 +1043,10 @@ mutable class Context private {
   mutable fun setDir(dir: Dir): void {
     dirName = dir.getDirName();
     this.!dirs = this.dirs.set(this.tick, dirName, dir);
+    dir match {
+    | DeletedDir _ -> this.!deletedDirs = this.deletedDirs.set(dirName)
+    | _ -> void
+    };
   }
 
   mutable fun getDir(dirName: DirName): Dir {
@@ -1146,6 +1157,7 @@ mutable class Context private {
         this.fromContext match {
         | Some(from) ->
           from.unsafeMaybeGetDir(dirName) match {
+          | None() -> false
           | Some(DeletedDir _) -> false
           | _ -> true
           }
@@ -1158,6 +1170,32 @@ mutable class Context private {
       this.!sharedSubDirsRefCount = this.sharedSubDirsRefCount.remove(dirName);
       this.setDir(DeletedDir::ofDir(dir))
     };
+  }
+  // Purge DeletedDir tombstones older than `limit`. Tombstones newer than
+  // `limit` are kept so a lagging import can still observe the deletion (see
+  // getDirsChangesAfter). When something is purged, advance dirsTombLimit
+  // monotonically: below that tick deletions are no longer visible as
+  // tombstones, and import must fall back to the full live-dir list.
+  mutable fun purgeDeletedDirs(limit: Tick): Int {
+    purged = 0;
+    stillTracked = SortedSet[];
+    for (dirName in this.deletedDirs) {
+      this.dirs.maybeGetWithTick(dirName) match {
+      | Some((DeletedDir _, tick)) if (tick.value < limit.value) ->
+        this.!dirs = this.dirs.removeDir(dirName);
+        !purged = purged + 1
+      | Some((DeletedDir _, _)) -> !stillTracked = stillTracked.set(dirName)
+      | _ -> void
+      }
+    };
+    this.!deletedDirs = stillTracked;
+    if (purged > 0) {
+      this.!dirsTombLimit = this.dirsTombLimit match {
+      | Some(prev) if (prev.value >= limit.value) -> Some(prev)
+      | _ -> Some(limit)
+      }
+    };
+    purged
   }
 
   readonly fun transitiveChildDirs(dirName: DirName): SortedSet<DirName> {
@@ -1219,8 +1257,24 @@ mutable class Context private {
     this.dirs.values()
   }
 
-  readonly fun getDirsChangesAfter(start: Tick): SortedSet<DirName> {
-    this.dirs.getChangesAfter(start)
+  // (purged, changed, allExisting):
+  //  - changed: dirs changed after `start` (the usual diff)
+  //  - purged: true if start <= dirsTombLimit, i.e. deletions in that window
+  //    were purged and are no longer present in `changed`
+  //  - allExisting: when purged, the full set of live dir names so a lagging
+  //    import can deduce deletions by absence; empty otherwise.
+  readonly fun getDirsChangesAfter(
+    start: Tick,
+  ): (Bool, SortedSet<DirName>, SortedSet<DirName>) {
+    changed = this.dirs.getChangesAfter(start);
+    this.dirsTombLimit match {
+    | Some(limit) if (start.value <= limit.value) ->
+      (true, changed, this.dirs.aliveDirNames())
+    | _ -> (false, changed, SortedSet[])
+    }
+  }
+  readonly fun aliveDirNames(): SortedSet<DirName> {
+    this.dirs.aliveDirNames()
   }
 
   mutable fun addToPurge(dirName: DirName): void {
@@ -1282,6 +1336,21 @@ private class Dirs{private state: DMap<DirName, Dir> = DMap::empty()} {
   fun maybeGet(key: DirName): ?Dir {
     this.state.maybeGet(key)
   }
+  fun maybeGetWithTick(key: DirName): ?(Dir, Tick) {
+    this.state.maybeGetWithTick(key)
+  }
+  // Names of all live dirs (DeletedDir tombstones excluded).
+  fun aliveDirNames(): SortedSet<DirName> {
+    result = SortedSet[];
+    this.state.items().each(kv -> {
+      (dirName, dir) = kv;
+      dir match {
+      | DeletedDir _ -> void
+      | _ -> !result = result.set(dirName)
+      }
+    });
+    result
+  }
   fun get(key: DirName): Dir {
     this.maybeGet(key) match {
     | None() ->
@@ -1290,11 +1359,18 @@ private class Dirs{private state: DMap<DirName, Dir> = DMap::empty()} {
     | Some(x) -> x
     }
   }
+
   fun values(): mutable Iterator<Dir> {
     this.state.values()
   }
+
   fun getChangesAfter(start: Tick): SortedSet<DirName> {
     this.state.getChangesAfter(start)
+  }
+
+  fun removeDir(key: DirName): this {
+    !this.state = this.state.remove(key);
+    this
   }
 }
 
@@ -1312,12 +1388,28 @@ fun import(
   tick: Tick,
   sourceCtx: readonly Context,
 ): void {
-  changedDirNames = sourceCtx.getDirsChangesAfter(tick);
+  (purged, changedDirNames, allExisting) = sourceCtx.getDirsChangesAfter(tick);
   for (dirName in changedDirNames) {
     sourceCtx.unsafeMaybeGetDir(dirName) match {
     | Some(DeletedDir{}) -> targetCtx.removeDir(dirName)
     | Some(dir @ EagerDir _) -> dir.import{targetCtx, tick}
     | _ -> void
+    }
+  };
+  // Source purged its tombstones before `tick`: deletions in that window are
+  // absent from changedDirNames. Deduce them by absence — any dir the target
+  // still has that is no longer in the source's live set was deleted.
+  // Precondition: target was forked from source at `tick`. An inherited dir
+  // has created < tick, so this guard spares dirs created locally afterwards.
+  if (purged) {
+    for (dirName in targetCtx.aliveDirNames()) {
+      targetCtx.unsafeMaybeGetDir(dirName) match {
+      | Some(
+        dir @ EagerDir _,
+      ) if (dir.created < tick && !allExisting.contains(dirName)) ->
+        targetCtx.removeDir(dirName)
+      | _ -> void
+      }
     }
   };
 }
@@ -1351,7 +1443,7 @@ fun resolveContext(
   | None() if (tick == root.getTick()) -> delta
   | None() -> invariant_violation("Concurrent access without synchronizer")
   | Some(sync) ->
-    changedDirs = delta.getDirsChangesAfter(tick);
+    changedDirs = delta.getDirsChangesAfter(tick).i1;
     try {
       sync.importFromRoot(delta, tick, root);
       None()
@@ -1375,6 +1467,12 @@ fun resolveContext(
     | Some(exn) -> return cloneContextWithError(root, exn)
     | None() -> void
     };
+    // Deletions inferred by absence during the imports are posted after the
+    // changedDirs snapshot above, so they are missing from it. Re-scan the
+    // final context so they reach CHANGED_DIRS and their subscribers are
+    // notified. Covers both import directions (posted on / propagated to
+    // newRoot).
+    !changedDirs = changedDirs.union(newRoot.getDirsChangesAfter(tick).i1);
 
     lockF match {
     | None() -> void
@@ -1383,7 +1481,7 @@ fun resolveContext(
         newRootTick = newRoot.getTick();
         f(newRoot, delta, root);
         !changedDirs = changedDirs.union(
-          newRoot.getDirsChangesAfter(newRootTick),
+          newRoot.getDirsChangesAfter(newRootTick).i1,
         );
         None()
       } catch {
@@ -1398,6 +1496,7 @@ fun resolveContext(
     };
     newRoot
   };
+  _ = context.purgeDeletedDirs(Tick(max(0, context.getTick().value - 1000)));
   context.purge();
   context
 }

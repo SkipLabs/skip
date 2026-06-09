@@ -202,7 +202,8 @@ test-%:
 
 .PHONY: test-native
 test-native: build/skdb
-	cd sql/ && SKARGO_PROFILE=$(SKARGO_PROFILE) SKDB_BIN=$(realpath build/skdb) ./test_sql.sh \
+	cd sql && skargo test --profile $(SKARGO_PROFILE)
+	@cd sql/ && SKARGO_PROFILE=$(SKARGO_PROFILE) SKDB_BIN=$(realpath build/skdb) ./test_sql.sh \
 	|tee /tmp/native-test.out ; \
 	! grep -v '\*\|^[[:blank:]]*$$\|OK\|PASS' /tmp/native-test.out
 

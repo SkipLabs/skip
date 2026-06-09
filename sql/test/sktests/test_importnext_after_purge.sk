@@ -1,0 +1,73 @@
+module alias T = SKTest;
+module alias SK = SKStore;
+module SKDBTest;
+
+// Proves the SKDB importNext path handles a lagging import after tombstone
+// purge: a source input dir /next/1/foo/ deleted then purged is still
+// propagated to the target's renamed /foo/ via absence deduction.
+fun testImportNextAfterPurge(): void {
+  _ = SK.newObstack();
+  nextFoo = SK.DirName::create("/next/foo/1/");
+  nextBar = SK.DirName::create("/next/bar/1/");
+  foo = SK.DirName::create("/foo/");
+  bar = SK.DirName::create("/bar/");
+
+  // Source: two input dirs in /next/ form.
+  source = SKDB.makeSqlContext().mclone();
+  _ = source.mkdir(
+    SK.IID::keyType,
+    SK.IntFile::type,
+    nextFoo,
+    Array[(SK.IID(0), SK.IntFile(0))],
+  );
+  _ = source.mkdir(
+    SK.IID::keyType,
+    SK.IntFile::type,
+    nextBar,
+    Array[(SK.IID(0), SK.IntFile(0))],
+  );
+  source.update();
+
+  tickBefore = source.getTick();
+
+  // Target: already holds the renamed dirs /foo/ and /bar/ (as inputs).
+  target = SKDB.makeSqlContext().mclone();
+  _ = target.mkdir(
+    SK.IID::keyType,
+    SK.IntFile::type,
+    foo,
+    Array[(SK.IID(0), SK.IntFile(0))],
+  );
+  _ = target.mkdir(
+    SK.IID::keyType,
+    SK.IntFile::type,
+    bar,
+    Array[(SK.IID(0), SK.IntFile(0))],
+  );
+  target.update();
+
+  // Delete /next/1/foo/ in source, then purge so the tombstone is gone.
+  source.removeDir(nextFoo);
+  source.update();
+  source.update();
+  purged = source.purgeDeletedDirs(source.getTick());
+  T.expectTrue(purged > 0, "Source tombstone purged");
+  T.expectTrue(source.maybeGetDir(nextFoo) is None _, "Tombstone gone");
+
+  // Lagging import from tickBefore (older than the purge). Without the fix
+  // the deletion is invisible; with it, importNext deduces /foo/ was deleted.
+  _ = SKDB.importNext(target, tickBefore, source);
+
+  T.expectTrue(
+    target.maybeGetDir(foo) is Some(SK.DeletedDir _),
+    "After a lagging importNext past a tombstone purge, /foo/ should " +
+      "be a DeletedDir (deletion deduced by absence), but it is still alive " +
+      "in the target — the deletion was lost",
+  );
+  T.expectTrue(
+    target.maybeGetDir(bar) is Some(SK.EagerDir _),
+    "/bar/ still alive in target",
+  );
+}
+
+module end;

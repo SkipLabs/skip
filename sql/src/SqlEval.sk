@@ -1187,7 +1187,7 @@ class Evaluator{options: Options, user: ?UserFile} {
           // If the deps haven't changed, that means we can reuse
           // the pre-computed data.
           if (sameDeps) {
-            changedDirNames = delta.getDirsChangesAfter(startTick);
+            changedDirNames = delta.getDirsChangesAfter(startTick).i1;
             for (changedDirName in changedDirNames) {
               if (context.unsafeMaybeGetDir(changedDirName).isNone()) {
                 context.setGlobal(
@@ -2055,7 +2055,7 @@ fun importNext(
   tick: SKStore.Tick,
   sourceCtx: readonly SKStore.Context,
 ): Bool {
-  changedDirNames = sourceCtx.getDirsChangesAfter(tick);
+  (purged, changedDirNames, allExisting) = sourceCtx.getDirsChangesAfter(tick);
   updates = mutable Map[];
   hasMultipleVersions = false;
   for (dirName in changedDirNames) {
@@ -2074,6 +2074,25 @@ fun importNext(
   for (targetDirName => src in updates) {
     (_version, dir) = src;
     dir.importNext{targetCtx, tick, targetDirName}
+  };
+  // Deduce deletions by absence (see import in the prelude). Source names are
+  // translated through makeInputDirName so the comparison is in the target's
+  // /table/ namespace. Precondition: target was forked from source at `tick`.
+  if (purged) {
+    expected = SortedSet[];
+    for (srcDirName in allExisting) {
+      (targetDirName, _version) = makeInputDirName(srcDirName);
+      !expected = expected.set(targetDirName)
+    };
+    for (targetDirName in targetCtx.aliveDirNames()) {
+      targetCtx.unsafeMaybeGetDir(targetDirName) match {
+      | Some(
+        dir @ SKStore.EagerDir{input => true},
+      ) if (dir.created < tick && !expected.contains(targetDirName)) ->
+        targetCtx.removeDir(targetDirName)
+      | _ -> void
+      }
+    }
   };
   hasMultipleVersions
 }

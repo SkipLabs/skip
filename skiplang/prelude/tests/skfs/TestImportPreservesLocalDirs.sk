@@ -1,0 +1,71 @@
+module alias T = SKTest;
+module alias SK = SKStore;
+
+module SKStoreTest;
+
+// Absence deduction must not delete a dir created locally in the target after
+// the fork (created == tick): it was never in the source, not deleted from it.
+@test
+fun testImportPreservesLocalDirs(): void {
+  _ = SK.newObstack();
+  aName = SK.DirName::create("/a/");
+  localName = SK.DirName::create("/local/");
+
+  // Source with one dir /a/.
+  source = SK.Context::create{}.mclone();
+  _ = source.mkdir(
+    SK.IID::keyType,
+    SK.IntFile::type,
+    aName,
+    Array[(SK.IID(0), SK.IntFile(0))],
+  );
+  source.update();
+
+  tickFork = source.getTick();
+
+  // Target forks from source, then creates a LOCAL dir /local/ that the
+  // source never had.
+  target = source.mclone();
+  _ = target.mkdir(
+    SK.IID::keyType,
+    SK.IntFile::type,
+    localName,
+    Array[(SK.IID(0), SK.IntFile(0))],
+  );
+  target.update();
+
+  T.expectTrue(
+    target.maybeGetDir(localName) is Some(SK.EagerDir _),
+    "Local dir exists before import",
+  );
+
+  // Create then delete a throwaway dir in source so there IS a tombstone to
+  // purge, which advances dirsTombLimit past tickFork.
+  throwaway = SK.DirName::create("/throwaway/");
+  _ = source.mkdir(
+    SK.IID::keyType,
+    SK.IntFile::type,
+    throwaway,
+    Array[(SK.IID(0), SK.IntFile(0))],
+  );
+  source.update();
+  source.removeDir(throwaway);
+  source.update();
+  source.update();
+  _ = source.purgeDeletedDirs(source.getTick());
+
+  // Sanity: importing from tickFork should see purged=true.
+  (purged, _, _) = source.getDirsChangesAfter(tickFork);
+  T.expectTrue(purged, "purged flag is true for a lagging fork");
+  // Import from tickFork. The local dir must NOT be deleted — it was never
+  // in the source, it is a local addition, not a source deletion.
+  SK.import(target, tickFork, source);
+
+  T.expectTrue(
+    target.maybeGetDir(localName) is Some(SK.EagerDir _),
+    "local dir /local/ was wrongly deleted by absence deduction — " +
+      "it was never in the source, so its absence there does not mean deletion",
+  );
+}
+
+module end;
