@@ -387,6 +387,7 @@ mutable base class WriteChecker {
 mutable class Context private {
   private mutable toPurge: SortedSet<DirName> = SortedSet[],
   private mutable dirs: Dirs = Dirs{},
+  private mutable deletedDirs: SortedSet<DirName> = SortedSet[],
   mutable reads: SortedSet<Path> = SortedSet[],
   private mutable time: Time = Time(0),
   /* Invariant: tick is only updated at the end of updateWithStatus */
@@ -546,6 +547,7 @@ mutable class Context private {
     mutable static{
       toPurge => this.toPurge,
       dirs => this.dirs,
+      deletedDirs => this.deletedDirs,
       reads => this.reads,
       time => this.time,
       tick => this.tick,
@@ -579,6 +581,7 @@ mutable class Context private {
   mutable fun replaceFromSaved(ctx: readonly Context): void {
     this.!toPurge = ctx.toPurge;
     this.!dirs = ctx.dirs;
+    this.!deletedDirs = ctx.deletedDirs;
     this.!reads = ctx.reads;
     this.!time = ctx.time;
     this.!tick = ctx.tick;
@@ -1036,6 +1039,10 @@ mutable class Context private {
   mutable fun setDir(dir: Dir): void {
     dirName = dir.getDirName();
     this.!dirs = this.dirs.set(this.tick, dirName, dir);
+    dir match {
+    | DeletedDir _ -> this.!deletedDirs = this.deletedDirs.set(dirName)
+    | _ -> void
+    };
   }
 
   mutable fun getDir(dirName: DirName): Dir {
@@ -1158,6 +1165,20 @@ mutable class Context private {
       this.!sharedSubDirsRefCount = this.sharedSubDirsRefCount.remove(dirName);
       this.setDir(DeletedDir::ofDir(dir))
     };
+  }
+  // Public context method to remove Deleted Dirs
+  mutable fun purgeDeletedDirs(): Int {
+    purged = 0;
+    for (dirName in this.deletedDirs) {
+      this.dirs.maybeGet(dirName) match {
+      | Some(DeletedDir _) ->
+        this.!dirs = this.dirs.removeDir(dirName);
+        !purged = purged + 1
+      | _ -> void
+      }
+    };
+    this.!deletedDirs = SortedSet[];
+    purged
   }
 
   readonly fun transitiveChildDirs(dirName: DirName): SortedSet<DirName> {
@@ -1290,11 +1311,18 @@ private class Dirs{private state: DMap<DirName, Dir> = DMap::empty()} {
     | Some(x) -> x
     }
   }
+
   fun values(): mutable Iterator<Dir> {
     this.state.values()
   }
+
   fun getChangesAfter(start: Tick): SortedSet<DirName> {
     this.state.getChangesAfter(start)
+  }
+
+  fun removeDir(key: DirName): this {
+    !this.state = this.state.remove(key);
+    this
   }
 }
 
@@ -1869,6 +1897,7 @@ fun runWithGc(
     initCtx,
     icontext ~> {
       context = icontext.mclone();
+      _ = context.purgeDeletedDirs();
       cop = f(context);
       (context.clone(), cop);
     },
@@ -2158,6 +2187,7 @@ fun runWithResult<T>(
   try {
     current = contexts.get(fork);
     context = current.mclone();
+    _ = context.purgeDeletedDirs();
     res = f(context);
     startTick = current.getTick();
     new = synchronizer match {
