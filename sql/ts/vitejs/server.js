@@ -53,7 +53,7 @@ const requestHandler = (request, response) => {
     response.end("[FAILED] Unable to load Bundled SKDB.");
     // @ts-ignore
     process.exit();
-  } else if (request.url == "/api/succeed") {
+  } else if (request.url == "/api/creationfailed") {
     let message = chalk.red("[FAILED]") + " Unable to use Bundled SKDB.";
     response.setHeader("Content-Type", "text/plain");
     console.log(message);
