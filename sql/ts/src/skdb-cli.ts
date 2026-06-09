@@ -227,14 +227,21 @@ if (values.dev) {
 } else {
   // using the local `credsFileName` file
 
-  if (!fs.existsSync(credsFileName)) {
-    fs.mkdirSync(skdbDir, { recursive: true });
-    fs.writeFileSync(credsFileName, JSON.stringify({}));
-  }
+  fs.mkdirSync(skdbDir, { recursive: true });
 
   // credentials file schema:
   // {host: { database: { accessKey: privateKey }}}
-  creds = JSON.parse(fs.readFileSync(credsFileName).toString());
+  // Read the file directly, treating a missing file as empty credentials.
+  // Checking for existence first would race with the read/writes below
+  // (CodeQL js/file-system-race).
+  try {
+    creds = JSON.parse(fs.readFileSync(credsFileName).toString());
+  } catch (ex: unknown) {
+    if ((ex as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw ex;
+    }
+    creds = {};
+  }
   hostCreds = creds[values.host as string] ?? {};
   creds[values.host as string] = hostCreds;
   dbCreds = hostCreds[values.db as string] ?? {};
