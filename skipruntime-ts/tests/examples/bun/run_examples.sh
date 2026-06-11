@@ -61,21 +61,24 @@ run_one_example() {
         SKIP_PLATFORM="native" bun run "$EXAMPLES_DIR/${extra}.ts" >/dev/null &
         BG_PIDS+=($!)
     done
+
     SKIP_PLATFORM="native" bun run "$EXAMPLES_DIR/${name}.ts" >/dev/null &
     BG_PIDS+=($!)
+
     if [ -f "$EXAMPLES_DIR/${name}-server.ts" ]; then
         bun run "$EXAMPLES_DIR/${name}-server.ts" >/dev/null &
         BG_PIDS+=($!)
     fi
+
     sleep 1
-#    if [ "$name" = "remote" ]; then
-#        sleep 2
-#    fi
+
     bun run "$EXAMPLES_DIR/${name}-client.ts" >"$out_file" 2>"$err_file"
+
     cleanup
+
     # Compare outputs (with .exp.out.alt fallback if present)
     local fail=0
-
+    echo "diff $out_file $exp_out"
     if ! diff "$out_file" "$exp_out" >/dev/null 2>&1; then
         # Main diff failed, try the .alt fallback
         if [ -e "${exp_out}.alt" ] && diff "$out_file" "${exp_out}.alt" >/dev/null 2>&1; then
@@ -87,11 +90,11 @@ run_one_example() {
         fi
     fi
 
+    echo "diff $err_file $exp_err"
     if ! diff "$err_file" "$exp_err"; then
         echo "  [FAIL] stderr differs from $exp_err"
         fail=1
     fi
-
     return $fail
 }
 
