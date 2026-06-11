@@ -48,11 +48,17 @@ fun trackedCaller5(): String {
   Unsafe.unsafe_untracked_call(untracked () -> sideEffect())
 }
 
+// trackedCaller6: pipe applications see the tracked type too
+fun trackedCaller6(): String {
+  (untracked () -> sideEffect()) |> unsafeUntrackedCall
+}
+
 untracked fun main(): void {
   print_raw(trackedCaller1());
   print_raw(trackedCaller2());
   print_raw(trackedCaller3());
   print_raw(trackedCaller4());
   print_raw(trackedCaller5());
+  print_raw(trackedCaller6());
 }
 module end;
