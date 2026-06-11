@@ -1,0 +1,23 @@
+// an @allow_tracked_call method has a tracked type, so overriding it with
+// a plain untracked method is an invalid override: calls through the base
+// type could otherwise dispatch to an override that never opted in
+base class X {
+  @allow_tracked_call
+  overridable untracked fun m(): String {
+    "X\n"
+  }
+}
+
+class Y() extends X {
+  untracked fun m(): String {
+    "Fail\n"
+  }
+}
+
+fun callIt(x: X): String {
+  x.m()
+}
+
+untracked fun main(): void {
+  print_raw(callIt(Y()))
+}
