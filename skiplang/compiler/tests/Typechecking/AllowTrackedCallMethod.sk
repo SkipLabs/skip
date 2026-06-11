@@ -1,0 +1,95 @@
+module Typechecking_AllowTrackedCallMethod;
+// @allow_tracked_call on an untracked method makes it appear tracked to
+// callers, including through base-typed receivers and method values
+
+untracked fun side(): String {
+  "impl\n"
+}
+
+base class Base {
+  @allow_tracked_call
+  overridable untracked fun m(): String {
+    "base\n"
+  }
+
+  @allow_tracked_call
+  untracked static fun s(): String {
+    "static\n"
+  }
+
+  // a tracked method can call the annotated method through `this`
+  fun viaThis(): String {
+    this.m()
+  }
+}
+
+class Child() extends Base {
+  // overriding with another annotated untracked method is fine
+  @allow_tracked_call
+  untracked fun m(): String {
+    "child\n"
+  }
+}
+
+base class Tracked_iface {
+  fun render(): String;
+}
+
+class ImpureImpl() extends Tracked_iface {
+  // an annotated untracked method can implement a tracked signature: the
+  // annotation makes its type tracked while its body stays untracked
+  @allow_tracked_call
+  untracked fun render(): String {
+    side()
+  }
+}
+
+base class Plain {
+  overridable untracked fun p(): String {
+    "plain\n"
+  }
+}
+
+class Annotated() extends Plain {
+  // the covariant direction: an annotated (tracked-typed) method may
+  // override a plain untracked one
+  @allow_tracked_call
+  untracked fun p(): String {
+    "annotated\n"
+  }
+}
+
+fun callThroughBase(b: Base): String {
+  b.m()
+}
+
+fun applyTracked(f: () -> String): String {
+  f()
+}
+
+fun callViaValue(c: Child): String {
+  applyTracked(c.m)
+}
+
+fun callIface(i: Tracked_iface): String {
+  i.render()
+}
+
+fun callStatic(): String {
+  Base::s()
+}
+
+fun callAnnotatedOverride(a: Annotated): String {
+  a.p()
+}
+
+untracked fun main(): void {
+  print_raw(callThroughBase(Child()));
+  print_raw(Child().m());
+  print_raw(Child().viaThis());
+  print_raw(callViaValue(Child()));
+  print_raw(callIface(ImpureImpl()));
+  print_raw(callStatic());
+  print_raw(callAnnotatedOverride(Annotated()));
+}
+module end;
