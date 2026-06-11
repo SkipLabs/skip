@@ -1640,7 +1640,11 @@ fun make_method_fields(
         }
       });
       purity = make_met_tfun_purity(met.kind);
-      tracking = make_tfun_tracking(met.untracked_);
+      tracking = make_tfun_tracking(
+        met.untracked_,
+        met.annotations,
+        met.name.i0,
+      );
       ml = N.Tfun_modifiers{purity, tracking};
       fty = (met.name.i0, N.Tfun(A.Vnone(), ml, Array[], params, met.return_));
       abstract = met.body match {
@@ -1673,10 +1677,28 @@ fun make_met_tfun_purity(kind: N.FieldKind): N.Purity_modifier {
   }
 }
 
-fun make_tfun_tracking(untracked_: ?FileRange): N.Tracking_modifier {
+// The external tracking of a function or method: untracked declarations
+// have untracked types, except that @allow_tracked_call makes the
+// declaration appear tracked to callers (its body is still checked in an
+// untracked context). Because the annotation is part of the type, calls,
+// indirect calls through values, and override compatibility all follow
+// from the ordinary tracking rules. Note that the opt-in is transitive:
+// plain lambdas created inside the untracked body have tracked types, so
+// an annotated declaration can hand untracked computations to tracked
+// callers.
+fun make_tfun_tracking(
+  untracked_: ?FileRange,
+  annotations: SSet,
+  pos: FileRange,
+): N.Tracking_modifier {
   untracked_ match {
   | None() -> N.Ftracked()
-  | Some _ -> N.Funtracked()
+  | Some _ ->
+    if (annotationsContain(annotations, "@allow_tracked_call", pos)) {
+      N.Ftracked()
+    } else {
+      N.Funtracked()
+    }
   }
 }
 
@@ -1753,6 +1775,15 @@ fun method_def(
   met: A.Method_def,
 ): N.Method_def {
   (_position, method_name) = met.name;
+  if (
+    met.untracked_.isNone() &&
+    annotationsContain(met.annotations, "@allow_tracked_call", met.name.i0)
+  ) {
+    SkipError.error(
+      met.name.i0,
+      "@allow_tracked_call requires the method to be untracked",
+    )
+  };
   tparam_context = context_name + "<method:tparam>" + method_name + ":";
   !env.in_deferred = met.deferred_.isSome();
   tunder_count = sk_create_counter();
@@ -2166,6 +2197,15 @@ fun fun_def(
   check_predefined(fd.name);
   if (fd.body.isNone() && fd.native_.isNone()) {
     SkipError.error(fd.name.i0, "Expected a function body")
+  };
+  if (
+    fd.untracked_.isNone() &&
+    annotationsContain(fd.annotations, "@allow_tracked_call", fd.name.i0)
+  ) {
+    SkipError.error(
+      fd.name.i0,
+      "@allow_tracked_call requires the function to be untracked",
+    )
   };
   check_default_last(params);
   params1 = params.map(p -> parameter(context, acc, env2, p));
