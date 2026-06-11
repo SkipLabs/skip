@@ -1,0 +1,52 @@
+module Typechecking_AllowTrackedCall;
+// An untracked function annotated with @allow_tracked_call appears tracked
+// to callers, so tracked code can call it (directly or through a value)
+
+@allow_tracked_call
+untracked fun unsafeUntrackedCall<T>(f: untracked () -> T): T {
+  f()
+}
+
+@allow_tracked_call
+untracked fun escape(): String {
+  sideEffect()
+}
+
+untracked fun sideEffect(): String {
+  "OK"
+}
+
+// trackedCaller1: wraps sideEffect() in an untracked lambda
+fun trackedCaller1(): String {
+  unsafeUntrackedCall(untracked () -> sideEffect())
+}
+
+// trackedCaller2: calls sideEffect() directly via unsafeUntrackedCall
+fun trackedCaller2(): String {
+  unsafeUntrackedCall(sideEffect)
+}
+
+// trackedCaller3: the annotation is part of the type, so the function can
+// flow through a value and still be called from a tracked context
+fun trackedCaller3(): String {
+  g = unsafeUntrackedCall;
+  g(untracked () -> sideEffect())
+}
+
+fun applyTracked(f: () -> String): String {
+  f()
+}
+
+// trackedCaller4: an annotated function satisfies a declared tracked
+// function-typed parameter
+fun trackedCaller4(): String {
+  applyTracked(escape)
+}
+
+untracked fun main(): void {
+  print_raw(trackedCaller1());
+  print_raw(trackedCaller2());
+  print_raw(trackedCaller3());
+  print_raw(trackedCaller4());
+}
+module end;
