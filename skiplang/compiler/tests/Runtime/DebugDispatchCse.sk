@@ -1,0 +1,33 @@
+module Runtime_DebugDispatchCse;
+// A dynamic dispatch call must not be CSE'd when any possible callee is
+// @debug: merging two calls would delete the second execution of the
+// @debug implementation's side effect. The CSE-able sibling implementation
+// (L inheriting B's m) reaching the same callsite is what made the old
+// per-callsite rule merge the calls.
+
+base class B {
+  overridable fun m(): Int {
+    0
+  }
+}
+
+class K() extends B {
+  @debug
+  fun m(): Int {
+    print_raw("k");
+    0
+  }
+}
+
+class L() extends B {}
+
+fun twice(b: B): Int {
+  b.m() + b.m()
+}
+
+fun main(): void {
+  _ = twice(K());
+  _ = twice(L());
+  print_raw("\n")
+}
+module end;
