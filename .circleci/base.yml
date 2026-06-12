@@ -189,6 +189,43 @@ jobs:
       - store_test_results:
           path: ~/test-results/skipruntime.xml
 
+  skipruntime-bun:
+    docker:
+      - image: skiplabs/skip:latest
+      - image: cimg/postgres:17.0
+        environment:
+          PGHOST: localhost
+          PGDATABASE: postgres
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: secret
+      - image: apache/kafka:4.1.1
+        command: sh -c "((sleep 15 && /opt/kafka/bin/kafka-topics.sh --bootstrap-server 127.0.0.1:9092 --create --topic skip-test-topic)&) && /etc/kafka/docker/run"
+        environment:
+          KAFKA_PROCESS_ROLES: controller,broker
+          KAFKA_NODE_ID: 0
+          KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
+          KAFKA_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093"
+          KAFKA_CONTROLLER_QUORUM_VOTERS: "0@localhost:9093"
+          KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+          KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+          KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+          KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    resource_class: large.gen2
+    environment:
+      SKIP_CAPACITY: 6G
+    steps:
+      - custom-checkout:
+          submodules: true
+      - run:
+          name: Install Bun
+          command: npm install -g bun
+      - run:
+          name: Run skip runtime tests under Bun
+          no_output_timeout: 10m
+          command: |
+            make test-skipruntime-ts-bun
+
   check-examples:
     docker:
       - image: cimg/base:2025.01

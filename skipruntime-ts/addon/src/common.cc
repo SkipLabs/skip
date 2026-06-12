@@ -1,37 +1,13 @@
 
 #include "common.h"
 
-#include <functional>
+#include <functional>  // obsolete since <napi.h> include it
 #include <iostream>
-#include <regex>
 #include <sstream>
 
 #define SKCONTEXT void*
 
 namespace skbinding {
-
-using v8::Array;
-using v8::Boolean;
-using v8::Context;
-using v8::Exception;
-using v8::External;
-using v8::Function;
-using v8::FunctionCallback;
-using v8::FunctionCallbackInfo;
-using v8::FunctionTemplate;
-using v8::HandleScope;
-using v8::Isolate;
-using v8::Local;
-using v8::MaybeLocal;
-using v8::Number;
-using v8::Object;
-using v8::ObjectTemplate;
-using v8::Persistent;
-using v8::PropertyDescriptor;
-using v8::String;
-using v8::Symbol;
-using v8::TryCatch;
-using v8::Value;
 
 extern "C" {
 char* sk_get_exception_message(SKError skExn);
@@ -40,370 +16,340 @@ char* SkipRuntime_getExceptionStack(SKError error);
 char* SkipRuntime_getExceptionType(SKError error);
 SKObstack SKIP_new_Obstack();
 void SKIP_destroy_Obstack(SKObstack obstack);
+char* sk_string_create(const char* buffer, uint32_t size);
 }
 
-Local<String> FromUtf8(Isolate* isolate, const char* str) {
-  return String::NewFromUtf8(isolate, str).ToLocalChecked();
+// Register a C++ function as a named property on a JS object.
+void AddFunction(Napi::Env env, Napi::Object handler, const char* name,
+                 Napi::Function::Callback callback) {
+  handler.Set(name, Napi::Function::New(env, callback, name));
 }
 
-void AddFunction(Isolate* isolate, Local<Object> handler, const char* name,
-                 FunctionCallback callback) {
-  Local<Context> context = isolate->GetCurrentContext();
-  Local<FunctionTemplate> v8Tpl = FunctionTemplate::New(isolate, callback);
-  Local<Function> v8Fn = v8Tpl->GetFunction(context).ToLocalChecked();
-  handler->Set(context, FromUtf8(isolate, name), v8Fn).FromJust();
+// Call a static method on a global JS class (ex. JSON.stringify).
+Napi::Value CallGlobalStaticMethod(Napi::Env env, const char* className,
+                                   const char* methodName,
+                                   const std::vector<napi_value>& args) {
+  Napi::Object global = env.Global();
+  Napi::Object classRef = global.Get(className).As<Napi::Object>();
+  Napi::Function method = classRef.Get(methodName).As<Napi::Function>();
+  return method.Call(classRef, args);
 }
 
-Local<Value> CallGlobalStaticMethod(Isolate* isolate, const char* className,
-                                    const char* methodName, int argc,
-                                    Local<Value> argv[]) {
-  Local<Context> context = isolate->GetCurrentContext();
-  Local<Object> global = context->Global();
-  Local<Object> classRef = global->Get(context, FromUtf8(isolate, className))
-                               .ToLocalChecked()
-                               .As<Object>();
-  Local<Function> method = classRef->Get(context, FromUtf8(isolate, methodName))
-                               .ToLocalChecked()
-                               .As<Function>();
-  return method->Call(context, classRef, argc, argv).ToLocalChecked();
-}
-
-void Print(Isolate* isolate, const char* prefix, Local<Value> value) {
-  v8::String::Utf8Value jsValue(isolate, value);
-  const char* val = *jsValue;
+// Print a JS value to stdout with a prefix.
+void Print(Napi::Env /*env*/, const char* prefix, Napi::Value value) {
+  std::string val = value.ToString().Utf8Value();
   std::cout << prefix << ": " << val << std::endl;
 }
 
-Local<Value> JSONStringify(Isolate* isolate, Local<Value> value) {
-  Local<Value> argv[1] = {value};
-  return CallGlobalStaticMethod(isolate, "JSON", "stringify", 1, argv);
+// Convert any JS value to a Skip string, using JS coercion if needed.
+char* ToSKString(Napi::Value value) {
+  std::string cppStr = value.ToString().Utf8Value();
+  return sk_string_create(cppStr.c_str(), cppStr.size());
+}
+
+// Serialize a JS value to its JSON string representation.
+Napi::Value JSONStringify(Napi::Env env, Napi::Value value) {
+  return CallGlobalStaticMethod(env, "JSON", "stringify", {value});
 }
 
 extern "C" {
 [[noreturn]] void SkipRuntime_throwExternalException(char*, char*, char*);
-
-char* sk_string_create(const char* buffer, uint32_t size);
 }
 
-void* SKTryCatch(Isolate* isolate, Local<Function> fn, Local<Value> recv,
-                 int argc, Local<Value> argv[],
-                 std::function<void*(Isolate*, Local<Value>)> success,
-                 std::function<void(Isolate*)> failure) {
-  Local<Context> context = isolate->GetCurrentContext();
-  TryCatch tryCatch(isolate);
-  MaybeLocal<Value> optResult = fn->Call(context, recv, argc, argv);
-  if (!tryCatch.HasCaught()) {
-    return success(isolate, optResult.ToLocalChecked());
-  } else {
-    failure(isolate);
-    Local<Value> exception = tryCatch.Exception();
-    if (exception->IsNativeError()) {
-      Local<Context> context = isolate->GetCurrentContext();
-      Local<Object> jsObj = exception->ToObject(context).ToLocalChecked();
-      char* sktype = ToSKString(isolate, jsObj->GetConstructorName());
-      char* skmessage = ToSKString(
-          isolate,
-          jsObj->Get(context, FromUtf8(isolate, "message")).ToLocalChecked());
-      char* skstack = ToSKString(
-          isolate,
-          jsObj->Get(context, FromUtf8(isolate, "stack")).ToLocalChecked());
+/*
+  Internal helper shared by SKTryCatch and SKTryCatchVoid.
+  Converts a JS exception into a call to SkipRuntime_throwExternalException.
+  Never returns.
+*/
+static void HandleJSException(Napi::Env env, Napi::Value exception) {
+  if (exception.IsObject()) {
+    Napi::Object jsObj = exception.As<Napi::Object>();
+    Napi::Value stackVal = jsObj.Get("stack");
+    if (stackVal.IsString()) {
+      Napi::Value nameVal = jsObj.Get("name");
+      Napi::Value messageVal = jsObj.Get("message");
+      char* sktype =
+          nameVal.IsString() ? ToSKString(nameVal) : sk_string_create("", 0);
+      char* skmessage = messageVal.IsString() ? ToSKString(messageVal)
+                                              : sk_string_create("", 0);
+      char* skstack = ToSKString(stackVal);
       SkipRuntime_throwExternalException(sktype, skmessage, skstack);
-    } else if (exception->IsObject()) {
-      MaybeLocal<Value> message =
-          exception.As<Object>()->Get(context, FromUtf8(isolate, "message"));
-      char* skempty = sk_string_create("", 0);
-      char* skmessage;
-      if (!message.IsEmpty()) {
-        skmessage = ToSKString(isolate, message.ToLocalChecked());
-      } else {
-        Local<Value> jsmessage = JSONStringify(isolate, exception);
-        skmessage = ToSKString(isolate, jsmessage);
-      }
-      SkipRuntime_throwExternalException(skempty, skmessage, skempty);
-    } else if (exception->IsString()) {
-      char* skempty = sk_string_create("", 0);
-      char* skmessage = ToSKString(isolate, exception);
-      SkipRuntime_throwExternalException(skempty, skmessage, skempty);
-    } else {
-      char* skempty = sk_string_create("", 0);
-      Local<Value> jsmessage = JSONStringify(isolate, exception);
-      char* skmessage = ToSKString(isolate, jsmessage);
-      SkipRuntime_throwExternalException(skempty, skmessage, skempty);
     }
+    Napi::Value messageVal = jsObj.Get("message");
+    char* skempty = sk_string_create("", 0);
+    char* skmessage;
+    if (messageVal.IsString()) {
+      skmessage = ToSKString(messageVal);
+    } else {
+      Napi::Value jsmessage = JSONStringify(env, exception);
+      skmessage = ToSKString(jsmessage);
+    }
+    SkipRuntime_throwExternalException(skempty, skmessage, skempty);
+  } else if (exception.IsString()) {
+    char* skempty = sk_string_create("", 0);
+    char* skmessage = ToSKString(exception);
+    SkipRuntime_throwExternalException(skempty, skmessage, skempty);
+  } else {
+    // Primitive non-string (number, boolean, null, undefined)
+    char* skempty = sk_string_create("", 0);
+    Napi::Value jsmessage = JSONStringify(env, exception);
+    char* skmessage = ToSKString(jsmessage);
+    SkipRuntime_throwExternalException(skempty, skmessage, skempty);
+  }
+}
+
+/*
+  Call a JS function from C++ and forward JS exceptions to the Skip runtime.
+  On success, delegates result handling to the `success` lambda.
+  On failure, runs `failure` for cleanup before propagating the error.
+*/
+void* SKTryCatch(Napi::Env env, Napi::Function fn, Napi::Value recv,
+                 const std::vector<napi_value>& args,
+                 std::function<void*(Napi::Env, Napi::Value)> success,
+                 std::function<void(Napi::Env)> failure) {
+  try {
+    Napi::Value result = fn.Call(recv, args);
+    return success(env, result);
+  } catch (const Napi::Error& e) {
+    failure(env);
+    HandleJSException(env, e.Value());
     return nullptr;
   }
 }
 
-void SKTryCatchVoid(Isolate* isolate, Local<Function> fn, Local<Value> recv,
-                    int argc, Local<Value> argv[],
-                    std::function<void(Isolate*)> success,
-                    std::function<void(Isolate*)> failure) {
-  Local<Context> context = isolate->GetCurrentContext();
-  TryCatch tryCatch(isolate);
-  auto result = fn->Call(context, recv, argc, argv);
-  (void)result;
-  if (!tryCatch.HasCaught()) {
-    success(isolate);
-  } else {
-    failure(isolate);
-    Local<Value> exception = tryCatch.Exception();
-    if (exception->IsNativeError()) {
-      Local<Context> context = isolate->GetCurrentContext();
-      Local<Object> jsObj = exception->ToObject(context).ToLocalChecked();
-      char* sktype = ToSKString(isolate, jsObj->GetConstructorName());
-      char* skmessage = ToSKString(
-          isolate,
-          jsObj->Get(context, FromUtf8(isolate, "message")).ToLocalChecked());
-      char* skstack = ToSKString(
-          isolate,
-          jsObj->Get(context, FromUtf8(isolate, "stack")).ToLocalChecked());
-      SkipRuntime_throwExternalException(sktype, skmessage, skstack);
-    } else if (exception->IsObject()) {
-      MaybeLocal<Value> message =
-          exception.As<Object>()->Get(context, FromUtf8(isolate, "message"));
-      char* skempty = sk_string_create("", 0);
-      char* skmessage;
-      if (!message.IsEmpty()) {
-        skmessage = ToSKString(isolate, message.ToLocalChecked());
-      } else {
-        Local<Value> jsmessage = JSONStringify(isolate, exception);
-        skmessage = ToSKString(isolate, jsmessage);
-      }
-      SkipRuntime_throwExternalException(skempty, skmessage, skempty);
-    } else if (exception->IsString()) {
-      char* skempty = sk_string_create("", 0);
-      char* skmessage = ToSKString(isolate, exception);
-      SkipRuntime_throwExternalException(skempty, skmessage, skempty);
-    } else {
-      char* skempty = sk_string_create("", 0);
-      Local<Value> jsmessage = JSONStringify(isolate, exception);
-      char* skmessage = ToSKString(isolate, jsmessage);
-      SkipRuntime_throwExternalException(skempty, skmessage, skempty);
-    }
+// Same as SKTryCatch but for JS functions whose return value is unused.
+void SKTryCatchVoid(Napi::Env env, Napi::Function fn, Napi::Value recv,
+                    const std::vector<napi_value>& args,
+                    std::function<void(Napi::Env)> success,
+                    std::function<void(Napi::Env)> failure) {
+  try {
+    fn.Call(recv, args);
+    success(env);
+  } catch (const Napi::Error& e) {
+    failure(env);
+    HandleJSException(env, e.Value());
   }
 }
 
-bool JSCheckFunction(Isolate* isolate, Local<Object> binding,
-                     const char* name) {
-  Local<Context> context = isolate->GetCurrentContext();
-  MaybeLocal<Value> optValue = binding->Get(context, FromUtf8(isolate, name));
-  if (optValue.IsEmpty()) {
+/*
+  Check that a binding property exists and is a function.
+  On failure, throws a JS-visible error and returns false.
+*/
+bool JSCheckFunction(Napi::Object binding, const char* name) {
+  Napi::Env env = binding.Env();
+  Napi::Value value = binding.Get(name);
+  if (value.IsUndefined()) {
     std::ostringstream error;
-    error << "Missing function"
-          << ": " << name;
-    isolate->ThrowException(
-        Exception::Error(FromUtf8(isolate, error.str().c_str())));
+    error << "Missing function: " << name;
+    Napi::Error::New(env, error.str()).ThrowAsJavaScriptException();
     return false;
   }
-  Local<Value> value = optValue.ToLocalChecked();
-  if (!value->IsFunction()) {
+  if (!value.IsFunction()) {
     std::ostringstream error;
-    error << name << " Is not a function";
-    isolate->ThrowException(
-        Exception::Error(FromUtf8(isolate, error.str().c_str())));
+    error << name << " is not a function";
+    Napi::Error::New(env, error.str()).ThrowAsJavaScriptException();
     return false;
   }
   return true;
 }
 
-Local<Function> CheckFunction(Isolate* isolate, Local<Object> binding,
-                              const char* name) {
-  Local<Context> context = isolate->GetCurrentContext();
-  MaybeLocal<Value> optValue = binding->Get(context, FromUtf8(isolate, name));
-  if (optValue.IsEmpty()) {
-    char* skempty = sk_string_create("", 0);
+/*
+  Retrieve a function from the binding object.
+  On failure, throws a Skip runtime exception instead of a JS one,
+  so the error integrates with Skip's internal mechanism.
+*/
+Napi::Function CheckFunction(Napi::Object binding, const char* name) {
+  Napi::Value value = binding.Get(name);
+  if (value.IsUndefined()) {
     std::ostringstream error;
-    error << "Undefined function"
-          << ": " << name;
-    std::string strerror(error.str());
-    char* skmessage = sk_string_create(strerror.c_str(), strerror.size());
+    error << "Undefined function: " << name;
+    std::string msg = error.str();
+    char* skempty = sk_string_create("", 0);
+    char* skmessage = sk_string_create(msg.c_str(), msg.size());
     SkipRuntime_throwExternalException(skempty, skmessage, skempty);
   }
-  Local<Value> value = optValue.ToLocalChecked();
-  if (!value->IsFunction()) {
-    char* skempty = sk_string_create("", 0);
+  if (!value.IsFunction()) {
     std::ostringstream error;
-    error << "Invalid function"
-          << ": " << name;
-    std::string strerror(error.str());
-    char* skmessage = sk_string_create(strerror.c_str(), strerror.size());
+    error << "Invalid function: " << name;
+    std::string msg = error.str();
+    char* skempty = sk_string_create("", 0);
+    char* skmessage = sk_string_create(msg.c_str(), msg.size());
     SkipRuntime_throwExternalException(skempty, skmessage, skempty);
   }
-  return value.As<Function>();
+  return value.As<Napi::Function>();
 }
 
-void CallJSVoidFunction(Isolate* isolate, Local<Object> binding,
-                        const char* name, int argc, Local<Value> argv[]) {
-  Local<Function> function = CheckFunction(isolate, binding, name);
+/*
+  Typed wrappers around SKTryCatch for common JS return types.
+  The `env` parameter is currently unused (Napi::Env is derived from `binding`)
+  but kept in the signature to preserve the existing API contract.
+*/
+void CallJSVoidFunction(Napi::Env /*env*/, Napi::Object binding,
+                        const char* name, const std::vector<napi_value>& args) {
+  Napi::Function function = CheckFunction(binding, name);
   SKTryCatchVoid(
-      isolate, function, binding, argc, argv, [](Isolate* _i) {},
-      [](Isolate* _i) {});
+      binding.Env(), function, binding, args, [](Napi::Env) {},
+      [](Napi::Env) {});
 }
 
-void* CallJSFunction(Isolate* isolate, Local<Object> binding, const char* name,
-                     int argc, Local<Value> argv[]) {
-  Local<Function> function = CheckFunction(isolate, binding, name);
+void* CallJSFunction(Napi::Env /*env*/, Napi::Object binding, const char* name,
+                     const std::vector<napi_value>& args) {
+  Napi::Function function = CheckFunction(binding, name);
   return SKTryCatch(
-      isolate, function, binding, argc, argv,
-      [](Isolate* i, Local<Value> result) {
-        if (!result->IsExternal()) {
+      binding.Env(), function, binding, args,
+      [](Napi::Env, Napi::Value result) -> void* {
+        if (!result.IsExternal()) {
           const char* message = "Invalid function return type";
           char* skempty = sk_string_create("", 0);
           char* skmessage = sk_string_create(message, strlen(message));
           SkipRuntime_throwExternalException(skempty, skmessage, skempty);
         }
-        return result.As<External>()->Value();
+        return result.As<Napi::External<void>>().Data();
       },
-      [](Isolate* _i) {});
+      [](Napi::Env) {});
 }
 
-void* CallJSNullableFunction(Isolate* isolate, Local<Object> binding,
-                             const char* name, int argc, Local<Value> argv[]) {
-  Local<Function> function = CheckFunction(isolate, binding, name);
+void* CallJSNullableFunction(Napi::Env /*env*/, Napi::Object binding,
+                             const char* name,
+                             const std::vector<napi_value>& args) {
+  Napi::Function function = CheckFunction(binding, name);
   return SKTryCatch(
-      isolate, function, binding, argc, argv,
-      [](Isolate* _i, Local<Value> result) {
-        if (!result->IsExternal() && !result->IsNull()) {
+      binding.Env(), function, binding, args,
+      [](Napi::Env, Napi::Value result) -> void* {
+        if (!result.IsExternal() && !result.IsNull()) {
           const char* message = "Invalid function return type";
           char* skempty = sk_string_create("", 0);
           char* skmessage = sk_string_create(message, strlen(message));
           SkipRuntime_throwExternalException(skempty, skmessage, skempty);
         }
-        if (result->IsExternal()) {
-          return result.As<External>()->Value();
+        if (result.IsExternal()) {
+          return result.As<Napi::External<void>>().Data();
         }
         return (void*)nullptr;
       },
-      [](Isolate* _i) {});
+      [](Napi::Env) {});
 }
 
-double CallJSNumberFunction(Isolate* isolate, Local<Object> binding,
-                            const char* name, int argc, Local<Value> argv[]) {
-  Local<Function> function = CheckFunction(isolate, binding, name);
+double CallJSNumberFunction(Napi::Env /*env*/, Napi::Object binding,
+                            const char* name,
+                            const std::vector<napi_value>& args) {
+  Napi::Function function = CheckFunction(binding, name);
   double returnValue = 0.0;
   SKTryCatch(
-      isolate, function, binding, argc, argv,
-      [&returnValue](Isolate* _i, Local<Value> result) {
-        if (!result->IsNumber()) {
+      binding.Env(), function, binding, args,
+      [&returnValue](Napi::Env, Napi::Value result) -> void* {
+        if (!result.IsNumber()) {
           const char* message = "Invalid function return type";
           char* skempty = sk_string_create("", 0);
           char* skmessage = sk_string_create(message, strlen(message));
           SkipRuntime_throwExternalException(skempty, skmessage, skempty);
         }
-        returnValue = result.As<Number>()->Value();
+        returnValue = result.As<Napi::Number>().DoubleValue();
         return nullptr;
       },
-      [](Isolate* _i) {});
+      [](Napi::Env) {});
   return returnValue;
 }
 
-char* CallJSStringFunction(Isolate* isolate, Local<Object> binding,
-                           const char* name, int argc, Local<Value> argv[]) {
-  Local<Function> function = CheckFunction(isolate, binding, name);
+char* CallJSStringFunction(Napi::Env /*env*/, Napi::Object binding,
+                           const char* name,
+                           const std::vector<napi_value>& args) {
+  Napi::Function function = CheckFunction(binding, name);
   return (char*)SKTryCatch(
-      isolate, function, binding, argc, argv,
-      [](Isolate* isolate, Local<Value> result) {
-        if (!result->IsString()) {
+      binding.Env(), function, binding, args,
+      [](Napi::Env, Napi::Value result) -> void* {
+        if (!result.IsString()) {
           const char* message = "Invalid function return type";
           char* skempty = sk_string_create("", 0);
           char* skmessage = sk_string_create(message, strlen(message));
           SkipRuntime_throwExternalException(skempty, skmessage, skempty);
         }
-        String::Utf8Value v8Str(isolate, result.As<String>());
-        std::string cppStr(*v8Str);
+        std::string cppStr = result.As<Napi::String>().Utf8Value();
         return sk_string_create(cppStr.c_str(), cppStr.size());
       },
-      [](Isolate* _i) {});
+      [](Napi::Env) {});
 }
 
-char* CallJSNullableStringFunction(Isolate* isolate, Local<Object> binding,
-                                   const char* name, int argc,
-                                   Local<Value> argv[]) {
-  Local<Function> function = CheckFunction(isolate, binding, name);
+char* CallJSNullableStringFunction(Napi::Env /*env*/, Napi::Object binding,
+                                   const char* name,
+                                   const std::vector<napi_value>& args) {
+  Napi::Function function = CheckFunction(binding, name);
   return (char*)SKTryCatch(
-      isolate, function, binding, argc, argv,
-      [](Isolate* isolate, Local<Value> result) {
-        if (!result->IsString() && !result->IsNull()) {
+      binding.Env(), function, binding, args,
+      [](Napi::Env, Napi::Value result) -> void* {
+        if (!result.IsString() && !result.IsNull()) {
           const char* message = "Invalid function return type";
           char* skempty = sk_string_create("", 0);
           char* skmessage = sk_string_create(message, strlen(message));
           SkipRuntime_throwExternalException(skempty, skmessage, skempty);
         }
-        if (result->IsNull()) {
-          return (char*)nullptr;
+        if (result.IsNull()) {
+          return (void*)nullptr;
         }
-        String::Utf8Value v8Str(isolate, result.As<String>());
-        std::string cppStr(*v8Str);
-        return sk_string_create(cppStr.c_str(), cppStr.size());
+        std::string cppStr = result.As<Napi::String>().Utf8Value();
+        return (void*)sk_string_create(cppStr.c_str(), cppStr.size());
       },
-      [](Isolate* _i) {});
+      [](Napi::Env) {});
 }
 
-void NatTryCatch(Isolate* isolate, std::function<void(Isolate*)> run) {
+/*
+  Catches Skip and std::exception errors raised by C++ code
+  invoked from JS, and re-throws them as JS-visible errors.
+  With NAPI_CPP_EXCEPTIONS enabled, Napi::Error propagates automatically
+  and does not need to be handled here.
+*/
+void NatTryCatch(Napi::Env env, std::function<void(Napi::Env)> run) {
   try {
-    run(isolate);
+    run(env);
   } catch (skbinding::SkipException& e) {
     std::ostringstream error;
     error << e.name() << ": " << e.what();
-    Local<Value> v8Error =
-        Exception::Error(FromUtf8(isolate, error.str().c_str()));
-    if (v8Error->IsNativeError()) {
-      char* stack = SkipRuntime_getExceptionStack(e.m_skipException);
-      if (stack != nullptr && strlen(stack) > 0) {
-        sk_string_check_c_safe(stack);
-        Local<Context> context = isolate->GetCurrentContext();
-        Local<Object> exc = v8Error.As<Object>();
-        exc->Set(context, FromUtf8(isolate, "stack"), FromUtf8(isolate, stack))
-            .FromJust();
-      }
+    Napi::Error napiError = Napi::Error::New(env, error.str());
+    char* stack = SkipRuntime_getExceptionStack(e.m_skipException);
+    if (stack != nullptr && strlen(stack) > 0) {
+      sk_string_check_c_safe(stack);
+      napiError.Value().Set("stack", Napi::String::New(env, stack));
     }
-    isolate->ThrowException(v8Error);
+    napiError.ThrowAsJavaScriptException();
   } catch (std::exception& e) {
-    const char* what = e.what();
-    isolate->ThrowException(Exception::Error(FromUtf8(isolate, what)));
+    Napi::Error::New(env, e.what()).ThrowAsJavaScriptException();
   }
 }
 
-void RunWithGC(const v8::FunctionCallbackInfo<v8::Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 1) {
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameters.")));
-    return;
-  };
-  if (!args[0]->IsFunction()) {
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a function.")));
-    return;
+/*
+  Functions exposed directly to JS via main.cc bindings.
+  They follow the node-addon-api callback signature:
+  Napi::Value(const Napi::CallbackInfo&).
+*/
+Napi::Value RunWithGC(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 1) {
+    throw Napi::TypeError::New(env, "Must have one parameter.");
+  }
+  if (!info[0].IsFunction()) {
+    throw Napi::TypeError::New(env, "The parameter must be a function.");
   }
   SKObstack obstack = SKIP_new_Obstack();
-  Local<Context> context = isolate->GetCurrentContext();
-  TryCatch tryCatch(isolate);
-  MaybeLocal<Value> optResult =
-      args[0].As<Function>()->Call(context, Null(isolate), 0, nullptr);
-  if (!tryCatch.HasCaught()) {
-    args.GetReturnValue().Set(optResult.ToLocalChecked());
-  } else {
-    tryCatch.ReThrow();
+  Napi::Function fn = info[0].As<Napi::Function>();
+  try {
+    Napi::Value result = fn.Call(env.Null(), {});
+    SKIP_destroy_Obstack(obstack);
+    return result;
+  } catch (...) {
+    SKIP_destroy_Obstack(obstack);
+    throw;
   }
-  SKIP_destroy_Obstack(obstack);
 }
 
-void GetErrorObject(const v8::FunctionCallbackInfo<v8::Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 1) {
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameters.")));
-    return;
-  };
-  if (!args[0]->IsExternal()) {
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a pointer.")));
-    return;
+Napi::Value GetErrorObject(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 1) {
+    throw Napi::TypeError::New(env, "Must have one parameter.");
   }
-  SKError skExn = args[0].As<External>()->Value();
+  if (!info[0].IsExternal()) {
+    throw Napi::TypeError::New(env, "The parameter must be a pointer.");
+  }
+  SKError skExn = info[0].As<Napi::External<void>>().Data();
 
   std::ostringstream error;
   char* type = SkipRuntime_getExceptionType(skExn);
@@ -412,25 +358,13 @@ void GetErrorObject(const v8::FunctionCallbackInfo<v8::Value>& args) {
     error << type << ": ";
   }
   error << (char*)sk_get_exception_message(skExn);
-  Local<Value> v8Error =
-      Exception::Error(FromUtf8(isolate, error.str().c_str()));
-  if (v8Error->IsNativeError()) {
-    char* stack = SkipRuntime_getExceptionStack(skExn);
-    if (stack != nullptr && strlen(stack) > 0) {
-      sk_string_check_c_safe(stack);
-      Local<Context> context = isolate->GetCurrentContext();
-      Local<Object> exc = v8Error.As<Object>();
-      exc->Set(context, FromUtf8(isolate, "stack"), FromUtf8(isolate, stack))
-          .FromJust();
-    }
+  Napi::Error napiError = Napi::Error::New(env, error.str());
+  char* stack = SkipRuntime_getExceptionStack(skExn);
+  if (stack != nullptr && strlen(stack) > 0) {
+    sk_string_check_c_safe(stack);
+    napiError.Value().Set("stack", Napi::String::New(env, stack));
   }
-  args.GetReturnValue().Set(v8Error);
-}
-
-char* ToSKString(Isolate* isolate, Local<Value> value) {
-  String::Utf8Value jsValue(isolate, value);
-  const char* strValue = *jsValue;
-  return sk_string_create(strValue, strlen(strValue));
+  return napiError.Value();
 }
 
 const char* SkipException::what() const noexcept {

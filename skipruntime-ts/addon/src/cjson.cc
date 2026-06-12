@@ -15,7 +15,7 @@ void SKIP_SKJSON_addToCJArray(PartialCJArr arr, CJSON value);
 CJArray SKIP_SKJSON_endCJArray(PartialCJArr arr);
 // primitives
 CJSON SKIP_SKJSON_createCJNull();
-CJSON SKIP_SKJSON_createCJInt(int64_t v);
+CJSON SKIP_SKJSON_createCJInt(double v);
 CJSON SKIP_SKJSON_createCJFloat(double v);
 CJSON SKIP_SKJSON_createCJString(char* str);
 CJSON SKIP_SKJSON_createCJBool(bool v);
@@ -37,520 +37,411 @@ double SKIP_SKJSON_arraySize(CJArray json);
 namespace skjson {
 
 using skbinding::AddFunction;
-using skbinding::FromUtf8;
 using skbinding::NatTryCatch;
 using skbinding::ToSKString;
-using v8::Array;
-using v8::BigInt;
-using v8::Boolean;
-using v8::Context;
-using v8::Exception;
-using v8::External;
-using v8::Function;
-using v8::FunctionCallback;
-using v8::FunctionCallbackInfo;
-using v8::FunctionTemplate;
-using v8::HandleScope;
-using v8::Int32;
-using v8::Isolate;
-using v8::Local;
-using v8::MaybeLocal;
-using v8::Null;
-using v8::Number;
-using v8::Object;
-using v8::Proxy;
-using v8::String;
-using v8::Uint32;
-using v8::Undefined;
-using v8::Value;
 
-void StartCJObject(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
+/* CJObject builders: open / fill / close pattern. */
+
+Napi::Value StartCJObject(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  Napi::Value result;
+  NatTryCatch(env, [&result, env](Napi::Env) {
     PartialCJObj skobject = SKIP_SKJSON_startCJObject();
-    args.GetReturnValue().Set(External::New(isolate, skobject));
+    result = Napi::External<void>::New(env, skobject);
   });
+  return result;
 }
 
-void AddToCJObject(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 3) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have three parameters.")));
-    return;
-  };
-  if (!args[0]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a pointer.")));
-    return;
+Napi::Value AddToCJObject(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 3) {
+    throw Napi::TypeError::New(env, "Must have three parameters.");
   }
-  if (!args[1]->IsString()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The second parameter must be a string.")));
-    return;
+  if (!info[0].IsExternal()) {
+    throw Napi::TypeError::New(env, "The first parameter must be a pointer.");
   }
-  if (!args[2]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The third parameter must be a pointer.")));
-    return;
+  if (!info[1].IsString()) {
+    throw Napi::TypeError::New(env, "The second parameter must be a string.");
   }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    SKIP_SKJSON_addToCJObject(args[0].As<External>()->Value(),
-                              ToSKString(isolate, args[1].As<String>()),
-                              args[2].As<External>()->Value());
+  if (!info[2].IsExternal()) {
+    throw Napi::TypeError::New(env, "The third parameter must be a pointer.");
+  }
+  NatTryCatch(env, [&info](Napi::Env) {
+    SKIP_SKJSON_addToCJObject(info[0].As<Napi::External<void>>().Data(),
+                              ToSKString(info[1]),
+                              info[2].As<Napi::External<void>>().Data());
   });
+  return env.Undefined();
 }
 
-void EndCJObject(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
-    return;
-  };
-  if (!args[0]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a pointer.")));
-    return;
+Napi::Value EndCJObject(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 1) {
+    throw Napi::TypeError::New(env, "Must have one parameter.");
   }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
+  if (!info[0].IsExternal()) {
+    throw Napi::TypeError::New(env, "The parameter must be a pointer.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
     CJObject skobject =
-        SKIP_SKJSON_endCJObject(args[0].As<External>()->Value());
-    args.GetReturnValue().Set(External::New(isolate, skobject));
+        SKIP_SKJSON_endCJObject(info[0].As<Napi::External<void>>().Data());
+    result = Napi::External<void>::New(env, skobject);
   });
+  return result;
 }
 
-void StartCJArray(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
+/* CJArray builders: same pattern as CJObject. */
+
+Napi::Value StartCJArray(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  Napi::Value result;
+  NatTryCatch(env, [&result, env](Napi::Env) {
     PartialCJArr skarray = SKIP_SKJSON_startCJArray();
-    args.GetReturnValue().Set(External::New(isolate, skarray));
+    result = Napi::External<void>::New(env, skarray);
   });
+  return result;
 }
 
-void AddToCJArray(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 2) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have three parameters.")));
-    return;
-  };
-  if (!args[0]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a pointer.")));
-    return;
+Napi::Value AddToCJArray(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 2) {
+    throw Napi::TypeError::New(env, "Must have two parameters.");
   }
-  if (!args[1]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The second parameter must be a pointer.")));
-    return;
+  if (!info[0].IsExternal()) {
+    throw Napi::TypeError::New(env, "The first parameter must be a pointer.");
   }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    SKIP_SKJSON_addToCJArray(args[0].As<External>()->Value(),
-                             args[1].As<External>()->Value());
+  if (!info[1].IsExternal()) {
+    throw Napi::TypeError::New(env, "The second parameter must be a pointer.");
+  }
+  NatTryCatch(env, [&info](Napi::Env) {
+    SKIP_SKJSON_addToCJArray(info[0].As<Napi::External<void>>().Data(),
+                             info[1].As<Napi::External<void>>().Data());
   });
+  return env.Undefined();
 }
 
-void EndCJArray(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
-    return;
-  };
-  if (!args[0]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a pointer.")));
-    return;
+Napi::Value EndCJArray(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 1) {
+    throw Napi::TypeError::New(env, "Must have one parameter.");
   }
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    CJArray skarray = SKIP_SKJSON_endCJArray(args[0].As<External>()->Value());
-    args.GetReturnValue().Set(External::New(isolate, skarray));
+  if (!info[0].IsExternal()) {
+    throw Napi::TypeError::New(env, "The parameter must be a pointer.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    CJArray skarray =
+        SKIP_SKJSON_endCJArray(info[0].As<Napi::External<void>>().Data());
+    result = Napi::External<void>::New(env, skarray);
   });
+  return result;
 }
 
-void CreateCJNull(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
+/* Primitive constructors: each wraps a single SKIP_SKJSON_create* call. */
+
+Napi::Value CreateCJNull(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  Napi::Value result;
+  NatTryCatch(env, [&result, env](Napi::Env) {
     CJSON sknull = SKIP_SKJSON_createCJNull();
-    args.GetReturnValue().Set(External::New(isolate, sknull));
+    result = Napi::External<void>::New(env, sknull);
   });
+  return result;
 }
 
-void CreateCJInt(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
-    return;
-  };
-  if (!args[0]->IsNumber() && !args[0]->IsBigInt()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a number or a bigint.")));
-    return;
-  };
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    int64_t skvalue;
-    if (args[0]->IsNumber()) {
-      skvalue = (int64_t)args[0].As<Number>()->Value();
+Napi::Value CreateCJInt(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 1) {
+    throw Napi::TypeError::New(env, "Must have one parameter.");
+  }
+  if (!info[0].IsNumber() && !info[0].IsBigInt()) {
+    throw Napi::TypeError::New(env,
+                               "The parameter must be a number or a bigint.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    double skvalue;
+    if (info[0].IsNumber()) {
+      skvalue = info[0].As<Napi::Number>().DoubleValue();
     } else {
-      skvalue = args[0].As<BigInt>()->Int64Value();
+      bool lossless;
+      skvalue = (double)info[0].As<Napi::BigInt>().Int64Value(&lossless);
     }
     CJSON skint = SKIP_SKJSON_createCJInt(skvalue);
-    args.GetReturnValue().Set(External::New(isolate, skint));
+    result = Napi::External<void>::New(env, skint);
   });
+  return result;
 }
 
-void CreateCJFloat(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
-    return;
-  };
-  if (!args[0]->IsNumber()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a number.")));
-    return;
-  };
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    double skvalue = args[0].As<Number>()->Value();
+Napi::Value CreateCJFloat(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 1) {
+    throw Napi::TypeError::New(env, "Must have one parameter.");
+  }
+  if (!info[0].IsNumber()) {
+    throw Napi::TypeError::New(env, "The parameter must be a number.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    double skvalue = info[0].As<Napi::Number>().DoubleValue();
     CJSON skfloat = SKIP_SKJSON_createCJFloat(skvalue);
-    args.GetReturnValue().Set(External::New(isolate, skfloat));
+    result = Napi::External<void>::New(env, skfloat);
   });
+  return result;
 }
 
-void CreateCJString(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
-    return;
-  };
-  if (!args[0]->IsString()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a string.")));
-    return;
-  };
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    char* skvalue = ToSKString(isolate, args[0].As<String>());
+Napi::Value CreateCJString(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 1) {
+    throw Napi::TypeError::New(env, "Must have one parameter.");
+  }
+  if (!info[0].IsString()) {
+    throw Napi::TypeError::New(env, "The parameter must be a string.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    char* skvalue = ToSKString(info[0]);
     CJSON skstring = SKIP_SKJSON_createCJString(skvalue);
-    args.GetReturnValue().Set(External::New(isolate, skstring));
+    result = Napi::External<void>::New(env, skstring);
   });
+  return result;
 }
 
-void CreateCJBool(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
-    return;
-  };
-  if (!args[0]->IsBoolean()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a boolean.")));
-    return;
-  };
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    bool skvalue = args[0].As<Boolean>()->Value();
+Napi::Value CreateCJBool(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 1) {
+    throw Napi::TypeError::New(env, "Must have one parameter.");
+  }
+  if (!info[0].IsBoolean()) {
+    throw Napi::TypeError::New(env, "The parameter must be a boolean.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    bool skvalue = info[0].As<Napi::Boolean>().Value();
     CJSON skbool = SKIP_SKJSON_createCJBool(skvalue);
-    args.GetReturnValue().Set(External::New(isolate, skbool));
+    result = Napi::External<void>::New(env, skbool);
   });
+  return result;
 }
 
-void TypeOf(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
-    return;
-  };
-  if (!args[0]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a pointer.")));
-    return;
-  };
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    double sktype = SKIP_SKJSON_typeOf(args[0].As<External>()->Value());
-    args.GetReturnValue().Set(Number::New(isolate, sktype));
+/* Type introspection and value extraction. */
+
+Napi::Value TypeOf(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 1) {
+    throw Napi::TypeError::New(env, "Must have one parameter.");
+  }
+  if (!info[0].IsExternal()) {
+    throw Napi::TypeError::New(env, "The parameter must be a pointer.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    double sktype =
+        SKIP_SKJSON_typeOf(info[0].As<Napi::External<void>>().Data());
+    result = Napi::Number::New(env, sktype);
   });
+  return result;
 }
 
-void AsNumber(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
-    return;
-  };
-  if (!args[0]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a pointer.")));
-    return;
-  };
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    double skvalue = SKIP_SKJSON_asNumber(args[0].As<External>()->Value());
-    args.GetReturnValue().Set(Number::New(isolate, skvalue));
+Napi::Value AsNumber(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 1) {
+    throw Napi::TypeError::New(env, "Must have one parameter.");
+  }
+  if (!info[0].IsExternal()) {
+    throw Napi::TypeError::New(env, "The parameter must be a pointer.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    double skvalue =
+        SKIP_SKJSON_asNumber(info[0].As<Napi::External<void>>().Data());
+    result = Napi::Number::New(env, skvalue);
   });
+  return result;
 }
 
-void AsString(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
-    return;
-  };
-  if (!args[0]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a pointer.")));
-    return;
-  };
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    char* skvalue = SKIP_SKJSON_asString(args[0].As<External>()->Value());
-    args.GetReturnValue().Set(FromUtf8(isolate, skvalue));
+Napi::Value AsString(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 1) {
+    throw Napi::TypeError::New(env, "Must have one parameter.");
+  }
+  if (!info[0].IsExternal()) {
+    throw Napi::TypeError::New(env, "The parameter must be a pointer.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    char* skvalue =
+        SKIP_SKJSON_asString(info[0].As<Napi::External<void>>().Data());
+    result = Napi::String::New(env, skvalue);
   });
+  return result;
 }
 
-void AsObject(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
-    return;
-  };
-  if (!args[0]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a pointer.")));
-    return;
-  };
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    CJObject object = SKIP_SKJSON_asObject(args[0].As<External>()->Value());
-    args.GetReturnValue().Set(External::New(isolate, object));
+Napi::Value AsObject(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 1) {
+    throw Napi::TypeError::New(env, "Must have one parameter.");
+  }
+  if (!info[0].IsExternal()) {
+    throw Napi::TypeError::New(env, "The parameter must be a pointer.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    CJObject object =
+        SKIP_SKJSON_asObject(info[0].As<Napi::External<void>>().Data());
+    result = Napi::External<void>::New(env, object);
   });
+  return result;
 }
 
-void AsArray(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
-    return;
-  };
-  if (!args[0]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a pointer.")));
-    return;
-  };
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    CJArray array = SKIP_SKJSON_asArray(args[0].As<External>()->Value());
-    args.GetReturnValue().Set(External::New(isolate, array));
+Napi::Value AsArray(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 1) {
+    throw Napi::TypeError::New(env, "Must have one parameter.");
+  }
+  if (!info[0].IsExternal()) {
+    throw Napi::TypeError::New(env, "The parameter must be a pointer.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    CJArray array =
+        SKIP_SKJSON_asArray(info[0].As<Napi::External<void>>().Data());
+    result = Napi::External<void>::New(env, array);
   });
+  return result;
 }
 
-void FieldAt(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 2) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have two parameters.")));
-    return;
-  };
-  if (!args[0]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a pointer.")));
-    return;
-  };
-  if (!args[1]->IsNumber()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The second parameter must be a number.")));
-    return;
-  };
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    char* skvalue = SKIP_SKJSON_fieldAt(args[0].As<External>()->Value(),
-                                        args[1].As<Number>()->Value());
-    args.GetReturnValue().Set(FromUtf8(isolate, skvalue));
+/* Indexed accessors and size queries. */
+
+Napi::Value FieldAt(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 2) {
+    throw Napi::TypeError::New(env, "Must have two parameters.");
+  }
+  if (!info[0].IsExternal()) {
+    throw Napi::TypeError::New(env, "The first parameter must be a pointer.");
+  }
+  if (!info[1].IsNumber()) {
+    throw Napi::TypeError::New(env, "The second parameter must be a number.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    char* skvalue =
+        SKIP_SKJSON_fieldAt(info[0].As<Napi::External<void>>().Data(),
+                            info[1].As<Napi::Number>().DoubleValue());
+    result = Napi::String::New(env, skvalue);
   });
+  return result;
 }
 
-void Get(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 2) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have two parameters.")));
-    return;
-  };
-  if (!args[0]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a pointer.")));
-    return;
-  };
-  if (!args[1]->IsNumber()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The second parameter must be a number.")));
-    return;
-  };
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    CJSON skvalue = SKIP_SKJSON_get(args[0].As<External>()->Value(),
-                                    args[1].As<Number>()->Value());
-    args.GetReturnValue().Set(External::New(isolate, skvalue));
+Napi::Value Get(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 2) {
+    throw Napi::TypeError::New(env, "Must have two parameters.");
+  }
+  if (!info[0].IsExternal()) {
+    throw Napi::TypeError::New(env, "The first parameter must be a pointer.");
+  }
+  if (!info[1].IsNumber()) {
+    throw Napi::TypeError::New(env, "The second parameter must be a number.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    CJSON skvalue = SKIP_SKJSON_get(info[0].As<Napi::External<void>>().Data(),
+                                    info[1].As<Napi::Number>().DoubleValue());
+    result = Napi::External<void>::New(env, skvalue);
   });
+  return result;
 }
 
-void At(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 2) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have two parameters.")));
-    return;
-  };
-  if (!args[0]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The first parameter must be a pointer.")));
-    return;
-  };
-  if (!args[1]->IsNumber()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The second parameter must be a number.")));
-    return;
-  };
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    CJSON skvalue = SKIP_SKJSON_at(args[0].As<External>()->Value(),
-                                   args[1].As<Number>()->Value());
-    args.GetReturnValue().Set(External::New(isolate, skvalue));
+Napi::Value At(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 2) {
+    throw Napi::TypeError::New(env, "Must have two parameters.");
+  }
+  if (!info[0].IsExternal()) {
+    throw Napi::TypeError::New(env, "The first parameter must be a pointer.");
+  }
+  if (!info[1].IsNumber()) {
+    throw Napi::TypeError::New(env, "The second parameter must be a number.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    CJSON skvalue = SKIP_SKJSON_at(info[0].As<Napi::External<void>>().Data(),
+                                   info[1].As<Napi::Number>().DoubleValue());
+    result = Napi::External<void>::New(env, skvalue);
   });
+  return result;
 }
 
-void ObjectSize(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
-    return;
-  };
-  if (!args[0]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a pointer.")));
-    return;
-  };
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    double skvalue = SKIP_SKJSON_objectSize(args[0].As<External>()->Value());
-    args.GetReturnValue().Set(Number::New(isolate, skvalue));
+Napi::Value ObjectSize(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 1) {
+    throw Napi::TypeError::New(env, "Must have one parameter.");
+  }
+  if (!info[0].IsExternal()) {
+    throw Napi::TypeError::New(env, "The parameter must be a pointer.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    double skvalue =
+        SKIP_SKJSON_objectSize(info[0].As<Napi::External<void>>().Data());
+    result = Napi::Number::New(env, skvalue);
   });
+  return result;
 }
 
-void ArraySize(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  if (args.Length() != 1) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(
-        Exception::TypeError(FromUtf8(isolate, "Must have one parameter.")));
-    return;
-  };
-  if (!args[0]->IsExternal()) {
-    // Throw an Error that is passed back to JavaScript
-    isolate->ThrowException(Exception::TypeError(
-        FromUtf8(isolate, "The parameter must be a pointer.")));
-    return;
-  };
-  NatTryCatch(isolate, [&args](Isolate* isolate) {
-    double skvalue = SKIP_SKJSON_arraySize(args[0].As<External>()->Value());
-    args.GetReturnValue().Set(Number::New(isolate, skvalue));
+Napi::Value ArraySize(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 1) {
+    throw Napi::TypeError::New(env, "Must have one parameter.");
+  }
+  if (!info[0].IsExternal()) {
+    throw Napi::TypeError::New(env, "The parameter must be a pointer.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    double skvalue =
+        SKIP_SKJSON_arraySize(info[0].As<Napi::External<void>>().Data());
+    result = Napi::Number::New(env, skvalue);
   });
+  return result;
 }
 
-void GetBinding(const FunctionCallbackInfo<Value>& args) {
-  Isolate* isolate = args.GetIsolate();
-  HandleScope scope(isolate);
-  Local<Object> binding = Object::New(isolate);
-  AddFunction(isolate, binding, "SKIP_SKJSON_startCJObject", StartCJObject);
-  AddFunction(isolate, binding, "SKIP_SKJSON_addToCJObject", AddToCJObject);
-  AddFunction(isolate, binding, "SKIP_SKJSON_endCJObject", EndCJObject);
+/* Assemble the binding object exposed to JS. */
 
-  AddFunction(isolate, binding, "SKIP_SKJSON_startCJArray", StartCJArray);
-  AddFunction(isolate, binding, "SKIP_SKJSON_addToCJArray", AddToCJArray);
-  AddFunction(isolate, binding, "SKIP_SKJSON_endCJArray", EndCJArray);
+Napi::Value GetBinding(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  Napi::Object binding = Napi::Object::New(env);
+  AddFunction(env, binding, "SKIP_SKJSON_startCJObject", StartCJObject);
+  AddFunction(env, binding, "SKIP_SKJSON_addToCJObject", AddToCJObject);
+  AddFunction(env, binding, "SKIP_SKJSON_endCJObject", EndCJObject);
 
-  AddFunction(isolate, binding, "SKIP_SKJSON_createCJNull", CreateCJNull);
-  AddFunction(isolate, binding, "SKIP_SKJSON_createCJInt", CreateCJInt);
-  AddFunction(isolate, binding, "SKIP_SKJSON_createCJFloat", CreateCJFloat);
-  AddFunction(isolate, binding, "SKIP_SKJSON_createCJString", CreateCJString);
-  AddFunction(isolate, binding, "SKIP_SKJSON_createCJBool", CreateCJBool);
+  AddFunction(env, binding, "SKIP_SKJSON_startCJArray", StartCJArray);
+  AddFunction(env, binding, "SKIP_SKJSON_addToCJArray", AddToCJArray);
+  AddFunction(env, binding, "SKIP_SKJSON_endCJArray", EndCJArray);
 
-  AddFunction(isolate, binding, "SKIP_SKJSON_typeOf", TypeOf);
-  AddFunction(isolate, binding, "SKIP_SKJSON_asNumber", AsNumber);
-  AddFunction(isolate, binding, "SKIP_SKJSON_asString", AsString);
-  AddFunction(isolate, binding, "SKIP_SKJSON_asObject", AsObject);
-  AddFunction(isolate, binding, "SKIP_SKJSON_asArray", AsArray);
+  AddFunction(env, binding, "SKIP_SKJSON_createCJNull", CreateCJNull);
+  AddFunction(env, binding, "SKIP_SKJSON_createCJInt", CreateCJInt);
+  AddFunction(env, binding, "SKIP_SKJSON_createCJFloat", CreateCJFloat);
+  AddFunction(env, binding, "SKIP_SKJSON_createCJString", CreateCJString);
+  AddFunction(env, binding, "SKIP_SKJSON_createCJBool", CreateCJBool);
 
-  AddFunction(isolate, binding, "SKIP_SKJSON_fieldAt", FieldAt);
-  AddFunction(isolate, binding, "SKIP_SKJSON_get", Get);
-  AddFunction(isolate, binding, "SKIP_SKJSON_at", At);
+  AddFunction(env, binding, "SKIP_SKJSON_typeOf", TypeOf);
+  AddFunction(env, binding, "SKIP_SKJSON_asNumber", AsNumber);
+  AddFunction(env, binding, "SKIP_SKJSON_asString", AsString);
+  AddFunction(env, binding, "SKIP_SKJSON_asObject", AsObject);
+  AddFunction(env, binding, "SKIP_SKJSON_asArray", AsArray);
 
-  AddFunction(isolate, binding, "SKIP_SKJSON_objectSize", ObjectSize);
-  AddFunction(isolate, binding, "SKIP_SKJSON_arraySize", ArraySize);
+  AddFunction(env, binding, "SKIP_SKJSON_fieldAt", FieldAt);
+  AddFunction(env, binding, "SKIP_SKJSON_get", Get);
+  AddFunction(env, binding, "SKIP_SKJSON_at", At);
 
-  args.GetReturnValue().Set(binding);
+  AddFunction(env, binding, "SKIP_SKJSON_objectSize", ObjectSize);
+  AddFunction(env, binding, "SKIP_SKJSON_arraySize", ArraySize);
+
+  return binding;
 }
 
 }  // namespace skjson

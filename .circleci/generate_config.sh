@@ -122,6 +122,9 @@ then
   skipruntime:
     jobs:
       - skipruntime
+  skipruntime-bun:
+    jobs:
+      - skipruntime-bun
 EOF
 fi
 

@@ -193,6 +193,10 @@ test-skjson:
 test-skipruntime-ts:
 	$(MAKE) -C skipruntime-ts test-all
 
+.PHONY: test-skipruntime-ts-bun
+test-skipruntime-ts-bun:
+	$(MAKE) -C skipruntime-ts test-skipruntime-ts-bun
+
 test-%:
 	cd $* && skargo test --profile $(SKARGO_PROFILE)
 
