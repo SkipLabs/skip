@@ -52,6 +52,18 @@ Napi::Value JSONStringify(Napi::Env env, Napi::Value value) {
   return CallGlobalStaticMethod(env, "JSON", "stringify", {value});
 }
 
+// Best-effort stringify: JSON.stringify throws on circular values, so fall
+// back to a placeholder rather than let a C++ exception unwind through Skip.
+static char* SafeStringifyToSK(Napi::Env env, Napi::Value value) {
+  try {
+    Napi::Value json = JSONStringify(env, value);
+    return ToSKString(json);
+  } catch (const Napi::Error&) {
+    const char* fallback = "<unserializable exception value>";
+    return sk_string_create(fallback, strlen(fallback));
+  }
+}
+
 extern "C" {
 [[noreturn]] void SkipRuntime_throwExternalException(char*, char*, char*);
 }
@@ -81,8 +93,7 @@ static void HandleJSException(Napi::Env env, Napi::Value exception) {
     if (messageVal.IsString()) {
       skmessage = ToSKString(messageVal);
     } else {
-      Napi::Value jsmessage = JSONStringify(env, exception);
-      skmessage = ToSKString(jsmessage);
+      skmessage = SafeStringifyToSK(env, exception);
     }
     SkipRuntime_throwExternalException(skempty, skmessage, skempty);
   } else if (exception.IsString()) {
@@ -92,8 +103,7 @@ static void HandleJSException(Napi::Env env, Napi::Value exception) {
   } else {
     // Primitive non-string (number, boolean, null, undefined)
     char* skempty = sk_string_create("", 0);
-    Napi::Value jsmessage = JSONStringify(env, exception);
-    char* skmessage = ToSKString(jsmessage);
+    char* skmessage = SafeStringifyToSK(env, exception);
     SkipRuntime_throwExternalException(skempty, skmessage, skempty);
   }
 }
