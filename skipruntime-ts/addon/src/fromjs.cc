@@ -456,24 +456,6 @@ void SkipRuntime_deleteReducer(uint32_t reducerId) {
   std::vector<napi_value> args = {Napi::Number::New(env, reducerId)};
   CallJSVoidFunction(env, externFunctions, "SkipRuntime_deleteReducer", args);
 }
-
-/* External service fetch callback. */
-
-double SkipRuntime_ServiceDefinition__fetch(uint32_t serviceId, char* supplier,
-                                            char* dirName, CJSON key) {
-  Napi::Env env = kExternFunctions.Env();
-  Napi::HandleScope scope(env);
-  Napi::Object externFunctions = kExternFunctions.Value();
-  std::vector<napi_value> args = {
-      Napi::Number::New(env, serviceId),
-      Napi::String::New(env, supplier),
-      Napi::String::New(env, dirName),
-      Napi::External<void>::New(env, key),
-  };
-  return CallJSNumberFunction(env, externFunctions,
-                              "SkipRuntime_ServiceDefinition__fetch", args);
-}
-
 }  // extern "C"
 
 }  // namespace skipruntime
