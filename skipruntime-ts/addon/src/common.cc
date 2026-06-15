@@ -321,6 +321,8 @@ void NatTryCatch(Napi::Env env, std::function<void(Napi::Env)> run) {
       napiError.Value().Set("stack", Napi::String::New(env, stack));
     }
     napiError.ThrowAsJavaScriptException();
+  } catch (const Napi::Error&) {
+    throw;
   } catch (std::exception& e) {
     Napi::Error::New(env, e.what()).ThrowAsJavaScriptException();
   }
