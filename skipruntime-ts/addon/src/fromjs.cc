@@ -20,6 +20,7 @@ static Napi::ObjectReference kExternFunctions;
 
 void SetFromJSBinding(Napi::Env /*env*/, Napi::Object externFunctions) {
   kExternFunctions = Napi::Persistent(externFunctions);
+  kExternFunctions.SuppressDestruct();
 }
 
 extern "C" {
@@ -28,6 +29,7 @@ extern "C" {
 
 double SkipRuntime_getErrorHdl(SKException exn) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {Napi::External<void>::New(env, exn)};
   return CallJSNumberFunction(env, externFunctions, "SkipRuntime_getErrorHdl",
@@ -36,6 +38,7 @@ double SkipRuntime_getErrorHdl(SKException exn) {
 
 void SkipRuntime_pushContext(SKContext context) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {Napi::External<void>::New(env, context)};
   CallJSVoidFunction(env, externFunctions, "SkipRuntime_pushContext", args);
@@ -43,12 +46,14 @@ void SkipRuntime_pushContext(SKContext context) {
 
 void SkipRuntime_popContext() {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   CallJSVoidFunction(env, externFunctions, "SkipRuntime_popContext", {});
 }
 
 void* SkipRuntime_getContext() {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   return CallJSNullableFunction(env, externFunctions, "SkipRuntime_getContext",
                                 {});
@@ -56,6 +61,7 @@ void* SkipRuntime_getContext() {
 
 void* SkipRuntime_getFork() {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   return CallJSNullableStringFunction(env, externFunctions,
                                       "SkipRuntime_getFork", {});
@@ -63,6 +69,7 @@ void* SkipRuntime_getFork() {
 
 uint32_t SkipRuntime_getChangeManager() {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   return (uint32_t)CallJSNumberFunction(env, externFunctions,
                                         "SkipRuntime_getChangeManager", {});
@@ -73,6 +80,7 @@ uint32_t SkipRuntime_getChangeManager() {
 CJArray SkipRuntime_Mapper__mapEntry(uint32_t mapperId, CJSON key,
                                      SKNonEmptyIterator values) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {
       Napi::Number::New(env, mapperId),
@@ -85,6 +93,7 @@ CJArray SkipRuntime_Mapper__mapEntry(uint32_t mapperId, CJSON key,
 
 CJObject SkipRuntime_Mapper__getInfo(uint32_t mapperId) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {
       Napi::Number::New(env, mapperId),
@@ -95,6 +104,7 @@ CJObject SkipRuntime_Mapper__getInfo(uint32_t mapperId) {
 
 uint32_t SkipRuntime_Mapper__isEquals(uint32_t mapperId, uint32_t otherId) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {
       Napi::Number::New(env, mapperId),
@@ -106,6 +116,7 @@ uint32_t SkipRuntime_Mapper__isEquals(uint32_t mapperId, uint32_t otherId) {
 
 void SkipRuntime_deleteMapper(uint32_t mapperId) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {Napi::Number::New(env, mapperId)};
   CallJSVoidFunction(env, externFunctions, "SkipRuntime_deleteMapper", args);
@@ -116,6 +127,7 @@ void SkipRuntime_deleteMapper(uint32_t mapperId) {
 CJSON SkipRuntime_LazyCompute__compute(uint32_t lazyComputeId, char* self,
                                        CJSON key) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {
       Napi::Number::New(env, lazyComputeId),
@@ -128,6 +140,7 @@ CJSON SkipRuntime_LazyCompute__compute(uint32_t lazyComputeId, char* self,
 
 CJObject SkipRuntime_LazyCompute__getInfo(uint32_t mapperId) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {
       Napi::Number::New(env, mapperId),
@@ -139,6 +152,7 @@ CJObject SkipRuntime_LazyCompute__getInfo(uint32_t mapperId) {
 uint32_t SkipRuntime_LazyCompute__isEquals(uint32_t mapperId,
                                            uint32_t otherId) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {
       Napi::Number::New(env, mapperId),
@@ -150,6 +164,7 @@ uint32_t SkipRuntime_LazyCompute__isEquals(uint32_t mapperId,
 
 void SkipRuntime_deleteLazyCompute(uint32_t lazyComputeId) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {Napi::Number::New(env, lazyComputeId)};
   CallJSVoidFunction(env, externFunctions, "SkipRuntime_deleteLazyCompute",
@@ -161,6 +176,7 @@ void SkipRuntime_deleteLazyCompute(uint32_t lazyComputeId) {
 char* SkipRuntime_Resource__instantiate(uint32_t resourceId,
                                         CJObject collections) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {
       Napi::Number::New(env, resourceId),
@@ -172,6 +188,7 @@ char* SkipRuntime_Resource__instantiate(uint32_t resourceId,
 
 void SkipRuntime_deleteResource(uint32_t resourceId) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {Napi::Number::New(env, resourceId)};
   CallJSVoidFunction(env, externFunctions, "SkipRuntime_deleteResource", args);
@@ -181,6 +198,7 @@ void SkipRuntime_deleteResource(uint32_t resourceId) {
 
 void SkipRuntime_deleteService(uint32_t serviceId) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {Napi::Number::New(env, serviceId)};
   CallJSVoidFunction(env, externFunctions, "SkipRuntime_deleteService", args);
@@ -192,6 +210,7 @@ double SkipRuntime_ServiceDefinition__subscribe(uint32_t serviceId,
                                                 char* resource,
                                                 CJObject params) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {
       Napi::Number::New(env, serviceId), Napi::String::New(env, collection),
@@ -206,6 +225,7 @@ void SkipRuntime_ServiceDefinition__unsubscribe(uint32_t serviceId,
                                                 char* supplier,
                                                 char* sessionId) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {
       Napi::Number::New(env, serviceId),
@@ -218,6 +238,7 @@ void SkipRuntime_ServiceDefinition__unsubscribe(uint32_t serviceId,
 
 double SkipRuntime_ServiceDefinition__shutdown(uint32_t serviceId) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {Napi::Number::New(env, serviceId)};
   return CallJSNumberFunction(env, externFunctions,
@@ -226,6 +247,7 @@ double SkipRuntime_ServiceDefinition__shutdown(uint32_t serviceId) {
 
 CJArray SkipRuntime_ServiceDefinition__inputs(uint32_t serviceId) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {
       Napi::Number::New(env, serviceId),
@@ -237,6 +259,7 @@ CJArray SkipRuntime_ServiceDefinition__inputs(uint32_t serviceId) {
 CJArray SkipRuntime_ServiceDefinition__initialData(uint32_t serviceId,
                                                    char* input) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {
       Napi::Number::New(env, serviceId),
@@ -248,6 +271,7 @@ CJArray SkipRuntime_ServiceDefinition__initialData(uint32_t serviceId,
 
 CJArray SkipRuntime_ServiceDefinition__resources(uint32_t serviceId) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {
       Napi::Number::New(env, serviceId),
@@ -260,6 +284,7 @@ SKResource SkipRuntime_ServiceDefinition__buildResource(uint32_t serviceId,
                                                         char* resource,
                                                         CJObject params) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {
       Napi::Number::New(env, serviceId),
@@ -273,6 +298,7 @@ SKResource SkipRuntime_ServiceDefinition__buildResource(uint32_t serviceId,
 CJObject SkipRuntime_ServiceDefinition__createGraph(uint32_t serviceId,
                                                     CJObject collections) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {
       Napi::Number::New(env, serviceId),
@@ -287,6 +313,7 @@ CJObject SkipRuntime_ServiceDefinition__createGraph(uint32_t serviceId,
 uint32_t SkipRuntime_ChangeManager__needInputReload(uint32_t serviceId,
                                                     char* name) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {Napi::Number::New(env, serviceId),
                                   Napi::String::New(env, name)};
@@ -297,6 +324,7 @@ uint32_t SkipRuntime_ChangeManager__needInputReload(uint32_t serviceId,
 uint32_t SkipRuntime_ChangeManager__needResourceReload(uint32_t serviceId,
                                                        char* name) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {Napi::Number::New(env, serviceId),
                                   Napi::String::New(env, name)};
@@ -308,6 +336,7 @@ uint32_t SkipRuntime_ChangeManager__needResourceReload(uint32_t serviceId,
 uint32_t SkipRuntime_ChangeManager__needExternalServiceReload(
     uint32_t serviceId, char* name, char* resource) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {Napi::Number::New(env, serviceId),
                                   Napi::String::New(env, name),
@@ -321,6 +350,7 @@ uint32_t SkipRuntime_ChangeManager__needExternalServiceReload(
 
 void SkipRuntime_Notifier__subscribed(uint32_t notifierId) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {Napi::Number::New(env, notifierId)};
   CallJSVoidFunction(env, externFunctions, "SkipRuntime_Notifier__subscribed",
@@ -330,6 +360,7 @@ void SkipRuntime_Notifier__subscribed(uint32_t notifierId) {
 void SkipRuntime_Notifier__notify(uint32_t notifierId, CJArray values,
                                   char* watermark, uint32_t updates) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {
       Napi::Number::New(env, notifierId),
@@ -343,6 +374,7 @@ void SkipRuntime_Notifier__notify(uint32_t notifierId, CJArray values,
 
 void SkipRuntime_Notifier__close(uint32_t notifierId) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {Napi::Number::New(env, notifierId)};
   CallJSVoidFunction(env, externFunctions, "SkipRuntime_Notifier__close", args);
@@ -350,6 +382,7 @@ void SkipRuntime_Notifier__close(uint32_t notifierId) {
 
 void SkipRuntime_deleteNotifier(uint32_t notifierId) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {Napi::Number::New(env, notifierId)};
   CallJSVoidFunction(env, externFunctions, "SkipRuntime_deleteNotifier", args);
@@ -359,6 +392,7 @@ void SkipRuntime_deleteNotifier(uint32_t notifierId) {
 
 CJSON SkipRuntime_Reducer__init(uint32_t reducerId) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {
       Napi::Number::New(env, reducerId),
@@ -369,6 +403,7 @@ CJSON SkipRuntime_Reducer__init(uint32_t reducerId) {
 
 CJSON SkipRuntime_Reducer__add(uint32_t reducerId, CJSON acc, CJSON value) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {
       Napi::Number::New(env, reducerId),
@@ -380,6 +415,7 @@ CJSON SkipRuntime_Reducer__add(uint32_t reducerId, CJSON acc, CJSON value) {
 
 CJSON SkipRuntime_Reducer__remove(uint32_t reducerId, CJSON acc, CJSON value) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {
       Napi::Number::New(env, reducerId),
@@ -392,6 +428,7 @@ CJSON SkipRuntime_Reducer__remove(uint32_t reducerId, CJSON acc, CJSON value) {
 
 uint32_t SkipRuntime_Reducer__isEquals(uint32_t reducerId, uint32_t otherId) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {
       Napi::Number::New(env, reducerId),
@@ -403,6 +440,7 @@ uint32_t SkipRuntime_Reducer__isEquals(uint32_t reducerId, uint32_t otherId) {
 
 CJObject SkipRuntime_Reducer__getInfo(uint32_t reducerId) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {
       Napi::Number::New(env, reducerId),
@@ -413,6 +451,7 @@ CJObject SkipRuntime_Reducer__getInfo(uint32_t reducerId) {
 
 void SkipRuntime_deleteReducer(uint32_t reducerId) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {Napi::Number::New(env, reducerId)};
   CallJSVoidFunction(env, externFunctions, "SkipRuntime_deleteReducer", args);
@@ -423,6 +462,7 @@ void SkipRuntime_deleteReducer(uint32_t reducerId) {
 double SkipRuntime_ServiceDefinition__fetch(uint32_t serviceId, char* supplier,
                                             char* dirName, CJSON key) {
   Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
   Napi::Object externFunctions = kExternFunctions.Value();
   std::vector<napi_value> args = {
       Napi::Number::New(env, serviceId),
