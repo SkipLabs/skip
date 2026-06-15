@@ -159,15 +159,19 @@ Napi::Value CreateCJInt(const Napi::CallbackInfo& info) {
     throw Napi::TypeError::New(env,
                                "The parameter must be a number or a bigint.");
   }
-  Napi::Value result;
-  NatTryCatch(env, [&result, &info, env](Napi::Env) {
-    double skvalue;
-    if (info[0].IsNumber()) {
-      skvalue = info[0].As<Napi::Number>().DoubleValue();
-    } else {
-      bool lossless;
-      skvalue = (double)info[0].As<Napi::BigInt>().Int64Value(&lossless);
+  double skvalue;
+  if (info[0].IsBigInt()) {
+    bool lossless;
+    int64_t int64value = info[0].As<Napi::BigInt>().Int64Value(&lossless);
+    if (!lossless) {
+      throw Napi::RangeError::New(env, "BigInt out of int64 range.");
     }
+    skvalue = (double)int64value;
+  } else {
+    skvalue = info[0].As<Napi::Number>().DoubleValue();
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, skvalue, env](Napi::Env) {
     CJSON skint = SKIP_SKJSON_createCJInt(skvalue);
     result = Napi::External<void>::New(env, skint);
   });
