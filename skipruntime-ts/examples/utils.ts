@@ -31,3 +31,30 @@ export async function subscribe(
     return evSource;
   });
 }
+
+// Minimal structural typing for the sqlite drivers used by the database
+// example: bun:sqlite under Bun, better-sqlite3 under Node.
+
+export interface SqliteStatement {
+  run(...params: unknown[]): unknown;
+  all(...params: unknown[]): unknown[];
+}
+
+export interface SqliteDatabase {
+  prepare(sql: string): SqliteStatement;
+  close(): void;
+}
+
+export type SqliteDatabaseConstructor = new (path: string) => SqliteDatabase;
+
+export async function getDatabase(): Promise<SqliteDatabaseConstructor> {
+  // @ts-expect-error - Bun is not typed in a Node environment
+  if (typeof Bun !== "undefined") {
+    // @ts-expect-error - bun:sqlite is only available under Bun
+    const mod = await import("bun:sqlite");
+    return mod.Database as SqliteDatabaseConstructor;
+  } else {
+    const mod = await import("better-sqlite3");
+    return mod.default as unknown as SqliteDatabaseConstructor;
+  }
+}

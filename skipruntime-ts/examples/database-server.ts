@@ -1,7 +1,8 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 import { SkipServiceBroker } from "@skipruntime/helpers";
 
 import express from "express";
+
+import { getDatabase } from "./utils.js";
 
 /*
   This is the user facing server of the database example
@@ -12,22 +13,6 @@ const service = new SkipServiceBroker({
   control_port: 8081,
   streaming_port: 8080,
 });
-
-/*****************************************************************************/
-// Conditional database driver loading: bun:sqlite under Bun, better-sqlite3 under Node
-/*****************************************************************************/
-
-async function getDatabase(): Promise<any> {
-  // @ts-expect-error - Bun is not typed in a Node environment
-  if (typeof Bun !== "undefined") {
-    // @ts-expect-error - bun:sqlite is only available under Bun
-    const mod = await import("bun:sqlite");
-    return mod.Database;
-  } else {
-    const mod = await import("better-sqlite3");
-    return mod.default;
-  }
-}
 
 const Database = await getDatabase();
 
