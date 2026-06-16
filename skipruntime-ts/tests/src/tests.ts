@@ -678,9 +678,7 @@ class NamedError extends Error {
     this.name = "CustomError";
   }
 }
-class MapWithNamedException
-  implements Mapper<string, number, string, number>
-{
+class MapWithNamedException implements Mapper<string, number, string, number> {
   mapEntry(_key: string, _values: Values<number>): Iterable<[string, number]> {
     throw new NamedError("Something goes wrong.");
   }
