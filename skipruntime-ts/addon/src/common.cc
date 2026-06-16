@@ -42,6 +42,8 @@ void Print(Napi::Env /*env*/, const char* prefix, Napi::Value value) {
 }
 
 // Convert any JS value to a Skip string, using JS coercion if needed.
+// Uses the full std::string length (not strlen), so embedded NUL bytes are
+// preserved rather than truncated.
 char* ToSKString(Napi::Value value) {
   std::string cppStr = value.ToString().Utf8Value();
   return sk_string_create(cppStr.c_str(), cppStr.size());
