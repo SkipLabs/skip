@@ -74,7 +74,7 @@ run_one_example() {
         BG_PIDS+=($!)
     fi
 
-    sleep 1
+    sleep 3
 
     bun run "$EXAMPLES_DIR/${name}-client.ts" >"$out_file" 2>"$err_file"
     local client_status=$?
