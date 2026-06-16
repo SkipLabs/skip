@@ -71,6 +71,11 @@ extern "C" {
 /*
   Internal helper shared by SKTryCatch and SKTryCatchVoid.
   Converts a JS exception into a call to SkipRuntime_throwExternalException.
+  N-API semantics, intentionally differing from the old V8 path:
+  - an object with a string "stack" is treated as a native error;
+  - the type is read from "name" (a subclass without its own name forwards
+    "Error", not the constructor name);
+  - a non-string message is JSON-stringified.
   Never returns.
 */
 static void HandleJSException(Napi::Env env, Napi::Value exception) {

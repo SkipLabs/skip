@@ -671,6 +671,33 @@ function testExternalService(): SkipService<Input_NN_NN, Input_NN_NN> {
   };
 }
 
+//// testMapWithNamedException
+class NamedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CustomError";
+  }
+}
+class MapWithNamedException
+  implements Mapper<string, number, string, number>
+{
+  mapEntry(_key: string, _values: Values<number>): Iterable<[string, number]> {
+    throw new NamedError("Something goes wrong.");
+  }
+}
+class MapWithNamedExceptionResource implements Resource<Input_SN> {
+  instantiate(collections: Input_SN): EagerCollection<string, number> {
+    return collections.input.map(MapWithNamedException);
+  }
+}
+const mapWithNamedExceptionService: SkipService<Input_SN, Input_SN> = {
+  initialData: { input: [] },
+  resources: { mapWithNamedException: MapWithNamedExceptionResource },
+  createGraph(inputCollections: Input_SN) {
+    return inputCollections;
+  },
+};
+
 //// initServiceWithExternalService
 
 type Col_N_NA = {
@@ -1292,7 +1319,6 @@ export function initTests(
       await service.close();
     }
   });
-
   it("valueMapper", async () => {
     const service = await initService(oneToOneMapperService);
     try {
@@ -2059,6 +2085,36 @@ INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
       await service.close();
     }
   });
+
+  if (category === "Native") {
+    it("testMapWithNamedException", async () => {
+      const service = await initService(mapWithNamedExceptionService);
+      try {
+        await service.instantiateResource(
+          "unsafe.fixed.resource.ident",
+          "mapWithNamedException",
+          {},
+        );
+        try {
+          await service.update("input", [[0, [10]]]);
+          throw new Error("Error was not thrown");
+        } catch (e: unknown) {
+          expect(e).toBeA(Error);
+          // The native addon (HandleJSException) reads the error type from
+          // the JS error's "name" property and prefixes it to the message.
+          // The wasm backend uses a different translation path, so this is
+          // native-only.
+          expect((e as Error).message).toMatchRegex(
+            new RegExp(/CustomError: Something goes wrong\./),
+          );
+        } finally {
+          await service.close();
+        }
+      } finally {
+        await service.close();
+      }
+    });
+  }
 
   it("testInitServiceWithExternalServiceFailure", async () => {
     try {
