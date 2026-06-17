@@ -1,5 +1,18 @@
 # Installation instructions
 
+## Native runtime (`@skipruntime/native`)
+
+The native runtime is distributed as a Linux shared object
+(`libskipruntime.so`) and supports:
+
+- **OS:** Linux (`amd64` or `arm64`)
+- **glibc:** ≥ 2.41 (Debian 13+, Ubuntu 24.04+, RHEL 10+)
+
+If your system does not meet these requirements, use the WebAssembly
+runtime [`@skipruntime/wasm`](https://www.npmjs.com/package/@skipruntime/wasm)
+instead. See the [`@skipruntime/native` README](./skipruntime-ts/addon/README.md)
+for the installation procedure.
+
 ## Skiplang tool chain
 
 ### Dependencies

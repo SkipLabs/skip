@@ -7,6 +7,19 @@ required to run a Skip reactive service.
 
 See the [docs](https://skiplabs.io/docs/getting_started#installation) for more details.
 
+## Requirements
+
+The native add-on links against `libskipruntime.so`, which is distributed
+as a Linux shared object. The runtime is built on Debian Trixie and
+requires:
+
+- **OS:** Linux (`amd64` or `arm64`)
+- **glibc:** ≥ 2.41 (Debian 13+, Ubuntu 24.04+, RHEL 10+)
+
+If your system does not meet these requirements, use the WebAssembly
+runtime [`@skipruntime/wasm`](https://www.npmjs.com/package/@skipruntime/wasm)
+instead.
+
 ## Installation
 
 Installing the native add-on version of the Skip runtime is done in two steps:

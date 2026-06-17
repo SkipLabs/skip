@@ -71,6 +71,15 @@ runtime release must be as well. The installation scripts download the
 binary runtime library from a github release tagged with `vM.N.O` where
 `M.N.O` is the version of the NPM packages.
 
+The runtime is built on Debian Trixie and therefore requires **glibc ≥ 2.41**
+(Debian 13+, Ubuntu 24.04+, RHEL 10+) on the consumer's system. The release
+notes for each version must state this floor, and any time the build base
+in `skiplang/Dockerfile` is bumped, verify the new floor with:
+
+```sh
+objdump -T build/libskipruntime.so-linux-amd64 | grep -oE 'GLIBC_[0-9.]+' | sort -Vu | tail
+```
+
 The release procedure for the runtime library binary is:
 
 1. Run `bin/build_runtime.sh` from a clean repo with HEAD at the commit that

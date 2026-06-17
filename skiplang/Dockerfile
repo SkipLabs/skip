@@ -1,9 +1,10 @@
 # skiplabs/skiplang-bin-builder
 # Dockerfile to build skiplang toolchain to build binary releases
 
-# aim to start from an image with a version of glibc that is as widely
-# compatible as possible while still receiving security updates
-FROM debian:bookworm-20250113-slim AS base
+# Debian Trixie ships glibc 2.41 — this is the minimum glibc for users
+# consuming libskipruntime.so binary releases. Bookworm-era systems
+# (Debian 12, Ubuntu 22.04, RHEL 8/9) are no longer supported targets.
+FROM debian:trixie-20260518-slim AS base
 
 ARG LLVM_VERSION=20
 ARG TARGETARCH
@@ -15,7 +16,7 @@ RUN --mount=type=cache,id=apt-cache-$TARGETARCH,target=/var/cache/apt,sharing=lo
     apt-get install --quiet --yes --no-install-recommends ca-certificates make wget && \
     mkdir -p /etc/apt/keyrings && \
     wget -qO /etc/apt/keyrings/llvm.asc https://apt.llvm.org/llvm-snapshot.gpg.key && \
-    echo "deb [signed-by=/etc/apt/keyrings/llvm.asc] http://apt.llvm.org/bookworm/ llvm-toolchain-bookworm-${LLVM_VERSION} main" > /etc/apt/sources.list.d/llvm.list && \
+    echo "deb [signed-by=/etc/apt/keyrings/llvm.asc] http://apt.llvm.org/trixie/ llvm-toolchain-trixie-${LLVM_VERSION} main" > /etc/apt/sources.list.d/llvm.list && \
     apt-get update --quiet && \
     apt-get install --quiet --yes --no-install-recommends \
         clang-${LLVM_VERSION} \
