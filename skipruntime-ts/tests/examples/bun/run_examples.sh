@@ -55,12 +55,12 @@ trap cleanup EXIT INT TERM
 wait_for_port() {
     local port="$1"
     local i=0
-    while [ "$i" -lt 50 ]; do
+    while [ "$i" -lt 10 ]; do
         if (exec 3<>"/dev/tcp/localhost/${port}") 2>/dev/null; then
             exec 3>&- 3<&-
             return 0
         fi
-        sleep 0.2
+        sleep 1
         i=$((i + 1))
     done
     return 1
