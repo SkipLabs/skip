@@ -99,16 +99,16 @@ test-native-example-%:
 	diff /tmp/$*-native.err tests/examples/$*.exp.err
 
 .PHONY: test-bun-unit
-test-bun-unit:
+test-bun-unit: build
 	cd tests && \
 	bun --bun ../../node_modules/.bin/mocha --config .mocharc.bun.json
 
 .PHONY: test-bun-examples
-test-bun-examples:
+test-bun-examples: build
 	cd tests/examples/bun && ./run_examples.sh
 
 .PHONY: test-skipruntime-ts-bun
-test-skipruntime-ts-bun: build test-bun-unit test-bun-examples
+test-skipruntime-ts-bun: test-bun-unit test-bun-examples
 
 EXAMPLES := $(patsubst tests/examples/%.sh,%,$(wildcard tests/examples/*.sh))
 

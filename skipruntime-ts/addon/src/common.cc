@@ -42,6 +42,8 @@ void Print(Napi::Env /*env*/, const char* prefix, Napi::Value value) {
 }
 
 // Convert any JS value to a Skip string, using JS coercion if needed.
+// Uses the full std::string length (not strlen), so embedded NUL bytes are
+// preserved rather than truncated.
 char* ToSKString(Napi::Value value) {
   std::string cppStr = value.ToString().Utf8Value();
   return sk_string_create(cppStr.c_str(), cppStr.size());
@@ -52,6 +54,18 @@ Napi::Value JSONStringify(Napi::Env env, Napi::Value value) {
   return CallGlobalStaticMethod(env, "JSON", "stringify", {value});
 }
 
+// Best-effort stringify: JSON.stringify throws on circular values, so fall
+// back to a placeholder rather than let a C++ exception unwind through Skip.
+static char* SafeStringifyToSK(Napi::Env env, Napi::Value value) {
+  try {
+    Napi::Value json = JSONStringify(env, value);
+    return ToSKString(json);
+  } catch (const Napi::Error&) {
+    const char* fallback = "<unserializable exception value>";
+    return sk_string_create(fallback, strlen(fallback));
+  }
+}
+
 extern "C" {
 [[noreturn]] void SkipRuntime_throwExternalException(char*, char*, char*);
 }
@@ -59,6 +73,11 @@ extern "C" {
 /*
   Internal helper shared by SKTryCatch and SKTryCatchVoid.
   Converts a JS exception into a call to SkipRuntime_throwExternalException.
+  N-API semantics, intentionally differing from the old V8 path:
+  - an object with a string "stack" is treated as a native error;
+  - the type is read from "name" (a subclass without its own name forwards
+    "Error", not the constructor name);
+  - a non-string message is JSON-stringified.
   Never returns.
 */
 static void HandleJSException(Napi::Env env, Napi::Value exception) {
@@ -81,8 +100,7 @@ static void HandleJSException(Napi::Env env, Napi::Value exception) {
     if (messageVal.IsString()) {
       skmessage = ToSKString(messageVal);
     } else {
-      Napi::Value jsmessage = JSONStringify(env, exception);
-      skmessage = ToSKString(jsmessage);
+      skmessage = SafeStringifyToSK(env, exception);
     }
     SkipRuntime_throwExternalException(skempty, skmessage, skempty);
   } else if (exception.IsString()) {
@@ -92,8 +110,7 @@ static void HandleJSException(Napi::Env env, Napi::Value exception) {
   } else {
     // Primitive non-string (number, boolean, null, undefined)
     char* skempty = sk_string_create("", 0);
-    Napi::Value jsmessage = JSONStringify(env, exception);
-    char* skmessage = ToSKString(jsmessage);
+    char* skmessage = SafeStringifyToSK(env, exception);
     SkipRuntime_throwExternalException(skempty, skmessage, skempty);
   }
 }
@@ -311,6 +328,8 @@ void NatTryCatch(Napi::Env env, std::function<void(Napi::Env)> run) {
       napiError.Value().Set("stack", Napi::String::New(env, stack));
     }
     napiError.ThrowAsJavaScriptException();
+  } catch (const Napi::Error&) {
+    throw;
   } catch (std::exception& e) {
     Napi::Error::New(env, e.what()).ThrowAsJavaScriptException();
   }

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 import type {
   EagerCollection,
   SkipService,
@@ -8,6 +7,8 @@ import type {
 
 import { runService } from "@skipruntime/server";
 
+import { getDatabase, type SqliteDatabase } from "./utils.js";
+
 /*
   This is the skip runtime service of the database example
 */
@@ -15,29 +16,13 @@ import { runService } from "@skipruntime/server";
 const platform: "wasm" | "native" =
   process.env["SKIP_PLATFORM"] == "native" ? "native" : "wasm";
 
-/*****************************************************************************/
-// Conditional database driver loading: bun:sqlite under Bun, better-sqlite3 under Node
-/*****************************************************************************/
-
-async function getDatabase(): Promise<any> {
-  // @ts-expect-error - Bun is not typed in a Node environment
-  if (typeof Bun !== "undefined") {
-    // @ts-expect-error - bun:sqlite is only available under Bun
-    const mod = await import("bun:sqlite");
-    return mod.Database;
-  } else {
-    const mod = await import("better-sqlite3");
-    return mod.default;
-  }
-}
-
 const Database = await getDatabase();
 
 /*****************************************************************************/
 // Populate the database with made-up values (if it's not already there)
 /*****************************************************************************/
 
-function initDB(): any {
+function initDB(): SqliteDatabase {
   const db = new Database("./db.sqlite");
 
   // Create the table if it doesn't exist

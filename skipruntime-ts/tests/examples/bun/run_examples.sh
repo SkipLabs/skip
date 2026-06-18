@@ -15,16 +15,7 @@
 #   - Compare reference files .exp.out / .exp.err with actual example outputs
 #   - Show the diff if fails, but continue to try the other examples
 
-ALL_EXAMPLES=(
-    sum
-    database
-    departures
-    groups
-    remote
-    sheet
-)
-
-# Hardcoded extra services : EXTRA_SERVICES[<example>]="service1 service2 ..."
+# Hardcoded extra services
 declare -A EXTRA_SERVICES
 EXTRA_SERVICES[remote]="sum"
 
@@ -32,6 +23,19 @@ EXTRA_SERVICES[remote]="sum"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 EXAMPLES_DIR="$SCRIPT_DIR/../../../examples"
 REF_DIR="$SCRIPT_DIR/.."
+
+# Auto-discover examples from the reference outputs in REF_DIR, mirroring the Node side
+ALL_EXAMPLES=()
+for exp in "$REF_DIR"/*.exp.out; do
+    [ -e "$exp" ] || continue
+    base="$(basename "$exp" .exp.out)"
+    ALL_EXAMPLES+=("$base")
+done
+
+# Run the example processes from EXAMPLES_DIR so files created relative to the
+# cwd (e.g. db.sqlite) land where the examples' .gitignore
+# covers them, matching the Node scripts that cd into examples/ first.
+cd "$EXAMPLES_DIR" || exit 1
 
 # List of background PID's to clean later
 BG_PIDS=()
@@ -70,14 +74,19 @@ run_one_example() {
         BG_PIDS+=($!)
     fi
 
-    sleep 1
+    sleep 3
 
     bun run "$EXAMPLES_DIR/${name}-client.ts" >"$out_file" 2>"$err_file"
+    local client_status=$?
 
     cleanup
 
     # Compare outputs (with .exp.out.alt fallback if present)
     local fail=0
+    if [ "$client_status" -ne 0 ]; then
+        echo "  [FAIL] client exited with status $client_status"
+        fail=1
+    fi
     echo "diff $out_file $exp_out"
     if ! diff "$out_file" "$exp_out" >/dev/null 2>&1; then
         # Main diff failed, try the .alt fallback

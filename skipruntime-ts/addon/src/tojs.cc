@@ -25,10 +25,6 @@ SKReducer SkipRuntime_createReducer(int32_t ref);
 
 CJSON SkipRuntime_initService(SKService service);
 double SkipRuntime_closeService();
-void SkipRuntime_setLazyCollectionValue(char* dirName, CJSON key,
-                                        CJArray values);
-double SkipRuntime_ServiceDefinition__fetch(int32_t service, char* supplier,
-                                            CJObject key);
 CJArray SkipRuntime_Collection__getArray(char* collection, CJSON key);
 char* SkipRuntime_Collection__map(char* collection, SKMapper mapper);
 char* SkipRuntime_Collection__mapReduce(char* collection, SKMapper mapper,
@@ -152,47 +148,6 @@ Napi::Value UseExternalResourceOfContext(const Napi::CallbackInfo& info) {
     result = Napi::String::New(env, skcollection);
   });
   return result;
-}
-
-/* ServiceDefinition operations. */
-
-Napi::Value FetchOfServiceDefinition(const Napi::CallbackInfo& info) {
-  Napi::Env env = info.Env();
-  if (info.Length() != 3) {
-    throw Napi::TypeError::New(env, "Must have three parameters.");
-  }
-  if (!info[0].IsNumber()) {
-    throw Napi::TypeError::New(env, "The first parameter must be a number.");
-  }
-  if (!info[1].IsString()) {
-    throw Napi::TypeError::New(env, "The second parameter must be a string.");
-  }
-  if (!info[2].IsExternal()) {
-    throw Napi::TypeError::New(env, "The third parameter must be a pointer.");
-  }
-  Napi::Value result;
-  NatTryCatch(env, [&result, &info, env](Napi::Env) {
-    double skresult = SkipRuntime_ServiceDefinition__fetch(
-        info[0].As<Napi::Number>().Int32Value(), ToSKString(info[1]),
-        info[2].As<Napi::External<void>>().Data());
-    result = Napi::Number::New(env, skresult);
-  });
-  return result;
-}
-
-/* Lazy collection setter. */
-
-Napi::Value SetLazyCollectionValue(const Napi::CallbackInfo& info) {
-  Napi::Env env = info.Env();
-  if (!info[0].IsString() || !info[1].IsExternal() || !info[2].IsExternal()) {
-    throw Napi::TypeError::New(env, "Invalid parameters.");
-  }
-  NatTryCatch(env, [&info](Napi::Env) {
-    SkipRuntime_setLazyCollectionValue(
-        ToSKString(info[0]), info[1].As<Napi::External<void>>().Data(),
-        info[2].As<Napi::External<void>>().Data());
-  });
-  return env.Undefined();
 }
 
 /* Object factories: create a Skip-side object from a numeric reference id. */
@@ -836,10 +791,6 @@ Napi::Value GetToJSBinding(const Napi::CallbackInfo& info) {
               JSONExtractOfContext);
   AddFunction(env, binding, "SkipRuntime_Context__useExternalResource",
               UseExternalResourceOfContext);
-  AddFunction(env, binding, "SkipRuntime_ServiceDefinition__fetch",
-              FetchOfServiceDefinition);
-  AddFunction(env, binding, "SkipRuntime_setLazyCollectionValue",
-              SetLazyCollectionValue);
   //
   AddFunction(env, binding, "SkipRuntime_createMapper", CreateMapper);
   AddFunction(env, binding, "SkipRuntime_createLazyCompute", CreateLazyCompute);
