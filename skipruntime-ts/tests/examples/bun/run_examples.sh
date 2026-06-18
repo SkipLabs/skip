@@ -51,6 +51,21 @@ cleanup() {
 # Cleanup if Ctrl+C or abnormal exit
 trap cleanup EXIT INT TERM
 
+# Poll a local TCP port until it accepts a connection, returns 1 if the port is not up within the timeout.
+wait_for_port() {
+    local port="$1"
+    local i=0
+    while [ "$i" -lt 50 ]; do
+        if (exec 3<>"/dev/tcp/localhost/${port}") 2>/dev/null; then
+            exec 3>&- 3<&-
+            return 0
+        fi
+        sleep 0.2
+        i=$((i + 1))
+    done
+    return 1
+}
+
 run_one_example() {
     local name="$1"
     local out_file="/tmp/${name}-bun.out"
@@ -72,9 +87,16 @@ run_one_example() {
     if [ -f "$EXAMPLES_DIR/${name}-server.ts" ]; then
         bun run "$EXAMPLES_DIR/${name}-server.ts" >/dev/null &
         BG_PIDS+=($!)
+        # Client talks to the REST server; wait until it listens instead of
+        # racing it.
+        if ! wait_for_port 8082; then
+            echo "  [FAIL] timed out waiting for server port 8082"
+            cleanup
+            return 1
+        fi
+    else
+        sleep 3
     fi
-
-    sleep 3
 
     bun run "$EXAMPLES_DIR/${name}-client.ts" >"$out_file" 2>"$err_file"
     local client_status=$?
