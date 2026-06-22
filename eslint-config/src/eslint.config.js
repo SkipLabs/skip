@@ -1,6 +1,6 @@
 import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
-import stylisticJs from "@stylistic/eslint-plugin-js";
+import stylisticJs from "@stylistic/eslint-plugin";
 import jsdoc from "eslint-plugin-jsdoc";
 
 export default tseslint.config(
