@@ -730,8 +730,14 @@ class MapWithNamedExceptionResource implements Resource<Input_SN> {
     return collections.input.map(MapWithNamedException);
   }
 }
-const mapWithNamedExceptionService: SkipService<Input_SN, Input_SN> = {
-  initialData: { input: [] },
+const mapWithNamedExceptionService: SkipService<
+  Input_SN_Def,
+  Input_SN,
+  Input_SN
+> = {
+  inputs: {
+    input: new InputDefinition([]),
+  },
   resources: { mapWithNamedException: MapWithNamedExceptionResource },
   createGraph(inputCollections: Input_SN) {
     return inputCollections;
