@@ -1,6 +1,6 @@
 // TODO: Remove once global `EventSource` makes it out of experimental
 // in nodejs LTS.
-import EventSource from "eventsource";
+import { EventSource } from "eventsource";
 
 import type { Json } from "@skipruntime/core";
 import { SkipServiceBroker } from "@skipruntime/helpers";
@@ -25,9 +25,9 @@ export async function subscribe(
     evSource.addEventListener("update", (e: MessageEvent<string>) => {
       console.log("Update", e.data);
     });
-    evSource.onerror = (e: MessageEvent<string>) => {
+    evSource.addEventListener("error", (e: MessageEvent<string>) => {
       console.log("Error", e);
-    };
+    });
     return evSource;
   });
 }
