@@ -199,6 +199,7 @@ export interface FromWasm {
     streams: ptr<Internal.CJArray<Internal.CJString>>,
   ): Handle<Error>;
 
+  SkipRuntime_getSkipPersistentSize(): bigint;
   // Reducer
 
   SkipRuntime_createReducer<K1 extends Json, V1 extends Json>(
@@ -237,6 +238,7 @@ interface ToWasm {
   SkipRuntime_getContext(): Nullable<ptr<Internal.Context>>;
   SkipRuntime_getFork(): Nullable<ptr<Internal.String>>;
   SkipRuntime_getChangeManager(): number;
+  SkipRuntime_callGCConfigProvider(): ptr<Internal.CJObject>;
 
   // Mapper
 
@@ -702,6 +704,10 @@ export class WasmFromBinding implements FromBinding {
     );
   }
 
+  SkipRuntime_getSkipPersistentSize(): bigint {
+    return this.fromWasm.SkipRuntime_getSkipPersistentSize();
+  }
+
   SkipRuntime_createReducer<K1 extends Json, V1 extends Json>(
     ref: Handle<HandlerInfo<Reducer<K1, V1>>>,
   ): Pointer<Internal.Reducer> {
@@ -800,6 +806,10 @@ class LinksImpl implements Links {
 
   getChangeManager() {
     return this.tobinding.SkipRuntime_getChangeManager();
+  }
+
+  callGCConfigProvider(): ptr<Internal.CJObject> {
+    return toPtr(this.tobinding.SkipRuntime_callGCConfigProvider());
   }
 
   // Mapper
@@ -1119,6 +1129,8 @@ class Manager implements ToWasmManager {
     toWasm.SkipRuntime_getContext = links.getContext.bind(links);
     toWasm.SkipRuntime_getFork = links.getFork.bind(links);
     toWasm.SkipRuntime_getChangeManager = links.getChangeManager.bind(links);
+    toWasm.SkipRuntime_callGCConfigProvider =
+      links.callGCConfigProvider.bind(links);
 
     // Mapper
 

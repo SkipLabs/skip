@@ -186,6 +186,9 @@ export interface FromBinding {
     streams: Pointer<Internal.CJArray<Internal.CJString>>,
   ): Handle<Error>;
 
+  // Get internal palloc size, used in the stress-tester
+  SkipRuntime_getSkipPersistentSize(): bigint;
+
   // Reducer
 
   SkipRuntime_createReducer<K1 extends Json, V1 extends Json>(

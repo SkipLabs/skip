@@ -37,6 +37,7 @@ import {
   type SkipService,
   type Watermark,
   type ExternalService,
+  type GCConfig,
 } from "./api.js";
 
 import {
@@ -684,6 +685,24 @@ export class ServiceInstance {
   }
 
   /**
+   * Returns the size in bytes of Skip's persistent memory.
+   *
+   * This measures the memory used by Skip's internal allocator.
+   * Useful for detecting memory leaks in the
+   * runtime. Actually used as the memory metric for the stress-tester
+   *
+   * @returns The persistent memory size in bytes.
+   */
+  getSkipPersistentSize(): number {
+    this.refs.setFork(this.forkName);
+    return Number(
+      this.refs.runWithGC(() => {
+        return this.refs.binding.SkipRuntime_getSkipPersistentSize();
+      }),
+    );
+  }
+
+  /**
    * Initiate reactive subscription on a resource instance
    * @param resourceInstanceId - the resource instance identifier
    * @param notifier - the object containing subscription callbacks
@@ -966,6 +985,7 @@ export class ToBinding {
   private initializing: boolean;
   readonly handles: Handles;
   changes: Nullable<Handle<ChangeManager>>;
+  private gcConfigProvider: Nullable<() => GCConfig>;
 
   constructor(
     public binding: FromBinding,
@@ -978,6 +998,7 @@ export class ToBinding {
     this.forkName = null;
     this.changes = null;
     this.initializing = false;
+    this.gcConfigProvider = null;
   }
 
   register<T>(v: T): Handle<T> {
@@ -1010,6 +1031,14 @@ export class ToBinding {
 
   SkipRuntime_getChangeManager(): number {
     return this.changes ?? 0;
+  }
+
+  SkipRuntime_callGCConfigProvider(): Pointer<Internal.CJObject> {
+    const skjson = this.getJsonConverter();
+    const config: GCConfig = this.gcConfigProvider
+      ? this.gcConfigProvider()
+      : {};
+    return skjson.exportJSON(config as JsonObject);
   }
 
   setFork(name: Nullable<string>): void {
@@ -1354,6 +1383,7 @@ export class ToBinding {
     const uuid = crypto.randomUUID();
     this.fork(uuid);
     const definition = new ServiceDefinition(service);
+    this.gcConfigProvider = service.gcConfig ?? null;
     const skservicehHdl = this.handles.register(definition);
     try {
       this.initializing = true;
