@@ -390,20 +390,13 @@ private fun canCSECall(
     (call match {
     | CallFunctionBase{name} -> funCanCSE(name, env, call.pos)
     | mcall @ CallMethodBase _ ->
-      // TODO: It's not clear what the rules should be for method call CSE,
-      // because some overrides may say @debug and some may not.
-      //
-      // To be honest, we don't care much about this case, so in general we
-      // allow CSE, but we allow a way for the determined user to turn it off.
-      // To avoid scanning huge numbers of subclasses here looking for @debug
-      // in any of them, if *any* do not say @debug we allow CSE, so the
-      // common check is quick.
-      //
-      // The user may expect saying @debug on the base class method should
-      // "contaminate" the subclasses, but we don't have a handy way to
-      // do that at the moment. We should revisit this later.
-      !optinfo.allMethodImplementations(mcall, env, (_, methodCodeID, _, _) ->
-        !funCanCSE(methodCodeID, env, call.pos)
+      // A dynamic dispatch may invoke any of the possible implementations,
+      // so only allow CSE when every one of them can: merging two calls
+      // that might dispatch to a @debug or untracked implementation would
+      // silently delete that implementation's second execution. The
+      // iteration stops at the first implementation that cannot CSE.
+      optinfo.allMethodImplementations(mcall, env, (_, methodCodeID, _, _) ->
+        funCanCSE(methodCodeID, env, call.pos)
       )
     })
 }
