@@ -2513,7 +2513,11 @@ fun expr_(
           acc,
           fd.tparams,
         );
-        tracking = SkipNaming.make_tfun_tracking(fd.untracked_);
+        tracking = SkipNaming.make_tfun_tracking(
+          fd.untracked_,
+          fd.annotations,
+          fd.name.i0,
+        );
         params_ty = TUtils.make_params_type(
           subst,
           acc.tparam_constraints,
@@ -2809,6 +2813,28 @@ fun expr_(
       pos,
       N.Tfun(Ast.Vplus(), mods, Array[], Positional(Array[ty1]), ret_ty),
     );
+    // Tracking is read with the pre-join subst: the join below binds any
+    // still-free type variable to ty_expect, whose modifiers are synthetic.
+    callee_tracking = Types.unfold_type(acc2.subst, ty2) match {
+    | (_, N.Tfun(_, fmods, _, _, _)) -> fmods.tracking
+    | (_, N.Tlambda(_, _, fmods, _)) -> fmods.tracking
+    | (_, N.Tparam(_, _, param_id, _)) ->
+      acc2.tparam_constraints
+        .findUppers(param_id)
+        .foldl(
+          (t, ty) ->
+            (t, Types.unfold_type(acc2.subst, ty)) match {
+            | (Some _, _) -> t
+            | (_, (_, N.Tfun(_, fmods, _, _, _))) -> Some(fmods.tracking)
+            | _ -> t
+            },
+          (None() : ?N.Tracking_modifier),
+        ) match {
+      | Some(t) -> t
+      | None() -> N.Ftracked()
+      }
+    | _ -> N.Ftracked()
+    };
     (acc3, _) = TUtils.join(
       context,
       next_id,
@@ -2819,6 +2845,7 @@ fun expr_(
       ty2,
       ty_expect,
     );
+    check_tracking(pos, env, callee_tracking);
     (acc3, (ret_ty, (pos, TAst.Call(e21, Positional(Array[(0, e11)])))))
   | N.Binop((_, op @ N.Barbar()), e1, e2)
   | N.Binop((_, op @ N.Ampamp()), e1, e2) ->
@@ -2937,6 +2964,8 @@ fun expr_(
         env.frozen_level
       },
       lam_tfun_modifiers => mods,
+      lam_tracked_context => env.tracked_context &&
+        mods.tracking is N.Ftracked(),
       yields,
     };
     lambda_list = List.Cons((lambda_id, lambda), acc1.lambda_list);
@@ -5293,6 +5322,7 @@ fun lambda(
         break_type => None(),
         frozen_level => lam.lam_frozen_level,
         locals => lam_locals,
+        tracked_context => lam.lam_tracked_context,
       };
       !env = setReturnType(context, next_id, env, acc, rty, lam.yields);
       ordered_args = args.map(t ->
