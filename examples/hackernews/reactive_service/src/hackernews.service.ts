@@ -1,10 +1,11 @@
-import type {
-  Context,
-  EagerCollection,
-  Json,
-  Values,
-  Resource,
-  SkipService,
+import {
+  InputDefinition,
+  type Context,
+  type EagerCollection,
+  type Json,
+  type Values,
+  type Resource,
+  type AnySkipService,
 } from "@skipruntime/core";
 
 import { PostgresExternalService } from "@skip-adapter/postgres";
@@ -179,9 +180,9 @@ class SessionsResource implements Resource<SessionsResourceInputs> {
  * Main service definition
  * Configures resources, external services, and data flow
  */
-export const service: SkipService<PostsServiceInputs, PostsResourceInputs> = {
-  initialData: {
-    sessions: [],
+export const service: AnySkipService = {
+  inputs: {
+    sessions: new InputDefinition(),
   },
   resources: { posts: PostsResource, sessions: SessionsResource },
   externalServices: { postgres },
