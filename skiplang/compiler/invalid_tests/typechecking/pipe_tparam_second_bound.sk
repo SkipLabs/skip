@@ -1,0 +1,20 @@
+// pipes honor only the FIRST function-type bound of the callee's type
+// parameter, exactly like direct calls: an argument that only fits a later
+// bound is rejected (previously the pipe validated against any bound but
+// cast the callee to the first, miscompiling or crashing the backend)
+base class B
+class A() extends B
+class C() extends B
+
+fun takeB(b: B): Int {
+  _ = b;
+  7
+}
+
+fun callIt<F: ((A) -> Int) & ((C) -> Int)>(f: F, c: C): Int {
+  c |> f
+}
+
+fun main(): void {
+  print_raw(callIt(takeB, C()).toString() + "\n")
+}

@@ -1617,6 +1617,42 @@ fun inner_type_for_class_add_outer_frozen(
   }
 }
 
+// The first function-type upper bound of a type parameter, if any.
+fun find_tfun_upper(acc: TUtils.Acc, param_id: String): ?N.Type_ {
+  acc.tparam_constraints
+    .findUppers(param_id)
+    .foldl(
+      (opt, ty) ->
+        (opt, Types.unfold_type(acc.subst, ty)) match {
+        | (Some _, _) -> opt
+        | (_, (uty @ (_, N.Tfun _))) -> Some(uty)
+        | _ -> None()
+        },
+      (None() : ?N.Type_),
+    )
+}
+
+// Retype a Tparam-typed callee to its first function-type upper bound, so
+// that it reaches the backend closure-typed rather than as a bare type
+// parameter (which emitClosureCall cannot lower). Returns the bound (the
+// type the call must be checked against — asserting one bound while
+// checking another would embed an unsound cast) and the retyped callee
+// (wrapped in TAst.Annotated, lowered to a cast), or None() when the type
+// parameter has no direct function-type upper bound.
+fun retype_tparam_callee(
+  context: mutable SKStore.Context,
+  env: TUtils.Env,
+  acc: TUtils.Acc,
+  pos: FileRange,
+  f: TAst.Expr,
+  param_id: String,
+): ?(N.Type_, TAst.Expr) {
+  find_tfun_upper(acc, param_id).map(tfun_ty -> {
+    promty = TUtils.promote(context, env, acc, tfun_ty);
+    (tfun_ty, (promty, (pos, TAst.Annotated(f, promty))))
+  })
+}
+
 fun call_or_constructor_(
   context: mutable SKStore.Context,
   next_id: () -> Int,
@@ -1669,25 +1705,12 @@ fun call_or_constructor_(
       args,
     )
   | (_, N.Tparam(_, _, param_id, _)) ->
-    tfun = acc.tparam_constraints
-      .findUppers(param_id)
-      .foldl(
-        (opt, ty) ->
-          (opt, Types.unfold_type(acc.subst, ty)) match {
-          | (Some _, _) -> opt
-          | (_, (uty @ (_, N.Tfun _))) -> Some(uty)
-          | _ -> None()
-          },
-        (None() : ?N.Type_),
-      );
-    tfun match {
+    retype_tparam_callee(context, env, acc, pos, f, param_id) match {
     | None() ->
       constructor_call(context, next_id, pos, env, acc, mut, f, args, args_ty)
-    | Some(tfun_ty) ->
+    | Some((tfun_ty, f1)) ->
       check_no_mutable(mut, f.i1.i0);
-      promty = TUtils.promote(context, env, acc, tfun_ty);
-      !f = (promty, (pos, TAst.Annotated(f, promty)));
-      tfun_call(context, next_id, pos, env, acc, f, tfun_ty, args_ty, args)
+      tfun_call(context, next_id, pos, env, acc, f1, tfun_ty, args_ty, args)
     }
   | _ ->
     constructor_call(context, next_id, pos, env, acc, mut, f, args, args_ty)
@@ -2809,6 +2832,32 @@ fun expr_(
       pos,
       N.Tfun(Ast.Vplus(), mods, Array[], Positional(Array[ty1]), ret_ty),
     );
+    // A Tparam-typed callee would reach the backend unresolved and fail
+    // emitClosureCall's closure-type check (issue #1269). Mirror direct
+    // calls in call_or_constructor_, which honor only the first
+    // function-type upper bound: retype the callee to that bound and
+    // validate the pipe against exactly the type being asserted.
+    (callee_ty, callee) = Types.unfold_type(acc2.subst, ty2) match {
+    | (_, N.Tparam(_, _, param_id, _)) ->
+      retype_tparam_callee(context, env, acc2, pos, e21, param_id) match {
+      | Some(r) -> r
+      | None() ->
+        // The function bound is only reachable through another type
+        // parameter (e.g. F: G, G: (S) -> T). Direct calls reject this
+        // shape too (they fall back to an invalid constructor call);
+        // reject it here instead of ICEing during lowering.
+        SkipError.errorl(
+          List[
+            (pos, "Invalid pipe"),
+            (
+              e21.i1.i0,
+              "The type of this expression has no function-type upper bound",
+            ),
+          ],
+        )
+      }
+    | _ -> (ty2, e21)
+    };
     (acc3, _) = TUtils.join(
       context,
       next_id,
@@ -2816,10 +2865,10 @@ fun expr_(
       pos,
       "Invalid pipe",
       acc2,
-      ty2,
+      callee_ty,
       ty_expect,
     );
-    (acc3, (ret_ty, (pos, TAst.Call(e21, Positional(Array[(0, e11)])))))
+    (acc3, (ret_ty, (pos, TAst.Call(callee, Positional(Array[(0, e11)])))))
   | N.Binop((_, op @ N.Barbar()), e1, e2)
   | N.Binop((_, op @ N.Ampamp()), e1, e2) ->
     (acc1, e11) = expr(context, next_id, env, acc, e1);
