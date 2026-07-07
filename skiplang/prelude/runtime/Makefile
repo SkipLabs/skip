@@ -1,7 +1,7 @@
 MEMSIZE32=1073741824
 
-# -I. lets vendored ryu/d2s.c resolve its `#include "ryu/ryu.h"` siblings
-# (upstream builds d2s.c with its repo root on the include path).
+# -I. lets the vendored Ryu sources (ryu/*.c) and string.c resolve
+# `#include "ryu/..."` (upstream builds with its repo root on the include path).
 CFLAGS += -I. -Werror -Wall -Wextra -Wno-sign-conversion -Wno-sometimes-uninitialized -Wno-c2x-extensions -Wsign-compare -Wextra-semi-stmt -fstrict-flex-arrays=3
 # To add: -Wcast-align -Wcast-qual -Wimplicit-int-conversion -Wmissing-noreturn -Wpadded -Wreserved-identifier -Wshorten-64-to-32 -Wtautological-unsigned-zero-compare
 # -Watomic-implicit-seq-cst ?
@@ -19,6 +19,7 @@ CFILES=\
 	obstack.c \
 	runtime.c \
 	ryu/d2s.c \
+	ryu/s2d.c \
 	stdlib.c \
 	stack.c \
 	string.c \
