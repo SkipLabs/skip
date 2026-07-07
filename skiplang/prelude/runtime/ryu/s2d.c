@@ -15,13 +15,19 @@
 // is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 // KIND, either express or implied.
 
-#include "ryu/ryu_parse.h"
-
-#include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
+#ifdef SKIP32
+// WASM: no libc. memcpy is a compiler builtin; assert is a no-op.
+void *memcpy(void *, const void *, unsigned long);
+#define assert(x) ((void) 0)
+#else
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#endif
+
+#include "ryu/ryu_parse.h"
 
 #ifdef RYU_DEBUG
 #include <inttypes.h>
@@ -258,6 +264,8 @@ enum Status s2d_n(const char *buffer, const int len, double *result) {
   return SUCCESS;
 }
 
+#ifndef SKIP32
 enum Status s2d(const char *buffer, double *result) {
   return s2d_n(buffer, strlen(buffer), result);
 }
+#endif
