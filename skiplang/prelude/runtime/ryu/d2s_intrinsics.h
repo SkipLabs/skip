@@ -18,7 +18,12 @@
 #define RYU_D2S_INTRINSICS_H
 
 #include <stdint.h>
-#ifndef SKIP32
+#ifdef SKIP32
+// wasm32 defines __SIZEOF_INT128__, but 128-bit ops lower to compiler-rt calls
+// (__multi3, __lshrti3) that are unavailable under -nostdlibinc, so the module
+// would fail to instantiate. Force Ryu's portable 64-bit path.
+#define RYU_ONLY_64_BIT_OPS
+#else
 #include <assert.h>
 #endif
 
