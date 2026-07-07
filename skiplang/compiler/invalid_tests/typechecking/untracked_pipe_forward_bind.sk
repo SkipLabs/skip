@@ -1,0 +1,19 @@
+// piping through a value binds its free type variable to a tracked
+// function type (we are in a tracked context), so a later attempt to store
+// an untracked function in it must fail — otherwise the pipe would have
+// been an unchecked untracked call
+untracked fun side(x: String): String {
+  x
+}
+
+fun trackedFn(): String {
+  v = mutable Vector[];
+  f = v[0];
+  r = "a" |> f;
+  v.push(side);
+  r
+}
+
+fun main(): void {
+  print_raw(trackedFn())
+}

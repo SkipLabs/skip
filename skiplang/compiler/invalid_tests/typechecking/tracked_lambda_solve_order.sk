@@ -1,0 +1,20 @@
+// a tracked lambda defined in a tracked function keeps its tracked body
+// check even when it is first called (and thus solved) inside an untracked
+// lambda
+untracked fun sideEffect(): String {
+  "Fail\n"
+}
+
+fun taker(_f: untracked () -> String): Int {
+  0
+}
+
+fun trackedFn(): String {
+  g = () -> sideEffect();
+  _ = taker(untracked () -> g());
+  g()
+}
+
+fun main(): void {
+  print_raw(trackedFn())
+}

@@ -1,0 +1,13 @@
+// it's an error to pipe into a callee whose type parameter is bounded by
+// an untracked function type, same as calling it directly
+untracked fun side(x: String): String {
+  x
+}
+
+fun callIt<F: untracked (String) -> String>(f: F, x: String): String {
+  x |> f
+}
+
+fun main(): void {
+  print_raw(callIt(side, "Fail\n"))
+}

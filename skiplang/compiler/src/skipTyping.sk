@@ -2536,7 +2536,11 @@ fun expr_(
           acc,
           fd.tparams,
         );
-        tracking = SkipNaming.make_tfun_tracking(fd.untracked_);
+        tracking = SkipNaming.make_tfun_tracking(
+          fd.untracked_,
+          fd.annotations,
+          fd.name.i0,
+        );
         params_ty = TUtils.make_params_type(
           subst,
           acc.tparam_constraints,
@@ -2827,7 +2831,18 @@ fun expr_(
     ty1 = TAstUtils.get_type(e11);
     ty2 = TAstUtils.get_type(e21);
     ret_ty = TUtils.fresh(next_id, (pos, void));
-    mods = N.Tfun_modifiers{purity => N.Fmutable(), tracking => N.Funtracked()};
+    // The join below binds a still-free callee type variable to ty_expect,
+    // so the expectation's tracking must fit the context: an untracked
+    // expectation in a tracked context would make later calls of the same
+    // value error spuriously, and a tracked one in an untracked context
+    // would be needlessly strict.
+    expect_tracking = if (env.tracked_context) N.Ftracked() else {
+      N.Funtracked()
+    };
+    mods = N.Tfun_modifiers{
+      purity => N.Fmutable(),
+      tracking => expect_tracking,
+    };
     ty_expect = (
       pos,
       N.Tfun(Ast.Vplus(), mods, Array[], Positional(Array[ty1]), ret_ty),
@@ -2858,6 +2873,16 @@ fun expr_(
       }
     | _ -> (ty2, e21)
     };
+    // Pipe applications are calls: enforce the same tracking rule as
+    // tfun_call. The tracking is read from the callee's pre-join type —
+    // after the join a formerly-free type variable would unfold to the
+    // synthetic ty_expect.
+    callee_tracking = Types.unfold_type(acc2.subst, callee_ty) match {
+    | (_, N.Tfun(_, fmods, _, _, _)) -> fmods.tracking
+    | (_, N.Tlambda(_, _, fmods, _)) -> fmods.tracking
+    | _ -> N.Ftracked()
+    };
+    check_tracking(pos, env, callee_tracking);
     (acc3, _) = TUtils.join(
       context,
       next_id,
@@ -2986,6 +3011,8 @@ fun expr_(
         env.frozen_level
       },
       lam_tfun_modifiers => mods,
+      lam_tracked_context => env.tracked_context &&
+        mods.tracking is N.Ftracked(),
       yields,
     };
     lambda_list = List.Cons((lambda_id, lambda), acc1.lambda_list);
@@ -5342,6 +5369,7 @@ fun lambda(
         break_type => None(),
         frozen_level => lam.lam_frozen_level,
         locals => lam_locals,
+        tracked_context => lam.lam_tracked_context,
       };
       !env = setReturnType(context, next_id, env, acc, rty, lam.yields);
       ordered_args = args.map(t ->

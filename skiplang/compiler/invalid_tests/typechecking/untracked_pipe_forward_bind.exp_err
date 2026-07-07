@@ -1,0 +1,33 @@
+File "invalid_tests/typechecking/untracked_pipe_forward_bind.sk", line 13, characters 10-13:
+Invalid argument
+11 |   f = v[0];
+12 |   r = "a" |> f;
+13 |   v.push(side);
+   |          ^^^^
+14 |   r
+
+File "invalid_tests/typechecking/untracked_pipe_forward_bind.sk", line 5, characters 15-18:
+The type: untracked ((String) ~> String)
+3 | // an untracked function in it must fail — otherwise the pipe would have
+4 | // been an unchecked untracked call
+5 | untracked fun side(x: String): String {
+  |               ^^^^
+6 |   x
+
+File "invalid_tests/typechecking/untracked_pipe_forward_bind.sk", line 12, characters 7-14:
+Is not a subtype of: ((String) -> _)
+10 |   v = mutable Vector[];
+11 |   f = v[0];
+12 |   r = "a" |> f;
+   |       ^^^^^^^^
+13 |   v.push(side);
+
+File "invalid_tests/typechecking/untracked_pipe_forward_bind.sk", line 12, characters 7-14:
+This type was found to be a fixed upper bound and could not be changed to a compatible type.
+To make these types compatible, annotate as this type: untracked ((String) -> String)
+10 |   v = mutable Vector[];
+11 |   f = v[0];
+12 |   r = "a" |> f;
+   |       ^^^^^^^^
+13 |   v.push(side);
+
