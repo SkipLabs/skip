@@ -19,6 +19,7 @@ CFILES=\
 	obstack.c \
 	runtime.c \
 	ryu/d2s.c \
+	ryu/s2d.c \
 	stdlib.c \
 	stack.c \
 	string.c \
