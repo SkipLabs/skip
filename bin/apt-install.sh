@@ -36,7 +36,7 @@ for step in "${steps[@]}"; do
         skiplang-build-deps)
             _ensure_base_deps
             wget -qO /etc/apt/keyrings/llvm.asc https://apt.llvm.org/llvm-snapshot.gpg.key
-            echo "deb [signed-by=/etc/apt/keyrings/llvm.asc] http://apt.llvm.org/jammy/ llvm-toolchain-jammy-$LLVM_VERSION main" >> /etc/apt/sources.list.d/llvm.list
+            echo "deb [signed-by=/etc/apt/keyrings/llvm.asc] http://apt.llvm.org/noble/ llvm-toolchain-noble-$LLVM_VERSION main" >> /etc/apt/sources.list.d/llvm.list
             apt-get update
             apt-get install -q -y --no-install-recommends automake clang-$LLVM_VERSION file gawk git lld-$LLVM_VERSION llvm-$LLVM_VERSION make openssh-client
 
@@ -62,7 +62,8 @@ for step in "${steps[@]}"; do
             apt-get install -q -y --no-install-recommends clang-format-$LLVM_VERSION docker.io docker-buildx parallel pip shellcheck
             # Version from requirements-dev.txt (check repo root, then /tmp for docker builds)
             BLACK_VERSION=$(grep '^black==' requirements-dev.txt /tmp/requirements-dev.txt 2>/dev/null | head -1 | cut -d'=' -f3)
-            pip install black=="${BLACK_VERSION:-26.1.0}"
+            # --break-system-packages: Ubuntu 24.04+ enforces PEP 668; safe in a throwaway container image
+            pip install --break-system-packages black=="${BLACK_VERSION:-26.1.0}"
             update-alternatives --auto clang
             ;;
         other-dev-tools)
