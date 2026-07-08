@@ -293,16 +293,21 @@ fun getOrInitializeBackend(context: mutable SKStore.Context): SKStore.EagerDir {
                 )))
       );
 
-      env = OuterIstToIR.createIR(
-        context,
-        conf,
-        shouldDisasm,
-        shouldRuntimeExport,
-        outerIst,
-        converter,
-        constsProj,
-        defsProj,
-      );
+      // The frontend (naming/typing of the stdlib) is computed lazily and
+      // realized here as createIR forces the typed defs, so this phase
+      // dominates compile time.
+      env = runCompilerPhase("frontend+ir", () -> {
+        OuterIstToIR.createIR(
+          context,
+          conf,
+          shouldDisasm,
+          shouldRuntimeExport,
+          outerIst,
+          converter,
+          constsProj,
+          defsProj,
+        )
+      });
 
       !env = createOptimizedFunctions(context, env, conf);
       defs = runCompilerPhase("native/create_asm_graph", () -> {
