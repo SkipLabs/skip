@@ -71,7 +71,9 @@ fun shouldDebugSymbol(_symbolName: String): Bool {
 //   value
 // }
 
-fun runCompilerPhase<T>(_phaseName: String, phase: () -> T): T {
+fun runCompilerPhase<T>(phaseName: String, phase: () -> T): T {
+  // Kept for future per-phase debugging/profiling (memory statistics,
+  // pass result dumps, profile-path recording):
   // if (config.debug || config.profile) {
   //   reportMemoryStatistics(`${phaseName} start`);
   //   (elapsedTime, result) = timeOperation(phase);
@@ -102,7 +104,19 @@ fun runCompilerPhase<T>(_phaseName: String, phase: () -> T): T {
   //  | None() -> phase()
   //  }
   //  }
-  phase()
+  //
+  // When SKC_TIME_PHASES is set, emit a "##TIME## <phase> <ns>" line to
+  // stderr per phase. Gated so there is no overhead on the normal path.
+  if (Environ.varOpt("SKC_TIME_PHASES").isNone()) {
+    phase()
+  } else {
+    // Monotonic (steady_clock), nanosecond-resolution elapsed time.
+    start = Time.time_ns();
+    result = phase();
+    elapsed = Time.time_ns() - start;
+    print_error(`##TIME## ${phaseName} ${elapsed}\n`);
+    result
+  }
 }
 
 /*
