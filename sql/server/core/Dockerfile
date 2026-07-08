@@ -1,4 +1,4 @@
-FROM eclipse-temurin:20
+FROM eclipse-temurin:21
 
 # Copy Gradle wrapper and build configs first (changes rarely)
 COPY sql/server/gradlew sql/server/gradle.properties /skdb/sql/server/

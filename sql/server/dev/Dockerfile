@@ -1,5 +1,5 @@
 FROM skiplabs/skdb AS skdb
-FROM eclipse-temurin:20 AS skgw
+FROM eclipse-temurin:21 AS skgw
 
 # Copy Gradle wrapper and build configs first (changes rarely)
 COPY sql/server/gradlew sql/server/gradle.properties /skdb/sql/server/
@@ -26,7 +26,7 @@ RUN --mount=type=cache,target=/root/.gradle,sharing=locked \
 # Build the development image by copying out artifacts
 ################################################################################
 
-FROM eclipse-temurin:20 AS dev
+FROM eclipse-temurin:21 AS dev
 
 WORKDIR /skdb
 

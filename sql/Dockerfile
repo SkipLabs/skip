@@ -2,7 +2,11 @@ FROM skiplabs/skip AS base
 
 ARG TARGETARCH
 
-# Install system deps, Java 20 (Adoptium Temurin), and Gradle 9.3.1
+# Install system deps, Java 21 (Adoptium Temurin), and Gradle 9.3.1.
+# The .sdkman stub dirs below are a build-time sentinel that lets
+# sql/ts/tests/service_common.mk skip its SDKMAN install (Java here comes
+# from apt above). Its version string only has to match that Makefile — it
+# does not track the JDK version and is intentionally left at 20.0.2-tem.
 RUN --mount=type=cache,id=apt-cache-$TARGETARCH,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lists-$TARGETARCH,target=/var/lib/apt/lists,sharing=locked \
     --mount=type=cache,target=/root/.npm,sharing=locked \
@@ -11,7 +15,7 @@ RUN --mount=type=cache,id=apt-cache-$TARGETARCH,target=/var/cache/apt,sharing=lo
     echo "deb [signed-by=/etc/apt/keyrings/adoptium.asc] https://packages.adoptium.net/artifactory/deb $(. /etc/os-release && echo $VERSION_CODENAME) main" \
       > /etc/apt/sources.list.d/adoptium.list && \
     apt-get update && \
-    apt-get install -q -y --no-install-recommends curl sqlite3 unzip zip temurin-20-jdk && \
+    apt-get install -q -y --no-install-recommends curl sqlite3 unzip zip temurin-21-jdk && \
     npm install -g bun && \
     npx playwright install-deps && \
     curl -sL https://services.gradle.org/distributions/gradle-9.3.1-bin.zip -o /tmp/gradle.zip && \
@@ -23,7 +27,7 @@ RUN --mount=type=cache,id=apt-cache-$TARGETARCH,target=/var/cache/apt,sharing=lo
       /root/.sdkman/candidates/gradle && \
     touch /root/.sdkman/bin/sdkman-init.sh
 
-ENV JAVA_HOME=/usr/lib/jvm/temurin-20-jdk-${TARGETARCH}
+ENV JAVA_HOME=/usr/lib/jvm/temurin-21-jdk-${TARGETARCH}
 
 FROM base AS skdb
 
