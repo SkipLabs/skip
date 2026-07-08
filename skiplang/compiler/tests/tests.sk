@@ -2,11 +2,6 @@ module alias T = SKTest;
 
 module SkcTests;
 
-// Convert a test path like "Runtime/Float1" to module name "Runtime_Float1".
-private fun testPathToModuleName(testPath: String): String {
-  testPath.split("/").join("_")
-}
-
 private fun compile_cmd(
   files: readonly Sequence<String>,
   output: String,
@@ -62,17 +57,91 @@ private fun genInvalidTest(basename: String): void {
   T.expectEq(actual, expected)
 }
 
-fun main(): void {
+// Split a module name into (suite, testName) at the underscore that
+// separates the top-level directory from the rest.
+// e.g. "Runtime_Float1" → ("Runtime", "Float1")
+//      "Typechecking_Exhaustiveness_Foo" → ("Typechecking/Exhaustiveness", "Foo")
+private fun splitModuleName(moduleName: String): (String, String) {
+  // The test name is after the last underscore
+  (prefix, testName) = moduleName.splitLast("_");
+  // Convert remaining underscores to slashes for the suite path
+  suite = prefix.split("_").join("/");
+  (suite, testName)
+}
+
+class ExpTestsDiscovery private () {
+  static macro fun addExpTestFunctions(
+    tests: mutable Map<String, mutable Vector<T.Test>>,
+  ): readonly Set<String> {
+    // Discover @exptest-annotated functions. These are present when all
+    // test .sk files are compiled into this binary (i.e. when `tests` is
+    // not set in Skargo.toml, so Skargo auto-discovers all files in tests/).
+    coveredModules = mutable Set[];
+    #forEachFunction (@exptest, #function, #functionName) {
+      // #functionName is "ModuleName.main"
+      testFn = #function;
+      (moduleName, _testName) = #functionName.splitFirst(".");
+      coveredModules.insert(moduleName);
+      (suite, testName) = splitModuleName(moduleName);
+      tests
+        .getOrAdd(suite, () -> mutable Vector[])
+        .push(
+          T.Test{
+            name => testName,
+            func => untracked () ~>
+              T.expectStdout(testFn, `tests/${suite}/${testName}.exp`),
+          },
+        );
+    };
+    coveredModules
+  }
+}
+
+untracked fun main(): void {
   tests = mutable Map[];
 
+  // Discover @exptest-annotated functions. These are present when all
+  // test .sk files are compiled into this binary (i.e. when `tests` is
+  // not set in Skargo.toml, so Skargo auto-discovers all files in tests/).
+  // Set SKC_SUBPROCESS=1 to force all tests to use subprocess mode.
+  coveredModules = if (Environ.varOpt("SKC_SUBPROCESS").isNone()) {
+    ExpTestsDiscovery::addExpTestFunctions(tests)
+  } else {
+    Set[]
+  };
+
+  // In unified mode, verify that the skc on PATH is the same one that
+  // compiled this test binary.
+  if (!coveredModules.isEmpty()) {
+    compiledBy = #env ("GIT_COMMIT_HASH");
+    tests
+      .getOrAdd("Native", () -> mutable Vector[])
+      .push(
+        T.Test{
+          name => "CompilerVersionCheck",
+          func => () ~> {
+            p = System.subprocess(Array["skc", "--version"]).fromSuccess();
+            invariant(
+              p.stdout.contains(compiledBy),
+              `Test binary compiled by skc (${compiledBy}) but PATH skc ` +
+                `reports: ${p.stdout}`,
+            );
+          },
+        },
+      );
+  };
+
+  // Run any valid tests NOT covered by @exptest in subprocess mode.
   validTests = FileSystem.readFilesRecursive("./tests", fn ->
     fn.endsWith(".exp")
   );
 
   for (testFile in validTests) {
     basename = testFile.stripSuffix(".exp");
-    (testSuite, testName) = basename.stripPrefix("tests/").splitLast("/");
-    moduleName = testPathToModuleName(testSuite + "/" + testName);
+    relPath = basename.stripPrefix("tests/");
+    (testSuite, testName) = relPath.splitLast("/");
+    moduleName = relPath.split("/").join("_");
+    if (coveredModules.contains(moduleName)) continue;
     mainFn = moduleName + ".main";
     tests
       .getOrAdd(testSuite, () -> mutable Vector[])
@@ -81,6 +150,7 @@ fun main(): void {
       );
   };
 
+  // Invalid tests always use subprocess mode (they must fail to compile).
   invalidTests = FileSystem.readFilesRecursive("./invalid_tests", fn ->
     fn.endsWith(".exp_err")
   );
@@ -95,7 +165,7 @@ fun main(): void {
       .push(T.Test{name => testName, func => () ~> genInvalidTest(basename)})
   };
 
-  SKTest.test_harness(tests)
+  T.test_harness(tests)
 }
 
 module end;

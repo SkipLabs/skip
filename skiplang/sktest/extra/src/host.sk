@@ -37,7 +37,7 @@ fun assign_all_tests(
   assigned.map(v -> v.toArray())
 }
 
-fun test_job(
+untracked fun test_job(
   tests: readonly Map<String, readonly Sequence<Test>>,
   filter: String,
   njobs: Int,
@@ -78,7 +78,40 @@ fun test_job(
   skipExit(0)
 }
 
-fun test_harness(tests: readonly Map<String, readonly Sequence<Test>>): void {
+// The parallel test runner calls this from a tracked context, so it must
+// appear tracked to callers even though its body is untracked (it captures
+// stdout via the OS). @allow_tracked_call is the sanctioned escape hatch.
+@allow_tracked_call
+untracked fun expectStdout(
+  f: untracked () ~> void,
+  expectedFile: String,
+): void {
+  saved = Posix.dup(IO.stdout().fileno);
+  tmp = Posix.mkstemp(Path.join(Environ.temp_dir(), "XXXXXX"));
+  actual = try {
+    Posix.dup2(tmp.fileno, IO.stdout().fileno);
+    f();
+    flushStdout();
+    _ = Posix.lseek(tmp.fileno, 0, Posix.SeekSet());
+    tmp.read_to_string().fromSuccess()
+  } catch {
+  | exn ->
+    Posix.dup2(saved, IO.stdout().fileno);
+    Posix.close(saved);
+    tmp.close();
+    throw exn
+  };
+  // Restore stdout and clean up before comparison (which may throw).
+  Posix.dup2(saved, IO.stdout().fileno);
+  Posix.close(saved);
+  tmp.close();
+  expected = FileSystem.readTextFile(expectedFile);
+  expectEq(actual, expected)
+}
+
+untracked fun test_harness(
+  tests: readonly Map<String, readonly Sequence<Test>>,
+): void {
   args = Cli.Command("tests")
     .about("Run tests")
     .arg(
