@@ -129,7 +129,7 @@ fmt-js: # Keep in sync with bin/git_hooks/check_format.sh
 
 .PHONY: fmt-py
 fmt-py: # Keep in sync with bin/git_hooks/check_format.sh
-	pip install -q black==$(BLACK_VERSION) && black --quiet --line-length 80 .
+	pip install -q --break-system-packages black==$(BLACK_VERSION) && black --quiet --line-length 80 .
 
 .PHONY: fmt
 fmt: fmt-sk fmt-c fmt-js fmt-py # Keep in sync with bin/git_hooks/check_format.sh
