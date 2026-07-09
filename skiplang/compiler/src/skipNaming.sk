@@ -2193,8 +2193,14 @@ fun fun_def(
   type_param_with_acc = (env, tparam) ->
     type_parameter(context, classAcc, env, tparam);
   (env1, tparams2) = tparams1.mapAcc(type_param_with_acc, env);
-  env2 = env1 with {in_async => fd.async_};
+  env2 = env1 with {in_async => fd.async_, macro_ => fd.macro_};
   check_predefined(fd.name);
+  if (fd.macro_.isSome() && (fd.native_.isSome() || fd.body.isNone())) {
+    SkipError.error(
+      fd.macro_.fromSome(),
+      "'macro' functions must include an expression body.",
+    )
+  };
   if (fd.body.isNone() && fd.native_.isNone()) {
     SkipError.error(fd.name.i0, "Expected a function body")
   };
@@ -3731,7 +3737,7 @@ fun expandForEachFieldMacro(
   context: mutable SKStore.Context,
   acc: mutable Acc,
   env: Env,
-  _pos: FileRange,
+  pos: FileRange,
   field: N.Name,
   fieldName: ?N.Name,
   body: A.Expr,
@@ -3765,30 +3771,36 @@ fun expandForEachFieldMacro(
     };
     expr(context, acc, env with {macros}, body)
   };
-  env.sk_this
-    .fromSome()
-    .params.transformClassParams(
-      params -> {
-        // This yields fields in the following order:
-        //    - Leaf class
-        //    - Direct traits
-        //    - Base classes
-        // All lists are L to R
-        params.params
-          .toList()
-          .sortedBy(param ~> param.index, compare)
-          .reversed() match {
-        | List.Nil() -> N.Literal(SkipAst.VoidLiteral())
-        | List.Cons(hd, tl) ->
-          tl.foldl(
-            (result, param) ->
-              (param.name.i0, N.Seq(convertField(param), result)),
-            convertField(hd),
-          ).i1
-        }
-      },
-      (N.Literal(SkipAst.VoidLiteral()) : N.Expr_),
+  this_class = env.sk_this match {
+  | Some(cd) -> cd
+  | None() ->
+    SkipError.error(
+      pos,
+      "'#forEachField' can only be used inside a method; it iterates the fields of the enclosing class.",
     )
+  };
+  this_class.params.transformClassParams(
+    params -> {
+      // This yields fields in the following order:
+      //    - Leaf class
+      //    - Direct traits
+      //    - Base classes
+      // All lists are L to R
+      params.params
+        .toList()
+        .sortedBy(param ~> param.index, compare)
+        .reversed() match {
+      | List.Nil() -> N.Literal(SkipAst.VoidLiteral())
+      | List.Cons(hd, tl) ->
+        tl.foldl(
+          (result, param) ->
+            (param.name.i0, N.Seq(convertField(param), result)),
+          convertField(hd),
+        ).i1
+      }
+    },
+    (N.Literal(SkipAst.VoidLiteral()) : N.Expr_),
+  )
 }
 
 fun expandForEachFunctionMacro(
