@@ -1471,7 +1471,12 @@ fun malias_fun_def(
       params => malias_params(context, env, fd.params),
       return_ => malias_type(env, fd.return_),
       body => fd.body.map(ex ->
-        (context) ~> malias_expr(context, env, ex(context))
+        (context) ~>
+          malias_expr(
+            context,
+            env with {allowMacros => fd.isMacro()},
+            ex(context),
+          )
       ),
     }
   }
@@ -1571,7 +1576,7 @@ fun report_macro_usage(env: Env, pos: FileRange): void {
   if (!env.allowMacros) {
     SkipError.error(
       pos,
-      "Macros may only be used inside bodies of methods marked 'macro'.",
+      "Macros may only be used inside bodies of methods or functions marked 'macro'.",
     )
   };
 }
@@ -2499,6 +2504,7 @@ fun fun_def(
   native_ = t__.native_;
   async_ = t__.async_;
   untracked_ = t__.untracked_;
+  macro_ = t__.macro_;
   fun_private = t__.fun_private;
   annotations = t__.annotations;
   name = t__.name;
@@ -2511,12 +2517,16 @@ fun fun_def(
   (env1, tparams1) = type_parameters(context, env, tparams);
   (env2, params1) = fun_parameters(context, env1, None(), params);
   return_1 = type(context, env2, return_);
-  body1 = body.map(ex -> (context) ~> expr(context, env2, ex(context)));
+  body1 = body.map(ex ->
+    (context) ~>
+      expr(context, env2 with {allowMacros => fd.isMacro()}, ex(context))
+  );
   A.Fun_def{
     annotations,
     native_,
     async_,
     untracked_,
+    macro_,
     fun_private,
     name => name1,
     tparams => tparams1,
