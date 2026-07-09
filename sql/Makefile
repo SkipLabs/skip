@@ -35,7 +35,7 @@ run-test:
 	cd ts/tests && make ROOT_DIR=${SCRIPT_DIR} -f service_common.mk
 	cd ts/tests && make ROOT_DIR=${SCRIPT_DIR} -f service_server.mk
 	cd ts/tests && make ROOT_DIR=${SCRIPT_DIR} -f service_mux.mk
-	cd ts/tests && npx playwright test --reporter=line
+	cd ts/tests && ./run-playwright.sh
 
 .PHONY: test
 test: install-test run-test
