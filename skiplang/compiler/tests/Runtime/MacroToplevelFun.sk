@@ -1,0 +1,34 @@
+module alias G = Runtime_MacroToplevelFunGreeters;
+
+module Runtime_MacroToplevelFunGreeters;
+@macro_toplevel_greeter
+fun alpha(): String {
+  "alpha"
+}
+
+@macro_toplevel_greeter
+fun beta(): String {
+  "beta"
+}
+module end;
+
+module Runtime_MacroToplevelFun;
+// A `macro fun` declared at the top level (not inside a class). It uses the
+// `#forEachFunction` macro, which is only permitted in a `macro` context.
+// Because this file also declares a module alias, a plain (non-macro) function
+// here would be rejected with "Macros may only be used inside bodies of methods
+// or functions marked 'macro'." Marking the function `macro` is what makes it
+// legal. See issue #1182.
+macro fun collectGreetings(): String {
+  greetings = mutable Vector<String>[];
+  #forEachFunction(@macro_toplevel_greeter, #function, #functionName) {
+    greetings.push(#function())
+  };
+  greetings.collect(Array).sorted().join(", ")
+}
+
+@exptest
+fun main(): void {
+  print_string(collectGreetings())
+}
+module end;
