@@ -69,32 +69,30 @@ private fun splitModuleName(moduleName: String): (String, String) {
   (suite, testName)
 }
 
-class ExpTestsDiscovery private () {
-  static macro fun addExpTestFunctions(
-    tests: mutable Map<String, mutable Vector<T.Test>>,
-  ): readonly Set<String> {
-    // Discover @exptest-annotated functions. These are present when all
-    // test .sk files are compiled into this binary (i.e. when `tests` is
-    // not set in Skargo.toml, so Skargo auto-discovers all files in tests/).
-    coveredModules = mutable Set[];
-    #forEachFunction (@exptest, #function, #functionName) {
-      // #functionName is "ModuleName.main"
-      testFn = #function;
-      (moduleName, _testName) = #functionName.splitFirst(".");
-      coveredModules.insert(moduleName);
-      (suite, testName) = splitModuleName(moduleName);
-      tests
-        .getOrAdd(suite, () -> mutable Vector[])
-        .push(
-          T.Test{
-            name => testName,
-            func => untracked () ~>
-              T.expectStdout(testFn, `tests/${suite}/${testName}.exp`),
-          },
-        );
-    };
-    coveredModules
-  }
+// Discover @exptest-annotated functions. These are present when all
+// test .sk files are compiled into this binary (i.e. when `tests` is
+// not set in Skargo.toml, so Skargo auto-discovers all files in tests/).
+private macro fun addExpTestFunctions(
+  tests: mutable Map<String, mutable Vector<T.Test>>,
+): readonly Set<String> {
+  coveredModules = mutable Set[];
+  #forEachFunction (@exptest, #function, #functionName) {
+    // #functionName is "ModuleName.main"
+    testFn = #function;
+    (moduleName, _testName) = #functionName.splitFirst(".");
+    coveredModules.insert(moduleName);
+    (suite, testName) = splitModuleName(moduleName);
+    tests
+      .getOrAdd(suite, () -> mutable Vector[])
+      .push(
+        T.Test{
+          name => testName,
+          func => untracked () ~>
+            T.expectStdout(testFn, `tests/${suite}/${testName}.exp`),
+        },
+      );
+  };
+  coveredModules
 }
 
 untracked fun main(): void {
@@ -105,7 +103,7 @@ untracked fun main(): void {
   // not set in Skargo.toml, so Skargo auto-discovers all files in tests/).
   // Set SKC_SUBPROCESS=1 to force all tests to use subprocess mode.
   coveredModules = if (Environ.varOpt("SKC_SUBPROCESS").isNone()) {
-    ExpTestsDiscovery::addExpTestFunctions(tests)
+    addExpTestFunctions(tests)
   } else {
     Set[]
   };
