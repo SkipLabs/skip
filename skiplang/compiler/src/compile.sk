@@ -362,7 +362,10 @@ fun compile(
     skipExit(4); // Exit code used by g++ for no input files
   };
 
-  ensureCompatibleLLVMVersion();
+  // In batch mode the LLVM version is checked once, up front.
+  if (!config.batch_mode) {
+    ensureCompatibleLLVMVersion()
+  };
 
   getOrInitializeBackend(context).writeArray(
     context,
@@ -387,6 +390,37 @@ fun compile(
   );
 
   context.update()
+}
+
+// Compile many units in one process on a single SKStore context. The
+// dependencies (stdlib) are written once and left unchanged across units,
+// so the reactive engine types them only for the first unit and reuses that
+// typed result for the rest — where the ~64% stdlib type-checking cost of a
+// one-shot compile normally is. Each manifest line is:
+//   <output> <mainFn> <input.sk> [<input2.sk> ...]
+// (whitespace-separated), where <mainFn> is exported as skip_main.
+fun compile_batch(
+  base_config: Config.Config,
+  context: mutable SKStore.Context,
+  manifest_path: String,
+): void {
+  ensureCompatibleLLVMVersion();
+  lines = FileSystem.readTextFile(manifest_path).split("\n");
+  for (line in lines) {
+    parts = line.split(" ").filter(p -> !p.isEmpty()).collect(Array);
+    if (parts.isEmpty()) {
+      continue
+    };
+    if (parts.size() < 3) {
+      print_error(`Invalid batch manifest line: ${line}\n`);
+      skipExit(1)
+    };
+    output = parts[0];
+    mainFn = parts[1];
+    inputs = parts.drop(2);
+    unit_config = base_config.withUnit(inputs, output, mainFn);
+    compile(unit_config, context, inputs)
+  }
 }
 
 fun compile_llvm_ir(

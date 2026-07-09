@@ -94,6 +94,13 @@ fun main(): void {
         "Extra linker arguments (space separated).",
       ),
     )
+    .arg(
+      Cli.Arg::string("batch").about(
+        "Compile many units in one process, sharing stdlib type-checking. " +
+          "Argument is a manifest file with one unit per line: " +
+          "<output> <mainFn> <input.sk> [<input2.sk> ...].",
+      ),
+    )
     .arg(Cli.Arg::string("files").positional().repeatable())
     .parseArgs();
 
@@ -115,6 +122,8 @@ fun main(): void {
 
   config = Config.Config::make(results);
 
+  batchManifest = results.maybeGetString("batch");
+
   isInit = results.maybeGetString("init").isSome();
   if (isInit) {
     _ = SKStore.gContextInit(SKStore.Context::create{});
@@ -125,7 +134,10 @@ fun main(): void {
       SKStore.CStop(
         Some((context, _, _) ~> {
           try {
-            compile(config, context, config.input_files)
+            batchManifest match {
+            | Some(manifest) -> compile_batch(config, context, manifest)
+            | None() -> compile(config, context, config.input_files)
+            }
           } catch {
           | exn ->
             print_error(exn.getMessage());
