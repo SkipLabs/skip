@@ -405,7 +405,6 @@ fun compile_batch(
   manifest_path: String,
 ): void {
   ensureCompatibleLLVMVersion();
-  config = base_config.withBatchMode();
   lines = FileSystem.readTextFile(manifest_path).split("\n");
   for (line in lines) {
     parts = line.split(" ").filter(p -> !p.isEmpty()).collect(Array);
@@ -419,7 +418,7 @@ fun compile_batch(
     output = parts[0];
     mainFn = parts[1];
     inputs = parts.drop(2);
-    unit_config = config.withUnit(inputs, output, mainFn);
+    unit_config = base_config.withUnit(inputs, output, mainFn);
     compile(unit_config, context, inputs)
   }
 }

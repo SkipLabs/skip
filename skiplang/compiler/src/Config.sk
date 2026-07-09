@@ -288,17 +288,12 @@ private class Config{
   // (dependencies, target, opt level, …) but different inputs, output, and
   // exported entry point.
   fun withUnit(inputs: Array<String>, output: String, mainFn: String): this {
-    exportAs = mutable UnorderedMap[];
-    exportAs.set(mainFn, "skip_main");
     this with {
       input_files => inputs,
       output => output,
-      exportedAsFunctions => exportAs.chill(),
+      exportedAsFunctions => UnorderedMap[mainFn => "skip_main"],
+      batch_mode => true,
     }
-  }
-
-  fun withBatchMode(): this {
-    this with {batch_mode => true}
   }
 }
 
