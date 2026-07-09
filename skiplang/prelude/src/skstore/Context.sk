@@ -819,6 +819,12 @@ mutable class Context private {
         break withChanges
       | Some((_time, Arrow(parentName, childName), toUpdate)) ->
         this.!toUpdate = toUpdate;
+        // SKC_TIME_PHASES: time each reactive dir-update (one arrow firing =
+        // one whole dir's dirty-key batch), emitting a "##TIME## dir/<name>"
+        // line so the otherwise-invisible frontend stages (parse/name/type/…)
+        // can be attributed.
+        timeDirs = Environ.varOpt("SKC_TIME_PHASES").isSome();
+        tstart = if (timeDirs) Time.time_ns() else 0;
         this.unsafeMaybeGetDir(childName) match {
         | None()
         | Some(DeletedDir _) ->
@@ -839,6 +845,9 @@ mutable class Context private {
             parentMaps,
             child,
           )
+        };
+        if (timeDirs) {
+          print_error(`##TIME## dir/${childName} ${Time.time_ns() - tstart}\n`)
         }
       }
     }

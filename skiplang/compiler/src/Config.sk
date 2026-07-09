@@ -146,8 +146,12 @@ private class Config{
     direct_dependencies = dep_roots.map(v ->
       if (v.contains("=")) v.splitFirst("=").i0 else v
     );
-    dependency_resolver = Sklib.Resolver::create(sklib_search_paths, target);
-    dependencies = dependency_resolver.resolve(dep_roots);
+    dependency_resolver = runCompilerPhase("frontend/sklib-decode", () ->
+      Sklib.Resolver::create(sklib_search_paths, target)
+    );
+    dependencies = runCompilerPhase("frontend/sklib-resolve", () ->
+      dependency_resolver.resolve(dep_roots)
+    );
 
     // Automatically add stdlib as a dependency, unless explicitly removed or
     // replaced.
