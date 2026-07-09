@@ -237,9 +237,14 @@ base class Explicity uses Equality {
 }
 
 class Fun_def{
+  macro_: ?FileRange,
   fun_private: ?FileRange,
   body: ?(mutable SKStore.Context) ~> Expr,
-} extends Callable_def
+} extends Callable_def {
+  fun isMacro(): Bool {
+    this.macro_.isSome()
+  }
+}
 
 base class Variance uses Equality, Hashable {
   children =
