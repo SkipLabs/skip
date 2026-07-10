@@ -73,12 +73,17 @@ jobs:
       - run:
           name: Run compiler tests
           no_output_timeout: 30m
+          # run-sktest.sh wraps `skargo test` in `circleci tests run` so the
+          # "Rerun failed tests" button reruns only the failed test suites.
           command: |
             mkdir -p ~/test-results
+            root="$PWD"
             cd skiplang/compiler && make STAGE=1
-            PATH=$(realpath ./stage1/bin):$PATH skargo test --jobs 8 --junitxml ~/test-results/skc.xml
+            PATH=$(realpath ./stage1/bin):$PATH \
+              SKTEST_JOBS=8 SKTEST_JUNIT=$HOME/test-results/skc.xml \
+              "$root/bin/run-sktest.sh"
       - store_test_results:
-          path: ~/test-results/skc.xml
+          path: ~/test-results
 
   skdb:
     docker:
@@ -137,9 +142,14 @@ jobs:
           submodules: true
       - run:
           name: Run << parameters.dir >> tests
+          # run-sktest.sh wraps `skargo test` in `circleci tests run` so the
+          # "Rerun failed tests" button reruns only the failed test suites.
           command: |
             mkdir -p ~/test-results
-            cd << parameters.dir >> && skargo test --jobs 2 --junitxml ~/test-results/$(tr / - \<<< "<< parameters.dir >>").xml
+            root="$PWD"
+            cd << parameters.dir >>
+            SKTEST_JOBS=2 SKTEST_JUNIT=$HOME/test-results/$(tr / - \<<< "<< parameters.dir >>").xml \
+              "$root/bin/run-sktest.sh"
       - store_test_results:
           path: ~/test-results
 

@@ -7,16 +7,33 @@ fun signal_name(code: Int): String {
   }
 }
 
+// A test runs unless a filter excludes it. `suiteFilters` (from SKTEST_FILTERS,
+// i.e. the JUnit `classname` suite names `circleci tests run` feeds back on a
+// rerun) selects whole suites by EXACT name -- substring matching there would
+// over-select suites whose name is a prefix of another (e.g. "Typechecking" vs
+// "Typechecking/Exhaustiveness"). `nameFilter` is the positional convenience
+// filter and keeps its historical substring-on-`suite.name` behavior.
+fun matchesFilters(
+  testSuite: String,
+  testName: String,
+  suiteFilters: readonly Sequence<String>,
+  nameFilter: String,
+): Bool {
+  (suiteFilters.size() == 0 || suiteFilters.any(s -> s == testSuite)) &&
+    (nameFilter == "" || `${testSuite}.${testName}`.contains(nameFilter))
+}
+
 fun each_assigned_test(
   tests: readonly Map<String, readonly Sequence<Test>>,
-  filter: String,
+  suiteFilters: readonly Sequence<String>,
+  nameFilter: String,
   njobs: Int,
   f: (Int, String, Test) -> void,
 ): void {
   i = 0;
   for (testSuite in tests.keys()) {
     for (test in tests[testSuite]) {
-      if (!`${testSuite}.${test.name}`.contains(filter)) {
+      if (!matchesFilters(testSuite, test.name, suiteFilters, nameFilter)) {
         continue
       };
       !i = i + 1;
@@ -27,54 +44,68 @@ fun each_assigned_test(
 
 fun assign_all_tests(
   tests: readonly Map<String, readonly Sequence<Test>>,
-  filter: String,
+  suiteFilters: readonly Sequence<String>,
+  nameFilter: String,
   njobs: Int,
 ): Array<Array<(String, Test)>> {
   assigned = Array::fillBy(njobs, _ -> mutable Vector[]);
-  each_assigned_test(tests, filter, njobs, (rank, testSuite, test) -> {
-    assigned[rank].push((testSuite, test))
-  });
+  each_assigned_test(
+    tests,
+    suiteFilters,
+    nameFilter,
+    njobs,
+    (rank, testSuite, test) -> {
+      assigned[rank].push((testSuite, test))
+    },
+  );
   assigned.map(v -> v.toArray())
 }
 
 untracked fun test_job(
   tests: readonly Map<String, readonly Sequence<Test>>,
-  filter: String,
+  suiteFilters: readonly Sequence<String>,
+  nameFilter: String,
   njobs: Int,
   rank: Int,
 ): void {
   stdout = mutable IO.File(Posix.dup(IO.stdout().fileno));
-  each_assigned_test(tests, filter, njobs, (r, testSuite, test) -> {
-    if (r == rank) {
-      stdout_file = Posix.mkstemp(Path.join(Environ.temp_dir(), "XXXXXX"));
-      Posix.dup2(stdout_file.fileno, IO.stdout().fileno);
-      stderr_file = Posix.mkstemp(Path.join(Environ.temp_dir(), "XXXXXX"));
-      Posix.dup2(stderr_file.fileno, IO.stderr().fileno);
+  each_assigned_test(
+    tests,
+    suiteFilters,
+    nameFilter,
+    njobs,
+    (r, testSuite, test) -> {
+      if (r == rank) {
+        stdout_file = Posix.mkstemp(Path.join(Environ.temp_dir(), "XXXXXX"));
+        Posix.dup2(stdout_file.fileno, IO.stdout().fileno);
+        stderr_file = Posix.mkstemp(Path.join(Environ.temp_dir(), "XXXXXX"));
+        Posix.dup2(stderr_file.fileno, IO.stderr().fileno);
 
-      res = run_test(
-        test,
-        TestResult{
-          name => test.name,
-          suite => testSuite,
-          file => test.file,
-          line => test.lineno,
-        },
-      );
+        res = run_test(
+          test,
+          TestResult{
+            name => test.name,
+            suite => testSuite,
+            file => test.file,
+            line => test.lineno,
+          },
+        );
 
-      flushStdout();
-      _ = Posix.lseek(stdout_file.fileno, 0, Posix.SeekSet());
-      _ = Posix.lseek(stderr_file.fileno, 0, Posix.SeekSet());
-      !res = res with {
-        stdout => stdout_file.read_to_string().fromSuccess(),
-        stderr => stderr_file.read_to_string().fromSuccess(),
-      };
+        flushStdout();
+        _ = Posix.lseek(stdout_file.fileno, 0, Posix.SeekSet());
+        _ = Posix.lseek(stderr_file.fileno, 0, Posix.SeekSet());
+        !res = res with {
+          stdout => stdout_file.read_to_string().fromSuccess(),
+          stderr => stderr_file.read_to_string().fromSuccess(),
+        };
 
-      stdout_file.close();
-      stderr_file.close();
+        stdout_file.close();
+        stderr_file.close();
 
-      stdout.write_all((res.toJSON() + "\n").bytes()).fromSuccess();
-    }
-  });
+        stdout.write_all((res.toJSON() + "\n").bytes()).fromSuccess();
+      }
+    },
+  );
   skipExit(0)
 }
 
@@ -109,6 +140,18 @@ untracked fun expectStdout(
   expectEq(actual, expected)
 }
 
+// Parse the newline-separated suite names in SKTEST_FILTERS (blank entries
+// dropped). An empty result means "no suite restriction".
+fun parseSuiteFilters(env: ?String): Array<String> {
+  result = mutable Vector<String>[];
+  env.each(s ->
+    for (part in s.split("\n")) {
+      if (part != "") result.push(part)
+    }
+  );
+  result.toArray()
+}
+
 untracked fun test_harness(
   tests: readonly Map<String, readonly Sequence<Test>>,
 ): void {
@@ -136,14 +179,31 @@ untracked fun test_harness(
         .short("v")
         .about("Use verbose output"),
     )
+    .arg(
+      Cli.Arg::bool("list").about(
+        "List the test suites (one per line) and exit, without running them",
+      ),
+    )
     .help()
     .parseArgs();
 
-  filter = args.maybeGetString("filter").default("");
+  // Suite filters come from SKTEST_FILTERS (the suite names `circleci tests run`
+  // feeds back on a rerun) and select whole suites by exact name; the positional
+  // filter is a substring convenience. Both empty = run everything.
+  suiteFilters = parseSuiteFilters(Environ.varOpt("SKTEST_FILTERS"));
+
+  if (args.getBool("list")) {
+    tests.keys().each(print_string);
+    skipExit(0)
+  };
+
+  // Subprocesses receive both filters via the environment (they are re-exec'd
+  // with no argv), so read the positional filter from SKTEST_FILTER there.
   Environ.varOpt("SKTEST_RANK") match {
   | Some(rank) ->
     test_job(
       tests,
+      suiteFilters,
       Environ.var("SKTEST_FILTER"),
       Environ.var("SKTEST_JOBS").toInt(),
       rank.toInt(),
@@ -158,8 +218,9 @@ untracked fun test_harness(
     reporters.push(mutable XmlTestReporter{output => Some(path)})
   );
 
+  nameFilter = args.maybeGetString("filter").default("");
   njobs = args.getInt("jobs");
-  expected_tests = assign_all_tests(tests, filter, njobs);
+  expected_tests = assign_all_tests(tests, suiteFilters, nameFilter, njobs);
 
   procs = Array::fillBy(njobs, rank -> {
     Posix.Popen::create{
@@ -167,7 +228,8 @@ untracked fun test_harness(
       env => Map[
         "SKTEST_RANK" => rank.toString(),
         "SKTEST_JOBS" => njobs.toString(),
-        "SKTEST_FILTER" => filter,
+        "SKTEST_FILTERS" => suiteFilters.join("\n"),
+        "SKTEST_FILTER" => nameFilter,
       ],
       stdout => true,
       stderr => true,
