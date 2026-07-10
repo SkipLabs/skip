@@ -133,8 +133,8 @@ export class PostgresExternalService implements ExternalService {
 
     const setupPgNotify = async () => {
       // Reuse existing trigger/function if possible
-      if (!this.open_instances.has(instance)) {
-        this.open_instances.add(instance);
+      if (this.open_instances.has(instance)) return;
+      try {
         await this.client.query(
           format(
             `
@@ -166,6 +166,21 @@ FOR EACH ROW EXECUTE FUNCTION %I();`,
             instance,
           ),
         );
+        // Only mark the instance as set up once all queries have succeeded,
+        // so that a failed setup is retried on the next subscription instead
+        // of leaving a dead channel behind.
+        this.open_instances.add(instance);
+      } catch (e) {
+        error(
+          `Error setting up Postgres change notifications for resource instance ${instance}:`,
+        )(e);
+        // Each query is committed separately, so a failure may leave behind
+        // the already-created trigger function; drop it so that nothing
+        // durable leaks from a failed setup.
+        await this.client
+          .query(format("DROP FUNCTION IF EXISTS %I CASCADE;", instance))
+          .catch(() => {});
+        throw e;
       }
     };
 
