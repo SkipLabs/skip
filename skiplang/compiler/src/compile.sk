@@ -385,6 +385,8 @@ fun compile(
   // In batch mode the LLVM version is checked once, up front.
   if (!config.batch_mode) {
     ensureCompatibleLLVMVersion()
+  } else {
+    SkipError.setBatchMode(context)
   };
 
   getOrInitializeBackend(context).writeArray(
@@ -413,21 +415,54 @@ fun compile(
 
   // The backend mapper records any compile errors as this unit's outcome in
   // `/backendSink/` (absent on success). Report them here, out of the reactive
-  // computation.
+  // computation. In batch mode a failure is recoverable (surface it as an
+  // exception so the batch can move on); otherwise it exits the process.
   backendSinkDir.maybeGet(context, SKStore.UnitID::singleton) match {
   | Some(ef) if (!ef.value.isEmpty()) ->
-    SkipError.printErrorsAndExit(ef.value.toArray(), file -> {
+    get_file = file -> {
       FileCache.fileDir.unsafeGetArray(context, file)[0].value
-    })
+    };
+    if (config.batch_mode) {
+      msg = SkipError.errorsToString(
+        ef.value.map(x -> x.errors).flatten().collect(Vector),
+        get_file,
+      );
+      throw SkipError.CompileFailureException{message => msg}
+    } else {
+      SkipError.printErrorsAndExit(ef.value.toArray(), get_file)
+    }
   | _ -> void
   }
 }
 
-// Compile many units in one process on a single SKStore context. The
-// dependencies (stdlib) are written once and left unchanged across units,
-// so the reactive engine types them only for the first unit and reuses that
-// typed result for the rest — where the ~64% stdlib type-checking cost of a
-// one-shot compile normally is. Each manifest line is:
+// Type the stdlib (dependencies) once into `context`, with no config written
+// so the backend mapper never fires — leaving a clean "warm" base that carries
+// the typed stdlib and no unit-specific state.
+fun warm_stdlib(config: Config.Config, context: mutable SKStore.Context): void {
+  _ = getOrInitializeBackend(context);
+  make_input_source_path = (pkg_base_dir, src_path) ~> {
+    res = Path.join(pkg_base_dir, src_path);
+    if (config.canonize_paths) {
+      !res = config.cwd.makeRelative(res);
+    };
+    res
+  };
+  FileCache.writeFiles(
+    context,
+    Array[],
+    config.dependencies,
+    config.lib_name,
+    make_input_source_path,
+  );
+  context.update()
+}
+
+// Compile many units in one process, sharing the stdlib type-checking that
+// is ~64% of a one-shot compile. The stdlib is typed once into a warm base
+// context; each unit then compiles on a cheap copy-on-write clone of that
+// base, so its typing (and any compile error, which would otherwise corrupt
+// the shared reactive state) is fully isolated — the base stays pristine and
+// a failed unit doesn't affect the others. Each manifest line is:
 //   <output> <mainFn> <input.sk> [<input2.sk> ...]
 // (whitespace-separated), where <mainFn> is exported as skip_main.
 fun compile_batch(
@@ -436,7 +471,10 @@ fun compile_batch(
   manifest_path: String,
 ): void {
   ensureCompatibleLLVMVersion();
+  SkipError.setBatchMode(context);
+  warm_stdlib(base_config, context);
   lines = FileSystem.readTextFile(manifest_path).split("\n");
+  failures = 0;
   for (line in lines) {
     parts = line.split(" ").filter(p -> !p.isEmpty()).collect(Array);
     if (parts.isEmpty()) {
@@ -450,7 +488,25 @@ fun compile_batch(
     mainFn = parts[1];
     inputs = parts.drop(2);
     unit_config = base_config.withUnit(inputs, output, mainFn);
-    compile(unit_config, context, inputs)
+    // Compile each unit on a throwaway clone of the warm base. The clone
+    // isolates the unit's typing (and any compile error, which would
+    // otherwise corrupt the shared reactive state) from the base and the
+    // other units; withForkedContext reclaims the clone's memory afterwards
+    // so a large batch does not accumulate per-unit state.
+    try {
+      SKStore.withForkedContext(context, ctx ~>
+        compile(unit_config, ctx, inputs)
+      )
+    } catch {
+    | err @ SkipError.CompileFailureException _ ->
+      print_error(err.getMessage());
+      !failures = failures + 1
+    | exn -> throw exn
+    }
+  };
+  if (failures > 0) {
+    print_error(`Batch compilation failed: ${failures} unit(s) had errors.\n`);
+    skipExit(2)
   }
 }
 
