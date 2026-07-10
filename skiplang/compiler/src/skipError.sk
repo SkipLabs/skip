@@ -120,6 +120,33 @@ fun isBatchMode(context: mutable SKStore.Context): Bool {
   context.getGlobal("BATCH_MODE").isSome()
 }
 
+// Report errors that abort the current compile. In one-shot mode this prints
+// them and exits the process (the historical behavior). In batch mode we must
+// not exit — but we also must not carry on: the phases that reach here abort
+// the whole compile in one-shot mode, and the later phases rely on that, so
+// continuing runs them on inconsistent state and trips an invariant. Instead
+// we abort just this unit with a recoverable failure carrying the same
+// rendered errors; its throwaway forked context is torn down safely by
+// withForkedContext, leaving the shared base pristine for the remaining units.
+fun printErrorsOrRecover<T>(
+  context: mutable SKStore.Context,
+  errors: Array<SkipErrorException>,
+): T {
+  get_file = file -> {
+    FileCache.fileDir.unsafeGetArray(context, file)[0].value
+  };
+  if (isBatchMode(context)) {
+    throw CompileFailureException{
+      message => errorsToString(
+        errors.map(x -> x.errors).flatten().collect(Vector),
+        get_file,
+      ),
+    }
+  } else {
+    printErrorsAndExit(errors, get_file)
+  }
+}
+
 fun keepErrors(
   _phase: Int,
   context: mutable SKStore.Context,
@@ -142,26 +169,18 @@ fun keepErrors(
 }
 
 fun catchErrors(
-  phase: Int,
+  _phase: Int,
   context: mutable SKStore.Context,
   f: () -> void,
 ): void {
-  // In batch mode, collect errors instead of exiting, so a failing unit
-  // doesn't terminate the shared process.
-  if (isBatchMode(context)) {
-    keepErrors(phase, context, f)
-  } else {
-    try {
-      f()
-    } catch {
-    | err @ SkipError.SkipErrorException _ ->
-      printErrorsAndExit(Array[err], file -> {
-        FileCache.fileDir.unsafeGetArray(context, file)[0].value
-      })
-    | exn ->
-      debug(exn);
-      throw exn
-    }
+  try {
+    f()
+  } catch {
+  | err @ SkipError.SkipErrorException _ ->
+    printErrorsOrRecover(context, Array[err])
+  | exn ->
+    debug(exn);
+    throw exn
   }
 }
 
@@ -404,13 +423,16 @@ fun fatalError<T>(
   msg: String,
   fix: ?Fix = None(),
 ): T {
-  printErrorsAndExit(
+  // Like the `catchErrors` path, `fatalError` aborts the whole compile in
+  // one-shot mode; route it through `printErrorsOrRecover` so it becomes a
+  // recoverable per-unit failure in batch mode instead of exiting the process.
+  printErrorsOrRecover(
+    context,
     Array[
       SkipErrorException{
         errors => Vector[Error{traces => List[(pos, msg)], fix}],
       },
     ],
-    file -> FileCache.fileDir.unsafeGetArray(context, file)[0].value,
   );
 }
 
