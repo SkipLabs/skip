@@ -18,9 +18,14 @@ if [ -n "${CIRCLECI:-}" ] && [ -z "${SKDB_WASM_TESTS_INNER:-}" ]; then
     mkdir -p "$HOME/test-results"
     export SKDB_WASM_TESTS_INNER=1
     export PLAYWRIGHT_JUNIT_OUTPUT_NAME="$HOME/test-results/skdb-wasm.xml"
-    # -r: an empty rerun set is a no-op rather than a full re-run.
-    circleci tests glob "*.play.ts" \
-        | circleci tests run --command="xargs -r $self" --verbose
+    files=$(circleci tests glob "*.play.ts")
+    # Fail loudly rather than pass green with zero tests if nothing matched;
+    # `circleci tests run` would otherwise no-op.
+    [ -n "$files" ] || { echo "run-playwright.sh: no spec files matched '*.play.ts'" >&2; exit 1; }
+    # -r: an empty rerun set is a no-op rather than a full re-run. Single-quote
+    # $self so it survives the shell re-parse inside `circleci tests run`.
+    printf '%s\n' "$files" \
+        | circleci tests run --command="xargs -r '$self'" --verbose
 else
     # Runner: the given spec files, or the whole suite if none were passed.
     reporter="line"
