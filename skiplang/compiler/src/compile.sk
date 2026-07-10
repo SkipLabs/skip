@@ -194,6 +194,22 @@ fun ensureCompatibleLLVMVersion(): void {
 
 class TickConfigFile(value: (Int, Config.Config)) extends SKStore.File
 
+// Sink of the backend mapper: for each unit, the compile errors it produced
+// (empty/absent on success). The mapper *emits its outcome* here rather than
+// reporting errors from inside the reactive computation; `compile()` reads it
+// back after `update()` and decides what to do.
+const backendSinkDirName: SKStore.DirName = SKStore.DirName::create(
+  "/backendSink/",
+);
+const backendSinkDir: SKStore.EHandle<
+  SKStore.UnitID,
+  SkipError.ErrorsFile,
+> = SKStore.EHandle(
+  SKStore.UnitID::keyType,
+  SkipError.ErrorsFile::type,
+  backendSinkDirName,
+);
+
 fun getOrInitializeBackend(context: mutable SKStore.Context): SKStore.EagerDir {
   backendDirName = SKStore.DirName::create("/backend/");
   context.unsafeMaybeGetEagerDir(backendDirName) match {
@@ -229,22 +245,26 @@ fun getOrInitializeBackend(context: mutable SKStore.Context): SKStore.EagerDir {
   );
 
   _ = backendDir.map(
-    SKStore.SID::keyType,
-    TickConfigFile::type,
+    SKStore.UnitID::keyType,
+    SkipError.ErrorsFile::type,
     context,
-    SKStore.DirName::create("/backendSink/"),
-    (context, _writer, _key, values) ~> {
+    backendSinkDirName,
+    (context, writer, key, values) ~> {
       (_, conf) = values.first.value;
 
       context.getGlobal("ERRORS") match {
       | None() -> void
       | Some(errors) ->
-        SkipError.printErrorsAndExit(
-          SkipError.ErrorsFile::type(errors).value.reversed().toArray(),
-          file -> {
-            FileCache.fileDir.unsafeGetArray(context, file)[0].value
-          },
-        )
+        // A compile error: emit it as this unit's outcome and stop. Reporting
+        // (or, in batch mode, recovering) is `compile()`'s job — doing control
+        // flow from inside the reactive mapper would corrupt the context.
+        writer.set(
+          key,
+          SkipError.ErrorsFile(
+            SkipError.ErrorsFile::type(errors).value.reversed(),
+          ),
+        );
+        return void
       };
 
       if (conf.check) {
@@ -389,7 +409,18 @@ fun compile(
     make_input_source_path,
   );
 
-  context.update()
+  context.update();
+
+  // The backend mapper records any compile errors as this unit's outcome in
+  // `/backendSink/` (absent on success). Report them here, out of the reactive
+  // computation.
+  backendSinkDir.maybeGet(context, SKStore.UnitID::singleton) match {
+  | Some(ef) if (!ef.value.isEmpty()) ->
+    SkipError.printErrorsAndExit(ef.value.toArray(), file -> {
+      FileCache.fileDir.unsafeGetArray(context, file)[0].value
+    })
+  | _ -> void
+  }
 }
 
 // Compile many units in one process on a single SKStore context. The
