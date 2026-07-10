@@ -1,6 +1,13 @@
 module SKTest;
 
-fun test_harness(tests: readonly Map<String, readonly Sequence<Test>>): void {
+fun test_harness(
+  tests: readonly Map<String, readonly Sequence<Test>>,
+  // Kept signature-compatible with the host harness; wasm runs tests serially,
+  // so this is invoked once with a job count of 1 (and a run-everything
+  // predicate — no wasm harness prepares artifacts through this hook).
+  parent_setup: untracked (Int, (String, String) ~> Bool) ~> void = (_, _) ~>
+    void,
+): void {
   args = Cli.Command("tests")
     .about("Run tests")
     .arg(
@@ -40,6 +47,7 @@ fun test_harness(tests: readonly Map<String, readonly Sequence<Test>>): void {
   args.maybeGetString("junitxml").each(path ->
     reporters.push(mutable XmlTestReporter{output => Some(path)})
   );
+  parent_setup(1, (_, _) ~> true);
   filter = args.maybeGetString("filter").default("");
   strict = args.getBool("strict");
   valid = (name, filter) ->
