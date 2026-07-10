@@ -41,6 +41,24 @@ export class PostgresExternalService implements ExternalService {
   }
 
   /**
+   * The underlying PostgreSQL client, exposed for monitoring and diagnostics.
+   *
+   * @returns The `pg.Client` used by this service.
+   */
+  getClient(): pg.Client {
+    return this.client;
+  }
+
+  /**
+   * Resource instances whose change-notification channels are currently set up.
+   *
+   * @returns A copy of the set of open resource instance identifiers.
+   */
+  getOpenInstances(): Set<string> {
+    return new Set(this.open_instances);
+  }
+
+  /**
    * @param db_config - Configuration of database to which to connect.
    * @param db_config.host - Host serving database.
    * @param db_config.port - Port on which database server listens.
