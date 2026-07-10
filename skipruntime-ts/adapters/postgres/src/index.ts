@@ -32,9 +32,12 @@ pg.types.setTypeParser(pg.types.builtins.TIMESTAMPTZ, (x: string) => x);
 export class PostgresExternalService implements ExternalService {
   private client: pg.Client;
   private open_instances: Set<string> = new Set<string>();
+  private broken: boolean = false;
 
   isConnected(): boolean {
-    return "_connected" in this.client && !!this.client._connected;
+    return (
+      !this.broken && "_connected" in this.client && !!this.client._connected
+    );
   }
 
   /**
@@ -53,6 +56,17 @@ export class PostgresExternalService implements ExternalService {
     password: string;
   }) {
     this.client = new pg.Client(db_config);
+    this.client.on("error", (e: Error) => {
+      // The connection is broken and node-pg neither reconnects nor accepts
+      // further queries on this client, so the LISTEN registrations are gone
+      // for good. Drop the channel state and mark the service broken so that
+      // the failure is observable (isConnected() reports it) and later
+      // subscriptions fail loudly instead of silently reusing dead channels.
+      // Recovery requires constructing a fresh PostgresExternalService.
+      this.broken = true;
+      this.open_instances.clear();
+      console.error("Postgres client connection error:", e);
+    });
     this.client.connect().then(
       () => {
         const handler = () => {
