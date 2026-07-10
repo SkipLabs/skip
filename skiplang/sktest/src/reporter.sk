@@ -212,12 +212,19 @@ mutable class XmlTestReporter{
         )}" tests="${numTests}" failures="${numFailures}" errors="${numErrors}" time="${time}">`,
       );
       for (res in results) {
+        // Only emit `file`/`line` when we have a real source location. The
+        // harness leaves file="unknown"/line=-1 for tests it can't locate;
+        // emitting that would make CI test-splitting/rerun key every test on the
+        // bogus "unknown" file instead of falling back to `classname`.
+        fileAttr = if (res.file == "" || res.file == "unknown") {
+          ""
+        } else {
+          ` file="${escapeAttr(res.file)}" line="${res.line}"`
+        };
         this.writeLine(
-          `    <testcase name="${escapeAttr(res.name)}" file="${escapeAttr(
-            res.file,
-          )}" line="${res.line}" time="${res.time}" classname="${escapeAttr(
-            res.suite,
-          )}">`,
+          `    <testcase name="${escapeAttr(res.name)}"${fileAttr} time="${
+            res.time
+          }" classname="${escapeAttr(res.suite)}">`,
         );
         if (res.stdout != "") {
           this.writeLine(
