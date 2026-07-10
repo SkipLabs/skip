@@ -101,6 +101,25 @@ fun printErrorsAndExit<T>(
 
 class ErrorsFile(value: List<SkipErrorException>) extends SKStore.File
 
+// A recoverable compilation failure: in batch mode a failing unit throws
+// this instead of exiting the process, so the batch can report it and move
+// on to the next unit.
+class CompileFailureException{message: String} extends Exception {
+  fun getMessage(): String {
+    this.message
+  }
+}
+
+// In batch mode, frontend errors must be collected (not exit the process),
+// so many units can be compiled on one context. compile() sets this flag.
+fun setBatchMode(context: mutable SKStore.Context): void {
+  context.setGlobal("BATCH_MODE", SKStore.StringFile("1"))
+}
+
+fun isBatchMode(context: mutable SKStore.Context): Bool {
+  context.getGlobal("BATCH_MODE").isSome()
+}
+
 fun keepErrors(
   _phase: Int,
   context: mutable SKStore.Context,
@@ -123,20 +142,26 @@ fun keepErrors(
 }
 
 fun catchErrors(
-  _phase: Int,
+  phase: Int,
   context: mutable SKStore.Context,
   f: () -> void,
 ): void {
-  try {
-    f()
-  } catch {
-  | err @ SkipError.SkipErrorException _ ->
-    printErrorsAndExit(Array[err], file -> {
-      FileCache.fileDir.unsafeGetArray(context, file)[0].value
-    })
-  | exn ->
-    debug(exn);
-    throw exn
+  // In batch mode, collect errors instead of exiting, so a failing unit
+  // doesn't terminate the shared process.
+  if (isBatchMode(context)) {
+    keepErrors(phase, context, f)
+  } else {
+    try {
+      f()
+    } catch {
+    | err @ SkipError.SkipErrorException _ ->
+      printErrorsAndExit(Array[err], file -> {
+        FileCache.fileDir.unsafeGetArray(context, file)[0].value
+      })
+    | exn ->
+      debug(exn);
+      throw exn
+    }
   }
 }
 
