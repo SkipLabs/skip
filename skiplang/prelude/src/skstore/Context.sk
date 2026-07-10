@@ -1939,6 +1939,34 @@ fun withRegionValue<T>(f: () ~> T): T {
   }
 }
 
+// Run `f` on a throwaway copy-on-write clone of `context`, inside a fresh
+// region. The clone isolates any mutations `f` makes (they never touch
+// `context`), and the region reclaims the clone's memory when `f` returns —
+// so repeated use does not accumulate state. Only `f`'s return value is
+// copied out. This is the read-only-base + per-call fork pattern without the
+// named-fork registry.
+fun withForkedContext<T>(
+  context: mutable Context,
+  f: (mutable Context) ~> T,
+): T {
+  optSaved: ?Obstack = None();
+  try {
+    !optSaved = Some(newObstack());
+    saved = optSaved.fromSome();
+    fresult = f(context.mclone());
+    destroyObstackWithValue(saved, fresult)
+  } catch {
+  | exn ->
+    optSaved match {
+    | Some(saved) ->
+      cexn = destroyObstackWithValue(saved, exn);
+      replaceExn(cexn);
+      throw cexn
+    | None() -> throw exn
+    }
+  }
+}
+
 /*
   Use with caution!!!
   If f if a unnamed closure, It can only capture variables from ancestors obstack of saved.
