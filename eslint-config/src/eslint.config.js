@@ -1,12 +1,11 @@
+import { globalIgnores } from "eslint/config";
 import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
 import stylisticJs from "@stylistic/eslint-plugin";
 import jsdoc from "eslint-plugin-jsdoc";
 
 export default tseslint.config(
-  {
-    ignores: ["**/dist/*"],
-  },
+  globalIgnores(["**/dist/*"]),
   eslint.configs.recommended,
   jsdoc.configs["flat/recommended-typescript-error"],
   ...tseslint.configs.strictTypeChecked,
@@ -14,6 +13,7 @@ export default tseslint.config(
   {
     linterOptions: {
       reportUnusedDisableDirectives: "error",
+      reportUnusedInlineConfigs: "error",
     },
     languageOptions: {
       parserOptions: {
