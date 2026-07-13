@@ -6,7 +6,7 @@ export default [
       "**/dev/*",
       "**/dist/*",
       "**/tests/*",
-      "**/vitejs/*",
+      "**/vitejs/**",
       "**/bun/*",
       "tsconfig.json",
     ],
