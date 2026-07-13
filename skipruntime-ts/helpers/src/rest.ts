@@ -34,6 +34,10 @@ function toHttp(entrypoint: Entrypoint) {
   return `http://${entrypoint.host}:${entrypoint.control_port}`;
 }
 
+// Generous enough not to give up on a slow (e.g. heavily loaded) service,
+// while still bounding how long requests can hang.
+const DEFAULT_TIMEOUT_MS = 10_000;
+
 /**
  * Perform an HTTP fetch where input and output data is `Json`.
  *
@@ -43,7 +47,7 @@ function toHttp(entrypoint: Entrypoint) {
  * @param options - Optional parameters.
  * @param options.headers - Additional headers to add to request.
  * @param options.body - Data to convert to JSON and send in request body.
- * @param options.timeout - Timeout for request, in milliseconds. Defaults to 1000ms.
+ * @param options.timeout - Timeout for request, in milliseconds. Defaults to 10000ms.
  * @returns Response parsed as JSON, and headers.
  */
 export async function fetchJSON<V extends Json>(
@@ -55,7 +59,7 @@ export async function fetchJSON<V extends Json>(
     timeout?: number;
   } = {
     headers: {},
-    timeout: 1000,
+    timeout: DEFAULT_TIMEOUT_MS,
   },
 ): Promise<[V | null, Headers]> {
   const body = options.body ? JSON.stringify(options.body) : undefined;
@@ -67,7 +71,7 @@ export async function fetchJSON<V extends Json>(
       Accept: "application/json",
       ...options.headers,
     },
-    signal: AbortSignal.timeout(options.timeout ?? 1000),
+    signal: AbortSignal.timeout(options.timeout ?? DEFAULT_TIMEOUT_MS),
   });
   if (!response.ok) {
     throw new SkipFetchError(`${response.status}: ${response.statusText}`);
@@ -93,7 +97,7 @@ export class SkipServiceBroker {
    * Construct a broker for a Skip service at the given entry point.
    *
    * @param entrypoint - Entry point of backing service.
-   * @param timeout - Timeout for request, in milliseconds. Defaults to 1000ms.
+   * @param timeout - Timeout for request, in milliseconds. Defaults to 10000ms.
    * @returns Method-call broker to service.
    */
   constructor(
@@ -220,7 +224,7 @@ export class SkipServiceBroker {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(params),
-      signal: AbortSignal.timeout(this.timeout ?? 1000),
+      signal: AbortSignal.timeout(this.timeout ?? DEFAULT_TIMEOUT_MS),
     });
     if (!response.ok) {
       throw new SkipFetchError(
