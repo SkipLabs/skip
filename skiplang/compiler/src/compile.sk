@@ -499,7 +499,14 @@ fun compile_batch(
       )
     } catch {
     | err @ SkipError.CompileFailureException _ ->
-      print_error(err.getMessage());
+      msg = err.getMessage();
+      print_error(msg);
+      // Also record this unit's errors next to its (unwritten) output, so a
+      // caller driving many units can attribute failures per unit without
+      // parsing the interleaved stderr stream. A successful unit writes its
+      // artifact at `output` and no `.err`; a failed one writes `.err` and no
+      // artifact, giving an unambiguous per-unit signal.
+      FileSystem.writeTextFile(output + ".err", msg);
       !failures = failures + 1
     | exn -> throw exn
     }

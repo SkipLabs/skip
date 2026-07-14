@@ -161,6 +161,14 @@ fun parseSuiteFilters(env: ?String): Array<String> {
 
 untracked fun test_harness(
   tests: readonly Map<String, readonly Sequence<Test>>,
+  // Called once in the parent, after the arguments are parsed and before the
+  // worker processes are forked. A harness can use it to prepare shared test
+  // artifacts in parallel (e.g. batch-compiling inputs) with the same
+  // parallelism the workers will run at. It receives the resolved job count and
+  // a predicate `(suite, name) -> will this test run` (the same filter the
+  // workers apply), so the preparation covers exactly the tests that will run.
+  parent_setup: untracked (Int, (String, String) ~> Bool) ~> void = (_, _) ~>
+    void,
 ): void {
   args = Cli.Command("tests")
     .about("Run tests")
@@ -227,6 +235,13 @@ untracked fun test_harness(
 
   nameFilter = args.maybeGetString("filter").default("");
   njobs = args.getInt("jobs");
+
+  // Parent-only, before forking: give the harness a chance to prepare shared
+  // artifacts for the workers to read (only for the tests that will run).
+  parent_setup(njobs, (suite, name) ~>
+    matchesFilters(suite, name, suiteFilters, nameFilter)
+  );
+
   expected_tests = assign_all_tests(tests, suiteFilters, nameFilter, njobs);
 
   procs = Array::fillBy(njobs, rank -> {
