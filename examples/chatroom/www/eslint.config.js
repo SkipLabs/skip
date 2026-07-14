@@ -5,6 +5,7 @@ import reactRefresh from "eslint-plugin-react-refresh";
 
 export default [
   ...config,
+  reactHooks.configs.flat.recommended,
   {
     files: ["**/*.{ts,tsx}"],
     languageOptions: {
@@ -12,11 +13,9 @@ export default [
       globals: globals.browser,
     },
     plugins: {
-      "react-hooks": reactHooks,
       "react-refresh": reactRefresh,
     },
     rules: {
-      ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": [
         "warn",
         { allowConstantExport: true },
