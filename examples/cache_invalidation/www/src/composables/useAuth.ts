@@ -3,12 +3,12 @@ import { ref, readonly } from "vue";
 // Session type can be expanded as needed
 type Session = any;
 
-const session = ref<Session | null>(null);
+const session = ref<Session>(null);
 
 // On load, check for existing token and fetch session
 const token = localStorage.getItem("jwt");
 if (token) {
-  fetchSession(token);
+  void fetchSession(token);
 }
 
 async function fetchSession(token: string) {
@@ -40,9 +40,12 @@ async function login(username: string, password: string) {
       body: JSON.stringify({ username, password }),
     });
     if (!response.ok) {
-      throw new Error("Login failed: " + response.status);
+      throw new Error(`Login failed: ${response.status}`);
     }
-    const { token: jwt, user } = await response.json();
+    const { token: jwt, user } = (await response.json()) as {
+      token: string;
+      user: Session;
+    };
     localStorage.setItem("jwt", jwt);
     session.value = user;
   } catch (error) {
