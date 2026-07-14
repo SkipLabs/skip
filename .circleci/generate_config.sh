@@ -15,13 +15,42 @@ for skargo_toml in **/Skargo.toml; do
     && SK_CHANGED["$dir"]=false || SK_CHANGED["$dir"]=true
 done
 
-if ${SK_CHANGED[skiplang/prelude]}; then
-  SK_CHANGED[skiplang/compiler]=true
-  SK_CHANGED[sql]=true
-fi
-if ${SK_CHANGED[skiplang/sqlparser]}; then
-  SK_CHANGED[sql]=true
-fi
+# Retest every package that (transitively) depends on a changed one, so a change
+# to a shared library reaches its dependents' jobs. The reverse dependency graph
+# is derived from the `path = "..."` entries in each Skargo.toml (all dependency
+# sections), rather than hand-maintained, so it stays correct as packages change.
+declare -A SK_DEPS
+for skargo_toml in **/Skargo.toml; do
+  dir=$(dirname "$skargo_toml")
+  deps=""
+  while IFS= read -r dep_path; do
+    [ -n "$dep_path" ] || continue
+    resolved=$(realpath -m --relative-to=. "$dir/$dep_path" 2>/dev/null)
+    [ -f "$resolved/Skargo.toml" ] && deps="$deps $resolved"
+  done < <(awk '/^\[(dev-|build-)?dependencies\]/{d=1;next} /^\[/{d=0} d && /path *=/{print}' "$skargo_toml" \
+           | grep -oE 'path *= *"[^"]+"' | sed 's/.*"\(.*\)"/\1/')
+  SK_DEPS["$dir"]="$deps"
+done
+
+declare -A SK_RDEPS
+for pkg in "${!SK_DEPS[@]}"; do
+  for dep in ${SK_DEPS[$pkg]}; do
+    SK_RDEPS["$dep"]="${SK_RDEPS[$dep]:-} $pkg"
+  done
+done
+
+# Cycle-safe BFS over the reverse graph, seeded with the directly-changed packages.
+queue=()
+for pkg in "${!SK_CHANGED[@]}"; do ${SK_CHANGED["$pkg"]} && queue+=("$pkg"); done
+while [ "${#queue[@]}" -gt 0 ]; do
+  cur="${queue[0]}"; queue=("${queue[@]:1}")
+  for dependent in ${SK_RDEPS["$cur"]:-}; do
+    if [ "${SK_CHANGED[$dependent]:-false}" != true ]; then
+      SK_CHANGED["$dependent"]=true
+      queue+=("$dependent")
+    fi
+  done
+done
 
 check_ts=false
 declare -A TS_CHANGED
