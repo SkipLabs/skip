@@ -85,17 +85,19 @@ fi
 
 cat .circleci/base.yml
 
-WORKFLOWS=$(mktemp)
-trap 'rm -f "$WORKFLOWS"' EXIT
+JOBS=$(mktemp)
+trap 'rm -f "$JOBS"' EXIT
 
+# Names of every job scheduled below, so the `all-checks` gate can require them.
+NAMES=()
+
+# The brace group runs in the current shell (redirection does not fork it), so
+# NAMES accumulates across the blocks below.
 {
 if $check_ts
 then
-    cat <<EOF
-  check-ts:
-    jobs:
-      - check-ts
-EOF
+    echo "      - check-ts"
+    NAMES+=(check-ts)
 fi
 
 for dir in "${!SK_CHANGED[@]}"; do
@@ -105,69 +107,63 @@ for dir in "${!SK_CHANGED[@]}"; do
         TS_CHANGED[skipruntime-ts]=true
         ;;
       sql)
-        cat <<EOF
-  skdb:
-    jobs:
-      - skdb
-EOF
+        echo "      - skdb"
+        NAMES+=(skdb)
         ;;
       skiplang/compiler)
-   cat <<EOF
-  compiler:
-    jobs:
-      - compiler
-EOF
+        echo "      - compiler"
+        NAMES+=(compiler)
         ;;
       skiplang/sqlparser) ;;
       *)
         name=$(basename "$dir")
         if [ -d "$dir/tests" ]; then
-          echo "  $name-tests:"
-          echo "    jobs:"
           echo "      - skip-package-tests:"
         else
-          echo "  $name-build:"
-          echo "    jobs:"
           echo "      - skip-package-build:"
         fi
         echo "          dir: $dir"
         echo "          name: $name"
+        NAMES+=("$name")
     esac
   fi
 done
 
 if ${TS_CHANGED[sql]}
 then
-    cat <<EOF
-  skdb-wasm:
-    jobs:
-      - skdb-wasm
-EOF
+    echo "      - skdb-wasm"
+    NAMES+=(skdb-wasm)
 fi
 
 if ${TS_CHANGED[skipruntime-ts]}
 then
-    cat <<EOF
-  skipruntime:
-    jobs:
-      - skipruntime
-  skipruntime-bun:
-    jobs:
-      - skipruntime-bun
-EOF
+    echo "      - skipruntime"
+    echo "      - skipruntime-bun"
+    NAMES+=(skipruntime skipruntime-bun)
 fi
 
 if (( examples != 0 ))
 then
-    cat <<EOF
-  examples:
-    jobs:
-      - check-examples
-EOF
+    echo "      - check-examples"
+    NAMES+=(check-examples)
 fi
-} > "$WORKFLOWS"
+} > "$JOBS"
 
-if [ -s "$WORKFLOWS" ]; then
-  echo "workflows:"
-  cat "$WORKFLOWS"
+# Schedule every triggered job in a single `ci` workflow, gated by `all-checks`.
+# The gate depends on all of them, so its status context (`ci/circleci:
+# all-checks`) only turns green once every triggered job has passed. It is
+# always emitted -- even when no jobs are triggered -- so it is a stable required
+# check that branch protection / auto-merge can wait on regardless of the diff.
+echo "workflows:"
+echo "  ci:"
+echo "    jobs:"
+cat "$JOBS"
+if [ "${#NAMES[@]}" -gt 0 ]; then
+  echo "      - all-checks:"
+  echo "          requires:"
+  for name in "${NAMES[@]}"; do
+    echo "            - $name"
+  done
+else
+  echo "      - all-checks"
 fi
