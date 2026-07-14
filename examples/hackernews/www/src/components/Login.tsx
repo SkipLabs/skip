@@ -18,7 +18,7 @@ function Login() {
     })
       .then((resp) => {
         if (!resp.ok) setLoginError("Invalid credentials");
-        else navigate("/");
+        else void navigate("/");
       })
       .catch((err: unknown) => {
         console.log(err);

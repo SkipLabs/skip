@@ -39,7 +39,7 @@ function Feed(props: { posts: Post[]; session: Session | null }) {
   const navigate = useNavigate();
 
   function toggleUpvote(post: Post) {
-    let method = post.upvoted ? "DELETE" : "PUT";
+    const method = post.upvoted ? "DELETE" : "PUT";
     void fetch(`/api/posts/${post.id}/upvotes`, { method }).catch(
       (err: unknown) => {
         console.error(err);
@@ -66,9 +66,10 @@ function Feed(props: { posts: Post[]; session: Session | null }) {
                 <div
                   className={post.upvoted ? "votearrow-active" : "votearrow"}
                   title="upvote"
-                  onClick={() =>
-                    session !== null ? toggleUpvote(post) : navigate("/login")
-                  }
+                  onClick={() => {
+                    if (session !== null) toggleUpvote(post);
+                    else void navigate("/login");
+                  }}
                 ></div>
                 <span className="posttitle">
                   <a href={post.url}>{post.title}</a>
