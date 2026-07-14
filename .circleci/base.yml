@@ -302,3 +302,16 @@ jobs:
           name: Tear down cache invalidation example
           working_directory: ~/project/examples/cache_invalidation
           command: docker compose down --volumes
+
+  # Aggregating gate: `generate_config.sh` makes this job depend on every other
+  # job it schedules, so `ci/circleci: all-checks` is a single, always-present
+  # status context that only passes once all triggered jobs pass. Make it a
+  # required check so auto-merge waits for the whole dynamically-generated set.
+  all-checks:
+    docker:
+      - image: cimg/base:2025.01
+    resource_class: small
+    steps:
+      - run:
+          name: All triggered jobs passed
+          command: echo "All triggered CI jobs passed."

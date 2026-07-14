@@ -48,10 +48,6 @@ jobs:
           name: Generate config
           command: |
             .circleci/generate_config.sh > generated_config.yml
-            if ! grep -q '^workflows:' generated_config.yml; then
-              echo "No dynamic workflows to run"
-              circleci-agent step halt
-            fi
       - continuation/continue:
           configuration_path: generated_config.yml
 
