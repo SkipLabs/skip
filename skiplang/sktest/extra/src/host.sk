@@ -144,9 +144,16 @@ untracked fun expectStdout(
 // dropped). An empty result means "no suite restriction".
 fun parseSuiteFilters(env: ?String): Array<String> {
   result = mutable Vector<String>[];
+  // Split on any whitespace, not just newlines: `circleci tests run` hands the
+  // selected suites back to `run-sktest.sh` as a single space-separated line
+  // (via `xargs`), so splitting only on `\n` would yield one bogus filter that
+  // matches no suite -- and the whole run would silently execute 0 tests. Suite
+  // names never contain whitespace, so this is safe.
   env.each(s ->
-    for (part in s.split("\n")) {
-      if (part != "") result.push(part)
+    for (line in s.split("\n")) {
+      for (part in line.split(" ")) {
+        if (part != "") result.push(part)
+      }
     }
   );
   result.toArray()
