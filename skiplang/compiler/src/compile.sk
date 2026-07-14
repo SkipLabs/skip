@@ -389,11 +389,13 @@ fun compile(
     SkipError.setBatchMode(context)
   };
 
-  getOrInitializeBackend(context).writeArray(
-    context,
-    SKStore.UnitID::singleton,
-    Array[TickConfigFile((context.getTick().value, config))],
-  );
+  runCompilerPhase("backend/init", () -> {
+    getOrInitializeBackend(context).writeArray(
+      context,
+      SKStore.UnitID::singleton,
+      Array[TickConfigFile((context.getTick().value, config))],
+    )
+  });
 
   make_input_source_path = (pkg_base_dir, src_path) ~> {
     res = Path.join(pkg_base_dir, src_path);
@@ -403,15 +405,17 @@ fun compile(
     res
   };
 
-  FileCache.writeFiles(
-    context,
-    fileNames,
-    config.dependencies,
-    config.lib_name,
-    make_input_source_path,
-  );
+  runCompilerPhase("frontend/read_files", () -> {
+    FileCache.writeFiles(
+      context,
+      fileNames,
+      config.dependencies,
+      config.lib_name,
+      make_input_source_path,
+    )
+  });
 
-  context.update();
+  runCompilerPhase("frontend/update", () -> context.update());
 
   // The backend mapper records any compile errors as this unit's outcome in
   // `/backendSink/` (absent on success). Report them here, out of the reactive
