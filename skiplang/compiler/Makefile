@@ -18,9 +18,27 @@ stage%:
 	mkdir -p $@
 	$(MAKE) $@/bin/skc $@/bin/skfmt $@/bin/skargo $@/lib/libstd.sklib
 
-build/%.ll: bootstrap/%.ll.gz
+build/%.ll: bootstrap/%.ll.gz | check-bootstrap
 	mkdir -p $(@D)
 	gunzip -c $< > $@
+
+# The compiler is bootstrapped from the pre-compiled IR shipped in the
+# `bootstrap` submodule. If that submodule is not at the commit recorded in this
+# checkout, skc gets built from mismatched IR and typically crashes at runtime
+# with an opaque internal error (e.g. "Invariant violation"). Fail early with a
+# clear remedy instead. (No-op outside a git checkout, e.g. source tarballs.)
+.PHONY: check-bootstrap
+check-bootstrap:
+	@if git submodule status bootstrap 2>/dev/null | grep -qE '^[-+U]'; then \
+	  echo "" >&2; \
+	  echo "ERROR: the bootstrap submodule (skiplang/compiler/bootstrap) is out of sync with" >&2; \
+	  echo "the commit recorded in this checkout, so skc would be built from mismatched IR." >&2; \
+	  echo "Sync it before building:" >&2; \
+	  echo "" >&2; \
+	  echo "    git submodule update --init skiplang/compiler/bootstrap" >&2; \
+	  echo "" >&2; \
+	  exit 1; \
+	fi
 
 .PHONY: build/libskip_runtime64.a build/libbacktrace.a
 build/libskip_runtime64.a build/libbacktrace.a:
