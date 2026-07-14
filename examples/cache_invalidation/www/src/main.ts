@@ -1,4 +1,4 @@
-import { createApp } from "vue";
+import { createApp, type Component } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 import App from "./App.vue";
 
@@ -22,6 +22,8 @@ const router = createRouter({
 });
 
 // Create and mount the app
-const app = createApp(App);
+// App is imported from a .vue SFC, which typescript-eslint's project service
+// resolves as an untyped module, so assert the component type explicitly.
+const app = createApp(App as Component);
 app.use(router);
 app.mount("#app");
