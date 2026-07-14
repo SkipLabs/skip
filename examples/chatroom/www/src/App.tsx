@@ -32,8 +32,8 @@ function Feed() {
       const data = JSON.parse(e.data) as [number, Message[]][];
       setMessages((messages) => {
         const newMessages = new Map(messages);
-        for (const [key, [msg]] of data) {
-          if (msg) newMessages.set(key, msg);
+        for (const [key, msgs] of data) {
+          if (msgs.length > 0) newMessages.set(key, msgs[0]);
           else newMessages.delete(key);
         }
         return newMessages;
@@ -125,7 +125,7 @@ function Feed() {
         className="new-message"
         onSubmit={(e) => {
           e.preventDefault();
-          sendMessage();
+          void sendMessage();
         }}
       >
         <input
