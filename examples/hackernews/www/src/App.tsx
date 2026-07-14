@@ -14,7 +14,7 @@ export default function App() {
   function updateSession(data: [number, Session[]][]) {
     let session;
     if (data.length > 0 && data[0][1].length > 0) {
-      session = data[0][1][0] as Session;
+      session = data[0][1][0];
     } else {
       session = null;
     }
@@ -44,20 +44,20 @@ export default function App() {
       return -1;
     };
     evSource.addEventListener("init", (e: MessageEvent<string>) => {
-      const data = JSON.parse(e.data) as [number, any[]][];
+      const data = JSON.parse(e.data) as [number, Post[]][];
       const initialPosts = data.map(([post_id, values]) => {
         values[0].date = new Date(values[0].date);
         return { ...values[0], id: post_id };
-      }) as Post[];
+      });
       initialPosts.sort(sortByUpvotes);
       setPosts(initialPosts);
       previousPostsValue.current = initialPosts;
     });
     evSource.addEventListener("update", (e: MessageEvent<string>) => {
-      const data = JSON.parse(e.data);
-      let modifiedPosts: number[] = [];
+      const data = JSON.parse(e.data) as [number, Post[]][];
+      const modifiedPosts: number[] = [];
       let updatedPosts: Post[] = [];
-      for (let [post_id, values] of data) {
+      for (const [post_id, values] of data) {
         modifiedPosts.push(post_id);
         if (values.length > 0) {
           values[0].date = new Date(values[0].date);

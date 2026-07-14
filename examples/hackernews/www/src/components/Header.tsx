@@ -23,7 +23,8 @@ function Header(props: { session: Session | null }) {
           href="#"
           onClick={(e) => {
             e.preventDefault();
-            props.session !== null ? navigate("/submit") : navigate("/login");
+            if (props.session !== null) void navigate("/submit");
+            else void navigate("/login");
           }}
         >
           submit

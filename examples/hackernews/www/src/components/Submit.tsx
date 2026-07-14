@@ -29,7 +29,7 @@ function Submit() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            createPost().then((_) => navigate("/"));
+            void createPost().then(() => navigate("/"));
           }}
         >
           <input
