@@ -278,20 +278,24 @@ skfmt-%:
 skbuild-%:
 	cd $* && skargo b --profile $(SKARGO_PROFILE)
 
-# Build every workspace package in dependency order. Required before any
-# publish-* target so that downstream packages can see their dependencies'
-# emitted .d.ts and .js (which release_npm.sh's idempotent skip-if-already-
-# published check would otherwise bypass).
+# Build every workspace package in dependency order. Required before the
+# publish-* targets that ship built artifacts, so that downstream packages can
+# see their dependencies' emitted .d.ts and .js (which release_npm.sh's
+# idempotent skip-if-already-published check would otherwise bypass).
 .PHONY: build-all
 build-all:
 	npm run build --workspaces --if-present
 
+# @skiplabs/tsconfig and @skiplabs/eslint-config are pure configuration
+# packages: no build step, no emitted artifacts, and nothing depends on them at
+# build time. They can be published without the (slow, toolchain-dependent)
+# build-all -- notably even when the Skip compiler cannot be built.
 .PHONY: publish-tsconfig
-publish-tsconfig: build-all
+publish-tsconfig:
 	bin/release_npm.sh @skiplabs/tsconfig tsconfig/package.json $(OTP)
 
 .PHONY: publish-eslint-config
-publish-eslint-config: build-all
+publish-eslint-config:
 	bin/release_npm.sh @skiplabs/eslint-config eslint-config/package.json $(OTP)
 
 .PHONY: publish-skiplang-std
