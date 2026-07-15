@@ -8,6 +8,7 @@
 // Module for manipulating the Files and Directories.
 
 // TODO: What module should this go in?
+@debug
 @cpp_extern("SKIP_getcwd")
 @may_alloc
 native fun getcwd(): String;
@@ -66,14 +67,17 @@ fun writeTextFile(filename: String, contents: String): void {
   string_to_file(contents, filename);
 }
 
+@debug
 @cpp_extern("SKIP_get_mtime")
 native fun getLastModificationTime(fileName: String): Int;
 
+@debug
 @synonym("appendFile")
 @synonym("appendFileSync")
 @cpp_extern
 native fun appendTextFile(filename: String, contents: String): void;
 
+@debug
 @cpp_extern("SKIP_check_if_file_exists")
 native fun exists(filename: String): Bool;
 
@@ -148,11 +152,13 @@ fun stat(path: String): ?FileStat {
   if (rc < 0) None() else Some(unsafe_chill_trust_me(result))
 }
 
+@debug
 @cpp_extern("SKIP_file_stat")
 private native fun fillStat(result: mutable FileStat, path: String): Int;
 
 // TODO: Rename the C++ entrypoints and merge these into the
 // public API above.
+@debug
 @cpp_extern
 private native fun .open_file(String): String;
 
@@ -160,6 +166,7 @@ private native fun .open_file(String): String;
 @cpp_extern
 private native fun .string_to_file(s: String, file: String): void;
 
+@debug
 @cpp_extern("SKIP_is_directory")
 private native fun is_directory(filename: String): Bool;
 
