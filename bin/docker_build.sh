@@ -144,13 +144,17 @@ fi
 # them. The tracked file is never touched: nothing to restore, nothing to
 # repair, and a local edit to .dockerignore no longer blocks builds.
 #
+# The tracked .dockerignore is cat'd in first, so its static exclusions
+# (including .git) apply here just as they do for builds that bypass this
+# script and read it directly.
+#
 # '**/*.dockerignore' excludes the generated files from the context, and they
 # are filtered out of the body below (git clean lists them once they exist) so
 # that the body is identical on every run -- which is what keeps --push-only
 # hitting the cache from an earlier --dry-run.
 ignore_body=$(
     cat .dockerignore
-    printf '%s\n' '**/*.dockerignore' '.git'
+    printf '%s\n' '**/*.dockerignore'
     # sed -n '...p' (not grep) so a pristine tree, which prints nothing here,
     # does not fail the pipeline under `set -o pipefail`.
     git clean -xd --dry-run | sed -n 's|^Would remove |/|p' | sed '/\.dockerignore$/d'
