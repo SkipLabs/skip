@@ -3,7 +3,13 @@
 
 # aim to start from an image with a version of glibc that is as widely
 # compatible as possible while still receiving security updates
-FROM debian:bookworm-20250113-slim AS base
+#
+# Keep the codename at bookworm: it sets the glibc floor (2.36) for the
+# libskipruntime.so binary releases built from this image, and bumping it
+# would drop support for Debian 12 / Ubuntu 22.04 / RHEL 9 users. Only the
+# date pin should be refreshed, which picks up security updates while
+# leaving glibc at 2.36.
+FROM debian:bookworm-20260713-slim AS base
 
 ARG LLVM_VERSION=20
 ARG TARGETARCH
