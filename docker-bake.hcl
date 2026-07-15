@@ -20,6 +20,26 @@ group "default" {
   ]
 }
 
+# The set of images published to Docker Hub, and the single source of truth for
+# what both bin/release_docker_ci_images.sh and .github/workflows/docker-publish.yml
+# publish. bin/check_ci_images.sh asserts that every skiplabs/ image CircleCI
+# pulls appears here.
+#
+# Toolchain images only. Their final stages contain compiled binaries and apt
+# packages but no repo source, so any commit on main can rebuild them and
+# republishing is not a release. skdb and skdb-dev-server are deliberately
+# absent: they bake in source and their tags carry release semantics, so they
+# stay manual.
+#
+# skiplang-bin-builder is published but never pulled by CI, which is why this
+# list cannot be derived from .circleci/ -- and why it went a year without a
+# rebuild (#1338).
+group "ci" {
+  targets = [
+    "skiplang", "skiplang-bin-builder", "skip", "skdb-base",
+  ]
+}
+
 group "local" {
   targets = [
     "skiplang", "skiplang-bin-builder", "skip",
