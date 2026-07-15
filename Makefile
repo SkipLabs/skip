@@ -236,6 +236,13 @@ test-soak-priv: build/skdb build/init.sql npm
 test-soak:
 	$(MAKE) SKARGO_PROFILE=release test-soak-priv
 
+.PHONY: test-mem-stress
+test-mem-stress:
+	@$(MAKE) -C skipruntime-ts build-examples
+	LD_LIBRARY_PATH=$(PWD)/build/skipruntime:$$LD_LIBRARY_PATH \
+	SKIP_PLATFORM=native \
+	node $(PWD)/skipruntime-ts/examples/dist/stress-tests/gc-stress.js $(ARGS)
+
 # run targets
 
 .PHONY: run-dev-server
