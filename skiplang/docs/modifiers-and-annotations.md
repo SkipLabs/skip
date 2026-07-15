@@ -409,6 +409,13 @@ clean diagnostic, so `skargo check` does not catch it.
 | `@gc` | Collect at every return and throw of this function. |
 | `@no_gc` | Suppress automatic collection for this function. |
 
+> **These have no runtime effect today.** The collection primitives are disabled
+> in the runtime — `obstack.c` carries a *"Collection primitive (disabled)"*
+> section, `SKIP_Obstack_collect` is an empty function, and the inline
+> entrypoints in the preamble return without doing anything. The compiler still
+> runs the whole local-GC pass and emits the calls; they lower to no-ops. What
+> follows describes what the annotations tell the *compiler*.
+
 By default a function is given automatic local GC if it is inferred to allocate
 an unbounded amount — in practice, if it allocates in a loop or recurses while
 allocating.
