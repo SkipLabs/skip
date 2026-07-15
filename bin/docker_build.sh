@@ -180,12 +180,26 @@ if [[ -n "$ARCH" ]]; then
     BAKE_ARGS+=(--set "*.platform=$ARCH")
 fi
 
+# Provenance + SBOM attestations, for published images only.
+#
+# These are restricted to push flows on purpose: they require the
+# docker-container driver, which is what the named builder below uses. Local
+# builds go to the docker driver via --load, which rejects them outright
+# ("Attestation is not supported for the docker driver"), so enabling these
+# everywhere would break every local build.
+#
+# mode=max records the build's sources and materials, which is what lets
+# consumers (and Docker Scout) identify the base image rather than guess it.
+# It also records build args, so do not pass secrets as build args -- the ones
+# used here (STAGE, SKIP_CAPACITY) are not sensitive.
+ATTEST_ARGS=(--provenance=mode=max --sbom=true)
+
 # Output mode
 if $PUSH_ONLY; then
     # Push existing layers — no --no-cache so BuildKit finds them in the builder
-    BAKE_ARGS+=(--push)
+    BAKE_ARGS+=(--push "${ATTEST_ARGS[@]}")
 elif $PUSH; then
-    BAKE_ARGS+=(--no-cache)
+    BAKE_ARGS+=(--no-cache "${ATTEST_ARGS[@]}")
     if ! $DRY_RUN; then
         BAKE_ARGS+=(--push)
     fi
