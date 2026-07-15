@@ -59,7 +59,17 @@ for step in "${steps[@]}"; do
             ;;
         other-CI-tools)
             # Assumes other steps have been run before
-            apt-get install -q -y --no-install-recommends clang-format-$LLVM_VERSION docker.io docker-buildx parallel pip shellcheck
+            _ensure_base_deps
+            # Use Docker's own packages rather than Ubuntu's docker.io: they are
+            # built against a current Go toolchain (Ubuntu's lag, carrying Go
+            # stdlib/x-crypto CVEs), and they install only the client. CI talks to
+            # a remote daemon via setup_remote_docker, so dockerd/containerd/runc
+            # -- which docker.io pulls in -- are never used.
+            wget -qO /etc/apt/keyrings/docker.asc https://download.docker.com/linux/ubuntu/gpg
+            # shellcheck disable=SC1091  # /etc/os-release is provided by the base image, not this repo
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" >> /etc/apt/sources.list.d/docker.list
+            apt-get update
+            apt-get install -q -y --no-install-recommends clang-format-$LLVM_VERSION docker-ce-cli docker-buildx-plugin parallel pip shellcheck
             # Version from requirements-dev.txt (check repo root, then /tmp for docker builds)
             BLACK_VERSION=$(grep '^black==' requirements-dev.txt /tmp/requirements-dev.txt 2>/dev/null | head -1 | cut -d'=' -f3)
             # --break-system-packages: Ubuntu 24.04+ enforces PEP 668; safe in a throwaway container image
