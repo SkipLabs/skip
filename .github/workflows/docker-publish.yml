@@ -8,16 +8,6 @@ on:
       - 'docker-bake.hcl'
       - 'bin/check_ci_images.sh'
       - '.github/workflows/docker-publish.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'Dockerfile'
-      - 'skiplang/Dockerfile'
-      - 'sql/Dockerfile'
-      - 'bin/apt-install.sh'
-      - 'docker-bake.hcl'
-      - 'requirements-dev.txt'
-      - '.github/workflows/docker-publish.yml'
   schedule:
     # Weekly, so base image security updates land without anyone remembering.
     - cron: '17 6 * * 1'
@@ -26,7 +16,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: docker-publish
+  # Scoped per ref, not one global group. Every publish trigger (workflow_dispatch,
+  # schedule) runs on refs/heads/main, so publishes still serialize against each
+  # other; a pull_request check-images run gets its own lane and is never cancelled
+  # by a contending publish.
+  group: docker-publish-${{ github.ref }}
   # Publishing is not latency sensitive, and cancelling midway through the merge
   # would leave some images' :latest updated and others not.
   cancel-in-progress: false

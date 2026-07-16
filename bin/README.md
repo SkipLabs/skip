@@ -28,10 +28,11 @@ Convenience wrappers are provided for common workflows:
 
 ## Publish the CI images
 
-The images in the `ci` group of `docker-bake.hcl` are published to Docker Hub
-automatically by `.github/workflows/docker-publish.yml`, on demand, on merges to
-`main` that touch the files the images are built from, and weekly so base image
-security updates land without anyone remembering.
+The images in the `ci` group of `docker-bake.hcl` are published to Docker Hub by
+`.github/workflows/docker-publish.yml` — on demand (`workflow_dispatch`) and
+weekly, so base image security updates land without anyone remembering. Publish
+after landing an image-affecting change by triggering it manually; it does not
+publish automatically on merge.
 
 That group is the single source of truth: the workflow and
 `release_docker_ci_images.sh` both take their image list from it, and
