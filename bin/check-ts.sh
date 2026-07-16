@@ -23,3 +23,5 @@ do
         "$SCRIPT_DIR"/cd_sh "$dir" "npm run build --if-present$LINT"
     fi
 done
+
+# t 1836
