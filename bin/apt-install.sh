@@ -31,6 +31,18 @@ else
     steps=("$@")
 fi
 
+# Retry transient mirror fetch failures rather than aborting the whole build.
+# arm64 builds run under QEMU emulation and pull from ports.ubuntu.com, which
+# intermittently drops connections; without this a single dropped fetch fails
+# the entire apt-get and the multi-arch image build with it.
+#
+# Best effort: only written when the apt config dir is writable (i.e. running
+# as root, as in the Docker builds this targets). Retries are an optimisation,
+# so a non-root invocation should skip this rather than fail on it.
+if [ -w /etc/apt/apt.conf.d ]; then
+    echo 'Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries
+fi
+
 for step in "${steps[@]}"; do
     case "$step" in
         skiplang-build-deps)
