@@ -21,9 +21,29 @@ Convenience wrappers are provided for common workflows:
 
 - `build_docker_images.sh` — local build of all images
 - `build_prod_skdb_images.sh` — local production build (`--prod`)
-- `release_docker_ci_images.sh` — push CI images to Docker Hub
+- `release_docker_ci_images.sh` — push the published images to Docker Hub by hand
 - `release_docker_skdb.sh` — push skdb image
 - `release_docker_skdb_dev_server.sh` — interactive push of dev server
+- `check_ci_images.sh` — check that every image CircleCI pulls is one we publish
+
+## Publish the CI images
+
+The images in the `ci` group of `docker-bake.hcl` are published to Docker Hub
+automatically by `.github/workflows/docker-publish.yml`, on demand, on merges to
+`main` that touch the files the images are built from, and weekly so base image
+security updates land without anyone remembering.
+
+That group is the single source of truth: the workflow and
+`release_docker_ci_images.sh` both take their image list from it, and
+`check_ci_images.sh` asserts every image CircleCI pulls is in it. It holds
+toolchain images only — their final stages contain compiled binaries and apt
+packages but no repo source, so republishing them is not a release.
+
+`skdb` and `skdb-dev-server` are not in that group and stay manual: they bake in
+source and their tags carry release semantics.
+
+Use `release_docker_ci_images.sh` only when the workflow is unavailable. It
+publishes the same images from your machine, using your own credentials.
 
 ## Release NPM packages
 

@@ -1,0 +1,235 @@
+name: docker-publish
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.circleci/**'
+      - 'docker-bake.hcl'
+      - 'bin/check_ci_images.sh'
+      - '.github/workflows/docker-publish.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'Dockerfile'
+      - 'skiplang/Dockerfile'
+      - 'sql/Dockerfile'
+      - 'bin/apt-install.sh'
+      - 'docker-bake.hcl'
+      - 'requirements-dev.txt'
+      - '.github/workflows/docker-publish.yml'
+  schedule:
+    # Weekly, so base image security updates land without anyone remembering.
+    - cron: '17 6 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-publish
+  # Publishing is not latency sensitive, and cancelling midway through the merge
+  # would leave some images' :latest updated and others not.
+  cancel-in-progress: false
+
+env:
+  # setup-buildx-action's version input has no default, so without this we get
+  # whatever buildx the runner image happens to ship. `imagetools create`
+  # silently dropped attestations before v0.30.0, which is a failure we would
+  # only notice by auditing the registry.
+  BUILDX_VERSION: v0.35.0
+
+jobs:
+  check-images:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v4
+        with:
+          version: ${{ env.BUILDX_VERSION }}
+      - name: Check every image CircleCI pulls is published
+        shell: bash
+        run: ./bin/check_ci_images.sh
+
+  build:
+    needs: [check-images]
+    # Fork PRs get no secrets, so they would only fail; forks get no schedule.
+    if: github.repository == 'SkipLabs/skip' && github.event_name != 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux/amd64
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            platform: linux/arm64
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The compiler is built from source in the image, and its Makefile
+          # needs the pinned bootstrap and libbacktrace submodules.
+          submodules: true
+      - uses: docker/setup-buildx-action@v4
+        with:
+          version: ${{ env.BUILDX_VERSION }}
+      - uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Resolve images to publish
+        id: images
+        shell: bash
+        run: |
+          # Each runner pushes by digest, which needs a name with no tag, so
+          # replace each target's `skiplabs/foo:latest` with a bare repository.
+          # Derived from the bake "ci" group rather than listed here, so this
+          # workflow cannot disagree with docker-bake.hcl about what we publish.
+          {
+            echo 'set<<SETEOF'
+            docker buildx bake -f docker-bake.hcl --print ci |
+              jq -r '.group.ci.targets[] as $t
+                     | .target[$t].tags[0]
+                     | sub(":.*$"; "")
+                     | "\($t).tags=docker.io/\(.)"'
+            echo 'SETEOF'
+          } >> "$GITHUB_OUTPUT"
+          count=$(docker buildx bake -f docker-bake.hcl --print ci |
+            jq '.group.ci.targets | length')
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+      - name: Show disk space before build
+        shell: bash
+        run: df -h /
+      - name: Build and push by digest
+        id: bake
+        uses: docker/bake-action@v7
+        with:
+          # v6+ defaults to the git context, which would pick up neither the
+          # submodules checked out above nor .dockerignore.
+          source: .
+          files: ./docker-bake.hcl
+          targets: ci
+          # No cache backend is configured, so every layer is rebuilt; pull
+          # re-resolves the FROM refs, which is what makes a scheduled run
+          # actually pick up base image updates.
+          pull: true
+          # Matches bin/docker_build.sh, so images published either way carry
+          # the same attestations. mode=max records build args: do not pass
+          # secrets as build args.
+          provenance: mode=max
+          sbom: true
+          set: |
+            *.platform=${{ matrix.platform }}
+            *.output=type=image,push-by-digest=true,name-canonical=true,push=true
+            ${{ steps.images.outputs.set }}
+      - name: Collect pushed digests
+        shell: bash
+        env:
+          METADATA: ${{ steps.bake.outputs.metadata }}
+          EXPECTED: ${{ steps.images.outputs.count }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          mkdir -p /tmp/meta
+          # Two things in the metadata are not pushed images and must not be
+          # counted as such: buildx.build.warnings, which is not an object, and
+          # targets reached only as a named context dependency, which carry a
+          # build ref but no digest.
+          jq '[to_entries[]
+               | select(.value | type == "object"
+                        and has("containerimage.digest"))
+               | {image: .value["image.name"],
+                  digest: .value["containerimage.digest"]}]' \
+            <<< "$METADATA" > "/tmp/meta/$ARCH.json"
+          cat "/tmp/meta/$ARCH.json"
+          count=$(jq 'length' "/tmp/meta/$ARCH.json")
+          if [[ "$count" -ne "$EXPECTED" ]]; then
+            echo "::error::pushed $count image(s), expected $EXPECTED"
+            exit 1
+          fi
+      - name: Show disk space after build
+        if: always()
+        shell: bash
+        run: df -h /
+      - uses: actions/upload-artifact@v4
+        with:
+          name: metadata-${{ matrix.arch }}
+          path: /tmp/meta/${{ matrix.arch }}.json
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    needs: [build]
+    # Redundant with needs (build is guarded and a skipped need skips this job),
+    # but explicit so no future edit to build's guard can leak a publish here.
+    if: github.repository == 'SkipLabs/skip'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: /tmp/meta
+          pattern: metadata-*
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@v4
+        with:
+          # Load bearing here, not just in build: imagetools create runs from
+          # the CLI plugin this installs, and it is what preserves or drops the
+          # per-platform attestations.
+          version: ${{ env.BUILDX_VERSION }}
+      - uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Create multi-arch tags
+        shell: bash
+        run: |
+          shopt -s nullglob
+          files=(/tmp/meta/*.json)
+          platforms=${#files[@]}
+          if [[ "$platforms" -eq 0 ]]; then
+            echo "::error::no build metadata found"
+            exit 1
+          fi
+          jq -s 'add | group_by(.image)
+                 | map({image: .[0].image, digests: map(.digest)})' \
+            "${files[@]}" > /tmp/images.json
+          cat /tmp/images.json
+          # Check every image before publishing any of them. Interleaving the
+          # two would let an image that sorts early get its :latest updated
+          # before a later one fails, which is the split-state this is meant to
+          # prevent. Nothing has touched a :latest tag yet.
+          while IFS=$'\t' read -r image digests; do
+            read -r -a refs <<< "$digests"
+            if [[ "${#refs[@]}" -ne "$platforms" ]]; then
+              echo "::error::$image has ${#refs[@]} digest(s), expected $platforms"
+              exit 1
+            fi
+          done < <(jq -r '.[] | "\(.image)\t\(.digests | join(" "))"' /tmp/images.json)
+          while IFS=$'\t' read -r image digests; do
+            read -r -a refs <<< "$digests"
+            args=()
+            for d in "${refs[@]}"; do
+              args+=("$image@$d")
+            done
+            docker buildx imagetools create -t "$image:latest" "${args[@]}"
+          done < <(jq -r '.[] | "\(.image)\t\(.digests | join(" "))"' /tmp/images.json)
+      - name: Check attestations survived the merge
+        shell: bash
+        run: |
+          # Losing attestations in the merge is silent: the image still works,
+          # it just has no provenance. Each platform contributes its image
+          # manifest plus an attestation manifest, so assert both are there.
+          platforms=$(jq -r '.[0].digests | length' /tmp/images.json)
+          expected=$((platforms * 2))
+          while read -r image; do
+            raw=$(docker buildx imagetools inspect "$image:latest" --raw)
+            total=$(jq '.manifests | length' <<< "$raw")
+            attested=$(jq '[.manifests[]
+                            | select(.annotations["vnd.docker.reference.type"]
+                                     == "attestation-manifest")] | length' <<< "$raw")
+            echo "$image: $total manifest(s), $attested attestation(s)"
+            if [[ "$total" -ne "$expected" || "$attested" -ne "$platforms" ]]; then
+              echo "::error::$image: expected $expected manifests and $platforms attestations"
+              exit 1
+            fi
+          done < <(jq -r '.[].image' /tmp/images.json)

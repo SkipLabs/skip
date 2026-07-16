@@ -1,7 +1,12 @@
 #!/bin/bash
 
-# Build and push Docker images used in CI.
-# Image names are extracted from .circleci/base.yml so the two stay in sync.
+# Build and push the Docker images we publish, taken from the "ci" group in
+# docker-bake.hcl.
+#
+# .github/workflows/docker-publish.yml publishes the same group automatically,
+# and is the normal path. This is the manual escape hatch, for when the workflow
+# is broken or unavailable.
+#
 # Defaults to amd64,arm64 (matching release_docker.sh); use --arch to
 # override (e.g. --arch amd64).
 # Usage: release_docker_ci_images.sh [--dry-run] [--arch PLATFORMS]
@@ -13,13 +18,15 @@ REPO="$SCRIPT_DIR/.."
 
 export DOCKER_DEFAULT_ARCH="${DOCKER_DEFAULT_ARCH:-amd64,arm64}"
 
-# Extract unique skiplabs/ image names from CI config
+"$SCRIPT_DIR"/check_ci_images.sh
+
 mapfile -t images < <(
-    grep -oP 'image:\s+skiplabs/\K[^:\s]+' "$REPO/.circleci/base.yml" | sort -u
+    docker buildx bake -f "$REPO/docker-bake.hcl" --print ci |
+        jq -r '.group.ci.targets[]' | sort -u
 )
 
 if [[ ${#images[@]} -eq 0 ]]; then
-    echo "Error: no skiplabs/ images found in .circleci/base.yml" >&2
+    echo 'Error: bake group "ci" is empty' >&2
     exit 1
 fi
 

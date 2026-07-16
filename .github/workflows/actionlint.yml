@@ -21,6 +21,9 @@ jobs:
       - name: Install and run actionlint
         shell: bash
         run: |
+          # The version argument is required: the tag in the URL only selects
+          # the downloader script, which otherwise installs its own hardcoded
+          # default version rather than the one requested here.
           bash <(curl --proto '=https' --tlsv1.2 -sSf \
-            https://raw.githubusercontent.com/rhysd/actionlint/v1.7.7/scripts/download-actionlint.bash)
+            https://raw.githubusercontent.com/rhysd/actionlint/v1.7.7/scripts/download-actionlint.bash) 1.7.7
           ./actionlint -color
