@@ -19,11 +19,11 @@ repositories {
 }
 
 dependencies {
-  implementation("io.undertow:undertow-core:2.3.2.Final") // http/ws
+  implementation("io.undertow:undertow-core:2.3.26.Final") // http/ws
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
   implementation("org.java-websocket:Java-WebSocket:1.5.3")
 
-  implementation("com.fasterxml.jackson.core:jackson-databind:2.16.1") // json
+  implementation("com.fasterxml.jackson.core:jackson-databind:2.21.5") // json
 }
 
 // Apply a specific Java toolchain to ease working on different environments.
