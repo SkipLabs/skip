@@ -36,8 +36,20 @@ install: libskipruntime
 install-all: libskipruntime
 	../bin/cd_sh .. "npm install"
 
+# Like install-all but without the native libskipruntime build, for consumers
+# that only need the TypeScript sources installed (typecheck/lint/wasm), never
+# the native addon. --ignore-scripts skips the addon's node-gyp rebuild, which
+# would otherwise fail to link the (unbuilt) libskipruntime.so.
+.PHONY: install-all-no-native
+install-all-no-native:
+	../bin/cd_sh .. "npm install --ignore-scripts"
+
+# check-ts only runs tsc/eslint; neither loads the native addon (it is pulled in
+# at runtime via an untyped createRequire that the type-checker never resolves),
+# so building libskipruntime here is redundant with the skipruntime/-bun jobs
+# that do load it.
 .PHONY: check-ts
-check-ts: install-all
+check-ts: install-all-no-native
 	../bin/check-ts.sh
 
 .PHONY: build
