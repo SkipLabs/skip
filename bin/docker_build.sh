@@ -118,14 +118,6 @@ for img in ${IMAGES[@]+"${IMAGES[@]}"}; do
     fi
 done
 
-# The script appends to .dockerignore and restores it with `git restore`
-# on exit, which would silently discard uncommitted changes to that file.
-if ! git diff --quiet -- .dockerignore || ! git diff --cached --quiet -- .dockerignore; then
-    echo "Error: .dockerignore has uncommitted changes" >&2
-    echo "       (this script modifies it and restores it with git restore)" >&2
-    exit 1
-fi
-
 # --push-only reuses an existing builder and doesn't build, so skip
 # submodule validation.
 if ! $PUSH_ONLY; then
@@ -135,13 +127,63 @@ if ! $PUSH_ONLY; then
          (echo "Submodule $name needs update" && exit 1)'
 fi
 
-# Prepare .dockerignore — always needed for consistent build context
-# (--push-only must send the same context as the dry-run for cache hits)
-git clean -xd --dry-run | sed 's|Would remove |/|g' >> .dockerignore
-echo ".git" >> .dockerignore
+# Prepare the build context exclusions.
+#
+# The context must exclude everything git would clean (node_modules, target/,
+# build/, ...), or every build ships hundreds of MB of local artifacts. This
+# used to be done by appending to the tracked .dockerignore and restoring it
+# with `git restore` on exit, which meant a killed build (SIGKILL, OOM, a
+# stopped container -- none of which run the trap) left the file dirty and
+# every later run refusing to start.
+#
+# Instead, generate untracked sibling files. BuildKit reads
+# "<dockerfile>.dockerignore" *instead of* the root .dockerignore -- it is a
+# precedence, not a merge -- and resolves it per bake target, so each target
+# gets its own copy. Patterns are relative to the context root even when the
+# file lives in a subdirectory, so one root-relative body works for all of
+# them. The tracked file is never touched: nothing to restore, nothing to
+# repair, and a local edit to .dockerignore no longer blocks builds.
+#
+# '**/*.dockerignore' excludes the generated files from the context, and they
+# are filtered out of the body below (git clean lists them once they exist) so
+# that the body is identical on every run -- which is what keeps --push-only
+# hitting the cache from an earlier --dry-run.
+ignore_body=$(
+    cat .dockerignore
+    printf '%s\n' '**/*.dockerignore' '.git'
+    # sed -n '...p' (not grep) so a pristine tree, which prints nothing here,
+    # does not fail the pipeline under `set -o pipefail`.
+    git clean -xd --dry-run | sed -n 's|^Would remove |/|p' | sed '/\.dockerignore$/d'
+)
 
-# Clean up on exit: restore .dockerignore and tear down the buildx builder
-# when appropriate.
+# Ask bake which dockerfiles exist rather than hardcoding them. --print does
+# not need a working daemon. stderr is left attached so an HCL error is
+# visible instead of being swallowed.
+mapfile -t DOCKERFILES < <(
+    docker buildx bake -f docker-bake.hcl --print "${KNOWN_IMAGES[@]}" \
+        | grep -oP '"dockerfile":\s*"\K[^"]+' | sort -u
+)
+if [[ ${#DOCKERFILES[@]} -eq 0 ]]; then
+    echo "Error: could not enumerate dockerfiles from 'docker buildx bake --print'" >&2
+    exit 1
+fi
+# The optional per-user image below is built directly, not through bake.
+if [[ -f "${USER:-}/Dockerfile" ]]; then
+    DOCKERFILES+=("${USER:-}/Dockerfile")
+fi
+
+for df in "${DOCKERFILES[@]}"; do
+    printf '%s\n' "$ignore_body" > "$df.dockerignore.$$.tmp"
+    mv -f "$df.dockerignore.$$.tmp" "$df.dockerignore"
+done
+
+# Clean up on exit: tear down the buildx builder when appropriate.
+#
+# The generated *.dockerignore files are deliberately left in place. Removing
+# them would race a concurrent build that has generated but not yet read them,
+# and several targets `COPY . /skdb`, so a missing exclusion file bakes local
+# artifacts into the image rather than merely slowing the build. They are
+# gitignored and rewritten on every run.
 NAMED_BUILDER="skip-builder"
 BUILDX_BUILDER=""
 cleanup() {
@@ -149,7 +191,8 @@ cleanup() {
         docker buildx stop "$BUILDX_BUILDER"
         docker buildx rm "$BUILDX_BUILDER"
     fi
-    git restore .dockerignore
+    # Only this process's temp files; concurrent builds own theirs.
+    find . -name "*.dockerignore.$$.tmp" -delete 2>/dev/null || true
 }
 trap cleanup EXIT
 
