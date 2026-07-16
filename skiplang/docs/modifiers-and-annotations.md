@@ -363,6 +363,53 @@ ends.
 that a `native` declaration must carry one of the three. The actual intrinsic
 expansion is keyed off the function's *name*.
 
+#### `@cpp_extern` vs `@cpp_runtime`
+
+These two overlap almost entirely, and the prelude uses `@cpp_extern` about
+twenty times as often (≈130 vs ≈7), so `@cpp_extern` is the one to reach for by
+default. They share everything that matters at the call site: both mark the
+function native, discard any Skip body, emit an external LLVM *declaration*
+rather than a definition, default the symbol to `SKIP_` + the mangled name, and
+count as roots so the declaration is never dead-code eliminated.
+
+There is exactly one behavioural difference. A `@cpp_runtime` function that is
+also `native` and **non-generic** is registered in an internal name → function
+table, so a *later compiler pass can synthesise a call to it by its Skip name*
+even when nothing in the program visibly calls it. The comment at the
+registration site (`OuterIstToIR.sk`) states the intent:
+
+> Guarantee we create Functions for all native runtime functions, so later
+> stages of the compiler can look them up by name even if they aren't obviously
+> used until later (e.g. lowering).
+
+Only a handful of functions actually depend on this, and they are runtime hooks
+the compiler emits itself: coroutine lowering looks up `Awaitable.awaitableSuspend`,
+and const lowering looks up `print_last_exception_stack_trace_and_exit`. If one
+of those carried `@cpp_extern` instead, the pass that needs it would not find it.
+
+So, choosing between them:
+
+- Binding a plain external C, C++ or LLVM symbol — which is almost every native
+  declaration — use **`@cpp_extern`**.
+- A function the **compiler itself** must be able to call by name from a later
+  pass (a coroutine/const/lowering runtime hook) — use **`@cpp_runtime`**, and it
+  must be `native` and non-generic for the registration to take effect.
+
+Beyond that one mechanism, `@cpp_runtime` also reads as a convention marker for
+"this belongs to the Skip runtime library, and its Skip body is a portable
+reference implementation that the native back end replaces." `intern` (identity
+fallback) and `multiThreadedTabulate` (*"replaced in the native back end with one
+that actually uses threads"*) are written this way. Both are generic, so they get
+*only* the convention, not the registration — which is a good reminder that on a
+generic function `@cpp_runtime` and `@cpp_extern` are behaviourally identical, and
+the choice is purely stylistic.
+
+One shared gotcha worth repeating: because either annotation makes the function
+native, a Skip body on a `@cpp_runtime`/`@cpp_extern` function is silently
+discarded in this back end. That is exactly what makes the "portable fallback"
+pattern work — the body documents the semantics and serves other back ends — but
+it means the body you see is not the code that runs.
+
 ### Contracts on native functions
 
 | Annotation | Effect | Default if absent |
