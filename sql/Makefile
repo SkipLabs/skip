@@ -17,7 +17,10 @@ check-all: check-src check-tests
 
 .PHONY: build
 build:
-	${MAKE} -C ../skipruntime-ts install-all
+#	install-all-no-native only for its side effect of installing skdb/skdb-tests'
+#	npm deps (NPM_WORKSPACES excludes sql, so this is the target that covers them);
+#	nothing under sql/ links libskipruntime, so skip building it.
+	${MAKE} -C ../skipruntime-ts install-all-no-native
 	../bin/cd_sh .. "npm run build -w skdb -w skdb-tests"
 
 .PHONY: clean
