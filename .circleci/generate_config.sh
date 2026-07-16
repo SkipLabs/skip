@@ -83,6 +83,21 @@ if ${TS_CHANGED[skiplang/prelude]}; then
   TS_CHANGED[skipruntime-ts]=true
 fi
 
+# Shared build and dependency infrastructure that no single workspace or Skargo
+# package owns, so the allowlists above attribute it to no job. These paths feed
+# the npm install + libskipruntime build shared by the TS jobs (check-ts,
+# skipruntime, skipruntime-bun, skdb-wasm): the root lockfile pins compile inputs
+# such as node-addon-api (linked by skipruntime-ts/addon/binding.gyp), and the
+# Makefiles/bin scripts drive those builds. Without this a change to e.g. the
+# lockfile or skipruntime-ts/Makefile runs no CI at all, even though it can break
+# those builds -- so route it to the TS job set.
+if ! git diff --quiet HEAD "$BASE" -- \
+     Makefile package.json package-lock.json bin/ skipruntime-ts/Makefile; then
+  check_ts=true
+  TS_CHANGED[skipruntime-ts]=true
+  TS_CHANGED[sql]=true
+fi
+
 cat .circleci/base.yml
 
 JOBS=$(mktemp)
