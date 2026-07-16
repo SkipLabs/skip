@@ -26,7 +26,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: docker-publish
+  # Scoped per ref, not one global group. Every publish trigger (workflow_dispatch,
+  # schedule) runs on refs/heads/main, so publishes still serialize against each
+  # other; a pull_request check-images run gets its own lane and is never cancelled
+  # by a contending publish.
+  group: docker-publish-${{ github.ref }}
   # Publishing is not latency sensitive, and cancelling midway through the merge
   # would leave some images' :latest updated and others not.
   cancel-in-progress: false
