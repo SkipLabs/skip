@@ -87,8 +87,12 @@ class DirSub(
 /* Unique number generator. */
 /*****************************************************************************/
 
+// Untracked because it draws from a global counter: two identical calls must
+// not be merged, or the "unique" ids collide. @allow_tracked_call keeps the
+// tracked callers (Path::iid, skjson, the back end's type ids) compiling.
+@allow_tracked_call
 @cpp_extern("SKIP_genSym")
-native fun genSym(Int): Int;
+untracked native fun genSym(Int): Int;
 
 @intrinsic
 native fun const_typed_symbol<T>(): Int;
