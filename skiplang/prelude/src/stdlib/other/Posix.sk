@@ -1,44 +1,52 @@
 module Posix;
 
-@debug
+@allow_tracked_call
 @cpp_extern("SKIP_posix_open")
-native fun internalOpen(path: String, oflag: Int, mode: Int): Int;
+untracked native fun internalOpen(path: String, oflag: Int, mode: Int): Int;
 
 fun open(path: String, oflag: Int, mode: Int = 0): Int {
   internalOpen(path, oflag, mode)
 }
 
-@debug
+@allow_tracked_call
 @cpp_extern("SKIP_posix_close")
-native fun close(fd: Int): void;
+untracked native fun close(fd: Int): void;
 
-@debug
+@allow_tracked_call
 @cpp_extern("SKIP_posix_write")
-native fun write(fd: Int, buf: readonly Unsafe.Ptr<UInt8>, len: Int): Int;
+untracked native fun write(
+  fd: Int,
+  buf: readonly Unsafe.Ptr<UInt8>,
+  len: Int,
+): Int;
 
-@debug
+@allow_tracked_call
 @cpp_extern("SKIP_posix_read")
-native fun read(fd: Int, buf: mutable Unsafe.Ptr<UInt8>, len: Int): Int;
+untracked native fun read(
+  fd: Int,
+  buf: mutable Unsafe.Ptr<UInt8>,
+  len: Int,
+): Int;
 
-@debug
+@allow_tracked_call
 @cpp_extern("SKIP_posix_lseek")
-native fun internalLseek(fd: Int, offset: Int, whence: Int): Int;
+untracked native fun internalLseek(fd: Int, offset: Int, whence: Int): Int;
 
 fun lseek(fd: Int, offset: Int, whence: SeekWhence): Int {
   internalLseek(fd, offset, whence.toInt())
 }
 
-@debug
+@allow_tracked_call
 @cpp_extern("SKIP_posix_pipe")
-native fun pipe(): Pipe;
+untracked native fun pipe(): Pipe;
 
-@debug
+@allow_tracked_call
 @cpp_extern("SKIP_posix_dup")
-native fun dup(fd: Int): Int;
+untracked native fun dup(fd: Int): Int;
 
-@debug
+@allow_tracked_call
 @cpp_extern("SKIP_posix_dup2")
-native fun dup2(oldfd: Int, newfd: Int): void;
+untracked native fun dup2(oldfd: Int, newfd: Int): void;
 
 @cpp_extern("SKIP_posix_open_flags")
 native fun open_flags(
@@ -63,37 +71,37 @@ native fun wtermsig(stat_loc: Int): Int;
 @cpp_extern("SKIP_posix_wstopsig")
 native fun wstopsig(stat_loc: Int): Int;
 
-@debug
+@allow_tracked_call
 @cpp_extern("SKIP_posix_kill")
-native fun kill(pid: Int, sig: Int): void;
+untracked native fun kill(pid: Int, sig: Int): void;
 
-@debug
+@allow_tracked_call
 @cpp_extern("SKIP_posix_waitpid")
-native fun waitpid(pid: Int, nohang: Bool = false): Int;
+untracked native fun waitpid(pid: Int, nohang: Bool = false): Int;
 
-@debug
+@allow_tracked_call
 @cpp_extern("SKIP_posix_execvp")
-native fun internalExecvp(args: Array<String>): void;
+untracked native fun internalExecvp(args: Array<String>): void;
 
 fun execvp<T>(args: Array<String>): T {
   internalExecvp(args);
   invariant_violation("unreachable")
 }
 
-@debug
+@allow_tracked_call
 @cpp_extern("SKIP_posix_poll")
-native fun poll(pollfds: mutable Array<mutable Pollfd>): Int;
+untracked native fun poll(pollfds: mutable Array<mutable Pollfd>): Int;
 
-@debug
+@allow_tracked_call
 @cpp_extern("SKIP_posix_isatty")
-native fun internalIsatty(fd: Int): Int;
+untracked native fun internalIsatty(fd: Int): Int;
 fun isatty(fd: Int): Bool {
   internalIsatty(fd) != 0
 }
 
-@debug
+@allow_tracked_call
 @cpp_extern("SKIP_posix_mkstemp")
-native fun internalMkstemp(template: String): Int;
+untracked native fun internalMkstemp(template: String): Int;
 
 fun mkstemp(template: String): mutable IO.File {
   // TODO: Properly set filename.
@@ -449,9 +457,9 @@ mutable native class SpawnFileActions {
   mutable native fun close(fd: Int): void;
 }
 
-@debug
+@allow_tracked_call
 @cpp_extern("SKIP_posix_spawnp")
-native fun internalSpawnp(
+untracked native fun internalSpawnp(
   argv: Array<String>,
   env: Array<String>,
   file_actions: readonly SpawnFileActions,
