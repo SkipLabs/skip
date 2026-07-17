@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+ - `DepSafeOf<T>`, the dependency-safe form of `T` (#829)
+
+### Changed
+ - Use `DepSafeOf<T>` rather than `T & DepSafe` throughout the API, so that the
+   values returned by `Values`, `EagerCollection`, `LazyCollection` and `Reducer`
+   can be spread and destructured without a cast (#829)
+ - `Managed` is now a class rather than a type alias, and its mark is nominal, so
+   that spreading a dependency-safe object gives back a value that is statically
+   not dependency-safe. This matches the runtime, where the mark is
+   non-enumerable and does not survive the spread either (#829)
+
 ## [0.0.19] - 2025-11-16
 
 ### Added
