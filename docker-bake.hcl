@@ -25,18 +25,29 @@ group "default" {
 # publish. bin/check_ci_images.sh asserts that every skiplabs/ image CircleCI
 # pulls appears here.
 #
-# Toolchain images only. Their final stages contain compiled binaries and apt
+# Mostly toolchain images: their final stages contain compiled binaries and apt
 # packages but no repo source, so any commit on main can rebuild them and
-# republishing is not a release. skdb and skdb-dev-server are deliberately
-# absent: they bake in source and their tags carry release semantics, so they
-# stay manual.
+# republishing is not a release.
+#
+# skdb-dev-server is the exception. It bakes in source, so publishing it from
+# main IS a release of main, and its :latest tracks main rather than the last
+# tagged release. That is deliberate: left manual it went a year without a
+# rebuild and rotted to 1 critical / 18 high (#1363), and it is the only one of
+# these images that users actually run. A stale :latest is the worse failure.
+# Release-semantic tags (e.g. skdb-dev-server:quickstart) stay manual, via
+# bin/release_docker_skdb_dev_server.sh.
+#
+# skdb is absent but still gets rebuilt here, as a link-only dependency of
+# skdb-dev-server: bake forces such targets to output=cacheonly, so it is built
+# fresh and consumed but never pushed. Publishing skiplabs/skdb itself stays
+# manual.
 #
 # skiplang-bin-builder is published but never pulled by CI, which is why this
 # list cannot be derived from .circleci/ -- and why it went a year without a
 # rebuild (#1338).
 group "ci" {
   targets = [
-    "skiplang", "skiplang-bin-builder", "skip", "skdb-base",
+    "skiplang", "skiplang-bin-builder", "skip", "skdb-base", "skdb-dev-server",
   ]
 }
 
