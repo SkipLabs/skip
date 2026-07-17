@@ -3,13 +3,23 @@ module SkipRuntime;
 @cpp_extern("SkipRuntime_pushContext")
 native fun pushContext(context: mutable SKStore.Context): void;
 
+// Untracked because it pops the host context stack: it takes no arguments and
+// returns void, so without this two pops in straight-line code merge into one
+// and the stack leaks. (pushContext is safe by accident — its mutable argument
+// already blocks CSE.)
+@allow_tracked_call
 @cpp_extern("SkipRuntime_popContext")
-native fun popContext(): void;
+untracked native fun popContext(): void;
 
 @cpp_extern("SkipRuntime_getContext")
 native fun getContext(): ?mutable SKStore.Context;
 
+// Untracked because it reads host state that the TS side reassigns via
+// setFork(), which the compiler cannot see: two reads straddling a setFork
+// must not collapse onto the stale first value. (getContext is safe by
+// accident — its ?mutable Context return already blocks CSE.)
+@allow_tracked_call
 @cpp_extern("SkipRuntime_getFork")
-native fun getFork(): ?String;
+untracked native fun getFork(): ?String;
 
 module end;
