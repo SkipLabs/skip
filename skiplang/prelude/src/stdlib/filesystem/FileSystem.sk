@@ -8,10 +8,10 @@
 // Module for manipulating the Files and Directories.
 
 // TODO: What module should this go in?
-@debug
+@allow_tracked_call
 @cpp_extern("SKIP_getcwd")
 @may_alloc
-native fun getcwd(): String;
+untracked native fun getcwd(): String;
 
 base class FileKind uses Orderable {
   children =
@@ -67,19 +67,19 @@ fun writeTextFile(filename: String, contents: String): void {
   string_to_file(contents, filename);
 }
 
-@debug
+@allow_tracked_call
 @cpp_extern("SKIP_get_mtime")
-native fun getLastModificationTime(fileName: String): Int;
+untracked native fun getLastModificationTime(fileName: String): Int;
 
-@debug
+@allow_tracked_call
 @synonym("appendFile")
 @synonym("appendFileSync")
 @cpp_extern
-native fun appendTextFile(filename: String, contents: String): void;
+untracked native fun appendTextFile(filename: String, contents: String): void;
 
-@debug
+@allow_tracked_call
 @cpp_extern("SKIP_check_if_file_exists")
-native fun exists(filename: String): Bool;
+untracked native fun exists(filename: String): Bool;
 
 fun isDirectory(filename: String): Bool {
   is_directory(filename);
@@ -152,38 +152,41 @@ fun stat(path: String): ?FileStat {
   if (rc < 0) None() else Some(unsafe_chill_trust_me(result))
 }
 
-@debug
+@allow_tracked_call
 @cpp_extern("SKIP_file_stat")
-private native fun fillStat(result: mutable FileStat, path: String): Int;
+private untracked native fun fillStat(
+  result: mutable FileStat,
+  path: String,
+): Int;
 
 // TODO: Rename the C++ entrypoints and merge these into the
 // public API above.
-@debug
+@allow_tracked_call
 @cpp_extern
-private native fun .open_file(String): String;
+private untracked native fun .open_file(String): String;
 
-@debug
+@allow_tracked_call
 @cpp_extern
-private native fun .string_to_file(s: String, file: String): void;
+private untracked native fun .string_to_file(s: String, file: String): void;
 
-@debug
+@allow_tracked_call
 @cpp_extern("SKIP_is_directory")
-private native fun is_directory(filename: String): Bool;
+private untracked native fun is_directory(filename: String): Bool;
 
-@debug
+@allow_tracked_call
 @cpp_extern("SKIP_opendir")
-private native fun opendir(dirname: String): Int;
+private untracked native fun opendir(dirname: String): Int;
 
-@debug
+@allow_tracked_call
 @cpp_extern("SKIP_readdir")
-private native fun readdir(dirhandle: Int): String;
+private untracked native fun readdir(dirhandle: Int): String;
 
-@debug
+@allow_tracked_call
 @cpp_extern("SKIP_closedir")
-private native fun closedir(dirhandle: Int): void;
+private untracked native fun closedir(dirhandle: Int): void;
 
-@debug
+@allow_tracked_call
 @cpp_extern("SKIP_realpath")
-native fun realpath(path: String): String;
+untracked native fun realpath(path: String): String;
 
 module end;
