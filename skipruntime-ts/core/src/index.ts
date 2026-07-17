@@ -32,6 +32,7 @@ import {
   type NamedCollections,
   type Values,
   type DepSafe,
+  type DepSafeOf,
   type Reducer,
   type Resource,
   type SkipService,
@@ -246,7 +247,7 @@ class LazyCollectionImpl<K extends Json, V extends Json>
     Object.freeze(this);
   }
 
-  getArray(key: K): (V & DepSafe)[] {
+  getArray(key: K): DepSafeOf<V>[] {
     return this.refs
       .json()
       .importJSON(
@@ -254,10 +255,10 @@ class LazyCollectionImpl<K extends Json, V extends Json>
           this.lazyCollection,
           this.refs.json().exportJSON(key),
         ),
-      ) as (V & DepSafe)[];
+      ) as DepSafeOf<V>[];
   }
 
-  getUnique(key: K, _default?: { ifNone?: V; ifMany?: V }): V & DepSafe {
+  getUnique(key: K, _default?: { ifNone?: V; ifMany?: V }): DepSafeOf<V> {
     const values = this.getArray(key);
     switch (values.length) {
       case 1:
@@ -284,7 +285,7 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     Object.freeze(this);
   }
 
-  getArray(key: K): (V & DepSafe)[] {
+  getArray(key: K): DepSafeOf<V>[] {
     return this.refs
       .json()
       .importJSON(
@@ -292,10 +293,10 @@ class EagerCollectionImpl<K extends Json, V extends Json>
           this.collection,
           this.refs.json().exportJSON(key),
         ),
-      ) as (V & DepSafe)[];
+      ) as DepSafeOf<V>[];
   }
 
-  getUnique(key: K, _default?: { ifNone?: V; ifMany?: V }): V & DepSafe {
+  getUnique(key: K, _default?: { ifNone?: V; ifMany?: V }): DepSafeOf<V> {
     const values = this.getArray(key);
     switch (values.length) {
       case 1:
@@ -887,11 +888,11 @@ export class ServiceInstance {
   }
 }
 
-class ValuesImpl<T> implements Values<T> {
+class ValuesImpl<T extends Json> implements Values<T> {
   /* Lazy Iterable/Sequence: values are generated from
     the Iterator pointer and stored in materialized.
     Once finished the pointer is nullified. */
-  private readonly materialized: (T & DepSafe)[] = [];
+  private readonly materialized: DepSafeOf<T>[] = [];
 
   constructor(
     private readonly skjson: JsonConverter,
@@ -901,14 +902,14 @@ class ValuesImpl<T> implements Values<T> {
     this.pointer = pointer;
   }
 
-  private next(): Nullable<T & DepSafe> {
+  private next(): Nullable<DepSafeOf<T>> {
     if (this.pointer === null) {
       return null;
     }
 
     const v = this.skjson.importOptJSON(
       this.binding.SkipRuntime_NonEmptyIterator__next(this.pointer),
-    ) as Nullable<T & DepSafe>;
+    ) as Nullable<DepSafeOf<T>>;
 
     if (v === null) {
       this.pointer = null;
@@ -918,7 +919,7 @@ class ValuesImpl<T> implements Values<T> {
     return v;
   }
 
-  getUnique(_default?: { ifMany?: T }): T & DepSafe {
+  getUnique(_default?: { ifMany?: T }): DepSafeOf<T> {
     if (this.materialized.length < 1) {
       this.next();
     }
@@ -934,14 +935,14 @@ class ValuesImpl<T> implements Values<T> {
     return first;
   }
 
-  toArray(): (T & DepSafe)[] {
+  toArray(): DepSafeOf<T>[] {
     while (this.next() !== null);
     return this.materialized;
   }
 
-  [Symbol.iterator](): Iterator<T & DepSafe> {
+  [Symbol.iterator](): Iterator<DepSafeOf<T>> {
     let i = 0;
-    const next = (): IteratorResult<T & DepSafe> => {
+    const next = (): IteratorResult<DepSafeOf<T>> => {
       // Invariant: this.materialized.length >= i
       let value = this.materialized[i];
       if (value === undefined /* i.e. this.materialized.length == i */) {
@@ -1306,7 +1307,7 @@ export class ToBinding {
     return skjson.exportJSON(
       reducer.object.add(
         skacc ? (skjson.importJSON(skacc) as Json) : null,
-        skjson.importJSON(skvalue) as Json & DepSafe,
+        skjson.importJSON(skvalue) as DepSafeOf<Json>,
       ),
     );
   }
@@ -1320,7 +1321,7 @@ export class ToBinding {
     const reducer = this.handles.get(skreducer);
     const result = reducer.object.remove(
       skjson.importJSON(skacc) as Json,
-      skjson.importJSON(skvalue) as Json & DepSafe,
+      skjson.importJSON(skvalue) as DepSafeOf<Json>,
     );
     if (result === null) return null;
     return skjson.exportJSON(result);

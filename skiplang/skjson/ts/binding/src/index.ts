@@ -136,6 +136,9 @@ export function checkOrCloneParam<T>(value: T): T {
  * @param value - The object to deep-freeze.
  * @returns The same object that was passed in.
  */
+export function deepFreeze<T>(value: T): DepSafeOf<T>;
+// The implementation signature keeps the intersection form: TypeScript cannot
+// check a function body against a deferred conditional return type.
 export function deepFreeze<T>(value: T): T & DepSafe {
   if (
     typeof value == "boolean" ||
