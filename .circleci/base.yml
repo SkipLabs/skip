@@ -304,14 +304,15 @@ jobs:
           command: docker compose down --volumes
 
   # Aggregating gate: `generate_config.sh` makes this job depend on every other
-  # job it schedules, so `ci/circleci: all-checks` is a single, always-present
-  # status context that only passes once all triggered jobs pass. Make it a
-  # required check so auto-merge waits for the whole dynamically-generated set.
+  # job it schedules, so it is a single, always-present status context that only
+  # passes once all triggered jobs pass. It is the required check that auto-merge
+  # waits on, covering the whole dynamically-generated set.
+  #
+  # A `no-op` job needs no executor and consumes no credits. Note that under the
+  # GitHub OAuth integration, no-op jobs (unlike build jobs) report a context
+  # prefixed with the workflow name, so the required check is
+  # `ci/circleci: ci/all-checks`, not `ci/circleci: all-checks`. Changing this
+  # job's type, or the workflow name, renames that context and needs a matching
+  # branch protection update.
   all-checks:
-    docker:
-      - image: cimg/base:2025.01
-    resource_class: small
-    steps:
-      - run:
-          name: All triggered jobs passed
-          command: echo "All triggered CI jobs passed."
+    type: no-op

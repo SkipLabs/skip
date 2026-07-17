@@ -166,9 +166,10 @@ fi
 
 # Schedule every triggered job in a single `ci` workflow, gated by `all-checks`.
 # The gate depends on all of them, so its status context (`ci/circleci:
-# all-checks`) only turns green once every triggered job has passed. It is
-# always emitted -- even when no jobs are triggered -- so it is a stable required
-# check that branch protection / auto-merge can wait on regardless of the diff.
+# ci/all-checks` -- see the note on the job in base.yml) only turns green once
+# every triggered job has passed. It is always emitted -- even when no jobs are
+# triggered -- so it is a stable required check that branch protection /
+# auto-merge can wait on regardless of the diff.
 echo "workflows:"
 echo "  ci:"
 echo "    jobs:"
