@@ -378,8 +378,11 @@ base class MInfo {
 /* The class used for subscriptions. */
 /*****************************************************************************/
 
+// Untracked because it writes the notification file: the write IS the
+// notification, so two identical calls must not be merged into one.
+@allow_tracked_call
 @cpp_extern("SKIP_notify")
-native fun unixNotify(String, Int32): Int32;
+untracked native fun unixNotify(String, Int32): Int32;
 
 /*****************************************************************************/
 /* The map containing the new data. */
