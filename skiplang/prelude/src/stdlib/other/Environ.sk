@@ -40,17 +40,17 @@ fun current_exe(): String {
   invariant_violation("Could not determine main executable.")
 }
 
-@debug
+@allow_tracked_call
 @cpp_extern("SKIP_getcwd")
-native fun current_dir(): String;
+untracked native fun current_dir(): String;
 
 fun temp_dir(): String {
   varOpt("TMPDIR").default("/tmp")
 }
 
-@debug
+@allow_tracked_call
 @cpp_extern("SKIP_chdir")
-native fun set_current_dir(path: String): void;
+untracked native fun set_current_dir(path: String): void;
 
 @cpp_extern("SKIP_getArgc")
 native fun internalGetArgc(): Int;
@@ -65,13 +65,13 @@ fun args(): mutable Iterator<String> {
   }
 }
 
-@debug
+@allow_tracked_call
 @cpp_extern("SKIP_get_envc")
-native fun internalGetEnvc(): Int;
+untracked native fun internalGetEnvc(): Int;
 
-@debug
+@allow_tracked_call
 @cpp_extern("SKIP_get_envN")
-native fun internalGetEnvN(n: Int): String;
+untracked native fun internalGetEnvN(n: Int): String;
 
 fun vars(): mutable Iterator<(String, String)> {
   envc = internalGetEnvc();
@@ -90,9 +90,9 @@ fun internalCreateNoneStringOption(): ?String {
   None()
 }
 
-@debug
+@allow_tracked_call
 @cpp_extern("SKIP_getenv")
-native fun varOpt(name: String): ?String;
+untracked native fun varOpt(name: String): ?String;
 
 class VarError(name: String) extends Exception {
   fun getMessage(): String {
@@ -107,12 +107,12 @@ fun var(name: String): String {
   }
 }
 
-@debug
+@allow_tracked_call
 @cpp_extern("SKIP_setenv")
-native fun set_var(name: String, value: String): void;
+untracked native fun set_var(name: String, value: String): void;
 
-@debug
+@allow_tracked_call
 @cpp_extern("SKIP_unsetenv")
-native fun remove_var(name: String): void;
+untracked native fun remove_var(name: String): void;
 
 module end;
