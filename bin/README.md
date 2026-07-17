@@ -36,12 +36,27 @@ publish automatically on merge.
 
 That group is the single source of truth: the workflow and
 `release_docker_ci_images.sh` both take their image list from it, and
-`check_ci_images.sh` asserts every image CircleCI pulls is in it. It holds
-toolchain images only — their final stages contain compiled binaries and apt
-packages but no repo source, so republishing them is not a release.
+`check_ci_images.sh` asserts every image CircleCI pulls is in it. Most of it is
+toolchain images — their final stages contain compiled binaries and apt packages
+but no repo source, so republishing them is not a release.
 
-`skdb` and `skdb-dev-server` are not in that group and stay manual: they bake in
-source and their tags carry release semantics.
+`skdb-dev-server` is the exception, and the one image here users actually run. It
+bakes in source, so publishing it from main **is** a release of main:
+`skdb-dev-server:latest` tracks main as of the last publish, not the last tagged
+release. That trade is deliberate — left manual it went a year without a rebuild
+and rotted to 1 critical / 18 high severity advisories, on the image users run.
+
+`skdb-dev-server:quickstart` still carries release semantics and stays manual, via
+`release_docker_skdb_dev_server.sh`. Do not reach for it as the "safe" alternative
+to `:latest`: nothing refreshes it either, and it has not been rebuilt since
+2024-01-30, so it is further behind on security fixes than the `:latest` this
+group now keeps current. A pinned tag is only safer than a moving one if somebody
+re-cuts it.
+
+`skdb` is not in the group, so `skiplabs/skdb` is still published by hand. It is
+rebuilt on every publish anyway, as a link-only dependency of `skdb-dev-server`:
+bake forces such targets to `output=cacheonly`, so it is built fresh and consumed
+but never pushed.
 
 Use `release_docker_ci_images.sh` only when the workflow is unavailable. It
 publishes the same images from your machine, using your own credentials.
