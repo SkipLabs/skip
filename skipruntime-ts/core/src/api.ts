@@ -10,10 +10,11 @@ import type {
   Json,
   JsonObject,
   DepSafe,
+  DepSafeOf,
 } from "../skiplang-json/index.js";
 
 export * from "./errors.js";
-export type { Managed, Json, JsonObject, Opaque, DepSafe };
+export type { Managed, Json, JsonObject, Opaque, DepSafe, DepSafeOf };
 export { deepFreeze } from "../skiplang-json/index.js";
 export type { Nullable };
 
@@ -67,7 +68,7 @@ export interface Reducer<V extends Json, A extends Json> {
    * @param value - The added value.
    * @returns The updated accumulated value.
    */
-  add(accum: Nullable<A>, value: V & DepSafe): A;
+  add(accum: Nullable<A>, value: DepSafeOf<V>): A;
 
   /**
    * Exclude a previously added value from the accumulated value.
@@ -81,25 +82,25 @@ export interface Reducer<V extends Json, A extends Json> {
    * @param value - The removed value.
    * @returns The updated accumulated value, or `null` indicating that the accumulated value should be recomputed using `add` and `initial`.
    */
-  remove(accum: A, value: V & DepSafe): Nullable<A>;
+  remove(accum: A, value: DepSafeOf<V>): Nullable<A>;
 }
 
 /**
  * A non-empty iterable sequence of dependency-safe values.
  */
-export interface Values<T> extends Iterable<T & DepSafe> {
+export interface Values<T> extends Iterable<DepSafeOf<T>> {
   /**
    * Return the first value, if there is exactly one.
    * @param _default
    * @param _default.ifMany - Default value to use instead of throwing if there are multiple values.
    * @throws {SkipNonUniqueValueError} if this iterable contains multiple values.
    */
-  getUnique(_default?: { ifMany?: T }): T & DepSafe;
+  getUnique(_default?: { ifMany?: T }): DepSafeOf<T>;
 
   /**
    * Return all the values.
    */
-  toArray(): (T & DepSafe)[];
+  toArray(): DepSafeOf<T>[];
 }
 
 /**
@@ -118,7 +119,7 @@ export interface LazyCollection<K extends Json, V extends Json>
    * @param key - The key to query.
    * @returns The values associated to `key`.
    */
-  getArray(key: K): (V & DepSafe)[];
+  getArray(key: K): DepSafeOf<V>[];
 
   /**
    * Get (and potentially compute) the single value associated to `key`.
@@ -132,7 +133,7 @@ export interface LazyCollection<K extends Json, V extends Json>
    * @returns The value associated to `key`.
    * @throws {SkipNonUniqueValueError} if `key` is associated to either zero or multiple values and no suitable default is provided.
    */
-  getUnique(key: K, _default?: { ifNone?: V; ifMany?: V }): V & DepSafe;
+  getUnique(key: K, _default?: { ifNone?: V; ifMany?: V }): DepSafeOf<V>;
 }
 
 /**
@@ -151,7 +152,7 @@ export interface EagerCollection<K extends Json, V extends Json>
    * @param key - The key to query.
    * @returns The values associated to `key`.
    */
-  getArray(key: K): (V & DepSafe)[];
+  getArray(key: K): DepSafeOf<V>[];
 
   /**
    * Get the single value associated to a key.
@@ -165,7 +166,7 @@ export interface EagerCollection<K extends Json, V extends Json>
    * @returns The value associated to `key`.
    * @throws {SkipNonUniqueValueError} if `key` is associated to either zero or multiple values and no suitable default is provided.
    */
-  getUnique(key: K, _default?: { ifNone?: V; ifMany?: V }): V & DepSafe;
+  getUnique(key: K, _default?: { ifNone?: V; ifMany?: V }): DepSafeOf<V>;
 
   /**
    * Create a new eager collection by mapping a function over the values in this one.
@@ -262,7 +263,7 @@ export interface EagerCollection<K extends Json, V extends Json>
    * @param end - The greatest key whose entry will be kept in the result.
    * @returns The restricted eager collection.
    */
-  slice(start: K & DepSafe, end: K & DepSafe): EagerCollection<K, V>;
+  slice(start: DepSafeOf<K>, end: DepSafeOf<K>): EagerCollection<K, V>;
 
   /**
    * Create a new eager collection by keeping only the elements whose keys are in at least one of the given ranges.
@@ -272,7 +273,7 @@ export interface EagerCollection<K extends Json, V extends Json>
    * @param ranges - The pairs of lower and upper bounds on keys to keep in the result.
    * @returns The restricted eager collection.
    */
-  slices(...ranges: [K & DepSafe, K & DepSafe][]): EagerCollection<K, V>;
+  slices(...ranges: [DepSafeOf<K>, DepSafeOf<K>][]): EagerCollection<K, V>;
 
   /**
    * Create a new eager collection by keeping the first entries.
