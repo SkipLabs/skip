@@ -89,6 +89,21 @@ export type DepSafe =
   | symbol
   | Managed;
 
+/**
+ * The dependency-safe form of `T`.
+ *
+ * Object types are marked `Managed`, while primitives are already dependency-safe and pass through unchanged.
+ *
+ * This exists because `DepSafe` is a union, so it cannot usefully be intersected with an object type: for an object type `T`, `T & DepSafe` keeps arms such as `T & string`, which TypeScript does not consider object types, and so it rejects spreading or destructuring the result.
+ * `DepSafeOf<T>` narrows to `T & Managed` instead, which spreads.
+ *
+ * Spreading a dependency-safe object gives back a plain object, not a dependency-safe one: the `Managed` mark is nominal, and TypeScript drops it from the spread result just as the runtime does.
+ * That is intended -- `{...deps, k: v}` is a fresh, unfrozen object -- so pass it to `deepFreeze` before using it as a `Mapper` or `Reducer` parameter.
+ *
+ * @typeParam T - Type of the value.
+ */
+export type DepSafeOf<T> = T extends object ? T & Managed : T;
+
 export function checkOrCloneParam<T>(value: T): T {
   if (
     typeof value == "boolean" ||
