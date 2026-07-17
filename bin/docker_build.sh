@@ -163,9 +163,19 @@ ignore_body=$(
 # Ask bake which dockerfiles exist rather than hardcoding them. --print does
 # not need a working daemon. stderr is left attached so an HCL error is
 # visible instead of being swallowed.
-mapfile -t DOCKERFILES < <(
+#
+# Portable on purpose: avoid `mapfile` (bash 4+, absent from macOS's stock
+# /bin/bash 3.2) and `grep -P`/`\K` (GNU-only, absent from BSD grep) so this
+# runs the same under either toolchain, not just whatever happens to be
+# first on the invoking shell's PATH.
+DOCKERFILES=()
+while IFS= read -r df; do
+    DOCKERFILES+=("$df")
+done < <(
     docker buildx bake -f docker-bake.hcl --print "${KNOWN_IMAGES[@]}" \
-        | grep -oP '"dockerfile":\s*"\K[^"]+' | sort -u
+        | grep -o '"dockerfile":[[:space:]]*"[^"]*"' \
+        | sed -E 's/^"dockerfile":[[:space:]]*"([^"]*)"$/\1/' \
+        | sort -u
 )
 if [[ ${#DOCKERFILES[@]} -eq 0 ]]; then
     echo "Error: could not enumerate dockerfiles from 'docker buildx bake --print'" >&2
