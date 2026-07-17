@@ -75,19 +75,26 @@ class RuntimeError(msg: String) extends Exception {
   }
 }
 
+// The three below read and write a single thread-local slot, so they are
+// untracked: they take no arguments (or a frozen one) and return frozen
+// types, which is everything CSE needs to merge two identical calls. Merging
+// two getExn() reads that straddle a write silently yields the stale value.
+@allow_tracked_call
 @cpp_extern("SKIP_getExn")
-native fun getExn(): Exception;
+untracked native fun getExn(): Exception;
 
 @export("SKIP_call0")
 fun call0(f: () -> void): void {
   f()
 }
 
+@allow_tracked_call
 @cpp_runtime
-native fun saveExn(exn: Exception): void;
+untracked native fun saveExn(exn: Exception): void;
 
+@allow_tracked_call
 @cpp_extern
-native fun replaceExn(exn: Exception): void;
+untracked native fun replaceExn(exn: Exception): void;
 
 class ExternalException(
   private eptr: SKStore.ExternalPointer,
