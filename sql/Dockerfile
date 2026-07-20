@@ -2,7 +2,7 @@ FROM skiplabs/skip AS base
 
 ARG TARGETARCH
 
-# Install system deps, Java 21 (Adoptium Temurin), and Gradle 9.3.1.
+# Install system deps, Java 21 (Adoptium Temurin), and Gradle 9.6.1.
 # The .sdkman stub dirs below are a build-time sentinel that lets
 # sql/ts/tests/service_common.mk skip its SDKMAN install (Java here comes
 # from apt above). Its version string only has to match that Makefile — it
@@ -18,10 +18,10 @@ RUN --mount=type=cache,id=apt-cache-$TARGETARCH,target=/var/cache/apt,sharing=lo
     apt-get install -q -y --no-install-recommends curl sqlite3 unzip zip temurin-21-jdk && \
     npm install -g bun && \
     npx playwright install-deps && \
-    curl -sL https://services.gradle.org/distributions/gradle-9.3.1-bin.zip -o /tmp/gradle.zip && \
+    curl -sL https://services.gradle.org/distributions/gradle-9.6.1-bin.zip -o /tmp/gradle.zip && \
     unzip -q /tmp/gradle.zip -d /opt && \
     rm /tmp/gradle.zip && \
-    ln -s /opt/gradle-9.3.1/bin/gradle /usr/local/bin/gradle && \
+    ln -s /opt/gradle-9.6.1/bin/gradle /usr/local/bin/gradle && \
     mkdir -p /root/.sdkman/bin \
       /root/.sdkman/candidates/java/20.0.2-tem \
       /root/.sdkman/candidates/gradle && \
