@@ -137,7 +137,7 @@ mutable class BuildRunner(
       // so they must be included in the fingerprint.
       if (
         unit.target.kind is LibTarget(LibraryTypeSklib _) &&
-        should_merge(unit.profile, unit.pkg.manifest)
+        should_merge_unit(unit, this.bctx.ws.package)
       ) {
         unit.pkg.manifest.test_target().each(t -> !srcs = srcs.concat(t.srcs));
       };
@@ -416,7 +416,7 @@ mutable class BuildRunner(
     // __merged (and all hardlinked bins/test) can link against it.
     if (
       unit.target.kind is LibTarget(LibraryTypeSklib _) &&
-      should_merge(unit.profile, unit.pkg.manifest)
+      should_merge_unit(unit, this.bctx.ws.package)
     ) {
       unit.pkg.manifest.test_target().each(t -> skc.args(t.srcs));
       dispatcher_path = this.generate_dispatcher(unit);
