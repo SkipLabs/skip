@@ -25,6 +25,7 @@ Convenience wrappers are provided for common workflows:
 - `release_docker_skdb.sh` — push skdb image
 - `release_docker_skdb_dev_server.sh` — interactive push of dev server
 - `check_ci_images.sh` — check that every image CircleCI pulls is one we publish
+- `check_push_access.sh` — check the Docker Hub credentials can push every published image
 
 ## Publish the CI images
 
@@ -57,6 +58,13 @@ re-cuts it.
 rebuilt on every publish anyway, as a link-only dependency of `skdb-dev-server`:
 bake forces such targets to `output=cacheonly`, so it is built fresh and consumed
 but never pushed.
+
+Adding an image to that group also needs the Docker Hub credentials to be able
+to push it — an existing repository is not enough if the token is scoped to a
+list. The workflow checks this up front (`check_push_access.sh`) and fails in
+seconds rather than after building everything, because Docker Hub grants a token
+with the scopes you have instead of refusing the ones you don't, so a missing
+push right otherwise only surfaces at the final push.
 
 Use `release_docker_ci_images.sh` only when the workflow is unavailable. It
 publishes the same images from your machine, using your own credentials.

@@ -44,8 +44,26 @@ jobs:
         shell: bash
         run: ./bin/check_ci_images.sh
 
-  build:
+  check-push-access:
     needs: [check-images]
+    # Needs the secrets, so it carries the same guard as build: fork PRs get
+    # none, and a skipped job skips build below it.
+    if: github.repository == 'SkipLabs/skip' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v4
+        with:
+          version: ${{ env.BUILDX_VERSION }}
+      - name: Check the credentials can push every published image
+        shell: bash
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: ./bin/check_push_access.sh
+
+  build:
+    needs: [check-images, check-push-access]
     # Fork PRs get no secrets, so they would only fail; forks get no schedule.
     if: github.repository == 'SkipLabs/skip' && github.event_name != 'pull_request'
     strategy:
