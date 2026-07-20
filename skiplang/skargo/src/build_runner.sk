@@ -137,7 +137,7 @@ mutable class BuildRunner(
       // so they must be included in the fingerprint.
       if (
         unit.target.kind is LibTarget(LibraryTypeSklib _) &&
-        should_merge(unit.profile, unit.pkg.manifest)
+        should_merge_unit(unit, this.bctx.ws.package)
       ) {
         unit.pkg.manifest.test_target().each(t -> !srcs = srcs.concat(t.srcs));
       };
@@ -416,7 +416,7 @@ mutable class BuildRunner(
     // __merged (and all hardlinked bins/test) can link against it.
     if (
       unit.target.kind is LibTarget(LibraryTypeSklib _) &&
-      should_merge(unit.profile, unit.pkg.manifest)
+      should_merge_unit(unit, this.bctx.ws.package)
     ) {
       unit.pkg.manifest.test_target().each(t -> skc.args(t.srcs));
       dispatcher_path = this.generate_dispatcher(unit);
@@ -723,13 +723,28 @@ private fun hash_of(
       dep_hashes.push(hash_of(dep, bctx, out))
     };
 
-    out.set(unit, compute_hash(unit, dep_hashes.collect(Array)))
+    out.set(
+      unit,
+      compute_hash(
+        unit,
+        dep_hashes.collect(Array),
+        should_merge_unit(unit, bctx.ws.package),
+      ),
+    )
   };
 
   out[unit]
 }
 
-private fun compute_hash(unit: Unit, dep_hashes: Array<Int>): Int {
+// NOTE: `merged` is part of the artifact's identity, not just of its
+// freshness: a merged library additionally embeds the package's test sources
+// and the generated dispatcher, so the same package built as the workspace
+// package and as a dependency must not share an `.sklib`.
+private fun compute_hash(
+  unit: Unit,
+  dep_hashes: Array<Int>,
+  merged: Bool,
+): Int {
   (
     unit.pkg.manifest.package_id,
     dep_hashes,
@@ -739,6 +754,7 @@ private fun compute_hash(unit: Unit, dep_hashes: Array<Int>): Int {
     unit.target.name,
     unit.target.kind,
     unit.build_opts,
+    merged,
   ).hash()
 }
 

@@ -98,6 +98,14 @@ fun should_merge(profile: String, manifest: Manifest): Bool {
   profile == "dev" && manifest.has_bins()
 }
 
+// Merging only ever applies to the workspace package. A dependency is built as
+// a plain library, even when it declares bins of its own: giving it the test
+// sources and the generated `SkipInternal.dispatch` shim would make every such
+// dependency define `dispatch`, and linking two of them collides.
+fun should_merge_unit(unit: Unit, ws_package: Package): Bool {
+  unit.pkg == ws_package && should_merge(unit.profile, unit.pkg.manifest)
+}
+
 // TODO: Return Result<...>
 fun create_bctx(
   gctx: GlobalContext,
@@ -121,7 +129,7 @@ fun create_bctx(
     opts.build_config,
     target_data.target_triple_for_arch(TargetArchHost()),
   );
-  unit_graph = build_unit_dependencies(roots, resolved_packages);
+  unit_graph = build_unit_dependencies(roots, resolved_packages, ws.package);
   target_dir = ws.target_dir();
   BuildContext{
     ws,
@@ -248,10 +256,16 @@ private fun find_named_target(
 fun build_unit_dependencies(
   roots: Array<Unit>,
   resolved_packages: Map<String, Package>,
+  ws_package: Package,
 ): UnitGraph {
   unit_graph = mutable UnitGraph[];
   for (unit in roots) {
-    build_unit_dependencies_for_unit(unit, resolved_packages, unit_graph)
+    build_unit_dependencies_for_unit(
+      unit,
+      resolved_packages,
+      ws_package,
+      unit_graph,
+    )
   };
 
   unit_graph.chill()
@@ -260,6 +274,7 @@ fun build_unit_dependencies(
 private fun build_unit_dependencies_for_unit(
   unit: Unit,
   resolved_packages: Map<String, Package>,
+  ws_package: Package,
   unit_graph: mutable UnitGraph,
   parents: List<Unit> = List.Nil(),
 ): void {
@@ -274,12 +289,13 @@ private fun build_unit_dependencies_for_unit(
     return void
   };
 
-  unit_deps = compute_deps(unit, resolved_packages);
+  unit_deps = compute_deps(unit, resolved_packages, ws_package);
   unit_graph![unit] = unit_deps;
   for (dep in unit_deps) {
     build_unit_dependencies_for_unit(
       dep,
       resolved_packages,
+      ws_package,
       unit_graph,
       List.Cons(unit, parents),
     )
@@ -289,6 +305,7 @@ private fun build_unit_dependencies_for_unit(
 private fun compute_deps(
   unit: Unit,
   resolved_packages: Map<String, Package>,
+  ws_package: Package,
 ): Array<Unit> {
   if (
     unit.target.kind is CustomBuildTarget _ &&
@@ -351,8 +368,7 @@ private fun compute_deps(
     | BinTarget _ -> false
     | LibTarget _ ->
       dep.kind is NormalDep _ ||
-        (should_merge(unit.profile, unit.pkg.manifest) &&
-          dep.kind is DevelopmentDep _)
+        (should_merge_unit(unit, ws_package) && dep.kind is DevelopmentDep _)
     | TestTarget _ -> dep.kind is DevelopmentDep _
     | CustomBuildTarget _ -> dep.kind is BuildDep _
     | HardlinkTarget _ -> false

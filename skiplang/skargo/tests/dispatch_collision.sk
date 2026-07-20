@@ -1,0 +1,78 @@
+module alias T = SKTest;
+
+module SkargoDispatchTests;
+
+const kManifestDir: String = #env ("SKARGO_MANIFEST_DIR");
+
+private fun write_file(path: String, contents: String): void {
+  _ = system(`mkdir -p ${Path.dirname(path)}`);
+  FileSystem.writeTextFile(path, contents)
+}
+
+private fun package_toml(
+  name: String,
+  prelude: String,
+  deps: Array<String>,
+): String {
+  dep_lines = deps.map(d -> `${d} = { path = "../${d}" }\n`).join("");
+  `[package]\nname = "${name}"\nversion = "0.1.0"\n\n[dependencies]\nstd = { path = "${prelude}" }\n${dep_lines}\n[[bin]]\nname = "${name}"\nmain = "${name.uppercase()}.main"\n`
+}
+
+// Regression test for #1378: in the dev profile, `skargo` merges a package's
+// bin and test targets into a single binary dispatched at runtime by a
+// generated `SkipInternal.dispatch`. That shim used to be compiled into *every*
+// library whose package declared a bin, dependencies included, so as soon as
+// two such libraries were linked together the build failed with
+// `Name already bound: dispatch`.
+//
+// The smallest trigger is two bin-declaring packages anywhere in the dependency
+// closure, counting the root: an `app` with a `[[bin]]` depending on a `dep`
+// with a `[[bin]]`.
+@test
+fun test_bin_declaring_dependency_dev_build(): void {
+  // Only meaningful in the dev profile, where the merged binary that runs this
+  // test is also a full `skargo` and can be re-executed as one.
+  if (Environ.varOpt("SKARGO_BIN") != Some("test")) {
+    print_string(
+      "skipping: merged-mode only, run `skargo test` in the dev profile",
+    );
+    return void
+  };
+
+  skargo = Environ.current_exe();
+  prelude = Path.join(Path.dirname(kManifestDir), "prelude");
+  root = Path.join(kManifestDir, "target", "it-dispatch-collision");
+  _ = system(`rm -rf ${root}`);
+
+  write_file(
+    Path.join(root, "dep", "Skargo.toml"),
+    package_toml("dep", prelude, Array[]),
+  );
+  write_file(
+    Path.join(root, "dep", "src/lib.sk"),
+    "module DEP;\nfun main(): void {\n  void\n}\nmodule end;\n",
+  );
+  write_file(
+    Path.join(root, "app", "Skargo.toml"),
+    package_toml("app", prelude, Array["dep"]),
+  );
+  write_file(
+    Path.join(root, "app", "src/main.sk"),
+    "module APP;\nfun main(): void {\n  void\n}\nmodule end;\n",
+  );
+
+  proc = Posix.Popen::create{
+    args => Array[skargo, "build"],
+    // Route the merged binary to `skargo` rather than to this test harness.
+    env => Map["SKARGO_BIN" => "skargo"],
+    cwd => Some(Path.join(root, "app")),
+    stdout => true,
+    stderr => true,
+  }.fromSuccess();
+  _out = proc.stdout.fromSome().read_to_string().fromSuccess();
+  err = proc.stderr.fromSome().read_to_string().fromSuccess();
+
+  T.expectTrue(proc.wait().success(), `dev-profile build failed:\n${err}`)
+}
+
+module end;
