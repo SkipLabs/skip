@@ -26,6 +26,7 @@ RUN --mount=type=cache,id=apt-cache-$TARGETARCH,target=/var/cache/apt,sharing=lo
     apt-get install --quiet --yes --no-install-recommends \
         clang-${LLVM_VERSION} \
         llvm-${LLVM_VERSION} \
+        llvm-${LLVM_VERSION}-dev \
         lld-${LLVM_VERSION} && \
     update-alternatives \
       --install /usr/bin/clang clang /usr/bin/clang-${LLVM_VERSION} 101 \
