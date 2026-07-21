@@ -244,8 +244,7 @@ fun tailSub(
     }
   };
 
-  loop {
-    localObstack = SKStore.newObstack();
+  SKStore.withRegionLoop(() -> {
     tick = SKStore.withContext<?Int>(context -> {
       context.getSession(sessionID) match {
       | None() ->
@@ -352,43 +351,41 @@ fun tailSub(
     };
     !init = false;
 
-    !tailWatermark = tick match {
+    tick match {
     // if we cannot follow changes from here - regardless of whether
     // we want to - this is a failure to honour the request. i.e.
     // the since value is too far in the past. the user should be
     // made aware and take action, probably using the rebuild
-    // mechanism.
-    | None() -> break false
-    | Some(_) -> tick
-    };
+    // mechanism. Stop the loop with false.
+    | None() -> Some(false)
+    | Some(_) ->
+      !tailWatermark = tick;
 
-    lock = SKStore.unfreezeLock(sub.lock);
-    cond = SKStore.unfreezeCond(sub.cond);
-    SKStore.mutexLock(lock);
-    while ({
-      SKStore.withContext(newContext -> {
-        shouldWait =
-          follow &&
-          !tailShouldWake(
-            newContext,
-            sub,
-            SKStore.Tick(tailWatermark.fromSome()),
-            userIDOpt,
-          );
-        shouldWait
-      })
-    }) {
-      timeoutSecs = 10;
-      _ = SKStore.condTimedWait(cond, lock, UInt32::truncate(timeoutSecs));
-      print_raw(":" + tailWatermark.fromSome().toString() + "\n");
-      flushStdout();
-    };
-    SKStore.mutexUnlock(lock);
-    SKStore.destroyObstack(localObstack);
-    if (!follow) {
-      break true
+      lock = SKStore.unfreezeLock(sub.lock);
+      cond = SKStore.unfreezeCond(sub.cond);
+      SKStore.mutexLock(lock);
+      while ({
+        SKStore.withContext(newContext -> {
+          shouldWait =
+            follow &&
+            !tailShouldWake(
+              newContext,
+              sub,
+              SKStore.Tick(tailWatermark.fromSome()),
+              userIDOpt,
+            );
+          shouldWait
+        })
+      }) {
+        timeoutSecs = 10;
+        _ = SKStore.condTimedWait(cond, lock, UInt32::truncate(timeoutSecs));
+        print_raw(":" + tailWatermark.fromSome().toString() + "\n");
+        flushStdout();
+      };
+      SKStore.mutexUnlock(lock);
+      if (!follow) Some(true) else None()
     }
-  }
+  })
 }
 
 module end;
