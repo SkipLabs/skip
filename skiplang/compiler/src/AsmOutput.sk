@@ -420,13 +420,21 @@ mutable class AsmDef{
       };
 
       // Locate the next upcoming special value.
+      //
+      // linkageOffset must be a candidate too, otherwise the cursor never
+      // stops there and the linkage keyword is never written. The `> i` guard
+      // both skips it once passed -- so the trailing writeExternal() below
+      // still returns Int::max -- and handles the -1 ("no linkage") case.
       min(
-        if (refsIndex == this.numDefinitionRefs) {
-          Int::max
-        } else {
-          refs[refsIndex].i0
-        },
-        if (debugIndex == dbg.size()) Int::max else dbg[debugIndex].i0,
+        if (this.linkageOffset > i) this.linkageOffset else Int::max,
+        min(
+          if (refsIndex == this.numDefinitionRefs) {
+            Int::max
+          } else {
+            refs[refsIndex].i0
+          },
+          if (debugIndex == dbg.size()) Int::max else dbg[debugIndex].i0,
+        ),
       )
     };
 
@@ -1037,7 +1045,7 @@ fun writeOutputFiles(
         if (!d.hasDefinition()) {
           d.write(sstr, metadata, false)
         } else {
-          d.write(sstr, metadata, !def.forceExternal)
+          d.write(sstr, metadata, !d.forceExternal)
         }
       }
     }
