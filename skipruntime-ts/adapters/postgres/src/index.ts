@@ -32,9 +32,54 @@ pg.types.setTypeParser(pg.types.builtins.TIMESTAMPTZ, (x: string) => x);
 export class PostgresExternalService implements ExternalService {
   private client: pg.Client;
   private open_instances: Set<string> = new Set<string>();
+  private instance_ops: Map<string, Promise<void>> = new Map<
+    string,
+    Promise<void>
+  >();
+  private broken: boolean = false;
+  private shutting_down: boolean = false;
+
+  // Serialize setup/teardown operations per instance: each operation runs
+  // only after the previous one for the same instance has settled, so that a
+  // teardown can never interleave with an in-flight setup (or vice versa).
+  private chainInstanceOp(
+    instance: string,
+    op: () => Promise<void>,
+  ): Promise<void> {
+    const prev = this.instance_ops.get(instance) ?? Promise.resolve();
+    const next = prev.then(op, op);
+    this.instance_ops.set(instance, next);
+    void next
+      .catch(() => {})
+      .finally(() => {
+        if (this.instance_ops.get(instance) === next)
+          this.instance_ops.delete(instance);
+      });
+    return next;
+  }
 
   isConnected(): boolean {
-    return "_connected" in this.client && !!this.client._connected;
+    return (
+      !this.broken && "_connected" in this.client && !!this.client._connected
+    );
+  }
+
+  /**
+   * The underlying PostgreSQL client, exposed for monitoring and diagnostics.
+   *
+   * @returns The `pg.Client` used by this service.
+   */
+  getClient(): pg.Client {
+    return this.client;
+  }
+
+  /**
+   * Resource instances whose change-notification channels are currently set up.
+   *
+   * @returns A copy of the set of open resource instance identifiers.
+   */
+  getOpenInstances(): Set<string> {
+    return new Set(this.open_instances);
   }
 
   /**
@@ -53,6 +98,17 @@ export class PostgresExternalService implements ExternalService {
     password: string;
   }) {
     this.client = new pg.Client(db_config);
+    this.client.on("error", (e: Error) => {
+      // The connection is broken and node-pg neither reconnects nor accepts
+      // further queries on this client, so the LISTEN registrations are gone
+      // for good. Drop the channel state and mark the service broken so that
+      // the failure is observable (isConnected() reports it) and later
+      // subscriptions fail loudly instead of silently reusing dead channels.
+      // Recovery requires constructing a fresh PostgresExternalService.
+      this.broken = true;
+      this.open_instances.clear();
+      console.error("Postgres client connection error:", e);
+    });
     this.client.connect().then(
       () => {
         const handler = () => {
@@ -106,6 +162,10 @@ export class PostgresExternalService implements ExternalService {
       error: (error: Json) => void;
     },
   ): Promise<void> {
+    if (this.shutting_down)
+      throw new Error(
+        `Cannot subscribe to resource instance ${instance}: service is shutting down.`,
+      );
     const table = resource;
     const key = validateKeyParam(params);
 
@@ -133,8 +193,8 @@ export class PostgresExternalService implements ExternalService {
 
     const setupPgNotify = async () => {
       // Reuse existing trigger/function if possible
-      if (!this.open_instances.has(instance)) {
-        this.open_instances.add(instance);
+      if (this.open_instances.has(instance)) return;
+      try {
         await this.client.query(
           format(
             `
@@ -166,16 +226,33 @@ FOR EACH ROW EXECUTE FUNCTION %I();`,
             instance,
           ),
         );
+        // Only mark the instance as set up once all queries have succeeded,
+        // so that a failed setup is retried on the next subscription instead
+        // of leaving a dead channel behind.
+        this.open_instances.add(instance);
+      } catch (e) {
+        error(
+          `Error setting up Postgres change notifications for resource instance ${instance}:`,
+        )(e);
+        // Each query is committed separately, so a failure may leave behind
+        // the already-created trigger function; drop it so that nothing
+        // durable leaks from a failed setup.
+        await this.client
+          .query(format("DROP FUNCTION IF EXISTS %I CASCADE;", instance))
+          .catch(() => {});
+        throw e;
       }
     };
 
-    await initData();
-
-    this.client.on("notification", (msg) => {
+    const onNotification = (msg: pg.Notification) => {
       if (
         msg.channel == instance &&
         msg.payload !== undefined &&
-        this.open_instances.has(instance)
+        // Also accept notifications while a setup/teardown of this instance
+        // is in flight: node-pg can deliver a NOTIFY parsed from the same
+        // socket buffer that completes the CREATE TRIGGER query, before
+        // open_instances is updated in the query's continuation.
+        (this.open_instances.has(instance) || this.instance_ops.has(instance))
       ) {
         const query = key.select(table, msg.payload);
         const k = key.type == "TEXT" ? msg.payload : Number(msg.payload);
@@ -195,26 +272,54 @@ FOR EACH ROW EXECUTE FUNCTION %I();`,
           }
         });
       }
+    };
+
+    // Run the initial sync and channel setup as one chained operation, so
+    // that an unsubscribe issued at any point after this call is ordered
+    // after them and tears the channel back down.
+    await this.chainInstanceOp(instance, async () => {
+      await initData();
+      // Register before LISTEN so no delivered NOTIFY is missed, and
+      // deregister if setup fails so a failed subscription does not leak a
+      // listener (and duplicate updates once retried).
+      this.client.on("notification", onNotification);
+      try {
+        await setupPgNotify();
+      } catch (e) {
+        this.client.removeListener("notification", onNotification);
+        throw e;
+      }
     });
-    await setupPgNotify();
   }
 
   unsubscribe(instance: string): void {
-    if (this.open_instances.has(instance))
-      this.client
-        .query(format("DROP FUNCTION IF EXISTS %I CASCADE;", instance))
-        .then(
-          () => this.open_instances.delete(instance),
-          (e: unknown) => {
-            console.error(
-              `Error unsubscribing from resource instance ${instance}:`,
-              e,
-            );
-          },
-        );
+    // Chained behind any in-flight setup of the same instance, so that a
+    // subscription still being set up is torn down once ready instead of
+    // being missed (and then outliving its unsubscription).
+    void this.chainInstanceOp(instance, async () => {
+      if (!this.open_instances.has(instance)) return;
+      await this.client.query(
+        format("DROP FUNCTION IF EXISTS %I CASCADE;", instance),
+      );
+      // Deleted only once the DROP succeeded: on failure the trigger still
+      // exists, so keeping the instance keeps state truthful and lets
+      // shutdown() retry the drop.
+      this.open_instances.delete(instance);
+    }).catch((e: unknown) => {
+      console.error(
+        `Error unsubscribing from resource instance ${instance}:`,
+        e,
+      );
+    });
   }
 
   async shutdown(): Promise<void> {
+    // Refuse new subscriptions, then let in-flight setups/teardowns settle
+    // (including any chained while waiting) so the drop list is complete.
+    this.shutting_down = true;
+    while (this.instance_ops.size > 0) {
+      await Promise.allSettled(Array.from(this.instance_ops.values()));
+    }
     if (this.open_instances.size > 0) {
       const query =
         "DROP FUNCTION IF EXISTS " +
