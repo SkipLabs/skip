@@ -136,7 +136,10 @@ export async function runService(
       throw e;
     }
   }
-  const instance = await runtime.initService(service);
+  const instance = await runtime.initService(service).catch((e: unknown) => {
+    console.error("Service could not be initialized; reason: ", e);
+    throw e;
+  });
 
   const controlApp = express();
   controlApp.use(logger_middleware);
