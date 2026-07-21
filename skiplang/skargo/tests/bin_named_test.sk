@@ -1,0 +1,70 @@
+module alias T = SKTest;
+
+module SkargoBinNamedTestTests;
+
+const kManifestDir: String = #env ("SKARGO_MANIFEST_DIR");
+
+private fun write_file(path: String, contents: String): void {
+  _ = system(`mkdir -p ${Path.dirname(path)}`);
+  FileSystem.writeTextFile(path, contents)
+}
+
+// Regression test for #1395: skargo names a package's implicit test target
+// `test`, so a `[[bin]]` also named `test` collides with it in merged (dev)
+// builds. That collision must be rejected at manifest-parse time with a clear
+// error naming the offending target and the manifest, rather than surfacing a
+// compile error inside generated dispatch code (or silently running the bin as
+// `skargo test`).
+@test
+fun test_bin_named_test_is_rejected(): void {
+  // Only meaningful in the dev profile, where the merged binary that runs this
+  // test is also a full `skargo` and can be re-executed as one.
+  if (Environ.varOpt("SKARGO_BIN") != Some("test")) {
+    print_string(
+      "skipping: merged-mode only, run `skargo test` in the dev profile",
+    );
+    return void
+  };
+
+  skargo = Environ.current_exe();
+  prelude = Path.join(Path.dirname(kManifestDir), "prelude");
+  root = Path.join(kManifestDir, "target", "it-bin-named-test");
+  _ = system(`rm -rf ${root}`);
+
+  write_file(
+    Path.join(root, "Skargo.toml"),
+    `[package]\nname = "binnamedtest"\nversion = "0.1.0"\n\n[dependencies]\nstd = { path = "${prelude}" }\n\n[[bin]]\nname = "test"\nmain = "BINNAMEDTEST.main"\n`,
+  );
+  write_file(
+    Path.join(root, "src/main.sk"),
+    "module BINNAMEDTEST;\nfun main(): void {\n  void\n}\nmodule end;\n",
+  );
+
+  proc = Posix.Popen::create{
+    args => Array[skargo, "build"],
+    // Route the merged binary to `skargo` rather than to this test harness.
+    env => Map["SKARGO_BIN" => "skargo"],
+    cwd => Some(root),
+    stdout => true,
+    stderr => true,
+  }.fromSuccess();
+  _out = proc.stdout.fromSome().read_to_string().fromSuccess();
+  err = proc.stderr.fromSome().read_to_string().fromSuccess();
+
+  T.expectFalse(
+    proc.wait().success(),
+    `build of a package with a bin named \`test\` should fail, but it succeeded:\n${err}`,
+  );
+  // The error must be actionable: it names the offending target and the
+  // manifest it came from.
+  T.expectTrue(
+    err.contains(`may not be named "test"`),
+    `error should explain the reserved name, got:\n${err}`,
+  );
+  T.expectTrue(
+    err.contains(Path.join(root, "Skargo.toml")),
+    `error should name the offending manifest, got:\n${err}`,
+  )
+}
+
+module end;
