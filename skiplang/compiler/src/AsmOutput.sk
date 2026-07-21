@@ -3563,12 +3563,15 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
     llvmWriteIntrinsicCall(asm, x, "SKIP_throw", Array[e]);
     asm.print("  unreachable, %D\n" % x)
   | Unreachable{why} ->
+    // In debug builds, call the runtime to report which `Unreachable` was
+    // hit before the `unreachable` terminator. There is no release-mode
+    // equivalent symbol (`@SKIP_unreachable` is declared nowhere), so in
+    // release we emit only the terminator, which is what tells LLVM the
+    // path cannot be reached anyway.
     if (!asm.common.config.release) {
       asm.print("  call void @SKIP_unreachableWithExplanation(");
       asm.common.writeCStringRef(asm, UTF8String::make(why + "\0"));
       asm.print("), %D\n" % instr)
-    } else {
-      asm.print("  call void @SKIP_unreachable(), %D\n" % instr)
     };
     asm.print("  unreachable, %D\n" % instr)
   | ArrayUnsafeGet{id, typ, pos, obj, index, tupleIndex} ->
