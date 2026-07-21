@@ -1,0 +1,525 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+module SkipError;
+
+fun fail<T>(): T {
+  skipExit(2)
+}
+
+type Trace = (FileRange, String);
+
+class Fix{
+  oldRange: TextRange,
+  newText: String,
+  // If included, this will be used to verify that the edit still applies cleanly.
+  // TODO: oldText: ?String,
+  // speculative means do not perform fix when 'Fix all in file' is executed.
+  speculative: Bool = false,
+  title: String = "Fix",
+} uses Hashable, Equality
+
+class Error{
+  traces: List<(FileRange, String)>,
+  fix: ?Fix,
+} uses Hashable, Equality {
+  fun range(): FileRange {
+    this.traces.getHead().i0;
+  }
+
+  fun message(): String {
+    this.traces.getHead().i1;
+  }
+}
+
+fun errorFromSyntaxError(
+  error: SyntaxError,
+  file: FileCache.InputSource,
+): Error {
+  SkipError.Error{
+    traces => error.messages.map(message -> {
+      (FileRange.create(file, message.i0), message.i1);
+    }),
+    fix => error.fix,
+  }
+}
+
+fun errorsToString(
+  errors: Vector<Error>,
+  get_file: (FileCache.InputSource) -> String,
+): String {
+  strErrors = mutable Vector[];
+  for (error in errors) {
+    strTraces = mutable Vector[];
+    for (trace in error.traces) {
+      strTraces.push(traceToString(trace, get_file));
+    };
+    strErrors.push(strTraces.join("\n"));
+  };
+  strErrors.join("")
+}
+
+fun printErrors(
+  errors: Vector<Error>,
+  get_file: FileCache.InputSource -> String,
+): void {
+  print_error(errorsToString(errors, get_file));
+}
+
+class SkipErrorException{
+  errors: Vector<Error>,
+} extends Exception, SKStore.File uses Hashable {
+  fun getMessage(): String {
+    invariant_violation("Internal Error: should have used printErrors");
+  }
+}
+
+fun throwErrors(errors: Vector<Error>): void {
+  if (!errors.isEmpty()) {
+    throw SkipErrorException{errors};
+  };
+}
+
+fun throwFlattenedErrors(errors: Vector<Vector<Error>>): void {
+  throwErrors(errors.flatten());
+}
+
+fun printErrorsAndExit<T>(
+  errors: Array<SkipErrorException>,
+  get_file: FileCache.InputSource -> String,
+): T {
+  SkipError.printErrors(
+    errors.map(x -> x.errors).flatten().collect(Vector),
+    get_file,
+  );
+  skipExit(2)
+}
+
+class ErrorsFile(value: List<SkipErrorException>) extends SKStore.File
+
+// A recoverable compilation failure: in batch mode a failing unit throws
+// this instead of exiting the process, so the batch can report it and move
+// on to the next unit.
+class CompileFailureException{message: String} extends Exception {
+  fun getMessage(): String {
+    this.message
+  }
+}
+
+// In batch mode, frontend errors must be collected (not exit the process),
+// so many units can be compiled on one context. compile() sets this flag.
+fun setBatchMode(context: mutable SKStore.Context): void {
+  context.setGlobal("BATCH_MODE", SKStore.StringFile("1"))
+}
+
+fun isBatchMode(context: mutable SKStore.Context): Bool {
+  context.getGlobal("BATCH_MODE").isSome()
+}
+
+// Report errors that abort the current compile. In one-shot mode this prints
+// them and exits the process (the historical behavior). In batch mode we must
+// not exit — but we also must not carry on: the phases that reach here abort
+// the whole compile in one-shot mode, and the later phases rely on that, so
+// continuing runs them on inconsistent state and trips an invariant. Instead
+// we abort just this unit with a recoverable failure carrying the same
+// rendered errors; its throwaway forked context is torn down safely by
+// withForkedContext, leaving the shared base pristine for the remaining units.
+fun printErrorsOrRecover<T>(
+  context: mutable SKStore.Context,
+  errors: Array<SkipErrorException>,
+): T {
+  get_file = file -> {
+    FileCache.fileDir.unsafeGetArray(context, file)[0].value
+  };
+  if (isBatchMode(context)) {
+    throw CompileFailureException{
+      message => errorsToString(
+        errors.map(x -> x.errors).flatten().collect(Vector),
+        get_file,
+      ),
+    }
+  } else {
+    printErrorsAndExit(errors, get_file)
+  }
+}
+
+fun keepErrors(
+  _phase: Int,
+  context: mutable SKStore.Context,
+  f: () -> void,
+): void {
+  try {
+    f()
+  } catch {
+  | err @ SkipError.SkipErrorException _ ->
+    errors = context.getGlobal("ERRORS") match {
+    | None() -> List[]
+    | Some(x) -> ErrorsFile::type(x).value
+    };
+    !errors = List.Cons(err, errors);
+    context.setGlobal("ERRORS", ErrorsFile(errors))
+  | exn ->
+    debug(exn);
+    throw exn
+  }
+}
+
+fun catchErrors(
+  _phase: Int,
+  context: mutable SKStore.Context,
+  f: () -> void,
+): void {
+  try {
+    f()
+  } catch {
+  | err @ SkipError.SkipErrorException _ ->
+    printErrorsOrRecover(context, Array[err])
+  | exn ->
+    debug(exn);
+    throw exn
+  }
+}
+
+fun doWithError<T>(f: () -> T): Result<T, Vector<Error>> {
+  try {
+    (Success(f()) : Result<T, Vector<SkipError.Error>>);
+  } catch {
+  | SkipErrorException{errors} ->
+    (Failure(errors) : Result<T, Vector<SkipError.Error>>)
+  | exn -> throw exn
+  }
+}
+
+fun do2WithError<T1, T2>(f1: () -> T1, f2: () -> T2): (T1, T2) {
+  r1 = doWithError(f1);
+  r2 = doWithError(f2);
+  throwFlattenedErrors(
+    Vector[r1.maybeFailure(), r2.maybeFailure()].filterNone(),
+  );
+  (r1.fromSuccess(), r2.fromSuccess());
+}
+
+fun do3WithError<T1, T2, T3>(
+  f1: () -> T1,
+  f2: () -> T2,
+  f3: () -> T3,
+): (T1, T2, T3) {
+  r1 = doWithError(f1);
+  r2 = doWithError(f2);
+  r3 = doWithError(f3);
+  throwFlattenedErrors(
+    Vector[
+      r1.maybeFailure(),
+      r2.maybeFailure(),
+      r3.maybeFailure(),
+    ].filterNone(),
+  );
+  (r1.fromSuccess(), r2.fromSuccess(), r3.fromSuccess());
+}
+
+fun do4WithError<T1, T2, T3, T4>(
+  f1: () -> T1,
+  f2: () -> T2,
+  f3: () -> T3,
+  f4: () -> T4,
+): (T1, T2, T3, T4) {
+  r1 = doWithError(f1);
+  r2 = doWithError(f2);
+  r3 = doWithError(f3);
+  r4 = doWithError(f4);
+  throwFlattenedErrors(
+    Vector[
+      r1.maybeFailure(),
+      r2.maybeFailure(),
+      r3.maybeFailure(),
+      r4.maybeFailure(),
+    ].filterNone(),
+  );
+  (r1.fromSuccess(), r2.fromSuccess(), r3.fromSuccess(), r4.fromSuccess());
+}
+
+fun renderTextRange(range: TextRange): String {
+  // TODO: This is a poor format as it doesn't show the end line correctly.
+  startColumn = range.start.column() + 1;
+  `line ${(range.start.line() + 1)}, characters ${startColumn}-${max(
+    startColumn,
+    range.end.column(),
+  )}`;
+}
+
+private fun render_pos(pos: FileRange): String {
+  // TODO: Better heuristic to use relative path when relevant.
+  cwd = getcwd();
+  path = pos.file.path;
+  if (pos.file.path.startsWith(cwd)) {
+    !path = path.stripPrefix(cwd + "/");
+  };
+  file = pos.file.pkg_opt match {
+  | Some(pkg) if (pkg != FileCache.kAnonymousPackageName) ->
+    `File "${path}" (package ${pkg})`
+  | _ -> `File "${path}"`
+  };
+
+  position = if (!pos.range.isNone()) {
+    `, ${renderTextRange(pos.range)}:`
+  } else {
+    "";
+  };
+
+  file + position + "\n";
+}
+
+private fun traceToString(
+  trace: Trace,
+  get_file: (FileCache.InputSource) -> String,
+): String {
+  contents = get_file(trace.i0.file);
+  render_pos(trace.i0) +
+    trace.i1 +
+    "\n" +
+    get_context_of_pos(trace.i0.range, contents);
+}
+
+private fun get_context_of_pos(range: TextRange, contents: String): String {
+  if (range.isNone()) {
+    return "";
+  };
+
+  getContextOfRange(range, contents)
+}
+
+fun syntaxErrorToString(error: SyntaxError, fileContents: String): String {
+  error.messages
+    .map(message ~> syntaxErrorMessageToString(message, fileContents))
+    .join("\n")
+}
+
+fun syntaxErrorMessageToString(
+  message: SyntaxError.Message,
+  fileContents: String,
+): String {
+  `${renderTextRange(message.i0)}: ${message.i1}\n${getContextOfRange(
+    message.i0,
+    fileContents,
+  )}`
+}
+
+fun getContextOfRange(range: TextRange, fileContents: String): String {
+  if (range.isNone()) {
+    return "";
+  };
+
+  line_number = range.start.line();
+  start_position = range.start;
+  end_position = range.end;
+
+  lines = List::createFromItems(fileContents.split("\n"));
+  number_of_lines = if (lines.isEmpty()) {
+    0
+  } else {
+    lines.size() -
+      if (lines.last() == "") {
+        1
+      } else {
+        0
+      }
+  };
+
+  /* How many digits do we need to print
+   *   0..9 -> 1
+   *   10..99 -> 2
+   *   100..999 -> 3
+   *   etc.
+   */
+  prefix_size = ((line_number + 3).toString()).length();
+
+  // Note that line
+  if (number_of_lines <= line_number) {
+    ""
+  } else {
+    line_numbered_line = lineToPrint ~> {
+      if (lineToPrint < 0 || lineToPrint >= number_of_lines) {
+        ""
+      } else {
+        digits = (lineToPrint + 1).toString();
+        padding = if (digits.length() < prefix_size) {
+          " "
+        } else {
+          ""
+        };
+        lineString = lines.getNth(lineToPrint);
+        linePrefix = if (lineString == "") {
+          ""
+        } else {
+          " "
+        };
+        padding + digits + " |" + linePrefix + lineString + "\n";
+      }
+    };
+
+    chevroned_line = (start, end, line_contents) ~> {
+      if (start.line() > end.line()) {
+        ""
+      } else {
+        // Do not display chevrons under leading spaces
+        line_length = line_contents.length();
+        firstNonSpaceColumnOpt = line_contents.search(ch ~> ch != ' ');
+        chevron_start = firstNonSpaceColumnOpt match {
+        | None() ->
+          if (start.line() == end.line()) {
+            max(start.column(), end.column());
+          } else {
+            line_length;
+          }
+        | Some(firstNonSpaceColumn) ->
+          max(
+            start.column(),
+            line_contents.getIter().substring(firstNonSpaceColumn).length(),
+          )
+        };
+        chevron_length = if (start.line() == end.line()) {
+          max(start.column() + 1, end.column()) - chevron_start;
+        } else {
+          line_length - chevron_start;
+        };
+
+        if (chevron_length > 0) {
+          paddingSize = prefix_size + 1;
+          ' '.repeat(paddingSize) +
+            "| " +
+            ' '.repeat(chevron_start) +
+            '^'.repeat(chevron_length) +
+            "\n"
+        } else {
+          ""
+        }
+      }
+    };
+
+    // The end position can go beyond the current line ending.
+    error_line = lines.getNth(line_number);
+    after_error_line = if (line_number + 1 >= number_of_lines) {
+      ""
+    } else {
+      lines.getNth(line_number + 1)
+    };
+
+    line_numbered_line(line_number - 2) +
+      line_numbered_line(line_number - 1) +
+      line_numbered_line(line_number) +
+      chevroned_line(start_position, end_position, error_line) +
+      line_numbered_line(line_number + 1) +
+      chevroned_line(start_position.nextLine(), end_position, after_error_line)
+  }
+}
+
+fun error<T>(pos: FileRange, msg: String, fix: ?Fix = None()): T {
+  errorl(List[(pos, msg)], fix);
+}
+
+fun fatalError<T>(
+  context: mutable SKStore.Context,
+  pos: FileRange,
+  msg: String,
+  fix: ?Fix = None(),
+): T {
+  // Like the `catchErrors` path, `fatalError` aborts the whole compile in
+  // one-shot mode; route it through `printErrorsOrRecover` so it becomes a
+  // recoverable per-unit failure in batch mode instead of exiting the process.
+  printErrorsOrRecover(
+    context,
+    Array[
+      SkipErrorException{
+        errors => Vector[Error{traces => List[(pos, msg)], fix}],
+      },
+    ],
+  );
+}
+
+fun errorl<T>(traces: List<(FileRange, String)>, fix: ?Fix = None()): T {
+  throw SkipErrorException{errors => Vector[Error{traces, fix}]};
+}
+
+fun independent_errors<T>(traces: List<(FileRange, String)>): T {
+  throw SkipErrorException{
+    errors => traces
+      .values()
+      .map(trace -> Error{traces => List[trace], fix => None()})
+      .collect(Vector),
+  }
+}
+
+fun internal_error2<T>(
+  primary_pos: FileRange,
+  primary_message: String,
+  related_pos: FileRange,
+  related_message: String,
+): T {
+  errorl(List[(primary_pos, primary_message), (related_pos, related_message)])
+}
+
+private fun unboundNameMapping(name: String): ?String {
+  name match {
+  | "Boolean" -> Some("Bool")
+  | "Integer" -> Some("Int")
+  | "Double" -> Some("Float")
+  | _ -> None()
+  }
+}
+
+private fun didYouMeanUnboundName(name: String): String {
+  unboundNameMapping(name) match {
+  | Some(correct_name) -> ". Did you mean '" + correct_name + "'?"
+  | None() -> ""
+  }
+}
+
+fun unbound_name<T>(name: String, pos: FileRange): T {
+  errorl(List[(pos, "Unbound name: " + name + didYouMeanUnboundName(name))])
+}
+
+fun unbound_name_with_msg<T>(
+  pos: FileRange,
+  msg: String,
+  npos: FileRange,
+  name: String,
+): T {
+  errorl(
+    List[
+      (pos, msg),
+      (npos, "Unbound name: " + name + didYouMeanUnboundName(name)),
+    ],
+  )
+}
+
+fun name_already_bound<T>(name: String, pos1: FileRange, pos2: FileRange): T {
+  errorl(List[(pos1, "Name already bound: " + name), (pos2, "Previously here")])
+}
+
+fun duplicate<T>(kind: String, pos1: FileRange, pos2: FileRange): T {
+  msg1 = (pos1, "Duplicate " + kind);
+  msg2 = (pos2, "Previously defined here");
+  errorl(List[msg1, msg2])
+}
+
+fun duplicate_modifier<T>(pos1: FileRange, pos2: FileRange): T {
+  duplicate("modifier", pos1, pos2)
+}
+
+fun duplicate_visibility<T>(pos1: FileRange, pos2: FileRange): T {
+  duplicate("visibility", pos1, pos2)
+}
+
+fun duplicate_class_kind<T>(pos1: FileRange, pos2: FileRange): T {
+  duplicate("class kind", pos1, pos2)
+}
+
+fun duplicate_context_type<T>(pos1: FileRange, pos2: FileRange): T {
+  duplicate("context type", pos1, pos2)
+}
+
+module end;

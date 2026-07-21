@@ -1,0 +1,65 @@
+module Skargo;
+
+class Skc(cmd: String, extra_options: Array<String>) {
+  fun process(): mutable ProcessBuilder {
+    ProcessBuilder::create{cmd => this.cmd, args => this.extra_options}
+  }
+}
+
+mutable class ProcessBuilder private {
+  private process_cmd: String,
+  private process_args: mutable Vector<String>,
+  private process_env: mutable Map<String, String> = mutable Map[],
+  private mutable process_cwd: ?String = None(),
+} {
+  static fun create{
+    cmd: String,
+    args: readonly Sequence<String> = Array[],
+  }: mutable this {
+    process_args = Vector::mcreateFromItems(args);
+    mutable static{process_cmd => cmd, process_args}
+  }
+
+  mutable fun arg(value: String): void {
+    this.process_args.push(value)
+  }
+
+  mutable fun args(values: Array<String>): void {
+    values.each(this.arg)
+  }
+
+  mutable fun env(key: String, value: String): void {
+    this.process_env![key] = value
+  }
+
+  mutable fun cwd(path: String): void {
+    this.!process_cwd = Some(path)
+  }
+
+  readonly fun get_cmd(): String {
+    this.process_cmd
+  }
+
+  readonly fun get_argv(): Array<String> {
+    Array[this.process_cmd].concat(this.process_args.collect(Array))
+  }
+
+  readonly fun get_env(): Map<String, String> {
+    this.process_env.chill()
+  }
+
+  readonly fun run(
+    stdout: (String) -> void = _ -> void,
+    stderr: (String) -> void = _ -> void,
+  ): System.CompletedProcess {
+    System.popen{
+      args => this.get_argv(),
+      env => this.get_env(),
+      cwd => this.process_cwd,
+      stdout,
+      stderr,
+    }.fromSuccess()
+  }
+}
+
+module end;

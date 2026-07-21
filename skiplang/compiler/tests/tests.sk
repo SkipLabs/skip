@@ -1,0 +1,285 @@
+module alias T = SKTest;
+
+module SkcTests;
+
+private fun compile_cmd(
+  files: readonly Sequence<String>,
+  output: String,
+  mainFn: String = "main",
+): Array<String> {
+  Array[
+    "skc",
+    "-O0",
+    "--no-inline",
+    "--export-function-as",
+    mainFn + "=skip_main",
+    "-o",
+    output,
+  ].concat(files.collect(Array))
+}
+
+private fun genValidTest(basename: String, mainFn: String): void {
+  p = System.subprocess(
+    compile_cmd(Array[basename + ".sk"], basename + ".bin", mainFn),
+  ).fromSuccess();
+  if (!p.success()) {
+    T.fail(
+      `Unexpected compile error\nstdout: ${p.stdout}\nstderr:\n${p.stderr}`,
+    );
+  };
+
+  !p = System.subprocess(Array[basename + ".bin"]).fromSuccess();
+
+  if (!p.success()) {
+    T.fail(`Unexpected error\nstdout: ${p.stdout}\nstderr:\n${p.stderr}`);
+  };
+
+  actual = p.stdout;
+  expected = FileSystem.readTextFile(basename + ".exp");
+
+  T.expectEq(actual, expected)
+}
+
+// Compile a single invalid test in its own `skc` subprocess. Used when batching
+// is disabled (see `main`); the default path reads pre-batched results instead
+// (`runInvalidFromBatch`).
+private fun genInvalidTest(basename: String): void {
+  p = System.subprocess(
+    compile_cmd(Array[basename + ".sk"], basename + ".bin"),
+  ).fromSuccess();
+
+  if (p.success()) {
+    T.fail("Expected compile error")
+  };
+
+  // NOTE: The `.trim()` is needed because error messages seem to currently
+  // have an extra newline.
+  actual = p.stderr.trim();
+  expected = FileSystem.readTextFile(basename + ".exp_err").trim();
+
+  T.expectEq(actual, expected)
+}
+
+// Invalid tests are compiled together, up front, via `skc --batch` (see
+// `batchCompileInvalid`), which shares the stdlib type-check across them. Each
+// unit's result lands in a scratch dir: a binary at its output path if it
+// compiled, or `<output>.err` diagnostics if it failed. Here we just read that
+// result — no per-test `skc`.
+
+// Deterministic scratch dir for batch-compiled test outputs, shared between
+// the parent (which runs the batches) and the re-exec'd workers (which read
+// the results). The parent recreates it each run, so there are no stale
+// artifacts, and both derive the same path from `Environ.temp_dir()`.
+private fun batchOutDir(): String {
+  Path.join(Environ.temp_dir(), "skc_test_batch")
+}
+
+// Path a batch unit writes for `basename`: its binary on success, or
+// `<path>.err` (the rendered diagnostics) on failure.
+private fun batchOutput(basename: String): String {
+  Path.join(batchOutDir(), basename.split("/").join("_") + ".bin")
+}
+
+private fun runInvalidFromBatch(basename: String): void {
+  output = batchOutput(basename);
+  if (FileSystem.exists(output)) {
+    // It produced an artifact — an invalid test must fail to compile.
+    T.fail("Expected compile error")
+  };
+  // NOTE: The `.trim()` is needed because error messages seem to currently
+  // have an extra newline. The `.err` sidecar holds the same rendered errors a
+  // one-shot `skc` writes to stderr, so this matches the old comparison.
+  actual = FileSystem.readTextFile(output + ".err").trim();
+  expected = FileSystem.readTextFile(basename + ".exp_err").trim();
+
+  T.expectEq(actual, expected)
+}
+
+// Compile every invalid test once, up front, sharing the stdlib type-check
+// across them via `skc --batch`. The set is sharded into `njobs` manifests run
+// as parallel `skc --batch` processes (each still types the stdlib only once),
+// which recovers the parallelism the per-test subprocess path had while paying
+// the ~64% stdlib type-check cost a handful of times instead of ~800. `njobs`
+// is the harness's own job count (see the `test_harness` call in `main`), so
+// `skargo test -j N` scales the batch exactly as it scales the test run. Runs
+// in the parent only, before `test_harness` forks the per-test workers; the
+// workers then read each unit's result from `batchOutDir()`.
+private fun batchCompileInvalid(
+  basenames: readonly Sequence<String>,
+  njobs: Int,
+  shouldRun: (String, String) ~> Bool,
+): void {
+  outDir = batchOutDir();
+  // Fresh dir each run: no stale binaries/diagnostics from a previous run.
+  _ = system(`rm -rf '${outDir}' && mkdir -p '${outDir}'`);
+
+  shards = Array::fillBy(njobs, _ -> mutable Vector<String>[]);
+  i = 0;
+  for (b in basenames) {
+    // Only compile tests that will actually run (e.g. under a `--filter`); the
+    // suite/name is derived the same way it is when registering the test.
+    (suite, name) = b.stripPrefix("invalid_tests/").splitLast("/");
+    if (!shouldRun(suite, name)) continue;
+    // Manifest line: `<output> <mainFn> <input.sk>`. mainFn is irrelevant since
+    // the compile must fail; the input stays CWD-relative so the paths embedded
+    // in the diagnostics match the `.exp_err` goldens.
+    shards[i % njobs].push(`${batchOutput(b)} main ${b}.sk`);
+    !i = i + 1
+  };
+
+  cmds = mutable Vector<String>[];
+  for ((si, shard) in shards.items()) {
+    if (!shard.isEmpty()) {
+      manifest = Path.join(outDir, `shard_${si}.manifest`);
+      FileSystem.writeTextFile(manifest, shard.join("\n"));
+      // `--batch` exits 2 when units fail (expected here) and prints their
+      // errors to stderr; we read results from the scratch dir, so discard it.
+      cmds.push(`skc --batch '${manifest}' -O0 --no-inline >/dev/null 2>&1`)
+    }
+  };
+
+  if (!cmds.isEmpty()) {
+    // Run the shards concurrently and wait for all of them.
+    _ = System.subprocess(Array["sh", "-c", cmds.join(" & ") + " & wait"])
+  }
+}
+
+// Split a module name into (suite, testName) at the underscore that
+// separates the top-level directory from the rest.
+// e.g. "Runtime_Float1" → ("Runtime", "Float1")
+//      "Typechecking_Exhaustiveness_Foo" → ("Typechecking/Exhaustiveness", "Foo")
+private fun splitModuleName(moduleName: String): (String, String) {
+  // The test name is after the last underscore
+  (prefix, testName) = moduleName.splitLast("_");
+  // Convert remaining underscores to slashes for the suite path
+  suite = prefix.split("_").join("/");
+  (suite, testName)
+}
+
+// Discover @exptest-annotated functions. These are present when all
+// test .sk files are compiled into this binary (i.e. when `tests` is
+// not set in Skargo.toml, so Skargo auto-discovers all files in tests/).
+private macro fun addExpTestFunctions(
+  tests: mutable Map<String, mutable Vector<T.Test>>,
+): readonly Set<String> {
+  coveredModules = mutable Set[];
+  #forEachFunction (@exptest, #function, #functionName) {
+    // #functionName is "ModuleName.main"
+    testFn = #function;
+    (moduleName, _testName) = #functionName.splitFirst(".");
+    coveredModules.insert(moduleName);
+    (suite, testName) = splitModuleName(moduleName);
+    tests
+      .getOrAdd(suite, () -> mutable Vector[])
+      .push(
+        T.Test{
+          name => testName,
+          func => untracked () ~>
+            T.expectStdout(testFn, `tests/${suite}/${testName}.exp`),
+        },
+      );
+  };
+  coveredModules
+}
+
+untracked fun main(): void {
+  tests = mutable Map[];
+
+  // Escape hatches for the fast paths, both compiling one `skc` per test:
+  //   SKC_SUBPROCESS=1 — force *all* tests to subprocess mode (no @exptest,
+  //                      no invalid-test batch).
+  //   SKC_NO_BATCH=1   — keep @exptest for valid tests, but disable just the
+  //                      invalid-test batch (compile each invalid test on its
+  //                      own, as before batching).
+  subprocessMode = Environ.varOpt("SKC_SUBPROCESS").isSome();
+  batchDisabled = subprocessMode || Environ.varOpt("SKC_NO_BATCH").isSome();
+
+  // Discover @exptest-annotated functions. These are present when all
+  // test .sk files are compiled into this binary (i.e. when `tests` is
+  // not set in Skargo.toml, so Skargo auto-discovers all files in tests/).
+  coveredModules = if (!subprocessMode) {
+    addExpTestFunctions(tests)
+  } else {
+    Set[]
+  };
+
+  // In unified mode, verify that the skc on PATH is the same one that
+  // compiled this test binary.
+  if (!coveredModules.isEmpty()) {
+    compiledBy = #env ("GIT_COMMIT_HASH");
+    tests
+      .getOrAdd("Native", () -> mutable Vector[])
+      .push(
+        T.Test{
+          name => "CompilerVersionCheck",
+          func => () ~> {
+            p = System.subprocess(Array["skc", "--version"]).fromSuccess();
+            invariant(
+              p.stdout.contains(compiledBy),
+              `Test binary compiled by skc (${compiledBy}) but PATH skc ` +
+                `reports: ${p.stdout}`,
+            );
+          },
+        },
+      );
+  };
+
+  // Run any valid tests NOT covered by @exptest in subprocess mode.
+  validTests = FileSystem.readFilesRecursive("./tests", fn ->
+    fn.endsWith(".exp")
+  );
+
+  for (testFile in validTests) {
+    basename = testFile.stripSuffix(".exp");
+    relPath = basename.stripPrefix("tests/");
+    (testSuite, testName) = relPath.splitLast("/");
+    moduleName = relPath.split("/").join("_");
+    if (coveredModules.contains(moduleName)) continue;
+    mainFn = moduleName + ".main";
+    tests
+      .getOrAdd(testSuite, () -> mutable Vector[])
+      .push(
+        T.Test{name => testName, func => () ~> genValidTest(basename, mainFn)},
+      );
+  };
+
+  // Invalid tests (which must fail to compile) are, by default, compiled
+  // together via `skc --batch` rather than one `skc` per test (see
+  // `batchCompileInvalid`); each test then just reads its pre-batched result.
+  // When batching is disabled, fall back to compiling each in its own `skc`.
+  invalidTests = FileSystem.readFilesRecursive("./invalid_tests", fn ->
+    fn.endsWith(".exp_err")
+  );
+
+  invalidBasenames = mutable Vector<String>[];
+  for (testFile in invalidTests) {
+    basename = testFile.stripSuffix(".exp_err");
+    invalidBasenames.push(basename);
+    (testSuite, testName) = basename
+      .stripPrefix("invalid_tests/")
+      .splitLast("/");
+    testFunc: untracked () ~> void = if (batchDisabled) {
+      () ~> genInvalidTest(basename)
+    } else {
+      () ~> runInvalidFromBatch(basename)
+    };
+    tests
+      .getOrAdd(testSuite, () -> mutable Vector[])
+      .push(T.Test{name => testName, func => testFunc})
+  };
+  invalidUnits = invalidBasenames.collect(Array);
+
+  // Unless batching is disabled, compile the invalid set once, up front,
+  // sharing the stdlib type-check via `skc --batch`. `test_harness` runs this
+  // in the parent after parsing its args and before forking the workers,
+  // passing its own job count — so the batch shards at the same parallelism the
+  // workers run at. The workers (which re-exec this binary) then just read each
+  // unit's result from the scratch dir.
+  T.test_harness(tests, (njobs, shouldRun) ~> {
+    if (!batchDisabled && !invalidUnits.isEmpty()) {
+      batchCompileInvalid(invalidUnits, njobs, shouldRun)
+    }
+  })
+}
+
+module end;

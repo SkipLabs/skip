@@ -1,0 +1,20 @@
+module Runtime_PatternMatchingBaseClass;
+base class Foo
+base class Bar extends Foo
+class Zaz() extends Foo
+class Baz() extends Bar
+
+fun getBazAsFoo(): Foo {
+  Baz()
+}
+
+@exptest
+fun main(): void {
+  print_raw(
+    getBazAsFoo() match {
+    | Bar _ -> "Pass\n"
+    | _ -> "Fail"
+    },
+  )
+}
+module end;

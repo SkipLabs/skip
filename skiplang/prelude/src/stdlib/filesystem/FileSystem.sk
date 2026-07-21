@@ -1,0 +1,192 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+// Module for manipulating the Files and Directories.
+
+// TODO: What module should this go in?
+@allow_tracked_call
+@cpp_extern("SKIP_getcwd")
+@may_alloc
+untracked native fun getcwd(): String;
+
+base class FileKind uses Orderable {
+  children =
+  | FKRegular()
+  | FKDirectory()
+  | FKSymlink()
+  | FKCharDevice()
+  | FKBlockDevice()
+  | FKFifo()
+  | FKSocket()
+  | FKUnknown()
+}
+
+// Layout must match sk_file_stat_t in runtime64_specific.cpp.
+// mode is the full st_mode (file type + permissions).
+// Could be extended with: dev, ino, nlink, uid, gid, rdev, blksize, blocks.
+mutable class FileStat(
+  mutable mode: Int,
+  mutable size: Int,
+  mutable mtime: Int,
+  mutable atime: Int,
+  mutable ctime: Int,
+) {
+  // Extract file type from mode.
+  fun kind(): FileKind {
+    this.mode.and(0o170000) match {
+    | 0o140000 -> FKSocket()
+    | 0o120000 -> FKSymlink()
+    | 0o100000 -> FKRegular()
+    | 0o060000 -> FKBlockDevice()
+    | 0o040000 -> FKDirectory()
+    | 0o020000 -> FKCharDevice()
+    | 0o010000 -> FKFifo()
+    | _ -> FKUnknown()
+    }
+  }
+
+  // Extract permission bits (lower 9 bits of mode).
+  fun permissions(): Int {
+    this.mode.and(0o777)
+  }
+}
+
+module FileSystem;
+
+// This is really broken - you can't read a file into a String without an
+// encoding!
+fun readTextFile(filename: String): String {
+  open_file(filename);
+}
+
+fun writeTextFile(filename: String, contents: String): void {
+  string_to_file(contents, filename);
+}
+
+@allow_tracked_call
+@cpp_extern("SKIP_get_mtime")
+untracked native fun getLastModificationTime(fileName: String): Int;
+
+@allow_tracked_call
+@synonym("appendFile")
+@synonym("appendFileSync")
+@cpp_extern
+untracked native fun appendTextFile(filename: String, contents: String): void;
+
+@allow_tracked_call
+@cpp_extern("SKIP_check_if_file_exists")
+untracked native fun exists(filename: String): Bool;
+
+fun isDirectory(filename: String): Bool {
+  is_directory(filename);
+}
+
+// Returns the contents of dirname without the 'dirname' prefix.
+fun readDirectory(dirname: String): Array<String> {
+  dh = opendir(dirname);
+  res = mutable Vector[];
+  loop {
+    fn = readdir(dh);
+    if (fn == "") {
+      break void
+    } else if (fn == "." || fn == "..") {
+      continue
+    };
+    res.push(fn)
+  };
+  closedir(dh);
+  res.toArray().sorted()
+}
+
+// Searches in dirname, for a file named filename.
+// If not found, continues searching in dirname's parent directory.
+// Returns the directory of the found file, or None() if not found.
+fun findNearestFile(dirname: String, filename: String): ?String {
+  if (exists(Path.join(dirname, filename))) {
+    Some(dirname);
+  } else if (Path.isRoot(dirname)) {
+    None();
+  } else {
+    findNearestFile(Path.dirname(dirname), filename);
+  };
+}
+
+// Returns all the files in dirname, recursively.
+// Note that it does NOT return the directories contained in dirname.
+//
+// fileFilter is applied to files only, not directories.
+fun readFilesRecursive(
+  dirname: String,
+  fileFilter: String -> Bool = _ ~> true,
+  directoryFilter: String -> Bool = _ ~> true,
+): Vector<String> {
+  result: mutable Vector<String> = mutable Vector[];
+
+  // TODO: Recursive lambdas.
+  processDirectory: String -> void = _ -> void;
+  !processDirectory = dir -> {
+    // Ensure predictable order.
+    for (entry in readDirectory(dir)) {
+      entryPath = Path.join(dir, entry);
+      if (isDirectory(entryPath)) {
+        if (directoryFilter(entryPath)) {
+          processDirectory(entryPath);
+        };
+      } else if (fileFilter(entryPath)) {
+        result.push(entryPath);
+      };
+    };
+  };
+  processDirectory(Path.normalize(dirname));
+
+  result.chill();
+}
+
+fun stat(path: String): ?FileStat {
+  result = mutable FileStat(0, 0, 0, 0, 0);
+  rc = fillStat(result, path);
+  if (rc < 0) None() else Some(unsafe_chill_trust_me(result))
+}
+
+@allow_tracked_call
+@cpp_extern("SKIP_file_stat")
+private untracked native fun fillStat(
+  result: mutable FileStat,
+  path: String,
+): Int;
+
+// TODO: Rename the C++ entrypoints and merge these into the
+// public API above.
+@allow_tracked_call
+@cpp_extern
+private untracked native fun .open_file(String): String;
+
+@allow_tracked_call
+@cpp_extern
+private untracked native fun .string_to_file(s: String, file: String): void;
+
+@allow_tracked_call
+@cpp_extern("SKIP_is_directory")
+private untracked native fun is_directory(filename: String): Bool;
+
+@allow_tracked_call
+@cpp_extern("SKIP_opendir")
+private untracked native fun opendir(dirname: String): Int;
+
+@allow_tracked_call
+@cpp_extern("SKIP_readdir")
+private untracked native fun readdir(dirhandle: Int): String;
+
+@allow_tracked_call
+@cpp_extern("SKIP_closedir")
+private untracked native fun closedir(dirhandle: Int): void;
+
+@allow_tracked_call
+@cpp_extern("SKIP_realpath")
+untracked native fun realpath(path: String): String;
+
+module end;

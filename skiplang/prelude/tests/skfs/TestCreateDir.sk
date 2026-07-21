@@ -1,0 +1,36 @@
+/*****************************************************************************/
+/* Test that creates a directory. */
+/*****************************************************************************/
+
+module SKStoreTest;
+
+@test
+fun testCreateDir(): void {
+  SKStore.runWithGc(SKStore.Context::create{}, context ~> {
+    dirName = SKStore.DirName::create("/tmp/");
+    mappedDirName = SKStore.DirName::create("/tmp/mapped/");
+    dir = context.mkdir(
+      SKStore.IID::keyType,
+      SKStore.StringFile::type,
+      dirName,
+    );
+    _ = dir.map(
+      SKStore.IID::keyType,
+      SKStore.StringFile::type,
+      context,
+      mappedDirName,
+      (_context, writer, key, files) ~> {
+        writer.setArray(
+          key,
+          files.toArray().map(file -> {
+            !file.value = file.value + "Mapped";
+            file
+          }),
+        )
+      },
+    );
+    SKStore.CStop(None())
+  })
+}
+
+module end;

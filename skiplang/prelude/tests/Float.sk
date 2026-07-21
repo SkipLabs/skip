@@ -1,0 +1,405 @@
+module alias T = SKTest;
+
+module FloatTest;
+
+@test
+fun testEquality(): void {
+  // Basic equality
+  T.expectTrue(1.0 == 1.0);
+  T.expectFalse(1.0 == 2.0);
+  T.expectFalse(1.0 != 1.0);
+  T.expectTrue(1.0 != 2.0);
+  // IEEE 754: NaN is not equal to anything, including itself
+  T.expectFalse(Float::nan == Float::nan);
+  T.expectTrue(Float::nan != Float::nan);
+  T.expectFalse(Float::nan == 1.0);
+  T.expectTrue(Float::nan != 1.0);
+  // -0.0 and 0.0 are equal under IEEE 754
+  T.expectTrue(0.0 == -0.0);
+  T.expectFalse(0.0 != -0.0);
+  // Infinity
+  T.expectTrue(Float::inf == Float::inf);
+  T.expectFalse(Float::inf == -Float::inf);
+}
+
+@test
+fun testArithmetic(): void {
+  // Addition
+  T.expectEq(1.0 + 2.0, 3.0);
+  T.expectEq(-1.0 + 1.0, 0.0);
+  T.expectEq(Float::inf + 1.0, Float::inf);
+  T.expectTrue((Float::inf + -Float::inf).isNaN()); // inf - inf = NaN
+  T.expectTrue((Float::nan + 1.0).isNaN());
+  // Subtraction
+  T.expectEq(3.0 - 1.0, 2.0);
+  T.expectEq(1.0 - 1.0, 0.0);
+  T.expectTrue((Float::nan - 1.0).isNaN());
+  // Multiplication
+  T.expectEq(2.0 * 3.0, 6.0);
+  T.expectEq(-2.0 * 3.0, -6.0);
+  T.expectEq(Float::inf * 2.0, Float::inf);
+  T.expectTrue((Float::inf * 0.0).isNaN()); // inf * 0 = NaN
+  T.expectTrue((Float::nan * 1.0).isNaN());
+  // Division
+  T.expectEq(6.0 / 2.0, 3.0);
+  T.expectEq(1.0 / Float::inf, 0.0);
+  T.expectEq(Float::inf / 1.0, Float::inf);
+  T.expectTrue((0.0 / 0.0).isNaN()); // 0/0 = NaN
+  T.expectTrue((Float::inf / Float::inf).isNaN()); // inf/inf = NaN
+  T.expectTrue((Float::nan / 1.0).isNaN());
+  // Division by zero produces infinity
+  T.expectEq(1.0 / 0.0, Float::inf);
+  T.expectEq(-1.0 / 0.0, -Float::inf);
+}
+
+@test
+fun testComparison(): void {
+  // Basic ordering
+  T.expectTrue(1.0 < 2.0);
+  T.expectFalse(2.0 < 1.0);
+  T.expectFalse(1.0 < 1.0);
+  T.expectTrue(2.0 > 1.0);
+  T.expectFalse(1.0 > 2.0);
+  T.expectTrue(1.0 <= 1.0);
+  T.expectTrue(1.0 <= 2.0);
+  T.expectFalse(2.0 <= 1.0);
+  T.expectTrue(1.0 >= 1.0);
+  T.expectTrue(2.0 >= 1.0);
+  T.expectFalse(1.0 >= 2.0);
+  // NaN comparisons are always false
+  T.expectFalse(Float::nan < 1.0);
+  T.expectFalse(Float::nan > 1.0);
+  T.expectFalse(Float::nan <= 1.0);
+  T.expectFalse(Float::nan >= 1.0);
+  T.expectFalse(1.0 < Float::nan);
+  T.expectFalse(1.0 > Float::nan);
+  T.expectFalse(Float::nan <= Float::nan);
+  T.expectFalse(Float::nan >= Float::nan);
+  // Infinity
+  T.expectTrue(1.0 < Float::inf);
+  T.expectTrue(-Float::inf < 1.0);
+  T.expectTrue(-Float::inf < Float::inf);
+  T.expectTrue(Float::inf >= Float::inf);
+}
+
+@test
+fun testCompare(): void {
+  // Normal ordering
+  T.expectEq(1.0.compare(2.0), LT());
+  T.expectEq(2.0.compare(1.0), GT());
+  T.expectEq(1.0.compare(1.0), EQ());
+  // Negative zero equals positive zero
+  T.expectEq((-0.0).compare(0.0), EQ());
+  T.expectEq(0.0.compare(-0.0), EQ());
+  // Negative values
+  T.expectEq((-2.0).compare(-1.0), LT());
+  T.expectEq((-1.0).compare(-2.0), GT());
+  // NaN compares as GT against everything, including itself
+  T.expectEq(Float::nan.compare(1.0), GT());
+  T.expectEq(Float::nan.compare(-1.0), GT());
+  T.expectEq(Float::nan.compare(Float::inf), GT());
+  T.expectEq(Float::nan.compare(-Float::inf), GT());
+  T.expectEq(Float::nan.compare(Float::nan), GT());
+  // Normal value compared to NaN
+  T.expectEq(1.0.compare(Float::nan), GT());
+  // Infinity ordering
+  T.expectEq(Float::inf.compare(1.0), GT());
+  T.expectEq(1.0.compare(Float::inf), LT());
+  T.expectEq(Float::inf.compare(Float::inf), EQ());
+  T.expectEq((-Float::inf).compare(-Float::inf), EQ());
+  T.expectEq((-Float::inf).compare(Float::inf), LT());
+  T.expectEq((-Float::inf).compare(-1.0), LT());
+}
+
+@test
+fun testIsEqual(): void {
+  // Basic equality
+  T.expectTrue(1.0.isEqual(1.0));
+  T.expectFalse(1.0.isEqual(2.0));
+  // Distinguishes -0.0 from 0.0 (unlike ==)
+  T.expectTrue(0.0 == -0.0);
+  T.expectFalse(0.0.isEqual(-0.0));
+  // -0.0 is equal to itself
+  T.expectTrue((-0.0).isEqual(-0.0));
+  // Same NaN bit pattern is equal
+  T.expectTrue(Float::nan.isEqual(Float::nan));
+  // Negated NaN has a different bit pattern (sign bit is flipped)
+  T.expectFalse(Float::nan.isEqual(-Float::nan));
+  // Infinity
+  T.expectTrue(Float::inf.isEqual(Float::inf));
+  T.expectFalse(Float::inf.isEqual(-Float::inf));
+  T.expectTrue((-Float::inf).isEqual(-Float::inf));
+}
+
+@test
+fun testNegate(): void {
+  T.expectTrue(1.0.negate().isEqual(-1.0));
+  T.expectTrue((-1.0).negate().isEqual(1.0));
+  // 0.0 negates to -0.0
+  T.expectTrue(0.0.negate().isEqual(-0.0));
+  T.expectTrue((-0.0).negate().isEqual(0.0));
+  // Infinity
+  T.expectTrue(Float::inf.negate().isEqual(-Float::inf));
+  T.expectTrue((-Float::inf).negate().isEqual(Float::inf));
+  // NaN negation flips the sign bit (IEEE 754 sign-bit semantics)
+  T.expectTrue(Float::nan.negate().isNaN());
+  T.expectFalse(Float::nan.negate().isEqual(Float::nan));
+  // Double negation of NaN restores original bit pattern
+  T.expectTrue(Float::nan.negate().negate().isEqual(Float::nan));
+}
+
+@test
+fun testIsNaN(): void {
+  T.expectTrue(Float::nan.isNaN());
+  T.expectTrue((-Float::nan).isNaN());
+  T.expectFalse(0.0.isNaN());
+  T.expectFalse(1.0.isNaN());
+  T.expectFalse(Float::inf.isNaN());
+  T.expectFalse((-Float::inf).isNaN());
+}
+
+@test
+fun testHash(): void {
+  // -0.0 and 0.0 must have the same hash (since they are ==)
+  T.expectEq(0.0.hash(), (-0.0).hash());
+  // Same value produces same hash
+  T.expectEq(1.0.hash(), 1.0.hash());
+  T.expectEq(Float::inf.hash(), Float::inf.hash());
+  // Different values should (very likely) have different hashes
+  T.expectTrue(1.0.hash() != 2.0.hash());
+  T.expectTrue(1.0.hash() != (-1.0).hash());
+  T.expectTrue(Float::inf.hash() != (-Float::inf).hash());
+}
+
+@test
+fun testToBits(): void {
+  // 0.0 and -0.0 have different bit patterns
+  T.expectTrue(0.0.toBits() != (-0.0).toBits());
+  // Same value has same bits
+  T.expectEq(1.0.toBits(), 1.0.toBits());
+  // Known IEEE 754 bit patterns
+  T.expectEq(0.0.toBits(), 0);
+  T.expectEq(1.0.toBits(), 4607182418800017408);
+  // -0.0 has only the sign bit set
+  T.expectEq((-0.0).toBits(), -9223372036854775808);
+  // Infinity has a known pattern (all exponent bits set, zero mantissa)
+  T.expectEq(Float::inf.toBits(), 9218868437227405312);
+  // NaN bits (quiet NaN: exponent all set, non-zero mantissa)
+  T.expectTrue(Float::nan.toBits() != 0);
+}
+
+@test
+fun testFromFloat(): void {
+  T.expectEq(0.0.fromFloat(1.5), 1.5);
+  T.expectEq(0.0.fromFloat(-1.5), -1.5);
+  T.expectEq(0.0.fromFloat(0.0), 0.0);
+  T.expectTrue(0.0.fromFloat(Float::nan).isNaN());
+  T.expectEq(0.0.fromFloat(Float::inf), Float::inf);
+  T.expectEq(0.0.fromFloat(-Float::inf), -Float::inf);
+}
+
+@test
+fun testToString(): void {
+  // Normal values
+  T.expectEq(1.0.toString(), "1.0");
+  T.expectEq((-1.0).toString(), "-1.0");
+  T.expectEq(0.5.toString(), "0.5");
+  T.expectEq(0.1.toString(), "0.1");
+  T.expectEq((-0.1).toString(), "-0.1");
+  T.expectEq(123.456.toString(), "123.456");
+  // Integer-valued floats get trailing .0
+  T.expectEq(100.0.toString(), "100.0");
+  T.expectEq((-100.0).toString(), "-100.0");
+  // Zero
+  T.expectEq(0.0.toString(), "0.0");
+  T.expectEq((-0.0).toString(), "-0.0");
+  // Infinity
+  T.expectEq(Float::inf.toString(), "inf");
+  T.expectEq((-Float::inf).toString(), "-inf");
+  // NaN: sign is dropped (unlike C printf which outputs "-nan"; matches Rust)
+  T.expectEq(Float::nan.toString(), "nan");
+  T.expectEq((-Float::nan).toString(), "nan");
+  // Very large values use scientific notation (integer-valued floats keep .0)
+  T.expectEq(1e20.toString(), "1.0e+20");
+  T.expectEq((-1e20).toString(), "-1.0e+20");
+  // Very small values use scientific notation (integer-valued floats keep .0)
+  T.expectEq(1e-10.toString(), "1.0e-10");
+  T.expectEq((-1e-10).toString(), "-1.0e-10");
+  // Values near scientific notation boundaries
+  T.expectEq(1e15.toString(), "1.0e+15");
+  T.expectEq(9999999999999.0.toString(), "9999999999999.0");
+}
+
+@test
+fun testToStringEdgeCases(): void {
+  // Subnormals (smallest representable doubles)
+  // Smallest subnormal: 5e-324 (actual value 4.9406564584124654e-324)
+  T.expectEq(5e-324.toString(), "4.940656458e-324");
+  // Smallest normal: 2.2250738585072014e-308
+  T.expectEq(2.2250738585072014e-308.toString(), "2.225073859e-308");
+  // Largest subnormal (just below smallest normal)
+  T.expectEq(2.225073858507201e-308.toString(), "2.225073859e-308");
+
+  // Max double
+  T.expectEq(1.7976931348623157e308.toString(), "1.797693135e+308");
+
+  // Values near scientific notation boundary (currently 1e15 / 1e-4)
+  T.expectEq(999999999999999.0.toString(), "999999999999999.0");
+  T.expectEq(9999999999999999.0.toString(), "1.0e+16");
+  T.expectEq(0.0001.toString(), "0.0001");
+  T.expectEq(0.00001.toString(), "1.0e-05");
+  T.expectEq(0.00009999.toString(), "9.999e-05");
+
+  // Tricky values that test shortest representation
+  // NOTE: current impl has 9-digit precision, so 0.1+0.2 rounds to "0.3"
+  T.expectEq(0.1.toString(), "0.1");
+  T.expectEq(0.2.toString(), "0.2");
+  T.expectEq(0.3.toString(), "0.3");
+  T.expectEq((0.1 + 0.2).toString(), "0.3");
+
+  // Powers of 2
+  T.expectEq(0.5.toString(), "0.5");
+  T.expectEq(0.25.toString(), "0.25");
+  T.expectEq(0.125.toString(), "0.125");
+
+  // Large integers that are exact doubles
+  T.expectEq(9007199254740992.0.toString(), "9.007199255e+15"); // 2^53
+  T.expectEq(9007199254740991.0.toString(), "9.007199255e+15"); // 2^53 - 1
+
+  // Negative edge cases
+  T.expectEq((-5e-324).toString(), "-4.940656458e-324");
+  T.expectEq((-1.7976931348623157e308).toString(), "-1.797693135e+308");
+}
+
+@test
+fun testToStringRoundTrip(): void {
+  // toString -> toFloat should preserve the value
+  values = Array[1.0, -1.0, 0.5, 123.456, 1e20, 1e-10, 0.0];
+  values.each(v -> {
+    T.expectEq(v.toString().toFloat(), v);
+  });
+  // Special values
+  T.expectEq("inf".toFloat(), Float::inf);
+  T.expectEq("-inf".toFloat(), -Float::inf);
+  T.expectTrue("nan".toFloat().isNaN());
+
+  // Edge case round-trips
+  // NOTE: current impl has only 9-digit precision, so many values don't
+  // round-trip. These tests document which values survive round-tripping
+  // and will be updated when Ryu is integrated (all should round-trip).
+  roundTrippable = Array[
+    0.1,
+    0.2,
+    0.3,
+    0.5,
+    0.25,
+    0.125,
+    1e-6,
+    1e-7,
+    1e20,
+    1e21,
+  ];
+  roundTrippable.each(v -> {
+    T.expectEq(v.toString().toFloat(), v);
+  });
+  // -0.0 round-trips to 0.0 (sign dropped by parser)
+  T.expectEq((-0.0).toString().toFloat(), 0.0);
+  // These DON'T round-trip with current 9-digit precision:
+  // 5e-324, 2.2250738585072014e-308, 1.7976931348623157e308, 2^53
+}
+
+@test
+fun testStringToFloat(): void {
+  // Basic parsing
+  T.expectEq("1.0".toFloat(), 1.0);
+  T.expectEq("-1.0".toFloat(), -1.0);
+  T.expectEq("0.5".toFloat(), 0.5);
+  T.expectEq("0.0".toFloat(), 0.0);
+  T.expectEq("-0.0".toFloat(), 0.0);
+  // Bare integers
+  T.expectEq("0".toFloat(), 0.0);
+  T.expectEq("-0".toFloat(), 0.0);
+  T.expectEq("42".toFloat(), 42.0);
+  T.expectEq("-42".toFloat(), -42.0);
+  T.expectEq("1000000".toFloat(), 1000000.0);
+  // Scientific notation
+  T.expectEq("1e10".toFloat(), 1e10);
+  T.expectEq("1.5e3".toFloat(), 1500.0);
+  T.expectEq("1e-5".toFloat(), 1e-5);
+  // Special values
+  T.expectEq("inf".toFloat(), Float::inf);
+  T.expectEq("-inf".toFloat(), -Float::inf);
+  T.expectTrue("nan".toFloat().isNaN());
+  // Invalid strings
+  T.expectEq("".toFloatOption(), None());
+  T.expectEq("abc".toFloatOption(), None());
+  T.expectEq("1.2.3".toFloatOption(), None());
+  T.expectEq("1e".toFloatOption(), None());
+}
+
+@test
+fun testToInt(): void {
+  // Truncates toward zero
+  T.expectEq(1.9.toInt(), 1);
+  T.expectEq((-1.9).toInt(), -1);
+  T.expectEq(1.1.toInt(), 1);
+  T.expectEq((-1.1).toInt(), -1);
+  T.expectEq(0.0.toInt(), 0);
+  T.expectEq((-0.0).toInt(), 0);
+  // Exact integer values
+  T.expectEq(42.0.toInt(), 42);
+  T.expectEq((-42.0).toInt(), -42);
+  // Large values within Int range
+  T.expectEq(1e15.toInt(), 1000000000000000);
+  T.expectEq((-1e15).toInt(), -1000000000000000);
+  // 2^53 - 1 is the largest integer exactly representable as Float
+  T.expectEq(9007199254740991.0.toInt(), 9007199254740991);
+}
+
+@test
+fun testFromInt(): void {
+  T.expectEq(0.0.fromInt(0), 0.0);
+  T.expectEq(0.0.fromInt(1), 1.0);
+  T.expectEq(0.0.fromInt(-1), -1.0);
+  T.expectEq(0.0.fromInt(42), 42.0);
+  // Negative values
+  T.expectEq(0.0.fromInt(-1000000), -1000000.0);
+  // 2^53 is exactly representable
+  T.expectEq(0.0.fromInt(9007199254740992).toInt(), 9007199254740992);
+  // 2^53 + 1 loses precision
+  large = 9007199254740993;
+  T.expectTrue(0.0.fromInt(large).toInt() != large);
+}
+
+@test
+fun testIntFloatRoundTrip(): void {
+  // Small integers round-trip exactly
+  values = Array[0, 1, -1, 42, -42, 1000000, -1000000];
+  values.each(v -> {
+    T.expectEq(v.toFloat().toInt(), v);
+  });
+  // Powers of 2 round-trip exactly up to 2^53
+  T.expectEq(4096.toFloat().toInt(), 4096);
+  T.expectEq(1099511627776.toFloat().toInt(), 1099511627776); // 2^40
+}
+
+@test
+fun testToFloat(): void {
+  // Identity conversion
+  T.expectEq(1.5.toFloat(), 1.5);
+  T.expectEq(0.0.toFloat(), 0.0);
+  T.expectTrue(0.0.toFloat().isEqual(0.0));
+  T.expectTrue((-0.0).toFloat().isEqual(-0.0));
+  T.expectTrue(Float::nan.toFloat().isNaN());
+  T.expectEq(Float::inf.toFloat(), Float::inf);
+}
+
+@test
+fun testInspect(): void {
+  T.expectEq(1.0.inspect().toString(), "1.0");
+  T.expectEq((-0.0).inspect().toString(), "-0.0");
+  T.expectEq(Float::inf.inspect().toString(), "inf");
+  T.expectEq(Float::nan.inspect().toString(), "nan");
+}
+
+module end;

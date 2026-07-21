@@ -1,0 +1,64 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+module SkipMain;
+/*****************************************************************************/
+/* All the phases of the front-end. */
+/*****************************************************************************/
+
+fun type_program(
+  context: mutable SKStore.Context,
+): SKStore.EHandle<SKStore.SID, SkipTyping.DefFile> {
+  parsed_program = FileCache.fileDir.map(
+    FileCache.InputSource::keyType,
+    SkipParse.DefsWithAccessedEnvVarsFile::type,
+    context,
+    SKStore.DirName::create("/astAndAccessedEnvVarsCache/"),
+    (context, writer, key, sources) ~> {
+      source = sources.first;
+      SkipError.catchErrors(0, context, () -> {
+        writer.set(key, SkipParse.parseFile(key, source.value))
+      })
+    },
+  );
+
+  _ = parsed_program.map(
+    SKStore.SID::keyType,
+    SKStore.StringFile::type,
+    context,
+    FileCache.packageEnvAccessDirName,
+    (_context, writer, key, values) ~> {
+      writer.setArray(
+        SKStore.SID(key.pkg_opt.default(FileCache.kAnonymousPackageName)),
+        values
+          .getUnique()
+          .fromSome()
+          .accessed_env_vars.values()
+          .map(v -> SKStore.StringFile(v))
+          .collect(Array),
+      )
+    },
+  );
+
+  ast = parsed_program.map(
+    FileCache.InputSource::keyType,
+    SkipParse.DefsFile::type,
+    context,
+    SkipParse.astDirName,
+    (_context, writer, key, values) ~> {
+      writer.set(key, SkipParse.DefsFile(values.getUnique().fromSome().defs))
+    },
+  );
+
+  (defsDir, childDir) = SkipExpand.program(context, ast);
+  inhDir = SkipInherit.populateClassesDir(context);
+  SkipNaming.populateClasses(context, defsDir, inhDir, childDir);
+  SkipNaming.populateFuns(context, defsDir);
+  SkipTyping.program(context, defsDir)
+}
+
+module end;

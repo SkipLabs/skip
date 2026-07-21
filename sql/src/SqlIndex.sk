@@ -1,0 +1,650 @@
+/*****************************************************************************/
+/* Module handling Sql indexes. */
+/*****************************************************************************/
+
+module alias P = SQLParser;
+
+module SKDB;
+
+const systemIndexPrefix: String = "__skdb__";
+
+extension class IndexProjKey extends SKStore.Key {
+  static fun create(values: Array<(Int, ?CValue)>): this {
+    row = RowValues::create(values.map(x -> x.i1));
+    columnIndices = values.map(x -> (x.i0));
+    static(row, columnIndices)
+  }
+
+  static fun createFromRowValues(
+    row: RowValues,
+    kinds: Array<(Int, P.IKind, P.Type)>,
+  ): IndexProjKey {
+    static(row, kinds.map(x -> x.i0))
+  }
+
+  fun toArray(): Array<(Int, ?CValue)> {
+    indexedValues = mutable Vector[];
+    for (i in Range(0, this.columnIndices.size())) {
+      columnIndex = this.columnIndices[i];
+      indexedValues.push((columnIndex, this.row.values[columnIndex]));
+    };
+    indexedValues.toArray()
+  }
+
+  fun compareRows(x: RowValues, y: RowValues): Order {
+    xsize = x.size();
+    ysize = y.size();
+    for (i in Range(0, this.columnIndices.size())) {
+      idx = this.columnIndices[i];
+      if (idx >= xsize && idx >= ysize) return EQ();
+      if (idx >= xsize) return LT();
+      if (idx >= ysize) return GT();
+      value1 = x.getValue(idx);
+      value2 = y.getValue(idx);
+      (value1, value2) match {
+      | (None(), None()) -> continue
+      | (None(), _) -> return LT()
+      | (_, None()) -> return GT()
+      | (Some(v1), Some(v2)) ->
+        cmp = v1.compare(v2);
+        if (cmp != EQ()) return cmp
+      }
+    };
+    EQ()
+  }
+
+  fun compare(other: SKStore.Key): Order {
+    other match {
+    | IndexProjKey(row2, columnIndices2) ->
+      this.columnIndices.compare(columnIndices2) match {
+      | EQ() -> this.compareRows(this.row, row2)
+      | diseq -> diseq
+      }
+    | _ -> this.getClassName().compare(other.getClassName())
+    }
+  }
+}
+
+fun createIndexName(
+  tableName: P.Name,
+  kinds: Array<(Int, P.IKind, P.Type)>,
+  size: Int,
+): P.Name {
+  if (size != kinds.size()) !kinds = kinds.slice(0, size);
+  P.Name::create("/indexes/" + tableName.lower + "/" + hash(kinds) + "/")
+}
+
+fun createIndex(
+  context: mutable SKStore.Context,
+  userIndexNameOpt: ?P.Name,
+  tableName: P.Name,
+  dirName: SKStore.DirName,
+  kinds: Array<(Int, P.IKind, P.Type)>,
+  size: Int,
+  unique: Bool,
+  text: ?String,
+): IndexDescr {
+  idxKinds = kinds.mapWithIndex((idx, field) -> {
+    (idx, P.IASC(), field.i2)
+  });
+  indexName = createIndexName(tableName, kinds, size);
+  needsReordering = false;
+  for (i => kind in kinds) {
+    if (i == kind.i0) continue;
+    !needsReordering = true;
+  };
+
+  handle = SKStore.EHandle(RowKey::keyType, RowValues::type, dirName);
+
+  index = if (!needsReordering) handle else {
+    handle.map(
+      RowKey::keyType,
+      RowValues::type,
+      context,
+      SKStore.DirName::create(indexName.lower),
+      (_ctx, writer, _key, rows) ~> {
+        row = rows.first;
+        values = kinds.map(kind -> row.getValue(kind.i0));
+        rvalues = RowValues::create(values);
+        writer.setArray(RowKey::create(rvalues, idxKinds), rows.toArray());
+      },
+    )
+  };
+  if (unique) {
+    columnIndices = kinds.slice(0, size);
+    _ = index
+      .map(
+        IndexProjKey::keyType,
+        RowValues::type,
+        context,
+        SKStore.DirName::create(indexName.lower + "unique/proj/"),
+        (_, writer, _key, values) ~> {
+          result = SortedMap<IndexProjKey, mutable Vector<RowValues>>[];
+          valuesArr = values.toArray();
+          for (v in valuesArr) {
+            k = IndexProjKey::createFromRowValues(v, columnIndices);
+            if (v.repeat != 1) {
+              throw Conflict(
+                0,
+                "UNIQUE constraint failed",
+                k.toArray(),
+                valuesArr,
+              )
+            };
+            if (!result.containsKey(k)) {
+              !result[k] = mutable Vector[];
+            };
+            result[k].push(v);
+          };
+          for (k => v in result) {
+            writer.setArray(k, v.toArray());
+          }
+        },
+      )
+      .map(
+        SKStore.NeverID::keyType,
+        SKStore.VoidFile::type,
+        context,
+        SKStore.DirName::create(indexName.lower + "unique/sink/"),
+        (_, _, projKey, values) ~> {
+          repeat = 0;
+          valuesArr = values.toArray();
+          for (r in valuesArr) {
+            !repeat = repeat + r.repeat;
+          };
+          if (repeat > 1) {
+            throw Conflict(
+              0,
+              "UNIQUE constraint failed",
+              projKey.toArray(),
+              valuesArr,
+            )
+          }
+        },
+      )
+  };
+
+  userIndexName = userIndexNameOpt match {
+  | None() -> indexName
+  | Some(x) -> x
+  };
+
+  indexDescr = IndexDescr{
+    name => userIndexName,
+    dirName => index.dirName,
+    tableName => tableName,
+    tableDirName => dirName,
+    fields => kinds,
+    unique,
+    text,
+  };
+
+  indexDescr
+}
+
+fun createUserIndex(
+  context: mutable SKStore.Context,
+  userIndexName: P.Name,
+  pos: Int,
+  tableName: P.Name,
+  columns: Array<P.IndexedColumn>,
+  unique: Bool,
+  text: ?String,
+): IndexDescr {
+  colNames = columns.map(x -> {
+    name = x.expr match {
+    | P.Identifier(name, None()) -> name
+    | _ -> error(pos, "Indexing on expressions not implemented")
+    };
+    (name, P.IASC())
+  });
+  colSet = mutable Set[];
+  for (colName in colNames) {
+    if (colSet.contains(colName.i0)) {
+      error(pos, "Duplicate column name: " + colName.i0);
+    };
+    colSet.add(colName.i0);
+  };
+  if (colNames.size() < 1) {
+    error(pos, "Invalid index: missing column names")
+  };
+
+  table = getTable(context, pos, tableName);
+  additionalCols = mutable Vector[];
+  for (ty in table.schema) {
+    if (colSet.contains(ty.name)) continue;
+    additionalCols.push((ty.name, P.IASC()));
+  };
+  !colNames = colNames.concat(additionalCols.toArray());
+
+  cols = colNames.map(x -> {
+    colName = x.i0;
+    if (!table.cols.containsKey(colName)) {
+      error(pos, "Column not found: " + x.i0);
+    };
+    (table.cols[colName], x.i1)
+  });
+  types = table.schema.map(x -> x.ty);
+  kinds = computeOrder(types, cols);
+
+  createIndex(
+    context,
+    Some(userIndexName),
+    table.name,
+    table.dirName,
+    kinds,
+    columns.size(),
+    unique,
+    text,
+  )
+}
+
+/*****************************************************************************/
+/* Algebra used to compile index lookups. */
+/*****************************************************************************/
+
+class SortedA<+T: Orderable> private (value: Array<T>) {
+  static fun createFromItems(array: Array<T>): this {
+    static(array.sorted())
+  }
+
+  fun merge<U: Orderable>[T: U](
+    t2A: SortedA<U>,
+    leftF: U ~> ?U,
+    rightF: U ~> ?U,
+    equalF: (U, U) ~> ?U,
+  ): SortedA<U> {
+    nthis: SortedA<U> = this;
+    t1 = nthis.value;
+    t2 = t2A.value;
+    result = mutable Vector[];
+    i = 0;
+    j = 0;
+    while (i < t1.size() || j < t2.size()) {
+      if (i >= t1.size()) {
+        rightF(t2[j]) match {
+        | None() -> void
+        | Some(x) -> result.push(x)
+        };
+        !j = j + 1;
+        continue;
+      };
+      if (j >= t2.size()) {
+        leftF(t1[i]) match {
+        | None() -> void
+        | Some(x) -> result.push(x)
+        };
+        !i = i + 1;
+        continue;
+      };
+      if (t1[i] < t2[j]) {
+        leftF(t1[i]) match {
+        | None() -> void
+        | Some(x) -> result.push(x)
+        };
+        !i = i + 1;
+      } else if (t1[i] > t2[j]) {
+        rightF(t2[j]) match {
+        | None() -> void
+        | Some(x) -> result.push(x)
+        };
+        !j = j + 1;
+      } else {
+        equalF(t1[i], t2[j]) match {
+        | None() -> void
+        | Some(x) -> result.push(x)
+        };
+        !i = i + 1;
+        !j = j + 1;
+      }
+    };
+    SortedA(result.toArray())
+  }
+}
+
+base class ColOp uses Orderable {
+  children =
+  | COEq(CValue)
+  | COLt(CValue)
+  | COLte(CValue)
+  | COGt(CValue)
+  | COGte(CValue)
+  | COLike(String)
+  | CORange(CValue, CValue)
+
+  static fun create(op: P.BinaryOperator, value: CValue): ColOp {
+    op match {
+    | P.OEq() -> COEq(value)
+    | P.OLt() -> COLt(value)
+    | P.OLtEq() -> COLte(value)
+    | P.OGt() -> COGt(value)
+    | P.OGtEq() -> COGte(value)
+    | _ -> invariant_violation("Unknown operation: " + op)
+    }
+  }
+}
+
+class Col(colNbr: Int, values: Array<ColOp>, unique: Bool) uses Orderable {
+  fun compare(y: Col): Order {
+    this.colNbr.compare(y.colNbr)
+  }
+}
+
+class Solution(eqs: Array<CValue>, other: ?ColOp, unique: Bool) uses Orderable {
+  fun min(): Array<CValue> {
+    op = this.other match {
+    | None() -> return this.eqs
+    | Some(COEq _) -> return this.eqs
+    | Some(op) -> op
+    };
+    this.eqs.concat(
+      Array[
+        op match {
+        | COEq _ -> invariant_violation("Already filtered out")
+        | CORange(x, _) -> x
+        | COLt(last)
+        | COLte(last) ->
+          last.min()
+        | COGt(last)
+        | COGte(last) ->
+          last
+        | COLike(last) ->
+          CString(
+            {
+              sub = mutable Vector[];
+              for (c in last) {
+                if (c == '_') break void;
+                if (c == '%') break void;
+                sub.push(c);
+              };
+              String::fromChars(sub.toArray())
+            },
+          )
+        },
+      ],
+    )
+  }
+
+  fun max(): Array<CValue> {
+    op = this.other match {
+    | None() -> return this.eqs
+    | Some(COEq _) -> return this.eqs
+    | Some(op) -> op
+    };
+    this.eqs.concat(
+      Array[
+        op match {
+        | COEq _ -> invariant_violation("Already filtered out")
+        | CORange(_, x) -> x
+        | COLt(last)
+        | COLte(last) ->
+          last
+        | COGt(last)
+        | COGte(last) ->
+          last.max()
+        | COLike(last) ->
+          CString(
+            {
+              sub = mutable Vector[];
+              for (c in last) {
+                if (c == '_') break void;
+                if (c == '%') break void;
+                sub.push(c);
+              };
+              String::fromChars(sub.toArray()) + largestString()
+            },
+          )
+        },
+      ],
+    )
+  }
+}
+
+class LookUp{
+  index: IndexDescr,
+  tableNbr: Int,
+  cols: SortedA<Col>,
+} uses Orderable {
+  fun compare(y: LookUp): Order {
+    this.index.compare(y.index)
+  }
+
+  fun or(y: LookUp): ?LookUp {
+    if (this.index != y.index) return None();
+    if (this.cols.value.size() > 1 || y.cols.value.size() > 1) return None();
+    invariant(this.tableNbr == y.tableNbr);
+    index = this.index;
+    tableNbr = this.tableNbr;
+
+    cols = this.cols.merge(
+      y.cols,
+      _ ~> None(),
+      _ ~> None(),
+      (x, y) ~> Some(Col(x.colNbr, x.values.concat(y.values), x.unique)),
+    );
+
+    Some(LookUp{index, tableNbr, cols})
+  }
+
+  fun and(y: LookUp): ?LookUp {
+    if (this.index != y.index) return None();
+    invariant(this.tableNbr == y.tableNbr);
+
+    index = this.index;
+    tableNbr = this.tableNbr;
+
+    cols = this.cols.merge(
+      y.cols,
+      x ~> Some(x),
+      x ~> Some(x),
+      (x, y) ~> {
+        allEq1 = for (opVal in x.values) {
+          if (opVal is COEq _) continue;
+          break false;
+        } else {
+          true
+        };
+        allEq2 = for (opVal in y.values) {
+          if (opVal is COEq _) continue;
+          break false;
+        } else {
+          true
+        };
+        Some(
+          if (allEq1 && allEq2) {
+            if (x.values.size() <= y.values.size()) x else y
+          } else {
+            if (x.values.size() == 1 && y.values.size() == 1) {
+              (x.values[0], y.values[0]) match {
+              | (COGte(low), COLte(high))
+              | (COLte(high), COGte(low)) ->
+                Col(x.colNbr, Array[CORange(low, high)], x.unique)
+              | _ if (allEq1) -> x
+              | _ -> y
+              }
+            } else if (allEq1) {
+              x
+            } else {
+              y
+            }
+          },
+        )
+      },
+    );
+
+    lookUp = LookUp{index, tableNbr, cols};
+    Some(lookUp)
+  }
+
+  static fun solutions(
+    acc: mutable Vector<Solution>,
+    n: Int,
+    solutionHead: Array<CValue>,
+    cols: Array<Col>,
+    unique: Bool,
+  ): void {
+    if (cols.size() == 0 || acc.size() > 128) {
+      acc.push(Solution(solutionHead, None(), unique));
+      return void;
+    };
+    col = cols[0];
+    if (col.colNbr != n) {
+      acc.push(Solution(solutionHead, None(), unique));
+      return void;
+    };
+    !cols = cols.slice(1, cols.size());
+    if (col.values.size() > 1 || col.values[0] is COEq _) {
+      for (opVal in col.values) {
+        if (!(opVal is COEq _)) {
+          acc.push(Solution(solutionHead, None(), unique));
+          return void;
+        }
+      };
+      for (opVal in col.values) {
+        value = opVal match {
+        | COEq(x) -> x
+        | _ -> invariant_violation("Unexpected operation kind")
+        };
+        static::solutions(
+          acc,
+          n + 1,
+          solutionHead.concat(Array[value]),
+          cols,
+          unique || col.unique,
+        )
+      }
+    } else if (col.values.size() == 1) {
+      acc.push(Solution(solutionHead, Some(col.values[0]), unique));
+    } else {
+      acc.push(Solution(solutionHead, None(), unique))
+    }
+  }
+
+  fun normalize(): ?Ranges {
+    acc = mutable Vector[];
+    static::solutions(acc, 0, Array[], this.cols.value, false);
+    set = SortedSet[];
+    nonEq = 0;
+    for (range in acc) {
+      if (range.other is Some _) !nonEq = nonEq + 1;
+    };
+    for (range in acc) {
+      !set = set.set(range);
+    };
+    if (nonEq != 1 || set.size() != 1) {
+      !set = set.map(x -> {
+        !x.other = None();
+        x
+      })
+    };
+    !set = set.filter(x -> x.eqs.size() > 0 || x.other is Some _);
+    if (set.size() == 0) return None();
+    Some(Ranges::create(this.index, this.tableNbr, set.collect(Array)))
+  }
+}
+
+class Ranges private (
+  index: IndexDescr,
+  tableNbr: Int,
+  ranges: Array<Solution>,
+  unique: Bool,
+  size: Int,
+  isEq: Bool,
+) {
+  static fun create(
+    index: IndexDescr,
+    tableNbr: Int,
+    ranges: Array<Solution>,
+  ): this {
+    Ranges(
+      index,
+      tableNbr,
+      ranges,
+      static::isUnique(ranges),
+      static::getSize(ranges),
+      static::isEqOp(ranges),
+    )
+  }
+
+  static fun isUnique(ranges: Array<Solution>): Bool {
+    for (solution in ranges) {
+      if (!solution.unique) return false;
+    };
+    true
+  }
+
+  static fun getSize(ranges: Array<Solution>): Int {
+    size = 0;
+    for (solution in ranges) {
+      !size = max(
+        solution.eqs.size() + (if (solution.other is Some _) 1 else 0),
+        size,
+      );
+    };
+    size
+  }
+
+  static fun isEqOp(ranges: Array<Solution>): Bool {
+    for (solution in ranges) {
+      solution.other match {
+      | Some(COEq _) -> void
+      | _ -> return false
+      }
+    };
+    true
+  }
+
+  fun select(other: Ranges): Ranges {
+    (this.unique, other.unique) match {
+    | (true, false) -> this
+    | (false, true) -> other
+    | _ ->
+      if (this.size > other.size) return this;
+      if (this.size < other.size) return other;
+      (this.isEq, other.isEq) match {
+      | (true, _) -> this
+      | (_, true) -> other
+      | _ -> this
+      }
+    }
+  }
+
+  fun minMax(): Array<(Array<CValue>, Array<CValue>)> {
+    this.ranges.map(x -> (x.min(), x.max()))
+  }
+}
+
+class LookUps private (array: SortedA<LookUp>) {
+  static fun createFromItems(array: Array<LookUp>): this {
+    static(SortedA::createFromItems(array))
+  }
+
+  fun and(y: LookUps): LookUps {
+    LookUps(
+      this.array.merge(y.array, x ~> Some(x), x ~> Some(x), (x, y) ~> x.and(y)),
+    )
+  }
+
+  fun or(y: LookUps): LookUps {
+    LookUps(
+      this.array.merge(y.array, _ ~> None(), _ ~> None(), (x, y) ~> x.or(y)),
+    )
+  }
+
+  fun select(): ?(IndexDescr, Int, Array<(Array<CValue>, Array<CValue>)>) {
+    cand: ?Ranges = None();
+    for (lookUp in this.array.value) {
+      !cand = (cand, lookUp.normalize()) match {
+      | (None(), x) -> x
+      | (Some(x), Some(y)) -> Some(x.select(y))
+      | (Some(x), None()) -> Some(x)
+      }
+    };
+    cand match {
+    | None() -> None()
+    | Some(x) -> Some((x.index, x.tableNbr, x.minMax()))
+    }
+  }
+}
+
+module end;

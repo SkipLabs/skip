@@ -1,0 +1,18 @@
+module Runtime_LambdaAssign3;
+@exptest
+fun main(): void {
+  lambda = {
+    n = 37;
+    (() -> n)
+  };
+
+  {
+    // Create a second variable called "n" unrelated to the first.
+    n = 99;
+    _ = n;
+    invariant(lambda() == 37, "")
+  };
+
+  print_string("OK")
+}
+module end;

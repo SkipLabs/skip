@@ -1,0 +1,782 @@
+module alias P = SQLParser;
+
+module SKDB;
+
+/*****************************************************************************/
+/* Helpers */
+/*****************************************************************************/
+
+@export("getVersion")
+fun getVersion(): String {
+  // FIXME
+  // #env("SKARGO_PKG_VERSION")
+  "FIXME (FIXME)"
+}
+
+fun getFieldNames(
+  context: readonly SKStore.Context,
+  dirName: SKStore.DirName,
+): Array<String> {
+  mcontext = context.mclone();
+  tables = SKDB.getTableDir(mcontext);
+  dirNameStr = dirName.toString();
+  iter = dirNameStr.getIter();
+  _ = iter.next();
+  tableName = dirNameStr.sub(iter, dirNameStr.length() - 2);
+  arr = tables.getArray(mcontext, SKStore.SID(tableName));
+  if (arr.size() == 0) {
+    print_error("There is no sql table associated with dir: " + dirNameStr);
+    skipExit(44);
+  };
+  dirDescr = arr[0];
+  dirDescr.schema.map(x -> x.name.origName);
+}
+
+// Read a single line from stdin, decode it to a JSON Object, expected
+// to be a map from key strings (parameter names) to values.
+fun queryParams(options: SKDB.Options): Map<String, P.Value> {
+  if (!options.expectQueryParams) {
+    return Map[];
+  };
+  read_line() match {
+  | Some(line) ->
+    try {
+      decodeParams(JSON.decode(line))
+    } catch {
+    | exn ->
+      print_error(
+        "Decoding JSON failed: \"" + line + "\"\n" + exn.getMessage(),
+      );
+      skipExit(2)
+    }
+
+  | None() ->
+    print_error("Reading stdin for statement parameters failed\n");
+    skipExit(2)
+  }
+}
+
+fun slurpStdin(): String {
+  lines = mutable Vector[];
+  try {
+    loop {
+      read_line() match {
+      | None() -> break void
+      | Some(l) -> lines.push(l)
+      }
+    }
+  } catch {
+  | EndOfFile _ -> void
+  | exn -> throw exn
+  };
+  lines.join("\n")
+}
+
+/*****************************************************************************/
+/* Main */
+/*****************************************************************************/
+
+untracked fun main(): void {
+  saved = SKStore.newObstack();
+  cmd = Cli.Command("skdb")
+    .about("The SQL database that tells you when your query results changed")
+    .arg(Cli.Arg::string("init").about("Initialize new SKStore runtime data"))
+    .arg(
+      Cli.Arg::string("data")
+        .about("Use existing SKStore runtime data")
+        .global(),
+    )
+    .arg(Cli.Arg::bool("backtrace").about("Internal use").global())
+    .arg(Cli.Arg::bool("sync").about("Sync to disk").global())
+    .arg(
+      Cli.Arg::string("format")
+        .default(if (IO.stdin().isatty()) "table" else "sql")
+        .about("Output format (sql, csv, json, or table)")
+        .global(),
+    )
+    .arg(
+      Cli.Arg::bool("always-allow-joins")
+        .about("Allow cross joins and joins outside of reactive views")
+        .global(),
+    )
+    .arg(
+      Cli.Arg::bool("show-used-indexes")
+        .about("Print indexes used by a query to stdout")
+        .global(),
+    )
+    .arg(
+      Cli.Arg::string("capacity").about(
+        "Initialize SKStore runtime with given capacity",
+      ),
+    )
+    .arg(
+      Cli.Arg::bool("expect-query-params").about(
+        "Read values of named parameters which may appear in the statement. The parameter values must be provided via stdin, on a single line, as an encoded JSON Object where the keys are the parameter names and the values will be interpreted as SQL values.",
+      ),
+    )
+    .subcommand(Cli.Command("sessions").about("List the current subscriptions"))
+    .subcommand(Cli.Command("compact").about("Compact the db"))
+    .subcommand(
+      Cli.Command("dump-table")
+        .about("Print a specific table signature")
+        .arg(
+          Cli.Arg::string("table").positional().required().about("Table name"),
+        )
+        .arg(Cli.Arg::string("table-suffix").about("Optional suffix"))
+        .arg(
+          Cli.Arg::bool("legacy-schema").about(
+            "Request maximally-legacy-compatible schema, including any columns which have been extracted to separate tables.",
+          ),
+        ),
+    )
+    .subcommand(
+      Cli.Command("connected-as")
+        .about("Informs the database that it is a replicating peer")
+        .arg(
+          Cli.Arg::string("userId")
+            .required()
+            .about("access key used for the connection"),
+        )
+        .arg(
+          Cli.Arg::string("replicationId")
+            .required()
+            .about(
+              "the replication id the client is using locally for this server-connection",
+            ),
+        ),
+    )
+    .subcommand(
+      Cli.Command("dump-tables")
+        .about("Dumps the tables in SQL format")
+        .arg(Cli.Arg::string("table-suffix").about("Optional suffix")),
+    )
+    .subcommand(
+      Cli.Command("dump-inserts").about("Dump the inserts in SQL format"),
+    )
+    .subcommand(
+      Cli.Command("dump-view")
+        .about("Print a specific view in SQL format")
+        .arg(
+          Cli.Arg::string("view").positional().required().about("View name"),
+        ),
+    )
+    .subcommand(Cli.Command("dump-views").about("Dump the views in SQL format"))
+    .subcommand(
+      Cli.Command("dump").about("Dumps tables/inserts/views in SQL format"),
+    )
+    .subcommand(
+      Cli.Command("migrate").about("Dumps to a new schema, read on stdin"),
+    )
+    .subcommand(
+      Cli.Command("csv-field")
+        .about("Output a specific CSV field")
+        .arg(
+          Cli.Arg::string("field")
+            .positional()
+            .required()
+            .about("Field number"),
+        ),
+    )
+    .subcommand(Cli.Command("size").about("Output the size of the db"))
+    .subcommand(
+      Cli.Command("diff")
+        .about("Send the diff from session")
+        .arg(
+          Cli.Arg::string("session-id")
+            .positional()
+            .required()
+            .about("Session id"),
+        )
+        // if not specified, diff will read a multi-table spec from stdin.
+        .arg(Cli.Arg::string("since").about("Starting time of the diff")),
+    )
+    .subcommand(
+      Cli.Command("disconnect")
+        .about("Disconnect a session")
+        .arg(
+          Cli.Arg::string("session-id")
+            .positional()
+            .required()
+            .about("Session id"),
+        ),
+    )
+    .subcommand(
+      Cli.Command("watermark")
+        .about("Get the watermark for table TABLE")
+        .arg(
+          Cli.Arg::string("source")
+            .required()
+            .about("Globally unique identity of this write stream"),
+        )
+        .arg(
+          Cli.Arg::string("table").positional().required().about("Table name"),
+        ),
+    )
+    .subcommand(
+      Cli.Command("replication-id")
+        .about("Get a unique id for CLIENT-UUID")
+        .arg(
+          Cli.Arg::string("client-uuid")
+            .positional()
+            .required()
+            .about("UUID of the client instance"),
+        ),
+    )
+    .subcommand(
+      Cli.Command("write-csv")
+        .about("Write data from stdin into a directory in CSV format")
+        .arg(
+          Cli.Arg::string("source").about(
+            "Globally unique identity of this write stream",
+          ),
+        )
+        .arg(Cli.Arg::string("user").about("Name of the user"))
+        .arg(
+          Cli.Arg::bool("enable-rebuilds").about(
+            "Allow write-csv to apply rebuilds. Should only be used by single-peer clients." +
+              " Used wrongly, can lead to data loss: if in doubt do not enable.",
+          ),
+        )
+        .arg(
+          Cli.Arg::bool("expect-schemas").about(
+            "Read source-specified schemas from stdin.  They must be JSON-encoded in a map from table name to schema and written on one line before any CSV data.",
+          ),
+        ),
+    )
+    .subcommand(
+      Cli.Command("tail")
+        .about("Tail changes on a directory")
+        .arg(
+          Cli.Arg::string("session-id")
+            .positional()
+            .required()
+            .about("Session id"),
+        )
+        .arg(
+          Cli.Arg::bool("follow")
+            .long("follow")
+            .short("f")
+            .about("Output appended data as the database grows"),
+        )
+        .arg(
+          Cli.Arg::bool("read-spec").about(
+            "Read a tail spec for the subscription from stdin",
+          ),
+        )
+        .arg(
+          Cli.Arg::string("since")
+            .long("since")
+            .about("Starting time of the tail"),
+        )
+        .arg(Cli.Arg::string("user").about("Name of the user")),
+    )
+    .subcommand(
+      Cli.Command("subscribe")
+        .about("Subscribe to a directory change")
+        .arg(
+          Cli.Arg::string("views")
+            .repeatable()
+            .positional()
+            .required()
+            .about("Views"),
+        )
+        .arg(Cli.Arg::bool("connect").about("Send the initial state first"))
+        .arg(
+          Cli.Arg::string("updates").about(
+            "Name of the file where the updates will be written",
+          ),
+        )
+        .arg(
+          Cli.Arg::string("notify").about(
+            "Name of the file updates with time of the last change",
+          ),
+        )
+        .arg(Cli.Arg::string("ignore-source").about("Write stream to ignore")),
+    )
+    .subcommand(
+      Cli.Command("can-mirror")
+        .about(
+          "Check that a table is eligible for mirroring under a given schema",
+        )
+        .arg(
+          Cli.Arg::string("table")
+            .positional()
+            .required()
+            .about("Table signature of remote to mirror"),
+        )
+        .arg(
+          Cli.Arg::string("schema")
+            .positional()
+            .required()
+            .about("Expected table schema"),
+        ),
+    )
+    .subcommand(Cli.Command("replay").about("Replay a diff"))
+    .subcommand(
+      Cli.Command("toggle-view")
+        .about("Toggle view status of specified table")
+        .arg(
+          Cli.Arg::string("table").positional().required().about("Table name"),
+        ),
+    )
+    .help();
+
+  //  try {
+  args = cmd.parseArgs();
+  options = SKDB.Options{
+    backtrace => args.getBool("backtrace"),
+    alwaysAllowJoins => args.getBool("always-allow-joins"),
+    sync => args.getBool("sync"),
+    showUsedIndexes => args.getBool("show-used-indexes"),
+    format => args.getString("format") match {
+    | "csv" -> SKDB.OFK_CSV()
+    | "json" -> SKDB.OFK_JSON()
+    | "sql" -> SKDB.OFK_SQL()
+    | "js" -> SKDB.OFK_JS()
+    | "table" -> SKDB.OFK_Table()
+    | f -> invariant_violation(`Unsupported format: ${f}`)
+    },
+    expectQueryParams => args.getBool("expect-query-params"),
+  };
+
+  subcmd_handler = args.subcommand
+    .map(subcmd ->
+      subcmd match {
+      | "sessions" -> execSessions
+      | "compact" -> execCompact
+      | "dump-table" -> execDumpTable
+      | "dump-tables" -> execDumpTables
+      | "dump-inserts" -> execDumpInserts
+      | "dump-view" -> execDumpView
+      | "dump-views" -> execDumpViews
+      | "dump" -> execDump
+      | "migrate" -> execMigrate
+      | "size" -> execSize
+      | "diff" -> execDiff
+      | "disconnect" -> execDisconnect
+      | "tail" -> execTail
+      | "watermark" -> execWatermark
+      | "replication-id" -> execReplicationId
+      | "write-csv" -> execWriteCsv
+      | "subscribe" -> execSubscribe
+      | "can-mirror" -> execCanMirror
+      | "replay" -> execReplay
+      | "toggle-view" -> execToggleView
+      | "connected-as" -> execSetClientContext
+      | _ -> invariant_violation(`Unknown subcommand ${subcmd}`)
+      }
+    )
+    .default((args, options) -> {
+      // NOTE: This should be a subcommand, but the `--init` flag is currently
+      // hardcoded in the runtime. It should be revisited once the runtime has
+      // a proper two-step init API for persistence.
+      if (args.maybeGetString("init") is Some _) {
+        _ = SKStore.gContextInit(SKDB.makeSqlContext().clone());
+        return void
+      } else if (args.maybeGetString("capacity") is Some _) {
+        print_error("cannot use capacity without init");
+        skipExit(2)
+      };
+      params = queryParams(options);
+      if (!IO.stdin().isatty()) {
+        input = read_to_end();
+        SKDB.eval(input, options, params) match {
+        | Failure(err) ->
+          SKDB.printError(input, err);
+          skipExit(1)
+        | Success _ -> void
+        }
+      } else {
+        loop {
+          SKStore.withRegionVoid(() ~> {
+            input = "";
+            print_raw("skdb> ");
+            loop {
+              read_line() match {
+              | Some(l) -> !input = input + l + " "
+              | None() -> skipExit(0)
+              };
+              SKDB.eval(input, options, params, true) match {
+              | Failure(UnfinishedTransactionError _)
+              | Failure(ParserError(P.UnexpectedTokenError(P.TEOF(), _, _))) ->
+                print_raw(" ...> ");
+                continue
+              | Failure(err) ->
+                printError(input, err);
+                break void
+              | _ -> break void
+              }
+            }
+          })
+        }
+      };
+    });
+  subcmd_handler(args, options);
+  /*  } catch {
+    | exn -> print_error("Internal error: " + exn.getMessage())
+    };
+  */
+  SKStore.destroyObstack(saved);
+}
+
+@wasm_export("SKDB_factory")
+untracked fun factory(): void {
+  main();
+}
+
+private fun ensureContext(args: Cli.ParseResults): void {
+  if (!SKStore.gHasContext()) {
+    invariant(args.maybeGetString("data") is None _);
+    print_error("Error: option --data is missing");
+    skipExit(2);
+  };
+}
+
+fun execSessions(args: Cli.ParseResults, options: SKDB.Options): void {
+  ensureContext(args);
+  SKDB.runSql(options, context ~> {
+    for (id => sub in context.getSessions()) {
+      print_string(
+        id.toString() + "\t" + sub.dirSubs().map(d -> d.entity).join(","),
+      );
+    };
+    SKStore.CStop(None())
+  })
+}
+
+fun execCompact(args: Cli.ParseResults, options: SKDB.Options): void {
+  ensureContext(args);
+  SKDB.runLockedSql(options, context ~> {
+    for (dir in context.listDirs()) {
+      dir match {
+      | edir @ SKStore.EagerDir _ ->
+        !edir = edir.purge(context.getTick());
+        context.setDir(edir)
+      | _ -> void
+      }
+    }
+  })
+}
+
+fun execDumpTable(args: Cli.ParseResults, options: SKDB.Options): void {
+  ensureContext(args);
+  tableName = args.getString("table");
+  suffix = args.maybeGetString("table-suffix");
+  legacySchema = args.getBool("legacy-schema");
+  SKDB.runSql(options, context ~> {
+    SKDB.dumpTable(context, tableName.lowercase(), suffix, legacySchema);
+    SKStore.CStop(None())
+  })
+}
+
+fun execSetClientContext(args: Cli.ParseResults, options: SKDB.Options): void {
+  ensureContext(args);
+  userId = args.getString("userId");
+  replicationId = args.getString("replicationId").toInt();
+  SKDB.runSql(options, _ctx ~> {
+    SKStore.CStop(
+      Some((context, _, _) ~> {
+        context.!purgeFrom = SKDB.sqlPurgeFrom(replicationId);
+        context.!writeChecker = Some(
+          SKDB.AccessSolver::create(context, userId),
+        );
+      }),
+    )
+  })
+}
+
+fun execDumpTables(args: Cli.ParseResults, options: SKDB.Options): void {
+  ensureContext(args);
+  suffix = args.maybeGetString("table-suffix");
+  SKDB.runSql(options, context ~> {
+    SKDB.dumpTables(context, suffix);
+    SKStore.CStop(None())
+  })
+}
+
+fun execDumpInserts(args: Cli.ParseResults, options: SKDB.Options): void {
+  ensureContext(args);
+  SKDB.runSql(options, context ~> {
+    SKDB.dumpInserts(context);
+    SKStore.CStop(None())
+  })
+}
+
+fun execDumpView(args: Cli.ParseResults, options: SKDB.Options): void {
+  ensureContext(args);
+  viewName = args.getString("view");
+  SKDB.runSql(options, context ~> {
+    SKDB.dumpView(context, viewName.lowercase());
+    SKStore.CStop(None())
+  })
+}
+
+fun execDumpViews(args: Cli.ParseResults, options: SKDB.Options): void {
+  ensureContext(args);
+  SKDB.runSql(options, context ~> {
+    SKDB.dumpViews(context);
+    SKStore.CStop(None())
+  })
+}
+
+fun execDump(args: Cli.ParseResults, options: SKDB.Options): void {
+  ensureContext(args);
+  SKDB.runSql(options, context ~> {
+    SKDB.dumpTables(context, None());
+    SKDB.dumpInserts(context);
+    SKDB.dumpViews(context);
+    SKStore.CStop(None())
+  })
+}
+
+fun execMigrate(args: Cli.ParseResults, options: SKDB.Options): void {
+  ensureContext(args);
+  stmts = SKDB.slurpStmts(options);
+  SKDB.runSql(options, context ~> {
+    schema = SKDB.getTables(context);
+    def = migrationDiff(stmts, schema);
+    SKDB.dumpAdjustedInserts(context, def);
+    SKStore.CStop(None())
+  })
+}
+
+fun execSize(args: Cli.ParseResults, options: SKDB.Options): void {
+  ensureContext(args);
+  SKDB.runSql(options, _context ~> {
+    SKStore.printPersistentSize();
+    SKStore.CStop(None())
+  })
+}
+
+fun execDiff(args: Cli.ParseResults, options: SKDB.Options): void {
+  ensureContext(args);
+  sessionID = args.getString("session-id");
+  since = args.maybeGetString("since").map(v -> v.toInt());
+  SKDB.runSql(options, origContext ~> {
+    context = origContext.mclone();
+    sub = context.getSession(sessionID) match {
+    | None() ->
+      print_error("Error: session not found");
+      skipExit(2)
+    | Some(x) -> x
+    };
+
+    sinceForTable = since match {
+    | None() ->
+      input = slurpStdin();
+      spec = decodeDiffSpec(input);
+      (name -> spec.maybeGet(name))
+    | Some(v) -> (_ -> Some(SKStore.Tick(v)))
+    };
+
+    diffSpec = mutable Vector[];
+
+    for (dirSub in sub.dirSubs()) {
+      tableName = P.Name::create(
+        dirSub.dirName.toString().stripPrefix("/").stripSuffix("/"),
+      );
+      sinceForTable(tableName) match {
+      | None() -> void
+      | Some(t) -> diffSpec.push((dirSub, t))
+      }
+    };
+
+    origContext.setGlobal("Stdout", SKDB.StdoutDiff(diffSpec.collect(Array)));
+    SKStore.CStop(None())
+  })
+}
+
+fun execDisconnect(args: Cli.ParseResults, options: SKDB.Options): void {
+  ensureContext(args);
+  sessionID = args.getString("session-id");
+  SKDB.runLockedSql(options, context ~> {
+    context.getSession(sessionID) match {
+    | None() ->
+      print_error("Error: session not found");
+      skipExit(2)
+    | Some(_) -> context.unsubscribe(sessionID)
+    };
+  })
+}
+
+fun execTail(args: Cli.ParseResults, options: SKDB.Options): void {
+  ensureContext(args);
+  sessionID = args.getString("session-id");
+  followMode = args.getBool("follow");
+
+  defaultSince = args.maybeGetString("since") match {
+  | Some(since) -> since.toInt()
+  | _ -> 0
+  };
+
+  user = args.maybeGetString("user");
+
+  spec = if (args.getBool("read-spec")) {
+    input = slurpStdin();
+    lookup = decodeTailSpec(input, defaultSince);
+    name ~> lookup.get(name)
+  } else {
+    _ ~> {
+      TailSpec{
+        since => defaultSince,
+        filter => None(),
+        params => Map[],
+        columns => None(),
+      }
+    }
+  };
+
+  if (!tailSub(options, followMode, sessionID, user, spec)) {
+    skipExit(1)
+  }
+}
+
+fun execWatermark(args: Cli.ParseResults, options: SKDB.Options): void {
+  ensureContext(args);
+  tableName = args.getString("table").lowercase();
+  source = args.getString("source").toIntOption();
+  SKDB.runSql(options, context ~> {
+    print_string(
+      SKDB.getWatermark(context, tableName, source).default(SKStore.Tick(0))
+        .value,
+    );
+    SKStore.CStop(None())
+  });
+}
+
+fun execReplicationId(args: Cli.ParseResults, options: SKDB.Options): void {
+  ensureContext(args);
+  clientUuid = args.getString("client-uuid").lowercase();
+  SKDB.runSql(options, context ~> {
+    clientsDirname = SKStore.DirName::create(`/clients/`);
+    clientsDir = context.maybeGetDir(clientsDirname) match {
+    | None() ->
+      context.mkdir(SKStore.SID::keyType, SKStore.IntFile::type, clientsDirname)
+    | Some(d) ->
+      SKStore.EHandle(
+        SKStore.SID::keyType,
+        SKStore.IntFile::type,
+        d.getDirName(),
+      )
+    };
+    key = SKStore.SID::create(clientUuid);
+    arr = clientsDir.unsafeGetArray(context, key);
+    replicationSource = if (arr.size() > 0) {
+      arr[0].value
+    } else {
+      source = SKStore.genSym(0);
+      clientsDir.writeArray(context, key, Array[SKStore.IntFile(source)]);
+      source
+    };
+    print_string(replicationSource);
+    SKStore.CStop(None())
+  });
+}
+
+fun execWriteCsv(args: Cli.ParseResults, options: SKDB.Options): void {
+  ensureContext(args);
+  source = args.maybeGetString("source") match {
+  | Some(src) -> src.toInt()
+  | None() -> SKStore.genSym(0)
+  };
+
+  user = args.maybeGetString("user");
+  schemas = if (args.getBool("expect-schemas")) {
+    read_line() match {
+    | Some(line) -> decodeSchemas(line)
+    | None() ->
+      print_error("Reading stdin for expected schemas failed\n");
+      skipExit(2)
+    }
+  } else {
+    Map::createFromItems(Array[])
+  };
+  rebuildsEnabled = args.getBool("enable-rebuilds");
+  SKDB.runSql(options, context ~>
+    SKCSV.replayDiff(context, read_line, user, source, schemas, rebuildsEnabled)
+  )
+}
+
+fun execSubscribe(args: Cli.ParseResults, options: SKDB.Options): void {
+  ensureContext(args);
+  views = args.getArray("views").map(v -> v.lowercase());
+  init = args.getBool("connect");
+  SKDB.runLockedSql(options, context ~> {
+    SKDB.forbidNow(context);
+    cmd = (
+      args.maybeGetString("updates"),
+      args.maybeGetString("notify"),
+    ) match {
+    | (Some(_), Some(_)) ->
+      print_error("Cannot have both --updates and --notify");
+      skipExit(4)
+    | (Some(fileName), _) -> SKStore.NUpdates{fileName}
+    | (_, Some(fileName)) -> SKStore.NNotify{fileName}
+    | _ -> SKStore.NTail()
+    };
+    (input, output) = SKDB.getSubsDirs(context);
+    viewKey = SKStore.SID(
+      views.maybeGet(0).fromSome("Must specify at least one view or table"),
+    );
+    inputDir = context.unsafeGetEagerDir(input.dirName);
+    sessionID = SKStore.genSym(0).toString();
+    request = SKDB.SubRequestFile(
+      views,
+      options.format,
+      init,
+      cmd,
+      sessionID,
+      args.maybeGetString("ignore-source").map(x -> x.toInt()),
+    );
+    inputDir.write(context, viewKey, request);
+    context.update();
+    outputDir = context.unsafeGetEagerDir(output.dirName);
+    file = outputDir.getArrayRaw(viewKey)[0];
+    invariant(sessionID == SKStore.StringFile::type(file).value);
+    print_string(sessionID.toString());
+  })
+}
+
+fun execCanMirror(args: Cli.ParseResults, options: SKDB.Options): void {
+  ensureContext(args);
+  table = args.getString("table");
+  schema = args.getString("schema");
+  SKDB.runSql(options, context ~> {
+    SKCSV.reasonSchemaUnsupported(context, table, schema.lowercase()) match {
+    | None() -> void
+    | Some(reason) -> print_string(reason)
+    };
+    SKStore.CStop(None())
+  })
+}
+
+fun execReplay(_args: Cli.ParseResults, _options: SKDB.Options): void {
+  state = SKCSV.replayStdin();
+  state.each((value, txNbrAndRepeat) -> {
+    (_, repeat) = txNbrAndRepeat;
+    for (_ in Range(0, repeat)) {
+      print_string(value);
+    }
+  })
+}
+
+fun execToggleView(args: Cli.ParseResults, _options: SKDB.Options): void {
+  ensureContext(args);
+  tableName = args.getString("table");
+  SKDB.runSql(_options, context ~> {
+    tables = getTableDir(context);
+    baseName = SKStore.SID::create(tableName.lowercase());
+    tables.maybeGet(context, baseName) match {
+    | None() -> error(0, "Table not found: " + tableName)
+    | Some(dirDescr) ->
+      tables.writeArray(
+        context,
+        baseName,
+        Array[dirDescr with {view => !dirDescr.view}],
+      )
+    };
+    SKStore.CStop(None())
+  })
+}
+
+module end;

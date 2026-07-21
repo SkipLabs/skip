@@ -1,0 +1,619 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+fun createOptimizedFunctions(
+  context: mutable SKStore.Context,
+  env: GlobalEnv,
+  config: Config.Config,
+): GlobalEnv {
+  runCompilerPhase("native/compile", () -> {
+    !env = Optimize.compileAll(context, env, config);
+
+    // Find all the functions that are still reachable from the root set,
+    // post-inlining, dead code elimination, etc.
+    !env.sfuns = findAllReachableFuns(
+      keep -> {
+        // Seed the "reachable" recursion with functions we definitely
+        // need to emit.
+        keep(env.initializeAllConstsID);
+        for (f in env.sfuns) {
+          if (f.isDisasm || f.isRuntimeExport) {
+            keep(f.id)
+          }
+        };
+        env.runtimeFunctions.values().each(keep)
+      },
+      env,
+    );
+
+    // Now that we have computed the fields for all of the various
+    // coroutine classes, we can finally analyze pointer escape info.
+    !env = Escape.computeWhetherPointersCanEscape(env);
+
+    // optimize.sk steps (5) Lower + (6) Lay out vtables.
+    !env = Lower.lowerFunctions(env, config)
+  });
+
+  env
+}
+
+// Returns the link command for the native (non-WASM) case.
+// For WASM, runs the multi-step toolchain directly and returns None().
+fun getLinkArgs(
+  llFile: String,
+  config: Config.Config,
+  exports: Array<String> = Array[],
+): ?Array<String> {
+  linker_args = config.link_args.concat(
+    config.dependencies.values().collect(Array).flatMap(x -> x.i1.links),
+  );
+  static_libs = config.static_libraries.concat(
+    config.dependencies
+      .values()
+      .filter(d -> d.i1.has_object_code)
+      .map(x -> x.i0)
+      .collect(Array),
+  );
+  if (config.isWasm()) {
+    output = config.output;
+    bcFile = output + ".bc";
+    runShell(
+      Array["llvm-link", llFile].concat(Array["-o", bcFile]),
+      config.verbose,
+    );
+    bcOptFile = output + ".opt.bc";
+    runShell(
+      Array["opt", `-O${config.optLevel}`, bcFile, "-o", bcOptFile],
+      config.verbose,
+    );
+    oFile = output + ".o";
+    runShell(
+      Array[
+        "llc",
+        "-mtriple=wasm32-unknown-unknown",
+        `-O${config.optLevel}`,
+        "-filetype=obj",
+        bcOptFile,
+        "-o",
+        oFile,
+      ],
+      config.verbose,
+    );
+    // TODO: Proper mechanism to select exports.
+    exportJs = exports
+      .concat(
+        Array[
+          "getCompositeName",
+          "getCompositeSize",
+          "getCompositeAt",
+          "SKIP_String_byteSize",
+          "getLeafValue",
+          "objectKind",
+          "SKIP_call0",
+          "SKIP_Obstack_alloc",
+          "skip_main",
+          "SKIP_init_jsroots",
+          "SKIP_add_root",
+          "SKIP_remove_root",
+          "SKIP_tracked_call",
+          "SKIP_tracked_query",
+          "sk_string_create",
+          "SKIP_initializeSkip",
+          "SKIP_skstore_init",
+          "SKIP_skstore_end_of_init",
+          "SKIP_get_persistent_size",
+          "sk_pop_dirty_page",
+          "SKIP_get_version",
+          "SKIP_throw_EndOfFile",
+          "SKIP_new_Obstack",
+          "SKIP_destroy_Obstack",
+          "getVersion",
+          "__heap_base",
+        ],
+      )
+      .map(x -> `-export=${x}`);
+    runShell(
+      Array[
+        "wasm-ld",
+        "--initial-memory=1073741824",
+        oFile,
+        "-o",
+        output,
+        "--no-entry",
+        "-allow-undefined",
+      ].concat(exportJs)
+        .concat(linker_args)
+        .concat(static_libs),
+      config.verbose,
+    );
+    None()
+  } else {
+    flags = if (config.emit == "cdylib") {
+      Array["-fPIC", "-shared"]
+    } else {
+      Array["-no-pie"]
+    };
+
+    Some(
+      Array[
+        "clang++",
+        `-O${config.optLevel}`,
+        "-o",
+        config.output,
+        llFile,
+      ].concat(flags)
+        .concat(linker_args)
+        .concat(static_libs),
+    )
+  }
+}
+
+fun runShell(args: Array<String>, verbose: Bool = false): void {
+  if (verbose) {
+    print_error(">> " + args.join(" "))
+  };
+  p = System.subprocess(
+    args,
+    s -> {
+      if (verbose) {
+        print_error_raw(s)
+      }
+    },
+    s -> {
+      if (verbose) {
+        print_error_raw(s)
+      }
+    },
+  ).fromSuccess();
+  if (!p.success()) {
+    if (!verbose) {
+      print_error_raw(p.stderr)
+    };
+    skipExit(1)
+  }
+}
+
+fun ensureCompatibleLLVMVersion(): void {
+  kLLVMVersion = "20.";
+
+  p = System.subprocess(Array["llvm-config", "--version"]).fromSuccess();
+  if (!p.success()) {
+    print_error_raw(p.stderr);
+    skipExit(1)
+  } else if (!p.stdout.startsWith(kLLVMVersion)) {
+    print_error(
+      `Incompatible LLVM version ${p.stdout.trimRight()}, expected LLVM ${kLLVMVersion}`,
+    );
+    skipExit(1)
+  }
+}
+
+class TickConfigFile(value: (Int, Config.Config)) extends SKStore.File
+
+// Sink of the backend mapper: for each unit, the compile errors it produced
+// (empty/absent on success). The mapper *emits its outcome* here rather than
+// reporting errors from inside the reactive computation; `compile()` reads it
+// back after `update()` and decides what to do.
+const backendSinkDirName: SKStore.DirName = SKStore.DirName::create(
+  "/backendSink/",
+);
+const backendSinkDir: SKStore.EHandle<
+  SKStore.UnitID,
+  SkipError.ErrorsFile,
+> = SKStore.EHandle(
+  SKStore.UnitID::keyType,
+  SkipError.ErrorsFile::type,
+  backendSinkDirName,
+);
+
+fun getOrInitializeBackend(context: mutable SKStore.Context): SKStore.EagerDir {
+  backendDirName = SKStore.DirName::create("/backend/");
+  context.unsafeMaybeGetEagerDir(backendDirName) match {
+  | Some(dir) -> return dir
+  | None() -> void
+  };
+
+  _ = context.mkdir(
+    FileCache.InputSource::keyType,
+    SKStore.StringFile::type,
+    FileCache.fileDirName,
+  );
+  _ = context.mkdir(
+    FileCache.InputPackageName::keyType,
+    FileCache.InputPackageFiles::type,
+    FileCache.packageDirName,
+  );
+  backendDir = context.mkdir(
+    SKStore.UnitID::keyType,
+    TickConfigFile::type,
+    backendDirName,
+  );
+
+  outerIst = OuterIstToIR.makeOuterIst(context);
+
+  defsProj = outerIst.getFunsProj(context);
+  constsProj = outerIst.getConstsProj(context);
+
+  converter = OuterIstToIR.Converter::create(
+    context,
+    SKStore.DirName::create("/converter/"),
+    outerIst,
+  );
+
+  _ = backendDir.map(
+    SKStore.UnitID::keyType,
+    SkipError.ErrorsFile::type,
+    context,
+    backendSinkDirName,
+    (context, writer, key, values) ~> {
+      (_, conf) = values.first.value;
+
+      context.getGlobal("ERRORS") match {
+      | None() -> void
+      | Some(errors) ->
+        // A compile error: emit it as this unit's outcome and stop. Reporting
+        // (or, in batch mode, recovering) is `compile()`'s job — doing control
+        // flow from inside the reactive mapper would corrupt the context.
+        writer.set(
+          key,
+          SkipError.ErrorsFile(
+            SkipError.ErrorsFile::type(errors).value.reversed(),
+          ),
+        );
+        return void
+      };
+
+      if (conf.check) {
+        return void;
+      };
+
+      if (conf.emit == "sklib") {
+        compile_sklib(context, conf);
+        return void
+      };
+
+      // Create a filter for what functions to compile.
+      shouldRuntimeExport = (
+        funDef ~>
+          AsmOutput.cppIsExported(
+            funDef.origName,
+            funDef.annotations,
+            funDef.getPos(),
+            conf.exportedAsFunctions,
+            conf.isWasm(),
+          )
+      );
+
+      // Are we in "disassemble" mode?
+      disasm = (
+        conf.disasmAll ||
+        conf.disasmAnnotated ||
+        !conf.disasmFiles.isEmpty() ||
+        !conf.disasmFunctions.isEmpty()
+      );
+
+      // Create a filter for what functions to disassemble.
+      //
+      // Note that for "disasmAll" we do not return true, since we only want
+      // to disassemble code which is actually used, and returning true would
+      // force everything to be compiled just so it could be disassembled.
+      shouldDisasm = (
+        funDef ~>
+          disasm &&
+            (conf.disasmFunctions.contains(funDef.origName) ||
+              (conf.disasmAnnotated &&
+                annotationsContain(
+                  funDef.annotations,
+                  "@disasm",
+                  funDef.getPos(),
+                )))
+      );
+
+      // The frontend (naming/typing of the stdlib) is computed lazily and
+      // realized here as createIR forces the typed defs, so this phase
+      // dominates compile time.
+      env = runCompilerPhase("frontend+ir", () -> {
+        OuterIstToIR.createIR(
+          context,
+          conf,
+          shouldDisasm,
+          shouldRuntimeExport,
+          outerIst,
+          converter,
+          constsProj,
+          defsProj,
+        )
+      });
+
+      !env = createOptimizedFunctions(context, env, conf);
+      defs = runCompilerPhase("native/create_asm_graph", () -> {
+        AsmOutput.createAsmDefGraph(env, conf)
+      });
+
+      runCompilerPhase("native/merge_asm_graph", () -> {
+        AsmOutput.mergeIdenticalAsmDefs(defs, conf.debug)
+      });
+
+      runCompilerPhase("native/create_asm_symbols", () -> {
+        AsmOutput.assignFinalSymbols(defs)
+      });
+
+      conf.emit match {
+      | "llvm-ir" -> compile_llvm_ir(defs, conf)
+      | "link" | "cdylib" ->
+        // TODO: Remove exports stuff once --emit=cdylib is supported.
+        wasm_exports = outerIst
+          .getFuns(context, defsProj)
+          .filter(f ->
+            annotationsContainParam(
+              f.annotations,
+              "@wasm_export",
+              f.getPos(),
+            ).isSome() ||
+              annotationsContainParam(
+                f.annotations,
+                "@export",
+                f.getPos(),
+              ).isSome()
+          )
+          .map(exportName);
+        compile_binary(defs, conf, wasm_exports)
+      | "sklib" ->
+        invariant_violation("--emit=sklib should have been handled earlier")
+      | _ -> invariant_violation("Unsupported value for `--emit`: " + conf.emit)
+      }
+    },
+  );
+
+  context.unsafeGetEagerDir(backendDirName)
+}
+
+fun compile(
+  config: Config.Config,
+  context: mutable SKStore.Context,
+  fileNames: Array<String>,
+): void {
+  if (fileNames.isEmpty() && config.dependencies.isEmpty()) {
+    print_error("fatal error: no input files\n");
+    skipExit(4); // Exit code used by g++ for no input files
+  };
+
+  // In batch mode the LLVM version is checked once, up front.
+  if (!config.batch_mode) {
+    ensureCompatibleLLVMVersion()
+  } else {
+    SkipError.setBatchMode(context)
+  };
+
+  runCompilerPhase("backend/init", () -> {
+    getOrInitializeBackend(context).writeArray(
+      context,
+      SKStore.UnitID::singleton,
+      Array[TickConfigFile((context.getTick().value, config))],
+    )
+  });
+
+  make_input_source_path = (pkg_base_dir, src_path) ~> {
+    res = Path.join(pkg_base_dir, src_path);
+    if (config.canonize_paths) {
+      !res = config.cwd.makeRelative(res);
+    };
+    res
+  };
+
+  runCompilerPhase("frontend/read_files", () -> {
+    FileCache.writeFiles(
+      context,
+      fileNames,
+      config.dependencies,
+      config.lib_name,
+      make_input_source_path,
+    )
+  });
+
+  runCompilerPhase("frontend/update", () -> context.update());
+
+  // The backend mapper records any compile errors as this unit's outcome in
+  // `/backendSink/` (absent on success). Report them here, out of the reactive
+  // computation. In batch mode a failure is recoverable (surface it as an
+  // exception so the batch can move on); otherwise it exits the process.
+  backendSinkDir.maybeGet(context, SKStore.UnitID::singleton) match {
+  | Some(ef) if (!ef.value.isEmpty()) ->
+    get_file = file -> {
+      FileCache.fileDir.unsafeGetArray(context, file)[0].value
+    };
+    if (config.batch_mode) {
+      msg = SkipError.errorsToString(
+        ef.value.map(x -> x.errors).flatten().collect(Vector),
+        get_file,
+      );
+      throw SkipError.CompileFailureException{message => msg}
+    } else {
+      SkipError.printErrorsAndExit(ef.value.toArray(), get_file)
+    }
+  | _ -> void
+  }
+}
+
+// Type the stdlib (dependencies) once into `context`, with no config written
+// so the backend mapper never fires — leaving a clean "warm" base that carries
+// the typed stdlib and no unit-specific state.
+fun warm_stdlib(config: Config.Config, context: mutable SKStore.Context): void {
+  _ = getOrInitializeBackend(context);
+  make_input_source_path = (pkg_base_dir, src_path) ~> {
+    res = Path.join(pkg_base_dir, src_path);
+    if (config.canonize_paths) {
+      !res = config.cwd.makeRelative(res);
+    };
+    res
+  };
+  FileCache.writeFiles(
+    context,
+    Array[],
+    config.dependencies,
+    config.lib_name,
+    make_input_source_path,
+  );
+  context.update()
+}
+
+// Compile many units in one process, sharing the stdlib type-checking that
+// is ~64% of a one-shot compile. The stdlib is typed once into a warm base
+// context; each unit then compiles on a cheap copy-on-write clone of that
+// base, so its typing (and any compile error, which would otherwise corrupt
+// the shared reactive state) is fully isolated — the base stays pristine and
+// a failed unit doesn't affect the others. Each manifest line is:
+//   <output> <mainFn> <input.sk> [<input2.sk> ...]
+// (whitespace-separated), where <mainFn> is exported as skip_main.
+fun compile_batch(
+  base_config: Config.Config,
+  context: mutable SKStore.Context,
+  manifest_path: String,
+): void {
+  ensureCompatibleLLVMVersion();
+  SkipError.setBatchMode(context);
+  warm_stdlib(base_config, context);
+  lines = FileSystem.readTextFile(manifest_path).split("\n");
+  failures = 0;
+  for (line in lines) {
+    parts = line.split(" ").filter(p -> !p.isEmpty()).collect(Array);
+    if (parts.isEmpty()) {
+      continue
+    };
+    if (parts.size() < 3) {
+      print_error(`Invalid batch manifest line: ${line}\n`);
+      skipExit(1)
+    };
+    output = parts[0];
+    mainFn = parts[1];
+    inputs = parts.drop(2);
+    unit_config = base_config.withUnit(inputs, output, mainFn);
+    // Compile each unit on a throwaway clone of the warm base. The clone
+    // isolates the unit's typing (and any compile error, which would
+    // otherwise corrupt the shared reactive state) from the base and the
+    // other units; withForkedContext reclaims the clone's memory afterwards
+    // so a large batch does not accumulate per-unit state.
+    try {
+      SKStore.withForkedContext(context, ctx ~>
+        compile(unit_config, ctx, inputs)
+      )
+    } catch {
+    | err @ SkipError.CompileFailureException _ ->
+      msg = err.getMessage();
+      print_error(msg);
+      // Also record this unit's errors next to its (unwritten) output, so a
+      // caller driving many units can attribute failures per unit without
+      // parsing the interleaved stderr stream. A successful unit writes its
+      // artifact at `output` and no `.err`; a failed one writes `.err` and no
+      // artifact, giving an unambiguous per-unit signal.
+      FileSystem.writeTextFile(output + ".err", msg);
+      !failures = failures + 1
+    | exn -> throw exn
+    }
+  };
+  if (failures > 0) {
+    print_error(`Batch compilation failed: ${failures} unit(s) had errors.\n`);
+    skipExit(2)
+  }
+}
+
+fun compile_llvm_ir(
+  defs: readonly AsmOutput.AsmDefIDToAsmDef,
+  conf: Config.Config,
+): void {
+  runCompilerPhase("native/write_asm_files", () -> {
+    AsmOutput.writeOutputFiles(defs, conf.input_files, conf.output, conf)
+  })
+}
+
+fun compile_binary(
+  defs: readonly AsmOutput.AsmDefIDToAsmDef,
+  conf: Config.Config,
+  exports: Array<String>,
+): void {
+  // TODO: Use `mkstemp()` instead.
+  llFile = conf.output + ".ll";
+  runCompilerPhase("native/write_asm_files", () -> {
+    AsmOutput.writeOutputFiles(defs, conf.input_files, llFile, conf)
+  });
+
+  runCompilerPhase("native/link", () -> {
+    getLinkArgs(llFile, conf, exports).each(args -> {
+      if (conf.no_link) {
+        print_string("---LINK_ARGS_BEGIN---");
+        args.each(print_string);
+        print_string("---LINK_ARGS_END---")
+      } else {
+        runShell(args, conf.verbose)
+      }
+    })
+  })
+}
+
+fun compile_sklib(context: mutable SKStore.Context, conf: Config.Config): void {
+  runCompilerPhase("native/write_sklib", () -> {
+    accessed_env_vars = SortedSet::createFromItems(
+      FileCache.packageEnvAccessDir.getArray(
+        context,
+        SKStore.SID(conf.lib_name.fromSome()),
+      ).map(v -> v.value),
+    );
+    env_dir = FileCache.packageEnvDir(conf.lib_name);
+    env_vars = SortedMap::createFromIterator(
+      accessed_env_vars
+        .map(v -> (v, env_dir.unsafeGet(context, SKStore.SID(v)).value))
+        .iterator(),
+    );
+
+    // NOTE: Static libraries (`.a` archives) provided as input files are
+    // bundled into the `sklib`.
+    sklib = mutable SklibBuilder(
+      conf.lib_name.fromSome(),
+      conf.target,
+      getcwd(),
+    );
+    env_vars.each((k, v) -> sklib.add_env_var(k, v));
+    conf.direct_dependencies.each(dep_name ->
+      sklib.add_dependency(dep_name, conf.dependencies[dep_name].i1)
+    );
+    conf.static_libraries.each(sklib.add_static_library);
+    conf.link_args.each(sklib.add_link_arg);
+    conf.preambles.each(sklib.add_preamble);
+    conf.input_files.each(sklib.add_source);
+
+    ar_file = IO.File::open(
+      conf.output,
+      IO.OpenOptions{write => true, create => true, truncate => true},
+    );
+    sklib.write(ar_file) match {
+    | Success _ -> void
+    | Failure(err) ->
+      print_error(`Could not write ${conf.output}: ${err}`);
+      skipExit(3)
+    };
+    ar_file.close();
+
+    p = System.subprocess(Array["llvm-ar", "s", conf.output]).fromSuccess();
+    if (!p.success()) {
+      print_error(`ranlib failed: ${p.stdout} ${p.stderr}`);
+      skipExit(3)
+    }
+  })
+}
+
+fun exportName(f: OuterIst.FunDef): String {
+  pos = f.getPos();
+  annotationsContainParam(f.annotations, "@wasm_export", pos) match {
+  | Some(s) if (!s.isEmpty()) -> return s
+  | _ -> void
+  };
+  annotationsContainParam(f.annotations, "@export", pos) match {
+  | Some(s) if (!s.isEmpty()) -> return s
+  | _ -> void
+  };
+  "SKIP_" + AsmOutput.mangle(f.origName)
+}

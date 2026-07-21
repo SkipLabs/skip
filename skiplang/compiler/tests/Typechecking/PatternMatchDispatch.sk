@@ -1,0 +1,14 @@
+module Typechecking_PatternMatchDispatch;
+@exptest
+fun main(): void {
+  print_raw(Foo("Pass\n").asString())
+}
+
+base class Bar {
+  children =
+  | Foo(String)
+
+  fun asString(): String
+  | _bug_ @ Foo(x) -> x
+}
+module end;

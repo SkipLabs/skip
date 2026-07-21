@@ -1,0 +1,74 @@
+services:
+  # Reverse proxy
+  haproxy:
+    image: reactive-blogger/reverse_proxy
+    build:
+      context: ./reverse_proxy
+      dockerfile: ./Dockerfile.distributed
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      www:
+        condition: service_healthy
+      skip_leader:
+        condition: service_healthy
+
+  # Web application
+  web:
+    image: reactive-blogger/web-service
+    build: ./web_service
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DISTRIBUTED_MODE: true
+
+  # SQL database
+  db:
+    image: reactive-blogger/db
+    build: ./db
+    restart: always
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  # Reactive cache
+  skip_leader:
+    image: reactive-blogger/reactive-service
+    build: ./reactive_service
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SKIP_LEADER: true
+  skip_follower1: &follower
+    image: reactive-blogger/reactive-service
+    build: ./reactive_service
+    networks:
+      default:
+        aliases:
+          - skip_followers
+    depends_on:
+      skip_leader:
+        condition: service_healthy
+    environment:
+      SKIP_FOLLOWER: true
+      SKIP_RESOURCE_PREFIX: follower1
+  skip_follower2:
+    <<: *follower
+    environment:
+      SKIP_FOLLOWER: true
+      SKIP_RESOURCE_PREFIX: follower2
+  skip_follower3:
+    <<: *follower
+    environment:
+      SKIP_FOLLOWER: true
+      SKIP_RESOURCE_PREFIX: follower3
+
+  # Front-end
+  www:
+    image: reactive-blogger/www
+    build: ./www
+
+volumes:
+  pgdata:

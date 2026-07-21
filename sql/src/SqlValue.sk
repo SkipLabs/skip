@@ -1,0 +1,378 @@
+module alias P = SQLParser;
+
+module SKDB;
+
+/*****************************************************************************/
+/* Primitives used to build js objects directly (instead of a string) */
+/*****************************************************************************/
+@cpp_extern("SKIP_last_tick")
+native fun lastTick(UInt32): UInt32;
+@cpp_extern("SKIP_switch_to")
+native fun switchTo(UInt32): void;
+@cpp_extern("SKIP_clear_field_names")
+native fun jsClearFieldNames(): void;
+@cpp_extern("SKIP_push_field_name")
+native fun jsPushFieldName(String): void;
+@cpp_extern("SKIP_clear_object")
+native fun jsClearObject(): void;
+@cpp_extern("SKIP_push_object_field_null")
+native fun jsPushObjectFieldNull(): void;
+@cpp_extern("SKIP_push_object_field_int32")
+native fun jsPushObjectFieldInt32(Int32): void;
+@cpp_extern("SKIP_push_object_field_int64")
+native fun jsPushObjectFieldInt64(String): void;
+@cpp_extern("SKIP_push_object_field_float")
+native fun jsPushObjectFieldFloat(String): void;
+@cpp_extern("SKIP_push_object_field_string")
+native fun jsPushObjectFieldString(String): void;
+@cpp_extern("SKIP_push_object_field_json")
+native fun jsPushObjectFieldJSON(SKJSON.CJSON): void;
+@cpp_extern("SKIP_push_object")
+native fun jsPushObject(): void;
+
+fun compareRows(
+  kinds: Array<(Int, P.IKind, P.Type)>,
+  x: RowValues,
+  y: RowValues,
+): Order {
+  xsize = x.size();
+  ysize = y.size();
+  for (i in Range(0, kinds.size())) {
+    (idx, direction, _ty) = kinds[i];
+    if (idx >= xsize && idx >= ysize) return EQ();
+    if (idx >= xsize) return LT();
+    if (idx >= ysize) return GT();
+    value1 = x.getValue(idx);
+    value2 = y.getValue(idx);
+    (value1, value2) match {
+    | (None(), None()) -> continue
+    | (None(), _) ->
+      return direction match {
+      | P.IDESC() -> GT()
+      | _ -> LT()
+      }
+    | (_, None()) ->
+      return direction match {
+      | P.IDESC() -> LT()
+      | _ -> GT()
+      }
+    | (Some(v1), Some(v2)) ->
+      cmp = direction match {
+      | P.INONE()
+      | P.IASC() ->
+        v1.compare(v2)
+      | P.IDESC() -> v2.compare(v1)
+      };
+      if (cmp != EQ()) return cmp
+    }
+  };
+  EQ()
+}
+
+extension class RowKey {
+  static fun create(
+    row: RowValues,
+    kinds: Array<(Int, P.IKind, P.Type)>,
+  ): RowKey {
+    static(row, kinds)
+  }
+
+  fun getRowValues(): RowValues {
+    this.row
+  }
+
+  fun getKinds(): Array<(Int, P.IKind, P.Type)> {
+    this.kinds
+  }
+
+  fun compare(other: SKStore.Key): Order {
+    other match {
+    | RowKey(row2, kinds2) ->
+      this.kinds.compare(kinds2) match {
+      | EQ() -> SKDB.compareRows(this.kinds, this.row, row2)
+      | diseq -> diseq
+      }
+    | _ -> this.getClassName().compare(other.getClassName())
+    }
+  }
+
+  fun toString(): String {
+    inspect(this).toString();
+  }
+
+  fun toKVStringRemove(format: SKStore.OutputFormat): String {
+    this.row.setRepeat(0).toKVString(format, this)
+  }
+
+  fun writeKVString(
+    writer: (String) -> void,
+    format: SKStore.OutputFormat,
+    files: Array<SKStore.File>,
+  ): void {
+    repeat = 0;
+    for (file in files) {
+      !repeat = repeat + RowValues::type(file).getRepeat()
+    };
+    writer(this.row.setRepeat(repeat).toKVString(format, this))
+  }
+}
+
+fun escapeStringStr(s: String): String {
+  chars = mutable Vector[];
+  chars.push('\'');
+  for (c in s) {
+    if (c == '\'') chars.push(c);
+    chars.push(c);
+  };
+  chars.push('\'');
+  String::fromChars(chars.toArray());
+}
+
+fun escapeString(o: String -> void, s: String): void {
+  o("'");
+  chars = mutable Vector[];
+  for (c in s) {
+    if (c == '\'') chars.push(c);
+    chars.push(c);
+  };
+  o(String::fromChars(chars.toArray()));
+  o("'")
+}
+
+base class Row extends SKStore.File {
+  fun size(): Int;
+  fun getInt(n: Int): ?Int;
+  fun getFloat(n: Int): ?Float;
+  fun getString(n: Int): ?String;
+  fun getJSON(n: Int): ?CJSON;
+  fun getType(n: Int): ?CType;
+  fun getValue(n: Int): ?CValue;
+  fun items(): mutable Iterator<(Int, ?CValue)>;
+  static overridable fun type(f: SKStore.File): Row {
+    f match {
+    | r @ RowValues _ -> r
+    | r @ RowKind _ -> r
+    | _ -> invariant_violation("Unexpected Row File")
+    }
+  }
+
+  fun toString(): String {
+    buffer = mutable Vector[];
+    o = x -> buffer.push(x);
+    o("(");
+    for (i => cvalue in this) {
+      cvalue match {
+      | None() -> o("NULL")
+      | Some(CInt(n)) -> o(n.toString())
+      | Some(CFloat(f)) -> o(f.toString())
+      | Some(CString(s)) -> escapeString(o, s)
+      | Some(b @ CJSON _) -> escapeString(o, b.toString())
+      | Some(CType(ty)) -> escapeString(o, SKJSON.prettyPrintType(true, ty))
+      };
+      if (i != this.size() - 1) {
+        o(",")
+      }
+    };
+    o(")");
+    concatArray(buffer.toArray())
+  }
+}
+
+extension class RowValues extends Row {
+  static fun create(values: Array<?CValue>, repeat: Int = 1): this {
+    invariant(repeat >= 0);
+    static(values, repeat)
+  }
+
+  fun setRepeat(repeat: Int): this {
+    invariant(repeat >= 0);
+    !this.repeat = repeat;
+    this
+  }
+
+  fun getRepeat(): Int {
+    this.repeat
+  }
+
+  fun size(): Int {
+    this.values.size()
+  }
+
+  static fun printHeader(format: SKStore.OutputFormat): void {
+    format match {
+    | SKStore.OJS(fieldNames) ->
+      jsClearFieldNames();
+      for (fieldName in fieldNames) {
+        jsPushFieldName(fieldName);
+      }
+    | _ -> void
+    }
+  }
+
+  static fun printItem(format: SKStore.OutputFormat, row: RowValues): void {
+    format match {
+    | SKStore.OJS _ ->
+      jsClearObject();
+      for (v in row.values) {
+        v match {
+        | None() -> jsPushObjectFieldNull()
+        | Some(CInt(n)) ->
+          n32 = Int32::truncate(n);
+          if (n32.toInt() == n) {
+            jsPushObjectFieldInt32(n32)
+          } else {
+            jsPushObjectFieldInt64(n.toString())
+          }
+        | Some(CFloat(f)) -> jsPushObjectFieldFloat(f.toString())
+        | Some(CString(s)) -> jsPushObjectFieldString(s)
+        | Some(b @ CJSON _) -> jsPushObjectFieldJSON(b.value)
+        | Some(b @ CType _) -> jsPushObjectFieldString(b.toString())
+        }
+      };
+      jsPushObject()
+    | _ -> print_string(row.toStringSingle(format))
+    }
+  }
+
+  fun toStringSingle(format: SKStore.OutputFormat): String {
+    values = this.values;
+    if (!(format is SKStore.OJSON _) && values.size() == 1) {
+      values[0] match {
+      | None() -> return ""
+      | Some(v) -> return v.toStringWithFormat(format)
+      }
+    };
+    result = mutable Vector[];
+    if (format is SKStore.OJSON _) {
+      result.push("{");
+    };
+
+    // This layer of indirection over indices is to support client-specified
+    // schemas which permute and/or elide columns
+    indices = format match {
+    | SKStore.OCSV(indices) -> indices
+    | _ -> Range(0, values.size()).collect(Array)
+    };
+    size = indices.size();
+
+    for (index in Range(0, size - 1)) {
+      i = indices[index];
+      format match {
+      | SKStore.OJSON(fieldNames) -> result.push("\"" + fieldNames[i] + "\":")
+      | _ -> void
+      };
+      values[i] match {
+      | None() -> if (format is SKStore.OJSON _) result.push("null") else void
+      | Some(v) -> result.push(v.toStringWithFormat(format))
+      };
+      result.push(if (format.usesComma()) "," else "|");
+    };
+    format match {
+    | SKStore.OJSON(fieldNames) ->
+      result.push("\"" + fieldNames[size - 1] + "\":")
+    | _ -> void
+    };
+    values[indices[size - 1]] match {
+    | None() -> if (format is SKStore.OJSON _) result.push("null") else void
+    | Some(v) -> result.push(v.toStringWithFormat(format))
+    };
+    if (format is SKStore.OJSON _) {
+      result.push("}");
+    };
+    Array.concatStringSequence(result)
+  }
+
+  fun toKVString(format: SKStore.OutputFormat, _key: SKStore.Key): String {
+    this.repeat.toString() + "\t" + this.toStringSingle(format) + "\n"
+  }
+
+  fun getInt(n: Int): ?Int {
+    this.values[n] match {
+    | None() -> None()
+    | Some(CInt(v)) -> Some(v)
+    | _ -> invariant_violation("Expected an int")
+    }
+  }
+
+  fun getFloat(n: Int): ?Float {
+    this.values[n] match {
+    | None() -> None()
+    | Some(CFloat(v)) -> Some(v)
+    | _ -> invariant_violation("Expected a float")
+    }
+  }
+
+  fun getString(n: Int): ?String {
+    this.values[n] match {
+    | None() -> None()
+    | Some(CString(v)) -> Some(v)
+    | _ -> invariant_violation("Expected a string")
+    }
+  }
+
+  fun getJSON(n: Int): ?CJSON {
+    this.values[n] match {
+    | None() -> None()
+    | Some(v @ CJSON _) -> Some(v)
+    | _ -> invariant_violation("Expected a JSON")
+    }
+  }
+
+  fun getType(n: Int): ?CType {
+    this.values[n] match {
+    | None() -> None()
+    | Some(v @ CType _) -> Some(v)
+    | _ -> invariant_violation("Expected a SCHEMA")
+    }
+  }
+
+  fun getValue(n: Int): ?CValue {
+    this.values[n]
+  }
+
+  fun items(): mutable Iterator<(Int, ?CValue)> {
+    this.values.items()
+  }
+
+  static fun type(f: SKStore.File): RowValues {
+    f match {
+    | r @ RowValues _ -> r
+    | _ -> invariant_violation("Unexpected Row File")
+    }
+  }
+}
+
+class RowKind(order: Int, kind: QueryKind, row: Row) extends Row {
+  fun size(): Int {
+    this.row.size()
+  }
+  fun getInt(n: Int): ?Int {
+    this.row.getInt(n)
+  }
+  fun getFloat(n: Int): ?Float {
+    this.row.getFloat(n)
+  }
+  fun getString(n: Int): ?String {
+    this.row.getString(n)
+  }
+  fun getJSON(n: Int): ?CJSON {
+    this.row.getJSON(n)
+  }
+  fun getType(n: Int): ?CType {
+    this.row.getType(n)
+  }
+  fun getValue(n: Int): ?CValue {
+    this.row.getValue(n)
+  }
+  fun items(): mutable Iterator<(Int, ?CValue)> {
+    this.row.items()
+  }
+  static fun type(f: SKStore.File): RowKind {
+    f match {
+    | r @ RowKind _ -> r
+    | _ -> invariant_violation("Unexpected Row File")
+    }
+  }
+}
+
+module end;

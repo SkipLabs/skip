@@ -1,0 +1,495 @@
+module alias T = SKTest;
+
+module CliTests;
+
+@test
+fun unexpectedExtraArguments(): void {
+  cmd = Cli.Command("foo").arg(Cli.Arg::string("bar").repeatable());
+  args = Cli.parseArgsFrom(cmd, Array["--", "foo2", "--bar", "--foo2"]);
+
+  T.expectTrue(args.error is Some(Cli.InvalidArgumentError _));
+}
+
+@test
+fun extraArguments(): void {
+  cmd = Cli.Command("foo").arg(Cli.Arg::string("bar").repeatable()).extra();
+  args = Cli.parseArgsFrom(cmd, Array["--", "foo2", "--bar", "--foo2"]);
+
+  T.expectEq(args.extra, Array["foo2", "--bar", "--foo2"]);
+}
+
+@test
+fun duplicateArgument(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.Arg::bool("bar").long("bar1"))
+    .arg(Cli.Arg::bool("bar").long("bar2"));
+  T.expectThrow(() -> _ = Cli.parseArgsFrom(cmd, Array[""]));
+}
+
+@test
+fun duplicateArgumentLongFlag(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.Arg::bool("bar1").long("bar"))
+    .arg(Cli.Arg::bool("bar2").long("bar"));
+  T.expectThrow(() -> _ = Cli.parseArgsFrom(cmd, Array[""]));
+}
+
+@test
+fun duplicateArgumentShortFlag(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.Arg::bool("bar1").short("bar"))
+    .arg(Cli.Arg::bool("bar2").short("bar"));
+  T.expectThrow(() -> _ = Cli.parseArgsFrom(cmd, Array[""]));
+}
+
+@test
+fun duplicateSubcommand(): void {
+  cmd = Cli.Command("foo")
+    .subcommand(Cli.Command("bar"))
+    .subcommand(Cli.Command("bar"));
+  T.expectThrow(() -> _ = Cli.parseArgsFrom(cmd, Array[""]));
+}
+
+@test
+fun duplicateSubcommandShort(): void {
+  cmd = Cli.Command("foo")
+    .subcommand(Cli.Command("bar1").short("b"))
+    .subcommand(Cli.Command("bar2").short("b"));
+  T.expectThrow(() -> _ = Cli.parseArgsFrom(cmd, Array[""]))
+}
+
+@test
+fun positionalArgs(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.Arg::string("bar").positional())
+    .arg(Cli.Arg::string("baz").positional())
+    .arg(Cli.Arg::bool("foobar1"))
+    .arg(Cli.Arg::bool("foobar2"))
+    .arg(Cli.Arg::bool("foobar3"));
+  args = Cli.parseArgsFrom(
+    cmd,
+    Array["--foobar1", "xxx", "--foobar2", "yyy", "--foobar3"],
+  );
+
+  T.expectEq(args.getString("bar"), "xxx");
+  T.expectEq(args.getString("baz"), "yyy");
+}
+
+@test
+fun stringArgsDefault(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.Arg::string("bar"))
+    .arg(Cli.Arg::string("baz"));
+  args = Cli.parseArgsFrom(cmd, Array["--bar", "foo1", "--baz=foo2"]);
+
+  T.expectEq(args.getString("bar"), "foo1");
+  T.expectEq(args.getString("baz"), "foo2");
+}
+
+@test
+fun stringArgsLong(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.Arg::string("bar").long("foobar"))
+    .arg(Cli.Arg::string("baz").long("foobaz"));
+  args = Cli.parseArgsFrom(cmd, Array["--foobar", "foo1", "--foobaz=foo2"]);
+
+  T.expectEq(args.getString("bar"), "foo1");
+  T.expectEq(args.getString("baz"), "foo2");
+  T.expectThrow(() -> _ = args.maybeGetString("foobar"));
+  T.expectThrow(() -> _ = args.maybeGetString("foobaz"));
+}
+
+@test
+fun stringArgsShort(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.Arg::string("bar").short("r"))
+    .arg(Cli.Arg::string("baz").short("z"));
+  args = Cli.parseArgsFrom(cmd, Array["-r", "foo1", "-z", "foo2"]);
+
+  T.expectEq(args.getString("bar"), "foo1");
+  T.expectEq(args.getString("baz"), "foo2");
+  T.expectThrow(() -> _ = args.maybeGetString("r"));
+  T.expectThrow(() -> _ = args.maybeGetString("z"));
+}
+
+@test
+fun stringArgsShortLong(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.Arg::string("bar").long("foobar").short("r"))
+    .arg(Cli.Arg::string("baz").long("foobaz").short("z"));
+  args = Cli.parseArgsFrom(cmd, Array["--foobar", "foo1", "-z", "foo2"]);
+
+  T.expectEq(args.getString("bar"), "foo1");
+  T.expectEq(args.getString("baz"), "foo2");
+}
+
+@test
+fun boolArgsDefault(): void {
+  cmd = Cli.Command("foo").arg(Cli.Arg::bool("bar")).arg(Cli.Arg::bool("baz"));
+  args = Cli.parseArgsFrom(cmd, Array["--bar"]);
+
+  T.expectTrue(args.getBool("bar"));
+  T.expectFalse(args.getBool("baz"));
+}
+
+@test
+fun boolArgsNegatable(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.Arg::bool("bar").negatable().default(true))
+    .arg(Cli.Arg::bool("baz").negatable().default(true));
+  args = Cli.parseArgsFrom(cmd, Array["--no-bar"]);
+
+  T.expectFalse(args.getBool("bar"));
+  T.expectTrue(args.getBool("baz"));
+}
+
+@test
+fun boolNegativeArgsRejected(): void {
+  cmd = Cli.Command("foo").arg(Cli.Arg::bool("no-bar"));
+
+  T.expectThrow(() -> _ = Cli.parseArgsFrom(cmd, Array["--no-foo"]));
+}
+
+@test
+fun subcommand(): void {
+  cmd = Cli.Command("foo")
+    .subcommand(Cli.Command("bar"))
+    .subcommand(Cli.Command("baz"));
+  args = Cli.parseArgsFrom(cmd, Array["baz"]);
+  T.expectEq(args.subcommand.fromSome(), "baz")
+}
+
+@test
+fun subcommandOptions(): void {
+  cmd = Cli.Command("foo")
+    .subcommand(Cli.Command("bar").arg(Cli.Arg::string("foobar1")))
+    .subcommand(Cli.Command("baz").arg(Cli.Arg::string("foobar2")));
+  args1 = Cli.parseArgsFrom(cmd, Array["bar", "--foobar1=xxx"]);
+  T.expectEq(args1.subcommand.fromSome(), "bar");
+  T.expectEq(args1.getString("foobar1"), "xxx");
+  args2 = Cli.parseArgsFrom(cmd, Array["baz", "--foobar2=yyy"]);
+  T.expectEq(args2.subcommand.fromSome(), "baz");
+  T.expectEq(args2.getString("foobar2"), "yyy")
+}
+
+@test
+fun subcommandGlobalOptions(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.Arg::string("global-string").global())
+    .arg(Cli.Arg::bool("global-bool").global())
+    .subcommand(Cli.Command("bar"));
+  args1 = Cli.parseArgsFrom(
+    cmd,
+    Array["bar", "--global-string=xxx", "--global-bool"],
+  );
+  T.expectEq(args1.subcommand.fromSome(), "bar");
+  T.expectEq(args1.getString("global-string"), "xxx");
+  T.expectTrue(args1.getBool("global-bool"));
+  args2 = Cli.parseArgsFrom(
+    cmd,
+    Array["--global-string=xxx", "--global-bool", "bar"],
+  );
+  T.expectEq(args2.subcommand.fromSome(), "bar");
+  T.expectEq(args2.getString("global-string"), "xxx");
+  T.expectTrue(args2.getBool("global-bool"))
+}
+
+@test
+fun arrayArgs(): void {
+  cmd = Cli.Command("foo").arg(Cli.Arg::string("bar").repeatable());
+  args = Cli.parseArgsFrom(cmd, Array["--bar", "foo1", "--bar=foo2"]);
+
+  T.expectEq(args.getArray("bar"), Array["foo1", "foo2"]);
+}
+
+@test
+fun arrayArgsDefault(): void {
+  cmd = Cli.Command("foo").arg(
+    Cli.Arg::string("bar").repeatable().default_values(Array["foo1", "foo2"]),
+  );
+  args = Cli.parseArgsFrom(cmd, Array[]);
+
+  T.expectEq(args.getArray("bar"), Array["foo1", "foo2"]);
+}
+
+@test
+fun arrayArgsPositional(): void {
+  cmd = Cli.Command("foo").arg(
+    Cli.Arg::string("bar").repeatable().positional(),
+  );
+  args = Cli.parseArgsFrom(cmd, Array["foo1", "foo2"]);
+
+  T.expectEq(args.getArray("bar"), Array["foo1", "foo2"]);
+}
+
+@test
+fun arrayArgsPositionalIntertwined(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.Arg::string("bar").repeatable().positional())
+    .arg(Cli.Arg::string("baz"));
+  args = Cli.parseArgsFrom(cmd, Array["foo1", "--baz", "foo", "foo2"]);
+
+  T.expectEq(args.getArray("bar"), Array["foo1", "foo2"]);
+}
+
+@test
+fun arrayArgsPositionalAfterArray(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.Arg::string("bar").repeatable().positional())
+    .arg(Cli.Arg::string("baz").positional());
+
+  T.expectThrow(() -> {
+    _ = Cli.parseArgsFrom(cmd, Array[]);
+  });
+}
+
+@test
+fun arrayArgsPositionalWithExtra(): void {
+  cmd = Cli.Command("foo").arg(
+    Cli.Arg::string("bar").repeatable().positional(),
+  );
+  args = Cli.parseArgsFrom(cmd, Array["foo1", "foo2", "--", "baz"]);
+
+  T.expectEq(args.getArray("bar"), Array["foo1", "foo2"]);
+}
+
+@test
+fun repeatableBoolArg(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.Arg::bool("bar").repeatable())
+    .arg(Cli.Arg::bool("baz").repeatable())
+    .arg(Cli.Arg::bool("verbose").short("v").repeatable());
+
+  args = Cli.parseArgsFrom(cmd, Array["--bar", "--bar", "--bar", "-vv"]);
+
+  T.expectEq(args.getArray("bar").size(), 3);
+  T.expectEq(args.getArray("baz").size(), 0);
+  T.expectEq(args.getArray("verbose").size(), 2)
+}
+
+@test
+fun shortOnlyWithValueNoSpace(): void {
+  cmd = Cli.Command("foo").arg(Cli.Arg::string("bar").short("O"));
+  args = Cli.parseArgsFrom(cmd, Array["-O2"]);
+
+  T.expectEq(args.getString("bar"), "2");
+}
+
+@test
+fun intArgs(): void {
+  cmd = Cli.Command("foo").arg(Cli.Arg::int("bar")).arg(Cli.Arg::int("baz"));
+  args = Cli.parseArgsFrom(cmd, Array["--bar", "1337", "--baz=-123"]);
+
+  T.expectEq(args.getInt("bar"), 1337);
+  T.expectEq(args.getInt("baz"), -123);
+}
+
+@test
+fun intArgsDefault(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.Arg::int("bar").default(42))
+    .arg(Cli.Arg::int("baz").default(101010));
+  args = Cli.parseArgsFrom(cmd, Array["--baz=1337"]);
+
+  T.expectEq(args.getInt("bar"), 42);
+  T.expectEq(args.getInt("baz"), 1337);
+}
+
+@test
+fun intArgsPositional(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.Arg::string("bar"))
+    .arg(Cli.Arg::int("baz").positional());
+  args = Cli.parseArgsFrom(cmd, Array["--bar=foo", "1337"]);
+
+  T.expectEq(args.getInt("baz"), 1337);
+}
+
+@test
+fun intArgsInvalid(): void {
+  cmd = Cli.Command("foo").arg(Cli.Arg::int("bar")).arg(Cli.Arg::int("baz"));
+  args = Cli.parseArgsFrom(cmd, Array["--bar", "foo", "--baz=123"]);
+
+  T.expectTrue(args.error is Some(Cli.InvalidArgumentError _));
+}
+
+@test
+fun boolArgsFromEnv(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.Arg::bool("bar").negatable().env("BAR"))
+    .arg(Cli.Arg::bool("baz").env("BAZ"));
+  // Snapshot names before removing: vars() caches the count upfront,
+  // so calling remove_var() during iteration shrinks environ and SIGSEGVs.
+  Environ.vars().map(v -> v.i0).collect(Array).each(Environ.remove_var);
+  Environ.set_var("BAR", "y");
+  Environ.set_var("BAZ", "1");
+  args = Cli.parseArgsFrom(cmd, Array["--no-bar"]);
+
+  T.expectFalse(args.getBool("bar"));
+  T.expectTrue(args.getBool("baz"));
+}
+
+@test
+fun intArgsFromEnv(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.Arg::int("foo").env("FOO"))
+    .arg(Cli.Arg::int("bar").default(123).env("BAR"))
+    .arg(Cli.Arg::int("baz").env("BAZ"));
+  // Snapshot names before removing: vars() caches the count upfront,
+  // so calling remove_var() during iteration shrinks environ and SIGSEGVs.
+  Environ.vars().map(v -> v.i0).collect(Array).each(Environ.remove_var);
+  Environ.set_var("BAR", "456");
+  Environ.set_var("BAZ", "42");
+  args = Cli.parseArgsFrom(cmd, Array["--foo=1"]);
+
+  T.expectEq(args.getInt("foo"), 1);
+  T.expectEq(args.getInt("bar"), 456);
+  T.expectEq(args.getInt("baz"), 42);
+}
+
+@test
+fun multipleBoolArgsTogether(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.Arg::bool("bar").short("b"))
+    .arg(Cli.Arg::bool("baz").short("z"))
+    .arg(Cli.Arg::bool("foobar").short("f"));
+  args = Cli.parseArgsFrom(cmd, Array["-bz"]);
+
+  T.expectTrue(args.getBool("bar"));
+  T.expectTrue(args.getBool("baz"));
+  T.expectFalse(args.getBool("foobar"));
+}
+
+@test
+fun nonBoolShortArgsTogether(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.Arg::bool("keep-going").short("k"))
+    .arg(Cli.Arg::int("jobs").short("j"))
+    .arg(Cli.Arg::bool("foobar").short("f"));
+  args = Cli.parseArgsFrom(cmd, Array["-kj2"]);
+
+  T.expectTrue(args.getBool("keep-going"));
+  T.expectEq(args.getInt("jobs"), 2);
+  T.expectFalse(args.getBool("foobar"));
+}
+
+@test
+fun undefinedArgs(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.Arg::bool("bar").negatable())
+    .arg(Cli.Arg::string("baz"))
+    .arg(Cli.Arg::int("foobar"))
+    .arg(Cli.Arg::string("foobar2").repeatable());
+  args = Cli.parseArgsFrom(
+    cmd,
+    Array[
+      "--no-bar",
+      "--baz",
+      "baz1",
+      "--foobar=1",
+      "--foobar2=abc",
+      "--foobar2",
+      "def",
+    ],
+  );
+
+  // Default is to throw.
+  T.expectThrow(() -> _ = args.maybeGetBool("unknown"));
+  T.expectThrow(() -> _ = args.maybeGetString("unknown"));
+  T.expectThrow(() -> _ = args.maybeGetInt("unknown"));
+  T.expectThrow(() -> _ = args.maybeGetArray("unknown"));
+
+  T.expectThrow(() -> _ = args.maybeGetBool("unknown", true));
+  T.expectThrow(() -> _ = args.maybeGetString("unknown", true));
+  T.expectThrow(() -> _ = args.maybeGetInt("unknown", true));
+  T.expectThrow(() -> _ = args.maybeGetArray("unknown", true));
+
+  T.expectEq(args.maybeGetBool("unknown", false), None());
+  T.expectEq(args.maybeGetString("unknown", false), None());
+  T.expectEq(args.maybeGetInt("unknown", false), None());
+  T.expectEq(args.maybeGetArray("unknown", false), None());
+
+  T.expectThrow(() -> _ = args.getBool("unknown"));
+  T.expectThrow(() -> _ = args.getString("unknown"));
+  T.expectThrow(() -> _ = args.getInt("unknown"));
+  T.expectThrow(() -> _ = args.getArray("unknown"));
+
+  T.expectThrow(() -> _ = args.getBool("unknown", None()));
+  T.expectThrow(() -> _ = args.getString("unknown", None()));
+  T.expectThrow(() -> _ = args.getInt("unknown", None()));
+  T.expectThrow(() -> _ = args.getArray("unknown", None()));
+
+  T.expectEq(args.getBool("unknown", Some(true)), true);
+  T.expectEq(args.getString("unknown", Some("foo")), "foo");
+  T.expectEq(args.getInt("unknown", Some(1337)), 1337);
+  T.expectEq(
+    args.getArray("unknown", Some(Array["1", "2", "3"])),
+    Array["1", "2", "3"],
+  );
+
+  // The default for undefined arg should not override the provided value.
+  T.expectEq(args.getBool("bar", Some(true)), false);
+  T.expectEq(args.getString("baz", Some("foo")), "baz1");
+  T.expectEq(args.getInt("foobar", Some(123)), 1);
+  T.expectEq(
+    args.getArray("foobar2", Some(Array["a", "b", "c"])),
+    Array["abc", "def"],
+  );
+}
+
+@test
+fun argDefaultWithUndefinedDefault(): void {
+  cmd = Cli.Command("foo")
+    .arg(Cli.Arg::bool("bar").default(true))
+    .arg(Cli.Arg::string("baz").default("foo"))
+    .arg(Cli.Arg::int("foobar").default(1337))
+    .arg(
+      Cli.Arg::string("foobar2")
+        .repeatable()
+        .default_values(Array["a", "b", "c"]),
+    );
+  args = Cli.parseArgsFrom(cmd, Array[]);
+
+  // The default for undefined arg should not override the default value.
+  T.expectEq(args.getBool("bar", Some(false)), true);
+  T.expectEq(args.getString("baz", Some("bar")), "foo");
+  T.expectEq(args.getInt("foobar", Some(123)), 1337);
+  T.expectEq(
+    args.getArray("foobar2", Some(Array["d", "e", "f"])),
+    Array["a", "b", "c"],
+  );
+}
+
+@test
+fun runtimeArgsAccepted(): void {
+  cmd = Cli.Command("foo").runtimeArgs();
+  args = Cli.parseArgsFrom(
+    cmd,
+    Array["--capacity", "8G", "--data", "foo.db", "--init", "bar.db"],
+  );
+
+  T.expectTrue(args.error is None _);
+  T.expectEq(args.getString("capacity"), "8G");
+  T.expectEq(args.getString("data"), "foo.db");
+  T.expectEq(args.getString("init"), "bar.db");
+}
+
+@test
+fun runtimeArgsRejectedWithoutOptIn(): void {
+  cmd = Cli.Command("foo");
+  args = Cli.parseArgsFrom(cmd, Array["--capacity", "8G"]);
+
+  T.expectTrue(args.error is Some(Cli.InvalidArgumentError _));
+}
+
+@test
+fun runtimeArgsAreGlobal(): void {
+  cmd = Cli.Command("foo").runtimeArgs().subcommand(Cli.Command("bar"));
+  args = Cli.parseArgsFrom(cmd, Array["bar", "--capacity", "8G"]);
+
+  T.expectTrue(args.error is None _);
+  T.expectEq(args.subcommand, Some("bar"));
+  T.expectEq(args.getString("capacity"), "8G");
+}
+
+module end;

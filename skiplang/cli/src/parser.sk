@@ -1,0 +1,463 @@
+module Cli;
+
+base class ArgumentError extends Exception uses Equality {
+  children =
+  | InvalidArgumentError(arg: String)
+  | MissingArgumentError(arg: String)
+  | MissingValueError(arg: String)
+  | DuplicateValueError(arg: String)
+
+  fun getMessage(): String
+  | InvalidArgumentError(arg) -> `Invalid argument ${arg}.`
+  | MissingArgumentError(arg) -> `Missing required argument ${arg}.`
+  | MissingValueError(arg) -> `No value provided for argument ${arg}.`
+  | DuplicateValueError(arg) -> `Multiple values provided for argument ${arg}.`
+}
+
+base class Value uses Show, Equality {
+  children =
+  | BoolValue(Bool)
+  | StringValue(String)
+  | IntValue(Int)
+  | ArrayValue(Array<String>)
+  | MissingValue()
+
+  fun toString(): String
+  | MissingValue() -> "(no value)"
+  | BoolValue(v) -> v.toString()
+  | StringValue(v) -> `"${v}"`
+  | IntValue(v) -> v.toString()
+  | ArrayValue(v) -> "[" + v.map(x -> `"${x}"`).join(", ") + "]"
+}
+
+class ParseResults{
+  cmd: Command,
+  values: Map<String, Value> = Map[],
+  extra: Array<String> = Array[],
+  subcommand: ?String = None(),
+  error: ?ArgumentError = None(),
+} {
+  fun maybeGetBool(name: String, fail_on_undefined_arg: Bool = true): ?Bool {
+    this.getValue(name, fail_on_undefined_arg) match {
+    | BoolValue(v) -> Some(v)
+    | MissingValue() -> None()
+    | _ -> invariant_violation(`Argument ${name} is not boolean`)
+    }
+  }
+  fun getBool(name: String, default: ?Bool = None()): Bool {
+    this.maybeGetBool(name, default.isNone()) match {
+    | Some(v) -> v
+    | None() ->
+      default match {
+      | Some(v) -> v
+      | None() -> invariant_violation(`Argument ${name} is missing`)
+      }
+    }
+  }
+
+  fun maybeGetString(
+    name: String,
+    fail_on_undefined_arg: Bool = true,
+  ): ?String {
+    this.getValue(name, fail_on_undefined_arg) match {
+    | StringValue(v) -> Some(v)
+    | MissingValue() -> None()
+    | _ -> invariant_violation(`Argument ${name} is not a string`)
+    }
+  }
+
+  fun getString(name: String, default: ?String = None()): String {
+    this.maybeGetString(name, default.isNone()) match {
+    | Some(s) -> s
+    | None() ->
+      default match {
+      | Some(s) -> s
+      | None() -> invariant_violation(`Argument ${name} is missing`)
+      }
+    }
+  }
+
+  fun maybeGetInt(name: String, fail_on_undefined_arg: Bool = true): ?Int {
+    this.getValue(name, fail_on_undefined_arg) match {
+    | IntValue(v) -> Some(v)
+    | MissingValue() -> None()
+    | _ -> invariant_violation(`Argument ${name} is not an int`)
+    }
+  }
+
+  fun getInt(name: String, default: ?Int = None()): Int {
+    this.maybeGetInt(name, default.isNone()) match {
+    | Some(v) -> v
+    | None() ->
+      default match {
+      | Some(v) -> v
+      | None() -> invariant_violation(`Argument ${name} is missing`)
+      }
+    }
+  }
+
+  fun maybeGetArray(
+    name: String,
+    fail_on_undefined_arg: Bool = true,
+  ): ?Array<String> {
+    this.getValue(name, fail_on_undefined_arg) match {
+    | ArrayValue(v) -> Some(v)
+    | MissingValue() -> None()
+    | _ -> invariant_violation(`Argument ${name} is not an array`)
+    }
+  }
+
+  fun getArray(name: String, default: ?Array<String> = None()): Array<String> {
+    this.maybeGetArray(name, default.isNone()) match {
+    | Some(a) -> a
+    | None() ->
+      default match {
+      | Some(a) -> a
+      | None() -> invariant_violation(`Argument ${name} is missing`)
+      }
+    }
+  }
+
+  private fun getValue(
+    name: String,
+    fail_on_undefined_arg: Bool = true,
+  ): Value {
+    this.values.maybeGet(name) match {
+    | Some(v) -> v
+    | None() if (fail_on_undefined_arg) ->
+      invariant_violation(`Argument ${name} is undefined`)
+    | None() -> MissingValue()
+    }
+  }
+
+  fun maybeGetSubcommand(): ?String {
+    this.subcommand
+  }
+
+  fun getCommand(): Command {
+    this.cmd
+  }
+}
+
+fun parseArgs(cmd: Command): ParseResults {
+  parseArgsFrom(cmd, Environ.args().drop(1).collect(Array))
+}
+
+fun parseArgsFrom(cmd: Command, argv: Sequence<String>): ParseResults {
+  parse(cmd, argv.values())
+}
+
+private fun updateValue(
+  values: mutable Map<String, Value>,
+  arg: Arg,
+  value: Value,
+): Result<void, ArgumentError> {
+  if (arg._repeatable) {
+    strValue = value match {
+    | StringValue(v) -> v
+    | BoolValue(true) -> "true"
+    | _ -> invariant_violation(`Unexpected value type for repeatable arg`)
+    };
+
+    values.maybeGet(arg.name) match {
+    | Some(ArrayValue(arr)) ->
+      values.set(arg.name, ArrayValue(arr.concat(Array[strValue])))
+    | None() -> values.set(arg.name, ArrayValue(Array[strValue]))
+    | Some(v) ->
+      invariant_violation(`Unexpected value type ${v} for repeatable arg`)
+    }
+  } else if (!values.containsKey(arg.name)) {
+    values.set(arg.name, value)
+  } else {
+    return Failure(DuplicateValueError(arg.name))
+  };
+
+  Success(void)
+}
+
+private fun defaultValue(arg: Arg): Value {
+  if (arg._repeatable) {
+    arg._default.default(ArrayValue(Array[]))
+  } else {
+    arg match {
+    | ValuedArg _ -> arg._default.default(MissingValue())
+    | BoolArg _ -> arg._default.default(BoolValue(false))
+    }
+  }
+}
+
+private fun subcommand_map(subcommands: Array<Command>): Map<String, Command> {
+  res = mutable Map[];
+  for (subcmd in subcommands) {
+    if (res.containsKey(subcmd.name)) {
+      invariant_violation(`Duplicate subcommand ${subcmd.name}`)
+    };
+    res.set(subcmd.name, subcmd);
+    subcmd._short.each(n -> {
+      if (res.containsKey(n)) {
+        invariant_violation(`Duplicate subcommand short alias ${n}`)
+      };
+      res.set(n, subcmd)
+    })
+  };
+
+  res.chill()
+}
+
+private fun arg_maps(args: Array<Arg>): (Array<Arg>, Map<String, Arg>) {
+  argsNames = mutable Set[];
+  posArgs = mutable Vector<Arg>[];
+  // TODO: options is a bad name. Maybe flag_args?
+  options = mutable Map[];
+  for (arg in args) {
+    if (argsNames.contains(arg.name)) {
+      invariant_violation(`Duplicate argument ${arg.name}`)
+    };
+    argsNames.add(arg.name);
+
+    if (arg._positional) {
+      if (posArgs.size() > 0) {
+        prevArg = posArgs[posArgs.size() - 1];
+        if (prevArg._repeatable) {
+          invariant_violation(
+            `Positional argument ${
+              arg.name
+            } cannot appear after repeatable positional argument ${
+              prevArg.name
+            }`,
+          )
+        }
+      };
+      posArgs.push(arg);
+    } else {
+      if (arg._short.isSome()) {
+        options.add(`-${arg._short.fromSome()}`, arg);
+        if (arg._long.isNone()) {
+          if (arg.isNegatable()) {
+            invariant_violation(
+              `Argument ${arg.name} cannot be negatable without a long name`,
+            )
+          };
+          continue
+        }
+      };
+
+      // Use arg name as default long flag for convenience.
+      longFlag = arg._long.default(arg.name);
+      if (arg is BoolArg _ && longFlag.startsWith("no-")) {
+        positiveFlag = longFlag.stripPrefix("no-");
+        invariant_violation(
+          `Invalid boolean argument name ${longFlag}. Declare a negatable ${positiveFlag} instead.`,
+        )
+      };
+      options.add(`--${longFlag}`, arg);
+      if (arg.isNegatable()) {
+        options.add(`--no-${longFlag}`, arg);
+      };
+    }
+  };
+
+  (posArgs.collect(Array), options.chill())
+}
+
+private fun parse(
+  cmd: Command,
+  iterator: mutable Iterator<String>,
+): ParseResults {
+  Parser::create(cmd).parse(iterator)
+}
+
+mutable class Parser(
+  cmd: Command,
+  subcommands: Map<String, Command>,
+  posArgs: Array<Arg>,
+  options: Map<String, Arg>,
+  values: mutable Map<String, Value> = mutable Map[],
+  mutable extra: mutable Vector<String> = mutable Vector[],
+  mutable posArgId: Int = 0,
+  mutable hasExtra: Bool = false,
+) {
+  static fun create(
+    cmd: Command,
+    globals: Array<Arg> = Array[],
+    values: mutable Map<String, Value> = mutable Map[],
+  ): mutable Parser {
+    subcommands = subcommand_map(cmd._subcommands);
+    (posArgs, options) = arg_maps(cmd._args.concat(globals));
+
+    mutable Parser(cmd, subcommands, posArgs, options, values)
+  }
+
+  mutable fun parse(iterator: mutable Iterator<String>): ParseResults {
+    error: ?ArgumentError = None();
+    subcommand: ?String = None();
+    loop {
+      iterator.next() match {
+      | None() -> break void
+      | Some(str) if (this.hasExtra) -> this.extra.push(str)
+      | Some(str) if (this.subcommands.containsKey(str)) ->
+        subcmd = this.subcommands.get(str);
+        !subcommand = Some(subcmd.name);
+
+        // TODO: This does not support nested subcommands (which probably
+        // shouldn't exist).
+        globalArgs = this.cmd._args.filter(a -> a._global);
+        subcmdParser = Parser::create(subcmd, globalArgs, this.values);
+        res = subcmdParser.parse(iterator);
+        if (res.error.isSome()) {
+          !error = res.error;
+          break void
+        };
+
+        // TODO: This is dirty.
+        this.!extra = Vector::mcreateFromItems(res.extra);
+
+        break void
+      | Some("--") ->
+        if (!this.cmd._extra) {
+          !error = Some(InvalidArgumentError("--"));
+          break void
+        };
+        this.!hasExtra = true
+      | Some(str) ->
+        this.parse_next_args(str, iterator) match {
+        | Failure(err) ->
+          !error = Some(err);
+          break void
+        | Success(args) ->
+          this.updateValues(args) match {
+          | Failure(err) ->
+            !error = Some(err);
+            break void
+          | Success _ -> void
+          }
+        }
+      }
+    };
+
+    if (error.isNone()) {
+      for (arg in this.cmd._args) {
+        if (!this.values.containsKey(arg.name)) {
+          if (arg.isRequired()) {
+            !error = Some(MissingArgumentError(arg.name));
+            break void
+          } else {
+            env_var = arg._env.map(v -> Environ.var(v));
+            value = env_var.map(v ->
+              arg match {
+              | StringArg _ -> StringValue(v)
+              | IntArg _ -> IntValue(v.toInt())
+              | BoolArg _ -> BoolValue(v != "no" && v != "false" && v != "0")
+              }
+            );
+            this.values.set(arg.name, value.default(defaultValue(arg)))
+          }
+        }
+      }
+    };
+
+    ParseResults{
+      cmd => this.cmd,
+      subcommand,
+      values => this.values.chill(),
+      extra => Array::createFromItems(this.extra.chill()),
+      error => error,
+    }
+  }
+
+  private mutable fun updateValues(
+    args: Array<(Arg, Value)>,
+  ): Result<void, ArgumentError> {
+    for ((arg, value) in args) {
+      updateValue(this.values, arg, value) match {
+      | Failure(err) -> return Failure(err)
+      | Success _ -> void
+      }
+    };
+
+    Success(void)
+  }
+
+  private mutable fun parse_next_args(
+    str: String,
+    iterator: mutable Iterator<String>,
+  ): Result<Array<(Arg, Value)>, ArgumentError> {
+    (argName, argValue) = if (str.contains("=")) {
+      (k, v) = str.splitFirst("=");
+      (k, Some(v))
+    } else {
+      (str, None())
+    };
+    this.options.maybeGet(argName) match {
+    | Some(arg @ ValuedArg _) ->
+      strValue = argValue match {
+      | Some(v) -> v
+      | None() ->
+        iterator.next() match {
+        | Some(v) -> v
+        | None() -> return Failure(MissingValueError(arg.name))
+        }
+      };
+      parse_value(arg, strValue).map(v -> Array[(arg, v)])
+    | Some(arg) -> Success(Array[(arg, BoolValue(!str.startsWith("--no-")))])
+    | None() if (!str.startsWith("-") && this.posArgId < this.posArgs.size()) ->
+      arg = this.posArgs[this.posArgId];
+      res = parse_value(arg, str).map(v -> Array[(arg, v)]);
+      if (!arg._repeatable) {
+        this.!posArgId = this.posArgId + 1
+      };
+      res
+    | None() ->
+      !argName = str.take(2);
+      this.options.maybeGet(argName) match {
+      // Check for short forms that take values such as `-O2`.
+      | Some(arg @ ValuedArg _) ->
+        strValue = str.substring(str.getIter().forward(2));
+        parse_value(arg, strValue).map(v -> Array[(arg, v)])
+      // Check for short boolean flags strung together such as `-abc`,
+      // possibly ending with a non-boolean flag such as `-kj2`.
+      | Some(BoolArg _) ->
+        res = mutable Vector<(Arg, Value)>[];
+        strFlags = str.stripPrefix("-");
+        iter = strFlags.getIter();
+        loop {
+          flag = iter.next() match {
+          | Some(c) -> c
+          | None() -> break void
+          };
+          this.options.maybeGet(`-${flag}`) match {
+          | Some(arg @ BoolArg _) -> res.push((arg, BoolValue(true)))
+          | Some(arg @ ValuedArg _) ->
+            strValue = strFlags.substring(iter);
+            value = parse_value(arg, strValue) match {
+            | Success(v) -> v
+            | Failure(err) -> return Failure(err)
+            };
+            res.push((arg, value));
+            break void
+          | None() -> return Failure(InvalidArgumentError(str))
+          }
+        };
+        Success(res.collect(Array))
+      | None() -> Failure(InvalidArgumentError(str))
+      }
+    }
+  }
+}
+
+private fun parse_value(
+  arg: Arg,
+  strValue: String,
+): Result<Value, ArgumentError> {
+  arg match {
+  | StringArg _ -> Success(StringValue(strValue))
+  | IntArg _ ->
+    strValue.toIntOption() match {
+    | Some(v) -> Success(IntValue(v))
+    | _ -> Failure(InvalidArgumentError(arg.name))
+    }
+  | BoolArg _ -> invariant_violation("Unexpected parse_value() for boolean arg")
+  }
+}
+
+module end;

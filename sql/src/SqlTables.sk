@@ -1,0 +1,1036 @@
+/*****************************************************************************/
+/* SQL tables.*/
+/*****************************************************************************/
+
+module alias P = SQLParser;
+
+module SKDB;
+
+const tableInfo: SKStore.DirName = SKStore.DirName::create("/tablesInfo/");
+const views: SKStore.DirName = SKStore.DirName::create("/views/");
+const subsInput: SKStore.DirName = SKStore.DirName::create("/subsInput/");
+const subsOutput: SKStore.DirName = SKStore.DirName::create("/subsOutput/");
+const indexInput: SKStore.DirName = SKStore.DirName::create("/indexInput/");
+const indexOutput: SKStore.DirName = SKStore.DirName::create("/indexOutput/");
+const indexByCol: SKStore.DirName = SKStore.DirName::create("/indexByCol/");
+const indexByName: SKStore.DirName = SKStore.DirName::create("/indexByName/");
+const watermarks: SKStore.DirName = SKStore.DirName::create("/watermarks/");
+const replication: SKStore.DirName = SKStore.DirName::create("/replication/");
+
+fun getWatermark(
+  context: readonly SKStore.Context,
+  tableName: String,
+  replicationSource: ?Int,
+): ?SKStore.Tick {
+  replicationSource match {
+  | None() -> None()
+  | Some(source) ->
+    context.unsafeMaybeGetDir(watermarks) match {
+    | None() -> None()
+    | Some(d) ->
+      key = SKStore.SID::create(`${tableName}_${source}`);
+      arr = d.typed().getArrayRaw(key);
+      if (arr.size() > 0) Some(SKStore.TickFile::type(arr[0]).value) else {
+        None()
+      }
+    }
+  }
+}
+
+fun setWatermark(
+  context: mutable SKStore.Context,
+  tableName: String,
+  replicationSource: Int,
+  checkpointTick: SKStore.Tick,
+): void {
+  watermarkDir = context.maybeGetDir(watermarks) match {
+  | None() ->
+    context.mkdir(SKStore.SID::keyType, SKStore.TickFile::type, watermarks)
+  | Some(d) ->
+    SKStore.EHandle(
+      SKStore.SID::keyType,
+      SKStore.TickFile::type,
+      d.getDirName(),
+    )
+  };
+  key = SKStore.SID::create(`${tableName}_${replicationSource}`);
+  mark = watermarkDir
+    .unsafeGetArray(context, key)
+    .reduce(max, SKStore.TickFile(checkpointTick));
+  watermarkDir.writeArray(context, key, Array[mark]);
+}
+
+fun resetWatermark(
+  context: mutable SKStore.Context,
+  tableName: String,
+  replicationSource: Int,
+): void {
+  watermarkDir = context.maybeGetDir(watermarks) match {
+  | None() ->
+    context.mkdir(SKStore.SID::keyType, SKStore.TickFile::type, watermarks)
+  | Some(d) ->
+    SKStore.EHandle(
+      SKStore.SID::keyType,
+      SKStore.TickFile::type,
+      d.getDirName(),
+    )
+  };
+  key = SKStore.SID::create(`${tableName}_${replicationSource}`);
+  watermarkDir.writeArray(context, key, Array[]);
+}
+
+base class ReplicationState {
+  children =
+  | RSError()
+  // once a downstream has fully caught up to a checkpoint and is now
+  // 'tailing since', they are considered established. this is useful
+  // to determine if this is a new-to-this-server client.
+  | RSEstablished()
+}
+class ReplicationStateFile(state: ReplicationState) extends SKStore.File
+
+fun getReplicationState(
+  context: readonly SKStore.Context,
+  replicationSource: ?Int,
+): ?ReplicationState {
+  replicationSource match {
+  | None() -> None()
+  | Some(source) ->
+    context.unsafeMaybeGetDir(replication) match {
+    | None() -> None()
+    | Some(d) ->
+      key = SKStore.IID(source);
+      arr = d.typed().getArrayRaw(key);
+      if (arr.size() > 0) {
+        Some(ReplicationStateFile::type(arr[0]).state)
+      } else {
+        None()
+      }
+    }
+  }
+}
+
+fun setReplicationState(
+  context: mutable SKStore.Context,
+  replicationSource: Int,
+  state: ReplicationState,
+): void {
+  replicationDir = makeInputDir(
+    SKStore.IID::keyType,
+    ReplicationStateFile::type,
+    context,
+    replication,
+  );
+  key = SKStore.IID(replicationSource);
+  arr = replicationDir.unsafeGetArray(context, key);
+  if (arr.size() < 1) {
+    replicationDir.writeArray(context, key, Array[ReplicationStateFile(state)])
+  } else {
+    arr[0] match {
+    | ReplicationStateFile(RSError()) ->
+      void // final state
+    | ReplicationStateFile(RSEstablished()) ->
+      replicationDir.writeArray(
+        context,
+        key,
+        Array[ReplicationStateFile(state)],
+      )
+    }
+  }
+}
+
+fun errorAllExistingSubs(
+  context: mutable SKStore.Context,
+  dir: SKStore.DirName,
+): void {
+  context.getSessions().values().each(sub ->
+    sub.destinationSource match {
+    | None() -> void
+    | Some(destSource) ->
+      if (sub.dirNames(context).any(dirName -> dirName == dir)) {
+        setReplicationState(context, destSource, RSError());
+        lock = SKStore.unfreezeLock(sub.lock);
+        SKStore.mutexLock(lock);
+        cond = SKStore.unfreezeCond(sub.cond);
+        _ = SKStore.condBroadcast(cond);
+        SKStore.mutexUnlock(lock);
+      }
+    }
+  )
+}
+
+class DirDescr{
+  colNames: Array<P.Name>,
+  schema: Array<P.ColumnDefinition>,
+  kinds: Array<(Int, P.IKind, P.Type)>,
+  cols: Map<P.Name, Int>,
+  alias: ?P.Name,
+  isInput: Bool,
+  view: Bool,
+} extends SKStore.File, Descr uses Orderable {
+  fun compare(y: DirDescr): Order {
+    this.name.compare(y.name)
+  }
+
+  static fun create{
+    name: P.Name,
+    schema: Array<P.ColumnDefinition>,
+    dirName: SKStore.DirName,
+    alias: ?P.Name,
+    isInput: Bool,
+    view: Bool = false,
+  }: this {
+    cols = mutable Map[];
+    colNames = schema.map(x -> x.name);
+    for (i => ty in schema) {
+      cols![ty.name] = i;
+    };
+    static{
+      name,
+      colNames,
+      schema,
+      kinds => schema.mapWithIndex((idx, ty) -> (idx, P.IASC(), ty.ty)),
+      cols => cols.chill(),
+      dirName,
+      alias,
+      isInput,
+      view,
+    }
+  }
+}
+
+fun makeSelectName(id: String): SKStore.DirName {
+  SKStore.DirName::create("/" + id + "/");
+}
+
+fun getDir(dirDescr: DirDescr): SKStore.EHandle<SKStore.Key, Row> {
+  SKStore.EHandle(x ~> x, Row::type, dirDescr.dirName)
+}
+
+fun makeInputDir<K: SKStore.Key, T: SKStore.File>(
+  fromKey: SKStore.Key ~> K,
+  fromFile: SKStore.File ~> T,
+  context: mutable SKStore.Context,
+  dirName: SKStore.DirName,
+): SKStore.EHandle<K, T> {
+  context.maybeGetDir(dirName) match {
+  | None() -> context.mkdir(fromKey, fromFile, dirName)
+  | Some(dir) -> SKStore.EHandle(fromKey, fromFile, dir.getDirName())
+  };
+}
+
+fun makeMapDir<
+  K: SKStore.Key,
+  T: SKStore.File,
+  K2: SKStore.Key,
+  T2: SKStore.File,
+>(
+  fromKey: SKStore.Key ~> K2,
+  fromFile: SKStore.File ~> T2,
+  context: mutable SKStore.Context,
+  dirName: SKStore.DirName,
+  input: SKStore.EHandle<K, T>,
+  f: SKStore.TMapFun<K, T, K2, T2>,
+): SKStore.EHandle<K2, T2> {
+  context.maybeGetDir(dirName) match {
+  | None() -> input.map(fromKey, fromFile, context, dirName, f)
+  | Some(dir) -> SKStore.EHandle(fromKey, fromFile, dir.getDirName())
+  };
+}
+
+fun getTableDir(
+  context: mutable SKStore.Context,
+): SKStore.EHandle<SKStore.SID, DirDescr> {
+  makeInputDir(SKStore.SID::keyType, DirDescr::type, context, tableInfo)
+}
+
+/*****************************************************************************/
+/* Getting the latest directory descriptor.
+ *
+ * Sometimes, we have to do physical copies of SQL tables or directories.
+ * This will happen when we are dealing with a transaction that is both
+ * reading and writing to the same table.
+ *
+ * For example:
+ * begin transaction;
+ *   delete from t1;
+ *   insert into t1 ...
+ * commit;
+ *
+ * You can guess what the problem here is. Because t1 is reactive, that means
+ * that the delete statement will delete anything added to t1. The solution
+ * is simple, the version that t1 inserts into is not the same than the one
+ * we delete from. To keep track of the different version of table we have
+ * a global called TableMap.
+ *
+ * At commit time, under the global lock, the different versions are thrown
+ * away, and only the result is copied into the real time.
+ */
+/*****************************************************************************/
+
+value class Version(value: Int) uses Orderable
+
+class TableMap{
+  startTick: SKStore.Tick,
+  version: Version,
+  map: SortedMap<SKStore.Key, (Version, Descr)>,
+} extends SKStore.File
+
+fun dirDescrCopy(
+  context: mutable SKStore.Context,
+  dirName: SKStore.DirName,
+  tableName: String,
+  version: Version,
+): SKStore.DirName {
+  oldDir = context.unsafeGetEagerDir(dirName);
+  nextName = SKStore.DirName::create(
+    "/next/" + tableName + "/" + version.value + "/",
+  );
+  sinkName = SKStore.DirName::create(
+    "/sink/" + tableName + "/" + version.value + "/",
+  );
+  time = context.timeStamp();
+  dir = oldDir.copy{
+    timeStack => SKStore.TimeStack::createInput(time),
+    created => context.getTick(),
+    dirName => nextName,
+    input => true,
+    creator => context.currentArrow(),
+  };
+  context.setDir(dir);
+  limit = context.getTick();
+  _ = SKStore.EagerDir::apply(
+    context,
+    dirName,
+    sinkName,
+    (context, _writer, key, _valueIter) ~> {
+      entries = mutable Vector[];
+      for (srcValue in (context.unsafeGetEagerDir(
+        dirName,
+      )).unsafeGetAllDataIterAfter(limit, key)) {
+        (_, source, writer, values) = srcValue;
+        entries.push((key, (source, writer, values)));
+      };
+      inputDir = context.unsafeGetEagerDir(nextName);
+      inputDir.unsafeWriteArraySourceMany(context, entries.iterator());
+    },
+    None(),
+    None(),
+    None(),
+    true,
+  );
+  nextName
+}
+
+base class Descr{name: P.Name, dirName: SKStore.DirName} {}
+
+fun getLatestDescr(context: mutable SKStore.Context, descr: Descr): Descr {
+  baseName = SKStore.SID(descr.name.lower);
+  context.getGlobal("TableMap") match {
+  | None() -> descr
+  | Some(tableMapFile) ->
+    tableMap = TableMap::type(tableMapFile);
+    oldDescr = tableMap.map.maybeGet(baseName) match {
+    | None() -> descr
+    | Some((version, oldDescr)) if (version == tableMap.version) ->
+      return oldDescr
+    | Some((_, x)) -> x
+    };
+    nextName = dirDescrCopy(
+      context,
+      oldDescr.dirName,
+      descr.name.origName,
+      tableMap.version,
+    );
+    result = descr with {dirName => nextName};
+    !tableMap.map[baseName] = (tableMap.version, result);
+    context.setGlobal("TableMap", tableMap);
+    result
+  }
+}
+
+fun getLatestDirDescr(
+  context: mutable SKStore.Context,
+  dirDescr: DirDescr,
+): DirDescr {
+  getLatestDescr(context, dirDescr) match {
+  | IndexDescr _ -> invariant_violation("Was not expecting an index")
+  | x @ DirDescr _ -> x
+  }
+}
+
+fun getLatestIndexDescr(
+  context: mutable SKStore.Context,
+  indexDescr: IndexDescr,
+): IndexDescr {
+  getLatestDescr(context, indexDescr) match {
+  | DirDescr _ -> invariant_violation("Was not expecting a table")
+  | x @ IndexDescr _ -> x
+  }
+}
+
+/*****************************************************************************/
+/* Sharding stats for joins. */
+/*****************************************************************************/
+
+class ShardStats(
+  tick: SKStore.Tick,
+  left: Int,
+  right: Int,
+) extends SKStore.File
+
+/*****************************************************************************/
+/* Views. */
+/*****************************************************************************/
+
+fun getViewsDir(
+  context: mutable SKStore.Context,
+): SKStore.EHandle<SKStore.SID, SelectFile> {
+  makeInputDir(SKStore.SID::keyType, SelectFile::type, context, views)
+}
+
+/*****************************************************************************/
+/* Subscriptions. */
+/*****************************************************************************/
+
+class SubRequestFile(
+  viewNames: Array<String>,
+  format: OutputFormatKind,
+  init: Bool,
+  cmd: SKStore.CmdMultipleDirs,
+  sessionID: String,
+  destinationSource: ?Int,
+) extends SKStore.File
+
+fun getSubsDirs(
+  context: mutable SKStore.Context,
+): (
+  SKStore.EHandle<SKStore.SID, SubRequestFile>,
+  SKStore.EHandle<SKStore.SID, SKStore.StringFile>,
+) {
+  if (context.unsafeMaybeGetEagerDir(subsInput) is Some _) {
+    input = SKStore.EHandle(
+      SKStore.SID::keyType,
+      SubRequestFile::type,
+      subsInput,
+    );
+    output = SKStore.EHandle(
+      SKStore.SID::keyType,
+      SKStore.StringFile::type,
+      subsOutput,
+    );
+    return (input, output)
+  };
+  input = context.mkdir(SKStore.SID::keyType, SubRequestFile::type, subsInput);
+  output = input.map(
+    SKStore.SID::keyType,
+    SKStore.StringFile::type,
+    context,
+    subsOutput,
+    (context, writer, key, values) ~> {
+      request = values.first;
+      tableDir = getTableDir(context);
+      dirSubs = request.viewNames.map(viewName -> {
+        (edir, dirDescr) = tableDir.maybeGet(
+          context,
+          SKStore.SID(viewName),
+        ) match {
+        | None() ->
+          views = SKDB.getViewsDir(context);
+          viewsDir = context.unsafeGetEagerDir(views.dirName);
+          selectFiles = viewsDir.getArrayRaw(SKStore.SID(viewName.toString()));
+          invariant(selectFiles.size() <= 1);
+          if (selectFiles.size() == 0) {
+            print_error(`Error: view ${viewName.toString()} doesn't exist`);
+            skipExit(3)
+          };
+          selectFile = SKDB.SelectFile::type(selectFiles[0]);
+          if (!selectFile.reactive) {
+            print_error("Error: can only connect to reactive views");
+            skipExit(23);
+          };
+          cselect = selectFile.cselect;
+          selectDir = SKDB.evalSelect(context, cselect, None());
+          edir = context.unsafeGetEagerDir(selectDir.dirName);
+          dirDescr = Compiler::getDirDescr(
+            context,
+            selectFile.sparams,
+            cselect.from,
+            cselect.params,
+            P.Name::create(selectDir.dirName.toString()),
+            selectDir.dirName,
+          );
+          (edir, dirDescr)
+        | Some(dirDescr) ->
+          edir = context.unsafeGetEagerDir(dirDescr.dirName);
+          (edir, dirDescr)
+        };
+        alwaysTrue = (_baseName ~> true);
+        filter = request.destinationSource match {
+        | None() -> (_context, _isReset, _dirName) ~> alwaysTrue
+        | Some(inputSrc) ->
+          (context, isReset, dirName) ~> {
+            if (isReset) return alwaysTrue;
+            tdir = context.unsafeGetEagerDir(dirName);
+            ignoredSrc = SKStore.Path::iid(dirDescr.dirName, inputSrc);
+            (file: SKStore.Key) -> {
+              rows = tdir.unsafeGetAllDataIter(file).collect(Array);
+              !updateIsFromIgnoredSource(ignoredSrc, rows)
+            }
+          }
+        };
+
+        format = request.format match {
+        | SKDB.OFK_CSV() ->
+          SKStore.OCSV(Range(0, dirDescr.schema.size()).collect(Array))
+        | SKDB.OFK_JSON() -> SKStore.OJSON(getFieldNames(context, edir.dirName))
+        | SKDB.OFK_SQL() -> SKStore.OSQL()
+        | SKDB.OFK_JS() -> SKStore.OJS(getFieldNames(context, edir.dirName))
+        | SKDB.OFK_Table() ->
+          SKStore.OTable(getFieldNames(context, edir.dirName))
+        };
+
+        SKStore.DirSub(
+          edir.dirName,
+          viewName,
+          format,
+          (context) ~>
+            getWatermark(context, viewName, request.destinationSource),
+          filter,
+        )
+      });
+
+      cmd = SKStore.NMultipleDirs(request.cmd, dirSubs);
+
+      context.subscribe(
+        request.sessionID,
+        cmd,
+        request.destinationSource,
+        if (request.init) Some(SKStore.Tick(0)) else None(),
+      );
+      writer.set(key, SKStore.StringFile(request.sessionID))
+    },
+  );
+  (input, output)
+}
+
+fun updateIsFromIgnoredSource(
+  ignoredSrc: SKStore.Path,
+  rows: Array<(SKStore.Tick, SKStore.Path, SKStore.Path, Array<SKStore.File>)>,
+): Bool {
+  maxTick = SKStore.Tick(0);
+  singleNonTomb: ?(SKStore.Tick, SKStore.Path) = None();
+
+  for ((tick, _origSrc, src, files) in rows) {
+    !maxTick = max(maxTick, tick);
+
+    if (!files.isEmpty()) {
+      // more than one non-tomb cannot be a replication update
+      if (singleNonTomb is Some _) return false;
+      !singleNonTomb = Some((tick, src));
+    };
+  };
+
+  singleNonTomb match {
+  | None() -> // all are tombs
+    rows.all(row -> {
+      (tick, _, src, _) = row;
+      tick != maxTick || src == ignoredSrc
+    })
+  | Some((tick, src)) -> tick == maxTick && src == ignoredSrc
+  }
+}
+
+module end;
+/*****************************************************************************/
+/* Indexes. */
+/*****************************************************************************/
+
+module SQLParser;
+extension class CreateIndex extends SKStore.File
+module end;
+
+module SKDB;
+
+class IndexDescr{
+  tableName: P.Name,
+  tableDirName: SKStore.DirName,
+  fields: Array<(Int, P.IKind, P.Type)>,
+  unique: Bool,
+  text: ?String,
+} extends SKStore.File, Descr uses Orderable {
+  fun compare(y: IndexDescr): Order {
+    this.name.compare(y.name)
+  }
+
+  fun isSystemIndex(): Bool {
+    this.name.lower.startsWith(systemIndexPrefix.lowercase())
+  }
+}
+
+fun getIndexInputDir(
+  context: mutable SKStore.Context,
+): SKStore.EHandle<SKStore.SID, P.CreateIndex> {
+  makeInputDir(SKStore.SID::keyType, P.CreateIndex::type, context, indexInput)
+}
+
+fun getIndexOutputDir(
+  context: mutable SKStore.Context,
+): SKStore.EHandle<SKStore.SID, IndexDescr> {
+  input = getIndexInputDir(context);
+  makeMapDir(
+    SKStore.SID::keyType,
+    IndexDescr::type,
+    context,
+    indexOutput,
+    input,
+    (context, writer, key, values) ~> {
+      index = values.first;
+      writer.set(
+        key,
+        createUserIndex(
+          context,
+          index.name,
+          index.pos,
+          index.on,
+          index.columns,
+          index.unique,
+          Some(index.toString()),
+        ),
+      )
+    },
+  )
+}
+
+fun makeIndexEntry(tableName: P.Name, colNbr: Int): SKStore.SID {
+  SKStore.SID::create(tableName.lower + ":" + colNbr);
+}
+
+fun getIndexByColNbr(
+  context: mutable SKStore.Context,
+): SKStore.EHandle<SKStore.SID, IndexDescr> {
+  indexes = getIndexOutputDir(context);
+  makeMapDir(
+    SKStore.SID::keyType,
+    IndexDescr::type,
+    context,
+    indexByCol,
+    indexes,
+    (_context, writer, _key, values) ~> {
+      indexDescr = values.first;
+      for (field in indexDescr.fields) {
+        fieldNbr = field.i0;
+        indexEntry = makeIndexEntry(indexDescr.tableName, fieldNbr);
+        writer.set(indexEntry, indexDescr)
+      }
+    },
+  )
+}
+
+fun getIndexByName(
+  context: mutable SKStore.Context,
+): SKStore.EHandle<SKStore.SID, IndexDescr> {
+  indexes = getIndexOutputDir(context);
+  makeMapDir(
+    SKStore.SID::keyType,
+    IndexDescr::type,
+    context,
+    indexByName,
+    indexes,
+    (_context, writer, _key, values) ~> {
+      indexDescr = values.first;
+      writer.set(SKStore.SID(indexDescr.tableName.lower), indexDescr)
+    },
+  )
+}
+
+/*****************************************************************************/
+/* Tables. */
+/*****************************************************************************/
+
+fun getDirDescrs(
+  origContext: readonly SKStore.Context,
+): SortedMap<P.Name, SKDB.DirDescr> {
+  context = origContext.mclone();
+  getTableDir(context)
+    .items(context)
+    .flatMap(x -> x.i1)
+    .reduce((acc, curr) -> acc.set(curr.name, curr), SortedMap::create())
+}
+
+fun getTables(origContext: readonly SKStore.Context): Array<DirDescr> {
+  context = origContext.mclone();
+  getTableDir(context)
+    .items(context)
+    .flatMap(x -> x.i1)
+    .filter(x -> x.isInput)
+    .collect(Array);
+}
+
+fun getTable(
+  context: mutable SKStore.Context,
+  pos: Int,
+  name: P.Name,
+): DirDescr {
+  sid = SKStore.SID::create(name.lower);
+  tableDir = getTableDir(context);
+  tableDir.maybeGet(context, sid) match {
+  | None() ->
+    hviews = getViewsDir(context);
+    viewsDir = context.unsafeGetEagerDir(hviews.dirName);
+    viewArray = viewsDir.getArrayRaw(SKStore.SID(name.lower));
+    if (viewArray.size() == 0) {
+      error(pos, "Table '" + name + "' does not exist")
+    } else {
+      view = viewArray[0];
+      selectFile = SelectFile::type(view);
+      dirName = SKStore.DirName::create("/" + selectFile.cselect.id + "/");
+      cselect = selectFile.cselect;
+      dirDescr = SKDB.Compiler::getDirDescr(
+        context,
+        selectFile.sparams,
+        cselect.from,
+        cselect.params,
+        cselect.id,
+        dirName,
+      );
+      if (!selectFile.reactive) {
+        _ = evalSelect(context, cselect, None());
+      };
+      dirDescr
+    }
+  | Some(dirDescr) -> getLatestDirDescr(context, dirDescr)
+  }
+}
+
+fun getSqlTableName(dirName: SKStore.DirName): String {
+  dirNameStr = dirName.toString();
+  dirNameStr.stripPrefix("/").stripSuffix("/");
+}
+
+fun getSqlTableFromDirName(
+  context: readonly SKStore.Context,
+  dirName: SKStore.DirName,
+): SKDB.DirDescr {
+  dirNameStr = getSqlTableName(dirName);
+  SKDB.getTable(context.mclone(), 0, P.Name::create(dirNameStr))
+}
+
+fun feedbackTable(table: String): String {
+  // WARNING: this must be kept in sync with the clients and how
+  // they create a table. the format of this table name forms part
+  // of the protocol.
+  table + "__skdb_mirror_feedback"
+}
+
+/*****************************************************************************/
+/* DUMP. */
+/*****************************************************************************/
+
+fun printDirDescr(dirDescr: DirDescr, suffix: ?String): void {
+  o = print_raw;
+  o("CREATE ");
+  o("TABLE ");
+  o(dirDescr.name.origName);
+  suffix match {
+  | None() -> void
+  | Some(x) -> o(x)
+  };
+  o(" (\n");
+  for (colName in dirDescr.colNames) {
+    colIndex = dirDescr.cols[colName];
+    o("  ");
+    o(colName.origName);
+    o(" ");
+    ty = dirDescr.schema[colIndex];
+    o(
+      ty.ty match {
+      | P.INTEGER() -> "INTEGER"
+      | P.FLOAT() -> "FLOAT"
+      | P.TEXT() -> "TEXT"
+      | P.JSON() -> "JSON"
+      | P.SCHEMA() -> "SCHEMA"
+      },
+    );
+    if (ty.unique is Some _) {
+      o(" UNIQUE");
+    };
+    if (ty.primary is Some _) {
+      o(" PRIMARY KEY");
+    };
+    if (ty.notNull is Some _) {
+      o(" NOT NULL");
+    };
+    ty.default match {
+    | None() -> void
+    | Some(P.CCDefault{expr}) ->
+      expr match {
+      | v @ P.Value _ ->
+        v match {
+        | P.VNull() -> void
+        | P.VInt(x) -> o(` DEFAULT ${x.toString()}`)
+        | P.VFloat(x) -> o(` DEFAULT ${x.toString()}`)
+        | P.VString(s) ->
+          o(` DEFAULT `);
+          escapeString(o, s)
+        | P.VCurrentTime()
+        | P.VCurrentDate()
+        | P.VCurrentTimestamp() ->
+          o(` DEFAULT ${v}`)
+        | P.VSeqNum _
+        | P.VId _
+        | P.VParam _
+        | P.VPermission _
+        | P.VJSON _ ->
+          invariant_violation("Invalid expression for default value")
+        }
+      | _ -> invariant_violation("Invalid expression for default value")
+      }
+    };
+    if (colIndex < dirDescr.schema.size() - 1) {
+      o(",");
+    };
+    o("\n");
+  };
+  o(");\n");
+  flushStdout();
+}
+
+fun dumpTable(
+  origContext: mutable SKStore.Context,
+  tableName: String,
+  suffix: ?String,
+  legacySchema: Bool = false,
+): void {
+  context = origContext.mclone();
+  tableDir = getTableDir(context);
+
+  dirDescrOpt = if (legacySchema) {
+    getLegacyViewsDir(context)
+      .maybeGet(context, SKStore.SID::create(tableName))
+      .flatMap(lvFile -> {
+        legacy_sid = SKStore.SID::create(lvFile.legacyView.lower);
+        tableDir.maybeGet(context, legacy_sid).map(dd -> {
+          schema_with_pk = dd.schema.map(col ->
+            if (col.name == lvFile.pkCol.name) {
+              invariant(col == (lvFile.pkCol with {primary => None()}));
+              lvFile.pkCol
+            } else {
+              col
+            }
+          );
+          dd with {name => P.Name::create(tableName), schema => schema_with_pk}
+        })
+      })
+  } else {
+    tableDir.maybeGet(context, SKStore.SID::create(tableName))
+  };
+
+  dirDescrOpt match {
+  | None() -> void
+  | Some(dd) -> printDirDescr(dd, suffix)
+  };
+}
+
+fun dumpTables(origContext: readonly SKStore.Context, suffix: ?String): void {
+  context = origContext.mclone();
+  handle = getTableDir(context);
+  sinkName = SKStore.DirName::create("/sink_" + SKStore.genSym(0) + "/");
+  _ = handle.map(
+    RowKey::keyType,
+    handle.type,
+    context,
+    sinkName,
+    (context, _writer, _key, values) ~> {
+      dirDescr = values.first;
+      if (!dirDescr.isInput) return void;
+      printDirDescr(dirDescr, suffix);
+      tableName = dirDescr.name.lower;
+      for (indexDescr in getIndexByName(context).getArray(
+        context,
+        SKStore.SID(tableName),
+      )) {
+        if (indexDescr.isSystemIndex()) {
+          continue;
+        };
+        indexDescr.text match {
+        | None() -> void
+        | Some(text) -> print_string(text + ";")
+        }
+      }
+    },
+  );
+}
+
+fun dumpInserts(origContext: readonly SKStore.Context): void {
+  context = origContext.mclone();
+  handle = getTableDir(context);
+  sinkName = SKStore.DirName::create("/sink_" + SKStore.genSym(0) + "/");
+  _ = handle.map(
+    RowKey::keyType,
+    handle.type,
+    context,
+    sinkName,
+    (context, _writer, _key, values) ~> {
+      dirDescr = values.first;
+      if (!dirDescr.isInput) return void;
+      fileIter = context
+        .unsafeGetEagerDir(dirDescr.dirName)
+        .unsafeGetFileIter();
+      count = 1;
+      print_raw("BEGIN TRANSACTION;\n");
+      for (kv in fileIter) {
+        if (count % 1024 == 0) {
+          print_raw("COMMIT;\n");
+          print_raw("BEGIN TRANSACTION;\n");
+        };
+        (_, files) = kv;
+        for (file in files) {
+          row = RowValues::type(file);
+          for (_ in Range(0, row.repeat)) {
+            print_raw("INSERT INTO " + dirDescr.name + " VALUES ");
+            print_raw(row.toString());
+            print_raw(";\n");
+            !count = count + 1;
+          };
+        };
+      };
+      print_raw("COMMIT;\n");
+      flushStdout();
+    },
+  );
+}
+
+fun dumpView(origContext: readonly SKStore.Context, viewName: String): void {
+  context = origContext.mclone();
+  hviews = getViewsDir(context);
+  viewsDir = context.unsafeGetEagerDir(hviews.dirName);
+  arr = viewsDir.getArrayRaw(SKStore.SID(viewName));
+  if (arr.size() == 0) {
+    return void
+  };
+  invariant(arr.size() == 1);
+  print_raw(SelectFile::type(arr[0]).text);
+  print_raw(";\n");
+  flushStdout();
+}
+
+fun dumpViews(origContext: readonly SKStore.Context): void {
+  context = origContext.mclone();
+  handle = getViewsDir(context);
+  sinkName = SKStore.DirName::create("/sink_" + SKStore.genSym(0) + "/");
+  sortedName = SKStore.DirName::create("/sorted_" + SKStore.genSym(0) + "/");
+  sorted = handle.map(
+    SKStore.IID::keyType,
+    handle.type,
+    context,
+    sortedName,
+    (_context, writer, _key, values) ~> {
+      for (selectFile in values) {
+        writer.set(SKStore.IID(selectFile.tick), selectFile)
+      }
+    },
+  );
+  _ = sorted.map(
+    SKStore.SID::keyType,
+    sorted.type,
+    context,
+    sinkName,
+    (context, _writer, _key, views) ~> {
+      o = print_raw;
+      for (view in views) {
+        o(view.text);
+        o(";\n");
+        for (indexDescr in getIndexByName(context).getArray(
+          context,
+          SKStore.SID(view.name.lower),
+        )) {
+          indexDescr.text match {
+          | None() -> void
+          | Some(text) -> o(text + ";\n")
+          }
+        };
+      };
+      flushStdout();
+    },
+  );
+}
+
+/*****************************************************************************/
+/* File used for globals. */
+/*****************************************************************************/
+
+const GLOBALS: String = "GLOBALS";
+
+class Globals(map: SortedMap<String, Int> = SortedMap[]) extends SKStore.File {
+  fun set(var: String, val: Int): this {
+    !this.map[var] = val;
+    this
+  }
+  fun containsKey(var: String): Bool {
+    this.map.containsKey(var)
+  }
+  fun get(var: String): Int {
+    this.map[var]
+  }
+  fun maybeGet(var: String): ?Int {
+    this.map.maybeGet(var)
+  }
+}
+
+const NAMEDIDS: String = "NAMEDIDS";
+
+class NamedIDs(
+  map: SortedMap<String, String> = SortedMap[],
+) extends SKStore.File {
+  fun set(var: String, val: String): this {
+    !this.map[var] = val;
+    this
+  }
+  fun containsKey(var: String): Bool {
+    this.map.containsKey(var)
+  }
+  fun get(var: String): String {
+    this.map[var]
+  }
+  fun maybeGet(var: String): ?String {
+    this.map.maybeGet(var)
+  }
+}
+
+module end;
+
+module SKStore;
+
+extension base class EagerDir {
+  fun copy{
+    created: Tick,
+    timeStack: TimeStack,
+    dirName: DirName,
+    input: Bool,
+    creator: ?ArrowKey,
+  }: this;
+}
+
+extension class TEagerDir {
+  fun copy{
+    created: Tick,
+    timeStack: TimeStack,
+    dirName: DirName,
+    input: Bool,
+    creator: ?ArrowKey,
+  }: this {
+    static{
+      timeStack,
+      created,
+      dirName,
+      input,
+      creator,
+      fixedData => this.fixedData,
+      data => this.data,
+      totalSize => this.totalSize,
+    }
+  }
+}
+
+module end;

@@ -1,0 +1,758 @@
+/*****************************************************************************/
+/* Definition of the "fixed" part of a directory.
+ *
+ * Every Eager Directory defines a "fixed" part. Meaning, the values defined
+ * at initialization time. After the initialization, the directory is defined
+ * as the difference between the initialization data (that never changes) and
+ * the changes made to the directory since its inception.
+ *
+ * So for example:
+ * dir = mkdir(..., Array[(1, 1), (2, 2), (3, 3)]);
+ * fixedData => FixedRow((1, (src, 1)), (2, (src, 2)), (3, (src, 3)))
+ *
+ * Then later someone removes the key 2.
+ * data => DMap[2 => SortedMap(src, Array[])]
+ *
+ * And the value associated with the key "2" is defined as the difference
+ * between fixedData and data. So in this case, because the source is the same
+ * the key 2 is associated with an empty array.
+ */
+/*****************************************************************************/
+module SKStore;
+
+value class FixedRow<+K: Orderable, +T>(
+  key: K,
+  value: T,
+  source: Path,
+  tag: TickRange,
+) uses Orderable {
+  fun changeSource(source: Path): this {
+    !this.source = source;
+    this
+  }
+
+  fun compare<L: Orderable, U>[K: L](other: FixedRow<L, U>): Order {
+    (this.key, this.source).compare((other.key, other.source))
+  }
+
+  fun <<L: Orderable, U>[K: L](other: FixedRow<L, U>): Bool {
+    this.compare(other) == LT()
+  }
+
+  fun <=<L: Orderable, U>[K: L](other: FixedRow<L, U>): Bool {
+    this.compare(other) != GT()
+  }
+
+  fun ><L: Orderable, U>[K: L](other: FixedRow<L, U>): Bool {
+    this.compare(other) == GT()
+  }
+
+  fun >=<L: Orderable, U>[K: L](other: FixedRow<L, U>): Bool {
+    this.compare(other) != LT()
+  }
+
+  fun ==<L: Orderable, U>[K: L](other: FixedRow<L, U>): Bool {
+    this.compare(other) == EQ()
+  }
+
+  fun !=<L: Orderable, U>[K: L](other: FixedRow<L, U>): Bool {
+    this.compare(other) != EQ()
+  }
+}
+
+base class FixedData<+K: Orderable, +T> {
+  fun size(): Int;
+  fun get(idx: Int): FixedRow<K, T>;
+  fun getPos<L: Orderable>[L: K](key: L): Int;
+  fun getArray<L: Orderable>[L: K](key: L): Array<T>;
+  fun getIter<L: Orderable>[L: K](key: L): mutable Iterator<(Tick, Path, T)>;
+  fun getIterAfter<L: Orderable>[L: K](
+    tick: Tick,
+    key: L,
+  ): mutable Iterator<(Tick, Path, T)>;
+  fun getArraySourceKey<L: Orderable>[L: K](source: Path, key: L): Array<T>;
+  fun getIterSourceKey<L: Orderable>[L: K](
+    source: Path,
+    key: L,
+  ): mutable Iterator<T>;
+  fun getChangesAfter(tick: Tick): SortedSet<K>;
+  fun iterator(): mutable Iterator<FixedRow<K, T>>;
+}
+
+base class FixedDataFactory<+K: Orderable, +F> {
+  static fun create(
+    vec: mutable Vector<FixedRow<K, F>> = mutable Vector[],
+  ): FixedData<K, F>;
+}
+
+// Assuming delta is monotone, that is, i <= j implies delta(i) <= delta(j),
+// findFirstBy(delta, l, u) is the least m where l <= m <= u such that
+// delta(m) == EQ(). If there is no such m, then l <= m <= u+1 but otherwise
+// is arbitrary.
+fun findFirstBy(delta: Int ~> Order, l: Int, u: Int): Int {
+  while (l <= u) {
+    m = l + (u - l) / 2;
+    if (delta(m) is GT()) {
+      !l = m + 1
+    } else {
+      !u = m - 1
+    }
+  };
+  l;
+}
+
+// Assuming delta is monotone, that is, i <= j implies delta(i) <= delta(j),
+// findAllBy(delta, l, u) enumerates, in increasing order, all the m where l
+// <= m <= u such that delta(m) == EQ().
+fun findAllBy<T>(delta: Int ~> Order, l: Int, u: Int): mutable Iterator<Int> {
+  i = findFirstBy(delta, l, u);
+  // Linear scan to find all elements that compare equal to key. If
+  // the number of such duplicates is expected to be > lg(u-i), this
+  // should be replaced with the findLastBy analogue of findFirstBy.
+  while (i <= u && delta(i) == EQ()) {
+    yield i;
+    !i = i + 1;
+  }
+}
+
+fun findAll<T: Orderable>(
+  get: Int ~> T,
+  key: T,
+  i: Int,
+  j: Int,
+): mutable Iterator<Int> {
+  findAllBy(idx ~> key.compare(get(idx)), i, j)
+}
+
+// Assuming x <= y implies get(x) <= get(y), binSearch(get, key, i, j)
+// is the least index k where i <= k <= j such that get(k) == key. If
+// there is no such index, then i <= k <= j+1 but otherwise is arbitrary.
+fun binSearch<T: Orderable>(get: Int ~> T, key: T, i: Int, j: Int): Int {
+  findFirstBy(idx ~> key.compare(get(idx)), i, j)
+}
+
+// Assuming that the elements of `sortedData` are in fact sorted by `f`,
+// checks that the elements are unique under `f` and throws otherwise
+fun assertUnique<T, U: Orderable>(
+  sortedData: mutable Vector<T>,
+  f: T ~> U,
+): void {
+  lastOpt: ?U = None();
+  for (t in sortedData) {
+    u = f(t);
+    lastOpt match {
+    | None() -> !lastOpt = Some(u)
+    | Some(last_u) ->
+      if (last_u == u) {
+        debug((last_u, u));
+        invariant_violation("Unexpected duplicate elements found")
+      } else {
+        !lastOpt = Some(u)
+      }
+    }
+  };
+}
+
+class FixedDir<+K: Orderable, +T: frozen> extends
+  IFixedDir<K, T, FixedRow<K, T>>,
+  FixedDataFactory<K, T>,
+{
+  static fun create(
+    data: mutable Vector<FixedRow<K, T>> = mutable Vector[],
+  ): this {
+    if (!data.isSorted()) {
+      data.sort();
+    };
+    static::computeTags(data);
+    static{data => data.toArray()}
+  }
+
+  fun get(i: Int): FixedRow<K, T> {
+    this.data.unsafe_get(i)
+  }
+}
+
+value class CompactRow(
+  values: Array<?SKDB.CValue>,
+  repeat: Int,
+  tag: TickRange,
+  sourceKey: ?Key,
+)
+
+class FixedDirMetadata{
+  sourceDir: DirName,
+  kinds: Array<(Int, SQLParser.IKind, SQLParser.Type)>,
+}
+
+// This is a more compact representation of a FixedDir, keeping some shared
+// metadata about the directory and stripping redundant repeated data
+// out of the rows themselves.
+class CompactFixedDir protected {
+  metadata: FixedDirMetadata,
+} extends
+  IFixedDir<Key, Array<File>, CompactRow>,
+  FixedDataFactory<Key, Array<File>>,
+{
+  static fun create(
+    vec: mutable Vector<FixedRow<Key, Array<File>>> = mutable Vector[],
+  ): FixedData<Key, Array<File>> {
+    static::getMetadata(vec) match {
+    | None() -> FixedDir<Key, Array<File>>::create(vec)
+    | Some(metadata) -> static::createWithMetadata(vec, metadata)
+    }
+  }
+
+  private static fun getMetadata(
+    data: readonly Vector<FixedRow<Key, Array<File>>>,
+  ): ?FixedDirMetadata {
+    possibleResult: ?FixedDirMetadata = None();
+
+    for (elt in data) {
+      if (elt.value.size() != 1) return None();
+      (elt.key, elt.value[0]) match {
+      | (SKDB.RowKey(row1, k), row2 @ SKDB.RowValues _) ->
+        possibleResult match {
+        | None() ->
+          !possibleResult = Some(
+            FixedDirMetadata{sourceDir => elt.source.dirName, kinds => k},
+          )
+        | Some(FixedDirMetadata{sourceDir, kinds}) ->
+          if (k != kinds || elt.source.dirName != sourceDir) {
+            return None()
+          }
+        };
+        if (row1 != row2) return None()
+      | _ -> return None()
+      }
+    };
+    possibleResult
+  }
+
+  static fun createWithMetadata<K: Key, V: Array<File>>(
+    data: mutable Vector<FixedRow<K, V>>,
+    metadata: FixedDirMetadata,
+  ): this {
+    if (!data.isSorted()) {
+      data.sort();
+    };
+    IFixedDir::computeTags(data);
+    static{
+      data => data.map(static::stripMetadata).toArray(),
+      metadata => metadata,
+    }
+  }
+  protected static fun stripMetadata<V: File>(
+    row: FixedRow<Key, Array<V>>,
+  ): CompactRow {
+    invariant(row.value.size() == 1);
+    sourceKey = if (row.source.baseName != row.key) {
+      Some(row.source.baseName)
+    } else {
+      None()
+    };
+
+    row.value[0] match {
+    | SKDB.RowValues(values, repeat) ->
+      CompactRow(values, repeat, row.tag, sourceKey)
+    | _ -> invariant_violation("Unexpected type")
+    };
+  }
+
+  fun get(i: Int): FixedRow<Key, Array<File>> {
+    compactRow = this.data.unsafe_get(i);
+    rowValues = SKDB.RowValues(compactRow.values, compactRow.repeat);
+    rowKey = SKDB.RowKey(rowValues, this.metadata.kinds);
+    sourceKey = compactRow.sourceKey match {
+    | None() -> rowKey
+    | Some(otherKey) -> otherKey
+    };
+    FixedRow(
+      rowKey,
+      Array[(rowValues : File)],
+      Path::create(this.metadata.sourceDir, sourceKey),
+      compactRow.tag,
+    )
+  }
+}
+
+//Defines the public interface of a FixedDir, allowing for some alternative
+// internal RowRepresentation of conceptually-FixedRow<K, T> rows.
+base class IFixedDir<
+  +K: Orderable,
+  +T: frozen,
+  RowRepresentation: frozen,
+> protected {
+  data: Array<RowRepresentation> = Array[],
+} extends FixedData<K, T> {
+  fun get(i: Int): FixedRow<K, T>;
+
+  fun iterator(): mutable Iterator<FixedRow<K, T>> {
+    this.data.keys().map(i -> this[i])
+  }
+
+  fun size(): Int {
+    this.data.size()
+  }
+
+  fun getPos<L: Orderable>[L: K](key: L): Int {
+    binSearch<K>(i ~> this.get(i).key, key, 0, this.size() - 1)
+  }
+
+  fun getAll<L: Orderable>[L: K](key: L): mutable Iterator<Int> {
+    findAll<K>(i ~> this.get(i).key, key, 0, this.size() - 1)
+  }
+
+  fun getAllSourceKey<L: Orderable>[L: K](
+    source: Path,
+    key: L,
+  ): mutable Iterator<Int> {
+    delta = i ~> {
+      entry = this.get(i);
+      c = key.compare(entry.key);
+      if (c != EQ()) return c;
+      source.compare(entry.source)
+    };
+    findAllBy(delta, 0, this.size() - 1)
+  }
+
+  fun getArray<L: Orderable>[L: K](key: L): Array<T> {
+    this.getAll(key).map(i ~> this.get(i).value).collect(Array)
+  }
+
+  fun getIter<L: Orderable>[L: K](key: L): mutable Iterator<(Tick, Path, T)> {
+    this.getAll(key).map(i -> {
+      elt = this.get(i);
+      (elt.tag.current, elt.source, elt.value)
+    })
+  }
+
+  fun getIterSourceKey<L: Orderable>[L: K](
+    source: Path,
+    key: L,
+  ): mutable Iterator<T> {
+    this.getAllSourceKey(source, key).map(i -> this.get(i).value)
+  }
+
+  fun getArraySourceKey<L: Orderable>[L: K](source: Path, key: L): Array<T> {
+    this.getIterSourceKey(source, key).collect(Array)
+  }
+
+  protected static fun computeTags(
+    array: mutable Vector<FixedRow<K, T>>,
+  ): void {
+    _: TickRange = static::computeTags_(array, 0, array.size() - 1);
+  }
+
+  private static fun computeTags_(
+    array: mutable Vector<FixedRow<K, T>>,
+    i: Int,
+    j: Int,
+  ): TickRange {
+    if (i > j) {
+      return TickRange::create(Tick(0))
+    };
+    pivot = i + (j - i) / 2;
+    elt = array[pivot];
+    tag = elt.tag;
+    right = static::computeTags_(array, pivot + 1, j);
+    left = static::computeTags_(array, i, pivot - 1);
+    !tag.max = max(tag.max, max(left.max, right.max));
+    array![pivot] = elt with {tag};
+    tag
+  }
+
+  private fun getChangesAcc(
+    after: Tick,
+    push: (K) -> void,
+    i: Int,
+    j: Int,
+  ): void {
+    if (i > j) {
+      return void;
+    };
+    pivot = i + (j - i) / 2;
+    elt = this[pivot];
+    tick = elt.tag;
+    if (tick.max < after) return void;
+    if (tick.current >= after) {
+      push(elt.key);
+    };
+    this.getChangesAcc(after, push, i, pivot - 1);
+    this.getChangesAcc(after, push, pivot + 1, j);
+  }
+
+  fun getChangesAfter(tick: Tick): SortedSet<K> {
+    acc = mutable Vector[];
+    this.getChangesAcc(tick, acc.push, 0, this.data.size() - 1);
+    result = SortedSet[];
+    for (elt in acc) {
+      !result = result.set(elt);
+    };
+    result
+  }
+
+  private fun getKeyChangesAfter<L: Orderable>[L: K](
+    after: Tick,
+    key: L,
+    i: Int,
+    j: Int,
+    push: ((Tick, Path, T)) -> void,
+  ): void {
+    if (i <= j) {
+      pivot = i + (j - i) / 2;
+      elt = this[pivot];
+      tick = elt.tag;
+      if (tick.max >= after) {
+        if (key <= elt.key) {
+          this.getKeyChangesAfter(after, key, i, pivot - 1, push);
+        };
+        if (tick.current >= after) {
+          if (elt.key.compare(key) is EQ()) {
+            push((tick.current, elt.source, elt.value));
+          }
+        };
+        if (key >= elt.key) {
+          this.getKeyChangesAfter(after, key, pivot + 1, j, push);
+        }
+      }
+    }
+  }
+
+  fun getIterAfter<L: Orderable>[L: K](
+    limit: Tick,
+    key: L,
+  ): mutable Iterator<(Tick, Path, T)> {
+    acc = mutable Vector[];
+    this.getKeyChangesAfter(limit, key, 0, this.data.size() - 1, acc.push);
+    acc.iterator()
+  }
+}
+
+/*****************************************************************************/
+/* Immutable map (represented with an Array), where the elements are
+ * guaranteed to be unique. */
+/*****************************************************************************/
+
+class FixedSingle<K: Orderable, +V: frozen> private (
+  data: Array<(K, V)> = Array[],
+) {
+  static fun empty(): this {
+    FixedSingle()
+  }
+
+  static fun singleton(k: K, v: V): this {
+    static(Array[(k, v)])
+  }
+
+  static fun pair(kv1: (K, V), kv2: (K, V)): this {
+    static::create(mutable Vector[kv1, kv2])
+  }
+
+  fun items(): mutable Iterator<(K, V)> {
+    this.data.iterator()
+  }
+
+  static fun createFromIterator(it: mutable Iterator<(K, V)>): this {
+    static::create(Vector::mcreateFromIterator(it))
+  }
+
+  static fun create(
+    data: mutable Vector<(K, V)>,
+    allowDuplicates: Bool = false,
+  ): FixedSingle<K, V> {
+    data.sortBy(x ~> x.i0);
+
+    if (!allowDuplicates) assertUnique(data, x ~> x.i0);
+
+    FixedSingle(data.toArray())
+  }
+
+  fun size(): Int {
+    this.data.size()
+  }
+
+  fun get(idx: Int): (K, V) {
+    this.data[idx]
+  }
+
+  private fun getPos(key: K): Int {
+    binSearch(i ~> this.get(i).i0, key, 0, this.size() - 1)
+  }
+
+  fun maybeGet(key: K): ?V {
+    pos = this.getPos(key);
+    if (pos >= this.size()) return None();
+    elt = this.get(pos);
+    if (elt.i0 != key) return None();
+    Some(elt.i1);
+  }
+
+  fun map<U: frozen>(f: V ~> U): FixedSingle<K, U> {
+    FixedSingle(this.data.map(kv -> (kv.i0, f(kv.i1))))
+  }
+}
+
+fun fsEquals<K: Orderable, V: Equality>(
+  first: FixedSingle<K, V>,
+  second: FixedSingle<K, V>,
+): Bool {
+  first.data == second.data
+}
+
+// Mapping from source paths to MInfo
+base class FixedSourceMap {
+  fun maybeGet(key: Path): ?MInfo;
+  fun get(idx: Int): (Path, MInfo);
+  fun size(): Int;
+  fun items(): mutable Iterator<(Path, MInfo)>;
+  overridable static fun empty(): FixedSourceMap {
+    FSMImpl::empty()
+  }
+  overridable static fun create(
+    data: mutable Vector<(Path, MInfo)>,
+    allowDuplicates: Bool = false,
+  ): FixedSourceMap {
+    static::getMetadata(data) match {
+    | Some(metadata) ->
+      CompactFSMImpl::createWithMetadata(data, metadata, allowDuplicates)
+    | None() -> FSMImpl::create(data, allowDuplicates)
+    }
+  }
+
+  private static fun getMetadata(
+    data: readonly Vector<(Path, MInfo)>,
+  ): ?FSMMetadata {
+    seenDirOpt: ?DirName = None();
+    seenRowKindsOpt: ?Array<(Int, SQLParser.IKind, SQLParser.Type)> = None();
+    seenMInfoTypeOpt: ?FSMMInfoType = None();
+
+    for ((path, minfo) in data) {
+      !seenDirOpt = seenDirOpt match {
+      | None() -> Some(path.dirName)
+      | Some(seenDir) if (seenDir != path.dirName) -> return None()
+      | _ -> seenDirOpt
+      };
+      path.baseName match {
+      | rowKey @ SKDB.RowKey(pathRow, rowKinds) ->
+        !seenRowKindsOpt = seenRowKindsOpt match {
+        | None() -> Some(rowKinds)
+        | Some(seenRowKinds) if (rowKinds != seenRowKinds) -> return None()
+        | _ -> seenRowKindsOpt
+        };
+        minfo match {
+        | MInfoSingle(
+          minfoKey @ SKDB.RowKey(SKDB.RowValues(minfoRow, _), minfoKinds),
+        ) ->
+          if (minfoKey == rowKey) {
+            !seenMInfoTypeOpt = seenMInfoTypeOpt match {
+            | None() -> Some(FullRow())
+            | Some(FullRow()) -> seenMInfoTypeOpt
+            | _ -> return None()
+            }
+          } else if (pathRow.values.size() == 1) {
+            pathVal = pathRow.values[0];
+            !seenMInfoTypeOpt = seenMInfoTypeOpt match {
+            | None() ->
+              col: ?Int = None();
+              for (idx in Range(0, minfoRow.size())) {
+                if (pathVal == minfoRow[idx]) {
+                  !col = Some(idx);
+                  break void
+                }
+              };
+              col match {
+              | Some(x) -> Some(Extension(x, minfoKinds))
+              | None() -> return None()
+              }
+            | Some(
+              Extension(col, extKinds),
+            ) if (
+              col < minfoRow.size() &&
+              pathVal == minfoRow[col] &&
+              extKinds == minfoKinds
+            ) ->
+              seenMInfoTypeOpt
+            | _ -> return None()
+            }
+          } else {
+            return None()
+          }
+        | MInfoSingle(SKDB.IndexProjKey(minfoRow, columnIndices)) ->
+          if (minfoRow != pathRow) return None();
+          !seenMInfoTypeOpt = seenMInfoTypeOpt match {
+          | None() -> Some(IndexProjection(columnIndices))
+          | Some(
+            IndexProjection(seenColumnIndices),
+          ) if (columnIndices == seenColumnIndices) ->
+            seenMInfoTypeOpt
+          | _ -> None()
+          }
+        | MInfoSingle(SKDB.ProjKey(_value, col, left, right)) ->
+          !seenMInfoTypeOpt = seenMInfoTypeOpt match {
+          | None() -> Some(Projection(col, left, right))
+          | Some(
+            Projection(pCol, pLeft, pRight),
+          ) if (col == pCol && left == pLeft && right == pRight) ->
+            seenMInfoTypeOpt
+          | _ -> None()
+          }
+        | _ -> return None()
+        }
+      | _ -> return None()
+      };
+    };
+    seenDirOpt.flatMap(dir ->
+      seenRowKindsOpt.flatMap(rowKinds ->
+        seenMInfoTypeOpt.map(minfoType -> FSMMetadata{dir, rowKinds, minfoType})
+      )
+    )
+  }
+}
+// Direct implementation of a FixedSourceMap as a (sorted) array of Path/MInfo pairs
+private class FSMImpl(
+  protected data: FixedSingle<Path, MInfo>,
+) extends FixedSourceMap {
+  static fun create(
+    data: mutable Vector<(Path, MInfo)>,
+    allowDuplicates: Bool = false,
+  ): this {
+    static(FixedSingle::create(data, allowDuplicates))
+  }
+  fun maybeGet(key: Path): ?MInfo {
+    this.data.maybeGet(key)
+  }
+  fun get(idx: Int): (Path, MInfo) {
+    this.data.get(idx)
+  }
+  fun size(): Int {
+    this.data.size()
+  }
+  fun items(): mutable Iterator<(Path, MInfo)> {
+    this.data.items()
+  }
+  static fun empty(): this {
+    static::create(Vector::mcreate(0))
+  }
+}
+
+// Each FSMMInfoType class encodes a relationship between Paths' baseNames and
+// corresponding MInfoSingles' keys in a CompactFSMImpl
+base class FSMMInfoType {
+  children =
+  // Each RowKey maps to itself
+  | FullRow()
+  // Each RowKey maps to an IndexProjKey with the same rowValues but the specified
+  // columnIndices array
+  | IndexProjection(columnIndices: Array<Int>)
+  // Each RowKey maps to a ProjKey with the specified left/right shard and the
+  // scalar value at position col in the rowKey.
+  | Projection(col: Int, leftShard: Int, rightShard: Int)
+  // Each RowKey is a singleton and maps to some larger RowKey with that singleton
+  // value at position col
+  | Extension(col: Int, kinds: Array<(Int, SQLParser.IKind, SQLParser.Type)>)
+}
+
+class FSMMetadata{
+  dir: DirName,
+  rowKinds: Array<(Int, SQLParser.IKind, SQLParser.Type)>,
+  minfoType: FSMMInfoType,
+}
+// More-compact representation of a FixedSourceMap, with shared information
+// extracted out of the individual key/val pairs and reconstructed on demand
+private class CompactFSMImpl protected (
+  metadata: FSMMetadata,
+  data: Array<SKDB.RowValues>,
+) extends FixedSourceMap {
+  private fun reconstructMInfo(rowKey: SKDB.RowKey): MInfo {
+    minfoKey = this.metadata.minfoType match {
+    | FullRow() -> rowKey
+    | IndexProjection(columnIndices) ->
+      SKDB.IndexProjKey(rowKey.row, columnIndices)
+    | Projection(col, leftShard, rightShard) ->
+      SKDB.ProjKey(rowKey.row.values[col], col, leftShard, rightShard)
+    | ext @ Extension _ -> return this.extendKey(rowKey, ext).fromSome()
+    };
+    MInfoSingle(minfoKey)
+  }
+
+  private fun extendKey(rowKey: SKDB.RowKey, extMetadata: Extension): ?MInfo {
+    idx = binSearch(
+      i ~> this.data.get(i).values[extMetadata.col],
+      rowKey.row.values[0],
+      0,
+      this.size() - 1,
+    );
+    if (idx >= this.data.size()) None() else {
+      Some(MInfoSingle(SKDB.RowKey(this.data.get(idx), extMetadata.kinds)))
+    }
+  }
+
+  private fun reconstructKVPair(row: SKDB.RowValues): (Path, MInfo) {
+    rowKey = SKDB.RowKey(row, this.metadata.rowKinds);
+    path = Path::create(this.metadata.dir, rowKey);
+    minfo = this.metadata.minfoType match {
+    | ext @ Extension _ -> this.extendKey(rowKey, ext).fromSome()
+    | _ -> this.reconstructMInfo(rowKey)
+    };
+    (path, minfo)
+  }
+
+  fun maybeGet(key: Path): ?MInfo {
+    key.baseName match {
+    | rowKey @ SKDB.RowKey(row, _kinds) ->
+      this.metadata.minfoType match {
+      | ext @ Extension _ -> this.extendKey(rowKey, ext)
+      | _ ->
+        idx = binSearch(this.data.get, row, 0, this.size() - 1);
+        if (idx >= this.data.size() || row != this.data.get(idx)) None() else {
+          Some(this.reconstructMInfo(rowKey))
+        }
+      }
+    | _ -> None()
+    }
+  }
+
+  fun get(idx: Int): (Path, MInfo) {
+    this.reconstructKVPair(this.data.get(idx))
+  }
+
+  fun size(): Int {
+    this.data.size()
+  }
+
+  fun items(): mutable Iterator<(Path, MInfo)> {
+    for (row in this.data.iterator()) {
+      yield this.reconstructKVPair(row)
+    }
+  }
+
+  static fun createWithMetadata(
+    data: mutable Vector<(Path, MInfo)>,
+    metadata: FSMMetadata,
+    allowDuplicates: Bool = false,
+  ): this {
+    strippedData = Vector::mcreateFromItems(
+      data.map(datum ->
+        if (metadata.minfoType is Extension _) {
+          datum.i1 match {
+          | MInfoSingle(SKDB.RowKey(values, _kinds)) -> values
+          | _ -> invariant_violation("malformed data for Extension metadata")
+          }
+        } else {
+          datum.i0.baseName match {
+          | SKDB.RowKey(values, _kinds) -> values
+          | _ ->
+            invariant_violation(
+              "getMetadata ensures all path basenames are RowKeys",
+            )
+          }
+        }
+      ),
+    );
+    strippedData.sortBy(x ~> x);
+    if (!allowDuplicates) assertUnique(strippedData, x ~> x);
+    static(metadata, strippedData.toArray())
+  }
+}
+
+module end;

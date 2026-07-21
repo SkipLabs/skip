@@ -1,0 +1,25 @@
+module Skargo;
+
+class Unit(
+  pkg: Package,
+  target: Target,
+  arch: TargetArch,
+  profile: String,
+  mode: CompileMode,
+  build_opts: UnitBuildOptions,
+) uses Equality, Hashable
+
+private base class CompileMode uses Equality, Hashable {
+  children =
+  | CompileModeBuild()
+  | CompileModeRunBuildScript()
+}
+
+private class UnitBuildOptions{
+  // Can be `static` or `pic`.
+  relocation_model: String,
+} uses Equality, Hashable
+
+type UnitGraph = Map<Unit, Array<Unit>>;
+
+module end;

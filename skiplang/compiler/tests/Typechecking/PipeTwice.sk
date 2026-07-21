@@ -1,0 +1,18 @@
+module Typechecking_PipeTwice;
+// Piping twice through the same value whose type is still being inferred
+// must not error: the first pipe binds the free type variable to the
+// synthesized expectation, whose tracking is derived from the context so
+// the second pipe sees a callable, tracked function type.
+
+fun neverCalled(): String {
+  v = Vector[];
+  f = v[0];
+  _ = "a" |> f;
+  "b" |> f
+}
+
+@exptest
+fun main(): void {
+  print_raw("Pass\n")
+}
+module end;

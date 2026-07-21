@@ -1,0 +1,45 @@
+services:
+  # Reverse proxy
+  blogger_haproxy:
+    image: reactive-blogger/reverse_proxy
+    build: ./reverse_proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      blogger_www:
+        condition: service_healthy
+      blogger_reactive_service:
+        condition: service_healthy
+
+  # Web application
+  blogger_web:
+    image: reactive-blogger/web-service
+    build: ./web_service
+    depends_on:
+      blogger_db:
+        condition: service_healthy
+
+  # SQL database
+  blogger_db:
+    image: reactive-blogger/db
+    build: ./db
+    restart: always
+    volumes:
+      - blogger_pgdata:/var/lib/postgresql/data
+
+  # Reactive service
+  blogger_reactive_service:
+    image: reactive-blogger/reactive-service
+    build: ./reactive_service
+    depends_on:
+      blogger_db:
+        condition: service_healthy
+
+  # Front-end
+  blogger_www:
+    image: reactive-blogger/www
+    build: ./www
+
+volumes:
+  blogger_pgdata:

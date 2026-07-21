@@ -1,0 +1,46 @@
+module alias T = SKTest;
+
+module CastsTest;
+
+base class Entry uses Unsafe.Downcastable
+
+class TEntry<K: frozen & Orderable, V: frozen>{
+  private key_: ?K = None(),
+  values: Array<V> = Array[],
+} extends Entry {
+  //
+  static fun create(key: K, values: Array<V>): TEntry<K, V> {
+    TEntry{key_ => Some(key), values};
+  }
+
+  fun key(): K {
+    this.key_.fromSome()
+  }
+}
+
+fun instanceOfEntry<K: frozen & Orderable, V: frozen>(entry: Entry): Bool {
+  Unsafe.instanceOf(entry, TEntry<K, V>);
+}
+
+value class VBox<U>(v: U)
+
+@test
+fun casts(): void {
+  entry1: Entry = TEntry::create("v", Array[0, 1]);
+  T.expectEq(instanceOfEntry<String, Int>(entry1), true);
+  T.expectEq(instanceOfEntry<String, Float>(entry1), false);
+  T.expectEq(instanceOfEntry<SKStore.IID, SKStore.IntFile>(entry1), false);
+  entry2: Entry = TEntry::create("v", Array[0.1, 1.1]);
+  T.expectEq(instanceOfEntry<String, Int>(entry2), false);
+  T.expectEq(instanceOfEntry<String, Float>(entry2), true);
+  T.expectEq(instanceOfEntry<SKStore.IID, SKStore.IntFile>(entry2), false);
+  entry3: Entry = TEntry::create(SKStore.IID(0), Array[SKStore.IntFile(0)]);
+  T.expectEq(instanceOfEntry<String, Int>(entry3), false);
+  T.expectEq(instanceOfEntry<String, Float>(entry3), false);
+  T.expectEq(instanceOfEntry<SKStore.IID, SKStore.IntFile>(entry3), true);
+  entry4: Entry = TEntry::create(0, Array[void]);
+  T.expectEq(instanceOfEntry<Int, void>(entry4), true);
+  T.expectEq(instanceOfEntry<Int, VBox<void>>(entry4), false);
+}
+
+module end;

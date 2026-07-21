@@ -1,0 +1,103 @@
+/*****************************************************************************/
+/* The interface for directories. */
+/*****************************************************************************/
+
+module SKStore;
+
+base class Dir protected {timeStack: TimeStack, dirName: DirName} {
+  /**
+   * Returns the directory name
+   */
+  fun getDirName(): DirName {
+    this.dirName
+  }
+
+  /**
+   * Returns the creation time of that directory.
+   */
+  fun getTime(): Time {
+    this.timeStack.getLast()
+  }
+
+  /**
+   * Returns the creation time of that directory and all of its ancestors
+   */
+  fun getTimeStack(): TimeStack {
+    this.timeStack
+  }
+
+  fun typed(): TDir;
+
+  fun addReaderKeyToKeySetOpt(arrowKey: ArrowKey, keySetOpt: ?KeySet): KeySet;
+}
+
+base class TDir extends Dir {
+  fun typed(): this;
+
+  /**
+   * Returns an array of files associated with a key.
+   * The array is empty if the key does not exist.
+   */
+  fun getArray(context: mutable Context, key: Key): Array<File>;
+
+  /**
+   * Returns an iterator of files associated with a key.
+   * The iterator is empty if the key does not exist.
+   */
+  fun getIter(context: mutable Context, key: Key): mutable Iterator<File>;
+
+  /**
+   * Same as getArray but does not create a dependency, which will break in
+   * incremental mode. This should only be used for testing.
+   */
+  fun getArrayRaw(key: Key): Array<File>;
+
+  /**
+   * Returns the list of files in a directory. Should only be used for testing.
+   */
+  fun keys(): SortedSet<Key>;
+
+  fun castKeySet(keySet: KeySet): TKeySet<Key> {
+    Unsafe.cast(keySet, TKeySet<Key>)
+  }
+
+  fun castOrEmptyKeySet(keySetOpt: ?KeySet): TKeySet<Key> {
+    keySetOpt.map(this.castKeySet).default(TKeySet::empty())
+  }
+
+  fun addKeyToKeySetOpt(key: Key, keySetOpt: ?KeySet): KeySet {
+    this.castOrEmptyKeySet(keySetOpt).set(key)
+  }
+
+  fun addReaderKeyToKeySetOpt(arrowKey: ArrowKey, keySetOpt: ?KeySet): KeySet {
+    this.addKeyToKeySetOpt(Unsafe.cast(arrowKey, TArrowKey<Key>).key, keySetOpt)
+  }
+
+  fun castKeyMap<V: frozen>(keyMap: KeyMap<V>): TKeyMap<Key, V> {
+    Unsafe.cast(keyMap, TKeyMap<Key, V>)
+  }
+
+  fun castOrEmptyKeyMap<V: frozen>(keyMapOpt: ?KeyMap<V>): TKeyMap<Key, V> {
+    keyMapOpt.map(this.castKeyMap).default(TKeyMap::empty())
+  }
+
+  fun keyOfArrowKey(arrowKey: ArrowKey): Key {
+    static::staticKeyOfArrowKey(arrowKey)
+  }
+
+  static fun staticKeyOfArrowKey(arrowKey: ArrowKey): Key {
+    Unsafe.cast(arrowKey, TArrowKey<Key>).key
+  }
+}
+
+/*****************************************************************************/
+/* Exceptions */
+/*****************************************************************************/
+
+class DirAlreadyExists(dirName: DirName) extends Exception {
+  fun toString(): String {
+    `Directory ${this.dirName} already exists`
+  }
+}
+
+module end;

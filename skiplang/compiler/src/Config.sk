@@ -1,0 +1,339 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+module Config;
+
+private fun hostTarget(): String {
+  p = System.subprocess(Array["llvm-config", "--host-target"]) match {
+  | Success(p) -> p
+  | Failure(err) ->
+    print_string(`Error while detecting host target triple: ${err}`);
+    skipExit(2)
+  };
+  if (!p.success()) {
+    print_string("Error while detecting host target triple:");
+    if (p.stdout != "") {
+      print_string(p.stdout)
+    };
+    if (p.stderr != "") {
+      print_string(p.stderr)
+    };
+    skipExit(2);
+  };
+  p.stdout.trimRight()
+}
+
+// If `--sklib-name` was not provided, infer a name from the output file.
+private fun default_lib_name(output: ?String): String {
+  output match {
+  | Some(path) ->
+    !path = Path.basename(path);
+    if (path.endsWith(".sklib")) {
+      !path = path.stripSuffix(".sklib")
+    };
+    path
+  | None() -> "lib.sklib"
+  }
+}
+
+class Config{
+  release: Bool,
+  verbose: Bool,
+  debug: Bool,
+  optConfig: Optimize.Config,
+  input_files: Array<String>,
+  direct_dependencies: Array<String>,
+  dependencies: Map<String, (String, Sklib.Metadata)>,
+  exportedFunctions: UnorderedSet<String>,
+  exportedAsFunctions: UnorderedMap<String, String>,
+  disasmAll: Bool,
+  disasmAnnotated: Bool,
+  disasmFiles: UnorderedSet<String>,
+  disasmFunctions: UnorderedSet<String>,
+  output: String,
+  // profilePath: String,
+  emit: String,
+  lib_name: ?String,
+  target: String,
+  optLevel: Int,
+  asan: Bool,
+  autogc: Bool,
+  sampleRate: Int,
+  // NOTE: Using fully specialized class names yields more detailed stats
+  // info, but inhibits sharing, which increases compilation time and
+  // binary sizes.
+  useSpecializedNames: Bool,
+  check: Bool,
+  no_link: Bool,
+  stackAlign: Int,
+  stackAlignStr: String,
+  ptrByteSize: Int,
+  ptrBitSize: Int,
+  vtableByteSize: Int,
+  sysroot: String,
+  sklib_search_paths: Array<String>,
+  static_libraries: Array<String>,
+  link_args: Array<String>,
+  preambles: Array<String>,
+  canonize_paths: Bool,
+  cwd: WorkingDirectory,
+  batch_mode: Bool = false,
+} {
+  static fun make(results: Cli.ParseResults): this {
+    optConfig = Optimize.Config::make(
+      results.getBool("dce"),
+      results.getBool("peephole"),
+      results.getBool("control"),
+      results.getBool("regpromote"),
+      results.getBool("inline"),
+      results.getBool("ipa"),
+      results.getBool("goto"),
+      results.getBool("verify"),
+    );
+    release = results.getBool("release");
+    debug_info = results.getBool("debug");
+    verbose = debug_info || results.getBool("verbose");
+
+    input_files_vec = mutable Vector[];
+    static_libs_vec = mutable Vector[];
+    for (input_file in results.getArray("files")) {
+      if (input_file.endsWith(".sk")) {
+        input_files_vec.push(input_file)
+      } else if (input_file.endsWith(".a")) {
+        static_libs_vec.push(input_file)
+      } else {
+        print_error(`Unrecognized file type for ${input_file}`);
+        skipExit(3);
+      }
+    };
+    input_files = input_files_vec.collect(Array);
+    static_libraries = static_libs_vec.collect(Array);
+
+    output = results.maybeGetString("output").default("a.out");
+    emit = results.getString("emit");
+    if (
+      results.maybeGetString("sklib-name") is Some _ ||
+      output.endsWith(".sklib")
+    ) {
+      // TODO: Check for inconsistencies between `-o foo.sklib` and `--emit`.
+      !emit = "sklib"
+    };
+    lib_name = if (emit == "sklib") {
+      Some(
+        results
+          .maybeGetString("sklib-name")
+          .default(default_lib_name(results.maybeGetString("output"))),
+      )
+    } else {
+      None()
+    };
+    target = results.maybeGetString("target").default(hostTarget());
+    optLevel = results.getString("opt-level").toInt();
+
+    basePath = Path.parentname(Path.dirname(Environ.current_exe()));
+
+    sysroot = results
+      .maybeGetString("sysroot")
+      .default(Path.join(basePath, "lib"));
+    sklib_search_paths = Array[sysroot].concat(
+      results.getArray("library-paths"),
+    );
+
+    dep_roots = results.getArray("libraries");
+    direct_dependencies = dep_roots.map(v ->
+      if (v.contains("=")) v.splitFirst("=").i0 else v
+    );
+    dependency_resolver = Sklib.Resolver::create(sklib_search_paths, target);
+    dependencies = dependency_resolver.resolve(dep_roots);
+
+    // Automatically add stdlib as a dependency, unless explicitly removed or
+    // replaced.
+    if (results.getBool("std") && !dependencies.containsKey("std")) {
+      (std_path, std_metadata) = dependency_resolver.resolve_single("std");
+      new_dependencies = mutable Map["std" => (std_path, std_metadata)];
+      new_dependencies.extend(dependencies);
+      !dependencies = new_dependencies.chill();
+    };
+
+    link_args = results
+      .maybeGetString("link-args")
+      .default("")
+      .split(" ")
+      .collect(Array);
+
+    disasmAll = results.getBool("disasm-all");
+    disasmAnnotated = results.getBool("disasm-annotated");
+    disasmFiles = UnorderedSet::createFromItems(
+      results.getArray("disasm-file"),
+    );
+    disasmFunctions = UnorderedSet::createFromItems(
+      results.getArray("disasm-function"),
+    );
+    exportedFunctions = UnorderedSet::createFromItems(
+      results.getArray("export-function"),
+    );
+    exportedAsFunctions = UnorderedSet::createFromItems(
+      results.getArray("export-function-as"),
+    );
+    // profilePath = results.getString("profile-path");
+    asan = results.getBool("asan");
+    autogc = results.getBool("autogc");
+    sampleRate = results.getString("sample-rate").toInt();
+    useSpecializedNames = results.getBool("use-specialized-names");
+    check = results.getBool("check");
+    no_link = !results.getBool("link");
+
+    exportAs = mutable UnorderedMap[];
+    for (f in exportedAsFunctions) {
+      vals = f.split("=");
+      if (vals.size() != 2 || vals[0].isEmpty() || vals[1].isEmpty()) {
+        print_error("Invalid --export-function-as: " + f + "\n");
+        skipExit(1)
+      };
+
+      skipName = vals[0];
+      cppName = vals[1];
+
+      if (!exportAs.maybeSet(skipName, cppName)) {
+        oldCppName = exportAs[skipName];
+        if (oldCppName != cppName) {
+          print_error(
+            "Conflicting --export-function-as for " +
+              skipName +
+              ": " +
+              oldCppName +
+              " and " +
+              cppName +
+              "\n",
+          );
+          skipExit(1)
+        }
+      }
+    };
+    // Export `main` as the main entry point if none was specified.
+    if (emit == "link" && exportAs.isEmpty()) {
+      exportAs.set("main", "skip_main")
+    };
+
+    // Mac Clang seems to align stack arrays mod 16 -- is that required to always
+    // keep the stack aligned or is 8 OK or what? Does Linux do that too?
+    // x86-64 ABI on linux and mac require 16 byte alignment.
+    // Does LLVM provide an portable abstraction?
+    // TODO: Make a proper `Target` class that holds the relevant platform-specific
+    // data, with a constructor that takes the target triple.
+    // Use the same wasm predicate as `isWasm()` below (prefix match, not an
+    // exact triple). Otherwise a bare `wasm32` triple -- which skargo does
+    // construct -- takes the wasm code paths via `isWasm()` while still being
+    // laid out with 64-bit pointers here.
+    isWasmTarget = target.startsWith("wasm32");
+    stackAlign = if (isWasmTarget) 8 else 16;
+    ptrByteSize = if (isWasmTarget) 4 else 8;
+    stackAlignStr = stackAlign.toString();
+    ptrBitSize = ptrByteSize * 8;
+    vtableByteSize = ptrByteSize;
+
+    // TODO: Support `--preamble`.
+    preambles = Environ.varOpt("SKC_PREAMBLE") match {
+    | Some(skcPreamble) if (!skcPreamble.trim().isEmpty()) ->
+      skcPreamble.split(Path.listSeparator).toArray()
+    | _ -> Array[]
+    };
+    canonize_paths = results.getBool("canonize-paths");
+    cwd = WorkingDirectory::create(canonize_paths);
+    static{
+      release,
+      verbose,
+      debug => debug_info,
+      optConfig,
+      input_files,
+      direct_dependencies,
+      dependencies,
+      exportedFunctions,
+      exportedAsFunctions => exportAs.chill(),
+      disasmAll,
+      disasmAnnotated,
+      disasmFiles,
+      disasmFunctions,
+      output,
+      // profilePath,
+      emit,
+      lib_name,
+      target,
+      optLevel,
+      asan,
+      autogc,
+      sampleRate,
+      useSpecializedNames,
+      check,
+      no_link,
+      stackAlign,
+      stackAlignStr,
+      ptrByteSize,
+      ptrBitSize,
+      vtableByteSize,
+      sysroot,
+      sklib_search_paths,
+      static_libraries,
+      link_args,
+      preambles,
+      cwd,
+      canonize_paths,
+    }
+  }
+
+  fun isWasm(): Bool {
+    this.target.startsWith("wasm32");
+  }
+
+  // Derive a per-unit config for batch compilation: same shared settings
+  // (dependencies, target, opt level, …) but different inputs, output, and
+  // exported entry point.
+  fun withUnit(inputs: Array<String>, output: String, mainFn: String): this {
+    this with {
+      input_files => inputs,
+      output => output,
+      exportedAsFunctions => UnorderedMap[mainFn => "skip_main"],
+      batch_mode => true,
+    }
+  }
+}
+
+value class WorkingDirectory{
+  private abs_cwd: String,
+  private rel_cwd: ?String,
+} {
+  static fun create(anonymize: Bool): this {
+    abs_cwd = getcwd();
+    rel_cwd = if (anonymize) {
+      Some(
+        {
+          repo = abs_cwd;
+          while (!FileSystem.exists(Path.join(repo, ".git"))) {
+            if (Path.isRoot(repo)) {
+              break Path.currentDirectory
+            };
+            !repo = Path.parentname(repo);
+          } else {
+            Path.relativeTo{path => abs_cwd, base => repo}
+          }
+        },
+      )
+    } else {
+      None()
+    };
+    static{abs_cwd, rel_cwd}
+  }
+  fun toString(): String {
+    this.rel_cwd.default(this.abs_cwd)
+  }
+  /* Makes a path relative to this working directory. */
+  fun makeRelative(path: String): String {
+    Path.relativeTo{path, base => this.abs_cwd}
+  }
+}
+
+module end;

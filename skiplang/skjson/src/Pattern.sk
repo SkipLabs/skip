@@ -1,0 +1,489 @@
+/*****************************************************************************/
+/* Pattern-matching for JSON */
+/*****************************************************************************/
+
+module SKJSON;
+
+/*****************************************************************************/
+// LIKE matching.
+//
+// This code matches patterns with two special operators % and [].
+// Using regular expression terminology:
+//   - % is equivalent to .*
+//   - [] is equivalent \[[0-9]*\]
+//
+// So why are we not using regular expressions? Sigh ... Because of
+// wasm.  We could use JS regular expressions of course, but that
+// would mean going back and forth with string encodings, which is
+// really inefficient. The other option would be to embbed a regular
+// expression engine, but that would mean pulling in a huge
+// dependency, and code size matters ...
+//
+// However, the code should not be too hard to understand (I
+// hope!). The first step consists in splitting the pattern into an
+// array of strings. Let's take an example: the pattern ab%de[]xy will
+// be split into ["ab", "de[", "]xy"]. So we split on % and on the
+// middle of [], the percent are removed, while the brackets are kept.
+//
+// Once we have it in the form of an array, we loop over the
+// characters of the string, matching one sub-string after an over. If
+// a sub-string matches, we move on to the next one, if not, we keep
+// on going in the string.
+//
+// Couple of subtleties:
+//
+// - We keep track of where the [] are located,
+// when we move from one substring to the next, we check that the
+// characters are indeed numbers.
+//
+// - The first and the last substrings are assumed to start (and
+// finish with %), so we need an extra check when that's not the case.
+//
+// Note: it should really be \[[0-9]+\], but the code was easier to write.
+/*****************************************************************************/
+
+fun isSub(sub: Array<Char>, text: Vector<Char>, i: Int): Bool {
+  j = 0;
+  loop {
+    if (j >= sub.size()) return true;
+    if (i >= text.size()) return false;
+    if (sub[j] == text[i]) {
+      !i = i + 1;
+      !j = j + 1;
+      continue
+    };
+    return false;
+  }
+}
+
+fun pathMatch(pattern: String, text: String, matchArray: Bool): Bool {
+  buffer = mutable Vector[];
+  subPatterns = mutable Vector[];
+  arrayIndexes = mutable Set[];
+  last = ' ';
+
+  for (c in pattern) {
+    if (c == '%' || matchArray && last == '[' && c == ']') {
+      if (buffer.size() != 0) {
+        subPatterns.push(buffer.toArray());
+        buffer.clear();
+        if (matchArray && c == ']') {
+          arrayIndexes.insert(subPatterns.size());
+          buffer.push(c);
+        };
+      };
+      !last = c;
+      continue;
+    };
+    !last = c;
+    buffer.push(c);
+  };
+  if (buffer.size() != 0) {
+    subPatterns.push(buffer.toArray());
+    buffer.clear();
+  };
+
+  textChars = text.chars();
+
+  if (!pattern.startsWith("%")) {
+    if (subPatterns.size() == 0) return textChars.isEmpty();
+    if (!isSub(subPatterns[0], textChars, 0)) return false;
+  };
+  if (!pattern.endsWith("%")) {
+    if (subPatterns.size() == 0) return textChars.isEmpty();
+    lastSub = subPatterns[subPatterns.size() - 1];
+    if (!isSub(lastSub, textChars, max(0, textChars.size() - lastSub.size()))) {
+      return false
+    };
+  };
+
+  patIdx = 0;
+  i = 0;
+
+  loop {
+    if (patIdx == subPatterns.size()) {
+      return true;
+    };
+    if (i == textChars.size()) return false;
+    invariant(i < textChars.size());
+    if (isSub(subPatterns[patIdx], textChars, i)) {
+      !i = i + subPatterns[patIdx].size();
+      !patIdx = patIdx + 1;
+    } else {
+      if (patIdx == 0 && !pattern.startsWith("%")) return false;
+      if (arrayIndexes.contains(patIdx)) {
+        if (textChars[i] < '0' || textChars[i] > '9') {
+          return false;
+        }
+      };
+      !i = i + 1
+    }
+  }
+}
+
+/*****************************************************************************/
+/* Pattern-matching of JSON. */
+/*****************************************************************************/
+
+base class ToplevelPattern {
+  children =
+  | TLPercent(PatField)
+  | TLPattern(Pattern)
+
+  fun pmatch(value: CJSON): mutable Iterator<List<(String, CJSON)>> {
+    this match {
+    | TLPercent(patField) ->
+      PObject(PatFields(Some(patField), Array[])).pmatch(value)
+    | TLPattern(pat) -> pat.pmatch(value)
+    }
+  }
+
+  fun types(): Array<(String, ?Type)> {
+    this match {
+    | TLPercent(patField) -> PObject(PatFields(Some(patField), Array[])).types()
+    | TLPattern(pat) -> pat.types()
+    }
+  }
+}
+
+base class Pattern {
+  children =
+  | PVar(Int, ?Type, String)
+  | PArray(?Int, Pattern)
+  | PObject(pfields: PatFields)
+
+  fun allNull(acc: List<(String, CJSON)> = List[]): List<(String, CJSON)>
+  | PVar(_, _, v) -> List.Cons((v, CJNull()), acc)
+  | PArray(_, pat) -> pat.allNull()
+  | PObject(pfields) ->
+    pfields.special match {
+    | None() -> void
+    | Some(field) -> !acc = field.pattern.allNull(acc)
+    };
+    for (p in pfields.rest) {
+      !acc = p.pattern.allNull(acc)
+    };
+    acc
+
+  fun pathMatch(path: List<PathElement>): Bool {
+    path match {
+    | List.Nil() -> true
+    | List.Cons(head, tail) ->
+      (head, this) match {
+      | (_, PVar _) -> true
+      | (PEField(fieldName), PObject(fields)) ->
+        invariant(fields.special is None());
+        fields.maybeGet(fieldName) match {
+        | None() -> false
+        | Some(field) -> field.pattern.pathMatch(tail)
+        }
+      | ((PEIndex(_)), PArray(_, p)) -> p.pathMatch(tail)
+      | (PEField _, PArray _) -> false
+      | (PEIndex _, PObject _) -> false
+      }
+    }
+  }
+
+  static fun specialField(
+    path: List<PathElement>,
+    json: CJSON,
+  ): mutable Iterator<(List<PathElement>, CJSON)> {
+    json match {
+    | CJNull()
+    | CJBool _
+    | CJInt _
+    | CJFloat _
+    | CJString _ ->
+      yield (path.reversed(), json)
+    | CJArray(arr) ->
+      yield (path.reversed(), json);
+      for (i => v in arr) {
+        newPath = List.Cons(PEIndex(i), path);
+        for (elt in static::specialField(newPath, v)) {
+          yield elt
+        }
+      }
+    | CJObject(fields) ->
+      yield (path.reversed(), json);
+      sortedFields = fields.items().collect(Array).sortedBy(x ~> x.i0);
+      for (kv in sortedFields) {
+        (fieldName, fieldValue) = kv;
+        newPath = List.Cons(PEField(fieldName), path);
+        for (elt in static::specialField(newPath, fieldValue)) {
+          yield elt
+        }
+      }
+    }
+  }
+
+  fun pmatch(value: CJSON): mutable Iterator<List<(String, CJSON)>> {
+    for (elt in this.pmatchHelper(value)) {
+      l = elt.filter(x -> {
+        for (c in x.i0) {
+          if (c == '^') return false;
+          return true;
+        };
+        true
+      });
+      if (!l.isEmpty()) {
+        yield l
+      }
+    }
+  }
+
+  private fun pmatchHelper(
+    value: CJSON,
+  ): mutable Iterator<List<(String, CJSON)>> {
+    this match {
+    | PVar(_, type, v) ->
+      typingCorrect = type match {
+      | None() -> true
+      | Some(ty) ->
+        try {
+          ty.isSuperType(value.toType());
+          if (ty.containsNum()) {
+            !value = ty.convertNum(value);
+          };
+          true
+        } catch {
+        | _exn -> false
+        }
+      };
+      if (typingCorrect) {
+        yield List[(v, value)]
+      }
+    | PArray(idxOpt, pat) ->
+      value match {
+      | CJArray(arr) ->
+        idxOpt match {
+        | None() ->
+          if (arr.size() == 0 && pat is PVar _) {
+            for (elt in pat.pmatchHelper(SKJSON.CJNull())) {
+              yield elt
+            }
+          } else {
+            for (idx in Range(0, arr.size())) {
+              for (elt in pat.pmatchHelper(arr[idx])) {
+                yield elt
+              }
+            }
+          }
+        | Some(n) ->
+          if (n >= 0 && n < arr.size()) {
+            for (elt in pat.pmatchHelper(arr[n])) {
+              yield elt
+            }
+          }
+        }
+      | _ -> void
+      }
+    | PObject(PatFields(None(), patFields)) if (patFields.isEmpty()) ->
+      value match {
+      | CJObject(CJFields(arr, _)) if (arr.size() == 0) ->
+        yield List[("^" + SKStore.genSym(0), CJNull())]
+      | _ -> void
+      }
+    | discard @ PObject(PatFields(Some(special), patFields)) ->
+      !discard.pfields.special = None();
+      if (!special.name.startsWith(".") && !special.name.startsWith("%")) {
+        !special.name = "." + special.name;
+      };
+      bindings = static::specialField(List[], value)
+        .filter(x -> {
+          !discard.pathMatch(x.i0) &&
+            pathMatch(special.name, pathToString(x.i0), true)
+        })
+        .map(v -> special.pattern.pmatchHelper(v.i1).collect(Array));
+      for (binding in bindings) {
+        for (elt in static::matchStaticFields(
+          List[binding],
+          value,
+          patFields,
+        )) {
+          yield elt
+        }
+      }
+    | PObject(PatFields(None(), patFields)) ->
+      for (elt in static::matchStaticFields(List[], value, patFields)) {
+        yield elt
+      }
+    }
+  }
+
+  static private fun matchStaticFields(
+    arrays: List<Array<List<(String, CJSON)>>>,
+    value: CJSON,
+    patFields: Array<PatField>,
+  ): mutable Iterator<List<(String, CJSON)>> {
+    value match {
+    | CJObject(fields) ->
+      i = 0;
+      j = 0;
+      loop {
+        if (i >= patFields.size() && j >= fields.cols.size()) {
+          break void;
+        };
+        if (j >= fields.cols.size()) {
+          if (patFields[i].optional) {
+            !arrays = List.Cons(Array[patFields[i].pattern.allNull()], arrays);
+          } else {
+            return Array[].iterator();
+          };
+          !i = i + 1;
+        } else if (i >= patFields.size()) {
+          !j = j + 1;
+        } else if (patFields[i].name < fields.cols[j]) {
+          if (patFields[i].optional) {
+            !arrays = List.Cons(Array[patFields[i].pattern.allNull()], arrays);
+          } else {
+            return Array[].iterator();
+          };
+          !i = i + 1;
+        } else if (patFields[i].name > fields.cols[j]) {
+          !j = j + 1;
+        } else {
+          subMatches = patFields[i].pattern
+            .pmatchHelper(fields.values[j])
+            .collect(Array);
+          if (subMatches.size() == 0 && patFields[i].optional) {
+            !subMatches = Array[patFields[i].pattern.allNull()];
+          };
+          !arrays = List.Cons(subMatches, arrays);
+          !i = i + 1;
+          !j = j + 1;
+        }
+      }
+    | _ -> void
+    };
+    static::combine(arrays)
+  }
+
+  static fun combine(
+    arrays: List<Array<List<(String, CJSON)>>>,
+  ): mutable Iterator<List<(String, CJSON)>> {
+    arrays match {
+    | List.Nil() -> void
+    | List.Cons(bindings, List.Nil()) ->
+      for (binding in bindings) {
+        yield binding
+      }
+    | List.Cons(bindings, rest) ->
+      for (elt in static::combine(rest)) {
+        for (binding in bindings) {
+          yield (binding.concat(elt))
+        }
+      }
+    }
+  }
+
+  fun types(): Array<(String, ?Type)> {
+    acc = mutable Vector[];
+    this.typesAcc(acc);
+    acc.sortBy(x ~> x.i0);
+    acc.map(x -> (x.i1, x.i2)).toArray()
+  }
+
+  fun typesAcc(acc: mutable Vector<(Int, String, ?Type)>): void {
+    this match {
+    | PVar(pos, ty, n) -> acc.push((pos, n, ty))
+    | PArray(_, p) -> p.typesAcc(acc)
+    | PObject(PatFields(special, rest)) ->
+      special match {
+      | None() -> void
+      | Some(s) -> s.typesAcc(acc)
+      };
+      for (r in rest) {
+        r.typesAcc(acc)
+      }
+    }
+  }
+}
+
+class PatFields(special: ?PatField, rest: Array<PatField>) {
+  static fun create(fields: Array<PatField>): this {
+    special: ?PatField = None();
+    rest = mutable Vector[];
+    for (field in fields) {
+      if (field.name.getIter().next() is Some('"')) {
+        !field.name = field.name.stripPrefix("\"");
+        rest.push(field);
+      } else if (field.name.contains("%")) {
+        special match {
+        | None() -> !special = Some(field)
+        | Some(_) ->
+          throw ParseError("Cannot have 2 fields with special characters")
+        }
+      } else {
+        patParser = PatternParser::mcreate(field.name);
+        path = patParser.path();
+        static::normalizePath(field.optional, path, field.pattern) match {
+        | PObject(PatFields(_, x)) -> rest.push(x[0])
+        | _ -> invariant_violation("Internal error: unexpected normalization")
+        }
+      }
+    };
+    rest.sortBy(x ~> x.name);
+    for (i in Range(0, rest.size())) {
+      if (i != 0) {
+        if (rest[i - 1].name == rest[i].name) {
+          throw ParseError("Duplicate name: " + rest[i].name);
+        }
+      }
+    };
+    PatFields(special, rest.toArray())
+  }
+
+  fun maybeGet(fieldName: String): ?PatField {
+    invariant(this.special is None());
+    idx = SKStore.binSearch(
+      i ~> this.rest[i].name,
+      fieldName,
+      0,
+      this.rest.size() - 1,
+    );
+    if (idx < 0 || idx >= this.rest.size()) return None();
+    if (this.rest[idx].name == fieldName) Some(this.rest[idx]) else None()
+  }
+
+  static fun normalizePath(
+    optional: Bool,
+    path: List<PathPatternElement>,
+    var: Pattern,
+  ): Pattern {
+    path match {
+    | List.Nil() -> invariant_violation("Internal error: empty path")
+    | List.Cons(pathElt, List.Nil()) ->
+      pathElt match {
+      | PEField(fieldName) ->
+        PObject(PatFields(None(), Array[PatField(optional, fieldName, var)]))
+      | PEEmptyIndex() -> PArray(None(), var)
+      | PEIndex(n) -> PArray(Some(n), var)
+      }
+    | List.Cons(pathElt, tail) ->
+      pat = static::normalizePath(optional, tail, var);
+      pathElt match {
+      | PEField(fieldName) ->
+        PObject(PatFields(None(), Array[PatField(optional, fieldName, pat)]))
+      | PEEmptyIndex() -> PArray(None(), pat)
+      | PEIndex(n) -> PArray(Some(n), pat)
+      }
+    }
+  }
+}
+
+class PatField(optional: Bool, name: String, pattern: Pattern) {
+  fun typesAcc(acc: mutable Vector<(Int, String, ?Type)>): void {
+    if (this.optional) {
+      newAcc = mutable Vector[];
+      this.pattern.typesAcc(newAcc);
+      for (ty in newAcc) {
+        !ty.i2 = ty.i2.map(x -> x.union(Type::create(TNull())));
+        acc.push(ty)
+      }
+    } else {
+      this.pattern.typesAcc(acc)
+    }
+  }
+}
+
+module end;

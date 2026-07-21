@@ -1,0 +1,14 @@
+module Runtime_CaptureStaticFromInstance;
+class C(x: String) {
+  fun m(): String ~> C {
+    x ~> {
+      static(x)
+    }
+  }
+}
+
+@exptest
+fun main(): void {
+  print_raw(C("Fail").m()("Pass\n").x)
+}
+module end;

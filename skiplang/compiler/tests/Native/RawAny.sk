@@ -1,0 +1,17 @@
+module Native_RawAny;
+class Foo<T>(x: Unsafe.RawStorage<T>) {
+  static fun empty(): Foo<T> {
+    Foo(Unsafe.RawStorage::uninitialized())
+  }
+}
+
+@no_inline
+fun sink<T>(_x: T): String {
+  "Pass\n"
+}
+
+@exptest
+fun main(): void {
+  print_raw(sink(Foo::empty()))
+}
+module end;

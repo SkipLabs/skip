@@ -1,0 +1,461 @@
+module SQLParser;
+
+base class Keyword uses Equality, Show, Hashable {
+  children =
+  | TAbort()
+  | TAction()
+  | TAdd()
+  | TAfter()
+  | TAll()
+  | TAlter()
+  | TAlways()
+  | TAnalyze()
+  | TAnd()
+  | TAs()
+  | TAsc()
+  | TAttach()
+  | TAutoincrement()
+  | TBefore()
+  | TBegin()
+  | TBetween()
+  | TBy()
+  | TCascade()
+  | TCase()
+  | TCast()
+  | TCheck()
+  | TCollate()
+  | TColumn()
+  | TCommit()
+  | TConflict()
+  | TConstraint()
+  | TCreate()
+  | TCross()
+  | TCurrent()
+  | TCurrentDate()
+  | TCurrentTime()
+  | TCurrentTimestamp()
+  | TDatabase()
+  | TDefault()
+  | TDeferrable()
+  | TDeferred()
+  | TDelete()
+  | TDesc()
+  | TDetach()
+  | TDistinct()
+  | TDo()
+  | TDrop()
+  | TEach()
+  | TElse()
+  | TEnd()
+  | TEscape()
+  | TExcept()
+  | TExclude()
+  | TExclusive()
+  | TExists()
+  | TExplain()
+  | TFail()
+  | TFilter()
+  | TFirst()
+  | TFollowing()
+  | TFor()
+  | TForeign()
+  | TFrom()
+  | TFull()
+  | TGenerated()
+  | TGlob()
+  | TGroup()
+  | TGroups()
+  | THaving()
+  | TIf()
+  | TIgnore()
+  | TImmediate()
+  | TIn()
+  | TIndex()
+  | TIndexed()
+  | TInitially()
+  | TInner()
+  | TInsert()
+  | TInstead()
+  | TIntersect()
+  | TInto()
+  | TIs()
+  | TIsNull()
+  | TJoin()
+  | TKey()
+  | TLast()
+  | TLeft()
+  | TLike()
+  | TLimit()
+  | TMatch()
+  | TMaterialized()
+  | TNatural()
+  | TNo()
+  | TNoKeyword()
+  | TNot()
+  | TNothing()
+  | TNotNull()
+  | TNull()
+  | TNulls()
+  | TOf()
+  | TOffset()
+  | TOn()
+  | TOr()
+  | TOrder()
+  | TOthers()
+  | TOuter()
+  | TOver()
+  | TPartition()
+  | TPlan()
+  | TPragma()
+  | TPreceding()
+  | TPrimary()
+  | TQuery()
+  | TRaise()
+  | TRange()
+  | TReactive()
+  | TRecursive()
+  | TReferences()
+  | TRegexp()
+  | TReindex()
+  | TRelease()
+  | TRename()
+  | TReplace()
+  | TRestrict()
+  | TReturning()
+  | TRight()
+  | TRollback()
+  | TRow()
+  | TRows()
+  | TSavePoint()
+  | TSelect()
+  | TSet()
+  | TTable()
+  | TTemp()
+  | TTemporary()
+  | TThen()
+  | TTies()
+  | TTo()
+  | TTransaction()
+  | TTrigger()
+  | TUnbounded()
+  | TUnion()
+  | TUnique()
+  | TUpdate()
+  | TUsing()
+  | TVacuum()
+  | TValues()
+  | TView()
+  | TVirtual()
+  | TWhen()
+  | TWhere()
+  | TWindow()
+  | TWith()
+  | TWithout()
+
+  fun toString(): String
+  | TAbort() -> "ABORT"
+  | TAction() -> "ACTION"
+  | TAdd() -> "ADD"
+  | TAfter() -> "AFTER"
+  | TAll() -> "ALL"
+  | TAlter() -> "ALTER"
+  | TAlways() -> "ALWAYS"
+  | TAnalyze() -> "ANALYZE"
+  | TAnd() -> "AND"
+  | TAs() -> "AS"
+  | TAsc() -> "ASC"
+  | TAttach() -> "ATTACH"
+  | TAutoincrement() -> "AUTOINCREMENT"
+  | TBefore() -> "BEFORE"
+  | TBegin() -> "BEGIN"
+  | TBetween() -> "BETWEEN"
+  | TBy() -> "BY"
+  | TCascade() -> "CASCADE"
+  | TCase() -> "CASE"
+  | TCast() -> "CAST"
+  | TCheck() -> "CHECK"
+  | TCollate() -> "COLLATE"
+  | TColumn() -> "COLUMN"
+  | TCommit() -> "COMMIT"
+  | TConflict() -> "CONFLICT"
+  | TConstraint() -> "CONSTRAINT"
+  | TCreate() -> "CREATE"
+  | TCross() -> "CROSS"
+  | TCurrent() -> "CURRENT"
+  | TCurrentDate() -> "CURRENT_DATE"
+  | TCurrentTime() -> "CURRENT_TIME"
+  | TCurrentTimestamp() -> "CURRENT_TIMESTAMP"
+  | TDatabase() -> "DATABASE"
+  | TDefault() -> "DEFAULT"
+  | TDeferrable() -> "DEFERRABLE"
+  | TDeferred() -> "DEFERRED"
+  | TDelete() -> "DELETE"
+  | TDesc() -> "DESC"
+  | TDetach() -> "DETACH"
+  | TDistinct() -> "DISTINCT"
+  | TDo() -> "DO"
+  | TDrop() -> "DROP"
+  | TEach() -> "EACH"
+  | TElse() -> "ELSE"
+  | TEnd() -> "END"
+  | TEscape() -> "ESCAPE"
+  | TExcept() -> "EXCEPT"
+  | TExclude() -> "EXCLUDE"
+  | TExclusive() -> "EXCLUSIVE"
+  | TExists() -> "EXISTS"
+  | TExplain() -> "EXPLAIN"
+  | TFail() -> "FAIL"
+  | TFilter() -> "FILTER"
+  | TFirst() -> "FIRST"
+  | TFollowing() -> "FOLLOWING"
+  | TFor() -> "FOR"
+  | TForeign() -> "FOREIGN"
+  | TFrom() -> "FROM"
+  | TFull() -> "FULL"
+  | TGenerated() -> "GENERATED"
+  | TGlob() -> "GLOB"
+  | TGroup() -> "GROUP"
+  | TGroups() -> "GROUPS"
+  | THaving() -> "HAVING"
+  | TIf() -> "IF"
+  | TIgnore() -> "IGNORE"
+  | TImmediate() -> "IMMEDIATE"
+  | TIn() -> "IN"
+  | TIndex() -> "INDEX"
+  | TIndexed() -> "INDEXED"
+  | TInitially() -> "INITIALLY"
+  | TInner() -> "INNER"
+  | TInsert() -> "INSERT"
+  | TInstead() -> "INSTEAD"
+  | TIntersect() -> "INTERSECT"
+  | TInto() -> "INTO"
+  | TIs() -> "IS"
+  | TIsNull() -> "ISNULL"
+  | TJoin() -> "JOIN"
+  | TKey() -> "KEY"
+  | TLast() -> "LAST"
+  | TLeft() -> "LEFT"
+  | TLike() -> "LIKE"
+  | TLimit() -> "LIMIT"
+  | TMatch() -> "MATCH"
+  | TMaterialized() -> "MATERIALIZED"
+  | TNatural() -> "NATURAL"
+  | TNo() -> "NO"
+  | TNoKeyword() -> "(not a keyword)"
+  | TNot() -> "NOT"
+  | TNothing() -> "NOTHING"
+  | TNotNull() -> "NOTNULL"
+  | TNull() -> "NULL"
+  | TNulls() -> "NULLS"
+  | TOf() -> "OF"
+  | TOffset() -> "OFFSET"
+  | TOn() -> "ON"
+  | TOr() -> "OR"
+  | TOrder() -> "ORDER"
+  | TOthers() -> "OTHERS"
+  | TOuter() -> "OUTER"
+  | TOver() -> "OVER"
+  | TPartition() -> "PARTITION"
+  | TPlan() -> "PLAN"
+  | TPragma() -> "PRAGMA"
+  | TPreceding() -> "PRECEDING"
+  | TPrimary() -> "PRIMARY"
+  | TQuery() -> "QUERY"
+  | TRaise() -> "RAISE"
+  | TRange() -> "RANGE"
+  | TReactive() -> "REACTIVE"
+  | TRecursive() -> "RECURSIVE"
+  | TReferences() -> "REFERENCES"
+  | TRegexp() -> "REGEXP"
+  | TReindex() -> "REINDEX"
+  | TRelease() -> "RELEASE"
+  | TRename() -> "RENAME"
+  | TReplace() -> "REPLACE"
+  | TRestrict() -> "RESTRICT"
+  | TReturning() -> "RETURNING"
+  | TRight() -> "RIGHT"
+  | TRollback() -> "ROLLBACK"
+  | TRow() -> "ROW"
+  | TRows() -> "ROWS"
+  | TSavePoint() -> "SAVEPOINT"
+  | TSelect() -> "SELECT"
+  | TSet() -> "SET"
+  | TTable() -> "TABLE"
+  | TTemp() -> "TEMP"
+  | TTemporary() -> "TEMPORARY"
+  | TThen() -> "THEN"
+  | TTies() -> "TIES"
+  | TTo() -> "TO"
+  | TTransaction() -> "TRANSACTION"
+  | TTrigger() -> "TRIGGER"
+  | TUnbounded() -> "UNBOUNDED"
+  | TUnion() -> "UNION"
+  | TUnique() -> "UNIQUE"
+  | TUpdate() -> "UPDATE"
+  | TUsing() -> "USING"
+  | TVacuum() -> "VACUUM"
+  | TValues() -> "VALUES"
+  | TView() -> "VIEW"
+  | TVirtual() -> "VIRTUAL"
+  | TWhen() -> "WHEN"
+  | TWhere() -> "WHERE"
+  | TWindow() -> "WINDOW"
+  | TWith() -> "WITH"
+  | TWithout() -> "WITHOUT"
+
+  static fun fromStringOpt(str: String): ?Keyword {
+    str match {
+    | "ABORT" -> Some(TAbort())
+    | "ACTION" -> Some(TAction())
+    | "ADD" -> Some(TAdd())
+    | "AFTER" -> Some(TAfter())
+    | "ALL" -> Some(TAll())
+    | "ALTER" -> Some(TAlter())
+    | "ALWAYS" -> Some(TAlways())
+    | "ANALYZE" -> Some(TAnalyze())
+    | "AND" -> Some(TAnd())
+    | "AS" -> Some(TAs())
+    | "ASC" -> Some(TAsc())
+    | "ATTACH" -> Some(TAttach())
+    | "AUTOINCREMENT" -> Some(TAutoincrement())
+    | "BEFORE" -> Some(TBefore())
+    | "BEGIN" -> Some(TBegin())
+    | "BETWEEN" -> Some(TBetween())
+    | "BY" -> Some(TBy())
+    | "CASCADE" -> Some(TCascade())
+    | "CASE" -> Some(TCase())
+    | "CAST" -> Some(TCast())
+    | "CHECK" -> Some(TCheck())
+    | "COLLATE" -> Some(TCollate())
+    | "COLUMN" -> Some(TColumn())
+    | "COMMIT" -> Some(TCommit())
+    | "CONFLICT" -> Some(TConflict())
+    | "CONSTRAINT" -> Some(TConstraint())
+    | "CREATE" -> Some(TCreate())
+    | "CROSS" -> Some(TCross())
+    | "CURRENT" -> Some(TCurrent())
+    | "CURRENT_DATE" -> Some(TCurrentDate())
+    | "CURRENT_TIME" -> Some(TCurrentTime())
+    | "CURRENT_TIMESTAMP" -> Some(TCurrentTimestamp())
+    | "DATABASE" -> Some(TDatabase())
+    | "DEFAULT" -> Some(TDefault())
+    | "DEFERRABLE" -> Some(TDeferrable())
+    | "DEFERRED" -> Some(TDeferred())
+    | "DELETE" -> Some(TDelete())
+    | "DESC" -> Some(TDesc())
+    | "DETACH" -> Some(TDetach())
+    | "DISTINCT" -> Some(TDistinct())
+    | "DO" -> Some(TDo())
+    | "DROP" -> Some(TDrop())
+    | "EACH" -> Some(TEach())
+    | "ELSE" -> Some(TElse())
+    | "END" -> Some(TEnd())
+    | "ESCAPE" -> Some(TEscape())
+    | "EXCEPT" -> Some(TExcept())
+    | "EXCLUDE" -> Some(TExclude())
+    | "EXCLUSIVE" -> Some(TExclusive())
+    | "EXISTS" -> Some(TExists())
+    | "EXPLAIN" -> Some(TExplain())
+    | "FAIL" -> Some(TFail())
+    | "FILTER" -> Some(TFilter())
+    | "FIRST" -> Some(TFirst())
+    | "FOLLOWING" -> Some(TFollowing())
+    | "FOR" -> Some(TFor())
+    | "FOREIGN" -> Some(TForeign())
+    | "FROM" -> Some(TFrom())
+    | "FULL" -> Some(TFull())
+    | "GENERATED" -> Some(TGenerated())
+    | "GLOB" -> Some(TGlob())
+    | "GROUP" -> Some(TGroup())
+    | "GROUPS" -> Some(TGroups())
+    | "HAVING" -> Some(THaving())
+    | "IF" -> Some(TIf())
+    | "IGNORE" -> Some(TIgnore())
+    | "IMMEDIATE" -> Some(TImmediate())
+    | "IN" -> Some(TIn())
+    | "INDEX" -> Some(TIndex())
+    | "INDEXED" -> Some(TIndexed())
+    | "INITIALLY" -> Some(TInitially())
+    | "INNER" -> Some(TInner())
+    | "INSERT" -> Some(TInsert())
+    | "INSTEAD" -> Some(TInstead())
+    | "INTERSECT" -> Some(TIntersect())
+    | "INTO" -> Some(TInto())
+    | "IS" -> Some(TIs())
+    | "ISNULL" -> Some(TIsNull())
+    | "JOIN" -> Some(TJoin())
+    | "KEY" -> Some(TKey())
+    | "LAST" -> Some(TLast())
+    | "LEFT" -> Some(TLeft())
+    | "LIKE" -> Some(TLike())
+    | "LIMIT" -> Some(TLimit())
+    | "MATCH" -> Some(TMatch())
+    | "MATERIALIZED" -> Some(TMaterialized())
+    | "NATURAL" -> Some(TNatural())
+    | "NO" -> Some(TNo())
+    | "NOT" -> Some(TNot())
+    | "NOTHING" -> Some(TNothing())
+    | "NOTNULL" -> Some(TNotNull())
+    | "NULL" -> Some(TNull())
+    | "NULLS" -> Some(TNulls())
+    | "OF" -> Some(TOf())
+    | "OFFSET" -> Some(TOffset())
+    | "ON" -> Some(TOn())
+    | "OR" -> Some(TOr())
+    | "ORDER" -> Some(TOrder())
+    | "OTHERS" -> Some(TOthers())
+    | "OUTER" -> Some(TOuter())
+    | "OVER" -> Some(TOver())
+    | "PARTITION" -> Some(TPartition())
+    | "PLAN" -> Some(TPlan())
+    | "PRAGMA" -> Some(TPragma())
+    | "PRECEDING" -> Some(TPreceding())
+    | "PRIMARY" -> Some(TPrimary())
+    | "QUERY" -> Some(TQuery())
+    | "RAISE" -> Some(TRaise())
+    | "RANGE" -> Some(TRange())
+    | "REACTIVE" -> Some(TReactive())
+    | "RECURSIVE" -> Some(TRecursive())
+    | "REFERENCES" -> Some(TReferences())
+    | "REGEXP" -> Some(TRegexp())
+    | "REINDEX" -> Some(TReindex())
+    | "RELEASE" -> Some(TRelease())
+    | "RENAME" -> Some(TRename())
+    | "REPLACE" -> Some(TReplace())
+    | "RESTRICT" -> Some(TRestrict())
+    | "RETURNING" -> Some(TReturning())
+    | "RIGHT" -> Some(TRight())
+    | "ROLLBACK" -> Some(TRollback())
+    | "ROW" -> Some(TRow())
+    | "ROWS" -> Some(TRows())
+    | "SAVEPOINT" -> Some(TSavePoint())
+    | "SELECT" -> Some(TSelect())
+    | "SET" -> Some(TSet())
+    | "TABLE" -> Some(TTable())
+    | "TEMP" -> Some(TTemp())
+    | "TEMPORARY" -> Some(TTemporary())
+    | "THEN" -> Some(TThen())
+    | "TIES" -> Some(TTies())
+    | "TO" -> Some(TTo())
+    | "TRANSACTION" -> Some(TTransaction())
+    | "TRIGGER" -> Some(TTrigger())
+    | "UNBOUNDED" -> Some(TUnbounded())
+    | "UNION" -> Some(TUnion())
+    | "UNIQUE" -> Some(TUnique())
+    | "UPDATE" -> Some(TUpdate())
+    | "USING" -> Some(TUsing())
+    | "VACUUM" -> Some(TVacuum())
+    | "VALUES" -> Some(TValues())
+    | "VIEW" -> Some(TView())
+    | "VIRTUAL" -> Some(TVirtual())
+    | "WHEN" -> Some(TWhen())
+    | "WHERE" -> Some(TWhere())
+    | "WINDOW" -> Some(TWindow())
+    | "WITH" -> Some(TWith())
+    | "WITHOUT" -> Some(TWithout())
+    | _ -> None()
+    }
+  }
+}
+
+module end;

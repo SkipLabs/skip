@@ -1,0 +1,275 @@
+module IO;
+
+fun stdin(): mutable File {
+  mutable File(0, "/dev/stdin")
+}
+
+fun stdout(): mutable File {
+  mutable File(1, "/dev/stdout")
+}
+
+fun stderr(): mutable File {
+  mutable File(2, "/dev/stderr")
+}
+
+class OpenOptions{
+  read: Bool = false,
+  write: Bool = false,
+  append: Bool = false,
+  truncate: Bool = false,
+  create: Bool = false,
+  create_new: Bool = false,
+  mode: Int = 0o777,
+} {
+  fun flags(): Int {
+    // TODO: Check validity of flags.
+    Posix.open_flags(
+      if (this.read) 1 else 0,
+      if (this.write) 1 else 0,
+      if (this.append) 1 else 0,
+      if (this.truncate) 1 else 0,
+      if (this.create) 1 else 0,
+      if (this.create_new) 1 else 0,
+    )
+  }
+}
+
+// TODO: Proper subclasses mapping to error codes.
+class Error(code: Int) extends Exception uses Show {
+  fun toString(): String {
+    `Error ${this.code}`
+  }
+}
+
+trait Read {
+  mutable fun read(buf: mutable MutableBytes): Result<Int, Error>;
+
+  mutable fun read_to_end(buf: mutable Vector<UInt8>): Result<Int, Error> {
+    nbytes = 0;
+    loop {
+      if (buf.size() == buf.capacity()) {
+        buf.ensureCapacity(buf.capacity() + 32)
+      };
+      spare = buf.unsafeSpareCapacityBytes();
+      sz = this.read(spare)?;
+      if (sz == 0) {
+        break void
+      };
+      !nbytes = nbytes + sz;
+      buf.unsafeConsumeSpareCapacity(sz)
+    };
+
+    Success(nbytes)
+  }
+
+  mutable fun read_to_string(): Result<String, Error> {
+    buf = mutable Vector[];
+    // TODO: Get rid of `.collect(Array)`.
+    this.read_to_end(buf).map(_ -> String::fromUtf8(buf.collect(Array)))
+  }
+
+  mutable fun read_exact(buf: mutable MutableBytes): Result<void, Error> {
+    nbytes = 0;
+    while (nbytes != buf.size()) {
+      sz = this.read(buf.mslice(nbytes))?;
+      if (sz == 0) {
+        return Failure(Error(-1)) // TODO: Proper ErrorUnexpectedEOF.
+      };
+      !nbytes = nbytes + sz
+    };
+
+    Success(void)
+  }
+}
+
+trait Write {
+  mutable fun write(buf: readonly Bytes): Result<Int, Error>;
+
+  mutable fun write_all(buf: readonly Bytes): Result<void, Error> {
+    while (buf.size() > 0) {
+      sz = this.write(buf)?;
+      !buf = buf.slice(sz)
+    };
+
+    Success(void)
+  }
+}
+
+base class SeekFrom(offset: Int) {
+  children =
+  | SeekFromStart()
+  | SeekFromCurrent()
+  | SeekFromEnd()
+}
+
+trait Seek {
+  mutable fun seek(pos: SeekFrom): Result<Int, Error>;
+
+  mutable fun rewind(): Result<void, Error> {
+    this.seek(SeekFromStart(0)).map(_ -> void)
+  }
+
+  mutable fun stream_len(): Result<Int, Error> {
+    old_pos = this.stream_position()?;
+    len = this.seek(SeekFromEnd(0))?;
+    if (old_pos != len) {
+      _ = this.seek(SeekFromStart(old_pos))?
+    };
+
+    Success(len)
+  }
+
+  mutable fun stream_position(): Result<Int, Error> {
+    this.seek(SeekFromCurrent(0))
+  }
+
+  mutable fun seek_relative(offset: Int): Result<void, Error> {
+    this.seek(SeekFromCurrent(offset)).map(_ -> void)
+  }
+}
+
+trait IsTerminal {
+  fun isatty(): Bool;
+}
+
+mutable class File(
+  fileno: Int,
+  path: String = "unknown",
+) uses Read, Write, Seek, IsTerminal {
+  static fun open(path: String, opts: OpenOptions): mutable File {
+    mutable File(Posix.open(path, opts.flags(), opts.mode), path)
+  }
+
+  readonly fun isatty(): Bool {
+    Posix.isatty(this.fileno)
+  }
+
+  mutable fun read(buf: mutable MutableBytes): Result<Int, Error> {
+    rv = Posix.read(this.fileno, buf.mptr(), buf.size());
+    if (rv >= 0) {
+      Success(rv)
+    } else {
+      Failure(Error(-rv))
+    }
+  }
+
+  mutable fun write(buf: readonly Bytes): Result<Int, Error> {
+    rv = Posix.write(this.fileno, buf.ptr(), buf.size());
+    if (rv >= 0) {
+      Success(rv)
+    } else {
+      Failure(Error(-rv))
+    }
+  }
+
+  mutable fun seek(from: SeekFrom): Result<Int, Error> {
+    whence = from match {
+    | SeekFromCurrent _ -> Posix.SeekCur()
+    | SeekFromStart _ -> Posix.SeekSet()
+    | SeekFromEnd _ -> Posix.SeekEnd()
+    };
+    rv = Posix.lseek(this.fileno, from.offset, whence);
+    if (rv >= 0) {
+      Success(rv)
+    } else {
+      Failure(Error(-rv))
+    }
+  }
+
+  mutable fun close(): void {
+    Posix.close(this.fileno)
+  }
+}
+
+trait BufRead extends Read {
+  mutable fun fill_buf(): Result<readonly Bytes, Error>;
+  mutable fun consume(nbytes: Int): void;
+  readonly fun has_buffered_data(): Bool;
+
+  mutable fun has_data_left(): Result<Bool, Error> {
+    this.fill_buf().map(buf -> buf.size() > 0)
+  }
+
+  mutable fun read(buf: mutable MutableBytes): Result<Int, Error> {
+    available = this.fill_buf()?;
+    sz = min(available.size(), buf.size());
+    // TODO: Proper copy.
+    for (i in Range(0, sz)) {
+      buf![i] = available[i]
+    };
+    this.consume(sz);
+
+    Success(sz)
+  }
+
+  mutable fun read_until(
+    delim: UInt8,
+    buf: mutable Vector<UInt8>,
+  ): Result<Int, Error> {
+    nbytes = 0;
+    loop {
+      available = this.fill_buf()?;
+      // We have reached EOF.
+      if (available.isEmpty()) {
+        break void
+      };
+      (found, count) = available.indexOf(delim) match {
+      | Some(index) -> (true, index + 1)
+      | None() -> (false, available.size())
+      };
+      buf.extend(available.slice(0, count));
+      !nbytes = nbytes + count;
+      this.consume(count);
+      if (found) {
+        break void
+      }
+    };
+
+    Success(nbytes)
+  }
+
+  mutable fun read_line(): Result<String, Error> {
+    buf = mutable Vector<UInt8>[];
+    this.read_until(UInt8::truncate(Chars.lineFeed.code()), buf).map(_ ->
+      // TODO: Get rid of `.collect(Array)`.
+      String::fromUtf8(buf.collect(Array))
+    )
+  }
+}
+
+mutable class BufferedReader<T: mutable Read>(
+  private stream: T,
+  // TODO: Uninitialized buffer.
+  private buffer: mutable Array<UInt8> = Array::mfill(8192, UInt8::truncate(0)),
+  private mutable available: Range = Range(0, 0),
+) uses BufRead {
+  mutable fun fill_buf(): Result<readonly Bytes, Error> {
+    if (this.available.isEmpty()) {
+      bytes_read = this.stream.read(this.buffer.mbytes())?;
+      this.!available = Range(0, bytes_read)
+    };
+
+    Success(this.buffer.bytes().slice(this.available.start, this.available.end))
+  }
+
+  mutable fun consume(nbytes: Int): void {
+    this.!available = Range(this.available.start + nbytes, this.available.end)
+  }
+
+  readonly fun has_buffered_data(): Bool {
+    !this.available.isEmpty()
+  }
+}
+
+// TODO: Properly optimized copy.
+fun copy<R: mutable Read, W: mutable Write>(
+  reader: R,
+  writer: W,
+): Result<Int, Error> {
+  buf = mutable Vector[];
+  res = reader.read_to_end(buf)?;
+  writer.write_all(buf.bytes())?;
+  Success(res)
+}
+
+module end;

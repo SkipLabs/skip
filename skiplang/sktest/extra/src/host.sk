@@ -1,0 +1,365 @@
+module SKTest;
+
+fun signal_name(code: Int): String {
+  Posix.Signal::fromCode(code) match {
+  | Some(sig) -> sig.toString()
+  | None() -> `signal ${code}`
+  }
+}
+
+// A test runs unless a filter excludes it. `suiteFilters` (from SKTEST_FILTERS,
+// i.e. the JUnit `classname` suite names `circleci tests run` feeds back on a
+// rerun) selects whole suites by EXACT name -- substring matching there would
+// over-select suites whose name is a prefix of another (e.g. "Typechecking" vs
+// "Typechecking/Exhaustiveness"). `nameFilter` is the positional convenience
+// filter and keeps its historical substring-on-`suite.name` behavior.
+fun matchesFilters(
+  testSuite: String,
+  testName: String,
+  suiteFilters: readonly Sequence<String>,
+  nameFilter: String,
+): Bool {
+  (suiteFilters.size() == 0 || suiteFilters.any(s -> s == testSuite)) &&
+    (nameFilter == "" || `${testSuite}.${testName}`.contains(nameFilter))
+}
+
+fun each_assigned_test(
+  tests: readonly Map<String, readonly Sequence<Test>>,
+  suiteFilters: readonly Sequence<String>,
+  nameFilter: String,
+  njobs: Int,
+  f: (Int, String, Test) -> void,
+): void {
+  i = 0;
+  for (testSuite in tests.keys()) {
+    for (test in tests[testSuite]) {
+      if (!matchesFilters(testSuite, test.name, suiteFilters, nameFilter)) {
+        continue
+      };
+      !i = i + 1;
+      f(i % njobs, testSuite, test)
+    }
+  }
+}
+
+fun assign_all_tests(
+  tests: readonly Map<String, readonly Sequence<Test>>,
+  suiteFilters: readonly Sequence<String>,
+  nameFilter: String,
+  njobs: Int,
+): Array<Array<(String, Test)>> {
+  assigned = Array::fillBy(njobs, _ -> mutable Vector[]);
+  each_assigned_test(
+    tests,
+    suiteFilters,
+    nameFilter,
+    njobs,
+    (rank, testSuite, test) -> {
+      assigned[rank].push((testSuite, test))
+    },
+  );
+  assigned.map(v -> v.toArray())
+}
+
+untracked fun test_job(
+  tests: readonly Map<String, readonly Sequence<Test>>,
+  suiteFilters: readonly Sequence<String>,
+  nameFilter: String,
+  njobs: Int,
+  rank: Int,
+): void {
+  stdout = mutable IO.File(Posix.dup(IO.stdout().fileno));
+  each_assigned_test(
+    tests,
+    suiteFilters,
+    nameFilter,
+    njobs,
+    (r, testSuite, test) -> {
+      if (r == rank) {
+        stdout_file = Posix.mkstemp(Path.join(Environ.temp_dir(), "XXXXXX"));
+        Posix.dup2(stdout_file.fileno, IO.stdout().fileno);
+        stderr_file = Posix.mkstemp(Path.join(Environ.temp_dir(), "XXXXXX"));
+        Posix.dup2(stderr_file.fileno, IO.stderr().fileno);
+
+        res = run_test(
+          test,
+          TestResult{
+            name => test.name,
+            suite => testSuite,
+            file => test.file,
+            line => test.lineno,
+          },
+        );
+
+        flushStdout();
+        _ = Posix.lseek(stdout_file.fileno, 0, Posix.SeekSet());
+        _ = Posix.lseek(stderr_file.fileno, 0, Posix.SeekSet());
+        !res = res with {
+          stdout => stdout_file.read_to_string().fromSuccess(),
+          stderr => stderr_file.read_to_string().fromSuccess(),
+        };
+
+        stdout_file.close();
+        stderr_file.close();
+
+        stdout.write_all((res.toJSON() + "\n").bytes()).fromSuccess();
+      }
+    },
+  );
+  skipExit(0)
+}
+
+// The parallel test runner calls this from a tracked context, so it must
+// appear tracked to callers even though its body is untracked (it captures
+// stdout via the OS). @allow_tracked_call is the sanctioned escape hatch.
+@allow_tracked_call
+untracked fun expectStdout(
+  f: untracked () ~> void,
+  expectedFile: String,
+): void {
+  saved = Posix.dup(IO.stdout().fileno);
+  tmp = Posix.mkstemp(Path.join(Environ.temp_dir(), "XXXXXX"));
+  actual = try {
+    Posix.dup2(tmp.fileno, IO.stdout().fileno);
+    f();
+    flushStdout();
+    _ = Posix.lseek(tmp.fileno, 0, Posix.SeekSet());
+    tmp.read_to_string().fromSuccess()
+  } catch {
+  | exn ->
+    Posix.dup2(saved, IO.stdout().fileno);
+    Posix.close(saved);
+    tmp.close();
+    throw exn
+  };
+  // Restore stdout and clean up before comparison (which may throw).
+  Posix.dup2(saved, IO.stdout().fileno);
+  Posix.close(saved);
+  tmp.close();
+  expected = FileSystem.readTextFile(expectedFile);
+  expectEq(actual, expected)
+}
+
+// Parse the whitespace-separated suite names in SKTEST_FILTERS (blank entries
+// dropped). An empty result means "no suite restriction".
+fun parseSuiteFilters(env: ?String): Array<String> {
+  result = mutable Vector<String>[];
+  // Split on any whitespace, not just newlines: `circleci tests run` hands the
+  // selected suites back to `run-sktest.sh` as a single space-separated line
+  // (via `xargs`), so splitting only on `\n` would yield one bogus filter that
+  // matches no suite -- and the whole run would silently execute 0 tests. Suite
+  // names never contain whitespace, so this is safe.
+  env.each(s ->
+    for (line in s.split("\n")) {
+      for (part in line.split(" ")) {
+        if (part != "") result.push(part)
+      }
+    }
+  );
+  result.toArray()
+}
+
+untracked fun test_harness(
+  tests: readonly Map<String, readonly Sequence<Test>>,
+  // Called once in the parent, after the arguments are parsed and before the
+  // worker processes are forked. A harness can use it to prepare shared test
+  // artifacts in parallel (e.g. batch-compiling inputs) with the same
+  // parallelism the workers will run at. It receives the resolved job count and
+  // a predicate `(suite, name) -> will this test run` (the same filter the
+  // workers apply), so the preparation covers exactly the tests that will run.
+  parent_setup: untracked (Int, (String, String) ~> Bool) ~> void = (_, _) ~>
+    void,
+): void {
+  args = Cli.Command("tests")
+    .about("Run tests")
+    .arg(
+      Cli.Arg::string("filter")
+        .positional()
+        .about(
+          "If specified, only run tests containing this string in their names",
+        ),
+    )
+    // TODO: Expose flag(s) to handle test report format(s) selection.
+    .arg(
+      Cli.Arg::int("jobs")
+        .long("jobs")
+        .short("j")
+        .about("Number of parallel jobs, defaults to # of CPUs")
+        .default(8), // TODO: Properly determine available cores.
+    )
+    .arg(Cli.Arg::string("junitxml").about("Generate a JUnit XML report"))
+    .arg(
+      Cli.Arg::bool("verbose")
+        .long("verbose")
+        .short("v")
+        .about("Use verbose output"),
+    )
+    .arg(
+      Cli.Arg::bool("list").about(
+        "List the test suites (one per line) and exit, without running them",
+      ),
+    )
+    .help()
+    .parseArgs();
+
+  // Suite filters come from SKTEST_FILTERS (the suite names `circleci tests run`
+  // feeds back on a rerun) and select whole suites by exact name; the positional
+  // filter is a substring convenience. Both empty = run everything.
+  suiteFilters = parseSuiteFilters(Environ.varOpt("SKTEST_FILTERS"));
+
+  if (args.getBool("list")) {
+    tests.keys().each(print_string);
+    skipExit(0)
+  };
+
+  // Subprocesses receive both filters via the environment (they are re-exec'd
+  // with no argv), so read the positional filter from SKTEST_FILTER there.
+  Environ.varOpt("SKTEST_RANK") match {
+  | Some(rank) ->
+    test_job(
+      tests,
+      suiteFilters,
+      Environ.var("SKTEST_FILTER"),
+      Environ.var("SKTEST_JOBS").toInt(),
+      rank.toInt(),
+    )
+  | None() -> void
+  };
+
+  reporters = mutable Vector<mutable TestReporter>[
+    mutable BasicTestReporter{color => true},
+  ];
+  args.maybeGetString("junitxml").each(path ->
+    reporters.push(mutable XmlTestReporter{output => Some(path)})
+  );
+
+  nameFilter = args.maybeGetString("filter").default("");
+  njobs = args.getInt("jobs");
+
+  // Parent-only, before forking: give the harness a chance to prepare shared
+  // artifacts for the workers to read (only for the tests that will run).
+  parent_setup(njobs, (suite, name) ~>
+    matchesFilters(suite, name, suiteFilters, nameFilter)
+  );
+
+  expected_tests = assign_all_tests(tests, suiteFilters, nameFilter, njobs);
+
+  procs = Array::fillBy(njobs, rank -> {
+    Posix.Popen::create{
+      args => Array[Environ.current_exe()],
+      env => Map[
+        "SKTEST_RANK" => rank.toString(),
+        "SKTEST_JOBS" => njobs.toString(),
+        "SKTEST_FILTERS" => suiteFilters.join("\n"),
+        "SKTEST_FILTER" => nameFilter,
+      ],
+      stdout => true,
+      stderr => true,
+    }.fromSuccess()
+  });
+  readers = procs.map(p -> mutable IO.BufferedReader(p.stdout.fromSome()));
+  pollfds = Array::mcreateFromItems(
+    procs.map(p -> Posix.Pollfd::create(p.stdout.fromSome().fileno)),
+  );
+  reported_tests = Array::fillBy(njobs, _ -> mutable Set[]);
+  open_fds = procs.size();
+  success = true;
+  while (open_fds > 0) {
+    _ = Posix.poll(pollfds);
+    for ((i, pfd) in pollfds.items()) {
+      if (pfd.fd == -1) continue;
+      if (pfd.pollin()) {
+        loop {
+          line = readers[i].read_line() match {
+          | Failure(err) -> throw err
+          | Success("") ->
+            pollfds.set(i, Posix.Pollfd::create(-1));
+            !open_fds = open_fds - 1;
+            break void
+          | Success(line) -> line
+          };
+          res = TestResult::fromJSON(line);
+          reported_tests[i].insert(`${res.suite}.${res.name}`);
+          if (res.result != "success") {
+            !success = false
+          };
+          reporters.each(x -> x.report(res));
+          if (!readers[i].has_buffered_data()) {
+            break void
+          }
+        }
+      } else if (pfd.pollerr() || pfd.pollhup()) {
+        pollfds.set(i, Posix.Pollfd::create(-1));
+        !open_fds = open_fds - 1
+      }
+    }
+  };
+
+  for (rank in Range(0, procs.size())) {
+    p = procs[rank];
+    // Read stderr before wait() which calls closefds().
+    stderr_output = p.stderr match {
+    | Some(f) ->
+      f.read_to_string() match {
+      | Success(s) -> s
+      | Failure(_) -> ""
+      }
+    | None() -> ""
+    };
+
+    exitstatus = p.wait();
+
+    if (!exitstatus.success()) {
+      !success = false;
+      reason = exitstatus match {
+      | Posix.WSignaled(sig) -> `killed by ${signal_name(sig)}`
+      | Posix.WExited(code) -> `exited with code ${code}`
+      | Posix.WStopped(sig) -> `stopped by ${signal_name(sig)}`
+      };
+      crash_desc = `subprocess ${rank} ${reason}`;
+
+      unreported = 0;
+      for ((testSuite, test) in expected_tests[rank]) {
+        key = `${testSuite}.${test.name}`;
+        if (!reported_tests[rank].contains(key)) {
+          !unreported = unreported + 1;
+          res = TestResult{
+            name => test.name,
+            suite => testSuite,
+            file => test.file,
+            line => test.lineno,
+            result => "error",
+            failure_type => "SubprocessCrash",
+            failure_message => crash_desc,
+            stderr => stderr_output,
+          };
+          reporters.each(x -> x.report(res))
+        }
+      };
+
+      // If all tests were reported but the process still crashed,
+      // report a standalone crash error.
+      if (unreported == 0) {
+        res = TestResult{
+          name => "(subprocess crash)",
+          suite => "(harness)",
+          file => "",
+          line => 0,
+          result => "error",
+          failure_type => "SubprocessCrash",
+          failure_message => `${crash_desc} (all tests completed before crash)`,
+          stderr => stderr_output,
+        };
+        reporters.each(x -> x.report(res))
+      }
+    }
+  };
+
+  reporters.each(r -> r.finish());
+
+  if (!success) {
+    skipExit(1)
+  }
+}
+
+module end;

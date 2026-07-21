@@ -1,0 +1,1191 @@
+/*****************************************************************************/
+/* SQL expression evaluator. */
+/*****************************************************************************/
+
+module alias P = SQLParser;
+
+module SKDB;
+
+base class AValue<+T> {
+  children =
+  | AUndef()
+  | ANull()
+  | ADef(T)
+  | ASuccess() // for representing a successful side effect
+
+  fun flatMap<T2>(f: T -> AValue<T2>): AValue<T2>
+  | AUndef() -> AUndef()
+  | ANull() -> ANull()
+  | ADef(x) -> f(x)
+  | ASuccess() -> ASuccess()
+
+  fun map<T2>(f: T -> T2): AValue<T2>
+  | AUndef() -> AUndef()
+  | ANull() -> ANull()
+  | ADef(x) -> ADef(f(x))
+  | ASuccess() -> ASuccess()
+}
+
+fun btoi(b: Bool): Int {
+  if (b) 1 else 0
+}
+
+fun errorEval<T>(msg: String): T {
+  throw SqlError(0, msg);
+}
+
+fun unexpectedSideEffect<T>(): T {
+  invariant_violation("unexpected side effect within an expression")
+}
+
+base class ComparisonKind {
+  children =
+  | Lt()
+  | Gt()
+  | Gte()
+  | Lte()
+  | Eq()
+  | Diff()
+}
+
+class ExprEvaluator(
+  entries: Array<Row>,
+  tables: Array<(DirDescr, ?Array<SKStore.KeyRange<SKStore.Key>>)>,
+  up: ?ExprEvaluator,
+) {
+  fun toString(): String {
+    inspect(this).toString()
+  }
+
+  private fun evalCFExpr(
+    context: mutable SKStore.Context,
+    expr: SKDB.CExpr<Float>,
+  ): AValue<Float> {
+    expr match {
+    | CNull() -> ANull()
+
+    | CFGetFrom(tableNbr, n) ->
+      if (tableNbr >= this.entries.size()) {
+        AUndef()
+      } else {
+        this.entries[tableNbr].getFloat(n) match {
+        | None() -> ANull()
+        | Some(x) -> ADef(x)
+        }
+      }
+
+    | CFLiteral(f) -> ADef(f)
+
+    | CUp(x) ->
+      this.up match {
+      | None() -> invariant_violation("Could not find up environment")
+      | Some(evaluator) -> evaluator.evalCFExpr(context, x)
+      }
+
+    | CAdd(e1, e2) ->
+      this.evalCFExpr(context, e1).flatMap(n1 ->
+        this.evalCFExpr(context, e2).flatMap(n2 -> {
+          ADef(n1 + n2)
+        })
+      )
+    | CSub(e1, e2) ->
+      this.evalCFExpr(context, e1).flatMap(n1 ->
+        this.evalCFExpr(context, e2).flatMap(n2 -> {
+          ADef(n1 - n2)
+        })
+      )
+    | CMul(e1, e2) ->
+      this.evalCFExpr(context, e1).flatMap(n1 ->
+        this.evalCFExpr(context, e2).flatMap(n2 -> {
+          ADef(n1 * n2)
+        })
+      )
+
+    | CMod(_e1, _e2) -> invariant_violation("Modulo on floats")
+
+    | CDiv(e1, e2) ->
+      this.evalCFExpr(context, e1).flatMap(n1 ->
+        this.evalCFExpr(context, e2).flatMap(n2 -> {
+          if (n2 == 0.0) ANull() else ADef(n1 / n2)
+        })
+      )
+
+    | CIf(conde, e1, e2) ->
+      cond = this.evalCIExpr(context, conde) match {
+      | ASuccess() -> unexpectedSideEffect()
+      | AUndef() -> return AUndef()
+      | ANull() -> false
+      | ADef(n) -> n != 0
+      };
+      if (cond) {
+        this.evalCFExpr(context, e1)
+      } else {
+        this.evalCFExpr(context, e2)
+      }
+
+    | CFAbs(f) ->
+      this.evalCFExpr(context, f).flatMap(x -> ADef(if (x < 0.0) -x else x))
+
+    | CCoalesce(el) ->
+      for (e in el) {
+        this.evalCFExpr(context, e) match {
+        | ASuccess() -> unexpectedSideEffect()
+        | AUndef() -> return AUndef()
+        | ANull() -> continue
+        | v @ ADef(_) -> return v
+        }
+      };
+      ANull()
+
+    | CFQuery(select) ->
+      this.evalQuery(context, select) match {
+      | ASuccess() -> unexpectedSideEffect()
+      | AUndef() -> AUndef()
+      | ANull() -> ANull()
+      | ADef(CFloat(f)) -> ADef(f)
+      | _ -> invariant_violation("Types have already been checked")
+      }
+
+    | CNullIf(e1, e2) ->
+      this.evalCFExpr(context, e1) match {
+      | ASuccess() -> unexpectedSideEffect()
+      | AUndef() -> AUndef()
+      | ANull() -> ANull()
+      | ADef(x) ->
+        this.evalCFExpr(context, e2) match {
+        | AUndef() -> AUndef()
+        | ANull() -> ADef(x)
+        | ADef(y) -> if (x == y) ANull() else ADef(x)
+        | ASuccess() -> unexpectedSideEffect()
+        }
+      }
+
+    | CFICast(f) -> this.evalCIExpr(context, f).map(x -> x.toFloat())
+    | CFSCast(s) -> this.evalCSExpr(context, s).map(x -> x.toFloat())
+    }
+  }
+
+  private fun evalCSExpr(
+    context: mutable SKStore.Context,
+    expr: SKDB.CExpr<String>,
+  ): AValue<String> {
+    expr match {
+    | CSLiteral(str) -> ADef(str)
+    | CSLower(e) ->
+      this.evalCSExpr(context, e).flatMap(str -> ADef(str.lowercase()))
+    | CSUpper(e) ->
+      this.evalCSExpr(context, e).flatMap(str -> ADef(str.uppercase()))
+    | CSGetFrom(tableNbr, n) ->
+      if (tableNbr >= this.entries.size()) {
+        AUndef()
+      } else {
+        this.entries[tableNbr].getString(n) match {
+        | None() -> ANull()
+        | Some(x) -> ADef(x)
+        }
+      }
+    | CSConcat(e1, e2) ->
+      this.evalCSExpr(context, e1).flatMap(n1 ->
+        this.evalCSExpr(context, e2).flatMap(n2 -> {
+          ADef(n1 + n2)
+        })
+      )
+
+    | CStrftime(sformat, stime, smodifiers) ->
+      this.evalCSExpr(context, sformat).flatMap(format ->
+        this.evalCSExpr(context, stime).flatMap(time -> {
+          modifiers = smodifiers.map(x -> this.evalCSExpr(context, x));
+          for (m in modifiers) {
+            m match {
+            | AUndef() -> return AUndef()
+            | _ -> void
+            }
+          };
+          for (m in modifiers) {
+            m match {
+            | ANull() -> return ANull()
+            | _ -> void
+            }
+          };
+          ADef(
+            strftime(
+              context,
+              format,
+              time,
+              modifiers.map(m ->
+                m match {
+                | ADef(v) -> v
+                | _ -> invariant_violation("Should have been checked")
+                }
+              ),
+            ),
+          )
+        })
+      )
+
+    | CSQuery(select) ->
+      this.evalQuery(context, select) match {
+      | ASuccess() -> unexpectedSideEffect()
+      | AUndef() -> AUndef()
+      | ANull() -> ANull()
+      | ADef(CString(f)) -> ADef(f)
+      | _ -> invariant_violation("Types have already been checked")
+      }
+
+    | CIf(conde, e1, e2) ->
+      cond = this.evalCIExpr(context, conde) match {
+      | ASuccess() -> unexpectedSideEffect()
+      | AUndef() -> return AUndef()
+      | ANull() -> false
+      | ADef(n) -> n != 0
+      };
+      if (cond) {
+        this.evalCSExpr(context, e1)
+      } else {
+        this.evalCSExpr(context, e2)
+      }
+
+    | SKDB.CAdd _
+    | SKDB.CSub _
+    | SKDB.CDiv _
+    | SKDB.CMod _
+    | SKDB.CMul _ ->
+      invariant_violation("INTERNAL ERROR: invalid operator on strings")
+
+    | CCoalesce(el) ->
+      for (e in el) {
+        this.evalCSExpr(context, e) match {
+        | ASuccess() -> unexpectedSideEffect()
+        | AUndef() -> return AUndef()
+        | ANull() -> continue
+        | v @ ADef(_) -> return v
+        }
+      };
+      ANull()
+
+    | CNull() -> ANull()
+
+    | CNullIf(e1, e2) ->
+      this.evalCSExpr(context, e1) match {
+      | ASuccess() -> unexpectedSideEffect()
+      | AUndef() -> AUndef()
+      | ANull() -> ANull()
+      | ADef(x) ->
+        this.evalCSExpr(context, e2) match {
+        | ASuccess() -> unexpectedSideEffect()
+        | AUndef() -> AUndef()
+        | ANull() -> ADef(x)
+        | ADef(y) -> if (x == y) ANull() else ADef(x)
+        }
+      }
+
+    | SKDB.CSFCast(e) -> this.evalCFExpr(context, e).map(f -> f.toString())
+    | SKDB.CSICast(e) -> this.evalCIExpr(context, e).map(f -> f.toString())
+    | SKDB.CJSCast(e) -> this.evalCJExpr(context, e).map(x -> x.toString())
+    | SKDB.CTSCast(e) -> this.evalCTExpr(context, e).map(x -> x.toString())
+
+    | CUp(x) ->
+      this.up match {
+      | None() -> invariant_violation("Could not find up environment")
+      | Some(evaluator) -> evaluator.evalCSExpr(context, x)
+      }
+
+    | CSJSchemaPp(e) ->
+      this.evalCTExpr(context, e).map(x ->
+        x match {
+        | CType(ty) -> SKJSON.prettyPrintType(false, ty)
+        }
+      )
+
+    | CSJSchemaCheck(e1, e2) ->
+      this.evalCTExpr(context, e1).flatMap(schema -> {
+        this.evalCTExpr(context, e2).map(value -> {
+          convert = x ->
+            x match {
+            | CType(ty) -> ty
+            };
+          convert(schema).isSuperType(convert(value));
+          "ok"
+        })
+      })
+
+    | CSId() -> ADef(Ksuid::create().toString())
+    }
+  }
+
+  private fun evalCJExpr(
+    context: mutable SKStore.Context,
+    expr: SKDB.CExpr<CJSON>,
+  ): AValue<CJSON> {
+    expr match {
+    | CJGetFrom(tableNbr, n) ->
+      if (tableNbr >= this.entries.size()) {
+        AUndef()
+      } else {
+        this.entries[tableNbr].getValue(n) match {
+        | None() -> ANull()
+        | Some(x @ CJSON(_)) -> ADef(x)
+        | Some(CString(x)) -> ADef(CJSON(decodeJSON(context, x)))
+        | _ -> invariant_violation("Expected a JSON")
+        }
+      }
+    | CJJSON(e) ->
+      this.evalCSExpr(context, e).map(s -> CJSON(decodeJSON(context, s)))
+    | CJQuery(select) ->
+      this.evalQuery(context, select) match {
+      | ASuccess() -> unexpectedSideEffect()
+      | AUndef() -> AUndef()
+      | ANull() -> ANull()
+      | ADef(x @ CJSON(_)) -> ADef(x)
+      | _ -> invariant_violation("Types have already been checked")
+      }
+
+    | CUp(x) ->
+      this.up match {
+      | None() -> invariant_violation("Could not find up environment")
+      | Some(evaluator) -> evaluator.evalCJExpr(context, x)
+      }
+
+    | CSub _
+    | CMul _
+    | CNull()
+    | CNullIf _
+    | CAdd _
+    | CCoalesce _
+    | CDiv _
+    | CIf _
+    | CMod _ ->
+      invariant_violation("Invalid operation on an opaque value")
+    }
+  }
+
+  private fun evalCTExpr(
+    context: mutable SKStore.Context,
+    expr: SKDB.CExpr<CType>,
+  ): AValue<CType> {
+    expr match {
+    | CTGetFrom(tableNbr, n) ->
+      if (tableNbr >= this.entries.size()) {
+        AUndef()
+      } else {
+        this.entries[tableNbr].getValue(n) match {
+        | None() -> ANull()
+        | Some(x @ CType(_)) -> ADef(x)
+        | Some(CJSON(x)) -> ADef(CType(x.toType()))
+        | Some(CString(x)) -> ADef(CType(decodeJSON(context, x).toType()))
+        | _ -> invariant_violation("Expected a type")
+        }
+      }
+    | CTJSchema(e) ->
+      this.evalCSExpr(context, e).map(s ->
+        CType::create(SKJSON.TypeParser::mcreate(s).type())
+      )
+    | CTJSONType(e) ->
+      this.evalCJExpr(context, e).map(j ->
+        j match {
+        | CJSON(x) -> CType::create(x.toType())
+        }
+      )
+    | CTParseSchema(e) ->
+      this.evalCSExpr(context, e).map(s ->
+        CType::create(SKJSON.TypeParser::mcreate(s).type())
+      )
+    | CTQuery(select) ->
+      this.evalQuery(context, select) match {
+      | ASuccess() -> unexpectedSideEffect()
+      | AUndef() -> AUndef()
+      | ANull() -> ANull()
+      | ADef(CType(x)) -> ADef(CType::create(x))
+      | ADef(CJSON(x)) -> ADef(CType::create(x.toType()))
+      | _ -> invariant_violation("Types have already been checked")
+      }
+
+    | CUp(x) ->
+      this.up match {
+      | None() -> invariant_violation("Could not find up environment")
+      | Some(evaluator) -> evaluator.evalCTExpr(context, x)
+      }
+
+    | CSub _
+    | CMul _
+    | CNull()
+    | CNullIf _
+    | CAdd _
+    | CCoalesce _
+    | CDiv _
+    | CIf _
+    | CMod _ ->
+      invariant_violation("Invalid operation on an opaque value")
+    }
+  }
+
+  fun evalWhere(
+    context: mutable SKStore.Context,
+    expr: ?SKDB.CExpr<Int>,
+  ): AValue<Int> {
+    expr match {
+    | None() -> ADef(1)
+    | Some(e) -> this.evalCIExpr(context, e)
+    }
+  }
+
+  fun evalCIExpr(
+    context: mutable SKStore.Context,
+    expr: SKDB.CExpr<Int>,
+  ): AValue<Int> {
+    expr match {
+    | CNull() -> ANull()
+    | CISize(tableNbr) ->
+      ADef(context.getEagerDir(this.tables[tableNbr].i0.dirName).size(context))
+    | CIGetFrom(tableNbr, n) ->
+      if (tableNbr >= this.entries.size()) {
+        AUndef()
+      } else {
+        this.entries[tableNbr].getInt(n) match {
+        | None() -> ANull()
+        | Some(x) -> ADef(x)
+        }
+      }
+    | CILiteral(n) -> ADef(n)
+
+    | CUp(x) ->
+      this.up match {
+      | None() -> invariant_violation("Could not find up environment")
+      | Some(evaluator) -> evaluator.evalCIExpr(context, x)
+      }
+
+    | CNot(e) ->
+      this.evalCIExpr(context, e) match {
+      | ASuccess() -> unexpectedSideEffect()
+      | AUndef() -> AUndef()
+      | ANull() -> ANull()
+      | ADef(n) -> ADef(if (n == 0) 1 else 0)
+      }
+
+    | COn(_, e) -> this.evalCIExpr(context, e)
+
+    | CILte(e1, e2) ->
+      this.biopCompare(
+        Lte(),
+        this.evalCIExpr(context, e1),
+        this.evalCIExpr(context, e2),
+      )
+    | CILt(e1, e2) ->
+      this.biopCompare(
+        Lt(),
+        this.evalCIExpr(context, e1),
+        this.evalCIExpr(context, e2),
+      )
+    | CIGte(e1, e2) ->
+      this.biopCompare(
+        Gte(),
+        this.evalCIExpr(context, e1),
+        this.evalCIExpr(context, e2),
+      )
+    | CIGt(e1, e2) ->
+      this.biopCompare(
+        Gt(),
+        this.evalCIExpr(context, e1),
+        this.evalCIExpr(context, e2),
+      )
+    | CIEq(e1, e2) ->
+      this.biopCompare(
+        Eq(),
+        this.evalCIExpr(context, e1),
+        this.evalCIExpr(context, e2),
+      )
+    | CIDiff(e1, e2) ->
+      this.biopCompare(
+        Diff(),
+        this.evalCIExpr(context, e1),
+        this.evalCIExpr(context, e2),
+      )
+
+    | CFLte(e1, e2) ->
+      this.bfopCompare(
+        Lte(),
+        this.evalCFExpr(context, e1),
+        this.evalCFExpr(context, e2),
+      )
+    | CFLt(e1, e2) ->
+      this.bfopCompare(
+        Lt(),
+        this.evalCFExpr(context, e1),
+        this.evalCFExpr(context, e2),
+      )
+    | CFGte(e1, e2) ->
+      this.bfopCompare(
+        Gte(),
+        this.evalCFExpr(context, e1),
+        this.evalCFExpr(context, e2),
+      )
+    | CFGt(e1, e2) ->
+      this.bfopCompare(
+        Gt(),
+        this.evalCFExpr(context, e1),
+        this.evalCFExpr(context, e2),
+      )
+    | CFEq(e1, e2) ->
+      this.bfopCompare(
+        Eq(),
+        this.evalCFExpr(context, e1),
+        this.evalCFExpr(context, e2),
+      )
+    | CFDiff(e1, e2) ->
+      this.bfopCompare(
+        Diff(),
+        this.evalCFExpr(context, e1),
+        this.evalCFExpr(context, e2),
+      )
+
+    | CSLte(e1, e2) ->
+      this.bsopCompare(
+        Lte(),
+        this.evalCSExpr(context, e1),
+        this.evalCSExpr(context, e2),
+      )
+    | CSLt(e1, e2) ->
+      this.bsopCompare(
+        Lt(),
+        this.evalCSExpr(context, e1),
+        this.evalCSExpr(context, e2),
+      )
+    | CSGte(e1, e2) ->
+      this.bsopCompare(
+        Gte(),
+        this.evalCSExpr(context, e1),
+        this.evalCSExpr(context, e2),
+      )
+    | CSGt(e1, e2) ->
+      this.bsopCompare(
+        Gt(),
+        this.evalCSExpr(context, e1),
+        this.evalCSExpr(context, e2),
+      )
+    | CSEq(e1, e2) ->
+      this.bsopCompare(
+        Eq(),
+        this.evalCSExpr(context, e1),
+        this.evalCSExpr(context, e2),
+      )
+    | CSDiff(e1, e2) ->
+      this.bsopCompare(
+        Diff(),
+        this.evalCSExpr(context, e1),
+        this.evalCSExpr(context, e2),
+      )
+
+    | CAdd(e1, e2) ->
+      this.evalCIExpr(context, e1).flatMap(n1 ->
+        this.evalCIExpr(context, e2).flatMap(n2 -> {
+          ADef(n1 + n2)
+        })
+      )
+    | CSub(e1, e2) ->
+      this.evalCIExpr(context, e1).flatMap(n1 ->
+        this.evalCIExpr(context, e2).flatMap(n2 -> {
+          ADef(n1 - n2)
+        })
+      )
+    | CMul(e1, e2) ->
+      this.evalCIExpr(context, e1).flatMap(n1 ->
+        this.evalCIExpr(context, e2).flatMap(n2 -> {
+          ADef(n1 * n2)
+        })
+      )
+    | CDiv(e1, e2) ->
+      this.evalCIExpr(context, e1).flatMap(n1 ->
+        this.evalCIExpr(context, e2).flatMap(n2 -> {
+          if (n2 == 0) ANull() else ADef(n1 / n2)
+        })
+      )
+
+    | CMod(e1, e2) ->
+      this.evalCIExpr(context, e1).flatMap(n1 ->
+        this.evalCIExpr(context, e2).flatMap(n2 -> {
+          ADef(n1 % n2)
+        })
+      )
+
+    | CIf(conde, e1, e2) ->
+      cond = this.evalCIExpr(context, conde) match {
+      | ASuccess() -> unexpectedSideEffect()
+      | AUndef() -> return AUndef()
+      | ANull() -> false
+      | ADef(n) -> n != 0
+      };
+      if (cond) {
+        this.evalCIExpr(context, e1)
+      } else {
+        this.evalCIExpr(context, e2)
+      }
+
+    | COr(e1, e2) ->
+      this.evalCIExpr(context, e1) match {
+      | ANull()
+      | ADef(0) ->
+        this.evalCIExpr(context, e2).flatMap(n2 -> ADef(btoi(n2 != 0))) match {
+        | AUndef() -> AUndef()
+        | x -> x
+        }
+      | AUndef() ->
+        this.evalCIExpr(context, e2).flatMap(n2 -> ADef(btoi(n2 != 0))) match {
+        | ADef(0) -> AUndef()
+        | x @ ADef _ -> x
+        | _ -> AUndef()
+        }
+      | x -> x
+      }
+
+    | CAnd(e1, e2) ->
+      this.evalCIExpr(context, e1) match {
+      | ASuccess() -> unexpectedSideEffect()
+      | ANull() -> ADef(0)
+      | x @ ADef(0) -> x
+      | AUndef() ->
+        this.evalCIExpr(context, e2).flatMap(n2 -> ADef(btoi(n2 != 0))) match {
+        | ASuccess() -> unexpectedSideEffect()
+        | ANull()
+        | ADef(0) ->
+          ADef(0)
+        | _ -> AUndef()
+        }
+      | ADef _ ->
+        this.evalCIExpr(context, e2).flatMap(n2 -> ADef(btoi(n2 != 0)))
+      }
+
+    | CIAbs(n) ->
+      this.evalCIExpr(context, n).flatMap(x -> ADef(if (x < 0) -x else x))
+
+    | CExists(select) ->
+      sdir = evalSelect(context, select, Some(this));
+      dir = context.unsafeGetEagerDir(sdir.dirName);
+      if (dir.getTime().value > 0) {
+        !dir = dir.reverseTime();
+        context.setDir(dir);
+      };
+      size = dir.size(context);
+      ADef(if (size > 0) 1 else 0)
+
+    | CCoalesce(el) ->
+      for (e in el) {
+        this.evalCIExpr(context, e) match {
+        | ASuccess() -> unexpectedSideEffect()
+        | AUndef() -> return AUndef()
+        | ANull() -> continue
+        | v @ ADef(_) -> return v
+        }
+      };
+      ANull()
+
+    | CIIsNull(e) ->
+      this.evalCIExpr(context, e) match {
+      | ASuccess() -> unexpectedSideEffect()
+      | AUndef() -> AUndef()
+      | ANull() -> ADef(1)
+      | ADef _ -> ADef(0)
+      }
+
+    | CFIsNull(e) ->
+      this.evalCFExpr(context, e) match {
+      | ASuccess() -> unexpectedSideEffect()
+      | AUndef() -> AUndef()
+      | ANull() -> ADef(1)
+      | ADef _ -> ADef(0)
+      }
+
+    | CSIsNull(e) ->
+      this.evalCSExpr(context, e) match {
+      | ASuccess() -> unexpectedSideEffect()
+      | AUndef() -> AUndef()
+      | ANull() -> ADef(1)
+      | ADef _ -> ADef(0)
+      }
+
+    | CJIsNull(e) ->
+      this.evalCJExpr(context, e) match {
+      | ASuccess() -> unexpectedSideEffect()
+      | AUndef() -> AUndef()
+      | ANull() -> ADef(1)
+      | ADef _ -> ADef(0)
+      }
+
+    | CTIsNull(e) ->
+      this.evalCTExpr(context, e) match {
+      | ASuccess() -> unexpectedSideEffect()
+      | AUndef() -> AUndef()
+      | ANull() -> ADef(1)
+      | ADef _ -> ADef(0)
+      }
+
+    | CIQuery(select) ->
+      this.evalQuery(context, select) match {
+      | AUndef() -> AUndef()
+      | ANull() -> ANull()
+      | ADef(CInt(n)) -> ADef(n)
+      | _ -> invariant_violation("Types have already been checked")
+      }
+
+    | CIBetween(e1, e2, e3) ->
+      (
+        this.biopCompare(
+          Lte(),
+          this.evalCIExpr(context, e2),
+          this.evalCIExpr(context, e1),
+        ),
+        this.biopCompare(
+          Lte(),
+          this.evalCIExpr(context, e1),
+          this.evalCIExpr(context, e3),
+        ),
+      ) match {
+      | (ADef(0), _)
+      | (_, ADef(0)) ->
+        ADef(0)
+      | (AUndef _, _)
+      | (_, AUndef _) ->
+        AUndef()
+      | (ANull(), _)
+      | (_, ANull()) ->
+        ANull()
+      | _ -> ADef(1)
+      }
+
+    | CINotBetween(e1, e2, e3) ->
+      (
+        this.biopCompare(
+          Lte(),
+          this.evalCIExpr(context, e2),
+          this.evalCIExpr(context, e1),
+        ),
+        this.biopCompare(
+          Lte(),
+          this.evalCIExpr(context, e1),
+          this.evalCIExpr(context, e3),
+        ),
+      ) match {
+      | (ADef(0), _)
+      | (_, ADef(0)) ->
+        ADef(1)
+      | (AUndef _, _)
+      | (_, AUndef _) ->
+        AUndef()
+      | (ANull(), _)
+      | (_, ANull()) ->
+        ANull()
+      | _ -> ADef(0)
+      }
+
+    | CFBetween(e1, e2, e3) ->
+      this.bfopCompare(
+        Lte(),
+        this.evalCFExpr(context, e2),
+        this.evalCFExpr(context, e1),
+      ).flatMap(n1 ->
+        this.bfopCompare(
+          Lte(),
+          this.evalCFExpr(context, e1),
+          this.evalCFExpr(context, e3),
+        ).flatMap(n2 -> ADef(btoi(n1 != 0 && n2 != 0)))
+      )
+
+    | CFNotBetween(e1, e2, e3) ->
+      this.bfopCompare(
+        Lte(),
+        this.evalCFExpr(context, e2),
+        this.evalCFExpr(context, e1),
+      ).flatMap(n1 ->
+        this.bfopCompare(
+          Lte(),
+          this.evalCFExpr(context, e1),
+          this.evalCFExpr(context, e3),
+        ).flatMap(n2 -> ADef(btoi(n1 == 0 || n2 == 0)))
+      )
+
+    | CSBetween(e1, e2, e3) ->
+      this.bsopCompare(
+        Lte(),
+        this.evalCSExpr(context, e2),
+        this.evalCSExpr(context, e1),
+      ).flatMap(n1 ->
+        this.bsopCompare(
+          Lte(),
+          this.evalCSExpr(context, e1),
+          this.evalCSExpr(context, e3),
+        ).flatMap(n2 -> ADef(btoi(n1 != 0 && n2 != 0)))
+      )
+
+    | CSNotBetween(e1, e2, e3) ->
+      this.bsopCompare(
+        Lte(),
+        this.evalCSExpr(context, e2),
+        this.evalCSExpr(context, e1),
+      ).flatMap(n1 ->
+        this.bsopCompare(
+          Lte(),
+          this.evalCSExpr(context, e1),
+          this.evalCSExpr(context, e3),
+        ).flatMap(n2 -> ADef(btoi(n1 == 0 || n2 == 0)))
+      )
+
+    | CSLike(e1, pattern) ->
+      this.evalCSExpr(context, e1).flatMap(text -> {
+        ADef(btoi(matching(text, pattern)))
+      })
+
+    | CIIn(vExpr, set) if (set.size() == 1 && set[0] is CIQuery _) ->
+      query = set[0] match {
+      | CIQuery(q) -> q
+      | _ -> invariant_violation("Already checked in pattern")
+      };
+      v = this.evalCIExpr(context, vExpr) match {
+      | ASuccess() -> unexpectedSideEffect()
+      | ANull() -> return ANull()
+      | ADef(x) -> x
+      | AUndef() -> return AUndef()
+      };
+      sdir = evalSelect(context, query, Some(this));
+      dirName = sdir.dirName;
+      dir = context.unsafeGetEagerDir(dirName);
+      if (dir.getTime().value > 0) {
+        !dir = dir.reverseTime();
+        context.setDir(dir);
+      };
+      invariant(query.orderBy is None());
+      invariant(query.params.size() == 1);
+      row = RowValues::create(Array[Some(CInt(v))], 1);
+      kinds = Array[(0, P.IASC(), P.TEXT())];
+      ADef(btoi(dir.getArray(context, RowKey::create(row, kinds)).size() != 0))
+
+    | CIIn(vExpr, set) ->
+      v = this.evalCIExpr(context, vExpr);
+      hasNull = v is ANull();
+
+      for (eltExpr in set) {
+        elt = this.evalCIExpr(context, eltExpr);
+        this.biopCompare(Eq(), v, elt) match {
+        | AUndef() -> return AUndef()
+        | ANull() -> !hasNull = true
+        | ADef(0) -> void
+        | x -> break x
+        }
+      } else {
+        if (hasNull) {
+          ANull()
+        } else {
+          ADef(0)
+        }
+      }
+
+    | CFIn(vExpr, set) if (set.size() == 1 && set[0] is CFQuery _) ->
+      query = set[0] match {
+      | CFQuery(q) -> q
+      | _ -> invariant_violation("Already checked in pattern")
+      };
+      v = this.evalCFExpr(context, vExpr) match {
+      | ASuccess() -> unexpectedSideEffect()
+      | ANull() -> return ANull()
+      | ADef(x) -> x
+      | AUndef() -> return AUndef()
+      };
+      sdir = evalSelect(context, query, Some(this));
+      dirName = sdir.dirName;
+      dir = context.unsafeGetEagerDir(dirName);
+      if (dir.getTime().value > 0) {
+        !dir = dir.reverseTime();
+        context.setDir(dir);
+      };
+      invariant(query.orderBy is None());
+      invariant(query.params.size() == 1);
+      row = RowValues::create(Array[Some(CFloat(v))], 1);
+      kinds = Array[(0, P.IASC(), P.TEXT())];
+      ADef(btoi(dir.getArray(context, RowKey::create(row, kinds)).size() != 0))
+
+    | CFIn(vExpr, set) ->
+      v = this.evalCFExpr(context, vExpr);
+      hasNull = v is ANull();
+
+      for (eltExpr in set) {
+        elt = this.evalCFExpr(context, eltExpr);
+        this.bfopCompare(Eq(), v, elt) match {
+        | AUndef() -> return AUndef()
+        | ANull() -> !hasNull = true
+        | ADef(0) -> void
+        | x -> break x
+        }
+      } else {
+        if (hasNull) {
+          ANull()
+        } else {
+          ADef(0)
+        }
+      }
+
+    | CSIn(vExpr, set) if (set.size() == 1 && set[0] is CSQuery _) ->
+      query = set[0] match {
+      | CSQuery(q) -> q
+      | _ -> invariant_violation("Already checked in pattern")
+      };
+      v = this.evalCSExpr(context, vExpr) match {
+      | ASuccess() -> unexpectedSideEffect()
+      | ANull() -> return ANull()
+      | ADef(x) -> x
+      | AUndef() -> return AUndef()
+      };
+      sdir = evalSelect(context, query, Some(this));
+      dirName = sdir.dirName;
+      dir = context.unsafeGetEagerDir(dirName);
+      if (dir.getTime().value > 0) {
+        !dir = dir.reverseTime();
+        context.setDir(dir);
+      };
+      invariant(query.orderBy is None());
+      invariant(query.params.size() == 1);
+      row = RowValues::create(Array[Some(CString(v))], 1);
+      kinds = Array[(0, P.IASC(), P.TEXT())];
+      ADef(btoi(dir.getArray(context, RowKey::create(row, kinds)).size() != 0))
+
+    | CSIn(vExpr, set) ->
+      v = this.evalCSExpr(context, vExpr);
+      hasNull = v is ANull();
+
+      for (elt in set) {
+        this.bsopCompare(Eq(), v, this.evalCSExpr(context, elt)) match {
+        | AUndef() -> return AUndef()
+        | ANull() -> !hasNull = true
+        | ADef(0) -> void
+        | x -> break x
+        }
+      } else {
+        if (hasNull) {
+          ANull()
+        } else {
+          ADef(0)
+        }
+      }
+
+    | CNullIf(e1, e2) ->
+      this.evalCIExpr(context, e1) match {
+      | ASuccess() -> unexpectedSideEffect()
+      | AUndef() -> AUndef()
+      | ANull() -> ANull()
+      | ADef(x) ->
+        this.evalCIExpr(context, e2) match {
+        | ASuccess() -> unexpectedSideEffect()
+        | AUndef() -> AUndef()
+        | ANull() -> ADef(x)
+        | ADef(y) -> if (x == y) ANull() else ADef(x)
+        }
+      }
+    | CIFCast(f) -> this.evalCFExpr(context, f).map(x -> x.toInt())
+    | CISCast(s) -> this.evalCSExpr(context, s).map(x -> x.toInt())
+
+    | CSLength(e) ->
+      this.evalCSExpr(context, e) match {
+      | ASuccess() -> unexpectedSideEffect()
+      | AUndef() -> AUndef()
+      | ANull() -> ANull()
+      | ADef(s) -> ADef(s.length())
+      }
+
+    | CISeqNum(isPositive) ->
+      if (isPositive) {
+        ADef(SKStore.genSym(0))
+      } else {
+        ADef(-SKStore.genSym(0))
+      }
+
+    | CICheck(pos, debugExpr, e, nameOpt) ->
+      this.evalCIExpr(context, e) match {
+      | ASuccess() -> ASuccess()
+      | AUndef() -> AUndef()
+      | ANull() -> ANull()
+      | ADef(n) if (n != 0) -> ASuccess()
+      | ADef(_) ->
+        named = nameOpt match {
+        | None() -> ""
+        | Some(n) -> ` '${n}'`
+        };
+        throw SqlError(pos, `Failed constraint${named}: ${debugExpr}`)
+      }
+    }
+  }
+
+  private fun evalQuery(
+    context: mutable SKStore.Context,
+    select: CSelect,
+  ): AValue<CValue> {
+    sdir = evalSelect(context, select, Some(this));
+    dirName = sdir.dirName;
+    dir = context.unsafeGetEagerDir(dirName);
+    if (dir.getTime().value > 0) {
+      !dir = dir.reverseTime();
+      context.setDir(dir);
+    };
+    keys = dir.keys();
+    if (keys.size() == 0) {
+      return ANull();
+    };
+    key = keys.min().fromSome();
+    files = dir.getArray(context, key);
+    if (files.size() == 0) {
+      return ANull();
+    };
+    row = RowValues::type(files[0]);
+    repeat = row.repeat;
+    if (files.size() > 1) {
+      for (i in Range(1, files.size())) {
+        !repeat = repeat + RowValues::type(files[i]).repeat;
+      }
+    };
+    if (repeat != row.repeat) {
+      !row = row.setRepeat(repeat);
+    };
+    if (row.size() != 1) {
+      errorEval("SELECT used as value returns multiple columns");
+    };
+    row.getValue(0) match {
+    | None() -> ANull()
+    | Some(x) -> ADef(x)
+    }
+  }
+
+  fun evalCGExpr(
+    context: mutable SKStore.Context,
+    e: SKDB.CGExpr,
+  ): AValue<CValue> {
+    result = e match {
+    | CGNull() -> ANull()
+    | CIExpr(ie) -> this.evalCIExpr(context, ie).map(x -> CInt(x))
+    | CFExpr(fe) -> this.evalCFExpr(context, fe).map(x -> CFloat(x))
+    | CSExpr(se) -> this.evalCSExpr(context, se).map(x -> CString(x))
+    | CJExpr(se) -> this.evalCJExpr(context, se)
+    | CTExpr(se) -> this.evalCTExpr(context, se)
+    };
+    result
+  }
+
+  fun biopCompare(
+    bop: ComparisonKind,
+    ie1: AValue<Int>,
+    ie2: AValue<Int>,
+  ): AValue<Int> {
+    ie1.flatMap(n1 ->
+      ie2.flatMap(n2 -> {
+        ADef(
+          btoi(
+            bop match {
+            | Lt() -> n1 < n2
+            | Lte() -> n1 <= n2
+            | Gte() -> n1 >= n2
+            | Gt() -> n1 > n2
+            | Eq() -> n1 == n2
+            | Diff() -> n1 != n2
+            },
+          ),
+        )
+      })
+    )
+  }
+
+  fun bfopCompare(
+    bop: ComparisonKind,
+    fe1: AValue<Float>,
+    fe2: AValue<Float>,
+  ): AValue<Int> {
+    fe1.flatMap(f1 ->
+      fe2.flatMap(f2 -> {
+        ADef(
+          btoi(
+            bop match {
+            | Lt() -> f1 < f2
+            | Lte() -> f1 <= f2
+            | Gte() -> f1 >= f2
+            | Gt() -> f1 > f2
+            | Eq() -> f1 == f2
+            | Diff() -> f1 != f2
+            },
+          ),
+        )
+      })
+    )
+  }
+
+  fun bsopCompare(
+    bop: ComparisonKind,
+    se1: AValue<String>,
+    se2: AValue<String>,
+  ): AValue<Int> {
+    se1.flatMap(s1 ->
+      se2.flatMap(s2 -> {
+        ADef(
+          btoi(
+            bop match {
+            | Lt() -> s1 < s2
+            | Lte() -> s1 <= s2
+            | Gte() -> s1 >= s2
+            | Gt() -> s1 > s2
+            | Eq() -> s1 == s2
+            | Diff() -> s1 != s2
+            },
+          ),
+        )
+      })
+    )
+  }
+}
+
+/*****************************************************************************/
+/* LIKE matching. */
+/*****************************************************************************/
+
+fun isSub(sub: Array<Char>, text: Vector<Char>, i: Int): Bool {
+  for (j in Range(0, sub.size())) {
+    if (i >= text.size()) return false;
+    c = sub[j];
+    if (c == '_') {
+      !i = i + 1;
+      continue
+    };
+    if (c == text[i]) {
+      !i = i + 1;
+      continue
+    };
+    return false;
+  };
+  true
+}
+
+fun matching(text: String, pat: Pattern): Bool {
+  chars = text.chars().map(c -> c.uncapitalize()).collect(Vector);
+  subs = pat.subs;
+  if (!pat.firstIsPercent) {
+    if (subs.size() == 0) return chars.isEmpty();
+    if (!isSub(subs[0], chars, 0)) return false;
+  };
+  if (!pat.lastIsPercent) {
+    if (subs.size() == 0) return chars.isEmpty();
+    sub = subs[subs.size() - 1];
+    if (!isSub(sub, chars, max(0, chars.size() - sub.size()))) return false;
+  };
+  idx = 0;
+  for (i in Range(0, chars.size())) {
+    if (idx == subs.size()) break void;
+    if (isSub(subs[idx], chars, i)) {
+      !idx = idx + 1;
+    }
+  };
+  idx == subs.size()
+}
+
+module end;
+
+module SKStore;
+
+extension base class EagerDir {
+  fun reverseTime(): this {
+    this with {timeStack => -this.timeStack}
+  }
+}
+
+module end;

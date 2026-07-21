@@ -1,0 +1,84 @@
+module Skargo;
+
+const kDefaultProfile: String = "dev";
+const kAvailableProfiles: Array<(String, String)> = Array[
+  ("dev", "Development profile: no optimizations, debug symbols"),
+  ("release", "Release profile: with optimizations"),
+];
+
+class BuildConfig{
+  // TODO: Support multiple requested arches (array `--target` flag).
+  requested_arch: ?TargetTriple,
+  requested_profile: String,
+  export_dir: ?String,
+  skc_extra_options: Array<String>,
+} uses Equality, Hashable
+
+class CompileOptions{
+  build_config: BuildConfig,
+  /// Filter to apply to the root package to select which targets will be built.
+  filter: CompileFilter,
+}
+
+fun build_config{
+  target_opt: ?String,
+  profile_opt: ?String,
+  release: Bool,
+  skc_extra_options: Array<String>,
+}: BuildConfig {
+  BuildConfig{
+    requested_arch => target_opt.map(t -> TargetTriple::fromString(t)),
+    requested_profile => (release, profile_opt) match {
+    | (false, None()) -> kDefaultProfile
+    | (true, None())
+    | (true, Some("release")) ->
+      "release"
+    | (true, Some(profile)) ->
+      invariant_violation(
+        `Cannot specify both \`--release\` and \`--profile=${profile}\``,
+      )
+    | (false, Some(profile)) ->
+      if (kAvailableProfiles.any(p -> p.i0 == profile)) profile else {
+        invariant_violation(`Unrecognized profile ${profile}`)
+      }
+    },
+    export_dir => None(),
+    skc_extra_options,
+  };
+}
+
+// TODO: Return Result<...>.
+fun compile_options(args: Cli.ParseResults): CompileOptions {
+  build_config = build_config{
+    target_opt => args.maybeGetString("target", false),
+    profile_opt => args.maybeGetString("profile"),
+    release => args.getBool("release"),
+    skc_extra_options => args.getArray("skcopt", Some(Array[])),
+  };
+  filter = CompileFilter::from_raw_arguments(
+    args.getBool("lib", Some(false)),
+    args.getArray("bin", Some(Array[])),
+    args.getBool("bins", Some(false)),
+    args.getBool("tests", Some(false)),
+    args.getBool("all-targets", Some(false)),
+  );
+
+  CompileOptions{build_config, filter}
+}
+
+const kSkcOptArg: Cli.Arg = Cli.Arg::string("skcopt")
+  .repeatable()
+  .value_name("option")
+  .about("Pass the given option to skc");
+
+const kProfileArgs: Array<Cli.Arg> = Array[
+  Cli.Arg::string("profile")
+    .value_name("PROFILE-NAME", kAvailableProfiles)
+    .about("Use the specified profile"),
+  Cli.Arg::bool("release")
+    .short("r")
+    .long("release")
+    .about("Shorthand for --profile=release"),
+];
+
+module end;

@@ -1,0 +1,24 @@
+module Syntax_WhenPattern5;
+base class Bar {
+  children =
+  | Foo(Int)
+  | Baz(Bool)
+}
+
+@exptest
+fun main(): void {
+  print_raw(
+    Foo(1) match {
+    | i @ Foo _ if (
+      i match {
+      | Foo(2) -> false
+      | Foo(1) -> true
+      | _ -> false
+      }
+    ) ->
+      "Pass\n"
+    | _ -> "Fail\n"
+    },
+  )
+}
+module end;

@@ -1,0 +1,6 @@
+// the callee's function bound is only reachable through another type
+// parameter; direct calls reject this shape and pipes must too (it
+// previously crashed the compiler during lowering, issue #1269)
+fun callIt<G: (String) -> String, F: G>(f: F, x: String): String {
+  x |> f
+}

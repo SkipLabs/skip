@@ -1,0 +1,82 @@
+module SKTest;
+
+untracked fun test_harness(
+  tests: readonly Map<String, readonly Sequence<Test>>,
+  // Kept signature-compatible with the host harness; wasm runs tests serially,
+  // so this is invoked once with a job count of 1 (and a run-everything
+  // predicate — no wasm harness prepares artifacts through this hook).
+  parent_setup: untracked (Int, (String, String) ~> Bool) ~> void = (_, _) ~>
+    void,
+): void {
+  args = Cli.Command("tests")
+    .about("Run tests")
+    .arg(
+      Cli.Arg::string("filter")
+        .positional()
+        .about(
+          "If specified, only run tests containing this string in their names",
+        ),
+    )
+    .arg(
+      Cli.Arg::bool("strict").about(
+        "If specified with filter, only run tests with listed names",
+      ),
+    )
+    .arg(
+      Cli.Arg::bool("json").about("If specified, print output in json format"),
+    )
+    .arg(Cli.Arg::bool("list").about("Display the list of available tests"))
+    .arg(Cli.Arg::string("junitxml").about("Generate a JUnit XML report"))
+    .arg(
+      Cli.Arg::bool("verbose")
+        .long("verbose")
+        .short("v")
+        .about("Use verbose output"),
+    )
+    .help()
+    .parseArgs();
+  if (args.getBool("list")) {
+    for (testSuite in tests.keys()) {
+      for (test in tests[testSuite]) {
+        print_string(testSuite + "." + test.name)
+      }
+    };
+    return void;
+  };
+  reporters = mutable Vector<mutable TestReporter>[mutable JSONTestReporter{}];
+  args.maybeGetString("junitxml").each(path ->
+    reporters.push(mutable XmlTestReporter{output => Some(path)})
+  );
+  parent_setup(1, (_, _) ~> true);
+  filter = args.maybeGetString("filter").default("");
+  strict = args.getBool("strict");
+  valid = (name, filter) ->
+    if (strict) name == filter else name.contains(filter);
+  success = true;
+  for (testSuite in tests.keys()) {
+    for (test in tests[testSuite]) {
+      if (!valid(testSuite + "." + test.name, filter)) {
+        continue
+      };
+      res = run_test(
+        test,
+        TestResult{
+          name => test.name,
+          suite => testSuite,
+          file => test.file,
+          line => test.lineno,
+        },
+      );
+      if (res.result != "success") {
+        !success = false
+      };
+      reporters.each(r -> r.report(res));
+    }
+  };
+  reporters.each(r -> r.finish());
+  if (!success) {
+    skipExit(1)
+  }
+}
+
+module end;

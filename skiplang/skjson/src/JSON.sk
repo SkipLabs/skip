@@ -1,0 +1,201 @@
+module SKJSON;
+
+/*****************************************************************************/
+// We use a different type than JSON.Value because representing fields
+// with hashtables is not what we want here.
+/*****************************************************************************/
+
+base class CJSON uses Orderable {
+  children =
+  | CJNull()
+  | CJBool(Bool)
+  | CJInt(Int)
+  | CJFloat(Float)
+  | CJString(String)
+  | CJArray(Array<CJSON>)
+  | CJObject(CJFields)
+
+  /* The order is such that null < bool < number < string < array < object */
+  fun compare(other: CJSON): Order {
+    (this, other) match {
+    | (CJNull(), CJNull()) -> EQ()
+    | (CJNull(), _) -> LT()
+    | (_, CJNull()) -> GT()
+    | (CJBool(a), CJBool(b)) -> a.compare(b)
+    | (CJBool(_), _) -> LT()
+    | (_, CJBool(_)) -> GT()
+    | (CJInt(a), CJInt(b)) -> a.compare(b)
+    | (CJFloat(a), CJFloat(b)) -> a.compare(b)
+    | (CJInt(a), CJFloat(b)) -> a.toFloat().compare(b)
+    | (CJFloat(a), CJInt(b)) -> a.compare(b.toFloat())
+    | (CJInt(_), _) -> LT()
+    | (CJFloat(_), _) -> LT()
+    | (_, CJInt(_)) -> GT()
+    | (_, CJFloat(_)) -> GT()
+    | (CJString(a), CJString(b)) -> a.compare(b)
+    | (CJString(_), _) -> LT()
+    | (_, CJString(_)) -> GT()
+    | (CJArray(a), CJArray(b)) -> a.compare(b)
+    | (CJArray(_), _) -> LT()
+    | (_, CJArray(_)) -> GT()
+    | (CJObject(a), CJObject(b)) -> a.compare(b)
+    }
+  }
+
+  fun toJSON(): JSON.Value
+  | CJNull() -> JSON.Null()
+  | CJBool(x) -> JSON.Bool(x)
+  | CJInt(x) -> JSON.IntNumber(x)
+  | CJFloat(x) -> JSON.FloatNumber(x)
+  | CJString(x) -> JSON.String(x)
+  | CJArray(arr) ->
+    JSON.Array(Vector::createFromItems(arr.map(x -> x.toJSON())))
+  | CJObject(fields) ->
+    map = mutable Map[];
+    for (fieldName => field in fields) {
+      map![fieldName] = field.toJSON();
+    };
+    JSON.Object(map.chill())
+
+  fun prettyPrint(): String {
+    this.toJSON().toString()
+  }
+
+  fun toType(): SKJSON.Type {
+    SKJSON.Type::create(this.toSType())
+  }
+
+  fun toSType(): SKJSON.SType
+  | CJNull() -> SKJSON.TNull()
+  | CJBool(_) -> SKJSON.TBool()
+  | CJInt(_) -> SKJSON.TInt()
+  | CJFloat(_) -> SKJSON.TFloat()
+  | CJString(_) -> SKJSON.TString()
+  | CJArray(elts) ->
+    ty = SKJSON.Type::any;
+    for (elt in elts) {
+      !ty = ty.union(elt.toType())
+    };
+    SKJSON.TArray(ty)
+  | CJObject(fields) ->
+    fieldCount = SKJSON.FieldCount::create();
+    dumbField = SKJSON.Field("", fieldCount, SKJSON.Type::any);
+    result = Array::mfill(fields.values.size(), dumbField);
+    for (i => field in fields.values) {
+      fieldName = fields.cols[i];
+      result![i] = SKJSON.Field(fieldName, fieldCount, field.toType());
+    };
+    SKJSON.TObject(SKJSON.Fields::create(result.chill()))
+}
+
+value class CJFields private (
+  cols: Array<String>,
+  values: Array<CJSON>,
+) uses Orderable {
+  /* Invariant:
+    - cols and values have the same length
+      - requires that internFieldNames preserves cols length
+    - cols was sorted lexicographically and had no duplicates, before being passed to internFieldNames */
+  static fun empty(): this {
+    static(Array[], Array[])
+  }
+  static fun create(
+    fields: Array<(String, CJSON)>,
+    internFieldNames: Array<String> -> Array<String>,
+  ): this {
+    !fields = fields.sortedBy(x ~> x.i0);
+    for (i => elt in fields) {
+      if (i != 0) invariant(fields[i - 1].i0 < elt.i0);
+    };
+    static(internFieldNames(fields.map(x -> x.i0)), fields.map(x -> x.i1))
+  }
+
+  fun compare(other: CJFields): Order {
+    i = 0;
+    while (i < this.cols.size()) {
+      if (i >= other.cols.size()) {
+        return GT();
+      };
+      this.cols[i].compare(other.cols[i]) match {
+      | EQ() -> void
+      | cmp -> return cmp
+      };
+      this.values[i].compare(other.values[i]) match {
+      | EQ() -> void
+      | cmp -> return cmp
+      };
+      !i = i + 1;
+    };
+    if (i < other.cols.size()) LT() else EQ()
+  }
+
+  fun isEmpty(): Bool {
+    this.values.isEmpty()
+  }
+  fun items(): mutable Iterator<(String, CJSON)> {
+    for (i => value in this.values) {
+      fieldName = this.cols[i];
+      yield (fieldName, value);
+    }
+  }
+  fun mapAcc<R>(f: (R, String, CJSON) -> (R, CJSON), acc: R): (R, this) {
+    ((_i, !acc), !this.values) = this.values.mapAcc(
+      (i_acc, v) -> {
+        (i, a) = i_acc;
+        (!a, !v) = f(a, this.cols[i], v);
+        ((i + 1, a), v)
+      },
+      (0, acc),
+    );
+    (acc, this)
+  }
+}
+
+mutable class CJSONBuilder{
+  internFieldNames: Array<String> -> Array<String>,
+} extends JSON.JSONBuilder<CJSON, (.String, CJSON), CJFields> {
+  mutable fun emptyObject(): CJSON {
+    CJObject(CJFields::empty())
+  }
+
+  mutable fun makeField(fieldName: .String, value: CJSON): (.String, CJSON) {
+    (fieldName, value)
+  }
+
+  mutable fun makeFields(fields: .Array<(.String, CJSON)>): CJFields {
+    CJFields::create(fields.sortedBy(x ~> x.i0), this.internFieldNames)
+  }
+
+  mutable fun makeObject(fields: CJFields): CJSON {
+    CJObject(fields)
+  }
+
+  mutable fun makeArray(fields: Vector<CJSON>): CJSON {
+    CJArray(fields.toArray())
+  }
+
+  mutable fun makeString(s: String): CJSON {
+    CJString(s)
+  }
+  mutable fun makeBool(b: Bool): CJSON {
+    CJBool(b)
+  }
+  mutable fun makeNull(): CJSON {
+    CJNull()
+  }
+  mutable fun makeInt(n: Int): CJSON {
+    CJInt(n)
+  }
+  mutable fun makeFloat(f: Float): CJSON {
+    CJFloat(f)
+  }
+}
+
+fun decode(
+  str: String,
+  internFieldNames: Array<String> -> Array<String>,
+): CJSON {
+  JSON.genericDecode(str, mutable CJSONBuilder{internFieldNames})
+}
+
+module end;

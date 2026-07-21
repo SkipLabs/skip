@@ -1,0 +1,875 @@
+module alias P = SQLParser;
+
+module SKDB;
+
+/*****************************************************************************/
+// Permission class.
+
+// They are ultimately represented by integers, but in the code, that
+// could be error prone.
+/*****************************************************************************/
+
+const kDeletePermission: Int = 1;
+const kInsertPermission: Int = 2;
+const kReadPermission: Int = 4;
+
+value class Permission(private perm: Int) {
+  static fun none(): this {
+    Permission(0)
+  }
+  static fun all(): this {
+    Permission(7)
+  }
+
+  fun canRead(): Bool {
+    this.perm.and(kReadPermission) != 0
+  }
+  fun canInsert(): Bool {
+    this.perm.and(kInsertPermission) != 0
+  }
+  fun canDelete(): Bool {
+    this.perm.and(kDeletePermission) != 0
+  }
+
+  fun or(y: Permission): Permission {
+    Permission(this.perm.or(y.perm))
+  }
+
+  fun and(y: Permission): Permission {
+    Permission(this.perm.and(y.perm))
+  }
+
+  fun toInt(): Int {
+    this.perm
+  }
+}
+
+/*****************************************************************************/
+// Predefined columns.
+/*****************************************************************************/
+
+const skdbAuthorColName: P.Name = P.Name::create("skdb_author");
+const skdbAccessColName: P.Name = P.Name::create("skdb_access");
+const groupIDColName: P.Name = P.Name::create("groupID");
+const userIDColName: P.Name = P.Name::create("userID");
+const adminIDColName: P.Name = P.Name::create("adminID");
+const ownerIDColName: P.Name = P.Name::create("ownerID");
+const permissionsColName: P.Name = P.Name::create("permissions");
+
+/*****************************************************************************/
+// Predefined tables.
+//
+// Some tables are "predefined" in the sense that fields are expected
+// to be found in a certain order, with a certain type etc ... This
+// class facilitates the creation of such tables.
+//
+// To use it: first, extend the class, then, define the schema that is
+// expected for this table, and the index you would like to use to
+// look up elements (you can find examples below: cf SKDBUsers,
+// SKDBGroupPermissions etc ...).
+//
+// Once you did all of this, you will be able to access the table
+// using getIndex (that will return the index) and makeKey (to build
+// the key you would like to lookup).
+/*****************************************************************************/
+
+base class PredefinedTable private final {
+  private columns: Map<String, Int>,
+  protected dirName: SKStore.DirName,
+  private schema: Array<P.ColumnDefinition>,
+  protected kinds: Array<(Int, P.IKind, P.Type)>,
+  private indexDirName: SKStore.DirName,
+  protected dirDescr: DirDescr,
+} {
+  const name: P.Name;
+  const schemaText: String;
+  const indexedFields: Array<P.Name>;
+
+  static deferred fun create(): this {
+    schema = P.Parser::create(static::schemaText).parseCreateTableSchema();
+
+    columns = mutable Map[];
+    for (i => col in schema.columns) {
+      columns![col.name.lower] = i;
+    };
+    dirName = SKStore.DirName::create("/" + static::name + "/");
+    kinds = schema.columns.mapWithIndex((idx, x) -> (idx, P.IASC(), x.ty));
+
+    indexName = createIndexName(
+      static::name,
+      static::indexedFields.map(x ->
+        (columns[x.lower], P.IASC(), schema.columns[columns[x.lower]].ty)
+      ),
+      static::indexedFields.size(),
+    );
+    indexDirName = SKStore.DirName::create(indexName.lower + "unique/proj/");
+
+    dirDescr = DirDescr::create{
+      name => static::name,
+      schema => schema.columns,
+      dirName,
+      alias => None(),
+      isInput => true,
+    };
+
+    static{
+      columns => columns.chill(),
+      dirName,
+      schema => schema.columns,
+      kinds,
+      indexDirName,
+      dirDescr,
+    }
+  }
+
+  static fun isReservedName(name: P.Name): Bool {
+    name == SKDBUsersByName::name ||
+      name == SKDBUserPermissions::name ||
+      name == SKDBGroups::name ||
+      name == SKDBGroupPermissions::name
+  }
+
+  fun getIndex(context: readonly SKStore.Context): PredefinedIndex {
+    context.unsafeMaybeGetEagerDir(this.indexDirName) match {
+    | None() -> error(0, "Privacy layer not initialized")
+    | Some(index) -> PredefinedIndex(static::name, index, this.columns)
+    }
+  }
+
+  fun getDirDescr(): DirDescr {
+    this.dirDescr
+  }
+
+  fun getColNbr(name: P.Name): Int {
+    this.columns.maybeGet(name.lower) match {
+    | None() ->
+      print_error(
+        `Internal error: could not find column ${name.origName} in table ${
+          static::name.origName
+        }`,
+      );
+      skipExit(2)
+    | Some(x) -> x
+    }
+  }
+
+  // Determines if a change in a directoy affects a given user
+  deferred fun hasChangedForUser(
+    context: readonly SKStore.Context,
+    user: UserFile,
+    tick: SKStore.Tick,
+    destination: ?Int,
+  ): Bool {
+    colNbr = this.columns.maybeGet(userIDColName.lower) match {
+    | None() -> return false
+    | Some(x) -> x
+    };
+
+    dir = context.unsafeMaybeGetEagerDir(this.dirName) match {
+    | None() ->
+      print_error(
+        "Error: could not find ${static::name}, privacy layer not initialized",
+      );
+      skipExit(2)
+    | Some(x) -> x
+    };
+
+    (isReset, changes) = dir.getChangesAfter(tick);
+    if (isReset) return true;
+    for (change in changes) {
+      change match {
+      | rowKey @ RowKey _ ->
+        row = rowKey.getRowValues();
+
+        affectedThisUser = row.getString(colNbr) match {
+        | None() ->
+          true // the change affected every user
+        | Some(x) if (user.name == x) -> true
+        | _ -> false
+        };
+
+        if (affectedThisUser) {
+          destination match {
+          | Some(dest) ->
+            writer = (SKStore.Path::iid(dir.dirName, dest));
+            rows = dir.unsafeGetAllDataIter(rowKey).collect(Array);
+            if (!updateIsFromIgnoredSource(writer, rows)) {
+              return true;
+            }
+          | None() -> return true
+          };
+        }
+      | _ -> invariant_violation("Unexpected key type")
+      }
+    };
+    false
+  }
+}
+
+// These classes exist to be able to manipulate rows using names
+// rather than integers. We want to be able to write
+// row.getCol(myColName) rather than row.values[2].
+
+class PredefinedRow(
+  rowValues: RowValues,
+  tableName: P.Name,
+  columns: Map<String, Int>,
+) {
+  private fun getCol(colName: P.Name): ?CValue {
+    this.rowValues.getValue(
+      this.columns.maybeGet(colName.lower) match {
+      | None() ->
+        print_error(
+          `Internal error: could not find column ${colName.origName} in table ${
+            this.tableName.origName
+          }`,
+        );
+        skipExit(2)
+      | Some(x) -> x
+      },
+    )
+  }
+
+  fun getInt(colName: P.Name): Int {
+    this.getCol(colName) match {
+    | Some(CInt(n)) -> n
+    | v ->
+      invariant_violation(
+        "Undexpected value for col " + colName + " " + inspect(v).toString(),
+      )
+    }
+  }
+
+  fun getString(colName: P.Name): String {
+    this.getCol(colName) match {
+    | Some(CString(n)) -> n
+    | v ->
+      invariant_violation(
+        "Undexpected value for col " + colName + " " + inspect(v).toString(),
+      )
+    }
+  }
+}
+
+class PredefinedIndex(
+  private tableName: P.Name,
+  private dir: SKStore.EagerDir,
+  private columns: Map<String, Int>,
+) {
+  fun get(projKey: IndexProjKey): ?PredefinedRow {
+    arr = this.dir.getArrayRaw(projKey);
+    if (arr.size() == 0) return None();
+    Some(PredefinedRow(RowValues::type(arr[0]), this.tableName, this.columns))
+  }
+}
+
+/*****************************************************************************/
+/* The skdb_users table. */
+/*****************************************************************************/
+
+class UserFile(name: String) extends SKStore.File {
+  static fun create(
+    context: readonly SKStore.Context,
+    userID: String,
+  ): UserFile {
+    skdbUsersByName
+      .getIndex(context)
+      .get(skdbUsersByName.makeKey(userID)) match {
+    | None() ->
+      print_error("Could not find user: " + userID);
+      skipExit(2)
+    | Some(_) -> UserFile(userID)
+    }
+  }
+}
+
+const skdbUsersByName: SKDBUsersByName = SKDBUsersByName::create();
+
+class SKDBUsersByName extends PredefinedTable {
+  const name: P.Name = P.Name::create("skdb_users");
+
+  const schemaText: String = `(
+    userID TEXT PRIMARY KEY,
+    privateKey TEXT NOT NULL
+  )`;
+
+  // Be careful when changing this schema, make sure that the
+  // indexedFields match the function that creates the key.
+
+  const indexedFields: Array<P.Name> = Array[P.Name::create("userID")];
+
+  fun makeKey(userID: String): IndexProjKey {
+    IndexProjKey::create(
+      Array[(this.getColNbr(userIDColName), Some(CString(userID)))],
+    )
+  }
+}
+
+/*****************************************************************************/
+/* The skdb_user_permissions table. */
+/*****************************************************************************/
+
+const skdbUserPermissions: SKDBUserPermissions = SKDBUserPermissions::create();
+
+class SKDBUserPermissions extends PredefinedTable {
+  const name: P.Name = P.Name::create("skdb_user_permissions");
+
+  const schemaText: String = `(
+    userID TEXT PRIMARY KEY,
+    permissions INTEGER NOT NULL,
+    skdb_access TEXT NOT NULL
+  )`;
+
+  // Be careful when changing this schema, make sure that the
+  // indexedFields match the function that creates the key.
+
+  const indexedFields: Array<P.Name> = Array[P.Name::create("userID")];
+
+  fun makeKey(userID: ?String): IndexProjKey {
+    IndexProjKey::create(
+      Array[(this.getColNbr(userIDColName), userID.map(x -> CString(x)))],
+    )
+  }
+}
+
+/*****************************************************************************/
+/* The skdb_groups table. */
+/*****************************************************************************/
+
+const skdbGroups: SKDBGroups = SKDBGroups::create();
+
+class SKDBGroups extends PredefinedTable {
+  const name: P.Name = P.Name::create("skdb_groups");
+
+  const schemaText: String = `(
+  groupID TEXT PRIMARY KEY,
+  skdb_author TEXT,
+  adminID TEXT NOT NULL,
+  ownerID TEXT NOT NULL,
+  skdb_access TEXT NOT NULL
+  )`;
+
+  const indexedFields: Array<P.Name> = Array[groupIDColName];
+  fun makeKey(groupID: String): IndexProjKey {
+    IndexProjKey::create(
+      Array[(this.getColNbr(groupIDColName), Some(CString(groupID)))],
+    )
+  }
+}
+/*****************************************************************************/
+/* The skdb_group_permissions table. */
+/*****************************************************************************/
+
+const skdbGroupPermissions: SKDBGroupPermissions = SKDBGroupPermissions::create();
+
+class SKDBGroupPermissions extends PredefinedTable {
+  const name: P.Name = P.Name::create("skdb_group_permissions");
+
+  const schemaText: String = `(
+    groupID TEXT NOT NULL,
+    userID TEXT,
+    permissions INTEGER NOT NULL,
+    skdb_access TEXT NOT NULL
+  )`;
+
+  const indexedFields: Array<P.Name> = Array[
+    P.Name::create("groupID"),
+    P.Name::create("userID"),
+  ];
+
+  fun makeKey(groupID: String, userID: ?String): IndexProjKey {
+    IndexProjKey::create(
+      Array[
+        (this.getColNbr(groupIDColName), Some(CString(groupID))),
+        (this.getColNbr(userIDColName), userID.map(x -> CString(x))),
+      ],
+    )
+  }
+}
+
+/*****************************************************************************/
+/* Primitives checking that a row can be written. */
+/*****************************************************************************/
+
+base class AccessResult() {
+  children =
+  | AROK()
+  | ARError(AccessResultError)
+}
+
+base class AccessResultError{userID: String} uses Show {
+  children =
+  | ARENullAuthor{}
+  | AREWrongAuthor{foundUserName: String}
+  | AREWrongAuthorType{}
+  | ARENotOwner{groupID: String}
+  | ARENotAdmin{groupID: String}
+  | ARECannotDelete{groupID: String}
+  | ARECannotInsert{groupID: String}
+  | ARECannotDeleteFromTable{tableName: String}
+  | ARECannotInsertIntoTable{tableName: String}
+  | ARECannotRead{groupID: ?String}
+  | ARECannotReadFromTable{tableName: String}
+
+  fun toString(): String
+  | ARENullAuthor{} ->
+    "The field skdb_author can only be set to the userID " +
+      "of the connected user " +
+      " (user " +
+      this.userID +
+      ")"
+  | AREWrongAuthor{foundUserName} ->
+    "skdb_author is set to the wrong id " +
+      " expected " +
+      this.userID +
+      " (found " +
+      foundUserName +
+      ")" +
+      " (user " +
+      this.userID +
+      ")"
+  | AREWrongAuthorType{} ->
+    "skdb_author is expected to be a userID" + " (user " + this.userID + ")"
+  | ARENotAdmin{groupID} ->
+    "cannot manage permissions for group " +
+      groupID +
+      " (user " +
+      this.userID +
+      ")"
+  | ARENotOwner{groupID} ->
+    "not an owner of group " + groupID + " (user " + this.userID + ")"
+  | ARECannotDelete{groupID} ->
+    "cannot delete with skdb_access set to " +
+      groupID +
+      " (user " +
+      this.userID +
+      ")"
+  | ARECannotInsert{groupID} ->
+    "cannot insert with skdb_access set to " +
+      groupID +
+      " (user " +
+      this.userID +
+      ")"
+  | ARECannotRead{groupID} ->
+    "cannot read with skdb_access set to " +
+      groupID +
+      " (user " +
+      this.userID +
+      ")"
+  | ARECannotDeleteFromTable{tableName} ->
+    "cannot delete from table " + tableName + " (user " + this.userID + ")"
+  | ARECannotInsertIntoTable{tableName} ->
+    "cannot insert into " + tableName + " (user " + this.userID + ")"
+  | ARECannotReadFromTable{tableName} ->
+    "cannot read from " + tableName + " (user " + this.userID + ")"
+}
+
+fun checkUserCanReadRow(
+  context: readonly SKStore.Context,
+  user: UserFile,
+  table: DirDescr,
+  row: RowValues,
+): AccessResult {
+  access = AccessSolver::create(context, user.name);
+
+  // Owners can always see their own groups
+  if (table.name == SKDBGroups::name) {
+    ownerGroupID = row.getValue(skdbGroups.getColNbr(ownerIDColName)) match {
+    | Some(CString(id)) -> id
+    | _ -> throw SqlError(0, "ownerID is a non-null string in skdb_groups")
+    };
+    if (access.canRead(context, ownerGroupID)) return AROK()
+  };
+
+  // Users can always see permissions that affect them or they have admin rights over
+  if (table.name == SKDBGroupPermissions::name) {
+    groupID = row.getValue(
+      skdbGroupPermissions.getColNbr(groupIDColName),
+    ) match {
+    | Some(CString(groupID)) -> groupID
+    | _ ->
+      throw SqlError(
+        0,
+        "groupID is a non-null string in skdb_group_permissions",
+      )
+    };
+
+    groupRow = skdbGroups
+      .getIndex(context)
+      .get(skdbGroups.makeKey(groupID))
+      .fromSome();
+
+    checkUserCanReadRow(
+      context,
+      user,
+      skdbGroups.getDirDescr(),
+      groupRow.rowValues,
+    ) match {
+    | AROK() ->
+      // group is visible to this user.  they can see this permission iff
+      // (a) they are the specified user,
+      // (b) the permission is a default for all unspecifed users, OR
+      // (c) they are an admin of the group
+      row.getValue(skdbGroupPermissions.getColNbr(userIDColName)) match {
+      | None() -> return AROK()
+      | Some(CString(userID)) if (userID == user.name) -> return AROK()
+      | _ ->
+        groupIndex = skdbGroups.getIndex(context);
+        (adminID, ownerID) = groupIndex.get(skdbGroups.makeKey(groupID)) match {
+        | Some(r) -> (r.getString(adminIDColName), r.getString(ownerIDColName))
+        | None() ->
+          throw SqlError(
+            0,
+            "malformed predefined table skdb_groups while checking read",
+          )
+        };
+        if (
+          access.canRead(context, adminID) ||
+          access.canRead(context, ownerID)
+        ) {
+          return AROK();
+        } else {
+          return ARError(ARENotAdmin{userID => user.name, groupID => groupID})
+        }
+      }
+    | reasonUserCantSeeGroup ->
+      // users should only see permissions for groups they can see
+      return reasonUserCantSeeGroup
+    };
+  };
+  groupIdxOption = table.cols.maybeGet(skdbAccessColName);
+  groupIdxOption match {
+  | None() ->
+    // There is no skdb_access column, but we have access to the table
+    AROK()
+  | Some(colNbr) ->
+    // There is an skdb_access column, let's check that we have the rights
+    row.getString(colNbr) match {
+    | None() ->
+      // skdb_access is set to NULL: no access
+      ARError(ARECannotRead{userID => user.name, groupID => None()})
+    | Some(groupID) ->
+      access.canRead(context, groupID) match {
+      | true -> AROK()
+      | false ->
+        ARError(ARECannotRead{userID => user.name, groupID => Some(groupID)})
+      }
+    }
+  };
+}
+
+fun getAuthorIdx(table: DirDescr): ?Int {
+  table.cols.maybeGet(skdbAuthorColName);
+}
+
+fun getAccessIdx(table: DirDescr): ?Int {
+  table.cols.maybeGet(skdbAccessColName);
+}
+
+fun checkUserCanWriteRow(
+  context: readonly SKStore.Context,
+  access: mutable AccessSolver,
+  tableName: String,
+  authorIdxOption: ?Int,
+  groupIdxOption: ?Int,
+  row: RowValues,
+): AccessResult {
+  if (tableName.lowercase() == SKDBGroups::name.lower) {
+    ownerIDIdx = skdbGroups.getColNbr(ownerIDColName);
+    ownerID = row.getValue(ownerIDIdx) match {
+    | Some(CString(id)) -> id
+    | _ -> throw SqlError(0, "ownerID is a non-null string in skdb_groups")
+    };
+    if (row.repeat == 0 && !access.canDelete(context, ownerID)) {
+      groupIDIdx = skdbGroups.getColNbr(groupIDColName);
+      groupID = row.getValue(groupIDIdx) match {
+      | Some(CString(id)) -> id
+      | _ -> throw SqlError(0, "groupID is a non-null string in skdb_groups")
+      };
+      return ARError(ARENotOwner{userID => access.userID, groupID})
+    }
+  };
+
+  if (tableName.lowercase() == SKDBGroupPermissions::name.lower) {
+    // Check that only group admins can insert/delete rows
+    // to SKDBGroupPermissions for that group
+    groupIDIdx = skdbGroupPermissions.getColNbr(groupIDColName);
+    groupID = row.getValue(groupIDIdx) match {
+    | Some(CString(groupID)) -> groupID
+    | _ ->
+      throw SqlError(
+        0,
+        "groupID is a non-null string in skdb_group_permissions",
+      )
+    };
+    hasAdminPrivileges = {
+      groupIndex = skdbGroups.getIndex(context);
+      groupIndex.get(skdbGroups.makeKey(groupID)) match {
+      | Some(r) ->
+        adminID = r.getString(adminIDColName);
+        ownerID = r.getString(ownerIDColName);
+        if (row.repeat == 0) {
+          access.canDelete(context, adminID) ||
+            access.canDelete(context, ownerID)
+        } else {
+          access.canInsert(context, adminID) ||
+            access.canInsert(context, ownerID)
+        }
+
+      | None() -> return AROK()
+      };
+    };
+    if (!hasAdminPrivileges) {
+      return ARError(ARENotAdmin{userID => access.userID, groupID => groupID})
+    }
+  };
+  authorIdxOption match {
+  | None() -> void
+  | Some(authorIdx) ->
+    row.getValue(authorIdx) match {
+    | None() -> return ARError(ARENullAuthor{userID => access.userID})
+    | Some(CString(n)) ->
+      if (n != access.userID) {
+        return ARError(
+          AREWrongAuthor{userID => access.userID, foundUserName => n},
+        )
+      }
+    | Some _ -> return ARError(AREWrongAuthorType{userID => access.userID})
+    }
+  };
+  groupIdxOption match {
+  | None() ->
+    if (row.repeat == 0) {
+      return ARError(
+        ARECannotDeleteFromTable{userID => access.userID, tableName},
+      );
+    } else {
+      return ARError(
+        ARECannotInsertIntoTable{userID => access.userID, tableName},
+      );
+    }
+  | Some(groupIdx) ->
+    row.getString(groupIdx) match {
+    | None() -> void
+    | Some(groupID) ->
+      if (row.repeat == 0) {
+        if (!access.canDelete(context, groupID)) {
+          return ARError(ARECannotDelete{userID => access.userID, groupID});
+        }
+      } else {
+        if (tableName.lowercase() == SKDBGroups::name.lower) {
+          row.getString(skdbGroups.getColNbr(groupIDColName)) match {
+          | Some(groupName) if (groupName == groupID) -> return AROK()
+          | _ -> void
+          }
+        };
+        if (!access.canInsert(context, groupID)) {
+          return ARError(ARECannotInsert{userID => access.userID, groupID});
+        }
+      }
+    }
+  };
+  AROK()
+}
+
+/*****************************************************************************/
+// The access solver is the object that computes the privacy for any
+// given user.
+/*****************************************************************************/
+
+value class TableIndexes(authorIdx: ?Int, accessIdx: ?Int)
+
+/* This class is mutable only because of the cache, otherwise
+   it behaves as if it wasn't mutable. A frozen clone and a
+   mutable clone should behave identically. */
+mutable class AccessSolver private {
+  private tables: SortedMap<SKStore.DirName, TableIndexes>,
+  userID: String,
+  userMask: Permission,
+  private mutable cache: SortedMap<String, Permission>,
+  private mutable currentTick: SKStore.Tick,
+} extends SKStore.WriteChecker {
+  static fun create(
+    context: readonly SKStore.Context,
+    userID: String,
+  ): mutable this {
+    userIndex = skdbUserPermissions.getIndex(context);
+    userPermissions = userIndex.get(
+      skdbUserPermissions.makeKey(Some(userID)),
+    ) match {
+    | None() ->
+      userIndex.get(skdbUserPermissions.makeKey(None())) match {
+      | None() ->
+        // We could not find permissions specific to the user. We want
+        // to be permissive, because the skdb_user table is only there
+        // to restrict (not grant) access.
+        Permission::all()
+      | Some(allUsersPermissions) ->
+        Permission(allUsersPermissions.getInt(permissionsColName))
+      }
+    | Some(thisUserPermissions) ->
+      Permission(thisUserPermissions.getInt(permissionsColName))
+    };
+    mutable static{
+      userID,
+      userMask => userPermissions,
+      tables => SortedMap[],
+      cache => SortedMap[],
+      currentTick => SKStore.Tick(-1),
+    }
+  }
+
+  mutable fun addTable(
+    dirName: SKStore.DirName,
+    authorIdx: ?Int,
+    accessIdx: ?Int,
+  ): mutable this {
+    !this.tables[dirName] = TableIndexes(authorIdx, accessIdx);
+    this
+  }
+
+  private mutable fun getPermissions(
+    context: readonly SKStore.Context,
+    groupID: String,
+  ): Permission {
+    if (context.getTick() != this.currentTick) {
+      this.!cache = SortedMap[];
+      this.!currentTick = context.getTick();
+    };
+    this.cache.maybeGet(groupID) match {
+    | None() ->
+      result = this.getPermissionsNoCache(context, groupID);
+      this.!cache[groupID] = result;
+      result
+    | Some(x) -> x
+    }
+  }
+
+  private mutable fun getPermissionsNoCache(
+    context: readonly SKStore.Context,
+    groupID: String,
+  ): Permission {
+    if (groupID == this.userID) {
+      return this.userMask;
+    };
+
+    groupIndex = skdbGroupPermissions.getIndex(context);
+    row = groupIndex.get(
+      skdbGroupPermissions.makeKey(groupID, Some(this.userID)),
+    ) match {
+    | None() -> groupIndex.get(skdbGroupPermissions.makeKey(groupID, None()))
+    | x @ Some _ -> x
+    };
+    row match {
+    | None() -> Permission::none()
+    | Some(x) -> this.userMask.and(Permission(x.getInt(permissionsColName)))
+    }
+  }
+
+  mutable fun canRead(
+    context: readonly SKStore.Context,
+    groupID: String,
+  ): Bool {
+    this.getPermissions(context, groupID).canRead()
+  }
+
+  mutable fun canInsert(
+    context: readonly SKStore.Context,
+    groupID: String,
+  ): Bool {
+    this.getPermissions(context, groupID).canInsert()
+  }
+
+  mutable fun canDelete(
+    context: readonly SKStore.Context,
+    groupID: String,
+  ): Bool {
+    this.getPermissions(context, groupID).canDelete()
+  }
+
+  mutable fun checkWrite(
+    context: readonly SKStore.Context,
+    dirName: SKStore.DirName,
+    key: SKStore.Key,
+    files: Array<SKStore.File>,
+  ): void {
+    this.tables.maybeGet(dirName) match {
+    | None() -> void
+    | Some(indexes) ->
+      key match {
+      | rowKey @ RowKey _ ->
+        rowValues = rowKey.getRowValues();
+        if (files.size() == 0) {
+          !rowValues = rowValues.setRepeat(0);
+        };
+        checkUserCanWriteRow(
+          context,
+          this,
+          dirName.toString().stripPrefix("/").stripSuffix("/"),
+          indexes.authorIdx,
+          indexes.accessIdx,
+          rowValues,
+        ) match {
+        | SKDB.AROK() -> void
+        | SKDB.ARError(err) -> throw SqlError(0, err.toString())
+        }
+      | _ -> void
+      }
+    }
+  }
+
+  readonly fun clone(): this {
+    static{
+      userID => this.userID,
+      userMask => this.userMask,
+      tables => this.tables,
+      cache => this.cache,
+      currentTick => this.currentTick,
+    }
+  }
+
+  readonly fun mclone(): mutable this {
+    mutable static{
+      userID => this.userID,
+      userMask => this.userMask,
+      tables => this.tables,
+      cache => this.cache,
+      currentTick => this.currentTick,
+    }
+  }
+}
+
+/*****************************************************************************/
+// Code checking if the privacy for a given user (or table) changed.
+/*****************************************************************************/
+
+fun userPrivacyChanged(
+  context: readonly SKStore.Context,
+  userIDOpt: ?String,
+  tick: SKStore.Tick,
+  destination: ?Int,
+): Bool {
+  userID = userIDOpt match {
+  | None()
+  | Some("root") ->
+    return false
+  | Some(x) -> x
+  };
+  user = UserFile::create(context, userID);
+  skdbGroupPermissions.hasChangedForUser(context, user, tick, destination) ||
+    skdbUserPermissions.hasChangedForUser(context, user, tick, destination)
+}
+
+module end;
+
+module SKStore;
+
+extension base class WriteChecker {
+  mutable fun addTable(
+    tableName: DirName,
+    authorIdxOpt: ?Int,
+    accessIdxOpt: ?Int,
+  ): mutable this;
+}
+
+module end;

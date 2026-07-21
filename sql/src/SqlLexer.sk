@@ -1,0 +1,208 @@
+module SKDB;
+
+mutable class Buffer(content: String) {
+  readonly fun get(idx: Int): Char {
+    String.getByte(this.content, idx).toInt().chr()
+  }
+
+  readonly fun size(): Int {
+    String.byteSize(this.content).toInt()
+  }
+
+  readonly fun slice(n1: Int, n2: Int): String {
+    String.unsafeSlice(this.content, n1, n2)
+  }
+}
+
+class Lexer(idRoot: Int, content: Buffer) {
+  fun next(pos: Int): (Int, Token) {
+    tok = this.token(pos);
+    (tok.posEnd, tok)
+  }
+
+  fun skipSpaces(pos: Int): Int {
+    // skip whitespaces and comments
+    loop {
+      if (pos >= this.content.size()) {
+        return pos;
+      };
+      currentChar = this.content[pos];
+      currentChar match {
+      | ' ' | '\n' | '\r' | '\t' ->
+        !pos = pos + 1;
+        continue
+      | '#' ->
+        while (pos < this.content.size() && this.content[pos] != '\n') {
+          !pos = pos + 1;
+        };
+        continue
+      | _ -> break void
+      }
+    };
+    pos
+  }
+
+  fun token(posBegin: Int, size: Int = this.content.size()): Token {
+    this.tokenAndKind(posBegin, size).i0
+  }
+
+  fun tokenAndKind(
+    posBegin: Int,
+    size: Int = this.content.size(),
+  ): (Token, TokenKind) {
+    !size = min(size, this.content.size());
+    !posBegin = this.skipSpaces(posBegin);
+    pos = posBegin;
+    if (pos >= this.content.size()) {
+      throw EndOfFile()
+    };
+    !posBegin = pos;
+    currentChar = this.content[pos];
+    !pos = pos + 1;
+    tokenKind = currentChar match {
+    | _ if (pos >= this.content.size()) -> TKWord()
+    | _ if (Chars.isDigit(currentChar)) ->
+      lastWasE = false;
+      allDigits = true;
+      while (
+        pos < size &&
+        (isLetter(this.content[pos]) ||
+          Chars.isDigit(this.content[pos]) ||
+          this.content[pos] == '.' ||
+          this.content[pos] == '-' && lastWasE)
+      ) {
+        !lastWasE = this.content[pos] == 'e' || this.content[pos] == 'E';
+        if (!Chars.isDigit(this.content[pos])) {
+          !allDigits = false;
+        };
+        !pos = pos + 1
+      };
+      if (allDigits) TKInt() else TKFloat()
+    | _ if (currentChar == '_' || isLetter(currentChar)) ->
+      while (
+        pos < size &&
+        (this.content[pos] == '_' ||
+          isLetter(this.content[pos]) ||
+          Chars.isDigit(this.content[pos]))
+      ) {
+        !pos = pos + 1;
+      };
+      TKWord()
+    | _ -> TKWord()
+    };
+    posEnd = pos;
+    (Token(posBegin, posEnd), tokenKind)
+  }
+
+  fun isEqAtF(token: Token, str: String, f: Char ~> Char): Bool {
+    strIter = str.getIter();
+    for (pos in Range(token.posBegin, token.posEnd)) {
+      c1 = this.content[pos];
+      strIter.next() match {
+      | Some(c2) if (f(c1) == f(c2)) -> continue
+      | _ -> return false
+      }
+    };
+    strIter.atEnd()
+  }
+
+  fun isEqAt(token: Token, str: String): Bool {
+    this.isEqAtF(token, str, x ~> x)
+  }
+
+  fun isEqUpperAt(token: Token, str: String): Bool {
+    this.isEqAtF(token, str, x ~> x.capitalize())
+  }
+
+  fun isEq(pos: Int, str: String): Bool {
+    !pos = this.skipSpaces(pos);
+    if (pos >= this.content.size()) return false;
+    this.isEqAt(this.token(pos), str)
+  }
+
+  fun isKeyword(pos: Int): Bool {
+    !pos = this.skipSpaces(pos);
+    if (pos >= this.content.size()) return false;
+    isKeyword(this.word(pos))
+  }
+
+  fun isEqUpper(pos: Int, str: String): Bool {
+    !pos = this.skipSpaces(pos);
+    if (pos >= this.content.size()) return false;
+    this.isEqUpperAt(this.token(pos), str)
+  }
+
+  fun expect(pos: Int, str: String): Int {
+    (!pos, tok) = this.next(pos);
+    if (!this.isEqAt(tok, str)) {
+      word = this.wordAt(tok);
+      error(
+        tok.posBegin,
+        "Expected token: '" + str + "' found '" + word + "' instead",
+      );
+    };
+    pos
+  }
+
+  fun expectUpper(pos: Int, str: String): Int {
+    (!pos, tok) = this.next(pos);
+    if (!this.isEqUpperAt(tok, str)) {
+      word = this.wordAt(tok);
+      error(
+        tok.posBegin,
+        "Expected token: '" + str + "' found '" + word + "' instead",
+      );
+    };
+    pos
+  }
+
+  fun word(pos: Int): String {
+    tok = this.token(pos);
+    this.wordAt(tok)
+  }
+
+  fun nextWord(pos: Int): (Int, String) {
+    (!pos, tok) = this.next(pos);
+    (pos, this.wordAt(tok));
+  }
+
+  fun wordAt(tok: Token): String {
+    this.content.slice(tok.posBegin, tok.posEnd)
+  }
+
+  private fun nextIntStr(pos: Int): (Int, readonly Vector<Char>) {
+    (!pos, str) = this.nextWord(pos);
+    (pos, str.chars())
+  }
+
+  fun nextInt(pos: Int): (Int, Int) {
+    try {
+      (!pos, chars) = this.nextIntStr(pos);
+      newStr = String::fromChars(chars.toArray());
+      (
+        pos,
+        if (chars.size() == 0) 0 else {
+          newStr.toInt()
+        },
+      )
+    } catch {
+    | _ -> error(pos, "Expected integer")
+    }
+  }
+
+  fun nextInt32(pos: Int): (Int, Int32) {
+    (!pos, i) = this.nextInt(pos);
+    (pos, Int32::truncate(i))
+  }
+
+  fun nextIntSize(pos: Int): (Int, Int, Int) {
+    (!pos, str) = this.nextWord(pos);
+    try {
+      (pos, str.toInt(), str.length())
+    } catch {
+    | _ -> error(pos, "Expected integer, found: " + str)
+    }
+  }
+}
+
+module end;

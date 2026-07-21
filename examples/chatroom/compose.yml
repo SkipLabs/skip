@@ -1,0 +1,58 @@
+ services:
+  # Reverse proxy
+  haproxy:
+    image: reactive-chatroom/reverse_proxy
+    build: ./reverse_proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      web:
+        condition: service_healthy
+      reactive_cache:
+        condition: service_healthy
+
+  # Reactive service
+  reactive_cache:
+    image: reactive-chatroom/skip-service
+    build: ./reactive_service
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  # Web backend
+  web:
+    image: reactive-chatroom/web-service
+    build: ./web_service
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  # Web frontend
+  www:
+    image: reactive-chatroom/www
+    build: ./www
+
+  # Kafka event store
+  kafka:
+    image: apache/kafka:4.1.1
+    command: sh -c "((sleep 5 && /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --create --topic skip-chatroom-messages && /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --create --topic skip-chatroom-likes)&) && touch /opt/kafka/config/log4j.properties && sed -i 's/INFO/WARN/g' /opt/kafka/config/log4j.properties && /etc/kafka/docker/run"
+    ports:
+      - "19092:19092"
+    environment:
+      KAFKA_PROCESS_ROLES: controller,broker
+      KAFKA_NODE_ID: 0
+      KAFKA_BROKER_ID: 0
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_LISTENERS: "PLAINTEXT://:19092,CONTROLLER://:19093"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "0@kafka:19093"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_ADVERTISED_HOST_NAME: kafka
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    healthcheck:
+      test: /opt/kafka/bin/kafka-topics.sh --list --bootstrap-server kafka:19092 | wc -l | xargs -I{} test {} -ge 2 || exit 1
+      interval: 1s
+      timeout: 10s
+      retries: 10

@@ -1,0 +1,24 @@
+module Runtime_TryCatch;
+class MyException() extends Exception {
+  fun getMessage(): String {
+    ""
+  }
+}
+
+@no_inline
+fun throwExc(): String {
+  throw MyException()
+}
+
+@exptest
+fun main(): void {
+  print_raw(
+    try {
+      throwExc()
+    } catch {
+    | MyException() -> "Pass\n"
+    | _ -> "Fail"
+    }
+  )
+}
+module end;

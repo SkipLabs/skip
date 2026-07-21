@@ -1,0 +1,2713 @@
+module alias P = SQLParser;
+
+module SKDB;
+
+/*****************************************************************************/
+/* Helper functions to evaluate SQL. */
+/*****************************************************************************/
+
+// Decode a string to a JSON Object, expected to be a map from key
+// strings (parameter names) to values.
+fun decodeParams(input: JSON.Value): Map<String, P.Value> {
+  input match {
+  | map @ JSON.Object _ ->
+    map.value.mapItems((key, val) -> {
+      !key = key.stripPrefix("@");
+      lit = val match {
+      | JSON.Null() -> P.VNull()
+      | JSON.IntNumber(v) -> P.VInt(v)
+      | JSON.Bool(v) -> if (v) P.VInt(1) else P.VInt(0)
+      | JSON.FloatNumber(v) -> P.VFloat(v)
+      | JSON.String(v) -> P.VString(v)
+      | JSON.Array _
+      | JSON.Object _ ->
+        print_error(
+          "Value " +
+            val +
+            " of statement parameter" +
+            key +
+            " expected to be a literal value",
+        );
+        skipExit(2)
+      };
+      (key, lit)
+    })
+  | _ ->
+    print_error("Expected an encoded JSON Object, got: " + input);
+    skipExit(2)
+  }
+}
+
+fun decodeDiffSpec(input: String): Map<P.Name, SKStore.Tick> {
+  try {
+    JSON.decode(input) match {
+    | map @ JSON.Object _ ->
+      map.value.mapItems((key, val) -> {
+        val match {
+        | obj @ JSON.Object _ ->
+          (P.Name::create(key), SKStore.Tick(obj.getInt("since")))
+        | _ ->
+          print_error("Expected an object");
+          skipExit(2)
+        };
+      })
+    | _ ->
+      print_error("Expected an encoded JSON Object, got: " + input);
+      skipExit(2)
+    }
+  } catch {
+  | exn ->
+    print_error("Decoding JSON failed: \"" + input + "\"\n" + exn.getMessage());
+    skipExit(2)
+  }
+}
+
+fun decodeTailSpec(input: String, defaultSince: Int): Map<P.Name, TailSpec> {
+  try {
+    JSON.decode(input) match {
+    | map @ JSON.Object _ ->
+      map.value.mapItems((key, val) -> {
+        val match {
+        | obj @ JSON.Object _ ->
+          (
+            P.Name::create(key),
+            TailSpec{
+              since => obj.maybeGetInt("since").default(defaultSince),
+              filter => obj.maybeGetString("filterExpr").flatMap(expr ->
+                if (expr.isEmpty()) None() else Some(expr)
+              ),
+              params => obj
+                .maybeGetObject("filterParams")
+                .map(o -> decodeParams(o))
+                .default(Map[]),
+              columns => obj.maybeGetString("expectedSchema") match {
+              | None() ->
+                print_error(
+                  "Tailer must specify an expected schema for each table",
+                );
+                skipExit(2)
+              | Some(schemaString) ->
+                if (schemaString == "*") None() else {
+                  Some(
+                    P.Parser::create(schemaString).parseCreateTableSchema()
+                      .columns,
+                  )
+                }
+              },
+            },
+          )
+        | _ ->
+          print_error("Expected an object");
+          skipExit(2)
+        };
+      })
+    | _ ->
+      print_error("Expected an encoded JSON Object, got: " + input);
+      skipExit(2)
+    }
+  } catch {
+  | exn ->
+    print_error("Decoding JSON failed: \"" + input + "\"\n" + exn.getMessage());
+    skipExit(2)
+  }
+}
+
+// Decode input string as a JSON Object, expected to be a map from table names
+// to corresponding schemas (both strings).
+fun decodeSchemas(input: String): Map<String, Array<P.ColumnDefinition>> {
+  try {
+    JSON.decode(input)
+  } catch {
+  | exn ->
+    print_error(
+      "JSON decoding of schema expectations failed: \"" +
+        input +
+        "\"\n" +
+        exn.getMessage(),
+    );
+    skipExit(2)
+  } match {
+  | JSON.Object(obj) ->
+    obj
+      .map((_key, val) ->
+        val match {
+        | JSON.String("*") -> None()
+        | JSON.String(s) ->
+          schema = P.Parser::create(s).parseCreateTableSchema().columns;
+          Some(schema)
+        | _ ->
+          print_error("Malformed --expect-schemas JSON object\n");
+          skipExit(2)
+        }
+      )
+      .filterNone()
+  | _ ->
+    print_error("Non-object --expect-schemas JSON\n");
+    skipExit(2)
+  }
+}
+
+fun computeTableDescr(
+  name: P.Name,
+  schema: Array<P.ColumnDefinition>,
+): DirDescr {
+  dirNameStr = "/" + name + "/";
+  dirName = SKStore.DirName::create(dirNameStr);
+  colVec = mutable Vector[];
+  for (i in Range(0, schema.size())) {
+    colVec.push((schema[i].name, i));
+  };
+  DirDescr::create{name, schema, dirName, alias => None(), isInput => true}
+}
+
+fun computeInsert(
+  context: mutable SKStore.Context,
+  params: Map<String, P.Value>,
+  inTransaction: Bool,
+  pos: Int,
+  columnParamsOpt: ?Array<P.Name>,
+  valuesArray: Array<Array<P.Expr>>,
+  table: DirDescr,
+  repeat: Int = 1,
+): Array<RowValues> {
+  valuesArray.map(vals -> {
+    values = vals.mapWithIndex((idx, expr) -> {
+      val = expr match {
+      | x @ P.Value _ -> x
+      | _ -> error(pos, "Arbitrary expressions not supported for INSERT")
+      };
+      schemaIdx = columnParamsOpt match {
+      | None() -> idx
+      | Some(columnParams) ->
+        colName = columnParams.maybeGet(idx) match {
+        | None() -> error(pos, "Value size mismatch with specified columns")
+        | Some(param) -> param
+        };
+        table.cols.maybeGet(colName) match {
+        | None() -> error(pos, "Column not found: " + colName)
+        | Some(colIdx) -> colIdx
+        }
+      };
+      valueToCValue(
+        context,
+        params,
+        inTransaction,
+        pos,
+        table.schema,
+        schemaIdx,
+        val,
+      )
+    });
+    computeInsertRow(context, pos, columnParamsOpt, values, table, repeat)
+  })
+}
+
+fun computeInsertRow(
+  context: mutable SKStore.Context,
+  pos: Int,
+  columnParamsOpt: ?Array<P.Name>,
+  values: Array<?CValue>,
+  table: DirDescr,
+  repeat: Int = 1,
+): RowValues {
+  schema = table.schema;
+  schemaSize = schema.size();
+  valueSize = values.size();
+  cvalues = columnParamsOpt match {
+  | None() ->
+    if (valueSize != schemaSize) {
+      error(pos, "Value size mismatch with table schema");
+    };
+    values
+  | Some(columnParams) ->
+    missingCols = mutable Map[];
+    for (col in schema) {
+      missingCols![col.name] = col;
+    };
+    for (userDefinedCol in columnParams) {
+      if (!missingCols.containsKey(userDefinedCol)) {
+        error(pos, "Column not found: " + userDefinedCol);
+      };
+      missingCols.remove(userDefinedCol);
+    };
+
+    result = Array<?CValue>::mfill(schema.size(), None());
+
+    for (i => colName in columnParams) {
+      result![table.cols[colName]] = values[i];
+    };
+
+    for (tyDescr in missingCols) {
+      value = tyDescr.default match {
+      | None() ->
+        if (tyDescr.primary is Some _) {
+          if (tyDescr.ty is P.TEXT()) {
+            Some(CString(Ksuid::create().toString()))
+          } else {
+            Some(CInt(Random.next()))
+          };
+        } else if (!tyDescr.notNull.isSome() && !tyDescr.unique.isSome()) {
+          None()
+        } else {
+          error(pos, "Missing value for column: " + tyDescr.name);
+        }
+      | Some(P.CCDefault{expr}) -> evaluateDefault(context, expr)
+      };
+      result![table.cols[tyDescr.name]] = value;
+    };
+
+    unsafe_chill_trust_me(result)
+  };
+  result = RowValues::create(cvalues);
+  if (repeat != 1) {
+    !result = result.setRepeat(repeat);
+  };
+  result
+}
+
+fun valueToCValue(
+  context: mutable SKStore.Context,
+  params: Map<String, P.Value>,
+  inTransaction: Bool,
+  pos: Int,
+  schema: Array<P.ColumnDefinition>,
+  idx: Int,
+  val: P.Value,
+): ?CValue {
+  if (idx >= schema.size()) {
+    error(pos, "Too many columns defined");
+  };
+  !val = val match {
+  | P.VParam(handle) ->
+    params.maybeGet(handle) match {
+    | Some(v) -> v
+    | None() -> error(pos, "Unbound parameter: " + handle)
+    }
+  | P.VPermission(arg) ->
+    perm_str = arg match {
+    | P.VParam(handle) ->
+      params.maybeGet(handle) match {
+      | Some(P.VString(str)) -> str
+      | Some(_) -> error(pos, "Argument to skdb_permission must be a string")
+      | None() -> error(pos, "Unbound parameter: " + handle)
+      }
+    | P.VString(str) -> str
+    | _ -> error(pos, "Argument to skdb_permission must be a string")
+    };
+    P.VInt(compilePermissionLiteral(perm_str))
+  | _ -> val
+  };
+  if (val is P.VNull _) {
+    if (schema[idx].notNull is Some _) {
+      error(pos, "cannot insert NULL in column declared as NOT NULL")
+    } else {
+      return (None() : ?CValue)
+    }
+  };
+  schema[idx].ty match {
+  | P.INTEGER() ->
+    val match {
+    | P.VSeqNum(isPositive, Some(varName)) ->
+      if (!inTransaction) {
+        error(pos, "named id can only be used in a transaction");
+      };
+      globals = context.getGlobal(GLOBALS) match {
+      | None() -> Globals()
+      | Some(file) -> Globals::type(file)
+      };
+      globals.maybeGet(varName) match {
+      | None() ->
+        id = SKStore.genSym(0);
+        if (!isPositive) !id = -id;
+        !globals = globals.set(varName, id);
+        context.setGlobal(GLOBALS, globals);
+        Some(CInt(id))
+      | Some(id) -> Some(CInt(id))
+      }
+    | P.VSeqNum(isPositive, None()) ->
+      if (isPositive) {
+        Some(CInt(SKStore.genSym(0)))
+      } else {
+        Some(CInt(-SKStore.genSym(0)))
+      }
+    | P.VInt(n) ->
+      if (schema[idx].primary is Some _) {
+        _ = SKStore.genSym(Math.abs(n));
+      };
+      Some(CInt(n))
+    | v ->
+      error(
+        pos,
+        "Type mismatch on column " +
+          (idx + 1) +
+          " expected type INTEGER (found " +
+          inspect(v).toString() +
+          ")",
+      )
+    }
+  | P.FLOAT() ->
+    val match {
+    | P.VFloat(f) -> Some(CFloat(f))
+    | P.VInt(i) -> Some(CFloat(i.toFloat()))
+    | v ->
+      error(
+        pos,
+        "Type mismatch on column " +
+          (idx + 1) +
+          " expected type FLOAT (found " +
+          inspect(v).toString() +
+          ")",
+      )
+    }
+  | P.TEXT() ->
+    val match {
+    | P.VId(Some(varName)) ->
+      if (!inTransaction) {
+        error(pos, "named id can only be used in a transaction");
+      };
+      namedIDs = context.getGlobal(NAMEDIDS) match {
+      | None() -> NamedIDs()
+      | Some(file) -> NamedIDs::type(file)
+      };
+      namedIDs.maybeGet(varName) match {
+      | None() ->
+        id = Ksuid::create().toString();
+        !namedIDs = namedIDs.set(varName, id);
+        context.setGlobal(NAMEDIDS, namedIDs);
+        Some(CString(id))
+      | Some(id) -> Some(CString(id))
+      }
+    | P.VId(None()) -> Some(CString(Ksuid::create().toString()))
+    | P.VString(str) -> Some(CString(str))
+    | P.VCurrentTime() ->
+      if (inTransaction) {
+        error(pos, "CURRENT_TIME cannot be used in a transaction")
+      };
+      Some(CString(strftime(context, "%H:%M:%S", "now", Array[])))
+    | P.VCurrentDate() ->
+      if (inTransaction) {
+        error(pos, "CURRENT_DATE cannot be used in a transaction")
+      };
+      Some(CString(strftime(context, "%Y-%m-%d", "now", Array[])))
+    | P.VCurrentTimestamp() ->
+      if (inTransaction) {
+        error(pos, "CURRENT_TIMESTAMP cannot be used in a transaction");
+      };
+      Some(CString(strftime(context, "%Y-%m-%d %H:%M:%S", "now", Array[])))
+    | v ->
+      error(
+        pos,
+        "Type mismatch on column " +
+          (idx + 1) +
+          " expected type TEXT (found " +
+          inspect(v).toString() +
+          ")",
+      )
+    }
+  | P.SCHEMA() -> error(pos, "Unsupported value: SCHEMA")
+  | P.JSON() ->
+    val match {
+    | P.VJSON(str) -> Some(CJSON(decodeJSON(context, str)))
+    | P.VString(str) -> Some(CJSON(decodeJSON(context, str)))
+    | v ->
+      error(
+        pos,
+        "Type mismatch on column " +
+          (idx + 1) +
+          " expected type TEXT (found " +
+          inspect(v).toString() +
+          ")",
+      )
+    }
+  }
+}
+
+fun computeKinds(
+  params: Array<CGExpr>,
+  ekinds: Array<(Int, P.IKind)>,
+): Array<(Int, P.IKind, P.Type)> {
+  size = params.size();
+  paramTypes = params.map(x -> x.getType());
+  colSet = mutable Set[];
+  ikinds = ekinds.map(eik -> {
+    (colNumber, kind) = eik;
+    !colNumber = colNumber - 1;
+    if (colNumber < 0 || colNumber >= size) {
+      errorEval("ORDER BY out of bounds");
+    };
+    if (colSet.contains(colNumber)) {
+      errorEval("invalid ORDER by");
+    };
+    colSet.add(colNumber);
+    (colNumber, kind)
+  });
+  computeOrder(paramTypes, ikinds)
+}
+
+fun computeOrder(
+  paramTypes: Array<P.Type>,
+  ikinds: Array<(Int, P.IKind)>,
+): Array<(Int, P.IKind, P.Type)> {
+  size = paramTypes.size();
+  defaultKinds = Array<?(Int, P.IKind, P.Type)>::mfillBy(size, i ->
+    Some((i, (P.INONE() : P.IKind), paramTypes[i]))
+  );
+  kinds = mutable Vector[];
+  for (ik in ikinds) {
+    (colNumber, kind) = ik;
+    defaultKinds![colNumber] = None();
+    kinds.push((colNumber, kind, paramTypes[colNumber]))
+  };
+  for (defaultKind in defaultKinds) {
+    defaultKind match {
+    | None() -> void
+    | Some(k) -> kinds.push(k)
+    }
+  };
+  kinds.toArray()
+}
+
+fun evaluateDefault(
+  context: mutable SKStore.Context,
+  defaultExpr: P.Expr,
+): ?CValue {
+  defaultExpr match {
+  | P.VNull() -> None()
+  | P.VInt(n) -> Some(CInt(n))
+  | P.VFloat(f) -> Some(CFloat(f))
+  | P.VString(x) -> Some(CString(x))
+  | P.VCurrentTime _ ->
+    Some(CString(strftime(context, "%H:%M:%S", "now", Array[])))
+  | P.VCurrentDate _ ->
+    Some(CString(strftime(context, "%Y-%m-%d", "now", Array[])))
+  | P.VCurrentTimestamp _ ->
+    Some(CString(strftime(context, "%Y-%m-%d %H:%M:%S", "now", Array[])))
+  | _ -> invariant_violation("Invalid expression for default value")
+  }
+}
+
+class SelectFile(
+  tick: Int,
+  name: P.Name,
+  reactive: Bool,
+  text: String,
+  sparams: Array<P.SelectResult>,
+  cselect: CSelect,
+  select: P.Select,
+  queryParams: Map<String, P.Value>,
+) extends SKStore.File
+
+class Evaluator{options: Options, user: ?UserFile} {
+  fun write(
+    context: mutable SKStore.Context,
+    dirName: SKStore.DirName,
+    key: SKStore.Key,
+    value: SKStore.File,
+  ): void {
+    context.getEagerDir(dirName).unsafeWrite(context, key, value);
+  }
+
+  fun writeArray(
+    context: mutable SKStore.Context,
+    dirName: SKStore.DirName,
+    key: SKStore.Key,
+    values: Array<SKStore.File>,
+  ): void {
+    context.getEagerDir(dirName).unsafeWriteArray(context, key, values);
+  }
+
+  fun stmt(
+    context: mutable SKStore.Context,
+    params: Map<String, P.Value>,
+    stmt: P.Stmt,
+    inTransaction: Bool,
+  ): ?((
+    mutable SKStore.Context,
+    mutable SKStore.Context,
+    SKStore.Context,
+  ) ~> void) {
+    stmt match {
+    | P.Pragma _ -> invariant_violation("PRAGMA should be handled at top level")
+    | P.BeginTransaction _
+    | P.EndTransaction _ ->
+      invariant_violation(
+        "BEGIN/END TRANSACTION should be handled at top level",
+      )
+    | P.CreateTableSchema{pos, name, schema, ifNotExists} ->
+      if (inTransaction) {
+        error(pos, "Cannot create a table in a transaction");
+      };
+      Some((context, _, _) ~> {
+        dirDescr = computeTableDescr(name, schema.columns);
+        this.createTable(context, pos, name, dirDescr, ifNotExists);
+      })
+    | P.CreateTableAs{pos, name, select, ifNotExists} ->
+      core: P.SelectCoreQuery = select.core match {
+      | P.SelectCoreValues _ ->
+        error(
+          pos,
+          "CREATE TABLE AS requires a SELECT query, not a VALUES literal",
+        )
+      | core @ P.SelectCoreQuery _ -> core
+      };
+
+      compiler = SKDB.Compiler::create(false, this.options, select.pos, params);
+      cselect = compiler.compileSelect(
+        context,
+        select,
+        genSelectId(select),
+        true,
+      );
+
+      (_, cols) = SKDB.Compiler::getCols(context, core.params, cselect.from);
+
+      schema = cselect.params.mapWithIndex((idx, param) -> {
+        P.ColumnDefinition{
+          name => cols.maybeGet(idx) match {
+          | None() ->
+            error(
+              pos,
+              "Anonymous columns not allowed in CREATE TABLE AS SELECT",
+            )
+          | Some(x) -> x
+          },
+          ty => param.getType(),
+        }
+      });
+
+      dirDescr = computeTableDescr(name, schema);
+      dirName = dirDescr.dirName;
+
+      Some((context, _, _) ~> {
+        this.createTable(context, pos, name, dirDescr, ifNotExists);
+        tableDir = context.unsafeGetEagerDir(dirName);
+
+        selectDir = evalSelect(context, cselect, None());
+        content = context
+          .unsafeGetEagerDir(selectDir.dirName)
+          .getIterator(context)
+          .map(kv -> (kv.i0, kv.i1.collect(Array)));
+
+        context.removeDir(selectDir.dirName);
+
+        tableDir.writeArrayMany(context, content);
+      })
+    | P.Insert{pos, onConflict, name, alias, paramsOpt, values} ->
+      if (alias is Some _) {
+        error(pos, "INSERT INTO table AS not implemented")
+      };
+      baseName = SKStore.SID::create(name.lower);
+      getTableDir(context).maybeGet(context, baseName) match {
+      | None() -> error(pos, "Table not found: " + name)
+      | Some(dirDescr) if (dirDescr.view) ->
+        error(pos, "Cannot write in view: " + name)
+      | _ -> void
+      };
+      if (!(getViewsDir(context).maybeGet(context, baseName) is None())) {
+        error(pos, "Cannot write in view: " + name);
+      };
+      values match {
+      | P.IDefault() -> error(pos, "DEFAULT VALUES not implemented")
+      | P.IQuery(selectAst @ P.Select _) ->
+        if (onConflict is Some _) {
+          error(pos, "Can only use OR IGNORE/REPLACE with values");
+        };
+        compiler = SKDB.Compiler::create(
+          false,
+          this.options,
+          selectAst.pos,
+          params,
+        );
+        select = compiler.compileSelect(
+          context,
+          selectAst,
+          P.Name::create(
+            genSelectId(selectAst).origName + "_" + SKStore.genSym(0),
+          ),
+          true,
+        );
+        selectDir = evalSelect(context, select, None());
+        updateTableMap(context);
+        table = getTable(context, pos, name);
+        dir = getDir(table);
+        sinkName = "/sinks/sink" + SKStore.genSym(0) + "/";
+        sinkDirName = SKStore.DirName::create(sinkName);
+        paramsOpt match {
+        | None() ->
+          if (select.params.size() != table.schema.size()) {
+            error(
+              pos,
+              "Incompatible select size: expected " +
+                table.schema.size() +
+                " found " +
+                select.params.size(),
+            )
+          }
+        | Some(insertColumns) ->
+          if (select.params.size() != insertColumns.size()) {
+            error(
+              pos,
+              "Incompatible select size: expected " +
+                insertColumns.size() +
+                " found " +
+                select.params.size(),
+            )
+          };
+          for (idx => insertColName in insertColumns) {
+            schemaIdx = table.cols.maybeGet(insertColName) match {
+            | None() -> error(pos, "Column not found: " + insertColName)
+            | Some(colIdx) -> colIdx
+            };
+            schemaTy = table.schema[schemaIdx].ty;
+            selectTy = select.params[idx].getType();
+            if (schemaTy != selectTy) {
+              error(
+                pos,
+                "Type mismatch on column " +
+                  (idx + 1) +
+                  " (" +
+                  insertColName +
+                  ") expected type " +
+                  schemaTy.toString() +
+                  " (found " +
+                  selectTy.toString() +
+                  ")",
+              )
+            }
+          }
+        };
+        _ = SKStore.EagerDir::apply(
+          context,
+          selectDir.dirName,
+          sinkDirName,
+          (context, _writer, key, valueIter) ~> {
+            src = SKStore.Path::create(selectDir.dirName, key);
+            rows: Array<SKStore.File> = valueIter
+              .map(row -> {
+                row match {
+                | RowValues(cvalues, repeat) ->
+                  computeInsertRow(
+                    context,
+                    pos,
+                    paramsOpt,
+                    cvalues,
+                    table,
+                    repeat,
+                  )
+                | _ -> invariant_violation("Invalid row kind")
+                }
+              })
+              .collect(Array);
+            entries = Vector[(key, (src, src, rows))];
+            inputDir = context.unsafeGetEagerDir(dir.dirName);
+            inputDir.unsafeWriteArraySourceMany(context, entries.iterator());
+          },
+        );
+        None()
+
+      | P.IValues(vals) ->
+        table = getTable(context, pos, name);
+        this.insert(
+          context,
+          params,
+          pos,
+          onConflict,
+          inTransaction,
+          table,
+          paramsOpt,
+          vals,
+        )
+      }
+    | selectAst @ P.Select{} ->
+      compiler = SKDB.Compiler::create(
+        !inTransaction,
+        this.options,
+        selectAst.pos,
+        params,
+      );
+      select = compiler.compileSelect(
+        context,
+        selectAst,
+        genSelectId(selectAst),
+        true,
+      );
+      selectDir = evalSelect(context, select, None());
+      stdout = context.getGlobal("Stdout") match {
+      | Some(StdoutFile(_, l)) -> l
+      | Some(_) -> invariant_violation("Wrong type for global stdout")
+      | None() -> List[]
+      };
+      !stdout = List.Cons(selectDir, stdout);
+      context.setGlobal("Stdout", StdoutFile(select.format, stdout));
+      None()
+
+    | index @ P.CreateIndex{pos, where, name} ->
+      if (where is Some _) {
+        error(pos, "INDEX ... WHERE not implemented")
+      };
+      if (name.lower.startsWith(systemIndexPrefix.lowercase())) {
+        error(
+          pos,
+          "Indices cannot begin with reserved prefix: " + systemIndexPrefix,
+        );
+      };
+      Some((context, _, _) ~> {
+        this.makeIndex(context, index);
+        context.update()
+      })
+    | P.CreateView{
+      pos,
+      name => viewName,
+      ifNotExists,
+      query => P.SCall(funName, args),
+      reactive,
+    } ->
+      if (!reactive) {
+        error(pos, "table transforms can only be done in a reactive view");
+      };
+      funName.lower match {
+      | "json_extract" ->
+        if (args.size() != 3) {
+          error(
+            pos,
+            "json_extract expects 3 arguments (table_name, column_name, pattern)",
+          );
+        };
+        (tableNameArg, colName, patStr) = (args[0], args[1], args[2]) match {
+        | (P.Identifier(x, _), P.Identifier(y, _), P.VString(z)) -> (x, y, z)
+        | _ ->
+          error(
+            pos,
+            "json_extract expects 3 arguments (table_name, column_name, pattern)",
+          )
+        };
+        pat = SKJSON.PatternParser::mcreate(patStr).toplevelPattern();
+        tableName = tableNameArg.lower;
+        views = getViewsDir(context);
+        viewsDir = context.unsafeGetEagerDir(views.dirName);
+        viewNameKey = SKStore.SID(viewName.lower);
+        if (viewsDir.getArrayRaw(viewNameKey).size() != 0) {
+          if (ifNotExists) return None();
+          error(pos, "VIEW " + viewName + " already exists");
+        } else {
+          tables = getTableDir(context);
+          tablesDir = context.unsafeGetEagerDir(tables.dirName);
+          if (tablesDir.getArrayRaw(viewNameKey).size() != 0) {
+            error(pos, "Table " + viewName + " exists");
+          };
+        };
+
+        Some((context, _, _) ~> {
+          tableDescr = getTable(context, pos, P.Name::create(tableName));
+          dir = SKStore.EHandle(
+            RowKey::keyType,
+            RowValues::type,
+            tableDescr.dirName,
+          );
+          if (!tableDescr.cols.containsKey(colName)) {
+            error(pos, "Column " + colName + " not found")
+          };
+          colNbr = tableDescr.cols[colName];
+          if (
+            !(tableDescr.schema[colNbr].ty is P.TEXT()) &&
+            !(tableDescr.schema[colNbr].ty is P.JSON())
+          ) {
+            error(pos, "Column " + colName + " is not of type JSON or TEXT")
+          };
+          newSchemaAcc = mutable Vector[];
+          patTypes = pat.types();
+          varMapAcc = mutable Map[];
+          for (i => pty in patTypes) {
+            varMapAcc![pty.i0] = i;
+          };
+          varMap = varMapAcc.chill();
+          for (i => ty in tableDescr.schema) {
+            if (i == colNbr) {
+              for (pty in patTypes) {
+                (patNameOrig, patTypeOpt) = pty;
+                patName = P.Name::create(patNameOrig);
+                patTypeOpt match {
+                | Some(patType) if (patType.isInt()) ->
+                  newSchemaAcc.push(
+                    P.ColumnDefinition{
+                      name => patName,
+                      ty => P.INTEGER(),
+                      notNull => Some(P.CCNotNull{}),
+                    },
+                  )
+                | Some(patType) if (patType.isIntOrNull()) ->
+                  newSchemaAcc.push(
+                    P.ColumnDefinition{name => patName, ty => P.INTEGER()},
+                  )
+
+                | Some(patType) if (patType.isBool()) ->
+                  newSchemaAcc.push(
+                    P.ColumnDefinition{
+                      name => patName,
+                      ty => P.INTEGER(),
+                      notNull => Some(P.CCNotNull{}),
+                    },
+                  )
+                | Some(patType) if (patType.isBoolOrNull()) ->
+                  newSchemaAcc.push(
+                    P.ColumnDefinition{name => patName, ty => P.INTEGER()},
+                  )
+
+                | Some(patType) if (patType.isNumAndNotNull()) ->
+                  newSchemaAcc.push(
+                    P.ColumnDefinition{
+                      name => patName,
+                      ty => P.FLOAT(),
+                      notNull => Some(P.CCNotNull{}),
+                    },
+                  )
+                | Some(patType) if (patType.isNum()) ->
+                  newSchemaAcc.push(
+                    P.ColumnDefinition{name => patName, ty => P.FLOAT()},
+                  )
+
+                | Some(patType) if (patType.isString()) ->
+                  newSchemaAcc.push(
+                    P.ColumnDefinition{
+                      name => patName,
+                      ty => P.TEXT(),
+                      notNull => Some(P.CCNotNull{}),
+                    },
+                  )
+                | Some(patType) if (patType.isStringOrNull()) ->
+                  newSchemaAcc.push(
+                    P.ColumnDefinition{name => patName, ty => P.TEXT()},
+                  )
+                | _ ->
+                  newSchemaAcc.push(
+                    P.ColumnDefinition{name => patName, ty => P.JSON()},
+                  )
+                }
+              }
+            } else {
+              newSchemaAcc.push(ty);
+            }
+          };
+          newSchema = newSchemaAcc.toArray();
+          colNames = mutable Set[];
+          for (col in newSchema) {
+            if (colNames.contains(col.name)) {
+              error(pos, "The column name " + col.name + " is already bound");
+            };
+            colNames.insert(col.name);
+          };
+          dirName = SKStore.DirName::create("/" + viewName + "/");
+          viewDescr = DirDescr::create{
+            name => viewName,
+            dirName => dirName,
+            schema => newSchema,
+            alias => Some(viewName),
+            isInput => false,
+          };
+          kinds = viewDescr.kinds;
+          _ = dir.map(
+            RowKey::keyType,
+            RowValues::type,
+            context,
+            dirName,
+            (context, writer, _key, rowIter) ~> {
+              for (row in rowIter) {
+                row match {
+                | RowValues(values, repeat) ->
+                  if (repeat == 0) continue;
+                  json = row.getValue(colNbr) match {
+                  | None() -> continue
+                  | Some(CString(jsonStr)) -> decodeJSON(context, jsonStr)
+                  | Some(CJSON(json)) -> json
+                  | _ -> invariant_violation("Unexpected type")
+                  };
+                  for (entry in pat.pmatch(json)) {
+                    newValues = mutable Vector<?CValue>[];
+                    for (i => value in values) {
+                      if (i == colNbr) {
+                        arr = Array::mfillBy(patTypes.size(), _ ->
+                          (SKJSON.CJNull() : SKJSON.CJSON)
+                        );
+                        for (kv in entry) {
+                          (varName, matchedValue) = kv;
+                          arr![varMap[varName]] = matchedValue;
+                        };
+                        for (matchedValue in arr) {
+                          (matchedValue, newSchema[newValues.size()].ty) match {
+                          | (SKJSON.CJNull(), _) -> newValues.push(None())
+                          | (_, P.JSON()) ->
+                            newValues.push(Some(CJSON(matchedValue)))
+                          | (SKJSON.CJInt(n), P.INTEGER()) ->
+                            newValues.push(Some(CInt(n)))
+                          | (SKJSON.CJBool(true), P.INTEGER()) ->
+                            newValues.push(Some(CInt(1)))
+                          | (SKJSON.CJBool(false), P.INTEGER()) ->
+                            newValues.push(Some(CInt(0)))
+                          | (SKJSON.CJFloat(n), P.FLOAT()) ->
+                            newValues.push(Some(CFloat(n)))
+                          | (SKJSON.CJString(n), P.TEXT()) ->
+                            newValues.push(Some(CString(n)))
+                          | x ->
+                            debug(x);
+                            error(pos, "Internal error")
+                          }
+                        }
+                      } else {
+                        newValues.push(value)
+                      }
+                    };
+                    rowValues = RowValues::create(newValues.toArray(), repeat);
+                    rowKey = RowKey(rowValues, kinds);
+                    writer.set(rowKey, rowValues)
+                  }
+                }
+              }
+            },
+          );
+          tableDir = getTableDir(context);
+          viewKey = SKStore.SID::create(viewName.lower);
+          tableDir.writeArray(context, viewKey, Array[viewDescr]);
+          _ = tableDir
+        })
+      | "json_split" ->
+        if (args.size() == 0) {
+          error(pos, "Missing argument for json_split");
+        };
+        if (args.size() > 1) {
+          error(pos, "Too many arguments for json_split");
+        };
+        args[0] match {
+        | P.Identifier(tableNameObj, _) ->
+          tableName = tableNameObj.lower;
+          views = getViewsDir(context);
+          viewsDir = context.unsafeGetEagerDir(views.dirName);
+          viewNameKey = SKStore.SID(viewName.lower);
+          if (viewsDir.getArrayRaw(viewNameKey).size() != 0) {
+            if (ifNotExists) return None();
+            error(pos, "VIEW " + viewName + " already exists");
+          } else {
+            tables = getTableDir(context);
+            tablesDir = context.unsafeGetEagerDir(tables.dirName);
+            if (tablesDir.getArrayRaw(viewNameKey).size() != 0) {
+              error(pos, "Table " + viewName + " exists");
+            };
+          };
+          Some((context, _, _) ~> {
+            tableDescr = getTable(context, pos, P.Name::create(tableName));
+            dir = SKStore.EHandle(
+              RowKey::keyType,
+              RowValues::type,
+              tableDescr.dirName,
+            );
+            if (tableDescr.schema.size() < 2) {
+              error(
+                pos,
+                "json_split can only be applied to a table with at least 2 columns",
+              );
+            };
+            if (
+              tableDescr.schema[0].primary is None() ||
+              tableDescr.schema[0].ty != P.TEXT()
+            ) {
+              error(
+                pos,
+                "json_split can only be applied to a table " +
+                  "where the first column is a TEXT primary key",
+              );
+            };
+            if (
+              tableDescr.schema[1].ty != P.TEXT() &&
+              tableDescr.schema[1].ty != P.JSON()
+            ) {
+              error(
+                pos,
+                "json_split can only be applied to a table " +
+                  "where the second column is TEXT or JSON",
+              );
+            };
+            dirName = SKStore.DirName::create("/" + viewName + "/");
+            viewDescr = DirDescr::create{
+              name => viewName,
+              dirName => dirName,
+              schema => Array[
+                P.ColumnDefinition{
+                  name => P.Name::create("id"),
+                  ty => P.TEXT(),
+                  primary => Some(
+                    P.CCPrimaryKey{
+                      order => P.IASC(),
+                      autoincrement => false,
+                      onConflict => None(),
+                    },
+                  ),
+                },
+                P.ColumnDefinition{
+                  name => P.Name::create("path"),
+                  ty => P.TEXT(),
+                },
+                P.ColumnDefinition{
+                  name => P.Name::create("type"),
+                  ty => P.TEXT(),
+                },
+                P.ColumnDefinition{
+                  name => P.Name::create("ivalue"),
+                  ty => P.INTEGER(),
+                },
+                P.ColumnDefinition{
+                  name => P.Name::create("fvalue"),
+                  ty => P.FLOAT(),
+                },
+                P.ColumnDefinition{
+                  name => P.Name::create("svalue"),
+                  ty => P.TEXT(),
+                },
+              ],
+              alias => Some(viewName),
+              isInput => false,
+            };
+            kinds = viewDescr.kinds;
+            _ = dir.map(
+              RowKey::keyType,
+              RowValues::type,
+              context,
+              dirName,
+              (context, writer, _key, valueIter) ~> {
+                for (value in valueIter) {
+                  value match {
+                  | row @ RowValues(_, repeat) ->
+                    if (repeat == 0) continue;
+                    invariant(repeat <= 1);
+                    pk = row.getString(0) match {
+                    | None() -> continue
+                    | Some(x) -> x
+                    };
+                    json = row.getValue(1) match {
+                    | None() -> continue
+                    | Some(CString(jsonStr)) -> decodeJSON(context, jsonStr)
+                    | Some(CJSON(json)) -> json
+                    | _ -> invariant_violation("Unexpected type")
+                    };
+                    pathIter = SKJSON.flatten(Array[(pk, json)].iterator());
+                    for (elt in pathIter) {
+                      (id, path, ty, ivalue, fvalue, svalue) = elt;
+                      rowValues = RowValues::create(
+                        Array[
+                          Some(CString(id)),
+                          internCString(context, path),
+                          ty match {
+                          | None() -> None()
+                          | Some(x) -> internCString(context, x.toString())
+                          },
+                          ivalue.map(x -> CInt(x)),
+                          fvalue.map(x -> CFloat(x)),
+                          svalue.map(s -> CString(s)),
+                        ],
+                        1,
+                      );
+                      rowKey = RowKey(rowValues, kinds);
+                      writer.set(rowKey, rowValues);
+                    }
+                  }
+                }
+              },
+            );
+            tableDir = getTableDir(context);
+            viewKey = SKStore.SID::create(viewName.lower);
+            tableDir.writeArray(context, viewKey, Array[viewDescr]);
+            _ = tableDir
+          })
+        | _ -> error(pos, "json_split expects a tableName as parameter")
+        }
+      | _ -> error(pos, "Unknown function: " + funName.origName)
+      }
+    | view @ P.CreateView{
+      pos,
+      name => viewName,
+      ifNotExists,
+      query => P.SQuery(selectAst @ P.Select _),
+      reactive,
+    } ->
+      if (selectAst.core is P.SelectCoreValues _) {
+        error(selectAst.pos, "CREATE VIEW AS VALUES ... not implemented")
+      };
+      if (inTransaction) {
+        error(pos, "Cannot create a view in a transaction");
+      };
+      views = getViewsDir(context);
+      viewsDir = context.unsafeGetEagerDir(views.dirName);
+      key = SKStore.SID(viewName.lower);
+      cselect1 = SKDB.Compiler::create(
+        false,
+        this.options with {reactive => true},
+        selectAst.pos,
+        params,
+      ).compileSelect(context, selectAst, viewName, true);
+      existingFiles = viewsDir.getArrayRaw(key);
+      if (existingFiles.size() > 0) {
+        existingFiles[0] match {
+        | _ if (!ifNotExists) ->
+          error(pos, "VIEW " + viewName + " already exists")
+        | SelectFile(_, _, _, _, _, cs, _, _) if (cselect1 != cs) ->
+          error(
+            pos,
+            "VIEW " + viewName + " already exists with a different query",
+          )
+        | _ -> return None()
+        }
+      } else {
+        tables = getTableDir(context);
+        tablesDir = context.unsafeGetEagerDir(tables.dirName);
+        if (tablesDir.getArrayRaw(key).size() != 0) {
+          error(pos, "Table " + viewName + " exists");
+        };
+      };
+      viewsDir.write(
+        context,
+        key,
+        SelectFile(
+          context.getTick().value,
+          viewName,
+          reactive,
+          view.toString(),
+          (selectAst.core as P.SelectCoreQuery _).params,
+          cselect1,
+          selectAst,
+          params,
+        ),
+      );
+      if (reactive) {
+        if (inTransaction) {
+          error(pos, "Cannot create a reactive view in a transaction");
+        };
+        startTick = context.getTick();
+        // This phase just populates the data.
+        _ = SKDB.evalSelect(context, cselect1, None());
+        Some((context, delta, _) ~> {
+          sameDeps = SKStore.Context::unsafeCompareDeps(context, delta);
+          // If the deps haven't changed, that means we can reuse
+          // the pre-computed data.
+          if (sameDeps) {
+            changedDirNames = delta.getDirsChangesAfter(startTick);
+            for (changedDirName in changedDirNames) {
+              if (context.unsafeMaybeGetDir(changedDirName).isNone()) {
+                context.setGlobal(
+                  "PRE_COMPUTED_" + changedDirName,
+                  SKStore.EagerDirFile(delta.unsafeGetEagerDir(changedDirName)),
+                );
+              }
+            }
+          };
+          compiler = SKDB.Compiler::create(
+            false,
+            this.options with {reactive => true},
+            selectAst.pos,
+            params,
+          );
+          cselect = compiler.compileSelect(context, selectAst, viewName, true);
+          dirName = SKStore.DirName::create("/" + viewName + "/");
+          context.setWithSharedSubDirs(dirName);
+          dirDescr = SKDB.Compiler::getDirDescr(
+            context,
+            (selectAst.core as P.SelectCoreQuery _).params,
+            cselect.from,
+            cselect.params,
+            cselect.id,
+            dirName,
+            true,
+          );
+          _selectDir = SKDB.evalSelect(context, cselect, None());
+          tableDir = getTableDir(context);
+          fileName = SKStore.SID::create(viewName.lower);
+          tableDir.writeArray(context, fileName, Array[dirDescr]);
+        })
+      } else {
+        None()
+      }
+    | P.DropView{pos, name => viewName, ifExists} ->
+      if (ifExists) {
+        error(pos, "DROP VIEW IF EXISTS not implemented")
+      };
+      if (inTransaction) {
+        error(pos, "Cannot drop a view in a transaction");
+      };
+      Some((context, _, _) ~> {
+        views = getViewsDir(context);
+        viewsDir = context.unsafeGetEagerDir(views.dirName);
+        key = SKStore.SID(viewName.lower);
+        files = viewsDir.getArrayRaw(key);
+        if (files.size() == 0) {
+          error(pos, "VIEW " + viewName + " does not exist");
+        };
+        selectFile = SelectFile::type(files[0]);
+        if (selectFile.reactive) {
+          error(pos, "Cannot drop a reactive view");
+        } else {
+          viewsDir.writeArray(context, key, Array[]);
+        }
+      })
+
+    | P.DropIndex{pos} -> error(pos, "Drop index not supported")
+    | P.DropTable{pos, name, ifExists} ->
+      if (ifExists) {
+        error(pos, "DROP TABLE IF EXISTS not implemented")
+      };
+      Some((context, _, _) ~> {
+        dirNameStr = "/" + name + "/";
+        dirName = SKStore.DirName::create(dirNameStr);
+        context.removeDir(dirName);
+        errorAllExistingSubs(context, dirName)
+      })
+    | P.Delete{pos, name, where, alias, indexed} ->
+      if (alias is Some _) {
+        error(pos, "DELETE FROM table AS not implemented")
+      };
+      if (indexed is Some _) {
+        error(pos, "DELETE FROM table INDEXED BY not implemented")
+      };
+      _ = this.delete(context, params, pos, name, where, Array[]);
+      None()
+
+    | P.Update{pos, name, alias, indexed, sets, where, from, onConflict} ->
+      if (alias is Some _) {
+        error(pos, "UPDATE table AS alias not implemented")
+      };
+      if (indexed is Some _) {
+        error(pos, "UPDATE table INDEXED BY not implemented")
+      };
+      if (onConflict is Some _) {
+        error(pos, "UPDATE OR not implemented")
+      };
+      if (from is Some _) {
+        error(pos, "UPDATE FROM not implemented")
+      };
+      baseName = SKStore.SID::create(name.lower);
+      if (getTableDir(context).maybeGet(context, baseName) is None()) {
+        error(pos, "Table not found: " + name.origName);
+      };
+      deleteDir = this.delete(context, params, pos, name, where, sets);
+      updateTableMap(context);
+      table = getTable(context, pos, name);
+      dir = getDir(table);
+      sinkName = "/sinks/sink" + SKStore.genSym(0) + "/";
+      sinkDirName = SKStore.DirName::create(sinkName);
+      _ = SKStore.EagerDir::apply(
+        context,
+        deleteDir,
+        sinkDirName,
+        (context, _writer, key, valueIter) ~> {
+          src = SKStore.Path::create(deleteDir, key);
+          entries = Vector[(key, (src, src, valueIter.collect(Array)))];
+          inputDir = context.unsafeGetEagerDir(dir.dirName);
+          inputDir.unsafeWriteArraySourceMany(context, entries.iterator());
+        },
+      );
+      None()
+    | P.AlterTableAddCol{pos, name, colDef} ->
+      Some((context, _, _) ~>
+        alterTableAddColumn(context, pos, name, colDef, this.options)
+      )
+    | P.AlterTableDropCol _ ->
+      invariant_violation(
+        "DROP COLUMN not allowed outside of extract-column transaction",
+      )
+    };
+  }
+
+  fun makeIndex(context: mutable SKStore.Context, index: P.CreateIndex): void {
+    input = getIndexInputDir(context);
+    key = SKStore.SID::create(index.name.lower);
+    current = (context.unsafeGetEagerDir(input.dirName)).getArrayRaw(key);
+    if (current.size() > 0) {
+      current[0] match {
+      | _ if (!index.ifNotExists) ->
+        error(index.pos, "INDEX " + index.name.origName + " already exists")
+      | ci @ P.CreateIndex _ ->
+        old = ci with {ifNotExists => true, pos => 0};
+        new = index with {pos => 0};
+        if (old != new) {
+          error(
+            index.pos,
+            "INDEX " +
+              index.name.origName +
+              " already exists with different schema",
+          )
+        } else {
+          return void
+        }
+      | _ -> return void
+      }
+    };
+    this.write(context, input.dirName, key, index);
+    _ = getIndexOutputDir(context);
+  }
+
+  fun delete(
+    context: mutable SKStore.Context,
+    params: Map<String, P.Value>,
+    pos: Int,
+    name: P.Name,
+    where: ?P.Expr,
+    sets: Array<P.UpdateSet>,
+  ): SKStore.DirName {
+    sinkName = "/sinks/sink" + SKStore.genSym(0) + "/";
+    sinkDirName = SKStore.DirName::create(sinkName);
+    from = Some(P.FromTable{name, asName => None(), indexed => false});
+    selectAst = P.Select{
+      pos => pos,
+      core => P.SelectCoreQuery{
+        params => Array[P.SelectStar(None())],
+        from,
+        where,
+        groupBy => None(),
+        having => None(),
+        distinct => false,
+      },
+      limit => None(),
+      orderBy => None(),
+      rest => Array[],
+    };
+    compiler = SKDB.Compiler::create(
+      false,
+      this.options,
+      selectAst.pos,
+      params,
+    );
+    select = compiler.compileSelect(
+      context,
+      selectAst,
+      P.Name::create("SELECT_" + SKStore.genSym(pos)),
+      true,
+      sets,
+    );
+    selectHandle = evalSelect(context, select, None());
+    selectDir = context.unsafeGetEagerDir(selectHandle.dirName);
+    updateTableMap(context);
+    table = getTable(context, pos, name);
+    inputDir = getDir(table);
+    SKStore.EagerDir::apply(
+      context,
+      selectDir.dirName,
+      sinkDirName,
+      (context, writer, key, rowIter) ~> {
+        entries = mutable Vector[];
+        dir = context.unsafeGetEagerDir(inputDir.dirName);
+        writerPath = SKStore.Path::gen(selectDir.dirName);
+        for ((_, source, _) in dir.getDataIterWithoutTombs(context, key)) {
+          entries.push((key, (source, writerPath, Array<SKStore.File>[])));
+        };
+        dir.unsafeWriteArraySourceMany(context, entries.iterator());
+        if (select.sets.isEmpty()) return void;
+
+        row = rowIter.next() match {
+        | None() -> return void
+        | Some(x @ RowValues _) -> x
+        | Some(_) -> invariant_violation("Unexpected row type")
+        };
+
+        repeat = row.repeat;
+
+        for (ir in rowIter) {
+          ir match {
+          | RowValues(_, r) -> !repeat = repeat + r
+          | _ -> invariant_violation("Unexpected Row type")
+          }
+        };
+
+        if (repeat != row.repeat) {
+          !row = row.setRepeat(repeat);
+        };
+
+        evaluator = ExprEvaluator(Array[row], Array[], None());
+
+        values = Array::mcreateFromItems(row.values);
+
+        for (set in select.sets) {
+          (idx, e) = set;
+          values![idx] = evaluator.evalCGExpr(context, e) match {
+          | ADef(x) -> Some(x)
+          | ANull() -> None()
+          | AUndef _ -> invariant_violation("Undefined set value")
+          | ASuccess() -> unexpectedSideEffect()
+          };
+        };
+        !row = RowValues::create(values.chill(), row.repeat);
+        kinds = key match {
+        | rowKey @ RowKey _ -> rowKey.getKinds()
+        | _ -> invariant_violation("Unexpected row kind")
+        };
+
+        writer.set(RowKey::create(row, kinds), row);
+      },
+    );
+    sinkDir = context.unsafeGetEagerDir(sinkDirName);
+    context.setDir(sinkDir.timeMaxMinus());
+    updateTableMap(context);
+    sinkDirName
+  }
+
+  fun insert(
+    context: mutable SKStore.Context,
+    params: Map<String, P.Value>,
+    pos: Int,
+    onConflict: ?P.OnConflict,
+    inTransaction: Bool,
+    table: DirDescr,
+    paramsOpt: ?Array<P.Name>,
+    values: Array<Array<P.Expr>>,
+  ): ?((
+    mutable SKStore.Context,
+    mutable SKStore.Context,
+    SKStore.Context,
+  ) ~> void) {
+    rows = computeInsert(
+      context,
+      params,
+      inTransaction,
+      pos,
+      paramsOpt,
+      values,
+      table,
+    );
+    if (inTransaction && onConflict is Some(P.OCIgnore())) {
+      error(pos, "OR IGNORE not supported in transactions")
+    } else if (inTransaction && onConflict is Some(P.OCReplace())) {
+      error(pos, "OR REPLACE not supported in transactions")
+    } else if (inTransaction) {
+      this.insertTable(context, table, rows);
+      context.update();
+      None()
+    } else if (onConflict is Some(P.OCUpdate(_))) {
+      onConflict match {
+      | Some(P.OCUpdate(update)) ->
+        copy = context.clone();
+        hasConflict = try {
+          this.insertTable(context, table, rows);
+          context.update();
+          false
+        } catch {
+        | Conflict _ ->
+          context.replaceFromSaved(copy);
+          true
+        | exn -> throw exn
+        };
+        if (hasConflict) {
+          this.stmt(context, params, update with {name => table.name}, false)
+        } else {
+          None()
+        }
+      | _ -> None()
+      }
+    } else {
+      Some((context, _, _) ~> {
+        if (onConflict is Some(P.OCIgnore())) {
+          copy = context.clone();
+          try {
+            this.insertTable(context, table, rows);
+            context.update();
+          } catch {
+          | Conflict _ -> context.replaceFromSaved(copy)
+          | exn -> throw exn
+          }
+        } else if (onConflict is Some(P.OCReplace())) {
+          loop {
+            copy = context.clone();
+            shouldContinue = try {
+              this.insertTable(context, table, rows);
+              context.update();
+              false
+            } catch {
+            | Conflict(_pos, _msg, _conflictingValues, rowValues) ->
+              context.replaceFromSaved(copy);
+              isDifferent = false;
+              for (row in rows) {
+                for (row2 in rowValues) {
+                  if (row2.getRepeat() != 0 && row != row2) {
+                    !isDifferent = true
+                  }
+                }
+              };
+              if (!isDifferent) {
+                false
+              } else {
+                kinds = table.schema.mapWithIndex((idx, x) ->
+                  (idx, P.IASC(), x.ty)
+                );
+                entries = mutable Vector[];
+                dir = context.unsafeGetEagerDir(table.dirName);
+                for (row in rowValues) {
+                  writerPath = SKStore.Path::gen(table.dirName);
+
+                  key: SKStore.Key = RowKey::create(row, kinds);
+                  for ((_, source, _) in dir.getDataIterWithoutTombs(
+                    context,
+                    key,
+                  )) {
+                    entries.push(
+                      (key, (source, writerPath, Array<SKStore.File>[])),
+                    );
+                  };
+                };
+                dir.unsafeWriteArraySourceMany(context, entries.iterator());
+                context.update();
+                true
+              }
+            | exn -> throw exn
+            };
+            if (!shouldContinue) break void
+          }
+        } else {
+          try {
+            this.insertTable(context, table, rows);
+            context.update();
+          } catch {
+          | Conflict(posError, msg, _, _) -> error(posError, msg)
+          | exn -> throw exn
+          }
+        }
+      })
+    }
+  }
+
+  fun insertTable(
+    context: mutable SKStore.Context,
+    table: DirDescr,
+    rows: Array<RowValues>,
+  ): void {
+    dir = getDir(table);
+    newDir = context.unsafeGetEagerDir(dir.dirName);
+    kinds = table.kinds;
+    for (row in rows) {
+      key = RowKey::create(row, kinds);
+      source = SKStore.Path::gen(dir.dirName);
+      !newDir = newDir.writeEntry(context, source, source, key, Array[row]);
+    };
+    context.setDir(newDir);
+  }
+
+  fun createTable(
+    context: mutable SKStore.Context,
+    pos: Int,
+    name: P.Name,
+    dirDescr: DirDescr,
+    ifNotExists: Bool,
+  ): void {
+    dirName = dirDescr.dirName;
+    if (ifNotExists && context.unsafeMaybeGetEagerDir(dirName) is Some _) {
+      currentSchema = getTable(context, pos, name).schema;
+      newSchema = dirDescr.schema;
+      if (currentSchema != newSchema) {
+        error(pos, "table exists with a different schema")
+      };
+      return void;
+    };
+
+    _ = context.mkdir(RowKey::keyType, RowValues::type, dirName);
+
+    context.writeChecker match {
+    | None() -> void
+    | Some(checker) ->
+      authorIdx = dirDescr.cols.maybeGet(skdbAuthorColName);
+      accessIdx = dirDescr.cols.maybeGet(skdbAccessColName);
+      if (authorIdx is Some _ || accessIdx is Some _) {
+        context.!writeChecker = Some(
+          checker.addTable(dirDescr.dirName, authorIdx, accessIdx),
+        );
+      }
+    };
+
+    getTableDir(context).writeArray(
+      context,
+      SKStore.SID::create(name.lower),
+      Array[dirDescr],
+    );
+
+    hasPrimary = false;
+
+    for (tyDescr in dirDescr.schema) {
+      if (tyDescr.primary is Some _) {
+        if (hasPrimary) {
+          error(pos, "multiple primary keys detected");
+        };
+        if (!(tyDescr.ty is P.INTEGER()) && !(tyDescr.ty is P.TEXT())) {
+          error(pos, "primary keys are expected to be integers or strings");
+        };
+        !hasPrimary = true;
+      };
+      if (tyDescr.unique is Some _ || tyDescr.primary is Some _) {
+        this.makeIndex(
+          context,
+          P.CreateIndex{
+            pos => pos,
+            ifNotExists => false,
+            name => P.Name::create(
+              systemIndexPrefix + name.origName + "_" + tyDescr.name.origName,
+            ),
+            on => name,
+            columns => Array[
+              P.IndexedColumn{
+                expr => P.Identifier(tyDescr.name),
+                order => P.IASC(),
+                collate => None(),
+              },
+            ],
+            unique => true,
+            where => None(),
+          },
+        );
+      }
+    };
+
+    if (context.debugMode) {
+      print_string("CREATED: " + name.origName);
+    };
+  }
+}
+
+@cpp_extern("SKIP_String_concatN")
+native fun concatArray(Array<String>): String;
+
+fun getLine(buffer: Buffer, pos: Int): Int {
+  line = 1;
+  for (i in Range(0, pos)) {
+    if (buffer[i] == '\n') {
+      !line = line + 1;
+    }
+  };
+  line
+}
+
+fun printError(input: String, error: Error): void {
+  buffer = Buffer(input);
+  leftSpaces = 0;
+  cursor = 0;
+  line = 0;
+  pos = error.getPosition();
+  while (cursor < pos) {
+    if (cursor == buffer.size()) {
+      break void
+    };
+    if (buffer[cursor] == '\n') {
+      !line = line + 1;
+      !leftSpaces = 0;
+    } else {
+      !leftSpaces = leftSpaces + 1;
+    };
+    !cursor = cursor + 1;
+  };
+  right = 0;
+  while (pos + right < buffer.size() && buffer[pos + right] != '\n') {
+    !right = right + 1
+  };
+  txtBegin = max(0, pos - cursor);
+  txtEnd = min(buffer.size(), pos + right);
+  print_error(buffer.slice(txtBegin, txtEnd));
+  spaceBuffer = mutable Vector[];
+  for (_ in Range(0, leftSpaces)) spaceBuffer.push(' ');
+  margin = String::fromChars(spaceBuffer.toArray());
+  print_error(margin + "^");
+  print_error(margin + "|");
+  print_error(margin + " ----- ERROR");
+  errLine = getLine(buffer, pos);
+  charPos = `character ${leftSpaces}`;
+  print_error(`Error: line ${errLine}, ${charPos}:`);
+  print_error(error.getMessage())
+}
+
+fun evalWithContext(
+  options: Options,
+  context: mutable SKStore.Context,
+  params: Map<String, P.Value>,
+  stmt: P.Stmt,
+  inTransaction: Bool,
+): ?((
+  mutable SKStore.Context,
+  mutable SKStore.Context,
+  SKStore.Context,
+) ~> void) {
+  user = context.getGlobal("USER").map(UserFile::type);
+  evaluator = Evaluator{options, user};
+  evaluator.stmt(context, params, stmt, inTransaction);
+}
+
+fun sqlPurgeFrom(
+  replicationId: Int,
+): (readonly SKStore.Context, SKStore.Dir) ~> SKStore.Tick {
+  (ctx, dir) ~> {
+    table = getSqlTableName(dir.getDirName());
+    ackTable = feedbackTable(table);
+    watermark = getWatermark(ctx, ackTable, Some(replicationId));
+    default = SKStore.Tick(ctx.getTick().value - 1000);
+    watermark match {
+    | Some(SKStore.Tick(x)) if (x < default.value) -> SKStore.Tick(x - 1)
+    | _ -> default
+    }
+  }
+}
+
+fun makeSqlContext(): SKStore.Context {
+  SKStore.Context::create{canReuse => SKStore.CRAlways(SortedSet::create())}
+}
+
+class StmtFile(stmt: P.Stmt) extends SKStore.File
+class TickFile(tick: SKStore.Tick) extends SKStore.File
+
+base class OutputFormatKind {
+  children =
+  | OFK_CSV()
+  | OFK_JSON()
+  | OFK_SQL()
+  | OFK_JS()
+  | OFK_Table()
+}
+
+class Options{
+  alwaysAllowJoins: Bool,
+  backtrace: Bool,
+  sync: Bool,
+  reactive: Bool = false,
+  showUsedIndexes: Bool,
+  format: OutputFormatKind = OFK_SQL(),
+  expectQueryParams: Bool = false,
+} extends SKStore.File
+
+private mutable class SQLContext(
+  synchronizer: SKStore.Synchronizer,
+  sync: UInt32,
+  mutable globals: SortedMap<String, SKStore.File>,
+  mutable contexts: SKStore.Contexts,
+  fork: ?String,
+) {
+  static fun withContext<T>(
+    sync: Bool,
+    f: (mutable SQLContext) ~> T,
+    fork: ?String = None(),
+  ): T {
+    initCtx = SKDB.makeSqlContext();
+    if (!SKStore.gHasContext()) {
+      SKStore.gContextInit(initCtx)
+    };
+    ctx = mutable SQLContext(
+      SKStore.Synchronizer(importFromRoot, exportToRoot, printContext),
+      UInt32::truncate(if (sync) 1 else 0),
+      initCtx.globals,
+      SKStore.gUnsafeContextsGet(),
+      fork,
+    );
+    res = f(ctx);
+    SKStore.gUnsafeFree(ctx.contexts);
+    res
+  }
+
+  private mutable fun _exec(
+    f: SKStore.Context ~> (
+      SKStore.Context,
+      ?(
+        mutable SKStore.Context,
+        mutable SKStore.Context,
+        SKStore.Context,
+      ) ~> void,
+    ),
+  ): void {
+    // Read the globals into a local: `~>` is a frozen lambda and cannot
+    // capture `this` (a mutable SQLContext).
+    globals = this.globals;
+    this.!contexts = SKStore.syncContexts(
+      this.contexts,
+      this.fork,
+      this.synchronizer,
+      this.sync,
+      context ~> f(context.withGlobals(globals)),
+    );
+    this.!globals = this.contexts.get(this.fork).globals;
+  }
+
+  mutable fun exec(
+    f: mutable SKStore.Context ~> ?(
+      mutable SKStore.Context,
+      mutable SKStore.Context,
+      SKStore.Context,
+    ) ~> void,
+  ): Result<void, Error> {
+    this._exec(icontext ~> {
+      context = icontext.mclone();
+      underLockF = f(context);
+      (context.clone(), underLockF);
+    });
+
+    this.globals.maybeGet("Error").map(f ->
+      SKStore.ErrorFile::type(f).value
+    ) match {
+    | Some(err @ Error _) -> Failure(err)
+    | Some(exn) ->
+      print_error(exn.getMessage());
+      skipExit(1)
+    | None() -> Success(void)
+    }
+  }
+
+  mutable fun eval(
+    statements: Array<P.Stmt>,
+    options: Options,
+    params: Map<String, P.Value>,
+    isTransaction: Bool,
+  ): Result<void, Error> {
+    this.exec(context ~> {
+      context.!globals = SortedMap[];
+
+      underLockF: ?((
+        mutable SKStore.Context,
+        mutable SKStore.Context,
+        SKStore.Context,
+      ) ~> void) = None();
+
+      if (
+        isTransaction &&
+        statements.any((stmt) -> stmt is P.AlterTableDropCol _)
+      ) {
+        return alterTableExtractColumn(context, statements, params, options)
+      };
+
+      for (stmt in statements) {
+        markIfRead(context, stmt);
+
+        try {
+          !underLockF = evalWithContext(
+            options,
+            context,
+            params,
+            stmt,
+            isTransaction,
+          );
+        } catch {
+        | IgnoreAndContinue() -> void
+        | SqlError(_, msg) -> throw SqlError(stmt.pos, msg)
+        | exn -> throw exn
+        };
+      };
+
+      underLockF
+    })
+  }
+}
+
+fun eval(
+  sql: String,
+  options: Options,
+  params: Map<String, P.Value>,
+  requireFinalSemicolon: Bool = false,
+): Result<void, Error> {
+  SKStore.withRegionValue(() ~> {
+    SQLContext::withContext(options.sync, (ctx) ~> {
+      parser = P.Parser::create(sql);
+      loop {
+        isTransaction = false;
+        statements = mutable Vector[];
+        loop {
+          parser.next_stmt(requireFinalSemicolon) match {
+          | Failure(err) ->
+            return (Failure(ParserError(err)) : Result<void, Error>)
+          | Success(None()) ->
+            if (isTransaction) {
+              return Failure(UnfinishedTransactionError(sql.length()))
+            };
+            if (statements.isEmpty()) {
+              return (Success(void) : Result<void, Error>)
+            }
+          | Success(Some(stmt)) ->
+            stmt match {
+            | P.BeginTransaction{pos} ->
+              if (isTransaction) {
+                return Failure(SqlError(pos, "Nested transaction"))
+              };
+              !isTransaction = true
+            | P.EndTransaction{pos} ->
+              if (!isTransaction) {
+                return (Failure(
+                  SqlError(pos, "Unexpected COMMIT/END TRANSACTION"),
+                ) : Result<void, Error>)
+              };
+              break void
+            | _ ->
+              statements.push(stmt);
+              if (!isTransaction) {
+                break void
+              }
+            }
+          }
+        };
+
+        result = try {
+          ctx.eval(statements.toArray(), options, params, isTransaction)
+        } catch {
+        | err @ Error _ -> Failure(err)
+        | ex -> throw ex
+        };
+
+        result match {
+        | res @ Failure _ -> break res
+        | Success _ -> void
+        }
+      }
+    })
+  });
+}
+
+fun slurpStmts(_options: Options): Array<P.Stmt> {
+  // TODO: properly handle buffering.
+  input = IO.stdin().read_to_string() match {
+  | Success(input) -> input
+  | Failure(err) -> invariant_violation(`Error reading input: ${err}`)
+  };
+  stmts = mutable Vector[];
+
+  parser = P.Parser::create(input);
+  loop {
+    parser.next_stmt() match {
+    | Success(None()) -> break void
+    | Success(Some(stmt)) -> stmts.push(stmt)
+    | Failure(err) ->
+      printError(input, ParserError(err));
+      skipExit(1)
+    }
+  };
+
+  stmts.collect(Array)
+}
+
+fun runSql(
+  options: Options,
+  f: mutable SKStore.Context ~> SKStore.ContextOp,
+): void {
+  SKStore.runWithGc(
+    SKDB.makeSqlContext(),
+    f,
+    Some(SKStore.Synchronizer(importFromRoot, exportToRoot, printContext)),
+    options.sync,
+  )
+}
+
+fun runLockedSql(options: Options, f: mutable SKStore.Context ~> void): void {
+  SKStore.runLocked(SKDB.makeSqlContext(), f, options.sync)
+}
+
+fun importFromRoot(
+  delta: mutable SKStore.Context,
+  tick: SKStore.Tick,
+  root: readonly SKStore.Context,
+): void {
+  shouldImport = delta.getGlobal("TableMap") match {
+  | None() ->
+    delta.getGlobal("IsRead") match {
+    | None() -> false
+    | Some(_) -> true
+    }
+  | Some(_tableMapFile) -> true
+  };
+  if (shouldImport) {
+    SKStore.import(delta, tick, root);
+    delta.update();
+  }
+}
+
+fun makeInputDirName(dirName: SKStore.DirName): (SKStore.DirName, Int) {
+  dirNameStr = dirName.toString();
+  if (dirNameStr.startsWith("/next/")) {
+    !dirNameStr = dirNameStr.stripPrefix("/next/");
+    iter = dirNameStr.getIter();
+    i = 0;
+    for (c in iter) {
+      if (c == '/') break void;
+      !i = i + 1;
+    };
+    nbr = mutable Vector[];
+    for (c in iter) {
+      if (c == '/') break void;
+      nbr.push(c);
+    };
+    !dirNameStr = "/" + dirNameStr.sub(dirNameStr.getIter(), i) + "/";
+    (
+      SKStore.DirName::create(dirNameStr),
+      String::fromChars(nbr.toArray()).toInt(),
+    )
+  } else {
+    (dirName, 0)
+  }
+}
+
+fun importNext(
+  targetCtx: mutable SKStore.Context,
+  tick: SKStore.Tick,
+  sourceCtx: readonly SKStore.Context,
+): Bool {
+  changedDirNames = sourceCtx.getDirsChangesAfter(tick);
+  updates = mutable Map[];
+  hasMultipleVersions = false;
+  for (dirName in changedDirNames) {
+    sourceCtx.unsafeMaybeGetDir(dirName) match {
+    | Some(SKStore.DeletedDir{}) -> targetCtx.removeDir(dirName)
+    | Some(dir @ SKStore.EagerDir{input => true}) ->
+      (targetDirName, version) = makeInputDirName(dirName);
+      !hasMultipleVersions = hasMultipleVersions || version != 0;
+      updates.maybeGet(targetDirName) match {
+      | Some((iversion, _)) if (iversion > version) -> void
+      | _ -> updates![targetDirName] = (version, dir)
+      }
+    | _ -> void
+    }
+  };
+  for (targetDirName => src in updates) {
+    (_version, dir) = src;
+    dir.importNext{targetCtx, tick, targetDirName}
+  };
+  hasMultipleVersions
+}
+
+fun exportToRoot(
+  root: mutable SKStore.Context,
+  tick: SKStore.Tick,
+  delta: readonly SKStore.Context,
+): Bool {
+  hasVersioning = importNext(root, tick, delta);
+  root.update();
+  hasVersioning
+}
+
+fun updateTableMap(context: mutable SKStore.Context): void {
+  tableMap = context.getGlobal("TableMap") match {
+  | None() ->
+    TableMap{
+      version => Version(SKStore.genSym(0)),
+      startTick => context.getTick(),
+      map => SortedMap[],
+    }
+  | Some(file) -> TableMap::type(file)
+  };
+  !tableMap.version.value = SKStore.genSym(tableMap.version.value);
+  context.setGlobal("TableMap", tableMap)
+}
+
+class StdoutFile(
+  format: SKStore.OutputFormat,
+  value: List<SelectDir>,
+) extends SKStore.File
+
+class StdoutDiff(
+  diffSpec: Array<(SKStore.DirSub, SKStore.Tick)>,
+) extends SKStore.File
+
+class StdoutCheckpointAck(
+  table: String,
+  time: SKStore.Tick,
+  acks: ?StdoutCheckpointAck,
+) extends SKStore.File
+
+const kMaxOutputRowsTable: Int = 1024;
+
+fun showSelect(
+  context: mutable SKStore.Context,
+  format: SKStore.OutputFormat,
+  sdir: SelectDir,
+): void {
+  dirName = sdir.dirName;
+  dir = context.unsafeGetEagerDir(dirName);
+  // TODO: Unify handling of the various output formats.
+  format match {
+  | SKStore.OTable(fieldNames) ->
+    data = mutable Vector[];
+    trailing = false;
+    for (kv in dir.unsafeGetFileIter()) {
+      (_key, rows) = kv;
+      rowArray = rows.collect(Array); // TODO: remove this collect once #769 is fixed
+      for (row in rowArray) {
+        row match {
+        | RowValues(values, r) ->
+          for (_ in Range(0, r)) {
+            if (data.size() > kMaxOutputRowsTable) {
+              !trailing = true;
+              return void
+            };
+            data.push(values)
+          }
+        | _ -> invariant_violation("Invalid row kind")
+        }
+      }
+    };
+
+    printTable(fieldNames, data.toArray(), trailing)
+
+  | _ ->
+    RowValues::printHeader(format);
+    for (kv in dir.unsafeGetFileIter()) {
+      (_key, rows) = kv;
+      rowArray = rows.collect(Array); // TODO: remove this collect once #769 is fixed
+      for (row in rowArray) {
+        row match {
+        | rvalues @ RowValues(_, r) ->
+          for (_ in Range(0, r)) {
+            RowValues::printItem(format, rvalues)
+          }
+        | _ -> invariant_violation("Invalid row kind")
+        }
+      }
+    }
+  }
+}
+
+fun printConsumeDiffResponse(acks: ?StdoutCheckpointAck): void {
+  acks match {
+  | None() -> void
+  | Some(StdoutCheckpointAck(table, tick, rest)) ->
+    print_raw("^" + feedbackTable(table) + "\n");
+    print_raw(":" + tick.value.toString() + "\n");
+    printConsumeDiffResponse(rest)
+  }
+}
+
+fun printContext(context: mutable SKStore.Context): void {
+  context.getGlobal("Stdout") match {
+  | None() -> void
+  | Some(StdoutFile(format, stdout)) ->
+    for (selectDir in stdout.toArray().reversed()) {
+      showSelect(context, format, selectDir)
+    }
+  | Some(StdoutDiff(spec)) ->
+    writer = mutable Debug.BufferedWriter(print_raw, 4096);
+    producedAnyOutput = false;
+    for ((dirsub, tick) in spec) {
+      edir = context.unsafeGetEagerDir(dirsub.dirName);
+      producedOutput = edir.writeChangesAfter(context, dirsub, tick, writer);
+      !producedAnyOutput = producedAnyOutput || producedOutput
+    };
+    if (producedAnyOutput) {
+      writer.write(`:${context.getTick().value.toString()}\n`);
+      writer.flush()
+    }
+  | Some _ -> invariant_violation("Unexpected Stdout type")
+  };
+  context.getGlobal("Ack") match {
+  | None() -> void
+  | Some(acks @ StdoutCheckpointAck _) -> printConsumeDiffResponse(Some(acks))
+  | Some _ -> invariant_violation("Unexpected Ack type")
+  };
+  flushStdout();
+}
+
+fun markIfRead(context: mutable SKStore.Context, stmt: P.Stmt): void {
+  stmt match {
+  | P.Insert{values => P.IQuery _}
+  | P.Update _
+  | P.Select _ ->
+    context.setGlobal("IsRead", SKStore.BoolFile(true))
+  | P.BeginTransaction _
+  | P.EndTransaction _
+  | P.Pragma _
+  | P.CreateTable _
+  | P.CreateView _
+  | P.CreateIndex _
+  | P.DropTable _
+  | P.DropView _
+  | P.DropIndex _
+  | P.Delete _
+  | P.Insert _
+  | P.AlterTable _ ->
+    void
+  }
+}
+
+/*****************************************************************************/
+/* Support for reactive queries. */
+/*****************************************************************************/
+
+class QueryInfo(query: String, params: JSON.Value, onlyChanges: Bool)
+class ReactiveQuery(
+  selectDir: SelectDir,
+  fieldNames: Array<String>,
+) extends SKStore.File
+
+class QueryInfoFile(value: ?QueryInfo) extends SKStore.File
+
+const reactiveQueriesDirName: SKStore.DirName = SKStore.DirName::create(
+  "/queries/reactive/",
+);
+
+const reactiveSelectsDirName: SKStore.DirName = SKStore.DirName::create(
+  "/queries/reactive/select/",
+);
+
+fun getReactiveQueryHandle(
+  context: mutable SKStore.Context,
+): (
+  SKStore.EHandle<SKStore.IID, QueryInfoFile>,
+  SKStore.EHandle<SKStore.IID, ReactiveQuery>,
+) {
+  context.maybeGetDir(reactiveQueriesDirName) match {
+  | None() ->
+    handle = context.mkdir(
+      SKStore.IID::keyType,
+      QueryInfoFile::type,
+      reactiveQueriesDirName,
+    );
+    selectDirs = handle.map(
+      SKStore.IID::keyType,
+      ReactiveQuery::type,
+      context,
+      reactiveSelectsDirName,
+      (context, writer, key, iterator) ~> {
+        current = context.canReuse;
+        globals = context.globals;
+        // We want canReuse set to CRNever, because we want a guarantee
+        // that no one will try to reuse our directories for something
+        // else. Otherwise we would not be able to remove them safely.
+        context.!canReuse = SKStore.CRNever();
+        context.!globals = SortedMap[];
+        queryID = key.value;
+        queryID32 = Int32::truncate(queryID);
+        iterator.first.value match {
+        | Some(queryInfo) ->
+          selectAst = P.Parser::create(queryInfo.query).parseSelect();
+          skOptions = SKDB.Options{
+            alwaysAllowJoins => false,
+            backtrace => false,
+            sync => false,
+            reactive => false,
+            showUsedIndexes => false,
+          };
+          params = decodeParams(queryInfo.params);
+          compiler = SKDB.Compiler::create(false, skOptions, 0, params);
+          cselect = compiler.compileSelect(
+            context,
+            selectAst,
+            genSelectId(selectAst),
+            true,
+          );
+          selectDir = SKDB.evalSelect(context, cselect, None());
+          schema = SKDB.Compiler::getSchema(
+            context,
+            (selectAst.core as P.SelectCoreQuery _).params,
+            cselect.from,
+            cselect.params,
+          );
+          fieldNames = schema.map(x -> x.name.origName);
+          printReactiveQueryResult(context, selectDir.dirName, fieldNames);
+          if (queryInfo.onlyChanges) printTick(context.getTick().next());
+          SKStore.EagerDir::apply(
+            context,
+            selectDir.dirName,
+            selectDir.dirName.sub("sink"),
+            (_ctx, _writer, _key, _valueIter) ~> jsMarkQuery(queryID32),
+            None(),
+            None(),
+            None(),
+            true,
+          );
+          writer.set(key, ReactiveQuery(selectDir, fieldNames));
+          context.!canReuse = current;
+          context.!globals = globals
+        | _ -> jsDeleteUserFun(queryID32)
+        }
+      },
+    );
+    (handle, selectDirs)
+  | Some(dir) ->
+    (
+      SKStore.EHandle(
+        SKStore.IID::keyType,
+        QueryInfoFile::type,
+        dir.getDirName(),
+      ),
+      SKStore.EHandle(
+        SKStore.IID::keyType,
+        ReactiveQuery::type,
+        reactiveSelectsDirName,
+      ),
+    )
+  };
+}
+
+fun printReactiveQueryResult(
+  context: mutable SKStore.Context,
+  dirName: SKStore.DirName,
+  fieldNames: Array<String>,
+): void {
+  format = SKStore.OJS(fieldNames);
+  RowValues::printHeader(format);
+  switchTo(UInt32::truncate(0));
+  for (kv in context.unsafeGetEagerDir(dirName).unsafeGetFileIter()) {
+    (_, files) = kv;
+    for (file in files) {
+      row = RowValues::type(file);
+      for (_ in Range(0, row.repeat)) {
+        RowValues::printItem(format, row);
+      }
+    }
+  };
+}
+
+fun printReactiveQueryChanges(
+  context: mutable SKStore.Context,
+  queryID: Int,
+  dirName: SKStore.DirName,
+  fieldNames: Array<String>,
+): void {
+  lastTick = lastTick(UInt32::truncate(queryID));
+  tick = SKStore.Tick(lastTick.toInt());
+  edir = context.unsafeGetEagerDir(dirName);
+  (isReset, changes) = edir.getChangesAfter(tick);
+  if (isReset) {
+    printReactiveQueryResult(context, dirName, fieldNames)
+  } else {
+    if (!changes.isEmpty()) {
+      format = SKStore.OJS(fieldNames);
+      RowValues::printHeader(format);
+      for (key in changes) {
+        values = edir.getArrayRaw(key);
+        if (values.size() == 0) {
+          switchTo(UInt32::truncate(2));
+          row = (key as RowKey _).getRowValues();
+          for (_ in Range(0, row.repeat)) {
+            RowValues::printItem(format, row);
+          }
+        } else {
+          switchTo(UInt32::truncate(1));
+          for (file in values) {
+            row = RowValues::type(file);
+            for (_ in Range(0, row.repeat)) {
+              RowValues::printItem(format, row);
+            }
+          }
+        }
+      }
+    }
+  };
+  printTick(context.getTick().next());
+}
+
+private fun printTick(tick: SKStore.Tick): void {
+  switchTo(UInt32::truncate(3));
+  jsClearFieldNames();
+  jsPushFieldName("tick");
+  jsClearObject();
+  jsPushObjectFieldInt32(Int32::truncate(tick.value));
+  jsPushObject()
+}
+
+fun printResult(
+  context: mutable SKStore.Context,
+  queryID: Int,
+  dirName: SKStore.DirName,
+  fieldNames: Array<String>,
+  onlyChanges: Bool,
+): void {
+  if (onlyChanges) {
+    printReactiveQueryChanges(context, queryID, dirName, fieldNames)
+  } else {
+    printReactiveQueryResult(context, dirName, fieldNames);
+  };
+}
+
+@cpp_extern("SKIP_js_delete_fun")
+native fun jsDeleteUserFun(queryID32: Int32): void;
+
+@cpp_extern("SKIP_js_mark_query")
+native fun jsMarkQuery(queryID32: Int32): void;
+
+@wasm_export("SKIP_reactive_query")
+fun reactiveQuery(
+  queryID32: Int32,
+  query: String,
+  encoded_params: String,
+): void {
+  manageReactiveQuery(queryID32, query, encoded_params, false)
+}
+
+@wasm_export("SKIP_reactive_query_changes")
+fun reactiveQueryChanges(
+  queryID32: Int32,
+  query: String,
+  encoded_params: String,
+): void {
+  manageReactiveQuery(queryID32, query, encoded_params, true)
+}
+
+fun manageReactiveQuery(
+  queryID32: Int32,
+  query: String,
+  encoded_params: String,
+  onlyChanges: Bool,
+): void {
+  try {
+    SKStore.runWithGc(SKDB.makeSqlContext(), context ~> {
+      queryID = queryID32.toInt();
+      getReactiveQueryHandle(context).i0.writeArray(
+        context,
+        SKStore.IID(queryID),
+        Array[
+          QueryInfoFile(
+            Some(QueryInfo(query, JSON.decode(encoded_params), onlyChanges)),
+          ),
+        ],
+      );
+      context.update();
+      SKStore.CStop(None())
+    })
+  } catch {
+  | exn -> print_error(exn.getMessage())
+  };
+}
+
+@wasm_export("SKIP_reactive_print_result")
+fun printReactiveQuery(queryID32: Int32): void {
+  SKStore.withRegionVoid(() ~> {
+    try {
+      SKStore.runWithGc(SKDB.makeSqlContext(), context ~> {
+        queryID = queryID32.toInt();
+        (rqs, sds) = getReactiveQueryHandle(context);
+        rqs
+          .maybeGet(context, SKStore.IID(queryID))
+          .flatMap(v ~> v.value)
+          .each(queryInfo ->
+            sds.maybeGet(context, SKStore.IID(queryID)).each(rq ->
+              printResult(
+                context,
+                queryID,
+                rq.selectDir.dirName,
+                rq.fieldNames,
+                queryInfo.onlyChanges,
+              )
+            )
+          );
+        SKStore.CStop(None())
+      })
+    } catch {
+    | exn -> print_error(exn.getMessage())
+    }
+  })
+}
+
+@wasm_export("SKIP_delete_reactive_query")
+fun deleteReactiveQuery(queryID32: Int32): void {
+  SKStore.withRegionVoid(() ~> {
+    try {
+      SKStore.runWithGc(SKDB.makeSqlContext(), context ~> {
+        queryID = queryID32.toInt();
+        getReactiveQueryHandle(context).i0.writeArray(
+          context,
+          SKStore.IID(queryID),
+          Array[QueryInfoFile(None())],
+        );
+        context.update();
+        SKStore.CStop(None())
+      })
+    } catch {
+    | exn -> print_error(exn.getMessage())
+    }
+  })
+}
+
+fun printTable(
+  fieldNames: Array<String>,
+  values: Sequence<Array<?CValue>>,
+  trailing: Bool,
+): void {
+  colWidth = Array::mcreateFromItems(fieldNames.map(n -> n.length()));
+  stringAndColor = values.map(row ->
+    row.map(v ->
+      v match {
+      | None() -> ("null", TermColor.Default())
+      | Some(val) ->
+        (
+          val.toStringWithFormat(SKStore.OTable(fieldNames)),
+          val match {
+          | CJSON _
+          | CType _
+          | CString _ ->
+            TermColor.Blue()
+          | CInt _
+          | CFloat _ ->
+            TermColor.Green()
+          },
+        )
+      }
+    )
+  );
+
+  for (row in stringAndColor) {
+    for ((i, v) in row.map(x -> x.i0).items()) {
+      colWidth![i] = max(colWidth[i], v.length())
+    }
+  };
+
+  // Add spacing
+  for (i in Range(0, colWidth.size())) {
+    colWidth![i] = colWidth[i] + 2;
+  };
+
+  topLeftCorner = "┌";
+  topRightCorner = "┐";
+  bottomLeftCorner = "└";
+  bottomRightCorner = "┘";
+  topSeparator = "┬";
+  midSeparator = "┼";
+  bottomSeparator = "┴";
+  leftSeparator = "├";
+  rightSeparator = "┤";
+  lineSeparator = "─";
+  colSeparator = "│";
+
+  printLine = (
+    left: String,
+    right: String,
+    elements: Sequence<String>,
+    separator: String,
+  ) ~> {
+    print_raw(left);
+    print_raw(elements.join(separator));
+    print_string(right)
+  };
+
+  justify = (str, width) ~> {
+    totalPadding = width - str.length();
+    paddingLeft = totalPadding / 2;
+    paddingRight = totalPadding - paddingLeft;
+    Range(0, paddingLeft).map(_ -> " ").join("") +
+      str +
+      Range(0, paddingRight).map(_ -> " ").join("")
+  };
+
+  lineSeparatorElements = colWidth.map(w ->
+    Range(0, w).map(_ -> lineSeparator).join("")
+  );
+
+  // Header
+  printLine(topLeftCorner, topRightCorner, lineSeparatorElements, topSeparator);
+  printLine(
+    colSeparator,
+    colSeparator,
+    fieldNames.mapWithIndex((i, name) -> justify(name, colWidth[i])),
+    colSeparator,
+  );
+  printLine(leftSeparator, rightSeparator, lineSeparatorElements, midSeparator);
+
+  for (row in stringAndColor) {
+    printLine(
+      colSeparator,
+      colSeparator,
+      row.mapWithIndex((i, v) -> {
+        (str, color) = v;
+        TermColor.colored(justify(str, colWidth[i]), color)
+      }),
+      colSeparator,
+    )
+  };
+
+  if (trailing) {
+    printLine(
+      colSeparator,
+      colSeparator,
+      colWidth.map(w -> justify("...", w)),
+      colSeparator,
+    )
+  };
+
+  // Footer
+  printLine(
+    bottomLeftCorner,
+    bottomRightCorner,
+    lineSeparatorElements,
+    bottomSeparator,
+  )
+}
+
+module end;
+
+module SKStore;
+
+extension class TimeStack {
+  fun maxMinus(): this {
+    !this.values = this.values.map(x -> Time(Int::max - x.value));
+    this
+  }
+}
+
+extension base class EagerDir {
+  fun timeMaxMinus(): this {
+    !this.timeStack = this.timeStack.maxMinus();
+    this
+  }
+
+  fun importNext{
+    targetCtx: mutable Context,
+    tick: Tick,
+    targetDirName: DirName,
+  }: void {
+    (isReset, changedKeys) = this.getChangesAfter(tick);
+    inputDir = targetCtx.unsafeMaybeGetEagerDir(targetDirName) match {
+    | None() ->
+      time = targetCtx.timeStamp();
+      targetDir = TEagerDir::create{
+        timeStack => TimeStack::createInput(time),
+        created => targetCtx.getTick(),
+        input => true,
+        dirName => targetDirName,
+        creator => None(),
+      };
+      targetCtx.setDir(targetDir);
+      targetDir
+    | Some(d) -> d
+    };
+    entries = mutable Vector[];
+    for (key in changedKeys) {
+      for (srcValue in this.unsafeGetAllDataIterAfter(tick, key)) {
+        (_, source, writer, values) = srcValue;
+        entries.push((key, (source, writer, values)));
+      }
+    };
+    inputDir.unsafeWriteArraySourceMany(
+      targetCtx,
+      entries.iterator(),
+      if (isReset) Some((this.dirName, changedKeys)) else None(),
+    )
+  }
+
+  fun writeChangesAfter(
+    context: readonly Context,
+    dirsub: DirSub,
+    tick: SKStore.Tick,
+    writer: mutable Debug.BufferedWriter,
+  ): Bool {
+    (shouldRebuild, changes) = this.getChangesAfter(tick);
+    producedOutput = this.writeDiff(
+      shouldRebuild,
+      changes.iterator(),
+      writer,
+      dirsub.entity,
+      dirsub.format,
+      dirsub.filter(context, false, dirsub.dirName),
+      dirsub.getDestinationWatermark(context),
+    );
+    producedOutput
+  }
+}
+
+@cpp_extern("SKIP_physEq")
+native fun unsafeCompareSets(
+  SortedMap<SKStore.Path, SortedSet<SKStore.ArrowKey>>,
+  SortedMap<SKStore.Path, SortedSet<SKStore.ArrowKey>>,
+): Int32;
+
+extension class Context {
+  static fun unsafeCompareDeps(
+    c1: readonly SKStore.Context,
+    c2: readonly SKStore.Context,
+  ): Bool {
+    Deps::unsafeCompare(c1.deps, c2.deps)
+  }
+}
+
+extension class Deps {
+  static fun unsafeCompare(d1: Deps, d2: Deps): Bool {
+    unsafeCompareSets(d1.data, d2.data) != 0
+  }
+}
+
+module end;

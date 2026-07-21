@@ -1,0 +1,29 @@
+/*****************************************************************************/
+/* Testing withForkedContext: run on a throwaway forked context, isolated
+   from the base, with the result copied out. */
+/*****************************************************************************/
+
+module alias T = SKTest;
+
+module SKStoreTest;
+
+@test
+fun testWithForkedContext(): void {
+  context = SKStore.Context::mcreate{};
+  context.setGlobal("k", SKStore.StringFile("base"));
+
+  // Run on a fork: mutate the fork's state and return a value derived from it.
+  result = SKStore.withForkedContext(context, ctx ~> {
+    ctx.setGlobal("k", SKStore.StringFile("fork"));
+    SKStore.StringFile::type(ctx.getGlobal("k").fromSome()).value + "!"
+  });
+
+  // The fork's return value is copied out of the region.
+  T.expectEq(result, "fork!", "withForkedContext returns the fork's result");
+
+  // The base context is untouched by the fork's mutation.
+  base = SKStore.StringFile::type(context.getGlobal("k").fromSome()).value;
+  T.expectEq(base, "base", "withForkedContext isolates the base context")
+}
+
+module end;

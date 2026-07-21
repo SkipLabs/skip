@@ -1,0 +1,74 @@
+services:
+  # Reverse proxy for distributed cache invalidation
+  invalidation_proxy:
+    image: invalidation_reverse_proxy
+    build:
+      context: ./reverse_proxy
+      dockerfile: ./Dockerfile.distributed
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      invalidation_frontend:
+        condition: service_healthy
+      invalidation_leader:
+        condition: service_healthy
+
+  # Web service triggering distributed cache invalidation
+  invalidation_api:
+    image: invalidation_api_service
+    build: ./web_service
+    depends_on:
+      invalidation_db:
+        condition: service_healthy
+    environment:
+      DISTRIBUTED_MODE: true
+
+  # SQL database - triggers distributed cache invalidation
+  invalidation_db:
+    image: invalidation_database
+    build: ./db
+    restart: always
+    volumes:
+      - invalidation_pgdata:/var/lib/postgresql/data
+
+  # Skip leader - coordinates automated cache invalidation
+  invalidation_leader:
+    image: invalidation_skip_cache
+    build: ./edge_service
+    depends_on:
+      invalidation_db:
+        condition: service_healthy
+    environment:
+      SKIP_LEADER: true
+  invalidation_follower1: &follower
+    image: invalidation_skip_cache
+    build: ./edge_service
+    networks:
+      default:
+        aliases:
+          - invalidation_followers
+    depends_on:
+      invalidation_leader:
+        condition: service_healthy
+    environment:
+      SKIP_FOLLOWER: true
+      SKIP_RESOURCE_PREFIX: follower1
+  invalidation_follower2:
+    <<: *follower
+    environment:
+      SKIP_FOLLOWER: true
+      SKIP_RESOURCE_PREFIX: follower2
+  invalidation_follower3:
+    <<: *follower
+    environment:
+      SKIP_FOLLOWER: true
+      SKIP_RESOURCE_PREFIX: follower3
+
+  # Frontend observing real-time cache invalidation
+  invalidation_frontend:
+    image: invalidation_frontend
+    build: ./www
+
+volumes:
+  invalidation_pgdata:

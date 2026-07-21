@@ -1,0 +1,174 @@
+module alias P = SQLParser;
+
+module SKDB;
+
+base class SchemaChange {
+  children =
+  | ScRemoveTable()
+  | ScMigrateTable(schema: Array<TableChange>)
+}
+
+base class TableChange {
+  children =
+  | TcNoChange(col: P.ColumnDefinition)
+  | TcNewCol(col: P.ColumnDefinition)
+  | TcChange(old: P.ColumnDefinition, new: P.ColumnDefinition)
+}
+
+fun tableDiff(
+  desired: P.CreateTableSchema,
+  existing: DirDescr,
+): Array<TableChange> {
+  desiredCols = desired.schema;
+  existingCols = existing.schema;
+
+  // very simple algo. cols form a set (with some position info), so
+  // no need to find minimum edits
+  desiredCols.columns.map(desiredCol ->
+    existingCols.find(c -> c.name == desiredCol.name) match {
+    | None() -> TcNewCol(desiredCol)
+    | Some(existingCol) if (desiredCol == existingCol) -> TcNoChange(desiredCol)
+    | Some(existingCol) -> TcChange(existingCol, desiredCol)
+    }
+  )
+}
+
+fun migrationDiff(
+  desired: Array<P.Stmt>,
+  existing: Array<DirDescr>,
+): Map<P.Name, SchemaChange> {
+  desiredTables: Array<P.CreateTableSchema> = desired
+    .map(x ->
+      x match {
+      | t @ P.CreateTableSchema _ -> Some(t)
+      | _ -> None()
+      }
+    )
+    .filterNone();
+  desiredTableNames = desiredTables.map(x -> x.name).collect(Set);
+  existingTableNames = existing.map(x -> x.name).collect(Set);
+  tablesToRemove = existingTableNames.difference(desiredTableNames);
+
+  tableChanges = Vector::mcreateFromItems(
+    tablesToRemove.map(name -> (name, (ScRemoveTable() : SchemaChange))),
+  );
+
+  for (name in desiredTableNames.intersection(existingTableNames)) {
+    desiredTable = desiredTables.find(t -> t.name == name).fromSome();
+    existingTable = existing.find(t -> t.name == name).fromSome();
+    diff = tableDiff(desiredTable, existingTable);
+    tableChanges.push((name, ScMigrateTable(diff)))
+  };
+
+  tableChanges.collect(Map)
+}
+
+fun adjustSerialisedValues(
+  row: RowValues,
+  nameToIndex: Map<P.Name, Int>,
+  colChanges: Array<TableChange>,
+): mutable Iterator<String> {
+  for (newCol in colChanges) {
+    newCol match {
+    | TcNoChange(col) ->
+      v = row.values[nameToIndex.get(col.name)];
+      yield v match {
+      | None() -> "NULL"
+      | Some(CInt(n)) -> n.toString()
+      | Some(CFloat(f)) -> f.toString()
+      | Some(CString(s)) -> escapeStringStr(s)
+      | Some(json @ CJSON _) -> escapeStringStr(json.toString())
+      | Some(schema @ CType _) -> escapeStringStr(schema.toString())
+      }
+    | TcNewCol(_col) -> yield "NULL"
+    | TcChange(_old, new) ->
+      // possible changes:
+      // 1. primary, unique, and not null changes are currently ignored.
+      //    you should change the schema incrementally and ensure the
+      //    data is compatible.
+      // 2. default does not matter to migration
+      // 3. type, which we handle
+      v = row.values[nameToIndex.get(new.name)];
+      yield (v, new.ty) match {
+      | (None(), _) -> "NULL"
+      | (Some(CInt(n)), P.INTEGER()) -> n.toString()
+      | (Some(CInt(n)), P.FLOAT()) -> n.toString()
+      | (Some(CInt(n)), P.TEXT()) -> escapeStringStr(n.toString())
+      | (Some(CFloat(f)), P.INTEGER()) -> f.toInt().toString()
+      | (Some(CFloat(f)), P.FLOAT()) -> f.toString()
+      | (Some(CFloat(f)), P.TEXT()) -> escapeStringStr(f.toString())
+      | (Some(CString(s)), P.INTEGER()) -> s
+      | (Some(CString(s)), P.FLOAT()) -> s
+      | (Some(CString(s)), P.TEXT()) -> escapeStringStr(s)
+      | (Some(CJSON _), _)
+      | (_, P.JSON()) ->
+        invariant_violation("JSON not supported in auto-migration")
+      | (Some(CType _), _)
+      | (_, P.SCHEMA()) ->
+        invariant_violation("SCHEMA not supported in auto-migration")
+      }
+    }
+  }
+}
+
+fun dumpAdjustedInserts(
+  origContext: readonly SKStore.Context,
+  changes: Map<P.Name, SchemaChange>,
+): void {
+  context = origContext.mclone();
+  handle = getTableDir(context);
+  sinkName = SKStore.DirName::create("/sink_" + SKStore.genSym(0) + "/");
+  _ = handle.map(
+    RowKey::keyType,
+    handle.type,
+    context,
+    sinkName,
+    (context, _writer, _key, values) ~> {
+      dirDescr = values.first;
+      if (!dirDescr.isInput) return void;
+
+      changes.maybeGet(dirDescr.name) match {
+      | None() -> invariant_violation(`Could not find ${dirDescr.name}`)
+      | Some(ScRemoveTable()) -> return void
+      | Some(ScMigrateTable(colChanges)) ->
+        o = print_raw;
+        fileIter = context
+          .unsafeGetEagerDir(dirDescr.dirName)
+          .unsafeGetFileIter();
+        o("BEGIN TRANSACTION;\n");
+        for (kv in fileIter) {
+          (_, files) = kv;
+          for (file in files) {
+            row = RowValues::type(file);
+            colNames = colChanges
+              .map(tc ->
+                tc match {
+                | TcNoChange(col) -> Some(col.name.origName)
+                | TcNewCol(col) -> Some(col.name.origName)
+                | TcChange(_old, new) -> Some(new.name.origName)
+                }
+              )
+              .filterNone();
+            colNamesStr = "(" + colNames.join(", ") + ")";
+            serialisedValues = adjustSerialisedValues(
+              row,
+              dirDescr.cols,
+              colChanges,
+            ).collect(Array);
+            valuesStr = "(" + serialisedValues.join(", ") + ")";
+            insert = `INSERT INTO ${
+              dirDescr.name
+            } ${colNamesStr} VALUES ${valuesStr};\n`;
+            for (_ in Range(0, row.repeat)) {
+              o(insert);
+            };
+          };
+        };
+        o("COMMIT;\n");
+        flushStdout()
+      };
+    },
+  );
+}
+
+module end;

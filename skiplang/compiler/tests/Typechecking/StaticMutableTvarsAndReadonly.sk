@@ -1,0 +1,15 @@
+module Typechecking_StaticMutableTvarsAndReadonly;
+mutable class Foo(mutable x: Int)
+class Eater() {
+  static fun eat<T: readonly Foo>(T): void {
+    void
+  }
+}
+
+@exptest
+fun main(): void {
+  m = mutable Foo(0);
+  Eater::eat(m);
+  print_string("Pass")
+}
+module end;

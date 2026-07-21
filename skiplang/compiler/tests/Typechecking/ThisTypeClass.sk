@@ -1,0 +1,20 @@
+module Typechecking_ThisTypeClass;
+trait Addish {
+  fun +(this): this;
+}
+
+class Foo() uses Addish {
+  fun +(_: this): this {
+    this
+  }
+}
+
+fun test<T: Addish>(x: T, y: T): T {
+  x + y
+}
+
+@exptest
+fun main(): void {
+  print_string("Pass")
+}
+module end;

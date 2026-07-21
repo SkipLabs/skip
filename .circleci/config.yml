@@ -1,0 +1,73 @@
+version: 2.1
+
+setup: true
+
+orbs:
+  continuation: circleci/continuation@1.0.0
+
+commands:
+  custom-checkout:
+    description: "SSH-authenticated checkout"
+    parameters:
+      with_main:
+        type: boolean
+        default: false
+        description: "Also clone the main branch (needed for diffing against main)"
+    steps:
+      - run:
+          name: Checkout code
+          command: |
+            if [ -z "$CIRCLE_BRANCH" ] || [ -n "$CIRCLE_TAG" ]; then echo "TODO: handle no-branch or tag-triggered CI"; exit 1; fi
+            mkdir -p ~/.ssh
+            echo 'github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=
+            github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=
+            github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+            ' > ~/.ssh/known_hosts
+            cat $CHECKOUT_KEY > ~/.ssh/id_rsa
+            if << parameters.with_main >> || [[ "$CIRCLE_BRANCH" =~ ^pull\/* ]]; then
+              # PR branches need a base clone to fetch the PR ref into; with_main also pulls main for diffing.
+              git clone --single-branch --branch main "$CIRCLE_REPOSITORY_URL" .
+              if [[ "$CIRCLE_BRANCH" =~ ^pull\/* ]]; then
+                git fetch --force origin "$CIRCLE_BRANCH/head:remotes/origin/$CIRCLE_BRANCH"
+              else
+                git fetch --force origin "$CIRCLE_BRANCH:remotes/origin/$CIRCLE_BRANCH"
+              fi
+            else
+              git clone --single-branch --branch "$CIRCLE_BRANCH" "$CIRCLE_REPOSITORY_URL" .
+            fi
+            git checkout "$CIRCLE_SHA1" -B "$CIRCLE_BRANCH"
+
+jobs:
+  setup:
+    executor: continuation/default
+    resource_class: small
+    steps:
+      - custom-checkout:
+          with_main: true
+      - run:
+          name: Generate config
+          command: |
+            .circleci/generate_config.sh > generated_config.yml
+      - continuation/continue:
+          configuration_path: generated_config.yml
+
+  fast-checks:
+    docker:
+      - image: skiplabs/skip:latest
+    resource_class: small
+    steps:
+      - custom-checkout
+      - run:
+          name: Check code is formatted
+          command: |
+            make check-fmt
+      - run:
+          name: Check shell scripts
+          command: |
+            make check-sh
+
+workflows:
+  setup:
+    jobs:
+      - setup
+      - fast-checks

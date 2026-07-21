@@ -1,0 +1,24 @@
+controller:
+  replicaCount: 1
+  service:
+    type: LoadBalancer
+    tcpPorts:
+      - name: runtime
+        port: 9999
+        targetPort: 9999
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-internal: 0.0.0.0/0
+      service.beta.kubernetes.io/aws-load-balancer-type: external
+      service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: instance
+      service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+  extraVolumes:
+  - name: haproxy-auxiliary-volume
+    configMap:
+      name: haproxy-auxiliary-configmap
+  extraVolumeMounts:
+  - name: haproxy-auxiliary-volume
+    mountPath: /usr/local/etc/haproxy/haproxy-aux.cfg
+    subPath: haproxy-aux.cfg
+  extraArgs:
+    - --configmap=default/rhn-haproxy-config
+    - --ingress.class=haproxy

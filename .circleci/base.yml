@@ -1,0 +1,318 @@
+version: 2.1
+
+commands:
+  custom-checkout:
+    description: "Shallow checkout code"
+    parameters:
+      submodules:
+        type: boolean
+        default: false
+    steps:
+      - run:
+          name: Shallow checkout code
+          command: |
+            if [ -z "$CIRCLE_BRANCH" ] || [ -n "$CIRCLE_TAG" ]; then echo "TODO: handle no-branch or tag-triggered CI"; exit 1; fi
+            mkdir -p ~/.ssh
+            echo 'github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=
+            github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=
+            github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+            ' > ~/.ssh/known_hosts
+            cat $CHECKOUT_KEY > ~/.ssh/id_rsa
+            if [[ "$CIRCLE_BRANCH" =~ ^pull\/* ]]; then
+              clone_branch=main
+            else
+              clone_branch="$CIRCLE_BRANCH"
+            fi
+            clone_args=(--depth=1 --branch "$clone_branch")
+            if << parameters.submodules >>; then clone_args+=(--shallow-submodules --recurse-submodules); fi
+            git clone "${clone_args[@]}" "$CIRCLE_REPOSITORY_URL" .
+            if [[ "$CIRCLE_BRANCH" =~ ^pull\/* ]]; then
+              git fetch --force origin "$CIRCLE_BRANCH/head:remotes/origin/$CIRCLE_BRANCH"
+            fi
+            git checkout "$CIRCLE_SHA1" -B "$CIRCLE_BRANCH"
+            git submodule update
+
+jobs:
+  check-ts:
+    docker:
+      - image: skiplabs/skip:latest
+    resource_class: medium.gen2
+    environment:
+      SKIP_CAPACITY: 3G
+    steps:
+      - custom-checkout:
+          submodules: true
+      - run:
+          name: Typecheck and lint typescript sources
+          command: make check-ts
+      - run:
+          name: Check locked TypeScript version
+          command: |
+            ts_version=$(npx tsc --version | awk '{print $2}')
+            if [[ ! "$ts_version" =~ ^5\.7\. ]]; then
+              echo "ERROR: Locked TypeScript version is $ts_version, expected 5.7.x"
+              echo "Update the additional typecheck steps in this job."
+              exit 1
+            fi
+      - run:
+          name: Typecheck with TypeScript ~5.8.0
+          command: npm install --save-dev typescript@~5.8.0 --ignore-scripts && SKIP_LINT=1 bin/check-ts.sh
+      - run:
+          name: Typecheck with TypeScript ~6.0.0
+          command: npm install --save-dev typescript@~6.0.0 --ignore-scripts && SKIP_LINT=1 bin/check-ts.sh
+
+  compiler:
+    docker:
+      - image: skiplabs/skiplang:latest
+    resource_class: xlarge.gen2
+    environment:
+      SKIP_CAPACITY: 12G
+    steps:
+      - custom-checkout:
+          submodules: true
+      - run:
+          name: Run compiler tests
+          no_output_timeout: 30m
+          # run-sktest.sh wraps `skargo test` in `circleci tests run` so the
+          # "Rerun failed tests" button reruns only the failed test suites.
+          command: |
+            mkdir -p ~/test-results
+            root="$PWD"
+            cd skiplang/compiler && make STAGE=1
+            PATH=$(realpath ./stage1/bin):$PATH \
+              SKTEST_JOBS=8 SKTEST_JUNIT=$HOME/test-results/skc.xml \
+              "$root/bin/run-sktest.sh"
+      - store_test_results:
+          path: ~/test-results
+
+  skdb:
+    docker:
+      - image: skiplabs/skdb-base:latest
+    resource_class: large.gen2
+    environment:
+      SKIP_CAPACITY: 6G
+    steps:
+      - custom-checkout:
+          submodules: true
+      - run:
+          name: Run native skdb tests
+          command: |
+            make test-native
+
+  skdb-wasm:
+    docker:
+      - image: skiplabs/skdb-base:latest
+    resource_class: large.gen2
+    environment:
+      SKIP_CAPACITY: 6G
+    steps:
+      - custom-checkout:
+          submodules: true
+      - run:
+          name: Run wasm skdb tests
+          no_output_timeout: 15m
+          command: make test-wasm
+      - store_test_results:
+          path: ~/test-results
+
+  skip-package-build:
+    docker:
+      - image: skiplabs/skiplang:latest
+    resource_class: medium
+    parameters:
+      dir:
+        type: string
+    steps:
+      - custom-checkout:
+          submodules: true
+      - run:
+          name: Build << parameters.dir >>
+          command: |
+            cd << parameters.dir >> && skargo build --all-targets
+
+  skip-package-tests:
+    docker:
+      - image: skiplabs/skiplang:latest
+    resource_class: medium
+    parameters:
+      dir:
+        type: string
+    steps:
+      - custom-checkout:
+          submodules: true
+      - run:
+          name: Run << parameters.dir >> tests
+          # run-sktest.sh wraps `skargo test` in `circleci tests run` so the
+          # "Rerun failed tests" button reruns only the failed test suites.
+          command: |
+            mkdir -p ~/test-results
+            root="$PWD"
+            cd << parameters.dir >>
+            SKTEST_JOBS=2 SKTEST_JUNIT=$HOME/test-results/$(tr / - \<<< "<< parameters.dir >>").xml \
+              "$root/bin/run-sktest.sh"
+      - store_test_results:
+          path: ~/test-results
+
+  skipruntime:
+    docker:
+      - image: skiplabs/skip:latest
+      - image: cimg/postgres:17.0
+        environment:
+          PGHOST: localhost
+          PGDATABASE: postgres
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: secret
+      - image: apache/kafka:4.1.1
+        command: sh -c "((sleep 15 && /opt/kafka/bin/kafka-topics.sh --bootstrap-server 127.0.0.1:9092 --create --topic skip-test-topic)&) && /etc/kafka/docker/run"
+        environment:
+          KAFKA_PROCESS_ROLES: controller,broker
+          KAFKA_NODE_ID: 0
+          KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
+          KAFKA_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093"
+          KAFKA_CONTROLLER_QUORUM_VOTERS: "0@localhost:9093"
+          KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+          KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+          KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+          KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    resource_class: large.gen2
+    environment:
+      SKIP_CAPACITY: 6G
+    steps:
+      - custom-checkout:
+          submodules: true
+      - setup_remote_docker
+      - run:
+          name: Run wasm skip runtime tests
+          no_output_timeout: 10m
+          command: |
+            mkdir -p ~/test-results
+            make test-skipruntime-ts
+      - run:
+          name: Run native addon unreleased test
+          no_output_timeout: 10m
+          command: |
+            cd skipruntime-ts/tests/native_addon_unreleased
+            ./run.sh
+      - store_test_results:
+          path: ~/test-results
+
+  skipruntime-bun:
+    docker:
+      - image: skiplabs/skip:latest
+      - image: cimg/postgres:17.0
+        environment:
+          PGHOST: localhost
+          PGDATABASE: postgres
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: secret
+      - image: apache/kafka:4.1.1
+        command: sh -c "((sleep 15 && /opt/kafka/bin/kafka-topics.sh --bootstrap-server 127.0.0.1:9092 --create --topic skip-test-topic)&) && /etc/kafka/docker/run"
+        environment:
+          KAFKA_PROCESS_ROLES: controller,broker
+          KAFKA_NODE_ID: 0
+          KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
+          KAFKA_LISTENERS: "PLAINTEXT://:9092,CONTROLLER://:9093"
+          KAFKA_CONTROLLER_QUORUM_VOTERS: "0@localhost:9093"
+          KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+          KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+          KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+          KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    resource_class: large.gen2
+    environment:
+      SKIP_CAPACITY: 6G
+    steps:
+      - custom-checkout:
+          submodules: true
+      - run:
+          name: Install Bun
+          command: npm install -g bun@1.3.14
+      - run:
+          name: Run skip runtime tests under Bun
+          no_output_timeout: 10m
+          command: |
+            make test-skipruntime-ts-bun
+
+  check-examples:
+    docker:
+      - image: cimg/base:2025.01
+    resource_class: large.gen2
+    steps:
+      - custom-checkout:
+          submodules: true
+      - setup_remote_docker
+      - run:
+          name: Build hackernews docker images
+          working_directory: ~/project/examples/hackernews
+          command: docker compose build --progress=plain
+      - run:
+          name: Start hackernews services
+          working_directory: ~/project/examples/hackernews
+          command: docker compose up --wait
+      - run:
+          name: Test hackernews back end health
+          command: (docker run --network hackernews_default -it cimg/base:2025.01 curl --silent --max-time 0.1 --insecure --location https://haproxy/api/posts || true) | grep --quiet "data:"
+      - run:
+          name: Tear down hackernews example
+          working_directory: ~/project/examples/hackernews
+          command: docker compose down --volumes
+      - run:
+          name: Build chatroom docker images
+          working_directory: ~/project/examples/chatroom
+          command: docker compose build  --progress=plain
+      - run:
+          name: Start chatroom services
+          working_directory: ~/project/examples/chatroom
+          command: docker compose up --wait
+      - run:
+          name: Test chatroom back end health
+          command: (docker run --network chatroom_default -it cimg/base:2025.01 curl --silent --max-time 0.1 --insecure --location https://haproxy/api/messages || true) | grep --quiet "data:"
+      - run:
+          name: Tear down chatroom example
+          working_directory: ~/project/examples/chatroom
+          command: docker compose down --volumes
+      - run:
+          name: Build blogger docker images
+          working_directory: ~/project/examples/blogger
+          command: docker compose build --progress=plain
+      - run:
+          name: Start blogger services
+          working_directory: ~/project/examples/blogger
+          command: docker compose up --wait
+      - run:
+          name: Test blogger back end health
+          command: (docker run --network blogger_default -it cimg/base:2025.01 curl --silent --max-time 5 --insecure --location https://blogger_haproxy/api/posts || true) | grep --quiet "event:"
+      - run:
+          name: Tear down blogger example
+          working_directory: ~/project/examples/blogger
+          command: docker compose down --volumes
+      - run:
+          name: Build cache invalidation docker images
+          working_directory: ~/project/examples/cache_invalidation
+          command: docker compose build --progress=plain
+      - run:
+          name: Start cache invalidation services
+          working_directory: ~/project/examples/cache_invalidation
+          command: docker compose up --wait
+      - run:
+          name: Test cache invalidation back end health
+          command: (docker run --network cache_invalidation_default -it cimg/base:2025.01 curl --silent --max-time 5 --insecure --location https://invalidation_proxy/api/posts || true) | grep --quiet "event:"
+      - run:
+          name: Tear down cache invalidation example
+          working_directory: ~/project/examples/cache_invalidation
+          command: docker compose down --volumes
+
+  # Aggregating gate: `generate_config.sh` makes this job depend on every other
+  # job it schedules, so it is a single, always-present status context that only
+  # passes once all triggered jobs pass. It is the required check that auto-merge
+  # waits on, covering the whole dynamically-generated set.
+  #
+  # A `no-op` job needs no executor and consumes no credits. Note that under the
+  # GitHub OAuth integration, no-op jobs (unlike build jobs) report a context
+  # prefixed with the workflow name, so the required check is
+  # `ci/circleci: ci/all-checks`, not `ci/circleci: all-checks`. Changing this
+  # job's type, or the workflow name, renames that context and needs a matching
+  # branch protection update.
+  all-checks:
+    type: no-op

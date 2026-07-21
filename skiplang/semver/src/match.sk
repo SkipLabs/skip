@@ -1,0 +1,104 @@
+module Semver;
+
+fun matches_exact(cmp: Comparator, ver: Version): Bool {
+  if (ver.major != cmp.major) return false;
+  cmp.minor match {
+  | Some(minor) if (ver.minor != minor) -> return false
+  | _ -> void
+  };
+  cmp.patch match {
+  | Some(patch) if (ver.patch != patch) -> return false
+  | _ -> void
+  };
+
+  ver.pre == cmp.pre
+}
+
+fun matches_greater(cmp: Comparator, ver: Version): Bool {
+  if (ver.major != cmp.major) return ver.major > cmp.major;
+  cmp.minor match {
+  | None() -> return false
+  | Some(minor) if (ver.minor != minor) -> return ver.minor > minor
+  | _ -> void
+  };
+  cmp.patch match {
+  | None() -> return false
+  | Some(patch) if (ver.patch != patch) -> return ver.patch > patch
+  | _ -> void
+  };
+
+  ver.pre > cmp.pre
+}
+
+fun matches_less(cmp: Comparator, ver: Version): Bool {
+  if (ver.major != cmp.major) return ver.major < cmp.major;
+  cmp.minor match {
+  | None() -> return false
+  | Some(minor) if (ver.minor != minor) -> return ver.minor < minor
+  | _ -> void
+  };
+  cmp.patch match {
+  | None() -> return false
+  | Some(patch) if (ver.patch != patch) -> return ver.patch < patch
+  | _ -> void
+  };
+
+  ver.pre < cmp.pre
+}
+
+fun matches_tilde(cmp: Comparator, ver: Version): Bool {
+  if (ver.major != cmp.major) return false;
+  cmp.minor match {
+  | Some(minor) if (ver.minor != minor) -> return false
+  | _ -> void
+  };
+  cmp.patch match {
+  | Some(patch) if (ver.patch != patch) -> return ver.patch > patch
+  | _ -> void
+  };
+
+  ver.pre >= cmp.pre
+}
+
+fun matches_caret(cmp: Comparator, ver: Version): Bool {
+  if (ver.major != cmp.major) return false;
+  minor = cmp.minor match {
+  | None _ -> return true
+  | Some(minor) -> minor
+  };
+  patch = cmp.patch match {
+  | None _ ->
+    if (cmp.major > 0) {
+      return ver.minor >= minor
+    } else {
+      return ver.minor == minor
+    }
+  | Some(patch) -> patch
+  };
+  if (cmp.major > 0) {
+    if (ver.minor != minor) {
+      return ver.minor > minor
+    } else if (ver.patch != patch) {
+      return ver.patch > patch
+    }
+  } else if (minor > 0) {
+    if (ver.minor != minor) {
+      return false
+    } else if (ver.patch != patch) {
+      return ver.patch > patch
+    }
+  } else if (ver.minor != minor || ver.patch != patch) {
+    return false
+  };
+
+  ver.pre >= cmp.pre
+}
+
+fun pre_is_compatible(cmp: Comparator, ver: Version): Bool {
+  cmp.major == ver.major &&
+    cmp.minor == Some(ver.minor) &&
+    cmp.patch == Some(ver.patch) &&
+    !cmp.pre.isEmpty()
+}
+
+module end;

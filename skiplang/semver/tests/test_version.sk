@@ -1,0 +1,179 @@
+module alias T = SKTest;
+module alias U = Utils;
+
+module VersionTests;
+
+@test
+fun test_parse(): void {
+  T.expectThrow(() -> _ = U.version(""));
+  T.expectThrow(() -> _ = U.version("  "));
+  T.expectThrow(() -> _ = U.version("1"));
+  T.expectThrow(() -> _ = U.version("1.2"));
+  T.expectThrow(() -> _ = U.version("1.2.3-"));
+  T.expectThrow(() -> _ = U.version("a.b.c"));
+  T.expectThrow(() -> _ = U.version("1.2.3 abc"));
+  // TODO: Reject segments with leading zeros in prerelease.
+  // T.expectThrow(() -> _ = U.version("1.2.3-01"));
+  T.expectThrow(() -> _ = U.version("1.2.3++"));
+  T.expectThrow(() -> _ = U.version("07"));
+  // TODO: Reject values overflowing int64.
+  // T.expectThrow(() -> _ = U.version("111111111111111111111.0.0"));
+  T.expectThrow(() -> _ = U.version("8\0"));
+
+  T.expectEq(U.version("1.2.3"), Semver.Version(1, 2, 3));
+  T.expectEq(
+    U.version("1.2.3-alpha1"),
+    Semver.Version(1, 2, 3, Semver.Prerelease("alpha1")),
+  );
+  T.expectEq(
+    U.version("1.2.3+build5"),
+    Semver.Version(
+      1,
+      2,
+      3,
+      Semver.Prerelease::kEmpty,
+      Semver.BuildMetadata("build5"),
+    ),
+  );
+  T.expectEq(
+    U.version("1.2.3+5build"),
+    Semver.Version(
+      1,
+      2,
+      3,
+      Semver.Prerelease::kEmpty,
+      Semver.BuildMetadata("5build"),
+    ),
+  );
+  T.expectEq(
+    U.version("1.2.3-alpha1+build5"),
+    Semver.Version(
+      1,
+      2,
+      3,
+      Semver.Prerelease("alpha1"),
+      Semver.BuildMetadata("build5"),
+    ),
+  );
+  T.expectEq(
+    U.version("1.2.3-1.alpha1.9+build5.7.3aedf"),
+    Semver.Version(
+      1,
+      2,
+      3,
+      Semver.Prerelease("1.alpha1.9"),
+      Semver.BuildMetadata("build5.7.3aedf"),
+    ),
+  );
+  T.expectEq(
+    U.version("1.2.3-0a.alpha1.9+05build.7.3aedf"),
+    Semver.Version(
+      1,
+      2,
+      3,
+      Semver.Prerelease("0a.alpha1.9"),
+      Semver.BuildMetadata("05build.7.3aedf"),
+    ),
+  );
+  T.expectEq(
+    U.version("0.4.0-beta.1+0851523"),
+    Semver.Version(
+      0,
+      4,
+      0,
+      Semver.Prerelease("beta.1"),
+      Semver.BuildMetadata("0851523"),
+    ),
+  );
+  T.expectEq(
+    U.version("1.1.0-beta-10"),
+    Semver.Version(1, 1, 0, Semver.Prerelease("beta-10")),
+  );
+}
+
+@test
+fun test_eq(): void {
+  T.expectEq(U.version("1.2.3"), U.version("1.2.3"));
+  T.expectEq(U.version("1.2.3-alpha1"), U.version("1.2.3-alpha1"));
+  T.expectEq(U.version("1.2.3+build.42"), U.version("1.2.3+build.42"));
+  T.expectEq(U.version("1.2.3-alpha1+42"), U.version("1.2.3-alpha1+42"));
+}
+
+@test
+fun test_ne(): void {
+  T.expectNe(U.version("0.0.0"), U.version("0.0.1"));
+  T.expectNe(U.version("0.0.0"), U.version("0.1.0"));
+  T.expectNe(U.version("0.0.0"), U.version("1.0.0"));
+  T.expectNe(U.version("1.2.3-alpha"), U.version("1.2.3-beta"));
+  T.expectNe(U.version("1.2.3+23"), U.version("1.2.3+42"));
+}
+
+@test
+fun test_display(): void {
+  T.expectEq(U.version("1.2.3").toString(), "1.2.3");
+  T.expectEq(U.version("1.2.3-alpha1").toString(), "1.2.3-alpha1");
+  T.expectEq(U.version("1.2.3+build.42").toString(), "1.2.3+build.42");
+  T.expectEq(U.version("1.2.3-alpha1+42").toString(), "1.2.3-alpha1+42");
+}
+
+@test
+fun test_lt(): void {
+  T.expectTrue(U.version("0.0.0") < U.version("1.2.3-alpha2"));
+  T.expectTrue(U.version("1.0.0") < U.version("1.2.3-alpha2"));
+  T.expectTrue(U.version("1.2.0") < U.version("1.2.3-alpha2"));
+  T.expectTrue(U.version("1.2.3-alpha1") < U.version("1.2.3"));
+  T.expectTrue(U.version("1.2.3-alpha1") < U.version("1.2.3-alpha2"));
+  T.expectTrue(!(U.version("1.2.3-alpha2") < U.version("1.2.3-alpha2")));
+  T.expectTrue(U.version("1.2.3+23") < U.version("1.2.3+42"));
+}
+
+@test
+fun test_le(): void {
+  T.expectTrue(U.version("0.0.0") <= U.version("1.2.3-alpha2"));
+  T.expectTrue(U.version("1.0.0") <= U.version("1.2.3-alpha2"));
+  T.expectTrue(U.version("1.2.0") <= U.version("1.2.3-alpha2"));
+  T.expectTrue(U.version("1.2.3-alpha1") <= U.version("1.2.3-alpha2"));
+  T.expectTrue(U.version("1.2.3-alpha2") <= U.version("1.2.3-alpha2"));
+  T.expectTrue(U.version("1.2.3+23") <= U.version("1.2.3+42"));
+}
+
+@test
+fun test_gt(): void {
+  T.expectTrue(U.version("1.2.3-alpha2") > U.version("0.0.0"));
+  T.expectTrue(U.version("1.2.3-alpha2") > U.version("1.0.0"));
+  T.expectTrue(U.version("1.2.3-alpha2") > U.version("1.2.0"));
+  T.expectTrue(U.version("1.2.3-alpha2") > U.version("1.2.3-alpha1"));
+  T.expectTrue(U.version("1.2.3") > U.version("1.2.3-alpha2"));
+  T.expectTrue(!(U.version("1.2.3-alpha2") > U.version("1.2.3-alpha2")));
+  T.expectTrue(!(U.version("1.2.3+23") > U.version("1.2.3+42")));
+}
+
+@test
+fun test_ge(): void {
+  T.expectTrue(U.version("1.2.3-alpha2") >= U.version("0.0.0"));
+  T.expectTrue(U.version("1.2.3-alpha2") >= U.version("1.0.0"));
+  T.expectTrue(U.version("1.2.3-alpha2") >= U.version("1.2.0"));
+  T.expectTrue(U.version("1.2.3-alpha2") >= U.version("1.2.3-alpha1"));
+  T.expectTrue(U.version("1.2.3-alpha2") >= U.version("1.2.3-alpha2"));
+  T.expectTrue(!(U.version("1.2.3+23") >= U.version("1.2.3+42")));
+}
+
+@test
+fun test_spec_order(): void {
+  vs = Array[
+    "1.0.0-alpha",
+    "1.0.0-alpha.1",
+    "1.0.0-alpha.beta",
+    "1.0.0-beta",
+    "1.0.0-beta.2",
+    "1.0.0-beta.11",
+    "1.0.0-rc.1",
+    "1.0.0",
+  ];
+  for (i in Range(1, vs.size())) {
+    print_string(`${vs[i - 1]} < ${vs[i]}`);
+    T.expectTrue(U.version(vs[i - 1]) < U.version(vs[i]))
+  }
+}
+
+module end;

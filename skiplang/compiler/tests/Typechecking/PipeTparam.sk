@@ -1,0 +1,42 @@
+module Typechecking_PipeTparam;
+// Piping into a value whose type is a function-bounded type parameter must
+// compile like the equivalent direct call (issue #1269)
+
+fun pipeIt<F: (String) -> String>(f: F, x: String): String {
+  x |> f
+}
+
+fun callIt<F: (String) -> String>(f: F, x: String): String {
+  f(x)
+}
+
+fun exclaim(s: String): String {
+  s + "!"
+}
+
+// with several function-type bounds, the first one is honored, exactly as
+// in the equivalent direct call
+base class MBase
+class MFirst() extends MBase
+class MSecond() extends MBase
+
+fun takeBase(b: MBase): String {
+  _ = b;
+  "multi"
+}
+
+fun pipeMulti<F: ((MFirst) -> String) & ((MSecond) -> String)>(
+  f: F,
+  x: MFirst,
+): String {
+  x |> f
+}
+
+@exptest
+fun main(): void {
+  print_raw(pipeIt(s -> s + "?", "lambda") + "\n");
+  print_raw(pipeIt(exclaim, "toplevel") + "\n");
+  print_raw(callIt(exclaim, "direct") + "\n");
+  print_raw(pipeMulti(takeBase, MFirst()) + "\n")
+}
+module end;

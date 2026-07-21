@@ -1,0 +1,258 @@
+module SKTest;
+
+class TestResult{
+  name: String,
+  suite: String,
+  file: String,
+  line: Int,
+  result: String = "",
+  time: Float = -1.0,
+  failure_type: String = "",
+  failure_message: String = "",
+  stdout: String = "",
+  stderr: String = "",
+} {
+  static fun fromJSON(s: String): TestResult {
+    v = JSON.decode(s).expectMap();
+    TestResult{
+      name => v["name"].expectString(),
+      suite => v["suite"].expectString(),
+      file => v["file"].expectString(),
+      line => v["line"].expectInt(),
+      result => v["result"].expectString(),
+      time => v["time"].expectFloat(),
+      failure_type => v["failure_type"].expectString(),
+      failure_message => v["failure_message"].expectString(),
+      stdout => v["stdout"].expectString(),
+      stderr => v["stderr"].expectString(),
+    }
+  }
+
+  fun toJSON(): String {
+    JSON.Object[
+      "name" => JSON.String(this.name),
+      "suite" => JSON.String(this.suite),
+      "file" => JSON.String(this.file),
+      "line" => JSON.IntNumber(this.line),
+      "result" => JSON.String(this.result),
+      "time" => JSON.FloatNumber(this.time),
+      "failure_type" => JSON.String(this.failure_type),
+      "failure_message" => JSON.String(this.failure_message),
+      "stdout" => JSON.String(this.stdout),
+      "stderr" => JSON.String(this.stderr),
+    ].encode()
+  }
+}
+
+mutable base class TestReporter{output: ?String = None()} {
+  mutable fun report(res: TestResult): void;
+  mutable fun writeLine(str: String): void {
+    this.output match {
+    | Some(file) -> FileSystem.appendTextFile(file, str + "\n")
+    | None() -> print_string(str)
+    }
+  }
+  overridable mutable fun finish(): void {
+    void
+  }
+}
+
+mutable class BasicTestReporter{
+  color: Bool,
+  private mutable successes: Int = 0,
+  private mutable failures: Int = 0,
+} extends TestReporter {
+  const kSeparator: String = "\n==========\n";
+
+  mutable fun report(res: TestResult): void {
+    result = if (res.result == "success") {
+      this.!successes = this.successes + 1;
+      this.success() + ` ${res.suite} ${res.name}`
+    } else {
+      this.!failures = this.failures + 1;
+      this.failure() +
+        ` ${res.suite} ${res.name}\n${res.failure_type}: ${
+          res.failure_message
+        }\n` +
+        "\nstdout:" +
+        static::kSeparator +
+        res.stdout +
+        static::kSeparator +
+        "\nstderr:" +
+        static::kSeparator +
+        res.stderr +
+        static::kSeparator;
+    };
+    this.writeLine(result)
+  }
+
+  mutable fun finish(): void {
+    this.writeLine(
+      `Failures: ${this.failures}, successes: ${this.successes} (total: ${this
+        .successes + this.failures})`,
+    )
+  }
+
+  private readonly fun failure(): String {
+    if (this.color) {
+      TermColor.colored(
+        "[FAILURE]",
+        TermColor.Red(),
+        TermColor.Default(),
+        Array[TermColor.Bold()],
+      );
+    } else {
+      "[FAILURE]"
+    }
+  }
+
+  private readonly fun success(): String {
+    if (this.color) {
+      TermColor.colored("[OK]", TermColor.Green());
+    } else {
+      "[OK]"
+    }
+  }
+}
+
+mutable class TestSuiteStats(
+  mutable tests: Int = 0,
+  mutable failures: Int = 0,
+  mutable errors: Int = 0,
+  mutable time: Float = 0.0,
+) {
+  mutable fun add(test: TestResult): void {
+    this.!tests = this.tests + 1;
+    this.!time = this.time + test.time;
+    test.result match {
+    | "error" -> this.!errors = this.errors + 1
+    | "failure" -> this.!failures = this.failures + 1
+    | _ -> void
+    }
+  }
+}
+
+private fun requiresEscapeXmlText(c: Char): Bool {
+  c == '<' || c == '>'
+}
+
+private fun escapeXmlTextChar(c: Char): String {
+  c match {
+  | '<' -> "&lt;"
+  | '>' -> "&gt;"
+  | _ -> c.toString()
+  }
+}
+
+private fun requiresEscapeXmlAttr(c: Char): Bool {
+  c == '"' || c == '\'' || c == '&' || requiresEscapeXmlText(c)
+}
+
+private fun escapeXmlAttrChar(c: Char): String {
+  c match {
+  | '"' -> "&quote;"
+  | '\'' -> "&apos;"
+  | '&' -> "&amp;"
+  | _ -> escapeXmlTextChar(c)
+  }
+}
+
+private fun escape(
+  s: String,
+  requiresEscape: Char -> Bool,
+  escape: Char -> String,
+): String {
+  if (s.chars().any(requiresEscape)) {
+    s.chars().map(escape).join("")
+  } else {
+    s
+  }
+}
+
+mutable class XmlTestReporter{
+  results: mutable Map<String, mutable Vector<TestResult>> = mutable Map[],
+  stats: mutable Map<String, mutable TestSuiteStats> = mutable Map[],
+} extends TestReporter {
+  mutable fun report(res: TestResult): void {
+    if (!this.results.containsKey(res.suite)) {
+      this.results.set(res.suite, mutable Vector[]);
+      this.stats.set(res.suite, mutable TestSuiteStats())
+    };
+    this.results[res.suite].push(res);
+    this.stats[res.suite].add(res)
+  }
+
+  mutable fun finish(): void {
+    escapeText = s -> escape(s, requiresEscapeXmlText, escapeXmlTextChar);
+    escapeAttr = s -> escape(s, requiresEscapeXmlAttr, escapeXmlAttrChar);
+    this.writeLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+    totalTests = this.stats.values()
+      .map(s -> s.tests)
+      .foldl((acc, x) -> acc + x, 0);
+    totalFailures = this.stats.values()
+      .map(s -> s.failures)
+      .foldl((acc, x) -> acc + x, 0);
+    totalErrors = this.stats.values()
+      .map(s -> s.errors)
+      .foldl((acc, x) -> acc + x, 0);
+    totalTime = this.stats.values()
+      .map(s -> s.time)
+      .foldl((acc, x) -> acc + x, 0.0);
+    this.writeLine(
+      `<testsuites tests="${totalTests}" failures="${totalFailures}" errors="${totalErrors}" time="${totalTime}" timestamp="0" name="AllTests">`,
+    );
+    for ((testSuiteName, results) in this.results.items()) {
+      numTests = results.size();
+      numFailures = this.stats[testSuiteName].failures;
+      numErrors = this.stats[testSuiteName].errors;
+      time = this.stats[testSuiteName].time;
+      this.writeLine(
+        `  <testsuite name="${escapeAttr(
+          testSuiteName,
+        )}" tests="${numTests}" failures="${numFailures}" errors="${numErrors}" time="${time}">`,
+      );
+      for (res in results) {
+        // Only emit `file`/`line` when we have a real source location. The
+        // harness leaves file="unknown"/line=-1 for tests it can't locate;
+        // emitting that would make CI test-splitting/rerun key every test on the
+        // bogus "unknown" file instead of falling back to `classname`.
+        fileAttr = if (res.file == "" || res.file == "unknown") {
+          ""
+        } else {
+          ` file="${escapeAttr(res.file)}" line="${res.line}"`
+        };
+        this.writeLine(
+          `    <testcase name="${escapeAttr(res.name)}"${fileAttr} time="${
+            res.time
+          }" classname="${escapeAttr(res.suite)}">`,
+        );
+        if (res.stdout != "") {
+          this.writeLine(
+            `      <system-out>${escapeText(res.stdout)}</system-out>`,
+          );
+          this.writeLine(
+            `      <system-err>${escapeText(res.stderr)}</system-err>`,
+          )
+        };
+        if (res.result != "success") {
+          this.writeLine(
+            `      <failure message="${escapeAttr(
+              res.failure_message,
+            )}" type="${escapeAttr(res.failure_type)}"></failure>`,
+          )
+        };
+        this.writeLine("    </testcase>")
+      };
+      this.writeLine("  </testsuite>");
+    };
+    this.writeLine("</testsuites>")
+  }
+}
+
+mutable class JSONTestReporter{} extends TestReporter {
+  mutable fun report(res: TestResult): void {
+    this.writeLine(res.toJSON())
+  }
+}
+
+module end;

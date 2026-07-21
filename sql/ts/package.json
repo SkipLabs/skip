@@ -1,0 +1,31 @@
+{
+  "name": "skdb",
+  "version": "1.0.2",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "node": "./dist/src/node.js",
+      "default": "./dist/src/browser.js"
+    },
+    "./orchestration.js": "./dist/src/skdb_orchestration.js"
+  },
+  "scripts": {
+    "build": "npm run typecheck && skargo build -r --target wasm32-unknown-unknown --lib --manifest-path=../Skargo.toml --out-dir=./dist/src/",
+    "prepack": "rm -f dist/tsconfig.tsbuildinfo",
+    "typecheck": "node ../../prebuild.mjs skiplang-std skiplang-json skipwasm-std skipwasm-json skipwasm-date skipwasm-worker && tsc",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo skiplang-std skiplang-json skipwasm-std skipwasm-json skipwasm-date skipwasm-worker",
+    "lint": "eslint",
+    "cli": "node ./dist/src/skdb-cli.js"
+  },
+  "bin": {
+    "skdb-cli": "./dist/src/skdb-cli.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@types/express": "^5.0.0",
+    "@types/ws": "^8.5.13"
+  }
+}

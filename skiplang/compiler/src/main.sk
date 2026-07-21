@@ -1,0 +1,151 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+fun main(): void {
+  results = Cli.Command("skc")
+    .about("Skip compiler")
+    .help()
+    .runtimeArgs()
+    .arg(Cli.Arg::bool("disasm-all"))
+    .arg(Cli.Arg::bool("disasm-annotated"))
+    .arg(Cli.Arg::string("disasm-file").repeatable())
+    .arg(Cli.Arg::string("disasm-function").repeatable())
+    .arg(Cli.Arg::string("export-function").repeatable())
+    .arg(Cli.Arg::string("export-function-as").repeatable())
+    .arg(Cli.Arg::string("export-module").repeatable())
+    .arg(Cli.Arg::string("output").long("output").short("o"))
+    // .arg(Cli.Arg::string("profile-path").default(""))
+    .arg(Cli.Arg::string("emit").default("link"))
+    .arg(Cli.Arg::string("target"))
+    .arg(Cli.Arg::string("opt-level").short("O").default("3"))
+    .arg(Cli.Arg::bool("asan"))
+    .arg(Cli.Arg::bool("autogc").default(true).negatable())
+    .arg(Cli.Arg::string("sample-rate").default("0"))
+    .arg(Cli.Arg::bool("use-specialized-names"))
+    .arg(
+      Cli.Arg::bool("version")
+        .long("version")
+        .short("V")
+        .about("Print version info and exit."),
+    )
+    // Global config flags
+    .arg(Cli.Arg::bool("release").about("Enable release optimizations."))
+    .arg(
+      Cli.Arg::bool("verbose")
+        .short("v")
+        .long("verbose")
+        .about("Use verbose output."),
+    )
+    .arg(Cli.Arg::bool("debug").about("Print debug information."))
+    // Optimization config flags
+    // .arg(Cli.Arg::bool("localopts").default(true).negatable())
+    .arg(Cli.Arg::bool("dce").default(true).negatable())
+    .arg(Cli.Arg::bool("peephole").default(true).negatable())
+    .arg(Cli.Arg::bool("control").default(true).negatable())
+    .arg(Cli.Arg::bool("regpromote").default(true).negatable())
+    .arg(Cli.Arg::bool("inline").default(true).negatable())
+    .arg(Cli.Arg::bool("ipa").default(true).negatable())
+    .arg(Cli.Arg::bool("verify").default(true).negatable())
+    .arg(Cli.Arg::bool("goto").negatable())
+    // .arg(Cli.Arg::bool("noopt"))
+    // These are handled in skipUtils.sk
+    // Just allow them to be ignored here
+    .arg(Cli.Arg::bool("profile"))
+    .arg(Cli.Arg::bool("canonize-paths").negatable())
+    .arg(Cli.Arg::bool("check").about("Run the front end only."))
+    .arg(
+      Cli.Arg::bool("link")
+        .negatable()
+        .default(true)
+        .about(
+          "Link the output binary (use --no-link to print link command instead).",
+        ),
+    )
+    .arg(
+      Cli.Arg::string("sklib-name")
+        .long("sklib-name")
+        .about("Specify the package name when building an sklib."),
+    )
+    .arg(
+      Cli.Arg::bool("std")
+        .negatable()
+        .default(true)
+        .about("Include a dependency to `std` (default: true)."),
+    )
+    .arg(Cli.Arg::string("sysroot").about("Override the sysroot location."))
+    .arg(
+      Cli.Arg::string("libraries")
+        .short("l")
+        .repeatable()
+        .about("Link against a skip library."),
+    )
+    .arg(
+      Cli.Arg::string("library-paths")
+        .short("L")
+        .repeatable()
+        .about("Add path to the library search path."),
+    )
+    .arg(
+      Cli.Arg::string("link-args").about(
+        "Extra linker arguments (space separated).",
+      ),
+    )
+    .arg(
+      Cli.Arg::string("batch").about(
+        "Compile many units in one process, sharing stdlib type-checking. " +
+          "Argument is a manifest file with one unit per line: " +
+          "<output> <mainFn> <input.sk> [<input2.sk> ...].",
+      ),
+    )
+    .arg(Cli.Arg::string("files").positional().repeatable())
+    .parseArgs();
+
+  results.error match {
+  | Some(exn) ->
+    print_error_ln(exn.getMessage().trim());
+    print_error(Cli.usage(results.cmd, false));
+    skipExit(1)
+  | _ -> void
+  };
+
+  if (results.getBool("version")) {
+    pkg_name = #env ("SKARGO_PKG_NAME");
+    pkg_version = #env ("SKARGO_PKG_VERSION");
+    git_commit = #env ("GIT_COMMIT_HASH");
+    print_string(`${pkg_name} ${pkg_version} (${git_commit})`);
+    skipExit(0);
+  };
+
+  config = Config.Config::make(results);
+
+  batchManifest = results.maybeGetString("batch");
+
+  isInit = results.maybeGetString("init").isSome();
+  if (isInit) {
+    _ = SKStore.gContextInit(SKStore.Context::create{});
+  };
+  SKStore.runWithGc(
+    SKStore.Context::create{},
+    _context ~> {
+      SKStore.CStop(
+        Some((context, _, _) ~> {
+          try {
+            batchManifest match {
+            | Some(manifest) -> compile_batch(config, context, manifest)
+            | None() -> compile(config, context, config.input_files)
+            }
+          } catch {
+          | exn ->
+            print_error(exn.getMessage());
+            skipExit(2)
+          }
+        }),
+      )
+    },
+    Some(SKStore.Synchronizer(SKStore.import, SKStore.export, _ ~> void)),
+  )
+}

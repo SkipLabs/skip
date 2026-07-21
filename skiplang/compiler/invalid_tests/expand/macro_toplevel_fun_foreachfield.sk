@@ -1,0 +1,12 @@
+// `#forEachField` iterates the fields of the enclosing class, so it is not
+// meaningful in a top-level `macro fun` (there is no enclosing class). This
+// must produce a clean error rather than crashing the compiler. See #1182.
+macro fun fields(): void {
+  #forEachField(#field, #fieldName) {
+    void
+  }
+}
+
+fun main(): void {
+  void
+}

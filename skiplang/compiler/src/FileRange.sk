@@ -1,0 +1,102 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+////////////////////////////////////////////////////////////////////////////////
+// A Range in a text file.
+////////////////////////////////////////////////////////////////////////////////
+
+module FileRange;
+
+base class .Pos{
+  file: FileCache.InputSource,
+  range: TextRange,
+} uses Hashable, Orderable, Show {
+  static fun create(file: FileCache.InputSource, range: TextRange): FileRange {
+    FileRange{file, range}
+  }
+
+  static fun fromStartEnd(start: FilePosition, end: FilePosition): FileRange {
+    // TODO: invariant(start.file == end.file);
+    FileRange.create(
+      start.file,
+      TextRange.create(start.position, end.position),
+    );
+  }
+
+  fun start(): FilePosition {
+    FilePosition.create(this.file, this.range.start);
+  }
+
+  fun end(): FilePosition {
+    FilePosition.create(this.file, this.range.end);
+  }
+
+  fun startPosition(): Position {
+    this.range.start;
+  }
+
+  fun endPosition(): Position {
+    this.range.end;
+  }
+
+  fun contains(position: FilePosition): Bool {
+    // TODO: invariant(this.file == position.file);
+    this.range.contains(position.position);
+  }
+
+  protected fun defaultToString(): String {
+    this.file.toString() + this.range.toString()
+  }
+
+  overridable fun toString(): String {
+    this.defaultToString()
+  }
+
+  fun die(msg: String): _;
+
+  fun invariant(flag: Bool, msg: String): void {
+    if (!flag) {
+      this.die(msg)
+    }
+  }
+
+  @always_inline
+  fun lazyInvariant(flag: Bool, msg: () -> String): void {
+    if (!flag) {
+      this.die(msg())
+    }
+  }
+
+  fun inspect(): Inspect {
+    InspectLiteral(this.toString());
+  }
+}
+
+class .FileRange extends Pos {
+  fun die(msg: String): _ {
+    Assert.fail(this, msg);
+  }
+}
+
+const none: FileRange = create(
+  FileCache.InputSource(None(), ""),
+  TextRange.none,
+);
+const builtin: FileRange = create(
+  FileCache.InputSource(None(), "<builtin>"),
+  TextRange.none,
+);
+
+fun create(file: FileCache.InputSource, range: TextRange): FileRange {
+  FileRange::create(file, range);
+}
+
+fun fromStartEnd(start: FilePosition, end: FilePosition): FileRange {
+  FileRange::fromStartEnd(start, end);
+}
+
+module end;

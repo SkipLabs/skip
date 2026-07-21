@@ -1,0 +1,11 @@
+delete from t1 where a = 1 AND b = 2;
+delete from t1 where a = 10 AND b = 21;
+delete from t1 where a = 10 AND b = 21;
+delete from t1 where a = 12 AND b = 23;
+delete from t1 where a = 14 AND b = 25;
+delete from t1 where a = 16 AND b = 27;
+delete from t1 where a = 18 AND b = 29;
+delete from t1 where a = 110 AND b = 211;
+delete from t1 where a = 110 AND b = 212;
+delete from t1 where a = 112 AND b = 213;
+delete from t1 where a = 114 AND b = 215;

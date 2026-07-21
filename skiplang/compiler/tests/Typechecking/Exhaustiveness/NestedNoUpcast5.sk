@@ -1,0 +1,15 @@
+module Typechecking_Exhaustiveness_NestedNoUpcast5;
+base class F {
+  children =
+  | Bar(Int, Int)
+}
+
+@exptest
+fun main(): void {
+  print_raw(
+    Bar(1, 1) match {
+    | Bar(_, Int _) -> "Pass\n"
+    },
+  )
+}
+module end;

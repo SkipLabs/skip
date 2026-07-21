@@ -1,0 +1,300 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+/** 64-bit IEEE 754 double-precision floating-point number.
+ *
+ * Arithmetic and comparison operators follow IEEE 754 semantics, which means
+ * NaN is not equal to itself. Use `isEqual()` for bitwise equality that
+ * distinguishes -0.0 from 0.0 and considers identical NaN bit patterns equal.
+ */
+native value class Float uses Number {
+  @intrinsic
+  native fun ==(other: Float): Bool;
+  @intrinsic
+  native fun !=(other: Float): Bool;
+  @intrinsic
+  native fun +(other: Float): Float;
+  @intrinsic
+  native fun -(other: Float): Float;
+  @intrinsic
+  native fun *(other: Float): Float;
+  @intrinsic
+  native fun /(other: Float): Float;
+  @intrinsic
+  native fun <(other: Float): Bool;
+  @intrinsic
+  native fun >(other: Float): Bool;
+  @intrinsic
+  native fun <=(other: Float): Bool;
+  @intrinsic
+  native fun >=(other: Float): Bool;
+
+  /** Compares two floats for ordering.
+   * Float is not truly Orderable (IEEE 754 NaNs are incomparable), but a
+   * total order is needed in practice for sorting and min/max. NaN compares
+   * as greater than any other value, including itself.
+   */
+  fun compare(other: Float): Order {
+    if (this < other) {
+      LT()
+    } else if (this == other) {
+      EQ()
+    } else {
+      GT()
+    }
+  }
+
+  /** Bitwise equality comparison.
+   * Unlike `==`, this distinguishes -0.0 from 0.0 and considers two NaN
+   * values equal only if they have the same bit pattern.
+   */
+  fun isEqual(other: Float): Bool {
+    this.toBits() == other.toBits()
+  }
+
+  /** Returns the arithmetic negation of this float.
+   * Flips the IEEE 754 sign bit: correctly maps 0.0 to -0.0 and vice versa,
+   * and flips the sign of NaN values (matching C/Rust behavior).
+   */
+  @cpp_extern("SKIP_Float_negate")
+  native fun negate(): Float;
+
+  /** Positive infinity. */
+  const inf: Float = 1.0 / 0.0;
+  /** Not-a-Number. */
+  const nan: Float = 0.0 / 0.0;
+
+  /** Returns true if this value is NaN (not-a-number). */
+  fun isNaN(): Bool {
+    this != this
+  }
+
+  /** Converts an Int to a Float. */
+  fun fromInt(x: Int): Float {
+    x.toFloat()
+  }
+
+  /** Identity conversion — returns the argument unchanged. */
+  fun fromFloat(x: Float): Float {
+    x
+  }
+
+  /** Returns this float (identity conversion). */
+  fun toFloat(): Float {
+    this
+  }
+
+  /** Converts a float to a string.
+   * Special values are formatted as "inf", "-inf", and "nan".
+   * Note: negative NaN is formatted as "nan" (sign is dropped), unlike C's
+   * printf which outputs "-nan". This matches Rust's Display behavior.
+   * Integer values are formatted as Int::toString(), with a trailing ".0".
+   * All other values are formatted by the "%.17g" printf format.
+   * See http://pubs.opengroup.org/onlinepubs/009695399/functions/fprintf.html
+   */
+  @intrinsic
+  native fun toString(): String;
+  /** Returns the raw IEEE 754 bit representation as an Int. */
+  @intrinsic
+  native fun toBits(): Int;
+  /** Truncates this float to an Int, discarding the fractional part.
+   * Behavior is undefined for NaN, infinity, and values outside the
+   * representable Int range (lowers to LLVM fptosi).
+   */
+  @intrinsic
+  native fun toInt(): Int;
+
+  /** Returns an Inspect representation for debugging. */
+  fun inspect(): Inspect {
+    InspectLiteral(this.toString())
+  }
+
+  /** Returns a hash code based on the raw IEEE 754 bits.
+   * Ensures -0.0 and 0.0 produce the same hash (since they are `==`).
+   * Caution: NaN does not compare equal to itself, so using Float keys
+   * containing NaN in hash tables will not work correctly.
+   */
+  fun hash(): Int {
+    bits = this.toBits();
+    if (bits == 0) {
+      (-0.0).toBits()
+    } else {
+      bits
+    }
+  }
+}
+
+/** Converts a Float to its string representation.
+ * Handles special cases (NaN, infinity, negative zero) and formats the
+ * result with scientific notation for very large or very small values.
+ */
+@export("SKIP_floatToString")
+fun floatToString(value: Float): String {
+  if (value.isNaN()) {
+    return "nan";
+  };
+  result = Vector::mcreate(32);
+  if (value.toBits().and(0x8000000000000000) != 0) {
+    result.push("-");
+    !value = -value;
+  };
+  if (value == Float::inf) {
+    result.push("inf");
+    return Array.concatStringSequence(result)
+  };
+  (integralPart, optDecimalPart, optExponent) = splitFloat(value);
+  result.push(integralPart.toString());
+  optDecimalPart match {
+  | None() -> result.push(".0")
+  | Some(decimalPart) ->
+    iValue = decimalPart.toInt();
+    width = 9;
+    // remove trailing zeros
+    while (iValue % 10 == 0 && width > 0) {
+      !iValue = iValue / 10;
+      !width = width - 1;
+    };
+    result.push(".");
+    ivalstr = iValue.toString();
+    while (width - ivalstr.length() > 0) {
+      result.push("0");
+      !width = width - 1;
+    };
+    result.push(ivalstr)
+  };
+  optExponent.each(exponent -> {
+    if (exponent < -9) {
+      result.push("e");
+      result.push(exponent.toString())
+    } else if (exponent < 0) {
+      result.push("e-0");
+      result.push((-exponent).toString())
+    } else {
+      result.push("e+");
+      result.push(exponent.toString())
+    }
+  });
+  Array.concatStringSequence(result)
+}
+
+/** Splits a normalized float into its integral part, optional decimal digits
+ * (as a UInt32 scaled by 1e9), and optional base-10 exponent.
+ */
+fun splitFloat(value: Float): (Int, ?UInt32, ?Int16) {
+  (norm_value, exponent) = normalizeFloat(value);
+  integralPart = norm_value.toInt();
+  remainder = norm_value - integralPart.toFloat();
+  !remainder = remainder * 1e9;
+  decimalPart = remainder.toInt();
+  // rounding
+  !remainder = remainder - decimalPart.toFloat();
+  zInt16 = Int16::truncate(0);
+  oInt16 = Int16::truncate(1);
+  if (remainder >= 0.5) {
+    !decimalPart = decimalPart + 1;
+    if (decimalPart.toFloat() >= 1e9) {
+      !decimalPart = 0;
+      !integralPart = integralPart + 1;
+      if (exponent != zInt16 && integralPart >= 10) {
+        !exponent = Int16::truncate(exponent + oInt16);
+        !integralPart = 1;
+      }
+    }
+  };
+  (
+    integralPart,
+    if (decimalPart > 0) Some(UInt32::truncate(decimalPart)) else None(),
+    if (exponent != zInt16) Some(exponent) else None(),
+  )
+}
+
+/** Normalizes a float into the range [1.0, 10.0) by computing a base-10
+ * exponent. Returns the normalized value and the exponent. Values already
+ * in [1e-4, 1e15) are returned with exponent 0.
+ */
+fun normalizeFloat(value: Float): (Float, Int16) {
+  positiveExpThreshold = 1e15;
+  negativeExpThreshold = 1e-4;
+  exponent = 0;
+  if (value >= positiveExpThreshold) {
+    if (value >= 1e256) {
+      !value = value / 1e256;
+      !exponent = exponent + 256;
+    };
+    if (value >= 1e128) {
+      !value = value / 1e128;
+      !exponent = exponent + 128;
+    };
+    if (value >= 1e64) {
+      !value = value / 1e64;
+      !exponent = exponent + 64;
+    };
+    if (value >= 1e32) {
+      !value = value / 1e32;
+      !exponent = exponent + 32;
+    };
+    if (value >= 1e16) {
+      !value = value / 1e16;
+      !exponent = exponent + 16;
+    };
+    if (value >= 1e8) {
+      !value = value / 1e8;
+      !exponent = exponent + 8;
+    };
+    if (value >= 1e4) {
+      !value = value / 1e4;
+      !exponent = exponent + 4;
+    };
+    if (value >= 1e2) {
+      !value = value / 1e2;
+      !exponent = exponent + 2;
+    };
+    if (value >= 1e1) {
+      !value = value / 1e1;
+      !exponent = exponent + 1;
+    }
+  };
+  if (value > 0.0 && value < negativeExpThreshold) {
+    if (value < 1e-255) {
+      !value = value * 1e256;
+      !exponent = exponent - 256;
+    };
+    if (value < 1e-127) {
+      !value = value * 1e128;
+      !exponent = exponent - 128;
+    };
+    if (value < 1e-63) {
+      !value = value * 1e64;
+      !exponent = exponent - 64;
+    };
+    if (value < 1e-31) {
+      !value = value * 1e32;
+      !exponent = exponent - 32;
+    };
+    if (value < 1e-15) {
+      !value = value * 1e16;
+      !exponent = exponent - 16;
+    };
+    if (value < 1e-7) {
+      !value = value * 1e8;
+      !exponent = exponent - 8;
+    };
+    if (value < 1e-3) {
+      !value = value * 1e4;
+      !exponent = exponent - 4;
+    };
+    if (value < 1e-1) {
+      !value = value * 1e2;
+      !exponent = exponent - 2;
+    };
+    if (value < 1e0) {
+      !value = value * 1e1;
+      !exponent = exponent - 1;
+    }
+  };
+  (value, Int16::truncate(exponent))
+}

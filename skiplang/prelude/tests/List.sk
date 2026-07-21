@@ -1,0 +1,18 @@
+module alias T = SKTest;
+
+module ListTest;
+
+@test
+fun testRevAppend(): void {
+  T.expectEq(List[].revAppend(List::of(1)), List[1]);
+  T.expectEq(List[].revAppend(List.Cons(1, List[2, 3, 4])), List[1, 2, 3, 4]);
+  T.expectEq(List[1].revAppend(List::of(2)), List[1, 2]);
+  T.expectEq(List[1].revAppend(List.Cons(2, List[3, 4])), List[1, 2, 3, 4]);
+  T.expectEq(List[3, 2, 1].revAppend(List::of(4)), List[1, 2, 3, 4]);
+  T.expectEq(
+    List[3, 2, 1].revAppend(List.Cons(4, List[5, 6])),
+    List[1, 2, 3, 4, 5, 6],
+  );
+}
+
+module end;

@@ -1,0 +1,48 @@
+module alias T = SKTest;
+
+module CrashDetectionTests;
+
+// This test only crashes when SKTEST_CRASH_TEST env var is set.
+// It's used by test_crash_is_detected below which spawns a subprocess
+// with that env var to test the harness's crash detection.
+@test
+fun test_inner_crash(): void {
+  if (Environ.varOpt("SKTEST_CRASH_TEST").isSome()) {
+    exit(1)
+  }
+}
+
+// Spawns the test binary as a full harness, filtered to only run
+// test_inner_crash with SKTEST_CRASH_TEST=1. Uses clear_env to ensure
+// the inner process has no SKTEST_RANK (so it runs as a harness, not
+// a worker). The inner harness then spawns its own worker which inherits
+// SKTEST_CRASH_TEST and crashes.
+//
+// Before fix: harness silently swallows the crash, exits 0 → test FAILS
+// After fix: harness detects crash, exits 1 → test PASSES
+@test
+fun test_crash_is_detected(): void {
+  // Skip in inner invocations to prevent infinite recursion.
+  if (Environ.varOpt("SKTEST_CRASH_TEST").isNone()) {
+    proc = Posix.Popen::create{
+      args => Array[
+        Environ.current_exe(),
+        "CrashDetectionTests.test_inner_crash",
+        "-j",
+        "1",
+      ],
+      env => Map["SKTEST_CRASH_TEST" => "1"],
+      clear_env => true,
+      stdout => true,
+      stderr => true,
+    }.fromSuccess();
+
+    _output = proc.stdout.fromSome().read_to_string().fromSuccess();
+    exitstatus = proc.wait();
+
+    // The harness must detect the crash and exit non-zero.
+    T.expectFalse(exitstatus.success())
+  }
+}
+
+module end;

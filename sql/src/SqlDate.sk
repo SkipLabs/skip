@@ -1,0 +1,241 @@
+module SKDB;
+
+/*****************************************************************************/
+/*
+ *  NNN days        | add the specified amount of days to the time value specified to its left
+ *  NNN hours       | add the specified amount of hours to the time value specified to its left
+ *  NNN minutes     | add the specified amount of minutes to the time value specified to its left
+ *  NNN months      | add the specified amount of months to the time value specified to its left
+ *  NNN years       | add the specified amount of years to the time value specified to its left
+ *  start of month  | shift the date backwards to the beginning of the subject month
+ *  start of year   | shift the date backwards to the beginning of the subject year
+ *  start of day    | shift the date backwards to the beginning of the subject day
+ *  weekday N       | advances the date forward, if necessary, to the next date where the weekday number is N
+ *  localtime       | adjusts time value to its left to the local time
+ *  utc             | adjusts time value to its left to the utc time
+ *  tz <timezone>   | adjusts time value to its left to the specified timezone (<timezone>: ±D | ±DD | ±DDDD | ±DD:DD | ±DD:DD:DD)
+ *  islocal         | force the time value to its left to be in local time
+ */
+/*****************************************************************************/
+
+base class PlusMinus {
+  children =
+  | PMPlus()
+  | PMMinus()
+
+  fun val(v: Int32): Int
+  | PMPlus() -> v.toInt()
+  | PMMinus() -> -v.toInt()
+}
+
+fun getUnixTime(): Int {
+  Time.time_ms() / 1000;
+}
+
+mutable class DateTime(mutable date: SKDate.Calendar) {
+  mutable fun apply(modifier: String): void {
+    pos = 0;
+    lex = Lexer(pos, Buffer(modifier));
+    this.applyModifier(lex, pos)
+  }
+
+  private mutable fun applyModifier(lex: Lexer, pos: Int): void {
+    if (lex.isEq(pos, "+")) {
+      !pos = lex.expect(pos, "+");
+      this.applyNNN(lex, pos, PMPlus())
+    } else if (lex.isEq(pos, "-")) {
+      !pos = lex.expect(pos, "-");
+      this.applyNNN(lex, pos, PMMinus())
+    } else if (lex.isEq(pos, "start")) {
+      this.applyStart(lex, pos);
+    } else if (lex.isEq(pos, "tz")) {
+      this.applyTz(lex, pos);
+    } else if (lex.isEq(pos, "weekday")) {
+      !pos = lex.expect(pos, "weekday");
+      (!pos, n) = lex.nextInt32(pos);
+      if (n < 0 || n > 6) {
+        errorEval("Invalid weekday");
+      };
+      ni = n.toInt();
+      if (ni == 0) {
+        !ni = 7;
+      };
+      this.!date = this.date.toNextWeekDay(SKDate.Day::dayForCode(ni))
+    } else if (lex.isEq(pos, "islocal")) {
+      this.!date = this.date.withTimeZone(SKDate.TZLocal())
+    } else if (lex.isEq(pos, "utc")) {
+      this.!date = this.date.deriveTimeZone(SKDate.utc)
+    } else if (lex.isEq(pos, "localtime")) {
+      this.!date = this.date.deriveTimeZone(SKDate.TZLocal())
+    } else {
+      errorEval("Invalid date modifier")
+    }
+  }
+
+  /*
+   *  start of month
+   *  start of year
+   *  start of day
+   */
+  private mutable fun applyStart(lex: Lexer, pos: Int): void {
+    !pos = lex.expect(pos, "of");
+    this.!date = this.date.setTime(SKDate.Time::create());
+    lex.word(pos) match {
+    | "month" -> this.!date = this.date.getMonthStart()
+    | "year" -> this.!date = this.date.getYearStart()
+    | "day" -> void
+    | x -> errorEval("Invalid modifier: " + x)
+    }
+  }
+
+  /*
+   *  tz ±D
+   *  tz ±DD
+   *  tz ±DDDD
+   *  tz ±DD:DD
+   *  tz ±DD:DD:DD
+   */
+
+  private mutable fun applyTz(lex: Lexer, pos: Int): void {
+    !pos = lex.expect(pos, "tz");
+    !pos = lex.skipSpaces(pos);
+    timezone = lex.content.slice(pos, lex.content.size());
+    SKDate.parseTimeZone(timezone) match {
+    | Some(tz) -> this.!date = this.date.deriveTimeZone(SKDate.TZ(tz))
+    | _ -> errorEval("Invalid modifier: " + timezone)
+    }
+  }
+
+  private mutable fun applyNNN(
+    lex: Lexer,
+    pos: Int,
+    plusMinus: PlusMinus,
+  ): void {
+    (!pos, nbr) = lex.nextInt32(pos);
+    if (lex.isEq(pos, ".")) {
+      error(pos, ". in dates not implemented");
+    } else {
+      (!pos, word) = lex.nextWord(pos);
+      word match {
+      | "days" | "day" -> this.!date = this.date.addDays(plusMinus.val(nbr))
+      | "hours" | "hour" -> this.!date = this.date.addHours(plusMinus.val(nbr))
+      | "minutes" | "minute" ->
+        this.!date = this.date.addMinutes(plusMinus.val(nbr))
+      | "months" | "month" ->
+        this.!date = this.date.addMonths(plusMinus.val(nbr))
+      | "years" | "year" -> this.!date = this.date.addYears(plusMinus.val(nbr))
+      | _ -> errorEval("Unexepected token: " + word)
+      }
+    }
+  }
+
+  static private fun op(plusMinus: PlusMinus, x: Int32, y: Int32): Int32 {
+    plusMinus match {
+    | PMPlus() -> Int32::truncate(x + y)
+    | PMMinus() -> Int32::truncate(x - y)
+    }
+  }
+}
+
+/*****************************************************************************/
+/* Get now. */
+/*****************************************************************************/
+
+fun forbidNow(context: mutable SKStore.Context): void {
+  context.setGlobal("NowForbidden", SKStore.BoolFile(true));
+}
+
+fun getNow(context: mutable SKStore.Context): SKDate.Calendar {
+  context.getGlobal("NowForbidden") match {
+  | Some(SKStore.BoolFile(true)) ->
+    errorEval("Cannot access 'now' in this context")
+  | _ -> void
+  };
+
+  context.getGlobal("Now") match {
+  | None() ->
+    now = SKDate.Calendar::current();
+    context.setGlobal("Now", SKDate.File(now));
+    now
+  | Some(file) -> SKDate.File::type(file).value
+  }
+}
+
+/*****************************************************************************/
+/* strftime. */
+/*****************************************************************************/
+
+base class TimeZone {
+  children =
+  | TZUtc()
+  | TZLocal()
+}
+
+fun callStrftime(
+  pos: Int,
+  context: mutable SKStore.Context,
+  sargs: Array<String>,
+): String {
+  if (sargs.size() < 2) error(pos, "missing arguments for strftime");
+  strftime(context, sargs[0], sargs[1], sargs.slice(2, sargs.size()))
+}
+
+/*****************************************************************************/
+/*
+ *  now
+ *  DDDDDDDDDDD     | the unix epoch time
+ *  DDDDDDD.DDDDD   | the fractional julian day
+ *  YYYY-MM-DD
+ *  YYYY-MM-DD HH:MM
+ *  YYYY-MM-DD HH:MM:SS
+ *  YYYY-MM-DD HH:MM:SS±TZ
+ *  YYYY-MM-DD HH:MM:SS.SSS
+ *  YYYY-MM-DD HH:MM:SS.SSS±TZ
+ *  YYYY-MM-DDTHH:MM
+ *  YYYY-MM-DDTHH:MM:SS
+ *  YYYY-MM-DDTHH:MM:SS±TZ
+ *  YYYY-MM-DDTHH:MM:SS.SSS
+ *  YYYY-MM-DDTHH:MM:SS.SSS±TZ
+ *  HH:MM
+ *  HH:MM:SS
+ *  HH:MM:SS.SSS
+ */
+/*****************************************************************************/
+
+fun parseFullDate(
+  context: mutable SKStore.Context,
+  str: String,
+  tz: SKDate.TZKind,
+): ?SKDate.Calendar {
+  if (str == "now") {
+    return Some(getNow(context).deriveTimeZone(tz))
+  };
+  str.toIntOption() match {
+  | Some(time) -> Some(SKDate.Calendar::epoch(time * 1000, tz))
+  | _ ->
+    str.toFloatOption() match {
+    | Some(julianDay) -> Some(SKDate.Calendar::fromJulianDay(julianDay, tz))
+    | _ -> SKDate.Calendar::parse(str, tz)
+    }
+  }
+}
+
+fun strftime(
+  context: mutable SKStore.Context,
+  format: String,
+  timeValue: String,
+  modifiers: Array<String>,
+): String {
+  optDateTime = parseFullDate(context, timeValue, SKDate.utc);
+  optDateTime match {
+  | Some(dateTime) ->
+    dt = mutable DateTime(dateTime);
+    for (modifier in modifiers) {
+      dt.apply(modifier);
+    };
+    SKDate.format(format, dt.date)
+  | _ -> errorEval("Invalid date format")
+  }
+}
+
+module end;

@@ -1,0 +1,138 @@
+# Releasing Docker and NPM artifacts
+
+The scripts in this directory are used to build docker images for local
+development and to build and release our Docker Hub and NPM artifacts.
+
+## Build Docker images
+
+The unified `docker_build.sh` script handles both local builds and releases.
+Image definitions and dependencies live in `docker-bake.hcl`; BuildKit
+automatically parallelizes independent targets.
+
+```
+docker_build.sh [--push] [--prod] [IMAGE...]
+```
+
+- **Local build** (default): `docker_build.sh` builds all images for the native architecture
+- **Production build**: `docker_build.sh --prod` forces `linux/amd64`
+- **Release to Docker Hub**: `docker_build.sh --push IMAGE...` builds multi-arch and pushes
+
+Convenience wrappers are provided for common workflows:
+
+- `build_docker_images.sh` — local build of all images
+- `build_prod_skdb_images.sh` — local production build (`--prod`)
+- `release_docker_ci_images.sh` — push the published images to Docker Hub by hand
+- `release_docker_skdb.sh` — push skdb image
+- `release_docker_skdb_dev_server.sh` — interactive push of dev server
+- `check_ci_images.sh` — check that every image CircleCI pulls is one we publish
+- `check_push_access.sh` — check the Docker Hub credentials can push every published image
+
+## Publish the CI images
+
+The images in the `ci` group of `docker-bake.hcl` are published to Docker Hub by
+`.github/workflows/docker-publish.yml` — on demand (`workflow_dispatch`) and
+weekly, so base image security updates land without anyone remembering. Publish
+after landing an image-affecting change by triggering it manually; it does not
+publish automatically on merge.
+
+That group is the single source of truth: the workflow and
+`release_docker_ci_images.sh` both take their image list from it, and
+`check_ci_images.sh` asserts every image CircleCI pulls is in it. Most of it is
+toolchain images — their final stages contain compiled binaries and apt packages
+but no repo source, so republishing them is not a release.
+
+`skdb-dev-server` is the exception, and the one image here users actually run. It
+bakes in source, so publishing it from main **is** a release of main:
+`skdb-dev-server:latest` tracks main as of the last publish, not the last tagged
+release. That trade is deliberate — left manual it went a year without a rebuild
+and rotted to 1 critical / 18 high severity advisories, on the image users run.
+
+`skdb-dev-server:quickstart` still carries release semantics and stays manual, via
+`release_docker_skdb_dev_server.sh`. Do not reach for it as the "safe" alternative
+to `:latest`: nothing refreshes it either, and it has not been rebuilt since
+2024-01-30, so it is further behind on security fixes than the `:latest` this
+group now keeps current. A pinned tag is only safer than a moving one if somebody
+re-cuts it.
+
+`skdb` is not in the group, so `skiplabs/skdb` is still published by hand. It is
+rebuilt on every publish anyway, as a link-only dependency of `skdb-dev-server`:
+bake forces such targets to `output=cacheonly`, so it is built fresh and consumed
+but never pushed.
+
+Adding an image to that group also needs the Docker Hub credentials to be able
+to push it — an existing repository is not enough if the token is scoped to a
+list. The workflow checks this up front (`check_push_access.sh`) and fails in
+seconds rather than after building everything, because Docker Hub grants a token
+with the scopes you have instead of refusing the ones you don't, so a missing
+push right otherwise only surfaces at the final push.
+
+Use `release_docker_ci_images.sh` only when the workflow is unavailable. It
+publishes the same images from your machine, using your own credentials.
+
+## Release NPM packages
+
+We keep all **public** NPM packages (i.e. `@skipruntime/*`, `@skiplabs/skip`,
+and `@skip-adapter/*`) at the same version so as to keep updates, documentation,
+and version management simple.  (Note that the build script of the native addon
+relies on this convention since it links to the skipruntime library with the same
+version as the addon package, so whenever anything in the skipruntime library
+changes, the addon package version must be bumped.)  To update from version
+`$OLD` to version `$NEW`, perform the following steps:
+
+1. Check out `main` and make sure your working copy is clean
+
+2. Check that relevant changes since the previous release are included in
+   `CHANGELOG.md`, and update section headers to group those changes under
+   version `$NEW`.
+
+3. Bump _all_ `./skipruntime-ts/**/package.json` version strings and
+   inter-dependencies from `$OLD` to `$NEW`, e.g. by running `sed -i ''
+   's/$OLD/$NEW/g' $(git grep -l $OLD skipruntime-ts/**/package.json)`.
+
+4. Build and test with `make -C skipruntime-ts test`.
+
+5. Check that tests pass and changes to `package-lock.json` and
+   `**/package.json` files look reasonable, then git-commit with a message like `NPM
+   version $NEW`, git-tag with `v$NEW`, git-push, and open a PR.
+
+6. When you're ready to publish, run `make publish-all` and provide proper NPM
+   auth to publish the new package versions.
+
+7. Update docker-compose `./examples` package dependencies to the now-released
+   `$NEW` versions (e.g. with `sed -i '' 's/$OLD/$NEW/g' $(g grep -l $OLD
+   examples/**/package.json)`), make any necessary changes to keep them
+   building/running with the new versions, add those changes to your PR, and
+   land it!
+
+8. Release the Skip runtime binaries, as below.
+
+## Release Skip runtime binaries
+
+The `@skipruntime/native` node addon dynamically links to a native library
+containing the Skip runtime. The versions of the NPM package and binary
+release must match. Therefore whenever NPM packages are released the binary
+runtime release must be as well. The installation scripts download the
+binary runtime library from a github release tagged with `vM.N.O` where
+`M.N.O` is the version of the NPM packages.
+
+The release procedure for the runtime library binary is:
+
+1. Run `bin/build_runtime.sh` from a clean repo with HEAD at the commit that
+   was/will be used for version `M.N.O` of the NPM packages. This leaves
+   `libskipruntime.so-<OS>-<ARCH>` files in the `build` directory.
+
+2. Visit https://github.com/skiplabs/skip/releases/new
+
+3. Click "Choose a tag"
+
+4. Enter `vM.N.O` as the tag name
+
+5. Click "Create new tag...on publish"
+
+6. Enter a release title and description
+
+7. Attach `build/libskipruntime.so-linux-arm64` and `build/libskipruntime.so-linux-amd64`
+
+8. Click "Publish release"
+
+9. Test the new release by running `cd skipruntime-ts/tests/native_addon/ ; ./run.sh`

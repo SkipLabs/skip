@@ -1,0 +1,851 @@
+module SkipRuntime;
+
+@cpp_extern("SkipRuntime_getErrorHdl")
+@debug
+native fun getErrorHdl(exn: .Exception): Float;
+
+/************  NonEmptyIterator ****************/
+
+@export("SkipRuntime_NonEmptyIterator__next")
+fun nextOfNonEmptyIterator(
+  values: mutable SKStore.NonEmptyIterator<SKJSON.CJSON>,
+): ?SKJSON.CJSON {
+  values.next()
+}
+
+/************  Mapper ****************/
+
+@cpp_extern("SkipRuntime_Mapper__mapEntry")
+@debug
+native fun mapEntryOfMapper(
+  mapper: UInt32,
+  key: SKJSON.CJSON,
+  values: mutable SKStore.NonEmptyIterator<SKJSON.CJSON>,
+): SKJSON.CJArray;
+
+@cpp_extern("SkipRuntime_Mapper__getInfo")
+@debug
+native fun getInfoOfMapper(mapper: UInt32): SKJSON.CJObject;
+
+@cpp_extern("SkipRuntime_Mapper__isEquals")
+@debug
+native fun isEqualsOfMapper(mapper: UInt32, other: UInt32): UInt32;
+
+@cpp_extern("SkipRuntime_deleteMapper")
+@debug
+native fun deleteMapper(mapper: UInt32): void;
+
+@export("SkipRuntime_createMapper")
+fun createMapper(mapper: UInt32): ExternMapper {
+  ExternMapper(SKStore.ExternalPointer::create(mapper, deleteMapper))
+}
+
+class ExternMapper(eptr: SKStore.ExternalPointer) extends Mapper {
+  fun mapEntry(
+    key: SKJSON.CJSON,
+    values: mutable SKStore.NonEmptyIterator<SKJSON.CJSON>,
+  ): mutable Iterator<(SKJSON.CJSON, SKJSON.CJSON)> {
+    mapEntryOfMapper(this.eptr.value, key, values) match {
+    | SKJSON.CJArray(vals) ->
+      vals
+        .map(e ->
+          e match {
+          | SKJSON.CJArray(av) ->
+            optKey = av.maybeGet(0);
+            optVal = av.maybeGet(1);
+            (optKey, optVal) match {
+            | (Some(rkey), Some(rval)) -> (rkey, rval)
+            | _ -> invariant_violation("Invalid entry.")
+            }
+          | _ -> invariant_violation("Invalid entry.")
+          }
+        )
+        .iterator()
+    }
+  }
+
+  fun ==(other: SKStore.Mapper<SKStore.Key, SKStore.File>): Bool {
+    other match {
+    | ExternMapper(eptr) -> isEqualsOfMapper(this.eptr.value, eptr.value) != 0
+    | _ -> false
+    }
+  }
+
+  fun getName(): String {
+    `xx_${XXHash64.xxHash64String(
+      getInfoOfMapper(this.eptr.value).prettyPrint(),
+    )}`
+  }
+}
+
+/************  LazyCompute ****************/
+
+@cpp_extern("SkipRuntime_LazyCompute__compute")
+@debug
+native fun computeOfLazyCompute(
+  lazyCompute: UInt32,
+  self: String,
+  key: SKJSON.CJSON,
+): SKJSON.CJSON;
+
+@cpp_extern("SkipRuntime_LazyCompute__getInfo")
+@debug
+native fun getInfoOfLazyCompute(lazyCompute: UInt32): SKJSON.CJObject;
+
+@cpp_extern("SkipRuntime_LazyCompute__isEquals")
+@debug
+native fun isEqualsOfLazyCompute(lazyCompute: UInt32, other: UInt32): UInt32;
+
+@cpp_extern("SkipRuntime_deleteLazyCompute")
+@debug
+native fun deleteLazyCompute(lazyCompute: UInt32): void;
+
+@export("SkipRuntime_createLazyCompute")
+fun createLazyCompute(lazyCompute: UInt32): ExternLazyCompute {
+  ExternLazyCompute(
+    SKStore.ExternalPointer::create(lazyCompute, deleteLazyCompute),
+  )
+}
+
+class ExternLazyCompute(eptr: SKStore.ExternalPointer) extends LazyCompute {
+  fun computeFor(self: LazyCollection, key: SKJSON.CJSON): Array<SKJSON.CJSON> {
+    computeOfLazyCompute(this.eptr.value, self.getId(), key) match {
+    | SKJSON.CJArray(value) -> value
+    | _ -> invariant_violation("Invalid computed value.")
+    }
+  }
+
+  fun ==(other: SKStore.LazyCompute<SKStore.Key, SKStore.File>): Bool {
+    other match {
+    | ExternLazyCompute(eptr) ->
+      isEqualsOfLazyCompute(this.eptr.value, eptr.value) != 0
+    | _ -> false
+    }
+  }
+
+  fun getName(): String {
+    `xx_${XXHash64.xxHash64String(
+      getInfoOfLazyCompute(this.eptr.value).prettyPrint(),
+    )}`
+  }
+}
+
+/************  CollectionWriter ****************/
+
+@export("SkipRuntime_CollectionWriter__update")
+fun updateOfCollectionWriter(
+  collection: String,
+  values: SKJSON.CJArray,
+  isInit: Int32,
+): SKJSON.CJSON {
+  writer = CollectionWriter(SKStore.DirName::create(collection));
+  writer.update(
+    values match {
+    | SKJSON.CJArray(vs) ->
+      vs.map(v -> {
+        e = SKJSON.expectArray(v);
+        (e[0], SKJSON.expectArray(e[1]))
+      })
+    },
+    isInit != 0,
+  ) match {
+  | Success(handles) ->
+    SKJSON.CJArray(handles.map(h -> SKJSON.CJFloat(h.value)))
+  | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
+  };
+}
+
+/************  Resource ****************/
+
+@cpp_extern("SkipRuntime_Resource__instantiate")
+@debug
+native fun instantiateOfResource(
+  resource: UInt32,
+  collections: SKJSON.CJObject,
+): String;
+
+@cpp_extern("SkipRuntime_deleteResource")
+@debug
+native fun deleteResource(resource: UInt32): void;
+
+@export("SkipRuntime_createResource")
+fun createResource(resource: UInt32): ExternResource {
+  ExternResource(SKStore.ExternalPointer::create(resource, deleteResource))
+}
+
+class ExternResource(eptr: SKStore.ExternalPointer) extends Resource {
+  fun instantiate(collections: Map<String, Collection>): Collection {
+    collectionName = instantiateOfResource(
+      this.eptr.value,
+      collectionsByName(collections),
+    );
+    collectionForName(collectionName)
+  }
+}
+
+/************  Service ****************/
+
+@export("SkipRuntime_createService")
+fun createService(service: UInt32): ExternService {
+  ExternService(SKStore.ExternalPointer::create(service, deleteService))
+}
+
+@cpp_extern("SkipRuntime_deleteService")
+@debug
+native fun deleteService(service: UInt32): void;
+
+@cpp_extern("SkipRuntime_ServiceDefinition__createGraph")
+@debug
+native fun createGraphOfService(
+  service: UInt32,
+  collections: SKJSON.CJObject,
+): SKJSON.CJObject;
+
+@cpp_extern("SkipRuntime_ServiceDefinition__inputs")
+@debug
+native fun inputsOfService(service: UInt32): SKJSON.CJArray;
+
+@cpp_extern("SkipRuntime_ServiceDefinition__initialData")
+@debug
+native fun initialDataOfService(service: UInt32, input: String): SKJSON.CJArray;
+
+@cpp_extern("SkipRuntime_ServiceDefinition__resources")
+@debug
+native fun resourcesOfService(service: UInt32): SKJSON.CJArray;
+
+@cpp_extern("SkipRuntime_ServiceDefinition__buildResource")
+@debug
+native fun buildResourceOfService(
+  service: UInt32,
+  resource: String,
+  params: SKJSON.CJSON,
+): Resource;
+
+@cpp_extern("SkipRuntime_ServiceDefinition__subscribe")
+@debug
+native fun subscribeOfService(
+  service: UInt32,
+  supplier: String,
+  collection: String,
+  instance: String,
+  resource: String,
+  params: SKJSON.CJSON,
+): Float;
+
+@cpp_extern("SkipRuntime_ServiceDefinition__unsubscribe")
+@debug
+native fun unsubscribeOfService(
+  service: UInt32,
+  supplier: String,
+  instance: String,
+): void;
+
+@cpp_extern("SkipRuntime_ServiceDefinition__shutdown")
+@debug
+native fun shutdownOfService(service: UInt32): Float;
+
+class ExternService(eptr: SKStore.ExternalPointer) extends Service {
+  //
+  fun inputs(): Array<String> {
+    SKJSON.expectArray(inputsOfService(this.eptr.value)).map(SKJSON.asString)
+  }
+
+  fun initialData(name: String): Array<(SKJSON.CJSON, Array<SKJSON.CJSON>)> {
+    values = initialDataOfService(this.eptr.value, name);
+    SKJSON.expectArray(values).map(v -> {
+      e = SKJSON.expectArray(v);
+      (e[0], SKJSON.expectArray(e[1]))
+    })
+  }
+
+  fun resources(): Array<String> {
+    SKJSON.expectArray(resourcesOfService(this.eptr.value)).map(SKJSON.asString)
+  }
+
+  fun buildResource(name: String, parameters: SKJSON.CJSON): Resource {
+    buildResourceOfService(this.eptr.value, name, parameters)
+  }
+
+  fun createGraph(inputs: Map<String, Collection>): Map<String, Collection> {
+    names = createGraphOfService(this.eptr.value, collectionsByName(inputs));
+    map = mutable Map[];
+    names match {
+    | SKJSON.CJObject(nfields) ->
+      for (fieldName => field in nfields) {
+        map![fieldName] = collectionForName(SKJSON.asString(field));
+      }
+    };
+    map.chill()
+  }
+
+  fun subscribe(
+    supplier: String,
+    instance: String,
+    collection: CollectionWriter,
+    resource: String,
+    params: SKJSON.CJSON,
+  ): Waitable {
+    Waitable(
+      subscribeOfService(
+        this.eptr.value,
+        supplier,
+        collection.dirName.toString(),
+        instance,
+        resource,
+        params,
+      ),
+    )
+  }
+
+  fun unsubscribe(supplier: String, instance: String): void {
+    unsubscribeOfService(this.eptr.value, supplier, instance)
+  }
+
+  fun shutdown(): Waitable {
+    Waitable(shutdownOfService(this.eptr.value))
+  }
+
+  fun needResourceReload(name: String): ?Bool {
+    this.getChangeManager()
+      .map(m -> m.needResourceReload(name))
+      .default(Some(false));
+  }
+
+  fun needInputReload(name: String): Bool {
+    this.getChangeManager().map(m -> m.needInputReload(name)).default(false)
+  }
+
+  fun needExternalServiceReload(external: String, resource: String): Bool {
+    this.getChangeManager()
+      .map(m -> m.needExternalServiceReload(external, resource))
+      .default(false);
+  }
+
+  private fun getChangeManager(): ?ChangeManager {
+    manager = getChangeManager();
+    if (manager != 0) Some(ChangeManager(manager)) else None()
+  }
+}
+
+/************  ChangeManager ****************/
+
+@cpp_extern("SkipRuntime_getChangeManager")
+@debug
+native fun getChangeManager(): UInt32;
+
+@cpp_extern("SkipRuntime_ChangeManager__needResourceReload")
+@debug
+native fun needResourceReloadOfChangeManager(
+  manager: UInt32,
+  name: String,
+): UInt32;
+
+@cpp_extern("SkipRuntime_ChangeManager__needInputReload")
+@debug
+native fun needInputReloadOfChangeManager(
+  manager: UInt32,
+  name: String,
+): UInt32;
+
+@cpp_extern("SkipRuntime_ChangeManager__needExternalServiceReload")
+@debug
+native fun needExternalServiceReloadOfChangeManager(
+  manager: UInt32,
+  name: String,
+  resource: String,
+): UInt32;
+
+class ChangeManager(eptr: UInt32) {
+  fun needResourceReload(name: String): ?Bool {
+    needResourceReloadOfChangeManager(this.eptr, name).toInt() match {
+    | 1 -> Some(true)
+    | 2 -> Some(false)
+    | _ -> None()
+    }
+  }
+
+  fun needInputReload(name: String): Bool {
+    needInputReloadOfChangeManager(this.eptr, name) != 0
+  }
+
+  fun needExternalServiceReload(external: String, resource: String): Bool {
+    needExternalServiceReloadOfChangeManager(this.eptr, external, resource) != 0
+  }
+}
+
+/************  Collection ****************/
+
+@export("SkipRuntime_Collection__getArray")
+fun getArrayOfCollection(
+  collection: String,
+  key: SKJSON.CJSON,
+): SKJSON.CJArray {
+  SKJSON.CJArray(collectionForName(collection).getArray(key))
+}
+
+@export("SkipRuntime_Collection__map")
+fun mapOfCollection(collection: String, mapper: Mapper): String {
+  collectionForName(collection).map(mapper).getId()
+}
+
+@export("SkipRuntime_Collection__mapReduce")
+fun mapReduceOfCollection(
+  collection: String,
+  mapper: Mapper,
+  reducer: JSONReducer,
+): String {
+  collectionForName(collection).mapReduce(Some(mapper), reducer).getId()
+}
+
+@export("SkipRuntime_Collection__nativeMapReduce")
+fun nativeMapReduce(
+  collection: String,
+  mapper: Mapper,
+  reducer: String,
+): String {
+  collectionForName(collection).nativeMapReduce(Some(mapper), reducer).getId()
+}
+
+@export("SkipRuntime_Collection__reduce")
+fun reduceOfCollection(collection: String, reducer: JSONReducer): String {
+  collectionForName(collection).mapReduce(None(), reducer).getId()
+}
+
+@export("SkipRuntime_Collection__nativeReduce")
+fun nativeReduceOfCollection(collection: String, reducer: String): String {
+  collectionForName(collection).nativeMapReduce(None(), reducer).getId()
+}
+
+@export("SkipRuntime_Collection__slice")
+fun sliceOfCollection(collection: String, ranges: SKJSON.CJArray): String {
+  collectionForName(collection)
+    .sliced(
+      ranges match {
+      | SKJSON.CJArray(values) ->
+        values.map(v -> {
+          e = SKJSON.expectArray(v);
+          (e[0], e[1])
+        })
+      },
+    )
+    .getId()
+}
+
+@export("SkipRuntime_Collection__take")
+fun takeOfCollection(collection: String, limit: Int): String {
+  collectionForName(collection).take(limit).getId()
+}
+
+@export("SkipRuntime_Collection__merge")
+fun mergeOfCollection(collection: String, others: SKJSON.CJArray): String {
+  collectionForName(collection)
+    .merge(
+      others match {
+      | SKJSON.CJArray(values) ->
+        values.map(c -> collectionForName(SKJSON.asString(c)))
+      },
+    )
+    .getId()
+}
+
+@export("SkipRuntime_Collection__size")
+fun sizeOfCollection(collection: String): Int {
+  collectionForName(collection).size()
+}
+
+/************  LazyCollection ****************/
+
+@export("SkipRuntime_LazyCollection__getArray")
+fun getArrayOfLazyCollection(lazy: String, key: SKJSON.CJSON): SKJSON.CJArray {
+  SKJSON.CJArray(lazyForName(lazy).getArray(key))
+}
+
+/************  Notifier ****************/
+
+@cpp_extern("SkipRuntime_Notifier__subscribed")
+@debug
+native fun subscribedOfNotifier(notifier: UInt32): void;
+
+@cpp_extern("SkipRuntime_Notifier__notify")
+@debug
+native fun notifyOfNotifier(
+  notifier: UInt32,
+  values: SKJSON.CJArray,
+  watermark: String,
+  updates: Int32,
+): void;
+
+@cpp_extern("SkipRuntime_Notifier__close")
+@debug
+native fun closeOfNotifier(notifier: UInt32): void;
+
+@cpp_extern("SkipRuntime_deleteNotifier")
+@debug
+native fun deleteNotifier(notifier: UInt32): void;
+
+@export("SkipRuntime_createNotifier")
+fun createNotifier(notifier: UInt32): Notifier {
+  ExternNotifier(SKStore.ExternalPointer::create(notifier, deleteNotifier))
+}
+
+class ExternNotifier(eptr: SKStore.ExternalPointer) extends Notifier {
+  fun subscribed(): void {
+    subscribedOfNotifier(this.eptr.value)
+  }
+
+  fun notify(
+    values: Array<(SKJSON.CJSON, Array<SKJSON.CJSON>)>,
+    watermark: String,
+    updates: Bool,
+  ): void {
+    notifyOfNotifier(
+      this.eptr.value,
+      SKJSON.CJArray(
+        values.map(v -> SKJSON.CJArray(Array[v.i0, SKJSON.CJArray(v.i1)])),
+      ),
+      watermark,
+      Int32::truncate(if (updates) 1 else 0),
+    )
+  }
+
+  fun close(): void {
+    closeOfNotifier(this.eptr.value)
+  }
+}
+
+/************  Reducer ****************/
+
+@cpp_extern("SkipRuntime_Reducer__init")
+@debug
+native fun initOfReducer(reducer: UInt32): SKJSON.CJSON;
+
+@cpp_extern("SkipRuntime_Reducer__add")
+@debug
+native fun addOfReducer(
+  reducer: UInt32,
+  acc: SKJSON.CJSON,
+  value: SKJSON.CJSON,
+): SKJSON.CJSON;
+
+@cpp_extern("SkipRuntime_Reducer__remove")
+@debug
+native fun removeOfReducer(
+  reducer: UInt32,
+  acc: SKJSON.CJSON,
+  value: SKJSON.CJSON,
+): ?SKJSON.CJSON;
+
+@cpp_extern("SkipRuntime_Reducer__getInfo")
+@debug
+native fun getInfoOfReducer(mapper: UInt32): SKJSON.CJObject;
+
+@cpp_extern("SkipRuntime_Reducer__isEquals")
+@debug
+native fun isEqualsOfReducer(reducer: UInt32, other: UInt32): UInt32;
+
+@cpp_extern("SkipRuntime_deleteReducer")
+@debug
+native fun deleteReducer(reducer: UInt32): void;
+
+@export("SkipRuntime_createReducer")
+fun createReducer(reducer: UInt32): JSONReducer {
+  JSONReducer(SKStore.ExternalPointer::create(reducer, deleteReducer))
+}
+
+class JSONReducer(
+  eptr: SKStore.ExternalPointer,
+) extends Reducer<SKJSON.CJSON, SKJSON.CJSON> {
+  //
+  fun getInit(): SKJSON.CJSON {
+    initOfReducer(this.eptr.value)
+  }
+
+  fun getType(): SKStore.File ~> SKJSON.CJSON {
+    f ~> JSONFile::type(f).json
+  }
+
+  fun getAccType(): (
+    SKStore.File ~> SKJSON.CJSON,
+    SKJSON.CJSON ~> SKStore.File,
+  ) {
+    (f ~> JSONFile::type(f).json, v ~> JSONFile(v))
+  }
+
+  fun add(acc: SKJSON.CJSON, value: SKJSON.CJSON): SKJSON.CJSON {
+    addOfReducer(this.eptr.value, acc, value)
+  }
+
+  fun remove(acc: SKJSON.CJSON, value: SKJSON.CJSON): ?SKJSON.CJSON {
+    removeOfReducer(this.eptr.value, acc, value)
+  }
+
+  fun ==(other: SKStore.IReducer<SKStore.File>): Bool {
+    other match {
+    | JSONReducer(eptr) -> isEqualsOfReducer(this.eptr.value, eptr.value) != 0
+    | _ -> false
+    }
+  }
+
+  fun getName(): String {
+    `xx_${XXHash64.xxHash64String(
+      getInfoOfReducer(this.eptr.value).prettyPrint(),
+    )}`
+  }
+}
+
+/************  Runtime ****************/
+
+@export("SkipRuntime_Runtime__createResource")
+fun createResourceOfRuntime(
+  identifier: String,
+  resource: String,
+  params: SKJSON.CJSON,
+): SKJSON.CJSON {
+  runWithResult(context ~> {
+    createReactiveResource(context, identifier, resource, params)
+  }) match {
+  | Success(handles) ->
+    SKJSON.CJArray(handles.map(h -> SKJSON.CJFloat(h.value)))
+  | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
+  }
+}
+
+@export("SkipRuntime_Runtime__getAll")
+fun getAllOfRuntime(resource: String, params: SKJSON.CJSON): SKJSON.CJSON {
+  runWithResult(context ~> {
+    res = getAll(context, resource, params);
+    /* Ensure all resources closed at right time */
+    updateContext(context);
+    res
+  }) match {
+  | Success(values) ->
+    SKJSON.CJArray(
+      values.values.map(v -> SKJSON.CJArray(Array[v.i0, SKJSON.CJArray(v.i1)])),
+    )
+  | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
+  }
+}
+
+@export("SkipRuntime_Runtime__getForKey")
+fun getForKeyOfRuntime(
+  resource: String,
+  params: SKJSON.CJSON,
+  key: SKJSON.CJSON,
+): SKJSON.CJSON {
+  runWithResult(context ~> {
+    res = getForKey(context, resource, params, key);
+    /* Ensure all resources closed at right time */
+    updateContext(context);
+    res
+  }) match {
+  | Success(values) -> SKJSON.CJArray(values)
+  | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
+  };
+}
+
+@export("SkipRuntime_Runtime__closeResource")
+fun closeResourceOfRuntime(identifier: String): Float {
+  runWithResult(context ~> {
+    closeReactiveResource(context, identifier)
+  }) match {
+  | Success _ -> 0.0
+  | Failure(err) -> getErrorHdl(err)
+  };
+}
+
+@export("SkipRuntime_Runtime__subscribe")
+fun subscribeOfRuntime(
+  reactiveId: String,
+  notifier: Notifier,
+  watermark: ?String,
+): Int {
+  runWithResult(context ~> {
+    subscribe(context, reactiveId, notifier, watermark)
+  }) match {
+  | Success(id) -> id
+  | Failure(err) -> -getErrorHdl(err).toInt()
+  };
+}
+
+@export("SkipRuntime_Runtime__unsubscribe")
+fun unsubscribeOfRuntime(session: String): Float {
+  runWithResult(context ~> {
+    unsubscribe(context, session)
+  }) match {
+  | Success _ -> 0.0
+  | Failure(err) -> getErrorHdl(err)
+  };
+}
+
+@export("SkipRuntime_Runtime__update")
+fun updateOfRuntime(input: String, values: SKJSON.CJArray): SKJSON.CJSON {
+  runWithResult(context ~> {
+    update(
+      context,
+      input,
+      values match {
+      | SKJSON.CJArray(vs) ->
+        vs.map(v -> {
+          e = SKJSON.expectArray(v);
+          (e[0], SKJSON.expectArray(e[1]))
+        })
+      },
+    )
+  }) match {
+  | Success(handles) ->
+    SKJSON.CJArray(handles.map(h -> SKJSON.CJFloat(h.value)))
+  | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
+  }
+}
+
+@export("SkipRuntime_Runtime__fork")
+fun forkOfRuntime(name: String): Float {
+  try {
+    if (!SKStore.gHasContext()) {
+      SKStore.gContextInit(initCtx());
+    };
+    SKStore.forkNoGc(name, getFork());
+    0.0
+  } catch {
+  | err -> getErrorHdl(err)
+  }
+}
+
+@export("SkipRuntime_Runtime__merge")
+fun mergeForkForOfRuntime(streamsToIgnore: SKJSON.CJArray): Float {
+  streamsToIgnore match {
+  | SKJSON.CJArray(values) ->
+    ignore = values.iterator().map(SKJSON.asString).collect(Set);
+    try {
+      getFork().each(f ->
+        SKStore.mergeForkNoGc(f, SKStore.ForkSettings::keepall(ignore))
+      );
+      0.0
+    } catch {
+    | err -> getErrorHdl(err)
+    }
+  }
+}
+
+@export("SkipRuntime_Runtime__abortFork")
+fun abortForkOfRuntime(): Float {
+  try {
+    getFork().each(fork -> SKStore.removeForkNoGc(fork));
+    0.0
+  } catch {
+  | err -> getErrorHdl(err)
+  }
+}
+
+@export("SkipRuntime_Runtime__forkExists")
+fun forkExistsOfRuntime(name: String): UInt32 {
+  UInt32::truncate(if (SKStore.forkExists(name)) 1 else 0);
+}
+
+@export("SkipRuntime_Runtime__reload")
+fun reloadOfRuntime(service: Service): SKJSON.CJSON {
+  reload(service) match {
+  | Success(handles) ->
+    SKJSON.CJArray(
+      Array[
+        SKJSON.CJArray(handles.i0.map(h -> SKJSON.CJFloat(h.value))),
+        SKJSON.CJArray(handles.i1.map(h -> SKJSON.CJString(h))),
+      ],
+    )
+  | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
+  };
+}
+
+@export("SkipRuntime_Runtime__closeResourceStreams")
+fun closeResourceStreamOfRuntime(streams: SKJSON.CJArray): Float {
+  streams match {
+  | SKJSON.CJArray(values) ->
+    runWithResult(context ~> {
+      closeReactiveSessions(
+        context,
+        values.iterator().map(SKJSON.asString).collect(Vector),
+      )
+    }) match {
+    | Success _ -> 0.0
+    | Failure(err) -> getErrorHdl(err)
+    }
+  }
+}
+
+/************ Context ****************/
+
+@export("SkipRuntime_Context__createLazyCollection")
+fun lazyOfContext(compute: LazyCompute): String {
+  createLazyCollection(compute).getId()
+}
+
+@export("SkipRuntime_Context__jsonExtract")
+fun jsonExtractOfContext(
+  from: SKJSON.CJObject,
+  pattern: String,
+): SKJSON.CJArray {
+  SKJSON.CJArray(jsonExtract(from, pattern))
+}
+
+@export("SkipRuntime_Context__useExternalResource")
+fun useExternalResource(
+  service: String,
+  identifier: String,
+  params: SKJSON.CJSON,
+): String {
+  useExternalCollection(service, identifier, params).getId()
+}
+
+/************ initService ****************/
+
+@export("SkipRuntime_initService")
+fun initSkipRuntimeService(service: Service): SKJSON.CJSON {
+  initService(service) match {
+  | Success(handles) ->
+    SKJSON.CJArray(handles.map(h -> SKJSON.CJFloat(h.value)))
+  | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
+  };
+}
+
+/************ closeService ****************/
+
+@export("SkipRuntime_closeService")
+fun closeSkipRuntimeService(): Float {
+  closeService() match {
+  | Success(handle) -> handle.value
+  | Failure(err) -> -getErrorHdl(err)
+  };
+}
+
+class ExternalException(
+  type: String,
+  message: String,
+  stack: String,
+) extends .Exception {
+  fun getMessage(): String {
+    this.message
+  }
+}
+
+@export("SkipRuntime_throwExternalException")
+fun throwExternalException(type: String, message: String, stack: String): void {
+  throw ExternalException(type, message, stack)
+}
+
+@export("SkipRuntime_getExceptionStack")
+fun getExceptionStack(exn: .Exception): ?String {
+  exn match {
+  | ExternalException(_, _, stack) -> Some(stack)
+  | _ -> None()
+  }
+}
+
+@export("SkipRuntime_getExceptionType")
+fun getExceptionType(exn: .Exception): String {
+  exn match {
+  | ExternalException(type, _, _) -> type
+  | _ -> exn.getClassName()
+  }
+}
+
+module end;

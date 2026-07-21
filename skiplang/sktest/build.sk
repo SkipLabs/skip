@@ -1,0 +1,11 @@
+fun main(): void {
+  target = Environ.var("TARGET");
+
+  extra_srcs = target match {
+  | "wasm32-unknown-unknown" -> Array["extra/src/wasm32.sk"]
+  | _ -> Array["extra/src/host.sk"]
+  };
+
+  extra_srcs.each(src -> print_string(`skargo:skc-extra-source=${src}`));
+  extra_srcs.each(src -> print_string(`skargo:rerun-if-changed=${src}`))
+}

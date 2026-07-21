@@ -1,0 +1,1064 @@
+module alias P = SQLParser;
+
+module SKCSV;
+
+class PrivacyWriteViolation() extends Exception {}
+
+fun requiresEscape(ch: Char): .Bool {
+  !Chars.isPrintableAscii(ch) || (ch == '"') || (ch == '\\');
+}
+
+// this deviates from 'standard' csv. it actually uses the json
+// escaping algorithm. this is for 2 reasons:
+// 1. this approach is very well battle tested and accounts for more
+//    things than csv usually considers.
+// 2. we have logic that assumes that a row is represented on a single
+//    line (e.g. looking for checkpoint markers). standard csv allows for
+//    line breaks in strings and this wreaks havoc. it'll also hurt
+//    line-based buffering.
+// this is all ok as the csv we produce is not meant to be public
+// facing. and ultimately we plan to replace this with a binary
+// format.
+fun charToString(ch: Char): String {
+  if (!requiresEscape(ch)) {
+    ch.toString()
+  } else {
+    addCode = (chars, code) -> {
+      chars.push('\\');
+      chars.push('u');
+      Chars.intToHexDigits(code, 4).each(chars.push);
+    };
+    ch match {
+    | '\\' -> "\\\\"
+    | '"' -> "\\\""
+    | '\b' -> "\\b"
+    | '\f' -> "\\f"
+    | '\n' -> "\\n"
+    | '\r' -> "\\r"
+    | '\t' -> "\\t"
+    | _ if (Chars.isBasicMultiLingualPlane(ch)) ->
+      chars = mutable Vector<Char>[];
+      addCode(chars, ch.code());
+      String::fromChars(chars.toArray())
+    | _ ->
+      chars = mutable Vector<Char>[];
+      (high, low) = Chars.toUTF16SurrogatePair(ch);
+      addCode(chars, high);
+      addCode(chars, low);
+      String::fromChars(chars.toArray())
+    };
+  }
+}
+
+fun escapeString(s: String): String {
+  s.search(requiresEscape) match {
+  | None() -> "\"" + s + "\""
+  | Some _ ->
+    strings = mutable Vector<String>[];
+    strings.push("\"");
+    s.each(ch -> {
+      strings.push(charToString(ch))
+    });
+    strings.push("\"");
+    strings.join("")
+  };
+}
+
+fun eatHexDigits(iter: () -> Char): Int {
+  result = mutable Vector[];
+  for (_ in Range(0, 4)) result.push(iter());
+  Chars.hexDigitsToInt(result.join(""));
+}
+
+fun decodeString(iter: () -> Char): String {
+  result = mutable Vector[];
+  loop {
+    iter() match {
+    | '"' -> break String::fromChars(result.toArray())
+    | '\\' ->
+      iter() match {
+      | '"' -> result.push('"')
+      | '\\' -> result.push('\\')
+      | '/' -> result.push('/')
+      | 'b' -> result.push('\b')
+      | 'f' -> result.push('\f')
+      | 'n' -> result.push('\n')
+      | 'r' -> result.push('\r')
+      | 't' -> result.push('\t')
+      | 'u' ->
+        leadingCode = eatHexDigits(iter);
+        if (!Chars.isSurrogate(leadingCode)) {
+          result.push(Char::fromCode(leadingCode));
+        } else if (Chars.isLowSurrogate(leadingCode)) {
+          invariant_violation("Trailing surrogate without leading surrogate");
+        } else {
+          trailingCode = eatHexDigits(iter);
+          if (!Chars.isLowSurrogate(trailingCode)) {
+            invariant_violation("Bad low surrogate");
+          };
+          result.push(Chars.fromSurrogatePair(leadingCode, trailingCode));
+        }
+      | _ -> invariant_violation("Invalid escape sequence in CSV string")
+      }
+    | ch if (Chars.isControlC0(ch)) ->
+      invariant_violation("Control C0 character in CSV string: " + ch.code())
+    | x -> result.push(x)
+    }
+  };
+}
+
+fun lex(next: () -> Char): mutable Iterator<(Bool, String)> {
+  acc = mutable Vector[];
+  processingString = false;
+  loop {
+    next() match {
+    | '\n' ->
+      if (!processingString) {
+        yield (false, String::fromChars(acc.toArray()))
+      };
+      break void
+    | '"' if (!processingString) ->
+      !processingString = true;
+      yield (true, decodeString(next))
+    | ',' ->
+      if (!processingString) {
+        yield (false, String::fromChars(acc.toArray()))
+      };
+      acc.clear();
+      !processingString = false
+    | x -> acc.push(x)
+    }
+  }
+}
+
+base class CValue {
+  children =
+  | CInt(Int)
+  | CFloat(Float)
+  | CString(String)
+}
+
+fun trim(chars: Array<Char>): Array<Char> {
+  i = 0;
+  while (i < chars.size() && chars[i] == ' ') !i = i + 1;
+  j = chars.size();
+  while (j - 1 >= 0 && chars[j - 1] == ' ') !j = j - 1;
+  chars.slice(i, j)
+}
+
+fun parseCSVValue(kv: (Bool, String)): P.Value {
+  (isStr, str) = kv;
+  if (isStr) return P.VString(str);
+  if (str == "") return P.VNull();
+  str.toIntOption() match {
+  | None() ->
+    str.toFloatOption() match {
+    | None() -> P.VString(str)
+    | Some(f) -> P.VFloat(f)
+    }
+  | Some(x) -> P.VInt(x)
+  }
+}
+
+fun reasonSchemaUnsupported(
+  origContext: readonly SKStore.Context,
+  table: String,
+  schemaStr: String,
+): ?String {
+  context = origContext.mclone();
+
+  parseResult = try {
+    Some(P.Parser::create(table).parseCreate())
+  } catch {
+  | _ -> None()
+  };
+  (tableName, actualSchema) = parseResult match {
+  | Some(P.CreateTableSchema{name, schema}) ->
+    (SKStore.SID(name.lower), schema.columns)
+  | _ ->
+    return Some(
+      "Malformed create-table statement given: " + inspect(table).toString(),
+    )
+  };
+
+  if (SKDB.getTableDir(context).maybeGet(context, tableName) is None()) {
+    return Some(`Table '${tableName}' does not exist.`)
+  };
+
+  if (actualSchema.any(x ~> x.unique is Some _)) {
+    return Some("Cannot mirror tables with unique constraints.")
+  };
+
+  if (actualSchema.all(x ~> x.name != SKDB.skdbAccessColName)) {
+    return Some(
+      `Cannot mirror tables without ${SKDB.skdbAccessColName.origName} column.`,
+    )
+  };
+
+  if (schemaStr != "*") {
+    try {
+      Some(P.Parser::create(schemaStr).parseCreateTableSchema().columns)
+    } catch {
+    | _exn -> None()
+    } match {
+    | None() ->
+      return Some(
+        "Malformed schema: expects parenthesized column-separated list of column definitions.",
+      )
+    | Some(requestedSchema) ->
+      for (col in requestedSchema) {
+        if (!actualSchema.contains(col)) {
+          return Some(
+            `Incompatible schema: unknown or incorrectly-defined column ${
+              col.name
+            }`,
+          )
+        }
+      };
+
+      for (col in actualSchema) {
+        if (
+          col.notNull is Some _ &&
+          col.default is None _ &&
+          !requestedSchema.contains(col)
+        ) {
+          return Some(
+            `Incompatible schema unsupported: missing required column ${
+              col.name
+            }`,
+          )
+        }
+      }
+    }
+  };
+  None()
+}
+
+// How to produce a value for a given column in translateFromSourceSchema:
+// CTSourceIdx -> get it from position `idx` in input row
+// CTNull -> nullable column, leave null
+// CTDefault -> column with default, evaluate the default expr
+base class ColumnTranslation {
+  children =
+  | CTSourceIdx(idx: Int)
+  | CTNull()
+  | CTDefault(expr: P.Expr)
+}
+
+fun translateFromSourceSchema(
+  sourceSchema: Array<P.ColumnDefinition>,
+  actualSchema: Array<P.ColumnDefinition>,
+): (SKDB.RowValues, mutable SKStore.Context) -> SKDB.RowValues {
+  rowConstructor = actualSchema.map(colDef ->
+    sourceSchema.indexOf(colDef) match {
+    | Some(idx) -> CTSourceIdx(idx)
+    | None() ->
+      colDef.default match {
+      | Some(P.CCDefault{expr}) -> CTDefault(expr)
+      | None() ->
+        colDef.notNull match {
+        | None() -> CTNull()
+        | Some(_) ->
+          invariant_violation(
+            "Can't transform to schema with missing non-nullable fields",
+          )
+        }
+      }
+    }
+  );
+  (row, context) -> {
+    values: Array<?SKDB.CValue> = rowConstructor.map(cTranslation ->
+      cTranslation match {
+      | CTNull() -> None()
+      | CTSourceIdx(idx) -> row.values[idx]
+      | CTDefault(expr) -> SKDB.evaluateDefault(context, expr)
+      }
+    );
+    SKDB.RowValues::create(values, row.repeat)
+  }
+}
+
+fun lwwEdits(
+  table: SKDB.DirDescr,
+  snapshot: Int,
+  writer: SKStore.Path,
+  primaryIdxOpt: ?Int,
+  context: mutable SKStore.Context,
+  dir: SKStore.EagerDir,
+  row: SKDB.RowValues,
+): mutable Iterator<
+  (SKStore.Key, (SKStore.Path, SKStore.Path, Array<SKStore.File>)),
+> {
+  primaryIdx = primaryIdxOpt match {
+  | None() -> invariant_violation("Using LWW without a primary key.")
+  | Some(p) -> p
+  };
+  indexEntry = SKDB.makeIndexEntry(table.name, primaryIdx);
+  indexTable = SKDB.getIndexByColNbr(context);
+  indexes = indexTable.unsafeGetArray(context, indexEntry);
+  invariant(indexes.size() > 0);
+  index = indexes[0];
+  indexDir = context.unsafeGetEagerDir(index.dirName);
+  primaryKey = row.getValue(primaryIdx);
+  startKey = SKDB.RowKey::create(
+    SKDB.RowValues::create(Array[primaryKey], 1),
+    index.fields,
+  );
+  entries = mutable Vector[];
+
+  keepingCurrent = false;
+  iter = indexDir.unsafeGetFileIter(Some(startKey));
+  loop {
+    (key, valueIter) = iter.next() match {
+    | None() -> break void
+    | Some(x) -> x
+    };
+    rowKey = SKDB.RowKey::keyType(key);
+    valueIter.next() match {
+    | None() -> continue
+    | _ -> void
+    };
+    if (rowKey.getRowValues().getValue(0) != primaryKey) break void;
+
+    for ((tick, source, _) in dir.getDataIterWithoutTombs(context, key)) {
+      if (
+        tick.value < snapshot ||
+        source == writer ||
+        rowKey.getRowValues() < row
+      ) {
+        entries.push((key, (source, writer, Array<SKStore.File>[])));
+      } else {
+        !keepingCurrent = true;
+        break void;
+      }
+    }
+  };
+
+  if (!keepingCurrent) {
+    for (entry in entries) yield entry;
+    yield (
+      SKDB.RowKey::create(row, table.kinds),
+      (writer, writer, Array<SKStore.File>[row]),
+    );
+  }
+}
+
+fun applyDiffStrategy(
+  table: SKDB.DirDescr,
+  identity: Int,
+  rebuild: Bool,
+  sourceRows: Array<SKDB.RowValues>,
+  sourceSchema: ?Array<P.ColumnDefinition>,
+  checkpoint: ?Int,
+  snapshot: ?Int,
+  userFileOpt: ?SKDB.UserFile,
+  sourceOverride: ?SKStore.Path = None(),
+): ((
+  mutable SKStore.Context,
+  mutable SKStore.Context,
+  SKStore.Context,
+) ~> void) {
+  writer = SKStore.Path::iid(table.dirName, identity);
+
+  shouldShortCircuitUpdate = (context) ~> {
+    previouslySeen = SKDB.getWatermark(
+      context,
+      table.name.lower,
+      Some(identity),
+    );
+    (checkpoint, previouslySeen) match {
+    | (Some(x), Some(y)) if (x <= y.value) -> true
+    | _ -> false
+    };
+  };
+
+  checkpointAndAck = (context, delta) ~> {
+    // the feedback table tracks the local writes that have been
+    // acknowledged - and as a result controls purging for clients.
+    // seed this if it hasn't already been done. this prevents a large
+    // initial mirror from purging and then wrongly triggering a
+    // rebuild.
+    SKDB.getWatermark(
+      context,
+      SKDB.feedbackTable(table.name.lower),
+      Some(identity),
+    ) match {
+    | None() ->
+      SKDB.setWatermark(
+        context,
+        SKDB.feedbackTable(table.name.lower),
+        identity,
+        delta.getTick(),
+      )
+    | _ -> void
+    };
+    checkpoint match {
+    // we do not checkpoint 0. this value communicates that you
+    // haven't received a full snapshot yet. it's used for e.g.
+    // chunking an initial mirror. once the value is > 0 we have
+    // received a consistent snapshot and should checkpoint and ack.
+    | Some(val) if (val > 0) ->
+      checkpointTick = SKStore.Tick(val);
+      SKDB.setWatermark(context, table.name.lower, identity, checkpointTick);
+      // if there is a sourceOverride, the client doesn't know about this table,
+      // and we've already ack'ed the table they are aware of.
+      if (sourceOverride.isNone()) {
+        delta.setGlobal(
+          "Ack",
+          SKDB.StdoutCheckpointAck(
+            table.name.origName,
+            checkpointTick,
+            delta.getGlobal("Ack").map(SKDB.StdoutCheckpointAck::type),
+          ),
+        )
+      }
+    | _ -> void
+    }
+  };
+
+  primaryIdx = for ((i, type) in table.schema.items()) {
+    if (type.primary is Some _) {
+      break Some(i)
+    }
+  } else {
+    None()
+  };
+
+  privacyIsOk = (context) ~> {
+    userFileOpt match {
+    | None() -> true
+    | Some(userFile) ->
+      accessSolver = SKDB.AccessSolver::create(context, userFile.name);
+      tableName = table.name.origName;
+      authorCol = SKDB.getAuthorIdx(table);
+      accessCol = SKDB.getAccessIdx(table);
+      rows = sourceSchema match {
+      | None() -> sourceRows.iterator()
+      | Some(schema) ->
+        translator = translateFromSourceSchema(schema, table.schema);
+        sourceRows.iterator().map(row -> translator(row, context))
+      };
+      for (row in rows) {
+        SKDB.checkUserCanWriteRow(
+          context,
+          accessSolver,
+          tableName,
+          authorCol,
+          accessCol,
+          row,
+        ) match {
+        | SKDB.AROK() -> void
+        | SKDB.ARError(err) ->
+          print_error("Error: " + err.toString());
+          break false
+        }
+      } else {
+        true
+      }
+    }
+  };
+
+  // we have several update strategies:
+
+  // assignRows - if there are no constraints on the table then we
+  // treat the relations as a multiset CRDT. inserts beat deletes when
+  // concurrent.
+  assignRows = (newRoot, delta, root) ~> {
+    if (shouldShortCircuitUpdate(root)) {
+      checkpointAndAck(newRoot, delta);
+      return void;
+    };
+
+    if (!privacyIsOk(newRoot)) {
+      throw PrivacyWriteViolation()
+    };
+    if (sourceOverride.isSome()) {
+      newRoot.!sourceOverride = sourceOverride
+    };
+
+    rows = sourceSchema match {
+    | None() -> sourceRows.iterator()
+    | Some(schema) ->
+      translator = translateFromSourceSchema(schema, table.schema);
+      sourceRows.iterator().map(row -> translator(row, newRoot))
+    };
+
+    dir = newRoot.unsafeGetEagerDir(table.dirName);
+
+    !dir = SKStore.withRegionFoldRec(
+      Some(newRoot),
+      rows,
+      dir,
+      (optContext, row, newDir) ~> {
+        ctx = optContext.fromSome();
+        key: SKStore.Key = SKDB.RowKey::create(row.setRepeat(1), table.kinds);
+        for ((tick, source, _) in newDir.unsafeGetDataIterWithoutTombs(key)) {
+          if (tick.value < snapshot.default(0) || source == writer) {
+            !newDir = newDir.writeEntry(
+              ctx,
+              source,
+              writer,
+              key,
+              Array<SKStore.File>[],
+              true,
+            );
+          }
+        };
+
+        if (row.repeat > 0) {
+          !newDir = newDir.writeEntry(
+            ctx,
+            writer,
+            writer,
+            SKDB.RowKey::create(row, table.kinds),
+            Array[row],
+            true,
+          );
+        };
+
+        // update incrementally to keep memory usage down. this has a
+        // significant effect for large write sets and negligible
+        // impact on performance
+        ctx.setDir(newDir);
+        ctx.update();
+
+        newDir
+      },
+    );
+
+    newRoot.setDir(dir);
+    newRoot.update();
+    newRoot.!sourceOverride = None();
+    checkpointAndAck(newRoot, delta)
+  };
+
+  // lwwRows - if there is a unique constraint on the table (e.g. a
+  // PK) then we resolve this using LWW. the total order is formed
+  // using the vector clock. concurrent tiebreaks use the row data.
+  lwwRows = (newRoot, delta, root) ~> {
+    if (shouldShortCircuitUpdate(root)) {
+      checkpointAndAck(newRoot, delta);
+      return void;
+    };
+
+    if (!privacyIsOk(newRoot)) {
+      throw PrivacyWriteViolation()
+    };
+    if (sourceOverride.isSome()) {
+      newRoot.!sourceOverride = sourceOverride
+    };
+
+    rows = sourceSchema match {
+    | None() -> sourceRows.iterator()
+    | Some(schema) ->
+      translator = translateFromSourceSchema(schema, table.schema);
+      sourceRows.iterator().map(row -> translator(row, newRoot))
+    };
+
+    dir = newRoot.unsafeGetEagerDir(table.dirName);
+
+    !dir = SKStore.withRegionFoldRec(
+      Some(newRoot),
+      rows,
+      dir,
+      (optContext, row, newDir) ~> {
+        ctx = optContext.fromSome();
+        if (row.repeat < 1) {
+          key: SKStore.Key = SKDB.RowKey::create(row.setRepeat(1), table.kinds);
+          for ((tick, source, _) in newDir.unsafeGetDataIterWithoutTombs(key)) {
+            if (tick.value < snapshot.default(0) || source == writer) {
+              !newDir = newDir.writeEntry(
+                ctx,
+                source,
+                writer,
+                key,
+                Array[],
+                true,
+              );
+            }
+          };
+        } else {
+          for (edit in lwwEdits(
+            table,
+            snapshot.default(0),
+            writer,
+            primaryIdx,
+            ctx,
+            newDir,
+            row,
+          )) {
+            (editKey, (editSrc, editWriter, editFiles)) = edit;
+            !newDir = newDir.writeEntry(
+              ctx,
+              editSrc,
+              editWriter,
+              editKey,
+              editFiles,
+              true,
+            );
+          };
+        };
+
+        // update incrementally to keep memory usage down. this has a
+        // significant effect for large write sets and negligible
+        // impact on performance
+        ctx.setDir(newDir);
+        ctx.update();
+
+        newDir
+      },
+    );
+
+    newRoot.setDir(dir);
+    newRoot.update();
+    newRoot.!sourceOverride = None();
+    checkpointAndAck(newRoot, delta)
+  };
+
+  // rebuild - this peer fell off the lead 'tail caravan' and got too
+  // far behind. we now need to cold start by rebuilding the table.
+  rebuildRows = (newRoot, _delta, _root) ~> {
+    dir = newRoot.unsafeGetEagerDir(table.dirName);
+
+    // so we don't wipe out unsynced rows
+    isEligibleForTomb = (tick, source) ~>
+      tick.value < snapshot.default(0) || source == writer;
+
+    !dir = dir.resetForRebuild(newRoot, writer, isEligibleForTomb);
+
+    SKDB.resetWatermark(newRoot, table.name.lower, identity);
+
+    newRoot.setDir(dir);
+    newRoot.update(); // TODO: could we not do this so we don't get a blip?
+  };
+
+  if (rebuild) {
+    rebuildRows;
+  } else if (primaryIdx is Some _) {
+    lwwRows;
+  } else {
+    assignRows
+  };
+}
+
+fun parseHeader(
+  context: mutable SKStore.Context,
+  line: String,
+): (SKDB.DirDescr, ?Int) {
+  if (!line.startsWith("^")) {
+    invariant_violation("Not a header")
+  };
+
+  tableAndSnapshot = line.stripPrefix("^").split(" ", 2);
+  table = tableAndSnapshot.maybeGet(0) match {
+  | None() -> invariant_violation("no table found")
+  | Some(t) -> SKDB.getTable(context, 0, P.Name::create(t))
+  };
+
+  (table, tableAndSnapshot.maybeGet(1).map(x -> x.toInt()))
+}
+
+fun parseCheckpoint(line: String): Int {
+  if (!line.startsWith(":")) {
+    invariant_violation("Not a checkpoint")
+  };
+
+  line.stripPrefix(":").toInt()
+}
+
+fun parseTableChange(
+  context: SKStore.Context,
+  table: SKDB.DirDescr,
+  line: String,
+): Array<SKDB.RowValues> {
+  SKStore.withRegionValue(() ~> {
+    if (line.startsWith("^") || line.startsWith(":") || line.startsWith("\t")) {
+      invariant_violation("Not a table change")
+    };
+
+    chars: mutable Vector<Char> = mutable Vector[];
+    iter = line.getIter();
+    repeat = loop {
+      c = iter.next() match {
+      | None() ->
+        print_error("Error: unexpected end of line");
+        skipExit(23)
+      | Some(x) -> x
+      };
+      if (c == '\t') {
+        break String::fromChars(chars.toArray()).toInt()
+      };
+      if (c < '0' || c > '9') {
+        print_error("Error: expected an integer");
+        skipExit(23)
+      };
+      chars.push(c);
+    };
+
+    // parse out the remainder of the line - the csv values
+    str = line.sub(iter, line.length() - chars.size() - 1);
+    values = mutable Vector[];
+    strIter = str.getIter();
+    next = () -> {
+      val = strIter.next();
+      val match {
+      | None() -> '\n'
+      | Some(x) -> x
+      }
+    };
+    for (value in lex(next)) {
+      values.push(value);
+    };
+    cvalues = values.map(parseCSVValue);
+    // empty params since no placeholders in skdb diff write-csv
+    params: Map<String, P.Value> = Map[];
+    SKDB.computeInsert(
+      context.mclone(),
+      params,
+      false,
+      0,
+      None(),
+      Array[cvalues.toArray()],
+      table,
+      repeat,
+    );
+  })
+}
+
+class FinalTableDiff(
+  table: SKDB.DirDescr,
+  snapshot: ?Int,
+  rebuild: Bool,
+  rows: Array<SKDB.RowValues>,
+  sourceSchema: ?Array<P.ColumnDefinition>,
+  lines: Array<String>,
+) {}
+
+mutable class TableDiff(
+  table: SKDB.DirDescr,
+  sourceSchema: ?Array<P.ColumnDefinition>,
+  snapshot: ?Int,
+  mutable rebuild: Bool,
+  rows: mutable Vector<SKDB.RowValues>,
+  lines: mutable Vector<String>,
+) {
+  static fun create(
+    table: SKDB.DirDescr,
+    sourceSchema: ?Array<P.ColumnDefinition>,
+    snapshot: ?Int,
+  ): mutable this {
+    mutable static(
+      table,
+      sourceSchema,
+      snapshot,
+      false,
+      mutable Vector[],
+      mutable Vector[],
+    )
+  }
+
+  readonly fun freeze(): FinalTableDiff {
+    FinalTableDiff(
+      this.table,
+      this.snapshot,
+      this.rebuild,
+      this.rows.toArray(),
+      this.sourceSchema,
+      this.lines.toArray(),
+    )
+  }
+}
+
+fun buildDiffChain(
+  context: mutable SKStore.Context,
+  userFileOpt: ?SKDB.UserFile,
+  tableDiffs: Array<FinalTableDiff>,
+  identity: Int,
+  checkpoint: Int,
+): ?((
+  mutable SKStore.Context,
+  mutable SKStore.Context,
+  SKStore.Context,
+) ~> void) {
+  strategies = Vector::mcreate();
+
+  tableDiffs.each(td -> {
+    strategies.push(
+      applyDiffStrategy(
+        td.table,
+        identity,
+        td.rebuild,
+        td.rows,
+        td.sourceSchema,
+        Some(checkpoint),
+        td.snapshot,
+        userFileOpt,
+      ),
+    );
+
+    td.sourceSchema match {
+    | Some(schema) if (!schema.all(x -> td.table.schema.contains(x))) ->
+      extractedTableWrites = SKDB.propagateRowsToExtractedTables(
+        context,
+        td.table,
+        schema,
+        td.rows,
+      );
+      for (diff in extractedTableWrites.items()) {
+        (descr, rows) = diff;
+        strategies.push(
+          applyDiffStrategy(
+            descr,
+            identity,
+            td.rebuild,
+            rows,
+            None(),
+            Some(checkpoint),
+            td.snapshot,
+            userFileOpt,
+            Some(SKStore.Path::iid(td.table.dirName, identity)),
+          ),
+        );
+      }
+    | _ -> void
+    }
+  });
+
+  strategiesArray = strategies.toArray();
+
+  Some((newRoot, delta, root) ~> {
+    try {
+      for (strategy in strategiesArray) {
+        strategy(newRoot, delta, root)
+      }
+    } catch {
+    | exn ->
+      writer = mutable Debug.BufferedWriter(print_raw, 4096);
+      for (tdiff in tableDiffs) {
+        nack(writer, tdiff)
+      };
+      writer.flush();
+      throw exn
+    }
+  })
+}
+
+mutable class DiffParsingState(
+  tableDiffs: mutable Vector<mutable TableDiff>,
+  currentDiff: mutable TableDiff,
+)
+
+fun nack(writer: mutable Debug.BufferedWriter, diff: FinalTableDiff): void {
+  writer.write("^" + SKDB.feedbackTable(diff.table.name.origName) + "\n");
+  for (line in diff.lines) {
+    writer.write(line);
+    writer.write("\n")
+  }
+}
+
+fun replayDiff(
+  context: mutable SKStore.Context,
+  getLine: () -> ?String,
+  user: ?String,
+  identity: Int,
+  schemas: Map<String, Array<P.ColumnDefinition>>,
+  rebuildsEnabled: Bool,
+): SKStore.ContextOp {
+  SKDB.getReplicationState(context, Some(identity)) match {
+  | Some(SKDB.RSError()) ->
+    print_raw(":reboot\n");
+    return SKStore.CStop(None())
+  | _ -> void
+  };
+
+  userFileOpt = user.map(x -> SKDB.UserFile::create(context, x));
+  immContext = context.clone();
+  state: ?(mutable DiffParsingState) = None();
+  try {
+    loop {
+      line = getLine() match {
+      | Some(l) -> l
+      | None() -> break SKStore.CStop(None())
+      };
+      !state = state match {
+      | None() if (line == "") -> None()
+      | None() if (String.getByte(line, 0) != 94) -> // !startsWith("^")
+        None()
+
+      | None() ->
+        (table, snapshot) = parseHeader(context, line);
+        schema = schemas.maybeGet(table.name.toString());
+        Some(
+          mutable DiffParsingState(
+            mutable Vector[],
+            TableDiff::create(table, schema, snapshot),
+          ),
+        )
+
+      | Some(
+        DiffParsingState(tableDiffs, currentDiff),
+      ) if (String.getByte(line, 0) == 94) -> // startsWith("^")
+        (table, snapshot) = parseHeader(context, line);
+        schema = schemas.maybeGet(table.name.toString());
+        tableDiffs.push(currentDiff);
+        Some(
+          mutable DiffParsingState(
+            tableDiffs,
+            TableDiff::create(table, schema, snapshot),
+          ),
+        )
+
+      | Some(
+        DiffParsingState(tableDiffs, currentDiff),
+      ) if (String.getByte(line, 0) == 58) -> // startsWith(":")
+        currentDiff.lines.push(line);
+        tableDiffs.push(currentDiff);
+        checkpoint = parseCheckpoint(line);
+
+        break SKStore.CContinue(
+          buildDiffChain(
+            context,
+            userFileOpt,
+            tableDiffs.map(td -> td.freeze()).toArray(),
+            identity,
+            checkpoint,
+          ),
+        )
+
+      | current @ Some(DiffParsingState(_, currentDiff)) if (
+        line == "!rebuild"
+      ) ->
+        if (!rebuildsEnabled) {
+          SKDB.setReplicationState(context, identity, SKDB.RSError());
+          invariant_violation("Received rebuild when processing disabled.")
+        };
+        currentDiff.!rebuild = true;
+        current
+
+      | current @ Some(DiffParsingState(_, currentDiff)) ->
+        currentDiff.lines.push(line); // capture the raw input for if we end up rejecting the txn
+        table = currentDiff.sourceSchema match {
+        | Some(schema) -> currentDiff.table with {schema}
+        | None() -> currentDiff.table
+        };
+        newRows = parseTableChange(immContext, table, line);
+        currentDiff.rows.extend(newRows);
+        current
+      };
+    }
+  } catch {
+  | EndOfFile _ ->
+    // we expect streams to be cut, not an error. but let's not
+    // apply changes that aren't guaranteed complete and consistent.
+    SKStore.CStop(None())
+  | SKDB.IgnoreAndContinue _ ->
+    flushStdout();
+    SKStore.CContinue(None())
+  | exn ->
+    print_error(exn.getMessage());
+    SKStore.CStop(None())
+  }
+}
+
+fun replayStdin(): Map<String, (Int, Int)> {
+  txNbr = 0;
+  all = mutable Map<String, (Int, Int)>[];
+  tx = mutable Map<String, (Int, Int)>[];
+  commit = () -> {
+    for (x => y in tx) {
+      all![x] = y
+    };
+    tx.clear();
+    !txNbr = txNbr + 1;
+  };
+  lineNbr = 1;
+  loop {
+    line = read_line() match {
+    | None() -> break all.chill()
+    | Some("") -> continue
+    | Some(l) -> l
+    };
+    chars: mutable Vector<Char> = mutable Vector[];
+    iter = line.getIter();
+    skip = false;
+    checkpoint = false;
+    loop {
+      c = iter.next() match {
+      | None() ->
+        print_error("Error, line " + lineNbr + ": unexpected end of line");
+        skipExit(23)
+      | Some('^') ->
+        !skip = true;
+        break void
+      | Some('!') ->
+        !skip = true;
+        break void
+      | Some(':') ->
+        !checkpoint = true;
+        break void
+      | Some(x) -> x
+      };
+      if (c == '\t') {
+        if (chars.size() == 0 || chars[0] == '\t') {
+          break void
+        } else {
+          break void
+        }
+      };
+      if (c < '0' || c > '9') {
+        print_error("Error, line " + lineNbr + ": expected an integer key");
+        skipExit(23)
+      };
+      chars.push(c);
+    };
+    if (skip) {
+      continue;
+    };
+    if (checkpoint) {
+      commit();
+      continue;
+    };
+    repeat = String::fromChars(chars.toArray()).toInt();
+    value = line.sub(iter, line.length() - chars.size() - 1);
+    tx![value] = (txNbr, repeat);
+    !lineNbr = lineNbr + 1;
+  }
+}
+
+module end;
+
+module SKStore;
+
+extension base class EagerDir {
+  fun resetForRebuild(
+    context: mutable Context,
+    writer: Path,
+    wasSeen: (Tick, Path) ~> Bool,
+  ): this {
+    this.unsafeGetFileIter().each(kv -> {
+      (key, valueIter) = kv;
+      valueIter.next() match {
+      | None() -> void
+      | Some _ ->
+        this.unsafeGetDataIterWithoutTombs(key).each(kv -> {
+          (tick, source, _values) = kv;
+          // do not wipe out data that has not yet been seen
+          if (wasSeen(tick, source)) {
+            !this = this.writeEntry(
+              context,
+              source,
+              writer,
+              key,
+              Array[],
+              true, // force: reset is low-level and we wish to ignore any safeguards
+            )
+          }
+        })
+      }
+    });
+
+    this
+  }
+}
+
+module end;

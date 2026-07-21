@@ -1,0 +1,182 @@
+module Base64;
+
+/* Base64 mapping */
+// printer-ignore
+const standardBase64: Array<Char> = Array[
+  'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
+  'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd',
+  'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's',
+  't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3', '4', '5', '6', '7',
+  '8', '9', '+', '/',
+];
+
+const urlBase64: Array<Char> = Array[
+  'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
+  'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd',
+  'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's',
+  't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3', '4', '5', '6', '7',
+  '8', '9', '-', '_',
+];
+
+
+/**
+ * This array is a lookup table that translates Unicode characters drawn from the "Base64 Alphabet" (as specified
+ * in Table 1 of RFC 2045) into their 6-bit positive integer equivalents. Characters that are not in the Base64
+ * alphabet but fall within the bounds of the array are translated to -1.
+ *
+ * Note: '+' and '-' both decode to 62. '/' and '_' both decode to 63. This means decoder seamlessly handles both
+ * URL_SAFE and STANDARD base64. (The encoder, on the other hand, needs to know ahead of time what to emit).
+ */
+const decodeTable:  Array<Int> = Array[
+// 0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F
+  -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, // 00-0f
+  -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, // 10-1f
+  -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 62, -1, 62, -1, 63, // 20-2f + - /
+  52, 53, 54, 55, 56, 57, 58, 59, 60, 61, -1, -1, -1, -1, -1, -1, // 30-3f 0-9
+  -1,  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, // 40-4f A-O
+  15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, -1, -1, -1, -1, 63, // 50-5f P-Z _
+  -1, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, // 60-6f a-o
+  41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51                      // 70-7a p-z
+];
+
+fun decode(str: String): Array<UInt8> {
+  // Return empty array if input is empty
+  if (str.isEmpty()) {
+    return Array[];
+  };
+  // Convert string to character vector
+  chars = str.chars();
+
+  // strip whitespace or line breaks
+  !chars = chars.filter(c -> c != '\n' && c != '\r' && c != ' ');
+  charsLen = chars.size();
+
+  // Base64 input length must be a multiple of 4
+  invariant(charsLen % 4 == 0, "Invalid Base64 data");
+
+  // Estimate decoded output length, adjusting for '=' padding characters
+  len = charsLen * 3 / 4;
+  if (charsLen > 1 && chars[charsLen - 1] == '=') {
+    !len = len - 1;
+    if (chars[charsLen - 2] == '=') {
+      !len = len - 1;
+    }
+  };
+  dbuf = Array<UInt8>::mfill(len, UInt8::truncate(0));
+  decode_(dbuf, chars);
+  dbuf.chill();
+}
+
+fun decodeString(encoded: String): String {
+  utf8 = decode(encoded);
+  String::fromUtf8(utf8);
+}
+
+private fun decode_(dbuf: mutable Array<UInt8>, chars: Vector<Char>): void {
+  dt = decodeTable;
+  i = 0;
+  j = 0;
+
+  while (i + 3 < chars.size() && j < dbuf.size()) {
+    aChar = chars[i];
+    bChar = chars[i + 1];
+    cChar = chars[i + 2];
+    dChar = chars[i + 3];
+    if (aChar == '=' || bChar == '=') break void;
+
+    a = dt[aChar.code()];
+    b = dt[bChar.code()];
+    c = dt[cChar.code()];
+    d = dt[dChar.code()];
+    invariant(a != -1 && b != -1, "Invalid Base64 data");
+
+    if (j < dbuf.size()) {
+      // Byte 1
+      dbuf.set(j, UInt8::truncate(a.shl(2) + b.and(0x30).shr(4)));
+      !j = j + 1;
+    };
+    if (j < dbuf.size()) {
+      // Byte 2
+      invariant(c != -1, "Invalid Base64 data");
+      dbuf.set(j, UInt8::truncate(b.and(0x0f).shl(4) + c.and(0x3c).shr(2)));
+      !j = j + 1;
+    };
+    if (j < dbuf.size()) {
+      // Byte 3
+      invariant(d != -1, "Invalid Base64 data");
+      dbuf.set(j, UInt8::truncate(c.and(0x03).shl(6) + d));
+      !j = j + 1;
+    };
+    !i = i + 4;
+  }
+}
+
+/**
+ * Base64 encode
+ */
+fun encode(str: String, urlSafe: Bool = false): Array<UInt8> {
+  encodeString(str, urlSafe).utf8()
+}
+
+fun encodeString(str: String, urlSafe: Bool = false): String {
+  if (str.isEmpty()) {
+    return ""
+  };
+  encodeBytes(str.utf8(), urlSafe);
+}
+
+fun encodeBytes(bytes: Array<UInt8>, urlSafe: Bool = false): String {
+  ret = mutable Vector<Char>[];
+  table = if (urlSafe) {
+    urlBase64
+  } else {
+    standardBase64
+  };
+  i = 0;
+  charArray3 = Array::mfill(3, 0);
+  push = vec -> {
+    vec.push(table[charArray3[0].and(0xfc).shr(2)]);
+    vec.push(
+      table[charArray3[0].and(0x03).shl(4) + charArray3[1].and(0xf0).shr(4)],
+    );
+    vec.push(
+      table[charArray3[1].and(0x0f).shl(2) + charArray3[2].and(0xc0).shr(6)],
+    );
+    vec.push(table[charArray3[2].and(0x3f)]);
+  };
+  bytes.each(byte -> {
+    charArray3.set(i, byte.toInt());
+    !i = i + 1;
+    if (i == 3) {
+      push(ret);
+      !i = 0;
+    }
+  });
+  if (i > 0) {
+    for (j in Range(i, 3)) {
+      charArray3.set(j, 0);
+    };
+    tmp = mutable Vector<Char>[];
+    push(tmp);
+    for (j in Range(0, i + 1)) {
+      ret.push(tmp[j]);
+    };
+    while (i < 3) {
+      ret.push('=');
+      !i = i + 1;
+    }
+  };
+  String::fromChars(ret.toArray());
+}
+
+@export("SKIP_Base64_encode")
+fun b64Encode(bytes: Array<UInt8>): String {
+  encodeBytes(bytes)
+}
+
+@export("SKIP_Base64_decode")
+fun b64Decode(encoded: String): Array<UInt8> {
+  decode(encoded)
+}
+
+module end;

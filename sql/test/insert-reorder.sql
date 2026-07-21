@@ -1,0 +1,5 @@
+CREATE TABLE t(id INTEGER PRIMARY KEY, x VARCHAR(10));
+INSERT INTO t(id, x) VALUES (0, 'foo');
+INSERT INTO t(id, x) VALUES (1, 'bar');
+INSERT INTO t(x, id) VALUES ('baz', 2);
+SELECT * FROM t;

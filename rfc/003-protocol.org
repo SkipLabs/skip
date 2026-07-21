@@ -1,0 +1,178 @@
+#+TITLE: SKDB Replication Protocol
+* Overview
+
+We have the following entities that need to communicate
+
+#+BEGIN_EXAMPLE
+  SKDB <--[local pipe]--> Server Orchestrator <--[TCP Socket]--> Client Orchestrator <--[shared memory]--> SKDB
+#+END_EXAMPLE
+
+The client and server communicate with each other using a stack that
+looks like this
+
+#+BEGIN_EXAMPLE
+  +---------------------------------------+
+  |                                       |
+  |         Replication Protocol          |
+  |                                       |
+  +---------------------------------------+
+  |                                       |
+  |          Websocket Protocol           |
+  |                                       |
+  +---------------------------------------+
+  |                                       |
+  |               TCP/IP                  |
+  |                                       |
+  +---------------------------------------+
+#+END_EXAMPLE
+
+The ~replication protocol~ is responsible for establishing an
+authenticated connection, controlling which collections to mirror, and
+transferring updates from the server to the client.
+
+The ~Websocket protocol~ (WS) is the standard WS protocol, defined in
+RFC 6455. It provides a handshake that is useful for routing to the
+correct database shard, tunnelling over HTTP, and a lightweight
+framing. This encodes payload sizes for us.
+
+And TCP/IP I won't describe.
+
+* Protocol
+
+There is a connection-level state machine:
+
+#+BEGIN_EXAMPLE
+  ,* -------------> IDLE
+                    ||
+           +--------+|
+           |         |
+           |         V
+           |    AUTHENTICATED
+           |         |
+           |         |
+           |         |
+           |         V
+           +----> CLOSED
+#+END_EXAMPLE
+
+- Initial -> IDLE :: this happens on connection establishment as
+  provided by WS/TCP/IP
+
+- IDLE -> AUTHENTICATED :: on receiving an authentication message that
+  is successful
+
+- IDLE -> CLOSED :: on receiving an authentication message that is not
+  successful or an error from the underlying WS stack
+
+- AUTHENTICATED -> CLOSED :: on receiving an error from the underlying
+  WS stack
+
+In the ~CLOSED~ state, nothing may be sent or received.
+
+** Back-pressure
+
+There is currently no flow control mechanism. With multiplexing this
+is normally necessary but we control the client and server. We may not
+need this as we can be cooperative. We create the protocol without it
+to avoid unnecessary complexity.
+
+If it is needed in the future we can introduce a windowed credit-based
+system (like HTTP/2) with a new message type. We also have some flex
+with the auth message carrying a version and some reserved bits.
+
+Clients should honour the robustness principle and ignore messages
+they don't understand.
+
+** Messages/framing
+
+We use a binary serialisation with the following layout.
+
+Where not specified, strings are UTF-8.
+
+*** Base frame (all frames derive/specialise this)
+
+- type (8)
+- payload
+  - This is the remainder of the Websocket message. Each frame type
+    specialises this.
+
+*** Auth/init
+
+(N: <field> means <field> starts at byte offset N)
+
+- 0: type = 0x0
+- payload
+  - 1: protocol version (8)
+  - 2: reserved (24) - must be zeroed
+  - 4: pubkey (65 * 8 = 520) - ECDSA public key
+  - 69: nonce (8 * 8 = 64)
+  - 77: timestamp (8 * 8 = 64)
+  - 85: signature (64 * 8 = 256) - ECDSA signature
+  - 149: client_version (client_version_length * 8) - ASCII encoded
+    string identifying this client
+
+
+*** Error/goaway
+
+- type = 0x1
+- payload
+  - error code (32) - see section below on errors
+  - msg (msg_length * 8)
+
+*** Tail data
+
+- type = 0x2
+- payload
+  - tick (64)
+  - collection_name_len (8)
+  - collection_name (collection_name_len * 8) -- ASCII
+  - UTF-8 encoded JSON payload
+
+*** Request tail
+
+- type = 0x3
+- payload
+  - since (64)
+  - collection_name (collection_name_length * 8) -- ASCII
+
+*** Abort tail
+
+- type = 0x4
+- payload
+  - collection_name (collection_name_length * 8) -- ASCII
+
+*** Request tail batch
+
+- type = 0x5
+- payload
+  - TODO
+
+*** Ping
+
+- type = 0x6
+
+*** Pong
+
+- type = 0x7
+
+* [stale] Errors
+
+Error code ranges have the following semantics.
+
+- [0, 1000) - below replication layer and/or ambiguous/unknown
+  - 0 - non-specific failure - do not assume anything
+
+- [1000, 2000) - replication layer
+  - 1000 - non-specific failure - do not assume anything
+
+  - 1001 - protocol failure - unexpected or invalid message, invalid
+    state machine transition - do not retry without re-establishing
+    the session
+
+  - 1002 - authentication failure - do not retry with same credentials
+
+  - 1003 - session timed out - by design the client should
+    retry/re-establish
+
+  - 1004 - like an HTTP 404 - cannot connect to the resource, it
+    cannot be found or does not exist. Do not retry the same session.

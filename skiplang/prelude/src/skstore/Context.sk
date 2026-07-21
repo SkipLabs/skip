@@ -1,0 +1,2563 @@
+/*****************************************************************************/
+/* File defining the context.
+ *
+ * The context is almost always mutable (unless it is copied to the shared
+ * heap).
+ *
+ * It keeps track of all the manipulation of the file system. Directories,
+ * dependencies etc ...
+ */
+/*****************************************************************************/
+
+module SKStore;
+
+base class Postponable
+
+base class UPostponable extends Postponable {
+  fun perform(context: mutable Context): void;
+}
+
+base class FPostponable(created: Tick) extends Postponable {
+  protected fun perform(context: Context): void;
+
+  fun check(context: Context, forkStart: ?Tick): ?(() ~> void) {
+    forkStart match {
+    | Some(start) if (start <= this.created) ->
+      Some(() ~> this.perform(context))
+    | None() -> Some(() ~> this.perform(context))
+    | _ -> None()
+    }
+  }
+}
+
+/*****************************************************************************/
+/* Sessions. */
+/*****************************************************************************/
+
+base class CmdMultipleDirs {
+  children =
+  | NUpdates{fileName: String}
+  | NNotify{fileName: String}
+  | NTail()
+}
+
+base class CmdKind
+
+class NMultipleDirs(CmdMultipleDirs, Array<DirSub>) extends CmdKind
+
+base class NWatch{
+  dirNameGetter: readonly Context ~> DirName,
+  from: Tick,
+  close: () ~> void,
+} extends CmdKind uses Unsafe.Downcastable
+
+class TNWatch<K: Key, F: File>{
+  fn: (Array<(K, Array<F>)>, Tick, Bool) ~> void,
+} extends NWatch
+
+value class Sub(
+  lock: Mutex,
+  cond: Condition,
+  cmd: CmdKind,
+  destinationSource: ?Int,
+) {
+  fun dirNames(context: readonly Context): mutable Iterator<DirName> {
+    this.cmd match {
+    | NWatch{dirNameGetter} -> Some(dirNameGetter(context)).iterator()
+    | NMultipleDirs(_, dirSubs) ->
+      dirSubs.iterator().map(dirSub -> dirSub.dirName)
+    }
+  }
+}
+
+class DirSub(
+  dirName: DirName,
+  entity: String,
+  format: OutputFormat,
+  // the watermark is per-dir because tables can be added and removed
+  // from the mirror-set: they don't necessarily all move forward in
+  // lock-step.
+  getDestinationWatermark: (readonly Context) ~> ?Tick,
+  // this is a dir-specific filter
+  filter: (readonly Context, Bool, DirName) ~> (Key -> Bool) = (_, _, _) ~>
+    (_ -> true),
+)
+
+/*****************************************************************************/
+/* Unique number generator. */
+/*****************************************************************************/
+
+// Untracked because it draws from a global counter: two identical calls must
+// not be merged, or the "unique" ids collide. @allow_tracked_call keeps the
+// tracked callers (Path::iid, skjson, the back end's type ids) compiling.
+@allow_tracked_call
+@cpp_extern("SKIP_genSym")
+untracked native fun genSym(Int): Int;
+
+@intrinsic
+native fun const_typed_symbol<T>(): Int;
+
+/*****************************************************************************/
+/* Constants */
+/*****************************************************************************/
+
+const debugMode: Bool = false;
+
+/*****************************************************************************/
+/* The types used to manage dependencies. */
+/*****************************************************************************/
+
+// An Arrow represent an operation from a parent to a child.
+// Typically, a map is a transformation that associates a value from a parent
+// to a child. The association between the two is called an Arrow.
+
+value class Arrow(parentName: DirName, childName: DirName) uses Orderable
+
+// An ArrowKey, is an Arrow plus a key (the key is from the parent).
+// This type is used to describe the root of a dependency on an EagerMap.
+// Let's say we have a directory A mapped to B. So B is the result of a map
+// applied to A with a given function.
+
+// If during the transformation from A to B, a key is read in a third directory,
+// we will need to remember that the read occurred while processing a map
+// from A to B on the key K. Hence the type:
+// ArrowKey{parentName => A, childName => B, key => K}.
+// If the read happens during the computation of the result of key K for a lazy
+// directory A, both the child and the parent are the same and equal to A.
+
+base class ArrowKey protected {
+  parentName: DirName,
+  childName: DirName,
+} uses Orderable, Unsafe.Downcastable, Show {
+  fun getKeyString(): String;
+}
+
+class TArrowKey<K: Orderable & Show>{key: K} extends ArrowKey {
+  static fun create{parentName: DirName, childName: DirName, key: K}: this {
+    static{parentName, childName, key}
+  }
+
+  fun getKeyString(): String {
+    this.key.toString()
+  }
+
+  fun compare(other: ArrowKey): Order {
+    this.parentName.compare(other.parentName) match {
+    | EQ() -> void
+    | neq -> return neq
+    };
+    this.childName.compare(other.childName) match {
+    | EQ() -> void
+    | neq -> return neq
+    };
+    tOther = Unsafe.cast(other, static);
+    this.key.compare(tOther.key)
+  }
+
+  fun toString(): String {
+    `${this.parentName}[${this.getKeyString()}] => ${this.childName}`
+  }
+}
+
+/*****************************************************************************/
+/* The function used to start the system. */
+/*****************************************************************************/
+
+fun run(f: (mutable Context) -> void): mutable Context {
+  context = Context::mcreate{};
+  f(context);
+  context.initPre();
+  context
+}
+
+/*****************************************************************************/
+/* Dependencies tracking. */
+/*****************************************************************************/
+
+value class Deps private (
+  private data: SortedMap<Path, SortedSet<ArrowKey>> = SortedMap[],
+  private idata: HashMap<DirName, SortedSet<Path>> = HashMap[],
+) {
+  static fun empty(): this {
+    Deps()
+  }
+
+  fun maybeGet(path: Path): ?SortedSet<ArrowKey> {
+    this.data.maybeGet(path)
+  }
+
+  fun set(path: Path, arrowKey: ArrowKey): this {
+    set = this.data.maybeGet(path) match {
+    | None() -> SortedSet[]
+    | Some(x) -> x
+    };
+    !set = set.set(arrowKey);
+    !this.data[path] = set;
+    !this = this.iset(arrowKey.childName, path);
+    this
+  }
+
+  fun maybeGetReads(
+    parent: DirName,
+    child: DirName,
+  ): SortedMap<ArrowKey, SortedSet<Path>> {
+    reads = SortedMap<ArrowKey, SortedSet<Path>>[];
+    this.idata.maybeGet(child).each(paths ->
+      paths.each(path ->
+        this.data.get(path)
+          .filter(ak -> ak.parentName == parent && ak.childName == child)
+          .each(ak ->
+            reads.maybeGet(ak) match {
+            | Some(pSet) -> !reads = reads.set(ak, pSet.set(path))
+            | _ -> !reads = reads.set(ak, SortedSet[path])
+            }
+          )
+      )
+    );
+    reads
+  }
+
+  private fun iset(dirName: DirName, arrow: Path): this {
+    iset = this.idata.maybeGet(dirName) match {
+    | None() -> SortedSet[]
+    | Some(x) -> x
+    };
+    !iset = iset.set(arrow);
+    !this.idata[dirName] = iset;
+    this
+  }
+
+  private fun iremove(dirName: DirName, arrow: Path): this {
+    iset = this.idata.maybeGet(dirName) match {
+    | None() -> SortedSet[]
+    | Some(x) -> x
+    };
+    !iset = iset.remove(arrow);
+    if (iset.isEmpty()) {
+      !this.idata = this.idata.remove(dirName);
+    } else {
+      !this.idata[dirName] = iset;
+    };
+    this
+  }
+
+  fun remove(path: Path, arrowKey: ArrowKey): this {
+    set = this.data.maybeGet(path) match {
+    | None() -> SortedSet[]
+    | Some(x) -> x
+    };
+    !set = set.remove(arrowKey);
+    if (set.isEmpty()) {
+      !this.data = this.data.remove(path)
+    } else {
+      !this.data[path] = set
+    };
+    !this = this.iremove(arrowKey.childName, path);
+    this
+  }
+
+  fun removeDir(dirName: DirName): this {
+    paths = this.idata.maybeGet(dirName) match {
+    | None() -> return this
+    | Some(x) -> x
+    };
+    for (path in paths) {
+      this.data.maybeGet(path) match {
+      | None() -> continue
+      | Some(vset) ->
+        !this.data[path] = vset.filter(x ->
+          !(x.parentName == dirName || x.childName == dirName)
+        )
+      }
+    };
+    !this.idata = this.idata.remove(dirName);
+    this
+  }
+}
+
+/*****************************************************************************/
+/* Value classes for tick and time. We use them to make sure we never treat
+ * them as integer. */
+/*****************************************************************************/
+
+value class Tick(value: Int) uses Orderable, Show {
+  fun next(): this {
+    !this.value = this.value + 1;
+    this
+  }
+
+  fun prev(): this {
+    !this.value = this.value - 1;
+    this
+  }
+
+  fun toString(): String {
+    this.value.toString()
+  }
+}
+
+class TickFile(value: Tick) extends File uses Orderable
+
+/* Time refers to the creation time of a directory.
+   Context#time is increased using Context#timeStamp() when a directory is created.
+   It is stored in the last element of the TimeStack of the directory.
+
+   Times and TimeStacks are used to order directory updates.
+   Context#toUpdate is used as a priority queue.
+ */
+value class Time(value: Int) uses Orderable, Show {
+  fun next(): this {
+    !this.value = genSym(this.value + 1);
+    this
+  }
+  fun toString(): String {
+    this.value.toString()
+  }
+
+  fun negate(): this {
+    !this.value = -this.value;
+    this
+  }
+}
+
+class TimeStack private (
+  private values: /* Invariant: non-empty array */ Array<Time>,
+) uses Orderable {
+  static fun createInput(time: Time): this {
+    static(Array[time])
+  }
+
+  static fun create(context: readonly Context, time: Time): this {
+    context.currentTimeStack() match {
+    | None() -> static::createInput(time)
+    | Some(timeStack) -> timeStack.extend(time)
+    }
+  }
+
+  fun extend(time: Time): this {
+    !this.values = this.values.concat(Array[time]);
+    this
+  }
+
+  fun getLast(): Time {
+    this.values.last()
+  }
+
+  fun negate(): this {
+    !this.values = this.values.map(x -> -x);
+    this
+  }
+}
+
+/*****************************************************************************/
+/* Tells the context if we can reuse directories or not. */
+/*****************************************************************************/
+
+base class CanReuse {
+  children =
+  | CRNever()
+  | CRAlways(except: SortedSet<DirName>)
+  | CRIfMatch()
+}
+
+/*****************************************************************************/
+/* Checks if a write should be allowed (only useful when using the */
+/* database as a specific user). */
+/*****************************************************************************/
+
+/* This base class is mutable only because its only child is mutable because
+   of a cache, otherwise it behaves as if it wasn't mutable. A frozen clone
+   and a mutable clone must behave identically. */
+mutable base class WriteChecker {
+  mutable fun checkWrite(
+    context: readonly Context,
+    dirName: DirName,
+    key: Key,
+    files: Array<File>,
+  ): void;
+
+  readonly fun mclone(): mutable WriteChecker;
+}
+
+/*****************************************************************************/
+/* The context */
+/*****************************************************************************/
+
+/* Because a context may be cloned shallowly, its fields types must be frozen
+   or behave as if they were.
+   E.g. its only mutable-typed field is writeChecker which is mutable only
+   because of a cache.
+*/
+mutable class Context private {
+  private mutable toPurge: SortedSet<DirName> = SortedSet[],
+  private mutable dirs: Dirs = Dirs{},
+  mutable reads: SortedSet<Path> = SortedSet[],
+  private mutable time: Time = Time(0),
+  /* Invariant: tick is only updated at the end of updateWithStatus */
+  private mutable tick: Tick = Tick(1),
+  private mutable lazyCapacity: Int = 10,
+  private mutable toUpdate: SortedMap<(TimeStack, Time), Arrow> = SortedMap[],
+  private mutable deps: Deps = Deps::empty(),
+  mutable debugMode: Bool = debugMode,
+  private mutable hasPre: SortedSet<DirName> = SortedSet[],
+  mutable newDirs: SortedSet<DirName> = SortedSet[],
+  mutable globals: SortedMap<String, File> = SortedMap[],
+  private mutable persistents: SortedMap<String, File> = SortedMap[],
+  private mutable dirty: SortedMap<DirName, KeySet> = SortedMap[],
+  private mutable dirtyReaders: /* parentName => childName => keys */ SortedMap<
+    DirName,
+    SortedMap<DirName, KeySet>,
+  > = SortedMap[],
+  mutable canReuse: CanReuse = CRIfMatch(),
+  private mutable arrowStack: List<(ArrowKey, TimeStack)> = List[],
+  private mutable lazyGets: SortedMap<DirName, KeySet> = SortedMap[],
+  private mutable lazyGetsQueue: Queue<SortedMap<DirName, KeySet>> = Queue[],
+  private mutable lazyGetsRefCount: SortedMap<
+    DirName,
+    KeyMap<Int>,
+  > = SortedMap[],
+  private mutable sessions: SortedMap<String, Sub> = SortedMap[],
+  private mutable postponables: Queue<UPostponable> = Queue[],
+  private mutable fpostponables: Queue<FPostponable> = Queue[],
+  private mutable dirsWithSharedSubDirs: SortedSet<DirName> = SortedSet[],
+  private mutable sharedSubDirsRefCount: SortedMap<DirName, Int> = SortedMap[],
+  mutable writeChecker: ?(mutable WriteChecker) = None(),
+  mutable purgeFrom: (readonly Context, Dir) ~> Tick = (ctx, _) ~>
+    Tick(ctx.getTick().value - 1000),
+  mutable sourceOverride: ?Path = None(),
+  mutable fromContext: ?Context = None(),
+} {
+  static fun create{canReuse: CanReuse = CRIfMatch()}: this {
+    static{canReuse}
+  }
+
+  static fun mcreate{}: mutable this {
+    mutable static{}
+  }
+
+  fun withGlobals(globals: SortedMap<String, File>): this {
+    this with {globals}
+  }
+
+  mutable fun copyDir(from: Context, dirName: DirName): Bool {
+    if (this.unsafeMaybeGetEagerDir(dirName).isSome()) {
+      throw DirAlreadyExists(dirName)
+    };
+    from.unsafeGetDir(dirName) match {
+    | DeletedDir _ -> false
+    | lazy @ LazyDir _ ->
+      this.setDir(lazy);
+      true
+    | eager @ EagerDir _ ->
+      if (eager.input) {
+        this.setDir(eager)
+      } else {
+        _ = EagerDir::importDir(this, from, dirName)
+      };
+      true
+    }
+  }
+
+  readonly fun maybeGetReads(
+    parent: DirName,
+    child: DirName,
+  ): SortedMap<ArrowKey, SortedSet<Path>> {
+    this.deps.maybeGetReads(parent, child)
+  }
+
+  readonly fun isWithSharedSubDirs(dirName: DirName): Bool {
+    this.dirsWithSharedSubDirs.contains(dirName)
+  }
+
+  mutable fun setWithSharedSubDirs(dirName: DirName): void {
+    this.!dirsWithSharedSubDirs = this.dirsWithSharedSubDirs.set(dirName)
+  }
+
+  mutable fun incrRefCount(dirName: DirName): void {
+    this.!sharedSubDirsRefCount = this.sharedSubDirsRefCount.set(
+      dirName,
+      this.sharedSubDirsRefCount.maybeGet(dirName).default(0) + 1,
+    )
+  }
+
+  mutable fun decrRefCount(dirName: DirName): Bool {
+    ref = this.sharedSubDirsRefCount.maybeGet(dirName).default(1) - 1;
+    if (ref == 0) {
+      this.!sharedSubDirsRefCount = this.sharedSubDirsRefCount.remove(dirName)
+    } else {
+      this.!sharedSubDirsRefCount = this.sharedSubDirsRefCount.set(dirName, ref)
+    };
+    ref == 0
+  }
+
+  mutable fun postpone(postponable: Postponable): void {
+    postponable match {
+    | u @ UPostponable _ -> this.!postponables = this.postponables.push(u)
+    | f @ FPostponable _ -> this.!fpostponables = this.fpostponables.push(f)
+    }
+  }
+
+  mutable fun addToUpdate(
+    timeStack: TimeStack,
+    parentTime: Time,
+    arrow: Arrow,
+  ): void {
+    this.!toUpdate = this.toUpdate.set((timeStack, parentTime), arrow);
+  }
+
+  readonly fun getSession(sessionId: String): ?Sub {
+    this.sessions.maybeGet(sessionId)
+  }
+
+  readonly fun getSessions(): SortedMap<String, Sub> {
+    this.sessions
+  }
+
+  mutable fun subscribe(
+    sessionId: String,
+    cmd: CmdKind,
+    destinationSource: ?Int,
+    init: ?Tick = None(),
+  ): void {
+    invariant(
+      !this.sessions.containsKey(sessionId),
+      "Session with same id already exists.",
+    );
+    sub = Sub(mutexCreate(), condCreate(), cmd, destinationSource);
+    init.each(tick -> this.notifySub(sub, tick));
+    this.!sessions[sessionId] = sub;
+  }
+
+  mutable fun unsubscribe(sessionId: String): void {
+    this.!sessions = this.sessions.remove(sessionId)
+  }
+
+  mutable fun filterSubscriptions(
+    context: readonly Context,
+    filter: (String, Sub, Tick) ~> ?Sub,
+  ): void {
+    tick = this.tick;
+    this.!sessions = context.sessions
+      .map((id, sub) -> filter(id, sub, tick))
+      .filterNone()
+  }
+
+  readonly fun clone(): this {
+    unsafe_chill_trust_me(this.mclone())
+  }
+
+  readonly fun mclone(): mutable this {
+    mutable static{
+      toPurge => this.toPurge,
+      dirs => this.dirs,
+      reads => this.reads,
+      time => this.time,
+      tick => this.tick,
+      lazyCapacity => this.lazyCapacity,
+      toUpdate => this.toUpdate,
+      deps => this.deps,
+      debugMode => this.debugMode,
+      hasPre => this.hasPre,
+      newDirs => this.newDirs,
+      globals => this.globals,
+      persistents => this.persistents,
+      dirty => this.dirty,
+      dirtyReaders => this.dirtyReaders,
+      canReuse => this.canReuse,
+      arrowStack => this.arrowStack,
+      lazyGets => this.lazyGets,
+      lazyGetsQueue => this.lazyGetsQueue,
+      lazyGetsRefCount => this.lazyGetsRefCount,
+      sessions => this.sessions,
+      postponables => this.postponables,
+      fpostponables => this.fpostponables,
+      dirsWithSharedSubDirs => this.dirsWithSharedSubDirs,
+      sharedSubDirsRefCount => this.sharedSubDirsRefCount,
+      writeChecker => this.writeChecker.map(x -> x.mclone()),
+      purgeFrom => this.purgeFrom,
+      sourceOverride => this.sourceOverride,
+      fromContext => this.fromContext,
+    }
+  }
+
+  mutable fun replaceFromSaved(ctx: readonly Context): void {
+    this.!toPurge = ctx.toPurge;
+    this.!dirs = ctx.dirs;
+    this.!reads = ctx.reads;
+    this.!time = ctx.time;
+    this.!tick = ctx.tick;
+    this.!lazyCapacity = ctx.lazyCapacity;
+    this.!toUpdate = ctx.toUpdate;
+    this.!deps = ctx.deps;
+    this.!debugMode = ctx.debugMode;
+    this.!hasPre = ctx.hasPre;
+    this.!newDirs = ctx.newDirs;
+    this.!globals = ctx.globals;
+    this.!persistents = ctx.persistents;
+    this.!dirty = ctx.dirty;
+    this.!dirtyReaders = ctx.dirtyReaders;
+    this.!canReuse = ctx.canReuse;
+    this.!arrowStack = ctx.arrowStack;
+    this.!lazyGets = ctx.lazyGets;
+    this.!lazyGetsQueue = ctx.lazyGetsQueue;
+    this.!lazyGetsRefCount = ctx.lazyGetsRefCount;
+    this.!sessions = ctx.sessions;
+    this.!postponables = ctx.postponables;
+    this.!fpostponables = ctx.fpostponables;
+    this.!dirsWithSharedSubDirs = ctx.dirsWithSharedSubDirs;
+    this.!sharedSubDirsRefCount = ctx.sharedSubDirsRefCount;
+    this.!writeChecker = ctx.writeChecker.map(x -> x.mclone());
+    this.!purgeFrom = ctx.purgeFrom;
+    this.!sourceOverride = ctx.sourceOverride;
+    this.!fromContext = ctx.fromContext;
+  }
+
+  readonly fun getReads(): SortedSet<Path> {
+    this.reads
+  }
+
+  mutable fun enter(arrow: ArrowKey, timeStack: TimeStack): void {
+    this.!arrowStack = List.Cons((arrow, timeStack), this.arrowStack);
+  }
+
+  mutable fun leave(arrow: ArrowKey): void {
+    this.arrowStack match {
+    | List.Nil() -> invariant_violation("Cannot leave empty context")
+    | List.Cons(arr, rl) ->
+      invariant(arr.i0 == arrow);
+      this.!arrowStack = rl
+    }
+  }
+
+  readonly fun currentArrow(): ?ArrowKey {
+    this.arrowStack.maybeHead().map(x -> x.i0)
+  }
+
+  readonly fun currentTimeStack(): ?TimeStack {
+    this.arrowStack.maybeHead().map(x -> x.i1)
+  }
+
+  private readonly fun getDeps(path: Path): SortedSet<ArrowKey> {
+    this.deps.maybeGet(path) match {
+    | None() -> SortedSet[]
+    | Some(deps) -> deps
+    }
+  }
+
+  mutable fun updateNewDeps(reader: ArrowKey, reads: SortedSet<Path>): void {
+    for (path in reads) {
+      this.!deps = this.deps.set(path, reader);
+    };
+  }
+
+  mutable fun removeDeps(
+    reader: ArrowKey,
+    reads: mutable Iterator<Path>,
+  ): void {
+    for (path in reads) {
+      this.!deps = this.deps.remove(path, reader);
+    }
+  }
+
+  mutable fun initPre(): void {
+    _ = this.updatePre();
+  }
+
+  private mutable fun updatePre(): Bool {
+    if (this.debugMode) {
+      print_debug(`------------ UPDATE PRE ------------`);
+    };
+    withChange = false;
+    this.hasPre.each(dirName -> {
+      this.unsafeMaybeGetEagerDir(dirName).each(dir -> {
+        if (dir.updatePre(this)) {
+          !withChange = true
+        }
+      })
+    });
+    withChange
+  }
+
+  /*****************************************************************************/
+  /* Primitives used to make a file "dirty" (dirty means that it needs to be
+   * recomputed.
+   *
+   * - dirtyReaders are files that are made dirty because of a read access
+   * - dirty are files that are made dirty because of a Map.
+   */
+  /*****************************************************************************/
+  mutable fun updateDirtyReaders(path: Path): void {
+    for (reader in this.getDeps(path)) {
+      child = this.unsafeMaybeGetDir(reader.childName) match {
+      | None() -> continue
+      | Some(x) -> x
+      };
+      parent = this.unsafeMaybeGetDir(reader.parentName) match {
+      | None() -> continue
+      | Some(x) -> x
+      };
+      this.!dirtyReaders[reader.parentName] = {
+        map = this.dirtyReaders.maybeGet(reader.parentName).default(
+          SortedMap[],
+        );
+        map.set(
+          reader.childName,
+          parent.addReaderKeyToKeySetOpt(
+            reader,
+            map.maybeGet(reader.childName),
+          ),
+        )
+      };
+      time = if (reader.parentName == reader.childName) {
+        -child.getTimeStack()
+      } else {
+        child.getTimeStack()
+      };
+      arrow = Arrow(reader.parentName, reader.childName);
+      this.addToUpdate(time, parent.getTime(), arrow);
+    };
+  }
+
+  private mutable fun checkPostponables(): Bool {
+    withChange = !this.postponables.isEmpty();
+    if (withChange) {
+      this.postponables.values().each(p -> p.perform(this));
+      this.!postponables = Queue[];
+    };
+    withChange;
+  }
+
+  fun clearForkPostponables(): (Context, Queue<FPostponable>) {
+    if (this.fpostponables.isEmpty()) {
+      (this, this.fpostponables)
+    } else {
+      postponables = this.fpostponables;
+      !this.fpostponables = Queue[];
+      (this, postponables)
+    }
+  }
+
+  private mutable fun updateLazyGets(): void {
+    this.!lazyGetsQueue = this.lazyGetsQueue.push(this.lazyGets);
+    deadLazyGets = if (this.lazyGetsQueue.size() <= this.lazyCapacity) {
+      SortedMap[]
+    } else {
+      (this.!lazyGetsQueue, lazyGets) = this.lazyGetsQueue.pop().fromSome();
+      lazyGets
+    };
+
+    if (this.lazyGets.isEmpty() && deadLazyGets.isEmpty()) return void;
+
+    this.!lazyGetsRefCount = this.lazyGetsRefCount.mergeWith2(
+      this.lazyGets,
+      deadLazyGets,
+      (dirName, refCountsOpt, newKeysOpt, deadKeysOpt) -> {
+        if (
+          newKeysOpt is None() &&
+          (refCountsOpt is None() || deadKeysOpt is None())
+        ) return refCountsOpt;
+
+        dir = this.unsafeGetLazyDir(dirName);
+        (!refCountsOpt, dirOpt) = dir.updateLazyGets(
+          refCountsOpt,
+          newKeysOpt,
+          deadKeysOpt,
+        );
+        dirOpt.each(this.setDir);
+        refCountsOpt
+      },
+    );
+    this.!lazyGets = SortedMap[]
+  }
+
+  mutable fun addLazyGet(dir: TLazyDir, key: Key): void {
+    dirName = dir.dirName;
+    this.!lazyGets[dirName] = dir.addKeyToKeySetOpt(
+      key,
+      this.lazyGets.maybeGet(dirName),
+    )
+  }
+
+  mutable fun addDirty(dir: TEagerDir, key: Key): void {
+    dirName = dir.dirName;
+    this.!dirty[dirName] = dir.addKeyToKeySetOpt(
+      key,
+      this.dirty.maybeGet(dirName),
+    )
+  }
+
+  mutable fun update(from: ?Context = None()): void {
+    withChanges = true;
+    while (withChanges) {
+      !withChanges = this.updateWithStatus(from);
+      !from = None();
+    }
+  }
+
+  mutable fun updateWithStatus(from: ?Context = None()): Bool {
+    invariant(
+      this.currentArrow().isNone(),
+      "updateWithStatus cannot be called during update.",
+    );
+    if (this.debugMode) {
+      print_debug(`------------ UPDATE (TICK: ${this.tick}) ------------`);
+    };
+    this.!fromContext = from;
+    from.each(ctx ->
+      if (ctx.tick > this.tick) {
+        this.!tick = ctx.tick
+      }
+    );
+    this.updateLazyGets();
+
+    loop {
+      this.toUpdate.removeMin() match {
+      | None() ->
+        this.!dirty = SortedMap[];
+        this.!dirtyReaders = SortedMap[];
+        withPostponables = this.checkPostponables();
+        withPre = this.updatePre();
+        withChanges = withPostponables || withPre;
+        this.!tick = this.tick.next();
+        this.!fromContext = None();
+        break withChanges
+      | Some((_time, Arrow(parentName, childName), toUpdate)) ->
+        this.!toUpdate = toUpdate;
+        this.unsafeMaybeGetDir(childName) match {
+        | None()
+        | Some(DeletedDir _) ->
+          void
+        | Some(dir @ LazyDir _) ->
+          invariant(parentName == childName);
+          dir.update(this, this.dirtyReaders.maybeGet(dir.dirName))
+        | Some(child @ EagerDir _) ->
+          parentMaps = child.parents.maybeGet(parentName) match {
+          | None() -> invariant_violation("Could not find parent")
+          | Some(f) -> f
+          };
+          parent = this.unsafeGetEagerDir(parentName);
+          parent.update(
+            this,
+            this.dirty.maybeGet(parentName),
+            this.dirtyReaders.maybeGet(parentName),
+            parentMaps,
+            child,
+          )
+        }
+      }
+    }
+  }
+
+  private readonly fun notifySub(sub: Sub, start: Tick): void {
+    lock = unfreezeLock(sub.lock);
+    mutexLock(lock);
+    sub.cmd match {
+    | NMultipleDirs(NUpdates{fileName}, dirSubs) ->
+      file = IO.File::open(
+        fileName,
+        IO.OpenOptions{
+          write => true,
+          create => true,
+          append => true,
+          mode => 0o777,
+        },
+      );
+      o = x -> _ = file.write_all(x.bytes());
+      writer = mutable Debug.BufferedWriter(o, 4096);
+
+      producedAnyOutput = false;
+      for (dirSub in dirSubs) {
+        dirName = dirSub.dirName;
+        this.unsafeMaybeGetDir(dirName) match {
+        | Some(dir @ EagerDir _) ->
+          startOpt = if (start.value > 0) Some(start) else None();
+          producedOutput = dir.notifySubUpdates(
+            startOpt,
+            writer,
+            dirSub.entity,
+            dirSub.format,
+            dirSub.filter(this, false, dirName),
+            dirSub.getDestinationWatermark(this),
+          );
+          !producedAnyOutput = producedAnyOutput || producedOutput
+        | _ -> void
+        }
+      };
+      if (producedAnyOutput) {
+        // then we need to produce a checkpoint for flushing and committing
+        writer.write(`:${this.tick}\n`);
+        writer.flush();
+        flushStdout();
+      };
+
+      file.close()
+    | NMultipleDirs(NNotify{fileName}, _) ->
+      _ = unixNotify(fileName, Int32::truncate(start.value))
+    | NMultipleDirs(NTail(), _) ->
+      cond = unfreezeCond(sub.cond);
+      _ = condBroadcast(cond)
+    | nWatch @ NWatch{dirNameGetter} ->
+      this.unsafeMaybeGetDir(dirNameGetter(this)) match {
+      | Some(dir @ EagerDir _) -> dir.notifySubWatch(start, this.tick, nWatch)
+      | _ -> void
+      }
+    };
+    mutexUnlock(lock)
+  }
+
+  readonly fun notifyAll(
+    start: Tick,
+    ignoredSessions: Set<String> = Set[],
+  ): void {
+    changedDirNames = this.getGlobal("CHANGED_DIRS") match {
+    | None() -> this.getDirsChangesAfter(start)
+    | Some(x @ ChangedDirs _) -> x.value
+    | _ -> invariant_violation("Wrong type for CHANGED_DIRS")
+    };
+    if (this.tick == start) return void;
+    readOnlyWithRegionFold(
+      Some(this),
+      this.sessions.filter((k, _) -> !ignoredSessions.contains(k)).values(),
+      void,
+      (ctx, sub, _) ~> {
+        affected = sub.dirNames(ctx.fromSome()).any(dirName ->
+          changedDirNames.contains(dirName)
+        );
+        if (!affected) return void;
+        ctx.fromSome().notifySub(sub, start);
+      },
+    )
+  }
+
+  readonly fun getTick(): Tick {
+    this.tick
+  }
+
+  mutable fun timeStamp(): Time {
+    this.!time = this.time.next();
+    this.time
+  }
+
+  mutable fun mkdir<K: Key, V: File>(
+    convKey: Key ~> K,
+    convValue: File ~> V,
+    dirName: DirName,
+    content: Array<(K, V)> = Array[],
+    ignoreIfExists: Bool = false,
+    optOnCreate: ?Postponable = None(),
+    optOnDelete: ?Postponable = None(),
+  ): EHandle<K, V> {
+    this.mkdirMulti(
+      convKey,
+      convValue,
+      dirName,
+      content.map(kv -> {
+        (key, value) = kv;
+        (key, Array[value])
+      }),
+      ignoreIfExists,
+      optOnCreate,
+      optOnDelete,
+    )
+  }
+
+  mutable fun mkdirMulti<K: Key, V: File>(
+    convKey: Key ~> K,
+    convValue: File ~> V,
+    dirName: DirName,
+    content: Array<(K, Array<V>)> = Array[],
+    ignoreIfExists: Bool = false,
+    optOnCreate: ?Postponable = None(),
+    optOnDelete: ?Postponable = None(),
+  ): EHandle<K, V> {
+    update = this.unsafeMaybeGetEagerDir(dirName) match {
+    | Some(dir) ->
+      if (dir.creator != this.currentArrow()) {
+        // In eager dir, if several properties are invalidated in same tick
+        // the delete could be called several time so the directory could exist
+        throw DirAlreadyExists(dirName);
+      } else if (ignoreIfExists) {
+        this.!newDirs = this.newDirs.add(dirName);
+        return EHandle(convKey, convValue, dirName)
+      };
+      true
+    | None() -> false
+    };
+    this.currentArrow().each(a -> {
+      this.unsafeMaybeGetDir(a.childName) match {
+      | Some(LazyDir _) ->
+        error(
+          `Error: input directory ${dirName} cannot be created into ${
+            a.childName
+          } lazy directory.`,
+        )
+      | _ -> void
+      }
+    });
+
+    vector: mutable Vector<FixedRow<Key, Array<File>>> = mutable Vector[];
+
+    n = content.size();
+    if (n > 0) {
+      tickRange = TickRange::create(this.tick);
+      !content = content.sortedBy(x ~> x.i0);
+      i = 0;
+      while (i < n) {
+        (key, values) = content[i];
+        !i = i + 1;
+        if (i < n && content[i].i0 == key) {
+          valueAcc = Vector::mcreateFromItems(values);
+          do {
+            valueAcc.extend(content[i].i1);
+            !i = i + 1;
+          } while (i < n && content[i].i0 == key);
+          !values = valueAcc.toArray();
+        };
+        source = Path::create(dirName, key);
+        vector.push(FixedRow<Key, Array<File>>(key, values, source, tickRange));
+      };
+    };
+    fixedData = FixedDataMap::create(vector);
+
+    creator = this.currentArrow();
+    time = this.timeStamp();
+    dir = TEagerDir::create{
+      timeStack => TimeStack::create(this, time),
+      created => this.getTick(),
+      input => true,
+      dirName,
+      fixedData,
+      creator,
+      optOnDelete,
+    };
+    if (update) this.updateDirtyReaders(Path::dirTag(dirName));
+    this.setDir(dir);
+    this.!newDirs = this.newDirs.add(dirName);
+    optOnCreate.each(this.postpone);
+    EHandle(convKey, convValue, dirName)
+  }
+
+  mutable fun setDir(dir: Dir): void {
+    dirName = dir.getDirName();
+    this.!dirs = this.dirs.set(this.tick, dirName, dir);
+  }
+
+  mutable fun getDir(dirName: DirName): Dir {
+    this.addRead(Path::dirTag(dirName));
+    this.dirs.get(dirName);
+  }
+
+  mutable fun maybeGetDir<T: File>(dirName: DirName): ?Dir {
+    this.addRead(Path::dirTag(dirName));
+    this.dirs.maybeGet(dirName);
+  }
+
+  readonly fun unsafeMaybeGetDir<T: File>(dirName: DirName): ?Dir {
+    this.dirs.maybeGet(dirName);
+  }
+
+  readonly fun unsafeGetDir(dirName: DirName): Dir {
+    this.dirs.get(dirName);
+  }
+
+  readonly fun unsafeGetLazyDir(dirName: DirName): LazyDir {
+    this.unsafeGetDir(dirName) match {
+    | d @ LazyDir _ -> d
+    | _ -> invariant_violation("unsafeGetLazyDir: Was expecting LazyDir")
+    }
+  }
+
+  readonly fun unsafeMaybeGetLazyDir(dirName: DirName): ?LazyDir {
+    this.unsafeMaybeGetDir(dirName) match {
+    | Some(d @ LazyDir _) -> Some(d)
+    | _ -> None()
+    }
+  }
+
+  readonly fun unsafeGetEagerDir(dirName: DirName): EagerDir {
+    this.unsafeGetDir(dirName) match {
+    | d @ EagerDir _ -> d
+    | _ -> invariant_violation("unsafeGetEagerDir: Was expecting EagerDir")
+    }
+  }
+
+  readonly fun unsafeMaybeGetEagerDir(dirName: DirName): ?EagerDir {
+    this.unsafeMaybeGetDir(dirName) match {
+    | None()
+    | Some(DeletedDir _) ->
+      None()
+    | Some(d @ EagerDir _) -> Some(d)
+    | Some(LazyDir _) ->
+      invariant_violation("unsafeMaybeGetEagerDir: Was expecting EagerDir")
+    }
+  }
+
+  mutable fun getEagerDir(dirName: DirName): EagerDir {
+    this.getDir(dirName) match {
+    | d @ EagerDir _ -> d
+    | _ -> invariant_violation("getEagerDir: Was expecting EagerDir")
+    }
+  }
+
+  mutable fun maybeGetLazyDir(dirName: DirName): ?LazyDir {
+    this.maybeGetDir(dirName) match {
+    | None()
+    | Some(DeletedDir _) ->
+      None()
+    | Some(d @ LazyDir _) -> Some(d)
+    | Some(EagerDir _) ->
+      invariant_violation("maybeGetLazyDir: Was expecting LazyDir")
+    }
+  }
+
+  mutable fun maybeGetEagerDir(dirName: DirName): ?EagerDir {
+    this.maybeGetDir(dirName) match {
+    | None()
+    | Some(DeletedDir _) ->
+      None()
+    | Some(d @ EagerDir _) -> Some(d)
+    | Some(LazyDir _) ->
+      invariant_violation("maybeGetEagerDir: Was expecting EagerDir")
+    }
+  }
+
+  mutable fun pre(dirName: DirName): ?EagerDir {
+    if (!this.hasPre.contains(dirName)) {
+      this.!hasPre = this.hasPre.add(dirName);
+    };
+    this.maybeGetEagerDir(dirName.pre())
+  }
+
+  mutable fun removeDir(dirName: DirName): void {
+    if (this.debugMode) {
+      print_debug(`REMOVED: ${dirName}`);
+    };
+    this.unsafeMaybeGetEagerDir(dirName) match {
+    | None() -> void
+    | Some(dir) ->
+      if (this.hasPre.contains(dirName)) {
+        this.!hasPre = this.hasPre.remove(dirName);
+      };
+      for (parentName => _ in dir.parents) {
+        this.unsafeMaybeGetEagerDir(parentName) match {
+        | None() -> continue
+        | Some(parent) -> this.setDir(parent.removeChildDir(dirName))
+        }
+      };
+      dir.removeSubDirs(this);
+      // Do not perform deletion if source corresponding dir is already deleted
+      if (
+        this.fromContext match {
+        | Some(from) ->
+          from.unsafeMaybeGetDir(dirName) match {
+          | Some(DeletedDir _) -> false
+          | _ -> true
+          }
+        | _ -> true
+        }
+      ) dir.optOnDelete.each(this.postpone);
+
+      this.!deps = this.deps.removeDir(dirName);
+      this.!dirsWithSharedSubDirs = this.dirsWithSharedSubDirs.remove(dirName);
+      this.!sharedSubDirsRefCount = this.sharedSubDirsRefCount.remove(dirName);
+      this.setDir(DeletedDir::ofDir(dir))
+    };
+  }
+
+  readonly fun transitiveChildDirs(dirName: DirName): SortedSet<DirName> {
+    this.unsafeMaybeGetEagerDir(dirName) match {
+    | Some(dir) ->
+      dir.childDirs.reduce(
+        (accDeps, child) -> {
+          accDeps.union(this.transitiveChildDirs(child))
+        },
+        dir.childDirs,
+      )
+    | None() -> SortedSet::create()
+    }
+  }
+
+  mutable fun addRead(path: Path): void {
+    this.!reads = this.reads.set(path);
+  }
+
+  mutable fun setGlobal(name: String, file: File): void {
+    this.!globals = this.globals.set(name, file);
+  }
+
+  mutable fun removeGlobal(name: String): void {
+    this.!globals = this.globals.remove(name);
+  }
+
+  mutable fun filterGlobals(
+    context: readonly Context,
+    filter: (String, File) ~> ?File,
+  ): void {
+    this.!globals = context.globals.map(filter).filterNone()
+  }
+
+  readonly fun getGlobal(name: String): ?File {
+    this.globals.maybeGet(name)
+  }
+
+  mutable fun setPersistent(name: String, file: File): void {
+    this.!persistents = this.persistents.set(name, file);
+  }
+
+  mutable fun removePersistent(name: String): void {
+    this.!persistents = this.persistents.remove(name);
+  }
+
+  mutable fun filterPersistents(
+    context: readonly Context,
+    filter: (String, File) ~> ?File,
+  ): void {
+    this.!persistents = context.persistents.map(filter).filterNone()
+  }
+
+  readonly fun getPersistent(name: String): ?File {
+    this.persistents.maybeGet(name)
+  }
+
+  readonly fun listDirs(): mutable Iterator<Dir> {
+    this.dirs.values()
+  }
+
+  readonly fun getDirsChangesAfter(start: Tick): SortedSet<DirName> {
+    this.dirs.getChangesAfter(start)
+  }
+
+  mutable fun addToPurge(dirName: DirName): void {
+    this.!toPurge = this.toPurge.set(dirName);
+  }
+
+  mutable fun purge(): void {
+    for (dirName in this.toPurge) {
+      this.unsafeMaybeGetEagerDir(dirName) match {
+      | None() -> void
+      | Some(dir) -> this.setDir(dir.purge(this.purgeFrom(this, dir)))
+      }
+    };
+    this.!toPurge = SortedSet[];
+  }
+
+  fun rollback(from: Tick): Vector<() ~> void> {
+    v = mutable Vector[];
+    this.dirs.values().each(dir ->
+      dir match {
+      | eager @ EagerDir _ ->
+        eager.optOnDelete.each(d ->
+          d match {
+          | p @ FPostponable _ -> p.check(this, Some(from)).each(v.push)
+          | _ -> void
+          }
+        )
+      | _ -> void
+      }
+    );
+    unsafe_chill_trust_me(v)
+  }
+}
+
+fun checkForkPostponables(
+  context: Context,
+  todo: mutable Vector<() ~> void>,
+  forkStart: ?Tick,
+  postponables: Queue<FPostponable>,
+  remaining: Queue<FPostponable> = Queue[],
+): Queue<FPostponable> {
+  postponables.values().each(p ->
+    p.check(context, forkStart) match {
+    | Some(fn) -> todo.push(fn)
+    | _ -> !remaining = remaining.push(p)
+    }
+  );
+  remaining
+}
+
+// @cpp_extern("SKIP_print_backtrace")
+// native fun printBacktrace(): void;
+
+private class Dirs{private state: DMap<DirName, Dir> = DMap::empty()} {
+  fun set<T: File>(tick: Tick, key: DirName, value: Dir): this {
+    !this.state = this.state.set(tick, key, value);
+    this
+  }
+  fun maybeGet(key: DirName): ?Dir {
+    this.state.maybeGet(key)
+  }
+  fun get(key: DirName): Dir {
+    this.maybeGet(key) match {
+    | None() ->
+      // printBacktrace();
+      invariant_violation(`Directory not found: ${key}`)
+    | Some(x) -> x
+    }
+  }
+  fun values(): mutable Iterator<Dir> {
+    this.state.values()
+  }
+  fun getChangesAfter(start: Tick): SortedSet<DirName> {
+    this.state.getChangesAfter(start)
+  }
+}
+
+fun export(
+  targetCtx: mutable Context,
+  tick: Tick,
+  sourceCtx: readonly Context,
+): Bool {
+  import(targetCtx, tick, sourceCtx);
+  false
+}
+
+fun import(
+  targetCtx: mutable Context,
+  tick: Tick,
+  sourceCtx: readonly Context,
+): void {
+  changedDirNames = sourceCtx.getDirsChangesAfter(tick);
+  for (dirName in changedDirNames) {
+    sourceCtx.unsafeMaybeGetDir(dirName) match {
+    | Some(DeletedDir{}) -> targetCtx.removeDir(dirName)
+    | Some(dir @ EagerDir _) -> dir.import{targetCtx, tick}
+    | _ -> void
+    }
+  };
+}
+
+class Synchronizer(
+  importFromRoot: ((mutable Context, Tick, readonly Context) ~> void),
+  exportToRoot: ((mutable Context, Tick, readonly Context) ~> Bool),
+  afterUnlock: (mutable Context ~> void),
+)
+
+class ChangedDirs(value: SortedSet<DirName>) extends File
+
+fun cloneContextWithError(
+  context: Context,
+  error: .Exception,
+): readonly Context {
+  newContext = context.mclone();
+  newContext.setGlobal("Error", ErrorFile(error));
+  newContext
+}
+
+@export("SKIP_resolve_context")
+fun resolveContext(
+  tick: Tick,
+  root: Context,
+  delta: mutable Context,
+  synchronizer: ?Synchronizer,
+  lockF: ?((mutable Context, mutable Context, Context) ~> void),
+): readonly Context {
+  context = synchronizer match {
+  | None() if (tick == root.getTick()) -> delta
+  | None() -> invariant_violation("Concurrent access without synchronizer")
+  | Some(sync) ->
+    changedDirs = delta.getDirsChangesAfter(tick);
+    try {
+      sync.importFromRoot(delta, tick, root);
+      None()
+    } catch {
+    | exn -> Some(exn)
+    } match {
+    | Some(exn) -> return cloneContextWithError(root, exn)
+    | None() -> void
+    };
+
+    newRoot = root.mclone();
+    newRoot.!globals = delta.globals;
+    hasVersioning = false;
+
+    try {
+      !hasVersioning = sync.exportToRoot(newRoot, tick, delta);
+      None()
+    } catch {
+    | exn -> Some(exn)
+    } match {
+    | Some(exn) -> return cloneContextWithError(root, exn)
+    | None() -> void
+    };
+
+    lockF match {
+    | None() -> void
+    | Some(f) ->
+      try {
+        newRootTick = newRoot.getTick();
+        f(newRoot, delta, root);
+        !changedDirs = changedDirs.union(
+          newRoot.getDirsChangesAfter(newRootTick),
+        );
+        None()
+      } catch {
+      | exn -> Some(exn)
+      } match {
+      | Some(exn) -> return cloneContextWithError(root, exn)
+      | None() -> void
+      }
+    };
+    if (!hasVersioning) {
+      newRoot.setGlobal("CHANGED_DIRS", ChangedDirs(changedDirs));
+    };
+    newRoot
+  };
+  context.purge();
+  context
+}
+
+@export("SKIP_call_after_unlock")
+fun callAfterUnlock(
+  synchronizer: ?Synchronizer,
+  context: mutable Context,
+): void {
+  synchronizer match {
+  | None() -> void
+  | Some(sync) -> sync.afterUnlock(context)
+  }
+}
+
+/*****************************************************************************/
+/* Locks/Conditions. */
+/*****************************************************************************/
+
+mutable class Mutex(Int, Int, Int, Int, Int)
+mutable class Condition(Int, Int, Int, Int, Int, Int)
+
+@cpp_extern("SKIP_mutex_init")
+native fun mutexInit(mutable Mutex): void;
+
+fun mutexCreate(): Mutex {
+  lock = mutable Mutex(0, 0, 0, 0, 0);
+  mutexInit(lock);
+  freezeLock(lock)
+}
+
+@debug
+@cpp_extern("SKIP_mutex_lock")
+native fun mutexLock(mutable Mutex): void;
+
+@debug
+@cpp_extern("SKIP_mutex_unlock")
+native fun mutexUnlock(mutable Mutex): void;
+
+@cpp_extern("SKIP_cond_init")
+native fun condInit(mutable Condition): void;
+
+fun condCreate(): Condition {
+  cond = mutable Condition(0, 0, 0, 0, 0, 0);
+  condInit(cond);
+  freezeCond(cond)
+}
+
+@debug
+@cpp_extern("SKIP_cond_timedwait")
+native fun condTimedWait(mutable Condition, mutable Mutex, UInt32): Int32;
+
+@debug
+@cpp_extern("SKIP_cond_broadcast")
+native fun condBroadcast(mutable Condition): Int32;
+
+@cpp_extern("SKIP_freeze_lock")
+native fun freezeLock(lock: mutable Mutex): Mutex;
+
+@cpp_extern("SKIP_unfreeze_lock")
+native fun unfreezeLock(lock: Mutex): mutable Mutex;
+
+@cpp_extern("SKIP_freeze_cond")
+native fun freezeCond(cond: mutable Condition): Condition;
+
+@cpp_extern("SKIP_unfreeze_cond")
+native fun unfreezeCond(cond: Condition): mutable Condition;
+
+/*****************************************************************************/
+/* Runtime primitives. */
+/*****************************************************************************/
+
+class Fork(
+  context: Context,
+  from: Tick,
+  update: Tick,
+  fork: ?String = None(),
+  postponables: Queue<FPostponable> = Queue[],
+)
+
+class Contexts(main: Context, forks: SortedMap<String, Fork> = SortedMap[]) {
+  //
+  fun get(optName: ?String): Context {
+    optName match {
+    | Some(name) -> this.forks[name].context
+    | _ -> this.main
+    }
+  }
+
+  fun check(
+    optName: ?String,
+    context: Context,
+    postponables: Queue<FPostponable> = Queue[],
+  ): ContextsWithActions {
+    startTick = optName.map(f -> this.forks[f].from);
+    (!context, cpostponables) = context.clearForkPostponables();
+    todo = mutable Vector[];
+    remaining = checkForkPostponables(context, todo, startTick, postponables);
+    !remaining = checkForkPostponables(
+      context,
+      todo,
+      startTick,
+      cpostponables,
+      remaining,
+    );
+    optName match {
+    | Some(name) ->
+      fork = this.forks[name];
+      !fork.context = context;
+      remaining.each(p -> !fork.postponables = fork.postponables.push(p));
+      !this.forks = this.forks.set(name, fork)
+    | _ ->
+      invariant(remaining.isEmpty(), "No actions can be postponed on main");
+      !this.main = context
+    };
+    ContextsWithActions(this, unsafe_chill_trust_me(todo))
+  }
+
+  fun remove(name: String): Contexts {
+    !this.forks = this.forks.remove(name);
+    this
+  }
+
+  fun has(optName: ?String): Bool {
+    optName match {
+    | Some(name) -> this.forks.containsKey(name)
+    | _ -> true
+    }
+  }
+
+  fun update(name: String, context: Context, tick: Tick): Contexts {
+    fork = this.forks[name];
+    !fork.context = context;
+    !fork.update = tick;
+    !this.forks = this.forks.set(name, fork);
+    this
+  }
+}
+
+@cpp_extern
+private native base class Obstack
+
+@cpp_extern
+private native base class Page
+
+@debug
+@cpp_extern("SKIP_new_Obstack")
+// Public part of the region API, alongside destroyObstack,
+// destroyObstackWithValue, and the preferred with* wrappers below. Prefer
+// withRegion/withRegionVoid/withRegionValue; reach for the raw pair only when
+// control flow escapes the region lexically (a loop `break`, or `skipExit`
+// from a program entry point) and so cannot be a `~>` lambda.
+native fun newObstack(): Obstack;
+
+@debug
+@cpp_extern("SKIP_destroy_Obstack")
+native fun destroyObstack(Obstack): void;
+
+@debug
+@cpp_extern("SKIP_destroy_Obstack_with_value")
+private native fun destroyObstackWithValueRaw<T>(Obstack, Box<T>): Box<T>;
+
+@always_inline
+fun destroyObstackWithValue<T>(obstack: Obstack, value: T): T {
+  destroyObstackWithValueRaw(obstack, Box(value)).unbox()
+}
+
+@debug
+@cpp_extern("SKIP_copy_value_to_Obstack")
+private native fun copyValueToObstack<T>(Page, List<T>): List<T>;
+
+@debug
+@cpp_extern("SKIP_switch_to_parent")
+private native fun switchToParent(Obstack): Page;
+
+@debug
+@cpp_extern("SKIP_restore_from_parent")
+private native fun restoreFromParent(Obstack, Page): void;
+
+@debug
+@cpp_extern("SKIP_context_sync")
+private native fun gContextSync(
+  Tick,
+  Contexts,
+  Context,
+  ?Synchronizer,
+  UInt32,
+  ?((mutable Context, mutable Context, Context) ~> void),
+  fork: ?String,
+): ContextsWithActions;
+
+@debug
+@cpp_extern("SKIP_context_sync_no_lock")
+private native fun gContextSyncNoLock(
+  Tick,
+  Contexts,
+  Context,
+  ?Synchronizer,
+  UInt32,
+  ?((mutable Context, mutable Context, Context) ~> void),
+  fork: ?String,
+): ContextsWithActions;
+
+@debug
+@cpp_extern("SKIP_global_unlock")
+private native fun gGlobalUnlock(): void;
+
+@debug
+@cpp_extern("SKIP_global_lock")
+private native fun gGlobalLock(): void;
+
+@debug
+@cpp_extern("SKIP_global_has_lock")
+private native fun gGlobalHasLock(): UInt32;
+
+@debug
+@cpp_extern("SKIP_contexts_init")
+private native fun gContextsInit(Contexts): void;
+
+@debug
+@cpp_extern("SKIP_contexts_get")
+native fun gUnsafeContextsGet(): Contexts;
+
+@debug
+@cpp_extern("SKIP_contexts_get_unsafe")
+native fun gContextsGetNoLock(): Contexts;
+
+@debug
+@cpp_extern("SKIP_contexts_replace_unsafe")
+native fun gContextsReplaceNoLock(Contexts, UInt32): void;
+
+class InvalidSync() extends Exception {
+  fun toString(): String {
+    "Internal error: invalid synchronization, getContext called too many times"
+  }
+}
+
+@debug
+@export("SKIP_throwInvalidSynchronization")
+fun throwInvalidSynchronization(): void {
+  throw InvalidSync()
+}
+
+@debug
+@cpp_extern("SKIP_has_context")
+native fun gHasForkContext(fork: ?String): UInt32;
+
+@debug
+@cpp_extern("SKIP_unsafe_free")
+native fun gUnsafeFree(Contexts): void;
+
+@debug
+@cpp_extern("SKIP_unsafe_contexts_incr_ref_count")
+native fun gUnsafeIncrRefCount(Contexts): void;
+
+@debug
+@cpp_extern("SKIP_should_GC")
+native fun shouldGC(Obstack): UInt32;
+
+@debug
+@cpp_extern("SKIP_print_persistent_size")
+native fun printPersistentSize(): void;
+
+fun gContextInit(context: Context, fork: ?String = None()): void {
+  invariant(fork.isNone(), "Init can only be used to init main context");
+  gContextsInit(Contexts(context))
+}
+
+@debug
+@export("SKIP_get_fork_context")
+fun getForkContext(contexts: Contexts, fork: ?String): Context {
+  contexts.get(fork)
+}
+
+value class ContextsWithActions(
+  contexts: Contexts,
+  actions: Vector<() ~> void>,
+)
+
+@debug
+@export("SKIP_check_fork_context")
+fun setForkContext(
+  contexts: Contexts,
+  fork: ?String,
+  context: Context,
+): ContextsWithActions {
+  contexts.check(fork, context)
+}
+
+@debug
+@export("SKIP_has_fork_context")
+fun hasForkContext(contexts: Contexts, fork: ?String): UInt32 {
+  UInt32::truncate(if (contexts.has(fork)) 1 else 0)
+}
+
+fun gHasContext(fork: ?String = None()): Bool {
+  gHasForkContext(fork) == 1
+}
+
+/*****************************************************************************/
+/* Safe way to use a context. */
+/*****************************************************************************/
+
+fun withContext<T>(f: Context -> T, fork: ?String = None()): T {
+  contexts = gUnsafeContextsGet();
+  try {
+    context = contexts.get(fork);
+    result = f(context);
+    gUnsafeFree(contexts);
+    result
+  } catch {
+  | exn ->
+    gUnsafeFree(contexts);
+    throw exn
+  }
+}
+
+base class ContextOp {
+  children =
+  | CContinue(?((mutable Context, mutable Context, Context) ~> void))
+  | CStop(?((mutable Context, mutable Context, Context) ~> void))
+}
+
+@cpp_noinline
+fun runWithGcIntern(
+  initCtx: Context,
+  f: Context ~> (Context, ContextOp),
+  synchronizer: ?Synchronizer = None(),
+  isync: Bool = false,
+  fork: ?String = None(),
+): Contexts {
+  sync = UInt32::truncate(if (isync) 1 else 0);
+  if (!gHasContext(fork)) {
+    gContextInit(initCtx, fork);
+  };
+  contexts = synchronizer match {
+  | None() ->
+    gGlobalLock();
+    gContextsGetNoLock()
+  | Some _ -> gUnsafeContextsGet()
+  };
+  globals = initCtx.globals;
+  loop {
+    context = contexts.get(fork);
+    startTick = context.getTick();
+    pos = newObstack();
+    (newContext, newContextOp) = (try {
+      Some(f(context.withGlobals(globals)))
+    } catch {
+    | exn ->
+      print_error(exn.getMessage());
+      None()
+    }) match {
+    | Some(x) -> x
+    | None() ->
+      if (synchronizer is None _) {
+        gGlobalUnlock();
+      };
+      destroyObstack(pos);
+      return contexts
+    };
+    newContextOp match {
+    | CContinue(underLockF) ->
+      synchronizer match {
+      | None() ->
+        new = gContextSyncNoLock(
+          startTick,
+          contexts,
+          newContext,
+          synchronizer,
+          sync,
+          underLockF,
+          fork,
+        );
+        new.contexts.get(fork).notifyAll(startTick);
+        new.actions.each(fn -> fn());
+        !contexts = new.contexts;
+        destroyObstack(pos)
+      | Some _ ->
+        new = gContextSync(
+          startTick,
+          contexts,
+          newContext,
+          synchronizer,
+          sync,
+          underLockF,
+          fork,
+        );
+        new.contexts.get(fork).notifyAll(startTick);
+        new.actions.each(fn -> fn());
+        !contexts = new.contexts;
+        destroyObstack(pos)
+      }
+    | CStop(underLockF) ->
+      synchronizer match {
+      | None() ->
+        new = gContextSyncNoLock(
+          startTick,
+          contexts,
+          newContext,
+          synchronizer,
+          sync,
+          underLockF,
+          fork,
+        );
+        gGlobalUnlock();
+        new.contexts.get(fork).notifyAll(startTick);
+        new.actions.each(fn -> fn());
+        !contexts = new.contexts;
+        gUnsafeFree(contexts);
+        destroyObstack(pos);
+        return contexts
+      | Some _ ->
+        new = gContextSync(
+          startTick,
+          contexts,
+          newContext,
+          synchronizer,
+          sync,
+          underLockF,
+          fork,
+        );
+        new.contexts.get(fork).notifyAll(startTick);
+        new.actions.each(fn -> fn());
+        !contexts = new.contexts;
+        gUnsafeFree(contexts);
+        destroyObstack(pos);
+        return contexts
+      }
+    };
+    !globals = contexts.get(fork).globals;
+  }
+}
+
+@cpp_noinline
+fun runLocked(
+  initCtx: Context,
+  f: mutable Context ~> void,
+  sync: Bool = false,
+  fork: ?String = None(),
+): void {
+  if (!gHasContext(fork)) {
+    gContextInit(initCtx, fork);
+  };
+  gGlobalLock();
+  contexts = gContextsGetNoLock();
+  root = contexts.get(fork);
+  start = root.getTick();
+  context = root.mclone();
+  f(context);
+  new = gContextSyncNoLock(
+    start,
+    contexts,
+    context.clone(),
+    None(),
+    if (sync) UInt32::truncate(1) else UInt32::truncate(0),
+    None(),
+    fork,
+  );
+  gGlobalUnlock();
+  new.contexts.get(fork).notifyAll(start);
+  new.actions.each(fn -> fn());
+  gUnsafeFree(new.contexts);
+}
+
+@cpp_noinline
+fun runWithGc(
+  initCtx: Context,
+  f: mutable Context ~> ContextOp,
+  synchronizer: ?Synchronizer = None(),
+  sync: Bool = false,
+  fork: ?String = None(),
+): void {
+  _ = runWithGcIntern(
+    initCtx,
+    icontext ~> {
+      context = icontext.mclone();
+      cop = f(context);
+      (context.clone(), cop);
+    },
+    synchronizer,
+    sync,
+    fork,
+  )
+}
+
+fun withRegion<T>(
+  context: mutable Context,
+  f: (Obstack, mutable Context) ~> T,
+): T {
+  optSaved: ?Obstack = None();
+  try {
+    !optSaved = Some(newObstack());
+    saved = optSaved.fromSome();
+    fresult = f(saved, context);
+    copied = destroyObstackWithValue(saved, (context.clone(), fresult));
+    (icontext, copiedResult) = copied;
+    context.replaceFromSaved(icontext);
+    copiedResult
+  } catch {
+  | exn ->
+    optSaved match {
+    | Some(saved) ->
+      cexn = destroyObstackWithValue(saved, exn);
+      replaceExn(cexn);
+      throw cexn
+    | None() -> throw exn
+    }
+  }
+}
+
+fun withRegionVoid<T>(f: () ~> void): void {
+  optSaved: ?Obstack = None();
+  try {
+    !optSaved = Some(newObstack());
+    f();
+    destroyObstack(optSaved.fromSome());
+  } catch {
+  | exn ->
+    optSaved match {
+    | Some(saved) ->
+      cexn = destroyObstackWithValue(saved, exn);
+      replaceExn(cexn);
+      throw cexn
+    | None() -> throw exn
+    }
+  }
+}
+
+fun withRegionValue<T>(f: () ~> T): T {
+  optSaved: ?Obstack = None();
+  try {
+    !optSaved = Some(newObstack());
+    fresult = f();
+    destroyObstackWithValue(optSaved.fromSome(), fresult)
+  } catch {
+  | exn ->
+    optSaved match {
+    | Some(saved) ->
+      cexn = destroyObstackWithValue(saved, exn);
+      replaceExn(cexn);
+      throw cexn
+    | None() -> throw exn
+    }
+  }
+}
+
+// Run `f` on a throwaway copy-on-write clone of `context`, inside a fresh
+// region. The clone isolates any mutations `f` makes (they never touch
+// `context`), and the region reclaims the clone's memory when `f` returns —
+// so repeated use does not accumulate state. Only `f`'s return value is
+// copied out. This is the read-only-base + per-call fork pattern without the
+// named-fork registry.
+fun withForkedContext<T>(
+  context: mutable Context,
+  f: (mutable Context) ~> T,
+): T {
+  optSaved: ?Obstack = None();
+  try {
+    !optSaved = Some(newObstack());
+    saved = optSaved.fromSome();
+    fresult = f(context.mclone());
+    destroyObstackWithValue(saved, fresult)
+  } catch {
+  | exn ->
+    optSaved match {
+    | Some(saved) ->
+      cexn = destroyObstackWithValue(saved, exn);
+      replaceExn(cexn);
+      throw cexn
+    | None() -> throw exn
+    }
+  }
+}
+
+/*
+  Use with caution!!!
+  If f if a unnamed closure, It can only capture variables from ancestors obstack of saved.
+  If the this mechanism is duplicated with a closure the accept parameters,
+  the parameters must belong to the ancestors obstack of saved.
+  The f function can neither create nor delete obstacks.
+  The f function can't use callOnParentObstack.
+ */
+@debug
+private fun callOnParentObstack<T>(saved: Obstack, f: () -> T): T {
+  page = switchToParent(saved);
+  res = f();
+  restoreFromParent(saved, page);
+  res
+}
+
+fun destroyObstackWithValueCheckContext<T>(
+  contextOpt: ?mutable Context,
+  value: T,
+  saved: Obstack,
+): T {
+  (icontextOpt, !value) = destroyObstackWithValue(
+    saved,
+    (contextOpt.map(ctx -> ctx.clone()), value),
+  );
+  icontextOpt.each(icontext ->
+    contextOpt.fromSome().replaceFromSaved(icontext)
+  );
+  value
+}
+
+fun readOnlyWithRegionFold<K, T>(
+  contextOpt: ?readonly Context,
+  it: mutable Iterator<K>,
+  value: T,
+  fn: (?readonly Context, K, T) ~> T,
+): T {
+  optSaved: ?Obstack = None();
+  valueInRegion = value;
+  try {
+    !optSaved = Some(newObstack());
+    loop {
+      saved = optSaved.fromSome();
+      callOnParentObstack(saved, it.next) match {
+      | Some(k) ->
+        !valueInRegion = fn(contextOpt, k, valueInRegion);
+        if (shouldGC(saved) != 0) {
+          !valueInRegion = destroyObstackWithValue(saved, valueInRegion);
+          !optSaved = Some(newObstack());
+        }
+      | None() -> break void
+      }
+    };
+    optSaved match {
+    | Some(saved) -> destroyObstackWithValue(saved, valueInRegion)
+    | None() -> value
+    }
+  } catch {
+  | exn ->
+    optSaved match {
+    | Some(saved) ->
+      cexn = destroyObstackWithValue(saved, exn);
+      replaceExn(cexn);
+      throw cexn
+    | None() -> throw exn
+    }
+  }
+}
+
+fun withRegionFold<K, T>(
+  contextOpt: ?mutable Context,
+  it: mutable Iterator<K>,
+  value: T,
+  fn: (?mutable Context, K, T) ~> T,
+): T {
+  optSaved: ?Obstack = None();
+  valueInRegion = value;
+  try {
+    !optSaved = Some(newObstack());
+    loop {
+      saved = optSaved.fromSome();
+      callOnParentObstack(saved, it.next) match {
+      | Some(k) ->
+        !valueInRegion = fn(contextOpt, k, valueInRegion);
+        if (shouldGC(saved) != 0) {
+          !valueInRegion = destroyObstackWithValueCheckContext(
+            contextOpt,
+            valueInRegion,
+            saved,
+          );
+          !optSaved = Some(newObstack());
+        }
+      | None() -> break void
+      }
+    };
+    optSaved match {
+    | Some(saved) ->
+      destroyObstackWithValueCheckContext(contextOpt, valueInRegion, saved)
+    | None() -> value
+    }
+  } catch {
+  | exn ->
+    optSaved match {
+    | Some(saved) ->
+      cexn = destroyObstackWithValue(saved, exn);
+      replaceExn(cexn);
+      throw cexn
+    | None() -> throw exn
+    }
+  }
+}
+
+fun withRegionFoldRec<K, T>(
+  contextOpt: ?mutable Context,
+  it: mutable Iterator<K>,
+  value: T,
+  fn: (?mutable Context, K, T) ~> T,
+): T {
+  valueInRegion = value;
+  levels = 0;
+  loop {
+    it.next() match {
+    | Some(val) ->
+      !valueInRegion = withRegionFoldRecHelp(
+        contextOpt,
+        val,
+        it,
+        valueInRegion,
+        fn,
+        levels,
+      )
+    | None() -> break valueInRegion
+    };
+    !levels = levels + 1;
+  }
+}
+
+fun withRegionFoldRecHelp<K, T>(
+  contextOpt: ?mutable Context,
+  first: K,
+  it: mutable Iterator<K>,
+  value: T,
+  fn: (?mutable Context, K, T) ~> T,
+  level: Int,
+  optRoot: ?Obstack = None(),
+): T {
+  optSaved: ?Obstack = None();
+  try {
+    !optSaved = Some(newObstack());
+    root = optRoot.default(optSaved.fromSome());
+    valueInRegion = fn(contextOpt, first, value);
+    i = 0;
+    loop {
+      callOnParentObstack(root, it.next) match {
+      | Some(k) ->
+        if (level < 1) {
+          !valueInRegion = fn(contextOpt, k, valueInRegion);
+          if (i > 64) {
+            break void
+          }
+        } else {
+          !valueInRegion = withRegionFoldRecHelp(
+            contextOpt,
+            k,
+            it,
+            valueInRegion,
+            fn,
+            level - 1,
+            Some(root),
+          );
+          if (i > 8) {
+            break void
+          };
+        }
+      | None() -> break void
+      };
+      !i = i + 1;
+    };
+    optSaved match {
+    | Some(saved) ->
+      destroyObstackWithValueCheckContext(contextOpt, valueInRegion, saved)
+    | None() -> value
+    }
+  } catch {
+  | exn ->
+    optSaved match {
+    | Some(saved) ->
+      cexn = destroyObstackWithValue(saved, exn);
+      replaceExn(cexn);
+      throw cexn
+    | None() -> throw exn
+    }
+  }
+}
+
+@debug
+fun copyValueToParentObstack<T>(saved: Obstack, value: List<T>): List<T> {
+  fromPage = switchToParent(saved);
+  res = copyValueToObstack(fromPage, value);
+  restoreFromParent(saved, fromPage);
+  res
+}
+
+fun runWithResult<T>(
+  f: mutable Context ~> T,
+  synchronizer: ?Synchronizer = None(),
+  isync: Bool = false,
+  fork: ?String = None(),
+): Result<T, .Exception> {
+  sync = UInt32::truncate(if (isync) 1 else 0);
+  contexts = synchronizer match {
+  | None() ->
+    gGlobalLock();
+    gContextsGetNoLock()
+  | Some _ -> gUnsafeContextsGet()
+  };
+  try {
+    current = contexts.get(fork);
+    context = current.mclone();
+    res = f(context);
+    startTick = current.getTick();
+    new = synchronizer match {
+    | None() ->
+      new = gContextSyncNoLock(
+        startTick,
+        contexts,
+        context.clone(),
+        synchronizer,
+        sync,
+        None(),
+        fork,
+      );
+      gGlobalUnlock();
+      new
+    | Some _ ->
+      gContextSync(
+        startTick,
+        contexts,
+        context.clone(),
+        synchronizer,
+        sync,
+        None(),
+        fork,
+      )
+    };
+    new.contexts.get(fork).notifyAll(startTick);
+    new.actions.each(fn -> fn());
+    gUnsafeFree(new.contexts);
+    Success(res)
+  } catch {
+  | exn ->
+    if (synchronizer.isNone()) gGlobalUnlock();
+    Failure(exn)
+  }
+}
+
+// Commit the context produced by `f` into `contexts`, inside a fresh region.
+//
+// `f` receives the current context for `fork` and returns the context to
+// commit, plus an optional callback for the synchronizer to run while it
+// holds the lock. Once the sync returns, readers are notified and the
+// actions it produced are run. The region is reclaimed on both the normal
+// and the exception path, and the returned `Contexts` outlives it.
+//
+// This is the counterpart of `runWithResult` for callers that own a
+// `Contexts` themselves (e.g. from `gUnsafeContextsGet`) rather than going
+// through the global registry and its lock. It exists so that such callers
+// do not need `newObstack`/`destroyObstack`/`gContextSync` directly.
+fun syncContexts(
+  contexts: Contexts,
+  fork: ?String,
+  synchronizer: Synchronizer,
+  sync: UInt32,
+  f: Context ~> (
+    Context,
+    ?((mutable Context, mutable Context, Context) ~> void),
+  ),
+): Contexts {
+  startTick = contexts.get(fork).getTick();
+  pos = newObstack();
+  (newContext, underLockF) = try {
+    f(contexts.get(fork))
+  } catch {
+  | exn ->
+    cexn = destroyObstackWithValue(pos, exn);
+    throw cexn
+  };
+  new = gContextSync(
+    startTick,
+    contexts,
+    newContext,
+    Some(synchronizer),
+    sync,
+    underLockF,
+    fork,
+  );
+  new.contexts.get(fork).notifyAll(startTick);
+  new.actions.each(fn -> fn());
+  destroyObstack(pos);
+  new.contexts
+}
+
+/*****************************************************************************/
+/* Forks dedicated functions. */
+/*****************************************************************************/
+
+class ForkSettings(
+  subscriptionsFilter: (String, Sub, Tick) ~> ?Sub = (_, _, _) ~> None(),
+  persistentsFilter: (String, File) ~> ?File = (_, _) ~> None(),
+  globalsFilter: (String, File) ~> ?File = (_, _) ~> None(),
+  ignoredSessions: Set<String> = Set[],
+  isSync: Bool = false,
+) {
+  static fun keepall(
+    ignoredSessions: Set<String> = Set[],
+    isSync: Bool = false,
+  ): ForkSettings {
+    ForkSettings(
+      (_, sub, _) ~> Some(sub),
+      (_, v) ~> Some(v),
+      (_, v) ~> Some(v),
+      ignoredSessions,
+      isSync,
+    )
+  }
+}
+
+fun forkNoGc(
+  name: String,
+  from: ?String,
+  settings: ForkSettings = ForkSettings(),
+): void {
+  gGlobalLock();
+  contexts = gContextsGetNoLock();
+  if (contexts.has(Some(name))) {
+    gUnsafeFree(contexts);
+    gGlobalUnlock();
+    invariant_violation(`Fork with name '${name}' already exists.`)
+  };
+  if (!contexts.has(from)) {
+    gUnsafeFree(contexts);
+    gGlobalUnlock();
+    invariant_violation(`Fork with name '${from}' doesn't exist.`)
+  };
+  context = contexts.get(from);
+  forked = context.mclone();
+  forked.filterSubscriptions(context, settings.subscriptionsFilter);
+  forked.filterPersistents(context, settings.persistentsFilter);
+  forked.filterGlobals(context, settings.globalsFilter);
+  tick = context.getTick();
+  new_contexts = contexts;
+  !new_contexts.forks = contexts.forks.set(
+    name,
+    Fork(forked.clone(), tick, tick, from),
+  );
+  gUnsafeFree(contexts);
+  sync = UInt32::truncate(if (settings.isSync) 1 else 0);
+  gContextsReplaceNoLock(new_contexts, sync);
+  gGlobalUnlock();
+}
+
+base class ForkSynchronizer {
+  fun sync(origin: Context, fork: Fork): Result<Context, .Exception>;
+}
+
+fun synchronizeForkNoGc(
+  name: String,
+  synchronizer: ForkSynchronizer,
+  isSync: Bool = false,
+): void {
+  gGlobalLock();
+  contexts = gContextsGetNoLock();
+  if (!contexts.has(Some(name))) {
+    gUnsafeFree(contexts);
+    gGlobalUnlock();
+    invariant_violation(`Fork with name '${name}' doesn't exist.`)
+  };
+  fork = contexts.forks[name];
+  if (!contexts.has(fork.fork)) {
+    SKStore.gUnsafeFree(contexts);
+    SKStore.gGlobalUnlock();
+    invariant_violation(`Source of '${name}' fork doesn't exist.`)
+  };
+  origin = contexts.get(fork.fork);
+  tick = origin.getTick();
+  if (fork.update == tick) {
+    gUnsafeFree(contexts);
+    gGlobalUnlock();
+    return void
+  };
+  synchronizer.sync(origin, fork) match {
+  | Success(synchronized) ->
+    new_contexts = contexts.update(name, synchronized, tick);
+    gUnsafeFree(contexts);
+    sync = UInt32::truncate(if (isSync) 1 else 0);
+    gContextsReplaceNoLock(new_contexts, sync);
+    gGlobalUnlock()
+  | Failure(ex) ->
+    SKStore.gUnsafeFree(contexts);
+    SKStore.gGlobalUnlock();
+    throw ex
+  }
+}
+
+class ConcurrentFork() extends .Exception {
+  fun toString(): String {
+    "Merging concurrent forks without synchronizer"
+  }
+}
+
+fun mergeForkNoGc(
+  name: String,
+  settings: ForkSettings = ForkSettings::keepall(),
+  synchronizer: ?ForkSynchronizer = None(),
+): void {
+  SKStore.gGlobalLock();
+  contexts = SKStore.gContextsGetNoLock();
+  if (!contexts.has(Some(name))) {
+    SKStore.gUnsafeFree(contexts);
+    SKStore.gGlobalUnlock();
+    invariant_violation(`Fork with name '${name}' doesn't exist.`)
+  };
+  fork = contexts.forks[name];
+  if (!contexts.has(fork.fork)) {
+    SKStore.gUnsafeFree(contexts);
+    SKStore.gGlobalUnlock();
+    invariant_violation(`Source of '${name}' fork doesn't exist.`)
+  };
+  origin = contexts.get(fork.fork);
+  start = origin.getTick();
+  result = if (start == fork.from) {
+    Success(fork.context)
+  } else {
+    synchronizer match {
+    | Some(sync) -> sync.sync(origin, fork)
+    | _ -> Failure(ConcurrentFork())
+    }
+  };
+  result match {
+  | Success(merged) ->
+    new_context = merged.mclone();
+    new_context.filterSubscriptions(origin, settings.subscriptionsFilter);
+    new_context.filterPersistents(origin, settings.persistentsFilter);
+    new_context.filterGlobals(origin, settings.globalsFilter);
+    new = contexts.check(fork.fork, new_context.clone(), fork.postponables);
+    !new.contexts = new.contexts.remove(name);
+    SKStore.gUnsafeFree(contexts);
+    sync = UInt32::truncate(if (settings.isSync) 1 else 0);
+    SKStore.gContextsReplaceNoLock(new.contexts, sync);
+    SKStore.gGlobalUnlock();
+    new.contexts.get(fork.fork).notifyAll(start, settings.ignoredSessions);
+    new.actions.each(fn -> fn())
+  | Failure(ex) ->
+    SKStore.gUnsafeFree(contexts);
+    SKStore.gGlobalUnlock();
+    throw ex
+  }
+}
+
+fun removeForkNoGc(name: String, isSync: Bool = false): void {
+  gGlobalLock();
+  contexts = gContextsGetNoLock();
+  if (!contexts.has(Some(name))) {
+    gUnsafeFree(contexts);
+    gGlobalUnlock();
+    invariant_violation(`Fork with name '${name}' doesn't exist.`)
+  };
+  fork = contexts.forks[name];
+  todo = fork.context.rollback(fork.from);
+  new_contexts = contexts.remove(name);
+  gUnsafeFree(contexts);
+  sync = UInt32::truncate(if (isSync) 1 else 0);
+  gContextsReplaceNoLock(new_contexts, sync);
+  gGlobalUnlock();
+  todo.each(fn -> fn())
+}
+
+fun fork(
+  name: String,
+  from: ?String,
+  settings: ForkSettings = ForkSettings(),
+): void {
+  optSaved: ?Obstack = None();
+  try {
+    !optSaved = Some(newObstack());
+    saved = optSaved.fromSome();
+    forkNoGc(name, from, settings);
+    destroyObstack(saved)
+  } catch {
+  | exn ->
+    optSaved match {
+    | Some(saved) ->
+      cexn = destroyObstackWithValue(saved, exn);
+      replaceExn(cexn);
+      throw cexn
+    | None() -> throw exn
+    }
+  }
+}
+
+fun synchronizeFork(
+  name: String,
+  synchronizer: ForkSynchronizer,
+  isSync: Bool = false,
+): void {
+  optSaved: ?Obstack = None();
+  try {
+    !optSaved = Some(newObstack());
+    saved = optSaved.fromSome();
+    synchronizeForkNoGc(name, synchronizer, isSync);
+    destroyObstack(saved)
+  } catch {
+  | exn ->
+    optSaved match {
+    | Some(saved) ->
+      cexn = destroyObstackWithValue(saved, exn);
+      replaceExn(cexn);
+      throw cexn
+    | None() -> throw exn
+    }
+  }
+}
+
+fun mergeFork(
+  name: String,
+  settings: ForkSettings = ForkSettings::keepall(),
+  synchronizer: ?ForkSynchronizer = None(),
+): void {
+  optSaved: ?Obstack = None();
+  try {
+    !optSaved = Some(newObstack());
+    saved = optSaved.fromSome();
+    mergeForkNoGc(name, settings, synchronizer);
+    destroyObstack(saved)
+  } catch {
+  | exn ->
+    optSaved match {
+    | Some(saved) ->
+      cexn = destroyObstackWithValue(saved, exn);
+      replaceExn(cexn);
+      throw cexn
+    | None() -> throw exn
+    }
+  }
+}
+
+fun removeFork(name: String, isSync: Bool = false): void {
+  optSaved: ?Obstack = None();
+  try {
+    !optSaved = Some(newObstack());
+    saved = optSaved.fromSome();
+    removeForkNoGc(name, isSync);
+    destroyObstack(saved)
+  } catch {
+  | exn ->
+    optSaved match {
+    | Some(saved) ->
+      cexn = destroyObstackWithValue(saved, exn);
+      replaceExn(cexn);
+      throw cexn
+    | None() -> throw exn
+    }
+  }
+}
+
+fun forkExists(name: String): Bool {
+  gUnsafeContextsGet().forks.containsKey(name)
+}
+
+// Allow to match with UPostponable
+class DummyUPostponable() extends UPostponable {
+  fun perform(_context: mutable Context): void {
+    invariant_violation("dummy")
+  }
+}
+
+// Allow to match with FPostponable
+class DummyFPostponable extends FPostponable {
+  protected fun perform(_context: readonly Context): void {
+    invariant_violation("dummy")
+  }
+}
+
+module end;

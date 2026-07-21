@@ -1,0 +1,2713 @@
+/*****************************************************************************/
+/* Compiles Sql queries from SqlAst to SqlCAst (for "compiled" Ast). */
+/*****************************************************************************/
+
+module alias P = SQLParser;
+
+module SKDB;
+
+/*****************************************************************************/
+/* Determines if a select can be optimized away. */
+/*****************************************************************************/
+
+fun isNoopParams(
+  params: Array<CGExpr>,
+  from: Array<(DirDescr, ?Array<SKStore.KeyRange<RowKey>>)>,
+): Bool {
+  if (from.size() != 1) return false;
+  kinds = from[0].i0.kinds;
+  if (kinds.size() != params.size()) return false;
+  for (i => param in params) {
+    param match {
+    | CIExpr(SKDB.CIGetFrom(0, x)) if (x == i) -> void
+    | CFExpr(SKDB.CFGetFrom(0, x)) if (x == i) -> void
+    | CSExpr(SKDB.CSGetFrom(0, x)) if (x == i) -> void
+    | _ -> return false
+    }
+  };
+  true
+}
+
+fun noRangeFrom(
+  from: Array<(DirDescr, ?Array<SKStore.KeyRange<RowKey>>)>,
+): Bool {
+  for (tableRange in from) {
+    if (tableRange.i1 is Some _) return false;
+  };
+  true
+}
+
+// The case that interests us specifically is in the case of a join:
+// select * from t1, t2 where a = b;
+
+// What will happen is that the result of the merge is exactly the
+// result we want, so there is nothing left to do in the select.  All
+// the other cases are not very interesting because if they were truly a
+// noop, the query could be trivially rewritten to get rid of the
+// overhead.
+
+// Why not optimize it anyway you may ask? Because the result is going
+// to be in an SKStore directory with the wrong name. Which means, every
+// place where we are looking up select results by dirName are going to
+// be broken.
+
+fun optimizeNoopSelect(select: CSelect): CSelect {
+  if (
+    !select.distinct &&
+    isNoopParams(select.params, select.from) &&
+    noRangeFrom(select.from) &&
+    select.sets.size() == 0 &&
+    select.aggr is None() &&
+    select.where is None() &&
+    select.groupBy is None() &&
+    select.having is None() &&
+    select.orderBy is None() &&
+    select.limit is None() &&
+    select.rest.isEmpty() &&
+    !select.needUp &&
+    !select.directMode &&
+    select.other.size() != 0
+  ) {
+    foundMerge = false;
+    !select.other = select.other.map(task ->
+      task match {
+      | merge @ SubMerge _ if (merge.childName == select.from[0].i0.dirName) ->
+        !foundMerge = true;
+        !merge.childName = SKStore.DirName::create("/" + select.id.lower + "/");
+        merge
+      | _ -> task
+      }
+    );
+    if (!foundMerge) return select;
+    select with {isNoop => true}
+  } else {
+    select
+  }
+}
+
+/*****************************************************************************/
+/* Determines smallest window. */
+/*****************************************************************************/
+
+fun minWindowSize(x: ?Int, y: ?Int): ?Int {
+  (x, y) match {
+  | (Some(n1), Some(n2)) -> Some(min(n1, n2))
+  | (r @ Some _, _)
+  | (_, r @ Some _) ->
+    r
+  | (None(), None()) -> None()
+  }
+}
+
+/*****************************************************************************/
+/* Helper functions/types for merge joins. */
+/*****************************************************************************/
+
+class JTable{
+  name: P.Name,
+  dirName: SKStore.DirName,
+  ranges: ?Array<SKStore.KeyRange<RowKey>>,
+  schema: Array<P.ColumnDefinition>,
+  alias: ?P.Name,
+} {
+  static fun fromDirDescr(
+    dirDescr: DirDescr,
+    ranges: ?Array<SKStore.KeyRange<RowKey>>,
+  ): this {
+    JTable{
+      name => dirDescr.name,
+      dirName => dirDescr.dirName,
+      ranges,
+      schema => dirDescr.schema,
+      alias => dirDescr.alias,
+    }
+  }
+}
+
+value class TableProj(
+  tableNbr: Int,
+  col: (Int, P.IKind, P.Type),
+  isUnique: Bool,
+)
+value class EqJoin(left: TableProj, right: TableProj)
+
+fun isUnique(tyDescr: P.ColumnDefinition): Bool {
+  tyDescr.primary is Some _ || tyDescr.unique is Some _
+}
+
+const crossJoinMsg: String = `
+This will be interpreted as a cross-join, which is almost
+certainly not what you want.
+If you are absolutely sure that's what you want to do, you can pass
+the option '--always-allow-joins' to make this error go away.`;
+
+const multipleTablesNoUniqueMsg: String = `
+SELECT involves multiple tables but none of them defines a unique column.
+`;
+
+const multipleTablesNoClauseMsg: String = `
+SELECT involves multiple tables but no appropriate join clause was found.
+`;
+
+fun errorNoMergeClause(pos: Int): void {
+  errorNbr(
+    1,
+    pos,
+    multipleTablesNoClauseMsg +
+      "Was expecting to find a clause of the form:\n" +
+      "... AND colName1 = colName2 AND ...\n" +
+      "\n" +
+      crossJoinMsg,
+  )
+}
+
+/*****************************************************************************/
+/* Finds table */
+/*****************************************************************************/
+
+fun genSelectId(select: P.Select): P.Name {
+  P.Name::create("SELECT_" + hash(select with {pos => 0}))
+}
+
+mutable class Compiler{
+  directMode: Bool,
+  options: Options,
+  pos: Int,
+  params: Map<String, P.Value>,
+  mutable subst: mutable Map<P.Identifier, CGExpr> = mutable Map[],
+  mutable ambiguous: mutable Set<P.Identifier> = mutable Set[],
+  mutable isAggr: Bool = false,
+  mutable aggrVars: mutable Vector<(AggrKind, CGExpr)> = mutable Vector[],
+  mutable needUp: Bool = false,
+  mutable other: mutable Vector<SubSelectTask> = mutable Vector[],
+} {
+  static fun create(
+    directMode: Bool,
+    options: Options,
+    pos: Int,
+    params: Map<String, P.Value>,
+  ): mutable this {
+    mutable static{directMode, options, pos, params}
+  }
+
+  mutable fun expandGroupBy(core: P.SelectCore): P.SelectCore {
+    // Tranforms:
+    // 'select ... from ... group by ...'
+    // ==> 'select * from (select ... from ... group by ...)'
+    core match {
+    | P.SelectCoreValues _ -> core
+    | select @ P.SelectCoreQuery _ ->
+      P.SelectCoreQuery{
+        distinct => select.distinct,
+        params => Array[P.SelectStar(None())],
+        from => Some(
+          P.FromQuery{
+            select => P.Select{
+              pos => 0,
+              core => select with {distinct => false},
+              orderBy => None(),
+              limit => None(),
+              rest => Array[],
+            },
+            asName => None(),
+          },
+        ),
+        where => None(),
+        groupBy => None(),
+        having => None(),
+      }
+    }
+  }
+
+  mutable fun compileSelectCoreQuery(
+    context: mutable SKStore.Context,
+    select: P.SelectCoreQuery,
+    selectId: P.Name,
+    sets: Array<P.UpdateSet> = Array[],
+  ): CSelect {
+    substCopy = this.subst;
+    ambiguousCopy = this.ambiguous;
+    aggrVarsCopy = this.aggrVars;
+    needUpCopy = this.needUp;
+    isAggrCopy = this.isAggr;
+    otherCopy = this.other;
+
+    newSubst = mutable Map[];
+    for (key => value in this.subst) {
+      if (key.table is Some _) {
+        newSubst![key] = value.up();
+      }
+    };
+
+    newAmbiguous = mutable Set[];
+    for (key in this.ambiguous) {
+      if (key.table is Some _) {
+        newAmbiguous.add(key);
+      }
+    };
+
+    this.!subst = newSubst;
+    this.!ambiguous = newAmbiguous;
+    this.!aggrVars = mutable Vector[];
+    this.!needUp = false;
+    this.!other = mutable Vector[];
+
+    isAggr = selectIsAggr(select);
+    this.!isAggr = isAggr;
+
+    (joinFrom, cond) = select.from match {
+    | Some(x) -> this.expandJoins(x)
+    | None() -> (Array[], None())
+    };
+    !select.where = (cond, select.where) match {
+    | (None(), c)
+    | (c, None()) ->
+      c
+    | (Some(c), Some(w)) -> Some(P.BinOp(P.OAnd(), c, w))
+    };
+    origFrom = this.compileFrom(context, joinFrom);
+    (!cond, from) = this.compileJoin(context, origFrom, select.where);
+    !select.where = cond;
+    params = this.compileParams(context, select.params, origFrom);
+    effects = this.compileSideEffectParams(context, select.params);
+    where = this.compileWhere(context, select.where);
+    groupBy = this.compileGroupBy(context, select.groupBy, params);
+    having = this.compileHaving(context, select.having);
+
+    aggr: ?Array<(AggrKind, CGExpr)> = None();
+    if (this.aggrVars.size() != 0) {
+      !aggr = Some(this.aggrVars.toArray());
+    };
+
+    cselect = CSelect{
+      id => P.Name::create(
+        selectId.lower +
+          (if (this.options.reactive) "" else params.hash().toString()) +
+          context.getGlobal("TableMap") match {
+          | None() -> ""
+          | Some(file) -> "_V" + TableMap::type(file).version.value.toString()
+          },
+      ),
+      distinct => select.distinct,
+      params,
+      effects,
+      sets => this.compileSets(context, sets),
+      aggr,
+      from,
+      where => if (where is Some(CILiteral(1))) None() else where,
+      groupBy,
+      having,
+      needUp => this.needUp,
+      other => this.other.toArray(),
+      format => SKStore.OSQL(),
+      directMode => false,
+      rest => List.Nil(),
+      kinds => Array[],
+      orderBy => None(),
+      limit => None(),
+    };
+
+    this.!subst = substCopy;
+    this.!ambiguous = ambiguousCopy;
+    this.!aggrVars = aggrVarsCopy;
+    this.!needUp = needUpCopy;
+    this.!isAggr = isAggrCopy;
+    this.!other = otherCopy;
+
+    cselect
+  }
+
+  // Expand a `VALUES (foo1_1, foo2_1, ...), ..., (foo1_n, foo2_n, ...)`
+  // clause into its equivalent
+  // ```
+  // SELECT * FROM (
+  //   SELECT foo1_1, foo2_1, ... UNION ALL
+  //                          ... UNION ALL
+  //   SELECT foo1_n, foo2_n, ...
+  // )
+  // NOTE: This could be optimized.
+  readonly fun expandValuesClause(core: P.SelectCoreValues): P.SelectCoreQuery {
+    P.SelectCoreQuery{
+      distinct => false,
+      params => Array[P.SelectStar(None())],
+      from => Some(
+        P.FromQuery{
+          select => P.Select{
+            pos => 0,
+            core => P.SelectCoreQuery{
+              distinct => false,
+              params => core.values[0].map(e -> P.SelectExpr(e, None())),
+              from => None(),
+              where => None(),
+              groupBy => None(),
+              having => None(),
+            },
+            rest => core.values.drop(1).map(v ->
+              (
+                P.COUnionAll(),
+                P.SelectCoreQuery{
+                  distinct => false,
+                  params => v.map(e -> P.SelectExpr(e, None())),
+                  from => None(),
+                  where => None(),
+                  groupBy => None(),
+                  having => None(),
+                },
+              )
+            ),
+            orderBy => None(),
+            limit => None(),
+          },
+          asName => None(),
+        },
+      ),
+      where => None(),
+      groupBy => None(),
+      having => None(),
+    }
+  }
+
+  mutable fun compileSelect(
+    context: mutable SKStore.Context,
+    select: P.Select,
+    selectId: P.Name,
+    toplevel: Bool,
+    sets: Array<P.UpdateSet> = Array[],
+  ): CSelect {
+    select.core match {
+    | core @ P.SelectCoreValues _ ->
+      return this.compileSelect(
+        context,
+        select with {core => this.expandValuesClause(core)},
+        selectId,
+        toplevel,
+        sets,
+      )
+    | _ -> void
+    };
+
+    // TODO: This heuristic seems suspiciously biased towards the first term of
+    // a compound select.
+    if (
+      (select.core as P.SelectCoreQuery _).distinct ||
+      toplevel &&
+        (select.orderBy is Some _ || select.limit is Some _) &&
+        ((select.core as P.SelectCoreQuery _).groupBy is Some _) ||
+      (!select.rest.isEmpty() || toplevel) &&
+        selectOrRestIsAggrOrEmptyFrom(select)
+    ) {
+      !select.core = this.expandGroupBy(select.core);
+      !select.rest = select.rest.map(x -> (x.i0, this.expandGroupBy(x.i1)))
+    };
+
+    core = this.compileSelectCoreQuery(
+      context,
+      select.core as P.SelectCoreQuery _,
+      selectId,
+      sets,
+    );
+
+    orderBy = this.compileOrderBy(
+      context,
+      (select.core as P.SelectCoreQuery _).params,
+      core.from,
+      select.orderBy,
+    );
+    limit = this.compileLimit(context, select.limit);
+
+    kinds = orderBy match {
+    | None() ->
+      i = 0;
+      core.params.map(param -> {
+        result = (i, P.IASC(), param.getType());
+        !i = i + 1;
+        result
+      })
+    | Some(ekinds) -> computeKinds(core.params, ekinds)
+    };
+
+    rest = this.compileRest(context, core.params, select.rest);
+
+    /*
+     * Direct mode is a setup where we want to output things on stdout
+     * directly. Of course, that will not work with any kind of
+     * query. So we restrict ourselves to queries of the form:
+     * "select ... from ... where ..."
+     *
+     * (when exactly one table is involved). We don't use direct mode
+     * when an index is involved because the result set is typically
+     * small enough that direct mode won't matter. And it saves us a lot
+     * of headache in the logic running the loop (no need to lookup the
+     * index etc ...).
+     */
+
+    directMode =
+      core.aggr is None() &&
+      this.directMode &&
+      toplevel &&
+      /* There is exactly one table */
+      core.from.size() == 1 &&
+      /* No index is involved (could change in the future?)  */
+      core.from[0].i1 is None() &&
+      !(select.core as P.SelectCoreQuery _).distinct &&
+      core.having is None() &&
+      orderBy is None() &&
+      core.groupBy is None() &&
+      rest.isEmpty();
+
+    format = this.options.format match {
+    | OFK_CSV() -> SKStore.OCSV(Range(0, core.params.size()).collect(Array))
+    | OFK_Table() ->
+      schema = static::getSchema(
+        context,
+        (select.core as P.SelectCoreQuery _).params,
+        core.from,
+        core.params,
+      );
+      fieldNames = schema.map(x -> x.name.origName);
+      SKStore.OTable(fieldNames)
+    | OFK_JSON() ->
+      schema = static::getSchema(
+        context,
+        (select.core as P.SelectCoreQuery _).params,
+        core.from,
+        core.params,
+      );
+      fieldNames = schema.map(x -> x.name.origName);
+      SKStore.OJSON(fieldNames)
+    | OFK_SQL() -> SKStore.OSQL()
+    | OFK_JS() ->
+      schema = static::getSchema(
+        context,
+        (select.core as P.SelectCoreQuery _).params,
+        core.from,
+        core.params,
+      );
+      fieldNames = schema.map(x -> x.name.origName);
+      SKStore.OJS(fieldNames)
+    };
+
+    cselect = core with {format, directMode, rest, kinds, orderBy, limit};
+
+    !cselect = optimizeNoopSelect(cselect);
+
+    cselect
+  }
+
+  mutable fun compileSets(
+    context: mutable SKStore.Context,
+    params: Array<P.UpdateSet>,
+  ): Array<(Int, CGExpr)> {
+    this.noAggr(() -> {
+      params.map(set -> {
+        if (set.columns.size() != 1) {
+          error(this.pos, "UPDATE ... SET a, b, c = expr not implemented")
+        };
+        (pos, colName) = set.columns[0];
+        e = set.value;
+        this.compileExpr(context, P.Identifier(colName)) match {
+        | (CIExpr(CIGetFrom(0, n))) ->
+          this.compileExpr(context, e) match {
+          | CGNull() -> (n, CGNull())
+          | v @ CIExpr(_) -> (n, v)
+          | _ -> errorNbr(2, pos, "Incompatible types for set")
+          }
+        | (CFExpr(CFGetFrom(0, n))) ->
+          this.compileExpr(context, e) match {
+          | CGNull() -> (n, CGNull())
+          | v @ CFExpr(_) -> (n, v)
+          | _ -> errorNbr(2, pos, "Incompatible types for set")
+          }
+        | (CSExpr(CSGetFrom(0, n))) ->
+          this.compileExpr(context, e) match {
+          | CGNull() -> (n, CGNull())
+          | v @ CSExpr(_) -> (n, v)
+          | _ -> errorNbr(2, pos, "Incompatible types for set")
+          }
+        | (CJExpr(CJGetFrom(0, n))) ->
+          this.compileExpr(context, e) match {
+          | CGNull() -> (n, CGNull())
+          | CSExpr(v) -> (n, CJExpr(CJJSON(v)))
+          | v @ CJExpr(_) -> (n, v)
+          | _ -> errorNbr(2, pos, "Incompatible types for set")
+          }
+        | _ -> errorNbr(3, pos, "Invalid set")
+        };
+      })
+    })
+  }
+
+  mutable fun compileParams(
+    context: mutable SKStore.Context,
+    selectParams: Array<P.SelectResult>,
+    origFrom: Array<DirDescr>,
+  ): Array<CGExpr> {
+    origFromMap = mutable Map[];
+    for (table in origFrom) {
+      if (!origFromMap.containsKey(table.name)) {
+        origFromMap![table.name] = table;
+      };
+      table.alias match {
+      | Some(alias) if (!origFromMap.containsKey(alias)) ->
+        origFromMap![alias] = table
+      | _ -> void
+      }
+    };
+    expandedSParams = mutable Vector[];
+    for (tableNbr => param in selectParams) {
+      param match {
+      | P.SelectStar(None()) ->
+        for (dirDescr in origFrom) {
+          tableName = dirDescr.alias match {
+          // NOTE: This branch is actually never taken because `compileFrom()`
+          // unconditionally sets `dirDescr.alias` to the desired value.
+          | None() -> P.Name::create(`${dirDescr.name.origName}_${tableNbr}`)
+          | Some(x) -> x
+          };
+          for (varName in dirDescr.colNames) {
+            expandedSParams.push(
+              P.SelectExpr(P.Identifier(varName, Some(tableName)), None()),
+            )
+          }
+        }
+
+      | P.SelectStar(Some(tableName)) ->
+        if (!origFromMap.containsKey(tableName)) {
+          error(this.pos, `Table not found: ${tableName}`);
+        };
+        tableDescr = origFromMap[tableName];
+        for (colName in tableDescr.colNames) {
+          expandedSParams.push(
+            P.SelectExpr(P.Identifier(colName, Some(tableName)), None()),
+          )
+        }
+
+      | P.SelectExpr(P.Check(_), _) -> void
+      | p @ P.SelectExpr _ -> expandedSParams.push(p)
+      }
+    };
+
+    expandedSParams.toArray().map(param -> {
+      this.compileExpr(context, param.expr)
+    })
+  }
+
+  mutable fun compileSideEffectParams(
+    context: mutable SKStore.Context,
+    selectParams: Array<P.SelectResult>,
+  ): Array<CGExpr> {
+    compiledExprs = mutable Vector[];
+    for (_ => param in selectParams) {
+      param match {
+      | P.SelectExpr(P.Check(e), alias) ->
+        cexpr = this.compileExpr(context, e) match {
+        | CIExpr(inner) -> CIExpr(CICheck(this.pos, e.toString(), inner, alias))
+        | _ -> error(this.pos, "Expected a boolean expression inside CHECK")
+        };
+        compiledExprs.push(cexpr)
+      | _ -> void
+      }
+    };
+    compiledExprs.toArray()
+  }
+
+  mutable fun compileFrom(
+    context: mutable SKStore.Context,
+    fromTables: Array<P.SelectSource>,
+  ): Array<SKDB.DirDescr> {
+    tableNbr = 0;
+
+    tables = fromTables.mapWithIndex((tableNbr, fromTable) -> {
+      table = this.getFromDirDescr(context, fromTable);
+      tableAlias = fromTable.asName match {
+      | Some(x) -> x
+      | None() -> P.Name::create(`${table.name.origName}_${tableNbr}`)
+      };
+      !table.alias = Some(tableAlias);
+      table
+    });
+
+    for (i => fromName in fromTables) {
+      table = tables[i];
+      tableName = table.name;
+
+      for (colName => colNbr in table.cols) {
+        this.addGetFrom(tableNbr, table.schema, P.Identifier(colName), colNbr);
+        if (fromName.asName is None _) {
+          this.addGetFrom(
+            tableNbr,
+            table.schema,
+            P.Identifier(colName, Some(table.alias.fromSome())),
+            colNbr,
+          )
+        }
+      };
+      fromName.asName match {
+      | None() ->
+        for (colName => colNbr in table.cols) {
+          dotName = P.Identifier(colName, Some(tableName));
+          this.addGetFrom(tableNbr, table.schema, dotName, colNbr)
+        }
+      | Some(asName) ->
+        for (colName => colNbr in table.cols) {
+          dotName = P.Identifier(colName, Some(asName));
+          this.addGetFrom(tableNbr, table.schema, dotName, colNbr)
+        }
+      };
+
+      !tableNbr = tableNbr + 1;
+    };
+
+    !tableNbr = 0;
+
+    for (i => fromName in fromTables) {
+      table = tables[i];
+      tableName = table.name;
+
+      fromName.asName match {
+      | None() -> void
+      | Some(_) ->
+        for (colName => colNbr in table.cols) {
+          dotName = P.Identifier(colName, Some(tableName));
+          if (!this.subst.containsKey(dotName)) {
+            this.addGetFrom(tableNbr, table.schema, dotName, colNbr)
+          }
+        }
+      };
+
+      !tableNbr = tableNbr + 1;
+    };
+
+    tables
+  }
+
+  mutable fun addGetFrom(
+    tableNbr: Int,
+    schema: Array<P.ColumnDefinition>,
+    colName: P.Identifier,
+    colNbr: Int,
+  ): void {
+    if (this.subst.containsKey(colName)) {
+      this.ambiguous.insert(colName);
+    } else {
+      this.subst![colName] = schema[colNbr].ty match {
+      | P.FLOAT() -> CFExpr(CFGetFrom(tableNbr, colNbr))
+      | P.INTEGER() -> CIExpr(CIGetFrom(tableNbr, colNbr))
+      | P.TEXT() -> CSExpr(CSGetFrom(tableNbr, colNbr))
+      | P.JSON() -> CJExpr(CJGetFrom(tableNbr, colNbr))
+      | P.SCHEMA() -> CTExpr(CTGetFrom(tableNbr, colNbr))
+      }
+    }
+  }
+
+  mutable fun getFromDirDescr(
+    context: mutable SKStore.Context,
+    from: P.SelectSource,
+  ): DirDescr {
+    from match {
+    | P.FromTable{name => tableName} -> getTable(context, this.pos, tableName)
+
+    | P.FromQuery{select} ->
+      if (select.core is P.SelectCoreValues _) {
+        error(select.pos, "SELECT ... FROM VALUES ... not implemented.")
+      };
+      cselect = this.compileSelect(context, select, genSelectId(select), false);
+      selectDir = evalSelect(context, cselect, None());
+      static::getDirDescr(
+        context,
+        (select.core as P.SelectCoreQuery _).params,
+        cselect.from,
+        cselect.params,
+        P.Name::create(selectDir.dirName.toString()),
+        selectDir.dirName,
+      )
+    }
+  }
+
+  static fun getCols(
+    context: mutable SKStore.Context,
+    params: Array<P.SelectResult>,
+    from: Array<(DirDescr, ?Array<SKStore.KeyRange<RowKey>>)>,
+  ): (SortedMap<P.Name, Int>, readonly Map<Int, P.Name>) {
+    cols = SortedMap[];
+    invCols = mutable Map[];
+    slot = 0;
+
+    origFromMap = mutable Map[];
+    for (tableRange in from) {
+      (table, _range) = tableRange;
+      if (!origFromMap.containsKey(table.name)) {
+        origFromMap![table.name] = table;
+      };
+      table.alias match {
+      | Some(alias) if (!origFromMap.containsKey(alias)) ->
+        origFromMap![alias] = table
+      | _ -> void
+      }
+    };
+
+    for (param in params) {
+      param match {
+      | P.SelectStar(None()) ->
+        for (dirDescr in from) {
+          for (tyName in dirDescr.i0.colNames) {
+            if (!cols.containsKey(tyName)) {
+              !cols[tyName] = slot;
+              invCols![slot] = tyName;
+            };
+            !slot = slot + 1;
+          }
+        }
+
+      | P.SelectStar(Some(tableName)) ->
+        dirDescr = origFromMap.maybeGet(tableName) match {
+        | Some(x) -> x
+        | None() -> getTable(context, 0, tableName)
+        };
+        for (tyName in dirDescr.colNames) {
+          if (!cols.containsKey(tyName)) {
+            !cols[tyName] = slot;
+            invCols![slot] = tyName;
+          };
+          !slot = slot + 1;
+        }
+
+      | P.SelectExpr(P.Check(_), _) -> continue
+
+      | P.SelectExpr(_, Some(aliasColName)) ->
+        if (cols.containsKey(aliasColName)) continue;
+        !cols[aliasColName] = slot;
+        invCols![slot] = aliasColName;
+        !slot = slot + 1
+
+      | P.SelectExpr(P.Identifier(colName, _), None _) ->
+        if (cols.containsKey(colName)) continue;
+        !cols[colName] = slot;
+        invCols![slot] = colName;
+        !slot = slot + 1
+      | _ -> !slot = slot + 1
+      }
+    };
+
+    (cols, invCols)
+  }
+
+  static fun getSchema(
+    context: mutable SKStore.Context,
+    params: Array<P.SelectResult>,
+    from: Array<(DirDescr, ?Array<SKStore.KeyRange<RowKey>>)>,
+    cparams: Array<CGExpr>,
+  ): Array<P.ColumnDefinition> {
+    (cols, invCols) = static::getCols(context, params, from);
+    cparams.mapWithIndex((idx, param) -> {
+      P.ColumnDefinition{
+        name => invCols.maybeGet(idx) match {
+        | None() ->
+          col = P.Name::create("col<" + idx + ">");
+          // FIXME: This is a noop?
+          !cols[col] = idx;
+          col
+        | Some(x) -> x
+        },
+        ty => param.getType(),
+      }
+    })
+  }
+
+  static fun getDirDescr(
+    context: mutable SKStore.Context,
+    params: Array<P.SelectResult>,
+    from: Array<(DirDescr, ?Array<SKStore.KeyRange<RowKey>>)>,
+    cparams: Array<CGExpr>,
+    selectId: P.Name,
+    dirName: SKStore.DirName,
+    view: Bool = false,
+  ): DirDescr {
+    schema = static::getSchema(context, params, from, cparams);
+    DirDescr::create{
+      name => selectId,
+      schema,
+      dirName,
+      alias => Some(selectId),
+      isInput => false,
+      view,
+    }
+  }
+
+  readonly fun expandJoins(
+    from: P.SelectFrom,
+  ): (Array<P.SelectSource>, ?P.Expr) {
+    mergeConds = (lhs, rhs) -> {
+      (lhs, rhs) match {
+      | (None(), x)
+      | (x, None()) ->
+        x
+      | (Some(c1), Some(c2)) -> Some(P.BinOp(P.OAnd(), c1, c2))
+      }
+    };
+    from match {
+    | source @ P.SelectSource _ -> (Array[source], None())
+    | P.Join{kind, lhs, rhs, on, using} ->
+      if (using is Some _) {
+        error(this.pos, "JOIN USING not implemented")
+      };
+      kind match {
+      | P.JComma()
+      | P.JCross() ->
+        expandedLhs = this.expandJoins(lhs);
+        expandedRhs = this.expandJoins(rhs);
+        (
+          expandedLhs.i0.concat(expandedRhs.i0),
+          mergeConds(expandedLhs.i1, expandedRhs.i1),
+        )
+      | _ ->
+        expandedLhs = this.expandJoins(lhs);
+        expandedRhs = this.expandJoins(rhs);
+        where = mergeConds(expandedLhs.i1, expandedRhs.i1);
+        on match {
+        | None() -> errorNbr(4, this.pos, "Expected ON after JOIN")
+        | Some(onClause) ->
+          !where = where match {
+          | None() -> Some(P.On(kind, onClause))
+          | Some(cond) -> Some(P.BinOp(P.OAnd(), P.On(kind, onClause), cond))
+          };
+          (expandedLhs.i0.concat(expandedRhs.i0), where)
+        }
+      }
+    }
+  }
+
+  mutable fun compileWhere(
+    context: mutable SKStore.Context,
+    whereOpt: ?P.Expr,
+  ): ?CExpr<Int> {
+    this.noAggr(() -> {
+      whereOpt match {
+      | None() -> None()
+      | Some(expr) ->
+        this.compileExpr(context, expr) match {
+        | CGNull() -> Some(CNull())
+        | CIExpr(x) -> Some(x)
+        | CFExpr _ -> errorNbr(5, this.pos, "A where clause cannot be a FLOAT")
+        | CSExpr _ -> errorNbr(5, this.pos, "A where clause cannot be TEXT")
+        | CJExpr _ -> errorNbr(5, this.pos, "A where clause cannot be a JSON")
+        | CTExpr _ -> errorNbr(5, this.pos, "A where clause cannot be a SCHEMA")
+        }
+      }
+    })
+  }
+
+  mutable fun compileGroupBy(
+    context: mutable SKStore.Context,
+    groupByOpt: ?Array<P.Expr>,
+    params: Array<CGExpr>,
+  ): ?Array<CGroupByElt> {
+    groupByOpt match {
+    | None() -> None()
+    | Some(groupBy) ->
+      Some(
+        groupBy.map(group -> {
+          this.compileExpr(context, group) match {
+          | CIExpr(CILiteral(nIndexedAt1)) ->
+            n = nIndexedAt1 - 1;
+            if (n < 0 || n >= params.size()) {
+              errorNbr(6, this.pos, "GROUP BY out of bounds");
+            };
+            e = params[n];
+            CGBExpr(e, e.getType())
+          | e -> CGBExpr(e, e.getType())
+          }
+        }),
+      )
+    }
+  }
+
+  mutable fun compileHaving(
+    context: mutable SKStore.Context,
+    havingOpt: ?P.Expr,
+  ): ?CExpr<Int> {
+    havingOpt.map(e ->
+      this.compileExpr(context, e) match {
+      | CGNull() -> CILiteral(0)
+      | CIExpr(x) -> x
+      | _ -> errorNbr(7, this.pos, "Invalid type for HAVING clause")
+      }
+    )
+  }
+
+  mutable fun compileRest(
+    context: mutable SKStore.Context,
+    cparams: Array<CGExpr>,
+    rest: Array<(P.CompoundOperator, P.SelectCore)>,
+  ): List<(QueryKind, CSelect)> {
+    List::createFromItems(
+      rest.map(x -> {
+        qkind = x.i0 match {
+        | P.COUnion() -> QUnion(USingle())
+        | P.COUnionAll() -> QUnion(UAll())
+        | P.COExcept() -> QExcept()
+        | P.COIntersect() -> QIntersect(false)
+        };
+        select = P.Select{
+          pos => 0,
+          core => x.i1,
+          orderBy => None(),
+          limit => None(),
+          rest => Array[],
+        };
+        query = this.compileSelect(context, select, genSelectId(select), false);
+        qparams = query.params;
+        if (cparams.size() != qparams.size()) {
+          // TODO: Better error message (for INTERSECT/EXCEPT).
+          errorNbr(8, this.pos, "Incompatible select width for union");
+        };
+        for (i in Range(0, qparams.size())) {
+          if (qparams[i].getType() != cparams[i].getType()) {
+            errorNbr(9, this.pos, "Incompatible types for union");
+          }
+        };
+        (qkind, query)
+      }),
+    )
+  }
+
+  mutable fun compileOrderBy(
+    context: mutable SKStore.Context,
+    params: Array<P.SelectResult>,
+    from: Array<(SKDB.DirDescr, ?Array<SKStore.KeyRange<RowKey>>)>,
+    orderByOpt: ?Array<(P.Expr, P.IKind)>,
+  ): ?Array<(Int, P.IKind)> {
+    orderByOpt match {
+    | None() -> None()
+    | Some(orderBy) ->
+      (cols, _) = static::getCols(context, params, from);
+      Some(
+        orderBy.map(kv -> {
+          (order, kind) = kv;
+          order match {
+          | P.VInt(n) -> (n, kind)
+          | colName @ P.Identifier _ ->
+            if (colName.table is Some _) {
+              error(this.pos, "ORDER BY foo.bar not supported")
+            };
+            if (cols.containsKey(colName.name)) {
+              (cols[colName.name] + 1, kind)
+            } else {
+              errorNbr(
+                10,
+                this.pos,
+                `invalid ORDER BY, unbound name ${colName}`,
+              )
+            }
+          | _ -> errorNbr(11, this.pos, "invalid ORDER BY")
+          }
+        }),
+      )
+    }
+  }
+
+  mutable fun compileLimit(
+    context: mutable SKStore.Context,
+    limit: ?P.Expr,
+  ): ?CExpr<Int> {
+    limit match {
+    | None() -> None()
+    | Some(e) ->
+      this.compileExpr(context, e) match {
+      | CIExpr(i) -> Some(i)
+      | _ -> errorNbr(13, this.pos, "Invalid limit")
+      }
+    }
+  }
+
+  mutable fun compileExpr(
+    context: mutable SKStore.Context,
+    expr: P.Expr,
+  ): CGExpr {
+    expr match {
+    | P.VNull() -> CGNull()
+    | P.VInt(i) -> CIExpr(CILiteral(i))
+    | P.VFloat(f) -> CFExpr(CFLiteral(f))
+    | P.VString(s) -> CSExpr(CSLiteral(s))
+    | P.VJSON(s) -> CJExpr(CJJSON(CSLiteral(s)))
+    | P.VSeqNum(_isPositive, Some(varName)) ->
+      globals = context.getGlobal(GLOBALS) match {
+      | None() ->
+        error(this.pos, "Unknown local_sequence_number name " + varName)
+      | Some(file) -> Globals::type(file)
+      };
+      if (!globals.containsKey(varName)) {
+        error(this.pos, "Unknown local_sequence_number name " + varName)
+      };
+      CIExpr(CILiteral(globals[varName]))
+    | P.VSeqNum(isPositive, None()) -> CIExpr(CISeqNum(isPositive))
+    | P.VId(Some(varName)) ->
+      namedIDs = context.getGlobal(NAMEDIDS) match {
+      | None() -> error(this.pos, "Unknown id " + varName)
+      | Some(file) -> NamedIDs::type(file)
+      };
+      if (!namedIDs.containsKey(varName)) {
+        error(this.pos, "Unknown id " + varName)
+      };
+      CSExpr(CSLiteral(namedIDs[varName]))
+    | P.VId(None()) -> CSExpr(CSId())
+    | P.VPermission(arg) ->
+      this.compileExpr(context, arg) match {
+      | CSExpr(CSLiteral(str)) ->
+        CIExpr(CILiteral(compilePermissionLiteral(str)))
+      | _ -> error(this.pos, "Argument to skdb_permission must be a string")
+      }
+    | P.VCurrentTime _ ->
+      CSExpr(CStrftime(CSLiteral("%H:%M:%S"), CSLiteral("now"), Array[]))
+    | P.VCurrentDate _ ->
+      CSExpr(CStrftime(CSLiteral("%Y-%m-%d"), CSLiteral("now"), Array[]))
+    | P.VCurrentTimestamp _ ->
+      CSExpr(
+        CStrftime(CSLiteral("%Y-%m-%d %H:%M:%S"), CSLiteral("now"), Array[]),
+      )
+    | P.VParam(handle) ->
+      this.params.maybeGet(handle) match {
+      | Some(val) -> this.compileExpr(context, val)
+      | None() -> error(this.pos, "Unbound parameter: " + handle)
+      }
+    | id @ P.Identifier _ ->
+      if (this.ambiguous.contains(id)) {
+        error(this.pos, `Ambiguous name: ${id}`);
+      };
+      this.subst.maybeGet(id) match {
+      | None() -> error(this.pos, `Unbound name: ${id}`)
+      | Some(e) ->
+        e match {
+        | CIExpr(CUp _)
+        | CFExpr(CUp _)
+        | CSExpr(CUp _) ->
+          this.!needUp = true
+        | _ -> void
+        };
+        if (this.isAggr) {
+          slot = this.aggrVars.size();
+          this.aggrVars.push((Noop(), e));
+          e.getType() match {
+          | P.INTEGER() -> CIExpr(CIGetFrom(0, slot))
+          | P.FLOAT() -> CFExpr(CFGetFrom(0, slot))
+          | P.TEXT() -> CSExpr(CSGetFrom(0, slot))
+          | P.JSON() -> CJExpr(CJGetFrom(0, slot))
+          | P.SCHEMA() -> CTExpr(CTGetFrom(0, slot))
+          }
+        } else {
+          e
+        }
+      }
+
+    | P.Tuple _ -> invariant_violation("not implemented")
+
+    | P.BinOp(P.OIs(true), e1, e2) ->
+      this.compileExpr(
+        context,
+        P.UnOp(P.UnaryNot(), P.BinOp(P.OIs(false), e1, e2)),
+      )
+
+    | P.BinOp(P.OIs(false), e, P.VNull()) ->
+      CIExpr(
+        this.compileExpr(context, e) match {
+        | CGNull() -> CILiteral(1)
+        | CIExpr(i) -> CIIsNull(i)
+        | CFExpr(f) -> CFIsNull(f)
+        | CSExpr(s) -> CSIsNull(s)
+        | CJExpr(s) -> CJIsNull(s)
+        | CTExpr(s) -> CTIsNull(s)
+        },
+      )
+
+    | P.BinOp(P.OIs(false), e, P.UnOp(P.UnaryNot(), P.VNull())) ->
+      CIExpr(
+        CNot(
+          this.compileExpr(context, e) match {
+          | CGNull() -> CILiteral(1)
+          | CIExpr(i) -> CIIsNull(i)
+          | CFExpr(f) -> CFIsNull(f)
+          | CSExpr(s) -> CSIsNull(s)
+          | CJExpr(b) -> CJIsNull(b)
+          | CTExpr(b) -> CTIsNull(b)
+          },
+        ),
+      )
+
+    | P.Between(e1, e2, e3, false) ->
+      (
+        this.compileExpr(context, e1),
+        this.compileExpr(context, e2),
+        this.compileExpr(context, e3),
+      ) match {
+      | (CGNull(), _, _) -> CGNull()
+      | (_, CGNull(), CGNull()) -> CGNull()
+
+      | (CIExpr(i1), CIExpr(i2), CIExpr(i3)) -> CIExpr(CIBetween(i1, i2, i3))
+      | (CIExpr(i1), CGNull(), CIExpr(i3)) -> CIExpr(CIBetween(i1, CNull(), i3))
+      | (CIExpr(i1), CIExpr(i2), CGNull()) -> CIExpr(CIBetween(i1, i2, CNull()))
+
+      | (CFExpr(f1), CFExpr(f2), CFExpr(f3)) -> CIExpr(CFBetween(f1, f2, f3))
+      | (CFExpr(f1), CGNull(), CFExpr(f3)) -> CIExpr(CFBetween(f1, CNull(), f3))
+      | (CFExpr(f1), CFExpr(f2), CGNull()) -> CIExpr(CFBetween(f1, f2, CNull()))
+
+      | (CSExpr(s1), CSExpr(s2), CSExpr(s3)) -> CIExpr(CSBetween(s1, s2, s3))
+      | (CSExpr(s1), CGNull(), CSExpr(s3)) -> CIExpr(CSBetween(s1, CNull(), s3))
+      | (CSExpr(s1), CSExpr(s2), CGNull()) -> CIExpr(CSBetween(s1, s2, CNull()))
+
+      | _ -> error(this.pos, "Type error: BETWEEN")
+      }
+
+    | P.Between(e1, e2, e3, true) ->
+      (
+        this.compileExpr(context, e1),
+        this.compileExpr(context, e2),
+        this.compileExpr(context, e3),
+      ) match {
+      | (CGNull(), _, _) -> CGNull()
+      | (_, CGNull(), CGNull()) -> CGNull()
+
+      | (CIExpr(i1), CIExpr(i2), CIExpr(i3)) -> CIExpr(CINotBetween(i1, i2, i3))
+      | (CIExpr(i1), CGNull(), CIExpr(i3)) ->
+        CIExpr(CINotBetween(i1, CNull(), i3))
+      | (CIExpr(i1), CIExpr(i2), CGNull()) ->
+        CIExpr(CINotBetween(i1, i2, CNull()))
+
+      | (CFExpr(f1), CFExpr(f2), CFExpr(f3)) -> CIExpr(CFNotBetween(f1, f2, f3))
+      | (CFExpr(f1), CGNull(), CFExpr(f3)) ->
+        CIExpr(CFNotBetween(f1, CNull(), f3))
+      | (CFExpr(f1), CFExpr(f2), CGNull()) ->
+        CIExpr(CFNotBetween(f1, f2, CNull()))
+
+      | (CSExpr(s1), CSExpr(s2), CSExpr(s3)) -> CIExpr(CSNotBetween(s1, s2, s3))
+      | (CSExpr(s1), CGNull(), CSExpr(s3)) ->
+        CIExpr(CSNotBetween(s1, CNull(), s3))
+      | (CSExpr(s1), CSExpr(s2), CGNull()) ->
+        CIExpr(CSNotBetween(s1, s2, CNull()))
+
+      | _ -> error(this.pos, "Type error: NOT BETWEEN")
+      }
+
+    | P.Like(ge1, ge2, escape, true) ->
+      this.compileExpr(
+        context,
+        P.UnOp(P.UnaryNot(), P.Like(ge1, ge2, escape, false)),
+      )
+
+    | P.Like(ge1, ge2, escape, false) ->
+      if (escape is Some _) {
+        error(this.pos, "LIKE ESCAPE not implemented")
+      };
+      pattern = ge2 match {
+      | P.VString(str) -> str
+      | P.VParam(handle) ->
+        this.params.maybeGet(handle) match {
+        | Some(P.VString(str)) -> str
+        | Some(_) -> error(this.pos, "Expected string parameter: " + handle)
+        | None() -> error(this.pos, "Unbound parameter: " + handle)
+        }
+
+      | _ -> error(this.pos, "Invalid LIKE, expected a pattern")
+      };
+
+      this.compileExpr(context, ge1) match {
+      | CSExpr(e1) -> CIExpr(CSLike(e1, parsePattern(pattern.chars())))
+      | _ -> error(this.pos, "Invalid LIKE, expected a string")
+      }
+
+    | P.BinOp(bop, ge1, ge2) ->
+      cge1 = this.compileExpr(context, ge1);
+      cge2 = this.compileExpr(context, ge2);
+      this.compileBinop(cge1, cge2, bop)
+
+    | P.Case(None(), whenCases, Some(last)) ->
+      result = this.compileExpr(context, last);
+      for (whenCase in whenCases.reversed()) {
+        (cond, action) = whenCase;
+        !result = this.makeIf(
+          this.compileExpr(context, cond),
+          this.compileExpr(context, action),
+          result,
+        );
+      };
+      result
+    | P.Case(Some(value), whenCases, Some(last)) ->
+      result = this.compileExpr(context, last);
+      for (whenCase in whenCases.reversed()) {
+        (matchValue, action) = whenCase;
+        !result = this.makeIf(
+          this.compileExpr(context, P.BinOp(P.OEq(), value, matchValue)),
+          this.compileExpr(context, action),
+          result,
+        );
+      };
+      result
+    | P.Subquery(select @ P.Select _) ->
+      cselect = this.compileSelect(context, select, genSelectId(select), false);
+      if (cselect.params.size() != 1) {
+        error(this.pos, "Invalid type for inner SELECT");
+      };
+      cselect.params[0].getType() match {
+      | P.INTEGER() -> CIExpr(CIQuery(cselect))
+      | P.FLOAT() -> CFExpr(CFQuery(cselect))
+      | P.TEXT() -> CSExpr(CSQuery(cselect))
+      | P.JSON() -> CJExpr(CJQuery(cselect))
+      | P.SCHEMA() -> CTExpr(CTQuery(cselect))
+      }
+    | P.Exists(select, true) ->
+      this.compileExpr(context, P.UnOp(P.UnaryNot(), P.Exists(select, false)))
+    | P.Exists(select @ P.Select _, false) ->
+      CIExpr(
+        CExists(
+          this.compileSelect(context, select, genSelectId(select), false),
+        ),
+      )
+
+    | e @ P.In(_, _, true) ->
+      this.compileExpr(context, P.UnOp(P.UnaryNot(), e with {negated => false}))
+    | P.In(e, P.InSelect(sel), negated) ->
+      this.compileExpr(
+        context,
+        P.In(e, P.InList(Array[P.Subquery(sel)]), negated),
+      )
+    | P.In(e, P.InList(arr), false) ->
+      this.compileExpr(context, e) match {
+      | CGNull() -> CGNull()
+      | CJExpr _ -> error(this.pos, "Cannot use 'IN' on a JSON")
+      | CTExpr _ -> error(this.pos, "Cannot use 'IN' on a SCHEMA")
+      | CIExpr(i) ->
+        set = arr.map(x ->
+          this.compileExpr(context, x) match {
+          | CIExpr(n) -> n
+          | _ -> error(this.pos, "Incompatible types: IN")
+          }
+        );
+        CIExpr(CIIn(i, set))
+
+      | CFExpr(f) ->
+        set = arr.map(x ->
+          this.compileExpr(context, x) match {
+          | CFExpr(n) -> n
+          | _ -> error(this.pos, "Incompatible types: IN")
+          }
+        );
+        CIExpr(CFIn(f, set))
+
+      | CSExpr(s) ->
+        set = arr.map(x ->
+          this.compileExpr(context, x) match {
+          | CSExpr(n) -> n
+          | _ -> error(this.pos, "Incompatible types: IN")
+          }
+        );
+        CIExpr(CSIn(s, set))
+      }
+
+    | P.UnOp(P.UnaryNot(), e) ->
+      this.compileExpr(context, e) match {
+      | CGNull() -> CGNull()
+      | CIExpr(b) -> CIExpr(CNot(b))
+      | _ ->
+        debug(e);
+        error(this.pos, "Invalid type for NOT")
+      }
+
+    | P.UnOp(P.UnaryMinus(), e) ->
+      val = this.compileExpr(context, e);
+      val match {
+      | CGNull() -> CGNull()
+      | CIExpr(i) -> CIExpr(CSub(CILiteral(0), i))
+      | CFExpr(f) -> CFExpr(CSub(CFLiteral(0.0), f))
+      | CSExpr _ -> error(this.pos, "cannot apply - on a string")
+      | CJExpr _ -> error(this.pos, "cannot apply - on a JSON")
+      | CTExpr _ -> error(this.pos, "cannot apply - on a SCHEMA")
+      }
+
+    | P.UnOp(P.UnaryPlus(), e) ->
+      val = this.compileExpr(context, e);
+      val match {
+      // FIXME: SQLite treats unary plus as a noop regardless of type.
+      | CSExpr _ -> error(this.pos, "cannot apply + on a string")
+      | x -> x
+      }
+    | P.UnOp _ -> error(this.pos, "operator not implemented")
+
+    | P.Call(fname, args, distinct) ->
+      fname.lower match {
+      | "upper" ->
+        if (args.size() != 1) {
+          error(this.pos, "upper expects one argument")
+        };
+        this.compileExpr(context, args[0]) match {
+        | CGNull _ -> CGNull()
+        | CSExpr(e) -> CSExpr(CSUpper(e))
+        | _ -> error(this.pos, "upper expects a string")
+        }
+      | "lower" ->
+        if (args.size() != 1) {
+          error(this.pos, "lower expects one argument")
+        };
+        this.compileExpr(context, args[0]) match {
+        | CGNull _ -> CGNull()
+        | CSExpr(e) -> CSExpr(CSLower(e))
+        | _ -> error(this.pos, "lower expects a string")
+        }
+      | "json" ->
+        if (args.size() != 1) {
+          error(this.pos, "json expects one argument")
+        };
+        this.compileExpr(context, args[0]) match {
+        | CGNull _ -> CGNull()
+        | CSExpr(e) -> CJExpr(CJJSON(e))
+        | _ -> error(this.pos, "json expects a string")
+        }
+      | "json_schema" ->
+        if (args.size() != 1) {
+          error(this.pos, "json_schema expects one argument")
+        };
+        this.compileExpr(context, args[0]) match {
+        | CGNull _ -> CGNull()
+        | CSExpr(e) -> CTExpr(CTJSchema(e))
+        | _ -> error(this.pos, "json_schema expects a string")
+        }
+      | "json_schema_pretty" ->
+        if (args.size() != 1) {
+          error(this.pos, "json_schema_pretty expects one argument")
+        };
+        this.compileExpr(context, args[0]) match {
+        | CGNull _ -> CGNull()
+        | CSExpr(e) -> CSExpr(CSJSchemaPp(CTParseSchema(e)))
+        | CTExpr(e) -> CSExpr(CSJSchemaPp(e))
+        | _ -> error(this.pos, "json_pretty_schema expects a json schema")
+        }
+      | "json_schema_compact" ->
+        if (args.size() != 1) {
+          error(this.pos, "json_schema_pretty expects one argument")
+        };
+        this.compileExpr(context, args[0]) match {
+        | CGNull _ -> CGNull()
+        | CSExpr(e) -> CSExpr(CSJSchemaPp(CTParseSchema(e)))
+        | CTExpr(e) -> CSExpr(CSJSchemaPp(e))
+        | _ -> error(this.pos, "json_pretty_schema expects a json schema")
+        }
+      | "json_check_schema" ->
+        if (args.size() != 2) {
+          error(this.pos, "json_check_schema expects two arguments")
+        };
+        (
+          this.compileExpr(context, args[0]),
+          this.compileExpr(context, args[1]),
+        ) match {
+        | (CSExpr(schema), CSExpr(json)) ->
+          CSExpr(
+            CSJSchemaCheck(CTParseSchema(schema), CTJSONType(CJJSON(json))),
+          )
+        | (CTExpr(schema), CSExpr(json)) ->
+          CSExpr(CSJSchemaCheck(schema, CTJSONType(CJJSON(json))))
+        | (CSExpr(schema), CJExpr(json)) ->
+          CSExpr(CSJSchemaCheck(CTParseSchema(schema), CTJSONType(json)))
+        | (CTExpr(schema), CJExpr(json)) ->
+          CSExpr(CSJSchemaCheck(schema, CTJSONType(json)))
+        | (CSExpr(schema), CTExpr(json)) ->
+          CSExpr(CSJSchemaCheck(CTParseSchema(schema), json))
+        | (CTExpr(schema), CTExpr(json)) -> CSExpr(CSJSchemaCheck(schema, json))
+        | _ ->
+          error(
+            this.pos,
+            "json_check_schema expects a schema and a JSON object",
+          )
+        }
+      | "coalesce" ->
+        if (args.isEmpty()) {
+          error(this.pos, "Missing arguments for COALESCE")
+        };
+        tvalues = args.map(x -> this.compileExpr(context, x));
+        ty = for (val in tvalues) {
+          val match {
+          | CGNull _ -> continue
+          | CIExpr _ -> break Some(P.INTEGER())
+          | CFExpr _ -> break Some(P.FLOAT())
+          | CSExpr _ -> break Some(P.TEXT())
+          | CJExpr _ -> break Some(P.JSON())
+          | CTExpr _ -> break Some(P.SCHEMA())
+          }
+        } else {
+          None()
+        };
+        ty match {
+        | None() -> CGNull()
+        | Some(P.INTEGER()) ->
+          CIExpr(
+            CCoalesce(
+              tvalues.map(tvalue ->
+                tvalue match {
+                | CGNull() -> CNull()
+                | CIExpr(e) -> e
+                | _ -> error(this.pos, "Inconsistent types in coalesce")
+                }
+              ),
+            ),
+          )
+        | Some(P.FLOAT()) ->
+          CFExpr(
+            CCoalesce(
+              tvalues.map(tvalue ->
+                tvalue match {
+                | CGNull() -> CNull()
+                | CFExpr(e) -> e
+                | _ -> error(this.pos, "Inconsistent types in coalesce")
+                }
+              ),
+            ),
+          )
+        | Some(P.TEXT()) ->
+          CSExpr(
+            CCoalesce(
+              tvalues.map(tvalue ->
+                tvalue match {
+                | CGNull() -> CNull()
+                | CSExpr(e) -> e
+                | _ -> error(this.pos, "Inconsistent types in coalesce")
+                }
+              ),
+            ),
+          )
+        | Some(P.SCHEMA()) -> error(this.pos, "Cannot call coalesce on a blob")
+        | Some(P.JSON()) -> error(this.pos, "Cannot call coalesce on JSON")
+        }
+
+      | "sum" ->
+        this.noAggr(() -> {
+          if (args.size() != 1) {
+            error(this.pos, "Invalid number of arguments for sum")
+          };
+          this.compileExpr(context, args[0]) match {
+          | e @ CIExpr(_) ->
+            slot = this.aggrVars.size();
+            this.aggrVars.push((Sum(distinct), e));
+            CIExpr(CIGetFrom(0, slot))
+          | e @ CFExpr(_) ->
+            slot = this.aggrVars.size();
+            this.aggrVars.push((Sum(distinct), e));
+            CFExpr(CFGetFrom(0, slot))
+          | CSExpr _ -> error(this.pos, "Cannot call sum on a string")
+          | CJExpr _ -> error(this.pos, "Cannot call sum on a JSON")
+          | CTExpr _ -> error(this.pos, "Cannot call sum on a SCHEMA")
+          | CGNull _ -> CGNull()
+          }
+        })
+
+      | "min" ->
+        this.noAggr(() -> {
+          if (args.size() != 1) {
+            error(this.pos, "Invalid number of arguments for min")
+          };
+          this.compileExpr(context, args[0]) match {
+          | e @ CIExpr(_) ->
+            slot = this.aggrVars.size();
+            this.aggrVars.push((Min(), e));
+            CIExpr(CIGetFrom(0, slot))
+          | e @ CFExpr(_) ->
+            slot = this.aggrVars.size();
+            this.aggrVars.push((Min(), e));
+            CFExpr(CFGetFrom(0, slot))
+          | e @ CSExpr(_) ->
+            slot = this.aggrVars.size();
+            this.aggrVars.push((Min(), e));
+            CSExpr(CSGetFrom(0, slot))
+          | CJExpr _ -> error(this.pos, "Cannot call min on a JSON")
+          | CTExpr _ -> error(this.pos, "Cannot call min on a SCHEMA")
+          | CGNull _ -> CGNull()
+          }
+        })
+
+      | "max" ->
+        this.noAggr(() -> {
+          if (args.size() != 1) {
+            error(this.pos, "Invalid number of arguments for max")
+          };
+          this.compileExpr(context, args[0]) match {
+          | e @ CIExpr(_) ->
+            slot = this.aggrVars.size();
+            this.aggrVars.push((Max(), e));
+            CIExpr(CIGetFrom(0, slot))
+          | e @ CFExpr(_) ->
+            slot = this.aggrVars.size();
+            this.aggrVars.push((Max(), e));
+            CFExpr(CFGetFrom(0, slot))
+          | e @ CSExpr(_) ->
+            slot = this.aggrVars.size();
+            this.aggrVars.push((Max(), e));
+            CSExpr(CSGetFrom(0, slot))
+          | CJExpr _ -> error(this.pos, "Cannot call max on a JSON")
+          | CTExpr _ -> error(this.pos, "Cannot call max on a SCHEMA")
+          | CGNull _ -> CGNull()
+          }
+        })
+
+      | "count" ->
+        this.noAggr(() -> {
+          value = args.size() match {
+          | 0 -> P.VInt(1)
+          | 1 -> args[0]
+          | _ -> error(this.pos, "Invalid number of arguments for sum")
+          };
+          this.compileExpr(context, value) match {
+          | e @ CIExpr(_) ->
+            slot = this.aggrVars.size();
+            this.aggrVars.push((Count(distinct), e));
+            CIExpr(CIGetFrom(0, slot))
+          | e @ CFExpr(_) ->
+            slot = this.aggrVars.size();
+            this.aggrVars.push((Count(distinct), e));
+            CIExpr(CIGetFrom(0, slot))
+          | e @ CSExpr(_) ->
+            slot = this.aggrVars.size();
+            this.aggrVars.push((Count(distinct), e));
+            CIExpr(CIGetFrom(0, slot))
+          | e @ CJExpr(_) ->
+            slot = this.aggrVars.size();
+            this.aggrVars.push((Count(distinct), e));
+            CJExpr(CJGetFrom(0, slot))
+          | e @ CTExpr(_) ->
+            slot = this.aggrVars.size();
+            this.aggrVars.push((Count(distinct), e));
+            CTExpr(CTGetFrom(0, slot))
+          | CGNull _ -> CGNull()
+          }
+        })
+
+      | "avg" ->
+        this.noAggr(() -> {
+          if (args.size() != 1) {
+            error(this.pos, "Invalid number of arguments for avg")
+          };
+          this.compileExpr(context, args[0]) match {
+          | e @ CIExpr(_) ->
+            sumSlot = this.aggrVars.size();
+            this.aggrVars.push((Sum(distinct), e));
+            countSlot = this.aggrVars.size();
+            this.aggrVars.push((Count(distinct), e));
+            CFExpr(
+              CDiv(
+                CFICast(CIGetFrom(0, sumSlot)),
+                CFICast(CIGetFrom(0, countSlot)),
+              ),
+            )
+          | e @ CFExpr(_) ->
+            sumSlot = this.aggrVars.size();
+            this.aggrVars.push((Sum(distinct), e));
+            countSlot = this.aggrVars.size();
+            this.aggrVars.push((Count(distinct), e));
+            CFExpr(
+              CDiv(CFGetFrom(0, sumSlot), CFICast(CIGetFrom(0, countSlot))),
+            )
+          | CSExpr _ -> error(this.pos, "Cannot call avg on a string")
+          | CJExpr _ -> error(this.pos, "Cannot call avg on a JSON")
+          | CTExpr _ -> error(this.pos, "Cannot call avg on a SCHEMA")
+          | CGNull _ -> CGNull()
+          }
+        })
+
+      | "json_infer_schema" ->
+        this.noAggr(() -> {
+          if (args.size() != 1) {
+            error(this.pos, "Invalid number of arguments for json_infer_schema")
+          };
+          this.compileExpr(context, args[0]) match {
+          | CIExpr(_) ->
+            error(this.pos, "Cannot call json_schema on an integer")
+          | CFExpr(_) ->
+            error(this.pos, "Cannot call json_infer_schema on a float")
+          | CTExpr(_) ->
+            error(this.pos, "Cannot call json_infer_schema on a SCHEMA")
+          | e @ CJExpr _ ->
+            slot = this.aggrVars.size();
+            this.aggrVars.push((InferSchema(), e));
+            CTExpr(CTGetFrom(0, slot))
+          | e @ CSExpr _ ->
+            slot = this.aggrVars.size();
+            this.aggrVars.push((InferSchema(), e));
+            CTExpr(CTGetFrom(0, slot))
+          | CGNull _ -> CGNull()
+          }
+        })
+
+      | "abs" ->
+        if (args.size() != 1) {
+          error(this.pos, "Invalid number of arguments for abs")
+        };
+        this.compileExpr(context, args[0]) match {
+        | CIExpr(n) -> CIExpr(CIAbs(n))
+        | CFExpr(f) -> CFExpr(CFAbs(f))
+        | _ ->
+          error(
+            this.pos,
+            "Invalid arguments for abs, expected an integer or a float",
+          )
+        }
+
+      | "date" ->
+        if (args.isEmpty()) {
+          !args = Array[P.VString("now")]
+        };
+        this.compileExpr(
+          context,
+          P.Call(
+            P.Name::create("strftime"),
+            Array[P.VString("%Y-%m-%d")].concat(args),
+            false,
+          ),
+        )
+
+      | "time" ->
+        if (args.isEmpty()) {
+          !args = Array[P.VString("now")]
+        };
+        this.compileExpr(
+          context,
+          P.Call(
+            P.Name::create("strftime"),
+            Array[P.VString("%H:%M:%S")].concat(args),
+            false,
+          ),
+        )
+
+      | "datetime" ->
+        if (args.isEmpty()) {
+          !args = Array[P.VString("now")]
+        };
+        this.compileExpr(
+          context,
+          P.Call(
+            P.Name::create("strftime"),
+            Array[P.VString("%Y-%m-%d %H:%M:%S")].concat(args),
+            false,
+          ),
+        )
+
+      | "calendar" ->
+        if (args.size() < 1) {
+          error(this.pos, "Missing arguments");
+        };
+        this.compileExpr(
+          context,
+          P.Call(
+            P.Name::create("strftime"),
+            Array[P.VString("%:c")].concat(args),
+            false,
+          ),
+        )
+
+      | "unixepoch" ->
+        if (args.isEmpty()) {
+          !args = Array[P.VString("now")]
+        };
+        this.compileExpr(
+          context,
+          P.Call(
+            P.Name::create("strftime"),
+            Array[P.VString("%s")].concat(args),
+            false,
+          ),
+        ) match {
+        | CGNull() -> CGNull()
+        | CSExpr(s) -> CIExpr(CISCast(s))
+        | _ -> error(this.pos, "strftime must return a string")
+        }
+
+      | "julianday" ->
+        if (args.isEmpty()) {
+          !args = Array[P.VString("now")]
+        };
+        this.compileExpr(
+          context,
+          P.Call(
+            P.Name::create("strftime"),
+            Array[P.VString("%J")].concat(args),
+            false,
+          ),
+        ) match {
+        | CGNull() -> CGNull()
+        | CSExpr(s) -> CFExpr(CFSCast(s))
+        | _ -> error(this.pos, "strftime must return a string")
+        }
+      | "strftime" ->
+        if (args.isEmpty()) {
+          error(this.pos, "Missing arguments")
+        } else if (args.size() == 1) {
+          !args = args.concat(Array[P.VString("now")])
+        };
+
+        isStatic = for (arg in args) {
+          arg match {
+          | P.VString _ -> void
+          | _ -> break false
+          }
+        } else {
+          true
+        };
+
+        if (isStatic) {
+          sargs = args.map(x ->
+            x match {
+            | P.VString(v) -> v
+            | _ -> error(this.pos, "only static dates are supported")
+            }
+          );
+
+          CSExpr(CSLiteral(callStrftime(this.pos, context, sargs)))
+        } else {
+          sargs = args.map(arg ->
+            this.compileExpr(context, arg) match {
+            | CSExpr(x) -> x
+            | _ -> error(this.pos, "Expected a string")
+            }
+          );
+          CSExpr(CStrftime(sargs[0], sargs[1], sargs.slice(2, sargs.size())))
+        }
+
+      | "timediff" -> error(this.pos, "timediff() not implemented")
+
+      | "nullif" ->
+        if (args.size() != 2) {
+          error(this.pos, "NULLIF expects 2 arguments");
+        };
+        (
+          this.compileExpr(context, args[0]),
+          this.compileExpr(context, args[1]),
+        ) match {
+        | (CGNull(), CGNull()) -> CGNull()
+        | (CIExpr(e1), CIExpr(e2)) -> CIExpr(CNullIf(e1, e2))
+        | (CFExpr(e1), CFExpr(e2)) -> CFExpr(CNullIf(e1, e2))
+        | (CSExpr(e1), CSExpr(e2)) -> CSExpr(CNullIf(e1, e2))
+        | (x, _) -> x
+        }
+
+      | "length" ->
+        if (args.size() != 1) {
+          error(this.pos, "LENGTH expects 1 argument");
+        };
+        this.compileExpr(context, args[0]) match {
+        | CGNull() -> CGNull()
+        | CSExpr(e1) -> CIExpr(CSLength(e1))
+        | _ -> error(this.pos, "LENGTH expects a string argument")
+        }
+
+      | _ -> error(this.pos, `Unknown function: ${fname}`)
+      }
+
+    | P.Case(condOpt, cases, defaultOpt) ->
+      acc = defaultOpt match {
+      | None() -> CGNull()
+      | Some(d) -> this.compileExpr(context, d)
+      };
+      for (case in cases.reversed()) {
+        (pat, action) = case;
+        cond = condOpt match {
+        | None() -> this.compileExpr(context, pat)
+        | Some(v) -> this.compileExpr(context, P.BinOp(P.OEq(), v, pat))
+        };
+        !acc = this.makeIf(cond, this.compileExpr(context, action), acc);
+      };
+      acc
+
+    | P.Cast(e1, ty) ->
+      (this.compileExpr(context, e1), ty) match {
+      | (CGNull(), _) -> CGNull()
+      | (CIExpr(i), P.FLOAT()) -> CFExpr(CFICast(i))
+      | (CFExpr(f), P.INTEGER()) -> CIExpr(CIFCast(f))
+      | (CSExpr(s), P.INTEGER()) -> CIExpr(CISCast(s))
+      | (CIExpr(i), P.TEXT()) -> CSExpr(CSICast(i))
+      | (CFExpr(f), P.TEXT()) -> CSExpr(CSFCast(f))
+      | (CSExpr(s), P.FLOAT()) -> CFExpr(CFSCast(s))
+      | (CJExpr(b), P.TEXT()) -> CSExpr(CJSCast(b))
+      | (CTExpr(b), P.TEXT()) -> CSExpr(CTSCast(b))
+      | (CTExpr _, _)
+      | (_, P.SCHEMA()) ->
+        error(this.pos, "Cannot cast a schema")
+      | (CJExpr _, _)
+      | (_, P.JSON()) ->
+        error(this.pos, "Cannot cast a JSON object")
+      | (ci @ CIExpr _, P.INTEGER()) -> ci
+      | (cf @ CFExpr _, P.FLOAT()) -> cf
+      | (cs @ CSExpr _, P.TEXT()) -> cs
+      }
+
+    | P.On(k, e) ->
+      this.compileExpr(context, e) match {
+      | CGNull _ -> CIExpr(CNull())
+      | CIExpr(ie) -> CIExpr(COn(k, ie))
+      | _ -> error(this.pos, "Unexpected type for ON")
+      }
+
+    | P.Collate _ -> invariant_violation("not implemented")
+    | P.Check(_) ->
+      // CHECK does not evaluate to ADef so should not be nested
+      error(this.pos, "CHECK expressions cannot be nested")
+    }
+  }
+
+  mutable fun noAggr<T>(f: () -> T): T {
+    this.!isAggr = false;
+    result = f();
+    this.!isAggr = true;
+    result
+  }
+
+  mutable fun compileBinop(
+    cge1: CGExpr,
+    cge2: CGExpr,
+    op: P.BinaryOperator,
+  ): CGExpr {
+    (cge1, cge2, op) match {
+    | (CGNull(), CGNull(), _) -> CGNull()
+
+    | (CIExpr(e1), CIExpr(e2), P.OOr()) -> CIExpr(COr(e1, e2))
+    | (CGNull(), CIExpr(e2), P.OOr()) -> CIExpr(COr(CNull(), e2))
+    | (CIExpr(e1), CGNull(), P.OOr()) -> CIExpr(COr(e1, CNull()))
+
+    | (CGNull(), _, _)
+    | (_, CGNull(), _) ->
+      CGNull()
+
+    | (CIExpr(e1), CIExpr(e2), P.OLt()) -> CIExpr(CILt(e1, e2))
+    | (CIExpr(e1), CIExpr(e2), P.OLtEq()) -> CIExpr(CILte(e1, e2))
+    | (CIExpr(e1), CIExpr(e2), P.OGtEq()) -> CIExpr(CIGte(e1, e2))
+    | (CIExpr(e1), CIExpr(e2), P.OGt()) -> CIExpr(CIGt(e1, e2))
+    | (CIExpr(e1), CIExpr(e2), P.OEq()) -> CIExpr(CIEq(e1, e2))
+    | (CIExpr(e1), CIExpr(e2), P.ONeq()) -> CIExpr(CIDiff(e1, e2))
+
+    | (CFExpr(e1), CFExpr(e2), P.OLt()) -> CIExpr(CFLt(e1, e2))
+    | (CFExpr(e1), CFExpr(e2), P.OLtEq()) -> CIExpr(CFLte(e1, e2))
+    | (CFExpr(e1), CFExpr(e2), P.OGtEq()) -> CIExpr(CFGte(e1, e2))
+    | (CFExpr(e1), CFExpr(e2), P.OGt()) -> CIExpr(CFGt(e1, e2))
+    | (CFExpr(e1), CFExpr(e2), P.OEq()) -> CIExpr(CFEq(e1, e2))
+    | (CFExpr(e1), CFExpr(e2), P.ONeq()) -> CIExpr(CFDiff(e1, e2))
+
+    | (CSExpr(e1), CSExpr(e2), P.OLt()) -> CIExpr(CSLt(e1, e2))
+    | (CSExpr(e1), CSExpr(e2), P.OLtEq()) -> CIExpr(CSLte(e1, e2))
+    | (CSExpr(e1), CSExpr(e2), P.OGtEq()) -> CIExpr(CSGte(e1, e2))
+    | (CSExpr(e1), CSExpr(e2), P.OGt()) -> CIExpr(CSGt(e1, e2))
+    | (CSExpr(e1), CSExpr(e2), P.OEq()) -> CIExpr(CSEq(e1, e2))
+    | (CSExpr(e1), CSExpr(e2), P.ONeq()) -> CIExpr(CSDiff(e1, e2))
+
+    | (CIExpr(e1), CIExpr(e2), P.OPlus()) -> CIExpr(CAdd(e1, e2))
+    | (CIExpr(e1), CIExpr(e2), P.OMinus()) -> CIExpr(CSub(e1, e2))
+    | (CIExpr(e1), CIExpr(e2), P.OMul()) -> CIExpr(CMul(e1, e2))
+    | (CIExpr(e1), CIExpr(e2), P.ODiv()) -> CIExpr(CDiv(e1, e2))
+    | (CIExpr(e1), CIExpr(e2), P.OMod()) -> CIExpr(CMod(e1, e2))
+
+    | (CFExpr(e1), CFExpr(e2), P.OPlus()) -> CFExpr(CAdd(e1, e2))
+    | (CFExpr(e1), CFExpr(e2), P.OMinus()) -> CFExpr(CSub(e1, e2))
+    | (CFExpr(e1), CFExpr(e2), P.OMul()) -> CFExpr(CMul(e1, e2))
+    | (CFExpr(e1), CFExpr(e2), P.ODiv()) -> CFExpr(CDiv(e1, e2))
+
+    | (CIExpr(e1), CIExpr(e2), P.OAnd()) -> CIExpr(CAnd(e1, e2))
+    | (CSExpr(e1), CSExpr(e2), P.OConcat()) -> CSExpr(CSConcat(e1, e2))
+
+    | _ -> error(this.pos, "Incompatible types: " + op)
+    }
+  }
+
+  mutable fun makeIf(cond: CGExpr, branch1: CGExpr, branch2: CGExpr): CGExpr {
+    cond match {
+    | CGNull() -> branch2
+    | CIExpr(icond) ->
+      (branch1, branch2) match {
+      | (CIExpr(e1), CIExpr(e2)) -> CIExpr(CIf(icond, e1, e2))
+      | (CFExpr(e1), CFExpr(e2)) -> CFExpr(CIf(icond, e1, e2))
+      | (CSExpr(e1), CSExpr(e2)) -> CSExpr(CIf(icond, e1, e2))
+      | (CGNull(), CGNull()) -> CGNull()
+      | (CGNull(), CIExpr(e2)) -> CIExpr(CIf(icond, CNull(), e2))
+      | (CGNull(), CFExpr(e2)) -> CFExpr(CIf(icond, CNull(), e2))
+      | (CGNull(), CSExpr(e2)) -> CSExpr(CIf(icond, CNull(), e2))
+      | (CIExpr(e1), CGNull()) -> CIExpr(CIf(icond, e1, CNull()))
+      | (CFExpr(e1), CGNull()) -> CFExpr(CIf(icond, e1, CNull()))
+      | (CSExpr(e1), CGNull()) -> CSExpr(CIf(icond, e1, CNull()))
+      | _ ->
+        debug((branch1, branch2));
+        error(this.pos, "Branch have different types")
+      }
+    | CFExpr(_) ->
+      error(
+        this.pos,
+        "Unexpected if condition type, expected INTEGER, not FLOAT",
+      )
+    | CSExpr(_) ->
+      error(
+        this.pos,
+        "Unexpected if condition type, expected INTEGER, not TEXT",
+      )
+    | CJExpr(_) ->
+      error(
+        this.pos,
+        "Unexpected if condition type, expected INTEGER, not JSON",
+      )
+    | CTExpr(_) ->
+      error(
+        this.pos,
+        "Unexpected if condition type, expected INTEGER, not SCHEMA",
+      )
+    }
+  }
+
+  readonly fun findJoin(
+    tables: readonly Vector<?JTable>,
+    cond: P.Expr,
+  ): (P.Expr, P.JoinKind, ?EqJoin) {
+    cond match {
+    | P.On(jk, e) ->
+      (!e, _, eqJoin) = this.findJoin(tables, e);
+      jk match {
+      | P.JLeft(natural)
+      | P.JRight(natural)
+      | P.JFull(natural) ->
+        if (natural) {
+          error(this.pos, "NATURAL JOINs not implemented")
+        };
+        if (eqJoin is None()) {
+          error(this.pos, "Invalid ON expression for JOIN");
+        }
+      | P.JInner(natural) ->
+        if (natural) {
+          error(this.pos, "NATURAL JOINs not implemented")
+        }
+      | P.JComma()
+      | P.JCross() ->
+        void
+      };
+      (e, jk, eqJoin)
+
+    | P.BinOp(P.OAnd(), e1, e2) ->
+      (!e1, jk1, join1) = this.findJoin(tables, e1);
+      join1 match {
+      | None() ->
+        (!e2, jk2, join2) = this.findJoin(tables, e2);
+        join2 match {
+        | None() -> (cond, P.JInner(false), None())
+        | Some(_) ->
+          (
+            if (e2 is P.VInt(1)) e1 else {
+              P.BinOp(P.OAnd(), e1, e2)
+            },
+            jk2,
+            join2,
+          )
+        }
+      | Some(_) ->
+        (
+          if (e1 is P.VInt(1)) e2 else {
+            P.BinOp(P.OAnd(), e1, e2)
+          },
+          jk1,
+          join1,
+        )
+      }
+
+    | P.BinOp(
+      P.OEq(),
+      name1 @ P.Identifier _,
+      name2 @ P.Identifier _,
+    ) if (this.isVar(name1) && this.isVar(name2)) ->
+      (this.subst[name1], this.subst[name2]) match {
+      | (CIExpr(CIGetFrom(tableNbr1, col1)), CIExpr(CIGetFrom(tableNbr2, col2)))
+      | (CFExpr(CFGetFrom(tableNbr1, col1)), CFExpr(CFGetFrom(tableNbr2, col2)))
+      | (
+        CSExpr(CSGetFrom(tableNbr1, col1)),
+        CSExpr(CSGetFrom(tableNbr2, col2)),
+      ) if (
+        tables[tableNbr1] is Some _ &&
+        tables[tableNbr2] is Some _ &&
+        tableNbr1 != tableNbr2
+      ) ->
+        if (tableNbr1 > tableNbr2) {
+          (!tableNbr1, !tableNbr2) = (tableNbr2, tableNbr1);
+          (!col1, !col2) = (col2, col1);
+        };
+        table1 = tables[tableNbr1].fromSome();
+        table2 = tables[tableNbr2].fromSome();
+        col1IsUnique = isUnique(table1.schema[col1]);
+        col2IsUnique = isUnique(table2.schema[col2]);
+        col1Name = (col1, P.IASC(), table1.schema[col1].ty);
+        proj1 = TableProj(tableNbr1, col1Name, col1IsUnique);
+        col2Name = (col2, P.IASC(), table2.schema[col2].ty);
+        proj2 = TableProj(tableNbr2, col2Name, col2IsUnique);
+        (P.VInt(1), P.JInner(false), Some(EqJoin(proj1, proj2)))
+      | _ -> (cond, P.JInner(false), None())
+      }
+    | _ -> (cond, P.JInner(false), None())
+    }
+  }
+
+  mutable fun compileJoin(
+    context: mutable SKStore.Context,
+    origFrom: Array<DirDescr>,
+    where: ?P.Expr,
+  ): (?P.Expr, Array<(SKDB.DirDescr, ?Array<SKStore.KeyRange<RowKey>>)>) {
+    where match {
+    | None() ->
+      if (origFrom.size() > 1) {
+        if (this.options.reactive) {
+          error(
+            this.pos,
+            "Cross joins not supported in reactive views (regardless of option --always-allow-joins)",
+          );
+        };
+        if (!this.options.alwaysAllowJoins) {
+          errorNoMergeClause(this.pos);
+        }
+      };
+      (None(), origFrom.map(x -> (x, None())))
+    | Some(cond) ->
+      from = this.compileIndexes(context, origFrom, cond);
+      (!cond, !from) = this.compileMerge(from, cond);
+
+      tablesLeft = from.filter(x ->
+        x.i1 match {
+        | None() -> true
+        | Some(_) -> false
+        }
+      );
+      if (tablesLeft.size() >= 2 && !this.options.alwaysAllowJoins) {
+        errorNoMergeClause(this.pos);
+      };
+      (Some(cond), from)
+    }
+  }
+
+  mutable fun compileMerge(
+    from: Array<(SKDB.DirDescr, ?Array<SKStore.KeyRange<RowKey>>)>,
+    cond: P.Expr,
+  ): (P.Expr, Array<(SKDB.DirDescr, ?Array<SKStore.KeyRange<RowKey>>)>) {
+    tables = mutable Vector<?JTable>[];
+    newFrom = mutable Vector[];
+    moveMap = mutable Map[];
+
+    for (tableRange in from) {
+      tables.push(Some(JTable::fromDirDescr(tableRange.i0, tableRange.i1)))
+    };
+
+    loop {
+      (!cond, joinKind, joinOpt) = this.findJoin(tables, cond);
+      join = joinOpt match {
+      | None() ->
+        for (tableNbr => tableOpt in tables) {
+          tableOpt match {
+          | None() -> void
+          | Some(table) ->
+            moveMap![tableNbr] = newFrom.size();
+            dirDescr = DirDescr::create{
+              name => P.Name::create(table.dirName.toString()),
+              dirName => table.dirName,
+              schema => table.schema.map(x ->
+                if (x.primary is Some _) {
+                  x with {unique => Some(P.CCUnique{})}
+                } else {
+                  x
+                }
+              ),
+              alias => table.alias,
+              isInput => false,
+            };
+            newFrom.push((dirDescr, table.ranges))
+          }
+        };
+
+        for (name => cexpr in this.subst.clone()) {
+          cexpr match {
+          | SKDB.CIExpr(
+            SKDB.CIGetFrom(tableNbr, colNbr),
+          ) if (moveMap.containsKey(tableNbr)) ->
+            this.subst![name] = SKDB.CIExpr(
+              SKDB.CIGetFrom(moveMap[tableNbr], colNbr),
+            )
+          | SKDB.CFExpr(
+            SKDB.CFGetFrom(tableNbr, colNbr),
+          ) if (moveMap.containsKey(tableNbr)) ->
+            this.subst![name] = SKDB.CFExpr(
+              SKDB.CFGetFrom(moveMap[tableNbr], colNbr),
+            )
+          | SKDB.CSExpr(
+            SKDB.CSGetFrom(tableNbr, colNbr),
+          ) if (moveMap.containsKey(tableNbr)) ->
+            this.subst![name] = SKDB.CSExpr(
+              SKDB.CSGetFrom(moveMap[tableNbr], colNbr),
+            )
+          | _ -> void
+          }
+        };
+
+        return (cond, newFrom.toArray())
+      | Some(x) -> x
+      };
+      leftTable = tables[join.left.tableNbr].fromSome();
+      rightTable = tables[join.right.tableNbr].fromSome();
+      viewName = P.Name::create(
+        leftTable.name.origName + "_" + rightTable.name.origName,
+      );
+      if (!this.options.reactive && !this.options.alwaysAllowJoins) {
+        leftSchema = tables[join.left.tableNbr].fromSome().schema;
+        col1 = leftSchema[join.left.col.i0].name;
+        rightSchema = tables[join.right.tableNbr].fromSome().schema;
+        col2 = rightSchema[join.right.col.i0].name;
+        msg =
+          "Joins outside of reactive views are considered bad practice in skdb.\n" +
+          "You should first create a reactive view joining " +
+          leftTable.name.origName +
+          " and " +
+          rightTable.name.origName +
+          " with a query of the form:\n\n" +
+          "create reactive view " +
+          viewName +
+          " as select * from " +
+          leftTable.name.origName +
+          ", " +
+          rightTable.name.origName +
+          " where " +
+          col1 +
+          " = " +
+          col2 +
+          ";\n\n" +
+          "And then use " +
+          viewName +
+          " directly.\n" +
+          "PS: You can ignore this error message with " +
+          "--always-allow-joins (not recommended).\n" +
+          if (tables.size() == 2) {
+            "PS2: don't forget you can add indexes to reactive views."
+          } else {
+            ""
+          };
+        error(this.pos, msg)
+      };
+      childName = SKStore.DirName::create(
+        "/merge/left" +
+          leftTable.dirName +
+          join.left.col.i0 +
+          "-" +
+          hash(leftTable.ranges) +
+          "/right" +
+          rightTable.dirName +
+          join.right.col.i0 +
+          "-" +
+          hash(rightTable.ranges) +
+          "/",
+      );
+      leftKinds = tables[join.left.tableNbr]
+        .fromSome()
+        .schema.mapWithIndex((idx, tyDescr) -> (idx, P.IASC(), tyDescr.ty));
+      rightKinds = tables[join.right.tableNbr]
+        .fromSome()
+        .schema.mapWithIndex((idx, tyDescr) -> (idx, P.IASC(), tyDescr.ty));
+      this.other.push(
+        SubMerge{
+          leftDirName => leftTable.dirName,
+          leftColNbr => join.left.col.i0,
+          leftIsUnique => join.left.isUnique,
+          leftRanges => leftTable.ranges,
+          rightDirName => rightTable.dirName,
+          rightColNbr => join.right.col.i0,
+          rightIsUnique => join.right.isUnique,
+          rightRanges => rightTable.ranges,
+          childName,
+          kinds => leftKinds.concat(
+            rightKinds.map(x -> (leftKinds.size() + x.i0, x.i1, x.i2)),
+          ),
+          joinKind,
+        },
+      );
+
+      for (name => cexpr in this.subst.clone()) {
+        cexpr match {
+        | SKDB.CIExpr(
+          SKDB.CIGetFrom(tableNbr, colNbr),
+        ) if (tableNbr == join.right.tableNbr) ->
+          leftSize = tables[join.left.tableNbr].fromSome().schema.size();
+          this.subst![name] = SKDB.CIExpr(
+            SKDB.CIGetFrom(join.left.tableNbr, leftSize + colNbr),
+          )
+        | SKDB.CFExpr(
+          SKDB.CFGetFrom(tableNbr, colNbr),
+        ) if (tableNbr == join.right.tableNbr) ->
+          leftSize = tables[join.left.tableNbr].fromSome().schema.size();
+          this.subst![name] = SKDB.CFExpr(
+            SKDB.CFGetFrom(join.left.tableNbr, leftSize + colNbr),
+          )
+        | SKDB.CSExpr(
+          SKDB.CSGetFrom(tableNbr, colNbr),
+        ) if (tableNbr == join.right.tableNbr) ->
+          leftSize = tables[join.left.tableNbr].fromSome().schema.size();
+          this.subst![name] = SKDB.CSExpr(
+            SKDB.CSGetFrom(join.left.tableNbr, leftSize + colNbr),
+          )
+        | _ -> void
+        }
+      };
+      newSchema = tables[join.left.tableNbr]
+        .fromSome()
+        .schema.concat(tables[join.right.tableNbr].fromSome().schema);
+      tables![join.right.tableNbr] = None();
+      tables![join.left.tableNbr] = Some(
+        JTable{
+          name => viewName,
+          dirName => childName,
+          ranges => None(),
+          schema => newSchema,
+          alias => None(),
+        },
+      );
+    }
+  }
+
+  mutable fun compileIndexes(
+    context: mutable SKStore.Context,
+    from: Array<DirDescr>,
+    cond: P.Expr,
+  ): Array<(SKDB.DirDescr, ?Array<SKStore.KeyRange<RowKey>>)> {
+    tables = mutable Vector[];
+    for (dirDescr in from) {
+      tables.push(JTable::fromDirDescr(dirDescr, None()));
+    };
+    killed = mutable Set[];
+    rangeMap = mutable Map[];
+
+    loop {
+      this.findLookUps(context, killed, tables, cond).select() match {
+      | None() ->
+        result = from.mapWithIndex((idx, table) -> {
+          rangeMap.maybeGet(idx) match {
+          | None() -> (table, None())
+          | Some((indexDirName, ranges)) ->
+            (table with {dirName => indexDirName}, Some(ranges))
+          }
+        });
+        return result
+      | Some((index, tableNbr, ranges)) ->
+        for (range in ranges) {
+          (low, high) = range;
+          if (low > high) {
+            error(
+              this.pos,
+              "contradictory inequalities, result will always be empty",
+            );
+          };
+        };
+        if (this.options.showUsedIndexes) {
+          print_string("USING INDEX: " + index.name);
+        };
+        killed.add(index.tableDirName);
+        rowRanges = ranges.map(range -> {
+          (minKeyValues, maxKeyValues) = range;
+          kinds = index.fields.mapWithIndex((idx, field) -> {
+            (idx, P.IASC(), field.i2)
+          });
+          maxValues = kinds.mapWithIndex((idx, kind) -> {
+            if (idx < maxKeyValues.size()) {
+              Some(maxKeyValues[idx])
+            } else {
+              Some(
+                kind.i2 match {
+                | P.INTEGER() -> CInt(Int::max)
+                | P.FLOAT() -> CFloat(Float::inf)
+                | P.TEXT() -> CString(largestString())
+                | P.JSON() -> maxJSON
+                | P.SCHEMA() -> maxSchema
+                },
+              )
+            }
+          });
+          minKey = RowKey::create(
+            RowValues::create(minKeyValues.map(x -> Some(x))),
+            kinds,
+          );
+          maxKey = RowKey::create(RowValues::create(maxValues), kinds);
+          SKStore.KeyRange::create(minKey, maxKey)
+        });
+        rangeMap![tableNbr] = (index.dirName, rowRanges)
+      }
+    }
+  }
+
+  // TODO: use this everywhere!
+  readonly fun isVar(name: P.Identifier): Bool {
+    this.subst.containsKey(name)
+  }
+
+  mutable fun findLookUps(
+    context: mutable SKStore.Context,
+    killed: readonly Set<SKStore.DirName>,
+    tables: readonly Vector<JTable>,
+    cond: P.Expr,
+  ): LookUps {
+    cond match {
+    | P.BinOp(op, P.Call(fname, args, _), e2) ->
+      if (
+        !Array["strftime", "date", "time", "datetime"].contains(fname.lower)
+      ) {
+        return LookUps[];
+      };
+      this.findLookUps(
+        context,
+        killed,
+        tables,
+        P.BinOp(op, this.evalTimeFun(context, fname, args), e2),
+      )
+
+    | P.BinOp(op, e1, P.Call(fname, args, _)) ->
+      if (
+        !Array["strftime", "date", "time", "datetime"].contains(fname.lower)
+      ) {
+        return LookUps[];
+      };
+      this.findLookUps(
+        context,
+        killed,
+        tables,
+        P.BinOp(op, e1, this.evalTimeFun(context, fname, args)),
+      )
+
+    | P.Like(P.Call(fname, args, _), e2, escape, negated) ->
+      if (
+        !Array["strftime", "date", "time", "datetime"].contains(fname.lower)
+      ) {
+        return LookUps[];
+      };
+      this.findLookUps(
+        context,
+        killed,
+        tables,
+        P.Like(this.evalTimeFun(context, fname, args), e2, escape, negated),
+      )
+
+    | P.Like(e1, P.Call(fname, args, _), escape, negated) ->
+      if (
+        !Array["strftime", "date", "time", "datetime"].contains(fname.lower)
+      ) {
+        return LookUps[];
+      };
+      this.findLookUps(
+        context,
+        killed,
+        tables,
+        P.Like(e1, this.evalTimeFun(context, fname, args), escape, negated),
+      )
+
+    | P.BinOp(P.OAnd(), e1, e2) ->
+      this.findLookUps(context, killed, tables, e1).and(
+        this.findLookUps(context, killed, tables, e2),
+      )
+    | P.BinOp(P.OOr(), e1, e2) ->
+      this.findLookUps(context, killed, tables, e1).or(
+        this.findLookUps(context, killed, tables, e2),
+      )
+
+    | P.BinOp(_, name1 @ P.Identifier _, name2 @ P.Identifier _)
+    | P.Like(
+      name1 @ P.Identifier _,
+      name2 @ P.Identifier _,
+      _,
+      _,
+    ) if (this.isVar(name1) && this.isVar(name2)) ->
+      LookUps[]
+
+    | P.In(e, P.InList(values), _) ->
+      if (values.size() == 0) {
+        error(this.pos, "Invalid IN")
+      };
+      acc = P.BinOp(P.OEq(), e, values[0]);
+      for (i in Range(1, values.size())) {
+        !acc = P.BinOp(P.OOr(), acc, P.BinOp(P.OEq(), e, values[i]))
+      };
+      this.findLookUps(context, killed, tables, acc)
+
+    | P.BinOp(op, e1 @ P.Value _, e2 @ P.Identifier _)
+    | P.BinOp(
+      op,
+      e1 @ P.Identifier _,
+      e2 @ P.Identifier _,
+    ) if (this.isVar(e2)) ->
+      !op = op match {
+      | P.OEq() -> op
+      | P.OLt() -> P.OGt()
+      | P.OLtEq() -> P.OGtEq()
+      | P.OGt() -> P.OLt()
+      | P.OGtEq() -> P.OLtEq()
+      | _ -> return LookUps[]
+      };
+      this.findLookUps(context, killed, tables, P.BinOp(op, e2, e1))
+
+    | P.Like(e1 @ P.Value _, e2 @ P.Identifier _, escape, negated)
+    | P.Like(
+      e1 @ P.Identifier _,
+      e2 @ P.Identifier _,
+      escape,
+      negated,
+    ) if (this.isVar(e2)) ->
+      this.findLookUps(context, killed, tables, P.Like(e2, e1, escape, negated))
+
+    | P.BinOp(op, name1 @ P.Identifier _, e @ P.Value _)
+    | P.BinOp(
+      op,
+      name1 @ P.Identifier _,
+      e @ P.Identifier _,
+    ) if (this.isVar(name1)) ->
+      op match {
+      | P.OEq()
+      | P.OLt()
+      | P.OLtEq()
+      | P.OGt()
+      | P.OGtEq() ->
+        void
+      | _ -> return LookUps[]
+      };
+      (tableNbr, colNbr) = this.subst[name1] match {
+      | (CIExpr(CIGetFrom(x, y))) -> (x, y)
+      | (CFExpr(CFGetFrom(x, y))) -> (x, y)
+      | (CSExpr(CSGetFrom(x, y))) -> (x, y)
+      | _ -> return LookUps[]
+      };
+      table = tables[tableNbr];
+      indexEntry = makeIndexEntry(table.name, colNbr);
+      indexTable = getIndexByColNbr(context);
+      indexes = indexTable.getArray(context, indexEntry);
+      !indexes = indexes.filter(index -> !killed.contains(index.tableDirName));
+      ce = this.compileExpr(context, e);
+      if (ce.getType() != table.schema[colNbr].ty) {
+        error(this.pos, "Incompatible types");
+      };
+      value = ce match {
+      | CIExpr(CILiteral(v)) -> CInt(v)
+      | CFExpr(CFLiteral(f)) -> CFloat(f)
+      | CSExpr(CSLiteral(s)) -> CString(s)
+      | _ -> return LookUps[]
+      };
+      lookUps = indexes.map(index -> {
+        (lookUpColNbr, unique) = for (slot => field in index.fields) {
+          if (field.i0 == colNbr) break (slot, isUnique(table.schema[colNbr]))
+        } else {
+          invariant_violation("Could not find column: " + colNbr)
+        };
+        cols = SortedA[
+          Col(lookUpColNbr, Array[(ColOp::create(op, value))], unique),
+        ];
+        !index = getLatestIndexDescr(context, index);
+        LookUp{index, tableNbr, cols}
+      });
+      LookUps::createFromItems(lookUps)
+
+    | P.Like(name1 @ P.Identifier _, e @ P.Value _, _, false)
+    | P.Like(
+      name1 @ P.Identifier _,
+      e @ P.Identifier _,
+      _,
+      false,
+    ) if (this.isVar(name1)) ->
+      (tableNbr, colNbr) = this.subst[name1] match {
+      | (CSExpr(CSGetFrom(x, y))) -> (x, y)
+      | _ -> return LookUps[]
+      };
+      table = tables[tableNbr];
+      indexEntry = makeIndexEntry(table.name, colNbr);
+      indexTable = getIndexByColNbr(context);
+      indexes = indexTable.getArray(context, indexEntry);
+      !indexes = indexes.filter(index -> !killed.contains(index.tableDirName));
+      ce = this.compileExpr(context, e);
+      if (ce.getType() != table.schema[colNbr].ty) {
+        error(this.pos, "Incompatible types");
+      };
+      value = ce match {
+      | CSExpr(CSLiteral(s)) -> CString(s)
+      | _ -> return LookUps[]
+      };
+      lookUps = indexes.map(index -> {
+        (lookUpColNbr, unique) = for (slot => field in index.fields) {
+          if (field.i0 == colNbr) break (slot, isUnique(table.schema[colNbr]))
+        } else {
+          invariant_violation("Could not find column: " + colNbr)
+        };
+        cols = SortedA[Col(lookUpColNbr, Array[(COLike(value.value))], unique)];
+        !index = getLatestIndexDescr(context, index);
+        LookUp{index, tableNbr, cols}
+      });
+      LookUps::createFromItems(lookUps)
+    | _ -> LookUps[]
+    }
+  }
+
+  readonly fun evalTimeFun(
+    context: mutable SKStore.Context,
+    fname: P.Name,
+    args: Array<P.Expr>,
+  ): P.Expr {
+    fname.lower match {
+    | "strftime" ->
+      sargs = args.map(x ->
+        x match {
+        | P.VString(str) -> str
+        | _ -> invariant_violation("Unexpected type")
+        }
+      );
+      P.VString(callStrftime(this.pos, context, sargs))
+    | "date" ->
+      if (args.size() < 1) {
+        error(this.pos, "Missing arguments");
+      };
+      P.Call(
+        P.Name::create("strftime"),
+        Array[P.VString("%Y-%m-%d")].concat(args),
+        false,
+      )
+    | "time" ->
+      if (args.size() < 1) {
+        error(this.pos, "Missing arguments");
+      };
+      P.Call(
+        P.Name::create("strftime"),
+        Array[P.VString("%H:%M:%S")].concat(args),
+        false,
+      )
+    | "datetime" ->
+      if (args.size() < 1) {
+        error(this.pos, "Missing arguments");
+      };
+      P.Call(
+        P.Name::create("strftime"),
+        Array[P.VString("%Y-%m-%d %H:%M:%S")].concat(args),
+        false,
+      )
+    | _ -> invariant_violation("unreachable")
+    }
+  }
+}
+
+/*****************************************************************************/
+/* LIKE patterns parsing. */
+/*****************************************************************************/
+
+fun parsePattern(str: Vector<Char>): Pattern {
+  text = mutable Vector[];
+  subs = mutable Vector[];
+  for (c in str) {
+    if (c == '%') {
+      if (text.size() != 0) {
+        subs.push(text.toArray());
+        text.clear();
+      };
+      continue;
+    };
+    text.push(c.uncapitalize());
+  };
+  if (text.size() != 0) {
+    subs.push(text.toArray());
+    text.clear();
+  };
+  firstIsPercent = str.size() > 0 && str[0] == '%';
+  lastIsPercent = str.size() > 0 && str[str.size() - 1] == '%';
+  Pattern{firstIsPercent, lastIsPercent, subs => subs.toArray()}
+}
+
+// Translate `skdb_permission(arg)` to the corresponding permission mask integer
+fun compilePermissionLiteral(perm_str: String): Int {
+  res = 0;
+  if (perm_str.contains("r")) {
+    !res = res.or(kReadPermission)
+  };
+  if (perm_str.contains("i")) {
+    !res = res.or(kInsertPermission)
+  };
+  if (perm_str.contains("d")) {
+    !res = res.or(kDeletePermission)
+  };
+  if (perm_str.contains("w")) {
+    !res = res.or(kInsertPermission).or(kDeletePermission)
+  };
+  res
+}
+
+/*****************************************************************************/
+/* Looks for an aggregate function. */
+/*****************************************************************************/
+
+fun hasAggr(expr: P.Expr): Bool {
+  expr match {
+  | P.Value _ -> false
+  | P.Identifier _ -> false
+  | P.Between(e, _, _, _)
+  | P.UnOp(_, e) ->
+    hasAggr(e)
+  | P.In(e, P.InList(arr), _) ->
+    hasAggr(e) ||
+      for (x in arr) {
+        if (hasAggr(x)) break true;
+      } else {
+        false
+      }
+  | P.In(_, P.InSelect _, _) -> invariant_violation("IN SELECT not implemented")
+  | P.BinOp(_, e1, e2)
+  | P.Like(e1, e2, _, _) ->
+    hasAggr(e1) || hasAggr(e2)
+  | P.On(_, e) -> hasAggr(e)
+  | P.Subquery(_)
+  | P.Exists _ ->
+    false
+  | P.Case(condOpt, whenCases, elseCase) ->
+    condOpt match {
+    | Some(e) if (hasAggr(e)) -> return true
+    | _ -> void
+    };
+    for (kv in whenCases) {
+      (e1, e2) = kv;
+      if (hasAggr(e1) || hasAggr(e2)) return true;
+    };
+    elseCase match {
+    | Some(e) if (hasAggr(e)) -> true
+    | _ -> false
+    }
+  | P.Call(fname, args, _) ->
+    if (
+      Array["min", "max", "sum", "avg", "count", "schema"].contains(fname.lower)
+    ) {
+      return true
+    };
+    for (e in args) {
+      if (hasAggr(e)) return true
+    };
+    false
+  | P.Cast(e, _) -> hasAggr(e)
+  | P.Tuple(values) -> values.any(hasAggr)
+  | P.Collate(e, _) -> hasAggr(e)
+  | P.Check(e) -> hasAggr(e)
+  }
+}
+
+fun selectIsAggr(select: P.SelectCore): Bool {
+  select match {
+  | P.SelectCoreValues _ -> false
+  | P.SelectCoreQuery{groupBy, params} ->
+    groupBy is Some _ ||
+      {
+        for (param in params) {
+          param match {
+          | P.SelectExpr(e, _) if (hasAggr(e)) -> return true
+          | _ -> void
+          }
+        };
+        false
+      }
+  }
+}
+
+fun selectIsEmptyFrom(select: P.SelectCore): Bool {
+  select match {
+  | P.SelectCoreQuery{from => Some _} -> false
+  | _ -> true
+  }
+}
+
+fun selectOrRestIsAggrOrEmptyFrom(select: P.Select): Bool {
+  selectIsAggr(select.core) ||
+    selectIsEmptyFrom(select.core) ||
+    select.rest.any(x -> selectIsAggr(x.i1) || selectIsEmptyFrom(x.i1))
+}
+
+module end;

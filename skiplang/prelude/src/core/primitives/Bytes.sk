@@ -1,0 +1,141 @@
+module Bytes;
+
+fun byteToString(b: UInt8): String {
+  if (b == '"'.code()) {
+    return "\""
+  };
+  if (Chars.isPrintableAscii(Char::fromCode(b.toInt()))) {
+    return String::tabulate(1, _ -> Char::fromCode(b.toInt()))
+  };
+  hi = Chars.intToHexDigit(b.ushr(0x10));
+  lo = Chars.intToHexDigit(b.and(0xF));
+  `\\x${hi}${lo}`
+}
+
+trait .AsBytes {
+  readonly fun bytes(): readonly Bytes;
+}
+
+trait .AsMutableBytes {
+  mutable fun mbytes(): mutable MutableBytes;
+}
+
+mutable base class .Bytes extends Sequence<UInt8> uses Show {
+  readonly fun ptr(): Unsafe.Ptr<UInt8>;
+  readonly fun size(): Int;
+
+  readonly fun values(): mutable Iterator<UInt8> {
+    mutable BytesIterator(this)
+  }
+
+  readonly fun toString(): String {
+    "b\"" + this.map(byteToString).join("") + "\""
+  }
+
+  // TODO: extends IndexedSequence<UInt8>
+  readonly fun get(index: Int): UInt8;
+  readonly fun slice(start: Int, end: Int = Int::max): readonly Bytes;
+  readonly fun indexOf(predicate: UInt8): ?Int {
+    for (index in Range(0, this.size())) {
+      if (this[index] == predicate) break Some(index)
+    } else {
+      None()
+    }
+  }
+}
+
+mutable base class .MutableBytes extends Bytes {
+  mutable fun mptr(): mutable Unsafe.Ptr<UInt8>;
+
+  // TODO: extends MutableIndexedSequence<UInt8>
+  mutable fun set(index: Int, value: UInt8): void;
+  mutable fun mslice(start: Int, end: Int = Int::max): mutable MutableBytes;
+}
+
+private mutable class BytesIterator(
+  private b: readonly Bytes,
+  private mutable i: Int = 0,
+) extends Iterator<UInt8> {
+  readonly fun sizeHint(): ?Int {
+    Some(this.b.size() - this.i)
+  }
+
+  @always_inline
+  mutable fun next(): ?UInt8 {
+    i = this.i;
+    if (i.ult(this.b.size())) {
+      this.!i = i + 1;
+      Some(this.b[i])
+    } else {
+      None()
+    }
+  }
+}
+
+mutable class Cursor(
+  buffer: readonly Bytes,
+  mutable pos: Int = 0,
+) uses IO.Read, IO.Seek {
+  static fun create(buffer: readonly Bytes): mutable Cursor {
+    mutable Cursor(buffer)
+  }
+
+  mutable fun read(buf: mutable MutableBytes): Result<Int, IO.Error> {
+    readSz = min(buf.size(), this.buffer.size() - this.pos);
+    // TODO: Proper copy.
+    for (i in Range(0, readSz)) {
+      buf![i] = this.buffer[this.pos + i]
+    };
+    this.!pos = this.pos + readSz;
+
+    Success(readSz)
+  }
+
+  mutable fun seek(pos: IO.SeekFrom): Result<Int, IO.Error> {
+    new_pos = pos match {
+    | IO.SeekFromStart(offset) -> offset
+    | IO.SeekFromCurrent(offset) -> this.pos + offset
+    | IO.SeekFromEnd(offset) -> this.buffer.size() - offset
+    };
+    if (new_pos < 0) {
+      // NOTE: 0x16 corresponds to EINVAL, in accordance with `lseek()`.
+      // TODO: Properly expose `errno` constants in `IO`.
+      return Failure(IO.Error(0x16))
+    };
+    this.!pos = new_pos;
+    Success(this.pos)
+  }
+}
+
+mutable class MutableCursor(
+  buffer: mutable MutableBytes,
+  mutable pos: Int = 0,
+) uses IO.Write, IO.Read {
+  static fun create(buffer: mutable MutableBytes): mutable MutableCursor {
+    mutable MutableCursor(buffer)
+  }
+
+  mutable fun read(buf: mutable MutableBytes): Result<Int, IO.Error> {
+    readSz = min(buf.size(), this.buffer.size() - this.pos);
+    // TODO: Proper copy.
+    for (i in Range(0, readSz)) {
+      buf![i] = this.buffer[this.pos + i]
+    };
+    this.!pos = this.pos + readSz;
+
+    Success(readSz)
+  }
+
+  mutable fun write(buf: readonly Bytes): Result<Int, IO.Error> {
+    writeSz = min(buf.size(), this.buffer.size() - this.pos);
+    // TODO: Proper copy.
+    for (i in Range(0, writeSz)) {
+      this.buffer![this.pos + i] = buf[i]
+    };
+    this.!pos = this.pos + writeSz;
+
+    Success(writeSz)
+  }
+}
+
+module end;

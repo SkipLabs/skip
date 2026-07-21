@@ -1,0 +1,17 @@
+module Runtime_ClosureProperty;
+class Foo{f: () ~> void} {
+  fun call(): void {
+    this.f()
+  }
+}
+
+@exptest
+fun main(): void {
+  Foo{
+    f => (() ~> {
+      void
+    }),
+  }.call();
+  print_string("Pass")
+}
+module end;

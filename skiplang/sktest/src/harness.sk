@@ -1,0 +1,47 @@
+module SKTest;
+
+class Test{
+  name: String,
+  func: untracked () ~> void,
+  file: String = "unknown",
+  lineno: Int = -1,
+} {}
+
+untracked fun run_test(test: Test, res: TestResult): TestResult {
+  time = () ~> Time.time_ms().toFloat() / 1000.0;
+  start = time();
+  try {
+    _ = test.func();
+    res with {result => "success", time => time() - start}
+  } catch {
+  | exn @ ExpectationError _ ->
+    res with {
+      result => "failure",
+      time => time() - start,
+      failure_type => "ExpectationError",
+      failure_message => exn.getMessage(),
+    }
+  | exn ->
+    res with {
+      result => "error",
+      time => time() - start,
+      failure_type => inspect(exn).toString(),
+      failure_message => exn.getMessage(),
+    }
+  }
+}
+
+untracked fun main(): void {
+  tests = mutable Map[];
+  #forEachFunction (@test, #function, #functionName) {
+    // TODO: Properly handle tests outside of module/suite?
+    (testSuite, testName) = #functionName.splitFirst(".");
+    if (!tests.containsKey(testSuite)) {
+      tests.set(testSuite, mutable Vector[])
+    };
+    tests[testSuite].push(Test{name => testName, func => #function})
+  };
+  test_harness(tests)
+}
+
+module end;

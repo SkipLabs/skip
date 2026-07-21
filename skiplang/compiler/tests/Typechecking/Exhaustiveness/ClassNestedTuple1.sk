@@ -1,0 +1,17 @@
+module Typechecking_Exhaustiveness_ClassNestedTuple1;
+base class Foo {
+  children =
+  | MyPair(Int, (Bool, Int))
+}
+
+@exptest
+fun main(): void {
+  x = MyPair(1, (true, 0));
+  print_raw(
+    x match {
+    | MyPair(1, (true, 0)) -> "Pass\n"
+    | MyPair(Int _, (Bool _, Int _)) -> "Fail\n"
+    },
+  )
+}
+module end;

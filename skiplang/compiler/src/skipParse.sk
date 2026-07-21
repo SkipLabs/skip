@@ -1,0 +1,303 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+/*****************************************************************************/
+/* Utility functions to perform the parsing. */
+/*****************************************************************************/
+module alias Error = SkipError;
+
+module FileCache;
+
+class InputSource(
+  /// Name of the package this source file belongs to, if any.
+  pkg_opt: ?String,
+  /// Absolute path of the original source file. NOTE: As we read the
+  /// source files of dependencies from the compiled `.sklib`s, the
+  /// path does not always map to a file with the same contents on the
+  /// actual file system (and sometimes maps to no file at all, as in
+  /// the case of using the bootstrap `libstd.sklib`).
+  path: String,
+) extends SKStore.Key uses Hashable, Show {
+  fun toString(): String {
+    this.path
+  }
+}
+
+const fileDirName: SKStore.DirName = SKStore.DirName::create("/fileCache/");
+const fileDir: SKStore.EHandle<
+  InputSource,
+  SKStore.StringFile,
+> = SKStore.EHandle(
+  InputSource::keyType,
+  SKStore.StringFile::type,
+  fileDirName,
+);
+
+class InputPackageName(name: ?String) extends SKStore.Key uses Hashable
+
+class InputPackageFiles(
+  /// Absolute path to the base directory of the package source. This
+  /// corresponds to the path of the directory containing the
+  /// `Skargo.toml` file in the file system that generated the
+  /// corresponding `.sklib`. It is read from the `sklib` metadata
+  /// when using a pre-built dependency.
+  base_dir: String,
+  /// Relative (to `base_dir`) path and mtime for each source file of
+  /// this package.
+  srcs: Array<(String, Int)>,
+) extends SKStore.File
+
+// Contains all the packages the analysis of which has been kept so
+// far.
+//
+// NOTE: Only one instance of a given package can be kept around, as
+// without namespaces there would be clashes.
+const packageDirName: SKStore.DirName = SKStore.DirName::create(
+  "/packageCache/",
+);
+const packageDir: SKStore.EHandle<
+  InputPackageName,
+  InputPackageFiles,
+> = SKStore.EHandle(
+  InputPackageName::keyType,
+  InputPackageFiles::type,
+  packageDirName,
+);
+
+const packageEnvAccessDirName: SKStore.DirName = SKStore.DirName::create(
+  "/packageEnvAccess/",
+);
+const packageEnvAccessDir: SKStore.EHandle<
+  SKStore.SID,
+  SKStore.StringFile,
+> = SKStore.EHandle(
+  SKStore.SID::keyType,
+  SKStore.StringFile::type,
+  packageEnvAccessDirName,
+);
+
+fun pkgDelta(
+  old_pkg: InputPackageFiles,
+  new_pkg: InputPackageFiles,
+): (Array<(String, String)>, Array<(String, String)>) {
+  if (old_pkg.base_dir != new_pkg.base_dir) {
+    return (
+      new_pkg.srcs.map(s -> (new_pkg.base_dir, s.i0)),
+      old_pkg.srcs.map(s -> (old_pkg.base_dir, s.i0)),
+    )
+  };
+
+  modified_files = mutable Vector[];
+  removed_files = mutable Vector[];
+
+  // FIXME: This is O(n^2).
+  for ((src, mtime) in new_pkg.srcs) {
+    old_pkg.srcs.find(s -> s.i0 == src) match {
+    | Some((_, old_mtime)) ->
+      if (mtime != old_mtime) {
+        modified_files.push(src)
+      }
+    | None() -> modified_files.push(src)
+    }
+  };
+
+  // FIXME: This is O(n^2).
+  for ((src, _) in old_pkg.srcs) {
+    if (!new_pkg.srcs.any(s -> s.i0 == src)) {
+      removed_files.push(src)
+    }
+  };
+
+  (
+    modified_files.map(f -> (new_pkg.base_dir, f)).collect(Array),
+    removed_files.map(f -> (old_pkg.base_dir, f)).collect(Array),
+  )
+}
+
+fun updatePackageFiles(
+  context: mutable SKStore.Context,
+  name: ?String,
+  pkg: InputPackageFiles,
+  get_file_contents: String ~> String,
+  make_input_source_path: (String, String) ~> String,
+): void {
+  (modified_files, removed_files) = packageDir.unsafeMaybeGet(
+    context,
+    InputPackageName(name),
+  ) match {
+  | Some(old_pkg) -> pkgDelta(old_pkg, pkg)
+  | None() -> (pkg.srcs.map(s -> (pkg.base_dir, s.i0)), Array[])
+  };
+  for ((pkg_base_dir, src_path) in modified_files) {
+    fileDir.writeArray(
+      context,
+      InputSource(name, make_input_source_path(pkg_base_dir, src_path)),
+      Array[SKStore.StringFile(get_file_contents(src_path))],
+    )
+  };
+  for ((pkg_base_dir, src_path) in removed_files) {
+    fileDir.writeArray(
+      context,
+      InputSource(name, make_input_source_path(pkg_base_dir, src_path)),
+      Array[SKStore.StringFile("")],
+    )
+  };
+  packageDir.writeArray(context, InputPackageName(name), Array[pkg])
+}
+
+fun writeFiles(
+  context: mutable SKStore.Context,
+  file_names: Array<String>,
+  dependencies: Map<String, (String, Sklib.Metadata)>,
+  lib_name_opt: ?String,
+  make_input_source_path: (String, String) ~> String,
+): void {
+  // TODO: If `lib_name_opt` is `Some(_)`, ensure there is a
+  // `Skargo.toml` in the cwd.
+
+  // Adding current (possibly anonymous) package to `fileDir`.
+  {
+    pkg = InputPackageFiles(
+      getcwd(),
+      file_names
+        .map(fn -> (fn, FileSystem.getLastModificationTime(fn)))
+        .collect(Array),
+    );
+    updatePackageFiles(
+      context,
+      lib_name_opt,
+      pkg,
+      src ~> {
+        FileSystem.readTextFile(src)
+      },
+      make_input_source_path,
+    );
+    updatePackageEnv(context, lib_name_opt, Environ.vars().collect(Array));
+  };
+
+  // For each (transitive) dependency, invalidate files that were
+  // modified or deleted.
+  //
+  // NOTE: Since we currently do not support package namespacing, we
+  // cannot handle multiple versions of the same package existing
+  // simultaneously in a given session. Thus, we need to invalidate
+  // (possibly transitive) dependencies if their files differ from the
+  // currently recorded ones for that package.
+  for (dep_name => dep in dependencies) {
+    (_, dep_meta) = dep;
+    pkg = InputPackageFiles(
+      dep_meta.pkg_dir,
+      dep_meta.sources.map(s -> (s.i0, s.i1)).collect(Array),
+    );
+    updatePackageFiles(
+      context,
+      Some(dep_name),
+      pkg,
+      src ~> {
+        dep_meta.sources.find(f -> f.i0 == src).fromSome().i2
+      },
+      make_input_source_path,
+    );
+    updatePackageEnv(context, Some(dep_name), dep_meta.env)
+  };
+
+  if (lib_name_opt is Some _) {
+    // Invalidate non-package source files when building a package.
+    updatePackageFiles(
+      context,
+      None(),
+      InputPackageFiles("", Array[]),
+      _ ~> "",
+      make_input_source_path,
+    )
+  }
+}
+
+// FIXME: Ensure package names cannot start with an underscore to avoid clash with `_anonymous`.
+const kAnonymousPackageName: String = "_anonymous";
+
+fun packageEnvDirName(pkg_opt: ?String): SKStore.DirName {
+  SKStore.DirName::create(
+    `/packageEnv/${pkg_opt.default(kAnonymousPackageName)}/`,
+  )
+}
+
+fun packageEnvDir(
+  pkg_opt: ?String,
+): SKStore.EHandle<SKStore.SID, SKStore.StringFile> {
+  SKStore.EHandle(
+    SKStore.SID::keyType,
+    SKStore.StringFile::type,
+    packageEnvDirName(pkg_opt),
+  )
+}
+
+fun updatePackageEnv(
+  context: mutable SKStore.Context,
+  pkg_opt: ?String,
+  env: Array<(String, String)>,
+): void {
+  envDirName = packageEnvDirName(pkg_opt);
+  envDir = context.unsafeMaybeGetEagerDir(envDirName) match {
+  | Some _ -> packageEnvDir(pkg_opt)
+  | None _ ->
+    context.mkdir(SKStore.SID::keyType, SKStore.StringFile::type, envDirName)
+  };
+  previousEnvKeys = SortedSet::createFromIterator(
+    envDir.items(context).map(kv -> SKStore.SID::keyType(kv.i0).value),
+  );
+  seenEnvKeys = SortedSet[];
+  for ((key, value) in env) {
+    envDir.writeArray(
+      context,
+      SKStore.SID(key),
+      Array[SKStore.StringFile(value)],
+    );
+    !seenEnvKeys = seenEnvKeys.set(key);
+  };
+  for (key in previousEnvKeys.difference(seenEnvKeys)) {
+    envDir.writeArray(context, SKStore.SID(key), Array[])
+  };
+}
+
+module end;
+
+module SkipParse;
+
+const astDirName: SKStore.DirName = SKStore.DirName::create("/astCache/");
+const astDir: SKStore.EHandle<SKStore.SID, DefsFile> = SKStore.EHandle(
+  SKStore.SID::keyType,
+  DefsFile::type,
+  astDirName,
+);
+
+class DefsFile(value: List<SkipAst.Definition>) extends SKStore.File
+class DefsWithAccessedEnvVarsFile(
+  defs: List<SkipAst.Definition>,
+  accessed_env_vars: SortedSet<String>,
+) extends SKStore.File
+
+fun parseFile(
+  file: FileCache.InputSource,
+  source: String,
+): DefsWithAccessedEnvVarsFile {
+  (fileResult, accessed_env_vars) = SkipParser.parseSource(source, true);
+  defs = parseToAst(file, fileResult);
+  DefsWithAccessedEnvVarsFile(defs, accessed_env_vars)
+}
+
+fun parseToAst(
+  file: FileCache.InputSource,
+  parseResults: Parser.ParseResults,
+): List<SkipAst.Definition> {
+  parseResults.throwOnError(file);
+  List::createFromItems(
+    ConvertTree.Converter{file}.convertTree(parseResults.tree),
+  );
+}
+
+module end;

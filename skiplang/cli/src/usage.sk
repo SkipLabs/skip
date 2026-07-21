@@ -1,0 +1,178 @@
+module Cli;
+
+const kTabSize: Int = 4;
+
+private fun usageSection(
+  name: String,
+  lines: Sequence<Sequence<?String>>,
+): String {
+  colSizes = lines
+    .map(l -> l.map(c -> c.map(str -> str.length()).default(0)))
+    .foldl(
+      (acc, l) -> acc.zipWith(l, (u, v) -> max(u, v)),
+      Array::fill(lines.first().size(), 0),
+    )
+    .map(x -> if (x > 0) kTabSize * (1 + (x / kTabSize)) else 0);
+
+  `${name}:\n` +
+    lines
+      .map(l ->
+        "".padLeft(kTabSize, ' ') +
+          l
+            .mapWithIndex((index, c) ->
+              c.default("").padRight(colSizes[index], ' ')
+            )
+            .join("")
+      )
+      .join("\n")
+}
+
+private fun usageUsage(
+  cmd: Command,
+  prefix: String,
+  positionalArgs: Sequence<Cli.Arg>,
+  options: Sequence<Cli.Arg>,
+): ?String {
+  res = "Usage:\n" + "".padLeft(kTabSize, ' ') + prefix + cmd.name;
+  if (options.size() > 0) {
+    !res = res + " [OPTIONS]"
+  };
+  if (cmd._subcommands.size() > 0) {
+    !res = res + " [SUBCOMMAND]"
+  } else {
+    // Cannot have both positional args and subcommands.
+    for (arg in positionalArgs) {
+      argString = if (arg.isRequired()) {
+        `<${arg.name}>`
+      } else {
+        `[${arg.name}]`
+      };
+      if (arg._repeatable) {
+        !argString = argString + "...";
+      };
+      !res = res + " " + argString
+    };
+  };
+  if (cmd._extra) {
+    name = cmd._extraName.default("args");
+    !res = res + ` [-- <${name}>...]`
+  };
+
+  Some(res)
+}
+
+private fun usagePositionalArgs(positionalArgs: Sequence<Cli.Arg>): String {
+  usageSection(
+    "ARGS",
+    positionalArgs.map(arg ->
+      Array[
+        Some(`<${arg.name}>`),
+        arg._default.map(v -> `[default: ${v}]`),
+        arg._about,
+      ]
+    ),
+  )
+}
+
+private fun usageOptions(options: Sequence<Cli.Arg>): String {
+  usageSection(
+    "OPTIONS",
+    options.map(arg -> {
+      baseOptFlags = (arg._short, arg._long) match {
+      | (Some(short), Some(long)) -> `-${short}, --${long}`
+      | (Some(short), None()) -> `-${short}`
+      | (None(), Some(long)) -> `    --${long}`
+      | _ -> `    --${arg.name}`
+      };
+      optFlags = arg match {
+      | Cli.ValuedArg{_value_name => value_name} ->
+        if (arg._repeatable) {
+          `${baseOptFlags} [<${value_name}>]`
+        } else {
+          `${baseOptFlags} <${value_name}>`
+        }
+      | _ if (arg._repeatable) -> `${baseOptFlags}...`
+      | _ -> baseOptFlags
+      };
+      Array[Some(optFlags), arg._about]
+    }),
+  )
+}
+
+private fun usageCommands(subcommands: Sequence<Command>): String {
+  usageSection(
+    "COMMANDS",
+    subcommands.map(subcmd -> {
+      name = subcmd.name;
+      subcmd._short.each(n -> !name = name + ", " + n);
+      Array[Some(name), subcmd._about]
+    }),
+  )
+}
+
+private fun usageValues(
+  values: Sequence<(String, Array<(String, String)>)>,
+): String {
+  nbLines = values.foldl(
+    (nb, name_abouts) -> nb + 1 + name_abouts.i1.size(),
+    0,
+  );
+  lines: mutable Vector<Array<?String>> = Vector::mcreate(nbLines);
+  for (name_abouts in values) {
+    (name, abouts) = name_abouts;
+    lines.push(Array[Some(name), None()]);
+    for (v_about in abouts) {
+      (v, about) = v_about;
+      lines.push(Array[Some("".padLeft(kTabSize, ' ') + v), Some(about)]);
+    }
+  };
+  usageSection("VALUES", lines.toArray())
+}
+
+fun usage(
+  cmd: Command,
+  header: Bool = true,
+  parent: ?Command = None(),
+): String {
+  positionalArgs = cmd._args.filter(arg -> arg._positional);
+  options = cmd._args
+    .filter(arg -> !arg._positional)
+    .concat(
+      parent.map(p -> p._args.filter(arg -> arg._global)).default(Array[]),
+    );
+  prefix = parent.map(x -> x.name + " ").default("");
+  values = cmd._args.filterMap(
+    (arg ->
+      (arg match {
+      | ValuedArg{
+        _value_name => value_name,
+        _value_about => value_about,
+      } if (value_about.size() > 0) ->
+        Some((value_name, value_about))
+      | _ -> None()
+      })),
+  );
+
+  Array[
+    if (header) cmd._about else None(),
+    usageUsage(cmd, prefix, positionalArgs, options),
+    if (positionalArgs.size() > 0) {
+      Some(usagePositionalArgs(positionalArgs))
+    } else {
+      None()
+    },
+    if (options.size() > 0) Some(usageOptions(options)) else None(),
+    if (cmd._subcommands.size() > 0) {
+      Some(usageCommands(cmd._subcommands))
+    } else {
+      None()
+    },
+    if (values.size() > 0) {
+      Some(usageValues(values))
+    } else {
+      None()
+    },
+  ].filterNone().join("\n\n")
+}
+
+module end;

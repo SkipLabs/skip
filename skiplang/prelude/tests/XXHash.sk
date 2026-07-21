@@ -1,0 +1,23 @@
+module alias T = SKTest;
+
+module XXHashTest;
+
+@test
+fun testOptionBoolXXHash(): void {
+  someTrueHash = Some(true).xxhash();
+  someFalseHash = Some(false).xxhash();
+  noneHash = (None() : ?Bool).xxhash();
+
+  // Some(true) and Some(false) should produce different hashes
+  T.expectTrue(someTrueHash != someFalseHash);
+
+  // Some(_) and None should produce different hashes
+  T.expectTrue(someTrueHash != noneHash);
+  T.expectTrue(someFalseHash != noneHash);
+
+  // Same input should produce same hash (deterministic)
+  T.expectEq(Some(true).xxhash(), someTrueHash);
+  T.expectEq((None() : ?Bool).xxhash(), noneHash);
+}
+
+module end;

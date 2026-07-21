@@ -1,0 +1,35 @@
+module Skargo;
+
+fun format(): (Cli.Command, (GlobalContext, Cli.ParseResults) ~> void) {
+  (
+    Cli.Command("fmt")
+      .about("Format all files using skfmt")
+      .arg(
+        Cli.Arg::string("manifest-path")
+          .value_name("PATH")
+          .about("Path to Skargo.toml"),
+      ),
+    execFmt,
+  )
+}
+
+fun execFmt(gctx: GlobalContext, args: Cli.ParseResults): void {
+  ws = workspace(args, gctx);
+
+  files = FileSystem.readFilesRecursive(
+    ws.package.root(),
+    f -> f.endsWith(".sk"),
+    d -> {
+      base = Path.basename(d);
+      base != "target" && base != "node_modules"
+    },
+  ).toArray();
+
+  p = System.subprocess(Array["skfmt", "-i"].concat(files)).fromSuccess();
+  if (!p.success()) {
+    gctx.console.error(subprocess_error_message(p));
+    skipExit(2);
+  }
+}
+
+module end;

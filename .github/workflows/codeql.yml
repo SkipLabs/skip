@@ -1,0 +1,85 @@
+name: "CodeQL Advanced"
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '39 18 * * 0'
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - language: javascript-typescript
+          build-mode: none
+        - language: python
+          build-mode: none
+        - language: c-cpp
+          build-mode: manual
+        - language: java-kotlin
+          build-mode: manual
+        - language: actions
+          build-mode: none
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v5
+
+    - name: Set up JDK 21
+      if: matrix.language == 'java-kotlin'
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '21'
+
+    - name: Install clang-20
+      if: matrix.language == 'c-cpp'
+      shell: bash
+      run: |
+        sudo install -d -m 0755 /etc/apt/keyrings
+        wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
+          | sudo tee /etc/apt/keyrings/llvm.asc >/dev/null
+        UBUNTU_CODENAME=$(lsb_release -cs)
+        echo "deb [signed-by=/etc/apt/keyrings/llvm.asc] http://apt.llvm.org/${UBUNTU_CODENAME}/ llvm-toolchain-${UBUNTU_CODENAME}-20 main" \
+          | sudo tee /etc/apt/sources.list.d/llvm.list >/dev/null
+        sudo apt-get update -q
+        sudo apt-get install -q -y --no-install-recommends clang-20 lld-20
+        # Runtime Makefile invokes bare `clang` / `clang++`
+        sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-20 100
+        sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-20 100
+
+    - name: Init libbacktrace submodule
+      if: matrix.language == 'c-cpp'
+      run: git submodule update --init skiplang/prelude/libbacktrace
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ matrix.language }}
+        build-mode: ${{ matrix.build-mode }}
+        queries: security-extended
+
+    - name: Build C runtime (manual c-cpp)
+      if: matrix.language == 'c-cpp'
+      shell: bash
+      working-directory: skiplang/prelude/runtime
+      run: make CFLAGS="-O2 -g3 -I../libbacktrace" libskip_runtime64.a
+
+    - name: Build Kotlin sources (manual java-kotlin)
+      if: matrix.language == 'java-kotlin'
+      shell: bash
+      working-directory: sql/server
+      run: ./gradlew --no-daemon classes testClasses
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:${{matrix.language}}"

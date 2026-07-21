@@ -1,0 +1,156 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+@cpp_export("sk_get_exception_type")
+fun getExceptionType(exn: Exception): String {
+  exn.getClassName()
+}
+
+@cpp_export("sk_get_exception_message")
+fun getExceptionMessage(exn: Exception): String {
+  exn.getMessage()
+}
+
+base class Exception uses HasClassName {
+  overridable fun getMessage(): String {
+    "Exception " + inspect(this).toString()
+  }
+}
+
+class OutOfBounds() extends Exception {
+  fun getMessage(): String {
+    "Out of bounds"
+  }
+}
+
+class Duplicate() extends Exception {
+  fun getMessage(): String {
+    "Duplicate element"
+  }
+}
+
+class KeyNotFound() extends Exception {
+  fun getMessage(): String {
+    "Key not found"
+  }
+}
+
+class ContainerChanged() extends Exception {
+  fun getMessage(): String {
+    "Container changed during iteration"
+  }
+}
+
+class InvalidCast(tOriginal: String, tExpected: String) extends Exception {
+  fun getMessage(): String {
+    `Failed to cast object of type ${this.tOriginal} to type ${
+      this.tExpected
+    } in 'as' expression`
+  }
+}
+
+// Exlined code to make uncommon case for compiled code smaller.
+@no_inline
+fun throwOutOfBounds(): _ {
+  throw OutOfBounds()
+}
+
+@no_inline
+fun throwKeyNotFound(): _ {
+  throw KeyNotFound()
+}
+
+@no_inline
+fun throwContainerChanged(): _ {
+  throw ContainerChanged()
+}
+
+class RuntimeError(msg: String) extends Exception {
+  fun getMessage(): String {
+    this.msg
+  }
+}
+
+// The three below read and write a single thread-local slot, so they are
+// untracked: they take no arguments (or a frozen one) and return frozen
+// types, which is everything CSE needs to merge two identical calls. Merging
+// two getExn() reads that straddle a write silently yields the stale value.
+@allow_tracked_call
+@cpp_extern("SKIP_getExn")
+untracked native fun getExn(): Exception;
+
+@export("SKIP_call0")
+fun call0(f: () -> void): void {
+  f()
+}
+
+@allow_tracked_call
+@cpp_runtime
+untracked native fun saveExn(exn: Exception): void;
+
+@allow_tracked_call
+@cpp_extern
+untracked native fun replaceExn(exn: Exception): void;
+
+class ExternalException(
+  private eptr: SKStore.ExternalPointer,
+) extends Exception {
+  //
+  static fun make(id: UInt32): this {
+    static(SKStore.ExternalPointer::create(id, deleteExternalException))
+  }
+
+  fun getMessage(): String {
+    message = getExternalExceptionMessage(this.eptr.value);
+    `external:${this.eptr.value}\n${message}`
+  }
+}
+
+@cpp_extern("SKIP_external_exception_message")
+native fun getExternalExceptionMessage(actor: UInt32): String;
+
+@cpp_extern("SKIP_delete_external_exception")
+native fun deleteExternalException(actor: UInt32): void;
+
+@wasm_export("SKIP_callWithException")
+fun callWithException(f: () -> void, exc: UInt32): void {
+  if (exc.toInt() > 0) saveExn(ExternalException::make(exc));
+  f();
+}
+
+// TODO: Deprecate vtry/etry once they are not used downstream anymore.
+@cpp_runtime
+native fun etry<T>(f: () -> void, onError: () -> void): void;
+
+fun vtry<T>(f: () -> T, onError: Exception -> T): T {
+  result: ?T = None();
+  etry(
+    () -> {
+      !result = Some(f());
+    },
+    () -> {
+      !result = Some(onError(getExn()));
+    },
+  );
+  result.fromSome()
+}
+
+/*****************************************************************************/
+/* The definitions for the C runtime errors (thrown from C code). */
+/*****************************************************************************/
+
+// We use Int32 to be JS friendly
+class CRuntimeError(code: Int32) extends Exception {
+  fun getMessage(): String {
+    inspect(this).toString()
+  }
+}
+
+@cpp_export("SKIP_throw_cruntime")
+fun throwCRuntime(code: Int32): void {
+  throw CRuntimeError(code);
+}

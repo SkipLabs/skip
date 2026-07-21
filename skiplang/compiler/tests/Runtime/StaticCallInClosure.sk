@@ -1,0 +1,17 @@
+module Runtime_StaticCallInClosure;
+class Foo() {
+  static fun hello(): () ~> String {
+    () ~> static::world()
+  }
+
+  private static fun world(): String {
+    "Pass\n"
+  }
+}
+
+@exptest
+fun main(): void {
+  f = Foo::hello();
+  print_raw(f())
+}
+module end;

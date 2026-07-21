@@ -1,0 +1,20 @@
+{
+  "name": "@skipruntime/wasm",
+  "version": "0.0.23",
+  "type": "module",
+  "exports": {
+    ".": {
+      "node": "./dist/src/node.js",
+      "default": "./dist/src/browser.js"
+    }
+  },
+  "scripts": {
+    "build": "npm run typecheck && skargo build -r --target wasm32-unknown-unknown --lib --manifest-path=../skiplang/ffi/Skargo.toml --out-dir=./dist/src/",
+    "typecheck": "node ../../prebuild.mjs skipwasm-std skipwasm-json && tsc",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo skipwasm-std skipwasm-json",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@skipruntime/core": "0.0.23"
+  }
+}

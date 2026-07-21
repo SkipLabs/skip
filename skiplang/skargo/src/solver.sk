@@ -1,0 +1,83 @@
+module Skargo;
+
+private fun fetchLatestManifest(
+  dep: Dependency,
+  // reps: Array<String>,
+): ?Package {
+  dep.source_id.kind match {
+  | PathSource() ->
+    path = Path.join(dep.source_id.url, kManifestFile);
+    Some(Package::read(path))
+  };
+  // Fetch highest available version within range.
+  // optLast: ?Manifest = None();
+  // for (repo in reps) {
+  //   dir = Path.join(repo, dep.name);
+  //   mFile = Path.join(dir, kManifestFile);
+  //   if (FileSystem.exists(mFile)) {
+  //     manifest = Manifest::read(mFile);
+  //     if (dep.req.matches(manifest.package_id.version)) {
+  //       !optLast = optLast match {
+  //       | Some(
+  //         last,
+  //       ) if (
+  //         dep.req.matches(last.package_id.version) &&
+  //         last.package_id.version < manifest.package_id.version
+  //       ) ->
+  //         Some(manifest)
+  //       | None() -> Some(manifest)
+  //       | _ -> optLast
+  //       }
+  //     };
+  //   }
+  // };
+  // optLast
+}
+
+class UnsatisfiableDependency(dep: Dependency) extends Exception {}
+
+// TODO: Backtrack on conflict, and try previous versions.
+fun activate(
+  package: Package,
+  solved: mutable Map<String, Package>,
+): Result<void, UnsatisfiableDependency> {
+  if (solved.containsKey(package.name())) {
+    return Success(void)
+  };
+  solved.set(package.name(), package);
+
+  for (dep in package.manifest.dependencies) {
+    solved.maybeGet(dep.name) match {
+    | Some(dep_package) ->
+      if (!dep.req.matches(dep_package.version())) {
+        return Failure(UnsatisfiableDependency(dep))
+      }
+    | None() ->
+      fetchLatestManifest(dep) match {
+      | Some(dep_package) ->
+        if (dep_package.name() != dep.name) {
+          invariant_violation(
+            `Package name mismatch (${dep.name} vs ${dep_package.name()})`,
+          )
+        };
+        activate(dep_package, solved) match {
+        | Failure(err) -> return Failure(err)
+        | Success _ -> void
+        }
+      | None() -> return Failure(UnsatisfiableDependency(dep))
+      }
+    }
+  };
+
+  Success(void)
+}
+
+fun resolve(package: Package): Map<String, Package> {
+  result = mutable Map[];
+  activate(package, result) match {
+  | Success _ -> result.chill()
+  | Failure(err) -> throw err
+  }
+}
+
+module end;

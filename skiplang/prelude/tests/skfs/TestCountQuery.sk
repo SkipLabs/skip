@@ -1,0 +1,231 @@
+module alias T = SKTest;
+
+module SKStore;
+
+fun sumDir<U: File>(
+  context: mutable Context,
+  dir: EHandle<IID, U>,
+  proj: Array<U> ~> Int,
+  diffName: String,
+  name: String,
+): EHandle<UnitID, IntFile> {
+  diffCountDirName = dir.dirName.sub(diffName);
+  countDirName = dir.dirName.sub(name);
+  SKStore.EagerDir::apply(
+    context,
+    dir.dirName,
+    diffCountDirName,
+    (context, writer, key, newValuesIter) ~> {
+      newValues = newValuesIter.collect(Array);
+      preDiffOpt = dir.pre(context);
+      oldValues = preDiffOpt match {
+      | None() -> Array[]
+      | Some(preDir) -> preDir.getArray(context, IID::keyType(key))
+      };
+      oldCount = if (oldValues.size() == 0) 0 else proj(oldValues);
+      newCount = if (newValues.size() == 0) 0 else {
+        proj(newValues.map(dir.type))
+      };
+      cmp = newCount - oldCount;
+      if (cmp != 0) {
+        writer.set(UnitID::singleton, IntFile(cmp))
+      }
+    },
+  );
+  countDir = EHandle(SKStore.UnitID::keyType, IntFile::type, countDirName);
+  SKStore.EagerDir::apply(
+    context,
+    diffCountDirName,
+    countDirName,
+    (context, writer, unit, diffs) ~> {
+      oldSums = countDir.pre(context) match {
+      | None() -> Array[]
+      | Some(preDir) -> preDir.getArray(context, UnitID::singleton)
+      };
+      acc = if (oldSums.size() == 0) 0 else oldSums[0].value;
+      for (diff in diffs) {
+        !acc = acc + IntFile::type(diff).value;
+      };
+      writer.set(unit, IntFile(acc))
+    },
+  );
+  countDir
+}
+
+module end;
+
+module SKStoreTest;
+
+fun toInt(f: SKStore.File): Int {
+  SKStore.IntFile::type(f).value
+}
+
+@test
+fun testCount(): void {
+  context = SKStore.run(context ~> {
+    inputFiles = SortedMap[
+      SKStore.IID(0) => SKStore.StringFile("23"),
+      SKStore.IID(1) => SKStore.StringFile("35"),
+    ];
+
+    sinput = SKStore.DirName::create("/sinput/");
+    dirSInput = context.mkdir(
+      SKStore.IID::keyType,
+      SKStore.StringFile::type,
+      sinput,
+      inputFiles.items().collect(Array),
+    );
+
+    _countDir = SKStore.sumDir(
+      context,
+      dirSInput,
+      _ ~> 1,
+      "diffCount",
+      "count",
+    );
+
+    inputSumFiles = SortedMap[
+      SKStore.IID(0) => SKStore.StringFile("0"),
+      SKStore.IID(1) => SKStore.StringFile("1"),
+    ];
+
+    sumInput = SKStore.DirName::create("/sumInput/");
+    dirSumInput = context.mkdir(
+      SKStore.IID::keyType,
+      SKStore.StringFile::type,
+      sumInput,
+      inputSumFiles.items().collect(Array),
+    );
+    _sumDir = SKStore.sumDir(
+      context,
+      dirSumInput,
+      x ~> x[0].value.toInt(),
+      "diffSum",
+      "sum",
+    );
+  });
+
+  testNbr = 0;
+  incrTestNbr = () -> {
+    !testNbr = testNbr + 1;
+    testNbr
+  };
+
+  dirSInput = SKStore.DirName::create("/sinput/");
+
+  countDir = SKStore.EHandle(
+    SKStore.UnitID::keyType,
+    SKStore.IntFile::type,
+    SKStore.DirName::create("/sinput/count/"),
+  );
+
+  /*************************** TESTS FOR COUNT ***************************/
+  size = 10;
+
+  for (i in Range(0, size)) {
+    files = Array[SKStore.StringFile(i.toString())];
+    write(context, dirSInput, SKStore.IID(i), files);
+    _ = context.updateWithStatus();
+    T.expectEq(
+      Array[if (i < 2) 2 else i + 1],
+      getData(context, countDir.dirName, SKStore.UnitID::singleton).map(toInt),
+      `TestCount: ${incrTestNbr()}`,
+    );
+  };
+
+  for (j in Range(0, size / 2)) {
+    write(context, dirSInput, SKStore.IID(size - j - 1), Array[]);
+    _ = context.updateWithStatus();
+    T.expectEq(
+      Array[size - j - 1],
+      getData(context, countDir.dirName, SKStore.UnitID::singleton).map(toInt),
+      `TestCount: ${incrTestNbr()}`,
+    );
+  };
+
+  for (j in Range(0, size / 2)) {
+    write(
+      context,
+      dirSInput,
+      SKStore.IID(size - j - 1),
+      Array[SKStore.StringFile("x")],
+    );
+    _ = context.updateWithStatus();
+    T.expectEq(
+      Array[size / 2 + j + 1],
+      getData(context, countDir.dirName, SKStore.UnitID::singleton).map(toInt),
+      `TestCount: ${incrTestNbr()}`,
+    );
+  };
+
+  for (j in Range(0, size / 2)) {
+    write(context, dirSInput, SKStore.IID(size - j - 1), Array[]);
+    _ = context.updateWithStatus();
+    T.expectEq(
+      Array[size - j - 1],
+      getData(context, countDir.dirName, SKStore.UnitID::singleton).map(toInt),
+      `TestCount: ${incrTestNbr()}`,
+    );
+  };
+
+  for (j in Range(0, size / 2)) {
+    write(context, dirSInput, SKStore.IID(size - j - 1), Array[]);
+    _ = context.updateWithStatus();
+    T.expectEq(
+      Array[size / 2],
+      getData(context, countDir.dirName, SKStore.UnitID::singleton).map(toInt),
+      `TestCount: ${incrTestNbr()}`,
+    );
+  };
+
+  for (j in Range(0, size / 2)) {
+    write(
+      context,
+      dirSInput,
+      SKStore.IID(size - j - 1),
+      Array[SKStore.StringFile("x")],
+    );
+    _ = context.updateWithStatus();
+    T.expectEq(
+      Array[size / 2 + j + 1],
+      getData(context, countDir.dirName, SKStore.UnitID::singleton).map(toInt),
+      `TestCount: ${incrTestNbr()}`,
+    );
+  };
+
+  /*************************** TESTS FOR SUM ***************************/
+
+  dirSumInput = SKStore.DirName::create("/sumInput/");
+
+  sumDir = SKStore.EHandle(
+    SKStore.UnitID::keyType,
+    SKStore.IntFile::type,
+    SKStore.DirName::create("/sumInput/sum/"),
+  );
+
+  for (i in Range(0, size)) {
+    files = Array[SKStore.StringFile(i.toString())];
+    write(context, dirSumInput, SKStore.IID(i), files);
+    _ = context.updateWithStatus();
+    T.expectEq(
+      Array[if (i == 0) 1 else i * (i + 1) / 2],
+      getData(context, sumDir.dirName, SKStore.UnitID::singleton).map(toInt),
+      `TestCount: ${incrTestNbr()}`,
+    );
+  };
+
+  sum = size * (size - 1) / 2;
+
+  for (i in Range(0, size / 2)) {
+    write(context, dirSumInput, SKStore.IID(size - i - 1), Array[]);
+    !sum = sum - (size - i - 1);
+    _ = context.updateWithStatus();
+    T.expectEq(
+      Array[sum],
+      getData(context, sumDir.dirName, SKStore.UnitID::singleton).map(toInt),
+      `TestCount: ${incrTestNbr()}`,
+    );
+  }
+}
+
+module end;

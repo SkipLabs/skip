@@ -1,0 +1,40 @@
+module Skargo;
+
+fun withTimer<T>(f: () -> T, g: Float -> void): T {
+  t0 = Time.time_ms();
+  res = f();
+  t1 = Time.time_ms();
+  g((t1 - t0).toFloat() / 1000.0);
+
+  res
+}
+
+fun subprocess_error_message(p: System.CompletedProcess): String {
+  message =
+    "command exited with non-zero status\n\n" +
+    "Caused by:\n" +
+    "  process did not exit successfully: \`" +
+    p.args[0] +
+    `\` (exit status: ${p.exitcode()})\n` +
+    "  --- stdout\n" +
+    p.stdout.split("\n").map(l -> "  " + l).join("\n") +
+    "\n" +
+    "  --- stderr\n" +
+    p.stderr.split("\n").map(l -> "  " + l).join("\n") +
+    "\n";
+  // An "Invariant violation" from skc is the compiler crashing internally, not a
+  // diagnostic about the code being compiled. It almost always means skc is out
+  // of sync with those sources (stale build artifacts or an out-of-date
+  // compiler) rather than a problem the user can fix in their code.
+  if (p.args[0].endsWith("skc") && p.stderr.contains("Invariant violation")) {
+    message +
+      "\nnote: skc terminated with an internal error rather than reporting a normal\n" +
+      "diagnostic. This usually means the compiler is out of sync with the sources being\n" +
+      "compiled (stale build artifacts or an out-of-date compiler), not a bug in the code.\n" +
+      "Try `skargo clean` and rebuild; if it persists, rebuild or update skc.\n"
+  } else {
+    message
+  }
+}
+
+module end;

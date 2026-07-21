@@ -1,0 +1,207 @@
+module alias T = SKTest;
+
+module ARParserTest;
+
+fun header{
+  identifier: String,
+  size: Int,
+  mtime: Int,
+  uid: Int,
+  gid: Int,
+  mode: Int,
+}: String {
+  identifier.padRight(16) +
+    `${mtime}`.padRight(12) +
+    `${uid}`.padRight(6) +
+    `${gid}`.padRight(6) +
+    Chars.intToOctDigits(mode).padRight(8) +
+    `${size}`.padRight(10) +
+    ARParser.kENTRY_HEADER_TERMINATOR
+}
+
+fun member{
+  identifier: String,
+  data: String,
+  mtime: Int = 0,
+  uid: Int = 0,
+  gid: Int = 0,
+  mode: Int = 0o644,
+}: String {
+  header{identifier, size => data.length(), mtime, uid, gid, mode} +
+    data +
+    if (data.length() % 2 != 0) {
+      " "
+    } else {
+      ""
+    }
+}
+
+fun expectMemberEq<U: mutable IO.Read & mutable IO.Seek>(
+  ar: mutable ARParser.Archive<U>,
+  identifier: String,
+  data: String,
+  mtime: Int,
+  uid: Int,
+  gid: Int,
+  mode: Int,
+): void {
+  ar.values().find(h -> h.identifier == identifier) match {
+  | Some(header) ->
+    T.expectEq(header.mtime, mtime);
+    T.expectEq(header.uid, uid);
+    T.expectEq(header.gid, gid);
+    T.expectEq(mode, mode);
+    ar.get(identifier) match {
+    | Success(Some(bytes)) ->
+      T.expectEq(String::fromUtf8(bytes.collect(Array)), data)
+    | Success(None()) -> T.fail(`Missing member data for \`${identifier}\``)
+    | Failure(err) ->
+      T.fail(`Error fetching data for member \`${identifier}\`: ${err}`)
+    }
+  | None() -> T.fail(`Missing member \`${identifier}\``)
+  };
+}
+
+@test
+fun read_empty_archive(): void {
+  archive = ARParser.kGLOBAL_HEADER;
+  ar = ARParser.Archive::read(Bytes.Cursor::create(archive.bytes())) match {
+  | Success(ar) -> ar
+  | Failure(err) -> T.fail(err.getMessage())
+  };
+  T.expectEq(ar.variant, ARParser.VariantCommon())
+}
+
+@test
+fun read_simple_archive(): void {
+  archive =
+    ARParser.kGLOBAL_HEADER +
+    member{
+      identifier => "foo",
+      data => "foo",
+      mtime => 123,
+      uid => 0,
+      gid => 0,
+      mode => 0o755,
+    } +
+    member{
+      identifier => "bar",
+      data => "foobar",
+      mtime => 12345,
+      uid => 1000,
+      gid => 1337,
+      mode => 0o644,
+    };
+  ar = ARParser.Archive::read(Bytes.Cursor::create(archive.bytes())) match {
+  | Success(ar) -> ar
+  | Failure(err) -> T.fail(err.getMessage())
+  };
+  T.expectEq(ar.variant, ARParser.VariantCommon());
+
+  expectMemberEq(ar, "foo", "foo", 123, 0, 0, 0o755);
+  expectMemberEq(ar, "bar", "foobar", 12345, 1000, 1337, 0o644);
+}
+
+@test
+fun read_gnu_archive(): void {
+  archive =
+    ARParser.kGLOBAL_HEADER +
+    member{
+      identifier => "//",
+      data => "foobarfoobarfoobar/\nanotherverylongidentifier/\n",
+    } +
+    member{
+      identifier => "foo/",
+      data => "foo",
+      mtime => 123,
+      uid => 0,
+      gid => 0,
+      mode => 0o755,
+    } +
+    member{
+      identifier => "/0",
+      data => "foobar",
+      mtime => 12345,
+      uid => 1000,
+      gid => 1337,
+      mode => 0o644,
+    } +
+    member{
+      identifier => "/20",
+      data => "baz",
+      mtime => 456,
+      uid => 1001,
+      gid => 1338,
+      mode => 0o654,
+    };
+
+  ar = ARParser.Archive::read(Bytes.Cursor::create(archive.bytes())) match {
+  | Success(ar) -> ar
+  | Failure(err) -> T.fail(err.getMessage())
+  };
+  T.expectEq(ar.variant, ARParser.VariantGNU());
+
+  debug(ar.values().collect(Array));
+  expectMemberEq(ar, "foo", "foo", 123, 0, 0, 0o755);
+  expectMemberEq(ar, "foobarfoobarfoobar", "foobar", 12345, 1000, 1337, 0o644);
+  expectMemberEq(
+    ar,
+    "anotherverylongidentifier",
+    "baz",
+    456,
+    1001,
+    1338,
+    0o654,
+  );
+}
+
+@test
+fun read_bsd_archive(): void {
+  archive =
+    ARParser.kGLOBAL_HEADER +
+    member{
+      identifier => "foo",
+      data => "foo",
+      mtime => 123,
+      uid => 0,
+      gid => 0,
+      mode => 0o755,
+    } +
+    member{
+      identifier => "#1/18",
+      data => "foobarfoobarfoobarfoobar",
+      mtime => 12345,
+      uid => 1000,
+      gid => 1337,
+      mode => 0o644,
+    } +
+    member{
+      identifier => "#1/25",
+      data => "anotherverylongidentifierbaz",
+      mtime => 456,
+      uid => 1001,
+      gid => 1338,
+      mode => 0o654,
+    };
+
+  ar = ARParser.Archive::read(Bytes.Cursor::create(archive.bytes())) match {
+  | Success(ar) -> ar
+  | Failure(err) -> T.fail(err.getMessage())
+  };
+  T.expectEq(ar.variant, ARParser.VariantBSD());
+
+  debug(ar.values().collect(Array));
+  expectMemberEq(ar, "foo", "foo", 123, 0, 0, 0o755);
+  expectMemberEq(ar, "foobarfoobarfoobar", "foobar", 12345, 1000, 1337, 0o644);
+  expectMemberEq(
+    ar,
+    "anotherverylongidentifier",
+    "baz",
+    456,
+    1001,
+    1338,
+    0o654,
+  );
+}
+
+module end;

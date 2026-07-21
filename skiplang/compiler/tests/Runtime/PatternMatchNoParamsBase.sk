@@ -1,0 +1,19 @@
+module Runtime_PatternMatchNoParamsBase;
+base class B(s: String) {
+  children =
+  | C
+  | D
+}
+
+// Test mix of patterns with/without params in an inheritance hierarchy
+@exptest
+fun main(): void {
+  print_raw(
+    (C("Pass\n") : B) match {
+    | C("Fail") -> "Fail"
+    | D _ -> "Fail"
+    | b @ B _ -> b.s
+    },
+  )
+}
+module end;

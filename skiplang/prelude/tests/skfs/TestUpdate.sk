@@ -1,0 +1,79 @@
+module alias T = SKTest;
+module alias SK = SKStore;
+
+module SKStoreTest;
+
+@test
+fun testUdpateFromContext(): void {
+  pos = SK.newObstack();
+  inputsDirName = SK.DirName::create("/inputs/");
+  mappedDirName = SK.DirName::create("/mapped/");
+  key = v ~> SK.IID(v);
+  val = v ~> SK.IntFile(v);
+  context = SK.Context::create{}.mclone();
+  inputs = context.mkdir(
+    SK.IID::keyType,
+    SK.IntFile::type,
+    inputsDirName,
+    Array[],
+  );
+  mapped = inputs.map(
+    SK.IID::keyType,
+    Handle::type,
+    context,
+    mappedDirName,
+    (context, writer, k, it) ~> {
+      v = it.first.value;
+      supmap = inputs.mapReduce(
+        IIKey::keyType,
+        SK.IntFile::type,
+        context,
+        mappedDirName.sub(`k${k}`),
+        (_context, writer, sk, sv) ~>
+          writer.set(
+            IIKey(k.value, sk.value % 2),
+            SK.IntFile(sv.first.value * v),
+          ),
+        SK.maxReducer(),
+      );
+      writer.set(k, Handle(supmap))
+    },
+  );
+  context.update();
+  t0 = context.getTick().value;
+  inputs.writeArray(context, key(1), Array[val(1)]);
+  context.update();
+  r0 = mapped.get(context, key(1)).v.get(context, IIKey(1, 1)).value;
+  T.expectEq(r0, 1, "Test update from context 0");
+  context2 = context.mclone();
+  t1 = context.getTick().value;
+  inputs.writeArray(context, key(2), Array[val(2)]);
+  context.update();
+  r1 = mapped.get(context, key(2)).v.get(context, IIKey(2, 0)).value;
+  T.expectEq(r1, 4, "Test update from context 1.0");
+  T.expectTrue(
+    mapped.maybeGet(context2, key(2)).isNone(),
+    "Test update from context 1.1",
+  );
+  inputs.writeArray(context2, key(1), Array[]);
+  context2.update();
+  context2.update();
+  context2.update();
+  T.expectTrue(
+    mapped.maybeGet(context2, key(1)).isNone(),
+    "Test update from context 2",
+  );
+  inputs.writeArray(context2, key(1), Array[val(1)]);
+  inputs.writeArray(context2, key(2), Array[val(2)]);
+  context2.update(Some(context.clone()));
+  r3 = mapped.get(context2, key(2)).v.get(context, IIKey(2, 0)).value;
+  T.expectEq(r3, 4, "Test update from context 3.0");
+  // Check the dirs are copied from context
+  c0 = context2.getEagerDir(mappedDirName.sub(`k1`)).created.value;
+  c1 = context2.getEagerDir(mappedDirName.sub(`k2`)).created.value;
+  T.expectEq(c0, t0, "Test update from context 3.1");
+  T.expectEq(c1, t1, "Test update from context 3.2");
+  SK.destroyObstack(pos);
+}
+
+module end;

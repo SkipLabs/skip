@@ -1,0 +1,16 @@
+module Runtime_AssignThisLambda;
+class C(x: String) {
+  fun m(): C {
+    lam = () -> {
+      !this = C("Pass\n");
+    };
+    lam();
+    this;
+  }
+}
+
+@exptest
+fun main(): void {
+  print_raw(C("Fail").m().x)
+}
+module end;

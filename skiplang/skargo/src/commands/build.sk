@@ -1,0 +1,65 @@
+module Skargo;
+
+fun build(): (Cli.Command, (GlobalContext, Cli.ParseResults) ~> void) {
+  (
+    Cli.Command("build")
+      .short("b")
+      .about("Compile a local package and all of its dependencies")
+      .arg(
+        Cli.Arg::string("manifest-path")
+          .value_name("PATH")
+          .about("Path to Skargo.toml"),
+      )
+      .arg(
+        Cli.Arg::string("target")
+          .value_name("TRIPLE")
+          .about("Build for the target triple"),
+      )
+      .arg(
+        Cli.Arg::string("target-dir")
+          .value_name("PATH")
+          .about("Directory for all generated artifacts"),
+      )
+      .arg(
+        Cli.Arg::string("out-dir")
+          .value_name("PATH")
+          .about("Copy final artifacts to this directory"),
+      )
+      .args(kProfileArgs)
+      .arg(Cli.Arg::bool("lib").about("Build only this package's library"))
+      .arg(
+        Cli.Arg::string("bin")
+          .repeatable()
+          .value_name("NAME")
+          .about("Build only the specified binary"),
+      )
+      .arg(Cli.Arg::bool("bins").about("Build all binaries"))
+      .arg(Cli.Arg::bool("tests").about("Build all tests"))
+      .arg(Cli.Arg::bool("all-targets").about("Build all targets"))
+      .arg(kSkcOptArg),
+    execBuild,
+  )
+}
+
+fun execBuild(gctx: GlobalContext, args: Cli.ParseResults): void {
+  ws = workspace(args, gctx);
+  opts = compile_options(args);
+  !opts.build_config.export_dir = args.maybeGetString("out-dir").map(p ->
+    Path.join(gctx.cwd, p)
+  );
+  bctx = create_bctx(gctx, ws, opts);
+  withTimer(
+    () -> {
+      build_runner = BuildRunner::create(bctx);
+      build_runner.compile()
+    },
+    t ->
+      gctx.console.status(
+        "Finished",
+        `${opts.build_config.requested_profile} target(s) in ${t}s`,
+      )
+    ,
+  );
+}
+
+module end;

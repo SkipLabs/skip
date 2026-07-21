@@ -1,0 +1,23 @@
+module Runtime_TryCatchBreakInLoop2;
+class MyException() extends Exception {
+  fun getMessage(): String {
+    ""
+  }
+}
+
+@exptest
+fun main(): void {
+  print_raw(
+    try {
+      throw MyException()
+    } catch {
+    | MyException _ ->
+      i = 0;
+      while (i == 0) {
+        break "Pass\n"
+      } else "Fail"
+    | _ -> "Fail"
+    }
+  )
+}
+module end;

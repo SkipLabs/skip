@@ -1,0 +1,29 @@
+{
+  "name": "@skipruntime/native",
+  "version": "0.0.23",
+  "gypfile": true,
+  "type": "module",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "libc": [
+    "glibc"
+  ],
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "install": "VERSION=$(./calculate_version.sh) node-gyp rebuild",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo && node-gyp clean",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@skipruntime/core": "0.0.23",
+    "node-addon-api": "^8.7.0"
+  }
+}

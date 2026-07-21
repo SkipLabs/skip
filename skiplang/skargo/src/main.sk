@@ -1,0 +1,76 @@
+module Skargo;
+
+const kManifestFile: String = "Skargo.toml";
+const kDefaultTarget: String = "host";
+const kTargetDir: String = "target";
+
+fun main(): void {
+  cmd = Cli.Command("skargo")
+    .about("Skip's package manager")
+    .arg(
+      Cli.Arg::bool("version")
+        .short("V")
+        .long("version")
+        .about("Print version info and exit"),
+    )
+    .arg(
+      Cli.Arg::bool("quiet")
+        .short("q")
+        .long("quiet")
+        .about("Do not print skargo log messages")
+        .global(),
+    )
+    .arg(
+      Cli.Arg::bool("verbose")
+        .short("v")
+        .long("verbose")
+        .repeatable()
+        .about("Use verbose output (-vv very verbose)")
+        .global(),
+    )
+    .arg(
+      Cli.Arg::string("color")
+        .value_name("WHEN")
+        .default("auto")
+        .about("Coloring: auto, always, never")
+        .global(),
+    );
+  suppliers = Array[
+    check,
+    build,
+    test,
+    runner,
+    clean,
+    format,
+    init,
+    update,
+    help,
+  ];
+  commands = mutable Map[];
+  for (supplier in suppliers) {
+    (subcommand, cmdFn) = supplier();
+    !cmd = cmd.subcommand(subcommand);
+    commands.set(subcommand.name, cmdFn);
+  };
+  !cmd = cmd.help().runtimeArgs();
+  args = cmd.parseArgs();
+  if (args.getBool("version")) {
+    pkg_name = #env ("SKARGO_PKG_NAME");
+    pkg_version = #env ("SKARGO_PKG_VERSION");
+    git_commit = #env ("GIT_COMMIT_HASH");
+    print_string(`${pkg_name} ${pkg_version} (${git_commit})`);
+    skipExit(0);
+  } else {
+    gctx = GlobalContext::create(args);
+    args.maybeGetSubcommand() match {
+    | Some(subcmd) ->
+      commands.maybeGet(subcmd) match {
+      | Some(handler) -> handler(gctx, args)
+      | _ -> invariant_violation(`unknown subcommand ${subcmd}`)
+      }
+    | None() -> print_string(Cli.usage(args.cmd, true))
+    }
+  }
+}
+
+module end;

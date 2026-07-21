@@ -1,0 +1,73 @@
+module alias T = SKTest;
+
+module Base64Test;
+
+@test
+fun base64Encode(): void {
+  Base64().encode();
+}
+
+@test
+fun base64Decode(): void {
+  Base64().decode();
+}
+
+class Base64() {
+  const cases: Array<(String, String)> = Array[
+    ("aaaaaaaaaaaaaaaaa", "YWFhYWFhYWFhYWFhYWFhYWE="),
+    ("Hello World", "SGVsbG8gV29ybGQ="),
+    ("foobar", "Zm9vYmFy"),
+    ("fooba", "Zm9vYmE="),
+    ("foob", "Zm9vYg=="),
+    ("foo", "Zm9v"),
+    ("fo", "Zm8="),
+    ("f", "Zg=="),
+    ("{\"v1\": \"6\", \"v2\": \"11\"}", "eyJ2MSI6ICI2IiwgInYyIjogIjExIn0="),
+    ("", ""),
+    ("Base64", "QmFzZTY0"),
+    ("1234567890", "MTIzNDU2Nzg5MA=="),
+    ("Rust", "UnVzdA=="),
+    ("TypeScript", "VHlwZVNjcmlwdA=="),
+    ("¡Hola!", "wqFIb2xhIQ=="),
+    ("中文测试", "5Lit5paH5rWL6K+V"),
+    ("Line\nBreak", "TGluZQpCcmVhaw=="),
+    ("Spaced text", "U3BhY2VkIHRleHQ="),
+    (
+      "The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog.",
+      "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZy4gVGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZy4=",
+    ),
+    ("café", "Y2Fmw6k="),
+    ("naïve", "bmHDr3Zl"),
+    ("élève", "w6lsw6h2ZQ=="),
+    ("français", "ZnJhbsOnYWlz"),
+    ("über", "w7xiZXI="),
+    ("façade", "ZmHDp2FkZQ=="),
+    ("coöperate", "Y2/DtnBlcmF0ZQ=="),
+    ("São Paulo", "U8OjbyBQYXVsbw=="),
+    ("Москва", "0JzQvtGB0LrQstCw"),
+    ("東京", "5p2x5Lqs"),
+    ("العربية", "2KfZhNi52LHYqNmK2Kk="),
+    ("हिन्दी", "4KS54KS/4KSo4KWN4KSm4KWA"),
+    ("中文", "5Lit5paH"),
+    ("Ελληνικά", "zpXOu867zrfOvc65zrrOrA=="),
+    ("Deutsch ist schön", "RGV1dHNjaCBpc3Qgc2Now7Zu"),
+    ("🤖", "8J+klg=="),
+    ("😊😊😊", "8J+YivCfmIrwn5iK"),
+  ];
+
+  fun encode(): void {
+    static::cases.each(case -> {
+      (decoded, encoded) = case;
+      T.expectEq(Base64.encodeString(decoded), encoded)
+    });
+  }
+
+  fun decode(): void {
+    static::cases.each(case -> {
+      (decoded, encoded) = case;
+      T.expectEq(Base64.decodeString(encoded), decoded)
+    });
+  }
+}
+
+module end;

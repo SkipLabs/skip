@@ -1,0 +1,10 @@
+fun main(): void {
+  target = Environ.var("TARGET");
+  isWasm32 = target.startsWith("wasm32");
+
+  if (!isWasm32) {
+    src = "extern/src/date.c";
+    print_string(`skargo:rerun-if-changed=${src}`);
+    Cc.Build().flags(Cc.kRecommendedCflags).file(src).compile("date")
+  }
+}

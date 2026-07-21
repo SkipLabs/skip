@@ -1,0 +1,481 @@
+module alias P = SQLParser;
+
+module SKDB;
+
+class TailSpec{
+  since: Int,
+  filter: ?String,
+  columns: ?Array<P.ColumnDefinition>,
+  params: Map<String, P.Value>,
+}
+
+fun buildTailFilter(
+  context: readonly SKStore.Context,
+  options: SKDB.Options,
+  replicationFilter: (
+    readonly SKStore.Context,
+    Bool,
+    SKStore.DirName,
+  ) ~> (SKStore.Key -> Bool),
+  userId: ?String,
+  tailSpec: TailSpec,
+  sqlTable: SKDB.DirDescr,
+): (readonly SKStore.Context, Bool, SKStore.DirName) ~> (SKStore.Key -> Bool) {
+  filter = tailSpec.filter match {
+  | None() -> replicationFilter
+  | Some(strCond) ->
+    compiler = SKDB.Compiler::create(false, options, 0, tailSpec.params);
+    ast = P.Parser::create(strCond).parseExpr();
+    compilerContext = context.mclone();
+    _ = compiler.compileFrom(
+      compilerContext,
+      Array[P.FromTable{name => sqlTable.name, asName => None()}],
+    );
+    e = compiler.compileExpr(compilerContext, ast) match {
+    | SKDB.CIExpr(x) -> x
+    | _ ->
+      print_error("Unexpected type for filter expression");
+      skipExit(2)
+    };
+    (context, isReset, dirName) ~> {
+      conditionFilter = replicationFilter(context, isReset, dirName);
+      mcontext = context.mclone();
+      baseName -> {
+        inputRow = baseName match {
+        | rowKey @ SKDB.RowKey _ -> rowKey.getRowValues()
+        | _ ->
+          print_error("Unexpected table entry type");
+          skipExit(2)
+        };
+        evaluator = SKDB.ExprEvaluator(Array[inputRow], Array[], None());
+
+        evaluator.evalCIExpr(mcontext, e) match {
+        | SKDB.ASuccess() -> unexpectedSideEffect()
+        | SKDB.ANull()
+        | SKDB.ADef(0) ->
+          false
+        | SKDB.AUndef()
+        | SKDB.ADef(_) ->
+          conditionFilter(baseName)
+        }
+      }
+    }
+  };
+
+  userId match {
+  | None() -> filter
+  | Some(userID) ->
+    (context, isReset, dirName) ~> {
+      user = SKDB.UserFile::create(context, userID);
+      oldFilter = filter(context, isReset, dirName);
+
+      baseName -> {
+        oldFilter(baseName) &&
+          baseName match {
+          | rowKey @ SKDB.RowKey _ ->
+            row = rowKey.getRowValues();
+            SKDB.checkUserCanReadRow(context, user, sqlTable, row) match {
+            | SKDB.AROK() -> true
+            | _ -> false
+            }
+          | _ ->
+            print_error("Unexpected table entry type");
+            skipExit(2)
+          };
+      }
+    }
+  };
+}
+
+fun buildCSVSchemaTransform(
+  dirDescr: SKDB.DirDescr,
+  tailSpec: TailSpec,
+): SKStore.OutputFormat {
+  source = dirDescr.schema;
+  target = tailSpec.columns match {
+  | None() -> return SKStore.OCSV(Range(0, source.size()).collect(Array))
+  | Some(targetSchema) -> targetSchema
+  };
+
+  for (sourceCol in source) {
+    if (
+      sourceCol.notNull is Some _ &&
+      sourceCol.default is None _ &&
+      !target.contains(sourceCol)
+    ) {
+      print_error(
+        `Incompatible schema: missing required column ${sourceCol.name}`,
+      );
+      skipExit(2)
+    };
+  };
+
+  schemaTransformation = target.map(targetCol -> {
+    source.findIdx(col -> col.name == targetCol.name) match {
+    | None() ->
+      print_error(`Incompatible schema: unknown column ${targetCol.name}`);
+      skipExit(2)
+    | Some(idx) -> idx
+    }
+  });
+
+  SKStore.OCSV(schemaTransformation);
+}
+
+fun tailShouldWake(
+  context: readonly SKStore.Context,
+  sub: SKStore.Sub,
+  tick: SKStore.Tick,
+  userIDOpt: ?String,
+): Bool {
+  SKDB.getReplicationState(context, sub.destinationSource) match {
+  | Some(SKDB.RSError()) -> return true
+  | _ -> void
+  };
+
+  if (
+    SKDB.userPrivacyChanged(context, userIDOpt, tick, sub.destinationSource)
+  ) {
+    return true
+  };
+
+  for (dirName in sub.dirNames(context)) {
+    context.unsafeMaybeGetEagerDir(dirName) match {
+    | None() -> void
+    | Some(dir) ->
+      if (dir.changesAfterIsResetOrNonEmpty(tick)) {
+        return true
+      }
+    }
+  };
+  false
+}
+
+fun tailFrom(
+  spec: (P.Name -> TailSpec),
+  dirName: SKStore.DirName,
+  tailWatermark: ?Int,
+): SKStore.Tick {
+  tailWatermark match {
+  | Some(tick) -> SKStore.Tick(tick)
+  | None() ->
+    // we haven't caught up yet so honour the requested since value per table
+    tableName = P.Name::create(getSqlTableName(dirName));
+    SKStore.Tick(spec(tableName).since)
+  }
+}
+
+fun tailSub(
+  options: SKDB.Options,
+  follow: Bool,
+  sessionID: String,
+  userIDOpt: ?String,
+  spec: (P.Name ~> TailSpec),
+): Bool {
+  legacyTableNames: SortedMap<P.Name, P.Name> = SortedMap::create();
+  sub = SKStore.withContext(gContext -> {
+    // rebuild the sub with extra filtering as supported by tail
+    gContext.getSession(sessionID) match {
+    | None() ->
+      print_error("Error: session not found");
+      skipExit(2)
+    | Some(sub) ->
+      dirDescrs = getDirDescrs(gContext);
+      sub.mapDirSubs(dirSub -> {
+        table = getSqlTableName(dirSub.dirName);
+        tableName = P.Name::create(table);
+        tailSpec = spec(tableName);
+
+        dirDescr = dirDescrs.maybeGet(tableName) match {
+        | Some(descr) ->
+          requiresLegacySchema = tailSpec.columns match {
+          | None() -> false
+          | Some(cols) -> cols.any(col -> !descr.schema.contains(col))
+          };
+          if (requiresLegacySchema) {
+            mCtx = gContext.mclone();
+            getLegacyViewsDir(mCtx)
+              .maybeGet(mCtx, SKStore.SID::create(tableName.lower))
+              .flatMap(lvFile -> {
+                !legacyTableNames = legacyTableNames.set(
+                  lvFile.legacyView,
+                  tableName,
+                );
+                dirDescrs.maybeGet(lvFile.legacyView)
+              }) match {
+            | None() ->
+              print_error(`Error: incompatible schema for ${tableName}`);
+              skipExit(2)
+            | Some(dd) -> dd
+            }
+          } else {
+            descr
+          }
+        | None _ ->
+          print_error(`Error: '${tableName}' not found`);
+          skipExit(2)
+        };
+
+        dirSub with {
+          dirName => dirDescr.dirName,
+          filter => buildTailFilter(
+            gContext,
+            options,
+            dirSub.filter,
+            userIDOpt,
+            tailSpec,
+            dirDescr,
+          ),
+          format => options.format match {
+          | SKDB.OFK_CSV() -> buildCSVSchemaTransform(dirDescr, tailSpec)
+          | _ -> dirSub.format
+          },
+        }
+      })
+    }
+  });
+
+  tailWatermark: ?Int = None();
+  init = true;
+  lookupSpec = (name) -> {
+    legacyTableNames.maybeGet(name) match {
+    | Some(table) -> spec(table)
+    | None() -> spec(name)
+    }
+  };
+
+  loop {
+    localObstack = SKStore.newObstack();
+    tick = SKStore.withContext<?Int>(context -> {
+      context.getSession(sessionID) match {
+      | None() ->
+        print_error("Error: session not found");
+        skipExit(2)
+      | Some(_) -> void
+      };
+
+      established = SKDB.getReplicationState(
+        context,
+        sub.destinationSource,
+      ) match {
+      | Some(RSError()) ->
+        print_raw(":reboot\n");
+        return None()
+      | Some(RSEstablished()) -> true
+      | _ -> sub.destinationSource is None()
+      };
+
+      writer = mutable Debug.BufferedWriter(print_raw, 4096);
+
+      requestToRebuildEverything = !sub.dirNames(context).any(dirName -> {
+        since = tailFrom(lookupSpec, dirName, tailWatermark);
+        since.value > 0
+      });
+      oldestSubSince = sub
+        .dirNames(context)
+        .map(dirName -> tailFrom(lookupSpec, dirName, tailWatermark))
+        .min{default => SKStore.Tick(Int::max)};
+      forceCompleteRebuild =
+        !requestToRebuildEverything &&
+        SKDB.userPrivacyChanged(
+          context,
+          userIDOpt,
+          oldestSubSince,
+          sub.destinationSource,
+        );
+
+      producedAnyOutput = false; // assume we won't
+      couldFollowChanges = true; // assume we can
+      chunkingDisabled = false;
+
+      for (dirSub in sub.dirSubs()) {
+        dirName = dirSub.dirName;
+        format = options.format match {
+        | SKDB.OFK_CSV() ->
+          assert(dirSub.format is SKStore.OCSV(_));
+          dirSub.format
+        | SKDB.OFK_JSON() -> SKStore.OJSON(getFieldNames(context, dirName))
+        | SKDB.OFK_SQL() -> SKStore.OSQL()
+        | SKDB.OFK_JS() -> SKStore.OJS(getFieldNames(context, dirName))
+        | SKDB.OFK_Table() -> SKStore.OTable(getFieldNames(context, dirName))
+        };
+        since = tailFrom(lookupSpec, dirName, tailWatermark);
+
+        edir = context.unsafeGetEagerDir(dirName);
+        (
+          producedOutput,
+          shouldRebuild,
+          !chunkingDisabled,
+        ) = edir.writeChangesTailSub{
+          context,
+          dirSub,
+          since,
+          writer,
+          format,
+          forceCompleteRebuild,
+          established,
+          chunkingDisabled,
+        };
+
+        !producedAnyOutput = producedAnyOutput || producedOutput;
+        !couldFollowChanges = couldFollowChanges && !shouldRebuild;
+      };
+
+      // produce checkpoint for flushing and committing
+      if (init || producedAnyOutput) {
+        // always do this on first iteration to ensure we output a
+        // checkpoint without delay so that the downstreams knows that
+        // it has received everything without waiting for the condvar
+        // timeout
+        writer.write(":" + context.getTick().value.toString() + "\n");
+        writer.flush();
+        flushStdout();
+      };
+
+      if (couldFollowChanges) {
+        Some(context.getTick().value)
+      } else {
+        None()
+      }
+    });
+
+    // we are now considered established, even if we're about to fail.
+    if (init && sub.destinationSource is Some _) {
+      runSql(options, (ctx) ~> {
+        SKDB.setReplicationState(
+          ctx,
+          sub.destinationSource.fromSome(),
+          RSEstablished(),
+        );
+        SKStore.CStop(None())
+      })
+    };
+    !init = false;
+
+    !tailWatermark = tick match {
+    // if we cannot follow changes from here - regardless of whether
+    // we want to - this is a failure to honour the request. i.e.
+    // the since value is too far in the past. the user should be
+    // made aware and take action, probably using the rebuild
+    // mechanism.
+    | None() -> break false
+    | Some(_) -> tick
+    };
+
+    lock = SKStore.unfreezeLock(sub.lock);
+    cond = SKStore.unfreezeCond(sub.cond);
+    SKStore.mutexLock(lock);
+    while ({
+      SKStore.withContext(newContext -> {
+        shouldWait =
+          follow &&
+          !tailShouldWake(
+            newContext,
+            sub,
+            SKStore.Tick(tailWatermark.fromSome()),
+            userIDOpt,
+          );
+        shouldWait
+      })
+    }) {
+      timeoutSecs = 10;
+      _ = SKStore.condTimedWait(cond, lock, UInt32::truncate(timeoutSecs));
+      print_raw(":" + tailWatermark.fromSome().toString() + "\n");
+      flushStdout();
+    };
+    SKStore.mutexUnlock(lock);
+    SKStore.destroyObstack(localObstack);
+    if (!follow) {
+      break true
+    }
+  }
+}
+
+module end;
+
+module SKStore;
+
+extension class Sub {
+  fun dirSubs(): Array<DirSub> {
+    this.cmd match {
+    | NWatch _ -> Array[]
+    | NMultipleDirs(_, dirSubs) -> dirSubs
+    }
+  }
+
+  fun mapDirSubs(f: DirSub -> DirSub): this {
+    this.cmd match {
+    | NWatch _ -> this
+    | NMultipleDirs(c, dirSubs) ->
+      this with {cmd => NMultipleDirs(c, dirSubs.map(f))}
+    }
+  }
+}
+
+extension base class EagerDir {
+  fun changesAfterIsResetOrNonEmpty(tick: Tick): Bool {
+    (isReset, changes) = this.getChangesAfter(tick);
+    isReset || !changes.isEmpty()
+  }
+
+  fun writeChangesTailSub{
+    context: readonly Context,
+    dirSub: DirSub,
+    since: SKStore.Tick,
+    writer: mutable Debug.BufferedWriter,
+    format: OutputFormat,
+    forceCompleteRebuild: Bool,
+    established: Bool,
+    chunkingDisabled: Bool,
+  }: (Bool, Bool, Bool) {
+    (shouldRebuild, changes) = if (forceCompleteRebuild) {
+      (true, Array[].iterator())
+    } else if (since.value <= 0) {
+      // if since is zero, the receiver is specifying that they
+      // have no data to tail since. to avoid a likely rebuild and
+      // allow chunking, we stream the current state of the table
+      // and begin tailing from here.
+      (false, this.unsafeGetFileIterNoReducer(None()).map(pair -> pair.i0))
+    } else if (since.value > 1 && !established) {
+      // we have a client that we've never seen before asking to
+      // tail from a point in time that they cannot understand, as
+      // they have no reference for our clock. we assume that this
+      // indicates they've moved from a different server to us and
+      // so need to reset their concept of the server's time.
+      (true, Array[].iterator())
+    } else {
+      // we can only chunk while tables are since 0 as we'll emit
+      // zero checkpoints. once a nonzero request is handled, we must
+      // make sure that it doesn't ultimately get sent back as part of a
+      // zero-checkpoint chunk - otherwise it won't be applied
+      // TODO: optimisation, request all 0 tables first
+      !chunkingDisabled = true;
+      (shouldRebuild, changes) = this.getChangesAfter(since);
+      (shouldRebuild, changes.iterator())
+    };
+
+    // Write checkpoints out at least every `checkpointInterval` rows during
+    // initialization, so that the client can start processing without waiting
+    // for the full changeset.
+    // this value is chosen based on some unscientific local testing
+    checkpointInterval = if (since.value == 0 && !chunkingDisabled) {
+      512
+    } else {
+      Int::max
+    };
+
+    producedOutput = this.writeDiff(
+      shouldRebuild,
+      changes,
+      writer,
+      dirSub.entity,
+      format,
+      dirSub.filter(context, since.value < 1, this.dirName), //send everything if client has nothing, i.e. since.value == 0
+      dirSub.getDestinationWatermark(context),
+      checkpointInterval,
+    );
+    (producedOutput, shouldRebuild, chunkingDisabled)
+  }
+}
+
+module end;

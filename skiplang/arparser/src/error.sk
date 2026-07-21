@@ -1,0 +1,17 @@
+module ARParser;
+
+base class Error extends Exception uses Show {
+  children =
+  | IOError(err: IO.Error)
+  | ParseError(msg: String)
+
+  fun getMessage(): String
+  | IOError(err) -> err.getMessage()
+  | ParseError(msg) -> `Invalid data: ${msg}`
+
+  fun toString(): String {
+    this.getMessage()
+  }
+}
+
+module end;

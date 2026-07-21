@@ -1,0 +1,22 @@
+module Syntax_MutableArg;
+mutable class Foo(mutable dummy: String) {
+  readonly fun chill(): Foo {
+    Foo(this.dummy)
+  }
+}
+
+base class Bar {
+  fun get(): Foo {
+    foo = mutable Foo("");
+    this.getWithMutableFoo(foo);
+    foo.chill()
+  }
+
+  protected fun getWithMutableFoo(mutable Foo): void;
+}
+
+@exptest
+fun main(): void {
+  void
+}
+module end;

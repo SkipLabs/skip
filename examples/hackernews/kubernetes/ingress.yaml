@@ -1,0 +1,43 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: haproxy-kubernetes-ingress
+spec:
+  ingressClassName: haproxy
+  rules:
+    - http:
+        paths:
+        - path: /streams
+          pathType: Prefix
+          backend:
+            service:
+              name: rhn-skip
+              port:
+                number: 8080
+    - http:
+        paths:
+        - path: /control
+          pathType: Prefix
+          backend:
+            service:
+              name: rhn-skip
+              port:
+                number: 8081
+    - http:
+        paths:
+        - path: /api
+          pathType: Prefix
+          backend:
+            service:
+              name: rhn-web
+              port:
+                number: 3031
+    - http:
+        paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: rhn-www
+              port:
+                number: 80

@@ -1,0 +1,15 @@
+module Typechecking_CovariantField;
+mutable class MyRef<+T>(value: T, mutable i: Int)
+
+@exptest
+fun main(): void {
+  ref = mutable MyRef(Some("OK\n"), 0);
+  ref.!i = ref.i + 1;
+  print_raw(
+    ref.value match {
+    | Some(x) -> x
+    // fine, value is immutable
+    },
+  );
+}
+module end;
