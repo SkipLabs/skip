@@ -125,10 +125,10 @@ fun gen(): (Cli.Command, Cli.ParseResults ~> void) {
 
 fun execGen(args: Cli.ParseResults): void {
   for (i in Range(0, args.getInt("n"))) {
-    saved = SKStore.newObstack();
-    r = RandomJSON::mcreate(i);
-    print_string(r.genValue().prettyPrint());
-    SKStore.destroyObstack(saved);
+    SKStore.withRegionVoid(() ~> {
+      r = RandomJSON::mcreate(i);
+      print_string(r.genValue().prettyPrint())
+    })
   }
 }
 
@@ -152,12 +152,12 @@ fun execCheck(args: Cli.ParseResults): void {
     readLineOpt() match {
     | None() -> break void
     | Some(str) ->
-      saved = SKStore.newObstack();
-      checkJSON(schema, decode(str, x -> x)) match {
-      | CROk() -> void
-      | CRError(msg) -> print_error(msg)
-      };
-      SKStore.destroyObstack(saved)
+      SKStore.withRegionVoid(() ~> {
+        checkJSON(schema, decode(str, x -> x)) match {
+        | CROk() -> void
+        | CRError(msg) -> print_error(msg)
+        }
+      })
     }
   }
 }
