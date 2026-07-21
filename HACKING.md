@@ -44,3 +44,34 @@ Then proceed with the client build, such as:
 > cd path/to/client
 > docker compose up --build
 ```
+
+### Migrating branches from before the history rewrite
+
+The repository's history was rewritten to purge large generated bootstrap
+binaries from every commit; they are now provided by the `compiler/bootstrap`
+and `prebuild` submodules. Because this re-hashed every commit past the rewrite
+point, any branch created before the rewrite is stranded on the *old* history:
+it shares no recent ancestor with `main`, cannot be merged, and shows up as
+thousands of phantom changes in comparisons.
+
+`bin/migrate-old-history-branches.sh` re-anchors such branches onto the current
+history. It replays only each branch's own commits onto the new-history *twin*
+of the exact commit it forked from — it does not rebase them forward onto a
+newer base — so a branch's content is preserved byte-for-byte and any stacking
+between your branches is kept intact. The old history is never fetched, so the
+purged binaries are not re-imported into your repository.
+
+```
+# preview your local branches (no changes are made)
+bin/migrate-old-history-branches.sh
+
+# migrate them in place (originals saved under refs/migrate-backup/*)
+bin/migrate-old-history-branches.sh --apply
+
+# migrate and push the branches of a remote, e.g. your fork
+bin/migrate-old-history-branches.sh --remote <remote> --apply --push
+```
+
+Run with `--help` for all options. Branches with complex history (for example,
+merges of the old mainline) are reported as needing manual attention rather than
+being migrated automatically.
