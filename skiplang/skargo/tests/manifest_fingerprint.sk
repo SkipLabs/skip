@@ -1,0 +1,120 @@
+module alias T = SKTest;
+
+module SkargoManifestFingerprintTests;
+
+const kManifestDir: String = #env ("SKARGO_MANIFEST_DIR");
+
+private fun write_file(path: String, contents: String): void {
+  _ = system(`mkdir -p ${Path.dirname(path)}`);
+  FileSystem.writeTextFile(path, contents)
+}
+
+// A two-bin `app` manifest. `alpha`/`beta` point at `alpha_main`/`beta_main`,
+// which lets the test swap the two entry points with a manifest-only edit.
+private fun app_toml(
+  prelude: String,
+  alpha_main: String,
+  beta_main: String,
+): String {
+  `[package]\nname = "app"\nversion = "0.1.0"\n\n[dependencies]\nstd = { path = "${prelude}" }\n\n[[bin]]\nname = "alpha"\nmain = "${alpha_main}"\n\n[[bin]]\nname = "beta"\nmain = "${beta_main}"\n`
+}
+
+// `untracked` (not just `@allow_tracked_call`) is load-bearing: these helpers
+// are called twice with identical arguments across a rebuild, and a plain
+// tracked wrapper around the untracked `Posix`/`system` primitives is itself
+// CSE-able, so the second call would be merged into the first and observe the
+// pre-rebuild result. `@allow_tracked_call` keeps them callable from the
+// tracked `@test`.
+@allow_tracked_call
+untracked fun run_build(skargo: String, app_dir: String): (Bool, String) {
+  proc = Posix.Popen::create{
+    args => Array[skargo, "build"],
+    // Route the merged binary to `skargo` rather than to this test harness.
+    env => Map["SKARGO_BIN" => "skargo"],
+    cwd => Some(app_dir),
+    stdout => true,
+    stderr => true,
+  }.fromSuccess();
+  _out = proc.stdout.fromSome().read_to_string().fromSuccess();
+  err = proc.stderr.fromSome().read_to_string().fromSuccess();
+  (proc.wait().success(), err)
+}
+
+@allow_tracked_call
+untracked fun run_bin(bin_path: String, name: String): (Bool, String, String) {
+  proc = Posix.Popen::create{
+    args => Array[bin_path],
+    // Select which bin the merged dispatcher runs.
+    env => Map["SKARGO_BIN" => name],
+    stdout => true,
+    stderr => true,
+  }.fromSuccess();
+  out = proc.stdout.fromSome().read_to_string().fromSuccess();
+  err = proc.stderr.fromSome().read_to_string().fromSuccess();
+  (proc.wait().success(), out, err)
+}
+
+// Regression test for #1394: in the dev profile, `skargo` merges a package's
+// bin and test targets into a single binary dispatched at runtime by a
+// generated `SkipInternal.dispatch` whose content is derived from the
+// manifest's `[[bin]]` list. `Skargo.toml` used to be absent from every unit's
+// fingerprint, so editing `[[bin]]` entries produced no rebuild and left the
+// binary dispatching according to the *previous* manifest. The fix adds the
+// manifest's mtime to the merged lib unit's fingerprint.
+//
+// (Distinct from #1380's `compute_hash(..., merged)` change, which put
+// merged-*ness* in a unit's artifact identity; this is about the merged
+// dispatcher's *contents* tracking the manifest.)
+@test
+fun test_manifest_edit_rebuilds_merged_bin(): void {
+  // Only meaningful in the dev profile, where the merged binary that runs this
+  // test is also a full `skargo` and can be re-executed as one.
+  if (Environ.varOpt("SKARGO_BIN") != Some("test")) {
+    print_string(
+      "skipping: merged-mode only, run `skargo test` in the dev profile",
+    );
+    return void
+  };
+
+  skargo = Environ.current_exe();
+  prelude = Path.join(Path.dirname(kManifestDir), "prelude");
+  root = Path.join(kManifestDir, "target", "it-manifest-fingerprint");
+  _ = system(`rm -rf ${root}`);
+
+  app_dir = Path.join(root, "app");
+  manifest = Path.join(app_dir, "Skargo.toml");
+  alpha_bin = Path.join(app_dir, "target/host/dev", "alpha");
+
+  write_file(manifest, app_toml(prelude, "ALPHA.main", "BETA.main"));
+  write_file(
+    Path.join(app_dir, "src/lib.sk"),
+    "module ALPHA;\nfun main(): void {\n  print_string(\"ALPHA v1\")\n}\nmodule end;\n\nmodule BETA;\nfun main(): void {\n  print_string(\"BETA v1\")\n}\nmodule end;\n",
+  );
+
+  (ok1, build_err1) = run_build(skargo, app_dir);
+  T.expectTrue(ok1, `first build failed:\n${build_err1}`);
+  (ran1, out1, run_err1) = run_bin(alpha_bin, "alpha");
+  T.expectTrue(ran1, `first run of alpha failed:\n${run_err1}`);
+
+  // `st_mtime` has one-second resolution, so guarantee the rewritten manifest
+  // lands in a strictly later second than the one the first build recorded.
+  _ = system("sleep 1");
+
+  // Manifest-only edit: swap the two bins' entry points. No source touched.
+  write_file(manifest, app_toml(prelude, "BETA.main", "ALPHA.main"));
+
+  (ok2, build_err2) = run_build(skargo, app_dir);
+  T.expectTrue(ok2, `second build failed:\n${build_err2}`);
+  (ran2, out2, run_err2) = run_bin(alpha_bin, "alpha");
+  T.expectTrue(ran2, `second run of alpha failed:\n${run_err2}`);
+
+  // After the swap, bin `alpha` must dispatch to `BETA.main`. If the manifest
+  // is not a fingerprint input the merged binary is stale and `out2 == out1`.
+  T.expectTrue(
+    out1 != out2,
+    `manifest edit did not rebuild the merged binary: bin \`alpha\` still ` +
+      `printed the pre-edit output.\nbefore: ${out1}after:  ${out2}`,
+  )
+}
+
+module end;
