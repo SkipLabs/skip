@@ -142,6 +142,12 @@ fun getLinkArgs(
       Array[
         "clang++",
         `-O${config.optLevel}`,
+        // Honor the requested target instead of letting clang default to the
+        // host. For the host target this is a no-op; it is the first step
+        // toward a real cross-compilation path (the module triple, still
+        // hardcoded in the preamble, is the remaining piece -- see the
+        // `Target` TODO in Config.sk).
+        `--target=${config.target}`,
         "-o",
         config.output,
         llFile,
