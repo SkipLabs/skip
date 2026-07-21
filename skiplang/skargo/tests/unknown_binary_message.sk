@@ -1,0 +1,88 @@
+module alias T = SKTest;
+
+module SkargoUnknownBinaryTests;
+
+const kManifestDir: String = #env ("SKARGO_MANIFEST_DIR");
+
+private fun write_file(path: String, contents: String): void {
+  _ = system(`mkdir -p ${Path.dirname(path)}`);
+  FileSystem.writeTextFile(path, contents)
+}
+
+// Regression test for #1397: the `SkipInternal.dispatch` shim skargo generates
+// for merged dev builds emitted its "Unknown binary" error as a double-quoted
+// string in the *generated* Skip source, so `${name}` was never interpolated
+// and the user saw the literal `${name}` (wrapped in stray backticks) instead
+// of the name that failed to dispatch.
+//
+// Building a single package with two bins forces the generated dispatcher to
+// take its fallback arm (the one-bin case emits `| _ -> <entry>()` and never
+// errors). Running the merged binary under an unknown `SKARGO_BIN` must report
+// the real name and must not leak the template literal.
+@test
+fun test_unknown_binary_message(): void {
+  // Only meaningful in the dev profile, where the merged binary that runs this
+  // test is also a full `skargo` and can be re-executed as one.
+  if (Environ.varOpt("SKARGO_BIN") != Some("test")) {
+    print_string(
+      "skipping: merged-mode only, run `skargo test` in the dev profile",
+    );
+    return void
+  };
+
+  skargo = Environ.current_exe();
+  prelude = Path.join(Path.dirname(kManifestDir), "prelude");
+  root = Path.join(kManifestDir, "target", "it-unknown-binary");
+  _ = system(`rm -rf ${root}`);
+
+  app_dir = Path.join(root, "app");
+  write_file(
+    Path.join(app_dir, "Skargo.toml"),
+    `[package]\nname = "app"\nversion = "0.1.0"\n\n[dependencies]\nstd = { path = "${prelude}" }\n\n[[bin]]\nname = "alpha"\nmain = "ALPHA.main"\n\n[[bin]]\nname = "beta"\nmain = "BETA.main"\n`,
+  );
+  write_file(
+    Path.join(app_dir, "src/alpha.sk"),
+    "module ALPHA;\nfun main(): void {\n  void\n}\nmodule end;\n",
+  );
+  write_file(
+    Path.join(app_dir, "src/beta.sk"),
+    "module BETA;\nfun main(): void {\n  void\n}\nmodule end;\n",
+  );
+
+  // Build the merged binary in the dev profile.
+  build = Posix.Popen::create{
+    args => Array[skargo, "build"],
+    // Route the merged binary to `skargo` rather than to this test harness.
+    env => Map["SKARGO_BIN" => "skargo"],
+    cwd => Some(app_dir),
+    stdout => true,
+    stderr => true,
+  }.fromSuccess();
+  _bout = build.stdout.fromSome().read_to_string().fromSuccess();
+  berr = build.stderr.fromSome().read_to_string().fromSuccess();
+  T.expectTrue(build.wait().success(), `dev-profile build failed:\n${berr}`);
+
+  // Run the merged binary under a name the dispatcher does not know.
+  merged = Path.join(Path.join(app_dir, "target", "host"), "dev", "__merged");
+  run = Posix.Popen::create{
+    args => Array[merged],
+    env => Map["SKARGO_BIN" => "bogus"],
+    cwd => Some(app_dir),
+    stdout => true,
+    stderr => true,
+  }.fromSuccess();
+  _rout = run.stdout.fromSome().read_to_string().fromSuccess();
+  rerr = run.stderr.fromSome().read_to_string().fromSuccess();
+  _ = run.wait();
+
+  T.expectTrue(
+    rerr.contains("Unknown binary 'bogus'"),
+    `expected the failed name interpolated into the error, got:\n${rerr}`,
+  );
+  T.expectFalse(
+    rerr.contains("${name}"),
+    `error still leaks the literal template, got:\n${rerr}`,
+  )
+}
+
+module end;
