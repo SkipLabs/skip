@@ -3935,9 +3935,11 @@ fun llvmWriteFunctionDeclaration(
       // OuterIstToIR checks that user-defined native functions have
       // @cpp_extern or @cpp_runtime.
       asm.print("declare ");
-      if (f.funType.returnType.size() == 1) {
-        llvmWriteTypeCallAttribute(asm, f.funType.returnType[0], false, true)
-      };
+      // `llvmWriteReturnTypeName` already emits the return-type call
+      // attribute (e.g. `zeroext`) for the single-return case; emitting it
+      // here too produced `declare zeroext zeroext ...`. The function
+      // definition path (`llvmWriteFunctionDefinition`) relies on
+      // `llvmWriteReturnTypeName` alone, so match it.
       llvmWriteReturnTypeName(asm, f.funType.returnType);
       asm.print(" %n(" % asm);
       writeFunParams(f, asm);
