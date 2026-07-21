@@ -129,7 +129,6 @@ for dir in "${!SK_CHANGED[@]}"; do
         echo "      - compiler"
         NAMES+=(compiler)
         ;;
-      skiplang/sqlparser) ;;
       *)
         name=$(basename "$dir")
         if [ -d "$dir/tests" ]; then
