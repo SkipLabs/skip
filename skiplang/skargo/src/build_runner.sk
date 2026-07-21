@@ -133,12 +133,12 @@ mutable class BuildRunner(
   private mutable fun fingerprint_for(unit: Unit): Int {
     if (!this.fingerprints.containsKey(unit)) {
       srcs = unit.target.srcs;
+      merged_lib =
+        unit.target.kind is LibTarget(LibraryTypeSklib _) &&
+        should_merge_unit(unit, this.bctx.ws.package);
       // In merged mode, test sources are compiled into the lib,
       // so they must be included in the fingerprint.
-      if (
-        unit.target.kind is LibTarget(LibraryTypeSklib _) &&
-        should_merge_unit(unit, this.bctx.ws.package)
-      ) {
+      if (merged_lib) {
         unit.pkg.manifest.test_target().each(t -> !srcs = srcs.concat(t.srcs));
       };
       this.fingerprints![unit] = (
@@ -151,6 +151,14 @@ mutable class BuildRunner(
           )
           .collect(Array),
         this.bctx.unit_graph[unit].map(dep -> this.fingerprint_for(dep)),
+        // In merged mode, the generated dispatcher is derived from the
+        // manifest's bin/test target list, so a manifest edit must rebuild the
+        // lib even when no source file changed.
+        if (merged_lib) {
+          Some(FileSystem.getLastModificationTime(unit.pkg.manifest_path))
+        } else {
+          None()
+        },
         if (
           unit.target.is_build_script() &&
           unit.mode is CompileModeRunBuildScript _
