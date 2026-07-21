@@ -89,7 +89,9 @@ libbacktrace:
 
 .PHONY: check
 check: libbacktrace
-	find * -name Skargo.toml -exec sh -c 'bin/cd_sh $$(dirname {}) "skargo check"' \;
+	@set -e; \
+	find . \( -name node_modules -o -name target \) -prune -o -name Skargo.toml -print | \
+	while read -r manifest; do bin/cd_sh "$$(dirname "$$manifest")" "skargo check"; done
 
 .PHONY: check-ts
 check-ts:	
