@@ -1951,6 +1951,35 @@ fun withRegionValue<T>(f: () ~> T): T {
   }
 }
 
+// Run `f` in a loop, each iteration inside a fresh region that is reclaimed
+// before the next one — and before the loop returns or a throw propagates. `f`
+// returns None() to keep looping or Some(v) to stop the loop with v.
+//
+// Unlike withRegion/withRegionVoid/withRegionValue, `f` is a `->` lambda: it may
+// read and write outer state and block (e.g. on a lock or condition wait), which
+// a frozen `~>` lambda cannot. In exchange the caller takes the same
+// responsibility as calling newObstack/destroyObstack directly — no value
+// allocated in the region may escape into outer state, since the region is torn
+// down after each iteration. (`Some`'s value is copied out, so it is safe to
+// return region-allocated data from the loop.)
+fun withRegionLoop<T>(f: () -> ?T): T {
+  loop {
+    saved = newObstack();
+    step = try {
+      f()
+    } catch {
+    | exn ->
+      cexn = destroyObstackWithValue(saved, exn);
+      replaceExn(cexn);
+      throw cexn
+    };
+    destroyObstackWithValue(saved, step) match {
+    | Some(v) -> break v
+    | None() -> void
+    }
+  }
+}
+
 // Run `f` on a throwaway copy-on-write clone of `context`, inside a fresh
 // region. The clone isolates any mutations `f` makes (they never touch
 // `context`), and the region reclaims the clone's memory when `f` returns —
