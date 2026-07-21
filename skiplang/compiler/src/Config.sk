@@ -225,8 +225,13 @@ class Config{
     // Does LLVM provide an portable abstraction?
     // TODO: Make a proper `Target` class that holds the relevant platform-specific
     // data, with a constructor that takes the target triple.
-    stackAlign = if (target == "wasm32-unknown-unknown") 8 else 16;
-    ptrByteSize = if (target == "wasm32-unknown-unknown") 4 else 8;
+    // Use the same wasm predicate as `isWasm()` below (prefix match, not an
+    // exact triple). Otherwise a bare `wasm32` triple -- which skargo does
+    // construct -- takes the wasm code paths via `isWasm()` while still being
+    // laid out with 64-bit pointers here.
+    isWasmTarget = target.startsWith("wasm32");
+    stackAlign = if (isWasmTarget) 8 else 16;
+    ptrByteSize = if (isWasmTarget) 4 else 8;
     stackAlignStr = stackAlign.toString();
     ptrBitSize = ptrByteSize * 8;
     vtableByteSize = ptrByteSize;
