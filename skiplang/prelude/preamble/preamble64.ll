@@ -6,6 +6,7 @@ declare void @SKIP_unreachableMethodCall(ptr, ptr)
 declare void @SKIP_unreachableWithExplanation(ptr)
 declare ptr @SKIP_intern(ptr)
 declare ptr @SKIP_llvm_memcpy(ptr, ptr, i64)
+declare void @SKIP_llvm_memset(ptr, i8, i64)
 
 ; LLVM intrinsics
 

@@ -53,6 +53,10 @@ void* SKIP_llvm_memcpy(char* dest, char* val, SkipInt len) {
   return memcpy(dest, val, (size_t)len);
 }
 
+void SKIP_llvm_memset(char* dest, int8_t val, SkipInt len) {
+  memset(dest, val, (size_t)len);
+}
+
 /*****************************************************************************/
 /* Global context synchronization. */
 /*****************************************************************************/
