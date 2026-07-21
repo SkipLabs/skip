@@ -304,6 +304,19 @@ private fun manifest_targets(
   };
 
   for (bin in manifest.bin) {
+    // `test` is reserved for the implicit test target below. In merged (dev)
+    // builds a bin and the test target sharing that name collide in the
+    // generated dispatcher, so reject it here with an actionable manifest error
+    // rather than surfacing a compile error in generated code (or, when there
+    // is no `tests/` directory, silently running the bin as `skargo test`).
+    if (bin.name == "test") {
+      invariant_violation(
+        `Failed to parse manifest at \`${Path.join(
+          package_root,
+          kManifestFile,
+        )}\`: a \`[[bin]]\` target may not be named "test"; that name is reserved for the package's implicit test target (run by \`skargo test\`). Rename the binary.`,
+      )
+    };
     res.push(Target(BinTarget(bin.main), bin.name, Array[]))
   };
 
