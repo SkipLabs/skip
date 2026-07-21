@@ -258,7 +258,11 @@ private fun render_pos(pos: FileRange): String {
   if (pos.file.path.startsWith(cwd)) {
     !path = path.stripPrefix(cwd + "/");
   };
-  file = `File "${path}"`;
+  file = pos.file.pkg_opt match {
+  | Some(pkg) if (pkg != FileCache.kAnonymousPackageName) ->
+    `File "${path}" (package ${pkg})`
+  | _ -> `File "${path}"`
+  };
 
   position = if (!pos.range.isNone()) {
     `, ${renderTextRange(pos.range)}:`
