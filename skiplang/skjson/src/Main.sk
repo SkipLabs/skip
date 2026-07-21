@@ -1,62 +1,52 @@
 module SKJSON;
 
 fun main(): void {
-  saved = SKStore.newObstack();
-  cmd = Cli.Command("skjson")
-    .about("Skip JSON tooling")
-    .arg(
-      Cli.Arg::bool("version")
-        .short("V")
-        .long("version")
-        .about("Print version info and exit"),
-    )
-    .arg(
-      Cli.Arg::bool("verbose")
-        .short("v")
-        .long("verbose")
-        .about("Use verbose output")
-        .global(),
-    );
-  suppliers = Array[infer, gen, check, help];
-  commands = mutable Map[];
-  for (supplier in suppliers) {
-    (subcommand, cmdFn) = supplier();
-    !cmd = cmd.subcommand(subcommand);
-    commands.set(subcommand.name, cmdFn);
-  };
-  !cmd = cmd.help();
-  args = cmd.parseArgs();
-  if (args.getBool("version")) {
-    print_string(
-      // FIXME
-      Environ.args().next().default("skjson") + " " + "FIXME",
-    );
-    SKStore.destroyObstack(saved);
-    skipExit(0);
-  } else {
-    args.maybeGetSubcommand() match {
-    | Some(subcmd) ->
-      commands.maybeGet(subcmd) match {
-      | Some(handler) ->
-        skipExit(
-          try {
-            handler(args);
-            SKStore.destroyObstack(saved);
-            0
-          } catch {
-          | exn ->
-            e = SKStore.destroyObstackWithValue(saved, exn);
-            throw e
-          },
-        )
-      | _ -> invariant_violation(`Unknown subcommand ${subcmd}`)
-      }
-    | None() ->
-      print_string(Cli.usage(args.cmd, true));
-      SKStore.destroyObstack(saved);
+  SKStore.withRegionVoid(() ~> {
+    cmd = Cli.Command("skjson")
+      .about("Skip JSON tooling")
+      .arg(
+        Cli.Arg::bool("version")
+          .short("V")
+          .long("version")
+          .about("Print version info and exit"),
+      )
+      .arg(
+        Cli.Arg::bool("verbose")
+          .short("v")
+          .long("verbose")
+          .about("Use verbose output")
+          .global(),
+      );
+    suppliers = Array[infer, gen, check, help];
+    commands = mutable Map[];
+    for (supplier in suppliers) {
+      (subcommand, cmdFn) = supplier();
+      !cmd = cmd.subcommand(subcommand);
+      commands.set(subcommand.name, cmdFn);
+    };
+    !cmd = cmd.help();
+    args = cmd.parseArgs();
+    if (args.getBool("version")) {
+      print_string(
+        // FIXME
+        Environ.args().next().default("skjson") + " " + "FIXME",
+      );
       skipExit(0)
+    } else {
+      args.maybeGetSubcommand() match {
+      | Some(subcmd) ->
+        commands.maybeGet(subcmd) match {
+        | Some(handler) ->
+          handler(args);
+          skipExit(0)
+        | _ -> invariant_violation(`Unknown subcommand ${subcmd}`)
+        }
+      | None() ->
+        print_string(Cli.usage(args.cmd, true));
+        skipExit(0)
+      }
     }
-  };
+  })
 }
 
 /*****************************************************************************/
