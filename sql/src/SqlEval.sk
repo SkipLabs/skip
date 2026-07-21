@@ -1808,33 +1808,17 @@ private mutable class SQLContext(
       ) ~> void,
     ),
   ): void {
-    context = this.contexts.get(this.fork);
-    startTick = context.getTick();
-    pos = SKStore.newObstack();
-
-    (newContext, underLockF) = try {
-      f(context.withGlobals(this.globals))
-    } catch {
-    | ex ->
-      cexn = SKStore.destroyObstackWithValue(pos, ex);
-      throw cexn
-    };
-    new = SKStore.gContextSync(
-      startTick,
+    // Read the globals into a local: `~>` is a frozen lambda and cannot
+    // capture `this` (a mutable SQLContext).
+    globals = this.globals;
+    this.!contexts = SKStore.syncContexts(
       this.contexts,
-      newContext,
-      Some(this.synchronizer),
-      this.sync,
-      underLockF,
       this.fork,
+      this.synchronizer,
+      this.sync,
+      context ~> f(context.withGlobals(globals)),
     );
-    this.!contexts = new.contexts;
-    !context = this.contexts.get(this.fork);
-    context.notifyAll(startTick);
-    new.actions.each(fn -> fn());
-    this.!globals = context.globals;
-
-    SKStore.destroyObstack(pos)
+    this.!globals = this.contexts.get(this.fork).globals;
   }
 
   mutable fun exec(
@@ -2473,51 +2457,51 @@ fun manageReactiveQuery(
 
 @wasm_export("SKIP_reactive_print_result")
 fun printReactiveQuery(queryID32: Int32): void {
-  saved = SKStore.newObstack();
-  try {
-    SKStore.runWithGc(SKDB.makeSqlContext(), context ~> {
-      queryID = queryID32.toInt();
-      (rqs, sds) = getReactiveQueryHandle(context);
-      rqs
-        .maybeGet(context, SKStore.IID(queryID))
-        .flatMap(v ~> v.value)
-        .each(queryInfo ->
-          sds.maybeGet(context, SKStore.IID(queryID)).each(rq ->
-            printResult(
-              context,
-              queryID,
-              rq.selectDir.dirName,
-              rq.fieldNames,
-              queryInfo.onlyChanges,
+  SKStore.withRegionVoid(() ~> {
+    try {
+      SKStore.runWithGc(SKDB.makeSqlContext(), context ~> {
+        queryID = queryID32.toInt();
+        (rqs, sds) = getReactiveQueryHandle(context);
+        rqs
+          .maybeGet(context, SKStore.IID(queryID))
+          .flatMap(v ~> v.value)
+          .each(queryInfo ->
+            sds.maybeGet(context, SKStore.IID(queryID)).each(rq ->
+              printResult(
+                context,
+                queryID,
+                rq.selectDir.dirName,
+                rq.fieldNames,
+                queryInfo.onlyChanges,
+              )
             )
-          )
-        );
-      SKStore.CStop(None())
-    })
-  } catch {
-  | exn -> print_error(exn.getMessage())
-  };
-  SKStore.destroyObstack(saved);
+          );
+        SKStore.CStop(None())
+      })
+    } catch {
+    | exn -> print_error(exn.getMessage())
+    }
+  })
 }
 
 @wasm_export("SKIP_delete_reactive_query")
 fun deleteReactiveQuery(queryID32: Int32): void {
-  saved = SKStore.newObstack();
-  try {
-    SKStore.runWithGc(SKDB.makeSqlContext(), context ~> {
-      queryID = queryID32.toInt();
-      getReactiveQueryHandle(context).i0.writeArray(
-        context,
-        SKStore.IID(queryID),
-        Array[QueryInfoFile(None())],
-      );
-      context.update();
-      SKStore.CStop(None())
-    })
-  } catch {
-  | exn -> print_error(exn.getMessage())
-  };
-  SKStore.destroyObstack(saved);
+  SKStore.withRegionVoid(() ~> {
+    try {
+      SKStore.runWithGc(SKDB.makeSqlContext(), context ~> {
+        queryID = queryID32.toInt();
+        getReactiveQueryHandle(context).i0.writeArray(
+          context,
+          SKStore.IID(queryID),
+          Array[QueryInfoFile(None())],
+        );
+        context.update();
+        SKStore.CStop(None())
+      })
+    } catch {
+    | exn -> print_error(exn.getMessage())
+    }
+  })
 }
 
 fun printTable(

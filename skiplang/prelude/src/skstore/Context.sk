@@ -1549,11 +1549,16 @@ private native base class Page
 
 @debug
 @cpp_extern("SKIP_new_Obstack")
-private native fun newObstack(): Obstack;
+// Public part of the region API, alongside destroyObstack,
+// destroyObstackWithValue, and the preferred with* wrappers below. Prefer
+// withRegion/withRegionVoid/withRegionValue; reach for the raw pair only when
+// control flow escapes the region lexically (a loop `break`, or `skipExit`
+// from a program entry point) and so cannot be a `~>` lambda.
+native fun newObstack(): Obstack;
 
 @debug
 @cpp_extern("SKIP_destroy_Obstack")
-private native fun destroyObstack(Obstack): void;
+native fun destroyObstack(Obstack): void;
 
 @debug
 @cpp_extern("SKIP_destroy_Obstack_with_value")
@@ -2226,6 +2231,52 @@ fun runWithResult<T>(
     if (synchronizer.isNone()) gGlobalUnlock();
     Failure(exn)
   }
+}
+
+// Commit the context produced by `f` into `contexts`, inside a fresh region.
+//
+// `f` receives the current context for `fork` and returns the context to
+// commit, plus an optional callback for the synchronizer to run while it
+// holds the lock. Once the sync returns, readers are notified and the
+// actions it produced are run. The region is reclaimed on both the normal
+// and the exception path, and the returned `Contexts` outlives it.
+//
+// This is the counterpart of `runWithResult` for callers that own a
+// `Contexts` themselves (e.g. from `gUnsafeContextsGet`) rather than going
+// through the global registry and its lock. It exists so that such callers
+// do not need `newObstack`/`destroyObstack`/`gContextSync` directly.
+fun syncContexts(
+  contexts: Contexts,
+  fork: ?String,
+  synchronizer: Synchronizer,
+  sync: UInt32,
+  f: Context ~> (
+    Context,
+    ?((mutable Context, mutable Context, Context) ~> void),
+  ),
+): Contexts {
+  startTick = contexts.get(fork).getTick();
+  pos = newObstack();
+  (newContext, underLockF) = try {
+    f(contexts.get(fork))
+  } catch {
+  | exn ->
+    cexn = destroyObstackWithValue(pos, exn);
+    throw cexn
+  };
+  new = gContextSync(
+    startTick,
+    contexts,
+    newContext,
+    Some(synchronizer),
+    sync,
+    underLockF,
+    fork,
+  );
+  new.contexts.get(fork).notifyAll(startTick);
+  new.actions.each(fn -> fn());
+  destroyObstack(pos);
+  new.contexts
 }
 
 /*****************************************************************************/
