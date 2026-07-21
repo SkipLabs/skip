@@ -1547,20 +1547,17 @@ private native base class Obstack
 @cpp_extern
 private native base class Page
 
+// The low-level region primitives, private because callers reach the region
+// through the public with* wrappers (withRegion, withRegionVoid,
+// withRegionValue, ...), which reclaim the region on both the normal and the
+// exception path. Reach for these directly only to build another such wrapper.
 @debug
 @cpp_extern("SKIP_new_Obstack")
-// Public part of the region API, alongside destroyObstack,
-// destroyObstackWithValue, and the preferred with* wrappers below. Prefer
-// withRegion/withRegionVoid/withRegionValue: they reclaim the region on both
-// the normal and the exception path. Reach for the raw pair only when the
-// region cannot be a `~>` lambda — because it must mutate outer state or span
-// a lock/condition wait, or because control flow breaks out of it. SqlTailer's
-// poll loop is the motivating case.
-native fun newObstack(): Obstack;
+private native fun newObstack(): Obstack;
 
 @debug
 @cpp_extern("SKIP_destroy_Obstack")
-native fun destroyObstack(Obstack): void;
+private native fun destroyObstack(Obstack): void;
 
 @debug
 @cpp_extern("SKIP_destroy_Obstack_with_value")
