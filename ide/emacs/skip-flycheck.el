@@ -24,7 +24,7 @@
   "A syntax checker for skip."
   :command ("skargo" "check")
   :error-patterns
-  ((error line-start "File \"" (file-name) "\", line " line ", characters " column "-" end-column ":\n" (message) line-end))
+  ((error line-start "File \"" (file-name) "\"" (opt " (package " (one-or-more (not (any ")"))) ")") ", line " line ", characters " column "-" end-column ":\n" (message) line-end))
   :modes (skip-mode))
 
 (defun skip-flycheck-setup ()
