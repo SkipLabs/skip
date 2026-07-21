@@ -255,6 +255,25 @@ export function clone<T>(value: T): T {
   }
 }
 
+// Wrap an `ObjectHandle` in the `reactiveObject` traps, which are what make it
+// *observably* an `ObjectProxy`: reads of `__pointer`/`clone`/`toJSON`/`keys`
+// and of the underlying JSON fields are all synthesized by the handler, not by
+// the handle itself. TypeScript cannot model a `Proxy` retyping its target, so
+// this `ObjectHandle` -> `ObjectProxy` conversion is intrinsically unchecked.
+// We keep that one unavoidable cast confined and documented here rather than
+// widening the exported `ObjectProxy` type to structurally overlap
+// `ObjectHandle` (which would let a checked cast typecheck, but at the cost of
+// making internal handle members like `.pointer`/`.get`/`.has` spuriously
+// accessible on every proxy and defeating `noPropertyAccessFromIndexSignature`
+// for data keys of those names).
+function newObjectProxy(
+  handle: ObjectHandle<Internal.CJObject>,
+): ObjectProxy<{ [k: string]: Exportable }> {
+  return new Proxy(handle, reactiveObject) as unknown as ObjectProxy<{
+    [k: string]: Exportable;
+  }>;
+}
+
 function interpretPointer<T extends Internal.CJSON>(
   binding: Binding,
   pointer: Nullable<Pointer<T>>,
@@ -281,10 +300,7 @@ function interpretPointer<T extends Internal.CJSON>(
     }
     case Type.Object: {
       const oPtr = binding.SKIP_SKJSON_asObject(pointer);
-      return new Proxy(
-        new ObjectHandle(binding, oPtr),
-        reactiveObject,
-      ) as unknown as ObjectProxy<{ [k: string]: Exportable }>;
+      return newObjectProxy(new ObjectHandle(binding, oPtr));
     }
     case Type.Undefined:
     default:
