@@ -77,346 +77,367 @@ fun slurpStdin(): String {
 /*****************************************************************************/
 
 untracked fun main(): void {
-  saved = SKStore.newObstack();
-  cmd = Cli.Command("skdb")
-    .about("The SQL database that tells you when your query results changed")
-    .arg(Cli.Arg::string("init").about("Initialize new SKStore runtime data"))
-    .arg(
-      Cli.Arg::string("data")
-        .about("Use existing SKStore runtime data")
-        .global(),
-    )
-    .arg(Cli.Arg::bool("backtrace").about("Internal use").global())
-    .arg(Cli.Arg::bool("sync").about("Sync to disk").global())
-    .arg(
-      Cli.Arg::string("format")
-        .default(if (IO.stdin().isatty()) "table" else "sql")
-        .about("Output format (sql, csv, json, or table)")
-        .global(),
-    )
-    .arg(
-      Cli.Arg::bool("always-allow-joins")
-        .about("Allow cross joins and joins outside of reactive views")
-        .global(),
-    )
-    .arg(
-      Cli.Arg::bool("show-used-indexes")
-        .about("Print indexes used by a query to stdout")
-        .global(),
-    )
-    .arg(
-      Cli.Arg::string("capacity").about(
-        "Initialize SKStore runtime with given capacity",
-      ),
-    )
-    .arg(
-      Cli.Arg::bool("expect-query-params").about(
-        "Read values of named parameters which may appear in the statement. The parameter values must be provided via stdin, on a single line, as an encoded JSON Object where the keys are the parameter names and the values will be interpreted as SQL values.",
-      ),
-    )
-    .subcommand(Cli.Command("sessions").about("List the current subscriptions"))
-    .subcommand(Cli.Command("compact").about("Compact the db"))
-    .subcommand(
-      Cli.Command("dump-table")
-        .about("Print a specific table signature")
-        .arg(
-          Cli.Arg::string("table").positional().required().about("Table name"),
-        )
-        .arg(Cli.Arg::string("table-suffix").about("Optional suffix"))
-        .arg(
-          Cli.Arg::bool("legacy-schema").about(
-            "Request maximally-legacy-compatible schema, including any columns which have been extracted to separate tables.",
-          ),
+  // The region wraps the command; withRegionVoid reclaims it on normal
+  // completion (exactly where the old destroyObstack ran) and on throw. The
+  // skipExit paths inside are argument errors that exit before any command
+  // runs — the original left the region for process exit to reclaim there too.
+  SKStore.withRegionVoid(() ~> {
+    cmd = Cli.Command("skdb")
+      .about("The SQL database that tells you when your query results changed")
+      .arg(Cli.Arg::string("init").about("Initialize new SKStore runtime data"))
+      .arg(
+        Cli.Arg::string("data")
+          .about("Use existing SKStore runtime data")
+          .global(),
+      )
+      .arg(Cli.Arg::bool("backtrace").about("Internal use").global())
+      .arg(Cli.Arg::bool("sync").about("Sync to disk").global())
+      .arg(
+        Cli.Arg::string("format")
+          .default(if (IO.stdin().isatty()) "table" else "sql")
+          .about("Output format (sql, csv, json, or table)")
+          .global(),
+      )
+      .arg(
+        Cli.Arg::bool("always-allow-joins")
+          .about("Allow cross joins and joins outside of reactive views")
+          .global(),
+      )
+      .arg(
+        Cli.Arg::bool("show-used-indexes")
+          .about("Print indexes used by a query to stdout")
+          .global(),
+      )
+      .arg(
+        Cli.Arg::string("capacity").about(
+          "Initialize SKStore runtime with given capacity",
         ),
-    )
-    .subcommand(
-      Cli.Command("connected-as")
-        .about("Informs the database that it is a replicating peer")
-        .arg(
-          Cli.Arg::string("userId")
-            .required()
-            .about("access key used for the connection"),
-        )
-        .arg(
-          Cli.Arg::string("replicationId")
-            .required()
-            .about(
-              "the replication id the client is using locally for this server-connection",
+      )
+      .arg(
+        Cli.Arg::bool("expect-query-params").about(
+          "Read values of named parameters which may appear in the statement. The parameter values must be provided via stdin, on a single line, as an encoded JSON Object where the keys are the parameter names and the values will be interpreted as SQL values.",
+        ),
+      )
+      .subcommand(
+        Cli.Command("sessions").about("List the current subscriptions"),
+      )
+      .subcommand(Cli.Command("compact").about("Compact the db"))
+      .subcommand(
+        Cli.Command("dump-table")
+          .about("Print a specific table signature")
+          .arg(
+            Cli.Arg::string("table")
+              .positional()
+              .required()
+              .about("Table name"),
+          )
+          .arg(Cli.Arg::string("table-suffix").about("Optional suffix"))
+          .arg(
+            Cli.Arg::bool("legacy-schema").about(
+              "Request maximally-legacy-compatible schema, including any columns which have been extracted to separate tables.",
             ),
-        ),
-    )
-    .subcommand(
-      Cli.Command("dump-tables")
-        .about("Dumps the tables in SQL format")
-        .arg(Cli.Arg::string("table-suffix").about("Optional suffix")),
-    )
-    .subcommand(
-      Cli.Command("dump-inserts").about("Dump the inserts in SQL format"),
-    )
-    .subcommand(
-      Cli.Command("dump-view")
-        .about("Print a specific view in SQL format")
-        .arg(
-          Cli.Arg::string("view").positional().required().about("View name"),
-        ),
-    )
-    .subcommand(Cli.Command("dump-views").about("Dump the views in SQL format"))
-    .subcommand(
-      Cli.Command("dump").about("Dumps tables/inserts/views in SQL format"),
-    )
-    .subcommand(
-      Cli.Command("migrate").about("Dumps to a new schema, read on stdin"),
-    )
-    .subcommand(
-      Cli.Command("csv-field")
-        .about("Output a specific CSV field")
-        .arg(
-          Cli.Arg::string("field")
-            .positional()
-            .required()
-            .about("Field number"),
-        ),
-    )
-    .subcommand(Cli.Command("size").about("Output the size of the db"))
-    .subcommand(
-      Cli.Command("diff")
-        .about("Send the diff from session")
-        .arg(
-          Cli.Arg::string("session-id")
-            .positional()
-            .required()
-            .about("Session id"),
-        )
-        // if not specified, diff will read a multi-table spec from stdin.
-        .arg(Cli.Arg::string("since").about("Starting time of the diff")),
-    )
-    .subcommand(
-      Cli.Command("disconnect")
-        .about("Disconnect a session")
-        .arg(
-          Cli.Arg::string("session-id")
-            .positional()
-            .required()
-            .about("Session id"),
-        ),
-    )
-    .subcommand(
-      Cli.Command("watermark")
-        .about("Get the watermark for table TABLE")
-        .arg(
-          Cli.Arg::string("source")
-            .required()
-            .about("Globally unique identity of this write stream"),
-        )
-        .arg(
-          Cli.Arg::string("table").positional().required().about("Table name"),
-        ),
-    )
-    .subcommand(
-      Cli.Command("replication-id")
-        .about("Get a unique id for CLIENT-UUID")
-        .arg(
-          Cli.Arg::string("client-uuid")
-            .positional()
-            .required()
-            .about("UUID of the client instance"),
-        ),
-    )
-    .subcommand(
-      Cli.Command("write-csv")
-        .about("Write data from stdin into a directory in CSV format")
-        .arg(
-          Cli.Arg::string("source").about(
-            "Globally unique identity of this write stream",
           ),
-        )
-        .arg(Cli.Arg::string("user").about("Name of the user"))
-        .arg(
-          Cli.Arg::bool("enable-rebuilds").about(
-            "Allow write-csv to apply rebuilds. Should only be used by single-peer clients." +
-              " Used wrongly, can lead to data loss: if in doubt do not enable.",
+      )
+      .subcommand(
+        Cli.Command("connected-as")
+          .about("Informs the database that it is a replicating peer")
+          .arg(
+            Cli.Arg::string("userId")
+              .required()
+              .about("access key used for the connection"),
+          )
+          .arg(
+            Cli.Arg::string("replicationId")
+              .required()
+              .about(
+                "the replication id the client is using locally for this server-connection",
+              ),
           ),
-        )
-        .arg(
-          Cli.Arg::bool("expect-schemas").about(
-            "Read source-specified schemas from stdin.  They must be JSON-encoded in a map from table name to schema and written on one line before any CSV data.",
+      )
+      .subcommand(
+        Cli.Command("dump-tables")
+          .about("Dumps the tables in SQL format")
+          .arg(Cli.Arg::string("table-suffix").about("Optional suffix")),
+      )
+      .subcommand(
+        Cli.Command("dump-inserts").about("Dump the inserts in SQL format"),
+      )
+      .subcommand(
+        Cli.Command("dump-view")
+          .about("Print a specific view in SQL format")
+          .arg(
+            Cli.Arg::string("view").positional().required().about("View name"),
           ),
-        ),
-    )
-    .subcommand(
-      Cli.Command("tail")
-        .about("Tail changes on a directory")
-        .arg(
-          Cli.Arg::string("session-id")
-            .positional()
-            .required()
-            .about("Session id"),
-        )
-        .arg(
-          Cli.Arg::bool("follow")
-            .long("follow")
-            .short("f")
-            .about("Output appended data as the database grows"),
-        )
-        .arg(
-          Cli.Arg::bool("read-spec").about(
-            "Read a tail spec for the subscription from stdin",
+      )
+      .subcommand(
+        Cli.Command("dump-views").about("Dump the views in SQL format"),
+      )
+      .subcommand(
+        Cli.Command("dump").about("Dumps tables/inserts/views in SQL format"),
+      )
+      .subcommand(
+        Cli.Command("migrate").about("Dumps to a new schema, read on stdin"),
+      )
+      .subcommand(
+        Cli.Command("csv-field")
+          .about("Output a specific CSV field")
+          .arg(
+            Cli.Arg::string("field")
+              .positional()
+              .required()
+              .about("Field number"),
           ),
-        )
-        .arg(
-          Cli.Arg::string("since")
-            .long("since")
-            .about("Starting time of the tail"),
-        )
-        .arg(Cli.Arg::string("user").about("Name of the user")),
-    )
-    .subcommand(
-      Cli.Command("subscribe")
-        .about("Subscribe to a directory change")
-        .arg(
-          Cli.Arg::string("views")
-            .repeatable()
-            .positional()
-            .required()
-            .about("Views"),
-        )
-        .arg(Cli.Arg::bool("connect").about("Send the initial state first"))
-        .arg(
-          Cli.Arg::string("updates").about(
-            "Name of the file where the updates will be written",
+      )
+      .subcommand(Cli.Command("size").about("Output the size of the db"))
+      .subcommand(
+        Cli.Command("diff")
+          .about("Send the diff from session")
+          .arg(
+            Cli.Arg::string("session-id")
+              .positional()
+              .required()
+              .about("Session id"),
+          )
+          // if not specified, diff will read a multi-table spec from stdin.
+          .arg(Cli.Arg::string("since").about("Starting time of the diff")),
+      )
+      .subcommand(
+        Cli.Command("disconnect")
+          .about("Disconnect a session")
+          .arg(
+            Cli.Arg::string("session-id")
+              .positional()
+              .required()
+              .about("Session id"),
           ),
-        )
-        .arg(
-          Cli.Arg::string("notify").about(
-            "Name of the file updates with time of the last change",
+      )
+      .subcommand(
+        Cli.Command("watermark")
+          .about("Get the watermark for table TABLE")
+          .arg(
+            Cli.Arg::string("source")
+              .required()
+              .about("Globally unique identity of this write stream"),
+          )
+          .arg(
+            Cli.Arg::string("table")
+              .positional()
+              .required()
+              .about("Table name"),
           ),
-        )
-        .arg(Cli.Arg::string("ignore-source").about("Write stream to ignore")),
-    )
-    .subcommand(
-      Cli.Command("can-mirror")
-        .about(
-          "Check that a table is eligible for mirroring under a given schema",
-        )
-        .arg(
-          Cli.Arg::string("table")
-            .positional()
-            .required()
-            .about("Table signature of remote to mirror"),
-        )
-        .arg(
-          Cli.Arg::string("schema")
-            .positional()
-            .required()
-            .about("Expected table schema"),
-        ),
-    )
-    .subcommand(Cli.Command("replay").about("Replay a diff"))
-    .subcommand(
-      Cli.Command("toggle-view")
-        .about("Toggle view status of specified table")
-        .arg(
-          Cli.Arg::string("table").positional().required().about("Table name"),
-        ),
-    )
-    .help();
+      )
+      .subcommand(
+        Cli.Command("replication-id")
+          .about("Get a unique id for CLIENT-UUID")
+          .arg(
+            Cli.Arg::string("client-uuid")
+              .positional()
+              .required()
+              .about("UUID of the client instance"),
+          ),
+      )
+      .subcommand(
+        Cli.Command("write-csv")
+          .about("Write data from stdin into a directory in CSV format")
+          .arg(
+            Cli.Arg::string("source").about(
+              "Globally unique identity of this write stream",
+            ),
+          )
+          .arg(Cli.Arg::string("user").about("Name of the user"))
+          .arg(
+            Cli.Arg::bool("enable-rebuilds").about(
+              "Allow write-csv to apply rebuilds. Should only be used by single-peer clients." +
+                " Used wrongly, can lead to data loss: if in doubt do not enable.",
+            ),
+          )
+          .arg(
+            Cli.Arg::bool("expect-schemas").about(
+              "Read source-specified schemas from stdin.  They must be JSON-encoded in a map from table name to schema and written on one line before any CSV data.",
+            ),
+          ),
+      )
+      .subcommand(
+        Cli.Command("tail")
+          .about("Tail changes on a directory")
+          .arg(
+            Cli.Arg::string("session-id")
+              .positional()
+              .required()
+              .about("Session id"),
+          )
+          .arg(
+            Cli.Arg::bool("follow")
+              .long("follow")
+              .short("f")
+              .about("Output appended data as the database grows"),
+          )
+          .arg(
+            Cli.Arg::bool("read-spec").about(
+              "Read a tail spec for the subscription from stdin",
+            ),
+          )
+          .arg(
+            Cli.Arg::string("since")
+              .long("since")
+              .about("Starting time of the tail"),
+          )
+          .arg(Cli.Arg::string("user").about("Name of the user")),
+      )
+      .subcommand(
+        Cli.Command("subscribe")
+          .about("Subscribe to a directory change")
+          .arg(
+            Cli.Arg::string("views")
+              .repeatable()
+              .positional()
+              .required()
+              .about("Views"),
+          )
+          .arg(Cli.Arg::bool("connect").about("Send the initial state first"))
+          .arg(
+            Cli.Arg::string("updates").about(
+              "Name of the file where the updates will be written",
+            ),
+          )
+          .arg(
+            Cli.Arg::string("notify").about(
+              "Name of the file updates with time of the last change",
+            ),
+          )
+          .arg(
+            Cli.Arg::string("ignore-source").about("Write stream to ignore"),
+          ),
+      )
+      .subcommand(
+        Cli.Command("can-mirror")
+          .about(
+            "Check that a table is eligible for mirroring under a given schema",
+          )
+          .arg(
+            Cli.Arg::string("table")
+              .positional()
+              .required()
+              .about("Table signature of remote to mirror"),
+          )
+          .arg(
+            Cli.Arg::string("schema")
+              .positional()
+              .required()
+              .about("Expected table schema"),
+          ),
+      )
+      .subcommand(Cli.Command("replay").about("Replay a diff"))
+      .subcommand(
+        Cli.Command("toggle-view")
+          .about("Toggle view status of specified table")
+          .arg(
+            Cli.Arg::string("table")
+              .positional()
+              .required()
+              .about("Table name"),
+          ),
+      )
+      .help();
 
-  //  try {
-  args = cmd.parseArgs();
-  options = SKDB.Options{
-    backtrace => args.getBool("backtrace"),
-    alwaysAllowJoins => args.getBool("always-allow-joins"),
-    sync => args.getBool("sync"),
-    showUsedIndexes => args.getBool("show-used-indexes"),
-    format => args.getString("format") match {
-    | "csv" -> SKDB.OFK_CSV()
-    | "json" -> SKDB.OFK_JSON()
-    | "sql" -> SKDB.OFK_SQL()
-    | "js" -> SKDB.OFK_JS()
-    | "table" -> SKDB.OFK_Table()
-    | f -> invariant_violation(`Unsupported format: ${f}`)
-    },
-    expectQueryParams => args.getBool("expect-query-params"),
-  };
-
-  subcmd_handler = args.subcommand
-    .map(subcmd ->
-      subcmd match {
-      | "sessions" -> execSessions
-      | "compact" -> execCompact
-      | "dump-table" -> execDumpTable
-      | "dump-tables" -> execDumpTables
-      | "dump-inserts" -> execDumpInserts
-      | "dump-view" -> execDumpView
-      | "dump-views" -> execDumpViews
-      | "dump" -> execDump
-      | "migrate" -> execMigrate
-      | "size" -> execSize
-      | "diff" -> execDiff
-      | "disconnect" -> execDisconnect
-      | "tail" -> execTail
-      | "watermark" -> execWatermark
-      | "replication-id" -> execReplicationId
-      | "write-csv" -> execWriteCsv
-      | "subscribe" -> execSubscribe
-      | "can-mirror" -> execCanMirror
-      | "replay" -> execReplay
-      | "toggle-view" -> execToggleView
-      | "connected-as" -> execSetClientContext
-      | _ -> invariant_violation(`Unknown subcommand ${subcmd}`)
-      }
-    )
-    .default((args, options) -> {
-      // NOTE: This should be a subcommand, but the `--init` flag is currently
-      // hardcoded in the runtime. It should be revisited once the runtime has
-      // a proper two-step init API for persistence.
-      if (args.maybeGetString("init") is Some _) {
-        _ = SKStore.gContextInit(SKDB.makeSqlContext().clone());
-        return void
-      } else if (args.maybeGetString("capacity") is Some _) {
-        print_error("cannot use capacity without init");
-        skipExit(2)
-      };
-      params = queryParams(options);
-      if (!IO.stdin().isatty()) {
-        input = read_to_end();
-        SKDB.eval(input, options, params) match {
-        | Failure(err) ->
-          SKDB.printError(input, err);
-          skipExit(1)
-        | Success _ -> void
-        }
-      } else {
-        loop {
-          SKStore.withRegionVoid(() ~> {
-            input = "";
-            print_raw("skdb> ");
-            loop {
-              read_line() match {
-              | Some(l) -> !input = input + l + " "
-              | None() -> skipExit(0)
-              };
-              SKDB.eval(input, options, params, true) match {
-              | Failure(UnfinishedTransactionError _)
-              | Failure(ParserError(P.UnexpectedTokenError(P.TEOF(), _, _))) ->
-                print_raw(" ...> ");
-                continue
-              | Failure(err) ->
-                printError(input, err);
-                break void
-              | _ -> break void
-              }
-            }
-          })
-        }
-      };
-    });
-  subcmd_handler(args, options);
-  /*  } catch {
-    | exn -> print_error("Internal error: " + exn.getMessage())
+    //  try {
+    args = cmd.parseArgs();
+    options = SKDB.Options{
+      backtrace => args.getBool("backtrace"),
+      alwaysAllowJoins => args.getBool("always-allow-joins"),
+      sync => args.getBool("sync"),
+      showUsedIndexes => args.getBool("show-used-indexes"),
+      format => args.getString("format") match {
+      | "csv" -> SKDB.OFK_CSV()
+      | "json" -> SKDB.OFK_JSON()
+      | "sql" -> SKDB.OFK_SQL()
+      | "js" -> SKDB.OFK_JS()
+      | "table" -> SKDB.OFK_Table()
+      | f -> invariant_violation(`Unsupported format: ${f}`)
+      },
+      expectQueryParams => args.getBool("expect-query-params"),
     };
-  */
-  SKStore.destroyObstack(saved);
+
+    subcmd_handler = args.subcommand
+      .map(subcmd ->
+        subcmd match {
+        | "sessions" -> execSessions
+        | "compact" -> execCompact
+        | "dump-table" -> execDumpTable
+        | "dump-tables" -> execDumpTables
+        | "dump-inserts" -> execDumpInserts
+        | "dump-view" -> execDumpView
+        | "dump-views" -> execDumpViews
+        | "dump" -> execDump
+        | "migrate" -> execMigrate
+        | "size" -> execSize
+        | "diff" -> execDiff
+        | "disconnect" -> execDisconnect
+        | "tail" -> execTail
+        | "watermark" -> execWatermark
+        | "replication-id" -> execReplicationId
+        | "write-csv" -> execWriteCsv
+        | "subscribe" -> execSubscribe
+        | "can-mirror" -> execCanMirror
+        | "replay" -> execReplay
+        | "toggle-view" -> execToggleView
+        | "connected-as" -> execSetClientContext
+        | _ -> invariant_violation(`Unknown subcommand ${subcmd}`)
+        }
+      )
+      .default((args, options) -> {
+        // NOTE: This should be a subcommand, but the `--init` flag is currently
+        // hardcoded in the runtime. It should be revisited once the runtime has
+        // a proper two-step init API for persistence.
+        if (args.maybeGetString("init") is Some _) {
+          _ = SKStore.gContextInit(SKDB.makeSqlContext().clone());
+          return void
+        } else if (args.maybeGetString("capacity") is Some _) {
+          print_error("cannot use capacity without init");
+          skipExit(2)
+        };
+        params = queryParams(options);
+        if (!IO.stdin().isatty()) {
+          input = read_to_end();
+          SKDB.eval(input, options, params) match {
+          | Failure(err) ->
+            SKDB.printError(input, err);
+            skipExit(1)
+          | Success _ -> void
+          }
+        } else {
+          loop {
+            SKStore.withRegionVoid(() ~> {
+              input = "";
+              print_raw("skdb> ");
+              loop {
+                read_line() match {
+                | Some(l) -> !input = input + l + " "
+                | None() -> skipExit(0)
+                };
+                SKDB.eval(input, options, params, true) match {
+                | Failure(UnfinishedTransactionError _)
+                | Failure(
+                  ParserError(P.UnexpectedTokenError(P.TEOF(), _, _)),
+                ) ->
+                  print_raw(" ...> ");
+                  continue
+                | Failure(err) ->
+                  printError(input, err);
+                  break void
+                | _ -> break void
+                }
+              }
+            })
+          }
+        };
+      });
+    subcmd_handler(args, options)
+    /*  } catch {
+      | exn -> print_error("Internal error: " + exn.getMessage())
+      };
+    */
+  })
 }
 
 @wasm_export("SKDB_factory")
