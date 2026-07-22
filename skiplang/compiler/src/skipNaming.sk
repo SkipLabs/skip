@@ -379,6 +379,21 @@ fun check_const_private_abstract(con: N.Const_def): void {
 }
 
 fun check_class_rules(cla: N.Class_def): void {
+  if (
+    annotationsContainParam(
+      cla.annotations,
+      "@cpp_export",
+      cla.name.i0,
+    ).isSome() &&
+    (!(cla.kind is A.KClass()) || !cla.extends_.isEmpty())
+  ) {
+    // `class`/`value class` are both A.KClass() here (the KValue split only
+    // happens later in the back end), so this correctly accepts value classes.
+    SkipError.error(
+      cla.name.i0,
+      "@cpp_export classes must be final and may not extend any base classes",
+    )
+  };
   if (cla.value.isSome()) {
     cla.params match {
     | N.NoParams()
@@ -1784,6 +1799,25 @@ fun method_def(
       "@allow_tracked_call requires the method to be untracked",
     )
   };
+  if (
+    met.native_.isSome() &&
+    annotationsContainParam(
+      met.annotations,
+      "@cpp_extern",
+      met.name.i0,
+    ).isNone() &&
+    annotationsContainParam(
+      met.annotations,
+      "@cpp_runtime",
+      met.name.i0,
+    ).isNone() &&
+    annotationsContainParam(met.annotations, "@intrinsic", met.name.i0).isNone()
+  ) {
+    SkipError.error(
+      met.name.i0,
+      "Native methods must be declared with @cpp_extern, @cpp_runtime, or @intrinsic",
+    )
+  };
   tparam_context = context_name + "<method:tparam>" + method_name + ":";
   !env.in_deferred = met.deferred_.isSome();
   tunder_count = sk_create_counter();
@@ -2212,6 +2246,40 @@ fun fun_def(
       fd.name.i0,
       "@allow_tracked_call requires the function to be untracked",
     )
+  };
+  if (
+    fd.native_.isSome() &&
+    annotationsContainParam(
+      fd.annotations,
+      "@cpp_extern",
+      fd.name.i0,
+    ).isNone() &&
+    annotationsContainParam(
+      fd.annotations,
+      "@cpp_runtime",
+      fd.name.i0,
+    ).isNone() &&
+    annotationsContainParam(fd.annotations, "@intrinsic", fd.name.i0).isNone()
+  ) {
+    SkipError.error(
+      fd.name.i0,
+      "Native functions must be declared with @cpp_extern, @cpp_runtime, or @intrinsic",
+    )
+  };
+  if (annotationsContain(fd.annotations, "@always_inline", fd.name.i0)) {
+    if (annotationsContain(fd.annotations, "@no_inline", fd.name.i0)) {
+      SkipError.error(
+        fd.name.i0,
+        "@always_inline cannot be combined with @no_inline",
+      )
+    } else if (annotationsContain(fd.annotations, "@gc", fd.name.i0)) {
+      SkipError.error(fd.name.i0, "@always_inline cannot be combined with @gc")
+    } else if (fd.body.isNone()) {
+      SkipError.error(
+        fd.name.i0,
+        "@always_inline requires a function body (cannot apply to a native function)",
+      )
+    }
   };
   check_default_last(params);
   params1 = params.map(p -> parameter(context, acc, env2, p));
