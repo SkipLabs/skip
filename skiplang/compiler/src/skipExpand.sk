@@ -661,6 +661,9 @@ class Env{
   module_aliases: UMap<A.Module_alias>,
   tparams: SMap<A.Type_parameter>,
   allowMacros: Bool,
+  // When set (via --allow-module-private-access), cross-module access to a
+  // `private` module element is permitted instead of erroring.
+  allowPrivateAccess: Bool,
 }
 
 fun empty_defs(mod_name: Module_): Defs {
@@ -683,7 +686,7 @@ fun empty_defs_names(): DefNames {
   DefNames(Array[])
 }
 
-fun makeEnv(): Env {
+fun makeEnv(allowPrivateAccess: Bool = false): Env {
   Env{
     context_name => "",
     current_module => Unqualified(),
@@ -691,6 +694,7 @@ fun makeEnv(): Env {
     module_aliases => UMap[],
     tparams => SortedMap[],
     allowMacros => false,
+    allowPrivateAccess,
   }
 }
 
@@ -856,6 +860,7 @@ fun check_module(
     (is_private.fromSome(), env.current_module) match {
     | (false, _) -> void
     | (true, Module(n)) if (mname.i1 == n.i1) -> void
+    | (true, _) if (env.allowPrivateAccess) -> void
     | (true, _) ->
       // If a same-named class exposes this name via `::`, the caller most
       // likely meant that; point them at it (M.foo is module access, M::foo is
@@ -1079,6 +1084,7 @@ class DefsFile(value: (?FileRange, SkipExpand.Defs)) extends SKStore.File
 fun program(
   context: mutable SKStore.Context,
   files: SKStore.EHandle<FileCache.InputSource, SkipParse.DefsFile>,
+  allowPrivateAccess: Bool,
 ): (
   SKStore.EHandle<SKStore.SID, GlobalEnv.ExpandedDefFile>,
   SKStore.EHandle<SKStore.SID, SKStore.StringFile>,
@@ -1115,7 +1121,7 @@ fun program(
     },
   );
   ModuleMap.populateCache(context, moduleDefsDir);
-  expandEnv = makeEnv();
+  expandEnv = makeEnv(allowPrivateAccess);
   expandedDefs = moduleDefsDir.map(
     SKStore.SID::keyType,
     DefsFile::type,

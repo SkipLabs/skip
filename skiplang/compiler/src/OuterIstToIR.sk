@@ -4881,9 +4881,12 @@ private const kEmptyMethods: UnorderedMap<
   SFunctionID,
 > = UnorderedMap[];
 
-fun makeOuterIst(context: mutable SKStore.Context): OuterIst.Program {
+fun makeOuterIst(
+  context: mutable SKStore.Context,
+  allowPrivateAccess: Bool,
+): OuterIst.Program {
   // run the compiler front end from parsing to type checking
-  typedAst = SkipMain.type_program(context);
+  typedAst = SkipMain.type_program(context, allowPrivateAccess);
   // OuterIst skeleton is built here, but code is done lazily
   SkipMakeOuterIst.program(context, typedAst)
 }

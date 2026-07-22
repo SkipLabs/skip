@@ -216,7 +216,10 @@ const backendSinkDir: SKStore.EHandle<
   backendSinkDirName,
 );
 
-fun getOrInitializeBackend(context: mutable SKStore.Context): SKStore.EagerDir {
+fun getOrInitializeBackend(
+  context: mutable SKStore.Context,
+  allowPrivateAccess: Bool,
+): SKStore.EagerDir {
   backendDirName = SKStore.DirName::create("/backend/");
   context.unsafeMaybeGetEagerDir(backendDirName) match {
   | Some(dir) -> return dir
@@ -239,7 +242,7 @@ fun getOrInitializeBackend(context: mutable SKStore.Context): SKStore.EagerDir {
     backendDirName,
   );
 
-  outerIst = OuterIstToIR.makeOuterIst(context);
+  outerIst = OuterIstToIR.makeOuterIst(context, allowPrivateAccess);
 
   defsProj = outerIst.getFunsProj(context);
   constsProj = outerIst.getConstsProj(context);
@@ -396,7 +399,7 @@ fun compile(
   };
 
   runCompilerPhase("backend/init", () -> {
-    getOrInitializeBackend(context).writeArray(
+    getOrInitializeBackend(context, config.bypass_module_private).writeArray(
       context,
       SKStore.UnitID::singleton,
       Array[TickConfigFile((context.getTick().value, config))],
@@ -449,7 +452,7 @@ fun compile(
 // so the backend mapper never fires — leaving a clean "warm" base that carries
 // the typed stdlib and no unit-specific state.
 fun warm_stdlib(config: Config.Config, context: mutable SKStore.Context): void {
-  _ = getOrInitializeBackend(context);
+  _ = getOrInitializeBackend(context, config.bypass_module_private);
   make_input_source_path = (pkg_base_dir, src_path) ~> {
     res = Path.join(pkg_base_dir, src_path);
     if (config.canonize_paths) {
