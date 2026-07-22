@@ -116,6 +116,10 @@ fun getLinkArgs(
         ],
       )
       .map(x -> `-export=${x}`);
+    // Strip DWARF from release wasm (the browser bundle). `-S` (not `-s`)
+    // keeps the `name` section, so JS stack traces still resolve Skip
+    // function names; `--debug` builds keep full debug info.
+    stripArgs = if (config.debug) Array<String>[] else Array["-S"];
     runShell(
       Array[
         "wasm-ld",
@@ -125,7 +129,8 @@ fun getLinkArgs(
         output,
         "--no-entry",
         "-allow-undefined",
-      ].concat(exportJs)
+      ].concat(stripArgs)
+        .concat(exportJs)
         .concat(linker_args)
         .concat(static_libs),
       config.verbose,
