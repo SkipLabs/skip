@@ -1,10 +1,10 @@
 target datalayout = "e-m:e-p:32:32-i64:64-n32:64-S128"
 target triple = "wasm32"
 
-declare void @SKIP_print_last_exception_stack_trace_and_exit(ptr)
-declare void @SKIP_throw(ptr)
-declare void @SKIP_unreachableMethodCall(ptr, ptr)
-declare void @SKIP_unreachableWithExplanation(ptr)
+declare void @SKIP_print_last_exception_stack_trace_and_exit(ptr) noreturn cold
+declare void @SKIP_throw(ptr) noreturn cold
+declare void @SKIP_unreachableMethodCall(ptr, ptr) noreturn cold
+declare void @SKIP_unreachableWithExplanation(ptr) noreturn cold
 declare ptr @SKIP_intern(ptr)
 declare ptr @SKIP_llvm_memcpy(ptr, ptr, i64)
 declare void @SKIP_llvm_memset(ptr, i8, i64)
