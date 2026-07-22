@@ -1,7 +1,9 @@
 #!/bin/bash
 
-# Assert the configured Docker Hub credentials can push every image in the bake
-# "ci" group, before anything spends ten minutes building them.
+# Assert the configured Docker Hub credentials can push the given images, before
+# anything spends ten minutes building them. With no arguments, checks every
+# image in the bake "ci" group; with arguments, checks exactly those repos (bare
+# namespace/name, e.g. skiplabs/skdb).
 #
 # Docker Hub's token endpoint does not reject a scope you lack. It returns 200
 # with a token carrying only the scopes you DO have, and the push then fails
@@ -14,10 +16,10 @@
 # because the push failed the merge job never ran -- so no image's :latest was
 # updated that run, not even the four whose credentials were fine.
 #
-# Reads the repository list from the same bake "ci" group the workflow pushes,
-# so this cannot disagree with what is actually published.
+# With no arguments, reads the repository list from the same bake "ci" group the
+# workflow pushes, so this cannot disagree with what is actually published.
 #
-# Usage: DOCKERHUB_USERNAME=... DOCKERHUB_TOKEN=... check_push_access.sh
+# Usage: DOCKERHUB_USERNAME=... DOCKERHUB_TOKEN=... check_push_access.sh [REPO...]
 
 set -euo pipefail
 
@@ -27,18 +29,23 @@ REPO="$SCRIPT_DIR/.."
 : "${DOCKERHUB_USERNAME:?DOCKERHUB_USERNAME must be set}"
 : "${DOCKERHUB_TOKEN:?DOCKERHUB_TOKEN must be set}"
 
-# Bare `namespace/name` for every published image, e.g. skiplabs/skip.
+# Bare `namespace/name` for every image to check, e.g. skiplabs/skip: the
+# explicit arguments if given, otherwise the whole bake "ci" group.
 repos=()
-while IFS= read -r r; do
-    repos+=("$r")
-done < <(
-    docker buildx bake -f "$REPO/docker-bake.hcl" --print ci |
-        jq -r '.group.ci.targets[] as $t
-               | .target[$t].tags[0]
-               | sub(":.*$"; "")'
-)
+if [[ $# -gt 0 ]]; then
+    repos=("$@")
+else
+    while IFS= read -r r; do
+        repos+=("$r")
+    done < <(
+        docker buildx bake -f "$REPO/docker-bake.hcl" --print ci |
+            jq -r '.group.ci.targets[] as $t
+                   | .target[$t].tags[0]
+                   | sub(":.*$"; "")'
+    )
+fi
 if [[ ${#repos[@]} -eq 0 ]]; then
-    echo 'Error: bake group "ci" resolved no images' >&2
+    echo 'Error: no repositories to check' >&2
     exit 1
 fi
 
@@ -94,4 +101,4 @@ EOF
     exit 1
 fi
 
-echo "OK: credentials can push all ${#repos[@]} image(s) in bake group \"ci\""
+echo "OK: credentials can push all ${#repos[@]} image(s)"
