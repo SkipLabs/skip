@@ -28,9 +28,9 @@ declare void @__cxa_end_catch()
 
 declare noalias align 8 ptr @SKIP_Obstack_alloc(i32) nofree
 declare noalias align 8 ptr @SKIP_Obstack_calloc(i32) nofree
-declare void @SKIP_Obstack_vectorUnsafeSet(ptr, ptr)
+declare void @SKIP_Obstack_vectorUnsafeSet(ptr writeonly captures(none) nonnull, ptr) nounwind willreturn nofree memory(argmem: write)
 declare void @SKIP_Obstack_collect(ptr, ptr, i64)
-declare ptr @SKIP_Obstack_shallowClone(i32, ptr)
+declare noalias align 4 ptr @SKIP_Obstack_shallowClone(i32, ptr readonly captures(none) nonnull) nofree
 
 define void @SKIP_Obstack_inl_collect(ptr, ptr, i64) alwaysinline nounwind uwtable {
   ret void
@@ -55,10 +55,10 @@ define void @SKIP_Obstack_store(ptr %obj, ptr %val) alwaysinline nounwind uwtabl
 
 ; String
 
-declare ptr @SKIP_String_concat2(ptr, ptr)
+declare noalias align 8 ptr @SKIP_String_concat2(ptr readonly captures(none), ptr readonly captures(none)) nofree willreturn
 declare i64 @SKIP_String_cmp(ptr captures(none), ptr captures(none)) memory(argmem: read) willreturn nounwind
 declare i64 @SKIP_String_hash(ptr captures(none)) memory(argmem: read) willreturn nounwind
-declare ptr @SKIP_Float_toString(double)
+declare align 8 ptr @SKIP_Float_toString(double) nofree
 
 define i1 @SKIP_String_eq(ptr captures(none) %0, ptr captures(none) %1) nounwind willreturn memory(argmem: read) {
   %3 = call i64 @SKIP_String_cmp(ptr %0, ptr %1)
