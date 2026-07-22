@@ -6,13 +6,22 @@ declare void @SKIP_throw(ptr) noreturn cold
 declare void @SKIP_unreachableMethodCall(ptr, ptr) noreturn cold
 declare void @SKIP_unreachableWithExplanation(ptr) noreturn cold
 declare ptr @SKIP_intern(ptr)
-declare ptr @SKIP_llvm_memcpy(ptr writeonly, ptr readonly captures(none), i64) memory(argmem: readwrite) mustprogress nounwind willreturn nofree
-declare void @SKIP_llvm_memset(ptr writeonly captures(none), i8, i64) memory(argmem: write) mustprogress nounwind willreturn nofree
+define linkonce_odr ptr @SKIP_llvm_memcpy(ptr %dest, ptr %src, i64 %len) alwaysinline nounwind uwtable {
+  call void @llvm.memcpy.p0.p0.i64(ptr %dest, ptr %src, i64 %len, i1 false)
+  ret ptr %dest
+}
+define linkonce_odr void @SKIP_llvm_memset(ptr %dest, i8 %val, i64 %len) alwaysinline nounwind uwtable {
+  call void @llvm.memset.p0.i64(ptr %dest, i8 %val, i64 %len, i1 false)
+  ret void
+}
 
 ; LLVM intrinsics
 
 declare void @llvm.lifetime.start(i64 immarg, ptr nocapture)
 declare void @llvm.lifetime.end(i64 immarg, ptr nocapture)
+
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias captures(none) writeonly, ptr noalias captures(none) readonly, i64, i1 immarg)
+declare void @llvm.memset.p0.i64(ptr captures(none) writeonly, i8, i64, i1 immarg)
 
 declare i32 @llvm.eh.typeid.for(ptr)
 
