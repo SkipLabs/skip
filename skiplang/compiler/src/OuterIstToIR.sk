@@ -2246,9 +2246,12 @@ class Converter private (
     ).isSome();
 
     if (isCppExport) {
-      // @cpp_export must be concrete with no base classes
+      // @cpp_export must be a final class with no base classes. Value classes
+      // (KClass in the AST, remapped to KValue here by convertClassKind) are
+      // final too, so accept both. The user-facing check now lives in naming
+      // (check_class_rules); this stays as a defensive back-end guard.
       pos.invariant(
-        kind is KClass _ && extends_.isEmpty(),
+        (kind is KClass _ || kind is KValue _) && extends_.isEmpty(),
         `@cpp_export classes must be final and may not extend any base classes`,
       )
     };
