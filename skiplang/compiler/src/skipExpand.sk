@@ -935,6 +935,19 @@ fun check_const_privacy(
   }
 }
 
+fun check_type_privacy(
+  env: Env,
+  name: A.Name,
+  x: (FileRange, A.Visibility),
+): void {
+  x match {
+  | (_, A.VPublic()) -> void
+  | (_, A.VProtected()) -> invariant_violation("ICE protected type alias")
+  | (pos, A.VPrivate()) ->
+    check_module_element_privacy("type", env, name, Some(pos))
+  }
+}
+
 fun current_defs_names(context: mutable SKStore.Context, env: Env): DefNames {
   module_names_find(context, env.current_module) match {
   | None() -> empty_defs_names()
@@ -2735,6 +2748,7 @@ fun type_alias_def(
   visibility = t__.visibility;
   name = t__.name;
   tparams = t__.tparams;
+  check_type_privacy(env, name, visibility);
   name1 = make_definition_name(env, name);
   (env1, tparams1) = type_parameters(context, env, tparams);
   body1 = type_alias(context, env1, tyd.body);
