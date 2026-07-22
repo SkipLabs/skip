@@ -212,9 +212,9 @@ fun populateCache(
         defMap = mutable Map[];
         pushDef = (prefix, moduleName, defName, isPrivate) -> {
           if (defName.startsWith(".")) {
-            // A `.`-prefixed name lives in the global namespace, not in a
-            // module, so module-`private` is meaningless on it: the dot wins
-            // and it stays public (see tests/Expand/GlobalAccessPrivate.sk).
+            // A `.`-prefixed name is global, not a module member; `private` on
+            // it is rejected at the declaration site (check_module_element_privacy),
+            // so it never reaches here as private — treat it as public defensively.
             !moduleName = "U";
             !defName = defName.getIter().forward(1).collectString();
             !isPrivate = false;
@@ -852,34 +852,54 @@ fun check_module(
 fun check_module_element_privacy(
   element_type: String,
   env: Env,
+  name: A.Name,
   privacy: ?FileRange,
 ): void {
-  (privacy, env.current_module) match {
-  | (None(), _)
-  | (_, Module _) ->
-    void
-  | (Some(vpos), Unqualified()) ->
-    SkipError.error(
-      vpos,
-      "Cannot declare a " + element_type + " as private outside of a module",
-    )
+  privacy match {
+  | None() -> void
+  | Some(vpos) ->
+    env.current_module match {
+    | Unqualified() ->
+      SkipError.error(
+        vpos,
+        "Cannot declare a " + element_type + " as private outside of a module",
+      )
+    | Module _ ->
+      // A `.`-prefixed name is hoisted into the global namespace, which has no
+      // "outside", so `private` on it is contradictory: reject it rather than
+      // silently ignore the `private`.
+      if (name.i1.startsWith(".")) {
+        SkipError.error(
+          vpos,
+          "Cannot declare the global (`.`-prefixed) " +
+            element_type +
+            " " +
+            name.i1 +
+            " as private",
+        )
+      }
+    }
   }
 }
 
-fun check_class_privacy(env: Env, privacy: ?FileRange): void {
-  check_module_element_privacy("class", env, privacy)
+fun check_class_privacy(env: Env, name: A.Name, privacy: ?FileRange): void {
+  check_module_element_privacy("class", env, name, privacy)
 }
 
-fun check_fun_privacy(env: Env, privacy: ?FileRange): void {
-  check_module_element_privacy("function", env, privacy)
+fun check_fun_privacy(env: Env, name: A.Name, privacy: ?FileRange): void {
+  check_module_element_privacy("function", env, name, privacy)
 }
 
-fun check_const_privacy(env: Env, x: (FileRange, A.Visibility)): void {
+fun check_const_privacy(
+  env: Env,
+  name: A.Name,
+  x: (FileRange, A.Visibility),
+): void {
   x match {
   | (_, A.VPublic()) -> void
   | (_, A.VProtected()) -> invariant_violation("ICE proected const")
   | (pos, A.VPrivate()) ->
-    check_module_element_privacy("constant", env, Some(pos))
+    check_module_element_privacy("constant", env, name, Some(pos))
   }
 }
 
@@ -2529,7 +2549,7 @@ fun fun_def(
   params = t__.params;
   return_ = t__.return_;
   body = t__.body;
-  check_fun_privacy(env, fun_private);
+  check_fun_privacy(env, name, fun_private);
   name1 = make_definition_name(env, name);
   (env1, tparams1) = type_parameters(context, env, tparams);
   (env2, params1) = fun_parameters(context, env1, None(), params);
@@ -2575,7 +2595,7 @@ fun const_def(
     if (source.isSome()) {
       name
     } else {
-      check_const_privacy(env, visibility);
+      check_const_privacy(env, name, visibility);
       make_definition_name(env, name)
     }
   };
@@ -2723,7 +2743,7 @@ fun class_def(
   private_ = cd.private_;
   annotations = cd.annotations;
   mutable_ = cd.mutable_;
-  check_class_privacy(env, private_);
+  check_class_privacy(env, name, private_);
   check_constructor(kind, params);
   name1 = make_definition_name(env, name);
   (env1, tparams1) = type_parameters(context, env, tparams);
