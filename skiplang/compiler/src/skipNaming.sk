@@ -2266,6 +2266,21 @@ fun fun_def(
       "Native functions must be declared with @cpp_extern, @cpp_runtime, or @intrinsic",
     )
   };
+  if (annotationsContain(fd.annotations, "@always_inline", fd.name.i0)) {
+    if (annotationsContain(fd.annotations, "@no_inline", fd.name.i0)) {
+      SkipError.error(
+        fd.name.i0,
+        "@always_inline cannot be combined with @no_inline",
+      )
+    } else if (annotationsContain(fd.annotations, "@gc", fd.name.i0)) {
+      SkipError.error(fd.name.i0, "@always_inline cannot be combined with @gc")
+    } else if (fd.body.isNone()) {
+      SkipError.error(
+        fd.name.i0,
+        "@always_inline requires a function body (cannot apply to a native function)",
+      )
+    }
+  };
   check_default_last(params);
   params1 = params.map(p -> parameter(context, acc, env2, p));
   return_1 = type(context, classAcc, env2, return_);
