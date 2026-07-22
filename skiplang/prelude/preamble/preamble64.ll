@@ -45,8 +45,8 @@ define void @SKIP_awaitableThrow(ptr, ptr) {
 
 ; Obstack
 
-declare ptr @SKIP_Obstack_alloc(i64)
-declare ptr @SKIP_Obstack_calloc(i64)
+declare noalias align 8 ptr @SKIP_Obstack_alloc(i64) nofree
+declare noalias align 8 ptr @SKIP_Obstack_calloc(i64) nofree
 declare void @SKIP_Obstack_vectorUnsafeSet(ptr, ptr)
 declare void @SKIP_Obstack_collect(ptr, ptr, i64)
 declare ptr @SKIP_Obstack_shallowClone(i64, ptr)

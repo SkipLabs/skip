@@ -32,8 +32,8 @@ declare void @__cxa_end_catch()
 
 ; Obstack
 
-declare ptr @SKIP_Obstack_alloc(i32)
-declare ptr @SKIP_Obstack_calloc(i32)
+declare noalias align 8 ptr @SKIP_Obstack_alloc(i32) nofree
+declare noalias align 8 ptr @SKIP_Obstack_calloc(i32) nofree
 declare void @SKIP_Obstack_vectorUnsafeSet(ptr, ptr)
 declare void @SKIP_Obstack_collect(ptr, ptr, i64)
 declare ptr @SKIP_Obstack_shallowClone(i32, ptr)
