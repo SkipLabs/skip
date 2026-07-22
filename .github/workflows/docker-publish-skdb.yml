@@ -1,0 +1,175 @@
+name: docker-publish-skdb
+
+# Manual-only publish of skiplabs/skdb.
+#
+# skdb is not in the bake "ci" group, so docker-publish.yml never pushes it --
+# it only builds it as a cacheonly dependency of skdb-dev-server. skdb bakes in
+# repo source, so publishing it is a release of main rather than a routine
+# toolchain rebuild; that is why it stays behind a manual trigger with no
+# schedule. The build machinery mirrors docker-publish.yml (native per-arch
+# build, push by digest, merge into a multi-arch tag, verify attestations), but
+# for the single skdb target.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-publish-skdb-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # setup-buildx-action's version input has no default, and imagetools create
+  # silently dropped attestations before buildx v0.30.0.
+  BUILDX_VERSION: v0.35.0
+  # The skdb target's repository in docker-bake.hcl, without the :tag -- a
+  # push-by-digest build needs a name with no tag.
+  IMAGE: skiplabs/skdb
+
+jobs:
+  check-push-access:
+    # A manual dispatch on a fork should never try to publish.
+    if: github.repository == 'SkipLabs/skip'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v4
+        with:
+          version: ${{ env.BUILDX_VERSION }}
+      - name: Check the credentials can push skdb
+        shell: bash
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: ./bin/check_push_access.sh "$IMAGE"
+
+  build:
+    needs: [check-push-access]
+    if: github.repository == 'SkipLabs/skip'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux/amd64
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            platform: linux/arm64
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # The compiler is built from source in the image, and its Makefile
+          # needs the pinned bootstrap and libbacktrace submodules.
+          submodules: true
+      - uses: docker/setup-buildx-action@v4
+        with:
+          version: ${{ env.BUILDX_VERSION }}
+      - uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Show disk space before build
+        shell: bash
+        run: df -h /
+      - name: Build and push by digest
+        id: bake
+        uses: docker/bake-action@v7
+        with:
+          # v6+ defaults to the git context, which would pick up neither the
+          # submodules checked out above nor .dockerignore.
+          source: .
+          files: ./docker-bake.hcl
+          # skdb only; its skip dependency builds as a cacheonly link and is
+          # never pushed.
+          targets: skdb
+          pull: true
+          # Matches bin/docker_build.sh. mode=max records build args: do not
+          # pass secrets as build args.
+          provenance: mode=max
+          sbom: true
+          set: |
+            *.platform=${{ matrix.platform }}
+            *.output=type=image,push-by-digest=true,name-canonical=true,push=true
+            skdb.tags=docker.io/${{ env.IMAGE }}
+      - name: Export digest
+        shell: bash
+        env:
+          METADATA: ${{ steps.bake.outputs.metadata }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          mkdir -p /tmp/digests
+          digest=$(jq -r '.skdb["containerimage.digest"] // empty' <<< "$METADATA")
+          if [[ -z "$digest" ]]; then
+            echo "::error::no digest for skdb in bake metadata"
+            exit 1
+          fi
+          echo "$digest" > "/tmp/digests/$ARCH"
+          echo "skdb $ARCH -> $digest"
+      - name: Show disk space after build
+        if: always()
+        shell: bash
+        run: df -h /
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.arch }}
+          path: /tmp/digests/${{ matrix.arch }}
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    needs: [build]
+    if: github.repository == 'SkipLabs/skip'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digest-*
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@v4
+        with:
+          # Load bearing: imagetools create runs from the CLI plugin this
+          # installs, and it is what preserves or drops the per-platform
+          # attestations.
+          version: ${{ env.BUILDX_VERSION }}
+      - uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Create the multi-arch tag
+        shell: bash
+        run: |
+          shopt -s nullglob
+          files=(/tmp/digests/*)
+          if [[ "${#files[@]}" -eq 0 ]]; then
+            echo "::error::no digests downloaded"
+            exit 1
+          fi
+          refs=()
+          for f in "${files[@]}"; do
+            refs+=("docker.io/$IMAGE@$(cat "$f")")
+          done
+          docker buildx imagetools create -t "docker.io/$IMAGE:latest" "${refs[@]}"
+      - name: Check attestations survived the merge
+        shell: bash
+        run: |
+          # A dropped attestation is silent -- the image still works, it just has
+          # no provenance. Each platform contributes its image manifest plus an
+          # attestation manifest, so assert both are present.
+          shopt -s nullglob
+          files=(/tmp/digests/*)
+          platforms=${#files[@]}
+          expected=$((platforms * 2))
+          raw=$(docker buildx imagetools inspect "docker.io/$IMAGE:latest" --raw)
+          total=$(jq '.manifests | length' <<< "$raw")
+          attested=$(jq '[.manifests[]
+                          | select(.annotations["vnd.docker.reference.type"]
+                                   == "attestation-manifest")] | length' <<< "$raw")
+          echo "$IMAGE:latest: $total manifest(s), $attested attestation(s)"
+          if [[ "$total" -ne "$expected" || "$attested" -ne "$platforms" ]]; then
+            echo "::error::expected $expected manifests and $platforms attestation(s)"
+            exit 1
+          fi
