@@ -39,8 +39,8 @@ define void @SKIP_awaitableThrow(ptr, ptr) {
 
 ; Obstack
 
-declare noalias align 8 ptr @SKIP_Obstack_alloc(i64) nofree
-declare noalias align 8 ptr @SKIP_Obstack_calloc(i64) nofree
+declare noalias align 8 ptr @SKIP_Obstack_alloc(i64) allocsize(0) nofree
+declare noalias align 8 ptr @SKIP_Obstack_calloc(i64) allocsize(0) nofree
 declare void @SKIP_Obstack_vectorUnsafeSet(ptr writeonly captures(none) nonnull, ptr) nounwind willreturn nofree memory(argmem: write)
 declare void @SKIP_Obstack_collect(ptr, ptr, i64)
 declare noalias align 8 ptr @SKIP_Obstack_shallowClone(i64, ptr readonly captures(none) nonnull) nofree

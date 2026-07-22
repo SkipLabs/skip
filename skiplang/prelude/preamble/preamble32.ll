@@ -26,8 +26,8 @@ declare void @__cxa_end_catch()
 
 ; Obstack
 
-declare noalias align 8 ptr @SKIP_Obstack_alloc(i32) nofree
-declare noalias align 8 ptr @SKIP_Obstack_calloc(i32) nofree
+declare noalias align 8 ptr @SKIP_Obstack_alloc(i32) allocsize(0) nofree
+declare noalias align 8 ptr @SKIP_Obstack_calloc(i32) allocsize(0) nofree
 declare void @SKIP_Obstack_vectorUnsafeSet(ptr writeonly captures(none) nonnull, ptr) nounwind willreturn nofree memory(argmem: write)
 declare void @SKIP_Obstack_collect(ptr, ptr, i64)
 declare noalias align 4 ptr @SKIP_Obstack_shallowClone(i32, ptr readonly captures(none) nonnull) nofree
