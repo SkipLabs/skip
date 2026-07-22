@@ -42,7 +42,14 @@ define void @SKIP_awaitableThrow(ptr, ptr) {
 declare noalias align 8 ptr @SKIP_Obstack_alloc(i64) nofree
 declare noalias align 8 ptr @SKIP_Obstack_calloc(i64) nofree
 declare void @SKIP_Obstack_vectorUnsafeSet(ptr writeonly captures(none) nonnull, ptr) nounwind willreturn nofree memory(argmem: write)
-declare void @SKIP_Obstack_collect(ptr, ptr, i64)
+; WARNING: SKIP_Obstack_collect is the moving-GC relocation hook (emitted by
+; LowerLocalGC in gc.sk with mayRelocatePointers). Its C body is a no-op today
+; (runtime.c: the collector is disabled), so only `nounwind willreturn` are sound.
+; When the moving collector is re-enabled it will READ the root buffer and WRITE
+; relocated pointers back, and may OOM-throw -- at which point `nounwind` becomes a
+; SILENT MISCOMPILE. Revisit these attributes (drop nounwind; do NOT add
+; memory()/nofree/captures) together with any GC re-enablement.
+declare void @SKIP_Obstack_collect(ptr, ptr, i64) nounwind willreturn
 declare noalias align 8 ptr @SKIP_Obstack_shallowClone(i64, ptr readonly captures(none) nonnull) nofree
 
 define void @SKIP_Obstack_inl_collect(ptr, ptr, i64) alwaysinline nounwind uwtable {
