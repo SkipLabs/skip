@@ -210,34 +210,42 @@ fun populateCache(
         };
         SkipExpand.checkConflicts(values.first.value);
         defMap = mutable Map[];
-        pushDef = (prefix, moduleName, defName) -> {
+        pushDef = (prefix, moduleName, defName, isPrivate) -> {
           if (defName.startsWith(".")) {
+            // A `.`-prefixed name lives in the global namespace, not in a
+            // module, so module-`private` is meaningless on it: the dot wins
+            // and it stays public (see tests/Expand/GlobalAccessPrivate.sk).
             !moduleName = "U";
             !defName = defName.getIter().forward(1).collectString();
+            !isPrivate = false;
           };
           !defName = prefix + defName;
           if (!defMap.containsKey(moduleName)) {
             defMap![moduleName] = SortedSet[];
           };
           defMap![moduleName] = defMap[moduleName].set(defName);
+          if (isPrivate) {
+            // Marker beside the "<kind>:<name>" tag; read by DefNames.isPrivateTag.
+            defMap![moduleName] = defMap[moduleName].set("private:" + defName);
+          };
         };
         (_, defs) = values.first.value;
 
         for (cd in defs.class_defs) {
           (_fileRange, defName) = cd.name;
-          pushDef("class:", moduleName, defName);
+          pushDef("class:", moduleName, defName, cd.private_.isSome());
         };
         for (fd in defs.fun_defs) {
           (_fileRange, defName) = fd.name;
-          pushDef("fun:", moduleName, defName);
+          pushDef("fun:", moduleName, defName, fd.fun_private.isSome());
         };
         for (cst in defs.const_defs) {
           (_fileRange, defName) = cst.name;
-          pushDef("const:", moduleName, defName);
+          pushDef("const:", moduleName, defName, cst.visibility.i1.isPrivate());
         };
         for (tyd in defs.type_defs) {
           (_fileRange, defName) = tyd.name;
-          pushDef("type:", moduleName, defName);
+          pushDef("type:", moduleName, defName, tyd.visibility.i1.isPrivate());
         };
         for (defModuleName => defSet in defMap) {
           writer.setArray(
@@ -504,8 +512,17 @@ class DefNames(defs: Array<String>) {
     this.binarySearch("type:" + typeName, 0, this.defs.size() - 1)
   }
 
+  // A "<kind>:<name>" tag is private iff a "private:<kind>:<name>" marker sits
+  // beside it in the sorted defs array (emitted by ModuleMap.populateCache).
+  // Kept separate from the plain tag so containsClass/Fun/Const/Type stay
+  // privacy-blind: same-module references to a private element must still
+  // resolve, and only check_module gates cross-module access.
+  fun isPrivateTag(tag: String): Bool {
+    this.binarySearch("private:" + tag, 0, this.defs.size() - 1)
+  }
+
   fun names(): Array<String> {
-    this.defs.map(x -> x.split(":")[1])
+    this.defs.filter(x -> !x.startsWith("private:")).map(x -> x.split(":")[1])
   }
 }
 
@@ -724,16 +741,16 @@ fun make_dotted_name<Ta>(
 
 fun element_privacy(md: DefNames, field_str: String): ?Bool {
   if (md.containsClass(field_str)) {
-    Some(false)
+    Some(md.isPrivateTag("class:" + field_str))
   } else {
     if (md.containsFun(field_str)) {
-      Some(false)
+      Some(md.isPrivateTag("fun:" + field_str))
     } else {
       if (md.containsType(field_str)) {
-        Some(false)
+        Some(md.isPrivateTag("type:" + field_str))
       } else {
         if (md.containsConst(field_str)) {
-          Some(false)
+          Some(md.isPrivateTag("const:" + field_str))
         } else {
           None()
         }
@@ -3346,7 +3363,23 @@ fun expr_(
       }
     | Failure(errors) ->
       (_, cname_str) = cname;
-      if (current_defs_names(context, env).containsClass(cname_str)) {
+      // A genuine cross-module privacy violation must not be reinterpreted as
+      // member access on a same-named class: only the intended unbound-module /
+      // unbound-name fallbacks may be swallowed, never a Some(true) privacy
+      // failure from element_privacy.
+      isPrivacyViolation = if (is_module(context, env, cname)) {
+        md = module_names_find_unsafe(context, expand_module_name(env, cname));
+        element_privacy(md, field_name.i1) match {
+        | Some(true) -> true
+        | _ -> false
+        }
+      } else {
+        false
+      };
+      if (
+        !isPrivacyViolation &&
+        current_defs_names(context, env).containsClass(cname_str)
+      ) {
         // Don't error out if there is a class by the same name in scope
         // so as to produce clearer error messages
         A.Dot(expr(context, env, e), field_name)
