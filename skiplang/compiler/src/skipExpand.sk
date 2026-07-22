@@ -411,6 +411,29 @@ fun getClass(
   )
 }
 
+// Best-effort: does a uniquely-named class `className` expose `member` via `::`
+// (a static method, a class constant, or a class type)? Used only to enrich a
+// diagnostic, so it must never crash — an absent or ambiguous class is `false`.
+fun classHasStaticMember(
+  context: mutable SKStore.Context,
+  className: String,
+  member: String,
+): Bool {
+  arr = defMapDir.getArray(context, SKStore.SID("class:" + className));
+  if (arr.size() != 1) return false;
+  arr[0].value match {
+  | EClass(cd) ->
+    isStaticMethod = cd.methods.maybeGetNoPos(member) match {
+    | Some(m) -> m.static_.isSome()
+    | None() -> false
+    };
+    isStaticMethod ||
+      cd.consts.maybeGetNoPos(member).isSome() ||
+      cd.types.maybeGetNoPos(member).isSome()
+  | _ -> false
+  }
+}
+
 fun getType(
   context: mutable SKStore.Context,
   typeName: String,
@@ -834,6 +857,14 @@ fun check_module(
     | (false, _) -> void
     | (true, Module(n)) if (mname.i1 == n.i1) -> void
     | (true, _) ->
+      // If a same-named class exposes this name via `::`, the caller most
+      // likely meant that; point them at it (M.foo is module access, M::foo is
+      // the static member of class M — a common collision for companion types).
+      hint = if (GlobalEnv.classHasStaticMember(context, m_str, field_str)) {
+        " (a static " + m_str + "::" + field_str + " is also in scope)"
+      } else {
+        ""
+      };
       SkipError.errorl(
         List[
           (
@@ -841,7 +872,8 @@ fun check_module(
             "Cannot access a private module element " +
               field_str +
               " outside of module " +
-              m_str,
+              m_str +
+              hint,
           ),
         ],
       )
