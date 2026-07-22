@@ -51,6 +51,10 @@ for step in "${steps[@]}"; do
             echo "deb [signed-by=/etc/apt/keyrings/llvm.asc] http://apt.llvm.org/noble/ llvm-toolchain-noble-$LLVM_VERSION main" >> /etc/apt/sources.list.d/llvm.list
             apt-get update
             apt-get install -q -y --no-install-recommends automake clang-$LLVM_VERSION file gawk git lld-$LLVM_VERSION llvm-$LLVM_VERSION llvm-$LLVM_VERSION-dev make openssh-client
+            # gzip and tar ship in the ubuntu base with fixable CVEs; the base
+            # image lags the Noble security updates, so pull the patched
+            # versions explicitly. Runs in skiplang-base, inherited downstream.
+            apt-get install -q -y --only-upgrade gzip tar
 
             update-alternatives --install /usr/bin/clang clang /usr/bin/clang-$LLVM_VERSION $PRIORITY \
                 --slave /usr/bin/clang++ clang++ /usr/bin/clang++-$LLVM_VERSION \
@@ -68,6 +72,13 @@ for step in "${steps[@]}"; do
             echo "deb [signed-by=/etc/apt/keyrings/nodesource.asc] https://deb.nodesource.com/node_22.x nodistro main" >> /etc/apt/sources.list.d/nodejs.list
             apt-get update
             apt-get install -q -y --no-install-recommends nodejs jq
+            # NodeSource's nodejs bundles npm 10.9.8, whose own bundled
+            # dependencies (tar, brace-expansion, sigstore, ...) carry CVEs
+            # including a critical in tar. Update npm to current 11.x, which
+            # bundles fixed versions. Major-pinned, not floating to @latest, so
+            # a rebuild self-heals within 11.x without jumping to a major that
+            # would require a newer node than the pinned node_22.x.
+            npm install -g npm@11
             ;;
         other-CI-tools)
             # Assumes other steps have been run before
