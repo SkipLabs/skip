@@ -6,24 +6,18 @@ declare void @SKIP_throw(ptr) noreturn cold
 declare void @SKIP_unreachableMethodCall(ptr, ptr) noreturn cold
 declare void @SKIP_unreachableWithExplanation(ptr) noreturn cold
 declare ptr @SKIP_intern(ptr)
-declare ptr @SKIP_llvm_memcpy(ptr, ptr, i64)
-declare void @SKIP_llvm_memset(ptr, i8, i64)
+declare ptr @SKIP_llvm_memcpy(ptr writeonly, ptr readonly captures(none), i64) memory(argmem: readwrite) mustprogress nounwind willreturn nofree
+declare void @SKIP_llvm_memset(ptr writeonly captures(none), i8, i64) memory(argmem: write) mustprogress nounwind willreturn nofree
 
 ; LLVM intrinsics
 
-; Function Attrs: mustprogress nocallback nofree nosync nounwind willreturn memory(argmem: readwrite)
 declare void @llvm.lifetime.start(i64 immarg, ptr nocapture)
-; Function Attrs: mustprogress nocallback nofree nosync nounwind willreturn memory(argmem: readwrite)
 declare void @llvm.lifetime.end(i64 immarg, ptr nocapture)
 
-; Function Attrs: nounwind readnone
 declare i32 @llvm.eh.typeid.for(ptr)
 
-; Function Attrs: nounwind readnone
 declare i64 @llvm.ctlz.i64(i64, i1)
-; Function Attrs: nounwind readnone
 declare i64 @llvm.cttz.i64(i64, i1)
-; Function Attrs: nounwind readnone
 declare i64 @llvm.ctpop.i64(i64)
 
 declare i32 @__gxx_personality_v0(...)
@@ -38,28 +32,23 @@ declare void @SKIP_Obstack_vectorUnsafeSet(ptr, ptr)
 declare void @SKIP_Obstack_collect(ptr, ptr, i64)
 declare ptr @SKIP_Obstack_shallowClone(i32, ptr)
 
-; Function Attrs: alwaysinline nounwind uwtable
-define void @SKIP_Obstack_inl_collect(ptr, ptr, i64) {
+define void @SKIP_Obstack_inl_collect(ptr, ptr, i64) alwaysinline nounwind uwtable {
   ret void
 }
 
-; Function Attrs: alwaysinline nounwind uwtable
-define ptr @SKIP_Obstack_note_inl() {
+define ptr @SKIP_Obstack_note_inl() alwaysinline nounwind uwtable {
   ret ptr null
 }
 
-; Function Attrs: alwaysinline nounwind uwtable
-define void @SKIP_Obstack_inl_collect0(ptr) {
+define void @SKIP_Obstack_inl_collect0(ptr) alwaysinline nounwind uwtable {
   ret void
 }
 
-; Function Attrs: alwaysinline nounwind uwtable
-define ptr @SKIP_Obstack_inl_collect1(ptr, ptr) {
+define ptr @SKIP_Obstack_inl_collect1(ptr, ptr) alwaysinline nounwind uwtable {
   ret ptr %1
 }
 
-; Function Attrs: alwaysinline nounwind uwtable
-define void @SKIP_Obstack_store(ptr %obj, ptr %val) {
+define void @SKIP_Obstack_store(ptr %obj, ptr %val) alwaysinline nounwind uwtable {
   store ptr %val, ptr %obj
   ret void
 }
@@ -71,8 +60,7 @@ declare i64 @SKIP_String_cmp(ptr captures(none), ptr captures(none)) memory(argm
 declare i64 @SKIP_String_hash(ptr captures(none)) memory(argmem: read) willreturn nounwind
 declare ptr @SKIP_Float_toString(double)
 
-; Function Attrs: noinline nounwind optnone
-define i1 @SKIP_String_eq(ptr %0, ptr %1) {
+define i1 @SKIP_String_eq(ptr captures(none) %0, ptr captures(none) %1) nounwind willreturn memory(argmem: read) {
   %3 = call i64 @SKIP_String_cmp(ptr %0, ptr %1)
   %4 = icmp eq i64 %3, 0
   ret i1 %4
@@ -83,5 +71,5 @@ define i1 @SKIP_String_eq(ptr %0, ptr %1) {
 
 @_ZTIN4skip13SkipExceptionE = external constant { ptr, ptr, ptr }, align 8
 
-declare void @SKIP_saveExn(ptr)
+declare void @SKIP_saveExn(ptr) nounwind willreturn memory(write, argmem: none) nofree
 declare void @SKIP_etry(ptr, ptr)
