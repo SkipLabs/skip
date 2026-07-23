@@ -9,7 +9,8 @@ import { init as runtimeInit } from "../skipwasm-std/sk_runtime.js";
 import { init as posixInit } from "../skipwasm-std/sk_posix.js";
 import { init as skjsonInit } from "../skipwasm-json/skjson.js";
 import { init as skruntimeInit } from "./internals/skipruntime_module.js";
-import type { ServiceInstance, AnySkipService } from "@skipruntime/core";
+import type { ServiceInstance } from "@skipruntime/core";
+import type { AnySkipService } from "@skipruntime/core/internal.js";
 
 const modules: ModuleInit[] = [
   runtimeInit,

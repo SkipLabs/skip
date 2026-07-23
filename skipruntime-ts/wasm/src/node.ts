@@ -1,4 +1,5 @@
-import type { ServiceInstance, AnySkipService } from "@skipruntime/core";
+import type { ServiceInstance } from "@skipruntime/core";
+import type { AnySkipService } from "@skipruntime/core/internal.js";
 
 import { initServiceFor } from "./skipruntime_init.js";
 import { environment as createEnvironment } from "../skipwasm-std/sk_node.js";

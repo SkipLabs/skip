@@ -10,7 +10,6 @@ import type {
 } from "../../skipwasm-std/index.js";
 import type * as Internal from "@skipruntime/core/internal.js";
 import type {
-  AnySkipService,
   Reducer,
   Mapper,
   LazyCompute,
@@ -1097,11 +1096,11 @@ class LinksImpl implements Links {
 export class ServiceInstanceFactory implements Shared {
   constructor(
     private readonly init: (
-      service: AnySkipService,
+      service: Internal.AnySkipService,
     ) => Promise<ServiceInstance>,
   ) {}
 
-  initService(service: AnySkipService): Promise<ServiceInstance> {
+  initService(service: Internal.AnySkipService): Promise<ServiceInstance> {
     return this.init(service);
   }
 

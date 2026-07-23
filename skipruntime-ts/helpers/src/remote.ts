@@ -4,7 +4,6 @@ import { EventSource } from "eventsource";
 
 import type {
   AbstractEagerCollection,
-  AnySkipService,
   Context,
   EagerCollection,
   Entry,
@@ -13,6 +12,7 @@ import type {
   NamedEagerCollections,
   Resource,
 } from "@skipruntime/core";
+import type { AnySkipService } from "@skipruntime/core/internal.js";
 import { SkipError } from "@skipruntime/core";
 
 import type { Entrypoint } from "./rest.js";
