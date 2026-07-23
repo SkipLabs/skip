@@ -1,15 +1,21 @@
-FROM ubuntu:latest
+# Node comes baked into the base image. Bookworm matches the glibc floor (2.36)
+# of the debian:bookworm image that builds the released libskipruntime.so, so the
+# downloaded .so loads. Deliberately NOT `ubuntu:latest` + a nodesource apt repo:
+# that pulled Node over the network on every run and, under an ephemeral Docker
+# daemon, balloons whenever those mirrors are slow (see #1470).
+FROM node:22.13.1-bookworm-slim
 
 ARG TARGETARCH
 
-# install dependencies needed to build the node addon
+# Install only the node-gyp toolchain (g++, make, python3), CA certificates, and
+# wget -- used below and by install_runtime.sh to fetch over HTTPS. (Unlike the
+# native_addon_unreleased variant, which copies the .so from a file:// source and
+# so needs curl, these are https:// downloads, which wget handles.)
 RUN --mount=type=cache,id=apt-cache-$TARGETARCH,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lists-$TARGETARCH,target=/var/lib/apt/lists,sharing=locked \
     --mount=type=cache,target=/root/.npm,sharing=locked \
     apt-get update --quiet \
  && apt-get install --quiet --yes --no-install-recommends ca-certificates g++ make python3 wget \
- && wget --quiet --output-document=- https://deb.nodesource.com/setup_22.x | bash - \
- && apt-get install --quiet --yes --no-install-recommends nodejs \
  && npm install --global typescript
 
 # copy the test code
