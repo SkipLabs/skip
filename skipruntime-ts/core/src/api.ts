@@ -569,9 +569,9 @@ export class InputDefinition<
   K extends Json,
   V extends Json,
 > extends AbstractInputDefinition {
-  readonly initial: Entry<K, V>[];
+  readonly initial: readonly Entry<K, V>[];
 
-  constructor(initial: Entry<K, V>[] = []) {
+  constructor(initial: readonly Entry<K, V>[] = []) {
     super();
     this.initial = initial;
   }

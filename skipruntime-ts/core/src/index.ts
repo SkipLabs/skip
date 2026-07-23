@@ -153,7 +153,7 @@ export class ServiceDefinition {
       throw new Error(
         `Input definition '${name}' must be an \`InputDefinition\`.`,
       );
-    return initial;
+    return initial.slice();
   }
 
   createGraph(
