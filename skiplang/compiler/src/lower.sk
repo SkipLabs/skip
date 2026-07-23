@@ -387,6 +387,11 @@ mutable class .Lower{
     );
 
     // call wrapper for llvm.memcpy intrinsic
+    // The wrapper returns its `dest` argument (like C `memcpy`), so the call
+    // site is typed as a (non-GC) pointer rather than void; the result is
+    // unused. Matching the callee's return type lets the always-inliner inline
+    // the preamble's `SKIP_llvm_memcpy` definition even at -O0 (a void call of
+    // a ptr-returning function is left un-inlined). See #1472.
     _ = this.emitNamedCall{
       args => Array[
         mem.id,
@@ -395,7 +400,7 @@ mutable class .Lower{
         // alignment = vtableByteSize
         // volatile = false
       ],
-      typ => tVoid,
+      typ => tNonGCPointer,
       pos,
       canThrow => false,
       allocAmount => AllocNothing(),
