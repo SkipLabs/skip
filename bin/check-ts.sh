@@ -8,7 +8,13 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 REPO="$SCRIPT_DIR/.."
 
 cd "$REPO"
-DIRS=$( jq --raw-output ".workspaces[]" package.json )
+# Exclude the top-level examples/* apps: check-examples builds them in Docker
+# against the published @skipruntime/core, not the local workspace, so
+# type-checking them here against local source would impose two mutually
+# exclusive API versions on the same file whenever the two diverge.
+# skipruntime-ts/examples is unaffected (it doesn't start with "examples/")
+# and has no other type-checking coverage, so it stays included.
+DIRS=$( jq --raw-output '.workspaces[] | select(startswith("examples/") | not)' package.json )
 
 LINT=""
 if [ -z "${SKIP_LINT:-}" ]; then
