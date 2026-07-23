@@ -53,6 +53,11 @@ jobs:
           submodules: recursive
           # Full history so the compiler's own git-describe versioning is sane.
           fetch-depth: 0
+      - name: Check the token can push before building
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.BOOTSTRAP_BUMP_TOKEN }}
+        run: ./bin/check_bootstrap_token.sh
       - name: Install the skiplang build toolchain
         shell: bash
         run: sudo ./bin/apt-install.sh skiplang-build-deps
