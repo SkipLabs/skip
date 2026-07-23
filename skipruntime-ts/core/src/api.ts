@@ -658,13 +658,3 @@ export interface SkipService<
    */
   createGraph(inputCollections: Inputs, context: Context): ResourceInputs;
 }
-
-/**
- * Type-erased SkipService, for use in internal runtime code and consumers
- * that don't need specific type parameters.
- */
-export type AnySkipService = SkipService<
-  NamedInputDefinitions,
-  NamedEagerCollections,
-  NamedEagerCollections
->;
