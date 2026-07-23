@@ -8,7 +8,6 @@ import type {
   LazyCompute,
   LazyCollection,
   Values,
-  AnySkipService,
   Resource,
   Entry,
   ExternalService,
@@ -20,6 +19,7 @@ import type {
   Reducer,
   ChangeManager,
 } from "@skipruntime/core";
+import type { AnySkipService } from "@skipruntime/core/internal.js";
 import { LoadStatus, InputDefinition } from "@skipruntime/core";
 import { Count, Sum } from "@skipruntime/helpers";
 
