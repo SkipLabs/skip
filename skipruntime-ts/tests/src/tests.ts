@@ -1266,6 +1266,46 @@ export function initTests(
   const it = (title: string, fn?: AsyncFunc) =>
     mit(`${title}[${category}]`, fn);
 
+  it("testLegacyInitialDataServiceRejected", async () => {
+    const legacyService = {
+      initialData: { input: [] },
+      resources: {},
+      createGraph: (inputCollections: NamedEagerCollections) =>
+        inputCollections,
+    } as unknown as AnySkipService;
+    try {
+      const service = await initService(legacyService);
+      await service.close();
+      throw new Error("Error was not thrown");
+    } catch (e: unknown) {
+      expect(e).toBeA(Error);
+      expect((e as Error).message).toMatchRegex(
+        new RegExp(/`SkipService.initialData` has been replaced by `inputs`/),
+      );
+    }
+  });
+
+  it("testNonInputDefinitionInputRejected", async () => {
+    const invalidService: AnySkipService = {
+      // Type-checks: the brand field is structural, but only `InputDefinition`
+      // carries the initial data the runtime needs.
+      inputs: { input: { __sk_inputDefBrand: undefined } },
+      resources: {},
+      createGraph: (inputCollections: NamedEagerCollections) =>
+        inputCollections,
+    };
+    try {
+      const service = await initService(invalidService);
+      await service.close();
+      throw new Error("Error was not thrown");
+    } catch (e: unknown) {
+      expect(e).toBeA(Error);
+      expect((e as Error).message).toMatchRegex(
+        new RegExp(/Input definition 'input' must be an `InputDefinition`/),
+      );
+    }
+  });
+
   it("testMap1", async () => {
     const service = await initService(map1Service);
     try {

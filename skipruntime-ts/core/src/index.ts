@@ -105,7 +105,19 @@ export class ServiceDefinition {
   constructor(
     private service: AnySkipService,
     private readonly externals: Map<string, ExternalService> = new Map(),
-  ) {}
+  ) {
+    // Untyped (plain JavaScript) consumers get no compile-time check that the
+    // service has the required shape; fail fast with an actionable message
+    // instead of a TypeError from deep inside service initialization.
+    const inputs: unknown = service.inputs;
+    if (typeof inputs !== "object" || inputs === null) {
+      throw new Error(
+        "initialData" in service
+          ? "`SkipService.initialData` has been replaced by `inputs`: define each input collection as `inputs: { <name>: new InputDefinition(<initial entries>) }`."
+          : "`SkipService.inputs` must be an object associating input collection names to `InputDefinition`s.",
+      );
+    }
+  }
 
   buildResource(
     name: string,
@@ -133,7 +145,15 @@ export class ServiceDefinition {
   initialData(name: string): Entry<Json, Json>[] {
     const inputDef = this.service.inputs[name];
     if (!inputDef) throw new Error(`Input definition '${name}' not exist.`);
-    return (inputDef as InputDefinition<Json, Json>).initial;
+    // Duck-typed rather than `instanceof InputDefinition`: the service may
+    // have been built against another copy of @skipruntime/core than the one
+    // running the service, in which case `instanceof` would spuriously fail.
+    const initial = (inputDef as InputDefinition<Json, Json>).initial;
+    if (!Array.isArray(initial))
+      throw new Error(
+        `Input definition '${name}' must be an \`InputDefinition\`.`,
+      );
+    return initial;
   }
 
   createGraph(
