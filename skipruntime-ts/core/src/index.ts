@@ -139,7 +139,7 @@ export class ServiceDefinition {
   }
 
   resources(): string[] {
-    return Object.keys(this.service.resources as object);
+    return Object.keys(this.service.resources);
   }
 
   initialData(name: string): Entry<Json, Json>[] {
