@@ -286,8 +286,8 @@ fun helper(): Int { 42 }
 ```
 
 This matters because several annotations are load-bearing for correctness — a
-typo in `@debug` silently restores CSE, and a missing `@may_alloc` is a silent
-wrong-code risk (see below).
+typo in `@debug` silently restores CSE, quietly reintroducing exactly the merge
+of side-effecting calls it exists to prevent.
 
 The openness is deliberate, though: the compiler indexes every function by the
 annotations it carries, and `#forEachFunction (@foo, ...)` enumerates them. That
@@ -414,7 +414,7 @@ it means the body you see is not the code that runs.
 
 | Annotation | Effect | Default if absent |
 | --- | --- | --- |
-| `@may_alloc` | The function may allocate without bound. | **Allocates nothing** |
+| `@no_alloc` | The function allocates nothing. | **May allocate without bound** |
 | `@no_throw` | The function cannot throw. | May throw |
 | `@no_return` | The function never returns. | Returns |
 
@@ -425,10 +425,25 @@ prelude contains dead examples of exactly this: `print_string` carries `@no_thro
 and `skipExit` carries `@no_return`, but both have bodies, so both annotations do
 nothing.
 
-`@no_throw` and `@no_return` default to the safe answer when absent.
-**`@may_alloc` does not.** A native function without it is assumed to allocate
-nothing, so forgetting it on an allocating runtime function is a silent
-wrong-code risk with no diagnostic.
+All three **default to the safe answer** when absent: a native with no
+`@no_alloc` is assumed to allocate without bound, one with no `@no_throw` is
+assumed to throw, and one with no `@no_return` is assumed to return. So the cost
+of forgetting one — or of a typo the compiler does not validate — is a missed
+optimization, never wrong code.
+
+The optimizer consumes the value: `@no_alloc`'s `AllocNothing` is what lets a
+caller skip the GC safepoint it would otherwise insert after the call
+(`gc.sk`'s `shouldGC`, fed via `calleeAllocAmount`/`instrAllocAmount`), so it must
+only go on a function that genuinely does not grow the obstack on the path that
+returns to its caller — a `@no_alloc` on an allocating function is a
+memory-safety miscompile. Allocating *only* on an error path that throws or
+aborts (rather than returning) does not disqualify it, since that path never
+returns to the caller.
+
+`@no_alloc` used to be spelled the other way round — `@may_alloc`, defaulting to
+"allocates nothing" — which put the *unsafe* answer on the forgotten annotation.
+It was inverted so that the failure mode of omitting it is a lost optimization
+rather than a silent wrong-code risk.
 
 ### Exports
 
