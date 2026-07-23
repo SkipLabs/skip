@@ -6,11 +6,36 @@ default_steps=(skiplang-build-deps skipruntime-deps)
 LLVM_VERSION=20
 PRIORITY=101
 
+# apt-get update fails transiently in two distinct ways during these image
+# builds, and they need different remedies:
+#
+#  - A dropped connection (common on the QEMU arm64 builds, which pull from
+#    ports.ubuntu.com). Handled by Acquire::Retries below, which re-fetches
+#    immediately.
+#  - A mirror caught mid-sync, which serves a Packages index whose size no
+#    longer matches the Release file it already sent ("File has unexpected size
+#    ... Mirror sync in progress?"). An immediate re-fetch just hits the same
+#    inconsistent snapshot, so Acquire::Retries does not help; the mirror needs
+#    a moment to finish. Retry at the script level with a growing delay.
+apt_update() {
+    local attempt=1 max=5 delay
+    while ! apt-get update; do
+        if [ "$attempt" -ge "$max" ]; then
+            echo "apt-get update: giving up after $max attempts" >&2
+            return 1
+        fi
+        delay=$((attempt * 15))
+        echo "apt-get update failed (attempt $attempt/$max); retrying in ${delay}s" >&2
+        sleep "$delay"
+        attempt=$((attempt + 1))
+    done
+}
+
 # Install ca-certificates and wget if not already present.
 # Called by steps that need to fetch GPG keys from HTTPS URLs.
 _ensure_base_deps() {
     if ! command -v wget &>/dev/null || ! dpkg -s ca-certificates &>/dev/null; then
-        apt-get update
+        apt_update
         apt-get install -q -y --no-install-recommends ca-certificates wget
     fi
     mkdir -p /etc/apt/keyrings
@@ -49,7 +74,7 @@ for step in "${steps[@]}"; do
             _ensure_base_deps
             wget -qO /etc/apt/keyrings/llvm.asc https://apt.llvm.org/llvm-snapshot.gpg.key
             echo "deb [signed-by=/etc/apt/keyrings/llvm.asc] http://apt.llvm.org/noble/ llvm-toolchain-noble-$LLVM_VERSION main" >> /etc/apt/sources.list.d/llvm.list
-            apt-get update
+            apt_update
             apt-get install -q -y --no-install-recommends automake clang-$LLVM_VERSION file gawk git lld-$LLVM_VERSION llvm-$LLVM_VERSION llvm-$LLVM_VERSION-dev make openssh-client
             # gzip and tar ship in the ubuntu base with fixable CVEs; the base
             # image lags the Noble security updates, so pull the patched
@@ -70,7 +95,7 @@ for step in "${steps[@]}"; do
             _ensure_base_deps
             wget -qO /etc/apt/keyrings/nodesource.asc https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key
             echo "deb [signed-by=/etc/apt/keyrings/nodesource.asc] https://deb.nodesource.com/node_22.x nodistro main" >> /etc/apt/sources.list.d/nodejs.list
-            apt-get update
+            apt_update
             apt-get install -q -y --no-install-recommends nodejs jq
             # NodeSource's nodejs bundles npm 10.9.8, whose own bundled
             # dependencies (tar, brace-expansion, sigstore, ...) carry CVEs
@@ -91,7 +116,7 @@ for step in "${steps[@]}"; do
             wget -qO /etc/apt/keyrings/docker.asc https://download.docker.com/linux/ubuntu/gpg
             # shellcheck disable=SC1091  # /etc/os-release is provided by the base image, not this repo
             echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" >> /etc/apt/sources.list.d/docker.list
-            apt-get update
+            apt_update
             apt-get install -q -y --no-install-recommends clang-format-$LLVM_VERSION docker-ce-cli docker-buildx-plugin parallel pip shellcheck
             # Version from requirements-dev.txt (check repo root, then /tmp for docker builds)
             BLACK_VERSION=$(grep '^black==' requirements-dev.txt /tmp/requirements-dev.txt 2>/dev/null | head -1 | cut -d'=' -f3)
