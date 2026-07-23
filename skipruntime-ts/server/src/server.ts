@@ -4,7 +4,12 @@
  * @packageDocumentation
  */
 
-import type { AnySkipService } from "@skipruntime/core";
+import type {
+  NamedEagerCollections,
+  NamedInputDefinitions,
+  SkipService,
+} from "@skipruntime/core";
+import type { AnySkipService } from "@skipruntime/core/internal.js";
 import {
   registerControlServiceRoutes,
   registerStreamingServiceRoutes,
@@ -92,6 +97,7 @@ export type SkipServer = {
  *   Check that the Skip service is running normally.
  *   Returns HTTP 200 if the service is healthy, for use in monitoring, deployments, and the like.
  *
+ * @typeParam InputDefs - Named input definitions used to seed the service's input collections.
  * @typeParam Inputs - Named collections from which the service computes.
  * @typeParam ResourceInputs - Named collections provided to resource computations.
  * @param service - The SkipService definition to run.
@@ -102,8 +108,12 @@ export type SkipServer = {
  * @param options.no_cors - Disable CORS for the streaming endpoint.
  * @returns Object to manage the running server.
  */
-export async function runService(
-  service: AnySkipService,
+export async function runService<
+  InputDefs extends NamedInputDefinitions,
+  Inputs extends NamedEagerCollections,
+  ResourceInputs extends NamedEagerCollections,
+>(
+  service: SkipService<InputDefs, Inputs, ResourceInputs>,
   options: {
     streaming_port: number;
     control_port: number;
@@ -136,10 +146,16 @@ export async function runService(
       throw e;
     }
   }
-  const instance = await runtime.initService(service).catch((e: unknown) => {
-    console.error("Service could not be initialized; reason: ", e);
-    throw e;
-  });
+  // Erase to AnySkipService at the runtime FFI boundary: initService crosses
+  // into untyped WASM/native territory where per-service type parameters
+  // can't be preserved. This is the one deliberate, internal erasure point --
+  // callers of runService itself never need to touch AnySkipService.
+  const instance = await runtime
+    .initService(service as unknown as AnySkipService)
+    .catch((e: unknown) => {
+      console.error("Service could not be initialized; reason: ", e);
+      throw e;
+    });
 
   const controlApp = express();
   controlApp.use(logger_middleware);
