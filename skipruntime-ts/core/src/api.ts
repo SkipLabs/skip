@@ -26,7 +26,7 @@ export type { Nullable };
  * erases the type parameters so that collections with different key/value
  * types can be stored together in a `NamedEagerCollections` map.
  *
- * Uses a branded field to ensure nominal (not structural) typing.
+ * Uses a brand field to keep the type-erased bases distinct from each other and from unrelated types.
  */
 export abstract class AbstractEagerCollection {
   readonly __sk_collectionBrand: undefined;
@@ -35,7 +35,7 @@ export abstract class AbstractEagerCollection {
 /**
  * Type-erased base for lazy collections, enabling sound typing in collection maps.
  *
- * Uses a branded field to ensure nominal (not structural) typing.
+ * Uses a brand field to keep the type-erased bases distinct from each other and from unrelated types.
  */
 export abstract class AbstractLazyCollection {
   readonly __sk_lazyCollectionBrand: undefined;
@@ -206,7 +206,7 @@ export interface EagerCollection<K extends Json, V extends Json>
    *
    * @remarks
    * The reason `map` accepts the `Mapper` class constructor and `params` separately and instantiates the class internally is to avoid the resulting `mapEntry` functions from being able to access other objects that the Skip Runtime is not aware of, and hence cannot track updates to.
-   * This is also the reason the `params` need to have type `DepSafe[]`, as this requires them to be either constant or tracked by the Skip Runtime.
+   * This is also the reason the `params` need to have type `readonly DepSafe[]`, as this requires them to be either constant or tracked by the Skip Runtime.
    * It is a **bad idea** to attempt to circumvent the spirit of the constraints this interface imposes.
    *
    * @typeParam K2 - Type of keys of the new collection.
@@ -236,7 +236,7 @@ export interface EagerCollection<K extends Json, V extends Json>
    *
    * @remarks
    * The reason `reduce` accepts the `Reducer` class constructor and `params` separately and instantiates the class internally is to avoid the resulting `add` and `remove` functions from being able to access other objects that the Skip Runtime is not aware of, and hence cannot track updates to.
-   * This is also the reason the `params` need to have type `DepSafe[]`, as this requires them to be either constant values or tracked by the Skip Runtime.
+   * This is also the reason the `params` need to have type `readonly DepSafe[]`, as this requires them to be either constant values or tracked by the Skip Runtime.
    * It is a **bad idea** to attempt to circumvent the spirit of the constraints this interface imposes.
    *
    * @typeParam Accum - Type of accumulated values.
@@ -553,7 +553,7 @@ export type InitialData<Inputs extends NamedEagerCollections> = {
 /**
  * Type-erased base for input definitions, enabling sound typing in input maps.
  *
- * Uses a branded field to ensure nominal (not structural) typing.
+ * Uses a brand field to keep the type-erased bases distinct from each other and from unrelated types.
  */
 export abstract class AbstractInputDefinition {
   readonly __sk_inputDefBrand: undefined;
@@ -592,7 +592,7 @@ export type NamedInputDefinitions = {
  * Skip services operate over data organized into _collections_, each of which has a unique string name and associates _keys_ to one or more _values_.
  * The contents of collections are computed from initial data, other collections, or reactive or non-reactive external resources.
  *
- * A Skip service's `Inputs` are collections that start populated with the `initialData`.
+ * A Skip service's `Inputs` are collections that start populated with the initial data of the corresponding `inputs` definitions.
  * The input collections is the mechanism by which a Skip service can accept writes.
  * See `runService` for the write requests of the HTTP API, and `SkipServiceBroker` for the write operations of the method-call API.
  *
@@ -626,6 +626,7 @@ export type NamedInputDefinitions = {
  * `Context.useExternalResource` accepts the name of an external service, which must be associated to an instance of the `ExternalService` interface by the `externalServices`, as well as a resource the external service provides and parameters for it, and returns an eager collection of the contents of the resource provided by the external service.
  * The resulting eager collection can then be incorporated into the reactive computation graph just like any other.
  *
+ * @typeParam InputDefs - Definitions of the service's input collections, including their initial data.
  * @typeParam Inputs - The service's input collections.
  * @typeParam ResourceInputs - Collections provided to the resource computation by the service's `createGraph`.
  */
