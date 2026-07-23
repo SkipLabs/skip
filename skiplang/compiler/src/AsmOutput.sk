@@ -3195,9 +3195,10 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
         instr,
     );
     if (zero) {
-      // call wrapper for llvm.memset. we know alignment=8, volatile=false
+      // Emit the llvm.memset intrinsic directly. The trailing `i1 false` is the
+      // (non-volatile) `isvolatile` immarg.
       asm.print(
-        "  call void @SKIP_llvm_memset(%N, i8 0, i64 %s), %D\n" %
+        "  call void @llvm.memset.p0.i64(%N, i8 0, i64 %s, i1 false), %D\n" %
           instr %
           byteSize %
           instr,
