@@ -486,6 +486,13 @@ export class EagerCollectionImpl<K extends Json, V extends Json>
   }
 
   static getName(coll: AbstractEagerCollection): string {
+    // The brand field is structural, so the type system cannot guarantee that
+    // a user-provided collection (from Resource.instantiate, createGraph, or
+    // merge) was actually created by the Skip runtime.
+    if (!(coll instanceof EagerCollectionImpl))
+      throw new Error(
+        "Expected an eager collection created by the Skip runtime.",
+      );
     return (coll as EagerCollectionImpl<Json, Json>).collection;
   }
 }
@@ -1161,9 +1168,7 @@ export class ToBinding {
       else throw new Error(`Unknown collection type ${info.type}`);
     }
     const collection = resource.instantiate(collections, new ContextImpl(this));
-    return EagerCollectionImpl.getName(
-      collection as EagerCollection<Json, Json>,
-    );
+    return EagerCollectionImpl.getName(collection);
   }
 
   SkipRuntime_deleteResource(

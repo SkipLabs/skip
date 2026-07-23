@@ -1335,6 +1335,33 @@ export function initTests(
     }
   });
 
+  it("testForeignCollectionRejected", async () => {
+    // Type-checks: the brand field is structural, but only collections
+    // created by the runtime can be merged into the computation graph.
+    const forged = {
+      __sk_collectionBrand: undefined,
+    } as unknown as EagerCollection<Json, Json>;
+    const forgingService: AnySkipService = {
+      inputs: { input: new InputDefinition() },
+      resources: {},
+      createGraph: (inputCollections: {
+        input: EagerCollection<Json, Json>;
+      }) => ({
+        output: inputCollections.input.merge(forged),
+      }),
+    };
+    try {
+      const service = await initService(forgingService);
+      await service.close();
+      throw new Error("Error was not thrown");
+    } catch (e: unknown) {
+      expect(e).toBeA(Error);
+      expect((e as Error).message).toMatchRegex(
+        new RegExp(/Expected an eager collection created by the Skip runtime/),
+      );
+    }
+  });
+
   it("testMap1", async () => {
     const service = await initService(map1Service);
     try {
