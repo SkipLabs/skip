@@ -3,7 +3,6 @@ import type {
   EagerCollection,
   Json,
   Resource,
-  AnySkipService,
 } from "@skipruntime/core";
 import { InputDefinition } from "@skipruntime/core";
 import { runService } from "@skipruntime/server";
@@ -52,7 +51,7 @@ class DeparturesResource implements Resource<ResourceInputs> {
   }
 }
 
-const service: AnySkipService = {
+const service = {
   inputs: { config: new InputDefinition() },
   resources: {
     departures: DeparturesResource,
@@ -68,7 +67,7 @@ const service: AnySkipService = {
       },
     }),
   },
-  createGraph: (ic) => ic,
+  createGraph: (ic: ResourceInputs) => ic,
 };
 
 const server = await runService(service, {
