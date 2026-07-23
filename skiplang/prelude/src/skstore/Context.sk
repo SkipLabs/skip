@@ -92,9 +92,11 @@ class DirSub(
 // tracked callers (Path::iid, skjson, the back end's type ids) compiling.
 @allow_tracked_call
 @cpp_extern("SKIP_genSym")
+@no_alloc
 untracked native fun genSym(Int): Int;
 
 @intrinsic
+@no_alloc
 native fun const_typed_symbol<T>(): Int;
 
 /*****************************************************************************/
@@ -1425,6 +1427,7 @@ mutable class Mutex(Int, Int, Int, Int, Int)
 mutable class Condition(Int, Int, Int, Int, Int, Int)
 
 @cpp_extern("SKIP_mutex_init")
+@no_alloc
 native fun mutexInit(mutable Mutex): void;
 
 fun mutexCreate(): Mutex {
@@ -1435,13 +1438,16 @@ fun mutexCreate(): Mutex {
 
 @debug
 @cpp_extern("SKIP_mutex_lock")
+@no_alloc
 native fun mutexLock(mutable Mutex): void;
 
 @debug
 @cpp_extern("SKIP_mutex_unlock")
+@no_alloc
 native fun mutexUnlock(mutable Mutex): void;
 
 @cpp_extern("SKIP_cond_init")
+@no_alloc
 native fun condInit(mutable Condition): void;
 
 fun condCreate(): Condition {
@@ -1452,22 +1458,28 @@ fun condCreate(): Condition {
 
 @debug
 @cpp_extern("SKIP_cond_timedwait")
+@no_alloc
 native fun condTimedWait(mutable Condition, mutable Mutex, UInt32): Int32;
 
 @debug
 @cpp_extern("SKIP_cond_broadcast")
+@no_alloc
 native fun condBroadcast(mutable Condition): Int32;
 
 @cpp_extern("SKIP_freeze_lock")
+@no_alloc
 native fun freezeLock(lock: mutable Mutex): Mutex;
 
 @cpp_extern("SKIP_unfreeze_lock")
+@no_alloc
 native fun unfreezeLock(lock: Mutex): mutable Mutex;
 
 @cpp_extern("SKIP_freeze_cond")
+@no_alloc
 native fun freezeCond(cond: mutable Condition): Condition;
 
 @cpp_extern("SKIP_unfreeze_cond")
+@no_alloc
 native fun unfreezeCond(cond: Condition): mutable Condition;
 
 /*****************************************************************************/
@@ -1557,6 +1569,7 @@ private native fun newObstack(): Obstack;
 
 @debug
 @cpp_extern("SKIP_destroy_Obstack")
+@no_alloc
 private native fun destroyObstack(Obstack): void;
 
 @debug
@@ -1574,10 +1587,12 @@ private native fun copyValueToObstack<T>(Page, List<T>): List<T>;
 
 @debug
 @cpp_extern("SKIP_switch_to_parent")
+@no_alloc
 private native fun switchToParent(Obstack): Page;
 
 @debug
 @cpp_extern("SKIP_restore_from_parent")
+@no_alloc
 private native fun restoreFromParent(Obstack, Page): void;
 
 @debug
@@ -1606,30 +1621,37 @@ private native fun gContextSyncNoLock(
 
 @debug
 @cpp_extern("SKIP_global_unlock")
+@no_alloc
 private native fun gGlobalUnlock(): void;
 
 @debug
 @cpp_extern("SKIP_global_lock")
+@no_alloc
 private native fun gGlobalLock(): void;
 
 @debug
 @cpp_extern("SKIP_global_has_lock")
+@no_alloc
 private native fun gGlobalHasLock(): UInt32;
 
 @debug
 @cpp_extern("SKIP_contexts_init")
+@no_alloc
 private native fun gContextsInit(Contexts): void;
 
 @debug
 @cpp_extern("SKIP_contexts_get")
+@no_alloc
 native fun gUnsafeContextsGet(): Contexts;
 
 @debug
 @cpp_extern("SKIP_contexts_get_unsafe")
+@no_alloc
 native fun gContextsGetNoLock(): Contexts;
 
 @debug
 @cpp_extern("SKIP_contexts_replace_unsafe")
+@no_alloc
 native fun gContextsReplaceNoLock(Contexts, UInt32): void;
 
 class InvalidSync() extends Exception {
@@ -1646,22 +1668,27 @@ fun throwInvalidSynchronization(): void {
 
 @debug
 @cpp_extern("SKIP_has_context")
+@no_alloc
 native fun gHasForkContext(fork: ?String): UInt32;
 
 @debug
 @cpp_extern("SKIP_unsafe_free")
+@no_alloc
 native fun gUnsafeFree(Contexts): void;
 
 @debug
 @cpp_extern("SKIP_unsafe_contexts_incr_ref_count")
+@no_alloc
 native fun gUnsafeIncrRefCount(Contexts): void;
 
 @debug
 @cpp_extern("SKIP_should_GC")
+@no_alloc
 native fun shouldGC(Obstack): UInt32;
 
 @debug
 @cpp_extern("SKIP_print_persistent_size")
+@no_alloc
 native fun printPersistentSize(): void;
 
 fun gContextInit(context: Context, fork: ?String = None()): void {

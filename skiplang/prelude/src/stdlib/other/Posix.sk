@@ -2,6 +2,7 @@ module Posix;
 
 @allow_tracked_call
 @cpp_extern("SKIP_posix_open")
+@no_alloc
 untracked native fun internalOpen(path: String, oflag: Int, mode: Int): Int;
 
 fun open(path: String, oflag: Int, mode: Int = 0): Int {
@@ -10,10 +11,12 @@ fun open(path: String, oflag: Int, mode: Int = 0): Int {
 
 @allow_tracked_call
 @cpp_extern("SKIP_posix_close")
+@no_alloc
 untracked native fun close(fd: Int): void;
 
 @allow_tracked_call
 @cpp_extern("SKIP_posix_write")
+@no_alloc
 untracked native fun write(
   fd: Int,
   buf: readonly Unsafe.Ptr<UInt8>,
@@ -22,6 +25,7 @@ untracked native fun write(
 
 @allow_tracked_call
 @cpp_extern("SKIP_posix_read")
+@no_alloc
 untracked native fun read(
   fd: Int,
   buf: mutable Unsafe.Ptr<UInt8>,
@@ -30,6 +34,7 @@ untracked native fun read(
 
 @allow_tracked_call
 @cpp_extern("SKIP_posix_lseek")
+@no_alloc
 untracked native fun internalLseek(fd: Int, offset: Int, whence: Int): Int;
 
 fun lseek(fd: Int, offset: Int, whence: SeekWhence): Int {
@@ -42,13 +47,16 @@ untracked native fun pipe(): Pipe;
 
 @allow_tracked_call
 @cpp_extern("SKIP_posix_dup")
+@no_alloc
 untracked native fun dup(fd: Int): Int;
 
 @allow_tracked_call
 @cpp_extern("SKIP_posix_dup2")
+@no_alloc
 untracked native fun dup2(oldfd: Int, newfd: Int): void;
 
 @cpp_extern("SKIP_posix_open_flags")
+@no_alloc
 native fun open_flags(
   read: Int,
   write: Int,
@@ -59,28 +67,37 @@ native fun open_flags(
 ): Int;
 
 @cpp_extern("SKIP_posix_wifexited")
+@no_alloc
 native fun wifexited(stat_loc: Int): Bool;
 @cpp_extern("SKIP_posix_wifsignaled")
+@no_alloc
 native fun wifsignaled(stat_loc: Int): Bool;
 @cpp_extern("SKIP_posix_wifstopped")
+@no_alloc
 native fun wifstopped(stat_loc: Int): Bool;
 @cpp_extern("SKIP_posix_wexitstatus")
+@no_alloc
 native fun wexitstatus(stat_loc: Int): Int;
 @cpp_extern("SKIP_posix_wtermsig")
+@no_alloc
 native fun wtermsig(stat_loc: Int): Int;
 @cpp_extern("SKIP_posix_wstopsig")
+@no_alloc
 native fun wstopsig(stat_loc: Int): Int;
 
 @allow_tracked_call
 @cpp_extern("SKIP_posix_kill")
+@no_alloc
 untracked native fun kill(pid: Int, sig: Int): void;
 
 @allow_tracked_call
 @cpp_extern("SKIP_posix_waitpid")
+@no_alloc
 untracked native fun waitpid(pid: Int, nohang: Bool = false): Int;
 
 @allow_tracked_call
 @cpp_extern("SKIP_posix_execvp")
+@no_alloc
 untracked native fun internalExecvp(args: Array<String>): void;
 
 fun execvp<T>(args: Array<String>): T {
@@ -90,10 +107,12 @@ fun execvp<T>(args: Array<String>): T {
 
 @allow_tracked_call
 @cpp_extern("SKIP_posix_poll")
+@no_alloc
 untracked native fun poll(pollfds: mutable Array<mutable Pollfd>): Int;
 
 @allow_tracked_call
 @cpp_extern("SKIP_posix_isatty")
+@no_alloc
 untracked native fun internalIsatty(fd: Int): Int;
 fun isatty(fd: Int): Bool {
   internalIsatty(fd) != 0
@@ -101,6 +120,7 @@ fun isatty(fd: Int): Bool {
 
 @allow_tracked_call
 @cpp_extern("SKIP_posix_mkstemp")
+@no_alloc
 untracked native fun internalMkstemp(template: String): Int;
 
 fun mkstemp(template: String): mutable IO.File {
@@ -445,20 +465,25 @@ mutable value class Pollfd(fd: Int32, events: Int16, revents: Int16) {
 
 mutable native class SpawnFileActions {
   @cpp_extern("SKIP_posix_spawn_file_actions_init")
+  @no_alloc
   native static fun init(): mutable SpawnFileActions;
 
   @cpp_extern("SKIP_posix_spawn_file_actions_destroy")
+  @no_alloc
   mutable native fun destroy(): void;
 
   @cpp_extern("SKIP_posix_spawn_file_actions_adddup2")
+  @no_alloc
   mutable native fun dup2(oldfd: Int, newfd: Int): void;
 
   @cpp_extern("SKIP_posix_spawn_file_actions_addclose")
+  @no_alloc
   mutable native fun close(fd: Int): void;
 }
 
 @allow_tracked_call
 @cpp_extern("SKIP_posix_spawnp")
+@no_alloc
 untracked native fun internalSpawnp(
   argv: Array<String>,
   env: Array<String>,

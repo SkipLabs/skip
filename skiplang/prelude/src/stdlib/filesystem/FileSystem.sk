@@ -10,7 +10,6 @@
 // TODO: What module should this go in?
 @allow_tracked_call
 @cpp_extern("SKIP_getcwd")
-@may_alloc
 untracked native fun getcwd(): String;
 
 base class FileKind uses Orderable {
@@ -69,16 +68,19 @@ fun writeTextFile(filename: String, contents: String): void {
 
 @allow_tracked_call
 @cpp_extern("SKIP_get_mtime")
+@no_alloc
 untracked native fun getLastModificationTime(fileName: String): Int;
 
 @allow_tracked_call
 @synonym("appendFile")
 @synonym("appendFileSync")
 @cpp_extern
+@no_alloc
 untracked native fun appendTextFile(filename: String, contents: String): void;
 
 @allow_tracked_call
 @cpp_extern("SKIP_check_if_file_exists")
+@no_alloc
 untracked native fun exists(filename: String): Bool;
 
 fun isDirectory(filename: String): Bool {
@@ -154,6 +156,7 @@ fun stat(path: String): ?FileStat {
 
 @allow_tracked_call
 @cpp_extern("SKIP_file_stat")
+@no_alloc
 private untracked native fun fillStat(
   result: mutable FileStat,
   path: String,
@@ -167,14 +170,17 @@ untracked native fun .open_file(String): String;
 
 @allow_tracked_call
 @cpp_extern
+@no_alloc
 untracked native fun .string_to_file(s: String, file: String): void;
 
 @allow_tracked_call
 @cpp_extern("SKIP_is_directory")
+@no_alloc
 private untracked native fun is_directory(filename: String): Bool;
 
 @allow_tracked_call
 @cpp_extern("SKIP_opendir")
+@no_alloc
 private untracked native fun opendir(dirname: String): Int;
 
 @allow_tracked_call
@@ -183,6 +189,7 @@ private untracked native fun readdir(dirhandle: Int): String;
 
 @allow_tracked_call
 @cpp_extern("SKIP_closedir")
+@no_alloc
 private untracked native fun closedir(dirhandle: Int): void;
 
 @allow_tracked_call

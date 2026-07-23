@@ -50,9 +50,11 @@ fun temp_dir(): String {
 
 @allow_tracked_call
 @cpp_extern("SKIP_chdir")
+@no_alloc
 untracked native fun set_current_dir(path: String): void;
 
 @cpp_extern("SKIP_getArgc")
+@no_alloc
 native fun internalGetArgc(): Int;
 
 @cpp_extern("SKIP_getArgN")
@@ -67,6 +69,7 @@ fun args(): mutable Iterator<String> {
 
 @allow_tracked_call
 @cpp_extern("SKIP_get_envc")
+@no_alloc
 untracked native fun internalGetEnvc(): Int;
 
 @allow_tracked_call
@@ -109,10 +112,12 @@ fun var(name: String): String {
 
 @allow_tracked_call
 @cpp_extern("SKIP_setenv")
+@no_alloc
 untracked native fun set_var(name: String, value: String): void;
 
 @allow_tracked_call
 @cpp_extern("SKIP_unsetenv")
+@no_alloc
 untracked native fun remove_var(name: String): void;
 
 module end;
