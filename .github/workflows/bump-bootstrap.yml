@@ -60,7 +60,19 @@ jobs:
         run: ./bin/check_bootstrap_token.sh
       - name: Install the skiplang build toolchain
         shell: bash
-        run: sudo ./bin/apt-install.sh skiplang-build-deps
+        run: |
+          # The GitHub runner image ships clang with its own update-alternatives
+          # entries (clang++ and friends registered as MASTER alternatives), which
+          # collide with the master+slave layout apt-install.sh installs -- it
+          # aborts with "alternative clang++ can't be slave of clang: it is a
+          # master alternative". Clear the names it manages first so the install
+          # is clean. This is runner-only: the Docker image builds run the same
+          # script from a base image that has none of these.
+          for alt in clang clang++ clang-format llc llvm-ar llvm-config \
+                     llvm-link opt wasm-ld; do
+            sudo update-alternatives --remove-all "$alt" 2>/dev/null || true
+          done
+          sudo ./bin/apt-install.sh skiplang-build-deps
       - name: Rebuild and verify the bootstrap
         shell: bash
         run: ./bin/bump_bootstrap.sh
