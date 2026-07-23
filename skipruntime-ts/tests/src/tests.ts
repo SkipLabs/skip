@@ -1306,6 +1306,28 @@ export function initTests(
     }
   });
 
+  it("testForeignCollectionRejected", async () => {
+    const forgingService: AnySkipService = {
+      inputs: {},
+      resources: {},
+      createGraph: () => ({
+        // Type-checks: the brand field is structural, but only collections
+        // created by the runtime can be part of the computation graph.
+        output: { __sk_collectionBrand: undefined },
+      }),
+    };
+    try {
+      const service = await initService(forgingService);
+      await service.close();
+      throw new Error("Error was not thrown");
+    } catch (e: unknown) {
+      expect(e).toBeA(Error);
+      expect((e as Error).message).toMatchRegex(
+        new RegExp(/Expected an eager collection created by the Skip runtime/),
+      );
+    }
+  });
+
   it("testMap1", async () => {
     const service = await initService(map1Service);
     try {

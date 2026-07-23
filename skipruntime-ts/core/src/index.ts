@@ -479,10 +479,15 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     return new EagerCollectionImpl<K2, V2>(collection, this.refs);
   }
 
-  static getName<K extends Json, V extends Json>(
-    coll: EagerCollection<K, V>,
-  ): string {
-    return (coll as EagerCollectionImpl<K, V>).collection;
+  static getName(coll: AbstractEagerCollection): string {
+    // The brand field is structural, so the type system cannot guarantee that
+    // a user-provided collection (from Resource.instantiate, createGraph, or
+    // merge) was actually created by the Skip runtime.
+    if (!(coll instanceof EagerCollectionImpl))
+      throw new Error(
+        "Expected an eager collection created by the Skip runtime.",
+      );
+    return (coll as EagerCollectionImpl<Json, Json>).collection;
   }
 }
 
@@ -1151,9 +1156,7 @@ export class ToBinding {
       collections[key] = new EagerCollectionImpl<Json, Json>(name, this);
     }
     const collection = resource.instantiate(collections, new ContextImpl(this));
-    return EagerCollectionImpl.getName(
-      collection as EagerCollection<Json, Json>,
-    );
+    return EagerCollectionImpl.getName(collection);
   }
 
   SkipRuntime_deleteResource(
@@ -1180,9 +1183,7 @@ export class ToBinding {
     const result = service.createGraph(collections, new ContextImpl(this));
     const collectionsNames: { [name: string]: string } = {};
     for (const [name, collection] of Object.entries(result)) {
-      collectionsNames[name] = EagerCollectionImpl.getName(
-        collection as EagerCollection<Json, Json>,
-      );
+      collectionsNames[name] = EagerCollectionImpl.getName(collection);
     }
     return skjson.exportJSON(collectionsNames);
   }
